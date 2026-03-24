@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(pip3 install:*)",
+      "Bash(python3 -c \":*)",
+      "Read(//c/Users/Ancona/AppData/Local/Programs/**)",
+      "Bash(ls /c/Python*)",
+      "Bash(where python:*)",
+      "Bash(node:*)",
+      "Bash(cd /tmp)",
+      "Bash(cp \"/c/Users/Ancona/Desktop/Receta.docx\" .)",
+      "Bash(unzip -o Receta.docx word/document.xml -d receta_extracted/)",
+      "Bash(sed 's/<[^>]*>//g')",
+      "Bash(npm -v)",
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-turbopack)",
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-turbopack --yes)"
+    ]
+  }
+}
