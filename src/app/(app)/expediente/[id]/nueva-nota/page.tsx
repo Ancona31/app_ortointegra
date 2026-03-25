@@ -9,6 +9,7 @@ import { ArrowLeft, Wand2, Save, Loader2, RotateCcw, Printer, Eye, Pencil } from
 import Link from 'next/link'
 import { PRINT_CSS, markdownToHtml } from '@/lib/printStyles'
 import ReactMarkdown from 'react-markdown'
+import ConsultaRapida from '@/components/ConsultaRapida'
 
 export default function NuevaNotaPage() {
   const { id } = useParams<{ id: string }>()
@@ -227,6 +228,9 @@ export default function NuevaNotaPage() {
           </div>
         </div>
       </div>
+
+      {/* Consulta rápida a Claude */}
+      <ConsultaRapida />
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
