@@ -140,14 +140,14 @@ function ExpedientePacienteContent() {
           className="flex flex-col items-center gap-2 p-4 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors text-center"
         >
           <FlaskConical size={20} />
-          <span className="text-xs font-medium">Nuevo laboratorio</span>
+          <span className="text-xs font-medium">Agregar resultados de laboratorio</span>
         </Link>
         <Link
           href={`/expediente/${id}/documentos`}
           className="flex flex-col items-center gap-2 p-4 bg-violet-600 text-white rounded-xl hover:bg-violet-700 transition-colors text-center"
         >
           <FileText size={20} />
-          <span className="text-xs font-medium">Documentos</span>
+          <span className="text-xs font-medium">Solicitudes</span>
         </Link>
       </div>
 
