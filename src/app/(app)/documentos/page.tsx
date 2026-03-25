@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { FileText, Pill, FlaskConical, ScanLine, ClipboardList } from 'lucide-react'
 import RecetaForm from '@/components/documentos/RecetaForm'
@@ -17,7 +17,7 @@ const TIPOS = [
 
 type TipoDoc = typeof TIPOS[number]['key']
 
-export default function DocumentosPage() {
+function DocumentosContent() {
   const searchParams = useSearchParams()
   const [tipo, setTipo] = useState<TipoDoc | null>(null)
 
@@ -61,5 +61,13 @@ export default function DocumentosPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function DocumentosPage() {
+  return (
+    <Suspense>
+      <DocumentosContent />
+    </Suspense>
   )
 }
