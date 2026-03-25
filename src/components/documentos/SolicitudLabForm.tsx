@@ -113,8 +113,8 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
       </div>
 
       {/* Lista manual */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 rounded-t-xl flex items-center justify-between">
           <h2 className="font-semibold text-slate-700 text-sm">Estudios solicitados</h2>
           <button onClick={addEstudio} className="flex items-center gap-1 text-xs text-[#1e5fa8] hover:text-[#1a3a5c] font-medium"><Plus size={14} /> Agregar</button>
         </div>
