@@ -18,10 +18,15 @@ const SUPLEMENTOS_DISPONIBLES = [
 
 type SupSelec = { nombre: string; dosis: string; justificacion: string }
 
-export default function PlanSuplementacionForm() {
-  const [paciente, setPaciente] = useState('')
+interface Props {
+  pacienteInicial?: string
+  diagnosticoInicial?: string
+}
+
+export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosticoInicial = '' }: Props) {
+  const [paciente, setPaciente] = useState(pacienteInicial)
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
-  const [diagnostico, setDiagnostico] = useState('')
+  const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
   const [seleccionados, setSeleccionados] = useState<SupSelec[]>([])
   const [notas, setNotas] = useState('')
   const [seguimiento, setSeguimiento] = useState('')
@@ -48,6 +53,7 @@ export default function PlanSuplementacionForm() {
         <p class="sup-dosis">📋 Dosis: ${s.dosis}</p>
         ${s.justificacion ? `<p class="sup-just">Justificación: ${s.justificacion}</p>` : ''}
       </div>`).join('')
+    const logoUrl = `${window.location.origin}/logo.png`
 
     ventana.document.write(`
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Plan de Suplementación</title>
@@ -74,7 +80,7 @@ export default function PlanSuplementacionForm() {
   .firma { text-align:center; border-top:1px solid #333; padding-top:6px; min-width:200px; font-size:9pt; color:#555; }
 </style></head><body>
   <div class="header">
-    <img class="logo" src="/logo.png" onerror="this.style.display='none'" />
+    <img class="logo" src="${logoUrl}" onerror="this.style.display='none'" />
     <div>
       <div class="doctor-name">Dr. Angel M. Ancona Pérez</div>
       <div class="especialidad">Cirugía de Columna Vertebral · Traumatología y Ortopedia</div>

@@ -13,10 +13,15 @@ const ESTUDIOS_PRESET = [
   'Hierro Sérico', 'Calcio Total', 'Fósforo', 'Magnesio',
 ]
 
-export default function SolicitudLabForm() {
-  const [paciente, setPaciente] = useState('')
+interface Props {
+  pacienteInicial?: string
+  diagnosticoInicial?: string
+}
+
+export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInicial = '' }: Props) {
+  const [paciente, setPaciente] = useState(pacienteInicial)
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
-  const [diagnostico, setDiagnostico] = useState('')
+  const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
   const [estudios, setEstudios] = useState<string[]>([''])
   const [notas, setNotas] = useState('')
 
@@ -33,6 +38,7 @@ export default function SolicitudLabForm() {
     if (!ventana) return
     const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
     const listaEstudios = estudios.filter(Boolean).map(e => `<li>${e}</li>`).join('')
+    const logoUrl = `${window.location.origin}/logo.png`
 
     ventana.document.write(`
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Solicitud Lab</title>
@@ -57,7 +63,7 @@ export default function SolicitudLabForm() {
   .firma { text-align:center; border-top:1px solid #333; padding-top:6px; min-width:200px; font-size:9pt; color:#555; }
 </style></head><body>
   <div class="header">
-    <img class="logo" src="/logo.png" onerror="this.style.display='none'" />
+    <img class="logo" src="${logoUrl}" onerror="this.style.display='none'" />
     <div>
       <div class="doctor-name">Dr. Angel M. Ancona Pérez</div>
       <div class="especialidad">Cirugía de Columna Vertebral · Traumatología y Ortopedia</div>

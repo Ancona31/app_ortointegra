@@ -6,9 +6,14 @@ import { Medicamento } from '@/types'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
-export default function RecetaForm() {
-  const [paciente, setPaciente] = useState('')
-  const [diagnostico, setDiagnostico] = useState('')
+interface Props {
+  pacienteInicial?: string
+  diagnosticoInicial?: string
+}
+
+export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = '' }: Props) {
+  const [paciente, setPaciente] = useState(pacienteInicial)
+  const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
   const [medicamentos, setMedicamentos] = useState<Medicamento[]>([
     { nombre_comercial: '', presentacion: '', dosis: '', principio_activo: '', indicacion: '' }
@@ -38,6 +43,8 @@ export default function RecetaForm() {
         <p class="med-indicacion">${m.indicacion}</p>
       </div>
     `).join('')
+
+    const logoUrl = `${window.location.origin}/logo.png`
 
     ventana.document.write(`
 <!DOCTYPE html>
@@ -82,7 +89,7 @@ export default function RecetaForm() {
 </head>
 <body>
   <div class="header">
-    <img class="logo" src="/logo.png" onerror="this.style.display='none'" />
+    <img class="logo" src="${logoUrl}" onerror="this.style.display='none'" />
     <div class="header-info">
       <div class="doctor-name">Dr. Angel M. Ancona Pérez</div>
       <div class="especialidad">Cirugía de Columna Vertebral &nbsp;·&nbsp; Traumatología y Ortopedia</div>

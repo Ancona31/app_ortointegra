@@ -317,7 +317,7 @@ export default function NuevaNotaPage() {
               {DOCS.map(({ key, label, icon: Icon, color }) => (
                 <Link
                   key={key}
-                  href={`/documentos?tipo=${key}`}
+                  href={`/expediente/${id}/documentos?tipo=${key}&dx=${encodeURIComponent(form.diagnosticos)}`}
                   className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all text-center ${color}`}
                 >
                   <Icon size={20} />

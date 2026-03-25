@@ -10,10 +10,15 @@ const REGIONES = ['Columna Cervical', 'Columna Torácica', 'Columna Lumbar', 'Co
 
 type Estudio = { tipo: string; region: string; proyecciones?: string; indicacion?: string }
 
-export default function SolicitudImagenForm() {
-  const [paciente, setPaciente] = useState('')
+interface Props {
+  pacienteInicial?: string
+  diagnosticoInicial?: string
+}
+
+export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoInicial = '' }: Props) {
+  const [paciente, setPaciente] = useState(pacienteInicial)
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
-  const [diagnostico, setDiagnostico] = useState('')
+  const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
   const [estudios, setEstudios] = useState<Estudio[]>([{ tipo: '', region: '', proyecciones: '', indicacion: '' }])
   const [urgente, setUrgente] = useState(false)
 
@@ -31,6 +36,7 @@ export default function SolicitudImagenForm() {
         <p class="est-nombre">${e.tipo} de ${e.region}${e.proyecciones ? ` (${e.proyecciones})` : ''}</p>
         ${e.indicacion ? `<p class="est-indicacion">${e.indicacion}</p>` : ''}
       </div>`).join('')
+    const logoUrl = `${window.location.origin}/logo.png`
 
     ventana.document.write(`
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Solicitud Imagen</title>
@@ -56,7 +62,7 @@ export default function SolicitudImagenForm() {
   .firma { text-align:center; border-top:1px solid #333; padding-top:6px; min-width:200px; font-size:9pt; color:#555; }
 </style></head><body>
   <div class="header">
-    <img class="logo" src="/logo.png" onerror="this.style.display='none'" />
+    <img class="logo" src="${logoUrl}" onerror="this.style.display='none'" />
     <div>
       <div class="doctor-name">Dr. Angel M. Ancona Pérez</div>
       <div class="especialidad">Cirugía de Columna Vertebral · Traumatología y Ortopedia</div>
