@@ -19,46 +19,47 @@ export async function POST(req: NextRequest) {
       talla,
     } = body
 
-    const prompt = `Actúa como un Médico Especialista en Traumatología y Ortopedia con Alta Especialidad en Cirugía de Columna. Tu objetivo es redactar notas médicas compactas, técnicas y con rigor legal (NOM-004-SSA3-2012) a partir de los datos brutos de la consulta que se te proporcionan.
+    const prompt = `Actúa como un Médico Especialista en Traumatología y Ortopedia con Alta Especialidad en Cirugía de Columna. Redacta ÚNICAMENTE el cuerpo clínico de la nota médica en formato SOAP, con rigor técnico y legal (NOM-004-SSA3-2012).
 
-DIRECTRICES DE REDACCIÓN:
-- Terminología médica precisa: usa términos como "hipoestesia en dermatoma L5", "claudicación neurógena", "signo de Spurling positivo", "espondilolistesis", etc.
-- Estructura SOAP: Subjetivo, Objetivo, Análisis, Plan.
-- Enfoque en columna: cuando se mencione dolor axial, incluye por defecto estado de reflejos osteotendinosos (ROT), fuerza muscular (Escala de Daniels) y sensibilidad, aunque los datos sean breves.
-- Concisión: elimina palabras de relleno. La nota debe ser "scannable" por otros médicos.
-- Legalidad: el pronóstico SIEMPRE menciona "para la vida y para la función".
-- Si el diagnóstico tiene código CIE-10 evidente, inclúyelo.
+REGLAS ESTRICTAS DE FORMATO:
+- NO incluyas título, encabezado, nombre del paciente, fecha, médico tratante, cédula, ni ningún dato administrativo. Esos datos ya están en el documento impreso.
+- NO uses líneas en blanco con guiones o subrayados (___).
+- NO agregues secciones de "Médico que atiende" ni firmas.
+- Inicia DIRECTAMENTE con la primera sección SOAP.
+- Usa terminología ortopédica precisa: "hipoestesia en dermatoma L5", "claudicación neurógena", "signo de Spurling positivo", etc.
+- Cuando haya dolor axial, incluye ROT, fuerza muscular (Escala de Daniels) y sensibilidad aunque los datos sean breves.
+- Conciso y "scannable". Sin frases de relleno.
+- El pronóstico SIEMPRE termina con "para la vida y para la función".
+- Incluye código CIE-10 si es evidente.
 
-DATOS DEL PACIENTE:
-- Nombre: ${paciente}
+DATOS CLÍNICOS DEL PACIENTE:
 - Edad: ${edad ? edad + ' años' : 'no especificada'}
 - Sexo: ${sexo === 'M' ? 'Masculino' : sexo === 'F' ? 'Femenino' : 'no especificado'}
-- Peso: ${peso ? peso + ' kg' : 'no especificado'}
-- Talla: ${talla ? talla + ' cm' : 'no especificada'}
-${antecedentes ? `- Antecedentes relevantes: ${antecedentes}` : ''}
+- Peso: ${peso ? peso + ' kg' : 'no especificado'} | Talla: ${talla ? talla + ' cm' : 'no especificada'}
+${antecedentes ? `- Antecedentes: ${antecedentes}` : ''}
 
 DATOS DE LA CONSULTA:
-${motivo_consulta ? `- Motivo / dictado del médico: ${motivo_consulta}` : ''}
+${motivo_consulta ? `- Motivo / dictado: ${motivo_consulta}` : ''}
 ${exploracion_fisica ? `- Exploración física: ${exploracion_fisica}` : ''}
 ${diagnosticos ? `- Diagnóstico(s): ${diagnosticos}` : ''}
-${plan_tratamiento ? `- Plan indicado: ${plan_tratamiento}` : ''}
+${plan_tratamiento ? `- Plan: ${plan_tratamiento}` : ''}
 
-FORMATO DE SALIDA — usa exactamente estas etiquetas:
+FORMATO DE SALIDA — usa exactamente estas 5 secciones, sin agregar nada más antes ni después:
 
 **S (Subjetivo):**
-Padecimiento actual, mecanismo de lesión y EVA del dolor.
+[Padecimiento actual, mecanismo de lesión, EVA del dolor]
 
 **O (Objetivo):**
-Inspección, palpación, arcos de movilidad, maniobras especiales, estado neurovascular distal. Incluye ROT, fuerza muscular (Daniels) y sensibilidad si hay componente axial.
+[Inspección, palpación, arcos de movilidad, maniobras especiales, estado neurovascular distal, ROT, Daniels, sensibilidad]
 
 **A (Análisis / Diagnóstico):**
-Diagnóstico(s) con código CIE-10 si aplica.
+[Diagnóstico(s) con CIE-10]
 
 **P (Plan):**
-Plan terapéutico, higiene de columna/articular y signos de alarma a vigilar.
+[Plan terapéutico, higiene de columna/articular, signos de alarma]
 
 **Pronóstico:**
-Para la vida y para la función.`
+[Pronóstico para la vida y para la función]`
 
     const response = await client.messages.create({
       model: 'claude-sonnet-4-6',

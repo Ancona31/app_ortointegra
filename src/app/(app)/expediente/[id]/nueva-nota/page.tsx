@@ -111,6 +111,7 @@ export default function NuevaNotaPage() {
       day: '2-digit', month: 'long', year: 'numeric',
       hour: '2-digit', minute: '2-digit', hour12: true,
     })
+    const logoUrl = `${window.location.origin}/logo.png`
 
     const notaHtml = markdownToHtml(notaGenerada)
 
@@ -118,7 +119,7 @@ export default function NuevaNotaPage() {
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Nota Médica</title>
 <style>${PRINT_CSS}</style></head><body>
   <div class="header">
-    <img class="logo" src="/logo.png" onerror="this.style.display='none'" />
+    <img class="logo" src="${logoUrl}" onerror="this.style.display='none'" />
     <div>
       <div class="doctor-name">Dr. Angel M. Ancona Pérez</div>
       <div class="especialidad">Cirugía de Columna Vertebral · Traumatología y Ortopedia</div>

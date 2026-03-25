@@ -36,6 +36,7 @@ export default function ConsultaDetallePage() {
     const ventana = window.open('', '_blank', 'width=800,height=600')
     if (!ventana) return
 
+    const logoUrl = `${window.location.origin}/logo.png`
     const edad = paciente.fecha_nacimiento
       ? differenceInYears(new Date(), parseISO(paciente.fecha_nacimiento))
       : null
@@ -50,7 +51,7 @@ export default function ConsultaDetallePage() {
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Nota Médica</title>
 <style>${PRINT_CSS}</style></head><body>
   <div class="header">
-    <img class="logo" src="/logo.png" onerror="this.style.display='none'" />
+    <img class="logo" src="${logoUrl}" onerror="this.style.display='none'" />
     <div>
       <div class="doctor-name">Dr. Angel M. Ancona Pérez</div>
       <div class="especialidad">Cirugía de Columna Vertebral · Traumatología y Ortopedia</div>
