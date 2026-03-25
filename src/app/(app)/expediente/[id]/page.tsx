@@ -147,7 +147,7 @@ function ExpedientePacienteContent() {
           className="flex flex-col items-center gap-2 p-4 bg-violet-600 text-white rounded-xl hover:bg-violet-700 transition-colors text-center"
         >
           <FileText size={20} />
-          <span className="text-xs font-medium">Solicitudes</span>
+          <span className="text-xs font-medium text-center leading-tight">Nueva receta<br/>y Solicitudes</span>
         </Link>
       </div>
 
