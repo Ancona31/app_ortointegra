@@ -5,9 +5,11 @@ import { usePathname } from 'next/navigation'
 import Image from 'next/image'
 import {
   Users, FileText, FlaskConical, ClipboardList,
-  Stethoscope, Pill, Menu, X, Home
+  Stethoscope, Pill, Menu, X, Home, LogOut
 } from 'lucide-react'
 import { useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 
 const navItems = [
   { href: '/dashboard',      label: 'Inicio',           icon: Home },
@@ -20,7 +22,15 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
   const [open, setOpen] = useState(false)
+
+  async function handleLogout() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
 
   return (
     <>
@@ -90,9 +100,16 @@ export default function Sidebar() {
         </nav>
 
         {/* Footer */}
-        <div className="px-4 py-4 border-t border-white/10">
+        <div className="px-4 py-4 border-t border-white/10 space-y-3">
           <p className="text-xs text-blue-400 text-center">Céd. Prof. 12085805</p>
           <p className="text-xs text-blue-400 text-center">CMOT 26/5567/25</p>
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs text-blue-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+          >
+            <LogOut size={14} />
+            Cerrar sesión
+          </button>
         </div>
       </aside>
     </>
