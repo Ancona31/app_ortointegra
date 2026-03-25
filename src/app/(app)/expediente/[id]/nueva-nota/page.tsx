@@ -5,9 +5,10 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Paciente } from '@/types'
 import { differenceInYears, parseISO } from 'date-fns'
-import { ArrowLeft, Wand2, Save, Loader2, RotateCcw, Printer } from 'lucide-react'
+import { ArrowLeft, Wand2, Save, Loader2, RotateCcw, Printer, Eye, Pencil } from 'lucide-react'
 import Link from 'next/link'
 import { PRINT_CSS } from '@/lib/printStyles'
+import ReactMarkdown from 'react-markdown'
 
 export default function NuevaNotaPage() {
   const { id } = useParams<{ id: string }>()
@@ -21,6 +22,7 @@ export default function NuevaNotaPage() {
     proxima_cita: '',
   })
   const [notaGenerada, setNotaGenerada] = useState('')
+  const [modoEdicion, setModoEdicion] = useState(false)
   const [generando, setGenerando] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
@@ -247,19 +249,42 @@ export default function NuevaNotaPage() {
           <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
             <div>
               <h2 className="font-semibold text-slate-700 text-sm">Nota médica generada</h2>
-              <p className="text-xs text-slate-400 mt-0.5">Puedes editar el texto antes de guardar</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {modoEdicion ? 'Editando texto — cambia lo que necesites' : 'Vista previa — haz clic en Editar para modificar'}
+              </p>
             </div>
-            <button onClick={generarNota} className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600">
-              <RotateCcw size={12} /> Regenerar
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setModoEdicion(!modoEdicion)}
+                className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition-colors ${modoEdicion ? 'bg-violet-100 border-violet-300 text-violet-700' : 'bg-slate-100 border-slate-200 text-slate-600 hover:border-slate-300'}`}
+              >
+                {modoEdicion ? <><Eye size={12} /> Vista previa</> : <><Pencil size={12} /> Editar</>}
+              </button>
+              <button onClick={generarNota} className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 px-2 py-1">
+                <RotateCcw size={12} /> Regenerar
+              </button>
+            </div>
           </div>
           <div className="p-5">
-            <textarea
-              value={notaGenerada}
-              onChange={e => setNotaGenerada(e.target.value)}
-              rows={20}
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 resize-y"
-            />
+            {modoEdicion ? (
+              <textarea
+                value={notaGenerada}
+                onChange={e => setNotaGenerada(e.target.value)}
+                rows={22}
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 resize-y"
+              />
+            ) : (
+              <div className="prose prose-sm max-w-none
+                prose-headings:text-[#1a3a5c] prose-headings:font-bold prose-headings:text-sm prose-headings:mt-4 prose-headings:mb-1
+                prose-strong:text-[#1a3a5c] prose-strong:font-semibold
+                prose-p:text-slate-700 prose-p:leading-relaxed prose-p:my-1
+                prose-ul:my-1 prose-li:my-0.5 prose-li:text-slate-700
+              ">
+                <ReactMarkdown>
+                  {notaGenerada}
+                </ReactMarkdown>
+              </div>
+            )}
           </div>
         </div>
       )}

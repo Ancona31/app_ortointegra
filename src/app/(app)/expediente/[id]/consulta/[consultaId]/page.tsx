@@ -9,6 +9,7 @@ import { es } from 'date-fns/locale'
 import { ArrowLeft, Printer, Stethoscope } from 'lucide-react'
 import Link from 'next/link'
 import { PRINT_CSS } from '@/lib/printStyles'
+import ReactMarkdown from 'react-markdown'
 
 export default function ConsultaDetallePage() {
   const { id, consultaId } = useParams<{ id: string; consultaId: string }>()
@@ -107,10 +108,13 @@ export default function ConsultaDetallePage() {
           )}
         </div>
         {consulta.notas_evolucion ? (
-          <div className="prose prose-sm max-w-none">
-            <pre className="whitespace-pre-wrap text-sm text-slate-700 font-sans leading-relaxed">
-              {consulta.notas_evolucion}
-            </pre>
+          <div className="prose prose-sm max-w-none
+            prose-headings:text-[#1a3a5c] prose-headings:font-bold prose-headings:text-sm prose-headings:mt-4 prose-headings:mb-1
+            prose-strong:text-[#1a3a5c] prose-strong:font-semibold
+            prose-p:text-slate-700 prose-p:leading-relaxed prose-p:my-1
+            prose-ul:my-1 prose-li:my-0.5 prose-li:text-slate-700
+          ">
+            <ReactMarkdown>{consulta.notas_evolucion}</ReactMarkdown>
           </div>
         ) : (
           <p className="text-slate-400 text-sm">Sin nota de evolución registrada</p>

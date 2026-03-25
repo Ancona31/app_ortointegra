@@ -26,7 +26,8 @@
       "Bash(gh repo:*)",
       "Bash(vercel env:*)",
       "Bash(1 echo:*)",
-      "Bash(vercel --prod)"
+      "Bash(vercel --prod)",
+      "Bash(npm list:*)"
     ]
   }
 }
