@@ -23,8 +23,8 @@ export const PRINT_CSS = `
   .nota-content { font-size:8.5pt; line-height:1.5; }
   .nota-content p { margin-bottom:3px; }
 
-  /* Secciones SOAP — los **S:**, **O:**, etc. */
-  .nota-content strong {
+  /* Solo los encabezados de sección SOAP van resaltados */
+  .nota-content .seccion-soap {
     color:#1a3a5c;
     font-size:9pt;
     font-weight:700;
@@ -34,6 +34,12 @@ export const PRINT_CSS = `
     padding:2px 6px;
     background:#eef3fa;
     border-left:3px solid #1e5fa8;
+  }
+
+  /* Negrita normal dentro del contenido — sin resaltado */
+  .nota-content strong {
+    font-weight:600;
+    color:#1a1a1a;
   }
 
   /* Próxima cita */
@@ -46,16 +52,32 @@ export const PRINT_CSS = `
   @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
 `
 
+// Encabezados SOAP reconocidos — solo estos van resaltados
+const SOAP_HEADERS = /^\*\*(S\s*[\(（]|O\s*[\(（]|A\s*[\(（]|P\s*[\(（]|Pronóstico|Pronostico)/i
+
 // Convierte markdown a HTML limpio para impresión
 export function markdownToHtml(texto: string): string {
-  return texto
-    // **texto** → bloque de sección con estilo
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    // Saltos de línea dobles → párrafos
-    .replace(/\n\n/g, '</p><p>')
-    // Saltos simples
-    .replace(/\n/g, '<br/>')
-    // Envolver en párrafos
-    .replace(/^(.)/m, '<p>$1')
-    + '</p>'
+  const lineas = texto.split('\n')
+  let html = ''
+
+  for (const linea of lineas) {
+    const trimmed = linea.trim()
+    if (!trimmed) {
+      html += '<br/>'
+      continue
+    }
+
+    // Detectar encabezados SOAP: **S (Subjetivo):**, **O (Objetivo):**, etc.
+    const soapMatch = trimmed.match(/^\*\*(.+?)\*\*:?\s*$/)
+    if (soapMatch && SOAP_HEADERS.test(trimmed)) {
+      html += `<span class="seccion-soap">${soapMatch[1]}</span>`
+      continue
+    }
+
+    // Resto del contenido: convertir **negrita** inline sin resaltado
+    const contenido = trimmed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    html += `<p>${contenido}</p>`
+  }
+
+  return html
 }
