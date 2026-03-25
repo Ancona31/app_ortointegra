@@ -43,12 +43,23 @@ export interface Diagnostico {
 }
 
 // ─── Laboratorio ──────────────────────────────────────────────────────────────
+export interface ResultadoLab {
+  nombre: string
+  valor: number | string
+  unidad?: string
+  rango_ref?: string
+  rango_optimo?: string
+  estado?: 'optimo' | 'suboptimo' | 'bajo' | 'alto' | 'normal'
+  nota_clinica?: string | null
+}
+
 export interface Laboratorio {
   id: string
   paciente_id: string
   fecha_toma: string
   pdf_url?: string
   valores: ValoresLab
+  resultados?: ResultadoLab[]
   analisis_ia?: AnalisisIA
   created_at?: string
 }

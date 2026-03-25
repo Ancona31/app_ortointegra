@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useDropzone } from 'react-dropzone'
 import { createClient } from '@/lib/supabase/client'
-import { Paciente, ValoresLab, AnalisisIA, VALORES_REFERENCIA, ParametroLab } from '@/types'
+import { Paciente, ValoresLab, AnalisisIA, ResultadoLab, VALORES_REFERENCIA, ParametroLab } from '@/types'
 import { analizarLaboratorios } from '@/lib/analisis'
 import { differenceInYears, parseISO } from 'date-fns'
 import {
@@ -37,6 +37,7 @@ export default function NuevoLaboratorioPage() {
   const [paciente, setPaciente] = useState<Paciente | null>(null)
   const [valores, setValores] = useState<Partial<ValoresLab>>({})
   const [analisis, setAnalisis] = useState<AnalisisIA | null>(null)
+  const [resultados, setResultados] = useState<ResultadoLab[]>([])
   const [extrayendo, setExtrayendo] = useState(false)
   const [analizando, setAnalizando] = useState(false)
   const [guardando, setGuardando] = useState(false)
@@ -70,7 +71,8 @@ export default function NuevoLaboratorioPage() {
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setValores(prev => ({ ...prev, ...data.valores }))
-      if (data.valores.fecha_toma) setFechaToma(data.valores.fecha_toma)
+      if (data.fecha_toma) setFechaToma(data.fecha_toma)
+      if (data.resultados) setResultados(data.resultados)
       setPdfExtraido(true)
     } catch (e: any) {
       setErrorMsg('No se pudo extraer el PDF: ' + e.message)
@@ -105,6 +107,7 @@ export default function NuevoLaboratorioPage() {
       paciente_id: id,
       fecha_toma: fechaToma,
       valores,
+      resultados: resultados.length > 0 ? resultados : null,
       analisis_ia: analisis,
     })
     setGuardando(false)
@@ -330,7 +333,7 @@ export default function NuevoLaboratorioPage() {
       )}
 
       {/* Guardar sin análisis */}
-      {!analisis && Object.keys(valores).length > 0 && (
+      {!analisis && (Object.keys(valores).length > 0 || resultados.length > 0) && (
         <button
           onClick={handleGuardar}
           disabled={guardando}
