@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Plus, Trash2, Printer } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import AutocompleteEstudio from '@/components/AutocompleteEstudio'
 
 const ESTUDIOS_PRESET = [
   'Vitamina D 25-OH', 'Insulina Basal', 'Triglicéridos', 'PCR Ultrasensible',
@@ -121,8 +122,11 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
           {estudios.map((e, i) => (
             <div key={i} className="flex items-center gap-2">
               <span className="text-slate-400 text-sm w-5">{i + 1}.</span>
-              <input type="text" value={e} onChange={ev => updateEstudio(i, ev.target.value)} placeholder="Nombre del estudio"
-                className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+              <AutocompleteEstudio
+                value={e}
+                onChange={val => updateEstudio(i, val)}
+                index={i}
+              />
               {estudios.length > 1 && <button onClick={() => removeEstudio(i)} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button>}
             </div>
           ))}
