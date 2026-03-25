@@ -5,6 +5,7 @@ import { Plus, Trash2, Printer } from 'lucide-react'
 import { Medicamento } from '@/types'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import ConsultaRapida from '@/components/ConsultaRapida'
 
 interface Props {
   pacienteInicial?: string
@@ -216,6 +217,8 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
           placeholder="Uso de inmovilizador, cuidados de herida, cita de seguimiento, datos de alarma..."
           rows={4} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
       </div>
+
+      <ConsultaRapida />
 
       <button
         onClick={imprimir}
