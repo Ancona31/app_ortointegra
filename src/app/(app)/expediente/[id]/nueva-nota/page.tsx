@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Paciente } from '@/types'
 import { differenceInYears, parseISO } from 'date-fns'
-import { ArrowLeft, Wand2, Save, Loader2, RotateCcw, Printer, Eye, Pencil } from 'lucide-react'
+import { ArrowLeft, Wand2, Save, Loader2, RotateCcw, Printer, Eye, Pencil, Pill, FlaskConical, ScanLine, ClipboardList, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
 import { PRINT_CSS, markdownToHtml } from '@/lib/printStyles'
 import ReactMarkdown from 'react-markdown'
@@ -27,6 +27,7 @@ export default function NuevaNotaPage() {
   const [generando, setGenerando] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
+  const [modalPost, setModalPost] = useState(false)
 
   useEffect(() => {
     async function cargar() {
@@ -97,7 +98,7 @@ export default function NuevaNotaPage() {
 
     setGuardando(false)
     if (err) setError('Error al guardar: ' + err.message)
-    else router.push(`/expediente/${id}`)
+    else setModalPost(true)
   }
 
   function imprimir() {
@@ -144,6 +145,13 @@ export default function NuevaNotaPage() {
     ventana.focus()
     setTimeout(() => ventana.print(), 500)
   }
+
+  const DOCS = [
+    { key: 'receta', label: 'Receta médica', icon: Pill, color: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' },
+    { key: 'lab', label: 'Solicitud de laboratorio', icon: FlaskConical, color: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' },
+    { key: 'imagen', label: 'Solicitud de imagen', icon: ScanLine, color: 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100' },
+    { key: 'suplementacion', label: 'Plan de suplementación', icon: ClipboardList, color: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100' },
+  ]
 
   return (
     <div className="max-w-4xl mx-auto space-y-5">
@@ -292,6 +300,37 @@ export default function NuevaNotaPage() {
                 </ReactMarkdown>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal post-guardado */}
+      {modalPost && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
+            <div className="flex items-center gap-3 mb-2">
+              <CheckCircle2 size={24} className="text-green-500 flex-shrink-0" />
+              <h2 className="font-bold text-[#1a3a5c] text-lg">Nota guardada</h2>
+            </div>
+            <p className="text-sm text-slate-500 mb-5">¿Deseas generar algún documento adicional para este paciente?</p>
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              {DOCS.map(({ key, label, icon: Icon, color }) => (
+                <Link
+                  key={key}
+                  href={`/documentos?tipo=${key}`}
+                  className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all text-center ${color}`}
+                >
+                  <Icon size={20} />
+                  <span className="text-xs font-medium leading-tight">{label}</span>
+                </Link>
+              ))}
+            </div>
+            <button
+              onClick={() => router.push(`/expediente/${id}`)}
+              className="w-full py-2.5 text-sm text-slate-500 hover:text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+            >
+              Ir al expediente
+            </button>
           </div>
         </div>
       )}

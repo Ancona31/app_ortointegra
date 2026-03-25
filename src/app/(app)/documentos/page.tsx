@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { FileText, Pill, FlaskConical, ScanLine, ClipboardList } from 'lucide-react'
 import RecetaForm from '@/components/documentos/RecetaForm'
 import SolicitudLabForm from '@/components/documentos/SolicitudLabForm'
@@ -17,7 +18,13 @@ const TIPOS = [
 type TipoDoc = typeof TIPOS[number]['key']
 
 export default function DocumentosPage() {
+  const searchParams = useSearchParams()
   const [tipo, setTipo] = useState<TipoDoc | null>(null)
+
+  useEffect(() => {
+    const t = searchParams.get('tipo') as TipoDoc | null
+    if (t && TIPOS.some(x => x.key === t)) setTipo(t)
+  }, [searchParams])
 
   return (
     <div className="max-w-4xl mx-auto">
