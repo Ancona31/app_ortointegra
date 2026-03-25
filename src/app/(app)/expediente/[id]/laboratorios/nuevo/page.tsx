@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useDropzone } from 'react-dropzone'
 import { createClient } from '@/lib/supabase/client'
-import { Paciente, ValoresLab, AnalisisIA, ResultadoLab, VALORES_REFERENCIA, ParametroLab } from '@/types'
+import { Paciente, ValoresLab, AnalisisIA, ResultadoLab } from '@/types'
 import { analizarLaboratorios } from '@/lib/analisis'
 import { differenceInYears, parseISO } from 'date-fns'
 import {
@@ -13,22 +13,23 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 
-const PARAMETROS = Object.entries(VALORES_REFERENCIA) as [ParametroLab, typeof VALORES_REFERENCIA[ParametroLab]][]
-
-function BadgeEstado({ valor, param }: { valor: number; param: ParametroLab }) {
-  const ref = VALORES_REFERENCIA[param]
-  const optMax = 'opt_max' in ref ? ref.opt_max : null
-  const optMin = 'opt_min' in ref ? ref.opt_min : null
-
-  let estado: 'optimo' | 'suboptimo' | 'bajo' = 'optimo'
-  if (optMax !== null && valor > optMax) estado = 'suboptimo'
-  if (optMin !== null && valor < optMin) estado = 'suboptimo'
-  if ((ref as any).ref_min !== null && valor < (ref as any).ref_min) estado = 'bajo'
-  if ((ref as any).ref_max !== null && valor > (ref as any).ref_max) estado = 'bajo'
-
-  if (estado === 'optimo') return <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-medium">Óptimo</span>
-  if (estado === 'suboptimo') return <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full font-medium">Sub-óptimo</span>
-  return <span className="text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full font-medium">Fuera de rango</span>
+function BadgeEstado({ estado }: { estado: ResultadoLab['estado'] }) {
+  if (!estado) return null
+  const map: Record<string, string> = {
+    optimo:    'bg-emerald-100 text-emerald-700',
+    normal:    'bg-emerald-100 text-emerald-700',
+    suboptimo: 'bg-amber-100 text-amber-700',
+    bajo:      'bg-red-100 text-red-700',
+    alto:      'bg-red-100 text-red-700',
+  }
+  const label: Record<string, string> = {
+    optimo: 'Óptimo', normal: 'Normal', suboptimo: 'Sub-óptimo', bajo: 'Bajo', alto: 'Alto'
+  }
+  return (
+    <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${map[estado] ?? 'bg-slate-100 text-slate-600'}`}>
+      {label[estado] ?? estado}
+    </span>
+  )
 }
 
 export default function NuevoLaboratorioPage() {
@@ -38,6 +39,7 @@ export default function NuevoLaboratorioPage() {
   const [valores, setValores] = useState<Partial<ValoresLab>>({})
   const [analisis, setAnalisis] = useState<AnalisisIA | null>(null)
   const [resultados, setResultados] = useState<ResultadoLab[]>([])
+  const [filtro, setFiltro] = useState<'todos' | 'alterados'>('todos')
   const [extrayendo, setExtrayendo] = useState(false)
   const [analizando, setAnalizando] = useState(false)
   const [guardando, setGuardando] = useState(false)
@@ -86,10 +88,6 @@ export default function NuevoLaboratorioPage() {
     accept: { 'application/pdf': ['.pdf'] },
     maxFiles: 1,
   })
-
-  function handleValor(key: ParametroLab, val: string) {
-    setValores(prev => ({ ...prev, [key]: val === '' ? undefined : parseFloat(val) }))
-  }
 
   function handleAnalizar() {
     setAnalizando(true)
@@ -185,42 +183,83 @@ export default function NuevoLaboratorioPage() {
         />
       </div>
 
-      {/* Tabla de valores */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-          <h2 className="font-semibold text-slate-700 text-sm">Valores de Laboratorio</h2>
-          {pdfExtraido && (
-            <button onClick={() => { setValores({}); setPdfExtraido(false) }} className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1">
-              <RotateCcw size={12} /> Limpiar
-            </button>
-          )}
-        </div>
-        <div className="divide-y divide-slate-100">
-          {PARAMETROS.map(([key, ref]) => (
-            <div key={key} className="flex items-center px-5 py-3 gap-4">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-700">{ref.label}</p>
-                <p className="text-xs text-slate-400">
-                  Ref: {(ref as any).ref_min ?? '–'}–{(ref as any).ref_max ?? '–'} {ref.unidad} ·
-                  Meta: {(ref as any).opt_min ? `${(ref as any).opt_min}–` : '< '}{(ref as any).opt_max ?? (ref as any).opt_min} {ref.unidad}
+      {/* Resultados extraídos del PDF */}
+      {resultados.length > 0 && (() => {
+        const alterados = resultados.filter(r => r.estado === 'bajo' || r.estado === 'alto' || r.estado === 'suboptimo')
+        const filtrados = filtro === 'alterados' ? alterados : resultados
+        return (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+            {/* Header */}
+            <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold text-slate-700 text-sm">Resultados extraídos</h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {resultados.length} parámetros · {alterados.length} fuera de rango óptimo
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  step="0.01"
-                  value={valores[key] ?? ''}
-                  onChange={e => handleValor(key, e.target.value)}
-                  placeholder="—"
-                  className="w-24 px-2 py-1.5 text-sm text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
-                />
-                <span className="text-xs text-slate-400 w-12">{ref.unidad}</span>
-                {valores[key] !== undefined && <BadgeEstado valor={valores[key]!} param={key} />}
-              </div>
+              <button
+                onClick={() => { setResultados([]); setValores({}); setPdfExtraido(false) }}
+                className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1"
+              >
+                <RotateCcw size={12} /> Limpiar
+              </button>
             </div>
-          ))}
-        </div>
-      </div>
+
+            {/* Filtros */}
+            <div className="px-5 py-2.5 border-b border-slate-100 flex gap-2">
+              <button
+                onClick={() => setFiltro('todos')}
+                className={`text-xs px-3 py-1 rounded-full transition-colors ${filtro === 'todos' ? 'bg-[#1e5fa8] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+              >
+                Todos ({resultados.length})
+              </button>
+              <button
+                onClick={() => setFiltro('alterados')}
+                className={`text-xs px-3 py-1 rounded-full transition-colors ${filtro === 'alterados' ? 'bg-red-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+              >
+                Alterados ({alterados.length})
+              </button>
+            </div>
+
+            {/* Encabezados */}
+            <div className="grid grid-cols-12 px-5 py-2 bg-slate-50 border-b border-slate-100 text-xs font-medium text-slate-400 uppercase tracking-wide">
+              <div className="col-span-4">Parámetro</div>
+              <div className="col-span-2 text-right">Valor</div>
+              <div className="col-span-2 text-center">Ref. lab</div>
+              <div className="col-span-2 text-center">Óptimo</div>
+              <div className="col-span-2 text-center">Estado</div>
+            </div>
+
+            <div className="divide-y divide-slate-100">
+              {filtrados.map((r, i) => (
+                <div key={i} className={`grid grid-cols-12 items-start px-5 py-3 hover:bg-slate-50 ${
+                  r.estado === 'bajo' || r.estado === 'alto' ? 'bg-red-50/30' :
+                  r.estado === 'suboptimo' ? 'bg-amber-50/30' : ''
+                }`}>
+                  <div className="col-span-4 min-w-0 pr-2">
+                    <p className="text-sm text-slate-800 leading-tight">{r.nombre}</p>
+                    {r.nota_clinica && (
+                      <p className="text-xs text-amber-600 mt-0.5 leading-tight">{r.nota_clinica}</p>
+                    )}
+                  </div>
+                  <div className="col-span-2 text-right">
+                    <span className="text-sm font-semibold text-slate-900">{r.valor}</span>
+                    {r.unidad && <span className="text-xs text-slate-400 ml-1">{r.unidad}</span>}
+                  </div>
+                  <div className="col-span-2 text-center text-xs text-slate-500">{r.rango_ref || '—'}</div>
+                  <div className="col-span-2 text-center text-xs text-emerald-700 font-medium">{r.rango_optimo || '—'}</div>
+                  <div className="col-span-2 flex justify-center">
+                    <BadgeEstado estado={r.estado} />
+                  </div>
+                </div>
+              ))}
+              {filtrados.length === 0 && (
+                <div className="px-5 py-6 text-center text-sm text-slate-400">No hay parámetros alterados</div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Datos clínicos */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
@@ -267,7 +306,7 @@ export default function NuevoLaboratorioPage() {
       <button
         onClick={handleAnalizar}
         disabled={analizando || Object.keys(valores).length === 0}
-        className="w-full py-3 bg-[#1e5fa8] text-white rounded-xl font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+        className={`w-full py-3 bg-[#1e5fa8] text-white rounded-xl font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${Object.keys(valores).length === 0 ? 'hidden' : ''}`}
       >
         {analizando ? <><Loader2 size={18} className="animate-spin" /> Analizando...</> : '🔬 Analizar y Recomendar Suplementos'}
       </button>
@@ -332,14 +371,14 @@ export default function NuevoLaboratorioPage() {
         </div>
       )}
 
-      {/* Guardar sin análisis */}
+      {/* Guardar */}
       {!analisis && (Object.keys(valores).length > 0 || resultados.length > 0) && (
         <button
           onClick={handleGuardar}
           disabled={guardando}
-          className="flex items-center gap-2 text-slate-500 hover:text-slate-700 border border-slate-200 px-4 py-2 rounded-lg text-sm transition-colors"
+          className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors disabled:opacity-60"
         >
-          {guardando ? <><Loader2 size={14} className="animate-spin" /> Guardando...</> : <><Save size={14} /> Guardar sin analizar</>}
+          {guardando ? <><Loader2 size={16} className="animate-spin" /> Guardando...</> : <><Save size={16} /> Guardar en expediente</>}
         </button>
       )}
     </div>
