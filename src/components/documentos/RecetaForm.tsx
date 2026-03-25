@@ -63,7 +63,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
   .doctor-name { font-size: 16pt; font-weight: bold; color: #1a3a5c; margin-bottom: 2px; }
   .especialidad { font-size: 10pt; color: #1e5fa8; margin-bottom: 4px; }
   .credenciales { font-size: 9pt; color: #555; }
-  .horarios { font-size: 9pt; color: #555; margin-top: 2px; }
+
 
   .rp { font-size: 28pt; font-weight: bold; color: #1a3a5c; text-align: right; line-height: 1; }
 
@@ -94,7 +94,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
       <div class="doctor-name">Dr. Angel M. Ancona Pérez</div>
       <div class="especialidad">Cirugía de Columna Vertebral &nbsp;·&nbsp; Traumatología y Ortopedia</div>
       <div class="credenciales">Céd. Prof. 12085805 &nbsp;·&nbsp; CMOT 26/5567/25</div>
-      <div class="horarios">Lun – Vie: 09:00 am – 2:00 pm &nbsp;/&nbsp; 3:00 pm – 8:00 pm</div>
+
     </div>
     <div class="rp">℞</div>
   </div>

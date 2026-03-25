@@ -125,7 +125,7 @@ export default function NuevaNotaPage() {
     <div>
       <div class="doctor-name">Dr. Angel M. Ancona Pérez</div>
       <div class="especialidad">Cirugía de Columna Vertebral · Traumatología y Ortopedia</div>
-      <div class="credenciales">Céd. Prof. 12085805 · CMOT 26/5567/25 · Lun–Vie 09:00–14:00 / 15:00–20:00</div>
+      <div class="credenciales">Céd. Prof. 12085805 · CMOT 26/5567/25</div>
     </div>
   </div>
   <div class="titulo">Nota de Evolución Médica</div>

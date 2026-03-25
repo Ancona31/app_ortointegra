@@ -76,7 +76,7 @@ export default function DashboardPage() {
           <p><span className="font-medium">Especialidad:</span> Cirugía de Columna · T&O</p>
           <p><span className="font-medium">Céd. Prof.:</span> 12085805</p>
           <p><span className="font-medium">CMOT:</span> 26/5567/25</p>
-          <p><span className="font-medium">Horarios:</span> Lun–Vie 9:00am–2pm / 3–8pm</p>
+
         </div>
       </div>
     </div>
