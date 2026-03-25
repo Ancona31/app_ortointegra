@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Loader2, Send, Bot, User, ChevronDown, ChevronUp } from 'lucide-react'
+import { Loader2, Send, Bot, User, ChevronDown, ChevronUp, TriangleAlert } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 
 type Mensaje = {
@@ -80,6 +80,13 @@ export default function ConsultaRapida() {
 
       {abierto && (
         <div className="flex flex-col" style={{ maxHeight: '400px' }}>
+          {/* Aviso de responsabilidad */}
+          <div className="mx-4 mt-3 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <TriangleAlert size={14} className="text-amber-500 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-amber-700 leading-relaxed">
+              La IA puede cometer errores. Verifica siempre la información antes de aplicarla. El uso clínico de estas respuestas es responsabilidad exclusiva del profesional de salud.
+            </p>
+          </div>
           {/* Sugerencias rápidas */}
           {mensajes.length === 0 && (
             <div className="px-4 pt-3 pb-2">
