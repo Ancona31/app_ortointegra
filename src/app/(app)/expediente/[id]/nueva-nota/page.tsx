@@ -246,7 +246,7 @@ export default function NuevaNotaPage() {
       >
         {generando
           ? <><Loader2 size={18} className="animate-spin" /> Redactando nota médica...</>
-          : <><Wand2 size={18} /> Generar nota médica con IA</>
+          : <><Wand2 size={18} /> Generar</>
         }
       </button>
 
