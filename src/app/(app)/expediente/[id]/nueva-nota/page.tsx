@@ -7,6 +7,7 @@ import { Paciente } from '@/types'
 import { differenceInYears, parseISO } from 'date-fns'
 import { ArrowLeft, Wand2, Save, Loader2, RotateCcw, Printer } from 'lucide-react'
 import Link from 'next/link'
+import { PRINT_CSS } from '@/lib/printStyles'
 
 export default function NuevaNotaPage() {
   const { id } = useParams<{ id: string }>()
@@ -111,24 +112,7 @@ export default function NuevaNotaPage() {
 
     ventana.document.write(`
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Nota Médica</title>
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  @page { size: letter; margin: 15mm 20mm; }
-  body { font-family: Arial, sans-serif; font-size: 10.5pt; color: #1a1a1a; line-height: 1.6; }
-  .header { display:flex; align-items:center; gap:20px; padding-bottom:12px; border-bottom:3px solid #1a3a5c; margin-bottom:14px; }
-  .logo { width:75px; height:75px; object-fit:contain; }
-  .doctor-name { font-size:15pt; font-weight:bold; color:#1a3a5c; }
-  .especialidad { font-size:10pt; color:#1e5fa8; margin:2px 0 3px; }
-  .credenciales { font-size:9pt; color:#555; }
-  .titulo { text-align:center; font-size:12pt; font-weight:bold; color:#1a3a5c; text-transform:uppercase; border:1.5px solid #1a3a5c; padding:5px; margin-bottom:12px; }
-  .datos-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px 20px; margin-bottom:14px; font-size:10pt; }
-  .dato { display:flex; gap:5px; }
-  .dato-label { font-weight:bold; color:#1a3a5c; min-width:80px; }
-  .nota-content { font-size:10pt; line-height:1.7; }
-  .nota-content strong { color:#1a3a5c; display:block; margin-top:10px; margin-bottom:2px; }
-  .footer { margin-top:50px; display:flex; justify-content:flex-end; }
-  .firma { text-align:center; border-top:1px solid #333; padding-top:6px; min-width:200px; font-size:9pt; color:#555; }
-</style></head><body>
+<style>${PRINT_CSS}</style></head><body>
   <div class="header">
     <img class="logo" src="/logo.png" onerror="this.style.display='none'" />
     <div>
@@ -147,7 +131,7 @@ export default function NuevaNotaPage() {
     ${paciente.talla_cm ? `<div class="dato"><span class="dato-label">Talla:</span><span>${paciente.talla_cm} cm</span></div>` : ''}
   </div>
   <div class="nota-content">${notaHtml}</div>
-  ${form.proxima_cita ? `<p style="margin-top:16px;font-size:10pt;"><strong style="color:#1a3a5c;">Próxima cita:</strong> ${form.proxima_cita}</p>` : ''}
+  ${form.proxima_cita ? `<div class="proxima-cita"><strong>Próxima cita:</strong> ${form.proxima_cita}</div>` : ''}
   <div class="footer"><div class="firma"><p>Dr. Angel M. Ancona Pérez</p><p>Céd. Prof. 12085805</p></div></div>
 </body></html>`)
     ventana.document.close()

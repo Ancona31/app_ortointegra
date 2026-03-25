@@ -8,6 +8,7 @@ import { differenceInYears, parseISO, format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ArrowLeft, Printer, Stethoscope } from 'lucide-react'
 import Link from 'next/link'
+import { PRINT_CSS } from '@/lib/printStyles'
 
 export default function ConsultaDetallePage() {
   const { id, consultaId } = useParams<{ id: string; consultaId: string }>()
@@ -43,30 +44,13 @@ export default function ConsultaDetallePage() {
 
     ventana.document.write(`
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Nota Médica</title>
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  @page { size: letter; margin: 15mm 20mm; }
-  body { font-family: Arial, sans-serif; font-size: 10.5pt; color: #1a1a1a; line-height: 1.6; }
-  .header { display:flex; align-items:center; gap:20px; padding-bottom:12px; border-bottom:3px solid #1a3a5c; margin-bottom:14px; }
-  .logo { width:75px; height:75px; object-fit:contain; }
-  .doctor-name { font-size:15pt; font-weight:bold; color:#1a3a5c; }
-  .especialidad { font-size:10pt; color:#1e5fa8; margin:2px 0 3px; }
-  .credenciales { font-size:9pt; color:#555; }
-  .titulo { text-align:center; font-size:12pt; font-weight:bold; color:#1a3a5c; text-transform:uppercase; border:1.5px solid #1a3a5c; padding:5px; margin-bottom:12px; }
-  .datos-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px 20px; margin-bottom:14px; font-size:10pt; }
-  .dato { display:flex; gap:5px; }
-  .dato-label { font-weight:bold; color:#1a3a5c; min-width:80px; }
-  .nota-content { font-size:10pt; line-height:1.7; }
-  .nota-content strong { color:#1a3a5c; display:block; margin-top:10px; }
-  .footer { margin-top:50px; display:flex; justify-content:flex-end; }
-  .firma { text-align:center; border-top:1px solid #333; padding-top:6px; min-width:200px; font-size:9pt; color:#555; }
-</style></head><body>
+<style>${PRINT_CSS}</style></head><body>
   <div class="header">
     <img class="logo" src="/logo.png" onerror="this.style.display='none'" />
     <div>
       <div class="doctor-name">Dr. Angel M. Ancona Pérez</div>
       <div class="especialidad">Cirugía de Columna Vertebral · Traumatología y Ortopedia</div>
-      <div class="credenciales">Céd. Prof. 12085805 · CMOT 26/5567/25</div>
+      <div class="credenciales">Céd. Prof. 12085805 · CMOT 26/5567/25 · Lun–Vie 09:00–14:00 / 15:00–20:00</div>
     </div>
   </div>
   <div class="titulo">Nota de Evolución Médica</div>
@@ -75,9 +59,11 @@ export default function ConsultaDetallePage() {
     <div class="dato"><span class="dato-label">Fecha:</span><span>${fechaConsulta}</span></div>
     <div class="dato"><span class="dato-label">Edad:</span><span>${edad !== null ? edad + ' años' : '—'}</span></div>
     <div class="dato"><span class="dato-label">Sexo:</span><span>${paciente.sexo === 'M' ? 'Masculino' : 'Femenino'}</span></div>
+    ${paciente.peso_kg ? `<div class="dato"><span class="dato-label">Peso:</span><span>${paciente.peso_kg} kg</span></div>` : ''}
+    ${paciente.talla_cm ? `<div class="dato"><span class="dato-label">Talla:</span><span>${paciente.talla_cm} cm</span></div>` : ''}
   </div>
   <div class="nota-content">${notaHtml}</div>
-  ${consulta.proxima_cita ? `<p style="margin-top:16px;font-size:10pt;"><strong style="color:#1a3a5c;">Próxima cita:</strong> ${consulta.proxima_cita}</p>` : ''}
+  ${consulta.proxima_cita ? `<div class="proxima-cita"><strong>Próxima cita:</strong> ${consulta.proxima_cita}</div>` : ''}
   <div class="footer"><div class="firma"><p>Dr. Angel M. Ancona Pérez</p><p>Céd. Prof. 12085805</p></div></div>
 </body></html>`)
     ventana.document.close()
