@@ -7,7 +7,7 @@ import { Paciente } from '@/types'
 import { differenceInYears, parseISO } from 'date-fns'
 import { ArrowLeft, Wand2, Save, Loader2, RotateCcw, Printer, Eye, Pencil } from 'lucide-react'
 import Link from 'next/link'
-import { PRINT_CSS } from '@/lib/printStyles'
+import { PRINT_CSS, markdownToHtml } from '@/lib/printStyles'
 import ReactMarkdown from 'react-markdown'
 
 export default function NuevaNotaPage() {
@@ -102,15 +102,17 @@ export default function NuevaNotaPage() {
   function imprimir() {
     const ventana = window.open('', '_blank', 'width=800,height=600')
     if (!ventana || !paciente) return
-    const edad = paciente.fecha_nacimiento
-      ? differenceInYears(new Date(), parseISO(paciente.fecha_nacimiento))
-      : null
-    const fechaHoy = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })
 
-    // Convertir markdown básico a HTML
-    const notaHtml = notaGenerada
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\n/g, '<br/>')
+    const ahora = new Date()
+    const edad = paciente.fecha_nacimiento
+      ? differenceInYears(ahora, parseISO(paciente.fecha_nacimiento))
+      : null
+    const fechaHora = ahora.toLocaleString('es-MX', {
+      day: '2-digit', month: 'long', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', hour12: true,
+    })
+
+    const notaHtml = markdownToHtml(notaGenerada)
 
     ventana.document.write(`
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Nota Médica</title>
@@ -126,7 +128,7 @@ export default function NuevaNotaPage() {
   <div class="titulo">Nota de Evolución Médica</div>
   <div class="datos-grid">
     <div class="dato"><span class="dato-label">Paciente:</span><span>${paciente.nombre} ${paciente.apellidos}</span></div>
-    <div class="dato"><span class="dato-label">Fecha:</span><span>${fechaHoy}</span></div>
+    <div class="dato"><span class="dato-label">Fecha y hora:</span><span>${fechaHora}</span></div>
     <div class="dato"><span class="dato-label">Edad:</span><span>${edad !== null ? edad + ' años' : '—'}</span></div>
     <div class="dato"><span class="dato-label">Sexo:</span><span>${paciente.sexo === 'M' ? 'Masculino' : paciente.sexo === 'F' ? 'Femenino' : '—'}</span></div>
     ${paciente.peso_kg ? `<div class="dato"><span class="dato-label">Peso:</span><span>${paciente.peso_kg} kg</span></div>` : ''}
@@ -134,7 +136,7 @@ export default function NuevaNotaPage() {
   </div>
   <div class="nota-content">${notaHtml}</div>
   ${form.proxima_cita ? `<div class="proxima-cita"><strong>Próxima cita:</strong> ${form.proxima_cita}</div>` : ''}
-  <div class="footer"><div class="firma"><p>Dr. Angel M. Ancona Pérez</p><p>Céd. Prof. 12085805</p></div></div>
+  <div class="footer"><div class="firma"><p>Dr. Angel M. Ancona Pérez</p></div></div>
 </body></html>`)
     ventana.document.close()
     ventana.focus()

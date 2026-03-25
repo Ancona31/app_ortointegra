@@ -8,7 +8,7 @@ import { differenceInYears, parseISO, format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ArrowLeft, Printer, Stethoscope } from 'lucide-react'
 import Link from 'next/link'
-import { PRINT_CSS } from '@/lib/printStyles'
+import { PRINT_CSS, markdownToHtml } from '@/lib/printStyles'
 import ReactMarkdown from 'react-markdown'
 
 export default function ConsultaDetallePage() {
@@ -35,13 +35,16 @@ export default function ConsultaDetallePage() {
     if (!paciente || !consulta) return
     const ventana = window.open('', '_blank', 'width=800,height=600')
     if (!ventana) return
+
     const edad = paciente.fecha_nacimiento
       ? differenceInYears(new Date(), parseISO(paciente.fecha_nacimiento))
       : null
-    const fechaConsulta = format(parseISO(consulta.fecha), "dd 'de' MMMM 'de' yyyy", { locale: es })
-    const notaHtml = (consulta.notas_evolucion || '')
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\n/g, '<br/>')
+    const fechaHora = format(
+      parseISO(consulta.fecha),
+      "dd 'de' MMMM 'de' yyyy, HH:mm 'hrs'",
+      { locale: es }
+    )
+    const notaHtml = markdownToHtml(consulta.notas_evolucion || '')
 
     ventana.document.write(`
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Nota Médica</title>
@@ -57,7 +60,7 @@ export default function ConsultaDetallePage() {
   <div class="titulo">Nota de Evolución Médica</div>
   <div class="datos-grid">
     <div class="dato"><span class="dato-label">Paciente:</span><span>${paciente.nombre} ${paciente.apellidos}</span></div>
-    <div class="dato"><span class="dato-label">Fecha:</span><span>${fechaConsulta}</span></div>
+    <div class="dato"><span class="dato-label">Fecha y hora:</span><span>${fechaHora}</span></div>
     <div class="dato"><span class="dato-label">Edad:</span><span>${edad !== null ? edad + ' años' : '—'}</span></div>
     <div class="dato"><span class="dato-label">Sexo:</span><span>${paciente.sexo === 'M' ? 'Masculino' : 'Femenino'}</span></div>
     ${paciente.peso_kg ? `<div class="dato"><span class="dato-label">Peso:</span><span>${paciente.peso_kg} kg</span></div>` : ''}
@@ -65,7 +68,7 @@ export default function ConsultaDetallePage() {
   </div>
   <div class="nota-content">${notaHtml}</div>
   ${consulta.proxima_cita ? `<div class="proxima-cita"><strong>Próxima cita:</strong> ${consulta.proxima_cita}</div>` : ''}
-  <div class="footer"><div class="firma"><p>Dr. Angel M. Ancona Pérez</p><p>Céd. Prof. 12085805</p></div></div>
+  <div class="footer"><div class="firma"><p>Dr. Angel M. Ancona Pérez</p></div></div>
 </body></html>`)
     ventana.document.close()
     ventana.focus()
