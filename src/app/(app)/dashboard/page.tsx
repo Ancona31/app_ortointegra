@@ -45,7 +45,7 @@ export default function DashboardPage() {
           Bienvenido, Dr. Ancona
         </h1>
         <p className="text-slate-500 mt-1">
-          Sistema de gestión clínica — Cirugía de Columna · Traumatología y Ortopedia 🔬
+          Sistema de gestión clínica — Cirugía de Columna · Traumatología y Ortopedia
         </p>
       </div>
 
