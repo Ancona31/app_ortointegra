@@ -1,96 +1,112 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Paciente, Consulta, Laboratorio, VALORES_REFERENCIA } from '@/types'
+import { Paciente, Consulta, Laboratorio } from '@/types'
 import { differenceInYears, parseISO, format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
   ArrowLeft, Stethoscope, Calendar, ChevronRight,
   FlaskConical, FileText, AlertTriangle,
-  Trash2, Loader2, BarChart2, Activity,
+  Trash2, Loader2, BarChart2, Activity, Search, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import Link from 'next/link'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, Legend,
+  ResponsiveContainer, ReferenceLine,
 } from 'recharts'
 
 type Tab = 'resumen' | 'consultas' | 'laboratorios' | 'graficas'
 
-const COLORES = ['#1e5fa8', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#be185d', '#65a30d', '#9333ea', '#c2410c']
+// Parsea strings como "70-100", "<5.7", ">40", "40-60"
+function parseRango(rango?: string): { min: number | null; max: number | null } {
+  if (!rango) return { min: null, max: null }
+  const rng = rango.trim()
+  const entre = rng.match(/^(\d+\.?\d*)\s*[-–]\s*(\d+\.?\d*)$/)
+  if (entre) return { min: parseFloat(entre[1]), max: parseFloat(entre[2]) }
+  const menorQ = rng.match(/^[<≤]\s*(\d+\.?\d*)$/)
+  if (menorQ) return { min: null, max: parseFloat(menorQ[1]) }
+  const mayorQ = rng.match(/^[>≥]\s*(\d+\.?\d*)$/)
+  if (mayorQ) return { min: parseFloat(mayorQ[1]), max: null }
+  return { min: null, max: null }
+}
 
-// Parámetros que graficamos con sus rangos
-const PARAMS_GRAFICA = Object.entries(VALORES_REFERENCIA).map(([key, ref]) => ({
-  key,
-  label: ref.label,
-  unidad: ref.unidad,
-  refMin: (ref as any).ref_min,
-  refMax: (ref as any).ref_max,
-  optMin: (ref as any).opt_min,
-  optMax: (ref as any).opt_max,
-}))
-
-function GraficaParametro({ labs, paramKey, label, unidad, refMin, refMax, optMin, optMax }: {
-  labs: Laboratorio[]
-  paramKey: string
-  label: string
+type PuntoGrafica = { fechaLabel: string; fechaISO: string; valor: number; estado?: string }
+type ParamGrafica = {
+  nombre: string
   unidad: string
-  refMin: number | null
-  refMax: number | null
-  optMin: number | null
-  optMax: number | null
-}) {
-  const puntos = labs
-    .filter(l => l.valores?.[paramKey] !== undefined)
-    .map(l => ({
-      fecha: format(parseISO(l.fecha_toma), 'dd/MM/yy'),
-      valor: l.valores![paramKey],
-    }))
-    .reverse()
+  rango_ref?: string
+  rango_optimo?: string
+  puntos: PuntoGrafica[]
+}
 
-  if (puntos.length < 1) return null
+function GraficaParametro({ param }: { param: ParamGrafica }) {
+  const { min: refMin, max: refMax } = parseRango(param.rango_ref)
+  const { min: optMin, max: optMax } = parseRango(param.rango_optimo)
 
-  const vals = puntos.map(p => p.valor as number)
-  const yMin = Math.min(...vals, refMin ?? Infinity, optMin ?? Infinity) * 0.85
-  const yMax = Math.max(...vals, refMax ?? 0, optMax ?? 0) * 1.15
+  const vals = param.puntos.map(p => p.valor)
+  const allNums = [
+    ...vals, refMin, refMax, optMin, optMax,
+  ].filter((v): v is number => v !== null && v !== undefined && !isNaN(v))
+
+  const span = Math.max(...allNums) - Math.min(...allNums)
+  const pad = span * 0.15 || Math.max(...allNums) * 0.1
+  const yMin = Math.min(...allNums) - pad
+  const yMax = Math.max(...allNums) + pad
+
+  const data = param.puntos.map(p => ({ fecha: p.fechaLabel, valor: p.valor }))
+
+  const getColor = (estado?: string) => {
+    if (estado === 'bajo' || estado === 'alto') return '#dc2626'
+    if (estado === 'suboptimo') return '#d97706'
+    return '#1e5fa8'
+  }
+  const lastEstado = param.puntos[param.puntos.length - 1]?.estado
+  const lineColor = getColor(lastEstado)
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <h3 className="font-semibold text-slate-700 text-sm">{label}</h3>
-          <p className="text-xs text-slate-400">{unidad}</p>
-        </div>
-        {puntos.length === 1 && (
-          <span className="text-xs text-slate-400">Solo 1 medición</span>
-        )}
-      </div>
-      <ResponsiveContainer width="100%" height={160}>
-        <LineChart data={puntos} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+    <div className="pt-3 pb-1">
+      <ResponsiveContainer width="100%" height={190}>
+        <LineChart data={data} margin={{ top: 6, right: 16, left: -18, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
           <XAxis dataKey="fecha" tick={{ fontSize: 10, fill: '#94a3b8' }} />
-          <YAxis domain={[yMin, yMax]} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+          <YAxis domain={[yMin, yMax]} tick={{ fontSize: 10, fill: '#94a3b8' }} width={48} />
           <Tooltip
-            contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
-            formatter={(v: any) => [`${v} ${unidad}`, label]}
+            contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0', padding: '6px 10px' }}
+            formatter={(v: any) => [`${v} ${param.unidad}`, param.nombre]}
           />
-          {/* Banda óptima */}
-          {optMin !== null && <ReferenceLine y={optMin} stroke="#10b981" strokeDasharray="4 2" strokeWidth={1} label={{ value: `Ópt. mín`, position: 'insideTopRight', fontSize: 9, fill: '#10b981' }} />}
-          {optMax !== null && <ReferenceLine y={optMax} stroke="#10b981" strokeDasharray="4 2" strokeWidth={1} label={{ value: `Ópt. máx`, position: 'insideBottomRight', fontSize: 9, fill: '#10b981' }} />}
-          {refMax !== null && <ReferenceLine y={refMax} stroke="#f59e0b" strokeDasharray="2 2" strokeWidth={1} />}
-          {refMin !== null && <ReferenceLine y={refMin} stroke="#f59e0b" strokeDasharray="2 2" strokeWidth={1} />}
+          {optMin !== null && (
+            <ReferenceLine y={optMin} stroke="#10b981" strokeDasharray="4 2" strokeWidth={1.5}
+              label={{ value: 'Ópt. mín', position: 'insideTopRight', fontSize: 9, fill: '#10b981' }} />
+          )}
+          {optMax !== null && (
+            <ReferenceLine y={optMax} stroke="#10b981" strokeDasharray="4 2" strokeWidth={1.5}
+              label={{ value: 'Ópt. máx', position: 'insideBottomRight', fontSize: 9, fill: '#10b981' }} />
+          )}
+          {refMin !== null && (
+            <ReferenceLine y={refMin} stroke="#f59e0b" strokeDasharray="2 2" strokeWidth={1} />
+          )}
+          {refMax !== null && (
+            <ReferenceLine y={refMax} stroke="#f59e0b" strokeDasharray="2 2" strokeWidth={1} />
+          )}
           <Line
             type="monotone"
             dataKey="valor"
-            stroke="#1e5fa8"
-            strokeWidth={2}
-            dot={{ r: 4, fill: '#1e5fa8', strokeWidth: 0 }}
-            activeDot={{ r: 6 }}
+            stroke={lineColor}
+            strokeWidth={2.5}
+            dot={(props: any) => {
+              const est = param.puntos[props.index]?.estado
+              const c = getColor(est)
+              return <circle key={props.index} cx={props.cx} cy={props.cy} r={5} fill={c} stroke="#fff" strokeWidth={1.5} />
+            }}
+            activeDot={{ r: 7 }}
           />
         </LineChart>
       </ResponsiveContainer>
+      {param.puntos.length === 1 && (
+        <p className="text-center text-xs text-slate-400 mt-1">Solo 1 medición — agrega más laboratorios para ver la tendencia</p>
+      )}
     </div>
   )
 }
@@ -105,6 +121,8 @@ function ExpedientePacienteContent() {
   const [loading, setLoading] = useState(true)
   const [eliminandoLab, setEliminandoLab] = useState<string | null>(null)
   const [confirmarEliminar, setConfirmarEliminar] = useState<string | null>(null)
+  const [graficasAbiertas, setGraficasAbiertas] = useState<Record<string, boolean>>({})
+  const [busquedaParam, setBusquedaParam] = useState('')
 
   useEffect(() => {
     const t = searchParams.get('tab')
@@ -128,6 +146,42 @@ function ExpedientePacienteContent() {
     cargar()
   }, [id])
 
+  // Recolecta todos los parámetros de todos los labs (resultados[])
+  const todosLosParams = useMemo((): ParamGrafica[] => {
+    const map = new Map<string, ParamGrafica>()
+    const labsOrdenados = [...labs].sort((a, b) => a.fecha_toma.localeCompare(b.fecha_toma))
+
+    labsOrdenados.forEach(lab => {
+      ;(lab.resultados || []).forEach(r => {
+        const val = typeof r.valor === 'number' ? r.valor : parseFloat(String(r.valor))
+        if (isNaN(val)) return
+        const key = r.nombre.trim()
+        if (!map.has(key)) {
+          map.set(key, {
+            nombre: key,
+            unidad: r.unidad || '',
+            rango_ref: r.rango_ref,
+            rango_optimo: r.rango_optimo,
+            puntos: [],
+          })
+        }
+        map.get(key)!.puntos.push({
+          fechaLabel: format(parseISO(lab.fecha_toma), 'dd/MM/yy'),
+          fechaISO: lab.fecha_toma,
+          valor: val,
+          estado: r.estado,
+        })
+      })
+    })
+
+    return Array.from(map.values())
+      .sort((a, b) => {
+        // Primero los que tienen más mediciones
+        if (b.puntos.length !== a.puntos.length) return b.puntos.length - a.puntos.length
+        return a.nombre.localeCompare(b.nombre)
+      })
+  }, [labs])
+
   async function eliminarLab(labId: string) {
     setEliminandoLab(labId)
     const supabase = createClient()
@@ -137,6 +191,10 @@ function ExpedientePacienteContent() {
     setConfirmarEliminar(null)
   }
 
+  function toggleGrafica(nombre: string) {
+    setGraficasAbiertas(prev => ({ ...prev, [nombre]: !prev[nombre] }))
+  }
+
   if (loading) return <div className="text-center py-12 text-slate-400">Cargando expediente...</div>
   if (!paciente) return <div className="text-center py-12 text-slate-400">Paciente no encontrado</div>
 
@@ -144,22 +202,22 @@ function ExpedientePacienteContent() {
     ? differenceInYears(new Date(), parseISO(paciente.fecha_nacimiento))
     : null
 
-  // Diagnósticos extraídos de consultas
   const diagnosticos = consultas
     .flatMap(c => c.diagnosticos || [])
     .filter((d, i, arr) => arr.findIndex(x => x.descripcion === d.descripcion) === i)
     .slice(0, 6)
 
-  // Params con al menos 2 mediciones para graficar
-  const paramsConDatos = PARAMS_GRAFICA.filter(p =>
-    labs.filter(l => l.valores?.[p.key] !== undefined).length >= 1
+  const paramsFiltrados = todosLosParams.filter(p =>
+    !busquedaParam || p.nombre.toLowerCase().includes(busquedaParam.toLowerCase())
   )
+
+  const conTendencia = todosLosParams.filter(p => p.puntos.length > 1).length
 
   const TABS: { key: Tab; label: string; count?: number }[] = [
     { key: 'resumen', label: 'Resumen' },
     { key: 'consultas', label: 'Consultas', count: consultas.length },
     { key: 'laboratorios', label: 'Laboratorios', count: labs.length },
-    { key: 'graficas', label: 'Gráficas' },
+    { key: 'graficas', label: 'Gráficas', count: todosLosParams.length || undefined },
   ]
 
   return (
@@ -271,7 +329,6 @@ function ExpedientePacienteContent() {
       {/* ── TAB: RESUMEN ── */}
       {tab === 'resumen' && (
         <div className="space-y-4">
-          {/* Diagnósticos */}
           {diagnosticos.length > 0 && (
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
@@ -288,14 +345,11 @@ function ExpedientePacienteContent() {
             </div>
           )}
 
-          {/* Últimas consultas */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
               <h3 className="font-semibold text-slate-700 text-sm">Últimas consultas</h3>
               {consultas.length > 3 && (
-                <button onClick={() => setTab('consultas')} className="text-xs text-[#1e5fa8] hover:underline">
-                  Ver todas →
-                </button>
+                <button onClick={() => setTab('consultas')} className="text-xs text-[#1e5fa8] hover:underline">Ver todas →</button>
               )}
             </div>
             {consultas.length === 0 ? (
@@ -320,7 +374,6 @@ function ExpedientePacienteContent() {
             )}
           </div>
 
-          {/* Último laboratorio */}
           {labs.length > 0 && (() => {
             const lab = labs[0]
             const alterados = lab.resultados?.filter(r => r.estado === 'bajo' || r.estado === 'alto' || r.estado === 'suboptimo') || []
@@ -329,13 +382,9 @@ function ExpedientePacienteContent() {
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                   <h3 className="font-semibold text-slate-700 text-sm">Último laboratorio</h3>
-                  <button onClick={() => setTab('laboratorios')} className="text-xs text-emerald-600 hover:underline">
-                    Ver historial →
-                  </button>
+                  <button onClick={() => setTab('laboratorios')} className="text-xs text-emerald-600 hover:underline">Ver historial →</button>
                 </div>
-                <Link href={`/expediente/${id}/laboratorios/${lab.id}`}
-                  className="block px-5 py-4 hover:bg-slate-50 transition-colors group"
-                >
+                <Link href={`/expediente/${id}/laboratorios/${lab.id}`} className="block px-5 py-4 hover:bg-slate-50 transition-colors group">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 flex-shrink-0">
@@ -367,7 +416,6 @@ function ExpedientePacienteContent() {
             )
           })()}
 
-          {/* Suplementos activos */}
           {labs.length > 0 && labs[0].analisis_ia?.suplementos_recomendados?.length ? (
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
@@ -379,9 +427,7 @@ function ExpedientePacienteContent() {
                     s.prioridad === 'alta' ? 'bg-red-50 border-red-100 text-red-700' :
                     s.prioridad === 'media' ? 'bg-amber-50 border-amber-100 text-amber-700' :
                     'bg-slate-50 border-slate-200 text-slate-600'
-                  }`}>
-                    {s.nombre}
-                  </span>
+                  }`}>{s.nombre}</span>
                 ))}
               </div>
             </div>
@@ -405,9 +451,7 @@ function ExpedientePacienteContent() {
             <div className="p-10 text-center">
               <Calendar size={36} className="mx-auto text-slate-300 mb-3" />
               <p className="text-slate-500 font-medium">Sin consultas registradas</p>
-              <Link href={`/expediente/${id}/nueva-nota`} className="text-[#1e5fa8] text-sm mt-2 inline-block hover:underline">
-                Crear primera nota →
-              </Link>
+              <Link href={`/expediente/${id}/nueva-nota`} className="text-[#1e5fa8] text-sm mt-2 inline-block hover:underline">Crear primera nota →</Link>
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
@@ -442,9 +486,7 @@ function ExpedientePacienteContent() {
             <div className="p-10 text-center">
               <FlaskConical size={36} className="mx-auto text-slate-300 mb-3" />
               <p className="text-slate-500 font-medium">Sin laboratorios registrados</p>
-              <Link href={`/expediente/${id}/laboratorios/nuevo`} className="text-emerald-600 text-sm mt-2 inline-block hover:underline">
-                Subir primer laboratorio →
-              </Link>
+              <Link href={`/expediente/${id}/laboratorios/nuevo`} className="text-emerald-600 text-sm mt-2 inline-block hover:underline">Subir primer laboratorio →</Link>
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
@@ -454,21 +496,16 @@ function ExpedientePacienteContent() {
                 const alertas = lab.analisis_ia?.alertas?.filter(a => a.tipo === 'critica') || []
                 const suplementos = lab.analisis_ia?.suplementos_recomendados?.length || 0
                 const confirmando = confirmarEliminar === lab.id
-
                 return (
                   <div key={lab.id}>
                     {confirmando && (
                       <div className="px-5 py-3 bg-red-50 border-b border-red-100 flex items-center justify-between gap-3">
                         <p className="text-sm text-red-700 font-medium">¿Eliminar este laboratorio?</p>
-                        <div className="flex gap-2 flex-shrink-0">
-                          <button onClick={() => setConfirmarEliminar(null)}
-                            className="text-xs px-3 py-1.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50">
-                            Cancelar
-                          </button>
+                        <div className="flex gap-2">
+                          <button onClick={() => setConfirmarEliminar(null)} className="text-xs px-3 py-1.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50">Cancelar</button>
                           <button onClick={() => eliminarLab(lab.id)} disabled={eliminandoLab === lab.id}
                             className="text-xs px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-60 flex items-center gap-1">
-                            {eliminandoLab === lab.id ? <Loader2 size={12} className="animate-spin" /> : null}
-                            Sí, eliminar
+                            {eliminandoLab === lab.id ? <Loader2 size={12} className="animate-spin" /> : null} Sí, eliminar
                           </button>
                         </div>
                       </div>
@@ -482,7 +519,7 @@ function ExpedientePacienteContent() {
                           <p className="font-medium text-slate-800 group-hover:text-[#1a3a5c]">
                             {format(parseISO(lab.fecha_toma), "dd 'de' MMMM 'de' yyyy", { locale: es })}
                           </p>
-                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                          <div className="flex items-center gap-2 mt-0.5">
                             {totalResultados > 0 ? (
                               <span className="text-xs text-slate-500">
                                 {totalResultados} parámetros
@@ -493,24 +530,14 @@ function ExpedientePacienteContent() {
                             )}
                           </div>
                           <div className="flex items-center gap-2 mt-1">
-                            {alertas.length > 0 && (
-                              <span className="text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full">
-                                {alertas.length} alerta{alertas.length > 1 ? 's' : ''} crítica{alertas.length > 1 ? 's' : ''}
-                              </span>
-                            )}
-                            {suplementos > 0 && (
-                              <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
-                                {suplementos} suplemento{suplementos > 1 ? 's' : ''}
-                              </span>
-                            )}
+                            {alertas.length > 0 && <span className="text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full">{alertas.length} alerta{alertas.length > 1 ? 's' : ''} crítica{alertas.length > 1 ? 's' : ''}</span>}
+                            {suplementos > 0 && <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">{suplementos} suplemento{suplementos > 1 ? 's' : ''}</span>}
                           </div>
                         </div>
                       </Link>
                       <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                        <button
-                          onClick={() => setConfirmarEliminar(confirmando ? null : lab.id)}
-                          className="p-1.5 text-slate-300 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50"
-                        >
+                        <button onClick={() => setConfirmarEliminar(confirmando ? null : lab.id)}
+                          className="p-1.5 text-slate-300 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50">
                           <Trash2 size={15} />
                         </button>
                         <ChevronRight size={16} className="text-slate-300 group-hover:text-emerald-600" />
@@ -526,33 +553,107 @@ function ExpedientePacienteContent() {
 
       {/* ── TAB: GRÁFICAS ── */}
       {tab === 'graficas' && (
-        <div className="space-y-4">
-          {paramsConDatos.length === 0 ? (
+        <div className="space-y-3">
+          {todosLosParams.length === 0 ? (
             <div className="bg-white rounded-xl border border-slate-200 p-10 text-center">
               <BarChart2 size={36} className="mx-auto text-slate-300 mb-3" />
               <p className="text-slate-500 font-medium">Sin datos para graficar</p>
-              <p className="text-xs text-slate-400 mt-1">Agrega laboratorios con los parámetros de seguimiento para ver las gráficas</p>
+              <p className="text-xs text-slate-400 mt-1">Agrega laboratorios para ver la evolución de los parámetros</p>
             </div>
           ) : (
             <>
-              <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-start gap-2 text-xs text-[#1a3a5c]">
-                <Activity size={14} className="mt-0.5 flex-shrink-0" />
-                <p>Las líneas <span className="text-emerald-600 font-semibold">verdes</span> marcan el rango óptimo (medicina funcional) y las <span className="text-amber-500 font-semibold">amarillas</span> el rango de referencia del laboratorio.</p>
+              {/* Info + stats */}
+              <div className="flex items-start gap-3">
+                <div className="flex-1 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-start gap-2 text-xs text-[#1a3a5c]">
+                  <Activity size={14} className="mt-0.5 flex-shrink-0" />
+                  <p>
+                    <span className="font-semibold">{todosLosParams.length} parámetros</span> detectados en todos los laboratorios ·{' '}
+                    <span className="text-emerald-700 font-semibold">{conTendencia} con tendencia</span> (2+ mediciones).
+                    Las líneas <span className="text-emerald-600 font-semibold">verdes</span> = rango óptimo,{' '}
+                    <span className="text-amber-500 font-semibold">amarillas</span> = rango de referencia.
+                  </p>
+                </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {paramsConDatos.map(p => (
-                  <GraficaParametro
-                    key={p.key}
-                    labs={labs}
-                    paramKey={p.key}
-                    label={p.label}
-                    unidad={p.unidad}
-                    refMin={p.refMin}
-                    refMax={p.refMax}
-                    optMin={p.optMin}
-                    optMax={p.optMax}
-                  />
-                ))}
+
+              {/* Buscador */}
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={busquedaParam}
+                  onChange={e => setBusquedaParam(e.target.value)}
+                  placeholder="Buscar parámetro..."
+                  className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 bg-white"
+                />
+              </div>
+
+              {/* Lista de parámetros */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                {paramsFiltrados.length === 0 ? (
+                  <div className="px-5 py-8 text-center text-sm text-slate-400">Sin resultados para "{busquedaParam}"</div>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {paramsFiltrados.map(param => {
+                      const abierto = !!graficasAbiertas[param.nombre]
+                      const ultimo = param.puntos[param.puntos.length - 1]
+                      const estadoColor: Record<string, string> = {
+                        optimo: 'bg-emerald-100 text-emerald-700',
+                        normal: 'bg-emerald-100 text-emerald-700',
+                        suboptimo: 'bg-amber-100 text-amber-700',
+                        bajo: 'bg-red-100 text-red-700',
+                        alto: 'bg-red-100 text-red-700',
+                      }
+                      const estadoLabel: Record<string, string> = {
+                        optimo: 'Óptimo', normal: 'Normal', suboptimo: 'Sub-óptimo', bajo: 'Bajo', alto: 'Alto'
+                      }
+                      const est = ultimo?.estado || ''
+
+                      return (
+                        <div key={param.nombre}>
+                          <div className="flex items-center px-5 py-3 hover:bg-slate-50 transition-colors">
+                            <div className="flex-1 min-w-0 mr-3">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-sm font-medium text-slate-800">{param.nombre}</p>
+                                {est && estadoColor[est] && (
+                                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${estadoColor[est]}`}>
+                                    {estadoLabel[est]}
+                                  </span>
+                                )}
+                                {param.puntos.length > 1 && (
+                                  <span className="text-xs px-2 py-0.5 bg-violet-100 text-violet-700 rounded-full font-medium">
+                                    {param.puntos.length} mediciones
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-slate-400 mt-0.5">
+                                Último: <span className="font-medium text-slate-600">{ultimo.valor} {param.unidad}</span>
+                                {' · '}{format(parseISO(ultimo.fechaISO), "dd/MM/yyyy")}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => toggleGrafica(param.nombre)}
+                              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-colors flex-shrink-0 ${
+                                abierto
+                                  ? 'bg-[#1e5fa8] text-white'
+                                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                              }`}
+                            >
+                              <BarChart2 size={12} />
+                              {abierto ? 'Ocultar' : 'Ver gráfica'}
+                              {abierto ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                            </button>
+                          </div>
+
+                          {abierto && (
+                            <div className="px-5 pb-4 bg-slate-50 border-t border-slate-100">
+                              <GraficaParametro param={param} />
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             </>
           )}
