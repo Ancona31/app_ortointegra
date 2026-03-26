@@ -66,7 +66,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
     <div>
       <div class="doctor-name">Dr. Angel M. Ancona Pérez</div>
       <div class="especialidad">Cirugía de Columna Vertebral · Traumatología y Ortopedia</div>
-      <div class="credenciales">Céd. Prof. 12085805 · CMOT 26/5567/25</div>
+      <div class="credenciales">Céd. Prof. 12085805 · CMOT 26/5567/25 · Yucatán</div>
     </div>
   </div>
   <div class="titulo-doc">Solicitud de Estudios de Imagen</div>

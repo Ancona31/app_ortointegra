@@ -94,7 +94,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     <div class="header-info">
       <div class="doctor-name">Dr. Angel M. Ancona Pérez</div>
       <div class="especialidad">Cirugía de Columna Vertebral &nbsp;·&nbsp; Traumatología y Ortopedia</div>
-      <div class="credenciales">Céd. Prof. 12085805 &nbsp;·&nbsp; CMOT 26/5567/25</div>
+      <div class="credenciales">Céd. Prof. 12085805 &nbsp;·&nbsp; CMOT 26/5567/25 &nbsp;·&nbsp; Yucatán</div>
 
     </div>
     <div class="rp">℞</div>

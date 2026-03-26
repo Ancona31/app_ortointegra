@@ -27,7 +27,12 @@
       "Bash(vercel env:*)",
       "Bash(1 echo:*)",
       "Bash(vercel --prod)",
-      "Bash(npm list:*)"
+      "Bash(npm list:*)",
+      "Bash(vercel ls:*)",
+      "Bash(curl:*)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d[''''status''''][''''description'''']\\)\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\Ancona\\\\desktop\\\\app_ortointegra\\\\src\\\\app\\\\\\(app\\)\\\\expediente\\\\[id]\\\\laboratorios\\\\nuevo\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\Ancona\\\\desktop\\\\app_ortointegra\\\\src\\\\app\\\\\\(app\\)\\\\expediente\\\\[id]\\\\laboratorios\\\\[labId]\")"
     ]
   }
 }
