@@ -19,6 +19,27 @@ import {
 
 type Tab = 'resumen' | 'consultas' | 'laboratorios' | 'graficas'
 
+// Palabras que no distinguen el parámetro clínico (se ignoran al agrupar)
+const QUALIFIERS_IGNORAR = new Set([
+  'serica','serico','sericas','sericos',
+  'basal','en','ayunas','simple','total','completo','completa',
+  'plasmatica','plasmatico','venosa','venoso','capilar','capilary',
+  'sangre','sanguinea','sanguineo','urinaria','urinario',
+  'de','la','el','los','las','y','o',
+])
+
+function normalizarKey(nombre: string): string {
+  return nombre
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')   // quitar acentos
+    .replace(/[^a-z0-9\s]/g, ' ')      // quitar puntuación
+    .split(/\s+/)
+    .filter(w => w.length >= 2 && !QUALIFIERS_IGNORAR.has(w))
+    .join(' ')
+    .trim()
+}
+
 // Parsea strings como "70-100", "<5.7", ">40", "40-60"
 function parseRango(rango?: string): { min: number | null; max: number | null } {
   if (!rango) return { min: null, max: null }
@@ -34,7 +55,8 @@ function parseRango(rango?: string): { min: number | null; max: number | null } 
 
 type PuntoGrafica = { fechaLabel: string; fechaISO: string; valor: number; estado?: string }
 type ParamGrafica = {
-  nombre: string
+  nombre: string          // nombre principal (más frecuente)
+  aliases: string[]       // otros nombres detectados para el mismo parámetro
   unidad: string
   rango_ref?: string
   rango_optimo?: string
@@ -146,26 +168,43 @@ function ExpedientePacienteContent() {
     cargar()
   }, [id])
 
-  // Recolecta todos los parámetros de todos los labs (resultados[])
+  // Recolecta todos los parámetros de todos los labs agrupando nombres equivalentes
   const todosLosParams = useMemo((): ParamGrafica[] => {
-    const map = new Map<string, ParamGrafica>()
+    // map key = nombre normalizado; value = grupo acumulado
+    const map = new Map<string, {
+      nombres: Map<string, number>   // nombre original → frecuencia
+      unidad: string
+      rango_ref?: string
+      rango_optimo?: string
+      puntos: PuntoGrafica[]
+    }>()
+
     const labsOrdenados = [...labs].sort((a, b) => a.fecha_toma.localeCompare(b.fecha_toma))
 
     labsOrdenados.forEach(lab => {
       ;(lab.resultados || []).forEach(r => {
         const val = typeof r.valor === 'number' ? r.valor : parseFloat(String(r.valor))
         if (isNaN(val)) return
-        const key = r.nombre.trim()
+
+        const nombreOriginal = r.nombre.trim()
+        const key = normalizarKey(nombreOriginal)
+        if (!key) return
+
         if (!map.has(key)) {
           map.set(key, {
-            nombre: key,
+            nombres: new Map(),
             unidad: r.unidad || '',
             rango_ref: r.rango_ref,
             rango_optimo: r.rango_optimo,
             puntos: [],
           })
         }
-        map.get(key)!.puntos.push({
+        const grupo = map.get(key)!
+        grupo.nombres.set(nombreOriginal, (grupo.nombres.get(nombreOriginal) || 0) + 1)
+        // Preferir el rango más completo (no vacío)
+        if (!grupo.rango_ref && r.rango_ref) grupo.rango_ref = r.rango_ref
+        if (!grupo.rango_optimo && r.rango_optimo) grupo.rango_optimo = r.rango_optimo
+        grupo.puntos.push({
           fechaLabel: format(parseISO(lab.fecha_toma), 'dd/MM/yy'),
           fechaISO: lab.fecha_toma,
           valor: val,
@@ -175,8 +214,21 @@ function ExpedientePacienteContent() {
     })
 
     return Array.from(map.values())
+      .map(g => {
+        // Nombre principal = el más frecuente (y más largo si hay empate)
+        const nombrePrincipal = Array.from(g.nombres.entries())
+          .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)[0][0]
+        const aliases = Array.from(g.nombres.keys()).filter(n => n !== nombrePrincipal)
+        return {
+          nombre: nombrePrincipal,
+          aliases,
+          unidad: g.unidad,
+          rango_ref: g.rango_ref,
+          rango_optimo: g.rango_optimo,
+          puntos: g.puntos,
+        }
+      })
       .sort((a, b) => {
-        // Primero los que tienen más mediciones
         if (b.puntos.length !== a.puntos.length) return b.puntos.length - a.puntos.length
         return a.nombre.localeCompare(b.nombre)
       })
@@ -624,10 +676,18 @@ function ExpedientePacienteContent() {
                                     {param.puntos.length} mediciones
                                   </span>
                                 )}
+                                {param.aliases.length > 0 && (
+                                  <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full" title={`También encontrado como: ${param.aliases.join(', ')}`}>
+                                    ~agrupado
+                                  </span>
+                                )}
                               </div>
                               <p className="text-xs text-slate-400 mt-0.5">
                                 Último: <span className="font-medium text-slate-600">{ultimo.valor} {param.unidad}</span>
                                 {' · '}{format(parseISO(ultimo.fechaISO), "dd/MM/yyyy")}
+                                {param.aliases.length > 0 && (
+                                  <span className="italic"> · también: {param.aliases.join(', ')}</span>
+                                )}
                               </p>
                             </div>
                             <button
