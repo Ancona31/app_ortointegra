@@ -75,18 +75,18 @@ export default function NuevoPacientePage() {
     const supabase = createClient()
 
     const formLimpio = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== ''))
-    const { error: err } = await supabase.from('pacientes').insert({
+    const { data: nuevo, error: err } = await supabase.from('pacientes').insert({
       ...formLimpio,
       peso_kg: form.peso_kg ? Math.round(parseFloat(form.peso_kg) * 10) / 10 : null,
       talla_cm: tallaCm,
       imc: imc ? parseFloat(imc) : null,
-    })
+    }).select('id').single()
 
     if (err) {
       setError('Error al guardar: ' + err.message)
       setLoading(false)
     } else {
-      router.push('/pacientes')
+      router.push(`/expediente/${nuevo.id}`)
     }
   }
 
@@ -167,7 +167,7 @@ export default function NuevoPacientePage() {
 
         <div className="flex gap-3 pb-6">
           <Link
-            href="/pacientes"
+            href="/expediente"
             className="flex-1 text-center px-4 py-2.5 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-50 transition-colors"
           >
             Cancelar

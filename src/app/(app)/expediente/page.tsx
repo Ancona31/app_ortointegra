@@ -35,6 +35,10 @@ export default function ExpedientePage() {
           </h1>
           <p className="text-slate-500 text-sm mt-1">Selecciona un paciente para ver o crear consultas</p>
         </div>
+        <Link href="/pacientes/nuevo"
+          className="flex items-center gap-2 px-4 py-2.5 bg-[#1e5fa8] text-white rounded-lg text-sm font-medium hover:bg-[#1a3a5c] transition-colors">
+          <Plus size={16} /> Nuevo paciente
+        </Link>
       </div>
 
       <div className="relative mb-4">
@@ -50,7 +54,7 @@ export default function ExpedientePage() {
           <div className="p-8 text-center text-slate-400">
             <Stethoscope size={40} className="mx-auto mb-3 opacity-30" />
             <p>No se encontraron pacientes</p>
-            <Link href="/pacientes/nuevo" className="text-[#1e5fa8] text-sm mt-2 inline-block hover:underline">Registrar paciente →</Link>
+            <Link href="/pacientes/nuevo" className="text-[#1e5fa8] text-sm mt-2 inline-block hover:underline">Nuevo paciente →</Link>
           </div>
         ) : (
           <div className="divide-y divide-slate-100">

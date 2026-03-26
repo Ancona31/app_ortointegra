@@ -13,9 +13,7 @@ import { useRouter } from 'next/navigation'
 
 const navItems = [
   { href: '/dashboard',      label: 'Inicio',           icon: Home },
-  { href: '/pacientes',      label: 'Pacientes',        icon: Users },
   { href: '/expediente',     label: 'Expediente',       icon: Stethoscope },
-  { href: '/laboratorios',   label: 'Laboratorios',     icon: FlaskConical },
   { href: '/suplementacion', label: 'Suplementación',   icon: Pill },
   { href: '/documentos',     label: 'Documentos',       icon: FileText },
 ]
