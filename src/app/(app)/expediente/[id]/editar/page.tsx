@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { ArrowLeft, Save, User } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { ArrowLeft, Save, User, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
@@ -17,20 +17,16 @@ type Campo = {
 }
 
 const campos: Campo[] = [
-  // Datos personales
   { section: 'personal', label: 'Nombre(s)', key: 'nombre', required: true, placeholder: 'Ej: Juan Carlos' },
   { section: 'personal', label: 'Apellidos', key: 'apellidos', required: true, placeholder: 'Ej: García López' },
   { section: 'personal', label: 'Fecha de nacimiento', key: 'fecha_nacimiento', type: 'date', required: true },
   { section: 'personal', label: 'Sexo', key: 'sexo', options: [{ value: 'M', label: 'Masculino' }, { value: 'F', label: 'Femenino' }, { value: 'Otro', label: 'Otro' }], required: true },
   { section: 'personal', label: 'N° Expediente', key: 'numero_expediente', placeholder: 'Ej: OI-2025-001' },
-  // Antropometría
   { section: 'antro', label: 'Peso (kg)', key: 'peso_kg', type: 'number', placeholder: '70' },
   { section: 'antro', label: 'Talla (cm)', key: 'talla_cm', type: 'number', placeholder: '170' },
-  // Contacto
   { section: 'contacto', label: 'Teléfono', key: 'telefono', type: 'tel', placeholder: 'Ej: 999 123 4567' },
   { section: 'contacto', label: 'Email', key: 'email', type: 'email', placeholder: 'paciente@email.com' },
   { section: 'contacto', label: 'Dirección', key: 'direccion', placeholder: 'Calle, colonia, ciudad' },
-  // Antecedentes
   { section: 'antecedentes', label: 'Antecedentes patológicos', key: 'ant_patologicos', placeholder: 'DM2, HTA, hipotiroidismo...' },
   { section: 'antecedentes', label: 'Antecedentes quirúrgicos', key: 'ant_quirurgicos', placeholder: 'Cirugías previas...' },
   { section: 'antecedentes', label: 'Antecedentes familiares', key: 'ant_familiares', placeholder: 'Enfermedades relevantes en familia...' },
@@ -45,11 +41,29 @@ const secciones = [
   { key: 'antecedentes', label: 'Antecedentes' },
 ]
 
-export default function NuevoPacientePage() {
+export default function EditarPacientePage() {
+  const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const [form, setForm] = useState<Record<string, string>>({})
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.from('pacientes').select('*').eq('id', id).single().then(({ data }) => {
+      if (data) {
+        const formData: Record<string, string> = {}
+        campos.forEach(c => {
+          if (data[c.key] !== null && data[c.key] !== undefined) {
+            formData[c.key] = String(data[c.key])
+          }
+        })
+        setForm(formData)
+      }
+      setLoading(false)
+    })
+  }, [id])
 
   function calcularIMC() {
     const peso = parseFloat(form.peso_kg || '0')
@@ -60,36 +74,32 @@ export default function NuevoPacientePage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setLoading(true)
+    setGuardando(true)
     setError('')
-
     const imc = calcularIMC()
     const supabase = createClient()
-
     const formLimpio = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== ''))
-    const { error: err } = await supabase.from('pacientes').insert({
+    const { error: err } = await supabase.from('pacientes').update({
       ...formLimpio,
       peso_kg: form.peso_kg ? Math.round(parseFloat(form.peso_kg) * 10) / 10 : null,
       talla_cm: form.talla_cm ? Math.round(parseFloat(form.talla_cm) * 10) / 10 : null,
       imc: imc ? parseFloat(imc) : null,
-    })
-
-    if (err) {
-      setError('Error al guardar: ' + err.message)
-      setLoading(false)
-    } else {
-      router.push('/pacientes')
-    }
+    }).eq('id', id)
+    setGuardando(false)
+    if (err) { setError('Error al guardar: ' + err.message) }
+    else { router.push(`/expediente/${id}`) }
   }
+
+  if (loading) return <div className="text-center py-12 text-slate-400">Cargando...</div>
 
   return (
     <div className="max-w-2xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/pacientes" className="text-slate-400 hover:text-slate-600">
+        <Link href={`/expediente/${id}`} className="text-slate-400 hover:text-slate-600">
           <ArrowLeft size={20} />
         </Link>
         <h1 className="text-2xl font-bold text-[#1a3a5c] flex items-center gap-2">
-          <User size={22} /> Nuevo Paciente
+          <User size={22} /> Editar Paciente
         </h1>
       </div>
 
@@ -112,12 +122,10 @@ export default function NuevoPacientePage() {
                         value={form[campo.key] || ''}
                         onChange={e => setForm({ ...form, [campo.key]: e.target.value })}
                         required={campo.required}
-                        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
+                        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30"
                       >
                         <option value="">Seleccionar...</option>
-                        {campo.options.map(o => (
-                          <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
+                        {campo.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                       </select>
                     ) : (campo.key.includes('ant_') || campo.key === 'medicamentos_actuales') ? (
                       <textarea
@@ -125,7 +133,7 @@ export default function NuevoPacientePage() {
                         onChange={e => setForm({ ...form, [campo.key]: e.target.value })}
                         placeholder={campo.placeholder}
                         rows={2}
-                        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8] resize-none"
+                        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 resize-none"
                       />
                     ) : (
                       <input
@@ -134,16 +142,14 @@ export default function NuevoPacientePage() {
                         onChange={e => setForm({ ...form, [campo.key]: e.target.value })}
                         placeholder={campo.placeholder}
                         required={campo.required}
-                        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
+                        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30"
                       />
                     )}
                   </div>
                 ))}
                 {sec.key === 'antro' && calcularIMC() && (
                   <div className="sm:col-span-2 bg-blue-50 border border-blue-100 rounded-lg px-4 py-2.5">
-                    <span className="text-sm text-blue-700">
-                      <strong>IMC calculado:</strong> {calcularIMC()} kg/m²
-                    </span>
+                    <span className="text-sm text-blue-700"><strong>IMC calculado:</strong> {calcularIMC()} kg/m²</span>
                   </div>
                 )}
               </div>
@@ -151,26 +157,16 @@ export default function NuevoPacientePage() {
           )
         })}
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-            {error}
-          </div>
-        )}
+        {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>}
 
         <div className="flex gap-3 pb-6">
-          <Link
-            href="/pacientes"
-            className="flex-1 text-center px-4 py-2.5 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-50 transition-colors"
-          >
+          <Link href={`/expediente/${id}`}
+            className="flex-1 text-center px-4 py-2.5 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-50 transition-colors">
             Cancelar
           </Link>
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex-1 flex items-center justify-center gap-2 bg-[#1e5fa8] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-60"
-          >
-            <Save size={16} />
-            {loading ? 'Guardando...' : 'Guardar Paciente'}
+          <button type="submit" disabled={guardando}
+            className="flex-1 flex items-center justify-center gap-2 bg-[#1e5fa8] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-60">
+            {guardando ? <><Loader2 size={16} className="animate-spin" /> Guardando...</> : <><Save size={16} /> Guardar cambios</>}
           </button>
         </div>
       </form>

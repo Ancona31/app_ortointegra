@@ -5,6 +5,7 @@ import { Plus, Trash2, Printer } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import AutocompleteEstudio from '@/components/AutocompleteEstudio'
+import { createClient } from '@/lib/supabase/client'
 
 const ESTUDIOS_PRESET = [
   'Vitamina D 25-OH', 'Insulina Basal', 'Triglicéridos', 'PCR Ultrasensible',
@@ -17,9 +18,10 @@ const ESTUDIOS_PRESET = [
 interface Props {
   pacienteInicial?: string
   diagnosticoInicial?: string
+  pacienteId?: string
 }
 
-export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInicial = '' }: Props) {
+export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId }: Props) {
   const [paciente, setPaciente] = useState(pacienteInicial)
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
@@ -35,6 +37,15 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
   }
 
   function imprimir() {
+    if (pacienteId) {
+      const supabase = createClient()
+      supabase.from('documentos').insert({
+        paciente_id: pacienteId,
+        tipo: 'lab',
+        contenido: { paciente, diagnostico, estudios: estudios.filter(Boolean), notas, fecha },
+      }).then(() => {})
+    }
+
     const ventana = window.open('', '_blank', 'width=800,height=600')
     if (!ventana) return
     const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })

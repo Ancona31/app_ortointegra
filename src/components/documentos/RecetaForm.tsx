@@ -6,13 +6,15 @@ import { Medicamento } from '@/types'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import ConsultaRapida from '@/components/ConsultaRapida'
+import { createClient } from '@/lib/supabase/client'
 
 interface Props {
   pacienteInicial?: string
   diagnosticoInicial?: string
+  pacienteId?: string
 }
 
-export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = '' }: Props) {
+export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId }: Props) {
   const [paciente, setPaciente] = useState(pacienteInicial)
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
@@ -34,6 +36,15 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
   }
 
   function imprimir() {
+    if (pacienteId) {
+      const supabase = createClient()
+      supabase.from('documentos').insert({
+        paciente_id: pacienteId,
+        tipo: 'receta',
+        contenido: { paciente, diagnostico, medicamentos, recomendaciones, fecha },
+      }).then(() => {})
+    }
+
     const ventana = window.open('', '_blank', 'width=800,height=600')
     if (!ventana) return
     const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })

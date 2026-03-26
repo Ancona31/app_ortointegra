@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Printer } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { createClient } from '@/lib/supabase/client'
 
 const TIPOS_ESTUDIO = ['Radiografía', 'Resonancia Magnética (RMN)', 'Tomografía (TAC)', 'Ultrasonido', 'Densitometría Ósea', 'Gammagrafía', 'Mielograma', 'Electromiografía (EMG)']
 const REGIONES = ['Columna Cervical', 'Columna Torácica', 'Columna Lumbar', 'Columna Lumbosacra', 'Columna Total', 'Hombro Der.', 'Hombro Izq.', 'Codo Der.', 'Codo Izq.', 'Muñeca Der.', 'Muñeca Izq.', 'Cadera Der.', 'Cadera Izq.', 'Rodilla Der.', 'Rodilla Izq.', 'Tobillo Der.', 'Tobillo Izq.', 'Pie Der.', 'Pie Izq.', 'Pelvis', 'Tórax']
@@ -13,9 +14,10 @@ type Estudio = { tipo: string; region: string; proyecciones?: string; indicacion
 interface Props {
   pacienteInicial?: string
   diagnosticoInicial?: string
+  pacienteId?: string
 }
 
-export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoInicial = '' }: Props) {
+export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId }: Props) {
   const [paciente, setPaciente] = useState(pacienteInicial)
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
@@ -28,6 +30,15 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
   }
 
   function imprimir() {
+    if (pacienteId) {
+      const supabase = createClient()
+      supabase.from('documentos').insert({
+        paciente_id: pacienteId,
+        tipo: 'imagen',
+        contenido: { paciente, diagnostico, estudios: estudios.filter(e => e.tipo && e.region), urgente, fecha },
+      }).then(() => {})
+    }
+
     const ventana = window.open('', '_blank', 'width=800,height=600')
     if (!ventana) return
     const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Printer } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { createClient } from '@/lib/supabase/client'
 
 const SUPLEMENTOS_DISPONIBLES = [
   { nombre: 'Vitamina D3 (Dosis de Carga)', dosis_default: '5,000 UI/día' },
@@ -21,9 +22,10 @@ type SupSelec = { nombre: string; dosis: string; justificacion: string }
 interface Props {
   pacienteInicial?: string
   diagnosticoInicial?: string
+  pacienteId?: string
 }
 
-export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosticoInicial = '' }: Props) {
+export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId }: Props) {
   const [paciente, setPaciente] = useState(pacienteInicial)
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
@@ -44,6 +46,15 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
   }
 
   function imprimir() {
+    if (pacienteId) {
+      const supabase = createClient()
+      supabase.from('documentos').insert({
+        paciente_id: pacienteId,
+        tipo: 'suplementacion',
+        contenido: { paciente, diagnostico, seleccionados, notas, seguimiento, fecha },
+      }).then(() => {})
+    }
+
     const ventana = window.open('', '_blank', 'width=800,height=600')
     if (!ventana) return
     const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })

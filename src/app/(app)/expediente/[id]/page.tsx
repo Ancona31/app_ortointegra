@@ -10,6 +10,7 @@ import {
   ArrowLeft, Stethoscope, Calendar, ChevronRight,
   FlaskConical, FileText, AlertTriangle,
   Trash2, Loader2, BarChart2, Activity, Search, ChevronDown, ChevronUp,
+  Pencil, Pill, ScanLine, ClipboardList,
 } from 'lucide-react'
 import Link from 'next/link'
 import {
@@ -17,7 +18,22 @@ import {
   ResponsiveContainer, ReferenceLine,
 } from 'recharts'
 
-type Tab = 'resumen' | 'consultas' | 'laboratorios' | 'graficas'
+type Tab = 'resumen' | 'consultas' | 'laboratorios' | 'graficas' | 'documentos'
+
+const TIPO_DOC_LABEL: Record<string, string> = {
+  receta: 'Receta',
+  solicitud_lab: 'Solicitud de Laboratorio',
+  solicitud_imagen: 'Solicitud de Imagen',
+  plan_suplementacion: 'Plan de Suplementación',
+  informe_clinico: 'Informe Clínico',
+}
+const TIPO_DOC_COLOR: Record<string, string> = {
+  receta: 'bg-blue-100 text-blue-700',
+  solicitud_lab: 'bg-emerald-100 text-emerald-700',
+  solicitud_imagen: 'bg-violet-100 text-violet-700',
+  plan_suplementacion: 'bg-amber-100 text-amber-700',
+  informe_clinico: 'bg-slate-100 text-slate-600',
+}
 
 // Palabras que no distinguen el parámetro clínico (se ignoran al agrupar)
 const QUALIFIERS_IGNORAR = new Set([
@@ -145,24 +161,28 @@ function ExpedientePacienteContent() {
   const [confirmarEliminar, setConfirmarEliminar] = useState<string | null>(null)
   const [graficasAbiertas, setGraficasAbiertas] = useState<Record<string, boolean>>({})
   const [busquedaParam, setBusquedaParam] = useState('')
+  const [documentos, setDocumentos] = useState<any[]>([])
 
   useEffect(() => {
     const t = searchParams.get('tab')
     if (t === 'laboratorios') setTab('laboratorios')
     else if (t === 'graficas') setTab('graficas')
+    else if (t === 'documentos') setTab('documentos')
   }, [searchParams])
 
   useEffect(() => {
     async function cargar() {
       const supabase = createClient()
-      const [{ data: p }, { data: c }, { data: l }] = await Promise.all([
+      const [{ data: p }, { data: c }, { data: l }, { data: d }] = await Promise.all([
         supabase.from('pacientes').select('*').eq('id', id).single(),
         supabase.from('consultas').select('*').eq('paciente_id', id).order('fecha', { ascending: false }),
         supabase.from('laboratorios').select('*').eq('paciente_id', id).order('fecha_toma', { ascending: false }),
+        supabase.from('documentos').select('id, tipo, contenido, created_at').eq('paciente_id', id).order('created_at', { ascending: false }),
       ])
       setPaciente(p)
       setConsultas(c || [])
       setLabs(l || [])
+      setDocumentos(d || [])
       setLoading(false)
     }
     cargar()
@@ -270,6 +290,7 @@ function ExpedientePacienteContent() {
     { key: 'consultas', label: 'Consultas', count: consultas.length },
     { key: 'laboratorios', label: 'Laboratorios', count: labs.length },
     { key: 'graficas', label: 'Gráficas', count: todosLosParams.length || undefined },
+    { key: 'documentos', label: 'Documentos', count: documentos.length || undefined },
   ]
 
   return (
@@ -296,6 +317,10 @@ function ExpedientePacienteContent() {
               {paciente.numero_expediente && ` · Exp. ${paciente.numero_expediente}`}
             </p>
           </div>
+          <Link href={`/expediente/${id}/editar`}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-medium transition-colors flex-shrink-0">
+            <Pencil size={13} /> Editar
+          </Link>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y divide-slate-100">
           {[
@@ -717,6 +742,54 @@ function ExpedientePacienteContent() {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* ── TAB: DOCUMENTOS ── */}
+      {tab === 'documentos' && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-slate-500">Documentos generados e impresos para este paciente</p>
+            <Link href={`/expediente/${id}/documentos`}
+              className="text-xs text-[#1e5fa8] hover:underline font-medium">
+              + Nuevo documento
+            </Link>
+          </div>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            {documentos.length === 0 ? (
+              <div className="p-10 text-center">
+                <FileText size={36} className="mx-auto text-slate-300 mb-3" />
+                <p className="text-slate-500 font-medium">Sin documentos generados</p>
+                <Link href={`/expediente/${id}/documentos`} className="text-[#1e5fa8] text-sm mt-2 inline-block hover:underline">
+                  Crear primera receta o solicitud →
+                </Link>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {documentos.map((doc: any) => (
+                  <div key={doc.id} className="flex items-center px-5 py-3 gap-4">
+                    <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+                      {doc.tipo === 'receta' && <Pill size={16} className="text-blue-600" />}
+                      {doc.tipo === 'solicitud_lab' && <FlaskConical size={16} className="text-emerald-600" />}
+                      {doc.tipo === 'solicitud_imagen' && <ScanLine size={16} className="text-violet-600" />}
+                      {doc.tipo === 'plan_suplementacion' && <ClipboardList size={16} className="text-amber-600" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${TIPO_DOC_COLOR[doc.tipo] || 'bg-slate-100 text-slate-600'}`}>
+                          {TIPO_DOC_LABEL[doc.tipo] || doc.tipo}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {format(parseISO(doc.created_at), "dd 'de' MMMM 'de' yyyy, HH:mm", { locale: es })}
+                        {doc.contenido?.diagnostico && ` · ${doc.contenido.diagnostico}`}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
