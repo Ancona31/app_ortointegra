@@ -23,7 +23,7 @@ const campos: Campo[] = [
   { section: 'personal', label: 'Sexo', key: 'sexo', options: [{ value: 'M', label: 'Masculino' }, { value: 'F', label: 'Femenino' }, { value: 'Otro', label: 'Otro' }], required: true },
   { section: 'personal', label: 'N° Expediente', key: 'numero_expediente', placeholder: 'Ej: OI-2025-001' },
   { section: 'antro', label: 'Peso (kg)', key: 'peso_kg', type: 'number', placeholder: '70' },
-  { section: 'antro', label: 'Talla (cm)', key: 'talla_cm', type: 'number', placeholder: '170' },
+  { section: 'antro', label: 'Talla (cm o m)', key: 'talla_cm', type: 'number', placeholder: '170 ó 1.70' },
   { section: 'contacto', label: 'Teléfono', key: 'telefono', type: 'tel', placeholder: 'Ej: 999 123 4567' },
   { section: 'contacto', label: 'Email', key: 'email', type: 'email', placeholder: 'paciente@email.com' },
   { section: 'contacto', label: 'Dirección', key: 'direccion', placeholder: 'Calle, colonia, ciudad' },
@@ -65,11 +65,18 @@ export default function EditarPacientePage() {
     })
   }, [id])
 
+  function parseTallaCm(val: string): number | null {
+    const n = parseFloat(val)
+    if (!n || n <= 0) return null
+    return n <= 3 ? Math.round(n * 100 * 10) / 10 : Math.round(n * 10) / 10
+  }
+
   function calcularIMC() {
     const peso = parseFloat(form.peso_kg || '0')
-    const talla = parseFloat(form.talla_cm || '0') / 100
-    if (peso > 0 && talla > 0) return (peso / (talla * talla)).toFixed(1)
-    return null
+    const tallaCm = parseTallaCm(form.talla_cm || '0')
+    if (!peso || !tallaCm) return null
+    const tallaM = tallaCm / 100
+    return (peso / (tallaM * tallaM)).toFixed(1)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -77,12 +84,13 @@ export default function EditarPacientePage() {
     setGuardando(true)
     setError('')
     const imc = calcularIMC()
+    const tallaCm = parseTallaCm(form.talla_cm || '')
     const supabase = createClient()
     const formLimpio = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== ''))
     const { error: err } = await supabase.from('pacientes').update({
       ...formLimpio,
       peso_kg: form.peso_kg ? Math.round(parseFloat(form.peso_kg) * 10) / 10 : null,
-      talla_cm: form.talla_cm ? Math.round(parseFloat(form.talla_cm) * 10) / 10 : null,
+      talla_cm: tallaCm,
       imc: imc ? parseFloat(imc) : null,
     }).eq('id', id)
     setGuardando(false)
