@@ -134,9 +134,9 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <div className="p-4">
+        <div style={{ height: 'calc(100vh - 320px)', minHeight: '520px' }}>
           {conectado === null ? (
-            <div className="h-64 flex items-center justify-center text-slate-400 text-sm">
+            <div className="h-full flex items-center justify-center text-slate-400 text-sm">
               <Loader2 size={20} className="animate-spin mr-2" /> Cargando...
             </div>
           ) : (
@@ -155,12 +155,15 @@ export default function DashboardPage() {
                 week: 'Semana',
                 day: 'Día',
               }}
-              height="auto"
+              height="100%"
+              contentHeight="100%"
+              expandRows={true}
               events={conectado ? fetchEventos : []}
               eventColor="#1e5fa8"
               eventTextColor="#ffffff"
               dayMaxEvents={3}
               nowIndicator={true}
+              scrollTime="08:00:00"
               editable={false}
               selectable={false}
             />
