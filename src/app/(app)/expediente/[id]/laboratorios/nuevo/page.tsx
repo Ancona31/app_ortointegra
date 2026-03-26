@@ -9,9 +9,17 @@ import { analizarLaboratorios } from '@/lib/analisis'
 import { differenceInYears, parseISO } from 'date-fns'
 import {
   ArrowLeft, FlaskConical, Upload, CheckCircle, AlertTriangle,
-  AlertCircle, Loader2, Save, RotateCcw
+  AlertCircle, Loader2, Save, RotateCcw, Plus, Trash2,
 } from 'lucide-react'
 import Link from 'next/link'
+
+const ESTADOS_OPCIONES = [
+  { value: 'optimo',    label: 'Óptimo' },
+  { value: 'normal',    label: 'Normal' },
+  { value: 'suboptimo', label: 'Sub-óptimo' },
+  { value: 'bajo',      label: 'Bajo' },
+  { value: 'alto',      label: 'Alto' },
+]
 
 function BadgeEstado({ estado }: { estado: ResultadoLab['estado'] }) {
   if (!estado) return null
@@ -39,6 +47,7 @@ export default function NuevoLaboratorioPage() {
   const [valores, setValores] = useState<Partial<ValoresLab>>({})
   const [analisis, setAnalisis] = useState<AnalisisIA | null>(null)
   const [resultados, setResultados] = useState<ResultadoLab[]>([])
+  const [modo, setModo] = useState<'pdf' | 'manual'>('pdf')
   const [filtro, setFiltro] = useState<'todos' | 'alterados'>('todos')
   const [extrayendo, setExtrayendo] = useState(false)
   const [analizando, setAnalizando] = useState(false)
@@ -89,6 +98,18 @@ export default function NuevoLaboratorioPage() {
     maxFiles: 1,
   })
 
+  function agregarFila() {
+    setResultados(prev => [...prev, { nombre: '', valor: '', unidad: '', rango_ref: '', rango_optimo: '', estado: 'normal', nota_clinica: null }])
+  }
+
+  function actualizarFila(i: number, campo: keyof ResultadoLab, val: string) {
+    setResultados(prev => prev.map((r, idx) => idx === i ? { ...r, [campo]: val } : r))
+  }
+
+  function eliminarFila(i: number) {
+    setResultados(prev => prev.filter((_, idx) => idx !== i))
+  }
+
   function handleAnalizar() {
     setAnalizando(true)
     setTimeout(() => {
@@ -137,38 +158,152 @@ export default function NuevoLaboratorioPage() {
         </div>
       </div>
 
-      {/* Drop Zone PDF */}
-      <div
-        {...getRootProps()}
-        className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all
-          ${isDragActive ? 'border-[#1e5fa8] bg-blue-50' : 'border-slate-300 hover:border-[#1e5fa8] hover:bg-slate-50'}
-          ${extrayendo ? 'opacity-70 pointer-events-none' : ''}
-        `}
-      >
-        <input {...getInputProps()} />
-        {extrayendo ? (
-          <div className="flex flex-col items-center gap-2 text-[#1e5fa8]">
-            <Loader2 size={32} className="animate-spin" />
-            <p className="font-medium">Extrayendo valores con IA...</p>
-          </div>
-        ) : pdfExtraido ? (
-          <div className="flex flex-col items-center gap-2 text-emerald-600">
-            <CheckCircle size={32} />
-            <p className="font-medium">PDF procesado — valores extraídos</p>
-            <p className="text-sm text-slate-400">Suelta otro PDF para reemplazar</p>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-2 text-slate-400">
-            <Upload size={32} />
-            <p className="font-medium text-slate-600">Arrastra el PDF del laboratorio aquí</p>
-            <p className="text-sm">o haz clic para seleccionar</p>
-          </div>
-        )}
+      {/* Modo toggle */}
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+        <button
+          onClick={() => setModo('pdf')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${modo === 'pdf' ? 'bg-white shadow-sm text-[#1a3a5c]' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          <Upload size={14} /> Subir PDF
+        </button>
+        <button
+          onClick={() => setModo('manual')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${modo === 'manual' ? 'bg-white shadow-sm text-[#1a3a5c]' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          <Plus size={14} /> Ingreso manual
+        </button>
       </div>
 
-      {errorMsg && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
-          <AlertCircle size={16} /> {errorMsg}
+      {/* Drop Zone PDF */}
+      {modo === 'pdf' && (
+        <>
+          <div
+            {...getRootProps()}
+            className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all
+              ${isDragActive ? 'border-[#1e5fa8] bg-blue-50' : 'border-slate-300 hover:border-[#1e5fa8] hover:bg-slate-50'}
+              ${extrayendo ? 'opacity-70 pointer-events-none' : ''}
+            `}
+          >
+            <input {...getInputProps()} />
+            {extrayendo ? (
+              <div className="flex flex-col items-center gap-2 text-[#1e5fa8]">
+                <Loader2 size={32} className="animate-spin" />
+                <p className="font-medium">Extrayendo valores con IA...</p>
+              </div>
+            ) : pdfExtraido ? (
+              <div className="flex flex-col items-center gap-2 text-emerald-600">
+                <CheckCircle size={32} />
+                <p className="font-medium">PDF procesado — valores extraídos</p>
+                <p className="text-sm text-slate-400">Suelta otro PDF para reemplazar</p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2 text-slate-400">
+                <Upload size={32} />
+                <p className="font-medium text-slate-600">Arrastra el PDF del laboratorio aquí</p>
+                <p className="text-sm">o haz clic para seleccionar</p>
+              </div>
+            )}
+          </div>
+          {errorMsg && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
+              <AlertCircle size={16} /> {errorMsg}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Ingreso manual */}
+      {modo === 'manual' && (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-visible">
+          <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
+            <h2 className="font-semibold text-slate-700 text-sm">Parámetros</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Ingresa cada resultado del reporte</p>
+          </div>
+          {/* Encabezados */}
+          <div className="grid grid-cols-12 px-4 py-2 bg-slate-50 border-b border-slate-100 text-xs font-medium text-slate-400 uppercase tracking-wide">
+            <div className="col-span-3">Parámetro</div>
+            <div className="col-span-2">Valor / Unidad</div>
+            <div className="col-span-2">Ref. lab</div>
+            <div className="col-span-2">Óptimo</div>
+            <div className="col-span-2">Estado</div>
+            <div className="col-span-1"></div>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {resultados.map((r, i) => (
+              <div key={i} className="grid grid-cols-12 gap-1 px-4 py-2 items-center">
+                <div className="col-span-3">
+                  <input
+                    type="text"
+                    value={r.nombre}
+                    onChange={e => actualizarFila(i, 'nombre', e.target.value)}
+                    placeholder="Glucosa, Hemoglobina..."
+                    className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e5fa8]/40"
+                  />
+                </div>
+                <div className="col-span-2 flex gap-1">
+                  <input
+                    type="text"
+                    value={String(r.valor)}
+                    onChange={e => actualizarFila(i, 'valor', e.target.value)}
+                    placeholder="0.0"
+                    className="w-14 px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e5fa8]/40"
+                  />
+                  <input
+                    type="text"
+                    value={r.unidad || ''}
+                    onChange={e => actualizarFila(i, 'unidad', e.target.value)}
+                    placeholder="mg/dL"
+                    className="w-16 px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e5fa8]/40"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <input
+                    type="text"
+                    value={r.rango_ref || ''}
+                    onChange={e => actualizarFila(i, 'rango_ref', e.target.value)}
+                    placeholder="70-100"
+                    className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e5fa8]/40"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <input
+                    type="text"
+                    value={r.rango_optimo || ''}
+                    onChange={e => actualizarFila(i, 'rango_optimo', e.target.value)}
+                    placeholder="80-90"
+                    className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e5fa8]/40"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <select
+                    value={r.estado || 'normal'}
+                    onChange={e => actualizarFila(i, 'estado', e.target.value)}
+                    className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e5fa8]/40 bg-white"
+                  >
+                    {ESTADOS_OPCIONES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div className="col-span-1 flex justify-center">
+                  <button onClick={() => eliminarFila(i)} className="text-slate-300 hover:text-red-500 transition-colors">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+            {resultados.length === 0 && (
+              <div className="px-5 py-6 text-center text-sm text-slate-400">
+                Aún no hay parámetros — agrega el primero
+              </div>
+            )}
+          </div>
+          <div className="px-5 py-3 border-t border-slate-100">
+            <button
+              onClick={agregarFila}
+              className="flex items-center gap-2 text-sm text-[#1e5fa8] hover:text-[#1a3a5c] font-medium"
+            >
+              <Plus size={15} /> Agregar parámetro
+            </button>
+          </div>
         </div>
       )}
 
@@ -183,8 +318,8 @@ export default function NuevoLaboratorioPage() {
         />
       </div>
 
-      {/* Resultados extraídos del PDF */}
-      {resultados.length > 0 && (() => {
+      {/* Resultados extraídos del PDF (solo en modo PDF) */}
+      {modo === 'pdf' && resultados.length > 0 && (() => {
         const alterados = resultados.filter(r => r.estado === 'bajo' || r.estado === 'alto' || r.estado === 'suboptimo')
         const filtrados = filtro === 'alterados' ? alterados : resultados
         return (
@@ -261,55 +396,59 @@ export default function NuevoLaboratorioPage() {
         )
       })()}
 
-      {/* Datos clínicos */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-        <h2 className="font-semibold text-slate-700 mb-4 text-sm">Datos clínicos adicionales</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="sm:col-span-2">
-            <label className="text-xs font-medium text-slate-500 block mb-1">Diagnóstico principal</label>
-            <input
-              type="text"
-              value={datosClinico.diagnostico}
-              onChange={e => setDatosClinico(p => ({ ...p, diagnostico: e.target.value }))}
-              placeholder="Ej: Artrosis de rodilla, hernia discal L4-L5..."
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30"
-            />
+      {/* Datos clínicos + analizar suplementos — solo en modo PDF con valores clave */}
+      {modo === 'pdf' && (
+        <>
+          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+            <h2 className="font-semibold text-slate-700 mb-4 text-sm">Datos clínicos adicionales</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <label className="text-xs font-medium text-slate-500 block mb-1">Diagnóstico principal</label>
+                <input
+                  type="text"
+                  value={datosClinico.diagnostico}
+                  onChange={e => setDatosClinico(p => ({ ...p, diagnostico: e.target.value }))}
+                  placeholder="Ej: Artrosis de rodilla, hernia discal L4-L5..."
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Dolor crónico (meses)</label>
+                <input
+                  type="number"
+                  value={datosClinico.dolor_cronico_meses || ''}
+                  onChange={e => setDatosClinico(p => ({ ...p, dolor_cronico_meses: parseInt(e.target.value) || 0 }))}
+                  placeholder="0"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30"
+                />
+              </div>
+              <div className="flex flex-col gap-3 pt-1">
+                <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                  <input type="checkbox" checked={datosClinico.post_operatorio}
+                    onChange={e => setDatosClinico(p => ({ ...p, post_operatorio: e.target.checked }))}
+                    className="w-4 h-4 accent-[#1e5fa8]" />
+                  Paciente post-operatorio / en rehabilitación
+                </label>
+                <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                  <input type="checkbox" checked={datosClinico.inmovilizacion}
+                    onChange={e => setDatosClinico(p => ({ ...p, inmovilizacion: e.target.checked }))}
+                    className="w-4 h-4 accent-[#1e5fa8]" />
+                  Inmovilización / reposo prolongado
+                </label>
+              </div>
+            </div>
           </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Dolor crónico (meses)</label>
-            <input
-              type="number"
-              value={datosClinico.dolor_cronico_meses || ''}
-              onChange={e => setDatosClinico(p => ({ ...p, dolor_cronico_meses: parseInt(e.target.value) || 0 }))}
-              placeholder="0"
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30"
-            />
-          </div>
-          <div className="flex flex-col gap-3 pt-1">
-            <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
-              <input type="checkbox" checked={datosClinico.post_operatorio}
-                onChange={e => setDatosClinico(p => ({ ...p, post_operatorio: e.target.checked }))}
-                className="w-4 h-4 accent-[#1e5fa8]" />
-              Paciente post-operatorio / en rehabilitación
-            </label>
-            <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
-              <input type="checkbox" checked={datosClinico.inmovilizacion}
-                onChange={e => setDatosClinico(p => ({ ...p, inmovilizacion: e.target.checked }))}
-                className="w-4 h-4 accent-[#1e5fa8]" />
-              Inmovilización / reposo prolongado
-            </label>
-          </div>
-        </div>
-      </div>
 
-      {/* Botón analizar */}
-      <button
-        onClick={handleAnalizar}
-        disabled={analizando || Object.keys(valores).length === 0}
-        className={`w-full py-3 bg-[#1e5fa8] text-white rounded-xl font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${Object.keys(valores).length === 0 ? 'hidden' : ''}`}
-      >
-        {analizando ? <><Loader2 size={18} className="animate-spin" /> Analizando...</> : '🔬 Analizar y Recomendar Suplementos'}
-      </button>
+          {/* Botón analizar */}
+          <button
+            onClick={handleAnalizar}
+            disabled={analizando || Object.keys(valores).length === 0}
+            className={`w-full py-3 bg-[#1e5fa8] text-white rounded-xl font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${Object.keys(valores).length === 0 ? 'hidden' : ''}`}
+          >
+            {analizando ? <><Loader2 size={18} className="animate-spin" /> Analizando...</> : '🔬 Analizar y Recomendar Suplementos'}
+          </button>
+        </>
+      )}
 
       {/* Resultado del análisis */}
       {analisis && (

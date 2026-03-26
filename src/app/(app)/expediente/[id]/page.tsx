@@ -9,6 +9,7 @@ import { es } from 'date-fns/locale'
 import {
   ArrowLeft, Plus, Stethoscope, Calendar, ChevronRight,
   FlaskConical, FileText, AlertTriangle, User, Phone, Mail,
+  Trash2, Loader2,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -22,6 +23,8 @@ function ExpedientePacienteContent() {
   const [labs, setLabs] = useState<Laboratorio[]>([])
   const [tab, setTab] = useState<Tab>('consultas')
   const [loading, setLoading] = useState(true)
+  const [eliminandoLab, setEliminandoLab] = useState<string | null>(null)
+  const [confirmarEliminar, setConfirmarEliminar] = useState<string | null>(null)
 
   useEffect(() => {
     if (searchParams.get('tab') === 'laboratorios') setTab('laboratorios')
@@ -42,6 +45,15 @@ function ExpedientePacienteContent() {
     }
     cargar()
   }, [id])
+
+  async function eliminarLab(labId: string) {
+    setEliminandoLab(labId)
+    const supabase = createClient()
+    await supabase.from('laboratorios').delete().eq('id', labId)
+    setLabs(prev => prev.filter(l => l.id !== labId))
+    setEliminandoLab(null)
+    setConfirmarEliminar(null)
+  }
 
   if (loading) return <div className="text-center py-12 text-slate-400">Cargando expediente...</div>
   if (!paciente) return <div className="text-center py-12 text-slate-400">Paciente no encontrado</div>
@@ -233,51 +245,88 @@ function ExpedientePacienteContent() {
                 const v = lab.valores || {}
                 const alertas = lab.analisis_ia?.alertas?.filter(a => a.tipo === 'critica') || []
                 const suplementos = lab.analisis_ia?.suplementos_recomendados?.length || 0
-                // Muestra hasta 3 valores clave disponibles
+                const totalResultados = lab.resultados?.length || 0
+                const alterados = lab.resultados?.filter(r => r.estado === 'bajo' || r.estado === 'alto' || r.estado === 'suboptimo').length || 0
                 const valoresMostrar = Object.entries(VALORES_REFERENCIA)
                   .filter(([k]) => v[k] !== undefined)
                   .slice(0, 3)
+                const confirmando = confirmarEliminar === lab.id
 
                 return (
-                  <Link
-                    key={lab.id}
-                    href={`/expediente/${id}/laboratorios/${lab.id}`}
-                    className="flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition-colors group"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 flex-shrink-0">
-                        <FlaskConical size={18} />
+                  <div key={lab.id} className="relative">
+                    {/* Confirmación eliminar */}
+                    {confirmando && (
+                      <div className="px-5 py-3 bg-red-50 border-b border-red-100 flex items-center justify-between gap-3">
+                        <p className="text-sm text-red-700 font-medium">¿Eliminar este laboratorio?</p>
+                        <div className="flex gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => setConfirmarEliminar(null)}
+                            className="text-xs px-3 py-1.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            onClick={() => eliminarLab(lab.id)}
+                            disabled={eliminandoLab === lab.id}
+                            className="text-xs px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-60 flex items-center gap-1"
+                          >
+                            {eliminandoLab === lab.id ? <Loader2 size={12} className="animate-spin" /> : null}
+                            Sí, eliminar
+                          </button>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium text-slate-800 group-hover:text-[#1a3a5c]">
-                          {format(parseISO(lab.fecha_toma), "dd 'de' MMMM 'de' yyyy", { locale: es })}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          {valoresMostrar.map(([k, ref]) => (
-                            <span key={k} className="text-xs text-slate-500">
-                              {ref.label}: <span className="font-medium text-slate-700">{v[k]} {ref.unidad}</span>
-                            </span>
-                          ))}
-                          {valoresMostrar.length === 0 && (
-                            <span className="text-xs text-slate-400">Sin valores registrados</span>
-                          )}
+                    )}
+                    <div className="flex items-center px-5 py-4 hover:bg-slate-50 transition-colors group">
+                      <Link href={`/expediente/${id}/laboratorios/${lab.id}`} className="flex items-center gap-4 flex-1 min-w-0">
+                        <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 flex-shrink-0">
+                          <FlaskConical size={18} />
                         </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          {alertas.length > 0 && (
-                            <span className="text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full">
-                              {alertas.length} alerta{alertas.length > 1 ? 's' : ''} crítica{alertas.length > 1 ? 's' : ''}
-                            </span>
-                          )}
-                          {suplementos > 0 && (
-                            <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
-                              {suplementos} suplemento{suplementos > 1 ? 's' : ''}
-                            </span>
-                          )}
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-800 group-hover:text-[#1a3a5c]">
+                            {format(parseISO(lab.fecha_toma), "dd 'de' MMMM 'de' yyyy", { locale: es })}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            {totalResultados > 0 ? (
+                              <span className="text-xs text-slate-500">
+                                {totalResultados} parámetros
+                                {alterados > 0 && <span className="text-red-600 font-medium"> · {alterados} alterados</span>}
+                              </span>
+                            ) : (
+                              valoresMostrar.map(([k, ref]) => (
+                                <span key={k} className="text-xs text-slate-500">
+                                  {ref.label}: <span className="font-medium text-slate-700">{v[k]} {ref.unidad}</span>
+                                </span>
+                              ))
+                            )}
+                            {totalResultados === 0 && valoresMostrar.length === 0 && (
+                              <span className="text-xs text-slate-400">Sin valores registrados</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            {alertas.length > 0 && (
+                              <span className="text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full">
+                                {alertas.length} alerta{alertas.length > 1 ? 's' : ''} crítica{alertas.length > 1 ? 's' : ''}
+                              </span>
+                            )}
+                            {suplementos > 0 && (
+                              <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+                                {suplementos} suplemento{suplementos > 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
                         </div>
+                      </Link>
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                        <button
+                          onClick={() => setConfirmarEliminar(confirmando ? null : lab.id)}
+                          className="p-1.5 text-slate-300 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                        <ChevronRight size={16} className="text-slate-300 group-hover:text-emerald-600" />
                       </div>
                     </div>
-                    <ChevronRight size={16} className="text-slate-300 group-hover:text-emerald-600 flex-shrink-0" />
-                  </Link>
+                  </div>
                 )
               })}
             </div>
