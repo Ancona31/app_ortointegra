@@ -20,8 +20,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const { user, error } = await requireSuperAdmin()
-  if (error) return error
+  const { error: authError } = await requireSuperAdmin()
+  if (authError) return authError
 
   const { nombre, max_medicos, max_secretarias } = await req.json()
   if (!nombre) return NextResponse.json({ error: 'Falta el nombre' }, { status: 400 })
@@ -34,8 +34,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const { user, error } = await requireSuperAdmin()
-  if (error) return error
+  const { error: authError } = await requireSuperAdmin()
+  if (authError) return authError
 
   const body = await req.json()
   const { id } = body
