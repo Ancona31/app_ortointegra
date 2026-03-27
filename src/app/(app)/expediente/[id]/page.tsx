@@ -11,7 +11,7 @@ import {
   ArrowLeft, Stethoscope, Calendar, ChevronRight,
   FlaskConical, FileText, AlertTriangle,
   Trash2, Loader2, BarChart2, Activity, Search, ChevronDown, ChevronUp,
-  Pencil, Pill, ScanLine, ClipboardList,
+  Pencil, Pill, ScanLine, ClipboardList, Eye, X,
 } from 'lucide-react'
 import Link from 'next/link'
 import {
@@ -164,6 +164,7 @@ function ExpedientePacienteContent() {
   const [graficasAbiertas, setGraficasAbiertas] = useState<Record<string, boolean>>({})
   const [busquedaParam, setBusquedaParam] = useState('')
   const [documentos, setDocumentos] = useState<any[]>([])
+  const [docSeleccionado, setDocSeleccionado] = useState<any>(null)
 
   useEffect(() => {
     const t = searchParams.get('tab')
@@ -297,6 +298,136 @@ function ExpedientePacienteContent() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-5">
+
+      {/* ── Modal visor de documento ── */}
+      {docSeleccionado && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col">
+            {/* Header modal */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${TIPO_DOC_COLOR[docSeleccionado.tipo] || 'bg-slate-100 text-slate-600'}`}>
+                  {TIPO_DOC_LABEL[docSeleccionado.tipo] || docSeleccionado.tipo}
+                </span>
+                <span className="text-xs text-slate-400">
+                  {format(parseISO(docSeleccionado.created_at), "dd 'de' MMMM 'de' yyyy", { locale: es })}
+                </span>
+              </div>
+              <button onClick={() => setDocSeleccionado(null)} className="text-slate-400 hover:text-slate-600">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Contenido */}
+            <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4 text-sm text-slate-700">
+              {/* Datos comunes */}
+              {docSeleccionado.contenido?.paciente && (
+                <div className="flex gap-2">
+                  <span className="font-medium text-slate-500 min-w-[90px]">Paciente:</span>
+                  <span>{docSeleccionado.contenido.paciente}</span>
+                </div>
+              )}
+              {docSeleccionado.contenido?.diagnostico && (
+                <div className="flex gap-2">
+                  <span className="font-medium text-slate-500 min-w-[90px]">Diagnóstico:</span>
+                  <span>{docSeleccionado.contenido.diagnostico}</span>
+                </div>
+              )}
+              {docSeleccionado.contenido?.fecha && (
+                <div className="flex gap-2">
+                  <span className="font-medium text-slate-500 min-w-[90px]">Fecha doc.:</span>
+                  <span>{docSeleccionado.contenido.fecha}</span>
+                </div>
+              )}
+
+              <div className="border-t border-slate-100 pt-3" />
+
+              {/* RECETA */}
+              {docSeleccionado.tipo === 'receta' && docSeleccionado.contenido?.medicamentos?.length > 0 && (
+                <div>
+                  <p className="font-semibold text-slate-700 mb-2">Medicamentos</p>
+                  <div className="space-y-3">
+                    {docSeleccionado.contenido.medicamentos.filter((m: any) => m.nombre_comercial).map((m: any, i: number) => (
+                      <div key={i} className="bg-slate-50 rounded-lg p-3">
+                        <p className="font-medium text-[#1a3a5c]">
+                          {i + 1}. {m.nombre_comercial.toUpperCase()}
+                          {m.presentacion && ` ${m.presentacion}`}
+                          {m.principio_activo && <span className="font-normal text-slate-500 text-xs"> ({m.principio_activo})</span>}
+                        </p>
+                        {m.indicacion && <p className="text-xs text-slate-600 mt-1 ml-3">{m.indicacion}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {docSeleccionado.tipo === 'receta' && docSeleccionado.contenido?.recomendaciones && (
+                <div>
+                  <p className="font-semibold text-slate-700 mb-1">Recomendaciones</p>
+                  <p className="text-sm text-slate-600 whitespace-pre-line">{docSeleccionado.contenido.recomendaciones}</p>
+                </div>
+              )}
+
+              {/* SOLICITUD LAB */}
+              {(docSeleccionado.tipo === 'lab' || docSeleccionado.tipo === 'solicitud_lab') && docSeleccionado.contenido?.estudios?.length > 0 && (
+                <div>
+                  <p className="font-semibold text-slate-700 mb-2">Estudios solicitados</p>
+                  <ul className="space-y-1">
+                    {docSeleccionado.contenido.estudios.map((e: string, i: number) => (
+                      <li key={i} className="flex items-center gap-2 text-sm">
+                        <span className="text-emerald-600 font-bold">✓</span> {e}
+                      </li>
+                    ))}
+                  </ul>
+                  {docSeleccionado.contenido.notas && (
+                    <div className="mt-3">
+                      <p className="font-semibold text-slate-700 mb-1">Indicaciones</p>
+                      <p className="text-sm text-slate-600">{docSeleccionado.contenido.notas}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* SOLICITUD IMAGEN */}
+              {(docSeleccionado.tipo === 'imagen' || docSeleccionado.tipo === 'solicitud_imagen') && docSeleccionado.contenido?.estudios?.length > 0 && (
+                <div>
+                  {docSeleccionado.contenido.urgente && (
+                    <p className="text-xs font-bold text-red-600 mb-2">⚠ URGENTE</p>
+                  )}
+                  <p className="font-semibold text-slate-700 mb-2">Estudios de imagen</p>
+                  <div className="space-y-2">
+                    {docSeleccionado.contenido.estudios.map((e: any, i: number) => (
+                      <div key={i} className="bg-slate-50 rounded-lg p-3 border-l-4 border-violet-400">
+                        <p className="font-medium text-[#1a3a5c]">
+                          {e.tipo} de {e.region}
+                          {e.proyecciones && <span className="font-normal text-slate-500"> ({e.proyecciones})</span>}
+                        </p>
+                        {e.indicacion && <p className="text-xs text-slate-600 mt-1">{e.indicacion}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* PLAN SUPLEMENTACIÓN */}
+              {docSeleccionado.tipo === 'plan_suplementacion' && docSeleccionado.contenido?.suplementos?.length > 0 && (
+                <div>
+                  <p className="font-semibold text-slate-700 mb-2">Suplementos</p>
+                  <div className="space-y-2">
+                    {docSeleccionado.contenido.suplementos.map((s: any, i: number) => (
+                      <div key={i} className="bg-amber-50 rounded-lg p-3">
+                        <p className="font-medium text-amber-900">{i + 1}. {s.nombre}</p>
+                        {s.dosis && <p className="text-xs text-amber-700 mt-0.5">Dosis: {s.dosis}</p>}
+                        {s.justificacion && <p className="text-xs text-slate-600 mt-0.5">{s.justificacion}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link href="/expediente" className="text-slate-400 hover:text-slate-600">
@@ -780,8 +911,8 @@ function ExpedientePacienteContent() {
                   <div key={doc.id} className="flex items-center px-5 py-3 gap-4">
                     <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
                       {doc.tipo === 'receta' && <Pill size={16} className="text-blue-600" />}
-                      {doc.tipo === 'solicitud_lab' && <FlaskConical size={16} className="text-emerald-600" />}
-                      {doc.tipo === 'solicitud_imagen' && <ScanLine size={16} className="text-violet-600" />}
+                      {(doc.tipo === 'solicitud_lab' || doc.tipo === 'lab') && <FlaskConical size={16} className="text-emerald-600" />}
+                      {(doc.tipo === 'solicitud_imagen' || doc.tipo === 'imagen') && <ScanLine size={16} className="text-violet-600" />}
                       {doc.tipo === 'plan_suplementacion' && <ClipboardList size={16} className="text-amber-600" />}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -795,6 +926,12 @@ function ExpedientePacienteContent() {
                         {doc.contenido?.diagnostico && ` · ${doc.contenido.diagnostico}`}
                       </p>
                     </div>
+                    <button
+                      onClick={() => setDocSeleccionado(doc)}
+                      className="flex items-center gap-1 text-xs text-[#1e5fa8] hover:text-[#1a3a5c] font-medium px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors flex-shrink-0"
+                    >
+                      <Eye size={14} /> Ver
+                    </button>
                   </div>
                 ))}
               </div>
