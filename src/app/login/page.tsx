@@ -45,8 +45,7 @@ export default function LoginPage() {
             />
           </div>
           <h1 className="text-2xl font-bold text-[#1a3a5c]">OrthoIntegra</h1>
-          <p className="text-sm text-slate-500 mt-1">Dr. Angel M. Ancona Pérez</p>
-          <p className="text-xs text-slate-400">Cirugía de Columna · Traumatología y Ortopedia</p>
+          <p className="text-xs text-slate-400 mt-1 text-center">Gestión clínica inteligente para el especialista moderno</p>
         </div>
 
         {/* Formulario */}
@@ -103,8 +102,8 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-xs text-slate-400 mt-6">
-          Céd. Prof. 12085805 · CMOT 26/5567/25
+        <p className="text-center text-xs text-slate-300 mt-6">
+          © {new Date().getFullYear()} OrthoIntegra · Todos los derechos reservados
         </p>
       </div>
     </div>
