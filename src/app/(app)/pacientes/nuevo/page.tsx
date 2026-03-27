@@ -76,12 +76,15 @@ export default function NuevoPacientePage() {
     const tallaCm = parseTallaCm(form.talla_cm || '')
     const supabase = createClient()
 
+    const { data: profileData } = await supabase.from('profiles').select('clinica_id, role, id').eq('id', (await supabase.auth.getUser()).data.user!.id).single()
     const formLimpio = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== ''))
     const { data: nuevo, error: err } = await supabase.from('pacientes').insert({
       ...formLimpio,
       peso_kg: form.peso_kg ? Math.round(parseFloat(form.peso_kg) * 10) / 10 : null,
       talla_cm: tallaCm,
       imc: imc ? parseFloat(imc) : null,
+      clinica_id: profileData?.clinica_id ?? null,
+      medico_id: profileData?.role === 'medico' ? profileData.id : null,
     }).select('id').single()
 
     if (err) {

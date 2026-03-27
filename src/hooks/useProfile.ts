@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
-export type Role = 'medico' | 'secretaria'
+export type Role = 'super_admin' | 'admin' | 'medico' | 'secretaria'
 
 export interface Profile {
   id: string
   role: Role
   nombre?: string | null
+  clinica_id?: string | null
 }
 
 export function useProfile() {
@@ -23,5 +24,12 @@ export function useProfile() {
     })
   }, [])
 
-  return { profile, loading, isDoctor: profile?.role === 'medico', isSecretary: profile?.role === 'secretaria' }
+  return {
+    profile,
+    loading,
+    isDoctor: profile?.role === 'medico' || profile?.role === 'super_admin',
+    isSecretary: profile?.role === 'secretaria',
+    isAdmin: profile?.role === 'admin' || profile?.role === 'super_admin',
+    isSuperAdmin: profile?.role === 'super_admin',
+  }
 }

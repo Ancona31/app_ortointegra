@@ -8,9 +8,9 @@ import { useRouter } from 'next/navigation'
 
 type Usuario = {
   id: string
-  role: 'medico' | 'secretaria'
+  role: 'super_admin' | 'admin' | 'medico' | 'secretaria'
   nombre: string | null
-  email?: string
+  email: string
 }
 
 export default function AdminUsuariosPage() {
@@ -33,9 +33,9 @@ export default function AdminUsuariosPage() {
   }, [])
 
   async function cargarUsuarios() {
-    const supabase = createClient()
-    const { data } = await supabase.from('profiles').select('*')
-    setUsuarios(data || [])
+    const res = await fetch('/api/admin/usuarios')
+    const data = await res.json()
+    setUsuarios(data.usuarios || [])
     setLoading(false)
   }
 
@@ -63,8 +63,11 @@ export default function AdminUsuariosPage() {
 
   async function eliminarUsuario(id: string) {
     if (id === profile?.id) { setError('No puedes eliminar tu propia cuenta'); return }
-    const supabase = createClient()
-    await supabase.from('profiles').delete().eq('id', id)
+    await fetch('/api/admin/usuarios', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: id }),
+    })
     cargarUsuarios()
   }
 
@@ -131,6 +134,7 @@ export default function AdminUsuariosPage() {
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30">
                   <option value="secretaria">Secretaria</option>
                   <option value="medico">Médico</option>
+                  <option value="admin">Admin</option>
                 </select>
               </div>
 
@@ -167,7 +171,8 @@ export default function AdminUsuariosPage() {
                 </div>
                 <div>
                   <p className="font-medium text-slate-800 text-sm">{u.nombre || 'Sin nombre'}</p>
-                  <p className="text-xs text-slate-400 mt-0.5 capitalize">{u.role}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{u.email}</p>
+                  <p className="text-xs text-slate-300 capitalize">{u.role}</p>
                 </div>
               </div>
               {u.id !== profile?.id && (

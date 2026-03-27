@@ -14,6 +14,9 @@ export async function POST(req: NextRequest) {
   const { email, password, nombre, role } = await req.json()
   if (!email || !password || !role) return NextResponse.json({ error: 'Faltan campos' }, { status: 400 })
 
+  // Obtener clinica_id del usuario que hace la petición
+  const { data: creatorProfile } = await supabase.from('profiles').select('clinica_id').eq('id', user.id).single()
+
   const admin = createAdminClient()
 
   // Crear usuario en Supabase Auth
@@ -25,11 +28,12 @@ export async function POST(req: NextRequest) {
 
   if (authError) return NextResponse.json({ error: authError.message }, { status: 400 })
 
-  // Crear perfil con rol
+  // Crear perfil con rol y clinica_id
   await admin.from('profiles').upsert({
     id: newUser.user.id,
     role,
     nombre,
+    clinica_id: creatorProfile?.clinica_id ?? null,
   })
 
   return NextResponse.json({ ok: true })
