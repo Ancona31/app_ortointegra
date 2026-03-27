@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useProfile } from '@/hooks/useProfile'
+import SecretariaDashboard from './SecretariaDashboard'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -38,6 +40,7 @@ type GCalEvent = {
 }
 
 export default function DashboardPage() {
+  const { profile, loading: loadingProfile } = useProfile()
   const [conectado, setConectado] = useState<boolean | null>(null)
   const hoy = new Date()
   const diaHoyTexto = format(hoy, "EEEE d 'de' MMMM 'de' yyyy", { locale: es })
@@ -66,6 +69,8 @@ export default function DashboardPage() {
       return []
     }
   }
+
+  if (!loadingProfile && profile?.role === 'secretaria') return <SecretariaDashboard />
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">

@@ -2,26 +2,35 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import Image from 'next/image'
 import {
-  Users, FileText, FlaskConical, ClipboardList,
-  Stethoscope, Pill, Menu, X, Home, LogOut
+  FileText, Stethoscope, Pill, Menu, X, Home, LogOut, UserPlus, Users,
 } from 'lucide-react'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { useProfile } from '@/hooks/useProfile'
 
-const navItems = [
-  { href: '/dashboard',      label: 'Inicio',           icon: Home },
-  { href: '/expediente',     label: 'Expediente',       icon: Stethoscope },
-  { href: '/suplementacion', label: 'Suplementación',   icon: Pill },
-  { href: '/documentos',     label: 'Documentos',       icon: FileText },
+const navDoctor = [
+  { href: '/dashboard',        label: 'Inicio',         icon: Home },
+  { href: '/expediente',       label: 'Expediente',     icon: Stethoscope },
+  { href: '/suplementacion',   label: 'Suplementación', icon: Pill },
+  { href: '/documentos',       label: 'Documentos',     icon: FileText },
+  { href: '/admin/usuarios',   label: 'Usuarios',       icon: Users },
+]
+
+const navSecretaria = [
+  { href: '/dashboard',        label: 'Inicio',         icon: Home },
+  { href: '/pacientes/nuevo',  label: 'Nuevo paciente', icon: UserPlus },
+  { href: '/expediente',       label: 'Pacientes',      icon: Stethoscope },
 ]
 
 export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const [open, setOpen] = useState(false)
+  const { profile } = useProfile()
+
+  const navItems = profile?.role === 'secretaria' ? navSecretaria : navDoctor
 
   async function handleLogout() {
     const supabase = createClient()
@@ -68,7 +77,9 @@ export default function Sidebar() {
           </div>
           <div className="text-center">
             <p className="font-semibold text-sm leading-tight">Dr. Angel M. Ancona Pérez</p>
-            <p className="text-xs text-blue-300 mt-1 leading-tight">Cirugía de Columna · Traumatología</p>
+            <p className="text-xs text-blue-300 mt-1 leading-tight">
+              {profile?.role === 'secretaria' ? 'Secretaria' : 'Cirugía de Columna · Traumatología'}
+            </p>
           </div>
         </div>
 
