@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 export async function GET() {
@@ -20,8 +19,7 @@ export async function GET() {
   let color_secundario = '#1e5fa8'
 
   if (profile.clinica_id) {
-    const admin = createAdminClient()
-    const { data: clinica } = await admin
+    const { data: clinica } = await supabase
       .from('clinicas')
       .select('logo_url, color_primario, color_secundario')
       .eq('id', profile.clinica_id)

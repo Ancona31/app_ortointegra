@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 export async function GET() {
@@ -15,8 +14,7 @@ export async function GET() {
 
   if (!profile?.clinica_id) return NextResponse.json({ medicos: [] })
 
-  const admin = createAdminClient()
-  const { data: medicos } = await admin
+  const { data: medicos } = await supabase
     .from('profiles')
     .select('id, nombre, titulo, especialidad')
     .eq('clinica_id', profile.clinica_id)
