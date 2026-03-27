@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useDropzone } from 'react-dropzone'
 import { createClient } from '@/lib/supabase/client'
@@ -9,8 +9,11 @@ import { analizarLaboratorios } from '@/lib/analisis'
 import { differenceInYears, parseISO } from 'date-fns'
 import {
   ArrowLeft, FlaskConical, Upload, CheckCircle, AlertTriangle,
-  AlertCircle, Loader2, Save, RotateCcw, Plus, Trash2,
+  AlertCircle, Loader2, Save, RotateCcw, Plus, Trash2, Clock,
 } from 'lucide-react'
+
+const POLL_INTERVAL_MS = 3000
+const POLL_TIMEOUT_MS  = 5 * 60 * 1000  // 5 minutos
 import Link from 'next/link'
 
 const ESTADOS_OPCIONES = [
@@ -50,7 +53,10 @@ export default function NuevoLaboratorioPage() {
   const [modo, setModo] = useState<'pdf' | 'manual'>('pdf')
   const [filtro, setFiltro] = useState<'todos' | 'alterados'>('todos')
   const [extrayendo, setExtrayendo] = useState(false)
+  const [extrayendoMsg, setExtrayendoMsg] = useState('Subiendo PDF...')
   const [analizando, setAnalizando] = useState(false)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollStartRef = useRef<number>(0)
   const [guardando, setGuardando] = useState(false)
   const [pdfExtraido, setPdfExtraido] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
@@ -67,10 +73,66 @@ export default function NuevoLaboratorioPage() {
     supabase.from('pacientes').select('*').eq('id', id).single().then(({ data }) => setPaciente(data))
   }, [id])
 
+  // Limpia el intervalo de polling al desmontar el componente
+  useEffect(() => {
+    return () => { if (pollRef.current) clearInterval(pollRef.current) }
+  }, [])
+
+  function stopPolling() {
+    if (pollRef.current) {
+      clearInterval(pollRef.current)
+      pollRef.current = null
+    }
+  }
+
+  function startPolling(jobId: string) {
+    pollStartRef.current = Date.now()
+    setExtrayendoMsg('Analizando con IA...')
+
+    pollRef.current = setInterval(async () => {
+      const elapsed = Date.now() - pollStartRef.current
+
+      if (elapsed > POLL_TIMEOUT_MS) {
+        stopPolling()
+        setExtrayendo(false)
+        setErrorMsg('El procesamiento tardó demasiado. Intenta con un PDF más pequeño.')
+        return
+      }
+
+      try {
+        const res = await fetch(`/api/labs-extract/status/${jobId}`)
+        const data = await res.json()
+
+        if (data.status === 'completed' && data.result) {
+          stopPolling()
+          const { valores: v, resultados: r, fecha_toma, } = data.result
+          setValores(prev => ({ ...prev, ...v }))
+          if (fecha_toma) setFechaToma(fecha_toma)
+          if (r) setResultados(r)
+          setPdfExtraido(true)
+          setExtrayendo(false)
+        } else if (data.status === 'error') {
+          stopPolling()
+          setExtrayendo(false)
+          setErrorMsg(data.error || 'Error al procesar el PDF')
+        } else {
+          // pending o processing — actualizar mensaje con tiempo transcurrido
+          const seg = Math.floor(elapsed / 1000)
+          setExtrayendoMsg(`Analizando con IA... ${seg}s`)
+        }
+      } catch {
+        // Error de red — seguir intentando hasta timeout
+      }
+    }, POLL_INTERVAL_MS)
+  }
+
   const onDrop = useCallback(async (files: File[]) => {
     const file = files[0]
     if (!file) return
+
+    stopPolling()
     setExtrayendo(true)
+    setExtrayendoMsg('Subiendo PDF...')
     setErrorMsg('')
     setPdfExtraido(false)
 
@@ -78,18 +140,28 @@ export default function NuevoLaboratorioPage() {
     fd.append('pdf', file)
 
     try {
+      // Paso 1: subir PDF y crear job (rápido, <2s)
       const res = await fetch('/api/labs-extract', { method: 'POST', body: fd })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
-      setValores(prev => ({ ...prev, ...data.valores }))
-      if (data.fecha_toma) setFechaToma(data.fecha_toma)
-      if (data.resultados) setResultados(data.resultados)
-      setPdfExtraido(true)
+
+      const { jobId } = data
+
+      // Paso 2: disparar worker en segundo plano (fire & forget)
+      fetch('/api/labs-extract/worker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId }),
+      }).catch(() => {/* worker error se detecta via polling */})
+
+      // Paso 3: iniciar polling
+      startPolling(jobId)
+
     } catch (e: any) {
-      setErrorMsg('No se pudo extraer el PDF: ' + e.message)
-    } finally {
       setExtrayendo(false)
+      setErrorMsg('No se pudo procesar el PDF: ' + e.message)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -187,8 +259,16 @@ export default function NuevoLaboratorioPage() {
             <input {...getInputProps()} />
             {extrayendo ? (
               <div className="flex flex-col items-center gap-2 text-[#1e5fa8]">
-                <Loader2 size={32} className="animate-spin" />
-                <p className="font-medium">Extrayendo valores con IA...</p>
+                {extrayendoMsg.includes('Subiendo') ? (
+                  <Loader2 size={32} className="animate-spin" />
+                ) : (
+                  <div className="relative">
+                    <Clock size={32} />
+                    <Loader2 size={16} className="animate-spin absolute -bottom-1 -right-1 text-[#1a3a5c]" />
+                  </div>
+                )}
+                <p className="font-medium">{extrayendoMsg}</p>
+                <p className="text-xs text-slate-400">Puedes seguir trabajando — te avisamos cuando termine</p>
               </div>
             ) : pdfExtraido ? (
               <div className="flex flex-col items-center gap-2 text-emerald-600">
