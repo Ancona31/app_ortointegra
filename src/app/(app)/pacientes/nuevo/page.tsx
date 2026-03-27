@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Save, User } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { useProfile } from '@/hooks/useProfile'
 
 type Campo = {
   label: string
@@ -47,6 +48,7 @@ const secciones = [
 
 export default function NuevoPacientePage() {
   const router = useRouter()
+  const { profile } = useProfile()
   const [form, setForm] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -102,7 +104,7 @@ export default function NuevoPacientePage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {secciones.map(sec => {
+        {secciones.filter(sec => profile?.role === 'secretaria' ? sec.key !== 'antecedentes' : true).map(sec => {
           const camposSec = campos.filter(c => c.section === sec.key)
           return (
             <div key={sec.key} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
