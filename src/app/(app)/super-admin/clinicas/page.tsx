@@ -67,10 +67,15 @@ export default function SuperAdminClinicasPage() {
   }, [profile, loadingProfile])
 
   async function cargarClinicas() {
-    const res = await fetch('/api/super-admin/clinicas')
-    const data = await res.json()
-    setClinicas(data.clinicas || [])
-    setLoading(false)
+    try {
+      const res = await fetch('/api/super-admin/clinicas')
+      const data = await res.json()
+      setClinicas(data.clinicas || [])
+    } catch {
+      // Error de red — mostrar lista vacía
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function crearClinica(e: React.FormEvent) {
@@ -178,7 +183,7 @@ export default function SuperAdminClinicasPage() {
 
   if (loadingProfile || loading) return <div className="text-center py-12 text-slate-400">Cargando...</div>
 
-  const listaClinicas = clinicas.filter(c => c.tipo === 'clinica')
+  const listaClinicas = clinicas.filter(c => c.tipo !== 'independiente')
   const listaIndep = clinicas.filter(c => c.tipo === 'independiente')
 
   return (
