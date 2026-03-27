@@ -31,10 +31,10 @@ export function useClinica() {
 
   return {
     clinica,
-    colorPrimario:  clinica?.color_primario  ?? '#1a3a5c',
+    colorPrimario:   clinica?.color_primario   ?? '#1a3a5c',
     colorSecundario: clinica?.color_secundario ?? '#1e5fa8',
-    nombreDisplay:  clinica?.nombre_display  ?? 'Dr. Angel M. Ancona Pérez',
-    subtitulo:      clinica?.subtitulo       ?? 'Cirugía de Columna · Traumatología',
-    logoUrl:        clinica?.logo_url        ?? null,
+    nombreDisplay:   clinica?.nombre_display   ?? null,
+    subtitulo:       clinica?.subtitulo        ?? null,
+    logoUrl:         clinica?.logo_url         ?? null,
   }
 }

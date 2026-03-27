@@ -100,9 +100,13 @@ export default function Sidebar() {
             )}
           </div>
           <div className="text-center">
-            <p className="font-semibold text-sm leading-tight">{nombreDisplay}</p>
+            <p className="font-semibold text-sm leading-tight">
+              {nombreDisplay ?? profile?.nombre ?? ''}
+            </p>
             <p className="text-xs text-blue-300 mt-1 leading-tight">
-              {profile?.role === 'secretaria' ? 'Secretaria' : subtitulo}
+              {profile?.role === 'secretaria'
+                ? 'Secretaria'
+                : subtitulo ?? profile?.especialidad ?? ''}
             </p>
           </div>
         </div>
