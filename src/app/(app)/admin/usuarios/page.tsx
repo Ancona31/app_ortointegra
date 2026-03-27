@@ -25,7 +25,9 @@ export default function AdminUsuariosPage() {
   const [exito, setExito] = useState('')
 
   useEffect(() => {
-    if (!loadingProfile && profile?.role !== 'medico') router.push('/dashboard')
+    if (!loadingProfile && profile && !['medico', 'admin', 'super_admin'].includes(profile.role)) {
+      router.push('/dashboard')
+    }
   }, [profile, loadingProfile, router])
 
   useEffect(() => {
