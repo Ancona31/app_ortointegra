@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Building2, Plus, Pencil, Check, X, Loader2, Palette, Upload, ImageIcon, UserCircle, Stethoscope } from 'lucide-react'
+import { Building2, Plus, Pencil, Check, X, Loader2, Palette, Upload, ImageIcon, UserCircle, Stethoscope, Trash2, AlertTriangle } from 'lucide-react'
 import { useProfile } from '@/hooks/useProfile'
 import { useRouter } from 'next/navigation'
 
@@ -38,6 +38,11 @@ export default function SuperAdminClinicasPage() {
 
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
+
+  // Modal eliminar usuario independiente
+  const [confirmDeleteIndep, setConfirmDeleteIndep] = useState<Clinica | null>(null)
+  const [eliminando, setEliminando] = useState(false)
+  const [errorEliminar, setErrorEliminar] = useState('')
 
   // Edición de límites inline
   const [editandoLimites, setEditandoLimites] = useState<string | null>(null)
@@ -178,6 +183,28 @@ export default function SuperAdminClinicasPage() {
 
     setGuardandoPers(false)
     setPersonalizando(null)
+    cargarClinicas()
+  }
+
+  async function eliminarUsuarioIndependiente() {
+    if (!confirmDeleteIndep) return
+    setEliminando(true)
+    setErrorEliminar('')
+
+    const res = await fetch('/api/super-admin/usuarios-independientes', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clinicaId: confirmDeleteIndep.id }),
+    })
+    const data = await res.json()
+    setEliminando(false)
+
+    if (!res.ok) {
+      setErrorEliminar(data.error || 'Error al eliminar')
+      return
+    }
+
+    setConfirmDeleteIndep(null)
     cargarClinicas()
   }
 
@@ -419,6 +446,59 @@ export default function SuperAdminClinicasPage() {
         </div>
       )}
 
+      {/* ── Modal eliminar usuario independiente ── */}
+      {confirmDeleteIndep && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle size={20} className="text-red-600" />
+              </div>
+              <div>
+                <h2 className="font-bold text-slate-800 text-lg">¿Eliminar usuario independiente?</h2>
+                <p className="text-sm text-slate-500">{confirmDeleteIndep.nombre_display || confirmDeleteIndep.nombre}</p>
+              </div>
+            </div>
+
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 space-y-1">
+              <p className="font-semibold">Esta acción es irreversible.</p>
+              <p>Se eliminarán permanentemente todos los datos de esta cuenta:</p>
+              <ul className="list-disc list-inside mt-1 space-y-0.5 text-red-600">
+                <li>Todos los pacientes registrados</li>
+                <li>Notas médicas y consultas</li>
+                <li>Resultados de laboratorio</li>
+                <li>Recetas y documentos</li>
+                <li>Cuenta de acceso (email y contraseña)</li>
+              </ul>
+            </div>
+
+            {errorEliminar && (
+              <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{errorEliminar}</p>
+            )}
+
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => { setConfirmDeleteIndep(null); setErrorEliminar('') }}
+                disabled={eliminando}
+                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={eliminarUsuarioIndependiente}
+                disabled={eliminando}
+                className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {eliminando
+                  ? <><Loader2 size={15} className="animate-spin" /> Eliminando...</>
+                  : <><Trash2 size={15} /> Sí, eliminar definitivamente</>
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Sección: Clínicas ── */}
       <div>
         <div className="flex items-center justify-between mb-4">
@@ -486,6 +566,7 @@ export default function SuperAdminClinicasPage() {
               onGuardarLimites={() => {}}
               onChangeLimites={() => {}}
               onPersonalizar={() => abrirPersonalizacion(c)}
+              onEliminar={() => { setConfirmDeleteIndep(c); setErrorEliminar('') }}
             />
           ))}
           {listaIndep.length === 0 && (
@@ -500,7 +581,7 @@ export default function SuperAdminClinicasPage() {
 // ── Componente tarjeta reutilizable ──────────────────────────────────────────
 function TarjetaCuenta({
   c, editandoLimites, editLimitesForm, guardando,
-  onEditar, onCancelarEditar, onGuardarLimites, onChangeLimites, onPersonalizar,
+  onEditar, onCancelarEditar, onGuardarLimites, onChangeLimites, onPersonalizar, onEliminar,
 }: {
   c: Clinica
   editandoLimites: string | null
@@ -511,6 +592,7 @@ function TarjetaCuenta({
   onGuardarLimites: () => void
   onChangeLimites: (field: string, val: string) => void
   onPersonalizar: () => void
+  onEliminar?: () => void
 }) {
   const esIndep = c.tipo === 'independiente'
 
@@ -551,6 +633,13 @@ function TarjetaCuenta({
               title="Personalizar">
               <Palette size={15} />
             </button>
+            {esIndep && onEliminar && (
+              <button onClick={onEliminar}
+                className="text-slate-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg transition-colors"
+                title="Eliminar usuario">
+                <Trash2 size={15} />
+              </button>
+            )}
             {!esIndep && (
               editandoLimites !== c.id ? (
                 <button onClick={onEditar}

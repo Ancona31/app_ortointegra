@@ -61,3 +61,54 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ ok: true, clinica_id: clinica.id })
 }
+
+export async function DELETE(req: NextRequest) {
+  const { error: authError } = await requireSuperAdmin()
+  if (authError) return authError
+
+  const { clinicaId } = await req.json()
+  if (!clinicaId) return NextResponse.json({ error: 'clinicaId requerido' }, { status: 400 })
+
+  const admin = createAdminClient()
+
+  // 1. Obtener el perfil del usuario dueño de esta clínica
+  const { data: profile } = await admin
+    .from('profiles')
+    .select('id')
+    .eq('clinica_id', clinicaId)
+    .single()
+
+  // 2. Obtener todos los pacientes de la clínica
+  const { data: pacientes } = await admin
+    .from('pacientes')
+    .select('id')
+    .eq('clinica_id', clinicaId)
+
+  const pacienteIds = (pacientes || []).map(p => p.id)
+
+  // 3. Eliminar datos clínicos en orden (hijos primero)
+  if (pacienteIds.length > 0) {
+    await admin.from('documentos').delete().in('paciente_id', pacienteIds)
+    await admin.from('laboratorios').delete().in('paciente_id', pacienteIds)
+    await admin.from('consultas').delete().in('paciente_id', pacienteIds)
+    await admin.from('pacientes').delete().in('id', pacienteIds)
+  }
+
+  // 4. Eliminar jobs de PDF del usuario
+  if (profile?.id) {
+    await admin.from('pdf_jobs').delete().eq('user_id', profile.id)
+  }
+
+  // 5. Eliminar el perfil
+  if (profile?.id) {
+    await admin.from('profiles').delete().eq('id', profile.id)
+    // 6. Eliminar usuario de Auth
+    await admin.auth.admin.deleteUser(profile.id)
+  }
+
+  // 7. Eliminar la clínica personal
+  const { error } = await admin.from('clinicas').delete().eq('id', clinicaId)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  return NextResponse.json({ ok: true })
+}
