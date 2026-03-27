@@ -7,9 +7,10 @@ import { useProfile } from '@/hooks/useProfile'
 import { Paciente, Consulta, Laboratorio } from '@/types'
 import { parseISO, format } from 'date-fns'
 import {
-  ArrowLeft, Stethoscope, FlaskConical, FileText,
+  ArrowLeft, Stethoscope, FlaskConical, FileText, Trash2, AlertTriangle, Loader2,
 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 import ModalVisorDocumento from '@/components/expediente/ModalVisorDocumento'
 import TarjetaPaciente from '@/components/expediente/TarjetaPaciente'
@@ -24,6 +25,7 @@ type Tab = 'resumen' | 'consultas' | 'laboratorios' | 'graficas' | 'documentos'
 function ExpedientePacienteContent() {
   const { id } = useParams<{ id: string }>()
   const searchParams = useSearchParams()
+  const router = useRouter()
   const { isDoctor } = useProfile()
   const [paciente, setPaciente] = useState<Paciente | null>(null)
   const [consultas, setConsultas] = useState<Consulta[]>([])
@@ -36,6 +38,9 @@ function ExpedientePacienteContent() {
   const [busquedaParam, setBusquedaParam] = useState('')
   const [documentos, setDocumentos] = useState<any[]>([])
   const [docSeleccionado, setDocSeleccionado] = useState<any>(null)
+  const [mostrarEliminarPaciente, setMostrarEliminarPaciente] = useState(false)
+  const [eliminandoPaciente, setEliminandoPaciente] = useState(false)
+  const [errorEliminar, setErrorEliminar] = useState('')
 
   useEffect(() => {
     const t = searchParams.get('tab')
@@ -134,6 +139,37 @@ function ExpedientePacienteContent() {
     setConfirmarEliminar(null)
   }
 
+  async function eliminarPaciente() {
+    setEliminandoPaciente(true)
+    setErrorEliminar('')
+    const supabase = createClient()
+
+    // Eliminar en orden: hijos primero, luego el paciente
+    const pasos = [
+      supabase.from('documentos').delete().eq('paciente_id', id),
+      supabase.from('laboratorios').delete().eq('paciente_id', id),
+      supabase.from('consultas').delete().eq('paciente_id', id),
+    ]
+
+    for (const paso of pasos) {
+      const { error } = await paso
+      if (error) {
+        setErrorEliminar('Error al eliminar datos: ' + error.message)
+        setEliminandoPaciente(false)
+        return
+      }
+    }
+
+    const { error } = await supabase.from('pacientes').delete().eq('id', id)
+    if (error) {
+      setErrorEliminar('Error al eliminar paciente: ' + error.message)
+      setEliminandoPaciente(false)
+      return
+    }
+
+    router.push('/expediente')
+  }
+
   function toggleGrafica(nombre: string) {
     setGraficasAbiertas(prev => ({ ...prev, [nombre]: !prev[nombre] }))
   }
@@ -168,6 +204,61 @@ function ExpedientePacienteContent() {
         <ModalVisorDocumento doc={docSeleccionado} onClose={() => setDocSeleccionado(null)} />
       )}
 
+      {/* ── Modal eliminar paciente ── */}
+      {mostrarEliminarPaciente && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle size={20} className="text-red-600" />
+              </div>
+              <div>
+                <h2 className="font-bold text-slate-800 text-lg">¿Eliminar expediente?</h2>
+                <p className="text-sm text-slate-500">
+                  {paciente?.nombre} {paciente?.apellidos}
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 space-y-1">
+              <p className="font-semibold">Esta acción es irreversible.</p>
+              <p>Se eliminarán permanentemente todos los datos del paciente:</p>
+              <ul className="list-disc list-inside mt-1 space-y-0.5 text-red-600">
+                <li>Notas médicas y consultas</li>
+                <li>Resultados de laboratorio</li>
+                <li>Recetas y solicitudes</li>
+                <li>Documentos adjuntos</li>
+                <li>Datos personales del paciente</li>
+              </ul>
+            </div>
+
+            {errorEliminar && (
+              <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{errorEliminar}</p>
+            )}
+
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => { setMostrarEliminarPaciente(false); setErrorEliminar('') }}
+                disabled={eliminandoPaciente}
+                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={eliminarPaciente}
+                disabled={eliminandoPaciente}
+                className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {eliminandoPaciente
+                  ? <><Loader2 size={15} className="animate-spin" /> Eliminando...</>
+                  : <><Trash2 size={15} /> Sí, eliminar definitivamente</>
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link href="/expediente" className="text-slate-400 hover:text-slate-600">
@@ -181,20 +272,30 @@ function ExpedientePacienteContent() {
 
       {/* Acciones rápidas — solo médico */}
       {isDoctor && (
-        <div className="grid grid-cols-3 gap-3">
-          <Link href={`/expediente/${id}/nueva-nota`} className="flex flex-col items-center gap-2 p-4 bg-[#1e5fa8] text-white rounded-xl hover:bg-[#1a3a5c] transition-colors text-center">
-            <Stethoscope size={20} />
-            <span className="text-xs font-medium">Nueva nota</span>
-          </Link>
-          <Link href={`/expediente/${id}/laboratorios/nuevo`} className="flex flex-col items-center gap-2 p-4 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors text-center">
-            <FlaskConical size={20} />
-            <span className="text-xs font-medium">Agregar resultados de laboratorio</span>
-          </Link>
-          <Link href={`/expediente/${id}/documentos`} className="flex flex-col items-center gap-2 p-4 bg-violet-600 text-white rounded-xl hover:bg-violet-700 transition-colors text-center">
-            <FileText size={20} />
-            <span className="text-xs font-medium text-center leading-tight">Nueva receta<br/>y Solicitudes</span>
-          </Link>
-        </div>
+        <>
+          <div className="grid grid-cols-3 gap-3">
+            <Link href={`/expediente/${id}/nueva-nota`} className="flex flex-col items-center gap-2 p-4 bg-[#1e5fa8] text-white rounded-xl hover:bg-[#1a3a5c] transition-colors text-center">
+              <Stethoscope size={20} />
+              <span className="text-xs font-medium">Nueva nota</span>
+            </Link>
+            <Link href={`/expediente/${id}/laboratorios/nuevo`} className="flex flex-col items-center gap-2 p-4 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors text-center">
+              <FlaskConical size={20} />
+              <span className="text-xs font-medium">Agregar resultados de laboratorio</span>
+            </Link>
+            <Link href={`/expediente/${id}/documentos`} className="flex flex-col items-center gap-2 p-4 bg-violet-600 text-white rounded-xl hover:bg-violet-700 transition-colors text-center">
+              <FileText size={20} />
+              <span className="text-xs font-medium text-center leading-tight">Nueva receta<br/>y Solicitudes</span>
+            </Link>
+          </div>
+          <div className="flex justify-end">
+            <button
+              onClick={() => setMostrarEliminarPaciente(true)}
+              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-red-600 transition-colors py-1"
+            >
+              <Trash2 size={13} /> Eliminar paciente
+            </button>
+          </div>
+        </>
       )}
 
       {/* Tabs */}
