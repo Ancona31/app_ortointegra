@@ -41,11 +41,16 @@ export default function AdminUsuariosPage() {
   }, [])
 
   async function cargarUsuarios() {
-    const res = await fetch('/api/admin/usuarios')
-    const data = await res.json()
-    setUsuarios(data.usuarios || [])
-    setLicencia(data.licencia ?? null)
-    setLoading(false)
+    try {
+      const res = await fetch('/api/admin/usuarios')
+      const data = await res.json()
+      setUsuarios(data.usuarios || [])
+      setLicencia(data.licencia ?? null)
+    } catch {
+      setError('Error al cargar usuarios. Verifica tu conexión.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function crearUsuario(e: React.FormEvent) {
