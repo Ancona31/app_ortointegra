@@ -25,6 +25,7 @@ create table if not exists pacientes (
   ant_familiares        text,
   alergias              text,
   medicamentos_actuales text,
+  clinica_id            uuid references clinicas(id) on delete set null,
   created_at            timestamptz default now(),
   updated_at            timestamptz default now()
 );
@@ -66,22 +67,61 @@ create table if not exists documentos (
 );
 
 -- ─── Índices ──────────────────────────────────────────────
-create index if not exists idx_consultas_paciente on consultas(paciente_id);
+create index if not exists idx_pacientes_clinica    on pacientes(clinica_id);
+create index if not exists idx_pacientes_apellidos  on pacientes(apellidos);
+create index if not exists idx_consultas_paciente   on consultas(paciente_id);
 create index if not exists idx_laboratorios_paciente on laboratorios(paciente_id);
-create index if not exists idx_documentos_paciente on documentos(paciente_id);
+create index if not exists idx_documentos_paciente  on documentos(paciente_id);
 
 -- ─── RLS (Row Level Security) ─────────────────────────────
-alter table pacientes   enable row level security;
-alter table consultas   enable row level security;
+alter table pacientes    enable row level security;
+alter table consultas    enable row level security;
 alter table laboratorios enable row level security;
-alter table documentos  enable row level security;
+alter table documentos   enable row level security;
 
--- Política temporal: permitir todo al usuario autenticado
--- (Ajustar cuando se implemente multi-usuario)
-create policy "Allow authenticated all" on pacientes   for all to authenticated using (true) with check (true);
-create policy "Allow authenticated all" on consultas   for all to authenticated using (true) with check (true);
-create policy "Allow authenticated all" on laboratorios for all to authenticated using (true) with check (true);
-create policy "Allow authenticated all" on documentos  for all to authenticated using (true) with check (true);
+-- Helper: obtiene clinica_id del usuario autenticado sin repetir el subquery
+create or replace function public.get_clinica_id()
+returns uuid language sql stable security definer as $$
+  select clinica_id from profiles where id = auth.uid()
+$$;
+
+-- pacientes: filtrado por clínica del usuario
+create policy "clinica_select" on pacientes for select to authenticated
+  using (clinica_id = public.get_clinica_id());
+create policy "clinica_insert" on pacientes for insert to authenticated
+  with check (clinica_id = public.get_clinica_id());
+create policy "clinica_update" on pacientes for update to authenticated
+  using (clinica_id = public.get_clinica_id()) with check (clinica_id = public.get_clinica_id());
+create policy "clinica_delete" on pacientes for delete to authenticated
+  using (clinica_id = public.get_clinica_id());
+
+-- consultas, laboratorios, documentos: heredan el filtro de clínica a través del paciente
+create policy "clinica_select" on consultas for select to authenticated
+  using (exists (select 1 from pacientes p where p.id = consultas.paciente_id and p.clinica_id = public.get_clinica_id()));
+create policy "clinica_insert" on consultas for insert to authenticated
+  with check (exists (select 1 from pacientes p where p.id = consultas.paciente_id and p.clinica_id = public.get_clinica_id()));
+create policy "clinica_update" on consultas for update to authenticated
+  using (exists (select 1 from pacientes p where p.id = consultas.paciente_id and p.clinica_id = public.get_clinica_id()));
+create policy "clinica_delete" on consultas for delete to authenticated
+  using (exists (select 1 from pacientes p where p.id = consultas.paciente_id and p.clinica_id = public.get_clinica_id()));
+
+create policy "clinica_select" on laboratorios for select to authenticated
+  using (exists (select 1 from pacientes p where p.id = laboratorios.paciente_id and p.clinica_id = public.get_clinica_id()));
+create policy "clinica_insert" on laboratorios for insert to authenticated
+  with check (exists (select 1 from pacientes p where p.id = laboratorios.paciente_id and p.clinica_id = public.get_clinica_id()));
+create policy "clinica_update" on laboratorios for update to authenticated
+  using (exists (select 1 from pacientes p where p.id = laboratorios.paciente_id and p.clinica_id = public.get_clinica_id()));
+create policy "clinica_delete" on laboratorios for delete to authenticated
+  using (exists (select 1 from pacientes p where p.id = laboratorios.paciente_id and p.clinica_id = public.get_clinica_id()));
+
+create policy "clinica_select" on documentos for select to authenticated
+  using (exists (select 1 from pacientes p where p.id = documentos.paciente_id and p.clinica_id = public.get_clinica_id()));
+create policy "clinica_insert" on documentos for insert to authenticated
+  with check (exists (select 1 from pacientes p where p.id = documentos.paciente_id and p.clinica_id = public.get_clinica_id()));
+create policy "clinica_update" on documentos for update to authenticated
+  using (exists (select 1 from pacientes p where p.id = documentos.paciente_id and p.clinica_id = public.get_clinica_id()));
+create policy "clinica_delete" on documentos for delete to authenticated
+  using (exists (select 1 from pacientes p where p.id = documentos.paciente_id and p.clinica_id = public.get_clinica_id()));
 
 -- ─── Storage bucket para PDFs ────────────────────────────
 insert into storage.buckets (id, name, public) values ('laboratorios-pdf', 'laboratorios-pdf', false) on conflict do nothing;

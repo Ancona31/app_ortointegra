@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { createClient } from '@/lib/supabase/server'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 export async function POST(req: NextRequest) {
   try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+    const limitError = await checkRateLimit(user.id, 'labs-extract')
+    if (limitError) return limitError
+
     const formData = await req.formData()
     const file = formData.get('pdf') as File
 
@@ -108,7 +117,6 @@ Reglas:
     })
 
   } catch (err: any) {
-    console.error('Error extracción PDF:', err)
-    return NextResponse.json({ error: err.message || 'Error interno' }, { status: 500 })
+    return NextResponse.json({ error: err.message || 'Error interno al procesar el PDF' }, { status: 500 })
   }
 }

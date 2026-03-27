@@ -16,18 +16,38 @@ export interface Profile {
   titulo?: string | null
 }
 
+// Caché a nivel de módulo: evita múltiples queries cuando varios componentes
+// usan useProfile() al mismo tiempo en la misma sesión.
+let profilePromise: Promise<Profile | null> | null = null
+
+function fetchProfile(): Promise<Profile | null> {
+  if (profilePromise) return profilePromise
+  const supabase = createClient()
+  profilePromise = supabase.auth.getUser().then(({ data: { user } }) => {
+    if (!user) return null
+    return supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => data)
+  }).catch(() => null)
+  return profilePromise
+}
+
+// Limpiar caché al cerrar sesión (llamar desde el botón de logout)
+export function clearProfileCache() {
+  profilePromise = null
+}
+
 export function useProfile() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) { setLoading(false); return }
-      supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data }) => {
-        setProfile(data)
-        setLoading(false)
-      })
+    fetchProfile().then(data => {
+      setProfile(data)
+      setLoading(false)
     })
   }, [])
 

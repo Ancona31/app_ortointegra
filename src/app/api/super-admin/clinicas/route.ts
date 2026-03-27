@@ -1,19 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createClient } from '@/lib/supabase/server'
-
-async function verificarSuperAdmin() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'super_admin') return null
-  return user
-}
+import { requireSuperAdmin } from '@/lib/auth'
 
 export async function GET() {
-  const user = await verificarSuperAdmin()
-  if (!user) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+  const { user, error } = await requireSuperAdmin()
+  if (error) return error
 
   const admin = createAdminClient()
   const { data: clinicas } = await admin.from('clinicas').select('*').order('nombre')
@@ -29,8 +20,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await verificarSuperAdmin()
-  if (!user) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+  const { user, error } = await requireSuperAdmin()
+  if (error) return error
 
   const { nombre, max_medicos, max_secretarias } = await req.json()
   if (!nombre) return NextResponse.json({ error: 'Falta el nombre' }, { status: 400 })
@@ -43,8 +34,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const user = await verificarSuperAdmin()
-  if (!user) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+  const { user, error } = await requireSuperAdmin()
+  if (error) return error
 
   const body = await req.json()
   const { id } = body

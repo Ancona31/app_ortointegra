@@ -1,23 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { createClient } from '@/lib/supabase/server'
+import { checkRateLimit } from '@/lib/rateLimit'
+import { sanitizePromptInput, sanitizeNumber } from '@/lib/sanitize'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 export async function POST(req: NextRequest) {
   try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+    const limitError = await checkRateLimit(user.id, 'nota-medica')
+    if (limitError) return limitError
+
     const body = await req.json()
-    const {
-      paciente,
-      motivo_consulta,
-      exploracion_fisica,
-      diagnosticos,
-      plan_tratamiento,
-      antecedentes,
-      edad,
-      sexo,
-      peso,
-      talla,
-    } = body
+
+    // Sanitizar todos los inputs antes de interpolarlos en el prompt
+    const motivo_consulta  = sanitizePromptInput(body.motivo_consulta, 1000)
+    const exploracion_fisica = sanitizePromptInput(body.exploracion_fisica, 1000)
+    const diagnosticos     = sanitizePromptInput(body.diagnosticos, 500)
+    const plan_tratamiento = sanitizePromptInput(body.plan_tratamiento, 500)
+    const antecedentes     = sanitizePromptInput(body.antecedentes, 500)
+    const edad             = sanitizeNumber(body.edad)
+    const peso             = sanitizeNumber(body.peso)
+    const talla            = sanitizeNumber(body.talla)
+    const sexo             = ['M', 'F'].includes(body.sexo) ? body.sexo as 'M' | 'F' : null
 
     const prompt = `Actúa como un Médico Especialista en Traumatología y Ortopedia con Alta Especialidad en Cirugía de Columna. Redacta ÚNICAMENTE el cuerpo clínico de la nota médica en formato SOAP, con rigor técnico y legal (NOM-004-SSA3-2012).
 
@@ -71,7 +80,6 @@ FORMATO DE SALIDA — usa exactamente estas 5 secciones, sin agregar nada más a
     return NextResponse.json({ nota })
 
   } catch (err: any) {
-    console.error('Error generando nota:', err)
-    return NextResponse.json({ error: err.message || 'Error interno' }, { status: 500 })
+    return NextResponse.json({ error: err.message || 'Error interno al generar la nota' }, { status: 500 })
   }
 }

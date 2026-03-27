@@ -1,11 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { createClient } from '@/lib/supabase/server'
+import { checkRateLimit } from '@/lib/rateLimit'
+import { sanitizePromptInput } from '@/lib/sanitize'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 export async function POST(req: NextRequest) {
   try {
-    const { pregunta } = await req.json()
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+    const limitError = await checkRateLimit(user.id, 'consulta-rapida')
+    if (limitError) return limitError
+
+    const body = await req.json()
+    const pregunta = sanitizePromptInput(body.pregunta, 500)
     if (!pregunta) return NextResponse.json({ error: 'Pregunta vacía' }, { status: 400 })
 
     const response = await client.messages.create({

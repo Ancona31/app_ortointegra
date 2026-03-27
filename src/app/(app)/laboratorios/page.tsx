@@ -7,20 +7,28 @@ import { ValoresLab, AnalisisIA, VALORES_REFERENCIA, ParametroLab } from '@/type
 import { analizarLaboratorios } from '@/lib/analisis'
 import { createClient } from '@/lib/supabase/client'
 
-const PARAMETROS = Object.entries(VALORES_REFERENCIA) as [ParametroLab, typeof VALORES_REFERENCIA[ParametroLab]][]
+// Tipo explícito para evitar `as any` al acceder a los campos de referencia
+type RefValue = {
+  ref_min: number | null
+  ref_max: number | null
+  opt_min: number | null
+  opt_max: number | null
+  unidad: string
+  label: string
+}
+
+const PARAMETROS = Object.entries(VALORES_REFERENCIA) as [ParametroLab, RefValue][]
 
 function BadgeEstado({ valor, param }: { valor: number; param: ParametroLab }) {
-  const ref = VALORES_REFERENCIA[param]
-  const optMax = 'opt_max' in ref ? ref.opt_max : null
-  const optMin = 'opt_min' in ref ? ref.opt_min : null
+  const ref = VALORES_REFERENCIA[param] as RefValue
 
-  let estado: 'optimo' | 'suboptimo' | 'bajo' = 'optimo'
-  if (optMax !== null && valor > optMax) estado = 'suboptimo'
-  if (optMin !== null && valor < optMin) estado = 'suboptimo'
-  if ((ref as any).ref_min !== null && valor < (ref as any).ref_min) estado = 'bajo'
-  if ((ref as any).ref_max !== null && valor > (ref as any).ref_max) estado = 'bajo'
+  let estado: 'optimo' | 'suboptimo' | 'bajo' | 'alto' = 'optimo'
+  if (ref.opt_max !== null && valor > ref.opt_max) estado = 'suboptimo'
+  if (ref.opt_min !== null && valor < ref.opt_min) estado = 'suboptimo'
+  if (ref.ref_min !== null && valor < ref.ref_min) estado = 'bajo'
+  if (ref.ref_max !== null && valor > ref.ref_max) estado = 'alto'
 
-  if (estado === 'optimo') return <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-medium">Óptimo</span>
+  if (estado === 'optimo')   return <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-medium">Óptimo</span>
   if (estado === 'suboptimo') return <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full font-medium">Sub-óptimo</span>
   return <span className="text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full font-medium">Fuera de rango</span>
 }
@@ -187,8 +195,8 @@ export default function LaboratoriosPage() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-slate-700">{ref.label}</p>
                 <p className="text-xs text-slate-400">
-                  Ref: {(ref as any).ref_min ?? '–'}–{(ref as any).ref_max ?? '–'} {ref.unidad} ·
-                  Meta: {(ref as any).opt_min ? `${(ref as any).opt_min}–` : '< '}{(ref as any).opt_max ?? (ref as any).opt_min} {ref.unidad}
+                  Ref: {(ref as RefValue).ref_min ?? '–'}–{(ref as RefValue).ref_max ?? '–'} {ref.unidad} ·
+                  Meta: {(ref as RefValue).opt_min ? `${(ref as RefValue).opt_min}–` : '< '}{(ref as RefValue).opt_max ?? (ref as RefValue).opt_min} {ref.unidad}
                 </p>
               </div>
               <div className="flex items-center gap-2">

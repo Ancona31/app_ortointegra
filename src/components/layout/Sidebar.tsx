@@ -8,7 +8,7 @@ import {
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { useProfile } from '@/hooks/useProfile'
+import { useProfile, clearProfileCache } from '@/hooks/useProfile'
 import { useClinica } from '@/hooks/useClinica'
 
 const navDoctor = [
@@ -52,6 +52,7 @@ export default function Sidebar() {
   async function handleLogout() {
     const supabase = createClient()
     await supabase.auth.signOut()
+    clearProfileCache()
     router.push('/login')
     router.refresh()
   }
@@ -87,7 +88,7 @@ export default function Sidebar() {
         {/* Logo y nombre */}
         <div className="flex flex-col items-center gap-3 px-6 py-6 border-b border-white/10">
           <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center overflow-hidden shadow-lg">
-            {logoUrl ? (
+            {logoUrl && logoUrl.startsWith('https://') ? (
               <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
             ) : (
               <img

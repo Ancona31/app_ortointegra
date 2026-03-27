@@ -39,6 +39,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
   ])
   const [sugerenciasDosis, setSugerenciasDosis] = useState<string[]>([''])
   const [recomendaciones, setRecomendaciones] = useState('')
+  const [errorGuardado, setErrorGuardado] = useState('')
 
   function addMed() {
     setMedicamentos([...medicamentos, { nombre_comercial: '', presentacion: '', dosis: '', principio_activo: '', indicacion: '' }])
@@ -64,14 +65,19 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     setSugerenciasDosis(prev => prev.map((s, idx) => idx === i ? med.dosis_sugerida : s))
   }
 
-  function imprimir() {
+  async function imprimir() {
+    setErrorGuardado('')
     if (pacienteId) {
       const supabase = createClient()
-      supabase.from('documentos').insert({
+      const { error } = await supabase.from('documentos').insert({
         paciente_id: pacienteId,
         tipo: 'receta',
         contenido: { paciente, diagnostico, medicamentos, recomendaciones, fecha },
-      }).then(() => {})
+      })
+      if (error) {
+        setErrorGuardado('No se pudo guardar la receta en el expediente.')
+        return
+      }
     }
 
     const ventana = window.open('', '_blank', 'width=800,height=600')
@@ -267,6 +273,12 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
       </div>
 
       <ConsultaRapida />
+
+      {errorGuardado && (
+        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+          {errorGuardado}
+        </p>
+      )}
 
       <button
         onClick={imprimir}

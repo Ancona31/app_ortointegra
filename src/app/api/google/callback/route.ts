@@ -10,8 +10,15 @@ const oauth2Client = new google.auth.OAuth2(
 
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get('code')
+  const state = req.nextUrl.searchParams.get('state')
+  const savedState = req.cookies.get('oauth_state')?.value
+
   if (!code) {
     return NextResponse.redirect(new URL('/dashboard?error=no_code', req.url))
+  }
+
+  if (!state || !savedState || state !== savedState) {
+    return NextResponse.redirect(new URL('/dashboard?error=invalid_state', req.url))
   }
 
   try {
@@ -30,7 +37,9 @@ export async function GET(req: NextRequest) {
       expires_at: tokens.expiry_date ?? null,
     })
 
-    return NextResponse.redirect(new URL('/dashboard?calendar=connected', req.url))
+    const response = NextResponse.redirect(new URL('/dashboard?calendar=connected', req.url))
+    response.cookies.delete('oauth_state')
+    return response
   } catch {
     return NextResponse.redirect(new URL('/dashboard?error=oauth_failed', req.url))
   }

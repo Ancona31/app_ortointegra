@@ -1,4 +1,5 @@
 import Sidebar from '@/components/layout/Sidebar'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -6,7 +7,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <main className="flex-1 lg:ml-64 overflow-y-auto">
         <div className="min-h-full p-6 lg:p-8">
-          {children}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
         </div>
       </main>
     </div>
