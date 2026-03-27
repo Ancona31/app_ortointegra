@@ -103,7 +103,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-slate-300 mt-6">
-          © {new Date().getFullYear()} OrthoIntegra · Todos los derechos reservados
+          © 2026 OrthoIntegra · Todos los derechos reservados
         </p>
       </div>
     </div>
