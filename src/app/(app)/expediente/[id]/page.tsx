@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useProfile } from '@/hooks/useProfile'
 import { Paciente, Consulta, Laboratorio } from '@/types'
 import { differenceInYears, parseISO, format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -152,6 +153,7 @@ function GraficaParametro({ param }: { param: ParamGrafica }) {
 function ExpedientePacienteContent() {
   const { id } = useParams<{ id: string }>()
   const searchParams = useSearchParams()
+  const { isDoctor } = useProfile()
   const [paciente, setPaciente] = useState<Paciente | null>(null)
   const [consultas, setConsultas] = useState<Consulta[]>([])
   const [labs, setLabs] = useState<Laboratorio[]>([])
@@ -290,7 +292,7 @@ function ExpedientePacienteContent() {
     { key: 'consultas', label: 'Consultas', count: consultas.length },
     { key: 'laboratorios', label: 'Laboratorios', count: labs.length },
     { key: 'graficas', label: 'Gráficas', count: todosLosParams.length || undefined },
-    { key: 'documentos', label: 'Documentos', count: documentos.length || undefined },
+    ...(isDoctor ? [{ key: 'documentos' as Tab, label: 'Documentos', count: documentos.length || undefined }] : []),
   ]
 
   return (
@@ -317,10 +319,12 @@ function ExpedientePacienteContent() {
               {paciente.numero_expediente && ` · Exp. ${paciente.numero_expediente}`}
             </p>
           </div>
-          <Link href={`/expediente/${id}/editar`}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-medium transition-colors flex-shrink-0">
-            <Pencil size={13} /> Editar
-          </Link>
+          {isDoctor && (
+            <Link href={`/expediente/${id}/editar`}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-medium transition-colors flex-shrink-0">
+              <Pencil size={13} /> Editar
+            </Link>
+          )}
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y divide-slate-100">
           {[
@@ -368,21 +372,23 @@ function ExpedientePacienteContent() {
         )}
       </div>
 
-      {/* Acciones rápidas */}
-      <div className="grid grid-cols-3 gap-3">
-        <Link href={`/expediente/${id}/nueva-nota`} className="flex flex-col items-center gap-2 p-4 bg-[#1e5fa8] text-white rounded-xl hover:bg-[#1a3a5c] transition-colors text-center">
-          <Stethoscope size={20} />
-          <span className="text-xs font-medium">Nueva nota</span>
-        </Link>
-        <Link href={`/expediente/${id}/laboratorios/nuevo`} className="flex flex-col items-center gap-2 p-4 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors text-center">
-          <FlaskConical size={20} />
-          <span className="text-xs font-medium">Agregar resultados de laboratorio</span>
-        </Link>
-        <Link href={`/expediente/${id}/documentos`} className="flex flex-col items-center gap-2 p-4 bg-violet-600 text-white rounded-xl hover:bg-violet-700 transition-colors text-center">
-          <FileText size={20} />
-          <span className="text-xs font-medium text-center leading-tight">Nueva receta<br/>y Solicitudes</span>
-        </Link>
-      </div>
+      {/* Acciones rápidas — solo médico */}
+      {isDoctor && (
+        <div className="grid grid-cols-3 gap-3">
+          <Link href={`/expediente/${id}/nueva-nota`} className="flex flex-col items-center gap-2 p-4 bg-[#1e5fa8] text-white rounded-xl hover:bg-[#1a3a5c] transition-colors text-center">
+            <Stethoscope size={20} />
+            <span className="text-xs font-medium">Nueva nota</span>
+          </Link>
+          <Link href={`/expediente/${id}/laboratorios/nuevo`} className="flex flex-col items-center gap-2 p-4 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors text-center">
+            <FlaskConical size={20} />
+            <span className="text-xs font-medium">Agregar resultados de laboratorio</span>
+          </Link>
+          <Link href={`/expediente/${id}/documentos`} className="flex flex-col items-center gap-2 p-4 bg-violet-600 text-white rounded-xl hover:bg-violet-700 transition-colors text-center">
+            <FileText size={20} />
+            <span className="text-xs font-medium text-center leading-tight">Nueva receta<br/>y Solicitudes</span>
+          </Link>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-slate-200 overflow-x-auto">
@@ -513,9 +519,11 @@ function ExpedientePacienteContent() {
           {consultas.length === 0 && labs.length === 0 && (
             <div className="bg-white rounded-xl border border-slate-200 p-10 text-center">
               <p className="text-slate-400 text-sm">Sin actividad registrada para este paciente</p>
-              <Link href={`/expediente/${id}/nueva-nota`} className="text-[#1e5fa8] text-sm mt-2 inline-block hover:underline">
-                Crear primera nota →
-              </Link>
+              {isDoctor && (
+                <Link href={`/expediente/${id}/nueva-nota`} className="text-[#1e5fa8] text-sm mt-2 inline-block hover:underline">
+                  Crear primera nota →
+                </Link>
+              )}
             </div>
           )}
         </div>
@@ -528,7 +536,7 @@ function ExpedientePacienteContent() {
             <div className="p-10 text-center">
               <Calendar size={36} className="mx-auto text-slate-300 mb-3" />
               <p className="text-slate-500 font-medium">Sin consultas registradas</p>
-              <Link href={`/expediente/${id}/nueva-nota`} className="text-[#1e5fa8] text-sm mt-2 inline-block hover:underline">Crear primera nota →</Link>
+              {isDoctor && <Link href={`/expediente/${id}/nueva-nota`} className="text-[#1e5fa8] text-sm mt-2 inline-block hover:underline">Crear primera nota →</Link>}
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
@@ -563,7 +571,7 @@ function ExpedientePacienteContent() {
             <div className="p-10 text-center">
               <FlaskConical size={36} className="mx-auto text-slate-300 mb-3" />
               <p className="text-slate-500 font-medium">Sin laboratorios registrados</p>
-              <Link href={`/expediente/${id}/laboratorios/nuevo`} className="text-emerald-600 text-sm mt-2 inline-block hover:underline">Subir primer laboratorio →</Link>
+              {isDoctor && <Link href={`/expediente/${id}/laboratorios/nuevo`} className="text-emerald-600 text-sm mt-2 inline-block hover:underline">Subir primer laboratorio →</Link>}
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
@@ -613,10 +621,12 @@ function ExpedientePacienteContent() {
                         </div>
                       </Link>
                       <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                        <button onClick={() => setConfirmarEliminar(confirmando ? null : lab.id)}
-                          className="p-1.5 text-slate-300 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50">
-                          <Trash2 size={15} />
-                        </button>
+                        {isDoctor && (
+                          <button onClick={() => setConfirmarEliminar(confirmando ? null : lab.id)}
+                            className="p-1.5 text-slate-300 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50">
+                            <Trash2 size={15} />
+                          </button>
+                        )}
                         <ChevronRight size={16} className="text-slate-300 group-hover:text-emerald-600" />
                       </div>
                     </div>
