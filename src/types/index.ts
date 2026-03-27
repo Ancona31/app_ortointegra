@@ -34,6 +34,12 @@ export interface Consulta {
   plan_tratamiento?: string
   notas_evolucion?: string
   proxima_cita?: string
+  // Médico que creó la nota — inmutable tras la creación
+  medico_nombre?: string | null
+  medico_especialidad?: string | null
+  medico_cedula_profesional?: string | null
+  medico_cedula_especialidad?: string | null
+  medico_logo_url?: string | null
   created_at?: string
 }
 

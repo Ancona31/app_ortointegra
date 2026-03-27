@@ -89,13 +89,14 @@ export default function ConsultaDetallePage() {
     const ventana = window.open('', '_blank', 'width=800,height=600')
     if (!ventana) return
 
-    const doctorNombre = medicoInfo?.nombre || 'Médico'
-    const doctorEspecialidad = medicoInfo?.especialidad || ''
+    // Use doctor info stored at note creation time (immutable)
+    const doctorNombre = consulta.medico_nombre || medicoInfo?.nombre || 'Médico'
+    const doctorEspecialidad = consulta.medico_especialidad || medicoInfo?.especialidad || ''
     const cedulas = [
-      medicoInfo?.cedula_profesional ? `Céd. Prof. ${medicoInfo.cedula_profesional}` : '',
-      medicoInfo?.cedula_especialidad ? `Céd. Esp. ${medicoInfo.cedula_especialidad}` : '',
+      (consulta.medico_cedula_profesional || medicoInfo?.cedula_profesional) ? `Céd. Prof. ${consulta.medico_cedula_profesional || medicoInfo?.cedula_profesional}` : '',
+      (consulta.medico_cedula_especialidad || medicoInfo?.cedula_especialidad) ? `Céd. Esp. ${consulta.medico_cedula_especialidad || medicoInfo?.cedula_especialidad}` : '',
     ].filter(Boolean).join(' · ')
-    const logoUrl = medicoInfo?.logo_url || `${window.location.origin}/logo.png`
+    const logoUrl = consulta.medico_logo_url || medicoInfo?.logo_url || `${window.location.origin}/logo.png`
     const edad = paciente.fecha_nacimiento
       ? differenceInYears(new Date(), parseISO(paciente.fecha_nacimiento))
       : null
@@ -124,7 +125,7 @@ export default function ConsultaDetallePage() {
   </div>
   <div class="nota-content">${notaHtml}</div>
   ${consulta.proxima_cita ? `<div class="proxima-cita"><strong>Próxima cita:</strong> ${consulta.proxima_cita}</div>` : ''}
-  <div class="footer"><div class="firma"><p>${doctorNombre}</p>${medicoInfo?.cedula_profesional ? `<p>Céd. Prof. ${medicoInfo.cedula_profesional}</p>` : ''}</div></div>
+  <div class="footer"><div class="firma"><p>${doctorNombre}</p>${(consulta.medico_cedula_profesional || medicoInfo?.cedula_profesional) ? `<p>Céd. Prof. ${consulta.medico_cedula_profesional || medicoInfo?.cedula_profesional}</p>` : ''}</div></div>
 </body></html>`)
     ventana.document.close()
     ventana.focus()

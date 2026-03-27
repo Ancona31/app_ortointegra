@@ -104,6 +104,11 @@ export default function NuevaNotaPage() {
       plan_tratamiento: form.plan_tratamiento,
       notas_evolucion: notaGenerada,
       proxima_cita: form.proxima_cita || null,
+      medico_nombre: medicoInfo?.nombre || null,
+      medico_especialidad: medicoInfo?.especialidad || null,
+      medico_cedula_profesional: medicoInfo?.cedula_profesional || null,
+      medico_cedula_especialidad: medicoInfo?.cedula_especialidad || null,
+      medico_logo_url: medicoInfo?.logo_url || null,
     })
 
     setGuardando(false)
