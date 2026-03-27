@@ -1,0 +1,449 @@
+'use client'
+
+import { useState, useEffect, useRef } from 'react'
+import { Building2, Plus, Pencil, Check, X, Loader2, Palette, Upload, ImageIcon } from 'lucide-react'
+import { useProfile } from '@/hooks/useProfile'
+import { useRouter } from 'next/navigation'
+
+type Clinica = {
+  id: string
+  nombre: string
+  nombre_display: string | null
+  subtitulo: string | null
+  color_primario: string | null
+  color_secundario: string | null
+  logo_url: string | null
+  max_medicos: number | null
+  max_secretarias: number | null
+  count_medicos: number
+  count_secretarias: number
+}
+
+export default function SuperAdminClinicasPage() {
+  const { profile, loading: loadingProfile } = useProfile()
+  const router = useRouter()
+  const [clinicas, setClinicas] = useState<Clinica[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Modal nueva clínica
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ nombre: '', max_medicos: '', max_secretarias: '' })
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState('')
+
+  // Edición de límites inline
+  const [editandoLimites, setEditandoLimites] = useState<string | null>(null)
+  const [editLimitesForm, setEditLimitesForm] = useState<Record<string, { max_medicos: string; max_secretarias: string }>>({})
+
+  // Modal personalización
+  const [personalizando, setPersonalizando] = useState<Clinica | null>(null)
+  const [persForm, setPersForm] = useState({
+    nombre_display: '',
+    subtitulo: '',
+    color_primario: '#1a3a5c',
+    color_secundario: '#1e5fa8',
+  })
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [logoPreview, setLogoPreview] = useState<string | null>(null)
+  const [guardandoPers, setGuardandoPers] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!loadingProfile && profile && profile.role !== 'super_admin') {
+      router.push('/dashboard')
+    }
+  }, [profile, loadingProfile, router])
+
+  useEffect(() => {
+    if (!loadingProfile && profile?.role === 'super_admin') cargarClinicas()
+  }, [profile, loadingProfile])
+
+  async function cargarClinicas() {
+    const res = await fetch('/api/super-admin/clinicas')
+    const data = await res.json()
+    setClinicas(data.clinicas || [])
+    setLoading(false)
+  }
+
+  async function crearClinica(e: React.FormEvent) {
+    e.preventDefault()
+    setGuardando(true)
+    setError('')
+    const res = await fetch('/api/super-admin/clinicas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nombre: form.nombre,
+        max_medicos: form.max_medicos ? parseInt(form.max_medicos) : null,
+        max_secretarias: form.max_secretarias ? parseInt(form.max_secretarias) : null,
+      }),
+    })
+    const data = await res.json()
+    setGuardando(false)
+    if (!res.ok) { setError(data.error || 'Error al crear clínica'); return }
+    setForm({ nombre: '', max_medicos: '', max_secretarias: '' })
+    setShowForm(false)
+    cargarClinicas()
+  }
+
+  async function actualizarLimites(id: string) {
+    const ef = editLimitesForm[id]
+    if (!ef) return
+    setGuardando(true)
+    await fetch('/api/super-admin/clinicas', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id,
+        max_medicos: ef.max_medicos ? parseInt(ef.max_medicos) : null,
+        max_secretarias: ef.max_secretarias ? parseInt(ef.max_secretarias) : null,
+      }),
+    })
+    setGuardando(false)
+    setEditandoLimites(null)
+    cargarClinicas()
+  }
+
+  function abrirPersonalizacion(c: Clinica) {
+    setPersonalizando(c)
+    setPersForm({
+      nombre_display: c.nombre_display ?? '',
+      subtitulo: c.subtitulo ?? '',
+      color_primario: c.color_primario ?? '#1a3a5c',
+      color_secundario: c.color_secundario ?? '#1e5fa8',
+    })
+    setLogoFile(null)
+    setLogoPreview(c.logo_url)
+  }
+
+  function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setLogoFile(file)
+    setLogoPreview(URL.createObjectURL(file))
+  }
+
+  async function guardarPersonalizacion() {
+    if (!personalizando) return
+    setGuardandoPers(true)
+
+    // Subir logo si hay uno nuevo
+    if (logoFile) {
+      const fd = new FormData()
+      fd.append('file', logoFile)
+      fd.append('clinicaId', personalizando.id)
+      await fetch('/api/super-admin/clinicas/logo', { method: 'POST', body: fd })
+    }
+
+    // Guardar resto de campos
+    await fetch('/api/super-admin/clinicas', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: personalizando.id,
+        nombre_display: persForm.nombre_display || null,
+        subtitulo: persForm.subtitulo || null,
+        color_primario: persForm.color_primario,
+        color_secundario: persForm.color_secundario,
+      }),
+    })
+
+    setGuardandoPers(false)
+    setPersonalizando(null)
+    cargarClinicas()
+  }
+
+  if (loadingProfile || loading) return <div className="text-center py-12 text-slate-400">Cargando...</div>
+
+  return (
+    <div className="max-w-3xl mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-[#1a3a5c] flex items-center gap-2">
+            <Building2 size={24} /> Gestión de clínicas
+          </h1>
+          <p className="text-slate-500 text-sm mt-1">Administra las clínicas, sus límites y personalización</p>
+        </div>
+        <button
+          onClick={() => { setShowForm(true); setError('') }}
+          className="flex items-center gap-2 px-4 py-2.5 bg-[#1e5fa8] text-white rounded-lg text-sm font-medium hover:bg-[#1a3a5c] transition-colors"
+        >
+          <Plus size={16} /> Nueva clínica
+        </button>
+      </div>
+
+      {/* Modal nueva clínica */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-slate-800 flex items-center gap-2"><Plus size={18} /> Nueva clínica</h2>
+              <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+            </div>
+            <form onSubmit={crearClinica} className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Nombre de la clínica</label>
+                <input type="text" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })}
+                  placeholder="Ej: Clínica Ortointegra Norte" required
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-500 block mb-1">Máx. médicos</label>
+                  <input type="number" min="0" value={form.max_medicos} onChange={e => setForm({ ...form, max_medicos: e.target.value })}
+                    placeholder="Sin límite"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500 block mb-1">Máx. secretarias</label>
+                  <input type="number" min="0" value={form.max_secretarias} onChange={e => setForm({ ...form, max_secretarias: e.target.value })}
+                    placeholder="Sin límite"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                </div>
+              </div>
+              {error && <p className="text-sm text-red-600">{error}</p>}
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowForm(false)}
+                  className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
+                <button type="submit" disabled={guardando}
+                  className="flex-1 py-2.5 bg-[#1e5fa8] text-white rounded-xl text-sm font-medium hover:bg-[#1a3a5c] disabled:opacity-60 flex items-center justify-center gap-2">
+                  {guardando ? <><Loader2 size={14} className="animate-spin" /> Creando...</> : 'Crear clínica'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal personalización */}
+      {personalizando && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-bold text-slate-800 flex items-center gap-2">
+                <Palette size={18} /> Personalizar clínica
+              </h2>
+              <button onClick={() => setPersonalizando(null)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Logo */}
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-2">Logo</label>
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200">
+                    {logoPreview
+                      ? <img src={logoPreview} alt="Logo preview" className="w-full h-full object-contain" />
+                      : <ImageIcon size={24} className="text-slate-300" />
+                    }
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50"
+                  >
+                    <Upload size={14} /> Subir imagen
+                  </button>
+                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
+                </div>
+                <p className="text-xs text-slate-400 mt-1">PNG o JPG, fondo transparente recomendado</p>
+              </div>
+
+              {/* Nombre display */}
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Nombre debajo del logo</label>
+                <input type="text" value={persForm.nombre_display}
+                  onChange={e => setPersForm({ ...persForm, nombre_display: e.target.value })}
+                  placeholder={personalizando.nombre}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                <p className="text-xs text-slate-400 mt-1">Si se deja vacío, se mostrará el nombre de la clínica</p>
+              </div>
+
+              {/* Subtítulo */}
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Subtítulo</label>
+                <input type="text" value={persForm.subtitulo}
+                  onChange={e => setPersForm({ ...persForm, subtitulo: e.target.value })}
+                  placeholder="Ej: Especialidad · Subespecialidad"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+              </div>
+
+              {/* Colores */}
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-2">Colores</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Color principal (sidebar)</label>
+                    <div className="flex items-center gap-2">
+                      <input type="color" value={persForm.color_primario}
+                        onChange={e => setPersForm({ ...persForm, color_primario: e.target.value })}
+                        className="w-10 h-10 rounded cursor-pointer border-0 p-0.5 bg-white border border-slate-200" />
+                      <span className="text-xs text-slate-500 font-mono">{persForm.color_primario}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Color secundario (activo)</label>
+                    <div className="flex items-center gap-2">
+                      <input type="color" value={persForm.color_secundario}
+                        onChange={e => setPersForm({ ...persForm, color_secundario: e.target.value })}
+                        className="w-10 h-10 rounded cursor-pointer border-0 p-0.5 bg-white border border-slate-200" />
+                      <span className="text-xs text-slate-500 font-mono">{persForm.color_secundario}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Preview del sidebar */}
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-2">Vista previa del sidebar</label>
+                <div className="rounded-xl overflow-hidden shadow-md w-44" style={{ backgroundColor: persForm.color_primario }}>
+                  <div className="flex flex-col items-center gap-2 px-4 py-4 border-b border-white/10">
+                    <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center overflow-hidden">
+                      {logoPreview
+                        ? <img src={logoPreview} alt="Logo" className="w-full h-full object-contain" />
+                        : <ImageIcon size={16} className="text-slate-300" />
+                      }
+                    </div>
+                    <p className="text-white text-xs font-semibold text-center leading-tight">
+                      {persForm.nombre_display || personalizando.nombre}
+                    </p>
+                    <p className="text-blue-300 text-[10px] text-center leading-tight">
+                      {persForm.subtitulo || 'Subtítulo'}
+                    </p>
+                  </div>
+                  <div className="px-2 py-2 space-y-1">
+                    {['Inicio', 'Expediente', 'Usuarios'].map((item, i) => (
+                      <div key={item} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
+                        style={i === 0 ? { backgroundColor: persForm.color_secundario, color: 'white' } : { color: 'rgb(147 197 253)' }}>
+                        <div className="w-2 h-2 rounded-full bg-current opacity-60" />
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setPersonalizando(null)}
+                className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">
+                Cancelar
+              </button>
+              <button onClick={guardarPersonalizacion} disabled={guardandoPers}
+                className="flex-1 py-2.5 bg-[#1e5fa8] text-white rounded-xl text-sm font-medium hover:bg-[#1a3a5c] disabled:opacity-60 flex items-center justify-center gap-2">
+                {guardandoPers ? <><Loader2 size={14} className="animate-spin" /> Guardando...</> : 'Guardar cambios'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lista de clínicas */}
+      <div className="space-y-3">
+        {clinicas.map(c => (
+          <div key={c.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-4">
+              {/* Encabezado */}
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  {c.logo_url ? (
+                    <div className="w-10 h-10 rounded-full bg-slate-100 overflow-hidden flex items-center justify-center border border-slate-200">
+                      <img src={c.logo_url} alt="Logo" className="w-full h-full object-contain" />
+                    </div>
+                  ) : (
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: c.color_primario ?? '#1a3a5c' }}>
+                      <Building2 size={18} className="text-white" />
+                    </div>
+                  )}
+                  <div>
+                    <h2 className="font-semibold text-slate-800">{c.nombre_display || c.nombre}</h2>
+                    {c.subtitulo && <p className="text-xs text-slate-400">{c.subtitulo}</p>}
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  <button onClick={() => abrirPersonalizacion(c)}
+                    className="text-slate-400 hover:text-violet-600 p-1.5 hover:bg-violet-50 rounded-lg transition-colors"
+                    title="Personalizar">
+                    <Palette size={15} />
+                  </button>
+                  {editandoLimites !== c.id ? (
+                    <button
+                      onClick={() => {
+                        setEditandoLimites(c.id)
+                        setEditLimitesForm(prev => ({
+                          ...prev,
+                          [c.id]: {
+                            max_medicos: c.max_medicos?.toString() ?? '',
+                            max_secretarias: c.max_secretarias?.toString() ?? '',
+                          }
+                        }))
+                      }}
+                      className="text-slate-400 hover:text-[#1e5fa8] p-1.5 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="Editar límites">
+                      <Pencil size={15} />
+                    </button>
+                  ) : (
+                    <>
+                      <button onClick={() => actualizarLimites(c.id)} disabled={guardando}
+                        className="text-emerald-600 hover:text-emerald-700 p-1.5 hover:bg-emerald-50 rounded-lg transition-colors">
+                        <Check size={15} />
+                      </button>
+                      <button onClick={() => setEditandoLimites(null)}
+                        className="text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-50 rounded-lg transition-colors">
+                        <X size={15} />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Colores */}
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-4 h-4 rounded-full border border-slate-200" style={{ backgroundColor: c.color_primario ?? '#1a3a5c' }} title="Color principal" />
+                <div className="w-4 h-4 rounded-full border border-slate-200" style={{ backgroundColor: c.color_secundario ?? '#1e5fa8' }} title="Color secundario" />
+                <span className="text-xs text-slate-400">{c.color_primario ?? '#1a3a5c'} · {c.color_secundario ?? '#1e5fa8'}</span>
+              </div>
+
+              {/* Contadores */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-blue-50 rounded-lg px-3 py-2.5">
+                  <p className="text-xs text-blue-500 font-medium mb-1">Médicos</p>
+                  {editandoLimites === c.id ? (
+                    <input type="number" min="0"
+                      value={editLimitesForm[c.id]?.max_medicos ?? ''}
+                      onChange={e => setEditLimitesForm(prev => ({ ...prev, [c.id]: { ...prev[c.id], max_medicos: e.target.value } }))}
+                      placeholder="Sin límite"
+                      className="w-full px-2 py-1 border border-blue-200 rounded text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-300" />
+                  ) : (
+                    <p className="text-sm font-semibold text-blue-700">
+                      {c.count_medicos} <span className="text-blue-400 font-normal">/ {c.max_medicos ?? '∞'}</span>
+                    </p>
+                  )}
+                </div>
+                <div className="bg-violet-50 rounded-lg px-3 py-2.5">
+                  <p className="text-xs text-violet-500 font-medium mb-1">Secretarias</p>
+                  {editandoLimites === c.id ? (
+                    <input type="number" min="0"
+                      value={editLimitesForm[c.id]?.max_secretarias ?? ''}
+                      onChange={e => setEditLimitesForm(prev => ({ ...prev, [c.id]: { ...prev[c.id], max_secretarias: e.target.value } }))}
+                      placeholder="Sin límite"
+                      className="w-full px-2 py-1 border border-violet-200 rounded text-sm bg-white focus:outline-none focus:ring-1 focus:ring-violet-300" />
+                  ) : (
+                    <p className="text-sm font-semibold text-violet-700">
+                      {c.count_secretarias} <span className="text-violet-400 font-normal">/ {c.max_secretarias ?? '∞'}</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {clinicas.length === 0 && (
+          <div className="text-center py-12 text-slate-400 text-sm">No hay clínicas registradas</div>
+        )}
+      </div>
+    </div>
+  )
+}

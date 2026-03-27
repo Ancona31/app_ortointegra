@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Loader2, Send, Bot, User, ChevronDown, ChevronUp, TriangleAlert } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
+import { Loader2, Send, Bot, User, ChevronDown, ChevronUp, TriangleAlert, Copy, Check } from 'lucide-react'
 
 type Mensaje = {
   rol: 'usuario' | 'claude'
@@ -10,11 +9,13 @@ type Mensaje = {
 }
 
 const SUGERENCIAS = [
-  'Dosis de ketorolaco IV postoperatorio',
-  'Nombre comercial de pregabalina en México',
-  'Escala de Daniels para fuerza muscular',
+  'Dosis de dexketoprofeno inyectable en adulto',
+  'Nombres comerciales de pregabalina en México',
+  'Tratamiento de infección de vías urinarias no complicada en México',
   'Posología de metilprednisolona en radiculopatía aguda',
   'Clasificación de Frankel para lesión medular',
+  'Esquema de antibiótico para herida quirúrgica infectada',
+  'Dosis de tramadol en adulto mayor con insuficiencia renal leve',
 ]
 
 export default function ConsultaRapida() {
@@ -22,7 +23,14 @@ export default function ConsultaRapida() {
   const [pregunta, setPregunta] = useState('')
   const [mensajes, setMensajes] = useState<Mensaje[]>([])
   const [cargando, setCargando] = useState(false)
+  const [copiado, setCopiado] = useState<number | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
+
+  function copiar(texto: string, idx: number) {
+    navigator.clipboard.writeText(texto)
+    setCopiado(idx)
+    setTimeout(() => setCopiado(null), 2000)
+  }
 
   useEffect(() => {
     if (endRef.current) endRef.current.scrollIntoView({ behavior: 'smooth' })
@@ -121,8 +129,19 @@ export default function ConsultaRapida() {
                       : 'bg-slate-100 text-slate-800 rounded-tl-sm'
                   }`}>
                     {m.rol === 'claude' ? (
-                      <div className="prose prose-sm max-w-none prose-p:my-0.5 prose-p:leading-relaxed prose-strong:text-slate-900">
-                        <ReactMarkdown>{m.texto}</ReactMarkdown>
+                      <div>
+                        <p className="whitespace-pre-wrap leading-relaxed text-slate-800">{m.texto}</p>
+                        <div className="flex justify-end mt-2">
+                          <button
+                            onClick={() => copiar(m.texto, i)}
+                            className="flex items-center gap-1 text-xs text-slate-400 hover:text-violet-600 transition-colors"
+                          >
+                            {copiado === i
+                              ? <><Check size={11} className="text-emerald-500" /><span className="text-emerald-500">Copiado</span></>
+                              : <><Copy size={11} /><span>Copiar</span></>
+                            }
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       <p>{m.texto}</p>

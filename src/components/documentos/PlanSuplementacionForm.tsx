@@ -1,6 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+
+type MedicoInfo = {
+  nombre: string
+  especialidad: string
+  cedula_profesional: string
+  cedula_especialidad: string
+  logo_url: string | null
+}
 import { Printer } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -26,7 +34,12 @@ interface Props {
 }
 
 export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId }: Props) {
+  const [medicoInfo, setMedicoInfo] = useState<MedicoInfo | null>(null)
   const [paciente, setPaciente] = useState(pacienteInicial)
+
+  useEffect(() => {
+    fetch('/api/me/perfil-medico').then(r => r.json()).then(({ medico }) => setMedicoInfo(medico))
+  }, [])
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
   const [seleccionados, setSeleccionados] = useState<SupSelec[]>([])
@@ -64,7 +77,13 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
         <p class="sup-dosis">📋 Dosis: ${s.dosis}</p>
         ${s.justificacion ? `<p class="sup-just">Justificación: ${s.justificacion}</p>` : ''}
       </div>`).join('')
-    const logoUrl = `${window.location.origin}/logo.png`
+    const doctorNombre = medicoInfo?.nombre || 'Médico'
+    const doctorEspecialidad = medicoInfo?.especialidad || ''
+    const cedulas = [
+      medicoInfo?.cedula_profesional ? `Céd. Prof. ${medicoInfo.cedula_profesional}` : '',
+      medicoInfo?.cedula_especialidad ? `Céd. Esp. ${medicoInfo.cedula_especialidad}` : '',
+    ].filter(Boolean).join(' · ')
+    const logoUrl = medicoInfo?.logo_url || `${window.location.origin}/logo.png`
 
     ventana.document.write(`
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Plan de Suplementación</title>
@@ -93,9 +112,9 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
   <div class="header">
     <img class="logo" src="${logoUrl}" onerror="this.style.display='none'" />
     <div>
-      <div class="doctor-name">Dr. Angel M. Ancona Pérez</div>
-      <div class="especialidad">Cirugía de Columna Vertebral · Traumatología y Ortopedia</div>
-      <div class="credenciales">Céd. Prof. 12085805 · CMOT 26/5567/25 · Yucatán</div>
+      <div class="doctor-name">${doctorNombre}</div>
+      ${doctorEspecialidad ? `<div class="especialidad">${doctorEspecialidad}</div>` : ''}
+      ${cedulas ? `<div class="credenciales">${cedulas}</div>` : ''}
     </div>
   </div>
   <div class="titulo-doc">Plan de Suplementación Osteomuscular</div>
@@ -106,7 +125,7 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
   ${lista}
   ${notas ? `<div class="seccion">Notas adicionales</div><p class="nota">${notas}</p>` : ''}
   ${seguimiento ? `<p style="margin-top:12px;font-size:10pt;"><strong>Control:</strong> ${seguimiento}</p>` : ''}
-  <div class="footer"><div class="firma"><p>Dr. Angel M. Ancona Pérez</p><p>Céd. Prof. 12085805</p></div></div>
+  <div class="footer"><div class="firma"><p>${doctorNombre}</p>${medicoInfo?.cedula_profesional ? `<p>Céd. Prof. ${medicoInfo.cedula_profesional}</p>` : ''}</div></div>
 </body></html>`)
     ventana.document.close()
     ventana.focus()

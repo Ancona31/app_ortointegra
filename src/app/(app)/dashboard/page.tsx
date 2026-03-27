@@ -76,9 +76,11 @@ export default function DashboardPage() {
     <div className="max-w-6xl mx-auto space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-[#1a3a5c]">Bienvenido, Dr. Ancona</h1>
+        <h1 className="text-2xl font-bold text-[#1a3a5c]">
+          Bienvenido{profile?.nombre ? `, ${profile.titulo ? `${profile.titulo} ` : ''}${profile.nombre}` : ''}
+        </h1>
         <p className="text-slate-500 mt-1 text-sm">
-          Sistema de gestión clínica — Cirugía de Columna · Traumatología y Ortopedia
+          Sistema de gestión clínica{profile?.especialidad ? ` — ${profile.especialidad}` : ''}
         </p>
       </div>
 
@@ -105,11 +107,19 @@ export default function DashboardPage() {
             ))}
           </div>
           <div className="bg-white rounded-xl border border-slate-200 px-5 py-3 shadow-sm">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm text-slate-600">
-              <p><span className="font-medium">Médico:</span> Dr. Angel M. Ancona Pérez</p>
-              <p><span className="font-medium">Especialidad:</span> Cirugía de Columna · T&O</p>
-              <p><span className="font-medium">Céd. Prof.:</span> 12085805</p>
-              <p><span className="font-medium">CMOT:</span> 26/5567/25</p>
+            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-600">
+              {profile?.nombre && (
+                <p><span className="font-medium">Médico:</span> {profile.nombre}</p>
+              )}
+              {profile?.especialidad && (
+                <p><span className="font-medium">Especialidad:</span> {profile.especialidad}</p>
+              )}
+              {profile?.cedula_profesional && (
+                <p><span className="font-medium">Céd. Prof.:</span> {profile.cedula_profesional}</p>
+              )}
+              {profile?.cedula_especialidad && (
+                <p><span className="font-medium">Céd. Esp.:</span> {profile.cedula_especialidad}</p>
+              )}
             </div>
           </div>
         </div>

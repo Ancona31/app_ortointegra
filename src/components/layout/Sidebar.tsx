@@ -3,19 +3,29 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  FileText, Stethoscope, Pill, Menu, X, Home, LogOut, UserPlus, Users,
+  FileText, Stethoscope, Pill, Menu, X, Home, LogOut, UserPlus, Users, Building2,
 } from 'lucide-react'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useProfile } from '@/hooks/useProfile'
+import { useClinica } from '@/hooks/useClinica'
 
 const navDoctor = [
   { href: '/dashboard',        label: 'Inicio',         icon: Home },
   { href: '/expediente',       label: 'Expediente',     icon: Stethoscope },
   { href: '/suplementacion',   label: 'Suplementación', icon: Pill },
   { href: '/documentos',       label: 'Documentos',     icon: FileText },
+]
+
+const navAdmin = [
+  ...navDoctor,
   { href: '/admin/usuarios',   label: 'Usuarios',       icon: Users },
+]
+
+const navSuperAdmin = [
+  ...navAdmin,
+  { href: '/super-admin/clinicas', label: 'Clínicas', icon: Building2 },
 ]
 
 const navSecretaria = [
@@ -29,8 +39,15 @@ export default function Sidebar() {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const { profile } = useProfile()
+  const { colorPrimario, colorSecundario, nombreDisplay, subtitulo, logoUrl } = useClinica()
 
-  const navItems = profile?.role === 'secretaria' ? navSecretaria : navDoctor
+  const navItems = profile?.role === 'secretaria'
+    ? navSecretaria
+    : profile?.role === 'super_admin'
+      ? navSuperAdmin
+      : profile?.role === 'admin'
+        ? navAdmin
+        : navDoctor
 
   async function handleLogout() {
     const supabase = createClient()
@@ -44,7 +61,8 @@ export default function Sidebar() {
       {/* Mobile toggle */}
       <button
         onClick={() => setOpen(!open)}
-        className="lg:hidden fixed top-4 left-4 z-50 bg-[#1a3a5c] text-white p-2 rounded-lg shadow-lg"
+        className="lg:hidden fixed top-4 left-4 z-50 text-white p-2 rounded-lg shadow-lg"
+        style={{ backgroundColor: colorPrimario }}
       >
         {open ? <X size={20} /> : <Menu size={20} />}
       </button>
@@ -58,27 +76,32 @@ export default function Sidebar() {
       )}
 
       {/* Sidebar */}
-      <aside className={`
-        fixed top-0 left-0 h-full w-64 bg-[#1a3a5c] text-white z-40 flex flex-col
-        transition-transform duration-300 shadow-2xl
-        ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-      `}>
-        {/* Logo y nombre doctor */}
+      <aside
+        style={{ backgroundColor: colorPrimario }}
+        className={`
+          fixed top-0 left-0 h-full w-64 text-white z-40 flex flex-col
+          transition-transform duration-300 shadow-2xl
+          ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `}
+      >
+        {/* Logo y nombre */}
         <div className="flex flex-col items-center gap-3 px-6 py-6 border-b border-white/10">
           <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center overflow-hidden shadow-lg">
-            <img
-              src="/logo.png"
-              alt="Logo Dr. Ancona"
-              className="w-18 h-18 object-contain"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none'
-              }}
-            />
+            {logoUrl ? (
+              <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+            ) : (
+              <img
+                src="/logo.png"
+                alt="Logo"
+                className="w-18 h-18 object-contain"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+              />
+            )}
           </div>
           <div className="text-center">
-            <p className="font-semibold text-sm leading-tight">Dr. Angel M. Ancona Pérez</p>
+            <p className="font-semibold text-sm leading-tight">{nombreDisplay}</p>
             <p className="text-xs text-blue-300 mt-1 leading-tight">
-              {profile?.role === 'secretaria' ? 'Secretaria' : 'Cirugía de Columna · Traumatología'}
+              {profile?.role === 'secretaria' ? 'Secretaria' : subtitulo}
             </p>
           </div>
         </div>
@@ -92,11 +115,12 @@ export default function Sidebar() {
                 key={href}
                 href={href}
                 onClick={() => setOpen(false)}
+                style={active ? { backgroundColor: colorSecundario } : undefined}
                 className={`
                   flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium
                   transition-all duration-150
                   ${active
-                    ? 'bg-[#1e5fa8] text-white shadow-md'
+                    ? 'text-white shadow-md'
                     : 'text-blue-200 hover:bg-white/10 hover:text-white'
                   }
                 `}
@@ -110,8 +134,12 @@ export default function Sidebar() {
 
         {/* Footer */}
         <div className="px-4 py-4 border-t border-white/10 space-y-3">
-          <p className="text-xs text-blue-400 text-center">Céd. Prof. 12085805</p>
-          <p className="text-xs text-blue-400 text-center">CMOT 26/5567/25</p>
+          {profile?.cedula_profesional && (
+            <p className="text-xs text-blue-400 text-center">Céd. Prof. {profile.cedula_profesional}</p>
+          )}
+          {profile?.cedula_especialidad && (
+            <p className="text-xs text-blue-400 text-center">{profile.cedula_especialidad}</p>
+          )}
           <button
             onClick={handleLogout}
             className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs text-blue-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors"

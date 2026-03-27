@@ -11,9 +11,18 @@ import { PRINT_CSS, markdownToHtml } from '@/lib/printStyles'
 import ReactMarkdown from 'react-markdown'
 import ConsultaRapida from '@/components/ConsultaRapida'
 
+type MedicoInfo = {
+  nombre: string
+  especialidad: string
+  cedula_profesional: string
+  cedula_especialidad: string
+  logo_url: string | null
+}
+
 export default function NuevaNotaPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const [medicoInfo, setMedicoInfo] = useState<MedicoInfo | null>(null)
   const [paciente, setPaciente] = useState<Paciente | null>(null)
   const [form, setForm] = useState({
     motivo_consulta: '',
@@ -30,6 +39,7 @@ export default function NuevaNotaPage() {
   const [modalPost, setModalPost] = useState(false)
 
   useEffect(() => {
+    fetch('/api/me/perfil-medico').then(r => r.json()).then(({ medico }) => setMedicoInfo(medico))
     async function cargar() {
       const supabase = createClient()
       const { data } = await supabase.from('pacientes').select('*').eq('id', id).single()
@@ -113,7 +123,13 @@ export default function NuevaNotaPage() {
       day: '2-digit', month: 'long', year: 'numeric',
       hour: '2-digit', minute: '2-digit', hour12: true,
     })
-    const logoUrl = `${window.location.origin}/logo.png`
+    const doctorNombre = medicoInfo?.nombre || 'Médico'
+    const doctorEspecialidad = medicoInfo?.especialidad || ''
+    const cedulas = [
+      medicoInfo?.cedula_profesional ? `Céd. Prof. ${medicoInfo.cedula_profesional}` : '',
+      medicoInfo?.cedula_especialidad ? `Céd. Esp. ${medicoInfo.cedula_especialidad}` : '',
+    ].filter(Boolean).join(' · ')
+    const logoUrl = medicoInfo?.logo_url || `${window.location.origin}/logo.png`
 
     const notaHtml = markdownToHtml(notaGenerada)
 
@@ -123,9 +139,9 @@ export default function NuevaNotaPage() {
   <div class="header">
     <img class="logo" src="${logoUrl}" onerror="this.style.display='none'" />
     <div>
-      <div class="doctor-name">Dr. Angel M. Ancona Pérez</div>
-      <div class="especialidad">Cirugía de Columna Vertebral · Traumatología y Ortopedia</div>
-      <div class="credenciales">Céd. Prof. 12085805 · CMOT 26/5567/25 · Yucatán</div>
+      <div class="doctor-name">${doctorNombre}</div>
+      ${doctorEspecialidad ? `<div class="especialidad">${doctorEspecialidad}</div>` : ''}
+      ${cedulas ? `<div class="credenciales">${cedulas}</div>` : ''}
     </div>
   </div>
   <div class="titulo">Nota de Evolución Médica</div>
@@ -139,7 +155,7 @@ export default function NuevaNotaPage() {
   </div>
   <div class="nota-content">${notaHtml}</div>
   ${form.proxima_cita ? `<div class="proxima-cita"><strong>Próxima cita:</strong> ${form.proxima_cita}</div>` : ''}
-  <div class="footer"><div class="firma"><p>Dr. Angel M. Ancona Pérez</p></div></div>
+  <div class="footer"><div class="firma"><p>${doctorNombre}</p>${medicoInfo?.cedula_profesional ? `<p>Céd. Prof. ${medicoInfo.cedula_profesional}</p>` : ''}</div></div>
 </body></html>`)
     ventana.document.close()
     ventana.focus()

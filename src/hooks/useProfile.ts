@@ -10,6 +10,10 @@ export interface Profile {
   role: Role
   nombre?: string | null
   clinica_id?: string | null
+  cedula_profesional?: string | null
+  cedula_especialidad?: string | null
+  especialidad?: string | null
+  titulo?: string | null
 }
 
 export function useProfile() {
@@ -18,9 +22,12 @@ export function useProfile() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('profiles').select('*').single().then(({ data }) => {
-      setProfile(data)
-      setLoading(false)
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) { setLoading(false); return }
+      supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data }) => {
+        setProfile(data)
+        setLoading(false)
+      })
     })
   }, [])
 

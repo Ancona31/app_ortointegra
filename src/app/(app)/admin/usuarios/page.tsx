@@ -13,19 +13,25 @@ type Usuario = {
   email: string
 }
 
+type LicenciaInfo = {
+  max_medicos: number | null
+  max_secretarias: number | null
+}
+
 export default function AdminUsuariosPage() {
   const { profile, loading: loadingProfile } = useProfile()
   const router = useRouter()
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
+  const [licencia, setLicencia] = useState<LicenciaInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ email: '', password: '', nombre: '', role: 'secretaria' })
+  const [form, setForm] = useState({ email: '', password: '', nombre: '', role: 'secretaria', titulo: 'Dr.', especialidad: '', cedula_profesional: '', cedula_especialidad: '' })
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
   const [exito, setExito] = useState('')
 
   useEffect(() => {
-    if (!loadingProfile && profile && !['medico', 'admin', 'super_admin'].includes(profile.role)) {
+    if (!loadingProfile && profile && !['admin', 'super_admin'].includes(profile.role)) {
       router.push('/dashboard')
     }
   }, [profile, loadingProfile, router])
@@ -38,6 +44,7 @@ export default function AdminUsuariosPage() {
     const res = await fetch('/api/admin/usuarios')
     const data = await res.json()
     setUsuarios(data.usuarios || [])
+    setLicencia(data.licencia ?? null)
     setLoading(false)
   }
 
@@ -58,7 +65,7 @@ export default function AdminUsuariosPage() {
     if (!res.ok) { setError(data.error || 'Error al crear usuario'); return }
 
     setExito(`Usuario ${form.email} creado exitosamente`)
-    setForm({ email: '', password: '', nombre: '', role: 'secretaria' })
+    setForm({ email: '', password: '', nombre: '', role: 'secretaria', titulo: 'Dr.', especialidad: '', cedula_profesional: '', cedula_especialidad: '' })
     setShowForm(false)
     cargarUsuarios()
   }
@@ -140,6 +147,37 @@ export default function AdminUsuariosPage() {
                 </select>
               </div>
 
+              {form.role === 'medico' && (
+                <>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 block mb-1">Título</label>
+                    <select value={form.titulo} onChange={e => setForm({ ...form, titulo: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30">
+                      <option value="Dr.">Dr.</option>
+                      <option value="Dra.">Dra.</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 block mb-1">Especialidad</label>
+                    <input type="text" value={form.especialidad} onChange={e => setForm({ ...form, especialidad: e.target.value })}
+                      placeholder="Ej: Cirugía de Columna · Traumatología"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 block mb-1">Cédula profesional</label>
+                    <input type="text" value={form.cedula_profesional} onChange={e => setForm({ ...form, cedula_profesional: e.target.value })}
+                      placeholder="Ej: 12085805"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 block mb-1">Cédula de especialidad</label>
+                    <input type="text" value={form.cedula_especialidad} onChange={e => setForm({ ...form, cedula_especialidad: e.target.value })}
+                      placeholder="Ej: CMOT 26/5567/25"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                  </div>
+                </>
+              )}
+
               {error && <p className="text-sm text-red-600">{error}</p>}
 
               <div className="flex gap-3 pt-2">
@@ -153,6 +191,26 @@ export default function AdminUsuariosPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Indicadores de licencia */}
+      {licencia && (
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+            <p className="text-xs text-blue-500 font-medium">Médicos</p>
+            <p className="text-lg font-bold text-blue-700 mt-0.5">
+              {usuarios.filter(u => u.role === 'medico').length}
+              <span className="text-sm font-normal text-blue-400"> / {licencia.max_medicos ?? '∞'}</span>
+            </p>
+          </div>
+          <div className="bg-violet-50 border border-violet-100 rounded-xl px-4 py-3">
+            <p className="text-xs text-violet-500 font-medium">Secretarias</p>
+            <p className="text-lg font-bold text-violet-700 mt-0.5">
+              {usuarios.filter(u => u.role === 'secretaria').length}
+              <span className="text-sm font-normal text-violet-400"> / {licencia.max_secretarias ?? '∞'}</span>
+            </p>
           </div>
         </div>
       )}

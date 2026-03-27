@@ -1,12 +1,22 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Trash2, Printer } from 'lucide-react'
 import { Medicamento } from '@/types'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import ConsultaRapida from '@/components/ConsultaRapida'
 import { createClient } from '@/lib/supabase/client'
+import AutocompleteMedicamento from '@/components/AutocompleteMedicamento'
+import { MedicamentoDB } from '@/data/medicamentos'
+
+type MedicoInfo = {
+  nombre: string
+  especialidad: string
+  cedula_profesional: string
+  cedula_especialidad: string
+  logo_url: string | null
+}
 
 interface Props {
   pacienteInicial?: string
@@ -15,24 +25,43 @@ interface Props {
 }
 
 export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId }: Props) {
+  const [medicoInfo, setMedicoInfo] = useState<MedicoInfo | null>(null)
   const [paciente, setPaciente] = useState(pacienteInicial)
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
+
+  useEffect(() => {
+    fetch('/api/me/perfil-medico').then(r => r.json()).then(({ medico }) => setMedicoInfo(medico))
+  }, [])
+
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
   const [medicamentos, setMedicamentos] = useState<Medicamento[]>([
     { nombre_comercial: '', presentacion: '', dosis: '', principio_activo: '', indicacion: '' }
   ])
+  const [sugerenciasDosis, setSugerenciasDosis] = useState<string[]>([''])
   const [recomendaciones, setRecomendaciones] = useState('')
 
   function addMed() {
     setMedicamentos([...medicamentos, { nombre_comercial: '', presentacion: '', dosis: '', principio_activo: '', indicacion: '' }])
+    setSugerenciasDosis(prev => [...prev, ''])
   }
 
   function removeMed(i: number) {
     setMedicamentos(medicamentos.filter((_, idx) => idx !== i))
+    setSugerenciasDosis(prev => prev.filter((_, idx) => idx !== i))
   }
 
   function updateMed(i: number, field: keyof Medicamento, val: string) {
     setMedicamentos(medicamentos.map((m, idx) => idx === i ? { ...m, [field]: val } : m))
+  }
+
+  function autocompletarMed(i: number, med: MedicamentoDB) {
+    setMedicamentos(medicamentos.map((m, idx) => idx === i ? {
+      ...m,
+      nombre_comercial: med.nombre_comercial,
+      presentacion: med.presentacion,
+      principio_activo: med.principio_activo,
+    } : m))
+    setSugerenciasDosis(prev => prev.map((s, idx) => idx === i ? med.dosis_sugerida : s))
   }
 
   function imprimir() {
@@ -51,12 +80,18 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 
     const meds = medicamentos.filter(m => m.nombre_comercial).map((m, i) => `
       <div class="medicamento">
-        <p class="med-nombre">${i + 1}. ${m.nombre_comercial.toUpperCase()}${m.presentacion ? ` ${m.presentacion}` : ''}${m.dosis ? ` ${m.dosis}` : ''}${m.principio_activo ? ` <span class="principio">(${m.principio_activo})</span>` : ''}</p>
+        <p class="med-nombre">${i + 1}. ${m.nombre_comercial.toUpperCase()}${m.presentacion ? ` ${m.presentacion}` : ''}${m.principio_activo ? ` <span class="principio">(${m.principio_activo})</span>` : ''}</p>
         <p class="med-indicacion">${m.indicacion}</p>
       </div>
     `).join('')
 
-    const logoUrl = `${window.location.origin}/logo.png`
+    const doctorNombre = medicoInfo?.nombre || 'Médico'
+    const doctorEspecialidad = medicoInfo?.especialidad || ''
+    const cedulas = [
+      medicoInfo?.cedula_profesional ? `Céd. Prof. ${medicoInfo.cedula_profesional}` : '',
+      medicoInfo?.cedula_especialidad ? `Céd. Esp. ${medicoInfo.cedula_especialidad}` : '',
+    ].filter(Boolean).join(' · ')
+    const logoUrl = medicoInfo?.logo_url || `${window.location.origin}/logo.png`
 
     ventana.document.write(`
 <!DOCTYPE html>
@@ -75,7 +110,6 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
   .doctor-name { font-size: 16pt; font-weight: bold; color: #1a3a5c; margin-bottom: 2px; }
   .especialidad { font-size: 10pt; color: #1e5fa8; margin-bottom: 4px; }
   .credenciales { font-size: 9pt; color: #555; }
-
 
   .rp { font-size: 28pt; font-weight: bold; color: #1a3a5c; text-align: right; line-height: 1; }
 
@@ -103,10 +137,9 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
   <div class="header">
     <img class="logo" src="${logoUrl}" onerror="this.style.display='none'" />
     <div class="header-info">
-      <div class="doctor-name">Dr. Angel M. Ancona Pérez</div>
-      <div class="especialidad">Cirugía de Columna Vertebral &nbsp;·&nbsp; Traumatología y Ortopedia</div>
-      <div class="credenciales">Céd. Prof. 12085805 &nbsp;·&nbsp; CMOT 26/5567/25 &nbsp;·&nbsp; Yucatán</div>
-
+      <div class="doctor-name">${doctorNombre}</div>
+      ${doctorEspecialidad ? `<div class="especialidad">${doctorEspecialidad}</div>` : ''}
+      ${cedulas ? `<div class="credenciales">${cedulas}</div>` : ''}
     </div>
     <div class="rp">℞</div>
   </div>
@@ -133,8 +166,8 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 
   <div class="footer">
     <div class="firma">
-      <p>Dr. Angel M. Ancona Pérez</p>
-      <p>Céd. Prof. 12085805</p>
+      <p>${doctorNombre}</p>
+      ${medicoInfo?.cedula_profesional ? `<p>Céd. Prof. ${medicoInfo.cedula_profesional}</p>` : ''}
     </div>
   </div>
 </body>
@@ -188,32 +221,36 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
                   </button>
                 )}
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-2">
                   <label className="text-xs text-slate-500 block mb-1">Nombre comercial</label>
-                  <input type="text" value={med.nombre_comercial} onChange={e => updateMed(i, 'nombre_comercial', e.target.value)}
-                    placeholder="VOLTAREN" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                  <AutocompleteMedicamento
+                    value={med.nombre_comercial}
+                    onChange={val => updateMed(i, 'nombre_comercial', val)}
+                    onSelect={m => autocompletarMed(i, m)}
+                    placeholder="VOLTAREN"
+                  />
                 </div>
                 <div>
                   <label className="text-xs text-slate-500 block mb-1">Presentación</label>
                   <input type="text" value={med.presentacion || ''} onChange={e => updateMed(i, 'presentacion', e.target.value)}
-                    placeholder="Tabletas" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                    placeholder="Tabletas 50 mg" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
                 </div>
-                <div>
-                  <label className="text-xs text-slate-500 block mb-1">Dosis</label>
-                  <input type="text" value={med.dosis || ''} onChange={e => updateMed(i, 'dosis', e.target.value)}
-                    placeholder="75mg" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
-                </div>
-                <div className="col-span-2 sm:col-span-4">
+                <div className="col-span-2 sm:col-span-3">
                   <label className="text-xs text-slate-500 block mb-1">Principio activo</label>
                   <input type="text" value={med.principio_activo || ''} onChange={e => updateMed(i, 'principio_activo', e.target.value)}
-                    placeholder="Diclofenaco" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                    placeholder="Diclofenaco sódico" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
                 </div>
-                <div className="col-span-2 sm:col-span-4">
+                <div className="col-span-2 sm:col-span-3">
                   <label className="text-xs text-slate-500 block mb-1">Indicaciones de administración</label>
                   <textarea value={med.indicacion} onChange={e => updateMed(i, 'indicacion', e.target.value)}
                     placeholder="Tomar 1 tableta cada 8 hrs con alimentos por 7 días"
                     rows={2} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                  {sugerenciasDosis[i] && (
+                    <p className="mt-1 text-xs text-slate-400 flex items-start gap-1">
+                      <span className="font-medium text-slate-500">Sugerencia:</span> {sugerenciasDosis[i]}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

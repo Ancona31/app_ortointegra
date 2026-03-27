@@ -11,9 +11,18 @@ import Link from 'next/link'
 import { PRINT_CSS, markdownToHtml } from '@/lib/printStyles'
 import ReactMarkdown from 'react-markdown'
 
+type MedicoInfo = {
+  nombre: string
+  especialidad: string
+  cedula_profesional: string
+  cedula_especialidad: string
+  logo_url: string | null
+}
+
 export default function ConsultaDetallePage() {
   const { id, consultaId } = useParams<{ id: string; consultaId: string }>()
   const router = useRouter()
+  const [medicoInfo, setMedicoInfo] = useState<MedicoInfo | null>(null)
   const [paciente, setPaciente] = useState<Paciente | null>(null)
   const [consulta, setConsulta] = useState<Consulta | null>(null)
   const [loading, setLoading] = useState(true)
@@ -29,6 +38,7 @@ export default function ConsultaDetallePage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    fetch('/api/me/perfil-medico').then(r => r.json()).then(({ medico }) => setMedicoInfo(medico))
     async function cargar() {
       const supabase = createClient()
       const [{ data: p }, { data: c }] = await Promise.all([
@@ -79,7 +89,13 @@ export default function ConsultaDetallePage() {
     const ventana = window.open('', '_blank', 'width=800,height=600')
     if (!ventana) return
 
-    const logoUrl = `${window.location.origin}/logo.png`
+    const doctorNombre = medicoInfo?.nombre || 'Médico'
+    const doctorEspecialidad = medicoInfo?.especialidad || ''
+    const cedulas = [
+      medicoInfo?.cedula_profesional ? `Céd. Prof. ${medicoInfo.cedula_profesional}` : '',
+      medicoInfo?.cedula_especialidad ? `Céd. Esp. ${medicoInfo.cedula_especialidad}` : '',
+    ].filter(Boolean).join(' · ')
+    const logoUrl = medicoInfo?.logo_url || `${window.location.origin}/logo.png`
     const edad = paciente.fecha_nacimiento
       ? differenceInYears(new Date(), parseISO(paciente.fecha_nacimiento))
       : null
@@ -92,9 +108,9 @@ export default function ConsultaDetallePage() {
   <div class="header">
     <img class="logo" src="${logoUrl}" onerror="this.style.display='none'" />
     <div>
-      <div class="doctor-name">Dr. Angel M. Ancona Pérez</div>
-      <div class="especialidad">Cirugía de Columna Vertebral · Traumatología y Ortopedia</div>
-      <div class="credenciales">Céd. Prof. 12085805 · CMOT 26/5567/25 · Yucatán</div>
+      <div class="doctor-name">${doctorNombre}</div>
+      ${doctorEspecialidad ? `<div class="especialidad">${doctorEspecialidad}</div>` : ''}
+      ${cedulas ? `<div class="credenciales">${cedulas}</div>` : ''}
     </div>
   </div>
   <div class="titulo">Nota de Evolución Médica</div>
@@ -108,7 +124,7 @@ export default function ConsultaDetallePage() {
   </div>
   <div class="nota-content">${notaHtml}</div>
   ${consulta.proxima_cita ? `<div class="proxima-cita"><strong>Próxima cita:</strong> ${consulta.proxima_cita}</div>` : ''}
-  <div class="footer"><div class="firma"><p>Dr. Angel M. Ancona Pérez</p></div></div>
+  <div class="footer"><div class="firma"><p>${doctorNombre}</p>${medicoInfo?.cedula_profesional ? `<p>Céd. Prof. ${medicoInfo.cedula_profesional}</p>` : ''}</div></div>
 </body></html>`)
     ventana.document.close()
     ventana.focus()
