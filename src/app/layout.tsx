@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'OrthoIntegra — Dr. Angel M. Ancona Pérez',
+  title: 'OrtoIntegra — Dr. Angel M. Ancona Pérez',
   description: 'Sistema de gestión clínica — Cirugía de Columna, Traumatología y Ortopedia',
 }
 

@@ -44,7 +44,7 @@ export default function LoginPage() {
               }}
             />
           </div>
-          <h1 className="text-2xl font-bold text-[#1a3a5c]">OrthoIntegra</h1>
+          <h1 className="text-2xl font-bold text-[#1a3a5c]">OrtoIntegra</h1>
           <p className="text-xs text-slate-400 mt-1 text-center">Gestión clínica inteligente para el especialista moderno</p>
         </div>
 
@@ -103,7 +103,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-slate-300 mt-6">
-          © 2026 OrthoIntegra · Todos los derechos reservados
+          © 2026 OrtoIntegra · Todos los derechos reservados
         </p>
       </div>
     </div>
