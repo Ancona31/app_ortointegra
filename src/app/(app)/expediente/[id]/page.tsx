@@ -19,6 +19,7 @@ import TabConsultas from '@/components/expediente/TabConsultas'
 import TabLaboratorios from '@/components/expediente/TabLaboratorios'
 import TabGraficas, { normalizarKey, ParamGrafica } from '@/components/expediente/TabGraficas'
 import TabDocumentos from '@/components/expediente/TabDocumentos'
+import ExportarExpedienteButton from '@/components/expediente/ExportarExpedienteButton'
 
 type Tab = 'resumen' | 'consultas' | 'laboratorios' | 'graficas' | 'documentos'
 
@@ -287,7 +288,13 @@ function ExpedientePacienteContent() {
               <span className="text-xs font-medium text-center leading-tight">Nueva receta<br/>y Solicitudes</span>
             </Link>
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-between">
+            <ExportarExpedienteButton
+              paciente={paciente}
+              consultas={consultas}
+              labs={labs}
+              documentos={documentos}
+            />
             <button
               onClick={() => setMostrarEliminarPaciente(true)}
               className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-red-600 transition-colors py-1"
