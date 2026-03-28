@@ -225,11 +225,6 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
   }
   .firma-nombre { font-weight: bold; font-size: 9.5pt; color: ${cp}; font-family: Arial, sans-serif; }
   .firma-ced { font-size: 8pt; color: #666; margin-top: 2px; }
-  .sello-area {
-    width: 90px; height: 90px; border: 1.5px dashed ${cs}60;
-    border-radius: 50%; display: flex; align-items: center; justify-content: center;
-    color: ${cs}50; font-size: 7pt; text-align: center; font-family: Arial, sans-serif;
-  }
 
   .barra-bottom {
     background: linear-gradient(135deg, ${cp} 0%, ${cs} 100%);
@@ -298,7 +293,6 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     ` : ''}
 
     <div class="footer-area">
-      <div class="sello-area">Sello<br/>clínica</div>
       <div class="firma">
         <div class="firma-nombre">${doctorNombre}</div>
         ${cedProf ? `<div class="firma-ced">Céd. Prof. ${cedProf}</div>` : ''}
