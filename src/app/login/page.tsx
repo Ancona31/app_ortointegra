@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Loader2, Lock } from 'lucide-react'
+import Link from 'next/link'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -99,6 +100,12 @@ export default function LoginPage() {
                 : 'Iniciar sesión'
               }
             </button>
+
+            <div className="text-center pt-1">
+              <Link href="/forgot-password" className="text-xs text-slate-400 hover:text-[#1e5fa8] transition-colors">
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
           </form>
         </div>
 

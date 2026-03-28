@@ -23,14 +23,16 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const isLoginPage = request.nextUrl.pathname === '/login'
+  const pathname = request.nextUrl.pathname
+  const isLoginPage = pathname === '/login'
+  const isPublicPage = ['/forgot-password', '/reset-password'].includes(pathname)
 
   // Rutas API que no requieren sesión (OAuth callbacks)
   const publicApiPaths = ['/api/google/callback']
-  const isPublicApi = publicApiPaths.some(p => request.nextUrl.pathname.startsWith(p))
+  const isPublicApi = publicApiPaths.some(p => pathname.startsWith(p))
 
-  // Si no hay sesión y no está en login ni en ruta pública → redirigir a login
-  if (!user && !isLoginPage && !isPublicApi) {
+  // Si no hay sesión y no está en ruta pública → redirigir a login
+  if (!user && !isLoginPage && !isPublicPage && !isPublicApi) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
