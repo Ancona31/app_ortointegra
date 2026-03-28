@@ -16,11 +16,16 @@ import AutocompleteEstudio from '@/components/AutocompleteEstudio'
 import { createClient } from '@/lib/supabase/client'
 
 const ESTUDIOS_PRESET = [
-  'Vitamina D 25-OH', 'Insulina Basal', 'Triglicéridos', 'PCR Ultrasensible',
-  'Albúmina', 'TGP (ALT)', 'TSH', 'HbA1c', 'Creatinina', 'Cistatina C',
-  'Biometría Hemática Completa', 'Química Sanguínea', 'Perfil Hepático',
-  'Perfil Tiroideo completo', 'Vitamina B12', 'Ácido Fólico', 'Ferritina',
-  'Hierro Sérico', 'Calcio Total', 'Fósforo', 'Magnesio',
+  'Biometría Hemática',
+  'Glucosa',
+  'Urea',
+  'Creatinina',
+  'Examen General de Orina',
+  'TP',
+  'TPT',
+  'Perfil Tiroideo Completo',
+  'Urocultivo',
+  'Cultivo de Secreción',
 ]
 
 interface Props {
