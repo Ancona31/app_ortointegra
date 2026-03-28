@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Loader2, Lock } from 'lucide-react'
@@ -12,6 +12,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    const hash = window.location.hash
+    if (hash.includes('error=access_denied') || hash.includes('otp_expired')) {
+      setError('El enlace de recuperación expiró o ya fue usado. Solicita uno nuevo.')
+    }
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -85,8 +92,13 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                {error}
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm space-y-1">
+                <p>{error}</p>
+                {error.includes('expiró') && (
+                  <Link href="/forgot-password" className="block text-[#1e5fa8] hover:underline font-medium">
+                    Solicitar nuevo enlace →
+                  </Link>
+                )}
               </div>
             )}
 
