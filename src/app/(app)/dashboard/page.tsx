@@ -70,7 +70,13 @@ export default function DashboardPage() {
     }
   }
 
-  if (!loadingProfile && profile?.role === 'secretaria') return <SecretariaDashboard />
+  if (loadingProfile) return (
+    <div className="flex items-center justify-center h-64">
+      <Loader2 size={24} className="animate-spin text-slate-300" />
+    </div>
+  )
+
+  if (profile?.role === 'secretaria') return <SecretariaDashboard />
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
