@@ -19,7 +19,13 @@ type MedicoInfo = {
   color_primario: string
   color_secundario: string
   clinica_nombre: string | null
+  direccion_consultorio: string
+  telefono_consultorio: string
 }
+
+type MedicamentoConVia = Medicamento & { via_administracion?: string }
+
+const VIAS = ['Oral', 'Tópica', 'Intramuscular', 'Intravenosa', 'Subcutánea', 'Sublingual', 'Oftálmica', 'Ótica', 'Nasal', 'Inhalatoria', 'Rectal', 'Transdérmica']
 
 interface Props {
   pacienteInicial?: string
@@ -31,21 +37,36 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
   const [medicoInfo, setMedicoInfo] = useState<MedicoInfo | null>(null)
   const [paciente, setPaciente] = useState(pacienteInicial)
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
+  const [pacienteData, setPacienteData] = useState<{ edad?: number | null; sexo?: string } | null>(null)
 
   useEffect(() => {
     fetch('/api/me/perfil-medico').then(r => r.json()).then(({ medico }) => setMedicoInfo(medico))
   }, [])
 
+  useEffect(() => {
+    if (!pacienteId) return
+    const supabase = createClient()
+    supabase.from('pacientes').select('fecha_nacimiento, sexo').eq('id', pacienteId).single()
+      .then(({ data }) => {
+        if (data) {
+          const edad = data.fecha_nacimiento
+            ? Math.floor((Date.now() - new Date(data.fecha_nacimiento).getTime()) / (365.25 * 24 * 3600 * 1000))
+            : null
+          setPacienteData({ edad, sexo: data.sexo })
+        }
+      })
+  }, [pacienteId])
+
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
-  const [medicamentos, setMedicamentos] = useState<Medicamento[]>([
-    { nombre_comercial: '', presentacion: '', dosis: '', principio_activo: '', indicacion: '' }
+  const [medicamentos, setMedicamentos] = useState<MedicamentoConVia[]>([
+    { nombre_comercial: '', presentacion: '', dosis: '', principio_activo: '', indicacion: '', via_administracion: 'Oral' }
   ])
   const [sugerenciasDosis, setSugerenciasDosis] = useState<string[]>([''])
   const [recomendaciones, setRecomendaciones] = useState('')
   const [errorGuardado, setErrorGuardado] = useState('')
 
   function addMed() {
-    setMedicamentos([...medicamentos, { nombre_comercial: '', presentacion: '', dosis: '', principio_activo: '', indicacion: '' }])
+    setMedicamentos([...medicamentos, { nombre_comercial: '', presentacion: '', dosis: '', principio_activo: '', indicacion: '', via_administracion: 'Oral' }])
     setSugerenciasDosis(prev => [...prev, ''])
   }
 
@@ -89,7 +110,9 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 
     const meds = medicamentos.filter(m => m.nombre_comercial).map((m, i) => `
       <div class="medicamento">
-        <p class="med-nombre">${i + 1}. ${m.nombre_comercial.toUpperCase()}${m.presentacion ? ` ${m.presentacion}` : ''}${m.principio_activo ? ` <span class="principio">(${m.principio_activo})</span>` : ''}</p>
+        <p class="med-numero">Medicamento ${i + 1}</p>
+        <p class="med-nombre">${m.nombre_comercial.toUpperCase()}${m.presentacion ? ` ${m.presentacion}` : ''}${m.principio_activo ? ` <span class="principio">(${m.principio_activo})</span>` : ''}</p>
+        ${m.via_administracion ? `<p class="med-via">Vía: ${m.via_administracion}</p>` : ''}
         <p class="med-indicacion">${m.indicacion}</p>
       </div>
     `).join('')
@@ -98,9 +121,13 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     const doctorEspecialidad = medicoInfo?.especialidad || ''
     const cedProf = medicoInfo?.cedula_profesional || ''
     const cedEsp = medicoInfo?.cedula_especialidad || ''
+    const direccion = medicoInfo?.direccion_consultorio || ''
+    const telefono = medicoInfo?.telefono_consultorio || ''
     const logoUrl = medicoInfo?.logo_url && medicoInfo.logo_url.startsWith('https://') ? medicoInfo.logo_url : `${window.location.origin}/logo.png`
     const cp = medicoInfo?.color_primario || '#1a3a5c'
     const cs = medicoInfo?.color_secundario || '#1e5fa8'
+    const edadPaciente = pacienteData?.edad
+    const sexoPaciente = pacienteData?.sexo === 'M' ? 'Masculino' : pacienteData?.sexo === 'F' ? 'Femenino' : pacienteData?.sexo || ''
     const marcaAguaUrl = logoUrl
     const folio = `R-${Date.now().toString().slice(-8)}`
 
@@ -151,6 +178,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
   .doctor-name { font-size: 15pt; font-weight: bold; color: ${cp}; line-height: 1.2; font-family: Arial, sans-serif; }
   .especialidad { font-size: 9.5pt; color: ${cs}; margin: 3px 0; font-style: italic; }
   .credenciales { font-size: 8.5pt; color: #666; }
+  .contacto-consultorio { font-size: 8pt; color: #888; margin-top: 3px; }
   .rp-wrap { text-align: right; }
   .rp { font-size: 52pt; font-weight: 900; color: ${cs}; line-height: 1; opacity: 0.85; font-family: Georgia, serif; }
   .folio { font-size: 7.5pt; color: #aaa; text-align: right; margin-top: 2px; font-family: Arial, sans-serif; }
@@ -184,6 +212,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
   .med-numero { font-size: 8pt; color: ${cs}; font-weight: bold; font-family: Arial, sans-serif; }
   .med-nombre { font-weight: bold; font-size: 10.5pt; color: #111; font-family: Arial, sans-serif; }
   .principio { font-weight: normal; font-style: italic; color: #666; font-size: 9pt; }
+  .med-via { font-size: 8.5pt; color: ${cs}; font-weight: 600; margin-top: 2px; }
   .med-indicacion { font-size: 9.5pt; margin-top: 3px; color: #444; line-height: 1.5; }
 
   .recomendaciones { font-size: 9.5pt; line-height: 1.7; color: #444; white-space: pre-line; padding-left: 10px; }
@@ -233,6 +262,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
           ${cedProf && cedEsp ? ' &nbsp;·&nbsp; ' : ''}
           ${cedEsp ? `Cédula Esp.: ${cedEsp}` : ''}
         </div>
+        ${direccion || telefono ? `<div class="contacto-consultorio">${[direccion, telefono ? `Tel: ${telefono}` : ''].filter(Boolean).join(' &nbsp;·&nbsp; ')}</div>` : ''}
       </div>
       <div class="rp-wrap">
         <div class="rp">℞</div>
@@ -244,6 +274,8 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
       <div class="datos-grid">
         <div class="dato"><span class="dato-label">Fecha</span><span class="dato-valor">${fechaFormat}</span></div>
         <div class="dato"><span class="dato-label">Paciente</span><span class="dato-valor">${paciente}</span></div>
+        ${edadPaciente != null ? `<div class="dato"><span class="dato-label">Edad</span><span class="dato-valor">${edadPaciente} años</span></div>` : ''}
+        ${sexoPaciente ? `<div class="dato"><span class="dato-label">Sexo</span><span class="dato-valor">${sexoPaciente}</span></div>` : ''}
         ${diagnostico ? `<div class="dato" style="grid-column:span 2"><span class="dato-label">Diagnóstico</span><span class="dato-valor">${diagnostico}</span></div>` : ''}
       </div>
     </div>
@@ -343,6 +375,13 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
                   <label className="text-xs text-slate-500 block mb-1">Presentación</label>
                   <input type="text" value={med.presentacion || ''} onChange={e => updateMed(i, 'presentacion', e.target.value)}
                     placeholder="Tabletas 50 mg" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 block mb-1">Vía de administración</label>
+                  <select value={(med as MedicamentoConVia).via_administracion || 'Oral'} onChange={e => updateMed(i, 'via_administracion' as any, e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30">
+                    {VIAS.map(v => <option key={v} value={v}>{v}</option>)}
+                  </select>
                 </div>
                 <div className="col-span-2 sm:col-span-3">
                   <label className="text-xs text-slate-500 block mb-1">Principio activo</label>

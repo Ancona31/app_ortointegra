@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  FileText, Stethoscope, Pill, Menu, X, Home, LogOut, UserPlus, Users, Building2,
+  FileText, Stethoscope, Pill, Menu, X, Home, LogOut, UserPlus, Users, Building2, UserCircle,
 } from 'lucide-react'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -17,6 +17,7 @@ const navDoctor = [
   { href: '/expediente',       label: 'Expediente',     icon: Stethoscope },
   { href: '/suplementacion',   label: 'Suplementación', icon: Pill },
   { href: '/documentos',       label: 'Documentos',     icon: FileText },
+  { href: '/perfil',           label: 'Mi perfil',      icon: UserCircle },
 ]
 
 const navAdmin = [

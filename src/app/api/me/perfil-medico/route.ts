@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 export async function GET() {
@@ -8,7 +8,7 @@ export async function GET() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('nombre, titulo, especialidad, cedula_profesional, cedula_especialidad, clinica_id')
+    .select('nombre, titulo, especialidad, cedula_profesional, cedula_especialidad, clinica_id, direccion_consultorio, telefono_consultorio')
     .eq('id', user.id)
     .single()
 
@@ -47,6 +47,24 @@ export async function GET() {
       color_primario,
       color_secundario,
       clinica_nombre: clinicaNombre,
+      direccion_consultorio: profile.direccion_consultorio ?? '',
+      telefono_consultorio: profile.telefono_consultorio ?? '',
     }
   })
+}
+
+export async function PUT(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+  const { direccion_consultorio, telefono_consultorio, especialidad, cedula_profesional, cedula_especialidad, titulo } = await req.json()
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ direccion_consultorio, telefono_consultorio, especialidad, cedula_profesional, cedula_especialidad, titulo })
+    .eq('id', user.id)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
 }
