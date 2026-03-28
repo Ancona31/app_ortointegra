@@ -23,7 +23,7 @@ export default function ForgotPasswordPage() {
 
     setLoading(false)
     if (err) {
-      setError('No se pudo enviar el correo. Verifica la dirección e intenta de nuevo.')
+      setError(err.message)
     } else {
       setEnviado(true)
     }
