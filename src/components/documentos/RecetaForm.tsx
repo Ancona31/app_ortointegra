@@ -101,7 +101,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     const logoUrl = medicoInfo?.logo_url && medicoInfo.logo_url.startsWith('https://') ? medicoInfo.logo_url : `${window.location.origin}/logo.png`
     const cp = medicoInfo?.color_primario || '#1a3a5c'
     const cs = medicoInfo?.color_secundario || '#1e5fa8'
-    const marcaAgua = medicoInfo?.clinica_nombre || doctorNombre
+    const marcaAguaUrl = logoUrl
     const folio = `R-${Date.now().toString().slice(-8)}`
 
     ventana.document.write(`
@@ -110,20 +110,19 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 <head>
 <meta charset="UTF-8">
 <title>Receta — ${paciente}</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   @page { size: letter; margin: 0; }
-  body { font-family: 'Georgia', serif; font-size: 10.5pt; color: #1a1a1a; position: relative; }
+  body { font-family: 'Roboto', Arial, sans-serif; font-size: 10.5pt; color: #1a1a1a; position: relative; }
 
   /* ── Marca de agua ── */
   .watermark {
     position: fixed; top: 50%; left: 50%;
-    transform: translate(-50%, -50%) rotate(-35deg);
-    font-size: 62pt; font-weight: 900;
-    color: ${cp}; opacity: 0.045;
-    white-space: nowrap; pointer-events: none;
-    font-family: Arial, sans-serif; letter-spacing: 4px; text-transform: uppercase;
-    z-index: 0;
+    transform: translate(-50%, -50%) rotate(-25deg);
+    width: 320px; height: 320px;
+    object-fit: contain; opacity: 0.06;
+    pointer-events: none; z-index: 0;
   }
 
   /* ── Barra superior ── */
@@ -216,7 +215,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 </head>
 <body>
 
-  <div class="watermark">${marcaAgua}</div>
+  <img class="watermark" src="${marcaAguaUrl}" onerror="this.style.display='none'" />
 
   <div class="barra-top"></div>
 
