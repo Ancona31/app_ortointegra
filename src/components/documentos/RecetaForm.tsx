@@ -16,6 +16,9 @@ type MedicoInfo = {
   cedula_profesional: string
   cedula_especialidad: string
   logo_url: string | null
+  color_primario: string
+  color_secundario: string
+  clinica_nombre: string | null
 }
 
 interface Props {
@@ -93,11 +96,13 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 
     const doctorNombre = medicoInfo?.nombre || 'Médico'
     const doctorEspecialidad = medicoInfo?.especialidad || ''
-    const cedulas = [
-      medicoInfo?.cedula_profesional ? `Céd. Prof. ${medicoInfo.cedula_profesional}` : '',
-      medicoInfo?.cedula_especialidad ? `Céd. Esp. ${medicoInfo.cedula_especialidad}` : '',
-    ].filter(Boolean).join(' · ')
-    const logoUrl = medicoInfo?.logo_url || `${window.location.origin}/logo.png`
+    const cedProf = medicoInfo?.cedula_profesional || ''
+    const cedEsp = medicoInfo?.cedula_especialidad || ''
+    const logoUrl = medicoInfo?.logo_url && medicoInfo.logo_url.startsWith('https://') ? medicoInfo.logo_url : `${window.location.origin}/logo.png`
+    const cp = medicoInfo?.color_primario || '#1a3a5c'
+    const cs = medicoInfo?.color_secundario || '#1e5fa8'
+    const marcaAgua = medicoInfo?.clinica_nombre || doctorNombre
+    const folio = `R-${Date.now().toString().slice(-8)}`
 
     ventana.document.write(`
 <!DOCTYPE html>
@@ -106,76 +111,174 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 <meta charset="UTF-8">
 <title>Receta — ${paciente}</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  @page { size: letter; margin: 15mm 20mm; }
-  body { font-family: Arial, sans-serif; font-size: 11pt; color: #1a1a1a; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  @page { size: letter; margin: 0; }
+  body { font-family: 'Georgia', serif; font-size: 10.5pt; color: #1a1a1a; position: relative; }
 
-  .header { display: flex; align-items: center; gap: 20px; padding-bottom: 14px; border-bottom: 3px solid #1a3a5c; margin-bottom: 16px; }
-  .logo { width: 80px; height: 80px; object-fit: contain; }
+  /* ── Marca de agua ── */
+  .watermark {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%) rotate(-35deg);
+    font-size: 62pt; font-weight: 900;
+    color: ${cp}; opacity: 0.045;
+    white-space: nowrap; pointer-events: none;
+    font-family: Arial, sans-serif; letter-spacing: 4px; text-transform: uppercase;
+    z-index: 0;
+  }
+
+  /* ── Barra superior ── */
+  .barra-top {
+    background: linear-gradient(135deg, ${cp} 0%, ${cs} 100%);
+    height: 12px; width: 100%;
+  }
+
+  /* ── Contenido principal ── */
+  .contenido { padding: 14mm 18mm 10mm; position: relative; z-index: 1; }
+
+  /* ── Encabezado ── */
+  .header {
+    display: flex; align-items: center; gap: 18px;
+    padding-bottom: 14px; margin-bottom: 14px;
+    border-bottom: 2px solid ${cp};
+  }
+  .logo-wrap {
+    width: 78px; height: 78px; border-radius: 50%;
+    border: 3px solid ${cs}; overflow: hidden; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: #f8fafc;
+  }
+  .logo { width: 100%; height: 100%; object-fit: contain; }
   .header-info { flex: 1; }
-  .doctor-name { font-size: 16pt; font-weight: bold; color: #1a3a5c; margin-bottom: 2px; }
-  .especialidad { font-size: 10pt; color: #1e5fa8; margin-bottom: 4px; }
-  .credenciales { font-size: 9pt; color: #555; }
+  .doctor-name { font-size: 15pt; font-weight: bold; color: ${cp}; line-height: 1.2; font-family: Arial, sans-serif; }
+  .especialidad { font-size: 9.5pt; color: ${cs}; margin: 3px 0; font-style: italic; }
+  .credenciales { font-size: 8.5pt; color: #666; }
+  .rp-wrap { text-align: right; }
+  .rp { font-size: 52pt; font-weight: 900; color: ${cs}; line-height: 1; opacity: 0.85; font-family: Georgia, serif; }
+  .folio { font-size: 7.5pt; color: #aaa; text-align: right; margin-top: 2px; font-family: Arial, sans-serif; }
 
-  .rp { font-size: 28pt; font-weight: bold; color: #1a3a5c; text-align: right; line-height: 1; }
+  /* ── Datos del paciente ── */
+  .datos-box {
+    background: linear-gradient(135deg, ${cp}08, ${cs}08);
+    border-left: 4px solid ${cs};
+    border-radius: 0 6px 6px 0;
+    padding: 10px 14px; margin-bottom: 16px;
+  }
+  .datos-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 20px; }
+  .dato { display: flex; gap: 6px; align-items: baseline; font-size: 9.5pt; }
+  .dato-label { font-weight: bold; color: ${cp}; white-space: nowrap; font-size: 8.5pt; font-family: Arial, sans-serif; text-transform: uppercase; letter-spacing: 0.3px; }
+  .dato-valor { flex: 1; border-bottom: 1px solid #d1d5db; padding-bottom: 1px; }
 
-  .datos { margin-bottom: 16px; display: flex; flex-direction: column; gap: 6px; }
-  .dato-row { display: flex; gap: 6px; }
-  .dato-label { font-weight: bold; min-width: 90px; color: #1a3a5c; font-size: 10pt; }
-  .dato-valor { border-bottom: 1px solid #aaa; flex: 1; font-size: 10pt; padding-bottom: 1px; }
+  /* ── Sección medicamentos ── */
+  .seccion-header {
+    display: flex; align-items: center; gap: 8px;
+    margin: 16px 0 10px;
+  }
+  .seccion-linea { flex: 1; height: 1px; background: linear-gradient(to right, ${cp}, transparent); }
+  .seccion-titulo {
+    font-size: 8pt; font-weight: bold; color: ${cp};
+    text-transform: uppercase; letter-spacing: 1.5px;
+    font-family: Arial, sans-serif;
+    background: ${cp}12; padding: 3px 10px; border-radius: 20px;
+  }
 
-  .seccion-titulo { font-size: 11pt; font-weight: bold; color: #1a3a5c; border-bottom: 1px solid #1a3a5c; padding-bottom: 3px; margin-bottom: 10px; margin-top: 16px; }
-  .medicamento { margin-bottom: 12px; }
-  .med-nombre { font-weight: bold; font-size: 10.5pt; }
-  .principio { font-weight: normal; font-style: italic; }
-  .med-indicacion { font-size: 10pt; margin-left: 14px; margin-top: 2px; color: #333; }
+  .medicamento { margin-bottom: 12px; padding-left: 10px; border-left: 2px solid ${cs}30; }
+  .med-numero { font-size: 8pt; color: ${cs}; font-weight: bold; font-family: Arial, sans-serif; }
+  .med-nombre { font-weight: bold; font-size: 10.5pt; color: #111; font-family: Arial, sans-serif; }
+  .principio { font-weight: normal; font-style: italic; color: #666; font-size: 9pt; }
+  .med-indicacion { font-size: 9.5pt; margin-top: 3px; color: #444; line-height: 1.5; }
 
-  .recomendaciones { font-size: 10pt; line-height: 1.7; color: #333; white-space: pre-line; }
+  .recomendaciones { font-size: 9.5pt; line-height: 1.7; color: #444; white-space: pre-line; padding-left: 10px; }
 
-  .footer { margin-top: 50px; display: flex; justify-content: flex-end; }
-  .firma { text-align: center; border-top: 1px solid #333; padding-top: 6px; min-width: 200px; }
-  .firma p { font-size: 9pt; color: #555; }
+  /* ── Barra inferior + firma ── */
+  .footer-area { margin-top: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
+  .firma {
+    text-align: center; min-width: 200px;
+    border-top: 1.5px solid ${cp}; padding-top: 8px;
+  }
+  .firma-nombre { font-weight: bold; font-size: 9.5pt; color: ${cp}; font-family: Arial, sans-serif; }
+  .firma-ced { font-size: 8pt; color: #666; margin-top: 2px; }
+  .sello-area {
+    width: 90px; height: 90px; border: 1.5px dashed ${cs}60;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    color: ${cs}50; font-size: 7pt; text-align: center; font-family: Arial, sans-serif;
+  }
 
-  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  .barra-bottom {
+    background: linear-gradient(135deg, ${cp} 0%, ${cs} 100%);
+    height: 8px; width: 100%; margin-top: 18px;
+  }
+
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .barra-top, .barra-bottom { -webkit-print-color-adjust: exact; }
+  }
 </style>
 </head>
 <body>
-  <div class="header">
-    <img class="logo" src="${logoUrl}" onerror="this.style.display='none'" />
-    <div class="header-info">
-      <div class="doctor-name">${doctorNombre}</div>
-      ${doctorEspecialidad ? `<div class="especialidad">${doctorEspecialidad}</div>` : ''}
-      ${cedulas ? `<div class="credenciales">${cedulas}</div>` : ''}
+
+  <div class="watermark">${marcaAgua}</div>
+
+  <div class="barra-top"></div>
+
+  <div class="contenido">
+
+    <div class="header">
+      <div class="logo-wrap">
+        <img class="logo" src="${logoUrl}" onerror="this.style.display='none'" />
+      </div>
+      <div class="header-info">
+        <div class="doctor-name">${doctorNombre}</div>
+        ${doctorEspecialidad ? `<div class="especialidad">${doctorEspecialidad}</div>` : ''}
+        <div class="credenciales">
+          ${cedProf ? `Cédula Prof.: ${cedProf}` : ''}
+          ${cedProf && cedEsp ? ' &nbsp;·&nbsp; ' : ''}
+          ${cedEsp ? `Cédula Esp.: ${cedEsp}` : ''}
+        </div>
+      </div>
+      <div class="rp-wrap">
+        <div class="rp">℞</div>
+        <div class="folio">${folio}</div>
+      </div>
     </div>
-    <div class="rp">℞</div>
+
+    <div class="datos-box">
+      <div class="datos-grid">
+        <div class="dato"><span class="dato-label">Fecha</span><span class="dato-valor">${fechaFormat}</span></div>
+        <div class="dato"><span class="dato-label">Paciente</span><span class="dato-valor">${paciente}</span></div>
+        ${diagnostico ? `<div class="dato" style="grid-column:span 2"><span class="dato-label">Diagnóstico</span><span class="dato-valor">${diagnostico}</span></div>` : ''}
+      </div>
+    </div>
+
+    <div class="seccion-header">
+      <div class="seccion-linea"></div>
+      <div class="seccion-titulo">Medicamentos</div>
+      <div class="seccion-linea"></div>
+    </div>
+
+    ${meds}
+
+    ${recomendaciones ? `
+    <div class="seccion-header">
+      <div class="seccion-linea"></div>
+      <div class="seccion-titulo">Recomendaciones</div>
+      <div class="seccion-linea"></div>
+    </div>
+    <p class="recomendaciones">${recomendaciones}</p>
+    ` : ''}
+
+    <div class="footer-area">
+      <div class="sello-area">Sello<br/>clínica</div>
+      <div class="firma">
+        <div class="firma-nombre">${doctorNombre}</div>
+        ${cedProf ? `<div class="firma-ced">Céd. Prof. ${cedProf}</div>` : ''}
+        ${cedEsp ? `<div class="firma-ced">Céd. Esp. ${cedEsp}</div>` : ''}
+      </div>
+    </div>
+
   </div>
 
-  <div class="datos">
-    <div class="dato-row">
-      <span class="dato-label">Fecha:</span>
-      <span class="dato-valor">${fechaFormat}</span>
-    </div>
-    <div class="dato-row">
-      <span class="dato-label">Paciente:</span>
-      <span class="dato-valor">${paciente}</span>
-    </div>
-    <div class="dato-row">
-      <span class="dato-label">Diagnóstico:</span>
-      <span class="dato-valor">${diagnostico}</span>
-    </div>
-  </div>
+  <div class="barra-bottom"></div>
 
-  <div class="seccion-titulo">Medicamentos</div>
-  ${meds}
-
-  ${recomendaciones ? `<div class="seccion-titulo">Recomendaciones</div><p class="recomendaciones">${recomendaciones}</p>` : ''}
-
-  <div class="footer">
-    <div class="firma">
-      <p>${doctorNombre}</p>
-      ${medicoInfo?.cedula_profesional ? `<p>Céd. Prof. ${medicoInfo.cedula_profesional}</p>` : ''}
-    </div>
-  </div>
 </body>
 </html>
     `)

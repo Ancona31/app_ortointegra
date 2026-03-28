@@ -17,17 +17,19 @@ export async function GET() {
   let logo_url: string | null = null
   let color_primario = '#1a3a5c'
   let color_secundario = '#1e5fa8'
+  let clinicaNombre: string | null = null
 
   if (profile.clinica_id) {
     const { data: clinica } = await supabase
       .from('clinicas')
-      .select('logo_url, color_primario, color_secundario')
+      .select('logo_url, color_primario, color_secundario, nombre_display, nombre')
       .eq('id', profile.clinica_id)
       .single()
     if (clinica) {
       logo_url = clinica.logo_url ?? null
       color_primario = clinica.color_primario ?? '#1a3a5c'
       color_secundario = clinica.color_secundario ?? '#1e5fa8'
+      clinicaNombre = clinica.nombre_display ?? clinica.nombre ?? null
     }
   }
 
@@ -44,6 +46,7 @@ export async function GET() {
       logo_url,
       color_primario,
       color_secundario,
+      clinica_nombre: clinicaNombre,
     }
   })
 }
