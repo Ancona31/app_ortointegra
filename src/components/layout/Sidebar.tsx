@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useProfile, clearProfileCache } from '@/hooks/useProfile'
 import { useClinica } from '@/hooks/useClinica'
+import { mutate } from 'swr'
 
 const navDoctor = [
   { href: '/dashboard',        label: 'Inicio',         icon: Home },
@@ -53,6 +54,7 @@ export default function Sidebar() {
     const supabase = createClient()
     await supabase.auth.signOut()
     clearProfileCache()
+    await mutate('/api/me/clinica', null, { revalidate: false })
     router.push('/login')
     router.refresh()
   }
