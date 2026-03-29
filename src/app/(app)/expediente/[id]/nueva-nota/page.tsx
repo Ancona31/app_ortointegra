@@ -8,6 +8,7 @@ import { differenceInYears, parseISO } from 'date-fns'
 import { ArrowLeft, Wand2, Save, Loader2, RotateCcw, Printer, Eye, Pencil, Pill, FlaskConical, ScanLine, ClipboardList, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
 import { PRINT_CSS, markdownToHtml } from '@/lib/printStyles'
+import { imprimirOCompartir } from '@/lib/mobileShare'
 import ReactMarkdown from 'react-markdown'
 import ConsultaRapida from '@/components/ConsultaRapida'
 import Breadcrumbs from '@/components/layout/Breadcrumbs'
@@ -117,9 +118,8 @@ export default function NuevaNotaPage() {
     else setModalPost(true)
   }
 
-  function imprimir() {
-    const ventana = window.open('', '_blank', 'width=800,height=600')
-    if (!ventana || !paciente) return
+  async function imprimir() {
+    if (!paciente) return
 
     const ahora = new Date()
     const edad = paciente.fecha_nacimiento
@@ -139,7 +139,7 @@ export default function NuevaNotaPage() {
 
     const notaHtml = markdownToHtml(notaGenerada)
 
-    ventana.document.write(`
+    const _html = `
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Nota Médica</title>
 <style>${PRINT_CSS}</style></head><body>
   <div class="header">
@@ -163,9 +163,7 @@ export default function NuevaNotaPage() {
   ${form.proxima_cita ? `<div class="proxima-cita"><strong>Próxima cita:</strong> ${form.proxima_cita}</div>` : ''}
   <div class="footer"><div class="firma"><p>${doctorNombre}</p>${medicoInfo?.cedula_profesional ? `<p>Céd. Prof. ${medicoInfo.cedula_profesional}</p>` : ''}</div></div>
 </body></html>`)
-    ventana.document.close()
-    ventana.focus()
-    setTimeout(() => ventana.print(), 500)
+    await imprimirOCompartir(_html, 'nota-medica.pdf')
   }
 
   const DOCS = [

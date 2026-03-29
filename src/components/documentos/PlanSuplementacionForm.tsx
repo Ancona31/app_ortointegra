@@ -10,6 +10,7 @@ type MedicoInfo = {
   logo_url: string | null
 }
 import { Printer } from 'lucide-react'
+import { imprimirOCompartir } from '@/lib/mobileShare'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
@@ -68,8 +69,6 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
       }).then(() => {})
     }
 
-    const ventana = window.open('', '_blank', 'width=800,height=600')
-    if (!ventana) return
     const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
     const lista = seleccionados.map((s, i) => `
       <div class="sup">
@@ -85,7 +84,7 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
     ].filter(Boolean).join(' · ')
     const logoUrl = medicoInfo?.logo_url || `${window.location.origin}/logo.png`
 
-    ventana.document.write(`
+    const _html = `
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Plan de Suplementación</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -127,9 +126,7 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
   ${seguimiento ? `<p style="margin-top:12px;font-size:10pt;"><strong>Control:</strong> ${seguimiento}</p>` : ''}
   <div class="footer"><div class="firma"><p>${doctorNombre}</p>${medicoInfo?.cedula_profesional ? `<p>Céd. Prof. ${medicoInfo.cedula_profesional}</p>` : ''}</div></div>
 </body></html>`)
-    ventana.document.close()
-    ventana.focus()
-    setTimeout(() => ventana.print(), 500)
+    await imprimirOCompartir(_html, 'plan-suplementacion.pdf')
   }
 
   return (

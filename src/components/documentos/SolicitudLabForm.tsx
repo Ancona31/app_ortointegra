@@ -10,6 +10,7 @@ type MedicoInfo = {
   logo_url: string | null
 }
 import { Plus, Trash2, Printer } from 'lucide-react'
+import { imprimirOCompartir } from '@/lib/mobileShare'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import AutocompleteEstudio from '@/components/AutocompleteEstudio'
@@ -54,7 +55,7 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
     else setEstudios([...estudios.filter(s => s !== ''), e])
   }
 
-  function imprimir() {
+  async function imprimir() {
     if (pacienteId) {
       const supabase = createClient()
       supabase.from('documentos').insert({
@@ -64,8 +65,6 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
       }).then(() => {})
     }
 
-    const ventana = window.open('', '_blank', 'width=800,height=600')
-    if (!ventana) return
     const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
     const listaEstudios = estudios.filter(Boolean).map(e => `<li>${e}</li>`).join('')
     const doctorNombre = medicoInfo?.nombre || 'Médico'
@@ -76,7 +75,7 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
     ].filter(Boolean).join(' · ')
     const logoUrl = medicoInfo?.logo_url || `${window.location.origin}/logo.png`
 
-    ventana.document.write(`
+    const _html = `
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Solicitud Lab</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -115,9 +114,7 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
   ${notas ? `<div class="seccion">Indicaciones</div><p style="font-size:10pt;color:#333">${notas}</p>` : ''}
   <div class="footer"><div class="firma"><p>${doctorNombre}</p>${medicoInfo?.cedula_profesional ? `<p>Céd. Prof. ${medicoInfo.cedula_profesional}</p>` : ''}</div></div>
 </body></html>`)
-    ventana.document.close()
-    ventana.focus()
-    setTimeout(() => ventana.print(), 500)
+    await imprimirOCompartir(_html, 'solicitud-laboratorio.pdf')
   }
 
   return (

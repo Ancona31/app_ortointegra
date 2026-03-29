@@ -8,6 +8,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import ConsultaRapida from '@/components/ConsultaRapida'
 import { createClient } from '@/lib/supabase/client'
+import { imprimirOCompartir } from '@/lib/mobileShare'
 import AutocompleteMedicamento from '@/components/AutocompleteMedicamento'
 import { MedicamentoDB } from '@/data/medicamentos'
 
@@ -125,8 +126,6 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     const verificacionUrl = `${window.location.origin}/r/${folio}`
     const qrDataUrl = await QRCode.toDataURL(verificacionUrl, { width: 96, margin: 1, color: { dark: '#1a3a5c', light: '#ffffff' } })
 
-    const ventana = window.open('', '_blank', 'width=800,height=600')
-    if (!ventana) return
     const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
 
     const medsData = medicamentos.filter(m => m.nombre_comercial)
@@ -169,7 +168,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     const sexoPaciente = pacienteData?.sexo === 'M' ? 'Masculino' : pacienteData?.sexo === 'F' ? 'Femenino' : pacienteData?.sexo || ''
     const marcaAguaUrl = logoUrl
 
-    ventana.document.write(`
+    const _html = `
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -370,9 +369,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 </body>
 </html>
     `)
-    ventana.document.close()
-    ventana.focus()
-    setTimeout(() => ventana.print(), 500)
+    await imprimirOCompartir(_html, 'receta-medica.pdf')
   }
 
   return (

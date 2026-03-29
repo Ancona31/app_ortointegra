@@ -10,6 +10,7 @@ type MedicoInfo = {
   logo_url: string | null
 }
 import { Printer } from 'lucide-react'
+import { imprimirOCompartir } from '@/lib/mobileShare'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
@@ -42,7 +43,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
     setEstudios(estudios.map((e, idx) => idx === i ? { ...e, [field]: val } : e))
   }
 
-  function imprimir() {
+  async function imprimir() {
     if (pacienteId) {
       const supabase = createClient()
       supabase.from('documentos').insert({
@@ -52,8 +53,6 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
       }).then(() => {})
     }
 
-    const ventana = window.open('', '_blank', 'width=800,height=600')
-    if (!ventana) return
     const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
     const listaEstudios = estudios.filter(e => e.tipo && e.region).map(e => `
       <div class="estudio">
@@ -68,7 +67,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
     ].filter(Boolean).join(' · ')
     const logoUrl = medicoInfo?.logo_url || `${window.location.origin}/logo.png`
 
-    ventana.document.write(`
+    const _html = `
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Solicitud Imagen</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -108,9 +107,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
   ${listaEstudios}
   <div class="footer"><div class="firma"><p>${doctorNombre}</p>${medicoInfo?.cedula_profesional ? `<p>Céd. Prof. ${medicoInfo.cedula_profesional}</p>` : ''}</div></div>
 </body></html>`)
-    ventana.document.close()
-    ventana.focus()
-    setTimeout(() => ventana.print(), 500)
+    await imprimirOCompartir(_html, 'solicitud-imagenologia.pdf')
   }
 
   return (
