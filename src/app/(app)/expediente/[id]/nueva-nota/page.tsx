@@ -5,12 +5,13 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Paciente } from '@/types'
 import { differenceInYears, parseISO } from 'date-fns'
-import { ArrowLeft, Wand2, Save, Loader2, RotateCcw, Printer, Eye, Pencil, Pill, FlaskConical, ScanLine, ClipboardList, CheckCircle2 } from 'lucide-react'
+import { flushSync } from 'react-dom'
+import { ArrowLeft, Save, Loader2, RotateCcw, Printer, Eye, Pencil, Pill, FlaskConical, ScanLine, ClipboardList, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
-import { PRINT_CSS, markdownToHtml } from '@/lib/printStyles'
 import ReactMarkdown from 'react-markdown'
 import ConsultaRapida from '@/components/ConsultaRapida'
 import Breadcrumbs from '@/components/layout/Breadcrumbs'
+import { imprimirOCompartir } from '@/lib/mobileShare'
 
 type MedicoInfo = {
   nombre: string
@@ -18,6 +19,10 @@ type MedicoInfo = {
   cedula_profesional: string
   cedula_especialidad: string
   logo_url: string | null
+  color_primario: string
+  color_secundario: string
+  direccion_consultorio: string
+  telefono_consultorio: string
 }
 
 export default function NuevaNotaPage() {
@@ -37,6 +42,7 @@ export default function NuevaNotaPage() {
   const [modoEdicion, setModoEdicion] = useState(false)
   const [generando, setGenerando] = useState(false)
   const [guardando, setGuardando] = useState(false)
+  const [imprimiendo, setImprimiendo] = useState(false)
   const [error, setError] = useState('')
   const [modalPost, setModalPost] = useState(false)
 
@@ -118,55 +124,222 @@ export default function NuevaNotaPage() {
     else setModalPost(true)
   }
 
-  function imprimir() {
-    const ventana = window.open('', '_blank', 'width=800,height=600')
-    if (!ventana || !paciente) return
+  async function imprimir() {
+    if (!paciente) return
+    flushSync(() => setImprimiendo(true))
+    try {
+      const ahora = new Date()
+      const edad = paciente.fecha_nacimiento
+        ? differenceInYears(ahora, parseISO(paciente.fecha_nacimiento))
+        : null
+      const fechaHora = ahora.toLocaleString('es-MX', {
+        day: '2-digit', month: 'long', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: true,
+      })
+      const cp = medicoInfo?.color_primario || '#1a3a5c'
+      const cs = medicoInfo?.color_secundario || '#1e5fa8'
+      const doctorNombre = medicoInfo?.nombre || 'Médico'
+      const doctorEspecialidad = medicoInfo?.especialidad || ''
+      const cedProf = medicoInfo?.cedula_profesional || ''
+      const cedEsp = medicoInfo?.cedula_especialidad || ''
+      const direccion = medicoInfo?.direccion_consultorio || ''
+      const telefono = medicoInfo?.telefono_consultorio || ''
+      const logoUrl = medicoInfo?.logo_url && medicoInfo.logo_url.startsWith('https://')
+        ? medicoInfo.logo_url
+        : `${window.location.origin}/logo.png`
 
-    const ahora = new Date()
-    const edad = paciente.fecha_nacimiento
-      ? differenceInYears(ahora, parseISO(paciente.fecha_nacimiento))
-      : null
-    const fechaHora = ahora.toLocaleString('es-MX', {
-      day: '2-digit', month: 'long', year: 'numeric',
-      hour: '2-digit', minute: '2-digit', hour12: true,
-    })
-    const doctorNombre = medicoInfo?.nombre || 'Médico'
-    const doctorEspecialidad = medicoInfo?.especialidad || ''
-    const cedulas = [
-      medicoInfo?.cedula_profesional ? `Céd. Prof. ${medicoInfo.cedula_profesional}` : '',
-      medicoInfo?.cedula_especialidad ? `Céd. Esp. ${medicoInfo.cedula_especialidad}` : '',
-    ].filter(Boolean).join(' · ')
-    const logoUrl = medicoInfo?.logo_url || `${window.location.origin}/logo.png`
+      // Convierte el markdown de Gemini a HTML con secciones estilizadas
+      function notaToHtml(texto: string): string {
+        const lines = texto.split('\n')
+        let html = ''
+        const sectionRe = /^\*\*\[([^\]]+)\]:\*\*$/
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed) { html += '<div style="height:5px"></div>'; continue }
+          const secMatch = trimmed.match(sectionRe)
+          if (secMatch) {
+            html += `
+              <div class="seccion-header">
+                <div class="seccion-linea"></div>
+                <div class="seccion-titulo">${secMatch[1]}</div>
+                <div class="seccion-linea"></div>
+              </div>`
+            continue
+          }
+          const contenido = trimmed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+          html += `<p>${contenido}</p>`
+        }
+        return html
+      }
 
-    const notaHtml = markdownToHtml(notaGenerada)
+      const notaHtml = notaToHtml(notaGenerada)
 
-    ventana.document.write(`
-<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Nota Médica</title>
-<style>${PRINT_CSS}</style></head><body>
-  <div class="header">
-    <img class="logo" src="${logoUrl}" onerror="this.style.display='none'" />
-    <div>
-      <div class="doctor-name">${doctorNombre}</div>
-      ${doctorEspecialidad ? `<div class="especialidad">${doctorEspecialidad}</div>` : ''}
-      ${cedulas ? `<div class="credenciales">${cedulas}</div>` : ''}
+      const _html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Nota Médica — ${paciente.nombre} ${paciente.apellidos}</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  @page { size: letter; margin: 0; }
+  body { font-family: 'Roboto', Arial, sans-serif; font-size: 10pt; color: #1a1a1a; position: relative; }
+
+  .watermark {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%) rotate(-25deg);
+    width: 320px; height: 320px;
+    object-fit: contain; opacity: 0.05;
+    pointer-events: none; z-index: 0;
+  }
+
+  .barra-top {
+    background: linear-gradient(135deg, ${cp} 0%, ${cs} 100%);
+    height: 12px; width: 100%;
+  }
+
+  .contenido { padding: 12mm 18mm 10mm; position: relative; z-index: 1; }
+
+  .header {
+    display: flex; align-items: center; gap: 18px;
+    padding-bottom: 12px; margin-bottom: 12px;
+    border-bottom: 2px solid ${cp};
+  }
+  .logo-wrap {
+    width: 72px; height: 72px; border-radius: 50%;
+    border: 3px solid ${cs}; overflow: hidden; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: #f8fafc;
+  }
+  .logo { width: 100%; height: 100%; object-fit: contain; }
+  .header-info { flex: 1; }
+  .doctor-name { font-size: 14pt; font-weight: bold; color: ${cp}; line-height: 1.2; }
+  .especialidad { font-size: 9pt; color: ${cs}; margin: 3px 0; font-style: italic; }
+  .credenciales { font-size: 8pt; color: #666; }
+  .contacto { font-size: 7.5pt; color: #888; margin-top: 3px; }
+  .titulo-doc {
+    text-align: right; min-width: 120px;
+  }
+  .titulo-texto {
+    font-size: 11pt; font-weight: 900; color: ${cp};
+    text-transform: uppercase; letter-spacing: 1px; line-height: 1.2;
+  }
+  .titulo-sub { font-size: 7.5pt; color: #aaa; margin-top: 3px; }
+
+  .datos-box {
+    background: linear-gradient(135deg, ${cp}08, ${cs}08);
+    border-left: 4px solid ${cs};
+    border-radius: 0 6px 6px 0;
+    padding: 9px 14px; margin-bottom: 14px;
+  }
+  .datos-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px 20px; }
+  .dato { display: flex; gap: 6px; align-items: baseline; font-size: 9pt; }
+  .dato-label { font-weight: bold; color: ${cp}; white-space: nowrap; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.3px; }
+  .dato-valor { flex: 1; border-bottom: 1px solid #d1d5db; padding-bottom: 1px; }
+
+  .seccion-header {
+    display: flex; align-items: center; gap: 8px;
+    margin: 13px 0 6px;
+  }
+  .seccion-linea { flex: 1; height: 1px; background: linear-gradient(to right, ${cp}, transparent); }
+  .seccion-titulo {
+    font-size: 7.5pt; font-weight: bold; color: ${cp};
+    text-transform: uppercase; letter-spacing: 1.5px;
+    background: ${cp}12; padding: 3px 10px; border-radius: 20px;
+    white-space: nowrap;
+  }
+
+  .nota-content { font-size: 9.5pt; line-height: 1.6; color: #2d2d2d; }
+  .nota-content p { margin-bottom: 3px; }
+  .nota-content strong { font-weight: 600; color: #111; }
+
+  .fecha-box {
+    margin-top: 12px;
+    background: ${cs}10;
+    border-left: 3px solid ${cs};
+    border-radius: 0 4px 4px 0;
+    padding: 6px 12px;
+    font-size: 9pt;
+  }
+
+  .footer-area { margin-top: 28px; display: flex; justify-content: flex-end; }
+  .firma {
+    text-align: center; min-width: 210px;
+    border-top: 1.5px solid ${cp}; padding-top: 8px;
+  }
+  .firma-nombre { font-weight: bold; font-size: 9.5pt; color: ${cp}; }
+  .firma-ced { font-size: 8pt; color: #666; margin-top: 2px; }
+
+  .barra-bottom {
+    background: linear-gradient(135deg, ${cp} 0%, ${cs} 100%);
+    height: 8px; width: 100%; margin-top: 16px;
+  }
+
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+  <img class="watermark" src="${logoUrl}" onerror="this.style.display='none'" />
+  <div class="barra-top"></div>
+
+  <div class="contenido">
+
+    <div class="header">
+      <div class="logo-wrap">
+        <img class="logo" src="${logoUrl}" onerror="this.style.display='none'" />
+      </div>
+      <div class="header-info">
+        <div class="doctor-name">${doctorNombre}</div>
+        ${doctorEspecialidad ? `<div class="especialidad">${doctorEspecialidad}</div>` : ''}
+        <div class="credenciales">
+          ${cedProf ? `Cédula Prof.: ${cedProf}` : ''}
+          ${cedProf && cedEsp ? ' &nbsp;·&nbsp; ' : ''}
+          ${cedEsp ? `Cédula Esp.: ${cedEsp}` : ''}
+        </div>
+        ${direccion || telefono ? `<div class="contacto">${[direccion, telefono ? `Tel: ${telefono}` : ''].filter(Boolean).join(' &nbsp;·&nbsp; ')}</div>` : ''}
+      </div>
+      <div class="titulo-doc">
+        <div class="titulo-texto">Nota<br>Médica</div>
+        <div class="titulo-sub">${fechaHora}</div>
+      </div>
     </div>
+
+    <div class="datos-box">
+      <div class="datos-grid">
+        <div class="dato"><span class="dato-label">Paciente</span><span class="dato-valor">${paciente.nombre} ${paciente.apellidos}</span></div>
+        <div class="dato"><span class="dato-label">Edad</span><span class="dato-valor">${edad !== null ? edad + ' años' : '—'}</span></div>
+        <div class="dato"><span class="dato-label">Sexo</span><span class="dato-valor">${paciente.sexo === 'M' ? 'Masculino' : paciente.sexo === 'F' ? 'Femenino' : '—'}</span></div>
+        ${paciente.peso_kg ? `<div class="dato"><span class="dato-label">Peso</span><span class="dato-valor">${paciente.peso_kg} kg</span></div>` : ''}
+        ${paciente.talla_cm ? `<div class="dato"><span class="dato-label">Talla</span><span class="dato-valor">${paciente.talla_cm} cm</span></div>` : ''}
+      </div>
+    </div>
+
+    <div class="nota-content">${notaHtml}</div>
+
+    ${form.proxima_cita ? `<div class="fecha-box"><strong>Fecha:</strong> ${form.proxima_cita}</div>` : ''}
+
+    <div class="footer-area">
+      <div class="firma">
+        <div class="firma-nombre">${doctorNombre}</div>
+        ${cedProf ? `<div class="firma-ced">Céd. Prof. ${cedProf}</div>` : ''}
+        ${cedEsp ? `<div class="firma-ced">Céd. Esp. ${cedEsp}</div>` : ''}
+      </div>
+    </div>
+
   </div>
-  <div class="titulo">Nota de Evolución Médica</div>
-  <div class="datos-grid">
-    <div class="dato"><span class="dato-label">Paciente:</span><span>${paciente.nombre} ${paciente.apellidos}</span></div>
-    <div class="dato"><span class="dato-label">Fecha y hora:</span><span>${fechaHora}</span></div>
-    <div class="dato"><span class="dato-label">Edad:</span><span>${edad !== null ? edad + ' años' : '—'}</span></div>
-    <div class="dato"><span class="dato-label">Sexo:</span><span>${paciente.sexo === 'M' ? 'Masculino' : paciente.sexo === 'F' ? 'Femenino' : '—'}</span></div>
-    ${paciente.peso_kg ? `<div class="dato"><span class="dato-label">Peso:</span><span>${paciente.peso_kg} kg</span></div>` : ''}
-    ${paciente.talla_cm ? `<div class="dato"><span class="dato-label">Talla:</span><span>${paciente.talla_cm} cm</span></div>` : ''}
-  </div>
-  <div class="nota-content">${notaHtml}</div>
-  ${form.proxima_cita ? `<div class="proxima-cita"><strong>Próxima cita:</strong> ${form.proxima_cita}</div>` : ''}
-  <div class="footer"><div class="firma"><p>${doctorNombre}</p>${medicoInfo?.cedula_profesional ? `<p>Céd. Prof. ${medicoInfo.cedula_profesional}</p>` : ''}</div></div>
-</body></html>`)
-    ventana.document.close()
-    ventana.focus()
-    setTimeout(() => ventana.print(), 500)
+
+  <div class="barra-bottom"></div>
+
+</body>
+</html>`
+
+      await imprimirOCompartir(_html, 'nota-medica.pdf')
+    } finally {
+      setImprimiendo(false)
+    }
   }
 
   const DOCS = [
@@ -382,9 +555,10 @@ export default function NuevaNotaPage() {
         <div className="flex gap-3 pb-6">
           <button
             onClick={imprimir}
-            className="flex items-center gap-2 px-5 py-2.5 border-2 border-[#1a3a5c] text-[#1a3a5c] rounded-lg text-sm font-medium hover:bg-[#1a3a5c] hover:text-white transition-colors"
+            disabled={imprimiendo}
+            className="flex items-center gap-2 px-5 py-2.5 border-2 border-[#1a3a5c] text-[#1a3a5c] rounded-lg text-sm font-medium hover:bg-[#1a3a5c] hover:text-white transition-colors disabled:opacity-50"
           >
-            <Printer size={16} /> Imprimir
+            {imprimiendo ? <><Loader2 size={16} className="animate-spin" /> Generando...</> : <><Printer size={16} /> Imprimir</>}
           </button>
           <button
             onClick={guardar}
