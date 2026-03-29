@@ -18,11 +18,12 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
 
     // Sanitizar todos los inputs antes de interpolarlos en el prompt
-    const motivo_consulta  = sanitizePromptInput(body.motivo_consulta, 1000)
-    const exploracion_fisica = sanitizePromptInput(body.exploracion_fisica, 1000)
-    const diagnosticos     = sanitizePromptInput(body.diagnosticos, 500)
-    const plan_tratamiento = sanitizePromptInput(body.plan_tratamiento, 500)
-    const antecedentes     = sanitizePromptInput(body.antecedentes, 500)
+    const motivo_consulta       = sanitizePromptInput(body.motivo_consulta, 1000)
+    const exploracion_fisica    = sanitizePromptInput(body.exploracion_fisica, 1000)
+    const diagnosticos          = sanitizePromptInput(body.diagnosticos, 500)
+    const plan_tratamiento      = sanitizePromptInput(body.plan_tratamiento, 500)
+    const gabinete_laboratorios = sanitizePromptInput(body.gabinete_laboratorios, 1000)
+    const antecedentes          = sanitizePromptInput(body.antecedentes, 500)
     const edad             = sanitizeNumber(body.edad)
     const peso             = sanitizeNumber(body.peso)
     const talla            = sanitizeNumber(body.talla)
@@ -51,6 +52,7 @@ DATOS DE LA CONSULTA:
 ${motivo_consulta ? `- Motivo / dictado: ${motivo_consulta}` : ''}
 ${exploracion_fisica ? `- Exploración física: ${exploracion_fisica}` : ''}
 ${diagnosticos ? `- Diagnóstico(s): ${diagnosticos}` : ''}
+${gabinete_laboratorios ? `- Gabinete y laboratorios: ${gabinete_laboratorios}` : ''}
 ${plan_tratamiento ? `- Plan: ${plan_tratamiento}` : ''}
 
 FORMATO DE SALIDA — usa exactamente estas 5 secciones, sin agregar nada más antes ni después:

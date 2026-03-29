@@ -30,6 +30,7 @@ export default function NuevaNotaPage() {
     exploracion_fisica: '',
     diagnosticos: '',
     plan_tratamiento: '',
+    gabinete_laboratorios: '',
     proxima_cita: '',
   })
   const [notaGenerada, setNotaGenerada] = useState('')
@@ -200,7 +201,11 @@ export default function NuevaNotaPage() {
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
           <h2 className="font-semibold text-slate-700 text-sm">Datos de la consulta</h2>
-          <p className="text-xs text-slate-400 mt-0.5">Completa los campos y Claude redactará la nota médica</p>
+          <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+            Completa los campos y
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="inline text-[#4285F4]"><path d="M12 2C12 2 13.8 9 19 12C13.8 15 12 22 12 22C12 22 10.2 15 5 12C10.2 9 12 2 12 2Z" fill="#4285F4"/></svg>
+            <span className="text-[#4285F4] font-medium">Gemini</span> redactará la nota médica
+          </p>
         </div>
         <div className="p-5 space-y-4">
           <div>
@@ -227,7 +232,7 @@ export default function NuevaNotaPage() {
           </div>
           <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">
-              Exploración física <span className="text-slate-400 font-normal">(opcional — Claude la complementa)</span>
+              Exploración física <span className="text-slate-400 font-normal">(opcional — Gemini la complementa)</span>
             </label>
             <textarea
               value={form.exploracion_fisica}
@@ -250,11 +255,24 @@ export default function NuevaNotaPage() {
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Próxima cita</label>
+            <label className="text-xs font-medium text-slate-500 block mb-1">
+              Gabinete y Laboratorios <span className="text-slate-400 font-normal">(opcional)</span>
+            </label>
+            <textarea
+              value={form.gabinete_laboratorios}
+              onChange={e => update('gabinete_laboratorios', e.target.value)}
+              placeholder="Ej: Rx columna lumbar AP/Lateral — disminución de espacio L4-L5. BH: Hb 13.2, leucocitos 7,800..."
+              rows={2}
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Fecha</label>
             <input
-              type="date"
+              type="text"
               value={form.proxima_cita}
               onChange={e => update('proxima_cita', e.target.value)}
+              placeholder="Ej: En 4 semanas, 15 de abril 2026..."
               className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
             />
           </div>
@@ -274,11 +292,11 @@ export default function NuevaNotaPage() {
       <button
         onClick={generarNota}
         disabled={generando || !form.motivo_consulta}
-        className="w-full py-3 bg-violet-600 text-white rounded-xl font-medium hover:bg-violet-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+        className="w-full py-3 bg-[#4285F4] text-white rounded-xl font-medium hover:bg-[#3367d6] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
       >
         {generando
           ? <><Loader2 size={18} className="animate-spin" /> Redactando nota médica...</>
-          : <><Wand2 size={18} /> Generar</>
+          : <><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2C12 2 13.8 9 19 12C13.8 15 12 22 12 22C12 22 10.2 15 5 12C10.2 9 12 2 12 2Z" fill="white"/></svg> Generar con Gemini</>
         }
       </button>
 
@@ -295,7 +313,7 @@ export default function NuevaNotaPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setModoEdicion(!modoEdicion)}
-                className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition-colors ${modoEdicion ? 'bg-violet-100 border-violet-300 text-violet-700' : 'bg-slate-100 border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition-colors ${modoEdicion ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-slate-100 border-slate-200 text-slate-600 hover:border-slate-300'}`}
               >
                 {modoEdicion ? <><Eye size={12} /> Vista previa</> : <><Pencil size={12} /> Editar</>}
               </button>

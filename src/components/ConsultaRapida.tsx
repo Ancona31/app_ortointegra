@@ -1,7 +1,15 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Loader2, Send, Bot, User, ChevronDown, ChevronUp, TriangleAlert, Copy, Check } from 'lucide-react'
+import { Loader2, Send, User, ChevronDown, ChevronUp, TriangleAlert, Copy, Check } from 'lucide-react'
+
+function GeminiIcon({ size = 18, className = '' }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M12 2C12 2 13.8 9 19 12C13.8 15 12 22 12 22C12 22 10.2 15 5 12C10.2 9 12 2 12 2Z" fill="currentColor" />
+    </svg>
+  )
+}
 
 type Mensaje = {
   rol: 'usuario' | 'claude'
@@ -74,16 +82,16 @@ export default function ConsultaRapida() {
       {/* Header — toggle */}
       <button
         onClick={() => setAbierto(!abierto)}
-        className="w-full flex items-center justify-between px-5 py-3 bg-violet-50 hover:bg-violet-100 transition-colors"
+        className="w-full flex items-center justify-between px-5 py-3 bg-gradient-to-r from-blue-50 to-sky-50 hover:from-blue-100 hover:to-sky-100 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <Bot size={18} className="text-violet-600" />
-          <span className="font-semibold text-violet-800 text-sm">Consulta rápida a Claude</span>
-          <span className="text-xs text-violet-500 bg-violet-100 px-2 py-0.5 rounded-full">
+          <GeminiIcon size={18} className="text-[#4285F4]" />
+          <span className="font-semibold text-[#1a3a5c] text-sm">Consulta rápida a Gemini</span>
+          <span className="text-xs text-[#4285F4] bg-blue-100 px-2 py-0.5 rounded-full">
             Medicamentos · Dosis · Escalas · Clasificaciones
           </span>
         </div>
-        {abierto ? <ChevronUp size={16} className="text-violet-500" /> : <ChevronDown size={16} className="text-violet-500" />}
+        {abierto ? <ChevronUp size={16} className="text-[#4285F4]" /> : <ChevronDown size={16} className="text-[#4285F4]" />}
       </button>
 
       {abierto && (
@@ -104,7 +112,7 @@ export default function ConsultaRapida() {
                   <button
                     key={s}
                     onClick={() => preguntar(s)}
-                    className="text-xs px-3 py-1.5 bg-slate-100 hover:bg-violet-100 hover:text-violet-700 text-slate-600 rounded-full transition-colors"
+                    className="text-xs px-3 py-1.5 bg-slate-100 hover:bg-blue-100 hover:text-[#4285F4] text-slate-600 rounded-full transition-colors"
                   >
                     {s}
                   </button>
@@ -119,13 +127,13 @@ export default function ConsultaRapida() {
               {mensajes.map((m, i) => (
                 <div key={i} className={`flex gap-2 ${m.rol === 'usuario' ? 'justify-end' : 'justify-start'}`}>
                   {m.rol === 'claude' && (
-                    <div className="w-6 h-6 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Bot size={13} className="text-violet-600" />
+                    <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <GeminiIcon size={13} className="text-[#4285F4]" />
                     </div>
                   )}
                   <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
                     m.rol === 'usuario'
-                      ? 'bg-violet-600 text-white rounded-tr-sm'
+                      ? 'bg-[#4285F4] text-white rounded-tr-sm'
                       : 'bg-slate-100 text-slate-800 rounded-tl-sm'
                   }`}>
                     {m.rol === 'claude' ? (
@@ -134,7 +142,7 @@ export default function ConsultaRapida() {
                         <div className="flex justify-end mt-2">
                           <button
                             onClick={() => copiar(m.texto, i)}
-                            className="flex items-center gap-1 text-xs text-slate-400 hover:text-violet-600 transition-colors"
+                            className="flex items-center gap-1 text-xs text-slate-400 hover:text-[#4285F4] transition-colors"
                           >
                             {copiado === i
                               ? <><Check size={11} className="text-emerald-500" /><span className="text-emerald-500">Copiado</span></>
@@ -148,7 +156,7 @@ export default function ConsultaRapida() {
                     )}
                   </div>
                   {m.rol === 'usuario' && (
-                    <div className="w-6 h-6 rounded-full bg-violet-600 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <div className="w-6 h-6 rounded-full bg-[#4285F4] flex items-center justify-center flex-shrink-0 mt-0.5">
                       <User size={13} className="text-white" />
                     </div>
                   )}
@@ -156,8 +164,8 @@ export default function ConsultaRapida() {
               ))}
               {cargando && (
                 <div className="flex gap-2 justify-start">
-                  <div className="w-6 h-6 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0">
-                    <Bot size={13} className="text-violet-600" />
+                  <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                    <GeminiIcon size={13} className="text-[#4285F4]" />
                   </div>
                   <div className="bg-slate-100 rounded-xl rounded-tl-sm px-3 py-2">
                     <Loader2 size={14} className="animate-spin text-violet-500" />
@@ -177,12 +185,12 @@ export default function ConsultaRapida() {
               onKeyDown={handleKey}
               placeholder="Ej: Dosis de tramadol en adulto mayor con insuficiencia renal..."
               disabled={cargando}
-              className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-400/30 focus:border-violet-400 disabled:opacity-50"
+              className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4285F4]/30 focus:border-[#4285F4] disabled:opacity-50"
             />
             <button
               onClick={() => preguntar()}
               disabled={!pregunta.trim() || cargando}
-              className="px-3 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors disabled:opacity-40"
+              className="px-3 py-2 bg-[#4285F4] text-white rounded-lg hover:bg-[#3367d6] transition-colors disabled:opacity-40"
             >
               {cargando ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
             </button>
