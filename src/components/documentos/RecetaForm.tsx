@@ -108,14 +108,32 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     if (!ventana) return
     const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
 
-    const meds = medicamentos.filter(m => m.nombre_comercial).map((m, i) => `
-      <div class="medicamento">
-        <p class="med-numero">Medicamento ${i + 1}</p>
-        <p class="med-nombre">${m.nombre_comercial.toUpperCase()}${m.presentacion ? ` ${m.presentacion}` : ''}${m.principio_activo ? ` <span class="principio">(${m.principio_activo})</span>` : ''}</p>
-        ${m.via_administracion ? `<p class="med-via">Vía: ${m.via_administracion}</p>` : ''}
-        <p class="med-indicacion">${m.indicacion}</p>
-      </div>
-    `).join('')
+    const medsData = medicamentos.filter(m => m.nombre_comercial)
+    const meds = medsData.length === 0 ? '' : `
+      <table class="meds-table">
+        <thead>
+          <tr>
+            <th class="col-num">#</th>
+            <th class="col-med">Medicamento</th>
+            <th class="col-via">Vía</th>
+            <th class="col-ind">Indicaciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${medsData.map((m, i) => `
+          <tr>
+            <td class="col-num num-cell">${i + 1}</td>
+            <td class="col-med">
+              <span class="med-nombre">${m.nombre_comercial.toUpperCase()}${m.presentacion ? ` <span class="med-pres">${m.presentacion}</span>` : ''}</span>
+              ${m.principio_activo ? `<br><span class="principio">(${m.principio_activo})</span>` : ''}
+            </td>
+            <td class="col-via via-cell">${m.via_administracion || 'Oral'}</td>
+            <td class="col-ind ind-cell">${m.indicacion || ''}</td>
+          </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `
 
     const doctorNombre = medicoInfo?.nombre || 'Médico'
     const doctorEspecialidad = medicoInfo?.especialidad || ''
@@ -195,7 +213,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
   .dato-label { font-weight: bold; color: ${cp}; white-space: nowrap; font-size: 8.5pt; font-family: Arial, sans-serif; text-transform: uppercase; letter-spacing: 0.3px; }
   .dato-valor { flex: 1; border-bottom: 1px solid #d1d5db; padding-bottom: 1px; }
 
-  /* ── Sección medicamentos ── */
+  /* ── Sección header ── */
   .seccion-header {
     display: flex; align-items: center; gap: 8px;
     margin: 16px 0 10px;
@@ -208,19 +226,37 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     background: ${cp}12; padding: 3px 10px; border-radius: 20px;
   }
 
-  .medicamento { margin-bottom: 12px; padding-left: 10px; border-left: 2px solid ${cs}30; }
-  .med-numero { font-size: 8pt; color: ${cs}; font-weight: bold; font-family: Arial, sans-serif; }
-  .med-nombre { font-weight: bold; font-size: 10.5pt; color: #111; font-family: Arial, sans-serif; }
-  .principio { font-weight: normal; font-style: italic; color: #666; font-size: 9pt; }
-  .med-via { font-size: 8.5pt; color: ${cs}; font-weight: 600; margin-top: 2px; }
-  .med-indicacion { font-size: 9.5pt; margin-top: 3px; color: #444; line-height: 1.5; }
+  /* ── Tabla de medicamentos ── */
+  .meds-table {
+    width: 100%; border-collapse: collapse;
+    font-family: Arial, sans-serif;
+  }
+  .meds-table thead tr {
+    background: linear-gradient(135deg, ${cp}, ${cs});
+  }
+  .meds-table thead th {
+    color: #fff; font-size: 7.5pt; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.8px;
+    padding: 6px 10px; text-align: left;
+  }
+  .meds-table thead th.col-num { text-align: center; width: 24px; }
+  .meds-table tbody tr { border-bottom: 1px solid ${cp}18; }
+  .meds-table tbody tr:last-child { border-bottom: none; }
+  .meds-table tbody tr:nth-child(even) { background: ${cp}05; }
+  .meds-table td { padding: 8px 10px; vertical-align: top; font-size: 9.5pt; }
+  .num-cell { text-align: center; color: ${cs}; font-weight: 700; font-size: 9pt; }
+  .med-nombre { font-weight: 700; color: #111; font-size: 10pt; }
+  .med-pres { font-weight: 400; color: #555; font-size: 9pt; }
+  .principio { font-style: italic; color: #777; font-size: 8.5pt; }
+  .via-cell { color: ${cs}; font-weight: 600; font-size: 8.5pt; white-space: nowrap; }
+  .ind-cell { color: #444; line-height: 1.55; }
 
   .recomendaciones { font-size: 9.5pt; line-height: 1.7; color: #444; white-space: pre-line; padding-left: 10px; }
 
   /* ── Barra inferior + firma ── */
-  .footer-area { margin-top: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
+  .footer-area { margin-top: 30px; display: flex; justify-content: flex-end; align-items: flex-end; }
   .firma {
-    text-align: center; min-width: 200px;
+    text-align: center; min-width: 220px;
     border-top: 1.5px solid ${cp}; padding-top: 8px;
   }
   .firma-nombre { font-weight: bold; font-size: 9.5pt; color: ${cp}; font-family: Arial, sans-serif; }
