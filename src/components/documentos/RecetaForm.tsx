@@ -193,6 +193,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
       medicamentos,
       recomendaciones,
       fecha,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       medico_nombre: medicoInfo?.nombre || '',
       medico_especialidad: medicoInfo?.especialidad || '',
       medico_cedula_profesional: medicoInfo?.cedula_profesional || '',

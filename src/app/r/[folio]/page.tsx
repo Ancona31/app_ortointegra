@@ -19,6 +19,7 @@ type Receta = {
   medicamentos: Medicamento[]
   recomendaciones?: string
   fecha: string
+  timezone?: string
   medico_nombre?: string
   medico_especialidad?: string
   medico_cedula_profesional?: string
@@ -50,9 +51,10 @@ export default async function VerificacionPage({ params }: { params: Promise<{ f
     ? format(parseISO(receta.fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
     : '—'
 
+  const tz = receta.timezone || 'America/Mexico_City'
   const emitidaFormato = emitida
     ? new Date(emitida).toLocaleString('es-MX', {
-        timeZone: 'America/Mexico_City',
+        timeZone: tz,
         day: '2-digit', month: 'long', year: 'numeric',
         hour: '2-digit', minute: '2-digit', hour12: true,
       })
