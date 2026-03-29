@@ -51,7 +51,11 @@ export default async function VerificacionPage({ params }: { params: Promise<{ f
     : '—'
 
   const emitidaFormato = emitida
-    ? format(parseISO(emitida), "dd 'de' MMMM 'de' yyyy, HH:mm", { locale: es })
+    ? new Date(emitida).toLocaleString('es-MX', {
+        timeZone: 'America/Mexico_City',
+        day: '2-digit', month: 'long', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: true,
+      })
     : '—'
 
   return (
