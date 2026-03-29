@@ -572,7 +572,10 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
           onChange={e => {
             if (!e.target.value) return
             const rec = RECOMENDACIONES_PREDETERMINADAS.find(r => r.label === e.target.value)
-            if (rec) setRecomendaciones(prev => prev ? prev + '\n\n' + rec.texto : rec.texto)
+            if (rec) {
+              const bloque = `${rec.label}\n${rec.texto}`
+              setRecomendaciones(prev => prev ? prev + '\n\n' + bloque : bloque)
+            }
             e.target.value = ''
           }}
           className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 bg-slate-50"
