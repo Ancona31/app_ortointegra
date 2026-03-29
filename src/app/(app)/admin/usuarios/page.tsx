@@ -60,7 +60,6 @@ export default function AdminUsuariosPage() {
     e.preventDefault()
     setGuardando(true)
     setError('')
-    setExito('')
 
     const res = await fetch('/api/admin/crear-usuario', {
       method: 'POST',
