@@ -62,13 +62,12 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
   const [requerimientosExtra, setRequerimientosExtra] = useState('')
   const [justificacion, setJustificacion] = useState('')
   const [instruccionesPaciente, setInstruccionesPaciente] = useState(
-`• Presentarse en Admisión Hospitalaria con: identificación oficial vigente, esta hoja de internamiento y estudios recientes (laboratorios, radiografías, resonancias).
-• Ayuno estricto de 8 horas antes del procedimiento. Solo se permiten líquidos claros hasta 4 horas antes.
+`• Presentarse en Admisión Hospitalaria con: identificación oficial vigente, esta hoja de internamiento, estudios recientes (laboratorios, radiografías, resonancias) y Valoración preoperatoria (Muy Importante).
+• Ayuno estricto de 8 horas antes del procedimiento. La cena deberá de ser ligera.
 • No traer objetos de valor, joyas ni alhajas.
 • Venir acompañado de un familiar mayor de edad responsable.
-• Si toma medicamentos de forma habitual, NO los suspenda sin consultarnos antes.
-• Traer ropa cómoda y artículos de aseo personal para su estancia.
-• En caso de dudas o cambio en su estado de salud antes del ingreso, comuníquese al consultorio.`
+• Si toma medicamentos antihipertensivos o de la tiroides, NO los suspenda sin consultarnos antes.
+• Traer ropa cómoda y artículos de aseo personal para su estancia.`
   )
   const [indicacionesPiso, setIndicacionesPiso] = useState('')
   const [imprimiendo, setImprimiendo] = useState(false)
