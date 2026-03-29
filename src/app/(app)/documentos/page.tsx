@@ -2,11 +2,12 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { FileText, Pill, FlaskConical, ScanLine, ClipboardList, Search, User, X } from 'lucide-react'
+import { FileText, Pill, FlaskConical, ScanLine, ClipboardList, Search, User, X, BedDouble } from 'lucide-react'
 import RecetaForm from '@/components/documentos/RecetaForm'
 import SolicitudLabForm from '@/components/documentos/SolicitudLabForm'
 import SolicitudImagenForm from '@/components/documentos/SolicitudImagenForm'
 import PlanSuplementacionForm from '@/components/documentos/PlanSuplementacionForm'
+import SolicitudInternamientoForm from '@/components/documentos/SolicitudInternamientoForm'
 import { createClient } from '@/lib/supabase/client'
 
 const TIPOS = [
@@ -14,6 +15,7 @@ const TIPOS = [
   { key: 'lab', label: 'Solicitud de Laboratorio', icon: FlaskConical, color: 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100' },
   { key: 'imagen', label: 'Solicitud de Imagen', icon: ScanLine, color: 'bg-violet-50 border-violet-200 text-violet-700 hover:bg-violet-100' },
   { key: 'suplementacion', label: 'Plan de Suplementación', icon: ClipboardList, color: 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100' },
+  { key: 'internamiento', label: 'Solicitud de Internamiento', icon: BedDouble, color: 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100' },
 ] as const
 
 type TipoDoc = typeof TIPOS[number]['key']
@@ -151,6 +153,12 @@ function DocumentosContent() {
           {tipo === 'lab' && <SolicitudLabForm pacienteId={pacienteSeleccionado.id} />}
           {tipo === 'imagen' && <SolicitudImagenForm pacienteId={pacienteSeleccionado.id} />}
           {tipo === 'suplementacion' && <PlanSuplementacionForm pacienteId={pacienteSeleccionado.id} />}
+          {tipo === 'internamiento' && (
+            <SolicitudInternamientoForm
+              pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}
+              pacienteId={pacienteSeleccionado.id}
+            />
+          )}
           {!tipo && (
             <div className="text-center py-12 text-slate-400">
               <FileText size={40} className="mx-auto mb-3 opacity-40" />
