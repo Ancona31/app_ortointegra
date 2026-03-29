@@ -368,7 +368,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 
 </body>
 </html>
-    `)
+    `
     await imprimirOCompartir(_html, 'receta-medica.pdf')
   }
 

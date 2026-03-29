@@ -162,7 +162,7 @@ export default function NuevaNotaPage() {
   <div class="nota-content">${notaHtml}</div>
   ${form.proxima_cita ? `<div class="proxima-cita"><strong>Próxima cita:</strong> ${form.proxima_cita}</div>` : ''}
   <div class="footer"><div class="firma"><p>${doctorNombre}</p>${medicoInfo?.cedula_profesional ? `<p>Céd. Prof. ${medicoInfo.cedula_profesional}</p>` : ''}</div></div>
-</body></html>`)
+</body></html>`
     await imprimirOCompartir(_html, 'nota-medica.pdf')
   }
 

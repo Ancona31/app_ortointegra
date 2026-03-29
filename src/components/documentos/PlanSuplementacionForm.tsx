@@ -125,7 +125,7 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
   ${notas ? `<div class="seccion">Notas adicionales</div><p class="nota">${notas}</p>` : ''}
   ${seguimiento ? `<p style="margin-top:12px;font-size:10pt;"><strong>Control:</strong> ${seguimiento}</p>` : ''}
   <div class="footer"><div class="firma"><p>${doctorNombre}</p>${medicoInfo?.cedula_profesional ? `<p>Céd. Prof. ${medicoInfo.cedula_profesional}</p>` : ''}</div></div>
-</body></html>`)
+</body></html>`
     await imprimirOCompartir(_html, 'plan-suplementacion.pdf')
   }
 

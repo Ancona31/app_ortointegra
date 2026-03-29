@@ -106,7 +106,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
   <div class="seccion">Estudios solicitados:</div>
   ${listaEstudios}
   <div class="footer"><div class="firma"><p>${doctorNombre}</p>${medicoInfo?.cedula_profesional ? `<p>Céd. Prof. ${medicoInfo.cedula_profesional}</p>` : ''}</div></div>
-</body></html>`)
+</body></html>`
     await imprimirOCompartir(_html, 'solicitud-imagenologia.pdf')
   }
 
