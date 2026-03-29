@@ -20,6 +20,12 @@ type MedicoInfo = {
   telefono_consultorio: string
 }
 
+type Presentacion = {
+  tipo: string      // 'cápsula' | 'tableta' | 'cucharada' | 'scoop'
+  contenido: number // cantidad por unidad, en la misma unidad que `unidad` del suplemento
+  nota?: string     // texto adicional en el PDF, ej: "+ 1 tableta Vitamina C 1,000 mg"
+}
+
 type Suplemento = {
   nombre: string
   dosis_default: string
@@ -27,8 +33,9 @@ type Suplemento = {
   min_kg: number | null
   max_kg: number | null
   unidad: string
-  beneficio_clinico: string   // texto médico — visible en el panel de selección (para el médico)
-  beneficio_paciente: string  // lenguaje amigable — aparece en el PDF (para el paciente)
+  presentacion: Presentacion | null  // null = mostrar mg/UI en PDF (sin conversión)
+  beneficio_clinico: string          // texto médico — visible en tarjetas de selección (médico)
+  beneficio_paciente: string         // lenguaje amigable — aparece en el PDF (paciente)
 }
 
 const SUPLEMENTOS: Suplemento[] = [
@@ -37,14 +44,16 @@ const SUPLEMENTOS: Suplemento[] = [
     dosis_default: '5,000 UI/día',
     dosis_por_kg: '70–100 UI/kg/día',
     min_kg: 70, max_kg: 100, unidad: 'UI',
+    presentacion: null, // sin conversión a cápsulas — se muestra en UI/día
     beneficio_clinico: 'Absorción de calcio y mineralización ósea. Con IMC elevado se requieren dosis de carga para saturar receptores. Clave para unión ósea en cirugía de columna y artroplastia.',
     beneficio_paciente: 'Ayuda a que tus huesos absorban el calcio correctamente y se mantengan fuertes. Es especialmente importante después de una cirugía de columna o articulaciones para que la recuperación sea más rápida y sólida.',
   },
   {
     nombre: 'Vitamina K2 (MK-7)',
-    dosis_default: '100–180 mcg/día',
+    dosis_default: '100 mcg/día',
     dosis_por_kg: '1.5–2 mcg/kg/día',
     min_kg: 1.5, max_kg: 2, unidad: 'mcg',
+    presentacion: { tipo: 'cápsula', contenido: 100 },
     beneficio_clinico: 'Activa la osteocalcina y dirige el calcio al hueso. Evita calcificación de ligamentos y arterias. Sinergia indispensable con Vitamina D3.',
     beneficio_paciente: 'Trabaja en equipo con la Vitamina D3 para que el calcio llegue exactamente a donde debe estar: tus huesos. Evita que ese calcio se acumule en lugares donde puede hacer daño, como las arterias o los ligamentos.',
   },
@@ -53,6 +62,7 @@ const SUPLEMENTOS: Suplemento[] = [
     dosis_default: '2–3 g/día con alimentos',
     dosis_por_kg: '30–40 mg/kg/día',
     min_kg: 30, max_kg: 40, unidad: 'mg',
+    presentacion: { tipo: 'cápsula', contenido: 640 }, // Nordic Naturals: 2 caps = 1,280 mg → 640 mg/cap
     beneficio_clinico: 'A >3 g/día modula la cascada del ácido araquidónico. Reduce inflamación en entesis y discos intervertebrales. Alternativa coadyuvante a AINEs en radiculopatía crónica.',
     beneficio_paciente: 'Reduce la inflamación de forma natural en articulaciones, nervios y discos de la columna. A dosis terapéuticas ayuda a controlar el dolor crónico sin irritar el estómago como lo hacen algunos antiinflamatorios convencionales.',
   },
@@ -61,6 +71,7 @@ const SUPLEMENTOS: Suplemento[] = [
     dosis_default: '10–15 g + 500 mg en ayunas',
     dosis_por_kg: '0.10–0.15 g/kg/día',
     min_kg: 0.10, max_kg: 0.15, unidad: 'g',
+    presentacion: { tipo: 'cucharada', contenido: 5, nota: '+ 1 tableta de Vitamina C 1,000 mg — tomar en ayunas' },
     beneficio_clinico: 'Aporta glicina y prolina para reparación de fascia y anillo fibroso del disco. Tomar en ayunas con vitamina C para máxima biodisponibilidad.',
     beneficio_paciente: 'El colágeno es el material de construcción natural de tus tendones, ligamentos y los discos que amortiguan tu columna. Tomarlo en ayunas con vitamina C ayuda a reparar y fortalecer esos tejidos desde adentro.',
   },
@@ -69,6 +80,7 @@ const SUPLEMENTOS: Suplemento[] = [
     dosis_default: '5 g/día',
     dosis_por_kg: '0.07–0.10 g/kg/día',
     min_kg: 0.07, max_kg: 0.10, unidad: 'g',
+    presentacion: { tipo: 'scoop', contenido: 5 },
     beneficio_clinico: 'Síntesis de ATP muscular y retención de nitrógeno. Previene sarcopenia y atrofia por desuso. Mejora potencia en rehabilitación incluso con déficit calórico.',
     beneficio_paciente: 'Le da más energía a tus músculos para que trabajen mejor durante la rehabilitación. Evita que el músculo se pierda cuando estás en reposo o en un proceso de recuperación, y mejora tu fuerza de forma progresiva.',
   },
@@ -77,6 +89,7 @@ const SUPLEMENTOS: Suplemento[] = [
     dosis_default: '300–400 mg/día',
     dosis_por_kg: '4–6 mg/kg/día',
     min_kg: 4, max_kg: 6, unidad: 'mg',
+    presentacion: { tipo: 'cápsula', contenido: 500 },
     beneficio_clinico: 'Relajación de musculatura paravertebral y cofactor en formación de matriz ósea. Alta biodisponibilidad sin efectos laxantes del óxido o citrato.',
     beneficio_paciente: 'Relaja los músculos de la espalda y ayuda a reducir los espasmos y la tensión. También es necesario para formar hueso sano y mejora la calidad del sueño, que es cuando el cuerpo más se repara.',
   },
@@ -85,6 +98,7 @@ const SUPLEMENTOS: Suplemento[] = [
     dosis_default: '500–1,000 mg/día',
     dosis_por_kg: '8–10 mg/kg/día',
     min_kg: 8, max_kg: 10, unidad: 'mg',
+    presentacion: { tipo: 'cápsula', contenido: 500 },
     beneficio_clinico: 'Inhibidor natural de NF-kB y COX-2. Reduce dolor articular crónico sin daño gástrico. Efecto comparable a dosis bajas de diclofenaco después de 4 semanas continuas.',
     beneficio_paciente: 'Es un antiinflamatorio natural muy potente extraído de la cúrcuma. Con uso continuo de 4 semanas ayuda a controlar el dolor crónico en articulaciones y espalda, sin los efectos secundarios que tienen los antiinflamatorios de farmacia.',
   },
@@ -93,14 +107,16 @@ const SUPLEMENTOS: Suplemento[] = [
     dosis_default: '3 g/día (3 tomas)',
     dosis_por_kg: '30–40 mg/kg/día',
     min_kg: 30, max_kg: 40, unidad: 'mg',
+    presentacion: { tipo: 'cápsula', contenido: 1000 },
     beneficio_clinico: 'Anticatabólico. Protege masa muscular en déficit calórico y periodos de estrés quirúrgico o posoperatorio.',
     beneficio_paciente: 'Protege tu músculo cuando el cuerpo está bajo estrés, como después de una cirugía o durante una dieta. Evita que el organismo "consuma" el músculo que tanto trabajo cuesta ganar o mantener.',
   },
   {
     nombre: 'Ashwagandha KSM-66',
-    dosis_default: '300–600 mg/día',
+    dosis_default: '1 cápsula al día',
     dosis_por_kg: null,
     min_kg: null, max_kg: null, unidad: 'mg',
+    presentacion: { tipo: 'cápsula', contenido: 600 },
     beneficio_clinico: 'Modulador de cortisol. Reduce gluconeogénesis inducida por estrés, protegiendo masa muscular. Indicado en pacientes con alta carga laboral o entrenamiento de alta intensidad.',
     beneficio_paciente: 'Ayuda a reducir el estrés y equilibrar el cortisol, que es la hormona que el cuerpo libera cuando está bajo presión. Cuando el cortisol está elevado por mucho tiempo, destruye músculo y dificulta la recuperación; esta planta ayuda a controlarlo.',
   },
@@ -124,6 +140,30 @@ function calcularDosis(sup: Suplemento, pesoKg: number): string {
   }
 
   return `${fmt(min)}–${fmt(max)} ${sup.unidad}/día`
+}
+
+// Devuelve la dosis en cápsulas/cucharadas para el PDF del paciente (dosis mínima por peso)
+function dosisEnCapsulas(sup: Suplemento, pesoKg: number): string | null {
+  if (!sup.presentacion) return null
+
+  let n: number
+  if (!sup.min_kg) {
+    // Dosis fija — 1 unidad como mínimo práctico
+    n = 1
+  } else {
+    const dosis_min = sup.min_kg * pesoKg
+    n = Math.max(1, Math.round(dosis_min / sup.presentacion.contenido))
+  }
+
+  const t = sup.presentacion.tipo
+  const label = n === 1 ? t
+    : t === 'cucharada' ? 'cucharadas'
+    : t === 'cápsula'   ? 'cápsulas'
+    : t === 'tableta'   ? 'tabletas'
+    : t + 's'
+
+  const base = `${n} ${label} al día`
+  return sup.presentacion.nota ? `${base} — ${sup.presentacion.nota}` : base
 }
 
 type SupSelec = { nombre: string; dosis: string; justificacion: string }
@@ -200,17 +240,18 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
       const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
       const cols = pesoKg ? '1fr 1fr 1fr' : '1fr 1fr'
 
+      const peso = parseFloat(pesoKg)
       const lista = seleccionados.map((s, i) => {
         const sup = SUPLEMENTOS.find(x => x.nombre === s.nombre)
-        const formula = pesoKg && sup?.dosis_por_kg
-          ? `<span style="font-size:8pt;color:#888;margin-left:6px;">(${sup.dosis_por_kg} · ${pesoKg} kg)</span>`
-          : ''
+        const dosisDisplay = (sup && peso > 0)
+          ? (dosisEnCapsulas(sup, peso) ?? s.dosis)
+          : s.dosis
         return `
         <div class="sup">
           <p class="sup-nombre">${i + 1}. ${s.nombre}</p>
-          <p class="sup-dosis">📋 Dosis: ${s.dosis}${formula}</p>
+          <p class="sup-dosis">📋 ${dosisDisplay}</p>
           ${sup?.beneficio_paciente ? `<p class="sup-beneficio">${sup.beneficio_paciente}</p>` : ''}
-          ${s.justificacion ? `<p class="sup-just">Nota clínica: ${s.justificacion}</p>` : ''}
+          ${s.justificacion ? `<p class="sup-just">Nota: ${s.justificacion}</p>` : ''}
         </div>`
       }).join('')
 
