@@ -14,6 +14,7 @@ function ResetPasswordContent() {
   const [error, setError] = useState('')
   const [listo, setListo] = useState(false)
   const [sesionLista, setSesionLista] = useState(false)
+  const [supabase] = useState(() => createClient())
 
   useEffect(() => {
     const code = searchParams.get('code')
@@ -21,7 +22,6 @@ function ResetPasswordContent() {
       setError('Enlace inválido o expirado. Solicita uno nuevo.')
       return
     }
-    const supabase = createClient()
     supabase.auth.exchangeCodeForSession(code).then(({ error: err }) => {
       if (err) {
         setError('Enlace inválido o expirado. Solicita uno nuevo.')
@@ -29,7 +29,7 @@ function ResetPasswordContent() {
         setSesionLista(true)
       }
     })
-  }, [searchParams])
+  }, [searchParams, supabase])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -45,7 +45,6 @@ function ResetPasswordContent() {
     setLoading(true)
     setError('')
 
-    const supabase = createClient()
     const { error: err } = await supabase.auth.updateUser({ password })
 
     setLoading(false)
