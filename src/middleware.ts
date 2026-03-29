@@ -26,6 +26,7 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   const isLoginPage = pathname === '/login'
   const isPublicPage = ['/forgot-password', '/reset-password', '/auth/confirm'].includes(pathname)
+    || pathname.startsWith('/r/')
 
   // Rutas API que no requieren sesión (OAuth callbacks)
   const publicApiPaths = ['/api/google/callback']

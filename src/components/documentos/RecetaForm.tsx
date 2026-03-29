@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, Printer } from 'lucide-react'
+import QRCode from 'qrcode'
 import { Medicamento } from '@/types'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -91,18 +92,38 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 
   async function imprimir() {
     setErrorGuardado('')
+    const folio = `R-${Date.now().toString().slice(-8)}`
+    const contenido = {
+      folio,
+      paciente,
+      diagnostico,
+      medicamentos,
+      recomendaciones,
+      fecha,
+      medico_nombre: medicoInfo?.nombre || '',
+      medico_especialidad: medicoInfo?.especialidad || '',
+      medico_cedula_profesional: medicoInfo?.cedula_profesional || '',
+      medico_cedula_especialidad: medicoInfo?.cedula_especialidad || '',
+      clinica_nombre: medicoInfo?.clinica_nombre || '',
+      color_primario: medicoInfo?.color_primario || '#1a3a5c',
+      color_secundario: medicoInfo?.color_secundario || '#1e5fa8',
+    }
+
     if (pacienteId) {
       const supabase = createClient()
       const { error } = await supabase.from('documentos').insert({
         paciente_id: pacienteId,
         tipo: 'receta',
-        contenido: { paciente, diagnostico, medicamentos, recomendaciones, fecha },
+        contenido,
       })
       if (error) {
         setErrorGuardado('No se pudo guardar la receta en el expediente.')
         return
       }
     }
+
+    const verificacionUrl = `${window.location.origin}/r/${folio}`
+    const qrDataUrl = await QRCode.toDataURL(verificacionUrl, { width: 96, margin: 1, color: { dark: '#1a3a5c', light: '#ffffff' } })
 
     const ventana = window.open('', '_blank', 'width=800,height=600')
     if (!ventana) return
@@ -147,7 +168,6 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     const edadPaciente = pacienteData?.edad
     const sexoPaciente = pacienteData?.sexo === 'M' ? 'Masculino' : pacienteData?.sexo === 'F' ? 'Femenino' : pacienteData?.sexo || ''
     const marcaAguaUrl = logoUrl
-    const folio = `R-${Date.now().toString().slice(-8)}`
 
     ventana.document.write(`
 <!DOCTYPE html>
@@ -254,7 +274,10 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
   .recomendaciones { font-size: 9.5pt; line-height: 1.7; color: #444; white-space: pre-line; padding-left: 10px; }
 
   /* ── Barra inferior + firma ── */
-  .footer-area { margin-top: 30px; display: flex; justify-content: flex-end; align-items: flex-end; }
+  .footer-area { margin-top: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
+  .qr-area { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .qr-img { width: 72px; height: 72px; }
+  .qr-label { font-size: 6.5pt; color: #aaa; font-family: Arial, sans-serif; text-align: center; line-height: 1.4; }
   .firma {
     text-align: center; min-width: 220px;
     border-top: 1.5px solid ${cp}; padding-top: 8px;
@@ -329,6 +352,10 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     ` : ''}
 
     <div class="footer-area">
+      <div class="qr-area">
+        <img class="qr-img" src="${qrDataUrl}" />
+        <div class="qr-label">Escanea para<br>verificar receta</div>
+      </div>
       <div class="firma">
         <div class="firma-nombre">${doctorNombre}</div>
         ${cedProf ? `<div class="firma-ced">Céd. Prof. ${cedProf}</div>` : ''}
