@@ -217,14 +217,7 @@ export default function NuevaNotaPage() {
   .especialidad { font-size: 9pt; color: ${cs}; margin: 3px 0; font-style: italic; }
   .credenciales { font-size: 8pt; color: #666; }
   .contacto { font-size: 7.5pt; color: #888; margin-top: 3px; }
-  .titulo-doc {
-    text-align: right; min-width: 120px;
-  }
-  .titulo-texto {
-    font-size: 11pt; font-weight: 900; color: ${cp};
-    text-transform: uppercase; letter-spacing: 1px; line-height: 1.2;
-  }
-  .titulo-sub { font-size: 7.5pt; color: #aaa; margin-top: 3px; }
+  .titulo-sub { font-size: 7.5pt; color: #aaa; text-align: right; }
 
   .datos-box {
     background: linear-gradient(135deg, ${cp}08, ${cs}08);
@@ -249,7 +242,16 @@ export default function NuevaNotaPage() {
     white-space: nowrap;
   }
 
-  .nota-content { font-size: 9.5pt; line-height: 1.6; color: #2d2d2d; }
+  .titulo-nota {
+    background: linear-gradient(135deg, ${cp} 0%, ${cs} 100%);
+    color: #fff; text-align: center;
+    font-size: 11pt; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 2px;
+    padding: 8px 0; border-radius: 4px;
+    margin-bottom: 14px;
+  }
+
+  .nota-content { font-size: 9.5pt; line-height: 1.6; color: #2d2d2d; text-align: justify; }
   .nota-content p { margin-bottom: 3px; }
   .nota-content strong { font-weight: 600; color: #111; }
 
@@ -301,10 +303,7 @@ export default function NuevaNotaPage() {
         </div>
         ${direccion || telefono ? `<div class="contacto">${[direccion, telefono ? `Tel: ${telefono}` : ''].filter(Boolean).join(' &nbsp;·&nbsp; ')}</div>` : ''}
       </div>
-      <div class="titulo-doc">
-        <div class="titulo-texto">Nota<br>Médica</div>
-        <div class="titulo-sub">${fechaHora}</div>
-      </div>
+      <div class="titulo-sub">${fechaHora}</div>
     </div>
 
     <div class="datos-box">
@@ -316,6 +315,8 @@ export default function NuevaNotaPage() {
         ${paciente.talla_cm ? `<div class="dato"><span class="dato-label">Talla</span><span class="dato-valor">${paciente.talla_cm} cm</span></div>` : ''}
       </div>
     </div>
+
+    <div class="titulo-nota">Nota de Evolución Médica</div>
 
     <div class="nota-content">${notaHtml}</div>
 
