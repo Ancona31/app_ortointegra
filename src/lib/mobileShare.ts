@@ -23,26 +23,48 @@ export async function imprimirOCompartir(html: string, filename = 'documento.pdf
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const html2pdf = (await import('html2pdf.js' as any)).default
 
-  // Montamos el HTML en un contenedor oculto fuera de la pantalla
+  // El contenedor DEBE estar dentro del viewport para que html2canvas lo capture.
+  // Usamos un overlay position:fixed con opacity:0 — mismo patrón que usa html2pdf
+  // internamente en su worker.js. top:-99999px no funciona porque html2canvas
+  // no puede obtener las dimensiones reales de elementos fuera del viewport.
+  const overlay = document.createElement('div')
+  overlay.style.cssText =
+    'position:fixed;inset:0;z-index:9999;opacity:0;pointer-events:none;overflow:hidden;'
+
   const container = document.createElement('div')
-  container.style.cssText = 'position:absolute;top:-99999px;left:-99999px;width:816px;background:#fff;'
-  // Incluimos <style> y <link> del <head> para que los estilos se apliquen
+  container.style.cssText = 'position:absolute;top:0;left:0;width:816px;background:#fff;'
+
+  // Extraemos los <style> del <head> para que los estilos apliquen al contenido.
+  // Los selectores body{} del CSS inyectado SOLAN al <body> real (que es ancestro
+  // del container), así que la herencia CSS funciona correctamente.
   const styleMatches = html.match(/<style[^>]*>[\s\S]*?<\/style>/gi) || []
-  const linkMatches = html.match(/<link[^>]+>/gi) || []
   const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)
   const bodyContent = bodyMatch ? bodyMatch[1] : html
-  // Eliminamos elementos con position:fixed (marca de agua) ya que se sale del contenedor
+  // Eliminamos la marca de agua (usa position:fixed que escapa al container)
   const cleanBody = bodyContent.replace(/<img[^>]+class="watermark"[^>]*>/gi, '')
-  container.innerHTML = linkMatches.join('\n') + styleMatches.join('\n') + cleanBody
-  document.body.appendChild(container)
+  container.innerHTML = styleMatches.join('\n') + cleanBody
+
+  overlay.appendChild(container)
+  document.body.appendChild(overlay)
+
+  // Esperamos a que el browser aplique estilos y compute el layout completo
+  // (2 animation frames + 300ms para fuentes e imágenes)
+  await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  await new Promise(resolve => setTimeout(resolve, 300))
 
   try {
     const opt = {
       margin:      0,
       filename,
       image:       { type: 'jpeg', quality: 0.97 },
-      html2canvas: { scale: 2, useCORS: true, logging: false },
-      jsPDF:       { unit: 'mm', format: 'letter', orientation: 'portrait' },
+      html2canvas: {
+        scale:       2,
+        useCORS:     true,
+        allowTaint:  true,
+        logging:     false,
+        windowWidth: 816,
+      },
+      jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' },
     }
 
     const pdfBlob: Blob = await html2pdf().set(opt).from(container).outputPdf('blob')
@@ -67,6 +89,6 @@ export async function imprimirOCompartir(html: string, filename = 'documento.pdf
       setTimeout(() => URL.revokeObjectURL(url), 1000)
     }
   } finally {
-    document.body.removeChild(container)
+    document.body.removeChild(overlay)
   }
 }
