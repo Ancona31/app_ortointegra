@@ -18,25 +18,33 @@ export async function imprimirOCompartir(html: string, filename = 'documento.pdf
     return
   }
 
-  // ── Móvil: generar PDF ──
+  // ── Móvil: generar PDF con html2canvas + jsPDF directamente ──
+  // Usamos las librerías directamente en vez del wrapper html2pdf para
+  // tener control total. El container debe estar VISIBLE y sin nada encima
+  // para que html2canvas lo capture correctamente.
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const html2pdf = (await import('html2pdf.js' as any)).default
+  const html2canvas = (await import('html2canvas' as any)).default
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { jsPDF } = await import('jspdf' as any)
 
-  // El overlay cubre la pantalla para que el usuario no vea el contenido.
-  // CRÍTICO: usamos ignoreElements para excluirlo del render de html2canvas.
-  // Sin esto, el overlay blanco (z-index mayor) tapa el container y el PDF sale en blanco.
-  const overlay = document.createElement('div')
-  overlay.style.cssText = [
-    'position:fixed', 'inset:0', 'z-index:9999',
-    'background:#fff', 'pointer-events:none',
-    'display:flex', 'align-items:center', 'justify-content:center',
+  // Badge de carga en esquina inferior — EXCLUIDO de la captura via ignoreElements
+  const badge = document.createElement('div')
+  badge.style.cssText = [
+    'position:fixed', 'bottom:24px', 'left:50%', 'transform:translateX(-50%)',
+    'z-index:10000', 'background:#1a3a5c', 'color:#fff',
+    'padding:10px 24px', 'border-radius:24px',
+    'font-family:Arial,sans-serif', 'font-size:14px', 'font-weight:500',
+    'pointer-events:none', 'box-shadow:0 4px 12px rgba(0,0,0,0.2)',
   ].join(';')
-  overlay.innerHTML = '<p style="font-family:Arial,sans-serif;color:#1a3a5c;font-size:15px;font-weight:500;">Generando PDF…</p>'
+  badge.textContent = 'Generando PDF…'
 
-  // Container dentro del viewport (position:fixed top:0 left:0) para que
-  // html2canvas pueda capturar sus dimensiones reales.
+  // Container al máximo z-index, sin nada encima — html2canvas captura directo
   const container = document.createElement('div')
-  container.style.cssText = 'position:fixed;top:0;left:0;width:816px;background:#fff;z-index:9998;'
+  container.style.cssText = [
+    'position:fixed', 'top:0', 'left:0', 'width:816px',
+    'background:#fff', 'z-index:9999',
+  ].join(';')
 
   // Extraemos <style> y <link> del <head> para que los estilos apliquen
   const styleMatches = html.match(/<style[^>]*>[\s\S]*?<\/style>/gi) || []
@@ -47,39 +55,50 @@ export async function imprimirOCompartir(html: string, filename = 'documento.pdf
   const cleanBody    = bodyContent.replace(/<img[^>]+class="watermark"[^>]*>/gi, '')
   container.innerHTML = linkMatches.join('\n') + styleMatches.join('\n') + cleanBody
 
-  document.body.appendChild(overlay)
+  document.body.appendChild(badge)
   document.body.appendChild(container)
 
-  // Esperar a que el browser aplique estilos, fuentes e imágenes
+  // Esperar a que el browser aplique estilos y compute el layout
   await new Promise<void>(resolve =>
     requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
   )
-  await new Promise(resolve => setTimeout(resolve, 500))
+  await new Promise(resolve => setTimeout(resolve, 400))
 
   try {
-    const opt = {
-      margin:  0,
-      filename,
-      image:   { type: 'jpeg', quality: 0.95 },
-      html2canvas: {
-        scale:          1.5,          // 2 puede exceder límite de canvas en móvil
-        useCORS:        true,         // para imágenes de Supabase Storage
-        logging:        false,
-        windowWidth:    816,
-        scrollX:        0,
-        scrollY:        0,
-        // CRÍTICO: excluimos el overlay para que no tape el contenido capturado
-        ignoreElements: (el: Element) => el === overlay,
-      },
-      jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' },
+    const canvas = await html2canvas(container, {
+      scale:          1.5,
+      useCORS:        true,
+      logging:        false,
+      windowWidth:    816,
+      scrollX:        0,
+      scrollY:        0,
+      // Excluimos el badge de carga para que no aparezca en el PDF
+      ignoreElements: (el: Element) => el === badge,
+    })
+
+    const imgData   = canvas.toDataURL('image/jpeg', 0.95)
+    const pdf       = new jsPDF({ unit: 'mm', format: 'letter', orientation: 'portrait' })
+    const pageW     = pdf.internal.pageSize.getWidth()
+    const pageH     = pdf.internal.pageSize.getHeight()
+    const imgH      = (canvas.height * pageW) / canvas.width
+
+    // Soporte multi-página
+    let posY = 0
+    pdf.addImage(imgData, 'JPEG', 0, posY, pageW, imgH)
+    let remaining = imgH - pageH
+    while (remaining > 0) {
+      posY -= pageH
+      pdf.addPage()
+      pdf.addImage(imgData, 'JPEG', 0, posY, pageW, imgH)
+      remaining -= pageH
     }
 
-    const pdfBlob: Blob = await html2pdf().set(opt).from(container).outputPdf('blob')
-    const file = new File([pdfBlob], filename, { type: 'application/pdf' })
+    const pdfBlob = pdf.output('blob') as Blob
+    const file    = new File([pdfBlob], filename, { type: 'application/pdf' })
 
     // Web Share API (iOS Safari 15+, Android Chrome 86+)
     if (
-      typeof navigator.share   === 'function' &&
+      typeof navigator.share    === 'function' &&
       typeof navigator.canShare === 'function' &&
       navigator.canShare({ files: [file] })
     ) {
@@ -96,7 +115,7 @@ export async function imprimirOCompartir(html: string, filename = 'documento.pdf
       setTimeout(() => URL.revokeObjectURL(url), 1000)
     }
   } finally {
-    document.body.removeChild(overlay)
     document.body.removeChild(container)
+    document.body.removeChild(badge)
   }
 }
