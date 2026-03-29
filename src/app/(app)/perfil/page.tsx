@@ -57,8 +57,6 @@ export default function PerfilPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setGuardando(true)
-    setError('')
-    setExito(false)
 
     const res = await fetch('/api/me/perfil-medico', {
       method: 'PUT',
