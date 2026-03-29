@@ -57,6 +57,7 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
   const [procedimiento, setProcedimiento] = useState('')
   const [diasEstimados, setDiasEstimados] = useState('')
   const [asa, setAsa] = useState('')
+  const [lugar, setLugar] = useState('')
   const [urgente, setUrgente] = useState(false)
   const [requerimientos, setRequerimientos] = useState<string[]>([])
   const [requerimientosExtra, setRequerimientosExtra] = useState('')
@@ -96,7 +97,7 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
         ...(pacienteId ? { paciente_id: pacienteId } : {}),
         tipo: 'solicitud_internamiento',
         contenido: {
-          paciente, fecha, fechaIngreso, diagnostico,
+          paciente, fecha, fechaIngreso, lugar, diagnostico,
           diagnosticosSecundarios: diagnosticosSecundarios.filter(Boolean),
           tipoInternamiento, procedimiento, diasEstimados,
           asa, urgente, requerimientos, requerimientosExtra, justificacion,
@@ -254,6 +255,7 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
       <div class="dato"><span class="dato-label">Fecha</span><span class="dato-valor">${fechaFormat}</span></div>
       <div class="dato"><span class="dato-label">Paciente</span><span class="dato-valor">${paciente}</span></div>
       <div class="dato"><span class="dato-label">Fecha de ingreso</span><span class="dato-valor">${fechaIngresoFormat}</span></div>
+      ${lugar ? `<div class="dato" style="grid-column: 1 / -1;"><span class="dato-label">🏥 Hospital / Lugar</span><span class="dato-valor" style="font-weight:600; color:${cp};">${lugar}</span></div>` : ''}
       ${tipoInternamiento ? `<div class="dato"><span class="dato-label">Tipo</span><span class="dato-valor">${tipoInternamiento}</span></div>` : ''}
       ${diasEstimados ? `<div class="dato"><span class="dato-label">Días estimados</span><span class="dato-valor">${diasEstimados}</span></div>` : ''}
       ${asa ? `<div class="dato"><span class="dato-label">Clasificación ASA</span><span class="dato-valor">${asa}</span></div>` : ''}
@@ -352,6 +354,18 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
               {ASA.map(a => <option key={a} value={`ASA ${a}`}>ASA {a}</option>)}
             </select>
           </div>
+        </div>
+        <div className="mt-4">
+          <label className="text-xs font-medium text-slate-500 block mb-1">
+            Hospital / Lugar de internamiento <span className="text-red-400">*</span>
+          </label>
+          <input
+            type="text"
+            value={lugar}
+            onChange={e => setLugar(e.target.value)}
+            placeholder="Ej: Hospital General de México, Hospital Ángeles Lomas..."
+            className={inputCls}
+          />
         </div>
         <label className="flex items-center gap-2 mt-4 text-sm text-red-600 cursor-pointer font-medium select-none">
           <input type="checkbox" checked={urgente} onChange={e => setUrgente(e.target.checked)} className="w-4 h-4 accent-red-600" />
@@ -456,7 +470,7 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
 
       <button
         onClick={imprimir}
-        disabled={!paciente || !diagnostico || imprimiendo}
+        disabled={!paciente || !diagnostico || !lugar || imprimiendo}
         className="w-full flex items-center justify-center gap-2 py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-50"
       >
         {imprimiendo
