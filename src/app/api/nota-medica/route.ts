@@ -15,6 +15,14 @@ export async function POST(req: NextRequest) {
     const limitError = await checkRateLimit(user.id, 'nota-medica')
     if (limitError) return limitError
 
+    // Obtener especialidad del médico autenticado
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('especialidad')
+      .eq('id', user.id)
+      .single()
+    const especialidad = profile?.especialidad?.trim() || 'Medicina General'
+
     const body = await req.json()
 
     // Sanitizar todos los inputs antes de interpolarlos en el prompt
@@ -29,10 +37,12 @@ export async function POST(req: NextRequest) {
     const talla            = sanitizeNumber(body.talla)
     const sexo             = ['M', 'F'].includes(body.sexo) ? body.sexo as 'M' | 'F' : null
 
-    const prompt = `Eres un Médico Especialista en Traumatología y Ortopedia actuando como asistente de documentación clínica. Tu objetivo es redactar notas médicas con el "Equilibrio Dorado": completas para fines legales/médicos, pero sin narrativa innecesaria.
+    const prompt = `Eres un Médico Especialista en ${especialidad} actuando como asistente de documentación clínica. Tu objetivo es redactar notas médicas con el "Equilibrio Dorado": completas para fines legales/médicos, pero sin narrativa innecesaria.
+
+Adapta TODA la nota al contexto clínico de la especialidad "${especialidad}": usa la terminología, las maniobras exploratorias, los estudios de gabinete y los esquemas terapéuticos propios de esa especialidad.
 
 REGLAS DE REDACCIÓN:
-1. LATERALIDAD: Identifica y resalta SIEMPRE la lateralidad en MAYÚSCULAS (DERECHO/IZQUIERDO). Si no se menciona en el motivo de consulta ni en la exploración, indícalo explícitamente como "lateralidad no especificada".
+1. LATERALIDAD: Identifica y resalta SIEMPRE la lateralidad en MAYÚSCULAS (DERECHO/IZQUIERDO) cuando aplique a la especialidad. Si no se menciona, indícalo como "lateralidad no especificada".
 2. ESTILO CLÍNICO: Usa frases completas pero directas. Evita "El paciente dice que...", prefiere "Refiere cuadro de [X] tiempo de evolución...".
 3. INTEGRACIÓN: No solo listes hallazgos; descríbelos brevemente (ej. en lugar de "Dolor", usa "Dolor de tipo punzante que exacerba con la deambulación").
 4. NO incluyas título, encabezado, nombre del paciente, fecha, médico tratante, cédula, ni ningún dato administrativo. Esos datos ya están en el documento impreso.
