@@ -189,13 +189,21 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
     fetch('/api/me/perfil-medico').then(r => r.json()).then(({ medico }) => setMedicoInfo(medico))
   }, [])
 
+  function dosisParaForm(sup: Suplemento, peso: number): string {
+    if (peso > 0) {
+      const caps = dosisEnCapsulas(sup, peso)
+      if (caps) return caps
+      if (sup.min_kg) return calcularDosis(sup, peso)
+    }
+    return sup.dosis_default
+  }
+
   function toggleSup(sup: Suplemento) {
     if (seleccionados.find(s => s.nombre === sup.nombre)) {
       setSeleccionados(prev => prev.filter(s => s.nombre !== sup.nombre))
     } else {
       const peso = parseFloat(pesoKg)
-      const dosis = (peso > 0 && sup.min_kg) ? calcularDosis(sup, peso) : sup.dosis_default
-      setSeleccionados(prev => [...prev, { nombre: sup.nombre, dosis, justificacion: '' }])
+      setSeleccionados(prev => [...prev, { nombre: sup.nombre, dosis: dosisParaForm(sup, peso), justificacion: '' }])
     }
   }
 
@@ -209,7 +217,7 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
     setSeleccionados(prev => prev.map(s => {
       const sup = SUPLEMENTOS.find(x => x.nombre === s.nombre)
       if (!sup) return s
-      return { ...s, dosis: calcularDosis(sup, peso) }
+      return { ...s, dosis: dosisParaForm(sup, peso) }
     }))
   }
 
