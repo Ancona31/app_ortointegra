@@ -59,7 +59,7 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
     setSeleccionados(seleccionados.map(s => s.nombre === nombre ? { ...s, [field]: val } : s))
   }
 
-  function imprimir() {
+  async function imprimir() {
     if (pacienteId) {
       const supabase = createClient()
       supabase.from('documentos').insert({

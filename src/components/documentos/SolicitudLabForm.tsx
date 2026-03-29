@@ -113,7 +113,7 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
   <ul>${listaEstudios}</ul>
   ${notas ? `<div class="seccion">Indicaciones</div><p style="font-size:10pt;color:#333">${notas}</p>` : ''}
   <div class="footer"><div class="firma"><p>${doctorNombre}</p>${medicoInfo?.cedula_profesional ? `<p>Céd. Prof. ${medicoInfo.cedula_profesional}</p>` : ''}</div></div>
-</body></html>`)
+</body></html>`
     await imprimirOCompartir(_html, 'solicitud-laboratorio.pdf')
   }
 
