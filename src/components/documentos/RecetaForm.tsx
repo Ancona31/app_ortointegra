@@ -30,6 +30,95 @@ type MedicamentoConVia = Medicamento & { via_administracion?: string }
 
 const VIAS = ['Oral', 'Tópica', 'Intramuscular', 'Intravenosa', 'Subcutánea', 'Sublingual', 'Oftálmica', 'Ótica', 'Nasal', 'Inhalatoria', 'Rectal', 'Transdérmica']
 
+const RECOMENDACIONES_PREDETERMINADAS: { label: string; texto: string }[] = [
+  {
+    label: '🦒 Columna Cervical (Cuello)',
+    texto: `Postura: Mantenga la mirada al frente al usar el celular o computadora; evite flexionar el cuello por tiempo prolongado.
+
+Descanso: Use una almohada cervical o una que mantenga su cabeza alineada con la columna.
+
+Calor local: Aplique compresas húmedas-calientes por 15-20 min para relajar la musculatura.
+
+🚨 Datos de Alarma: Pérdida de fuerza en manos, sensación de "toques eléctricos" hacia los brazos o dificultad para abotonarse la camisa.`,
+  },
+  {
+    label: '🎒 Columna Dorsal (Espalda Media)',
+    texto: `Carga: Evite cargar mochilas o bolsas pesadas sobre un solo hombro.
+
+Movilidad: Realice ejercicios de extensión torácica y respiraciones profundas varias veces al día.
+
+Ergonomía: Asegúrese de que su silla tenga un soporte adecuado en la zona media de la espalda.
+
+🚨 Datos de Alarma: Dolor opresivo que impide la respiración profunda o dolor que se corre hacia las costillas (tipo cinturón).`,
+  },
+  {
+    label: '🧘 Columna Lumbar (Espalda Baja)',
+    texto: `Higiene de Columna: Al levantarse de la cama, hágalo de lado apoyando los brazos. No se doble de cintura para recoger objetos; flexione las rodillas.
+
+Peso: Mantenga su peso ideal para reducir la carga mecánica sobre los discos intervertebrales.
+
+Asientos: Evite sillones muy blandos o permanecer sentado más de 50 minutos seguidos.
+
+🚨 Datos de Alarma: Adormecimiento en la zona genital (silla de montar), pérdida de control de esfínteres o "pie caído" (tropiezos constantes).`,
+  },
+  {
+    label: '⚾ Hombro y Codo',
+    texto: `Reposo relativo: Evite levantar el brazo por encima del nivel de la cabeza o cargar objetos pesados con el brazo estirado.
+
+Crioterapia: Aplique hielo envuelto en una toalla por 15 min después de realizar actividades físicas.
+
+Movimiento: Realice ejercicios pendulares (deje colgar el brazo y haga círculos suaves) si su médico lo autorizó.
+
+🚨 Datos de Alarma: Imposibilidad total para elevar el brazo o deformidad evidente ("signo del Popeye").`,
+  },
+  {
+    label: '🖐️ Muñeca y Mano',
+    texto: `Férulas: Si se le indicó férula, úsela especialmente durante la noche para evitar posturas viciosas.
+
+Pausas: Si trabaja en computadora, realice estiramientos de flexores y extensores cada hora.
+
+Edema: Mantenga la mano elevada por encima del nivel del corazón si presenta mucha inflamación.
+
+🚨 Datos de Alarma: Dedos morados/fríos o pérdida total de la sensibilidad (anestesia) en las yemas.`,
+  },
+  {
+    label: '🦵 Rodilla',
+    texto: `Impacto: Evite saltar, correr en superficies duras o subir/bajar escaleras innecesariamente.
+
+Calzado: Use zapatos con buena amortiguación; evite tacones altos o sandalias totalmente planas.
+
+Control de carga: No permanezca de pie por periodos prolongados.
+
+🚨 Datos de Alarma: Rodilla "trabada" (incapacidad para estirar o doblar), aumento de temperatura local intensa o sensación de inestabilidad ("se le va la rodilla").`,
+  },
+  {
+    label: '🦶 Tobillo y Pie',
+    texto: `Elevación: Mantenga el pie elevado con dos almohadas al estar sentado o acostado.
+
+Vendaje: Si usa vendaje elástico, asegúrese de que no esté demasiado apretado; debe poder introducir un dedo bajo la venda.
+
+Apoyo: Respete el tiempo de "no apoyo" si se le indicó el uso de muletas o andadera.
+
+🚨 Datos de Alarma: Hinchazón excesiva de la pantorrilla con dolor al tocarla (posible coágulo) o cambios de coloración en los dedos.`,
+  },
+  {
+    label: '✂️ Cuidados de la Herida Quirúrgica (Postoperados)',
+    texto: `Limpieza: Lave la herida solo con agua y jabón neutro durante el baño diario. Seque con toques suaves usando una gasa estéril o toalla limpia exclusiva.
+
+Exposición: Mantenga la herida cubierta con una gasa seca a menos que su cirujano indique dejarla al aire.
+
+Prohibido: No aplique alcohol, agua oxigenada, pomadas, cremas, remedios caseros o "chochitos" sobre la incisión.
+
+Actividad: Evite esfuerzos físicos que puedan "estirar" la cicatriz y causar que se abra (dehiscencia).
+
+🚨 Datos de Alarma en la Herida:
+• Salida de líquido amarillento, espeso o con mal olor (pus).
+• Enrojecimiento que se extiende más allá de los bordes de la herida.
+• Fiebre mayor a 38°C persistente.
+• Apertura de los puntos de sutura.`,
+  },
+]
+
 interface Props {
   pacienteInicial?: string
   diagnosticoInicial?: string
@@ -466,11 +555,40 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
       </div>
 
       {/* Recomendaciones */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-        <label className="text-sm font-semibold text-slate-700 block mb-3">Recomendaciones / Notas</label>
-        <textarea value={recomendaciones} onChange={e => setRecomendaciones(e.target.value)}
-          placeholder="Uso de inmovilizador, cuidados de herida, cita de seguimiento, datos de alarma..."
-          rows={4} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-semibold text-slate-700">Recomendaciones / Notas</label>
+          {recomendaciones && (
+            <button
+              onClick={() => setRecomendaciones('')}
+              className="text-xs text-slate-400 hover:text-red-500 transition-colors"
+            >
+              Limpiar
+            </button>
+          )}
+        </div>
+        <select
+          defaultValue=""
+          onChange={e => {
+            if (!e.target.value) return
+            const rec = RECOMENDACIONES_PREDETERMINADAS.find(r => r.label === e.target.value)
+            if (rec) setRecomendaciones(prev => prev ? prev + '\n\n' + rec.texto : rec.texto)
+            e.target.value = ''
+          }}
+          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 bg-slate-50"
+        >
+          <option value="">＋ Insertar recomendaciones predeterminadas...</option>
+          {RECOMENDACIONES_PREDETERMINADAS.map(r => (
+            <option key={r.label} value={r.label}>{r.label}</option>
+          ))}
+        </select>
+        <textarea
+          value={recomendaciones}
+          onChange={e => setRecomendaciones(e.target.value)}
+          placeholder="Selecciona un segmento arriba o escribe tus propias recomendaciones..."
+          rows={6}
+          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30"
+        />
       </div>
 
       <ConsultaRapida />
