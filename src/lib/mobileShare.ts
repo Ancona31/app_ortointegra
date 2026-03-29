@@ -1,8 +1,42 @@
 /**
  * En desktop: abre ventana emergente y dispara el diálogo de impresión.
- * En móvil:   envía el HTML a /api/generar-pdf (Puppeteer en Vercel),
- *             recibe el PDF vectorial y lo comparte vía Web Share API.
+ * En móvil:   convierte imágenes a base64, envía el HTML a /api/generar-pdf
+ *             (Puppeteer en Vercel) y comparte el PDF vectorial resultante.
  */
+
+/** Convierte todas las imágenes externas del HTML a base64 data URLs.
+ *  Necesario porque Puppeteer en Vercel no puede acceder a URLs de Supabase
+ *  Storage que requieren sesión o tienen restricciones CORS desde el servidor.
+ */
+async function inlineImages(html: string): Promise<string> {
+  const srcPattern = /src="(https?:\/\/[^"]+)"/g
+  const urls = new Set<string>()
+
+  let m
+  while ((m = srcPattern.exec(html)) !== null) urls.add(m[1])
+
+  const replacements = new Map<string, string>()
+  await Promise.all([...urls].map(async (url) => {
+    try {
+      const res  = await fetch(url)
+      const blob = await res.blob()
+      const b64  = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.onerror  = reject
+        reader.readAsDataURL(blob)
+      })
+      replacements.set(url, b64)
+    } catch {
+      // Si falla la carga, se deja la URL original
+    }
+  }))
+
+  return html.replace(/src="(https?:\/\/[^"]+)"/g, (_, url) =>
+    `src="${replacements.get(url) ?? url}"`
+  )
+}
+
 export async function imprimirOCompartir(html: string, filename = 'documento.pdf') {
   const isMobile =
     /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
@@ -19,11 +53,13 @@ export async function imprimirOCompartir(html: string, filename = 'documento.pdf
     return
   }
 
-  // ── Móvil: PDF vectorial vía Puppeteer en servidor ──
+  // ── Móvil: inline images → PDF vectorial vía Puppeteer ──
+  const htmlConImagenes = await inlineImages(html)
+
   const res = await fetch('/api/generar-pdf', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ html, filename }),
+    body: JSON.stringify({ html: htmlConImagenes, filename }),
   })
 
   if (!res.ok) {
@@ -32,9 +68,8 @@ export async function imprimirOCompartir(html: string, filename = 'documento.pdf
   }
 
   const pdfBlob = await res.blob()
-  const file = new File([pdfBlob], filename, { type: 'application/pdf' })
+  const file    = new File([pdfBlob], filename, { type: 'application/pdf' })
 
-  // Web Share API (iOS Safari 15+, Android Chrome 86+)
   if (
     typeof navigator.share    === 'function' &&
     typeof navigator.canShare === 'function' &&
@@ -42,7 +77,6 @@ export async function imprimirOCompartir(html: string, filename = 'documento.pdf
   ) {
     await navigator.share({ files: [file], title: filename.replace('.pdf', '') })
   } else {
-    // Fallback: descarga directa
     const url = URL.createObjectURL(pdfBlob)
     const a   = document.createElement('a')
     a.href     = url

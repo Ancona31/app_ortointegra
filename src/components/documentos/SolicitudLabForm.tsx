@@ -9,7 +9,7 @@ type MedicoInfo = {
   cedula_especialidad: string
   logo_url: string | null
 }
-import { Plus, Trash2, Printer } from 'lucide-react'
+import { Plus, Trash2, Printer, Loader2 } from 'lucide-react'
 import { imprimirOCompartir } from '@/lib/mobileShare'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -46,6 +46,7 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
   const [estudios, setEstudios] = useState<string[]>([''])
   const [notas, setNotas] = useState('')
+  const [imprimiendo, setImprimiendo] = useState(false)
 
   function addEstudio() { setEstudios([...estudios, '']) }
   function removeEstudio(i: number) { setEstudios(estudios.filter((_, idx) => idx !== i)) }
@@ -56,6 +57,8 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
   }
 
   async function imprimir() {
+    setImprimiendo(true)
+    try {
     if (pacienteId) {
       const supabase = createClient()
       supabase.from('documentos').insert({
@@ -115,6 +118,7 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
   <div class="footer"><div class="firma"><p>${doctorNombre}</p>${medicoInfo?.cedula_profesional ? `<p>Céd. Prof. ${medicoInfo.cedula_profesional}</p>` : ''}</div></div>
 </body></html>`
     await imprimirOCompartir(_html, 'solicitud-laboratorio.pdf')
+    } finally { setImprimiendo(false) }
   }
 
   return (
@@ -171,9 +175,9 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
           className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
       </div>
 
-      <button onClick={imprimir} disabled={!paciente || estudios.filter(Boolean).length === 0}
+      <button onClick={imprimir} disabled={!paciente || estudios.filter(Boolean).length === 0 || imprimiendo}
         className="w-full flex items-center justify-center gap-2 py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-50">
-        <Printer size={18} /> Imprimir Solicitud
+        {imprimiendo ? <><Loader2 size={18} className="animate-spin" /> Generando PDF...</> : <><Printer size={18} /> Imprimir Solicitud</>}
       </button>
     </div>
   )

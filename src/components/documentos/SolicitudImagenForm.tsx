@@ -9,7 +9,7 @@ type MedicoInfo = {
   cedula_especialidad: string
   logo_url: string | null
 }
-import { Printer } from 'lucide-react'
+import { Printer, Loader2 } from 'lucide-react'
 import { imprimirOCompartir } from '@/lib/mobileShare'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -37,6 +37,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
   const [estudios, setEstudios] = useState<Estudio[]>([{ tipo: '', region: '', proyecciones: '', indicacion: '' }])
   const [urgente, setUrgente] = useState(false)
+  const [imprimiendo, setImprimiendo] = useState(false)
 
   function addEstudio() { setEstudios([...estudios, { tipo: '', region: '', proyecciones: '', indicacion: '' }]) }
   function updateEstudio(i: number, field: keyof Estudio, val: string) {
@@ -44,6 +45,8 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
   }
 
   async function imprimir() {
+    setImprimiendo(true)
+    try {
     if (pacienteId) {
       const supabase = createClient()
       supabase.from('documentos').insert({
@@ -108,6 +111,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
   <div class="footer"><div class="firma"><p>${doctorNombre}</p>${medicoInfo?.cedula_profesional ? `<p>Céd. Prof. ${medicoInfo.cedula_profesional}</p>` : ''}</div></div>
 </body></html>`
     await imprimirOCompartir(_html, 'solicitud-imagenologia.pdf')
+    } finally { setImprimiendo(false) }
   }
 
   return (
@@ -165,9 +169,9 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
         </div>
       </div>
 
-      <button onClick={imprimir} disabled={!paciente || estudios.filter(e => e.tipo && e.region).length === 0}
+      <button onClick={imprimir} disabled={!paciente || estudios.filter(e => e.tipo && e.region).length === 0 || imprimiendo}
         className="w-full flex items-center justify-center gap-2 py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-50">
-        <Printer size={18} /> Imprimir Solicitud
+        {imprimiendo ? <><Loader2 size={18} className="animate-spin" /> Generando PDF...</> : <><Printer size={18} /> Imprimir Solicitud</>}
       </button>
     </div>
   )

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Printer } from 'lucide-react'
+import { Plus, Trash2, Printer, Loader2 } from 'lucide-react'
 import QRCode from 'qrcode'
 import { Medicamento } from '@/types'
 import { format } from 'date-fns'
@@ -66,6 +66,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
   const [sugerenciasDosis, setSugerenciasDosis] = useState<string[]>([''])
   const [recomendaciones, setRecomendaciones] = useState('')
   const [errorGuardado, setErrorGuardado] = useState('')
+  const [imprimiendo, setImprimiendo] = useState(false)
 
   function addMed() {
     setMedicamentos([...medicamentos, { nombre_comercial: '', presentacion: '', dosis: '', principio_activo: '', indicacion: '', via_administracion: 'Oral' }])
@@ -93,6 +94,8 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 
   async function imprimir() {
     setErrorGuardado('')
+    setImprimiendo(true)
+    try {
     const folio = `R-${Date.now().toString().slice(-8)}`
     const contenido = {
       folio,
@@ -174,7 +177,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 <head>
 <meta charset="UTF-8">
 <title>Receta — ${paciente}</title>
-<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Noto+Serif&display=swap" rel="stylesheet">
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   @page { size: letter; margin: 0; }
@@ -217,7 +220,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
   .credenciales { font-size: 8.5pt; color: #666; }
   .contacto-consultorio { font-size: 8pt; color: #888; margin-top: 3px; }
   .rp-wrap { text-align: right; }
-  .rp { font-size: 52pt; font-weight: 900; color: ${cs}; line-height: 1; opacity: 0.85; font-family: Georgia, serif; }
+  .rp { font-size: 52pt; font-weight: 900; color: ${cs}; line-height: 1; opacity: 0.85; font-family: 'Noto Serif', Georgia, serif; }
   .folio { font-size: 7.5pt; color: #aaa; text-align: right; margin-top: 2px; font-family: Arial, sans-serif; }
 
   /* ── Datos del paciente ── */
@@ -370,6 +373,9 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 </html>
     `
     await imprimirOCompartir(_html, 'receta-medica.pdf')
+    } finally {
+      setImprimiendo(false)
+    }
   }
 
   return (
@@ -477,10 +483,12 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 
       <button
         onClick={imprimir}
-        disabled={!paciente}
+        disabled={!paciente || imprimiendo}
         className="w-full flex items-center justify-center gap-2 py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-50"
       >
-        <Printer size={18} /> Imprimir Receta
+        {imprimiendo
+          ? <><Loader2 size={18} className="animate-spin" /> Generando PDF...</>
+          : <><Printer size={18} /> Imprimir Receta</>}
       </button>
     </div>
   )
