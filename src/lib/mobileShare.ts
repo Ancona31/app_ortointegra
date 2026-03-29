@@ -49,7 +49,7 @@ export async function imprimirOCompartir(html: string, filename = 'documento.pdf
 
   // Esperamos a que el browser aplique estilos y compute el layout completo
   // (2 animation frames + 300ms para fuentes e imágenes)
-  await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
   await new Promise(resolve => setTimeout(resolve, 300))
 
   try {
