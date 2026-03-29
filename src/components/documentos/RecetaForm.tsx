@@ -202,17 +202,15 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
       color_secundario: medicoInfo?.color_secundario || '#1e5fa8',
     }
 
-    if (pacienteId) {
-      const supabase = createClient()
-      const { error } = await supabase.from('documentos').insert({
-        paciente_id: pacienteId,
-        tipo: 'receta',
-        contenido,
-      })
-      if (error) {
-        setErrorGuardado('No se pudo guardar la receta en el expediente.')
-        return
-      }
+    const supabase = createClient()
+    const { error: saveError } = await supabase.from('documentos').insert({
+      ...(pacienteId ? { paciente_id: pacienteId } : {}),
+      tipo: 'receta',
+      contenido,
+    })
+    if (saveError) {
+      setErrorGuardado('No se pudo guardar la receta. El QR de verificación no funcionará.')
+      // No retornamos — permitimos imprimir igual
     }
 
     const verificacionUrl = `${window.location.origin}/r/${folio}`
