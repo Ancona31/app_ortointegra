@@ -25,10 +25,15 @@ export async function imprimirOCompartir(html: string, filename = 'documento.pdf
 
   // Montamos el HTML en un contenedor oculto fuera de la pantalla
   const container = document.createElement('div')
-  container.style.cssText = 'position:fixed;top:-99999px;left:-99999px;width:816px;'
-  // Extraemos sólo el <body> para evitar doble <html>
+  container.style.cssText = 'position:absolute;top:-99999px;left:-99999px;width:816px;background:#fff;'
+  // Incluimos <style> y <link> del <head> para que los estilos se apliquen
+  const styleMatches = html.match(/<style[^>]*>[\s\S]*?<\/style>/gi) || []
+  const linkMatches = html.match(/<link[^>]+>/gi) || []
   const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)
-  container.innerHTML = bodyMatch ? bodyMatch[1] : html
+  const bodyContent = bodyMatch ? bodyMatch[1] : html
+  // Eliminamos elementos con position:fixed (marca de agua) ya que se sale del contenedor
+  const cleanBody = bodyContent.replace(/<img[^>]+class="watermark"[^>]*>/gi, '')
+  container.innerHTML = linkMatches.join('\n') + styleMatches.join('\n') + cleanBody
   document.body.appendChild(container)
 
   try {
