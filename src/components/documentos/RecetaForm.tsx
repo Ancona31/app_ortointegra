@@ -362,7 +362,13 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
   .via-cell { color: ${cs}; font-weight: 600; font-size: 8.5pt; white-space: nowrap; }
   .ind-cell { color: #444; line-height: 1.55; }
 
-  .recomendaciones { font-size: 9.5pt; line-height: 1.7; color: #444; white-space: pre-line; padding-left: 10px; }
+  .recomendaciones { font-size: 9pt; line-height: 1.35; color: #333; padding-left: 10px; }
+  .recomendaciones p { margin: 0 0 3px 0; }
+  .recomendaciones .rec-header { font-weight: 700; color: ${cp}; font-size: 9.5pt; margin: 8px 0 2px 0; display: block; }
+  .recomendaciones .rec-header:first-child { margin-top: 0; }
+  .recomendaciones .rec-keyword { font-weight: 700; color: ${cs}; }
+  .recomendaciones .rec-alarma { font-weight: 700; color: #c0392b; }
+  .recomendaciones .rec-bullet { padding-left: 10px; color: #444; font-style: italic; }
 
   /* ── Barra inferior + firma ── */
   .footer-area { margin-top: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
@@ -439,7 +445,29 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
       <div class="seccion-titulo">Recomendaciones</div>
       <div class="seccion-linea"></div>
     </div>
-    <p class="recomendaciones">${recomendaciones}</p>
+    <div class="recomendaciones">${
+      recomendaciones.split('\n').map(line => {
+        const t = line.trim()
+        if (!t) return '<div style="height:2px"></div>'
+        // Línea de encabezado de segmento (contiene emoji al inicio)
+        if (/^[\u{1F300}-\u{1FAFF}✂️]/u.test(t))
+          return `<span class="rec-header">${t}</span>`
+        // Datos de alarma
+        if (/^🚨/.test(t))
+          return `<p><span class="rec-alarma">${t}</span></p>`
+        // Bullet points
+        if (/^[•\-]/.test(t))
+          return `<p class="rec-bullet">${t}</p>`
+        // Línea con "Keyword: texto" — keyword en bold color
+        if (/^[A-ZÁÉÍÓÚÑÜ][^:]{2,25}:/.test(t)) {
+          const idx = t.indexOf(':')
+          const key = t.slice(0, idx)
+          const rest = t.slice(idx + 1)
+          return `<p><span class="rec-keyword">${key}:</span><em>${rest}</em></p>`
+        }
+        return `<p>${t}</p>`
+      }).join('')
+    }</div>
     ` : ''}
 
     <div class="footer-area">
