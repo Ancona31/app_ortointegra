@@ -19,36 +19,37 @@ export async function imprimirOCompartir(html: string, filename = 'documento.pdf
   }
 
   // ── Móvil: generar PDF ──
-  // Cargamos html2pdf de forma dinámica para no aumentar el bundle en desktop
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const html2pdf = (await import('html2pdf.js' as any)).default
 
-  // El contenedor DEBE estar dentro del viewport para que html2canvas lo capture.
-  // Usamos un overlay position:fixed con opacity:0 — mismo patrón que usa html2pdf
-  // internamente en su worker.js. top:-99999px no funciona porque html2canvas
-  // no puede obtener las dimensiones reales de elementos fuera del viewport.
+  // CRÍTICO: el container debe ser hermano del overlay, NO hijo.
+  // Si está dentro de un elemento con opacity:0, hereda esa opacidad
+  // y html2canvas captura todo en blanco.
+  //
+  // El overlay cubre la pantalla para que el usuario no vea el contenido.
+  // El container está detrás (z-index menor) pero html2canvas lo captura
+  // directamente por subtree, sin verse afectado por el overlay encima.
   const overlay = document.createElement('div')
   overlay.style.cssText =
-    'position:fixed;inset:0;z-index:9999;opacity:0;pointer-events:none;overflow:hidden;'
+    'position:fixed;inset:0;z-index:9999;background:#fff;pointer-events:none;'
 
   const container = document.createElement('div')
-  container.style.cssText = 'position:absolute;top:0;left:0;width:816px;background:#fff;'
+  container.style.cssText =
+    'position:fixed;top:0;left:0;width:816px;background:#fff;z-index:9998;'
 
-  // Extraemos los <style> del <head> para que los estilos apliquen al contenido.
-  // Los selectores body{} del CSS inyectado SOLAN al <body> real (que es ancestro
-  // del container), así que la herencia CSS funciona correctamente.
+  // Extraemos <style> del <head> — necesarios para que apliquen los estilos
   const styleMatches = html.match(/<style[^>]*>[\s\S]*?<\/style>/gi) || []
   const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)
   const bodyContent = bodyMatch ? bodyMatch[1] : html
-  // Eliminamos la marca de agua (usa position:fixed que escapa al container)
+  // Eliminamos marca de agua (position:fixed que escapa al container)
   const cleanBody = bodyContent.replace(/<img[^>]+class="watermark"[^>]*>/gi, '')
   container.innerHTML = styleMatches.join('\n') + cleanBody
 
-  overlay.appendChild(container)
+  // Overlay primero (encima), container después (debajo)
   document.body.appendChild(overlay)
+  document.body.appendChild(container)
 
-  // Esperamos a que el browser aplique estilos y compute el layout completo
-  // (2 animation frames + 300ms para fuentes e imágenes)
+  // Esperamos a que el browser compute el layout y aplique estilos
   await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
   await new Promise(resolve => setTimeout(resolve, 300))
 
@@ -90,5 +91,6 @@ export async function imprimirOCompartir(html: string, filename = 'documento.pdf
     }
   } finally {
     document.body.removeChild(overlay)
+    document.body.removeChild(container)
   }
 }
