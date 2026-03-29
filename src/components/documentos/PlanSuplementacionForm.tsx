@@ -27,7 +27,8 @@ type Suplemento = {
   min_kg: number | null
   max_kg: number | null
   unidad: string
-  beneficio_clinico: string
+  beneficio_clinico: string   // texto médico — visible en el panel de selección (para el médico)
+  beneficio_paciente: string  // lenguaje amigable — aparece en el PDF (para el paciente)
 }
 
 const SUPLEMENTOS: Suplemento[] = [
@@ -37,6 +38,7 @@ const SUPLEMENTOS: Suplemento[] = [
     dosis_por_kg: '70–100 UI/kg/día',
     min_kg: 70, max_kg: 100, unidad: 'UI',
     beneficio_clinico: 'Absorción de calcio y mineralización ósea. Con IMC elevado se requieren dosis de carga para saturar receptores. Clave para unión ósea en cirugía de columna y artroplastia.',
+    beneficio_paciente: 'Ayuda a que tus huesos absorban el calcio correctamente y se mantengan fuertes. Es especialmente importante después de una cirugía de columna o articulaciones para que la recuperación sea más rápida y sólida.',
   },
   {
     nombre: 'Vitamina K2 (MK-7)',
@@ -44,6 +46,7 @@ const SUPLEMENTOS: Suplemento[] = [
     dosis_por_kg: '1.5–2 mcg/kg/día',
     min_kg: 1.5, max_kg: 2, unidad: 'mcg',
     beneficio_clinico: 'Activa la osteocalcina y dirige el calcio al hueso. Evita calcificación de ligamentos y arterias. Sinergia indispensable con Vitamina D3.',
+    beneficio_paciente: 'Trabaja en equipo con la Vitamina D3 para que el calcio llegue exactamente a donde debe estar: tus huesos. Evita que ese calcio se acumule en lugares donde puede hacer daño, como las arterias o los ligamentos.',
   },
   {
     nombre: 'Omega-3 (EPA/DHA)',
@@ -51,6 +54,7 @@ const SUPLEMENTOS: Suplemento[] = [
     dosis_por_kg: '30–40 mg/kg/día',
     min_kg: 30, max_kg: 40, unidad: 'mg',
     beneficio_clinico: 'A >3 g/día modula la cascada del ácido araquidónico. Reduce inflamación en entesis y discos intervertebrales. Alternativa coadyuvante a AINEs en radiculopatía crónica.',
+    beneficio_paciente: 'Reduce la inflamación de forma natural en articulaciones, nervios y discos de la columna. A dosis terapéuticas ayuda a controlar el dolor crónico sin irritar el estómago como lo hacen algunos antiinflamatorios convencionales.',
   },
   {
     nombre: 'Colágeno Hidrolizado + Vitamina C',
@@ -58,6 +62,7 @@ const SUPLEMENTOS: Suplemento[] = [
     dosis_por_kg: '0.10–0.15 g/kg/día',
     min_kg: 0.10, max_kg: 0.15, unidad: 'g',
     beneficio_clinico: 'Aporta glicina y prolina para reparación de fascia y anillo fibroso del disco. Tomar en ayunas con vitamina C para máxima biodisponibilidad.',
+    beneficio_paciente: 'El colágeno es el material de construcción natural de tus tendones, ligamentos y los discos que amortiguan tu columna. Tomarlo en ayunas con vitamina C ayuda a reparar y fortalecer esos tejidos desde adentro.',
   },
   {
     nombre: 'Creatina Monohidratada',
@@ -65,6 +70,7 @@ const SUPLEMENTOS: Suplemento[] = [
     dosis_por_kg: '0.07–0.10 g/kg/día',
     min_kg: 0.07, max_kg: 0.10, unidad: 'g',
     beneficio_clinico: 'Síntesis de ATP muscular y retención de nitrógeno. Previene sarcopenia y atrofia por desuso. Mejora potencia en rehabilitación incluso con déficit calórico.',
+    beneficio_paciente: 'Le da más energía a tus músculos para que trabajen mejor durante la rehabilitación. Evita que el músculo se pierda cuando estás en reposo o en un proceso de recuperación, y mejora tu fuerza de forma progresiva.',
   },
   {
     nombre: 'Magnesio Glicinato',
@@ -72,6 +78,7 @@ const SUPLEMENTOS: Suplemento[] = [
     dosis_por_kg: '4–6 mg/kg/día',
     min_kg: 4, max_kg: 6, unidad: 'mg',
     beneficio_clinico: 'Relajación de musculatura paravertebral y cofactor en formación de matriz ósea. Alta biodisponibilidad sin efectos laxantes del óxido o citrato.',
+    beneficio_paciente: 'Relaja los músculos de la espalda y ayuda a reducir los espasmos y la tensión. También es necesario para formar hueso sano y mejora la calidad del sueño, que es cuando el cuerpo más se repara.',
   },
   {
     nombre: 'Cúrcuma (Curcumina 95%)',
@@ -79,6 +86,7 @@ const SUPLEMENTOS: Suplemento[] = [
     dosis_por_kg: '8–10 mg/kg/día',
     min_kg: 8, max_kg: 10, unidad: 'mg',
     beneficio_clinico: 'Inhibidor natural de NF-kB y COX-2. Reduce dolor articular crónico sin daño gástrico. Efecto comparable a dosis bajas de diclofenaco después de 4 semanas continuas.',
+    beneficio_paciente: 'Es un antiinflamatorio natural muy potente extraído de la cúrcuma. Con uso continuo de 4 semanas ayuda a controlar el dolor crónico en articulaciones y espalda, sin los efectos secundarios que tienen los antiinflamatorios de farmacia.',
   },
   {
     nombre: 'HMB (Beta-hidroxi-beta-metilbutirato)',
@@ -86,6 +94,7 @@ const SUPLEMENTOS: Suplemento[] = [
     dosis_por_kg: '30–40 mg/kg/día',
     min_kg: 30, max_kg: 40, unidad: 'mg',
     beneficio_clinico: 'Anticatabólico. Protege masa muscular en déficit calórico y periodos de estrés quirúrgico o posoperatorio.',
+    beneficio_paciente: 'Protege tu músculo cuando el cuerpo está bajo estrés, como después de una cirugía o durante una dieta. Evita que el organismo "consuma" el músculo que tanto trabajo cuesta ganar o mantener.',
   },
   {
     nombre: 'Ashwagandha KSM-66',
@@ -93,6 +102,7 @@ const SUPLEMENTOS: Suplemento[] = [
     dosis_por_kg: null,
     min_kg: null, max_kg: null, unidad: 'mg',
     beneficio_clinico: 'Modulador de cortisol. Reduce gluconeogénesis inducida por estrés, protegiendo masa muscular. Indicado en pacientes con alta carga laboral o entrenamiento de alta intensidad.',
+    beneficio_paciente: 'Ayuda a reducir el estrés y equilibrar el cortisol, que es la hormona que el cuerpo libera cuando está bajo presión. Cuando el cortisol está elevado por mucho tiempo, destruye músculo y dificulta la recuperación; esta planta ayuda a controlarlo.',
   },
 ]
 
@@ -199,7 +209,7 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
         <div class="sup">
           <p class="sup-nombre">${i + 1}. ${s.nombre}</p>
           <p class="sup-dosis">📋 Dosis: ${s.dosis}${formula}</p>
-          ${sup?.beneficio_clinico ? `<p class="sup-beneficio">${sup.beneficio_clinico}</p>` : ''}
+          ${sup?.beneficio_paciente ? `<p class="sup-beneficio">${sup.beneficio_paciente}</p>` : ''}
           ${s.justificacion ? `<p class="sup-just">Nota clínica: ${s.justificacion}</p>` : ''}
         </div>`
       }).join('')
@@ -362,6 +372,9 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
                 <span className="block text-xs text-slate-400 mt-0.5">
                   {s.dosis_por_kg ?? s.dosis_default}
                 </span>
+                <span className="block text-xs mt-1.5 leading-relaxed" style={{ color: sel ? '#1e5fa8cc' : '#94a3b8' }}>
+                  {s.beneficio_clinico}
+                </span>
               </button>
             )
           })}
@@ -380,9 +393,6 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
               return (
                 <div key={s.nombre} className="p-4 space-y-2">
                   <p className="font-medium text-slate-700 text-sm">{s.nombre}</p>
-                  {sup?.beneficio_clinico && (
-                    <p className="text-xs text-slate-400 italic leading-relaxed">{sup.beneficio_clinico}</p>
-                  )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <label className="text-xs text-slate-400">Dosis</label>
