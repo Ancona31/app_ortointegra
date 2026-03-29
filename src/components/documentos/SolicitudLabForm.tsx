@@ -10,6 +10,7 @@ type MedicoInfo = {
   logo_url: string | null
 }
 import { Plus, Trash2, Printer, Loader2 } from 'lucide-react'
+import { flushSync } from 'react-dom'
 import { imprimirOCompartir } from '@/lib/mobileShare'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -57,8 +58,7 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
   }
 
   async function imprimir() {
-    setImprimiendo(true)
-    await new Promise(resolve => setTimeout(resolve, 0))
+    flushSync(() => setImprimiendo(true))
     try {
     if (pacienteId) {
       const supabase = createClient()

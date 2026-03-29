@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, Printer, Loader2 } from 'lucide-react'
+import { flushSync } from 'react-dom'
 import QRCode from 'qrcode'
 import { Medicamento } from '@/types'
 import { format } from 'date-fns'
@@ -93,9 +94,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
   }
 
   async function imprimir() {
-    setErrorGuardado('')
-    setImprimiendo(true)
-    await new Promise(resolve => setTimeout(resolve, 0))
+    flushSync(() => { setErrorGuardado(''); setImprimiendo(true) })
     try {
     const folio = `R-${Date.now().toString().slice(-8)}`
     const contenido = {
