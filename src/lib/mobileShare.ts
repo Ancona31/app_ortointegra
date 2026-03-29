@@ -22,48 +22,54 @@ export async function imprimirOCompartir(html: string, filename = 'documento.pdf
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const html2pdf = (await import('html2pdf.js' as any)).default
 
-  // CRÍTICO: el container debe ser hermano del overlay, NO hijo.
-  // Si está dentro de un elemento con opacity:0, hereda esa opacidad
-  // y html2canvas captura todo en blanco.
-  //
   // El overlay cubre la pantalla para que el usuario no vea el contenido.
-  // El container está detrás (z-index menor) pero html2canvas lo captura
-  // directamente por subtree, sin verse afectado por el overlay encima.
+  // CRÍTICO: usamos ignoreElements para excluirlo del render de html2canvas.
+  // Sin esto, el overlay blanco (z-index mayor) tapa el container y el PDF sale en blanco.
   const overlay = document.createElement('div')
-  overlay.style.cssText =
-    'position:fixed;inset:0;z-index:9999;background:#fff;pointer-events:none;'
+  overlay.style.cssText = [
+    'position:fixed', 'inset:0', 'z-index:9999',
+    'background:#fff', 'pointer-events:none',
+    'display:flex', 'align-items:center', 'justify-content:center',
+  ].join(';')
+  overlay.innerHTML = '<p style="font-family:Arial,sans-serif;color:#1a3a5c;font-size:15px;font-weight:500;">Generando PDF…</p>'
 
+  // Container dentro del viewport (position:fixed top:0 left:0) para que
+  // html2canvas pueda capturar sus dimensiones reales.
   const container = document.createElement('div')
-  container.style.cssText =
-    'position:fixed;top:0;left:0;width:816px;background:#fff;z-index:9998;'
+  container.style.cssText = 'position:fixed;top:0;left:0;width:816px;background:#fff;z-index:9998;'
 
-  // Extraemos <style> del <head> — necesarios para que apliquen los estilos
+  // Extraemos <style> y <link> del <head> para que los estilos apliquen
   const styleMatches = html.match(/<style[^>]*>[\s\S]*?<\/style>/gi) || []
-  const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)
-  const bodyContent = bodyMatch ? bodyMatch[1] : html
-  // Eliminamos marca de agua (position:fixed que escapa al container)
-  const cleanBody = bodyContent.replace(/<img[^>]+class="watermark"[^>]*>/gi, '')
-  container.innerHTML = styleMatches.join('\n') + cleanBody
+  const linkMatches  = html.match(/<link[^>]+stylesheet[^>]*>/gi) || []
+  const bodyMatch    = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)
+  const bodyContent  = bodyMatch ? bodyMatch[1] : html
+  // Eliminamos marca de agua (position:fixed que escapa del container)
+  const cleanBody    = bodyContent.replace(/<img[^>]+class="watermark"[^>]*>/gi, '')
+  container.innerHTML = linkMatches.join('\n') + styleMatches.join('\n') + cleanBody
 
-  // Overlay primero (encima), container después (debajo)
   document.body.appendChild(overlay)
   document.body.appendChild(container)
 
-  // Esperamos a que el browser compute el layout y aplique estilos
-  await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
-  await new Promise(resolve => setTimeout(resolve, 300))
+  // Esperar a que el browser aplique estilos, fuentes e imágenes
+  await new Promise<void>(resolve =>
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+  )
+  await new Promise(resolve => setTimeout(resolve, 500))
 
   try {
     const opt = {
-      margin:      0,
+      margin:  0,
       filename,
-      image:       { type: 'jpeg', quality: 0.97 },
+      image:   { type: 'jpeg', quality: 0.95 },
       html2canvas: {
-        scale:       2,
-        useCORS:     true,
-        allowTaint:  true,
-        logging:     false,
-        windowWidth: 816,
+        scale:          1.5,          // 2 puede exceder límite de canvas en móvil
+        useCORS:        true,         // para imágenes de Supabase Storage
+        logging:        false,
+        windowWidth:    816,
+        scrollX:        0,
+        scrollY:        0,
+        // CRÍTICO: excluimos el overlay para que no tape el contenido capturado
+        ignoreElements: (el: Element) => el === overlay,
       },
       jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' },
     }
@@ -73,7 +79,7 @@ export async function imprimirOCompartir(html: string, filename = 'documento.pdf
 
     // Web Share API (iOS Safari 15+, Android Chrome 86+)
     if (
-      typeof navigator.share === 'function' &&
+      typeof navigator.share   === 'function' &&
       typeof navigator.canShare === 'function' &&
       navigator.canShare({ files: [file] })
     ) {
@@ -81,8 +87,8 @@ export async function imprimirOCompartir(html: string, filename = 'documento.pdf
     } else {
       // Fallback: descarga directa
       const url = URL.createObjectURL(pdfBlob)
-      const a = document.createElement('a')
-      a.href = url
+      const a   = document.createElement('a')
+      a.href     = url
       a.download = filename
       document.body.appendChild(a)
       a.click()
