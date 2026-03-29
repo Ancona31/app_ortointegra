@@ -10,6 +10,7 @@ import Link from 'next/link'
 import { PRINT_CSS, markdownToHtml } from '@/lib/printStyles'
 import ReactMarkdown from 'react-markdown'
 import ConsultaRapida from '@/components/ConsultaRapida'
+import Breadcrumbs from '@/components/layout/Breadcrumbs'
 
 type MedicoInfo = {
   nombre: string
@@ -176,6 +177,9 @@ export default function NuevaNotaPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-5">
+      {/* Breadcrumbs */}
+      <Breadcrumbs pacienteNombre={paciente ? `${paciente.nombre} ${paciente.apellidos}` : undefined} />
+
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link href={`/expediente/${id}`} className="text-slate-400 hover:text-slate-600">
@@ -248,10 +252,9 @@ export default function NuevaNotaPage() {
           <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">Próxima cita</label>
             <input
-              type="text"
+              type="date"
               value={form.proxima_cita}
               onChange={e => update('proxima_cita', e.target.value)}
-              placeholder="Ej: En 4 semanas con RMN / 15 de Abril a las 10:00 am"
               className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
             />
           </div>

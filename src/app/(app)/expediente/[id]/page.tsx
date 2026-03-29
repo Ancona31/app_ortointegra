@@ -13,6 +13,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 import ModalVisorDocumento from '@/components/expediente/ModalVisorDocumento'
+import Breadcrumbs from '@/components/layout/Breadcrumbs'
 import TarjetaPaciente from '@/components/expediente/TarjetaPaciente'
 import TabResumen from '@/components/expediente/TabResumen'
 import TabConsultas from '@/components/expediente/TabConsultas'
@@ -259,6 +260,9 @@ function ExpedientePacienteContent() {
           </div>
         </div>
       )}
+
+      {/* Breadcrumbs */}
+      <Breadcrumbs pacienteNombre={paciente ? `${paciente.nombre} ${paciente.apellidos}` : undefined} />
 
       {/* Header */}
       <div className="flex items-center gap-3">

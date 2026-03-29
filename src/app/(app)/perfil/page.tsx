@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useProfile } from '@/hooks/useProfile'
 import { useRouter } from 'next/navigation'
 import { Loader2, Save, UserCircle } from 'lucide-react'
+import { useToast } from '@/components/ui/Toast'
 
 type FormData = {
   titulo: string
@@ -17,6 +18,7 @@ type FormData = {
 export default function PerfilPage() {
   const { profile, loading: loadingProfile } = useProfile()
   const router = useRouter()
+  const toast = useToast()
   const [form, setForm] = useState<FormData>({
     titulo: '',
     especialidad: '',
@@ -27,8 +29,6 @@ export default function PerfilPage() {
   })
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
-  const [exito, setExito] = useState(false)
-  const [error, setError] = useState('')
 
   useEffect(() => {
     if (!loadingProfile && profile && !['medico', 'admin', 'super_admin'].includes(profile.role)) {
@@ -69,10 +69,9 @@ export default function PerfilPage() {
     setGuardando(false)
 
     if (!res.ok) {
-      setError(data.error || 'Error al guardar')
+      toast.error(data.error || 'Error al guardar')
     } else {
-      setExito(true)
-      setTimeout(() => setExito(false), 3000)
+      toast.success('Perfil actualizado correctamente')
     }
   }
 
@@ -146,13 +145,6 @@ export default function PerfilPage() {
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
           </div>
         </div>
-
-        {error && (
-          <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">{error}</p>
-        )}
-        {exito && (
-          <p className="text-sm text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">Perfil actualizado correctamente.</p>
-        )}
 
         <button type="submit" disabled={guardando}
           className="w-full flex items-center justify-center gap-2 py-3 bg-[#1e5fa8] text-white rounded-xl font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-60">

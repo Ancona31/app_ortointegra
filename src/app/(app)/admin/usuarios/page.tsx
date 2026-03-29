@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Users, Plus, Trash2, Loader2, Shield, UserCheck, X } from 'lucide-react'
+import { Users, Plus, Trash2, Loader2, Shield, UserCheck, X, Eye, EyeOff, AlertTriangle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
 import { useRouter } from 'next/navigation'
+import { useToast } from '@/components/ui/Toast'
 
 type Usuario = {
   id: string
@@ -21,14 +22,16 @@ type LicenciaInfo = {
 export default function AdminUsuariosPage() {
   const { profile, loading: loadingProfile } = useProfile()
   const router = useRouter()
+  const toast = useToast()
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [licencia, setLicencia] = useState<LicenciaInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [showPass, setShowPass] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<Usuario | null>(null)
   const [form, setForm] = useState({ email: '', password: '', nombre: '', role: 'secretaria', titulo: 'Dr.', especialidad: '', cedula_profesional: '', cedula_especialidad: '' })
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
-  const [exito, setExito] = useState('')
 
   useEffect(() => {
     if (!loadingProfile && profile && !['admin', 'super_admin'].includes(profile.role)) {
@@ -69,23 +72,44 @@ export default function AdminUsuariosPage() {
 
     if (!res.ok) { setError(data.error || 'Error al crear usuario'); return }
 
-    setExito(`Usuario ${form.email} creado exitosamente`)
+    toast.success(`Usuario ${form.email} creado exitosamente`)
     setForm({ email: '', password: '', nombre: '', role: 'secretaria', titulo: 'Dr.', especialidad: '', cedula_profesional: '', cedula_especialidad: '' })
     setShowForm(false)
     cargarUsuarios()
   }
 
-  async function eliminarUsuario(id: string) {
-    if (id === profile?.id) { setError('No puedes eliminar tu propia cuenta'); return }
+  async function eliminarUsuario(usuario: Usuario) {
+    if (usuario.id === profile?.id) { toast.error('No puedes eliminar tu propia cuenta'); return }
+    setConfirmDelete(usuario)
+  }
+
+  async function confirmarEliminar() {
+    if (!confirmDelete) return
     await fetch('/api/admin/usuarios', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: id }),
+      body: JSON.stringify({ userId: confirmDelete.id }),
     })
+    toast.success(`Usuario ${confirmDelete.nombre || confirmDelete.email} eliminado`)
+    setConfirmDelete(null)
     cargarUsuarios()
   }
 
-  if (loadingProfile || loading) return <div className="text-center py-12 text-slate-400">Cargando...</div>
+  if (loadingProfile || loading) return (
+    <div className="max-w-2xl mx-auto space-y-4">
+      {[1,2,3].map(i => (
+        <div key={i} className="bg-white rounded-xl border border-slate-200 p-4 animate-pulse">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-slate-200" />
+            <div className="space-y-1.5">
+              <div className="h-3 w-32 bg-slate-200 rounded" />
+              <div className="h-2.5 w-48 bg-slate-100 rounded" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -97,18 +121,12 @@ export default function AdminUsuariosPage() {
           <p className="text-slate-500 text-sm mt-1">Crea y administra los accesos al sistema</p>
         </div>
         <button
-          onClick={() => { setShowForm(true); setError(''); setExito('') }}
+          onClick={() => { setShowForm(true); setError('') }}
           className="flex items-center gap-2 px-4 py-2.5 bg-[#1e5fa8] text-white rounded-lg text-sm font-medium hover:bg-[#1a3a5c] transition-colors"
         >
           <Plus size={16} /> Nuevo usuario
         </button>
       </div>
-
-      {exito && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg text-sm mb-4">
-          {exito}
-        </div>
-      )}
 
       {/* Modal nuevo usuario */}
       {showForm && (
@@ -138,9 +156,15 @@ export default function AdminUsuariosPage() {
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-500 block mb-1">Contraseña</label>
-                <input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
-                  placeholder="Mínimo 6 caracteres" required minLength={6}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                <div className="relative">
+                  <input type={showPass ? 'text' : 'password'} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
+                    placeholder="Mínimo 6 caracteres" required minLength={6}
+                    className="w-full px-3 py-2 pr-9 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                  <button type="button" onClick={() => setShowPass(s => !s)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                    {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-500 block mb-1">Rol</label>
@@ -220,6 +244,35 @@ export default function AdminUsuariosPage() {
         </div>
       )}
 
+      {/* Modal confirmación borrado */}
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <AlertTriangle size={18} className="text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-800">Eliminar usuario</h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  ¿Estás seguro de eliminar a <strong>{confirmDelete.nombre || confirmDelete.email}</strong>? Esta acción no se puede deshacer.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmDelete(null)}
+                className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">
+                Cancelar
+              </button>
+              <button onClick={confirmarEliminar}
+                className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition-colors">
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Lista de usuarios */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
@@ -241,7 +294,8 @@ export default function AdminUsuariosPage() {
                 </div>
               </div>
               {u.id !== profile?.id && (
-                <button onClick={() => eliminarUsuario(u.id)}
+                <button onClick={() => eliminarUsuario(u)}
+                  title="Eliminar usuario"
                   className="text-red-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg transition-colors">
                   <Trash2 size={15} />
                 </button>
