@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import { createClient } from '@/lib/supabase/server'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { sanitizePromptInput, sanitizeNumber } from '@/lib/sanitize'
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
 export async function POST(req: NextRequest) {
   try {
@@ -70,13 +70,9 @@ FORMATO DE SALIDA — usa exactamente estas 5 secciones, sin agregar nada más a
 **Pronóstico:**
 [Pronóstico para la vida y para la función]`
 
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 2048,
-      messages: [{ role: 'user', content: prompt }],
-    })
-
-    const nota = response.content[0].type === 'text' ? response.content[0].text : ''
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+    const response = await model.generateContent(prompt)
+    const nota = response.response.text()
     return NextResponse.json({ nota })
 
   } catch (err: any) {

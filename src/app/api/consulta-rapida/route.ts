@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import { createClient } from '@/lib/supabase/server'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { sanitizePromptInput } from '@/lib/sanitize'
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,10 +19,7 @@ export async function POST(req: NextRequest) {
     const pregunta = sanitizePromptInput(body.pregunta, 500)
     if (!pregunta) return NextResponse.json({ error: 'Pregunta vacía' }, { status: 400 })
 
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
-      system: `Eres un asistente clínico de referencia rápida para médicos en México. Responde consultas de cualquier especialidad médica de forma directa y estructurada.
+    const systemPrompt = `Eres un asistente clínico de referencia rápida para médicos en México. Responde consultas de cualquier especialidad médica de forma directa y estructurada.
 
 CONTEXTO GEOGRÁFICO — OBLIGATORIO:
 • Todas las respuestas deben estar contextualizadas para México.
@@ -49,11 +46,14 @@ Nombre de la escala, luego ítems con 🔹 y puntuación/interpretación al fina
 PARA PROCEDIMIENTOS:
 Descripción concisa con pasos numerados y hallazgo positivo.
 
-Responde siempre en español con lenguaje médico formal.`,
-      messages: [{ role: 'user', content: pregunta }],
-    })
+Responde siempre en español con lenguaje médico formal.`
 
-    const respuesta = response.content[0].type === 'text' ? response.content[0].text : ''
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.0-flash',
+      systemInstruction: systemPrompt,
+    })
+    const response = await model.generateContent(pregunta)
+    const respuesta = response.response.text()
     return NextResponse.json({ respuesta })
 
   } catch (err: any) {
