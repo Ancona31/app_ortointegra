@@ -61,6 +61,16 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
   const [requerimientos, setRequerimientos] = useState<string[]>([])
   const [requerimientosExtra, setRequerimientosExtra] = useState('')
   const [justificacion, setJustificacion] = useState('')
+  const [instruccionesPaciente, setInstruccionesPaciente] = useState(
+`• Presentarse en Admisión Hospitalaria con: identificación oficial vigente, esta hoja de internamiento y estudios recientes (laboratorios, radiografías, resonancias).
+• Ayuno estricto de 8 horas antes del procedimiento. Solo se permiten líquidos claros hasta 4 horas antes.
+• No traer objetos de valor, joyas ni alhajas.
+• Venir acompañado de un familiar mayor de edad responsable.
+• Si toma medicamentos de forma habitual, NO los suspenda sin consultarnos antes.
+• Traer ropa cómoda y artículos de aseo personal para su estancia.
+• En caso de dudas o cambio en su estado de salud antes del ingreso, comuníquese al consultorio.`
+  )
+  const [indicacionesPiso, setIndicacionesPiso] = useState('')
   const [imprimiendo, setImprimiendo] = useState(false)
 
   useEffect(() => {
@@ -91,6 +101,7 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
           diagnosticosSecundarios: diagnosticosSecundarios.filter(Boolean),
           tipoInternamiento, procedimiento, diasEstimados,
           asa, urgente, requerimientos, requerimientosExtra, justificacion,
+          instruccionesPaciente, indicacionesPiso,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         },
       })
@@ -176,6 +187,33 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
 
   .justificacion { font-size: 9.5pt; line-height: 1.6; color: #2d2d2d; text-align: justify; white-space: pre-line; }
 
+  /* ── Instrucciones para el paciente ── */
+  .paciente-box {
+    background: #fffbeb; border: 1.5px solid #f59e0b;
+    border-radius: 6px; padding: 10px 14px; margin-top: 14px;
+  }
+  .paciente-header {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 9pt; font-weight: 700; color: #92400e;
+    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 7px;
+  }
+  .paciente-icon { font-size: 13pt; }
+  .paciente-texto { font-size: 9pt; line-height: 1.6; color: #78350f; white-space: pre-line; text-align: justify; }
+
+  /* ── Indicaciones de piso ── */
+  .piso-box {
+    background: ${cp}06; border: 1.5px solid ${cp}40;
+    border-radius: 6px; padding: 10px 14px; margin-top: 14px;
+    page-break-inside: avoid;
+  }
+  .piso-header {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 9pt; font-weight: 700; color: ${cp};
+    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 7px;
+  }
+  .piso-icon { font-size: 13pt; }
+  .piso-texto { font-size: 9.5pt; line-height: 1.6; color: #1a1a1a; white-space: pre-line; text-align: justify; }
+
   .footer-area { margin-top: 24px; display: flex; justify-content: flex-end; }
   .firma { text-align: center; min-width: 210px; border-top: 1.5px solid ${cp}; padding-top: 8px; }
   .firma-nombre { font-weight: bold; font-size: 9.5pt; color: ${cp}; }
@@ -240,6 +278,20 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
   ${justificacion ? `
   <div class="seccion-header"><div class="seccion-linea"></div><div class="seccion-titulo">Justificación clínica</div><div class="seccion-linea"></div></div>
   <p class="justificacion">${justificacion}</p>
+  ` : ''}
+
+  ${instruccionesPaciente ? `
+  <div class="paciente-box">
+    <div class="paciente-header"><span class="paciente-icon">📋</span> Instrucciones para el paciente — Trámite de ingreso</div>
+    <p class="paciente-texto">${instruccionesPaciente}</p>
+  </div>
+  ` : ''}
+
+  ${indicacionesPiso ? `
+  <div class="piso-box">
+    <div class="piso-header"><span class="piso-icon">🏥</span> Indicaciones de ingreso a piso — Personal de enfermería y médico</div>
+    <p class="piso-texto">${indicacionesPiso}</p>
+  </div>
   ` : ''}
 
   <div class="footer-area">
@@ -374,6 +426,33 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
         <textarea value={justificacion} onChange={e => setJustificacion(e.target.value)}
           placeholder="Descripción clínica que justifica el internamiento: evolución del padecimiento, hallazgos, fracaso de tratamiento conservador..."
           rows={4} className={`${inputCls} resize-y`} />
+      </div>
+
+      {/* Instrucciones para el paciente */}
+      <div className="bg-amber-50 rounded-xl border border-amber-200 p-5 shadow-sm">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-lg">📋</span>
+          <div>
+            <h2 className="font-semibold text-amber-800 text-sm">Instrucciones para el paciente</h2>
+            <p className="text-xs text-amber-600">Trámite de ingreso — aparece en el documento impreso</p>
+          </div>
+        </div>
+        <textarea value={instruccionesPaciente} onChange={e => setInstruccionesPaciente(e.target.value)}
+          rows={7} className="w-full px-3 py-2 border border-amber-200 rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 bg-white" />
+      </div>
+
+      {/* Indicaciones de ingreso a piso */}
+      <div className="bg-blue-50 rounded-xl border border-blue-200 p-5 shadow-sm">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-lg">🏥</span>
+          <div>
+            <h2 className="font-semibold text-[#1a3a5c] text-sm">Indicaciones de ingreso a piso</h2>
+            <p className="text-xs text-blue-500">Para personal de enfermería y médico residente</p>
+          </div>
+        </div>
+        <textarea value={indicacionesPiso} onChange={e => setIndicacionesPiso(e.target.value)}
+          placeholder={`Ej:\n1. Dieta: Ayuno\n2. Soluciones: SSN 0.9% 1000 ml a 60 ml/hr\n3. Medicamentos: Ketorolaco 30mg IV c/8hrs, Omeprazol 40mg IV c/24hrs\n4. Monitoreo: Signos vitales c/4hrs\n5. Laboratorios de ingreso: BH, QS, TP, TTP, Grupo y Rh\n6. Posición: Semi-Fowler\n7. Actividad: Reposo relativo en cama`}
+          rows={8} className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8] bg-white" />
       </div>
 
       <button
