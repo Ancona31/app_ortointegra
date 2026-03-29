@@ -70,7 +70,7 @@ FORMATO DE SALIDA — usa exactamente estas 5 secciones, sin agregar nada más a
 **Pronóstico:**
 [Pronóstico para la vida y para la función]`
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash' })
     const response = await model.generateContent(prompt)
     const nota = response.response.text()
     return NextResponse.json({ nota })
