@@ -95,6 +95,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
   async function imprimir() {
     setErrorGuardado('')
     setImprimiendo(true)
+    await new Promise(resolve => setTimeout(resolve, 0))
     try {
     const folio = `R-${Date.now().toString().slice(-8)}`
     const contenido = {
@@ -220,7 +221,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
   .credenciales { font-size: 8.5pt; color: #666; }
   .contacto-consultorio { font-size: 8pt; color: #888; margin-top: 3px; }
   .rp-wrap { text-align: right; }
-  .rp { font-size: 52pt; font-weight: 900; color: ${cs}; line-height: 1; opacity: 0.85; font-family: 'Noto Serif', Georgia, serif; }
+  .rp { font-size: 52pt; font-weight: 900; color: ${cs}; line-height: 1; opacity: 0.85; font-family: Arial, sans-serif; }
   .folio { font-size: 7.5pt; color: #aaa; text-align: right; margin-top: 2px; font-family: Arial, sans-serif; }
 
   /* ── Datos del paciente ── */
@@ -321,7 +322,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
         ${direccion || telefono ? `<div class="contacto-consultorio">${[direccion, telefono ? `Tel: ${telefono}` : ''].filter(Boolean).join(' &nbsp;·&nbsp; ')}</div>` : ''}
       </div>
       <div class="rp-wrap">
-        <div class="rp">℞</div>
+        <div class="rp">Rx</div>
         <div class="folio">${folio}</div>
       </div>
     </div>

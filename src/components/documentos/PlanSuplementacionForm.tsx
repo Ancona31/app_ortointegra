@@ -62,6 +62,7 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
 
   async function imprimir() {
     setImprimiendo(true)
+    await new Promise(resolve => setTimeout(resolve, 0))
     try {
     if (pacienteId) {
       const supabase = createClient()

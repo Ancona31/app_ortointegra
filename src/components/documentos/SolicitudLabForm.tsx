@@ -58,6 +58,7 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
 
   async function imprimir() {
     setImprimiendo(true)
+    await new Promise(resolve => setTimeout(resolve, 0))
     try {
     if (pacienteId) {
       const supabase = createClient()
