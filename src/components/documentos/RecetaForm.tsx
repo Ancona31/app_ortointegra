@@ -6,6 +6,7 @@ import { flushSync } from 'react-dom'
 import QRCode from 'qrcode'
 import { Medicamento, MedicoInfo } from '@/types'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
+import { useProfile } from '@/hooks/useProfile'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import ConsultaRapida from '@/components/ConsultaRapida'
@@ -115,6 +116,7 @@ interface Props {
 
 export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId }: Props) {
   const { medicoInfo } = useMedicoInfo()
+  const { isSuperAdmin } = useProfile()
   const [paciente, setPaciente] = useState(pacienteInicial)
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
   const [pacienteData, setPacienteData] = useState<{ edad?: number | null; sexo?: string } | null>(null)
@@ -201,7 +203,9 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     const verificacionUrl = `${window.location.origin}/r/${folio}`
     const [qrDataUrl, blogQrDataUrl] = await Promise.all([
       QRCode.toDataURL(verificacionUrl, { width: 96, margin: 1, color: { dark: '#1a3a5c', light: '#ffffff' } }),
-      QRCode.toDataURL('https://dranconacolumna.com/articulos.html', { width: 64, margin: 1, color: { dark: medicoInfo?.color_primario || '#1a3a5c', light: '#ffffff' } }),
+      isSuperAdmin
+        ? QRCode.toDataURL('https://dranconacolumna.com/articulos.html', { width: 64, margin: 1, color: { dark: medicoInfo?.color_primario || '#1a3a5c', light: '#ffffff' } })
+        : Promise.resolve(''),
     ])
 
     const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
@@ -406,8 +410,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
       <div class="rp-wrap">
         <div class="rp">Rx</div>
         <div class="folio">${folio}</div>
-        <img class="blog-qr" src="${blogQrDataUrl}" />
-        <div class="blog-qr-label">Blog del Dr.</div>
+        ${isSuperAdmin && blogQrDataUrl ? `<img class="blog-qr" src="${blogQrDataUrl}" /><div class="blog-qr-label">Blog del Dr.</div>` : ''}
       </div>
     </div>
 

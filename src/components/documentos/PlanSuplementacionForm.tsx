@@ -1,6 +1,7 @@
 'use client'
 import { MedicoInfo } from '@/types'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
+import { useProfile } from '@/hooks/useProfile'
 
 import { useState, useCallback } from 'react'
 import { Printer, Loader2, RefreshCw } from 'lucide-react'
@@ -167,6 +168,7 @@ interface Props {
 
 export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId }: Props) {
   const { medicoInfo } = useMedicoInfo()
+  const { isSuperAdmin } = useProfile()
   const [paciente, setPaciente] = useState(pacienteInicial)
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
@@ -232,10 +234,12 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
         ? medicoInfo.logo_url
         : `${window.location.origin}/logo.png`
 
-      const blogQrDataUrl = await QRCode.toDataURL(
-        'https://dranconacolumna.com/articulos.html#61bea08b-ea34-455b-a2b5-15c431987c64',
-        { width: 80, margin: 1, color: { dark: cp, light: '#ffffff' } }
-      )
+      const blogQrDataUrl = isSuperAdmin
+        ? await QRCode.toDataURL(
+            'https://dranconacolumna.com/articulos.html#61bea08b-ea34-455b-a2b5-15c431987c64',
+            { width: 80, margin: 1, color: { dark: cp, light: '#ffffff' } }
+          )
+        : ''
       const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
       const cols = pesoKg ? '1fr 1fr 1fr' : '1fr 1fr'
 
@@ -332,10 +336,7 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
   ${seguimiento ? `<p style="margin-top:12px;font-size:9.5pt;"><strong style="color:${cp};">Control:</strong> ${seguimiento}</p>` : ''}
 
   <div class="footer-area">
-    <div class="qr-blog">
-      <img src="${blogQrDataUrl}" />
-      <div class="qr-blog-label">Más info sobre<br>suplementación</div>
-    </div>
+    ${isSuperAdmin && blogQrDataUrl ? `<div class="qr-blog"><img src="${blogQrDataUrl}" /><div class="qr-blog-label">Más info sobre<br>suplementación</div></div>` : '<div></div>'}
     <div class="firma">
       <div class="firma-nombre">${doctorNombre}</div>
       ${cedProf ? `<div class="firma-ced">Céd. Prof. ${cedProf}</div>` : ''}
