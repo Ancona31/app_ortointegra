@@ -1,7 +1,7 @@
 'use client'
-import { MedicoInfo } from '@/types'
+import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState } from 'react'
 import { Printer, Loader2, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignJustify, Minus } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { imprimirOCompartir } from '@/lib/mobileShare'
@@ -29,17 +29,13 @@ const TAMANOS = [
 ]
 
 export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId }: Props) {
-  const [medicoInfo, setMedicoInfo]   = useState<MedicoInfo | null>(null)
+  const { medicoInfo } = useMedicoInfo()
   const [paciente, setPaciente]       = useState(pacienteInicial)
   const [fecha, setFecha]             = useState(new Date().toISOString().split('T')[0])
   const [asunto, setAsunto]           = useState('')
   const [isEmpty, setIsEmpty]         = useState(true)
   const [imprimiendo, setImprimiendo] = useState(false)
   const editorRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    fetch('/api/me/perfil-medico').then(r => r.json()).then(({ medico }) => setMedicoInfo(medico))
-  }, [])
 
   function exec(cmd: string, value?: string) {
     document.execCommand(cmd, false, value ?? undefined)

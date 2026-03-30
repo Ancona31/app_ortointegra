@@ -1,14 +1,8 @@
 'use client'
+import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
-type MedicoInfo = {
-  nombre: string
-  especialidad: string
-  cedula_profesional: string
-  cedula_especialidad: string
-  logo_url: string | null
-}
 import { Printer, Loader2 } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { imprimirOCompartir } from '@/lib/mobileShare'
@@ -28,12 +22,8 @@ interface Props {
 }
 
 export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId }: Props) {
-  const [medicoInfo, setMedicoInfo] = useState<MedicoInfo | null>(null)
+  const { medicoInfo } = useMedicoInfo()
   const [paciente, setPaciente] = useState(pacienteInicial)
-
-  useEffect(() => {
-    fetch('/api/me/perfil-medico').then(r => r.json()).then(({ medico }) => setMedicoInfo(medico))
-  }, [])
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
   const [estudios, setEstudios] = useState<Estudio[]>([{ tipo: '', region: '', proyecciones: '', indicacion: '' }])

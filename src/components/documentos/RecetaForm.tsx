@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Plus, Trash2, Printer, Loader2 } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import QRCode from 'qrcode'
-import { Medicamento } from '@/types'
+import { Medicamento, MedicoInfo } from '@/types'
+import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import ConsultaRapida from '@/components/ConsultaRapida'
@@ -12,19 +13,6 @@ import { createClient } from '@/lib/supabase/client'
 import { imprimirOCompartir } from '@/lib/mobileShare'
 import AutocompleteMedicamento from '@/components/AutocompleteMedicamento'
 import { MedicamentoDB } from '@/data/medicamentos'
-
-type MedicoInfo = {
-  nombre: string
-  especialidad: string
-  cedula_profesional: string
-  cedula_especialidad: string
-  logo_url: string | null
-  color_primario: string
-  color_secundario: string
-  clinica_nombre: string | null
-  direccion_consultorio: string
-  telefono_consultorio: string
-}
 
 type MedicamentoConVia = Medicamento & { via_administracion?: string }
 
@@ -126,14 +114,10 @@ interface Props {
 }
 
 export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId }: Props) {
-  const [medicoInfo, setMedicoInfo] = useState<MedicoInfo | null>(null)
+  const { medicoInfo } = useMedicoInfo()
   const [paciente, setPaciente] = useState(pacienteInicial)
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
   const [pacienteData, setPacienteData] = useState<{ edad?: number | null; sexo?: string } | null>(null)
-
-  useEffect(() => {
-    fetch('/api/me/perfil-medico').then(r => r.json()).then(({ medico }) => setMedicoInfo(medico))
-  }, [])
 
   useEffect(() => {
     if (!pacienteId) return

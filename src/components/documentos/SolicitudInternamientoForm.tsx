@@ -1,7 +1,8 @@
 'use client'
 import { MedicoInfo } from '@/types'
+import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { Printer, Loader2, Plus, Trash2 } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { imprimirOCompartir } from '@/lib/mobileShare'
@@ -36,7 +37,7 @@ const REQUERIMIENTOS = [
 ]
 
 export default function SolicitudInternamientoForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId }: Props) {
-  const [medicoInfo, setMedicoInfo] = useState<MedicoInfo | null>(null)
+  const { medicoInfo } = useMedicoInfo()
   const [paciente, setPaciente] = useState(pacienteInicial)
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
   const [fechaIngreso, setFechaIngreso] = useState('')
@@ -62,13 +63,9 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
   const [indicacionesPiso, setIndicacionesPiso] = useState('')
   const [imprimiendo, setImprimiendo] = useState(false)
 
-  useEffect(() => {
-    fetch('/api/me/perfil-medico').then(r => r.json()).then(({ medico }) => setMedicoInfo(medico))
-  }, [])
-
-  function toggleRequerimiento(r: string) {
+  const toggleRequerimiento = useCallback((r: string) => {
     setRequerimientos(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])
-  }
+  }, [])
 
   function addDx() { setDiagnosticosSecundarios(prev => [...prev, '']) }
   function updateDx(i: number, val: string) {

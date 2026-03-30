@@ -1,7 +1,8 @@
 'use client'
 import { MedicoInfo } from '@/types'
+import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { Printer, Loader2, RefreshCw } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { imprimirOCompartir } from '@/lib/mobileShare'
@@ -164,7 +165,7 @@ interface Props {
 }
 
 export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId }: Props) {
-  const [medicoInfo, setMedicoInfo] = useState<MedicoInfo | null>(null)
+  const { medicoInfo } = useMedicoInfo()
   const [paciente, setPaciente] = useState(pacienteInicial)
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
@@ -173,10 +174,6 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
   const [notas, setNotas] = useState('')
   const [seguimiento, setSeguimiento] = useState('')
   const [imprimiendo, setImprimiendo] = useState(false)
-
-  useEffect(() => {
-    fetch('/api/me/perfil-medico').then(r => r.json()).then(({ medico }) => setMedicoInfo(medico))
-  }, [])
 
   function dosisParaForm(sup: Suplemento, peso: number): string {
     if (peso > 0) {
@@ -187,20 +184,20 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
     return sup.dosis_default
   }
 
-  function toggleSup(sup: Suplemento) {
+  const toggleSup = useCallback((sup: Suplemento) => {
     if (seleccionados.find(s => s.nombre === sup.nombre)) {
       setSeleccionados(prev => prev.filter(s => s.nombre !== sup.nombre))
     } else {
       const peso = parseFloat(pesoKg)
       setSeleccionados(prev => [...prev, { nombre: sup.nombre, dosis: dosisParaForm(sup, peso), justificacion: '' }])
     }
-  }
+  }, [seleccionados, pesoKg])
 
   function updateSup(nombre: string, field: keyof SupSelec, val: string) {
     setSeleccionados(prev => prev.map(s => s.nombre === nombre ? { ...s, [field]: val } : s))
   }
 
-  function recalcularTodas() {
+  const recalcularTodas = useCallback(() => {
     const peso = parseFloat(pesoKg)
     if (!peso) return
     setSeleccionados(prev => prev.map(s => {
@@ -208,7 +205,7 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
       if (!sup) return s
       return { ...s, dosis: dosisParaForm(sup, peso) }
     }))
-  }
+  }, [pesoKg])
 
   async function imprimir() {
     flushSync(() => setImprimiendo(true))

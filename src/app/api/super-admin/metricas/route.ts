@@ -16,12 +16,12 @@ export async function GET() {
     docsRes,
     rateRes,
   ] = await Promise.all([
-    admin.from('clinicas').select('id, nombre, nombre_display').order('nombre'),
-    admin.from('profiles').select('id, nombre, clinica_id, role'),
-    admin.from('pacientes').select('id, clinica_id, medico_id, created_at'),
-    admin.from('consultas').select('id, paciente_id, created_at'),
-    admin.from('documentos').select('id, paciente_id, tipo, created_at'),
-    admin.from('rate_limits').select('user_id, ruta, created_at'),
+    admin.from('clinicas').select('id, nombre, nombre_display').order('nombre').limit(10000),
+    admin.from('profiles').select('id, nombre, clinica_id, role').limit(10000),
+    admin.from('pacientes').select('id, clinica_id, medico_id, created_at').limit(10000),
+    admin.from('consultas').select('id, paciente_id, created_at').limit(10000),
+    admin.from('documentos').select('id, paciente_id, tipo, created_at').limit(10000),
+    admin.from('rate_limits').select('user_id, ruta, created_at').limit(10000),
   ])
 
   const clinicas = clinicasRes.data || []
