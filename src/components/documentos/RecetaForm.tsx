@@ -199,7 +199,10 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     }
 
     const verificacionUrl = `${window.location.origin}/r/${folio}`
-    const qrDataUrl = await QRCode.toDataURL(verificacionUrl, { width: 96, margin: 1, color: { dark: '#1a3a5c', light: '#ffffff' } })
+    const [qrDataUrl, blogQrDataUrl] = await Promise.all([
+      QRCode.toDataURL(verificacionUrl, { width: 96, margin: 1, color: { dark: '#1a3a5c', light: '#ffffff' } }),
+      QRCode.toDataURL('https://dranconacolumna.com/articulos.html', { width: 64, margin: 1, color: { dark: medicoInfo?.color_primario || '#1a3a5c', light: '#ffffff' } }),
+    ])
 
     const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
 
@@ -291,9 +294,11 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
   .especialidad { font-size: 9.5pt; color: ${cs}; margin: 3px 0; font-style: italic; }
   .credenciales { font-size: 8.5pt; color: #666; }
   .contacto-consultorio { font-size: 8pt; color: #888; margin-top: 3px; }
-  .rp-wrap { text-align: right; }
+  .rp-wrap { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
   .rp { font-size: 52pt; font-weight: 900; color: ${cs}; line-height: 1; opacity: 0.85; font-family: Arial, sans-serif; }
   .folio { font-size: 7.5pt; color: #aaa; text-align: right; margin-top: 2px; font-family: Arial, sans-serif; }
+  .blog-qr { width: 46px; height: 46px; margin-top: 5px; }
+  .blog-qr-label { font-size: 5.5pt; color: #bbb; text-align: center; line-height: 1.3; font-family: Arial, sans-serif; margin-top: 2px; }
 
   /* ── Datos del paciente ── */
   .datos-box {
@@ -401,6 +406,8 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
       <div class="rp-wrap">
         <div class="rp">Rx</div>
         <div class="folio">${folio}</div>
+        <img class="blog-qr" src="${blogQrDataUrl}" />
+        <div class="blog-qr-label">Blog del Dr.</div>
       </div>
     </div>
 
