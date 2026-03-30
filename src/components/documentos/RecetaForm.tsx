@@ -91,6 +91,22 @@ Apoyo: Respete el tiempo de "no apoyo" si se le indicó el uso de muletas o anda
 🚨 Datos de Alarma: Hinchazón excesiva de la pantorrilla con dolor al tocarla (posible coágulo) o cambios de coloración en los dedos.`,
   },
   {
+    label: '📍 Fisioterapia y Rehabilitación',
+    texto: `Asistencia: Cumplir con un ciclo inicial de 10 sesiones para asegurar resultados.
+
+Frecuencia: Se sugiere acudir de 2 a 3 veces por semana según la disponibilidad.
+
+Objetivos: Enfoque en higiene de columna, fortalecimiento de core y estiramientos analíticos.
+
+Modalidades: Aplicación de medios físicos, electrotermoterapia y terapia manual.
+
+Restricciones: Evitar cargar objetos pesados (>5 kg) y movimientos de rotación brusca.
+
+Seguimiento: Al concluir las sesiones, solicitar reporte de evolución para su revaloración en consulta.
+
+💡 Nota importante: La constancia en su rehabilitación es la clave para una recuperación exitosa y para prevenir futuras lesiones. ¡Su esfuerzo hoy es su movilidad mañana!`,
+  },
+  {
     label: '✂️ Cuidados de la Herida Quirúrgica (Postoperados)',
     texto: `Limpieza: Lave la herida solo con agua y jabón neutro durante el baño diario. Seque con toques suaves usando una gasa estéril o toalla limpia exclusiva.
 
