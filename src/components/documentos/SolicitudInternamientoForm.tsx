@@ -1,4 +1,5 @@
 'use client'
+import { MedicoInfo } from '@/types'
 
 import { useState, useEffect } from 'react'
 import { Printer, Loader2, Plus, Trash2 } from 'lucide-react'
@@ -7,18 +8,6 @@ import { imprimirOCompartir } from '@/lib/mobileShare'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
-
-type MedicoInfo = {
-  nombre: string
-  especialidad: string
-  cedula_profesional: string
-  cedula_especialidad: string
-  logo_url: string | null
-  color_primario: string
-  color_secundario: string
-  direccion_consultorio: string
-  telefono_consultorio: string
-}
 
 interface Props {
   pacienteInicial?: string

@@ -66,7 +66,7 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
         paciente_id: pacienteId,
         tipo: 'lab',
         contenido: { paciente, diagnostico, estudios: estudios.filter(Boolean), notas, fecha },
-      }).then(() => {})
+      }).then(({ error }) => { if (error) console.error('Error guardando documento:', error) })
     }
 
     const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })

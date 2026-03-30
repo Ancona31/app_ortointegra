@@ -54,7 +54,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
         paciente_id: pacienteId,
         tipo: 'imagen',
         contenido: { paciente, diagnostico, estudios: estudios.filter(e => e.tipo && e.region), urgente, fecha },
-      }).then(() => {})
+      }).then(({ error }) => { if (error) console.error('Error guardando documento:', error) })
     }
 
     const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })

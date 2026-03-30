@@ -108,8 +108,29 @@ export interface Alerta {
   valor_optimo?: string
 }
 
+// ─── Médico (perfil del doctor autenticado) ───────────────────────────────────
+export interface MedicoInfo {
+  nombre: string
+  especialidad: string
+  cedula_profesional: string
+  cedula_especialidad: string
+  logo_url: string | null
+  color_primario: string
+  color_secundario: string
+  direccion_consultorio: string
+  telefono_consultorio: string
+  clinica_nombre?: string
+}
+
 // ─── Documentos ───────────────────────────────────────────────────────────────
-export type TipoDocumento = 'receta' | 'solicitud_lab' | 'solicitud_imagen' | 'informe_clinico' | 'plan_suplementacion'
+export type TipoDocumento =
+  | 'receta'
+  | 'solicitud_lab'
+  | 'solicitud_imagen'
+  | 'informe_clinico'
+  | 'plan_suplementacion'
+  | 'solicitud_internamiento'
+  | 'escrito_medico'
 
 export interface Documento {
   id: string

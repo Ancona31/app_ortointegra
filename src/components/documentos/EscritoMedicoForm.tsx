@@ -1,4 +1,5 @@
 'use client'
+import { MedicoInfo } from '@/types'
 
 import { useRef, useState, useEffect } from 'react'
 import { Printer, Loader2, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignJustify, Minus } from 'lucide-react'
@@ -8,21 +9,17 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 
-type MedicoInfo = {
-  nombre: string
-  especialidad: string
-  cedula_profesional: string
-  cedula_especialidad: string
-  logo_url: string | null
-  color_primario: string
-  color_secundario: string
-  direccion_consultorio: string
-  telefono_consultorio: string
-}
-
 interface Props {
   pacienteInicial?: string
   pacienteId?: string
+}
+
+function sanitizeEditorHtml(html: string): string {
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '')
+    .replace(/href\s*=\s*["']javascript:[^"']*["']/gi, 'href="#"')
+    .replace(/src\s*=\s*["']javascript:[^"']*["']/gi, 'src="#"')
 }
 
 const TAMANOS = [
@@ -60,7 +57,7 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId }: 
   }
 
   async function imprimir() {
-    const contenido = editorRef.current?.innerHTML ?? ''
+    const contenido = sanitizeEditorHtml(editorRef.current?.innerHTML ?? '')
     if (!contenido.trim()) return
 
     flushSync(() => setImprimiendo(true))
