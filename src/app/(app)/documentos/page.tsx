@@ -2,14 +2,23 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { FileText, Pill, FlaskConical, ScanLine, ClipboardList, Search, User, X, BedDouble, PenLine } from 'lucide-react'
-import RecetaForm from '@/components/documentos/RecetaForm'
-import SolicitudLabForm from '@/components/documentos/SolicitudLabForm'
-import SolicitudImagenForm from '@/components/documentos/SolicitudImagenForm'
-import PlanSuplementacionForm from '@/components/documentos/PlanSuplementacionForm'
-import SolicitudInternamientoForm from '@/components/documentos/SolicitudInternamientoForm'
-import EscritoMedicoForm from '@/components/documentos/EscritoMedicoForm'
+import { FileText, Pill, FlaskConical, ScanLine, ClipboardList, Search, User, X, BedDouble, PenLine, Loader2 } from 'lucide-react'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
+
+const FormLoader = () => (
+  <div className="flex items-center justify-center py-16 text-slate-400">
+    <Loader2 size={20} className="animate-spin mr-2" />
+    <span className="text-sm">Cargando formulario...</span>
+  </div>
+)
+
+const RecetaForm = dynamic(() => import('@/components/documentos/RecetaForm'), { ssr: false, loading: FormLoader })
+const SolicitudLabForm = dynamic(() => import('@/components/documentos/SolicitudLabForm'), { ssr: false, loading: FormLoader })
+const SolicitudImagenForm = dynamic(() => import('@/components/documentos/SolicitudImagenForm'), { ssr: false, loading: FormLoader })
+const PlanSuplementacionForm = dynamic(() => import('@/components/documentos/PlanSuplementacionForm'), { ssr: false, loading: FormLoader })
+const SolicitudInternamientoForm = dynamic(() => import('@/components/documentos/SolicitudInternamientoForm'), { ssr: false, loading: FormLoader })
+const EscritoMedicoForm = dynamic(() => import('@/components/documentos/EscritoMedicoForm'), { ssr: false, loading: FormLoader })
 
 const TIPOS = [
   { key: 'receta', label: 'Receta Médica', icon: Pill, color: 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100' },

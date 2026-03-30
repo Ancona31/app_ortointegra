@@ -4,33 +4,71 @@ import { useState, useEffect } from 'react'
 import { Users, Plus, Search, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Paciente } from '@/types'
-import { format, differenceInYears, parseISO } from 'date-fns'
-import { es } from 'date-fns/locale'
+import { differenceInYears, parseISO } from 'date-fns'
+
+type PacienteRow = {
+  id: string
+  nombre: string
+  apellidos: string
+  fecha_nacimiento: string | null
+  sexo: string | null
+  numero_expediente: string | null
+}
+
+const CAMPOS = 'id, nombre, apellidos, fecha_nacimiento, sexo, numero_expediente'
 
 export default function PacientesPage() {
-  const [pacientes, setPacientes] = useState<Paciente[]>([])
+  const [pacientes, setPacientes] = useState<PacienteRow[]>([])
   const [busqueda, setBusqueda] = useState('')
   const [loading, setLoading] = useState(true)
 
+  // Carga inicial: 150 más recientes
   useEffect(() => {
-    cargarPacientes()
+    const supabase = createClient()
+    supabase
+      .from('pacientes')
+      .select(CAMPOS)
+      .order('created_at', { ascending: false })
+      .limit(150)
+      .then(({ data }) => {
+        setPacientes(data ?? [])
+        setLoading(false)
+      })
   }, [])
 
-  async function cargarPacientes() {
-    const supabase = createClient()
-    const { data } = await supabase
-      .from('pacientes')
-      .select('*')
-      .order('created_at', { ascending: false })
-    setPacientes(data || [])
-    setLoading(false)
-  }
+  // Búsqueda server-side con debounce 300 ms
+  useEffect(() => {
+    if (busqueda.trim().length < 2) return
+    setLoading(true)
+    const timeout = setTimeout(async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('pacientes')
+        .select(CAMPOS)
+        .or(`nombre.ilike.%${busqueda}%,apellidos.ilike.%${busqueda}%,numero_expediente.ilike.%${busqueda}%`)
+        .order('apellidos')
+        .limit(100)
+      setPacientes(data ?? [])
+      setLoading(false)
+    }, 300)
+    return () => clearTimeout(timeout)
+  }, [busqueda])
 
-  const filtrados = pacientes.filter(p =>
-    `${p.nombre} ${p.apellidos}`.toLowerCase().includes(busqueda.toLowerCase()) ||
-    p.numero_expediente?.includes(busqueda)
-  )
+  // Al borrar la búsqueda, volver a la lista inicial
+  useEffect(() => {
+    if (busqueda.trim().length > 0) return
+    setLoading(true)
+    const supabase = createClient()
+    supabase
+      .from('pacientes')
+      .select(CAMPOS)
+      .order('created_at', { ascending: false })
+      .limit(150)
+      .then(({ data }) => {
+        setPacientes(data ?? [])
+        setLoading(false)
+      })
+  }, [busqueda])
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -40,7 +78,7 @@ export default function PacientesPage() {
           <h1 className="text-2xl font-bold text-[#1a3a5c] flex items-center gap-2">
             <Users size={24} /> Pacientes
           </h1>
-          <p className="text-slate-500 text-sm mt-1">{pacientes.length} pacientes registrados</p>
+          <p className="text-slate-500 text-sm mt-1">{pacientes.length} pacientes{busqueda.length >= 2 ? ' encontrados' : ' registrados'}</p>
         </div>
         <Link
           href="/pacientes/nuevo"
@@ -66,7 +104,7 @@ export default function PacientesPage() {
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
         {loading ? (
           <div className="p-8 text-center text-slate-400">Cargando...</div>
-        ) : filtrados.length === 0 ? (
+        ) : pacientes.length === 0 ? (
           <div className="p-8 text-center">
             <Users size={40} className="mx-auto text-slate-300 mb-3" />
             <p className="text-slate-500 font-medium">
@@ -80,7 +118,7 @@ export default function PacientesPage() {
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
-            {filtrados.map(p => {
+            {pacientes.map(p => {
               const edad = p.fecha_nacimiento
                 ? differenceInYears(new Date(), parseISO(p.fecha_nacimiento))
                 : null

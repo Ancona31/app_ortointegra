@@ -1,5 +1,6 @@
 'use client'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
+import { buildPdfHeader, buildPdfHeaderCss, buildPdfFirma, getPdfColors, getLogoUrl } from '@/lib/pdf/header'
 
 import { useState } from 'react'
 
@@ -61,13 +62,8 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
 
     const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
     const listaEstudios = estudios.filter(Boolean).map(e => `<li>${e}</li>`).join('')
-    const doctorNombre = medicoInfo?.nombre || 'Médico'
-    const doctorEspecialidad = medicoInfo?.especialidad || ''
-    const cedulas = [
-      medicoInfo?.cedula_profesional ? `Céd. Prof. ${medicoInfo.cedula_profesional}` : '',
-      medicoInfo?.cedula_especialidad ? `Céd. Esp. ${medicoInfo.cedula_especialidad}` : '',
-    ].filter(Boolean).join(' · ')
-    const logoUrl = medicoInfo?.logo_url || `${window.location.origin}/logo.png`
+    const { cp, cs } = getPdfColors(medicoInfo)
+    const logoUrl = getLogoUrl(medicoInfo, window.location.origin)
 
     const _html = `
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Solicitud Lab</title>
@@ -75,30 +71,17 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
   * { margin:0; padding:0; box-sizing:border-box; }
   @page { size: letter; margin: 15mm 20mm; }
   body { font-family: Arial, sans-serif; font-size: 11pt; color: #1a1a1a; }
-  .header { display:flex; align-items:center; gap:20px; padding-bottom:14px; border-bottom:3px solid #1a3a5c; margin-bottom:16px; }
-  .logo { width:80px; height:80px; object-fit:contain; }
-  .doctor-name { font-size:16pt; font-weight:bold; color:#1a3a5c; }
-  .especialidad { font-size:10pt; color:#1e5fa8; margin:2px 0 4px; }
-  .credenciales { font-size:9pt; color:#555; }
-  .titulo-doc { text-align:center; font-size:14pt; font-weight:bold; color:#1a3a5c; text-transform:uppercase; margin:16px 0 14px; border:2px solid #1a3a5c; padding:6px; }
+  ${buildPdfHeaderCss(cp, cs)}
+  .titulo-doc { text-align:center; font-size:14pt; font-weight:bold; color:${cp}; text-transform:uppercase; margin:16px 0 14px; border:2px solid ${cp}; padding:6px; }
   .dato-row { display:flex; gap:6px; margin-bottom:8px; }
-  .dato-label { font-weight:bold; min-width:100px; color:#1a3a5c; }
+  .dato-label { font-weight:bold; min-width:100px; color:${cp}; }
   .dato-valor { border-bottom:1px solid #aaa; flex:1; padding-bottom:1px; }
-  .seccion { font-size:11pt; font-weight:bold; color:#1a3a5c; border-bottom:1px solid #1a3a5c; padding-bottom:3px; margin:16px 0 10px; }
+  .seccion { font-size:11pt; font-weight:bold; color:${cp}; border-bottom:1px solid ${cp}; padding-bottom:3px; margin:16px 0 10px; }
   ul { list-style:none; columns:2; gap:20px; }
   li { padding:4px 0; padding-left:16px; position:relative; font-size:10.5pt; }
-  li::before { content:"✓"; position:absolute; left:0; color:#1e5fa8; font-weight:bold; }
-  .footer { margin-top:50px; display:flex; justify-content:flex-end; }
-  .firma { text-align:center; border-top:1px solid #333; padding-top:6px; min-width:200px; font-size:9pt; color:#555; }
+  li::before { content:"✓"; position:absolute; left:0; color:${cs}; font-weight:bold; }
 </style></head><body>
-  <div class="header">
-    <img class="logo" src="${logoUrl}" onerror="this.style.display='none'" />
-    <div>
-      <div class="doctor-name">${doctorNombre}</div>
-      ${doctorEspecialidad ? `<div class="especialidad">${doctorEspecialidad}</div>` : ''}
-      ${cedulas ? `<div class="credenciales">${cedulas}</div>` : ''}
-    </div>
-  </div>
+  ${buildPdfHeader(medicoInfo, logoUrl, cp, cs)}
   <div class="titulo-doc">Solicitud de Estudios de Laboratorio</div>
   <div class="dato-row"><span class="dato-label">Fecha:</span><span class="dato-valor">${fechaFormat}</span></div>
   <div class="dato-row"><span class="dato-label">Paciente:</span><span class="dato-valor">${paciente}</span></div>
@@ -106,7 +89,7 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
   <div class="seccion">Se solicita:</div>
   <ul>${listaEstudios}</ul>
   ${notas ? `<div class="seccion">Indicaciones</div><p style="font-size:10pt;color:#333">${notas}</p>` : ''}
-  <div class="footer"><div class="firma"><p>${doctorNombre}</p>${medicoInfo?.cedula_profesional ? `<p>Céd. Prof. ${medicoInfo.cedula_profesional}</p>` : ''}</div></div>
+  ${buildPdfFirma(medicoInfo, cp)}
 </body></html>`
     await imprimirOCompartir(_html, 'solicitud-laboratorio.pdf')
     } finally { setImprimiendo(false) }

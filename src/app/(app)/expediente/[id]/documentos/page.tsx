@@ -5,14 +5,23 @@ import { useParams, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Paciente } from '@/types'
 import { differenceInYears, parseISO } from 'date-fns'
-import { ArrowLeft, Pill, FlaskConical, ScanLine, ClipboardList, BedDouble, PenLine } from 'lucide-react'
+import { ArrowLeft, Pill, FlaskConical, ScanLine, ClipboardList, BedDouble, PenLine, Loader2 } from 'lucide-react'
 import Link from 'next/link'
-import RecetaForm from '@/components/documentos/RecetaForm'
-import SolicitudLabForm from '@/components/documentos/SolicitudLabForm'
-import SolicitudImagenForm from '@/components/documentos/SolicitudImagenForm'
-import PlanSuplementacionForm from '@/components/documentos/PlanSuplementacionForm'
-import SolicitudInternamientoForm from '@/components/documentos/SolicitudInternamientoForm'
-import EscritoMedicoForm from '@/components/documentos/EscritoMedicoForm'
+import dynamic from 'next/dynamic'
+
+const FormLoader = () => (
+  <div className="flex items-center justify-center py-16 text-slate-400">
+    <Loader2 size={20} className="animate-spin mr-2" />
+    <span className="text-sm">Cargando formulario...</span>
+  </div>
+)
+
+const RecetaForm = dynamic(() => import('@/components/documentos/RecetaForm'), { ssr: false, loading: FormLoader })
+const SolicitudLabForm = dynamic(() => import('@/components/documentos/SolicitudLabForm'), { ssr: false, loading: FormLoader })
+const SolicitudImagenForm = dynamic(() => import('@/components/documentos/SolicitudImagenForm'), { ssr: false, loading: FormLoader })
+const PlanSuplementacionForm = dynamic(() => import('@/components/documentos/PlanSuplementacionForm'), { ssr: false, loading: FormLoader })
+const SolicitudInternamientoForm = dynamic(() => import('@/components/documentos/SolicitudInternamientoForm'), { ssr: false, loading: FormLoader })
+const EscritoMedicoForm = dynamic(() => import('@/components/documentos/EscritoMedicoForm'), { ssr: false, loading: FormLoader })
 
 const TABS = [
   { key: 'receta', label: 'Receta', icon: Pill, color: 'text-blue-700 border-blue-500 bg-blue-50', inactive: 'text-slate-500 hover:text-blue-600 hover:bg-blue-50' },
@@ -38,7 +47,7 @@ function DocumentosPacienteContent() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('pacientes').select('*').eq('id', id).single().then(({ data }) => setPaciente(data))
+    supabase.from('pacientes').select('id, nombre, apellidos, fecha_nacimiento, sexo, numero_expediente').eq('id', id).single().then(({ data }) => setPaciente(data as any))
   }, [id])
 
   const nombreCompleto = paciente ? `${paciente.nombre} ${paciente.apellidos}` : ''
