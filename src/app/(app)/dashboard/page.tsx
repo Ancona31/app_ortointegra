@@ -8,7 +8,7 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import esLocale from '@fullcalendar/core/locales/es'
-import { FileText, Stethoscope, CalendarDays, LogIn, Loader2, Users, ClipboardList, Search } from 'lucide-react'
+import { FileText, Stethoscope, CalendarDays, LogIn, Loader2, Users, ClipboardList, Search, Monitor } from 'lucide-react'
 import Link from 'next/link'
 import { format, formatDistanceToNow, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -43,6 +43,14 @@ const accesos = [
     desc: 'Recetas, solicitudes de lab e imagen',
     color: 'bg-amber-50 border-amber-200 hover:bg-amber-100',
     iconColor: 'text-amber-700',
+  },
+  {
+    href: '/dicom',
+    icon: Monitor,
+    label: 'Visor DICOM',
+    desc: 'Visualiza estudios de imagen médica',
+    color: 'bg-teal-50 border-teal-200 hover:bg-teal-100',
+    iconColor: 'text-teal-700',
   },
 ]
 
@@ -188,7 +196,7 @@ export default function DashboardPage() {
           <p className="text-base font-bold leading-snug capitalize">{diaHoyTexto}</p>
         </div>
         <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {accesos.map(({ href, icon: Icon, label, desc, color, iconColor }) => (
               <Link key={href} href={href}
                 className={`flex items-start gap-4 p-4 rounded-xl border-2 transition-all ${color}`}>
