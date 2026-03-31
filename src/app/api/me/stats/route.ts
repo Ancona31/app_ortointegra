@@ -44,7 +44,8 @@ export async function GET() {
       .maybeSingle()
 
     if (ultimaData) {
-      const pac = ultimaData.pacientes as { nombre: string; apellidos: string } | null
+      const pacRaw = ultimaData.pacientes as unknown
+      const pac = (Array.isArray(pacRaw) ? pacRaw[0] : pacRaw) as { nombre: string; apellidos: string } | null
       ultimaConsulta = {
         created_at: ultimaData.created_at,
         motivo_consulta: ultimaData.motivo_consulta,

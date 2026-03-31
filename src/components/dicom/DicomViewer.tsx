@@ -136,8 +136,9 @@ export default function DicomViewer() {
   const coronalRef   = useRef<HTMLDivElement>(null)
   const engineRef      = useRef<any>(null)
   const toolGroupRef   = useRef<any>(null)
-  const toolNamesRef   = useRef<Record<string, string>>({})
-  const flipRef        = useRef({ h: false, v: false })
+  const toolNamesRef      = useRef<Record<string, string>>({})
+  const toolGroupMgrRef   = useRef<any>(null)
+  const flipRef           = useRef({ h: false, v: false })
   const dcmFilesRef    = useRef<File[]>([])
   // Always-current refs for MPR callbacks (avoids stale closure in handleAction)
   const activateMPRRef   = useRef<() => Promise<void>>(async () => {})
@@ -215,6 +216,7 @@ export default function DicomViewer() {
           defaultOptions: { background: [0, 0, 0] as [number, number, number] },
         })
 
+        toolGroupMgrRef.current = ToolGroupManager
         const tg = ToolGroupManager.createToolGroup(TOOL_GROUP_ID)!
         toolGroupRef.current = tg
         tg.addViewport(VIEWPORT_ID, ENGINE_ID)
@@ -241,8 +243,7 @@ export default function DicomViewer() {
 
     return () => {
       try {
-        const { ToolGroupManager } = require('@cornerstonejs/tools')
-        ToolGroupManager.destroyToolGroup(TOOL_GROUP_ID)
+        toolGroupMgrRef.current?.destroyToolGroup(TOOL_GROUP_ID)
         engineRef.current?.destroy()
       } catch { /* cleanup */ }
     }
