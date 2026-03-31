@@ -152,11 +152,14 @@ export default function NuevaNotaPage() {
       function notaToHtml(texto: string): string {
         const lines = texto.split('\n')
         let html = ''
-        const sectionRe = /^\*\*\[([^\]]+)\]:\*\*$/
+        // Permisiva: acepta contenido opcional después de ]:** y espacios extras
+        const sectionRe = /^\*{1,2}\[([^\]]+)\]:?\*{0,2}\s*(.*)?$/
         for (const line of lines) {
           const trimmed = line.trim()
           if (!trimmed) { html += '<div style="height:5px"></div>'; continue }
-          const secMatch = trimmed.match(sectionRe)
+          // Detectar encabezado de sección: debe empezar con * o ** y contener [TEXTO]
+          const hasBracket = /\[[^\]]+\]/.test(trimmed)
+          const secMatch = hasBracket ? trimmed.match(sectionRe) : null
           if (secMatch) {
             html += `
               <div class="seccion-header">
@@ -164,6 +167,11 @@ export default function NuevaNotaPage() {
                 <div class="seccion-titulo">${secMatch[1]}</div>
                 <div class="seccion-linea"></div>
               </div>`
+            // Si hay contenido tras el encabezado en la misma línea, renderizarlo
+            if (secMatch[2]?.trim()) {
+              const contenido = secMatch[2].trim().replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+              html += `<p>${contenido}</p>`
+            }
             continue
           }
           const contenido = trimmed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
