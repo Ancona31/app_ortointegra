@@ -21,8 +21,18 @@ import TabLaboratorios from '@/components/expediente/TabLaboratorios'
 import TabGraficas, { normalizarKey, ParamGrafica } from '@/components/expediente/TabGraficas'
 import TabDocumentos from '@/components/expediente/TabDocumentos'
 import ExportarExpedienteButton from '@/components/expediente/ExportarExpedienteButton'
+import dynamic from 'next/dynamic'
 
-type Tab = 'resumen' | 'consultas' | 'laboratorios' | 'graficas' | 'documentos'
+const TabDicom = dynamic(() => import('@/components/dicom/TabDicom'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center py-20 text-slate-400">
+      <span className="text-sm">Inicializando visor DICOM...</span>
+    </div>
+  ),
+})
+
+type Tab = 'resumen' | 'consultas' | 'laboratorios' | 'graficas' | 'documentos' | 'dicom'
 
 function ExpedientePacienteContent() {
   const { id } = useParams<{ id: string }>()
@@ -196,6 +206,7 @@ function ExpedientePacienteContent() {
     { key: 'laboratorios', label: 'Laboratorios', count: labs.length },
     { key: 'graficas', label: 'Gráficas', count: todosLosParams.length || undefined },
     ...(isDoctor ? [{ key: 'documentos' as Tab, label: 'Documentos', count: documentos.length || undefined }] : []),
+    { key: 'dicom' as Tab, label: '🖥️ DICOM' },
   ]
 
   return (
@@ -380,6 +391,8 @@ function ExpedientePacienteContent() {
           onVerDocumento={setDocSeleccionado}
         />
       )}
+
+      {tab === 'dicom' && <TabDicom />}
     </div>
   )
 }

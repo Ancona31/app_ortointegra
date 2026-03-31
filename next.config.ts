@@ -17,6 +17,36 @@ const nextConfig: NextConfig = {
       },
     ]
   },
+  serverExternalPackages: [
+    '@cornerstonejs/core',
+    '@cornerstonejs/tools',
+    '@cornerstonejs/dicom-image-loader',
+    '@cornerstonejs/codec-charls',
+    '@cornerstonejs/codec-libjpeg-turbo-8bit',
+    '@cornerstonejs/codec-openjpeg',
+    '@cornerstonejs/codec-openjph',
+    'dicom-parser',
+  ],
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // Los codecs de cornerstone intentan importar módulos de Node.js — ignorarlos en el cliente
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+        crypto: false,
+        stream: false,
+        buffer: false,
+      }
+    }
+    config.module = config.module || {}
+    config.module.rules = config.module.rules || []
+    config.module.rules.push({
+      test: /\.wasm$/,
+      type: 'asset/resource',
+    })
+    return config
+  },
 };
 
 export default nextConfig;
