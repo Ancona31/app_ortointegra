@@ -56,7 +56,7 @@ export default function ConsultaRapida() {
       const res = await fetch('/api/consulta-rapida', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pregunta: q }),
+        body: JSON.stringify({ pregunta: q, historial: mensajes }),
       })
       const data = await res.json()
       setMensajes(prev => [...prev, {
