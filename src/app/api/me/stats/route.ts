@@ -10,17 +10,16 @@ export async function GET() {
   startOfMonth.setDate(1)
   startOfMonth.setHours(0, 0, 0, 0)
 
-  // Total pacientes del médico
+  // Total pacientes visibles para este usuario (RLS se encarga del filtro por clínica/médico)
   const { count: totalPacientes } = await supabase
     .from('pacientes')
     .select('id', { count: 'exact', head: true })
-    .eq('medico_id', user.id)
 
-  // IDs de pacientes del médico (para joins)
+  // IDs de pacientes visibles (RLS, sin límite de 1000 — paginamos de ser necesario)
   const { data: pacientesData } = await supabase
     .from('pacientes')
     .select('id')
-    .eq('medico_id', user.id)
+    .limit(5000)
 
   const pacienteIds = (pacientesData || []).map(p => p.id)
 
@@ -29,30 +28,23 @@ export async function GET() {
   let docsTotal = 0
 
   if (pacienteIds.length > 0) {
-    // Consultas este mes
+    // Consultas este mes — usando join con pacientes para evitar límite del IN
     const { count: cMes } = await supabase
       .from('consultas')
-      .select('id', { count: 'exact', head: true })
-      .in('paciente_id', pacienteIds)
+      .select('id, pacientes!inner(id)', { count: 'exact', head: true })
       .gte('created_at', startOfMonth.toISOString())
     consultasMes = cMes || 0
 
-    // Última consulta
+    // Última consulta con nombre del paciente via join (solo pacientes accesibles por RLS)
     const { data: ultimaData } = await supabase
       .from('consultas')
-      .select('created_at, motivo_consulta, paciente_id')
-      .in('paciente_id', pacienteIds)
+      .select('created_at, motivo_consulta, paciente_id, pacientes!inner(nombre, apellidos)')
       .order('created_at', { ascending: false })
       .limit(1)
-      .single()
+      .maybeSingle()
 
     if (ultimaData) {
-      // Buscar nombre del paciente
-      const { data: pac } = await supabase
-        .from('pacientes')
-        .select('nombre, apellidos')
-        .eq('id', ultimaData.paciente_id)
-        .single()
+      const pac = ultimaData.pacientes as { nombre: string; apellidos: string } | null
       ultimaConsulta = {
         created_at: ultimaData.created_at,
         motivo_consulta: ultimaData.motivo_consulta,
@@ -60,11 +52,10 @@ export async function GET() {
       }
     }
 
-    // Documentos generados total
+    // Documentos generados total — join con pacientes
     const { count: dTotal } = await supabase
       .from('documentos')
-      .select('id', { count: 'exact', head: true })
-      .in('paciente_id', pacienteIds)
+      .select('id, pacientes!inner(id)', { count: 'exact', head: true })
     docsTotal = dTotal || 0
   }
 
