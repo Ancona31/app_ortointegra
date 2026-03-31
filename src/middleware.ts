@@ -13,9 +13,11 @@ export async function middleware(request: NextRequest) {
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
+          cookiesToSet.forEach(({ name, value, options }) => {
+            // Cookie de sesión: sin maxAge ni expires → se borra al cerrar el navegador
+            const { maxAge: _m, expires: _e, ...sessionOptions } = options ?? {}
+            supabaseResponse.cookies.set(name, value, sessionOptions)
+          })
         },
       },
     }
