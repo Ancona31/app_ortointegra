@@ -121,6 +121,7 @@ export async function POST(req: NextRequest) {
 
     const { data: evento } = await calendar.events.insert({
       calendarId: 'primary',
+      sendUpdates: 'all',
       requestBody: {
         summary: titulo,
         description: descripcion ?? undefined,
