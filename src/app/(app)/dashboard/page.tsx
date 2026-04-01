@@ -170,6 +170,7 @@ export default function DashboardPage() {
     const paciente = (data.get('paciente') as string).trim()
     const motivo = (data.get('motivo') as string).trim()
     const descripcionExtra = (data.get('descripcion') as string).trim()
+    const emailMedico = (data.get('emailMedico') as string).trim()
     const zona = Intl.DateTimeFormat().resolvedOptions().timeZone
 
     // Construir descripción combinando los campos clínicos
@@ -182,7 +183,7 @@ export default function DashboardPage() {
     setCreandoEvento(true)
     try {
       const body = crearTodoDia
-        ? { titulo, descripcion, todoDia: true, fecha }
+        ? { titulo, descripcion, todoDia: true, fecha, emailMedico: emailMedico || undefined }
         : {
             titulo,
             descripcion,
@@ -190,6 +191,7 @@ export default function DashboardPage() {
             inicio: `${fecha}T${horaInicio}:00`,
             fin: `${fecha}T${horaFin}:00`,
             zona,
+            emailMedico: emailMedico || undefined,
           }
 
       const res = await fetch('/api/google/events', {
@@ -485,6 +487,17 @@ export default function DashboardPage() {
                   name="motivo"
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]"
                   placeholder="Ej. Dolor lumbar, revisión postquirúrgica..."
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-1">
+                  Email del médico <span className="text-slate-400 font-normal">(se le enviará invitación)</span>
+                </label>
+                <input
+                  name="emailMedico"
+                  type="email"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]"
+                  placeholder="doctor@ejemplo.com"
                 />
               </div>
               <div className="flex items-center gap-2">

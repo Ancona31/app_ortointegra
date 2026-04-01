@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-    const { titulo, descripcion, todoDia, fecha, inicio, fin, zona } = await req.json()
+    const { titulo, descripcion, todoDia, fecha, inicio, fin, zona, emailMedico } = await req.json()
     if (!titulo) return NextResponse.json({ error: 'Título requerido' }, { status: 400 })
 
     const { data: tokenData } = await supabase
@@ -94,6 +94,7 @@ export async function POST(req: NextRequest) {
         description: descripcion ?? undefined,
         start: todoDia ? { date: fecha } : { dateTime: inicio, timeZone },
         end:   todoDia ? { date: fecha } : { dateTime: fin,   timeZone },
+        ...(emailMedico ? { attendees: [{ email: emailMedico }] } : {}),
       },
     })
 
