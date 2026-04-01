@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 
 // Límites por ruta: máximo de llamadas permitidas en 24 horas por usuario
@@ -52,6 +53,53 @@ export async function checkRateLimit(userId: string, ruta: string): Promise<Next
     .eq('user_id', userId)
     .eq('ruta', ruta)
     .lt('created_at', hace24h)
+    .then(() => {})
+
+  return null
+}
+
+/**
+ * Rate limiting por IP para endpoints públicos (sin autenticación).
+ * Usa la tabla ip_rate_limits gestionada con el service role.
+ *
+ * @param ip       Dirección IP del cliente
+ * @param ruta     Nombre de la ruta (ej. 'verificar-receta')
+ * @param limite   Máximo de peticiones por hora (default: 30)
+ * @returns null si está permitido, o un NextResponse 429 si superó el límite
+ */
+export async function checkIpRateLimit(
+  ip: string,
+  ruta: string,
+  limite = 30
+): Promise<NextResponse | null> {
+  const admin = createAdminClient()
+  const hace1h = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+
+  const { count } = await admin
+    .from('ip_rate_limits')
+    .select('*', { count: 'exact', head: true })
+    .eq('ip', ip)
+    .eq('ruta', ruta)
+    .gte('created_at', hace1h)
+
+  const total = count ?? 0
+
+  if (total >= limite) {
+    return NextResponse.json(
+      { error: 'Demasiadas solicitudes. Intenta más tarde.' },
+      { status: 429 }
+    )
+  }
+
+  await admin.from('ip_rate_limits').insert({ ip, ruta })
+
+  // Limpiar registros viejos sin bloquear la respuesta
+  admin
+    .from('ip_rate_limits')
+    .delete()
+    .eq('ip', ip)
+    .eq('ruta', ruta)
+    .lt('created_at', hace1h)
     .then(() => {})
 
   return null

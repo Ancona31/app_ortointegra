@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useProfile } from '@/hooks/useProfile'
 import SecretariaDashboard from './SecretariaDashboard'
 import FullCalendar from '@fullcalendar/react'
@@ -8,7 +8,10 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import esLocale from '@fullcalendar/core/locales/es'
-import { FileText, Stethoscope, CalendarDays, LogIn, Loader2, Users, ClipboardList, Search, Monitor } from 'lucide-react'
+import {
+  FileText, Stethoscope, CalendarDays, LogIn, Loader2, Users, ClipboardList,
+  Search, Monitor, X, MapPin, AlignLeft, ExternalLink, Plus, LogOut,
+} from 'lucide-react'
 import Link from 'next/link'
 import { format, formatDistanceToNow, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -23,8 +26,28 @@ type Stats = {
 type GCalEvent = {
   id?: string | null
   summary?: string | null
+  description?: string | null
+  location?: string | null
+  htmlLink?: string | null
   start?: { date?: string | null; dateTime?: string | null } | null
   end?: { date?: string | null; dateTime?: string | null } | null
+}
+
+type CalEventInfo = {
+  id?: string
+  title: string
+  start: string
+  end?: string
+  allDay: boolean
+  description?: string
+  location?: string
+  htmlLink?: string
+}
+
+type ModalCrear = {
+  fecha: string
+  horaInicio: string
+  horaFin: string
 }
 
 const accesos = [
@@ -68,6 +91,11 @@ export default function DashboardPage() {
   const [conectado, setConectado] = useState<boolean | null>(null)
   const [stats, setStats] = useState<Stats | null>(null)
   const [loadingStats, setLoadingStats] = useState(true)
+  const [eventoDetalle, setEventoDetalle] = useState<CalEventInfo | null>(null)
+  const [modalCrear, setModalCrear] = useState<ModalCrear | null>(null)
+  const [crearTodoDia, setCrearTodoDia] = useState(false)
+  const [creandoEvento, setCreandoEvento] = useState(false)
+  const calendarRef = useRef<FullCalendar>(null)
   const hoy = new Date()
   const diaHoyTexto = format(hoy, "EEEE d 'de' MMMM 'de' yyyy", { locale: es })
 
@@ -99,8 +127,81 @@ export default function DashboardPage() {
         start: e.start?.dateTime ?? e.start?.date ?? '',
         end: e.end?.dateTime ?? e.end?.date ?? undefined,
         allDay: !e.start?.dateTime,
+        extendedProps: {
+          description: e.description ?? undefined,
+          location: e.location ?? undefined,
+          htmlLink: e.htmlLink ?? undefined,
+        },
       }))
     } catch { return [] }
+  }
+
+  function handleEventClick(info: { event: { id: string; title: string; startStr: string; endStr: string; allDay: boolean; extendedProps: Record<string, string> } }) {
+    const ev = info.event
+    setEventoDetalle({
+      id: ev.id,
+      title: ev.title,
+      start: ev.startStr,
+      end: ev.endStr || undefined,
+      allDay: ev.allDay,
+      description: ev.extendedProps.description,
+      location: ev.extendedProps.location,
+      htmlLink: ev.extendedProps.htmlLink,
+    })
+  }
+
+  function handleDateClick(info: { dateStr: string; allDay: boolean }) {
+    const fecha = info.dateStr.slice(0, 10)
+    const horaInicio = info.allDay ? '09:00' : info.dateStr.slice(11, 16)
+    const [h, m] = horaInicio.split(':').map(Number)
+    const horaFin = `${String((h + 1) % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+    setCrearTodoDia(false)
+    setModalCrear({ fecha, horaInicio, horaFin })
+  }
+
+  async function handleCrearEvento(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const form = e.currentTarget
+    const data = new FormData(form)
+    const titulo = data.get('titulo') as string
+    const fecha = data.get('fecha') as string
+    const horaInicio = data.get('horaInicio') as string
+    const horaFin = data.get('horaFin') as string
+    const descripcion = (data.get('descripcion') as string).trim()
+    const zona = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+    setCreandoEvento(true)
+    try {
+      const body = crearTodoDia
+        ? { titulo, descripcion: descripcion || undefined, todoDia: true, fecha }
+        : {
+            titulo,
+            descripcion: descripcion || undefined,
+            todoDia: false,
+            inicio: `${fecha}T${horaInicio}:00`,
+            fin: `${fecha}T${horaFin}:00`,
+            zona,
+          }
+
+      const res = await fetch('/api/google/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+      if (res.ok) {
+        setModalCrear(null)
+        calendarRef.current?.getApi().refetchEvents()
+      }
+    } finally {
+      setCreandoEvento(false)
+    }
+  }
+
+  async function handleDesconectar() {
+    if (!confirm('¿Desconectar Google Calendar?')) return
+    await fetch('/api/google/disconnect', { method: 'DELETE' })
+    setConectado(false)
   }
 
   if (loadingProfile) return (
@@ -123,7 +224,6 @@ export default function DashboardPage() {
             Sistema de gestión clínica{profile?.especialidad ? ` — ${profile.especialidad}` : ''}
           </p>
         </div>
-        {/* Ctrl+K hint */}
         <button
           onClick={() => {
             const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true })
@@ -140,9 +240,7 @@ export default function DashboardPage() {
       {/* Stats cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {loadingStats ? (
-          <>
-            <StatSkeleton /><StatSkeleton /><StatSkeleton /><StatSkeleton />
-          </>
+          <><StatSkeleton /><StatSkeleton /><StatSkeleton /><StatSkeleton /></>
         ) : (
           <>
             <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm animate-fade-in-up">
@@ -231,9 +329,21 @@ export default function DashboardPage() {
               <Loader2 size={12} className="animate-spin" /> Verificando...
             </div>
           ) : conectado ? (
-            <span className="text-xs text-emerald-600 font-medium flex items-center gap-1.5">
-              <CalendarDays size={12} /> Google Calendar conectado
-            </span>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setModalCrear({ fecha: format(hoy, 'yyyy-MM-dd'), horaInicio: '09:00', horaFin: '10:00' })}
+                className="flex items-center gap-1.5 text-xs font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a3a5c] px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <Plus size={12} /> Nueva cita
+              </button>
+              <button
+                onClick={handleDesconectar}
+                className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-red-500 transition-colors"
+                title="Desconectar Google Calendar"
+              >
+                <LogOut size={13} /> Desconectar
+              </button>
+            </div>
           ) : (
             <a href="/api/google/connect"
               className="flex items-center gap-1.5 text-xs font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a3a5c] px-3 py-1.5 rounded-lg transition-colors">
@@ -248,6 +358,7 @@ export default function DashboardPage() {
             </div>
           ) : (
             <FullCalendar
+              ref={calendarRef}
               plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
               initialView="dayGridMonth"
               locale={esLocale}
@@ -263,11 +374,166 @@ export default function DashboardPage() {
               nowIndicator={true}
               scrollTime="08:00:00"
               editable={false}
-              selectable={false}
+              selectable={true}
+              eventClick={handleEventClick}
+              dateClick={handleDateClick}
             />
           )}
         </div>
       </div>
+
+      {/* Modal: detalle de evento */}
+      {eventoDetalle && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setEventoDetalle(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between mb-4 gap-3">
+              <h2 className="font-semibold text-slate-800 text-base leading-snug">{eventoDetalle.title}</h2>
+              <button onClick={() => setEventoDetalle(null)} className="text-slate-400 hover:text-slate-600 shrink-0">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="space-y-3 text-sm text-slate-600">
+              <div className="flex items-center gap-2">
+                <CalendarDays size={14} className="text-[#1e5fa8] shrink-0" />
+                <span>
+                  {eventoDetalle.allDay
+                    ? format(parseISO(eventoDetalle.start), "EEEE d 'de' MMMM yyyy", { locale: es })
+                    : `${format(parseISO(eventoDetalle.start), "EEEE d 'de' MMMM, HH:mm", { locale: es })}${eventoDetalle.end ? ` – ${format(parseISO(eventoDetalle.end), 'HH:mm')}` : ''}`
+                  }
+                </span>
+              </div>
+              {eventoDetalle.location && (
+                <div className="flex items-center gap-2">
+                  <MapPin size={14} className="text-slate-400 shrink-0" />
+                  <span>{eventoDetalle.location}</span>
+                </div>
+              )}
+              {eventoDetalle.description && (
+                <div className="flex items-start gap-2">
+                  <AlignLeft size={14} className="text-slate-400 shrink-0 mt-0.5" />
+                  <span className="whitespace-pre-wrap">{eventoDetalle.description}</span>
+                </div>
+              )}
+            </div>
+            {eventoDetalle.htmlLink && (
+              <a
+                href={eventoDetalle.htmlLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 flex items-center gap-1.5 text-xs text-[#1e5fa8] hover:underline"
+              >
+                <ExternalLink size={12} /> Abrir en Google Calendar
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal: crear cita */}
+      {modalCrear && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setModalCrear(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-semibold text-slate-800">Nueva cita</h2>
+              <button onClick={() => setModalCrear(null)} className="text-slate-400 hover:text-slate-600">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleCrearEvento} className="space-y-4">
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-1">Título *</label>
+                <input
+                  name="titulo"
+                  required
+                  autoFocus
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]"
+                  placeholder="Consulta, cirugía, junta..."
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="allDay"
+                  checked={crearTodoDia}
+                  onChange={e => setCrearTodoDia(e.target.checked)}
+                  className="rounded"
+                />
+                <label htmlFor="allDay" className="text-sm text-slate-600 cursor-pointer">Todo el día</label>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-1">Fecha *</label>
+                <input
+                  type="date"
+                  name="fecha"
+                  defaultValue={modalCrear.fecha}
+                  required
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]"
+                />
+              </div>
+              {!crearTodoDia && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 block mb-1">Hora inicio</label>
+                    <input
+                      type="time"
+                      name="horaInicio"
+                      defaultValue={modalCrear.horaInicio}
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 block mb-1">Hora fin</label>
+                    <input
+                      type="time"
+                      name="horaFin"
+                      defaultValue={modalCrear.horaFin}
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]"
+                    />
+                  </div>
+                </div>
+              )}
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-1">Descripción (opcional)</label>
+                <textarea
+                  name="descripcion"
+                  rows={2}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8] resize-none"
+                  placeholder="Notas adicionales..."
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setModalCrear(null)}
+                  className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={creandoEvento}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a3a5c] rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {creandoEvento ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                  Crear cita
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

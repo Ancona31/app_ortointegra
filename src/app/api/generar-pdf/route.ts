@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { logAudit } from '@/lib/audit'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -16,6 +17,9 @@ export async function POST(req: NextRequest) {
   if (!html) {
     return NextResponse.json({ error: 'HTML requerido' }, { status: 400 })
   }
+
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+  logAudit({ userId: user.id, accion: 'generar_pdf', ip, descripcion: filename })
 
   let browser = null
   try {

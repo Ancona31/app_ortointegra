@@ -7,7 +7,9 @@ export async function GET(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-    const q = req.nextUrl.searchParams.get('q')?.trim() ?? ''
+    const raw = req.nextUrl.searchParams.get('q')?.trim() ?? ''
+    // Solo letras, números, espacios y guiones — evita inyección de operadores PostgREST
+    const q = raw.replace(/[^a-zA-ZáéíóúÁÉÍÓÚüÜñÑ0-9 \-]/g, '').trim()
 
     if (q.length < 2) {
       return NextResponse.json([])

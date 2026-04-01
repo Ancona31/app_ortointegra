@@ -20,6 +20,12 @@ export async function POST(req: NextRequest) {
   const { email, password, nombre, role, titulo, especialidad, cedula_profesional, cedula_especialidad } = await req.json()
   if (!email || !password || !role) return NextResponse.json({ error: 'Faltan campos' }, { status: 400 })
 
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(email)) return NextResponse.json({ error: 'Email inválido' }, { status: 400 })
+  if (typeof password !== 'string' || password.length < 8) return NextResponse.json({ error: 'La contraseña debe tener al menos 8 caracteres' }, { status: 400 })
+  const rolesPermitidos = ['medico', 'secretaria', 'admin']
+  if (!rolesPermitidos.includes(role)) return NextResponse.json({ error: 'Rol inválido' }, { status: 400 })
+
   const clinicaId = creatorProfile.clinica_id
   const admin = createAdminClient()
 
