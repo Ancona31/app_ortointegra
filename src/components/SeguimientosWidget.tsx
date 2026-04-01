@@ -25,8 +25,6 @@ export default function SeguimientosWidget() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading || seguimientos.length === 0) return null
-
   const vencidos = seguimientos.filter(s => isPast(parseISO(s.proxima_cita)) && !isToday(parseISO(s.proxima_cita)))
 
   return (
@@ -39,10 +37,27 @@ export default function SeguimientosWidget() {
             {vencidos.length} vencido{vencidos.length > 1 ? 's' : ''}
           </span>
         )}
-        <span className="ml-auto bg-amber-100 text-amber-700 text-xs font-bold px-2 py-0.5 rounded-full">
-          {seguimientos.length}
-        </span>
+        {seguimientos.length > 0 && (
+          <span className="ml-auto bg-amber-100 text-amber-700 text-xs font-bold px-2 py-0.5 rounded-full">
+            {seguimientos.length}
+          </span>
+        )}
       </div>
+
+      {loading && (
+        <div className="flex items-center justify-center py-6 text-slate-400">
+          <Clock size={14} className="animate-pulse mr-2" />
+          <span className="text-xs">Cargando...</span>
+        </div>
+      )}
+
+      {!loading && seguimientos.length === 0 && (
+        <div className="flex items-center gap-2 px-5 py-4 text-slate-400">
+          <CalendarCheck size={15} className="text-slate-300" />
+          <p className="text-xs">Sin seguimientos pendientes en los próximos 14 días</p>
+        </div>
+      )}
+
       <div className="divide-y divide-slate-100">
         {seguimientos.map(s => {
           const fecha = parseISO(s.proxima_cita)
