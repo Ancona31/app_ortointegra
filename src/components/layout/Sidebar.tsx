@@ -109,7 +109,7 @@ export default function Sidebar() {
             </p>
             <p className="text-xs text-blue-300 mt-1 leading-tight">
               {profile?.role === 'secretaria'
-                ? 'Secretaria'
+                ? 'Asistente Médico/a'
                 : subtitulo ?? profile?.especialidad ?? ''}
             </p>
           </div>

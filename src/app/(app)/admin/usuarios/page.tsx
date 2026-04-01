@@ -169,7 +169,7 @@ export default function AdminUsuariosPage() {
                 <label className="text-xs font-medium text-slate-500 block mb-1">Rol</label>
                 <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30">
-                  <option value="secretaria">Secretaria</option>
+                  <option value="secretaria">Asistente Médico/a</option>
                   <option value="medico">Médico</option>
                   <option value="admin">Admin</option>
                 </select>
@@ -234,7 +234,7 @@ export default function AdminUsuariosPage() {
             </p>
           </div>
           <div className="bg-violet-50 border border-violet-100 rounded-xl px-4 py-3">
-            <p className="text-xs text-violet-500 font-medium">Secretarias</p>
+            <p className="text-xs text-violet-500 font-medium">Asistentes</p>
             <p className="text-lg font-bold text-violet-700 mt-0.5">
               {usuarios.filter(u => u.role === 'secretaria').length}
               <span className="text-sm font-normal text-violet-400"> / {licencia.max_secretarias ?? '∞'}</span>

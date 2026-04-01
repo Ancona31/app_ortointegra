@@ -239,7 +239,7 @@ export default function SuperAdminClinicasPage() {
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">Máx. secretarias</label>
+                  <label className="text-xs font-medium text-slate-500 block mb-1">Máx. asistentes</label>
                   <input type="number" min="0" value={formClinica.max_secretarias} onChange={e => setFormClinica({ ...formClinica, max_secretarias: e.target.value })}
                     placeholder="Sin límite"
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
@@ -688,7 +688,7 @@ function TarjetaCuenta({
               )}
             </div>
             <div className="bg-violet-50 rounded-lg px-3 py-2.5">
-              <p className="text-xs text-violet-500 font-medium mb-1">Secretarias</p>
+              <p className="text-xs text-violet-500 font-medium mb-1">Asistentes</p>
               {editandoLimites === c.id ? (
                 <input type="number" min="0"
                   value={editLimitesForm[c.id]?.max_secretarias ?? ''}
