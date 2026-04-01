@@ -167,16 +167,25 @@ export default function DashboardPage() {
     const fecha = data.get('fecha') as string
     const horaInicio = data.get('horaInicio') as string
     const horaFin = data.get('horaFin') as string
-    const descripcion = (data.get('descripcion') as string).trim()
+    const paciente = (data.get('paciente') as string).trim()
+    const motivo = (data.get('motivo') as string).trim()
+    const descripcionExtra = (data.get('descripcion') as string).trim()
     const zona = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+    // Construir descripción combinando los campos clínicos
+    const partes = []
+    if (paciente) partes.push(`Paciente: ${paciente}`)
+    if (motivo) partes.push(`Motivo: ${motivo}`)
+    if (descripcionExtra) partes.push(descripcionExtra)
+    const descripcion = partes.join('\n') || undefined
 
     setCreandoEvento(true)
     try {
       const body = crearTodoDia
-        ? { titulo, descripcion: descripcion || undefined, todoDia: true, fecha }
+        ? { titulo, descripcion, todoDia: true, fecha }
         : {
             titulo,
-            descripcion: descripcion || undefined,
+            descripcion,
             todoDia: false,
             inicio: `${fecha}T${horaInicio}:00`,
             fin: `${fecha}T${horaFin}:00`,
@@ -460,6 +469,22 @@ export default function DashboardPage() {
                   autoFocus
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]"
                   placeholder="Consulta, cirugía, junta..."
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-1">Nombre del paciente</label>
+                <input
+                  name="paciente"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]"
+                  placeholder="Ej. Juan Pérez"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-1">Motivo de consulta</label>
+                <input
+                  name="motivo"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]"
+                  placeholder="Ej. Dolor lumbar, revisión postquirúrgica..."
                 />
               </div>
               <div className="flex items-center gap-2">
