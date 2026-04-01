@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
   const html = generarHtmlEmail(doc, medicoNombre, tipoLabel)
 
   const { error } = await resend.emails.send({
-    from: 'OrthoIntegra <noreply@ortointegra.com>',
+    from: 'OrthoIntegra <noreply@mail.ortointegra.com>',
     to: pacienteEmail,
     subject: `${tipoLabel} — ${medicoNombre}`,
     html,
