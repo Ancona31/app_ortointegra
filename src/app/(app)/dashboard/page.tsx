@@ -5,6 +5,7 @@ import { useProfile } from '@/hooks/useProfile'
 import AsistenteDashboard from './AsistenteDashboard'
 import CalendarWidget from '@/components/calendario/CalendarWidget'
 import { FileText, Stethoscope, CalendarDays, Loader2, Users, ClipboardList, Search, Monitor } from 'lucide-react'
+import SeguimientosWidget from '@/components/SeguimientosWidget'
 import Link from 'next/link'
 import { format, formatDistanceToNow, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -188,6 +189,9 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Seguimientos */}
+      <SeguimientosWidget />
 
       {/* Calendario */}
       <CalendarWidget conectado={conectado} setConectado={setConectado} />

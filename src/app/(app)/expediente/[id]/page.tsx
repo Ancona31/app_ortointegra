@@ -214,7 +214,7 @@ function ExpedientePacienteContent() {
 
       {/* ── Modal visor de documento ── */}
       {docSeleccionado && (
-        <ModalVisorDocumento doc={docSeleccionado} onClose={() => setDocSeleccionado(null)} />
+        <ModalVisorDocumento doc={docSeleccionado} onClose={() => setDocSeleccionado(null)} pacienteEmail={paciente?.email} />
       )}
 
       {/* ── Modal eliminar paciente ── */}

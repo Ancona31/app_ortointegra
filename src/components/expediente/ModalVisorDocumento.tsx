@@ -1,8 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { X } from 'lucide-react'
+import { X, Mail, Loader2, CheckCircle } from 'lucide-react'
 
 const TIPO_DOC_LABEL: Record<string, string> = {
   receta: 'Receta',
@@ -22,9 +23,29 @@ const TIPO_DOC_COLOR: Record<string, string> = {
 interface Props {
   doc: any
   onClose: () => void
+  pacienteEmail?: string | null
 }
 
-export default function ModalVisorDocumento({ doc, onClose }: Props) {
+export default function ModalVisorDocumento({ doc, onClose, pacienteEmail }: Props) {
+  const [enviando, setEnviando] = useState(false)
+  const [enviado, setEnviado] = useState(false)
+  const [errorEmail, setErrorEmail] = useState('')
+
+  async function enviarAlPaciente() {
+    if (!pacienteEmail || enviando) return
+    setEnviando(true)
+    setErrorEmail('')
+    const res = await fetch('/api/email/enviar-documento', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ documentoId: doc.id, pacienteEmail }),
+    })
+    const data = await res.json()
+    setEnviando(false)
+    if (!res.ok) { setErrorEmail(data.error || 'Error al enviar'); return }
+    setEnviado(true)
+  }
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col">
@@ -149,6 +170,28 @@ export default function ModalVisorDocumento({ doc, onClose }: Props) {
             </div>
           )}
         </div>
+
+        {/* Footer con botón de email */}
+        {pacienteEmail && (
+          <div className="px-5 py-3 border-t border-slate-100">
+            {errorEmail && <p className="text-xs text-red-500 mb-2">{errorEmail}</p>}
+            <button
+              onClick={enviarAlPaciente}
+              disabled={enviando || enviado}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-colors
+                disabled:opacity-60
+                bg-[#1e5fa8] text-white hover:bg-[#1a3a5c]"
+            >
+              {enviando ? (
+                <><Loader2 size={14} className="animate-spin" /> Enviando...</>
+              ) : enviado ? (
+                <><CheckCircle size={14} /> Enviado a {pacienteEmail}</>
+              ) : (
+                <><Mail size={14} /> Enviar al paciente</>
+              )}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
