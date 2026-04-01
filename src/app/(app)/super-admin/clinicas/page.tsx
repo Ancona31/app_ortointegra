@@ -18,6 +18,7 @@ type Clinica = {
   max_secretarias: number | null
   count_medicos: number
   count_secretarias: number
+  admin: { id: string; nombre: string; email: string | null } | null
 }
 
 export default function SuperAdminClinicasPage() {
@@ -28,7 +29,13 @@ export default function SuperAdminClinicasPage() {
 
   // Modal nueva clínica
   const [showFormClinica, setShowFormClinica] = useState(false)
-  const [formClinica, setFormClinica] = useState({ nombre: '', max_medicos: '', max_secretarias: '' })
+  const [formClinica, setFormClinica] = useState({ nombre: '', max_medicos: '', max_secretarias: '', adminNombre: '', adminEmail: '', adminPassword: '' })
+
+  // Modal asignar admin a clínica existente
+  const [modalAdmin, setModalAdmin] = useState<Clinica | null>(null)
+  const [formAdmin, setFormAdmin] = useState({ nombre: '', email: '', password: '' })
+  const [guardandoAdmin, setGuardandoAdmin] = useState(false)
+  const [errorAdmin, setErrorAdmin] = useState('')
 
   // Modal nuevo usuario independiente
   const [showFormIndep, setShowFormIndep] = useState(false)
@@ -94,12 +101,15 @@ export default function SuperAdminClinicasPage() {
         nombre: formClinica.nombre,
         max_medicos: formClinica.max_medicos ? parseInt(formClinica.max_medicos) : null,
         max_secretarias: formClinica.max_secretarias ? parseInt(formClinica.max_secretarias) : null,
+        adminNombre: formClinica.adminNombre || undefined,
+        adminEmail: formClinica.adminEmail || undefined,
+        adminPassword: formClinica.adminPassword || undefined,
       }),
     })
     const data = await res.json()
     setGuardando(false)
     if (!res.ok) { setError(data.error || 'Error al crear clínica'); return }
-    setFormClinica({ nombre: '', max_medicos: '', max_secretarias: '' })
+    setFormClinica({ nombre: '', max_medicos: '', max_secretarias: '', adminNombre: '', adminEmail: '', adminPassword: '' })
     setShowFormClinica(false)
     cargarClinicas()
   }
@@ -118,6 +128,24 @@ export default function SuperAdminClinicasPage() {
     if (!res.ok) { setError(data.error || 'Error al crear usuario'); return }
     setFormIndep({ nombre: '', email: '', password: '', titulo: 'Dr.', especialidad: '', cedula_profesional: '' })
     setShowFormIndep(false)
+    cargarClinicas()
+  }
+
+  async function asignarAdmin(e: React.FormEvent) {
+    e.preventDefault()
+    if (!modalAdmin) return
+    setGuardandoAdmin(true)
+    setErrorAdmin('')
+    const res = await fetch(`/api/super-admin/clinicas/${modalAdmin.id}/admin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formAdmin),
+    })
+    const data = await res.json()
+    setGuardandoAdmin(false)
+    if (!res.ok) { setErrorAdmin(data.error || 'Error al crear admin'); return }
+    setModalAdmin(null)
+    setFormAdmin({ nombre: '', email: '', password: '' })
     cargarClinicas()
   }
 
@@ -245,6 +273,24 @@ export default function SuperAdminClinicasPage() {
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
                 </div>
               </div>
+              {/* Sección admin */}
+              <div className="border-t border-slate-100 pt-3">
+                <p className="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-1.5">
+                  Administrador de clínica
+                  <span className="font-normal text-slate-400">(opcional — máx. 1 por clínica)</span>
+                </p>
+                <div className="space-y-2">
+                  <input type="text" placeholder="Nombre del admin"
+                    value={formClinica.adminNombre} onChange={e => setFormClinica({ ...formClinica, adminNombre: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                  <input type="email" placeholder="Email"
+                    value={formClinica.adminEmail} onChange={e => setFormClinica({ ...formClinica, adminEmail: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                  <input type="password" placeholder="Contraseña (mín. 8 caracteres)"
+                    value={formClinica.adminPassword} onChange={e => setFormClinica({ ...formClinica, adminPassword: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                </div>
+              </div>
               {error && <p className="text-sm text-red-600">{error}</p>}
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowFormClinica(false)}
@@ -317,6 +363,50 @@ export default function SuperAdminClinicasPage() {
                 <button type="submit" disabled={guardando}
                   className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 disabled:opacity-60 flex items-center justify-center gap-2">
                   {guardando ? <><Loader2 size={14} className="animate-spin" /> Creando...</> : 'Crear usuario'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal asignar admin ── */}
+      {modalAdmin && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="font-bold text-slate-800">Asignar administrador</h2>
+                <p className="text-xs text-slate-400 mt-0.5">{modalAdmin.nombre_display || modalAdmin.nombre}</p>
+              </div>
+              <button onClick={() => { setModalAdmin(null); setErrorAdmin('') }} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+            </div>
+            <form onSubmit={asignarAdmin} className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Nombre completo</label>
+                <input type="text" required value={formAdmin.nombre} onChange={e => setFormAdmin({ ...formAdmin, nombre: e.target.value })}
+                  placeholder="Nombre del administrador"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Email</label>
+                <input type="email" required value={formAdmin.email} onChange={e => setFormAdmin({ ...formAdmin, email: e.target.value })}
+                  placeholder="admin@ejemplo.com"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Contraseña temporal</label>
+                <input type="password" required minLength={8} value={formAdmin.password} onChange={e => setFormAdmin({ ...formAdmin, password: e.target.value })}
+                  placeholder="Mínimo 8 caracteres"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+              </div>
+              {errorAdmin && <p className="text-sm text-red-600">{errorAdmin}</p>}
+              <div className="flex gap-3 pt-1">
+                <button type="button" onClick={() => { setModalAdmin(null); setErrorAdmin('') }}
+                  className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
+                <button type="submit" disabled={guardandoAdmin}
+                  className="flex-1 py-2.5 bg-[#1e5fa8] text-white rounded-xl text-sm font-medium hover:bg-[#1a3a5c] disabled:opacity-60 flex items-center justify-center gap-2">
+                  {guardandoAdmin ? <><Loader2 size={14} className="animate-spin" /> Creando...</> : 'Crear admin'}
                 </button>
               </div>
             </form>
@@ -530,6 +620,7 @@ export default function SuperAdminClinicasPage() {
               onGuardarLimites={() => actualizarLimites(c.id)}
               onChangeLimites={(field, val) => setEditLimitesForm(prev => ({ ...prev, [c.id]: { ...prev[c.id], [field]: val } }))}
               onPersonalizar={() => abrirPersonalizacion(c)}
+              onAsignarAdmin={!c.admin ? () => { setModalAdmin(c); setFormAdmin({ nombre: '', email: '', password: '' }); setErrorAdmin('') } : undefined}
             />
           ))}
           {listaClinicas.length === 0 && (
@@ -581,7 +672,7 @@ export default function SuperAdminClinicasPage() {
 // ── Componente tarjeta reutilizable ──────────────────────────────────────────
 function TarjetaCuenta({
   c, editandoLimites, editLimitesForm, guardando,
-  onEditar, onCancelarEditar, onGuardarLimites, onChangeLimites, onPersonalizar, onEliminar,
+  onEditar, onCancelarEditar, onGuardarLimites, onChangeLimites, onPersonalizar, onEliminar, onAsignarAdmin,
 }: {
   c: Clinica
   editandoLimites: string | null
@@ -593,6 +684,7 @@ function TarjetaCuenta({
   onChangeLimites: (field: string, val: string) => void
   onPersonalizar: () => void
   onEliminar?: () => void
+  onAsignarAdmin?: () => void
 }) {
   const esIndep = c.tipo === 'independiente'
 
@@ -672,36 +764,59 @@ function TarjetaCuenta({
 
         {/* Contadores — solo para clínicas */}
         {!esIndep && (
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-blue-50 rounded-lg px-3 py-2.5">
-              <p className="text-xs text-blue-500 font-medium mb-1">Médicos</p>
-              {editandoLimites === c.id ? (
-                <input type="number" min="0"
-                  value={editLimitesForm[c.id]?.max_medicos ?? ''}
-                  onChange={e => onChangeLimites('max_medicos', e.target.value)}
-                  placeholder="Sin límite"
-                  className="w-full px-2 py-1 border border-blue-200 rounded text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-300" />
-              ) : (
-                <p className="text-sm font-semibold text-blue-700">
-                  {c.count_medicos} <span className="text-blue-400 font-normal">/ {c.max_medicos ?? '∞'}</span>
-                </p>
+          <>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="bg-blue-50 rounded-lg px-3 py-2.5">
+                <p className="text-xs text-blue-500 font-medium mb-1">Médicos</p>
+                {editandoLimites === c.id ? (
+                  <input type="number" min="0"
+                    value={editLimitesForm[c.id]?.max_medicos ?? ''}
+                    onChange={e => onChangeLimites('max_medicos', e.target.value)}
+                    placeholder="Sin límite"
+                    className="w-full px-2 py-1 border border-blue-200 rounded text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-300" />
+                ) : (
+                  <p className="text-sm font-semibold text-blue-700">
+                    {c.count_medicos} <span className="text-blue-400 font-normal">/ {c.max_medicos ?? '∞'}</span>
+                  </p>
+                )}
+              </div>
+              <div className="bg-violet-50 rounded-lg px-3 py-2.5">
+                <p className="text-xs text-violet-500 font-medium mb-1">Asistentes</p>
+                {editandoLimites === c.id ? (
+                  <input type="number" min="0"
+                    value={editLimitesForm[c.id]?.max_secretarias ?? ''}
+                    onChange={e => onChangeLimites('max_secretarias', e.target.value)}
+                    placeholder="Sin límite"
+                    className="w-full px-2 py-1 border border-violet-200 rounded text-sm bg-white focus:outline-none focus:ring-1 focus:ring-violet-300" />
+                ) : (
+                  <p className="text-sm font-semibold text-violet-700">
+                    {c.count_secretarias} <span className="text-violet-400 font-normal">/ {c.max_secretarias ?? '∞'}</span>
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Admin */}
+            <div className="bg-slate-50 rounded-lg px-3 py-2.5 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs text-slate-500 font-medium mb-0.5">Administrador</p>
+                {c.admin ? (
+                  <p className="text-sm font-semibold text-slate-700">
+                    {c.admin.nombre}
+                    {c.admin.email && <span className="font-normal text-slate-400 ml-1.5 text-xs">{c.admin.email}</span>}
+                  </p>
+                ) : (
+                  <p className="text-xs text-amber-600 font-medium">Sin administrador asignado</p>
+                )}
+              </div>
+              {!c.admin && onAsignarAdmin && (
+                <button onClick={onAsignarAdmin}
+                  className="text-xs font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a3a5c] px-3 py-1.5 rounded-lg transition-colors shrink-0">
+                  + Asignar admin
+                </button>
               )}
             </div>
-            <div className="bg-violet-50 rounded-lg px-3 py-2.5">
-              <p className="text-xs text-violet-500 font-medium mb-1">Asistentes</p>
-              {editandoLimites === c.id ? (
-                <input type="number" min="0"
-                  value={editLimitesForm[c.id]?.max_secretarias ?? ''}
-                  onChange={e => onChangeLimites('max_secretarias', e.target.value)}
-                  placeholder="Sin límite"
-                  className="w-full px-2 py-1 border border-violet-200 rounded text-sm bg-white focus:outline-none focus:ring-1 focus:ring-violet-300" />
-              ) : (
-                <p className="text-sm font-semibold text-violet-700">
-                  {c.count_secretarias} <span className="text-violet-400 font-normal">/ {c.max_secretarias ?? '∞'}</span>
-                </p>
-              )}
-            </div>
-          </div>
+          </>
         )}
       </div>
     </div>
