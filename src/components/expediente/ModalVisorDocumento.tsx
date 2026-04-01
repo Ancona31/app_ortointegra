@@ -206,6 +206,12 @@ export default function ModalVisorDocumento({ doc, onClose, pacienteEmail }: Pro
         {pacienteEmail && (
           <div className="px-5 py-3 border-t border-slate-100">
             {errorEmail && <p className="text-xs text-red-500 mb-2">{errorEmail}</p>}
+            {enviado && (
+              <p className="text-xs text-slate-400 mb-2 flex items-start gap-1">
+                <span className="mt-0.5">💡</span>
+                Si el paciente no lo recibe, pídele que revise su carpeta de <strong>spam o correo no deseado</strong> y lo marque como "No es spam".
+              </p>
+            )}
             <button
               onClick={enviarAlPaciente}
               disabled={enviando || enviado}
