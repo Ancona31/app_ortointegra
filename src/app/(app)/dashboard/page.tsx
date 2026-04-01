@@ -10,7 +10,7 @@ import interactionPlugin from '@fullcalendar/interaction'
 import esLocale from '@fullcalendar/core/locales/es'
 import {
   FileText, Stethoscope, CalendarDays, LogIn, Loader2, Users, ClipboardList,
-  Search, Monitor, X, MapPin, AlignLeft, ExternalLink, Plus, LogOut,
+  Search, Monitor, X, MapPin, AlignLeft, ExternalLink, Plus, LogOut, Trash2,
 } from 'lucide-react'
 import Link from 'next/link'
 import { format, formatDistanceToNow, parseISO } from 'date-fns'
@@ -95,6 +95,7 @@ export default function DashboardPage() {
   const [modalCrear, setModalCrear] = useState<ModalCrear | null>(null)
   const [crearTodoDia, setCrearTodoDia] = useState(false)
   const [creandoEvento, setCreandoEvento] = useState(false)
+  const [eliminandoEvento, setEliminandoEvento] = useState(false)
   const calendarRef = useRef<FullCalendar>(null)
   const hoy = new Date()
   const diaHoyTexto = format(hoy, "EEEE d 'de' MMMM 'de' yyyy", { locale: es })
@@ -206,6 +207,25 @@ export default function DashboardPage() {
       }
     } finally {
       setCreandoEvento(false)
+    }
+  }
+
+  async function handleEliminarEvento() {
+    if (!eventoDetalle?.id) return
+    if (!confirm('¿Eliminar este evento del calendario?')) return
+    setEliminandoEvento(true)
+    try {
+      const res = await fetch('/api/google/events', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId: eventoDetalle.id }),
+      })
+      if (res.ok) {
+        setEventoDetalle(null)
+        calendarRef.current?.getApi().refetchEvents()
+      }
+    } finally {
+      setEliminandoEvento(false)
     }
   }
 
@@ -432,16 +452,28 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
-            {eventoDetalle.htmlLink && (
-              <a
-                href={eventoDetalle.htmlLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-4 flex items-center gap-1.5 text-xs text-[#1e5fa8] hover:underline"
-              >
-                <ExternalLink size={12} /> Abrir en Google Calendar
-              </a>
-            )}
+            <div className="mt-5 flex items-center justify-between">
+              {eventoDetalle.htmlLink ? (
+                <a
+                  href={eventoDetalle.htmlLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-xs text-[#1e5fa8] hover:underline"
+                >
+                  <ExternalLink size={12} /> Abrir en Google Calendar
+                </a>
+              ) : <span />}
+              {eventoDetalle.id && (
+                <button
+                  onClick={handleEliminarEvento}
+                  disabled={eliminandoEvento}
+                  className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-700 disabled:opacity-50 transition-colors"
+                >
+                  {eliminandoEvento ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                  Eliminar evento
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

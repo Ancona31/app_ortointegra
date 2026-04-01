@@ -61,6 +61,38 @@ export async function GET(req: NextRequest) {
   }
 }
 
+export async function DELETE(req: NextRequest) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+    const { eventId } = await req.json()
+    if (!eventId) return NextResponse.json({ error: 'eventId requerido' }, { status: 400 })
+
+    const { data: tokenData } = await supabase
+      .from('google_tokens')
+      .select('*')
+      .eq('user_id', user.id)
+      .single()
+
+    if (!tokenData) return NextResponse.json({ error: 'Calendar no conectado' }, { status: 400 })
+
+    oauth2Client.setCredentials({
+      access_token: decrypt(tokenData.access_token),
+      refresh_token: decrypt(tokenData.refresh_token),
+      expiry_date: tokenData.expires_at,
+    })
+
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
+    await calendar.events.delete({ calendarId: 'primary', eventId })
+
+    return NextResponse.json({ ok: true })
+  } catch {
+    return NextResponse.json({ error: 'Error al eliminar evento' }, { status: 500 })
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient()
