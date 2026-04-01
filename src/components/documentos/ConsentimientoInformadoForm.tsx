@@ -1,7 +1,7 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { Printer, Loader2, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignJustify, Minus, FileText, ChevronDown } from 'lucide-react'
+import { useState } from 'react'
+import { Printer, Loader2, ChevronDown, ChevronUp, ShieldCheck } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { imprimirOCompartir } from '@/lib/mobileShare'
 import { format } from 'date-fns'
@@ -15,159 +15,109 @@ interface Props {
   diagnosticoInicial?: string
 }
 
-function sanitizeEditorHtml(html: string): string {
-  return html
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '')
-    .replace(/href\s*=\s*["']javascript:[^"']*["']/gi, 'href="#"')
-    .replace(/src\s*=\s*["']javascript:[^"']*["']/gi, 'src="#"')
+const SECCIONES_DEFAULT = {
+  preoperatorio: `Después de haberle realizado historia clínica y estudios diagnósticos pertinentes (análisis de laboratorio, estudios de imagen u otros según el caso), se ha establecido el diagnóstico descrito y, habiendo agotado otras alternativas de tratamiento, se le recomienda someterse al procedimiento indicado. Se le indicará el tiempo necesario de ayuno previo y las indicaciones preoperatorias correspondientes.`,
+
+  beneficios: `El fin primordial del procedimiento es corregir la condición diagnosticada, proteger las estructuras anatómicas involucradas, mantener o restaurar la función y evitar la progresión de la enfermedad, la cual podría producir lesiones más serias o dolor incapacitante. Los resultados esperados incluyen mejoría del dolor, recuperación funcional y mejora en la calidad de vida, aunque estos no pueden garantizarse en su totalidad, ya que dependen de múltiples factores individuales.`,
+
+  anestesia: `La intervención puede precisar anestesia, cuyo tipo y modalidad serán valorados en forma individual de acuerdo con las características del paciente y del procedimiento. El médico anestesiólogo le informará cuál es la alternativa más adecuada para su caso y resolverá cualquier duda al respecto.`,
+
+  descripcion: `Describir aquí el procedimiento quirúrgico: vía de abordaje, técnica a utilizar, estructuras involucradas, materiales o implantes a emplear (si aplica), y cualquier aspecto relevante específico de esta cirugía. Si durante el procedimiento fuera necesario modificar la técnica inicialmente planeada, el equipo médico tomará la decisión más conveniente para preservar la salud del paciente.`,
+
+  riesgosComunes: `Cualquier procedimiento quirúrgico conlleva riesgos comunes independientemente de la técnica empleada, que incluyen pero no se limitan a: sangrado transoperatorio o postoperatorio, infección superficial o profunda de la herida quirúrgica, reacciones adversas a la anestesia o medicamentos, trombosis venosa profunda, tromboembolismo pulmonar, cicatrización anómala (cicatriz hipertrófica o queloide), dehiscencia de herida, y en casos excepcionales, complicaciones graves que podrían requerir tratamientos complementarios médicos o quirúrgicos e incluso, en un mínimo porcentaje de casos, ser causa de muerte.\n\nCuando sea médicamente necesario, el paciente autoriza la transfusión de sangre y/o hemoderivados en la cantidad y frecuencia requeridas, habiendo sido informado de que las transfusiones no siempre producen el resultado deseado y que existe la posibilidad de resultados no favorables.`,
+
+  riesgosEspecificos: `Describir aquí los riesgos específicos propios de este procedimiento: complicaciones neurológicas, vasculares, de implantes, u otras que correspondan a la cirugía en cuestión, indicando frecuencia aproximada cuando sea posible (ej. "en alrededor del 1% de los casos").\n\nSi surgiera alguna situación imprevista durante la intervención que precisara la realización de un procedimiento distinto al informado, se consultará con el familiar autorizado. Únicamente cuando las eventualidades acontecidas pongan en riesgo la vida del paciente, se autoriza al equipo quirúrgico para adoptar la decisión más conveniente conforme a la normatividad vigente.`,
+
+  alternativas: `Como alternativa al procedimiento propuesto, el paciente puede optar por tratamiento conservador que incluye manejo analgésico y antiinflamatorio, reposo relativo, rehabilitación física, uso de ortesis o inmovilización y otras medidas paliativas. Dicho tratamiento posiblemente mejore los síntomas sin resolver la causa de fondo, pudiendo requerir manejo definitivo en el futuro.`,
 }
 
-const TAMANOS = [
-  { label: 'Normal', tag: 'p' },
-  { label: 'Grande', tag: 'h3' },
-  { label: 'Título', tag: 'h2' },
-]
+type SeccionKey = keyof typeof SECCIONES_DEFAULT
 
-const PLANTILLAS: { label: string; procedimiento: string; cuerpo: string }[] = [
-  {
-    label: 'En blanco',
-    procedimiento: '',
-    cuerpo: '',
-  },
-  {
-    label: 'Cirugía de columna (discectomía / fusión)',
-    procedimiento: 'Cirugía de columna vertebral',
-    cuerpo: `<p>Por medio del presente documento, yo <strong>[NOMBRE DEL PACIENTE]</strong>, con plena capacidad legal y habiendo recibido información suficiente, clara y comprensible por parte del médico tratante, manifiesto mi consentimiento libre y voluntario para someterme al procedimiento quirúrgico denominado <strong>[NOMBRE DEL PROCEDIMIENTO]</strong>.</p>
+const LABELS: Record<SeccionKey, { num: string; titulo: string; hint: string }> = {
+  preoperatorio:      { num: '1', titulo: 'Preoperatorio',                hint: 'Describe los estudios realizados, el diagnóstico y el procedimiento recomendado.' },
+  beneficios:         { num: '2', titulo: 'Beneficios esperados',          hint: 'Explica los objetivos y resultados esperados del procedimiento.' },
+  anestesia:          { num: '3', titulo: 'Anestesia',                     hint: 'Indica el tipo de anestesia prevista y quién informará al paciente.' },
+  descripcion:        { num: '4', titulo: 'Descripción del procedimiento', hint: 'Detalla la técnica quirúrgica, vía de abordaje e implantes a utilizar.' },
+  riesgosComunes:     { num: '5', titulo: 'Riesgos comunes',               hint: 'Riesgos inherentes a cualquier procedimiento quirúrgico.' },
+  riesgosEspecificos: { num: '6', titulo: 'Riesgos específicos',           hint: 'Riesgos propios de esta cirugía en particular.' },
+  alternativas:       { num: '7', titulo: 'Alternativas de tratamiento',   hint: 'Opciones disponibles en lugar del procedimiento propuesto.' },
+}
 
-<h3>Descripción del procedimiento</h3>
-<p>El procedimiento consiste en la intervención quirúrgica de la columna vertebral con el objetivo de descomprimir estructuras nerviosas, estabilizar segmentos vertebrales o ambos, según sea el caso clínico. El médico me ha explicado detalladamente en qué consiste la cirugía, el abordaje quirúrgico previsto y las técnicas que se emplearán.</p>
+function SeccionCard({
+  seccionKey, value, onChange,
+}: { seccionKey: SeccionKey; value: string; onChange: (v: string) => void }) {
+  const [abierta, setAbierta] = useState(true)
+  const { num, titulo, hint } = LABELS[seccionKey]
 
-<h3>Beneficios esperados</h3>
-<p>Mejoría del dolor, recuperación de la función neurológica, estabilización de la columna y mejora en la calidad de vida. El médico me ha informado que los resultados no pueden garantizarse en su totalidad y dependen de múltiples factores individuales.</p>
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setAbierta(o => !o)}
+        className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-slate-50 transition-colors"
+      >
+        <span className="w-6 h-6 rounded-full bg-[#1e5fa8] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
+          {num}
+        </span>
+        <span className="font-semibold text-slate-700 text-sm flex-1">{titulo}</span>
+        {abierta ? <ChevronUp size={15} className="text-slate-400" /> : <ChevronDown size={15} className="text-slate-400" />}
+      </button>
 
-<h3>Riesgos y complicaciones</h3>
-<p>He sido informado de los riesgos inherentes a este tipo de procedimiento, que incluyen pero no se limitan a: sangrado, infección de herida quirúrgica, trombosis venosa profunda, lesión neurológica transitoria o permanente, fístula de líquido cefalorraquídeo, pseudoartrosis, falla de implantes, y en casos excepcionales, complicaciones graves o muerte. Asimismo, se me han explicado los riesgos anestésicos correspondientes.</p>
-
-<h3>Alternativas terapéuticas</h3>
-<p>El médico me ha informado sobre las alternativas de tratamiento disponibles, incluyendo manejo conservador (fisioterapia, medicamentos, bloqueos), y me ha explicado las razones por las cuales se recomienda el procedimiento quirúrgico en mi caso específico.</p>
-
-<h3>Declaración de consentimiento</h3>
-<p>He tenido la oportunidad de formular todas mis preguntas, las cuales han sido respondidas de manera satisfactoria. He comprendido la información proporcionada y acepto voluntariamente someterme al procedimiento descrito. Entiendo que puedo revocar este consentimiento en cualquier momento antes del inicio del procedimiento.</p>`,
-  },
-  {
-    label: 'Infiltración / Bloqueo',
-    procedimiento: 'Infiltración / Bloqueo terapéutico',
-    cuerpo: `<p>Por medio del presente documento, yo <strong>[NOMBRE DEL PACIENTE]</strong>, manifiesto mi consentimiento informado para someterme al procedimiento de <strong>infiltración / bloqueo terapéutico</strong> indicado por mi médico tratante.</p>
-
-<h3>Descripción del procedimiento</h3>
-<p>El procedimiento consiste en la aplicación de medicamento (corticoesteroide, anestésico local u otro agente terapéutico) mediante inyección dirigida a la zona afectada (articulación, espacio epidural, tejido blando u otro sitio anatómico). El médico me ha explicado el sitio de aplicación, la técnica a utilizar y los medicamentos a emplear.</p>
-
-<h3>Beneficios esperados</h3>
-<p>Reducción del dolor, disminución de la inflamación local y mejoría funcional. El médico me ha informado que los efectos pueden ser temporales y que pueden requerirse procedimientos adicionales.</p>
-
-<h3>Riesgos y complicaciones</h3>
-<p>He sido informado sobre los posibles riesgos, que incluyen: dolor transitorio en el sitio de inyección, sangrado local, infección, reacción alérgica a los medicamentos, elevación transitoria de glucosa en sangre (en pacientes diabéticos), daño a estructuras nerviosas o vasculares adyacentes, y en casos excepcionales, complicaciones sistémicas.</p>
-
-<h3>Declaración de consentimiento</h3>
-<p>He comprendido la información proporcionada, he resuelto mis dudas con el médico y acepto voluntariamente someterme al procedimiento descrito.</p>`,
-  },
-  {
-    label: 'Procedimiento diagnóstico (EMG / artroscopia diagnóstica)',
-    procedimiento: 'Procedimiento diagnóstico',
-    cuerpo: `<p>Por medio del presente documento, yo <strong>[NOMBRE DEL PACIENTE]</strong>, otorgo mi consentimiento informado para la realización del procedimiento diagnóstico indicado por mi médico tratante.</p>
-
-<h3>Descripción del procedimiento</h3>
-<p>El procedimiento diagnóstico tiene como finalidad evaluar el estado de las estructuras anatómicas involucradas en mi padecimiento a través de exploración directa o registro de actividad eléctrica muscular / nerviosa. El médico me ha explicado en qué consiste el procedimiento y cómo se llevará a cabo.</p>
-
-<h3>Beneficios esperados</h3>
-<p>Obtención de información diagnóstica precisa que permita orientar el tratamiento más adecuado para mi condición clínica.</p>
-
-<h3>Riesgos y complicaciones</h3>
-<p>He sido informado sobre los posibles riesgos del procedimiento, que incluyen: molestia o dolor durante el procedimiento, sangrado mínimo en los sitios de exploración, infección, y en casos excepcionales, lesión de estructuras adyacentes.</p>
-
-<h3>Declaración de consentimiento</h3>
-<p>He comprendido la información proporcionada y acepto voluntariamente la realización del procedimiento diagnóstico descrito.</p>`,
-  },
-  {
-    label: 'Cirugía de cadera o rodilla',
-    procedimiento: 'Cirugía de cadera / rodilla',
-    cuerpo: `<p>Por medio del presente documento, yo <strong>[NOMBRE DEL PACIENTE]</strong>, manifiesto mi consentimiento informado para someterme al procedimiento quirúrgico de <strong>[ESPECIFICAR: reemplazo total de cadera / rodilla, artroscopía, osteotomía, u otro]</strong>.</p>
-
-<h3>Descripción del procedimiento</h3>
-<p>El procedimiento consiste en la intervención quirúrgica de la articulación indicada con el objetivo de restaurar la función, aliviar el dolor y mejorar la calidad de vida. El médico me ha explicado detalladamente el tipo de cirugía, el abordaje previsto, los materiales de implante a utilizar (cuando aplica) y el proceso de recuperación esperado.</p>
-
-<h3>Beneficios esperados</h3>
-<p>Mejoría significativa del dolor, restauración de la movilidad articular y mejora en las actividades de la vida diaria. Se me ha informado que la recuperación funcional completa puede tomar entre 3 y 12 meses dependiendo del procedimiento y de las condiciones individuales del paciente.</p>
-
-<h3>Riesgos y complicaciones</h3>
-<p>He sido informado sobre los riesgos inherentes al procedimiento, que incluyen: sangrado, infección superficial o profunda, trombosis venosa profunda y tromboembolismo pulmonar, luxación del implante, falla o desgaste prematuro del implante, lesión neurovascular, dismetría de extremidades, rigidez articular, y en casos excepcionales, complicaciones graves o muerte.</p>
-
-<h3>Alternativas terapéuticas</h3>
-<p>Se me ha informado sobre las alternativas de tratamiento disponibles y las razones clínicas por las que se recomienda el abordaje quirúrgico en mi caso.</p>
-
-<h3>Declaración de consentimiento</h3>
-<p>He comprendido la información proporcionada, he formulado y resuelto mis preguntas, y acepto voluntariamente someterme al procedimiento descrito.</p>`,
-  },
-  {
-    label: 'Manejo con opioides / medicamentos controlados',
-    procedimiento: 'Tratamiento con medicamentos controlados',
-    cuerpo: `<p>Por medio del presente documento, yo <strong>[NOMBRE DEL PACIENTE]</strong>, manifiesto mi consentimiento informado para recibir tratamiento con medicamentos analgésicos del grupo de los opioides u otras sustancias controladas indicadas por mi médico tratante para el manejo de dolor crónico.</p>
-
-<h3>Descripción del tratamiento</h3>
-<p>El tratamiento consiste en la prescripción y administración de medicamentos controlados con el objetivo de manejar adecuadamente el dolor crónico de origen músculo-esquelético / neuropático / post-quirúrgico. El médico me ha explicado los medicamentos a utilizar, la dosis, la vía de administración y la duración estimada del tratamiento.</p>
-
-<h3>Compromisos del paciente</h3>
-<p>Me comprometo a: tomar los medicamentos exclusivamente según la prescripción médica, no compartir ni vender los medicamentos, informar a mi médico sobre cualquier efecto secundario, no conducir vehículos ni operar maquinaria pesada bajo el efecto de los medicamentos, y acudir puntualmente a mis citas de seguimiento.</p>
-
-<h3>Riesgos y efectos secundarios</h3>
-<p>He sido informado sobre los posibles riesgos, que incluyen: somnolencia, mareo, estreñimiento, náuseas, tolerancia, dependencia física, depresión respiratoria (en sobredosis), y riesgo de trastorno por uso de sustancias. Entiendo que el uso inadecuado de estos medicamentos puede tener consecuencias legales.</p>
-
-<h3>Declaración de consentimiento</h3>
-<p>He comprendido la información proporcionada y acepto voluntariamente el tratamiento bajo las condiciones descritas.</p>`,
-  },
-]
+      {abierta && (
+        <div className="px-5 pb-4">
+          <p className="text-xs text-slate-400 mb-2">{hint}</p>
+          <textarea
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            rows={5}
+            className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8] resize-y"
+          />
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function ConsentimientoInformadoForm({ pacienteInicial = '', pacienteId, diagnosticoInicial = '' }: Props) {
   const { medicoInfo } = useMedicoInfo()
-  const [paciente, setPaciente]           = useState(pacienteInicial)
-  const [fecha, setFecha]                 = useState(new Date().toISOString().split('T')[0])
-  const [procedimiento, setProcedimiento] = useState(diagnosticoInicial)
-  const [tutor, setTutor]                 = useState('')
-  const [isEmpty, setIsEmpty]             = useState(true)
-  const [imprimiendo, setImprimiendo]     = useState(false)
-  const [plantillaOpen, setPlantillaOpen] = useState(false)
-  const editorRef = useRef<HTMLDivElement>(null)
 
-  function exec(cmd: string, value?: string) {
-    document.execCommand(cmd, false, value ?? undefined)
-    editorRef.current?.focus()
+  // Campos de identificación
+  const [paciente, setPaciente]               = useState(pacienteInicial)
+  const [fecha, setFecha]                     = useState(new Date().toISOString().split('T')[0])
+  const [expediente, setExpediente]           = useState('')
+  const [edad, setEdad]                       = useState('')
+  const [idPaciente, setIdPaciente]           = useState('')
+  const [procedimiento, setProcedimiento]     = useState(diagnosticoInicial)
+  const [diagnostico, setDiagnostico]         = useState('')
+  const [familiar, setFamiliar]               = useState('')
+  const [idFamiliar, setIdFamiliar]           = useState('')
+  const [representante, setRepresentante]     = useState('')
+  const [idRepresentante, setIdRepresentante] = useState('')
+  const [anestesiologo, setAnestesiologo]     = useState('')
+  const [testigo1, setTestigo1]               = useState('')
+  const [testigo2, setTestigo2]               = useState('')
+  const [autorizaTransfusion, setAutorizaTransfusion] = useState<'si' | 'no' | null>(null)
+  const [autorizaFotos, setAutorizaFotos]     = useState(false)
+
+  // Secciones editables
+  const [secciones, setSecciones] = useState({ ...SECCIONES_DEFAULT })
+
+  const [imprimiendo, setImprimiendo] = useState(false)
+
+  function updateSeccion(key: SeccionKey, val: string) {
+    setSecciones(s => ({ ...s, [key]: val }))
   }
 
-  function setTamano(tag: string) {
-    document.execCommand('formatBlock', false, tag)
-    editorRef.current?.focus()
-  }
-
-  function onEditorInput() {
-    const text = editorRef.current?.innerText?.trim() ?? ''
-    setIsEmpty(text === '')
-  }
-
-  function cargarPlantilla(plantilla: typeof PLANTILLAS[number]) {
-    if (plantilla.procedimiento) setProcedimiento(plantilla.procedimiento)
-    if (editorRef.current) {
-      editorRef.current.innerHTML = plantilla.cuerpo
-      setIsEmpty(!plantilla.cuerpo.trim())
-    }
-    setPlantillaOpen(false)
-    editorRef.current?.focus()
+  function nl2p(text: string): string {
+    return text
+      .split('\n')
+      .map(l => l.trim())
+      .filter(l => l.length > 0)
+      .map(l => `<p style="margin-bottom:6px;">${l}</p>`)
+      .join('')
   }
 
   async function imprimir() {
-    const contenido = sanitizeEditorHtml(editorRef.current?.innerHTML ?? '')
-    if (!contenido.trim()) return
-
     flushSync(() => setImprimiendo(true))
     try {
       const supabase = createClient()
@@ -175,11 +125,10 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
         ...(pacienteId ? { paciente_id: pacienteId } : {}),
         tipo: 'consentimiento_informado',
         contenido: {
-          paciente,
-          fecha,
-          procedimiento,
-          tutor,
-          cuerpo: contenido,
+          paciente, fecha, expediente, edad, idPaciente, procedimiento, diagnostico,
+          familiar, idFamiliar, representante, idRepresentante, anestesiologo,
+          testigo1, testigo2, autorizaTransfusion, autorizaFotos,
+          secciones,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         },
       })
@@ -198,45 +147,66 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
 
       const fechaFmt = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
 
+      const firmaBox = (label: string, nombre2: string = '', sublabel: string = '', idLabel: string = '', idVal: string = '') => `
+        <div class="firma-box">
+          <div class="firma-espacio"></div>
+          <div class="firma-linea">
+            <div class="firma-nombre">${nombre2 || '___________________________________'}</div>
+            <div class="firma-rol">${label}</div>
+            ${sublabel ? `<div class="firma-ced">${sublabel}</div>` : ''}
+          </div>
+          ${idLabel ? `<div class="firma-id"><span class="firma-id-lbl">${idLabel}:</span> ${idVal || '___________________________'}</div>` : ''}
+        </div>`
+
       const _html = `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><title>Consentimiento Informado</title>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Georgia&display=swap" rel="stylesheet">
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   @page { size: letter; margin: 0; }
-  body { font-family: 'Roboto', Arial, sans-serif; font-size: 10pt; color: #1a1a1a; position: relative; }
-  .watermark { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%) rotate(-25deg); width:300px; height:300px; object-fit:contain; opacity:0.04; pointer-events:none; z-index:0; }
-  .barra-top { background:linear-gradient(135deg, ${cp} 0%, ${cs} 100%); height:12px; }
-  .contenido { padding:10mm 18mm 8mm; position:relative; z-index:1; }
-  .header { display:flex; align-items:center; gap:16px; padding-bottom:10px; margin-bottom:12px; border-bottom:2px solid ${cp}; }
-  .logo-wrap { width:64px; height:64px; border-radius:50%; border:3px solid ${cs}; overflow:hidden; flex-shrink:0; display:flex; align-items:center; justify-content:center; background:#f8fafc; }
+  body { font-family:'Roboto',Arial,sans-serif; font-size:9.5pt; color:#1a1a1a; }
+  .watermark { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%) rotate(-25deg); width:280px; height:280px; object-fit:contain; opacity:0.04; pointer-events:none; z-index:0; }
+  .barra-top { background:linear-gradient(135deg,${cp},${cs}); height:10px; }
+  .contenido { padding:8mm 16mm 6mm; position:relative; z-index:1; }
+  .header { display:flex; align-items:center; gap:14px; padding-bottom:8px; margin-bottom:10px; border-bottom:2px solid ${cp}; }
+  .logo-wrap { width:58px; height:58px; border-radius:50%; border:2.5px solid ${cs}; overflow:hidden; flex-shrink:0; display:flex; align-items:center; justify-content:center; background:#f8fafc; }
   .logo { width:100%; height:100%; object-fit:contain; }
-  .doctor-name { font-size:13pt; font-weight:bold; color:${cp}; line-height:1.2; }
-  .especialidad { font-size:8.5pt; color:${cs}; margin:2px 0; font-style:italic; }
+  .doctor-name { font-size:12pt; font-weight:700; color:${cp}; }
+  .especialidad { font-size:8pt; color:${cs}; margin:2px 0; font-style:italic; }
   .credenciales { font-size:7.5pt; color:#555; }
   .contacto { font-size:7pt; color:#888; margin-top:2px; }
-  .titulo-doc { text-align:center; margin:14px 0 12px; }
-  .titulo-doc h1 { font-size:14pt; font-weight:800; color:${cp}; text-transform:uppercase; letter-spacing:2px; }
-  .titulo-doc .subtitulo { font-size:8.5pt; color:#666; margin-top:3px; letter-spacing:0.5px; }
-  .datos-paciente { border:1.5px solid ${cp}; border-radius:6px; padding:10px 14px; margin-bottom:14px; background:#f8fafc; }
-  .datos-paciente table { width:100%; border-collapse:collapse; }
-  .datos-paciente td { padding:3px 8px 3px 0; font-size:9pt; }
-  .datos-paciente .lbl { font-weight:700; color:${cp}; font-size:8pt; text-transform:uppercase; white-space:nowrap; width:130px; }
-  .datos-paciente .val { border-bottom:1px solid #d1d5db; padding-bottom:1px; }
-  .cuerpo { font-family:Georgia, 'Times New Roman', serif; font-size:9.5pt; line-height:1.7; color:#1a1a1a; margin-bottom:16px; text-align:justify; }
-  .cuerpo h2 { font-family:'Roboto',Arial,sans-serif; font-size:11pt; font-weight:700; color:${cp}; margin:12px 0 4px; text-align:left; }
-  .cuerpo h3 { font-family:'Roboto',Arial,sans-serif; font-size:10pt; font-weight:700; color:${cp}; margin:10px 0 4px; text-align:left; }
-  .cuerpo p { margin-bottom:5px; }
-  .cuerpo p:empty::after { content:'\\00a0'; }
-  .cuerpo hr { border:none; border-top:1px solid #d1d5db; margin:12px 0; }
-  .firmas { margin-top:28px; display:grid; grid-template-columns:1fr 1fr; gap:24px; }
-  .firma-box { text-align:center; }
-  .firma-linea { border-top:1.5px solid ${cp}; margin-bottom:6px; padding-top:6px; }
-  .firma-nombre { font-weight:700; font-size:9pt; color:${cp}; }
-  .firma-rol { font-size:7.5pt; color:#666; margin-top:2px; }
-  .firma-ced { font-size:7.5pt; color:#888; }
-  .aviso-legal { margin-top:14px; padding:8px 12px; background:#f8fafc; border-left:3px solid ${cp}; font-size:7pt; color:#666; line-height:1.5; }
-  .barra-bottom { background:linear-gradient(135deg, ${cp} 0%, ${cs} 100%); height:8px; margin-top:12px; }
+  .titulo-doc { text-align:center; margin:10px 0 8px; border:2px solid ${cp}; border-radius:4px; padding:7px; background:#f8fafc; }
+  .titulo-doc h1 { font-size:12pt; font-weight:800; color:${cp}; text-transform:uppercase; letter-spacing:1.5px; }
+  ${procedimiento ? `.titulo-doc .subtitulo { font-size:8.5pt; color:#555; margin-top:3px; }` : ''}
+  .datos-grid { display:grid; grid-template-columns:1fr 1fr; gap:0; border:1.5px solid #d1d5db; border-radius:4px; overflow:hidden; margin-bottom:10px; font-size:8.5pt; }
+  .dato-row { display:contents; }
+  .dato-cell { padding:4px 8px; border-bottom:1px solid #e5e7eb; }
+  .dato-cell:nth-child(odd) { border-right:1px solid #e5e7eb; }
+  .dato-lbl { font-weight:700; color:${cp}; font-size:7.5pt; text-transform:uppercase; }
+  .dato-val { color:#1e293b; border-bottom:1px solid #9ca3af; min-width:80px; display:inline-block; }
+  .intro { font-size:8.5pt; line-height:1.55; color:#1a1a1a; margin-bottom:10px; text-align:justify; padding:8px 10px; background:#f8fafc; border-left:3px solid ${cp}; border-radius:0 4px 4px 0; }
+  .seccion { margin-bottom:8px; }
+  .sec-header { display:flex; align-items:center; gap:7px; margin-bottom:4px; }
+  .sec-num { width:18px; height:18px; border-radius:50%; background:${cp}; color:#fff; font-size:8pt; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .sec-titulo { font-size:9pt; font-weight:700; color:${cp}; text-transform:uppercase; letter-spacing:0.5px; }
+  .sec-cuerpo { font-family:Georgia,'Times New Roman',serif; font-size:9pt; line-height:1.6; color:#1a1a1a; text-align:justify; padding-left:25px; }
+  .sec-cuerpo p { margin-bottom:5px; }
+  .consentimiento-titulo { text-align:center; font-size:11pt; font-weight:800; color:${cp}; text-transform:uppercase; letter-spacing:1px; margin:14px 0 8px; border-top:2px solid ${cp}; padding-top:10px; }
+  .consentimiento-body { font-size:8.5pt; line-height:1.6; color:#1a1a1a; text-align:justify; margin-bottom:10px; }
+  .consentimiento-body p { margin-bottom:6px; }
+  .firmas-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px 20px; margin-top:16px; }
+  .firma-box { }
+  .firma-espacio { height:32px; }
+  .firma-linea { border-top:1.5px solid ${cp}; padding-top:4px; }
+  .firma-nombre { font-weight:700; font-size:8.5pt; color:${cp}; }
+  .firma-rol { font-size:7.5pt; color:#555; margin-top:1px; }
+  .firma-ced { font-size:7pt; color:#888; }
+  .firma-id { font-size:7pt; color:#666; margin-top:3px; padding:2px 0; border-top:1px dotted #d1d5db; }
+  .firma-id-lbl { font-weight:700; color:#555; }
+  .page-break { page-break-before:always; }
+  .denegacion-titulo { text-align:center; font-size:12pt; font-weight:800; color:${cp}; text-transform:uppercase; letter-spacing:1px; margin:16px 0 10px; border:2px solid ${cp}; padding:8px; border-radius:4px; background:#f8fafc; }
+  .denegacion-body { font-size:9pt; line-height:1.65; color:#1a1a1a; text-align:justify; margin-bottom:14px; padding:10px; border:1.5px solid #d1d5db; border-radius:4px; }
+  .barra-bottom { background:linear-gradient(135deg,${cp},${cs}); height:7px; margin-top:10px; }
   @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
 </style></head><body>
 <img class="watermark" src="${logoUrl}" onerror="this.style.display='none'" />
@@ -258,53 +228,97 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
   </div>
 
   <div class="titulo-doc">
-    <h1>Carta de Consentimiento Informado</h1>
+    <h1>Consentimiento Médico Informado</h1>
     ${procedimiento ? `<div class="subtitulo">${procedimiento}</div>` : ''}
   </div>
 
-  <div class="datos-paciente">
-    <table>
-      <tr>
-        <td class="lbl">Paciente</td>
-        <td class="val">${paciente || '___________________________________'}</td>
-        <td class="lbl" style="padding-left:16px;">Fecha</td>
-        <td class="val">${fechaFmt}</td>
-      </tr>
-      ${tutor ? `<tr>
-        <td class="lbl">Tutor / Representante</td>
-        <td class="val" colspan="3">${tutor}</td>
-      </tr>` : ''}
-    </table>
+  <div class="intro">
+    De acuerdo a la Norma Oficial Mexicana del expediente clínico NOM-004-SSA3-2012, se deberá autorizar y firmar el presente Consentimiento Médico Informado. Por medio de este documento, usted, su representante legal o familiar, recibirá información médica clara y comprensible acerca del procedimiento al que será sometido, sus beneficios, riesgos y alternativas disponibles. Se le ha <strong>INFORMADO Y ACLARADO</strong> todas sus dudas y preguntas con respecto al procedimiento.<br><br>
+    <em>He leído este documento y lo suscribo de manera libre y voluntaria.</em>
   </div>
 
-  <div class="cuerpo">${contenido}</div>
-
-  <div class="firmas">
-    <div class="firma-box">
-      <div style="height:40px;"></div>
-      <div class="firma-linea">
-        <div class="firma-nombre">${paciente || 'Paciente'}</div>
-        <div class="firma-rol">Paciente${tutor ? ' / Tutor Legal' : ''}</div>
-        ${tutor ? `<div class="firma-ced">${tutor}</div>` : ''}
-      </div>
-    </div>
-    <div class="firma-box">
-      <div style="height:40px;"></div>
-      <div class="firma-linea">
-        <div class="firma-nombre">${nombre}</div>
-        <div class="firma-rol">Médico Tratante</div>
-        ${cedProf ? `<div class="firma-ced">Céd. Prof. ${cedProf}</div>` : ''}
-        ${cedEsp  ? `<div class="firma-ced">Céd. Esp. ${cedEsp}</div>` : ''}
-      </div>
-    </div>
+  <div class="datos-grid">
+    <div class="dato-cell"><span class="dato-lbl">Lugar y Fecha: </span><span class="dato-val">${fechaFmt}</span></div>
+    <div class="dato-cell"><span class="dato-lbl">No. Expediente: </span><span class="dato-val">${expediente || ''}</span></div>
+    <div class="dato-cell"><span class="dato-lbl">Nombre del Paciente: </span><span class="dato-val">${paciente || ''}</span></div>
+    <div class="dato-cell"><span class="dato-lbl">Edad: </span><span class="dato-val">${edad || ''}</span></div>
+    <div class="dato-cell" style="grid-column:span 2"><span class="dato-lbl">Identificado con: </span><span class="dato-val">${idPaciente || ''}</span></div>
+    <div class="dato-cell"><span class="dato-lbl">Familiar Responsable: </span><span class="dato-val">${familiar || ''}</span></div>
+    <div class="dato-cell"><span class="dato-lbl">Identificado con: </span><span class="dato-val">${idFamiliar || ''}</span></div>
+    ${representante ? `<div class="dato-cell" style="grid-column:span 2"><span class="dato-lbl">Representante Legal: </span><span class="dato-val">${representante}</span></div>
+    <div class="dato-cell" style="grid-column:span 2"><span class="dato-lbl">Identificado con: </span><span class="dato-val">${idRepresentante}</span></div>` : ''}
+    ${diagnostico ? `<div class="dato-cell" style="grid-column:span 2"><span class="dato-lbl">Diagnóstico: </span><span class="dato-val">${diagnostico}</span></div>` : ''}
   </div>
 
-  <div class="aviso-legal">
-    Este documento ha sido firmado de manera libre y voluntaria. El paciente declara haber recibido información suficiente sobre el procedimiento, sus riesgos, beneficios y alternativas, conforme a lo establecido en la NOM-004-SSA3-2012 relativa al expediente clínico y a la Ley General de Salud vigente.
+  ${(Object.keys(secciones) as SeccionKey[]).map(key => `
+  <div class="seccion">
+    <div class="sec-header">
+      <div class="sec-num">${LABELS[key].num}</div>
+      <div class="sec-titulo">${LABELS[key].titulo}</div>
+    </div>
+    <div class="sec-cuerpo">${nl2p(secciones[key])}</div>
+  </div>`).join('')}
+
+  <div class="consentimiento-titulo">Consentimiento</div>
+
+  <div class="consentimiento-body">
+    <p>Yo: <strong>${paciente || '___________________________________'}</strong>, en pleno uso de mis facultades mentales y en estado de máximo alerta, por medio del presente acepto y autorizo al <strong>${nombre}</strong>${cedProf ? ` con Cédula Profesional No. ${cedProf}` : ''}${cedEsp ? ` y Cédula de Especialidad No. ${cedEsp}` : ''} para que sea realizado el procedimiento de <strong>${procedimiento || '___________________________________'}</strong>.</p>
+    ${anestesiologo ? `<p>El paciente acepta que el médico anestesiólogo sea: <strong>${anestesiologo}</strong>, quien decidirá la mejor alternativa de anestesia para el caso.</p>` : ''}
+    <p>Comprendo que, a pesar de las medidas de higiene y seguridad establecidas, el acto quirúrgico y la estancia en la institución son factores de riesgo para infecciones intrahospitalarias, que son poco comunes pero posibles.</p>
+    <p>Así mismo, entiendo plenamente que la <strong>MEDICINA NO ES UNA CIENCIA EXACTA</strong>, por tanto el resultado no asegura una certeza de eficacia al 100%, así como tampoco de curación.</p>
+    <p>Estoy consciente de que los riesgos y reacciones adversas descritos pueden presentarse en cualquier momento, antes, durante y después del procedimiento, y autorizo al personal médico para contrarrestarlos.</p>
+    ${autorizaTransfusion !== null ? `<p>Autorizo la transfusión de sangre y/o hemoderivados: <strong>${autorizaTransfusion === 'si' ? 'SÍ' : 'NO'}</strong>.</p>` : ''}
+    ${autorizaFotos ? `<p>Autorizo expresamente que las fotografías tomadas antes y después del procedimiento sean utilizadas para fines educativos y formación académica, de conformidad al artículo 87 de la Ley Federal de Derechos de Autor.</p>` : ''}
+  </div>
+
+  <div class="firmas-grid">
+    ${firmaBox('Nombre y Firma del Paciente', paciente, '', 'Identificado con', idPaciente)}
+    ${firmaBox('Nombre y Firma del Médico Tratante', nombre, cedProf ? `Céd. Prof. ${cedProf}` : '')}
+    ${firmaBox('Nombre y Firma del Familiar / Representante', familiar || representante, '', 'Identificado con', idFamiliar || idRepresentante)}
+    ${firmaBox('Nombre y Firma del Médico')}
+    ${firmaBox('Nombre y Firma del Testigo', testigo1, '', 'Identificado con', '')}
+    ${firmaBox('Nombre y Firma del Testigo', testigo2, '', 'Identificado con', '')}
   </div>
 
 </div>
 <div class="barra-bottom"></div>
+
+<!-- DENEGACIÓN O REVOCACIÓN -->
+<div class="page-break"></div>
+<div class="barra-top"></div>
+<div class="contenido">
+
+  <div class="header">
+    <div class="logo-wrap"><img class="logo" src="${logoUrl}" onerror="this.style.display='none'" /></div>
+    <div>
+      <div class="doctor-name">${nombre}</div>
+      ${esp ? `<div class="especialidad">${esp}</div>` : ''}
+      <div class="credenciales">
+        ${cedProf ? `Cédula Prof.: ${cedProf}` : ''}
+        ${cedProf && cedEsp ? ' &nbsp;·&nbsp; ' : ''}
+        ${cedEsp ? `Cédula Esp.: ${cedEsp}` : ''}
+      </div>
+    </div>
+  </div>
+
+  <div class="denegacion-titulo">Denegación o Revocación del Consentimiento</div>
+
+  <div class="denegacion-body">
+    <p>Yo: <strong>${paciente || '___________________________________'}</strong>, después de ser informado de la naturaleza y riesgos del procedimiento propuesto, manifiesto de forma libre y consciente mi <strong>DENEGACIÓN / REVOCACIÓN</strong> (táchese lo que no proceda) para su realización, haciéndome responsable de las consecuencias que puedan derivarse de esta decisión.</p>
+  </div>
+
+  <div class="firmas-grid">
+    ${firmaBox('Nombre y Firma del Paciente', paciente, '', 'Identificado con', idPaciente)}
+    ${firmaBox('Nombre y Firma del Médico Tratante', nombre, cedProf ? `Céd. Prof. ${cedProf}` : '')}
+    ${firmaBox('Nombre y Firma del Familiar', familiar || representante, '', 'Identificado con', idFamiliar || idRepresentante)}
+    ${firmaBox('Nombre y Firma del Médico Responsable')}
+    ${firmaBox('Nombre y Firma del Testigo', testigo1, '', 'Identificado con', '')}
+    ${firmaBox('Nombre y Firma del Testigo', testigo2, '', 'Identificado con', '')}
+  </div>
+
+</div>
+<div class="barra-bottom"></div>
+
 </body></html>`
 
       await imprimirOCompartir(_html, 'consentimiento-informado.pdf')
@@ -314,42 +328,17 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
   }
 
   const inputCls = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]'
-  const tbBtn = 'p-1.5 rounded text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-colors'
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
 
-      {/* Selector de plantilla */}
-      <div className="relative">
-        <button
-          onClick={() => setPlantillaOpen(o => !o)}
-          className="w-full flex items-center justify-between px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 shadow-sm transition-colors"
-        >
-          <span className="flex items-center gap-2">
-            <FileText size={16} className="text-[#1e5fa8]" />
-            Cargar plantilla predefinida (opcional)
-          </span>
-          <ChevronDown size={15} className={`text-slate-400 transition-transform ${plantillaOpen ? 'rotate-180' : ''}`} />
-        </button>
-        {plantillaOpen && (
-          <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
-            {PLANTILLAS.map((p, i) => (
-              <button
-                key={i}
-                onClick={() => cargarPlantilla(p)}
-                className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0"
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Datos del documento */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-        <h2 className="font-semibold text-slate-700 text-sm mb-4">Datos del consentimiento</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {/* Datos de identificación */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <ShieldCheck size={15} className="text-[#1e5fa8]" />
+          <h2 className="font-semibold text-slate-700 text-sm">Datos de identificación</h2>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">Fecha</label>
             <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className={inputCls} />
@@ -359,60 +348,104 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
             <input type="text" value={paciente} onChange={e => setPaciente(e.target.value)} placeholder="Nombre completo" className={inputCls} />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Procedimiento / Diagnóstico</label>
-            <input type="text" value={procedimiento} onChange={e => setProcedimiento(e.target.value)} placeholder="Ej: Cirugía de columna lumbar, Infiltración..." className={inputCls} />
+            <label className="text-xs font-medium text-slate-500 block mb-1">No. Expediente</label>
+            <input type="text" value={expediente} onChange={e => setExpediente(e.target.value)} placeholder="Ej: 2024-001" className={inputCls} />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Tutor legal <span className="text-slate-300 font-normal">(si aplica)</span></label>
-            <input type="text" value={tutor} onChange={e => setTutor(e.target.value)} placeholder="Nombre del tutor o representante legal" className={inputCls} />
+            <label className="text-xs font-medium text-slate-500 block mb-1">Edad del paciente</label>
+            <input type="text" value={edad} onChange={e => setEdad(e.target.value)} placeholder="Ej: 45 años" className={inputCls} />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Identificado con</label>
+            <input type="text" value={idPaciente} onChange={e => setIdPaciente(e.target.value)} placeholder="Ej: INE 123456789" className={inputCls} />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Procedimiento</label>
+            <input type="text" value={procedimiento} onChange={e => setProcedimiento(e.target.value)} placeholder="Ej: Artrodesis cervical anterior" className={inputCls} />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Diagnóstico</label>
+            <input type="text" value={diagnostico} onChange={e => setDiagnostico(e.target.value)} placeholder="Diagnóstico principal" className={inputCls} />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Familiar responsable</label>
+            <input type="text" value={familiar} onChange={e => setFamiliar(e.target.value)} placeholder="Nombre completo" className={inputCls} />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Identificación del familiar</label>
+            <input type="text" value={idFamiliar} onChange={e => setIdFamiliar(e.target.value)} placeholder="Ej: INE 987654321" className={inputCls} />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Representante legal <span className="text-slate-300">(si aplica)</span></label>
+            <input type="text" value={representante} onChange={e => setRepresentante(e.target.value)} placeholder="Nombre completo" className={inputCls} />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Identificación del representante</label>
+            <input type="text" value={idRepresentante} onChange={e => setIdRepresentante(e.target.value)} placeholder="Tipo y número de ID" className={inputCls} />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Médico anestesiólogo <span className="text-slate-300">(si aplica)</span></label>
+            <input type="text" value={anestesiologo} onChange={e => setAnestesiologo(e.target.value)} placeholder="Nombre del anestesiólogo" className={inputCls} />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Testigo 1</label>
+            <input type="text" value={testigo1} onChange={e => setTestigo1(e.target.value)} placeholder="Nombre del testigo" className={inputCls} />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Testigo 2</label>
+            <input type="text" value={testigo2} onChange={e => setTestigo2(e.target.value)} placeholder="Nombre del testigo" className={inputCls} />
+          </div>
+        </div>
+
+        {/* Autorizaciones */}
+        <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-2">Autoriza transfusión de sangre</label>
+            <div className="flex gap-3">
+              {(['si', 'no'] as const).map(v => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setAutorizaTransfusion(v)}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                    autorizaTransfusion === v
+                      ? v === 'si' ? 'bg-green-100 border-green-400 text-green-700' : 'bg-red-100 border-red-400 text-red-700'
+                      : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  {v === 'si' ? 'Sí' : 'No'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-start gap-3 pt-1">
+            <input
+              type="checkbox"
+              id="autorizaFotos"
+              checked={autorizaFotos}
+              onChange={e => setAutorizaFotos(e.target.checked)}
+              className="mt-0.5 w-4 h-4 accent-[#1e5fa8]"
+            />
+            <label htmlFor="autorizaFotos" className="text-xs text-slate-600 leading-relaxed cursor-pointer">
+              Autoriza uso de fotografías para fines educativos y publicación académica
+            </label>
           </div>
         </div>
       </div>
 
-      {/* Editor */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        {/* Barra de herramientas */}
-        <div className="flex items-center gap-0.5 px-3 py-2 border-b border-slate-100 bg-slate-50 flex-wrap gap-y-1">
-          <select
-            onChange={e => setTamano(e.target.value)}
-            defaultValue="p"
-            className="text-xs border border-slate-200 rounded px-2 py-1 mr-1 text-slate-600 bg-white focus:outline-none focus:ring-1 focus:ring-[#1e5fa8]/30"
-          >
-            {TAMANOS.map(t => <option key={t.tag} value={t.tag}>{t.label}</option>)}
-          </select>
-          <div className="w-px h-5 bg-slate-200 mx-1" />
-          <button onMouseDown={e => { e.preventDefault(); exec('bold') }}      title="Negrita"     className={tbBtn}><Bold      size={14} /></button>
-          <button onMouseDown={e => { e.preventDefault(); exec('italic') }}    title="Itálica"     className={tbBtn}><Italic    size={14} /></button>
-          <button onMouseDown={e => { e.preventDefault(); exec('underline') }} title="Subrayado"   className={tbBtn}><Underline size={14} /></button>
-          <div className="w-px h-5 bg-slate-200 mx-1" />
-          <button onMouseDown={e => { e.preventDefault(); exec('justifyLeft')   }} title="Izquierda"   className={tbBtn}><AlignLeft    size={14} /></button>
-          <button onMouseDown={e => { e.preventDefault(); exec('justifyCenter') }} title="Centrado"    className={tbBtn}><AlignCenter  size={14} /></button>
-          <button onMouseDown={e => { e.preventDefault(); exec('justifyFull')   }} title="Justificado" className={tbBtn}><AlignJustify size={14} /></button>
-          <div className="w-px h-5 bg-slate-200 mx-1" />
-          <button onMouseDown={e => { e.preventDefault(); exec('insertHorizontalRule') }} title="Separador" className={tbBtn}><Minus size={14} /></button>
-        </div>
-
-        {/* Área de escritura */}
-        <div className="relative">
-          {isEmpty && (
-            <p className="absolute top-5 left-5 text-sm text-slate-300 pointer-events-none select-none">
-              Redacta o selecciona una plantilla para comenzar...
-            </p>
-          )}
-          <div
-            ref={editorRef}
-            contentEditable
-            suppressContentEditableWarning
-            onInput={onEditorInput}
-            className="min-h-[420px] p-5 text-sm leading-relaxed focus:outline-none"
-            style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: '10.5pt' }}
-          />
-        </div>
-      </div>
+      {/* Secciones clínicas */}
+      {(Object.keys(secciones) as SeccionKey[]).map(key => (
+        <SeccionCard
+          key={key}
+          seccionKey={key}
+          value={secciones[key]}
+          onChange={v => updateSeccion(key, v)}
+        />
+      ))}
 
       <button
         onClick={imprimir}
-        disabled={isEmpty || imprimiendo}
+        disabled={imprimiendo}
         className="w-full flex items-center justify-center gap-2 py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-50"
       >
         {imprimiendo
