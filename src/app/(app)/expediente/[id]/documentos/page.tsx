@@ -5,7 +5,7 @@ import { useParams, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Paciente } from '@/types'
 import { differenceInYears, parseISO } from 'date-fns'
-import { ArrowLeft, Pill, FlaskConical, ScanLine, ClipboardList, BedDouble, PenLine, Loader2 } from 'lucide-react'
+import { ArrowLeft, Pill, FlaskConical, ScanLine, ClipboardList, BedDouble, PenLine, ShieldCheck, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 
@@ -22,6 +22,7 @@ const SolicitudImagenForm = dynamic(() => import('@/components/documentos/Solici
 const PlanSuplementacionForm = dynamic(() => import('@/components/documentos/PlanSuplementacionForm'), { ssr: false, loading: FormLoader })
 const SolicitudInternamientoForm = dynamic(() => import('@/components/documentos/SolicitudInternamientoForm'), { ssr: false, loading: FormLoader })
 const EscritoMedicoForm = dynamic(() => import('@/components/documentos/EscritoMedicoForm'), { ssr: false, loading: FormLoader })
+const ConsentimientoInformadoForm = dynamic(() => import('@/components/documentos/ConsentimientoInformadoForm'), { ssr: false, loading: FormLoader })
 
 const TABS = [
   { key: 'receta', label: 'Receta', icon: Pill, color: 'text-blue-700 border-blue-500 bg-blue-50', inactive: 'text-slate-500 hover:text-blue-600 hover:bg-blue-50' },
@@ -30,6 +31,7 @@ const TABS = [
   { key: 'suplementacion', label: 'Suplementación', icon: ClipboardList, color: 'text-amber-700 border-amber-500 bg-amber-50', inactive: 'text-slate-500 hover:text-amber-600 hover:bg-amber-50' },
   { key: 'internamiento', label: 'Internamiento', icon: BedDouble, color: 'text-rose-700 border-rose-500 bg-rose-50', inactive: 'text-slate-500 hover:text-rose-600 hover:bg-rose-50' },
   { key: 'escrito', label: 'Escrito Médico', icon: PenLine, color: 'text-teal-700 border-teal-500 bg-teal-50', inactive: 'text-slate-500 hover:text-teal-600 hover:bg-teal-50' },
+  { key: 'consentimiento', label: 'Consentimiento', icon: ShieldCheck, color: 'text-indigo-700 border-indigo-500 bg-indigo-50', inactive: 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50' },
 ] as const
 
 type TabKey = typeof TABS[number]['key']
@@ -94,6 +96,7 @@ function DocumentosPacienteContent() {
       {tab === 'suplementacion' && <PlanSuplementacionForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} />}
       {tab === 'internamiento' && <SolicitudInternamientoForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} />}
       {tab === 'escrito' && <EscritoMedicoForm pacienteInicial={nombreCompleto} pacienteId={id} />}
+      {tab === 'consentimiento' && <ConsentimientoInformadoForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} />}
     </div>
   )
 }

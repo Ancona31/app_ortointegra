@@ -11,6 +11,9 @@ const TIPO_DOC_LABEL: Record<string, string> = {
   solicitud_imagen: 'Solicitud de Imagen',
   plan_suplementacion: 'Plan de Suplementación',
   informe_clinico: 'Informe Clínico',
+  escrito_medico: 'Escrito Médico',
+  solicitud_internamiento: 'Solicitud de Internamiento',
+  consentimiento_informado: 'Consentimiento Informado',
 }
 const TIPO_DOC_COLOR: Record<string, string> = {
   receta: 'bg-blue-100 text-blue-700',
@@ -18,6 +21,9 @@ const TIPO_DOC_COLOR: Record<string, string> = {
   solicitud_imagen: 'bg-violet-100 text-violet-700',
   plan_suplementacion: 'bg-amber-100 text-amber-700',
   informe_clinico: 'bg-slate-100 text-slate-600',
+  escrito_medico: 'bg-teal-100 text-teal-700',
+  solicitud_internamiento: 'bg-rose-100 text-rose-700',
+  consentimiento_informado: 'bg-indigo-100 text-indigo-700',
 }
 
 interface Props {
@@ -151,6 +157,31 @@ export default function ModalVisorDocumento({ doc, onClose, pacienteEmail }: Pro
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* CONSENTIMIENTO INFORMADO */}
+          {doc.tipo === 'consentimiento_informado' && (
+            <div className="space-y-3">
+              {doc.contenido?.procedimiento && (
+                <div className="flex gap-2">
+                  <span className="font-medium text-slate-500 min-w-[90px]">Procedimiento:</span>
+                  <span>{doc.contenido.procedimiento}</span>
+                </div>
+              )}
+              {doc.contenido?.tutor && (
+                <div className="flex gap-2">
+                  <span className="font-medium text-slate-500 min-w-[90px]">Tutor:</span>
+                  <span>{doc.contenido.tutor}</span>
+                </div>
+              )}
+              {doc.contenido?.cuerpo && (
+                <div
+                  className="text-sm text-slate-600 leading-relaxed border-t border-slate-100 pt-3"
+                  style={{ fontFamily: 'Georgia, serif' }}
+                  dangerouslySetInnerHTML={{ __html: doc.contenido.cuerpo }}
+                />
+              )}
             </div>
           )}
 
