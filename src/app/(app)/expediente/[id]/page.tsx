@@ -142,6 +142,12 @@ function ExpedientePacienteContent() {
       })
   }, [labs])
 
+  async function eliminarDocumento(docId: string) {
+    const supabase = createClient()
+    await supabase.from('documentos').delete().eq('id', docId)
+    setDocumentos(prev => prev.filter(d => d.id !== docId))
+  }
+
   async function eliminarLab(labId: string) {
     setEliminandoLab(labId)
     const supabase = createClient()
@@ -389,6 +395,7 @@ function ExpedientePacienteContent() {
           id={id}
           documentos={documentos}
           onVerDocumento={setDocSeleccionado}
+          onEliminarDocumento={eliminarDocumento}
         />
       )}
 

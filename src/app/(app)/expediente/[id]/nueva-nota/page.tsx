@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Paciente } from '@/types'
 import { differenceInYears, parseISO } from 'date-fns'
 import { flushSync } from 'react-dom'
-import { ArrowLeft, Save, Loader2, RotateCcw, Printer, Eye, Pencil, Pill, FlaskConical, ScanLine, ClipboardList, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Save, Loader2, RotateCcw, Printer, Eye, Pencil, Pill, FlaskConical, ScanLine, ClipboardList, CheckCircle2, BedDouble, PenLine, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 import ConsultaRapida from '@/components/ConsultaRapida'
@@ -352,10 +352,13 @@ export default function NuevaNotaPage() {
   }
 
   const DOCS = [
-    { key: 'receta', label: 'Receta médica', icon: Pill, color: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' },
-    { key: 'lab', label: 'Solicitud de laboratorio', icon: FlaskConical, color: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' },
-    { key: 'imagen', label: 'Solicitud de imagen', icon: ScanLine, color: 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100' },
-    { key: 'suplementacion', label: 'Plan de suplementación', icon: ClipboardList, color: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100' },
+    { key: 'receta',          label: 'Receta médica',           icon: Pill,         color: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' },
+    { key: 'lab',             label: 'Solicitud de laboratorio', icon: FlaskConical, color: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' },
+    { key: 'imagen',          label: 'Solicitud de imagen',      icon: ScanLine,     color: 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100' },
+    { key: 'suplementacion',  label: 'Plan de suplementación',   icon: ClipboardList,color: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100' },
+    { key: 'internamiento',   label: 'Internamiento',            icon: BedDouble,    color: 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100' },
+    { key: 'escrito',         label: 'Escrito médico',           icon: PenLine,      color: 'border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100' },
+    { key: 'consentimiento',  label: 'Consentimiento',           icon: ShieldCheck,  color: 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100' },
   ]
 
   return (

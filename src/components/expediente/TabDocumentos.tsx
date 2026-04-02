@@ -2,7 +2,7 @@
 
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ClipboardList, Eye, FileText, FlaskConical, Pill, ScanLine } from 'lucide-react'
+import { ClipboardList, Eye, FileText, FlaskConical, Pill, ScanLine, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 
 const TIPO_DOC_LABEL: Record<string, string> = {
@@ -30,9 +30,10 @@ interface Props {
   id: string
   documentos: any[]
   onVerDocumento: (doc: any) => void
+  onEliminarDocumento?: (id: string) => void
 }
 
-export default function TabDocumentos({ id, documentos, onVerDocumento }: Props) {
+export default function TabDocumentos({ id, documentos, onVerDocumento, onEliminarDocumento }: Props) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -72,12 +73,27 @@ export default function TabDocumentos({ id, documentos, onVerDocumento }: Props)
                     {doc.contenido?.diagnostico && ` · ${doc.contenido.diagnostico}`}
                   </p>
                 </div>
-                <button
-                  onClick={() => onVerDocumento(doc)}
-                  className="flex items-center gap-1 text-xs text-[#1e5fa8] hover:text-[#1a3a5c] font-medium px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors flex-shrink-0"
-                >
-                  <Eye size={14} /> Ver
-                </button>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    onClick={() => onVerDocumento(doc)}
+                    className="flex items-center gap-1 text-xs text-[#1e5fa8] hover:text-[#1a3a5c] font-medium px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors"
+                  >
+                    <Eye size={14} /> Ver
+                  </button>
+                  {onEliminarDocumento && (
+                    <button
+                      onClick={() => {
+                        if (window.confirm('¿Eliminar este documento? Esta acción es permanente y no podrá recuperarse nunca.')) {
+                          onEliminarDocumento(doc.id)
+                        }
+                      }}
+                      className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600 font-medium px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                      title="Eliminar documento"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
