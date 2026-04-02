@@ -27,11 +27,11 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
   const isLoginPage = pathname === '/login'
-  const isPublicPage = ['/forgot-password', '/reset-password', '/auth/confirm'].includes(pathname)
+  const isPublicPage = ['/forgot-password', '/reset-password', '/auth/confirm', '/pricing'].includes(pathname)
     || pathname.startsWith('/r/')
 
-  // Rutas API que no requieren sesión (OAuth callbacks)
-  const publicApiPaths = ['/api/google/callback']
+  // Rutas API que no requieren sesión (OAuth callbacks y Stripe webhook)
+  const publicApiPaths = ['/api/google/callback', '/api/stripe/webhook']
   const isPublicApi = publicApiPaths.some(p => pathname.startsWith(p))
 
   // Si no hay sesión y no está en ruta pública → redirigir a login
