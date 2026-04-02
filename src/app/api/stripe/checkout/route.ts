@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
     customer: customerId,
     mode: 'subscription',
     payment_method_types: ['card'],
+    payment_method_collection: 'always',
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: `${baseUrl}/billing?success=true&plan=${planKey}`,
     cancel_url: `${baseUrl}/pricing`,
