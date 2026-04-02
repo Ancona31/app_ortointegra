@@ -22,11 +22,11 @@ const SECCIONES_DEFAULT = {
 
   anestesia: `La intervención puede precisar anestesia, cuyo tipo y modalidad serán valorados en forma individual de acuerdo con las características del paciente y del procedimiento. El médico anestesiólogo le informará cuál es la alternativa más adecuada para su caso y resolverá cualquier duda al respecto.`,
 
-  descripcion: `Describir aquí el procedimiento quirúrgico: vía de abordaje, técnica a utilizar, estructuras involucradas, materiales o implantes a emplear (si aplica), y cualquier aspecto relevante específico de esta cirugía. Si durante el procedimiento fuera necesario modificar la técnica inicialmente planeada, el equipo médico tomará la decisión más conveniente para preservar la salud del paciente.`,
+  descripcion: ``,
 
   riesgosComunes: `Cualquier procedimiento quirúrgico conlleva riesgos comunes independientemente de la técnica empleada, que incluyen pero no se limitan a: sangrado transoperatorio o postoperatorio, infección superficial o profunda de la herida quirúrgica, reacciones adversas a la anestesia o medicamentos, trombosis venosa profunda, tromboembolismo pulmonar, cicatrización anómala (cicatriz hipertrófica o queloide), dehiscencia de herida, y en casos excepcionales, complicaciones graves que podrían requerir tratamientos complementarios médicos o quirúrgicos e incluso, en un mínimo porcentaje de casos, ser causa de muerte.\n\nCuando sea médicamente necesario, el paciente autoriza la transfusión de sangre y/o hemoderivados en la cantidad y frecuencia requeridas, habiendo sido informado de que las transfusiones no siempre producen el resultado deseado y que existe la posibilidad de resultados no favorables.`,
 
-  riesgosEspecificos: `Describir aquí los riesgos específicos propios de este procedimiento: complicaciones neurológicas, vasculares, de implantes, u otras que correspondan a la cirugía en cuestión, indicando frecuencia aproximada cuando sea posible (ej. "en alrededor del 1% de los casos").\n\nSi surgiera alguna situación imprevista durante la intervención que precisara la realización de un procedimiento distinto al informado, se consultará con el familiar autorizado. Únicamente cuando las eventualidades acontecidas pongan en riesgo la vida del paciente, se autoriza al equipo quirúrgico para adoptar la decisión más conveniente conforme a la normatividad vigente.`,
+  riesgosEspecificos: ``,
 
   alternativas: `Como alternativa al procedimiento propuesto, el paciente puede optar por tratamiento conservador que incluye manejo analgésico y antiinflamatorio, reposo relativo, rehabilitación física, uso de ortesis o inmovilización y otras medidas paliativas. Dicho tratamiento posiblemente mejore los síntomas sin resolver la causa de fondo, pudiendo requerir manejo definitivo en el futuro.`,
 }
@@ -44,8 +44,8 @@ const LABELS: Record<SeccionKey, { num: string; titulo: string; hint: string }> 
 }
 
 function SeccionCard({
-  seccionKey, value, onChange,
-}: { seccionKey: SeccionKey; value: string; onChange: (v: string) => void }) {
+  seccionKey, value, onChange, requerido,
+}: { seccionKey: SeccionKey; value: string; onChange: (v: string) => void; requerido?: boolean }) {
   const [abierta, setAbierta] = useState(true)
   const { num, titulo, hint } = LABELS[seccionKey]
 
@@ -59,7 +59,9 @@ function SeccionCard({
         <span className="w-6 h-6 rounded-full bg-[#1e5fa8] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
           {num}
         </span>
-        <span className="font-semibold text-slate-700 text-sm flex-1">{titulo}</span>
+        <span className="font-semibold text-slate-700 text-sm flex-1">
+          {titulo}{requerido && <span className="text-red-400 ml-1">*</span>}
+        </span>
         {abierta ? <ChevronUp size={15} className="text-slate-400" /> : <ChevronDown size={15} className="text-slate-400" />}
       </button>
 
@@ -121,13 +123,15 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
 
   async function imprimir() {
     const faltantes = [
-      { val: paciente,      label: 'Nombre del paciente' },
-      { val: lugar,         label: 'Lugar' },
-      { val: fecha,         label: 'Fecha' },
-      { val: edad,          label: 'Edad' },
-      { val: procedimiento, label: 'Procedimiento' },
-      { val: diagnostico,   label: 'Diagnóstico' },
-      { val: familiar,      label: 'Familiar responsable' },
+      { val: paciente,                    label: 'Nombre del paciente' },
+      { val: lugar,                       label: 'Lugar' },
+      { val: fecha,                       label: 'Fecha' },
+      { val: edad,                        label: 'Edad' },
+      { val: procedimiento,               label: 'Procedimiento' },
+      { val: diagnostico,                 label: 'Diagnóstico' },
+      { val: familiar,                    label: 'Familiar responsable' },
+      { val: secciones.descripcion,       label: 'Descripción del procedimiento' },
+      { val: secciones.riesgosEspecificos, label: 'Riesgos específicos' },
     ].filter(c => !c.val.trim()).map(c => c.label)
     if (faltantes.length > 0) {
       alert(`Campos obligatorios faltantes:\n• ${faltantes.join('\n• ')}`)
@@ -515,6 +519,7 @@ ${_htmlDeneg}
           seccionKey={key}
           value={secciones[key]}
           onChange={v => updateSeccion(key, v)}
+          requerido={key === 'descripcion' || key === 'riesgosEspecificos'}
         />
       ))}
 
