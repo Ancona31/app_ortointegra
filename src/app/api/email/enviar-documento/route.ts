@@ -11,6 +11,9 @@ const TIPO_LABEL: Record<string, string> = {
   plan_suplementacion: 'Plan de suplementación',
   informe_clinico: 'Informe clínico',
   escrito_medico: 'Escrito médico',
+  solicitud_internamiento: 'Solicitud de internamiento',
+  consentimiento_informado: 'Consentimiento informado',
+  nota_honorarios: 'Recibo de honorarios',
 }
 
 export async function POST(req: NextRequest) {
@@ -47,7 +50,7 @@ export async function POST(req: NextRequest) {
   const html = generarHtmlEmail(doc, medicoNombre, tipoLabel)
 
   const { error } = await resend.emails.send({
-    from: 'OrthoIntegra <noreply@mail.ortointegra.com>',
+    from: 'OrtoIntegra <noreply@mail.ortointegra.com>',
     to: pacienteEmail,
     subject: `${tipoLabel} — ${medicoNombre}`,
     html,
@@ -56,6 +59,10 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json({ ok: true })
+}
+
+function fmtCurrency(amount: number, currency = 'MXN'): string {
+  return amount.toLocaleString(currency === 'USD' ? 'en-US' : 'es-MX', { style: 'currency', currency })
 }
 
 function generarHtmlEmail(doc: any, medicoNombre: string, tipoLabel: string): string {
@@ -89,7 +96,7 @@ function generarHtmlEmail(doc: any, medicoNombre: string, tipoLabel: string): st
     const items = contenido.estudios
       .map((e: string) => `<li style="padding:8px 0;border-bottom:1px solid #f1f5f9;color:#334155;">${e}</li>`)
       .join('')
-    cuerpo = `<ul style="list-style:none;padding:0;margin:16px 0;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;padding:0 16px;">${items}</ul>`
+    cuerpo = `<ul style="list-style:none;padding:0 16px;margin:16px 0;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">${items}</ul>`
     if (contenido.notas) {
       cuerpo += `<p style="color:#475569;font-size:14px;">${contenido.notas}</p>`
     }
@@ -101,14 +108,81 @@ function generarHtmlEmail(doc: any, medicoNombre: string, tipoLabel: string): st
       </li>`)
       .join('')
     cuerpo = `<ul style="list-style:none;padding:0;margin:16px 0;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">${items}</ul>`
-  } else if (tipo === 'plan_suplementacion' && contenido?.suplementos?.length) {
-    const items = contenido.suplementos
+  } else if (tipo === 'plan_suplementacion' && contenido?.seleccionados?.length) {
+    const items = contenido.seleccionados
       .map((s: any, i: number) => `<li style="padding:10px 12px;border-bottom:1px solid #f1f5f9;">
         <strong style="color:#1e293b;">${i + 1}. ${s.nombre}</strong>${s.dosis ? ` — ${s.dosis}` : ''}
         ${s.justificacion ? `<br><span style="color:#64748b;font-size:12px;">${s.justificacion}</span>` : ''}
       </li>`)
       .join('')
     cuerpo = `<ul style="list-style:none;padding:0;margin:16px 0;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">${items}</ul>`
+    if (contenido.notas) {
+      cuerpo += `<div style="margin-top:16px;padding:14px 16px;background:#fffbeb;border-radius:8px;border:1px solid #fde68a;">
+        <p style="margin:0 0 6px;font-weight:600;color:#92400e;font-size:13px;">Notas</p>
+        <p style="margin:0;color:#78350f;font-size:14px;">${contenido.notas}</p>
+      </div>`
+    }
+  } else if (tipo === 'escrito_medico') {
+    if (contenido?.asunto) {
+      cuerpo += `<div style="margin-bottom:16px;padding:12px 16px;background:#f0fdfa;border-radius:8px;border-left:4px solid #0d9488;">
+        <p style="margin:0 0 2px;font-size:11px;color:#0f766e;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Asunto</p>
+        <p style="margin:0;font-weight:600;color:#134e4a;font-size:15px;">${contenido.asunto}</p>
+      </div>`
+    }
+    if (contenido?.cuerpo) {
+      cuerpo += `<div style="padding:16px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;font-family:Georgia,serif;font-size:14px;line-height:1.7;color:#334155;">
+        ${contenido.cuerpo}
+      </div>`
+    }
+  } else if (tipo === 'consentimiento_informado') {
+    const filas = [
+      contenido?.procedimiento ? `<tr><td style="color:#64748b;font-size:12px;padding:8px 0 2px;">Procedimiento</td></tr><tr><td style="font-weight:600;color:#1e293b;font-size:14px;padding-bottom:10px;">${contenido.procedimiento}</td></tr>` : '',
+      contenido?.familiar ? `<tr><td style="color:#64748b;font-size:12px;padding:8px 0 2px;">Familiar / Representante</td></tr><tr><td style="font-weight:600;color:#1e293b;font-size:14px;padding-bottom:10px;">${contenido.familiar}</td></tr>` : '',
+      contenido?.anestesiologo ? `<tr><td style="color:#64748b;font-size:12px;padding:8px 0 2px;">Anestesiólogo</td></tr><tr><td style="font-weight:600;color:#1e293b;font-size:14px;padding-bottom:10px;">${contenido.anestesiologo}</td></tr>` : '',
+    ].filter(Boolean).join('')
+    if (filas) {
+      cuerpo = `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;border:1px solid #e2e8f0;border-radius:8px;padding:16px;">${filas}</table>`
+    }
+    cuerpo += `<div style="margin-top:16px;padding:14px 16px;background:#eef2ff;border-radius:8px;border:1px solid #c7d2fe;">
+      <p style="margin:0;color:#3730a3;font-size:13px;line-height:1.5;">Este documento es un consentimiento informado emitido por tu médico. Si tienes dudas, comunícate directamente con el consultorio.</p>
+    </div>`
+  } else if (tipo === 'solicitud_internamiento') {
+    const filas = [
+      contenido?.hospital ? `<tr><td style="color:#64748b;font-size:12px;padding:8px 0 2px;">Hospital</td></tr><tr><td style="font-weight:600;color:#1e293b;font-size:14px;padding-bottom:10px;">${contenido.hospital}</td></tr>` : '',
+      contenido?.motivo ? `<tr><td style="color:#64748b;font-size:12px;padding:8px 0 2px;">Motivo de internamiento</td></tr><tr><td style="font-weight:600;color:#1e293b;font-size:14px;padding-bottom:10px;">${contenido.motivo}</td></tr>` : '',
+      contenido?.tipo_internamiento ? `<tr><td style="color:#64748b;font-size:12px;padding:8px 0 2px;">Tipo</td></tr><tr><td style="font-weight:600;color:#1e293b;font-size:14px;padding-bottom:10px;">${contenido.tipo_internamiento}</td></tr>` : '',
+    ].filter(Boolean).join('')
+    if (filas) {
+      cuerpo = `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;border:1px solid #e2e8f0;border-radius:8px;padding:16px;">${filas}</table>`
+    }
+  } else if (tipo === 'nota_honorarios') {
+    if (contenido?.folio) {
+      cuerpo += `<p style="font-size:12px;color:#94a3b8;margin:0 0 16px;">Folio: <span style="font-family:monospace;">${contenido.folio}</span></p>`
+    }
+    if (contenido?.lineas?.length) {
+      const filas = contenido.lineas
+        .map((l: any) => `<tr>
+          <td style="padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#334155;font-size:14px;">${l.concepto}</td>
+          <td style="padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#334155;font-size:14px;text-align:right;font-family:monospace;">${fmtCurrency(Number(l.precio), contenido.divisa)}</td>
+        </tr>`)
+        .join('')
+      cuerpo += `<table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:4px;">
+        <thead><tr>
+          <th style="padding:10px 14px;background:#f8fafc;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;text-align:left;">Concepto</th>
+          <th style="padding:10px 14px;background:#f8fafc;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;text-align:right;">Precio</th>
+        </tr></thead>
+        <tbody>${filas}</tbody>
+      </table>`
+    }
+    if (contenido?.monto != null) {
+      cuerpo += `<div style="background:linear-gradient(135deg,#1a3a5c,#1e5fa8);border-radius:8px;padding:14px 18px;display:flex;justify-content:space-between;margin-top:8px;">
+        <span style="color:#93c5fd;font-weight:600;font-size:14px;">Total</span>
+        <span style="color:#ffffff;font-weight:700;font-size:18px;">${fmtCurrency(Number(contenido.monto), contenido.divisa)} <span style="font-size:11px;opacity:0.7;">${contenido.divisa || 'MXN'}</span></span>
+      </div>`
+    }
+    if (contenido?.forma_pago) {
+      cuerpo += `<p style="margin:12px 0 0;font-size:13px;color:#64748b;">Forma de pago: <strong style="color:#334155;">${contenido.forma_pago}</strong></p>`
+    }
   }
 
   return `<!DOCTYPE html>
@@ -117,7 +191,7 @@ function generarHtmlEmail(doc: any, medicoNombre: string, tipoLabel: string): st
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;background:#f8fafc;margin:0;padding:0;">
   <div style="max-width:560px;margin:40px auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
     <div style="background:linear-gradient(135deg,#1a3a5c,#1e5fa8);padding:28px;">
-      <p style="margin:0 0 4px;color:#93c5fd;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:600;">OrthoIntegra</p>
+      <p style="margin:0 0 4px;color:#93c5fd;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:600;">OrtoIntegra</p>
       <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">${tipoLabel}</h1>
     </div>
     <div style="padding:28px;">
@@ -133,7 +207,7 @@ function generarHtmlEmail(doc: any, medicoNombre: string, tipoLabel: string): st
       </table>
       ${cuerpo}
       <p style="margin:28px 0 0;font-size:12px;color:#94a3b8;border-top:1px solid #f1f5f9;padding-top:16px;">
-        Documento generado el ${fecha}. Este mensaje fue enviado desde el sistema de gestión clínica OrthoIntegra.
+        Documento generado el ${fecha}. Este mensaje fue enviado desde el sistema de gestión clínica OrtoIntegra.
       </p>
     </div>
   </div>

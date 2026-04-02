@@ -162,6 +162,25 @@ export default function ModalVisorDocumento({ doc, onClose, pacienteEmail }: Pro
             </div>
           )}
 
+          {/* ESCRITO MÉDICO */}
+          {doc.tipo === 'escrito_medico' && (
+            <div className="space-y-3">
+              {doc.contenido?.asunto && (
+                <div className="flex gap-2">
+                  <span className="font-medium text-slate-500 min-w-[90px]">Asunto:</span>
+                  <span className="font-medium text-[#1a3a5c]">{doc.contenido.asunto}</span>
+                </div>
+              )}
+              {doc.contenido?.cuerpo && (
+                <div
+                  className="text-sm text-slate-600 leading-relaxed border-t border-slate-100 pt-3"
+                  style={{ fontFamily: 'Georgia, serif' }}
+                  dangerouslySetInnerHTML={{ __html: doc.contenido.cuerpo }}
+                />
+              )}
+            </div>
+          )}
+
           {/* NOTA DE HONORARIOS */}
           {doc.tipo === 'nota_honorarios' && (
             <div className="space-y-3">
@@ -171,17 +190,33 @@ export default function ModalVisorDocumento({ doc, onClose, pacienteEmail }: Pro
                   <span className="font-mono text-sm">{doc.contenido.folio}</span>
                 </div>
               )}
-              {doc.contenido?.concepto && (
-                <div className="flex gap-2">
-                  <span className="font-medium text-slate-500 min-w-[90px]">Concepto:</span>
-                  <span className="whitespace-pre-wrap">{doc.contenido.concepto}</span>
+              {doc.contenido?.lineas?.length > 0 && (
+                <div>
+                  <p className="font-semibold text-slate-700 mb-2">Conceptos</p>
+                  <div className="space-y-1">
+                    {doc.contenido.lineas.map((l: any, i: number) => (
+                      <div key={i} className="flex justify-between text-sm bg-slate-50 rounded px-3 py-1.5">
+                        <span>{l.concepto}</span>
+                        <span className="font-mono text-slate-600">
+                          {Number(l.precio).toLocaleString(
+                            doc.contenido.divisa === 'USD' ? 'en-US' : 'es-MX',
+                            { style: 'currency', currency: doc.contenido.divisa || 'MXN' }
+                          )}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
               {doc.contenido?.monto != null && (
-                <div className="flex gap-2">
-                  <span className="font-medium text-slate-500 min-w-[90px]">Monto:</span>
-                  <span className="font-semibold text-lg text-[#1a3a5c]">
-                    {Number(doc.contenido.monto).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}
+                <div className="flex justify-between items-center bg-[#1a3a5c] text-white rounded-lg px-4 py-2.5">
+                  <span className="font-semibold">Total</span>
+                  <span className="font-bold text-lg">
+                    {Number(doc.contenido.monto).toLocaleString(
+                      doc.contenido.divisa === 'USD' ? 'en-US' : 'es-MX',
+                      { style: 'currency', currency: doc.contenido.divisa || 'MXN' }
+                    )}
+                    {doc.contenido.divisa && <span className="text-xs ml-1 opacity-75">{doc.contenido.divisa}</span>}
                   </span>
                 </div>
               )}
@@ -215,28 +250,27 @@ export default function ModalVisorDocumento({ doc, onClose, pacienteEmail }: Pro
                   <span>{doc.contenido.procedimiento}</span>
                 </div>
               )}
-              {doc.contenido?.tutor && (
+              {doc.contenido?.familiar && (
                 <div className="flex gap-2">
-                  <span className="font-medium text-slate-500 min-w-[90px]">Tutor:</span>
-                  <span>{doc.contenido.tutor}</span>
+                  <span className="font-medium text-slate-500 min-w-[90px]">Familiar:</span>
+                  <span>{doc.contenido.familiar}</span>
                 </div>
               )}
-              {doc.contenido?.cuerpo && (
-                <div
-                  className="text-sm text-slate-600 leading-relaxed border-t border-slate-100 pt-3"
-                  style={{ fontFamily: 'Georgia, serif' }}
-                  dangerouslySetInnerHTML={{ __html: doc.contenido.cuerpo }}
-                />
+              {doc.contenido?.anestesiologo && (
+                <div className="flex gap-2">
+                  <span className="font-medium text-slate-500 min-w-[90px]">Anestesiólogo:</span>
+                  <span>{doc.contenido.anestesiologo}</span>
+                </div>
               )}
             </div>
           )}
 
           {/* PLAN SUPLEMENTACIÓN */}
-          {doc.tipo === 'plan_suplementacion' && doc.contenido?.suplementos?.length > 0 && (
+          {doc.tipo === 'plan_suplementacion' && doc.contenido?.seleccionados?.length > 0 && (
             <div>
               <p className="font-semibold text-slate-700 mb-2">Suplementos</p>
               <div className="space-y-2">
-                {doc.contenido.suplementos.map((s: any, i: number) => (
+                {doc.contenido.seleccionados.map((s: any, i: number) => (
                   <div key={i} className="bg-amber-50 rounded-lg p-3">
                     <p className="font-medium text-amber-900">{i + 1}. {s.nombre}</p>
                     {s.dosis && <p className="text-xs text-amber-700 mt-0.5">Dosis: {s.dosis}</p>}
@@ -244,6 +278,12 @@ export default function ModalVisorDocumento({ doc, onClose, pacienteEmail }: Pro
                   </div>
                 ))}
               </div>
+              {doc.contenido?.notas && (
+                <div className="mt-3">
+                  <p className="font-semibold text-slate-700 mb-1">Notas</p>
+                  <p className="text-sm text-slate-600">{doc.contenido.notas}</p>
+                </div>
+              )}
             </div>
           )}
         </div>
