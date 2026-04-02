@@ -83,6 +83,7 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
 
   // Campos de identificación
   const [paciente, setPaciente]               = useState(pacienteInicial)
+  const [lugar, setLugar]                     = useState('')
   const [fecha, setFecha]                     = useState(new Date().toISOString().split('T')[0])
   const [expediente, setExpediente]           = useState('')
   const [edad, setEdad]                       = useState('')
@@ -119,6 +120,19 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
   }
 
   async function imprimir() {
+    const faltantes = [
+      { val: paciente,      label: 'Nombre del paciente' },
+      { val: lugar,         label: 'Lugar' },
+      { val: fecha,         label: 'Fecha' },
+      { val: edad,          label: 'Edad' },
+      { val: procedimiento, label: 'Procedimiento' },
+      { val: diagnostico,   label: 'Diagnóstico' },
+      { val: familiar,      label: 'Familiar responsable' },
+    ].filter(c => !c.val.trim()).map(c => c.label)
+    if (faltantes.length > 0) {
+      alert(`Campos obligatorios faltantes:\n• ${faltantes.join('\n• ')}`)
+      return
+    }
     flushSync(() => setImprimiendo(true))
     try {
       const supabase = createClient()
@@ -126,7 +140,7 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
         ...(pacienteId ? { paciente_id: pacienteId } : {}),
         tipo: 'consentimiento_informado',
         contenido: {
-          paciente, fecha, expediente, edad, idPaciente, procedimiento, diagnostico,
+          paciente, lugar, fecha, expediente, edad, idPaciente, procedimiento, diagnostico,
           familiar, idFamiliar, representante, idRepresentante, anestesiologo,
           testigo1, testigo2, autorizaTransfusion, autorizaFotos,
           secciones,
@@ -310,7 +324,8 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
   <div class="datos-wrap">
     <div class="datos-head"><span class="datos-head-txt">Datos de Identificación</span></div>
     <div class="datos-grid">
-      <div class="dato-cell"><span class="dato-lbl">Lugar y Fecha</span><span class="dato-val">${fechaFmt}</span></div>
+      <div class="dato-cell"><span class="dato-lbl">Lugar</span><span class="dato-val">${lugar || ''}</span></div>
+      <div class="dato-cell"><span class="dato-lbl">Fecha</span><span class="dato-val">${fechaFmt}</span></div>
       <div class="dato-cell"><span class="dato-lbl">No. Expediente</span><span class="dato-val">${expediente || ''}</span></div>
       <div class="dato-cell"><span class="dato-lbl">Nombre del Paciente</span><span class="dato-val">${paciente || ''}</span></div>
       <div class="dato-cell"><span class="dato-lbl">Edad</span><span class="dato-val">${edad || ''}</span></div>
@@ -396,35 +411,39 @@ ${_htmlDeneg}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Fecha</label>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Lugar <span className="text-red-400">*</span></label>
+            <input type="text" value={lugar} onChange={e => setLugar(e.target.value)} placeholder="Ej: Monterrey, N.L." className={inputCls} />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Fecha <span className="text-red-400">*</span></label>
             <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className={inputCls} />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Paciente</label>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Paciente <span className="text-red-400">*</span></label>
             <input type="text" value={paciente} onChange={e => setPaciente(e.target.value)} placeholder="Nombre completo" className={inputCls} />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Edad del paciente <span className="text-red-400">*</span></label>
+            <input type="text" value={edad} onChange={e => setEdad(e.target.value)} placeholder="Ej: 45 años" className={inputCls} />
           </div>
           <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">No. Expediente</label>
             <input type="text" value={expediente} onChange={e => setExpediente(e.target.value)} placeholder="Ej: 2024-001" className={inputCls} />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Edad del paciente</label>
-            <input type="text" value={edad} onChange={e => setEdad(e.target.value)} placeholder="Ej: 45 años" className={inputCls} />
-          </div>
-          <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">Identificado con</label>
             <input type="text" value={idPaciente} onChange={e => setIdPaciente(e.target.value)} placeholder="Ej: INE 123456789" className={inputCls} />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Procedimiento</label>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Procedimiento <span className="text-red-400">*</span></label>
             <input type="text" value={procedimiento} onChange={e => setProcedimiento(e.target.value)} placeholder="Ej: Artrodesis cervical anterior" className={inputCls} />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Diagnóstico</label>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Diagnóstico <span className="text-red-400">*</span></label>
             <input type="text" value={diagnostico} onChange={e => setDiagnostico(e.target.value)} placeholder="Diagnóstico principal" className={inputCls} />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Familiar responsable</label>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Familiar responsable <span className="text-red-400">*</span></label>
             <input type="text" value={familiar} onChange={e => setFamiliar(e.target.value)} placeholder="Nombre completo" className={inputCls} />
           </div>
           <div>
