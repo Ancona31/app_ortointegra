@@ -13,7 +13,7 @@ async function actualizarClinica(
   subscriptionId: string,
   priceId: string,
   estado: 'activo' | 'vencido' | 'cancelado',
-  billingAnchor?: number | null,
+  periodEnd?: number | null,
 ) {
   const limits = PLAN_LIMITS[plan]
   await admin.from('clinicas').update({
@@ -24,8 +24,7 @@ async function actualizarClinica(
     max_medicos: limits.max_medicos,
     max_secretarias: limits.max_secretarias,
     max_pacientes: limits.max_pacientes,
-    // billing_cycle_anchor es el anclaje del ciclo (en Stripe v21 no existe current_period_end)
-    suscripcion_ends_at: billingAnchor ? new Date(billingAnchor * 1000).toISOString() : null,
+    suscripcion_ends_at: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
   }).eq('id', clinicaId)
 }
 
@@ -72,7 +71,7 @@ export async function POST(req: NextRequest) {
         admin, clinicaId, planKey,
         subscription.id, priceId,
         'activo',
-        subscription.billing_cycle_anchor,
+        subscription.items.data[0]?.current_period_end,
       )
       break
     }
@@ -93,7 +92,7 @@ export async function POST(req: NextRequest) {
         admin, clinicaId, planKey,
         subscription.id, priceId,
         estado,
-        subscription.billing_cycle_anchor,
+        subscription.items.data[0]?.current_period_end,
       )
       break
     }
@@ -111,7 +110,9 @@ export async function POST(req: NextRequest) {
         max_medicos: 1,
         max_secretarias: 0,
         max_pacientes: 15,
-        suscripcion_ends_at: new Date(subscription.billing_cycle_anchor * 1000).toISOString(),
+        suscripcion_ends_at: subscription.items.data[0]?.current_period_end
+          ? new Date(subscription.items.data[0].current_period_end * 1000).toISOString()
+          : null,
       }).eq('id', clinicaId)
       break
     }
