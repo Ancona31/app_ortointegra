@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Loader2, Eye, EyeOff, CheckCircle, Building2 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 type Step = 'form' | 'enviado'
 
@@ -35,6 +36,7 @@ export default function RegisterPage() {
     setLoading(true)
     setError('')
 
+    // Paso 1: crear clínica en el servidor
     const res = await fetch('/api/auth/registro', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -42,16 +44,44 @@ export default function RegisterPage() {
     })
 
     const data = await res.json()
-    setLoading(false)
 
     if (!res.ok) {
+      setLoading(false)
       if (res.status === 409) {
         setError(data.error)
-        // Small delay then redirect to login
         setTimeout(() => router.push('/login'), 2000)
       } else {
         setError(data.error || 'Error al crear la cuenta. Intenta de nuevo.')
       }
+      return
+    }
+
+    const { clinica_id } = data
+
+    // Paso 2: crear usuario con signUp (Supabase envía el email de confirmación)
+    const supabase = createClient()
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.ortointegra.com'
+
+    const { error: signUpError } = await supabase.auth.signUp({
+      email: form.email,
+      password: form.password,
+      options: {
+        emailRedirectTo: `${origin}/auth/confirm`,
+        data: {
+          nombre: form.nombre,
+          titulo: form.titulo,
+          especialidad: form.especialidad,
+          cedula_profesional: form.cedula_profesional,
+          cedula_especialidad: form.cedula_especialidad,
+          clinica_id,
+        },
+      },
+    })
+
+    setLoading(false)
+
+    if (signUpError) {
+      setError(signUpError.message || 'Error al crear la cuenta. Intenta de nuevo.')
       return
     }
 

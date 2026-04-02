@@ -22,14 +22,19 @@ function ConfirmContent() {
     const type      = searchParams.get('type')
     const code      = searchParams.get('code')
 
-    // PKCE code exchange — generateLink redirige con ?code= en lugar de ?token_hash=
+    async function completarRegistro() {
+      await fetch('/api/auth/complete-registro', { method: 'POST' })
+      setEstado('confirmado')
+      setTimeout(() => router.push('/dashboard'), 2500)
+    }
+
+    // PKCE code exchange — signUp redirige con ?code=
     if (code) {
       supabase.auth.exchangeCodeForSession(code).then(({ error: err }) => {
         if (err) {
           setEstado('error')
         } else {
-          setEstado('confirmado')
-          setTimeout(() => router.push('/dashboard'), 2500)
+          completarRegistro()
         }
       })
       return
@@ -46,8 +51,7 @@ function ConfirmContent() {
         if (err) {
           setEstado('error')
         } else {
-          setEstado('confirmado')
-          setTimeout(() => router.push('/dashboard'), 2500)
+          completarRegistro()
         }
       })
       return
