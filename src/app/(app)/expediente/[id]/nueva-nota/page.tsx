@@ -1,87 +1,172 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Paciente } from '@/types'
 import { differenceInYears, parseISO } from 'date-fns'
 import { flushSync } from 'react-dom'
-import { ArrowLeft, Save, Loader2, RotateCcw, Printer, Eye, Pencil, Pill, FlaskConical, ScanLine, ClipboardList, CheckCircle2, BedDouble, PenLine, ShieldCheck } from 'lucide-react'
+import {
+  ArrowLeft, Save, Loader2, RotateCcw, Printer, Eye, Pencil,
+  Pill, FlaskConical, ScanLine, ClipboardList, CheckCircle2,
+  BedDouble, PenLine, ShieldCheck, Receipt, Plus, Trash2, X,
+} from 'lucide-react'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 import ConsultaRapida from '@/components/ConsultaRapida'
 import Breadcrumbs from '@/components/layout/Breadcrumbs'
 import { imprimirOCompartir } from '@/lib/mobileShare'
+import dynamic from 'next/dynamic'
+
+const RecetaFormDynamic       = dynamic(() => import('@/components/documentos/RecetaForm'), { ssr: false, loading: () => <FormCargando /> })
+const SolicitudLabFormDynamic = dynamic(() => import('@/components/documentos/SolicitudLabForm'), { ssr: false, loading: () => <FormCargando /> })
+const SolicitudImagenFormDynamic = dynamic(() => import('@/components/documentos/SolicitudImagenForm'), { ssr: false, loading: () => <FormCargando /> })
+const PlanSupFormDynamic      = dynamic(() => import('@/components/documentos/PlanSuplementacionForm'), { ssr: false, loading: () => <FormCargando /> })
+const InternamientoFormDynamic = dynamic(() => import('@/components/documentos/SolicitudInternamientoForm'), { ssr: false, loading: () => <FormCargando /> })
+const EscritoFormDynamic      = dynamic(() => import('@/components/documentos/EscritoMedicoForm'), { ssr: false, loading: () => <FormCargando /> })
+const ConsentimientoFormDynamic = dynamic(() => import('@/components/documentos/ConsentimientoInformadoForm'), { ssr: false, loading: () => <FormCargando /> })
+const HonorariosFormDynamic   = dynamic(() => import('@/components/documentos/NotaHonorariosForm'), { ssr: false, loading: () => <FormCargando /> })
+
+function FormCargando() {
+  return (
+    <div className="flex items-center justify-center py-12 text-slate-400">
+      <Loader2 size={20} className="animate-spin mr-2" />
+      <span className="text-sm">Cargando formulario...</span>
+    </div>
+  )
+}
 
 type MedicoInfo = {
-  nombre: string
-  especialidad: string
-  cedula_profesional: string
-  cedula_especialidad: string
-  logo_url: string | null
-  color_primario: string
-  color_secundario: string
-  direccion_consultorio: string
-  telefono_consultorio: string
+  nombre: string; especialidad: string; cedula_profesional: string
+  cedula_especialidad: string; logo_url: string | null
+  color_primario: string; color_secundario: string
+  direccion_consultorio: string; telefono_consultorio: string
 }
+
+type MedRow = { nombre: string; dosis: string; frecuencia: string; duracion: string }
+type MedicamentoConVia = {
+  nombre_comercial: string; presentacion: string; dosis: string
+  principio_activo: string; indicacion: string; via_administracion: string
+}
+
+const DOCS = [
+  { key: 'receta',         label: 'Receta médica',            icon: Pill,          color: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' },
+  { key: 'lab',            label: 'Solicitud de laboratorio', icon: FlaskConical,  color: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' },
+  { key: 'imagen',         label: 'Solicitud de imagen',      icon: ScanLine,      color: 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100' },
+  { key: 'suplementacion', label: 'Plan de suplementación',   icon: ClipboardList, color: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100' },
+  { key: 'internamiento',  label: 'Internamiento',            icon: BedDouble,     color: 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100' },
+  { key: 'escrito',        label: 'Escrito médico',           icon: PenLine,       color: 'border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100' },
+  { key: 'consentimiento', label: 'Consentimiento',           icon: ShieldCheck,   color: 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100' },
+  { key: 'honorarios',     label: 'Honorarios',               icon: Receipt,       color: 'border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100' },
+]
+
+const MED_VACIA: MedRow = { nombre: '', dosis: '', frecuencia: '', duracion: '' }
 
 export default function NuevaNotaPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const [medicoInfo, setMedicoInfo] = useState<MedicoInfo | null>(null)
-  const [paciente, setPaciente] = useState<Paciente | null>(null)
-  const [form, setForm] = useState({
-    motivo_consulta: '',
-    exploracion_fisica: '',
-    diagnosticos: '',
-    plan_tratamiento: '',
-    gabinete_laboratorios: '',
-    proxima_cita: '',
-  })
-  const [notaGenerada, setNotaGenerada] = useState('')
-  const [modoEdicion, setModoEdicion] = useState(false)
-  const [generando, setGenerando] = useState(false)
-  const [guardando, setGuardando] = useState(false)
-  const [imprimiendo, setImprimiendo] = useState(false)
-  const [error, setError] = useState('')
-  const [modalPost, setModalPost] = useState(false)
+  const [paciente, setPaciente]     = useState<Paciente | null>(null)
 
+  const [form, setForm] = useState({
+    motivo_consulta: '', exploracion_fisica: '', diagnosticos: '',
+    pronostico: '', plan_tratamiento: '', gabinete_laboratorios: '', proxima_cita: '',
+  })
+  const [medicamentos, setMedicamentos] = useState<MedRow[]>([{ ...MED_VACIA }])
+  const [medCache, setMedCache]         = useState<string[]>([])
+  const [showSuggest, setShowSuggest]   = useState<number | null>(null)
+
+  const [notaGenerada, setNotaGenerada] = useState('')
+  const [modoEdicion, setModoEdicion]   = useState(false)
+  const [generando, setGenerando]       = useState(false)
+  const [guardando, setGuardando]       = useState(false)
+  const [imprimiendo, setImprimiendo]   = useState(false)
+  const [error, setError]               = useState('')
+  const [notaSaved, setNotaSaved]       = useState(false)
+  const [docInline, setDocInline]       = useState<string | null>(null)
+
+  const suggestRef = useRef<HTMLDivElement>(null)
+
+  // ── Carga datos ──────────────────────────────────────────────
   useEffect(() => {
     fetch('/api/me/perfil-medico').then(r => r.json()).then(({ medico }) => setMedicoInfo(medico))
-    async function cargar() {
-      const supabase = createClient()
-      const { data } = await supabase.from('pacientes').select('*').eq('id', id).single()
-      setPaciente(data)
-    }
-    cargar()
+    const supabase = createClient()
+    supabase.from('pacientes').select('*').eq('id', id).single().then(({ data }) => setPaciente(data))
+    try {
+      const raw = localStorage.getItem('med-frecuentes')
+      if (raw) {
+        const data = JSON.parse(raw) as { nombre: string; count: number }[]
+        setMedCache(data.sort((a, b) => b.count - a.count).map(d => d.nombre))
+      }
+    } catch {}
   }, [id])
+
+  // Cerrar autocomplete al hacer clic fuera
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (suggestRef.current && !suggestRef.current.contains(e.target as Node)) {
+        setShowSuggest(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  // ── Helpers de medicamentos ───────────────────────────────────
+  function getSuggestions(query: string): string[] {
+    if (!query.trim()) return medCache.slice(0, 6)
+    return medCache.filter(n => n.toLowerCase().includes(query.toLowerCase())).slice(0, 6)
+  }
+
+  function saveMedCache(meds: MedRow[]) {
+    try {
+      const nombres = meds.filter(m => m.nombre.trim()).map(m => m.nombre.trim())
+      if (!nombres.length) return
+      const raw = localStorage.getItem('med-frecuentes')
+      let data: { nombre: string; count: number }[] = []
+      try { if (raw) data = JSON.parse(raw) } catch {}
+      nombres.forEach(nombre => {
+        const idx = data.findIndex(d => d.nombre.toLowerCase() === nombre.toLowerCase())
+        if (idx >= 0) data[idx].count++
+        else data.push({ nombre, count: 1 })
+      })
+      localStorage.setItem('med-frecuentes', JSON.stringify(data))
+      setMedCache(data.sort((a, b) => b.count - a.count).map(d => d.nombre))
+    } catch {}
+  }
+
+  function updateMed(i: number, field: keyof MedRow, val: string) {
+    setMedicamentos(prev => prev.map((m, idx) => idx === i ? { ...m, [field]: val } : m))
+  }
+
+  function addMed() {
+    setMedicamentos(prev => [...prev, { ...MED_VACIA }])
+  }
+
+  function removeMed(i: number) {
+    if (medicamentos.length === 1) { setMedicamentos([{ ...MED_VACIA }]); return }
+    setMedicamentos(prev => prev.filter((_, idx) => idx !== i))
+  }
 
   function update(field: string, val: string) {
     setForm(prev => ({ ...prev, [field]: val }))
   }
 
+  // ── Generar nota con Gemini ───────────────────────────────────
   async function generarNota() {
     if (!form.motivo_consulta) { setError('Ingresa al menos el motivo de consulta'); return }
-    setGenerando(true)
-    setError('')
-
+    setGenerando(true); setError('')
     const edad = paciente?.fecha_nacimiento
-      ? differenceInYears(new Date(), parseISO(paciente.fecha_nacimiento))
-      : null
-
+      ? differenceInYears(new Date(), parseISO(paciente.fecha_nacimiento)) : null
     try {
       const res = await fetch('/api/nota-medica', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           paciente: `${paciente?.nombre} ${paciente?.apellidos}`,
-          edad,
-          sexo: paciente?.sexo,
-          peso: paciente?.peso_kg,
-          talla: paciente?.talla_cm,
+          edad, sexo: paciente?.sexo, peso: paciente?.peso_kg, talla: paciente?.talla_cm,
           antecedentes: [
-            paciente?.ant_patologicos,
-            paciente?.ant_quirurgicos,
+            paciente?.ant_patologicos, paciente?.ant_quirurgicos,
             paciente?.medicamentos_actuales ? `Medicamentos: ${paciente.medicamentos_actuales}` : null,
             paciente?.alergias ? `Alergias: ${paciente.alergias}` : null,
           ].filter(Boolean).join('. '),
@@ -98,10 +183,16 @@ export default function NuevaNotaPage() {
     }
   }
 
+  // ── Guardar nota ──────────────────────────────────────────────
   async function guardar() {
     if (!notaGenerada && !form.motivo_consulta) { setError('Completa la nota antes de guardar'); return }
     setGuardando(true)
     const supabase = createClient()
+
+    const medsConDatos = medicamentos.filter(m => m.nombre.trim())
+    // Append pronóstico al texto de la nota si existe
+    const notaFinal = notaGenerada
+      + (form.pronostico.trim() ? `\n\n**[PRONÓSTICO]:**\n${form.pronostico.trim()}` : '')
 
     const { error: err } = await supabase.from('consultas').insert({
       paciente_id: id,
@@ -110,8 +201,9 @@ export default function NuevaNotaPage() {
       exploracion_fisica: form.exploracion_fisica,
       diagnosticos: form.diagnosticos ? [{ descripcion: form.diagnosticos }] : [],
       plan_tratamiento: form.plan_tratamiento,
-      notas_evolucion: notaGenerada,
+      notas_evolucion: notaFinal,
       proxima_cita: form.proxima_cita || null,
+      medicamentos: medsConDatos.length ? medsConDatos : null,
       medico_nombre: medicoInfo?.nombre || null,
       medico_especialidad: medicoInfo?.especialidad || null,
       medico_cedula_profesional: medicoInfo?.cedula_profesional || null,
@@ -120,54 +212,47 @@ export default function NuevaNotaPage() {
     })
 
     setGuardando(false)
-    if (err) setError('Error al guardar: ' + err.message)
-    else setModalPost(true)
+    if (err) { setError('Error al guardar: ' + err.message); return }
+    saveMedCache(medsConDatos)
+    setNotaSaved(true)
+    setDocInline(null)
   }
 
+  // ── Imprimir nota ─────────────────────────────────────────────
   async function imprimir() {
     if (!paciente) return
     flushSync(() => setImprimiendo(true))
     try {
       const ahora = new Date()
       const edad = paciente.fecha_nacimiento
-        ? differenceInYears(ahora, parseISO(paciente.fecha_nacimiento))
-        : null
+        ? differenceInYears(ahora, parseISO(paciente.fecha_nacimiento)) : null
       const fechaHora = ahora.toLocaleString('es-MX', {
-        day: '2-digit', month: 'long', year: 'numeric',
-        hour: '2-digit', minute: '2-digit', hour12: true,
+        day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true,
       })
       const cp = medicoInfo?.color_primario || '#1a3a5c'
       const cs = medicoInfo?.color_secundario || '#1e5fa8'
       const doctorNombre = medicoInfo?.nombre || 'Médico'
-      const doctorEspecialidad = medicoInfo?.especialidad || ''
-      const cedProf = medicoInfo?.cedula_profesional || ''
-      const cedEsp = medicoInfo?.cedula_especialidad || ''
+      const cedProf  = medicoInfo?.cedula_profesional || ''
+      const cedEsp   = medicoInfo?.cedula_especialidad || ''
       const direccion = medicoInfo?.direccion_consultorio || ''
-      const telefono = medicoInfo?.telefono_consultorio || ''
-      const logoUrl = medicoInfo?.logo_url && medicoInfo.logo_url.startsWith('https://')
-        ? medicoInfo.logo_url
-        : `${window.location.origin}/logo.png`
+      const telefono  = medicoInfo?.telefono_consultorio || ''
+      const logoUrl   = medicoInfo?.logo_url && medicoInfo.logo_url.startsWith('https://')
+        ? medicoInfo.logo_url : `${window.location.origin}/logo.png`
 
-      // Convierte el markdown de Gemini a HTML con secciones estilizadas
+      const notaParaImprimir = notaGenerada
+        + (form.pronostico.trim() ? `\n\n**[PRONÓSTICO]:**\n${form.pronostico.trim()}` : '')
+
       function notaToHtml(texto: string): string {
         const lines = texto.split('\n')
         let html = ''
-        // Permisiva: acepta contenido opcional después de ]:** y espacios extras
         const sectionRe = /^\*{1,2}\[([^\]]+)\]:?\*{0,2}\s*(.*)?$/
         for (const line of lines) {
           const trimmed = line.trim()
           if (!trimmed) { html += '<div style="height:5px"></div>'; continue }
-          // Detectar encabezado de sección: debe empezar con * o ** y contener [TEXTO]
           const hasBracket = /\[[^\]]+\]/.test(trimmed)
           const secMatch = hasBracket ? trimmed.match(sectionRe) : null
           if (secMatch) {
-            html += `
-              <div class="seccion-header">
-                <div class="seccion-linea"></div>
-                <div class="seccion-titulo">${secMatch[1]}</div>
-                <div class="seccion-linea"></div>
-              </div>`
-            // Si hay contenido tras el encabezado en la misma línea, renderizarlo
+            html += `<div class="seccion-header"><div class="seccion-linea"></div><div class="seccion-titulo">${secMatch[1]}</div><div class="seccion-linea"></div></div>`
             if (secMatch[2]?.trim()) {
               const contenido = secMatch[2].trim().replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
               html += `<p>${contenido}</p>`
@@ -180,7 +265,8 @@ export default function NuevaNotaPage() {
         return html
       }
 
-      const notaHtml = notaToHtml(notaGenerada)
+      const notaHtml = notaToHtml(notaParaImprimir)
+      const medsParaPDF = medicamentos.filter(m => m.nombre.trim())
 
       const _html = `<!DOCTYPE html>
 <html lang="es">
@@ -192,33 +278,11 @@ export default function NuevaNotaPage() {
   * { margin:0; padding:0; box-sizing:border-box; }
   @page { size: letter; margin: 0; }
   body { font-family: 'Roboto', Arial, sans-serif; font-size: 10pt; color: #1a1a1a; position: relative; }
-
-  .watermark {
-    position: fixed; top: 50%; left: 50%;
-    transform: translate(-50%, -50%) rotate(-25deg);
-    width: 320px; height: 320px;
-    object-fit: contain; opacity: 0.05;
-    pointer-events: none; z-index: 0;
-  }
-
-  .barra-top {
-    background: linear-gradient(135deg, ${cp} 0%, ${cs} 100%);
-    height: 12px; width: 100%;
-  }
-
+  .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-25deg); width: 320px; height: 320px; object-fit: contain; opacity: 0.05; pointer-events: none; z-index: 0; }
+  .barra-top { background: linear-gradient(135deg, ${cp} 0%, ${cs} 100%); height: 12px; width: 100%; }
   .contenido { padding: 12mm 18mm 10mm; position: relative; z-index: 1; }
-
-  .header {
-    display: flex; align-items: center; gap: 18px;
-    padding-bottom: 12px; margin-bottom: 12px;
-    border-bottom: 2px solid ${cp};
-  }
-  .logo-wrap {
-    width: 72px; height: 72px; border-radius: 50%;
-    border: 3px solid ${cs}; overflow: hidden; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    background: #f8fafc;
-  }
+  .header { display: flex; align-items: center; gap: 18px; padding-bottom: 12px; margin-bottom: 12px; border-bottom: 2px solid ${cp}; }
+  .logo-wrap { width: 72px; height: 72px; border-radius: 50%; border: 3px solid ${cs}; overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: #f8fafc; }
   .logo { width: 100%; height: 100%; object-fit: contain; }
   .header-info { flex: 1; }
   .doctor-name { font-size: 14pt; font-weight: bold; color: ${cp}; line-height: 1.2; }
@@ -226,94 +290,49 @@ export default function NuevaNotaPage() {
   .credenciales { font-size: 8pt; color: #666; }
   .contacto { font-size: 7.5pt; color: #888; margin-top: 3px; }
   .titulo-sub { font-size: 7.5pt; color: #aaa; text-align: right; }
-
-  .datos-box {
-    background: linear-gradient(135deg, ${cp}08, ${cs}08);
-    border-left: 4px solid ${cs};
-    border-radius: 0 6px 6px 0;
-    padding: 9px 14px; margin-bottom: 14px;
-  }
+  .datos-box { background: linear-gradient(135deg, ${cp}08, ${cs}08); border-left: 4px solid ${cs}; border-radius: 0 6px 6px 0; padding: 9px 14px; margin-bottom: 14px; }
   .datos-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px 20px; }
   .dato { display: flex; gap: 6px; align-items: baseline; font-size: 9pt; }
   .dato-label { font-weight: bold; color: ${cp}; white-space: nowrap; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.3px; }
   .dato-valor { flex: 1; border-bottom: 1px solid #d1d5db; padding-bottom: 1px; }
-
-  .seccion-header {
-    display: flex; align-items: center; gap: 8px;
-    margin: 13px 0 6px;
-  }
+  .seccion-header { display: flex; align-items: center; gap: 8px; margin: 13px 0 6px; }
   .seccion-linea { flex: 1; height: 1px; background: linear-gradient(to right, ${cp}, transparent); }
-  .seccion-titulo {
-    font-size: 7.5pt; font-weight: bold; color: ${cp};
-    text-transform: uppercase; letter-spacing: 1.5px;
-    background: ${cp}12; padding: 3px 10px; border-radius: 20px;
-    white-space: nowrap;
-  }
-
-  .titulo-nota {
-    background: linear-gradient(135deg, ${cp} 0%, ${cs} 100%);
-    color: #fff; text-align: center;
-    font-size: 11pt; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 2px;
-    padding: 8px 0; border-radius: 4px;
-    margin-bottom: 14px;
-  }
-
+  .seccion-titulo { font-size: 7.5pt; font-weight: bold; color: ${cp}; text-transform: uppercase; letter-spacing: 1.5px; background: ${cp}12; padding: 3px 10px; border-radius: 20px; white-space: nowrap; }
+  .titulo-nota { background: linear-gradient(135deg, ${cp} 0%, ${cs} 100%); color: #fff; text-align: center; font-size: 11pt; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; padding: 8px 0; border-radius: 4px; margin-bottom: 14px; }
   .nota-content { font-size: 9.5pt; line-height: 1.6; color: #2d2d2d; text-align: justify; }
   .nota-content p { margin-bottom: 3px; }
   .nota-content strong { font-weight: 600; color: #111; }
-
-  .fecha-box {
-    margin-top: 12px;
-    background: ${cs}10;
-    border-left: 3px solid ${cs};
-    border-radius: 0 4px 4px 0;
-    padding: 6px 12px;
-    font-size: 9pt;
-  }
-
-  .footer-area { margin-top: 28px; display: flex; justify-content: flex-end; }
-  .firma {
-    text-align: center; min-width: 210px;
-    border-top: 1.5px solid ${cp}; padding-top: 8px;
-  }
-  .firma-nombre { font-weight: bold; font-size: 9.5pt; color: ${cp}; }
+  .fecha-box { margin-top: 12px; background: ${cs}10; border-left: 3px solid ${cs}; border-radius: 0 4px 4px 0; padding: 6px 12px; font-size: 9pt; }
+  /* Terapéutica empleada */
+  .terapeutica { width: 100%; border-collapse: collapse; font-size: 9pt; margin-top: 6px; }
+  .terapeutica th { background: ${cp}15; color: ${cp}; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 10px; text-align: left; border-bottom: 1.5px solid ${cp}40; font-weight: 700; }
+  .terapeutica td { padding: 5px 10px; border-bottom: 1px dotted #e2e8f0; color: #2d2d2d; }
+  .terapeutica tr:last-child td { border-bottom: none; }
+  /* Firma */
+  .footer-area { margin-top: 60px; display: flex; justify-content: flex-end; }
+  .firma { text-align: center; min-width: 240px; }
+  .firma-space { height: 60px; }
+  .firma-linea { border-top: 1.5px solid ${cp}; }
+  .firma-nombre { font-weight: bold; font-size: 9.5pt; color: ${cp}; margin-top: 6px; }
   .firma-ced { font-size: 8pt; color: #666; margin-top: 2px; }
-
-  .barra-bottom {
-    background: linear-gradient(135deg, ${cp} 0%, ${cs} 100%);
-    height: 8px; width: 100%; margin-top: 16px;
-  }
-
-  @media print {
-    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  }
+  .barra-bottom { background: linear-gradient(135deg, ${cp} 0%, ${cs} 100%); height: 8px; width: 100%; margin-top: 16px; }
+  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 </style>
 </head>
 <body>
-
   <img class="watermark" src="${logoUrl}" onerror="this.style.display='none'" />
   <div class="barra-top"></div>
-
   <div class="contenido">
-
     <div class="header">
-      <div class="logo-wrap">
-        <img class="logo" src="${logoUrl}" onerror="this.style.display='none'" />
-      </div>
+      <div class="logo-wrap"><img class="logo" src="${logoUrl}" onerror="this.style.display='none'" /></div>
       <div class="header-info">
         <div class="doctor-name">${doctorNombre}</div>
-        ${doctorEspecialidad ? `<div class="especialidad">${doctorEspecialidad}</div>` : ''}
-        <div class="credenciales">
-          ${cedProf ? `Cédula Prof.: ${cedProf}` : ''}
-          ${cedProf && cedEsp ? ' &nbsp;·&nbsp; ' : ''}
-          ${cedEsp ? `Cédula Esp.: ${cedEsp}` : ''}
-        </div>
+        ${medicoInfo?.especialidad ? `<div class="especialidad">${medicoInfo.especialidad}</div>` : ''}
+        <div class="credenciales">${cedProf ? `Cédula Prof.: ${cedProf}` : ''}${cedProf && cedEsp ? ' &nbsp;·&nbsp; ' : ''}${cedEsp ? `Cédula Esp.: ${cedEsp}` : ''}</div>
         ${direccion || telefono ? `<div class="contacto">${[direccion, telefono ? `Tel: ${telefono}` : ''].filter(Boolean).join(' &nbsp;·&nbsp; ')}</div>` : ''}
       </div>
       <div class="titulo-sub">${fechaHora}</div>
     </div>
-
     <div class="datos-box">
       <div class="datos-grid">
         <div class="dato"><span class="dato-label">Paciente</span><span class="dato-valor">${paciente.nombre} ${paciente.apellidos}</span></div>
@@ -323,25 +342,28 @@ export default function NuevaNotaPage() {
         ${paciente.talla_cm ? `<div class="dato"><span class="dato-label">Talla</span><span class="dato-valor">${paciente.talla_cm} cm</span></div>` : ''}
       </div>
     </div>
-
     <div class="titulo-nota">Nota de Evolución Médica</div>
-
     <div class="nota-content">${notaHtml}</div>
-
-    ${form.proxima_cita ? `<div class="fecha-box"><strong>Fecha:</strong> ${form.proxima_cita}</div>` : ''}
-
+    ${medsParaPDF.length > 0 ? `
+    <div class="seccion-header"><div class="seccion-linea"></div><div class="seccion-titulo">Terapéutica Empleada</div><div class="seccion-linea"></div></div>
+    <table class="terapeutica">
+      <thead><tr><th>Medicamento</th><th>Dosis</th><th>Frecuencia</th><th>Duración</th></tr></thead>
+      <tbody>
+        ${medsParaPDF.map(m => `<tr><td>${m.nombre}</td><td>${m.dosis || '—'}</td><td>${m.frecuencia || '—'}</td><td>${m.duracion || '—'}</td></tr>`).join('')}
+      </tbody>
+    </table>` : ''}
+    ${form.proxima_cita ? `<div class="fecha-box"><strong>Próxima cita:</strong> ${form.proxima_cita}</div>` : ''}
     <div class="footer-area">
       <div class="firma">
+        <div class="firma-space"></div>
+        <div class="firma-linea"></div>
         <div class="firma-nombre">${doctorNombre}</div>
         ${cedProf ? `<div class="firma-ced">Céd. Prof. ${cedProf}</div>` : ''}
         ${cedEsp ? `<div class="firma-ced">Céd. Esp. ${cedEsp}</div>` : ''}
       </div>
     </div>
-
   </div>
-
   <div class="barra-bottom"></div>
-
 </body>
 </html>`
 
@@ -351,19 +373,23 @@ export default function NuevaNotaPage() {
     }
   }
 
-  const DOCS = [
-    { key: 'receta',          label: 'Receta médica',           icon: Pill,         color: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' },
-    { key: 'lab',             label: 'Solicitud de laboratorio', icon: FlaskConical, color: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' },
-    { key: 'imagen',          label: 'Solicitud de imagen',      icon: ScanLine,     color: 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100' },
-    { key: 'suplementacion',  label: 'Plan de suplementación',   icon: ClipboardList,color: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100' },
-    { key: 'internamiento',   label: 'Internamiento',            icon: BedDouble,    color: 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100' },
-    { key: 'escrito',         label: 'Escrito médico',           icon: PenLine,      color: 'border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100' },
-    { key: 'consentimiento',  label: 'Consentimiento',           icon: ShieldCheck,  color: 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100' },
-  ]
+  // ── Medicamentos → formato RecetaForm ─────────────────────────
+  const medicamentosParaReceta: MedicamentoConVia[] = medicamentos
+    .filter(m => m.nombre.trim())
+    .map(m => ({
+      nombre_comercial: m.nombre,
+      presentacion: '',
+      dosis: m.dosis,
+      principio_activo: '',
+      indicacion: [m.frecuencia, m.duracion].filter(Boolean).join(' · '),
+      via_administracion: 'Oral',
+    }))
 
+  const nombrePaciente = paciente ? `${paciente.nombre} ${paciente.apellidos}` : ''
+
+  // ── Render ────────────────────────────────────────────────────
   return (
     <div className="max-w-4xl mx-auto space-y-5">
-      {/* Breadcrumbs */}
       <Breadcrumbs pacienteNombre={paciente ? `${paciente.nombre} ${paciente.apellidos}` : undefined} />
 
       {/* Header */}
@@ -382,7 +408,18 @@ export default function NuevaNotaPage() {
         </div>
       </div>
 
-      {/* Datos de la consulta */}
+      {/* Banner de éxito */}
+      {notaSaved && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
+          <CheckCircle2 size={20} className="text-emerald-500 flex-shrink-0" />
+          <p className="text-sm font-medium text-emerald-700">Nota guardada en el expediente</p>
+          <Link href={`/expediente/${id}`} className="ml-auto text-xs text-emerald-600 hover:underline whitespace-nowrap">
+            Ver expediente →
+          </Link>
+        </div>
+      )}
+
+      {/* ── Formulario de la consulta ── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
           <h2 className="font-semibold text-slate-700 text-sm">Datos de la consulta</h2>
@@ -394,91 +431,132 @@ export default function NuevaNotaPage() {
         </div>
         <div className="p-5 space-y-4">
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">
-              Motivo de consulta <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={form.motivo_consulta}
-              onChange={e => update('motivo_consulta', e.target.value)}
+            <label className="text-xs font-medium text-slate-500 block mb-1">Motivo de consulta <span className="text-red-400">*</span></label>
+            <input type="text" value={form.motivo_consulta} onChange={e => update('motivo_consulta', e.target.value)}
               placeholder="Ej: Dolor lumbar crónico, limitación funcional..."
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
-            />
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
           </div>
           <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">Diagnóstico(s)</label>
-            <input
-              type="text"
-              value={form.diagnosticos}
-              onChange={e => update('diagnosticos', e.target.value)}
-              placeholder="Ej: Hernia discal L4-L5 con radiculopatía derecha, Espondilolistesis L5-S1 grado I..."
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
-            />
+            <input type="text" value={form.diagnosticos} onChange={e => update('diagnosticos', e.target.value)}
+              placeholder="Ej: Hernia discal L4-L5 con radiculopatía derecha..."
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">
-              Exploración física <span className="text-slate-400 font-normal">(opcional — Gemini la complementa)</span>
-            </label>
-            <textarea
-              value={form.exploracion_fisica}
-              onChange={e => update('exploracion_fisica', e.target.value)}
-              placeholder="Ej: Marcha antiálgica, Lasègue positivo a 45° derecho, hipoestesia en L5..."
+            <label className="text-xs font-medium text-slate-500 block mb-1">Exploración física <span className="text-slate-400 font-normal">(opcional — Gemini la complementa)</span></label>
+            <textarea value={form.exploracion_fisica} onChange={e => update('exploracion_fisica', e.target.value)}
+              placeholder="Ej: Marcha antiálgica, Lasègue positivo a 45° derecho..."
               rows={3}
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
-            />
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">
-              Plan de tratamiento <span className="text-slate-400 font-normal">(opcional)</span>
-            </label>
-            <textarea
-              value={form.plan_tratamiento}
-              onChange={e => update('plan_tratamiento', e.target.value)}
-              placeholder="Ej: Manejo conservador, fisioterapia, AINES, valorar cirugía..."
+            <label className="text-xs font-medium text-slate-500 block mb-1">Plan de tratamiento <span className="text-slate-400 font-normal">(opcional)</span></label>
+            <textarea value={form.plan_tratamiento} onChange={e => update('plan_tratamiento', e.target.value)}
+              placeholder="Ej: Manejo conservador, fisioterapia, valorar cirugía..."
               rows={2}
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
-            />
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">
-              Gabinete y Laboratorios <span className="text-slate-400 font-normal">(opcional)</span>
-            </label>
-            <textarea
-              value={form.gabinete_laboratorios}
-              onChange={e => update('gabinete_laboratorios', e.target.value)}
-              placeholder="Ej: Rx columna lumbar AP/Lateral — disminución de espacio L4-L5. BH: Hb 13.2, leucocitos 7,800..."
+            <label className="text-xs font-medium text-slate-500 block mb-1">Pronóstico <span className="text-slate-400 font-normal">(opcional)</span></label>
+            <input type="text" value={form.pronostico} onChange={e => update('pronostico', e.target.value)}
+              placeholder="Ej: Favorable a mediano plazo con tratamiento conservador..."
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Gabinete y Laboratorios <span className="text-slate-400 font-normal">(opcional)</span></label>
+            <textarea value={form.gabinete_laboratorios} onChange={e => update('gabinete_laboratorios', e.target.value)}
+              placeholder="Ej: Rx columna lumbar AP/Lateral — disminución de espacio L4-L5..."
               rows={2}
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
-            />
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Fecha</label>
-            <input
-              type="text"
-              value={form.proxima_cita}
-              onChange={e => update('proxima_cita', e.target.value)}
+            <label className="text-xs font-medium text-slate-500 block mb-1">Próxima cita</label>
+            <input type="text" value={form.proxima_cita} onChange={e => update('proxima_cita', e.target.value)}
               placeholder="Ej: En 4 semanas, 15 de abril 2026..."
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
-            />
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
           </div>
         </div>
       </div>
 
-      {/* Consulta rápida a Claude */}
+      {/* ── Terapéutica empleada ── */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold text-slate-700 text-sm flex items-center gap-2">
+              <Pill size={14} className="text-blue-500" />
+              Terapéutica empleada
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">Se imprime en la nota y pre-carga la receta</p>
+          </div>
+          <button type="button" onClick={addMed}
+            className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200">
+            <Plus size={13} /> Agregar
+          </button>
+        </div>
+        <div className="p-4 space-y-2" ref={suggestRef}>
+          {/* Encabezados */}
+          <div className="grid grid-cols-12 gap-2 px-1 mb-1">
+            <span className="col-span-4 text-xs font-medium text-slate-400 uppercase tracking-wide">Medicamento</span>
+            <span className="col-span-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Dosis</span>
+            <span className="col-span-2 text-xs font-medium text-slate-400 uppercase tracking-wide">Frecuencia</span>
+            <span className="col-span-2 text-xs font-medium text-slate-400 uppercase tracking-wide">Duración</span>
+            <span className="col-span-1" />
+          </div>
+          {medicamentos.map((med, i) => {
+            const suggestions = getSuggestions(med.nombre)
+            const mostrarSuggest = showSuggest === i && suggestions.length > 0
+            return (
+              <div key={i} className="grid grid-cols-12 gap-2 relative">
+                {/* Nombre con autocomplete */}
+                <div className="col-span-4 relative">
+                  <input
+                    type="text"
+                    value={med.nombre}
+                    onChange={e => updateMed(i, 'nombre', e.target.value)}
+                    onFocus={() => setShowSuggest(i)}
+                    placeholder="Ej: Ketorolaco"
+                    className="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
+                  />
+                  {mostrarSuggest && (
+                    <div className="absolute top-full left-0 right-0 z-20 bg-white border border-slate-200 rounded-lg shadow-lg mt-1 overflow-hidden">
+                      {suggestions.map(s => (
+                        <button key={s} type="button"
+                          onMouseDown={() => { updateMed(i, 'nombre', s); setShowSuggest(null) }}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <input type="text" value={med.dosis} onChange={e => updateMed(i, 'dosis', e.target.value)}
+                  placeholder="Ej: 30 mg" className="col-span-3 px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                <input type="text" value={med.frecuencia} onChange={e => updateMed(i, 'frecuencia', e.target.value)}
+                  placeholder="Ej: c/8 h" className="col-span-2 px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                <input type="text" value={med.duracion} onChange={e => updateMed(i, 'duracion', e.target.value)}
+                  placeholder="Ej: 5 días" className="col-span-2 px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                <button type="button" onClick={() => removeMed(i)}
+                  className="col-span-1 flex items-center justify-center text-slate-300 hover:text-red-400 transition-colors">
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            )
+          })}
+          {medicamentos.every(m => !m.nombre.trim()) && (
+            <p className="text-xs text-slate-400 text-center py-2">Sin medicamentos — usa el botón "Agregar" o comienza a escribir</p>
+          )}
+        </div>
+      </div>
+
       <ConsultaRapida />
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-          {error}
-        </div>
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
       )}
 
       {/* Botón generar */}
-      <button
-        onClick={generarNota}
-        disabled={generando || !form.motivo_consulta}
-        className="w-full py-3 bg-[#4285F4] text-white rounded-xl font-medium hover:bg-[#3367d6] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-      >
+      <button onClick={generarNota} disabled={generando || !form.motivo_consulta}
+        className="w-full py-3 bg-[#4285F4] text-white rounded-xl font-medium hover:bg-[#3367d6] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
         {generando
           ? <><Loader2 size={18} className="animate-spin" /> Redactando nota médica...</>
           : <><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2C12 2 13.8 9 19 12C13.8 15 12 22 12 22C12 22 10.2 15 5 12C10.2 9 12 2 12 2Z" fill="white"/></svg> Generar con Gemini</>
@@ -492,14 +570,12 @@ export default function NuevaNotaPage() {
             <div>
               <h2 className="font-semibold text-slate-700 text-sm">Nota médica generada</h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                {modoEdicion ? 'Editando texto — cambia lo que necesites' : 'Vista previa — haz clic en Editar para modificar'}
+                {modoEdicion ? 'Editando texto' : 'Vista previa — haz clic en Editar para modificar'}
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setModoEdicion(!modoEdicion)}
-                className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition-colors ${modoEdicion ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-slate-100 border-slate-200 text-slate-600 hover:border-slate-300'}`}
-              >
+              <button onClick={() => setModoEdicion(!modoEdicion)}
+                className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition-colors ${modoEdicion ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-slate-100 border-slate-200 text-slate-600 hover:border-slate-300'}`}>
                 {modoEdicion ? <><Eye size={12} /> Vista previa</> : <><Pencil size={12} /> Editar</>}
               </button>
               <button onClick={generarNota} className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 px-2 py-1">
@@ -509,81 +585,108 @@ export default function NuevaNotaPage() {
           </div>
           <div className="p-5">
             {modoEdicion ? (
-              <textarea
-                value={notaGenerada}
-                onChange={e => setNotaGenerada(e.target.value)}
-                rows={22}
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 resize-y"
-              />
+              <textarea value={notaGenerada} onChange={e => setNotaGenerada(e.target.value)} rows={22}
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 resize-y" />
             ) : (
-              <div className="prose prose-sm max-w-none
-                prose-headings:text-[#1a3a5c] prose-headings:font-bold prose-headings:text-sm prose-headings:mt-4 prose-headings:mb-1
-                prose-strong:text-[#1a3a5c] prose-strong:font-semibold
-                prose-p:text-slate-700 prose-p:leading-relaxed prose-p:my-1
-                prose-ul:my-1 prose-li:my-0.5 prose-li:text-slate-700
-              ">
-                <ReactMarkdown>
-                  {notaGenerada}
-                </ReactMarkdown>
+              <div className="prose prose-sm max-w-none prose-headings:text-[#1a3a5c] prose-headings:font-bold prose-headings:text-sm prose-headings:mt-4 prose-headings:mb-1 prose-strong:text-[#1a3a5c] prose-strong:font-semibold prose-p:text-slate-700 prose-p:leading-relaxed prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-li:text-slate-700">
+                <ReactMarkdown>{notaGenerada}</ReactMarkdown>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Modal post-guardado */}
-      {modalPost && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <CheckCircle2 size={24} className="text-green-500 flex-shrink-0" />
-              <h2 className="font-bold text-[#1a3a5c] text-lg">Nota guardada</h2>
-            </div>
-            <p className="text-sm text-slate-500 mb-5">¿Deseas generar algún documento adicional para este paciente?</p>
-            <div className="grid grid-cols-2 gap-2 mb-4">
-              {DOCS.map(({ key, label, icon: Icon, color }) => (
-                <Link
-                  key={key}
-                  href={`/expediente/${id}/documentos?tipo=${key}&dx=${encodeURIComponent(form.diagnosticos)}`}
-                  className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all text-center ${color}`}
-                >
-                  <Icon size={20} />
-                  <span className="text-xs font-medium leading-tight">{label}</span>
-                </Link>
-              ))}
-            </div>
-            <button
-              onClick={() => router.push(`/expediente/${id}`)}
-              className="w-full py-2.5 text-sm text-slate-500 hover:text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-            >
-              Ir al expediente
-            </button>
-          </div>
+      {/* Acciones */}
+      {notaGenerada && (
+        <div className="flex gap-3 pb-2">
+          <button onClick={imprimir} disabled={imprimiendo}
+            className="flex items-center gap-2 px-5 py-2.5 border-2 border-[#1a3a5c] text-[#1a3a5c] rounded-lg text-sm font-medium hover:bg-[#1a3a5c] hover:text-white transition-colors disabled:opacity-50">
+            {imprimiendo ? <><Loader2 size={16} className="animate-spin" /> Generando...</> : <><Printer size={16} /> Imprimir</>}
+          </button>
+          <button onClick={guardar} disabled={guardando}
+            className="flex-1 flex items-center justify-center gap-2 bg-[#1e5fa8] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-60">
+            {guardando ? <><Loader2 size={16} className="animate-spin" /> Guardando...</> : <><Save size={16} /> Guardar en expediente</>}
+          </button>
         </div>
       )}
 
-      {/* Acciones */}
-      {notaGenerada && (
-        <div className="flex gap-3 pb-6">
-          <button
-            onClick={imprimir}
-            disabled={imprimiendo}
-            className="flex items-center gap-2 px-5 py-2.5 border-2 border-[#1a3a5c] text-[#1a3a5c] rounded-lg text-sm font-medium hover:bg-[#1a3a5c] hover:text-white transition-colors disabled:opacity-50"
-          >
-            {imprimiendo ? <><Loader2 size={16} className="animate-spin" /> Generando...</> : <><Printer size={16} /> Imprimir</>}
-          </button>
-          <button
-            onClick={guardar}
-            disabled={guardando}
-            className="flex-1 flex items-center justify-center gap-2 bg-[#1e5fa8] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-60"
-          >
-            {guardando
-              ? <><Loader2 size={16} className="animate-spin" /> Guardando...</>
-              : <><Save size={16} /> Guardar en expediente</>
-            }
-          </button>
+      {/* ── Panel post-guardado: generar documentos inline ── */}
+      {notaSaved && (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
+            <h2 className="font-semibold text-slate-700 text-sm">Generar documento para este paciente</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Los datos de la consulta se pre-cargan automáticamente</p>
+          </div>
+          <div className="p-4">
+            {/* Botón destacado: Imprimir receta */}
+            {medicamentosParaReceta.length > 0 && (
+              <button onClick={() => setDocInline(docInline === 'receta' ? null : 'receta')}
+                className={`w-full mb-3 flex items-center justify-center gap-2 py-3 rounded-xl border-2 text-sm font-semibold transition-all ${docInline === 'receta' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100'}`}>
+                <Pill size={16} />
+                {docInline === 'receta' ? 'Cerrar receta' : `Imprimir receta (${medicamentosParaReceta.length} medicamento${medicamentosParaReceta.length > 1 ? 's' : ''} pre-cargado${medicamentosParaReceta.length > 1 ? 's' : ''})`}
+              </button>
+            )}
+            {/* Grid de otros documentos */}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {DOCS.filter(d => !(d.key === 'receta' && medicamentosParaReceta.length > 0)).map(({ key, label, icon: Icon, color }) => (
+                <button key={key}
+                  onClick={() => setDocInline(docInline === key ? null : key)}
+                  className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all text-center text-xs font-medium ${docInline === key ? color.replace('hover:', '') + ' border-current opacity-100' : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'}`}>
+                  <Icon size={18} />
+                  <span className="leading-tight">{label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Formulario inline */}
+          {docInline && (
+            <div className="border-t border-slate-100">
+              <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                <span className="text-sm font-semibold text-slate-700">
+                  {DOCS.find(d => d.key === docInline)?.label}
+                </span>
+                <button onClick={() => setDocInline(null)} className="text-slate-400 hover:text-slate-600">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="p-5">
+                {docInline === 'receta' && (
+                  <RecetaFormDynamic
+                    pacienteInicial={nombrePaciente}
+                    diagnosticoInicial={form.diagnosticos}
+                    pacienteId={id}
+                    medicamentosIniciales={medicamentosParaReceta}
+                  />
+                )}
+                {docInline === 'lab' && (
+                  <SolicitudLabFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
+                )}
+                {docInline === 'imagen' && (
+                  <SolicitudImagenFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
+                )}
+                {docInline === 'suplementacion' && (
+                  <PlanSupFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
+                )}
+                {docInline === 'internamiento' && (
+                  <InternamientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
+                )}
+                {docInline === 'escrito' && (
+                  <EscritoFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} />
+                )}
+                {docInline === 'consentimiento' && (
+                  <ConsentimientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
+                )}
+                {docInline === 'honorarios' && (
+                  <HonorariosFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} />
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
+
+      <div className="pb-6" />
     </div>
   )
 }

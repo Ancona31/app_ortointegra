@@ -128,9 +128,10 @@ interface Props {
   pacienteInicial?: string
   diagnosticoInicial?: string
   pacienteId?: string
+  medicamentosIniciales?: MedicamentoConVia[]
 }
 
-export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId }: Props) {
+export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, medicamentosIniciales }: Props) {
   const { medicoInfo } = useMedicoInfo()
   const { isSuperAdmin } = useProfile()
   const [paciente, setPaciente] = useState(pacienteInicial)
@@ -151,11 +152,13 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
       })
   }, [pacienteId])
 
+  const medInicial: MedicamentoConVia[] = medicamentosIniciales && medicamentosIniciales.length > 0
+    ? medicamentosIniciales
+    : [{ nombre_comercial: '', presentacion: '', dosis: '', principio_activo: '', indicacion: '', via_administracion: 'Oral' }]
+
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
-  const [medicamentos, setMedicamentos] = useState<MedicamentoConVia[]>([
-    { nombre_comercial: '', presentacion: '', dosis: '', principio_activo: '', indicacion: '', via_administracion: 'Oral' }
-  ])
-  const [sugerenciasDosis, setSugerenciasDosis] = useState<string[]>([''])
+  const [medicamentos, setMedicamentos] = useState<MedicamentoConVia[]>(medInicial)
+  const [sugerenciasDosis, setSugerenciasDosis] = useState<string[]>(medInicial.map(() => ''))
   const [recomendaciones, setRecomendaciones] = useState('')
   const [errorGuardado, setErrorGuardado] = useState('')
   const [imprimiendo, setImprimiendo] = useState(false)

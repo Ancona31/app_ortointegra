@@ -10,7 +10,9 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useProfile, clearProfileCache } from '@/hooks/useProfile'
 import { useClinica } from '@/hooks/useClinica'
+import { useTheme } from '@/components/layout/ThemeProvider'
 import { mutate } from 'swr'
+import { Moon, Sun } from 'lucide-react'
 
 const navDoctor = [
   { href: '/dashboard',        label: 'Inicio',         icon: Home },
@@ -45,6 +47,7 @@ export default function Sidebar() {
   const [open, setOpen] = useState(false)
   const { profile } = useProfile()
   const { colorPrimario, colorSecundario, nombreDisplay, subtitulo, logoUrl } = useClinica()
+  const { dark, toggle } = useTheme()
 
   const navItems = profile?.role === 'secretaria'
     ? navSecretaria
@@ -151,6 +154,13 @@ export default function Sidebar() {
           {profile?.cedula_especialidad && (
             <p className="text-xs text-blue-400 text-center">{profile.cedula_especialidad}</p>
           )}
+          <button
+            onClick={toggle}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs text-blue-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+          >
+            {dark ? <Sun size={14} /> : <Moon size={14} />}
+            {dark ? 'Modo claro' : 'Modo oscuro'}
+          </button>
           <button
             onClick={handleLogout}
             className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs text-blue-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
