@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Save, User } from 'lucide-react'
+import { ArrowLeft, Save, User, Hash } from 'lucide-react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
 
 type Campo = {
@@ -29,7 +28,6 @@ const campos: Campo[] = [
   { section: 'personal', label: 'Apellidos', key: 'apellidos', required: true, placeholder: 'Ej: García López' },
   { section: 'personal', label: 'Fecha de nacimiento', key: 'fecha_nacimiento', type: 'date', required: true },
   { section: 'personal', label: 'Sexo', key: 'sexo', options: [{ value: 'M', label: 'Masculino' }, { value: 'F', label: 'Femenino' }, { value: 'Otro', label: 'Otro' }], required: true },
-  { section: 'personal', label: 'N° Expediente', key: 'numero_expediente', placeholder: 'Ej: OI-2025-001' },
   { section: 'antro', label: 'Peso (kg)', key: 'peso_kg', type: 'number', placeholder: '70' },
   { section: 'antro', label: 'Talla (cm o m)', key: 'talla_cm', type: 'number', placeholder: '170 ó 1.70' },
   { section: 'contacto', label: 'Teléfono', key: 'telefono', type: 'tel', placeholder: 'Ej: 999 123 4567' },
@@ -59,6 +57,7 @@ export default function NuevoPacientePage() {
   const [error, setError] = useState('')
 
   const isSecretaria = profile?.role === 'secretaria'
+  const [expPreview] = useState(`EXP-${new Date().getFullYear()}-????`)
 
   useEffect(() => {
     if (isSecretaria) {
@@ -95,34 +94,26 @@ export default function NuevoPacientePage() {
 
     const imc = calcularIMC()
     const tallaCm = parseTallaCm(form.talla_cm || '')
-    const supabase = createClient()
 
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('clinica_id, role, id')
-      .eq('id', (await supabase.auth.getUser()).data.user!.id)
-      .single()
+    const res = await fetch('/api/pacientes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...form,
+        peso_kg: form.peso_kg ? Math.round(parseFloat(form.peso_kg) * 10) / 10 : null,
+        talla_cm: tallaCm,
+        imc: imc ? parseFloat(imc) : null,
+        medico_id: isSecretaria ? medicoSeleccionado : undefined,
+      }),
+    })
 
-    const formLimpio = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== ''))
+    const data = await res.json()
 
-    const medico_id = isSecretaria
-      ? medicoSeleccionado
-      : profileData?.role === 'medico' ? profileData.id : null
-
-    const { data: nuevo, error: err } = await supabase.from('pacientes').insert({
-      ...formLimpio,
-      peso_kg: form.peso_kg ? Math.round(parseFloat(form.peso_kg) * 10) / 10 : null,
-      talla_cm: tallaCm,
-      imc: imc ? parseFloat(imc) : null,
-      clinica_id: profileData?.clinica_id ?? null,
-      medico_id,
-    }).select('id').single()
-
-    if (err) {
-      setError('Error al guardar: ' + err.message)
+    if (!res.ok) {
+      setError('Error al guardar: ' + (data.error || 'Error desconocido'))
       setLoading(false)
     } else {
-      router.push(`/expediente/${nuevo.id}`)
+      router.push(`/expediente/${data.id}`)
     }
   }
 
@@ -135,6 +126,15 @@ export default function NuevoPacientePage() {
         <h1 className="text-2xl font-bold text-[#1a3a5c] flex items-center gap-2">
           <User size={22} /> Nuevo Paciente
         </h1>
+      </div>
+
+      {/* Badge número de expediente */}
+      <div className="flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl">
+        <Hash size={16} className="text-blue-500 flex-shrink-0" />
+        <div>
+          <p className="text-sm font-medium text-blue-700">Número de expediente automático</p>
+          <p className="text-xs text-blue-500 mt-0.5">Se asignará <strong>{expPreview}</strong> al guardar</p>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
