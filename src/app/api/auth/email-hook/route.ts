@@ -1,13 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
+import { createHmac, timingSafeEqual } from 'crypto'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
+
+function verificarFirma(payload: string, signature: string): boolean {
+  const secret = process.env.SUPABASE_HOOK_SECRET
+  if (!secret) return false
+  // El secret tiene formato "v1,whsec_BASE64" — extraer solo la parte base64
+  const base64 = secret.replace(/^v1,whsec_/, '')
+  const key = Buffer.from(base64, 'base64')
+  const expected = createHmac('sha256', key).update(payload).digest('hex')
+  try {
+    return timingSafeEqual(Buffer.from(signature), Buffer.from(expected))
+  } catch {
+    return false
+  }
+}
 
 // Supabase Auth Hook — Send Email
 // Configurar en: Supabase → Authentication → Hooks → Send Email
 // URL: https://www.ortointegra.com/api/auth/email-hook
 export async function POST(req: NextRequest) {
-  const body = await req.json()
+  const rawBody = await req.text()
+  const signature = req.headers.get('x-supabase-signature') ?? ''
+
+  if (!verificarFirma(rawBody, signature)) {
+    return NextResponse.json({ error: 'Firma inválida' }, { status: 401 })
+  }
+
+  const body = JSON.parse(rawBody)
 
   const { user, email_data } = body
   const email: string = user?.email
