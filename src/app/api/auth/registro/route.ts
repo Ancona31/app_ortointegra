@@ -78,6 +78,7 @@ export async function POST(req: NextRequest) {
   const { data: linkData } = await admin.auth.admin.generateLink({
     type: 'signup',
     email,
+    password,
     options: { redirectTo: `${baseUrl}/auth/confirm` },
   })
 
