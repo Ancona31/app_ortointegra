@@ -4,15 +4,20 @@ import { createHmac, timingSafeEqual } from 'crypto'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
-function verificarFirma(payload: string, signature: string): boolean {
+function verificarFirma(payload: string, signatureHeader: string): boolean {
   const secret = process.env.SUPABASE_HOOK_SECRET
   if (!secret) return false
-  // El secret tiene formato "v1,whsec_BASE64" — extraer solo la parte base64
-  const base64 = secret.replace(/^v1,whsec_/, '')
-  const key = Buffer.from(base64, 'base64')
-  const expected = createHmac('sha256', key).update(payload).digest('hex')
+
+  // Secret: "v1,whsec_BASE64" → extraer la parte base64
+  const secretBase64 = secret.replace(/^v1,whsec_/, '')
+  const key = Buffer.from(secretBase64, 'base64')
+
+  // Firma recibida: "v1,BASE64_HMAC" → extraer solo el base64
+  const receivedBase64 = signatureHeader.replace(/^v1,/, '')
+
+  const expected = createHmac('sha256', key).update(payload).digest('base64')
   try {
-    return timingSafeEqual(Buffer.from(signature), Buffer.from(expected))
+    return timingSafeEqual(Buffer.from(receivedBase64), Buffer.from(expected))
   } catch {
     return false
   }
