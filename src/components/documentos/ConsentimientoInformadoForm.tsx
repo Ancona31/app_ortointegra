@@ -103,6 +103,7 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
   const [secciones, setSecciones] = useState({ ...SECCIONES_DEFAULT })
 
   const [imprimiendo, setImprimiendo] = useState(false)
+  const [imprimirDenegacion, setImprimirDenegacion] = useState(false)
 
   function updateSeccion(key: SeccionKey, val: string) {
     setSecciones(s => ({ ...s, [key]: val }))
@@ -158,6 +159,40 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
           ${idLabel ? `<div class="firma-id"><span class="firma-id-lbl">${idLabel}:</span> ${idVal || '___________________________'}</div>` : ''}
         </div>`
 
+      const makeSecs = (keys: SeccionKey[]) => keys.map(key => `
+  <div class="sec-wrap">
+    <div class="sec-head">
+      <div class="sec-badge">${LABELS[key].num}</div>
+      <div class="sec-titulo">${LABELS[key].titulo}</div>
+    </div>
+    <div class="sec-body">${nl2p(secciones[key])}</div>
+  </div>`).join('')
+      const _secP1 = makeSecs(['preoperatorio', 'beneficios', 'anestesia', 'descripcion'])
+      const _secP2 = makeSecs(['riesgosComunes', 'riesgosEspecificos', 'alternativas'])
+      const _creds = [cedProf ? `Céd. Prof. ${cedProf}` : '', cedEsp ? `Céd. Esp. ${cedEsp}` : ''].filter(Boolean).join(' · ')
+      const _compactHdr = `<div class="header-compact"><div class="logo-wrap-sm"><img class="logo" src="${logoUrl}" onerror="this.style.display='none'" /></div><div><div class="doctor-name">${nombre}</div>${_creds ? '<div class="credenciales">'+_creds+'</div>' : ''}</div><div class="header-meta">${paciente || ''}<br/>${procedimiento || ''}</div></div>`
+      let _htmlDeneg = ''
+      if (imprimirDenegacion) {
+        _htmlDeneg = [
+          '\n<!-- HOJA 4: Denegación -->',
+          '<div class="page-break"></div>',
+          '<div class="barra-top"></div>',
+          '<div class="contenido">',
+          _compactHdr,
+          '<div class="deneg-wrap"><div class="deneg-head"><span class="deneg-head-txt">Denegación o Revocación del Consentimiento</span></div><div class="deneg-body"><p>Yo: <strong>' + (paciente || '___________________________________') + '</strong>, después de ser informado de la naturaleza y riesgos del procedimiento propuesto, manifiesto de forma libre y consciente mi <strong>DENEGACIÓN / REVOCACIÓN</strong> (táchese lo que no proceda) para su realización, haciéndome responsable de las consecuencias que puedan derivarse de esta decisión.</p></div></div>',
+          '<div class="firmas-grid">',
+          firmaBox('Nombre y Firma del Paciente', paciente, '', 'Identificado con', idPaciente),
+          firmaBox('Nombre y Firma del Médico Tratante', nombre, cedProf ? 'Céd. Prof. ' + cedProf : ''),
+          firmaBox('Nombre y Firma del Familiar', familiar || representante, '', 'Identificado con', idFamiliar || idRepresentante),
+          firmaBox('Nombre y Firma del Médico Responsable'),
+          firmaBox('Nombre y Firma del Testigo', testigo1, '', 'Identificado con', ''),
+          firmaBox('Nombre y Firma del Testigo', testigo2, '', 'Identificado con', ''),
+          '</div>',
+          '</div>',
+          '<div class="barra-bottom"></div>',
+        ].join('\n')
+      }
+
       const _html = `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><title>Consentimiento Informado</title>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Georgia&display=swap" rel="stylesheet">
@@ -177,6 +212,12 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
   .especialidad { font-size:8pt; color:${cs}; margin:2px 0; font-style:italic; }
   .credenciales { font-size:7.5pt; color:#555; }
   .contacto { font-size:7pt; color:#888; margin-top:2px; }
+
+  /* Header compacto (páginas 2+) */
+  .header-compact { display:flex; align-items:center; gap:10px; padding-bottom:5px; margin-bottom:8px; border-bottom:2px solid ${cp}; }
+  .logo-wrap-sm { width:32px; height:32px; border-radius:50%; border:2px solid ${cs}; overflow:hidden; flex-shrink:0; display:flex; align-items:center; justify-content:center; background:#f8fafc; }
+  .header-meta { margin-left:auto; text-align:right; font-size:7pt; color:#888; line-height:1.4; }
+  .continuacion { font-size:8pt; font-weight:700; color:${cp}; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid #e5e7eb; }
 
   /* Título principal del documento */
   .titulo-doc { background:linear-gradient(135deg,${cp},${cs}); border-radius:4px; padding:9px 14px; margin:10px 0 10px; text-align:center; }
@@ -231,6 +272,7 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
   .deneg-body { padding:12px 14px; font-size:9pt; line-height:1.65; color:#1a1a1a; text-align:justify; background:#fff; }
 
   .page-break { page-break-before:always; }
+  .page-break + .barra-top { margin-top:12mm; }
   .barra-bottom { background:linear-gradient(135deg,${cp},${cs}); height:7px; margin-top:10px; }
   @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
 </style></head><body>
@@ -281,15 +323,28 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
     </div>
   </div>
 
-  <!-- Secciones clínicas -->
-  ${(Object.keys(secciones) as SeccionKey[]).map(key => `
-  <div class="sec-wrap">
-    <div class="sec-head">
-      <div class="sec-badge">${LABELS[key].num}</div>
-      <div class="sec-titulo">${LABELS[key].titulo}</div>
-    </div>
-    <div class="sec-body">${nl2p(secciones[key])}</div>
-  </div>`).join('')}
+  <!-- HOJA 1: Secciones 1–4 -->
+  ${_secP1}
+
+</div>
+<div class="barra-bottom"></div>
+
+<!-- HOJA 2: Secciones 5–7 -->
+<div class="page-break"></div>
+<div class="barra-top"></div>
+<div class="contenido">
+  ${_compactHdr}
+  <div class="continuacion">Consentimiento Médico Informado — continuación</div>
+  ${_secP2}
+
+</div>
+<div class="barra-bottom"></div>
+
+<!-- HOJA 3: Declaración y Firmas -->
+<div class="page-break"></div>
+<div class="barra-top"></div>
+<div class="contenido">
+  ${_compactHdr}
 
   <!-- Declaración de Consentimiento -->
   <div class="consent-wrap">
@@ -318,42 +373,7 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
 </div>
 <div class="barra-bottom"></div>
 
-<!-- DENEGACIÓN O REVOCACIÓN -->
-<div class="page-break"></div>
-<div class="barra-top"></div>
-<div class="contenido">
-
-  <div class="header">
-    <div class="logo-wrap"><img class="logo" src="${logoUrl}" onerror="this.style.display='none'" /></div>
-    <div>
-      <div class="doctor-name">${nombre}</div>
-      ${esp ? `<div class="especialidad">${esp}</div>` : ''}
-      <div class="credenciales">
-        ${cedProf ? `Cédula Prof.: ${cedProf}` : ''}
-        ${cedProf && cedEsp ? ' &nbsp;·&nbsp; ' : ''}
-        ${cedEsp ? `Cédula Esp.: ${cedEsp}` : ''}
-      </div>
-    </div>
-  </div>
-
-  <div class="deneg-wrap">
-    <div class="deneg-head"><span class="deneg-head-txt">Denegación o Revocación del Consentimiento</span></div>
-    <div class="deneg-body">
-      <p>Yo: <strong>${paciente || '___________________________________'}</strong>, después de ser informado de la naturaleza y riesgos del procedimiento propuesto, manifiesto de forma libre y consciente mi <strong>DENEGACIÓN / REVOCACIÓN</strong> (táchese lo que no proceda) para su realización, haciéndome responsable de las consecuencias que puedan derivarse de esta decisión.</p>
-    </div>
-  </div>
-
-  <div class="firmas-grid">
-    ${firmaBox('Nombre y Firma del Paciente', paciente, '', 'Identificado con', idPaciente)}
-    ${firmaBox('Nombre y Firma del Médico Tratante', nombre, cedProf ? `Céd. Prof. ${cedProf}` : '')}
-    ${firmaBox('Nombre y Firma del Familiar', familiar || representante, '', 'Identificado con', idFamiliar || idRepresentante)}
-    ${firmaBox('Nombre y Firma del Médico Responsable')}
-    ${firmaBox('Nombre y Firma del Testigo', testigo1, '', 'Identificado con', '')}
-    ${firmaBox('Nombre y Firma del Testigo', testigo2, '', 'Identificado con', '')}
-  </div>
-
-</div>
-<div class="barra-bottom"></div>
+${_htmlDeneg}
 
 </body></html>`
 
@@ -478,6 +498,20 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
           onChange={v => updateSeccion(key, v)}
         />
       ))}
+
+      {/* Opción: incluir hoja de denegación */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-3.5 flex items-center gap-3">
+        <input
+          type="checkbox"
+          id="imprimirDenegacion"
+          checked={imprimirDenegacion}
+          onChange={e => setImprimirDenegacion(e.target.checked)}
+          className="w-4 h-4 accent-[#1e5fa8] flex-shrink-0"
+        />
+        <label htmlFor="imprimirDenegacion" className="text-sm text-slate-600 cursor-pointer leading-snug">
+          Incluir hoja de <strong>Denegación o Revocación</strong> del consentimiento (hoja 4 opcional)
+        </label>
+      </div>
 
       <button
         onClick={imprimir}
