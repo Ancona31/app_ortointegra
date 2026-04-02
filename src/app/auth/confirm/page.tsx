@@ -10,7 +10,7 @@ function ConfirmContent() {
   const router = useRouter()
   const [supabase] = useState(() => createClient())
 
-  const [estado, setEstado] = useState<'verificando' | 'listo' | 'error'>('verificando')
+  const [estado, setEstado] = useState<'verificando' | 'listo' | 'confirmado' | 'error'>('verificando')
   const [password, setPassword] = useState('')
   const [confirmar, setConfirmar] = useState('')
   const [loading, setLoading] = useState(false)
@@ -21,7 +21,26 @@ function ConfirmContent() {
     const tokenHash = searchParams.get('token_hash')
     const type = searchParams.get('type')
 
-    if (!tokenHash || type !== 'recovery') {
+    if (!tokenHash) {
+      setEstado('error')
+      return
+    }
+
+    // Confirmación de cuenta nueva (registro)
+    if (type === 'email' || type === 'signup') {
+      supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'email' }).then(({ error: err }) => {
+        if (err) {
+          setEstado('error')
+        } else {
+          setEstado('confirmado')
+          setTimeout(() => router.push('/dashboard'), 2500)
+        }
+      })
+      return
+    }
+
+    // Recuperación de contraseña
+    if (type !== 'recovery') {
       setEstado('error')
       return
     }
@@ -66,6 +85,15 @@ function ConfirmContent() {
             <div className="flex flex-col items-center gap-3 py-6">
               <Loader2 size={24} className="animate-spin text-slate-400" />
               <p className="text-sm text-slate-500">Verificando enlace...</p>
+            </div>
+          )}
+
+          {estado === 'confirmado' && (
+            <div className="text-center space-y-4 py-4">
+              <CheckCircle size={48} className="text-emerald-500 mx-auto" />
+              <h2 className="font-bold text-slate-800 text-lg">¡Cuenta confirmada!</h2>
+              <p className="text-sm text-slate-500">Tu cuenta está activa. Redirigiendo al sistema...</p>
+              <Loader2 size={16} className="animate-spin text-slate-400 mx-auto" />
             </div>
           )}
 

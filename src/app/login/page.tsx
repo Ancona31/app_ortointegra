@@ -120,10 +120,16 @@ export default function LoginPage() {
               }
             </button>
 
-            <div className="text-center pt-1">
-              <Link href="/forgot-password" className="text-xs text-slate-400 hover:text-[#1e5fa8] transition-colors">
+            <div className="text-center pt-1 space-y-2">
+              <Link href="/forgot-password" className="block text-xs text-slate-400 hover:text-[#1e5fa8] transition-colors">
                 ¿Olvidaste tu contraseña?
               </Link>
+              <p className="text-xs text-slate-400">
+                ¿No tienes cuenta?{' '}
+                <Link href="/register" className="text-[#1e5fa8] font-medium hover:underline">
+                  Regístrate gratis
+                </Link>
+              </p>
             </div>
           </form>
         </div>
