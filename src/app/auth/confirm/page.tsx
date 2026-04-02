@@ -19,7 +19,21 @@ function ConfirmContent() {
 
   useEffect(() => {
     const tokenHash = searchParams.get('token_hash')
-    const type = searchParams.get('type')
+    const type      = searchParams.get('type')
+    const code      = searchParams.get('code')
+
+    // PKCE code exchange — generateLink redirige con ?code= en lugar de ?token_hash=
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code).then(({ error: err }) => {
+        if (err) {
+          setEstado('error')
+        } else {
+          setEstado('confirmado')
+          setTimeout(() => router.push('/dashboard'), 2500)
+        }
+      })
+      return
+    }
 
     if (!tokenHash) {
       setEstado('error')
