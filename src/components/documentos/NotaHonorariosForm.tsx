@@ -21,11 +21,14 @@ interface LineaConcepto {
 
 const FORMAS_PAGO = ['Efectivo', 'Transferencia bancaria', 'Tarjeta de crédito', 'Tarjeta de débito', 'Cheque']
 
-function generarFolio(): string {
+type TipoDoc = 'honorarios' | 'cotizacion'
+
+function generarFolio(tipo: TipoDoc = 'honorarios'): string {
   const now = new Date()
   const ymd = format(now, 'yyyyMMdd')
   const seq = String(now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()).padStart(5, '0')
-  return `NOH-${ymd}-${seq}`
+  const prefix = tipo === 'cotizacion' ? 'COT' : 'NOH'
+  return `${prefix}-${ymd}-${seq}`
 }
 
 type Divisa = 'MXN' | 'USD'
@@ -36,16 +39,20 @@ function fmt(n: number, divisa: Divisa = 'MXN'): string {
 
 export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }: Props) {
   const { medicoInfo } = useMedicoInfo()
+  const [tipoDoc, setTipoDoc]         = useState<TipoDoc>('honorarios')
   const [paciente, setPaciente]       = useState(pacienteInicial)
   const [fecha, setFecha]             = useState(new Date().toISOString().split('T')[0])
   const [rfcMedico, setRfcMedico]     = useState('')
   const [rfcPaciente, setRfcPaciente] = useState('')
   const [formaPago, setFormaPago]     = useState('Efectivo')
-  const [folio]                       = useState(generarFolio)
+  const [folio]                       = useState(() => generarFolio('honorarios'))
   const [imprimiendo, setImprimiendo] = useState(false)
   const [lineas, setLineas]           = useState<LineaConcepto[]>([{ id: 1, concepto: '', precio: '' }])
   const [nextId, setNextId]           = useState(2)
   const [divisa, setDivisa]           = useState<Divisa>('MXN')
+
+  const folioDisplay = tipoDoc === 'cotizacion' ? folio.replace('NOH-', 'COT-') : folio
+  const tituloDoc    = tipoDoc === 'cotizacion' ? 'Cotización' : 'Recibo de Honorarios'
 
   const total = lineas.reduce((sum, l) => sum + (parseFloat(l.precio) || 0), 0)
   const puedeImprimir = lineas.some(l => l.concepto.trim() !== '' && parseFloat(l.precio) > 0)
@@ -74,7 +81,7 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
         ...(pacienteId ? { paciente_id: pacienteId } : {}),
         tipo: 'nota_honorarios',
         contenido: {
-          paciente, fecha, folio,
+          paciente, fecha, folio: folioDisplay, tipo_doc: tipoDoc,
           rfc_medico: rfcMedico,
           rfc_paciente: rfcPaciente,
           lineas: lineasValidas,
@@ -108,7 +115,7 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
       `).join('')
 
       const _html = `<!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8"><title>Nota de Honorarios</title>
+<html lang="es"><head><meta charset="UTF-8"><title>${tituloDoc}</title>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -179,8 +186,8 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
   </div>
 
   <div class="titulo-doc">
-    <span>Recibo de Honorarios</span>
-    <span class="folio">${folio}</span>
+    <span>${tituloDoc}</span>
+    <span class="folio">${folioDisplay}</span>
   </div>
 
   <div class="grid-meta">
@@ -233,7 +240,9 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
 
   <div class="footer-area">
     <div class="nota-fiscal">
-      Este documento es una nota de honorarios médicos.<br/>
+      ${tipoDoc === 'cotizacion'
+        ? 'Este documento es una cotización de servicios médicos y no representa un cobro definitivo.'
+        : 'Este documento es una nota de honorarios médicos.'}<br/>
       ${rfcMedico ? `Expedida por RFC <strong>${rfcMedico.toUpperCase()}</strong>.` : ''}
       No es un comprobante fiscal digital (CFDI).
     </div>
@@ -248,7 +257,7 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
 <div class="barra-bottom"></div>
 </body></html>`
 
-      await imprimirOCompartir(_html, 'nota-honorarios.pdf')
+      await imprimirOCompartir(_html, tipoDoc === 'cotizacion' ? 'cotizacion.pdf' : 'nota-honorarios.pdf')
     } finally {
       setImprimiendo(false)
     }
@@ -258,6 +267,26 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
 
   return (
     <div className="space-y-5">
+
+      {/* Selector de tipo */}
+      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        <p className="text-xs font-medium text-slate-500 mb-2">Tipo de documento</p>
+        <div className="flex gap-2">
+          {([
+            { key: 'honorarios', label: 'Recibo de honorarios' },
+            { key: 'cotizacion', label: 'Cotización' },
+          ] as { key: TipoDoc; label: string }[]).map(({ key, label }) => (
+            <button key={key} type="button" onClick={() => setTipoDoc(key)}
+              className={`flex-1 py-2.5 rounded-lg text-sm font-semibold border-2 transition-all ${
+                tipoDoc === key
+                  ? 'border-[#1e5fa8] bg-[#1e5fa8] text-white'
+                  : 'border-slate-200 text-slate-500 hover:border-[#1e5fa8] hover:text-[#1e5fa8]'
+              }`}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Datos generales */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
@@ -273,7 +302,7 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
           </div>
           <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">Folio</label>
-            <input type="text" value={folio} readOnly className={inputCls + ' bg-slate-50 text-slate-400 cursor-not-allowed'} />
+            <input type="text" value={folioDisplay} readOnly className={inputCls + ' bg-slate-50 text-slate-400 cursor-not-allowed'} />
           </div>
         </div>
       </div>
@@ -392,7 +421,7 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
       >
         {imprimiendo
           ? <><Loader2 size={18} className="animate-spin" /> Generando PDF...</>
-          : <><Printer size={18} /> Imprimir Nota de Honorarios</>
+          : <><Printer size={18} /> Imprimir {tituloDoc}</>
         }
       </button>
     </div>

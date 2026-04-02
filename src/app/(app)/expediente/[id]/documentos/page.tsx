@@ -33,7 +33,7 @@ const TABS = [
   { key: 'internamiento', label: 'Internamiento', icon: BedDouble, color: 'text-rose-700 border-rose-500 bg-rose-50', inactive: 'text-slate-500 hover:text-rose-600 hover:bg-rose-50' },
   { key: 'escrito', label: 'Escrito Médico', icon: PenLine, color: 'text-teal-700 border-teal-500 bg-teal-50', inactive: 'text-slate-500 hover:text-teal-600 hover:bg-teal-50' },
   { key: 'consentimiento', label: 'Consentimiento', icon: ShieldCheck, color: 'text-indigo-700 border-indigo-500 bg-indigo-50', inactive: 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50' },
-  { key: 'honorarios', label: 'Honorarios', icon: Receipt, color: 'text-orange-700 border-orange-500 bg-orange-50', inactive: 'text-slate-500 hover:text-orange-600 hover:bg-orange-50' },
+  { key: 'honorarios', label: 'Honorarios / Cotización', icon: Receipt, color: 'text-orange-700 border-orange-500 bg-orange-50', inactive: 'text-slate-500 hover:text-orange-600 hover:bg-orange-50' },
 ] as const
 
 type TabKey = typeof TABS[number]['key']
