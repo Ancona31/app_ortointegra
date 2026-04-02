@@ -126,7 +126,7 @@ export default function RegisterPage() {
               <div className="col-span-2">
                 <label className="text-xs font-medium text-slate-500 block mb-1">Nombre completo *</label>
                 <input type="text" value={form.nombre} onChange={set('nombre')}
-                  placeholder="Ej: Ángel Ancona" required
+                  placeholder="Ej: Juan Pérez" required
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
               </div>
             </div>
@@ -134,7 +134,7 @@ export default function RegisterPage() {
             <div>
               <label className="text-xs font-medium text-slate-500 block mb-1">Especialidad *</label>
               <input type="text" value={form.especialidad} onChange={set('especialidad')}
-                placeholder="Ej: Cirugía de Columna · Traumatología" required
+                placeholder="Ej: Medicina General · Cardiología" required
                 className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
             </div>
 
@@ -161,7 +161,7 @@ export default function RegisterPage() {
             <div>
               <label className="text-xs font-medium text-slate-500 block mb-1">Nombre del consultorio *</label>
               <input type="text" value={form.nombreClinica} onChange={set('nombreClinica')}
-                placeholder="Ej: Consultorio Dr. Ancona" required
+                placeholder="Ej: Consultorio Médico del Norte" required
                 className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
             </div>
 
