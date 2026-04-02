@@ -38,10 +38,11 @@ export default function PricingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ plan: planKey, interval }),
       })
+
+      if (res.status === 401) { router.push('/login?redirect=/pricing'); return }
+
       const data = await res.json()
       if (!res.ok) {
-        // Si no está autenticado, redirigir al login
-        if (res.status === 401) { router.push('/login?redirect=/pricing'); return }
         alert(data.error || 'Error al iniciar el pago')
         return
       }
