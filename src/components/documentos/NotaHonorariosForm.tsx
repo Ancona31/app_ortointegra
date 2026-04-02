@@ -145,7 +145,7 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
   .tabla-conceptos tfoot td.total-valor { text-align:right; color:${cp}; font-size:13pt; }
   .forma-pago-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
   .forma-pago-badge { background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px; padding:5px 12px; font-size:9pt; color:#475569; }
-  .footer-area { display:flex; justify-content:space-between; align-items:flex-end; margin-top:20px; }
+  .footer-area { display:flex; justify-content:space-between; align-items:flex-end; margin-top:60px; }
   .nota-fiscal { font-size:7.5pt; color:#999; max-width:260px; line-height:1.5; }
   .firma { text-align:center; min-width:210px; border-top:1.5px solid ${cp}; padding-top:8px; }
   .firma-nombre { font-weight:bold; font-size:9.5pt; color:${cp}; }
@@ -173,7 +173,7 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
   </div>
 
   <div class="titulo-doc">
-    <span>Nota de Honorarios</span>
+    <span>Recibo de Honorarios</span>
     <span class="folio">${folio}</span>
   </div>
 
