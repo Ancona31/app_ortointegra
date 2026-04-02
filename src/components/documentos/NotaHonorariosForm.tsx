@@ -28,8 +28,10 @@ function generarFolio(): string {
   return `NOH-${ymd}-${seq}`
 }
 
-function fmt(n: number): string {
-  return n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })
+type Divisa = 'MXN' | 'USD'
+
+function fmt(n: number, divisa: Divisa = 'MXN'): string {
+  return n.toLocaleString(divisa === 'MXN' ? 'es-MX' : 'en-US', { style: 'currency', currency: divisa })
 }
 
 export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }: Props) {
@@ -43,6 +45,7 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
   const [imprimiendo, setImprimiendo] = useState(false)
   const [lineas, setLineas]           = useState<LineaConcepto[]>([{ id: 1, concepto: '', precio: '' }])
   const [nextId, setNextId]           = useState(2)
+  const [divisa, setDivisa]           = useState<Divisa>('MXN')
 
   const total = lineas.reduce((sum, l) => sum + (parseFloat(l.precio) || 0), 0)
   const puedeImprimir = lineas.some(l => l.concepto.trim() !== '' && parseFloat(l.precio) > 0)
@@ -76,6 +79,7 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
           rfc_paciente: rfcPaciente,
           lineas: lineasValidas,
           monto: total,
+          divisa,
           forma_pago: formaPago,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         },
@@ -99,7 +103,7 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
         <tr>
           <td class="num">${i + 1}</td>
           <td class="concepto-col">${l.concepto}</td>
-          <td class="precio-col">${fmt(parseFloat(l.precio))}</td>
+          <td class="precio-col">${fmt(parseFloat(l.precio), divisa)}</td>
         </tr>
       `).join('')
 
@@ -139,10 +143,12 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
   .tabla-conceptos tbody td.num { text-align:center; color:#94a3b8; font-size:9pt; }
   .tabla-conceptos tbody td.concepto-col { color:#1a1a1a; }
   .tabla-conceptos tbody td.precio-col { text-align:right; color:#1a1a1a; font-weight:500; }
-  .tabla-conceptos tfoot tr { background:#f1f5f9; }
-  .tabla-conceptos tfoot td { padding:10px 12px; font-weight:700; font-size:11pt; }
-  .tabla-conceptos tfoot td.total-label { text-align:right; color:${cp}; text-transform:uppercase; letter-spacing:0.5px; font-size:9pt; }
-  .tabla-conceptos tfoot td.total-valor { text-align:right; color:${cp}; font-size:13pt; }
+  .tabla-conceptos tfoot { display:none; }
+  .total-card { display:flex; justify-content:flex-end; margin:16px 0 20px; }
+  .total-inner { background:linear-gradient(135deg, ${cp} 0%, ${cs} 100%); color:#fff; border-radius:10px; padding:14px 28px; text-align:right; min-width:220px; }
+  .total-inner-label { font-size:8pt; text-transform:uppercase; letter-spacing:1px; opacity:0.8; margin-bottom:4px; }
+  .total-inner-valor { font-size:22pt; font-weight:700; letter-spacing:0.5px; }
+  .total-inner-divisa { font-size:7.5pt; opacity:0.75; margin-top:3px; }
   .forma-pago-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
   .forma-pago-badge { background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px; padding:5px 12px; font-size:9pt; color:#475569; }
   .footer-area { display:flex; justify-content:space-between; align-items:flex-end; margin-top:60px; }
@@ -211,6 +217,14 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
       </tr>
     </tfoot>
   </table>
+
+  <div class="total-card">
+    <div class="total-inner">
+      <div class="total-inner-label">Total a pagar</div>
+      <div class="total-inner-valor">${fmt(total, divisa)}</div>
+      <div class="total-inner-divisa">${divisa === 'MXN' ? 'Pesos mexicanos (MXN)' : 'Dólares americanos (USD)'}</div>
+    </div>
+  </div>
 
   <div class="forma-pago-row">
     <span class="campo-label">Forma de pago</span>
@@ -334,17 +348,41 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
         {total > 0 && (
           <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center">
             <span className="text-sm font-medium text-slate-500">Total</span>
-            <span className="text-xl font-bold text-[#1a3a5c]">{fmt(total)}</span>
+            <span className="text-xl font-bold text-[#1a3a5c]">{fmt(total, divisa)}</span>
           </div>
         )}
       </div>
 
-      {/* Forma de pago */}
+      {/* Forma de pago y divisa */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-        <h2 className="font-semibold text-slate-700 text-sm mb-4">Forma de pago</h2>
-        <select value={formaPago} onChange={e => setFormaPago(e.target.value)} className={inputCls}>
-          {FORMAS_PAGO.map(f => <option key={f} value={f}>{f}</option>)}
-        </select>
+        <h2 className="font-semibold text-slate-700 text-sm mb-4">Pago</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Forma de pago</label>
+            <select value={formaPago} onChange={e => setFormaPago(e.target.value)} className={inputCls}>
+              {FORMAS_PAGO.map(f => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Divisa</label>
+            <div className="flex gap-2">
+              {(['MXN', 'USD'] as Divisa[]).map(d => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setDivisa(d)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 transition-all ${
+                    divisa === d
+                      ? 'border-[#1e5fa8] bg-[#1e5fa8] text-white'
+                      : 'border-slate-200 text-slate-500 hover:border-[#1e5fa8] hover:text-[#1e5fa8]'
+                  }`}
+                >
+                  {d === 'MXN' ? '🇲🇽 MXN' : '🇺🇸 USD'}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
 
       <button
