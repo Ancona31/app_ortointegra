@@ -27,16 +27,9 @@ export async function POST(req: NextRequest) {
   const limits = PLAN_LIMITS.free
 
   // Verificar si el email ya está registrado
-  const { data: existingUsers } = await admin.auth.admin.listUsers({ perPage: 1, page: 1 })
-  // Buscar por email de forma más eficiente con un filtro de perfil
-  const { data: existingProfile } = await admin
-    .from('profiles')
-    .select('id')
-    .eq('id', (await admin.auth.admin.getUserByEmail(email)).data.user?.id ?? '')
-    .maybeSingle()
-
-  const { data: existingUser } = await admin.auth.admin.getUserByEmail(email)
-  if (existingUser.user) {
+  const { data: { users } } = await admin.auth.admin.listUsers({ perPage: 1000 })
+  const existingUser = users.find(u => u.email === email)
+  if (existingUser) {
     return NextResponse.json({ error: 'Este correo ya está registrado. Inicia sesión.' }, { status: 409 })
   }
 
