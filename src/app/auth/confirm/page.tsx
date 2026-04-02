@@ -10,7 +10,7 @@ function ConfirmContent() {
   const router = useRouter()
   const [supabase] = useState(() => createClient())
 
-  const [estado, setEstado] = useState<'verificando' | 'listo' | 'confirmado' | 'error'>('verificando')
+  const [estado, setEstado] = useState<'verificando' | 'listo' | 'error'>('verificando')
   const [password, setPassword] = useState('')
   const [confirmar, setConfirmar] = useState('')
   const [loading, setLoading] = useState(false)
@@ -20,45 +20,8 @@ function ConfirmContent() {
   useEffect(() => {
     const tokenHash = searchParams.get('token_hash')
     const type      = searchParams.get('type')
-    const code      = searchParams.get('code')
 
-    async function completarRegistro() {
-      await fetch('/api/auth/complete-registro', { method: 'POST' })
-      setEstado('confirmado')
-      setTimeout(() => router.push('/dashboard'), 2500)
-    }
-
-    // PKCE code exchange — signUp redirige con ?code=
-    if (code) {
-      supabase.auth.exchangeCodeForSession(code).then(({ error: err }) => {
-        if (err) {
-          setEstado('error')
-        } else {
-          completarRegistro()
-        }
-      })
-      return
-    }
-
-    if (!tokenHash) {
-      setEstado('error')
-      return
-    }
-
-    // Confirmación de cuenta nueva (registro)
-    if (type === 'email' || type === 'signup') {
-      supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'email' }).then(({ error: err }) => {
-        if (err) {
-          setEstado('error')
-        } else {
-          completarRegistro()
-        }
-      })
-      return
-    }
-
-    // Recuperación de contraseña
-    if (type !== 'recovery') {
+    if (!tokenHash || type !== 'recovery') {
       setEstado('error')
       return
     }
@@ -106,16 +69,7 @@ function ConfirmContent() {
             </div>
           )}
 
-          {estado === 'confirmado' && (
-            <div className="text-center space-y-4 py-4">
-              <CheckCircle size={48} className="text-emerald-500 mx-auto" />
-              <h2 className="font-bold text-slate-800 text-lg">¡Cuenta confirmada!</h2>
-              <p className="text-sm text-slate-500">Tu cuenta está activa. Redirigiendo al sistema...</p>
-              <Loader2 size={16} className="animate-spin text-slate-400 mx-auto" />
-            </div>
-          )}
-
-          {estado === 'error' && (
+{estado === 'error' && (
             <div className="space-y-4">
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
                 Enlace inválido o expirado. Solicita uno nuevo.
