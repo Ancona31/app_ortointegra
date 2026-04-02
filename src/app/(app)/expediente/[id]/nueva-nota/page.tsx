@@ -9,7 +9,7 @@ import { flushSync } from 'react-dom'
 import {
   ArrowLeft, Save, Loader2, RotateCcw, Printer, Eye, Pencil,
   Pill, FlaskConical, ScanLine, ClipboardList, CheckCircle2,
-  BedDouble, PenLine, ShieldCheck, Receipt, Plus, Trash2, X,
+  BedDouble, PenLine, ShieldCheck, Receipt, Plus, Trash2, X, FileText,
 } from 'lucide-react'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
@@ -389,304 +389,336 @@ export default function NuevaNotaPage() {
 
   // ── Render ────────────────────────────────────────────────────
   return (
-    <div className="max-w-4xl mx-auto space-y-5">
-      <Breadcrumbs pacienteNombre={paciente ? `${paciente.nombre} ${paciente.apellidos}` : undefined} />
-
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Link href={`/expediente/${id}`} className="text-slate-400 hover:text-slate-600">
-          <ArrowLeft size={20} />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-[#1a3a5c]">Nueva Nota Médica</h1>
-          {paciente && (
-            <p className="text-slate-500 text-sm mt-0.5">
-              {paciente.nombre} {paciente.apellidos} ·{' '}
-              {paciente.fecha_nacimiento ? differenceInYears(new Date(), parseISO(paciente.fecha_nacimiento)) + ' años' : ''}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Banner de éxito */}
-      {notaSaved && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
-          <CheckCircle2 size={20} className="text-emerald-500 flex-shrink-0" />
-          <p className="text-sm font-medium text-emerald-700">Nota guardada en el expediente</p>
-          <Link href={`/expediente/${id}`} className="ml-auto text-xs text-emerald-600 hover:underline whitespace-nowrap">
-            Ver expediente →
+    <div className="max-w-7xl mx-auto">
+      {/* Breadcrumbs + Header — ancho completo */}
+      <div className="mb-5 space-y-4">
+        <Breadcrumbs pacienteNombre={paciente ? `${paciente.nombre} ${paciente.apellidos}` : undefined} />
+        <div className="flex items-center gap-3">
+          <Link href={`/expediente/${id}`} className="text-slate-400 hover:text-slate-600">
+            <ArrowLeft size={20} />
           </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-[#1a3a5c]">Nueva Nota Médica</h1>
+            {paciente && (
+              <p className="text-slate-500 text-sm mt-0.5">
+                {paciente.nombre} {paciente.apellidos} ·{' '}
+                {paciente.fecha_nacimiento ? differenceInYears(new Date(), parseISO(paciente.fecha_nacimiento)) + ' años' : ''}
+              </p>
+            )}
+          </div>
         </div>
-      )}
 
-      {/* ── Formulario de la consulta ── */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
-          <h2 className="font-semibold text-slate-700 text-sm">Datos de la consulta</h2>
-          <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
-            Completa los campos y
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="inline text-[#4285F4]"><path d="M12 2C12 2 13.8 9 19 12C13.8 15 12 22 12 22C12 22 10.2 15 5 12C10.2 9 12 2 12 2Z" fill="#4285F4"/></svg>
-            <span className="text-[#4285F4] font-medium">Gemini</span> redactará la nota médica
-          </p>
-        </div>
-        <div className="p-5 space-y-4">
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Motivo de consulta <span className="text-red-400">*</span></label>
-            <input type="text" value={form.motivo_consulta} onChange={e => update('motivo_consulta', e.target.value)}
-              placeholder="Ej: Dolor lumbar crónico, limitación funcional..."
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+        {/* Banner de éxito */}
+        {notaSaved && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
+            <CheckCircle2 size={20} className="text-emerald-500 flex-shrink-0" />
+            <p className="text-sm font-medium text-emerald-700">Nota guardada en el expediente</p>
+            <Link href={`/expediente/${id}`} className="ml-auto text-xs text-emerald-600 hover:underline whitespace-nowrap">
+              Ver expediente →
+            </Link>
           </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Diagnóstico(s)</label>
-            <input type="text" value={form.diagnosticos} onChange={e => update('diagnosticos', e.target.value)}
-              placeholder="Ej: Hernia discal L4-L5 con radiculopatía derecha..."
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Exploración física <span className="text-slate-400 font-normal">(opcional — Gemini la complementa)</span></label>
-            <textarea value={form.exploracion_fisica} onChange={e => update('exploracion_fisica', e.target.value)}
-              placeholder="Ej: Marcha antiálgica, Lasègue positivo a 45° derecho..."
-              rows={3}
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Plan de tratamiento <span className="text-slate-400 font-normal">(opcional)</span></label>
-            <textarea value={form.plan_tratamiento} onChange={e => update('plan_tratamiento', e.target.value)}
-              placeholder="Ej: Manejo conservador, fisioterapia, valorar cirugía..."
-              rows={2}
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Pronóstico <span className="text-slate-400 font-normal">(opcional)</span></label>
-            <input type="text" value={form.pronostico} onChange={e => update('pronostico', e.target.value)}
-              placeholder="Ej: Favorable a mediano plazo con tratamiento conservador..."
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Gabinete y Laboratorios <span className="text-slate-400 font-normal">(opcional)</span></label>
-            <textarea value={form.gabinete_laboratorios} onChange={e => update('gabinete_laboratorios', e.target.value)}
-              placeholder="Ej: Rx columna lumbar AP/Lateral — disminución de espacio L4-L5..."
-              rows={2}
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Próxima cita</label>
-            <input type="text" value={form.proxima_cita} onChange={e => update('proxima_cita', e.target.value)}
-              placeholder="Ej: En 4 semanas, 15 de abril 2026..."
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* ── Terapéutica empleada ── */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-          <div>
-            <h2 className="font-semibold text-slate-700 text-sm flex items-center gap-2">
-              <Pill size={14} className="text-blue-500" />
-              Terapéutica empleada
-            </h2>
-            <p className="text-xs text-slate-400 mt-0.5">Se imprime en la nota y pre-carga la receta</p>
-          </div>
-          <button type="button" onClick={addMed}
-            className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200">
-            <Plus size={13} /> Agregar
-          </button>
-        </div>
-        <div className="p-4 space-y-2" ref={suggestRef}>
-          {/* Encabezados */}
-          <div className="grid grid-cols-12 gap-2 px-1 mb-1">
-            <span className="col-span-4 text-xs font-medium text-slate-400 uppercase tracking-wide">Medicamento</span>
-            <span className="col-span-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Dosis</span>
-            <span className="col-span-2 text-xs font-medium text-slate-400 uppercase tracking-wide">Frecuencia</span>
-            <span className="col-span-2 text-xs font-medium text-slate-400 uppercase tracking-wide">Duración</span>
-            <span className="col-span-1" />
-          </div>
-          {medicamentos.map((med, i) => {
-            const suggestions = getSuggestions(med.nombre)
-            const mostrarSuggest = showSuggest === i && suggestions.length > 0
-            return (
-              <div key={i} className="grid grid-cols-12 gap-2 relative">
-                {/* Nombre con autocomplete */}
-                <div className="col-span-4 relative">
-                  <input
-                    type="text"
-                    value={med.nombre}
-                    onChange={e => updateMed(i, 'nombre', e.target.value)}
-                    onFocus={() => setShowSuggest(i)}
-                    placeholder="Ej: Ketorolaco"
-                    className="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
-                  />
-                  {mostrarSuggest && (
-                    <div className="absolute top-full left-0 right-0 z-20 bg-white border border-slate-200 rounded-lg shadow-lg mt-1 overflow-hidden">
-                      {suggestions.map(s => (
-                        <button key={s} type="button"
-                          onMouseDown={() => { updateMed(i, 'nombre', s); setShowSuggest(null) }}
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
-                          {s}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <input type="text" value={med.dosis} onChange={e => updateMed(i, 'dosis', e.target.value)}
-                  placeholder="Ej: 30 mg" className="col-span-3 px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-                <input type="text" value={med.frecuencia} onChange={e => updateMed(i, 'frecuencia', e.target.value)}
-                  placeholder="Ej: c/8 h" className="col-span-2 px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-                <input type="text" value={med.duracion} onChange={e => updateMed(i, 'duracion', e.target.value)}
-                  placeholder="Ej: 5 días" className="col-span-2 px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-                <button type="button" onClick={() => removeMed(i)}
-                  className="col-span-1 flex items-center justify-center text-slate-300 hover:text-red-400 transition-colors">
-                  <Trash2 size={15} />
-                </button>
-              </div>
-            )
-          })}
-          {medicamentos.every(m => !m.nombre.trim()) && (
-            <p className="text-xs text-slate-400 text-center py-2">Sin medicamentos — usa el botón "Agregar" o comienza a escribir</p>
-          )}
-        </div>
-      </div>
+      {/* ── Grid de dos columnas ── */}
+      <div className="lg:grid lg:grid-cols-5 lg:gap-6 lg:items-start space-y-5 lg:space-y-0">
 
-      <ConsultaRapida />
+        {/* ════════════════════════════════
+            COLUMNA IZQUIERDA (3/5)
+            Formulario + nota generada
+        ════════════════════════════════ */}
+        <div className="lg:col-span-3 space-y-5">
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
-      )}
-
-      {/* Botón generar */}
-      <button onClick={generarNota} disabled={generando || !form.motivo_consulta}
-        className="w-full py-3 bg-[#4285F4] text-white rounded-xl font-medium hover:bg-[#3367d6] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-        {generando
-          ? <><Loader2 size={18} className="animate-spin" /> Redactando nota médica...</>
-          : <><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2C12 2 13.8 9 19 12C13.8 15 12 22 12 22C12 22 10.2 15 5 12C10.2 9 12 2 12 2Z" fill="white"/></svg> Generar con Gemini</>
-        }
-      </button>
-
-      {/* Nota generada */}
-      {notaGenerada && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-            <div>
-              <h2 className="font-semibold text-slate-700 text-sm">Nota médica generada</h2>
-              <p className="text-xs text-slate-400 mt-0.5">
-                {modoEdicion ? 'Editando texto' : 'Vista previa — haz clic en Editar para modificar'}
+          {/* Formulario de la consulta */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
+              <h2 className="font-semibold text-slate-700 text-sm">Datos de la consulta</h2>
+              <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                Completa los campos y
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="inline text-[#4285F4]"><path d="M12 2C12 2 13.8 9 19 12C13.8 15 12 22 12 22C12 22 10.2 15 5 12C10.2 9 12 2 12 2Z" fill="#4285F4"/></svg>
+                <span className="text-[#4285F4] font-medium">Gemini</span> redactará la nota médica
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setModoEdicion(!modoEdicion)}
-                className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition-colors ${modoEdicion ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-slate-100 border-slate-200 text-slate-600 hover:border-slate-300'}`}>
-                {modoEdicion ? <><Eye size={12} /> Vista previa</> : <><Pencil size={12} /> Editar</>}
-              </button>
-              <button onClick={generarNota} className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 px-2 py-1">
-                <RotateCcw size={12} /> Regenerar
-              </button>
-            </div>
-          </div>
-          <div className="p-5">
-            {modoEdicion ? (
-              <textarea value={notaGenerada} onChange={e => setNotaGenerada(e.target.value)} rows={22}
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 resize-y" />
-            ) : (
-              <div className="prose prose-sm max-w-none prose-headings:text-[#1a3a5c] prose-headings:font-bold prose-headings:text-sm prose-headings:mt-4 prose-headings:mb-1 prose-strong:text-[#1a3a5c] prose-strong:font-semibold prose-p:text-slate-700 prose-p:leading-relaxed prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-li:text-slate-700">
-                <ReactMarkdown>{notaGenerada}</ReactMarkdown>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Motivo de consulta <span className="text-red-400">*</span></label>
+                <input type="text" value={form.motivo_consulta} onChange={e => update('motivo_consulta', e.target.value)}
+                  placeholder="Ej: Dolor lumbar crónico, limitación funcional..."
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
               </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Acciones */}
-      {notaGenerada && (
-        <div className="flex gap-3 pb-2">
-          <button onClick={imprimir} disabled={imprimiendo}
-            className="flex items-center gap-2 px-5 py-2.5 border-2 border-[#1a3a5c] text-[#1a3a5c] rounded-lg text-sm font-medium hover:bg-[#1a3a5c] hover:text-white transition-colors disabled:opacity-50">
-            {imprimiendo ? <><Loader2 size={16} className="animate-spin" /> Generando...</> : <><Printer size={16} /> Imprimir</>}
-          </button>
-          <button onClick={guardar} disabled={guardando}
-            className="flex-1 flex items-center justify-center gap-2 bg-[#1e5fa8] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-60">
-            {guardando ? <><Loader2 size={16} className="animate-spin" /> Guardando...</> : <><Save size={16} /> Guardar en expediente</>}
-          </button>
-        </div>
-      )}
-
-      {/* ── Panel post-guardado: generar documentos inline ── */}
-      {notaSaved && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
-            <h2 className="font-semibold text-slate-700 text-sm">Generar documento para este paciente</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Los datos de la consulta se pre-cargan automáticamente</p>
-          </div>
-          <div className="p-4">
-            {/* Botón destacado: Imprimir receta */}
-            {medicamentosParaReceta.length > 0 && (
-              <button onClick={() => setDocInline(docInline === 'receta' ? null : 'receta')}
-                className={`w-full mb-3 flex items-center justify-center gap-2 py-3 rounded-xl border-2 text-sm font-semibold transition-all ${docInline === 'receta' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100'}`}>
-                <Pill size={16} />
-                {docInline === 'receta' ? 'Cerrar receta' : `Imprimir receta (${medicamentosParaReceta.length} medicamento${medicamentosParaReceta.length > 1 ? 's' : ''} pre-cargado${medicamentosParaReceta.length > 1 ? 's' : ''})`}
-              </button>
-            )}
-            {/* Grid de otros documentos */}
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {DOCS.filter(d => !(d.key === 'receta' && medicamentosParaReceta.length > 0)).map(({ key, label, icon: Icon, color }) => (
-                <button key={key}
-                  onClick={() => setDocInline(docInline === key ? null : key)}
-                  className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all text-center text-xs font-medium ${docInline === key ? color.replace('hover:', '') + ' border-current opacity-100' : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'}`}>
-                  <Icon size={18} />
-                  <span className="leading-tight">{label}</span>
-                </button>
-              ))}
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Diagnóstico(s)</label>
+                <input type="text" value={form.diagnosticos} onChange={e => update('diagnosticos', e.target.value)}
+                  placeholder="Ej: Hernia discal L4-L5 con radiculopatía derecha..."
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Exploración física <span className="text-slate-400 font-normal">(opcional — Gemini la complementa)</span></label>
+                <textarea value={form.exploracion_fisica} onChange={e => update('exploracion_fisica', e.target.value)}
+                  placeholder="Ej: Marcha antiálgica, Lasègue positivo a 45° derecho..."
+                  rows={3}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Plan de tratamiento <span className="text-slate-400 font-normal">(opcional)</span></label>
+                <textarea value={form.plan_tratamiento} onChange={e => update('plan_tratamiento', e.target.value)}
+                  placeholder="Ej: Manejo conservador, fisioterapia, valorar cirugía..."
+                  rows={2}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Pronóstico <span className="text-slate-400 font-normal">(opcional)</span></label>
+                <input type="text" value={form.pronostico} onChange={e => update('pronostico', e.target.value)}
+                  placeholder="Ej: Favorable a mediano plazo con tratamiento conservador..."
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Gabinete y Laboratorios <span className="text-slate-400 font-normal">(opcional)</span></label>
+                <textarea value={form.gabinete_laboratorios} onChange={e => update('gabinete_laboratorios', e.target.value)}
+                  placeholder="Ej: Rx columna lumbar AP/Lateral — disminución de espacio L4-L5..."
+                  rows={2}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Próxima cita</label>
+                <input type="text" value={form.proxima_cita} onChange={e => update('proxima_cita', e.target.value)}
+                  placeholder="Ej: En 4 semanas, 15 de abril 2026..."
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+              </div>
             </div>
           </div>
 
-          {/* Formulario inline */}
-          {docInline && (
-            <div className="border-t border-slate-100">
+          {/* Terapéutica empleada */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold text-slate-700 text-sm flex items-center gap-2">
+                  <Pill size={14} className="text-blue-500" />
+                  Terapéutica empleada
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">Se imprime en la nota y pre-carga la receta</p>
+              </div>
+              <button type="button" onClick={addMed}
+                className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200">
+                <Plus size={13} /> Agregar
+              </button>
+            </div>
+            <div className="p-4 space-y-2" ref={suggestRef}>
+              <div className="grid grid-cols-12 gap-2 px-1 mb-1">
+                <span className="col-span-4 text-xs font-medium text-slate-400 uppercase tracking-wide">Medicamento</span>
+                <span className="col-span-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Dosis</span>
+                <span className="col-span-2 text-xs font-medium text-slate-400 uppercase tracking-wide">Frecuencia</span>
+                <span className="col-span-2 text-xs font-medium text-slate-400 uppercase tracking-wide">Duración</span>
+                <span className="col-span-1" />
+              </div>
+              {medicamentos.map((med, i) => {
+                const suggestions = getSuggestions(med.nombre)
+                const mostrarSuggest = showSuggest === i && suggestions.length > 0
+                return (
+                  <div key={i} className="grid grid-cols-12 gap-2 relative">
+                    <div className="col-span-4 relative">
+                      <input type="text" value={med.nombre}
+                        onChange={e => updateMed(i, 'nombre', e.target.value)}
+                        onFocus={() => setShowSuggest(i)}
+                        placeholder="Ej: Ketorolaco"
+                        className="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                      {mostrarSuggest && (
+                        <div className="absolute top-full left-0 right-0 z-20 bg-white border border-slate-200 rounded-lg shadow-lg mt-1 overflow-hidden">
+                          {suggestions.map(s => (
+                            <button key={s} type="button"
+                              onMouseDown={() => { updateMed(i, 'nombre', s); setShowSuggest(null) }}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
+                              {s}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <input type="text" value={med.dosis} onChange={e => updateMed(i, 'dosis', e.target.value)}
+                      placeholder="Ej: 30 mg" className="col-span-3 px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                    <input type="text" value={med.frecuencia} onChange={e => updateMed(i, 'frecuencia', e.target.value)}
+                      placeholder="Ej: c/8 h" className="col-span-2 px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                    <input type="text" value={med.duracion} onChange={e => updateMed(i, 'duracion', e.target.value)}
+                      placeholder="Ej: 5 días" className="col-span-2 px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                    <button type="button" onClick={() => removeMed(i)}
+                      className="col-span-1 flex items-center justify-center text-slate-300 hover:text-red-400 transition-colors">
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                )
+              })}
+              {medicamentos.every(m => !m.nombre.trim()) && (
+                <p className="text-xs text-slate-400 text-center py-2">Sin medicamentos — usa el botón "Agregar" o comienza a escribir</p>
+              )}
+            </div>
+          </div>
+
+          <ConsultaRapida />
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
+          )}
+
+          {/* Botón generar */}
+          <button onClick={generarNota} disabled={generando || !form.motivo_consulta}
+            className="w-full py-3 bg-[#4285F4] text-white rounded-xl font-medium hover:bg-[#3367d6] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+            {generando
+              ? <><Loader2 size={18} className="animate-spin" /> Redactando nota médica...</>
+              : <><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2C12 2 13.8 9 19 12C13.8 15 12 22 12 22C12 22 10.2 15 5 12C10.2 9 12 2 12 2Z" fill="white"/></svg> Generar con Gemini</>
+            }
+          </button>
+
+          {/* Nota generada */}
+          {notaGenerada && (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                <span className="text-sm font-semibold text-slate-700">
-                  {DOCS.find(d => d.key === docInline)?.label}
-                </span>
-                <button onClick={() => setDocInline(null)} className="text-slate-400 hover:text-slate-600">
-                  <X size={16} />
-                </button>
+                <div>
+                  <h2 className="font-semibold text-slate-700 text-sm">Nota médica generada</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {modoEdicion ? 'Editando texto' : 'Vista previa — haz clic en Editar para modificar'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setModoEdicion(!modoEdicion)}
+                    className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition-colors ${modoEdicion ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-slate-100 border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                    {modoEdicion ? <><Eye size={12} /> Vista previa</> : <><Pencil size={12} /> Editar</>}
+                  </button>
+                  <button onClick={generarNota} className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 px-2 py-1">
+                    <RotateCcw size={12} /> Regenerar
+                  </button>
+                </div>
               </div>
               <div className="p-5">
-                {docInline === 'receta' && (
-                  <RecetaFormDynamic
-                    pacienteInicial={nombrePaciente}
-                    diagnosticoInicial={form.diagnosticos}
-                    pacienteId={id}
-                    medicamentosIniciales={medicamentosParaReceta}
-                  />
-                )}
-                {docInline === 'lab' && (
-                  <SolicitudLabFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
-                )}
-                {docInline === 'imagen' && (
-                  <SolicitudImagenFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
-                )}
-                {docInline === 'suplementacion' && (
-                  <PlanSupFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
-                )}
-                {docInline === 'internamiento' && (
-                  <InternamientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
-                )}
-                {docInline === 'escrito' && (
-                  <EscritoFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} />
-                )}
-                {docInline === 'consentimiento' && (
-                  <ConsentimientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
-                )}
-                {docInline === 'honorarios' && (
-                  <HonorariosFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} />
+                {modoEdicion ? (
+                  <textarea value={notaGenerada} onChange={e => setNotaGenerada(e.target.value)} rows={22}
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 resize-y" />
+                ) : (
+                  <div className="prose prose-sm max-w-none prose-headings:text-[#1a3a5c] prose-headings:font-bold prose-headings:text-sm prose-headings:mt-4 prose-headings:mb-1 prose-strong:text-[#1a3a5c] prose-strong:font-semibold prose-p:text-slate-700 prose-p:leading-relaxed prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-li:text-slate-700">
+                    <ReactMarkdown>{notaGenerada}</ReactMarkdown>
+                  </div>
                 )}
               </div>
             </div>
           )}
-        </div>
-      )}
 
-      <div className="pb-6" />
+          {/* Acciones imprimir / guardar */}
+          {notaGenerada && (
+            <div className="flex gap-3 pb-6">
+              <button onClick={imprimir} disabled={imprimiendo}
+                className="flex items-center gap-2 px-5 py-2.5 border-2 border-[#1a3a5c] text-[#1a3a5c] rounded-lg text-sm font-medium hover:bg-[#1a3a5c] hover:text-white transition-colors disabled:opacity-50">
+                {imprimiendo ? <><Loader2 size={16} className="animate-spin" /> Generando...</> : <><Printer size={16} /> Imprimir</>}
+              </button>
+              <button onClick={guardar} disabled={guardando}
+                className="flex-1 flex items-center justify-center gap-2 bg-[#1e5fa8] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-60">
+                {guardando ? <><Loader2 size={16} className="animate-spin" /> Guardando...</> : <><Save size={16} /> Guardar en expediente</>}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* ════════════════════════════════
+            COLUMNA DERECHA (2/5)
+            Panel de documentos — sticky
+        ════════════════════════════════ */}
+        <div className="lg:col-span-2 lg:sticky lg:top-6">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+              <FileText size={14} className="text-slate-400" />
+              <h2 className="font-semibold text-slate-700 text-sm">Documentos del paciente</h2>
+            </div>
+
+            {!notaSaved ? (
+              /* Estado: esperando que se guarde la nota */
+              <div className="p-8 flex flex-col items-center text-center gap-3">
+                <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center">
+                  <FileText size={22} className="text-slate-300" />
+                </div>
+                <p className="text-sm text-slate-400 leading-relaxed">
+                  {notaGenerada
+                    ? 'Guarda la nota para poder generar documentos desde aquí'
+                    : 'Completa y genera la nota para activar este panel'}
+                </p>
+                {notaGenerada && (
+                  <button onClick={guardar} disabled={guardando}
+                    className="mt-1 flex items-center gap-2 px-4 py-2 bg-[#1e5fa8] text-white rounded-lg text-xs font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-60">
+                    {guardando ? <><Loader2 size={13} className="animate-spin" /> Guardando...</> : <><Save size={13} /> Guardar nota</>}
+                  </button>
+                )}
+              </div>
+            ) : (
+              /* Estado: nota guardada — panel activo */
+              <div className="p-4 space-y-3">
+                {/* Receta destacada si hay medicamentos */}
+                {medicamentosParaReceta.length > 0 && (
+                  <button onClick={() => setDocInline(docInline === 'receta' ? null : 'receta')}
+                    className={`w-full flex items-center gap-2 py-2.5 px-3 rounded-xl border-2 text-sm font-semibold transition-all ${docInline === 'receta' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100'}`}>
+                    <Pill size={15} />
+                    <span className="text-left leading-tight">
+                      {docInline === 'receta' ? 'Cerrar receta' : `Receta médica`}
+                    </span>
+                    <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-normal ${docInline === 'receta' ? 'bg-white/20' : 'bg-blue-100 text-blue-600'}`}>
+                      {medicamentosParaReceta.length} med.
+                    </span>
+                  </button>
+                )}
+
+                {/* Grid de documentos */}
+                <div className="grid grid-cols-2 gap-2">
+                  {DOCS.filter(d => !(d.key === 'receta' && medicamentosParaReceta.length > 0)).map(({ key, label, icon: Icon, color }) => (
+                    <button key={key}
+                      onClick={() => setDocInline(docInline === key ? null : key)}
+                      className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-center text-xs font-medium leading-tight ${docInline === key ? color + ' border-current' : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'}`}>
+                      <Icon size={17} />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Formulario inline en columna derecha */}
+                {docInline && (
+                  <div className="border border-slate-200 rounded-xl overflow-hidden mt-1">
+                    <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-700">
+                        {DOCS.find(d => d.key === docInline)?.label}
+                      </span>
+                      <button onClick={() => setDocInline(null)} className="text-slate-400 hover:text-slate-600">
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div className="p-4 max-h-[70vh] overflow-y-auto">
+                      {docInline === 'receta' && (
+                        <RecetaFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} medicamentosIniciales={medicamentosParaReceta} />
+                      )}
+                      {docInline === 'lab' && (
+                        <SolicitudLabFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
+                      )}
+                      {docInline === 'imagen' && (
+                        <SolicitudImagenFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
+                      )}
+                      {docInline === 'suplementacion' && (
+                        <PlanSupFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
+                      )}
+                      {docInline === 'internamiento' && (
+                        <InternamientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
+                      )}
+                      {docInline === 'escrito' && (
+                        <EscritoFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} />
+                      )}
+                      {docInline === 'consentimiento' && (
+                        <ConsentimientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
+                      )}
+                      {docInline === 'honorarios' && (
+                        <HonorariosFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} />
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+      </div>
     </div>
   )
 }
