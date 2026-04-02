@@ -62,7 +62,7 @@ function BillingContent() {
         supabase.from('clinicas').select(
           'plan, suscripcion_estado, trial_ends_at, suscripcion_ends_at, stripe_customer_id, max_medicos, max_secretarias, max_pacientes'
         ).eq('id', profile!.clinica_id!).single(),
-        supabase.from('profiles').select('id', { count: 'exact' }).eq('clinica_id', profile!.clinica_id!).eq('role', 'medico'),
+        supabase.from('profiles').select('id', { count: 'exact' }).eq('clinica_id', profile!.clinica_id!).in('role', ['admin', 'medico']),
         supabase.from('profiles').select('id', { count: 'exact' }).eq('clinica_id', profile!.clinica_id!).eq('role', 'secretaria'),
         supabase.from('pacientes').select('id', { count: 'exact' }).eq('clinica_id', profile!.clinica_id!),
       ])
