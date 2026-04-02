@@ -54,7 +54,7 @@ export function useProfile() {
   return {
     profile,
     loading,
-    isDoctor: profile?.role === 'medico' || profile?.role === 'super_admin',
+    isDoctor: profile?.role === 'medico' || profile?.role === 'super_admin' || profile?.role === 'admin',
     isSecretary: profile?.role === 'secretaria',
     isAdmin: profile?.role === 'admin' || profile?.role === 'super_admin',
     isSuperAdmin: profile?.role === 'super_admin',
