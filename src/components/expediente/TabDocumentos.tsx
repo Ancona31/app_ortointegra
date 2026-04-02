@@ -1,8 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ClipboardList, Eye, FileText, FlaskConical, Pill, ScanLine, Trash2 } from 'lucide-react'
+import { AlertTriangle, ClipboardList, Eye, FileText, FlaskConical, Pill, ScanLine, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 
 const TIPO_DOC_LABEL: Record<string, string> = {
@@ -34,7 +35,10 @@ interface Props {
 }
 
 export default function TabDocumentos({ id, documentos, onVerDocumento, onEliminarDocumento }: Props) {
+  const [docAEliminar, setDocAEliminar] = useState<{ id: string; tipo: string } | null>(null)
+
   return (
+    <>
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-xs text-slate-500">Documentos generados e impresos para este paciente</p>
@@ -82,11 +86,7 @@ export default function TabDocumentos({ id, documentos, onVerDocumento, onElimin
                   </button>
                   {onEliminarDocumento && (
                     <button
-                      onClick={() => {
-                        if (window.confirm('¿Eliminar este documento? Esta acción es permanente y no podrá recuperarse nunca.')) {
-                          onEliminarDocumento(doc.id)
-                        }
-                      }}
+                      onClick={() => setDocAEliminar({ id: doc.id, tipo: TIPO_DOC_LABEL[doc.tipo] || doc.tipo })}
                       className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600 font-medium px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
                       title="Eliminar documento"
                     >
@@ -100,5 +100,43 @@ export default function TabDocumentos({ id, documentos, onVerDocumento, onElimin
         )}
       </div>
     </div>
+
+      {/* Modal confirmar eliminación */}
+      {docAEliminar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle size={20} className="text-red-600" />
+              </div>
+              <div>
+                <h2 className="font-bold text-slate-800 text-lg">¿Eliminar documento?</h2>
+                <p className="text-sm text-slate-500">{docAEliminar.tipo}</p>
+              </div>
+            </div>
+
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 space-y-1">
+              <p className="font-semibold">Esta acción es irreversible.</p>
+              <p>El documento será eliminado permanentemente y no podrá recuperarse nunca.</p>
+            </div>
+
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => setDocAEliminar(null)}
+                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => { onEliminarDocumento!(docAEliminar.id); setDocAEliminar(null) }}
+                className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+              >
+                <Trash2 size={15} /> Sí, eliminar definitivamente
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
