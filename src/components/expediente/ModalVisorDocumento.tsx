@@ -14,6 +14,7 @@ const TIPO_DOC_LABEL: Record<string, string> = {
   escrito_medico: 'Escrito Médico',
   solicitud_internamiento: 'Solicitud de Internamiento',
   consentimiento_informado: 'Consentimiento Informado',
+  nota_honorarios: 'Nota de Honorarios',
 }
 const TIPO_DOC_COLOR: Record<string, string> = {
   receta: 'bg-blue-100 text-blue-700',
@@ -24,6 +25,7 @@ const TIPO_DOC_COLOR: Record<string, string> = {
   escrito_medico: 'bg-teal-100 text-teal-700',
   solicitud_internamiento: 'bg-rose-100 text-rose-700',
   consentimiento_informado: 'bg-indigo-100 text-indigo-700',
+  nota_honorarios: 'bg-orange-100 text-orange-700',
 }
 
 interface Props {
@@ -157,6 +159,50 @@ export default function ModalVisorDocumento({ doc, onClose, pacienteEmail }: Pro
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* NOTA DE HONORARIOS */}
+          {doc.tipo === 'nota_honorarios' && (
+            <div className="space-y-3">
+              {doc.contenido?.folio && (
+                <div className="flex gap-2">
+                  <span className="font-medium text-slate-500 min-w-[90px]">Folio:</span>
+                  <span className="font-mono text-sm">{doc.contenido.folio}</span>
+                </div>
+              )}
+              {doc.contenido?.concepto && (
+                <div className="flex gap-2">
+                  <span className="font-medium text-slate-500 min-w-[90px]">Concepto:</span>
+                  <span className="whitespace-pre-wrap">{doc.contenido.concepto}</span>
+                </div>
+              )}
+              {doc.contenido?.monto != null && (
+                <div className="flex gap-2">
+                  <span className="font-medium text-slate-500 min-w-[90px]">Monto:</span>
+                  <span className="font-semibold text-lg text-[#1a3a5c]">
+                    {Number(doc.contenido.monto).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}
+                  </span>
+                </div>
+              )}
+              {doc.contenido?.forma_pago && (
+                <div className="flex gap-2">
+                  <span className="font-medium text-slate-500 min-w-[90px]">Forma pago:</span>
+                  <span>{doc.contenido.forma_pago}</span>
+                </div>
+              )}
+              {doc.contenido?.rfc_medico && (
+                <div className="flex gap-2">
+                  <span className="font-medium text-slate-500 min-w-[90px]">RFC médico:</span>
+                  <span className="font-mono">{doc.contenido.rfc_medico}</span>
+                </div>
+              )}
+              {doc.contenido?.rfc_paciente && (
+                <div className="flex gap-2">
+                  <span className="font-medium text-slate-500 min-w-[90px]">RFC paciente:</span>
+                  <span className="font-mono">{doc.contenido.rfc_paciente}</span>
+                </div>
+              )}
             </div>
           )}
 

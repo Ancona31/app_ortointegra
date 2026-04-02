@@ -15,6 +15,7 @@ const TIPO_DOC_LABEL: Record<string, string> = {
   escrito_medico: 'Escrito Médico',
   solicitud_internamiento: 'Solicitud de Internamiento',
   consentimiento_informado: 'Consentimiento Informado',
+  nota_honorarios: 'Nota de Honorarios',
 }
 const TIPO_DOC_COLOR: Record<string, string> = {
   receta: 'bg-blue-100 text-blue-700',
@@ -25,6 +26,7 @@ const TIPO_DOC_COLOR: Record<string, string> = {
   escrito_medico: 'bg-teal-100 text-teal-700',
   solicitud_internamiento: 'bg-rose-100 text-rose-700',
   consentimiento_informado: 'bg-indigo-100 text-indigo-700',
+  nota_honorarios: 'bg-orange-100 text-orange-700',
 }
 
 interface Props {

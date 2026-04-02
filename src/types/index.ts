@@ -131,6 +131,7 @@ export type TipoDocumento =
   | 'plan_suplementacion'
   | 'solicitud_internamiento'
   | 'escrito_medico'
+  | 'nota_honorarios'
 
 export interface Documento {
   id: string
