@@ -140,9 +140,9 @@ export default function RegisterPage() {
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Cédula profesional</label>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Cédula profesional *</label>
                 <input type="text" value={form.cedula_profesional} onChange={set('cedula_profesional')}
-                  placeholder="Opcional"
+                  placeholder="Ej: 12345678" required
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
               </div>
               <div>

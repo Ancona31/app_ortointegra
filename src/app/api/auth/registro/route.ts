@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     titulo, especialidad, cedula_profesional, cedula_especialidad,
   } = await req.json()
 
-  if (!email || !password || !nombre || !nombreClinica || !titulo || !especialidad) {
+  if (!email || !password || !nombre || !nombreClinica || !titulo || !especialidad || !cedula_profesional) {
     return NextResponse.json({ error: 'Faltan campos obligatorios' }, { status: 400 })
   }
 
