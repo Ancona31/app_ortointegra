@@ -233,10 +233,11 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
     </div>
   </div>
 
+  ${tipoDoc !== 'cotizacion' ? `
   <div class="forma-pago-row">
     <span class="campo-label">Forma de pago</span>
     <span class="forma-pago-badge">${formaPago}</span>
-  </div>
+  </div>` : ''}
 
   <div class="footer-area">
     <div class="nota-fiscal">
@@ -386,12 +387,14 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
       <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
         <h2 className="font-semibold text-slate-700 text-sm mb-4">Pago</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {tipoDoc !== 'cotizacion' && (
           <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">Forma de pago</label>
             <select value={formaPago} onChange={e => setFormaPago(e.target.value)} className={inputCls}>
               {FORMAS_PAGO.map(f => <option key={f} value={f}>{f}</option>)}
             </select>
           </div>
+          )}
           <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">Divisa</label>
             <div className="flex gap-2">

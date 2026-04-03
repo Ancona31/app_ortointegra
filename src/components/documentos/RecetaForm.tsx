@@ -533,11 +533,8 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 
       {/* Medicamentos */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
           <h2 className="font-semibold text-slate-700 text-sm">Medicamentos</h2>
-          <button onClick={addMed} className="flex items-center gap-1 text-xs text-[#1e5fa8] hover:text-[#1a3a5c] font-medium">
-            <Plus size={14} /> Agregar
-          </button>
         </div>
         <div className="divide-y divide-slate-100">
           {medicamentos.map((med, i) => (
@@ -591,6 +588,13 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
               </div>
             </div>
           ))}
+          {/* Botón al pie del último medicamento */}
+          <div className="px-4 py-3">
+            <button onClick={addMed}
+              className="flex items-center gap-1.5 text-xs font-medium text-[#1e5fa8] hover:text-[#1a3a5c] transition-colors">
+              <Plus size={14} /> Agregar medicamento
+            </button>
+          </div>
         </div>
       </div>
 

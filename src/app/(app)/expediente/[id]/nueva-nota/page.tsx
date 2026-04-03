@@ -447,30 +447,11 @@ export default function NuevaNotaPage() {
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Diagnóstico(s)</label>
-                <input type="text" value={form.diagnosticos} onChange={e => update('diagnosticos', e.target.value)}
-                  placeholder="Ej: Hernia discal L4-L5 con radiculopatía derecha..."
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-              </div>
-              <div>
                 <label className="text-xs font-medium text-slate-500 block mb-1">Exploración física <span className="text-slate-400 font-normal">(opcional — Gemini la complementa)</span></label>
                 <textarea value={form.exploracion_fisica} onChange={e => update('exploracion_fisica', e.target.value)}
                   placeholder="Ej: Marcha antiálgica, Lasègue positivo a 45° derecho..."
                   rows={3}
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Plan de tratamiento <span className="text-slate-400 font-normal">(opcional)</span></label>
-                <textarea value={form.plan_tratamiento} onChange={e => update('plan_tratamiento', e.target.value)}
-                  placeholder="Ej: Manejo conservador, fisioterapia, valorar cirugía..."
-                  rows={2}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Pronóstico <span className="text-slate-400 font-normal">(opcional)</span></label>
-                <input type="text" value={form.pronostico} onChange={e => update('pronostico', e.target.value)}
-                  placeholder="Ej: Favorable a mediano plazo con tratamiento conservador..."
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-500 block mb-1">Gabinete y Laboratorios <span className="text-slate-400 font-normal">(opcional)</span></label>
@@ -480,28 +461,29 @@ export default function NuevaNotaPage() {
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Próxima cita</label>
-                <input type="text" value={form.proxima_cita} onChange={e => update('proxima_cita', e.target.value)}
-                  placeholder="Ej: En 4 semanas, 15 de abril 2026..."
+                <label className="text-xs font-medium text-slate-500 block mb-1">Diagnóstico(s)</label>
+                <input type="text" value={form.diagnosticos} onChange={e => update('diagnosticos', e.target.value)}
+                  placeholder="Ej: Hernia discal L4-L5 con radiculopatía derecha..."
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Plan de tratamiento <span className="text-slate-400 font-normal">(opcional)</span></label>
+                <textarea value={form.plan_tratamiento} onChange={e => update('plan_tratamiento', e.target.value)}
+                  placeholder="Ej: Manejo conservador, fisioterapia, valorar cirugía..."
+                  rows={2}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
               </div>
             </div>
           </div>
 
           {/* Terapéutica empleada */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h2 className="font-semibold text-slate-700 text-sm flex items-center gap-2">
-                  <Pill size={14} className="text-blue-500" />
-                  Terapéutica empleada
-                </h2>
-                <p className="text-xs text-slate-400 mt-0.5">Se imprime en la nota y pre-carga la receta</p>
-              </div>
-              <button type="button" onClick={addMed}
-                className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200">
-                <Plus size={13} /> Agregar
-              </button>
+            <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
+              <h2 className="font-semibold text-slate-700 text-sm flex items-center gap-2">
+                <Pill size={14} className="text-blue-500" />
+                Terapéutica empleada
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">Se imprime en la nota y pre-carga la receta</p>
             </div>
             <div className="p-4 space-y-2" ref={suggestRef}>
               <div className="grid grid-cols-12 gap-2 px-1 mb-1">
@@ -550,6 +532,33 @@ export default function NuevaNotaPage() {
               {medicamentos.every(m => !m.nombre.trim()) && (
                 <p className="text-xs text-slate-400 text-center py-2">Sin medicamentos — usa el botón "Agregar" o comienza a escribir</p>
               )}
+              <div className="pt-1">
+                <button type="button" onClick={addMed}
+                  className="flex items-center gap-1.5 text-xs font-medium text-[#1e5fa8] hover:text-[#1a3a5c] transition-colors">
+                  <Plus size={14} /> Agregar medicamento
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Pronóstico y próxima cita */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
+              <h2 className="font-semibold text-slate-700 text-sm">Pronóstico y seguimiento</h2>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Pronóstico <span className="text-slate-400 font-normal">(opcional)</span></label>
+                <input type="text" value={form.pronostico} onChange={e => update('pronostico', e.target.value)}
+                  placeholder="Ej: Favorable a mediano plazo con tratamiento conservador..."
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Próxima cita</label>
+                <input type="text" value={form.proxima_cita} onChange={e => update('proxima_cita', e.target.value)}
+                  placeholder="Ej: En 4 semanas, 15 de abril 2026..."
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+              </div>
             </div>
           </div>
 
