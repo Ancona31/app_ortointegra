@@ -76,7 +76,7 @@ Interpretación técnica de estudios de gabinete (Rx, RM, TAC) y laboratorios re
 Diagnóstico clínico y radiológico preciso, incluyendo lateralidad en MAYÚSCULAS y clasificación si aplica.
 
 **[PLAN]:**
-Manejo farmacológico detallado, indicaciones no farmacológicas (reposo, apoyo, terapia física) y cronograma de seguimiento.`
+PROHIBIDO mencionar medicamentos, fármacos, nombres comerciales, denominaciones genéricas, dosis, vía de administración, frecuencia ni duración de ningún tratamiento farmacológico. El médico los registra por separado en el apartado de Terapéutica Empleada. Incluye ÚNICAMENTE: indicaciones no farmacológicas (reposo, descarga de peso, inmovilización, uso de órtesis, terapia física, rehabilitación, cuidados locales, dieta, etc.) y cronograma de seguimiento o próxima valoración.`
 
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
     const response = await model.generateContent(prompt)
