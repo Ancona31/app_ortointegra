@@ -186,11 +186,6 @@ function ExpedientePacienteContent() {
   if (loading) return <div className="text-center py-12 text-slate-400">Cargando expediente...</div>
   if (!paciente) return <div className="text-center py-12 text-slate-400">Paciente no encontrado</div>
 
-  const diagnosticos = consultas
-    .flatMap(c => c.diagnosticos || [])
-    .filter((d, i, arr) => arr.findIndex(x => x.descripcion === d.descripcion) === i)
-    .slice(0, 6)
-
   const paramsFiltrados = todosLosParams.filter(p =>
     !busquedaParam || p.nombre.toLowerCase().includes(busquedaParam.toLowerCase())
   )
@@ -206,61 +201,60 @@ function ExpedientePacienteContent() {
   ]
 
   return (
-    <div className="max-w-4xl mx-auto space-y-5">
+    <div className="max-w-4xl mx-auto space-y-4 animate-slide-up">
 
       {/* ── Modal visor de documento ── */}
       {docSeleccionado && (
         <ModalVisorDocumento doc={docSeleccionado} onClose={() => setDocSeleccionado(null)} pacienteEmail={paciente?.email} />
       )}
 
-      {/* ── Modal eliminar paciente ── */}
+      {/* ── Modal eliminar paciente — macOS alert dialog ── */}
       {mostrarEliminarPaciente && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                <AlertTriangle size={20} className="text-red-600" />
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
+            {/* Icon + title */}
+            <div className="px-6 pt-6 pb-4 text-center">
+              <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ backgroundColor: '#FEF2F2' }}>
+                <AlertTriangle size={22} style={{ color: '#EF5350' }} />
               </div>
-              <div>
-                <h2 className="font-bold text-slate-800 text-lg">¿Eliminar expediente?</h2>
-                <p className="text-sm text-slate-500">
-                  {paciente?.nombre} {paciente?.apellidos}
-                </p>
-              </div>
+              <h2 className="text-base font-semibold text-[#1d1d1f]">Eliminar expediente</h2>
+              <p className="text-sm text-[#86868b] mt-1">
+                {paciente?.nombre} {paciente?.apellidos}
+              </p>
             </div>
 
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 space-y-1">
-              <p className="font-semibold">Esta acción es irreversible.</p>
-              <p>Se eliminarán permanentemente todos los datos del paciente:</p>
-              <ul className="list-disc list-inside mt-1 space-y-0.5 text-red-600">
-                <li>Notas médicas y consultas</li>
-                <li>Resultados de laboratorio</li>
-                <li>Recetas y solicitudes</li>
-                <li>Documentos adjuntos</li>
-                <li>Datos personales del paciente</li>
-              </ul>
+            {/* Divider */}
+            <div className="border-t border-slate-100 mx-4" />
+
+            {/* Body */}
+            <div className="px-6 py-4 text-center">
+              <p className="text-[13px] text-[#3d3d3f] leading-relaxed">
+                Se eliminarán <span className="font-semibold">permanentemente</span> todas las notas, laboratorios, documentos y datos personales del paciente.
+              </p>
+              <p className="text-[12px] text-[#86868b] mt-2">Esta acción no se puede deshacer.</p>
+              {errorEliminar && (
+                <p className="text-xs text-red-500 mt-3 bg-red-50 px-3 py-2 rounded-lg">{errorEliminar}</p>
+              )}
             </div>
 
-            {errorEliminar && (
-              <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{errorEliminar}</p>
-            )}
-
-            <div className="flex gap-3 pt-1">
+            {/* Buttons — macOS order: destructive on right */}
+            <div className="border-t border-slate-100 grid grid-cols-2">
               <button
                 onClick={() => { setMostrarEliminarPaciente(false); setErrorEliminar('') }}
                 disabled={eliminandoPaciente}
-                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors disabled:opacity-50"
+                className="px-4 py-3.5 text-sm font-medium text-[#1e5fa8] hover:bg-slate-50 transition-colors disabled:opacity-40 border-r border-slate-100"
               >
                 Cancelar
               </button>
               <button
                 onClick={eliminarPaciente}
                 disabled={eliminandoPaciente}
-                className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                className="px-4 py-3.5 text-sm font-semibold transition-colors disabled:opacity-40 flex items-center justify-center gap-1.5"
+                style={{ color: '#EF5350' }}
               >
                 {eliminandoPaciente
-                  ? <><Loader2 size={15} className="animate-spin" /> Eliminando...</>
-                  : <><Trash2 size={15} /> Sí, eliminar definitivamente</>
+                  ? <><Loader2 size={14} className="animate-spin" /> Eliminando...</>
+                  : 'Eliminar'
                 }
               </button>
             </div>
@@ -271,12 +265,17 @@ function ExpedientePacienteContent() {
       {/* Breadcrumbs */}
       <Breadcrumbs pacienteNombre={paciente ? `${paciente.nombre} ${paciente.apellidos}` : undefined} />
 
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Link href="/expediente" className="text-slate-400 hover:text-slate-600">
-          <ArrowLeft size={20} />
+      {/* Header — macOS style */}
+      <div className="flex items-center gap-2">
+        <Link
+          href="/expediente"
+          className="flex items-center gap-1 text-[#1e5fa8] hover:text-[#1a3a5c] text-sm font-medium transition-colors"
+        >
+          <ArrowLeft size={16} strokeWidth={2.5} />
+          <span>Pacientes</span>
         </Link>
-        <h1 className="text-2xl font-bold text-[#1a3a5c]">Expediente Clínico</h1>
+        <span className="text-slate-300 select-none">/</span>
+        <h1 className="text-sm font-semibold text-[#1d1d1f] truncate">Expediente Clínico</h1>
       </div>
 
       {/* Tarjeta del paciente */}
@@ -285,21 +284,54 @@ function ExpedientePacienteContent() {
       {/* Acciones rápidas — solo médico */}
       {isDoctor && (
         <>
-          <div className="grid grid-cols-3 gap-3">
-            <Link href={`/expediente/${id}/nueva-nota`} className="flex flex-col items-center gap-2 p-4 bg-[#1e5fa8] text-white rounded-xl hover:bg-[#1a3a5c] transition-colors text-center">
-              <Stethoscope size={20} />
-              <span className="text-xs font-medium">Nueva nota</span>
-            </Link>
-            <Link href={`/expediente/${id}/laboratorios/nuevo`} className="flex flex-col items-center gap-2 p-4 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors text-center">
-              <FlaskConical size={20} />
-              <span className="text-xs font-medium">Agregar resultados de laboratorio</span>
-            </Link>
-            <Link href={`/expediente/${id}/documentos`} className="flex flex-col items-center gap-2 p-4 bg-violet-600 text-white rounded-xl hover:bg-violet-700 transition-colors text-center">
-              <FileText size={20} />
-              <span className="text-xs font-medium text-center leading-tight">Nueva receta<br/>y Solicitudes</span>
-            </Link>
+          {/* Quick actions — macOS icon dock style */}
+          <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
+            <div className="grid grid-cols-3 divide-x divide-slate-100 sm:divide-x">
+              {[
+                {
+                  href: `/expediente/${id}/nueva-nota`,
+                  label: 'Nueva nota',
+                  sublabel: 'Consulta médica',
+                  icon: Stethoscope,
+                  color: 'text-[#1e5fa8]',
+                  bg: 'bg-blue-50',
+                },
+                {
+                  href: `/expediente/${id}/laboratorios/nuevo`,
+                  label: 'Laboratorio',
+                  sublabel: 'Resultados de lab',
+                  icon: FlaskConical,
+                  color: 'text-emerald-600',
+                  bg: 'bg-emerald-50',
+                },
+                {
+                  href: `/expediente/${id}/documentos`,
+                  label: 'Documento',
+                  sublabel: 'Receta / Solicitud',
+                  icon: FileText,
+                  color: 'text-sky-600',
+                  bg: 'bg-sky-50',
+                },
+              ].map(({ href, label, sublabel, icon: Icon, color, bg }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="group flex flex-col items-center gap-2 sm:gap-2.5 px-2 sm:px-4 py-4 sm:py-5 hover:bg-slate-50/80 transition-colors duration-150 text-center"
+                >
+                  <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center transition-transform duration-150 group-hover:scale-105`}>
+                    <Icon size={18} className={color} strokeWidth={2} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-[#1d1d1f] leading-tight">{label}</p>
+                    <p className="text-[10px] text-[#86868b] mt-0.5 leading-tight">{sublabel}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
           </div>
-          <div className="flex justify-between">
+
+          {/* Exportar + eliminar */}
+          <div className="flex items-center justify-between">
             <ExportarExpedienteButton
               paciente={paciente}
               consultas={consultas}
@@ -308,86 +340,88 @@ function ExpedientePacienteContent() {
             />
             <button
               onClick={() => setMostrarEliminarPaciente(true)}
-              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-red-600 transition-colors py-1"
+              className="flex items-center gap-1.5 text-[11px] text-[#86868b] hover:text-red-500 transition-colors"
             >
-              <Trash2 size={13} /> Eliminar paciente
+              <Trash2 size={12} /> Eliminar paciente
             </button>
           </div>
         </>
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-slate-200 overflow-x-auto">
+      {/* Tabs — macOS segmented control */}
+      <div className="bg-slate-100 p-1 rounded-xl flex gap-0.5 overflow-x-auto scrollbar-none">
         {TABS.map(t => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+            className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap transition-all duration-150 min-w-fit ${
               tab === t.key
-                ? t.key === 'graficas' ? 'border-violet-600 text-violet-600'
-                  : t.key === 'laboratorios' ? 'border-emerald-600 text-emerald-600'
-                  : 'border-[#1e5fa8] text-[#1e5fa8]'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
+                ? 'bg-white shadow-sm text-[#1d1d1f] font-semibold'
+                : 'text-[#86868b] hover:text-[#3d3d3f]'
             }`}
           >
-            {t.label}{t.count !== undefined ? ` (${t.count})` : ''}
+            {t.label}
+            {t.count !== undefined && (
+              <span className={`ml-1 text-[10px] font-semibold ${tab === t.key ? 'text-[#86868b]' : 'text-slate-400'}`}>
+                {t.count}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
-      {/* ── TAB: RESUMEN ── */}
-      {tab === 'resumen' && (
-        <TabResumen
-          id={id}
-          consultas={consultas}
-          labs={labs}
-          isDoctor={isDoctor}
-          diagnosticos={diagnosticos}
-          onVerConsultas={() => setTab('consultas')}
-          onVerLaboratorios={() => setTab('laboratorios')}
-        />
-      )}
+      {/* ── CONTENIDO DE TABS — con transición iOS ── */}
+      <div key={tab} className="animate-tab-enter">
 
-      {/* ── TAB: CONSULTAS ── */}
-      {tab === 'consultas' && (
-        <TabConsultas id={id} consultas={consultas} isDoctor={isDoctor} />
-      )}
+        {tab === 'resumen' && (
+          <TabResumen
+            id={id}
+            consultas={consultas}
+            labs={labs}
+            isDoctor={isDoctor}
+            onVerConsultas={() => setTab('consultas')}
+            onVerLaboratorios={() => setTab('laboratorios')}
+          />
+        )}
 
-      {/* ── TAB: LABORATORIOS ── */}
-      {tab === 'laboratorios' && (
-        <TabLaboratorios
-          id={id}
-          labs={labs}
-          isDoctor={isDoctor}
-          confirmarEliminar={confirmarEliminar}
-          eliminandoLab={eliminandoLab}
-          onConfirmarEliminar={setConfirmarEliminar}
-          onEliminarLab={eliminarLab}
-        />
-      )}
+        {tab === 'consultas' && (
+          <TabConsultas id={id} consultas={consultas} isDoctor={isDoctor} />
+        )}
 
-      {/* ── TAB: GRÁFICAS ── */}
-      {tab === 'graficas' && (
-        <TabGraficas
-          todosLosParams={todosLosParams}
-          paramsFiltrados={paramsFiltrados}
-          conTendencia={conTendencia}
-          busquedaParam={busquedaParam}
-          graficasAbiertas={graficasAbiertas}
-          onBusquedaChange={setBusquedaParam}
-          onToggleGrafica={toggleGrafica}
-        />
-      )}
+        {tab === 'laboratorios' && (
+          <TabLaboratorios
+            id={id}
+            labs={labs}
+            isDoctor={isDoctor}
+            confirmarEliminar={confirmarEliminar}
+            eliminandoLab={eliminandoLab}
+            onConfirmarEliminar={setConfirmarEliminar}
+            onEliminarLab={eliminarLab}
+          />
+        )}
 
-      {/* ── TAB: DOCUMENTOS ── */}
-      {tab === 'documentos' && (
-        <TabDocumentos
-          id={id}
-          documentos={documentos}
-          onVerDocumento={setDocSeleccionado}
-          onEliminarDocumento={eliminarDocumento}
-        />
-      )}
+        {tab === 'graficas' && (
+          <TabGraficas
+            todosLosParams={todosLosParams}
+            paramsFiltrados={paramsFiltrados}
+            conTendencia={conTendencia}
+            busquedaParam={busquedaParam}
+            graficasAbiertas={graficasAbiertas}
+            onBusquedaChange={setBusquedaParam}
+            onToggleGrafica={toggleGrafica}
+          />
+        )}
+
+        {tab === 'documentos' && (
+          <TabDocumentos
+            id={id}
+            documentos={documentos}
+            onVerDocumento={setDocSeleccionado}
+            onEliminarDocumento={eliminarDocumento}
+          />
+        )}
+
+      </div>
 
     </div>
   )

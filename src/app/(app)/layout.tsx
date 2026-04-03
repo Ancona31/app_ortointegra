@@ -3,6 +3,7 @@ import { ThemeProvider } from '@/components/layout/ThemeProvider'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ToastProvider } from '@/components/ui/Toast'
 import CommandPalette from '@/components/CommandPalette'
+import PageTransition from '@/components/layout/PageTransition'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -10,10 +11,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <ThemeProvider>
         <div className="flex h-screen overflow-hidden">
           <Sidebar />
-          <main className="flex-1 lg:ml-64 overflow-y-auto">
-            <div className="min-h-full p-6 lg:p-8">
+          <main className="flex-1 lg:ml-60 overflow-y-auto">
+            <div className="min-h-full pt-16 px-4 pb-6 lg:pt-8 lg:px-8 lg:pb-8">
               <ErrorBoundary>
-                {children}
+                <PageTransition>
+                  {children}
+                </PageTransition>
               </ErrorBoundary>
             </div>
           </main>

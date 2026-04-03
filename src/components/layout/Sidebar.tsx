@@ -3,59 +3,164 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  FileText, Stethoscope, Pill, Menu, X, Home, LogOut, UserPlus, Users, Building2, UserCircle, BarChart2, TrendingUp, CreditCard,
+  Home, Stethoscope, Pill, FileText, FlaskConical, ScanLine,
+  ClipboardList, BedDouble, PenLine, ShieldCheck, Receipt,
+  CalendarDays, BarChart2, Users, CreditCard, UserCircle,
+  HelpCircle, ChevronRight, Menu, X, LogOut, Moon, Sun,
+  Building2, TrendingUp, UserPlus,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useProfile, clearProfileCache } from '@/hooks/useProfile'
 import { useClinica } from '@/hooks/useClinica'
 import { useTheme } from '@/components/layout/ThemeProvider'
 import { mutate } from 'swr'
-import { Moon, Sun } from 'lucide-react'
 
-const navDoctor = [
-  { href: '/dashboard',        label: 'Inicio',         icon: Home },
-  { href: '/expediente',       label: 'Expediente',     icon: Stethoscope },
-  { href: '/suplementacion',   label: 'Suplementación', icon: Pill },
-  { href: '/documentos',       label: 'Documentos',     icon: FileText },
-  { href: '/estadisticas',     label: 'Estadísticas',   icon: TrendingUp },
-  { href: '/perfil',           label: 'Mi perfil',      icon: UserCircle },
+/* ─── Tipos ───────────────────────────────────────────────── */
+
+type NavLeaf = {
+  kind: 'leaf'
+  href: string
+  label: string
+  icon: React.ElementType
+  badge?: string
+  disabled?: boolean
+}
+
+type NavGroup = {
+  kind: 'group'
+  key: string
+  label: string
+  icon: React.ElementType
+  matchPaths?: string[]   // rutas que activan el grupo aunque no sean hijas directas
+  children: NavLeaf[]
+}
+
+type NavSection = NavLeaf | NavGroup | { kind: 'divider' }
+
+/* ─── Estructura de navegación ────────────────────────────── */
+
+const DOCS_CHILDREN: NavLeaf[] = [
+  { kind: 'leaf', href: '/documentos?tipo=receta',        label: 'Receta médica',          icon: Pill },
+  { kind: 'leaf', href: '/documentos?tipo=lab',           label: 'Solicitud de laboratorio', icon: FlaskConical },
+  { kind: 'leaf', href: '/documentos?tipo=imagen',        label: 'Solicitud de imagen',    icon: ScanLine },
+  { kind: 'leaf', href: '/documentos?tipo=suplementacion',label: 'Plan de suplementación', icon: ClipboardList },
+  { kind: 'leaf', href: '/documentos?tipo=internamiento', label: 'Internamiento',           icon: BedDouble },
+  { kind: 'leaf', href: '/documentos?tipo=escrito',       label: 'Escrito médico',          icon: PenLine },
+  { kind: 'leaf', href: '/documentos?tipo=consentimiento',label: 'Consentimiento',          icon: ShieldCheck },
+  { kind: 'leaf', href: '/documentos?tipo=honorarios',    label: 'Honorarios / Cotización', icon: Receipt },
 ]
 
-const navAdmin = [
-  ...navDoctor,
-  { href: '/admin/usuarios',   label: 'Usuarios',       icon: Users },
-  { href: '/billing',          label: 'Facturación',    icon: CreditCard },
-]
+function navDoctor(isAdmin: boolean, isSuperAdmin: boolean): NavSection[] {
+  const adminChildren: NavLeaf[] = [
+    { kind: 'leaf', href: '/estadisticas',   label: 'Estadísticas',        icon: TrendingUp },
+    ...(isAdmin || isSuperAdmin ? [
+      { kind: 'leaf' as const, href: '/admin/usuarios', label: 'Usuarios de la clínica', icon: Users },
+      { kind: 'leaf' as const, href: '/billing',        label: 'Facturación',             icon: CreditCard },
+    ] : []),
+    ...(isSuperAdmin ? [
+      { kind: 'leaf' as const, href: '/super-admin/clinicas', label: 'Clínicas',  icon: Building2 },
+      { kind: 'leaf' as const, href: '/super-admin/metricas', label: 'Métricas',  icon: BarChart2 },
+    ] : []),
+  ]
 
-const navSuperAdmin = [
-  ...navAdmin,
-  { href: '/super-admin/clinicas',  label: 'Clínicas',  icon: Building2 },
-  { href: '/super-admin/metricas',  label: 'Métricas',  icon: BarChart2 },
-]
+  return [
+    { kind: 'leaf', href: '/dashboard', label: 'Inicio', icon: Home },
+    {
+      kind: 'group', key: 'pacientes', label: 'Pacientes', icon: Stethoscope,
+      matchPaths: ['/expediente', '/suplementacion', '/pacientes'],
+      children: [
+        { kind: 'leaf', href: '/expediente',    label: 'Expediente',      icon: Stethoscope },
+        { kind: 'leaf', href: '/suplementacion', label: 'Suplementación', icon: Pill },
+      ],
+    },
+    {
+      kind: 'leaf', href: '/agenda', label: 'Agenda', icon: CalendarDays,
+      badge: 'En construcción', disabled: true,
+    },
+    {
+      kind: 'group', key: 'documentos', label: 'Documentos', icon: FileText,
+      matchPaths: ['/documentos'],
+      children: DOCS_CHILDREN,
+    },
+    {
+      kind: 'group', key: 'administracion', label: 'Administración', icon: BarChart2,
+      matchPaths: ['/estadisticas', '/admin', '/billing', '/super-admin'],
+      children: adminChildren,
+    },
+    { kind: 'divider' },
+    { kind: 'leaf', href: '/perfil',  label: 'Mi perfil', icon: UserCircle },
+    { kind: 'leaf', href: '/ayuda',   label: 'Ayuda',     icon: HelpCircle, disabled: true, badge: 'Próximo' },
+  ]
+}
 
-const navSecretaria = [
-  { href: '/dashboard',        label: 'Inicio',         icon: Home },
-  { href: '/pacientes/nuevo',  label: 'Nuevo paciente', icon: UserPlus },
-  { href: '/expediente',       label: 'Pacientes',      icon: Stethoscope },
-]
+function navSecretaria(): NavSection[] {
+  return [
+    { kind: 'leaf', href: '/dashboard', label: 'Inicio', icon: Home },
+    {
+      kind: 'group', key: 'pacientes', label: 'Pacientes', icon: Stethoscope,
+      matchPaths: ['/expediente', '/pacientes'],
+      children: [
+        { kind: 'leaf', href: '/pacientes/nuevo', label: 'Nuevo paciente', icon: UserPlus },
+        { kind: 'leaf', href: '/expediente',      label: 'Expediente',     icon: Stethoscope },
+      ],
+    },
+    { kind: 'divider' },
+    { kind: 'leaf', href: '/perfil', label: 'Mi perfil', icon: UserCircle },
+  ]
+}
+
+/* ─── Helpers ─────────────────────────────────────────────── */
+
+function leafIsActive(href: string, pathname: string) {
+  const base = href.split('?')[0]
+  if (base === '/dashboard') return pathname === '/dashboard'
+  return pathname === base || pathname.startsWith(base + '/')
+}
+
+function groupHasActiveChild(group: NavGroup, pathname: string) {
+  if (group.matchPaths?.some(p => pathname.startsWith(p))) return true
+  return group.children.some(c => leafIsActive(c.href, pathname))
+}
+
+/* ─── Componente ──────────────────────────────────────────── */
 
 export default function Sidebar() {
   const pathname = usePathname()
-  const router = useRouter()
-  const [open, setOpen] = useState(false)
-  const { profile } = useProfile()
+  const router   = useRouter()
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const [expanded, setExpanded]     = useState<Set<string>>(new Set())
+  const { profile }  = useProfile()
   const { colorPrimario, colorSecundario, nombreDisplay, subtitulo, logoUrl } = useClinica()
   const { dark, toggle } = useTheme()
 
-  const navItems = profile?.role === 'secretaria'
-    ? navSecretaria
-    : profile?.role === 'super_admin'
-      ? navSuperAdmin
-      : profile?.role === 'admin'
-        ? navAdmin
-        : navDoctor
+  const isAdmin      = profile?.role === 'admin' || profile?.role === 'super_admin'
+  const isSuperAdmin = profile?.role === 'super_admin'
+
+  const sections: NavSection[] =
+    profile?.role === 'secretaria'
+      ? navSecretaria()
+      : navDoctor(isAdmin, isSuperAdmin)
+
+  /* Auto-expandir grupos con hijo activo */
+  useEffect(() => {
+    const toOpen = new Set<string>()
+    sections.forEach(s => {
+      if (s.kind === 'group' && groupHasActiveChild(s, pathname)) {
+        toOpen.add(s.key)
+      }
+    })
+    setExpanded(toOpen)
+  }, [pathname])
+
+  function toggleGroup(key: string) {
+    setExpanded(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+  }
 
   async function handleLogout() {
     const supabase = createClient()
@@ -66,53 +171,49 @@ export default function Sidebar() {
     router.refresh()
   }
 
+  function close() { setMobileOpen(false) }
+
+  /* ── Render ─────────────────────────────────────────────── */
   return (
     <>
       {/* Mobile toggle */}
       <button
-        onClick={() => setOpen(!open)}
+        onClick={() => setMobileOpen(!mobileOpen)}
         className="lg:hidden fixed top-4 left-4 z-50 text-white p-2 rounded-lg shadow-lg"
         style={{ backgroundColor: colorPrimario }}
       >
-        {open ? <X size={20} /> : <Menu size={20} />}
+        {mobileOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 
-      {/* Overlay mobile */}
-      {open && (
-        <div
-          className="lg:hidden fixed inset-0 bg-black/40 z-30"
-          onClick={() => setOpen(false)}
-        />
+      {/* Overlay */}
+      {mobileOpen && (
+        <div className="lg:hidden fixed inset-0 bg-black/40 z-30" onClick={close} />
       )}
 
       {/* Sidebar */}
       <aside
         style={{ backgroundColor: colorPrimario }}
         className={`
-          fixed top-0 left-0 h-full w-64 text-white z-40 flex flex-col
+          fixed top-0 left-0 h-full w-60 text-white z-40 flex flex-col
           transition-transform duration-300 shadow-2xl
-          ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+          ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}
       >
-        {/* Logo y nombre */}
-        <div className="flex flex-col items-center gap-3 px-6 py-6 border-b border-white/10">
-          <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center overflow-hidden shadow-lg">
-            {logoUrl && logoUrl.startsWith('https://') ? (
+        {/* Logo + nombre */}
+        <div className="flex flex-col items-center gap-2.5 px-5 py-5 border-b border-white/10">
+          <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center overflow-hidden shadow-lg flex-shrink-0">
+            {logoUrl?.startsWith('https://') ? (
               <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
             ) : (
-              <img
-                src="/logo.png"
-                alt="Logo"
-                className="w-18 h-18 object-contain"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-              />
+              <img src="/logo.png" alt="Logo" className="w-full h-full object-contain"
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
             )}
           </div>
           <div className="text-center">
             <p className="font-semibold text-sm leading-tight">
               {nombreDisplay ?? profile?.nombre ?? ''}
             </p>
-            <p className="text-xs text-blue-300 mt-1 leading-tight">
+            <p className="text-[11px] opacity-40 mt-0.5 leading-tight">
               {profile?.role === 'secretaria'
                 ? 'Asistente Médico/a'
                 : subtitulo ?? profile?.especialidad ?? ''}
@@ -121,50 +222,111 @@ export default function Sidebar() {
         </div>
 
         {/* Navegación */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {navItems.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href || pathname.startsWith(href + '/')
-            return (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setOpen(false)}
-                style={active ? { backgroundColor: colorSecundario } : undefined}
-                className={`
-                  flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium
-                  transition-all duration-150
-                  ${active
-                    ? 'text-white shadow-md'
-                    : 'text-blue-200 hover:bg-white/10 hover:text-white'
-                  }
-                `}
-              >
-                <Icon size={18} />
-                {label}
-              </Link>
-            )
+        <nav className="flex-1 px-2.5 py-3 overflow-y-auto space-y-0.5">
+          {sections.map((section, idx) => {
+
+            /* Divider */
+            if (section.kind === 'divider') {
+              return <div key={`divider-${idx}`} className="my-2 border-t border-white/10" />
+            }
+
+            /* Leaf */
+            if (section.kind === 'leaf') {
+              const active = leafIsActive(section.href, pathname)
+              if (section.disabled) {
+                return (
+                  <div key={section.href}
+                    className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] opacity-35 cursor-not-allowed select-none">
+                    <section.icon size={16} />
+                    <span>{section.label}</span>
+                    {section.badge && (
+                      <span className="ml-auto text-[9px] font-semibold bg-white/15 px-1.5 py-0.5 rounded-full leading-none">
+                        {section.badge}
+                      </span>
+                    )}
+                  </div>
+                )
+              }
+              return (
+                <Link key={section.href} href={section.href} onClick={close}
+                  style={active ? { backgroundColor: colorSecundario } : undefined}
+                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150 ${
+                    active ? 'text-white shadow-sm' : 'text-white/55 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  <section.icon size={16} className={active ? 'opacity-100' : 'opacity-70'} />
+                  {section.label}
+                </Link>
+              )
+            }
+
+            /* Group */
+            if (section.kind === 'group') {
+              const isOpen    = expanded.has(section.key)
+              const hasActive = groupHasActiveChild(section, pathname)
+
+              return (
+                <div key={section.key}>
+                  {/* Header del grupo */}
+                  <button
+                    onClick={() => toggleGroup(section.key)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150 ${
+                      hasActive && !isOpen
+                        ? 'text-white bg-white/10'
+                        : isOpen
+                        ? 'text-white/80'
+                        : 'text-white/55 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    <section.icon size={16} className={hasActive ? 'opacity-100' : 'opacity-70'} />
+                    <span className="flex-1 text-left">{section.label}</span>
+                    <ChevronRight
+                      size={13}
+                      className={`opacity-50 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`}
+                    />
+                  </button>
+
+                  {/* Sub-items */}
+                  {isOpen && (
+                    <div className="mt-0.5 ml-3 pl-3 border-l border-white/10 space-y-0.5">
+                      {section.children.map(child => {
+                        const childActive = leafIsActive(child.href, pathname)
+                        return (
+                          <Link key={child.href} href={child.href} onClick={close}
+                            style={childActive ? { backgroundColor: colorSecundario } : undefined}
+                            className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-[12px] font-medium transition-all duration-150 ${
+                              childActive ? 'text-white shadow-sm' : 'text-white/50 hover:bg-white/10 hover:text-white'
+                            }`}
+                          >
+                            <child.icon size={13} className={childActive ? 'opacity-100' : 'opacity-60'} />
+                            {child.label}
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            }
+
+            return null
           })}
         </nav>
 
         {/* Footer */}
-        <div className="px-4 py-4 border-t border-white/10 space-y-3">
+        <div className="px-3 py-3 border-t border-white/10 space-y-0.5">
           {profile?.cedula_profesional && (
-            <p className="text-xs text-blue-400 text-center">Céd. Prof. {profile.cedula_profesional}</p>
+            <p className="text-[10px] text-white/25 text-center mb-2 px-2">
+              Céd. {profile.cedula_profesional}
+            </p>
           )}
-          {profile?.cedula_especialidad && (
-            <p className="text-xs text-blue-400 text-center">{profile.cedula_especialidad}</p>
-          )}
-          <button
-            onClick={toggle}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs text-blue-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-          >
+          <button onClick={toggle}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-white/50 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-150">
             {dark ? <Sun size={14} /> : <Moon size={14} />}
             {dark ? 'Modo claro' : 'Modo oscuro'}
           </button>
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs text-blue-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-          >
+          <button onClick={handleLogout}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-white/50 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-150">
             <LogOut size={14} />
             Cerrar sesión
           </button>

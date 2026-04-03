@@ -242,15 +242,15 @@ export default function SuperAdminClinicasPage() {
   const listaIndep = clinicas.filter(c => c.tipo === 'independiente')
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8">
+    <div className="max-w-3xl mx-auto space-y-5 animate-slide-up">
 
       {/* ── Modal nueva clínica ── */}
       {showFormClinica && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-slate-800 flex items-center gap-2"><Building2 size={18} /> Nueva clínica</h2>
-              <button onClick={() => setShowFormClinica(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
+            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100">
+              <h2 className="text-base font-semibold text-[#1d1d1f]">Nueva clínica</h2>
+              <button onClick={() => setShowFormClinica(false)} className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-[#86868b] transition-colors"><X size={14} /></button>
             </div>
             <form onSubmit={crearClinica} className="space-y-3">
               <div>
@@ -307,18 +307,26 @@ export default function SuperAdminClinicasPage() {
 
       {/* ── Modal nuevo usuario independiente ── */}
       {showFormIndep && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-slate-800 flex items-center gap-2"><UserCircle size={18} /> Nuevo usuario independiente</h2>
-              <button onClick={() => { setShowFormIndep(false); setError('') }} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm flex flex-col animate-slide-up">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
+                  <UserCircle size={15} className="text-emerald-600" />
+                </div>
+                <h2 className="text-sm font-semibold text-[#1d1d1f]">Nuevo usuario independiente</h2>
+              </div>
+              <button onClick={() => { setShowFormIndep(false); setError('') }}
+                className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-[#86868b] transition-colors">
+                <X size={14} />
+              </button>
             </div>
-            <form onSubmit={crearUsuarioIndependiente} className="space-y-3">
+            <form onSubmit={crearUsuarioIndependiente} className="px-5 py-4 space-y-3">
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="text-xs font-medium text-slate-500 block mb-1">Título</label>
                   <select value={formIndep.titulo} onChange={e => setFormIndep({ ...formIndep, titulo: e.target.value })}
-                    className="w-full px-2 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 bg-white">
+                    className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:bg-white transition-all">
                     <option>Dr.</option>
                     <option>Dra.</option>
                     <option>Lic.</option>
@@ -330,38 +338,38 @@ export default function SuperAdminClinicasPage() {
                   <label className="text-xs font-medium text-slate-500 block mb-1">Nombre completo</label>
                   <input type="text" value={formIndep.nombre} onChange={e => setFormIndep({ ...formIndep, nombre: e.target.value })}
                     placeholder="Nombre Apellidos" required
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:bg-white transition-all" />
                 </div>
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-500 block mb-1">Especialidad</label>
                 <input type="text" value={formIndep.especialidad} onChange={e => setFormIndep({ ...formIndep, especialidad: e.target.value })}
                   placeholder="Ej: Traumatología y Ortopedia"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:bg-white transition-all" />
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-500 block mb-1">Cédula profesional</label>
                 <input type="text" value={formIndep.cedula_profesional} onChange={e => setFormIndep({ ...formIndep, cedula_profesional: e.target.value })}
                   placeholder="Opcional"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:bg-white transition-all" />
               </div>
               <div className="border-t border-slate-100 pt-3">
-                <p className="text-xs font-medium text-slate-500 mb-2">Credenciales de acceso</p>
+                <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-2">Credenciales de acceso</p>
                 <div className="space-y-2">
                   <input type="email" value={formIndep.email} onChange={e => setFormIndep({ ...formIndep, email: e.target.value })}
                     placeholder="correo@ejemplo.com" required
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:bg-white transition-all" />
                   <input type="password" value={formIndep.password} onChange={e => setFormIndep({ ...formIndep, password: e.target.value })}
                     placeholder="Contraseña temporal" required minLength={8}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:bg-white transition-all" />
                 </div>
               </div>
-              {error && <p className="text-sm text-red-600">{error}</p>}
-              <div className="flex gap-3 pt-1">
+              {error && <p className="text-xs text-red-500">{error}</p>}
+              <div className="flex gap-3 pt-1 pb-1">
                 <button type="button" onClick={() => { setShowFormIndep(false); setError('') }}
-                  className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
+                  className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition-colors">Cancelar</button>
                 <button type="submit" disabled={guardando}
-                  className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 disabled:opacity-60 flex items-center justify-center gap-2">
+                  className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 disabled:opacity-60 flex items-center justify-center gap-2 transition-colors">
                   {guardando ? <><Loader2 size={14} className="animate-spin" /> Creando...</> : 'Crear usuario'}
                 </button>
               </div>
@@ -372,40 +380,43 @@ export default function SuperAdminClinicasPage() {
 
       {/* ── Modal asignar admin ── */}
       {modalAdmin && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
-            <div className="flex items-center justify-between mb-4">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm flex flex-col animate-slide-up">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <div>
-                <h2 className="font-bold text-slate-800">Asignar administrador</h2>
-                <p className="text-xs text-slate-400 mt-0.5">{modalAdmin.nombre_display || modalAdmin.nombre}</p>
+                <h2 className="text-sm font-semibold text-[#1d1d1f]">Asignar administrador</h2>
+                <p className="text-xs text-[#86868b] mt-0.5">{modalAdmin.nombre_display || modalAdmin.nombre}</p>
               </div>
-              <button onClick={() => { setModalAdmin(null); setErrorAdmin('') }} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+              <button onClick={() => { setModalAdmin(null); setErrorAdmin('') }}
+                className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-[#86868b] transition-colors">
+                <X size={14} />
+              </button>
             </div>
-            <form onSubmit={asignarAdmin} className="space-y-3">
+            <form onSubmit={asignarAdmin} className="px-5 py-4 space-y-3">
               <div>
                 <label className="text-xs font-medium text-slate-500 block mb-1">Nombre completo</label>
                 <input type="text" required value={formAdmin.nombre} onChange={e => setFormAdmin({ ...formAdmin, nombre: e.target.value })}
                   placeholder="Nombre del administrador"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:bg-white transition-all" />
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-500 block mb-1">Email</label>
                 <input type="email" required value={formAdmin.email} onChange={e => setFormAdmin({ ...formAdmin, email: e.target.value })}
                   placeholder="admin@ejemplo.com"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:bg-white transition-all" />
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-500 block mb-1">Contraseña temporal</label>
                 <input type="password" required minLength={8} value={formAdmin.password} onChange={e => setFormAdmin({ ...formAdmin, password: e.target.value })}
                   placeholder="Mínimo 8 caracteres"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:bg-white transition-all" />
               </div>
-              {errorAdmin && <p className="text-sm text-red-600">{errorAdmin}</p>}
-              <div className="flex gap-3 pt-1">
+              {errorAdmin && <p className="text-xs text-red-500">{errorAdmin}</p>}
+              <div className="flex gap-3 pt-1 pb-1">
                 <button type="button" onClick={() => { setModalAdmin(null); setErrorAdmin('') }}
-                  className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
+                  className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition-colors">Cancelar</button>
                 <button type="submit" disabled={guardandoAdmin}
-                  className="flex-1 py-2.5 bg-[#1e5fa8] text-white rounded-xl text-sm font-medium hover:bg-[#1a3a5c] disabled:opacity-60 flex items-center justify-center gap-2">
+                  className="flex-1 py-2.5 bg-[#1e5fa8] text-white rounded-xl text-sm font-medium hover:bg-[#1a3a5c] disabled:opacity-60 flex items-center justify-center gap-2 transition-colors">
                   {guardandoAdmin ? <><Loader2 size={14} className="animate-spin" /> Creando...</> : 'Crear admin'}
                 </button>
               </div>
@@ -416,17 +427,24 @@ export default function SuperAdminClinicasPage() {
 
       {/* ── Modal personalización ── */}
       {personalizando && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="font-bold text-slate-800 flex items-center gap-2">
-                <Palette size={18} />
-                {personalizando.tipo === 'independiente' ? 'Personalizar cuenta' : 'Personalizar clínica'}
-              </h2>
-              <button onClick={() => setPersonalizando(null)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh] animate-slide-up">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-indigo-50 flex items-center justify-center">
+                  <Palette size={14} className="text-indigo-600" />
+                </div>
+                <h2 className="text-sm font-semibold text-[#1d1d1f]">
+                  {personalizando.tipo === 'independiente' ? 'Personalizar cuenta' : 'Personalizar clínica'}
+                </h2>
+              </div>
+              <button onClick={() => setPersonalizando(null)}
+                className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-[#86868b] transition-colors">
+                <X size={14} />
+              </button>
             </div>
 
-            <div className="space-y-4">
+            <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
               {/* Logo */}
               <div>
                 <label className="text-xs font-medium text-slate-500 block mb-2">Logo</label>
@@ -438,12 +456,12 @@ export default function SuperAdminClinicasPage() {
                     }
                   </div>
                   <button type="button" onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50">
+                    className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-white transition-all">
                     <Upload size={14} /> Subir imagen
                   </button>
                   <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
                 </div>
-                <p className="text-xs text-slate-400 mt-1">PNG o JPG, fondo transparente recomendado</p>
+                <p className="text-xs text-[#86868b] mt-1">PNG o JPG, fondo transparente recomendado</p>
               </div>
 
               {/* Nombre display */}
@@ -454,7 +472,7 @@ export default function SuperAdminClinicasPage() {
                 <input type="text" value={persForm.nombre_display}
                   onChange={e => setPersForm({ ...persForm, nombre_display: e.target.value })}
                   placeholder={personalizando.nombre}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:bg-white transition-all" />
               </div>
 
               {/* Subtítulo */}
@@ -463,7 +481,7 @@ export default function SuperAdminClinicasPage() {
                 <input type="text" value={persForm.subtitulo}
                   onChange={e => setPersForm({ ...persForm, subtitulo: e.target.value })}
                   placeholder={personalizando.tipo === 'independiente' ? 'Ej: Traumatología · Ortopedia' : 'Ej: Especialidad · Subespecialidad'}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:bg-white transition-all" />
               </div>
 
               {/* Colores */}
@@ -522,13 +540,13 @@ export default function SuperAdminClinicasPage() {
               </div>
             </div>
 
-            <div className="flex gap-3 mt-5">
+            <div className="px-5 py-3 border-t border-slate-100 flex gap-3">
               <button onClick={() => setPersonalizando(null)}
-                className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">
+                className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition-colors">
                 Cancelar
               </button>
               <button onClick={guardarPersonalizacion} disabled={guardandoPers}
-                className="flex-1 py-2.5 bg-[#1e5fa8] text-white rounded-xl text-sm font-medium hover:bg-[#1a3a5c] disabled:opacity-60 flex items-center justify-center gap-2">
+                className="flex-1 py-2.5 bg-[#1e5fa8] text-white rounded-xl text-sm font-medium hover:bg-[#1a3a5c] disabled:opacity-60 flex items-center justify-center gap-2 transition-colors">
                 {guardandoPers ? <><Loader2 size={14} className="animate-spin" /> Guardando...</> : 'Guardar cambios'}
               </button>
             </div>
@@ -536,53 +554,32 @@ export default function SuperAdminClinicasPage() {
         </div>
       )}
 
-      {/* ── Modal eliminar usuario independiente ── */}
+      {/* ── Modal eliminar usuario independiente — macOS alert ── */}
       {confirmDeleteIndep && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                <AlertTriangle size={20} className="text-red-600" />
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden animate-slide-up">
+            <div className="px-6 pt-6 pb-4 text-center">
+              <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ backgroundColor: '#FEF2F2' }}>
+                <AlertTriangle size={22} style={{ color: '#EF5350' }} />
               </div>
-              <div>
-                <h2 className="font-bold text-slate-800 text-lg">¿Eliminar usuario independiente?</h2>
-                <p className="text-sm text-slate-500">{confirmDeleteIndep.nombre_display || confirmDeleteIndep.nombre}</p>
-              </div>
+              <h2 className="text-base font-semibold text-[#1d1d1f]">Eliminar usuario independiente</h2>
+              <p className="text-sm text-[#86868b] mt-1">{confirmDeleteIndep.nombre_display || confirmDeleteIndep.nombre}</p>
+              <p className="text-[13px] text-[#3d3d3f] mt-3 leading-relaxed">
+                Se eliminarán <span className="font-semibold">permanentemente</span> todos los pacientes, notas, labs y documentos de esta cuenta.
+              </p>
+              {errorEliminar && (
+                <p className="text-xs mt-2" style={{ color: '#EF5350' }}>{errorEliminar}</p>
+              )}
             </div>
-
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 space-y-1">
-              <p className="font-semibold">Esta acción es irreversible.</p>
-              <p>Se eliminarán permanentemente todos los datos de esta cuenta:</p>
-              <ul className="list-disc list-inside mt-1 space-y-0.5 text-red-600">
-                <li>Todos los pacientes registrados</li>
-                <li>Notas médicas y consultas</li>
-                <li>Resultados de laboratorio</li>
-                <li>Recetas y documentos</li>
-                <li>Cuenta de acceso (email y contraseña)</li>
-              </ul>
-            </div>
-
-            {errorEliminar && (
-              <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{errorEliminar}</p>
-            )}
-
-            <div className="flex gap-3 pt-1">
-              <button
-                onClick={() => { setConfirmDeleteIndep(null); setErrorEliminar('') }}
-                disabled={eliminando}
-                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors disabled:opacity-50"
-              >
+            <div className="border-t border-slate-100 grid grid-cols-2">
+              <button onClick={() => { setConfirmDeleteIndep(null); setErrorEliminar('') }} disabled={eliminando}
+                className="px-4 py-3.5 text-sm font-medium text-[#1e5fa8] hover:bg-slate-50 transition-colors disabled:opacity-40 border-r border-slate-100">
                 Cancelar
               </button>
-              <button
-                onClick={eliminarUsuarioIndependiente}
-                disabled={eliminando}
-                className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {eliminando
-                  ? <><Loader2 size={15} className="animate-spin" /> Eliminando...</>
-                  : <><Trash2 size={15} /> Sí, eliminar definitivamente</>
-                }
+              <button onClick={eliminarUsuarioIndependiente} disabled={eliminando}
+                className="px-4 py-3.5 text-sm font-semibold transition-colors hover:bg-red-50 flex items-center justify-center gap-1.5 disabled:opacity-40"
+                style={{ color: '#EF5350' }}>
+                {eliminando ? <><Loader2 size={13} className="animate-spin" /> Eliminando...</> : 'Eliminar'}
               </button>
             </div>
           </div>
@@ -591,12 +588,11 @@ export default function SuperAdminClinicasPage() {
 
       {/* ── Sección: Clínicas ── */}
       <div>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-end justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-[#1a3a5c] flex items-center gap-2">
-              <Building2 size={24} /> Clínicas
-            </h1>
-            <p className="text-slate-500 text-sm mt-0.5">Cuentas multi-usuario con equipo médico</p>
+            <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest mb-1">Super Admin</p>
+            <h1 className="text-[22px] font-bold tracking-tight text-[#1d1d1f]">Clínicas</h1>
+            <p className="text-sm text-[#86868b] mt-0.5">Cuentas multi-usuario con equipo médico</p>
           </div>
           <button
             onClick={() => { setShowFormClinica(true); setError('') }}

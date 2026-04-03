@@ -30,6 +30,12 @@ const PALETAS = [
   { nombre: 'Pizarra oscuro',        primario: '#0f172a', secundario: '#475569' },
 ]
 
+function SectionHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest px-5 pt-4 pb-1">{children}</p>
+  )
+}
+
 export default function PerfilPage() {
   const { profile, loading: loadingProfile } = useProfile()
   const router = useRouter()
@@ -100,14 +106,12 @@ export default function PerfilPage() {
     e.preventDefault()
     setGuardando(true)
 
-    // Guardar perfil médico
     const r1 = await fetch('/api/me/perfil-medico', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form),
     })
 
-    // Guardar colores (solo admin)
     if (isAdmin) {
       await fetch('/api/me/clinica', {
         method: 'PUT',
@@ -118,7 +122,6 @@ export default function PerfilPage() {
         }),
       })
 
-      // Subir logo si hay uno nuevo
       if (logoFile) {
         setSubiendoLogo(true)
         const fd = new FormData()
@@ -148,172 +151,170 @@ export default function PerfilPage() {
 
   if (loading || loadingProfile) return (
     <div className="flex items-center justify-center h-64">
-      <Loader2 size={24} className="animate-spin text-slate-300" />
+      <Loader2 size={20} className="animate-spin text-slate-300" />
     </div>
   )
 
   const logoMostrado = logoPreview || apariencia.logo_url
 
+  const inputClass = "w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-[#1d1d1f] placeholder:text-[#86868b] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 focus:bg-white transition-all"
+
   return (
-    <div className="max-w-lg mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <UserCircle size={24} className="text-[#1a3a5c]" />
-        <h1 className="text-2xl font-bold text-[#1a3a5c]">Mi perfil</h1>
+    <div className="max-w-lg mx-auto space-y-5 animate-slide-up">
+
+      {/* Header */}
+      <div>
+        <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest mb-1">Cuenta</p>
+        <h1 className="text-[22px] font-bold tracking-tight text-[#1d1d1f]">Mi perfil</h1>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-4">
 
         {/* Datos profesionales */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
-          <h2 className="font-semibold text-slate-700 text-sm">Datos profesionales</h2>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-medium text-slate-500 block mb-1">Título</label>
-              <select value={form.titulo} onChange={e => setForm({ ...form, titulo: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30">
-                <option value="Dr.">Dr.</option>
-                <option value="Dra.">Dra.</option>
-              </select>
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <SectionHeader>Datos profesionales</SectionHeader>
+          <div className="px-5 pb-5 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Título</label>
+                <select value={form.titulo} onChange={e => setForm({ ...form, titulo: e.target.value })} className={inputClass}>
+                  <option value="Dr.">Dr.</option>
+                  <option value="Dra.">Dra.</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Especialidad</label>
+                <input type="text" value={form.especialidad} onChange={e => setForm({ ...form, especialidad: e.target.value })}
+                  placeholder="Ej: Cirugía de Columna" className={inputClass} />
+              </div>
             </div>
-            <div>
-              <label className="text-xs font-medium text-slate-500 block mb-1">Especialidad</label>
-              <input type="text" value={form.especialidad} onChange={e => setForm({ ...form, especialidad: e.target.value })}
-                placeholder="Ej: Cirugía de Columna"
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-medium text-slate-500 block mb-1">Cédula profesional</label>
-              <input type="text" value={form.cedula_profesional} onChange={e => setForm({ ...form, cedula_profesional: e.target.value })}
-                placeholder="Ej: 12085805"
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-slate-500 block mb-1">Cédula de especialidad</label>
-              <input type="text" value={form.cedula_especialidad} onChange={e => setForm({ ...form, cedula_especialidad: e.target.value })}
-                placeholder="Ej: CMOT 26/5567/25"
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Cédula profesional</label>
+                <input type="text" value={form.cedula_profesional} onChange={e => setForm({ ...form, cedula_profesional: e.target.value })}
+                  placeholder="Ej: 12085805" className={inputClass} />
+              </div>
+              <div>
+                <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Cédula de especialidad</label>
+                <input type="text" value={form.cedula_especialidad} onChange={e => setForm({ ...form, cedula_especialidad: e.target.value })}
+                  placeholder="Ej: CMOT 26/5567/25" className={inputClass} />
+              </div>
             </div>
           </div>
         </div>
 
         {/* Consultorio */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
-          <h2 className="font-semibold text-slate-700 text-sm">
-            Datos del consultorio
-            <span className="ml-2 text-xs font-normal text-slate-400">Requeridos en recetas (RIS)</span>
-          </h2>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Dirección</label>
-            <input type="text" value={form.direccion_consultorio} onChange={e => setForm({ ...form, direccion_consultorio: e.target.value })}
-              placeholder="Ej: Calle 60 #400, Col. Centro, Mérida, Yucatán"
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div className="px-5 pt-4 pb-1 flex items-baseline gap-2">
+            <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest">Consultorio</p>
+            <span className="text-[10px] text-[#86868b]">Requerido en recetas (RIS)</span>
           </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Teléfono</label>
-            <input type="tel" value={form.telefono_consultorio} onChange={e => setForm({ ...form, telefono_consultorio: e.target.value })}
-              placeholder="Ej: (999) 123-4567"
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+          <div className="px-5 pb-5 space-y-3">
+            <div>
+              <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Dirección</label>
+              <input type="text" value={form.direccion_consultorio} onChange={e => setForm({ ...form, direccion_consultorio: e.target.value })}
+                placeholder="Ej: Calle 60 #400, Col. Centro, Mérida, Yucatán" className={inputClass} />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Teléfono</label>
+              <input type="tel" value={form.telefono_consultorio} onChange={e => setForm({ ...form, telefono_consultorio: e.target.value })}
+                placeholder="Ej: (999) 123-4567" className={inputClass} />
+            </div>
           </div>
         </div>
 
         {/* Apariencia — solo admin */}
         {isAdmin && (
-          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
-            <div className="flex items-center gap-2">
-              <Palette size={15} className="text-[#1a3a5c]" />
-              <h2 className="font-semibold text-slate-700 text-sm">Apariencia</h2>
-              <span className="text-xs text-slate-400">Se aplica en documentos y PDFs</span>
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="px-5 pt-4 pb-1 flex items-center gap-2">
+              <Palette size={13} className="text-[#86868b]" />
+              <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest">Apariencia</p>
+              <span className="text-[10px] text-[#86868b]">Se aplica en documentos y PDFs</span>
             </div>
 
-            {/* Logo */}
-            <div>
-              <label className="text-xs font-medium text-slate-500 block mb-2">Logo del consultorio</label>
-              <div className="flex items-center gap-4">
-                <div className="w-20 h-20 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden bg-slate-50 flex-shrink-0">
-                  {logoMostrado
-                    ? <img src={logoMostrado} alt="Logo" className="w-full h-full object-contain p-1" />
-                    : <Upload size={20} className="text-slate-300" />
-                  }
-                </div>
-                <div className="flex flex-col gap-2">
-                  <button type="button" onClick={() => fileRef.current?.click()}
-                    className="px-3 py-1.5 text-xs font-medium border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
-                    {logoMostrado ? 'Cambiar logo' : 'Subir logo'}
-                  </button>
-                  {logoMostrado && (
-                    <button type="button" onClick={quitarLogo}
-                      className="px-3 py-1.5 text-xs font-medium text-red-500 border border-red-100 rounded-lg hover:bg-red-50 transition-colors flex items-center gap-1">
-                      <X size={11} /> Quitar
+            <div className="px-5 pb-5 space-y-5">
+              {/* Logo */}
+              <div>
+                <label className="text-[11px] font-medium text-[#86868b] block mb-2">Logo del consultorio</label>
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden bg-slate-50 flex-shrink-0">
+                    {logoMostrado
+                      ? <img src={logoMostrado} alt="Logo" className="w-full h-full object-contain p-1" />
+                      : <Upload size={18} className="text-slate-300" />
+                    }
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <button type="button" onClick={() => fileRef.current?.click()}
+                      className="px-3 py-1.5 text-xs font-medium border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+                      {logoMostrado ? 'Cambiar logo' : 'Subir logo'}
                     </button>
-                  )}
-                  <p className="text-xs text-slate-400">PNG, JPG, SVG · máx. 2 MB</p>
-                </div>
-              </div>
-              <input ref={fileRef} type="file" accept=".png,.jpg,.jpeg,.webp,.svg"
-                onChange={onSelectLogo} className="hidden" />
-            </div>
-
-            {/* Paletas predefinidas */}
-            <div>
-              <label className="text-xs font-medium text-slate-500 block mb-2">Paleta de colores</label>
-              <div className="grid grid-cols-2 gap-2 mb-4">
-                {PALETAS.map(p => (
-                  <button key={p.nombre} type="button"
-                    onClick={() => setApariencia(a => ({ ...a, color_primario: p.primario, color_secundario: p.secundario }))}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs text-left transition-colors
-                      ${apariencia.color_primario === p.primario && apariencia.color_secundario === p.secundario
-                        ? 'border-[#1e5fa8] bg-blue-50'
-                        : 'border-slate-200 hover:bg-slate-50'}`}>
-                    <div className="flex gap-1 flex-shrink-0">
-                      <span className="w-4 h-4 rounded-full border border-white shadow-sm" style={{ background: p.primario }} />
-                      <span className="w-4 h-4 rounded-full border border-white shadow-sm" style={{ background: p.secundario }} />
-                    </div>
-                    <span className="text-slate-600 truncate">{p.nombre}</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Colores personalizados */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-slate-500 block mb-1">Color primario</label>
-                  <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2">
-                    <input type="color" value={apariencia.color_primario}
-                      onChange={e => setApariencia(a => ({ ...a, color_primario: e.target.value }))}
-                      className="w-6 h-6 rounded cursor-pointer border-0 p-0 bg-transparent" />
-                    <span className="text-xs font-mono text-slate-600">{apariencia.color_primario}</span>
+                    {logoMostrado && (
+                      <button type="button" onClick={quitarLogo}
+                        className="px-3 py-1.5 text-xs font-medium rounded-xl border transition-colors flex items-center gap-1"
+                        style={{ color: '#EF5350', borderColor: '#fecaca' }}>
+                        <X size={11} /> Quitar
+                      </button>
+                    )}
+                    <p className="text-[10px] text-[#86868b]">PNG, JPG, SVG · máx. 2 MB</p>
                   </div>
                 </div>
-                <div>
-                  <label className="text-xs text-slate-500 block mb-1">Color secundario</label>
-                  <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2">
-                    <input type="color" value={apariencia.color_secundario}
-                      onChange={e => setApariencia(a => ({ ...a, color_secundario: e.target.value }))}
-                      className="w-6 h-6 rounded cursor-pointer border-0 p-0 bg-transparent" />
-                    <span className="text-xs font-mono text-slate-600">{apariencia.color_secundario}</span>
-                  </div>
+                <input ref={fileRef} type="file" accept=".png,.jpg,.jpeg,.webp,.svg" onChange={onSelectLogo} className="hidden" />
+              </div>
+
+              {/* Paletas */}
+              <div>
+                <label className="text-[11px] font-medium text-[#86868b] block mb-2">Paleta de colores</label>
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  {PALETAS.map(p => (
+                    <button key={p.nombre} type="button"
+                      onClick={() => setApariencia(a => ({ ...a, color_primario: p.primario, color_secundario: p.secundario }))}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs text-left transition-colors
+                        ${apariencia.color_primario === p.primario && apariencia.color_secundario === p.secundario
+                          ? 'border-[#1e5fa8] bg-blue-50'
+                          : 'border-slate-200 hover:bg-slate-50'}`}>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <span className="w-4 h-4 rounded-full border border-white shadow-sm" style={{ background: p.primario }} />
+                        <span className="w-4 h-4 rounded-full border border-white shadow-sm" style={{ background: p.secundario }} />
+                      </div>
+                      <span className="text-[#3d3d3f] truncate">{p.nombre}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Colores custom */}
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: 'Color primario', key: 'color_primario' as const },
+                    { label: 'Color secundario', key: 'color_secundario' as const },
+                  ].map(({ label, key }) => (
+                    <div key={key}>
+                      <label className="text-[10px] text-[#86868b] block mb-1.5">{label}</label>
+                      <div className="flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-2 bg-slate-50">
+                        <input type="color" value={apariencia[key]}
+                          onChange={e => setApariencia(a => ({ ...a, [key]: e.target.value }))}
+                          className="w-5 h-5 rounded cursor-pointer border-0 p-0 bg-transparent" />
+                        <span className="text-xs font-mono text-[#3d3d3f]">{apariencia[key]}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            </div>
 
-            {/* Preview */}
-            <div>
-              <label className="text-xs font-medium text-slate-500 block mb-2">Vista previa del encabezado en PDFs</label>
-              <div className="rounded-lg overflow-hidden border border-slate-200">
-                <div style={{ background: `linear-gradient(135deg, ${apariencia.color_primario}, ${apariencia.color_secundario})` }}
-                  className="p-4 flex items-center gap-3">
-                  {logoMostrado && (
-                    <div className="w-10 h-10 rounded-full bg-white/20 overflow-hidden flex items-center justify-center flex-shrink-0">
-                      <img src={logoMostrado} alt="Logo" className="w-8 h-8 object-contain" />
+              {/* Preview */}
+              <div>
+                <label className="text-[11px] font-medium text-[#86868b] block mb-2">Vista previa del encabezado en PDFs</label>
+                <div className="rounded-xl overflow-hidden border border-slate-200">
+                  <div style={{ background: `linear-gradient(135deg, ${apariencia.color_primario}, ${apariencia.color_secundario})` }}
+                    className="p-4 flex items-center gap-3">
+                    {logoMostrado && (
+                      <div className="w-10 h-10 rounded-full bg-white/20 overflow-hidden flex items-center justify-center flex-shrink-0">
+                        <img src={logoMostrado} alt="Logo" className="w-8 h-8 object-contain" />
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-white font-bold text-sm">{form.titulo} {profile?.nombre}</p>
+                      <p className="text-white/70 text-xs">{form.especialidad || 'Especialidad'}</p>
                     </div>
-                  )}
-                  <div>
-                    <p className="text-white font-bold text-sm">{form.titulo} {profile?.nombre}</p>
-                    <p className="text-white/70 text-xs">{form.especialidad || 'Especialidad'}</p>
                   </div>
                 </div>
               </div>
@@ -322,11 +323,12 @@ export default function PerfilPage() {
         )}
 
         <button type="submit" disabled={guardando || subiendoLogo}
-          className="w-full flex items-center justify-center gap-2 py-3 bg-[#1e5fa8] text-white rounded-xl font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-60">
+          className="w-full flex items-center justify-center gap-2 py-3 bg-[#1e5fa8] text-white rounded-2xl text-sm font-semibold hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 shadow-sm">
           {guardando || subiendoLogo
-            ? <><Loader2 size={16} className="animate-spin" /> {subiendoLogo ? 'Subiendo logo...' : 'Guardando...'}</>
-            : <><Save size={16} /> Guardar cambios</>}
+            ? <><Loader2 size={15} className="animate-spin" /> {subiendoLogo ? 'Subiendo logo...' : 'Guardando...'}</>
+            : <><Save size={15} /> Guardar cambios</>}
         </button>
+
       </form>
     </div>
   )

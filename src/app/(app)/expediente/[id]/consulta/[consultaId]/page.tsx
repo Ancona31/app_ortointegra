@@ -138,32 +138,37 @@ export default function ConsultaDetallePage() {
   return (
     <div className="max-w-4xl mx-auto space-y-5">
 
-      {/* Modal confirmar eliminación */}
+      {/* Modal confirmar eliminación — macOS alert */}
       {confirmEliminar && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <Trash2 size={22} className="text-red-500" />
-              <h2 className="font-bold text-slate-800">¿Eliminar nota?</h2>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden animate-slide-up">
+            <div className="px-6 pt-6 pb-4 text-center">
+              <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ backgroundColor: '#FEF2F2' }}>
+                <Trash2 size={20} style={{ color: '#EF5350' }} />
+              </div>
+              <h2 className="text-base font-semibold text-[#1d1d1f]">Eliminar nota médica</h2>
+              <p className="text-sm text-[#86868b] mt-1">
+                {format(parseISO(consulta.fecha), "dd 'de' MMMM 'de' yyyy", { locale: es })}
+              </p>
+              <p className="text-[13px] text-[#3d3d3f] mt-3 leading-relaxed">
+                La nota será eliminada <span className="font-semibold">permanentemente</span>. Esta acción no se puede deshacer.
+              </p>
+              {error && <p className="text-xs mt-2" style={{ color: '#EF5350' }}>{error}</p>}
             </div>
-            <p className="text-sm text-slate-500 mb-5">
-              Esta acción no se puede deshacer. La nota del{' '}
-              <span className="font-medium">{format(parseISO(consulta.fecha), "dd 'de' MMMM 'de' yyyy", { locale: es })}</span> será eliminada permanentemente.
-            </p>
-            {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
-            <div className="flex gap-3">
+            <div className="border-t border-slate-100 grid grid-cols-2">
               <button
                 onClick={() => setConfirmEliminar(false)}
-                className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+                className="px-4 py-3.5 text-sm font-medium text-[#1e5fa8] hover:bg-slate-50 transition-colors border-r border-slate-100"
               >
                 Cancelar
               </button>
               <button
                 onClick={eliminar}
                 disabled={eliminando}
-                className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                className="px-4 py-3.5 text-sm font-semibold hover:bg-red-50 transition-colors disabled:opacity-40 flex items-center justify-center gap-1.5"
+                style={{ color: '#EF5350' }}
               >
-                {eliminando ? <><Loader2 size={14} className="animate-spin" /> Eliminando...</> : 'Sí, eliminar'}
+                {eliminando ? <><Loader2 size={13} className="animate-spin" /> Eliminando...</> : 'Eliminar'}
               </button>
             </div>
           </div>

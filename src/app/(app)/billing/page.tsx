@@ -101,11 +101,12 @@ function BillingContent() {
   const tieneStripe = !!clinica.stripe_customer_id
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-5 animate-slide-up">
 
       <div>
-        <h1 className="text-2xl font-bold text-[#1a3a5c]">Facturación</h1>
-        <p className="text-slate-500 text-sm mt-1">Gestiona tu suscripción y plan</p>
+        <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest mb-1">Cuenta</p>
+        <h1 className="text-[22px] font-bold tracking-tight text-[#1d1d1f]">Facturación</h1>
+        <p className="text-sm text-[#86868b] mt-0.5">Gestiona tu suscripción y plan</p>
       </div>
 
       {/* Banner de éxito */}
@@ -142,7 +143,7 @@ function BillingContent() {
       {/* Card del plan actual */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-6 py-5 border-b border-slate-100">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <h2 className="text-lg font-bold text-slate-800">{plan.nombre}</h2>
@@ -192,7 +193,7 @@ function BillingContent() {
         {/* Uso actual */}
         <div className="px-6 py-5">
           <h3 className="text-sm font-semibold text-slate-600 mb-4">Uso actual</h3>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <UsageCard
               icon={<Users size={18} className="text-blue-600" />}
               label="Médicos"
@@ -255,7 +256,7 @@ function UsageCard({ icon, label, usado, limite }: {
   const enLimite = !ilimitado && usado >= (limite ?? 0)
 
   return (
-    <div className="bg-slate-50 rounded-xl p-4">
+    <div className="bg-slate-50/80 rounded-2xl p-4">
       <div className="flex items-center gap-2 mb-2">
         {icon}
         <span className="text-xs font-medium text-slate-500">{label}</span>

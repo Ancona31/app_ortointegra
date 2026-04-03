@@ -55,20 +55,20 @@ export default function ModalVisorDocumento({ doc, onClose, pacienteEmail }: Pro
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
+      <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col animate-slide-up">
         {/* Header modal */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${TIPO_DOC_COLOR[doc.tipo] || 'bg-slate-100 text-slate-600'}`}>
               {TIPO_DOC_LABEL[doc.tipo] || doc.tipo}
             </span>
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-[#86868b]">
               {format(parseISO(doc.created_at), "dd 'de' MMMM 'de' yyyy", { locale: es })}
             </span>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-            <X size={18} />
+          <button onClick={onClose} className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-[#86868b] transition-colors">
+            <X size={14} />
           </button>
         </div>
 

@@ -47,16 +47,16 @@ export default function Breadcrumbs({ pacienteNombre }: { pacienteNombre?: strin
   if (crumbs.length <= 1) return null
 
   return (
-    <nav className="flex items-center gap-1 text-xs text-slate-400 mb-4 flex-wrap">
+    <nav className="flex items-center gap-1 flex-wrap">
       {crumbs.map((c, i) => (
         <span key={c.href} className="flex items-center gap-1">
-          {i === 0 && <Home size={11} className="opacity-60" />}
+          {i === 0 && <Home size={10} className="text-[#86868b]" />}
           {i < crumbs.length - 1 ? (
-            <Link href={c.href} className="hover:text-[#1e5fa8] transition-colors">{c.label}</Link>
+            <Link href={c.href} className="text-[11px] text-[#86868b] hover:text-[#1e5fa8] transition-colors font-medium">{c.label}</Link>
           ) : (
-            <span className="text-slate-600 font-medium">{c.label}</span>
+            <span className="text-[11px] text-[#3d3d3f] font-semibold">{c.label}</span>
           )}
-          {i < crumbs.length - 1 && <ChevronRight size={11} className="opacity-40" />}
+          {i < crumbs.length - 1 && <ChevronRight size={10} className="text-slate-300" />}
         </span>
       ))}
     </nav>

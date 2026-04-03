@@ -111,64 +111,61 @@ export default function AdminUsuariosPage() {
   )
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="max-w-2xl mx-auto space-y-4 animate-slide-up">
+      <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#1a3a5c] flex items-center gap-2">
-            <Users size={24} /> Gestión de usuarios
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">Crea y administra los accesos al sistema</p>
+          <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest mb-1">Admin</p>
+          <h1 className="text-[22px] font-bold tracking-tight text-[#1d1d1f]">Usuarios</h1>
+          <p className="text-sm text-[#86868b] mt-0.5">Crea y administra los accesos al sistema</p>
         </div>
         <button
           onClick={() => { setShowForm(true); setError('') }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#1e5fa8] text-white rounded-lg text-sm font-medium hover:bg-[#1a3a5c] transition-colors"
+          className="flex items-center gap-1.5 px-4 py-2 bg-[#1e5fa8] text-white rounded-xl text-sm font-semibold hover:bg-[#1a3a5c] transition-colors shadow-sm"
         >
-          <Plus size={16} /> Nuevo usuario
+          <Plus size={15} strokeWidth={2.5} /> Nuevo usuario
         </button>
       </div>
 
-      {/* Modal nuevo usuario */}
+      {/* Modal nuevo usuario — macOS sheet */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-slate-800 flex items-center gap-2">
-                <Plus size={18} /> Nuevo usuario
-              </h2>
-              <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600">
-                <X size={18} />
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
+            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100">
+              <h2 className="text-base font-semibold text-[#1d1d1f]">Nuevo usuario</h2>
+              <button onClick={() => setShowForm(false)}
+                className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-[#86868b] transition-colors">
+                <X size={14} />
               </button>
             </div>
 
-            <form onSubmit={crearUsuario} className="space-y-3">
+            <form onSubmit={crearUsuario} className="px-5 py-4 space-y-3">
+              {[
+                { label: 'Nombre completo', type: 'text', key: 'nombre', placeholder: 'Ej: María González', required: true },
+                { label: 'Correo electrónico', type: 'email', key: 'email', placeholder: 'correo@email.com', required: true },
+              ].map(f => (
+                <div key={f.key}>
+                  <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">{f.label}</label>
+                  <input type={f.type} value={(form as any)[f.key]} onChange={e => setForm({ ...form, [f.key]: e.target.value })}
+                    placeholder={f.placeholder} required={f.required}
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 focus:bg-white transition-all" />
+                </div>
+              ))}
               <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Nombre completo</label>
-                <input type="text" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })}
-                  placeholder="Ej: María González" required
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Correo electrónico</label>
-                <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
-                  placeholder="correo@email.com" required
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Contraseña</label>
+                <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Contraseña</label>
                 <div className="relative">
                   <input type={showPass ? 'text' : 'password'} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
                     placeholder="Mínimo 6 caracteres" required minLength={6}
-                    className="w-full px-3 py-2 pr-9 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                    className="w-full px-3 py-2.5 pr-9 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:bg-white transition-all" />
                   <button type="button" onClick={() => setShowPass(s => !s)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                    {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#86868b] hover:text-[#3d3d3f]">
+                    {showPass ? <EyeOff size={13} /> : <Eye size={13} />}
                   </button>
                 </div>
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Rol</label>
+                <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Rol</label>
                 <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30">
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:bg-white transition-all">
                   <option value="secretaria">Asistente Médico/a</option>
                   <option value="medico">Médico</option>
                   <option value="admin">Admin</option>
@@ -176,46 +173,33 @@ export default function AdminUsuariosPage() {
               </div>
 
               {form.role === 'medico' && (
-                <>
-                  <div>
-                    <label className="text-xs font-medium text-slate-500 block mb-1">Título</label>
-                    <select value={form.titulo} onChange={e => setForm({ ...form, titulo: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30">
-                      <option value="Dr.">Dr.</option>
-                      <option value="Dra.">Dra.</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-slate-500 block mb-1">Especialidad</label>
-                    <input type="text" value={form.especialidad} onChange={e => setForm({ ...form, especialidad: e.target.value })}
-                      placeholder="Ej: Cirugía de Columna · Traumatología"
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-slate-500 block mb-1">Cédula profesional</label>
-                    <input type="text" value={form.cedula_profesional} onChange={e => setForm({ ...form, cedula_profesional: e.target.value })}
-                      placeholder="Ej: 12085805"
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-slate-500 block mb-1">Cédula de especialidad</label>
-                    <input type="text" value={form.cedula_especialidad} onChange={e => setForm({ ...form, cedula_especialidad: e.target.value })}
-                      placeholder="Ej: CMOT 26/5567/25"
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
-                  </div>
-                </>
+                <div className="space-y-3 pt-1 border-t border-slate-100">
+                  <p className="text-[10px] font-semibold text-[#86868b] uppercase tracking-widest pt-1">Datos médicos</p>
+                  {[
+                    { label: 'Especialidad', key: 'especialidad', placeholder: 'Ej: Cirugía de Columna' },
+                    { label: 'Cédula profesional', key: 'cedula_profesional', placeholder: 'Ej: 12085805' },
+                    { label: 'Cédula de especialidad', key: 'cedula_especialidad', placeholder: 'Ej: CMOT 26/5567/25' },
+                  ].map(f => (
+                    <div key={f.key}>
+                      <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">{f.label}</label>
+                      <input type="text" value={(form as any)[f.key]} onChange={e => setForm({ ...form, [f.key]: e.target.value })}
+                        placeholder={f.placeholder}
+                        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:bg-white transition-all" />
+                    </div>
+                  ))}
+                </div>
               )}
 
-              {error && <p className="text-sm text-red-600">{error}</p>}
+              {error && <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-xl">{error}</p>}
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-2 pt-1">
                 <button type="button" onClick={() => setShowForm(false)}
-                  className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">
+                  className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-[#3d3d3f] hover:bg-slate-50 transition-colors">
                   Cancelar
                 </button>
                 <button type="submit" disabled={guardando}
-                  className="flex-1 py-2.5 bg-[#1e5fa8] text-white rounded-xl text-sm font-medium hover:bg-[#1a3a5c] disabled:opacity-60 flex items-center justify-center gap-2">
-                  {guardando ? <><Loader2 size={14} className="animate-spin" /> Creando...</> : 'Crear usuario'}
+                  className="flex-1 py-2.5 bg-[#1e5fa8] text-white rounded-xl text-sm font-semibold hover:bg-[#1a3a5c] disabled:opacity-50 flex items-center justify-center gap-1.5 transition-colors">
+                  {guardando ? <><Loader2 size={13} className="animate-spin" /> Creando...</> : 'Crear usuario'}
                 </button>
               </div>
             </form>
@@ -225,47 +209,48 @@ export default function AdminUsuariosPage() {
 
       {/* Indicadores de licencia */}
       {licencia && (
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
-            <p className="text-xs text-blue-500 font-medium">Médicos</p>
-            <p className="text-lg font-bold text-blue-700 mt-0.5">
-              {usuarios.filter(u => u.role === 'medico').length}
-              <span className="text-sm font-normal text-blue-400"> / {licencia.max_medicos ?? '∞'}</span>
-            </p>
-          </div>
-          <div className="bg-violet-50 border border-violet-100 rounded-xl px-4 py-3">
-            <p className="text-xs text-violet-500 font-medium">Asistentes</p>
-            <p className="text-lg font-bold text-violet-700 mt-0.5">
-              {usuarios.filter(u => u.role === 'secretaria').length}
-              <span className="text-sm font-normal text-violet-400"> / {licencia.max_secretarias ?? '∞'}</span>
-            </p>
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div className="grid grid-cols-2 divide-x divide-slate-100">
+            <div className="px-5 py-4">
+              <p className="text-[10px] font-semibold text-[#86868b] uppercase tracking-widest">Médicos</p>
+              <p className="text-xl font-bold text-[#1d1d1f] mt-1.5 tabular-nums">
+                {usuarios.filter(u => u.role === 'medico').length}
+                <span className="text-sm font-normal text-[#86868b]"> / {licencia.max_medicos ?? '∞'}</span>
+              </p>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-[10px] font-semibold text-[#86868b] uppercase tracking-widest">Asistentes</p>
+              <p className="text-xl font-bold text-[#1d1d1f] mt-1.5 tabular-nums">
+                {usuarios.filter(u => u.role === 'secretaria').length}
+                <span className="text-sm font-normal text-[#86868b]"> / {licencia.max_secretarias ?? '∞'}</span>
+              </p>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Modal confirmación borrado */}
+      {/* Modal confirmación borrado — macOS alert */}
       {confirmDelete && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
-            <div className="flex items-start gap-3 mb-4">
-              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <AlertTriangle size={18} className="text-red-600" />
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden animate-slide-up">
+            <div className="px-6 pt-6 pb-4 text-center">
+              <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ backgroundColor: '#FEF2F2' }}>
+                <AlertTriangle size={22} style={{ color: '#EF5350' }} />
               </div>
-              <div>
-                <h3 className="font-bold text-slate-800">Eliminar usuario</h3>
-                <p className="text-sm text-slate-500 mt-1">
-                  ¿Estás seguro de eliminar a <strong>{confirmDelete.nombre || confirmDelete.email}</strong>? Esta acción no se puede deshacer.
-                </p>
-              </div>
+              <h3 className="text-base font-semibold text-[#1d1d1f]">Eliminar usuario</h3>
+              <p className="text-sm text-[#86868b] mt-1">
+                ¿Eliminar a <span className="font-semibold text-[#3d3d3f]">{confirmDelete.nombre || confirmDelete.email}</span>? Esta acción no se puede deshacer.
+              </p>
             </div>
-            <div className="flex gap-3">
+            <div className="border-t border-slate-100 grid grid-cols-2">
               <button onClick={() => setConfirmDelete(null)}
-                className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">
+                className="px-4 py-3.5 text-sm font-medium text-[#1e5fa8] hover:bg-slate-50 transition-colors border-r border-slate-100">
                 Cancelar
               </button>
               <button onClick={confirmarEliminar}
-                className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition-colors">
-                Sí, eliminar
+                className="px-4 py-3.5 text-sm font-semibold transition-colors hover:bg-red-50"
+                style={{ color: '#EF5350' }}>
+                Eliminar
               </button>
             </div>
           </div>
@@ -273,37 +258,42 @@ export default function AdminUsuariosPage() {
       )}
 
       {/* Lista de usuarios */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
-          <h2 className="font-semibold text-slate-700 text-sm">Usuarios registrados</h2>
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-slate-100">
+          <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest">Usuarios registrados</p>
         </div>
         <div className="divide-y divide-slate-100">
-          {usuarios.map(u => (
-            <div key={u.id} className="flex items-center justify-between px-5 py-4">
-              <div className="flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-full flex items-center justify-center ${u.role === 'medico' ? 'bg-blue-100' : 'bg-violet-100'}`}>
-                  {u.role === 'medico'
-                    ? <Shield size={16} className="text-blue-700" />
-                    : <UserCheck size={16} className="text-violet-700" />}
+          {usuarios.map(u => {
+            const isMedico = ['medico', 'admin', 'super_admin'].includes(u.role)
+            return (
+              <div key={u.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-slate-50/60 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${isMedico ? 'bg-blue-50' : 'bg-violet-50'}`}>
+                    {isMedico
+                      ? <Shield size={15} className="text-[#1e5fa8]" />
+                      : <UserCheck size={15} className="text-violet-600" />}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-[#1d1d1f]">{u.nombre || 'Sin nombre'}</p>
+                    <p className="text-[11px] text-[#86868b]">{u.email}</p>
+                    <p className="text-[10px] text-[#86868b] capitalize mt-0.5">{u.role}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium text-slate-800 text-sm">{u.nombre || 'Sin nombre'}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{u.email}</p>
-                  <p className="text-xs text-slate-300 capitalize">{u.role}</p>
+                <div className="flex items-center gap-2">
+                  {u.id === profile?.id && (
+                    <span className="text-[10px] font-semibold text-[#86868b] bg-slate-100 px-2 py-1 rounded-full">Tú</span>
+                  )}
+                  {u.id !== profile?.id && (
+                    <button onClick={() => eliminarUsuario(u)} title="Eliminar usuario"
+                      className="w-7 h-7 rounded-lg hover:bg-red-50 flex items-center justify-center transition-colors"
+                      style={{ color: '#EF5350' }}>
+                      <Trash2 size={13} />
+                    </button>
+                  )}
                 </div>
               </div>
-              {u.id !== profile?.id && (
-                <button onClick={() => eliminarUsuario(u)}
-                  title="Eliminar usuario"
-                  className="text-red-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg transition-colors">
-                  <Trash2 size={15} />
-                </button>
-              )}
-              {u.id === profile?.id && (
-                <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-full">Tú</span>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </div>

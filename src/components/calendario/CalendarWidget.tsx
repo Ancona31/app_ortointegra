@@ -233,20 +233,20 @@ export default function CalendarWidget({ conectado, setConectado }: {
         </div>
       </div>
 
-      {/* Modal: detalle de evento */}
+      {/* Modal: detalle de evento — macOS sheet */}
       {eventoDetalle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setEventoDetalle(null)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
-            <div className="flex items-start justify-between mb-4 gap-3">
-              <h2 className="font-semibold text-slate-800 text-base leading-snug">{eventoDetalle.title}</h2>
-              <button onClick={() => setEventoDetalle(null)} className="text-slate-400 hover:text-slate-600 shrink-0">
-                <X size={18} />
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setEventoDetalle(null)}>
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between px-5 pt-5 pb-4 border-b border-slate-100 gap-3">
+              <h2 className="text-base font-semibold text-[#1d1d1f] leading-snug">{eventoDetalle.title}</h2>
+              <button onClick={() => setEventoDetalle(null)} className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-[#86868b] shrink-0 transition-colors">
+                <X size={14} />
               </button>
             </div>
-            <div className="space-y-3 text-sm text-slate-600">
-              <div className="flex items-center gap-2">
+            <div className="px-5 py-4 space-y-3">
+              <div className="flex items-center gap-2.5">
                 <CalendarDays size={14} className="text-[#1e5fa8] shrink-0" />
-                <span>
+                <span className="text-sm text-[#3d3d3f]">
                   {eventoDetalle.allDay
                     ? format(parseISO(eventoDetalle.start), "EEEE d 'de' MMMM yyyy", { locale: es })
                     : `${format(parseISO(eventoDetalle.start), "EEEE d 'de' MMMM, HH:mm", { locale: es })}${eventoDetalle.end ? ` – ${format(parseISO(eventoDetalle.end), 'HH:mm')}` : ''}`
@@ -254,22 +254,22 @@ export default function CalendarWidget({ conectado, setConectado }: {
                 </span>
               </div>
               {eventoDetalle.location && (
-                <div className="flex items-center gap-2">
-                  <MapPin size={14} className="text-slate-400 shrink-0" />
-                  <span>{eventoDetalle.location}</span>
+                <div className="flex items-center gap-2.5">
+                  <MapPin size={14} className="text-[#86868b] shrink-0" />
+                  <span className="text-sm text-[#3d3d3f]">{eventoDetalle.location}</span>
                 </div>
               )}
               {eventoDetalle.description && (
-                <div className="flex items-start gap-2">
-                  <AlignLeft size={14} className="text-slate-400 shrink-0 mt-0.5" />
-                  <span className="whitespace-pre-wrap">{eventoDetalle.description}</span>
+                <div className="flex items-start gap-2.5">
+                  <AlignLeft size={14} className="text-[#86868b] shrink-0 mt-0.5" />
+                  <span className="text-sm text-[#3d3d3f] whitespace-pre-wrap">{eventoDetalle.description}</span>
                 </div>
               )}
             </div>
-            <div className="mt-5 flex items-center justify-between">
+            <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between">
               {eventoDetalle.htmlLink ? (
                 <a href={eventoDetalle.htmlLink} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-xs text-[#1e5fa8] hover:underline">
+                  className="flex items-center gap-1.5 text-xs text-[#1e5fa8] hover:underline font-medium">
                   <ExternalLink size={12} /> Abrir en Google Calendar
                 </a>
               ) : <span />}
@@ -277,9 +277,10 @@ export default function CalendarWidget({ conectado, setConectado }: {
                 <button
                   onClick={handleEliminarEvento}
                   disabled={eliminandoEvento}
-                  className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-700 disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-1.5 text-xs font-medium disabled:opacity-40 transition-colors"
+                  style={{ color: '#EF5350' }}
                 >
-                  {eliminandoEvento ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                  {eliminandoEvento ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
                   Eliminar evento
                 </button>
               )}
@@ -288,44 +289,38 @@ export default function CalendarWidget({ conectado, setConectado }: {
         </div>
       )}
 
-      {/* Modal: crear cita */}
+      {/* Modal: crear cita — macOS sheet */}
       {modalCrear && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setModalCrear(null)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="font-semibold text-slate-800">Nueva cita</h2>
-              <button onClick={() => setModalCrear(null)} className="text-slate-400 hover:text-slate-600">
-                <X size={18} />
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setModalCrear(null)}>
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100">
+              <h2 className="text-base font-semibold text-[#1d1d1f]">Nueva cita</h2>
+              <button onClick={() => setModalCrear(null)} className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-[#86868b] transition-colors">
+                <X size={14} />
               </button>
             </div>
-            <form onSubmit={handleCrearEvento} className="space-y-4">
-              <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">Título *</label>
-                <input name="titulo" required autoFocus
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]"
-                  placeholder="Consulta, cirugía, junta..." />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">Nombre del paciente</label>
-                <input name="paciente"
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]"
-                  placeholder="Ej. Juan Pérez" />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">Motivo de consulta</label>
-                <input name="motivo"
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]"
-                  placeholder="Ej. Dolor lumbar, revisión postquirúrgica..." />
-              </div>
+            <form onSubmit={handleCrearEvento} className="px-5 py-4 space-y-3">
+              {[
+                { name: 'titulo', label: 'Título', placeholder: 'Consulta, cirugía, junta...', required: true, autoFocus: true },
+                { name: 'paciente', label: 'Nombre del paciente', placeholder: 'Ej. Juan Pérez', required: false },
+                { name: 'motivo', label: 'Motivo de consulta', placeholder: 'Ej. Dolor lumbar, revisión postquirúrgica...', required: false },
+              ].map(f => (
+                <div key={f.name}>
+                  <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">{f.label}{f.required && ' *'}</label>
+                  <input name={f.name} required={f.required} autoFocus={f.autoFocus}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-[#1d1d1f] placeholder:text-[#86868b] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:bg-white transition-all"
+                    placeholder={f.placeholder} />
+                </div>
+              ))}
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="allDayCW" checked={crearTodoDia}
                   onChange={e => setCrearTodoDia(e.target.checked)} className="rounded" />
-                <label htmlFor="allDayCW" className="text-sm text-slate-600 cursor-pointer">Todo el día</label>
+                <label htmlFor="allDayCW" className="text-sm text-[#3d3d3f] cursor-pointer">Todo el día</label>
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">Fecha *</label>
+                <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Fecha *</label>
                 <input type="date" name="fecha" defaultValue={modalCrear.fecha} required
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]" />
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:bg-white transition-all" />
               </div>
               {!crearTodoDia && (
                 <div className="grid grid-cols-2 gap-3">

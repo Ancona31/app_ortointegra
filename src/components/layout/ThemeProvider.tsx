@@ -68,89 +68,138 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
 
     /* ═══════════════════════════════════════════════
-       MODO OSCURO — html.dark
+       MODO OSCURO — Material Design Dark Theme
+       Base:    #121212  (dp0 — fondo raíz)
+       dp1:     #1E1E1E  (cards primer nivel)
+       dp2:     #242424  (cards segundo nivel / inputs)
+       dp4:     #2C2C2C  (hover / elevated)
+       Texto primario:    rgba(255,255,255,0.87)
+       Texto secundario:  rgba(255,255,255,0.60)
+       Texto desactivado: rgba(255,255,255,0.38)
+       Bordes/divisores:  rgba(255,255,255,0.12)
     ═══════════════════════════════════════════════ */
+
+    /* ── Raíz ── */
     html.dark body {
-      background-color: #0f172a !important;
-      color: #e2e8f0 !important;
+      background-color: #121212 !important;
+      color: rgba(255,255,255,0.87) !important;
     }
+    html.dark .min-h-full { background-color: #121212 !important; }
 
-    /* Fondo de página */
-    html.dark .min-h-full { background-color: #0f172a !important; }
+    /* ── Superficies / cards ── */
+    html.dark .bg-white          { background-color: #1E1E1E !important; }
+    html.dark .bg-slate-50       { background-color: #242424 !important; }
+    html.dark .bg-slate-100      { background-color: #2C2C2C !important; }
+    html.dark .bg-slate-200      { background-color: #383838 !important; }
 
-    /* Cards y panels */
-    html.dark .bg-white          { background-color: #1e293b !important; }
-    html.dark .bg-slate-50       { background-color: #0f172a !important; }
-    html.dark .bg-slate-100      { background-color: #1e293b !important; }
-    html.dark .bg-slate-200      { background-color: #334155 !important; }
+    /* ── Bordes — muy sutiles, Material usa 12% blanco ── */
+    html.dark .border-slate-200,
+    html.dark .border-slate-200\\/80  { border-color: rgba(255,255,255,0.12) !important; }
+    html.dark .border-slate-100       { border-color: rgba(255,255,255,0.08) !important; }
+    html.dark .border-slate-300       { border-color: rgba(255,255,255,0.16) !important; }
+    html.dark .divide-slate-100 > * + *,
+    html.dark .divide-slate-200 > * + * { border-color: rgba(255,255,255,0.08) !important; }
 
-    /* Bordes */
-    html.dark .border-slate-200  { border-color: #334155 !important; }
-    html.dark .border-slate-100  { border-color: #1e293b !important; }
-    html.dark .border-slate-300  { border-color: #475569 !important; }
-    html.dark .divide-slate-200 > * + * { border-color: #334155 !important; }
+    /* ── Texto ── */
+    /* Texto oscuro macOS → blanco/87 */
+    html.dark .text-\\[\\#1d1d1f\\]     { color: rgba(255,255,255,0.87) !important; }
+    /* Texto secundario macOS → blanco/60 */
+    html.dark .text-\\[\\#86868b\\]     { color: rgba(255,255,255,0.60) !important; }
 
-    /* Texto */
-    html.dark .text-slate-900    { color: #f1f5f9 !important; }
-    html.dark .text-slate-800    { color: #e2e8f0 !important; }
-    html.dark .text-slate-700    { color: #cbd5e1 !important; }
-    html.dark .text-slate-600    { color: #94a3b8 !important; }
-    html.dark .text-slate-500    { color: #64748b !important; }
-    html.dark .text-slate-400    { color: #475569 !important; }
-    html.dark .text-slate-300    { color: #334155 !important; }
+    html.dark .text-slate-900    { color: rgba(255,255,255,0.87) !important; }
+    html.dark .text-slate-800    { color: rgba(255,255,255,0.87) !important; }
+    html.dark .text-slate-700    { color: rgba(255,255,255,0.75) !important; }
+    html.dark .text-slate-600    { color: rgba(255,255,255,0.60) !important; }
+    html.dark .text-slate-500    { color: rgba(255,255,255,0.50) !important; }
+    html.dark .text-slate-400    { color: rgba(255,255,255,0.38) !important; }
+    html.dark .text-slate-300    { color: rgba(255,255,255,0.28) !important; }
 
-    /* Inputs, textareas, selects */
+    /* ── Colores primarios desaturados en dark ── */
+    /* Evita que el azul "vibre" sobre el fondo oscuro */
+    html.dark .text-\\[\\#1e5fa8\\],
+    html.dark .hover\\:text-\\[\\#1e5fa8\\]:hover { color: #60a5fa !important; }
+    html.dark .text-\\[\\#1a3a5c\\],
+    html.dark .hover\\:text-\\[\\#1a3a5c\\]:hover { color: #93c5fd !important; }
+    html.dark .text-emerald-600   { color: #34d399 !important; }
+    html.dark .text-red-600       { color: #f87171 !important; }
+    html.dark .text-red-500       { color: #f87171 !important; }
+    html.dark .text-amber-700     { color: #fbbf24 !important; }
+    html.dark .text-blue-600      { color: #60a5fa !important; }
+
+    /* ── Inputs / textareas / selects ── */
     html.dark input:not([type="color"]),
     html.dark textarea,
     html.dark select {
-      background-color: #0f172a !important;
-      color: #e2e8f0 !important;
-      border-color: #334155 !important;
+      background-color: #242424 !important;
+      color: rgba(255,255,255,0.87) !important;
+      border-color: rgba(255,255,255,0.12) !important;
     }
     html.dark input::placeholder,
-    html.dark textarea::placeholder { color: #475569 !important; }
+    html.dark textarea::placeholder { color: rgba(255,255,255,0.38) !important; }
 
-    /* Hover states */
-    html.dark .hover\\:bg-slate-50:hover  { background-color: #1e293b !important; }
-    html.dark .hover\\:bg-slate-100:hover { background-color: #334155 !important; }
+    /* ── Hover states ── */
+    html.dark .hover\\:bg-slate-50:hover,
+    html.dark .hover\\:bg-slate-50\\/80:hover { background-color: #2C2C2C !important; }
+    html.dark .hover\\:bg-slate-100:hover     { background-color: #383838 !important; }
 
-    /* Sombras */
-    html.dark .shadow-sm {
-      box-shadow: 0 1px 2px rgba(0,0,0,0.6) !important;
+    /* ── Sombras — Material las elimina, usa elevación por color ── */
+    html.dark .shadow-sm  { box-shadow: none !important; }
+    html.dark .shadow-md  { box-shadow: none !important; }
+    html.dark .shadow-xl  {
+      box-shadow: 0 20px 40px rgba(0,0,0,0.8) !important;
     }
-    html.dark .shadow-xl {
-      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.7), 0 8px 10px -6px rgba(0,0,0,0.5) !important;
-    }
 
-    /* Scrollbar oscuro */
-    html.dark ::-webkit-scrollbar-track { background: #1e293b !important; }
-    html.dark ::-webkit-scrollbar-thumb { background: #475569 !important; }
-    html.dark ::-webkit-scrollbar-thumb:hover { background: #64748b !important; }
+    /* ── Scrollbar ── */
+    html.dark ::-webkit-scrollbar-track { background: #1E1E1E !important; }
+    html.dark ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.16) !important; border-radius: 3px; }
+    html.dark ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.28) !important; }
 
-    /* Prose (ReactMarkdown) */
+    /* ── Prose (ReactMarkdown) ── */
     html.dark .prose p,
-    html.dark .prose li     { color: #cbd5e1 !important; }
-    html.dark .prose strong { color: #e2e8f0 !important; }
+    html.dark .prose li     { color: rgba(255,255,255,0.75) !important; }
+    html.dark .prose strong { color: rgba(255,255,255,0.87) !important; }
     html.dark .prose h1, html.dark .prose h2,
     html.dark .prose h3, html.dark .prose h4 { color: #93c5fd !important; }
 
-    /* Badges / pills de colores suaves */
-    html.dark .bg-blue-50    { background-color: #1e3a5f !important; }
-    html.dark .bg-emerald-50 { background-color: #064e3b !important; }
-    html.dark .bg-red-50     { background-color: #450a0a !important; }
-    html.dark .bg-amber-50   { background-color: #451a03 !important; }
-    html.dark .bg-violet-50  { background-color: #2e1065 !important; }
-    html.dark .bg-indigo-50  { background-color: #1e1b4b !important; }
-    html.dark .bg-teal-50    { background-color: #042f2e !important; }
-    html.dark .bg-rose-50    { background-color: #4c0519 !important; }
-    html.dark .bg-orange-50  { background-color: #431407 !important; }
-    html.dark .bg-green-50   { background-color: #052e16 !important; }
+    /* ── Badges de color — usar tint suave, no bloques sólidos oscuros ── */
+    html.dark .bg-blue-50    { background-color: rgba(59,130,246,0.14)  !important; }
+    html.dark .bg-emerald-50 { background-color: rgba(16,185,129,0.14)  !important; }
+    html.dark .bg-red-50     { background-color: rgba(239,68,68,0.14)   !important; }
+    html.dark .bg-amber-50   { background-color: rgba(245,158,11,0.14)  !important; }
+    html.dark .bg-violet-50  { background-color: rgba(139,92,246,0.14)  !important; }
+    html.dark .bg-indigo-50  { background-color: rgba(99,102,241,0.14)  !important; }
+    html.dark .bg-teal-50    { background-color: rgba(20,184,166,0.14)  !important; }
+    html.dark .bg-rose-50    { background-color: rgba(244,63,94,0.14)   !important; }
+    html.dark .bg-orange-50  { background-color: rgba(249,115,22,0.14)  !important; }
+    html.dark .bg-green-50   { background-color: rgba(34,197,94,0.14)   !important; }
+    html.dark .bg-sky-50     { background-color: rgba(14,165,233,0.14)  !important; }
 
-    /* Modales */
-    html.dark .fixed.inset-0.bg-black\\/50 { background-color: rgba(0,0,0,0.75) !important; }
+    /* Bordes de badges */
+    html.dark .border-blue-100,
+    html.dark .border-blue-200    { border-color: rgba(59,130,246,0.25)  !important; }
+    html.dark .border-emerald-100,
+    html.dark .border-emerald-200 { border-color: rgba(16,185,129,0.25)  !important; }
+    html.dark .border-red-100,
+    html.dark .border-red-200     { border-color: rgba(239,68,68,0.25)   !important; }
+    html.dark .border-amber-100,
+    html.dark .border-amber-200   { border-color: rgba(245,158,11,0.25)  !important; }
 
-    /* Tabs */
-    html.dark .border-b.border-slate-200 { border-color: #334155 !important; }
+    /* Texto de badges — desaturado */
+    html.dark .text-blue-600,
+    html.dark .text-\\[\\#1a3a5c\\]   { color: #93c5fd !important; }
+    html.dark .text-emerald-700      { color: #6ee7b7 !important; }
+    html.dark .text-red-700          { color: #fca5a5 !important; }
+    html.dark .text-amber-700        { color: #fcd34d !important; }
+    html.dark .text-blue-400         { color: #7dd3fc !important; }
+
+    /* ── Modales ── */
+    html.dark .fixed.inset-0.bg-black\\/50 { background-color: rgba(0,0,0,0.8) !important; }
+
+    /* ── Tabs ── */
+    html.dark .border-b.border-slate-200 { border-color: rgba(255,255,255,0.12) !important; }
+
+    /* ── Gradientes del header de tarjeta — se mantienen, son parte del branding ── */
+    /* Los gradientes azules del header de TarjetaPaciente se ven bien en dark */
   `
 
   return (

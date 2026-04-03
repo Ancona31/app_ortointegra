@@ -9,7 +9,7 @@ import { flushSync } from 'react-dom'
 import {
   ArrowLeft, Save, Loader2, RotateCcw, Printer, Eye, Pencil,
   Pill, FlaskConical, ScanLine, ClipboardList, CheckCircle2,
-  BedDouble, PenLine, ShieldCheck, Receipt, Plus, Trash2, X, FileText,
+  BedDouble, PenLine, ShieldCheck, Receipt, Plus, Trash2, X, FileText, ChevronDown,
 } from 'lucide-react'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
@@ -84,10 +84,20 @@ export default function NuevaNotaPage() {
   const [error, setError]               = useState('')
   const [notaSaved, setNotaSaved]       = useState(false)
   const [docInline, setDocInline]       = useState<string | null>(null)
+  const [ultimoGuardado, setUltimoGuardado] = useState<Date | null>(null)
+  const [borradorRestaurado, setBorradorRestaurado] = useState(false)
+  const [ultimaConsulta, setUltimaConsulta] = useState<{ diagnosticos: string; medicamentos: MedRow[] | null } | null>(null)
+  const [camposExpandidos, setCamposExpandidos] = useState<Record<string, boolean>>({
+    exploracion: false, gabinete: false, plan: false,
+  })
+  function toggleCampo(k: string) { setCamposExpandidos(p => ({ ...p, [k]: !p[k] })) }
 
-  const suggestRef = useRef<HTMLDivElement>(null)
+  const suggestRef  = useRef<HTMLDivElement>(null)
+  const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // ── Carga datos ──────────────────────────────────────────────
+  // ── Carga datos + borrador ────────────────────────────────────
+  const draftKey = `nota-draft-${id}`
+
   useEffect(() => {
     fetch('/api/me/perfil-medico').then(r => r.json()).then(({ medico }) => setMedicoInfo(medico))
     const supabase = createClient()
@@ -99,7 +109,46 @@ export default function NuevaNotaPage() {
         setMedCache(data.sort((a, b) => b.count - a.count).map(d => d.nombre))
       }
     } catch {}
+    // Restaurar borrador si existe
+    try {
+      const draft = localStorage.getItem(draftKey)
+      if (draft) {
+        const parsed = JSON.parse(draft)
+        if (parsed.form) { setForm(parsed.form); setBorradorRestaurado(true) }
+        if (parsed.medicamentos?.length) setMedicamentos(parsed.medicamentos)
+      }
+    } catch {}
+    // Cargar última consulta para contexto
+    const supabase2 = createClient()
+    supabase2.from('consultas')
+      .select('diagnosticos, medicamentos')
+      .eq('paciente_id', id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data) return
+        const dx = Array.isArray(data.diagnosticos)
+          ? (data.diagnosticos as { descripcion?: string }[]).map(d => d.descripcion).filter(Boolean).join(', ')
+          : ''
+        setUltimaConsulta({ diagnosticos: dx, medicamentos: data.medicamentos || null })
+      })
   }, [id])
+
+  // ── Autosave en localStorage ──────────────────────────────────
+  useEffect(() => {
+    if (notaSaved) return // no guardar borrador si la nota ya fue guardada en DB
+    if (autosaveRef.current) clearTimeout(autosaveRef.current)
+    autosaveRef.current = setTimeout(() => {
+      const tieneDatos = form.motivo_consulta || form.diagnosticos || form.exploracion_fisica
+      if (!tieneDatos) return
+      try {
+        localStorage.setItem(draftKey, JSON.stringify({ form, medicamentos }))
+        setUltimoGuardado(new Date())
+      } catch {}
+    }, 1500)
+    return () => { if (autosaveRef.current) clearTimeout(autosaveRef.current) }
+  }, [form, medicamentos, notaSaved])
 
   // Cerrar autocomplete al hacer clic fuera
   useEffect(() => {
@@ -214,6 +263,7 @@ export default function NuevaNotaPage() {
     setGuardando(false)
     if (err) { setError('Error al guardar: ' + err.message); return }
     saveMedCache(medsConDatos)
+    try { localStorage.removeItem(draftKey) } catch {}
     setNotaSaved(true)
     setDocInline(null)
   }
@@ -429,15 +479,42 @@ export default function NuevaNotaPage() {
         ════════════════════════════════ */}
         <div className="lg:col-span-3 space-y-5">
 
+          {/* Banner borrador restaurado */}
+          {borradorRestaurado && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-3">
+              <RotateCcw size={15} className="text-amber-500 flex-shrink-0" />
+              <p className="text-xs text-amber-700 font-medium flex-1">Borrador restaurado — continúa donde lo dejaste</p>
+              <button
+                onClick={() => {
+                  setForm({ motivo_consulta: '', exploracion_fisica: '', diagnosticos: '', pronostico: '', plan_tratamiento: '', gabinete_laboratorios: '', proxima_cita: '' })
+                  setMedicamentos([{ ...MED_VACIA }])
+                  try { localStorage.removeItem(draftKey) } catch {}
+                  setBorradorRestaurado(false)
+                }}
+                className="text-xs text-amber-600 hover:text-amber-800 underline"
+              >
+                Descartar
+              </button>
+            </div>
+          )}
+
           {/* Formulario de la consulta */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
-              <h2 className="font-semibold text-slate-700 text-sm">Datos de la consulta</h2>
-              <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
-                Completa los campos y
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="inline text-[#4285F4]"><path d="M12 2C12 2 13.8 9 19 12C13.8 15 12 22 12 22C12 22 10.2 15 5 12C10.2 9 12 2 12 2Z" fill="#4285F4"/></svg>
-                <span className="text-[#4285F4] font-medium">Gemini</span> redactará la nota médica
-              </p>
+            <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold text-slate-700 text-sm">Datos de la consulta</h2>
+                <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                  Completa los campos y
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="inline text-[#4285F4]"><path d="M12 2C12 2 13.8 9 19 12C13.8 15 12 22 12 22C12 22 10.2 15 5 12C10.2 9 12 2 12 2Z" fill="#4285F4"/></svg>
+                  <span className="text-[#4285F4] font-medium">Gemini</span> redactará la nota médica
+                </p>
+              </div>
+              {ultimoGuardado && !notaSaved && (
+                <div className="flex items-center gap-1.5 text-[10px] text-emerald-600">
+                  <CheckCircle2 size={11} />
+                  Borrador guardado
+                </div>
+              )}
             </div>
             <div className="p-5 space-y-4">
               <div>
@@ -446,32 +523,61 @@ export default function NuevaNotaPage() {
                   placeholder="Ej: Dolor lumbar crónico, limitación funcional..."
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
               </div>
+              {/* Exploración física — expandible */}
               <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Exploración física <span className="text-slate-400 font-normal">(opcional — Gemini la complementa)</span></label>
-                <textarea value={form.exploracion_fisica} onChange={e => update('exploracion_fisica', e.target.value)}
-                  placeholder="Ej: Marcha antiálgica, Lasègue positivo a 45° derecho..."
-                  rows={3}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                <button type="button" onClick={() => toggleCampo('exploracion')}
+                  className="flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors mb-1 w-full text-left">
+                  <ChevronDown size={13} className={`transition-transform duration-200 ${camposExpandidos.exploracion ? 'rotate-180' : ''}`} />
+                  Exploración física
+                  <span className="text-slate-300 font-normal ml-1">Gemini la complementa</span>
+                  {form.exploracion_fisica && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#1e5fa8]" />}
+                </button>
+                {camposExpandidos.exploracion && (
+                  <textarea value={form.exploracion_fisica} onChange={e => update('exploracion_fisica', e.target.value)}
+                    placeholder="Ej: Marcha antiálgica, Lasègue positivo a 45° derecho..."
+                    rows={3} autoFocus
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                )}
               </div>
+
+              {/* Gabinete — expandible */}
               <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Gabinete y Laboratorios <span className="text-slate-400 font-normal">(opcional)</span></label>
-                <textarea value={form.gabinete_laboratorios} onChange={e => update('gabinete_laboratorios', e.target.value)}
-                  placeholder="Ej: Rx columna lumbar AP/Lateral — disminución de espacio L4-L5..."
-                  rows={2}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                <button type="button" onClick={() => toggleCampo('gabinete')}
+                  className="flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors mb-1 w-full text-left">
+                  <ChevronDown size={13} className={`transition-transform duration-200 ${camposExpandidos.gabinete ? 'rotate-180' : ''}`} />
+                  Gabinete y Laboratorios
+                  {form.gabinete_laboratorios && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#1e5fa8]" />}
+                </button>
+                {camposExpandidos.gabinete && (
+                  <textarea value={form.gabinete_laboratorios} onChange={e => update('gabinete_laboratorios', e.target.value)}
+                    placeholder="Ej: Rx columna lumbar AP/Lateral — disminución de espacio L4-L5..."
+                    rows={2} autoFocus
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                )}
               </div>
+
+              {/* Diagnóstico — siempre visible */}
               <div>
                 <label className="text-xs font-medium text-slate-500 block mb-1">Diagnóstico(s)</label>
                 <input type="text" value={form.diagnosticos} onChange={e => update('diagnosticos', e.target.value)}
                   placeholder="Ej: Hernia discal L4-L5 con radiculopatía derecha..."
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
               </div>
+
+              {/* Plan de tratamiento — expandible */}
               <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Plan de tratamiento <span className="text-slate-400 font-normal">(opcional)</span></label>
-                <textarea value={form.plan_tratamiento} onChange={e => update('plan_tratamiento', e.target.value)}
-                  placeholder="Ej: Manejo conservador, fisioterapia, valorar cirugía..."
-                  rows={2}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                <button type="button" onClick={() => toggleCampo('plan')}
+                  className="flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors mb-1 w-full text-left">
+                  <ChevronDown size={13} className={`transition-transform duration-200 ${camposExpandidos.plan ? 'rotate-180' : ''}`} />
+                  Plan de tratamiento
+                  {form.plan_tratamiento && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#1e5fa8]" />}
+                </button>
+                {camposExpandidos.plan && (
+                  <textarea value={form.plan_tratamiento} onChange={e => update('plan_tratamiento', e.target.value)}
+                    placeholder="Ej: Manejo conservador, fisioterapia, valorar cirugía..."
+                    rows={2} autoFocus
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                )}
               </div>
             </div>
           </div>
@@ -486,7 +592,7 @@ export default function NuevaNotaPage() {
               <p className="text-xs text-slate-400 mt-0.5">Se imprime en la nota y pre-carga la receta</p>
             </div>
             <div className="p-4 space-y-2" ref={suggestRef}>
-              <div className="grid grid-cols-12 gap-2 px-1 mb-1">
+              <div className="hidden sm:grid sm:grid-cols-12 gap-2 px-1 mb-1">
                 <span className="col-span-4 text-xs font-medium text-slate-400 uppercase tracking-wide">Medicamento</span>
                 <span className="col-span-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Dosis</span>
                 <span className="col-span-2 text-xs font-medium text-slate-400 uppercase tracking-wide">Frecuencia</span>
@@ -497,8 +603,8 @@ export default function NuevaNotaPage() {
                 const suggestions = getSuggestions(med.nombre)
                 const mostrarSuggest = showSuggest === i && suggestions.length > 0
                 return (
-                  <div key={i} className="grid grid-cols-12 gap-2 relative">
-                    <div className="col-span-4 relative">
+                  <div key={i} className="grid grid-cols-2 sm:grid-cols-12 gap-2 relative">
+                    <div className="col-span-2 sm:col-span-4 relative">
                       <input type="text" value={med.nombre}
                         onChange={e => updateMed(i, 'nombre', e.target.value)}
                         onFocus={() => setShowSuggest(i)}
@@ -517,13 +623,13 @@ export default function NuevaNotaPage() {
                       )}
                     </div>
                     <input type="text" value={med.dosis} onChange={e => updateMed(i, 'dosis', e.target.value)}
-                      placeholder="Ej: 30 mg" className="col-span-3 px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                      placeholder="Dosis" className="col-span-1 sm:col-span-3 px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
                     <input type="text" value={med.frecuencia} onChange={e => updateMed(i, 'frecuencia', e.target.value)}
-                      placeholder="Ej: c/8 h" className="col-span-2 px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                      placeholder="Frecuencia" className="col-span-1 sm:col-span-2 px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
                     <input type="text" value={med.duracion} onChange={e => updateMed(i, 'duracion', e.target.value)}
-                      placeholder="Ej: 5 días" className="col-span-2 px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                      placeholder="Duración" className="col-span-1 sm:col-span-2 px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
                     <button type="button" onClick={() => removeMed(i)}
-                      className="col-span-1 flex items-center justify-center text-slate-300 hover:text-red-400 transition-colors">
+                      className="col-span-1 sm:col-span-1 flex items-center justify-center text-slate-300 hover:text-red-400 transition-colors">
                       <Trash2 size={15} />
                     </button>
                   </div>
@@ -629,7 +735,72 @@ export default function NuevaNotaPage() {
             COLUMNA DERECHA (2/5)
             Panel de documentos — sticky
         ════════════════════════════════ */}
-        <div className="lg:col-span-2 lg:sticky lg:top-6">
+        <div className="lg:col-span-2 lg:sticky lg:top-6 space-y-4">
+
+          {/* ── Panel contextual del paciente ── */}
+          {paciente && (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Contexto del paciente</p>
+              </div>
+              <div className="p-4 space-y-3">
+                {/* Datos básicos */}
+                <div className="flex flex-wrap gap-2">
+                  {paciente.fecha_nacimiento && (
+                    <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-lg">
+                      {differenceInYears(new Date(), parseISO(paciente.fecha_nacimiento))} años
+                    </span>
+                  )}
+                  {paciente.sexo && (
+                    <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-lg">
+                      {paciente.sexo === 'M' ? 'Masculino' : paciente.sexo === 'F' ? 'Femenino' : paciente.sexo}
+                    </span>
+                  )}
+                  {paciente.peso_kg && paciente.talla_cm && (
+                    <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-lg">
+                      IMC {(paciente.peso_kg / Math.pow(paciente.talla_cm / 100, 2)).toFixed(1)}
+                    </span>
+                  )}
+                </div>
+
+                {/* Alergias */}
+                {paciente.alergias && (
+                  <div className="rounded-lg px-3 py-2" style={{ backgroundColor: '#EF5350' }}>
+                    <p className="text-[10px] font-semibold text-white/80 uppercase tracking-wide mb-0.5">⚠ Alergias</p>
+                    <p className="text-xs text-white font-medium">{paciente.alergias}</p>
+                  </div>
+                )}
+
+                {/* Último diagnóstico */}
+                {ultimaConsulta?.diagnosticos && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Último diagnóstico</p>
+                    <p className="text-xs text-slate-600 leading-relaxed">{ultimaConsulta.diagnosticos}</p>
+                  </div>
+                )}
+
+                {/* Último tratamiento */}
+                {ultimaConsulta?.medicamentos && ultimaConsulta.medicamentos.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Último tratamiento</p>
+                    <div className="space-y-0.5">
+                      {ultimaConsulta.medicamentos.slice(0, 4).map((m, i) => (
+                        <p key={i} className="text-xs text-slate-600">
+                          · {m.nombre} {m.dosis && <span className="text-slate-400">{m.dosis}</span>}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {!paciente.alergias && !ultimaConsulta?.diagnosticos && (
+                  <p className="text-xs text-slate-400 text-center py-2">Primera consulta del paciente</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── Panel de documentos ── */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
               <FileText size={14} className="text-slate-400" />
