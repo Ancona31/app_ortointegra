@@ -4,6 +4,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ToastProvider } from '@/components/ui/Toast'
 import CommandPalette from '@/components/CommandPalette'
 import PageTransition from '@/components/layout/PageTransition'
+import OnboardingGuide from '@/components/ui/OnboardingGuide'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -22,6 +23,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </main>
         </div>
         <CommandPalette />
+        <OnboardingGuide />
       </ThemeProvider>
     </ToastProvider>
   )
