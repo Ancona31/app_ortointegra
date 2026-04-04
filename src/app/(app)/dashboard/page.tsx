@@ -4,11 +4,13 @@ import { useState, useEffect } from 'react'
 import { useProfile } from '@/hooks/useProfile'
 import AsistenteDashboard from './AsistenteDashboard'
 import { DashboardSkeleton } from '@/components/ui/Skeleton'
-import { FileText, Stethoscope, Monitor, Search, ArrowRight, UserPlus, Pill, ClipboardList, CheckCircle2, Clock, CalendarDays, FolderOpen, User } from 'lucide-react'
+import { FileText, Stethoscope, Monitor, Search, ArrowRight, UserPlus, Pill, ClipboardList, CalendarDays, FolderOpen, User } from 'lucide-react'
 import Link from 'next/link'
-import { format, formatDistanceToNow, parseISO, isToday, isTomorrow } from 'date-fns'
+import { format, formatDistanceToNow, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
+import { formatCitaHora } from './utils'
+import { StatusChip } from './StatusChip'
 
 /* ─── Helpers ─────────────────────────────────────────────── */
 
@@ -17,27 +19,6 @@ function saludo() {
   if (h < 12) return 'Buenos días'
   if (h < 19) return 'Buenas tardes'
   return 'Buenas noches'
-}
-
-export function formatCitaHora(start_time: string) {
-  const date = parseISO(start_time)
-  const hora = format(date, 'HH:mm')
-  if (isToday(date))    return `Hoy · ${hora}`
-  if (isTomorrow(date)) return `Mañana · ${hora}`
-  return format(date, "EEE d MMM · HH:mm", { locale: es })
-}
-
-export function StatusChip({ status }: { status: string }) {
-  if (status === 'confirmed') return (
-    <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full whitespace-nowrap">
-      <CheckCircle2 size={10} /> Confirmada
-    </span>
-  )
-  return (
-    <span className="flex items-center gap-1 text-[10px] font-semibold text-[#1e5fa8] bg-blue-50 px-2 py-0.5 rounded-full whitespace-nowrap">
-      <Clock size={10} /> Agendada
-    </span>
-  )
 }
 
 /* ─── Tipos ───────────────────────────────────────────────── */

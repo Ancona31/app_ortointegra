@@ -9,7 +9,8 @@ import { Paciente } from '@/types'
 import { format, differenceInYears, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import CalendarWidget from '@/components/calendario/CalendarWidget'
-import { StatusChip, formatCitaHora } from './page'
+import { StatusChip } from './StatusChip'
+import { formatCitaHora } from './utils'
 
 type ProximaCita = {
   id: string
