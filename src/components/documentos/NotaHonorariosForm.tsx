@@ -42,8 +42,6 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
   const [tipoDoc, setTipoDoc]         = useState<TipoDoc>('honorarios')
   const [paciente, setPaciente]       = useState(pacienteInicial)
   const [fecha, setFecha]             = useState(new Date().toISOString().split('T')[0])
-  const [rfcMedico, setRfcMedico]     = useState('')
-  const [rfcPaciente, setRfcPaciente] = useState('')
   const [formaPago, setFormaPago]     = useState('Efectivo')
   const [folio]                       = useState(() => generarFolio('honorarios'))
   const [imprimiendo, setImprimiendo] = useState(false)
@@ -82,8 +80,6 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
         tipo: 'nota_honorarios',
         contenido: {
           paciente, fecha, folio: folioDisplay, tipo_doc: tipoDoc,
-          rfc_medico: rfcMedico,
-          rfc_paciente: rfcPaciente,
           lineas: lineasValidas,
           monto: total,
           divisa,
@@ -181,7 +177,6 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
         ${cedEsp  ? `Cédula Esp.: ${cedEsp}` : ''}
       </div>
       ${dir || tel ? `<div class="contacto">${[dir, tel ? `Tel: ${tel}` : ''].filter(Boolean).join(' &nbsp;·&nbsp; ')}</div>` : ''}
-      ${rfcMedico ? `<div class="contacto" style="margin-top:2px;font-weight:600;color:${cp}">RFC: ${rfcMedico.toUpperCase()}</div>` : ''}
     </div>
   </div>
 
@@ -199,11 +194,6 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
       <div class="campo-label">Paciente / Cliente</div>
       <div class="campo-valor ${paciente ? '' : 'vacio'}">${paciente || 'No especificado'}</div>
     </div>
-    ${rfcPaciente ? `
-    <div>
-      <div class="campo-label">RFC del paciente</div>
-      <div class="campo-valor">${rfcPaciente.toUpperCase()}</div>
-    </div>` : ''}
   </div>
 
   <table class="tabla-conceptos">
@@ -244,7 +234,6 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
       ${tipoDoc === 'cotizacion'
         ? 'Este documento es una cotización de servicios médicos y no representa un cobro definitivo.'
         : 'Este documento es una nota de honorarios médicos.'}<br/>
-      ${rfcMedico ? `Expedida por RFC <strong>${rfcMedico.toUpperCase()}</strong>.` : ''}
       No es un comprobante fiscal digital (CFDI).
     </div>
     <div class="firma">
@@ -304,21 +293,6 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
           <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">Folio</label>
             <input type="text" value={folioDisplay} readOnly className={inputCls + ' bg-slate-50 text-slate-400 cursor-not-allowed'} />
-          </div>
-        </div>
-      </div>
-
-      {/* Datos fiscales */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-        <h2 className="font-semibold text-slate-700 text-sm mb-4">Datos fiscales <span className="text-slate-400 font-normal">(opcionales)</span></h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">RFC del médico</label>
-            <input type="text" value={rfcMedico} onChange={e => setRfcMedico(e.target.value.toUpperCase())} placeholder="Ej: AABC800101ABC" maxLength={13} className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">RFC del paciente <span className="text-slate-400">(para deducción)</span></label>
-            <input type="text" value={rfcPaciente} onChange={e => setRfcPaciente(e.target.value.toUpperCase())} placeholder="Ej: XAXX010101000" maxLength={13} className={inputCls} />
           </div>
         </div>
       </div>

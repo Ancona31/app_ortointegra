@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { FileText, Pill, FlaskConical, ScanLine, ClipboardList, Search, User, X, BedDouble, PenLine, Loader2, ChevronRight, UserPlus } from 'lucide-react'
+import { FileText, Pill, FlaskConical, ScanLine, ClipboardList, Search, User, X, BedDouble, PenLine, Loader2, ChevronRight, UserPlus, ShieldCheck, Receipt } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import QuickPatientModal from '@/components/ui/QuickPatientModal'
@@ -20,6 +20,8 @@ const SolicitudImagenForm     = dynamic(() => import('@/components/documentos/So
 const PlanSuplementacionForm  = dynamic(() => import('@/components/documentos/PlanSuplementacionForm'),  { ssr: false, loading: FormLoader })
 const SolicitudInternamientoForm = dynamic(() => import('@/components/documentos/SolicitudInternamientoForm'), { ssr: false, loading: FormLoader })
 const EscritoMedicoForm       = dynamic(() => import('@/components/documentos/EscritoMedicoForm'),       { ssr: false, loading: FormLoader })
+const ConsentimientoForm      = dynamic(() => import('@/components/documentos/ConsentimientoInformadoForm'), { ssr: false, loading: FormLoader })
+const NotaHonorariosForm      = dynamic(() => import('@/components/documentos/NotaHonorariosForm'),      { ssr: false, loading: FormLoader })
 
 const TIPOS = [
   { key: 'receta',        label: 'Receta Médica',       sublabel: 'Prescripción farmacológica', icon: Pill,           bg: 'bg-blue-50',    icon_color: 'text-[#1e5fa8]' },
@@ -28,6 +30,8 @@ const TIPOS = [
   { key: 'suplementacion',label: 'Suplementación',       sublabel: 'Plan nutricional',           icon: ClipboardList,  bg: 'bg-amber-50',   icon_color: 'text-amber-600' },
   { key: 'internamiento',label: 'Internamiento',         sublabel: 'Solicitud hospitalaria',     icon: BedDouble,      bg: 'bg-rose-50',    icon_color: 'text-rose-600' },
   { key: 'escrito',      label: 'Escrito Médico',        sublabel: 'Carta o informe libre',      icon: PenLine,        bg: 'bg-teal-50',    icon_color: 'text-teal-600' },
+  { key: 'consentimiento', label: 'Consentimiento',     sublabel: 'Consentimiento informado',   icon: ShieldCheck,    bg: 'bg-indigo-50',  icon_color: 'text-indigo-600' },
+  { key: 'honorarios',  label: 'Honorarios',            sublabel: 'Cotización o nota de cobro',  icon: Receipt,        bg: 'bg-slate-50',   icon_color: 'text-slate-600' },
 ] as const
 
 type TipoDoc = typeof TIPOS[number]['key']
@@ -180,7 +184,7 @@ function DocumentosContent() {
               <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest mb-0.5">Paso 2</p>
               <h2 className="text-sm font-semibold text-[#1d1d1f]">Tipo de documento</h2>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 divide-x divide-y divide-slate-100">
+            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y divide-slate-100">
               {TIPOS.map(({ key, label, sublabel, icon: Icon, bg, icon_color }) => (
                 <button
                   key={key}
@@ -220,6 +224,18 @@ function DocumentosContent() {
           )}
           {tipo === 'escrito' && (
             <EscritoMedicoForm
+              pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}
+              pacienteId={pacienteSeleccionado.id}
+            />
+          )}
+          {tipo === 'consentimiento' && (
+            <ConsentimientoForm
+              pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}
+              pacienteId={pacienteSeleccionado.id}
+            />
+          )}
+          {tipo === 'honorarios' && (
+            <NotaHonorariosForm
               pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}
               pacienteId={pacienteSeleccionado.id}
             />
