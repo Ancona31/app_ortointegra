@@ -6,6 +6,8 @@ import type Stripe from 'stripe'
 
 export const runtime = 'nodejs'
 
+const PLANES_CLINICA: PlanKey[] = ['basica', 'pro', 'premium']
+
 async function actualizarClinica(
   admin: ReturnType<typeof createAdminClient>,
   clinicaId: string,
@@ -26,6 +28,15 @@ async function actualizarClinica(
     max_pacientes: limits.max_pacientes,
     suscripcion_ends_at: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
   }).eq('id', clinicaId)
+
+  // Planes de clínica: convertir cuenta a tipo='clinica' y promover al dueño a admin
+  if (PLANES_CLINICA.includes(plan)) {
+    await admin.from('clinicas').update({ tipo: 'clinica' }).eq('id', clinicaId)
+    await admin.from('profiles')
+      .update({ role: 'admin' })
+      .eq('clinica_id', clinicaId)
+      .eq('role', 'medico')
+  }
 }
 
 function getSubscriptionIdFromInvoice(invoice: Stripe.Invoice): string | null {
@@ -109,7 +120,7 @@ export async function POST(req: NextRequest) {
         stripe_price_id: null,
         max_medicos: 1,
         max_secretarias: 0,
-        max_pacientes: 15,
+        max_pacientes: 5,
         suscripcion_ends_at: subscription.items.data[0]?.current_period_end
           ? new Date(subscription.items.data[0].current_period_end * 1000).toISOString()
           : null,

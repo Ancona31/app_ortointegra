@@ -37,15 +37,20 @@ export async function POST(req: NextRequest) {
     const talla            = sanitizeNumber(body.talla)
     const sexo             = ['M', 'F'].includes(body.sexo) ? body.sexo as 'M' | 'F' : null
 
-    const prompt = `Eres un Médico Especialista en ${especialidad} actuando como asistente de documentación clínica. Tu objetivo es redactar notas médicas con el "Equilibrio Dorado": completas para fines legales/médicos, pero sin narrativa innecesaria.
+    const prompt = `Actúa como un Médico Especialista en ${especialidad}. Tu objetivo es redactar una nota médica profesional, precisa y estructurada con el "Equilibrio Dorado": completa para fines legales/médicos, sin narrativa innecesaria.
 
-Adapta TODA la nota al contexto clínico de la especialidad "${especialidad}": usa la terminología, las maniobras exploratorias, los estudios de gabinete y los esquemas terapéuticos propios de esa especialidad.
+Adapta TODA la nota al contexto clínico de "${especialidad}": usa la terminología técnica, las maniobras semiológicas, las escalas de valoración, los estudios de gabinete y los enfoques terapéuticos propios de esa especialidad. Por ejemplo:
+- Ortopedia/Columna → arcos de movilidad, escalas ASIA/Daniels, imagenología musculoesquelética
+- Cardiología → ruidos cardíacos, hemodinamia, FEVI, ECG, troponinas
+- Neurología → pares craneales, reflejos, escala de Glasgow/NIHSS, neuroimagen
+- Gastroenterología → peristaltismo, signos de irritación peritoneal, endoscopia, enzimas hepáticas
+- Y así para cada especialidad: prioriza lo que un experto en "${especialidad}" evaluaría y documentaría.
 
 REGLAS DE REDACCIÓN:
-1. LATERALIDAD: Identifica y resalta SIEMPRE la lateralidad en MAYÚSCULAS (DERECHO/IZQUIERDO) cuando aplique a la especialidad. Si no se menciona, indícalo como "lateralidad no especificada".
-2. ESTILO CLÍNICO: Usa frases completas pero directas. Evita "El paciente dice que...", prefiere "Refiere cuadro de [X] tiempo de evolución...".
-3. INTEGRACIÓN: No solo listes hallazgos; descríbelos brevemente (ej. en lugar de "Dolor", usa "Dolor de tipo punzante que exacerba con la deambulación").
-4. NO incluyas título, encabezado, nombre del paciente, fecha, médico tratante, cédula, ni ningún dato administrativo. Esos datos ya están en el documento impreso.
+1. ESTILO CLÍNICO: Frases directas en tercera persona. Evita "el paciente dice que"; prefiere "Refiere cuadro de [X] de [tiempo] de evolución".
+2. LATERALIDAD: Cuando aplique a la especialidad, indica lateralidad en MAYÚSCULAS (DERECHO/IZQUIERDO). Si no se menciona, escribe "lateralidad no especificada".
+3. INTEGRACIÓN: Describe hallazgos con contexto clínico breve, no los listes de forma aislada.
+4. NO incluyas título, encabezado, nombre del paciente, fecha, médico tratante, cédula ni ningún dato administrativo.
 5. NO agregues introducciones, cierres ni firmas. Inicia DIRECTAMENTE con [SUBJETIVO].
 
 DATOS CLÍNICOS DEL PACIENTE:
@@ -64,19 +69,20 @@ ${plan_tratamiento ? `- Plan: ${plan_tratamiento}` : ''}
 FORMATO DE SALIDA — usa exactamente estas 5 secciones, sin agregar nada más antes ni después:
 
 **[SUBJETIVO]:**
-Antecedentes del trauma o padecimiento actual, mecanismo de lesión y síntomas referidos con su cronología.
+Motivo de consulta y padecimiento actual con cronología. Síntomas referidos y antecedentes relevantes para la especialidad ${especialidad}.
 
 **[OBJETIVO]:**
-Exploración física detallada. Incluye arcos de movilidad, fuerza muscular (escala de Daniels), estado neurovascular distal y maniobras especiales de la especialidad.
+Exploración física detallada con las maniobras, escalas de valoración y hallazgos semiológicos propios de la especialidad ${especialidad}. Da formato a los signos vitales si se proporcionaron.
 
 **[AUXILIARES DIAGNÓSTICOS]:**
-Interpretación técnica de estudios de gabinete (Rx, RM, TAC) y laboratorios relevantes. Si no se proporcionaron estudios, escribe: "Estudios de gabinete y laboratorio pendientes."
+Interpretación técnica de los estudios de gabinete y laboratorio pertinentes para ${especialidad}. Si no se proporcionaron estudios, escribe: "Estudios de gabinete y laboratorio pendientes."
 
 **[ANÁLISIS]:**
-Diagnóstico clínico y radiológico preciso, incluyendo lateralidad en MAYÚSCULAS y clasificación si aplica.
+Diagnóstico clínico preciso con terminología de la especialidad ${especialidad}. Incluye diagnóstico diferencial si aplica, lateralidad en MAYÚSCULAS y clasificación o estadificación cuando corresponda.
 
 **[PLAN]:**
-PROHIBIDO mencionar medicamentos, fármacos, nombres comerciales, denominaciones genéricas, dosis, vía de administración, frecuencia ni duración de ningún tratamiento farmacológico. El médico los registra por separado en el apartado de Terapéutica Empleada. Incluye ÚNICAMENTE: indicaciones no farmacológicas (reposo, descarga de peso, inmovilización, uso de órtesis, terapia física, rehabilitación, cuidados locales, dieta, etc.) y cronograma de seguimiento o próxima valoración.`
+PROHIBIDO mencionar medicamentos, fármacos, nombres comerciales, denominaciones genéricas, dosis, vía de administración, frecuencia ni duración de ningún tratamiento farmacológico. El médico los registra por separado en el apartado de Terapéutica Empleada.
+Incluye ÚNICAMENTE: indicaciones no farmacológicas pertinentes para la especialidad ${especialidad} (rehabilitación, restricciones funcionales, dieta, procedimientos, interconsultas, vigilancia de signos de alarma, etc.) y cronograma de seguimiento o próxima valoración.`
 
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
     const response = await model.generateContent(prompt)

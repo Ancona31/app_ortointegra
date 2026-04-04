@@ -165,7 +165,7 @@ export default function PricingPage() {
 
                 <div className="flex gap-3 text-xs text-slate-500">
                   <span>{plan.max_medicos} médico{plan.max_medicos > 1 ? 's' : ''}</span>
-                  {plan.max_secretarias > 0 && <span>· {plan.max_secretarias} secretaria{plan.max_secretarias > 1 ? 's' : ''}</span>}
+                  {plan.max_secretarias > 0 && <span>· {plan.max_secretarias} asistente{plan.max_secretarias > 1 ? 's' : ''}</span>}
                 </div>
 
                 <ul className="space-y-2 flex-1">

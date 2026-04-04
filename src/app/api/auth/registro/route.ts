@@ -9,10 +9,15 @@ export async function POST(req: NextRequest) {
   const {
     email, password, nombre, nombreClinica,
     titulo, especialidad, cedula_profesional, cedula_especialidad,
+    tipo = 'independiente',
   } = await req.json()
 
   if (!email || !password || !nombre || !nombreClinica || !titulo || !especialidad || !cedula_profesional) {
     return NextResponse.json({ error: 'Faltan campos obligatorios' }, { status: 400 })
+  }
+
+  if (!['independiente', 'clinica'].includes(tipo)) {
+    return NextResponse.json({ error: 'Tipo de cuenta inválido' }, { status: 400 })
   }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -37,12 +42,13 @@ export async function POST(req: NextRequest) {
   const { data: clinica, error: clinicaError } = await admin
     .from('clinicas')
     .insert({
-      nombre: nombreClinica,
-      plan: 'free',
+      nombre:             nombreClinica,
+      tipo,
+      plan:               'free',
       suscripcion_estado: 'activo',
-      max_medicos: limits.max_medicos,
-      max_secretarias: limits.max_secretarias,
-      max_pacientes: limits.max_pacientes,
+      max_medicos:        limits.max_medicos,
+      max_secretarias:    limits.max_secretarias,
+      max_pacientes:      limits.max_pacientes,
     })
     .select('id')
     .single()
@@ -64,14 +70,18 @@ export async function POST(req: NextRequest) {
   }
 
   // 3. Crear perfil
+  // Independiente → role 'medico' (cuenta 1/1 en el límite, puede escalar)
+  // Clínica       → role 'admin'  (no ocupa slot de médico, gestiona el equipo)
+  const role = tipo === 'clinica' ? 'admin' : 'medico'
+
   await admin.from('profiles').upsert({
-    id: newUser.user.id,
-    role: 'admin',
+    id:                  newUser.user.id,
+    role,
     nombre,
-    clinica_id: clinica.id,
+    clinica_id:          clinica.id,
     titulo,
     especialidad,
-    cedula_profesional: cedula_profesional || null,
+    cedula_profesional:  cedula_profesional  || null,
     cedula_especialidad: cedula_especialidad || null,
   })
 

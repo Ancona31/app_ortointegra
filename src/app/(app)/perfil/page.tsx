@@ -3,8 +3,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useProfile } from '@/hooks/useProfile'
 import { useRouter } from 'next/navigation'
-import { Loader2, Save, UserCircle, Palette, Upload, X } from 'lucide-react'
+import { Loader2, Save, Palette, Upload, X } from 'lucide-react'
+import { PerfilSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
+import EspecialidadSelector from '@/components/ui/EspecialidadSelector'
 
 type FormData = {
   titulo: string
@@ -46,6 +48,7 @@ export default function PerfilPage() {
     titulo: '', especialidad: '', cedula_profesional: '',
     cedula_especialidad: '', direccion_consultorio: '', telefono_consultorio: '',
   })
+  const [especialidades, setEspecialidades] = useState<string[]>([''])
   const [apariencia, setApariencia] = useState<Apariencia>({
     color_primario: '#1a3a5c', color_secundario: '#1e5fa8', logo_url: null,
   })
@@ -69,9 +72,12 @@ export default function PerfilPage() {
       fetch('/api/me/clinica').then(r => r.json()),
     ]).then(([perfilData, clinicaData]) => {
       if (perfilData.medico) {
+        const espRaw = perfilData.medico.especialidad || ''
+        const espArray = espRaw ? espRaw.split(' · ').filter(Boolean) : ['']
+        setEspecialidades(espArray.length > 0 ? espArray : [''])
         setForm({
           titulo: perfilData.medico.titulo || 'Dr.',
-          especialidad: perfilData.medico.especialidad || '',
+          especialidad: espRaw,
           cedula_profesional: perfilData.medico.cedula_profesional || '',
           cedula_especialidad: perfilData.medico.cedula_especialidad || '',
           direccion_consultorio: perfilData.medico.direccion_consultorio || '',
@@ -109,7 +115,7 @@ export default function PerfilPage() {
     const r1 = await fetch('/api/me/perfil-medico', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, especialidad: especialidades.filter(Boolean).join(' · ') }),
     })
 
     if (isAdmin) {
@@ -149,11 +155,7 @@ export default function PerfilPage() {
     }
   }
 
-  if (loading || loadingProfile) return (
-    <div className="flex items-center justify-center h-64">
-      <Loader2 size={20} className="animate-spin text-slate-300" />
-    </div>
-  )
+  if (loading || loadingProfile) return <PerfilSkeleton />
 
   const logoMostrado = logoPreview || apariencia.logo_url
 
@@ -174,30 +176,27 @@ export default function PerfilPage() {
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <SectionHeader>Datos profesionales</SectionHeader>
           <div className="px-5 pb-5 space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Título</label>
-                <select value={form.titulo} onChange={e => setForm({ ...form, titulo: e.target.value })} className={inputClass}>
-                  <option value="Dr.">Dr.</option>
-                  <option value="Dra.">Dra.</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Especialidad</label>
-                <input type="text" value={form.especialidad} onChange={e => setForm({ ...form, especialidad: e.target.value })}
-                  placeholder="Ej: Cirugía de Columna" className={inputClass} />
-              </div>
+            <div>
+              <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Título</label>
+              <select value={form.titulo} onChange={e => setForm({ ...form, titulo: e.target.value })} className={inputClass}>
+                <option value="Dr.">Dr.</option>
+                <option value="Dra.">Dra.</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Especialidad</label>
+              <EspecialidadSelector value={especialidades} onChange={setEspecialidades} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Cédula profesional</label>
                 <input type="text" value={form.cedula_profesional} onChange={e => setForm({ ...form, cedula_profesional: e.target.value })}
-                  placeholder="Ej: 12085805" className={inputClass} />
+                  placeholder="Ej: 87654321" className={inputClass} />
               </div>
               <div>
                 <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Cédula de especialidad</label>
                 <input type="text" value={form.cedula_especialidad} onChange={e => setForm({ ...form, cedula_especialidad: e.target.value })}
-                  placeholder="Ej: CMOT 26/5567/25" className={inputClass} />
+                  placeholder="Ej: 3890214" className={inputClass} />
               </div>
             </div>
           </div>

@@ -8,6 +8,7 @@ import {
   LineChart, Line, PieChart, Pie, Cell,
 } from 'recharts'
 import { TrendingUp, Stethoscope, Pill, Users, RefreshCw, Loader2 } from 'lucide-react'
+import { ListSkeleton } from '@/components/ui/Skeleton'
 
 type Datos = {
   consultasPorMes: { mes: string; total: number }[]
@@ -70,11 +71,7 @@ export default function EstadisticasPage() {
 
   useEffect(() => { cargar() }, [])
 
-  if (loadingProfile || loading) return (
-    <div className="flex items-center justify-center h-64">
-      <Loader2 size={20} className="animate-spin text-slate-300" />
-    </div>
-  )
+  if (loadingProfile || loading) return <ListSkeleton rows={5} />
 
   if (!datos) return (
     <div className="text-center text-[#86868b] py-16 text-sm">Error cargando estadísticas.</div>

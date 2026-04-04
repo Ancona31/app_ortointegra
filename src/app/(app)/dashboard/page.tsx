@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useProfile } from '@/hooks/useProfile'
 import AsistenteDashboard from './AsistenteDashboard'
+import { DashboardSkeleton } from '@/components/ui/Skeleton'
 import { FileText, Stethoscope, Monitor, Search, ArrowRight, UserPlus, Pill, ClipboardList } from 'lucide-react'
 import Link from 'next/link'
 import { format, formatDistanceToNow, parseISO } from 'date-fns'
@@ -109,11 +110,7 @@ export default function DashboardPage() {
       })
   }, [profile, loadingProfile])
 
-  if (loadingProfile) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="w-5 h-5 rounded-full border-2 border-slate-200 border-t-slate-500 animate-spin" />
-    </div>
-  )
+  if (loadingProfile) return <DashboardSkeleton />
 
   if (profile?.role === 'secretaria') return <AsistenteDashboard />
 

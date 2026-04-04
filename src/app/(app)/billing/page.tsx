@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
 import { PLANS, formatPrecio, type PlanKey } from '@/lib/plans'
 import { CheckCircle, CreditCard, Loader2, ExternalLink, AlertTriangle, Zap, Users, UserCheck, FileText, ArrowUpRight } from 'lucide-react'
+import { BillingSkeleton } from '@/components/ui/Skeleton'
 import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -62,7 +63,7 @@ function BillingContent() {
         supabase.from('clinicas').select(
           'plan, suscripcion_estado, trial_ends_at, suscripcion_ends_at, stripe_customer_id, max_medicos, max_secretarias, max_pacientes'
         ).eq('id', profile!.clinica_id!).single(),
-        supabase.from('profiles').select('id', { count: 'exact' }).eq('clinica_id', profile!.clinica_id!).in('role', ['admin', 'medico']),
+        supabase.from('profiles').select('id', { count: 'exact' }).eq('clinica_id', profile!.clinica_id!).eq('role', 'medico'),
         supabase.from('profiles').select('id', { count: 'exact' }).eq('clinica_id', profile!.clinica_id!).eq('role', 'secretaria'),
         supabase.from('pacientes').select('id', { count: 'exact' }).eq('clinica_id', profile!.clinica_id!),
       ])
@@ -86,13 +87,7 @@ function BillingContent() {
     else alert(data.error || 'Error al abrir el portal')
   }
 
-  if (loading || loadingProfile) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 size={24} className="animate-spin text-slate-400" />
-      </div>
-    )
-  }
+  if (loading || loadingProfile) return <BillingSkeleton />
 
   if (!clinica) return null
 
@@ -202,7 +197,7 @@ function BillingContent() {
             />
             <UsageCard
               icon={<UserCheck size={18} className="text-emerald-600" />}
-              label="Secretarias"
+              label="Asistentes"
               usado={usage?.secretarias ?? 0}
               limite={clinica.max_secretarias}
             />

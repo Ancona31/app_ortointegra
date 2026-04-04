@@ -10,16 +10,42 @@
   --azul-suave: #e8f4fd;
 }
 
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Elimina tap delay en móvil — hace que los toques respondan de inmediato */
+* {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: #f1f5f9; }
 ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+/* ── Skeleton shimmer — más orgánico que animate-pulse ── */
+@keyframes shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 600px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 0.5rem;
+}
 
 /* ── Animations ── */
 @keyframes slideInRight {
@@ -43,44 +69,68 @@ body {
   animation: fadeIn 0.18s ease-out both;
 }
 
-/* macOS-style slide up — usado en dashboard */
+/* macOS-style slide up — curva Apple quintic-out */
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(14px); }
+  from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .animate-slide-up {
-  animation: slideUp 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+  animation: slideUp 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
+  will-change: transform, opacity;
 }
 
-/* iOS-style page transition — fade + bloom suave */
+/* iOS-style page transition — bloom + fade */
 @keyframes pageEnter {
-  from { opacity: 0; transform: scale(0.97) translateY(8px); }
+  from { opacity: 0; transform: scale(0.97) translateY(6px); }
   to   { opacity: 1; transform: scale(1)    translateY(0);   }
 }
 .animate-page-enter {
-  animation: pageEnter 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+  animation: pageEnter 0.24s cubic-bezier(0.32, 0.72, 0, 1) both;
+  will-change: transform, opacity;
 }
 
-/* iOS-style tab transition — fade lateral */
+/* iOS-style tab transition */
 @keyframes tabEnter {
-  from { opacity: 0; transform: translateX(10px); }
-  to   { opacity: 1; transform: translateX(0);    }
+  from { opacity: 0; transform: translateX(8px); }
+  to   { opacity: 1; transform: translateX(0);   }
 }
 .animate-tab-enter {
-  animation: tabEnter 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+  animation: tabEnter 0.2s cubic-bezier(0.32, 0.72, 0, 1) both;
+  will-change: transform, opacity;
 }
 
-/* ── FullCalendar custom styles ── */
+/* Modal scale-in — escala desde el centro, curva Apple */
+@keyframes modalEnter {
+  from { opacity: 0; transform: scale(0.94) translateY(8px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);   }
+}
+.animate-modal-enter {
+  animation: modalEnter 0.22s cubic-bezier(0.32, 0.72, 0, 1) both;
+  will-change: transform, opacity;
+}
+
+/* Alias — algunos modales usan slide-up */
+.animate-slide-up-modal {
+  animation: modalEnter 0.22s cubic-bezier(0.32, 0.72, 0, 1) both;
+  will-change: transform, opacity;
+}
+
+/* ── FullCalendar — Google Calendar look ── */
 .fc {
   font-family: system-ui, -apple-system, sans-serif;
   font-size: 13px;
+  --fc-border-color: #f1f5f9;
+  --fc-today-bg-color: #eff6ff;
+  --fc-highlight-color: #dbeafe;
+  --fc-event-border-color: transparent;
+  --fc-page-bg-color: #ffffff;
 }
 
 /* Toolbar */
 .fc .fc-toolbar {
   padding: 12px 16px;
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
+  border-bottom: 1px solid #f1f5f9;
   margin-bottom: 0 !important;
   flex-wrap: wrap;
   gap: 8px;
@@ -102,10 +152,10 @@ body {
   padding: 5px 12px !important;
   border-radius: 8px !important;
   box-shadow: none !important;
-  transition: all 0.15s !important;
+  transition: all 0.15s ease !important;
 }
 .fc .fc-button:hover {
-  background: #f1f5f9 !important;
+  background: #f8fafc !important;
   color: #1a3a5c !important;
   border-color: #cbd5e1 !important;
 }
@@ -127,77 +177,114 @@ body {
 
 /* Cabecera de días */
 .fc .fc-col-header-cell {
-  background: #f8fafc;
+  background: #ffffff;
   padding: 8px 4px;
+  border-bottom: 1px solid #f1f5f9 !important;
 }
 .fc .fc-col-header-cell-cushion {
-  color: #64748b;
+  color: #94a3b8;
   font-weight: 600;
-  font-size: 12px;
+  font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   text-decoration: none !important;
 }
 
-/* Día actual */
-.fc .fc-day-today {
-  background: #eff6ff !important;
-}
-.fc .fc-daygrid-day-number.fc-day-today,
-.fc .fc-day-today .fc-daygrid-day-number {
+/* Día actual — fondo azul claro distintivo */
+.fc .fc-day-today { background: #e8f2ff !important; }
+
+/* Vista mes — círculo en el número */
+.fc-daygrid .fc-day-today .fc-daygrid-day-number {
   background: #1e5fa8;
-  color: white;
+  color: white !important;
   border-radius: 50%;
   width: 26px;
   height: 26px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 .fc .fc-daygrid-day-number {
-  color: #475569;
+  color: #64748b;
   font-size: 12px;
   font-weight: 500;
   text-decoration: none !important;
   padding: 4px 6px;
 }
 
-/* Eventos */
-.fc .fc-event {
-  border: none !important;
-  border-radius: 6px !important;
-  padding: 2px 6px !important;
-  font-size: 12px !important;
-  font-weight: 500 !important;
-  cursor: default !important;
+/* Vista semana/día — rectángulo azul completo en el header del día actual */
+.fc-timegrid .fc-col-header-cell.fc-day-today {
+  background: #1e5fa8 !important;
+  border-radius: 0;
 }
-.fc .fc-event-title {
-  font-weight: 500;
-}
-.fc .fc-daygrid-event {
-  border-radius: 6px !important;
-}
-.fc .fc-timegrid-event {
-  border-radius: 6px !important;
-  border-left: 3px solid rgba(255,255,255,0.4) !important;
+.fc-timegrid .fc-col-header-cell.fc-day-today .fc-col-header-cell-cushion {
+  color: white !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  display: block !important;
 }
 
-/* Línea de hora actual */
+/* Bordes de grilla — ultra suaves */
+.fc .fc-scrollgrid { border-color: #f1f5f9 !important; }
+.fc td, .fc th    { border-color: #f1f5f9 !important; }
+.fc .fc-timegrid-slot-minor { border-style: dashed !important; border-color: #f8fafc !important; }
+
+/* Etiquetas de hora */
+.fc .fc-timegrid-slot-label-cushion {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 500;
+  padding-right: 8px;
+}
+
+/* Eventos — contenedor transparente, todo lo visual va en eventContent */
+.fc .fc-event {
+  background:    transparent !important;
+  border:        none !important;
+  border-radius: 6px !important;
+  padding:       0 !important;
+  box-shadow:    none !important;
+  cursor:        pointer !important;
+  transition:    transform 0.15s ease, filter 0.15s ease !important;
+}
+.fc .fc-event:hover {
+  transform: scale(1.02) !important;
+  filter:    drop-shadow(0 4px 8px rgba(0,0,0,0.12)) !important;
+  z-index:   10 !important;
+}
+.fc .fc-event .fc-event-main { padding: 0; }
+.fc .fc-daygrid-event        { border-radius: 6px !important; }
+.fc .fc-timegrid-event       { border-radius: 6px !important; margin: 0 1px !important; }
+
+/* Now-indicator — línea fina roja con punto */
 .fc .fc-timegrid-now-indicator-line {
-  border-color: #ef4444;
-  border-width: 2px;
+  border-color: #ef4444 !important;
+  border-width: 1.5px !important;
 }
 .fc .fc-timegrid-now-indicator-arrow {
-  border-color: #ef4444;
+  border: none !important;
+  width: 10px;
+  height: 10px;
+  background: #ef4444;
+  border-radius: 50%;
+  margin-top: -5px;
+  margin-left: -5px;
 }
 
-/* Bordes de la grilla */
-.fc .fc-scrollgrid {
-  border-radius: 0;
-  border-color: #e2e8f0 !important;
-}
-.fc td, .fc th {
-  border-color: #e2e8f0 !important;
+/* Selección de slot */
+.fc .fc-highlight { background: #dbeafe !important; border-radius: 6px; }
+
+/* Horas fuera del horario de consulta — patrón diagonal "no disponible" */
+.fc .fc-non-business {
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(148, 163, 184, 0.07),
+    rgba(148, 163, 184, 0.07) 3px,
+    transparent 3px,
+    transparent 10px
+  ) !important;
 }
 
 /* Más eventos */

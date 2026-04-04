@@ -75,10 +75,7 @@ function navDoctor(isAdmin: boolean, isSuperAdmin: boolean): NavSection[] {
         { kind: 'leaf', href: '/suplementacion', label: 'Suplementación', icon: Pill },
       ],
     },
-    {
-      kind: 'leaf', href: '/agenda', label: 'Agenda', icon: CalendarDays,
-      badge: 'En construcción', disabled: true,
-    },
+    { kind: 'leaf', href: '/agenda', label: 'Agenda', icon: CalendarDays },
     {
       kind: 'group', key: 'documentos', label: 'Documentos', icon: FileText,
       matchPaths: ['/documentos'],
@@ -97,7 +94,7 @@ function navDoctor(isAdmin: boolean, isSuperAdmin: boolean): NavSection[] {
 
 function navSecretaria(): NavSection[] {
   return [
-    { kind: 'leaf', href: '/dashboard', label: 'Inicio', icon: Home },
+    { kind: 'leaf', href: '/dashboard', label: 'Inicio',  icon: Home },
     {
       kind: 'group', key: 'pacientes', label: 'Pacientes', icon: Stethoscope,
       matchPaths: ['/expediente', '/pacientes'],
@@ -106,6 +103,7 @@ function navSecretaria(): NavSection[] {
         { kind: 'leaf', href: '/expediente',      label: 'Expediente',     icon: Stethoscope },
       ],
     },
+    { kind: 'leaf', href: '/agenda', label: 'Agenda', icon: CalendarDays },
     { kind: 'divider' },
     { kind: 'leaf', href: '/perfil', label: 'Mi perfil', icon: UserCircle },
   ]

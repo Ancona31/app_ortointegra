@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Users, Plus, Search, ChevronRight } from 'lucide-react'
+import { PatientRowSkeleton } from '@/components/ui/Skeleton'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { differenceInYears, parseISO } from 'date-fns'
@@ -103,7 +104,9 @@ export default function PacientesPage() {
       {/* Lista */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
         {loading ? (
-          <div className="p-8 text-center text-slate-400">Cargando...</div>
+          <div className="divide-y divide-slate-100">
+            {Array.from({ length: 8 }).map((_, i) => <PatientRowSkeleton key={i} />)}
+          </div>
         ) : pacientes.length === 0 ? (
           <div className="p-8 text-center">
             <Users size={40} className="mx-auto text-slate-300 mb-3" />

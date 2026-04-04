@@ -18,7 +18,7 @@ export async function GET() {
     .from('profiles')
     .select('id, nombre, titulo, especialidad')
     .eq('clinica_id', profile.clinica_id)
-    .eq('role', 'medico')
+    .in('role', ['medico', 'admin'])
     .order('nombre')
 
   return NextResponse.json({ medicos: medicos || [] })

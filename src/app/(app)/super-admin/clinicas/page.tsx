@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Building2, Plus, Pencil, Check, X, Loader2, Palette, Upload, ImageIcon, UserCircle, Stethoscope, Trash2, AlertTriangle } from 'lucide-react'
+import { Building2, Plus, Pencil, Check, X, Loader2, Palette, Upload, ImageIcon, UserCircle, Stethoscope, Trash2, AlertTriangle, PauseCircle, PlayCircle, ChevronDown, ChevronUp, ShieldOff } from 'lucide-react'
 import { useProfile } from '@/hooks/useProfile'
 import { useRouter } from 'next/navigation'
+
+type UsuarioClinica = { id: string; nombre: string; role: string; email: string | null }
 
 type Clinica = {
   id: string
@@ -18,7 +20,9 @@ type Clinica = {
   max_secretarias: number | null
   count_medicos: number
   count_secretarias: number
+  suspendida: boolean
   admin: { id: string; nombre: string; email: string | null } | null
+  usuarios: UsuarioClinica[]
 }
 
 export default function SuperAdminClinicasPage() {
@@ -27,7 +31,10 @@ export default function SuperAdminClinicasPage() {
   const [clinicas, setClinicas] = useState<Clinica[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Modal nueva clínica
+  // Modal nueva cuenta — paso 1: selector de tipo
+  const [showSelector, setShowSelector]       = useState(false)
+
+  // Modal nueva clínica — paso 2a
   const [showFormClinica, setShowFormClinica] = useState(false)
   const [formClinica, setFormClinica] = useState({ nombre: '', max_medicos: '', max_secretarias: '', adminNombre: '', adminEmail: '', adminPassword: '' })
 
@@ -37,7 +44,7 @@ export default function SuperAdminClinicasPage() {
   const [guardandoAdmin, setGuardandoAdmin] = useState(false)
   const [errorAdmin, setErrorAdmin] = useState('')
 
-  // Modal nuevo usuario independiente
+  // Modal nuevo usuario independiente — paso 2b
   const [showFormIndep, setShowFormIndep] = useState(false)
   const [formIndep, setFormIndep] = useState({
     nombre: '', email: '', password: '', titulo: 'Dr.', especialidad: '', cedula_profesional: '',
@@ -50,6 +57,21 @@ export default function SuperAdminClinicasPage() {
   const [confirmDeleteIndep, setConfirmDeleteIndep] = useState<Clinica | null>(null)
   const [eliminando, setEliminando] = useState(false)
   const [errorEliminar, setErrorEliminar] = useState('')
+
+  // Modal eliminar usuario de clínica
+  const [confirmDeleteUser, setConfirmDeleteUser] = useState<{ user: UsuarioClinica; clinicaNombre: string } | null>(null)
+  const [eliminandoUser, setEliminandoUser] = useState(false)
+  const [errorEliminarUser, setErrorEliminarUser] = useState('')
+
+  // Modal suspender / reactivar clínica
+  const [confirmSuspender, setConfirmSuspender] = useState<Clinica | null>(null)
+  const [suspendiendo, setSuspendiendo] = useState(false)
+
+  // Modal upgrade cuenta independiente → clínica
+  const [modalUpgrade, setModalUpgrade] = useState<Clinica | null>(null)
+  const [upgradeForm, setUpgradeForm]   = useState({ max_medicos: '3', max_secretarias: '1' })
+  const [upgradando,  setUpgradando]    = useState(false)
+  const [errorUpgrade, setErrorUpgrade] = useState('')
 
   // Edición de límites inline
   const [editandoLimites, setEditandoLimites] = useState<string | null>(null)
@@ -236,6 +258,56 @@ export default function SuperAdminClinicasPage() {
     cargarClinicas()
   }
 
+  async function eliminarUsuarioClinica() {
+    if (!confirmDeleteUser) return
+    setEliminandoUser(true)
+    setErrorEliminarUser('')
+    const res = await fetch('/api/super-admin/clinicas/usuarios', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: confirmDeleteUser.user.id }),
+    })
+    const data = await res.json()
+    setEliminandoUser(false)
+    if (!res.ok) { setErrorEliminarUser(data.error || 'Error al eliminar'); return }
+    setConfirmDeleteUser(null)
+    cargarClinicas()
+  }
+
+  async function ejecutarUpgrade() {
+    if (!modalUpgrade) return
+    setUpgradando(true)
+    setErrorUpgrade('')
+    const res = await fetch('/api/super-admin/clinicas/upgrade', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clinicaId:       modalUpgrade.id,
+        max_medicos:     parseInt(upgradeForm.max_medicos)     || 3,
+        max_secretarias: parseInt(upgradeForm.max_secretarias) || 1,
+        max_pacientes:   null,
+      }),
+    })
+    const data = await res.json()
+    setUpgradando(false)
+    if (!res.ok) { setErrorUpgrade(data.error || 'Error al actualizar'); return }
+    setModalUpgrade(null)
+    cargarClinicas()
+  }
+
+  async function toggleSuspender() {
+    if (!confirmSuspender) return
+    setSuspendiendo(true)
+    await fetch('/api/super-admin/clinicas', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: confirmSuspender.id, suspendida: !confirmSuspender.suspendida }),
+    })
+    setSuspendiendo(false)
+    setConfirmSuspender(null)
+    cargarClinicas()
+  }
+
   if (loadingProfile || loading) return <div className="text-center py-12 text-slate-400">Cargando...</div>
 
   const listaClinicas = clinicas.filter(c => c.tipo !== 'independiente')
@@ -243,6 +315,49 @@ export default function SuperAdminClinicasPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-5 animate-slide-up">
+
+      {/* ── Modal selector de tipo de cuenta ── */}
+      {showSelector && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <h2 className="text-base font-semibold text-[#1d1d1f]">Nueva cuenta</h2>
+              <button onClick={() => setShowSelector(false)} className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-[#86868b] transition-colors">
+                <X size={14} />
+              </button>
+            </div>
+            <div className="px-5 py-5 space-y-3">
+              <p className="text-xs text-[#86868b]">Elige el punto de partida — cualquier cuenta puede escalar después</p>
+              {/* Opción: Clínica */}
+              <button
+                onClick={() => { setShowSelector(false); setShowFormClinica(true); setError('') }}
+                className="w-full flex items-start gap-4 p-4 rounded-xl border-2 border-slate-200 hover:border-[#1e5fa8] hover:bg-blue-50 transition-all text-left group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-blue-50 group-hover:bg-blue-100 flex items-center justify-center shrink-0 transition-colors">
+                  <Building2 size={20} className="text-[#1e5fa8]" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-[#1d1d1f]">Cuenta de clínica</p>
+                  <p className="text-xs text-[#86868b] mt-0.5">Equipo médico con múltiples doctores y asistentes. Requiere administrador.</p>
+                </div>
+              </button>
+              {/* Opción: Cuenta básica */}
+              <button
+                onClick={() => { setShowSelector(false); setShowFormIndep(true); setError('') }}
+                className="w-full flex items-start gap-4 p-4 rounded-xl border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all text-left group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 group-hover:bg-emerald-100 flex items-center justify-center shrink-0 transition-colors">
+                  <UserCircle size={20} className="text-emerald-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-[#1d1d1f]">Cuenta básica</p>
+                  <p className="text-xs text-[#86868b] mt-0.5">Un solo médico, configuración rápida. Puede escalar a clínica en cualquier momento.</p>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal nueva clínica ── */}
       {showFormClinica && (
@@ -273,20 +388,20 @@ export default function SuperAdminClinicasPage() {
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
                 </div>
               </div>
-              {/* Sección admin */}
+              {/* Sección admin — requerida */}
               <div className="border-t border-slate-100 pt-3">
-                <p className="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-1.5">
-                  Administrador de clínica
-                  <span className="font-normal text-slate-400">(opcional — máx. 1 por clínica)</span>
+                <p className="text-xs font-semibold text-[#1e5fa8] mb-2 flex items-center gap-1.5">
+                  Administrador <span className="text-red-400">*</span>
+                  <span className="font-normal text-slate-400 ml-0.5">— también tiene acceso médico</span>
                 </p>
                 <div className="space-y-2">
-                  <input type="text" placeholder="Nombre del admin"
+                  <input type="text" placeholder="Nombre completo" required
                     value={formClinica.adminNombre} onChange={e => setFormClinica({ ...formClinica, adminNombre: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
-                  <input type="email" placeholder="Email"
+                  <input type="email" placeholder="Correo electrónico" required
                     value={formClinica.adminEmail} onChange={e => setFormClinica({ ...formClinica, adminEmail: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
-                  <input type="password" placeholder="Contraseña (mín. 8 caracteres)"
+                  <input type="password" placeholder="Contraseña (mín. 8 caracteres)" required minLength={8}
                     value={formClinica.adminPassword} onChange={e => setFormClinica({ ...formClinica, adminPassword: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
                 </div>
@@ -586,6 +701,129 @@ export default function SuperAdminClinicasPage() {
         </div>
       )}
 
+      {/* ── Modal eliminar usuario de clínica ── */}
+      {confirmDeleteUser && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden animate-slide-up">
+            <div className="px-6 pt-6 pb-4 text-center">
+              <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center bg-red-50">
+                <Trash2 size={20} className="text-red-500" />
+              </div>
+              <h2 className="text-base font-semibold text-[#1d1d1f]">Eliminar usuario</h2>
+              <p className="text-sm text-[#86868b] mt-1 font-medium">{confirmDeleteUser.user.nombre}</p>
+              <p className="text-xs text-[#86868b] mt-0.5">{confirmDeleteUser.clinicaNombre}</p>
+              <p className="text-[13px] text-[#3d3d3f] mt-3 leading-relaxed">
+                Se eliminará su acceso permanentemente. Sus registros clínicos (notas, expedientes) <span className="font-semibold">no se borran</span> para preservar la trazabilidad.
+              </p>
+              {errorEliminarUser && <p className="text-xs mt-2 text-red-500">{errorEliminarUser}</p>}
+            </div>
+            <div className="border-t border-slate-100 grid grid-cols-2">
+              <button onClick={() => { setConfirmDeleteUser(null); setErrorEliminarUser('') }} disabled={eliminandoUser}
+                className="px-4 py-3.5 text-sm font-medium text-[#1e5fa8] hover:bg-slate-50 transition-colors disabled:opacity-40 border-r border-slate-100">
+                Cancelar
+              </button>
+              <button onClick={eliminarUsuarioClinica} disabled={eliminandoUser}
+                className="px-4 py-3.5 text-sm font-semibold text-red-500 hover:bg-red-50 flex items-center justify-center gap-1.5 disabled:opacity-40 transition-colors">
+                {eliminandoUser ? <><Loader2 size={13} className="animate-spin" /> Eliminando...</> : 'Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal suspender / reactivar clínica ── */}
+      {confirmSuspender && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden animate-slide-up">
+            <div className="px-6 pt-6 pb-4 text-center">
+              <div className={`w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center ${confirmSuspender.suspendida ? 'bg-emerald-50' : 'bg-amber-50'}`}>
+                {confirmSuspender.suspendida
+                  ? <PlayCircle size={22} className="text-emerald-500" />
+                  : <PauseCircle size={22} className="text-amber-500" />
+                }
+              </div>
+              <h2 className="text-base font-semibold text-[#1d1d1f]">
+                {confirmSuspender.suspendida ? 'Reactivar clínica' : 'Suspender clínica'}
+              </h2>
+              <p className="text-sm text-[#86868b] mt-1 font-medium">{confirmSuspender.nombre_display || confirmSuspender.nombre}</p>
+              <p className="text-[13px] text-[#3d3d3f] mt-3 leading-relaxed">
+                {confirmSuspender.suspendida
+                  ? 'La clínica volverá a estar activa. Sus datos permanecen intactos.'
+                  : 'Los datos se conservan íntegramente. Esta acción es reversible en cualquier momento.'
+                }
+              </p>
+            </div>
+            <div className="border-t border-slate-100 grid grid-cols-2">
+              <button onClick={() => setConfirmSuspender(null)} disabled={suspendiendo}
+                className="px-4 py-3.5 text-sm font-medium text-[#1e5fa8] hover:bg-slate-50 transition-colors disabled:opacity-40 border-r border-slate-100">
+                Cancelar
+              </button>
+              <button onClick={toggleSuspender} disabled={suspendiendo}
+                className={`px-4 py-3.5 text-sm font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40 transition-colors ${confirmSuspender.suspendida ? 'text-emerald-600 hover:bg-emerald-50' : 'text-amber-600 hover:bg-amber-50'}`}>
+                {suspendiendo
+                  ? <><Loader2 size={13} className="animate-spin" /> Procesando...</>
+                  : confirmSuspender.suspendida ? 'Reactivar' : 'Suspender'
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal upgrade: básica → clínica ── */}
+      {modalUpgrade && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
+                  <Building2 size={15} className="text-[#1e5fa8]" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-semibold text-[#1d1d1f]">Escalar a clínica</h2>
+                  <p className="text-[11px] text-[#86868b]">{modalUpgrade.nombre_display || modalUpgrade.nombre}</p>
+                </div>
+              </div>
+              <button onClick={() => { setModalUpgrade(null); setErrorUpgrade('') }}
+                className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-[#86868b] transition-colors">
+                <X size={14} />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-xs text-[#86868b] leading-relaxed">
+                El médico pasará a ser <strong>administrador</strong> de la clínica. Sus pacientes y expedientes se conservan intactos.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-500 block mb-1">Máx. médicos</label>
+                  <input type="number" min="1" value={upgradeForm.max_medicos}
+                    onChange={e => setUpgradeForm(f => ({ ...f, max_medicos: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500 block mb-1">Máx. asistentes</label>
+                  <input type="number" min="0" value={upgradeForm.max_secretarias}
+                    onChange={e => setUpgradeForm(f => ({ ...f, max_secretarias: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                </div>
+              </div>
+              <p className="text-[11px] text-[#86868b]">El límite de pacientes pasa a ser ilimitado automáticamente.</p>
+              {errorUpgrade && <p className="text-xs text-red-500">{errorUpgrade}</p>}
+            </div>
+            <div className="px-5 py-3 border-t border-slate-100 flex gap-3">
+              <button onClick={() => { setModalUpgrade(null); setErrorUpgrade('') }}
+                className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                Cancelar
+              </button>
+              <button onClick={ejecutarUpgrade} disabled={upgradando}
+                className="flex-1 py-2.5 bg-[#1e5fa8] text-white rounded-xl text-sm font-semibold hover:bg-[#1a3a5c] disabled:opacity-60 flex items-center justify-center gap-2 transition-colors">
+                {upgradando ? <><Loader2 size={14} className="animate-spin" /> Escalando...</> : 'Confirmar upgrade'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Sección: Clínicas ── */}
       <div>
         <div className="flex items-end justify-between mb-4">
@@ -595,10 +833,10 @@ export default function SuperAdminClinicasPage() {
             <p className="text-sm text-[#86868b] mt-0.5">Cuentas multi-usuario con equipo médico</p>
           </div>
           <button
-            onClick={() => { setShowFormClinica(true); setError('') }}
+            onClick={() => setShowSelector(true)}
             className="flex items-center gap-2 px-4 py-2.5 bg-[#1e5fa8] text-white rounded-lg text-sm font-medium hover:bg-[#1a3a5c] transition-colors"
           >
-            <Plus size={16} /> Nueva clínica
+            <Plus size={16} /> Nueva cuenta
           </button>
         </div>
 
@@ -617,6 +855,9 @@ export default function SuperAdminClinicasPage() {
               onChangeLimites={(field, val) => setEditLimitesForm(prev => ({ ...prev, [c.id]: { ...prev[c.id], [field]: val } }))}
               onPersonalizar={() => abrirPersonalizacion(c)}
               onAsignarAdmin={!c.admin ? () => { setModalAdmin(c); setFormAdmin({ nombre: '', email: '', password: '' }); setErrorAdmin('') } : undefined}
+              onSuspender={() => setConfirmSuspender(c)}
+              onEliminarUsuario={(user) => setConfirmDeleteUser({ user, clinicaNombre: c.nombre_display || c.nombre })}
+              onUpgrade={undefined}
             />
           ))}
           {listaClinicas.length === 0 && (
@@ -635,10 +876,10 @@ export default function SuperAdminClinicasPage() {
             <p className="text-slate-500 text-sm mt-0.5">Médicos en práctica individual sin equipo</p>
           </div>
           <button
-            onClick={() => { setShowFormIndep(true); setError('') }}
+            onClick={() => setShowSelector(true)}
             className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
           >
-            <Plus size={16} /> Nuevo usuario
+            <Plus size={16} /> Nueva cuenta
           </button>
         </div>
 
@@ -654,6 +895,9 @@ export default function SuperAdminClinicasPage() {
               onChangeLimites={() => {}}
               onPersonalizar={() => abrirPersonalizacion(c)}
               onEliminar={() => { setConfirmDeleteIndep(c); setErrorEliminar('') }}
+              onSuspender={() => {}}
+              onEliminarUsuario={() => {}}
+              onUpgrade={() => { setModalUpgrade(c); setUpgradeForm({ max_medicos: '3', max_secretarias: '1' }); setErrorUpgrade('') }}
             />
           ))}
           {listaIndep.length === 0 && (
@@ -666,9 +910,16 @@ export default function SuperAdminClinicasPage() {
 }
 
 // ── Componente tarjeta reutilizable ──────────────────────────────────────────
+const ROLE_LABEL: Record<string, string> = {
+  admin:      'Admin',
+  medico:     'Médico',
+  secretaria: 'Asistente',
+}
+
 function TarjetaCuenta({
   c, editandoLimites, editLimitesForm, guardando,
-  onEditar, onCancelarEditar, onGuardarLimites, onChangeLimites, onPersonalizar, onEliminar, onAsignarAdmin,
+  onEditar, onCancelarEditar, onGuardarLimites, onChangeLimites,
+  onPersonalizar, onEliminar, onAsignarAdmin, onSuspender, onEliminarUsuario, onUpgrade,
 }: {
   c: Clinica
   editandoLimites: string | null
@@ -681,21 +932,49 @@ function TarjetaCuenta({
   onPersonalizar: () => void
   onEliminar?: () => void
   onAsignarAdmin?: () => void
+  onSuspender: () => void
+  onEliminarUsuario: (user: UsuarioClinica) => void
+  onUpgrade?: () => void
 }) {
   const esIndep = c.tipo === 'independiente'
+  const [expandUsuarios, setExpandUsuarios] = useState(false)
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div className={`bg-white rounded-xl border shadow-sm overflow-hidden transition-colors ${c.suspendida ? 'border-amber-200' : 'border-slate-200'}`}>
+      {/* Banner de suspensión */}
+      {c.suspendida && (
+        <div className="flex items-center gap-2 px-5 py-2 bg-amber-50 border-b border-amber-100">
+          <ShieldOff size={13} className="text-amber-500 shrink-0" />
+          <p className="text-xs font-semibold text-amber-700">Clínica suspendida — los datos están intactos</p>
+        </div>
+      )}
+
+      {/* Banner sin administrador — clínicas multi-usuario */}
+      {!esIndep && !c.admin && (
+        <div className="flex items-center justify-between gap-3 px-5 py-2.5 bg-red-50 border-b border-red-100">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={13} className="text-red-500 shrink-0" />
+            <p className="text-xs font-semibold text-red-700">Sin administrador asignado</p>
+          </div>
+          {onAsignarAdmin && (
+            <button onClick={onAsignarAdmin}
+              className="text-xs font-semibold text-white bg-red-500 hover:bg-red-600 px-3 py-1 rounded-lg transition-colors shrink-0">
+              + Asignar ahora
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="px-5 py-4">
         {/* Encabezado */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-3">
             {c.logo_url ? (
-              <div className="w-10 h-10 rounded-full bg-slate-100 overflow-hidden flex items-center justify-center border border-slate-200">
+              <div className={`w-10 h-10 rounded-full bg-slate-100 overflow-hidden flex items-center justify-center border border-slate-200 ${c.suspendida ? 'opacity-50 grayscale' : ''}`}>
                 <img src={c.logo_url} alt="Logo" className="w-full h-full object-contain" />
               </div>
             ) : (
-              <div className="w-10 h-10 rounded-full flex items-center justify-center"
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${c.suspendida ? 'opacity-50 grayscale' : ''}`}
                 style={{ backgroundColor: c.color_primario ?? '#1a3a5c' }}>
                 {esIndep
                   ? <Stethoscope size={18} className="text-white" />
@@ -704,8 +983,10 @@ function TarjetaCuenta({
               </div>
             )}
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="font-semibold text-slate-800">{c.nombre_display || c.nombre}</h2>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className={`font-semibold ${c.suspendida ? 'text-slate-400' : 'text-slate-800'}`}>
+                  {c.nombre_display || c.nombre}
+                </h2>
                 {esIndep && (
                   <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
                     Independiente
@@ -715,12 +996,26 @@ function TarjetaCuenta({
               {c.subtitulo && <p className="text-xs text-slate-400">{c.subtitulo}</p>}
             </div>
           </div>
-          <div className="flex gap-1">
+
+          {/* Acciones */}
+          <div className="flex gap-1 shrink-0">
             <button onClick={onPersonalizar}
               className="text-slate-400 hover:text-violet-600 p-1.5 hover:bg-violet-50 rounded-lg transition-colors"
               title="Personalizar">
               <Palette size={15} />
             </button>
+            {/* Suspender / Reactivar — solo clínicas */}
+            {!esIndep && (
+              <button onClick={onSuspender}
+                className={`p-1.5 rounded-lg transition-colors ${c.suspendida
+                  ? 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'
+                  : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50'
+                }`}
+                title={c.suspendida ? 'Reactivar clínica' : 'Suspender clínica'}>
+                {c.suspendida ? <PlayCircle size={15} /> : <PauseCircle size={15} />}
+              </button>
+            )}
+            {/* Eliminar — solo independientes */}
             {esIndep && onEliminar && (
               <button onClick={onEliminar}
                 className="text-slate-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg transition-colors"
@@ -728,6 +1023,7 @@ function TarjetaCuenta({
                 <Trash2 size={15} />
               </button>
             )}
+            {/* Editar límites — solo clínicas */}
             {!esIndep && (
               editandoLimites !== c.id ? (
                 <button onClick={onEditar}
@@ -758,7 +1054,36 @@ function TarjetaCuenta({
           <span className="text-xs text-slate-400">{c.color_primario ?? '#1a3a5c'} · {c.color_secundario ?? '#1e5fa8'}</span>
         </div>
 
-        {/* Contadores — solo para clínicas */}
+        {/* Cuenta básica — datos del médico + botón upgrade */}
+        {esIndep && c.admin && (
+          <div className="space-y-2 mb-3">
+            <div className="bg-emerald-50 rounded-lg px-3 py-2.5 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-full bg-emerald-200 flex items-center justify-center shrink-0">
+                  <span className="text-[10px] font-bold text-emerald-800">
+                    {c.admin.nombre.slice(0, 2).toUpperCase()}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-emerald-900">{c.admin.nombre}</p>
+                  {c.admin.email && <p className="text-[11px] text-emerald-600">{c.admin.email}</p>}
+                </div>
+              </div>
+              <span className="text-[11px] font-semibold bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full shrink-0">
+                {c.count_medicos}/{c.max_medicos ?? 1} médico
+              </span>
+            </div>
+            {onUpgrade && (
+              <button onClick={onUpgrade}
+                className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-dashed border-[#1e5fa8] text-[#1e5fa8] text-xs font-semibold hover:bg-blue-50 transition-colors">
+                <Building2 size={13} />
+                Escalar a clínica
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Contadores — solo para clínicas multi-usuario */}
         {!esIndep && (
           <>
             <div className="grid grid-cols-2 gap-3 mb-3">
@@ -793,25 +1118,63 @@ function TarjetaCuenta({
             </div>
 
             {/* Admin */}
-            <div className="bg-slate-50 rounded-lg px-3 py-2.5 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs text-slate-500 font-medium mb-0.5">Administrador</p>
-                {c.admin ? (
-                  <p className="text-sm font-semibold text-slate-700">
+            {c.admin && (
+              <div className="bg-slate-50 rounded-lg px-3 py-2.5 flex items-center gap-3 mb-3">
+                <div className="w-7 h-7 rounded-full bg-[#1e5fa8] flex items-center justify-center shrink-0">
+                  <span className="text-[10px] font-bold text-white">{c.admin.nombre.slice(0, 2).toUpperCase()}</span>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-slate-500 font-medium">Administrador</p>
+                  <p className="text-sm font-semibold text-slate-700 truncate">
                     {c.admin.nombre}
                     {c.admin.email && <span className="font-normal text-slate-400 ml-1.5 text-xs">{c.admin.email}</span>}
                   </p>
-                ) : (
-                  <p className="text-xs text-amber-600 font-medium">Sin administrador asignado</p>
+                </div>
+              </div>
+            )}
+
+            {/* Lista de usuarios expandible */}
+            {c.usuarios && c.usuarios.length > 0 && (
+              <div>
+                <button
+                  onClick={() => setExpandUsuarios(v => !v)}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors mb-1"
+                >
+                  {expandUsuarios ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                  {expandUsuarios ? 'Ocultar' : 'Ver'} usuarios ({c.usuarios.length})
+                </button>
+                {expandUsuarios && (
+                  <div className="rounded-xl border border-slate-100 overflow-hidden">
+                    {c.usuarios.map((u, i) => (
+                      <div key={u.id} className={`flex items-center justify-between px-3 py-2.5 gap-3 ${i > 0 ? 'border-t border-slate-50' : ''}`}>
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                            <span className="text-[10px] font-bold text-slate-500">
+                              {u.nombre.slice(0, 2).toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-slate-700 truncate">{u.nombre}</p>
+                            <p className="text-[11px] text-slate-400 truncate">{u.email ?? '—'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                            {ROLE_LABEL[u.role] ?? u.role}
+                          </span>
+                          <button
+                            onClick={() => onEliminarUsuario(u)}
+                            className="text-slate-300 hover:text-red-500 p-1 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Eliminar usuario">
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
-              {!c.admin && onAsignarAdmin && (
-                <button onClick={onAsignarAdmin}
-                  className="text-xs font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a3a5c] px-3 py-1.5 rounded-lg transition-colors shrink-0">
-                  + Asignar admin
-                </button>
-              )}
-            </div>
+            )}
           </>
         )}
       </div>

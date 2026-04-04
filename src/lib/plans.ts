@@ -26,10 +26,10 @@ export const PLANS: Record<PlanKey, Plan> = {
     precio_anual: 0,
     max_medicos: 1,
     max_secretarias: 0,
-    max_pacientes: 15,
+    max_pacientes: 5,
     color: 'slate',
     features: [
-      'Hasta 15 pacientes',
+      'Hasta 5 pacientes',
       'Expedientes clínicos',
       'Documentos médicos básicos',
       'Recetas con QR verificable',
@@ -126,7 +126,7 @@ export const PLANS: Record<PlanKey, Plan> = {
 }
 
 export const PLAN_LIMITS: Record<PlanKey, { max_medicos: number; max_secretarias: number; max_pacientes: number | null }> = {
-  free:       { max_medicos: 1,  max_secretarias: 0, max_pacientes: 15   },
+  free:       { max_medicos: 1,  max_secretarias: 0, max_pacientes: 5    },
   individual: { max_medicos: 1,  max_secretarias: 0, max_pacientes: null },
   basica:     { max_medicos: 3,  max_secretarias: 1, max_pacientes: null },
   pro:        { max_medicos: 5,  max_secretarias: 2, max_pacientes: null },

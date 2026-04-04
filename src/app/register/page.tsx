@@ -3,26 +3,25 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Loader2, Eye, EyeOff, CheckCircle, Building2 } from 'lucide-react'
-
-type Step = 'form' | 'enviado'
+import { Loader2, Eye, EyeOff, CheckCircle } from 'lucide-react'
+import EspecialidadSelector from '@/components/ui/EspecialidadSelector'
 
 export default function RegisterPage() {
   const router = useRouter()
-  const [step, setStep] = useState<Step>('form')
+  const [step,     setStep]     = useState<'form' | 'enviado'>('form')
   const [showPass, setShowPass] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [loading,  setLoading]  = useState(false)
+  const [error,    setError]    = useState('')
 
+  const [especialidades, setEspecialidades] = useState<string[]>([''])
   const [form, setForm] = useState({
-    nombre: '',
-    email: '',
-    password: '',
-    nombreClinica: '',
-    titulo: 'Dr.',
-    especialidad: '',
+    nombre:             '',
+    email:              '',
+    password:           '',
+    nombreClinica:      '',
+    titulo:             'Dr.',
     cedula_profesional: '',
-    cedula_especialidad: '',
+    cedula_especialidad:'',
   })
 
   function set(field: keyof typeof form) {
@@ -35,17 +34,16 @@ export default function RegisterPage() {
     setLoading(true)
     setError('')
 
-    // Paso 1: crear clínica en el servidor
     const res = await fetch('/api/auth/registro', {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body:    JSON.stringify({ ...form, especialidad: especialidades.filter(Boolean).join(' · '), tipo: 'independiente' }),
     })
 
     const data = await res.json()
+    setLoading(false)
 
     if (!res.ok) {
-      setLoading(false)
       if (res.status === 409) {
         setError(data.error)
         setTimeout(() => router.push('/login'), 2000)
@@ -55,21 +53,15 @@ export default function RegisterPage() {
       return
     }
 
-    setLoading(false)
     setStep('enviado')
   }
 
+  /* ── Pantalla: confirmación enviada ────────────────────── */
   if (step === 'enviado') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f0f4f8] px-4">
         <div className="w-full max-w-sm">
-          <div className="flex flex-col items-center mb-8">
-            <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-lg mb-4 overflow-hidden">
-              <img src="/logo.png" alt="Logo OrtoIntegra" className="w-20 h-20 object-contain"
-                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-            </div>
-            <h1 className="text-2xl font-bold text-[#1a3a5c]">OrtoIntegra</h1>
-          </div>
+          <Logo />
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
             <CheckCircle size={48} className="text-emerald-500 mx-auto mb-4" />
             <h2 className="text-xl font-bold text-slate-800 mb-2">¡Cuenta creada!</h2>
@@ -91,28 +83,16 @@ export default function RegisterPage() {
     )
   }
 
+  /* ── Pantalla: formulario de registro ──────────────────── */
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#f0f4f8] px-4 py-10">
       <div className="w-full max-w-sm">
-        {/* Header */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg mb-4 overflow-hidden">
-            <img src="/logo.png" alt="Logo OrtoIntegra" className="w-16 h-16 object-contain"
-              onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-          </div>
-          <h1 className="text-2xl font-bold text-[#1a3a5c]">OrtoIntegra</h1>
-          <p className="text-xs text-slate-400 mt-1 text-center">Crea tu cuenta gratuita</p>
-        </div>
+        <Logo />
 
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-          <div className="flex items-center gap-2 mb-6">
-            <Building2 size={16} className="text-[#1a3a5c]" />
-            <h2 className="font-semibold text-slate-700">Crear cuenta</h2>
-          </div>
-
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
 
-            {/* Sección: datos personales */}
+            {/* Datos del médico */}
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Datos del médico</p>
 
             <div className="grid grid-cols-3 gap-2">
@@ -127,16 +107,18 @@ export default function RegisterPage() {
               <div className="col-span-2">
                 <label className="text-xs font-medium text-slate-500 block mb-1">Nombre completo *</label>
                 <input type="text" value={form.nombre} onChange={set('nombre')}
-                  placeholder="Ej: Juan Pérez" required
+                  placeholder="Ej: Juan Pérez" required autoFocus
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
               </div>
             </div>
 
             <div>
               <label className="text-xs font-medium text-slate-500 block mb-1">Especialidad *</label>
-              <input type="text" value={form.especialidad} onChange={set('especialidad')}
-                placeholder="Ej: Medicina General · Cardiología" required
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+              <EspecialidadSelector
+                value={especialidades}
+                onChange={setEspecialidades}
+                selectClassName="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8] bg-white"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-2">
@@ -148,27 +130,28 @@ export default function RegisterPage() {
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-500 block mb-1">Cédula especialidad</label>
-                <input type="text" value={form.cedula_especialidad} onChange={set('cedula_especialidad')}
-                  placeholder="Opcional"
+                <input type="text" inputMode="numeric" pattern="[0-9]*" value={form.cedula_especialidad} onChange={set('cedula_especialidad')}
+                  placeholder="Ej: 3890214"
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
               </div>
             </div>
 
             <div className="border-t border-slate-100 pt-1" />
 
-            {/* Sección: consultorio */}
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Consultorio / Clínica</p>
+            {/* Nombre del consultorio */}
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Consultorio</p>
 
             <div>
               <label className="text-xs font-medium text-slate-500 block mb-1">Nombre del consultorio *</label>
               <input type="text" value={form.nombreClinica} onChange={set('nombreClinica')}
-                placeholder="Ej: Consultorio Médico del Norte" required
+                placeholder="Ej: Consultorio Dr. Pérez"
+                required
                 className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
             </div>
 
             <div className="border-t border-slate-100 pt-1" />
 
-            {/* Sección: acceso */}
+            {/* Acceso */}
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Acceso</p>
 
             <div>
@@ -213,11 +196,29 @@ export default function RegisterPage() {
             </p>
           </form>
         </div>
-
-        <p className="text-center text-xs text-slate-300 mt-6">
-          © 2026 OrtoIntegra · Todos los derechos reservados
-        </p>
+        <Footer />
       </div>
     </div>
+  )
+}
+
+function Logo() {
+  return (
+    <div className="flex flex-col items-center mb-6">
+      <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg mb-4 overflow-hidden">
+        <img src="/logo.png" alt="Logo OrtoIntegra" className="w-16 h-16 object-contain"
+          onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+      </div>
+      <h1 className="text-2xl font-bold text-[#1a3a5c]">OrtoIntegra</h1>
+      <p className="text-xs text-slate-400 mt-1">Crea tu cuenta gratuita</p>
+    </div>
+  )
+}
+
+function Footer() {
+  return (
+    <p className="text-center text-xs text-slate-300 mt-6">
+      © 2026 OrtoIntegra · Todos los derechos reservados
+    </p>
   )
 }

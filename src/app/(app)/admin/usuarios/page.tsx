@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { Users, Plus, Trash2, Loader2, Shield, UserCheck, X, Eye, EyeOff, AlertTriangle } from 'lucide-react'
+import EspecialidadSelector from '@/components/ui/EspecialidadSelector'
+import Portal from '@/components/ui/Portal'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
 import { useRouter } from 'next/navigation'
@@ -29,7 +31,8 @@ export default function AdminUsuariosPage() {
   const [showForm, setShowForm] = useState(false)
   const [showPass, setShowPass] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<Usuario | null>(null)
-  const [form, setForm] = useState({ email: '', password: '', nombre: '', role: 'secretaria', titulo: 'Dr.', especialidad: '', cedula_profesional: '', cedula_especialidad: '' })
+  const [form, setForm] = useState({ email: '', password: '', nombre: '', role: 'secretaria', titulo: 'Dr.', cedula_profesional: '', cedula_especialidad: '' })
+  const [especialidades, setEspecialidades] = useState<string[]>([''])
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
 
@@ -64,7 +67,7 @@ export default function AdminUsuariosPage() {
     const res = await fetch('/api/admin/crear-usuario', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, especialidad: especialidades.filter(Boolean).join(' · ') }),
     })
     const data = await res.json()
     setGuardando(false)
@@ -72,7 +75,8 @@ export default function AdminUsuariosPage() {
     if (!res.ok) { setError(data.error || 'Error al crear usuario'); return }
 
     toast.success(`Usuario ${form.email} creado exitosamente`)
-    setForm({ email: '', password: '', nombre: '', role: 'secretaria', titulo: 'Dr.', especialidad: '', cedula_profesional: '', cedula_especialidad: '' })
+    setEspecialidades([''])
+    setForm({ email: '', password: '', nombre: '', role: 'secretaria', titulo: 'Dr.', cedula_profesional: '', cedula_especialidad: '' })
     setShowForm(false)
     cargarUsuarios()
   }
@@ -128,9 +132,10 @@ export default function AdminUsuariosPage() {
 
       {/* Modal nuevo usuario — macOS sheet */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
-            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100">
+      <Portal>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm flex flex-col max-h-[90vh] animate-slide-up">
+            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100 flex-shrink-0">
               <h2 className="text-base font-semibold text-[#1d1d1f]">Nuevo usuario</h2>
               <button onClick={() => setShowForm(false)}
                 className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-[#86868b] transition-colors">
@@ -138,7 +143,7 @@ export default function AdminUsuariosPage() {
               </button>
             </div>
 
-            <form onSubmit={crearUsuario} className="px-5 py-4 space-y-3">
+            <form id="form-nuevo-usuario" onSubmit={crearUsuario} className="px-5 py-4 space-y-3 overflow-y-auto flex-1">
               {[
                 { label: 'Nombre completo', type: 'text', key: 'nombre', placeholder: 'Ej: María González', required: true },
                 { label: 'Correo electrónico', type: 'email', key: 'email', placeholder: 'correo@email.com', required: true },
@@ -168,17 +173,19 @@ export default function AdminUsuariosPage() {
                   className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:bg-white transition-all">
                   <option value="secretaria">Asistente Médico/a</option>
                   <option value="medico">Médico</option>
-                  <option value="admin">Admin</option>
                 </select>
               </div>
 
               {form.role === 'medico' && (
                 <div className="space-y-3 pt-1 border-t border-slate-100">
                   <p className="text-[10px] font-semibold text-[#86868b] uppercase tracking-widest pt-1">Datos médicos</p>
+                  <div>
+                    <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Especialidad</label>
+                    <EspecialidadSelector value={especialidades} onChange={setEspecialidades} />
+                  </div>
                   {[
-                    { label: 'Especialidad', key: 'especialidad', placeholder: 'Ej: Cirugía de Columna' },
-                    { label: 'Cédula profesional', key: 'cedula_profesional', placeholder: 'Ej: 12085805' },
-                    { label: 'Cédula de especialidad', key: 'cedula_especialidad', placeholder: 'Ej: CMOT 26/5567/25' },
+                    { label: 'Cédula profesional', key: 'cedula_profesional', placeholder: 'Ej: 87654321' },
+                    { label: 'Cédula de especialidad', key: 'cedula_especialidad', placeholder: 'Ej: 3890214' },
                   ].map(f => (
                     <div key={f.key}>
                       <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">{f.label}</label>
@@ -191,20 +198,21 @@ export default function AdminUsuariosPage() {
               )}
 
               {error && <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-xl">{error}</p>}
-
-              <div className="flex gap-2 pt-1">
-                <button type="button" onClick={() => setShowForm(false)}
-                  className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-[#3d3d3f] hover:bg-slate-50 transition-colors">
-                  Cancelar
-                </button>
-                <button type="submit" disabled={guardando}
-                  className="flex-1 py-2.5 bg-[#1e5fa8] text-white rounded-xl text-sm font-semibold hover:bg-[#1a3a5c] disabled:opacity-50 flex items-center justify-center gap-1.5 transition-colors">
-                  {guardando ? <><Loader2 size={13} className="animate-spin" /> Creando...</> : 'Crear usuario'}
-                </button>
-              </div>
             </form>
+
+            <div className="flex gap-2 px-5 pb-5 pt-3 border-t border-slate-100 flex-shrink-0">
+              <button type="button" onClick={() => setShowForm(false)}
+                className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-[#3d3d3f] hover:bg-slate-50 transition-colors">
+                Cancelar
+              </button>
+              <button type="submit" form="form-nuevo-usuario" disabled={guardando}
+                className="flex-1 py-2.5 bg-[#1e5fa8] text-white rounded-xl text-sm font-semibold hover:bg-[#1a3a5c] disabled:opacity-50 flex items-center justify-center gap-1.5 transition-colors">
+                {guardando ? <><Loader2 size={13} className="animate-spin" /> Creando...</> : 'Crear usuario'}
+              </button>
+            </div>
           </div>
         </div>
+      </Portal>
       )}
 
       {/* Indicadores de licencia */}
@@ -231,7 +239,8 @@ export default function AdminUsuariosPage() {
 
       {/* Modal confirmación borrado — macOS alert */}
       {confirmDelete && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
+      <Portal>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden animate-slide-up">
             <div className="px-6 pt-6 pb-4 text-center">
               <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ backgroundColor: '#FEF2F2' }}>
@@ -255,6 +264,7 @@ export default function AdminUsuariosPage() {
             </div>
           </div>
         </div>
+      </Portal>
       )}
 
       {/* Lista de usuarios */}
