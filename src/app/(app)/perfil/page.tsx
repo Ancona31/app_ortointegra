@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useProfile } from '@/hooks/useProfile'
 import { useRouter } from 'next/navigation'
-import { Loader2, Save, Palette, Upload, X } from 'lucide-react'
+import { Loader2, Save, Palette, Upload, X, CalendarDays, CheckCircle2, LogIn, LogOut } from 'lucide-react'
 import { PerfilSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import EspecialidadSelector from '@/components/ui/EspecialidadSelector'
@@ -57,6 +57,8 @@ export default function PerfilPage() {
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [subiendoLogo, setSubiendoLogo] = useState(false)
+  const [gcalConectado, setGcalConectado] = useState<boolean | null>(null)
+  const [desconectandoGcal, setDesconectandoGcal] = useState(false)
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin'
 
@@ -67,6 +69,10 @@ export default function PerfilPage() {
   }, [profile, loadingProfile, router])
 
   useEffect(() => {
+    fetch('/api/google/events').then(r => r.json())
+      .then(d => setGcalConectado(d.connected ?? false))
+      .catch(() => setGcalConectado(false))
+
     Promise.all([
       fetch('/api/me/perfil-medico').then(r => r.json()),
       fetch('/api/me/clinica').then(r => r.json()),
@@ -153,6 +159,13 @@ export default function PerfilPage() {
     } else {
       toast.success('Cambios guardados correctamente')
     }
+  }
+
+  async function desconectarGcal() {
+    setDesconectandoGcal(true)
+    await fetch('/api/google/disconnect', { method: 'DELETE' })
+    setGcalConectado(false)
+    setDesconectandoGcal(false)
   }
 
   if (loading || loadingProfile) return <PerfilSkeleton />
@@ -320,6 +333,57 @@ export default function PerfilPage() {
             </div>
           </div>
         )}
+
+        {/* Integraciones */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <SectionHeader>Integraciones</SectionHeader>
+          <div className="px-5 pb-5">
+            <div className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+                  <CalendarDays size={15} className="text-[#1e5fa8]" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-[#1d1d1f]">Google Calendar</p>
+                  <p className="text-[11px] text-[#86868b]">
+                    {gcalConectado === null
+                      ? 'Verificando...'
+                      : gcalConectado
+                        ? 'Sincronización activa — las citas se crean automáticamente'
+                        : 'Conecta para sincronizar citas con tu calendario personal'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex-shrink-0 ml-4">
+                {gcalConectado === null ? (
+                  <Loader2 size={14} className="animate-spin text-[#86868b]" />
+                ) : gcalConectado ? (
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-600">
+                      <CheckCircle2 size={13} /> Conectado
+                    </span>
+                    <button
+                      type="button"
+                      onClick={desconectarGcal}
+                      disabled={desconectandoGcal}
+                      className="flex items-center gap-1 text-[11px] text-[#86868b] hover:text-red-500 transition-colors disabled:opacity-40"
+                    >
+                      {desconectandoGcal ? <Loader2 size={12} className="animate-spin" /> : <LogOut size={12} />}
+                      Desconectar
+                    </button>
+                  </div>
+                ) : (
+                  <a
+                    href="/api/google/connect"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a3a5c] rounded-xl transition-colors"
+                  >
+                    <LogIn size={12} /> Conectar
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
 
         <button type="submit" disabled={guardando || subiendoLogo}
           className="w-full flex items-center justify-center gap-2 py-3 bg-[#1e5fa8] text-white rounded-2xl text-sm font-semibold hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 shadow-sm">

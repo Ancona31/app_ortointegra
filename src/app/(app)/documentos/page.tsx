@@ -2,9 +2,10 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { FileText, Pill, FlaskConical, ScanLine, ClipboardList, Search, User, X, BedDouble, PenLine, Loader2, ChevronRight } from 'lucide-react'
+import { FileText, Pill, FlaskConical, ScanLine, ClipboardList, Search, User, X, BedDouble, PenLine, Loader2, ChevronRight, UserPlus } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
+import QuickPatientModal from '@/components/ui/QuickPatientModal'
 
 const FormLoader = () => (
   <div className="flex items-center justify-center py-16 text-[#86868b]">
@@ -13,20 +14,20 @@ const FormLoader = () => (
   </div>
 )
 
-const RecetaForm = dynamic(() => import('@/components/documentos/RecetaForm'), { ssr: false, loading: FormLoader })
-const SolicitudLabForm = dynamic(() => import('@/components/documentos/SolicitudLabForm'), { ssr: false, loading: FormLoader })
-const SolicitudImagenForm = dynamic(() => import('@/components/documentos/SolicitudImagenForm'), { ssr: false, loading: FormLoader })
-const PlanSuplementacionForm = dynamic(() => import('@/components/documentos/PlanSuplementacionForm'), { ssr: false, loading: FormLoader })
+const RecetaForm              = dynamic(() => import('@/components/documentos/RecetaForm'),              { ssr: false, loading: FormLoader })
+const SolicitudLabForm        = dynamic(() => import('@/components/documentos/SolicitudLabForm'),        { ssr: false, loading: FormLoader })
+const SolicitudImagenForm     = dynamic(() => import('@/components/documentos/SolicitudImagenForm'),     { ssr: false, loading: FormLoader })
+const PlanSuplementacionForm  = dynamic(() => import('@/components/documentos/PlanSuplementacionForm'),  { ssr: false, loading: FormLoader })
 const SolicitudInternamientoForm = dynamic(() => import('@/components/documentos/SolicitudInternamientoForm'), { ssr: false, loading: FormLoader })
-const EscritoMedicoForm = dynamic(() => import('@/components/documentos/EscritoMedicoForm'), { ssr: false, loading: FormLoader })
+const EscritoMedicoForm       = dynamic(() => import('@/components/documentos/EscritoMedicoForm'),       { ssr: false, loading: FormLoader })
 
 const TIPOS = [
-  { key: 'receta',        label: 'Receta Médica',           sublabel: 'Prescripción farmacológica', icon: Pill,        bg: 'bg-blue-50',    icon_color: 'text-[#1e5fa8]' },
-  { key: 'lab',          label: 'Laboratorio',              sublabel: 'Solicitud de estudios',       icon: FlaskConical, bg: 'bg-emerald-50', icon_color: 'text-emerald-600' },
-  { key: 'imagen',       label: 'Imagen',                   sublabel: 'Rx, RM, TAC, US',             icon: ScanLine,    bg: 'bg-violet-50',  icon_color: 'text-violet-600' },
-  { key: 'suplementacion',label: 'Suplementación',          sublabel: 'Plan nutricional',            icon: ClipboardList,bg: 'bg-amber-50',  icon_color: 'text-amber-600' },
-  { key: 'internamiento',label: 'Internamiento',            sublabel: 'Solicitud hospitalaria',      icon: BedDouble,   bg: 'bg-rose-50',    icon_color: 'text-rose-600' },
-  { key: 'escrito',      label: 'Escrito Médico',           sublabel: 'Carta o informe libre',       icon: PenLine,     bg: 'bg-teal-50',    icon_color: 'text-teal-600' },
+  { key: 'receta',        label: 'Receta Médica',       sublabel: 'Prescripción farmacológica', icon: Pill,           bg: 'bg-blue-50',    icon_color: 'text-[#1e5fa8]' },
+  { key: 'lab',          label: 'Laboratorio',           sublabel: 'Solicitud de estudios',      icon: FlaskConical,   bg: 'bg-emerald-50', icon_color: 'text-emerald-600' },
+  { key: 'imagen',       label: 'Imagen',                sublabel: 'Rx, RM, TAC, US',            icon: ScanLine,       bg: 'bg-violet-50',  icon_color: 'text-violet-600' },
+  { key: 'suplementacion',label: 'Suplementación',       sublabel: 'Plan nutricional',           icon: ClipboardList,  bg: 'bg-amber-50',   icon_color: 'text-amber-600' },
+  { key: 'internamiento',label: 'Internamiento',         sublabel: 'Solicitud hospitalaria',     icon: BedDouble,      bg: 'bg-rose-50',    icon_color: 'text-rose-600' },
+  { key: 'escrito',      label: 'Escrito Médico',        sublabel: 'Carta o informe libre',      icon: PenLine,        bg: 'bg-teal-50',    icon_color: 'text-teal-600' },
 ] as const
 
 type TipoDoc = typeof TIPOS[number]['key']
@@ -39,6 +40,7 @@ function DocumentosContent() {
   const [busqueda, setBusqueda] = useState('')
   const [resultados, setResultados] = useState<Paciente[]>([])
   const [buscando, setBuscando] = useState(false)
+  const [showQuickPatient, setShowQuickPatient] = useState(false)
 
   useEffect(() => {
     const t = searchParams.get('tipo') as TipoDoc | null
@@ -71,6 +73,8 @@ function DocumentosContent() {
     setPacienteSeleccionado(null)
     setTipo(null)
   }
+
+  const sinResultados = busqueda.length >= 2 && !buscando && resultados.length === 0
 
   return (
     <div className="max-w-4xl mx-auto space-y-4 animate-slide-up">
@@ -120,13 +124,31 @@ function DocumentosContent() {
               ))}
             </div>
           )}
+
           {buscando && (
             <p className="text-xs text-[#86868b] mt-2 text-center flex items-center justify-center gap-1.5">
               <Loader2 size={11} className="animate-spin" /> Buscando...
             </p>
           )}
-          {busqueda.length >= 2 && !buscando && resultados.length === 0 && (
-            <p className="text-xs text-[#86868b] mt-2 text-center">No se encontraron pacientes.</p>
+
+          {sinResultados && (
+            <div className="mt-2 border border-slate-200/80 rounded-xl overflow-hidden">
+              <button
+                onClick={() => setShowQuickPatient(true)}
+                className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center justify-between group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                    <UserPlus size={13} className="text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-[#1d1d1f]">Registrar "{busqueda}"</p>
+                    <p className="text-[10px] text-emerald-500">Crear nuevo paciente y continuar</p>
+                  </div>
+                </div>
+                <ChevronRight size={14} className="text-slate-300 group-hover:text-[#86868b]" />
+              </button>
+            </div>
           )}
         </div>
       ) : (
@@ -212,6 +234,19 @@ function DocumentosContent() {
           )}
         </>
       )}
+
+      {/* Modal registro rápido — mismo que en Agenda */}
+      {showQuickPatient && (
+        <QuickPatientModal
+          nombreInicial={busqueda}
+          onCreated={p => {
+            seleccionar(p)
+            setShowQuickPatient(false)
+          }}
+          onClose={() => setShowQuickPatient(false)}
+        />
+      )}
+
     </div>
   )
 }

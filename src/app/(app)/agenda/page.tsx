@@ -11,6 +11,8 @@ import { X, Calendar, User, Plus, Trash2, Settings } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ui/Toast'
 import { useProfile } from '@/hooks/useProfile'
+import QuickPatientModal from '@/components/ui/QuickPatientModal'
+import Portal from '@/components/ui/Portal'
 
 /* ─── Tipos ────────────────────────────────────────────── */
 
@@ -141,6 +143,7 @@ function HorarioModal({ onClose, onSave }: { onClose: () => void; onSave: (h: Ho
   }
 
   return (
+    <Portal>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md animate-modal-enter overflow-hidden">
@@ -224,6 +227,7 @@ function HorarioModal({ onClose, onSave }: { onClose: () => void; onSave: (h: Ho
         </div>
       </div>
     </div>
+    </Portal>
   )
 }
 
@@ -287,7 +291,9 @@ function usePacientes(query: string) {
 }
 
 /* ─── Modal de creación rápida de paciente ──────────────── */
-
+// Ahora importado desde @/components/ui/QuickPatientModal
+// Se mantiene el bloque comentado para referencia
+/*
 function QuickPatientModal({
   nombreInicial,
   onCreated,
@@ -386,6 +392,8 @@ function QuickPatientModal({
   )
 }
 
+*/
+
 /* ─── Modal de cita ─────────────────────────────────────── */
 
 function AppointmentModal({
@@ -452,7 +460,7 @@ function AppointmentModal({
   }
 
   return (
-    <>
+    <Portal>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md animate-modal-enter overflow-hidden">
@@ -660,7 +668,7 @@ function AppointmentModal({
         onClose={() => setQuickCreate(false)}
       />
     )}
-    </>
+    </Portal>
   )
 }
 
@@ -672,6 +680,7 @@ function ConfirmModal({ message, onConfirm, onCancel }: {
   onCancel: () => void
 }) {
   return (
+    <Portal>
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm animate-modal-enter p-6">
@@ -692,6 +701,7 @@ function ConfirmModal({ message, onConfirm, onCancel }: {
         </div>
       </div>
     </div>
+    </Portal>
   )
 }
 
@@ -1076,6 +1086,8 @@ export default function AgendaPage() {
           eventClick={handleEventClick}
           eventDrop={handleEventDrop}
           height="auto"
+          slotDuration="00:30:00"
+          slotLabelInterval="01:00:00"
           eventTimeFormat={{ hour: '2-digit', minute: '2-digit', meridiem: false, hour12: false }}
           slotLabelFormat={{ hour: '2-digit', minute: '2-digit', meridiem: false, hour12: false }}
         />

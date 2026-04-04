@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react'
 import { useProfile } from '@/hooks/useProfile'
 import AsistenteDashboard from './AsistenteDashboard'
 import { DashboardSkeleton } from '@/components/ui/Skeleton'
-import { FileText, Stethoscope, Monitor, Search, ArrowRight, UserPlus, Pill, ClipboardList } from 'lucide-react'
+import { FileText, Stethoscope, Monitor, Search, ArrowRight, UserPlus, Pill, ClipboardList, CheckCircle2, Clock, CalendarDays, FolderOpen, User } from 'lucide-react'
 import Link from 'next/link'
-import { format, formatDistanceToNow, parseISO } from 'date-fns'
+import { format, formatDistanceToNow, parseISO, isToday, isTomorrow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 
@@ -19,6 +19,27 @@ function saludo() {
   return 'Buenas noches'
 }
 
+export function formatCitaHora(start_time: string) {
+  const date = parseISO(start_time)
+  const hora = format(date, 'HH:mm')
+  if (isToday(date))    return `Hoy · ${hora}`
+  if (isTomorrow(date)) return `Mañana · ${hora}`
+  return format(date, "EEE d MMM · HH:mm", { locale: es })
+}
+
+export function StatusChip({ status }: { status: string }) {
+  if (status === 'confirmed') return (
+    <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full whitespace-nowrap">
+      <CheckCircle2 size={10} /> Confirmada
+    </span>
+  )
+  return (
+    <span className="flex items-center gap-1 text-[10px] font-semibold text-[#1e5fa8] bg-blue-50 px-2 py-0.5 rounded-full whitespace-nowrap">
+      <Clock size={10} /> Agendada
+    </span>
+  )
+}
+
 /* ─── Tipos ───────────────────────────────────────────────── */
 
 type Reciente = {
@@ -27,6 +48,16 @@ type Reciente = {
   apellidos: string
   created_at: string
   motivo_consulta: string
+}
+
+type ProximaCita = {
+  id: string
+  title: string
+  start_time: string
+  status: string
+  paciente_id: string | null
+  pacientes: { nombre: string; apellidos: string } | null
+  medico: { id: string; nombre: string; titulo: string } | null
 }
 
 /* ─── Config ──────────────────────────────────────────────── */
@@ -70,8 +101,12 @@ const AVATAR_COLORS = [
 
 export default function DashboardPage() {
   const { profile, loading: loadingProfile } = useProfile()
-  const [recientes, setRecientes] = useState<Reciente[]>([])
+  const [recientes,      setRecientes]      = useState<Reciente[]>([])
   const [totalPacientes, setTotalPacientes] = useState<number | null>(null)
+  const [proximasCitas,  setProximasCitas]  = useState<ProximaCita[]>([])
+  const [clinicaTipo,    setClinicaTipo]    = useState<string>('independiente')
+  const [soloMisCitas,   setSoloMisCitas]   = useState(false)
+  const [loadingCitas,   setLoadingCitas]   = useState(true)
 
   useEffect(() => {
     if (loadingProfile || profile?.role === 'secretaria') return
@@ -84,6 +119,7 @@ export default function DashboardPage() {
       .select('id', { count: 'exact', head: true })
       .then(({ count }) => setTotalPacientes(count ?? 0))
 
+    // Pacientes recientes
     supabase
       .from('consultas')
       .select('paciente_id, created_at, motivo_consulta, pacientes!inner(nombre, apellidos)')
@@ -108,18 +144,56 @@ export default function DashboardPage() {
         }
         setRecientes(unique)
       })
+
+    // Próximas citas + clinica.tipo
+    async function fetchCitas() {
+      const { data: clinicaData } = await supabase
+        .from('clinicas')
+        .select('tipo')
+        .eq('id', profile!.clinica_id!)
+        .single()
+
+      const tipo = clinicaData?.tipo ?? 'independiente'
+      setClinicaTipo(tipo)
+
+      const isClinicaAdmin = profile!.role === 'admin' && tipo === 'clinica'
+
+      let q = supabase
+        .from('appointments')
+        .select('id, title, start_time, status, paciente_id, pacientes(nombre, apellidos), medico:profiles!appointments_medico_id_fkey(id, nombre, titulo)')
+        .eq('clinica_id', profile!.clinica_id!)
+        .gt('start_time', new Date().toISOString())
+        .in('status', ['scheduled', 'confirmed'])
+        .order('start_time', { ascending: true })
+        .limit(isClinicaAdmin ? 8 : 1) as any
+
+      if (!isClinicaAdmin) {
+        q = q.eq('medico_id', profile!.id)
+      }
+
+      const { data } = await q
+      setProximasCitas((data as ProximaCita[]) ?? [])
+      setLoadingCitas(false)
+    }
+
+    fetchCitas()
   }, [profile, loadingProfile])
 
   if (loadingProfile) return <DashboardSkeleton />
-
   if (profile?.role === 'secretaria') return <AsistenteDashboard />
 
   const nombre = profile?.nombre ?? ''
   const titulo = profile?.titulo ? `${profile.titulo} ` : ''
-  const hoy = format(new Date(), "EEEE, d 'de' MMMM", { locale: es })
+  const hoy    = format(new Date(), "EEEE, d 'de' MMMM", { locale: es })
 
   const abrirBusqueda = () =>
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))
+
+  const isClinicaAdmin = profile?.role === 'admin' && clinicaTipo === 'clinica'
+  const displayCitas   = soloMisCitas
+    ? proximasCitas.filter(c => c.medico?.id === profile?.id)
+    : proximasCitas
+  const proximaCita    = proximasCitas[0] ?? null
 
   return (
     <div className="max-w-3xl mx-auto space-y-8 py-2">
@@ -135,51 +209,156 @@ export default function DashboardPage() {
       {/* ── Dos CTAs principales ─────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 animate-slide-up" style={{ animationDelay: '60ms' }}>
 
-        {/* Buscar paciente */}
-        <button
-          onClick={abrirBusqueda}
-          className="group relative overflow-hidden flex items-center sm:flex-col sm:items-start gap-3 sm:gap-3 px-5 py-4 sm:px-6 sm:py-5 rounded-2xl
-            bg-gradient-to-br from-[#1a3a5c] to-[#1e5fa8] text-white text-left
-            shadow-[0_4px_24px_rgba(30,95,168,0.3)]
-            hover:shadow-[0_8px_32px_rgba(30,95,168,0.4)]
-            hover:-translate-y-0.5
-            active:scale-[0.98] active:shadow-md
-            transition-all duration-200"
-        >
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out" />
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
-            <Search size={18} />
+        {/* ── Tarjeta izquierda: Próxima(s) cita(s) — 3 columnas ── */}
+        {isClinicaAdmin ? (
+          /* Lista para admin de clínica */
+          <div className="sm:col-span-1 bg-white border border-[#1e5fa8]/20 rounded-2xl shadow-sm shadow-[#1e5fa8]/5 ring-1 ring-[#1e5fa8]/10 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-[#1a3a5c] to-[#1e5fa8] rounded-t-2xl">
+              <div className="flex items-center gap-2">
+                <CalendarDays size={13} className="text-white/70" />
+                <p className="text-[11px] font-semibold text-white uppercase tracking-widest">Próximas citas</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-1.5 text-[11px] text-white/70 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={soloMisCitas}
+                    onChange={e => setSoloMisCitas(e.target.checked)}
+                    className="rounded border-white/30 bg-white/10 text-white focus:ring-white/30"
+                  />
+                  Solo mías
+                </label>
+                <Link href="/agenda" className="text-[10px] text-white/70 hover:text-white hover:underline">Ver agenda →</Link>
+              </div>
+            </div>
+            {loadingCitas ? (
+              <div className="px-5 py-4 space-y-3">
+                {[1,2].map(i => <div key={i} className="h-12 bg-slate-100 rounded-xl animate-pulse" />)}
+              </div>
+            ) : displayCitas.length > 0 ? (
+              displayCitas.slice(0, 4).map(cita => (
+                <div key={cita.id} className="flex gap-3 px-5 py-3 border-b border-slate-50 last:border-0">
+                  <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <User size={17} className="text-[#1e5fa8]" />
+                  </div>
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-[#1d1d1f]">
+                        {cita.pacientes?.nombre} {cita.pacientes?.apellidos}
+                      </p>
+                      <StatusChip status={cita.status} />
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px] text-[#86868b]">
+                      <span>{formatCitaHora(cita.start_time)}</span>
+                      {!soloMisCitas && cita.medico && (
+                        <span>· {cita.medico.titulo} {cita.medico.nombre}</span>
+                      )}
+                    </div>
+                    {cita.paciente_id && (
+                      <div className="flex items-center gap-1.5 pt-0.5">
+                        <Link href={`/expediente/${cita.paciente_id}/nueva-nota`}
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a3a5c] transition-colors">
+                          <Stethoscope size={10} /> Iniciar consulta
+                        </Link>
+                        <Link href={`/expediente/${cita.paciente_id}`}
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-[#1e5fa8] bg-blue-50 hover:bg-blue-100 transition-colors">
+                          <FolderOpen size={10} /> Expediente
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-[#86868b] px-5 py-6 text-center">No hay citas agendadas</p>
+            )}
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-[15px] leading-tight">Buscar paciente</p>
-            <p className="text-white/60 text-xs mt-0.5">Iniciar consulta</p>
+        ) : (
+          /* Tarjeta simple para médico o admin independiente */
+          <div className="sm:col-span-1 bg-white border border-[#1e5fa8]/20 rounded-2xl shadow-sm shadow-[#1e5fa8]/5 ring-1 ring-[#1e5fa8]/10 flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-[#1a3a5c] to-[#1e5fa8] rounded-t-2xl">
+              <div className="flex items-center gap-2">
+                <CalendarDays size={13} className="text-white/70" />
+                <p className="text-[11px] font-semibold text-white uppercase tracking-widest">Próxima cita</p>
+              </div>
+              <Link href="/agenda" className="text-[10px] text-white/70 hover:text-white hover:underline">Ver agenda →</Link>
+            </div>
+            <div className="px-5 py-4 sm:px-6 flex-1 flex flex-col gap-3">
+            {loadingCitas ? (
+              <div className="h-12 bg-slate-100 rounded-xl animate-pulse" />
+            ) : proximaCita ? (
+              <div className="flex gap-3">
+                <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
+                  <User size={22} className="text-[#1e5fa8]" />
+                </div>
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <div>
+                    <p className="font-semibold text-[17px] text-[#1d1d1f] leading-snug">
+                      {proximaCita.pacientes?.nombre} {proximaCita.pacientes?.apellidos}
+                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-xs text-[#86868b]">{formatCitaHora(proximaCita.start_time)}</p>
+                      <StatusChip status={proximaCita.status} />
+                    </div>
+                  </div>
+                  {proximaCita.paciente_id && (
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/expediente/${proximaCita.paciente_id}/nueva-nota`}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a3a5c] transition-colors"
+                      >
+                        <Stethoscope size={11} /> Iniciar consulta
+                      </Link>
+                      <Link
+                        href={`/expediente/${proximaCita.paciente_id}`}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-[#1e5fa8] bg-blue-50 hover:bg-blue-100 transition-colors"
+                      >
+                        <FolderOpen size={11} /> Ver expediente
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-[#86868b]">No hay citas agendadas</p>
+            )}
+            </div>
           </div>
-          <kbd className="hidden sm:inline font-mono text-[10px] bg-white/10 border border-white/20 px-2 py-0.5 rounded-md text-white/70">
-            Ctrl / ⌘ K
-          </kbd>
-        </button>
+        )}
 
-        {/* Nuevo paciente */}
-        <Link
-          href="/pacientes/nuevo"
-          className="group flex items-center sm:flex-col sm:items-start gap-3 px-5 py-4 sm:px-6 sm:py-5 rounded-2xl
-            bg-white border border-slate-100 text-left
-            shadow-sm
-            hover:shadow-md hover:-translate-y-0.5
-            active:scale-[0.98] active:shadow-sm
-            transition-all duration-200 ring-2 ring-transparent group-hover:ring-emerald-100"
-        >
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-100 transition-colors duration-150">
-            <UserPlus size={18} className="text-emerald-600" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-[15px] text-[#1d1d1f] leading-tight">Nuevo paciente</p>
-            <p className="text-[#86868b] text-xs mt-0.5">Crear expediente</p>
-          </div>
-          <span className="hidden sm:inline text-[10px] text-emerald-600 font-semibold bg-emerald-50 group-hover:bg-emerald-100 px-2 py-0.5 rounded-md transition-colors duration-150">
-            + Registrar
-          </span>
-        </Link>
+        {/* ── Tarjeta derecha: Buscar / Nuevo paciente — 2 columnas ── */}
+        <div className="sm:col-span-1 group relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#1a3a5c] to-[#1e5fa8] text-white shadow-[0_4px_24px_rgba(30,95,168,0.3)] hover:shadow-[0_8px_32px_rgba(30,95,168,0.4)] transition-all duration-200 flex flex-col">
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out" />
+          {/* Buscar */}
+          <button
+            onClick={abrirBusqueda}
+            className="relative flex-1 w-full flex items-center gap-3 px-5 py-4 border-b border-white/10 hover:bg-white/15 active:bg-white/20 transition-colors text-left"
+          >
+            <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
+              <Search size={16} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-[14px] leading-tight">Buscar paciente</p>
+              <p className="text-white/60 text-[11px] mt-0.5">Iniciar consulta</p>
+            </div>
+            <kbd className="hidden sm:inline font-mono text-[10px] bg-white/10 border border-white/20 px-2 py-0.5 rounded-md text-white/70 flex-shrink-0">
+              Ctrl K
+            </kbd>
+          </button>
+          {/* Nuevo */}
+          <Link
+            href="/pacientes/nuevo"
+            className="relative flex-1 flex items-center gap-3 px-5 py-4 hover:bg-white/15 active:bg-white/20 transition-colors"
+          >
+            <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
+              <UserPlus size={16} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-[14px] leading-tight">Nuevo paciente</p>
+              <p className="text-white/60 text-[11px] mt-0.5">Crear expediente</p>
+            </div>
+          </Link>
+        </div>
 
       </div>
 
@@ -192,7 +371,7 @@ export default function DashboardPage() {
               key={href}
               href={href}
               className={`group bg-white rounded-2xl border border-slate-100 p-5 shadow-sm
-                hover:shadow-md hover:-translate-y-1
+                hover:shadow-[0_4px_20px_rgba(30,95,168,0.15)] hover:border-[#1e5fa8]/20 hover:-translate-y-1
                 active:scale-[0.97]
                 transition-all duration-200
                 ring-2 ring-transparent ${ring}`}
@@ -229,9 +408,8 @@ export default function DashboardPage() {
               return (
                 <div
                   key={p.paciente_id}
-                  className={`flex items-center gap-3 px-4 py-3 group ${i < recientes.length - 1 ? 'border-b border-slate-50' : ''}`}
+                  className={`flex items-center gap-3 px-4 py-3 group hover:bg-blue-50/50 transition-colors ${i < recientes.length - 1 ? 'border-b border-slate-50' : ''}`}
                 >
-                  {/* Avatar + nombre → navega al expediente */}
                   <Link
                     href={`/expediente/${p.paciente_id}`}
                     className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity"
@@ -249,9 +427,7 @@ export default function DashboardPage() {
                     </div>
                   </Link>
 
-                  {/* Acciones rápidas */}
-                  <div className="flex items-center gap-1 flex-shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-150">
-                    {/* Receta Express */}
+                  <div className="flex items-center gap-1 flex-shrink-0 flex items-center gap-1">
                     <Link
                       href={`/expediente/${p.paciente_id}/documentos?tipo=receta`}
                       title="Receta express"
@@ -260,7 +436,6 @@ export default function DashboardPage() {
                       <Pill size={12} />
                       Receta
                     </Link>
-                    {/* Última nota */}
                     <Link
                       href={`/expediente/${p.paciente_id}?tab=consultas`}
                       title="Última nota"
@@ -269,7 +444,6 @@ export default function DashboardPage() {
                       <ClipboardList size={12} />
                       Nota
                     </Link>
-                    {/* Ver expediente */}
                     <Link
                       href={`/expediente/${p.paciente_id}`}
                       className="p-1.5 rounded-lg text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors"

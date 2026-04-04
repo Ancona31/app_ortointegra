@@ -231,6 +231,9 @@ body {
 .fc td, .fc th    { border-color: #f1f5f9 !important; }
 .fc .fc-timegrid-slot-minor { border-style: dashed !important; border-color: #f8fafc !important; }
 
+/* Altura de franjas horarias — suficiente para nombres largos */
+.fc .fc-timegrid-slot { height: 1.8rem !important; }
+
 /* Etiquetas de hora */
 .fc .fc-timegrid-slot-label-cushion {
   font-size: 11px;
