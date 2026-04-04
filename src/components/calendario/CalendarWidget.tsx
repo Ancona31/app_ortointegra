@@ -7,6 +7,7 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import esLocale from '@fullcalendar/core/locales/es'
 import { CalendarDays, LogIn, Loader2, X, MapPin, AlignLeft, ExternalLink, Plus, LogOut, Trash2 } from 'lucide-react'
+import Portal from '@/components/ui/Portal'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -235,6 +236,7 @@ export default function CalendarWidget({ conectado, setConectado }: {
 
       {/* Modal: detalle de evento — macOS sheet */}
       {eventoDetalle && (
+        <Portal>
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setEventoDetalle(null)}>
           <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up" onClick={e => e.stopPropagation()}>
             <div className="flex items-start justify-between px-5 pt-5 pb-4 border-b border-slate-100 gap-3">
@@ -287,10 +289,12 @@ export default function CalendarWidget({ conectado, setConectado }: {
             </div>
           </div>
         </div>
+        </Portal>
       )}
 
       {/* Modal: crear cita — macOS sheet */}
       {modalCrear && (
+        <Portal>
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setModalCrear(null)}>
           <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100">
@@ -364,6 +368,7 @@ export default function CalendarWidget({ conectado, setConectado }: {
             </form>
           </div>
         </div>
+        </Portal>
       )}
     </>
   )

@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
 import { Paciente, Consulta, Laboratorio } from '@/types'
 import { parseISO, format } from 'date-fns'
+import Portal from '@/components/ui/Portal'
 import {
   ArrowLeft, Stethoscope, FlaskConical, FileText, Trash2, AlertTriangle, Loader2,
 } from 'lucide-react'
@@ -210,6 +211,7 @@ function ExpedientePacienteContent() {
 
       {/* ── Modal eliminar paciente — macOS alert dialog ── */}
       {mostrarEliminarPaciente && (
+        <Portal>
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
           <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
             {/* Icon + title */}
@@ -260,6 +262,7 @@ function ExpedientePacienteContent() {
             </div>
           </div>
         </div>
+        </Portal>
       )}
 
       {/* Breadcrumbs */}

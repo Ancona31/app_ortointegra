@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Building2, Plus, Pencil, Check, X, Loader2, Palette, Upload, ImageIcon, UserCircle, Stethoscope, Trash2, AlertTriangle, PauseCircle, PlayCircle, ChevronDown, ChevronUp, ShieldOff } from 'lucide-react'
+import Portal from '@/components/ui/Portal'
 import { useProfile } from '@/hooks/useProfile'
 import { useRouter } from 'next/navigation'
 
@@ -318,7 +319,7 @@ export default function SuperAdminClinicasPage() {
 
       {/* ── Modal selector de tipo de cuenta ── */}
       {showSelector && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
+        <Portal><div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
           <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <h2 className="text-base font-semibold text-[#1d1d1f]">Nueva cuenta</h2>
@@ -356,12 +357,12 @@ export default function SuperAdminClinicasPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div></Portal>
       )}
 
       {/* ── Modal nueva clínica ── */}
       {showFormClinica && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
+        <Portal><div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
           <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
             <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100">
               <h2 className="text-base font-semibold text-[#1d1d1f]">Nueva clínica</h2>
@@ -417,12 +418,12 @@ export default function SuperAdminClinicasPage() {
               </div>
             </form>
           </div>
-        </div>
+        </div></Portal>
       )}
 
       {/* ── Modal nuevo usuario independiente ── */}
       {showFormIndep && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
+        <Portal><div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
           <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm flex flex-col animate-slide-up">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -490,12 +491,12 @@ export default function SuperAdminClinicasPage() {
               </div>
             </form>
           </div>
-        </div>
+        </div></Portal>
       )}
 
       {/* ── Modal asignar admin ── */}
       {modalAdmin && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
+        <Portal><div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
           <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm flex flex-col animate-slide-up">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <div>
@@ -537,12 +538,12 @@ export default function SuperAdminClinicasPage() {
               </div>
             </form>
           </div>
-        </div>
+        </div></Portal>
       )}
 
       {/* ── Modal personalización ── */}
       {personalizando && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
+        <Portal><div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
           <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh] animate-slide-up">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -666,12 +667,12 @@ export default function SuperAdminClinicasPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div></Portal>
       )}
 
       {/* ── Modal eliminar usuario independiente — macOS alert ── */}
       {confirmDeleteIndep && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+        <Portal><div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
           <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden animate-slide-up">
             <div className="px-6 pt-6 pb-4 text-center">
               <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ backgroundColor: '#FEF2F2' }}>
@@ -698,12 +699,12 @@ export default function SuperAdminClinicasPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div></Portal>
       )}
 
       {/* ── Modal eliminar usuario de clínica ── */}
       {confirmDeleteUser && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+        <Portal><div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
           <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden animate-slide-up">
             <div className="px-6 pt-6 pb-4 text-center">
               <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center bg-red-50">
@@ -728,12 +729,12 @@ export default function SuperAdminClinicasPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div></Portal>
       )}
 
       {/* ── Modal suspender / reactivar clínica ── */}
       {confirmSuspender && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+        <Portal><div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
           <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden animate-slide-up">
             <div className="px-6 pt-6 pb-4 text-center">
               <div className={`w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center ${confirmSuspender.suspendida ? 'bg-emerald-50' : 'bg-amber-50'}`}>
@@ -767,12 +768,12 @@ export default function SuperAdminClinicasPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div></Portal>
       )}
 
       {/* ── Modal upgrade: básica → clínica ── */}
       {modalUpgrade && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+        <Portal><div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
           <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -821,7 +822,7 @@ export default function SuperAdminClinicasPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div></Portal>
       )}
 
       {/* ── Sección: Clínicas ── */}

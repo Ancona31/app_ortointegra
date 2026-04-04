@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { AlertTriangle, ClipboardList, Eye, FileText, FlaskConical, Pill, ScanLine, Trash2 } from 'lucide-react'
+import Portal from '@/components/ui/Portal'
 import Link from 'next/link'
 
 const TIPO_DOC_LABEL: Record<string, string> = {
@@ -105,6 +106,7 @@ export default function TabDocumentos({ id, documentos, onVerDocumento, onElimin
 
       {/* Modal confirmar eliminación — macOS alert */}
       {docAEliminar && (
+        <Portal>
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
           <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden animate-slide-up">
             <div className="px-6 pt-6 pb-4 text-center">
@@ -134,6 +136,7 @@ export default function TabDocumentos({ id, documentos, onVerDocumento, onElimin
             </div>
           </div>
         </div>
+        </Portal>
       )}
     </>
   )

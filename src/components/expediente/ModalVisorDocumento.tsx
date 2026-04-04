@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { X, Mail, Loader2, CheckCircle } from 'lucide-react'
+import Portal from '@/components/ui/Portal'
 
 const TIPO_DOC_LABEL: Record<string, string> = {
   receta: 'Receta',
@@ -55,6 +56,7 @@ export default function ModalVisorDocumento({ doc, onClose, pacienteEmail }: Pro
   }
 
   return (
+    <Portal>
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
       <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col animate-slide-up">
         {/* Header modal */}
@@ -316,5 +318,6 @@ export default function ModalVisorDocumento({ doc, onClose, pacienteEmail }: Pro
         )}
       </div>
     </div>
+    </Portal>
   )
 }

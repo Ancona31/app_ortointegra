@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Paciente, Consulta } from '@/types'
 import { differenceInYears, parseISO, format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import Portal from '@/components/ui/Portal'
 import { ArrowLeft, Printer, Stethoscope, Pencil, Trash2, Save, Loader2, X } from 'lucide-react'
 import Link from 'next/link'
 import { PRINT_CSS, markdownToHtml } from '@/lib/printStyles'
@@ -140,6 +141,7 @@ export default function ConsultaDetallePage() {
 
       {/* Modal confirmar eliminación — macOS alert */}
       {confirmEliminar && (
+        <Portal>
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
           <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden animate-slide-up">
             <div className="px-6 pt-6 pb-4 text-center">
@@ -173,6 +175,7 @@ export default function ConsultaDetallePage() {
             </div>
           </div>
         </div>
+        </Portal>
       )}
 
       {/* Header */}
