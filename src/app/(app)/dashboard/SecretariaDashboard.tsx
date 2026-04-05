@@ -18,7 +18,7 @@ export default function SecretariaDashboard() {
       .select('*')
       .order('created_at', { ascending: false })
       .limit(5)
-      .then(({ data }) => setRecientes(data || []))
+      .then(({ data }: { data: Paciente[] | null }) => setRecientes(data || []))
   }, [])
 
   const hoy = format(new Date(), "EEEE d 'de' MMMM 'de' yyyy", { locale: es })
