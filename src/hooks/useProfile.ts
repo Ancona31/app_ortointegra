@@ -23,7 +23,7 @@ let profilePromise: Promise<Profile | null> | null = null
 function fetchProfile(): Promise<Profile | null> {
   if (profilePromise) return profilePromise
   const supabase = createClient()
-  profilePromise = supabase.auth.getUser().then(({ data: { user } }) => {
+  profilePromise = supabase.auth.getUser().then(({ data: { user } }: { data: { user: any } }) => {
     if (!user) return null
     return supabase
       .from('profiles')
@@ -32,7 +32,7 @@ function fetchProfile(): Promise<Profile | null> {
       .single()
       .then(({ data }: { data: any }) => data)
   }).catch(() => null)
-  return profilePromise
+  return profilePromise!
 }
 
 // Limpiar caché al cerrar sesión (llamar desde el botón de logout)

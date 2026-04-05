@@ -26,7 +26,7 @@ function ConfirmContent() {
       return
     }
 
-    supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' }).then(({ error: err }) => {
+    supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' }).then(({ error: err }: { error: any }) => {
       if (err) {
         setEstado('error')
       } else {

@@ -22,7 +22,7 @@ function ResetPasswordContent() {
       setError('Enlace inválido o expirado. Solicita uno nuevo.')
       return
     }
-    supabase.auth.exchangeCodeForSession(code).then(({ error: err }) => {
+    supabase.auth.exchangeCodeForSession(code).then(({ error: err }: { error: any }) => {
       if (err) {
         setError('Enlace inválido o expirado. Solicita uno nuevo.')
       } else {
