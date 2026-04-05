@@ -49,7 +49,7 @@ function BillingContent() {
   const newPlan = searchParams.get('plan') as PlanKey | null
 
   useEffect(() => {
-    if (!loadingProfile && profile && !['admin', 'super_admin'].includes(profile.role)) {
+    if (!loadingProfile && profile && !['admin', 'super_admin', 'medico'].includes(profile.role)) {
       router.push('/dashboard')
     }
   }, [profile, loadingProfile, router])
