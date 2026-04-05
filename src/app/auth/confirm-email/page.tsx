@@ -21,7 +21,7 @@ function ConfirmEmailContent() {
     }
 
     const supabase = createClient()
-    supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'email' }).then(async ({ error }) => {
+    supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'email' }).then(async ({ error }: { error: any }) => {
       if (error) {
         router.replace('/login?error=invalid_link')
         return
