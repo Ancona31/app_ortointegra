@@ -53,7 +53,7 @@ export default function LabDetallePage() {
   useEffect(() => {
     const supabase = createClient()
     supabase.from('laboratorios').select('*').eq('id', labId).single()
-      .then(({ data }) => { setLab(data); setLoading(false) })
+      .then(({ data }: { data: any }) => { setLab(data); setLoading(false) })
   }, [labId])
 
   if (loading) return <div className="text-center py-12 text-slate-400">Cargando...</div>

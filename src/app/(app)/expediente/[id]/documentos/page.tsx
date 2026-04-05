@@ -51,7 +51,7 @@ function DocumentosPacienteContent() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('pacientes').select('id, nombre, apellidos, fecha_nacimiento, sexo, numero_expediente').eq('id', id).single().then(({ data }) => setPaciente(data as any))
+    supabase.from('pacientes').select('id, nombre, apellidos, fecha_nacimiento, sexo, numero_expediente').eq('id', id).single().then(({ data }: { data: any }) => setPaciente(data))
   }, [id])
 
   const nombreCompleto = paciente ? `${paciente.nombre} ${paciente.apellidos}` : ''

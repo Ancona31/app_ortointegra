@@ -101,7 +101,7 @@ export default function NuevaNotaPage() {
   useEffect(() => {
     fetch('/api/me/perfil-medico').then(r => r.json()).then(({ medico }) => setMedicoInfo(medico))
     const supabase = createClient()
-    supabase.from('pacientes').select('*').eq('id', id).single().then(({ data }) => setPaciente(data))
+    supabase.from('pacientes').select('*').eq('id', id).single().then(({ data }: { data: any }) => setPaciente(data))
     try {
       const raw = localStorage.getItem('med-frecuentes')
       if (raw) {
@@ -126,7 +126,7 @@ export default function NuevaNotaPage() {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-      .then(({ data }) => {
+      .then(({ data }: { data: any }) => {
         if (!data) return
         const dx = Array.isArray(data.diagnosticos)
           ? (data.diagnosticos as { descripcion?: string }[]).map(d => d.descripcion).filter(Boolean).join(', ')

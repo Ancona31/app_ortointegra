@@ -70,7 +70,7 @@ export default function NuevoLaboratorioPage() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('pacientes').select('*').eq('id', id).single().then(({ data }) => setPaciente(data))
+    supabase.from('pacientes').select('*').eq('id', id).single().then(({ data }: { data: any }) => setPaciente(data))
   }, [id])
 
   // Limpia el intervalo de polling al desmontar el componente

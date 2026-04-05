@@ -142,7 +142,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     if (!pacienteId) return
     const supabase = createClient()
     supabase.from('pacientes').select('fecha_nacimiento, sexo').eq('id', pacienteId).single()
-      .then(({ data }) => {
+      .then(({ data }: { data: any }) => {
         if (data) {
           const edad = data.fecha_nacimiento
             ? Math.floor((Date.now() - new Date(data.fecha_nacimiento).getTime()) / (365.25 * 24 * 3600 * 1000))

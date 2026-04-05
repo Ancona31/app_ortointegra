@@ -31,7 +31,7 @@ export default function PacientesPage() {
       .select(CAMPOS)
       .order('created_at', { ascending: false })
       .limit(150)
-      .then(({ data }) => {
+      .then(({ data }: { data: any[] | null }) => {
         setPacientes(data ?? [])
         setLoading(false)
       })
@@ -65,7 +65,7 @@ export default function PacientesPage() {
       .select(CAMPOS)
       .order('created_at', { ascending: false })
       .limit(150)
-      .then(({ data }) => {
+      .then(({ data }: { data: any[] | null }) => {
         setPacientes(data ?? [])
         setLoading(false)
       })

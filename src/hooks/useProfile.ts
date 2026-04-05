@@ -30,7 +30,7 @@ function fetchProfile(): Promise<Profile | null> {
       .select('*')
       .eq('id', user.id)
       .single()
-      .then(({ data }) => data)
+      .then(({ data }: { data: any }) => data)
   }).catch(() => null)
   return profilePromise
 }

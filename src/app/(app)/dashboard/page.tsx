@@ -98,7 +98,7 @@ export default function DashboardPage() {
     supabase
       .from('pacientes')
       .select('id', { count: 'exact', head: true })
-      .then(({ count }) => setTotalPacientes(count ?? 0))
+      .then(({ count }: { count: number | null }) => setTotalPacientes(count ?? 0))
 
     // Pacientes recientes
     supabase
@@ -106,7 +106,7 @@ export default function DashboardPage() {
       .select('paciente_id, created_at, motivo_consulta, pacientes!inner(nombre, apellidos)')
       .order('created_at', { ascending: false })
       .limit(15)
-      .then(({ data }) => {
+      .then(({ data }: { data: any[] | null }) => {
         if (!data) return
         const seen = new Set<string>()
         const unique: Reciente[] = []
