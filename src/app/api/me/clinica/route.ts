@@ -44,6 +44,9 @@ export async function PUT(req: NextRequest) {
   }
 
   const { color_primario, color_secundario } = await req.json()
+  const hexRegex = /^#[0-9A-Fa-f]{6}$/
+  if (color_primario && !hexRegex.test(color_primario)) return NextResponse.json({ error: 'Color primario inválido' }, { status: 400 })
+  if (color_secundario && !hexRegex.test(color_secundario)) return NextResponse.json({ error: 'Color secundario inválido' }, { status: 400 })
 
   const admin = createAdminClient()
   const { error } = await admin.from('clinicas')

@@ -59,6 +59,7 @@ function DocumentosContent() {
       const { data } = await supabase
         .from('pacientes')
         .select('id, nombre, apellidos')
+        .neq('activo', false)
         .or(`nombre.ilike.%${busqueda}%,apellidos.ilike.%${busqueda}%`)
         .limit(8)
       setResultados(data ?? [])

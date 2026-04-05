@@ -23,12 +23,13 @@ export default function PacientesPage() {
   const [busqueda, setBusqueda] = useState('')
   const [loading, setLoading] = useState(true)
 
-  // Carga inicial: 150 más recientes
+  // Carga inicial: 150 más recientes (solo activos)
   useEffect(() => {
     const supabase = createClient()
     supabase
       .from('pacientes')
       .select(CAMPOS)
+      .neq('activo', false)
       .order('created_at', { ascending: false })
       .limit(150)
       .then(({ data }: { data: any[] | null }) => {
@@ -37,7 +38,7 @@ export default function PacientesPage() {
       })
   }, [])
 
-  // Búsqueda server-side con debounce 300 ms
+  // Búsqueda server-side con debounce 300 ms (solo activos)
   useEffect(() => {
     if (busqueda.trim().length < 2) return
     setLoading(true)
@@ -46,6 +47,7 @@ export default function PacientesPage() {
       const { data } = await supabase
         .from('pacientes')
         .select(CAMPOS)
+        .neq('activo', false)
         .or(`nombre.ilike.%${busqueda}%,apellidos.ilike.%${busqueda}%,numero_expediente.ilike.%${busqueda}%`)
         .order('apellidos')
         .limit(100)
@@ -55,7 +57,7 @@ export default function PacientesPage() {
     return () => clearTimeout(timeout)
   }, [busqueda])
 
-  // Al borrar la búsqueda, volver a la lista inicial
+  // Al borrar la búsqueda, volver a la lista inicial (solo activos)
   useEffect(() => {
     if (busqueda.trim().length > 0) return
     setLoading(true)
@@ -63,6 +65,7 @@ export default function PacientesPage() {
     supabase
       .from('pacientes')
       .select(CAMPOS)
+      .neq('activo', false)
       .order('created_at', { ascending: false })
       .limit(150)
       .then(({ data }: { data: any[] | null }) => {

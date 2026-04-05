@@ -135,16 +135,14 @@ function ExpedientePacienteContent() {
   }, [labs])
 
   async function eliminarDocumento(docId: string) {
-    const supabase = createClient()
-    await supabase.from('documentos').delete().eq('id', docId)
-    setDocumentos(prev => prev.filter(d => d.id !== docId))
+    const res = await fetch(`/api/documentos/${docId}`, { method: 'DELETE' })
+    if (res.ok) setDocumentos(prev => prev.filter(d => d.id !== docId))
   }
 
   async function eliminarLab(labId: string) {
     setEliminandoLab(labId)
-    const supabase = createClient()
-    await supabase.from('laboratorios').delete().eq('id', labId)
-    setLabs(prev => prev.filter(l => l.id !== labId))
+    const res = await fetch(`/api/laboratorios/${labId}`, { method: 'DELETE' })
+    if (res.ok) setLabs(prev => prev.filter(l => l.id !== labId))
     setEliminandoLab(null)
     setConfirmarEliminar(null)
   }
@@ -152,27 +150,11 @@ function ExpedientePacienteContent() {
   async function eliminarPaciente() {
     setEliminandoPaciente(true)
     setErrorEliminar('')
-    const supabase = createClient()
 
-    // Eliminar en orden: hijos primero, luego el paciente
-    const pasos = [
-      supabase.from('documentos').delete().eq('paciente_id', id),
-      supabase.from('laboratorios').delete().eq('paciente_id', id),
-      supabase.from('consultas').delete().eq('paciente_id', id),
-    ]
-
-    for (const paso of pasos) {
-      const { error } = await paso
-      if (error) {
-        setErrorEliminar('Error al eliminar datos: ' + error.message)
-        setEliminandoPaciente(false)
-        return
-      }
-    }
-
-    const { error } = await supabase.from('pacientes').delete().eq('id', id)
-    if (error) {
-      setErrorEliminar('Error al eliminar paciente: ' + error.message)
+    const res = await fetch(`/api/pacientes/${id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({ error: 'Error desconocido' }))
+      setErrorEliminar(data.error || 'No se pudo eliminar el paciente. Intenta de nuevo.')
       setEliminandoPaciente(false)
       return
     }

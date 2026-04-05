@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const securityHeaders = [
   { key: 'X-Content-Type-Options',  value: 'nosniff' },
@@ -30,7 +31,6 @@ const nextConfig: NextConfig = {
   ],
   webpack: (config, { isServer }) => {
     if (!isServer) {
-      // Los codecs de cornerstone intentan importar módulos de Node.js — ignorarlos en el cliente
       config.resolve.fallback = {
         ...config.resolve.fallback,
         fs: false,
@@ -50,4 +50,10 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  org: "ortointegra",
+  project: "ortointegra",
+  silent: true,
+  widenClientFileUpload: true,
+  disableLogger: true,
+});

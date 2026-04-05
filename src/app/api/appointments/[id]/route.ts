@@ -41,15 +41,19 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
+    const { data: profile } = await supabase.from('profiles').select('clinica_id').eq('id', user.id).single()
+    if (!profile?.clinica_id) return NextResponse.json({ error: 'Sin clínica' }, { status: 403 })
+
     const { id } = await ctx.params
     const body = await req.json()
     const { title, start_time, end_time, paciente_id, notes, status, medico_id, updated_at: clientUpdatedAt } = body
 
-    // ── 409 Conflict: validar versión optimista ──────────────
+    // ── Verificar ownership ──────────────────────────────────
     const { data: existing } = await supabase
       .from('appointments')
       .select('id, google_event_id, gcal_sync_status, updated_at')
       .eq('id', id)
+      .eq('clinica_id', profile.clinica_id)
       .single()
 
     if (!existing) return NextResponse.json({ error: 'Cita no encontrada' }, { status: 404 })
@@ -130,12 +134,16 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext<'/api/appointm
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
+    const { data: profile } = await supabase.from('profiles').select('clinica_id').eq('id', user.id).single()
+    if (!profile?.clinica_id) return NextResponse.json({ error: 'Sin clínica' }, { status: 403 })
+
     const { id } = await ctx.params
 
     const { data: existing } = await supabase
       .from('appointments')
       .select('id, google_event_id')
       .eq('id', id)
+      .eq('clinica_id', profile.clinica_id)
       .single()
     if (!existing) return NextResponse.json({ error: 'Cita no encontrada' }, { status: 404 })
 

@@ -244,32 +244,32 @@ export default function NuevaNotaPage() {
   async function guardar() {
     if (!notaGenerada && !form.motivo_consulta) { setError('Completa la nota antes de guardar'); return }
     setGuardando(true)
-    const supabase = createClient()
 
     const medsConDatos = medicamentos.filter(m => m.nombre.trim())
-    // Append pronóstico al texto de la nota si existe
     const notaFinal = notaGenerada
       + (form.pronostico.trim() ? `\n\n**[PRONÓSTICO]:**\n${form.pronostico.trim()}` : '')
 
-    const { error: err } = await supabase.from('consultas').insert({
-      paciente_id: id,
-      fecha: new Date().toISOString(),
-      motivo_consulta: form.motivo_consulta,
-      exploracion_fisica: form.exploracion_fisica,
-      diagnosticos: form.diagnosticos ? [{ descripcion: form.diagnosticos }] : [],
-      plan_tratamiento: form.plan_tratamiento,
-      notas_evolucion: notaFinal,
-      proxima_cita: form.proxima_cita || null,
-      medicamentos: medsConDatos.length ? medsConDatos : null,
-      medico_nombre: medicoInfo?.nombre || null,
-      medico_especialidad: medicoInfo?.especialidad || null,
-      medico_cedula_profesional: medicoInfo?.cedula_profesional || null,
-      medico_cedula_especialidad: medicoInfo?.cedula_especialidad || null,
-      medico_logo_url: medicoInfo?.logo_url || null,
+    const res = await fetch('/api/consultas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        paciente_id: id,
+        motivo_consulta: form.motivo_consulta,
+        exploracion_fisica: form.exploracion_fisica,
+        diagnosticos: form.diagnosticos ? [{ descripcion: form.diagnosticos }] : [],
+        plan_tratamiento: form.plan_tratamiento,
+        notas_evolucion: notaFinal,
+        proxima_cita: form.proxima_cita || null,
+        medicamentos: medsConDatos.length ? medsConDatos : null,
+      }),
     })
 
     setGuardando(false)
-    if (err) { setError('No se pudo guardar la nota. Verifica tu conexión e intenta de nuevo.'); return }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({ error: 'Error desconocido' }))
+      setError(data.error || 'No se pudo guardar la nota. Verifica tu conexión e intenta de nuevo.')
+      return
+    }
     saveMedCache(medsConDatos)
     try { localStorage.removeItem(draftKey) } catch {}
     setNotaSaved(true)

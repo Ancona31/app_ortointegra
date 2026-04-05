@@ -94,17 +94,22 @@ export default function EditarPacientePage() {
     setError('')
     const imc = calcularIMC()
     const tallaCm = parseTallaCm(form.talla_cm || '')
-    const supabase = createClient()
     const formLimpio = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== ''))
-    const { error: err } = await supabase.from('pacientes').update({
-      ...formLimpio,
-      peso_kg: form.peso_kg ? Math.round(parseFloat(form.peso_kg) * 10) / 10 : null,
-      talla_cm: tallaCm,
-      imc: imc ? parseFloat(imc) : null,
-    }).eq('id', id)
+    const res = await fetch(`/api/pacientes/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...formLimpio,
+        peso_kg: form.peso_kg ? Math.round(parseFloat(form.peso_kg) * 10) / 10 : null,
+        talla_cm: tallaCm,
+        imc: imc ? parseFloat(imc) : null,
+      }),
+    })
     setGuardando(false)
-    if (err) { setError('Error al guardar: ' + err.message) }
-    else { router.push(`/expediente/${id}`) }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({ error: 'Error desconocido' }))
+      setError(data.error || 'No se pudo guardar.')
+    } else { router.push(`/expediente/${id}`) }
   }
 
   if (loading) return (

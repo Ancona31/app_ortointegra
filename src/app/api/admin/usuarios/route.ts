@@ -65,7 +65,7 @@ export async function DELETE(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('profiles').select('role, clinica_id').eq('id', user.id).single()
 
   // Solo admin y super_admin pueden eliminar
   if (!profile || !['admin', 'super_admin'].includes(profile.role)) {
@@ -75,9 +75,13 @@ export async function DELETE(req: Request) {
   const { userId } = await req.json()
   if (userId === user.id) return NextResponse.json({ error: 'No puedes eliminarte a ti mismo' }, { status: 400 })
 
-  // Verificar que el objetivo tiene un rol menor al del solicitante
+  // Verificar que el objetivo pertenece a la misma clínica
   const admin = createAdminClient()
-  const { data: targetProfile } = await admin.from('profiles').select('role').eq('id', userId).single()
+  const { data: targetProfile } = await admin.from('profiles').select('role, clinica_id').eq('id', userId).single()
+
+  if (profile.role !== 'super_admin' && targetProfile?.clinica_id !== profile.clinica_id) {
+    return NextResponse.json({ error: 'No puedes eliminar usuarios de otra clínica' }, { status: 403 })
+  }
 
   const callerLevel = ROLE_LEVEL[profile.role] ?? 0
   const targetLevel = ROLE_LEVEL[targetProfile?.role ?? ''] ?? 0

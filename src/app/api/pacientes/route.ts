@@ -21,6 +21,26 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const admin = createAdminClient()
 
+    // ── Verificar límite de pacientes (cuenta todos, incluso inactivos) ──
+    const { data: clinica } = await admin
+      .from('clinicas')
+      .select('max_pacientes')
+      .eq('id', profile.clinica_id)
+      .single()
+
+    if (clinica?.max_pacientes && clinica.max_pacientes > 0) {
+      const { count } = await admin
+        .from('pacientes')
+        .select('id', { count: 'exact', head: true })
+        .eq('clinica_id', profile.clinica_id)
+      if ((count ?? 0) >= clinica.max_pacientes) {
+        return NextResponse.json(
+          { error: `Has alcanzado el límite de ${clinica.max_pacientes} pacientes de tu plan. Actualiza tu plan para continuar.` },
+          { status: 403 }
+        )
+      }
+    }
+
     // ── Generar número de expediente ──────────────────────────────
     const year = new Date().getFullYear()
     const prefix = `EXP-${year}-`
@@ -44,7 +64,7 @@ export async function POST(req: NextRequest) {
 
     // ── Determinar medico_id ──────────────────────────────────────
     const medico_id = body.medico_id
-      || (profile.role === 'medico' ? profile.id : null)
+      || (['medico', 'admin'].includes(profile.role) ? profile.id : null)
 
     // ── Insertar paciente ─────────────────────────────────────────
     const { data: nuevo, error } = await admin

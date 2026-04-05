@@ -278,6 +278,7 @@ function usePacientes(query: string) {
       const { data } = await supabase
         .from('pacientes')
         .select('id, nombre, apellidos, telefono')
+        .neq('activo', false)
         .or(`nombre.ilike.%${query}%,apellidos.ilike.%${query}%`)
         .order('apellidos')
         .limit(8)

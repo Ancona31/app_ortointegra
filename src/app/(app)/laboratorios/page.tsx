@@ -97,16 +97,21 @@ export default function LaboratoriosPage() {
   async function handleGuardar() {
     if (!pacienteId) { setErrorMsg('Ingresa el ID del paciente'); return }
     setGuardando(true)
-    const supabase = createClient()
-    const { error } = await supabase.from('laboratorios').insert({
-      paciente_id: pacienteId,
-      fecha_toma: fechaToma,
-      valores,
-      analisis_ia: analisis,
+    const res = await fetch('/api/laboratorios', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        paciente_id: pacienteId,
+        fecha_toma: fechaToma,
+        valores,
+        analisis_ia: analisis,
+      }),
     })
     setGuardando(false)
-    if (error) setErrorMsg('Error al guardar: ' + error.message)
-    else setGuardado(true)
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({ error: 'Error desconocido' }))
+      setErrorMsg(data.error || 'No se pudo guardar el laboratorio.')
+    } else setGuardado(true)
   }
 
   return (

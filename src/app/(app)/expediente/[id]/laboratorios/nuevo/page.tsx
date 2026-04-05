@@ -193,17 +193,22 @@ export default function NuevoLaboratorioPage() {
 
   async function handleGuardar() {
     setGuardando(true)
-    const supabase = createClient()
-    const { error } = await supabase.from('laboratorios').insert({
-      paciente_id: id,
-      fecha_toma: fechaToma,
-      valores,
-      resultados: resultados.length > 0 ? resultados : null,
-      analisis_ia: analisis,
+    const res = await fetch('/api/laboratorios', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        paciente_id: id,
+        fecha_toma: fechaToma,
+        valores,
+        resultados: resultados.length > 0 ? resultados : null,
+        analisis_ia: analisis,
+      }),
     })
     setGuardando(false)
-    if (error) setErrorMsg('No se pudo guardar el laboratorio. Verifica tu conexión e intenta de nuevo.')
-    else router.push(`/expediente/${id}?tab=laboratorios`)
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({ error: 'Error desconocido' }))
+      setErrorMsg(data.error || 'No se pudo guardar el laboratorio. Verifica tu conexión e intenta de nuevo.')
+    } else router.push(`/expediente/${id}?tab=laboratorios`)
   }
 
   const edad = paciente?.fecha_nacimiento

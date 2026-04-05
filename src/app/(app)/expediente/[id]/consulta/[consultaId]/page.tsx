@@ -61,27 +61,34 @@ export default function ConsultaDetallePage() {
   async function guardarEdicion() {
     setGuardando(true)
     setError('')
-    const supabase = createClient()
-    const { error: err } = await supabase
-      .from('consultas')
-      .update({
+    const res = await fetch(`/api/consultas/${consultaId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         motivo_consulta: form.motivo_consulta,
         notas_evolucion: form.notas_evolucion,
         proxima_cita: form.proxima_cita || null,
-      })
-      .eq('id', consultaId)
+      }),
+    })
     setGuardando(false)
-    if (err) { setError('Error al guardar: ' + err.message); return }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({ error: 'Error desconocido' }))
+      setError(data.error || 'No se pudo guardar.')
+      return
+    }
     setConsulta(prev => prev ? { ...prev, ...form } : prev)
     setEditando(false)
   }
 
   async function eliminar() {
     setEliminando(true)
-    const supabase = createClient()
-    const { error: err } = await supabase.from('consultas').delete().eq('id', consultaId)
+    const res = await fetch(`/api/consultas/${consultaId}`, { method: 'DELETE' })
     setEliminando(false)
-    if (err) { setError('Error al eliminar: ' + err.message); return }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({ error: 'Error desconocido' }))
+      setError(data.error || 'No se pudo eliminar la nota.')
+      return
+    }
     router.push(`/expediente/${id}`)
   }
 

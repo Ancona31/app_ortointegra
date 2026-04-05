@@ -72,6 +72,7 @@ export default function CommandPalette() {
     const { data } = await supabase
       .from('pacientes')
       .select('id, nombre, apellidos, fecha_nacimiento, numero_expediente, sexo')
+      .neq('activo', false)
       .or(`nombre.ilike.%${q}%,apellidos.ilike.%${q}%`)
       .order('apellidos')
       .limit(8)
