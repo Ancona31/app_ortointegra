@@ -10,7 +10,15 @@ const securityHeaders = [
 ]
 
 const nextConfig: NextConfig = {
-  turbopack: {},
+  turbopack: {
+    resolveAlias: {
+      fs: { browser: './src/lib/stubs/empty.js' },
+      path: { browser: './src/lib/stubs/empty.js' },
+      crypto: { browser: './src/lib/stubs/empty.js' },
+      stream: { browser: './src/lib/stubs/empty.js' },
+      buffer: { browser: './src/lib/stubs/empty.js' },
+    },
+  },
   async headers() {
     return [
       {

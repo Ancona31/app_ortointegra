@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { google } from 'googleapis'
@@ -87,61 +87,68 @@ export async function POST(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    // Sincronizar con Google Calendar — fallo no bloquea, queda como 'pending' para reintento
-    let gcal_sync_status: 'synced' | 'pending' | 'failed' = 'pending'
-    let google_event_id: string | null = null
+    // Google Calendar sync en background — no bloquea la respuesta
+    after(async () => {
+      let gcal_sync_status: 'synced' | 'pending' | 'failed' = 'pending'
+      let google_event_id: string | null = null
 
-    try {
-      const { data: tokenData } = await supabase
-        .from('google_tokens')
-        .select('*')
-        .eq('user_id', profile.userId)
-        .single()
+      try {
+        const { data: tokenData } = await supabase
+          .from('google_tokens')
+          .select('*')
+          .eq('user_id', profile.userId)
+          .single()
 
-      if (tokenData) {
-        oauth2Client.setCredentials({
-          access_token:  decrypt(tokenData.access_token),
-          refresh_token: decrypt(tokenData.refresh_token),
-          expiry_date:   tokenData.expires_at,
-        })
-        if (tokenData.expires_at && Date.now() > tokenData.expires_at) {
-          const { credentials } = await oauth2Client.refreshAccessToken()
-          await supabase.from('google_tokens').update({
-            access_token: credentials.access_token ? encrypt(credentials.access_token) : null,
-            expires_at:   credentials.expiry_date ?? null,
-          }).eq('user_id', profile.userId)
-          oauth2Client.setCredentials(credentials)
+        if (tokenData) {
+          const bgOauth = new google.auth.OAuth2(
+            process.env.GOOGLE_CLIENT_ID,
+            process.env.GOOGLE_CLIENT_SECRET,
+            process.env.GOOGLE_REDIRECT_URI
+          )
+          bgOauth.setCredentials({
+            access_token:  decrypt(tokenData.access_token),
+            refresh_token: decrypt(tokenData.refresh_token),
+            expiry_date:   tokenData.expires_at,
+          })
+          if (tokenData.expires_at && Date.now() > tokenData.expires_at) {
+            const { credentials } = await bgOauth.refreshAccessToken()
+            await admin.from('google_tokens').update({
+              access_token: credentials.access_token ? encrypt(credentials.access_token) : null,
+              expires_at:   credentials.expiry_date ?? null,
+            }).eq('user_id', profile.userId)
+            bgOauth.setCredentials(credentials)
+          }
+
+          const calendar = google.calendar({ version: 'v3', auth: bgOauth })
+          const { data: gEvent } = await calendar.events.insert({
+            calendarId:  'primary',
+            requestBody: {
+              summary:     title,
+              description: notes ?? undefined,
+              start: { dateTime: start_time, timeZone: 'America/Mexico_City' },
+              end:   { dateTime: end_time,   timeZone: 'America/Mexico_City' },
+            },
+          })
+          google_event_id  = gEvent.id ?? null
+          gcal_sync_status = 'synced'
+        } else {
+          gcal_sync_status = 'synced'
         }
-
-        const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
-        const { data: gEvent } = await calendar.events.insert({
-          calendarId:  'primary',
-          requestBody: {
-            summary:     title,
-            description: notes ?? undefined,
-            start: { dateTime: start_time, timeZone: 'America/Mexico_City' },
-            end:   { dateTime: end_time,   timeZone: 'America/Mexico_City' },
-          },
-        })
-        google_event_id  = gEvent.id ?? null
-        gcal_sync_status = 'synced'
-      } else {
-        // Sin Google Calendar conectado — no hay nada que sincronizar
-        gcal_sync_status = 'synced'
+      } catch (gcalErr) {
+        console.error('[GCal background sync error]', gcalErr)
+        gcal_sync_status = 'failed'
       }
-    } catch (gcalErr) {
-      console.error('[GCal sync error]', gcalErr)
-      gcal_sync_status = 'failed'
-    }
 
-    await admin
-      .from('appointments')
-      .update({ google_event_id, gcal_sync_status })
-      .eq('id', apt.id)
+      await admin
+        .from('appointments')
+        .update({ google_event_id, gcal_sync_status })
+        .eq('id', apt.id)
+    })
 
+    // Respuesta inmediata — Google sync continúa en background
     return NextResponse.json({
-      appointment: { ...apt, google_event_id, gcal_sync_status },
-      gcalSynced:  gcal_sync_status === 'synced',
+      appointment: apt,
+      gcalSynced:  false, // sync aún en progreso
     })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })

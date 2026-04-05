@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
-import interactionPlugin, { DateClickArg } from '@fullcalendar/interaction'
+import interactionPlugin, { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
 import { EventClickArg, EventDropArg, DateSelectArg, EventInput, EventContentArg } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
 import { X, Calendar, User, Plus, Trash2, Settings } from 'lucide-react'
@@ -706,16 +706,17 @@ function ConfirmModal({ message, onConfirm, onCancel }: {
   )
 }
 
-/* ─── Renderer de eventos (estilo Google) ──────────────── */
+/* ─── Renderer de eventos (estilo Google) — memoizado ──── */
 
 type EventColor = { bg: string; text: string; border: string }
 
-function renderEventContent(arg: EventContentArg) {
-  const apt = arg.event.extendedProps as Appointment & { colorStyle?: EventColor; doctorInitial?: string }
-  if (!apt?.status) return <>{arg.event.title}</>
-  const s   = apt.colorStyle ?? STATUS_STYLE[apt.status]
-  const pac = apt.pacientes
-
+const MemoizedEventContent = memo(function MemoizedEventContent({
+  timeText, title, pacNombre, status, colorStyle, doctorInitial,
+}: {
+  timeText: string; title: string; pacNombre: string | null
+  status: Status; colorStyle?: EventColor; doctorInitial?: string
+}) {
+  const s = colorStyle ?? STATUS_STYLE[status]
   return (
     <div style={{
       background:     s.bg,
@@ -731,15 +732,15 @@ function renderEventContent(arg: EventContentArg) {
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
         <span style={{ fontSize: '10px', color: s.text, opacity: 0.6, lineHeight: 1.2, fontWeight: 500, flex: 1 }}>
-          {arg.timeText}
+          {timeText}
         </span>
-        {apt.doctorInitial && (
+        {doctorInitial && (
           <span style={{
             fontSize: '9px', fontWeight: 700, color: s.text,
             background: s.border + '33', borderRadius: '3px',
             padding: '0 3px', lineHeight: '14px', flexShrink: 0,
           }}>
-            {apt.doctorInitial}
+            {doctorInitial}
           </span>
         )}
       </div>
@@ -753,9 +754,25 @@ function renderEventContent(arg: EventContentArg) {
         overflowWrap: 'break-word',
         whiteSpace:   'normal',
       }}>
-        {pac ? `${pac.nombre} ${pac.apellidos}` : apt.title}
+        {pacNombre ?? title}
       </div>
     </div>
+  )
+})
+
+function renderEventContent(arg: EventContentArg) {
+  const apt = arg.event.extendedProps as Appointment & { colorStyle?: EventColor; doctorInitial?: string }
+  if (!apt?.status) return <>{arg.event.title}</>
+  const pac = apt.pacientes
+  return (
+    <MemoizedEventContent
+      timeText={arg.timeText}
+      title={apt.title}
+      pacNombre={pac ? `${pac.nombre} ${pac.apellidos}` : null}
+      status={apt.status}
+      colorStyle={apt.colorStyle}
+      doctorInitial={apt.doctorInitial}
+    />
   )
 }
 
@@ -820,17 +837,25 @@ export default function AgendaPage() {
     calendarRef.current?.getApi().refetchEvents()
   }
 
-  /* ── Supabase Realtime — WebSocket subscription ─────── */
+  /* ── Supabase Realtime — debounced (max 1 refetch/sec) ── */
+  const realtimeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
     const supabase = createClient()
     const channel = supabase
       .channel('appointments-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => {
-        refetch()
+        if (realtimeTimer.current) return // ya hay un refetch pendiente
+        realtimeTimer.current = setTimeout(() => {
+          realtimeTimer.current = null
+          refetch()
+        }, 1000)
       })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      supabase.removeChannel(channel)
+      if (realtimeTimer.current) clearTimeout(realtimeTimer.current)
+    }
   }, [])
 
   /* ── Event source: nuestras citas ───────────────────── */
@@ -915,6 +940,51 @@ export default function AgendaPage() {
     }
   }, [])
 
+  /* ── Stable eventSources ref (evita re-registro en cada render) ── */
+  const appointmentSourceRef = useRef(appointmentSource)
+  appointmentSourceRef.current = appointmentSource
+  const gcalSourceRef = useRef(gcalSource)
+  gcalSourceRef.current = gcalSource
+
+  const stableAppointmentSource = useCallback(
+    (info: { startStr: string; endStr: string }, success: (events: EventInput[]) => void, failure: (err: Error) => void) =>
+      appointmentSourceRef.current(info, success, failure),
+    []
+  )
+  const stableGcalSource = useCallback(
+    (info: { startStr: string; endStr: string }, success: (events: EventInput[]) => void, failure: (err: Error) => void) =>
+      gcalSourceRef.current(info, success, failure),
+    []
+  )
+  const eventSourcesStable = useMemo(() => [stableAppointmentSource, stableGcalSource], [stableAppointmentSource, stableGcalSource])
+
+  /* ── Helper: construir EventInput desde datos de cita ── */
+  function buildEventInput(data: Partial<Appointment> & { id?: string }): EventInput {
+    const status = data.status ?? 'scheduled'
+    let colorStyle: EventColor
+    let doctorInitial: string | undefined
+
+    if (!isSingleDoctor && data.medico_id) {
+      const idx = medicoColorMap.get(data.medico_id) ?? 0
+      colorStyle = DOCTOR_COLORS[idx % DOCTOR_COLORS.length]
+      const m = medicos.find(m => m.id === data.medico_id)
+      if (m) doctorInitial = m.nombre.slice(0, 2).toUpperCase()
+    } else {
+      colorStyle = STATUS_STYLE[status] ?? STATUS_STYLE.scheduled
+    }
+
+    return {
+      id:              data.id ?? `optimistic-${Date.now()}`,
+      title:           data.title ?? '',
+      start:           data.start_time,
+      end:             data.end_time,
+      backgroundColor: 'transparent',
+      borderColor:     'transparent',
+      textColor:       colorStyle.text,
+      extendedProps:   { ...data, colorStyle, doctorInitial },
+    }
+  }
+
   /* ── Handlers ────────────────────────────────────────── */
   function handleDateClick(arg: DateClickArg) {
     const start = arg.date.toISOString()
@@ -964,41 +1034,83 @@ export default function AgendaPage() {
     }
 
     // Sin updated_at — drag & drop no requiere chequeo de concurrencia
-    toast.info('Guardando cambio...')
+    // FullCalendar ya movió el evento visualmente — solo sincronizar con servidor
     ejecutarDrop(id, start_time, end_time, arg)
   }
 
-  async function ejecutarDrop(id: string, start_time: string, end_time: string | undefined, arg: EventDropArg) {
+  async function ejecutarDrop(id: string, start_time: string, end_time: string | undefined, arg: EventDropArg | EventResizeDoneArg) {
     const res = await fetch(`/api/appointments/${id}`, {
       method:  'PUT',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ start_time, end_time }),
     })
 
-    if (res.ok) {
-      toast.success('Cita actualizada')
-    } else {
+    if (!res.ok) {
       arg.revert()
       const { error } = await res.json().catch(() => ({ error: 'Error desconocido' }))
       toast.error(error ?? 'Error de conexión — cita devuelta a su horario original')
+      return
     }
+
+    toast.success('Cita reagendada')
+
+    // Glow verde de confirmación
+    const el = arg.el as HTMLElement | null
+    if (el) {
+      el.classList.add('fc-event-drop-success')
+      setTimeout(() => el.classList.remove('fc-event-drop-success'), 700)
+    }
+  }
+
+  async function handleEventResize(arg: EventResizeDoneArg) {
+    if (arg.event.extendedProps.isGcalBlock) { arg.revert(); return }
+    const id         = arg.event.id
+    const start_time = arg.event.start?.toISOString()
+    const end_time   = arg.event.end?.toISOString()
+    if (!start_time) { arg.revert(); return }
+    ejecutarDrop(id, start_time, end_time, arg)
   }
 
   async function handleSave(data: Partial<Appointment> & { id?: string }) {
     const isEdit = !!data.id
+    const api = calendarRef.current?.getApi()
 
-    // Optimistic: cierra el modal y actualiza el calendario de inmediato
+    // ── Optimistic update: inyectar/actualizar evento en FullCalendar al instante ──
     closeModal()
-    refetch()
     toast.success(isEdit ? 'Cita actualizada' : 'Cita agendada correctamente')
 
+    let optimisticEvent: ReturnType<NonNullable<typeof api>['addEvent']> | null = null
+
+    if (api) {
+      if (isEdit) {
+        // Actualizar el evento existente in-place
+        const existing = api.getEventById(data.id!)
+        if (existing) {
+          if (data.start_time) existing.setStart(data.start_time)
+          if (data.end_time)   existing.setEnd(data.end_time)
+          if (data.title)      existing.setProp('title', data.title)
+          // Actualizar extendedProps con nuevo color/status
+          const ev = buildEventInput(data)
+          existing.setExtendedProp('status', data.status ?? existing.extendedProps.status)
+          existing.setExtendedProp('colorStyle', ev.extendedProps?.colorStyle)
+          existing.setExtendedProp('notes', data.notes ?? existing.extendedProps.notes)
+          existing.setExtendedProp('pacientes', data.paciente_id ? existing.extendedProps.pacientes : null)
+        }
+      } else {
+        // Crear evento optimista temporal
+        optimisticEvent = api.addEvent(buildEventInput(data))
+      }
+    }
+
+    // ── Llamada real al API ──
     const res = await fetch(
       isEdit ? `/api/appointments/${data.id}` : '/api/appointments',
       { method: isEdit ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }
     )
 
     if (!res.ok) {
-      // Rollback: revertir el optimismo si falló
+      // Rollback: remover evento optimista y refrescar desde servidor
+      if (optimisticEvent) optimisticEvent.remove()
       refetch()
       const { error } = await res.json().catch(() => ({ error: 'Error desconocido' }))
       toast.error(error ?? 'No se pudo guardar la cita')
@@ -1006,6 +1118,13 @@ export default function AgendaPage() {
     }
 
     const json = await res.json()
+
+    if (!isEdit && optimisticEvent && json.appointment?.id) {
+      // Reemplazar evento optimista con el real (que tiene ID de DB)
+      optimisticEvent.remove()
+      api?.addEvent(buildEventInput({ ...data, ...json.appointment }))
+    }
+
     if (!isEdit && json.gcalSynced === false) {
       toast.info('Sin conexión con Google Calendar — se sincronizará pronto.')
     }
@@ -1013,11 +1132,16 @@ export default function AgendaPage() {
 
   async function handleDelete(id: string) {
     closeModal()
-    refetch()
     toast.success('Cita eliminada')
+
+    // Optimistic: remover evento del calendario al instante
+    const api = calendarRef.current?.getApi()
+    const existing = api?.getEventById(id)
+    existing?.remove()
 
     const res = await fetch(`/api/appointments/${id}`, { method: 'DELETE' })
     if (!res.ok) {
+      // Rollback: restaurar estado desde servidor
       refetch()
       toast.error('No se pudo eliminar la cita')
     }
@@ -1117,13 +1241,16 @@ export default function AgendaPage() {
           selectable
           selectMirror
           editable
+          dragRevertDuration={200}
+          eventResizableFromStart
           businessHours={horarioToBusinessHours(horario)}
-          eventSources={[appointmentSource, gcalSource]}
+          eventSources={eventSourcesStable}
           eventContent={renderEventContent}
           dateClick={handleDateClick}
           select={handleSelect}
           eventClick={handleEventClick}
           eventDrop={handleEventDrop}
+          eventResize={handleEventResize}
           height="auto"
           slotDuration="00:30:00"
           slotLabelInterval="01:00:00"

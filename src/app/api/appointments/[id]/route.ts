@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { google } from 'googleapis'
@@ -85,40 +85,43 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    // ── Sincronizar con Google Calendar ──────────────────────
+    // ── Sincronizar con Google Calendar en background ──────
     const gcalFieldChanged = title !== undefined || start_time !== undefined || end_time !== undefined || notes !== undefined || status !== undefined
     if (existing.google_event_id && gcalFieldChanged) {
-      // Mapeo de status → colorId de Google Calendar
-      const STATUS_COLOR: Record<string, string | undefined> = {
-        confirmed: '2',   // verde (sage)
-        cancelled: '11',  // rojo (tomato)
-        no_show:   '11',  // rojo
-        completed: '8',   // gris (graphite)
-      }
-      let gcal_sync_status: 'synced' | 'pending' | 'failed' = 'pending'
-      try {
-        const calendar = await getGCalClient(supabase, user.id)
-        if (calendar) {
-          await calendar.events.patch({
-            calendarId: 'primary',
-            eventId:    existing.google_event_id,
-            requestBody: {
-              ...(title      !== undefined ? { summary:     title }                                               : {}),
-              ...(notes      !== undefined ? { description: notes ?? '' }                                         : {}),
-              ...(start_time !== undefined ? { start: { dateTime: start_time, timeZone: 'America/Mexico_City' } } : {}),
-              ...(end_time   !== undefined ? { end:   { dateTime: end_time,   timeZone: 'America/Mexico_City' } } : {}),
-              ...(status     !== undefined && STATUS_COLOR[status] ? { colorId: STATUS_COLOR[status] }            : {}),
-            },
-          })
-          gcal_sync_status = 'synced'
-        } else {
-          gcal_sync_status = 'synced'
+      const gcalEventId = existing.google_event_id
+      const userId = user.id
+      after(async () => {
+        const STATUS_COLOR: Record<string, string | undefined> = {
+          confirmed: '2',   // verde (sage)
+          cancelled: '11',  // rojo (tomato)
+          no_show:   '11',  // rojo
+          completed: '8',   // gris (graphite)
         }
-      } catch (gcalErr) {
-        console.error('[GCal sync error]', gcalErr)
-        gcal_sync_status = 'failed'
-      }
-      await admin.from('appointments').update({ gcal_sync_status }).eq('id', id)
+        let gcal_sync_status: 'synced' | 'pending' | 'failed' = 'pending'
+        try {
+          const calendar = await getGCalClient(supabase, userId)
+          if (calendar) {
+            await calendar.events.patch({
+              calendarId: 'primary',
+              eventId:    gcalEventId,
+              requestBody: {
+                ...(title      !== undefined ? { summary:     title }                                               : {}),
+                ...(notes      !== undefined ? { description: notes ?? '' }                                         : {}),
+                ...(start_time !== undefined ? { start: { dateTime: start_time, timeZone: 'America/Mexico_City' } } : {}),
+                ...(end_time   !== undefined ? { end:   { dateTime: end_time,   timeZone: 'America/Mexico_City' } } : {}),
+                ...(status     !== undefined && STATUS_COLOR[status] ? { colorId: STATUS_COLOR[status] }            : {}),
+              },
+            })
+            gcal_sync_status = 'synced'
+          } else {
+            gcal_sync_status = 'synced'
+          }
+        } catch (gcalErr) {
+          console.error('[GCal background sync error]', gcalErr)
+          gcal_sync_status = 'failed'
+        }
+        await admin.from('appointments').update({ gcal_sync_status }).eq('id', id)
+      })
     }
 
     return NextResponse.json({ appointment: apt })
@@ -152,12 +155,16 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext<'/api/appointm
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     if (existing.google_event_id) {
-      try {
-        const calendar = await getGCalClient(supabase, user.id)
-        if (calendar) {
-          await calendar.events.delete({ calendarId: 'primary', eventId: existing.google_event_id })
-        }
-      } catch { /* GCal delete es best-effort */ }
+      const gcalEventId = existing.google_event_id
+      const userId = user.id
+      after(async () => {
+        try {
+          const calendar = await getGCalClient(supabase, userId)
+          if (calendar) {
+            await calendar.events.delete({ calendarId: 'primary', eventId: gcalEventId })
+          }
+        } catch { /* GCal delete es best-effort */ }
+      })
     }
 
     return NextResponse.json({ ok: true })
