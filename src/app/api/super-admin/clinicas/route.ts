@@ -15,18 +15,18 @@ export async function GET() {
   const result = (clinicas || []).map(c => {
     const clinicaProfiles = (profiles || []).filter(p => p.clinica_id === c.id)
 
-    // Independientes: el médico (role='medico') ES el dueño/admin de su cuenta
-    // Clínicas: el admin (role='admin') tiene acceso médico completo pero NO ocupa slot
-    const adminProfile = c.tipo === 'independiente'
-      ? clinicaProfiles.find(p => p.role === 'medico')   // el médico es su propio admin
-      : clinicaProfiles.find(p => p.role === 'admin')
+    // Todos los dueños de cuenta son role='admin' (independientes y clínicas)
+    const adminProfile = clinicaProfiles.find(p => p.role === 'admin')
 
     const adminEmail = adminProfile
       ? (authUsers.find(u => u.id === adminProfile.id)?.email ?? null)
       : null
 
-    // Regla uniforme: solo role='medico' ocupa slots — admins siempre tienen acceso pero no cuentan
-    const count_medicos = clinicaProfiles.filter(p => p.role === 'medico').length
+    // Independiente: admin ES el médico → cuenta como 1
+    // Clínica: solo role='medico' ocupa slots
+    const count_medicos = c.tipo === 'independiente'
+      ? (adminProfile ? 1 : 0)
+      : clinicaProfiles.filter(p => p.role === 'medico').length
 
     const usuarios = clinicaProfiles
       .filter(p => ['medico', 'secretaria', 'admin'].includes(p.role))

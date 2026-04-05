@@ -61,7 +61,7 @@ export default function PerfilPage() {
   const [gcalConectado, setGcalConectado] = useState<boolean | null>(null)
   const [desconectandoGcal, setDesconectandoGcal] = useState(false)
 
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin' || profile?.role === 'medico'
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin'
 
   useEffect(() => {
     if (!loadingProfile && profile && !['medico', 'admin', 'super_admin'].includes(profile.role)) {

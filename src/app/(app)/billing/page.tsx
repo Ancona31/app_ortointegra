@@ -49,7 +49,7 @@ function BillingContent() {
   const newPlan = searchParams.get('plan') as PlanKey | null
 
   useEffect(() => {
-    if (!loadingProfile && profile && !['admin', 'super_admin', 'medico'].includes(profile.role)) {
+    if (!loadingProfile && profile && !['admin', 'super_admin'].includes(profile.role)) {
       router.push('/dashboard')
     }
   }, [profile, loadingProfile, router])
@@ -61,15 +61,19 @@ function BillingContent() {
     async function load() {
       const [{ data: c }, { data: medicos }, { data: secretarias }, { data: pacientes }] = await Promise.all([
         supabase.from('clinicas').select(
-          'plan, suscripcion_estado, trial_ends_at, suscripcion_ends_at, stripe_customer_id, max_medicos, max_secretarias, max_pacientes'
+          'plan, suscripcion_estado, trial_ends_at, suscripcion_ends_at, stripe_customer_id, max_medicos, max_secretarias, max_pacientes, tipo'
         ).eq('id', profile!.clinica_id!).single(),
         supabase.from('profiles').select('id', { count: 'exact' }).eq('clinica_id', profile!.clinica_id!).eq('role', 'medico'),
         supabase.from('profiles').select('id', { count: 'exact' }).eq('clinica_id', profile!.clinica_id!).eq('role', 'secretaria'),
         supabase.from('pacientes').select('id', { count: 'exact' }).eq('clinica_id', profile!.clinica_id!),
       ])
       setClinica(c as any)
+      // Independiente: el admin ES el médico → contar como 1
+      const esMedicoCount = (c as any)?.tipo === 'independiente'
+        ? 1
+        : (medicos?.length ?? 0)
       setUsage({
-        medicos: medicos?.length ?? 0,
+        medicos: esMedicoCount,
         secretarias: secretarias?.length ?? 0,
         pacientes: pacientes?.length ?? 0,
       })

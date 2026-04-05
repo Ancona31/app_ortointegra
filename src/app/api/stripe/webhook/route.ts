@@ -29,13 +29,10 @@ async function actualizarClinica(
     suscripcion_ends_at: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
   }).eq('id', clinicaId)
 
-  // Planes de clínica: convertir cuenta a tipo='clinica' y promover al dueño a admin
+  // Planes de clínica: convertir cuenta a tipo='clinica'
+  // El dueño ya es admin por defecto desde el registro
   if (PLANES_CLINICA.includes(plan)) {
     await admin.from('clinicas').update({ tipo: 'clinica' }).eq('id', clinicaId)
-    await admin.from('profiles')
-      .update({ role: 'admin' })
-      .eq('clinica_id', clinicaId)
-      .eq('role', 'medico')
   }
 }
 

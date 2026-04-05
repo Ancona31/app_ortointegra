@@ -70,9 +70,10 @@ export async function POST(req: NextRequest) {
   }
 
   // 3. Crear perfil
-  // Independiente → role 'medico' (cuenta 1/1 en el límite, puede escalar)
-  // Clínica       → role 'admin'  (no ocupa slot de médico, gestiona el equipo)
-  const role = tipo === 'clinica' ? 'admin' : 'medico'
+  // Todos los dueños de cuenta son admin — independientes y clínicas
+  // En clínicas: admin no ocupa slot de médico, gestiona el equipo
+  // En independiente: admin ES el médico (billing lo cuenta como 1 médico)
+  const role = 'admin'
 
   await admin.from('profiles').upsert({
     id:                  newUser.user.id,

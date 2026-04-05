@@ -57,8 +57,8 @@ function navDoctor(isAdmin: boolean, isSuperAdmin: boolean): NavSection[] {
     { kind: 'leaf', href: '/estadisticas',   label: 'Estadísticas',        icon: TrendingUp },
     ...(isAdmin || isSuperAdmin ? [
       { kind: 'leaf' as const, href: '/admin/usuarios', label: 'Usuarios de la clínica', icon: Users },
+      { kind: 'leaf' as const, href: '/billing',        label: 'Facturación',             icon: CreditCard },
     ] : []),
-    { kind: 'leaf', href: '/billing', label: 'Facturación', icon: CreditCard },
     ...(isSuperAdmin ? [
       { kind: 'leaf' as const, href: '/super-admin/clinicas', label: 'Clínicas',  icon: Building2 },
       { kind: 'leaf' as const, href: '/super-admin/metricas', label: 'Métricas',  icon: BarChart2 },
