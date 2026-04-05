@@ -121,6 +121,7 @@ export async function PATCH(req: NextRequest) {
   if ('color_primario' in body) campos.color_primario = body.color_primario
   if ('color_secundario' in body) campos.color_secundario = body.color_secundario
   if ('suspendida'      in body) campos.suspendida       = body.suspendida
+  if ('max_pacientes'   in body) campos.max_pacientes    = body.max_pacientes
 
   const admin = createAdminClient()
   const { error } = await admin.from('clinicas').update(campos).eq('id', id)

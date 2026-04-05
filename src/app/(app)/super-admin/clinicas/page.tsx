@@ -17,8 +17,10 @@ type Clinica = {
   color_primario: string | null
   color_secundario: string | null
   logo_url: string | null
+  plan: string
   max_medicos: number | null
   max_secretarias: number | null
+  max_pacientes: number | null
   count_medicos: number
   count_secretarias: number
   suspendida: boolean
@@ -306,6 +308,16 @@ export default function SuperAdminClinicasPage() {
     })
     setSuspendiendo(false)
     setConfirmSuspender(null)
+    cargarClinicas()
+  }
+
+  async function toggleVip(clinicaId: string, currentMax: number | null) {
+    const isVip = currentMax === null || currentMax === -1
+    await fetch('/api/super-admin/clinicas', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: clinicaId, max_pacientes: isVip ? 50 : null }),
+    })
     cargarClinicas()
   }
 
@@ -899,6 +911,7 @@ export default function SuperAdminClinicasPage() {
               onSuspender={() => {}}
               onEliminarUsuario={() => {}}
               onUpgrade={() => { setModalUpgrade(c); setUpgradeForm({ max_medicos: '3', max_secretarias: '1' }); setErrorUpgrade('') }}
+              onToggleVip={() => toggleVip(c.id, c.max_pacientes)}
             />
           ))}
           {listaIndep.length === 0 && (
@@ -920,7 +933,7 @@ const ROLE_LABEL: Record<string, string> = {
 function TarjetaCuenta({
   c, editandoLimites, editLimitesForm, guardando,
   onEditar, onCancelarEditar, onGuardarLimites, onChangeLimites,
-  onPersonalizar, onEliminar, onAsignarAdmin, onSuspender, onEliminarUsuario, onUpgrade,
+  onPersonalizar, onEliminar, onAsignarAdmin, onSuspender, onEliminarUsuario, onUpgrade, onToggleVip,
 }: {
   c: Clinica
   editandoLimites: string | null
@@ -936,6 +949,7 @@ function TarjetaCuenta({
   onSuspender: () => void
   onEliminarUsuario: (user: UsuarioClinica) => void
   onUpgrade?: () => void
+  onToggleVip?: () => void
 }) {
   const esIndep = c.tipo === 'independiente'
   const [expandUsuarios, setExpandUsuarios] = useState(false)
@@ -1080,6 +1094,21 @@ function TarjetaCuenta({
                 <Building2 size={13} />
                 Escalar a clínica
               </button>
+            )}
+            {/* VIP: plan individual gratuito con pacientes ilimitados */}
+            {onToggleVip && (
+              <div className="flex items-center justify-between bg-amber-50 rounded-lg px-3 py-2.5">
+                <div>
+                  <p className="text-xs font-semibold text-amber-800">Plan VIP</p>
+                  <p className="text-[10px] text-amber-600">Pacientes ilimitados · Gratuito</p>
+                </div>
+                <button
+                  onClick={onToggleVip}
+                  className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${c.max_pacientes === null || c.max_pacientes === -1 ? 'bg-amber-500' : 'bg-slate-300'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${c.max_pacientes === null || c.max_pacientes === -1 ? 'translate-x-4' : 'translate-x-0'}`} />
+                </button>
+              </div>
             )}
           </div>
         )}
