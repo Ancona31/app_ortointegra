@@ -33,6 +33,7 @@ export default function LoginPage() {
     if (err) {
       setError('Credenciales incorrectas. Verifica tu correo y contraseña.')
     } else {
+      sessionStorage.setItem('ortointegra_active', '1')
       router.push('/dashboard')
       router.refresh()
     }
