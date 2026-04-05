@@ -136,6 +136,10 @@ export default function LoginPage() {
 
         <p className="text-center text-xs text-slate-300 mt-6">
           © 2026 OrtoIntegra · Todos los derechos reservados
+          <br />
+          <Link href="/privacidad" target="_blank" className="text-slate-400 hover:text-[#1e5fa8] transition-colors">
+            Aviso de Privacidad
+          </Link>
         </p>
       </div>
     </div>

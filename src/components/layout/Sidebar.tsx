@@ -328,6 +328,10 @@ export default function Sidebar() {
             <LogOut size={14} />
             Cerrar sesión
           </button>
+          <Link href="/privacidad" target="_blank"
+            className="block text-center text-[10px] text-white/20 hover:text-white/40 transition-colors pt-2">
+            Aviso de Privacidad
+          </Link>
         </div>
       </aside>
     </>
