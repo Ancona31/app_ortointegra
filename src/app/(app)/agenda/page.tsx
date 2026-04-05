@@ -901,9 +901,9 @@ export default function AgendaPage() {
           start:           e.start?.dateTime ?? e.start?.date ?? '',
           end:             e.end?.dateTime ?? e.end?.date ?? undefined,
           allDay:          !e.start?.dateTime,
-          backgroundColor: '#f1f5f9',
-          borderColor:     '#cbd5e1',
-          textColor:       '#64748b',
+          backgroundColor: '#f3e8ff',
+          borderColor:     '#c084fc',
+          textColor:       '#7c3aed',
           editable:        false,
           extendedProps:   { isGcalBlock: true },
         }))
