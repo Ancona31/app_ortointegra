@@ -129,7 +129,8 @@ export async function POST(req: NextRequest) {
         // Sin Google Calendar conectado — no hay nada que sincronizar
         gcal_sync_status = 'synced'
       }
-    } catch {
+    } catch (gcalErr) {
+      console.error('[GCal sync error]', gcalErr)
       gcal_sync_status = 'failed'
     }
 

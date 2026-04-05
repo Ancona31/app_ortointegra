@@ -874,8 +874,45 @@ export default function AgendaPage() {
     }
   }, [isSingleDoctor, medicoColorMap, filtroMedico])
 
-  // Google Calendar source eliminado — la sincronización sigue activa (citas se crean en GCal)
-  // pero no mostramos eventos de GCal de vuelta en la agenda para evitar duplicados.
+  /* ── Event source: eventos personales de Google Calendar ── */
+  const gcalSource = useCallback(async (
+    info: { startStr: string; endStr: string },
+    success: (events: EventInput[]) => void,
+    failure: (err: Error) => void
+  ) => {
+    try {
+      const res = await fetch(`/api/google/events?from=${info.startStr}&to=${info.endStr}`)
+      const data = await res.json()
+      if (!data.connected || !data.events) { success([]); return }
+
+      // IDs de eventos que ya son citas de la app — para no duplicar
+      const appGcalIds = new Set<string>()
+      const aptsRes = await fetch(`/api/appointments?from=${info.startStr}&to=${info.endStr}`)
+      const aptsData = await aptsRes.json()
+      for (const apt of aptsData.appointments ?? []) {
+        if (apt.google_event_id) appGcalIds.add(apt.google_event_id)
+      }
+
+      const eventos = (data.events as any[])
+        .filter((e: any) => e.id && !appGcalIds.has(e.id))
+        .map((e: any) => ({
+          id:              `gcal-${e.id}`,
+          title:           `🔒 ${e.summary || 'Ocupado'}`,
+          start:           e.start?.dateTime ?? e.start?.date ?? '',
+          end:             e.end?.dateTime ?? e.end?.date ?? undefined,
+          allDay:          !e.start?.dateTime,
+          backgroundColor: '#f1f5f9',
+          borderColor:     '#cbd5e1',
+          textColor:       '#64748b',
+          editable:        false,
+          extendedProps:   { isGcalBlock: true },
+        }))
+
+      success(eventos)
+    } catch (err: any) {
+      failure(err)
+    }
+  }, [])
 
   /* ── Handlers ────────────────────────────────────────── */
   function handleDateClick(arg: DateClickArg) {
@@ -904,11 +941,12 @@ export default function AgendaPage() {
   }
 
   function handleEventClick(arg: EventClickArg) {
-    if (arg.event.extendedProps.isGoogleEvent) return
+    if (arg.event.extendedProps.isGoogleEvent || arg.event.extendedProps.isGcalBlock) return
     setModal({ mode: 'edit', appointment: arg.event.extendedProps as Appointment })
   }
 
   async function handleEventDrop(arg: EventDropArg) {
+    if (arg.event.extendedProps.isGcalBlock) { arg.revert(); return }
     const id         = arg.event.id
     const start_time = arg.event.start?.toISOString()
     const end_time   = arg.event.end?.toISOString()
@@ -1079,7 +1117,7 @@ export default function AgendaPage() {
           selectMirror
           editable
           businessHours={horarioToBusinessHours(horario)}
-          eventSources={[appointmentSource]}
+          eventSources={[appointmentSource, gcalSource]}
           eventContent={renderEventContent}
           dateClick={handleDateClick}
           select={handleSelect}
