@@ -63,7 +63,7 @@ export async function imprimirOCompartir(html: string, filename = 'documento.pdf
   })
 
   if (!res.ok) {
-    alert('Error al generar el PDF. Intenta de nuevo.')
+    alert('No se pudo generar el PDF. Verifica tu conexión e intenta de nuevo. Si el problema persiste, intenta desde una computadora.')
     return
   }
 

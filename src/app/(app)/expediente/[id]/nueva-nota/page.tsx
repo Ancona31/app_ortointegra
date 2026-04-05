@@ -226,7 +226,15 @@ export default function NuevaNotaPage() {
       if (data.error) throw new Error(data.error)
       setNotaGenerada(data.nota)
     } catch (e: any) {
-      setError('Error al generar nota: ' + e.message)
+      const msg = e.message?.toLowerCase() || ''
+      if (msg.includes('timeout') || msg.includes('deadline'))
+        setError('La IA tardó demasiado en responder. Intenta de nuevo en unos segundos.')
+      else if (msg.includes('rate') || msg.includes('quota') || msg.includes('429'))
+        setError('Se alcanzó el límite de uso de la IA. Espera un minuto e intenta de nuevo.')
+      else if (msg.includes('network') || msg.includes('fetch'))
+        setError('Error de conexión. Verifica tu internet e intenta de nuevo.')
+      else
+        setError('No se pudo generar la nota. Intenta de nuevo o escríbela manualmente.')
     } finally {
       setGenerando(false)
     }
@@ -261,7 +269,7 @@ export default function NuevaNotaPage() {
     })
 
     setGuardando(false)
-    if (err) { setError('Error al guardar: ' + err.message); return }
+    if (err) { setError('No se pudo guardar la nota. Verifica tu conexión e intenta de nuevo.'); return }
     saveMedCache(medsConDatos)
     try { localStorage.removeItem(draftKey) } catch {}
     setNotaSaved(true)

@@ -14,46 +14,65 @@ function CallbackContent() {
   useEffect(() => {
     const supabase = createClient()
 
+    function confirmar() {
+      sessionStorage.setItem('ortointegra_active', '1')
+      setEstado('confirmado')
+      setTimeout(() => router.push('/dashboard'), 2000)
+    }
+
     async function manejar() {
-      // Caso 1: tokens en el hash (#access_token=...) — flujo implícito de generateLink
       const hash = window.location.hash
+
+      // Caso 1: tokens en el hash (#access_token=...)
       if (hash.includes('access_token')) {
-        // Supabase ya confirmó la cuenta y puso la sesión en el hash
-        // Esperamos a que el cliente de Supabase procese el hash
+        // Intentar obtener sesión directamente
         const { data } = await supabase.auth.getSession()
-        if (data.session) {
-          setEstado('confirmado')
-          setTimeout(() => router.push('/dashboard'), 2000)
-          return
-        }
-        // Si no hay sesión aún, escuchar el evento de auth
-        supabase.auth.onAuthStateChange((event: string, session: any) => {
+        if (data.session) { confirmar(); return }
+
+        // Si no hay sesión aún, escuchar el evento de auth con timeout
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, session: any) => {
           if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
-            setEstado('confirmado')
-            setTimeout(() => router.push('/dashboard'), 2000)
+            confirmar()
           }
         })
+
+        // Timeout: si después de 8s no se resuelve, verificar una vez más y decidir
+        setTimeout(async () => {
+          const { data: retry } = await supabase.auth.getSession()
+          subscription.unsubscribe()
+          if (retry.session) { confirmar() }
+          else { setEstado('error') }
+        }, 8000)
         return
       }
 
-      // Caso 2: ?code= (PKCE)
+      // Caso 2: hash vacío pero la sesión ya existe (Supabase procesó los tokens antes del mount)
+      if (hash === '#' || hash === '') {
+        const { data } = await supabase.auth.getSession()
+        if (data.session) { confirmar(); return }
+
+        // Esperar un momento — a veces el SDK necesita tiempo para procesar
+        await new Promise(r => setTimeout(r, 2000))
+        const { data: retry } = await supabase.auth.getSession()
+        if (retry.session) { confirmar(); return }
+      }
+
+      // Caso 3: ?code= (PKCE)
       const code = searchParams.get('code')
       if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code)
+        const { error }: { error: any } = await supabase.auth.exchangeCodeForSession(code)
         if (error) { setEstado('error'); return }
-        setEstado('confirmado')
-        setTimeout(() => router.push('/dashboard'), 2000)
+        confirmar()
         return
       }
 
-      // Caso 3: ?token_hash= (token directo)
+      // Caso 4: ?token_hash= (token directo)
       const tokenHash = searchParams.get('token_hash')
       const type = searchParams.get('type')
       if (tokenHash && (type === 'email' || type === 'signup')) {
-        const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'email' })
+        const { error }: { error: any } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'email' })
         if (error) { setEstado('error'); return }
-        setEstado('confirmado')
-        setTimeout(() => router.push('/dashboard'), 2000)
+        confirmar()
         return
       }
 
@@ -86,10 +105,10 @@ function CallbackContent() {
           )}
           {estado === 'error' && (
             <div className="space-y-4">
-              <p className="text-sm text-red-600 bg-red-50 border border-red-200 px-4 py-3 rounded-lg">
-                El enlace es inválido o ya expiró.
+              <p className="text-sm text-[#3d3d3f] bg-slate-50 border border-slate-200 px-4 py-3 rounded-lg">
+                El enlace ya fue utilizado o expiró. Si ya confirmaste tu cuenta, inicia sesión normalmente.
               </p>
-              <a href="/login" className="block text-sm text-[#1e5fa8] hover:underline">
+              <a href="/login" className="inline-block px-6 py-2.5 bg-[#1e5fa8] text-white text-sm font-semibold rounded-xl hover:bg-[#1a3a5c] transition-colors">
                 Ir al inicio de sesión
               </a>
             </div>

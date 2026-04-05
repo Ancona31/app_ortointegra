@@ -114,7 +114,7 @@ export default function NuevoLaboratorioPage() {
         } else if (data.status === 'error') {
           stopPolling()
           setExtrayendo(false)
-          setErrorMsg(data.error || 'Error al procesar el PDF')
+          setErrorMsg(data.error || 'No se pudo extraer los datos del PDF. Verifica que el archivo sea legible e intenta de nuevo.')
         } else {
           // pending o processing — actualizar mensaje con tiempo transcurrido
           const seg = Math.floor(elapsed / 1000)
@@ -159,7 +159,7 @@ export default function NuevoLaboratorioPage() {
 
     } catch (e: any) {
       setExtrayendo(false)
-      setErrorMsg('No se pudo procesar el PDF: ' + e.message)
+      setErrorMsg('No se pudo subir el PDF. Verifica tu conexión e intenta de nuevo.')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -202,7 +202,7 @@ export default function NuevoLaboratorioPage() {
       analisis_ia: analisis,
     })
     setGuardando(false)
-    if (error) setErrorMsg('Error al guardar: ' + error.message)
+    if (error) setErrorMsg('No se pudo guardar el laboratorio. Verifica tu conexión e intenta de nuevo.')
     else router.push(`/expediente/${id}?tab=laboratorios`)
   }
 
