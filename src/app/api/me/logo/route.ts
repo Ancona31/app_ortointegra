@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     .eq('id', user.id)
     .single()
 
-  if (!profile?.clinica_id || !['admin', 'super_admin'].includes(profile.role)) {
+  if (!profile?.clinica_id || !['admin', 'super_admin', 'medico'].includes(profile.role)) {
     return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
   }
 

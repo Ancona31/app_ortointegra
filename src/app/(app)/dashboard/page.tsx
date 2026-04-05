@@ -128,10 +128,11 @@ export default function DashboardPage() {
 
     // Próximas citas + clinica.tipo
     async function fetchCitas() {
+      if (!profile?.clinica_id) { setLoadingCitas(false); return }
       const { data: clinicaData } = await supabase
         .from('clinicas')
         .select('tipo')
-        .eq('id', profile!.clinica_id!)
+        .eq('id', profile.clinica_id)
         .single()
 
       const tipo = clinicaData?.tipo ?? 'independiente'
