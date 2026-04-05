@@ -27,7 +27,7 @@ function CallbackContent() {
           return
         }
         // Si no hay sesión aún, escuchar el evento de auth
-        supabase.auth.onAuthStateChange((event, session) => {
+        supabase.auth.onAuthStateChange((event: string, session: any) => {
           if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
             setEstado('confirmado')
             setTimeout(() => router.push('/dashboard'), 2000)
