@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/components/ui/Toast'
+import { validarCedula } from '@/lib/validaciones'
 
 type Usuario = {
   id: string
@@ -61,6 +62,11 @@ export default function AdminUsuariosPage() {
 
   async function crearUsuario(e: React.FormEvent) {
     e.preventDefault()
+    if (form.role === 'medico') {
+      const errCed = validarCedula(form.cedula_profesional)
+      const errCedEsp = validarCedula(form.cedula_especialidad)
+      if (errCed || errCedEsp) { setError(errCed || errCedEsp || 'Revisa las cédulas'); return }
+    }
     setGuardando(true)
     setError('')
 

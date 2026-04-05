@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, ChevronDown, Save, Hash, Mail, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { useProfile } from '@/hooks/useProfile'
+import { validarEmail, validarTelefono, formatearTelefono } from '@/lib/validaciones'
 
 type Medico = {
   id: string
@@ -57,6 +58,12 @@ export default function NuevoPacientePage() {
     e.preventDefault()
     if (isSecretaria && !medicoSeleccionado) {
       setError('Debes seleccionar un médico para asignar el paciente')
+      return
+    }
+    const errTel = validarTelefono(form.telefono || '')
+    const errEmail = validarEmail(form.email || '')
+    if (errTel || errEmail) {
+      setError(errTel || errEmail || 'Revisa los campos')
       return
     }
     setLoading(true)
@@ -193,8 +200,11 @@ export default function NuevoPacientePage() {
                 <div className="space-y-3">
                   <div>
                     <label className={labelCls}>Teléfono</label>
-                    <input type="tel" value={form.telefono || ''} onChange={e => set('telefono', e.target.value)}
-                      placeholder="999 123 4567" className={inputCls} />
+                    <input type="tel" inputMode="numeric" value={form.telefono || ''} onChange={e => set('telefono', formatearTelefono(e.target.value))}
+                      placeholder="999 123 4567" maxLength={12} className={inputCls} />
+                    {form.telefono && validarTelefono(form.telefono) && (
+                      <p className="text-[10px] text-red-500 mt-1">{validarTelefono(form.telefono)}</p>
+                    )}
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5 mb-1">
@@ -206,6 +216,9 @@ export default function NuevoPacientePage() {
                     </div>
                     <input type="email" value={form.email || ''} onChange={e => set('email', e.target.value)}
                       placeholder="paciente@email.com" className={inputCls} />
+                    {form.email && validarEmail(form.email) && (
+                      <p className="text-[10px] text-red-500 mt-1">{validarEmail(form.email)}</p>
+                    )}
                   </div>
                   <div>
                     <label className={labelCls}>Dirección</label>

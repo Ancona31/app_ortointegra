@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Loader2, Eye, EyeOff, CheckCircle } from 'lucide-react'
 import EspecialidadSelector from '@/components/ui/EspecialidadSelector'
+import { validarCedula } from '@/lib/validaciones'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -31,6 +32,12 @@ export default function RegisterPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    const errCed = validarCedula(form.cedula_profesional)
+    const errCedEsp = validarCedula(form.cedula_especialidad)
+    if (errCed || errCedEsp) {
+      setError(errCed || errCedEsp || 'Revisa los campos de cédula')
+      return
+    }
     setLoading(true)
     setError('')
 
@@ -124,15 +131,23 @@ export default function RegisterPage() {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-xs font-medium text-slate-500 block mb-1">Cédula profesional *</label>
-                <input type="text" value={form.cedula_profesional} onChange={set('cedula_profesional')}
+                <input type="text" inputMode="numeric" value={form.cedula_profesional}
+                  onChange={e => setForm(f => ({ ...f, cedula_profesional: e.target.value.replace(/\D/g, '').slice(0, 8) }))}
                   placeholder="Ej: 12345678" required
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                {form.cedula_profesional && validarCedula(form.cedula_profesional) && (
+                  <p className="text-[10px] text-red-500 mt-1">{validarCedula(form.cedula_profesional)}</p>
+                )}
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-500 block mb-1">Cédula especialidad</label>
-                <input type="text" inputMode="numeric" pattern="[0-9]*" value={form.cedula_especialidad} onChange={set('cedula_especialidad')}
+                <input type="text" inputMode="numeric" value={form.cedula_especialidad}
+                  onChange={e => setForm(f => ({ ...f, cedula_especialidad: e.target.value.replace(/\D/g, '').slice(0, 8) }))}
                   placeholder="Ej: 3890214"
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                {form.cedula_especialidad && validarCedula(form.cedula_especialidad) && (
+                  <p className="text-[10px] text-red-500 mt-1">{validarCedula(form.cedula_especialidad)}</p>
+                )}
               </div>
             </div>
 

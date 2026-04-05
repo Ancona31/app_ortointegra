@@ -7,6 +7,7 @@ import { Loader2, Save, Palette, Upload, X, CalendarDays, CheckCircle2, LogIn, L
 import { PerfilSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import EspecialidadSelector from '@/components/ui/EspecialidadSelector'
+import { validarTelefono, validarCedula, formatearTelefono } from '@/lib/validaciones'
 
 type FormData = {
   titulo: string
@@ -116,6 +117,13 @@ export default function PerfilPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    const errTel = validarTelefono(form.telefono_consultorio)
+    const errCed = validarCedula(form.cedula_profesional)
+    const errCedEsp = validarCedula(form.cedula_especialidad)
+    if (errTel || errCed || errCedEsp) {
+      toast.error(errTel || errCed || errCedEsp || 'Revisa los campos')
+      return
+    }
     setGuardando(true)
 
     const r1 = await fetch('/api/me/perfil-medico', {
@@ -203,13 +211,21 @@ export default function PerfilPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Cédula profesional</label>
-                <input type="text" value={form.cedula_profesional} onChange={e => setForm({ ...form, cedula_profesional: e.target.value })}
+                <input type="text" inputMode="numeric" value={form.cedula_profesional}
+                  onChange={e => setForm({ ...form, cedula_profesional: e.target.value.replace(/\D/g, '').slice(0, 8) })}
                   placeholder="Ej: 87654321" className={inputClass} />
+                {form.cedula_profesional && validarCedula(form.cedula_profesional) && (
+                  <p className="text-[10px] text-red-500 mt-1">{validarCedula(form.cedula_profesional)}</p>
+                )}
               </div>
               <div>
                 <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Cédula de especialidad</label>
-                <input type="text" value={form.cedula_especialidad} onChange={e => setForm({ ...form, cedula_especialidad: e.target.value })}
+                <input type="text" inputMode="numeric" value={form.cedula_especialidad}
+                  onChange={e => setForm({ ...form, cedula_especialidad: e.target.value.replace(/\D/g, '').slice(0, 8) })}
                   placeholder="Ej: 3890214" className={inputClass} />
+                {form.cedula_especialidad && validarCedula(form.cedula_especialidad) && (
+                  <p className="text-[10px] text-red-500 mt-1">{validarCedula(form.cedula_especialidad)}</p>
+                )}
               </div>
             </div>
           </div>
@@ -229,8 +245,12 @@ export default function PerfilPage() {
             </div>
             <div>
               <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Teléfono</label>
-              <input type="tel" value={form.telefono_consultorio} onChange={e => setForm({ ...form, telefono_consultorio: e.target.value })}
-                placeholder="Ej: (999) 123-4567" className={inputClass} />
+              <input type="tel" inputMode="numeric" value={form.telefono_consultorio}
+                onChange={e => setForm({ ...form, telefono_consultorio: formatearTelefono(e.target.value) })}
+                placeholder="Ej: 999 123 4567" maxLength={12} className={inputClass} />
+              {form.telefono_consultorio && validarTelefono(form.telefono_consultorio) && (
+                <p className="text-[10px] text-red-500 mt-1">{validarTelefono(form.telefono_consultorio)}</p>
+              )}
             </div>
           </div>
         </div>

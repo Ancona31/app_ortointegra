@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Save, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { validarEmail, validarTelefono, formatearTelefono } from '@/lib/validaciones'
 
 type Campo = {
   label: string
@@ -83,6 +84,12 @@ export default function EditarPacientePage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    const errTel = validarTelefono(form.telefono || '')
+    const errEmail = validarEmail(form.email || '')
+    if (errTel || errEmail) {
+      setError(errTel || errEmail || 'Revisa los campos')
+      return
+    }
     setGuardando(true)
     setError('')
     const imc = calcularIMC()
@@ -155,14 +162,27 @@ export default function EditarPacientePage() {
                         className={`${inputCls} resize-none`}
                       />
                     ) : (
+                      <>
                       <input
                         type={campo.type || 'text'}
+                        inputMode={campo.type === 'tel' ? 'numeric' : undefined}
+                        maxLength={campo.type === 'tel' ? 12 : undefined}
                         value={form[campo.key] || ''}
-                        onChange={e => setForm({ ...form, [campo.key]: e.target.value })}
+                        onChange={e => {
+                          const val = campo.key === 'telefono' ? formatearTelefono(e.target.value) : e.target.value
+                          setForm({ ...form, [campo.key]: val })
+                        }}
                         placeholder={campo.placeholder}
                         required={campo.required}
                         className={inputCls}
                       />
+                      {campo.key === 'telefono' && form.telefono && validarTelefono(form.telefono) && (
+                        <p className="text-[10px] text-red-500 mt-1">{validarTelefono(form.telefono)}</p>
+                      )}
+                      {campo.key === 'email' && form.email && validarEmail(form.email) && (
+                        <p className="text-[10px] text-red-500 mt-1">{validarEmail(form.email)}</p>
+                      )}
+                      </>
                     )}
                   </div>
                 ))}
