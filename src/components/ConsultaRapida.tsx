@@ -84,10 +84,10 @@ export default function ConsultaRapida() {
         onClick={() => setAbierto(!abierto)}
         className="w-full flex items-center justify-between px-5 py-3 bg-gradient-to-r from-blue-50 to-sky-50 hover:from-blue-100 hover:to-sky-100 transition-colors"
       >
-        <div className="flex items-center gap-2">
-          <GeminiIcon size={18} className="text-[#4285F4]" />
-          <span className="font-semibold text-[#1a3a5c] text-sm">Consulta rápida a Gemini</span>
-          <span className="text-xs text-[#4285F4] bg-blue-100 px-2 py-0.5 rounded-full">
+        <div className="flex items-center gap-2 min-w-0">
+          <GeminiIcon size={18} className="text-[#4285F4] flex-shrink-0" />
+          <span className="font-semibold text-[#1a3a5c] text-sm truncate">Consulta rápida a Gemini</span>
+          <span className="text-xs text-[#4285F4] bg-blue-100 px-2 py-0.5 rounded-full hidden sm:inline-block flex-shrink-0">
             Medicamentos · Dosis · Escalas · Clasificaciones
           </span>
         </div>

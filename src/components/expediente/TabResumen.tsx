@@ -56,7 +56,7 @@ export default function TabResumen({
       {ultima && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           {/* Encabezado */}
-          <div className="px-6 pt-5 pb-4 flex items-start justify-between gap-4">
+          <div className="px-4 sm:px-6 pt-5 pb-4 flex items-start justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1e5fa8] to-[#1a3a5c] flex items-center justify-center flex-shrink-0">
                 <Stethoscope size={16} className="text-white" />
@@ -77,10 +77,10 @@ export default function TabResumen({
           </div>
 
           {/* Separador */}
-          <div className="mx-6 border-t border-slate-100" />
+          <div className="mx-4 sm:mx-6 border-t border-slate-100" />
 
           {/* Cuerpo */}
-          <div className="px-6 py-4 space-y-4">
+          <div className="px-4 sm:px-6 py-4 space-y-4">
 
             {/* Motivo */}
             <div>
@@ -114,7 +114,7 @@ export default function TabResumen({
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-3 border-t border-slate-100 flex justify-end">
+          <div className="px-4 sm:px-6 py-3 border-t border-slate-100 flex justify-end">
             <Link
               href={`/expediente/${id}/consulta/${ultima.id}`}
               className="flex items-center gap-1.5 text-xs font-semibold text-[#1e5fa8] hover:text-[#1a3a5c] transition-colors"
@@ -128,7 +128,7 @@ export default function TabResumen({
       {/* ── Consultas recientes ── */}
       {consultas.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div className="px-6 pt-5 pb-3 flex items-center justify-between">
+          <div className="px-4 sm:px-6 pt-5 pb-3 flex items-center justify-between">
             <p className="text-sm font-semibold text-[#1d1d1f]">Consultas recientes</p>
             {consultas.length > 3 && (
               <button
@@ -144,7 +144,7 @@ export default function TabResumen({
               <Link
                 key={c.id}
                 href={`/expediente/${id}/consulta/${c.id}`}
-                className="flex items-center gap-4 px-6 py-3.5 hover:bg-slate-50/80 transition-colors group"
+                className="flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3.5 hover:bg-slate-50/80 transition-colors group"
               >
                 {/* Línea de tiempo */}
                 <div className="flex flex-col items-center gap-1 flex-shrink-0">
@@ -176,7 +176,7 @@ export default function TabResumen({
         const criticos = lab.analisis_ia?.alertas?.filter((a: any) => a.tipo === 'critica') || []
         return (
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-            <div className="px-6 pt-5 pb-3 flex items-center justify-between">
+            <div className="px-4 sm:px-6 pt-5 pb-3 flex items-center justify-between">
               <p className="text-sm font-semibold text-[#1d1d1f]">Último laboratorio</p>
               <button
                 onClick={onVerLaboratorios}
@@ -187,7 +187,7 @@ export default function TabResumen({
             </div>
             <Link
               href={`/expediente/${id}/laboratorios/${lab.id}`}
-              className="flex items-center gap-4 px-6 py-4 border-t border-slate-100 hover:bg-slate-50/80 transition-colors group"
+              className="flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-4 border-t border-slate-100 hover:bg-slate-50/80 transition-colors group"
             >
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center flex-shrink-0">
                 <FlaskConical size={16} className="text-white" />
@@ -221,14 +221,14 @@ export default function TabResumen({
       {/* ── Suplementos recomendados ── */}
       {labs.length > 0 && labs[0].analisis_ia?.suplementos_recomendados?.length ? (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div className="px-6 pt-5 pb-3 flex items-center gap-2.5">
+          <div className="px-4 sm:px-6 pt-5 pb-3 flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-400 to-violet-600 flex items-center justify-center">
               <Pill size={13} className="text-white" />
             </div>
             <p className="text-sm font-semibold text-[#1d1d1f]">Suplementos recomendados</p>
             <span className="text-[10px] text-[#86868b] ml-auto">Basado en último lab</span>
           </div>
-          <div className="px-6 pb-5 pt-1 flex flex-wrap gap-2">
+          <div className="px-4 sm:px-6 pb-5 pt-1 flex flex-wrap gap-2">
             {labs[0].analisis_ia!.suplementos_recomendados.map((s: any, i: number) => (
               <span key={i} className={`text-xs px-3 py-1.5 rounded-full font-semibold border ${
                 s.prioridad === 'alta'  ? 'bg-red-50 border-red-100 text-red-600'   :

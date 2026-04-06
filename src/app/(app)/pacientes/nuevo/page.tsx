@@ -146,7 +146,7 @@ export default function NuevoPacientePage() {
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
           <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest">Datos del paciente</p>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Nombre(s) <span className="text-red-400">*</span></label>
               <input type="text" value={form.nombre || ''} onChange={e => set('nombre', e.target.value)}
@@ -159,7 +159,7 @@ export default function NuevoPacientePage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Fecha de nacimiento <span className="text-red-400">*</span></label>
               <input type="date" value={form.fecha_nacimiento || ''} onChange={e => set('fecha_nacimiento', e.target.value)}
@@ -231,7 +231,7 @@ export default function NuevoPacientePage() {
               {/* Antropometría */}
               <div>
                 <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest mb-3">Antropometría</p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className={labelCls}>Peso (kg)</label>
                     <input type="number" value={form.peso_kg || ''} onChange={e => set('peso_kg', e.target.value)}

@@ -44,7 +44,7 @@ export default function TarjetaPaciente({ paciente, id, isDoctor }: Props) {
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
 
       {/* ── Header con gradiente ── */}
-      <div className="bg-gradient-to-br from-[#1a3a5c] to-[#1e5fa8] px-6 py-5 flex items-center gap-4">
+      <div className="bg-gradient-to-br from-[#1a3a5c] to-[#1e5fa8] px-4 sm:px-6 py-4 sm:py-5 flex items-center gap-3 sm:gap-4">
         {/* Avatar */}
         <div className="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white font-bold text-xl flex-shrink-0 shadow-inner">
           {paciente.nombre.charAt(0)}{paciente.apellidos.charAt(0)}
@@ -85,7 +85,7 @@ export default function TarjetaPaciente({ paciente, id, isDoctor }: Props) {
 
       {/* ── Alergias ── */}
       {paciente.alergias && (
-        <div className="flex items-center gap-3 px-6 py-3" style={{ backgroundColor: '#EF5350' }}>
+        <div className="flex items-center gap-3 px-4 sm:px-6 py-3" style={{ backgroundColor: '#EF5350' }}>
           <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
             <AlertTriangle size={14} className="text-white" />
           </div>

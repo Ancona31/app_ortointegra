@@ -35,17 +35,17 @@ export default function PrivacidadPage() {
       </div>
 
       {/* Contenido */}
-      <div className="max-w-3xl mx-auto px-6 -mt-4 pb-16">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 -mt-4 pb-16">
         <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200/60 shadow-[0_8px_40px_rgba(0,0,0,0.06)] overflow-hidden">
 
           {/* Meta */}
-          <div className="flex flex-wrap items-center gap-4 px-8 py-4 border-b border-slate-100 text-[11px] text-[#86868b]">
+          <div className="flex flex-wrap items-center gap-4 px-4 sm:px-8 py-4 border-b border-slate-100 text-[11px] text-[#86868b]">
             <span className="flex items-center gap-1.5"><Calendar size={12} /> Actualizado: 4 de abril de 2026</span>
             <span className="flex items-center gap-1.5"><MapPin size={12} /> Merida, Yucatan, Mexico</span>
           </div>
 
           {/* Secciones */}
-          <div className="px-8 py-8 space-y-8">
+          <div className="px-4 sm:px-8 py-6 sm:py-8 space-y-8">
 
             <Section title="I. Identidad y domicilio del responsable">
               <p>

@@ -148,8 +148,8 @@ export default function MetricasPage() {
 
       {/* Tabla clínicas */}
       {tab === 'clinicas' && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-x-auto">
+          <table className="w-full text-sm min-w-[600px]">
             <thead>
               <tr className="border-b border-slate-100">
                 <th className={thCls}>Clínica</th>
@@ -200,7 +200,7 @@ export default function MetricasPage() {
       {/* Tabla usuarios */}
       {tab === 'usuarios' && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[700px]">
             <thead>
               <tr className="border-b border-slate-100">
                 <th className={thCls}>Usuario</th>
