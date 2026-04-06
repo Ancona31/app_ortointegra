@@ -9,7 +9,6 @@ import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useProfile } from '@/hooks/useProfile'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import ConsultaRapida from '@/components/ConsultaRapida'
 import { createClient } from '@/lib/supabase/client'
 import { imprimirOCompartir } from '@/lib/mobileShare'
 import AutocompleteMedicamento from '@/components/AutocompleteMedicamento'
@@ -638,8 +637,6 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
         />
       </div>
 
-      <ConsultaRapida />
-
       {errorGuardado && (
         <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
           {errorGuardado}
@@ -649,7 +646,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
       <button
         onClick={imprimir}
         disabled={!paciente || imprimiendo}
-        className="w-full flex items-center justify-center gap-2 py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-50"
+        className="doc-print-btn w-full flex items-center justify-center gap-2 py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-50"
       >
         {imprimiendo
           ? <><Loader2 size={18} className="animate-spin" /> Generando PDF...</>

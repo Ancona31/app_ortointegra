@@ -9,9 +9,11 @@ import { parseISO, format } from 'date-fns'
 import Portal from '@/components/ui/Portal'
 import {
   ArrowLeft, Stethoscope, FlaskConical, FileText, Trash2, AlertTriangle, Loader2,
+  Pill, ScanLine, ClipboardList, BedDouble, PenLine, ShieldCheck, Receipt, X, CalendarDays,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { createPortal } from 'react-dom'
 
 import ModalVisorDocumento from '@/components/expediente/ModalVisorDocumento'
 import Breadcrumbs from '@/components/layout/Breadcrumbs'
@@ -23,6 +25,30 @@ import TabGraficas, { normalizarKey, ParamGrafica } from '@/components/expedient
 import TabDocumentos from '@/components/expediente/TabDocumentos'
 import ExportarExpedienteButton from '@/components/expediente/ExportarExpedienteButton'
 import dynamic from 'next/dynamic'
+
+function FormCargando() {
+  return <div className="flex items-center justify-center py-12"><Loader2 className="animate-spin text-slate-300" size={24} /></div>
+}
+
+const RecetaFormDynamic       = dynamic(() => import('@/components/documentos/RecetaForm'), { ssr: false, loading: () => <FormCargando /> })
+const SolicitudLabFormDynamic = dynamic(() => import('@/components/documentos/SolicitudLabForm'), { ssr: false, loading: () => <FormCargando /> })
+const SolicitudImagenFormDynamic = dynamic(() => import('@/components/documentos/SolicitudImagenForm'), { ssr: false, loading: () => <FormCargando /> })
+const PlanSupFormDynamic      = dynamic(() => import('@/components/documentos/PlanSuplementacionForm'), { ssr: false, loading: () => <FormCargando /> })
+const InternamientoFormDynamic = dynamic(() => import('@/components/documentos/SolicitudInternamientoForm'), { ssr: false, loading: () => <FormCargando /> })
+const EscritoFormDynamic      = dynamic(() => import('@/components/documentos/EscritoMedicoForm'), { ssr: false, loading: () => <FormCargando /> })
+const ConsentimientoFormDynamic = dynamic(() => import('@/components/documentos/ConsentimientoInformadoForm'), { ssr: false, loading: () => <FormCargando /> })
+const HonorariosFormDynamic   = dynamic(() => import('@/components/documentos/NotaHonorariosForm'), { ssr: false, loading: () => <FormCargando /> })
+
+const DOCS = [
+  { key: 'receta',         label: 'Receta médica',            icon: Pill,          color: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' },
+  { key: 'lab',            label: 'Solicitud de laboratorio', icon: FlaskConical,  color: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' },
+  { key: 'imagen',         label: 'Solicitud de imagen',      icon: ScanLine,      color: 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100' },
+  { key: 'suplementacion', label: 'Plan de suplementación',   icon: ClipboardList, color: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100' },
+  { key: 'internamiento',  label: 'Internamiento',            icon: BedDouble,     color: 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100' },
+  { key: 'escrito',        label: 'Escrito médico',           icon: PenLine,       color: 'border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100' },
+  { key: 'consentimiento', label: 'Consentimiento',           icon: ShieldCheck,   color: 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100' },
+  { key: 'honorarios',     label: 'Honorarios / Cotización',   icon: Receipt,       color: 'border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100' },
+]
 
 type Tab = 'resumen' | 'consultas' | 'laboratorios' | 'graficas' | 'documentos'
 
@@ -42,6 +68,7 @@ function ExpedientePacienteContent() {
   const [busquedaParam, setBusquedaParam] = useState('')
   const [documentos, setDocumentos] = useState<any[]>([])
   const [docSeleccionado, setDocSeleccionado] = useState<any>(null)
+  const [docInline, setDocInline] = useState<string | null>(null)
   const [mostrarEliminarPaciente, setMostrarEliminarPaciente] = useState(false)
   const [eliminandoPaciente, setEliminandoPaciente] = useState(false)
   const [errorEliminar, setErrorEliminar] = useState('')
@@ -271,47 +298,55 @@ function ExpedientePacienteContent() {
         <>
           {/* Quick actions — macOS icon dock style */}
           <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
-            <div className="grid grid-cols-3 divide-x divide-slate-100 sm:divide-x">
-              {[
-                {
-                  href: `/expediente/${id}/nueva-nota`,
-                  label: 'Nueva nota',
-                  sublabel: 'Consulta médica',
-                  icon: Stethoscope,
-                  color: 'text-[#1e5fa8]',
-                  bg: 'bg-blue-50',
-                },
-                {
-                  href: `/expediente/${id}/laboratorios/nuevo`,
-                  label: 'Laboratorio',
-                  sublabel: 'Resultados de lab',
-                  icon: FlaskConical,
-                  color: 'text-emerald-600',
-                  bg: 'bg-emerald-50',
-                },
-                {
-                  href: `/expediente/${id}/documentos`,
-                  label: 'Documento',
-                  sublabel: 'Receta / Solicitud',
-                  icon: FileText,
-                  color: 'text-sky-600',
-                  bg: 'bg-sky-50',
-                },
-              ].map(({ href, label, sublabel, icon: Icon, color, bg }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className="group flex flex-col items-center gap-2 sm:gap-2.5 px-2 sm:px-4 py-4 sm:py-5 hover:bg-slate-50/80 transition-colors duration-150 text-center"
-                >
-                  <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center transition-transform duration-150 group-hover:scale-105`}>
-                    <Icon size={18} className={color} strokeWidth={2} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-[#1d1d1f] leading-tight">{label}</p>
-                    <p className="text-[10px] text-[#86868b] mt-0.5 leading-tight">{sublabel}</p>
-                  </div>
-                </Link>
-              ))}
+            <div className="grid grid-cols-4 divide-x divide-slate-100 sm:divide-x">
+              <Link
+                href={`/expediente/${id}/nueva-nota`}
+                className="group flex flex-col items-center gap-2 sm:gap-2.5 px-2 sm:px-4 py-4 sm:py-5 hover:bg-slate-50/80 transition-colors duration-150 text-center"
+              >
+                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center transition-transform duration-150 group-hover:scale-105">
+                  <Stethoscope size={18} className="text-[#1e5fa8]" strokeWidth={2} />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-[#1d1d1f] leading-tight">Nueva nota</p>
+                  <p className="text-[10px] text-[#86868b] mt-0.5 leading-tight">Consulta médica</p>
+                </div>
+              </Link>
+              <Link
+                href={`/expediente/${id}/laboratorios/nuevo`}
+                className="group flex flex-col items-center gap-2 sm:gap-2.5 px-2 sm:px-4 py-4 sm:py-5 hover:bg-slate-50/80 transition-colors duration-150 text-center"
+              >
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center transition-transform duration-150 group-hover:scale-105">
+                  <FlaskConical size={18} className="text-emerald-600" strokeWidth={2} />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-[#1d1d1f] leading-tight">Laboratorio</p>
+                  <p className="text-[10px] text-[#86868b] mt-0.5 leading-tight">Ingresar valores</p>
+                </div>
+              </Link>
+              <Link
+                href="/agenda"
+                className="group flex flex-col items-center gap-2 sm:gap-2.5 px-2 sm:px-4 py-4 sm:py-5 hover:bg-slate-50/80 transition-colors duration-150 text-center"
+              >
+                <div className="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center transition-transform duration-150 group-hover:scale-105">
+                  <CalendarDays size={18} className="text-violet-600" strokeWidth={2} />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-[#1d1d1f] leading-tight">Agenda</p>
+                  <p className="text-[10px] text-[#86868b] mt-0.5 leading-tight">Ver citas</p>
+                </div>
+              </Link>
+              <button
+                onClick={() => setDocInline('receta')}
+                className="group flex flex-col items-center gap-2 sm:gap-2.5 px-2 sm:px-4 py-4 sm:py-5 hover:bg-slate-50/80 transition-colors duration-150 text-center"
+              >
+                <div className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center transition-transform duration-150 group-hover:scale-105">
+                  <FileText size={18} className="text-sky-600" strokeWidth={2} />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-[#1d1d1f] leading-tight">Documento</p>
+                  <p className="text-[10px] text-[#86868b] mt-0.5 leading-tight">Receta / Solicitud</p>
+                </div>
+              </button>
             </div>
           </div>
 
@@ -408,6 +443,87 @@ function ExpedientePacienteContent() {
 
       </div>
 
+      {/* ── Modal flotante de documentos (portal a body) ── */}
+      {docInline && createPortal((() => {
+        const currentDoc = DOCS.find(d => d.key === docInline)
+        const CurrentIcon = currentDoc?.icon ?? FileText
+        const nombrePaciente = paciente ? `${paciente.nombre} ${paciente.apellidos}` : ''
+
+        return (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-8">
+            <div
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm animate-[fadeIn_0.15s_ease-out]"
+              onClick={() => setDocInline(null)}
+            />
+            <div className="relative bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.2)] border border-slate-200/60 w-full max-w-3xl flex flex-col animate-[modalEnter_0.22s_cubic-bezier(0.32,0.72,0,1)]" style={{ height: '85vh' }}>
+              <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200/60 flex-shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${currentDoc?.color.split(' ').slice(1, 3).join(' ') ?? 'bg-slate-50'}`}>
+                    <CurrentIcon size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-800">{currentDoc?.label}</h3>
+                    <p className="text-[11px] text-slate-400">{nombrePaciente}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  {DOCS.map(({ key, label, icon: Icon, color }) => {
+                    const isActive = key === docInline
+                    const colorClasses = color.split(' ')
+                    const bgClass = isActive ? colorClasses.slice(1, 3).join(' ') : 'bg-transparent'
+                    const textClass = isActive ? colorClasses[3] ?? 'text-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => setDocInline(key)}
+                        title={label}
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center active:scale-90 transition-all duration-150 ${bgClass} ${textClass} ${isActive ? 'ring-1 ring-current/20 shadow-sm' : ''}`}
+                      >
+                        <Icon size={15} />
+                      </button>
+                    )
+                  })}
+                  <div className="w-px h-5 bg-slate-200 mx-1" />
+                  <button
+                    onClick={() => setDocInline(null)}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 active:scale-95 transition-all"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              </div>
+              <div className="doc-modal-scroll flex-1 overflow-y-auto overflow-x-hidden relative">
+                <div className="p-5 sm:p-6 min-h-full">
+                  {docInline === 'receta' && (
+                    <RecetaFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} />
+                  )}
+                  {docInline === 'lab' && (
+                    <SolicitudLabFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} />
+                  )}
+                  {docInline === 'imagen' && (
+                    <SolicitudImagenFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} />
+                  )}
+                  {docInline === 'suplementacion' && (
+                    <PlanSupFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} />
+                  )}
+                  {docInline === 'internamiento' && (
+                    <InternamientoFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} />
+                  )}
+                  {docInline === 'escrito' && (
+                    <EscritoFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} />
+                  )}
+                  {docInline === 'consentimiento' && (
+                    <ConsentimientoFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} />
+                  )}
+                  {docInline === 'honorarios' && (
+                    <HonorariosFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} />
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })(), document.body)}
     </div>
   )
 }

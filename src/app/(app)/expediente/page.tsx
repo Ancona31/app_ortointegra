@@ -97,6 +97,7 @@ export default function ExpedientePage() {
         </div>
         <Link
           href="/pacientes/nuevo"
+          data-onboard="nuevo-paciente-exp"
           className="flex items-center gap-1.5 px-4 py-2 bg-[#1e5fa8] text-white rounded-xl text-sm font-semibold hover:bg-[#1a3a5c] transition-colors shadow-sm"
         >
           <Plus size={15} strokeWidth={2.5} /> Nuevo paciente

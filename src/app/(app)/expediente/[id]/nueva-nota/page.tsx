@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Paciente } from '@/types'
@@ -10,6 +11,7 @@ import {
   ArrowLeft, Save, Loader2, RotateCcw, Printer, Eye, Pencil,
   Pill, FlaskConical, ScanLine, ClipboardList, CheckCircle2,
   BedDouble, PenLine, ShieldCheck, Receipt, Plus, Trash2, X, FileText, ChevronDown,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
@@ -83,7 +85,22 @@ export default function NuevaNotaPage() {
   const [imprimiendo, setImprimiendo]   = useState(false)
   const [error, setError]               = useState('')
   const [notaSaved, setNotaSaved]       = useState(false)
-  const [docInline, setDocInline]       = useState<string | null>(null)
+  const [docInline, setDocInlineRaw]    = useState<string | null>(null)
+  const [slideDir, setSlideDir]         = useState<'left' | 'right'>('right')
+  const [slideKey, setSlideKey]         = useState(0)
+  const prevDocRef                      = useRef<string | null>(null)
+
+  const setDocInline = (key: string | null) => {
+    if (key && prevDocRef.current && key !== prevDocRef.current) {
+      const docs = medicamentosParaReceta.length > 0 ? DOCS : DOCS.filter(d => d.key !== 'receta')
+      const prevIdx = docs.findIndex(d => d.key === prevDocRef.current)
+      const nextIdx = docs.findIndex(d => d.key === key)
+      setSlideDir(nextIdx > prevIdx ? 'right' : 'left')
+      setSlideKey(k => k + 1)
+    }
+    prevDocRef.current = key
+    setDocInlineRaw(key)
+  }
   const [ultimoGuardado, setUltimoGuardado] = useState<Date | null>(null)
   const [borradorRestaurado, setBorradorRestaurado] = useState(false)
   const [ultimaConsulta, setUltimaConsulta] = useState<{ diagnosticos: string; medicamentos: MedRow[] | null } | null>(null)
@@ -466,12 +483,15 @@ export default function NuevaNotaPage() {
           </div>
         </div>
 
+        {/* Marcador para onboarding: consulta completa (nota guardada, sin modal abierto) */}
+        {notaSaved && !docInline && <div data-onboard="consulta-completa" className="hidden" />}
+
         {/* Banner de éxito */}
         {notaSaved && (
           <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
             <CheckCircle2 size={20} className="text-emerald-500 flex-shrink-0" />
             <p className="text-sm font-medium text-emerald-700">Nota guardada en el expediente</p>
-            <Link href={`/expediente/${id}`} className="ml-auto text-xs text-emerald-600 hover:underline whitespace-nowrap">
+            <Link href={`/expediente/${id}`} data-onboard="ver-expediente" className="ml-auto text-xs text-emerald-600 hover:underline whitespace-nowrap">
               Ver expediente →
             </Link>
           </div>
@@ -835,7 +855,7 @@ export default function NuevaNotaPage() {
               </div>
             ) : (
               /* Estado: nota guardada — panel activo */
-              <div className="p-4 space-y-3">
+              <div className="p-4 space-y-3" data-onboard="panel-documentos">
                 {/* Receta destacada si hay medicamentos */}
                 {medicamentosParaReceta.length > 0 && (
                   <button onClick={() => setDocInline(docInline === 'receta' ? null : 'receta')}
@@ -862,43 +882,11 @@ export default function NuevaNotaPage() {
                   ))}
                 </div>
 
-                {/* Formulario inline en columna derecha */}
+                {/* Indicador de documento abierto */}
                 {docInline && (
-                  <div className="border border-slate-200 rounded-xl overflow-hidden mt-1">
-                    <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-700">
-                        {DOCS.find(d => d.key === docInline)?.label}
-                      </span>
-                      <button onClick={() => setDocInline(null)} className="text-slate-400 hover:text-slate-600">
-                        <X size={14} />
-                      </button>
-                    </div>
-                    <div className="p-4 max-h-[70vh] overflow-y-auto">
-                      {docInline === 'receta' && (
-                        <RecetaFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} medicamentosIniciales={medicamentosParaReceta} />
-                      )}
-                      {docInline === 'lab' && (
-                        <SolicitudLabFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
-                      )}
-                      {docInline === 'imagen' && (
-                        <SolicitudImagenFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
-                      )}
-                      {docInline === 'suplementacion' && (
-                        <PlanSupFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
-                      )}
-                      {docInline === 'internamiento' && (
-                        <InternamientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
-                      )}
-                      {docInline === 'escrito' && (
-                        <EscritoFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} />
-                      )}
-                      {docInline === 'consentimiento' && (
-                        <ConsentimientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
-                      )}
-                      {docInline === 'honorarios' && (
-                        <HonorariosFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} />
-                      )}
-                    </div>
+                  <div className="flex items-center gap-2 px-3 py-2 bg-[#1e5fa8]/5 border border-[#1e5fa8]/20 rounded-xl text-xs text-[#1e5fa8] font-medium">
+                    <FileText size={13} />
+                    Editando: {DOCS.find(d => d.key === docInline)?.label}
                   </div>
                 )}
               </div>
@@ -907,6 +895,99 @@ export default function NuevaNotaPage() {
         </div>
 
       </div>
+
+      {/* ── Modal flotante de documentos (portal a body) ── */}
+      {docInline && createPortal((() => {
+        const currentDoc = DOCS.find(d => d.key === docInline)
+        const CurrentIcon = currentDoc?.icon ?? FileText
+
+        return (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-8">
+            {/* Backdrop con blur — cubre toda la pantalla */}
+            <div
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm animate-[fadeIn_0.15s_ease-out]"
+              onClick={() => setDocInline(null)}
+            />
+
+            {/* Ventana flotante centrada — tamaño fijo */}
+            <div className="relative bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.2)] border border-slate-200/60 w-full max-w-3xl flex flex-col animate-[modalEnter_0.22s_cubic-bezier(0.32,0.72,0,1)]" style={{ height: '85vh' }}>
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200/60 flex-shrink-0">
+                <div key={`header-${slideKey}`} className="flex items-center gap-2.5" style={slideKey > 0 ? { animation: 'docTitleIn 0.35s cubic-bezier(0.32, 0.72, 0, 1)' } : undefined}>
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${currentDoc?.color.split(' ').slice(1, 3).join(' ') ?? 'bg-slate-50'}`}>
+                    <CurrentIcon size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-800">{currentDoc?.label}</h3>
+                    <p className="text-[11px] text-slate-400">{nombrePaciente}</p>
+                  </div>
+                </div>
+
+                {/* Navegación entre documentos — todos los iconos */}
+                <div className="flex items-center gap-1" data-onboard="modal-doc-iconos">
+                  {DOCS.map(({ key, label, icon: Icon, color }) => {
+                    const isActive = key === docInline
+                    const colorClasses = color.split(' ')
+                    const bgClass = isActive ? colorClasses.slice(1, 3).join(' ') : 'bg-transparent'
+                    const textClass = isActive ? colorClasses[3] ?? 'text-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => setDocInline(key)}
+                        title={label}
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center active:scale-90 transition-all duration-150 ${bgClass} ${textClass} ${isActive ? 'ring-1 ring-current/20 shadow-sm' : ''}`}
+                      >
+                        <Icon size={15} />
+                      </button>
+                    )
+                  })}
+                  <div className="w-px h-5 bg-slate-200 mx-1" />
+                  <button
+                    onClick={() => setDocInline(null)}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 active:scale-95 transition-all"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Contenido scrolleable — height fijo, slide animation */}
+              <div className="doc-modal-scroll flex-1 overflow-y-auto overflow-x-hidden relative">
+                <div
+                  key={slideKey}
+                  className="p-5 sm:p-6 min-h-full"
+                  style={slideKey > 0 ? { animation: `${slideDir === 'right' ? 'slideFromRight' : 'slideFromLeft'} 0.3s cubic-bezier(0.32, 0.72, 0, 1)` } : undefined}
+                >
+                  {docInline === 'receta' && (
+                    <RecetaFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} medicamentosIniciales={medicamentosParaReceta} />
+                  )}
+                  {docInline === 'lab' && (
+                    <SolicitudLabFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
+                  )}
+                  {docInline === 'imagen' && (
+                    <SolicitudImagenFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
+                  )}
+                  {docInline === 'suplementacion' && (
+                    <PlanSupFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
+                  )}
+                  {docInline === 'internamiento' && (
+                    <InternamientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
+                  )}
+                  {docInline === 'escrito' && (
+                    <EscritoFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} />
+                  )}
+                  {docInline === 'consentimiento' && (
+                    <ConsentimientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
+                  )}
+                  {docInline === 'honorarios' && (
+                    <HonorariosFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} />
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })(), document.body)}
     </div>
   )
 }

@@ -785,6 +785,7 @@ export default function AgendaPage() {
   const [horario,      setHorario]      = useState<Horario>(HORARIO_DEFAULT)
   const [horarioOpen,  setHorarioOpen]  = useState(false)
   const [confirm,      setConfirm]      = useState<{ message: string; onConfirm: () => void; onCancel: () => void } | null>(null)
+  const [citaCreada,   setCitaCreada]   = useState(false)
   const [medicos,      setMedicos]      = useState<Medico[]>([])
   const [filtroMedico, setFiltroMedico] = useState<string>('')
   const { profile } = useProfile()
@@ -1078,6 +1079,7 @@ export default function AgendaPage() {
     // ── Optimistic update: inyectar/actualizar evento en FullCalendar al instante ──
     closeModal()
     toast.success(isEdit ? 'Cita actualizada' : 'Cita agendada correctamente')
+    if (!isEdit) setCitaCreada(true)
 
     let optimisticEvent: ReturnType<NonNullable<typeof api>['addEvent']> | null = null
 
@@ -1182,6 +1184,7 @@ export default function AgendaPage() {
           )}
           <button
             onClick={() => { const now = new Date().toISOString(); setModal({ mode: 'create', start: now, end: addHour(now) }) }}
+            data-onboard="nueva-cita"
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a4f8c] transition-colors shadow-sm"
           >
             <Plus size={15} />
@@ -1189,6 +1192,8 @@ export default function AgendaPage() {
           </button>
         </div>
       </div>
+
+      {citaCreada && <div data-onboard="cita-creada" className="hidden" />}
 
       {/* ── Leyenda ─────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-3 mb-4">

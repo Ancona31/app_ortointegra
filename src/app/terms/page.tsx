@@ -124,7 +124,7 @@ export default function TermsPage() {
         <h2>13. Contacto</h2>
         <p>
           Para cualquier consulta sobre estos términos, contáctenos en{' '}
-          <a href="mailto:aancona00@gmail.com">aancona00@gmail.com</a>.
+          <a href="mailto:contacto@ortointegra.com">contacto@ortointegra.com</a>.
         </p>
 
         <div className="mt-12 pt-8 border-t border-slate-200">

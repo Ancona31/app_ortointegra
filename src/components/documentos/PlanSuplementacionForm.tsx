@@ -496,7 +496,7 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
       <button
         onClick={imprimir}
         disabled={!paciente || seleccionados.length === 0 || imprimiendo}
-        className="w-full flex items-center justify-center gap-2 py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-50"
+        className="doc-print-btn w-full flex items-center justify-center gap-2 py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-50"
       >
         {imprimiendo
           ? <><Loader2 size={18} className="animate-spin" /> Generando PDF...</>

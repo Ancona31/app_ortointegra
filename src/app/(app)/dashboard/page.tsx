@@ -53,6 +53,14 @@ const ACCESOS = [
     ring: 'group-hover:ring-violet-200',
   },
   {
+    href: '/agenda',
+    icon: CalendarDays,
+    label: 'Agenda',
+    desc: 'Citas y horarios',
+    gradient: 'from-blue-500 to-blue-600',
+    ring: 'group-hover:ring-blue-200',
+  },
+  {
     href: '/documentos',
     icon: FileText,
     label: 'Documentos',
@@ -330,6 +338,7 @@ export default function DashboardPage() {
           {/* Nuevo */}
           <Link
             href="/pacientes/nuevo"
+            data-onboard="nuevo-paciente"
             className="relative flex-1 flex items-center gap-3 px-5 py-4 hover:bg-white/15 active:bg-white/20 transition-colors"
           >
             <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
@@ -347,7 +356,7 @@ export default function DashboardPage() {
       {/* ── Módulos ───────────────────────────────────────────── */}
       <div className="animate-slide-up" style={{ animationDelay: '120ms' }}>
         <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest mb-3">Módulos</p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {ACCESOS.map(({ href, icon: Icon, label, desc, gradient, ring }) => (
             <Link
               key={href}

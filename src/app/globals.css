@@ -277,6 +277,33 @@ body {
 }
 
 /* Glow de confirmación tras drop exitoso */
+/* Botón de imprimir sticky dentro del modal de documentos */
+.doc-modal-scroll .doc-print-btn {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  box-shadow: 0 -12px 24px rgba(255,255,255,0.95);
+}
+
+@keyframes ledPulse {
+  0%, 100% { box-shadow: 0 0 10px 4px rgba(59,130,246,0.6), 0 0 24px 8px rgba(59,130,246,0.3), 0 0 40px 16px rgba(59,130,246,0.1); }
+  50%      { box-shadow: 0 0 16px 6px rgba(59,130,246,1), 0 0 36px 14px rgba(59,130,246,0.5), 0 0 60px 24px rgba(59,130,246,0.2); }
+}
+
+@keyframes docTitleIn {
+  0%   { opacity: 0; transform: translateY(6px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes slideFromRight {
+  0%   { transform: translateX(60px); opacity: 0; }
+  100% { transform: translateX(0);    opacity: 1; }
+}
+@keyframes slideFromLeft {
+  0%   { transform: translateX(-60px); opacity: 0; }
+  100% { transform: translateX(0);     opacity: 1; }
+}
+
 @keyframes marquee {
   0%   { transform: translateX(0); }
   100% { transform: translateX(-50%); }

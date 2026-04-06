@@ -88,7 +88,7 @@ function navDoctor(isAdmin: boolean, isSuperAdmin: boolean): NavSection[] {
     },
     { kind: 'divider' },
     { kind: 'leaf', href: '/perfil',  label: 'Mi perfil', icon: UserCircle },
-    { kind: 'leaf', href: '/ayuda',   label: 'Ayuda',     icon: HelpCircle, disabled: true, badge: 'Próximo' },
+    { kind: 'leaf', href: '/ayuda',   label: 'Ayuda',     icon: HelpCircle },
   ]
 }
 

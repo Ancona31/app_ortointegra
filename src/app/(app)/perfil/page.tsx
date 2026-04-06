@@ -277,6 +277,7 @@ export default function PerfilPage() {
                   </div>
                   <div className="flex flex-col gap-2">
                     <button type="button" onClick={() => fileRef.current?.click()}
+                      data-onboard="subir-logo"
                       className="px-3 py-1.5 text-xs font-medium border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
                       {logoMostrado ? 'Cambiar logo' : 'Subir logo'}
                     </button>

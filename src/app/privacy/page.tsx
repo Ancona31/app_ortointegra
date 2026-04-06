@@ -87,7 +87,7 @@ export default function PrivacyPage() {
         <p>
           Usted tiene derecho a Acceder, Rectificar, Cancelar u Oponerse al tratamiento de sus datos
           personales (derechos ARCO). Para ejercer estos derechos, envíe un correo electrónico a{' '}
-          <a href="mailto:aancona00@gmail.com">aancona00@gmail.com</a> con el asunto
+          <a href="mailto:privacidad@ortointegra.com">privacidad@ortointegra.com</a> con el asunto
           &quot;Derechos ARCO&quot;, indicando su nombre completo y la acción solicitada.
           Responderemos en un plazo máximo de 20 días hábiles.
         </p>
@@ -110,7 +110,7 @@ export default function PrivacyPage() {
         <h2>10. Contacto</h2>
         <p>
           Para cualquier consulta relacionada con este aviso de privacidad, puede contactarnos en{' '}
-          <a href="mailto:aancona00@gmail.com">aancona00@gmail.com</a>.
+          <a href="mailto:privacidad@ortointegra.com">privacidad@ortointegra.com</a>.
         </p>
 
         <div className="mt-12 pt-8 border-t border-slate-200">
