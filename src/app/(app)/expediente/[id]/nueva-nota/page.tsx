@@ -912,42 +912,46 @@ export default function NuevaNotaPage() {
             {/* Ventana flotante centrada — tamaño fijo */}
             <div className="relative bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.2)] border border-slate-200/60 w-full max-w-3xl flex flex-col animate-[modalEnter_0.22s_cubic-bezier(0.32,0.72,0,1)]" style={{ height: '85vh' }}>
               {/* Header */}
-              <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200/60 flex-shrink-0">
-                <div key={`header-${slideKey}`} className="flex items-center gap-2.5" style={slideKey > 0 ? { animation: 'docTitleIn 0.35s cubic-bezier(0.32, 0.72, 0, 1)' } : undefined}>
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${currentDoc?.color.split(' ').slice(1, 3).join(' ') ?? 'bg-slate-50'}`}>
-                    <CurrentIcon size={16} />
+              <div className="border-b border-slate-200/60 flex-shrink-0">
+                {/* Row 1: Title + close */}
+                <div className="flex items-center justify-between px-4 sm:px-5 pt-3 pb-2 sm:pb-3">
+                  <div key={`header-${slideKey}`} className="flex items-center gap-2 sm:gap-2.5 min-w-0" style={slideKey > 0 ? { animation: 'docTitleIn 0.35s cubic-bezier(0.32, 0.72, 0, 1)' } : undefined}>
+                    <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${currentDoc?.color.split(' ').slice(1, 3).join(' ') ?? 'bg-slate-50'}`}>
+                      <CurrentIcon size={15} />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-xs sm:text-sm font-semibold text-slate-800 truncate">{currentDoc?.label}</h3>
+                      <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">{nombrePaciente}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-slate-800">{currentDoc?.label}</h3>
-                    <p className="text-[11px] text-slate-400">{nombrePaciente}</p>
-                  </div>
-                </div>
-
-                {/* Navegación entre documentos — todos los iconos */}
-                <div className="flex items-center gap-1" data-onboard="modal-doc-iconos">
-                  {DOCS.map(({ key, label, icon: Icon, color }) => {
-                    const isActive = key === docInline
-                    const colorClasses = color.split(' ')
-                    const bgClass = isActive ? colorClasses.slice(1, 3).join(' ') : 'bg-transparent'
-                    const textClass = isActive ? colorClasses[3] ?? 'text-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => setDocInline(key)}
-                        title={label}
-                        className={`w-8 h-8 rounded-lg flex items-center justify-center active:scale-90 transition-all duration-150 ${bgClass} ${textClass} ${isActive ? 'ring-1 ring-current/20 shadow-sm' : ''}`}
-                      >
-                        <Icon size={15} />
-                      </button>
-                    )
-                  })}
-                  <div className="w-px h-5 bg-slate-200 mx-1" />
                   <button
                     onClick={() => setDocInline(null)}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 active:scale-95 transition-all"
+                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 active:scale-95 transition-all flex-shrink-0 ml-2"
                   >
                     <X size={16} />
                   </button>
+                </div>
+
+                {/* Row 2: Document type icons */}
+                <div className="px-4 sm:px-5 pb-2.5 -mt-0.5">
+                  <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide" data-onboard="modal-doc-iconos">
+                    {DOCS.map(({ key, label, icon: Icon, color }) => {
+                      const isActive = key === docInline
+                      const colorClasses = color.split(' ')
+                      const bgClass = isActive ? colorClasses.slice(1, 3).join(' ') : 'bg-transparent'
+                      const textClass = isActive ? colorClasses[3] ?? 'text-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => setDocInline(key)}
+                          title={label}
+                          className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center active:scale-90 transition-all duration-150 flex-shrink-0 ${bgClass} ${textClass} ${isActive ? 'ring-1 ring-current/20 shadow-sm' : ''}`}
+                        >
+                          <Icon size={14} />
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               </div>
 
@@ -955,7 +959,7 @@ export default function NuevaNotaPage() {
               <div className="doc-modal-scroll flex-1 overflow-y-auto overflow-x-hidden relative">
                 <div
                   key={slideKey}
-                  className="p-5 sm:p-6 min-h-full"
+                  className="p-4 sm:p-6 min-h-full"
                   style={slideKey > 0 ? { animation: `${slideDir === 'right' ? 'slideFromRight' : 'slideFromLeft'} 0.3s cubic-bezier(0.32, 0.72, 0, 1)` } : undefined}
                 >
                   {docInline === 'receta' && (
