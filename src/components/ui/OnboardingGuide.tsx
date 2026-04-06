@@ -5,25 +5,36 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useProfile } from '@/hooks/useProfile'
 import Portal from '@/components/ui/Portal'
 import {
-  Stethoscope, CalendarDays, FileText, UserCircle,
-  ChevronRight, X, Sparkles, ArrowUp, MessageCircle,
+  ChevronRight, X, Sparkles, ArrowUp, MessageCircle, Volume2, VolumeX,
 } from 'lucide-react'
 
-/* ─── Tips contextuales por página ───────────────────────── */
+/* ─── Types ──────────────────────────────────────────────── */
 
 type ContextTip = {
   id: string
   title: string
   message: string
-  highlight?: string            // data-onboard value to point arrow at
+  highlight?: string
   action?: { label: string; href: string }
-  requiresElement?: string      // only show tip when this data-onboard element exists in DOM
+  requiresElement?: string
 }
 
 type PageContext = {
   match: (path: string) => boolean
   tips: ContextTip[]
 }
+
+/* ─── State machine ──────────────────────────────────────── */
+
+type Phase =
+  | 'dormido'        // waiting for initial delay
+  | 'welcome'        // showing welcome card + audio
+  | 'playing'        // showing tips with audio + auto-advance
+  | 'manual'         // muted — no audio, no auto-advance
+  | 'bubble'         // minimized pulsing bubble
+  | 'dismissed'      // permanently hidden
+
+/* ─── Tip data ───────────────────────────────────────────── */
 
 const WELCOME_TIP: ContextTip = {
   id: 'welcome',
@@ -235,36 +246,40 @@ const PAGE_CONTEXTS: PageContext[] = [
   },
 ]
 
+/* ─── Persistence ────────────────────────────────────────── */
+
 const STORAGE_KEY = 'ortointegra_onboarding'
 
-type OnboardingState = {
+type PersistedState = {
   dismissed: boolean
-  seenTips: string[]       // IDs of tips the user has seen
-  welcomed: boolean        // Has seen the welcome message
+  seenTips: string[]
+  welcomed: boolean
+  muted: boolean
 }
 
-function getState(): OnboardingState {
-  if (typeof window === 'undefined') return { dismissed: false, seenTips: [], welcomed: false }
+const DEFAULT_STATE: PersistedState = { dismissed: false, seenTips: [], welcomed: false, muted: false }
+
+function loadState(): PersistedState {
+  if (typeof window === 'undefined') return DEFAULT_STATE
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      // Migration from old format
-      if ('currentStep' in parsed) return { dismissed: false, seenTips: [], welcomed: false }
-      return parsed
+      if ('currentStep' in parsed) return DEFAULT_STATE // migrate old format
+      return { ...DEFAULT_STATE, ...parsed }
     }
   } catch {}
-  return { dismissed: false, seenTips: [], welcomed: false }
+  return DEFAULT_STATE
 }
 
-function saveState(state: OnboardingState) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)) } catch {}
+function persistState(s: PersistedState) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)) } catch {}
 }
 
 /* ─── Arrow component ────────────────────────────────────── */
 
 function HighlightArrow({ target }: { target: string }) {
-  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null)
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
   const rafRef = useRef(0)
 
   useEffect(() => {
@@ -272,13 +287,12 @@ function HighlightArrow({ target }: { target: string }) {
       const el = document.querySelector(`[data-onboard="${target}"]`) as HTMLElement | null
       if (el) {
         const rect = el.getBoundingClientRect()
-        setPos({ top: rect.top, left: rect.left + rect.width / 2, width: rect.width })
+        setPos({ top: rect.top, left: rect.left + rect.width / 2 })
       } else {
         setPos(null)
       }
       rafRef.current = requestAnimationFrame(update)
     }
-    // Small delay to let page render
     const timer = setTimeout(() => { rafRef.current = requestAnimationFrame(update) }, 300)
     return () => { clearTimeout(timer); cancelAnimationFrame(rafRef.current) }
   }, [target])
@@ -306,55 +320,177 @@ export default function OnboardingGuide() {
   const { profile, loading } = useProfile()
   const pathname = usePathname()
   const router = useRouter()
-  const [state, setState] = useState<OnboardingState>({ dismissed: false, seenTips: [], welcomed: false })
-  const [open, setOpen] = useState(false)
+
+  // Persisted state
+  const [persisted, setPersisted] = useState<PersistedState>(DEFAULT_STATE)
+  const persistedRef = useRef(persisted)
+  persistedRef.current = persisted
+
+  // Phase machine
+  const [phase, setPhase] = useState<Phase>('dormido')
+  const phaseRef = useRef(phase)
+  phaseRef.current = phase
+
+  // UI state
+  const [tipIndex, setTipIndex] = useState(0)
   const [entering, setEntering] = useState(false)
   const [mounted, setMounted] = useState(false)
-  const [tipIndex, setTipIndex] = useState(0)
-  const [minimized, setMinimized] = useState(false)
   const [visibleElements, setVisibleElements] = useState<Set<string>>(new Set())
 
-  useEffect(() => {
-    const s = getState()
-    setState(s)
-    setMounted(true)
+  // Audio refs
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const autoAdvanceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Stable updater
+  const save = useCallback((partial: Partial<PersistedState>) => {
+    setPersisted(prev => {
+      const next = { ...prev, ...partial }
+      persistState(next)
+      return next
+    })
   }, [])
 
-  // Show after delay
+  // ── Derived: tips for current page ──
+  const pageCtx = PAGE_CONTEXTS.find(c => c.match(pathname))
+  const allTips = pageCtx?.tips ?? []
+  const tips = allTips.filter(t => !t.requiresElement || visibleElements.has(t.requiresElement))
+  const isWelcome = phase === 'welcome'
+  const currentTip = isWelcome ? WELCOME_TIP : tips[Math.min(tipIndex, tips.length - 1)] ?? null
+
+  // ── Audio helpers (use refs to avoid stale closures) ──
+  function stopAudio() {
+    if (autoAdvanceRef.current) {
+      clearTimeout(autoAdvanceRef.current)
+      autoAdvanceRef.current = null
+    }
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.removeAttribute('src')
+      audioRef.current = null
+    }
+  }
+
+  function playAudio(tipId: string) {
+    stopAudio()
+    const audio = new Audio(`/audio/${tipId}.mp3`)
+    audio.volume = 0.8
+    audio.addEventListener('ended', () => {
+      autoAdvanceRef.current = setTimeout(() => {
+        autoAdvanceRef.current = null
+        advanceRef.current()
+      }, 1200)
+    })
+    audio.play().catch(() => {})
+    audioRef.current = audio
+  }
+
+  // ── Advance logic (ref for stable access from audio callback) ──
+  const advanceRef = useRef(() => {})
+  advanceRef.current = () => {
+    const p = phaseRef.current
+    if (p === 'welcome') {
+      save({ welcomed: true })
+      setPhase('playing')
+      setTipIndex(0)
+      return
+    }
+    if (p !== 'playing' && p !== 'manual') return
+    // Mark current tip as seen
+    const ps = persistedRef.current
+    const ctx = PAGE_CONTEXTS.find(c => c.match(pathname))
+    const all = ctx?.tips ?? []
+    const vis = all.filter(t => !t.requiresElement || visibleElements.has(t.requiresElement))
+    const cur = vis[Math.min(tipIndex, vis.length - 1)]
+    if (cur && !ps.seenTips.includes(cur.id)) {
+      save({ seenTips: [...ps.seenTips, cur.id] })
+    }
+    // Advance or bubble
+    if (tipIndex < vis.length - 1) {
+      setTipIndex(tipIndex + 1)
+    } else {
+      stopAudio()
+      setPhase('bubble')
+    }
+  }
+
+  // ── 1. Mount + load persisted state ──
   useEffect(() => {
-    if (!mounted || state.dismissed || loading) return
-    if (profile?.role === 'secretaria') return
+    const s = loadState()
+    setPersisted(s)
+    setMounted(true)
+    if (s.dismissed) {
+      setPhase('dismissed')
+    }
+  }, [])
+
+  // ── 2. DORMIDO → WELCOME or PLAYING (initial delay) ──
+  useEffect(() => {
+    if (!mounted || phase !== 'dormido' || loading) return
+    if (profile?.role === 'secretaria') { setPhase('dismissed'); return }
+    if (persisted.dismissed) { setPhase('dismissed'); return }
+
     const timer = setTimeout(() => {
-      setOpen(true)
+      if (persisted.welcomed) {
+        // Already saw welcome — check if page has unseen tips
+        const ctx = PAGE_CONTEXTS.find(c => c.match(pathname))
+        const all = ctx?.tips ?? []
+        const hasUnseen = all.some(t => !persisted.seenTips.includes(t.id))
+        if (hasUnseen && all.length > 0) {
+          setPhase(persisted.muted ? 'manual' : 'playing')
+        } else {
+          setPhase('bubble')
+        }
+      } else {
+        setPhase('welcome')
+      }
       requestAnimationFrame(() => setEntering(true))
     }, 1500)
     return () => clearTimeout(timer)
-  }, [mounted, state.dismissed, loading, profile?.role])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted, loading, profile?.role])
 
-  // Reset tip index and ref when page changes
-  const prevPathRef = useRef(pathname)
-  const prevTipCountRef = useRef(0)
+  // ── 3. Play audio when tip changes (playing phase only) ──
+  const currentTipId = currentTip?.id ?? null
   useEffect(() => {
-    if (pathname !== prevPathRef.current) {
-      setTipIndex(0)
-      prevTipCountRef.current = 0
-      prevPathRef.current = pathname
+    if (!currentTipId) return
+    if (phase === 'playing' || phase === 'welcome') {
+      playAudio(currentTipId)
     }
+    // Cleanup on change
+    return () => stopAudio()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTipId, phase])
+
+  // ── 4. Page navigation handling ──
+  const prevPathRef = useRef(pathname)
+  useEffect(() => {
+    if (pathname === prevPathRef.current) return
+    prevPathRef.current = pathname
+    stopAudio()
+    setTipIndex(0)
+
+    const p = phaseRef.current
+    if (p === 'dismissed') return
+
+    const ctx = PAGE_CONTEXTS.find(c => c.match(pathname))
+    const pageTips = ctx?.tips ?? []
+    const ps = persistedRef.current
+    const hasUnseen = pageTips.some(t => !ps.seenTips.includes(t.id))
+
+    if (p === 'bubble' && hasUnseen && pageTips.length > 0) {
+      // Auto-expand for unseen tips
+      setPhase(ps.muted ? 'manual' : 'playing')
+      setEntering(true)
+    } else if (p === 'playing' || p === 'manual') {
+      // Stay expanded but reset index
+      if (pageTips.length === 0) {
+        setPhase('bubble')
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname])
 
-  // Auto-advance when new required elements appear (only within same page)
-  useEffect(() => {
-    const pageCtx = PAGE_CONTEXTS.find(c => c.match(pathname))
-    const allT = pageCtx?.tips ?? []
-    const visible = allT.filter(t => !t.requiresElement || visibleElements.has(t.requiresElement))
-    if (visible.length > prevTipCountRef.current && prevTipCountRef.current > 0) {
-      // New tip became available on the same page — jump to it
-      setTipIndex(visible.length - 1)
-    }
-    prevTipCountRef.current = visible.length
-  }, [visibleElements, pathname])
-
-  // Observe DOM for dynamic data-onboard elements
+  // ── 5. Observe DOM for dynamic data-onboard elements ──
   useEffect(() => {
     if (!mounted) return
     function scan() {
@@ -372,50 +508,84 @@ export default function OnboardingGuide() {
     return () => observer.disconnect()
   }, [mounted, pathname])
 
-  const update = useCallback((partial: Partial<OnboardingState>) => {
-    setState(prev => {
-      const next = { ...prev, ...partial }
-      saveState(next)
-      return next
-    })
+  // ── 6. Auto-jump when new requiresElement tips appear on same page ──
+  const prevTipCountRef = useRef(0)
+  useEffect(() => {
+    if (phase !== 'playing' && phase !== 'manual') return
+    if (tips.length > prevTipCountRef.current && prevTipCountRef.current > 0) {
+      setTipIndex(tips.length - 1)
+    }
+    prevTipCountRef.current = tips.length
+  }, [tips.length, phase])
+
+  // ── 7. Cleanup on unmount ──
+  useEffect(() => {
+    return () => stopAudio()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  function dismiss() {
+  // ── Actions ──
+  function handleNext() {
+    stopAudio()
+    advanceRef.current()
+  }
+
+  function handlePrev() {
+    stopAudio()
+    if (tipIndex > 0) setTipIndex(tipIndex - 1)
+  }
+
+  function handleAction() {
+    if (currentTip?.action?.href) {
+      router.push(currentTip.action.href)
+    }
+    handleNext()
+  }
+
+  function handleMinimize() {
+    stopAudio()
+    setPhase('bubble')
+  }
+
+  function handleDismiss() {
+    stopAudio()
     setEntering(false)
     setTimeout(() => {
-      setOpen(false)
-      update({ dismissed: true })
+      setPhase('dismissed')
+      save({ dismissed: true })
     }, 250)
   }
 
-  function markSeen(tipId: string) {
-    if (!state.seenTips.includes(tipId)) {
-      update({ seenTips: [...state.seenTips, tipId] })
+  function handleToggleMute() {
+    const nowMuted = !persisted.muted
+    save({ muted: nowMuted })
+    if (nowMuted) {
+      stopAudio()
+      if (phase === 'playing') setPhase('manual')
+    } else {
+      if (phase === 'manual') {
+        setPhase('playing')
+        // Audio will auto-play via the effect watching phase+currentTipId
+      }
     }
   }
 
-  if (!mounted || loading || state.dismissed) return null
-  if (profile?.role === 'secretaria') return null
-  if (!open) return null
+  function handleBubbleClick() {
+    setTipIndex(0)
+    setPhase(persisted.muted ? 'manual' : 'playing')
+    setEntering(true)
+  }
 
-  // Find context for current page — filter by visible elements
-  const pageCtx = PAGE_CONTEXTS.find(c => c.match(pathname))
-  const allTips = pageCtx?.tips ?? []
-  const tips = allTips.filter(t => !t.requiresElement || visibleElements.has(t.requiresElement))
+  // ── Render gates ──
+  if (!mounted || loading || phase === 'dormido' || phase === 'dismissed') return null
 
-  // Show welcome first if not seen
-  const showWelcome = !state.welcomed
-
-  // Auto-advance to newly visible tip (e.g. panel-documentos just appeared)
-  const currentTip = showWelcome ? WELCOME_TIP : tips[Math.min(tipIndex, tips.length - 1)]
-
-  // Minimized bubble — LED pulsing
-  if (minimized || (!showWelcome && !currentTip)) {
+  // ── Bubble ──
+  if (phase === 'bubble') {
     return (
       <Portal>
         <div className="fixed bottom-6 right-6 z-[10002]">
           <button
-            onClick={() => { setMinimized(false); setTipIndex(0) }}
+            onClick={handleBubbleClick}
             className="relative w-12 h-12 bg-gradient-to-br from-[#1a3a5c] to-[#1e5fa8] rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-transform duration-200"
             style={{ animation: 'ledPulse 2s ease-in-out infinite' }}
             title="Abrir asistente"
@@ -427,29 +597,10 @@ export default function OnboardingGuide() {
     )
   }
 
+  // ── Card (welcome, playing, manual) ──
+  const showWelcome = phase === 'welcome'
   const hasMultipleTips = !showWelcome && tips.length > 1
-
-  function handleNext() {
-    if (showWelcome) {
-      update({ welcomed: true })
-      return
-    }
-    if (currentTip) markSeen(currentTip.id)
-    if (tipIndex < tips.length - 1) {
-      setTipIndex(tipIndex + 1)
-    }
-  }
-
-  function handlePrev() {
-    if (tipIndex > 0) setTipIndex(tipIndex - 1)
-  }
-
-  function handleAction() {
-    if (currentTip?.action?.href) {
-      router.push(currentTip.action.href)
-    }
-    handleNext()
-  }
+  const isMuted = persisted.muted
 
   return (
     <Portal>
@@ -478,14 +629,24 @@ export default function OnboardingGuide() {
             </div>
             <div className="flex items-center gap-1">
               <button
-                onClick={() => setMinimized(true)}
+                onClick={handleToggleMute}
+                className="w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                title={isMuted ? 'Activar voz' : 'Silenciar voz'}
+              >
+                {isMuted
+                  ? <VolumeX size={11} className="text-white/70" />
+                  : <Volume2 size={11} className="text-white/70" />
+                }
+              </button>
+              <button
+                onClick={handleMinimize}
                 className="w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
                 title="Minimizar"
               >
                 <span className="text-white/70 text-[10px] font-bold leading-none">—</span>
               </button>
               <button
-                onClick={dismiss}
+                onClick={handleDismiss}
                 className="w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
                 title="No mostrar más"
               >
@@ -561,7 +722,7 @@ export default function OnboardingGuide() {
                 {tips.map((_, i) => (
                   <button
                     key={i}
-                    onClick={() => setTipIndex(i)}
+                    onClick={() => { stopAudio(); setTipIndex(i) }}
                     className={`h-1.5 rounded-full transition-all duration-300 ${
                       i === tipIndex ? 'w-5 bg-[#1e5fa8]' : 'w-1.5 bg-slate-200 hover:bg-slate-300'
                     }`}
