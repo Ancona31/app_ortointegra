@@ -463,11 +463,13 @@ export default function OnboardingGuide() {
 
   // ── 4. Page navigation handling ──
   const prevPathRef = useRef(pathname)
+  const prevTipCountRef = useRef(0)
   useEffect(() => {
     if (pathname === prevPathRef.current) return
     prevPathRef.current = pathname
     stopAudio()
     setTipIndex(0)
+    prevTipCountRef.current = 0
 
     const p = phaseRef.current
     if (p === 'dismissed') return
@@ -509,7 +511,6 @@ export default function OnboardingGuide() {
   }, [mounted, pathname])
 
   // ── 6. Auto-jump when new requiresElement tips appear on same page ──
-  const prevTipCountRef = useRef(0)
   useEffect(() => {
     if (phase !== 'playing' && phase !== 'manual') return
     if (tips.length > prevTipCountRef.current && prevTipCountRef.current > 0) {
