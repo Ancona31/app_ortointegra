@@ -548,7 +548,7 @@ export default function NuevaNotaPage() {
               <div>
                 <label className="text-xs font-medium text-slate-500 block mb-1">Motivo de consulta <span className="text-red-400">*</span></label>
                 <input type="text" value={form.motivo_consulta} onChange={e => update('motivo_consulta', e.target.value)}
-                  placeholder="Ej: Dolor lumbar crónico, limitación funcional..."
+                  placeholder="Ej: Dolor abdominal agudo, cefalea persistente..."
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
               </div>
               {/* Exploración física — expandible */}
@@ -562,7 +562,7 @@ export default function NuevaNotaPage() {
                 </button>
                 {camposExpandidos.exploracion && (
                   <textarea value={form.exploracion_fisica} onChange={e => update('exploracion_fisica', e.target.value)}
-                    placeholder="Ej: Marcha antiálgica, Lasègue positivo a 45° derecho..."
+                    placeholder="Ej: Abdomen blando, no doloroso a la palpación..."
                     rows={3} autoFocus
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
                 )}
@@ -578,7 +578,7 @@ export default function NuevaNotaPage() {
                 </button>
                 {camposExpandidos.gabinete && (
                   <textarea value={form.gabinete_laboratorios} onChange={e => update('gabinete_laboratorios', e.target.value)}
-                    placeholder="Ej: Rx columna lumbar AP/Lateral — disminución de espacio L4-L5..."
+                    placeholder="Ej: BH, QS, EGO, Rx de tórax PA..."
                     rows={2} autoFocus
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
                 )}
@@ -588,7 +588,7 @@ export default function NuevaNotaPage() {
               <div>
                 <label className="text-xs font-medium text-slate-500 block mb-1">Diagnóstico(s)</label>
                 <input type="text" value={form.diagnosticos} onChange={e => update('diagnosticos', e.target.value)}
-                  placeholder="Ej: Hernia discal L4-L5 con radiculopatía derecha..."
+                  placeholder="Ej: Diabetes mellitus tipo 2 descontrolada..."
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
               </div>
 
@@ -602,7 +602,7 @@ export default function NuevaNotaPage() {
                 </button>
                 {camposExpandidos.plan && (
                   <textarea value={form.plan_tratamiento} onChange={e => update('plan_tratamiento', e.target.value)}
-                    placeholder="Ej: Manejo conservador, fisioterapia, valorar cirugía..."
+                    placeholder="Ej: Ajuste de tratamiento, interconsulta, seguimiento..."
                     rows={2} autoFocus
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
                 )}
