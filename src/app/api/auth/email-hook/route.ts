@@ -1,89 +1,125 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
-import { createHmac, timingSafeEqual } from 'crypto'
+import { createHmac } from 'crypto'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
-function verificarFirma(req: NextRequest): boolean {
-  try {
-    const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization') ?? ''
-    
-    if (!authHeader) {
-      console.warn("No se recibió cabecera de Authorization.");
-      return false;
-    }
+/* ─── Standard Webhooks verification ─────────────────────────
+   Supabase Auth Hooks (HTTPS) usan el estándar "Standard Webhooks".
+   Headers enviados: webhook-id, webhook-timestamp, webhook-signature
+   Secret format: v1,whsec_<base64_key>
+   Signed content: "${webhook-id}.${webhook-timestamp}.${body}"
+   Signature: HMAC-SHA256 del signed content con la key decodificada
+   ──────────────────────────────────────────────────────────── */
 
-    const receivedSecret = authHeader.replace(/^Bearer /i, '').trim()
-    const systemSecret = process.env.SUPABASE_HOOK_SECRET?.trim()
-
-    if (!systemSecret) return false
-
-    if (receivedSecret.length !== systemSecret.length) return false
-    
-    return timingSafeEqual(Buffer.from(receivedSecret), Buffer.from(systemSecret))
-  } catch (err) {
-    console.error('Error validando token:', err)
+function verificarFirma(req: NextRequest, rawBody: string): boolean {
+  const secret = process.env.SUPABASE_HOOK_SECRET
+  if (!secret) {
+    console.error('[EMAIL-HOOK] SUPABASE_HOOK_SECRET no configurado')
     return false
   }
+
+  const webhookId = req.headers.get('webhook-id')
+  const webhookTimestamp = req.headers.get('webhook-timestamp')
+  const webhookSignature = req.headers.get('webhook-signature')
+
+  if (!webhookId || !webhookTimestamp || !webhookSignature) {
+    console.warn('[EMAIL-HOOK] Headers faltantes:', {
+      id: !!webhookId,
+      timestamp: !!webhookTimestamp,
+      signature: !!webhookSignature,
+    })
+    return false
+  }
+
+  // Extraer la clave base64 del secret: "v1,whsec_BASE64" → BASE64
+  const secretBase64 = secret.replace(/^v1,whsec_/, '')
+  const key = Buffer.from(secretBase64, 'base64')
+
+  // El contenido firmado es: "webhook-id.webhook-timestamp.body"
+  const signedContent = `${webhookId}.${webhookTimestamp}.${rawBody}`
+  const expectedSignature = createHmac('sha256', key).update(signedContent).digest('base64')
+
+  // webhook-signature puede tener múltiples firmas separadas por espacio: "v1,SIG1 v1,SIG2"
+  const signatures = webhookSignature.split(' ')
+
+  for (const sig of signatures) {
+    const sigValue = sig.replace(/^v1,/, '')
+    if (sigValue === expectedSignature) return true
+  }
+
+  console.warn('[EMAIL-HOOK] Firma no coincide')
+  console.warn('[EMAIL-HOOK] Expected:', expectedSignature)
+  console.warn('[EMAIL-HOOK] Received:', webhookSignature)
+  return false
 }
 
 // Supabase Auth Hook — Send Email
-// Configurar en: Supabase → Authentication → Hooks → Send Email
 // URL: https://www.spinus.com.mx/api/auth/email-hook
 export async function POST(req: NextRequest) {
-  // La firma tipo x-supabase-signature sólo aplica a Database Webhooks, no a Auth Hooks
   const rawBody = await req.text()
 
-  if (!verificarFirma(req)) {
-    console.warn(`[WEBHOOK ERROR] Acceso denegado. Token inválido o ausente.`)
-    return NextResponse.json({ error: 'Autorización denegada' }, { status: 401 })
+  if (!verificarFirma(req, rawBody)) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
 
-  const body = JSON.parse(rawBody)
+  try {
+    const body = JSON.parse(rawBody)
+    const { user, email_data } = body
+    const email: string = user?.email
+    const nombre: string = user?.user_metadata?.nombre || 'Doctor'
+    const actionType: string = email_data?.email_action_type
+    const tokenHash: string = email_data?.token_hash
+    const redirectTo: string = email_data?.redirect_to || 'https://www.spinus.com.mx/auth/callback'
 
-  const { user, email_data } = body
-  const email: string = user?.email
-  const nombre: string = user?.user_metadata?.nombre || 'Doctor'
-  const actionType: string = email_data?.email_action_type
-  const tokenHash: string = email_data?.token_hash
-  const redirectTo: string = email_data?.redirect_to || 'https://www.spinus.com.mx/auth/callback'
+    if (!email || !tokenHash) {
+      console.error(`[EMAIL-HOOK] Datos incompletos — email: ${!!email}, token: ${!!tokenHash}, action: ${actionType}`)
+      return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
+    }
 
-  if (!email || !tokenHash) {
-    console.error(`[WEBHOOK ERROR] Datos incompletos. Email: ${!!email}, Token: ${!!tokenHash}, Action: ${actionType}`)
-    return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
-  }
+    const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.spinus.com.mx'
+    let subject = ''
+    let html = ''
 
-  // Construir URL de confirmación/acción
-  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.spinus.com.mx'
-  let subject = ''
-  let html = ''
+    if (actionType === 'signup') {
+      const url = `${siteUrl}/auth/confirm-email?token_hash=${tokenHash}&type=email&redirect_to=${encodeURIComponent(redirectTo)}`
+      subject = 'Confirma tu cuenta — Spinus'
+      html = emailConfirmacion(nombre, url)
+    } else if (actionType === 'recovery') {
+      const url = `${siteUrl}/auth/confirm?token_hash=${tokenHash}&type=recovery`
+      subject = 'Recupera tu contraseña — Spinus'
+      html = emailRecuperacion(nombre, url)
+    } else if (actionType === 'magiclink') {
+      const url = `${siteUrl}/auth/callback?token_hash=${tokenHash}&type=magiclink`
+      subject = 'Tu enlace de acceso — Spinus'
+      html = emailMagicLink(nombre, url)
+    } else {
+      console.log(`[EMAIL-HOOK] Tipo no manejado: ${actionType}`)
+      return NextResponse.json({ ok: true })
+    }
 
-  if (actionType === 'signup') {
-    const confirmUrl = `${siteUrl}/auth/confirm-email?token_hash=${tokenHash}&type=email&redirect_to=${encodeURIComponent(redirectTo)}`
-    subject = 'Confirma tu cuenta — Spinus'
-    html = emailConfirmacion(nombre, confirmUrl)
-  } else if (actionType === 'recovery') {
-    const recoveryUrl = `${siteUrl}/auth/confirm?token_hash=${tokenHash}&type=recovery`
-    subject = 'Recupera tu contraseña — Spinus'
-    html = emailRecuperacion(nombre, recoveryUrl)
-  } else if (actionType === 'magiclink') {
-    const magicUrl = `${siteUrl}/auth/callback?token_hash=${tokenHash}&type=magiclink`
-    subject = 'Tu enlace de acceso — Spinus'
-    html = emailMagicLink(nombre, magicUrl)
-  } else {
-    // Tipo no manejado — dejar que Supabase lo envíe
+    const { error } = await resend.emails.send({
+      from: 'Spinus <noreply@mail.spinus.com.mx>',
+      to: email,
+      subject,
+      html,
+    })
+
+    if (error) {
+      console.error('[EMAIL-HOOK] Resend error:', error)
+      return NextResponse.json({ error: 'Error al enviar email' }, { status: 500 })
+    }
+
+    console.log(`[EMAIL-HOOK] OK — ${actionType} → ${email}`)
     return NextResponse.json({ ok: true })
+
+  } catch (err) {
+    console.error('[EMAIL-HOOK] Error inesperado:', err)
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
-
-  await resend.emails.send({
-    from: 'Spinus <noreply@mail.spinus.com.mx>',
-    to: email,
-    subject,
-    html,
-  })
-
-  return NextResponse.json({ ok: true })
 }
+
+/* ─── Templates de email ─────────────────────────────────── */
 
 function emailBase(titulo: string, contenido: string): string {
   return `<!DOCTYPE html>
