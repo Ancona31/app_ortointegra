@@ -8,17 +8,28 @@ function verificarFirma(payload: string, signatureHeader: string): boolean {
   const secret = process.env.SUPABASE_HOOK_SECRET
   if (!secret) return false
 
-  // Secret: "v1,whsec_BASE64" → extraer la parte base64
-  const secretBase64 = secret.replace(/^v1,whsec_/, '')
-  const key = Buffer.from(secretBase64, 'base64')
-
-  // Firma recibida: "v1,BASE64_HMAC" → extraer solo el base64
-  const receivedBase64 = signatureHeader.replace(/^v1,/, '')
-
-  const expected = createHmac('sha256', key).update(payload).digest('base64')
   try {
-    return timingSafeEqual(Buffer.from(receivedBase64), Buffer.from(expected))
-  } catch {
+    const cleanSignature = signatureHeader.replace(/^v1,/, '').replace(/^whsec_/, '').trim()
+
+    // Supabase Auth Hooks usan el secreto en texto plano y generan un hash (usualmente en hex o base64).
+    const expectedHex = createHmac('sha256', secret).update(payload).digest('hex')
+    const expectedB64 = createHmac('sha256', secret).update(payload).digest('base64')
+
+    // Si tu secret estaba decodificable en base64 (algunas configuraciones viejas)
+    const keyBuf = Buffer.from(secret, 'base64')
+    const expectedHexB = createHmac('sha256', keyBuf).update(payload).digest('hex')
+    const expectedB64B = createHmac('sha256', keyBuf).update(payload).digest('base64')
+
+    const signatures = [expectedHex, expectedB64, expectedHexB, expectedB64B]
+    return signatures.some(sig => {
+      try {
+        return timingSafeEqual(Buffer.from(cleanSignature), Buffer.from(sig))
+      } catch {
+        return cleanSignature === sig // Fallback si timingSafeEqual falla por longitud de bits
+      }
+    })
+  } catch (err) {
+    console.error('Error criptográfico:', err)
     return false
   }
 }
@@ -31,6 +42,7 @@ export async function POST(req: NextRequest) {
   const signature = req.headers.get('x-supabase-signature') ?? ''
 
   if (!verificarFirma(rawBody, signature)) {
+    console.warn(`[WEBHOOK ERROR] Firma inválida. Recibido: ${signature.substring(0, 10)}... (Secreto configurado: ${!!process.env.SUPABASE_HOOK_SECRET})`)
     return NextResponse.json({ error: 'Firma inválida' }, { status: 401 })
   }
 
@@ -44,6 +56,7 @@ export async function POST(req: NextRequest) {
   const redirectTo: string = email_data?.redirect_to || 'https://www.spinus.com.mx/auth/callback'
 
   if (!email || !tokenHash) {
+    console.error(`[WEBHOOK ERROR] Datos incompletos. Email: ${!!email}, Token: ${!!tokenHash}, Action: ${actionType}`)
     return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
   }
 
