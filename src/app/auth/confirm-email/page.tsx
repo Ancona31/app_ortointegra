@@ -6,30 +6,38 @@ import { createClient } from '@/lib/supabase/client'
 import { Loader2 } from 'lucide-react'
 
 // Página intermedia para confirmación de email vía token_hash (Auth Hook)
-// Verifica el OTP y redirige al dashboard
+// Cierra cualquier sesión activa, verifica el OTP y redirige al dashboard
 function ConfirmEmailContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
 
   useEffect(() => {
-    const tokenHash = searchParams.get('token_hash')
-    const redirectTo = searchParams.get('redirect_to') || '/dashboard'
+    async function confirmar() {
+      const tokenHash = searchParams.get('token_hash')
 
-    if (!tokenHash) {
-      router.replace('/login?error=invalid_link')
-      return
-    }
+      if (!tokenHash) {
+        router.replace('/login?error=invalid_link')
+        return
+      }
 
-    const supabase = createClient()
-    supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'email' }).then(async ({ error }: { error: any }) => {
+      const supabase = createClient()
+
+      // Cerrar sesión activa para evitar conflicto con otro usuario
+      await supabase.auth.signOut()
+
+      const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'email' })
+
       if (error) {
         router.replace('/login?error=invalid_link')
         return
       }
+
       // Crear perfil si no existe
       await fetch('/api/auth/complete-registro', { method: 'POST' })
       router.replace('/dashboard')
-    })
+    }
+
+    confirmar()
   }, [searchParams, router])
 
   return (
