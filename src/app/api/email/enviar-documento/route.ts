@@ -186,31 +186,40 @@ function generarHtmlEmail(doc: any, medicoNombre: string, tipoLabel: string): st
   }
 
   return `<!DOCTYPE html>
-<html lang="es">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;background:#f8fafc;margin:0;padding:0;">
-  <div style="max-width:560px;margin:40px auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
-    <div style="background:linear-gradient(135deg,#1a3a5c,#1e5fa8);padding:28px;">
-      <p style="margin:0 0 4px;color:#93c5fd;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:600;">Spinus</p>
-      <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">${tipoLabel}</h1>
-    </div>
-    <div style="padding:28px;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
-        <tr>
-          <td style="color:#64748b;font-size:13px;padding-bottom:2px;">Emitido por</td>
-        </tr>
-        <tr>
-          <td style="font-weight:600;color:#1e293b;font-size:15px;">${medicoNombre}</td>
-        </tr>
-        ${contenido?.paciente ? `<tr><td style="color:#64748b;font-size:13px;padding-top:12px;padding-bottom:2px;">Paciente</td></tr>
-        <tr><td style="font-weight:600;color:#1e293b;font-size:15px;">${contenido.paciente}</td></tr>` : ''}
+<html lang="es" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <!--[if mso]><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml><![endif]-->
+</head>
+<body style="margin:0;padding:0;background-color:#f8fafc;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;">
+    <tr><td align="center" style="padding:40px 16px;">
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background-color:#ffffff;border:1px solid #e2e8f0;">
+        <tr><td style="background-color:#1a3a5c;padding:28px;">
+          <p style="margin:0 0 4px;color:#93c5fd;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:600;">Spinus</p>
+          <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">${tipoLabel}</h1>
+        </td></tr>
+        <tr><td style="padding:28px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+            <tr>
+              <td style="color:#64748b;font-size:13px;padding-bottom:2px;">Emitido por</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;color:#1e293b;font-size:15px;">${medicoNombre}</td>
+            </tr>
+            ${contenido?.paciente ? `<tr><td style="color:#64748b;font-size:13px;padding-top:12px;padding-bottom:2px;">Paciente</td></tr>
+            <tr><td style="font-weight:600;color:#1e293b;font-size:15px;">${contenido.paciente}</td></tr>` : ''}
+          </table>
+          ${cuerpo}
+          <p style="margin:28px 0 0;font-size:12px;color:#94a3b8;border-top:1px solid #f1f5f9;padding-top:16px;">
+            Documento generado el ${fecha}. Este mensaje fue enviado desde el sistema de gestión clínica Spinus.
+          </p>
+        </td></tr>
       </table>
-      ${cuerpo}
-      <p style="margin:28px 0 0;font-size:12px;color:#94a3b8;border-top:1px solid #f1f5f9;padding-top:16px;">
-        Documento generado el ${fecha}. Este mensaje fue enviado desde el sistema de gestión clínica Spinus.
-      </p>
-    </div>
-  </div>
+    </td></tr>
+  </table>
 </body>
 </html>`
 }

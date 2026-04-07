@@ -39,10 +39,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Si hay sesión y está en login → redirigir al dashboard
-  if (user && isLoginPage) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
-  }
+  // Permitir acceso a /login aunque haya sesión activa
+  // El usuario puede querer cambiar de cuenta — la página mostrará un aviso
 
   return supabaseResponse
 }

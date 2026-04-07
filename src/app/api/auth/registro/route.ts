@@ -110,29 +110,42 @@ export async function POST(req: NextRequest) {
 
 function generarEmailConfirmacion(nombre: string, confirmUrl: string): string {
   return `<!DOCTYPE html>
-<html lang="es">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;background:#f8fafc;margin:0;padding:0;">
-  <div style="max-width:540px;margin:40px auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
-    <div style="background:linear-gradient(135deg,#1a3a5c,#1e5fa8);padding:28px;">
-      <p style="margin:0 0 4px;color:#93c5fd;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:600;">Spinus</p>
-      <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">Confirma tu cuenta</h1>
-    </div>
-    <div style="padding:32px;">
-      <p style="color:#334155;font-size:15px;margin-top:0;">Hola <strong>${nombre}</strong>,</p>
-      <p style="color:#475569;font-size:14px;line-height:1.6;">Tu cuenta de Spinus ha sido creada. Confirma tu correo electrónico para comenzar a usar el sistema.</p>
-      <div style="text-align:center;margin:32px 0;">
-        <a href="${confirmUrl}" style="display:inline-block;background:linear-gradient(135deg,#1a3a5c,#1e5fa8);color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:10px;font-weight:600;font-size:15px;">
-          Confirmar mi cuenta
-        </a>
-      </div>
-      <p style="color:#64748b;font-size:13px;">Si el botón no funciona, copia este enlace:</p>
-      <p style="color:#1e5fa8;font-size:12px;word-break:break-all;">${confirmUrl}</p>
-      <p style="color:#94a3b8;font-size:12px;border-top:1px solid #f1f5f9;padding-top:16px;margin-top:24px;">
-        Si no creaste esta cuenta, ignora este mensaje. El enlace expira en 24 horas.
-      </p>
-    </div>
-  </div>
+<html lang="es" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <!--[if mso]><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml><![endif]-->
+</head>
+<body style="margin:0;padding:0;background-color:#f8fafc;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;">
+    <tr><td align="center" style="padding:40px 16px;">
+      <table role="presentation" width="540" cellpadding="0" cellspacing="0" style="max-width:540px;width:100%;background-color:#ffffff;border:1px solid #e2e8f0;">
+        <tr><td style="background-color:#1a3a5c;padding:28px;">
+          <p style="margin:0 0 4px;color:#93c5fd;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:600;">Spinus</p>
+          <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">Confirma tu cuenta</h1>
+        </td></tr>
+        <tr><td style="padding:32px;">
+          <p style="color:#334155;font-size:15px;margin-top:0;">Hola <strong>${nombre}</strong>,</p>
+          <p style="color:#475569;font-size:14px;line-height:1.6;">Tu cuenta de Spinus ha sido creada. Confirma tu correo electrónico para comenzar a usar el sistema.</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px auto;">
+            <tr><td align="center" style="background-color:#1e5fa8;padding:14px 36px;">
+              <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="${confirmUrl}" style="height:48px;width:220px;v-text-anchor:middle;" arcsize="20%" fillcolor="#1e5fa8" stroke="f"><v:textbox inset="0,0,0,0"><center style="color:#ffffff;font-family:Segoe UI,Helvetica,sans-serif;font-size:15px;font-weight:600;"><![endif]-->
+              <a href="${confirmUrl}" style="display:inline-block;background-color:#1e5fa8;color:#ffffff;text-decoration:none;padding:14px 36px;font-weight:600;font-size:15px;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+                Confirmar mi cuenta
+              </a>
+              <!--[if mso]></center></v:textbox></v:roundrect><![endif]-->
+            </td></tr>
+          </table>
+          <p style="color:#64748b;font-size:12px;text-align:center;">Si el botón no funciona, copia este enlace:<br>
+          <span style="color:#1e5fa8;word-break:break-all;">${confirmUrl}</span></p>
+          <p style="color:#94a3b8;font-size:12px;border-top:1px solid #f1f5f9;padding-top:16px;margin-top:24px;">
+            Si no creaste esta cuenta, ignora este mensaje. El enlace expira en 24 horas.
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
 </body>
 </html>`
 }

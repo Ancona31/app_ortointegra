@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Loader2, Lock, Eye, EyeOff } from 'lucide-react'
+import { Loader2, Lock, Eye, EyeOff, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 
 export default function LoginPage() {
@@ -13,12 +13,21 @@ export default function LoginPage() {
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [sesionActiva, setSesionActiva] = useState<string | null>(null)
 
   useEffect(() => {
     const hash = window.location.hash
     if (hash.includes('error=access_denied') || hash.includes('otp_expired')) {
       setError('El enlace de recuperación expiró o ya fue usado. Solicita uno nuevo.')
     }
+
+    // Detectar si hay sesión activa
+    const supabase = createClient()
+    supabase.auth.getUser().then((res: { data: { user: { email: string } | null } }) => {
+      if (res.data.user?.email) {
+        setSesionActiva(res.data.user.email)
+      }
+    })
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
@@ -27,6 +36,12 @@ export default function LoginPage() {
     setError('')
 
     const supabase = createClient()
+
+    // Cerrar sesión activa antes de iniciar con otra cuenta
+    if (sesionActiva) {
+      await supabase.auth.signOut()
+    }
+
     const { error: err } = await supabase.auth.signInWithPassword({ email, password })
 
     setLoading(false)
@@ -37,6 +52,10 @@ export default function LoginPage() {
       router.push('/dashboard')
       router.refresh()
     }
+  }
+
+  function handleVolverDashboard() {
+    router.push('/dashboard')
   }
 
   return (
@@ -58,11 +77,35 @@ export default function LoginPage() {
           <p className="text-xs text-slate-400 mt-1 text-center">Gestión clínica inteligente para el especialista moderno</p>
         </div>
 
+        {/* Aviso de sesión activa */}
+        {sesionActiva && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-amber-800">Sesión activa</p>
+                <p className="text-xs text-amber-600 mt-1">
+                  Tienes una sesión abierta como <strong>{sesionActiva}</strong>.
+                  Al iniciar sesión con otra cuenta, se cerrará la sesión actual.
+                </p>
+                <button
+                  onClick={handleVolverDashboard}
+                  className="text-xs font-medium text-amber-700 hover:text-amber-900 underline mt-2 inline-block"
+                >
+                  Volver al dashboard →
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Formulario */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
           <div className="flex items-center gap-2 mb-6">
             <Lock size={16} className="text-[#1a3a5c]" />
-            <h2 className="font-semibold text-slate-700">Acceso al sistema</h2>
+            <h2 className="font-semibold text-slate-700">
+              {sesionActiva ? 'Cambiar de cuenta' : 'Acceso al sistema'}
+            </h2>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -117,7 +160,7 @@ export default function LoginPage() {
             >
               {loading
                 ? <><Loader2 size={16} className="animate-spin" /> Iniciando sesión...</>
-                : 'Iniciar sesión'
+                : sesionActiva ? 'Cambiar de cuenta' : 'Iniciar sesión'
               }
             </button>
 
