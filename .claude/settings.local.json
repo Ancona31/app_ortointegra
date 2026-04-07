@@ -50,7 +50,28 @@
       "WebFetch(domain:www.namecheap.com)",
       "Bash(find \"C:\\\\users\\\\ancona\\\\desktop\\\\app_ortointegra/src/app/\\(app\\)/super-admin\" -type f)",
       "Bash(find \"C:\\\\users\\\\ancona\\\\desktop\\\\app_ortointegra/src/app/\\(app\\)\" -name \"page.tsx\")",
-      "Bash(grep -r \"order_by\\\\|limit\\\\|count\\\\|aggregate\" C:usersanconadesktopapp_ortointegra/src/app/api --include=*.ts)"
+      "Bash(grep -r \"order_by\\\\|limit\\\\|count\\\\|aggregate\" C:usersanconadesktopapp_ortointegra/src/app/api --include=*.ts)",
+      "Bash(find /c/users/ancona/desktop/app_ortointegra -name *.sql -type f)",
+      "Bash(find /c/users/ancona/desktop/app_ortointegra/src/components/documentos -name \"*.tsx\" -exec wc -l {} +)",
+      "Bash(grep -n \"tipo.*=\\\\|tipo:\" /c/users/ancona/desktop/app_ortointegra/src/components/documentos/*.tsx)",
+      "Bash(grep -rn \"eval\\\\|Function\\\\|exec\\\\|child_process\" /c/users/ancona/desktop/app_ortointegra/src --include=*.ts --include=*.tsx)",
+      "Bash(grep:*)",
+      "Bash(git:*)",
+      "Bash(find:*)",
+      "Bash(cat /c/users/ancona/desktop/app_ortointegra/.env*)",
+      "Bash(xargs dirname:*)",
+      "Bash(npx next:*)",
+      "Bash(xargs basename:*)",
+      "Bash(grep -n \"formatter\" src/app/\\\\\\(app\\\\\\)/expediente/[id]/page.tsx)",
+      "Bash(npx tsx:*)",
+      "Bash(stripe listen:*)",
+      "Bash(./stripe.exe listen:*)",
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(rm:*)",
+      "WebSearch",
+      "Bash(file *.jpg)",
+      "Bash(npx sharp-cli:*)",
+      "Bash(python -c ':*)"
     ]
   }
 }
