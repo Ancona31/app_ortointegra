@@ -6,16 +6,24 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 
 function verificarFirma(req: NextRequest): boolean {
   try {
-    console.log("=== BYPASS ABSOLUTO ACTIVADO ===");
-    const authHeader = req.headers.get('authorization') || req.headers.get('Authorization') || "NADA";
-    console.log("-> Header que mandó Supabase:", authHeader);
-    console.log("-> Variable en Vercel:", process.env.SUPABASE_HOOK_SECRET);
+    const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization') ?? ''
     
-    // RETORNA TRUE PASE LO QUE PASE PARA QUE EL CORREO SALGA SÍ O SÍ
-    return true;
+    if (!authHeader) {
+      console.warn("No se recibió cabecera de Authorization.");
+      return false;
+    }
+
+    const receivedSecret = authHeader.replace(/^Bearer /i, '').trim()
+    const systemSecret = process.env.SUPABASE_HOOK_SECRET?.trim()
+
+    if (!systemSecret) return false
+
+    if (receivedSecret.length !== systemSecret.length) return false
+    
+    return timingSafeEqual(Buffer.from(receivedSecret), Buffer.from(systemSecret))
   } catch (err) {
-    console.error('Error:', err);
-    return true;
+    console.error('Error validando token:', err)
+    return false
   }
 }
 
