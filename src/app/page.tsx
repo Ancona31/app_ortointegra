@@ -56,8 +56,8 @@ function AppMockup() {
       {/* Sidebar */}
       <div className="w-[180px] bg-white/90 border-r border-slate-200/60 p-4 flex-shrink-0 hidden sm:block">
         <div className="flex items-center gap-2 mb-6">
-          <Image src="/logo-ortointegra.png" alt="OrtoIntegra" width={24} height={24} className="object-contain" />
-          <span className="text-[11px] font-bold text-slate-800">OrtoIntegra</span>
+          <Image src="/logo-spinus.png" alt="Spinus" width={24} height={24} className="object-contain" />
+          <span className="text-[11px] font-bold text-slate-800">Spinus®</span>
         </div>
         <div className="space-y-1">
           {[
@@ -157,15 +157,15 @@ export default function HomePage() {
     <main className="min-h-screen bg-[#f8fafc] relative" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', WebkitFontSmoothing: 'antialiased' }}>
       {/* Logo watermark — fixed left side, visible across entire page */}
       <div className="fixed -left-16 sm:-left-6 top-1/2 -translate-y-1/2 pointer-events-none select-none opacity-[0.07] z-0">
-        <Image src="/logo-ortointegra.png" alt="" width={575} height={575} className="w-[460px] sm:w-[575px] h-auto" aria-hidden="true" />
+        <Image src="/logo-spinus.png" alt="" width={575} height={575} className="w-[460px] sm:w-[575px] h-auto" aria-hidden="true" />
       </div>
 
       {/* Nav */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/60">
         <nav className="mx-auto max-w-6xl flex items-center justify-between px-4 sm:px-8 h-14">
           <div className="flex items-center gap-2.5">
-            <Image src="/logo-ortointegra.png" alt="OrtoIntegra" width={36} height={36} className="object-contain" />
-            <span className="text-[17px] font-bold text-slate-900 tracking-tight">OrtoIntegra</span>
+            <Image src="/logo-spinus.png" alt="Spinus" width={36} height={36} className="object-contain" />
+            <span className="text-[17px] font-bold text-slate-900 tracking-tight">Spinus®</span>
           </div>
           <div className="flex items-center gap-3">
             <Link
@@ -244,7 +244,7 @@ export default function HomePage() {
             </div>
             <div className="flex-1 flex justify-center">
               <div className="bg-white/80 border border-slate-200/60 rounded-md px-3 py-0.5 text-[10px] text-slate-400 font-medium">
-                ortointegra.com/agenda
+                spinus.com.mx/agenda
               </div>
             </div>
             <div className="w-[52px]" /> {/* spacer to center address bar */}
@@ -499,7 +499,7 @@ export default function HomePage() {
               <h2 className="text-[28px] sm:text-[38px] font-bold text-slate-900 tracking-tight leading-[1.15]">
                 Si sabes usar tu celular,{' '}
                 <br className="hidden sm:block" />
-                <span className="text-slate-400">ya sabes usar OrtoIntegra</span>
+                <span className="text-slate-400">ya sabes usar Spinus®</span>
               </h2>
               <p className="mt-5 text-[16px] text-slate-500 leading-relaxed max-w-lg">
                 Sin manuales, sin capacitaciones. Cada pantalla está diseñada para que el siguiente paso sea obvio. El flujo completo de una consulta — desde que llega el paciente hasta que se va con su receta — en menos de 5 clics.
@@ -571,8 +571,8 @@ export default function HomePage() {
         <div className="mx-auto max-w-6xl px-4 sm:px-8 py-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2.5">
-              <Image src="/logo-ortointegra.png" alt="OrtoIntegra" width={28} height={28} className="object-contain" />
-              <span className="text-[13px] text-slate-500">&copy; {new Date().getFullYear()} OrtoIntegra. Todos los derechos reservados.</span>
+              <Image src="/logo-spinus.png" alt="Spinus" width={28} height={28} className="object-contain" />
+              <span className="text-[13px] text-slate-500">&copy; {new Date().getFullYear()} Spinus®. Todos los derechos reservados.</span>
             </div>
             <div className="flex items-center gap-6">
               <Link href="/privacy" className="text-[13px] text-slate-500 hover:text-slate-700 transition-colors duration-200">

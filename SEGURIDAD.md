@@ -16,7 +16,7 @@
 - Resultados de laboratorio con análisis por inteligencia artificial
 - Agenda médica integrada con Google Calendar
 
-**URL de producción:** `https://www.ortointegra.com`
+**URL de producción:** `https://www.spinus.com.mx`
 **Infraestructura:** Vercel (frontend/API) + Supabase (base de datos PostgreSQL)
 
 ---
@@ -202,7 +202,7 @@ Solo los roles `admin` y `super_admin` pueden consultar el audit log. El log es 
 ## 9. Seguridad en Comunicaciones
 
 - **HTTPS obligatorio** en producción (gestionado por Vercel + certificado TLS automático)
-- **HSTS** habilitado por Vercel en el dominio `ortointegra.com`
+- **HSTS** habilitado por Vercel en el dominio `spinus.com.mx`
 - Las cookies de sesión tienen los flags `Secure` (solo HTTPS) y `HttpOnly` (no accesibles desde JavaScript)
 
 ---

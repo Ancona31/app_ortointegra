@@ -163,7 +163,7 @@ export default function Sidebar() {
   async function handleLogout() {
     const supabase = createClient()
     await supabase.auth.signOut()
-    sessionStorage.removeItem('ortointegra_active')
+    sessionStorage.removeItem('spinus_active')
     clearProfileCache()
     await mutate('/api/me/clinica', null, { revalidate: false })
     router.push('/login')

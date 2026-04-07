@@ -33,7 +33,7 @@ export default function LoginPage() {
     if (err) {
       setError('Credenciales incorrectas. Verifica tu correo y contraseña.')
     } else {
-      sessionStorage.setItem('ortointegra_active', '1')
+      sessionStorage.setItem('spinus_active', '1')
       router.push('/dashboard')
       router.refresh()
     }
@@ -54,7 +54,7 @@ export default function LoginPage() {
               }}
             />
           </div>
-          <h1 className="text-2xl font-bold text-[#1a3a5c]">OrtoIntegra</h1>
+          <h1 className="text-2xl font-bold text-[#1a3a5c]">Spinus®</h1>
           <p className="text-xs text-slate-400 mt-1 text-center">Gestión clínica inteligente para el especialista moderno</p>
         </div>
 
@@ -136,7 +136,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-slate-300 mt-6">
-          © 2026 OrtoIntegra · Todos los derechos reservados
+          © 2026 Spinus® · Todos los derechos reservados
           <br />
           <Link href="/privacidad" target="_blank" className="text-slate-400 hover:text-[#1e5fa8] transition-colors">
             Aviso de Privacidad

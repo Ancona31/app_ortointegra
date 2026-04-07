@@ -13,7 +13,7 @@ import { useRouter } from 'next/navigation'
  * pero sí hay cookies de Supabase, significa que el navegador restauró cookies
  * de una sesión anterior → forzar logout.
  */
-const SESSION_FLAG = 'ortointegra_active'
+const SESSION_FLAG = 'spinus_active'
 
 export default function SessionGuard() {
   const router = useRouter()

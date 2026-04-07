@@ -59,8 +59,8 @@ const nextConfig: NextConfig = {
 };
 
 export default withSentryConfig(nextConfig, {
-  org: "ortointegra",
-  project: "ortointegra",
+  org: "spinus",
+  project: "spinus",
   silent: true,
   widenClientFileUpload: true,
   disableLogger: true,

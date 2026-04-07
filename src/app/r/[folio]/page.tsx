@@ -159,7 +159,7 @@ export default async function VerificacionPage({ params }: { params: Promise<{ f
 
         {/* Footer */}
         <p className="text-center text-xs text-slate-300 pb-4">
-          OrtoIntegra · Sistema de Gestión Clínica · ortointegra.com
+          Spinus® · Sistema de Gestión Clínica · spinus.com.mx
         </p>
       </div>
     </div>

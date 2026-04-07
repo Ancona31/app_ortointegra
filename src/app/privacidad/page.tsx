@@ -131,7 +131,7 @@ export default function PrivacidadPage() {
               </p>
               <div className="flex items-center gap-2.5 bg-blue-50/50 rounded-xl px-4 py-3 border border-blue-100/50 mt-1">
                 <Mail size={16} className="text-[#1e5fa8] flex-shrink-0" />
-                <span className="text-sm font-semibold text-[#1e5fa8]">privacidad@ortointegra.com</span>
+                <span className="text-sm font-semibold text-[#1e5fa8]">privacidad@spinus.com.mx</span>
               </div>
               <p className="text-[12px] text-[#86868b]">
                 La solicitud debera contener: nombre completo, descripcion del derecho a ejercer y documento de identidad. Respuesta en un plazo maximo de 20 dias habiles.
@@ -187,8 +187,8 @@ export default function PrivacidadPage() {
               <p className="font-medium text-[#3d3d3f]">Angel Manuel Ancona Perez</p>
               <p>Merida, Yucatan, Mexico</p>
             </div>
-            <a href="mailto:privacidad@ortointegra.com" className="text-[11px] text-[#1e5fa8] hover:underline">
-              privacidad@ortointegra.com
+            <a href="mailto:privacidad@spinus.com.mx" className="text-[11px] text-[#1e5fa8] hover:underline">
+              privacidad@spinus.com.mx
             </a>
           </div>
         </div>

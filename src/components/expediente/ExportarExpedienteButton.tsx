@@ -236,7 +236,7 @@ export default function ExportarExpedienteButton({ paciente, consultas, labs, do
     // ── Footer ─────────────────────────────────────────────────────────
     const footerHtml = `
       <div style="margin-top:24px;border-top:1px solid #d1d9e6;padding-top:8px;font-size:7.5pt;color:#94a3b8;display:flex;justify-content:space-between">
-        <span>OrtoIntegra · Expediente exportado el ${fechaExport}</span>
+        <span>Spinus® · Expediente exportado el ${fechaExport}</span>
         <span>Documento confidencial — uso médico exclusivo</span>
       </div>
     `

@@ -38,7 +38,7 @@ type Phase =
 
 const WELCOME_TIP: ContextTip = {
   id: 'welcome',
-  title: '¡Bienvenido a OrtoIntegra!',
+  title: '¡Bienvenido a Spinus®!',
   message: 'Te llevaré paso a paso a conocer tu nueva plataforma de expediente clínico. Puedes navegar libremente — estaré aquí para guiarte.',
 }
 
@@ -248,7 +248,7 @@ const PAGE_CONTEXTS: PageContext[] = [
 
 /* ─── Persistence ────────────────────────────────────────── */
 
-const STORAGE_KEY = 'ortointegra_onboarding'
+const STORAGE_KEY = 'spinus_onboarding'
 
 type PersistedState = {
   dismissed: boolean

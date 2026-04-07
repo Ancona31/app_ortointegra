@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 
 export const metadata: Metadata = {
-  title: 'Aviso de Privacidad — OrtoIntegra',
-  description: 'Aviso de privacidad y protección de datos personales de OrtoIntegra.',
+  title: 'Aviso de Privacidad — Spinus®',
+  description: 'Aviso de privacidad y protección de datos personales de Spinus.',
 }
 
 export default function PrivacyPage() {
@@ -15,7 +15,7 @@ export default function PrivacyPage() {
 
         <h2>1. Responsable del tratamiento</h2>
         <p>
-          <strong>OrtoIntegra</strong>, con domicilio en Mérida, Yucatán, México, es responsable del
+          <strong>Spinus®</strong>, con domicilio en Mérida, Yucatán, México, es responsable del
           tratamiento de los datos personales que usted nos proporcione, de conformidad con la Ley
           Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP) y su
           Reglamento.
@@ -44,7 +44,7 @@ export default function PrivacyPage() {
 
         <h2>4. Integración con Google Calendar</h2>
         <p>
-          OrtoIntegra solicita acceso al permiso <code>calendar.events</code> de Google Calendar
+          Spinus® solicita acceso al permiso <code>calendar.events</code> de Google Calendar
           exclusivamente para:
         </p>
         <ul>
@@ -87,7 +87,7 @@ export default function PrivacyPage() {
         <p>
           Usted tiene derecho a Acceder, Rectificar, Cancelar u Oponerse al tratamiento de sus datos
           personales (derechos ARCO). Para ejercer estos derechos, envíe un correo electrónico a{' '}
-          <a href="mailto:privacidad@ortointegra.com">privacidad@ortointegra.com</a> con el asunto
+          <a href="mailto:privacidad@spinus.com.mx">privacidad@spinus.com.mx</a> con el asunto
           &quot;Derechos ARCO&quot;, indicando su nombre completo y la acción solicitada.
           Responderemos en un plazo máximo de 20 días hábiles.
         </p>
@@ -110,7 +110,7 @@ export default function PrivacyPage() {
         <h2>10. Contacto</h2>
         <p>
           Para cualquier consulta relacionada con este aviso de privacidad, puede contactarnos en{' '}
-          <a href="mailto:privacidad@ortointegra.com">privacidad@ortointegra.com</a>.
+          <a href="mailto:privacidad@spinus.com.mx">privacidad@spinus.com.mx</a>.
         </p>
 
         <div className="mt-12 pt-8 border-t border-slate-200">

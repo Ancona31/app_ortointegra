@@ -18,8 +18,8 @@ const faqs = [
     a: 'Ve a Agenda y haz clic en el botón "Conectar Google Calendar". Se abrirá una ventana de Google donde autorizas el acceso. Una vez conectado, tus citas se sincronizan bidireccional — lo que creas en la app aparece en tu calendario y viceversa.',
   },
   {
-    q: '¿Puedo usar OrtoIntegra desde mi celular?',
-    a: 'Sí. La app es 100% responsive y funciona en cualquier navegador. No necesitas instalar nada — solo abre ortointegra.com desde tu celular o tablet.',
+    q: '¿Puedo usar Spinus® desde mi celular?',
+    a: 'Sí. La app es 100% responsive y funciona en cualquier navegador. No necesitas instalar nada — solo abre spinus.com.mx desde tu celular o tablet.',
   },
   {
     q: '¿Cómo cambio de plan?',
@@ -117,7 +117,7 @@ export default function AyudaPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-900">Centro de ayuda</h1>
-            <p className="text-sm text-slate-500">Todo lo que necesitas para sacarle el máximo a OrtoIntegra</p>
+            <p className="text-sm text-slate-500">Todo lo que necesitas para sacarle el máximo a Spinus®</p>
           </div>
         </div>
       </div>
@@ -155,7 +155,7 @@ export default function AyudaPage() {
       {/* Reiniciar onboarding */}
       <button
         onClick={() => {
-          localStorage.removeItem('ortointegra_onboarding')
+          localStorage.removeItem('spinus_onboarding')
           window.location.reload()
         }}
         className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-[#1a3a5c] to-[#1e5fa8] text-white rounded-xl text-sm font-semibold shadow-[0_4px_24px_rgba(30,95,168,0.3)] hover:shadow-[0_8px_32px_rgba(30,95,168,0.4)] hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
@@ -238,7 +238,7 @@ export default function AyudaPage() {
             Escríbenos y te responderemos lo antes posible.
           </p>
           <a
-            href="mailto:soporte@ortointegra.com?subject=Soporte OrtoIntegra"
+            href="mailto:soporte@spinus.com.mx?subject=Soporte Spinus"
             className="relative inline-flex items-center gap-2 mt-5 bg-white text-[#1a3a5c] px-6 py-2.5 rounded-xl text-sm font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
           >
             <Mail size={16} />

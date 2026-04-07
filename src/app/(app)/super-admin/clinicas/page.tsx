@@ -384,7 +384,7 @@ export default function SuperAdminClinicasPage() {
               <div>
                 <label className="text-xs font-medium text-slate-500 block mb-1">Nombre de la clínica</label>
                 <input type="text" value={formClinica.nombre} onChange={e => setFormClinica({ ...formClinica, nombre: e.target.value })}
-                  placeholder="Ej: Clínica Ortointegra Norte" required
+                  placeholder="Ej: Clínica Spinus Norte" required
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
               </div>
               <div className="grid grid-cols-2 gap-3">

@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
   })
 
   // 4. Generar link de confirmación y enviar via Resend (Supabase no envía nada)
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.ortointegra.com'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.spinus.com.mx'
   const { data: linkData } = await admin.auth.admin.generateLink({
     type: 'signup',
     email,
@@ -98,9 +98,9 @@ export async function POST(req: NextRequest) {
   const confirmUrl = linkData?.properties?.action_link
   if (confirmUrl) {
     await resend.emails.send({
-      from: 'OrtoIntegra <noreply@mail.ortointegra.com>',
+      from: 'Spinus <noreply@mail.spinus.com.mx>',
       to: email,
-      subject: 'Confirma tu cuenta — OrtoIntegra',
+      subject: 'Confirma tu cuenta — Spinus',
       html: generarEmailConfirmacion(nombre, confirmUrl),
     })
   }
@@ -115,12 +115,12 @@ function generarEmailConfirmacion(nombre: string, confirmUrl: string): string {
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;background:#f8fafc;margin:0;padding:0;">
   <div style="max-width:540px;margin:40px auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
     <div style="background:linear-gradient(135deg,#1a3a5c,#1e5fa8);padding:28px;">
-      <p style="margin:0 0 4px;color:#93c5fd;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:600;">OrtoIntegra</p>
+      <p style="margin:0 0 4px;color:#93c5fd;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:600;">Spinus</p>
       <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">Confirma tu cuenta</h1>
     </div>
     <div style="padding:32px;">
       <p style="color:#334155;font-size:15px;margin-top:0;">Hola <strong>${nombre}</strong>,</p>
-      <p style="color:#475569;font-size:14px;line-height:1.6;">Tu cuenta de OrtoIntegra ha sido creada. Confirma tu correo electrónico para comenzar a usar el sistema.</p>
+      <p style="color:#475569;font-size:14px;line-height:1.6;">Tu cuenta de Spinus ha sido creada. Confirma tu correo electrónico para comenzar a usar el sistema.</p>
       <div style="text-align:center;margin:32px 0;">
         <a href="${confirmUrl}" style="display:inline-block;background:linear-gradient(135deg,#1a3a5c,#1e5fa8);color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:10px;font-weight:600;font-size:15px;">
           Confirmar mi cuenta

@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 
 export const metadata: Metadata = {
-  title: 'Términos de Servicio — OrtoIntegra',
-  description: 'Términos y condiciones de uso de la plataforma OrtoIntegra.',
+  title: 'Términos de Servicio — Spinus®',
+  description: 'Términos y condiciones de uso de la plataforma Spinus.',
 }
 
 export default function TermsPage() {
@@ -15,14 +15,14 @@ export default function TermsPage() {
 
         <h2>1. Aceptación de los términos</h2>
         <p>
-          Al registrarse y utilizar OrtoIntegra (&quot;la Plataforma&quot;), usted acepta estos
+          Al registrarse y utilizar Spinus® (&quot;la Plataforma&quot;), usted acepta estos
           Términos de Servicio en su totalidad. Si no está de acuerdo con alguno de los términos,
           no utilice la Plataforma.
         </p>
 
         <h2>2. Descripción del servicio</h2>
         <p>
-          OrtoIntegra es una plataforma de gestión clínica diseñada para profesionales de la salud.
+          Spinus® es una plataforma de gestión clínica diseñada para profesionales de la salud.
           El servicio incluye:
         </p>
         <ul>
@@ -55,7 +55,7 @@ export default function TermsPage() {
 
         <h2>5. Planes y pagos</h2>
         <ul>
-          <li>OrtoIntegra ofrece un plan gratuito con funcionalidades limitadas y planes de suscripción de pago.</li>
+          <li>Spinus® ofrece un plan gratuito con funcionalidades limitadas y planes de suscripción de pago.</li>
           <li>Los pagos se procesan de forma segura a través de Stripe, Inc.</li>
           <li>Las suscripciones se renuevan automáticamente según el periodo contratado (mensual o anual).</li>
           <li>Puede cancelar su suscripción en cualquier momento desde el portal de facturación. La cancelación toma efecto al final del periodo pagado.</li>
@@ -65,7 +65,7 @@ export default function TermsPage() {
 
         <h2>6. Propiedad intelectual</h2>
         <p>
-          El código fuente, diseño, marca y contenido de la Plataforma son propiedad de OrtoIntegra.
+          El código fuente, diseño, marca y contenido de la Plataforma son propiedad de Spinus®.
           Los datos clínicos introducidos por el usuario son propiedad del profesional de salud
           responsable y de sus pacientes, conforme a la legislación aplicable.
         </p>
@@ -75,12 +75,12 @@ export default function TermsPage() {
           <li>La Plataforma utiliza modelos de inteligencia artificial como herramienta de apoyo clínico.</li>
           <li>Las sugerencias generadas por IA <strong>no sustituyen el juicio clínico</strong> del profesional de salud.</li>
           <li>El médico es el único responsable de las decisiones clínicas tomadas con base en la información proporcionada por la Plataforma.</li>
-          <li>OrtoIntegra no garantiza la exactitud, completitud o idoneidad de los análisis generados por IA.</li>
+          <li>Spinus® no garantiza la exactitud, completitud o idoneidad de los análisis generados por IA.</li>
         </ul>
 
         <h2>8. Disponibilidad del servicio</h2>
         <p>
-          OrtoIntegra se esfuerza por mantener la Plataforma disponible de forma continua, pero no
+          Spinus® se esfuerza por mantener la Plataforma disponible de forma continua, pero no
           garantiza un tiempo de actividad del 100%. Podrán existir interrupciones por mantenimiento,
           actualizaciones o circunstancias fuera de nuestro control. No seremos responsables por
           daños derivados de la indisponibilidad temporal del servicio.
@@ -88,7 +88,7 @@ export default function TermsPage() {
 
         <h2>9. Limitación de responsabilidad</h2>
         <ul>
-          <li>OrtoIntegra es una herramienta de gestión administrativa y clínica. No proporciona diagnósticos ni tratamientos médicos.</li>
+          <li>Spinus® es una herramienta de gestión administrativa y clínica. No proporciona diagnósticos ni tratamientos médicos.</li>
           <li>No somos responsables por decisiones clínicas tomadas con base en la información de la Plataforma.</li>
           <li>Nuestra responsabilidad máxima se limita al monto pagado por el usuario en los últimos 12 meses.</li>
           <li>No somos responsables por pérdida de datos causada por el uso indebido de la Plataforma por parte del usuario.</li>
@@ -124,7 +124,7 @@ export default function TermsPage() {
         <h2>13. Contacto</h2>
         <p>
           Para cualquier consulta sobre estos términos, contáctenos en{' '}
-          <a href="mailto:contacto@ortointegra.com">contacto@ortointegra.com</a>.
+          <a href="mailto:contacto@spinus.com.mx">contacto@spinus.com.mx</a>.
         </p>
 
         <div className="mt-12 pt-8 border-t border-slate-200">

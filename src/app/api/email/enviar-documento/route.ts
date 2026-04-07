@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
   const html = generarHtmlEmail(doc, medicoNombre, tipoLabel)
 
   const { error } = await resend.emails.send({
-    from: 'OrtoIntegra <noreply@mail.ortointegra.com>',
+    from: 'Spinus <noreply@mail.spinus.com.mx>',
     to: pacienteEmail,
     subject: `${tipoLabel} — ${medicoNombre}`,
     html,
@@ -191,7 +191,7 @@ function generarHtmlEmail(doc: any, medicoNombre: string, tipoLabel: string): st
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;background:#f8fafc;margin:0;padding:0;">
   <div style="max-width:560px;margin:40px auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
     <div style="background:linear-gradient(135deg,#1a3a5c,#1e5fa8);padding:28px;">
-      <p style="margin:0 0 4px;color:#93c5fd;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:600;">OrtoIntegra</p>
+      <p style="margin:0 0 4px;color:#93c5fd;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:600;">Spinus</p>
       <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">${tipoLabel}</h1>
     </div>
     <div style="padding:28px;">
@@ -207,7 +207,7 @@ function generarHtmlEmail(doc: any, medicoNombre: string, tipoLabel: string): st
       </table>
       ${cuerpo}
       <p style="margin:28px 0 0;font-size:12px;color:#94a3b8;border-top:1px solid #f1f5f9;padding-top:16px;">
-        Documento generado el ${fecha}. Este mensaje fue enviado desde el sistema de gestión clínica OrtoIntegra.
+        Documento generado el ${fecha}. Este mensaje fue enviado desde el sistema de gestión clínica Spinus.
       </p>
     </div>
   </div>

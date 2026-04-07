@@ -25,7 +25,7 @@ function verificarFirma(payload: string, signatureHeader: string): boolean {
 
 // Supabase Auth Hook — Send Email
 // Configurar en: Supabase → Authentication → Hooks → Send Email
-// URL: https://www.ortointegra.com/api/auth/email-hook
+// URL: https://www.spinus.com.mx/api/auth/email-hook
 export async function POST(req: NextRequest) {
   const rawBody = await req.text()
   const signature = req.headers.get('x-supabase-signature') ?? ''
@@ -41,28 +41,28 @@ export async function POST(req: NextRequest) {
   const nombre: string = user?.user_metadata?.nombre || 'Doctor'
   const actionType: string = email_data?.email_action_type
   const tokenHash: string = email_data?.token_hash
-  const redirectTo: string = email_data?.redirect_to || 'https://www.ortointegra.com/auth/callback'
+  const redirectTo: string = email_data?.redirect_to || 'https://www.spinus.com.mx/auth/callback'
 
   if (!email || !tokenHash) {
     return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
   }
 
   // Construir URL de confirmación/acción
-  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.ortointegra.com'
+  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.spinus.com.mx'
   let subject = ''
   let html = ''
 
   if (actionType === 'signup') {
     const confirmUrl = `${siteUrl}/auth/confirm-email?token_hash=${tokenHash}&type=email&redirect_to=${encodeURIComponent(redirectTo)}`
-    subject = 'Confirma tu cuenta — OrtoIntegra'
+    subject = 'Confirma tu cuenta — Spinus'
     html = emailConfirmacion(nombre, confirmUrl)
   } else if (actionType === 'recovery') {
     const recoveryUrl = `${siteUrl}/auth/confirm?token_hash=${tokenHash}&type=recovery`
-    subject = 'Recupera tu contraseña — OrtoIntegra'
+    subject = 'Recupera tu contraseña — Spinus'
     html = emailRecuperacion(nombre, recoveryUrl)
   } else if (actionType === 'magiclink') {
     const magicUrl = `${siteUrl}/auth/callback?token_hash=${tokenHash}&type=magiclink`
-    subject = 'Tu enlace de acceso — OrtoIntegra'
+    subject = 'Tu enlace de acceso — Spinus'
     html = emailMagicLink(nombre, magicUrl)
   } else {
     // Tipo no manejado — dejar que Supabase lo envíe
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
   }
 
   await resend.emails.send({
-    from: 'OrtoIntegra <noreply@mail.ortointegra.com>',
+    from: 'Spinus <noreply@mail.spinus.com.mx>',
     to: email,
     subject,
     html,
@@ -86,7 +86,7 @@ function emailBase(titulo: string, contenido: string): string {
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;background:#f8fafc;margin:0;padding:0;">
   <div style="max-width:540px;margin:40px auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
     <div style="background:linear-gradient(135deg,#1a3a5c,#1e5fa8);padding:28px;">
-      <p style="margin:0 0 4px;color:#93c5fd;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:600;">OrtoIntegra</p>
+      <p style="margin:0 0 4px;color:#93c5fd;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:600;">Spinus</p>
       <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">${titulo}</h1>
     </div>
     <div style="padding:32px;">
@@ -113,7 +113,7 @@ function boton(url: string, texto: string): string {
 function emailConfirmacion(nombre: string, url: string): string {
   return emailBase('Confirma tu cuenta', `
     <p style="color:#334155;font-size:15px;margin-top:0;">Hola <strong>${nombre}</strong>,</p>
-    <p style="color:#475569;font-size:14px;line-height:1.6;">Tu cuenta de OrtoIntegra ha sido creada. Confirma tu correo electrónico para comenzar.</p>
+    <p style="color:#475569;font-size:14px;line-height:1.6;">Tu cuenta de Spinus ha sido creada. Confirma tu correo electrónico para comenzar.</p>
     ${boton(url, 'Confirmar mi cuenta')}
   `)
 }
@@ -130,6 +130,6 @@ function emailMagicLink(nombre: string, url: string): string {
   return emailBase('Tu enlace de acceso', `
     <p style="color:#334155;font-size:15px;margin-top:0;">Hola <strong>${nombre}</strong>,</p>
     <p style="color:#475569;font-size:14px;line-height:1.6;">Usa el botón a continuación para acceder a tu cuenta.</p>
-    ${boton(url, 'Acceder a OrtoIntegra')}
+    ${boton(url, 'Acceder a Spinus')}
   `)
 }
