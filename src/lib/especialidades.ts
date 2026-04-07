@@ -30,6 +30,7 @@ export const ESPECIALIDADES = [
   'Anestesiología',
   'Medicina de Rehabilitación',
   'Medicina de Urgencias',
+  'Medicina Crítica',
   'Psiquiatría',
   'Medicina Familiar y Comunitaria',
   'Medicina del Deporte',
