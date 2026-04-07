@@ -4,14 +4,29 @@ import { createHmac, timingSafeEqual } from 'crypto'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
-function verificarFirma(payload: string, signatureHeader: string): boolean {
+function verificarFirma(req: NextRequest): boolean {
   try {
-    // BYPASS DE EMERGENCIA PARA DEJAR SALIR EL CORREO AHORA MISMO
-    console.log("=== DEBUG BYPASS ===");
-    console.log("Firma recibida de Supabase:", signatureHeader);
-    return true; 
+    // Supabase Auth Hooks no usan firmas criptográficas complejas (x-supabase-signature).
+    // Usan un Bearer token estándar en las cabeceras HTTP si tú lo configuras así en Supabase.
+    const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization') ?? ''
+    
+    if (!authHeader) {
+      console.warn("No se recibió cabecera de Authorization.");
+      return false;
+    }
+
+    const receivedSecret = authHeader.replace(/^Bearer /i, '').trim()
+    const systemSecret = process.env.SUPABASE_HOOK_SECRET?.trim()
+
+    if (!systemSecret) return false
+
+    // Prevenir ataques de tiempo (Timing Attacks) asegurando longitudes idénticas antes de comparar
+    if (receivedSecret.length !== systemSecret.length) return false
+    
+    return timingSafeEqual(Buffer.from(receivedSecret), Buffer.from(systemSecret))
   } catch (err) {
-    return true;
+    console.error('Error validando token:', err)
+    return false
   }
 }
 
@@ -19,12 +34,12 @@ function verificarFirma(payload: string, signatureHeader: string): boolean {
 // Configurar en: Supabase → Authentication → Hooks → Send Email
 // URL: https://www.spinus.com.mx/api/auth/email-hook
 export async function POST(req: NextRequest) {
+  // La firma tipo x-supabase-signature sólo aplica a Database Webhooks, no a Auth Hooks
   const rawBody = await req.text()
-  const signature = req.headers.get('x-supabase-signature') ?? ''
 
-  if (!verificarFirma(rawBody, signature)) {
-    console.warn(`[WEBHOOK ERROR] Firma inválida. Recibido: ${signature.substring(0, 10)}... (Secreto configurado: ${!!process.env.SUPABASE_HOOK_SECRET})`)
-    return NextResponse.json({ error: 'Firma inválida' }, { status: 401 })
+  if (!verificarFirma(req)) {
+    console.warn(`[WEBHOOK ERROR] Acceso denegado. Token inválido o ausente.`)
+    return NextResponse.json({ error: 'Autorización denegada' }, { status: 401 })
   }
 
   const body = JSON.parse(rawBody)
