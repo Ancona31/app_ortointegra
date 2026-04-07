@@ -92,11 +92,11 @@ export async function POST(req: NextRequest) {
     type: 'signup',
     email,
     password,
-    options: { redirectTo: `${baseUrl}/auth/callback` },
   })
 
-  const confirmUrl = linkData?.properties?.action_link
-  if (confirmUrl) {
+  const tokenHash = linkData?.properties?.hashed_token
+  if (tokenHash) {
+    const confirmUrl = `${baseUrl}/auth/confirm-email?token_hash=${tokenHash}&type=email`
     await resend.emails.send({
       from: 'Spinus <noreply@mail.spinus.com.mx>',
       to: email,
