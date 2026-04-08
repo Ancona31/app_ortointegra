@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { logAudit } from '@/lib/audit'
 import sanitizeHtml from 'sanitize-html'
 
-export const maxDuration = 60
+export const maxDuration = 180
 export const dynamic = 'force-dynamic'
 
 // Configuración de sanitize-html para PDFs médicos:

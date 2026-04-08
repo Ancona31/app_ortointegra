@@ -37,6 +37,50 @@ async function inlineImages(html: string): Promise<string> {
   )
 }
 
+const PDF_TIMEOUT_MS = 120_000
+
+async function fetchPdf(body: string, signal: AbortSignal): Promise<Response> {
+  return fetch('/api/generar-pdf', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+    signal,
+  })
+}
+
+async function fetchPdfConReintento(body: string): Promise<Blob | null> {
+  for (let intento = 1; intento <= 2; intento++) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), PDF_TIMEOUT_MS)
+
+    try {
+      const res = await fetchPdf(body, controller.signal)
+      clearTimeout(timer)
+
+      if (res.status === 504 && intento === 1) continue
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => null)
+        const detail = json?.error ? `\n\nDetalle: ${json.error}` : ''
+        alert(`No se pudo generar el PDF.${detail}`)
+        return null
+      }
+
+      return await res.blob()
+    } catch (err) {
+      clearTimeout(timer)
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        if (intento === 1) continue
+        alert('El servidor tardó demasiado en generar el PDF. Intenta de nuevo o usa una computadora.')
+        return null
+      }
+      alert('Error de conexión al generar el PDF. Verifica tu red e intenta de nuevo.')
+      return null
+    }
+  }
+  return null
+}
+
 export async function imprimirOCompartir(html: string, filename = 'documento.pdf') {
   const isMobile =
     /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
@@ -55,21 +99,10 @@ export async function imprimirOCompartir(html: string, filename = 'documento.pdf
 
   // ── Móvil: inline images → PDF vectorial vía Puppeteer ──
   const htmlConImagenes = await inlineImages(html)
+  const body = JSON.stringify({ html: htmlConImagenes, filename })
 
-  const res = await fetch('/api/generar-pdf', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ html: htmlConImagenes, filename }),
-  })
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => null)
-    const detail = body?.error ? `\n\nDetalle: ${body.error}` : ''
-    alert(`No se pudo generar el PDF. Verifica tu conexión e intenta de nuevo. Si el problema persiste, intenta desde una computadora.${detail}`)
-    return
-  }
-
-  const pdfBlob = await res.blob()
+  const pdfBlob = await fetchPdfConReintento(body)
+  if (!pdfBlob) return
   const file    = new File([pdfBlob], filename, { type: 'application/pdf' })
 
   if (
