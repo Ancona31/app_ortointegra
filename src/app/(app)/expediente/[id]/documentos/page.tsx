@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useAuditAccess } from '@/hooks/useAudit'
 import { Paciente } from '@/types'
 import { differenceInYears, parseISO } from 'date-fns'
 import { ArrowLeft, Pill, FlaskConical, ScanLine, ClipboardList, BedDouble, PenLine, ShieldCheck, Receipt, Loader2 } from 'lucide-react'
@@ -40,6 +41,7 @@ type TabKey = typeof TABS[number]['key']
 
 function DocumentosPacienteContent() {
   const { id } = useParams<{ id: string }>()
+  useAuditAccess('documentos', id)
   const searchParams = useSearchParams()
   const [paciente, setPaciente] = useState<Paciente | null>(null)
   const [tab, setTab] = useState<TabKey>('receta')

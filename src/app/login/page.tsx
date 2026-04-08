@@ -47,8 +47,20 @@ export default function LoginPage() {
     setLoading(false)
     if (err) {
       setError('Credenciales incorrectas. Verifica tu correo y contraseña.')
+      // NOM-024: registrar intento fallido de login
+      fetch('/api/auth/audit-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'login_fallido', email }),
+      }).catch(() => {})
     } else {
       sessionStorage.setItem('spinus_active', '1')
+      // NOM-024: registrar login exitoso
+      fetch('/api/auth/audit-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'login_exitoso' }),
+      }).catch(() => {})
       router.push('/dashboard')
       router.refresh()
     }

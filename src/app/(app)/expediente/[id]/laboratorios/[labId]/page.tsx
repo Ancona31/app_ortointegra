@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useAuditAccess } from '@/hooks/useAudit'
 import { Laboratorio, ResultadoLab, VALORES_REFERENCIA, ParametroLab } from '@/types'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -45,6 +46,7 @@ function BadgeEstado({ estado }: { estado: ResultadoLab['estado'] }) {
 
 export default function LabDetallePage() {
   const { id, labId } = useParams<{ id: string; labId: string }>()
+  useAuditAccess('laboratorios', labId)
   const [lab, setLab] = useState<Laboratorio | null>(null)
   const [loading, setLoading] = useState(true)
   const [mostrarTodos, setMostrarTodos] = useState(true)

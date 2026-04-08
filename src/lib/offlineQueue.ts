@@ -1,6 +1,13 @@
-import { createClient } from '@/lib/supabase/client'
+/**
+ * Cola offline para documentos médicos.
+ * Los datos se cifran en localStorage vía secureStorage (AES-256-GCM).
+ * LFPDPPP Art. 19: protección de datos personales sensibles en reposo.
+ */
 
-const QUEUE_KEY = 'spinus_offline_queue'
+import { createClient } from '@/lib/supabase/client'
+import { secureStorage } from '@/lib/secureStorage'
+
+const QUEUE_KEY = 'offline_queue'
 
 type QueuedDocument = {
   id: string
@@ -11,42 +18,41 @@ type QueuedDocument = {
   retries: number
 }
 
-function getQueue(): QueuedDocument[] {
+async function getQueue(): Promise<QueuedDocument[]> {
   if (typeof window === 'undefined') return []
-  try {
-    const raw = localStorage.getItem(QUEUE_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch {
-    return []
+  const data = await secureStorage.get<QueuedDocument[]>(QUEUE_KEY)
+  return data ?? []
+}
+
+async function saveQueue(queue: QueuedDocument[]): Promise<void> {
+  if (queue.length === 0) {
+    secureStorage.remove(QUEUE_KEY)
+  } else {
+    await secureStorage.set(QUEUE_KEY, queue)
   }
 }
 
-function saveQueue(queue: QueuedDocument[]) {
-  try {
-    localStorage.setItem(QUEUE_KEY, JSON.stringify(queue))
-  } catch {}
-}
-
-/** Agrega un documento a la cola offline */
-export function enqueue(doc: Omit<QueuedDocument, 'id' | 'created_at' | 'retries'>) {
-  const queue = getQueue()
+/** Agrega un documento a la cola offline (cifrado) */
+export async function enqueue(doc: Omit<QueuedDocument, 'id' | 'created_at' | 'retries'>): Promise<void> {
+  const queue = await getQueue()
   queue.push({
     ...doc,
     id: crypto.randomUUID(),
     created_at: new Date().toISOString(),
     retries: 0,
   })
-  saveQueue(queue)
+  await saveQueue(queue)
 }
 
 /** Devuelve la cantidad de documentos pendientes */
-export function pendingCount(): number {
-  return getQueue().length
+export async function pendingCount(): Promise<number> {
+  const queue = await getQueue()
+  return queue.length
 }
 
 /** Intenta enviar todos los documentos pendientes a Supabase */
 export async function flush(): Promise<{ sent: number; failed: number }> {
-  const queue = getQueue()
+  const queue = await getQueue()
   if (queue.length === 0) return { sent: 0, failed: 0 }
 
   const supabase = createClient()
@@ -70,7 +76,8 @@ export async function flush(): Promise<{ sent: number; failed: number }> {
     }
   }
 
-  saveQueue(remaining)
+  // Limpiar datos inmediatamente después de enviar exitosamente
+  await saveQueue(remaining)
   return { sent, failed: remaining.length }
 }
 
@@ -78,19 +85,22 @@ export async function flush(): Promise<{ sent: number; failed: number }> {
 export function startAutoSync(intervalMs = 30_000) {
   if (typeof window === 'undefined') return
 
+  // Limpiar datos expirados al iniciar
+  secureStorage.cleanup()
+
   // Intentar flush inmediato al iniciar
   flush()
 
   // Flush periódico
-  const timer = setInterval(() => {
-    if (navigator.onLine && pendingCount() > 0) {
+  const timer = setInterval(async () => {
+    if (navigator.onLine && (await pendingCount()) > 0) {
       flush()
     }
   }, intervalMs)
 
   // Flush cuando vuelve la conexión
   function onOnline() {
-    if (pendingCount() > 0) flush()
+    pendingCount().then(count => { if (count > 0) flush() })
   }
   window.addEventListener('online', onOnline)
 

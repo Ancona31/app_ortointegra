@@ -161,6 +161,12 @@ export default function Sidebar() {
   }
 
   async function handleLogout() {
+    // NOM-024: registrar logout antes de cerrar sesión
+    fetch('/api/auth/audit-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'logout' }),
+    }).catch(() => {})
     const supabase = createClient()
     await supabase.auth.signOut()
     sessionStorage.removeItem('spinus_active')

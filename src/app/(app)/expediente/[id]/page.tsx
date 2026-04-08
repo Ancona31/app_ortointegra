@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
+import { useAuditAccess } from '@/hooks/useAudit'
 import { Paciente, Consulta, Laboratorio, Documento } from '@/types'
 import { parseISO, format } from 'date-fns'
 import Portal from '@/components/ui/Portal'
@@ -57,6 +58,7 @@ function ExpedientePacienteContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { isDoctor } = useProfile()
+  useAuditAccess('pacientes', id) // NOM-024: registrar acceso al expediente
   const [paciente, setPaciente] = useState<Paciente | null>(null)
   const [consultas, setConsultas] = useState<Consulta[]>([])
   const [labs, setLabs] = useState<Laboratorio[]>([])

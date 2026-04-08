@@ -18,6 +18,8 @@ import ReactMarkdown from 'react-markdown'
 import ConsultaRapida from '@/components/ConsultaRapida'
 import Breadcrumbs from '@/components/layout/Breadcrumbs'
 import { imprimirOCompartir } from '@/lib/mobileShare'
+import { secureStorage } from '@/lib/secureStorage'
+import { useAuditAccess } from '@/hooks/useAudit'
 import dynamic from 'next/dynamic'
 
 const RecetaFormDynamic       = dynamic(() => import('@/components/documentos/RecetaForm'), { ssr: false, loading: () => <FormCargando /> })
@@ -67,6 +69,7 @@ const MED_VACIA: MedRow = { nombre: '', dosis: '', frecuencia: '', duracion: '' 
 export default function NuevaNotaPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  useAuditAccess('consultas', id) // NOM-024: registrar acceso a nota médica
   const [medicoInfo, setMedicoInfo] = useState<MedicoInfo | null>(null)
   const [paciente, setPaciente]     = useState<Paciente | null>(null)
 
@@ -119,22 +122,15 @@ export default function NuevaNotaPage() {
     fetch('/api/me/perfil-medico').then(r => r.json()).then(({ medico }) => setMedicoInfo(medico))
     const supabase = createClient()
     supabase.from('pacientes').select('*').eq('id', id).single().then((res: { data: Paciente | null }) => setPaciente(res.data))
-    try {
-      const raw = localStorage.getItem('med-frecuentes')
-      if (raw) {
-        const data = JSON.parse(raw) as { nombre: string; count: number }[]
-        setMedCache(data.sort((a, b) => b.count - a.count).map(d => d.nombre))
-      }
-    } catch {}
-    // Restaurar borrador si existe
-    try {
-      const draft = localStorage.getItem(draftKey)
-      if (draft) {
-        const parsed = JSON.parse(draft)
-        if (parsed.form) { setForm(parsed.form); setBorradorRestaurado(true) }
-        if (parsed.medicamentos?.length) setMedicamentos(parsed.medicamentos)
-      }
-    } catch {}
+    // Cargar medicamentos frecuentes y borrador (cifrados en secureStorage)
+    secureStorage.get<{ nombre: string; count: number }[]>('med-frecuentes').then(data => {
+      if (data) setMedCache(data.sort((a, b) => b.count - a.count).map(d => d.nombre))
+    })
+    secureStorage.get<{ form: typeof form; medicamentos: typeof medicamentos }>(`nota-draft-${id}`).then(parsed => {
+      if (!parsed) return
+      if (parsed.form) { setForm(parsed.form); setBorradorRestaurado(true) }
+      if (parsed.medicamentos?.length) setMedicamentos(parsed.medicamentos)
+    })
     // Cargar última consulta para contexto
     const supabase2 = createClient()
     supabase2.from('consultas')
@@ -160,10 +156,9 @@ export default function NuevaNotaPage() {
     autosaveRef.current = setTimeout(() => {
       const tieneDatos = form.motivo_consulta || form.diagnosticos || form.exploracion_fisica
       if (!tieneDatos) return
-      try {
-        localStorage.setItem(draftKey, JSON.stringify({ form, medicamentos }))
+      secureStorage.set(draftKey, { form, medicamentos }).then(() => {
         setUltimoGuardado(new Date())
-      } catch {}
+      })
     }, 1500)
     return () => { if (autosaveRef.current) clearTimeout(autosaveRef.current) }
   }, [form, medicamentos, notaSaved])
@@ -185,19 +180,18 @@ export default function NuevaNotaPage() {
     return medCache.filter(n => n.toLowerCase().includes(query.toLowerCase())).slice(0, 6)
   }
 
-  function saveMedCache(meds: MedRow[]) {
+  async function saveMedCache(meds: MedRow[]) {
     try {
       const nombres = meds.filter(m => m.nombre.trim()).map(m => m.nombre.trim())
       if (!nombres.length) return
-      const raw = localStorage.getItem('med-frecuentes')
-      let data: { nombre: string; count: number }[] = []
-      try { if (raw) data = JSON.parse(raw) } catch {}
+      const existing = await secureStorage.get<{ nombre: string; count: number }[]>('med-frecuentes')
+      const data = existing ?? []
       nombres.forEach(nombre => {
         const idx = data.findIndex(d => d.nombre.toLowerCase() === nombre.toLowerCase())
         if (idx >= 0) data[idx].count++
         else data.push({ nombre, count: 1 })
       })
-      localStorage.setItem('med-frecuentes', JSON.stringify(data))
+      await secureStorage.set('med-frecuentes', data)
       setMedCache(data.sort((a, b) => b.count - a.count).map(d => d.nombre))
     } catch {}
   }
@@ -289,7 +283,7 @@ export default function NuevaNotaPage() {
       return
     }
     saveMedCache(medsConDatos)
-    try { localStorage.removeItem(draftKey) } catch {}
+    secureStorage.remove(draftKey)
     setNotaSaved(true)
     setDocInline(null)
   }
@@ -517,7 +511,7 @@ export default function NuevaNotaPage() {
                 onClick={() => {
                   setForm({ motivo_consulta: '', exploracion_fisica: '', diagnosticos: '', pronostico: '', plan_tratamiento: '', gabinete_laboratorios: '', proxima_cita: '' })
                   setMedicamentos([{ ...MED_VACIA }])
-                  try { localStorage.removeItem(draftKey) } catch {}
+                  secureStorage.remove(draftKey)
                   setBorradorRestaurado(false)
                 }}
                 className="text-xs text-amber-600 hover:text-amber-800 underline"

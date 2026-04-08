@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useDropzone } from 'react-dropzone'
 import { createClient } from '@/lib/supabase/client'
+import { useAuditAccess } from '@/hooks/useAudit'
 import { Paciente, ValoresLab, AnalisisIA, ResultadoLab } from '@/types'
 import { analizarLaboratorios } from '@/lib/analisis'
 import { differenceInYears, parseISO } from 'date-fns'
@@ -46,6 +47,7 @@ function BadgeEstado({ estado }: { estado: ResultadoLab['estado'] }) {
 export default function NuevoLaboratorioPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  useAuditAccess('laboratorios', id)
   const [paciente, setPaciente] = useState<Paciente | null>(null)
   const [valores, setValores] = useState<Partial<ValoresLab>>({})
   const [analisis, setAnalisis] = useState<AnalisisIA | null>(null)

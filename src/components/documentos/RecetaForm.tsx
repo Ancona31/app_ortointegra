@@ -217,7 +217,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     })
     if (saveError) {
       // Guardar en cola offline — se sincronizará automáticamente cuando vuelva la conexión
-      enqueue({
+      await enqueue({
         paciente_id: pacienteId || undefined,
         tipo: 'receta',
         contenido,
