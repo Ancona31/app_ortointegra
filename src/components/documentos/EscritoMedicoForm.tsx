@@ -8,18 +8,22 @@ import { imprimirOCompartir } from '@/lib/mobileShare'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
+import DOMPurify from 'dompurify'
 
 interface Props {
   pacienteInicial?: string
   pacienteId?: string
 }
 
+// Sanitización con DOMPurify en lugar de regex — cubre SVG scripts,
+// iframes, event handlers y todos los vectores de XSS conocidos
 function sanitizeEditorHtml(html: string): string {
-  return html
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '')
-    .replace(/href\s*=\s*["']javascript:[^"']*["']/gi, 'href="#"')
-    .replace(/src\s*=\s*["']javascript:[^"']*["']/gi, 'src="#"')
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['p', 'br', 'b', 'strong', 'i', 'em', 'u', 'h2', 'h3', 'div', 'span', 'hr', 'ul', 'ol', 'li'],
+    ALLOWED_ATTR: ['style', 'class'],
+    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'link'],
+    FORBID_ATTR: ['onerror', 'onclick', 'onload', 'onmouseover', 'onfocus'],
+  })
 }
 
 const TAMANOS = [
