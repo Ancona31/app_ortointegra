@@ -7,7 +7,21 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 // Vercel Pro permite hasta 300s — necesario para PDFs extensos
 export const maxDuration = 300
 
+// PRIVACIDAD — LFPDPPP Art. 9: El PDF de laboratorio puede contener datos
+// identificatorios del paciente (nombre, CURP, dirección). Como no es viable
+// extraer y anonimizar el texto del PDF sin perder el formato que Claude
+// necesita para leer las tablas de valores, se instruye explícitamente a
+// Claude para que IGNORE y NO devuelva datos identificatorios del paciente.
+// Además, el campo paciente_nombre se descarta del resultado (línea ~158).
+
 const PROMPT = `Eres un médico especialista en medicina funcional y de precisión con amplio conocimiento en interpretación de laboratorios clínicos.
+
+INSTRUCCIÓN DE PRIVACIDAD (OBLIGATORIA):
+Este documento puede contener datos personales del paciente (nombre, CURP, dirección, teléfono, email).
+Por cumplimiento con la Ley Federal de Protección de Datos Personales (LFPDPPP), NO debes incluir
+en tu respuesta: nombres de pacientes, CURP, RFC, direcciones, teléfonos ni emails.
+El campo "paciente_nombre" en el JSON de salida SIEMPRE debe ser null.
+Solo extrae datos clínicos: valores de laboratorio, rangos de referencia y fechas de toma de muestra.
 
 Analiza este reporte de laboratorio y extrae TODOS los valores encontrados. Para cada parámetro proporciona:
 1. El valor del reporte
@@ -155,7 +169,9 @@ export async function POST(req: NextRequest) {
       valores: valoresLimpios,
       resultados: parsed.resultados ?? [],
       laboratorio_nombre: parsed.laboratorio_nombre ?? null,
-      paciente_nombre: parsed.paciente_nombre ?? null,
+      // paciente_nombre se descarta intencionalmente — no guardar PII
+      // extraída por la IA. El nombre del paciente ya existe en la tabla
+      // pacientes vinculada por paciente_id en el laboratorio.
       fecha_toma: parsed.fecha_toma ?? null,
     }
 

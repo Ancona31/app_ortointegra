@@ -3,6 +3,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import { createClient } from '@/lib/supabase/server'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { sanitizePromptInput } from '@/lib/sanitize'
+import { anonimizarTexto } from '@/lib/anonimizar'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
@@ -16,7 +17,11 @@ export async function POST(req: NextRequest) {
     if (limitError) return limitError
 
     const body = await req.json()
-    const pregunta = sanitizePromptInput(body.pregunta, 500)
+
+    // Anonimizar PII antes de enviar a Gemini.
+    // LFPDPPP Art. 9: el médico puede escribir nombres de pacientes en sus
+    // preguntas clínicas — se redactan antes de transmitir a Google.
+    const pregunta = anonimizarTexto(sanitizePromptInput(body.pregunta, 500))
     if (!pregunta) return NextResponse.json({ error: 'Pregunta vacía' }, { status: 400 })
 
     // Construir historial de la conversación para contexto (máx. 20 turnos)
@@ -24,7 +29,7 @@ export async function POST(req: NextRequest) {
     const historialRaw: Mensaje[] = Array.isArray(body.historial) ? body.historial.slice(-20) : []
     const history = historialRaw.map(m => ({
       role: m.rol === 'usuario' ? 'user' : 'model',
-      parts: [{ text: sanitizePromptInput(m.texto, 2000) }],
+      parts: [{ text: anonimizarTexto(sanitizePromptInput(m.texto, 2000)) }],
     }))
 
     const systemPrompt = `Eres un asistente clínico de referencia rápida para médicos en México. Responde consultas de cualquier especialidad médica de forma directa y estructurada.

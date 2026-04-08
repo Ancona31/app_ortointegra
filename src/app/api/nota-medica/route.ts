@@ -3,6 +3,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import { createClient } from '@/lib/supabase/server'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { sanitizePromptInput, sanitizeNumber } from '@/lib/sanitize'
+import { anonimizarTexto } from '@/lib/anonimizar'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
@@ -25,13 +26,16 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
 
-    // Sanitizar todos los inputs antes de interpolarlos en el prompt
-    const motivo_consulta       = sanitizePromptInput(body.motivo_consulta, 1000)
-    const exploracion_fisica    = sanitizePromptInput(body.exploracion_fisica, 1000)
-    const diagnosticos          = sanitizePromptInput(body.diagnosticos, 500)
-    const plan_tratamiento      = sanitizePromptInput(body.plan_tratamiento, 500)
-    const gabinete_laboratorios = sanitizePromptInput(body.gabinete_laboratorios, 1000)
-    const antecedentes          = sanitizePromptInput(body.antecedentes, 500)
+    // Sanitizar inputs + anonimizar PII antes de enviar a Gemini.
+    // LFPDPPP Art. 9: datos de salud son sensibles y requieren minimización
+    // al compartir con terceros (Google Gemini). Se preservan datos clínicos
+    // (síntomas, signos, diagnósticos) pero se redactan nombres, IDs, contacto.
+    const motivo_consulta       = anonimizarTexto(sanitizePromptInput(body.motivo_consulta, 1000))
+    const exploracion_fisica    = anonimizarTexto(sanitizePromptInput(body.exploracion_fisica, 1000))
+    const diagnosticos          = anonimizarTexto(sanitizePromptInput(body.diagnosticos, 500))
+    const plan_tratamiento      = anonimizarTexto(sanitizePromptInput(body.plan_tratamiento, 500))
+    const gabinete_laboratorios = anonimizarTexto(sanitizePromptInput(body.gabinete_laboratorios, 1000))
+    const antecedentes          = anonimizarTexto(sanitizePromptInput(body.antecedentes, 500))
     const edad             = sanitizeNumber(body.edad)
     const peso             = sanitizeNumber(body.peso)
     const talla            = sanitizeNumber(body.talla)
