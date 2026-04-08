@@ -44,22 +44,12 @@ export default function PlanSuplementacionPdf({
   const colors = getPdfColors(medico)
 
   const s = StyleSheet.create({
-    tituloWrap: {
-      backgroundColor: colors.cp + '0D',
-      borderRadius: 4,
-      paddingVertical: 8,
-      marginTop: 18,
-      marginBottom: 18,
+    /* Titulo doc */
+    tituloBanner: {
+      ...baseStyles.tituloDoc,
+      backgroundColor: colors.cp,
     },
-    tituloText: {
-      textAlign: 'center',
-      fontSize: 13,
-      fontWeight: 700,
-      textTransform: 'uppercase',
-      color: colors.cp,
-      letterSpacing: 1,
-    },
-    /* Sección heading */
+    /* Seccion heading */
     seccionWrap: {
       backgroundColor: colors.cp + '0A',
       borderLeftWidth: 3,
@@ -67,107 +57,151 @@ export default function PlanSuplementacionPdf({
       borderRadius: 3,
       paddingVertical: 6,
       paddingLeft: 10,
-      marginTop: 20,
-      marginBottom: 12,
+      marginTop: 18,
+      marginBottom: 10,
     },
     seccionText: {
       color: colors.cp,
       fontSize: 11,
       fontWeight: 700,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
     },
-    /* Suplemento card */
-    card: {
-      borderLeftWidth: 2.5,
-      borderLeftColor: colors.cs,
-      backgroundColor: '#f9fafb',
-      borderRadius: 3,
-      paddingVertical: 8,
-      paddingHorizontal: 12,
-      marginBottom: 10,
-    },
-    cardHeader: {
+    /* Tabla header */
+    tableHeader: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 4,
+      backgroundColor: colors.cp,
+      borderTopLeftRadius: 4,
+      borderTopRightRadius: 4,
+      paddingVertical: 7,
+      paddingHorizontal: 10,
     },
-    cardNombre: {
-      fontSize: 11,
+    thNum: {
+      width: 26,
+      fontSize: 7.5,
       fontWeight: 700,
-      color: colors.cp,
+      color: '#ffffff',
+      textTransform: 'uppercase',
     },
-    cardDosis: {
+    thNombre: {
+      flex: 1,
+      fontSize: 7.5,
+      fontWeight: 700,
+      color: '#ffffff',
+      textTransform: 'uppercase',
+    },
+    thDosis: {
+      width: 72,
+      fontSize: 7.5,
+      fontWeight: 700,
+      color: '#ffffff',
+      textTransform: 'uppercase',
+    },
+    thPresentacion: {
+      width: 82,
+      fontSize: 7.5,
+      fontWeight: 700,
+      color: '#ffffff',
+      textTransform: 'uppercase',
+    },
+    thIndicacion: {
+      width: 150,
+      fontSize: 7.5,
+      fontWeight: 700,
+      color: '#ffffff',
+      textTransform: 'uppercase',
+    },
+    /* Tabla rows */
+    tableRow: {
+      flexDirection: 'row',
+      paddingVertical: 7,
+      paddingHorizontal: 10,
+      alignItems: 'flex-start',
+    },
+    tdNum: {
+      width: 26,
       fontSize: 9,
+      color: '#888',
+      fontWeight: 500,
+    },
+    tdNombre: {
+      flex: 1,
+      fontSize: 10,
+      fontWeight: 700,
+      color: '#1a1a1a',
+    },
+    tdDosis: {
+      width: 72,
+      fontSize: 9.5,
       color: colors.cs,
       fontWeight: 500,
     },
-    cardPresentacion: {
+    tdPresentacion: {
+      width: 82,
+      fontSize: 9.5,
+      color: '#444',
+    },
+    tdIndicacion: {
+      width: 150,
       fontSize: 9,
-      color: '#666',
-      marginBottom: 4,
-    },
-    beneficioRow: {
-      flexDirection: 'row',
-      gap: 4,
-      marginBottom: 2,
-    },
-    beneficioLabel: {
-      fontSize: 8.5,
-      fontWeight: 700,
-      color: '#555',
-    },
-    beneficioText: {
-      fontSize: 8.5,
       color: '#333',
-      flex: 1,
-      lineHeight: 1.5,
-    },
-    justificacion: {
-      fontSize: 8,
-      color: '#999',
-      marginTop: 3,
       lineHeight: 1.4,
     },
-    cardNum: {
-      fontSize: 8,
-      color: '#aaa',
-      fontWeight: 700,
-      marginRight: 6,
+    justificacion: {
+      fontSize: 7.5,
+      color: '#999',
+      paddingLeft: 26,
+      paddingRight: 10,
+      paddingBottom: 5,
+      lineHeight: 1.4,
     },
     /* Notas */
+    notasBox: {
+      borderWidth: 0.75,
+      borderColor: '#e5e7eb',
+      borderRadius: 4,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      marginTop: 6,
+    },
     notasText: {
       fontSize: 10,
       color: '#333',
-      marginTop: 4,
       lineHeight: 1.6,
     },
     /* Cita control */
-    citaWrap: {
-      backgroundColor: colors.cs + '12',
-      borderRadius: 4,
-      paddingVertical: 6,
-      paddingHorizontal: 12,
+    citaBadge: {
+      backgroundColor: colors.cs + '10',
+      borderWidth: 0.5,
+      borderColor: colors.cs + '30',
+      borderRadius: 10,
+      paddingVertical: 5,
+      paddingHorizontal: 14,
       marginTop: 14,
       alignSelf: 'flex-start',
+      flexDirection: 'row',
+      gap: 6,
+      alignItems: 'center',
     },
     citaLabel: {
       fontSize: 7.5,
       color: '#888',
       textTransform: 'uppercase',
       letterSpacing: 0.5,
-      marginBottom: 2,
+      fontWeight: 700,
     },
     citaText: {
-      fontSize: 10,
+      fontSize: 9.5,
       color: colors.cp,
       fontWeight: 500,
     },
-    /* QR */
-    qrRow: {
+    /* Footer area */
+    footerRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'flex-end',
-      marginTop: 20,
+      marginTop: 'auto',
+      paddingTop: 20,
     },
     qrWrap: {
       alignItems: 'center',
@@ -199,61 +233,72 @@ export default function PlanSuplementacionPdf({
           />
 
           {/* Titulo */}
-          <View style={s.tituloWrap}>
-            <Text style={s.tituloText}>Plan de Suplementación</Text>
-          </View>
+          <Text style={s.tituloBanner}>Plan de Suplementación</Text>
 
           {/* Datos del paciente */}
           <View style={baseStyles.datoRow}>
             <View style={baseStyles.datoField}>
-              <Text style={baseStyles.datoLabel}>FECHA</Text>
+              <Text style={{ ...baseStyles.datoLabel, color: colors.cs }}>FECHA</Text>
               <Text style={baseStyles.datoValor}>{data.fecha}</Text>
             </View>
-            <View style={baseStyles.datoField}>
-              <Text style={baseStyles.datoLabel}>PACIENTE</Text>
+            <View style={[baseStyles.datoField, { flex: 2 }]}>
+              <Text style={{ ...baseStyles.datoLabel, color: colors.cs }}>PACIENTE</Text>
               <Text style={baseStyles.datoValor}>{data.paciente}</Text>
             </View>
           </View>
           <View style={baseStyles.datoRow}>
             {data.peso ? (
               <View style={baseStyles.datoField}>
-                <Text style={baseStyles.datoLabel}>PESO</Text>
+                <Text style={{ ...baseStyles.datoLabel, color: colors.cs }}>PESO</Text>
                 <Text style={baseStyles.datoValor}>{data.peso}</Text>
               </View>
             ) : null}
             {data.diagnostico ? (
-              <View style={baseStyles.datoField}>
-                <Text style={baseStyles.datoLabel}>DIAGNÓSTICO</Text>
+              <View style={[baseStyles.datoField, { flex: 2 }]}>
+                <Text style={{ ...baseStyles.datoLabel, color: colors.cs }}>DIAGNÓSTICO</Text>
                 <Text style={baseStyles.datoValor}>{data.diagnostico}</Text>
               </View>
             ) : null}
           </View>
 
-          {/* Sección suplementos */}
+          {/* Seccion suplementos */}
           <View style={s.seccionWrap}>
             <Text style={s.seccionText}>Suplementos recomendados</Text>
           </View>
 
+          {/* Table header */}
+          <View style={s.tableHeader}>
+            <Text style={s.thNum}>#</Text>
+            <Text style={s.thNombre}>Suplemento</Text>
+            <Text style={s.thDosis}>Dosis</Text>
+            <Text style={s.thPresentacion}>Presentación</Text>
+            <Text style={s.thIndicacion}>Indicación</Text>
+          </View>
+
+          {/* Table rows */}
           {data.suplementos.map((sup, i) => (
-            <View key={i} style={s.card} wrap={false}>
-              <View style={s.cardHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={s.cardNum}>{i + 1}.</Text>
-                  <Text style={s.cardNombre}>{sup.nombre}</Text>
-                </View>
-                <Text style={s.cardDosis}>{sup.dosis}</Text>
-              </View>
-              <Text style={s.cardPresentacion}>{sup.presentacion}</Text>
-              <View style={s.beneficioRow}>
-                <Text style={s.beneficioLabel}>Beneficio clínico:</Text>
-                <Text style={s.beneficioText}>{sup.beneficio_clinico}</Text>
-              </View>
-              <View style={s.beneficioRow}>
-                <Text style={s.beneficioLabel}>Para el paciente:</Text>
-                <Text style={s.beneficioText}>{sup.beneficio_paciente}</Text>
+            <View key={i} wrap={false}>
+              <View
+                style={[
+                  s.tableRow,
+                  { backgroundColor: i % 2 === 0 ? '#f9fafb' : '#ffffff' },
+                ]}
+              >
+                <Text style={s.tdNum}>{i + 1}</Text>
+                <Text style={s.tdNombre}>{sup.nombre}</Text>
+                <Text style={s.tdDosis}>{sup.dosis}</Text>
+                <Text style={s.tdPresentacion}>{sup.presentacion}</Text>
+                <Text style={s.tdIndicacion}>{sup.beneficio_paciente}</Text>
               </View>
               {sup.justificacion ? (
-                <Text style={s.justificacion}>{sup.justificacion}</Text>
+                <Text
+                  style={[
+                    s.justificacion,
+                    { backgroundColor: i % 2 === 0 ? '#f9fafb' : '#ffffff' },
+                  ]}
+                >
+                  {sup.justificacion}
+                </Text>
               ) : null}
             </View>
           ))}
@@ -264,20 +309,22 @@ export default function PlanSuplementacionPdf({
               <View style={s.seccionWrap}>
                 <Text style={s.seccionText}>Notas</Text>
               </View>
-              <Text style={s.notasText}>{data.notas}</Text>
+              <View style={s.notasBox}>
+                <Text style={s.notasText}>{data.notas}</Text>
+              </View>
             </>
           ) : null}
 
           {/* Cita de control */}
           {data.citaControl ? (
-            <View style={s.citaWrap}>
-              <Text style={s.citaLabel}>CITA DE CONTROL</Text>
+            <View style={s.citaBadge}>
+              <Text style={s.citaLabel}>Cita de control:</Text>
               <Text style={s.citaText}>{data.citaControl}</Text>
             </View>
           ) : null}
 
-          {/* QR + Firma */}
-          <View style={s.qrRow}>
+          {/* Footer: QR izquierda + Firma derecha */}
+          <View style={s.footerRow}>
             {data.blogQrDataUrl ? (
               <View style={s.qrWrap}>
                 <Image style={s.qrImage} src={data.blogQrDataUrl} />

@@ -13,7 +13,8 @@ export default function PdfFirma({ medico, colors }: Props) {
 
   const s = StyleSheet.create({
     footerArea: {
-      marginTop: 32,
+      marginTop: 'auto',
+      paddingTop: 20,
       flexDirection: 'row',
       justifyContent: 'flex-end',
     },
@@ -24,6 +25,7 @@ export default function PdfFirma({ medico, colors }: Props) {
     linea: {
       borderTopWidth: 1,
       borderTopColor: colors.cp,
+      borderTopStyle: 'dashed',
       paddingTop: 8,
     },
     nombre: {
@@ -32,16 +34,16 @@ export default function PdfFirma({ medico, colors }: Props) {
       color: colors.cp,
     },
     ced: {
-      fontSize: 8,
+      fontSize: 7.5,
       color: '#666',
       marginTop: 2,
     },
     firmaLabel: {
-      fontSize: 7,
-      color: '#b0b0b0',
-      marginTop: 6,
+      fontSize: 6,
+      color: '#c0c0c0',
+      marginTop: 5,
       textTransform: 'uppercase',
-      letterSpacing: 1,
+      letterSpacing: 1.5,
     },
   })
 

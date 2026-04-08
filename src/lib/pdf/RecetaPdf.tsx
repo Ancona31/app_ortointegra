@@ -1,10 +1,9 @@
 import { Document, Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer'
 import PdfHeader from './PdfHeader'
-import PdfFirma from './PdfFirma'
 import PdfWatermark from './PdfWatermark'
 import { BarraTop, BarraBottom } from './PdfBarras'
 import { baseStyles, getPdfColors } from './PdfStyles'
-import type { PdfMedicoData } from './PdfStyles'
+import type { PdfMedicoData, PdfColors } from './PdfStyles'
 
 export interface RecetaData {
   paciente: string
@@ -53,7 +52,6 @@ function parseRecomendaciones(text: string, cpColor: string, csColor: string) {
     }
 
     // Lines starting with any emoji — bold header in cp color
-    // Detect common emoji ranges without unicode property escapes (ES2017 compat)
     const emojiHeaderMatch = /^([\u{1F300}-\u{1F9FF}\u{2600}-\u{27BF}\u{2B50}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}][\u{FE00}-\u{FE0F}\u{200D}\u{20E3}]*)\s*(.+)/u.exec(trimmed)
     if (emojiHeaderMatch) {
       return (
@@ -63,7 +61,7 @@ function parseRecomendaciones(text: string, cpColor: string, csColor: string) {
       )
     }
 
-    // Lines starting with bullet (-, *, •) — italic indented
+    // Lines starting with bullet (-, *, •) — indented
     if (/^[-*\u2022]\s/.test(trimmed)) {
       return (
         <Text key={i} style={{ fontSize: 9.5, color: '#555', paddingLeft: 14, lineHeight: 1.6, marginBottom: 1 }}>
@@ -73,7 +71,7 @@ function parseRecomendaciones(text: string, cpColor: string, csColor: string) {
     }
 
     // Lines with "Keyword:" pattern — keyword bold in cs, rest normal
-    const keywordMatch = /^([A-Za-zÀ-ÿ\s]+):\s*(.*)/.exec(trimmed)
+    const keywordMatch = /^([A-Za-z\u00C0-\u00FF\s]+):\s*(.*)/.exec(trimmed)
     if (keywordMatch) {
       return (
         <Text key={i} style={{ fontSize: 10, lineHeight: 1.6, marginBottom: 1 }}>
@@ -92,28 +90,83 @@ function parseRecomendaciones(text: string, cpColor: string, csColor: string) {
   })
 }
 
+/** Bloque de firma inline (para uso dentro de un row, no el componente completo) */
+function FirmaInline({ medico, colors }: { medico: PdfMedicoData | null; colors: PdfColors }) {
+  const nombre = medico?.nombre || 'Médico'
+  const cedProf = medico?.cedula_profesional || ''
+  const cedEsp = medico?.cedula_especialidad || ''
+
+  const s = StyleSheet.create({
+    firma: {
+      textAlign: 'center',
+      minWidth: 220,
+    },
+    linea: {
+      borderTopWidth: 1,
+      borderTopColor: colors.cp,
+      borderTopStyle: 'dashed',
+      paddingTop: 8,
+    },
+    nombre: {
+      fontWeight: 700,
+      fontSize: 9.5,
+      color: colors.cp,
+    },
+    ced: {
+      fontSize: 7.5,
+      color: '#666',
+      marginTop: 2,
+    },
+    firmaLabel: {
+      fontSize: 6,
+      color: '#c0c0c0',
+      marginTop: 5,
+      textTransform: 'uppercase',
+      letterSpacing: 1.5,
+    },
+  })
+
+  return (
+    <View style={s.firma}>
+      <View style={s.linea}>
+        <Text style={s.nombre}>{nombre}</Text>
+        {cedProf ? <Text style={s.ced}>Céd. Prof. {cedProf}</Text> : null}
+        {cedEsp ? <Text style={s.ced}>Céd. Esp. {cedEsp}</Text> : null}
+        <Text style={s.firmaLabel}>Firma y sello</Text>
+      </View>
+    </View>
+  )
+}
+
 export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
   const colors = getPdfColors(medico)
 
   const s = StyleSheet.create({
+    /* ---------- Rx decorativo ---------- */
     rxText: {
       position: 'absolute',
-      top: 90,
+      top: 82,
       right: 50,
-      fontSize: 40,
+      fontSize: 42,
       fontWeight: 700,
       color: colors.cs,
-      opacity: 0.85,
+      opacity: 0.8,
     },
+
+    /* ---------- Datos del paciente ---------- */
     patientBox: {
-      backgroundColor: colors.cp + '08',
-      borderLeftWidth: 3,
-      borderLeftColor: colors.cs,
-      borderRadius: 4,
-      padding: 12,
       marginTop: 8,
-      marginBottom: 8,
+      marginBottom: 10,
     },
+    datoField: {
+      ...baseStyles.datoField,
+    },
+    datoLabel: {
+      ...baseStyles.datoLabel,
+      color: colors.cp,
+    },
+
+    /* ---------- Tabla medicamentos ---------- */
     tblHeader: {
       flexDirection: 'row',
       backgroundColor: colors.cp,
@@ -137,10 +190,10 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
       borderBottomColor: '#e5e7eb',
     },
     tblRowAlt: {
-      backgroundColor: '#f9fafb',
+      backgroundColor: '#f8f9fb',
     },
     colNum: {
-      width: 28,
+      width: 24,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -168,6 +221,7 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
     medPresentacion: {
       fontSize: 9,
       color: '#555',
+      marginTop: 1,
     },
     medPrincipio: {
       fontSize: 8.5,
@@ -184,20 +238,27 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
       color: '#333',
       lineHeight: 1.4,
     },
+
+    /* ---------- Secciones ---------- */
     seccionWrap: {
       backgroundColor: colors.cp + '0A',
-      borderLeftColor: colors.cp,
       borderRadius: 3,
     },
     recomendacionesBody: {
       marginTop: 4,
       paddingLeft: 6,
     },
+
+    /* ---------- Footer: QR + Firma ---------- */
     footerRow: {
       flexDirection: 'row',
       alignItems: 'flex-end',
       justifyContent: 'space-between',
       marginTop: 28,
+    },
+    qrGroup: {
+      flexDirection: 'row',
+      gap: 12,
     },
     qrWrap: {
       alignItems: 'center',
@@ -213,14 +274,9 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
       textAlign: 'center',
       maxWidth: 80,
     },
-    firmaWrap: {
-      flex: 1,
-      alignItems: 'flex-end',
-    },
     blogQrWrap: {
       alignItems: 'center',
       gap: 4,
-      marginLeft: 16,
     },
     blogQrImage: {
       width: 56,
@@ -232,6 +288,10 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
       textAlign: 'center',
       maxWidth: 70,
     },
+    firmaWrap: {
+      flex: 1,
+      alignItems: 'flex-end',
+    },
   })
 
   const hasQr = Boolean(data.qrDataUrl)
@@ -241,8 +301,10 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
     <Document>
       <Page size="LETTER" style={baseStyles.page}>
         <BarraTop colors={colors} />
+
         <View style={baseStyles.contenido}>
           <PdfWatermark logoUrl={logoUrl} />
+
           <PdfHeader
             medico={medico}
             colors={colors}
@@ -254,37 +316,42 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
           {/* Rx decorativo */}
           <Text style={s.rxText}>Rx</Text>
 
-          {/* Datos del paciente */}
+          {/* ──── Datos del paciente ──── */}
           <View style={s.patientBox}>
+            {/* Row 1: Fecha + Paciente */}
             <View style={baseStyles.datoRow}>
-              <View style={baseStyles.datoField}>
-                <Text style={baseStyles.datoLabel}>FECHA</Text>
+              <View style={s.datoField}>
+                <Text style={s.datoLabel}>FECHA</Text>
                 <Text style={baseStyles.datoValor}>{data.fecha}</Text>
               </View>
-              <View style={baseStyles.datoField}>
-                <Text style={baseStyles.datoLabel}>PACIENTE</Text>
+              <View style={{ ...s.datoField, flex: 2 }}>
+                <Text style={s.datoLabel}>PACIENTE</Text>
                 <Text style={baseStyles.datoValor}>{data.paciente}</Text>
               </View>
             </View>
+
+            {/* Row 2: Edad + Sexo */}
             <View style={baseStyles.datoRow}>
-              <View style={baseStyles.datoField}>
-                <Text style={baseStyles.datoLabel}>EDAD</Text>
-                <Text style={baseStyles.datoValor}>{data.edad || '—'}</Text>
+              <View style={s.datoField}>
+                <Text style={s.datoLabel}>EDAD</Text>
+                <Text style={baseStyles.datoValor}>{data.edad || '\u2014'}</Text>
               </View>
-              <View style={baseStyles.datoField}>
-                <Text style={baseStyles.datoLabel}>SEXO</Text>
-                <Text style={baseStyles.datoValor}>{data.sexo || '—'}</Text>
+              <View style={s.datoField}>
+                <Text style={s.datoLabel}>SEXO</Text>
+                <Text style={baseStyles.datoValor}>{data.sexo || '\u2014'}</Text>
               </View>
             </View>
-            <View style={{ ...baseStyles.datoField, marginBottom: 0 }}>
-              <Text style={baseStyles.datoLabel}>{`DIAGN\u00D3STICO`}</Text>
-              <Text style={baseStyles.datoValor}>{data.diagnostico || '—'}</Text>
+
+            {/* Row 3: Diagnóstico (full width) */}
+            <View style={{ ...s.datoField, marginBottom: 0 }}>
+              <Text style={s.datoLabel}>{`DIAGN\u00D3STICO`}</Text>
+              <Text style={baseStyles.datoValor}>{data.diagnostico || '\u2014'}</Text>
             </View>
           </View>
 
-          {/* Seccion Medicamentos */}
-          <View style={[baseStyles.seccion, s.seccionWrap, { borderLeftColor: colors.cs }]}>
-            <Text style={{ color: colors.cs, fontSize: 11, fontWeight: 700 }}>Medicamentos</Text>
+          {/* ──── Sección Medicamentos ──── */}
+          <View style={[baseStyles.seccion, s.seccionWrap, { borderLeftColor: colors.cp }]}>
+            <Text style={{ color: colors.cp, fontSize: 11, fontWeight: 700 }}>Medicamentos</Text>
           </View>
 
           {/* Tabla de medicamentos */}
@@ -316,27 +383,25 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
                   <Text style={s.numText}>{idx + 1}</Text>
                 </View>
                 <View style={s.colMed}>
-                  <Text style={s.medNombre}>
-                    {med.nombre_comercial}
-                    {med.presentacion ? (
-                      <Text style={s.medPresentacion}>{`  ${med.presentacion}`}</Text>
-                    ) : null}
-                  </Text>
+                  <Text style={s.medNombre}>{med.nombre_comercial}</Text>
+                  {med.presentacion ? (
+                    <Text style={s.medPresentacion}>{med.presentacion}</Text>
+                  ) : null}
                   {med.principio_activo ? (
                     <Text style={s.medPrincipio}>{med.principio_activo}</Text>
                   ) : null}
                 </View>
                 <View style={s.colVia}>
-                  <Text style={s.viaText}>{med.via_administracion || '—'}</Text>
+                  <Text style={s.viaText}>{med.via_administracion || '\u2014'}</Text>
                 </View>
                 <View style={s.colInd}>
-                  <Text style={s.indText}>{med.indicacion || '—'}</Text>
+                  <Text style={s.indText}>{med.indicacion || '\u2014'}</Text>
                 </View>
               </View>
             ))}
           </View>
 
-          {/* Recomendaciones */}
+          {/* ──── Recomendaciones ──── */}
           {data.recomendaciones ? (
             <>
               <View style={[baseStyles.seccion, s.seccionWrap, { borderLeftColor: colors.cp }]}>
@@ -348,33 +413,29 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
             </>
           ) : null}
 
-          {/* Footer: QR + Firma */}
-          {hasQr || hasBlogQr ? (
-            <View style={s.footerRow}>
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                {data.qrDataUrl ? (
-                  <View style={s.qrWrap}>
-                    <Image style={s.qrImage} src={data.qrDataUrl} />
-                    <Text style={s.qrLabel}>Escanea para verificar receta</Text>
-                  </View>
-                ) : null}
-                {data.blogQrDataUrl ? (
-                  <View style={s.blogQrWrap}>
-                    <Image style={s.blogQrImage} src={data.blogQrDataUrl} />
-                    <Text style={s.blogQrLabel}>Blog del especialista</Text>
-                  </View>
-                ) : null}
-              </View>
-              <View style={s.firmaWrap}>
-                <PdfFirma medico={medico} colors={colors} />
-              </View>
+          {/* ──── Footer: QR(s) izquierda + Firma derecha ──── */}
+          <View style={s.footerRow}>
+            <View style={s.qrGroup}>
+              {data.qrDataUrl ? (
+                <View style={s.qrWrap}>
+                  <Image style={s.qrImage} src={data.qrDataUrl} />
+                  <Text style={s.qrLabel}>Escanea para verificar autenticidad</Text>
+                </View>
+              ) : null}
+              {data.blogQrDataUrl ? (
+                <View style={s.blogQrWrap}>
+                  <Image style={s.blogQrImage} src={data.blogQrDataUrl} />
+                  <Text style={s.blogQrLabel}>Blog del especialista</Text>
+                </View>
+              ) : null}
             </View>
-          ) : (
-            <PdfFirma medico={medico} colors={colors} />
-          )}
+            <View style={s.firmaWrap}>
+              <FirmaInline medico={medico} colors={colors} />
+            </View>
+          </View>
         </View>
 
-        {/* Numeracion de pagina */}
+        {/* Numeración de página */}
         <Text
           style={baseStyles.pageNumber}
           render={({ pageNumber, totalPages }) => `P\u00E1gina ${pageNumber} de ${totalPages}`}

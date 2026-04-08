@@ -30,28 +30,13 @@ export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudI
   const colors = getPdfColors(medico)
 
   const s = StyleSheet.create({
-    tituloWrap: {
-      backgroundColor: colors.cp + '0D',
-      borderRadius: 4,
-      paddingVertical: 8,
-      marginTop: 18,
-      marginBottom: 18,
-    },
-    tituloText: {
-      textAlign: 'center',
-      fontSize: 13,
-      fontWeight: 700,
-      textTransform: 'uppercase',
-      color: colors.cp,
-      letterSpacing: 1,
-    },
     urgenteBadge: {
       backgroundColor: '#dc2626',
-      borderRadius: 4,
-      paddingVertical: 4,
-      paddingHorizontal: 14,
+      borderRadius: 3,
+      paddingVertical: 5,
+      paddingHorizontal: 20,
       alignSelf: 'center',
-      marginBottom: 14,
+      marginBottom: 10,
     },
     urgenteText: {
       color: '#ffffff',
@@ -59,31 +44,85 @@ export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudI
       fontWeight: 700,
       letterSpacing: 1.5,
       textTransform: 'uppercase',
+      textAlign: 'center',
     },
-    seccionWrap: {
-      backgroundColor: colors.cp + '0A',
-      borderLeftColor: colors.cp,
-      borderRadius: 3,
+    tableHeader: {
+      flexDirection: 'row',
+      backgroundColor: colors.cp,
+      borderTopLeftRadius: 3,
+      borderTopRightRadius: 3,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
     },
-    estudioCard: {
-      borderLeftWidth: 3,
-      borderLeftColor: colors.cs,
-      backgroundColor: colors.cs + '08',
-      borderRadius: 4,
-      paddingVertical: 8,
-      paddingHorizontal: 12,
-      marginBottom: 8,
-    },
-    estudioNombre: {
-      fontSize: 10.5,
+    thNum: {
+      width: 26,
+      fontSize: 8,
       fontWeight: 700,
+      color: '#ffffff',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    thEstudio: {
+      width: '28%',
+      fontSize: 8,
+      fontWeight: 700,
+      color: '#ffffff',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    thRegion: {
+      width: '32%',
+      fontSize: 8,
+      fontWeight: 700,
+      color: '#ffffff',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    thIndicacion: {
+      flex: 1,
+      fontSize: 8,
+      fontWeight: 700,
+      color: '#ffffff',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    tableRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 7,
+      paddingHorizontal: 10,
+    },
+    tableRowAlt: {
+      backgroundColor: '#f8f9fa',
+    },
+    tdNum: {
+      width: 26,
+      alignItems: 'flex-start',
+      justifyContent: 'center',
+    },
+    bullet: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: colors.cs,
+    },
+    tdEstudio: {
+      width: '28%',
+      fontSize: 10,
+      fontWeight: 500,
       color: '#1a1a1a',
       lineHeight: 1.4,
     },
-    estudioIndicacion: {
-      fontSize: 9,
-      color: '#666',
-      marginTop: 3,
+    tdRegion: {
+      width: '32%',
+      fontSize: 10,
+      color: '#1a1a1a',
+      lineHeight: 1.4,
+    },
+    tdIndicacion: {
+      flex: 1,
+      fontSize: 9.5,
+      color: '#555',
       lineHeight: 1.4,
     },
   })
@@ -103,9 +142,9 @@ export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudI
           />
 
           {/* Titulo */}
-          <View style={s.tituloWrap}>
-            <Text style={s.tituloText}>Solicitud de Estudios de Imagen</Text>
-          </View>
+          <Text style={[baseStyles.tituloDoc, { backgroundColor: colors.cp }]}>
+            Solicitud de Estudios de Imagen
+          </Text>
 
           {/* Badge urgente */}
           {data.urgente ? (
@@ -117,42 +156,54 @@ export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudI
           {/* Datos del paciente */}
           <View style={baseStyles.datoRow}>
             <View style={baseStyles.datoField}>
-              <Text style={baseStyles.datoLabel}>FECHA</Text>
+              <Text style={[baseStyles.datoLabel, { color: colors.cp }]}>FECHA</Text>
               <Text style={baseStyles.datoValor}>{data.fecha}</Text>
             </View>
           </View>
           <View style={baseStyles.datoRow}>
             <View style={baseStyles.datoField}>
-              <Text style={baseStyles.datoLabel}>PACIENTE</Text>
+              <Text style={[baseStyles.datoLabel, { color: colors.cp }]}>PACIENTE</Text>
               <Text style={baseStyles.datoValor}>{data.paciente}</Text>
             </View>
             <View style={baseStyles.datoField}>
-              <Text style={baseStyles.datoLabel}>{'\u0044IAGN\u00D3STICO'}</Text>
+              <Text style={[baseStyles.datoLabel, { color: colors.cp }]}>DIAGN{'\u00D3'}STICO</Text>
               <Text style={baseStyles.datoValor}>{data.diagnostico}</Text>
             </View>
           </View>
 
           {/* Estudios solicitados */}
-          <View style={[baseStyles.seccion, s.seccionWrap, { borderLeftColor: colors.cp }]}>
+          <View style={[baseStyles.seccion, { backgroundColor: colors.cp + '08', borderLeftColor: colors.cp }]}>
             <Text style={{ color: colors.cp, fontSize: 11, fontWeight: 700 }}>Estudios solicitados:</Text>
           </View>
-          {data.estudios.map((estudio, i) => {
-            const nombre = `${estudio.tipo} de ${estudio.region}${estudio.proyecciones ? ` — ${estudio.proyecciones}` : ''}`
-            return (
-              <View key={i} style={s.estudioCard}>
-                <Text style={s.estudioNombre}>{nombre}</Text>
-                {estudio.indicacion ? (
-                  <Text style={s.estudioIndicacion}>{estudio.indicacion}</Text>
-                ) : null}
-              </View>
-            )
-          })}
+
+          {/* Tabla de estudios */}
+          <View>
+            <View style={s.tableHeader}>
+              <Text style={s.thNum}>#</Text>
+              <Text style={s.thEstudio}>Estudio</Text>
+              <Text style={s.thRegion}>{`Regi\u00F3n`}</Text>
+              <Text style={s.thIndicacion}>{`Indicaci\u00F3n`}</Text>
+            </View>
+            {data.estudios.map((estudio, i) => {
+              const regionText = estudio.region + (estudio.proyecciones ? ` — ${estudio.proyecciones}` : '')
+              return (
+                <View key={i} style={[s.tableRow, i % 2 !== 0 ? s.tableRowAlt : {}]}>
+                  <View style={s.tdNum}>
+                    <View style={s.bullet} />
+                  </View>
+                  <Text style={s.tdEstudio}>{estudio.tipo}</Text>
+                  <Text style={s.tdRegion}>{regionText}</Text>
+                  <Text style={s.tdIndicacion}>{estudio.indicacion || '—'}</Text>
+                </View>
+              )
+            })}
+          </View>
 
           {/* Firma */}
           <PdfFirma medico={medico} colors={colors} />
         </View>
 
-        {/* Numeración de página */}
+        {/* Numeraci{'\u00F3'}n de p{'\u00E1'}gina */}
         <Text
           style={baseStyles.pageNumber}
           render={({ pageNumber, totalPages }) => `P\u00E1gina ${pageNumber} de ${totalPages}`}

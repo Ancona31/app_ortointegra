@@ -30,60 +30,69 @@ export default function SolicitudLabPdf({ medico, data, logoUrl }: SolicitudLabP
   const colors = getPdfColors(medico)
 
   const s = StyleSheet.create({
-    tituloWrap: {
-      backgroundColor: colors.cp + '0D',
-      borderRadius: 4,
-      paddingVertical: 8,
-      marginTop: 18,
-      marginBottom: 18,
-    },
-    tituloText: {
-      textAlign: 'center',
-      fontSize: 13,
-      fontWeight: 700,
-      textTransform: 'uppercase',
-      color: colors.cp,
-      letterSpacing: 1,
-    },
-    checkItem: {
+    tableHeader: {
       flexDirection: 'row',
-      gap: 8,
-      paddingVertical: 5,
-      paddingLeft: 6,
+      backgroundColor: colors.cp,
+      borderTopLeftRadius: 3,
+      borderTopRightRadius: 3,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
     },
-    checkMark: {
-      fontSize: 10,
-      color: colors.cs,
+    tableHeaderNum: {
+      width: 30,
+      fontSize: 8,
       fontWeight: 700,
+      color: '#ffffff',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
     },
-    checkText: {
-      fontSize: 10.5,
+    tableHeaderText: {
       flex: 1,
+      fontSize: 8,
+      fontWeight: 700,
+      color: '#ffffff',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    tableRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 7,
+      paddingHorizontal: 10,
+    },
+    tableRowAlt: {
+      backgroundColor: '#f8f9fa',
+    },
+    bulletCol: {
+      width: 30,
+      alignItems: 'flex-start',
+      justifyContent: 'center',
+    },
+    bullet: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: colors.cs,
+    },
+    studyName: {
+      flex: 1,
+      fontSize: 10.5,
+      color: '#1a1a1a',
+      fontWeight: 500,
       lineHeight: 1.4,
     },
-    estudiosGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-    },
-    estudiosCol: {
-      width: '50%',
-    },
-    seccionWrap: {
-      backgroundColor: colors.cp + '0A',
-      borderLeftColor: colors.cp,
+    notasBox: {
+      borderWidth: 0.75,
+      borderColor: '#e5e7eb',
       borderRadius: 3,
+      padding: 8,
     },
     notasText: {
       fontSize: 10,
       color: '#333',
-      marginTop: 4,
       lineHeight: 1.6,
     },
   })
-
-  const mitad = Math.ceil(data.estudios.length / 2)
-  const col1 = data.estudios.slice(0, mitad)
-  const col2 = data.estudios.slice(mitad)
 
   return (
     <Document>
@@ -100,58 +109,58 @@ export default function SolicitudLabPdf({ medico, data, logoUrl }: SolicitudLabP
           />
 
           {/* Titulo */}
-          <View style={s.tituloWrap}>
-            <Text style={s.tituloText}>Solicitud de Estudios de Laboratorio</Text>
-          </View>
+          <Text style={[baseStyles.tituloDoc, { backgroundColor: colors.cp }]}>
+            Solicitud de Estudios de Laboratorio
+          </Text>
 
-          {/* Datos del paciente — formato formulario médico */}
+          {/* Datos del paciente */}
           <View style={baseStyles.datoRow}>
             <View style={baseStyles.datoField}>
-              <Text style={baseStyles.datoLabel}>FECHA</Text>
+              <Text style={[baseStyles.datoLabel, { color: colors.cp }]}>FECHA</Text>
               <Text style={baseStyles.datoValor}>{data.fecha}</Text>
             </View>
           </View>
           <View style={baseStyles.datoRow}>
             <View style={baseStyles.datoField}>
-              <Text style={baseStyles.datoLabel}>PACIENTE</Text>
+              <Text style={[baseStyles.datoLabel, { color: colors.cp }]}>PACIENTE</Text>
               <Text style={baseStyles.datoValor}>{data.paciente}</Text>
             </View>
             <View style={baseStyles.datoField}>
-              <Text style={baseStyles.datoLabel}>DIAGN&#xD3;STICO</Text>
+              <Text style={[baseStyles.datoLabel, { color: colors.cp }]}>DIAGN{'\u00D3'}STICO</Text>
               <Text style={baseStyles.datoValor}>{data.diagnostico}</Text>
             </View>
           </View>
 
           {/* Estudios */}
-          <View style={[baseStyles.seccion, s.seccionWrap, { borderLeftColor: colors.cp }]}>
+          <View style={[baseStyles.seccion, { backgroundColor: colors.cp + '08', borderLeftColor: colors.cp }]}>
             <Text style={{ color: colors.cp, fontSize: 11, fontWeight: 700 }}>Se solicita:</Text>
           </View>
-          <View style={s.estudiosGrid}>
-            <View style={s.estudiosCol}>
-              {col1.map((e, i) => (
-                <View key={i} style={s.checkItem}>
-                  <Text style={s.checkMark}>{'\u2713'}</Text>
-                  <Text style={s.checkText}>{e}</Text>
-                </View>
-              ))}
+
+          {/* Tabla de estudios */}
+          <View>
+            <View style={s.tableHeader}>
+              <Text style={s.tableHeaderNum}>#</Text>
+              <Text style={s.tableHeaderText}>Estudio solicitado</Text>
             </View>
-            <View style={s.estudiosCol}>
-              {col2.map((e, i) => (
-                <View key={i} style={s.checkItem}>
-                  <Text style={s.checkMark}>{'\u2713'}</Text>
-                  <Text style={s.checkText}>{e}</Text>
+            {data.estudios.map((estudio, i) => (
+              <View key={i} style={[s.tableRow, i % 2 !== 0 ? s.tableRowAlt : {}]}>
+                <View style={s.bulletCol}>
+                  <View style={s.bullet} />
                 </View>
-              ))}
-            </View>
+                <Text style={s.studyName}>{estudio}</Text>
+              </View>
+            ))}
           </View>
 
           {/* Notas */}
           {data.notas ? (
             <>
-              <View style={[baseStyles.seccion, s.seccionWrap, { borderLeftColor: colors.cp }]}>
+              <View style={[baseStyles.seccion, { backgroundColor: colors.cp + '08', borderLeftColor: colors.cp }]}>
                 <Text style={{ color: colors.cp, fontSize: 11, fontWeight: 700 }}>Indicaciones</Text>
               </View>
-              <Text style={s.notasText}>{data.notas}</Text>
+              <View style={s.notasBox}>
+                <Text style={s.notasText}>{data.notas}</Text>
+              </View>
             </>
           ) : null}
 
@@ -159,7 +168,7 @@ export default function SolicitudLabPdf({ medico, data, logoUrl }: SolicitudLabP
           <PdfFirma medico={medico} colors={colors} />
         </View>
 
-        {/* Numeración de página */}
+        {/* Numeraci{'\u00F3'}n de p{'\u00E1'}gina */}
         <Text
           style={baseStyles.pageNumber}
           render={({ pageNumber, totalPages }) => `P\u00E1gina ${pageNumber} de ${totalPages}`}

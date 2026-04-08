@@ -39,69 +39,76 @@ export default function NotaHonorariosPdf({ medico, data, logoUrl }: NotaHonorar
   const colors = getPdfColors(medico)
   const esCotizacion = data.tipoDoc === 'cotizacion'
   const titulo = esCotizacion ? 'Cotización' : 'Recibo de Honorarios'
+  const divisaLabel = data.divisa === 'MXN' ? 'Pesos mexicanos' : 'Dólares americanos'
 
   const s = StyleSheet.create({
+    /* Titulo banner */
     tituloBanner: {
-      backgroundColor: colors.cp + '0D',
-      borderRadius: 4,
-      paddingVertical: 8,
-      paddingHorizontal: 14,
-      marginTop: 18,
-      marginBottom: 18,
+      ...baseStyles.tituloDoc,
+      backgroundColor: colors.cp,
       flexDirection: 'row',
-      justifyContent: 'space-between',
+      justifyContent: 'center',
       alignItems: 'center',
+      position: 'relative',
     },
     tituloText: {
-      fontSize: 13,
+      fontSize: 12,
       fontWeight: 700,
       textTransform: 'uppercase',
-      color: colors.cp,
-      letterSpacing: 1,
+      color: '#ffffff',
+      letterSpacing: 1.5,
+      textAlign: 'center',
+      flex: 1,
     },
-    folioText: {
-      fontSize: 9,
-      color: colors.cp,
+    folioTag: {
+      position: 'absolute',
+      right: 14,
+      fontSize: 8,
+      color: '#ffffff',
+      opacity: 0.85,
       fontWeight: 500,
     },
     /* Tabla */
     tableHeader: {
       flexDirection: 'row',
       backgroundColor: colors.cp,
-      borderRadius: 3,
-      paddingVertical: 6,
-      paddingHorizontal: 10,
-      marginBottom: 2,
+      borderTopLeftRadius: 4,
+      borderTopRightRadius: 4,
+      paddingVertical: 7,
+      paddingHorizontal: 12,
     },
     thNum: {
       width: 30,
-      fontSize: 8,
+      fontSize: 7.5,
       fontWeight: 700,
       color: '#ffffff',
+      textTransform: 'uppercase',
     },
     thConcepto: {
       flex: 1,
-      fontSize: 8,
+      fontSize: 7.5,
       fontWeight: 700,
       color: '#ffffff',
+      textTransform: 'uppercase',
     },
     thPrecio: {
-      width: 100,
-      fontSize: 8,
+      width: 110,
+      fontSize: 7.5,
       fontWeight: 700,
       color: '#ffffff',
+      textTransform: 'uppercase',
       textAlign: 'right',
     },
     tableRow: {
       flexDirection: 'row',
-      paddingVertical: 6,
-      paddingHorizontal: 10,
-      borderRadius: 2,
+      paddingVertical: 7,
+      paddingHorizontal: 12,
     },
     tdNum: {
       width: 30,
       fontSize: 9.5,
-      color: '#555',
+      color: '#888',
+      fontWeight: 500,
     },
     tdConcepto: {
       flex: 1,
@@ -109,48 +116,58 @@ export default function NotaHonorariosPdf({ medico, data, logoUrl }: NotaHonorar
       color: '#1a1a1a',
     },
     tdPrecio: {
-      width: 100,
+      width: 110,
       fontSize: 10,
       color: '#1a1a1a',
+      fontWeight: 500,
       textAlign: 'right',
     },
-    /* Total */
-    totalCard: {
+    /* Total — separate from table */
+    totalWrap: {
       backgroundColor: colors.cp,
-      borderRadius: 4,
-      paddingVertical: 10,
-      paddingHorizontal: 18,
-      marginTop: 14,
-      alignSelf: 'flex-end',
-      minWidth: 200,
+      borderRadius: 6,
+      padding: 12,
+      marginTop: 16,
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
     },
     totalLabel: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: 700,
       color: '#ffffff',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
     },
     totalAmount: {
-      fontSize: 16,
+      fontSize: 18,
       fontWeight: 700,
       color: '#ffffff',
     },
     divisaNote: {
       fontSize: 7.5,
-      color: '#888',
+      color: '#ffffff',
+      opacity: 0.7,
       textAlign: 'right',
       marginTop: 4,
     },
     /* Forma de pago */
     pagoBadge: {
-      backgroundColor: '#f0f0f0',
+      borderWidth: 0.75,
+      borderColor: '#d1d5db',
+      backgroundColor: '#f9fafb',
       borderRadius: 10,
-      paddingVertical: 4,
-      paddingHorizontal: 12,
+      paddingVertical: 5,
+      paddingHorizontal: 14,
       alignSelf: 'flex-start',
       marginTop: 14,
+      flexDirection: 'row',
+      gap: 4,
+    },
+    pagoLabel: {
+      fontSize: 8.5,
+      color: '#888',
+      fontWeight: 700,
     },
     pagoText: {
       fontSize: 8.5,
@@ -161,7 +178,8 @@ export default function NotaHonorariosPdf({ medico, data, logoUrl }: NotaHonorar
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'flex-end',
-      marginTop: 32,
+      marginTop: 'auto',
+      paddingTop: 20,
     },
     fiscalNote: {
       fontSize: 7,
@@ -170,8 +188,6 @@ export default function NotaHonorariosPdf({ medico, data, logoUrl }: NotaHonorar
       lineHeight: 1.5,
     },
   })
-
-  const divisaLabel = data.divisa === 'MXN' ? 'Pesos mexicanos' : 'Dólares americanos'
 
   return (
     <Document>
@@ -187,20 +203,20 @@ export default function NotaHonorariosPdf({ medico, data, logoUrl }: NotaHonorar
             fecha={data.fecha}
           />
 
-          {/* Titulo banner */}
+          {/* Titulo banner con folio */}
           <View style={s.tituloBanner}>
             <Text style={s.tituloText}>{titulo}</Text>
-            <Text style={s.folioText}>Folio: {data.folio}</Text>
+            <Text style={s.folioTag}>Folio: {data.folio}</Text>
           </View>
 
           {/* Datos */}
           <View style={baseStyles.datoRow}>
             <View style={baseStyles.datoField}>
-              <Text style={baseStyles.datoLabel}>FECHA</Text>
+              <Text style={{ ...baseStyles.datoLabel, color: colors.cs }}>FECHA</Text>
               <Text style={baseStyles.datoValor}>{data.fecha}</Text>
             </View>
-            <View style={baseStyles.datoField}>
-              <Text style={baseStyles.datoLabel}>
+            <View style={[baseStyles.datoField, { flex: 2 }]}>
+              <Text style={{ ...baseStyles.datoLabel, color: colors.cs }}>
                 {esCotizacion ? 'CLIENTE' : 'PACIENTE'}
               </Text>
               <Text style={baseStyles.datoValor}>{data.paciente || '—'}</Text>
@@ -227,8 +243,8 @@ export default function NotaHonorariosPdf({ medico, data, logoUrl }: NotaHonorar
             </View>
           ))}
 
-          {/* Total */}
-          <View style={s.totalCard}>
+          {/* Total — separate card */}
+          <View style={s.totalWrap}>
             <Text style={s.totalLabel}>Total</Text>
             <Text style={s.totalAmount}>{fmt(data.total, data.divisa)}</Text>
           </View>
@@ -237,7 +253,8 @@ export default function NotaHonorariosPdf({ medico, data, logoUrl }: NotaHonorar
           {/* Forma de pago */}
           {!esCotizacion && data.formaPago ? (
             <View style={s.pagoBadge}>
-              <Text style={s.pagoText}>Forma de pago: {data.formaPago}</Text>
+              <Text style={s.pagoLabel}>Forma de pago:</Text>
+              <Text style={s.pagoText}>{data.formaPago}</Text>
             </View>
           ) : null}
 

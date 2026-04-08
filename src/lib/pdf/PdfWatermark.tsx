@@ -14,7 +14,7 @@ export default function PdfWatermark({ logoUrl }: Props) {
       left: '50%',
       width: 400,
       height: 400,
-      opacity: 0.03,
+      opacity: 0.025,
       transform: 'translate(-50%, -50%) rotate(-25deg)',
     },
   })

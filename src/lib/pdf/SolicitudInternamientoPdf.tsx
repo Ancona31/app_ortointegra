@@ -38,62 +38,57 @@ export function renderSolicitudInternamiento(props: SolicitudInternamientoProps)
 
 function buildStyles(colors: PdfColors) {
   return StyleSheet.create({
-    tituloWrap: {
-      backgroundColor: colors.cp + '0D',
-      borderRadius: 4,
-      paddingVertical: 8,
-      marginTop: 18,
-      marginBottom: 18,
-    },
-    tituloText: {
-      textAlign: 'center',
-      fontSize: 13,
-      fontWeight: 700,
-      textTransform: 'uppercase',
-      color: colors.cp,
-      letterSpacing: 1,
+    /* --- Titulo documento --- */
+    tituloDoc: {
+      ...baseStyles.tituloDoc,
+      backgroundColor: colors.cp,
     },
     urgenteBadge: {
       backgroundColor: '#dc2626',
-      paddingHorizontal: 12,
-      paddingVertical: 3,
-      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 4,
+      borderRadius: 3,
       alignSelf: 'center',
-      marginTop: 6,
+      marginTop: 8,
+      marginBottom: 4,
     },
     urgenteBadgeText: {
-      fontSize: 9,
+      fontSize: 10,
       fontWeight: 700,
       color: '#ffffff',
       letterSpacing: 1.5,
       textTransform: 'uppercase',
+      textAlign: 'center',
     },
-    pacienteBox: {
-      backgroundColor: colors.cp + '08',
-      borderLeftWidth: 4,
-      borderLeftColor: colors.cp,
-      borderRadius: 4,
-      padding: 14,
-      marginBottom: 16,
-    },
-    pacienteHighlight: {
+
+    /* --- Grid de datos del paciente --- */
+    lugarValor: {
       fontSize: 10.5,
       fontWeight: 700,
       color: colors.cp,
-      borderBottomWidth: 0.75,
-      borderBottomColor: '#d1d5db',
-      paddingBottom: 4,
       lineHeight: 1.4,
     },
-    seccionWrap: {
+
+    /* --- Secciones --- */
+    seccion: {
+      ...baseStyles.seccion,
       backgroundColor: colors.cp + '0A',
       borderLeftColor: colors.cp,
-      borderRadius: 3,
     },
     seccionTitle: {
-      color: colors.cp,
       fontSize: 11,
       fontWeight: 700,
+      color: colors.cp,
+    },
+
+    /* --- Diagnosticos --- */
+    diagPrincipal: {
+      fontSize: 10.5,
+      fontWeight: 700,
+      color: '#1a1a1a',
+      marginBottom: 6,
+      paddingLeft: 6,
+      lineHeight: 1.5,
     },
     bulletRow: {
       flexDirection: 'row',
@@ -114,19 +109,18 @@ function buildStyles(colors: PdfColors) {
       flex: 1,
       lineHeight: 1.5,
     },
-    diagPrincipal: {
-      fontSize: 10.5,
-      fontWeight: 700,
-      color: '#1a1a1a',
-      marginBottom: 6,
-      paddingLeft: 6,
-    },
-    procedimientoText: {
+
+    /* --- Procedimiento / Justificacion --- */
+    justifiedText: {
       fontSize: 10.5,
       color: '#333',
       lineHeight: 1.6,
+      textAlign: 'justify',
       paddingLeft: 6,
+      marginTop: 4,
     },
+
+    /* --- Badges requerimientos --- */
     badgesWrap: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -135,30 +129,26 @@ function buildStyles(colors: PdfColors) {
       paddingLeft: 6,
     },
     badge: {
-      backgroundColor: colors.cp + '0D',
+      backgroundColor: colors.cp + '10',
       paddingHorizontal: 10,
       paddingVertical: 4,
-      borderRadius: 12,
+      borderRadius: 10,
+      borderWidth: 0.5,
+      borderColor: colors.cp + '30',
     },
     badgeText: {
       fontSize: 9,
       color: colors.cp,
       fontWeight: 500,
     },
-    justificacionText: {
-      fontSize: 10,
-      color: '#333',
-      lineHeight: 1.6,
-      textAlign: 'justify',
-      paddingLeft: 6,
-      marginTop: 4,
-    },
+
+    /* --- Instrucciones paciente --- */
     instruccionesBox: {
       backgroundColor: '#fffbeb',
       borderWidth: 1,
       borderColor: '#f59e0b',
       borderRadius: 4,
-      padding: 12,
+      padding: 10,
       marginTop: 16,
     },
     instruccionesHeader: {
@@ -174,12 +164,14 @@ function buildStyles(colors: PdfColors) {
       color: '#78350f',
       lineHeight: 1.6,
     },
+
+    /* --- Indicaciones de piso --- */
     indicacionesBox: {
-      backgroundColor: colors.cp + '08',
+      backgroundColor: colors.cp + '06',
       borderWidth: 1,
       borderColor: colors.cp + '30',
       borderRadius: 4,
-      padding: 12,
+      padding: 10,
       marginTop: 12,
     },
     indicacionesHeader: {
@@ -194,6 +186,33 @@ function buildStyles(colors: PdfColors) {
       fontSize: 9.5,
       color: '#1a1a1a',
       lineHeight: 1.6,
+    },
+
+    /* --- Firmas (doble) --- */
+    firmasRow: {
+      marginTop: 'auto',
+      paddingTop: 20,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 30,
+    },
+    firmaPaciente: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    firmaLineaDashed: {
+      width: '100%',
+      borderTopWidth: 1,
+      borderTopColor: '#999',
+      borderTopStyle: 'dashed',
+      paddingTop: 8,
+    },
+    firmaLabel: {
+      fontSize: 8,
+      color: '#888',
+      textAlign: 'center',
+      textTransform: 'uppercase',
+      letterSpacing: 1,
     },
   })
 }
@@ -217,65 +236,69 @@ export default function SolicitudInternamientoPdf({ medico, data, logoUrl }: Sol
           />
 
           {/* Titulo */}
-          <View style={s.tituloWrap}>
-            <Text style={s.tituloText}>Solicitud de Internamiento Hospitalario</Text>
-            {data.urgente ? (
-              <View style={s.urgenteBadge}>
-                <Text style={s.urgenteBadgeText}>URGENTE</Text>
+          <Text style={s.tituloDoc}>
+            Solicitud de Internamiento Hospitalario
+          </Text>
+
+          {/* Badge urgente */}
+          {data.urgente ? (
+            <View style={s.urgenteBadge}>
+              <Text style={s.urgenteBadgeText}>URGENTE</Text>
+            </View>
+          ) : null}
+
+          {/* Row 1: FECHA + PACIENTE + FECHA DE INGRESO */}
+          <View style={baseStyles.datoRow}>
+            <View style={baseStyles.datoField}>
+              <Text style={baseStyles.datoLabel}>FECHA</Text>
+              <Text style={baseStyles.datoValor}>{data.fecha}</Text>
+            </View>
+            <View style={[baseStyles.datoField, { flex: 2 }]}>
+              <Text style={baseStyles.datoLabel}>PACIENTE</Text>
+              <Text style={baseStyles.datoValor}>{data.paciente}</Text>
+            </View>
+            {data.fechaIngreso ? (
+              <View style={baseStyles.datoField}>
+                <Text style={baseStyles.datoLabel}>FECHA DE INGRESO</Text>
+                <Text style={baseStyles.datoValor}>{data.fechaIngreso}</Text>
               </View>
             ) : null}
           </View>
 
-          {/* Datos del paciente */}
-          <View style={s.pacienteBox}>
+          {/* Row 2: HOSPITAL/LUGAR (full width) */}
+          {data.lugar ? (
             <View style={baseStyles.datoRow}>
               <View style={baseStyles.datoField}>
-                <Text style={baseStyles.datoLabel}>FECHA</Text>
-                <Text style={baseStyles.datoValor}>{data.fecha}</Text>
+                <Text style={baseStyles.datoLabel}>HOSPITAL / LUGAR</Text>
+                <Text style={s.lugarValor}>{data.lugar}</Text>
               </View>
+            </View>
+          ) : null}
+
+          {/* Row 3: TIPO + DIAS ESTIMADOS + ASA */}
+          <View style={baseStyles.datoRow}>
+            {data.tipoInternamiento ? (
               <View style={baseStyles.datoField}>
-                <Text style={baseStyles.datoLabel}>PACIENTE</Text>
-                <Text style={s.pacienteHighlight}>{data.paciente}</Text>
+                <Text style={baseStyles.datoLabel}>TIPO DE INTERNAMIENTO</Text>
+                <Text style={baseStyles.datoValor}>{data.tipoInternamiento}</Text>
               </View>
-            </View>
-            <View style={baseStyles.datoRow}>
-              {data.fechaIngreso ? (
-                <View style={baseStyles.datoField}>
-                  <Text style={baseStyles.datoLabel}>FECHA DE INGRESO</Text>
-                  <Text style={baseStyles.datoValor}>{data.fechaIngreso}</Text>
-                </View>
-              ) : null}
-              {data.lugar ? (
-                <View style={baseStyles.datoField}>
-                  <Text style={baseStyles.datoLabel}>LUGAR / HOSPITAL</Text>
-                  <Text style={s.pacienteHighlight}>{data.lugar}</Text>
-                </View>
-              ) : null}
-            </View>
-            <View style={baseStyles.datoRow}>
-              {data.tipoInternamiento ? (
-                <View style={baseStyles.datoField}>
-                  <Text style={baseStyles.datoLabel}>TIPO DE INTERNAMIENTO</Text>
-                  <Text style={baseStyles.datoValor}>{data.tipoInternamiento}</Text>
-                </View>
-              ) : null}
-              {data.diasEstimados ? (
-                <View style={baseStyles.datoField}>
-                  <Text style={baseStyles.datoLabel}>D{'\u00cd'}AS ESTIMADOS</Text>
-                  <Text style={baseStyles.datoValor}>{data.diasEstimados}</Text>
-                </View>
-              ) : null}
-              {data.asa ? (
-                <View style={baseStyles.datoField}>
-                  <Text style={baseStyles.datoLabel}>ASA</Text>
-                  <Text style={baseStyles.datoValor}>{data.asa}</Text>
-                </View>
-              ) : null}
-            </View>
+            ) : null}
+            {data.diasEstimados ? (
+              <View style={baseStyles.datoField}>
+                <Text style={baseStyles.datoLabel}>D{'\u00cd'}AS ESTIMADOS</Text>
+                <Text style={baseStyles.datoValor}>{data.diasEstimados}</Text>
+              </View>
+            ) : null}
+            {data.asa ? (
+              <View style={baseStyles.datoField}>
+                <Text style={baseStyles.datoLabel}>ASA</Text>
+                <Text style={baseStyles.datoValor}>{data.asa}</Text>
+              </View>
+            ) : null}
           </View>
 
-          {/* Diagnósticos */}
-          <View style={[baseStyles.seccion, s.seccionWrap, { borderLeftColor: colors.cp }]}>
+          {/* Diagnosticos */}
+          <View style={s.seccion}>
             <Text style={s.seccionTitle}>Diagn{'\u00f3'}sticos</Text>
           </View>
           <Text style={s.diagPrincipal}>{data.diagnostico}</Text>
@@ -289,17 +312,17 @@ export default function SolicitudInternamientoPdf({ medico, data, logoUrl }: Sol
           {/* Procedimiento */}
           {data.procedimiento ? (
             <>
-              <View style={[baseStyles.seccion, s.seccionWrap, { borderLeftColor: colors.cp }]}>
+              <View style={s.seccion}>
                 <Text style={s.seccionTitle}>Procedimiento / Cirug{'\u00ed'}a</Text>
               </View>
-              <Text style={s.procedimientoText}>{data.procedimiento}</Text>
+              <Text style={s.justifiedText}>{data.procedimiento}</Text>
             </>
           ) : null}
 
           {/* Requerimientos especiales */}
           {data.requerimientos && data.requerimientos.length > 0 ? (
             <>
-              <View style={[baseStyles.seccion, s.seccionWrap, { borderLeftColor: colors.cp }]}>
+              <View style={s.seccion}>
                 <Text style={s.seccionTitle}>Requerimientos especiales</Text>
               </View>
               <View style={s.badgesWrap}>
@@ -312,13 +335,13 @@ export default function SolicitudInternamientoPdf({ medico, data, logoUrl }: Sol
             </>
           ) : null}
 
-          {/* Justificación clínica */}
+          {/* Justificacion clinica */}
           {data.justificacion ? (
             <>
-              <View style={[baseStyles.seccion, s.seccionWrap, { borderLeftColor: colors.cp }]}>
+              <View style={s.seccion}>
                 <Text style={s.seccionTitle}>Justificaci{'\u00f3'}n cl{'\u00ed'}nica</Text>
               </View>
-              <Text style={s.justificacionText}>{data.justificacion}</Text>
+              <Text style={s.justifiedText}>{data.justificacion}</Text>
             </>
           ) : null}
 
@@ -338,11 +361,18 @@ export default function SolicitudInternamientoPdf({ medico, data, logoUrl }: Sol
             </View>
           ) : null}
 
-          {/* Firma */}
-          <PdfFirma medico={medico} colors={colors} />
+          {/* Doble firma: paciente/familiar + medico */}
+          <View style={s.firmasRow}>
+            <View style={s.firmaPaciente}>
+              <View style={s.firmaLineaDashed}>
+                <Text style={s.firmaLabel}>Firma del Paciente o Familiar</Text>
+              </View>
+            </View>
+            <PdfFirma medico={medico} colors={colors} />
+          </View>
         </View>
 
-        {/* Numeración de página */}
+        {/* Numeracion de pagina */}
         <Text
           style={baseStyles.pageNumber}
           render={({ pageNumber, totalPages }) => `P\u00e1gina ${pageNumber} de ${totalPages}`}
