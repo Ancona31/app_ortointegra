@@ -57,7 +57,7 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
         paciente_id: pacienteId,
         tipo: 'solicitud_lab',
         contenido: { paciente, diagnostico, estudios: estudios.filter(Boolean), notas, fecha },
-      }).then(({ error }: { error: { message: string } | null }) => { if (error) console.error('Error guardando documento:', error) })
+      }).then(({ error }: { error: { message: string } | null }) => { if (error) console.error('[DOC] Error guardando solicitud de laboratorio') })
     }
 
     const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })

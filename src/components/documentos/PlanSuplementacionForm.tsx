@@ -219,7 +219,7 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
           paciente_id: pacienteId,
           tipo: 'plan_suplementacion',
           contenido: { paciente, diagnostico, pesoKg, seleccionados, notas, seguimiento, fecha },
-        }).then(({ error }: { error: { message: string } | null }) => { if (error) console.error('Error guardando documento:', error) })
+        }).then(({ error }: { error: { message: string } | null }) => { if (error) console.error('[DOC] Error guardando plan de suplementación') })
       }
 
       const cp = medicoInfo?.color_primario || '#1a3a5c'

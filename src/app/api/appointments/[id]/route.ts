@@ -127,7 +127,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
             gcal_sync_status = 'synced'
           }
         } catch (gcalErr) {
-          console.error('[GCal background sync error]', gcalErr)
+          console.error('[GCal] Error de sincronización en background')
           gcal_sync_status = 'failed'
         }
         await admin.from('appointments').update({ gcal_sync_status }).eq('id', id)

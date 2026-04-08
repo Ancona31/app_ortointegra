@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { createHmac } from 'crypto'
+import { logger } from '@/lib/logger'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -15,7 +16,7 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 function verificarFirma(req: NextRequest, rawBody: string): boolean {
   const secret = process.env.SUPABASE_HOOK_SECRET
   if (!secret) {
-    console.error('[EMAIL-HOOK] SUPABASE_HOOK_SECRET no configurado')
+    logger.error('EMAIL-HOOK', 'SUPABASE_HOOK_SECRET no configurado')
     return false
   }
 
@@ -24,11 +25,7 @@ function verificarFirma(req: NextRequest, rawBody: string): boolean {
   const webhookSignature = req.headers.get('webhook-signature')
 
   if (!webhookId || !webhookTimestamp || !webhookSignature) {
-    console.warn('[EMAIL-HOOK] Headers faltantes:', {
-      id: !!webhookId,
-      timestamp: !!webhookTimestamp,
-      signature: !!webhookSignature,
-    })
+    logger.warn('EMAIL-HOOK', `Headers faltantes — id: ${!!webhookId}, ts: ${!!webhookTimestamp}, sig: ${!!webhookSignature}`)
     return false
   }
 
@@ -48,9 +45,7 @@ function verificarFirma(req: NextRequest, rawBody: string): boolean {
     if (sigValue === expectedSignature) return true
   }
 
-  console.warn('[EMAIL-HOOK] Firma no coincide')
-  console.warn('[EMAIL-HOOK] Expected:', expectedSignature)
-  console.warn('[EMAIL-HOOK] Received:', webhookSignature)
+  logger.warn('EMAIL-HOOK', 'Firma no coincide')
   return false
 }
 
@@ -73,7 +68,7 @@ export async function POST(req: NextRequest) {
     const redirectTo: string = email_data?.redirect_to || 'https://www.spinus.com.mx/auth/callback'
 
     if (!email || !tokenHash) {
-      console.error(`[EMAIL-HOOK] Datos incompletos — email: ${!!email}, token: ${!!tokenHash}, action: ${actionType}`)
+      logger.error('EMAIL-HOOK', `Datos incompletos — action: ${actionType}`)
       return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
     }
 
@@ -94,7 +89,7 @@ export async function POST(req: NextRequest) {
       subject = 'Tu enlace de acceso — Spinus'
       html = emailMagicLink(nombre, url)
     } else {
-      console.log(`[EMAIL-HOOK] Tipo no manejado: ${actionType}`)
+      logger.info('EMAIL-HOOK', `Tipo no manejado: ${actionType}`)
       return NextResponse.json({ ok: true })
     }
 
@@ -106,15 +101,15 @@ export async function POST(req: NextRequest) {
     })
 
     if (error) {
-      console.error('[EMAIL-HOOK] Resend error:', error)
+      logger.error('EMAIL-HOOK', 'Error al enviar email vía Resend')
       return NextResponse.json({ error: 'Error al enviar email' }, { status: 500 })
     }
 
-    console.log(`[EMAIL-HOOK] OK — ${actionType} → ${email}`)
+    logger.info('EMAIL-HOOK', `${actionType} procesado correctamente`)
     return NextResponse.json({ ok: true })
 
   } catch (err) {
-    console.error('[EMAIL-HOOK] Error inesperado:', err)
+    logger.error('EMAIL-HOOK', 'Error inesperado en hook')
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }
