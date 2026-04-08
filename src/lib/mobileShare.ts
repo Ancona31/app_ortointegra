@@ -63,7 +63,9 @@ export async function imprimirOCompartir(html: string, filename = 'documento.pdf
   })
 
   if (!res.ok) {
-    alert('No se pudo generar el PDF. Verifica tu conexión e intenta de nuevo. Si el problema persiste, intenta desde una computadora.')
+    const body = await res.json().catch(() => null)
+    const detail = body?.error ? `\n\nDetalle: ${body.error}` : ''
+    alert(`No se pudo generar el PDF. Verifica tu conexión e intenta de nuevo. Si el problema persiste, intenta desde una computadora.${detail}`)
     return
   }
 

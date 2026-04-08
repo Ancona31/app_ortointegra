@@ -113,6 +113,10 @@ export async function POST(req: NextRequest) {
         'Content-Disposition': `inline; filename="${safeName}"`,
       },
     })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error desconocido'
+    console.error('[generar-pdf] Error:', message)
+    return NextResponse.json({ error: message }, { status: 500 })
   } finally {
     if (browser) await browser.close()
   }
