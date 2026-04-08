@@ -11,6 +11,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 import { imprimirOCompartir } from '@/lib/mobileShare'
+import { enqueue } from '@/lib/offlineQueue'
 import AutocompleteMedicamento from '@/components/AutocompleteMedicamento'
 import { MedicamentoDB } from '@/data/medicamentos'
 
@@ -214,8 +215,13 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
       contenido,
     })
     if (saveError) {
-      setErrorGuardado('No se pudo guardar la receta. El QR de verificación no funcionará.')
-      // No retornamos — permitimos imprimir igual
+      // Guardar en cola offline — se sincronizará automáticamente cuando vuelva la conexión
+      enqueue({
+        paciente_id: pacienteId || undefined,
+        tipo: 'receta',
+        contenido,
+      })
+      setErrorGuardado('Sin conexión — la receta se guardará automáticamente cuando vuelva el internet.')
     }
 
     const verificacionUrl = `${window.location.origin}/r/${folio}`

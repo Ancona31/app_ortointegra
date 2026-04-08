@@ -6,6 +6,7 @@ import CommandPalette from '@/components/CommandPalette'
 import PageTransition from '@/components/layout/PageTransition'
 import OnboardingGuide from '@/components/ui/OnboardingGuide'
 import SessionGuard from '@/components/SessionGuard'
+import OfflineSync from '@/components/OfflineSync'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -26,6 +27,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <CommandPalette />
         <OnboardingGuide />
         <SessionGuard />
+        <OfflineSync />
       </ThemeProvider>
     </ToastProvider>
   )
