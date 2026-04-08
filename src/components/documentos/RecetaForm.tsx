@@ -191,7 +191,8 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
   async function imprimir() {
     flushSync(() => { setErrorGuardado(''); setImprimiendo(true) })
     try {
-    const folio = `R-${Date.now().toString().slice(-8)}`
+    // Folio criptográficamente aleatorio — 12 chars de UUID, imposible de enumerar
+    const folio = `R-${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`
     const contenido = {
       folio,
       paciente,
