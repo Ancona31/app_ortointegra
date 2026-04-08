@@ -254,7 +254,16 @@ export default function NuevaNotaPage() {
 
   // ── Guardar nota ──────────────────────────────────────────────
   async function guardar() {
-    if (!notaGenerada && !form.motivo_consulta) { setError('Completa la nota antes de guardar'); return }
+    // NOM-004-SSA3: validar campos obligatorios antes de guardar
+    const faltantes: string[] = []
+    if (!form.motivo_consulta.trim()) faltantes.push('Motivo de consulta')
+    if (!form.exploracion_fisica.trim()) faltantes.push('Exploración física')
+    if (!form.diagnosticos.trim()) faltantes.push('Diagnóstico')
+    if (!form.plan_tratamiento.trim()) faltantes.push('Plan de tratamiento')
+    if (faltantes.length > 0) {
+      setError(`Campos obligatorios: ${faltantes.join(', ')}`)
+      return
+    }
     setGuardando(true)
 
     const medsConDatos = medicamentos.filter(m => m.nombre.trim())
@@ -551,7 +560,7 @@ export default function NuevaNotaPage() {
                 <button type="button" onClick={() => toggleCampo('exploracion')}
                   className="flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors mb-1 w-full text-left">
                   <ChevronDown size={13} className={`transition-transform duration-200 ${camposExpandidos.exploracion ? 'rotate-180' : ''}`} />
-                  Exploración física
+                  Exploración física <span className="text-red-400">*</span>
                   <span className="text-slate-300 font-normal ml-1">Gemini la complementa</span>
                   {form.exploracion_fisica && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#1e5fa8]" />}
                 </button>
@@ -581,7 +590,7 @@ export default function NuevaNotaPage() {
 
               {/* Diagnóstico — siempre visible */}
               <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Diagnóstico(s)</label>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Diagnóstico(s) <span className="text-red-400">*</span></label>
                 <input type="text" value={form.diagnosticos} onChange={e => update('diagnosticos', e.target.value)}
                   placeholder="Ej: Diabetes mellitus tipo 2 descontrolada..."
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
@@ -592,7 +601,7 @@ export default function NuevaNotaPage() {
                 <button type="button" onClick={() => toggleCampo('plan')}
                   className="flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors mb-1 w-full text-left">
                   <ChevronDown size={13} className={`transition-transform duration-200 ${camposExpandidos.plan ? 'rotate-180' : ''}`} />
-                  Plan de tratamiento
+                  Plan de tratamiento <span className="text-red-400">*</span>
                   {form.plan_tratamiento && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#1e5fa8]" />}
                 </button>
                 {camposExpandidos.plan && (

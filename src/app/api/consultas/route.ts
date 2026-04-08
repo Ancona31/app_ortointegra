@@ -19,6 +19,19 @@ export async function POST(req: NextRequest) {
     const { paciente_id } = body
     if (!paciente_id) return NextResponse.json({ error: 'paciente_id requerido' }, { status: 400 })
 
+    // NOM-004-SSA3: campos obligatorios de la nota clínica
+    const camposFaltantes: string[] = []
+    if (!body.motivo_consulta?.trim()) camposFaltantes.push('Motivo de consulta')
+    if (!body.exploracion_fisica?.trim()) camposFaltantes.push('Exploración física')
+    if (!body.diagnosticos || (Array.isArray(body.diagnosticos) && body.diagnosticos.length === 0)) camposFaltantes.push('Diagnóstico')
+    if (!body.plan_tratamiento?.trim()) camposFaltantes.push('Plan de tratamiento')
+    if (camposFaltantes.length > 0) {
+      return NextResponse.json(
+        { error: `Campos obligatorios faltantes: ${camposFaltantes.join(', ')}` },
+        { status: 400 }
+      )
+    }
+
     // RLS filtra por clinica_id automáticamente
     const { data: paciente } = await supabase
       .from('pacientes')
