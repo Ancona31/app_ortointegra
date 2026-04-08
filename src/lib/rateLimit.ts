@@ -59,6 +59,48 @@ export async function checkRateLimit(userId: string, ruta: string): Promise<Next
 }
 
 /**
+ * Rate limiting para autenticación (login, registro, recovery).
+ * Verifica por identificador (email o IP) y acción.
+ * Usa ip_rate_limits con service role.
+ */
+export async function checkAuthRateLimit(
+  identifier: string,
+  action: string,
+  limite: number,
+  windowMinutes: number
+): Promise<{ blocked: boolean; remaining: number }> {
+  const admin = createAdminClient()
+  const windowStart = new Date(Date.now() - windowMinutes * 60 * 1000).toISOString()
+  const ruta = `auth:${action}:${identifier}`
+
+  const { count } = await admin
+    .from('ip_rate_limits')
+    .select('*', { count: 'exact', head: true })
+    .eq('ip', identifier)
+    .eq('ruta', ruta)
+    .gte('created_at', windowStart)
+
+  const total = count ?? 0
+
+  if (total >= limite) {
+    return { blocked: true, remaining: 0 }
+  }
+
+  await admin.from('ip_rate_limits').insert({ ip: identifier, ruta })
+
+  // Limpiar registros viejos sin bloquear
+  admin
+    .from('ip_rate_limits')
+    .delete()
+    .eq('ip', identifier)
+    .eq('ruta', ruta)
+    .lt('created_at', windowStart)
+    .then(() => {})
+
+  return { blocked: false, remaining: limite - total - 1 }
+}
+
+/**
  * Rate limiting por IP para endpoints públicos (sin autenticación).
  * Usa la tabla ip_rate_limits gestionada con el service role.
  *

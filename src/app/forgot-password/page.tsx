@@ -16,17 +16,27 @@ export default function ForgotPasswordPage() {
     setLoading(true)
     setError('')
 
+    // Rate limit: 3 recovery por email por hora
+    const rlRes = await fetch('/api/auth/rate-limit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'recovery', email }),
+    })
+    // Siempre mostrar éxito — no revelar si el email existe o si fue bloqueado
+    if (rlRes.status === 429 || !(await rlRes.json()).ok) {
+      setLoading(false)
+      setEnviado(true)
+      return
+    }
+
     const supabase = createClient()
     const redirectTo = `${window.location.origin}/reset-password`
 
-    const { error: err } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
+    await supabase.auth.resetPasswordForEmail(email, { redirectTo })
 
+    // Siempre mostrar éxito — no revelar si el email existe
     setLoading(false)
-    if (err) {
-      setError('No se pudo enviar el correo. Verifica la dirección e intenta de nuevo.')
-    } else {
-      setEnviado(true)
-    }
+    setEnviado(true)
   }
 
   return (

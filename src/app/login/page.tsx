@@ -35,6 +35,19 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
+    // Rate limit: verificar antes de intentar login
+    const rlRes = await fetch('/api/auth/rate-limit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'login_email', email }),
+    })
+    if (rlRes.status === 429) {
+      const rlData = await rlRes.json()
+      setLoading(false)
+      setError(rlData.error || 'Demasiados intentos. Espera 15 minutos.')
+      return
+    }
+
     const supabase = createClient()
 
     // Cerrar sesión activa antes de iniciar con otra cuenta

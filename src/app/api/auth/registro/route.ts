@@ -2,10 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Resend } from 'resend'
 import { PLAN_LIMITS } from '@/lib/plans'
+import { checkAuthRateLimit } from '@/lib/rateLimit'
+import { logAudit } from '@/lib/audit'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(req: NextRequest) {
+  // Rate limit: 3 registros por IP por hora
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+  const { blocked } = await checkAuthRateLimit(ip, 'registro', 3, 60)
+  if (blocked) {
+    logAudit({ accion: 'acceso_denegado', ip, descripcion: 'Registro bloqueado por rate limit (IP)' })
+    return NextResponse.json({ error: 'Has excedido el límite de registros. Intenta más tarde.' }, { status: 429 })
+  }
+
   const {
     email, password, nombre, nombreClinica,
     titulo, especialidad, cedula_profesional, cedula_especialidad,

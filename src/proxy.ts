@@ -31,7 +31,7 @@ export async function proxy(request: NextRequest) {
     || pathname.startsWith('/r/')
 
   // Rutas API que no requieren sesión (OAuth callbacks, Stripe webhook y Stripe checkout/portal que manejan su propia auth)
-  const publicApiPaths = ['/api/google/callback', '/api/stripe/webhook', '/api/stripe/checkout', '/api/stripe/portal', '/api/auth/registro', '/api/auth/complete-registro', '/api/auth/email-hook', '/api/auth/verify-email', '/api/auth/audit-login']
+  const publicApiPaths = ['/api/google/callback', '/api/stripe/webhook', '/api/stripe/checkout', '/api/stripe/portal', '/api/auth/registro', '/api/auth/complete-registro', '/api/auth/email-hook', '/api/auth/verify-email', '/api/auth/audit-login', '/api/auth/rate-limit']
   const isPublicApi = publicApiPaths.some(p => pathname.startsWith(p))
 
   // Si no hay sesión y no está en ruta pública → redirigir a login
