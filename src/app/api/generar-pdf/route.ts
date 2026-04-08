@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { logAudit } from '@/lib/audit'
-import DOMPurify from 'isomorphic-dompurify'
+import sanitizeHtml from 'sanitize-html'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
 
-// Configuración de DOMPurify para PDFs médicos:
+// Configuración de sanitize-html para PDFs médicos:
 // Permite estilos inline y estructura HTML necesaria para documentos,
 // pero bloquea scripts, iframes, event handlers y cualquier vector de XSS/SSRF.
-const PURIFY_CONFIG = {
-  ALLOWED_TAGS: [
+const SANITIZE_CONFIG: sanitizeHtml.IOptions = {
+  allowedTags: [
     'html', 'head', 'body', 'meta', 'title', 'style',
     'div', 'span', 'p', 'br', 'hr',
     'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
@@ -22,20 +22,31 @@ const PURIFY_CONFIG = {
     'blockquote', 'pre', 'code',
     'svg', 'path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'g',
   ],
-  ALLOWED_ATTR: [
-    'style', 'class', 'id', 'width', 'height', 'align', 'valign',
-    'colspan', 'rowspan', 'cellpadding', 'cellspacing', 'border',
-    'src', 'alt', 'href', 'target', 'rel',
-    'role', 'aria-label', 'aria-hidden',
-    'viewBox', 'xmlns', 'd', 'fill', 'stroke', 'stroke-width', 'cx', 'cy', 'r',
-    'x', 'y', 'x1', 'y1', 'x2', 'y2', 'points', 'transform',
-  ],
-  ALLOW_DATA_ATTR: false,
-  FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'textarea', 'button', 'select', 'link'],
-  FORBID_ATTR: ['onclick', 'onmouseover', 'onfocus', 'onblur', 'onchange', 'onsubmit'],
-  // onerror y onload permitidos: se usan en imgs para ocultar logos que no cargan.
-  // No son vector de ataque en Puppeteer server-side (no hay usuario interactuando).
-  WHOLE_DOCUMENT: true,
+  allowedAttributes: {
+    '*': ['style', 'class', 'id', 'role', 'aria-label', 'aria-hidden'],
+    table: ['width', 'height', 'align', 'cellpadding', 'cellspacing', 'border'],
+    td: ['width', 'height', 'align', 'valign', 'colspan', 'rowspan'],
+    th: ['width', 'height', 'align', 'valign', 'colspan', 'rowspan'],
+    tr: ['align', 'valign'],
+    col: ['width', 'span'],
+    colgroup: ['span'],
+    // onerror y onload en img: se usan para ocultar logos que no cargan.
+    // No son vector de ataque en Puppeteer server-side (no hay usuario interactuando).
+    img: ['src', 'alt', 'width', 'height', 'onerror', 'onload'],
+    a: ['href', 'target', 'rel'],
+    meta: ['charset', 'name', 'content'],
+    svg: ['viewBox', 'xmlns', 'width', 'height'],
+    path: ['d', 'fill', 'stroke', 'stroke-width', 'transform'],
+    circle: ['cx', 'cy', 'r', 'fill', 'stroke', 'stroke-width'],
+    rect: ['x', 'y', 'width', 'height', 'fill', 'stroke', 'stroke-width'],
+    line: ['x1', 'y1', 'x2', 'y2', 'stroke', 'stroke-width'],
+    polyline: ['points', 'fill', 'stroke', 'stroke-width'],
+    polygon: ['points', 'fill', 'stroke', 'stroke-width'],
+    g: ['transform', 'fill', 'stroke'],
+  },
+  allowedSchemes: ['data', 'https'],
+  // Necesario para permitir <style>, <html>, <head> (documento PDF completo)
+  allowVulnerableTags: true,
 }
 
 // Sanitiza filename para evitar path traversal
@@ -60,9 +71,9 @@ export async function POST(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
   logAudit({ userId: user.id, accion: 'generar_pdf', ip, descripcion: safeName })
 
-  // Sanitizar HTML con DOMPurify antes de pasarlo a Puppeteer
+  // Sanitizar HTML con sanitize-html antes de pasarlo a Puppeteer
   // Previene XSS, SSRF y ejecución de código arbitrario
-  const cleanHtml = DOMPurify.sanitize(html, PURIFY_CONFIG)
+  const cleanHtml = sanitizeHtml(html, SANITIZE_CONFIG)
 
   let browser = null
   try {
