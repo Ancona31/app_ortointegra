@@ -26,6 +26,7 @@ export default function NuevoPacientePage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [expandido, setExpandido] = useState(false)
+  const [consentimiento, setConsentimiento] = useState(false)
 
   const isSecretaria = profile?.role === 'secretaria'
 
@@ -60,6 +61,10 @@ export default function NuevoPacientePage() {
       setError('Debes seleccionar un médico para asignar el paciente')
       return
     }
+    if (!consentimiento) {
+      setError('Debes marcar el consentimiento del aviso de privacidad')
+      return
+    }
     const errTel = validarTelefono(form.telefono || '')
     const errEmail = validarEmail(form.email || '')
     if (errTel || errEmail) {
@@ -81,6 +86,7 @@ export default function NuevoPacientePage() {
         talla_cm: tallaCm,
         imc:      imc ? parseFloat(imc) : null,
         medico_id: isSecretaria ? medicoSeleccionado : undefined,
+        consentimiento_otorgado: true,
       }),
     })
 
@@ -278,6 +284,22 @@ export default function NuevoPacientePage() {
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">{error}</div>
         )}
+
+        {/* Consentimiento de privacidad — LFPDPPP Art. 9 */}
+        <label className="flex items-start gap-3 cursor-pointer py-2">
+          <input
+            type="checkbox"
+            checked={consentimiento}
+            onChange={e => setConsentimiento(e.target.checked)}
+            className="mt-0.5 w-4 h-4 rounded border-slate-300 text-[#1e5fa8] focus:ring-[#1e5fa8]/30"
+          />
+          <span className="text-xs text-slate-500 leading-relaxed">
+            Paciente informado del{' '}
+            <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="text-[#1e5fa8] hover:underline font-medium">
+              aviso de privacidad
+            </a>
+          </span>
+        </label>
 
         {/* Acciones */}
         <div className="flex gap-3 pb-8">

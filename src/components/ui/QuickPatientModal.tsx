@@ -22,10 +22,15 @@ export default function QuickPatientModal({
   const [email,     setEmail]     = useState('')
   const [saving,    setSaving]    = useState(false)
   const [error,     setError]     = useState('')
+  const [consentimiento, setConsentimiento] = useState(false)
 
   async function handleCreate() {
     if (!nombre.trim() || !apellidos.trim() || !edad) {
       setError('Nombre, apellidos y edad son requeridos.')
+      return
+    }
+    if (!consentimiento) {
+      setError('Debes marcar el consentimiento del aviso de privacidad.')
       return
     }
     setSaving(true)
@@ -37,7 +42,7 @@ export default function QuickPatientModal({
     const res = await fetch('/api/pacientes', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ nombre: nombre.trim(), apellidos: apellidos.trim(), fecha_nacimiento, email: email.trim() || null }),
+      body:    JSON.stringify({ nombre: nombre.trim(), apellidos: apellidos.trim(), fecha_nacimiento, email: email.trim() || null, consentimiento_otorgado: true }),
     })
     const data = await res.json()
     if (!res.ok) { setError(data.error ?? 'Error al crear paciente'); setSaving(false); return }
@@ -91,6 +96,21 @@ export default function QuickPatientModal({
           </div>
 
           <p className="text-[11px] text-[#86868b]">El expediente completo se puede editar después desde Pacientes.</p>
+
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={consentimiento}
+              onChange={e => setConsentimiento(e.target.checked)}
+              className="mt-0.5 w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/30"
+            />
+            <span className="text-[11px] text-slate-500 leading-relaxed">
+              Paciente informado del{' '}
+              <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:underline font-medium">
+                aviso de privacidad
+              </a>
+            </span>
+          </label>
         </div>
 
         <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">

@@ -115,7 +115,7 @@ function BillingContent() {
           <div>
             <p className="font-semibold text-emerald-800">¡Suscripción activada!</p>
             <p className="text-sm text-emerald-700">
-              Tu plan {newPlan ? PLANS[newPlan]?.nombre : ''} está activo. Bienvenido a OrthoIntegra Pro.
+              Tu plan {newPlan ? PLANS[newPlan]?.nombre : ''} está activo. Bienvenido a Spinus® Pro.
             </p>
           </div>
         </div>
@@ -237,7 +237,7 @@ function BillingContent() {
 
       {/* Seguridad de pagos */}
       <p className="text-xs text-slate-400 text-center flex items-center justify-center gap-1.5">
-        <CreditCard size={12} /> Pagos procesados de forma segura por Stripe. OrthoIntegra no almacena datos de tarjetas.
+        <CreditCard size={12} /> Pagos procesados de forma segura por Stripe. Spinus® no almacena datos de tarjetas.
       </p>
 
     </div>

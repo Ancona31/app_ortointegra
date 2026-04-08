@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { ShieldCheck, ArrowLeft, Mail, MapPin, Calendar } from 'lucide-react'
 
 export const metadata = {
-  title: 'Aviso de Privacidad — OrthoIntegra',
+  title: 'Aviso de Privacidad — Spinus®',
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -57,7 +57,7 @@ export default function PrivacidadPage() {
             </Section>
 
             <Section title="II. Datos personales que recabamos">
-              <p>Para la prestacion de servicios medicos y la operacion de la plataforma OrthoIntegra, podemos recabar:</p>
+              <p>Para la prestacion de servicios medicos y la operacion de la plataforma Spinus®, podemos recabar:</p>
               <ul className="list-disc pl-5 space-y-1 text-[13px]">
                 <li><strong className="text-[#1d1d1f]">Identificacion:</strong> nombre completo, fecha de nacimiento, sexo, correo electronico, telefono.</li>
                 <li><strong className="text-[#1d1d1f]">Salud (sensibles):</strong> diagnosticos, antecedentes medicos, resultados de laboratorio, imagenes medicas, notas clinicas, tratamientos y prescripciones.</li>
@@ -173,7 +173,7 @@ export default function PrivacidadPage() {
 
             <Section title="X. Consentimiento">
               <p>
-                Al crear una cuenta o utilizar los servicios de OrthoIntegra, usted manifiesta
+                Al crear una cuenta o utilizar los servicios de Spinus®, usted manifiesta
                 su consentimiento expreso para el tratamiento de sus datos personales conforme
                 a los terminos del presente aviso de privacidad.
               </p>

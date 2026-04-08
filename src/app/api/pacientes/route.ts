@@ -64,6 +64,11 @@ export async function POST(req: NextRequest) {
     const medico_id = body.medico_id
       || (['medico', 'admin'].includes(profile.role) ? profile.id : null)
 
+    // ── LFPDPPP Art. 9: consentimiento expreso para datos sensibles de salud ──
+    if (!body.consentimiento_otorgado) {
+      return NextResponse.json({ error: 'Se requiere el consentimiento del aviso de privacidad' }, { status: 400 })
+    }
+
     // ── Insertar paciente ─────────────────────────────────────────
     const { data: nuevo, error } = await supabase
       .from('pacientes')
@@ -86,6 +91,9 @@ export async function POST(req: NextRequest) {
         clinica_id:            profile.clinica_id,
         medico_id,
         numero_expediente,
+        consentimiento_otorgado: true,
+        fecha_consentimiento: new Date().toISOString(),
+        version_aviso_privacidad: 'v1.0-2026-04-08',
       })
       .select('id, numero_expediente')
       .single()
