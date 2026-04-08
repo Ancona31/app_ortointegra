@@ -55,7 +55,7 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
       const supabase = createClient()
       supabase.from('documentos').insert({
         paciente_id: pacienteId,
-        tipo: 'lab',
+        tipo: 'solicitud_lab',
         contenido: { paciente, diagnostico, estudios: estudios.filter(Boolean), notas, fecha },
       }).then(({ error }: { error: any }) => { if (error) console.error('Error guardando documento:', error) })
     }

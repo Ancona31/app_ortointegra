@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,17 +18,16 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const admin = createAdminClient()
 
     // ── Verificar límite de pacientes (cuenta todos, incluso inactivos) ──
-    const { data: clinica } = await admin
+    const { data: clinica } = await supabase
       .from('clinicas')
       .select('max_pacientes')
       .eq('id', profile.clinica_id)
       .single()
 
     if (clinica?.max_pacientes && clinica.max_pacientes > 0) {
-      const { count } = await admin
+      const { count } = await supabase
         .from('pacientes')
         .select('id', { count: 'exact', head: true })
         .eq('clinica_id', profile.clinica_id)
@@ -45,7 +43,7 @@ export async function POST(req: NextRequest) {
     const year = new Date().getFullYear()
     const prefix = `EXP-${year}-`
 
-    const { data: ultimo } = await admin
+    const { data: ultimo } = await supabase
       .from('pacientes')
       .select('numero_expediente')
       .eq('clinica_id', profile.clinica_id)
@@ -67,7 +65,7 @@ export async function POST(req: NextRequest) {
       || (['medico', 'admin'].includes(profile.role) ? profile.id : null)
 
     // ── Insertar paciente ─────────────────────────────────────────
-    const { data: nuevo, error } = await admin
+    const { data: nuevo, error } = await supabase
       .from('pacientes')
       .insert({
         nombre:                body.nombre,
@@ -95,7 +93,8 @@ export async function POST(req: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     return NextResponse.json({ id: nuevo.id, numero_expediente: nuevo.numero_expediente })
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Error interno'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

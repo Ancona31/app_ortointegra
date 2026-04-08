@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
 
     const medicoFilter = req.nextUrl.searchParams.get('medico_id')
 
+    // RLS filtra por clinica_id
     let query = supabase
       .from('appointments')
       .select('*, pacientes(id, nombre, apellidos, telefono), medico:profiles!appointments_medico_id_fkey(id, nombre, titulo)')
@@ -48,8 +49,9 @@ export async function GET(req: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     return NextResponse.json({ appointments: data })
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Error interno'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
@@ -67,8 +69,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
     }
 
-    const admin = createAdminClient()
-    const { data: apt, error } = await admin
+    // RLS filtra por clinica_id
+    const { data: apt, error } = await supabase
       .from('appointments')
       .insert({
         clinica_id:      profile.clinica_id,
@@ -87,13 +89,14 @@ export async function POST(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    // Google Calendar sync en background — no bloquea la respuesta
+    // Google Calendar sync en background — necesita admin porque after() no tiene contexto de cookies
+    const admin = createAdminClient()
     after(async () => {
       let gcal_sync_status: 'synced' | 'pending' | 'failed' = 'pending'
       let google_event_id: string | null = null
 
       try {
-        const { data: tokenData } = await supabase
+        const { data: tokenData } = await admin
           .from('google_tokens')
           .select('*')
           .eq('user_id', profile.userId)
@@ -145,12 +148,12 @@ export async function POST(req: NextRequest) {
         .eq('id', apt.id)
     })
 
-    // Respuesta inmediata — Google sync continúa en background
     return NextResponse.json({
       appointment: apt,
-      gcalSynced:  false, // sync aún en progreso
+      gcalSynced:  false,
     })
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Error interno'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

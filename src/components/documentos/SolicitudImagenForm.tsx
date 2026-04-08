@@ -43,7 +43,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
       const supabase = createClient()
       supabase.from('documentos').insert({
         paciente_id: pacienteId,
-        tipo: 'imagen',
+        tipo: 'solicitud_imagen',
         contenido: { paciente, diagnostico, estudios: estudios.filter(e => e.tipo && e.region), urgente, fecha },
       }).then(({ error }: { error: any }) => { if (error) console.error('Error guardando documento:', error) })
     }

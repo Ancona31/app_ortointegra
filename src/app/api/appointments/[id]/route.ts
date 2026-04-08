@@ -48,12 +48,11 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
     const body = await req.json()
     const { title, start_time, end_time, paciente_id, notes, status, medico_id, updated_at: clientUpdatedAt } = body
 
-    // ── Verificar ownership ──────────────────────────────────
+    // RLS filtra por clinica_id
     const { data: existing } = await supabase
       .from('appointments')
       .select('id, google_event_id, gcal_sync_status, updated_at')
       .eq('id', id)
-      .eq('clinica_id', profile.clinica_id)
       .single()
 
     if (!existing) return NextResponse.json({ error: 'Cita no encontrada' }, { status: 404 })
@@ -65,7 +64,6 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       )
     }
 
-    // ── Construir payload dinámico ───────────────────────────
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
     if (title       !== undefined) updates.title       = title
     if (start_time  !== undefined) updates.start_time  = start_time
@@ -75,8 +73,8 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
     if (status      !== undefined) updates.status      = status
     if (medico_id   !== undefined) updates.medico_id   = medico_id || null
 
-    const admin = createAdminClient()
-    const { data: apt, error } = await admin
+    // RLS filtra por clinica_id
+    const { data: apt, error } = await supabase
       .from('appointments')
       .update(updates)
       .eq('id', id)
@@ -85,17 +83,18 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    // ── Sincronizar con Google Calendar en background ──────
+    // Google Calendar sync en background — necesita admin porque after() no tiene contexto de cookies
     const gcalFieldChanged = title !== undefined || start_time !== undefined || end_time !== undefined || notes !== undefined || status !== undefined
     if (existing.google_event_id && gcalFieldChanged) {
       const gcalEventId = existing.google_event_id
       const userId = user.id
+      const admin = createAdminClient()
       after(async () => {
         const STATUS_COLOR: Record<string, string | undefined> = {
-          confirmed: '2',   // verde (sage)
-          cancelled: '11',  // rojo (tomato)
-          no_show:   '11',  // rojo
-          completed: '8',   // gris (graphite)
+          confirmed: '2',
+          cancelled: '11',
+          no_show:   '11',
+          completed: '8',
         }
         let gcal_sync_status: 'synced' | 'pending' | 'failed' = 'pending'
         try {
@@ -125,8 +124,9 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
     }
 
     return NextResponse.json({ appointment: apt })
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Error interno'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
@@ -142,16 +142,15 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext<'/api/appointm
 
     const { id } = await ctx.params
 
+    // RLS filtra por clinica_id
     const { data: existing } = await supabase
       .from('appointments')
       .select('id, google_event_id')
       .eq('id', id)
-      .eq('clinica_id', profile.clinica_id)
       .single()
     if (!existing) return NextResponse.json({ error: 'Cita no encontrada' }, { status: 404 })
 
-    const admin = createAdminClient()
-    const { error } = await admin.from('appointments').delete().eq('id', id)
+    const { error } = await supabase.from('appointments').delete().eq('id', id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     if (existing.google_event_id) {
@@ -168,7 +167,8 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext<'/api/appointm
     }
 
     return NextResponse.json({ ok: true })
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Error interno'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

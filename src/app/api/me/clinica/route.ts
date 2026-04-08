@@ -23,8 +23,9 @@ export async function GET() {
       .single()
 
     return NextResponse.json({ clinica })
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Error interno'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
@@ -48,6 +49,7 @@ export async function PUT(req: NextRequest) {
   if (color_primario && !hexRegex.test(color_primario)) return NextResponse.json({ error: 'Color primario inválido' }, { status: 400 })
   if (color_secundario && !hexRegex.test(color_secundario)) return NextResponse.json({ error: 'Color secundario inválido' }, { status: 400 })
 
+  // clinicas no tiene política UPDATE para authenticated — necesita admin
   const admin = createAdminClient()
   const { error } = await admin.from('clinicas')
     .update({ color_primario, color_secundario })

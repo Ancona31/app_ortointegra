@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 
 /* ── POST /api/consultas — crear nota médica ───────────── */
 export async function POST(req: NextRequest) {
@@ -20,26 +19,21 @@ export async function POST(req: NextRequest) {
     const { paciente_id } = body
     if (!paciente_id) return NextResponse.json({ error: 'paciente_id requerido' }, { status: 400 })
 
-    const admin = createAdminClient()
-
-    // Verificar que el paciente pertenece a la clínica
-    const { data: paciente } = await admin
+    // RLS filtra por clinica_id automáticamente
+    const { data: paciente } = await supabase
       .from('pacientes')
       .select('id')
       .eq('id', paciente_id)
-      .eq('clinica_id', profile.clinica_id)
       .single()
     if (!paciente) return NextResponse.json({ error: 'Paciente no encontrado' }, { status: 404 })
 
-    // Obtener info del médico (logo desde clinica)
-    const { data: clinica } = await admin
+    const { data: clinica } = await supabase
       .from('clinicas')
       .select('logo_url')
       .eq('id', profile.clinica_id)
       .single()
 
-    // Fecha del servidor — no del cliente
-    const { data: consulta, error } = await admin.from('consultas').insert({
+    const { data: consulta, error } = await supabase.from('consultas').insert({
       paciente_id,
       fecha: new Date().toISOString(),
       motivo_consulta:           body.motivo_consulta || null,
@@ -58,7 +52,8 @@ export async function POST(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ consulta })
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Error interno'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

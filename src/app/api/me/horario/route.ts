@@ -27,8 +27,9 @@ export async function GET() {
       .single()
 
     return NextResponse.json({ horario: clinica?.horario_consulta ?? null })
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Error interno'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
@@ -46,6 +47,7 @@ export async function PUT(req: NextRequest) {
     const { horario } = await req.json()
     if (!horario) return NextResponse.json({ error: 'Horario requerido' }, { status: 400 })
 
+    // clinicas no tiene política UPDATE para authenticated — necesita admin
     const admin = createAdminClient()
     const { error } = await admin
       .from('clinicas')
@@ -54,7 +56,8 @@ export async function PUT(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ ok: true })
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Error interno'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
