@@ -12,6 +12,7 @@ export interface SolicitudLabData {
   diagnostico: string
   estudios: string[]
   notas?: string
+  folio?: string
 }
 
 export interface SolicitudLabProps {
@@ -29,11 +30,26 @@ export default function SolicitudLabPdf({ medico, data, logoUrl }: SolicitudLabP
   const colors = getPdfColors(medico)
 
   const s = StyleSheet.create({
+    tituloWrap: {
+      backgroundColor: colors.cp + '0D',
+      borderRadius: 4,
+      paddingVertical: 8,
+      marginTop: 18,
+      marginBottom: 18,
+    },
+    tituloText: {
+      textAlign: 'center',
+      fontSize: 13,
+      fontWeight: 700,
+      textTransform: 'uppercase',
+      color: colors.cp,
+      letterSpacing: 1,
+    },
     checkItem: {
       flexDirection: 'row',
-      gap: 6,
-      paddingVertical: 4,
-      paddingLeft: 4,
+      gap: 8,
+      paddingVertical: 5,
+      paddingLeft: 6,
     },
     checkMark: {
       fontSize: 10,
@@ -43,6 +59,7 @@ export default function SolicitudLabPdf({ medico, data, logoUrl }: SolicitudLabP
     checkText: {
       fontSize: 10.5,
       flex: 1,
+      lineHeight: 1.4,
     },
     estudiosGrid: {
       flexDirection: 'row',
@@ -51,11 +68,16 @@ export default function SolicitudLabPdf({ medico, data, logoUrl }: SolicitudLabP
     estudiosCol: {
       width: '50%',
     },
+    seccionWrap: {
+      backgroundColor: colors.cp + '0A',
+      borderLeftColor: colors.cp,
+      borderRadius: 3,
+    },
     notasText: {
       fontSize: 10,
       color: '#333',
       marginTop: 4,
-      lineHeight: 1.5,
+      lineHeight: 1.6,
     },
   })
 
@@ -69,33 +91,46 @@ export default function SolicitudLabPdf({ medico, data, logoUrl }: SolicitudLabP
         <BarraTop colors={colors} />
         <View style={baseStyles.contenido}>
           <PdfWatermark logoUrl={logoUrl} />
-          <PdfHeader medico={medico} colors={colors} logoUrl={logoUrl} />
+          <PdfHeader
+            medico={medico}
+            colors={colors}
+            logoUrl={logoUrl}
+            folio={data.folio}
+            fecha={data.fecha}
+          />
 
-          <Text style={[baseStyles.tituloDoc, { color: colors.cp, borderColor: colors.cp }]}>
-            Solicitud de Estudios de Laboratorio
-          </Text>
-
-          <View style={baseStyles.datoRow}>
-            <Text style={[baseStyles.datoLabel, { color: colors.cp }]}>Fecha:</Text>
-            <Text style={baseStyles.datoValor}>{data.fecha}</Text>
-          </View>
-          <View style={baseStyles.datoRow}>
-            <Text style={[baseStyles.datoLabel, { color: colors.cp }]}>Paciente:</Text>
-            <Text style={baseStyles.datoValor}>{data.paciente}</Text>
-          </View>
-          <View style={baseStyles.datoRow}>
-            <Text style={[baseStyles.datoLabel, { color: colors.cp }]}>Diagnóstico:</Text>
-            <Text style={baseStyles.datoValor}>{data.diagnostico}</Text>
+          {/* Titulo */}
+          <View style={s.tituloWrap}>
+            <Text style={s.tituloText}>Solicitud de Estudios de Laboratorio</Text>
           </View>
 
-          <Text style={[baseStyles.seccion, { color: colors.cp, borderBottomColor: colors.cp }]}>
-            Se solicita:
-          </Text>
+          {/* Datos del paciente — formato formulario médico */}
+          <View style={baseStyles.datoRow}>
+            <View style={baseStyles.datoField}>
+              <Text style={baseStyles.datoLabel}>FECHA</Text>
+              <Text style={baseStyles.datoValor}>{data.fecha}</Text>
+            </View>
+          </View>
+          <View style={baseStyles.datoRow}>
+            <View style={baseStyles.datoField}>
+              <Text style={baseStyles.datoLabel}>PACIENTE</Text>
+              <Text style={baseStyles.datoValor}>{data.paciente}</Text>
+            </View>
+            <View style={baseStyles.datoField}>
+              <Text style={baseStyles.datoLabel}>DIAGN&#xD3;STICO</Text>
+              <Text style={baseStyles.datoValor}>{data.diagnostico}</Text>
+            </View>
+          </View>
+
+          {/* Estudios */}
+          <View style={[baseStyles.seccion, s.seccionWrap, { borderLeftColor: colors.cp }]}>
+            <Text style={{ color: colors.cp, fontSize: 11, fontWeight: 700 }}>Se solicita:</Text>
+          </View>
           <View style={s.estudiosGrid}>
             <View style={s.estudiosCol}>
               {col1.map((e, i) => (
                 <View key={i} style={s.checkItem}>
-                  <Text style={s.checkMark}>{'✓'}</Text>
+                  <Text style={s.checkMark}>{'\u2713'}</Text>
                   <Text style={s.checkText}>{e}</Text>
                 </View>
               ))}
@@ -103,25 +138,35 @@ export default function SolicitudLabPdf({ medico, data, logoUrl }: SolicitudLabP
             <View style={s.estudiosCol}>
               {col2.map((e, i) => (
                 <View key={i} style={s.checkItem}>
-                  <Text style={s.checkMark}>{'✓'}</Text>
+                  <Text style={s.checkMark}>{'\u2713'}</Text>
                   <Text style={s.checkText}>{e}</Text>
                 </View>
               ))}
             </View>
           </View>
 
+          {/* Notas */}
           {data.notas ? (
             <>
-              <Text style={[baseStyles.seccion, { color: colors.cp, borderBottomColor: colors.cp }]}>
-                Indicaciones
-              </Text>
+              <View style={[baseStyles.seccion, s.seccionWrap, { borderLeftColor: colors.cp }]}>
+                <Text style={{ color: colors.cp, fontSize: 11, fontWeight: 700 }}>Indicaciones</Text>
+              </View>
               <Text style={s.notasText}>{data.notas}</Text>
             </>
           ) : null}
 
+          {/* Firma */}
           <PdfFirma medico={medico} colors={colors} />
         </View>
-        <BarraBottom colors={colors} />
+
+        {/* Numeración de página */}
+        <Text
+          style={baseStyles.pageNumber}
+          render={({ pageNumber, totalPages }) => `P\u00E1gina ${pageNumber} de ${totalPages}`}
+          fixed
+        />
+
+        <BarraBottom colors={colors} medico={medico} />
       </Page>
     </Document>
   )

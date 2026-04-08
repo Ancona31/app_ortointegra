@@ -13,27 +13,47 @@ export default function PdfFirma({ medico, colors }: Props) {
 
   const s = StyleSheet.create({
     footerArea: {
-      marginTop: 24,
+      marginTop: 32,
       flexDirection: 'row',
       justifyContent: 'flex-end',
     },
     firma: {
       textAlign: 'center',
-      minWidth: 210,
-      borderTopWidth: 1.5,
+      minWidth: 240,
+    },
+    linea: {
+      borderTopWidth: 1,
       borderTopColor: colors.cp,
       paddingTop: 8,
     },
-    nombre: { fontWeight: 700, fontSize: 9.5, color: colors.cp },
-    ced: { fontSize: 8, color: '#666', marginTop: 2 },
+    nombre: {
+      fontWeight: 700,
+      fontSize: 9.5,
+      color: colors.cp,
+    },
+    ced: {
+      fontSize: 8,
+      color: '#666',
+      marginTop: 2,
+    },
+    firmaLabel: {
+      fontSize: 7,
+      color: '#b0b0b0',
+      marginTop: 6,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+    },
   })
 
   return (
     <View style={s.footerArea}>
       <View style={s.firma}>
-        <Text style={s.nombre}>{nombre}</Text>
-        {cedProf ? <Text style={s.ced}>Céd. Prof. {cedProf}</Text> : null}
-        {cedEsp ? <Text style={s.ced}>Céd. Esp. {cedEsp}</Text> : null}
+        <View style={s.linea}>
+          <Text style={s.nombre}>{nombre}</Text>
+          {cedProf ? <Text style={s.ced}>Céd. Prof. {cedProf}</Text> : null}
+          {cedEsp ? <Text style={s.ced}>Céd. Esp. {cedEsp}</Text> : null}
+          <Text style={s.firmaLabel}>Firma y sello</Text>
+        </View>
       </View>
     </View>
   )

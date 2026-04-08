@@ -12,9 +12,9 @@ export default function PdfWatermark({ logoUrl }: Props) {
       position: 'absolute',
       top: '50%',
       left: '50%',
-      width: 320,
-      height: 320,
-      opacity: 0.05,
+      width: 400,
+      height: 400,
+      opacity: 0.03,
       transform: 'translate(-50%, -50%) rotate(-25deg)',
     },
   })

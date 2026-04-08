@@ -5,39 +5,28 @@ interface Props {
   medico: PdfMedicoData | null
   colors: PdfColors
   logoUrl?: string
+  folio?: string
+  fecha?: string
 }
 
-export default function PdfHeader({ medico, colors, logoUrl }: Props) {
+export default function PdfHeader({ medico, colors, logoUrl, folio, fecha }: Props) {
   const nombre = medico?.nombre || 'Médico'
   const esp = medico?.especialidad || ''
   const cedProf = medico?.cedula_profesional || ''
   const cedEsp = medico?.cedula_especialidad || ''
-  const dir = medico?.direccion_consultorio || ''
-  const tel = medico?.telefono_consultorio || ''
-
-  const contactoParts = [dir, tel ? `Tel: ${tel}` : ''].filter(Boolean)
-  const contacto = contactoParts.join('  ·  ')
-
-  const creds = [
-    cedProf ? `Cédula Prof.: ${cedProf}` : '',
-    cedEsp ? `Cédula Esp.: ${cedEsp}` : '',
-  ].filter(Boolean).join('  ·  ')
 
   const s = StyleSheet.create({
-    header: {
+    headerRow: {
       flexDirection: 'row',
-      alignItems: 'center',
-      gap: 18,
-      paddingBottom: 12,
-      marginBottom: 12,
-      borderBottomWidth: 2,
-      borderBottomColor: colors.cp,
+      alignItems: 'flex-start',
+      gap: 16,
+      marginBottom: 0,
     },
     logoWrap: {
-      width: 70,
-      height: 70,
-      borderRadius: 35,
-      borderWidth: 3,
+      width: 68,
+      height: 68,
+      borderRadius: 34,
+      borderWidth: 2.5,
       borderColor: colors.cs,
       overflow: 'hidden',
       alignItems: 'center',
@@ -45,30 +34,120 @@ export default function PdfHeader({ medico, colors, logoUrl }: Props) {
       backgroundColor: '#f8fafc',
     },
     logo: {
-      width: 64,
-      height: 64,
+      width: 62,
+      height: 62,
       objectFit: 'contain',
     },
-    info: { flex: 1 },
-    name: { fontSize: 14, fontWeight: 700, color: colors.cp, lineHeight: 1.2 },
-    especialidad: { fontSize: 9, color: colors.cs, marginTop: 3, fontStyle: 'italic' },
-    credenciales: { fontSize: 8, color: '#666', marginTop: 2 },
-    contacto: { fontSize: 7.5, color: '#888', marginTop: 3 },
+    info: {
+      flex: 1,
+    },
+    name: {
+      fontSize: 15,
+      fontWeight: 700,
+      color: colors.cp,
+      letterSpacing: 0.5,
+      lineHeight: 1.2,
+    },
+    especialidadBadge: {
+      backgroundColor: colors.cs + '15',
+      paddingHorizontal: 8,
+      paddingVertical: 2.5,
+      borderRadius: 10,
+      alignSelf: 'flex-start',
+      marginTop: 4,
+    },
+    especialidadText: {
+      fontSize: 8.5,
+      color: colors.cs,
+      fontWeight: 500,
+    },
+    credsRow: {
+      flexDirection: 'row',
+      gap: 12,
+      marginTop: 5,
+    },
+    cedItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    cedDot: {
+      width: 3,
+      height: 3,
+      borderRadius: 1.5,
+      backgroundColor: colors.cs,
+    },
+    cedText: {
+      fontSize: 8,
+      color: '#666',
+    },
+    meta: {
+      alignItems: 'flex-end',
+      minWidth: 100,
+    },
+    metaText: {
+      fontSize: 7.5,
+      color: '#999',
+      lineHeight: 1.5,
+    },
+    metaFolio: {
+      fontSize: 8,
+      color: colors.cp,
+      fontWeight: 500,
+      lineHeight: 1.5,
+    },
+    separadorGrueso: {
+      height: 2.5,
+      backgroundColor: colors.cp,
+      marginTop: 12,
+    },
+    separadorFino: {
+      height: 0.75,
+      backgroundColor: colors.cs,
+      marginTop: 1.5,
+      marginBottom: 14,
+    },
   })
 
   return (
-    <View style={s.header}>
-      {logoUrl ? (
-        <View style={s.logoWrap}>
-          <Image style={s.logo} src={logoUrl} />
+    <View>
+      <View style={s.headerRow}>
+        {logoUrl ? (
+          <View style={s.logoWrap}>
+            <Image style={s.logo} src={logoUrl} />
+          </View>
+        ) : null}
+        <View style={s.info}>
+          <Text style={s.name}>{nombre}</Text>
+          {esp ? (
+            <View style={s.especialidadBadge}>
+              <Text style={s.especialidadText}>{esp}</Text>
+            </View>
+          ) : null}
+          <View style={s.credsRow}>
+            {cedProf ? (
+              <View style={s.cedItem}>
+                <View style={s.cedDot} />
+                <Text style={s.cedText}>Céd. Prof. {cedProf}</Text>
+              </View>
+            ) : null}
+            {cedEsp ? (
+              <View style={s.cedItem}>
+                <View style={s.cedDot} />
+                <Text style={s.cedText}>Céd. Esp. {cedEsp}</Text>
+              </View>
+            ) : null}
+          </View>
         </View>
-      ) : null}
-      <View style={s.info}>
-        <Text style={s.name}>{nombre}</Text>
-        {esp ? <Text style={s.especialidad}>{esp}</Text> : null}
-        {creds ? <Text style={s.credenciales}>{creds}</Text> : null}
-        {contacto ? <Text style={s.contacto}>{contacto}</Text> : null}
+        {(folio || fecha) ? (
+          <View style={s.meta}>
+            {folio ? <Text style={s.metaFolio}>No. {folio}</Text> : null}
+            {fecha ? <Text style={s.metaText}>{fecha}</Text> : null}
+          </View>
+        ) : null}
       </View>
+      <View style={s.separadorGrueso} />
+      <View style={s.separadorFino} />
     </View>
   )
 }
