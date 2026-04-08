@@ -86,12 +86,14 @@ export async function DELETE(req: NextRequest) {
 
   const pacienteIds = (pacientes || []).map(p => p.id)
 
-  // 3. Eliminar datos clínicos en orden (hijos primero)
+  // 3. Soft delete de pacientes — NOM-004-SSA3: retención mínima 5 años
+  // Los expedientes clínicos NO se borran, solo se marcan como inactivos.
+  // Los documentos, laboratorios y consultas permanecen intactos.
   if (pacienteIds.length > 0) {
-    await admin.from('documentos').delete().in('paciente_id', pacienteIds)
-    await admin.from('laboratorios').delete().in('paciente_id', pacienteIds)
-    await admin.from('consultas').delete().in('paciente_id', pacienteIds)
-    await admin.from('pacientes').delete().in('id', pacienteIds)
+    await admin.from('pacientes').update({
+      activo: false,
+      fecha_baja: new Date().toISOString(),
+    }).in('id', pacienteIds)
   }
 
   // 4. Eliminar jobs de PDF del usuario

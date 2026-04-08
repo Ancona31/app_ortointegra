@@ -106,6 +106,7 @@ export default function DashboardPage() {
     supabase
       .from('pacientes')
       .select('id', { count: 'exact', head: true })
+      .neq('activo', false)
       .then(({ count }: { count: number | null }) => setTotalPacientes(count ?? 0))
 
     // Pacientes recientes

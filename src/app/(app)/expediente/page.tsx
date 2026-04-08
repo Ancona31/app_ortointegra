@@ -48,6 +48,7 @@ export default function ExpedientePage() {
     let query = supabase
       .from('pacientes')
       .select('*', { count: 'exact' })
+      .neq('activo', false)
       .order('apellidos')
       .range(pag * PAGE_SIZE, pag * PAGE_SIZE + PAGE_SIZE)
 

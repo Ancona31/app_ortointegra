@@ -49,19 +49,34 @@ export default function ModalVisorDocumento({ doc, onClose, pacienteEmail }: Pro
   const [enviando, setEnviando] = useState(false)
   const [enviado, setEnviado] = useState(false)
   const [errorEmail, setErrorEmail] = useState('')
+  const [confirmarAlterno, setConfirmarAlterno] = useState(false)
+  const [emailRegistrado, setEmailRegistrado] = useState('')
 
-  async function enviarAlPaciente() {
+  async function enviarAlPaciente(confirmar = false) {
     if (!pacienteEmail || enviando) return
     setEnviando(true)
     setErrorEmail('')
+    setConfirmarAlterno(false)
     const res = await fetch('/api/email/enviar-documento', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ documentoId: doc.id, pacienteEmail }),
+      body: JSON.stringify({
+        documentoId: doc.id,
+        pacienteEmail,
+        confirmarEmailAlterno: confirmar,
+      }),
     })
     const data = await res.json()
     setEnviando(false)
-    if (!res.ok) { setErrorEmail(data.error || 'Error al enviar'); return }
+    if (!res.ok) {
+      if (data.error === 'email_mismatch') {
+        setEmailRegistrado(data.emailRegistrado || '')
+        setConfirmarAlterno(true)
+        return
+      }
+      setErrorEmail(data.error || 'Error al enviar')
+      return
+    }
     setEnviado(true)
   }
 
@@ -304,26 +319,54 @@ export default function ModalVisorDocumento({ doc, onClose, pacienteEmail }: Pro
         {pacienteEmail && (
           <div className="px-5 py-3 border-t border-slate-100">
             {errorEmail && <p className="text-xs text-red-500 mb-2">{errorEmail}</p>}
+
+            {/* Diálogo de confirmación cuando el email no coincide con el registrado */}
+            {confirmarAlterno && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-2">
+                <p className="text-xs text-amber-800 font-medium mb-1">Email diferente al registrado</p>
+                <p className="text-[11px] text-amber-700 leading-relaxed mb-2">
+                  El email del paciente registrado es <strong>{emailRegistrado}</strong> pero
+                  se intenta enviar a <strong>{pacienteEmail}</strong>.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => enviarAlPaciente(true)}
+                    className="flex-1 text-xs py-1.5 rounded-lg bg-amber-600 text-white font-medium hover:bg-amber-700 transition-colors"
+                  >
+                    Confirmar envio
+                  </button>
+                  <button
+                    onClick={() => setConfirmarAlterno(false)}
+                    className="flex-1 text-xs py-1.5 rounded-lg bg-slate-100 text-slate-600 font-medium hover:bg-slate-200 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+
             {enviado && (
               <p className="text-xs text-slate-400 mb-2 text-center leading-relaxed">
-                💡 Si el paciente no lo recibe, pídele que revise su carpeta de <strong>spam o correo no deseado</strong> y lo marque como &quot;No es spam&quot;.
+                Si el paciente no lo recibe, pidele que revise su carpeta de <strong>spam o correo no deseado</strong> y lo marque como &quot;No es spam&quot;.
               </p>
             )}
-            <button
-              onClick={enviarAlPaciente}
-              disabled={enviando || enviado}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-colors
-                disabled:opacity-60
-                bg-[#1e5fa8] text-white hover:bg-[#1a3a5c]"
-            >
-              {enviando ? (
-                <><Loader2 size={14} className="animate-spin" /> Enviando...</>
-              ) : enviado ? (
-                <><CheckCircle size={14} /> Enviado a {pacienteEmail}</>
-              ) : (
-                <><Mail size={14} /> Enviar al paciente</>
-              )}
-            </button>
+            {!confirmarAlterno && (
+              <button
+                onClick={() => enviarAlPaciente()}
+                disabled={enviando || enviado}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-colors
+                  disabled:opacity-60
+                  bg-[#1e5fa8] text-white hover:bg-[#1a3a5c]"
+              >
+                {enviando ? (
+                  <><Loader2 size={14} className="animate-spin" /> Enviando...</>
+                ) : enviado ? (
+                  <><CheckCircle size={14} /> Enviado a {pacienteEmail}</>
+                ) : (
+                  <><Mail size={14} /> Enviar al paciente</>
+                )}
+              </button>
+            )}
           </div>
         )}
       </div>

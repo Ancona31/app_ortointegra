@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { Resend } from 'resend'
+import { logAudit } from '@/lib/audit'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -16,12 +17,19 @@ const TIPO_LABEL: Record<string, string> = {
   nota_honorarios: 'Recibo de honorarios',
 }
 
+// SEGURIDAD — LFPDPPP: validar que el email destino sea el del paciente
+// registrado en la DB. Si no coincide, se permite enviar a un email
+// alternativo SOLO si el médico lo confirma explícitamente (flag override).
+// Cada envío se registra en audit_log para trazabilidad.
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-  const { documentoId, pacienteEmail } = await req.json()
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+
+  const { documentoId, pacienteEmail, confirmarEmailAlterno = false } = await req.json()
   if (!documentoId || !pacienteEmail) {
     return NextResponse.json({ error: 'Faltan datos' }, { status: 400 })
   }
@@ -31,14 +39,63 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Email del paciente inválido' }, { status: 400 })
   }
 
+  // ── Rate limiting: máximo 10 emails por hora ──
+  const hace1h = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+  const { count } = await supabase
+    .from('rate_limits')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .eq('ruta', 'enviar-documento')
+    .gte('created_at', hace1h)
+
+  if ((count ?? 0) >= 10) {
+    return NextResponse.json(
+      { error: 'Has alcanzado el límite de 10 emails por hora. Intenta más tarde.' },
+      { status: 429 }
+    )
+  }
+
+  // Registrar esta llamada en rate_limits
+  await supabase.from('rate_limits').insert({ user_id: user.id, ruta: 'enviar-documento' })
+
+  // ── Obtener documento (RLS filtra por clínica) ──
   const { data: doc } = await supabase
     .from('documentos')
-    .select('tipo, contenido, created_at')
+    .select('id, tipo, contenido, created_at, paciente_id')
     .eq('id', documentoId)
     .single()
 
   if (!doc) return NextResponse.json({ error: 'Documento no encontrado' }, { status: 404 })
 
+  // ── Validar email contra el registrado del paciente ──
+  if (doc.paciente_id) {
+    const { data: paciente } = await supabase
+      .from('pacientes')
+      .select('email')
+      .eq('id', doc.paciente_id)
+      .single()
+
+    const emailRegistrado = paciente?.email?.trim().toLowerCase()
+    const emailSolicitado = pacienteEmail.trim().toLowerCase()
+
+    if (emailRegistrado && emailRegistrado !== emailSolicitado && !confirmarEmailAlterno) {
+      // Email no coincide y el médico no confirmó — registrar intento y rechazar
+      logAudit({
+        userId: user.id,
+        accion: 'enviar_documento_denegado',
+        tabla: 'documentos',
+        registroId: documentoId,
+        ip,
+        descripcion: `Email solicitado (${emailSolicitado}) no coincide con el registrado. Requiere confirmación.`,
+      })
+      return NextResponse.json(
+        { error: 'email_mismatch', emailRegistrado: emailRegistrado },
+        { status: 403 }
+      )
+    }
+  }
+
+  // ── Obtener perfil del médico ──
   const { data: profile } = await supabase
     .from('profiles')
     .select('nombre, titulo, especialidad')
@@ -57,6 +114,16 @@ export async function POST(req: NextRequest) {
   })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // ── Registrar envío exitoso en audit_log ──
+  logAudit({
+    userId: user.id,
+    accion: 'enviar_documento',
+    tabla: 'documentos',
+    registroId: documentoId,
+    ip,
+    descripcion: `${tipoLabel} enviado a ${pacienteEmail}`,
+  })
 
   return NextResponse.json({ ok: true })
 }

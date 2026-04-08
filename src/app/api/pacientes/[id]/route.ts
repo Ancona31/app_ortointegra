@@ -82,8 +82,11 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext<'/api/paciente
 
     if (!paciente) return NextResponse.json({ error: 'Paciente no encontrado' }, { status: 404 })
 
-    // Soft delete
-    const { error } = await supabase.from('pacientes').update({ activo: false }).eq('id', id)
+    // Soft delete — NOM-004-SSA3: retención mínima 5 años, no se borra físicamente
+    const { error } = await supabase.from('pacientes').update({
+      activo: false,
+      fecha_baja: new Date().toISOString(),
+    }).eq('id', id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     return NextResponse.json({ ok: true })

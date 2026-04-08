@@ -4,6 +4,19 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { google } from 'googleapis'
 import { decrypt, encrypt } from '@/lib/encrypt'
 
+// PRIVACIDAD — LFPDPPP Art. 9: los datos de salud son sensibles.
+// Google Calendar es un servicio externo — NUNCA enviar nombres de
+// pacientes ni datos clínicos. Solo "Cita médica" + iniciales como máximo.
+function gcalSummary(title: string): string {
+  // Extraer iniciales si el título parece un nombre (2+ palabras capitalizadas)
+  const words = title.trim().split(/\s+/)
+  if (words.length >= 2 && words.every(w => /^[A-ZÁÉÍÓÚÑ]/.test(w))) {
+    const iniciales = words.map(w => w[0]).join('').toUpperCase()
+    return `Cita médica (${iniciales})`
+  }
+  return 'Cita médica'
+}
+
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
@@ -126,8 +139,8 @@ export async function POST(req: NextRequest) {
           const { data: gEvent } = await calendar.events.insert({
             calendarId:  'primary',
             requestBody: {
-              summary:     title,
-              description: notes ?? undefined,
+              summary: gcalSummary(title),
+              // NO enviar notes/descripción a Google — puede contener datos clínicos
               start: { dateTime: start_time, timeZone: 'America/Mexico_City' },
               end:   { dateTime: end_time,   timeZone: 'America/Mexico_City' },
             },

@@ -5,6 +5,8 @@ export type AuditAccion =
   | 'generar_pdf'
   | 'verificar_receta'
   | 'exportar_expediente'
+  | 'enviar_documento'
+  | 'enviar_documento_denegado'
 
 /**
  * Registra una acción sensible en el audit_log.

@@ -2,6 +2,7 @@ import { google } from 'googleapis'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { decrypt, encrypt } from '@/lib/encrypt'
+import { anonimizarTexto } from '@/lib/anonimizar'
 
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
@@ -122,9 +123,10 @@ export async function POST(req: NextRequest) {
     const { data: evento } = await calendar.events.insert({
       calendarId: 'primary',
       sendUpdates: 'all',
+      // PRIVACIDAD — LFPDPPP: anonimizar título y descripción antes de enviar a Google
       requestBody: {
-        summary: titulo,
-        description: descripcion ?? undefined,
+        summary: anonimizarTexto(titulo),
+        description: descripcion ? anonimizarTexto(descripcion) : undefined,
         start: todoDia ? { date: fecha } : { dateTime: inicio, timeZone },
         end:   todoDia ? { date: fecha } : { dateTime: fin,   timeZone },
         ...(emailMedico ? { attendees: [{ email: emailMedico }] } : {}),

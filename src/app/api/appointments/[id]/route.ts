@@ -4,6 +4,17 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { google } from 'googleapis'
 import { decrypt, encrypt } from '@/lib/encrypt'
 
+// PRIVACIDAD — LFPDPPP Art. 9: NUNCA enviar nombres de pacientes
+// ni datos clínicos a Google Calendar.
+function gcalSummary(title: string): string {
+  const words = title.trim().split(/\s+/)
+  if (words.length >= 2 && words.every(w => /^[A-ZÁÉÍÓÚÑ]/.test(w))) {
+    const iniciales = words.map(w => w[0]).join('').toUpperCase()
+    return `Cita médica (${iniciales})`
+  }
+  return 'Cita médica'
+}
+
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
@@ -104,8 +115,8 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
               calendarId: 'primary',
               eventId:    gcalEventId,
               requestBody: {
-                ...(title      !== undefined ? { summary:     title }                                               : {}),
-                ...(notes      !== undefined ? { description: notes ?? '' }                                         : {}),
+                ...(title      !== undefined ? { summary: gcalSummary(title) }                                      : {}),
+                // NO enviar notes/descripción a Google — puede contener datos clínicos
                 ...(start_time !== undefined ? { start: { dateTime: start_time, timeZone: 'America/Mexico_City' } } : {}),
                 ...(end_time   !== undefined ? { end:   { dateTime: end_time,   timeZone: 'America/Mexico_City' } } : {}),
                 ...(status     !== undefined && STATUS_COLOR[status] ? { colorId: STATUS_COLOR[status] }            : {}),
