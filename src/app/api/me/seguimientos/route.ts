@@ -17,7 +17,8 @@ export async function GET() {
     .order('proxima_cita', { ascending: true })
     .limit(20)
 
-  const seguimientos = (data || []).map((c: any) => {
+  type ConsultaSeguimiento = { id: string; paciente_id: string; proxima_cita: string; motivo_consulta?: string; pacientes: { nombre: string; apellidos: string } | { nombre: string; apellidos: string }[] }
+  const seguimientos = (data || []).map((c: ConsultaSeguimiento) => {
     const pac = Array.isArray(c.pacientes) ? c.pacientes[0] : c.pacientes
     return {
       consulta_id: c.id,

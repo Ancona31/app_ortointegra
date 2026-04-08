@@ -68,7 +68,7 @@ export default function LaboratoriosPage() {
       setValores(prev => ({ ...prev, ...data.valores }))
       if (data.valores.fecha_toma) setFechaToma(data.valores.fecha_toma)
       setPdfExtraido(true)
-    } catch (e: any) {
+    } catch (e: unknown) {
       setErrorMsg('No se pudo extraer los datos del PDF. Verifica que el archivo sea legible e intenta de nuevo.')
     } finally {
       setExtrayendo(false)

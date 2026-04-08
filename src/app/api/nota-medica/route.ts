@@ -89,7 +89,8 @@ Incluye ÚNICAMENTE: indicaciones no farmacológicas pertinentes para la especia
     const nota = response.response.text()
     return NextResponse.json({ nota })
 
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Error interno al generar la nota' }, { status: 500 })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Error interno al generar la nota'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

@@ -65,7 +65,7 @@ function fmtCurrency(amount: number, currency = 'MXN'): string {
   return amount.toLocaleString(currency === 'USD' ? 'en-US' : 'es-MX', { style: 'currency', currency })
 }
 
-function generarHtmlEmail(doc: any, medicoNombre: string, tipoLabel: string): string {
+function generarHtmlEmail(doc: { tipo: string; contenido: Record<string, any>; created_at: string }, medicoNombre: string, tipoLabel: string): string {
   const { tipo, contenido, created_at } = doc
   const fecha = new Date(created_at).toLocaleDateString('es-MX', {
     day: 'numeric', month: 'long', year: 'numeric',
@@ -75,7 +75,7 @@ function generarHtmlEmail(doc: any, medicoNombre: string, tipoLabel: string): st
 
   if (tipo === 'receta' && contenido?.medicamentos?.length) {
     const meds = contenido.medicamentos
-      .filter((m: any) => m.nombre_comercial)
+      .filter((m: { nombre_comercial?: string; presentacion?: string; principio_activo?: string; indicacion?: string }) => m.nombre_comercial)
       .map((m: any, i: number) => `
         <tr>
           <td style="padding:12px 16px;border-bottom:1px solid #f1f5f9;">

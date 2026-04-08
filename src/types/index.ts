@@ -132,6 +132,10 @@ export type TipoDocumento =
   | 'solicitud_internamiento'
   | 'escrito_medico'
   | 'nota_honorarios'
+  | 'consentimiento_informado'
+  // Legacy (documentos existentes en DB antes del rename)
+  | 'lab'
+  | 'imagen'
 
 export interface Documento {
   id: string
@@ -146,17 +150,36 @@ export interface Documento {
 export interface DocumentoContenido {
   fecha?: string
   diagnostico?: string
+  paciente?: string
+  folio?: string
   // Receta
   medicamentos?: Medicamento[]
   recomendaciones?: string
   // Solicitudes
-  estudios?: string[]
+  estudios?: (string | { tipo?: string; region?: string; proyecciones?: string; indicacion?: string })[]
   indicacion_clinica?: string
   region?: string
+  notas?: string
+  urgente?: boolean
   // Suplementación
   suplementos?: SuplementoRec[]
+  seleccionados?: { nombre: string; dosis: string; frecuencia: string; duracion: string; notas?: string }[]
+  // Internamiento
+  motivo?: string
+  servicio?: string
+  medico_tratante?: string
+  // Escrito médico
+  titulo?: string
+  cuerpo?: string
+  // Honorarios
+  lineas?: { concepto: string; cantidad: number; precio: number }[]
+  monto?: number
+  divisa?: string
+  forma_pago?: string
   // Informe
   resumen?: string
+  // Flexible para contenido adicional
+  [key: string]: unknown
 }
 
 export interface Medicamento {

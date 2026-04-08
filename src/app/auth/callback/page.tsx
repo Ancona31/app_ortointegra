@@ -30,7 +30,7 @@ function CallbackContent() {
         if (data.session) { confirmar(); return }
 
         // Si no hay sesión aún, escuchar el evento de auth con timeout
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, session: any) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, session: { user: { id: string } } | null) => {
           if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
             confirmar()
           }
@@ -60,7 +60,7 @@ function CallbackContent() {
       // Caso 3: ?code= (PKCE)
       const code = searchParams.get('code')
       if (code) {
-        const { error }: { error: any } = await supabase.auth.exchangeCodeForSession(code)
+        const { error }: { error: { message: string } | null } = await supabase.auth.exchangeCodeForSession(code)
         if (error) { setEstado('error'); return }
         confirmar()
         return
@@ -70,7 +70,7 @@ function CallbackContent() {
       const tokenHash = searchParams.get('token_hash')
       const type = searchParams.get('type')
       if (tokenHash && (type === 'email' || type === 'signup')) {
-        const { error }: { error: any } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'email' })
+        const { error }: { error: { message: string } | null } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'email' })
         if (error) { setEstado('error'); return }
         confirmar()
         return

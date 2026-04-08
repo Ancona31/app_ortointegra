@@ -70,7 +70,7 @@ export default function NuevoLaboratorioPage() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('pacientes').select('*').eq('id', id).single().then(({ data }: { data: any }) => setPaciente(data))
+    supabase.from('pacientes').select('*').eq('id', id).single().then((res: { data: Paciente | null }) => setPaciente(res.data))
   }, [id])
 
   // Limpia el intervalo de polling al desmontar el componente
@@ -157,7 +157,7 @@ export default function NuevoLaboratorioPage() {
       // Paso 3: iniciar polling
       startPolling(jobId)
 
-    } catch (e: any) {
+    } catch (e: unknown) {
       setExtrayendo(false)
       setErrorMsg('No se pudo subir el PDF. Verifica tu conexión e intenta de nuevo.')
     }

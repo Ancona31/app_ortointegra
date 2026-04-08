@@ -30,10 +30,12 @@ const TIPO_DOC_COLOR: Record<string, string> = {
   nota_honorarios: 'bg-orange-100 text-orange-700',
 }
 
+import { Documento } from '@/types'
+
 interface Props {
   id: string
-  documentos: any[]
-  onVerDocumento: (doc: any) => void
+  documentos: Documento[]
+  onVerDocumento: (doc: Documento) => void
   onEliminarDocumento?: (id: string) => void
 }
 
@@ -61,7 +63,7 @@ export default function TabDocumentos({ id, documentos, onVerDocumento, onElimin
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
-            {documentos.map((doc: any) => (
+            {documentos.map((doc) => (
               <div key={doc.id} className="flex items-center px-3 sm:px-5 py-3 gap-3 sm:gap-4">
                 <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
                   {doc.tipo === 'receta' && <Pill size={16} className="text-blue-600" />}
@@ -76,7 +78,7 @@ export default function TabDocumentos({ id, documentos, onVerDocumento, onElimin
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    {format(parseISO(doc.created_at), "dd 'de' MMMM 'de' yyyy, HH:mm", { locale: es })}
+                    {doc.created_at ? format(parseISO(doc.created_at), "dd 'de' MMMM 'de' yyyy, HH:mm", { locale: es }) : ''}
                     {doc.contenido?.diagnostico && ` · ${doc.contenido.diagnostico}`}
                   </p>
                 </div>

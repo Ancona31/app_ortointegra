@@ -65,7 +65,8 @@ Responde siempre en español con lenguaje médico formal.`
     const respuesta = response.response.text()
     return NextResponse.json({ respuesta })
 
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Error interno'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

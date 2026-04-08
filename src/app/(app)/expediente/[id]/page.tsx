@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
-import { Paciente, Consulta, Laboratorio } from '@/types'
+import { Paciente, Consulta, Laboratorio, Documento } from '@/types'
 import { parseISO, format } from 'date-fns'
 import Portal from '@/components/ui/Portal'
 import {
@@ -66,8 +66,8 @@ function ExpedientePacienteContent() {
   const [confirmarEliminar, setConfirmarEliminar] = useState<string | null>(null)
   const [graficasAbiertas, setGraficasAbiertas] = useState<Record<string, boolean>>({})
   const [busquedaParam, setBusquedaParam] = useState('')
-  const [documentos, setDocumentos] = useState<any[]>([])
-  const [docSeleccionado, setDocSeleccionado] = useState<any>(null)
+  const [documentos, setDocumentos] = useState<Documento[]>([])
+  const [docSeleccionado, setDocSeleccionado] = useState<Documento | null>(null)
   const [docInline, setDocInline] = useState<string | null>(null)
   const [mostrarEliminarPaciente, setMostrarEliminarPaciente] = useState(false)
   const [eliminandoPaciente, setEliminandoPaciente] = useState(false)

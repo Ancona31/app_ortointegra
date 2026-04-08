@@ -166,7 +166,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true })
 
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Error interno' }, { status: 500 })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Error interno'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

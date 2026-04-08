@@ -23,14 +23,14 @@ let profilePromise: Promise<Profile | null> | null = null
 function fetchProfile(): Promise<Profile | null> {
   if (profilePromise) return profilePromise
   const supabase = createClient()
-  profilePromise = supabase.auth.getUser().then(({ data: { user } }: { data: { user: any } }) => {
+  profilePromise = supabase.auth.getUser().then(({ data: { user } }: { data: { user: { id: string } | null } }) => {
     if (!user) return null
     return supabase
       .from('profiles')
       .select('*')
       .eq('id', user.id)
       .single()
-      .then(({ data }: { data: any }) => data)
+      .then((res: { data: Record<string, string | null> | null }) => res.data)
   }).catch(() => null)
   return profilePromise!
 }

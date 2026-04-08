@@ -1,6 +1,6 @@
 'use client'
 
-import { Paciente, Consulta, Laboratorio } from '@/types'
+import { Paciente, Consulta, Laboratorio, Documento } from '@/types'
 import { differenceInYears, parseISO, format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { FileDown } from 'lucide-react'
@@ -10,7 +10,7 @@ interface Props {
   paciente: Paciente
   consultas: Consulta[]
   labs: Laboratorio[]
-  documentos: any[]
+  documentos: Documento[]
 }
 
 const ESTADO_BADGE: Record<string, string> = {
@@ -227,7 +227,7 @@ export default function ExportarExpedienteButton({ paciente, consultas, labs, do
     const docsHtml = documentos.length === 0 ? '' : `
       <div class="seccion-titulo">Documentos generados (${documentos.length})</div>
       ${documentos.map(d => {
-        const fecha = format(parseISO(d.created_at), "dd/MM/yyyy", { locale: es })
+        const fecha = d.created_at ? format(parseISO(d.created_at), "dd/MM/yyyy", { locale: es }) : ''
         const tipo = TIPO_DOC[d.tipo as string] ?? d.tipo
         return `<div class="doc-row"><span>${tipo}</span><span style="color:#64748b">${fecha}</span></div>`
       }).join('')}

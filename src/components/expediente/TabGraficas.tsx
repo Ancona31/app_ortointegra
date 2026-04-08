@@ -90,7 +90,7 @@ function GraficaParametro({ param }: { param: ParamGrafica }) {
           <YAxis domain={[yMin, yMax]} tick={{ fontSize: 10, fill: '#94a3b8' }} width={48} />
           <Tooltip
             contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0', padding: '6px 10px' }}
-            formatter={(v: any) => [`${v} ${param.unidad}`, param.nombre]}
+            formatter={((v: string | number) => [`${v} ${param.unidad}`, param.nombre]) as never}
           />
           {optMin !== null && (
             <ReferenceLine y={optMin} stroke="#10b981" strokeDasharray="4 2" strokeWidth={1.5}
@@ -111,11 +111,11 @@ function GraficaParametro({ param }: { param: ParamGrafica }) {
             dataKey="valor"
             stroke={lineColor}
             strokeWidth={2.5}
-            dot={(props: any) => {
+            dot={((props: { index: number; cx: number; cy: number }) => {
               const est = param.puntos[props.index]?.estado
               const c = getColor(est)
               return <circle key={props.index} cx={props.cx} cy={props.cy} r={5} fill={c} stroke="#fff" strokeWidth={1.5} />
-            }}
+            }) as never}
             activeDot={{ r: 7 }}
           />
         </LineChart>

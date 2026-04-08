@@ -54,7 +54,7 @@ export default function EditarPacientePage() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('pacientes').select('*').eq('id', id).single().then(({ data }: { data: any }) => {
+    supabase.from('pacientes').select('*').eq('id', id).single().then((res: { data: Record<string, string | null> | null }) => { const data = res.data;
       if (data) {
         const formData: Record<string, string> = {}
         campos.forEach(c => {

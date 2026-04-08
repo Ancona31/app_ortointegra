@@ -896,8 +896,8 @@ export default function AgendaPage() {
           extendedProps:   { ...apt, colorStyle, doctorInitial },
         }
       }))
-    } catch (err: any) {
-      failure(err)
+    } catch (err: unknown) {
+      failure(err instanceof Error ? err : new Error('Error cargando citas'))
     }
   }, [isSingleDoctor, medicoColorMap, filtroMedico])
 
@@ -920,9 +920,10 @@ export default function AgendaPage() {
         if (apt.google_event_id) appGcalIds.add(apt.google_event_id)
       }
 
-      const eventos = (data.events as any[])
-        .filter((e: any) => e.id && !appGcalIds.has(e.id))
-        .map((e: any) => ({
+      type GCalEvent = { id?: string; summary?: string; start?: { dateTime?: string; date?: string }; end?: { dateTime?: string; date?: string } }
+      const eventos = (data.events as GCalEvent[])
+        .filter((e) => e.id && !appGcalIds.has(e.id))
+        .map((e) => ({
           id:              `gcal-${e.id}`,
           title:           `🔒 ${e.summary || 'Ocupado'}`,
           start:           e.start?.dateTime ?? e.start?.date ?? '',
@@ -936,8 +937,8 @@ export default function AgendaPage() {
         }))
 
       success(eventos)
-    } catch (err: any) {
-      failure(err)
+    } catch (err: unknown) {
+      failure(err instanceof Error ? err : new Error('Error cargando eventos'))
     }
   }, [])
 

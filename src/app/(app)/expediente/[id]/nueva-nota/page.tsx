@@ -118,7 +118,7 @@ export default function NuevaNotaPage() {
   useEffect(() => {
     fetch('/api/me/perfil-medico').then(r => r.json()).then(({ medico }) => setMedicoInfo(medico))
     const supabase = createClient()
-    supabase.from('pacientes').select('*').eq('id', id).single().then(({ data }: { data: any }) => setPaciente(data))
+    supabase.from('pacientes').select('*').eq('id', id).single().then((res: { data: Paciente | null }) => setPaciente(res.data))
     try {
       const raw = localStorage.getItem('med-frecuentes')
       if (raw) {
@@ -143,7 +143,8 @@ export default function NuevaNotaPage() {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-      .then(({ data }: { data: any }) => {
+      .then((res: { data: { diagnosticos: { descripcion?: string }[] | null; medicamentos: { nombre: string; dosis: string; frecuencia: string; duracion: string }[] | null } | null }) => {
+        const data = res.data
         if (!data) return
         const dx = Array.isArray(data.diagnosticos)
           ? (data.diagnosticos as { descripcion?: string }[]).map(d => d.descripcion).filter(Boolean).join(', ')
@@ -242,8 +243,8 @@ export default function NuevaNotaPage() {
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setNotaGenerada(data.nota)
-    } catch (e: any) {
-      const msg = e.message?.toLowerCase() || ''
+    } catch (e: unknown) {
+      const msg = (e instanceof Error ? e.message : '').toLowerCase()
       if (msg.includes('timeout') || msg.includes('deadline'))
         setError('La IA tardó demasiado en responder. Intenta de nuevo en unos segundos.')
       else if (msg.includes('rate') || msg.includes('quota') || msg.includes('429'))

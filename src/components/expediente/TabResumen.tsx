@@ -1,6 +1,6 @@
 'use client'
 
-import { Consulta, Laboratorio } from '@/types'
+import { Consulta, Laboratorio, Alerta, SuplementoRec } from '@/types'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
@@ -173,7 +173,7 @@ export default function TabResumen({
       {labs.length > 0 && (() => {
         const lab = labs[0]
         const alterados = lab.resultados?.filter(r => r.estado === 'bajo' || r.estado === 'alto' || r.estado === 'suboptimo') || []
-        const criticos = lab.analisis_ia?.alertas?.filter((a: any) => a.tipo === 'critica') || []
+        const criticos = lab.analisis_ia?.alertas?.filter((a: Alerta) => a.tipo === 'critica') || []
         return (
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
             <div className="px-4 sm:px-6 pt-5 pb-3 flex items-center justify-between">
@@ -204,7 +204,7 @@ export default function TabResumen({
                 </p>
                 {criticos.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-2">
-                    {criticos.slice(0, 2).map((a: any, i: number) => (
+                    {criticos.slice(0, 2).map((a: Alerta, i: number) => (
                       <span key={i} className="inline-flex items-center gap-1 text-[11px] bg-red-50 border border-red-100 text-red-600 rounded-lg px-2 py-0.5 font-medium">
                         <AlertTriangle size={10} /> {a.mensaje}
                       </span>
@@ -229,7 +229,7 @@ export default function TabResumen({
             <span className="text-[10px] text-[#86868b] ml-auto">Basado en último lab</span>
           </div>
           <div className="px-4 sm:px-6 pb-5 pt-1 flex flex-wrap gap-2">
-            {labs[0].analisis_ia!.suplementos_recomendados.map((s: any, i: number) => (
+            {labs[0].analisis_ia!.suplementos_recomendados.map((s: SuplementoRec, i: number) => (
               <span key={i} className={`text-xs px-3 py-1.5 rounded-full font-semibold border ${
                 s.prioridad === 'alta'  ? 'bg-red-50 border-red-100 text-red-600'   :
                 s.prioridad === 'media' ? 'bg-amber-50 border-amber-100 text-amber-700' :

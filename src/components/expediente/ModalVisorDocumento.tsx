@@ -29,8 +29,18 @@ const TIPO_DOC_COLOR: Record<string, string> = {
   nota_honorarios: 'bg-orange-100 text-orange-700',
 }
 
+// El visor renderiza múltiples tipos de documento con contenido JSON flexible de la DB.
+// El contenido es dinámico y varía por tipo — Record<string, any> es intencional aquí.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+interface VisorDoc {
+  id: string
+  tipo: string
+  contenido: Record<string, any>
+  created_at?: string
+}
+
 interface Props {
-  doc: any
+  doc: VisorDoc
   onClose: () => void
   pacienteEmail?: string | null
 }
@@ -66,7 +76,7 @@ export default function ModalVisorDocumento({ doc, onClose, pacienteEmail }: Pro
               {TIPO_DOC_LABEL[doc.tipo] || doc.tipo}
             </span>
             <span className="text-xs text-[#86868b]">
-              {format(parseISO(doc.created_at), "dd 'de' MMMM 'de' yyyy", { locale: es })}
+              {doc.created_at ? format(parseISO(doc.created_at), "dd 'de' MMMM 'de' yyyy", { locale: es }) : ''}
             </span>
           </div>
           <button onClick={onClose} className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-[#86868b] transition-colors">

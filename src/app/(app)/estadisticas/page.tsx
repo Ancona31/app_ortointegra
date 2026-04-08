@@ -39,7 +39,7 @@ function Empty() {
   return <p className="text-center text-[#86868b] text-sm py-8">Sin datos suficientes aún</p>
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string }) => {
   if (!active || !payload?.length) return null
   return (
     <div className="bg-white border border-slate-200/80 rounded-xl px-3 py-2 shadow-lg text-xs">

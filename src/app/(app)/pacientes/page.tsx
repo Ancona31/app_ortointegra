@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+
 import { Users, Plus, Search, ChevronRight } from 'lucide-react'
 import { PatientRowSkeleton } from '@/components/ui/Skeleton'
 import Link from 'next/link'
@@ -32,7 +33,7 @@ export default function PacientesPage() {
       .neq('activo', false)
       .order('created_at', { ascending: false })
       .limit(150)
-      .then(({ data }: { data: any[] | null }) => {
+      .then(({ data }: { data: PacienteRow[] | null }) => {
         setPacientes(data ?? [])
         setLoading(false)
       })
@@ -68,7 +69,7 @@ export default function PacientesPage() {
       .neq('activo', false)
       .order('created_at', { ascending: false })
       .limit(150)
-      .then(({ data }: { data: any[] | null }) => {
+      .then(({ data }: { data: PacienteRow[] | null }) => {
         setPacientes(data ?? [])
         setLoading(false)
       })

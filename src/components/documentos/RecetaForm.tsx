@@ -142,12 +142,13 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     if (!pacienteId) return
     const supabase = createClient()
     supabase.from('pacientes').select('fecha_nacimiento, sexo').eq('id', pacienteId).single()
-      .then(({ data }: { data: any }) => {
+      .then((res: { data: { fecha_nacimiento: string | null; sexo: string | null } | null }) => {
+        const data = res.data
         if (data) {
           const edad = data.fecha_nacimiento
             ? Math.floor((Date.now() - new Date(data.fecha_nacimiento).getTime()) / (365.25 * 24 * 3600 * 1000))
             : null
-          setPacienteData({ edad, sexo: data.sexo })
+          setPacienteData({ edad, sexo: data.sexo ?? undefined })
         }
       })
   }, [pacienteId])

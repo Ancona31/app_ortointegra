@@ -1,6 +1,6 @@
 'use client'
 
-import { Laboratorio } from '@/types'
+import { Laboratorio, Alerta } from '@/types'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ChevronRight, FlaskConical, Loader2, Trash2 } from 'lucide-react'
@@ -42,7 +42,7 @@ export default function TabLaboratorios({
           {labs.map(lab => {
             const alterados = lab.resultados?.filter(r => r.estado === 'bajo' || r.estado === 'alto' || r.estado === 'suboptimo').length || 0
             const totalResultados = lab.resultados?.length || 0
-            const alertas = lab.analisis_ia?.alertas?.filter((a: any) => a.tipo === 'critica') || []
+            const alertas = lab.analisis_ia?.alertas?.filter((a: Alerta) => a.tipo === 'critica') || []
             const suplementos = lab.analisis_ia?.suplementos_recomendados?.length || 0
             const confirmando = confirmarEliminar === lab.id
             return (

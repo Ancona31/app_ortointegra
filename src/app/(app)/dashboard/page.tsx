@@ -114,7 +114,7 @@ export default function DashboardPage() {
       .select('paciente_id, created_at, motivo_consulta, pacientes!inner(nombre, apellidos)')
       .order('created_at', { ascending: false })
       .limit(15)
-      .then(({ data }: { data: any[] | null }) => {
+      .then(({ data }: { data: { paciente_id: string; created_at: string; motivo_consulta: string | null; pacientes: { nombre: string; apellidos: string } | { nombre: string; apellidos: string }[] }[] | null }) => {
         if (!data) return
         const seen = new Set<string>()
         const unique: Reciente[] = []
