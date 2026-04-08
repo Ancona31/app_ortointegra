@@ -3,9 +3,10 @@ import { StyleSheet, Font } from '@react-pdf/renderer'
 Font.register({
   family: 'Roboto',
   fonts: [
-    { src: 'https://fonts.gstatic.com/s/roboto/v47/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWubEbGmT.ttf', fontWeight: 400 },
-    { src: 'https://fonts.gstatic.com/s/roboto/v47/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWuaabWmT.ttf', fontWeight: 500 },
-    { src: 'https://fonts.gstatic.com/s/roboto/v47/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWuZebmmT.ttf', fontWeight: 700 },
+    { src: '/fonts/Roboto-Regular.ttf', fontWeight: 400 },
+    { src: '/fonts/Roboto-Medium.ttf', fontWeight: 500 },
+    { src: '/fonts/Roboto-Bold.ttf', fontWeight: 700 },
+    { src: '/fonts/Roboto-Italic.ttf', fontWeight: 400, fontStyle: 'italic' },
   ],
 })
 
