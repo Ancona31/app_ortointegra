@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import Portal from '@/components/ui/Portal'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Paciente } from '@/types'
@@ -87,6 +88,7 @@ export default function NuevaNotaPage() {
   const [guardando, setGuardando]       = useState(false)
   const [imprimiendo, setImprimiendo]   = useState(false)
   const [error, setError]               = useState('')
+  const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false)
   const [notaSaved, setNotaSaved]       = useState(false)
   const [docInline, setDocInlineRaw]    = useState<string | null>(null)
   const [slideDir, setSlideDir]         = useState<'left' | 'right'>('right')
@@ -252,9 +254,9 @@ export default function NuevaNotaPage() {
     }
   }
 
-  // ── Guardar nota ──────────────────────────────────────────────
-  async function guardar() {
-    // NOM-004-SSA3: validar campos obligatorios antes de guardar
+  // ── Validar y mostrar confirmación antes de guardar ───────────
+  function intentarGuardar() {
+    // NOM-004-SSA3: validar campos obligatorios
     const faltantes: string[] = []
     if (!form.motivo_consulta.trim()) faltantes.push('Motivo de consulta')
     if (!form.exploracion_fisica.trim()) faltantes.push('Exploración física')
@@ -264,6 +266,18 @@ export default function NuevaNotaPage() {
       setError(`Campos obligatorios: ${faltantes.join(', ')}`)
       return
     }
+    // Si el médico marcó "No mostrar de nuevo", guardar directo
+    const skipModal = localStorage.getItem('spinus_skip_confirm_nota') === '1'
+    if (skipModal) {
+      guardar()
+    } else {
+      setMostrarConfirmacion(true)
+    }
+  }
+
+  // ── Guardar nota ──────────────────────────────────────────────
+  async function guardar() {
+    setMostrarConfirmacion(false)
     setGuardando(true)
 
     const medsConDatos = medicamentos.filter(m => m.nombre.trim())
@@ -469,6 +483,62 @@ export default function NuevaNotaPage() {
   // ── Render ────────────────────────────────────────────────────
   return (
     <div className="max-w-7xl mx-auto">
+
+      {/* Modal de confirmación antes de guardar — inmutabilidad NOM-004 */}
+      {mostrarConfirmacion && (
+        <Portal>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
+              <div className="px-6 pt-6 pb-4 text-center">
+                <div className="w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center bg-red-50" style={{ animation: 'pulse 1.5s ease-in-out infinite' }}>
+                  <Save size={24} className="text-red-500" />
+                </div>
+                <h2 className="text-lg font-bold text-[#1d1d1f]">
+                  <span className="inline-block" style={{ animation: 'alertGlow 2s ease-in-out infinite' }}>
+                    ¿Guardar esta nota?
+                  </span>
+                </h2>
+                <p className="text-sm text-[#3d3d3f] mt-3 leading-relaxed">
+                  Una vez guardada, <span className="font-bold text-red-600">no podrá modificarse</span> por motivos de seguridad y cumplimiento normativo.
+                  Si necesitas hacer correcciones después, podrás agregar una nota aclaratoria (addendum).
+                </p>
+                <label className="flex items-center justify-center gap-2 mt-4 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    onChange={e => {
+                      if (e.target.checked) localStorage.setItem('spinus_skip_confirm_nota', '1')
+                      else localStorage.removeItem('spinus_skip_confirm_nota')
+                    }}
+                    className="w-3.5 h-3.5 rounded border-slate-300 text-[#1e5fa8]"
+                  />
+                  <span className="text-xs text-slate-400">No mostrar de nuevo</span>
+                </label>
+              </div>
+              <div className="border-t border-slate-100 grid grid-cols-2">
+                <button
+                  onClick={() => setMostrarConfirmacion(false)}
+                  className="px-4 py-3.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors border-r border-slate-100"
+                >
+                  Revisar nota
+                </button>
+                <button
+                  onClick={guardar}
+                  className="px-4 py-3.5 text-sm font-bold text-[#1e5fa8] hover:bg-blue-50 transition-colors"
+                >
+                  Guardar nota
+                </button>
+              </div>
+            </div>
+          </div>
+          <style>{`
+            @keyframes alertGlow {
+              0%, 100% { color: #1d1d1f; }
+              50% { color: #dc2626; }
+            }
+          `}</style>
+        </Portal>
+      )}
+
       {/* Breadcrumbs + Header — ancho completo */}
       <div className="mb-5 space-y-4">
         <Breadcrumbs pacienteNombre={paciente ? `${paciente.nombre} ${paciente.apellidos}` : undefined} />
@@ -755,7 +825,7 @@ export default function NuevaNotaPage() {
                 className="flex items-center gap-2 px-5 py-2.5 border-2 border-[#1a3a5c] text-[#1a3a5c] rounded-lg text-sm font-medium hover:bg-[#1a3a5c] hover:text-white transition-colors disabled:opacity-50">
                 {imprimiendo ? <><Loader2 size={16} className="animate-spin" /> Generando...</> : <><Printer size={16} /> Imprimir</>}
               </button>
-              <button onClick={guardar} disabled={guardando}
+              <button onClick={intentarGuardar} disabled={guardando}
                 className="flex-1 flex items-center justify-center gap-2 bg-[#1e5fa8] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-60">
                 {guardando ? <><Loader2 size={16} className="animate-spin" /> Guardando...</> : <><Save size={16} /> Guardar en expediente</>}
               </button>
@@ -851,7 +921,7 @@ export default function NuevaNotaPage() {
                     : 'Completa y genera la nota para activar este panel'}
                 </p>
                 {notaGenerada && (
-                  <button onClick={guardar} disabled={guardando}
+                  <button onClick={intentarGuardar} disabled={guardando}
                     className="mt-1 flex items-center gap-2 px-4 py-2 bg-[#1e5fa8] text-white rounded-lg text-xs font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-60">
                     {guardando ? <><Loader2 size={13} className="animate-spin" /> Guardando...</> : <><Save size={13} /> Guardar nota</>}
                   </button>

@@ -1,16 +1,16 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Paciente, Consulta } from '@/types'
 import { differenceInYears, parseISO, format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import Portal from '@/components/ui/Portal'
-import { ArrowLeft, Printer, Stethoscope, Pencil, Trash2, Save, Loader2, X } from 'lucide-react'
+import { ArrowLeft, Printer, Stethoscope, Plus, Loader2, FileText, Lock } from 'lucide-react'
 import Link from 'next/link'
 import { PRINT_CSS, markdownToHtml } from '@/lib/printStyles'
 import ReactMarkdown from 'react-markdown'
+import { useAuditAccess } from '@/hooks/useAudit'
 
 type MedicoInfo = {
   nombre: string
@@ -20,22 +20,27 @@ type MedicoInfo = {
   logo_url: string | null
 }
 
+type Addendum = {
+  id: string
+  contenido: string
+  medico_nombre: string
+  created_at: string
+}
+
 export default function ConsultaDetallePage() {
   const { id, consultaId } = useParams<{ id: string; consultaId: string }>()
-  const router = useRouter()
+  useAuditAccess('consultas', consultaId)
+
   const [medicoInfo, setMedicoInfo] = useState<MedicoInfo | null>(null)
   const [paciente, setPaciente] = useState<Paciente | null>(null)
   const [consulta, setConsulta] = useState<Consulta | null>(null)
+  const [addendums, setAddendums] = useState<Addendum[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Edición
-  const [editando, setEditando] = useState(false)
-  const [form, setForm] = useState({ motivo_consulta: '', notas_evolucion: '', proxima_cita: '' })
-  const [guardando, setGuardando] = useState(false)
-
-  // Eliminar
-  const [confirmEliminar, setConfirmEliminar] = useState(false)
-  const [eliminando, setEliminando] = useState(false)
+  // Addendum form
+  const [showAddendum, setShowAddendum] = useState(false)
+  const [addendumTexto, setAddendumTexto] = useState('')
+  const [guardandoAddendum, setGuardandoAddendum] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -48,48 +53,37 @@ export default function ConsultaDetallePage() {
       ])
       setPaciente(p)
       setConsulta(c)
-      if (c) setForm({
-        motivo_consulta: c.motivo_consulta || '',
-        notas_evolucion: c.notas_evolucion || '',
-        proxima_cita: c.proxima_cita || '',
-      })
       setLoading(false)
     }
     cargar()
+    fetch(`/api/consultas/${consultaId}/addendum`)
+      .then(r => r.json())
+      .then(data => setAddendums(data.addendums ?? []))
+      .catch(() => {})
   }, [id, consultaId])
 
-  async function guardarEdicion() {
-    setGuardando(true)
+  async function guardarAddendum() {
+    if (!addendumTexto.trim()) { setError('El addendum no puede estar vacío'); return }
+    setGuardandoAddendum(true)
     setError('')
-    const res = await fetch(`/api/consultas/${consultaId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        motivo_consulta: form.motivo_consulta,
-        notas_evolucion: form.notas_evolucion,
-        proxima_cita: form.proxima_cita || null,
-      }),
-    })
-    setGuardando(false)
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({ error: 'Error desconocido' }))
-      setError(data.error || 'No se pudo guardar.')
-      return
-    }
-    setConsulta(prev => prev ? { ...prev, ...form } : prev)
-    setEditando(false)
-  }
 
-  async function eliminar() {
-    setEliminando(true)
-    const res = await fetch(`/api/consultas/${consultaId}`, { method: 'DELETE' })
-    setEliminando(false)
+    const res = await fetch(`/api/consultas/${consultaId}/addendum`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contenido: addendumTexto }),
+    })
+
+    const data = await res.json()
+    setGuardandoAddendum(false)
+
     if (!res.ok) {
-      const data = await res.json().catch(() => ({ error: 'Error desconocido' }))
-      setError(data.error || 'No se pudo eliminar la nota.')
+      setError(data.error || 'No se pudo guardar el addendum')
       return
     }
-    router.push(`/expediente/${id}`)
+
+    setAddendums(prev => [...prev, data.addendum])
+    setAddendumTexto('')
+    setShowAddendum(false)
   }
 
   function imprimir() {
@@ -97,7 +91,6 @@ export default function ConsultaDetallePage() {
     const ventana = window.open('', '_blank', 'width=800,height=600')
     if (!ventana) return
 
-    // Use doctor info stored at note creation time (immutable)
     const doctorNombre = consulta.medico_nombre || medicoInfo?.nombre || 'Médico'
     const doctorEspecialidad = consulta.medico_especialidad || medicoInfo?.especialidad || ''
     const cedulas = [
@@ -105,11 +98,21 @@ export default function ConsultaDetallePage() {
       (consulta.medico_cedula_especialidad || medicoInfo?.cedula_especialidad) ? `Céd. Esp. ${consulta.medico_cedula_especialidad || medicoInfo?.cedula_especialidad}` : '',
     ].filter(Boolean).join(' · ')
     const logoUrl = consulta.medico_logo_url || medicoInfo?.logo_url || `${window.location.origin}/logo.png`
-    const edad = paciente.fecha_nacimiento
-      ? differenceInYears(new Date(), parseISO(paciente.fecha_nacimiento))
-      : null
+    const edad = paciente.fecha_nacimiento ? differenceInYears(new Date(), parseISO(paciente.fecha_nacimiento)) : null
     const fechaHora = format(parseISO(consulta.fecha), "dd 'de' MMMM 'de' yyyy, HH:mm 'hrs'", { locale: es })
     const notaHtml = markdownToHtml(consulta.notas_evolucion || '')
+
+    const addendumsHtml = addendums.length > 0
+      ? `<div style="margin-top:24px;border-top:2px solid #e2e8f0;padding-top:16px;">
+          <h3 style="font-size:11pt;font-weight:bold;color:#1a3a5c;margin-bottom:8px;">Notas aclaratorias (Addendums)</h3>
+          ${addendums.map(a => `
+            <div style="margin-bottom:12px;padding:10px;background:#f8fafc;border-left:3px solid #1e5fa8;border-radius:4px;">
+              <p style="font-size:9pt;color:#64748b;margin:0 0 4px;">${format(parseISO(a.created_at), "dd/MM/yyyy HH:mm", { locale: es })} — ${a.medico_nombre}</p>
+              <p style="font-size:10pt;color:#334155;margin:0;white-space:pre-line;">${a.contenido}</p>
+            </div>
+          `).join('')}
+        </div>`
+      : ''
 
     ventana.document.write(`
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Nota Médica</title>
@@ -133,6 +136,7 @@ export default function ConsultaDetallePage() {
   </div>
   <div class="nota-content">${notaHtml}</div>
   ${consulta.proxima_cita ? `<div class="proxima-cita"><strong>Próxima cita:</strong> ${consulta.proxima_cita}</div>` : ''}
+  ${addendumsHtml}
   <div class="footer"><div class="firma"><p>${doctorNombre}</p>${(consulta.medico_cedula_profesional || medicoInfo?.cedula_profesional) ? `<p>Céd. Prof. ${consulta.medico_cedula_profesional || medicoInfo?.cedula_profesional}</p>` : ''}</div></div>
 </body></html>`)
     ventana.document.close()
@@ -145,45 +149,6 @@ export default function ConsultaDetallePage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-5">
-
-      {/* Modal confirmar eliminación — macOS alert */}
-      {confirmEliminar && (
-        <Portal>
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden animate-slide-up">
-            <div className="px-6 pt-6 pb-4 text-center">
-              <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ backgroundColor: '#FEF2F2' }}>
-                <Trash2 size={20} style={{ color: '#EF5350' }} />
-              </div>
-              <h2 className="text-base font-semibold text-[#1d1d1f]">Eliminar nota médica</h2>
-              <p className="text-sm text-[#86868b] mt-1">
-                {format(parseISO(consulta.fecha), "dd 'de' MMMM 'de' yyyy", { locale: es })}
-              </p>
-              <p className="text-[13px] text-[#3d3d3f] mt-3 leading-relaxed">
-                La nota será eliminada <span className="font-semibold">permanentemente</span>. Esta acción no se puede deshacer.
-              </p>
-              {error && <p className="text-xs mt-2" style={{ color: '#EF5350' }}>{error}</p>}
-            </div>
-            <div className="border-t border-slate-100 grid grid-cols-2">
-              <button
-                onClick={() => setConfirmEliminar(false)}
-                className="px-4 py-3.5 text-sm font-medium text-[#1e5fa8] hover:bg-slate-50 transition-colors border-r border-slate-100"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={eliminar}
-                disabled={eliminando}
-                className="px-4 py-3.5 text-sm font-semibold hover:bg-red-50 transition-colors disabled:opacity-40 flex items-center justify-center gap-1.5"
-                style={{ color: '#EF5350' }}
-              >
-                {eliminando ? <><Loader2 size={13} className="animate-spin" /> Eliminando...</> : 'Eliminar'}
-              </button>
-            </div>
-          </div>
-        </div>
-        </Portal>
-      )}
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -202,113 +167,114 @@ export default function ConsultaDetallePage() {
           </div>
         </div>
 
-        {/* Acciones */}
         <div className="flex items-center gap-2">
-          {!editando && (
-            <>
-              <button
-                onClick={() => setEditando(true)}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors"
-              >
-                <Pencil size={14} /> Editar
-              </button>
-              <button
-                onClick={() => setConfirmEliminar(true)}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-              >
-                <Trash2 size={14} /> Eliminar
-              </button>
-              <button
-                onClick={imprimir}
-                className="flex items-center gap-2 px-4 py-2 border-2 border-[#1a3a5c] text-[#1a3a5c] rounded-lg text-sm font-medium hover:bg-[#1a3a5c] hover:text-white transition-colors"
-              >
-                <Printer size={16} /> Imprimir
-              </button>
-            </>
-          )}
-          {editando && (
-            <>
-              <button
-                onClick={() => { setEditando(false); setError('') }}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors"
-              >
-                <X size={14} /> Cancelar
-              </button>
-              <button
-                onClick={guardarEdicion}
-                disabled={guardando}
-                className="flex items-center gap-1.5 px-4 py-2 text-sm bg-[#1e5fa8] text-white rounded-lg hover:bg-[#1a3a5c] transition-colors disabled:opacity-60"
-              >
-                {guardando ? <><Loader2 size={14} className="animate-spin" /> Guardando...</> : <><Save size={14} /> Guardar</>}
-              </button>
-            </>
-          )}
+          <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-400 bg-slate-50 border border-slate-200 rounded-lg">
+            <Lock size={12} /> Nota sellada
+          </span>
+          <button
+            onClick={imprimir}
+            className="flex items-center gap-2 px-4 py-2 border-2 border-[#1a3a5c] text-[#1a3a5c] rounded-lg text-sm font-medium hover:bg-[#1a3a5c] hover:text-white transition-colors"
+          >
+            <Printer size={16} /> Imprimir
+          </button>
         </div>
       </div>
 
-      {error && !confirmEliminar && (
+      {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
       )}
 
-      {/* Contenido */}
+      {/* Contenido de la nota — inmutable */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-5">
-        {/* Motivo y próxima cita */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-5 border-b border-slate-100">
           <div>
             <span className="text-xs text-slate-400 block mb-1">Motivo de consulta</span>
-            {editando ? (
-              <input
-                type="text"
-                value={form.motivo_consulta}
-                onChange={e => setForm(f => ({ ...f, motivo_consulta: e.target.value }))}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30"
-              />
-            ) : (
-              <p className="text-sm font-medium text-slate-800">{consulta.motivo_consulta}</p>
-            )}
+            <p className="text-sm font-medium text-slate-800">{consulta.motivo_consulta}</p>
           </div>
           <div>
             <span className="text-xs text-slate-400 block mb-1">Próxima cita</span>
-            {editando ? (
-              <input
-                type="text"
-                value={form.proxima_cita}
-                onChange={e => setForm(f => ({ ...f, proxima_cita: e.target.value }))}
-                placeholder="Ej: En 4 semanas"
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30"
-              />
-            ) : (
-              <p className="text-sm font-medium text-slate-800">{consulta.proxima_cita || '—'}</p>
-            )}
+            <p className="text-sm font-medium text-slate-800">{consulta.proxima_cita || '—'}</p>
           </div>
         </div>
 
-        {/* Nota de evolución */}
-        {editando ? (
-          <div>
-            <span className="text-xs text-slate-400 block mb-2">Nota de evolución</span>
-            <textarea
-              value={form.notas_evolucion}
-              onChange={e => setForm(f => ({ ...f, notas_evolucion: e.target.value }))}
-              rows={22}
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 resize-y"
-            />
+        {consulta.notas_evolucion ? (
+          <div className="prose prose-sm max-w-none
+            prose-headings:text-[#1a3a5c] prose-headings:font-bold prose-headings:text-sm prose-headings:mt-4 prose-headings:mb-1
+            prose-strong:text-[#1a3a5c] prose-strong:font-semibold
+            prose-p:text-slate-700 prose-p:leading-relaxed prose-p:my-1
+            prose-ul:my-1 prose-li:my-0.5 prose-li:text-slate-700
+          ">
+            <ReactMarkdown>{consulta.notas_evolucion}</ReactMarkdown>
           </div>
         ) : (
-          consulta.notas_evolucion ? (
-            <div className="prose prose-sm max-w-none
-              prose-headings:text-[#1a3a5c] prose-headings:font-bold prose-headings:text-sm prose-headings:mt-4 prose-headings:mb-1
-              prose-strong:text-[#1a3a5c] prose-strong:font-semibold
-              prose-p:text-slate-700 prose-p:leading-relaxed prose-p:my-1
-              prose-ul:my-1 prose-li:my-0.5 prose-li:text-slate-700
-            ">
-              <ReactMarkdown>{consulta.notas_evolucion}</ReactMarkdown>
-            </div>
-          ) : (
-            <p className="text-slate-400 text-sm">Sin nota de evolución registrada</p>
-          )
+          <p className="text-slate-400 text-sm">Sin nota de evolución registrada</p>
         )}
       </div>
+
+      {/* Addendums — notas aclaratorias */}
+      {addendums.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-slate-600 flex items-center gap-2">
+            <FileText size={14} /> Notas aclaratorias ({addendums.length})
+          </h3>
+          {addendums.map(a => (
+            <div key={a.id} className="bg-blue-50/50 border border-blue-100 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-medium text-[#1e5fa8]">{a.medico_nombre}</span>
+                <span className="text-xs text-slate-400">
+                  {format(parseISO(a.created_at), "dd/MM/yyyy HH:mm", { locale: es })}
+                </span>
+                <span className="flex items-center gap-1 text-[10px] text-slate-400 ml-auto">
+                  <Lock size={9} /> Sellado
+                </span>
+              </div>
+              <p className="text-sm text-slate-700 whitespace-pre-line">{a.contenido}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Botón de agregar addendum — siempre visible */}
+      {!showAddendum ? (
+        <button
+          onClick={() => setShowAddendum(true)}
+          className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-[#1e5fa8]/30 text-[#1e5fa8] rounded-xl text-sm font-medium hover:bg-[#1e5fa8]/5 hover:border-[#1e5fa8]/50 transition-all"
+        >
+          <Plus size={16} /> Agregar nota aclaratoria (addendum)
+        </button>
+      ) : (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
+          <h3 className="text-sm font-semibold text-[#1d1d1f] flex items-center gap-2">
+            <Plus size={14} /> Nueva nota aclaratoria
+          </h3>
+          <p className="text-xs text-slate-400">
+            Este addendum se adjuntará a la nota original y no podrá modificarse una vez guardado.
+          </p>
+          <textarea
+            value={addendumTexto}
+            onChange={e => setAddendumTexto(e.target.value)}
+            rows={4}
+            placeholder="Escriba la aclaración, corrección o nota adicional..."
+            autoFocus
+            className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
+          />
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => { setShowAddendum(false); setAddendumTexto(''); setError('') }}
+              className="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-lg transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={guardarAddendum}
+              disabled={guardandoAddendum}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-[#1e5fa8] text-white rounded-lg hover:bg-[#1a3a5c] transition-colors disabled:opacity-60"
+            >
+              {guardandoAddendum ? <><Loader2 size={13} className="animate-spin" /> Guardando...</> : 'Guardar addendum'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
