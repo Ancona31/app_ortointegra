@@ -59,7 +59,8 @@ export default function PdfHeader({ medico, colors, logoUrl, folio, fecha }: Pro
     especialidadText: {
       fontSize: 8.5,
       color: colors.cs,
-      fontWeight: 500,
+      fontWeight: 400,
+      letterSpacing: 0.3,
     },
     credsRow: {
       flexDirection: 'row',

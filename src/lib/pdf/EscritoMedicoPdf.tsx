@@ -207,7 +207,7 @@ function parseHtmlToElements(html: string, colors: PdfColors): ReactElement[] {
               key={j}
               style={{
                 fontWeight: il.bold ? 700 : 400,
-                fontStyle: il.italic ? 'italic' : 'normal',
+                color: il.italic ? '#555' : '#1a1a1a',
                 textDecoration: il.underline ? 'underline' : 'none',
               }}
             >

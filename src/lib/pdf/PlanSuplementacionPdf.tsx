@@ -125,7 +125,6 @@ export default function PlanSuplementacionPdf({
     justificacion: {
       fontSize: 8,
       color: '#999',
-      fontStyle: 'italic',
       marginTop: 3,
       lineHeight: 1.4,
     },

@@ -66,7 +66,7 @@ function parseRecomendaciones(text: string, cpColor: string, csColor: string) {
     // Lines starting with bullet (-, *, •) — italic indented
     if (/^[-*\u2022]\s/.test(trimmed)) {
       return (
-        <Text key={i} style={{ fontSize: 9.5, fontStyle: 'italic', color: '#444', paddingLeft: 14, lineHeight: 1.6, marginBottom: 1 }}>
+        <Text key={i} style={{ fontSize: 9.5, color: '#555', paddingLeft: 14, lineHeight: 1.6, marginBottom: 1 }}>
           {trimmed}
         </Text>
       )
@@ -171,7 +171,6 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
     },
     medPrincipio: {
       fontSize: 8.5,
-      fontStyle: 'italic',
       color: '#888',
       marginTop: 1,
     },
