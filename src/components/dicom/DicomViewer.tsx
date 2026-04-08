@@ -342,7 +342,7 @@ export default function DicomViewer() {
     }
 
     if (action in WL_PRESETS) {
-      const applyPreset = (vp: any) => {
+      const applyPreset = (vp: { setProperties: (props: Record<string, unknown>) => void; render: () => void } | undefined) => {
         if (!vp) return
         const [center, width] = WL_PRESETS[action]
         vp.setProperties({ voiRange: { lower: center - width / 2, upper: center + width / 2 } })
