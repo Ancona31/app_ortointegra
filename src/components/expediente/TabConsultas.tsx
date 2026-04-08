@@ -10,9 +10,12 @@ interface Props {
   id: string
   consultas: Consulta[]
   isDoctor: boolean
+  hayMas?: boolean
+  cargandoMas?: boolean
+  onCargarMas?: () => void
 }
 
-export default function TabConsultas({ id, consultas, isDoctor }: Props) {
+export default function TabConsultas({ id, consultas, isDoctor, hayMas, cargandoMas, onCargarMas }: Props) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       {consultas.length === 0 ? (
@@ -47,6 +50,12 @@ export default function TabConsultas({ id, consultas, isDoctor }: Props) {
             </Link>
           ))}
         </div>
+      )}
+      {hayMas && onCargarMas && (
+        <button onClick={onCargarMas} disabled={cargandoMas}
+          className="w-full py-3 text-sm text-[#1e5fa8] font-medium hover:bg-slate-50 transition-colors border-t border-slate-100 disabled:opacity-50">
+          {cargandoMas ? 'Cargando...' : 'Cargar más consultas'}
+        </button>
       )}
     </div>
   )

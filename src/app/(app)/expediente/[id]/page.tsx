@@ -59,12 +59,17 @@ function ExpedientePacienteContent() {
   const router = useRouter()
   const { isDoctor } = useProfile()
   useAuditAccess('pacientes', id) // NOM-024: registrar acceso al expediente
+  const PAGE_SIZE = 15
   const [paciente, setPaciente] = useState<Paciente | null>(null)
   const [consultas, setConsultas] = useState<Consulta[]>([])
   const [labs, setLabs] = useState<Laboratorio[]>([])
   const [allAddendums, setAllAddendums] = useState<{ id: string; consulta_id: string; contenido: string; medico_nombre: string; created_at: string }[]>([])
   const [tab, setTab] = useState<Tab>('resumen')
   const [loading, setLoading] = useState(true)
+  const [hayMasConsultas, setHayMasConsultas] = useState(false)
+  const [hayMasLabs, setHayMasLabs] = useState(false)
+  const [hayMasDocs, setHayMasDocs] = useState(false)
+  const [cargandoMas, setCargandoMas] = useState(false)
   const [eliminandoLab, setEliminandoLab] = useState<string | null>(null)
   const [confirmarEliminar, setConfirmarEliminar] = useState<string | null>(null)
   const [graficasAbiertas, setGraficasAbiertas] = useState<Record<string, boolean>>({})
@@ -86,20 +91,31 @@ function ExpedientePacienteContent() {
   useEffect(() => {
     async function cargar() {
       const supabase = createClient()
+      const limit = PAGE_SIZE + 1 // +1 para detectar si hay más
       const [{ data: p }, { data: c }, { data: l }, { data: d }] = await Promise.all([
         supabase.from('pacientes').select('*').eq('id', id).single(),
-        supabase.from('consultas').select('*').eq('paciente_id', id).order('fecha', { ascending: false }),
-        supabase.from('laboratorios').select('*').eq('paciente_id', id).order('fecha_toma', { ascending: false }),
-        supabase.from('documentos').select('id, tipo, contenido, created_at').eq('paciente_id', id).order('created_at', { ascending: false }),
+        supabase.from('consultas').select('*').eq('paciente_id', id).order('fecha', { ascending: false }).limit(limit),
+        supabase.from('laboratorios').select('*').eq('paciente_id', id).order('fecha_toma', { ascending: false }).limit(limit),
+        supabase.from('documentos').select('id, tipo, contenido, created_at').eq('paciente_id', id).order('created_at', { ascending: false }).limit(limit),
       ])
       setPaciente(p)
-      setConsultas(c || [])
-      setLabs(l || [])
-      setDocumentos(d || [])
+
+      const consultas = c || []
+      setHayMasConsultas(consultas.length > PAGE_SIZE)
+      setConsultas(consultas.slice(0, PAGE_SIZE))
+
+      const labsList = l || []
+      setHayMasLabs(labsList.length > PAGE_SIZE)
+      setLabs(labsList.slice(0, PAGE_SIZE))
+
+      const docsList = d || []
+      setHayMasDocs(docsList.length > PAGE_SIZE)
+      setDocumentos(docsList.slice(0, PAGE_SIZE))
+
       setLoading(false)
 
-      // Cargar addendums de todas las consultas
-      const consultaIds = (c || []).map((con: { id: string }) => con.id)
+      // Cargar addendums de las consultas visibles
+      const consultaIds = consultas.slice(0, PAGE_SIZE).map((con: { id: string }) => con.id)
       if (consultaIds.length > 0) {
         supabase.from('addendums')
           .select('id, consulta_id, contenido, medico_nombre, created_at')
@@ -110,6 +126,61 @@ function ExpedientePacienteContent() {
     }
     cargar()
   }, [id])
+
+  // ── Cargar más (cursor-based: usa fecha del último item) ──────
+  async function cargarMasConsultas() {
+    if (!consultas.length) return
+    setCargandoMas(true)
+    const cursor = consultas[consultas.length - 1].fecha
+    const supabase = createClient()
+    const { data } = await supabase.from('consultas').select('*')
+      .eq('paciente_id', id).order('fecha', { ascending: false })
+      .lt('fecha', cursor).limit(PAGE_SIZE + 1)
+    const items = data || []
+    setHayMasConsultas(items.length > PAGE_SIZE)
+    setConsultas(prev => [...prev, ...items.slice(0, PAGE_SIZE)])
+    // Cargar addendums de las nuevas consultas
+    const newIds = items.slice(0, PAGE_SIZE).map((c: { id: string }) => c.id)
+    if (newIds.length > 0) {
+      supabase.from('addendums')
+        .select('id, consulta_id, contenido, medico_nombre, created_at')
+        .in('consulta_id', newIds)
+        .order('created_at', { ascending: true })
+        .then((res: { data: { id: string; consulta_id: string; contenido: string; medico_nombre: string; created_at: string }[] | null }) =>
+          setAllAddendums(prev => [...prev, ...(res.data || [])])
+        )
+    }
+    setCargandoMas(false)
+  }
+
+  async function cargarMasLabs() {
+    if (!labs.length) return
+    setCargandoMas(true)
+    const cursor = labs[labs.length - 1].fecha_toma
+    const supabase = createClient()
+    const { data } = await supabase.from('laboratorios').select('*')
+      .eq('paciente_id', id).order('fecha_toma', { ascending: false })
+      .lt('fecha_toma', cursor).limit(PAGE_SIZE + 1)
+    const items = data || []
+    setHayMasLabs(items.length > PAGE_SIZE)
+    setLabs(prev => [...prev, ...items.slice(0, PAGE_SIZE)])
+    setCargandoMas(false)
+  }
+
+  async function cargarMasDocs() {
+    if (!documentos.length) return
+    setCargandoMas(true)
+    const cursor = documentos[documentos.length - 1].created_at
+    const supabase = createClient()
+    const { data } = await supabase.from('documentos')
+      .select('id, tipo, contenido, created_at')
+      .eq('paciente_id', id).order('created_at', { ascending: false })
+      .lt('created_at', cursor).limit(PAGE_SIZE + 1)
+    const items = data || []
+    setHayMasDocs(items.length > PAGE_SIZE)
+    setDocumentos(prev => [...prev, ...items.slice(0, PAGE_SIZE)])
+    setCargandoMas(false)
+  }
 
   // Recolecta todos los parámetros de todos los labs agrupando nombres equivalentes
   const todosLosParams = useMemo((): ParamGrafica[] => {
@@ -419,7 +490,7 @@ function ExpedientePacienteContent() {
         )}
 
         {tab === 'consultas' && (
-          <TabConsultas id={id} consultas={consultas} isDoctor={isDoctor} />
+          <TabConsultas id={id} consultas={consultas} isDoctor={isDoctor} hayMas={hayMasConsultas} cargandoMas={cargandoMas} onCargarMas={cargarMasConsultas} />
         )}
 
         {tab === 'laboratorios' && (
@@ -431,6 +502,9 @@ function ExpedientePacienteContent() {
             eliminandoLab={eliminandoLab}
             onConfirmarEliminar={setConfirmarEliminar}
             onEliminarLab={eliminarLab}
+            hayMas={hayMasLabs}
+            cargandoMas={cargandoMas}
+            onCargarMas={cargarMasLabs}
           />
         )}
 
@@ -452,6 +526,9 @@ function ExpedientePacienteContent() {
             documentos={documentos}
             onVerDocumento={setDocSeleccionado}
             onEliminarDocumento={eliminarDocumento}
+            hayMas={hayMasDocs}
+            cargandoMas={cargandoMas}
+            onCargarMas={cargarMasDocs}
           />
         )}
 

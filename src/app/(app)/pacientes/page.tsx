@@ -20,26 +20,34 @@ type PacienteRow = {
 const CAMPOS = 'id, nombre, apellidos, fecha_nacimiento, sexo, numero_expediente'
 
 export default function PacientesPage() {
+  const PAGE = 20
   const [pacientes, setPacientes] = useState<PacienteRow[]>([])
   const [busqueda, setBusqueda] = useState('')
   const [loading, setLoading] = useState(true)
+  const [hayMas, setHayMas] = useState(false)
+  const [cargandoMas, setCargandoMas] = useState(false)
 
-  // Carga inicial: 150 más recientes (solo activos)
-  useEffect(() => {
+  function cargarPacientes(reset = true) {
+    if (reset) setLoading(true)
     const supabase = createClient()
     supabase
       .from('pacientes')
       .select(CAMPOS)
       .neq('activo', false)
       .order('created_at', { ascending: false })
-      .limit(150)
+      .limit(PAGE + 1)
       .then(({ data }: { data: PacienteRow[] | null }) => {
-        setPacientes(data ?? [])
+        const items = data ?? []
+        setHayMas(items.length > PAGE)
+        setPacientes(items.slice(0, PAGE))
         setLoading(false)
       })
-  }, [])
+  }
 
-  // Búsqueda server-side con debounce 300 ms (solo activos)
+  // Carga inicial
+  useEffect(() => { cargarPacientes() }, [])
+
+  // Búsqueda server-side con debounce 300 ms
   useEffect(() => {
     if (busqueda.trim().length < 2) return
     setLoading(true)
@@ -51,29 +59,46 @@ export default function PacientesPage() {
         .neq('activo', false)
         .or(`nombre.ilike.%${busqueda}%,apellidos.ilike.%${busqueda}%,numero_expediente.ilike.%${busqueda}%`)
         .order('apellidos')
-        .limit(100)
-      setPacientes(data ?? [])
+        .limit(PAGE + 1)
+      const items = data ?? []
+      setHayMas(items.length > PAGE)
+      setPacientes(items.slice(0, PAGE))
       setLoading(false)
     }, 300)
     return () => clearTimeout(timeout)
   }, [busqueda])
 
-  // Al borrar la búsqueda, volver a la lista inicial (solo activos)
+  // Al borrar la búsqueda, volver a la lista inicial
   useEffect(() => {
     if (busqueda.trim().length > 0) return
-    setLoading(true)
-    const supabase = createClient()
-    supabase
-      .from('pacientes')
-      .select(CAMPOS)
-      .neq('activo', false)
-      .order('created_at', { ascending: false })
-      .limit(150)
-      .then(({ data }: { data: PacienteRow[] | null }) => {
-        setPacientes(data ?? [])
-        setLoading(false)
-      })
+    cargarPacientes()
   }, [busqueda])
+
+  async function cargarMasPacientes() {
+    if (!pacientes.length) return
+    setCargandoMas(true)
+    const cursor = pacientes[pacientes.length - 1].id
+    const supabase = createClient()
+    // Obtener created_at del último para cursor
+    const { data: lastRow } = await supabase.from('pacientes').select('created_at').eq('id', cursor).single() as { data: { created_at: string } | null }
+    if (!lastRow) { setCargandoMas(false); return }
+
+    let query = supabase.from('pacientes').select(CAMPOS)
+      .neq('activo', false)
+      .lt('created_at', lastRow.created_at)
+      .order('created_at', { ascending: false })
+      .limit(PAGE + 1)
+
+    if (busqueda.trim().length >= 2) {
+      query = query.or(`nombre.ilike.%${busqueda}%,apellidos.ilike.%${busqueda}%,numero_expediente.ilike.%${busqueda}%`)
+    }
+
+    const { data } = await query
+    const items = data ?? []
+    setHayMas(items.length > PAGE)
+    setPacientes(prev => [...prev, ...items.slice(0, PAGE)])
+    setCargandoMas(false)
+  }
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -156,6 +181,12 @@ export default function PacientesPage() {
               )
             })}
           </div>
+        )}
+        {hayMas && (
+          <button onClick={cargarMasPacientes} disabled={cargandoMas}
+            className="w-full py-3 text-sm text-[#1e5fa8] font-medium hover:bg-slate-50 transition-colors border-t border-slate-100 disabled:opacity-50">
+            {cargandoMas ? 'Cargando...' : 'Cargar más pacientes'}
+          </button>
         )}
       </div>
     </div>

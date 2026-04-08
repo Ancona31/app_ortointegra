@@ -37,9 +37,12 @@ interface Props {
   documentos: Documento[]
   onVerDocumento: (doc: Documento) => void
   onEliminarDocumento?: (id: string) => void
+  hayMas?: boolean
+  cargandoMas?: boolean
+  onCargarMas?: () => void
 }
 
-export default function TabDocumentos({ id, documentos, onVerDocumento, onEliminarDocumento }: Props) {
+export default function TabDocumentos({ id, documentos, onVerDocumento, onEliminarDocumento, hayMas, cargandoMas, onCargarMas }: Props) {
   const [docAEliminar, setDocAEliminar] = useState<{ id: string; tipo: string } | null>(null)
 
   return (
@@ -102,6 +105,12 @@ export default function TabDocumentos({ id, documentos, onVerDocumento, onElimin
               </div>
             ))}
           </div>
+        )}
+        {hayMas && onCargarMas && (
+          <button onClick={onCargarMas} disabled={cargandoMas}
+            className="w-full py-3 text-sm text-[#1e5fa8] font-medium hover:bg-slate-50 transition-colors border-t border-slate-100 disabled:opacity-50">
+            {cargandoMas ? 'Cargando...' : 'Cargar más documentos'}
+          </button>
         )}
       </div>
     </div>

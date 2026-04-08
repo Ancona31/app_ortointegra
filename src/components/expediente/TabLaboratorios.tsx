@@ -14,6 +14,9 @@ interface Props {
   eliminandoLab: string | null
   onConfirmarEliminar: (labId: string | null) => void
   onEliminarLab: (labId: string) => void
+  hayMas?: boolean
+  cargandoMas?: boolean
+  onCargarMas?: () => void
 }
 
 export default function TabLaboratorios({
@@ -24,6 +27,9 @@ export default function TabLaboratorios({
   eliminandoLab,
   onConfirmarEliminar,
   onEliminarLab,
+  hayMas,
+  cargandoMas,
+  onCargarMas,
 }: Props) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -116,6 +122,12 @@ export default function TabLaboratorios({
             )
           })}
         </div>
+      )}
+      {hayMas && onCargarMas && (
+        <button onClick={onCargarMas} disabled={cargandoMas}
+          className="w-full py-3 text-sm text-[#1e5fa8] font-medium hover:bg-slate-50 transition-colors border-t border-slate-100 disabled:opacity-50">
+          {cargandoMas ? 'Cargando...' : 'Cargar más laboratorios'}
+        </button>
       )}
     </div>
   )
