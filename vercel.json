@@ -1,9 +1,3 @@
 {
-  "buildCommand": "next build --webpack",
-  "functions": {
-    "src/app/api/generar-pdf/route.ts": {
-      "maxDuration": 180,
-      "memory": 1536
-    }
-  }
+  "buildCommand": "next build --webpack"
 }

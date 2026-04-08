@@ -1,12 +1,11 @@
 'use client'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
-import { buildPdfHeader, buildPdfHeaderCss, buildPdfFirma, getPdfColors, getLogoUrl } from '@/lib/pdf/header'
+import { generarPdf } from '@/lib/mobileShare'
 
 import { useState } from 'react'
 
 import { Plus, Trash2, Printer, Loader2 } from 'lucide-react'
 import { flushSync } from 'react-dom'
-import { imprimirOCompartir } from '@/lib/mobileShare'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import AutocompleteEstudio from '@/components/AutocompleteEstudio'
@@ -61,37 +60,33 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
     }
 
     const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
-    const listaEstudios = estudios.filter(Boolean).map(e => `<li>${e}</li>`).join('')
-    const { cp, cs } = getPdfColors(medicoInfo)
-    const logoUrl = getLogoUrl(medicoInfo, window.location.origin)
 
-    const _html = `
-<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Solicitud Lab</title>
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  @page { size: letter; margin: 15mm 20mm; }
-  body { font-family: Arial, sans-serif; font-size: 11pt; color: #1a1a1a; }
-  ${buildPdfHeaderCss(cp, cs)}
-  .titulo-doc { text-align:center; font-size:14pt; font-weight:bold; color:${cp}; text-transform:uppercase; margin:16px 0 14px; border:2px solid ${cp}; padding:6px; }
-  .dato-row { display:flex; gap:6px; margin-bottom:8px; }
-  .dato-label { font-weight:bold; min-width:100px; color:${cp}; }
-  .dato-valor { border-bottom:1px solid #aaa; flex:1; padding-bottom:1px; }
-  .seccion { font-size:11pt; font-weight:bold; color:${cp}; border-bottom:1px solid ${cp}; padding-bottom:3px; margin:16px 0 10px; }
-  ul { list-style:none; columns:2; gap:20px; }
-  li { padding:4px 0; padding-left:16px; position:relative; font-size:10.5pt; }
-  li::before { content:"✓"; position:absolute; left:0; color:${cs}; font-weight:bold; }
-</style></head><body>
-  ${buildPdfHeader(medicoInfo, logoUrl, cp, cs)}
-  <div class="titulo-doc">Solicitud de Estudios de Laboratorio</div>
-  <div class="dato-row"><span class="dato-label">Fecha:</span><span class="dato-valor">${fechaFormat}</span></div>
-  <div class="dato-row"><span class="dato-label">Paciente:</span><span class="dato-valor">${paciente}</span></div>
-  <div class="dato-row"><span class="dato-label">Diagnóstico:</span><span class="dato-valor">${diagnostico}</span></div>
-  <div class="seccion">Se solicita:</div>
-  <ul>${listaEstudios}</ul>
-  ${notas ? `<div class="seccion">Indicaciones</div><p style="font-size:10pt;color:#333">${notas}</p>` : ''}
-  ${buildPdfFirma(medicoInfo, cp)}
-</body></html>`
-    await imprimirOCompartir(_html, 'solicitud-laboratorio.pdf')
+    const medicoData = medicoInfo ? {
+      nombre: medicoInfo.nombre,
+      especialidad: medicoInfo.especialidad,
+      cedula_profesional: medicoInfo.cedula_profesional,
+      cedula_especialidad: medicoInfo.cedula_especialidad,
+      color_primario: medicoInfo.color_primario,
+      color_secundario: medicoInfo.color_secundario,
+      direccion_consultorio: medicoInfo.direccion_consultorio,
+      telefono_consultorio: medicoInfo.telefono_consultorio,
+    } : null
+
+    const logoUrl = medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined
+
+    await generarPdf({
+      tipo: 'solicitud_lab',
+      medico: medicoData,
+      data: {
+        paciente,
+        fecha: fechaFormat,
+        diagnostico,
+        estudios: estudios.filter(Boolean),
+        notas: notas || undefined,
+      },
+      logoUrl,
+      filename: 'solicitud-laboratorio.pdf',
+    })
     } finally { setImprimiendo(false) }
   }
 

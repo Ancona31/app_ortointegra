@@ -1,12 +1,10 @@
 'use client'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
-import { buildPdfHeader, buildPdfHeaderCss, buildPdfFirma, getPdfColors, getLogoUrl } from '@/lib/pdf/header'
-
 import { useState } from 'react'
 
 import { Printer, Loader2 } from 'lucide-react'
 import { flushSync } from 'react-dom'
-import { imprimirOCompartir } from '@/lib/mobileShare'
+import { generarPdf } from '@/lib/mobileShare'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
@@ -49,42 +47,33 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
     }
 
     const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
-    const { cp, cs } = getPdfColors(medicoInfo)
-    const logoUrl = getLogoUrl(medicoInfo, window.location.origin)
-    const listaEstudios = estudios.filter(e => e.tipo && e.region).map(e => `
-      <div class="estudio">
-        <p class="est-nombre">${e.tipo} de ${e.region}${e.proyecciones ? ` (${e.proyecciones})` : ''}</p>
-        ${e.indicacion ? `<p class="est-indicacion">${e.indicacion}</p>` : ''}
-      </div>`).join('')
 
-    const _html = `
-<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Solicitud Imagen</title>
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  @page { size: letter; margin: 15mm 20mm; }
-  body { font-family: Arial, sans-serif; font-size: 11pt; color: #1a1a1a; }
-  ${buildPdfHeaderCss(cp, cs)}
-  .titulo-doc { text-align:center; font-size:14pt; font-weight:bold; color:${cp}; text-transform:uppercase; margin:16px 0 14px; border:2px solid ${cp}; padding:6px; }
-  .urgente-badge { background:#dc2626; color:white; text-align:center; padding:4px; font-weight:bold; margin-bottom:10px; }
-  .dato-row { display:flex; gap:6px; margin-bottom:8px; }
-  .dato-label { font-weight:bold; min-width:100px; color:${cp}; }
-  .dato-valor { border-bottom:1px solid #aaa; flex:1; }
-  .seccion { font-size:11pt; font-weight:bold; color:${cp}; border-bottom:1px solid ${cp}; padding-bottom:3px; margin:16px 0 10px; }
-  .estudio { margin-bottom:12px; padding:8px; border-left:3px solid ${cs}; background:#f8f9fa; }
-  .est-nombre { font-weight:bold; }
-  .est-indicacion { font-size:10pt; color:#555; margin-top:2px; }
-</style></head><body>
-  ${buildPdfHeader(medicoInfo, logoUrl, cp, cs)}
-  <div class="titulo-doc">Solicitud de Estudios de Imagen</div>
-  ${urgente ? '<div class="urgente-badge">⚠ URGENTE</div>' : ''}
-  <div class="dato-row"><span class="dato-label">Fecha:</span><span class="dato-valor">${fechaFormat}</span></div>
-  <div class="dato-row"><span class="dato-label">Paciente:</span><span class="dato-valor">${paciente}</span></div>
-  <div class="dato-row"><span class="dato-label">Diagnóstico:</span><span class="dato-valor">${diagnostico}</span></div>
-  <div class="seccion">Estudios solicitados:</div>
-  ${listaEstudios}
-  ${buildPdfFirma(medicoInfo, cp)}
-</body></html>`
-    await imprimirOCompartir(_html, 'solicitud-imagenologia.pdf')
+    const medicoData = medicoInfo ? {
+      nombre: medicoInfo.nombre,
+      especialidad: medicoInfo.especialidad,
+      cedula_profesional: medicoInfo.cedula_profesional,
+      cedula_especialidad: medicoInfo.cedula_especialidad,
+      color_primario: medicoInfo.color_primario,
+      color_secundario: medicoInfo.color_secundario,
+      direccion_consultorio: medicoInfo.direccion_consultorio,
+      telefono_consultorio: medicoInfo.telefono_consultorio,
+    } : null
+
+    const logoUrl = medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined
+
+    await generarPdf({
+      tipo: 'solicitud_imagen',
+      medico: medicoData,
+      data: {
+        paciente,
+        fecha: fechaFormat,
+        diagnostico,
+        estudios: estudios.filter(e => e.tipo && e.region),
+        urgente,
+      },
+      logoUrl,
+      filename: 'solicitud-imagenologia.pdf',
+    })
     } finally { setImprimiendo(false) }
   }
 

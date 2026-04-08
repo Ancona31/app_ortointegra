@@ -1,11 +1,10 @@
 'use client'
-import { MedicoInfo } from '@/types'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 
 import { useState, useCallback } from 'react'
 import { Printer, Loader2, Plus, Trash2 } from 'lucide-react'
 import { flushSync } from 'react-dom'
-import { imprimirOCompartir } from '@/lib/mobileShare'
+import { generarPdf } from '@/lib/mobileShare'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
@@ -92,210 +91,24 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
         },
       })
 
-      const cp = medicoInfo?.color_primario || '#1a3a5c'
-      const cs = medicoInfo?.color_secundario || '#1e5fa8'
-      const doctorNombre = medicoInfo?.nombre || 'Médico'
-      const doctorEspecialidad = medicoInfo?.especialidad || ''
-      const cedProf = medicoInfo?.cedula_profesional || ''
-      const cedEsp = medicoInfo?.cedula_especialidad || ''
-      const direccion = medicoInfo?.direccion_consultorio || ''
-      const telefono = medicoInfo?.telefono_consultorio || ''
-      const logoUrl = medicoInfo?.logo_url && medicoInfo.logo_url.startsWith('https://')
-        ? medicoInfo.logo_url
-        : `${window.location.origin}/logo.png`
-
+      const medicoData = medicoInfo ? { nombre: medicoInfo.nombre, especialidad: medicoInfo.especialidad, cedula_profesional: medicoInfo.cedula_profesional, cedula_especialidad: medicoInfo.cedula_especialidad, color_primario: medicoInfo.color_primario, color_secundario: medicoInfo.color_secundario, direccion_consultorio: medicoInfo.direccion_consultorio, telefono_consultorio: medicoInfo.telefono_consultorio } : null
+      const logoUrl = medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined
       const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
-      const fechaIngresoFormat = fechaIngreso
-        ? format(new Date(fechaIngreso + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
-        : '—'
+      const fechaIngresoFormat = fechaIngreso ? format(new Date(fechaIngreso + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es }) : undefined
 
-      const dxSecList = diagnosticosSecundarios.filter(Boolean)
-      const reqList = [...requerimientos, ...(requerimientosExtra ? [requerimientosExtra] : [])].filter(Boolean)
-
-      const _html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Solicitud de Internamiento — ${paciente}</title>
-<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  @page { size: letter; margin: 0; }
-  body { font-family: 'Roboto', Arial, sans-serif; font-size: 10pt; color: #1a1a1a; position: relative; }
-
-  .watermark {
-    position: fixed; top: 50%; left: 50%;
-    transform: translate(-50%, -50%) rotate(-25deg);
-    width: 320px; height: 320px; object-fit: contain; opacity: 0.05;
-    pointer-events: none; z-index: 0;
-  }
-  .barra-top { background: linear-gradient(135deg, ${cp} 0%, ${cs} 100%); height: 12px; }
-  .contenido { padding: 12mm 18mm 10mm; position: relative; z-index: 1; }
-
-  .header { display: flex; align-items: center; gap: 18px; padding-bottom: 12px; margin-bottom: 12px; border-bottom: 2px solid ${cp}; }
-  .logo-wrap { width: 70px; height: 70px; border-radius: 50%; border: 3px solid ${cs}; overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: #f8fafc; }
-  .logo { width: 100%; height: 100%; object-fit: contain; }
-  .header-info { flex: 1; }
-  .doctor-name { font-size: 14pt; font-weight: bold; color: ${cp}; line-height: 1.2; }
-  .especialidad { font-size: 9pt; color: ${cs}; margin: 3px 0; font-style: italic; }
-  .credenciales { font-size: 8pt; color: #666; }
-  .contacto { font-size: 7.5pt; color: #888; margin-top: 3px; }
-
-  .titulo-banner {
-    background: linear-gradient(135deg, ${cp} 0%, ${cs} 100%);
-    color: #fff; text-align: center; font-size: 11pt; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 2px;
-    padding: 8px 0; border-radius: 4px; margin-bottom: 14px;
-  }
-  ${urgente ? `.urgente { background: #dc2626; color: #fff; text-align: center; font-size: 9pt; font-weight: 700; padding: 5px; border-radius: 4px; margin-bottom: 10px; letter-spacing: 1px; }` : ''}
-
-  .datos-box { background: linear-gradient(135deg, ${cp}08, ${cs}08); border-left: 4px solid ${cs}; border-radius: 0 6px 6px 0; padding: 9px 14px; margin-bottom: 14px; }
-  .datos-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px 20px; }
-  .dato { display: flex; gap: 6px; align-items: baseline; font-size: 9pt; }
-  .dato-label { font-weight: bold; color: ${cp}; white-space: nowrap; font-size: 8pt; text-transform: uppercase; }
-  .dato-valor { flex: 1; border-bottom: 1px solid #d1d5db; padding-bottom: 1px; }
-
-  .seccion-header { display: flex; align-items: center; gap: 8px; margin: 12px 0 7px; }
-  .seccion-linea { flex: 1; height: 1px; background: linear-gradient(to right, ${cp}, transparent); }
-  .seccion-titulo { font-size: 7.5pt; font-weight: bold; color: ${cp}; text-transform: uppercase; letter-spacing: 1.5px; background: ${cp}12; padding: 3px 10px; border-radius: 20px; white-space: nowrap; }
-
-  .campo { font-size: 9.5pt; line-height: 1.5; color: #2d2d2d; text-align: justify; }
-  .campo-row { display: flex; gap: 8px; margin-bottom: 5px; font-size: 9pt; }
-  .campo-label { font-weight: bold; color: ${cp}; min-width: 140px; font-size: 8.5pt; }
-  .campo-valor { flex: 1; border-bottom: 1px solid #d1d5db; padding-bottom: 1px; }
-
-  .dx-principal { font-weight: 700; color: #111; font-size: 10pt; }
-  .dx-secundario { font-size: 9pt; color: #555; margin-top: 2px; }
-  .dx-bullet { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: ${cs}; margin-right: 6px; vertical-align: middle; }
-
-  .req-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-  .req-badge { background: ${cp}12; color: ${cp}; font-size: 8pt; font-weight: 600; padding: 3px 10px; border-radius: 20px; border: 1px solid ${cp}30; }
-
-  .justificacion { font-size: 9.5pt; line-height: 1.6; color: #2d2d2d; text-align: justify; white-space: pre-line; }
-
-  /* ── Instrucciones para el paciente ── */
-  .paciente-box {
-    background: #fffbeb; border: 1.5px solid #f59e0b;
-    border-radius: 6px; padding: 10px 14px; margin-top: 14px;
-  }
-  .paciente-header {
-    display: flex; align-items: center; gap: 8px;
-    font-size: 9pt; font-weight: 700; color: #92400e;
-    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 7px;
-  }
-  .paciente-icon { font-size: 13pt; }
-  .paciente-texto { font-size: 9pt; line-height: 1.6; color: #78350f; white-space: pre-line; text-align: justify; }
-
-  /* ── Indicaciones de piso ── */
-  .piso-box {
-    background: ${cp}06; border: 1.5px solid ${cp}40;
-    border-radius: 6px; padding: 10px 14px; margin-top: 14px;
-    page-break-inside: avoid;
-  }
-  .piso-header {
-    display: flex; align-items: center; gap: 8px;
-    font-size: 9pt; font-weight: 700; color: ${cp};
-    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 7px;
-  }
-  .piso-icon { font-size: 13pt; }
-  .piso-texto { font-size: 9.5pt; line-height: 1.6; color: #1a1a1a; white-space: pre-line; text-align: justify; }
-
-  .footer-area { margin-top: 24px; display: flex; justify-content: flex-end; }
-  .firma { text-align: center; min-width: 210px; border-top: 1.5px solid ${cp}; padding-top: 8px; }
-  .firma-nombre { font-weight: bold; font-size: 9.5pt; color: ${cp}; }
-  .firma-ced { font-size: 8pt; color: #666; margin-top: 2px; }
-
-  .barra-bottom { background: linear-gradient(135deg, ${cp} 0%, ${cs} 100%); height: 8px; margin-top: 16px; }
-
-  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-</style>
-</head>
-<body>
-
-<img class="watermark" src="${logoUrl}" onerror="this.style.display='none'" />
-<div class="barra-top"></div>
-
-<div class="contenido">
-
-  <div class="header">
-    <div class="logo-wrap">
-      <img class="logo" src="${logoUrl}" onerror="this.style.display='none'" />
-    </div>
-    <div class="header-info">
-      <div class="doctor-name">${doctorNombre}</div>
-      ${doctorEspecialidad ? `<div class="especialidad">${doctorEspecialidad}</div>` : ''}
-      <div class="credenciales">
-        ${cedProf ? `Cédula Prof.: ${cedProf}` : ''}
-        ${cedProf && cedEsp ? ' &nbsp;·&nbsp; ' : ''}
-        ${cedEsp ? `Cédula Esp.: ${cedEsp}` : ''}
-      </div>
-      ${direccion || telefono ? `<div class="contacto">${[direccion, telefono ? `Tel: ${telefono}` : ''].filter(Boolean).join(' &nbsp;·&nbsp; ')}</div>` : ''}
-    </div>
-  </div>
-
-  <div class="titulo-banner">Solicitud de Internamiento Hospitalario</div>
-  ${urgente ? '<div class="urgente">⚠ URGENTE — REQUIERE ATENCIÓN INMEDIATA</div>' : ''}
-
-  <div class="datos-box">
-    <div class="datos-grid">
-      <div class="dato"><span class="dato-label">Fecha</span><span class="dato-valor">${fechaFormat}</span></div>
-      <div class="dato"><span class="dato-label">Paciente</span><span class="dato-valor">${paciente}</span></div>
-      <div class="dato"><span class="dato-label">Fecha de ingreso</span><span class="dato-valor">${fechaIngresoFormat}</span></div>
-      ${lugar ? `<div class="dato" style="grid-column: 1 / -1;"><span class="dato-label">🏥 Hospital / Lugar</span><span class="dato-valor" style="font-weight:600; color:${cp};">${lugar}</span></div>` : ''}
-      ${tipoInternamiento ? `<div class="dato"><span class="dato-label">Tipo</span><span class="dato-valor">${tipoInternamiento}</span></div>` : ''}
-      ${diasEstimados ? `<div class="dato"><span class="dato-label">Días estimados</span><span class="dato-valor">${diasEstimados}</span></div>` : ''}
-      ${asa ? `<div class="dato"><span class="dato-label">Clasificación ASA</span><span class="dato-valor">${asa}</span></div>` : ''}
-    </div>
-  </div>
-
-  <div class="seccion-header"><div class="seccion-linea"></div><div class="seccion-titulo">Diagnósticos</div><div class="seccion-linea"></div></div>
-  <p class="dx-principal">${diagnostico || '—'}</p>
-  ${dxSecList.length > 0 ? dxSecList.map(d => `<p class="dx-secundario"><span class="dx-bullet"></span>${d}</p>`).join('') : ''}
-
-  ${procedimiento ? `
-  <div class="seccion-header"><div class="seccion-linea"></div><div class="seccion-titulo">Procedimiento / Cirugía</div><div class="seccion-linea"></div></div>
-  <p class="campo">${procedimiento}</p>
-  ` : ''}
-
-  ${reqList.length > 0 ? `
-  <div class="seccion-header"><div class="seccion-linea"></div><div class="seccion-titulo">Requerimientos especiales</div><div class="seccion-linea"></div></div>
-  <div class="req-grid">${reqList.map(r => `<span class="req-badge">${r}</span>`).join('')}</div>
-  ` : ''}
-
-  ${justificacion ? `
-  <div class="seccion-header"><div class="seccion-linea"></div><div class="seccion-titulo">Justificación clínica</div><div class="seccion-linea"></div></div>
-  <p class="justificacion">${justificacion}</p>
-  ` : ''}
-
-  ${instruccionesPaciente ? `
-  <div class="paciente-box">
-    <div class="paciente-header"><span class="paciente-icon">📋</span> Instrucciones para el paciente — Trámite de ingreso</div>
-    <p class="paciente-texto">${instruccionesPaciente}</p>
-  </div>
-  ` : ''}
-
-  ${indicacionesPiso ? `
-  <div class="piso-box">
-    <div class="piso-header"><span class="piso-icon">🏥</span> Indicaciones de ingreso a piso — Personal de enfermería y médico</div>
-    <p class="piso-texto">${indicacionesPiso}</p>
-  </div>
-  ` : ''}
-
-  <div class="footer-area">
-    <div class="firma">
-      <div class="firma-nombre">${doctorNombre}</div>
-      ${cedProf ? `<div class="firma-ced">Céd. Prof. ${cedProf}</div>` : ''}
-      ${cedEsp ? `<div class="firma-ced">Céd. Esp. ${cedEsp}</div>` : ''}
-    </div>
-  </div>
-
-</div>
-
-<div class="barra-bottom"></div>
-</body>
-</html>`
-
-      await imprimirOCompartir(_html, 'solicitud-internamiento.pdf')
+      await generarPdf({
+        tipo: 'solicitud_internamiento',
+        medico: medicoData,
+        data: {
+          paciente, fecha: fechaFormat, fechaIngreso: fechaIngresoFormat, lugar,
+          diagnostico, diagnosticosSecundarios: diagnosticosSecundarios.filter(Boolean),
+          tipoInternamiento, procedimiento, diasEstimados, asa, urgente,
+          requerimientos: [...requerimientos, ...(requerimientosExtra ? [requerimientosExtra] : [])].filter(Boolean),
+          justificacion, instruccionesPaciente, indicacionesPiso,
+        },
+        logoUrl,
+        filename: 'solicitud-internamiento.pdf',
+      })
     } finally {
       setImprimiendo(false)
     }

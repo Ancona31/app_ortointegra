@@ -10,7 +10,7 @@ import { useProfile } from '@/hooks/useProfile'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
-import { imprimirOCompartir } from '@/lib/mobileShare'
+import { generarPdf } from '@/lib/mobileShare'
 import { enqueue } from '@/lib/offlineQueue'
 import AutocompleteMedicamento from '@/components/AutocompleteMedicamento'
 import { MedicamentoDB } from '@/data/medicamentos'
@@ -237,31 +237,6 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
 
     const medsData = medicamentos.filter(m => m.nombre_comercial)
-    const meds = medsData.length === 0 ? '' : `
-      <table class="meds-table">
-        <thead>
-          <tr>
-            <th class="col-num">#</th>
-            <th class="col-med">Medicamento</th>
-            <th class="col-via">Vía</th>
-            <th class="col-ind">Indicaciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${medsData.map((m, i) => `
-          <tr>
-            <td class="col-num num-cell">${i + 1}</td>
-            <td class="col-med">
-              <span class="med-nombre">${m.nombre_comercial.toUpperCase()}${m.presentacion ? ` <span class="med-pres">${m.presentacion}</span>` : ''}</span>
-              ${m.principio_activo ? `<br><span class="principio">(${m.principio_activo})</span>` : ''}
-            </td>
-            <td class="col-via via-cell">${m.via_administracion || 'Oral'}</td>
-            <td class="col-ind ind-cell">${m.indicacion || ''}</td>
-          </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    `
 
     const doctorNombre = medicoInfo?.nombre || 'Médico'
     const doctorEspecialidad = medicoInfo?.especialidad || ''
@@ -274,241 +249,34 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     const cs = medicoInfo?.color_secundario || '#1e5fa8'
     const edadPaciente = pacienteData?.edad
     const sexoPaciente = pacienteData?.sexo === 'M' ? 'Masculino' : pacienteData?.sexo === 'F' ? 'Femenino' : pacienteData?.sexo || ''
-    const marcaAguaUrl = logoUrl
 
-    const _html = `
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Receta — ${paciente}</title>
-<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Noto+Serif&display=swap" rel="stylesheet">
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  @page { size: letter; margin: 0; }
-  body { font-family: 'Roboto', Arial, sans-serif; font-size: 10.5pt; color: #1a1a1a; position: relative; }
-
-  /* ── Marca de agua ── */
-  .watermark {
-    position: fixed; top: 50%; left: 50%;
-    transform: translate(-50%, -50%) rotate(-25deg);
-    width: 320px; height: 320px;
-    object-fit: contain; opacity: 0.06;
-    pointer-events: none; z-index: 0;
-  }
-
-  /* ── Barra superior ── */
-  .barra-top {
-    background: linear-gradient(135deg, ${cp} 0%, ${cs} 100%);
-    height: 12px; width: 100%;
-  }
-
-  /* ── Contenido principal ── */
-  .contenido { padding: 14mm 18mm 10mm; position: relative; z-index: 1; }
-
-  /* ── Encabezado ── */
-  .header {
-    display: flex; align-items: center; gap: 18px;
-    padding-bottom: 14px; margin-bottom: 14px;
-    border-bottom: 2px solid ${cp};
-  }
-  .logo-wrap {
-    width: 78px; height: 78px; border-radius: 50%;
-    border: 3px solid ${cs}; overflow: hidden; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    background: #f8fafc;
-  }
-  .logo { width: 100%; height: 100%; object-fit: contain; }
-  .header-info { flex: 1; }
-  .doctor-name { font-size: 15pt; font-weight: bold; color: ${cp}; line-height: 1.2; font-family: Arial, sans-serif; }
-  .especialidad { font-size: 9.5pt; color: ${cs}; margin: 3px 0; font-style: italic; }
-  .credenciales { font-size: 8.5pt; color: #666; }
-  .contacto-consultorio { font-size: 8pt; color: #888; margin-top: 3px; }
-  .rp-wrap { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
-  .rp { font-size: 52pt; font-weight: 900; color: ${cs}; line-height: 1; opacity: 0.85; font-family: Arial, sans-serif; }
-  .folio { font-size: 7.5pt; color: #aaa; text-align: right; margin-top: 2px; font-family: Arial, sans-serif; }
-  .blog-qr { width: 46px; height: 46px; margin-top: 5px; }
-  .blog-qr-label { font-size: 5.5pt; color: #bbb; text-align: center; line-height: 1.3; font-family: Arial, sans-serif; margin-top: 2px; }
-
-  /* ── Datos del paciente ── */
-  .datos-box {
-    background: linear-gradient(135deg, ${cp}08, ${cs}08);
-    border-left: 4px solid ${cs};
-    border-radius: 0 6px 6px 0;
-    padding: 10px 14px; margin-bottom: 16px;
-  }
-  .datos-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 20px; }
-  .dato { display: flex; gap: 6px; align-items: baseline; font-size: 9.5pt; }
-  .dato-label { font-weight: bold; color: ${cp}; white-space: nowrap; font-size: 8.5pt; font-family: Arial, sans-serif; text-transform: uppercase; letter-spacing: 0.3px; }
-  .dato-valor { flex: 1; border-bottom: 1px solid #d1d5db; padding-bottom: 1px; }
-
-  /* ── Sección header ── */
-  .seccion-header {
-    display: flex; align-items: center; gap: 8px;
-    margin: 16px 0 10px;
-  }
-  .seccion-linea { flex: 1; height: 1px; background: linear-gradient(to right, ${cp}, transparent); }
-  .seccion-titulo {
-    font-size: 8pt; font-weight: bold; color: ${cp};
-    text-transform: uppercase; letter-spacing: 1.5px;
-    font-family: Arial, sans-serif;
-    background: ${cp}12; padding: 3px 10px; border-radius: 20px;
-  }
-
-  /* ── Tabla de medicamentos ── */
-  .meds-table {
-    width: 100%; border-collapse: collapse;
-    font-family: Arial, sans-serif;
-  }
-  .meds-table thead tr {
-    background: linear-gradient(135deg, ${cp}, ${cs});
-  }
-  .meds-table thead th {
-    color: #fff; font-size: 7.5pt; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.8px;
-    padding: 6px 10px; text-align: left;
-  }
-  .meds-table thead th.col-num { text-align: center; width: 24px; }
-  .meds-table tbody tr { border-bottom: 1px solid ${cp}18; }
-  .meds-table tbody tr:last-child { border-bottom: none; }
-  .meds-table tbody tr:nth-child(even) { background: ${cp}05; }
-  .meds-table td { padding: 8px 10px; vertical-align: top; font-size: 9.5pt; }
-  .num-cell { text-align: center; color: ${cs}; font-weight: 700; font-size: 9pt; }
-  .med-nombre { font-weight: 700; color: #111; font-size: 10pt; }
-  .med-pres { font-weight: 400; color: #555; font-size: 9pt; }
-  .principio { font-style: italic; color: #777; font-size: 8.5pt; }
-  .via-cell { color: ${cs}; font-weight: 600; font-size: 8.5pt; white-space: nowrap; }
-  .ind-cell { color: #444; line-height: 1.55; }
-
-  .recomendaciones { font-size: 9pt; line-height: 1.35; color: #333; padding-left: 10px; }
-  .recomendaciones p { margin: 0 0 3px 0; }
-  .recomendaciones .rec-header { font-weight: 700; color: ${cp}; font-size: 9.5pt; margin: 8px 0 2px 0; display: block; }
-  .recomendaciones .rec-header:first-child { margin-top: 0; }
-  .recomendaciones .rec-keyword { font-weight: 700; color: ${cs}; }
-  .recomendaciones .rec-alarma { font-weight: 700; color: #c0392b; }
-  .recomendaciones .rec-bullet { padding-left: 10px; color: #444; font-style: italic; }
-
-  /* ── Barra inferior + firma ── */
-  .footer-area { margin-top: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
-  .qr-area { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-  .qr-img { width: 72px; height: 72px; }
-  .qr-label { font-size: 6.5pt; color: #aaa; font-family: Arial, sans-serif; text-align: center; line-height: 1.4; }
-  .firma {
-    text-align: center; min-width: 220px;
-    border-top: 1.5px solid ${cp}; padding-top: 8px;
-  }
-  .firma-nombre { font-weight: bold; font-size: 9.5pt; color: ${cp}; font-family: Arial, sans-serif; }
-  .firma-ced { font-size: 8pt; color: #666; margin-top: 2px; }
-
-  .barra-bottom {
-    background: linear-gradient(135deg, ${cp} 0%, ${cs} 100%);
-    height: 8px; width: 100%; margin-top: 18px;
-  }
-
-  @media print {
-    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .barra-top, .barra-bottom { -webkit-print-color-adjust: exact; }
-  }
-</style>
-</head>
-<body>
-
-  <img class="watermark" src="${marcaAguaUrl}" onerror="this.style.display='none'" />
-
-  <div class="barra-top"></div>
-
-  <div class="contenido">
-
-    <div class="header">
-      <div class="logo-wrap">
-        <img class="logo" src="${logoUrl}" onerror="this.style.display='none'" />
-      </div>
-      <div class="header-info">
-        <div class="doctor-name">${doctorNombre}</div>
-        ${doctorEspecialidad ? `<div class="especialidad">${doctorEspecialidad}</div>` : ''}
-        <div class="credenciales">
-          ${cedProf ? `Cédula Prof.: ${cedProf}` : ''}
-          ${cedProf && cedEsp ? ' &nbsp;·&nbsp; ' : ''}
-          ${cedEsp ? `Cédula Esp.: ${cedEsp}` : ''}
-        </div>
-        ${direccion || telefono ? `<div class="contacto-consultorio">${[direccion, telefono ? `Tel: ${telefono}` : ''].filter(Boolean).join(' &nbsp;·&nbsp; ')}</div>` : ''}
-      </div>
-      <div class="rp-wrap">
-        <div class="rp">Rx</div>
-        <div class="folio">${folio}</div>
-        ${isSuperAdmin && blogQrDataUrl ? `<img class="blog-qr" src="${blogQrDataUrl}" /><div class="blog-qr-label">Blog del Dr.</div>` : ''}
-      </div>
-    </div>
-
-    <div class="datos-box">
-      <div class="datos-grid">
-        <div class="dato"><span class="dato-label">Fecha</span><span class="dato-valor">${fechaFormat}</span></div>
-        <div class="dato"><span class="dato-label">Paciente</span><span class="dato-valor">${paciente}</span></div>
-        ${edadPaciente != null ? `<div class="dato"><span class="dato-label">Edad</span><span class="dato-valor">${edadPaciente} años</span></div>` : ''}
-        ${sexoPaciente ? `<div class="dato"><span class="dato-label">Sexo</span><span class="dato-valor">${sexoPaciente}</span></div>` : ''}
-        ${diagnostico ? `<div class="dato" style="grid-column:span 2"><span class="dato-label">Diagnóstico</span><span class="dato-valor">${diagnostico}</span></div>` : ''}
-      </div>
-    </div>
-
-    <div class="seccion-header">
-      <div class="seccion-linea"></div>
-      <div class="seccion-titulo">Medicamentos</div>
-      <div class="seccion-linea"></div>
-    </div>
-
-    ${meds}
-
-    ${recomendaciones ? `
-    <div class="seccion-header">
-      <div class="seccion-linea"></div>
-      <div class="seccion-titulo">Recomendaciones</div>
-      <div class="seccion-linea"></div>
-    </div>
-    <div class="recomendaciones">${
-      recomendaciones.split('\n').map(line => {
-        const t = line.trim()
-        if (!t) return '<div style="height:2px"></div>'
-        // Línea de encabezado de segmento (contiene emoji al inicio)
-        if (/^[\u{1F300}-\u{1FAFF}✂️]/u.test(t))
-          return `<span class="rec-header">${t}</span>`
-        // Datos de alarma
-        if (/^🚨/.test(t))
-          return `<p><span class="rec-alarma">${t}</span></p>`
-        // Bullet points
-        if (/^[•\-]/.test(t))
-          return `<p class="rec-bullet">${t}</p>`
-        // Línea con "Keyword: texto" — keyword en bold color
-        if (/^[A-ZÁÉÍÓÚÑÜ][^:]{2,25}:/.test(t)) {
-          const idx = t.indexOf(':')
-          const key = t.slice(0, idx)
-          const rest = t.slice(idx + 1)
-          return `<p><span class="rec-keyword">${key}:</span><em>${rest}</em></p>`
-        }
-        return `<p>${t}</p>`
-      }).join('')
-    }</div>
-    ` : ''}
-
-    <div class="footer-area">
-      <div class="qr-area">
-        <img class="qr-img" src="${qrDataUrl}" />
-        <div class="qr-label">Escanea para<br>verificar receta</div>
-      </div>
-      <div class="firma">
-        <div class="firma-nombre">${doctorNombre}</div>
-        ${cedProf ? `<div class="firma-ced">Céd. Prof. ${cedProf}</div>` : ''}
-        ${cedEsp ? `<div class="firma-ced">Céd. Esp. ${cedEsp}</div>` : ''}
-      </div>
-    </div>
-
-  </div>
-
-  <div class="barra-bottom"></div>
-
-</body>
-</html>
-    `
-    await imprimirOCompartir(_html, 'receta-medica.pdf')
+    await generarPdf({
+      tipo: 'receta',
+      medico: {
+        nombre: doctorNombre,
+        especialidad: doctorEspecialidad,
+        cedula_profesional: cedProf,
+        cedula_especialidad: cedEsp,
+        color_primario: cp,
+        color_secundario: cs,
+        direccion_consultorio: direccion,
+        telefono_consultorio: telefono,
+      },
+      data: {
+        paciente,
+        fecha: fechaFormat,
+        diagnostico,
+        edad: edadPaciente != null ? `${edadPaciente} años` : undefined,
+        sexo: sexoPaciente || undefined,
+        folio,
+        medicamentos: medsData,
+        recomendaciones: recomendaciones || undefined,
+        qrDataUrl,
+        blogQrDataUrl: blogQrDataUrl || undefined,
+      },
+      logoUrl,
+      filename: 'receta-medica.pdf',
+    })
     } finally {
       setImprimiendo(false)
     }

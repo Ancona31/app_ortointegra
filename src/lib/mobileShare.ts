@@ -1,52 +1,14 @@
 /**
- * En desktop: abre ventana emergente y dispara el diálogo de impresión.
- * En móvil:   convierte imágenes a base64, envía el HTML a /api/generar-pdf
- *             (Puppeteer en Vercel) y comparte el PDF vectorial resultante.
+ * Genera PDFs vía @react-pdf/renderer en el servidor.
+ * Tanto desktop como móvil usan el mismo endpoint para PDFs consistentes.
+ *
+ * imprimirOCompartir() — legacy: abre ventana print en desktop, PDF en móvil
+ * generarPdf()         — nuevo: genera PDF vía react-pdf en ambas plataformas
  */
 
-/** Convierte todas las imágenes externas del HTML a base64 data URLs.
- *  Necesario porque Puppeteer en Vercel no puede acceder a URLs de Supabase
- *  Storage que requieren sesión o tienen restricciones CORS desde el servidor.
- */
-async function inlineImages(html: string): Promise<string> {
-  const srcPattern = /src="(https?:\/\/[^"]+)"/g
-  const urls = new Set<string>()
+import type { PdfMedicoData } from '@/lib/pdf/PdfStyles'
 
-  let m
-  while ((m = srcPattern.exec(html)) !== null) urls.add(m[1])
-
-  const replacements = new Map<string, string>()
-  await Promise.all([...urls].map(async (url) => {
-    try {
-      const res  = await fetch(url)
-      const blob = await res.blob()
-      const b64  = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onloadend = () => resolve(reader.result as string)
-        reader.onerror  = reject
-        reader.readAsDataURL(blob)
-      })
-      replacements.set(url, b64)
-    } catch {
-      // Si falla la carga, se deja la URL original
-    }
-  }))
-
-  return html.replace(/src="(https?:\/\/[^"]+)"/g, (_, url) =>
-    `src="${replacements.get(url) ?? url}"`
-  )
-}
-
-const PDF_TIMEOUT_MS = 120_000
-
-async function fetchPdf(body: string, signal: AbortSignal): Promise<Response> {
-  return fetch('/api/generar-pdf', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body,
-    signal,
-  })
-}
+const PDF_TIMEOUT_MS = 30_000
 
 async function fetchPdfConReintento(body: string): Promise<Blob | null> {
   for (let intento = 1; intento <= 2; intento++) {
@@ -54,7 +16,12 @@ async function fetchPdfConReintento(body: string): Promise<Blob | null> {
     const timer = setTimeout(() => controller.abort(), PDF_TIMEOUT_MS)
 
     try {
-      const res = await fetchPdf(body, controller.signal)
+      const res = await fetch('/api/generar-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal: controller.signal,
+      })
       clearTimeout(timer)
 
       if (res.status === 504 && intento === 1) continue
@@ -71,7 +38,7 @@ async function fetchPdfConReintento(body: string): Promise<Blob | null> {
       clearTimeout(timer)
       if (err instanceof DOMException && err.name === 'AbortError') {
         if (intento === 1) continue
-        alert('El servidor tardó demasiado en generar el PDF. Intenta de nuevo o usa una computadora.')
+        alert('El servidor tardó demasiado en generar el PDF. Intenta de nuevo.')
         return null
       }
       alert('Error de conexión al generar el PDF. Verifica tu red e intenta de nuevo.')
@@ -81,44 +48,73 @@ async function fetchPdfConReintento(body: string): Promise<Blob | null> {
   return null
 }
 
-export async function imprimirOCompartir(html: string, filename = 'documento.pdf') {
+function descargarBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+async function compartirODescargar(blob: Blob, filename: string) {
+  const file = new File([blob], filename, { type: 'application/pdf' })
+
+  if (
+    typeof navigator.share === 'function' &&
+    typeof navigator.canShare === 'function' &&
+    navigator.canShare({ files: [file] })
+  ) {
+    try {
+      await navigator.share({ files: [file], title: filename.replace('.pdf', '') })
+      return
+    } catch {
+      // NotAllowedError: user gesture lost after async fetch
+    }
+  }
+  descargarBlob(blob, filename)
+}
+
+/** Genera PDF vía react-pdf en el servidor — funciona en desktop y móvil */
+export async function generarPdf(params: {
+  tipo: string
+  medico: PdfMedicoData | null
+  data: Record<string, unknown>
+  logoUrl?: string
+  filename?: string
+}): Promise<void> {
+  const { tipo, medico, data, logoUrl, filename } = params
+  const defaultFilename = `${tipo.replace(/_/g, '-')}.pdf`
+  const body = JSON.stringify({ tipo, medico, data, logoUrl })
+
+  const pdfBlob = await fetchPdfConReintento(body)
+  if (!pdfBlob) return
+
   const isMobile =
     /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
     window.innerWidth < 768
 
-  if (!isMobile) {
-    // ── Desktop: comportamiento original ──
-    const ventana = window.open('', '_blank', 'width=800,height=600')
-    if (!ventana) return
-    ventana.document.write(html)
-    ventana.document.close()
-    ventana.focus()
-    setTimeout(() => ventana.print(), 500)
-    return
-  }
-
-  // ── Móvil: inline images → PDF vectorial vía Puppeteer ──
-  const htmlConImagenes = await inlineImages(html)
-  const body = JSON.stringify({ html: htmlConImagenes, filename })
-
-  const pdfBlob = await fetchPdfConReintento(body)
-  if (!pdfBlob) return
-  const file    = new File([pdfBlob], filename, { type: 'application/pdf' })
-
-  if (
-    typeof navigator.share    === 'function' &&
-    typeof navigator.canShare === 'function' &&
-    navigator.canShare({ files: [file] })
-  ) {
-    await navigator.share({ files: [file], title: filename.replace('.pdf', '') })
+  if (isMobile) {
+    await compartirODescargar(pdfBlob, filename ?? defaultFilename)
   } else {
+    // Desktop: abrir PDF en nueva pestaña
     const url = URL.createObjectURL(pdfBlob)
-    const a   = document.createElement('a')
-    a.href     = url
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    window.open(url, '_blank')
+    setTimeout(() => URL.revokeObjectURL(url), 60000)
   }
+}
+
+/**
+ * Legacy: mantiene compatibilidad con formularios que aún envían HTML.
+ * Desktop: abre ventana print. Móvil: no soportado (usar generarPdf).
+ */
+export async function imprimirOCompartir(html: string, _filename = 'documento.pdf') {
+  const ventana = window.open('', '_blank', 'width=800,height=600')
+  if (!ventana) return
+  ventana.document.write(html)
+  ventana.document.close()
+  ventana.focus()
+  setTimeout(() => ventana.print(), 500)
 }
