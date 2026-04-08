@@ -33,6 +33,10 @@ export type AuditAccion =
   | 'login_exitoso'
   | 'login_fallido'
   | 'logout'
+  // Derechos ARCO (LFPDPPP)
+  | 'arco_acceso'
+  | 'arco_rectificacion'
+  | 'arco_cancelacion'
   // Acceso no autorizado
   | 'acceso_denegado'
 

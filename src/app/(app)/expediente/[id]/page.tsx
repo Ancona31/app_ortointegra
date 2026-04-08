@@ -62,6 +62,7 @@ function ExpedientePacienteContent() {
   const [paciente, setPaciente] = useState<Paciente | null>(null)
   const [consultas, setConsultas] = useState<Consulta[]>([])
   const [labs, setLabs] = useState<Laboratorio[]>([])
+  const [allAddendums, setAllAddendums] = useState<{ id: string; consulta_id: string; contenido: string; medico_nombre: string; created_at: string }[]>([])
   const [tab, setTab] = useState<Tab>('resumen')
   const [loading, setLoading] = useState(true)
   const [eliminandoLab, setEliminandoLab] = useState<string | null>(null)
@@ -96,6 +97,16 @@ function ExpedientePacienteContent() {
       setLabs(l || [])
       setDocumentos(d || [])
       setLoading(false)
+
+      // Cargar addendums de todas las consultas
+      const consultaIds = (c || []).map((con: { id: string }) => con.id)
+      if (consultaIds.length > 0) {
+        supabase.from('addendums')
+          .select('id, consulta_id, contenido, medico_nombre, created_at')
+          .in('consulta_id', consultaIds)
+          .order('created_at', { ascending: true })
+          .then((res: { data: { id: string; consulta_id: string; contenido: string; medico_nombre: string; created_at: string }[] | null }) => setAllAddendums(res.data || []))
+      }
     }
     cargar()
   }, [id])
@@ -359,6 +370,7 @@ function ExpedientePacienteContent() {
               consultas={consultas}
               labs={labs}
               documentos={documentos}
+              addendums={allAddendums}
             />
             <button
               onClick={() => setMostrarEliminarPaciente(true)}

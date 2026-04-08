@@ -6,11 +6,14 @@ import { es } from 'date-fns/locale'
 import { FileDown } from 'lucide-react'
 import { PRINT_CSS, markdownToHtml } from '@/lib/printStyles'
 
+type Addendum = { id: string; consulta_id: string; contenido: string; medico_nombre: string; created_at: string }
+
 interface Props {
   paciente: Paciente
   consultas: Consulta[]
   labs: Laboratorio[]
   documentos: Documento[]
+  addendums?: Addendum[]
 }
 
 const ESTADO_BADGE: Record<string, string> = {
@@ -81,7 +84,7 @@ const EXTRA_CSS = `
   .proxima { background:#e8f4fd; border-left:3px solid #1e5fa8; padding:4px 8px; font-size:8pt; margin-top:6px; }
 `
 
-export default function ExportarExpedienteButton({ paciente, consultas, labs, documentos }: Props) {
+export default function ExportarExpedienteButton({ paciente, consultas, labs, documentos, addendums = [] }: Props) {
   function exportar() {
     const edad = paciente.fecha_nacimiento
       ? differenceInYears(new Date(), parseISO(paciente.fecha_nacimiento))
@@ -152,6 +155,19 @@ export default function ExportarExpedienteButton({ paciente, consultas, labs, do
           `<span class="diag-chip">${d.codigo_cie10 ? `${d.codigo_cie10} · ` : ''}${d.descripcion}</span>`
         ).join('')
 
+        const consultaAddendums = addendums.filter(a => a.consulta_id === c.id)
+        const addendumsHtml = consultaAddendums.length === 0 ? '' : `
+          <div style="margin-top:8px;border-top:1px solid #e2e8f0;padding-top:6px;">
+            <div style="font-size:7.5pt;font-weight:600;color:#1e5fa8;margin-bottom:4px;">Notas aclaratorias (${consultaAddendums.length})</div>
+            ${consultaAddendums.map(a => `
+              <div style="margin-bottom:6px;padding:5px 8px;background:#f0f4ff;border-left:2px solid #1e5fa8;border-radius:3px;">
+                <div style="font-size:7pt;color:#64748b;">${format(parseISO(a.created_at), "dd/MM/yyyy HH:mm", { locale: es })} — ${a.medico_nombre}</div>
+                <div style="font-size:8pt;color:#334155;white-space:pre-line;">${a.contenido}</div>
+              </div>
+            `).join('')}
+          </div>
+        `
+
         return `
           <div class="consulta-bloque">
             <div class="consulta-header">
@@ -162,6 +178,7 @@ export default function ExportarExpedienteButton({ paciente, consultas, labs, do
             ${c.notas_evolucion ? `<div class="nota-content">${markdownToHtml(c.notas_evolucion)}</div>` : ''}
             ${c.plan_tratamiento ? `<div style="margin-top:6px;font-size:8.5pt"><strong>Plan:</strong> ${c.plan_tratamiento}</div>` : ''}
             ${c.proxima_cita ? `<div class="proxima">Próxima cita: ${c.proxima_cita}</div>` : ''}
+            ${addendumsHtml}
           </div>
         `
       }).join('')}
