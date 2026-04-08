@@ -32,7 +32,9 @@ const PURIFY_CONFIG = {
   ],
   ALLOW_DATA_ATTR: false,
   FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'textarea', 'button', 'select', 'link'],
-  FORBID_ATTR: ['onerror', 'onclick', 'onload', 'onmouseover', 'onfocus', 'onblur', 'onchange', 'onsubmit'],
+  FORBID_ATTR: ['onclick', 'onmouseover', 'onfocus', 'onblur', 'onchange', 'onsubmit'],
+  // onerror y onload permitidos: se usan en imgs para ocultar logos que no cargan.
+  // No son vector de ataque en Puppeteer server-side (no hay usuario interactuando).
   WHOLE_DOCUMENT: true,
 }
 
@@ -79,20 +81,24 @@ export async function POST(req: NextRequest) {
 
     const page = await browser.newPage()
 
-    // SSRF protection: interceptar requests y bloquear URLs externas
-    // Solo permitir data: URIs (imágenes inline) y about:blank
+    // SSRF protection: interceptar requests y bloquear URLs no confiables
+    // Permitir: data: URIs (imágenes inline), about:blank, y Supabase Storage (logos)
     await page.setRequestInterception(true)
     page.on('request', (request) => {
       const url = request.url()
-      if (url.startsWith('data:') || url === 'about:blank') {
+      if (
+        url.startsWith('data:') ||
+        url === 'about:blank' ||
+        url.includes('.supabase.co/storage/')
+      ) {
         request.continue()
       } else {
-        // Bloquear cualquier request a URLs externas o internas
         request.abort('blockedbyclient')
       }
     })
 
-    await page.setContent(cleanHtml, { waitUntil: 'domcontentloaded', timeout: 30000 })
+    // networkidle0: esperar a que todas las imágenes (Supabase Storage) terminen de cargar
+    await page.setContent(cleanHtml, { waitUntil: 'networkidle0', timeout: 30000 })
 
     // preferCSSPageSize respeta las reglas @page del HTML (márgenes, tamaño)
     const pdfBuffer = await page.pdf({
