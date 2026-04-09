@@ -39,6 +39,21 @@ export type AuditAccion =
   | 'arco_cancelacion'
   // Acceso no autorizado
   | 'acceso_denegado'
+  // Acciones de super_admin (centro de control)
+  | 'sa_crear_clinica'
+  | 'sa_eliminar_clinica'
+  | 'sa_editar_clinica'
+  | 'sa_suspender_clinica'
+  | 'sa_reactivar_clinica'
+  | 'sa_upgrade_clinica'
+  | 'sa_toggle_vip'
+  | 'sa_subir_logo'
+  | 'sa_crear_independiente'
+  | 'sa_eliminar_independiente'
+  | 'sa_crear_usuario_clinica'
+  | 'sa_eliminar_usuario_clinica'
+  | 'sa_asignar_admin'
+  | 'sa_ver_dashboard'
 
 interface AuditParams {
   userId?: string | null

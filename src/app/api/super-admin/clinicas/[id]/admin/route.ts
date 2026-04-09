@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireSuperAdmin } from '@/lib/auth'
+import { logAudit } from '@/lib/audit'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { error: authError } = await requireSuperAdmin()
-  if (authError) return authError
+  const auth = await requireSuperAdmin()
+  if (auth.error) return auth.error
 
   const { id: clinicaId } = await params
   const { nombre, email, password } = await req.json()
@@ -47,6 +48,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     role: 'admin',
     nombre,
     clinica_id: clinicaId,
+  })
+
+  await logAudit({
+    userId: auth.user.id,
+    accion: 'sa_asignar_admin',
+    tabla: 'profiles',
+    registroId: newUser.user.id,
+    descripcion: `clinica=${clinicaId}; email=${email}`,
   })
 
   return NextResponse.json({ ok: true })

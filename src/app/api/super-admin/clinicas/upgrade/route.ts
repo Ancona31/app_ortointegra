@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireSuperAdmin } from '@/lib/auth'
+import { logAudit } from '@/lib/audit'
 
 /* ── POST /api/super-admin/clinicas/upgrade ─────────────────
    Convierte una cuenta independiente en cuenta de clínica.
@@ -10,8 +11,8 @@ import { requireSuperAdmin } from '@/lib/auth'
    Body: { clinicaId, max_medicos, max_secretarias, max_pacientes }
 ──────────────────────────────────────────────────────────── */
 export async function POST(req: NextRequest) {
-  const { error: authError } = await requireSuperAdmin()
-  if (authError) return authError
+  const auth = await requireSuperAdmin()
+  if (auth.error) return auth.error
 
   const { clinicaId, max_medicos, max_secretarias, max_pacientes } = await req.json()
   if (!clinicaId) return NextResponse.json({ error: 'Falta clinicaId' }, { status: 400 })
@@ -51,6 +52,14 @@ export async function POST(req: NextRequest) {
     .in('role', ['medico', 'admin'])
 
   if (profileErr) return NextResponse.json({ error: profileErr.message }, { status: 500 })
+
+  await logAudit({
+    userId: auth.user.id,
+    accion: 'sa_upgrade_clinica',
+    tabla: 'clinicas',
+    registroId: String(clinicaId),
+    descripcion: `max_medicos=${max_medicos}; max_secretarias=${max_secretarias}; max_pacientes=${max_pacientes}`,
+  })
 
   return NextResponse.json({ ok: true })
 }

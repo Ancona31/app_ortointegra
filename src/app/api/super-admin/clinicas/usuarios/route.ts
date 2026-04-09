@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireSuperAdmin } from '@/lib/auth'
+import { logAudit } from '@/lib/audit'
 
 /* ── DELETE /api/super-admin/clinicas/usuarios ──────────────
    Elimina un usuario (auth + profile) de una clínica.
@@ -9,8 +10,8 @@ import { requireSuperAdmin } from '@/lib/auth'
    Body: { userId: string }
 ──────────────────────────────────────────────────────────── */
 export async function DELETE(req: NextRequest) {
-  const { error: authError } = await requireSuperAdmin()
-  if (authError) return authError
+  const auth = await requireSuperAdmin()
+  if (auth.error) return auth.error
 
   const { userId } = await req.json()
   if (!userId) return NextResponse.json({ error: 'Falta userId' }, { status: 400 })
@@ -50,6 +51,14 @@ export async function DELETE(req: NextRequest) {
   // Eliminar el usuario de Supabase Auth
   const { error: authErr } = await admin.auth.admin.deleteUser(userId)
   if (authErr) return NextResponse.json({ error: authErr.message }, { status: 500 })
+
+  await logAudit({
+    userId: auth.user.id,
+    accion: 'sa_eliminar_usuario_clinica',
+    tabla: 'profiles',
+    registroId: String(userId),
+    descripcion: `clinica=${perfil?.clinica_id ?? 'unknown'}; rol=${perfil?.role ?? 'unknown'}`,
+  })
 
   return NextResponse.json({ ok: true })
 }

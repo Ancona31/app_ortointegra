@@ -7,7 +7,7 @@ import {
   ClipboardList, BedDouble, PenLine, ShieldCheck, Receipt,
   CalendarDays, BarChart2, Users, CreditCard, UserCircle,
   HelpCircle, ChevronRight, Menu, X, LogOut, Moon, Sun,
-  Building2, TrendingUp, UserPlus,
+  Building2, TrendingUp, UserPlus, LayoutDashboard,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -60,8 +60,9 @@ function navDoctor(isAdmin: boolean, isSuperAdmin: boolean): NavSection[] {
       { kind: 'leaf' as const, href: '/billing',        label: 'Facturación',             icon: CreditCard },
     ] : []),
     ...(isSuperAdmin ? [
-      { kind: 'leaf' as const, href: '/super-admin/clinicas', label: 'Clínicas',  icon: Building2 },
-      { kind: 'leaf' as const, href: '/super-admin/metricas', label: 'Métricas',  icon: BarChart2 },
+      { kind: 'leaf' as const, href: '/super-admin/dashboard', label: 'Dashboard Admin', icon: LayoutDashboard },
+      { kind: 'leaf' as const, href: '/super-admin/clinicas',  label: 'Clínicas',        icon: Building2 },
+      { kind: 'leaf' as const, href: '/super-admin/metricas',  label: 'Métricas',        icon: BarChart2 },
     ] : []),
   ]
 

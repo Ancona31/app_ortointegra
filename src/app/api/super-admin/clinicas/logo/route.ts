@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireSuperAdmin } from '@/lib/auth'
+import { logAudit } from '@/lib/audit'
 
 export async function POST(req: NextRequest) {
   const { user, error } = await requireSuperAdmin()
@@ -47,6 +48,14 @@ export async function POST(req: NextRequest) {
 
   // Guardar URL en clinicas
   await admin.from('clinicas').update({ logo_url: publicUrl }).eq('id', clinicaId)
+
+  await logAudit({
+    userId: user.id,
+    accion: 'sa_subir_logo',
+    tabla: 'clinicas',
+    registroId: String(clinicaId),
+    descripcion: `mime=${file.type}`,
+  })
 
   return NextResponse.json({ url: publicUrl })
 }

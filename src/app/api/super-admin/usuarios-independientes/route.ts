@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireSuperAdmin } from '@/lib/auth'
+import { logAudit } from '@/lib/audit'
 
 export async function POST(req: NextRequest) {
-  const { error: authError } = await requireSuperAdmin()
-  if (authError) return authError
+  const auth = await requireSuperAdmin()
+  if (auth.error) return auth.error
 
   const { email, password, nombre, titulo, especialidad, cedula_profesional } = await req.json()
 
@@ -59,12 +60,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Error al crear el perfil: ' + profileError.message }, { status: 500 })
   }
 
+  await logAudit({
+    userId: auth.user.id,
+    accion: 'sa_crear_independiente',
+    tabla: 'clinicas',
+    registroId: clinica.id,
+    descripcion: `email=${email}; nombre=${nombre}`,
+  })
+
   return NextResponse.json({ ok: true, clinica_id: clinica.id })
 }
 
 export async function DELETE(req: NextRequest) {
-  const { error: authError } = await requireSuperAdmin()
-  if (authError) return authError
+  const auth = await requireSuperAdmin()
+  if (auth.error) return auth.error
 
   const { clinicaId } = await req.json()
   if (!clinicaId) return NextResponse.json({ error: 'clinicaId requerido' }, { status: 400 })
@@ -111,6 +120,14 @@ export async function DELETE(req: NextRequest) {
   // 7. Eliminar la clínica personal
   const { error } = await admin.from('clinicas').delete().eq('id', clinicaId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  await logAudit({
+    userId: auth.user.id,
+    accion: 'sa_eliminar_independiente',
+    tabla: 'clinicas',
+    registroId: String(clinicaId),
+    descripcion: `pacientes_anonimizados=${pacienteIds.length}`,
+  })
 
   return NextResponse.json({ ok: true })
 }

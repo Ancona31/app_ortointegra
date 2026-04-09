@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireSuperAdmin } from '@/lib/auth'
+import { logAudit } from '@/lib/audit'
 
 export async function GET() {
   const { user, error } = await requireSuperAdmin()
   if (error) return error
+  void user
 
   const admin = createAdminClient()
   const { data: clinicas } = await admin.from('clinicas').select('*').order('nombre')
@@ -52,8 +54,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const { error: authError } = await requireSuperAdmin()
-  if (authError) return authError
+  const auth = await requireSuperAdmin()
+  if (auth.error) return auth.error
 
   const { nombre, max_medicos, max_secretarias, adminNombre, adminEmail, adminPassword } = await req.json()
 
@@ -102,12 +104,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Error al crear perfil: ${profileErr.message}` }, { status: 500 })
   }
 
+  await logAudit({
+    userId: auth.user.id,
+    accion: 'sa_crear_clinica',
+    tabla: 'clinicas',
+    registroId: nuevaClinica.id,
+    descripcion: `nombre=${nombre}; admin=${adminEmail}`,
+  })
+
   return NextResponse.json({ ok: true })
 }
 
 export async function PATCH(req: NextRequest) {
-  const { error: authError } = await requireSuperAdmin()
-  if (authError) return authError
+  const auth = await requireSuperAdmin()
+  if (auth.error) return auth.error
 
   const body = await req.json()
   const { id } = body
@@ -126,6 +136,20 @@ export async function PATCH(req: NextRequest) {
   const admin = createAdminClient()
   const { error } = await admin.from('clinicas').update(campos).eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+  // Determinar acción específica para el audit
+  let accion: 'sa_toggle_vip' | 'sa_suspender_clinica' | 'sa_reactivar_clinica' | 'sa_editar_clinica' =
+    'sa_editar_clinica'
+  if ('max_pacientes' in body) accion = 'sa_toggle_vip'
+  else if ('suspendida' in body) accion = body.suspendida ? 'sa_suspender_clinica' : 'sa_reactivar_clinica'
+
+  await logAudit({
+    userId: auth.user.id,
+    accion,
+    tabla: 'clinicas',
+    registroId: String(id),
+    descripcion: JSON.stringify(campos),
+  })
 
   return NextResponse.json({ ok: true })
 }
