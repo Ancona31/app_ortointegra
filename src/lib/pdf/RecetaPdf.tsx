@@ -35,7 +35,7 @@ export function renderReceta(props: RecetaPdfProps) {
   return <RecetaPdf {...props} />
 }
 
-/** Parsea las recomendaciones en fragmentos con estilo */
+/** Parsea las recomendaciones en fragmentos con estilo (compacto 7.5pt) */
 function parseRecomendaciones(text: string, cpColor: string, csColor: string) {
   const lines = text.split('\n').filter((l) => l.trim().length > 0)
 
@@ -45,7 +45,7 @@ function parseRecomendaciones(text: string, cpColor: string, csColor: string) {
     // Lines starting with alarm emoji — bold red
     if (trimmed.startsWith('\u{1F6A8}')) {
       return (
-        <Text key={i} style={{ fontSize: 10, fontWeight: 700, color: '#dc2626', lineHeight: 1.6, marginBottom: 2 }}>
+        <Text key={i} style={{ fontSize: 7.5, fontWeight: 700, color: '#dc2626', lineHeight: 1.3, marginBottom: 0.5 }}>
           {trimmed}
         </Text>
       )
@@ -55,7 +55,7 @@ function parseRecomendaciones(text: string, cpColor: string, csColor: string) {
     const emojiHeaderMatch = /^([\u{1F300}-\u{1F9FF}\u{2600}-\u{27BF}\u{2B50}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}][\u{FE00}-\u{FE0F}\u{200D}\u{20E3}]*)\s*(.+)/u.exec(trimmed)
     if (emojiHeaderMatch) {
       return (
-        <Text key={i} style={{ fontSize: 10.5, fontWeight: 700, color: cpColor, lineHeight: 1.6, marginTop: 6, marginBottom: 2 }}>
+        <Text key={i} style={{ fontSize: 8, fontWeight: 700, color: cpColor, lineHeight: 1.3, marginTop: 2, marginBottom: 0.5 }}>
           {trimmed}
         </Text>
       )
@@ -64,7 +64,7 @@ function parseRecomendaciones(text: string, cpColor: string, csColor: string) {
     // Lines starting with bullet (-, *, •) — indented
     if (/^[-*\u2022]\s/.test(trimmed)) {
       return (
-        <Text key={i} style={{ fontSize: 9.5, color: '#555', paddingLeft: 14, lineHeight: 1.6, marginBottom: 1 }}>
+        <Text key={i} style={{ fontSize: 7.5, color: '#555', paddingLeft: 10, lineHeight: 1.3 }}>
           {trimmed}
         </Text>
       )
@@ -74,7 +74,7 @@ function parseRecomendaciones(text: string, cpColor: string, csColor: string) {
     const keywordMatch = /^([A-Za-z\u00C0-\u00FF\s]+):\s*(.*)/.exec(trimmed)
     if (keywordMatch) {
       return (
-        <Text key={i} style={{ fontSize: 10, lineHeight: 1.6, marginBottom: 1 }}>
+        <Text key={i} style={{ fontSize: 7.5, lineHeight: 1.3 }}>
           <Text style={{ fontWeight: 700, color: csColor }}>{keywordMatch[1]}:</Text>
           {' '}{keywordMatch[2]}
         </Text>
@@ -83,14 +83,14 @@ function parseRecomendaciones(text: string, cpColor: string, csColor: string) {
 
     // Default text
     return (
-      <Text key={i} style={{ fontSize: 10, color: '#333', lineHeight: 1.6, marginBottom: 1 }}>
+      <Text key={i} style={{ fontSize: 7.5, color: '#333', lineHeight: 1.3 }}>
         {trimmed}
       </Text>
     )
   })
 }
 
-/** Bloque de firma inline (para uso dentro de un row, no el componente completo) */
+/** Bloque de firma inline compacto */
 function FirmaInline({ medico, colors }: { medico: PdfMedicoData | null; colors: PdfColors }) {
   const nombre = medico?.nombre || 'Médico'
   const cedProf = medico?.cedula_profesional || ''
@@ -99,28 +99,28 @@ function FirmaInline({ medico, colors }: { medico: PdfMedicoData | null; colors:
   const s = StyleSheet.create({
     firma: {
       textAlign: 'center',
-      minWidth: 220,
+      minWidth: 190,
     },
     linea: {
       borderTopWidth: 1,
       borderTopColor: colors.cp,
       borderTopStyle: 'dashed',
-      paddingTop: 8,
+      paddingTop: 5,
     },
     nombre: {
       fontWeight: 700,
-      fontSize: 9.5,
+      fontSize: 8.5,
       color: colors.cp,
     },
     ced: {
-      fontSize: 7.5,
+      fontSize: 6.5,
       color: '#666',
-      marginTop: 2,
+      marginTop: 1,
     },
     firmaLabel: {
-      fontSize: 6,
+      fontSize: 5.5,
       color: '#c0c0c0',
-      marginTop: 5,
+      marginTop: 3,
       textTransform: 'uppercase',
       letterSpacing: 1.5,
     },
@@ -142,12 +142,20 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
   const colors = getPdfColors(medico)
 
   const s = StyleSheet.create({
+    /* ---------- Contenido compacto para receta ---------- */
+    contenido: {
+      paddingHorizontal: 40,
+      paddingTop: 12,
+      paddingBottom: 6,
+      flex: 1,
+    },
+
     /* ---------- Rx decorativo ---------- */
     rxText: {
       position: 'absolute',
-      top: 82,
-      right: 50,
-      fontSize: 42,
+      top: 66,
+      right: 40,
+      fontSize: 34,
       fontWeight: 700,
       color: colors.cs,
       opacity: 0.8,
@@ -155,15 +163,54 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
 
     /* ---------- Datos del paciente ---------- */
     patientBox: {
-      marginTop: 8,
-      marginBottom: 10,
+      marginTop: 2,
+      marginBottom: 2,
+    },
+    datoRow: {
+      flexDirection: 'row',
+      gap: 6,
+      marginBottom: 0,
     },
     datoField: {
-      ...baseStyles.datoField,
+      flex: 1,
+      marginBottom: 4,
+      borderWidth: 0.5,
+      borderColor: '#e5e7eb',
+      borderRadius: 2,
+      paddingHorizontal: 5,
+      paddingTop: 2,
+      paddingBottom: 3,
     },
     datoLabel: {
-      ...baseStyles.datoLabel,
+      fontSize: 5.5,
+      fontWeight: 700,
       color: colors.cp,
+      marginBottom: 0.5,
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+    },
+    datoValor: {
+      fontSize: 8.5,
+      color: '#1a1a1a',
+      fontWeight: 500,
+      lineHeight: 1.2,
+    },
+
+    /* ---------- Sección heading ---------- */
+    seccionWrap: {
+      backgroundColor: colors.cp + '0A',
+      borderLeftWidth: 3,
+      borderLeftColor: colors.cp,
+      borderRadius: 3,
+      paddingVertical: 3,
+      paddingLeft: 8,
+      marginTop: 6,
+      marginBottom: 4,
+    },
+    seccionText: {
+      color: colors.cp,
+      fontSize: 9,
+      fontWeight: 700,
     },
 
     /* ---------- Tabla medicamentos ---------- */
@@ -172,19 +219,19 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
       backgroundColor: colors.cp,
       borderTopLeftRadius: 3,
       borderTopRightRadius: 3,
-      paddingVertical: 6,
+      paddingVertical: 3,
       paddingHorizontal: 4,
     },
     tblHeaderText: {
-      fontSize: 8,
+      fontSize: 6.5,
       fontWeight: 700,
       color: '#ffffff',
       textTransform: 'uppercase',
-      letterSpacing: 0.4,
+      letterSpacing: 0.3,
     },
     tblRow: {
       flexDirection: 'row',
-      paddingVertical: 6,
+      paddingVertical: 3,
       paddingHorizontal: 4,
       borderBottomWidth: 0.5,
       borderBottomColor: '#e5e7eb',
@@ -193,60 +240,56 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
       backgroundColor: '#f8f9fb',
     },
     colNum: {
-      width: 24,
+      width: 18,
       alignItems: 'center',
       justifyContent: 'center',
     },
     colMed: {
       flex: 3,
-      paddingRight: 6,
+      paddingRight: 4,
     },
     colVia: {
       flex: 1,
-      paddingRight: 6,
+      paddingRight: 4,
     },
     colInd: {
       flex: 2,
     },
     numText: {
-      fontSize: 11,
+      fontSize: 8.5,
       fontWeight: 700,
       color: colors.cs,
     },
     medNombre: {
-      fontSize: 10,
+      fontSize: 8,
       fontWeight: 700,
       textTransform: 'uppercase',
     },
     medPresentacion: {
-      fontSize: 9,
+      fontSize: 7,
       color: '#555',
-      marginTop: 1,
+      marginTop: 0.5,
     },
     medPrincipio: {
-      fontSize: 8.5,
+      fontSize: 6.5,
       color: '#888',
-      marginTop: 1,
+      marginTop: 0.5,
     },
     viaText: {
-      fontSize: 9.5,
+      fontSize: 7.5,
       color: colors.cs,
       fontWeight: 500,
     },
     indText: {
-      fontSize: 9.5,
+      fontSize: 7.5,
       color: '#333',
-      lineHeight: 1.4,
+      lineHeight: 1.3,
     },
 
-    /* ---------- Secciones ---------- */
-    seccionWrap: {
-      backgroundColor: colors.cp + '0A',
-      borderRadius: 3,
-    },
+    /* ---------- Recomendaciones ---------- */
     recomendacionesBody: {
-      marginTop: 4,
-      paddingLeft: 6,
+      marginTop: 1,
+      paddingLeft: 4,
     },
 
     /* ---------- Footer: QR + Firma ---------- */
@@ -254,39 +297,40 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
       flexDirection: 'row',
       alignItems: 'flex-end',
       justifyContent: 'space-between',
-      marginTop: 28,
+      marginTop: 10,
+      paddingTop: 8,
     },
     qrGroup: {
       flexDirection: 'row',
-      gap: 12,
+      gap: 8,
     },
     qrWrap: {
       alignItems: 'center',
-      gap: 4,
+      gap: 2,
     },
     qrImage: {
-      width: 72,
-      height: 72,
+      width: 50,
+      height: 50,
     },
     qrLabel: {
-      fontSize: 6.5,
+      fontSize: 5,
       color: '#999',
       textAlign: 'center',
-      maxWidth: 80,
+      maxWidth: 58,
     },
     blogQrWrap: {
       alignItems: 'center',
-      gap: 4,
+      gap: 2,
     },
     blogQrImage: {
-      width: 56,
-      height: 56,
+      width: 40,
+      height: 40,
     },
     blogQrLabel: {
-      fontSize: 6,
+      fontSize: 4.5,
       color: '#aaa',
       textAlign: 'center',
-      maxWidth: 70,
+      maxWidth: 50,
     },
     firmaWrap: {
       flex: 1,
@@ -294,15 +338,12 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
     },
   })
 
-  const hasQr = Boolean(data.qrDataUrl)
-  const hasBlogQr = Boolean(data.blogQrDataUrl)
-
   return (
     <Document>
       <Page size="LETTER" style={baseStyles.page}>
         <BarraTop colors={colors} />
 
-        <View style={baseStyles.contenido}>
+        <View style={s.contenido}>
           <PdfWatermark logoUrl={logoUrl} />
 
           <PdfHeader
@@ -311,52 +352,48 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
             logoUrl={logoUrl}
             folio={data.folio}
             fecha={data.fecha}
+            compact
           />
 
           {/* Rx decorativo */}
           <Text style={s.rxText}>Rx</Text>
 
-          {/* ──── Datos del paciente ──── */}
+          {/* Datos del paciente — 2 filas compactas */}
           <View style={s.patientBox}>
-            {/* Row 1: Fecha + Paciente */}
-            <View style={baseStyles.datoRow}>
+            {/* Row 1: Fecha + Paciente + Edad + Sexo */}
+            <View style={s.datoRow}>
               <View style={s.datoField}>
                 <Text style={s.datoLabel}>FECHA</Text>
-                <Text style={baseStyles.datoValor}>{data.fecha}</Text>
+                <Text style={s.datoValor}>{data.fecha}</Text>
               </View>
               <View style={{ ...s.datoField, flex: 2 }}>
                 <Text style={s.datoLabel}>PACIENTE</Text>
-                <Text style={baseStyles.datoValor}>{data.paciente}</Text>
+                <Text style={s.datoValor}>{data.paciente}</Text>
               </View>
-            </View>
-
-            {/* Row 2: Edad + Sexo */}
-            <View style={baseStyles.datoRow}>
               <View style={s.datoField}>
                 <Text style={s.datoLabel}>EDAD</Text>
-                <Text style={baseStyles.datoValor}>{data.edad || '\u2014'}</Text>
+                <Text style={s.datoValor}>{data.edad || '\u2014'}</Text>
               </View>
               <View style={s.datoField}>
                 <Text style={s.datoLabel}>SEXO</Text>
-                <Text style={baseStyles.datoValor}>{data.sexo || '\u2014'}</Text>
+                <Text style={s.datoValor}>{data.sexo || '\u2014'}</Text>
               </View>
             </View>
 
-            {/* Row 3: Diagnóstico (full width) */}
+            {/* Row 2: Diagnóstico (full width) */}
             <View style={{ ...s.datoField, marginBottom: 0 }}>
               <Text style={s.datoLabel}>{`DIAGN\u00D3STICO`}</Text>
-              <Text style={baseStyles.datoValor}>{data.diagnostico || '\u2014'}</Text>
+              <Text style={s.datoValor}>{data.diagnostico || '\u2014'}</Text>
             </View>
           </View>
 
-          {/* ──── Sección Medicamentos ──── */}
-          <View style={[baseStyles.seccion, s.seccionWrap, { borderLeftColor: colors.cp }]}>
-            <Text style={{ color: colors.cp, fontSize: 11, fontWeight: 700 }}>Medicamentos</Text>
+          {/* Sección Medicamentos */}
+          <View style={s.seccionWrap}>
+            <Text style={s.seccionText}>Medicamentos</Text>
           </View>
 
-          {/* Tabla de medicamentos */}
+          {/* Tabla de medicamentos — wrap={false} mantiene cada fila junta */}
           <View>
-            {/* Header */}
             <View style={s.tblHeader}>
               <View style={s.colNum}>
                 <Text style={s.tblHeaderText}>#</Text>
@@ -372,7 +409,6 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
               </View>
             </View>
 
-            {/* Rows */}
             {data.medicamentos.map((med, idx) => (
               <View
                 key={idx}
@@ -401,20 +437,20 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
             ))}
           </View>
 
-          {/* ──── Recomendaciones ──── */}
+          {/* Recomendaciones */}
           {data.recomendaciones ? (
-            <>
-              <View style={[baseStyles.seccion, s.seccionWrap, { borderLeftColor: colors.cp }]}>
-                <Text style={{ color: colors.cp, fontSize: 11, fontWeight: 700 }}>Recomendaciones</Text>
+            <View>
+              <View style={s.seccionWrap}>
+                <Text style={s.seccionText}>Recomendaciones</Text>
               </View>
               <View style={s.recomendacionesBody}>
                 {parseRecomendaciones(data.recomendaciones, colors.cp, colors.cs)}
               </View>
-            </>
+            </View>
           ) : null}
 
-          {/* ──── Footer: QR(s) izquierda + Firma derecha ──── */}
-          <View style={s.footerRow}>
+          {/* Footer: QR(s) izquierda + Firma derecha */}
+          <View style={s.footerRow} wrap={false}>
             <View style={s.qrGroup}>
               {data.qrDataUrl ? (
                 <View style={s.qrWrap}>

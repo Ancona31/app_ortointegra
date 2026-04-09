@@ -7,9 +7,11 @@ interface Props {
   logoUrl?: string
   folio?: string
   fecha?: string
+  /** Modo compacto: logo más pequeño, menos espaciado (para receta) */
+  compact?: boolean
 }
 
-export default function PdfHeader({ medico, colors, logoUrl, folio, fecha }: Props) {
+export default function PdfHeader({ medico, colors, logoUrl, folio, fecha, compact }: Props) {
   const nombre = medico?.nombre || 'Médico'
   const esp = medico?.especialidad || ''
   const cedProf = medico?.cedula_profesional || ''
@@ -25,17 +27,20 @@ export default function PdfHeader({ medico, colors, logoUrl, folio, fecha }: Pro
     cedEsp ? `Céd. Esp. ${cedEsp}` : '',
   ].filter(Boolean).join('   ·   ')
 
+  const logoSize = compact ? 42 : 62
+  const logoInner = compact ? 38 : 56
+
   const s = StyleSheet.create({
     headerRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 14,
+      gap: compact ? 10 : 14,
       marginBottom: 0,
     },
     logoWrap: {
-      width: 62,
-      height: 62,
-      borderRadius: 31,
+      width: logoSize,
+      height: logoSize,
+      borderRadius: logoSize / 2,
       borderWidth: 1.5,
       borderColor: colors.cp + '40',
       overflow: 'hidden',
@@ -44,15 +49,15 @@ export default function PdfHeader({ medico, colors, logoUrl, folio, fecha }: Pro
       backgroundColor: '#fafbfc',
     },
     logo: {
-      width: 56,
-      height: 56,
+      width: logoInner,
+      height: logoInner,
       objectFit: 'contain',
     },
     info: {
       flex: 1,
     },
     name: {
-      fontSize: 16,
+      fontSize: compact ? 13 : 16,
       fontWeight: 700,
       color: colors.cp,
       letterSpacing: 0.3,
@@ -60,16 +65,16 @@ export default function PdfHeader({ medico, colors, logoUrl, folio, fecha }: Pro
     },
     especialidadBadge: {
       backgroundColor: colors.cs + '12',
-      paddingHorizontal: 8,
-      paddingVertical: 2,
+      paddingHorizontal: compact ? 6 : 8,
+      paddingVertical: compact ? 1.5 : 2,
       borderRadius: 10,
       borderWidth: 0.5,
       borderColor: colors.cs + '30',
       alignSelf: 'flex-start',
-      marginTop: 3,
+      marginTop: compact ? 2 : 3,
     },
     especialidadText: {
-      fontSize: 8,
+      fontSize: compact ? 7 : 8,
       color: colors.cs,
       fontWeight: 500,
       letterSpacing: 0.3,
@@ -77,7 +82,7 @@ export default function PdfHeader({ medico, colors, logoUrl, folio, fecha }: Pro
     credsRow: {
       flexDirection: 'row',
       gap: 10,
-      marginTop: 4,
+      marginTop: compact ? 2 : 4,
     },
     cedItem: {
       flexDirection: 'row',
@@ -91,13 +96,13 @@ export default function PdfHeader({ medico, colors, logoUrl, folio, fecha }: Pro
       backgroundColor: colors.cs,
     },
     cedText: {
-      fontSize: 7.5,
+      fontSize: compact ? 7 : 7.5,
       color: '#666',
     },
     contacto: {
-      fontSize: 7,
+      fontSize: compact ? 6.5 : 7,
       color: '#888',
-      marginTop: 3,
+      marginTop: compact ? 1 : 3,
     },
     meta: {
       alignItems: 'flex-end',
@@ -116,15 +121,15 @@ export default function PdfHeader({ medico, colors, logoUrl, folio, fecha }: Pro
       marginTop: 1,
     },
     separadorGrueso: {
-      height: 2,
+      height: compact ? 1.5 : 2,
       backgroundColor: colors.cp,
-      marginTop: 10,
+      marginTop: compact ? 6 : 10,
     },
     separadorFino: {
       height: 0.5,
       backgroundColor: colors.cs,
       marginTop: 1.5,
-      marginBottom: 12,
+      marginBottom: compact ? 8 : 12,
     },
   })
 
