@@ -370,6 +370,241 @@ export const ingresosResumenSchema: z.ZodType<IngresosResumen> = z.object({
 })
 
 // ──────────────────────────────────────────────────────────────────
+// Sección 4 — Uso de plataforma
+// ──────────────────────────────────────────────────────────────────
+
+export interface RankingFuncion {
+  accion: string
+  total: number
+}
+
+export const rankingFuncionSchema: z.ZodType<RankingFuncion> = z.object({
+  accion: z.string(),
+  total: z.number(),
+})
+
+export interface HeatmapCell {
+  hora: number      // 0-23
+  diaSemana: number // 0=domingo … 6=sábado
+  total: number
+}
+
+export const heatmapCellSchema: z.ZodType<HeatmapCell> = z.object({
+  hora: z.number(),
+  diaSemana: z.number(),
+  total: z.number(),
+})
+
+export interface TopMedico {
+  userId: string
+  nombre: string
+  clinicaNombre: string | null
+  total: number
+}
+
+export const topMedicoSchema: z.ZodType<TopMedico> = z.object({
+  userId: z.string(),
+  nombre: z.string(),
+  clinicaNombre: z.string().nullable(),
+  total: z.number(),
+})
+
+export interface UsoIaItem {
+  accion: string
+  total: number
+}
+
+export const usoIaItemSchema: z.ZodType<UsoIaItem> = z.object({
+  accion: z.string(),
+  total: z.number(),
+})
+
+export interface UsoPlataformaResponse {
+  rankingFunciones: RankingFuncion[]
+  heatmap: HeatmapCell[]
+  topMedicos: TopMedico[]
+  usoIA: UsoIaItem[]
+}
+
+export const usoPlataformaResponseSchema: z.ZodType<UsoPlataformaResponse> = z.object({
+  rankingFunciones: z.array(rankingFuncionSchema),
+  heatmap: z.array(heatmapCellSchema),
+  topMedicos: z.array(topMedicoSchema),
+  usoIA: z.array(usoIaItemSchema),
+})
+
+// ──────────────────────────────────────────────────────────────────
+// Sección 5 — Audit log viewer
+// ──────────────────────────────────────────────────────────────────
+
+export interface AuditLogEntry {
+  id: string
+  userId: string
+  userNombre: string | null
+  accion: string
+  tabla: string | null
+  registroId: string | null
+  ip: string | null
+  descripcion: string | null
+  createdAtIso: string
+}
+
+export const auditLogEntrySchema: z.ZodType<AuditLogEntry> = z.object({
+  id: z.string(),
+  userId: z.string(),
+  userNombre: z.string().nullable(),
+  accion: z.string(),
+  tabla: z.string().nullable(),
+  registroId: z.string().nullable(),
+  ip: z.string().nullable(),
+  descripcion: z.string().nullable(),
+  createdAtIso: z.string(),
+})
+
+export interface AuditLogResponse {
+  items: AuditLogEntry[]
+  total: number
+  page: number
+  totalPages: number
+}
+
+export const auditLogResponseSchema: z.ZodType<AuditLogResponse> = z.object({
+  items: z.array(auditLogEntrySchema),
+  total: z.number(),
+  page: z.number(),
+  totalPages: z.number(),
+})
+
+// ──────────────────────────────────────────────────────────────────
+// Sección 6 — Alertas
+// ──────────────────────────────────────────────────────────────────
+
+export type SeveridadAlerta = 'critico' | 'warning' | 'info'
+
+export const severidadAlertaSchema = z.union([
+  z.literal('critico'),
+  z.literal('warning'),
+  z.literal('info'),
+])
+
+export interface AlertaItem {
+  id: string
+  severidad: SeveridadAlerta
+  titulo: string
+  descripcion: string
+  clinicaId: string | null
+  clinicaNombre: string | null
+  fechaIso: string
+}
+
+export const alertaItemSchema: z.ZodType<AlertaItem> = z.object({
+  id: z.string(),
+  severidad: severidadAlertaSchema,
+  titulo: z.string(),
+  descripcion: z.string(),
+  clinicaId: z.string().nullable(),
+  clinicaNombre: z.string().nullable(),
+  fechaIso: z.string(),
+})
+
+export interface CohorteRetencion {
+  mes: string
+  totalClinicas: number
+  activas: number
+  pct: number
+}
+
+export const cohorteRetencionSchema: z.ZodType<CohorteRetencion> = z.object({
+  mes: z.string(),
+  totalClinicas: z.number(),
+  activas: z.number(),
+  pct: z.number(),
+})
+
+export interface AlertasResponse {
+  alertas: AlertaItem[]
+  cohortes: CohorteRetencion[]
+}
+
+export const alertasResponseSchema: z.ZodType<AlertasResponse> = z.object({
+  alertas: z.array(alertaItemSchema),
+  cohortes: z.array(cohorteRetencionSchema),
+})
+
+// ──────────────────────────────────────────────────────────────────
+// Sección 7 — Legal / ARCO
+// ──────────────────────────────────────────────────────────────────
+
+export type TipoArco = 'acceso' | 'rectificacion' | 'cancelacion' | 'oposicion'
+export type EstadoArco = 'pendiente' | 'en_proceso' | 'completada' | 'rechazada'
+
+export const tipoArcoSchema = z.union([
+  z.literal('acceso'),
+  z.literal('rectificacion'),
+  z.literal('cancelacion'),
+  z.literal('oposicion'),
+])
+
+export const estadoArcoSchema = z.union([
+  z.literal('pendiente'),
+  z.literal('en_proceso'),
+  z.literal('completada'),
+  z.literal('rechazada'),
+])
+
+export interface SolicitudArco {
+  id: string
+  clinicaId: string
+  clinicaNombre: string | null
+  tipo: TipoArco
+  estado: EstadoArco
+  descripcion: string | null
+  fechaSolicitudIso: string
+  fechaLimiteIso: string | null
+  fechaResolucionIso: string | null
+}
+
+export const solicitudArcoSchema: z.ZodType<SolicitudArco> = z.object({
+  id: z.string(),
+  clinicaId: z.string(),
+  clinicaNombre: z.string().nullable(),
+  tipo: tipoArcoSchema,
+  estado: estadoArcoSchema,
+  descripcion: z.string().nullable(),
+  fechaSolicitudIso: z.string(),
+  fechaLimiteIso: z.string().nullable(),
+  fechaResolucionIso: z.string().nullable(),
+})
+
+export interface ConsentimientoClinica {
+  clinicaId: string
+  clinicaNombre: string
+  totalPacientes: number
+  conConsentimiento: number
+  pct: number
+}
+
+export const consentimientoClinicaSchema: z.ZodType<ConsentimientoClinica> = z.object({
+  clinicaId: z.string(),
+  clinicaNombre: z.string(),
+  totalPacientes: z.number(),
+  conConsentimiento: z.number(),
+  pct: z.number(),
+})
+
+export interface LegalResponse {
+  solicitudesArco: SolicitudArco[]
+  consentimientos: ConsentimientoClinica[]
+  totalAnonimizados: number
+}
+
+export const legalResponseSchema: z.ZodType<LegalResponse> = z.object({
+  solicitudesArco: z.array(solicitudArcoSchema),
+  consentimientos: z.array(consentimientoClinicaSchema),
+  totalAnonimizados: z.number(),
+})
+
+// ──────────────────────────────────────────────────────────────────
 // Filtros de UI
 // ──────────────────────────────────────────────────────────────────
 

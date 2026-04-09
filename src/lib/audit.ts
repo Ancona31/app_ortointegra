@@ -54,6 +54,11 @@ export type AuditAccion =
   | 'sa_eliminar_usuario_clinica'
   | 'sa_asignar_admin'
   | 'sa_ver_dashboard'
+  | 'sa_ver_uso'
+  | 'sa_ver_audit'
+  | 'sa_ver_alertas'
+  | 'sa_ver_legal'
+  | 'sa_export_audit_csv'
 
 interface AuditParams {
   userId?: string | null
