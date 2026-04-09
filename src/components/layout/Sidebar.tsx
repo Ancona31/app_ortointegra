@@ -60,9 +60,8 @@ function navDoctor(isAdmin: boolean, isSuperAdmin: boolean): NavSection[] {
       { kind: 'leaf' as const, href: '/billing',        label: 'Facturación',             icon: CreditCard },
     ] : []),
     ...(isSuperAdmin ? [
-      { kind: 'leaf' as const, href: '/super-admin/dashboard', label: 'Dashboard Admin', icon: LayoutDashboard },
-      { kind: 'leaf' as const, href: '/super-admin/clinicas',  label: 'Clínicas',        icon: Building2 },
-      { kind: 'leaf' as const, href: '/super-admin/metricas',  label: 'Métricas',        icon: BarChart2 },
+      { kind: 'leaf' as const, href: '/super-admin/clinicas', label: 'Clínicas', icon: Building2 },
+      { kind: 'leaf' as const, href: '/super-admin/metricas', label: 'Métricas', icon: BarChart2 },
     ] : []),
   ]
 
@@ -87,6 +86,9 @@ function navDoctor(isAdmin: boolean, isSuperAdmin: boolean): NavSection[] {
       matchPaths: ['/estadisticas', '/admin', '/billing', '/super-admin'],
       children: adminChildren,
     },
+    ...(isSuperAdmin
+      ? [{ kind: 'leaf' as const, href: '/super-admin/dashboard', label: 'Dashboard Admin', icon: LayoutDashboard }]
+      : []),
     { kind: 'divider' },
     { kind: 'leaf', href: '/perfil',  label: 'Mi perfil', icon: UserCircle },
     { kind: 'leaf', href: '/ayuda',   label: 'Ayuda',     icon: HelpCircle },

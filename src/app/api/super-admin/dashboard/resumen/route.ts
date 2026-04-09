@@ -134,6 +134,7 @@ interface ClinicaPlanRow {
   plan: string | null
   max_pacientes: number | null
   suscripcion_estado: string | null
+  stripe_subscription_id: string | null
 }
 
 interface DocumentoTipoRow {
@@ -277,11 +278,19 @@ function distribucionPlanes(rows: ReadonlyArray<ClinicaPlanRow>): DistribucionIt
       vip++
       continue
     }
-    if (!r.plan || r.plan === 'free' || r.suscripcion_estado === 'free') {
+    if (!r.stripe_subscription_id) {
       gratuito++
       continue
     }
-    pagando++
+    if (!r.plan || r.plan === 'free') {
+      gratuito++
+      continue
+    }
+    if (r.suscripcion_estado === 'activo' || r.suscripcion_estado === 'trial') {
+      pagando++
+      continue
+    }
+    gratuito++
   }
   return [
     { etiqueta: 'Gratuito', valor: gratuito, color: COLOR_PLAN.gratuito },
@@ -391,7 +400,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       admin.from('clinicas').select('created_at').gte('created_at', inicioMes12Iso),
       admin.from('consultas').select('created_at').gte('created_at', isoNDaysAgo(30)),
       admin.from('rate_limits').select('created_at').gte('created_at', isoNDaysAgo(30)),
-      admin.from('clinicas').select('id, plan, max_pacientes, suscripcion_estado'),
+      admin.from('clinicas').select('id, plan, max_pacientes, suscripcion_estado, stripe_subscription_id'),
       admin.from('documentos').select('tipo').gte('created_at', isoNDaysAgo(90)),
       obtenerMetricasStripe(),
     ])
@@ -420,6 +429,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         r.suscripcion_estado === null || r.suscripcion_estado === undefined
           ? null
           : String(r.suscripcion_estado),
+      stripe_subscription_id:
+        r.stripe_subscription_id === null || r.stripe_subscription_id === undefined
+          ? null
+          : String(r.stripe_subscription_id),
     }))
     const docRows: DocumentoTipoRow[] = (documentosTipoRows.data ?? []).map((r) => ({
       tipo: String(r.tipo),

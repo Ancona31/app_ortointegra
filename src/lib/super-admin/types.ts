@@ -267,6 +267,109 @@ export const usuariosListResponseSchema: z.ZodType<UsuariosListResponse> = z.obj
 })
 
 // ──────────────────────────────────────────────────────────────────
+// Sección 3 — Ingresos
+// ──────────────────────────────────────────────────────────────────
+
+export type EstadoTransaccion = 'paid' | 'open' | 'void' | 'uncollectible' | 'draft' | 'desconocido'
+
+export const estadoTransaccionSchema = z.union([
+  z.literal('paid'),
+  z.literal('open'),
+  z.literal('void'),
+  z.literal('uncollectible'),
+  z.literal('draft'),
+  z.literal('desconocido'),
+])
+
+export interface TransaccionStripe {
+  id: string
+  fechaIso: string
+  monto: number
+  moneda: string
+  estado: EstadoTransaccion
+  clinicaId: string | null
+  clinicaNombre: string | null
+  customerId: string | null
+  hostedInvoiceUrl: string | null
+}
+
+export const transaccionStripeSchema: z.ZodType<TransaccionStripe> = z.object({
+  id: z.string(),
+  fechaIso: z.string(),
+  monto: z.number(),
+  moneda: z.string(),
+  estado: estadoTransaccionSchema,
+  clinicaId: z.string().nullable(),
+  clinicaNombre: z.string().nullable(),
+  customerId: z.string().nullable(),
+  hostedInvoiceUrl: z.string().nullable(),
+})
+
+export interface ClinicaPagoFallido {
+  clinicaId: string
+  nombre: string
+  diasFallido: number
+}
+
+export const clinicaPagoFallidoSchema: z.ZodType<ClinicaPagoFallido> = z.object({
+  clinicaId: z.string(),
+  nombre: z.string(),
+  diasFallido: z.number(),
+})
+
+export interface ClinicaTrial {
+  clinicaId: string
+  nombre: string
+  diasRestantes: number
+}
+
+export const clinicaTrialSchema: z.ZodType<ClinicaTrial> = z.object({
+  clinicaId: z.string(),
+  nombre: z.string(),
+  diasRestantes: z.number(),
+})
+
+export interface SuscripcionPorVencer {
+  clinicaId: string
+  nombre: string
+  diasParaVencer: number
+  monto: number
+}
+
+export const suscripcionPorVencerSchema: z.ZodType<SuscripcionPorVencer> = z.object({
+  clinicaId: z.string(),
+  nombre: z.string(),
+  diasParaVencer: z.number(),
+  monto: z.number(),
+})
+
+export interface IngresosResumen {
+  mrrActual: KpiVariacion
+  clinicasEnTrial: number
+  conversionTrialPct: number | null
+  clinicasPagoFallido: number
+  suscripcionesVencen7d: number
+  serieIngresosPorMes: SeriePunto[]
+  trials: ClinicaTrial[]
+  pagosFallidos: ClinicaPagoFallido[]
+  porVencer: SuscripcionPorVencer[]
+  transacciones: TransaccionStripe[]
+}
+
+export const ingresosResumenSchema: z.ZodType<IngresosResumen> = z.object({
+  mrrActual: kpiVariacionSchema,
+  clinicasEnTrial: z.number(),
+  conversionTrialPct: z.number().nullable(),
+  clinicasPagoFallido: z.number(),
+  suscripcionesVencen7d: z.number(),
+  serieIngresosPorMes: z.array(seriePuntoSchema),
+  trials: z.array(clinicaTrialSchema),
+  pagosFallidos: z.array(clinicaPagoFallidoSchema),
+  porVencer: z.array(suscripcionPorVencerSchema),
+  transacciones: z.array(transaccionStripeSchema),
+})
+
+// ──────────────────────────────────────────────────────────────────
 // Filtros de UI
 // ──────────────────────────────────────────────────────────────────
 

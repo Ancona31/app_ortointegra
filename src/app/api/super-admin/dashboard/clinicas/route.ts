@@ -33,6 +33,7 @@ interface ClinicaRowDb {
   max_pacientes: number | null
   suspendida: boolean | null
   suscripcion_estado: string | null
+  stripe_subscription_id: string | null
   created_at: string
 }
 
@@ -82,8 +83,14 @@ function clasificarTipo(raw: string | null): TipoCuenta {
 }
 
 function clasificarPago(row: ClinicaRowDb): EstadoPago {
+  // VIP siempre gana
   if (row.max_pacientes === null) return 'vip'
-  const estado = row.suscripcion_estado ?? 'free'
+  // Sin suscripción real de Stripe = gratuito (default seguro)
+  if (!row.stripe_subscription_id) return 'gratuito'
+  // Plan explícitamente 'free' = gratuito aunque haya un id viejo
+  if (!row.plan || row.plan === 'free') return 'gratuito'
+  // Estado real de la suscripción
+  const estado = row.suscripcion_estado
   if (estado === 'trial') return 'trial'
   if (estado === 'activo') return 'pagando'
   if (estado === 'vencido') return 'pago_fallido'
@@ -123,7 +130,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     let clinicasQuery = admin
       .from('clinicas')
       .select(
-        'id, nombre, nombre_display, logo_url, tipo, plan, max_medicos, max_secretarias, max_pacientes, suspendida, suscripcion_estado, created_at',
+        'id, nombre, nombre_display, logo_url, tipo, plan, max_medicos, max_secretarias, max_pacientes, suspendida, suscripcion_estado, stripe_subscription_id, created_at',
       )
       .order('created_at', { ascending: false })
       .limit(PAGE_SIZE + 1)
