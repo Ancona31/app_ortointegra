@@ -107,22 +107,23 @@ CREATE OR REPLACE FUNCTION public.sa_top_medicos(
   dias_atras int DEFAULT 30,
   limite     int DEFAULT 10
 )
-RETURNS TABLE(user_id uuid, nombre text, clinica_nombre text, total bigint)
+RETURNS TABLE(user_id text, nombre text, clinica_nombre text, total bigint)
 LANGUAGE sql
 SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT
-    al.user_id,
+    al.user_id::text,
     COALESCE(p.nombre, '(sin perfil)')::text  AS nombre,
     c.nombre::text                             AS clinica_nombre,
     count(*)::bigint                           AS total
   FROM public.audit_log al
-  LEFT JOIN public.profiles p ON p.id = al.user_id
+  -- Comparamos p.id::text con al.user_id (text) para evitar uuid = text
+  LEFT JOIN public.profiles p ON p.id::text = al.user_id
   LEFT JOIN public.clinicas  c ON c.id = p.clinica_id
   WHERE al.created_at >= now() - make_interval(days => dias_atras)
     AND al.user_id IS NOT NULL
-    AND al.user_id::text <> 'anonymous'
+    AND al.user_id <> 'anonymous'
   GROUP BY al.user_id, p.nombre, c.nombre
   ORDER BY total DESC
   LIMIT limite;
