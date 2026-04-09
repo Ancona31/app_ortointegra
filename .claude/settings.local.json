@@ -71,7 +71,23 @@
       "WebSearch",
       "Bash(file *.jpg)",
       "Bash(npx sharp-cli:*)",
-      "Bash(python -c ':*)"
+      "Bash(python -c ':*)",
+      "Bash(ipconfig)",
+      "Bash(netsh advfirewall:*)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(taskkill //PID 34372 //F)",
+      "Bash(npm uninstall:*)",
+      "Bash(taskkill //PID 43440 //F)",
+      "Bash(netstat -ano)",
+      "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | Select-Object LocalPort,State,OwningProcess\")",
+      "Bash(powershell -Command \"Stop-Process -Id 17688 -Force -ErrorAction SilentlyContinue; Stop-Process -Id 19952 -Force -ErrorAction SilentlyContinue\")",
+      "Bash(powershell:*)",
+      "Bash(kill 23392)",
+      "Bash(taskkill /PID 23392 /F)",
+      "Bash(taskkill:*)",
+      "Bash(tasklist //FI \"IMAGENAME eq node.exe\")",
+      "Bash(tasklist /FI \"IMAGENAME eq node.exe\")",
+      "Read(//tmp/**)"
     ]
   }
 }

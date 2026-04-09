@@ -4,7 +4,7 @@ import type { ReactElement } from 'react'
 import PdfHeader from './PdfHeader'
 import PdfWatermark from './PdfWatermark'
 import { BarraTop, BarraBottom } from './PdfBarras'
-import { baseStyles, getPdfColors } from './PdfStyles'
+import { baseStyles, getPdfColors, GradientBg } from './PdfStyles'
 import type { PdfMedicoData, PdfColors } from './PdfStyles'
 
 /* ------------------------------------------------------------------ */
@@ -246,6 +246,30 @@ export default function ConsentimientoInformadoPdf({
   const seccionesP2 = SECCION_LABELS.slice(4)
 
   const s = StyleSheet.create({
+    page: {
+      fontFamily: 'Roboto',
+      fontSize: 10,
+      color: '#1a1a1a',
+      paddingTop: 100,
+      paddingBottom: 54,
+      paddingHorizontal: 50,
+    },
+    headerFixed: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+    },
+    headerInner: {
+      paddingHorizontal: 50,
+      paddingTop: 8,
+    },
+    footerFixed: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+    },
     /* Title banner */
     tituloWrap: {
       backgroundColor: colors.cp + '0D',
@@ -294,9 +318,10 @@ export default function ConsentimientoInformadoPdf({
       overflow: 'hidden',
     },
     datosHeader: {
-      backgroundColor: colors.cp,
       paddingVertical: 5,
       paddingHorizontal: 10,
+      position: 'relative',
+      overflow: 'hidden',
     },
     datosHeaderText: {
       fontSize: 9,
@@ -331,12 +356,13 @@ export default function ConsentimientoInformadoPdf({
     secHeader: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.cp,
       borderRadius: 3,
       paddingVertical: 5,
       paddingHorizontal: 10,
       marginTop: 14,
       marginBottom: 6,
+      position: 'relative',
+      overflow: 'hidden',
     },
     secBadge: {
       backgroundColor: '#ffffff',
@@ -386,9 +412,10 @@ export default function ConsentimientoInformadoPdf({
       marginBottom: 16,
     },
     declHeader: {
-      backgroundColor: colors.cp,
       paddingVertical: 6,
       paddingHorizontal: 12,
+      position: 'relative',
+      overflow: 'hidden',
     },
     declHeaderText: {
       fontSize: 10,
@@ -463,6 +490,7 @@ export default function ConsentimientoInformadoPdf({
     return (
       <View wrap={false}>
         <View style={s.secHeader}>
+          <GradientBg cp={colors.cp} cs={colors.cs} id={`gSec${sec.num}`} />
           <View style={s.secBadge}>
             <Text style={s.secBadgeNum}>{sec.num}</Text>
           </View>
@@ -545,17 +573,28 @@ export default function ConsentimientoInformadoPdf({
   return (
     <Document>
       {/* =================== PAGE 1 =================== */}
-      <Page size="LETTER" style={baseStyles.page}>
-        <BarraTop colors={colors} />
-        <View style={baseStyles.contenido}>
-          <PdfWatermark logoUrl={logoUrl} />
-          <PdfHeader
-            medico={medico}
-            colors={colors}
-            logoUrl={logoUrl}
-            folio={data.folio}
-            fecha={data.fecha}
-          />
+      <Page size="LETTER" style={s.page}>
+        {/* Header fixed */}
+        <View fixed style={s.headerFixed}>
+          <BarraTop colors={colors} />
+          <View style={s.headerInner}>
+            <PdfHeader
+              medico={medico}
+              colors={colors}
+              logoUrl={logoUrl}
+              folio={data.folio}
+              fecha={data.fecha}
+              compact
+            />
+          </View>
+        </View>
+
+        {/* Footer fixed */}
+        <View fixed style={s.footerFixed}>
+          <BarraBottom colors={colors} medico={medico} />
+        </View>
+
+        <PdfWatermark logoUrl={logoUrl} />
 
           {/* Title */}
           <View style={s.tituloWrap}>
@@ -578,6 +617,7 @@ export default function ConsentimientoInformadoPdf({
           {/* Datos de identificacion */}
           <View style={s.datosBox}>
             <View style={s.datosHeader}>
+              <GradientBg cp={colors.cp} cs={colors.cs} id="gDatCon" />
               <Text style={s.datosHeaderText}>Datos de Identificaci\u00F3n</Text>
             </View>
             <View style={s.datosGrid}>
@@ -636,58 +676,63 @@ export default function ConsentimientoInformadoPdf({
           {seccionesP1.map((sec) => (
             <SeccionBlock key={sec.key} sec={sec} />
           ))}
-        </View>
-
-        <Text
-          style={baseStyles.pageNumber}
-          render={({ pageNumber, totalPages }) => `P\u00E1gina ${pageNumber} de ${totalPages}`}
-          fixed
-        />
-        <BarraBottom colors={colors} medico={medico} />
       </Page>
 
       {/* =================== PAGE 2 =================== */}
-      <Page size="LETTER" style={baseStyles.page}>
-        <BarraTop colors={colors} />
-        <View style={baseStyles.contenido}>
-          <CompactHeader
-            medico={medico}
-            colors={colors}
-            logoUrl={logoUrl}
-            paciente={data.paciente}
-            procedimiento={data.procedimiento}
-          />
-          <Text style={s.contLabel}>Continuaci\u00F3n \u2014 Consentimiento M\u00E9dico Informado</Text>
+      <Page size="LETTER" style={s.page}>
+        <View fixed style={s.headerFixed}>
+          <BarraTop colors={colors} />
+          <View style={s.headerInner}>
+            <PdfHeader
+              medico={medico}
+              colors={colors}
+              logoUrl={logoUrl}
+              folio={data.folio}
+              fecha={data.fecha}
+              compact
+            />
+          </View>
+        </View>
+        <View fixed style={s.footerFixed}>
+          <BarraBottom colors={colors} medico={medico} />
+        </View>
+
+        <PdfWatermark logoUrl={logoUrl} />
+
+          <Text style={s.contLabel}>Continuaci{'\u00F3'}n {'\u2014'} Consentimiento M{'\u00E9'}dico Informado</Text>
 
           {/* Sections 5-7 */}
           {seccionesP2.map((sec) => (
             <SeccionBlock key={sec.key} sec={sec} />
           ))}
-        </View>
-
-        <Text
-          style={baseStyles.pageNumber}
-          render={({ pageNumber, totalPages }) => `P\u00E1gina ${pageNumber} de ${totalPages}`}
-          fixed
-        />
-        <BarraBottom colors={colors} medico={medico} />
       </Page>
 
       {/* =================== PAGE 3 =================== */}
-      <Page size="LETTER" style={baseStyles.page}>
-        <BarraTop colors={colors} />
-        <View style={baseStyles.contenido}>
-          <CompactHeader
-            medico={medico}
-            colors={colors}
-            logoUrl={logoUrl}
-            paciente={data.paciente}
-            procedimiento={data.procedimiento}
-          />
+      <Page size="LETTER" style={s.page}>
+        <View fixed style={s.headerFixed}>
+          <BarraTop colors={colors} />
+          <View style={s.headerInner}>
+            <PdfHeader
+              medico={medico}
+              colors={colors}
+              logoUrl={logoUrl}
+              folio={data.folio}
+              fecha={data.fecha}
+              compact
+            />
+          </View>
+        </View>
+        <View fixed style={s.footerFixed}>
+          <BarraBottom colors={colors} medico={medico} />
+        </View>
 
+        <PdfWatermark logoUrl={logoUrl} />
+
+        <View style={{ flex: 1 }}>
           {/* Declaracion de Consentimiento */}
           <View style={s.declBox}>
             <View style={s.declHeader}>
+              <GradientBg cp={colors.cp} cs={colors.cs} id="gDeclCon" />
               <Text style={s.declHeaderText}>Declaraci\u00F3n de Consentimiento</Text>
             </View>
             <View style={s.declBody}>
@@ -715,31 +760,35 @@ export default function ConsentimientoInformadoPdf({
             </View>
           </View>
 
-          {/* Firmas */}
-          <FirmasBlock />
         </View>
 
-        <Text
-          style={baseStyles.pageNumber}
-          render={({ pageNumber, totalPages }) => `P\u00E1gina ${pageNumber} de ${totalPages}`}
-          fixed
-        />
-        <BarraBottom colors={colors} medico={medico} />
+          {/* Firmas */}
+          <FirmasBlock />
       </Page>
 
       {/* =================== PAGE 4 (optional) =================== */}
       {data.imprimirDenegacion ? (
-        <Page size="LETTER" style={baseStyles.page}>
-          <BarraTop colors={colors} />
-          <View style={baseStyles.contenido}>
-            <CompactHeader
-              medico={medico}
-              colors={colors}
-              logoUrl={logoUrl}
-              paciente={data.paciente}
-              procedimiento={data.procedimiento}
-            />
+        <Page size="LETTER" style={s.page}>
+          <View fixed style={s.headerFixed}>
+            <BarraTop colors={colors} />
+            <View style={s.headerInner}>
+              <PdfHeader
+                medico={medico}
+                colors={colors}
+                logoUrl={logoUrl}
+                folio={data.folio}
+                fecha={data.fecha}
+                compact
+              />
+            </View>
+          </View>
+          <View fixed style={s.footerFixed}>
+            <BarraBottom colors={colors} medico={medico} />
+          </View>
 
+          <PdfWatermark logoUrl={logoUrl} />
+
+          <View style={{ flex: 1 }}>
             {/* Denegacion */}
             <View style={s.denegBox}>
               <View style={s.denegHeader}>
@@ -769,16 +818,10 @@ export default function ConsentimientoInformadoPdf({
               </View>
             </View>
 
-            {/* Firmas */}
-            <FirmasBlock />
           </View>
 
-          <Text
-            style={baseStyles.pageNumber}
-            render={({ pageNumber, totalPages }) => `P\u00E1gina ${pageNumber} de ${totalPages}`}
-            fixed
-          />
-          <BarraBottom colors={colors} medico={medico} />
+            {/* Firmas */}
+            <FirmasBlock />
         </Page>
       ) : null}
     </Document>

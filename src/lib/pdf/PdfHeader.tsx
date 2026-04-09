@@ -1,4 +1,4 @@
-import { View, Text, Image, StyleSheet } from '@react-pdf/renderer'
+import { View, Text, Image, StyleSheet, Svg, Defs, LinearGradient, Stop, Rect } from '@react-pdf/renderer'
 import type { PdfMedicoData, PdfColors } from './PdfStyles'
 
 interface Props {
@@ -9,9 +9,11 @@ interface Props {
   fecha?: string
   /** Modo compacto: logo más pequeño, menos espaciado (para receta) */
   compact?: boolean
+  /** Mostrar el símbolo "Rx" (solo recetas médicas) */
+  showRx?: boolean
 }
 
-export default function PdfHeader({ medico, colors, logoUrl, folio, fecha, compact }: Props) {
+export default function PdfHeader({ medico, colors, logoUrl, folio, fecha, compact, showRx }: Props) {
   const nombre = medico?.nombre || 'Médico'
   const esp = medico?.especialidad || ''
   const cedProf = medico?.cedula_profesional || ''
@@ -27,8 +29,8 @@ export default function PdfHeader({ medico, colors, logoUrl, folio, fecha, compa
     cedEsp ? `Céd. Esp. ${cedEsp}` : '',
   ].filter(Boolean).join('   ·   ')
 
-  const logoSize = compact ? 42 : 62
-  const logoInner = compact ? 38 : 56
+  const logoSize = compact ? 52 : 62
+  const logoInner = compact ? 48 : 56
 
   const s = StyleSheet.create({
     headerRow: {
@@ -42,7 +44,7 @@ export default function PdfHeader({ medico, colors, logoUrl, folio, fecha, compa
       height: logoSize,
       borderRadius: logoSize / 2,
       borderWidth: 1.5,
-      borderColor: colors.cp + '40',
+      borderColor: '#d1d5db',
       overflow: 'hidden',
       alignItems: 'center',
       justifyContent: 'center',
@@ -63,20 +65,11 @@ export default function PdfHeader({ medico, colors, logoUrl, folio, fecha, compa
       letterSpacing: 0.3,
       lineHeight: 1.2,
     },
-    especialidadBadge: {
-      backgroundColor: colors.cs + '12',
-      paddingHorizontal: compact ? 6 : 8,
-      paddingVertical: compact ? 1.5 : 2,
-      borderRadius: 10,
-      borderWidth: 0.5,
-      borderColor: colors.cs + '30',
-      alignSelf: 'flex-start',
-      marginTop: compact ? 2 : 3,
-    },
     especialidadText: {
-      fontSize: compact ? 7 : 8,
+      fontSize: compact ? 7.5 : 8.5,
       color: colors.cs,
       fontWeight: 500,
+      marginTop: compact ? 1 : 2,
       letterSpacing: 0.3,
     },
     credsRow: {
@@ -86,7 +79,7 @@ export default function PdfHeader({ medico, colors, logoUrl, folio, fecha, compa
     },
     cedItem: {
       flexDirection: 'row',
-      alignItems: 'center',
+      alignItems: 'flex-start',
       gap: 3,
     },
     cedDot: {
@@ -94,6 +87,7 @@ export default function PdfHeader({ medico, colors, logoUrl, folio, fecha, compa
       height: 2.5,
       borderRadius: 1.25,
       backgroundColor: colors.cs,
+      marginTop: compact ? 3 : 3.5,
     },
     cedText: {
       fontSize: compact ? 7 : 7.5,
@@ -104,32 +98,25 @@ export default function PdfHeader({ medico, colors, logoUrl, folio, fecha, compa
       color: '#888',
       marginTop: compact ? 1 : 3,
     },
-    meta: {
-      alignItems: 'flex-end',
-      minWidth: 90,
+    rxWrap: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: logoSize,
+      height: logoSize,
     },
-    metaFolio: {
-      fontSize: 7.5,
+    rxText: {
+      fontSize: compact ? 34 : 38,
+      fontWeight: 700,
+      color: colors.cs,
+      opacity: 0.85,
+      textAlign: 'center',
+    },
+    rxFolio: {
+      fontSize: 7,
       color: colors.cp,
       fontWeight: 700,
-      lineHeight: 1.5,
-    },
-    metaFecha: {
-      fontSize: 7.5,
-      color: '#777',
-      lineHeight: 1.5,
-      marginTop: 1,
-    },
-    separadorGrueso: {
-      height: compact ? 1.5 : 2,
-      backgroundColor: colors.cp,
-      marginTop: compact ? 6 : 10,
-    },
-    separadorFino: {
-      height: 0.5,
-      backgroundColor: colors.cs,
-      marginTop: 1.5,
-      marginBottom: compact ? 8 : 12,
+      textAlign: 'center',
+      marginTop: 31,
     },
   })
 
@@ -143,11 +130,7 @@ export default function PdfHeader({ medico, colors, logoUrl, folio, fecha, compa
         ) : null}
         <View style={s.info}>
           <Text style={s.name}>{nombre}</Text>
-          {esp ? (
-            <View style={s.especialidadBadge}>
-              <Text style={s.especialidadText}>{esp}</Text>
-            </View>
-          ) : null}
+          {esp ? <Text style={s.especialidadText}>{esp}</Text> : null}
           <View style={s.credsRow}>
             {cedProf ? (
               <View style={s.cedItem}>
@@ -164,15 +147,37 @@ export default function PdfHeader({ medico, colors, logoUrl, folio, fecha, compa
           </View>
           {contacto ? <Text style={s.contacto}>{contacto}</Text> : null}
         </View>
-        {(folio || fecha) ? (
-          <View style={s.meta}>
-            {folio ? <Text style={s.metaFolio}>No. {folio}</Text> : null}
-            {fecha ? <Text style={s.metaFecha}>{fecha}</Text> : null}
+        {showRx ? (
+          <View style={s.rxWrap}>
+            <Text style={s.rxText}>Rx</Text>
+            {folio ? <Text style={s.rxFolio}>{folio}</Text> : null}
           </View>
-        ) : null}
+        ) : (folio ? (
+          <View style={{ alignItems: 'flex-end', minWidth: 90 }}>
+            <Text style={s.rxFolio}>No. {folio}</Text>
+          </View>
+        ) : null)}
       </View>
-      <View style={s.separadorGrueso} />
-      <View style={s.separadorFino} />
+      {/* Separador grueso con degradado cp → cs */}
+      <Svg viewBox="0 0 100 2" preserveAspectRatio="none" style={{ width: '100%', height: compact ? 1.5 : 2, marginTop: compact ? 6 : 10 }}>
+        <Defs>
+          <LinearGradient id="gG" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0" stopColor={colors.cp} stopOpacity={1} />
+            <Stop offset="1" stopColor={colors.cs} stopOpacity={1} />
+          </LinearGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100" height="2" fill="url(#gG)" />
+      </Svg>
+      {/* Separador fino con degradado cs → cp */}
+      <Svg viewBox="0 0 100 1" preserveAspectRatio="none" style={{ width: '100%', height: 0.5, marginTop: 1.5, marginBottom: compact ? 8 : 12 }}>
+        <Defs>
+          <LinearGradient id="gF" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0" stopColor={colors.cs} stopOpacity={1} />
+            <Stop offset="1" stopColor={colors.cp} stopOpacity={1} />
+          </LinearGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100" height="1" fill="url(#gF)" />
+      </Svg>
     </View>
   )
 }

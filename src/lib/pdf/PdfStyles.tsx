@@ -1,4 +1,5 @@
-import { StyleSheet, Font } from '@react-pdf/renderer'
+import { StyleSheet, Font, Svg, Defs, LinearGradient, Stop, Rect } from '@react-pdf/renderer'
+import React from 'react'
 import path from 'path'
 
 const fontsDir = path.join(process.cwd(), 'public', 'fonts')
@@ -39,6 +40,24 @@ export function getPdfColors(medico: PdfMedicoData | null): PdfColors {
   }
 }
 
+/**
+ * Fondo con degradado cp → cs para usar como background absoluto.
+ * Requiere que el padre tenga `position: 'relative'` y `overflow: 'hidden'`.
+ */
+export function GradientBg({ cp, cs, id }: { cp: string; cs: string; id: string }) {
+  return (
+    <Svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+      <Defs>
+        <LinearGradient id={id} x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0" stopColor={cp} stopOpacity={1} />
+          <Stop offset="1" stopColor={cs} stopOpacity={1} />
+        </LinearGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100" height="100" fill={`url(#${id})`} />
+    </Svg>
+  )
+}
+
 /** Estilos base reutilizables — diseño premium clínica privada */
 export const baseStyles = StyleSheet.create({
   page: {
@@ -52,41 +71,40 @@ export const baseStyles = StyleSheet.create({
   },
   contenido: {
     paddingHorizontal: 50,
-    paddingTop: 24,
-    paddingBottom: 44,
-    flex: 1,
+    paddingTop: 16,
+    paddingBottom: 28,
   },
   tituloDoc: {
     textAlign: 'center',
     fontSize: 12,
     fontWeight: 700,
     textTransform: 'uppercase',
-    marginTop: 14,
-    marginBottom: 16,
-    paddingVertical: 9,
+    marginTop: 6,
+    marginBottom: 8,
+    paddingVertical: 6,
     borderRadius: 4,
     letterSpacing: 1.5,
     color: '#ffffff',
   },
   datoRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 2,
+    gap: 8,
+    marginBottom: 1,
   },
   datoField: {
     flex: 1,
-    marginBottom: 10,
+    marginBottom: 4,
     borderWidth: 0.75,
     borderColor: '#e5e7eb',
     borderRadius: 3,
     paddingHorizontal: 8,
-    paddingTop: 5,
-    paddingBottom: 6,
+    paddingTop: 3,
+    paddingBottom: 3,
   },
   datoLabel: {
     fontSize: 7,
     fontWeight: 700,
-    marginBottom: 2,
+    marginBottom: 1,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -94,17 +112,17 @@ export const baseStyles = StyleSheet.create({
     fontSize: 10.5,
     color: '#1a1a1a',
     fontWeight: 500,
-    lineHeight: 1.4,
+    lineHeight: 1.3,
   },
   seccion: {
     fontSize: 11,
     fontWeight: 700,
-    paddingVertical: 6,
+    paddingVertical: 4,
     paddingLeft: 10,
     borderLeftWidth: 3,
     borderRadius: 3,
-    marginTop: 16,
-    marginBottom: 10,
+    marginTop: 8,
+    marginBottom: 4,
   },
   pageNumber: {
     position: 'absolute',

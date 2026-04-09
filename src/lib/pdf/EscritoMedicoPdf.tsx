@@ -4,7 +4,7 @@ import PdfHeader from './PdfHeader'
 import PdfFirma from './PdfFirma'
 import PdfWatermark from './PdfWatermark'
 import { BarraTop, BarraBottom } from './PdfBarras'
-import { baseStyles, getPdfColors } from './PdfStyles'
+import { baseStyles, getPdfColors, GradientBg } from './PdfStyles'
 import type { PdfMedicoData, PdfColors } from './PdfStyles'
 
 export interface EscritoMedicoData {
@@ -224,8 +224,32 @@ function parseHtmlToElements(html: string, colors: PdfColors): ReactElement[] {
 
 /* ---------- Component ---------- */
 
-function buildStyles(colors: PdfColors) {
+function buildStyles(_colors: PdfColors) {
   return StyleSheet.create({
+    page: {
+      fontFamily: 'Roboto',
+      fontSize: 10,
+      color: '#1a1a1a',
+      paddingTop: 100,
+      paddingBottom: 54,
+      paddingHorizontal: 50,
+    },
+    headerFixed: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+    },
+    headerInner: {
+      paddingHorizontal: 50,
+      paddingTop: 8,
+    },
+    footerFixed: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+    },
     metaRow: {
       flexDirection: 'row',
       gap: 16,
@@ -258,18 +282,30 @@ export default function EscritoMedicoPdf({ medico, data, logoUrl }: EscritoMedic
 
   return (
     <Document>
-      <Page size="LETTER" style={baseStyles.page}>
-        <BarraTop colors={colors} />
-        <View style={baseStyles.contenido}>
-          <PdfWatermark logoUrl={logoUrl} />
-          <PdfHeader
-            medico={medico}
-            colors={colors}
-            logoUrl={logoUrl}
-            folio={data.folio}
-            fecha={data.fecha}
-          />
+      <Page size="LETTER" style={s.page}>
+        {/* Header fixed — se repite en cada página */}
+        <View fixed style={s.headerFixed}>
+          <BarraTop colors={colors} />
+          <View style={s.headerInner}>
+            <PdfHeader
+              medico={medico}
+              colors={colors}
+              logoUrl={logoUrl}
+              folio={data.folio}
+              fecha={data.fecha}
+              compact
+            />
+          </View>
+        </View>
 
+        {/* Footer fixed — se repite en cada página */}
+        <View fixed style={s.footerFixed}>
+          <BarraBottom colors={colors} medico={medico} />
+        </View>
+
+        <PdfWatermark logoUrl={logoUrl} />
+
+        <View style={{ flex: 1 }}>
           {/* Meta: fecha + paciente */}
           <View style={s.metaRow}>
             <View style={baseStyles.datoField}>
@@ -286,7 +322,8 @@ export default function EscritoMedicoPdf({ medico, data, logoUrl }: EscritoMedic
 
           {/* Asunto */}
           {data.asunto ? (
-            <View style={[s.asuntoBanner, { backgroundColor: colors.cp }]}>
+            <View style={[s.asuntoBanner, { position: 'relative', overflow: 'hidden' }]}>
+              <GradientBg cp={colors.cp} cs={colors.cs} id="gAsunto" />
               <Text style={s.asuntoText}>{data.asunto}</Text>
             </View>
           ) : null}
@@ -296,18 +333,10 @@ export default function EscritoMedicoPdf({ medico, data, logoUrl }: EscritoMedic
             {bodyElements}
           </View>
 
-          {/* Firma */}
-          <PdfFirma medico={medico} colors={colors} />
         </View>
 
-        {/* Numeración de página */}
-        <Text
-          style={baseStyles.pageNumber}
-          render={({ pageNumber, totalPages }) => `P\u00e1gina ${pageNumber} de ${totalPages}`}
-          fixed
-        />
-
-        <BarraBottom colors={colors} medico={medico} />
+          {/* Firma */}
+          <PdfFirma medico={medico} colors={colors} />
       </Page>
     </Document>
   )

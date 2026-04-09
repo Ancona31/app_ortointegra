@@ -3,7 +3,7 @@ import PdfHeader from './PdfHeader'
 import PdfFirma from './PdfFirma'
 import PdfWatermark from './PdfWatermark'
 import { BarraTop, BarraBottom } from './PdfBarras'
-import { baseStyles, getPdfColors } from './PdfStyles'
+import { baseStyles, getPdfColors, GradientBg } from './PdfStyles'
 import type { PdfMedicoData } from './PdfStyles'
 
 export interface SolicitudImagenData {
@@ -30,6 +30,30 @@ export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudI
   const colors = getPdfColors(medico)
 
   const s = StyleSheet.create({
+    page: {
+      fontFamily: 'Roboto',
+      fontSize: 10,
+      color: '#1a1a1a',
+      paddingTop: 100,
+      paddingBottom: 54,
+      paddingHorizontal: 50,
+    },
+    headerFixed: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+    },
+    headerInner: {
+      paddingHorizontal: 50,
+      paddingTop: 8,
+    },
+    footerFixed: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+    },
     urgenteBadge: {
       backgroundColor: '#dc2626',
       borderRadius: 3,
@@ -48,11 +72,12 @@ export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudI
     },
     tableHeader: {
       flexDirection: 'row',
-      backgroundColor: colors.cp,
       borderTopLeftRadius: 3,
       borderTopRightRadius: 3,
       paddingVertical: 6,
       paddingHorizontal: 10,
+      position: 'relative',
+      overflow: 'hidden',
     },
     thNum: {
       width: 26,
@@ -64,6 +89,7 @@ export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudI
     },
     thEstudio: {
       width: '28%',
+      paddingRight: 8,
       fontSize: 8,
       fontWeight: 700,
       color: '#ffffff',
@@ -72,19 +98,27 @@ export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudI
     },
     thRegion: {
       width: '32%',
+      paddingRight: 8,
       fontSize: 8,
       fontWeight: 700,
       color: '#ffffff',
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
-    thIndicacion: {
+    thComplemento: {
       flex: 1,
+    },
+    thComplementoTitle: {
       fontSize: 8,
       fontWeight: 700,
       color: '#ffffff',
       textTransform: 'uppercase',
       letterSpacing: 0.5,
+    },
+    thComplementoSub: {
+      fontSize: 5.5,
+      color: '#ffffffcc',
+      marginTop: 1,
     },
     tableRow: {
       flexDirection: 'row',
@@ -108,6 +142,7 @@ export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudI
     },
     tdEstudio: {
       width: '28%',
+      paddingRight: 8,
       fontSize: 10,
       fontWeight: 500,
       color: '#1a1a1a',
@@ -115,11 +150,12 @@ export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudI
     },
     tdRegion: {
       width: '32%',
+      paddingRight: 8,
       fontSize: 10,
       color: '#1a1a1a',
       lineHeight: 1.4,
     },
-    tdIndicacion: {
+    tdComplemento: {
       flex: 1,
       fontSize: 9.5,
       color: '#555',
@@ -129,22 +165,37 @@ export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudI
 
   return (
     <Document>
-      <Page size="LETTER" style={baseStyles.page}>
-        <BarraTop colors={colors} />
-        <View style={baseStyles.contenido}>
-          <PdfWatermark logoUrl={logoUrl} />
-          <PdfHeader
-            medico={medico}
-            colors={colors}
-            logoUrl={logoUrl}
-            folio={data.folio}
-            fecha={data.fecha}
-          />
+      <Page size="LETTER" style={s.page}>
+        {/* Header fixed — se repite en cada página */}
+        <View fixed style={s.headerFixed}>
+          <BarraTop colors={colors} />
+          <View style={s.headerInner}>
+            <PdfHeader
+              medico={medico}
+              colors={colors}
+              logoUrl={logoUrl}
+              folio={data.folio}
+              fecha={data.fecha}
+              compact
+            />
+          </View>
+        </View>
 
+        {/* Footer fixed — se repite en cada página */}
+        <View fixed style={s.footerFixed}>
+          <BarraBottom colors={colors} medico={medico} />
+        </View>
+
+        <PdfWatermark logoUrl={logoUrl} />
+
+        <View style={{ flex: 1 }}>
           {/* Titulo */}
-          <Text style={[baseStyles.tituloDoc, { backgroundColor: colors.cp }]}>
-            Solicitud de Estudios de Imagen
-          </Text>
+          <View style={{ marginTop: 14, marginBottom: 16, paddingVertical: 9, borderRadius: 4, position: 'relative', overflow: 'hidden', alignItems: 'center' }}>
+            <GradientBg cp={colors.cp} cs={colors.cs} id="gTitImg" />
+            <Text style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#ffffff', letterSpacing: 1.5, textAlign: 'center' }}>
+              Solicitud de Estudios de Imagen
+            </Text>
+          </View>
 
           {/* Badge urgente */}
           {data.urgente ? (
@@ -153,21 +204,21 @@ export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudI
             </View>
           ) : null}
 
-          {/* Datos del paciente */}
-          <View style={baseStyles.datoRow}>
-            <View style={baseStyles.datoField}>
-              <Text style={[baseStyles.datoLabel, { color: colors.cp }]}>FECHA</Text>
-              <Text style={baseStyles.datoValor}>{data.fecha}</Text>
+          {/* Datos del paciente — compactos */}
+          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 0.5 }}>
+            <View style={{ flex: 1, borderWidth: 0.75, borderColor: '#e5e7eb', borderRadius: 3, paddingHorizontal: 8, paddingTop: 0.5, paddingBottom: 1, marginBottom: 0.5 }}>
+              <Text style={[baseStyles.datoLabel, { color: colors.cp, marginBottom: 0, lineHeight: 1 }]}>FECHA</Text>
+              <Text style={[baseStyles.datoValor, { lineHeight: 1.1 }]}>{data.fecha}</Text>
             </View>
           </View>
-          <View style={baseStyles.datoRow}>
-            <View style={baseStyles.datoField}>
-              <Text style={[baseStyles.datoLabel, { color: colors.cp }]}>PACIENTE</Text>
-              <Text style={baseStyles.datoValor}>{data.paciente}</Text>
+          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 0.5 }}>
+            <View style={{ flex: 1, borderWidth: 0.75, borderColor: '#e5e7eb', borderRadius: 3, paddingHorizontal: 8, paddingTop: 0.5, paddingBottom: 1, marginBottom: 0.5 }}>
+              <Text style={[baseStyles.datoLabel, { color: colors.cp, marginBottom: 0, lineHeight: 1 }]}>PACIENTE</Text>
+              <Text style={[baseStyles.datoValor, { lineHeight: 1.1 }]}>{data.paciente}</Text>
             </View>
-            <View style={baseStyles.datoField}>
-              <Text style={[baseStyles.datoLabel, { color: colors.cp }]}>DIAGN{'\u00D3'}STICO</Text>
-              <Text style={baseStyles.datoValor}>{data.diagnostico}</Text>
+            <View style={{ flex: 1, borderWidth: 0.75, borderColor: '#e5e7eb', borderRadius: 3, paddingHorizontal: 8, paddingTop: 0.5, paddingBottom: 1, marginBottom: 0.5 }}>
+              <Text style={[baseStyles.datoLabel, { color: colors.cp, marginBottom: 0, lineHeight: 1 }]}>DIAGN{'\u00D3'}STICO</Text>
+              <Text style={[baseStyles.datoValor, { lineHeight: 1.1 }]}>{data.diagnostico}</Text>
             </View>
           </View>
 
@@ -179,10 +230,11 @@ export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudI
           {/* Tabla de estudios */}
           <View>
             <View style={s.tableHeader}>
+              <GradientBg cp={colors.cp} cs={colors.cs} id="gTblImg" />
               <Text style={s.thNum}>#</Text>
               <Text style={s.thEstudio}>Estudio</Text>
               <Text style={s.thRegion}>{`Regi\u00F3n`}</Text>
-              <Text style={s.thIndicacion}>{`Indicaci\u00F3n`}</Text>
+              <Text style={s.thComplementoTitle}>Complemento</Text>
             </View>
             {data.estudios.map((estudio, i) => {
               const regionText = estudio.region + (estudio.proyecciones ? ` — ${estudio.proyecciones}` : '')
@@ -193,24 +245,16 @@ export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudI
                   </View>
                   <Text style={s.tdEstudio}>{estudio.tipo}</Text>
                   <Text style={s.tdRegion}>{regionText}</Text>
-                  <Text style={s.tdIndicacion}>{estudio.indicacion || '—'}</Text>
+                  <Text style={s.tdComplemento}>{estudio.indicacion || '—'}</Text>
                 </View>
               )
             })}
           </View>
 
-          {/* Firma */}
-          <PdfFirma medico={medico} colors={colors} />
         </View>
 
-        {/* Numeraci{'\u00F3'}n de p{'\u00E1'}gina */}
-        <Text
-          style={baseStyles.pageNumber}
-          render={({ pageNumber, totalPages }) => `P\u00E1gina ${pageNumber} de ${totalPages}`}
-          fixed
-        />
-
-        <BarraBottom colors={colors} medico={medico} />
+          {/* Firma */}
+          <PdfFirma medico={medico} colors={colors} />
       </Page>
     </Document>
   )

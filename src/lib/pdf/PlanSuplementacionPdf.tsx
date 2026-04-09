@@ -3,7 +3,7 @@ import PdfHeader from './PdfHeader'
 import PdfFirma from './PdfFirma'
 import PdfWatermark from './PdfWatermark'
 import { BarraTop, BarraBottom } from './PdfBarras'
-import { baseStyles, getPdfColors } from './PdfStyles'
+import { baseStyles, getPdfColors, GradientBg } from './PdfStyles'
 import type { PdfMedicoData } from './PdfStyles'
 
 export interface PlanSuplementacionData {
@@ -44,10 +44,39 @@ export default function PlanSuplementacionPdf({
   const colors = getPdfColors(medico)
 
   const s = StyleSheet.create({
+    page: {
+      fontFamily: 'Roboto',
+      fontSize: 10,
+      color: '#1a1a1a',
+      paddingTop: 100,
+      paddingBottom: 54,
+      paddingHorizontal: 50,
+    },
+    headerFixed: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+    },
+    headerInner: {
+      paddingHorizontal: 50,
+      paddingTop: 8,
+    },
+    footerFixed: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+    },
     /* Titulo doc */
     tituloBanner: {
-      ...baseStyles.tituloDoc,
-      backgroundColor: colors.cp,
+      marginTop: 14,
+      marginBottom: 16,
+      paddingVertical: 9,
+      borderRadius: 4,
+      position: 'relative',
+      overflow: 'hidden',
+      alignItems: 'center',
     },
     /* Seccion heading */
     seccionWrap: {
@@ -70,11 +99,12 @@ export default function PlanSuplementacionPdf({
     /* Tabla header */
     tableHeader: {
       flexDirection: 'row',
-      backgroundColor: colors.cp,
       borderTopLeftRadius: 4,
       borderTopRightRadius: 4,
       paddingVertical: 7,
       paddingHorizontal: 10,
+      position: 'relative',
+      overflow: 'hidden',
     },
     thNum: {
       width: 26,
@@ -200,8 +230,8 @@ export default function PlanSuplementacionPdf({
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'flex-end',
-      marginTop: 'auto',
-      paddingTop: 20,
+      marginTop: 16,
+      paddingTop: 10,
     },
     qrWrap: {
       alignItems: 'center',
@@ -220,20 +250,37 @@ export default function PlanSuplementacionPdf({
 
   return (
     <Document>
-      <Page size="LETTER" style={baseStyles.page}>
-        <BarraTop colors={colors} />
-        <View style={baseStyles.contenido}>
-          <PdfWatermark logoUrl={logoUrl} />
-          <PdfHeader
-            medico={medico}
-            colors={colors}
-            logoUrl={logoUrl}
-            folio={data.folio}
-            fecha={data.fecha}
-          />
+      <Page size="LETTER" style={s.page}>
+        {/* Header fixed — se repite en cada página */}
+        <View fixed style={s.headerFixed}>
+          <BarraTop colors={colors} />
+          <View style={s.headerInner}>
+            <PdfHeader
+              medico={medico}
+              colors={colors}
+              logoUrl={logoUrl}
+              folio={data.folio}
+              fecha={data.fecha}
+              compact
+            />
+          </View>
+        </View>
 
+        {/* Footer fixed — se repite en cada página */}
+        <View fixed style={s.footerFixed}>
+          <BarraBottom colors={colors} medico={medico} />
+        </View>
+
+        <PdfWatermark logoUrl={logoUrl} />
+
+        <View style={{ flex: 1 }}>
           {/* Titulo */}
-          <Text style={s.tituloBanner}>Plan de Suplementación</Text>
+          <View style={s.tituloBanner}>
+            <GradientBg cp={colors.cp} cs={colors.cs} id="gTitSup" />
+            <Text style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#ffffff', letterSpacing: 1.5, textAlign: 'center' }}>
+              Plan de Suplementación
+            </Text>
+          </View>
 
           {/* Datos del paciente */}
           <View style={baseStyles.datoRow}>
@@ -268,6 +315,7 @@ export default function PlanSuplementacionPdf({
 
           {/* Table header */}
           <View style={s.tableHeader}>
+            <GradientBg cp={colors.cp} cs={colors.cs} id="gTblSup" />
             <Text style={s.thNum}>#</Text>
             <Text style={s.thNombre}>Suplemento</Text>
             <Text style={s.thDosis}>Dosis</Text>
@@ -323,6 +371,8 @@ export default function PlanSuplementacionPdf({
             </View>
           ) : null}
 
+        </View>
+
           {/* Footer: QR izquierda + Firma derecha */}
           <View style={s.footerRow}>
             {data.blogQrDataUrl ? (
@@ -337,18 +387,6 @@ export default function PlanSuplementacionPdf({
               <PdfFirma medico={medico} colors={colors} />
             </View>
           </View>
-        </View>
-
-        {/* Numeración de página */}
-        <Text
-          style={baseStyles.pageNumber}
-          render={({ pageNumber, totalPages }) =>
-            `Página ${pageNumber} de ${totalPages}`
-          }
-          fixed
-        />
-
-        <BarraBottom colors={colors} medico={medico} />
       </Page>
     </Document>
   )

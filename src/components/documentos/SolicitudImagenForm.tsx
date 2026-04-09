@@ -105,17 +105,19 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
             <div key={i} className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="sm:col-span-2">
                 <label className="text-xs text-slate-500 block mb-1">Tipo de estudio</label>
-                <select value={e.tipo} onChange={ev => updateEstudio(i, 'tipo', ev.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30">
-                  <option value="">Seleccionar...</option>
-                  {TIPOS_ESTUDIO.map(t => <option key={t}>{t}</option>)}
-                </select>
+                <input list={`tipos-${i}`} value={e.tipo} onChange={ev => updateEstudio(i, 'tipo', ev.target.value)} placeholder="Seleccionar o escribir..."
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                <datalist id={`tipos-${i}`}>
+                  {TIPOS_ESTUDIO.map(t => <option key={t} value={t} />)}
+                </datalist>
               </div>
               <div className="sm:col-span-2">
                 <label className="text-xs text-slate-500 block mb-1">Región anatómica</label>
-                <select value={e.region} onChange={ev => updateEstudio(i, 'region', ev.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30">
-                  <option value="">Seleccionar...</option>
-                  {REGIONES.map(r => <option key={r}>{r}</option>)}
-                </select>
+                <input list={`regiones-${i}`} value={e.region} onChange={ev => updateEstudio(i, 'region', ev.target.value)} placeholder="Seleccionar o escribir..."
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                <datalist id={`regiones-${i}`}>
+                  {REGIONES.map(r => <option key={r} value={r} />)}
+                </datalist>
               </div>
               <div>
                 <label className="text-xs text-slate-500 block mb-1">Proyecciones</label>

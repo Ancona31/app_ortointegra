@@ -3,7 +3,7 @@ import type { ReactElement } from 'react'
 import PdfHeader from './PdfHeader'
 import PdfFirma from './PdfFirma'
 import { BarraTop, BarraBottom } from './PdfBarras'
-import { baseStyles, getPdfColors } from './PdfStyles'
+import { baseStyles, getPdfColors, GradientBg } from './PdfStyles'
 import type { PdfMedicoData } from './PdfStyles'
 
 /* ------------------------------------------------------------------ */
@@ -56,6 +56,30 @@ export default function NotaEvolucionPdf({ medico, data, logoUrl }: NotaEvolucio
   const colors = getPdfColors(medico)
 
   const s = StyleSheet.create({
+    page: {
+      fontFamily: 'Roboto',
+      fontSize: 10,
+      color: '#1a1a1a',
+      paddingTop: 100,
+      paddingBottom: 54,
+      paddingHorizontal: 50,
+    },
+    headerFixed: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+    },
+    headerInner: {
+      paddingHorizontal: 50,
+      paddingTop: 8,
+    },
+    footerFixed: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+    },
     tituloWrap: {
       backgroundColor: colors.cp + '0D',
       borderRadius: 4,
@@ -128,11 +152,12 @@ export default function NotaEvolucionPdf({ medico, data, logoUrl }: NotaEvolucio
     },
     tableHeaderRow: {
       flexDirection: 'row',
-      backgroundColor: colors.cp,
       borderTopLeftRadius: 3,
       borderTopRightRadius: 3,
       paddingVertical: 6,
       paddingHorizontal: 8,
+      position: 'relative',
+      overflow: 'hidden',
     },
     tableHeaderCell: {
       fontSize: 8,
@@ -210,17 +235,28 @@ export default function NotaEvolucionPdf({ medico, data, logoUrl }: NotaEvolucio
 
   return (
     <Document>
-      <Page size="LETTER" style={baseStyles.page}>
-        <BarraTop colors={colors} />
-        <View style={baseStyles.contenido}>
-          <PdfHeader
-            medico={medico}
-            colors={colors}
-            logoUrl={logoUrl}
-            folio={data.folio}
-            fecha={data.fecha}
-          />
+      <Page size="LETTER" style={s.page}>
+        {/* Header fixed — se repite en cada página */}
+        <View fixed style={s.headerFixed}>
+          <BarraTop colors={colors} />
+          <View style={s.headerInner}>
+            <PdfHeader
+              medico={medico}
+              colors={colors}
+              logoUrl={logoUrl}
+              folio={data.folio}
+              fecha={data.fecha}
+              compact
+            />
+          </View>
+        </View>
 
+        {/* Footer fixed — se repite en cada página */}
+        <View fixed style={s.footerFixed}>
+          <BarraBottom colors={colors} medico={medico} />
+        </View>
+
+        <View style={{ flex: 1 }}>
           {/* Title */}
           <View style={s.tituloWrap}>
             <Text style={s.tituloText}>Nota de Evoluci\u00F3n M\u00E9dica</Text>
@@ -249,6 +285,7 @@ export default function NotaEvolucionPdf({ medico, data, logoUrl }: NotaEvolucio
             <View style={s.tableWrap}>
               <Text style={s.tableSectionHeader}>Terap\u00E9utica</Text>
               <View style={s.tableHeaderRow}>
+                <GradientBg cp={colors.cp} cs={colors.cs} id="gTblEvo" />
                 <Text style={[s.tableHeaderCell, s.colMed]}>Medicamento</Text>
                 <Text style={[s.tableHeaderCell, s.colDosis]}>Dosis</Text>
                 <Text style={[s.tableHeaderCell, s.colFrec]}>Frecuencia</Text>
@@ -265,17 +302,10 @@ export default function NotaEvolucionPdf({ medico, data, logoUrl }: NotaEvolucio
             </View>
           ) : null}
 
-          {/* Firma */}
-          <PdfFirma medico={medico} colors={colors} />
         </View>
 
-        {/* Page number */}
-        <Text
-          style={baseStyles.pageNumber}
-          render={({ pageNumber, totalPages }) => `P\u00E1gina ${pageNumber} de ${totalPages}`}
-          fixed
-        />
-        <BarraBottom colors={colors} medico={medico} />
+          {/* Firma */}
+          <PdfFirma medico={medico} colors={colors} />
       </Page>
     </Document>
   )

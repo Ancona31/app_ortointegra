@@ -1,9 +1,8 @@
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer'
 import PdfHeader from './PdfHeader'
-import PdfFirma from './PdfFirma'
 import PdfWatermark from './PdfWatermark'
 import { BarraTop, BarraBottom } from './PdfBarras'
-import { baseStyles, getPdfColors } from './PdfStyles'
+import { baseStyles, getPdfColors, GradientBg } from './PdfStyles'
 import type { PdfMedicoData, PdfColors } from './PdfStyles'
 
 export interface SolicitudInternamientoData {
@@ -31,25 +30,59 @@ export interface SolicitudInternamientoProps {
   logoUrl?: string
 }
 
-/** Helper para renderToBuffer — retorna el JSX con tipo correcto */
 export function renderSolicitudInternamiento(props: SolicitudInternamientoProps) {
   return <SolicitudInternamientoPdf {...props} />
 }
 
 function buildStyles(colors: PdfColors) {
   return StyleSheet.create({
-    /* --- Titulo documento --- */
+    page: {
+      fontFamily: 'Roboto',
+      fontSize: 10,
+      color: '#1a1a1a',
+      paddingTop: 100,
+      paddingBottom: 42,
+      paddingHorizontal: 50,
+    },
+    headerFixed: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+    },
+    headerInner: {
+      paddingHorizontal: 50,
+      paddingTop: 8,
+    },
+    footerFixed: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+    },
     tituloDoc: {
-      ...baseStyles.tituloDoc,
-      backgroundColor: colors.cp,
+      marginTop: 4,
+      marginBottom: 6,
+      paddingVertical: 6,
+      borderRadius: 4,
+      position: 'relative',
+      overflow: 'hidden',
+      alignItems: 'center',
+    },
+    tituloText: {
+      fontSize: 12,
+      fontWeight: 700,
+      textTransform: 'uppercase',
+      color: '#ffffff',
+      letterSpacing: 1.5,
+      textAlign: 'center',
     },
     urgenteBadge: {
       backgroundColor: '#dc2626',
       paddingHorizontal: 14,
-      paddingVertical: 4,
+      paddingVertical: 3,
       borderRadius: 3,
       alignSelf: 'center',
-      marginTop: 8,
       marginBottom: 4,
     },
     urgenteBadgeText: {
@@ -60,46 +93,60 @@ function buildStyles(colors: PdfColors) {
       textTransform: 'uppercase',
       textAlign: 'center',
     },
-
-    /* --- Grid de datos del paciente --- */
+    datoRow: {
+      flexDirection: 'row',
+      gap: 8,
+      marginBottom: 1,
+    },
+    datoField: {
+      flex: 1,
+      marginBottom: 3,
+      borderWidth: 0.75,
+      borderColor: '#e5e7eb',
+      borderRadius: 3,
+      paddingHorizontal: 8,
+      paddingTop: 2,
+      paddingBottom: 3,
+    },
     lugarValor: {
       fontSize: 10.5,
       fontWeight: 700,
       color: colors.cp,
-      lineHeight: 1.4,
+      lineHeight: 1.3,
     },
-
-    /* --- Secciones --- */
     seccion: {
-      ...baseStyles.seccion,
-      backgroundColor: colors.cp + '0A',
+      paddingVertical: 4,
+      paddingLeft: 10,
+      borderLeftWidth: 3,
       borderLeftColor: colors.cp,
+      backgroundColor: colors.cp + '0A',
+      borderRadius: 3,
+      marginTop: 6,
+      marginBottom: 3,
     },
     seccionTitle: {
       fontSize: 11,
       fontWeight: 700,
       color: colors.cp,
     },
-
-    /* --- Diagnosticos --- */
     diagPrincipal: {
       fontSize: 10.5,
       fontWeight: 700,
       color: '#1a1a1a',
-      marginBottom: 6,
+      marginBottom: 2,
       paddingLeft: 6,
-      lineHeight: 1.5,
+      lineHeight: 1.3,
     },
     bulletRow: {
       flexDirection: 'row',
-      gap: 8,
-      paddingVertical: 3,
+      gap: 6,
+      paddingVertical: 1,
       paddingLeft: 6,
     },
     bulletDot: {
-      width: 5,
-      height: 5,
-      borderRadius: 2.5,
+      width: 4,
+      height: 4,
+      borderRadius: 2,
       backgroundColor: colors.cs,
       marginTop: 4,
     },
@@ -107,31 +154,27 @@ function buildStyles(colors: PdfColors) {
       fontSize: 10,
       color: '#333',
       flex: 1,
-      lineHeight: 1.5,
+      lineHeight: 1.3,
     },
-
-    /* --- Procedimiento / Justificacion --- */
     justifiedText: {
-      fontSize: 10.5,
+      fontSize: 10,
       color: '#333',
-      lineHeight: 1.6,
+      lineHeight: 1.4,
       textAlign: 'justify',
       paddingLeft: 6,
-      marginTop: 4,
+      marginTop: 2,
     },
-
-    /* --- Badges requerimientos --- */
     badgesWrap: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 6,
-      marginTop: 4,
+      gap: 5,
+      marginTop: 2,
       paddingLeft: 6,
     },
     badge: {
       backgroundColor: colors.cp + '10',
-      paddingHorizontal: 10,
-      paddingVertical: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
       borderRadius: 10,
       borderWidth: 0.5,
       borderColor: colors.cp + '30',
@@ -141,71 +184,50 @@ function buildStyles(colors: PdfColors) {
       color: colors.cp,
       fontWeight: 500,
     },
-
-    /* --- Instrucciones paciente --- */
     instruccionesBox: {
       backgroundColor: '#fffbeb',
       borderWidth: 1,
       borderColor: '#f59e0b',
       borderRadius: 4,
-      padding: 10,
-      marginTop: 16,
+      padding: 8,
+      marginTop: 6,
     },
     instruccionesHeader: {
-      fontSize: 10,
+      fontSize: 9.5,
       fontWeight: 700,
       color: '#b45309',
-      marginBottom: 6,
+      marginBottom: 2,
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
     instruccionesContent: {
-      fontSize: 9.5,
+      fontSize: 9,
       color: '#78350f',
-      lineHeight: 1.6,
-    },
-
-    /* --- Indicaciones de piso --- */
-    indicacionesBox: {
-      backgroundColor: colors.cp + '06',
-      borderWidth: 1,
-      borderColor: colors.cp + '30',
-      borderRadius: 4,
-      padding: 10,
-      marginTop: 12,
-    },
-    indicacionesHeader: {
-      fontSize: 10,
-      fontWeight: 700,
-      color: colors.cp,
-      marginBottom: 6,
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
+      lineHeight: 1.4,
     },
     indicacionesContent: {
-      fontSize: 9.5,
+      fontSize: 10,
       color: '#1a1a1a',
-      lineHeight: 1.6,
+      lineHeight: 1.5,
     },
-
-    /* --- Firmas (doble) --- */
     firmasRow: {
-      marginTop: 'auto',
-      paddingTop: 20,
+      marginTop: 60,
+      paddingTop: 8,
       flexDirection: 'row',
       justifyContent: 'space-between',
       gap: 30,
     },
-    firmaPaciente: {
+    firmaCol: {
       flex: 1,
       alignItems: 'center',
     },
-    firmaLineaDashed: {
+    firmaLinea: {
       width: '100%',
       borderTopWidth: 1,
       borderTopColor: '#999',
       borderTopStyle: 'dashed',
-      paddingTop: 8,
+      paddingTop: 6,
+      alignItems: 'center',
     },
     firmaLabel: {
       fontSize: 8,
@@ -214,90 +236,120 @@ function buildStyles(colors: PdfColors) {
       textTransform: 'uppercase',
       letterSpacing: 1,
     },
+    firmaNombre: {
+      fontWeight: 700,
+      fontSize: 9.5,
+      color: colors.cp,
+      textAlign: 'center',
+    },
+    firmaCed: {
+      fontSize: 7.5,
+      color: '#666',
+      marginTop: 1,
+      textAlign: 'center',
+    },
+    firmaYSello: {
+      fontSize: 6,
+      color: '#c0c0c0',
+      marginTop: 3,
+      textTransform: 'uppercase',
+      letterSpacing: 1.5,
+      textAlign: 'center',
+    },
   })
 }
 
 export default function SolicitudInternamientoPdf({ medico, data, logoUrl }: SolicitudInternamientoProps) {
   const colors = getPdfColors(medico)
   const s = buildStyles(colors)
+  const nombre = medico?.nombre || 'Médico'
+  const cedProf = medico?.cedula_profesional || ''
+  const cedEsp = medico?.cedula_especialidad || ''
 
   return (
     <Document>
-      <Page size="LETTER" style={baseStyles.page}>
-        <BarraTop colors={colors} />
-        <View style={baseStyles.contenido}>
-          <PdfWatermark logoUrl={logoUrl} />
-          <PdfHeader
-            medico={medico}
-            colors={colors}
-            logoUrl={logoUrl}
-            folio={data.folio}
-            fecha={data.fecha}
-          />
+      <Page size="LETTER" style={s.page}>
+        {/* Header fixed — se repite en cada página */}
+        <View fixed style={s.headerFixed}>
+          <BarraTop colors={colors} />
+          <View style={s.headerInner}>
+            <PdfHeader medico={medico} colors={colors} logoUrl={logoUrl} folio={data.folio} fecha={data.fecha} compact />
+          </View>
+        </View>
 
-          {/* Titulo */}
-          <Text style={s.tituloDoc}>
-            Solicitud de Internamiento Hospitalario
-          </Text>
+        {/* Footer fixed — se repite en cada página */}
+        <View fixed style={s.footerFixed}>
+          <BarraBottom colors={colors} medico={medico} />
+        </View>
 
-          {/* Badge urgente */}
-          {data.urgente ? (
-            <View style={s.urgenteBadge}>
-              <Text style={s.urgenteBadgeText}>URGENTE</Text>
+        <PdfWatermark logoUrl={logoUrl} />
+
+        <View style={{ flex: 1 }}>
+        {/* Titulo */}
+        <View style={s.tituloDoc}>
+          <GradientBg cp={colors.cp} cs={colors.cs} id="gTitInt" />
+          <Text style={s.tituloText}>Solicitud de Internamiento Hospitalario</Text>
+        </View>
+
+        {/* Badge urgente */}
+        {data.urgente ? (
+          <View style={s.urgenteBadge}>
+            <Text style={s.urgenteBadgeText}>URGENTE</Text>
+          </View>
+        ) : null}
+
+        {/* FECHA + PACIENTE + FECHA INGRESO */}
+        <View style={s.datoRow}>
+          <View style={s.datoField}>
+            <Text style={[baseStyles.datoLabel, { color: colors.cp }]}>FECHA</Text>
+            <Text style={baseStyles.datoValor}>{data.fecha}</Text>
+          </View>
+          <View style={[s.datoField, { flex: 2 }]}>
+            <Text style={[baseStyles.datoLabel, { color: colors.cp }]}>PACIENTE</Text>
+            <Text style={baseStyles.datoValor}>{data.paciente}</Text>
+          </View>
+          {data.fechaIngreso ? (
+            <View style={s.datoField}>
+              <Text style={[baseStyles.datoLabel, { color: colors.cp }]}>FECHA DE INGRESO</Text>
+              <Text style={baseStyles.datoValor}>{data.fechaIngreso}</Text>
             </View>
           ) : null}
+        </View>
 
-          {/* Row 1: FECHA + PACIENTE + FECHA DE INGRESO */}
-          <View style={baseStyles.datoRow}>
-            <View style={baseStyles.datoField}>
-              <Text style={baseStyles.datoLabel}>FECHA</Text>
-              <Text style={baseStyles.datoValor}>{data.fecha}</Text>
+        {/* HOSPITAL/LUGAR */}
+        {data.lugar ? (
+          <View style={s.datoRow}>
+            <View style={s.datoField}>
+              <Text style={[baseStyles.datoLabel, { color: colors.cp }]}>HOSPITAL / LUGAR</Text>
+              <Text style={s.lugarValor}>{data.lugar}</Text>
             </View>
-            <View style={[baseStyles.datoField, { flex: 2 }]}>
-              <Text style={baseStyles.datoLabel}>PACIENTE</Text>
-              <Text style={baseStyles.datoValor}>{data.paciente}</Text>
-            </View>
-            {data.fechaIngreso ? (
-              <View style={baseStyles.datoField}>
-                <Text style={baseStyles.datoLabel}>FECHA DE INGRESO</Text>
-                <Text style={baseStyles.datoValor}>{data.fechaIngreso}</Text>
-              </View>
-            ) : null}
           </View>
+        ) : null}
 
-          {/* Row 2: HOSPITAL/LUGAR (full width) */}
-          {data.lugar ? (
-            <View style={baseStyles.datoRow}>
-              <View style={baseStyles.datoField}>
-                <Text style={baseStyles.datoLabel}>HOSPITAL / LUGAR</Text>
-                <Text style={s.lugarValor}>{data.lugar}</Text>
-              </View>
+        {/* TIPO + DIAS + ASA */}
+        <View style={s.datoRow}>
+          {data.tipoInternamiento ? (
+            <View style={s.datoField}>
+              <Text style={[baseStyles.datoLabel, { color: colors.cp }]}>TIPO DE INTERNAMIENTO</Text>
+              <Text style={baseStyles.datoValor}>{data.tipoInternamiento}</Text>
             </View>
           ) : null}
+          {data.diasEstimados ? (
+            <View style={s.datoField}>
+              <Text style={[baseStyles.datoLabel, { color: colors.cp }]}>D{'\u00cd'}AS ESTIMADOS</Text>
+              <Text style={baseStyles.datoValor}>{data.diasEstimados}</Text>
+            </View>
+          ) : null}
+          {data.asa ? (
+            <View style={s.datoField}>
+              <Text style={[baseStyles.datoLabel, { color: colors.cp }]}>ASA</Text>
+              <Text style={baseStyles.datoValor}>{data.asa}</Text>
+            </View>
+          ) : null}
+        </View>
 
-          {/* Row 3: TIPO + DIAS ESTIMADOS + ASA */}
-          <View style={baseStyles.datoRow}>
-            {data.tipoInternamiento ? (
-              <View style={baseStyles.datoField}>
-                <Text style={baseStyles.datoLabel}>TIPO DE INTERNAMIENTO</Text>
-                <Text style={baseStyles.datoValor}>{data.tipoInternamiento}</Text>
-              </View>
-            ) : null}
-            {data.diasEstimados ? (
-              <View style={baseStyles.datoField}>
-                <Text style={baseStyles.datoLabel}>D{'\u00cd'}AS ESTIMADOS</Text>
-                <Text style={baseStyles.datoValor}>{data.diasEstimados}</Text>
-              </View>
-            ) : null}
-            {data.asa ? (
-              <View style={baseStyles.datoField}>
-                <Text style={baseStyles.datoLabel}>ASA</Text>
-                <Text style={baseStyles.datoValor}>{data.asa}</Text>
-              </View>
-            ) : null}
-          </View>
-
-          {/* Diagnosticos */}
+        {/* Diagnosticos */}
+        <View>
           <View style={s.seccion}>
             <Text style={s.seccionTitle}>Diagn{'\u00f3'}sticos</Text>
           </View>
@@ -308,79 +360,115 @@ export default function SolicitudInternamientoPdf({ medico, data, logoUrl }: Sol
               <Text style={s.bulletText}>{dx}</Text>
             </View>
           ))}
-
-          {/* Procedimiento */}
-          {data.procedimiento ? (
-            <>
-              <View style={s.seccion}>
-                <Text style={s.seccionTitle}>Procedimiento / Cirug{'\u00ed'}a</Text>
-              </View>
-              <Text style={s.justifiedText}>{data.procedimiento}</Text>
-            </>
-          ) : null}
-
-          {/* Requerimientos especiales */}
-          {data.requerimientos && data.requerimientos.length > 0 ? (
-            <>
-              <View style={s.seccion}>
-                <Text style={s.seccionTitle}>Requerimientos especiales</Text>
-              </View>
-              <View style={s.badgesWrap}>
-                {data.requerimientos.map((req, i) => (
-                  <View key={i} style={s.badge}>
-                    <Text style={s.badgeText}>{req}</Text>
-                  </View>
-                ))}
-              </View>
-            </>
-          ) : null}
-
-          {/* Justificacion clinica */}
-          {data.justificacion ? (
-            <>
-              <View style={s.seccion}>
-                <Text style={s.seccionTitle}>Justificaci{'\u00f3'}n cl{'\u00ed'}nica</Text>
-              </View>
-              <Text style={s.justifiedText}>{data.justificacion}</Text>
-            </>
-          ) : null}
-
-          {/* Instrucciones para el paciente */}
-          {data.instruccionesPaciente ? (
-            <View style={s.instruccionesBox}>
-              <Text style={s.instruccionesHeader}>Instrucciones para el paciente</Text>
-              <Text style={s.instruccionesContent}>{data.instruccionesPaciente}</Text>
-            </View>
-          ) : null}
-
-          {/* Indicaciones de piso */}
-          {data.indicacionesPiso ? (
-            <View style={s.indicacionesBox}>
-              <Text style={s.indicacionesHeader}>Indicaciones de piso</Text>
-              <Text style={s.indicacionesContent}>{data.indicacionesPiso}</Text>
-            </View>
-          ) : null}
-
-          {/* Doble firma: paciente/familiar + medico */}
-          <View style={s.firmasRow}>
-            <View style={s.firmaPaciente}>
-              <View style={s.firmaLineaDashed}>
-                <Text style={s.firmaLabel}>Firma del Paciente o Familiar</Text>
-              </View>
-            </View>
-            <PdfFirma medico={medico} colors={colors} />
-          </View>
         </View>
 
-        {/* Numeracion de pagina */}
-        <Text
-          style={baseStyles.pageNumber}
-          render={({ pageNumber, totalPages }) => `P\u00e1gina ${pageNumber} de ${totalPages}`}
-          fixed
-        />
+        {/* Procedimiento */}
+        {data.procedimiento ? (
+          <View>
+            <View style={s.seccion}>
+              <Text style={s.seccionTitle}>Procedimiento / Cirug{'\u00ed'}a</Text>
+            </View>
+            <Text style={s.justifiedText}>{data.procedimiento}</Text>
+          </View>
+        ) : null}
 
-        <BarraBottom colors={colors} medico={medico} />
+        {/* Requerimientos especiales */}
+        {data.requerimientos && data.requerimientos.length > 0 ? (
+          <View>
+            <View style={s.seccion}>
+              <Text style={s.seccionTitle}>Requerimientos especiales</Text>
+            </View>
+            <View style={s.badgesWrap}>
+              {data.requerimientos.map((req, i) => (
+                <View key={i} style={s.badge}>
+                  <Text style={s.badgeText}>{req}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        {/* Justificacion clinica */}
+        {data.justificacion ? (
+          <View>
+            <View style={s.seccion}>
+              <Text style={s.seccionTitle}>Justificaci{'\u00f3'}n cl{'\u00ed'}nica</Text>
+            </View>
+            <Text style={s.justifiedText}>{data.justificacion}</Text>
+          </View>
+        ) : null}
+
+        {/* Instrucciones para el paciente */}
+        {data.instruccionesPaciente ? (
+          <View style={s.instruccionesBox}>
+            <Text style={s.instruccionesHeader}>Instrucciones para el paciente</Text>
+            <Text style={s.instruccionesContent}>{data.instruccionesPaciente}</Text>
+          </View>
+        ) : null}
+
+        </View>
+
+        {/* Doble firma — último elemento del contenido */}
+        <View style={s.firmasRow} wrap={false}>
+          <View style={s.firmaCol}>
+            <View style={s.firmaLinea}>
+              <Text style={s.firmaLabel}>Firma del Paciente o Familiar</Text>
+            </View>
+          </View>
+          <View style={s.firmaCol}>
+            <View style={s.firmaLinea}>
+              <Text style={s.firmaNombre}>{nombre}</Text>
+              {cedProf ? <Text style={s.firmaCed}>Céd. Prof. {cedProf}</Text> : null}
+              {cedEsp ? <Text style={s.firmaCed}>Céd. Esp. {cedEsp}</Text> : null}
+              <Text style={s.firmaYSello}>Firma y sello</Text>
+            </View>
+          </View>
+        </View>
       </Page>
+
+      {/* PÁGINA 2 — Solo si hay indicaciones de piso */}
+      {data.indicacionesPiso ? (
+        <Page size="LETTER" style={s.page}>
+          <View fixed style={s.headerFixed}>
+            <BarraTop colors={colors} />
+            <View style={s.headerInner}>
+              <PdfHeader medico={medico} colors={colors} logoUrl={logoUrl} compact />
+            </View>
+          </View>
+
+          <View fixed style={s.footerFixed}>
+            <BarraBottom colors={colors} medico={medico} />
+          </View>
+
+          <PdfWatermark logoUrl={logoUrl} />
+
+          <View style={{ flex: 1 }}>
+          <View style={s.tituloDoc}>
+            <GradientBg cp={colors.cp} cs={colors.cs} id="gTitPiso" />
+            <Text style={s.tituloText}>Indicaciones de Ingreso a Piso</Text>
+          </View>
+          <Text style={{ fontSize: 8, color: '#666', textAlign: 'center', marginBottom: 10 }}>
+            Para personal de enfermer{'\u00ed'}a y m{'\u00e9'}dico residente
+          </Text>
+
+          <Text style={s.indicacionesContent}>{data.indicacionesPiso}</Text>
+
+          </View>
+
+          {/* Firma del médico */}
+          <View style={s.firmasRow}>
+            <View style={s.firmaCol} />
+            <View style={s.firmaCol}>
+              <View style={s.firmaLinea}>
+                <Text style={s.firmaNombre}>{nombre}</Text>
+                {cedProf ? <Text style={s.firmaCed}>Céd. Prof. {cedProf}</Text> : null}
+                {cedEsp ? <Text style={s.firmaCed}>Céd. Esp. {cedEsp}</Text> : null}
+                <Text style={s.firmaYSello}>Firma y sello</Text>
+              </View>
+            </View>
+          </View>
+        </Page>
+      ) : null}
     </Document>
   )
 }
