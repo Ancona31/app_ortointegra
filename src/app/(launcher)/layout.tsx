@@ -1,11 +1,12 @@
 import { ToastProvider } from '@/components/ui/Toast'
+import { ThemeProvider } from '@/components/launcher/ThemeContext'
 
 export default function LauncherLayout({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
-      <div className="min-h-screen bg-[#f0f4f8]">
+      <ThemeProvider>
         {children}
-      </div>
+      </ThemeProvider>
     </ToastProvider>
   )
 }
