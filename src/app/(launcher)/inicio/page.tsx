@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   Loader2, Stethoscope, FileText, LayoutDashboard,
   ChevronRight, UserCircle, Zap,
-  CalendarDays, Users,
+  CalendarDays, Users, WifiOff,
 } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -14,6 +14,11 @@ import ConsultaRapidaModal from '@/components/launcher/ConsultaRapidaModal'
 import OnboardingModal from '@/components/onboarding/OnboardingModal'
 import ParticleCanvas from '@/components/launcher/ParticleCanvas'
 import { useTheme } from '@/components/launcher/ThemeContext'
+import { useMedicoInfo } from '@/hooks/useMedicoInfo'
+import { useClinica } from '@/hooks/useClinica'
+import { precacheFonts } from '@/lib/pdfClientFallback'
+import { subscribe, getStatus } from '@/lib/connectionMonitor'
+import { precachePatients } from '@/lib/offlinePatients'
 
 type GridMode = 'sin_pacientes' | 'nuevo' | 'activo'
 
@@ -72,6 +77,17 @@ export default function InicioPage() {
   const [modalConsulta, setModalConsulta] = useState(false)
   const [citasHoy, setCitasHoy] = useState<number>(0)
   const [pacientesSemana, setPacientesSemana] = useState<number>(0)
+
+  const [isOnline, setIsOnline] = useState(() => getStatus() !== 'offline')
+
+  // Precarga: poblar cache SWR de médico, clínica y fuentes PDF
+  useMedicoInfo()
+  useClinica()
+  useEffect(() => { precacheFonts(); precachePatients() }, [])
+  useEffect(() => {
+    const unsub = subscribe((status) => setIsOnline(status !== 'offline'))
+    return unsub
+  }, [])
 
   useEffect(() => {
     const supabase = createClient()
@@ -308,25 +324,43 @@ export default function InicioPage() {
             </Link>
 
             {/* Dashboard */}
-            <Link
-              href="/dashboard"
-              className={`launcher-card-2 group relative flex flex-col items-center justify-center gap-4 p-8 rounded-3xl border shadow-sm transition-all duration-300 min-h-[220px] hover:scale-[1.03] active:scale-[0.98] ${cardBase} ${cardHover}`}
-            >
-              <div className="w-16 h-16 rounded-2xl bg-violet-600 flex items-center justify-center group-hover:bg-violet-700 transition-colors">
-                <LayoutDashboard size={32} className="text-white transition-transform duration-300 group-hover:animate-[iconBounce_0.5s_ease-in-out]" style={{ animationFillMode: 'both' }} />
+            {isOnline ? (
+              <Link
+                href="/dashboard"
+                className={`launcher-card-2 group relative flex flex-col items-center justify-center gap-4 p-8 rounded-3xl border shadow-sm transition-all duration-300 min-h-[220px] hover:scale-[1.03] active:scale-[0.98] ${cardBase} ${cardHover}`}
+              >
+                <div className="w-16 h-16 rounded-2xl bg-violet-600 flex items-center justify-center group-hover:bg-violet-700 transition-colors">
+                  <LayoutDashboard size={32} className="text-white transition-transform duration-300 group-hover:animate-[iconBounce_0.5s_ease-in-out]" style={{ animationFillMode: 'both' }} />
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-bold leading-tight">Dashboard</p>
+                  <p className={`text-sm mt-1 ${dark ? 'text-slate-400' : 'text-slate-400'}`}>
+                    Ver resumen, <strong>agenda</strong> y estadisticas
+                  </p>
+                </div>
+                <div className={`absolute bottom-4 right-4 opacity-20 group-hover:opacity-50 transition-opacity ${
+                  dark ? 'text-slate-400' : 'text-slate-600'
+                }`}>
+                  <ChevronRight size={18} />
+                </div>
+              </Link>
+            ) : (
+              <div
+                className={`launcher-card-2 relative flex flex-col items-center justify-center gap-4 p-8 rounded-3xl border shadow-sm min-h-[220px] opacity-50 cursor-not-allowed ${
+                  dark ? 'bg-slate-900/80 border-slate-700/50 text-slate-400' : 'bg-white/80 border-slate-200 text-slate-400'
+                }`}
+              >
+                <div className="w-16 h-16 rounded-2xl bg-slate-400 flex items-center justify-center">
+                  <LayoutDashboard size={32} className="text-white" />
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-bold leading-tight">Dashboard</p>
+                  <p className="text-sm mt-1 flex items-center justify-center gap-1">
+                    <WifiOff size={13} /> Requiere conexion
+                  </p>
+                </div>
               </div>
-              <div className="text-center">
-                <p className="text-lg font-bold leading-tight">Dashboard</p>
-                <p className={`text-sm mt-1 ${dark ? 'text-slate-400' : 'text-slate-400'}`}>
-                  Ver resumen, <strong>agenda</strong> y estadisticas
-                </p>
-              </div>
-              <div className={`absolute bottom-4 right-4 opacity-20 group-hover:opacity-50 transition-opacity ${
-                dark ? 'text-slate-400' : 'text-slate-600'
-              }`}>
-                <ChevronRight size={18} />
-              </div>
-            </Link>
+            )}
           </div>
 
           {/* Quick activity row */}

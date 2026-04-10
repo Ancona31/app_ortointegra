@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, Pill, FlaskConical, ScanLine, ClipboardList, BedDouble, PenLine, ShieldCheck, Receipt } from 'lucide-react'
+import { X, Pill, FlaskConical, ScanLine, ClipboardList, BedDouble, PenLine, ShieldCheck, Receipt, WifiOff } from 'lucide-react'
+import { subscribe, getStatus } from '@/lib/connectionMonitor'
 
 const TIPOS = [
   { tipo: 'receta',         label: 'Receta médica',          icon: Pill,          color: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' },
@@ -22,6 +23,12 @@ interface Props {
 
 export default function DocumentoRapidoModal({ open, onClose }: Props) {
   const router = useRouter()
+  const [isOnline, setIsOnline] = useState(() => getStatus() !== 'offline')
+
+  useEffect(() => {
+    const unsub = subscribe((status) => setIsOnline(status !== 'offline'))
+    return unsub
+  }, [])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -49,13 +56,20 @@ export default function DocumentoRapidoModal({ open, onClose }: Props) {
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
           <div>
-            <p className="text-sm font-semibold text-slate-800">Documento rápido</p>
+            <p className="text-sm font-semibold text-slate-800">Documento rapido</p>
             <p className="text-xs text-slate-400 mt-0.5">¿Qué tipo de documento necesitas?</p>
           </div>
           <button onClick={onClose} className="text-slate-300 hover:text-slate-500 transition-colors">
             <X size={16} />
           </button>
         </div>
+
+        {!isOnline && (
+          <div className="mx-4 mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
+            <WifiOff size={13} className="shrink-0" />
+            <span>Sin conexion — la busqueda de pacientes no estara disponible. Puedes escribir los datos manualmente.</span>
+          </div>
+        )}
 
         <div className="p-4 grid grid-cols-2 gap-2">
           {TIPOS.map(({ tipo, label, icon: Icon, color }) => (

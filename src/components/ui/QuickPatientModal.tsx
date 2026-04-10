@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { User, X } from 'lucide-react'
 import Portal from '@/components/ui/Portal'
+import { getStatus } from '@/lib/connectionMonitor'
+import { createPatientOffline } from '@/lib/offlinePatients'
 
 type PacienteBusqueda = { id: string; nombre: string; apellidos: string; telefono: string | null }
 
@@ -39,14 +41,49 @@ export default function QuickPatientModal({
     const anio = new Date().getFullYear() - edadNum
     const fecha_nacimiento = `${anio}-06-15`
 
-    const res = await fetch('/api/pacientes', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ nombre: nombre.trim(), apellidos: apellidos.trim(), fecha_nacimiento, email: email.trim() || null, consentimiento_otorgado: true }),
-    })
-    const data = await res.json()
-    if (!res.ok) { setError(data.error ?? 'Error al crear paciente'); setSaving(false); return }
-    onCreated({ id: data.id, nombre: nombre.trim(), apellidos: apellidos.trim(), telefono: null })
+    if (getStatus() === 'offline') {
+      // Crear paciente offline — se sincronizará al reconectar
+      try {
+        const patient = await createPatientOffline({
+          nombre: nombre.trim(),
+          apellidos: apellidos.trim(),
+          fecha_nacimiento,
+          email: email.trim() || null,
+          consentimiento_otorgado: true,
+        })
+        onCreated({ id: patient.id, nombre: nombre.trim(), apellidos: apellidos.trim(), telefono: null })
+      } catch {
+        setError('Error al guardar paciente offline')
+        setSaving(false)
+      }
+      return
+    }
+
+    try {
+      const res = await fetch('/api/pacientes', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ nombre: nombre.trim(), apellidos: apellidos.trim(), fecha_nacimiento, email: email.trim() || null, consentimiento_otorgado: true }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error ?? 'Error al crear paciente'); setSaving(false); return }
+      onCreated({ id: data.id, nombre: nombre.trim(), apellidos: apellidos.trim(), telefono: null })
+    } catch {
+      // Fallback offline si falla la red
+      try {
+        const patient = await createPatientOffline({
+          nombre: nombre.trim(),
+          apellidos: apellidos.trim(),
+          fecha_nacimiento,
+          email: email.trim() || null,
+          consentimiento_otorgado: true,
+        })
+        onCreated({ id: patient.id, nombre: nombre.trim(), apellidos: apellidos.trim(), telefono: null })
+      } catch {
+        setError('Error al guardar paciente')
+        setSaving(false)
+      }
+    }
   }
 
   return (

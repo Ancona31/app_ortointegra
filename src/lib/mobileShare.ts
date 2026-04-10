@@ -1,19 +1,21 @@
 /**
  * Genera PDFs vía @react-pdf/renderer en el servidor.
- * Tanto desktop como móvil usan el mismo endpoint para PDFs consistentes.
+ * Fallback: si el servidor no responde en 5s, genera en el CLIENTE.
  *
  * imprimirOCompartir() — legacy: abre ventana print en desktop, PDF en móvil
  * generarPdf()         — nuevo: genera PDF vía react-pdf en ambas plataformas
  */
 
+import type { ReactElement } from 'react'
+import type { DocumentProps } from '@react-pdf/renderer'
 import type { PdfMedicoData } from '@/lib/pdf/PdfStyles'
 
-const PDF_TIMEOUT_MS = 30_000
+const SERVER_TIMEOUT_MS = 5_000
 
 async function fetchPdfConReintento(body: string): Promise<Blob | null> {
   for (let intento = 1; intento <= 2; intento++) {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), PDF_TIMEOUT_MS)
+    const timer = setTimeout(() => controller.abort(), SERVER_TIMEOUT_MS)
 
     try {
       const res = await fetch('/api/generar-pdf', {
@@ -27,21 +29,14 @@ async function fetchPdfConReintento(body: string): Promise<Blob | null> {
       if (res.status === 504 && intento === 1) continue
 
       if (!res.ok) {
-        const json = await res.json().catch(() => null)
-        const detail = json?.error ? `\n\nDetalle: ${json.error}` : ''
-        alert(`No se pudo generar el PDF.${detail}`)
+        // No alertar — dejar que el fallback cliente tome control
         return null
       }
 
       return await res.blob()
-    } catch (err) {
+    } catch {
       clearTimeout(timer)
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        if (intento === 1) continue
-        alert('El servidor tardó demasiado en generar el PDF. Intenta de nuevo.')
-        return null
-      }
-      alert('Error de conexión al generar el PDF. Verifica tu red e intenta de nuevo.')
+      if (intento === 1) continue
       return null
     }
   }
@@ -77,20 +72,38 @@ async function compartirODescargar(blob: Blob, filename: string) {
   descargarBlob(blob, filename)
 }
 
-/** Genera PDF vía react-pdf en el servidor — funciona en desktop y móvil */
+/** Genera PDF vía react-pdf en el servidor — con fallback cliente offline */
 export async function generarPdf(params: {
   tipo: string
   medico: PdfMedicoData | null
   data: Record<string, unknown>
   logoUrl?: string
   filename?: string
+  /** Componente react-pdf para fallback cliente (opcional) */
+  clientElement?: ReactElement<DocumentProps>
 }): Promise<void> {
-  const { tipo, medico, data, logoUrl, filename } = params
+  const { tipo, medico, data, logoUrl, filename, clientElement } = params
   const defaultFilename = `${tipo.replace(/_/g, '-')}.pdf`
   const body = JSON.stringify({ tipo, medico, data, logoUrl })
 
-  const pdfBlob = await fetchPdfConReintento(body)
-  if (!pdfBlob) return
+  // Intentar servidor primero
+  let pdfBlob = await fetchPdfConReintento(body)
+
+  // Fallback: generar en el cliente si el servidor falló
+  if (!pdfBlob && clientElement) {
+    try {
+      const { generatePdfClient } = await import('@/lib/pdfClientFallback')
+      pdfBlob = await generatePdfClient(clientElement)
+    } catch {
+      alert('No se pudo generar el PDF. Verifica tu conexión e intenta de nuevo.')
+      return
+    }
+  }
+
+  if (!pdfBlob) {
+    alert('No se pudo generar el PDF. Verifica tu conexión e intenta de nuevo.')
+    return
+  }
 
   const isMobile =
     /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||

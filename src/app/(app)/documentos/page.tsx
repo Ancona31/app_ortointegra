@@ -6,6 +6,8 @@ import { FileText, Pill, FlaskConical, ScanLine, ClipboardList, Search, User, X,
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import QuickPatientModal from '@/components/ui/QuickPatientModal'
+import { searchPatientsOffline, createPatientOffline } from '@/lib/offlinePatients'
+import { getStatus } from '@/lib/connectionMonitor'
 
 const FormLoader = () => (
   <div className="flex items-center justify-center py-16 text-[#86868b]">
@@ -55,14 +57,30 @@ function DocumentosContent() {
     if (busqueda.trim().length < 2) { setResultados([]); return }
     const timeout = setTimeout(async () => {
       setBuscando(true)
+
+      if (getStatus() === 'offline') {
+        // Búsqueda desde cache local
+        const cached = await searchPatientsOffline(busqueda)
+        setResultados(cached.map(p => ({ id: p.id, nombre: p.nombre, apellidos: p.apellidos })))
+        setBuscando(false)
+        return
+      }
+
       const supabase = createClient()
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('pacientes')
         .select('id, nombre, apellidos')
         .neq('activo', false)
         .or(`nombre.ilike.%${busqueda}%,apellidos.ilike.%${busqueda}%`)
         .limit(8)
-      setResultados(data ?? [])
+
+      if (error) {
+        // Fallback a cache si Supabase falla
+        const cached = await searchPatientsOffline(busqueda)
+        setResultados(cached.map(p => ({ id: p.id, nombre: p.nombre, apellidos: p.apellidos })))
+      } else {
+        setResultados(data ?? [])
+      }
       setBuscando(false)
     }, 300)
     return () => clearTimeout(timeout)

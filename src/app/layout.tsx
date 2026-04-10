@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import ConnectionBanner from '@/components/ConnectionBanner'
 
 export const metadata: Metadata = {
   title: 'Spinus® — Dr. Angel M. Ancona Pérez',
@@ -9,7 +10,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" className="h-full">
-      <body className="min-h-full antialiased">{children}</body>
+      <body className="min-h-full antialiased">
+        <ConnectionBanner />
+        {children}
+      </body>
     </html>
   )
 }

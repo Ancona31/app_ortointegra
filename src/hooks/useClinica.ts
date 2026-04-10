@@ -1,6 +1,7 @@
 'use client'
 
 import useSWR from 'swr'
+import { secureStorage } from '@/lib/secureStorage'
 
 export type ClinicaConfig = {
   id: string
@@ -12,6 +13,8 @@ export type ClinicaConfig = {
   logo_url: string | null
 }
 
+const CACHE_KEY = 'cache_clinica'
+
 const fetcher = (url: string) =>
   fetch(url).then(r => {
     if (!r.ok) throw new Error('Error al cargar clínica')
@@ -19,15 +22,30 @@ const fetcher = (url: string) =>
   })
 
 export function useClinica() {
-  // SWR cachea la respuesta y la comparte entre todos los componentes
-  // que usen el hook — sin queries duplicadas al servidor
-  const { data } = useSWR<{ clinica: ClinicaConfig | null }>(
+  const { data, error } = useSWR<{ clinica: ClinicaConfig | null }>(
     '/api/me/clinica',
     fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 60_000 }
+    {
+      revalidateOnFocus: true,
+      dedupingInterval: 60_000,
+      onSuccess: (d) => {
+        if (d.clinica) secureStorage.set(CACHE_KEY, d.clinica)
+      },
+    },
   )
 
-  const clinica = data?.clinica ?? null
+  // Fallback offline
+  const { data: fallback } = useSWR<ClinicaConfig>(
+    !data && error ? `${CACHE_KEY}_fallback` : null,
+    async () => {
+      const cached = await secureStorage.get<ClinicaConfig>(CACHE_KEY)
+      if (!cached) throw new Error('Sin cache offline')
+      return cached
+    },
+    { revalidateOnFocus: false },
+  )
+
+  const clinica = data?.clinica ?? fallback ?? null
 
   return {
     clinica,
@@ -36,5 +54,6 @@ export function useClinica() {
     nombreDisplay:   clinica?.nombre_display   ?? null,
     subtitulo:       clinica?.subtitulo        ?? null,
     logoUrl:         clinica?.logo_url         ?? null,
+    isOfflineData:   !data?.clinica && !!fallback,
   }
 }

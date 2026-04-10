@@ -6,6 +6,7 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { secureStorage } from '@/lib/secureStorage'
+import { isOnline } from '@/lib/connectionMonitor'
 
 const QUEUE_KEY = 'offline_queue'
 
@@ -91,9 +92,9 @@ export function startAutoSync(intervalMs = 30_000) {
   // Intentar flush inmediato al iniciar
   flush()
 
-  // Flush periódico
+  // Flush periódico — usa connectionMonitor para estado real
   const timer = setInterval(async () => {
-    if (navigator.onLine && (await pendingCount()) > 0) {
+    if (isOnline() && (await pendingCount()) > 0) {
       flush()
     }
   }, intervalMs)
