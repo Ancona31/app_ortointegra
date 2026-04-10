@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function GET() {
   const supabase = await createClient()
@@ -8,7 +9,7 @@ export async function GET() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('nombre, titulo, especialidad, cedula_profesional, cedula_especialidad, clinica_id, direccion_consultorio, telefono_consultorio')
+    .select('nombre, titulo, especialidad, cedula_profesional, cedula_especialidad, clinica_id, direccion_consultorio, telefono_consultorio, firma_url')
     .eq('id', user.id)
     .single()
 
@@ -36,6 +37,16 @@ export async function GET() {
   const titulo = profile.titulo ?? 'Dr.'
   const nombreCompleto = `${titulo} ${profile.nombre ?? ''}`.trim()
 
+  // Generar signed URL (1h) para la firma si existe
+  let firmaSignedUrl: string | null = null
+  if (profile.firma_url) {
+    const admin = createAdminClient()
+    const { data: signed } = await admin.storage
+      .from('firmas-medicos')
+      .createSignedUrl(profile.firma_url as string, 3600)
+    firmaSignedUrl = signed?.signedUrl ?? null
+  }
+
   return NextResponse.json({
     medico: {
       nombre: nombreCompleto,
@@ -44,6 +55,7 @@ export async function GET() {
       cedula_profesional: profile.cedula_profesional ?? '',
       cedula_especialidad: profile.cedula_especialidad ?? '',
       logo_url,
+      firma_url: firmaSignedUrl,
       color_primario,
       color_secundario,
       clinica_nombre: clinicaNombre,

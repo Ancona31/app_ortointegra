@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet } from '@react-pdf/renderer'
+import { View, Text, Image, StyleSheet } from '@react-pdf/renderer'
 import type { PdfMedicoData, PdfColors } from './PdfStyles'
 
 interface Props {
@@ -56,6 +56,14 @@ export default function PdfFirma({ medico, colors }: Props) {
   return (
     <View style={s.footerArea}>
       <View style={s.firma}>
+        {medico?.firma_url ? (
+          <View style={{ alignItems: 'center', marginBottom: 4 }}>
+            <Image
+              src={medico.firma_url}
+              style={{ width: 140, height: 52, objectFit: 'contain' }}
+            />
+          </View>
+        ) : null}
         <View style={s.linea}>
           <Text style={s.nombre}>{nombre}</Text>
           {cedProf ? <Text style={s.ced}>Céd. Prof. {cedProf}</Text> : null}

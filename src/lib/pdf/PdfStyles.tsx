@@ -26,6 +26,8 @@ export interface PdfMedicoData {
   cedula_profesional?: string
   cedula_especialidad?: string
   logo_url?: string | null
+  /** URL firmada (1h) de la firma autógrafa en PNG transparente */
+  firma_url?: string | null
   color_primario?: string
   color_secundario?: string
   direccion_consultorio?: string

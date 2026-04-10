@@ -3,11 +3,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { useProfile } from '@/hooks/useProfile'
 import { useRouter } from 'next/navigation'
-import { Loader2, Save, Palette, Upload, X, CalendarDays, CheckCircle2, LogIn, LogOut } from 'lucide-react'
+import { Loader2, Save, Palette, Upload, X, CalendarDays, CheckCircle2, LogIn, LogOut, PenLine } from 'lucide-react'
 import { PerfilSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import EspecialidadSelector from '@/components/ui/EspecialidadSelector'
 import { validarTelefono, validarCedula, formatearTelefono } from '@/lib/validaciones'
+import FirmaCaptura from '@/components/perfil/FirmaCaptura'
 
 type FormData = {
   titulo: string
@@ -58,6 +59,7 @@ export default function PerfilPage() {
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [subiendoLogo, setSubiendoLogo] = useState(false)
+  const [firmaUrl, setFirmaUrl] = useState<string | null>(null)
   const [gcalConectado, setGcalConectado] = useState<boolean | null>(null)
   const [desconectandoGcal, setDesconectandoGcal] = useState(false)
 
@@ -90,6 +92,7 @@ export default function PerfilPage() {
           direccion_consultorio: perfilData.medico.direccion_consultorio || '',
           telefono_consultorio: perfilData.medico.telefono_consultorio || '',
         })
+        setFirmaUrl(perfilData.medico.firma_url ?? null)
       }
       if (clinicaData.clinica) {
         setApariencia({
@@ -252,6 +255,21 @@ export default function PerfilPage() {
                 <p className="text-[10px] text-red-500 mt-1">{validarTelefono(form.telefono_consultorio)}</p>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Firma autógrafa */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div className="px-5 pt-4 pb-1 flex items-center gap-2">
+            <PenLine size={13} className="text-[#86868b]" />
+            <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest">Firma autógrafa</p>
+            <span className="text-[10px] text-[#86868b]">Aparece en todos los documentos y PDFs</span>
+          </div>
+          <div className="px-5 pb-5">
+            <FirmaCaptura
+              firmaActual={firmaUrl}
+              onFirmaCambiada={url => setFirmaUrl(url)}
+            />
           </div>
         </div>
 

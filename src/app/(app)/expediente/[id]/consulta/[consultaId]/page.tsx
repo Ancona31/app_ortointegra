@@ -18,6 +18,7 @@ type MedicoInfo = {
   cedula_profesional: string
   cedula_especialidad: string
   logo_url: string | null
+  firma_url: string | null
 }
 
 type Addendum = {
@@ -137,7 +138,7 @@ export default function ConsultaDetallePage() {
   <div class="nota-content">${notaHtml}</div>
   ${consulta.proxima_cita ? `<div class="proxima-cita"><strong>Próxima cita:</strong> ${consulta.proxima_cita}</div>` : ''}
   ${addendumsHtml}
-  <div class="footer"><div class="firma"><p>${doctorNombre}</p>${(consulta.medico_cedula_profesional || medicoInfo?.cedula_profesional) ? `<p>Céd. Prof. ${consulta.medico_cedula_profesional || medicoInfo?.cedula_profesional}</p>` : ''}</div></div>
+  <div class="footer"><div class="firma">${medicoInfo?.firma_url ? `<img src="${medicoInfo.firma_url}" style="max-height:60px;max-width:160px;display:block;margin:0 auto 6px;object-fit:contain;" />` : ''}<p>${doctorNombre}</p>${(consulta.medico_cedula_profesional || medicoInfo?.cedula_profesional) ? `<p>Céd. Prof. ${consulta.medico_cedula_profesional || medicoInfo?.cedula_profesional}</p>` : ''}</div></div>
 </body></html>`)
     ventana.document.close()
     ventana.focus()
