@@ -89,6 +89,25 @@ export default function InicioPage() {
     // Prefetch chunks JS de rutas críticas para navegación offline
     router.prefetch('/documentos')
     router.prefetch('/expediente/_/nueva-nota')
+    // Pre-descargar chunks de formularios de documentos
+    import('@/components/documentos/RecetaForm')
+    import('@/components/documentos/SolicitudLabForm')
+    import('@/components/documentos/SolicitudImagenForm')
+    import('@/components/documentos/PlanSuplementacionForm')
+    import('@/components/documentos/SolicitudInternamientoForm')
+    import('@/components/documentos/EscritoMedicoForm')
+    import('@/components/documentos/ConsentimientoInformadoForm')
+    import('@/components/documentos/NotaHonorariosForm')
+    // Pre-descargar chunks de renderers PDF para generación offline
+    import('@/lib/pdf/RecetaPdf')
+    import('@/lib/pdf/SolicitudLabPdf')
+    import('@/lib/pdf/SolicitudImagenPdf')
+    import('@/lib/pdf/PlanSuplementacionPdf')
+    import('@/lib/pdf/NotaHonorariosPdf')
+    import('@/lib/pdf/SolicitudInternamientoPdf')
+    import('@/lib/pdf/EscritoMedicoPdf')
+    import('@/lib/pdf/ConsentimientoInformadoPdf')
+    import('@/lib/pdf/NotaEvolucionPdf')
   }, [router])
   useEffect(() => {
     const unsub = subscribe((status) => setIsOnline(status !== 'offline'))
