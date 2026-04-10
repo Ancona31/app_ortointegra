@@ -261,6 +261,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
         color_secundario: cs,
         direccion_consultorio: direccion,
         telefono_consultorio: telefono,
+        firma_url: medicoInfo?.firma_url ?? null,
       },
       data: {
         paciente,

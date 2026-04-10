@@ -73,7 +73,7 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId }: 
         },
       })
 
-      const medicoData = medicoInfo ? { nombre: medicoInfo.nombre, especialidad: medicoInfo.especialidad, cedula_profesional: medicoInfo.cedula_profesional, cedula_especialidad: medicoInfo.cedula_especialidad, color_primario: medicoInfo.color_primario, color_secundario: medicoInfo.color_secundario, direccion_consultorio: medicoInfo.direccion_consultorio, telefono_consultorio: medicoInfo.telefono_consultorio } : null
+      const medicoData = medicoInfo ? { nombre: medicoInfo.nombre, especialidad: medicoInfo.especialidad, cedula_profesional: medicoInfo.cedula_profesional, cedula_especialidad: medicoInfo.cedula_especialidad, color_primario: medicoInfo.color_primario, color_secundario: medicoInfo.color_secundario, direccion_consultorio: medicoInfo.direccion_consultorio, telefono_consultorio: medicoInfo.telefono_consultorio, firma_url: medicoInfo.firma_url ?? null } : null
       const logoUrl = medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined
       const fechaFmt = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
 

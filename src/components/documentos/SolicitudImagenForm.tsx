@@ -57,6 +57,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
       color_secundario: medicoInfo.color_secundario,
       direccion_consultorio: medicoInfo.direccion_consultorio,
       telefono_consultorio: medicoInfo.telefono_consultorio,
+      firma_url: medicoInfo.firma_url ?? null,
     } : null
 
     const logoUrl = medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined
