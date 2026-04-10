@@ -108,6 +108,9 @@ export default function InicioPage() {
     import('@/lib/pdf/EscritoMedicoPdf')
     import('@/lib/pdf/ConsentimientoInformadoPdf')
     import('@/lib/pdf/NotaEvolucionPdf')
+    // Fetch páginas críticas para que el SW cache todos sus chunks
+    fetch('/documentos').catch(() => {})
+    fetch('/expediente/_/nueva-nota').catch(() => {})
   }, [router])
   useEffect(() => {
     const unsub = subscribe((status) => setIsOnline(status !== 'offline'))
