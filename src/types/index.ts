@@ -34,6 +34,8 @@ export interface Consulta {
   plan_tratamiento?: string
   notas_evolucion?: string
   proxima_cita?: string
+  // Origen de la nota: 'ia' = Gemini, 'manual' = escrita por el médico
+  nota_origen?: 'ia' | 'manual'
   // Médico que creó la nota — inmutable tras la creación
   medico_nombre?: string | null
   medico_especialidad?: string | null

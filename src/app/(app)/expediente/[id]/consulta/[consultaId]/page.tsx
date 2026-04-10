@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Paciente, Consulta } from '@/types'
 import { differenceInYears, parseISO, format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ArrowLeft, Printer, Stethoscope, Plus, Loader2, FileText, Lock } from 'lucide-react'
+import { ArrowLeft, Printer, Stethoscope, Plus, Loader2, FileText, Lock, PenLine } from 'lucide-react'
 import Link from 'next/link'
 import { PRINT_CSS, markdownToHtml } from '@/lib/printStyles'
 import ReactMarkdown from 'react-markdown'
@@ -168,6 +168,16 @@ export default function ConsultaDetallePage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {consulta.nota_origen === 'manual' ? (
+            <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-500 bg-slate-50 border border-slate-200 rounded-lg">
+              <PenLine size={12} /> Nota manual
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#4285F4] bg-[#4285F4]/5 border border-[#4285F4]/20 rounded-lg">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M12 2C12 2 13.8 9 19 12C13.8 15 12 22 12 22C12 22 10.2 15 5 12C10.2 9 12 2 12 2Z" fill="currentColor"/></svg>
+              Nota IA
+            </span>
+          )}
           <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-400 bg-slate-50 border border-slate-200 rounded-lg">
             <Lock size={12} /> Nota sellada
           </span>

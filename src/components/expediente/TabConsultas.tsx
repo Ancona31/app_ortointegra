@@ -3,7 +3,7 @@
 import { Consulta } from '@/types'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { Calendar, ChevronRight, Stethoscope } from 'lucide-react'
+import { Calendar, ChevronRight, PenLine, Stethoscope } from 'lucide-react'
 import Link from 'next/link'
 
 interface Props {
@@ -39,7 +39,20 @@ export default function TabConsultas({ id, consultas, isDoctor, hayMas, cargando
                   <Stethoscope size={18} />
                 </div>
                 <div>
-                  <p className="font-medium text-slate-800 group-hover:text-[#1a3a5c]">{c.motivo_consulta}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-slate-800 group-hover:text-[#1a3a5c]">{c.motivo_consulta}</p>
+                    {c.nota_origen === 'manual' ? (
+                      <span className="flex-shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-100 text-slate-400 border border-slate-200">
+                        <PenLine size={8} />
+                        Manual
+                      </span>
+                    ) : (
+                      <span className="flex-shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-[#4285F4]/8 text-[#4285F4] border border-[#4285F4]/15">
+                        <svg width="8" height="8" viewBox="0 0 24 24" fill="none"><path d="M12 2C12 2 13.8 9 19 12C13.8 15 12 22 12 22C12 22 10.2 15 5 12C10.2 9 12 2 12 2Z" fill="currentColor"/></svg>
+                        IA
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-slate-400 mt-0.5">
                     {format(parseISO(c.fecha), "dd 'de' MMMM 'de' yyyy", { locale: es })}
                     {c.proxima_cita && ` · Próxima: ${c.proxima_cita}`}

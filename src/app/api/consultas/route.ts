@@ -46,6 +46,9 @@ export async function POST(req: NextRequest) {
       .eq('id', profile.clinica_id)
       .single()
 
+    const notaOrigen: 'ia' | 'manual' =
+      body.nota_origen === 'manual' ? 'manual' : 'ia'
+
     const { data: consulta, error } = await supabase.from('consultas').insert({
       paciente_id,
       fecha: new Date().toISOString(),
@@ -56,6 +59,7 @@ export async function POST(req: NextRequest) {
       notas_evolucion:           body.notas_evolucion || null,
       proxima_cita:              body.proxima_cita || null,
       medicamentos:              body.medicamentos || null,
+      nota_origen:               notaOrigen,
       medico_nombre:             `${profile.titulo || ''} ${profile.nombre || ''}`.trim() || null,
       medico_especialidad:       profile.especialidad || null,
       medico_cedula_profesional: profile.cedula_profesional || null,
