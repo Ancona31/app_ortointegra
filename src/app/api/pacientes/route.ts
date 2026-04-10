@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
 
     // ── Determinar medico_id ──────────────────────────────────────
     const medico_id = body.medico_id
-      || (['medico', 'admin'].includes(profile.role) ? profile.id : null)
+      || (['medico', 'admin', 'super_admin'].includes(profile.role) ? profile.id : null)
 
     // ── LFPDPPP Art. 9: consentimiento expreso para datos sensibles de salud ──
     if (!body.consentimiento_otorgado) {

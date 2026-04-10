@@ -36,8 +36,8 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
   const [modoCrear, setModoCrear]     = useState(false)
   const [formNombre, setFormNombre]   = useState('')
   const [formApellidos, setFormApellidos] = useState('')
-  const [formTel, setFormTel]         = useState('')
-  const [formMotivo, setFormMotivo]   = useState('')
+  const [formFechaNac, setFormFechaNac] = useState('')
+  const [formConsentimiento, setFormConsentimiento] = useState(false)
   const [creando, setCreando]         = useState(false)
 
   const inputRef    = useRef<HTMLInputElement>(null)
@@ -47,7 +47,8 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
     if (open) {
       setQuery(''); setResults([]); setSelected(0)
       setModoCrear(false)
-      setFormNombre(''); setFormApellidos(''); setFormTel(''); setFormMotivo('')
+      setFormNombre(''); setFormApellidos(''); setFormFechaNac('')
+      setFormConsentimiento(false)
       setTimeout(() => inputRef.current?.focus(), 50)
     }
   }, [open])
@@ -117,13 +118,17 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
         body: JSON.stringify({
           nombre: formNombre.trim(),
           apellidos: formApellidos.trim(),
-          telefono: formTel.trim(),
-          motivo_inicial: formMotivo.trim(),
           sexo: null,
-          fecha_nacimiento: null,
+          fecha_nacimiento: formFechaNac || null,
+          consentimiento_otorgado: formConsentimiento,
         }),
       })
-      const data = await res.json() as { id?: string }
+      const data = await res.json() as { id?: string; error?: string }
+      if (!res.ok) {
+        console.error('[ConsultaRapidaModal] Error API:', data.error)
+        alert(`Error al crear paciente: ${data.error ?? 'Error desconocido'}`)
+        return
+      }
       if (data.id) {
         onClose()
         router.push(`/expediente/${data.id}/nueva-nota`)
@@ -290,25 +295,28 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
                 </div>
               </div>
               <div>
-                <label className="text-[11px] font-medium text-slate-500 block mb-1">Teléfono</label>
+                <label className="text-[11px] font-medium text-slate-500 block mb-1">Fecha de nacimiento <span className="text-red-400">*</span></label>
                 <input
-                  type="tel"
-                  value={formTel}
-                  onChange={e => setFormTel(e.target.value)}
-                  placeholder="55 1234 5678"
+                  type="date"
+                  value={formFechaNac}
+                  onChange={e => setFormFechaNac(e.target.value)}
+                  required
                   className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
                 />
               </div>
-              <div>
-                <label className="text-[11px] font-medium text-slate-500 block mb-1">Motivo de consulta</label>
+              <label className="flex items-start gap-2 cursor-pointer">
                 <input
-                  type="text"
-                  value={formMotivo}
-                  onChange={e => setFormMotivo(e.target.value)}
-                  placeholder="Ej: Dolor lumbar, revisión general..."
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
+                  type="checkbox"
+                  checked={formConsentimiento}
+                  onChange={e => setFormConsentimiento(e.target.checked)}
+                  className="mt-0.5 accent-[#1e5fa8]"
                 />
-              </div>
+                <span className="text-[11px] text-slate-500 leading-tight">
+                  El paciente ha leído y acepta el{' '}
+                  <a href="/privacidad" target="_blank" className="text-[#1e5fa8] underline">Aviso de Privacidad</a>
+                  {' '}(LFPDPPP Art. 9) <span className="text-red-400">*</span>
+                </span>
+              </label>
             </div>
 
             <div className="px-4 pb-4 flex gap-2">
@@ -321,11 +329,13 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
               </button>
               <button
                 type="submit"
-                disabled={creando || !formNombre.trim()}
-                className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#1e5fa8] rounded-xl hover:bg-[#1a3a5c] disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                disabled={creando || !formNombre.trim() || !formFechaNac || !formConsentimiento}
+                className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#1e5fa8] rounded-xl hover:bg-[#1a3a5c] disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5 min-w-0"
               >
-                {creando ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
-                {creando ? 'Creando...' : 'Crear e iniciar consulta'}
+                {creando
+                  ? <Loader2 size={14} className="animate-spin shrink-0" />
+                  : <UserPlus size={14} className="shrink-0" />}
+                <span className="truncate">{creando ? 'Creando...' : 'Crear e iniciar consulta'}</span>
               </button>
             </div>
           </form>
