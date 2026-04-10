@@ -83,7 +83,13 @@ export default function InicioPage() {
   // Precarga: poblar cache SWR de médico, clínica y fuentes PDF
   useMedicoInfo()
   useClinica()
-  useEffect(() => { precacheFonts(); precachePatients() }, [])
+  useEffect(() => {
+    precacheFonts()
+    precachePatients()
+    // Prefetch chunks JS de rutas críticas para navegación offline
+    router.prefetch('/documentos')
+    router.prefetch('/expediente/_/nueva-nota')
+  }, [router])
   useEffect(() => {
     const unsub = subscribe((status) => setIsOnline(status !== 'offline'))
     return unsub

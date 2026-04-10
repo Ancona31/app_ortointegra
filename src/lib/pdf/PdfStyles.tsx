@@ -1,18 +1,31 @@
 import { StyleSheet, Font, Svg, Defs, LinearGradient, Stop, Rect } from '@react-pdf/renderer'
 import React from 'react'
-import path from 'path'
 
-const fontsDir = path.join(process.cwd(), 'public', 'fonts')
-
-Font.register({
-  family: 'Roboto',
-  fonts: [
-    { src: path.join(fontsDir, 'Roboto-Regular.ttf'), fontWeight: 400 },
-    { src: path.join(fontsDir, 'Roboto-Medium.ttf'), fontWeight: 500 },
-    { src: path.join(fontsDir, 'Roboto-Bold.ttf'), fontWeight: 700 },
-    { src: path.join(fontsDir, 'Roboto-Italic.ttf'), fontWeight: 400, fontStyle: 'italic' },
-  ],
-})
+// Registro de fuentes: servidor usa rutas del filesystem, cliente usa URLs
+if (typeof window === 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const path = require('path') as typeof import('path')
+  const fontsDir = path.join(process.cwd(), 'public', 'fonts')
+  Font.register({
+    family: 'Roboto',
+    fonts: [
+      { src: path.join(fontsDir, 'Roboto-Regular.ttf'), fontWeight: 400 },
+      { src: path.join(fontsDir, 'Roboto-Medium.ttf'), fontWeight: 500 },
+      { src: path.join(fontsDir, 'Roboto-Bold.ttf'), fontWeight: 700 },
+      { src: path.join(fontsDir, 'Roboto-Italic.ttf'), fontWeight: 400, fontStyle: 'italic' },
+    ],
+  })
+} else {
+  Font.register({
+    family: 'Roboto',
+    fonts: [
+      { src: '/fonts/Roboto-Regular.ttf', fontWeight: 400 },
+      { src: '/fonts/Roboto-Medium.ttf', fontWeight: 500 },
+      { src: '/fonts/Roboto-Bold.ttf', fontWeight: 700 },
+      { src: '/fonts/Roboto-Italic.ttf', fontWeight: 400, fontStyle: 'italic' },
+    ],
+  })
+}
 
 export interface PdfColors {
   cp: string

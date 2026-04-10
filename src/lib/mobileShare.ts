@@ -1,16 +1,26 @@
 /**
  * Genera PDFs vía @react-pdf/renderer en el servidor.
- * Fallback: si el servidor no responde en 5s, genera en el CLIENTE.
+ * Offline: genera directamente en el CLIENTE sin intentar el servidor.
  *
  * imprimirOCompartir() — legacy: abre ventana print en desktop, PDF en móvil
  * generarPdf()         — nuevo: genera PDF vía react-pdf en ambas plataformas
  */
 
-import type { ReactElement } from 'react'
-import type { DocumentProps } from '@react-pdf/renderer'
 import type { PdfMedicoData } from '@/lib/pdf/PdfStyles'
+import { getStatus } from '@/lib/connectionMonitor'
 
 const SERVER_TIMEOUT_MS = 5_000
+
+type DocType =
+  | 'solicitud_lab'
+  | 'solicitud_imagen'
+  | 'receta'
+  | 'plan_suplementacion'
+  | 'nota_honorarios'
+  | 'solicitud_internamiento'
+  | 'escrito_medico'
+  | 'consentimiento_informado'
+  | 'nota_evolucion'
 
 async function fetchPdfConReintento(body: string): Promise<Blob | null> {
   for (let intento = 1; intento <= 2; intento++) {
@@ -27,11 +37,7 @@ async function fetchPdfConReintento(body: string): Promise<Blob | null> {
       clearTimeout(timer)
 
       if (res.status === 504 && intento === 1) continue
-
-      if (!res.ok) {
-        // No alertar — dejar que el fallback cliente tome control
-        return null
-      }
+      if (!res.ok) return null
 
       return await res.blob()
     } catch {
@@ -41,6 +47,57 @@ async function fetchPdfConReintento(body: string): Promise<Blob | null> {
     }
   }
   return null
+}
+
+/** Importa dinámicamente el renderer correcto y genera el elemento react-pdf */
+async function buildClientElement(
+  tipo: string,
+  medico: PdfMedicoData | null,
+  data: Record<string, unknown>,
+  logoUrl?: string,
+) {
+  const props = { medico, data, logoUrl }
+
+  switch (tipo as DocType) {
+    case 'receta': {
+      const { renderReceta } = await import('@/lib/pdf/RecetaPdf')
+      return renderReceta({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl })
+    }
+    case 'solicitud_lab': {
+      const { renderSolicitudLab } = await import('@/lib/pdf/SolicitudLabPdf')
+      return renderSolicitudLab({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl })
+    }
+    case 'solicitud_imagen': {
+      const { renderSolicitudImagen } = await import('@/lib/pdf/SolicitudImagenPdf')
+      return renderSolicitudImagen({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl })
+    }
+    case 'plan_suplementacion': {
+      const { renderPlanSuplementacion } = await import('@/lib/pdf/PlanSuplementacionPdf')
+      return renderPlanSuplementacion({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl })
+    }
+    case 'nota_honorarios': {
+      const { renderNotaHonorarios } = await import('@/lib/pdf/NotaHonorariosPdf')
+      return renderNotaHonorarios({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl })
+    }
+    case 'solicitud_internamiento': {
+      const { renderSolicitudInternamiento } = await import('@/lib/pdf/SolicitudInternamientoPdf')
+      return renderSolicitudInternamiento({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl })
+    }
+    case 'escrito_medico': {
+      const { renderEscritoMedico } = await import('@/lib/pdf/EscritoMedicoPdf')
+      return renderEscritoMedico({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl })
+    }
+    case 'consentimiento_informado': {
+      const { renderConsentimiento } = await import('@/lib/pdf/ConsentimientoInformadoPdf')
+      return renderConsentimiento({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl })
+    }
+    case 'nota_evolucion': {
+      const { renderNotaEvolucion } = await import('@/lib/pdf/NotaEvolucionPdf')
+      return renderNotaEvolucion({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl })
+    }
+    default:
+      return null
+  }
 }
 
 function descargarBlob(blob: Blob, filename: string) {
@@ -72,31 +129,36 @@ async function compartirODescargar(blob: Blob, filename: string) {
   descargarBlob(blob, filename)
 }
 
-/** Genera PDF vía react-pdf en el servidor — con fallback cliente offline */
+/** Genera PDF — servidor si hay conexión, cliente directo si offline */
 export async function generarPdf(params: {
   tipo: string
   medico: PdfMedicoData | null
   data: Record<string, unknown>
   logoUrl?: string
   filename?: string
-  /** Componente react-pdf para fallback cliente (opcional) */
-  clientElement?: ReactElement<DocumentProps>
 }): Promise<void> {
-  const { tipo, medico, data, logoUrl, filename, clientElement } = params
+  const { tipo, medico, data, logoUrl, filename } = params
   const defaultFilename = `${tipo.replace(/_/g, '-')}.pdf`
-  const body = JSON.stringify({ tipo, medico, data, logoUrl })
 
-  // Intentar servidor primero
-  let pdfBlob = await fetchPdfConReintento(body)
+  let pdfBlob: Blob | null = null
+  const offline = getStatus() === 'offline'
 
-  // Fallback: generar en el cliente si el servidor falló
-  if (!pdfBlob && clientElement) {
+  // Si hay conexión, intentar servidor
+  if (!offline) {
+    const body = JSON.stringify({ tipo, medico, data, logoUrl })
+    pdfBlob = await fetchPdfConReintento(body)
+  }
+
+  // Si no hay blob (offline o servidor falló), generar en el cliente
+  if (!pdfBlob) {
     try {
-      const { generatePdfClient } = await import('@/lib/pdfClientFallback')
-      pdfBlob = await generatePdfClient(clientElement)
+      const element = await buildClientElement(tipo, medico, data, logoUrl)
+      if (element) {
+        const { generatePdfClient } = await import('@/lib/pdfClientFallback')
+        pdfBlob = await generatePdfClient(element)
+      }
     } catch {
-      alert('No se pudo generar el PDF. Verifica tu conexión e intenta de nuevo.')
-      return
+      // fallthrough to error
     }
   }
 
@@ -112,7 +174,6 @@ export async function generarPdf(params: {
   if (isMobile) {
     await compartirODescargar(pdfBlob, filename ?? defaultFilename)
   } else {
-    // Desktop: abrir PDF en nueva pestaña
     const url = URL.createObjectURL(pdfBlob)
     window.open(url, '_blank')
     setTimeout(() => URL.revokeObjectURL(url), 60000)
