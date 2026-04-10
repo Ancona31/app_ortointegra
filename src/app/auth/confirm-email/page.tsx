@@ -13,6 +13,7 @@ function ConfirmEmailContent() {
   useEffect(() => {
     async function confirmar() {
       const tokenHash = searchParams.get('token_hash')
+      const type = searchParams.get('type') ?? 'email'
 
       if (!tokenHash) {
         setEstado('error')
@@ -22,7 +23,7 @@ function ConfirmEmailContent() {
       const res = await fetch('/api/auth/verify-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token_hash: tokenHash }),
+        body: JSON.stringify({ token_hash: tokenHash, type }),
       })
 
       if (res.ok) {

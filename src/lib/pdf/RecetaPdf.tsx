@@ -224,6 +224,11 @@ function FirmaInline({ medico, colors }: { medico: PdfMedicoData | null; colors:
 
   return (
     <View style={s.firma}>
+      {medico?.firma_url ? (
+        <View style={{ alignItems: 'center', marginBottom: 4 }}>
+          <Image src={medico.firma_url} style={{ width: 120, height: 44, objectFit: 'contain' }} />
+        </View>
+      ) : null}
       <View style={s.linea}>
         <Text style={s.nombre}>{nombre}</Text>
         {cedProf ? <Text style={s.ced}>Céd. Prof. {cedProf}</Text> : null}

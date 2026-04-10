@@ -5,7 +5,11 @@ import { createClient } from '@supabase/supabase-js'
 // Esto confirma el email en la base de datos sin afectar la sesión activa del browser
 export async function POST(req: NextRequest) {
   try {
-    const { token_hash } = await req.json()
+    const body = await req.json() as { token_hash?: unknown; type?: unknown }
+    const token_hash = typeof body.token_hash === 'string' ? body.token_hash : ''
+    const rawType = typeof body.type === 'string' ? body.type : 'email'
+    // Solo tipos válidos para confirmación de cuenta
+    const type = rawType === 'magiclink' ? 'magiclink' : 'email'
 
     if (!token_hash) {
       return NextResponse.json({ error: 'Token faltante' }, { status: 400 })
@@ -17,7 +21,7 @@ export async function POST(req: NextRequest) {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     )
 
-    const { error } = await supabase.auth.verifyOtp({ token_hash, type: 'email' })
+    const { error } = await supabase.auth.verifyOtp({ token_hash, type })
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 })

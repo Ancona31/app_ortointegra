@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Loader2, Eye, EyeOff, CheckCircle } from 'lucide-react'
+import { Loader2, Eye, EyeOff, CheckCircle, RefreshCw } from 'lucide-react'
 import EspecialidadSelector from '@/components/ui/EspecialidadSelector'
 import { validarCedula } from '@/lib/validaciones'
 
@@ -13,6 +13,46 @@ export default function RegisterPage() {
   const [showPass, setShowPass] = useState(false)
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState('')
+
+  // Reenvío de correo de confirmación
+  const [reenvioLoading, setReenvioLoading] = useState(false)
+  const [reenvioMsg,     setReenvioMsg]     = useState('')
+  const [reenvioError,   setReenvioError]   = useState('')
+  const [cooldown,       setCooldown]       = useState(0)
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    return () => { if (cooldownRef.current) clearInterval(cooldownRef.current) }
+  }, [])
+
+  async function handleReenviar() {
+    setReenvioLoading(true)
+    setReenvioMsg('')
+    setReenvioError('')
+    try {
+      const res = await fetch('/api/auth/reenviar-confirmacion', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ email: form.email }),
+      })
+      const data = await res.json() as { ok?: boolean; error?: string }
+      if (!res.ok) {
+        setReenvioError(data.error ?? 'No se pudo reenviar. Intenta más tarde.')
+      } else {
+        setReenvioMsg('¡Correo reenviado! Revisa tu bandeja de entrada.')
+        // Cooldown de 60 s para no spamear
+        setCooldown(60)
+        cooldownRef.current = setInterval(() => {
+          setCooldown(s => {
+            if (s <= 1) { clearInterval(cooldownRef.current!); return 0 }
+            return s - 1
+          })
+        }, 1000)
+      }
+    } finally {
+      setReenvioLoading(false)
+    }
+  }
 
   const [especialidades, setEspecialidades] = useState<string[]>([''])
   const [form, setForm] = useState({
@@ -79,8 +119,30 @@ export default function RegisterPage() {
             <p className="text-xs text-slate-400">
               ¿No lo ves? Revisa tu carpeta de <strong>spam o correo no deseado</strong>.
             </p>
-            <div className="mt-6 pt-4 border-t border-slate-100">
-              <Link href="/login" className="text-sm text-[#1e5fa8] hover:underline">
+
+            {/* Reenvío */}
+            <div className="mt-5 pt-4 border-t border-slate-100 space-y-2">
+              {reenvioMsg && (
+                <p className="text-xs text-emerald-600 font-medium">{reenvioMsg}</p>
+              )}
+              {reenvioError && (
+                <p className="text-xs text-red-500">{reenvioError}</p>
+              )}
+              <button
+                onClick={handleReenviar}
+                disabled={reenvioLoading || cooldown > 0}
+                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-colors"
+              >
+                {reenvioLoading
+                  ? <Loader2 size={14} className="animate-spin" />
+                  : <RefreshCw size={14} />
+                }
+                {cooldown > 0
+                  ? `Reenviar correo (${cooldown}s)`
+                  : reenvioLoading ? 'Enviando...' : 'Reenviar correo de confirmación'
+                }
+              </button>
+              <Link href="/login" className="block text-center text-sm text-[#1e5fa8] hover:underline mt-1">
                 Volver al inicio de sesión
               </Link>
             </div>
