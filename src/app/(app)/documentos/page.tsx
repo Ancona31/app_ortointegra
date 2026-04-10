@@ -16,14 +16,30 @@ const FormLoader = () => (
   </div>
 )
 
-const RecetaForm              = dynamic(() => import('@/components/documentos/RecetaForm'),              { ssr: false, loading: FormLoader })
-const SolicitudLabForm        = dynamic(() => import('@/components/documentos/SolicitudLabForm'),        { ssr: false, loading: FormLoader })
-const SolicitudImagenForm     = dynamic(() => import('@/components/documentos/SolicitudImagenForm'),     { ssr: false, loading: FormLoader })
-const PlanSuplementacionForm  = dynamic(() => import('@/components/documentos/PlanSuplementacionForm'),  { ssr: false, loading: FormLoader })
-const SolicitudInternamientoForm = dynamic(() => import('@/components/documentos/SolicitudInternamientoForm'), { ssr: false, loading: FormLoader })
-const EscritoMedicoForm       = dynamic(() => import('@/components/documentos/EscritoMedicoForm'),       { ssr: false, loading: FormLoader })
-const ConsentimientoForm      = dynamic(() => import('@/components/documentos/ConsentimientoInformadoForm'), { ssr: false, loading: FormLoader })
-const NotaHonorariosForm      = dynamic(() => import('@/components/documentos/NotaHonorariosForm'),      { ssr: false, loading: FormLoader })
+const FormError = () => (
+  <div className="flex flex-col items-center justify-center py-16 text-[#86868b] gap-2">
+    <p className="text-sm font-medium">No se pudo cargar el formulario</p>
+    <p className="text-xs">Verifica tu conexion e intenta de nuevo</p>
+  </div>
+)
+
+function safeDynamic<T extends Record<string, unknown>>(loader: () => Promise<{ default: React.ComponentType<T> }>) {
+  return dynamic<T>(
+    () => loader().catch(() => ({
+      default: (() => FormError()) as unknown as React.ComponentType<T>,
+    })),
+    { ssr: false, loading: FormLoader },
+  )
+}
+
+const RecetaForm              = safeDynamic(() => import('@/components/documentos/RecetaForm'))
+const SolicitudLabForm        = safeDynamic(() => import('@/components/documentos/SolicitudLabForm'))
+const SolicitudImagenForm     = safeDynamic(() => import('@/components/documentos/SolicitudImagenForm'))
+const PlanSuplementacionForm  = safeDynamic(() => import('@/components/documentos/PlanSuplementacionForm'))
+const SolicitudInternamientoForm = safeDynamic(() => import('@/components/documentos/SolicitudInternamientoForm'))
+const EscritoMedicoForm       = safeDynamic(() => import('@/components/documentos/EscritoMedicoForm'))
+const ConsentimientoForm      = safeDynamic(() => import('@/components/documentos/ConsentimientoInformadoForm'))
+const NotaHonorariosForm      = safeDynamic(() => import('@/components/documentos/NotaHonorariosForm'))
 
 const TIPOS = [
   { key: 'receta',        label: 'Receta Médica',       sublabel: 'Prescripción farmacológica', icon: Pill,           bg: 'bg-blue-50',    icon_color: 'text-[#1e5fa8]' },

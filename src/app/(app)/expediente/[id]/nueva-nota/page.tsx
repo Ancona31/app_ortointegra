@@ -25,15 +25,6 @@ import { getPatientOffline } from '@/lib/offlinePatients'
 import { saveNoteOffline } from '@/lib/offlineNotes'
 import dynamic from 'next/dynamic'
 
-const RecetaFormDynamic       = dynamic(() => import('@/components/documentos/RecetaForm'), { ssr: false, loading: () => <FormCargando /> })
-const SolicitudLabFormDynamic = dynamic(() => import('@/components/documentos/SolicitudLabForm'), { ssr: false, loading: () => <FormCargando /> })
-const SolicitudImagenFormDynamic = dynamic(() => import('@/components/documentos/SolicitudImagenForm'), { ssr: false, loading: () => <FormCargando /> })
-const PlanSupFormDynamic      = dynamic(() => import('@/components/documentos/PlanSuplementacionForm'), { ssr: false, loading: () => <FormCargando /> })
-const InternamientoFormDynamic = dynamic(() => import('@/components/documentos/SolicitudInternamientoForm'), { ssr: false, loading: () => <FormCargando /> })
-const EscritoFormDynamic      = dynamic(() => import('@/components/documentos/EscritoMedicoForm'), { ssr: false, loading: () => <FormCargando /> })
-const ConsentimientoFormDynamic = dynamic(() => import('@/components/documentos/ConsentimientoInformadoForm'), { ssr: false, loading: () => <FormCargando /> })
-const HonorariosFormDynamic   = dynamic(() => import('@/components/documentos/NotaHonorariosForm'), { ssr: false, loading: () => <FormCargando /> })
-
 function FormCargando() {
   return (
     <div className="flex items-center justify-center py-12 text-slate-400">
@@ -42,6 +33,33 @@ function FormCargando() {
     </div>
   )
 }
+
+function FormErrorFallback() {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-2">
+      <p className="text-sm font-medium">No se pudo cargar el formulario</p>
+      <p className="text-xs">Verifica tu conexion e intenta de nuevo</p>
+    </div>
+  )
+}
+
+function safeDynamic<T extends Record<string, unknown>>(loader: () => Promise<{ default: React.ComponentType<T> }>) {
+  return dynamic<T>(
+    () => loader().catch(() => ({
+      default: (() => <FormErrorFallback />) as unknown as React.ComponentType<T>,
+    })),
+    { ssr: false, loading: () => <FormCargando /> },
+  )
+}
+
+const RecetaFormDynamic       = safeDynamic(() => import('@/components/documentos/RecetaForm'))
+const SolicitudLabFormDynamic = safeDynamic(() => import('@/components/documentos/SolicitudLabForm'))
+const SolicitudImagenFormDynamic = safeDynamic(() => import('@/components/documentos/SolicitudImagenForm'))
+const PlanSupFormDynamic      = safeDynamic(() => import('@/components/documentos/PlanSuplementacionForm'))
+const InternamientoFormDynamic = safeDynamic(() => import('@/components/documentos/SolicitudInternamientoForm'))
+const EscritoFormDynamic      = safeDynamic(() => import('@/components/documentos/EscritoMedicoForm'))
+const ConsentimientoFormDynamic = safeDynamic(() => import('@/components/documentos/ConsentimientoInformadoForm'))
+const HonorariosFormDynamic   = safeDynamic(() => import('@/components/documentos/NotaHonorariosForm'))
 
 type MedicoInfo = {
   nombre: string; especialidad: string; cedula_profesional: string
@@ -146,13 +164,13 @@ export default function NuevaNotaPage() {
         // Fallback: buscar en cache offline
         return getPatientOffline(id as string).then(cached => {
           if (cached) setPaciente({ id: cached.id, nombre: cached.nombre, apellidos: cached.apellidos, fecha_nacimiento: cached.fecha_nacimiento ?? null, sexo: cached.sexo ?? null } as Paciente)
-        })
+        }).catch(() => {})
       })
       .catch(() => {
         // Offline: cargar desde cache
         getPatientOffline(id as string).then(cached => {
           if (cached) setPaciente({ id: cached.id, nombre: cached.nombre, apellidos: cached.apellidos, fecha_nacimiento: cached.fecha_nacimiento ?? null, sexo: cached.sexo ?? null } as Paciente)
-        })
+        }).catch(() => {})
       })
     // Cargar medicamentos frecuentes y borrador (cifrados en secureStorage)
     secureStorage.get<{ nombre: string; count: number }[]>('med-frecuentes').then(data => {
