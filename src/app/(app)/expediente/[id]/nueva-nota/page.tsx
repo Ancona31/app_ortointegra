@@ -157,12 +157,12 @@ export default function NuevaNotaPage() {
     // Cargar medicamentos frecuentes y borrador (cifrados en secureStorage)
     secureStorage.get<{ nombre: string; count: number }[]>('med-frecuentes').then(data => {
       if (data) setMedCache(data.sort((a, b) => b.count - a.count).map(d => d.nombre))
-    })
+    }).catch(() => {})
     secureStorage.get<{ form: typeof form; medicamentos: typeof medicamentos }>(`nota-draft-${id}`).then(parsed => {
       if (!parsed) return
       if (parsed.form) { setForm(parsed.form); setBorradorRestaurado(true) }
       if (parsed.medicamentos?.length) setMedicamentos(parsed.medicamentos)
-    })
+    }).catch(() => {})
     // Cargar última consulta para contexto
     const supabase2 = createClient()
     supabase2.from('consultas')
@@ -178,7 +178,7 @@ export default function NuevaNotaPage() {
           ? (data.diagnosticos as { descripcion?: string }[]).map(d => d.descripcion).filter(Boolean).join(', ')
           : ''
         setUltimaConsulta({ diagnosticos: dx, medicamentos: data.medicamentos || null })
-      })
+      }).catch(() => {})
   }, [id])
 
   // ── Autosave en localStorage ──────────────────────────────────

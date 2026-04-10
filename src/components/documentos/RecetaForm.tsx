@@ -150,7 +150,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
             : null
           setPacienteData({ edad, sexo: data.sexo ?? undefined })
         }
-      })
+      }).catch(() => {})
   }, [pacienteId])
 
   const medInicial: MedicamentoConVia[] = medicamentosIniciales && medicamentosIniciales.length > 0
