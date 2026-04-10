@@ -16,7 +16,6 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
-import ConsultaRapida from '@/components/ConsultaRapida'
 import Breadcrumbs from '@/components/layout/Breadcrumbs'
 import { imprimirOCompartir } from '@/lib/mobileShare'
 import { secureStorage } from '@/lib/secureStorage'
@@ -870,8 +869,6 @@ export default function NuevaNotaPage() {
               </div>
             </div>
           </div>
-
-          <ConsultaRapida />
 
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>

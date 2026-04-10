@@ -74,13 +74,13 @@ export default function LoginPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'login_exitoso' }),
       }).catch(() => {})
-      router.push('/dashboard')
+      router.push('/inicio')
       router.refresh()
     }
   }
 
   function handleVolverDashboard() {
-    router.push('/dashboard')
+    router.push('/inicio')
   }
 
   return (

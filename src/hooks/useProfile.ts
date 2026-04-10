@@ -14,6 +14,7 @@ export interface Profile {
   cedula_especialidad?: string | null
   especialidad?: string | null
   titulo?: string | null
+  universidad?: string | null
 }
 
 // Caché a nivel de módulo: evita múltiples queries cuando varios componentes

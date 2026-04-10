@@ -25,7 +25,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </main>
         </div>
         <CommandPalette />
-        <OnboardingGuide />
+        {/* <OnboardingGuide /> — desactivado temporalmente, reemplazado por nuevo sistema */}
         <SessionGuard />
         <OfflineSync />
       </ThemeProvider>

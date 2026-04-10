@@ -70,11 +70,15 @@ export async function PUT(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-  const { direccion_consultorio, telefono_consultorio, especialidad, cedula_profesional, cedula_especialidad, titulo } = await req.json()
+  const { direccion_consultorio, telefono_consultorio, especialidad, cedula_profesional, cedula_especialidad, titulo, nombre, universidad } = await req.json()
+
+  const updateData: Record<string, string | undefined> = { direccion_consultorio, telefono_consultorio, especialidad, cedula_profesional, cedula_especialidad, titulo }
+  if (nombre !== undefined) updateData.nombre = nombre
+  if (universidad !== undefined) updateData.universidad = universidad
 
   const { error } = await supabase
     .from('profiles')
-    .update({ direccion_consultorio, telefono_consultorio, especialidad, cedula_profesional, cedula_especialidad, titulo })
+    .update(updateData)
     .eq('id', user.id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

@@ -66,7 +66,7 @@ function navDoctor(isAdmin: boolean, isSuperAdmin: boolean): NavSection[] {
   ]
 
   return [
-    { kind: 'leaf', href: '/dashboard', label: 'Inicio', icon: Home },
+    { kind: 'leaf', href: '/inicio', label: 'Inicio', icon: Home },
     {
       kind: 'group', key: 'pacientes', label: 'Pacientes', icon: Stethoscope,
       matchPaths: ['/expediente', '/suplementacion', '/pacientes'],
@@ -97,7 +97,7 @@ function navDoctor(isAdmin: boolean, isSuperAdmin: boolean): NavSection[] {
 
 function navSecretaria(): NavSection[] {
   return [
-    { kind: 'leaf', href: '/dashboard', label: 'Inicio',  icon: Home },
+    { kind: 'leaf', href: '/inicio', label: 'Inicio',  icon: Home },
     {
       kind: 'group', key: 'pacientes', label: 'Pacientes', icon: Stethoscope,
       matchPaths: ['/expediente', '/pacientes'],
@@ -116,7 +116,7 @@ function navSecretaria(): NavSection[] {
 
 function leafIsActive(href: string, pathname: string) {
   const base = href.split('?')[0]
-  if (base === '/dashboard') return pathname === '/dashboard'
+  if (base === '/inicio') return pathname === '/inicio'
   return pathname === base || pathname.startsWith(base + '/')
 }
 
