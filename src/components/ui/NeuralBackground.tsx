@@ -6,8 +6,8 @@ import { useRef, useEffect } from 'react'
    CONFIGURACIÓN — Ajusta estos valores para personalizar la animación
    ═══════════════════════════════════════════════════════════════════════ */
 
-/** Nodos por píxel² — ~60 nodos en 1920×1080. Subir = más denso */
-const NODE_DENSITY = 0.00003
+/** Nodos por píxel² — ~70 nodos en 1920×1080. Subir = más denso */
+const NODE_DENSITY = 0.000035
 
 /** Velocidad máxima base en px/frame (capa frontal). Bajar = más calma */
 const NODE_SPEED = 0.15
@@ -116,8 +116,9 @@ export default function NeuralBackground() {
       const cy = height * 0.4
       const r = Math.max(width, height) * 0.8
       bgGradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, r)
-      bgGradient.addColorStop(0, '#FFFFFF')
-      bgGradient.addColorStop(1, '#F0F4F8')
+      bgGradient.addColorStop(0, '#F8FBFF')
+      bgGradient.addColorStop(0.5, '#EFF6FC')
+      bgGradient.addColorStop(1, '#E0EEF8')
     }
 
     /* ── Loop de animación ── */
@@ -184,7 +185,7 @@ export default function NeuralBackground() {
           if (dist2 > connDist2) continue
 
           const dist = Math.sqrt(dist2)
-          let alpha = (1 - dist / CONNECTION_DIST) * 0.35
+          let alpha = (1 - dist / CONNECTION_DIST) * 0.5
 
           // Capa promedio para la opacidad de la línea
           const avgScale = (a.scale + b.scale) * 0.5
@@ -200,7 +201,7 @@ export default function NeuralBackground() {
             alpha *= 1 + (1 - Math.sqrt(mDist2) / MOUSE_RADIUS) * 1.5
           }
 
-          alpha = Math.min(alpha, 0.6)
+          alpha = Math.min(alpha, 0.8)
 
           // Gradiente entre nodos (haz de energía)
           const grad = ctx.createLinearGradient(a.x, a.y, b.x, b.y)
@@ -223,8 +224,8 @@ export default function NeuralBackground() {
 
           // Pulso orgánico senoidal (latido asincrónico)
           const pulse = 0.6 + 0.4 * Math.sin(now * 1.2 + n.pulseOffset)
-          const radius = (1.2 + n.scale * 1.8) * (0.85 + pulse * 0.15)
-          const alpha = (0.3 + n.scale * 0.5) * pulse
+          const radius = (1.5 + n.scale * 2.2) * (0.85 + pulse * 0.15)
+          const alpha = (0.5 + n.scale * 0.5) * pulse
 
           // Boost si el mouse está cerca
           let glowRadius = radius
@@ -239,8 +240,8 @@ export default function NeuralBackground() {
           // Glow (shadow)
           ctx.save()
           ctx.globalAlpha = alpha
-          ctx.shadowColor = `rgba(${ACCENT_RGB}, ${0.6 * n.scale})`
-          ctx.shadowBlur = 6 + n.scale * 8
+          ctx.shadowColor = `rgba(${ACCENT_RGB}, ${0.8 * n.scale})`
+          ctx.shadowBlur = 8 + n.scale * 12
           ctx.beginPath()
           ctx.arc(n.x, n.y, glowRadius, 0, Math.PI * 2)
           ctx.fillStyle = `rgba(${ACCENT_RGB}, 1)`
