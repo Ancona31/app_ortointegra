@@ -265,8 +265,8 @@ export default function HomePage() {
 
         <div className="relative overflow-hidden group/marquee">
           {/* Fade edges */}
-          <div className="absolute left-0 top-0 bottom-0 w-16 sm:w-32 bg-gradient-to-r from-[#f8fafc] to-transparent z-10 pointer-events-none" />
-          <div className="absolute right-0 top-0 bottom-0 w-16 sm:w-32 bg-gradient-to-l from-[#f8fafc] to-transparent z-10 pointer-events-none" />
+          <div className="absolute left-0 top-0 bottom-0 w-16 sm:w-32 bg-gradient-to-r from-white/70 to-transparent z-10 pointer-events-none" />
+          <div className="absolute right-0 top-0 bottom-0 w-16 sm:w-32 bg-gradient-to-l from-white/70 to-transparent z-10 pointer-events-none" />
 
           <div className="flex gap-4 animate-[marquee_35s_linear_infinite] group-hover/marquee:[animation-play-state:paused] w-max">
             {/* Render cards twice for seamless loop */}
@@ -287,7 +287,7 @@ export default function HomePage() {
       </section>
 
       {/* Section: Powered by Gemini */}
-      <section className="border-t border-slate-200/60 bg-white">
+      <section className="border-t border-slate-200/60 bg-white/70 backdrop-blur-sm">
         <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-20">
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-10 sm:p-14">
             {/* Subtle shine */}
@@ -339,7 +339,7 @@ export default function HomePage() {
       </section>
 
       {/* Section: Expediente electrónico */}
-      <section className="border-t border-slate-200/60 bg-white">
+      <section className="border-t border-slate-200/60 bg-white/70 backdrop-blur-sm">
         <div className="mx-auto max-w-6xl px-4 sm:px-8 py-20 sm:py-28">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
             <div>
@@ -409,7 +409,7 @@ export default function HomePage() {
       </section>
 
       {/* Section: Portabilidad */}
-      <section className="bg-[#f8fafc]">
+      <section className="bg-[#f8fafc]/70 backdrop-blur-sm">
         <div className="mx-auto max-w-6xl px-4 sm:px-8 py-20 sm:py-28">
           <div className="text-center mb-14">
             <div className="inline-flex items-center gap-2 bg-violet-50 rounded-full px-3.5 py-1 mb-6">
@@ -461,7 +461,7 @@ export default function HomePage() {
       </section>
 
       {/* Section: Interfaz intuitiva */}
-      <section className="border-t border-slate-200/60 bg-white">
+      <section className="border-t border-slate-200/60 bg-white/70 backdrop-blur-sm">
         <div className="mx-auto max-w-6xl px-4 sm:px-8 py-20 sm:py-28">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
             {/* Left: visual */}
@@ -523,7 +523,7 @@ export default function HomePage() {
       </section>
 
       {/* Social proof / trust */}
-      <section className="border-t border-slate-200/60 bg-white">
+      <section className="border-t border-slate-200/60 bg-white/70 backdrop-blur-sm">
         <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-20">
           <div className="grid sm:grid-cols-3 gap-8 text-center">
             <div>
