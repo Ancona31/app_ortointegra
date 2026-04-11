@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { Calendar, FileText, Shield, Brain, ArrowRight, Stethoscope, BarChart3, Pill, MonitorCheck, Clock, Search, Users, Activity, Zap, Smartphone, Laptop, MousePointerClick, FolderOpen, Share2 } from 'lucide-react'
+import NeuralBackground from '@/components/ui/NeuralBackground'
 
 const features = [
   {
@@ -155,10 +156,8 @@ function AppMockup() {
 export default function HomePage() {
   return (
     <main className="min-h-screen bg-[#f8fafc] relative" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', WebkitFontSmoothing: 'antialiased' }}>
-      {/* Logo watermark — fixed left side, visible across entire page */}
-      <div className="fixed -left-16 sm:-left-6 top-1/2 -translate-y-1/2 pointer-events-none select-none opacity-[0.07] z-0">
-        <Image src="/logo-spinus.png" alt="" width={575} height={575} className="w-[460px] sm:w-[575px] h-auto" aria-hidden="true" />
-      </div>
+      {/* Fondo animado Neural Data Nexus — solo landing page */}
+      <NeuralBackground />
 
       {/* Nav */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/60">
