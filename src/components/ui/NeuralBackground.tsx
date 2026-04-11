@@ -24,8 +24,8 @@ const MOUSE_STRENGTH = 0.02
 /** Grosor máximo de las líneas de conexión */
 const LINE_WIDTH = 0.3
 
-/** Color de acento en formato RGB (sin alpha) — teal/cian Spinus */
-const ACCENT_RGB = '0, 188, 212'
+/** Color de acento en formato RGB (sin alpha) — azul médico Spinus #004A99 */
+const ACCENT_RGB = '0, 74, 153'
 
 /** Cantidad de capas de profundidad (parallax) */
 const LAYER_COUNT = 3
@@ -116,9 +116,9 @@ export default function NeuralBackground() {
       const cy = height * 0.4
       const r = Math.max(width, height) * 0.8
       bgGradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, r)
-      bgGradient.addColorStop(0, '#F8FBFF')
-      bgGradient.addColorStop(0.5, '#EFF6FC')
-      bgGradient.addColorStop(1, '#E0EEF8')
+      bgGradient.addColorStop(0, '#E0EEF8')
+      bgGradient.addColorStop(0.5, '#D6E6F4')
+      bgGradient.addColorStop(1, '#D1E4F5')
     }
 
     /* ── Loop de animación ── */
