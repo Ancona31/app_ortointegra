@@ -5,11 +5,17 @@ import { useState, useEffect } from 'react'
 import { subscribe, getStatus } from '@/lib/connectionMonitor'
 import OfflineFallbackPage from '@/components/OfflineFallbackPage'
 
-const OFFLINE_ALLOWED_PREFIXES = ['/inicio', '/documentos']
+/** Rutas que requieren servidor — todo lo demás funciona offline */
+const ONLINE_ONLY_PREFIXES = [
+  '/super-admin',
+  '/login',
+  '/register',
+  '/reset-password',
+  '/forgot-password',
+]
 
-function isRouteAvailableOffline(pathname: string): boolean {
-  return OFFLINE_ALLOWED_PREFIXES.some(p => pathname === p || pathname.startsWith(p + '/')) ||
-    pathname.includes('/nueva-nota')
+function isRouteOnlineOnly(pathname: string): boolean {
+  return ONLINE_ONLY_PREFIXES.some(p => pathname === p || pathname.startsWith(p + '/'))
 }
 
 export default function OfflineGate({ children }: { children: React.ReactNode }) {
@@ -21,7 +27,7 @@ export default function OfflineGate({ children }: { children: React.ReactNode })
     return unsub
   }, [])
 
-  if (!isOnline && !isRouteAvailableOffline(pathname)) {
+  if (!isOnline && isRouteOnlineOnly(pathname)) {
     return <OfflineFallbackPage />
   }
 

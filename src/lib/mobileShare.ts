@@ -1,15 +1,12 @@
 /**
- * Genera PDFs vía @react-pdf/renderer en el servidor.
- * Offline: genera directamente en el CLIENTE sin intentar el servidor.
+ * Genera PDFs 100% en el CLIENTE con @react-pdf/renderer.
+ * Sin dependencia del servidor — funciona online y offline.
  *
- * imprimirOCompartir() — legacy: abre ventana print en desktop, PDF en móvil
- * generarPdf()         — nuevo: genera PDF vía react-pdf en ambas plataformas
+ * imprimirOCompartir() — legacy: abre ventana print en desktop
+ * generarPdf()         — genera PDF vía react-pdf en todas las plataformas
  */
 
 import type { PdfMedicoData } from '@/lib/pdf/PdfStyles'
-import { getStatus } from '@/lib/connectionMonitor'
-
-const SERVER_TIMEOUT_MS = 5_000
 
 type DocType =
   | 'solicitud_lab'
@@ -21,33 +18,6 @@ type DocType =
   | 'escrito_medico'
   | 'consentimiento_informado'
   | 'nota_evolucion'
-
-async function fetchPdfConReintento(body: string): Promise<Blob | null> {
-  for (let intento = 1; intento <= 2; intento++) {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), SERVER_TIMEOUT_MS)
-
-    try {
-      const res = await fetch('/api/generar-pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-        signal: controller.signal,
-      })
-      clearTimeout(timer)
-
-      if (res.status === 504 && intento === 1) continue
-      if (!res.ok) return null
-
-      return await res.blob()
-    } catch {
-      clearTimeout(timer)
-      if (intento === 1) continue
-      return null
-    }
-  }
-  return null
-}
 
 /** Importa dinámicamente el renderer correcto y genera el elemento react-pdf */
 async function buildClientElement(
@@ -123,13 +93,13 @@ async function compartirODescargar(blob: Blob, filename: string) {
       await navigator.share({ files: [file], title: filename.replace('.pdf', '') })
       return
     } catch {
-      // NotAllowedError: user gesture lost after async fetch
+      // NotAllowedError: user gesture lost after async work
     }
   }
   descargarBlob(blob, filename)
 }
 
-/** Genera PDF — servidor si hay conexión, cliente directo si offline */
+/** Genera PDF 100% en el cliente — sin servidor, sin delay */
 export async function generarPdf(params: {
   tipo: string
   medico: PdfMedicoData | null
@@ -141,34 +111,23 @@ export async function generarPdf(params: {
   const defaultFilename = `${tipo.replace(/_/g, '-')}.pdf`
 
   let pdfBlob: Blob | null = null
-  const offline = getStatus() === 'offline'
 
-  // Si hay conexión, intentar servidor
-  if (!offline) {
-    const body = JSON.stringify({ tipo, medico, data, logoUrl })
-    pdfBlob = await fetchPdfConReintento(body)
-  }
-
-  // Si no hay blob (offline o servidor falló), generar en el cliente
-  if (!pdfBlob) {
-    try {
-      // Si está offline y el logo es URL externa, usar Base64
-      let effectiveLogoUrl = logoUrl
-      if (offline && (!logoUrl || logoUrl.startsWith('https://'))) {
-        const { LOGO_BASE64 } = await import('@/lib/pdf/logo')
-        effectiveLogoUrl = LOGO_BASE64
-      }
-      const element = await buildClientElement(tipo, medico, data, effectiveLogoUrl)
-      if (element) {
-        const { generatePdfClient } = await import('@/lib/pdfClientFallback')
-        pdfBlob = await generatePdfClient(element)
-      }
-    } catch (err) {
-      if (typeof window !== 'undefined' && 'console' in window) {
-        // eslint-disable-next-line no-console
-        console.error('[generarPdf] fallback cliente falló:', err)
-      }
+  try {
+    // Si el logo es URL externa o no existe, usar Base64 optimizado (24KB)
+    let effectiveLogoUrl = logoUrl
+    if (!logoUrl || logoUrl.startsWith('https://')) {
+      const { LOGO_BASE64 } = await import('@/lib/pdf/logo')
+      effectiveLogoUrl = LOGO_BASE64
     }
+
+    const element = await buildClientElement(tipo, medico, data, effectiveLogoUrl)
+    if (element) {
+      const { generatePdfClient } = await import('@/lib/pdfClientFallback')
+      pdfBlob = await generatePdfClient(element)
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[generarPdf] renderizado cliente falló:', err)
   }
 
   if (!pdfBlob) {

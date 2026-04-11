@@ -3,18 +3,22 @@
 import { WifiOff } from 'lucide-react'
 import Link from 'next/link'
 
-export default function OfflineFallbackPage() {
+interface Props {
+  message?: string
+}
+
+export default function OfflineFallbackPage({ message }: Props) {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6">
       <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center mb-6">
         <WifiOff size={36} className="text-slate-400" />
       </div>
       <h1 className="text-xl font-bold text-slate-800 mb-2">
-        Esta seccion requiere conexion a internet
+        {message ?? 'Esta sección requiere conexión a internet'}
       </h1>
       <p className="text-sm text-slate-500 max-w-md mb-8">
-        Mientras tanto puedes crear notas medicas o generar documentos.
-        Cuando la conexion se restablezca, podras acceder a esta seccion normalmente.
+        Mientras tanto puedes crear notas médicas o generar documentos.
+        Cuando la conexión se restablezca, podrás acceder a esta sección normalmente.
       </p>
       <div className="flex gap-3">
         <Link
