@@ -278,6 +278,8 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
       logoUrl,
       filename: 'receta-medica.pdf',
     })
+    } catch {
+      setErrorGuardado('No se pudo generar el PDF. Intenta de nuevo.')
     } finally {
       setImprimiendo(false)
     }

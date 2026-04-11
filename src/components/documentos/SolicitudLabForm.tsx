@@ -98,6 +98,8 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
       logoUrl,
       filename: 'solicitud-laboratorio.pdf',
     })
+    } catch {
+      toast.error('No se pudo generar el PDF. Intenta de nuevo.')
     } finally { setImprimiendo(false) }
   }
 

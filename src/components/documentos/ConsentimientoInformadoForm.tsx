@@ -180,6 +180,8 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
         logoUrl,
         filename: 'consentimiento-informado.pdf',
       })
+    } catch {
+      toast.error('No se pudo generar el PDF. Intenta de nuevo.')
     } finally {
       setImprimiendo(false)
     }

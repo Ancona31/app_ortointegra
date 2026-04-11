@@ -114,6 +114,8 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
         logoUrl,
         filename: tipoDoc === 'cotizacion' ? 'cotizacion.pdf' : 'nota-honorarios.pdf',
       })
+    } catch {
+      toast.error('No se pudo generar el PDF. Intenta de nuevo.')
     } finally {
       setImprimiendo(false)
     }

@@ -85,6 +85,8 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
       logoUrl,
       filename: 'solicitud-imagenologia.pdf',
     })
+    } catch {
+      toast.error('No se pudo generar el PDF. Intenta de nuevo.')
     } finally { setImprimiendo(false) }
   }
 

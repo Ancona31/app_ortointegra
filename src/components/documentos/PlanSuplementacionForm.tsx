@@ -268,6 +268,8 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
         logoUrl,
         filename: 'plan-suplementacion.pdf',
       })
+    } catch {
+      toast.error('No se pudo generar el PDF. Intenta de nuevo.')
     } finally {
       setImprimiendo(false)
     }

@@ -163,8 +163,11 @@ export async function generarPdf(params: {
         const { generatePdfClient } = await import('@/lib/pdfClientFallback')
         pdfBlob = await generatePdfClient(element)
       }
-    } catch {
-      // fallthrough to error
+    } catch (err) {
+      if (typeof window !== 'undefined' && 'console' in window) {
+        // eslint-disable-next-line no-console
+        console.error('[generarPdf] fallback cliente falló:', err)
+      }
     }
   }
 

@@ -94,6 +94,8 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId }: 
         logoUrl,
         filename: 'escrito-medico.pdf',
       })
+    } catch {
+      toast.error('No se pudo generar el PDF. Intenta de nuevo.')
     } finally {
       setImprimiendo(false)
     }

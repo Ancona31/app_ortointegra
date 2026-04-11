@@ -119,6 +119,8 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
         logoUrl,
         filename: 'solicitud-internamiento.pdf',
       })
+    } catch {
+      toast.error('No se pudo generar el PDF. Intenta de nuevo.')
     } finally {
       setImprimiendo(false)
     }
