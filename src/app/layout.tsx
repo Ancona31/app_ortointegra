@@ -10,6 +10,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" className="h-full">
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#1a3a5c" />
+      </head>
       <body className="min-h-full antialiased">
         <ConnectionBanner />
         {children}
