@@ -4,7 +4,7 @@ import type { ReactElement } from 'react'
 import PdfHeader from './PdfHeader'
 import PdfWatermark from './PdfWatermark'
 import { BarraTop, BarraBottom } from './PdfBarras'
-import { baseStyles, getPdfColors, GradientBg } from './PdfStyles'
+import { baseStyles, getPdfColors, contrastText } from './PdfStyles'
 import type { PdfMedicoData, PdfColors } from './PdfStyles'
 
 /* ------------------------------------------------------------------ */
@@ -168,8 +168,8 @@ function CompactHeader({ medico, colors, logoUrl, paciente, procedimiento }: Com
       gap: 8,
     },
     logoSmall: {
-      width: 28,
-      height: 28,
+      width: 40,
+      height: 20,
       objectFit: 'contain',
     },
     docName: {
@@ -320,13 +320,12 @@ export default function ConsentimientoInformadoPdf({
     datosHeader: {
       paddingVertical: 5,
       paddingHorizontal: 10,
-      position: 'relative',
-      overflow: 'hidden',
+      backgroundColor: colors.cp,
     },
     datosHeaderText: {
       fontSize: 9,
       fontWeight: 700,
-      color: '#ffffff',
+      color: contrastText(colors.cp),
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
@@ -361,8 +360,7 @@ export default function ConsentimientoInformadoPdf({
       paddingHorizontal: 10,
       marginTop: 14,
       marginBottom: 6,
-      position: 'relative',
-      overflow: 'hidden',
+      backgroundColor: colors.cp,
     },
     secBadge: {
       backgroundColor: '#ffffff',
@@ -381,7 +379,7 @@ export default function ConsentimientoInformadoPdf({
     secTitle: {
       fontSize: 10,
       fontWeight: 700,
-      color: '#ffffff',
+      color: contrastText(colors.cp),
       letterSpacing: 0.3,
     },
     secBody: {
@@ -414,13 +412,12 @@ export default function ConsentimientoInformadoPdf({
     declHeader: {
       paddingVertical: 6,
       paddingHorizontal: 12,
-      position: 'relative',
-      overflow: 'hidden',
+      backgroundColor: colors.cp,
     },
     declHeaderText: {
       fontSize: 10,
       fontWeight: 700,
-      color: '#ffffff',
+      color: contrastText(colors.cp),
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
@@ -486,11 +483,10 @@ export default function ConsentimientoInformadoPdf({
 
   /* ---------- Render section block ---------- */
   function SeccionBlock({ sec }: { sec: (typeof SECCION_LABELS)[number] }) {
-    const text = data.secciones[sec.key as keyof typeof data.secciones] || ''
+    const text = data?.secciones?.[sec.key as keyof typeof data.secciones] ?? ''
     return (
       <View wrap={false}>
         <View style={s.secHeader}>
-          <GradientBg cp={colors.cp} cs={colors.cs} id={`gSec${sec.num}`} />
           <View style={s.secBadge}>
             <Text style={s.secBadgeNum}>{sec.num}</Text>
           </View>
@@ -507,9 +503,9 @@ export default function ConsentimientoInformadoPdf({
       <View style={s.firmasGrid}>
         <FirmaBox
           label="Paciente"
-          nombre={data.paciente}
+          nombre={data?.paciente ?? ''}
           idLabel="Identificaci\u00F3n"
-          idVal={data.idPaciente}
+          idVal={data?.idPaciente}
           colors={colors}
         />
         <FirmaBox
@@ -521,25 +517,25 @@ export default function ConsentimientoInformadoPdf({
           colors={colors}
         />
         <FirmaBox
-          label={data.representante ? 'Representante Legal' : 'Familiar / Responsable'}
-          nombre={data.representante || data.familiar}
+          label={data?.representante ? 'Representante Legal' : 'Familiar / Responsable'}
+          nombre={data?.representante ?? data?.familiar ?? ''}
           idLabel="Identificaci\u00F3n"
-          idVal={data.idRepresentante || data.idFamiliar}
+          idVal={data?.idRepresentante ?? data?.idFamiliar}
           colors={colors}
         />
         <FirmaBox
           label="Anestesi\u00F3logo"
-          nombre={data.anestesiologo}
+          nombre={data?.anestesiologo}
           colors={colors}
         />
         <FirmaBox
           label="Testigo 1"
-          nombre={data.testigo1}
+          nombre={data?.testigo1}
           colors={colors}
         />
         <FirmaBox
           label="Testigo 2"
-          nombre={data.testigo2}
+          nombre={data?.testigo2}
           colors={colors}
         />
       </View>
@@ -599,7 +595,7 @@ export default function ConsentimientoInformadoPdf({
           {/* Title */}
           <View style={s.tituloWrap}>
             <Text style={s.tituloText}>Consentimiento M\u00E9dico Informado</Text>
-            <Text style={s.subtituloText}>{data.procedimiento}</Text>
+            <Text style={s.subtituloText}>{data?.procedimiento ?? ''}</Text>
           </View>
 
           {/* NOM intro */}
@@ -617,43 +613,42 @@ export default function ConsentimientoInformadoPdf({
           {/* Datos de identificacion */}
           <View style={s.datosBox}>
             <View style={s.datosHeader}>
-              <GradientBg cp={colors.cp} cs={colors.cs} id="gDatCon" />
               <Text style={s.datosHeaderText}>Datos de Identificaci\u00F3n</Text>
             </View>
             <View style={s.datosGrid}>
               <View style={s.datosCell}>
                 <Text style={baseStyles.datoLabel}>LUGAR</Text>
-                <Text style={baseStyles.datoValor}>{data.lugar}</Text>
+                <Text style={baseStyles.datoValor}>{data?.lugar ?? ''}</Text>
               </View>
               <View style={s.datosCell}>
                 <Text style={baseStyles.datoLabel}>FECHA</Text>
-                <Text style={baseStyles.datoValor}>{data.fecha}</Text>
+                <Text style={baseStyles.datoValor}>{data?.fecha ?? ''}</Text>
               </View>
               <View style={s.datosCell}>
                 <Text style={baseStyles.datoLabel}>NO. EXPEDIENTE</Text>
-                <Text style={baseStyles.datoValor}>{data.expediente || '\u2014'}</Text>
+                <Text style={baseStyles.datoValor}>{data?.expediente ?? '\u2014'}</Text>
               </View>
               <View style={s.datosCell}>
                 <Text style={baseStyles.datoLabel}>PACIENTE</Text>
-                <Text style={baseStyles.datoValor}>{data.paciente}</Text>
+                <Text style={baseStyles.datoValor}>{data?.paciente ?? 'Pte. no identificado'}</Text>
               </View>
               <View style={s.datosCell}>
                 <Text style={baseStyles.datoLabel}>EDAD</Text>
-                <Text style={baseStyles.datoValor}>{data.edad}</Text>
+                <Text style={baseStyles.datoValor}>{data?.edad ?? '\u2014'}</Text>
               </View>
               <View style={s.datosCell}>
                 <Text style={baseStyles.datoLabel}>IDENTIFICACI\u00D3N PACIENTE</Text>
-                <Text style={baseStyles.datoValor}>{data.idPaciente || '\u2014'}</Text>
+                <Text style={baseStyles.datoValor}>{data?.idPaciente ?? '\u2014'}</Text>
               </View>
               <View style={s.datosCellHalf}>
                 <Text style={baseStyles.datoLabel}>FAMILIAR / RESPONSABLE</Text>
-                <Text style={baseStyles.datoValor}>{data.familiar}</Text>
+                <Text style={baseStyles.datoValor}>{data?.familiar ?? ''}</Text>
               </View>
               <View style={s.datosCellHalf}>
                 <Text style={baseStyles.datoLabel}>IDENTIFICACI\u00D3N FAMILIAR</Text>
-                <Text style={baseStyles.datoValor}>{data.idFamiliar || '\u2014'}</Text>
+                <Text style={baseStyles.datoValor}>{data?.idFamiliar ?? '\u2014'}</Text>
               </View>
-              {data.representante ? (
+              {data?.representante ? (
                 <>
                   <View style={s.datosCellHalf}>
                     <Text style={baseStyles.datoLabel}>REPRESENTANTE LEGAL</Text>
@@ -661,13 +656,13 @@ export default function ConsentimientoInformadoPdf({
                   </View>
                   <View style={s.datosCellHalf}>
                     <Text style={baseStyles.datoLabel}>IDENTIFICACI\u00D3N REPRESENTANTE</Text>
-                    <Text style={baseStyles.datoValor}>{data.idRepresentante || '\u2014'}</Text>
+                    <Text style={baseStyles.datoValor}>{data?.idRepresentante ?? '\u2014'}</Text>
                   </View>
                 </>
               ) : null}
               <View style={s.datosCellFull}>
                 <Text style={baseStyles.datoLabel}>DIAGN\u00D3STICO</Text>
-                <Text style={baseStyles.datoValor}>{data.diagnostico}</Text>
+                <Text style={baseStyles.datoValor}>{data?.diagnostico ?? ''}</Text>
               </View>
             </View>
           </View>
@@ -732,16 +727,15 @@ export default function ConsentimientoInformadoPdf({
           {/* Declaracion de Consentimiento */}
           <View style={s.declBox}>
             <View style={s.declHeader}>
-              <GradientBg cp={colors.cp} cs={colors.cs} id="gDeclCon" />
               <Text style={s.declHeaderText}>Declaraci\u00F3n de Consentimiento</Text>
             </View>
             <View style={s.declBody}>
               <Text style={s.declText}>
-                Yo, <Text style={s.declBold}>{data.paciente}</Text>, declaro que el/la Dr(a).{' '}
+                Yo, <Text style={s.declBold}>{data?.paciente ?? 'Pte. no identificado'}</Text>, declaro que el/la Dr(a).{' '}
                 <Text style={s.declBold}>{nombre}</Text>
                 {credsStr ? ` (${credsStr})` : ''} me ha explicado de forma clara y comprensible
                 la naturaleza del procedimiento:{' '}
-                <Text style={s.declBold}>{data.procedimiento}</Text>, incluyendo sus riesgos,
+                <Text style={s.declBold}>{data?.procedimiento ?? ''}</Text>, incluyendo sus riesgos,
                 beneficios esperados y alternativas de tratamiento.
               </Text>
               <Text style={s.declText}>
@@ -798,9 +792,9 @@ export default function ConsentimientoInformadoPdf({
               </View>
               <View style={s.denegBody}>
                 <Text style={s.denegText}>
-                  Yo, <Text style={s.declBold}>{data.paciente}</Text>, declaro que he sido
+                  Yo, <Text style={s.declBold}>{data?.paciente ?? 'Pte. no identificado'}</Text>, declaro que he sido
                   informado(a) de manera clara y completa sobre el procedimiento:{' '}
-                  <Text style={s.declBold}>{data.procedimiento}</Text>, sus riesgos, beneficios
+                  <Text style={s.declBold}>{data?.procedimiento ?? ''}</Text>, sus riesgos, beneficios
                   y alternativas por el/la Dr(a).{' '}
                   <Text style={s.declBold}>{nombre}</Text>.
                 </Text>

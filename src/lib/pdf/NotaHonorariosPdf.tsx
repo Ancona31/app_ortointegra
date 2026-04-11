@@ -3,7 +3,7 @@ import PdfHeader from './PdfHeader'
 import PdfFirma from './PdfFirma'
 import PdfWatermark from './PdfWatermark'
 import { BarraTop, BarraBottom } from './PdfBarras'
-import { baseStyles, getPdfColors, GradientBg } from './PdfStyles'
+import { baseStyles, getPdfColors, contrastText } from './PdfStyles'
 import type { PdfMedicoData } from './PdfStyles'
 
 export interface NotaHonorariosData {
@@ -75,14 +75,13 @@ export default function NotaHonorariosPdf({ medico, data, logoUrl }: NotaHonorar
       flexDirection: 'row',
       justifyContent: 'center',
       alignItems: 'center',
-      position: 'relative',
-      overflow: 'hidden',
+      backgroundColor: colors.cp,
     },
     tituloText: {
       fontSize: 12,
       fontWeight: 700,
       textTransform: 'uppercase',
-      color: '#ffffff',
+      color: contrastText(colors.cp),
       letterSpacing: 1.5,
       textAlign: 'center',
       flex: 1,
@@ -91,7 +90,7 @@ export default function NotaHonorariosPdf({ medico, data, logoUrl }: NotaHonorar
       position: 'absolute',
       right: 14,
       fontSize: 8,
-      color: '#ffffff',
+      color: contrastText(colors.cp),
       opacity: 0.85,
       fontWeight: 500,
     },
@@ -102,28 +101,27 @@ export default function NotaHonorariosPdf({ medico, data, logoUrl }: NotaHonorar
       borderTopRightRadius: 4,
       paddingVertical: 7,
       paddingHorizontal: 12,
-      position: 'relative',
-      overflow: 'hidden',
+      backgroundColor: colors.cp,
     },
     thNum: {
       width: 30,
       fontSize: 7.5,
       fontWeight: 700,
-      color: '#ffffff',
+      color: contrastText(colors.cp),
       textTransform: 'uppercase',
     },
     thConcepto: {
       flex: 1,
       fontSize: 7.5,
       fontWeight: 700,
-      color: '#ffffff',
+      color: contrastText(colors.cp),
       textTransform: 'uppercase',
     },
     thPrecio: {
       width: 110,
       fontSize: 7.5,
       fontWeight: 700,
-      color: '#ffffff',
+      color: contrastText(colors.cp),
       textTransform: 'uppercase',
       textAlign: 'right',
     },
@@ -158,25 +156,23 @@ export default function NotaHonorariosPdf({ medico, data, logoUrl }: NotaHonorar
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      position: 'relative',
-      overflow: 'hidden',
+      backgroundColor: colors.cp,
     },
     totalLabel: {
       fontSize: 12,
       fontWeight: 700,
-      color: '#ffffff',
+      color: contrastText(colors.cp),
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
     totalAmount: {
       fontSize: 18,
       fontWeight: 700,
-      color: '#ffffff',
+      color: contrastText(colors.cp),
     },
     divisaNote: {
       fontSize: 7.5,
-      color: '#ffffff',
-      opacity: 0.7,
+      color: '#888',
       textAlign: 'right',
       marginTop: 4,
     },
@@ -246,7 +242,6 @@ export default function NotaHonorariosPdf({ medico, data, logoUrl }: NotaHonorar
         <View style={{ flex: 1 }}>
           {/* Titulo banner con folio */}
           <View style={s.tituloBanner}>
-            <GradientBg cp={colors.cp} cs={colors.cs} id="gTitHon" />
             <Text style={s.tituloText}>{titulo}</Text>
             <Text style={s.folioTag}>Folio: {data.folio}</Text>
           </View>
@@ -267,7 +262,6 @@ export default function NotaHonorariosPdf({ medico, data, logoUrl }: NotaHonorar
 
           {/* Tabla de conceptos */}
           <View style={s.tableHeader}>
-            <GradientBg cp={colors.cp} cs={colors.cs} id="gTblHon" />
             <Text style={s.thNum}>#</Text>
             <Text style={s.thConcepto}>Concepto</Text>
             <Text style={s.thPrecio}>Precio</Text>
@@ -277,7 +271,7 @@ export default function NotaHonorariosPdf({ medico, data, logoUrl }: NotaHonorar
               key={i}
               style={[
                 s.tableRow,
-                { backgroundColor: i % 2 === 0 ? '#f9fafb' : '#ffffff' },
+                { backgroundColor: i % 2 === 0 ? colors.cs + '0D' : '#ffffff' },
               ]}
             >
               <Text style={s.tdNum}>{i + 1}</Text>
@@ -288,7 +282,6 @@ export default function NotaHonorariosPdf({ medico, data, logoUrl }: NotaHonorar
 
           {/* Total — separate card */}
           <View style={s.totalWrap}>
-            <GradientBg cp={colors.cp} cs={colors.cs} id="gTotHon" />
             <Text style={s.totalLabel}>Total</Text>
             <Text style={s.totalAmount}>{fmt(data.total, data.divisa)}</Text>
           </View>

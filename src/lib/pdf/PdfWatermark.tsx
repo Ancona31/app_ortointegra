@@ -1,23 +1,33 @@
-import { Image, StyleSheet } from '@react-pdf/renderer'
+import { Image, StyleSheet, View } from '@react-pdf/renderer'
 
 interface Props {
   logoUrl?: string
 }
 
+const s = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  watermark: {
+    width: 220,
+    height: 220,
+    opacity: 0.05,
+    transform: 'rotate(-25deg)',
+  },
+})
+
 export default function PdfWatermark({ logoUrl }: Props) {
   if (!logoUrl) return null
 
-  const s = StyleSheet.create({
-    watermark: {
-      position: 'absolute',
-      top: '50%',
-      left: '50%',
-      width: 400,
-      height: 400,
-      opacity: 0.07,
-      transform: 'translate(-9%, -30%) rotate(-25deg)',
-    },
-  })
-
-  return <Image style={s.watermark} src={logoUrl} />
+  return (
+    <View fixed style={s.container}>
+      {logoUrl ? <Image style={s.watermark} src={logoUrl} /> : null}
+    </View>
+  )
 }

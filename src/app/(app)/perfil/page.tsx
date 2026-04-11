@@ -9,6 +9,7 @@ import { useToast } from '@/components/ui/Toast'
 import EspecialidadSelector from '@/components/ui/EspecialidadSelector'
 import { validarTelefono, validarCedula, formatearTelefono } from '@/lib/validaciones'
 import FirmaCaptura from '@/components/perfil/FirmaCaptura'
+import { compressLogoImage } from '@/lib/compressImage'
 
 type FormData = {
   titulo: string
@@ -105,11 +106,16 @@ export default function PerfilPage() {
     })
   }, [])
 
-  function onSelectLogo(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onSelectLogo(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    setLogoFile(file)
-    setLogoPreview(URL.createObjectURL(file))
+    try {
+      const compressed = await compressLogoImage(file)
+      setLogoFile(compressed)
+      setLogoPreview(URL.createObjectURL(compressed))
+    } catch {
+      toast.error('No se pudo procesar la imagen. Intenta con otro archivo.')
+    }
   }
 
   function quitarLogo() {
@@ -306,7 +312,7 @@ export default function PerfilPage() {
                         <X size={11} /> Quitar
                       </button>
                     )}
-                    <p className="text-[10px] text-[#86868b]">PNG, JPG, SVG · máx. 2 MB</p>
+                    <p className="text-[10px] text-[#86868b]">PNG, JPG, SVG · se optimiza a máx. 150 KB</p>
                   </div>
                 </div>
                 <input ref={fileRef} type="file" accept=".png,.jpg,.jpeg,.webp,.svg" onChange={onSelectLogo} className="hidden" />

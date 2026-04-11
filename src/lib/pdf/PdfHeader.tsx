@@ -1,4 +1,4 @@
-import { View, Text, Image, StyleSheet, Svg, Defs, LinearGradient, Stop, Rect } from '@react-pdf/renderer'
+import { View, Text, Image, StyleSheet } from '@react-pdf/renderer'
 import type { PdfMedicoData, PdfColors } from './PdfStyles'
 
 interface Props {
@@ -29,8 +29,8 @@ export default function PdfHeader({ medico, colors, logoUrl, folio, fecha, compa
     cedEsp ? `Céd. Esp. ${cedEsp}` : '',
   ].filter(Boolean).join('   ·   ')
 
-  const logoSize = compact ? 52 : 62
-  const logoInner = compact ? 48 : 56
+  const logoBoxW = compact ? 52 : 62
+  const logoBoxH = compact ? 52 : 62
 
   const s = StyleSheet.create({
     headerRow: {
@@ -40,9 +40,9 @@ export default function PdfHeader({ medico, colors, logoUrl, folio, fecha, compa
       marginBottom: 0,
     },
     logoWrap: {
-      width: logoSize,
-      height: logoSize,
-      borderRadius: logoSize / 2,
+      width: logoBoxW,
+      height: logoBoxH,
+      borderRadius: logoBoxW / 2,
       borderWidth: 1.5,
       borderColor: '#d1d5db',
       overflow: 'hidden',
@@ -51,8 +51,8 @@ export default function PdfHeader({ medico, colors, logoUrl, folio, fecha, compa
       backgroundColor: '#fafbfc',
     },
     logo: {
-      width: logoInner,
-      height: logoInner,
+      width: 80,
+      height: 40,
       objectFit: 'contain',
     },
     info: {
@@ -101,8 +101,8 @@ export default function PdfHeader({ medico, colors, logoUrl, folio, fecha, compa
     rxWrap: {
       alignItems: 'center',
       justifyContent: 'center',
-      width: logoSize,
-      height: logoSize,
+      width: logoBoxW,
+      height: logoBoxH,
     },
     rxText: {
       fontSize: compact ? 34 : 38,
@@ -158,26 +158,10 @@ export default function PdfHeader({ medico, colors, logoUrl, folio, fecha, compa
           </View>
         ) : null)}
       </View>
-      {/* Separador grueso con degradado cp → cs */}
-      <Svg viewBox="0 0 100 2" preserveAspectRatio="none" style={{ width: '100%', height: compact ? 1.5 : 2, marginTop: compact ? 6 : 10 }}>
-        <Defs>
-          <LinearGradient id="gG" x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0" stopColor={colors.cp} stopOpacity={1} />
-            <Stop offset="1" stopColor={colors.cs} stopOpacity={1} />
-          </LinearGradient>
-        </Defs>
-        <Rect x="0" y="0" width="100" height="2" fill="url(#gG)" />
-      </Svg>
-      {/* Separador fino con degradado cs → cp */}
-      <Svg viewBox="0 0 100 1" preserveAspectRatio="none" style={{ width: '100%', height: 0.5, marginTop: 1.5, marginBottom: compact ? 8 : 12 }}>
-        <Defs>
-          <LinearGradient id="gF" x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0" stopColor={colors.cs} stopOpacity={1} />
-            <Stop offset="1" stopColor={colors.cp} stopOpacity={1} />
-          </LinearGradient>
-        </Defs>
-        <Rect x="0" y="0" width="100" height="1" fill="url(#gF)" />
-      </Svg>
+      {/* Separador grueso cp */}
+      <View style={{ width: '100%', height: compact ? 1.5 : 2, backgroundColor: colors.cp, marginTop: compact ? 6 : 10 }} />
+      {/* Separador fino cs */}
+      <View style={{ width: '100%', height: 0.5, backgroundColor: colors.cs, marginTop: 1.5, marginBottom: compact ? 8 : 12 }} />
     </View>
   )
 }

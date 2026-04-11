@@ -63,7 +63,20 @@ export async function precacheFonts(): Promise<void> {
 
 /** Genera un PDF blob en el cliente a partir de un componente react-pdf */
 export async function generatePdfClient(element: ReactElement<DocumentProps>): Promise<Blob> {
-  await registerFontsWithFallback()
-  const doc = pdf(element)
-  return doc.toBlob()
+  try {
+    await registerFontsWithFallback()
+  } catch (fontErr) {
+    // eslint-disable-next-line no-console
+    console.error('[generatePdfClient] Error registrando fuentes:', fontErr)
+    throw new Error('Error en renderizado: fallo al cargar fuentes')
+  }
+
+  try {
+    const doc = pdf(element)
+    return await doc.toBlob()
+  } catch (renderErr) {
+    // eslint-disable-next-line no-console
+    console.error('[generatePdfClient] Error en renderizado PDF:', renderErr)
+    throw new Error(`Error en renderizado: ${renderErr instanceof Error ? renderErr.message : 'desconocido'}`)
+  }
 }

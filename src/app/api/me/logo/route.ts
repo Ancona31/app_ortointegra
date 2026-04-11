@@ -21,9 +21,9 @@ export async function POST(req: NextRequest) {
   const file = formData.get('logo') as File | null
   if (!file) return NextResponse.json({ error: 'No se recibió archivo' }, { status: 400 })
 
-  const maxSize = 2 * 1024 * 1024 // 2 MB
+  const maxSize = 500 * 1024 // 500 KB — el frontend comprime a ≤150KB
   if (file.size > maxSize) {
-    return NextResponse.json({ error: 'El archivo no debe superar 2 MB' }, { status: 400 })
+    return NextResponse.json({ error: 'El logo no debe superar 500 KB. Sube una imagen más pequeña.' }, { status: 400 })
   }
 
   const ext = file.name.split('.').pop()?.toLowerCase()

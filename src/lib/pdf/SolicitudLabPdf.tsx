@@ -1,9 +1,9 @@
-import { Document, Page, View, Text, StyleSheet, Svg, Defs, LinearGradient, Stop, Rect } from '@react-pdf/renderer'
+import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer'
 import PdfHeader from './PdfHeader'
 import PdfFirma from './PdfFirma'
 import PdfWatermark from './PdfWatermark'
 import { BarraTop, BarraBottom } from './PdfBarras'
-import { baseStyles, getPdfColors } from './PdfStyles'
+import { baseStyles, getPdfColors, contrastText } from './PdfStyles'
 import type { PdfMedicoData } from './PdfStyles'
 
 export interface SolicitudLabData {
@@ -26,18 +26,9 @@ export function renderSolicitudLab(props: SolicitudLabProps) {
   return <SolicitudLabPdf {...props} />
 }
 
-/** Colores más oscuros para las barras de sección y tabla */
-function darkenHex(hex: string, amount: number): string {
-  const r = Math.max(0, parseInt(hex.slice(1, 3), 16) - amount)
-  const g = Math.max(0, parseInt(hex.slice(3, 5), 16) - amount)
-  const b = Math.max(0, parseInt(hex.slice(5, 7), 16) - amount)
-  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
-}
-
 export default function SolicitudLabPdf({ medico, data, logoUrl }: SolicitudLabProps) {
   const colors = getPdfColors(medico)
-  const darkCp = darkenHex(colors.cp, 40)
-  const darkCs = darkenHex(colors.cs, 40)
+  const cpText = contrastText(colors.cp)
 
   // Partir estudios en 2 columnas
   const mid = Math.ceil(data.estudios.length / 2)
@@ -80,16 +71,8 @@ export default function SolicitudLabPdf({ medico, data, logoUrl }: SolicitudLabP
       paddingVertical: 7,
       borderRadius: 4,
       letterSpacing: 1.5,
-      color: '#ffffff',
-      position: 'relative',
-      overflow: 'hidden',
-    },
-    tituloBg: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
+      color: cpText,
+      backgroundColor: colors.cp,
     },
 
     /* ── Datos del paciente compactos ── */
@@ -123,27 +106,19 @@ export default function SolicitudLabPdf({ medico, data, logoUrl }: SolicitudLabP
       lineHeight: 1.2,
     },
 
-    /* ── Sección heading con gradiente oscuro ── */
+    /* ── Sección heading ── */
     seccion: {
       paddingVertical: 5,
       paddingLeft: 10,
       borderLeftWidth: 3,
-      borderLeftColor: darkCp,
+      borderLeftColor: colors.cs,
       borderRadius: 3,
       marginTop: 10,
       marginBottom: 8,
-      position: 'relative',
-      overflow: 'hidden',
-    },
-    seccionBg: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
+      backgroundColor: colors.cp,
     },
     seccionText: {
-      color: '#ffffff',
+      color: cpText,
       fontSize: 11,
       fontWeight: 700,
     },
@@ -155,21 +130,13 @@ export default function SolicitudLabPdf({ medico, data, logoUrl }: SolicitudLabP
       borderTopRightRadius: 3,
       paddingVertical: 5,
       paddingHorizontal: 10,
-      position: 'relative',
-      overflow: 'hidden',
-    },
-    tableHeaderBg: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
+      backgroundColor: colors.cp,
     },
     tableHeaderNum: {
       width: 24,
       fontSize: 7.5,
       fontWeight: 700,
-      color: '#ffffff',
+      color: cpText,
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
@@ -177,7 +144,7 @@ export default function SolicitudLabPdf({ medico, data, logoUrl }: SolicitudLabP
       flex: 1,
       fontSize: 7.5,
       fontWeight: 700,
-      color: '#ffffff',
+      color: cpText,
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
@@ -197,7 +164,7 @@ export default function SolicitudLabPdf({ medico, data, logoUrl }: SolicitudLabP
       paddingHorizontal: 10,
     },
     tableRowAlt: {
-      backgroundColor: '#f8f9fa',
+      backgroundColor: colors.cs + '0D',
     },
     bulletCol: {
       width: 24,
@@ -236,15 +203,6 @@ export default function SolicitudLabPdf({ medico, data, logoUrl }: SolicitudLabP
     <View style={s.tableCol}>
       {/* Header de columna */}
       <View style={s.tableHeader}>
-        <Svg viewBox="0 0 100 20" preserveAspectRatio="none" style={s.tableHeaderBg}>
-          <Defs>
-            <LinearGradient id={`gTblLab${startIdx}`} x1="0" y1="0" x2="1" y2="0">
-              <Stop offset="0" stopColor={darkCp} stopOpacity={1} />
-              <Stop offset="1" stopColor={darkCs} stopOpacity={1} />
-            </LinearGradient>
-          </Defs>
-          <Rect x="0" y="0" width="100" height="20" fill={`url(#gTblLab${startIdx})`} />
-        </Svg>
         <Text style={s.tableHeaderNum}>#</Text>
         <Text style={s.tableHeaderText}>Estudio solicitado</Text>
       </View>
@@ -288,18 +246,7 @@ export default function SolicitudLabPdf({ medico, data, logoUrl }: SolicitudLabP
         <View style={{ flex: 1 }}>
           {/* Titulo — pegado a las líneas divisorias */}
           <View style={s.titulo}>
-            <Svg viewBox="0 0 100 30" preserveAspectRatio="none" style={s.tituloBg}>
-              <Defs>
-                <LinearGradient id="gTitLab" x1="0" y1="0" x2="1" y2="0">
-                  <Stop offset="0" stopColor={darkCp} stopOpacity={1} />
-                  <Stop offset="1" stopColor={darkCs} stopOpacity={1} />
-                </LinearGradient>
-              </Defs>
-              <Rect x="0" y="0" width="100" height="30" fill="url(#gTitLab)" />
-            </Svg>
-            <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5 }}>
-              Solicitud de Estudios de Laboratorio
-            </Text>
+            <Text>Solicitud de Estudios de Laboratorio</Text>
           </View>
 
           {/* Datos del paciente — compactos */}
@@ -320,17 +267,8 @@ export default function SolicitudLabPdf({ medico, data, logoUrl }: SolicitudLabP
             </View>
           </View>
 
-          {/* Sección "Se solicita" con gradiente oscuro */}
+          {/* Sección "Se solicita" */}
           <View style={s.seccion}>
-            <Svg viewBox="0 0 100 20" preserveAspectRatio="none" style={s.seccionBg}>
-              <Defs>
-                <LinearGradient id="gSecLab" x1="0" y1="0" x2="1" y2="0">
-                  <Stop offset="0" stopColor={darkCp} stopOpacity={1} />
-                  <Stop offset="1" stopColor={darkCs} stopOpacity={1} />
-                </LinearGradient>
-              </Defs>
-              <Rect x="0" y="0" width="100" height="20" fill="url(#gSecLab)" />
-            </Svg>
             <Text style={s.seccionText}>Se solicita:</Text>
           </View>
 
@@ -345,15 +283,6 @@ export default function SolicitudLabPdf({ medico, data, logoUrl }: SolicitudLabP
           {data.notas ? (
             <>
               <View style={s.seccion}>
-                <Svg viewBox="0 0 100 20" preserveAspectRatio="none" style={s.seccionBg}>
-                  <Defs>
-                    <LinearGradient id="gSecNot" x1="0" y1="0" x2="1" y2="0">
-                      <Stop offset="0" stopColor={darkCp} stopOpacity={1} />
-                      <Stop offset="1" stopColor={darkCs} stopOpacity={1} />
-                    </LinearGradient>
-                  </Defs>
-                  <Rect x="0" y="0" width="100" height="20" fill="url(#gSecNot)" />
-                </Svg>
                 <Text style={s.seccionText}>Indicaciones</Text>
               </View>
               <View style={s.notasBox}>

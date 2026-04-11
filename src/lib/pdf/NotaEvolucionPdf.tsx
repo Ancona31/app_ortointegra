@@ -3,7 +3,7 @@ import type { ReactElement } from 'react'
 import PdfHeader from './PdfHeader'
 import PdfFirma from './PdfFirma'
 import { BarraTop, BarraBottom } from './PdfBarras'
-import { baseStyles, getPdfColors, GradientBg } from './PdfStyles'
+import { baseStyles, getPdfColors, contrastText } from './PdfStyles'
 import type { PdfMedicoData } from './PdfStyles'
 
 /* ------------------------------------------------------------------ */
@@ -156,13 +156,12 @@ export default function NotaEvolucionPdf({ medico, data, logoUrl }: NotaEvolucio
       borderTopRightRadius: 3,
       paddingVertical: 6,
       paddingHorizontal: 8,
-      position: 'relative',
-      overflow: 'hidden',
+      backgroundColor: colors.cp,
     },
     tableHeaderCell: {
       fontSize: 8,
       fontWeight: 700,
-      color: '#ffffff',
+      color: contrastText(colors.cp),
       textTransform: 'uppercase',
       letterSpacing: 0.3,
     },
@@ -179,7 +178,7 @@ export default function NotaEvolucionPdf({ medico, data, logoUrl }: NotaEvolucio
       paddingHorizontal: 8,
       borderBottomWidth: 0.5,
       borderBottomColor: '#e5e7eb',
-      backgroundColor: '#f9fafb',
+      backgroundColor: colors.cs + '0D',
     },
     tableCell: {
       fontSize: 9.5,
@@ -285,7 +284,6 @@ export default function NotaEvolucionPdf({ medico, data, logoUrl }: NotaEvolucio
             <View style={s.tableWrap}>
               <Text style={s.tableSectionHeader}>Terap\u00E9utica</Text>
               <View style={s.tableHeaderRow}>
-                <GradientBg cp={colors.cp} cs={colors.cs} id="gTblEvo" />
                 <Text style={[s.tableHeaderCell, s.colMed]}>Medicamento</Text>
                 <Text style={[s.tableHeaderCell, s.colDosis]}>Dosis</Text>
                 <Text style={[s.tableHeaderCell, s.colFrec]}>Frecuencia</Text>

@@ -2,7 +2,7 @@ import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer'
 import PdfHeader from './PdfHeader'
 import PdfWatermark from './PdfWatermark'
 import { BarraTop, BarraBottom } from './PdfBarras'
-import { baseStyles, getPdfColors, GradientBg } from './PdfStyles'
+import { baseStyles, getPdfColors, contrastText } from './PdfStyles'
 import type { PdfMedicoData, PdfColors } from './PdfStyles'
 
 export interface SolicitudInternamientoData {
@@ -65,15 +65,14 @@ function buildStyles(colors: PdfColors) {
       marginBottom: 6,
       paddingVertical: 6,
       borderRadius: 4,
-      position: 'relative',
-      overflow: 'hidden',
       alignItems: 'center',
+      backgroundColor: colors.cp,
     },
     tituloText: {
       fontSize: 12,
       fontWeight: 700,
       textTransform: 'uppercase',
-      color: '#ffffff',
+      color: contrastText(colors.cp),
       letterSpacing: 1.5,
       textAlign: 'center',
     },
@@ -287,7 +286,6 @@ export default function SolicitudInternamientoPdf({ medico, data, logoUrl }: Sol
         <View style={{ flex: 1 }}>
         {/* Titulo */}
         <View style={s.tituloDoc}>
-          <GradientBg cp={colors.cp} cs={colors.cs} id="gTitInt" />
           <Text style={s.tituloText}>Solicitud de Internamiento Hospitalario</Text>
         </View>
 
@@ -444,7 +442,6 @@ export default function SolicitudInternamientoPdf({ medico, data, logoUrl }: Sol
 
           <View style={{ flex: 1 }}>
           <View style={s.tituloDoc}>
-            <GradientBg cp={colors.cp} cs={colors.cs} id="gTitPiso" />
             <Text style={s.tituloText}>Indicaciones de Ingreso a Piso</Text>
           </View>
           <Text style={{ fontSize: 8, color: '#666', textAlign: 'center', marginBottom: 10 }}>

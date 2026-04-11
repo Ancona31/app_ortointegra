@@ -1,8 +1,8 @@
-import { Document, Page, View, Text, Image, StyleSheet, Svg, Defs, LinearGradient, Stop, Rect } from '@react-pdf/renderer'
+import { Document, Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer'
 import PdfHeader from './PdfHeader'
 import PdfWatermark from './PdfWatermark'
 import { BarraTop, BarraBottom } from './PdfBarras'
-import { getPdfColors } from './PdfStyles'
+import { getPdfColors, contrastText } from './PdfStyles'
 import type { PdfMedicoData, PdfColors } from './PdfStyles'
 
 export interface RecetaData {
@@ -355,20 +355,12 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
       borderTopRightRadius: 3,
       paddingVertical: 3,
       paddingHorizontal: 4,
-      position: 'relative',
-      overflow: 'hidden',
-    },
-    tblHeaderBg: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
+      backgroundColor: colors.cp,
     },
     tblHeaderText: {
       fontSize: 6.5,
       fontWeight: 700,
-      color: '#ffffff',
+      color: contrastText(colors.cp),
       textTransform: 'uppercase',
       letterSpacing: 0.3,
     },
@@ -380,7 +372,7 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
       borderBottomColor: '#e5e7eb',
     },
     tblRowAlt: {
-      backgroundColor: '#f8f9fb',
+      backgroundColor: colors.cs + '0D',
     },
     colNum: {
       width: 18,
@@ -515,22 +507,22 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
             <View style={s.datoRow}>
               <View style={{ ...s.datoField, flex: 3 }}>
                 <Text style={s.datoLabel}>PACIENTE</Text>
-                <Text style={s.datoValor}>{data.paciente}</Text>
+                <Text style={s.datoValor}>{data?.paciente ?? 'Pte. no identificado'}</Text>
               </View>
               <View style={s.datoField}>
                 <Text style={s.datoLabel}>EDAD</Text>
-                <Text style={s.datoValor}>{data.edad || '\u2014'}</Text>
+                <Text style={s.datoValor}>{data?.edad ?? '\u2014'}</Text>
               </View>
               <View style={s.datoField}>
                 <Text style={s.datoLabel}>SEXO</Text>
-                <Text style={s.datoValor}>{data.sexo || '\u2014'}</Text>
+                <Text style={s.datoValor}>{data?.sexo ?? '\u2014'}</Text>
               </View>
             </View>
 
             {/* Diagnóstico (full width, prominente) */}
             <View style={s.diagField}>
               <Text style={s.diagLabel}>{`DIAGN\u00D3STICO`}</Text>
-              <Text style={s.diagValor}>{data.diagnostico || '\u2014'}</Text>
+              <Text style={s.diagValor}>{data?.diagnostico ?? '\u2014'}</Text>
             </View>
           </View>
 
@@ -542,15 +534,6 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
           {/* Tabla de medicamentos */}
           <View>
             <View style={s.tblHeader}>
-              <Svg viewBox="0 0 100 20" preserveAspectRatio="none" style={s.tblHeaderBg}>
-                <Defs>
-                  <LinearGradient id="gTbl" x1="0" y1="0" x2="1" y2="0">
-                    <Stop offset="0" stopColor={colors.cp} stopOpacity={1} />
-                    <Stop offset="1" stopColor={colors.cs} stopOpacity={1} />
-                  </LinearGradient>
-                </Defs>
-                <Rect x="0" y="0" width="100" height="20" fill="url(#gTbl)" />
-              </Svg>
               <View style={s.colNum}>
                 <Text style={s.tblHeaderText}>#</Text>
               </View>
@@ -565,7 +548,7 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
               </View>
             </View>
 
-            {data.medicamentos.map((med, idx) => (
+            {(data?.medicamentos ?? []).map((med, idx) => (
               <View
                 key={idx}
                 style={[s.tblRow, idx % 2 === 1 ? s.tblRowAlt : {}]}
@@ -575,26 +558,26 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
                   <Text style={s.numText}>{idx + 1}</Text>
                 </View>
                 <View style={s.colMed}>
-                  <Text style={s.medNombre}>{med.nombre_comercial}</Text>
-                  {med.presentacion ? (
+                  <Text style={s.medNombre}>{med?.nombre_comercial ?? ''}</Text>
+                  {med?.presentacion ? (
                     <Text style={s.medPresentacion}>{med.presentacion}</Text>
                   ) : null}
-                  {med.principio_activo ? (
+                  {med?.principio_activo ? (
                     <Text style={s.medPrincipio}>{med.principio_activo}</Text>
                   ) : null}
                 </View>
                 <View style={s.colVia}>
-                  <Text style={s.viaText}>{med.via_administracion || '\u2014'}</Text>
+                  <Text style={s.viaText}>{med?.via_administracion ?? '\u2014'}</Text>
                 </View>
                 <View style={s.colInd}>
-                  <Text style={s.indText}>{med.indicacion || '\u2014'}</Text>
+                  <Text style={s.indText}>{med?.indicacion ?? '\u2014'}</Text>
                 </View>
               </View>
             ))}
           </View>
 
           {/* Recomendaciones con sistema semántico */}
-          {data.recomendaciones ? (
+          {data?.recomendaciones ? (
             <View>
               <View style={s.seccionWrap}>
                 <Text style={s.seccionText}>Recomendaciones</Text>
@@ -610,13 +593,13 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
           {/* Footer: QR(s) izquierda + Firma derecha */}
           <View style={s.footerRow} wrap={false}>
             <View style={s.qrGroup}>
-              {data.qrDataUrl ? (
+              {data?.qrDataUrl ? (
                 <View style={s.qrWrap}>
                   <Image style={s.qrImage} src={data.qrDataUrl} />
                   <Text style={s.qrLabel}>Escanea para verificar autenticidad</Text>
                 </View>
               ) : null}
-              {data.blogQrDataUrl ? (
+              {data?.blogQrDataUrl ? (
                 <View style={s.blogQrWrap}>
                   <Image style={s.blogQrImage} src={data.blogQrDataUrl} />
                   <Text style={s.blogQrLabel}>Blog del especialista</Text>

@@ -3,7 +3,7 @@ import PdfHeader from './PdfHeader'
 import PdfFirma from './PdfFirma'
 import PdfWatermark from './PdfWatermark'
 import { BarraTop, BarraBottom } from './PdfBarras'
-import { baseStyles, getPdfColors, GradientBg } from './PdfStyles'
+import { baseStyles, getPdfColors, contrastText } from './PdfStyles'
 import type { PdfMedicoData } from './PdfStyles'
 
 export interface PlanSuplementacionData {
@@ -74,9 +74,8 @@ export default function PlanSuplementacionPdf({
       marginBottom: 16,
       paddingVertical: 9,
       borderRadius: 4,
-      position: 'relative',
-      overflow: 'hidden',
       alignItems: 'center',
+      backgroundColor: colors.cp,
     },
     /* Seccion heading */
     seccionWrap: {
@@ -103,42 +102,41 @@ export default function PlanSuplementacionPdf({
       borderTopRightRadius: 4,
       paddingVertical: 7,
       paddingHorizontal: 10,
-      position: 'relative',
-      overflow: 'hidden',
+      backgroundColor: colors.cp,
     },
     thNum: {
       width: 26,
       fontSize: 7.5,
       fontWeight: 700,
-      color: '#ffffff',
+      color: contrastText(colors.cp),
       textTransform: 'uppercase',
     },
     thNombre: {
       flex: 1,
       fontSize: 7.5,
       fontWeight: 700,
-      color: '#ffffff',
+      color: contrastText(colors.cp),
       textTransform: 'uppercase',
     },
     thDosis: {
       width: 72,
       fontSize: 7.5,
       fontWeight: 700,
-      color: '#ffffff',
+      color: contrastText(colors.cp),
       textTransform: 'uppercase',
     },
     thPresentacion: {
       width: 82,
       fontSize: 7.5,
       fontWeight: 700,
-      color: '#ffffff',
+      color: contrastText(colors.cp),
       textTransform: 'uppercase',
     },
     thIndicacion: {
       width: 150,
       fontSize: 7.5,
       fontWeight: 700,
-      color: '#ffffff',
+      color: contrastText(colors.cp),
       textTransform: 'uppercase',
     },
     /* Tabla rows */
@@ -276,8 +274,7 @@ export default function PlanSuplementacionPdf({
         <View style={{ flex: 1 }}>
           {/* Titulo */}
           <View style={s.tituloBanner}>
-            <GradientBg cp={colors.cp} cs={colors.cs} id="gTitSup" />
-            <Text style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#ffffff', letterSpacing: 1.5, textAlign: 'center' }}>
+            <Text style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: contrastText(colors.cp), letterSpacing: 1.5, textAlign: 'center' }}>
               Plan de Suplementación
             </Text>
           </View>
@@ -286,21 +283,21 @@ export default function PlanSuplementacionPdf({
           <View style={baseStyles.datoRow}>
             <View style={baseStyles.datoField}>
               <Text style={{ ...baseStyles.datoLabel, color: colors.cs }}>FECHA</Text>
-              <Text style={baseStyles.datoValor}>{data.fecha}</Text>
+              <Text style={baseStyles.datoValor}>{data?.fecha ?? ''}</Text>
             </View>
             <View style={[baseStyles.datoField, { flex: 2 }]}>
               <Text style={{ ...baseStyles.datoLabel, color: colors.cs }}>PACIENTE</Text>
-              <Text style={baseStyles.datoValor}>{data.paciente}</Text>
+              <Text style={baseStyles.datoValor}>{data?.paciente ?? 'Pte. no identificado'}</Text>
             </View>
           </View>
           <View style={baseStyles.datoRow}>
-            {data.peso ? (
+            {data?.peso ? (
               <View style={baseStyles.datoField}>
                 <Text style={{ ...baseStyles.datoLabel, color: colors.cs }}>PESO</Text>
                 <Text style={baseStyles.datoValor}>{data.peso}</Text>
               </View>
             ) : null}
-            {data.diagnostico ? (
+            {data?.diagnostico ? (
               <View style={[baseStyles.datoField, { flex: 2 }]}>
                 <Text style={{ ...baseStyles.datoLabel, color: colors.cs }}>DIAGNÓSTICO</Text>
                 <Text style={baseStyles.datoValor}>{data.diagnostico}</Text>
@@ -315,7 +312,6 @@ export default function PlanSuplementacionPdf({
 
           {/* Table header */}
           <View style={s.tableHeader}>
-            <GradientBg cp={colors.cp} cs={colors.cs} id="gTblSup" />
             <Text style={s.thNum}>#</Text>
             <Text style={s.thNombre}>Suplemento</Text>
             <Text style={s.thDosis}>Dosis</Text>
@@ -324,25 +320,25 @@ export default function PlanSuplementacionPdf({
           </View>
 
           {/* Table rows */}
-          {data.suplementos.map((sup, i) => (
+          {(data?.suplementos ?? []).map((sup, i) => (
             <View key={i} wrap={false}>
               <View
                 style={[
                   s.tableRow,
-                  { backgroundColor: i % 2 === 0 ? '#f9fafb' : '#ffffff' },
+                  { backgroundColor: i % 2 === 0 ? colors.cs + '0D' : '#ffffff' },
                 ]}
               >
                 <Text style={s.tdNum}>{i + 1}</Text>
-                <Text style={s.tdNombre}>{sup.nombre}</Text>
-                <Text style={s.tdDosis}>{sup.dosis}</Text>
-                <Text style={s.tdPresentacion}>{sup.presentacion}</Text>
-                <Text style={s.tdIndicacion}>{sup.beneficio_paciente}</Text>
+                <Text style={s.tdNombre}>{sup?.nombre ?? ''}</Text>
+                <Text style={s.tdDosis}>{sup?.dosis ?? ''}</Text>
+                <Text style={s.tdPresentacion}>{sup?.presentacion ?? ''}</Text>
+                <Text style={s.tdIndicacion}>{sup?.beneficio_paciente ?? ''}</Text>
               </View>
-              {sup.justificacion ? (
+              {sup?.justificacion ? (
                 <Text
                   style={[
                     s.justificacion,
-                    { backgroundColor: i % 2 === 0 ? '#f9fafb' : '#ffffff' },
+                    { backgroundColor: i % 2 === 0 ? colors.cs + '0D' : '#ffffff' },
                   ]}
                 >
                   {sup.justificacion}
@@ -352,7 +348,7 @@ export default function PlanSuplementacionPdf({
           ))}
 
           {/* Notas */}
-          {data.notas ? (
+          {data?.notas ? (
             <>
               <View style={s.seccionWrap}>
                 <Text style={s.seccionText}>Notas</Text>
@@ -364,7 +360,7 @@ export default function PlanSuplementacionPdf({
           ) : null}
 
           {/* Cita de control */}
-          {data.citaControl ? (
+          {data?.citaControl ? (
             <View style={s.citaBadge}>
               <Text style={s.citaLabel}>Cita de control:</Text>
               <Text style={s.citaText}>{data.citaControl}</Text>
@@ -375,7 +371,7 @@ export default function PlanSuplementacionPdf({
 
           {/* Footer: QR izquierda + Firma derecha */}
           <View style={s.footerRow}>
-            {data.blogQrDataUrl ? (
+            {data?.blogQrDataUrl ? (
               <View style={s.qrWrap}>
                 <Image style={s.qrImage} src={data.blogQrDataUrl} />
                 <Text style={s.qrCaption}>Más información</Text>

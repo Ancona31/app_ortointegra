@@ -1,5 +1,4 @@
-import { StyleSheet, Font, Svg, Defs, LinearGradient, Stop, Rect } from '@react-pdf/renderer'
-import React from 'react'
+import { StyleSheet, Font } from '@react-pdf/renderer'
 
 // Registro de fuentes: servidor usa rutas del filesystem, cliente usa URLs
 if (typeof window === 'undefined') {
@@ -50,27 +49,22 @@ export interface PdfMedicoData {
 
 export function getPdfColors(medico: PdfMedicoData | null): PdfColors {
   return {
-    cp: medico?.color_primario || '#1a3a5c',
-    cs: medico?.color_secundario || '#1e5fa8',
+    cp: medico?.color_primario ?? '#004A99',
+    cs: medico?.color_secundario ?? '#1e5fa8',
   }
 }
 
 /**
- * Fondo con degradado cp → cs para usar como background absoluto.
- * Requiere que el padre tenga `position: 'relative'` y `overflow: 'hidden'`.
+ * Retorna '#ffffff' o '#1a1a1a' según la luminosidad del color de fondo.
+ * Garantiza que el texto sea siempre legible sobre cualquier color corporativo.
  */
-export function GradientBg({ cp, cs, id }: { cp: string; cs: string; id: string }) {
-  return (
-    <Svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
-      <Defs>
-        <LinearGradient id={id} x1="0" y1="0" x2="1" y2="0">
-          <Stop offset="0" stopColor={cp} stopOpacity={1} />
-          <Stop offset="1" stopColor={cs} stopOpacity={1} />
-        </LinearGradient>
-      </Defs>
-      <Rect x="0" y="0" width="100" height="100" fill={`url(#${id})`} />
-    </Svg>
-  )
+export function contrastText(hex: string): string {
+  const clean = hex.replace('#', '')
+  const r = parseInt(clean.slice(0, 2), 16)
+  const g = parseInt(clean.slice(2, 4), 16)
+  const b = parseInt(clean.slice(4, 6), 16)
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return luminance > 0.5 ? '#1a1a1a' : '#ffffff'
 }
 
 /** Estilos base reutilizables — diseño premium clínica privada */

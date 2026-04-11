@@ -3,7 +3,7 @@ import PdfHeader from './PdfHeader'
 import PdfFirma from './PdfFirma'
 import PdfWatermark from './PdfWatermark'
 import { BarraTop, BarraBottom } from './PdfBarras'
-import { baseStyles, getPdfColors, GradientBg } from './PdfStyles'
+import { baseStyles, getPdfColors, contrastText } from './PdfStyles'
 import type { PdfMedicoData } from './PdfStyles'
 
 export interface SolicitudImagenData {
@@ -76,14 +76,13 @@ export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudI
       borderTopRightRadius: 3,
       paddingVertical: 6,
       paddingHorizontal: 10,
-      position: 'relative',
-      overflow: 'hidden',
+      backgroundColor: colors.cp,
     },
     thNum: {
       width: 26,
       fontSize: 8,
       fontWeight: 700,
-      color: '#ffffff',
+      color: contrastText(colors.cp),
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
@@ -92,7 +91,7 @@ export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudI
       paddingRight: 8,
       fontSize: 8,
       fontWeight: 700,
-      color: '#ffffff',
+      color: contrastText(colors.cp),
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
@@ -101,7 +100,7 @@ export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudI
       paddingRight: 8,
       fontSize: 8,
       fontWeight: 700,
-      color: '#ffffff',
+      color: contrastText(colors.cp),
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
@@ -111,7 +110,7 @@ export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudI
     thComplementoTitle: {
       fontSize: 8,
       fontWeight: 700,
-      color: '#ffffff',
+      color: contrastText(colors.cp),
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
@@ -127,7 +126,7 @@ export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudI
       paddingHorizontal: 10,
     },
     tableRowAlt: {
-      backgroundColor: '#f8f9fa',
+      backgroundColor: colors.cs + '0D',
     },
     tdNum: {
       width: 26,
@@ -190,9 +189,8 @@ export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudI
 
         <View style={{ flex: 1 }}>
           {/* Titulo */}
-          <View style={{ marginTop: 14, marginBottom: 16, paddingVertical: 9, borderRadius: 4, position: 'relative', overflow: 'hidden', alignItems: 'center' }}>
-            <GradientBg cp={colors.cp} cs={colors.cs} id="gTitImg" />
-            <Text style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#ffffff', letterSpacing: 1.5, textAlign: 'center' }}>
+          <View style={{ marginTop: 14, marginBottom: 16, paddingVertical: 9, borderRadius: 4, alignItems: 'center', backgroundColor: colors.cp }}>
+            <Text style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: contrastText(colors.cp), letterSpacing: 1.5, textAlign: 'center' }}>
               Solicitud de Estudios de Imagen
             </Text>
           </View>
@@ -230,7 +228,6 @@ export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudI
           {/* Tabla de estudios */}
           <View>
             <View style={s.tableHeader}>
-              <GradientBg cp={colors.cp} cs={colors.cs} id="gTblImg" />
               <Text style={s.thNum}>#</Text>
               <Text style={s.thEstudio}>Estudio</Text>
               <Text style={s.thRegion}>{`Regi\u00F3n`}</Text>

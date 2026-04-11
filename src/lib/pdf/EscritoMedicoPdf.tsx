@@ -4,7 +4,7 @@ import PdfHeader from './PdfHeader'
 import PdfFirma from './PdfFirma'
 import PdfWatermark from './PdfWatermark'
 import { BarraTop, BarraBottom } from './PdfBarras'
-import { baseStyles, getPdfColors, GradientBg } from './PdfStyles'
+import { baseStyles, getPdfColors, contrastText } from './PdfStyles'
 import type { PdfMedicoData, PdfColors } from './PdfStyles'
 
 export interface EscritoMedicoData {
@@ -322,9 +322,8 @@ export default function EscritoMedicoPdf({ medico, data, logoUrl }: EscritoMedic
 
           {/* Asunto */}
           {data.asunto ? (
-            <View style={[s.asuntoBanner, { position: 'relative', overflow: 'hidden' }]}>
-              <GradientBg cp={colors.cp} cs={colors.cs} id="gAsunto" />
-              <Text style={s.asuntoText}>{data.asunto}</Text>
+            <View style={[s.asuntoBanner, { backgroundColor: colors.cp }]}>
+              <Text style={[s.asuntoText, { color: contrastText(colors.cp) }]}>{data.asunto}</Text>
             </View>
           ) : null}
 
