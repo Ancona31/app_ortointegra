@@ -156,8 +156,11 @@ function AppMockup() {
 export default function HomePage() {
   return (
     <main className="min-h-screen relative" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', WebkitFontSmoothing: 'antialiased' }}>
-      {/* Fondo animado Neural Data Nexus — z-index: -1, detrás de todo */}
+      {/* Fondo animado Neural Data Nexus — fixed z-0, detrás del contenido */}
       <NeuralBackground />
+
+      {/* Wrapper de contenido — z-[1] para quedar sobre el canvas */}
+      <div className="relative z-[1]">
 
       {/* Nav — sticky necesita z alto para quedar sobre todo */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/60">
@@ -587,6 +590,7 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
+      </div>{/* cierre wrapper z-[1] */}
     </main>
   )
 }
