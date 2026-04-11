@@ -6,8 +6,8 @@ import { useRef, useEffect } from 'react'
    CONFIGURACIÓN — Ajusta estos valores para personalizar la animación
    ═══════════════════════════════════════════════════════════════════════ */
 
-/** Nodos por píxel² — ~80 nodos en 1920×1080. Subir = más denso */
-const NODE_DENSITY = 0.00004
+/** Nodos por píxel² — ~60 nodos en 1920×1080. Subir = más denso */
+const NODE_DENSITY = 0.00003
 
 /** Velocidad máxima base en px/frame (capa frontal). Bajar = más calma */
 const NODE_SPEED = 0.15
@@ -315,7 +315,7 @@ export default function NeuralBackground() {
         left: 0,
         width: '100%',
         height: '100%',
-        zIndex: 0,
+        zIndex: -1,
         pointerEvents: 'none',
         willChange: 'transform',
       }}
