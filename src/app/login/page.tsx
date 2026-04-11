@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Loader2, Lock, Eye, EyeOff, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
+import NeuralBackground from '@/components/ui/NeuralBackground'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -84,11 +85,12 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f0f4f8] px-4">
-      <div className="w-full max-w-sm">
+    <div className="min-h-screen flex items-center justify-center px-4">
+      <NeuralBackground />
+      <div className="w-full max-w-sm relative z-[1]">
         {/* Logo y encabezado */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-lg mb-4 overflow-hidden">
+          <div className="w-24 h-24 bg-white/50 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg mb-4 overflow-hidden border border-white/40">
             <img
               src="/logo.png"
               alt="Logo Dr. Ancona"
@@ -125,7 +127,7 @@ export default function LoginPage() {
         )}
 
         {/* Formulario */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+        <div className="bg-white/30 backdrop-blur-md rounded-2xl shadow-lg border border-white/30 p-8">
           <div className="flex items-center gap-2 mb-6">
             <Lock size={16} className="text-[#1a3a5c]" />
             <h2 className="font-semibold text-slate-700">
