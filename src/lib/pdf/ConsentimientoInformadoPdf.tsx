@@ -52,9 +52,9 @@ const SECCION_LABELS: Array<{ key: string; num: string; titulo: string }> = [
   { key: 'preoperatorio', num: '1', titulo: 'Preoperatorio' },
   { key: 'beneficios', num: '2', titulo: 'Beneficios esperados' },
   { key: 'anestesia', num: '3', titulo: 'Anestesia' },
-  { key: 'descripcion', num: '4', titulo: 'Descripci\u00F3n del procedimiento' },
+  { key: 'descripcion', num: '4', titulo: 'Descripción del procedimiento' },
   { key: 'riesgosComunes', num: '5', titulo: 'Riesgos comunes' },
-  { key: 'riesgosEspecificos', num: '6', titulo: 'Riesgos espec\u00EDficos' },
+  { key: 'riesgosEspecificos', num: '6', titulo: 'Riesgos específicos' },
   { key: 'alternativas', num: '7', titulo: 'Alternativas de tratamiento' },
 ]
 
@@ -151,7 +151,7 @@ interface CompactHeaderProps {
 }
 
 function CompactHeader({ medico, colors, logoUrl, paciente, procedimiento }: CompactHeaderProps) {
-  const nombre = medico?.nombre || 'M\u00E9dico'
+  const nombre = medico?.nombre || 'Médico'
   const cedProf = medico?.cedula_profesional || ''
   const cedEsp = medico?.cedula_especialidad || ''
 
@@ -238,7 +238,7 @@ export default function ConsentimientoInformadoPdf({
   logoUrl,
 }: ConsentimientoProps) {
   const colors = getPdfColors(medico)
-  const nombre = medico?.nombre || 'M\u00E9dico'
+  const nombre = medico?.nombre || 'Médico'
   const cedProf = medico?.cedula_profesional || ''
   const cedEsp = medico?.cedula_especialidad || ''
 
@@ -504,27 +504,27 @@ export default function ConsentimientoInformadoPdf({
         <FirmaBox
           label="Paciente"
           nombre={data?.paciente ?? ''}
-          idLabel="Identificaci\u00F3n"
+          idLabel="Identificación"
           idVal={data?.idPaciente}
           colors={colors}
         />
         <FirmaBox
-          label="M\u00E9dico Tratante"
+          label="Médico Tratante"
           nombre={nombre}
           sublabel={medico?.especialidad}
-          idLabel="C\u00E9d. Prof."
+          idLabel="Céd. Prof."
           idVal={cedProf}
           colors={colors}
         />
         <FirmaBox
           label={data?.representante ? 'Representante Legal' : 'Familiar / Responsable'}
           nombre={data?.representante ?? data?.familiar ?? ''}
-          idLabel="Identificaci\u00F3n"
+          idLabel="Identificación"
           idVal={data?.idRepresentante ?? data?.idFamiliar}
           colors={colors}
         />
         <FirmaBox
-          label="Anestesi\u00F3logo"
+          label="Anestesiólogo"
           nombre={data?.anestesiologo}
           colors={colors}
         />
@@ -544,8 +544,8 @@ export default function ConsentimientoInformadoPdf({
 
   /* ---------- Cédulas string ---------- */
   const credsStr = [
-    cedProf ? `C\u00E9d. Prof. ${cedProf}` : '',
-    cedEsp ? `C\u00E9d. Esp. ${cedEsp}` : '',
+    cedProf ? `Céd. Prof. ${cedProf}` : '',
+    cedEsp ? `Céd. Esp. ${cedEsp}` : '',
   ]
     .filter(Boolean)
     .join(', ')
@@ -554,12 +554,12 @@ export default function ConsentimientoInformadoPdf({
   const transfusionLine =
     data.autorizaTransfusion != null
       ? data.autorizaTransfusion === 'si'
-        ? 'Autorizo la transfusi\u00F3n de sangre o hemoderivados si el m\u00E9dico lo considera necesario durante el procedimiento.'
-        : 'NO autorizo la transfusi\u00F3n de sangre o hemoderivados, asumiendo los riesgos que esto implica.'
+        ? 'Autorizo la transfusión de sangre o hemoderivados si el médico lo considera necesario durante el procedimiento.'
+        : 'NO autorizo la transfusión de sangre o hemoderivados, asumiendo los riesgos que esto implica.'
       : null
 
   const fotosLine = data.autorizaFotos
-    ? 'Autorizo la toma de fotograf\u00EDas cl\u00EDnicas con fines de documentaci\u00F3n m\u00E9dica y seguimiento del tratamiento.'
+    ? 'Autorizo la toma de fotografías clínicas con fines de documentación médica y seguimiento del tratamiento.'
     : null
 
   /* ================================================================ */
@@ -594,7 +594,7 @@ export default function ConsentimientoInformadoPdf({
 
           {/* Title */}
           <View style={s.tituloWrap}>
-            <Text style={s.tituloText}>Consentimiento M\u00E9dico Informado</Text>
+            <Text style={s.tituloText}>Consentimiento Médico Informado</Text>
             <Text style={s.subtituloText}>{data?.procedimiento ?? ''}</Text>
           </View>
 
@@ -602,9 +602,9 @@ export default function ConsentimientoInformadoPdf({
           <View style={s.nomBox}>
             <Text style={s.nomText}>
               De conformidad con lo dispuesto en la Norma Oficial Mexicana NOM-004-SSA3-2012 del
-              Expediente Cl\u00EDnico, la Ley General de Salud (Art. 80 y 81), y el Reglamento de la
-              Ley General de Salud en Materia de Prestaci\u00F3n de Servicios de Atenci\u00F3n
-              M\u00E9dica (Art. 80), el presente documento tiene como finalidad informar al paciente
+              Expediente Clínico, la Ley General de Salud (Art. 80 y 81), y el Reglamento de la
+              Ley General de Salud en Materia de Prestación de Servicios de Atención
+              Médica (Art. 80), el presente documento tiene como finalidad informar al paciente
               o su representante legal sobre el procedimiento propuesto, sus riesgos, beneficios y
               alternativas, a fin de obtener su consentimiento libre, voluntario e informado.
             </Text>
@@ -613,7 +613,7 @@ export default function ConsentimientoInformadoPdf({
           {/* Datos de identificacion */}
           <View style={s.datosBox}>
             <View style={s.datosHeader}>
-              <Text style={s.datosHeaderText}>Datos de Identificaci\u00F3n</Text>
+              <Text style={s.datosHeaderText}>Datos de Identificación</Text>
             </View>
             <View style={s.datosGrid}>
               <View style={s.datosCell}>
@@ -626,7 +626,7 @@ export default function ConsentimientoInformadoPdf({
               </View>
               <View style={s.datosCell}>
                 <Text style={baseStyles.datoLabel}>NO. EXPEDIENTE</Text>
-                <Text style={baseStyles.datoValor}>{data?.expediente ?? '\u2014'}</Text>
+                <Text style={baseStyles.datoValor}>{data?.expediente ?? '—'}</Text>
               </View>
               <View style={s.datosCell}>
                 <Text style={baseStyles.datoLabel}>PACIENTE</Text>
@@ -634,19 +634,19 @@ export default function ConsentimientoInformadoPdf({
               </View>
               <View style={s.datosCell}>
                 <Text style={baseStyles.datoLabel}>EDAD</Text>
-                <Text style={baseStyles.datoValor}>{data?.edad ?? '\u2014'}</Text>
+                <Text style={baseStyles.datoValor}>{data?.edad ?? '—'}</Text>
               </View>
               <View style={s.datosCell}>
-                <Text style={baseStyles.datoLabel}>IDENTIFICACI\u00D3N PACIENTE</Text>
-                <Text style={baseStyles.datoValor}>{data?.idPaciente ?? '\u2014'}</Text>
+                <Text style={baseStyles.datoLabel}>IDENTIFICACIÓN PACIENTE</Text>
+                <Text style={baseStyles.datoValor}>{data?.idPaciente ?? '—'}</Text>
               </View>
               <View style={s.datosCellHalf}>
                 <Text style={baseStyles.datoLabel}>FAMILIAR / RESPONSABLE</Text>
                 <Text style={baseStyles.datoValor}>{data?.familiar ?? ''}</Text>
               </View>
               <View style={s.datosCellHalf}>
-                <Text style={baseStyles.datoLabel}>IDENTIFICACI\u00D3N FAMILIAR</Text>
-                <Text style={baseStyles.datoValor}>{data?.idFamiliar ?? '\u2014'}</Text>
+                <Text style={baseStyles.datoLabel}>IDENTIFICACIÓN FAMILIAR</Text>
+                <Text style={baseStyles.datoValor}>{data?.idFamiliar ?? '—'}</Text>
               </View>
               {data?.representante ? (
                 <>
@@ -655,13 +655,13 @@ export default function ConsentimientoInformadoPdf({
                     <Text style={baseStyles.datoValor}>{data.representante}</Text>
                   </View>
                   <View style={s.datosCellHalf}>
-                    <Text style={baseStyles.datoLabel}>IDENTIFICACI\u00D3N REPRESENTANTE</Text>
-                    <Text style={baseStyles.datoValor}>{data?.idRepresentante ?? '\u2014'}</Text>
+                    <Text style={baseStyles.datoLabel}>IDENTIFICACIÓN REPRESENTANTE</Text>
+                    <Text style={baseStyles.datoValor}>{data?.idRepresentante ?? '—'}</Text>
                   </View>
                 </>
               ) : null}
               <View style={s.datosCellFull}>
-                <Text style={baseStyles.datoLabel}>DIAGN\u00D3STICO</Text>
+                <Text style={baseStyles.datoLabel}>DIAGNÓSTICO</Text>
                 <Text style={baseStyles.datoValor}>{data?.diagnostico ?? ''}</Text>
               </View>
             </View>
@@ -694,7 +694,7 @@ export default function ConsentimientoInformadoPdf({
 
         <PdfWatermark logoUrl={logoUrl} />
 
-          <Text style={s.contLabel}>Continuaci{'\u00F3'}n {'\u2014'} Consentimiento M{'\u00E9'}dico Informado</Text>
+          <Text style={s.contLabel}>Continuación — Consentimiento Médico Informado</Text>
 
           {/* Sections 5-7 */}
           {seccionesP2.map((sec) => (
@@ -727,7 +727,7 @@ export default function ConsentimientoInformadoPdf({
           {/* Declaracion de Consentimiento */}
           <View style={s.declBox}>
             <View style={s.declHeader}>
-              <Text style={s.declHeaderText}>Declaraci\u00F3n de Consentimiento</Text>
+              <Text style={s.declHeaderText}>Declaración de Consentimiento</Text>
             </View>
             <View style={s.declBody}>
               <Text style={s.declText}>
@@ -740,13 +740,13 @@ export default function ConsentimientoInformadoPdf({
               </Text>
               <Text style={s.declText}>
                 He tenido la oportunidad de hacer preguntas y todas han sido respondidas a mi
-                satisfacci\u00F3n. Comprendo que ning\u00FAn procedimiento m\u00E9dico est\u00E1
+                satisfacción. Comprendo que ningún procedimiento médico está
                 libre de riesgos y que los resultados no pueden ser garantizados.
               </Text>
               <Text style={s.declText}>
                 Por lo anterior, otorgo mi consentimiento libre, voluntario e informado para la
-                realizaci\u00F3n del procedimiento descrito, as\u00ED como para los procedimientos
-                adicionales que pudieran ser necesarios durante el acto quir\u00FArgico por
+                realización del procedimiento descrito, así como para los procedimientos
+                adicionales que pudieran ser necesarios durante el acto quirúrgico por
                 hallazgos transoperatorios.
               </Text>
               {transfusionLine ? <Text style={s.authLine}>{transfusionLine}</Text> : null}
@@ -787,7 +787,7 @@ export default function ConsentimientoInformadoPdf({
             <View style={s.denegBox}>
               <View style={s.denegHeader}>
                 <Text style={s.denegHeaderText}>
-                  Denegaci\u00F3n o Revocaci\u00F3n del Consentimiento
+                  Denegación o Revocación del Consentimiento
                 </Text>
               </View>
               <View style={s.denegBody}>
@@ -800,13 +800,13 @@ export default function ConsentimientoInformadoPdf({
                 </Text>
                 <Text style={s.denegText}>
                   No obstante, en pleno uso de mis facultades y de forma libre y voluntaria,
-                  manifiesto mi decisi\u00F3n de NO autorizar / REVOCAR la autorizaci\u00F3n
-                  previamente otorgada para la realizaci\u00F3n del procedimiento descrito,
+                  manifiesto mi decisión de NO autorizar / REVOCAR la autorización
+                  previamente otorgada para la realización del procedimiento descrito,
                   asumiendo las consecuencias que de ello puedan derivarse, las cuales me han
                   sido explicadas.
                 </Text>
                 <Text style={s.denegText}>
-                  Se me ha informado que puedo cambiar de opini\u00F3n y otorgar mi
+                  Se me ha informado que puedo cambiar de opinión y otorgar mi
                   consentimiento en cualquier momento.
                 </Text>
               </View>

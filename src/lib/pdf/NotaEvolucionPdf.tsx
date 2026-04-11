@@ -258,7 +258,7 @@ export default function NotaEvolucionPdf({ medico, data, logoUrl }: NotaEvolucio
         <View style={{ flex: 1 }}>
           {/* Title */}
           <View style={s.tituloWrap}>
-            <Text style={s.tituloText}>Nota de Evoluci\u00F3n M\u00E9dica</Text>
+            <Text style={s.tituloText}>Nota de Evolución Médica</Text>
           </View>
 
           {/* Patient data */}
@@ -282,12 +282,12 @@ export default function NotaEvolucionPdf({ medico, data, logoUrl }: NotaEvolucio
           {/* Terapeutica table */}
           {data.terapeutica && data.terapeutica.length > 0 ? (
             <View style={s.tableWrap}>
-              <Text style={s.tableSectionHeader}>Terap\u00E9utica</Text>
+              <Text style={s.tableSectionHeader}>Terapéutica</Text>
               <View style={s.tableHeaderRow}>
                 <Text style={[s.tableHeaderCell, s.colMed]}>Medicamento</Text>
                 <Text style={[s.tableHeaderCell, s.colDosis]}>Dosis</Text>
                 <Text style={[s.tableHeaderCell, s.colFrec]}>Frecuencia</Text>
-                <Text style={[s.tableHeaderCell, s.colDur]}>Duraci\u00F3n</Text>
+                <Text style={[s.tableHeaderCell, s.colDur]}>Duración</Text>
               </View>
               {data.terapeutica.map((med, i) => (
                 <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>

@@ -215,7 +215,7 @@ export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudI
               <Text style={[baseStyles.datoValor, { lineHeight: 1.1 }]}>{data.paciente}</Text>
             </View>
             <View style={{ flex: 1, borderWidth: 0.75, borderColor: '#e5e7eb', borderRadius: 3, paddingHorizontal: 8, paddingTop: 0.5, paddingBottom: 1, marginBottom: 0.5 }}>
-              <Text style={[baseStyles.datoLabel, { color: colors.cp, marginBottom: 0, lineHeight: 1 }]}>DIAGN{'\u00D3'}STICO</Text>
+              <Text style={[baseStyles.datoLabel, { color: colors.cp, marginBottom: 0, lineHeight: 1 }]}>DIAGNÓSTICO</Text>
               <Text style={[baseStyles.datoValor, { lineHeight: 1.1 }]}>{data.diagnostico}</Text>
             </View>
           </View>
@@ -230,7 +230,7 @@ export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudI
             <View style={s.tableHeader}>
               <Text style={s.thNum}>#</Text>
               <Text style={s.thEstudio}>Estudio</Text>
-              <Text style={s.thRegion}>{`Regi\u00F3n`}</Text>
+              <Text style={s.thRegion}>Región</Text>
               <Text style={s.thComplementoTitle}>Complemento</Text>
             </View>
             {data.estudios.map((estudio, i) => {

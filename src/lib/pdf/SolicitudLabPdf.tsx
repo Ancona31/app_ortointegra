@@ -262,7 +262,7 @@ export default function SolicitudLabPdf({ medico, data, logoUrl }: SolicitudLabP
               <Text style={s.datoValor}>{data.paciente}</Text>
             </View>
             <View style={s.datoField}>
-              <Text style={s.datoLabel}>DIAGN{'\u00D3'}STICO</Text>
+              <Text style={s.datoLabel}>DIAGNÓSTICO</Text>
               <Text style={s.datoValor}>{data.diagnostico}</Text>
             </View>
           </View>

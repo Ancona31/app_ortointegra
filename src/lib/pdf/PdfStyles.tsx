@@ -26,6 +26,18 @@ if (typeof window === 'undefined') {
   })
 }
 
+// Desactivar hyphenation — el callback por defecto corrompe caracteres acentuados
+Font.registerHyphenationCallback(word => [word])
+
+/**
+ * Normaliza texto para PDF: aplica NFC para que los acentos sean glifos únicos
+ * y no secuencias combining (base + acento separado).
+ */
+export function t(text: string | undefined | null): string {
+  if (!text) return ''
+  return text.normalize('NFC')
+}
+
 export interface PdfColors {
   cp: string
   cs: string

@@ -511,18 +511,18 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
               </View>
               <View style={s.datoField}>
                 <Text style={s.datoLabel}>EDAD</Text>
-                <Text style={s.datoValor}>{data?.edad ?? '\u2014'}</Text>
+                <Text style={s.datoValor}>{data?.edad ?? '—'}</Text>
               </View>
               <View style={s.datoField}>
                 <Text style={s.datoLabel}>SEXO</Text>
-                <Text style={s.datoValor}>{data?.sexo ?? '\u2014'}</Text>
+                <Text style={s.datoValor}>{data?.sexo ?? '—'}</Text>
               </View>
             </View>
 
             {/* Diagnóstico (full width, prominente) */}
             <View style={s.diagField}>
-              <Text style={s.diagLabel}>{`DIAGN\u00D3STICO`}</Text>
-              <Text style={s.diagValor}>{data?.diagnostico ?? '\u2014'}</Text>
+              <Text style={s.diagLabel}>DIAGNÓSTICO</Text>
+              <Text style={s.diagValor}>{data?.diagnostico ?? '—'}</Text>
             </View>
           </View>
 
@@ -541,7 +541,7 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
                 <Text style={s.tblHeaderText}>Medicamento</Text>
               </View>
               <View style={s.colVia}>
-                <Text style={s.tblHeaderText}>{`V\u00EDa`}</Text>
+                <Text style={s.tblHeaderText}>Vía</Text>
               </View>
               <View style={s.colInd}>
                 <Text style={s.tblHeaderText}>Indicaciones</Text>
@@ -567,10 +567,10 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
                   ) : null}
                 </View>
                 <View style={s.colVia}>
-                  <Text style={s.viaText}>{med?.via_administracion ?? '\u2014'}</Text>
+                  <Text style={s.viaText}>{med?.via_administracion ?? '—'}</Text>
                 </View>
                 <View style={s.colInd}>
-                  <Text style={s.indText}>{med?.indicacion ?? '\u2014'}</Text>
+                  <Text style={s.indText}>{med?.indicacion ?? '—'}</Text>
                 </View>
               </View>
             ))}

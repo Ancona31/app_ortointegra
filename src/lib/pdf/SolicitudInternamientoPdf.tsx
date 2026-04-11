@@ -334,7 +334,7 @@ export default function SolicitudInternamientoPdf({ medico, data, logoUrl }: Sol
           ) : null}
           {data.diasEstimados ? (
             <View style={s.datoField}>
-              <Text style={[baseStyles.datoLabel, { color: colors.cp }]}>D{'\u00cd'}AS ESTIMADOS</Text>
+              <Text style={[baseStyles.datoLabel, { color: colors.cp }]}>DÍAS ESTIMADOS</Text>
               <Text style={baseStyles.datoValor}>{data.diasEstimados}</Text>
             </View>
           ) : null}
@@ -349,7 +349,7 @@ export default function SolicitudInternamientoPdf({ medico, data, logoUrl }: Sol
         {/* Diagnosticos */}
         <View>
           <View style={s.seccion}>
-            <Text style={s.seccionTitle}>Diagn{'\u00f3'}sticos</Text>
+            <Text style={s.seccionTitle}>Diagnósticos</Text>
           </View>
           <Text style={s.diagPrincipal}>{data.diagnostico}</Text>
           {data.diagnosticosSecundarios?.map((dx, i) => (
@@ -364,7 +364,7 @@ export default function SolicitudInternamientoPdf({ medico, data, logoUrl }: Sol
         {data.procedimiento ? (
           <View>
             <View style={s.seccion}>
-              <Text style={s.seccionTitle}>Procedimiento / Cirug{'\u00ed'}a</Text>
+              <Text style={s.seccionTitle}>Procedimiento / Cirugía</Text>
             </View>
             <Text style={s.justifiedText}>{data.procedimiento}</Text>
           </View>
@@ -390,7 +390,7 @@ export default function SolicitudInternamientoPdf({ medico, data, logoUrl }: Sol
         {data.justificacion ? (
           <View>
             <View style={s.seccion}>
-              <Text style={s.seccionTitle}>Justificaci{'\u00f3'}n cl{'\u00ed'}nica</Text>
+              <Text style={s.seccionTitle}>Justificación clínica</Text>
             </View>
             <Text style={s.justifiedText}>{data.justificacion}</Text>
           </View>
@@ -445,7 +445,7 @@ export default function SolicitudInternamientoPdf({ medico, data, logoUrl }: Sol
             <Text style={s.tituloText}>Indicaciones de Ingreso a Piso</Text>
           </View>
           <Text style={{ fontSize: 8, color: '#666', textAlign: 'center', marginBottom: 10 }}>
-            Para personal de enfermer{'\u00ed'}a y m{'\u00e9'}dico residente
+            Para personal de enfermería y médico residente
           </Text>
 
           <Text style={s.indicacionesContent}>{data.indicacionesPiso}</Text>

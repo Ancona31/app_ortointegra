@@ -23,6 +23,9 @@ const FONT_URLS = [
 async function registerFontsWithFallback(): Promise<void> {
   if (fontsRegistered) return
 
+  // Desactivar hyphenation — corrompe caracteres acentuados (é, ó, ñ, etc.)
+  Font.registerHyphenationCallback(word => [word])
+
   // Verificar si las fuentes están disponibles (cache o red)
   try {
     const test = await fetch(FONT_URLS[0].src, { method: 'HEAD' })
