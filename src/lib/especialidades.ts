@@ -1,4 +1,6 @@
 export const ESPECIALIDADES = [
+  'Medicina General',
+  'Medicina Familiar',
   'Medicina Interna',
   'Cardiología',
   'Neumología',
@@ -30,7 +32,7 @@ export const ESPECIALIDADES = [
   'Anestesiología',
   'Medicina de Rehabilitación',
   'Medicina de Urgencias',
-  'Medicina Crítica',
+  'Medicina del Enfermo en Estado Crítico',
   'Psiquiatría',
   'Medicina Familiar y Comunitaria',
   'Medicina del Deporte',
