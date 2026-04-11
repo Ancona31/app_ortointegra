@@ -5,6 +5,8 @@ import { useRef, useState } from 'react'
 import { Printer, Loader2, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignJustify, Minus } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { generarPdf } from '@/lib/mobileShare'
+import { enqueue } from '@/lib/offlineQueue'
+import { useToast } from '@/components/ui/Toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
@@ -34,6 +36,7 @@ const TAMANOS = [
 
 export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId }: Props) {
   const { medicoInfo } = useMedicoInfo()
+  const toast = useToast()
   const [paciente, setPaciente]       = useState(pacienteInicial)
   const [fecha, setFecha]             = useState(new Date().toISOString().split('T')[0])
   const [asunto, setAsunto]           = useState('')
@@ -62,16 +65,23 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId }: 
 
     flushSync(() => setImprimiendo(true))
     try {
+      const clientId = crypto.randomUUID()
+      const docContenido = {
+        paciente, fecha, asunto,
+        cuerpo: contenido,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      }
+
       const supabase = createClient()
-      await supabase.from('documentos').insert({
+      const { error: saveError } = await supabase.from('documentos').insert({
         ...(pacienteId ? { paciente_id: pacienteId } : {}),
         tipo: 'escrito_medico',
-        contenido: {
-          paciente, fecha, asunto,
-          cuerpo: contenido,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        },
+        contenido: docContenido,
       })
+      if (saveError) {
+        await enqueue({ client_id: clientId, paciente_id: pacienteId ?? undefined, tipo: 'escrito_medico', contenido: docContenido })
+        toast.warning('Guardado localmente — se sincronizará al reconectar.')
+      }
 
       const medicoData = medicoInfo ? { nombre: medicoInfo.nombre, especialidad: medicoInfo.especialidad, cedula_profesional: medicoInfo.cedula_profesional, cedula_especialidad: medicoInfo.cedula_especialidad, color_primario: medicoInfo.color_primario, color_secundario: medicoInfo.color_secundario, direccion_consultorio: medicoInfo.direccion_consultorio, telefono_consultorio: medicoInfo.telefono_consultorio, firma_url: medicoInfo.firma_url ?? null } : null
       const logoUrl = medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined

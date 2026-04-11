@@ -6,7 +6,7 @@ import {
   startMonitor, subscribe, type ConnectionStatus,
 } from '@/lib/connectionMonitor'
 import { getPendingNotesCount, syncPendingNotes } from '@/lib/offlineNotes'
-import { pendingCount as pendingDocCount } from '@/lib/offlineQueue'
+import { pendingCount as pendingDocCount, flush as flushDocs } from '@/lib/offlineQueue'
 import { getPendingPatientsCount, syncOfflinePatients, updateOfflineReferences } from '@/lib/offlinePatients'
 
 type BannerState = 'none' | 'offline' | 'slow' | 'restored'
@@ -14,6 +14,7 @@ type BannerState = 'none' | 'offline' | 'slow' | 'restored'
 export default function ConnectionBanner() {
   const [banner, setBanner] = useState<BannerState>('none')
   const [pendingTotal, setPendingTotal] = useState(0)
+  const [pendingDetail, setPendingDetail] = useState({ notes: 0, docs: 0, patients: 0 })
   const [syncing, setSyncing] = useState(false)
   const [prevStatus, setPrevStatus] = useState<ConnectionStatus>('online')
 
@@ -50,6 +51,7 @@ export default function ConnectionBanner() {
         getPendingPatientsCount(),
       ])
       setPendingTotal(notes + docs + patients)
+      setPendingDetail({ notes, docs, patients })
     }
     check()
     const timer = setInterval(check, 10_000)
@@ -62,7 +64,8 @@ export default function ConnectionBanner() {
       // Sync patients first to get real IDs
       const idMap = await syncOfflinePatients()
       await updateOfflineReferences(idMap)
-      await syncPendingNotes()
+      // Sync notes and documents in parallel
+      await Promise.all([syncPendingNotes(), flushDocs()])
       const [notes, docs, patients] = await Promise.all([
         getPendingNotesCount(),
         pendingDocCount(),
@@ -108,7 +111,16 @@ export default function ConnectionBanner() {
             <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-orange-500 text-white text-xs font-bold">
               {pendingTotal}
             </span>
-            {pendingTotal === 1 ? 'cambio pendiente' : 'cambios pendientes'} de sincronizar
+            {pendingTotal === 1 ? 'cambio pendiente' : 'cambios pendientes'}
+            {pendingTotal > 1 && (
+              <span className="text-orange-500 text-xs font-normal">
+                ({[
+                  pendingDetail.docs > 0 && `${pendingDetail.docs} doc`,
+                  pendingDetail.notes > 0 && `${pendingDetail.notes} nota`,
+                  pendingDetail.patients > 0 && `${pendingDetail.patients} pac`,
+                ].filter(Boolean).join(', ')})
+              </span>
+            )}
           </span>
           <button
             onClick={handleSync}

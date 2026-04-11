@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { Printer, Loader2, ChevronDown, ChevronUp, ShieldCheck } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { generarPdf } from '@/lib/mobileShare'
+import { enqueue } from '@/lib/offlineQueue'
+import { useToast } from '@/components/ui/Toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
@@ -82,6 +84,7 @@ function SeccionCard({
 
 export default function ConsentimientoInformadoForm({ pacienteInicial = '', pacienteId, diagnosticoInicial = '' }: Props) {
   const { medicoInfo } = useMedicoInfo()
+  const toast = useToast()
 
   // Campos de identificación
   const [paciente, setPaciente]               = useState(pacienteInicial)
@@ -125,23 +128,30 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
       { val: secciones.riesgosEspecificos, label: 'Riesgos específicos' },
     ].filter(c => !c.val.trim()).map(c => c.label)
     if (faltantes.length > 0) {
-      alert(`Campos obligatorios faltantes:\n• ${faltantes.join('\n• ')}`)
+      toast.error(`Campos obligatorios faltantes: ${faltantes.join(', ')}`)
       return
     }
     flushSync(() => setImprimiendo(true))
     try {
+      const clientId = crypto.randomUUID()
+      const contenido = {
+        paciente, lugar, fecha, expediente, edad, idPaciente, procedimiento, diagnostico,
+        familiar, idFamiliar, representante, idRepresentante, anestesiologo,
+        testigo1, testigo2, autorizaTransfusion, autorizaFotos,
+        secciones,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      }
+
       const supabase = createClient()
-      await supabase.from('documentos').insert({
+      const { error: saveError } = await supabase.from('documentos').insert({
         ...(pacienteId ? { paciente_id: pacienteId } : {}),
         tipo: 'consentimiento_informado',
-        contenido: {
-          paciente, lugar, fecha, expediente, edad, idPaciente, procedimiento, diagnostico,
-          familiar, idFamiliar, representante, idRepresentante, anestesiologo,
-          testigo1, testigo2, autorizaTransfusion, autorizaFotos,
-          secciones,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        },
+        contenido,
       })
+      if (saveError) {
+        await enqueue({ client_id: clientId, paciente_id: pacienteId ?? undefined, tipo: 'consentimiento_informado', contenido })
+        toast.warning('Guardado localmente — se sincronizará al reconectar.')
+      }
 
       const medicoData = medicoInfo ? {
         nombre: medicoInfo.nombre,

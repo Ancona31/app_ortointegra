@@ -33,12 +33,19 @@ async function saveQueue(queue: QueuedDocument[]): Promise<void> {
   }
 }
 
-/** Agrega un documento a la cola offline (cifrado) */
-export async function enqueue(doc: Omit<QueuedDocument, 'id' | 'created_at' | 'retries'>): Promise<void> {
+/** Agrega un documento a la cola offline (cifrado).
+ *  Acepta client_id opcional para idempotencia — si ya existe, no duplica. */
+export async function enqueue(doc: Omit<QueuedDocument, 'id' | 'created_at' | 'retries'> & { client_id?: string }): Promise<void> {
   const queue = await getQueue()
+  const clientId = doc.client_id ?? crypto.randomUUID()
+
+  // Idempotencia: no duplicar si ya existe un doc con el mismo client_id
+  if (queue.some(q => q.id === clientId)) return
+
+  const { client_id: _, ...rest } = doc
   queue.push({
-    ...doc,
-    id: crypto.randomUUID(),
+    ...rest,
+    id: clientId,
     created_at: new Date().toISOString(),
     retries: 0,
   })

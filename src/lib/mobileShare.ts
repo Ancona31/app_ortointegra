@@ -152,7 +152,13 @@ export async function generarPdf(params: {
   // Si no hay blob (offline o servidor falló), generar en el cliente
   if (!pdfBlob) {
     try {
-      const element = await buildClientElement(tipo, medico, data, logoUrl)
+      // Si está offline y el logo es URL externa, usar Base64
+      let effectiveLogoUrl = logoUrl
+      if (offline && (!logoUrl || logoUrl.startsWith('https://'))) {
+        const { LOGO_BASE64 } = await import('@/lib/pdf/logo')
+        effectiveLogoUrl = LOGO_BASE64
+      }
+      const element = await buildClientElement(tipo, medico, data, effectiveLogoUrl)
       if (element) {
         const { generatePdfClient } = await import('@/lib/pdfClientFallback')
         pdfBlob = await generatePdfClient(element)
@@ -163,8 +169,7 @@ export async function generarPdf(params: {
   }
 
   if (!pdfBlob) {
-    alert('No se pudo generar el PDF. Verifica tu conexión e intenta de nuevo.')
-    return
+    throw new Error('No se pudo generar el PDF.')
   }
 
   const isMobile =

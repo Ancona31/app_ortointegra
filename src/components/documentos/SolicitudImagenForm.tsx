@@ -5,6 +5,8 @@ import { useState } from 'react'
 import { Printer, Loader2 } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { generarPdf } from '@/lib/mobileShare'
+import { enqueue } from '@/lib/offlineQueue'
+import { useToast } from '@/components/ui/Toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
@@ -22,6 +24,7 @@ interface Props {
 
 export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId }: Props) {
   const { medicoInfo } = useMedicoInfo()
+  const toast = useToast()
   const [paciente, setPaciente] = useState(pacienteInicial)
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
@@ -37,13 +40,20 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
   async function imprimir() {
     flushSync(() => setImprimiendo(true))
     try {
+    const clientId = crypto.randomUUID()
+    const contenido = { paciente, diagnostico, estudios: estudios.filter(e => e.tipo && e.region), urgente, fecha }
+
     if (pacienteId) {
       const supabase = createClient()
-      supabase.from('documentos').insert({
+      const { error: saveError } = await supabase.from('documentos').insert({
         paciente_id: pacienteId,
         tipo: 'solicitud_imagen',
-        contenido: { paciente, diagnostico, estudios: estudios.filter(e => e.tipo && e.region), urgente, fecha },
-      }).then(({ error }: { error: { message: string } | null }) => { if (error) console.error('[DOC] Error guardando solicitud de imagen') })
+        contenido,
+      })
+      if (saveError) {
+        await enqueue({ client_id: clientId, paciente_id: pacienteId, tipo: 'solicitud_imagen', contenido })
+        toast.warning('Guardado localmente — se sincronizará al reconectar.')
+      }
     }
 
     const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })

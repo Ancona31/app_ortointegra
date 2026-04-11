@@ -6,6 +6,8 @@ import { useState, useCallback } from 'react'
 import { Printer, Loader2, RefreshCw } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { generarPdf } from '@/lib/mobileShare'
+import { enqueue } from '@/lib/offlineQueue'
+import { useToast } from '@/components/ui/Toast'
 import QRCode from 'qrcode'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -168,6 +170,7 @@ interface Props {
 export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId }: Props) {
   const { medicoInfo } = useMedicoInfo()
   const { isSuperAdmin } = useProfile()
+  const toast = useToast()
   const [paciente, setPaciente] = useState(pacienteInicial)
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
@@ -212,13 +215,20 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
   async function imprimir() {
     flushSync(() => setImprimiendo(true))
     try {
+      const clientId = crypto.randomUUID()
+      const contenido = { paciente, diagnostico, pesoKg, seleccionados, notas, seguimiento, fecha }
+
       if (pacienteId) {
         const supabase = createClient()
-        supabase.from('documentos').insert({
+        const { error: saveError } = await supabase.from('documentos').insert({
           paciente_id: pacienteId,
           tipo: 'plan_suplementacion',
-          contenido: { paciente, diagnostico, pesoKg, seleccionados, notas, seguimiento, fecha },
-        }).then(({ error }: { error: { message: string } | null }) => { if (error) console.error('[DOC] Error guardando plan de suplementación') })
+          contenido,
+        })
+        if (saveError) {
+          await enqueue({ client_id: clientId, paciente_id: pacienteId, tipo: 'plan_suplementacion', contenido })
+          toast.warning('Guardado localmente — se sincronizará al reconectar.')
+        }
       }
 
       const cp = medicoInfo?.color_primario || '#1a3a5c'

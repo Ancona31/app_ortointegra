@@ -2,8 +2,9 @@
  * Fallback: genera PDFs en el CLIENTE con @react-pdf/renderer.
  * Se usa cuando el servidor no responde en 5s.
  *
- * Las fuentes Roboto se registran por URL (no path.join)
- * y se precachean al iniciar sesión.
+ * Las fuentes Roboto se cargan en este orden:
+ * 1. URLs locales (/fonts/*.ttf) — rápido si están cacheadas por el SW
+ * 2. Base64 embebido — fallback garantizado offline (dynamic import)
  */
 'use client'
 
@@ -19,9 +20,24 @@ const FONT_URLS = [
   { src: '/fonts/Roboto-Italic.ttf', fontWeight: 400 as const, fontStyle: 'italic' as const },
 ]
 
-function registerFonts() {
+async function registerFontsWithFallback(): Promise<void> {
   if (fontsRegistered) return
-  Font.register({ family: 'Roboto', fonts: FONT_URLS })
+
+  // Verificar si las fuentes están disponibles (cache o red)
+  try {
+    const test = await fetch(FONT_URLS[0].src, { method: 'HEAD' })
+    if (test.ok) {
+      Font.register({ family: 'Roboto', fonts: FONT_URLS })
+      fontsRegistered = true
+      return
+    }
+  } catch {
+    // Fuentes no disponibles por URL — usar Base64
+  }
+
+  // Fallback: cargar fuentes Base64 con dynamic import
+  const { ROBOTO_FONTS } = await import('@/lib/pdf/fonts')
+  Font.register({ family: 'Roboto', fonts: ROBOTO_FONTS })
   fontsRegistered = true
 }
 
@@ -41,13 +57,13 @@ export async function precacheFonts(): Promise<void> {
       }
     }
   } catch {
-    // Cache API no disponible — las fuentes se cargarán por red
+    // Cache API no disponible — las fuentes se cargarán por Base64
   }
 }
 
 /** Genera un PDF blob en el cliente a partir de un componente react-pdf */
 export async function generatePdfClient(element: ReactElement<DocumentProps>): Promise<Blob> {
-  registerFonts()
+  await registerFontsWithFallback()
   const doc = pdf(element)
   return doc.toBlob()
 }

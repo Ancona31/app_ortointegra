@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { Printer, Loader2, Plus, Trash2 } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { generarPdf } from '@/lib/mobileShare'
+import { enqueue } from '@/lib/offlineQueue'
+import { useToast } from '@/components/ui/Toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
@@ -39,6 +41,7 @@ function fmt(n: number, divisa: Divisa = 'MXN'): string {
 
 export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }: Props) {
   const { medicoInfo } = useMedicoInfo()
+  const toast = useToast()
   const [tipoDoc, setTipoDoc]         = useState<TipoDoc>('honorarios')
   const [paciente, setPaciente]       = useState(pacienteInicial)
   const [fecha, setFecha]             = useState(new Date().toISOString().split('T')[0])
@@ -73,20 +76,27 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
     if (!puedeImprimir) return
     flushSync(() => setImprimiendo(true))
     try {
+      const clientId = crypto.randomUUID()
       const lineasValidas = lineas.filter(l => l.concepto.trim() !== '' && parseFloat(l.precio) > 0)
+      const contenido = {
+        paciente, fecha, folio: folioDisplay, tipo_doc: tipoDoc,
+        lineas: lineasValidas,
+        monto: total,
+        divisa,
+        forma_pago: formaPago,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      }
+
       const supabase = createClient()
-      await supabase.from('documentos').insert({
+      const { error: saveError } = await supabase.from('documentos').insert({
         ...(pacienteId ? { paciente_id: pacienteId } : {}),
         tipo: 'nota_honorarios',
-        contenido: {
-          paciente, fecha, folio: folioDisplay, tipo_doc: tipoDoc,
-          lineas: lineasValidas,
-          monto: total,
-          divisa,
-          forma_pago: formaPago,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        },
+        contenido,
       })
+      if (saveError) {
+        await enqueue({ client_id: clientId, paciente_id: pacienteId ?? undefined, tipo: 'nota_honorarios', contenido })
+        toast.warning('Guardado localmente — se sincronizará al reconectar.')
+      }
 
       const fechaFmt = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
 

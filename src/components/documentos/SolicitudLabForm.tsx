@@ -1,6 +1,8 @@
 'use client'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { generarPdf } from '@/lib/mobileShare'
+import { enqueue } from '@/lib/offlineQueue'
+import { useToast } from '@/components/ui/Toast'
 
 import { useState } from 'react'
 
@@ -32,6 +34,7 @@ interface Props {
 
 export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId }: Props) {
   const { medicoInfo } = useMedicoInfo()
+  const toast = useToast()
   const [paciente, setPaciente] = useState(pacienteInicial)
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
@@ -50,13 +53,20 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
   async function imprimir() {
     flushSync(() => setImprimiendo(true))
     try {
+    const clientId = crypto.randomUUID()
+    const contenido = { paciente, diagnostico, estudios: estudios.filter(Boolean), notas, fecha }
+
     if (pacienteId) {
       const supabase = createClient()
-      supabase.from('documentos').insert({
+      const { error: saveError } = await supabase.from('documentos').insert({
         paciente_id: pacienteId,
         tipo: 'solicitud_lab',
-        contenido: { paciente, diagnostico, estudios: estudios.filter(Boolean), notas, fecha },
-      }).then(({ error }: { error: { message: string } | null }) => { if (error) console.error('[DOC] Error guardando solicitud de laboratorio') })
+        contenido,
+      })
+      if (saveError) {
+        await enqueue({ client_id: clientId, paciente_id: pacienteId, tipo: 'solicitud_lab', contenido })
+        toast.warning('Guardado localmente — se sincronizará al reconectar.')
+      }
     }
 
     const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
