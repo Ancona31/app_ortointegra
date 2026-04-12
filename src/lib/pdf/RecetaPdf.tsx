@@ -503,7 +503,7 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
         <View style={{ flex: 1 }}>
         {/* Datos del paciente */}
         <View style={s.patientBox}>
-            {/* Row 1: Paciente + Edad + Sexo */}
+            {/* Row 1: Paciente + Edad + Sexo + Fecha */}
             <View style={s.datoRow}>
               <View style={{ ...s.datoField, flex: 3 }}>
                 <Text style={s.datoLabel}>PACIENTE</Text>
@@ -516,6 +516,10 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
               <View style={s.datoField}>
                 <Text style={s.datoLabel}>SEXO</Text>
                 <Text style={s.datoValor}>{data?.sexo ?? '—'}</Text>
+              </View>
+              <View style={{ ...s.datoField, flex: 2 }}>
+                <Text style={s.datoLabel}>FECHA</Text>
+                <Text style={{ ...s.datoValor, fontSize: 9 }}>{data?.fecha ?? '—'}</Text>
               </View>
             </View>
 
