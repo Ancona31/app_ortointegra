@@ -6,6 +6,9 @@ import { ArrowLeft, ChevronDown, Save, Hash, Mail, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { useProfile } from '@/hooks/useProfile'
 import { validarEmail, validarTelefono, formatearTelefono } from '@/lib/validaciones'
+import { createPatientOffline } from '@/lib/offlinePatients'
+import { secureStorage } from '@/lib/secureStorage'
+import { getStatus } from '@/lib/connectionMonitor'
 
 type Medico = {
   id: string
@@ -13,6 +16,8 @@ type Medico = {
   titulo: string | null
   especialidad: string | null
 }
+
+const MEDICOS_CACHE_KEY = 'cache_medicos_clinica'
 
 const inputCls = 'w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8] focus:bg-white transition-all'
 const labelCls = 'block text-xs font-medium text-[#86868b] mb-1'
@@ -30,12 +35,36 @@ export default function NuevoPacientePage() {
 
   const isSecretaria = profile?.role === 'secretaria'
 
+  // Cargar lista de médicos (secretaria) — red primero, cache como fallback
   useEffect(() => {
-    if (isSecretaria) {
-      fetch('/api/clinica/medicos')
-        .then(r => r.json())
-        .then(({ medicos }) => setMedicos(medicos || []))
+    if (!isSecretaria) return
+
+    let cancelled = false
+
+    async function cargarMedicos() {
+      // Intento online
+      try {
+        const r = await fetch('/api/clinica/medicos')
+        if (!r.ok) throw new Error('fetch failed')
+        const { medicos: lista } = await r.json() as { medicos: Medico[] }
+        if (cancelled) return
+        const rows = lista || []
+        setMedicos(rows)
+        // Cachear para futuros accesos offline
+        secureStorage.set(MEDICOS_CACHE_KEY, rows).catch(() => {})
+      } catch {
+        // Fallback offline: leer del cache
+        try {
+          const cached = await secureStorage.get<Medico[]>(MEDICOS_CACHE_KEY)
+          if (!cancelled && Array.isArray(cached)) setMedicos(cached)
+        } catch {
+          // silencioso
+        }
+      }
     }
+
+    cargarMedicos()
+    return () => { cancelled = true }
   }, [isSecretaria])
 
   function set(key: string, val: string) {
@@ -77,25 +106,60 @@ export default function NuevoPacientePage() {
     const tallaCm = parseTallaCm(form.talla_cm || '')
     const imc = calcularIMC()
 
-    const res = await fetch('/api/pacientes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...form,
-        peso_kg:  form.peso_kg  ? Math.round(parseFloat(form.peso_kg)  * 10) / 10 : null,
-        talla_cm: tallaCm,
-        imc:      imc ? parseFloat(imc) : null,
-        medico_id: isSecretaria ? medicoSeleccionado : undefined,
-        consentimiento_otorgado: true,
-      }),
-    })
+    const payload = {
+      ...form,
+      peso_kg: form.peso_kg ? Math.round(parseFloat(form.peso_kg) * 10) / 10 : null,
+      talla_cm: tallaCm,
+      imc: imc ? parseFloat(imc) : null,
+      medico_id: isSecretaria ? medicoSeleccionado : undefined,
+      consentimiento_otorgado: true,
+    }
 
-    const data = await res.json()
-    if (!res.ok) {
-      setError('Error al guardar: ' + (data.error || 'Error desconocido'))
-      setLoading(false)
-    } else {
+    // Si ya sabemos que está offline, saltar directo al offline queue
+    const offline = getStatus() === 'offline'
+    if (offline) {
+      await guardarOffline(payload)
+      return
+    }
+
+    // Intento online con try/catch
+    try {
+      const res = await fetch('/api/pacientes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError('Error al guardar: ' + (data.error || 'Error desconocido'))
+        setLoading(false)
+        return
+      }
       router.push(`/expediente/${data.id}`)
+    } catch {
+      // Red caída durante el fetch → fallback offline
+      await guardarOffline(payload)
+    }
+  }
+
+  async function guardarOffline(payload: Record<string, unknown>) {
+    try {
+      const cached = await createPatientOffline({
+        nombre: String(payload.nombre ?? ''),
+        apellidos: String(payload.apellidos ?? ''),
+        fecha_nacimiento: (payload.fecha_nacimiento as string | null) ?? null,
+        sexo: (payload.sexo as string | null) ?? null,
+        telefono: (payload.telefono as string | null) ?? null,
+        email: (payload.email as string | null) ?? null,
+        consentimiento_otorgado: true,
+        ...payload,
+      })
+      // Redirigir al expediente con el tempId — el cache ya lo tiene
+      router.push(`/expediente/${cached.id}`)
+    } catch (err) {
+      setError('No se pudo guardar localmente: ' + (err instanceof Error ? err.message : 'Error desconocido'))
+      setLoading(false)
     }
   }
 
@@ -145,6 +209,11 @@ export default function NuevoPacientePage() {
                 </option>
               ))}
             </select>
+            {medicos.length === 0 && (
+              <p className="text-[11px] text-amber-600 mt-2">
+                No hay médicos disponibles. Si estás sin conexión, conéctate al menos una vez para sincronizar la lista.
+              </p>
+            )}
           </div>
         )}
 

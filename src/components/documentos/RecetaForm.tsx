@@ -12,6 +12,7 @@ import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 import { generarPdf } from '@/lib/mobileShare'
 import { enqueue } from '@/lib/offlineQueue'
+import { getPatientOffline } from '@/lib/offlinePatients'
 import AutocompleteMedicamento from '@/components/AutocompleteMedicamento'
 import { MedicamentoDB } from '@/data/medicamentos'
 
@@ -140,17 +141,45 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 
   useEffect(() => {
     if (!pacienteId) return
-    const supabase = createClient()
-    supabase.from('pacientes').select('fecha_nacimiento, sexo').eq('id', pacienteId).single()
-      .then((res: { data: { fecha_nacimiento: string | null; sexo: string | null } | null }) => {
-        const data = res.data
-        if (data) {
-          const edad = data.fecha_nacimiento
-            ? Math.floor((Date.now() - new Date(data.fecha_nacimiento).getTime()) / (365.25 * 24 * 3600 * 1000))
-            : null
-          setPacienteData({ edad, sexo: data.sexo ?? undefined })
+
+    async function cargarDatosPaciente() {
+      // Helper: aplicar datos (edad + sexo) al state desde cualquier fuente
+      const aplicar = (fechaNac: string | null, sexo: string | null | undefined) => {
+        const edad = fechaNac
+          ? Math.floor((Date.now() - new Date(fechaNac).getTime()) / (365.25 * 24 * 3600 * 1000))
+          : null
+        setPacienteData({ edad, sexo: sexo ?? undefined })
+      }
+
+      // Fallback a cache local — se ejecuta si Supabase falla o retorna null
+      const leerDeCache = async () => {
+        try {
+          const cached = await getPatientOffline(pacienteId as string)
+          if (cached) aplicar(cached.fecha_nacimiento ?? null, cached.sexo)
+        } catch {
+          // cache vacío — no hacer nada
         }
-      }).catch(() => {})
+      }
+
+      try {
+        const supabase = createClient()
+        const res = await supabase
+          .from('pacientes')
+          .select('fecha_nacimiento, sexo')
+          .eq('id', pacienteId)
+          .single() as { data: { fecha_nacimiento: string | null; sexo: string | null } | null; error: unknown }
+
+        if (res.data) {
+          aplicar(res.data.fecha_nacimiento, res.data.sexo)
+        } else {
+          await leerDeCache()
+        }
+      } catch {
+        await leerDeCache()
+      }
+    }
+
+    cargarDatosPaciente()
   }, [pacienteId])
 
   const medInicial: MedicamentoConVia[] = medicamentosIniciales && medicamentosIniciales.length > 0

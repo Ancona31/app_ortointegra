@@ -12,8 +12,13 @@ import { useRouter } from 'next/navigation'
  * sessionStorage muere al cerrar la pestaña. Si al montar el flag NO existe
  * pero sí hay cookies de Supabase, significa que el navegador restauró cookies
  * de una sesión anterior → forzar logout.
+ *
+ * Offline: el signOut() hace un request de red que puede colgar indefinidamente.
+ * Usamos Promise.race con un timeout de 2s para evitar que la app quede atascada
+ * si el usuario reabre sin conexión.
  */
 const SESSION_FLAG = 'spinus_active'
+const SIGNOUT_TIMEOUT_MS = 2000
 
 export default function SessionGuard() {
   const router = useRouter()
@@ -29,8 +34,15 @@ export default function SessionGuard() {
     if (hasSupabaseCookies) {
       // Cookies residuales de una sesión anterior → limpiar y redirigir a login
       const supabase = createClient()
-      supabase.auth.signOut().finally(() => {
-        // Limpiar cookies manualmente por si signOut no las borra todas
+
+      // Promise.race: completa al primero que responda (signOut o timeout)
+      const signOutPromise = supabase.auth.signOut().catch(() => null)
+      const timeoutPromise = new Promise<void>(resolve =>
+        setTimeout(resolve, SIGNOUT_TIMEOUT_MS)
+      )
+
+      Promise.race([signOutPromise, timeoutPromise]).finally(() => {
+        // Limpiar cookies manualmente (garantizado incluso si signOut colgó)
         document.cookie.split(';').forEach(c => {
           const name = c.trim().split('=')[0]
           if (name.startsWith('sb-')) {

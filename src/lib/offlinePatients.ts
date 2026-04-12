@@ -104,8 +104,11 @@ export async function createPatientOffline(data: {
   nombre: string
   apellidos: string
   fecha_nacimiento?: string | null
+  sexo?: string | null
+  telefono?: string | null
   email?: string | null
   consentimiento_otorgado?: boolean
+  [key: string]: unknown
 }): Promise<CachedPatient> {
   const tempId = crypto.randomUUID()
 
@@ -114,8 +117,8 @@ export async function createPatientOffline(data: {
     nombre: data.nombre,
     apellidos: data.apellidos,
     fecha_nacimiento: data.fecha_nacimiento ?? null,
-    sexo: null,
-    telefono: null,
+    sexo: (data.sexo as string | null) ?? null,
+    telefono: (data.telefono as string | null) ?? null,
     email: data.email ?? null,
     _offline: true,
   }
