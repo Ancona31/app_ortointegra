@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-const SW_CONTENT = `const CACHE = 'spinus-v4'
+const SW_CONTENT = `const CACHE = 'spinus-v5'
 const FONT_CACHE = 'spinus-pdf-fonts-v1'
 
 const PRECACHE = [
@@ -12,10 +12,6 @@ const PRECACHE = [
   '/laboratorios',
   '/suplementacion',
   '/offline',
-  '/fonts/Roboto-Regular.ttf',
-  '/fonts/Roboto-Medium.ttf',
-  '/fonts/Roboto-Bold.ttf',
-  '/fonts/Roboto-Italic.ttf',
   '/logo.png',
   '/icon-192.png',
 ]
@@ -41,6 +37,9 @@ self.addEventListener('activate', (e) => {
 })
 
 self.addEventListener('fetch', (e) => {
+  // Guarda: solo cachear requests GET. Evita "HEAD is unsupported" en cache.put
+  if (e.request.method !== 'GET') return
+
   const url = new URL(e.request.url)
 
   // APIs y cross-origin: pass-through (nunca cachear)
