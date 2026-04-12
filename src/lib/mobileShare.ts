@@ -2,6 +2,11 @@
  * Genera PDFs 100% en el CLIENTE con @react-pdf/renderer.
  * Sin dependencia del servidor — funciona online y offline.
  *
+ * Estrategia de entrega:
+ *  - Desktop: descarga vía <a download> (sobrevive async sin popup blocker)
+ *  - Mobile:  navigator.share con File (estándar iOS/Android)
+ *  - Fallback móvil: descarga vía <a download>
+ *
  * imprimirOCompartir() — legacy: abre ventana print en desktop
  * generarPdf()         — genera PDF vía react-pdf en todas las plataformas
  */
@@ -18,6 +23,9 @@ type DocType =
   | 'escrito_medico'
   | 'consentimiento_informado'
   | 'nota_evolucion'
+
+/** Guard de concurrencia — evita ejecuciones paralelas por multi-clic */
+let isGenerating = false
 
 /** Importa dinámicamente el renderer correcto y genera el elemento react-pdf */
 async function buildClientElement(
@@ -70,17 +78,28 @@ async function buildClientElement(
   }
 }
 
+/**
+ * Descarga el blob vía elemento <a download> oculto.
+ * Este patrón es el único que sobrevive async work sin ser bloqueado
+ * por popup blockers en Mac Chrome/Safari.
+ */
 function descargarBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
   a.download = filename
+  a.style.display = 'none'
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
+  // Liberar memoria tras 1s (suficiente para que el browser procese)
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
+/**
+ * Compartir en móvil con navigator.share (iOS/Android).
+ * Fallback a descarga directa si share no está disponible o falla.
+ */
 async function compartirODescargar(blob: Blob, filename: string) {
   const file = new File([blob], filename, { type: 'application/pdf' })
 
@@ -90,16 +109,20 @@ async function compartirODescargar(blob: Blob, filename: string) {
     navigator.canShare({ files: [file] })
   ) {
     try {
+      // eslint-disable-next-line no-console
+      console.log('[generarPdf] intentando navigator.share (iOS/Android)')
       await navigator.share({ files: [file], title: filename.replace('.pdf', '') })
       return
-    } catch {
-      // NotAllowedError: user gesture lost after async work
+    } catch (err) {
+      // NotAllowedError: user gesture perdido, o AbortError: usuario canceló
+      // eslint-disable-next-line no-console
+      console.warn('[generarPdf] navigator.share falló, fallback a descarga:', err)
     }
   }
   descargarBlob(blob, filename)
 }
 
-/** Genera PDF 100% en el cliente — sin servidor, sin delay */
+/** Genera PDF 100% en el cliente — sin servidor, sin delay, sin popup blocker */
 export async function generarPdf(params: {
   tipo: string
   medico: PdfMedicoData | null
@@ -107,43 +130,77 @@ export async function generarPdf(params: {
   logoUrl?: string
   filename?: string
 }): Promise<void> {
+  // Guard de concurrencia: ignorar multi-clics
+  if (isGenerating) {
+    // eslint-disable-next-line no-console
+    console.warn('[generarPdf] ya hay una generación en curso — ignorando llamada duplicada')
+    return
+  }
+
+  isGenerating = true
   const { tipo, medico, data, logoUrl, filename } = params
   const defaultFilename = `${tipo.replace(/_/g, '-')}.pdf`
 
-  let pdfBlob: Blob | null = null
+  // Variable de fase para diagnosticar exactamente dónde falla
+  let phase = 'inicio'
 
   try {
-    // Si el logo es URL externa o no existe, usar Base64 optimizado (24KB)
+    // eslint-disable-next-line no-console
+    console.log('[generarPdf] 1/5 inicio — tipo:', tipo)
+
+    // ── Fase 1: resolver logo ──
+    phase = 'resolviendo logo'
     let effectiveLogoUrl = logoUrl
     if (!logoUrl || logoUrl.startsWith('https://')) {
       const { LOGO_BASE64 } = await import('@/lib/pdf/logo')
       effectiveLogoUrl = LOGO_BASE64
     }
 
+    // ── Fase 2: construir elemento react-pdf ──
+    phase = 'construyendo elemento react-pdf'
     const element = await buildClientElement(tipo, medico, data, effectiveLogoUrl)
-    if (element) {
-      const { generatePdfClient } = await import('@/lib/pdfClientFallback')
-      pdfBlob = await generatePdfClient(element)
+    if (!element) {
+      throw new Error(`Tipo de documento no válido: ${tipo}`)
     }
+    // eslint-disable-next-line no-console
+    console.log('[generarPdf] 2/5 elemento construido')
+
+    // ── Fase 3: renderizar a blob ──
+    phase = 'renderizando PDF'
+    const { generatePdfClient } = await import('@/lib/pdfClientFallback')
+    const rawBlob = await generatePdfClient(element)
+
+    // ── Fase 4: blindar MIME type ──
+    phase = 'blindando MIME type'
+    const pdfBlob = new Blob([rawBlob], { type: 'application/pdf' })
+    // eslint-disable-next-line no-console
+    console.log('[generarPdf] 3/5 blob generado — size:', pdfBlob.size, 'bytes, type:', pdfBlob.type)
+
+    // ── Fase 5: disparar entrega ──
+    phase = 'disparando entrega'
+    const isMobile =
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      window.innerWidth < 768
+
+    // eslint-disable-next-line no-console
+    console.log('[generarPdf] 4/5 disparando:', isMobile ? 'mobile (share)' : 'desktop (download)')
+
+    const finalName = filename ?? defaultFilename
+    if (isMobile) {
+      await compartirODescargar(pdfBlob, finalName)
+    } else {
+      descargarBlob(pdfBlob, finalName)
+    }
+
+    // eslint-disable-next-line no-console
+    console.log('[generarPdf] 5/5 completado')
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.error('[generarPdf] renderizado cliente falló:', err)
-  }
-
-  if (!pdfBlob) {
+    console.error(`[generarPdf] falló en fase "${phase}":`, err)
     throw new Error('No se pudo generar el PDF.')
-  }
-
-  const isMobile =
-    /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-    window.innerWidth < 768
-
-  if (isMobile) {
-    await compartirODescargar(pdfBlob, filename ?? defaultFilename)
-  } else {
-    const url = URL.createObjectURL(pdfBlob)
-    window.open(url, '_blank')
-    setTimeout(() => URL.revokeObjectURL(url), 60000)
+  } finally {
+    // Siempre liberar el guard, incluso en error
+    isGenerating = false
   }
 }
 
