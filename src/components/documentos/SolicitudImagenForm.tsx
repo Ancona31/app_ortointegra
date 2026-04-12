@@ -5,7 +5,8 @@ import { useState } from 'react'
 import { Printer, Loader2 } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { generarPdf } from '@/lib/mobileShare'
-import { enqueue } from '@/lib/offlineQueue'
+import { enqueueOutbox } from '@/lib/outbox-engine'
+import { getStatus } from '@/lib/connectionMonitor'
 import { useToast } from '@/components/ui/Toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -30,6 +31,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
   const [estudios, setEstudios] = useState<Estudio[]>([{ tipo: '', region: '', proyecciones: '', indicacion: '' }])
   const [urgente, setUrgente] = useState(false)
+  const [errorGuardado, setErrorGuardado] = useState('')
   const [imprimiendo, setImprimiendo] = useState(false)
 
   function addEstudio() { setEstudios([...estudios, { tipo: '', region: '', proyecciones: '', indicacion: '' }]) }
@@ -38,56 +40,128 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
   }
 
   async function imprimir() {
-    flushSync(() => setImprimiendo(true))
-    try {
-    const clientId = crypto.randomUUID()
-    const contenido = { paciente, diagnostico, estudios: estudios.filter(e => e.tipo && e.region), urgente, fecha }
+    flushSync(() => { setErrorGuardado(''); setImprimiendo(true) })
 
-    if (pacienteId) {
-      const supabase = createClient()
-      const { error: saveError } = await supabase.from('documentos').insert({
-        paciente_id: pacienteId,
-        tipo: 'solicitud_imagen',
-        contenido,
-      })
-      if (saveError) {
-        await enqueue({ client_id: clientId, paciente_id: pacienteId, tipo: 'solicitud_imagen', contenido })
-        toast.warning('Guardado localmente — se sincronizará al reconectar.')
-      }
+    // 1. Feedback instantáneo
+    toast.info('Generando solicitud de imagen...')
+
+    // 2. Identidad — UUID v4 puro (las solicitudes de imagen no tienen
+    //    verificación pública ni folio visible)
+    const clientId = crypto.randomUUID()
+    const contenido = {
+      paciente,
+      diagnostico,
+      estudios: estudios.filter(e => e.tipo && e.region),
+      urgente,
+      fecha,
     }
 
-    const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
+    // Flags de tracking para diferenciar errores
+    let pdfGenerated = false
+    let persistedHow: 'supabase' | 'outbox' | null = null
 
-    const medicoData = medicoInfo ? {
-      nombre: medicoInfo.nombre,
-      especialidad: medicoInfo.especialidad,
-      cedula_profesional: medicoInfo.cedula_profesional,
-      cedula_especialidad: medicoInfo.cedula_especialidad,
-      color_primario: medicoInfo.color_primario,
-      color_secundario: medicoInfo.color_secundario,
-      direccion_consultorio: medicoInfo.direccion_consultorio,
-      telefono_consultorio: medicoInfo.telefono_consultorio,
-      firma_url: medicoInfo.firma_url ?? null,
-    } : null
+    try {
+      // 3. PDF PRIMERO — si falla, abortamos antes de persistir
+      const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
 
-    const logoUrl = medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined
+      const medicoData = medicoInfo ? {
+        nombre: medicoInfo.nombre,
+        especialidad: medicoInfo.especialidad,
+        cedula_profesional: medicoInfo.cedula_profesional,
+        cedula_especialidad: medicoInfo.cedula_especialidad,
+        color_primario: medicoInfo.color_primario,
+        color_secundario: medicoInfo.color_secundario,
+        direccion_consultorio: medicoInfo.direccion_consultorio,
+        telefono_consultorio: medicoInfo.telefono_consultorio,
+        firma_url: medicoInfo.firma_url ?? null,
+      } : null
 
-    await generarPdf({
-      tipo: 'solicitud_imagen',
-      medico: medicoData,
-      data: {
-        paciente,
-        fecha: fechaFormat,
-        diagnostico,
-        estudios: estudios.filter(e => e.tipo && e.region),
-        urgente,
-      },
-      logoUrl,
-      filename: 'solicitud-imagenologia.pdf',
-    })
-    } catch {
-      toast.error('No se pudo generar el PDF. Intenta de nuevo.')
-    } finally { setImprimiendo(false) }
+      const logoUrl = medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined
+
+      await generarPdf({
+        tipo: 'solicitud_imagen',
+        medico: medicoData,
+        data: {
+          paciente,
+          fecha: fechaFormat,
+          diagnostico,
+          estudios: estudios.filter(e => e.tipo && e.region),
+          urgente,
+        },
+        logoUrl,
+        filename: 'solicitud-imagenologia.pdf',
+      })
+
+      pdfGenerated = true
+
+      // 4. Persistencia resiliente — bypass inteligente según estado de red
+      const browserOffline = typeof navigator !== 'undefined' && navigator.onLine === false
+      const monitorOffline = getStatus() === 'offline'
+      const isTrulyOffline = browserOffline || monitorOffline
+
+      if (!isTrulyOffline) {
+        // Intento directo a Supabase con client_id para idempotencia
+        try {
+          const supabase = createClient()
+          const insertPayload: Record<string, unknown> = {
+            tipo: 'solicitud_imagen',
+            contenido,
+            client_id: clientId,
+          }
+          if (pacienteId) insertPayload.paciente_id = pacienteId
+
+          const { error } = await supabase.from('documentos').insert(insertPayload)
+          if (error) throw error
+          persistedHow = 'supabase'
+        } catch {
+          // Red inestable, 5xx, o columna client_id sin desplegar:
+          // fallback al outbox que reintentará automáticamente.
+          await enqueueOutbox({
+            clientId,
+            action: 'INSERT',
+            resource: 'document',
+            subtype: 'solicitud_imagen',
+            payload: contenido,
+            tempRef: pacienteId || undefined,
+            endpoint: '/api/documentos',
+            method: 'POST',
+          })
+          persistedHow = 'outbox'
+        }
+      } else {
+        // Offline declarado → directo al outbox
+        await enqueueOutbox({
+          clientId,
+          action: 'INSERT',
+          resource: 'document',
+          subtype: 'solicitud_imagen',
+          payload: contenido,
+          tempRef: pacienteId || undefined,
+          endpoint: '/api/documentos',
+          method: 'POST',
+        })
+        persistedHow = 'outbox'
+      }
+
+      // 5. Feedback final diferenciado
+      if (persistedHow === 'supabase') {
+        toast.success('Solicitud guardada y sincronizada')
+      } else {
+        toast.warning('Solicitud guardada localmente — se sincronizará al reconectar')
+      }
+    } catch (err) {
+      if (!pdfGenerated) {
+        toast.error('No se pudo generar el PDF. Intenta de nuevo.')
+        setErrorGuardado('No se pudo generar el PDF. Intenta de nuevo.')
+      } else {
+        toast.error('Solicitud generada pero no se pudo guardar. Revisa errores de sincronización.')
+        setErrorGuardado('Error al guardar la solicitud.')
+      }
+      // eslint-disable-next-line no-console
+      console.error('[SolicitudImagenForm] imprimir falló:', err)
+    } finally {
+      setImprimiendo(false)
+    }
   }
 
   return (
@@ -146,6 +220,12 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
           ))}
         </div>
       </div>
+
+      {errorGuardado && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+          {errorGuardado}
+        </div>
+      )}
 
       <button onClick={imprimir} disabled={!paciente || estudios.filter(e => e.tipo && e.region).length === 0 || imprimiendo}
         className="doc-print-btn w-full flex items-center justify-center gap-2 py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-50">
