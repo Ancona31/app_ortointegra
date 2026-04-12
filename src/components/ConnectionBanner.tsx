@@ -1,13 +1,15 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { WifiOff, Wifi, AlertTriangle, RefreshCw } from 'lucide-react'
+import { WifiOff, Wifi, AlertTriangle, RefreshCw, AlertCircle } from 'lucide-react'
 import {
   startMonitor, subscribe, type ConnectionStatus,
 } from '@/lib/connectionMonitor'
 import { getPendingNotesCount, syncPendingNotes } from '@/lib/offlineNotes'
 import { pendingCount as pendingDocCount, flush as flushDocs } from '@/lib/offlineQueue'
 import { getPendingPatientsCount, syncOfflinePatients, updateOfflineReferences } from '@/lib/offlinePatients'
+import { getOutboxStats } from '@/lib/outbox-engine'
+import DeadLetterDrawer from '@/components/ui/DeadLetterDrawer'
 
 type BannerState = 'none' | 'offline' | 'slow' | 'restored'
 
@@ -17,6 +19,8 @@ export default function ConnectionBanner() {
   const [pendingDetail, setPendingDetail] = useState({ notes: 0, docs: 0, patients: 0 })
   const [syncing, setSyncing] = useState(false)
   const [prevStatus, setPrevStatus] = useState<ConnectionStatus>('online')
+  const [deadLetterCount, setDeadLetterCount] = useState(0)
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   // Monitor de conexión
   useEffect(() => {
@@ -42,7 +46,7 @@ export default function ConnectionBanner() {
     return unsub
   }, [])
 
-  // Contar pendientes cada 10s
+  // Contar pendientes + DLQ cada 10s
   useEffect(() => {
     async function check() {
       const [notes, docs, patients] = await Promise.all([
@@ -52,11 +56,36 @@ export default function ConnectionBanner() {
       ])
       setPendingTotal(notes + docs + patients)
       setPendingDetail({ notes, docs, patients })
+
+      // Contar items con error permanente en la DLQ
+      try {
+        const stats = await getOutboxStats()
+        setDeadLetterCount(stats.failed)
+      } catch {
+        setDeadLetterCount(0)
+      }
     }
     check()
     const timer = setInterval(check, 10_000)
     return () => clearInterval(timer)
   }, [])
+
+  // Prevenir pérdida de datos al cerrar tab con pendientes
+  useEffect(() => {
+    if (pendingTotal === 0) return
+
+    const handler = (e: BeforeUnloadEvent) => {
+      // El browser muestra su diálogo nativo. El mensaje custom puede ser
+      // ignorado en Chrome/Firefox modernos por seguridad, pero la alerta
+      // aparece igualmente.
+      e.preventDefault()
+      e.returnValue = `Tienes ${pendingTotal} cambio${pendingTotal > 1 ? 's' : ''} sin sincronizar. ¿Salir de todas formas?`
+      return e.returnValue
+    }
+
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [pendingTotal])
 
   const handleSync = useCallback(async () => {
     setSyncing(true)
@@ -77,8 +106,8 @@ export default function ConnectionBanner() {
     }
   }, [])
 
-  // Nada que mostrar
-  if (banner === 'none' && pendingTotal === 0) return null
+  // Nada que mostrar — mostrar si hay banner de estado, pendientes o errores en DLQ
+  if (banner === 'none' && pendingTotal === 0 && deadLetterCount === 0) return null
 
   return (
     <div className="sticky top-0 z-[60] flex flex-col">
@@ -132,6 +161,27 @@ export default function ConnectionBanner() {
           </button>
         </div>
       )}
+
+      {/* Badge de errores permanentes (DLQ) — siempre visible si hay items fallidos */}
+      {deadLetterCount > 0 && banner !== 'offline' && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center justify-center gap-3 text-sm">
+          <span className="inline-flex items-center gap-1.5 text-amber-700 font-medium">
+            <AlertCircle size={14} />
+            <span>
+              {deadLetterCount} {deadLetterCount === 1 ? 'error de sincronización' : 'errores de sincronización'}
+            </span>
+          </span>
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600 transition-colors"
+          >
+            Ver detalles
+          </button>
+        </div>
+      )}
+
+      {/* Drawer modal de Dead Letter Queue */}
+      <DeadLetterDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </div>
   )
 }

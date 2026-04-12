@@ -97,7 +97,7 @@ function readCriticalChunks(): string[] {
       return Array.from(chunks)
     }
 
-    // Walker recursivo ligero
+    // Walker recursivo ligero — acepta .js y .css
     const walk = (dir: string): string[] => {
       const results: string[] = []
       try {
@@ -106,7 +106,10 @@ function readCriticalChunks(): string[] {
           const full = path.join(dir, entry.name)
           if (entry.isDirectory()) {
             results.push(...walk(full))
-          } else if (entry.isFile() && entry.name.endsWith('.js')) {
+          } else if (
+            entry.isFile() &&
+            (entry.name.endsWith('.js') || entry.name.endsWith('.css'))
+          ) {
             results.push(full)
           }
         }
@@ -139,9 +142,38 @@ function readCriticalChunks(): string[] {
       }
     }
 
+    // Escaneo explícito de .next/static/css/ — los archivos CSS de
+    // Next.js no viven dentro de static/chunks/, están en su propio
+    // directorio. Sin precachearlos, la primera visita offline sufre FOUC.
+    try {
+      const cssDir = path.join(process.cwd(), '.next', 'static', 'css')
+      if (fs.existsSync(cssDir)) {
+        const cssFiles = fs
+          .readdirSync(cssDir)
+          .filter(f => f.endsWith('.css'))
+        for (const f of cssFiles) {
+          chunks.add('/_next/static/css/' + f)
+        }
+      }
+    } catch (cssErr) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        '[sw.js] CSS scan failed:',
+        cssErr instanceof Error ? cssErr.message : cssErr,
+      )
+    }
+
+    // Log diferenciado JS vs CSS para verificación post-build
+    const chunksArray = Array.from(chunks)
+    const jsCount = chunksArray.filter(c => c.endsWith('.js')).length
+    const cssCount = chunksArray.filter(c => c.endsWith('.css')).length
     // eslint-disable-next-line no-console
     console.log(
-      `[sw.js] Precache scan: ${routesFound}/${CRITICAL_CHUNK_PREFIXES.length} prefixes matched, ${chunks.size} chunks totales`
+      `[sw.js] Precache scan: ${routesFound}/${CRITICAL_CHUNK_PREFIXES.length} prefixes matched`
+    )
+    // eslint-disable-next-line no-console
+    console.log(
+      `[sw.js] Precache total: ${jsCount} JS + ${cssCount} CSS (${chunks.size} archivos)`
     )
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -286,7 +318,27 @@ self.addEventListener('fetch', (e) => {
         return tryFetch().catch(() =>
           new Promise(resolve => setTimeout(resolve, 100))
             .then(() => tryFetch())
-            .catch(() => new Response('', { status: 404, statusText: 'Not Found' }))
+            .catch(() => {
+              // Synthetic fallback: en lugar de un 404 que causa
+              // ChunkLoadError fatal en el Webpack runtime, devolvemos un
+              // stub JS válido que dispara el evento 'spinus:chunk-missing'
+              // para que el cliente muestre un toast amigable.
+              var missingUrl = e.request.url
+              var syntheticBody =
+                '/* Spinus: chunk no disponible offline */\\n' +
+                '(function(){try{' +
+                'if(typeof window!=="undefined"){' +
+                'window.dispatchEvent(new CustomEvent("spinus:chunk-missing",{' +
+                'detail:{url:"' + missingUrl + '"}' +
+                '}));' +
+                '}' +
+                '}catch(err){}})();' +
+                'throw new Error("[Spinus] Modulo no disponible offline");'
+              return new Response(syntheticBody, {
+                status: 200,
+                headers: { 'Content-Type': 'application/javascript; charset=utf-8' }
+              })
+            })
         )
       })
     )

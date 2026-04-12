@@ -34,6 +34,7 @@ import {
   getStorageQuota,
   type StorageQuotaReport,
 } from '@/lib/storage-vault'
+import { getOutboxStats } from '@/lib/outbox-engine'
 
 /**
  * Detecta dinámicamente el cache actual del Service Worker.
@@ -102,6 +103,8 @@ interface ChecksState {
   storageReliable: boolean | null
   /** null = verificando, reporte de cuota del origen (INFORMATIVO) */
   storageQuota: StorageQuotaReport | null
+  /** null = verificando, número de items en la Dead Letter Queue (INFORMATIVO) */
+  deadLetterCount: number | null
 }
 
 /** Umbral mínimo de chunks para considerar el sistema blindado */
@@ -133,6 +136,7 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
     chunksCached: null,
     storageReliable: null,
     storageQuota: null,
+    deadLetterCount: null,
   })
   const [refreshing, setRefreshing] = useState(false)
   const { mutate } = useSWRConfig()
@@ -249,6 +253,15 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
       storageQuota = null
     }
 
+    // ── 8. Dead Letter Queue count (INFORMATIVO — no bloquea badge) ──
+    let deadLetterCount = 0
+    try {
+      const stats = await getOutboxStats()
+      deadLetterCount = stats.failed
+    } catch {
+      deadLetterCount = 0
+    }
+
     setChecks({
       swActive,
       pdfReady,
@@ -258,6 +271,7 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
       chunksCached,
       storageReliable,
       storageQuota,
+      deadLetterCount,
     })
   }, [])
 
@@ -299,7 +313,7 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
     return (
       <div
         className={`
-          relative z-[2] rounded-2xl border p-5 h-[380px]
+          relative z-[2] rounded-2xl border p-5 h-[410px]
           backdrop-blur-md shadow-lg
           ${dark
             ? 'bg-slate-900/40 border-white/10'
@@ -470,6 +484,15 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
             label={`Espacio: ${formatBytes(checks.storageQuota.totalUsed)} / ${formatBytes(checks.storageQuota.totalQuota)} (${checks.storageQuota.percentUsed.toFixed(1)}%)`}
             dark={dark}
             trailingIcon={<HardDrive size={13} />}
+          />
+        )}
+        {/* ── Fila INFORMATIVA: DLQ count (solo si hay items fallados) ── */}
+        {checks.deadLetterCount !== null && checks.deadLetterCount > 0 && (
+          <CheckRow
+            state={false}
+            label={`${checks.deadLetterCount} item${checks.deadLetterCount > 1 ? 's' : ''} con error permanente`}
+            dark={dark}
+            trailingIcon={<AlertCircle size={13} />}
           />
         )}
         <CheckRow
