@@ -28,8 +28,23 @@ import {
 } from 'lucide-react'
 import { secureStorage } from '@/lib/secureStorage'
 
-/** Nombre del cache — debe coincidir con el del Service Worker (sw.js/route.ts) */
-const CACHE_NAME = 'spinus-v5.1'
+/**
+ * Detecta dinámicamente el cache actual del Service Worker.
+ * El nombre incluye el BUILD_ID de Vercel (ej: 'spinus-abc123def456'),
+ * así que lo buscamos por prefijo en lugar de hardcodearlo.
+ * Excluye el cache de fuentes PDF que es permanente.
+ */
+async function findSpinusCache(): Promise<string | null> {
+  try {
+    if (typeof caches === 'undefined') return null
+    const keys = await caches.keys()
+    return keys.find(k =>
+      k.startsWith('spinus-') && k !== 'spinus-pdf-fonts-v1'
+    ) ?? null
+  } catch {
+    return null
+  }
+}
 
 /** Rutas críticas que DEBEN estar precacheadas desde la primera visita.
  *  Sincronizado con PRECACHE de sw.js/route.ts */
@@ -97,13 +112,15 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
 
   /** Ejecuta los 4 chequeos en paralelo */
   const runChecks = useCallback(async () => {
-    // ── 1. Motor v5.1 — doble verificación ──
+    // Resolver el nombre del cache actual (incluye BUILD_ID del deploy)
+    const cacheName = await findSpinusCache()
+
+    // ── 1. Motor activo — controller + cache del deploy actual ──
     let swActive = false
     try {
-      if (typeof navigator !== 'undefined' && typeof caches !== 'undefined') {
+      if (typeof navigator !== 'undefined') {
         const hasController = !!navigator.serviceWorker?.controller
-        const hasCache = await caches.has(CACHE_NAME)
-        swActive = hasController && hasCache
+        swActive = hasController && cacheName !== null
       }
     } catch {
       swActive = false
@@ -141,10 +158,10 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
       total: CRITICAL_ROUTES.length,
     }
     try {
-      if (typeof caches !== 'undefined') {
-        const cache = await caches.open(CACHE_NAME)
+      if (typeof caches !== 'undefined' && cacheName) {
+        const cache = await caches.open(cacheName)
         const matches = await Promise.all(
-          CRITICAL_ROUTES.map(route => cache.match(route))
+          CRITICAL_ROUTES.map(route => cache.match(route, { ignoreSearch: true }))
         )
         routesCached = {
           ready: matches.filter(Boolean).length,
@@ -301,7 +318,7 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
       <div className="space-y-2.5">
         <CheckRow
           state={checks.swActive}
-          label="Motor v5.1 Activo"
+          label="Motor Activo"
           dark={dark}
         />
         <CheckRow

@@ -10,6 +10,12 @@ const securityHeaders = [
 ]
 
 const nextConfig: NextConfig = {
+  // Build ID único por deploy — usado por el Service Worker para nombrar
+  // el cache. Garantiza que cada deploy tenga su propio cache y elimina
+  // desajustes de hashes entre HTML cacheado y chunks físicos.
+  generateBuildId: async () => {
+    return process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) || 'dev-local'
+  },
   turbopack: {
     resolveAlias: {
       fs: { browser: './src/lib/stubs/empty.js' },

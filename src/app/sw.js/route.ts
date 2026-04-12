@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server'
 
-const SW_CONTENT = `const CACHE = 'spinus-v5.1'
+/**
+ * BUILD_ID único por deploy. Estable durante toda la vida del deploy en Vercel.
+ * Se inyecta en el template string del SW para nombrar el cache.
+ * Garantiza coherencia HTML ↔ chunks: cada deploy tiene su propio cache,
+ * el SW viejo se desactiva y su cache es borrado automáticamente en activate.
+ */
+const BUILD_ID = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) || 'dev-local'
+
+const SW_CONTENT = `const CACHE = 'spinus-${BUILD_ID}'
 const FONT_CACHE = 'spinus-pdf-fonts-v1'
 
 const PRECACHE = [
@@ -112,50 +120,26 @@ self.addEventListener('fetch', (e) => {
     return
   }
 
-  // ── NAVEGACIÓN: Stale-While-Revalidate para rutas de la app ──
+  // ── NAVEGACIÓN: Network-First con fallback a cache ──
+  // Crítico: NO usamos Stale-While-Revalidate aquí porque actualizar el HTML
+  // en background causaba desajuste con los chunks cacheados (HTML nuevo con
+  // refs a chunks que nunca se descargaron). Ahora: siempre red primero
+  // cuando hay conexión → HTML y chunks del MISMO deploy. Offline: cache
+  // que siempre corresponde al deploy que el usuario visitó online.
   if (e.request.mode === 'navigate') {
-    // Refresh manual (Ctrl+Shift+R): bypass cache, forzar red
-    const isForceRefresh = e.request.cache === 'no-cache' ||
-      (e.request.headers.get('cache-control') || '').includes('no-cache')
-
-    if (isForceRefresh) {
-      e.respondWith(
-        fetch(e.request).then(res => {
-          if (res.ok) {
-            const clone = res.clone()
-            caches.open(CACHE).then(c => c.put(e.request, clone)).catch(() => {})
-          }
-          return res
-        }).catch(() =>
-          caches.match(e.request).then(cached => cached || caches.match('/offline'))
-            .then(r => r || new Response('Offline', { status: 503 }))
-        )
-      )
-      return
-    }
-
-    // Stale-While-Revalidate: servir cache instantáneo, refrescar en background
     e.respondWith(
-      caches.match(e.request).then(cached => {
-        const fetchPromise = fetch(e.request).then(res => {
-          if (res.ok) {
-            const clone = res.clone()
-            caches.open(CACHE).then(c => c.put(e.request, clone)).catch(() => {})
-          }
-          return res
-        }).catch(() => null)
-
-        if (cached) {
-          fetchPromise
-          return cached
+      fetch(e.request).then(res => {
+        if (res.ok) {
+          const clone = res.clone()
+          caches.open(CACHE).then(c => c.put(e.request, clone)).catch(() => {})
         }
-
-        return fetchPromise.then(res => {
-          if (res) return res
-          return caches.match('/offline')
-            .then(r => r || new Response('Offline', { status: 503 }))
-        })
-      })
+        return res
+      }).catch(() =>
+        // Red caída → cache del mismo deploy (coherente con chunks cacheados)
+        caches.match(e.request, { ignoreSearch: true })
+          .then(cached => cached || caches.match('/offline'))
+          .then(r => r || new Response('Offline', { status: 503 }))
+      )
     )
     return
   }
