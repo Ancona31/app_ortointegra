@@ -87,11 +87,22 @@ export default function InicioPage() {
   useEffect(() => {
     precacheFonts()
     precachePatients()
-    // Prefetch chunks JS de rutas críticas para navegación offline
+    // Prefetch chunks JS de TODAS las rutas críticas para navegación offline
+    router.prefetch('/dashboard')
+    router.prefetch('/agenda')
+    router.prefetch('/estadisticas')
     router.prefetch('/documentos')
-    router.prefetch('/expediente/_/nueva-nota')
     router.prefetch('/pacientes')
     router.prefetch('/pacientes/nuevo')
+    router.prefetch('/expediente')
+    router.prefetch('/expediente/_')
+    router.prefetch('/expediente/_/nueva-nota')
+    router.prefetch('/expediente/_/editar')
+    router.prefetch('/expediente/_/documentos')
+    router.prefetch('/expediente/_/laboratorios/nuevo')
+    router.prefetch('/expediente/_/laboratorios/_')
+    router.prefetch('/expediente/_/consulta/_')
+    router.prefetch('/suplementacion')
     // Pre-descargar chunks de formularios de documentos
     import('@/components/documentos/RecetaForm')
     import('@/components/documentos/SolicitudLabForm')
@@ -112,8 +123,24 @@ export default function InicioPage() {
     import('@/lib/pdf/ConsentimientoInformadoPdf')
     import('@/lib/pdf/NotaEvolucionPdf')
     // Fetch páginas críticas para que el SW cache todos sus chunks
-    fetch('/documentos').catch(() => {})
-    fetch('/expediente/_/nueva-nota').catch(() => {})
+    const rutasWarmup = [
+      '/dashboard',
+      '/agenda',
+      '/estadisticas',
+      '/documentos',
+      '/pacientes',
+      '/pacientes/nuevo',
+      '/expediente',
+      '/expediente/_',
+      '/expediente/_/nueva-nota',
+      '/expediente/_/editar',
+      '/expediente/_/documentos',
+      '/expediente/_/laboratorios/nuevo',
+      '/expediente/_/laboratorios/_',
+      '/expediente/_/consulta/_',
+      '/suplementacion',
+    ]
+    rutasWarmup.forEach(r => { fetch(r).catch(() => {}) })
   }, [router])
   useEffect(() => {
     const unsub = subscribe((status) => setIsOnline(status !== 'offline'))
