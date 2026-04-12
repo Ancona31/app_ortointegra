@@ -20,6 +20,7 @@ import { useClinica } from '@/hooks/useClinica'
 import { precacheFonts } from '@/lib/pdfClientFallback'
 import { subscribe, getStatus } from '@/lib/connectionMonitor'
 import { precachePatients } from '@/lib/offlinePatients'
+import { requestPersistentStorage } from '@/lib/storage-vault'
 
 type GridMode = 'sin_pacientes' | 'nuevo' | 'activo'
 
@@ -227,6 +228,16 @@ export default function InicioPage() {
       '/suplementacion',
     ]
     rutasWarmup.forEach(r => { fetch(r).catch(() => {}) })
+
+    // Solicitar persistencia de storage al inicio de cada sesión del launcher
+    // Idempotente — si ya está granted, retorna sin acción. En Safari retorna
+    // 'unreliable' sin llamar la API real. Nunca bloquea el launcher.
+    requestPersistentStorage()
+      .then(status => {
+        // eslint-disable-next-line no-console
+        console.log('[Spinus] Persistent storage:', status)
+      })
+      .catch(() => {})
   }, [router])
   useEffect(() => {
     const unsub = subscribe((status) => setIsOnline(status !== 'offline'))

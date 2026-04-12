@@ -7,6 +7,7 @@ import PageTransition from '@/components/layout/PageTransition'
 import SessionGuard from '@/components/SessionGuard'
 import OfflineSync from '@/components/OfflineSync'
 import OfflineGate from '@/components/OfflineGate'
+import PersistenceWarning from '@/components/ui/PersistenceWarning'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -19,6 +20,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <ErrorBoundary>
                 <PageTransition>
                   <OfflineGate>
+                    <PersistenceWarning />
                     {children}
                   </OfflineGate>
                 </PageTransition>

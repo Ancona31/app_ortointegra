@@ -25,8 +25,15 @@ import {
   FileCheck,
   Users,
   FileText,
+  HardDrive,
 } from 'lucide-react'
 import { secureStorage } from '@/lib/secureStorage'
+import {
+  isStoragePersistent,
+  isPersistenceReliable,
+  getStorageQuota,
+  type StorageQuotaReport,
+} from '@/lib/storage-vault'
 
 /**
  * Detecta dinámicamente el cache actual del Service Worker.
@@ -91,10 +98,22 @@ interface ChecksState {
   routesCached: { ready: number; total: number } | null
   /** null = verificando, número = chunks JS cacheados */
   chunksCached: { ready: number; threshold: number } | null
+  /** null = verificando, true = persistente+confiable, false = volátil/unreliable (INFORMATIVO) */
+  storageReliable: boolean | null
+  /** null = verificando, reporte de cuota del origen (INFORMATIVO) */
+  storageQuota: StorageQuotaReport | null
 }
 
 /** Umbral mínimo de chunks para considerar el sistema blindado */
 const CHUNKS_THRESHOLD = 20
+
+/** Formatea bytes a string legible: 1234 → "1.2 KB" */
+function formatBytes(bytes: number): string {
+  if (!bytes || bytes <= 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB']
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`
+}
 
 interface Props {
   /** Activa paleta oscura para el launcher */
@@ -112,6 +131,8 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
     formsReady: null,
     routesCached: null,
     chunksCached: null,
+    storageReliable: null,
+    storageQuota: null,
   })
   const [refreshing, setRefreshing] = useState(false)
   const { mutate } = useSWRConfig()
@@ -215,6 +236,19 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
       chunksCached = { ready: 0, threshold: CHUNKS_THRESHOLD }
     }
 
+    // ── 7. Persistencia de storage (INFORMATIVO — no bloquea badge) ──
+    let storageReliable = false
+    let storageQuota: StorageQuotaReport | null = null
+    try {
+      const reliable = isPersistenceReliable()
+      const persistent = await isStoragePersistent()
+      storageReliable = reliable && persistent
+      storageQuota = await getStorageQuota()
+    } catch {
+      storageReliable = false
+      storageQuota = null
+    }
+
     setChecks({
       swActive,
       pdfReady,
@@ -222,6 +256,8 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
       formsReady,
       routesCached,
       chunksCached,
+      storageReliable,
+      storageQuota,
     })
   }, [])
 
@@ -263,7 +299,7 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
     return (
       <div
         className={`
-          relative z-[2] rounded-2xl border p-5 h-[300px]
+          relative z-[2] rounded-2xl border p-5 h-[380px]
           backdrop-blur-md shadow-lg
           ${dark
             ? 'bg-slate-900/40 border-white/10'
@@ -410,6 +446,32 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
           dark={dark}
           trailingIcon={<FileCheck size={13} />}
         />
+        {/* ── Fila INFORMATIVA: persistencia de storage (no bloquea badge) ── */}
+        <CheckRow
+          state={
+            checks.storageReliable === null
+              ? null
+              : checks.storageReliable
+          }
+          label={
+            checks.storageReliable === null
+              ? 'Persistencia: verificando...'
+              : checks.storageReliable
+                ? 'Almacenamiento persistente'
+                : 'Almacenamiento volátil (informativo)'
+          }
+          dark={dark}
+          trailingIcon={<Shield size={13} />}
+        />
+        {/* ── Fila INFORMATIVA: cuota de storage (solo si API disponible) ── */}
+        {checks.storageQuota && checks.storageQuota.totalQuota > 0 && (
+          <CheckRow
+            state={true}
+            label={`Espacio: ${formatBytes(checks.storageQuota.totalUsed)} / ${formatBytes(checks.storageQuota.totalQuota)} (${checks.storageQuota.percentUsed.toFixed(1)}%)`}
+            dark={dark}
+            trailingIcon={<HardDrive size={13} />}
+          />
+        )}
         <CheckRow
           state={checks.expedientesCount !== null ? true : null}
           label={
