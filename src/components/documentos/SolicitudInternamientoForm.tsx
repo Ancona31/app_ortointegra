@@ -5,7 +5,8 @@ import { useState, useCallback } from 'react'
 import { Printer, Loader2, Plus, Trash2 } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { generarPdf } from '@/lib/mobileShare'
-import { enqueue } from '@/lib/offlineQueue'
+import { enqueueOutbox } from '@/lib/outbox-engine'
+import { getStatus } from '@/lib/connectionMonitor'
 import { useToast } from '@/components/ui/Toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -64,6 +65,7 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
   )
   const [indicacionesPiso, setIndicacionesPiso] = useState('')
   const [imprimiendo, setImprimiendo] = useState(false)
+  const [errorGuardado, setErrorGuardado] = useState('')
 
   const toggleRequerimiento = useCallback((r: string) => {
     setRequerimientos(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])
@@ -78,30 +80,42 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
   }
 
   async function imprimir() {
-    flushSync(() => setImprimiendo(true))
+    flushSync(() => { setErrorGuardado(''); setImprimiendo(true) })
+
+    // 1. Feedback instantáneo
+    toast.info('Generando solicitud de internamiento...')
+
+    // 2. Identidad — UUID v4 puro como clientId
+    const clientId = crypto.randomUUID()
+
+    // 3. Contenido persistido — requerimientos y requerimientosExtra
+    //    quedan SEPARADOS (se fusionan solo para el PDF)
+    const contenido = {
+      paciente, fecha, fechaIngreso, lugar, diagnostico,
+      diagnosticosSecundarios: diagnosticosSecundarios.filter(Boolean),
+      tipoInternamiento, procedimiento, diasEstimados,
+      asa, urgente, requerimientos, requerimientosExtra, justificacion,
+      instruccionesPaciente, indicacionesPiso,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    }
+
+    // Flags de tracking para diferenciar errores
+    let pdfGenerated = false
+    let persistedHow: 'supabase' | 'outbox' | null = null
+
     try {
-      const clientId = crypto.randomUUID()
-      const contenido = {
-        paciente, fecha, fechaIngreso, lugar, diagnostico,
-        diagnosticosSecundarios: diagnosticosSecundarios.filter(Boolean),
-        tipoInternamiento, procedimiento, diasEstimados,
-        asa, urgente, requerimientos, requerimientosExtra, justificacion,
-        instruccionesPaciente, indicacionesPiso,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      }
-
-      const supabase = createClient()
-      const { error: saveError } = await supabase.from('documentos').insert({
-        ...(pacienteId ? { paciente_id: pacienteId } : {}),
-        tipo: 'solicitud_internamiento',
-        contenido,
-      })
-      if (saveError) {
-        await enqueue({ client_id: clientId, paciente_id: pacienteId ?? undefined, tipo: 'solicitud_internamiento', contenido })
-        toast.warning('Guardado localmente — se sincronizará al reconectar.')
-      }
-
-      const medicoData = medicoInfo ? { nombre: medicoInfo.nombre, especialidad: medicoInfo.especialidad, cedula_profesional: medicoInfo.cedula_profesional, cedula_especialidad: medicoInfo.cedula_especialidad, color_primario: medicoInfo.color_primario, color_secundario: medicoInfo.color_secundario, direccion_consultorio: medicoInfo.direccion_consultorio, telefono_consultorio: medicoInfo.telefono_consultorio, firma_url: medicoInfo.firma_url ?? null } : null
+      // 4. PDF PRIMERO — si falla, abortamos antes de persistir
+      const medicoData = medicoInfo ? {
+        nombre: medicoInfo.nombre,
+        especialidad: medicoInfo.especialidad,
+        cedula_profesional: medicoInfo.cedula_profesional,
+        cedula_especialidad: medicoInfo.cedula_especialidad,
+        color_primario: medicoInfo.color_primario,
+        color_secundario: medicoInfo.color_secundario,
+        direccion_consultorio: medicoInfo.direccion_consultorio,
+        telefono_consultorio: medicoInfo.telefono_consultorio,
+        firma_url: medicoInfo.firma_url ?? null,
+      } : null
       const logoUrl = medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined
       const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
       const fechaIngresoFormat = fechaIngreso ? format(new Date(fechaIngreso + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es }) : undefined
@@ -119,8 +133,74 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
         logoUrl,
         filename: 'solicitud-internamiento.pdf',
       })
-    } catch {
-      toast.error('No se pudo generar el PDF. Intenta de nuevo.')
+
+      pdfGenerated = true
+
+      // 5. Persistencia resiliente — bypass inteligente según estado de red
+      const browserOffline = typeof navigator !== 'undefined' && navigator.onLine === false
+      const monitorOffline = getStatus() === 'offline'
+      const isTrulyOffline = browserOffline || monitorOffline
+
+      if (!isTrulyOffline) {
+        // Intento directo a Supabase con client_id para idempotencia
+        try {
+          const supabase = createClient()
+          const insertPayload: Record<string, unknown> = {
+            tipo: 'solicitud_internamiento',
+            contenido,
+            client_id: clientId,
+          }
+          if (pacienteId) insertPayload.paciente_id = pacienteId
+
+          const { error } = await supabase.from('documentos').insert(insertPayload)
+          if (error) throw error
+          persistedHow = 'supabase'
+        } catch {
+          // Red inestable, 5xx, o columna client_id sin desplegar:
+          // fallback al outbox que reintentará automáticamente.
+          await enqueueOutbox({
+            clientId,
+            action: 'INSERT',
+            resource: 'document',
+            subtype: 'solicitud_internamiento',
+            payload: contenido,
+            tempRef: pacienteId || undefined,
+            endpoint: '/api/documentos',
+            method: 'POST',
+          })
+          persistedHow = 'outbox'
+        }
+      } else {
+        // Offline declarado → directo al outbox
+        await enqueueOutbox({
+          clientId,
+          action: 'INSERT',
+          resource: 'document',
+          subtype: 'solicitud_internamiento',
+          payload: contenido,
+          tempRef: pacienteId || undefined,
+          endpoint: '/api/documentos',
+          method: 'POST',
+        })
+        persistedHow = 'outbox'
+      }
+
+      // 6. Feedback final diferenciado
+      if (persistedHow === 'supabase') {
+        toast.success('Solicitud guardada y sincronizada')
+      } else {
+        toast.warning('Solicitud guardada localmente — se sincronizará al reconectar')
+      }
+    } catch (err) {
+      if (!pdfGenerated) {
+        toast.error('No se pudo generar el PDF. Intenta de nuevo.')
+        setErrorGuardado('No se pudo generar el PDF. Intenta de nuevo.')
+      } else {
+        toast.error('Solicitud generada pero no se pudo guardar. Revisa errores de sincronización.')
+        setErrorGuardado('Error al guardar la solicitud.')
+      }
+      // eslint-disable-next-line no-console
+      console.error('[SolicitudInternamientoForm] imprimir falló:', err)
     } finally {
       setImprimiendo(false)
     }
@@ -278,6 +358,12 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
           placeholder={`Ej:\n1. Dieta: Ayuno\n2. Soluciones: SSN 0.9% 1000 ml a 60 ml/hr\n3. Medicamentos: Ketorolaco 30mg IV c/8hrs, Omeprazol 40mg IV c/24hrs\n4. Monitoreo: Signos vitales c/4hrs\n5. Laboratorios de ingreso: BH, QS, TP, TTP, Grupo y Rh\n6. Posición: Semi-Fowler\n7. Actividad: Reposo relativo en cama`}
           rows={8} className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8] bg-white" />
       </div>
+
+      {errorGuardado && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+          {errorGuardado}
+        </div>
+      )}
 
       <button
         onClick={imprimir}
