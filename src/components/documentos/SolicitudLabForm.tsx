@@ -1,7 +1,8 @@
 'use client'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { generarPdf } from '@/lib/mobileShare'
-import { enqueue } from '@/lib/offlineQueue'
+import { enqueueOutbox } from '@/lib/outbox-engine'
+import { getStatus } from '@/lib/connectionMonitor'
 import { useToast } from '@/components/ui/Toast'
 
 import { useState } from 'react'
@@ -40,6 +41,7 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
   const [estudios, setEstudios] = useState<string[]>([''])
   const [notas, setNotas] = useState('')
+  const [errorGuardado, setErrorGuardado] = useState('')
   const [imprimiendo, setImprimiendo] = useState(false)
 
   function addEstudio() { setEstudios([...estudios, '']) }
@@ -51,56 +53,129 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
   }
 
   async function imprimir() {
-    flushSync(() => setImprimiendo(true))
-    try {
-    const clientId = crypto.randomUUID()
-    const contenido = { paciente, diagnostico, estudios: estudios.filter(Boolean), notas, fecha }
+    flushSync(() => { setErrorGuardado(''); setImprimiendo(true) })
 
-    if (pacienteId) {
-      const supabase = createClient()
-      const { error: saveError } = await supabase.from('documentos').insert({
-        paciente_id: pacienteId,
-        tipo: 'solicitud_lab',
-        contenido,
-      })
-      if (saveError) {
-        await enqueue({ client_id: clientId, paciente_id: pacienteId, tipo: 'solicitud_lab', contenido })
-        toast.warning('Guardado localmente — se sincronizará al reconectar.')
-      }
+    // 1. Feedback instantáneo
+    toast.info('Generando solicitud de laboratorio...')
+
+    // 2. Identidad — UUID v4 puro como clientId (las solicitudes de lab
+    //    no tienen folio público ni verificación externa, no necesitan
+    //    un identificador visible en el PDF)
+    const clientId = crypto.randomUUID()
+    const contenido = {
+      paciente,
+      diagnostico,
+      estudios: estudios.filter(Boolean),
+      notas,
+      fecha,
     }
 
-    const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
+    // Flags de tracking para diferenciar errores
+    let pdfGenerated = false
+    let persistedHow: 'supabase' | 'outbox' | null = null
 
-    const medicoData = medicoInfo ? {
-      nombre: medicoInfo.nombre,
-      especialidad: medicoInfo.especialidad,
-      cedula_profesional: medicoInfo.cedula_profesional,
-      cedula_especialidad: medicoInfo.cedula_especialidad,
-      color_primario: medicoInfo.color_primario,
-      color_secundario: medicoInfo.color_secundario,
-      direccion_consultorio: medicoInfo.direccion_consultorio,
-      telefono_consultorio: medicoInfo.telefono_consultorio,
-      firma_url: medicoInfo.firma_url ?? null,
-    } : null
+    try {
+      // 3. PDF PRIMERO — si falla, abortamos antes de persistir
+      const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
 
-    const logoUrl = medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined
+      const medicoData = medicoInfo ? {
+        nombre: medicoInfo.nombre,
+        especialidad: medicoInfo.especialidad,
+        cedula_profesional: medicoInfo.cedula_profesional,
+        cedula_especialidad: medicoInfo.cedula_especialidad,
+        color_primario: medicoInfo.color_primario,
+        color_secundario: medicoInfo.color_secundario,
+        direccion_consultorio: medicoInfo.direccion_consultorio,
+        telefono_consultorio: medicoInfo.telefono_consultorio,
+        firma_url: medicoInfo.firma_url ?? null,
+      } : null
 
-    await generarPdf({
-      tipo: 'solicitud_lab',
-      medico: medicoData,
-      data: {
-        paciente,
-        fecha: fechaFormat,
-        diagnostico,
-        estudios: estudios.filter(Boolean),
-        notas: notas || undefined,
-      },
-      logoUrl,
-      filename: 'solicitud-laboratorio.pdf',
-    })
-    } catch {
-      toast.error('No se pudo generar el PDF. Intenta de nuevo.')
-    } finally { setImprimiendo(false) }
+      const logoUrl = medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined
+
+      await generarPdf({
+        tipo: 'solicitud_lab',
+        medico: medicoData,
+        data: {
+          paciente,
+          fecha: fechaFormat,
+          diagnostico,
+          estudios: estudios.filter(Boolean),
+          notas: notas || undefined,
+        },
+        logoUrl,
+        filename: 'solicitud-laboratorio.pdf',
+      })
+
+      pdfGenerated = true
+
+      // 4. Persistencia resiliente — bypass inteligente según estado de red
+      const browserOffline = typeof navigator !== 'undefined' && navigator.onLine === false
+      const monitorOffline = getStatus() === 'offline'
+      const isTrulyOffline = browserOffline || monitorOffline
+
+      if (!isTrulyOffline) {
+        // Intento directo a Supabase con client_id para idempotencia
+        try {
+          const supabase = createClient()
+          const insertPayload: Record<string, unknown> = {
+            tipo: 'solicitud_lab',
+            contenido,
+            client_id: clientId,
+          }
+          if (pacienteId) insertPayload.paciente_id = pacienteId
+
+          const { error } = await supabase.from('documentos').insert(insertPayload)
+          if (error) throw error
+          persistedHow = 'supabase'
+        } catch {
+          // Red inestable, 5xx, o columna client_id sin desplegar:
+          // fallback al outbox que reintentará automáticamente.
+          await enqueueOutbox({
+            clientId,
+            action: 'INSERT',
+            resource: 'document',
+            subtype: 'solicitud_lab',
+            payload: contenido,
+            tempRef: pacienteId || undefined,
+            endpoint: '/api/documentos',
+            method: 'POST',
+          })
+          persistedHow = 'outbox'
+        }
+      } else {
+        // Offline declarado → directo al outbox
+        await enqueueOutbox({
+          clientId,
+          action: 'INSERT',
+          resource: 'document',
+          subtype: 'solicitud_lab',
+          payload: contenido,
+          tempRef: pacienteId || undefined,
+          endpoint: '/api/documentos',
+          method: 'POST',
+        })
+        persistedHow = 'outbox'
+      }
+
+      // 5. Feedback final diferenciado
+      if (persistedHow === 'supabase') {
+        toast.success('Solicitud guardada y sincronizada')
+      } else {
+        toast.warning('Solicitud guardada localmente — se sincronizará al reconectar')
+      }
+    } catch (err) {
+      if (!pdfGenerated) {
+        toast.error('No se pudo generar el PDF. Intenta de nuevo.')
+        setErrorGuardado('No se pudo generar el PDF. Intenta de nuevo.')
+      } else {
+        toast.error('Solicitud generada pero no se pudo guardar. Revisa errores de sincronización.')
+        setErrorGuardado('Error al guardar la solicitud.')
+      }
+      // eslint-disable-next-line no-console
+      console.error('[SolicitudLabForm] imprimir falló:', err)
+    } finally {
+      setImprimiendo(false)
+    }
   }
 
   return (
@@ -156,6 +231,12 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
         <textarea value={notas} onChange={e => setNotas(e.target.value)} placeholder="Indicaciones especiales, ayuno requerido..." rows={2}
           className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
       </div>
+
+      {errorGuardado && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+          {errorGuardado}
+        </div>
+      )}
 
       <button onClick={imprimir} disabled={!paciente || estudios.filter(Boolean).length === 0 || imprimiendo}
         className="doc-print-btn w-full flex items-center justify-center gap-2 py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-50">
