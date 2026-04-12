@@ -13,6 +13,7 @@ import Image from 'next/image'
 import ConsultaRapidaModal from '@/components/launcher/ConsultaRapidaModal'
 import OnboardingModal from '@/components/onboarding/OnboardingModal'
 import ParticleCanvas from '@/components/launcher/ParticleCanvas'
+import OfflineReadinessPanel from '@/components/ui/OfflineReadinessPanel'
 import { useTheme } from '@/components/launcher/ThemeContext'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useClinica } from '@/hooks/useClinica'
@@ -238,6 +239,11 @@ export default function InicioPage() {
               <UserCircle size={18} />
             </Link>
           </div>
+        </div>
+
+        {/* Offline readiness panel — estado del sistema */}
+        <div className="mx-6 mt-3">
+          <OfflineReadinessPanel dark={dark} />
         </div>
 
         {/* Profile completion banner */}
