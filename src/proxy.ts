@@ -1,7 +1,35 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// ════════════════════════════════════════════════════════════════════
+// HARD-EXCLUSION PWA — NUNCA autenticar estos recursos
+// ════════════════════════════════════════════════════════════════════
+// Defensa en profundidad: aunque el matcher del `config` (abajo) excluya
+// estos paths, en Next.js 16 con Route Handlers el matcher regex con
+// lookahead negativo puede fallar silenciosamente y dejar pasar /sw.js
+// por el flujo de auth, emitiendo un 302 → /login al primer visitante
+// sin sesión. El browser rechaza el registro del Service Worker con
+// "SecurityError: The script resource is behind a redirect".
+//
+// Este early-return garantiza que esos recursos nunca lleguen al auth
+// check. Cero redirects posibles, independiente del matcher.
+const PWA_PUBLIC_ASSETS = new Set([
+  '/sw.js',
+  '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/apple-touch-icon.png',
+  '/offline',  // fallback del SW — debe ser accesible sin sesión
+])
+
 export async function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
+
+  // Bypass inmediato para recursos críticos de la PWA
+  if (PWA_PUBLIC_ASSETS.has(pathname)) {
+    return NextResponse.next({ request })
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -25,7 +53,6 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const pathname = request.nextUrl.pathname
   const isLoginPage = pathname === '/login'
   const isPublicPage = ['/', '/forgot-password', '/reset-password', '/auth/confirm', '/auth/callback', '/auth/confirm-email', '/pricing', '/register', '/privacy', '/terms', '/offline'].includes(pathname)
     || pathname.startsWith('/r/')

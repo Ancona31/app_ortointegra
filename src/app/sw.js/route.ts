@@ -399,9 +399,15 @@ self.addEventListener('fetch', (e) => {
 export async function GET() {
   return new NextResponse(SW_CONTENT, {
     headers: {
-      'Content-Type': 'application/javascript',
+      // Trifecta anti-caché: asegura que Vercel CDN, edge caches y
+      // browsers viejos sirvan siempre la versión fresca del SW.
+      // Un SW cacheado con redirect viejo es la causa raíz de los
+      // SecurityError que vimos en Sentry.
+      'Content-Type': 'application/javascript; charset=utf-8',
       'Service-Worker-Allowed': '/',
-      'Cache-Control': 'no-cache',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
     },
   })
 }
