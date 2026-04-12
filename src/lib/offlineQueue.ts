@@ -1,119 +1,54 @@
 /**
- * Cola offline para documentos médicos.
- * Los datos se cifran en localStorage vía secureStorage (AES-256-GCM).
- * LFPDPPP Art. 19: protección de datos personales sensibles en reposo.
+ * offlineQueue.ts — Facade backward-compatible.
+ *
+ * Las funciones exportadas por este módulo mantienen la misma API que
+ * tenían antes del refactor del Commit 3, pero internamente delegan al
+ * outbox-engine unificado. Esto evita tocar los 8 formularios y los
+ * componentes que lo consumen (ConnectionBanner, OfflineSync, nueva-nota).
+ *
+ * LFPDPPP Art. 19: datos cifrados vía secureStorage (AES-256-GCM) —
+ * gestionado por outbox-engine.
  */
 
-import { createClient } from '@/lib/supabase/client'
-import { secureStorage } from '@/lib/secureStorage'
-import { isOnline } from '@/lib/connectionMonitor'
+import {
+  enqueueOutbox,
+  flushOutbox,
+  getOutboxStats,
+  startAutoSync as engineStartAutoSync,
+} from './outbox-engine'
 
-const QUEUE_KEY = 'offline_queue'
-
-type QueuedDocument = {
-  id: string
+/** Agrega un documento a la cola offline. Idempotente vía client_id. */
+export async function enqueue(doc: {
+  client_id?: string
   paciente_id?: string
   tipo: string
   contenido: Record<string, unknown>
-  created_at: string
-  retries: number
-}
-
-async function getQueue(): Promise<QueuedDocument[]> {
-  if (typeof window === 'undefined') return []
-  const data = await secureStorage.get<QueuedDocument[]>(QUEUE_KEY)
-  return data ?? []
-}
-
-async function saveQueue(queue: QueuedDocument[]): Promise<void> {
-  if (queue.length === 0) {
-    secureStorage.remove(QUEUE_KEY)
-  } else {
-    await secureStorage.set(QUEUE_KEY, queue)
-  }
-}
-
-/** Agrega un documento a la cola offline (cifrado).
- *  Acepta client_id opcional para idempotencia — si ya existe, no duplica. */
-export async function enqueue(doc: Omit<QueuedDocument, 'id' | 'created_at' | 'retries'> & { client_id?: string }): Promise<void> {
-  const queue = await getQueue()
+}): Promise<void> {
   const clientId = doc.client_id ?? crypto.randomUUID()
-
-  // Idempotencia: no duplicar si ya existe un doc con el mismo client_id
-  if (queue.some(q => q.id === clientId)) return
-
-  const { client_id: _, ...rest } = doc
-  queue.push({
-    ...rest,
-    id: clientId,
-    created_at: new Date().toISOString(),
-    retries: 0,
+  await enqueueOutbox({
+    clientId,
+    action: 'INSERT',
+    resource: 'document',
+    subtype: doc.tipo,
+    payload: doc.contenido,
+    tempRef: doc.paciente_id,
+    endpoint: '/api/documentos',
+    method: 'POST',
   })
-  await saveQueue(queue)
 }
 
-/** Devuelve la cantidad de documentos pendientes */
+/** Cantidad de documentos pendientes en la outbox */
 export async function pendingCount(): Promise<number> {
-  const queue = await getQueue()
-  return queue.length
+  const stats = await getOutboxStats()
+  return stats.byResource.document
 }
 
 /** Intenta enviar todos los documentos pendientes a Supabase */
 export async function flush(): Promise<{ sent: number; failed: number }> {
-  const queue = await getQueue()
-  if (queue.length === 0) return { sent: 0, failed: 0 }
-
-  const supabase = createClient()
-  let sent = 0
-  const remaining: QueuedDocument[] = []
-
-  for (const doc of queue) {
-    const { error } = await supabase.from('documentos').insert({
-      ...(doc.paciente_id ? { paciente_id: doc.paciente_id } : {}),
-      tipo: doc.tipo,
-      contenido: doc.contenido,
-    })
-
-    if (error) {
-      // Si falló más de 5 veces, descartarlo para no acumular basura
-      if (doc.retries < 5) {
-        remaining.push({ ...doc, retries: doc.retries + 1 })
-      }
-    } else {
-      sent++
-    }
-  }
-
-  // Limpiar datos inmediatamente después de enviar exitosamente
-  await saveQueue(remaining)
-  return { sent, failed: remaining.length }
+  const result = await flushOutbox()
+  // El facade no distingue entre retrying y dead — retorna dead como failed
+  return { sent: result.synced, failed: result.dead }
 }
 
 /** Inicia el proceso de sincronización automática */
-export function startAutoSync(intervalMs = 30_000) {
-  if (typeof window === 'undefined') return
-
-  // Limpiar datos expirados al iniciar
-  secureStorage.cleanup()
-
-  // Intentar flush inmediato al iniciar
-  flush()
-
-  // Flush periódico — usa connectionMonitor para estado real
-  const timer = setInterval(async () => {
-    if (isOnline() && (await pendingCount()) > 0) {
-      flush()
-    }
-  }, intervalMs)
-
-  // Flush cuando vuelve la conexión
-  function onOnline() {
-    pendingCount().then(count => { if (count > 0) flush() })
-  }
-  window.addEventListener('online', onOnline)
-
-  return () => {
-    clearInterval(timer)
-    window.removeEventListener('online', onOnline)
-  }
-}
+export const startAutoSync = engineStartAutoSync

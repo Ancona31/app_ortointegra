@@ -1,14 +1,19 @@
 /**
- * Cola offline para notas clínicas (consultas).
- * Datos cifrados en secureStorage (AES-256-GCM).
- * LFPDPPP Art. 19: protección de datos personales sensibles en reposo.
+ * offlineNotes.ts — Facade backward-compatible.
+ *
+ * Mantiene la API original de esta librería (saveNoteOffline,
+ * getPendingNotes, getPendingNotesCount, syncPendingNotes) pero delega
+ * al outbox-engine unificado del Commit 3.
+ *
+ * LFPDPPP Art. 19: datos cifrados en secureStorage (gestionado por engine).
  */
 
-import { secureStorage } from '@/lib/secureStorage'
-import { fetchWithRetry } from '@/lib/fetchWithRetry'
-import { isOnline } from '@/lib/connectionMonitor'
-
-const NOTES_QUEUE_KEY = 'offline_notes_queue'
+import {
+  enqueueOutbox,
+  getPendingOutbox,
+  getOutboxStats,
+  flushOutbox,
+} from './outbox-engine'
 
 export interface QueuedNote {
   id: string
@@ -18,82 +23,46 @@ export interface QueuedNote {
   retries: number
 }
 
-async function getQueue(): Promise<QueuedNote[]> {
-  if (typeof window === 'undefined') return []
-  const data = await secureStorage.get<QueuedNote[]>(NOTES_QUEUE_KEY)
-  return data ?? []
-}
-
-async function saveQueue(queue: QueuedNote[]): Promise<void> {
-  if (queue.length === 0) {
-    secureStorage.remove(NOTES_QUEUE_KEY)
-  } else {
-    await secureStorage.set(NOTES_QUEUE_KEY, queue)
-  }
-}
-
-/** Guarda una nota clínica en la cola offline (cifrada) */
+/** Guarda una nota clínica offline. Retorna el id generado. */
 export async function saveNoteOffline(
   paciente_id: string,
   payload: Record<string, unknown>,
 ): Promise<string> {
-  const queue = await getQueue()
-  const id = crypto.randomUUID()
-  queue.push({
-    id,
-    paciente_id,
+  const clientId = crypto.randomUUID()
+  const id = await enqueueOutbox({
+    clientId,
+    action: 'INSERT',
+    resource: 'note',
     payload,
-    created_at: new Date().toISOString(),
-    retries: 0,
+    tempRef: paciente_id,
+    endpoint: '/api/consultas',
+    method: 'POST',
   })
-  await saveQueue(queue)
   return id
 }
 
-/** Devuelve la cantidad de notas pendientes */
-export async function getPendingNotesCount(): Promise<number> {
-  const queue = await getQueue()
-  return queue.length
-}
-
-/** Devuelve las notas pendientes (para UI) */
+/** Devuelve las notas pendientes con el shape legacy (para UI existente) */
 export async function getPendingNotes(): Promise<QueuedNote[]> {
-  return getQueue()
+  const outbox = await getPendingOutbox()
+  return outbox
+    .filter(it => it.resource === 'note')
+    .map(it => ({
+      id: it.id,
+      paciente_id: it.tempRef ?? '',
+      payload: it.payload,
+      created_at: it.createdAt,
+      retries: it.retries,
+    }))
 }
 
-/** Sincroniza todas las notas pendientes con el servidor */
+/** Cantidad de notas pendientes */
+export async function getPendingNotesCount(): Promise<number> {
+  const stats = await getOutboxStats()
+  return stats.byResource.note
+}
+
+/** Sincroniza todas las notas pendientes. Shape legacy del retorno. */
 export async function syncPendingNotes(): Promise<{ sent: number; failed: number }> {
-  const queue = await getQueue()
-  if (queue.length === 0) return { sent: 0, failed: 0 }
-  if (!isOnline()) return { sent: 0, failed: queue.length }
-
-  let sent = 0
-  const remaining: QueuedNote[] = []
-
-  for (const note of queue) {
-    try {
-      const res = await fetchWithRetry('/api/consultas', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paciente_id: note.paciente_id, ...note.payload }),
-        maxRetries: 2,
-        timeoutMs: 10_000,
-      })
-
-      if (res.ok) {
-        sent++
-      } else {
-        if (note.retries < 5) {
-          remaining.push({ ...note, retries: note.retries + 1 })
-        }
-      }
-    } catch {
-      if (note.retries < 5) {
-        remaining.push({ ...note, retries: note.retries + 1 })
-      }
-    }
-  }
-
-  await saveQueue(remaining)
-  return { sent, failed: remaining.length }
+  const result = await flushOutbox()
+  return { sent: result.synced, failed: result.dead }
 }
