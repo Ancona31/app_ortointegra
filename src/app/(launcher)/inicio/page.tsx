@@ -103,25 +103,69 @@ export default function InicioPage() {
     router.prefetch('/expediente/_/laboratorios/_')
     router.prefetch('/expediente/_/consulta/_')
     router.prefetch('/suplementacion')
-    // Pre-descargar chunks de formularios de documentos
-    import('@/components/documentos/RecetaForm')
-    import('@/components/documentos/SolicitudLabForm')
-    import('@/components/documentos/SolicitudImagenForm')
-    import('@/components/documentos/PlanSuplementacionForm')
-    import('@/components/documentos/SolicitudInternamientoForm')
-    import('@/components/documentos/EscritoMedicoForm')
-    import('@/components/documentos/ConsentimientoInformadoForm')
-    import('@/components/documentos/NotaHonorariosForm')
-    // Pre-descargar chunks de renderers PDF para generación offline
-    import('@/lib/pdf/RecetaPdf')
-    import('@/lib/pdf/SolicitudLabPdf')
-    import('@/lib/pdf/SolicitudImagenPdf')
-    import('@/lib/pdf/PlanSuplementacionPdf')
-    import('@/lib/pdf/NotaHonorariosPdf')
-    import('@/lib/pdf/SolicitudInternamientoPdf')
-    import('@/lib/pdf/EscritoMedicoPdf')
-    import('@/lib/pdf/ConsentimientoInformadoPdf')
-    import('@/lib/pdf/NotaEvolucionPdf')
+    // Warm-up: forzar descarga completa de los chunks JS de los 8 formularios
+    // El SW los intercepta y cachea automáticamente para modo offline.
+    const formWarmups: Array<[string, Promise<unknown>]> = [
+      ['RecetaForm',                    import('@/components/documentos/RecetaForm')],
+      ['SolicitudLabForm',              import('@/components/documentos/SolicitudLabForm')],
+      ['SolicitudImagenForm',           import('@/components/documentos/SolicitudImagenForm')],
+      ['PlanSuplementacionForm',        import('@/components/documentos/PlanSuplementacionForm')],
+      ['SolicitudInternamientoForm',    import('@/components/documentos/SolicitudInternamientoForm')],
+      ['EscritoMedicoForm',             import('@/components/documentos/EscritoMedicoForm')],
+      ['ConsentimientoInformadoForm',   import('@/components/documentos/ConsentimientoInformadoForm')],
+      ['NotaHonorariosForm',            import('@/components/documentos/NotaHonorariosForm')],
+    ]
+
+    Promise.all(
+      formWarmups.map(([name, p]) =>
+        p.then(() => {
+          // eslint-disable-next-line no-console
+          console.log('[Spinus warm-up] ✓', name)
+          return name
+        }).catch(err => {
+          // eslint-disable-next-line no-console
+          console.error('[Spinus warm-up] ✗', name, err)
+          return null
+        })
+      )
+    ).then(results => {
+      const ok = results.filter(Boolean).length
+      // eslint-disable-next-line no-console
+      console.log(`[Spinus warm-up] formularios listos: ${ok}/${formWarmups.length}`)
+    })
+
+    // Warm-up de renderers PDF
+    const pdfWarmups: Array<[string, Promise<unknown>]> = [
+      ['RecetaPdf',                   import('@/lib/pdf/RecetaPdf')],
+      ['SolicitudLabPdf',             import('@/lib/pdf/SolicitudLabPdf')],
+      ['SolicitudImagenPdf',          import('@/lib/pdf/SolicitudImagenPdf')],
+      ['PlanSuplementacionPdf',       import('@/lib/pdf/PlanSuplementacionPdf')],
+      ['NotaHonorariosPdf',           import('@/lib/pdf/NotaHonorariosPdf')],
+      ['SolicitudInternamientoPdf',   import('@/lib/pdf/SolicitudInternamientoPdf')],
+      ['EscritoMedicoPdf',            import('@/lib/pdf/EscritoMedicoPdf')],
+      ['ConsentimientoInformadoPdf',  import('@/lib/pdf/ConsentimientoInformadoPdf')],
+      ['NotaEvolucionPdf',            import('@/lib/pdf/NotaEvolucionPdf')],
+    ]
+
+    Promise.all(
+      pdfWarmups.map(([name, p]) =>
+        p.then(() => {
+          // eslint-disable-next-line no-console
+          console.log('[Spinus warm-up] ✓ PDF', name)
+          return name
+        }).catch(err => {
+          // eslint-disable-next-line no-console
+          console.error('[Spinus warm-up] ✗ PDF', name, err)
+          return null
+        })
+      )
+    ).then(results => {
+      const ok = results.filter(Boolean).length
+      // eslint-disable-next-line no-console
+      console.log(`[Spinus warm-up] renderers PDF listos: ${ok}/${pdfWarmups.length}`)
+      // eslint-disable-next-line no-console
+      console.log('[Spinus warm-up] todo listo — sistema blindado para offline')
+    })
     // Fetch páginas críticas para que el SW cache todos sus chunks
     const rutasWarmup = [
       '/dashboard',

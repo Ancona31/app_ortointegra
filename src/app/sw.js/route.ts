@@ -46,7 +46,7 @@ self.addEventListener('activate', (e) => {
 })
 
 self.addEventListener('fetch', (e) => {
-  // Guarda: solo cachear requests GET. Evita "HEAD is unsupported" en cache.put
+  // Guarda: solo cachear requests GET
   if (e.request.method !== 'GET') return
 
   const url = new URL(e.request.url)
@@ -54,7 +54,44 @@ self.addEventListener('fetch', (e) => {
   // APIs y cross-origin: pass-through (nunca cachear)
   if (url.pathname.startsWith('/api/') || url.origin !== self.location.origin) return
 
-  // ASSETS: cache-first (fuentes, estáticos, iconos)
+  // ── CAPTURA TOTAL DE CHUNKS JS — Stale-While-Revalidate ──
+  // Los chunks de _next/static/chunks son CRÍTICOS para evitar ChunkLoadError.
+  // Estrategia: si hay cache → servir inmediato + actualizar background.
+  //             si no hay cache → red, cachear, servir.
+  if (
+    url.pathname.startsWith('/_next/static/chunks/') ||
+    url.pathname.match(/\\/_next\\/static\\/.*\\.(js|css|json)$/)
+  ) {
+    e.respondWith(
+      caches.match(e.request).then(cached => {
+        // Fetch en segundo plano — actualiza cache silenciosamente
+        const networkUpdate = fetch(e.request).then(res => {
+          if (res.ok) {
+            const clone = res.clone()
+            caches.open(CACHE).then(c => c.put(e.request, clone)).catch(() => {})
+          }
+          return res
+        }).catch(() => null)
+
+        // Si hay cache: servir inmediato, actualizar en background (fire-and-forget)
+        if (cached) {
+          networkUpdate
+          return cached
+        }
+
+        // Sin cache: esperar la red y cachear
+        return networkUpdate.then(res => {
+          if (res) return res
+          // Offline + cache miss: devolver 404 real (no 503) para que
+          // Next.js active su mecanismo de retry en lugar de ChunkLoadError fatal
+          return new Response('', { status: 404, statusText: 'Not Found' })
+        })
+      })
+    )
+    return
+  }
+
+  // ── ASSETS ESTÁTICOS (fuentes, iconos, imágenes) — cache-first ──
   if (
     url.pathname.startsWith('/_next/static/') ||
     url.pathname.startsWith('/fonts/') ||
@@ -66,16 +103,16 @@ self.addEventListener('fetch', (e) => {
         return fetch(e.request).then(res => {
           if (res.ok) {
             const clone = res.clone()
-            caches.open(CACHE).then(c => c.put(e.request, clone))
+            caches.open(CACHE).then(c => c.put(e.request, clone)).catch(() => {})
           }
           return res
-        }).catch(() => new Response('Offline', { status: 503 }))
+        }).catch(() => new Response('', { status: 404, statusText: 'Not Found' }))
       })
     )
     return
   }
 
-  // NAVEGACIÓN: Stale-While-Revalidate para rutas de la app
+  // ── NAVEGACIÓN: Stale-While-Revalidate para rutas de la app ──
   if (e.request.mode === 'navigate') {
     // Refresh manual (Ctrl+Shift+R): bypass cache, forzar red
     const isForceRefresh = e.request.cache === 'no-cache' ||
@@ -86,7 +123,7 @@ self.addEventListener('fetch', (e) => {
         fetch(e.request).then(res => {
           if (res.ok) {
             const clone = res.clone()
-            caches.open(CACHE).then(c => c.put(e.request, clone))
+            caches.open(CACHE).then(c => c.put(e.request, clone)).catch(() => {})
           }
           return res
         }).catch(() =>
@@ -103,18 +140,16 @@ self.addEventListener('fetch', (e) => {
         const fetchPromise = fetch(e.request).then(res => {
           if (res.ok) {
             const clone = res.clone()
-            caches.open(CACHE).then(c => c.put(e.request, clone))
+            caches.open(CACHE).then(c => c.put(e.request, clone)).catch(() => {})
           }
           return res
         }).catch(() => null)
 
-        // Si hay cache, servir inmediato (stale) y actualizar en background
         if (cached) {
-          fetchPromise // fire-and-forget: actualiza cache en background
+          fetchPromise
           return cached
         }
 
-        // Sin cache: esperar la red, fallback a /offline
         return fetchPromise.then(res => {
           if (res) return res
           return caches.match('/offline')
