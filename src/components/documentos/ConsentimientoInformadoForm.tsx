@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { Printer, Loader2, ChevronDown, ChevronUp, ShieldCheck } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { generarPdf } from '@/lib/mobileShare'
-import { enqueue } from '@/lib/offlineQueue'
+import { enqueueOutbox } from '@/lib/outbox-engine'
+import { getStatus } from '@/lib/connectionMonitor'
 import { useToast } from '@/components/ui/Toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -109,6 +110,7 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
   const [secciones, setSecciones] = useState({ ...SECCIONES_DEFAULT })
 
   const [imprimiendo, setImprimiendo] = useState(false)
+  const [errorGuardado, setErrorGuardado] = useState('')
   const [imprimirDenegacion, setImprimirDenegacion] = useState(false)
 
   function updateSeccion(key: SeccionKey, val: string) {
@@ -116,6 +118,11 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
   }
 
   async function imprimir() {
+    // ══════════════════════════════════════════════════════════════════
+    // VALIDACIÓN LEGAL — 9 campos obligatorios (NOM-004-SSA3-2012)
+    // Se preserva exactamente como estaba. Ejecuta ANTES de flushSync
+    // para que el botón no entre en estado "Generando..." si falta algo.
+    // ══════════════════════════════════════════════════════════════════
     const faltantes = [
       { val: paciente,                    label: 'Nombre del paciente' },
       { val: lugar,                       label: 'Lugar' },
@@ -131,28 +138,33 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
       toast.error(`Campos obligatorios faltantes: ${faltantes.join(', ')}`)
       return
     }
-    flushSync(() => setImprimiendo(true))
+
+    flushSync(() => { setErrorGuardado(''); setImprimiendo(true) })
+
+    // 1. Feedback instantáneo
+    toast.info('Generando consentimiento informado...')
+
+    // 2. Identidad — UUID v4 puro como clientId
+    const clientId = crypto.randomUUID()
+
+    // 3. Contenido persistido — NO incluye imprimirDenegacion (es una
+    //    opción de impresión, no parte del consentimiento legal)
+    const contenido = {
+      paciente, lugar, fecha, expediente, edad, idPaciente, procedimiento, diagnostico,
+      familiar, idFamiliar, representante, idRepresentante, anestesiologo,
+      testigo1, testigo2, autorizaTransfusion, autorizaFotos,
+      secciones,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    }
+
+    // Flags de tracking para diferenciar errores
+    let pdfGenerated = false
+    let persistedHow: 'supabase' | 'outbox' | null = null
+
     try {
-      const clientId = crypto.randomUUID()
-      const contenido = {
-        paciente, lugar, fecha, expediente, edad, idPaciente, procedimiento, diagnostico,
-        familiar, idFamiliar, representante, idRepresentante, anestesiologo,
-        testigo1, testigo2, autorizaTransfusion, autorizaFotos,
-        secciones,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      }
-
-      const supabase = createClient()
-      const { error: saveError } = await supabase.from('documentos').insert({
-        ...(pacienteId ? { paciente_id: pacienteId } : {}),
-        tipo: 'consentimiento_informado',
-        contenido,
-      })
-      if (saveError) {
-        await enqueue({ client_id: clientId, paciente_id: pacienteId ?? undefined, tipo: 'consentimiento_informado', contenido })
-        toast.warning('Guardado localmente — se sincronizará al reconectar.')
-      }
-
+      // 4. PDF PRIMERO — si falla, abortamos antes de persistir.
+      //    CRÍTICO en consentimiento: evita registros legales huérfanos
+      //    en DB sin documento físico entregable al paciente.
       const medicoData = medicoInfo ? {
         nombre: medicoInfo.nombre,
         especialidad: medicoInfo.especialidad,
@@ -180,8 +192,74 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
         logoUrl,
         filename: 'consentimiento-informado.pdf',
       })
-    } catch {
-      toast.error('No se pudo generar el PDF. Intenta de nuevo.')
+
+      pdfGenerated = true
+
+      // 5. Persistencia resiliente — bypass inteligente según estado de red
+      const browserOffline = typeof navigator !== 'undefined' && navigator.onLine === false
+      const monitorOffline = getStatus() === 'offline'
+      const isTrulyOffline = browserOffline || monitorOffline
+
+      if (!isTrulyOffline) {
+        // Intento directo a Supabase con client_id para idempotencia
+        try {
+          const supabase = createClient()
+          const insertPayload: Record<string, unknown> = {
+            tipo: 'consentimiento_informado',
+            contenido,
+            client_id: clientId,
+          }
+          if (pacienteId) insertPayload.paciente_id = pacienteId
+
+          const { error } = await supabase.from('documentos').insert(insertPayload)
+          if (error) throw error
+          persistedHow = 'supabase'
+        } catch {
+          // Red inestable, 5xx, o columna client_id sin desplegar:
+          // fallback al outbox que reintentará automáticamente.
+          await enqueueOutbox({
+            clientId,
+            action: 'INSERT',
+            resource: 'document',
+            subtype: 'consentimiento_informado',
+            payload: contenido,
+            tempRef: pacienteId || undefined,
+            endpoint: '/api/documentos',
+            method: 'POST',
+          })
+          persistedHow = 'outbox'
+        }
+      } else {
+        // Offline declarado → directo al outbox
+        await enqueueOutbox({
+          clientId,
+          action: 'INSERT',
+          resource: 'document',
+          subtype: 'consentimiento_informado',
+          payload: contenido,
+          tempRef: pacienteId || undefined,
+          endpoint: '/api/documentos',
+          method: 'POST',
+        })
+        persistedHow = 'outbox'
+      }
+
+      // 6. Feedback final diferenciado
+      if (persistedHow === 'supabase') {
+        toast.success('Consentimiento guardado y sincronizado')
+      } else {
+        toast.warning('Consentimiento guardado localmente — se sincronizará al reconectar')
+      }
+    } catch (err) {
+      if (!pdfGenerated) {
+        toast.error('No se pudo generar el PDF. Intenta de nuevo.')
+        setErrorGuardado('No se pudo generar el PDF. Intenta de nuevo.')
+      } else {
+        toast.error('Consentimiento generado pero no se pudo guardar. Revisa errores de sincronización.')
+        setErrorGuardado('Error al guardar el consentimiento.')
+      }
+      // eslint-disable-next-line no-console
+      console.error('[ConsentimientoInformadoForm] imprimir falló:', err)
     } finally {
       setImprimiendo(false)
     }
@@ -321,6 +399,12 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
           Incluir hoja de <strong>Denegación o Revocación</strong> del consentimiento (hoja 4 opcional)
         </label>
       </div>
+
+      {errorGuardado && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+          {errorGuardado}
+        </div>
+      )}
 
       <button
         onClick={imprimir}
