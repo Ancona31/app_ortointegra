@@ -54,51 +54,45 @@ self.addEventListener('fetch', (e) => {
   // APIs y cross-origin: pass-through (nunca cachear)
   if (url.pathname.startsWith('/api/') || url.origin !== self.location.origin) return
 
-  // ── CAPTURA TOTAL DE CHUNKS JS — Stale-While-Revalidate ──
+  // ── CAPTURA TOTAL DE CHUNKS JS — Cache-First ──
   // Los chunks de _next/static/chunks son CRÍTICOS para evitar ChunkLoadError.
-  // Estrategia: si hay cache → servir inmediato + actualizar background.
-  //             si no hay cache → red, cachear, servir.
+  // Estrategia:
+  //   1. Buscar en cache con ignoreSearch: true (matchea archivo.js?v=1 con archivo.js)
+  //   2. Si hay match → servir instantáneo, NO ir a red
+  //   3. Si no hay match → red → cachear → servir
+  //   4. Si red falla offline + no cache → 404 (no 503) para retry natural de Next.js
   if (
     url.pathname.startsWith('/_next/static/chunks/') ||
     url.pathname.match(/\\/_next\\/static\\/.*\\.(js|css|json)$/)
   ) {
     e.respondWith(
-      caches.match(e.request).then(cached => {
-        // Fetch en segundo plano — actualiza cache silenciosamente
-        const networkUpdate = fetch(e.request).then(res => {
+      caches.match(e.request, { ignoreSearch: true }).then(cached => {
+        // Cache hit → servir inmediato sin tocar red
+        if (cached) return cached
+
+        // Cache miss → intentar red y cachear
+        return fetch(e.request).then(res => {
           if (res.ok) {
             const clone = res.clone()
             caches.open(CACHE).then(c => c.put(e.request, clone)).catch(() => {})
           }
           return res
-        }).catch(() => null)
-
-        // Si hay cache: servir inmediato, actualizar en background (fire-and-forget)
-        if (cached) {
-          networkUpdate
-          return cached
-        }
-
-        // Sin cache: esperar la red y cachear
-        return networkUpdate.then(res => {
-          if (res) return res
-          // Offline + cache miss: devolver 404 real (no 503) para que
-          // Next.js active su mecanismo de retry en lugar de ChunkLoadError fatal
-          return new Response('', { status: 404, statusText: 'Not Found' })
-        })
+        }).catch(() =>
+          new Response('', { status: 404, statusText: 'Not Found' })
+        )
       })
     )
     return
   }
 
-  // ── ASSETS ESTÁTICOS (fuentes, iconos, imágenes) — cache-first ──
+  // ── ASSETS ESTÁTICOS (fuentes, iconos, imágenes) — cache-first con ignoreSearch ──
   if (
     url.pathname.startsWith('/_next/static/') ||
     url.pathname.startsWith('/fonts/') ||
     url.pathname.match(/\\.(png|jpg|svg|ico|woff2?)$/)
   ) {
     e.respondWith(
-      caches.match(e.request).then(cached => {
+      caches.match(e.request, { ignoreSearch: true }).then(cached => {
         if (cached) return cached
         return fetch(e.request).then(res => {
           if (res.ok) {

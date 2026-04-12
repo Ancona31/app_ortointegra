@@ -105,15 +105,38 @@ export default function InicioPage() {
     router.prefetch('/suplementacion')
     // Warm-up: forzar descarga completa de los chunks JS de los 8 formularios
     // El SW los intercepta y cachea automáticamente para modo offline.
+    // Helper: logguea la inyección ANTES del import dinámico
+    const logInject = (path: string) => {
+      // eslint-disable-next-line no-console
+      console.log('[Spinus] Inyectando script: ' + path)
+    }
+
+    logInject('@/components/documentos/RecetaForm')
+    const wRcta = import('@/components/documentos/RecetaForm')
+    logInject('@/components/documentos/SolicitudLabForm')
+    const wSLab = import('@/components/documentos/SolicitudLabForm')
+    logInject('@/components/documentos/SolicitudImagenForm')
+    const wSImg = import('@/components/documentos/SolicitudImagenForm')
+    logInject('@/components/documentos/PlanSuplementacionForm')
+    const wSupl = import('@/components/documentos/PlanSuplementacionForm')
+    logInject('@/components/documentos/SolicitudInternamientoForm')
+    const wInt = import('@/components/documentos/SolicitudInternamientoForm')
+    logInject('@/components/documentos/EscritoMedicoForm')
+    const wEsc = import('@/components/documentos/EscritoMedicoForm')
+    logInject('@/components/documentos/ConsentimientoInformadoForm')
+    const wCons = import('@/components/documentos/ConsentimientoInformadoForm')
+    logInject('@/components/documentos/NotaHonorariosForm')
+    const wHon = import('@/components/documentos/NotaHonorariosForm')
+
     const formWarmups: Array<[string, Promise<unknown>]> = [
-      ['RecetaForm',                    import('@/components/documentos/RecetaForm')],
-      ['SolicitudLabForm',              import('@/components/documentos/SolicitudLabForm')],
-      ['SolicitudImagenForm',           import('@/components/documentos/SolicitudImagenForm')],
-      ['PlanSuplementacionForm',        import('@/components/documentos/PlanSuplementacionForm')],
-      ['SolicitudInternamientoForm',    import('@/components/documentos/SolicitudInternamientoForm')],
-      ['EscritoMedicoForm',             import('@/components/documentos/EscritoMedicoForm')],
-      ['ConsentimientoInformadoForm',   import('@/components/documentos/ConsentimientoInformadoForm')],
-      ['NotaHonorariosForm',            import('@/components/documentos/NotaHonorariosForm')],
+      ['RecetaForm', wRcta],
+      ['SolicitudLabForm', wSLab],
+      ['SolicitudImagenForm', wSImg],
+      ['PlanSuplementacionForm', wSupl],
+      ['SolicitudInternamientoForm', wInt],
+      ['EscritoMedicoForm', wEsc],
+      ['ConsentimientoInformadoForm', wCons],
+      ['NotaHonorariosForm', wHon],
     ]
 
     Promise.all(
@@ -135,16 +158,35 @@ export default function InicioPage() {
     })
 
     // Warm-up de renderers PDF
+    logInject('@/lib/pdf/RecetaPdf')
+    const pRcta = import('@/lib/pdf/RecetaPdf')
+    logInject('@/lib/pdf/SolicitudLabPdf')
+    const pSLab = import('@/lib/pdf/SolicitudLabPdf')
+    logInject('@/lib/pdf/SolicitudImagenPdf')
+    const pSImg = import('@/lib/pdf/SolicitudImagenPdf')
+    logInject('@/lib/pdf/PlanSuplementacionPdf')
+    const pSupl = import('@/lib/pdf/PlanSuplementacionPdf')
+    logInject('@/lib/pdf/NotaHonorariosPdf')
+    const pHon = import('@/lib/pdf/NotaHonorariosPdf')
+    logInject('@/lib/pdf/SolicitudInternamientoPdf')
+    const pInt = import('@/lib/pdf/SolicitudInternamientoPdf')
+    logInject('@/lib/pdf/EscritoMedicoPdf')
+    const pEsc = import('@/lib/pdf/EscritoMedicoPdf')
+    logInject('@/lib/pdf/ConsentimientoInformadoPdf')
+    const pCons = import('@/lib/pdf/ConsentimientoInformadoPdf')
+    logInject('@/lib/pdf/NotaEvolucionPdf')
+    const pEvo = import('@/lib/pdf/NotaEvolucionPdf')
+
     const pdfWarmups: Array<[string, Promise<unknown>]> = [
-      ['RecetaPdf',                   import('@/lib/pdf/RecetaPdf')],
-      ['SolicitudLabPdf',             import('@/lib/pdf/SolicitudLabPdf')],
-      ['SolicitudImagenPdf',          import('@/lib/pdf/SolicitudImagenPdf')],
-      ['PlanSuplementacionPdf',       import('@/lib/pdf/PlanSuplementacionPdf')],
-      ['NotaHonorariosPdf',           import('@/lib/pdf/NotaHonorariosPdf')],
-      ['SolicitudInternamientoPdf',   import('@/lib/pdf/SolicitudInternamientoPdf')],
-      ['EscritoMedicoPdf',            import('@/lib/pdf/EscritoMedicoPdf')],
-      ['ConsentimientoInformadoPdf',  import('@/lib/pdf/ConsentimientoInformadoPdf')],
-      ['NotaEvolucionPdf',            import('@/lib/pdf/NotaEvolucionPdf')],
+      ['RecetaPdf', pRcta],
+      ['SolicitudLabPdf', pSLab],
+      ['SolicitudImagenPdf', pSImg],
+      ['PlanSuplementacionPdf', pSupl],
+      ['NotaHonorariosPdf', pHon],
+      ['SolicitudInternamientoPdf', pInt],
+      ['EscritoMedicoPdf', pEsc],
+      ['ConsentimientoInformadoPdf', pCons],
+      ['NotaEvolucionPdf', pEvo],
     ]
 
     Promise.all(
