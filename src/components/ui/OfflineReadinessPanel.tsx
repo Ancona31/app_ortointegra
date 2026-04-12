@@ -89,7 +89,12 @@ interface ChecksState {
   formsReady: boolean | null
   /** null = verificando, número = rutas cacheadas / total */
   routesCached: { ready: number; total: number } | null
+  /** null = verificando, número = chunks JS cacheados */
+  chunksCached: { ready: number; threshold: number } | null
 }
+
+/** Umbral mínimo de chunks para considerar el sistema blindado */
+const CHUNKS_THRESHOLD = 20
 
 interface Props {
   /** Activa paleta oscura para el launcher */
@@ -106,6 +111,7 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
     expedientesCount: null,
     formsReady: null,
     routesCached: null,
+    chunksCached: null,
   })
   const [refreshing, setRefreshing] = useState(false)
   const { mutate } = useSWRConfig()
@@ -183,7 +189,40 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
       formsReady = false
     }
 
-    setChecks({ swActive, pdfReady, expedientesCount, formsReady, routesCached })
+    // ── 6. Chunks JS precacheados — contar /_next/static/chunks/ en el cache ──
+    let chunksCached: { ready: number; threshold: number } = {
+      ready: 0,
+      threshold: CHUNKS_THRESHOLD,
+    }
+    try {
+      if (cacheName) {
+        const cache = await caches.open(cacheName)
+        const keys = await cache.keys()
+        const chunkCount = keys.filter(req => {
+          try {
+            const u = new URL(req.url)
+            return (
+              u.pathname.startsWith('/_next/static/chunks/') ||
+              /\/_next\/static\/.*\.(js|css)$/.test(u.pathname)
+            )
+          } catch {
+            return false
+          }
+        }).length
+        chunksCached = { ready: chunkCount, threshold: CHUNKS_THRESHOLD }
+      }
+    } catch {
+      chunksCached = { ready: 0, threshold: CHUNKS_THRESHOLD }
+    }
+
+    setChecks({
+      swActive,
+      pdfReady,
+      expedientesCount,
+      formsReady,
+      routesCached,
+      chunksCached,
+    })
   }, [])
 
   // Mount + chequeos iniciales con retry escalonado
@@ -224,7 +263,7 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
     return (
       <div
         className={`
-          relative z-[2] rounded-2xl border p-5 h-[260px]
+          relative z-[2] rounded-2xl border p-5 h-[300px]
           backdrop-blur-md shadow-lg
           ${dark
             ? 'bg-slate-900/40 border-white/10'
@@ -235,23 +274,29 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
     )
   }
 
-  // Estado global derivado — Sistema Autónomo requiere los 5 checks verdes
+  // Estado global derivado — Sistema Autónomo requiere los 6 checks verdes
   const routesAllCached =
     checks.routesCached !== null &&
     checks.routesCached.ready === checks.routesCached.total
+
+  const chunksOk =
+    checks.chunksCached !== null &&
+    checks.chunksCached.ready >= checks.chunksCached.threshold
 
   const anyChecking =
     checks.swActive === null ||
     checks.pdfReady === null ||
     checks.expedientesCount === null ||
     checks.formsReady === null ||
-    checks.routesCached === null
+    checks.routesCached === null ||
+    checks.chunksCached === null
 
   const anyFailed =
     checks.swActive === false ||
     checks.pdfReady === false ||
     checks.formsReady === false ||
-    (checks.routesCached !== null && !routesAllCached)
+    (checks.routesCached !== null && !routesAllCached) ||
+    (checks.chunksCached !== null && !chunksOk)
 
   const badgeState: BadgeState = anyChecking
     ? 'syncing'
@@ -348,6 +393,22 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
           label="Formularios críticos: 8/8 listos"
           dark={dark}
           trailingIcon={<FileText size={13} />}
+        />
+        <CheckRow
+          state={
+            checks.chunksCached === null
+              ? null
+              : chunksOk
+          }
+          label={
+            checks.chunksCached === null
+              ? 'Chunks JS: verificando...'
+              : chunksOk
+                ? `Chunks JS: ${checks.chunksCached.ready} blindados`
+                : `Chunks JS: solo ${checks.chunksCached.ready}, insuficiente`
+          }
+          dark={dark}
+          trailingIcon={<FileCheck size={13} />}
         />
         <CheckRow
           state={checks.expedientesCount !== null ? true : null}

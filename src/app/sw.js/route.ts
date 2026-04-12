@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import fs from 'fs'
+import path from 'path'
 
 /**
  * BUILD_ID único por deploy. Estable durante toda la vida del deploy en Vercel.
@@ -8,10 +10,154 @@ import { NextResponse } from 'next/server'
  */
 const BUILD_ID = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) || 'dev-local'
 
+/**
+ * Paths relativos (sin hash) de los chunks que buscamos en .next/static/chunks/
+ * Next.js 16 con App Router genera chunks con nombres tipo:
+ *   app/(app)/documentos/page-{hash}.js
+ *   app/(launcher)/inicio/page-{hash}.js
+ *   app/(app)/expediente/[id]/nueva-nota/page-{hash}.js
+ *
+ * Cada prefix representa una ruta crítica. Escaneamos el filesystem en
+ * build time y matcheamos por prefijo, ignorando el hash.
+ */
+const CRITICAL_CHUNK_PREFIXES = [
+  'app/(launcher)/inicio/page-',
+  'app/(launcher)/layout-',
+  'app/(app)/dashboard/page-',
+  'app/(app)/agenda/page-',
+  'app/(app)/estadisticas/page-',
+  'app/(app)/documentos/page-',
+  'app/(app)/pacientes/page-',
+  'app/(app)/pacientes/nuevo/page-',
+  'app/(app)/expediente/page-',
+  'app/(app)/expediente/[id]/page-',
+  'app/(app)/expediente/[id]/nueva-nota/page-',
+  'app/(app)/expediente/[id]/editar/page-',
+  'app/(app)/expediente/[id]/documentos/page-',
+  'app/(app)/expediente/[id]/laboratorios/nuevo/page-',
+  'app/(app)/expediente/[id]/laboratorios/[labId]/page-',
+  'app/(app)/expediente/[id]/consulta/[consultaId]/page-',
+  'app/(app)/suplementacion/page-',
+  'app/(app)/layout-',
+  'app/layout-',
+]
+
+/**
+ * Lee chunks críticos combinando 2 fuentes:
+ *
+ * 1. .next/build-manifest.json → rootMainFiles (webpack/framework/main-app)
+ *    + polyfillFiles (los chunks compartidos por TODAS las rutas)
+ *
+ * 2. Escaneo del filesystem .next/static/chunks/ para encontrar los chunks
+ *    específicos por ruta (page-{hash}.js, layout-{hash}.js) matcheando
+ *    contra CRITICAL_CHUNK_PREFIXES.
+ *
+ * Degradación elegante: si falla, retorna [] y el SW degrada a solo-HTML.
+ * El warm-up del launcher cubre los chunks en ese caso.
+ */
+function readCriticalChunks(): string[] {
+  const chunks = new Set<string>()
+
+  // ── Fuente 1: build-manifest.json (root chunks compartidos) ──
+  try {
+    const manifestPath = path.join(process.cwd(), '.next', 'build-manifest.json')
+    if (fs.existsSync(manifestPath)) {
+      const raw = fs.readFileSync(manifestPath, 'utf-8')
+      const manifest = JSON.parse(raw) as {
+        rootMainFiles?: string[]
+        polyfillFiles?: string[]
+      }
+      if (Array.isArray(manifest.rootMainFiles)) {
+        for (const f of manifest.rootMainFiles) {
+          if (typeof f === 'string' && f.length > 0) {
+            chunks.add('/_next/' + f)
+          }
+        }
+      }
+      if (Array.isArray(manifest.polyfillFiles)) {
+        for (const f of manifest.polyfillFiles) {
+          if (typeof f === 'string' && f.length > 0) {
+            chunks.add('/_next/' + f)
+          }
+        }
+      }
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('[sw.js] Error leyendo build-manifest.json:',
+      err instanceof Error ? err.message : err)
+  }
+
+  // ── Fuente 2: escaneo del filesystem para chunks por ruta ──
+  try {
+    const appChunksDir = path.join(process.cwd(), '.next', 'static', 'chunks')
+    if (!fs.existsSync(appChunksDir)) {
+      // eslint-disable-next-line no-console
+      console.warn('[sw.js] .next/static/chunks/ no existe — SW degrada')
+      return Array.from(chunks)
+    }
+
+    // Walker recursivo ligero
+    const walk = (dir: string): string[] => {
+      const results: string[] = []
+      try {
+        const entries = fs.readdirSync(dir, { withFileTypes: true })
+        for (const entry of entries) {
+          const full = path.join(dir, entry.name)
+          if (entry.isDirectory()) {
+            results.push(...walk(full))
+          } else if (entry.isFile() && entry.name.endsWith('.js')) {
+            results.push(full)
+          }
+        }
+      } catch {
+        // carpeta inaccesible — continuar
+      }
+      return results
+    }
+
+    const allFiles = walk(appChunksDir)
+    let routesFound = 0
+
+    for (const prefix of CRITICAL_CHUNK_PREFIXES) {
+      // Convertir el prefix en un path absoluto para comparación
+      const prefixAbs = path.join(appChunksDir, prefix).replace(/\\/g, '/')
+      const matching = allFiles.filter(f => {
+        const normalized = f.replace(/\\/g, '/')
+        return normalized.startsWith(prefixAbs)
+      })
+
+      if (matching.length > 0) routesFound++
+
+      for (const abs of matching) {
+        // Convertir a URL /_next/static/chunks/...
+        const rel = path.relative(
+          path.join(process.cwd(), '.next'),
+          abs
+        ).replace(/\\/g, '/')
+        chunks.add('/_next/' + rel)
+      }
+    }
+
+    // eslint-disable-next-line no-console
+    console.log(
+      `[sw.js] Precache scan: ${routesFound}/${CRITICAL_CHUNK_PREFIXES.length} prefixes matched, ${chunks.size} chunks totales`
+    )
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('[sw.js] Error escaneando chunks — SW degrada:',
+      err instanceof Error ? err.message : err)
+  }
+
+  return Array.from(chunks)
+}
+
+const CRITICAL_CHUNKS = readCriticalChunks()
+
 const SW_CONTENT = `const CACHE = 'spinus-${BUILD_ID}'
 const FONT_CACHE = 'spinus-pdf-fonts-v1'
 
-const PRECACHE = [
+const PRECACHE_HTML = [
   '/inicio',
   '/dashboard',
   '/agenda',
@@ -33,14 +179,43 @@ const PRECACHE = [
   '/icon-192.png',
 ]
 
+// Chunks JS extraídos del app-build-manifest.json en build time
+const PRECACHE_CHUNKS = ${JSON.stringify(CRITICAL_CHUNKS)}
+
+const PRECACHE = [...PRECACHE_HTML, ...PRECACHE_CHUNKS]
+
+// ── INSTALL: descarga atómica suave con Promise.allSettled ──
+// Un 404 en un chunk individual NO invalida el resto del cache
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE)
-      .then(c => c.addAll(PRECACHE))
-      .then(() => self.skipWaiting())
+    caches.open(CACHE).then(async cache => {
+      const results = await Promise.allSettled(
+        PRECACHE.map(async url => {
+          const res = await fetch(url, { cache: 'reload' })
+          if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + url)
+          await cache.put(url, res)
+          return url
+        })
+      )
+
+      const ok = results.filter(r => r.status === 'fulfilled').length
+      const failed = results.filter(r => r.status === 'rejected').length
+      // eslint-disable-next-line no-console
+      console.log('[sw.js] Precache completado: ' + ok + ' OK, ' + failed + ' fallidos de ' + PRECACHE.length)
+
+      if (failed > 0) {
+        const failures = results
+          .filter(r => r.status === 'rejected')
+          .slice(0, 3)
+          .map(r => (r.reason && r.reason.message) || 'unknown')
+        // eslint-disable-next-line no-console
+        console.warn('[sw.js] Ejemplos de fallos:', failures)
+      }
+    }).then(() => self.skipWaiting())
   )
 })
 
+// ── ACTIVATE: cleanup de caches de deploys anteriores ──
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then(keys =>
@@ -53,6 +228,35 @@ self.addEventListener('activate', (e) => {
   )
 })
 
+// ── Navigation Fallback: mapea URLs dinámicas a su template ──
+function resolveTemplateUrl(pathname) {
+  // /expediente/[id]/laboratorios/[labId]
+  if (/^\\/expediente\\/[^/]+\\/laboratorios\\/[^/]+$/.test(pathname)) {
+    // Excepción: /laboratorios/nuevo es su propio template
+    if (/^\\/expediente\\/[^/]+\\/laboratorios\\/nuevo$/.test(pathname)) {
+      return '/expediente/_/laboratorios/nuevo'
+    }
+    return '/expediente/_/laboratorios/_'
+  }
+
+  // /expediente/[id]/consulta/[consultaId]
+  if (/^\\/expediente\\/[^/]+\\/consulta\\/[^/]+$/.test(pathname)) {
+    return '/expediente/_/consulta/_'
+  }
+
+  // /expediente/[id]/(nueva-nota|editar|documentos)
+  var m = pathname.match(/^\\/expediente\\/([^/]+)\\/(nueva-nota|editar|documentos)$/)
+  if (m) return '/expediente/_/' + m[2]
+
+  // /expediente/[id]
+  if (/^\\/expediente\\/[^/]+$/.test(pathname)) {
+    return '/expediente/_'
+  }
+
+  return null
+}
+
+// ── FETCH handler ──
 self.addEventListener('fetch', (e) => {
   // Guarda: solo cachear requests GET
   if (e.request.method !== 'GET') return
@@ -63,23 +267,14 @@ self.addEventListener('fetch', (e) => {
   if (url.pathname.startsWith('/api/') || url.origin !== self.location.origin) return
 
   // ── CAPTURA TOTAL DE CHUNKS JS — Cache-First con retry 100ms ──
-  // Los chunks de _next/static/chunks son CRÍTICOS para evitar ChunkLoadError.
-  // Estrategia:
-  //   1. Buscar en cache con ignoreSearch: true (matchea archivo.js?v=1 con archivo.js)
-  //   2. Si hay match → servir instantáneo, NO ir a red
-  //   3. Si no hay match → red → cachear → servir
-  //   4. Si red falla, retry tras 100ms (tolera glitches transitorios)
-  //   5. Si red falla ambos intentos → 404 (no 503) para retry natural de Next.js
   if (
     url.pathname.startsWith('/_next/static/chunks/') ||
     url.pathname.match(/\\/_next\\/static\\/.*\\.(js|css|json)$/)
   ) {
     e.respondWith(
       caches.match(e.request, { ignoreSearch: true }).then(cached => {
-        // Cache hit → servir inmediato sin tocar red
         if (cached) return cached
 
-        // Helper: intenta el fetch y cachea si ok
         const tryFetch = () => fetch(e.request).then(res => {
           if (res.ok) {
             const clone = res.clone()
@@ -88,7 +283,6 @@ self.addEventListener('fetch', (e) => {
           return res
         })
 
-        // Cache miss → primer intento de red, con retry de 100ms si falla
         return tryFetch().catch(() =>
           new Promise(resolve => setTimeout(resolve, 100))
             .then(() => tryFetch())
@@ -120,12 +314,7 @@ self.addEventListener('fetch', (e) => {
     return
   }
 
-  // ── NAVEGACIÓN: Network-First con fallback a cache ──
-  // Crítico: NO usamos Stale-While-Revalidate aquí porque actualizar el HTML
-  // en background causaba desajuste con los chunks cacheados (HTML nuevo con
-  // refs a chunks que nunca se descargaron). Ahora: siempre red primero
-  // cuando hay conexión → HTML y chunks del MISMO deploy. Offline: cache
-  // que siempre corresponde al deploy que el usuario visitó online.
+  // ── NAVEGACIÓN: Network-First con fallback a cache (y a template para rutas dinámicas) ──
   if (e.request.mode === 'navigate') {
     e.respondWith(
       fetch(e.request).then(res => {
@@ -135,10 +324,20 @@ self.addEventListener('fetch', (e) => {
         }
         return res
       }).catch(() =>
-        // Red caída → cache del mismo deploy (coherente con chunks cacheados)
-        caches.match(e.request, { ignoreSearch: true })
-          .then(cached => cached || caches.match('/offline'))
-          .then(r => r || new Response('Offline', { status: 503 }))
+        caches.match(e.request, { ignoreSearch: true }).then(cached => {
+          if (cached) return cached
+
+          // Cache miss → buscar el template de la ruta dinámica
+          const templateUrl = resolveTemplateUrl(url.pathname)
+          if (templateUrl) {
+            return caches.match(templateUrl, { ignoreSearch: true }).then(tplCached => {
+              if (tplCached) return tplCached
+              return caches.match('/offline')
+            })
+          }
+
+          return caches.match('/offline')
+        }).then(r => r || new Response('Offline', { status: 503 }))
       )
     )
     return
