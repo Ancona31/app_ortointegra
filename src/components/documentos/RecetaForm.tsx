@@ -11,10 +11,12 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 import { generarPdf } from '@/lib/mobileShare'
-import { enqueue } from '@/lib/offlineQueue'
+import { enqueueOutbox } from '@/lib/outbox-engine'
 import { getPatientOffline } from '@/lib/offlinePatients'
+import { getStatus } from '@/lib/connectionMonitor'
 import AutocompleteMedicamento from '@/components/AutocompleteMedicamento'
 import { MedicamentoDB } from '@/data/medicamentos'
+import { useToast } from '@/components/ui/Toast'
 
 type MedicamentoConVia = Medicamento & { via_administracion?: string }
 
@@ -135,6 +137,7 @@ interface Props {
 export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, medicamentosIniciales }: Props) {
   const { medicoInfo } = useMedicoInfo()
   const { isSuperAdmin } = useProfile()
+  const toast = useToast()
   const [paciente, setPaciente] = useState(pacienteInicial)
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
   const [pacienteData, setPacienteData] = useState<{ edad?: number | null; sexo?: string } | null>(null)
@@ -219,8 +222,14 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 
   async function imprimir() {
     flushSync(() => { setErrorGuardado(''); setImprimiendo(true) })
-    try {
-    // Folio criptográficamente aleatorio — 12 chars de UUID, imposible de enumerar
+
+    // 1. Feedback instantáneo — el usuario ve progreso en <50ms
+    toast.info('Generando receta...')
+
+    // 2. Construcción de identidad — el folio sirve DOBLE propósito:
+    //    - Identificador público del documento (QR de verificación)
+    //    - clientId del outbox-engine (idempotencia garantizada por el
+    //      índice único parcial en la tabla documentos)
     const folio = `R-${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`
     const contenido = {
       folio,
@@ -239,76 +248,149 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
       color_secundario: medicoInfo?.color_secundario || '#1e5fa8',
     }
 
-    const supabase = createClient()
-    const { error: saveError } = await supabase.from('documentos').insert({
-      ...(pacienteId ? { paciente_id: pacienteId } : {}),
-      tipo: 'receta',
-      contenido,
-    })
-    if (saveError) {
-      // Guardar en cola offline — se sincronizará automáticamente cuando vuelva la conexión
-      await enqueue({
-        paciente_id: pacienteId || undefined,
+    // Flags de tracking para diferenciar errores de PDF vs persistencia
+    let pdfGenerated = false
+    let persistedHow: 'supabase' | 'outbox' | null = null
+
+    try {
+      // 3. PDF PRIMERO — si falla, abortamos antes de escribir nada.
+      //    Evita orphan records donde el outbox tiene una receta que el
+      //    médico nunca vio porque el PDF nunca se generó.
+      const verificacionUrl = `${window.location.origin}/r/${folio}`
+      const [qrDataUrl, blogQrDataUrl] = await Promise.all([
+        QRCode.toDataURL(verificacionUrl, {
+          width: 96,
+          margin: 1,
+          color: { dark: '#1a3a5c', light: '#ffffff' },
+        }),
+        isSuperAdmin
+          ? QRCode.toDataURL('https://dranconacolumna.com/articulos.html', {
+              width: 64,
+              margin: 1,
+              color: { dark: medicoInfo?.color_primario || '#1a3a5c', light: '#ffffff' },
+            })
+          : Promise.resolve(''),
+      ])
+
+      const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
+      const medsData = medicamentos.filter(m => m.nombre_comercial)
+
+      const doctorNombre = medicoInfo?.nombre || 'Médico'
+      const doctorEspecialidad = medicoInfo?.especialidad || ''
+      const cedProf = medicoInfo?.cedula_profesional || ''
+      const cedEsp = medicoInfo?.cedula_especialidad || ''
+      const direccion = medicoInfo?.direccion_consultorio || ''
+      const telefono = medicoInfo?.telefono_consultorio || ''
+      const logoUrl =
+        medicoInfo?.logo_url && medicoInfo.logo_url.startsWith('https://')
+          ? medicoInfo.logo_url
+          : `${window.location.origin}/logo.png`
+      const cp = medicoInfo?.color_primario || '#1a3a5c'
+      const cs = medicoInfo?.color_secundario || '#1e5fa8'
+      const edadPaciente = pacienteData?.edad
+      const sexoPaciente =
+        pacienteData?.sexo === 'M' ? 'Masculino' :
+        pacienteData?.sexo === 'F' ? 'Femenino' :
+        pacienteData?.sexo || ''
+
+      await generarPdf({
         tipo: 'receta',
-        contenido,
+        medico: {
+          nombre: doctorNombre,
+          especialidad: doctorEspecialidad,
+          cedula_profesional: cedProf,
+          cedula_especialidad: cedEsp,
+          color_primario: cp,
+          color_secundario: cs,
+          direccion_consultorio: direccion,
+          telefono_consultorio: telefono,
+          firma_url: medicoInfo?.firma_url ?? null,
+        },
+        data: {
+          paciente,
+          fecha: fechaFormat,
+          diagnostico,
+          edad: edadPaciente != null ? `${edadPaciente} años` : undefined,
+          sexo: sexoPaciente || undefined,
+          folio,
+          medicamentos: medsData,
+          recomendaciones: recomendaciones || undefined,
+          qrDataUrl,
+          blogQrDataUrl: blogQrDataUrl || undefined,
+        },
+        logoUrl,
+        filename: 'receta-medica.pdf',
       })
-      setErrorGuardado('Sin conexión — la receta se guardará automáticamente cuando vuelva el internet.')
-    }
 
-    const verificacionUrl = `${window.location.origin}/r/${folio}`
-    const [qrDataUrl, blogQrDataUrl] = await Promise.all([
-      QRCode.toDataURL(verificacionUrl, { width: 96, margin: 1, color: { dark: '#1a3a5c', light: '#ffffff' } }),
-      isSuperAdmin
-        ? QRCode.toDataURL('https://dranconacolumna.com/articulos.html', { width: 64, margin: 1, color: { dark: medicoInfo?.color_primario || '#1a3a5c', light: '#ffffff' } })
-        : Promise.resolve(''),
-    ])
+      pdfGenerated = true
 
-    const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
+      // 4. Persistencia resiliente — bypass inteligente según estado de red
+      const browserOffline = typeof navigator !== 'undefined' && navigator.onLine === false
+      const monitorOffline = getStatus() === 'offline'
+      const isTrulyOffline = browserOffline || monitorOffline
 
-    const medsData = medicamentos.filter(m => m.nombre_comercial)
+      if (!isTrulyOffline) {
+        // Intento directo a Supabase con client_id para idempotencia
+        try {
+          const supabase = createClient()
+          const insertPayload: Record<string, unknown> = {
+            tipo: 'receta',
+            contenido,
+            client_id: folio,
+          }
+          if (pacienteId) insertPayload.paciente_id = pacienteId
 
-    const doctorNombre = medicoInfo?.nombre || 'Médico'
-    const doctorEspecialidad = medicoInfo?.especialidad || ''
-    const cedProf = medicoInfo?.cedula_profesional || ''
-    const cedEsp = medicoInfo?.cedula_especialidad || ''
-    const direccion = medicoInfo?.direccion_consultorio || ''
-    const telefono = medicoInfo?.telefono_consultorio || ''
-    const logoUrl = medicoInfo?.logo_url && medicoInfo.logo_url.startsWith('https://') ? medicoInfo.logo_url : `${window.location.origin}/logo.png`
-    const cp = medicoInfo?.color_primario || '#1a3a5c'
-    const cs = medicoInfo?.color_secundario || '#1e5fa8'
-    const edadPaciente = pacienteData?.edad
-    const sexoPaciente = pacienteData?.sexo === 'M' ? 'Masculino' : pacienteData?.sexo === 'F' ? 'Femenino' : pacienteData?.sexo || ''
+          const { error } = await supabase.from('documentos').insert(insertPayload)
+          if (error) throw error
+          persistedHow = 'supabase'
+        } catch {
+          // Red inestable, 5xx, o columna client_id todavía sin desplegar:
+          // fallback al outbox que reintentará automáticamente.
+          await enqueueOutbox({
+            clientId: folio,
+            action: 'INSERT',
+            resource: 'document',
+            subtype: 'receta',
+            payload: contenido,
+            tempRef: pacienteId || undefined,
+            endpoint: '/api/documentos',
+            method: 'POST',
+          })
+          persistedHow = 'outbox'
+        }
+      } else {
+        // Offline declarado → directo al outbox, sin intentar Supabase
+        await enqueueOutbox({
+          clientId: folio,
+          action: 'INSERT',
+          resource: 'document',
+          subtype: 'receta',
+          payload: contenido,
+          tempRef: pacienteId || undefined,
+          endpoint: '/api/documentos',
+          method: 'POST',
+        })
+        persistedHow = 'outbox'
+      }
 
-    await generarPdf({
-      tipo: 'receta',
-      medico: {
-        nombre: doctorNombre,
-        especialidad: doctorEspecialidad,
-        cedula_profesional: cedProf,
-        cedula_especialidad: cedEsp,
-        color_primario: cp,
-        color_secundario: cs,
-        direccion_consultorio: direccion,
-        telefono_consultorio: telefono,
-        firma_url: medicoInfo?.firma_url ?? null,
-      },
-      data: {
-        paciente,
-        fecha: fechaFormat,
-        diagnostico,
-        edad: edadPaciente != null ? `${edadPaciente} años` : undefined,
-        sexo: sexoPaciente || undefined,
-        folio,
-        medicamentos: medsData,
-        recomendaciones: recomendaciones || undefined,
-        qrDataUrl,
-        blogQrDataUrl: blogQrDataUrl || undefined,
-      },
-      logoUrl,
-      filename: 'receta-medica.pdf',
-    })
-    } catch {
-      setErrorGuardado('No se pudo generar el PDF. Intenta de nuevo.')
+      // 5. Feedback final — solo cuando el dato está físicamente persistido
+      if (persistedHow === 'supabase') {
+        toast.success('Receta guardada y sincronizada')
+      } else {
+        toast.warning('Receta guardada localmente — se sincronizará al reconectar')
+      }
+    } catch (err) {
+      if (!pdfGenerated) {
+        // El error ocurrió antes/durante el PDF → ningún orphan record
+        toast.error('No se pudo generar el PDF. Intenta de nuevo.')
+        setErrorGuardado('No se pudo generar el PDF. Intenta de nuevo.')
+      } else {
+        // PDF OK pero persistencia colapsó (improbable: enqueueOutbox no hace network)
+        toast.error('Receta generada pero no se pudo guardar. Revisa errores de sincronización.')
+        setErrorGuardado('Error al guardar la receta.')
+      }
+      // eslint-disable-next-line no-console
+      console.error('[RecetaForm] imprimir falló:', err)
     } finally {
       setImprimiendo(false)
     }
