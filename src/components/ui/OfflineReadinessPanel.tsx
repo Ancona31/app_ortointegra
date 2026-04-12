@@ -31,6 +31,27 @@ import { secureStorage } from '@/lib/secureStorage'
 /** Nombre del cache — debe coincidir con el del Service Worker (sw.js/route.ts) */
 const CACHE_NAME = 'spinus-v5.1'
 
+/** Rutas críticas que DEBEN estar precacheadas desde la primera visita.
+ *  Sincronizado con PRECACHE de sw.js/route.ts */
+const CRITICAL_ROUTES = [
+  '/inicio',
+  '/dashboard',
+  '/agenda',
+  '/estadisticas',
+  '/documentos',
+  '/pacientes',
+  '/pacientes/nuevo',
+  '/expediente',
+  '/expediente/_',
+  '/expediente/_/nueva-nota',
+  '/expediente/_/editar',
+  '/expediente/_/documentos',
+  '/expediente/_/laboratorios/nuevo',
+  '/expediente/_/laboratorios/_',
+  '/expediente/_/consulta/_',
+  '/suplementacion',
+]
+
 /** Los 8 formularios críticos que deben estar cacheados para modo offline */
 const CRITICAL_FORMS = [
   () => import('@/components/documentos/RecetaForm'),
@@ -51,6 +72,8 @@ interface ChecksState {
   expedientesCount: number | null
   /** null = verificando, true = 8/8 listos, false = alguno falló */
   formsReady: boolean | null
+  /** null = verificando, número = rutas cacheadas / total */
+  routesCached: { ready: number; total: number } | null
 }
 
 interface Props {
@@ -67,6 +90,7 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
     pdfReady: null,
     expedientesCount: null,
     formsReady: null,
+    routesCached: null,
   })
   const [refreshing, setRefreshing] = useState(false)
   const { mutate } = useSWRConfig()
@@ -111,28 +135,38 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
       expedientesCount = 0
     }
 
-    // ── 4. Formularios críticos — los 8 formularios cacheados ──
-    let formsReady = false
+    // ── 4. Rutas críticas — verificar las 16 rutas del PRECACHE ──
+    let routesCached: { ready: number; total: number } = {
+      ready: 0,
+      total: CRITICAL_ROUTES.length,
+    }
     try {
       if (typeof caches !== 'undefined') {
         const cache = await caches.open(CACHE_NAME)
-        const [docsInCache, notaInCache] = await Promise.all([
-          cache.match('/documentos'),
-          cache.match('/expediente/_/nueva-nota'),
-        ])
-
-        if (docsInCache && notaInCache) {
-          // Intentar importar los 8 formularios — si algún chunk no está
-          // cacheado, el SW lo descargará ahora (warm-up adicional)
-          await Promise.all(CRITICAL_FORMS.map(loader => loader()))
-          formsReady = true
+        const matches = await Promise.all(
+          CRITICAL_ROUTES.map(route => cache.match(route))
+        )
+        routesCached = {
+          ready: matches.filter(Boolean).length,
+          total: CRITICAL_ROUTES.length,
         }
       }
+    } catch {
+      routesCached = { ready: 0, total: CRITICAL_ROUTES.length }
+    }
+
+    // ── 5. Formularios críticos — los 8 dynamic imports ──
+    let formsReady = false
+    try {
+      // Intentar importar los 8 formularios — si algún chunk no está
+      // cacheado, el SW lo descargará ahora (warm-up adicional)
+      await Promise.all(CRITICAL_FORMS.map(loader => loader()))
+      formsReady = true
     } catch {
       formsReady = false
     }
 
-    setChecks({ swActive, pdfReady, expedientesCount, formsReady })
+    setChecks({ swActive, pdfReady, expedientesCount, formsReady, routesCached })
   }, [])
 
   // Mount + chequeos iniciales con retry escalonado
@@ -173,7 +207,7 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
     return (
       <div
         className={`
-          relative z-[2] rounded-2xl border p-5 h-[220px]
+          relative z-[2] rounded-2xl border p-5 h-[260px]
           backdrop-blur-md shadow-lg
           ${dark
             ? 'bg-slate-900/40 border-white/10'
@@ -184,17 +218,23 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
     )
   }
 
-  // Estado global derivado — Sistema Autónomo requiere los 4 checks verdes
+  // Estado global derivado — Sistema Autónomo requiere los 5 checks verdes
+  const routesAllCached =
+    checks.routesCached !== null &&
+    checks.routesCached.ready === checks.routesCached.total
+
   const anyChecking =
     checks.swActive === null ||
     checks.pdfReady === null ||
     checks.expedientesCount === null ||
-    checks.formsReady === null
+    checks.formsReady === null ||
+    checks.routesCached === null
 
   const anyFailed =
     checks.swActive === false ||
     checks.pdfReady === false ||
-    checks.formsReady === false
+    checks.formsReady === false ||
+    (checks.routesCached !== null && !routesAllCached)
 
   const badgeState: BadgeState = anyChecking
     ? 'syncing'
@@ -257,7 +297,7 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
         </span>
       </div>
 
-      {/* Checks list — 4 verificaciones */}
+      {/* Checks list — 5 verificaciones */}
       <div className="space-y-2.5">
         <CheckRow
           state={checks.swActive}
@@ -269,6 +309,22 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
           label="Generador de PDFs: Listo"
           dark={dark}
           trailingIcon={<FileCheck size={13} />}
+        />
+        <CheckRow
+          state={
+            checks.routesCached === null
+              ? null
+              : routesAllCached
+          }
+          label={
+            checks.routesCached === null
+              ? 'Rutas precacheadas: verificando...'
+              : routesAllCached
+                ? `Rutas precacheadas: ${checks.routesCached.total}/${checks.routesCached.total} listas`
+                : `Rutas NO disponibles: ${checks.routesCached.total - checks.routesCached.ready} de ${checks.routesCached.total} faltan`
+          }
+          dark={dark}
+          trailingIcon={<FileText size={13} />}
         />
         <CheckRow
           state={checks.formsReady}
