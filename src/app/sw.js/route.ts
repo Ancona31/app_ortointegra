@@ -54,13 +54,14 @@ self.addEventListener('fetch', (e) => {
   // APIs y cross-origin: pass-through (nunca cachear)
   if (url.pathname.startsWith('/api/') || url.origin !== self.location.origin) return
 
-  // ── CAPTURA TOTAL DE CHUNKS JS — Cache-First ──
+  // ── CAPTURA TOTAL DE CHUNKS JS — Cache-First con retry 100ms ──
   // Los chunks de _next/static/chunks son CRÍTICOS para evitar ChunkLoadError.
   // Estrategia:
   //   1. Buscar en cache con ignoreSearch: true (matchea archivo.js?v=1 con archivo.js)
   //   2. Si hay match → servir instantáneo, NO ir a red
   //   3. Si no hay match → red → cachear → servir
-  //   4. Si red falla offline + no cache → 404 (no 503) para retry natural de Next.js
+  //   4. Si red falla, retry tras 100ms (tolera glitches transitorios)
+  //   5. Si red falla ambos intentos → 404 (no 503) para retry natural de Next.js
   if (
     url.pathname.startsWith('/_next/static/chunks/') ||
     url.pathname.match(/\\/_next\\/static\\/.*\\.(js|css|json)$/)
@@ -70,15 +71,20 @@ self.addEventListener('fetch', (e) => {
         // Cache hit → servir inmediato sin tocar red
         if (cached) return cached
 
-        // Cache miss → intentar red y cachear
-        return fetch(e.request).then(res => {
+        // Helper: intenta el fetch y cachea si ok
+        const tryFetch = () => fetch(e.request).then(res => {
           if (res.ok) {
             const clone = res.clone()
             caches.open(CACHE).then(c => c.put(e.request, clone)).catch(() => {})
           }
           return res
-        }).catch(() =>
-          new Response('', { status: 404, statusText: 'Not Found' })
+        })
+
+        // Cache miss → primer intento de red, con retry de 100ms si falla
+        return tryFetch().catch(() =>
+          new Promise(resolve => setTimeout(resolve, 100))
+            .then(() => tryFetch())
+            .catch(() => new Response('', { status: 404, statusText: 'Not Found' }))
         )
       })
     )

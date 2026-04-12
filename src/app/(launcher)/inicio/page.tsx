@@ -235,6 +235,35 @@ export default function InicioPage() {
 
   useEffect(() => {
     const supabase = createClient()
+
+    // Offline: saltar validación de sesión, cargar UI con datos cacheados
+    // para que el médico pueda acceder al launcher sin bloqueo
+    const isBrowserOffline =
+      typeof navigator !== 'undefined' && navigator.onLine === false
+
+    if (isBrowserOffline) {
+      // Estado mínimo fallback para que la UI no se quede colgada
+      const fallbackEstado: EstadoPerfil = {
+        porcentaje: 100,
+        requiereOnboarding: false,
+        gridMode: 'activo',
+        role: 'medico',
+        nombre: null,
+        plan: 'free',
+        planNombre: 'Free',
+        suscripcion_estado: 'trial',
+      }
+
+      // Intentar leer el estado del perfil (el SW lo puede tener cacheado si
+      // el médico abrió el launcher antes online); si falla, usar fallback
+      fetch('/api/me/estado-perfil')
+        .then(r => r.json())
+        .then((data: EstadoPerfil) => setEstado(data))
+        .catch(() => setEstado(fallbackEstado))
+        .finally(() => setLoading(false))
+      return
+    }
+
     supabase.auth.getUser().then(({ data: { user } }: { data: { user: { id: string } | null } }) => {
       if (!user) { router.push('/login'); return }
 

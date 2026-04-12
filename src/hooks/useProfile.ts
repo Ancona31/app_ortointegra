@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { secureStorage } from '@/lib/secureStorage'
 
 export type Role = 'super_admin' | 'admin' | 'medico' | 'secretaria'
 
@@ -17,28 +18,65 @@ export interface Profile {
   universidad?: string | null
 }
 
+const PROFILE_CACHE_KEY = 'cache_user_profile'
+
 // Caché a nivel de módulo: evita múltiples queries cuando varios componentes
 // usan useProfile() al mismo tiempo en la misma sesión.
 let profilePromise: Promise<Profile | null> | null = null
 
+/** Lee el profile cacheado en secureStorage (cifrado AES-256-GCM) */
+async function getCachedProfile(): Promise<Profile | null> {
+  try {
+    const cached = await secureStorage.get<Profile>(PROFILE_CACHE_KEY)
+    return cached ?? null
+  } catch {
+    return null
+  }
+}
+
 function fetchProfile(): Promise<Profile | null> {
   if (profilePromise) return profilePromise
+
+  // Offline: no tocar Supabase, leer directo del cache para evitar cuelgues
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    profilePromise = getCachedProfile()
+    return profilePromise
+  }
+
   const supabase = createClient()
-  profilePromise = supabase.auth.getUser().then(({ data: { user } }: { data: { user: { id: string } | null } }) => {
-    if (!user) return null
-    return supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
-      .then((res: { data: Record<string, string | null> | null }) => res.data)
-  }).catch(() => null)
+  profilePromise = supabase.auth.getUser()
+    .then(({ data: { user } }: { data: { user: { id: string } | null } }) => {
+      if (!user) return null
+      return supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+        .then(async (res: { data: Record<string, string | null> | null }) => {
+          const profile = res.data as Profile | null
+          // Persistir en secureStorage para acceso offline futuro
+          if (profile) {
+            secureStorage.set(PROFILE_CACHE_KEY, profile).catch(() => {})
+          }
+          return profile
+        })
+    })
+    .catch(async () => {
+      // Fetch falló (offline sobrevenido, red caída, timeout) → fallback al cache
+      return await getCachedProfile()
+    })
   return profilePromise!
 }
 
-// Limpiar caché al cerrar sesión (llamar desde el botón de logout)
+/** Limpiar caché al cerrar sesión (llamar desde el botón de logout) */
 export function clearProfileCache() {
   profilePromise = null
+  // Limpiar también el cache persistente
+  try {
+    secureStorage.remove(PROFILE_CACHE_KEY)
+  } catch {
+    // silencioso
+  }
 }
 
 export function useProfile() {
