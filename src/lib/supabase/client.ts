@@ -27,7 +27,12 @@ export function createClient() {
     {
       auth: {
         persistSession: true,
-        storage: typeof window !== 'undefined' ? window.sessionStorage : undefined,
+        // LOCAL-FIRST: usamos localStorage (no sessionStorage) para que la
+        // sesión sobreviva al cierre del tab y permita operación offline
+        // sostenida. El SessionGuard usa sessionStorage.SESSION_FLAG como
+        // detector de "tab nuevo" para mantener el auto-logout al cerrar
+        // navegador, pero la sesión real de Supabase vive en localStorage.
+        storage: typeof window !== 'undefined' ? window.localStorage : undefined,
         autoRefreshToken: true,
         detectSessionInUrl: true,
       },
