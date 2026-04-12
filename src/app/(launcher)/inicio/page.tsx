@@ -90,6 +90,8 @@ export default function InicioPage() {
     // Prefetch chunks JS de rutas críticas para navegación offline
     router.prefetch('/documentos')
     router.prefetch('/expediente/_/nueva-nota')
+    router.prefetch('/pacientes')
+    router.prefetch('/pacientes/nuevo')
     // Pre-descargar chunks de formularios de documentos
     import('@/components/documentos/RecetaForm')
     import('@/components/documentos/SolicitudLabForm')

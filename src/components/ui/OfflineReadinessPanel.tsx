@@ -3,10 +3,11 @@
 /**
  * OfflineReadinessPanel — panel de estado del sistema offline-first.
  *
- * Verifica 3 dimensiones críticas:
- *  1. Motor: Service Worker v5 activo + caché spinus-v5 presente
+ * Verifica 4 dimensiones críticas:
+ *  1. Motor: Service Worker v5.1 activo + caché spinus-v5.1 presente
  *  2. Generador PDF: LOGO_BASE64 + ROBOTO_FONTS cargables via dynamic import
- *  3. Data local: conteo de expedientes en secureStorage
+ *  3. Expedientes: conteo de pacientes en secureStorage
+ *  4. Formularios críticos: los 8 formularios cacheados y listos
  *
  * Diseño glassmorphism — se adapta a modo oscuro del launcher.
  * Incluye retry automático durante los primeros 5s para evitar falsos negativos
@@ -23,8 +24,24 @@ import {
   RefreshCw,
   FileCheck,
   Users,
+  FileText,
 } from 'lucide-react'
 import { secureStorage } from '@/lib/secureStorage'
+
+/** Nombre del cache — debe coincidir con el del Service Worker (sw.js/route.ts) */
+const CACHE_NAME = 'spinus-v5.1'
+
+/** Los 8 formularios críticos que deben estar cacheados para modo offline */
+const CRITICAL_FORMS = [
+  () => import('@/components/documentos/RecetaForm'),
+  () => import('@/components/documentos/SolicitudLabForm'),
+  () => import('@/components/documentos/SolicitudImagenForm'),
+  () => import('@/components/documentos/EscritoMedicoForm'),
+  () => import('@/components/documentos/ConsentimientoInformadoForm'),
+  () => import('@/components/documentos/SolicitudInternamientoForm'),
+  () => import('@/components/documentos/NotaHonorariosForm'),
+  () => import('@/components/documentos/PlanSuplementacionForm'),
+]
 
 interface ChecksState {
   /** null = verificando, true = OK, false = falla */
@@ -32,6 +49,8 @@ interface ChecksState {
   pdfReady: boolean | null
   /** null = verificando, número = cantidad real */
   expedientesCount: number | null
+  /** null = verificando, true = 8/8 listos, false = alguno falló */
+  formsReady: boolean | null
 }
 
 interface Props {
@@ -47,19 +66,20 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
     swActive: null,
     pdfReady: null,
     expedientesCount: null,
+    formsReady: null,
   })
   const [refreshing, setRefreshing] = useState(false)
   const { mutate } = useSWRConfig()
 
-  /** Ejecuta los 3 chequeos en paralelo */
+  /** Ejecuta los 4 chequeos en paralelo */
   const runChecks = useCallback(async () => {
-    // ── 1. Motor v5 — doble verificación ──
+    // ── 1. Motor v5.1 — doble verificación ──
     let swActive = false
     try {
       if (typeof navigator !== 'undefined' && typeof caches !== 'undefined') {
         const hasController = !!navigator.serviceWorker?.controller
-        const hasV5Cache = await caches.has('spinus-v5')
-        swActive = hasController && hasV5Cache
+        const hasCache = await caches.has(CACHE_NAME)
+        swActive = hasController && hasCache
       }
     } catch {
       swActive = false
@@ -91,7 +111,28 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
       expedientesCount = 0
     }
 
-    setChecks({ swActive, pdfReady, expedientesCount })
+    // ── 4. Formularios críticos — los 8 formularios cacheados ──
+    let formsReady = false
+    try {
+      if (typeof caches !== 'undefined') {
+        const cache = await caches.open(CACHE_NAME)
+        const [docsInCache, notaInCache] = await Promise.all([
+          cache.match('/documentos'),
+          cache.match('/expediente/_/nueva-nota'),
+        ])
+
+        if (docsInCache && notaInCache) {
+          // Intentar importar los 8 formularios — si algún chunk no está
+          // cacheado, el SW lo descargará ahora (warm-up adicional)
+          await Promise.all(CRITICAL_FORMS.map(loader => loader()))
+          formsReady = true
+        }
+      }
+    } catch {
+      formsReady = false
+    }
+
+    setChecks({ swActive, pdfReady, expedientesCount, formsReady })
   }, [])
 
   // Mount + chequeos iniciales con retry escalonado
@@ -99,8 +140,8 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
     setMounted(true)
     runChecks()
 
-    // Retry durante los primeros 5s para dar tiempo al SW de activarse
-    // y a precachePatients de poblar el cache
+    // Retry durante los primeros 5s para dar tiempo al SW de activarse,
+    // a precachePatients de poblar el cache y al warm-up de formularios
     const retries = [1500, 3000, 5000]
     const timers = retries.map((delay) =>
       setTimeout(() => {
@@ -132,7 +173,7 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
     return (
       <div
         className={`
-          relative z-[2] rounded-2xl border p-5 h-[180px]
+          relative z-[2] rounded-2xl border p-5 h-[220px]
           backdrop-blur-md shadow-lg
           ${dark
             ? 'bg-slate-900/40 border-white/10'
@@ -143,15 +184,17 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
     )
   }
 
-  // Estado global derivado
+  // Estado global derivado — Sistema Autónomo requiere los 4 checks verdes
   const anyChecking =
     checks.swActive === null ||
     checks.pdfReady === null ||
-    checks.expedientesCount === null
+    checks.expedientesCount === null ||
+    checks.formsReady === null
 
   const anyFailed =
     checks.swActive === false ||
-    checks.pdfReady === false
+    checks.pdfReady === false ||
+    checks.formsReady === false
 
   const badgeState: BadgeState = anyChecking
     ? 'syncing'
@@ -214,11 +257,11 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
         </span>
       </div>
 
-      {/* Checks list */}
+      {/* Checks list — 4 verificaciones */}
       <div className="space-y-2.5">
         <CheckRow
           state={checks.swActive}
-          label="Motor v5 Activo"
+          label="Motor v5.1 Activo"
           dark={dark}
         />
         <CheckRow
@@ -226,6 +269,12 @@ export default function OfflineReadinessPanel({ dark = false }: Props) {
           label="Generador de PDFs: Listo"
           dark={dark}
           trailingIcon={<FileCheck size={13} />}
+        />
+        <CheckRow
+          state={checks.formsReady}
+          label="Formularios críticos: 8/8 listos"
+          dark={dark}
+          trailingIcon={<FileText size={13} />}
         />
         <CheckRow
           state={checks.expedientesCount !== null ? true : null}

@@ -1,15 +1,14 @@
 import { NextResponse } from 'next/server'
 
-const SW_CONTENT = `const CACHE = 'spinus-v5'
+const SW_CONTENT = `const CACHE = 'spinus-v5.1'
 const FONT_CACHE = 'spinus-pdf-fonts-v1'
 
 const PRECACHE = [
   '/inicio',
   '/documentos',
+  '/expediente/_/nueva-nota',
   '/pacientes',
   '/pacientes/nuevo',
-  '/perfil',
-  '/laboratorios',
   '/suplementacion',
   '/offline',
   '/logo.png',
