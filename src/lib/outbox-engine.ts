@@ -632,8 +632,30 @@ async function processBatch(
 }
 
 /**
+ * Prioriza items por peso del payload serializado (ascendente).
+ *
+ * Objetivo: cuando la red vuelve tras horas offline, procesar primero
+ * los registros JSON ligeros (recetas, notas, solicitudes) antes que
+ * items pesados (PDFs embebidos, imágenes base64) que tienen más
+ * probabilidad de fallar por timeout y bloquear el sync completo.
+ *
+ * No toca el schema del OutboxItem. Ordena localmente el array justo
+ * antes del processBatch. Sort estable por ES2019+.
+ */
+function prioritizeByWeight(items: OutboxItem[]): OutboxItem[] {
+  return [...items].sort((a, b) => {
+    let wa: number
+    let wb: number
+    try { wa = JSON.stringify(a.payload ?? {}).length } catch { wa = Number.MAX_SAFE_INTEGER }
+    try { wb = JSON.stringify(b.payload ?? {}).length } catch { wb = Number.MAX_SAFE_INTEGER }
+    return wa - wb
+  })
+}
+
+/**
  * Flush ordenado: pacientes primero, luego updateReferences, luego
- * notas + documentos en paralelo. Retorna el resumen total.
+ * notas + documentos en paralelo. Dentro de cada grupo, items ligeros
+ * tienen prioridad sobre items pesados. Retorna el resumen total.
  */
 export async function flushOutbox(): Promise<FlushResult> {
   await migrateLegacyQueues()
@@ -650,8 +672,8 @@ export async function flushOutbox(): Promise<FlushResult> {
     it => !['patient', 'note', 'document'].includes(it.resource),
   )
 
-  // 1. Procesar pacientes primero
-  const patientResult = await processBatch(patients)
+  // 1. Procesar pacientes primero (ordenados por peso)
+  const patientResult = await processBatch(prioritizeByWeight(patients))
 
   // 2. Si hay remapping, actualizar referencias en notes/docs antes del flush
   let notesToProcess = notes
@@ -665,11 +687,11 @@ export async function flushOutbox(): Promise<FlushResult> {
     documentsToProcess = refreshed.filter(it => it.resource === 'document')
   }
 
-  // 3. Flush notes y documents en paralelo
+  // 3. Flush notes y documents en paralelo (cada grupo ordenado por peso)
   const [notesResult, docsResult, othersResult] = await Promise.all([
-    processBatch(notesToProcess),
-    processBatch(documentsToProcess),
-    processBatch(others),
+    processBatch(prioritizeByWeight(notesToProcess)),
+    processBatch(prioritizeByWeight(documentsToProcess)),
+    processBatch(prioritizeByWeight(others)),
   ])
 
   // 4. Guardar el estado resultante: solo los que siguen en retrying quedan pending

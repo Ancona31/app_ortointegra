@@ -2,6 +2,12 @@
  * Monitor global de conexión.
  * Combina navigator.onLine + ping real a /api/health cada 30s.
  * Mide latencia para detectar conexión lenta.
+ *
+ * Modo Offline Forzado:
+ *   Toggle manual persistente (localStorage) que fuerza el estado a
+ *   'offline' independientemente del estado real de la red. Útil para
+ *   QA en consultorio con "Wi-Fi fantasma" y para testing reproducible
+ *   del outbox/DLQ. Mientras esté activo, los pings se suprimen.
  */
 
 export type ConnectionStatus = 'online' | 'offline' | 'slow'
@@ -10,12 +16,14 @@ type Listener = (status: ConnectionStatus, latencyMs: number | null) => void
 
 const PING_INTERVAL = 30_000
 const SLOW_THRESHOLD_MS = 3_000
+const FORCED_OFFLINE_KEY = 'spinus:forced-offline'
 
 let currentStatus: ConnectionStatus = 'online'
 let currentLatency: number | null = null
 let listeners: Listener[] = []
 let pingTimer: ReturnType<typeof setInterval> | null = null
 let started = false
+let forcedOffline = false
 
 function notify() {
   for (const fn of listeners) {
@@ -31,6 +39,12 @@ function setStatus(status: ConnectionStatus, latency: number | null) {
 }
 
 async function ping() {
+  // Modo offline forzado bloquea cualquier ping real
+  if (forcedOffline) {
+    setStatus('offline', null)
+    return
+  }
+
   if (!navigator.onLine) {
     setStatus('offline', null)
     return
@@ -55,14 +69,29 @@ async function ping() {
   }
 }
 
-function handleOnline() { ping() }
+function handleOnline() {
+  // Si está forzado offline, ignorar el evento del browser
+  if (forcedOffline) return
+  ping()
+}
 function handleOffline() { setStatus('offline', null) }
 
 export function startMonitor() {
   if (typeof window === 'undefined' || started) return
   started = true
 
-  currentStatus = navigator.onLine ? 'online' : 'offline'
+  // Recuperar estado forzado persistido antes de calcular status inicial
+  try {
+    forcedOffline = window.localStorage.getItem(FORCED_OFFLINE_KEY) === '1'
+  } catch {
+    forcedOffline = false
+  }
+
+  if (forcedOffline) {
+    currentStatus = 'offline'
+  } else {
+    currentStatus = navigator.onLine ? 'online' : 'offline'
+  }
 
   window.addEventListener('online', handleOnline)
   window.addEventListener('offline', handleOffline)
@@ -90,3 +119,40 @@ export function subscribe(fn: Listener): () => void {
 export function getStatus(): ConnectionStatus { return currentStatus }
 export function getLatency(): number | null { return currentLatency }
 export function isOnline(): boolean { return currentStatus !== 'offline' }
+
+/**
+ * Modo Offline Forzado — API pública
+ *
+ * isForcedOffline() — lectura del estado actual
+ * setForcedOffline(true)  — activa: persiste flag, setea status a 'offline',
+ *                            notifica listeners, ignora navigator.onLine
+ * setForcedOffline(false) — desactiva: persiste, dispara ping() para
+ *                            re-sincronizar con el estado real de red
+ */
+export function isForcedOffline(): boolean { return forcedOffline }
+
+export function setForcedOffline(value: boolean): void {
+  if (typeof window === 'undefined') return
+  if (forcedOffline === value) return
+
+  forcedOffline = value
+
+  try {
+    if (value) {
+      window.localStorage.setItem(FORCED_OFFLINE_KEY, '1')
+    } else {
+      window.localStorage.removeItem(FORCED_OFFLINE_KEY)
+    }
+  } catch {
+    // localStorage no disponible (Safari private mode, etc.) — aceptamos
+    // que el toggle no sobreviva recarga pero sigue funcionando en memoria
+  }
+
+  if (value) {
+    // Al activar: forzar estado offline y notificar
+    setStatus('offline', null)
+  } else {
+    // Al desactivar: disparar un ping inmediato para re-sincronizar con red real
+    ping()
+  }
+}

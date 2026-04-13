@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { WifiOff, Wifi, AlertTriangle, RefreshCw, AlertCircle } from 'lucide-react'
+import { WifiOff, Wifi, AlertTriangle, RefreshCw, AlertCircle, Lock, Unlock } from 'lucide-react'
 import {
-  startMonitor, subscribe, type ConnectionStatus,
+  startMonitor, subscribe, isForcedOffline, setForcedOffline, type ConnectionStatus,
 } from '@/lib/connectionMonitor'
 import { getPendingNotesCount, syncPendingNotes } from '@/lib/offlineNotes'
 import { pendingCount as pendingDocCount, flush as flushDocs } from '@/lib/offlineQueue'
@@ -21,11 +21,20 @@ export default function ConnectionBanner() {
   const [prevStatus, setPrevStatus] = useState<ConnectionStatus>('online')
   const [deadLetterCount, setDeadLetterCount] = useState(0)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [forced, setForced] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
   // Monitor de conexión
   useEffect(() => {
+    setMounted(true)
     startMonitor()
+    // Sincronizar estado forzado al montar (hidratación limpia)
+    setForced(isForcedOffline())
+
     const unsub = subscribe((status) => {
+      // Mantener sincronía del flag forced con cada notificación
+      setForced(isForcedOffline())
+
       setPrevStatus(prev => {
         // Conexión restablecida después de estar offline
         if (prev === 'offline' && status === 'online') {
@@ -44,6 +53,13 @@ export default function ConnectionBanner() {
       })
     })
     return unsub
+  }, [])
+
+  // Toggle Modo Offline Forzado
+  const toggleForced = useCallback(() => {
+    const next = !isForcedOffline()
+    setForcedOffline(next)
+    setForced(next)
   }, [])
 
   // Contar pendientes + DLQ cada 10s
@@ -106,27 +122,60 @@ export default function ConnectionBanner() {
     }
   }, [])
 
-  // Nada que mostrar — mostrar si hay banner de estado, pendientes o errores en DLQ
-  if (banner === 'none' && pendingTotal === 0 && deadLetterCount === 0) return null
+  // Evitar render hasta montar (hydration-safe con el estado forced)
+  if (!mounted) return null
+
+  // Sin nada que mostrar: renderizar solo el trigger fantasma del modo forzado
+  // (opacity 30%, esquina derecha) para mantener siempre accesible el toggle
+  // sin saturar la UI.
+  const nothingToShow = banner === 'none' && pendingTotal === 0 && deadLetterCount === 0 && !forced
+  if (nothingToShow) {
+    return (
+      <div className="sticky top-0 z-[60] flex justify-end pointer-events-none">
+        <button
+          onClick={toggleForced}
+          title="Activar modo offline forzado (QA / testing)"
+          className="pointer-events-auto m-2 p-1.5 rounded-md bg-white/70 backdrop-blur-sm border border-slate-200 text-slate-400 opacity-30 hover:opacity-100 transition-opacity shadow-sm"
+        >
+          <Lock size={12} />
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="sticky top-0 z-[60] flex flex-col">
-      {/* Banner de estado de conexión */}
-      {banner === 'offline' && (
+      {/* Banner de Modo Offline Forzado — tiene prioridad visual sobre todo */}
+      {forced && (
+        <div className="bg-purple-600 text-white px-4 py-2.5 flex items-center justify-center gap-3 text-sm font-medium shadow-lg">
+          <Lock size={16} />
+          <span>Modo offline forzado — ignorando red real. Los cambios quedan en cola local.</span>
+          <button
+            onClick={toggleForced}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-xs font-semibold transition-colors"
+          >
+            <Unlock size={12} />
+            Reactivar red
+          </button>
+        </div>
+      )}
+
+      {/* Banner de estado de conexión (se oculta si el modo forzado está activo) */}
+      {!forced && banner === 'offline' && (
         <div className="bg-red-600 text-white px-4 py-2.5 flex items-center justify-center gap-2 text-sm font-medium shadow-lg">
           <WifiOff size={16} />
           <span>Sin conexion a internet — modo offline activo. Tus cambios se guardaran localmente.</span>
         </div>
       )}
 
-      {banner === 'slow' && (
+      {!forced && banner === 'slow' && (
         <div className="bg-amber-500 text-white px-4 py-2 flex items-center justify-center gap-2 text-sm font-medium shadow-lg">
           <AlertTriangle size={16} />
           <span>Conexion lenta — los cambios pueden tardar en guardarse.</span>
         </div>
       )}
 
-      {banner === 'restored' && (
+      {!forced && banner === 'restored' && (
         <div className="bg-emerald-500 text-white px-4 py-2 flex items-center justify-center gap-2 text-sm font-medium shadow-lg animate-fade-in">
           <Wifi size={16} />
           <span>Conexion restablecida — sincronizando datos...</span>

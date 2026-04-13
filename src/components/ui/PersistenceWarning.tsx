@@ -1,36 +1,43 @@
 'use client'
 
 /**
- * PersistenceWarning — Banner discreto que advierte al usuario si el
- * navegador no garantiza la persistencia de los datos locales.
+ * PersistenceWarning — Banner accionable que advierte al usuario SOLO
+ * cuando el almacenamiento local está por agotarse.
  *
- * Se muestra cuando:
- *   - isPersistenceReliable() === false (Safari: la API miente)
- *   - isStoragePersistent() === false (concedido explícitamente denegado)
+ * Criterios (ambos son motivos para mostrar el banner):
+ *   1. Espacio libre < 500 MB, o
+ *   2. Porcentaje usado >= 90% (menos del 10% disponible)
+ *
+ * Diseño intencional:
+ *   - NO se muestra si el navegador simplemente deniega persistencia
+ *     pero hay espacio de sobra (era ruido visual sin acción posible)
+ *   - NO se muestra si getStorageQuota() devuelve null (API no soportada)
+ *   - Solo alertas accionables: el médico debe saber cuándo liberar
+ *     espacio o migrar datos, no recibir avisos vagos de "no garantizado"
  *
  * Comportamiento:
- *   - Dismissable por sesión (flag en sessionStorage, no permanente)
- *   - Reaparece al cerrar/reabrir el tab — forzamos consciencia del riesgo
- *     en cada sesión médica
+ *   - Dismissable por sesión (flag en sessionStorage)
+ *   - Re-evalúa cada vez que se monta (cambio de tab / recarga)
  *
  * Integración:
  *   - Importar desde el layout principal de la app
  *   - No requiere props
- *   - Si no aplica (navegador confiable y persistencia granted), retorna null
  */
 
 import { useEffect, useState } from 'react'
 import { AlertTriangle, X } from 'lucide-react'
-import {
-  isPersistenceReliable,
-  isStoragePersistent,
-} from '@/lib/storage-vault'
+import { getStorageQuota } from '@/lib/storage-vault'
 
 const DISMISS_KEY = 'spinus_persistence_warning_dismissed'
+const FREE_SPACE_THRESHOLD_BYTES = 500 * 1024 * 1024 // 500 MB
+const PERCENT_USED_THRESHOLD = 90 // 90% = menos del 10% disponible
+
+type WarningReason = 'low_space' | 'high_usage'
 
 export default function PersistenceWarning() {
   const [mounted, setMounted] = useState(false)
-  const [shouldShow, setShouldShow] = useState(false)
+  const [reason, setReason] = useState<WarningReason | null>(null)
+  const [freeMb, setFreeMb] = useState<number | null>(null)
   const [dismissed, setDismissed] = useState(false)
 
   useEffect(() => {
@@ -49,17 +56,32 @@ export default function PersistenceWarning() {
     let cancelled = false
 
     ;(async () => {
-      // Detección síncrona: Safari nunca es confiable
-      if (!isPersistenceReliable()) {
-        if (!cancelled) setShouldShow(true)
+      const quota = await getStorageQuota()
+      if (cancelled) return
+
+      // API no soportada → silencio total, sin banner
+      if (!quota) return
+
+      // Si no hay info válida de cuota, no podemos decidir → silencio
+      if (quota.totalQuota <= 0) return
+
+      const freeBytes = quota.totalQuota - quota.totalUsed
+
+      // Criterio 1: menos de 500 MB libres
+      if (freeBytes < FREE_SPACE_THRESHOLD_BYTES) {
+        setFreeMb(Math.max(0, Math.round(freeBytes / (1024 * 1024))))
+        setReason('low_space')
         return
       }
 
-      // Detección async: estado actual de persistencia concedida
-      const persistent = await isStoragePersistent()
-      if (!cancelled && !persistent) {
-        setShouldShow(true)
+      // Criterio 2: más del 90% usado
+      if (quota.percentUsed >= PERCENT_USED_THRESHOLD) {
+        setFreeMb(Math.round(freeBytes / (1024 * 1024)))
+        setReason('high_usage')
+        return
       }
+
+      // Hay espacio de sobra → no mostrar nada
     })()
 
     return () => {
@@ -79,7 +101,17 @@ export default function PersistenceWarning() {
   // SSR + hydration safe: no renderizar hasta estar montado en cliente
   if (!mounted) return null
   if (dismissed) return null
-  if (!shouldShow) return null
+  if (reason === null) return null
+
+  const title =
+    reason === 'low_space'
+      ? 'Espacio local casi agotado'
+      : 'Almacenamiento casi lleno'
+
+  const body =
+    reason === 'low_space'
+      ? `Queda menos de 500 MB libres en tu navegador (≈ ${freeMb ?? '?'} MB). Libera espacio en tu dispositivo o sincroniza y limpia datos antiguos para evitar que se borren registros locales.`
+      : `Has usado más del 90% del almacenamiento del navegador (≈ ${freeMb ?? '?'} MB libres). Sincroniza tus cambios pendientes y considera limpiar datos antiguos para mantener la app funcional offline.`
 
   return (
     <div
@@ -95,13 +127,10 @@ export default function PersistenceWarning() {
         />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-amber-900">
-            Almacenamiento no garantizado
+            {title}
           </p>
           <p className="text-xs text-amber-800 mt-1 leading-relaxed">
-            Tu navegador no permite marcar los datos como persistentes. En
-            casos de poco espacio en el dispositivo, el sistema podría borrar
-            información local. Conéctate regularmente a internet para
-            sincronizar tus datos.
+            {body}
           </p>
         </div>
         <button
