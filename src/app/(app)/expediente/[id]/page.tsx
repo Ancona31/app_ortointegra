@@ -27,6 +27,14 @@ import TabDocumentos from '@/components/expediente/TabDocumentos'
 import ExportarExpedienteButton from '@/components/expediente/ExportarExpedienteButton'
 import dynamic from 'next/dynamic'
 
+// ── Read Mirror (Hito 3.3) ─────────────────────────────────────
+import { useHybridQuery } from '@/hooks/useHybridQuery'
+import {
+  getPacienteLocal, getConsultasLocal, getDocumentosLocal, hydratePaciente,
+} from '@/lib/read-mirror'
+import FreshnessBadge from '@/components/ui/FreshnessBadge'
+import { getStatus, subscribe } from '@/lib/connectionMonitor'
+
 function FormCargando() {
   return <div className="flex items-center justify-center py-12"><Loader2 className="animate-spin text-slate-300" size={24} /></div>
 }
@@ -53,34 +61,120 @@ const DOCS = [
 
 type Tab = 'resumen' | 'consultas' | 'laboratorios' | 'graficas' | 'documentos'
 
+/**
+ * LABS_PAGE_SIZE: sigue usando el tamaño original (15) con paginación
+ * cursor-based online. Los laboratorios NO están en el mirror (Bloque 2.5).
+ *
+ * MIRROR_VIEW_LIMIT: límite unificado para consultas y documentos que sí
+ * viven en el mirror. 50 cubre ~1 año de seguimiento típico ortopédico.
+ * Si se requiere más, se puede ampliar a futuro sin paginación visible.
+ */
+const LABS_PAGE_SIZE = 15
+const MIRROR_VIEW_LIMIT = 50
+
 function ExpedientePacienteContent() {
   const { id } = useParams<{ id: string }>()
   const searchParams = useSearchParams()
   const router = useRouter()
   const { isDoctor } = useProfile()
   useAuditAccess('pacientes', id) // NOM-024: registrar acceso al expediente
-  const PAGE_SIZE = 15
-  const [paciente, setPaciente] = useState<Paciente | null>(null)
-  const [consultas, setConsultas] = useState<Consulta[]>([])
+
+  // ── Estados que se mantienen intactos del código original ──
   const [labs, setLabs] = useState<Laboratorio[]>([])
   const [allAddendums, setAllAddendums] = useState<{ id: string; consulta_id: string; contenido: string; medico_nombre: string; created_at: string }[]>([])
   const [tab, setTab] = useState<Tab>('resumen')
-  const [loading, setLoading] = useState(true)
-  const [hayMasConsultas, setHayMasConsultas] = useState(false)
   const [hayMasLabs, setHayMasLabs] = useState(false)
-  const [hayMasDocs, setHayMasDocs] = useState(false)
   const [cargandoMas, setCargandoMas] = useState(false)
   const [eliminandoLab, setEliminandoLab] = useState<string | null>(null)
   const [confirmarEliminar, setConfirmarEliminar] = useState<string | null>(null)
   const [graficasAbiertas, setGraficasAbiertas] = useState<Record<string, boolean>>({})
   const [busquedaParam, setBusquedaParam] = useState('')
-  const [documentos, setDocumentos] = useState<Documento[]>([])
   const [docSeleccionado, setDocSeleccionado] = useState<Documento | null>(null)
   const [docInline, setDocInline] = useState<string | null>(null)
   const [mostrarEliminarPaciente, setMostrarEliminarPaciente] = useState(false)
   const [eliminandoPaciente, setEliminandoPaciente] = useState(false)
   const [errorEliminar, setErrorEliminar] = useState('')
 
+  // ── Detector de red para banner offline en tab Laboratorios ──
+  const [offline, setOffline] = useState(() => getStatus() === 'offline')
+  useEffect(() => {
+    const unsub = subscribe((status) => setOffline(status === 'offline'))
+    return unsub
+  }, [])
+
+  // ── 3 hybrid queries: paciente + consultas + documentos ──
+  // Nota: uso los tipos del proyecto (Paciente, Consulta, Documento) como T
+  // del hook genérico y caso en el localFetcher. Esto preserva la
+  // compatibilidad con los subcomponentes sin modificarlos.
+
+  const qPaciente = useHybridQuery<Paciente>({
+    key: `exp-paciente-${id}`,
+    localFetcher: async () => {
+      const local = await getPacienteLocal(id)
+      return local as unknown as Paciente | null
+    },
+    remoteFetcher: async () => {
+      const supabase = createClient()
+      const { data, error } = await supabase.from('pacientes').select('*').eq('id', id).single()
+      if (error) throw error
+      return data as Paciente
+    },
+  })
+
+  const qConsultas = useHybridQuery<Consulta[]>({
+    key: `exp-consultas-${id}`,
+    localFetcher: async () => {
+      const local = await getConsultasLocal(id, MIRROR_VIEW_LIMIT)
+      return local as unknown as Consulta[]
+    },
+    remoteFetcher: async () => {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('consultas')
+        .select('*')
+        .eq('paciente_id', id)
+        .order('fecha', { ascending: false })
+        .limit(MIRROR_VIEW_LIMIT)
+      if (error) throw error
+      return (data ?? []) as Consulta[]
+    },
+  })
+
+  const qDocumentos = useHybridQuery<Documento[]>({
+    key: `exp-documentos-${id}`,
+    localFetcher: async () => {
+      const local = await getDocumentosLocal(id, MIRROR_VIEW_LIMIT)
+      return local as unknown as Documento[]
+    },
+    remoteFetcher: async () => {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('documentos')
+        .select('*')
+        .eq('paciente_id', id)
+        .order('created_at', { ascending: false })
+        .limit(MIRROR_VIEW_LIMIT)
+      if (error) throw error
+      return (data ?? []) as Documento[]
+    },
+  })
+
+  // Derived state — usa los mismos nombres que el código original para
+  // minimizar cambios en el JSX más abajo.
+  const paciente = qPaciente.data
+  const consultas = qConsultas.data ?? []
+  const documentos = qDocumentos.data ?? []
+
+  // ── Refuerzo del Smart Warm-up: hidratar el paciente on-open ──
+  // Fire-and-forget. Actualiza el mirror en background para que la
+  // próxima apertura del mismo expediente sea instantánea incluso offline.
+  useEffect(() => {
+    void hydratePaciente(id).catch(() => {
+      // silent — si no hay red, el hook ya está usando la data local
+    })
+  }, [id])
+
+  // ── Efecto de query string para seleccionar tab inicial ──
   useEffect(() => {
     const t = searchParams.get('tab')
     if (t === 'laboratorios') setTab('laboratorios')
@@ -88,71 +182,57 @@ function ExpedientePacienteContent() {
     else if (t === 'documentos') setTab('documentos')
   }, [searchParams])
 
+  // ── Fetch inicial de laboratorios (online-only, sin mirror) ──
   useEffect(() => {
-    async function cargar() {
-      const supabase = createClient()
-      const limit = PAGE_SIZE + 1 // +1 para detectar si hay más
-      const [{ data: p }, { data: c }, { data: l }, { data: d }] = await Promise.all([
-        supabase.from('pacientes').select('*').eq('id', id).single(),
-        supabase.from('consultas').select('*').eq('paciente_id', id).order('fecha', { ascending: false }).limit(limit),
-        supabase.from('laboratorios').select('*').eq('paciente_id', id).order('fecha_toma', { ascending: false }).limit(limit),
-        supabase.from('documentos').select('id, tipo, contenido, created_at').eq('paciente_id', id).order('created_at', { ascending: false }).limit(limit),
-      ])
-      setPaciente(p)
+    const supabase = createClient()
+    let cancelled = false
+    const limit = LABS_PAGE_SIZE + 1 // +1 para detectar si hay más
 
-      const consultas = c || []
-      setHayMasConsultas(consultas.length > PAGE_SIZE)
-      setConsultas(consultas.slice(0, PAGE_SIZE))
+    supabase
+      .from('laboratorios')
+      .select('*')
+      .eq('paciente_id', id)
+      .order('fecha_toma', { ascending: false })
+      .limit(limit)
+      .then(({ data }: { data: Laboratorio[] | null }) => {
+        if (cancelled) return
+        const labsList = data || []
+        setHayMasLabs(labsList.length > LABS_PAGE_SIZE)
+        setLabs(labsList.slice(0, LABS_PAGE_SIZE))
+      })
 
-      const labsList = l || []
-      setHayMasLabs(labsList.length > PAGE_SIZE)
-      setLabs(labsList.slice(0, PAGE_SIZE))
-
-      const docsList = d || []
-      setHayMasDocs(docsList.length > PAGE_SIZE)
-      setDocumentos(docsList.slice(0, PAGE_SIZE))
-
-      setLoading(false)
-
-      // Cargar addendums de las consultas visibles
-      const consultaIds = consultas.slice(0, PAGE_SIZE).map((con: { id: string }) => con.id)
-      if (consultaIds.length > 0) {
-        supabase.from('addendums')
-          .select('id, consulta_id, contenido, medico_nombre, created_at')
-          .in('consulta_id', consultaIds)
-          .order('created_at', { ascending: true })
-          .then((res: { data: { id: string; consulta_id: string; contenido: string; medico_nombre: string; created_at: string }[] | null }) => setAllAddendums(res.data || []))
-      }
+    return () => {
+      cancelled = true
     }
-    cargar()
   }, [id])
 
-  // ── Cargar más (cursor-based: usa fecha del último item) ──────
-  async function cargarMasConsultas() {
-    if (!consultas.length) return
-    setCargandoMas(true)
-    const cursor = consultas[consultas.length - 1].fecha
-    const supabase = createClient()
-    const { data } = await supabase.from('consultas').select('*')
-      .eq('paciente_id', id).order('fecha', { ascending: false })
-      .lt('fecha', cursor).limit(PAGE_SIZE + 1)
-    const items = data || []
-    setHayMasConsultas(items.length > PAGE_SIZE)
-    setConsultas(prev => [...prev, ...items.slice(0, PAGE_SIZE)])
-    // Cargar addendums de las nuevas consultas
-    const newIds = items.slice(0, PAGE_SIZE).map((c: { id: string }) => c.id)
-    if (newIds.length > 0) {
-      supabase.from('addendums')
-        .select('id, consulta_id, contenido, medico_nombre, created_at')
-        .in('consulta_id', newIds)
-        .order('created_at', { ascending: true })
-        .then((res: { data: { id: string; consulta_id: string; contenido: string; medico_nombre: string; created_at: string }[] | null }) =>
-          setAllAddendums(prev => [...prev, ...(res.data || [])])
-        )
+  // ── Fetch de addendums (online-only, dependiente de qConsultas.data) ──
+  useEffect(() => {
+    const list = qConsultas.data
+    if (!list || list.length === 0) {
+      setAllAddendums([])
+      return
     }
-    setCargandoMas(false)
-  }
 
+    const ids = list.map(c => c.id)
+    let cancelled = false
+    const supabase = createClient()
+
+    supabase.from('addendums')
+      .select('id, consulta_id, contenido, medico_nombre, created_at')
+      .in('consulta_id', ids)
+      .order('created_at', { ascending: true })
+      .then((res: { data: { id: string; consulta_id: string; contenido: string; medico_nombre: string; created_at: string }[] | null }) => {
+        if (cancelled) return
+        setAllAddendums(res.data || [])
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [qConsultas.data])
+
+  // ── Cargar más labs (solo labs mantiene paginación cursor online) ──
   async function cargarMasLabs() {
     if (!labs.length) return
     setCargandoMas(true)
@@ -160,25 +240,10 @@ function ExpedientePacienteContent() {
     const supabase = createClient()
     const { data } = await supabase.from('laboratorios').select('*')
       .eq('paciente_id', id).order('fecha_toma', { ascending: false })
-      .lt('fecha_toma', cursor).limit(PAGE_SIZE + 1)
+      .lt('fecha_toma', cursor).limit(LABS_PAGE_SIZE + 1)
     const items = data || []
-    setHayMasLabs(items.length > PAGE_SIZE)
-    setLabs(prev => [...prev, ...items.slice(0, PAGE_SIZE)])
-    setCargandoMas(false)
-  }
-
-  async function cargarMasDocs() {
-    if (!documentos.length) return
-    setCargandoMas(true)
-    const cursor = documentos[documentos.length - 1].created_at
-    const supabase = createClient()
-    const { data } = await supabase.from('documentos')
-      .select('id, tipo, contenido, created_at')
-      .eq('paciente_id', id).order('created_at', { ascending: false })
-      .lt('created_at', cursor).limit(PAGE_SIZE + 1)
-    const items = data || []
-    setHayMasDocs(items.length > PAGE_SIZE)
-    setDocumentos(prev => [...prev, ...items.slice(0, PAGE_SIZE)])
+    setHayMasLabs(items.length > LABS_PAGE_SIZE)
+    setLabs(prev => [...prev, ...items.slice(0, LABS_PAGE_SIZE)])
     setCargandoMas(false)
   }
 
@@ -247,7 +312,10 @@ function ExpedientePacienteContent() {
 
   async function eliminarDocumento(docId: string) {
     const res = await fetch(`/api/documentos/${docId}`, { method: 'DELETE' })
-    if (res.ok) setDocumentos(prev => prev.filter(d => d.id !== docId))
+    if (res.ok) {
+      // Refetch para remover el documento eliminado del mirror y del state del hook
+      await qDocumentos.refetch()
+    }
   }
 
   async function eliminarLab(labId: string) {
@@ -277,8 +345,15 @@ function ExpedientePacienteContent() {
     setGraficasAbiertas(prev => ({ ...prev, [nombre]: !prev[nombre] }))
   }
 
-  if (loading) return <div className="text-center py-12 text-slate-400">Cargando expediente...</div>
-  if (!paciente) return <div className="text-center py-12 text-slate-400">Paciente no encontrado</div>
+  // ── Loading / not-found guards ─────────────────────────────
+  // El hook marca isLoading=true SOLO cuando no hay data ni local ni remota.
+  // Si el mirror ya tiene el paciente, el render es instantáneo.
+  if (qPaciente.isLoading && !paciente) {
+    return <div className="text-center py-12 text-slate-400">Cargando expediente...</div>
+  }
+  if (!paciente) {
+    return <div className="text-center py-12 text-slate-400">Paciente no encontrado</div>
+  }
 
   const paramsFiltrados = todosLosParams.filter(p =>
     !busquedaParam || p.nombre.toLowerCase().includes(busquedaParam.toLowerCase())
@@ -362,16 +437,20 @@ function ExpedientePacienteContent() {
       <Breadcrumbs pacienteNombre={paciente ? `${paciente.nombre} ${paciente.apellidos}` : undefined} />
 
       {/* Header — macOS style */}
-      <div className="flex items-center gap-2">
-        <Link
-          href="/expediente"
-          className="flex items-center gap-1 text-[#1e5fa8] hover:text-[#1a3a5c] text-sm font-medium transition-colors"
-        >
-          <ArrowLeft size={16} strokeWidth={2.5} />
-          <span>Pacientes</span>
-        </Link>
-        <span className="text-slate-300 select-none">/</span>
-        <h1 className="text-sm font-semibold text-[#1d1d1f] truncate">Expediente Clínico</h1>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <Link
+            href="/expediente"
+            className="flex items-center gap-1 text-[#1e5fa8] hover:text-[#1a3a5c] text-sm font-medium transition-colors"
+          >
+            <ArrowLeft size={16} strokeWidth={2.5} />
+            <span>Pacientes</span>
+          </Link>
+          <span className="text-slate-300 select-none">/</span>
+          <h1 className="text-sm font-semibold text-[#1d1d1f] truncate">Expediente Clínico</h1>
+        </div>
+        {/* Freshness badge — refleja el estado de la sesión de datos del paciente */}
+        <FreshnessBadge state={qPaciente} />
       </div>
 
       {/* Tarjeta del paciente */}
@@ -490,22 +569,41 @@ function ExpedientePacienteContent() {
         )}
 
         {tab === 'consultas' && (
-          <TabConsultas id={id} consultas={consultas} isDoctor={isDoctor} hayMas={hayMasConsultas} cargandoMas={cargandoMas} onCargarMas={cargarMasConsultas} />
+          <TabConsultas
+            id={id}
+            consultas={consultas}
+            isDoctor={isDoctor}
+            hayMas={false}
+            cargandoMas={false}
+            onCargarMas={() => { /* consultas se cargan vía el mirror, sin cursor */ }}
+          />
         )}
 
         {tab === 'laboratorios' && (
-          <TabLaboratorios
-            id={id}
-            labs={labs}
-            isDoctor={isDoctor}
-            confirmarEliminar={confirmarEliminar}
-            eliminandoLab={eliminandoLab}
-            onConfirmarEliminar={setConfirmarEliminar}
-            onEliminarLab={eliminarLab}
-            hayMas={hayMasLabs}
-            cargandoMas={cargandoMas}
-            onCargarMas={cargarMasLabs}
-          />
+          <>
+            {/* Banner offline: los laboratorios no están en el mirror (Bloque 2.5) */}
+            {offline && labs.length === 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-3">
+                <p className="text-sm text-amber-800 text-center">
+                  Los laboratorios no están disponibles offline.
+                  <br />
+                  Conéctate a internet para cargarlos.
+                </p>
+              </div>
+            )}
+            <TabLaboratorios
+              id={id}
+              labs={labs}
+              isDoctor={isDoctor}
+              confirmarEliminar={confirmarEliminar}
+              eliminandoLab={eliminandoLab}
+              onConfirmarEliminar={setConfirmarEliminar}
+              onEliminarLab={eliminarLab}
+              hayMas={hayMasLabs}
+              cargandoMas={cargandoMas}
+              onCargarMas={cargarMasLabs}
+            />
+          </>
         )}
 
         {tab === 'graficas' && (
@@ -526,9 +624,9 @@ function ExpedientePacienteContent() {
             documentos={documentos}
             onVerDocumento={setDocSeleccionado}
             onEliminarDocumento={eliminarDocumento}
-            hayMas={hayMasDocs}
-            cargandoMas={cargandoMas}
-            onCargarMas={cargarMasDocs}
+            hayMas={false}
+            cargandoMas={false}
+            onCargarMas={() => { /* documentos se cargan vía el mirror, sin cursor */ }}
           />
         )}
 
