@@ -1,212 +1,101 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
-import { Users, Plus, Search, ChevronRight, WifiOff } from 'lucide-react'
+import { Users, Plus, Search, ChevronRight } from 'lucide-react'
 import { PatientRowSkeleton } from '@/components/ui/Skeleton'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { differenceInYears, parseISO } from 'date-fns'
-import { searchPatientsOffline, type CachedPatient } from '@/lib/offlinePatients'
-import { secureStorage } from '@/lib/secureStorage'
-import { getStatus, subscribe } from '@/lib/connectionMonitor'
+import { useHybridQuery } from '@/hooks/useHybridQuery'
+import { getPacientesLocal, type PacienteLocal } from '@/lib/read-mirror'
+import FreshnessBadge from '@/components/ui/FreshnessBadge'
 
-type PacienteRow = {
-  id: string
-  nombre: string
-  apellidos: string
-  fecha_nacimiento: string | null
-  sexo: string | null
-  numero_expediente: string | null
-}
+/**
+ * Límite unificado (local + remoto). 200 registros cubren el caseload
+ * típico de un médico activo. La búsqueda por nombre cubre el resto
+ * de pacientes si alguien tiene más de 200.
+ */
+const PACIENTES_LIMIT = 200
 
-const CAMPOS = 'id, nombre, apellidos, fecha_nacimiento, sexo, numero_expediente'
-const PATIENTS_CACHE_KEY = 'offline_patients_cache'
-
-/** Convierte CachedPatient → PacienteRow para la UI */
-function cachedToRow(p: CachedPatient): PacienteRow {
-  return {
-    id: p.id,
-    nombre: p.nombre,
-    apellidos: p.apellidos,
-    fecha_nacimiento: p.fecha_nacimiento ?? null,
-    sexo: p.sexo ?? null,
-    numero_expediente: p.numero_expediente ?? null,
-  }
-}
+/** Debounce ms para la búsqueda reactiva */
+const SEARCH_DEBOUNCE_MS = 300
 
 export default function PacientesPage() {
-  const PAGE = 20
-  const [pacientes, setPacientes] = useState<PacienteRow[]>([])
   const [busqueda, setBusqueda] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [hayMas, setHayMas] = useState(false)
-  const [cargandoMas, setCargandoMas] = useState(false)
-  const [offline, setOffline] = useState(() => getStatus() === 'offline')
+  const [busquedaDebounced, setBusquedaDebounced] = useState('')
 
-  // Monitor conexión para ajustar UI
+  // Debounce del input → término que efectivamente dispara fetch
   useEffect(() => {
-    const unsub = subscribe((status) => setOffline(status === 'offline'))
-    return unsub
-  }, [])
-
-  /** Lee pacientes del cache offline (secureStorage) y los pagina */
-  const cargarDesdeCache = useCallback(async (reset = true): Promise<PacienteRow[]> => {
-    try {
-      const cached = await secureStorage.get<CachedPatient[]>(PATIENTS_CACHE_KEY)
-      if (!Array.isArray(cached)) return []
-      // Orden consistente con el fetch: por apellido para offline
-      const ordenados = [...cached].sort((a, b) =>
-        (a.apellidos ?? '').localeCompare(b.apellidos ?? '')
-      )
-      const rows = ordenados.map(cachedToRow)
-      if (reset) {
-        setHayMas(rows.length > PAGE)
-        setPacientes(rows.slice(0, PAGE))
-      }
-      return rows
-    } catch {
-      return []
-    }
-  }, [])
-
-  const cargarPacientes = useCallback(async (reset = true) => {
-    if (reset) setLoading(true)
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from('pacientes')
-        .select(CAMPOS)
-        .neq('activo', false)
-        .order('created_at', { ascending: false })
-        .limit(PAGE + 1)
-
-      if (error) throw error
-      const items = (data ?? []) as PacienteRow[]
-      setHayMas(items.length > PAGE)
-      setPacientes(items.slice(0, PAGE))
-    } catch {
-      // Fallback offline: leer del cache
-      await cargarDesdeCache(true)
-    } finally {
-      setLoading(false)
-    }
-  }, [cargarDesdeCache])
-
-  // Carga inicial
-  useEffect(() => { cargarPacientes() }, [cargarPacientes])
-
-  // Búsqueda server-side con debounce 300 ms + fallback offline
-  useEffect(() => {
-    if (busqueda.trim().length < 2) return
-    setLoading(true)
-    const timeout = setTimeout(async () => {
-      try {
-        const supabase = createClient()
-        const { data, error } = await supabase
-          .from('pacientes')
-          .select(CAMPOS)
-          .neq('activo', false)
-          .or(`nombre.ilike.%${busqueda}%,apellidos.ilike.%${busqueda}%,numero_expediente.ilike.%${busqueda}%`)
-          .order('apellidos')
-          .limit(PAGE + 1)
-
-        if (error) throw error
-        const items = (data ?? []) as PacienteRow[]
-        setHayMas(items.length > PAGE)
-        setPacientes(items.slice(0, PAGE))
-      } catch {
-        // Fallback offline: buscar en el cache local
-        const cached = await searchPatientsOffline(busqueda)
-        const rows = cached.map(cachedToRow)
-        setHayMas(false)
-        setPacientes(rows)
-      } finally {
-        setLoading(false)
-      }
-    }, 300)
-    return () => clearTimeout(timeout)
+    const id = setTimeout(() => setBusquedaDebounced(busqueda.trim()), SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(id)
   }, [busqueda])
 
-  // Al borrar la búsqueda, volver a la lista inicial
-  useEffect(() => {
-    if (busqueda.trim().length > 0) return
-    cargarPacientes()
-  }, [busqueda, cargarPacientes])
-
-  async function cargarMasPacientes() {
-    if (!pacientes.length) return
-    // Offline: paginar desde el cache en memoria
-    if (offline) {
-      setCargandoMas(true)
-      try {
-        const all = await cargarDesdeCache(false)
-        const start = pacientes.length
-        const next = all.slice(start, start + PAGE)
-        setPacientes(prev => [...prev, ...next])
-        setHayMas(start + PAGE < all.length)
-      } finally {
-        setCargandoMas(false)
-      }
-      return
-    }
-
-    setCargandoMas(true)
-    try {
-      const cursor = pacientes[pacientes.length - 1].id
+  const q = useHybridQuery<PacienteLocal[]>({
+    key: `pacientes:${busquedaDebounced}`,
+    localFetcher: async () =>
+      getPacientesLocal({
+        activosOnly: true,
+        search: busquedaDebounced || undefined,
+        limit: PACIENTES_LIMIT,
+      }),
+    remoteFetcher: async () => {
       const supabase = createClient()
-      const { data: lastRow } = await supabase
+      let query = supabase
         .from('pacientes')
-        .select('created_at')
-        .eq('id', cursor)
-        .single() as { data: { created_at: string } | null }
-
-      if (!lastRow) return
-
-      let query = supabase.from('pacientes').select(CAMPOS)
+        .select('*')
         .neq('activo', false)
-        .lt('created_at', lastRow.created_at)
-        .order('created_at', { ascending: false })
-        .limit(PAGE + 1)
 
-      if (busqueda.trim().length >= 2) {
-        query = query.or(`nombre.ilike.%${busqueda}%,apellidos.ilike.%${busqueda}%,numero_expediente.ilike.%${busqueda}%`)
+      if (busquedaDebounced.length >= 2) {
+        query = query.or(
+          `nombre.ilike.%${busquedaDebounced}%,apellidos.ilike.%${busquedaDebounced}%,numero_expediente.ilike.%${busquedaDebounced}%`,
+        )
       }
 
       const { data, error } = await query
+        .order('created_at', { ascending: false })
+        .limit(PACIENTES_LIMIT)
+
       if (error) throw error
-      const items = (data ?? []) as PacienteRow[]
-      setHayMas(items.length > PAGE)
-      setPacientes(prev => [...prev, ...items.slice(0, PAGE)])
-    } catch {
-      // Offline sobrevenido durante paginación — no añadir más, marcar fin
-      setHayMas(false)
-    } finally {
-      setCargandoMas(false)
-    }
-  }
+      return (data ?? []) as PacienteLocal[]
+    },
+  })
+
+  /**
+   * Orden unificado client-side: created_at DESC (más recientes primero).
+   * El mirror devuelve por nombre ASC internamente — post-sort aquí
+   * preserva la UX del listing original sin tocar getPacientesLocal.
+   * Costo despreciable para 200 registros.
+   */
+  const pacientes = useMemo(() => {
+    const rows = q.data ?? []
+    return [...rows].sort((a, b) =>
+      (b.created_at ?? '').localeCompare(a.created_at ?? ''),
+    )
+  }, [q.data])
+
+  const mostrarNotaLimite = pacientes.length >= PACIENTES_LIMIT
+  const hayBusqueda = busquedaDebounced.length > 0
 
   return (
     <div className="max-w-4xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-[#1a3a5c] flex items-center gap-2">
-            <Users size={24} /> Pacientes
-          </h1>
-          <p className="text-slate-500 text-sm mt-1 flex items-center gap-2">
-            {pacientes.length} pacientes{busqueda.length >= 2 ? ' encontrados' : ' registrados'}
-            {offline && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
-                <WifiOff size={10} /> Desde cache local
-              </span>
-            )}
+      <div className="flex items-start justify-between mb-6 gap-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-2xl font-bold text-[#1a3a5c] flex items-center gap-2">
+              <Users size={24} /> Pacientes
+            </h1>
+            <FreshnessBadge state={q} />
+          </div>
+          <p className="text-slate-500 text-sm mt-1">
+            {pacientes.length} pacientes{hayBusqueda ? ' encontrados' : ' registrados'}
           </p>
         </div>
         <Link
           href="/pacientes/nuevo"
           data-onboard="nuevo-paciente"
-          className="flex items-center gap-2 bg-[#1e5fa8] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[#1a3a5c] transition-colors shadow-sm"
+          className="flex items-center gap-2 bg-[#1e5fa8] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[#1a3a5c] transition-colors shadow-sm flex-shrink-0"
         >
           <Plus size={16} /> Nuevo Paciente
         </Link>
@@ -226,7 +115,7 @@ export default function PacientesPage() {
 
       {/* Lista */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-        {loading ? (
+        {q.isLoading ? (
           <div className="divide-y divide-slate-100">
             {Array.from({ length: 8 }).map((_, i) => <PatientRowSkeleton key={i} />)}
           </div>
@@ -234,10 +123,15 @@ export default function PacientesPage() {
           <div className="p-8 text-center">
             <Users size={40} className="mx-auto text-slate-300 mb-3" />
             <p className="text-slate-500 font-medium">
-              {busqueda ? 'No se encontraron pacientes' : 'No hay pacientes registrados'}
+              {hayBusqueda
+                ? 'No se encontraron pacientes'
+                : 'No hay pacientes registrados'}
             </p>
-            {!busqueda && (
-              <Link href="/pacientes/nuevo" className="text-[#1e5fa8] text-sm mt-2 inline-block hover:underline">
+            {!hayBusqueda && (
+              <Link
+                href="/pacientes/nuevo"
+                className="text-[#1e5fa8] text-sm mt-2 inline-block hover:underline"
+              >
                 Registrar primer paciente →
               </Link>
             )}
@@ -248,6 +142,7 @@ export default function PacientesPage() {
               const edad = p.fecha_nacimiento
                 ? differenceInYears(new Date(), parseISO(p.fecha_nacimiento))
                 : null
+              const apellidosTxt = p.apellidos ?? ''
               return (
                 <Link
                   key={p.id}
@@ -256,11 +151,11 @@ export default function PacientesPage() {
                 >
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-full bg-[#e8f4fd] flex items-center justify-center text-[#1e5fa8] font-semibold text-sm">
-                      {p.nombre.charAt(0)}{p.apellidos.charAt(0)}
+                      {p.nombre.charAt(0)}{apellidosTxt.charAt(0)}
                     </div>
                     <div>
                       <p className="font-medium text-slate-800 group-hover:text-[#1a3a5c]">
-                        {p.nombre} {p.apellidos}
+                        {p.nombre} {apellidosTxt}
                       </p>
                       <p className="text-xs text-slate-400 mt-0.5">
                         {edad !== null && `${edad} años · `}
@@ -275,13 +170,16 @@ export default function PacientesPage() {
             })}
           </div>
         )}
-        {hayMas && (
-          <button onClick={cargarMasPacientes} disabled={cargandoMas}
-            className="w-full py-3 text-sm text-[#1e5fa8] font-medium hover:bg-slate-50 transition-colors border-t border-slate-100 disabled:opacity-50">
-            {cargandoMas ? 'Cargando...' : 'Cargar más pacientes'}
-          </button>
-        )}
       </div>
+
+      {/* Nota de límite cuando hay >=200 registros */}
+      {mostrarNotaLimite && (
+        <p className="text-center text-xs text-slate-400 mt-4">
+          {q.source === 'local'
+            ? `Mostrando los ${PACIENTES_LIMIT} pacientes más recientes (Modo Offline)`
+            : `Mostrando los ${PACIENTES_LIMIT} pacientes más recientes`}
+        </p>
+      )}
     </div>
   )
 }
