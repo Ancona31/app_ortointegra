@@ -9,6 +9,7 @@ import OfflineSync from '@/components/OfflineSync'
 import OfflineGate from '@/components/OfflineGate'
 import PersistenceWarning from '@/components/ui/PersistenceWarning'
 import ChunkMissingListener from '@/components/ChunkMissingListener'
+import MirrorInitializer from '@/components/MirrorInitializer'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -32,6 +33,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <CommandPalette />
         <SessionGuard />
         <OfflineSync />
+        <MirrorInitializer />
         <ChunkMissingListener />
       </ThemeProvider>
     </ToastProvider>

@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { getStatus } from '@/lib/connectionMonitor'
+import { clearMirror } from '@/lib/read-mirror'
 
 /**
  * SessionGuard — Protege el auto-logout al cerrar el navegador sin bloquear
@@ -87,7 +88,11 @@ export default function SessionGuard() {
       return
     }
 
-    // Online real → validar con el servidor con timeout agresivo
+    // Online real → validar con el servidor con timeout agresivo.
+    // Defensa en profundidad: wipe del read mirror como parte del cleanup
+    // por sesión residual. Fire-and-forget con .catch porque el
+    // mirrorUserId check del próximo login es el backstop definitivo.
+    void clearMirror().catch(() => {})
     const supabase = createClient()
     const signOutPromise = supabase.auth.signOut().catch(() => null)
     const timeoutPromise = new Promise<void>(resolve =>

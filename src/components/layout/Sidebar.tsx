@@ -17,6 +17,7 @@ import { useClinica } from '@/hooks/useClinica'
 import { useTheme } from '@/components/layout/ThemeProvider'
 import { mutate } from 'swr'
 import { subscribe, getStatus } from '@/lib/connectionMonitor'
+import { clearMirror } from '@/lib/read-mirror'
 
 /* ─── Tipos ───────────────────────────────────────────────── */
 
@@ -186,6 +187,11 @@ export default function Sidebar() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'logout' }),
     }).catch(() => {})
+    // SEGURIDAD: wipe del read mirror ANTES del signOut para garantizar
+    // que no queden datos clínicos del médico saliente si otro entra
+    // inmediatamente en el mismo dispositivo. La latencia añadida es
+    // <100ms en IndexedDB local.
+    await clearMirror()
     const supabase = createClient()
     await supabase.auth.signOut()
     sessionStorage.removeItem('spinus_active')

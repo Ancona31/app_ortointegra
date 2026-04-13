@@ -7,6 +7,7 @@ import { Loader2, Lock, Eye, EyeOff, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import NeuralBackground from '@/components/ui/NeuralBackground'
 import { requestPersistentStorage } from '@/lib/storage-vault'
+import { clearMirror } from '@/lib/read-mirror'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -52,8 +53,12 @@ export default function LoginPage() {
 
     const supabase = createClient()
 
-    // Cerrar sesión activa antes de iniciar con otra cuenta
+    // Cerrar sesión activa antes de iniciar con otra cuenta.
+    // SEGURIDAD: wipe del read mirror ANTES del signOut para evitar
+    // que los datos del médico anterior queden visibles si el nuevo
+    // login falla o es interrumpido.
     if (sesionActiva) {
+      await clearMirror()
       await supabase.auth.signOut()
     }
 
