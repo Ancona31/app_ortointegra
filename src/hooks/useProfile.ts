@@ -34,17 +34,26 @@ async function getCachedProfile(): Promise<Profile | null> {
   }
 }
 
+/**
+ * Timeout en ms para el fetch remoto antes de caer al cache.
+ * Motivo: en gray zone (captive portal, Wi-Fi fantasma, DNS lento),
+ * el fetch puede colgarse indefinidamente y dejar el Dashboard en
+ * skeleton eterno. Con timeout, el médico ve sus datos locales en
+ * ≤3s garantizado.
+ */
+const FETCH_TIMEOUT_MS = 3000
+
 function fetchProfile(): Promise<Profile | null> {
   if (profilePromise) return profilePromise
 
-  // Offline: no tocar Supabase, leer directo del cache para evitar cuelgues
+  // Offline declarado: no tocar Supabase, leer directo del cache
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
     profilePromise = getCachedProfile()
     return profilePromise
   }
 
   const supabase = createClient()
-  profilePromise = supabase.auth.getUser()
+  const fetchPromise: Promise<Profile | null> = supabase.auth.getUser()
     .then(({ data: { user } }: { data: { user: { id: string } | null } }) => {
       if (!user) return null
       return supabase
@@ -67,9 +76,20 @@ function fetchProfile(): Promise<Profile | null> {
         })
     })
     .catch(async () => {
-      // Fetch falló (offline sobrevenido, red caída, timeout) → fallback al cache
+      // Fetch falló (offline sobrevenido, red caída, error) → fallback al cache
       return await getCachedProfile()
     })
+
+  // Timeout de emergencia: si el remoto no responde en 3s,
+  // resolvemos con el cache. Evita el "spinner eterno" en gray zone.
+  const timeoutPromise = new Promise<Profile | null>(resolve => {
+    setTimeout(async () => {
+      const cached = await getCachedProfile()
+      resolve(cached)
+    }, FETCH_TIMEOUT_MS)
+  })
+
+  profilePromise = Promise.race([fetchPromise, timeoutPromise])
   return profilePromise!
 }
 

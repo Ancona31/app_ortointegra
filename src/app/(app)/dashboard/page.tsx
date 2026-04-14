@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { format, formatDistanceToNow, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
+import { getMirrorStats } from '@/lib/read-mirror'
 import { formatCitaHora } from './utils'
 import { StatusChip } from './StatusChip'
 
@@ -102,14 +103,30 @@ export default function DashboardPage() {
 
     const supabase = createClient()
 
-    // Total de expedientes
+    // Total de expedientes — fetch remoto con fallback al mirror
     supabase
       .from('pacientes')
       .select('id', { count: 'exact', head: true })
       .neq('activo', false)
       .then(({ count }: { count: number | null }) => setTotalPacientes(count ?? 0))
+      .catch(() => {
+        // silent — el fallback al mirror abajo resuelve el contador
+      })
 
-    // Pacientes recientes
+    // Fallback al mirror con timeout de 2s: si el remoto no respondió,
+    // mostrar el conteo local. Si el remoto ya actualizó, setTotalPacientes
+    // usa ?? para no sobrescribir.
+    setTimeout(() => {
+      getMirrorStats()
+        .then(stats => {
+          setTotalPacientes(prev => prev ?? stats.pacientes)
+        })
+        .catch(() => {
+          setTotalPacientes(prev => prev ?? 0)
+        })
+    }, 2000)
+
+    // Pacientes recientes — catch silencioso
     supabase
       .from('consultas')
       .select('paciente_id, created_at, motivo_consulta, pacientes!inner(nombre, apellidos)')
@@ -134,40 +151,52 @@ export default function DashboardPage() {
         }
         setRecientes(unique)
       })
+      .catch(() => {
+        // silent — si el fetch falla, recientes queda vacío y no se renderiza
+      })
 
-    // Próximas citas + clinica.tipo
+    // Próximas citas + clinica.tipo — wrap completo en try/catch/finally
+    // para garantizar que loadingCitas siempre termine en false.
     async function fetchCitas() {
-      if (!profile?.clinica_id) { setLoadingCitas(false); return }
-      const { data: clinicaData } = await supabase
-        .from('clinicas')
-        .select('tipo')
-        .eq('id', profile.clinica_id)
-        .single()
+      try {
+        if (!profile?.clinica_id) return
 
-      const tipo = clinicaData?.tipo ?? 'independiente'
-      setClinicaTipo(tipo)
+        const { data: clinicaData } = await supabase
+          .from('clinicas')
+          .select('tipo')
+          .eq('id', profile.clinica_id)
+          .single()
 
-      const isClinicaAdmin = profile!.role === 'admin' && tipo === 'clinica'
+        const tipo = clinicaData?.tipo ?? 'independiente'
+        setClinicaTipo(tipo)
 
-      let q = supabase
-        .from('appointments')
-        .select('id, title, start_time, status, paciente_id, pacientes(nombre, apellidos), medico:profiles!appointments_medico_id_fkey(id, nombre, titulo)')
-        .eq('clinica_id', profile!.clinica_id!)
-        .gt('start_time', new Date().toISOString())
-        .in('status', ['scheduled', 'confirmed'])
-        .order('start_time', { ascending: true })
-        .limit(isClinicaAdmin ? 8 : 1) as any
+        const isClinicaAdmin = profile!.role === 'admin' && tipo === 'clinica'
 
-      if (!isClinicaAdmin) {
-        q = q.eq('medico_id', profile!.id)
+        let q = supabase
+          .from('appointments')
+          .select('id, title, start_time, status, paciente_id, pacientes(nombre, apellidos), medico:profiles!appointments_medico_id_fkey(id, nombre, titulo)')
+          .eq('clinica_id', profile!.clinica_id!)
+          .gt('start_time', new Date().toISOString())
+          .in('status', ['scheduled', 'confirmed'])
+          .order('start_time', { ascending: true })
+          .limit(isClinicaAdmin ? 8 : 1) as any
+
+        if (!isClinicaAdmin) {
+          q = q.eq('medico_id', profile!.id)
+        }
+
+        const { data } = await q
+        setProximasCitas((data as ProximaCita[]) ?? [])
+      } catch {
+        // Red caída o query fallida → citas vacío, el resto del dashboard renderiza
+        setProximasCitas([])
+      } finally {
+        // SIEMPRE apagar el skeleton de carga, sin importar el path
+        setLoadingCitas(false)
       }
-
-      const { data } = await q
-      setProximasCitas((data as ProximaCita[]) ?? [])
-      setLoadingCitas(false)
     }
 
-    fetchCitas()
+    void fetchCitas()
   }, [profile, loadingProfile])
 
   if (loadingProfile) return <DashboardSkeleton />
