@@ -34,12 +34,19 @@ import { getStorageQuota } from '@/lib/storage-vault'
    ────────────────────────────────────────────────────────────────────── */
 
 const DB_NAME = 'spinus_readmirror'
-const DB_VERSION = 1
+/**
+ * v1 → v2 (Sprint 3 Hito 3.C): añade el store `laboratorios`.
+ * Upgrade idempotente — los 4 stores existentes (pacientes, consultas,
+ * documentos, appointments) y el store _meta se preservan íntegros.
+ * Los datos sincronizados en Sprint 2 siguen accesibles.
+ */
+const DB_VERSION = 2
 
 const STORE_PACIENTES    = 'pacientes'    as const
 const STORE_CONSULTAS    = 'consultas'    as const
 const STORE_DOCUMENTOS   = 'documentos'   as const
 const STORE_APPOINTMENTS = 'appointments' as const
+const STORE_LABORATORIOS = 'laboratorios' as const
 const STORE_META         = '_meta'        as const
 
 const CAPS: Record<MirrorDataStore, number> = {
@@ -47,6 +54,7 @@ const CAPS: Record<MirrorDataStore, number> = {
   consultas:    600,
   documentos:   600,
   appointments: 400,
+  laboratorios: 400,
 }
 
 const TTL_SOFT_MS                = 30 * 24 * 3600 * 1000 // 30 días sin acceso
@@ -60,7 +68,12 @@ const WARMUP_DELAY_MS            = 150                   // espaciado entre hidr
    Tipos públicos
    ────────────────────────────────────────────────────────────────────── */
 
-export type MirrorDataStore = 'pacientes' | 'consultas' | 'documentos' | 'appointments'
+export type MirrorDataStore =
+  | 'pacientes'
+  | 'consultas'
+  | 'documentos'
+  | 'appointments'
+  | 'laboratorios'
 
 /** Metadata que el mirror añade a cada registro — NO viene de Supabase */
 interface MirrorMetadata {
@@ -130,6 +143,23 @@ export interface AppointmentLocal extends MirrorMetadata {
   [k: string]: unknown
 }
 
+/**
+ * Laboratorios (Sprint 3 Hito 3.C).
+ * El field `resultados` es un array de ResultadoLab con estructura
+ * {nombre, valor, unidad, rango_ref, rango_optimo, estado}. Lo
+ * dejamos como `unknown` para no acoplar el mirror al tipo específico
+ * de la UI — el consumidor casea al tipo del proyecto al leer.
+ */
+export interface LaboratorioLocal extends MirrorMetadata {
+  id: string
+  paciente_id: string
+  fecha_toma: string
+  resultados: unknown
+  created_at: string
+  updated_at: string
+  [k: string]: unknown
+}
+
 export interface SyncResult {
   store: MirrorDataStore
   synced: number
@@ -141,6 +171,7 @@ export interface HydrateResult {
   pacienteOk: boolean
   consultas: number
   documentos: number
+  laboratorios: number
 }
 
 export interface MirrorStats {
@@ -148,6 +179,7 @@ export interface MirrorStats {
   consultas: number
   documentos: number
   appointments: number
+  laboratorios: number
   lastSyncAt: Record<MirrorDataStore, string | null>
   lastSweepAt: string | null
   mirrorUserId: string | null
@@ -212,6 +244,17 @@ function openDb(): Promise<IDBDatabase> {
         const s = db.createObjectStore(STORE_APPOINTMENTS, { keyPath: 'id' })
         s.createIndex('by_start_time', 'start_time')
         s.createIndex('by_paciente', 'paciente_id')
+        s.createIndex('by_last_accessed', '_lastAccessedAt')
+      }
+
+      // v1 → v2 (Sprint 3 Hito 3.C): laboratorios
+      // Idempotente: solo crea si no existe. Los 4 stores anteriores
+      // se preservan intactos con todos sus datos sincronizados.
+      if (!db.objectStoreNames.contains(STORE_LABORATORIOS)) {
+        const s = db.createObjectStore(STORE_LABORATORIOS, { keyPath: 'id' })
+        s.createIndex('by_paciente', 'paciente_id')
+        s.createIndex('by_paciente_fecha', ['paciente_id', 'fecha_toma'])
+        s.createIndex('by_updated', 'updated_at')
         s.createIndex('by_last_accessed', '_lastAccessedAt')
       }
 
@@ -410,6 +453,7 @@ async function dailySweep(): Promise<void> {
         consultas:    Math.floor(CAPS.consultas / 2),
         documentos:   Math.floor(CAPS.documentos / 2),
         appointments: Math.floor(CAPS.appointments / 2),
+        laboratorios: Math.floor(CAPS.laboratorios / 2),
       }
     }
   } catch {
@@ -418,7 +462,7 @@ async function dailySweep(): Promise<void> {
 
   // Soft TTL sweep: borrar registros sin acceso desde hace > 30 días (respetando exempt)
   const cutoff = Date.now() - TTL_SOFT_MS
-  const stores: MirrorDataStore[] = ['pacientes', 'consultas', 'documentos', 'appointments']
+  const stores: MirrorDataStore[] = ['pacientes', 'consultas', 'documentos', 'appointments', 'laboratorios']
 
   for (const storeName of stores) {
     try {
@@ -459,7 +503,7 @@ async function dailySweep(): Promise<void> {
  * Detecta si el error de Supabase indica columna faltante (código
  * Postgres 42703 "undefined_column") o menciona la columna específica
  * en el mensaje. Usado para fallback de `updated_at` → `start_time`
- * en appointments.
+ * en appointments y `updated_at` → `fecha_toma` en laboratorios.
  */
 function isUpdatedAtColumnError(
   err: { code?: string; message?: string } | null,
@@ -514,6 +558,41 @@ async function syncStoreInternal(storeName: MirrorDataStore): Promise<SyncResult
         if (error) throw new Error(error.message)
         rows = (data ?? []) as RawRecord[]
       }
+    } else if (storeName === 'laboratorios') {
+      // ── Laboratorios: intenta updated_at, fallback a fecha_toma ──
+      if (lastSync) {
+        const first = await supabase
+          .from('laboratorios')
+          .select('*')
+          .gt('updated_at', lastSync)
+          .order('updated_at', { ascending: true })
+
+        if (first.error) {
+          if (isUpdatedAtColumnError(first.error)) {
+            // Fallback: fecha_toma como proxy temporal
+            const second = await supabase
+              .from('laboratorios')
+              .select('*')
+              .gte('fecha_toma', lastSync)
+              .order('fecha_toma', { ascending: true })
+            if (second.error) throw new Error(second.error.message)
+            rows = (second.data ?? []) as RawRecord[]
+          } else {
+            throw new Error(first.error.message)
+          }
+        } else {
+          rows = (first.data ?? []) as RawRecord[]
+        }
+      } else {
+        // Primer sync: trae los últimos CAPS por fecha_toma DESC
+        const { data, error } = await supabase
+          .from('laboratorios')
+          .select('*')
+          .order('fecha_toma', { ascending: false })
+          .limit(CAPS.laboratorios)
+        if (error) throw new Error(error.message)
+        rows = (data ?? []) as RawRecord[]
+      }
     } else {
       // ── Tablas clínicas: asumen updated_at ──
       const base = supabase.from(storeName).select('*')
@@ -565,13 +644,14 @@ export async function syncStore(storeName: MirrorDataStore): Promise<SyncResult>
 }
 
 export async function syncAllStores(): Promise<Record<MirrorDataStore, SyncResult>> {
-  const [pacientes, consultas, documentos, appointments] = await Promise.all([
+  const [pacientes, consultas, documentos, appointments, laboratorios] = await Promise.all([
     syncStoreInternal('pacientes'),
     syncStoreInternal('consultas'),
     syncStoreInternal('documentos'),
     syncStoreInternal('appointments'),
+    syncStoreInternal('laboratorios'),
   ])
-  return { pacientes, consultas, documentos, appointments }
+  return { pacientes, consultas, documentos, appointments, laboratorios }
 }
 
 /* ──────────────────────────────────────────────────────────────────────
@@ -580,7 +660,12 @@ export async function syncAllStores(): Promise<Record<MirrorDataStore, SyncResul
 
 export async function hydratePaciente(pacienteId: string): Promise<HydrateResult> {
   const supabase = createClient()
-  const result: HydrateResult = { pacienteOk: false, consultas: 0, documentos: 0 }
+  const result: HydrateResult = {
+    pacienteOk: false,
+    consultas: 0,
+    documentos: 0,
+    laboratorios: 0,
+  }
 
   // 1. Paciente
   try {
@@ -628,6 +713,24 @@ export async function hydratePaciente(pacienteId: string): Promise<HydrateResult
         try { await putRecord('documentos', row as RawRecord) } catch {}
       }
       result.documentos = data.length
+    }
+  } catch {
+    // silent
+  }
+
+  // 4. Laboratorios recientes (Sprint 3 Hito 3.C)
+  try {
+    const { data, error } = await supabase
+      .from('laboratorios')
+      .select('*')
+      .eq('paciente_id', pacienteId)
+      .order('fecha_toma', { ascending: false })
+      .limit(HYDRATE_LIMIT)
+    if (!error && data) {
+      for (const row of data) {
+        try { await putRecord('laboratorios', row as RawRecord) } catch {}
+      }
+      result.laboratorios = data.length
     }
   } catch {
     // silent
@@ -742,7 +845,13 @@ export async function stopMirrorEngine(): Promise<void> {
 export async function clearMirror(): Promise<void> {
   try {
     const db = await openDb()
-    const dataStores: MirrorDataStore[] = ['pacientes', 'consultas', 'documentos', 'appointments']
+    const dataStores: MirrorDataStore[] = [
+      'pacientes',
+      'consultas',
+      'documentos',
+      'appointments',
+      'laboratorios',
+    ]
     const tx = db.transaction(dataStores, 'readwrite')
     for (const s of dataStores) {
       tx.objectStore(s).clear()
@@ -754,6 +863,7 @@ export async function clearMirror(): Promise<void> {
     await setMeta('lastSyncAt:consultas', null)
     await setMeta('lastSyncAt:documentos', null)
     await setMeta('lastSyncAt:appointments', null)
+    await setMeta('lastSyncAt:laboratorios', null)
     await setMeta('lastSweepAt', null)
   } catch {
     // silent
@@ -867,6 +977,32 @@ export async function getDocumentosLocal(
   }
 }
 
+/**
+ * Laboratorios de un paciente, ordenados DESC por `fecha_toma`.
+ * Toca `_lastAccessedAt` del paciente (ver labs == ver expediente).
+ *
+ * Sprint 3 Hito 3.C — infraestructura disponible. El consumo desde
+ * TabLaboratorios vía useHybridQuery es un hito posterior.
+ */
+export async function getLaboratoriosLocal(
+  pacienteId: string,
+  limit?: number,
+): Promise<LaboratorioLocal[]> {
+  try {
+    const db = await openDb()
+    const tx = db.transaction(STORE_LABORATORIOS, 'readonly')
+    const index = tx.objectStore(STORE_LABORATORIOS).index('by_paciente')
+    const rows = await promisifyRequest(
+      index.getAll(IDBKeyRange.only(pacienteId)),
+    ) as LaboratorioLocal[]
+    rows.sort((a, b) => (b.fecha_toma || '').localeCompare(a.fecha_toma || ''))
+    void touchAccessed('pacientes', pacienteId)
+    return limit ? rows.slice(0, limit) : rows
+  } catch {
+    return []
+  }
+}
+
 /** Citas en un rango de tiempo, ordenadas ASC por `start_time`. */
 export async function getAppointmentsLocal(range: {
   from: Date
@@ -896,15 +1032,17 @@ export async function getLastSyncAt(storeName: MirrorDataStore): Promise<string 
 }
 
 export async function getMirrorStats(): Promise<MirrorStats> {
-  const [p, c, d, a, lp, lc, ld, la, ls, uid] = await Promise.all([
+  const [p, c, d, a, lab, lp, lc, ld, la, llab, ls, uid] = await Promise.all([
     countStore('pacientes'),
     countStore('consultas'),
     countStore('documentos'),
     countStore('appointments'),
+    countStore('laboratorios'),
     getLastSyncAt('pacientes'),
     getLastSyncAt('consultas'),
     getLastSyncAt('documentos'),
     getLastSyncAt('appointments'),
+    getLastSyncAt('laboratorios'),
     getMetaString('lastSweepAt'),
     getMetaString('mirrorUserId'),
   ])
@@ -913,11 +1051,13 @@ export async function getMirrorStats(): Promise<MirrorStats> {
     consultas:    c,
     documentos:   d,
     appointments: a,
+    laboratorios: lab,
     lastSyncAt: {
       pacientes:    lp,
       consultas:    lc,
       documentos:   ld,
       appointments: la,
+      laboratorios: llab,
     },
     lastSweepAt:  ls,
     mirrorUserId: uid,

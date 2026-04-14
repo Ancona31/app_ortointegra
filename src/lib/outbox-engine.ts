@@ -29,7 +29,12 @@ import { isOnline } from '@/lib/connectionMonitor'
    ────────────────────────────────────────────────────────────────────── */
 
 export type OutboxAction = 'INSERT' | 'UPDATE' | 'DELETE'
-export type OutboxResource = 'patient' | 'note' | 'document' | 'appointment'
+export type OutboxResource =
+  | 'patient'
+  | 'note'
+  | 'document'
+  | 'appointment'
+  | 'audit_event'
 export type OutboxStatus = 'pending' | 'syncing' | 'failed_permanent'
 
 export interface OutboxItem<T = Record<string, unknown>> {
@@ -79,6 +84,7 @@ export interface OutboxStats {
     note: number
     document: number
     appointment: number
+    audit_event: number
   }
 }
 
@@ -88,6 +94,29 @@ export interface FlushResult {
   dead: number
 }
 
+/**
+ * Payload canónico para items resource='audit_event'.
+ *
+ * Hito 3.B fase 1 — Solo definición del tipo. El helper client-side
+ * `logAudit()` y la integración con páginas es fase 2 posterior.
+ *
+ * NOM-024-SSA3-2012 exige registrar todo acceso a expediente clínico.
+ * Este payload se encola vía `enqueueOutbox` y se procesa por la rama
+ * genérica de `syncItem`. El endpoint destino `/api/audit` se creará
+ * en el hito siguiente.
+ */
+export interface AuditEventPayload {
+  user_id: string
+  action: 'read' | 'write' | 'delete' | 'export' | 'print'
+  resource_type: 'paciente' | 'consulta' | 'documento' | 'laboratorio'
+  resource_id: string
+  /** ISO timestamp del cliente — puede ser offline, se respeta */
+  timestamp: string
+  /** True si el evento se generó en modo offline (con el toggle o sin red) */
+  offline_flag: boolean
+  metadata?: Record<string, unknown>
+}
+
 /* ──────────────────────────────────────────────────────────────────────
    Constantes
    ────────────────────────────────────────────────────────────────────── */
@@ -95,6 +124,14 @@ export interface FlushResult {
 const OUTBOX_KEY = 'outbox_pending_v2'
 const DLQ_KEY = 'outbox_dead_letter_v2'
 const MIGRATED_FLAG_KEY = 'outbox_migrated_v2'
+/**
+ * Hito 3.A — Durabilidad del ID Remapping (Sprint 3).
+ * Persistimos los mappings tempId → realId en secureStorage entre
+ * el success del sync del paciente y la aplicación a los dependents.
+ * Al arrancar flushOutbox, recuperamos los mappings pendientes de
+ * sesiones previas que pudieron ser interrumpidas por crash.
+ */
+const PENDING_REMAPS_KEY = 'outbox_pending_remaps_v1'
 
 const MAX_RETRIES = 5
 const HTTP_TIMEOUT_MS = 10_000
@@ -357,11 +394,12 @@ export async function getOutboxStats(): Promise<OutboxStats> {
   await migrateLegacyQueues()
   const [outbox, dlq] = await Promise.all([getOutbox(), getDLQ()])
 
-  const byResource = {
+  const byResource: OutboxStats['byResource'] = {
     patient: 0,
     note: 0,
     document: 0,
     appointment: 0,
+    audit_event: 0,
   }
   for (const item of outbox) {
     byResource[item.resource]++
@@ -431,11 +469,72 @@ export async function clearDeadLetter(): Promise<void> {
    API pública: ID remapping (tras sync de pacientes offline)
    ────────────────────────────────────────────────────────────────────── */
 
+/* ──────────────────────────────────────────────────────────────────────
+   Hito 3.A — Persistencia durable del idMap (resiliencia ante crash)
+   ────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Carga los mappings tempId→realId persistidos de una sesión previa.
+ * Si la app crasheó entre el sync del paciente y la aplicación de las
+ * referencias, los mappings quedaron aquí esperando. El flushOutbox los
+ * aplica al arrancar.
+ */
+async function loadPendingRemaps(): Promise<Map<string, string>> {
+  if (typeof window === 'undefined') return new Map()
+  try {
+    const data = await secureStorage.get<Record<string, string>>(PENDING_REMAPS_KEY)
+    if (!data || typeof data !== 'object') return new Map()
+    return new Map(Object.entries(data))
+  } catch {
+    return new Map()
+  }
+}
+
+/**
+ * Persiste los mappings pendientes. Llamado DESPUÉS del success del
+ * paciente en el servidor pero ANTES de aplicar las referencias al
+ * outbox — si la app muere ahí, la siguiente sesión recupera estos
+ * mappings y los aplica al arrancar.
+ */
+async function savePendingRemaps(map: Map<string, string>): Promise<void> {
+  if (typeof window === 'undefined') return
+  try {
+    if (map.size === 0) {
+      secureStorage.remove(PENDING_REMAPS_KEY)
+      return
+    }
+    const obj: Record<string, string> = {}
+    for (const [k, v] of map.entries()) obj[k] = v
+    await secureStorage.set(PENDING_REMAPS_KEY, obj)
+  } catch {
+    // silent — la pérdida de durabilidad es aceptable si secureStorage
+    // falla; el comportamiento degrada al pre-Hito 3.A
+  }
+}
+
+/**
+ * Limpia el store de remaps pendientes. Llamado al final de un flush
+ * exitoso, cuando todos los dependents ya fueron procesados con las
+ * referencias correctas.
+ */
+async function clearPendingRemaps(): Promise<void> {
+  if (typeof window === 'undefined') return
+  try {
+    secureStorage.remove(PENDING_REMAPS_KEY)
+  } catch {
+    // silent
+  }
+}
+
 /**
  * Actualiza las referencias tempRef en el outbox tras el sync de pacientes.
  * Si una nota/doc apuntaba a un paciente offline con tempId=X, y ahora
  * X fue sincronizado y obtuvo realId=Y, actualizamos tempRef y el
  * payload.paciente_id para que la siguiente sync envíe el ID real.
+ *
+ * Idempotente: aplicar el mismo map dos veces es no-op porque el tempRef
+ * ya fue remapeado a realId y no matchea ninguna key del map.
+ * Performance: O(n) sobre el outbox actual.
  */
 export async function updateOutboxReferences(
   idMap: Map<string, string>,
@@ -654,17 +753,42 @@ function prioritizeByWeight(items: OutboxItem[]): OutboxItem[] {
 
 /**
  * Flush ordenado: pacientes primero, luego updateReferences, luego
- * notas + documentos en paralelo. Dentro de cada grupo, items ligeros
- * tienen prioridad sobre items pesados. Retorna el resumen total.
+ * notas + documentos + others (appointments + audit_events) en paralelo.
+ * Dentro de cada grupo, items ligeros tienen prioridad sobre items pesados.
+ *
+ * Hito 3.A — Durabilidad del remapping:
+ *   Recuperamos al arrancar cualquier mapping pendiente de sesiones
+ *   anteriores (crash, cierre forzado, etc.). Los mappings nuevos del
+ *   batch actual se persisten ANTES de aplicarse al outbox. Al final
+ *   del flush exitoso, el store persistente se limpia.
+ *
+ * Hito 3.B — audit_event:
+ *   Los items con resource='audit_event' entran al bucket 'others' y
+ *   son procesados por la rama genérica de syncItem.
  */
 export async function flushOutbox(): Promise<FlushResult> {
   await migrateLegacyQueues()
   if (!isOnline()) return { synced: 0, retrying: 0, dead: 0 }
 
-  const outbox = await getOutbox()
-  if (outbox.length === 0) return { synced: 0, retrying: 0, dead: 0 }
+  // ──────────────────────────────────────────────────────────────────
+  // 0. Recovery de crashes previos: aplicar remaps pendientes que
+  //    quedaron persistidos de una sesión interrumpida.
+  // ──────────────────────────────────────────────────────────────────
+  const pendingRemaps = await loadPendingRemaps()
+  if (pendingRemaps.size > 0) {
+    await updateOutboxReferences(pendingRemaps)
+    // No limpiamos aún — se limpian al final del flush exitoso
+  }
 
-  // Separar por recurso
+  const outbox = await getOutbox()
+  if (outbox.length === 0) {
+    // Nada que sincronizar — pero limpiamos los remaps para no cargarlos
+    // innecesariamente en los próximos flushes si ya fueron aplicados.
+    await clearPendingRemaps()
+    return { synced: 0, retrying: 0, dead: 0 }
+  }
+
+  // Separar por recurso. 'others' incluye appointments y audit_events.
   const patients = outbox.filter(it => it.resource === 'patient')
   const notes = outbox.filter(it => it.resource === 'note')
   const documents = outbox.filter(it => it.resource === 'document')
@@ -675,11 +799,22 @@ export async function flushOutbox(): Promise<FlushResult> {
   // 1. Procesar pacientes primero (ordenados por peso)
   const patientResult = await processBatch(prioritizeByWeight(patients))
 
-  // 2. Si hay remapping, actualizar referencias en notes/docs antes del flush
+  // 2. Si hay remapping nuevo, PERSISTIR antes de aplicar.
+  //    Esto garantiza que si la app crashea entre el success del
+  //    paciente y la aplicación al outbox, el próximo flush recupera
+  //    los mappings y los aplica al arrancar (paso 0 del siguiente run).
   let notesToProcess = notes
   let documentsToProcess = documents
   if (patientResult.idMap.size > 0) {
+    // Merge: mantenemos los remaps previos + añadimos los nuevos
+    for (const [tempId, realId] of patientResult.idMap.entries()) {
+      pendingRemaps.set(tempId, realId)
+    }
+    await savePendingRemaps(pendingRemaps)
+
+    // Aplicar en memoria al outbox actual
     await updateOutboxReferences(patientResult.idMap)
+
     // Re-leer los items actualizados del outbox (por si updateReferences
     // cambió payload.paciente_id)
     const refreshed = await getOutbox()
@@ -687,7 +822,8 @@ export async function flushOutbox(): Promise<FlushResult> {
     documentsToProcess = refreshed.filter(it => it.resource === 'document')
   }
 
-  // 3. Flush notes y documents en paralelo (cada grupo ordenado por peso)
+  // 3. Flush notes, documents y others (appointments + audit_events)
+  //    en paralelo, cada grupo ordenado por peso
   const [notesResult, docsResult, othersResult] = await Promise.all([
     processBatch(prioritizeByWeight(notesToProcess)),
     processBatch(prioritizeByWeight(documentsToProcess)),
@@ -704,6 +840,13 @@ export async function flushOutbox(): Promise<FlushResult> {
     ...othersResult.retrying,
   ]
   await saveOutbox(newOutbox)
+
+  // 5. Hito 3.A: limpiar los remaps persistidos. Llegamos aquí solo si el
+  //    flush completó su ciclo — los dependents ya fueron procesados con
+  //    las referencias actualizadas. Si quedaron en retrying, ya tienen
+  //    el realId en su tempRef — el próximo flush los reintentará sin
+  //    necesitar los mappings persistidos.
+  await clearPendingRemaps()
 
   return {
     synced:
