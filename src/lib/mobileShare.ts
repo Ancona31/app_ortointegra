@@ -13,6 +13,56 @@
 
 import type { PdfMedicoData } from '@/lib/pdf/PdfStyles'
 
+/* ──────────────────────────────────────────────────────────────────────
+   resolveLogoForPdf — Resolver universal del logo para todos los PDFs.
+
+   Centraliza la lógica de determinación del logo que antes vivía dispersa
+   (y con un bug de condición invertida) dentro de generarPdf. Los 8
+   formularios clínicos no se modifican — este resolver procesa el
+   logoUrl recibido y garantiza que el <Image /> de react-pdf siempre
+   reciba un string válido.
+
+   Prioridades en orden:
+     1. URL absoluta válida (https://, http://, o data:image/) → se usa
+        tal cual. Cubre el caso del logo personalizado del médico
+        subido al bucket clinica-logos vía getPublicUrl().
+
+     2. Relajación — URL relativa o path sin protocolo → se reconstruye
+        con window.location.origin. Cubre casos de URLs parciales o
+        paths de storage que perdieron el prefijo.
+
+     3. Fallback — URL null, undefined, o string vacío → usa el logo
+        predeterminado de Spinus en /logo.png (servido desde public/).
+        Esto garantiza que el PDF nunca tenga un hueco donde debería
+        ir el logo.
+
+   Siempre retorna un string no vacío. Nunca retorna undefined, así
+   el render del PdfHeader siempre tiene algo que dibujar.
+   ────────────────────────────────────────────────────────────────────── */
+function resolveLogoForPdf(rawLogoUrl: string | null | undefined): string {
+  const url = typeof rawLogoUrl === 'string' ? rawLogoUrl.trim() : ''
+
+  // Prioridad 1: URL absoluta válida (http, https, data:image)
+  if (url && /^(https?:\/\/|data:image\/)/i.test(url)) {
+    return url
+  }
+
+  // Prioridad 2: Relajación — path relativo → prepender origin
+  // Cubre casos como "/logo.png", "logos/custom.png", etc.
+  if (url && typeof window !== 'undefined') {
+    const path = url.startsWith('/') ? url : `/${url}`
+    return `${window.location.origin}${path}`
+  }
+
+  // Prioridad 3: Fallback universal al logo default de Spinus
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}/logo.png`
+  }
+
+  // SSR fallback (no debería ejecutarse — generarPdf es client-side only)
+  return '/logo.png'
+}
+
 type DocType =
   | 'solicitud_lab'
   | 'solicitud_imagen'
@@ -149,12 +199,13 @@ export async function generarPdf(params: {
     console.log('[generarPdf] 1/5 inicio — tipo:', tipo)
 
     // ── Fase 1: resolver logo ──
+    // CRÍTICO: la lógica antigua tenía una condición invertida
+    // (|| logoUrl.startsWith('https://')) que reemplazaba TODA URL
+    // válida con LOGO_BASE64, canibalizando el logo personalizado
+    // del médico. Ahora usamos el resolver centralizado con las
+    // 3 prioridades documentadas arriba.
     phase = 'resolviendo logo'
-    let effectiveLogoUrl = logoUrl
-    if (!logoUrl || logoUrl.startsWith('https://')) {
-      const { LOGO_BASE64 } = await import('@/lib/pdf/logo')
-      effectiveLogoUrl = LOGO_BASE64
-    }
+    const effectiveLogoUrl = resolveLogoForPdf(logoUrl)
 
     // ── Fase 2: construir elemento react-pdf ──
     phase = 'construyendo elemento react-pdf'
