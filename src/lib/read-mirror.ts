@@ -969,7 +969,14 @@ async function readPacienteFromLegacyCache(id: string): Promise<PacienteLocal | 
     if (!cached) return null
     const now = Date.now()
     const isoNow = new Date().toISOString()
+    // Spread inclusivo: preserva todas las propiedades del cache legacy
+    // (incluyendo telefono, email, _offline y cualquier campo futuro
+    // añadido al shape de CachedPatient). Los campos requeridos por
+    // PacienteLocal que no están en el legacy cache se rellenan con
+    // defaults sanos después del spread para que sobrescriban
+    // cualquier valor stale o inesperado.
     return {
+      ...cached,
       id: cached.id,
       nombre: cached.nombre,
       apellidos: cached.apellidos,
