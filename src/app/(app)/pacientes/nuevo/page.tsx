@@ -115,8 +115,13 @@ export default function NuevoPacientePage() {
       consentimiento_otorgado: true,
     }
 
-    // Si ya sabemos que está offline, saltar directo al offline queue
-    const offline = getStatus() === 'offline'
+    // Sprint 3 Hotfix — Detección offline reforzada:
+    // getStatus() puede retornar 'online' en el primer tick antes de que
+    // el connectionMonitor pingee. navigator.onLine cubre ese gap. Uno u
+    // otro en 'offline' → saltamos directo al flujo offline queue.
+    const offline =
+      getStatus() === 'offline' ||
+      (typeof navigator !== 'undefined' && navigator.onLine === false)
     if (offline) {
       await guardarOffline(payload)
       return

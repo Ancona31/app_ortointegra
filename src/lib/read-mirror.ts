@@ -28,6 +28,7 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { getStorageQuota } from '@/lib/storage-vault'
+import { getPatientOffline } from '@/lib/offlinePatients'
 
 /* ──────────────────────────────────────────────────────────────────────
    Constantes
@@ -911,7 +912,19 @@ export async function getPacientesLocal(opts?: {
   }
 }
 
-/** Detalle de 1 paciente. Toca `_lastAccessedAt` (señal fuerte de uso). */
+/**
+ * Detalle de 1 paciente. Toca `_lastAccessedAt` (señal fuerte de uso).
+ *
+ * Sprint 3 Hotfix — Si el mirror no tiene el paciente, hace fallback
+ * al legacy cache `offline_patients_cache` (offlinePatients.ts). Esto
+ * cubre el caso crítico de pacientes creados offline con tempId que
+ * aún no se sincronizaron a Supabase: `nuevo/page.tsx` guarda en el
+ * legacy cache + outbox, y `router.push('/expediente/tempId')`
+ * antes rompía con "Paciente no encontrado" porque el mirror no
+ * conocía el tempId.
+ *
+ * El mirror sigue siendo read-only — esta lectura no escribe nada.
+ */
 export async function getPacienteLocal(id: string): Promise<PacienteLocal | null> {
   try {
     const db = await openDb()
@@ -919,9 +932,58 @@ export async function getPacienteLocal(id: string): Promise<PacienteLocal | null
     const rec = await promisifyRequest(
       tx.objectStore(STORE_PACIENTES).get(id),
     ) as PacienteLocal | undefined
-    if (!rec) return null
-    void touchAccessed('pacientes', id) // fire-and-forget
-    return rec
+    if (rec) {
+      void touchAccessed('pacientes', id) // fire-and-forget
+      return rec
+    }
+
+    // Fallback al legacy cache — pacientes creados offline con tempId
+    return await readPacienteFromLegacyCache(id)
+  } catch {
+    // Si el mirror falla por completo, intentar legacy cache como último recurso
+    try {
+      return await readPacienteFromLegacyCache(id)
+    } catch {
+      return null
+    }
+  }
+}
+
+/**
+ * Lee un paciente del legacy cache de `offlinePatients.ts` y normaliza
+ * su shape al `PacienteLocal` esperado por los consumidores.
+ *
+ * Campos no disponibles en el legacy cache se rellenan con defaults
+ * sanos:
+ *   - `clinica_id`: string vacío (los consumidores actuales no lo usan
+ *     para filtrar, solo lo pasan a componentes de presentación)
+ *   - `activo`: true (los pacientes eliminados no entran al legacy cache)
+ *   - `created_at` / `updated_at`: timestamp actual (aproximación — el
+ *     real lo tendrá tras sincronizar y re-popular el mirror)
+ *   - Metadata: _localFetchedAt = ahora, _lastAccessedAt = ahora,
+ *     _exemptUntil = null
+ */
+async function readPacienteFromLegacyCache(id: string): Promise<PacienteLocal | null> {
+  try {
+    const cached = await getPatientOffline(id)
+    if (!cached) return null
+    const now = Date.now()
+    const isoNow = new Date().toISOString()
+    return {
+      id: cached.id,
+      nombre: cached.nombre,
+      apellidos: cached.apellidos,
+      fecha_nacimiento: cached.fecha_nacimiento ?? null,
+      sexo: cached.sexo ?? null,
+      numero_expediente: cached.numero_expediente ?? null,
+      clinica_id: '',
+      activo: true,
+      created_at: isoNow,
+      updated_at: isoNow,
+      _localFetchedAt: now,
+      _lastAccessedAt: now,
+      _exemptUntil: null,
+    } as PacienteLocal
   } catch {
     return null
   }

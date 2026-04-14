@@ -24,31 +24,63 @@ export default function LoginPage() {
       setError('El enlace de recuperación expiró o ya fue usado. Solicita uno nuevo.')
     }
 
-    // Detectar si hay sesión activa
+    // Sprint 3 Hotfix — Blindaje offline del login:
+    // Si ya hay sesión local válida (cliente tiene tokens en localStorage),
+    // redirect automático a /inicio sin pedir credenciales. Esto cubre el
+    // caso en que el proxy server-side empuja al médico a /login en gray
+    // zone mientras la sesión del cliente sigue intacta.
     const supabase = createClient()
-    supabase.auth.getUser().then((res: { data: { user: { email: string } | null } }) => {
-      if (res.data.user?.email) {
-        setSesionActiva(res.data.user.email)
-      }
-    })
-  }, [])
+    supabase.auth.getSession()
+      .then(({ data: { session } }: { data: { session: { user: { email: string | null } } | null } }) => {
+        if (session?.user?.email) {
+          // Sesión válida local → volver a la app sin pedir credenciales
+          router.push('/inicio')
+          return
+        }
+        // Sin sesión local → flujo normal de login, detectar sesión residual
+        return supabase.auth.getUser().then((res: { data: { user: { email: string } | null } }) => {
+          if (res.data.user?.email) {
+            setSesionActiva(res.data.user.email)
+          }
+        })
+      })
+      .catch(() => {
+        // silent — si getSession/getUser fallan (SDK offline strict),
+        // permitir el form de login normal
+      })
+  }, [router])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
 
-    // Rate limit: verificar antes de intentar login
-    const rlRes = await fetch('/api/auth/rate-limit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'login_email', email }),
-    })
-    if (rlRes.status === 429) {
-      const rlData = await rlRes.json()
-      setLoading(false)
-      setError(rlData.error || 'Demasiados intentos. Espera 15 minutos.')
-      return
+    // Sprint 3 Hotfix — Rate-limit offline-aware:
+    // Si el browser reporta sin red, saltar el rate-limit completamente
+    // (no hay ataques remotos sin red). Además wrap en try/catch como
+    // safety net — el Service Worker NO intercepta POSTs (solo cachea
+    // GETs), entonces offline real el fetch falla con TypeError. Sin
+    // este wrap, el spinner del login quedaba eterno.
+    const isBrowserOffline = typeof navigator !== 'undefined' && navigator.onLine === false
+
+    if (!isBrowserOffline) {
+      try {
+        const rlRes = await fetch('/api/auth/rate-limit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'login_email', email }),
+        })
+        if (rlRes.status === 429) {
+          const rlData = await rlRes.json()
+          setLoading(false)
+          setError(rlData.error || 'Demasiados intentos. Espera 15 minutos.')
+          return
+        }
+      } catch {
+        // Red cayó durante el rate-limit check → procedemos sin rate-limit.
+        // Si el signInWithPassword también falla por red, mostrará su
+        // propio error abajo.
+      }
     }
 
     const supabase = createClient()
