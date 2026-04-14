@@ -27,13 +27,13 @@ import TabDocumentos from '@/components/expediente/TabDocumentos'
 import ExportarExpedienteButton from '@/components/expediente/ExportarExpedienteButton'
 import dynamic from 'next/dynamic'
 
-// ── Read Mirror (Hito 3.3) ─────────────────────────────────────
+// ── Read Mirror (Hito 3.3 + Bloque 3.D) ────────────────────────
 import { useHybridQuery } from '@/hooks/useHybridQuery'
 import {
-  getPacienteLocal, getConsultasLocal, getDocumentosLocal, hydratePaciente,
+  getPacienteLocal, getConsultasLocal, getDocumentosLocal,
+  getLaboratoriosLocal, hydratePaciente,
 } from '@/lib/read-mirror'
 import FreshnessBadge from '@/components/ui/FreshnessBadge'
-import { getStatus, subscribe } from '@/lib/connectionMonitor'
 
 function FormCargando() {
   return <div className="flex items-center justify-center py-12"><Loader2 className="animate-spin text-slate-300" size={24} /></div>
@@ -62,14 +62,11 @@ const DOCS = [
 type Tab = 'resumen' | 'consultas' | 'laboratorios' | 'graficas' | 'documentos'
 
 /**
- * LABS_PAGE_SIZE: sigue usando el tamaño original (15) con paginación
- * cursor-based online. Los laboratorios NO están en el mirror (Bloque 2.5).
- *
- * MIRROR_VIEW_LIMIT: límite unificado para consultas y documentos que sí
- * viven en el mirror. 50 cubre ~1 año de seguimiento típico ortopédico.
- * Si se requiere más, se puede ampliar a futuro sin paginación visible.
+ * MIRROR_VIEW_LIMIT: límite unificado para consultas, documentos y
+ * laboratorios que viven en el mirror (Sprint 3 Hito 3.C). 50 cubre
+ * ~1 año de seguimiento típico ortopédico. Los pacientes con más
+ * registros siguen visibles via el listado global online.
  */
-const LABS_PAGE_SIZE = 15
 const MIRROR_VIEW_LIMIT = 50
 
 function ExpedientePacienteContent() {
@@ -80,11 +77,8 @@ function ExpedientePacienteContent() {
   useAuditAccess('pacientes', id) // NOM-024: registrar acceso al expediente
 
   // ── Estados que se mantienen intactos del código original ──
-  const [labs, setLabs] = useState<Laboratorio[]>([])
   const [allAddendums, setAllAddendums] = useState<{ id: string; consulta_id: string; contenido: string; medico_nombre: string; created_at: string }[]>([])
   const [tab, setTab] = useState<Tab>('resumen')
-  const [hayMasLabs, setHayMasLabs] = useState(false)
-  const [cargandoMas, setCargandoMas] = useState(false)
   const [eliminandoLab, setEliminandoLab] = useState<string | null>(null)
   const [confirmarEliminar, setConfirmarEliminar] = useState<string | null>(null)
   const [graficasAbiertas, setGraficasAbiertas] = useState<Record<string, boolean>>({})
@@ -94,13 +88,6 @@ function ExpedientePacienteContent() {
   const [mostrarEliminarPaciente, setMostrarEliminarPaciente] = useState(false)
   const [eliminandoPaciente, setEliminandoPaciente] = useState(false)
   const [errorEliminar, setErrorEliminar] = useState('')
-
-  // ── Detector de red para banner offline en tab Laboratorios ──
-  const [offline, setOffline] = useState(() => getStatus() === 'offline')
-  useEffect(() => {
-    const unsub = subscribe((status) => setOffline(status === 'offline'))
-    return unsub
-  }, [])
 
   // ── 3 hybrid queries: paciente + consultas + documentos ──
   // Nota: uso los tipos del proyecto (Paciente, Consulta, Documento) como T
@@ -159,11 +146,32 @@ function ExpedientePacienteContent() {
     },
   })
 
+  // 4to hook (Bloque 3.D) — laboratorios desde el mirror (Hito 3.C)
+  const qLabs = useHybridQuery<Laboratorio[]>({
+    key: `exp-labs-${id}`,
+    localFetcher: async () => {
+      const local = await getLaboratoriosLocal(id, MIRROR_VIEW_LIMIT)
+      return local as unknown as Laboratorio[]
+    },
+    remoteFetcher: async () => {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('laboratorios')
+        .select('*')
+        .eq('paciente_id', id)
+        .order('fecha_toma', { ascending: false })
+        .limit(MIRROR_VIEW_LIMIT)
+      if (error) throw error
+      return (data ?? []) as Laboratorio[]
+    },
+  })
+
   // Derived state — usa los mismos nombres que el código original para
   // minimizar cambios en el JSX más abajo.
   const paciente = qPaciente.data
   const consultas = qConsultas.data ?? []
   const documentos = qDocumentos.data ?? []
+  const labs = qLabs.data ?? []
 
   // ── Refuerzo del Smart Warm-up: hidratar el paciente on-open ──
   // Fire-and-forget. Actualiza el mirror en background para que la
@@ -181,30 +189,6 @@ function ExpedientePacienteContent() {
     else if (t === 'graficas') setTab('graficas')
     else if (t === 'documentos') setTab('documentos')
   }, [searchParams])
-
-  // ── Fetch inicial de laboratorios (online-only, sin mirror) ──
-  useEffect(() => {
-    const supabase = createClient()
-    let cancelled = false
-    const limit = LABS_PAGE_SIZE + 1 // +1 para detectar si hay más
-
-    supabase
-      .from('laboratorios')
-      .select('*')
-      .eq('paciente_id', id)
-      .order('fecha_toma', { ascending: false })
-      .limit(limit)
-      .then(({ data }: { data: Laboratorio[] | null }) => {
-        if (cancelled) return
-        const labsList = data || []
-        setHayMasLabs(labsList.length > LABS_PAGE_SIZE)
-        setLabs(labsList.slice(0, LABS_PAGE_SIZE))
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [id])
 
   // ── Fetch de addendums (online-only, dependiente de qConsultas.data) ──
   useEffect(() => {
@@ -231,21 +215,6 @@ function ExpedientePacienteContent() {
       cancelled = true
     }
   }, [qConsultas.data])
-
-  // ── Cargar más labs (solo labs mantiene paginación cursor online) ──
-  async function cargarMasLabs() {
-    if (!labs.length) return
-    setCargandoMas(true)
-    const cursor = labs[labs.length - 1].fecha_toma
-    const supabase = createClient()
-    const { data } = await supabase.from('laboratorios').select('*')
-      .eq('paciente_id', id).order('fecha_toma', { ascending: false })
-      .lt('fecha_toma', cursor).limit(LABS_PAGE_SIZE + 1)
-    const items = data || []
-    setHayMasLabs(items.length > LABS_PAGE_SIZE)
-    setLabs(prev => [...prev, ...items.slice(0, LABS_PAGE_SIZE)])
-    setCargandoMas(false)
-  }
 
   // Recolecta todos los parámetros de todos los labs agrupando nombres equivalentes
   const todosLosParams = useMemo((): ParamGrafica[] => {
@@ -321,7 +290,10 @@ function ExpedientePacienteContent() {
   async function eliminarLab(labId: string) {
     setEliminandoLab(labId)
     const res = await fetch(`/api/laboratorios/${labId}`, { method: 'DELETE' })
-    if (res.ok) setLabs(prev => prev.filter(l => l.id !== labId))
+    if (res.ok) {
+      // Refetch el hook para remover el lab del state + refrescar el mirror
+      await qLabs.refetch()
+    }
     setEliminandoLab(null)
     setConfirmarEliminar(null)
   }
@@ -580,30 +552,18 @@ function ExpedientePacienteContent() {
         )}
 
         {tab === 'laboratorios' && (
-          <>
-            {/* Banner offline: los laboratorios no están en el mirror (Bloque 2.5) */}
-            {offline && labs.length === 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-3">
-                <p className="text-sm text-amber-800 text-center">
-                  Los laboratorios no están disponibles offline.
-                  <br />
-                  Conéctate a internet para cargarlos.
-                </p>
-              </div>
-            )}
-            <TabLaboratorios
-              id={id}
-              labs={labs}
-              isDoctor={isDoctor}
-              confirmarEliminar={confirmarEliminar}
-              eliminandoLab={eliminandoLab}
-              onConfirmarEliminar={setConfirmarEliminar}
-              onEliminarLab={eliminarLab}
-              hayMas={hayMasLabs}
-              cargandoMas={cargandoMas}
-              onCargarMas={cargarMasLabs}
-            />
-          </>
+          <TabLaboratorios
+            id={id}
+            labs={labs}
+            isDoctor={isDoctor}
+            confirmarEliminar={confirmarEliminar}
+            eliminandoLab={eliminandoLab}
+            onConfirmarEliminar={setConfirmarEliminar}
+            onEliminarLab={eliminarLab}
+            hayMas={false}
+            cargandoMas={false}
+            onCargarMas={() => { /* labs se cargan vía el mirror, sin cursor */ }}
+          />
         )}
 
         {tab === 'graficas' && (
