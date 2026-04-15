@@ -63,7 +63,7 @@ function getTokenExpiration(exp: unknown): number | null {
 }
 
 /* ──────────────────────────────────────────────────────────────────────
-   Persistencia de metadata (fuera del SDK)
+   Persistencia de metadata local (spinus_session_meta)
    ────────────────────────────────────────────────────────────────────── */
 
 function getStoredMeta(): SessionMeta {
@@ -91,25 +91,55 @@ function saveMeta(meta: SessionMeta): void {
 }
 
 /* ──────────────────────────────────────────────────────────────────────
-   Obtención de token raw desde Supabase localStorage
+   Sincronizar metadata desde sesión del SDK (cookies)
    ────────────────────────────────────────────────────────────────────── */
 
-function getSupabaseToken(): string | null {
+/**
+ * Obtiene sesión del SDK de Supabase y sincroniza a spinus_session_meta.
+ * El SDK lee de cookies en SSR, o de localStorage en client puro.
+ * Si SDK retorna null (offline), se mantiene el último estado conocido.
+ */
+async function syncFromSdkSession(currentMeta: SessionMeta): Promise<SessionMeta> {
   try {
-    const prefix = 'sb-'
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key && key.startsWith(prefix) && key.includes('-auth-token')) {
-        const raw = localStorage.getItem(key)
-        if (!raw) continue
-        const parsed = JSON.parse(raw) as { access_token?: string }
-        if (parsed.access_token) return parsed.access_token
+    const supabase = createClient()
+    const { data, error } = await supabase.auth.getSession()
+
+    if (error || !data.session) {
+      // SDK no tiene sesión — mantener estado actual si existe
+      return currentMeta.userId ? currentMeta : { userId: null, expiresAt: null, redVerifiedAt: null, email: null }
+    }
+
+    const { session } = data
+    const { user, access_token, expires_at } = session
+
+    let exp: number | null = null
+    let email: string | null = null
+
+    if (access_token) {
+      const payload = decodeJWTPayload(access_token)
+      if (payload) {
+        exp = getTokenExpiration(payload.exp)
+        email = (payload.email as string | undefined) ?? null
       }
     }
+
+    if (!user?.id) {
+      return currentMeta.userId ? currentMeta : { userId: null, expiresAt: null, redVerifiedAt: null, email: null }
+    }
+
+    const newMeta: SessionMeta = {
+      userId: user.id,
+      expiresAt: exp ?? (expires_at ? expires_at * 1000 : null),
+      redVerifiedAt: Date.now(),
+      email: email ?? user.email ?? null,
+    }
+
+    saveMeta(newMeta)
+    return newMeta
   } catch {
-    // Silencioso
+    // Error — mantener estado actual si existe
+    return currentMeta.userId ? currentMeta : { userId: null, expiresAt: null, redVerifiedAt: null, email: null }
   }
-  return null
 }
 
 /* ──────────────────────────────────────────────────────────────────────
@@ -178,56 +208,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const isAuthenticated = meta.userId !== null && !tokenState.isExpired
 
   /**
-   * Sincroniza metadata con Supabase — solo se ejecuta online.
-   * Extrae el JWT del localStorage de Supabase, decodifica payload,
-   * y actualiza red_verified_at si el token es válido.
+   * RefreshMeta — Sincroniza con el SDK y actualiza spinus_session_meta.
+   * Se ejecuta:
+   *   - Online, periódicamente (visibility change)
+   *   - Al reconectar (evento online)
+   *   - Explicitamente vía hook
    *
-   * Esta función es idempotente y no falla — si hay error, mantiene
-   * el último estado conocido válido.
+   * Esto garantiza que cada vez que hay red y la sesión es válida,
+   * el timestamp redVerifiedAt se actualiza, extendiendo el grace period.
    */
   const refreshMeta = useCallback(async (): Promise<void> => {
     if (getStatus() === 'offline') return
 
-    const token = getSupabaseToken()
-    if (!token) return
-
-    const payload = decodeJWTPayload(token)
-    if (!payload) return
-
-    const userId = payload.sub as string | undefined
-    const exp = getTokenExpiration(payload.exp)
-    const email = payload.email as string | undefined
-
-    if (!userId) return
-
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase.auth.getUser()
-
-      if (error || !data.user) {
-        const newMeta: SessionMeta = {
-          userId: meta.userId,
-          expiresAt: exp ?? meta.expiresAt,
-          redVerifiedAt: meta.redVerifiedAt,
-          email: meta.email,
-        }
+    setMeta(current => {
+      void syncFromSdkSession(current).then(newMeta => {
         setMeta(newMeta)
-        saveMeta(newMeta)
-        return
-      }
-
-      const newMeta: SessionMeta = {
-        userId: data.user.id,
-        expiresAt: exp ?? meta.expiresAt,
-        redVerifiedAt: Date.now(),
-        email: data.user.email ?? email ?? null,
-      }
-      setMeta(newMeta)
-      saveMeta(newMeta)
-    } catch {
-      // Mantener estado existente si falla
-    }
-  }, [meta])
+      })
+      return current
+    })
+  }, [])
 
   /**
    * SignOut explícito — limpia todo lo relacionado con la sesión.
@@ -252,39 +251,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [])
 
   /**
-   * Inicialización — extrae sesión persistida del SDK de Supabase
-   * y-popula la metadata local para que esté disponible inmediatamente.
+   * Inicialización — Hidratación híbrida
    *
-   * IMPORTANTE: Esta función se ejecuta una sola vez al montar.
-   * No espera a que el SDK complete su proceso asíncrono — lee
-   * directamente del localStorage para tener userId disponible
-   * antes de que el Mirror y el Outbox necesiten inicializarse.
+   * Paso 1: Leer spinus_session_meta del localStorage (inmediato, offline-safe)
+   *         → Esto nos da userId disponible para Mirror y Outbox SIN esperar SDK
+   *
+   * Paso 2: Si estamos online, sincronizar con SDK (getSession → cookies)
+   *         → Esto actualiza redVerifiedAt y mantiene la sesión fresca
+   *
+   * El resultado: incluso si SDK falla o las cookies expiran,
+   * siempre tenemos el último userId conocido guardado localmente.
    */
   useEffect(() => {
     async function init() {
+      // Paso 1: Cargar estado local inmediatamente
       const storedMeta = getStoredMeta()
-      const token = getSupabaseToken()
 
-      if (token && !storedMeta.redVerifiedAt) {
-        const payload = decodeJWTPayload(token)
-        if (payload) {
-          const userId = payload.sub as string | undefined
-          const exp = getTokenExpiration(payload.exp)
-          const email = payload.email as string | undefined
-
-          if (userId) {
-            const newMeta: SessionMeta = {
-              userId,
-              expiresAt: exp,
-              redVerifiedAt: Date.now(),
-              email: email ?? null,
-            }
-            setMeta(newMeta)
-            saveMeta(newMeta)
-          }
-        }
-      } else if (storedMeta.userId) {
+      if (storedMeta.userId) {
+        // Hay sesión guardada previamente — usarla inmediatamente
         setMeta(storedMeta)
+      }
+
+      // Paso 2: Sincronizar con SDK si hay red
+      if (getStatus() !== 'offline') {
+        const syncedMeta = await syncFromSdkSession(storedMeta)
+        setMeta(syncedMeta)
       }
 
       setInitialized(true)
@@ -294,9 +285,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [])
 
   /**
-   * Sync periódico — cada vez que la conexión cambia a online,
-   * refreshMeta actualiza red_verified_at.
-   * También se dispara cuando la pestaña vuelve al foreground.
+   * Sync periódico — cada vez que la conexión cambia a online
+   * o cuando la pestaña vuelve al foreground, refreshMeta actualiza
+   * redVerifiedAt para extender el grace period.
    */
   useEffect(() => {
     if (!initialized) return
