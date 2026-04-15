@@ -10,32 +10,35 @@ import OfflineGate from '@/components/OfflineGate'
 import PersistenceWarning from '@/components/ui/PersistenceWarning'
 import ChunkMissingListener from '@/components/ChunkMissingListener'
 import MirrorInitializer from '@/components/MirrorInitializer'
+import { AuthProvider } from '@/lib/auth-context'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ToastProvider>
-      <ThemeProvider>
-        <div className="flex h-screen overflow-hidden">
-          <Sidebar />
-          <main className="flex-1 lg:ml-60 overflow-y-auto">
-            <div className="min-h-full pt-16 px-4 pb-6 lg:pt-8 lg:px-8 lg:pb-8">
-              <ErrorBoundary>
-                <PageTransition>
-                  <OfflineGate>
-                    <PersistenceWarning />
-                    {children}
-                  </OfflineGate>
-                </PageTransition>
-              </ErrorBoundary>
-            </div>
-          </main>
-        </div>
-        <CommandPalette />
-        <SessionGuard />
-        <OfflineSync />
-        <MirrorInitializer />
-        <ChunkMissingListener />
-      </ThemeProvider>
-    </ToastProvider>
+    <AuthProvider>
+      <ToastProvider>
+        <ThemeProvider>
+          <div className="flex h-screen overflow-hidden">
+            <Sidebar />
+            <main className="flex-1 lg:ml-60 overflow-y-auto">
+              <div className="min-h-full pt-16 px-4 pb-6 lg:pt-8 lg:px-8 lg:pb-8">
+                <ErrorBoundary>
+                  <PageTransition>
+                    <OfflineGate>
+                      <PersistenceWarning />
+                      {children}
+                    </OfflineGate>
+                  </PageTransition>
+                </ErrorBoundary>
+              </div>
+            </main>
+          </div>
+          <CommandPalette />
+          <SessionGuard />
+          <OfflineSync />
+          <MirrorInitializer />
+          <ChunkMissingListener />
+        </ThemeProvider>
+      </ToastProvider>
+    </AuthProvider>
   )
 }
