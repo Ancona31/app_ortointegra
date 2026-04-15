@@ -67,7 +67,52 @@ export default function SessionGuard() {
           return
         }
 
-        // Sin sesión local → cleanup + redirect limpio a /login.
+        // ══════════════════════════════════════════════════════════════
+        // DEFENSA OFFLINE: getSession() puede retornar null si el access
+        // token expiró Y el SDK intentó refresh que falló por falta de
+        // red. En ese caso, el usuario tiene una sesión PERFECTAMENTE
+        // VÁLIDA en localStorage que solo necesita refresh online.
+        //
+        // Antes de redirigir/limpiar nada, verificamos directamente si
+        // hay tokens raw de Supabase en localStorage (con prefijo sb-).
+        // Si los hay Y estamos offline → confiar 100% en local, NO
+        // ejecutar cleanup, NO redirigir, NO clearMirror.
+        //
+        // Cuando el usuario vuelva online, autoRefreshToken del SDK
+        // renovará el token automáticamente sin intervención.
+        //
+        // Esto resuelve la "expulsión fantasma" del médico cuando lleva
+        // más de ~1h en la app y se va offline.
+        // ══════════════════════════════════════════════════════════════
+        const isOffline =
+          typeof navigator !== 'undefined' && navigator.onLine === false
+
+        if (isOffline) {
+          let hasRawSupabaseToken = false
+          try {
+            for (let i = 0; i < localStorage.length; i++) {
+              const k = localStorage.key(i)
+              if (k && k.startsWith('sb-') && k.includes('-auth-token')) {
+                hasRawSupabaseToken = true
+                break
+              }
+            }
+          } catch {
+            // localStorage bloqueado — fall through al cleanup
+          }
+
+          if (hasRawSupabaseToken) {
+            // Confiar local. NO redirigir. NO clearMirror. NO cleanup.
+            try {
+              sessionStorage.setItem(SESSION_FLAG, '1')
+            } catch {
+              // silent
+            }
+            return
+          }
+        }
+
+        // Sin sesión local Y (online OR sin token raw) → cleanup + redirect.
         // clearMirror previene que datos clínicos sigan visibles si otro
         // médico entra inmediatamente en el mismo dispositivo.
         await clearMirror().catch(() => {})

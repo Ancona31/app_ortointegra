@@ -217,7 +217,13 @@ const PRECACHE_CHUNKS = ${JSON.stringify(CRITICAL_CHUNKS)}
 const PRECACHE = [...PRECACHE_HTML, ...PRECACHE_CHUNKS]
 
 // ── INSTALL: descarga atómica suave con Promise.allSettled ──
-// Un 404 en un chunk individual NO invalida el resto del cache
+// Un 404 en un chunk individual NO invalida el resto del cache.
+// CRÍTICO: rechazamos respuestas REDIRIGIDAS para evitar guardar
+// contenido equivocado bajo URLs de rutas protegidas. Si el SW se
+// instala sin sesión activa, el proxy redirige /inicio → /login y
+// el fetch sigue el redirect. Sin esta validación, cacheariamos
+// contenido de /login bajo la key /inicio y el usuario veria login
+// al navegar offline a /inicio.
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE).then(async cache => {
@@ -225,6 +231,9 @@ self.addEventListener('install', (e) => {
         PRECACHE.map(async url => {
           const res = await fetch(url, { cache: 'reload' })
           if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + url)
+          if (res.redirected) {
+            throw new Error('Redirected: ' + url + ' → ' + res.url + ' (likely no session at install time)')
+          }
           await cache.put(url, res)
           return url
         })

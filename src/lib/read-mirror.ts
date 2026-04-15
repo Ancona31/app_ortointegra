@@ -594,8 +594,78 @@ async function syncStoreInternal(storeName: MirrorDataStore): Promise<SyncResult
         if (error) throw new Error(error.message)
         rows = (data ?? []) as RawRecord[]
       }
+    } else if (storeName === 'consultas') {
+      // ── Consultas: intenta updated_at, fallback a fecha ──
+      // (consultas tiene `fecha` que es la fecha de la consulta clínica)
+      if (lastSync) {
+        const first = await supabase
+          .from('consultas')
+          .select('*')
+          .gt('updated_at', lastSync)
+          .order('updated_at', { ascending: true })
+
+        if (first.error) {
+          if (isUpdatedAtColumnError(first.error)) {
+            const second = await supabase
+              .from('consultas')
+              .select('*')
+              .gte('fecha', lastSync)
+              .order('fecha', { ascending: true })
+            if (second.error) throw new Error(second.error.message)
+            rows = (second.data ?? []) as RawRecord[]
+          } else {
+            throw new Error(first.error.message)
+          }
+        } else {
+          rows = (first.data ?? []) as RawRecord[]
+        }
+      } else {
+        // Primer pull: fecha DESC limitado a CAPS
+        const { data, error } = await supabase
+          .from('consultas')
+          .select('*')
+          .order('fecha', { ascending: false })
+          .limit(CAPS.consultas)
+        if (error) throw new Error(error.message)
+        rows = (data ?? []) as RawRecord[]
+      }
+    } else if (storeName === 'documentos') {
+      // ── Documentos: intenta updated_at, fallback a created_at ──
+      // (documentos no tiene fecha clínica, usa created_at como proxy)
+      if (lastSync) {
+        const first = await supabase
+          .from('documentos')
+          .select('*')
+          .gt('updated_at', lastSync)
+          .order('updated_at', { ascending: true })
+
+        if (first.error) {
+          if (isUpdatedAtColumnError(first.error)) {
+            const second = await supabase
+              .from('documentos')
+              .select('*')
+              .gte('created_at', lastSync)
+              .order('created_at', { ascending: true })
+            if (second.error) throw new Error(second.error.message)
+            rows = (second.data ?? []) as RawRecord[]
+          } else {
+            throw new Error(first.error.message)
+          }
+        } else {
+          rows = (first.data ?? []) as RawRecord[]
+        }
+      } else {
+        // Primer pull: created_at DESC limitado a CAPS
+        const { data, error } = await supabase
+          .from('documentos')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(CAPS.documentos)
+        if (error) throw new Error(error.message)
+        rows = (data ?? []) as RawRecord[]
+      }
     } else {
-      // ── Tablas clínicas: asumen updated_at ──
+      // ── Tabla con updated_at garantizado: pacientes ──
       const base = supabase.from(storeName).select('*')
       if (lastSync) {
         const { data, error } = await base
