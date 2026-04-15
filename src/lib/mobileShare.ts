@@ -12,55 +12,59 @@
  */
 
 import type { PdfMedicoData } from '@/lib/pdf/PdfStyles'
+// Import ESTÁTICO del logo base64 embebido. Crítico para offline:
+// el resolver debe tener acceso inmediato al fallback sin depender
+// de un chunk adicional que pueda no estar en la precache del SW.
+// Costo de bundle: ~15KB, aceptable para garantizar que el PDF
+// siempre tenga un logo renderizable sin fetch.
+import { LOGO_BASE64 } from '@/lib/pdf/logo'
 
 /* ──────────────────────────────────────────────────────────────────────
-   resolveLogoForPdf — Resolver universal del logo para todos los PDFs.
+   resolveLogoForPdf — Resolver de logo con ESTRATEGIA CERO LATENCIA.
 
-   Centraliza la lógica de determinación del logo que antes vivía dispersa
-   (y con un bug de condición invertida) dentro de generarPdf. Los 8
-   formularios clínicos no se modifican — este resolver procesa el
-   logoUrl recibido y garantiza que el <Image /> de react-pdf siempre
-   reciba un string válido.
+   Post-mortem (regresión offline detectada en campo):
+     La versión anterior usaba `${window.location.origin}/logo.png`
+     como fallback, lo que forzaba un fetch HTTP para obtener el logo.
+     En WiFi físico apagado, ese fetch quedaba colgado esperando el
+     timeout de DNS del sistema operativo (30-120s), bloqueando el
+     render del PDF indefinidamente.
 
-   Prioridades en orden:
-     1. URL absoluta válida (https://, http://, o data:image/) → se usa
-        tal cual. Cubre el caso del logo personalizado del médico
-        subido al bucket clinica-logos vía getPublicUrl().
+     Esta versión elimina TODA dependencia de red:
+       - Data URIs inline → retornadas tal cual (cero latencia)
+       - URLs http/https → se pasan al renderer (cache del browser/SW
+         maneja el caso offline; el timeout de 12s en Fase 3 del
+         generarPdf es la red de seguridad definitiva)
+       - Cualquier otro caso (null, undefined, path, etc.) → LOGO_BASE64
+         importado estáticamente, DISPONIBLE INMEDIATAMENTE sin fetch
 
-     2. Relajación — URL relativa o path sin protocolo → se reconstruye
-        con window.location.origin. Cubre casos de URLs parciales o
-        paths de storage que perdieron el prefijo.
+     El renderer de react-pdf puede intentar cargar URLs http/https;
+     si fallan por offline, el Promise.race de 12s en la Fase 3 del
+     generarPdf aborta el render y libera el guard isGenerating.
 
-     3. Fallback — URL null, undefined, o string vacío → usa el logo
-        predeterminado de Spinus en /logo.png (servido desde public/).
-        Esto garantiza que el PDF nunca tenga un hueco donde debería
-        ir el logo.
-
-   Siempre retorna un string no vacío. Nunca retorna undefined, así
-   el render del PdfHeader siempre tiene algo que dibujar.
+   Prioridades:
+     1. Data URI inline → sin latencia, siempre válido
+     2. URL remota http/https → pasa tal cual al renderer
+     3. Fallback → LOGO_BASE64 inline (sin fetch, garantiza offline)
    ────────────────────────────────────────────────────────────────────── */
 function resolveLogoForPdf(rawLogoUrl: string | null | undefined): string {
   const url = typeof rawLogoUrl === 'string' ? rawLogoUrl.trim() : ''
 
-  // Prioridad 1: URL absoluta válida (http, https, data:image)
-  if (url && /^(https?:\/\/|data:image\/)/i.test(url)) {
+  // Prioridad 1: Data URI inline — cero latencia, cero fetch
+  if (url && /^data:image\//i.test(url)) {
     return url
   }
 
-  // Prioridad 2: Relajación — path relativo → prepender origin
-  // Cubre casos como "/logo.png", "logos/custom.png", etc.
-  if (url && typeof window !== 'undefined') {
-    const path = url.startsWith('/') ? url : `/${url}`
-    return `${window.location.origin}${path}`
+  // Prioridad 2: URL remota http/https — se pasa tal cual al renderer
+  // Si el renderer puede fetcharla (online o cache), muestra el logo
+  // personalizado. Si no puede, el Promise.race de Fase 3 protege
+  // contra el cuelgue eterno.
+  if (url && /^https?:\/\//i.test(url)) {
+    return url
   }
 
-  // Prioridad 3: Fallback universal al logo default de Spinus
-  if (typeof window !== 'undefined') {
-    return `${window.location.origin}/logo.png`
-  }
-
-  // SSR fallback (no debería ejecutarse — generarPdf es client-side only)
-  return '/logo.png'
+  // Prioridad 3: Fallback inline base64 — SIEMPRE disponible
+  // Sin fetch, sin network, sin riesgo de cuelgue offline.
+  return LOGO_BASE64
 }
 
 type DocType =
@@ -217,9 +221,25 @@ export async function generarPdf(params: {
     console.log('[generarPdf] 2/5 elemento construido')
 
     // ── Fase 3: renderizar a blob ──
+    // CRÍTICO: @react-pdf/renderer fetches imágenes internamente (logo
+    // remoto, firma signed URL). En WiFi real off, esos fetches pueden
+    // colgar esperando DNS timeout del OS (30-120s). Envolvemos en
+    // Promise.race con timeout de 12s para garantizar que:
+    //   1. El guard isGenerating se libere SIEMPRE (finally lo hace)
+    //   2. El usuario vea un error accionable en lugar de un spinner eterno
+    //   3. Los retries sean posibles inmediatamente tras el timeout
     phase = 'renderizando PDF'
     const { generatePdfClient } = await import('@/lib/pdfClientFallback')
-    const rawBlob = await generatePdfClient(element)
+    const PDF_TIMEOUT_MS = 12_000
+    const rawBlob = await Promise.race([
+      generatePdfClient(element),
+      new Promise<never>((_, reject) => {
+        setTimeout(
+          () => reject(new Error('Tiempo de espera agotado al generar el PDF. Intente de nuevo.')),
+          PDF_TIMEOUT_MS,
+        )
+      }),
+    ])
 
     // ── Fase 4: blindar MIME type ──
     phase = 'blindando MIME type'
