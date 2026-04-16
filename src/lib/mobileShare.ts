@@ -149,9 +149,31 @@ export async function generarPdf(params: {
     console.log('[generarPdf] 1/5 inicio — tipo:', tipo)
 
     // ── Fase 1: resolver logo ──
+    // Si hay URL https del logo personalizado → convertir a Base64 data URL
+    // para que @react-pdf/renderer lo embeba sin depender de CORS/red.
+    // Si no hay logo o la URL no es https → fallback al logo de Spinus.
     phase = 'resolviendo logo'
-    let effectiveLogoUrl = logoUrl
-    if (!logoUrl || logoUrl.startsWith('https://')) {
+    let effectiveLogoUrl: string | undefined = undefined
+
+    if (logoUrl && logoUrl.startsWith('https://')) {
+      try {
+        const res = await fetch(logoUrl)
+        if (res.ok) {
+          const blob = await res.blob()
+          effectiveLogoUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onloadend = () => resolve(reader.result as string)
+            reader.onerror = reject
+            reader.readAsDataURL(blob)
+          })
+        }
+      } catch {
+        // Fetch falló (red, CORS, URL rota) → caer al fallback
+      }
+    }
+
+    // Fallback: logo de Spinus en Base64 si no se pudo resolver el personalizado
+    if (!effectiveLogoUrl) {
       const { LOGO_BASE64 } = await import('@/lib/pdf/logo')
       effectiveLogoUrl = LOGO_BASE64
     }

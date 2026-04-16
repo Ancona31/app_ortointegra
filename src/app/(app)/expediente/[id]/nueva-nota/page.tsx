@@ -379,8 +379,10 @@ export default function NuevaNotaPage() {
       const cedEsp   = medicoInfo?.cedula_especialidad || ''
       const direccion = medicoInfo?.direccion_consultorio || ''
       const telefono  = medicoInfo?.telefono_consultorio || ''
+      // Logo: usar URL directa si es https (el browser sí puede cargarla en window.open)
+      // Fallback: logo genérico local
       const logoUrl   = medicoInfo?.logo_url && medicoInfo.logo_url.startsWith('https://')
-        ? medicoInfo.logo_url : `${window.location.origin}/logo.png`
+        ? medicoInfo.logo_url : '/logo.png'
 
       const notaParaImprimir = notaGenerada
         + (form.pronostico.trim() ? `\n\n**[PRONÓSTICO]:**\n${form.pronostico.trim()}` : '')
