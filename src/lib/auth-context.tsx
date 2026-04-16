@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getStatus } from '@/lib/connectionMonitor'
 import { stopMirrorEngine, clearMirror } from '@/lib/read-mirror'
@@ -38,6 +38,13 @@ export interface AuthContextValue {
    ────────────────────────────────────────────────────────────────────── */
 
 const GRACE_PERIOD_MS = 30 * 60 * 1000
+
+/**
+ * Si redVerifiedAt fue actualizado hace menos de este umbral,
+ * refreshMeta() se salta la petición al SDK. Evita requests
+ * redundantes cuando online + visibilitychange disparan en ráfaga.
+ */
+const FRESHNESS_THRESHOLD_MS = 10_000
 
 const SESSION_META_KEY = 'spinus_session_meta'
 
@@ -204,29 +211,58 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [meta, setMeta] = useState<SessionMeta>(() => getStoredMeta())
   const [initialized, setInitialized] = useState(false)
 
+  // ── Refs para refreshMeta blindado (FASE A.3) ──
+
+  /** Referencia síncrona al estado meta — evita el hack de setMeta(current => ...) */
+  const metaRef = useRef<SessionMeta>(meta)
+  metaRef.current = meta
+
+  /** Mutex: true mientras refreshMeta está en curso → rechaza llamadas concurrentes */
+  const refreshingRef = useRef(false)
+
   const status = validateToken(meta)
   const tokenState = computeTokenState(meta)
   const isAuthenticated = meta.userId !== null && !tokenState.isExpired
 
   /**
    * RefreshMeta — Sincroniza con el SDK y actualiza spinus_session_meta.
-   * Se ejecuta:
-   *   - Online, periódicamente (visibility change)
-   *   - Al reconectar (evento online)
-   *   - Explicitamente vía hook
    *
-   * Esto garantiza que cada vez que hay red y la sesión es válida,
-   * el timestamp redVerifiedAt se actualiza, extendiendo el grace period.
+   * ── FASE A.3: Blindaje contra race conditions ──
+   *
+   * Tres protecciones:
+   *   1. Mutex (refreshingRef) — solo una petición a la vez
+   *   2. Debounce de frescura (FRESHNESS_THRESHOLD_MS) — si redVerifiedAt
+   *      fue actualizado hace <10s, no gastamos otra request
+   *   3. Lectura síncrona (metaRef) — sin hack de setState updater
+   *
+   * Se dispara desde:
+   *   - Evento online (Wi-Fi reconecta)
+   *   - Evento visibilitychange (médico desbloquea pantalla)
+   *   - Explícitamente vía hook
    */
   const refreshMeta = useCallback(async (): Promise<void> => {
+    // Guard 1: offline → no intentar
     if (getStatus() === 'offline') return
 
-    setMeta(current => {
-      void syncFromSdkSession(current).then(newMeta => {
-        setMeta(newMeta)
-      })
-      return current
-    })
+    // Guard 2: mutex → ya hay un refresh en curso
+    if (refreshingRef.current) return
+
+    // Guard 3: frescura → verificado hace menos de 10s, innecesario
+    const current = metaRef.current
+    if (
+      current.redVerifiedAt &&
+      (Date.now() - current.redVerifiedAt) < FRESHNESS_THRESHOLD_MS
+    ) {
+      return
+    }
+
+    refreshingRef.current = true
+    try {
+      const newMeta = await syncFromSdkSession(current)
+      setMeta(newMeta)
+    } finally {
+      refreshingRef.current = false
+    }
   }, [])
 
   /**
