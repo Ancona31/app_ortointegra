@@ -10,14 +10,13 @@ import {
   Building2, TrendingUp, UserPlus, LayoutDashboard, WifiOff,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useProfile, clearProfileCache } from '@/hooks/useProfile'
 import { useClinica } from '@/hooks/useClinica'
 import { useTheme } from '@/components/layout/ThemeProvider'
+import { useAuth } from '@/lib/auth-context'
 import { mutate } from 'swr'
 import { subscribe, getStatus } from '@/lib/connectionMonitor'
-import { clearMirror } from '@/lib/read-mirror'
 
 /* ─── Tipos ───────────────────────────────────────────────── */
 
@@ -146,6 +145,7 @@ export default function Sidebar() {
   const { profile }  = useProfile()
   const { colorPrimario, colorSecundario, nombreDisplay, subtitulo, logoUrl } = useClinica()
   const { dark, toggle } = useTheme()
+  const { signOut } = useAuth()
   const [isOnline, setIsOnline] = useState(() => getStatus() !== 'offline')
 
   useEffect(() => {
@@ -187,14 +187,9 @@ export default function Sidebar() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'logout' }),
     }).catch(() => {})
-    // SEGURIDAD: wipe del read mirror ANTES del signOut para garantizar
-    // que no queden datos clínicos del médico saliente si otro entra
-    // inmediatamente en el mismo dispositivo. La latencia añadida es
-    // <100ms en IndexedDB local.
-    await clearMirror()
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    sessionStorage.removeItem('spinus_active')
+    // signOut() del AuthContext es la ÚNICA fuente de limpieza:
+    // stopMirrorEngine → clearMirror → cookies sb-* → sessionStorage → SDK signOut
+    await signOut()
     clearProfileCache()
     await mutate('/api/me/clinica', null, { revalidate: false })
     router.push('/login')

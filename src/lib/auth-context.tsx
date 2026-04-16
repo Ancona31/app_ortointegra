@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getStatus } from '@/lib/connectionMonitor'
+import { stopMirrorEngine, clearMirror } from '@/lib/read-mirror'
 
 /* ──────────────────────────────────────────────────────────────────────
    Tipos
@@ -229,17 +230,51 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [])
 
   /**
-   * SignOut explícito — limpia todo lo relacionado con la sesión.
-   * Se llama desde el handleLogout del Sidebar.
+   * SignOut explícito — ÚNICA fuente de verdad de limpieza de sesión.
+   *
+   * Secuencia obligatoria (FASE A.2):
+   *   1. Detener Mirror engine (cierra handle IDB)
+   *   2. Limpiar datos clínicos del mirror (IndexedDB)
+   *   3. Limpiar cookies sb-* y sessionStorage
+   *   4. SignOut del SDK de Supabase (best-effort, puede fallar offline)
+   *   5. Resetear estado interno del contexto
+   *
+   * Los pasos 1-3 son locales y DEBEN ejecutarse incluso si la red falla.
+   * El paso 4 se envuelve en catch — el cleanup local no depende de red.
    */
   const signOut = useCallback(async (): Promise<void> => {
+    // 1. Detener el engine antes de borrar datos
+    await stopMirrorEngine()
+
+    // 2. Limpiar base local (IndexedDB)
+    await clearMirror()
+
+    // 3. Limpiar rastro de sesión en cookies y sessionStorage
+    try {
+      document.cookie.split(';').forEach(c => {
+        const name = c.trim().split('=')[0]
+        if (name.startsWith('sb-')) {
+          document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+        }
+      })
+    } catch {
+      // Cookie API puede fallar en contexts restringidos — silent
+    }
+    try {
+      sessionStorage.removeItem('spinus_active')
+    } catch {
+      // sessionStorage bloqueado (Safari private mode) — silent
+    }
+
+    // 4. SignOut del SDK (best-effort — no bloquea si offline)
     try {
       const supabase = createClient()
       await supabase.auth.signOut()
     } catch {
-      // Silencioso — signOut server-side es best-effort
+      // Red caída o SDK error — el cleanup local ya se ejecutó
     }
 
+    // 5. Resetear estado interno
     const emptyMeta: SessionMeta = {
       userId: null,
       expiresAt: null,
