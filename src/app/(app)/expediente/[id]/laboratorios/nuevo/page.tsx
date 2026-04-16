@@ -8,7 +8,6 @@ import { useAuditAccess } from '@/hooks/useAudit'
 import { Paciente, ValoresLab, AnalisisIA, ResultadoLab } from '@/types'
 import { analizarLaboratorios } from '@/lib/analisis'
 import { differenceInYears, parseISO } from 'date-fns'
-import { getStatus, subscribe } from '@/lib/connectionMonitor'
 import {
   ArrowLeft, FlaskConical, Upload, CheckCircle, AlertTriangle,
   AlertCircle, Loader2, Save, RotateCcw, Plus, Trash2, Clock, WifiOff,
@@ -71,21 +70,6 @@ export default function NuevoLaboratorioPage() {
     inmovilizacion: false,
   })
 
-  // ── Detección de red para proteger el modo PDF (extracción con IA) ──
-  const [offline, setOffline] = useState(() => getStatus() === 'offline')
-  useEffect(() => {
-    const unsub = subscribe((status) => setOffline(status === 'offline'))
-    return unsub
-  }, [])
-
-  // Si el médico entra (o queda) offline estando en modo PDF, forzamos
-  // el cambio a manual automáticamente. El endpoint de extracción con
-  // Claude API NO funciona sin red.
-  useEffect(() => {
-    if (offline && modo === 'pdf') {
-      setModo('manual')
-    }
-  }, [offline, modo])
 
   useEffect(() => {
     const supabase = createClient()
@@ -258,13 +242,9 @@ export default function NuevoLaboratorioPage() {
       <div className="flex flex-col gap-2">
         <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
           <button
-            onClick={() => { if (!offline) setModo('pdf') }}
-            disabled={offline}
-            title={offline ? 'La extracción con IA requiere conexión a internet' : undefined}
+onClick={() => setModo('pdf')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              offline
-                ? 'text-slate-300 cursor-not-allowed opacity-60'
-                : modo === 'pdf'
+                modo === 'pdf'
                 ? 'bg-white shadow-sm text-[#1a3a5c]'
                 : 'text-slate-500 hover:text-slate-700'
             }`}
@@ -278,12 +258,6 @@ export default function NuevoLaboratorioPage() {
             <Plus size={14} /> Ingreso manual
           </button>
         </div>
-        {offline && (
-          <p className="text-[11px] text-amber-600 flex items-center gap-1.5">
-            <WifiOff size={12} />
-            La extracción con IA requiere conexión a internet. Puedes ingresar los valores manualmente.
-          </p>
-        )}
       </div>
 
       {/* Drop Zone PDF */}

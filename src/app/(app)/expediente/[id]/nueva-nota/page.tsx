@@ -20,9 +20,6 @@ import Breadcrumbs from '@/components/layout/Breadcrumbs'
 import { imprimirOCompartir } from '@/lib/mobileShare'
 import { secureStorage } from '@/lib/secureStorage'
 import { useAuditAccess } from '@/hooks/useAudit'
-import { subscribe, getStatus } from '@/lib/connectionMonitor'
-import { getPacienteLocal } from '@/lib/read-mirror'
-import { saveNoteOffline } from '@/lib/offlineNotes'
 import dynamic from 'next/dynamic'
 
 function FormCargando() {
@@ -105,7 +102,6 @@ export default function NuevaNotaPage() {
   const [modoNota, setModoNota]         = useState<'ia' | 'manual'>('ia')
   const [notaGenerada, setNotaGenerada] = useState('')
   const [modoEdicion, setModoEdicion]   = useState(false)
-  const [isOnline, setIsOnline]         = useState(() => getStatus() !== 'offline')
   const [generando, setGenerando]       = useState(false)
   const [guardando, setGuardando]       = useState(false)
   const [imprimiendo, setImprimiendo]   = useState(false)
@@ -139,29 +135,12 @@ export default function NuevaNotaPage() {
   const suggestRef  = useRef<HTMLDivElement>(null)
   const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // ── Monitor de conexión para IA ─────────────────────────────
-  useEffect(() => {
-    const unsub = subscribe((status) => {
-      const connected = status !== 'offline'
-      setIsOnline(connected)
-      if (!connected) {
-        setModoNota('manual')
-        setNotaGenerada('')
-      }
-    })
-    return unsub
-  }, [])
 
   // ── Carga datos + borrador ────────────────────────────────────
   const draftKey = `nota-draft-${id}`
 
   useEffect(() => {
     fetch('/api/me/perfil-medico').then(r => r.json()).then(({ medico }) => setMedicoInfo(medico)).catch(() => {})
-    // FASE C.2: Mirror primero (instantáneo, offline-safe), Supabase como refresh
-    getPacienteLocal(id as string).then(cached => {
-      if (cached) setPaciente({ id: cached.id, nombre: cached.nombre, apellidos: cached.apellidos, fecha_nacimiento: cached.fecha_nacimiento ?? null, sexo: cached.sexo ?? null } as Paciente)
-    }).catch(() => {})
-    // Background refresh desde Supabase si hay red
     const supabase = createClient()
     supabase.from('pacientes').select('*').eq('id', id).single()
       .then((res: { data: Paciente | null }) => {
@@ -365,18 +344,7 @@ export default function NuevaNotaPage() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: 'Error desconocido' }))
-        // Si es error de red/servidor, intentar guardar offline
-        if (res.status >= 500 || res.status === 0) {
-          await saveNoteOffline(id as string, payload)
-          setError('')
-          saveMedCache(medsConDatos)
-          secureStorage.remove(draftKey)
-          setNotaSaved(true)
-          setDocInline(null)
-          alert('Nota guardada localmente — se sincronizará automáticamente cuando vuelva la conexión.')
-          setGuardando(false)
-          return
-        }
+
         setError(data.error || 'No se pudo guardar la nota.')
         setGuardando(false)
         return
@@ -387,14 +355,7 @@ export default function NuevaNotaPage() {
       setNotaSaved(true)
       setDocInline(null)
     } catch {
-      // Fallo de red — guardar offline
-      await saveNoteOffline(id as string, payload)
-      setError('')
-      saveMedCache(medsConDatos)
-      secureStorage.remove(draftKey)
-      setNotaSaved(true)
-      setDocInline(null)
-      alert('Nota guardada localmente — se sincronizará automáticamente cuando vuelva la conexión.')
+      setError("Error de conexion. Verifica tu internet e intenta de nuevo.")
     }
 
     setGuardando(false)
@@ -674,13 +635,9 @@ export default function NuevaNotaPage() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-1.5 flex gap-1">
             <button
               type="button"
-              onClick={() => { if (isOnline) { setModoNota('ia'); setNotaGenerada(''); setError('') } }}
-              disabled={!isOnline}
-              title={!isOnline ? 'No disponible sin conexión' : undefined}
+onClick={() => { setModoNota('ia'); setNotaGenerada(''); setError('') }}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
-                !isOnline
-                  ? 'opacity-50 cursor-not-allowed text-slate-400 bg-slate-50'
-                  : modoNota === 'ia'
+modoNota === 'ia'
                     ? 'bg-[#4285F4]/10 text-[#4285F4] border border-[#4285F4]/30 shadow-sm'
                     : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
               }`}

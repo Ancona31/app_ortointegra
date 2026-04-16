@@ -9,7 +9,6 @@ import Link from 'next/link'
 import { format, formatDistanceToNow, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
-import { getMirrorStats } from '@/lib/read-mirror'
 import { formatCitaHora } from './utils'
 import { StatusChip } from './StatusChip'
 
@@ -113,18 +112,7 @@ export default function DashboardPage() {
         // silent — el fallback al mirror abajo resuelve el contador
       })
 
-    // Fallback al mirror con timeout de 2s: si el remoto no respondió,
-    // mostrar el conteo local. Si el remoto ya actualizó, setTotalPacientes
-    // usa ?? para no sobrescribir.
-    setTimeout(() => {
-      getMirrorStats()
-        .then(stats => {
-          setTotalPacientes(prev => prev ?? stats.pacientes)
-        })
-        .catch(() => {
-          setTotalPacientes(prev => prev ?? 0)
-        })
-    }, 2000)
+
 
     // Pacientes recientes — catch silencioso
     supabase

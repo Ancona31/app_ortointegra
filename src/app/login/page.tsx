@@ -6,7 +6,6 @@ import { createClient } from '@/lib/supabase/client'
 import { Loader2, Lock, Eye, EyeOff, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import NeuralBackground from '@/components/ui/NeuralBackground'
-import { requestPersistentStorage } from '@/lib/storage-vault'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -108,7 +107,6 @@ export default function LoginPage() {
       // Solicitar persistencia de storage inmediatamente tras el gesto del login.
       // El click del botón cuenta como 'user activation' en Chromium/Firefox,
       // maximizando la probabilidad de 'granted' sin prompt intrusivo.
-      requestPersistentStorage().catch(() => {})
       // NOM-024: registrar login exitoso
       fetch('/api/auth/audit-login', {
         method: 'POST',

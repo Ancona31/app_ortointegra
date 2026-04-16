@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, Suspense } from 'react'
+import { useState, useEffect, useMemo, useCallback, Suspense } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
@@ -26,14 +26,6 @@ import TabGraficas, { normalizarKey, ParamGrafica } from '@/components/expedient
 import TabDocumentos from '@/components/expediente/TabDocumentos'
 import ExportarExpedienteButton from '@/components/expediente/ExportarExpedienteButton'
 import dynamic from 'next/dynamic'
-
-// ── Read Mirror (Hito 3.3 + Bloque 3.D) ────────────────────────
-import { useHybridQuery } from '@/hooks/useHybridQuery'
-import {
-  getPacienteLocal, getConsultasLocal, getDocumentosLocal,
-  getLaboratoriosLocal, hydratePaciente,
-} from '@/lib/read-mirror'
-import FreshnessBadge from '@/components/ui/FreshnessBadge'
 
 function FormCargando() {
   return <div className="flex items-center justify-center py-12"><Loader2 className="animate-spin text-slate-300" size={24} /></div>
@@ -61,13 +53,8 @@ const DOCS = [
 
 type Tab = 'resumen' | 'consultas' | 'laboratorios' | 'graficas' | 'documentos'
 
-/**
- * MIRROR_VIEW_LIMIT: límite unificado para consultas, documentos y
- * laboratorios que viven en el mirror (Sprint 3 Hito 3.C). 50 cubre
- * ~1 año de seguimiento típico ortopédico. Los pacientes con más
- * registros siguen visibles via el listado global online.
- */
-const MIRROR_VIEW_LIMIT = 50
+/** Límite de registros por query */
+const QUERY_LIMIT = 50
 
 function ExpedientePacienteContent() {
   const { id } = useParams<{ id: string }>()
@@ -76,7 +63,7 @@ function ExpedientePacienteContent() {
   const { isDoctor } = useProfile()
   useAuditAccess('pacientes', id) // NOM-024: registrar acceso al expediente
 
-  // ── Estados que se mantienen intactos del código original ──
+  // ── Estados UI ──
   const [allAddendums, setAllAddendums] = useState<{ id: string; consulta_id: string; contenido: string; medico_nombre: string; created_at: string }[]>([])
   const [tab, setTab] = useState<Tab>('resumen')
   const [eliminandoLab, setEliminandoLab] = useState<string | null>(null)
@@ -89,97 +76,82 @@ function ExpedientePacienteContent() {
   const [eliminandoPaciente, setEliminandoPaciente] = useState(false)
   const [errorEliminar, setErrorEliminar] = useState('')
 
-  // ── 3 hybrid queries: paciente + consultas + documentos ──
-  // Nota: uso los tipos del proyecto (Paciente, Consulta, Documento) como T
-  // del hook genérico y caso en el localFetcher. Esto preserva la
-  // compatibilidad con los subcomponentes sin modificarlos.
+  // ── Data fetching: direct Supabase queries ──
+  const [paciente, setPaciente] = useState<Paciente | null>(null)
+  const [consultas, setConsultas] = useState<Consulta[]>([])
+  const [documentos, setDocumentos] = useState<Documento[]>([])
+  const [labs, setLabs] = useState<Laboratorio[]>([])
+  const [loadingPaciente, setLoadingPaciente] = useState(true)
 
-  const qPaciente = useHybridQuery<Paciente>({
-    key: `exp-paciente-${id}`,
-    localFetcher: async () => {
-      const local = await getPacienteLocal(id)
-      return local as unknown as Paciente | null
-    },
-    remoteFetcher: async () => {
-      const supabase = createClient()
-      const { data, error } = await supabase.from('pacientes').select('*').eq('id', id).single()
-      if (error) throw error
-      return data as Paciente
-    },
-  })
+  // Refetch helpers for child actions (delete doc, delete lab)
+  const fetchDocumentos = useCallback(async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('documentos')
+      .select('*')
+      .eq('paciente_id', id)
+      .order('created_at', { ascending: false })
+      .limit(QUERY_LIMIT)
+    setDocumentos((data ?? []) as Documento[])
+  }, [id])
 
-  const qConsultas = useHybridQuery<Consulta[]>({
-    key: `exp-consultas-${id}`,
-    localFetcher: async () => {
-      const local = await getConsultasLocal(id, MIRROR_VIEW_LIMIT)
-      return local as unknown as Consulta[]
-    },
-    remoteFetcher: async () => {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from('consultas')
-        .select('*')
-        .eq('paciente_id', id)
-        .order('fecha', { ascending: false })
-        .limit(MIRROR_VIEW_LIMIT)
-      if (error) throw error
-      return (data ?? []) as Consulta[]
-    },
-  })
+  const fetchLabs = useCallback(async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('laboratorios')
+      .select('*')
+      .eq('paciente_id', id)
+      .order('fecha_toma', { ascending: false })
+      .limit(QUERY_LIMIT)
+    setLabs((data ?? []) as Laboratorio[])
+  }, [id])
 
-  const qDocumentos = useHybridQuery<Documento[]>({
-    key: `exp-documentos-${id}`,
-    localFetcher: async () => {
-      const local = await getDocumentosLocal(id, MIRROR_VIEW_LIMIT)
-      return local as unknown as Documento[]
-    },
-    remoteFetcher: async () => {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from('documentos')
-        .select('*')
-        .eq('paciente_id', id)
-        .order('created_at', { ascending: false })
-        .limit(MIRROR_VIEW_LIMIT)
-      if (error) throw error
-      return (data ?? []) as Documento[]
-    },
-  })
-
-  // 4to hook (Bloque 3.D) — laboratorios desde el mirror (Hito 3.C)
-  const qLabs = useHybridQuery<Laboratorio[]>({
-    key: `exp-labs-${id}`,
-    localFetcher: async () => {
-      const local = await getLaboratoriosLocal(id, MIRROR_VIEW_LIMIT)
-      return local as unknown as Laboratorio[]
-    },
-    remoteFetcher: async () => {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from('laboratorios')
-        .select('*')
-        .eq('paciente_id', id)
-        .order('fecha_toma', { ascending: false })
-        .limit(MIRROR_VIEW_LIMIT)
-      if (error) throw error
-      return (data ?? []) as Laboratorio[]
-    },
-  })
-
-  // Derived state — usa los mismos nombres que el código original para
-  // minimizar cambios en el JSX más abajo.
-  const paciente = qPaciente.data
-  const consultas = qConsultas.data ?? []
-  const documentos = qDocumentos.data ?? []
-  const labs = qLabs.data ?? []
-
-  // ── Refuerzo del Smart Warm-up: hidratar el paciente on-open ──
-  // Fire-and-forget. Actualiza el mirror en background para que la
-  // próxima apertura del mismo expediente sea instantánea incluso offline.
   useEffect(() => {
-    void hydratePaciente(id).catch(() => {
-      // silent — si no hay red, el hook ya está usando la data local
-    })
+    let cancelled = false
+    const supabase = createClient()
+
+    // Paciente
+    supabase.from('pacientes').select('*').eq('id', id).single()
+      .then((res: { data: Paciente | null; error: unknown }) => {
+        if (cancelled) return
+        if (!res.error && res.data) setPaciente(res.data)
+        setLoadingPaciente(false)
+      })
+
+    // Consultas
+    supabase
+      .from('consultas')
+      .select('*')
+      .eq('paciente_id', id)
+      .order('fecha', { ascending: false })
+      .limit(QUERY_LIMIT)
+      .then((res: { data: Consulta[] | null }) => {
+        if (!cancelled) setConsultas((res.data ?? []) as Consulta[])
+      })
+
+    // Documentos
+    supabase
+      .from('documentos')
+      .select('*')
+      .eq('paciente_id', id)
+      .order('created_at', { ascending: false })
+      .limit(QUERY_LIMIT)
+      .then((res: { data: Documento[] | null }) => {
+        if (!cancelled) setDocumentos((res.data ?? []) as Documento[])
+      })
+
+    // Laboratorios
+    supabase
+      .from('laboratorios')
+      .select('*')
+      .eq('paciente_id', id)
+      .order('fecha_toma', { ascending: false })
+      .limit(QUERY_LIMIT)
+      .then((res: { data: Laboratorio[] | null }) => {
+        if (!cancelled) setLabs((res.data ?? []) as Laboratorio[])
+      })
+
+    return () => { cancelled = true }
   }, [id])
 
   // ── Efecto de query string para seleccionar tab inicial ──
@@ -190,15 +162,14 @@ function ExpedientePacienteContent() {
     else if (t === 'documentos') setTab('documentos')
   }, [searchParams])
 
-  // ── Fetch de addendums (online-only, dependiente de qConsultas.data) ──
+  // ── Fetch de addendums (dependiente de consultas) ──
   useEffect(() => {
-    const list = qConsultas.data
-    if (!list || list.length === 0) {
+    if (!consultas || consultas.length === 0) {
       setAllAddendums([])
       return
     }
 
-    const ids = list.map(c => c.id)
+    const ids = consultas.map(c => c.id)
     let cancelled = false
     const supabase = createClient()
 
@@ -214,7 +185,7 @@ function ExpedientePacienteContent() {
     return () => {
       cancelled = true
     }
-  }, [qConsultas.data])
+  }, [consultas])
 
   // Recolecta todos los parámetros de todos los labs agrupando nombres equivalentes
   const todosLosParams = useMemo((): ParamGrafica[] => {
@@ -282,8 +253,7 @@ function ExpedientePacienteContent() {
   async function eliminarDocumento(docId: string) {
     const res = await fetch(`/api/documentos/${docId}`, { method: 'DELETE' })
     if (res.ok) {
-      // Refetch para remover el documento eliminado del mirror y del state del hook
-      await qDocumentos.refetch()
+      await fetchDocumentos()
     }
   }
 
@@ -291,8 +261,7 @@ function ExpedientePacienteContent() {
     setEliminandoLab(labId)
     const res = await fetch(`/api/laboratorios/${labId}`, { method: 'DELETE' })
     if (res.ok) {
-      // Refetch el hook para remover el lab del state + refrescar el mirror
-      await qLabs.refetch()
+      await fetchLabs()
     }
     setEliminandoLab(null)
     setConfirmarEliminar(null)
@@ -318,9 +287,7 @@ function ExpedientePacienteContent() {
   }
 
   // ── Loading / not-found guards ─────────────────────────────
-  // El hook marca isLoading=true SOLO cuando no hay data ni local ni remota.
-  // Si el mirror ya tiene el paciente, el render es instantáneo.
-  if (qPaciente.isLoading && !paciente) {
+  if (loadingPaciente) {
     return <div className="text-center py-12 text-slate-400">Cargando expediente...</div>
   }
   if (!paciente) {
@@ -421,8 +388,6 @@ function ExpedientePacienteContent() {
           <span className="text-slate-300 select-none">/</span>
           <h1 className="text-sm font-semibold text-[#1d1d1f] truncate">Expediente Clínico</h1>
         </div>
-        {/* Freshness badge — refleja el estado de la sesión de datos del paciente */}
-        <FreshnessBadge state={qPaciente} />
       </div>
 
       {/* Tarjeta del paciente */}
@@ -547,7 +512,7 @@ function ExpedientePacienteContent() {
             isDoctor={isDoctor}
             hayMas={false}
             cargandoMas={false}
-            onCargarMas={() => { /* consultas se cargan vía el mirror, sin cursor */ }}
+            onCargarMas={() => {}}
           />
         )}
 
@@ -562,7 +527,7 @@ function ExpedientePacienteContent() {
             onEliminarLab={eliminarLab}
             hayMas={false}
             cargandoMas={false}
-            onCargarMas={() => { /* labs se cargan vía el mirror, sin cursor */ }}
+            onCargarMas={() => {}}
           />
         )}
 
@@ -586,7 +551,7 @@ function ExpedientePacienteContent() {
             onEliminarDocumento={eliminarDocumento}
             hayMas={false}
             cargandoMas={false}
-            onCargarMas={() => { /* documentos se cargan vía el mirror, sin cursor */ }}
+            onCargarMas={() => {}}
           />
         )}
 

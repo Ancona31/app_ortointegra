@@ -1,15 +1,13 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { getStatus } from '@/lib/connectionMonitor'
-import { stopMirrorEngine, clearMirror } from '@/lib/read-mirror'
 
 /* ──────────────────────────────────────────────────────────────────────
    Tipos
    ────────────────────────────────────────────────────────────────────── */
 
-export type AuthStatus = 'FRESH' | 'GRACE_EXPIRED' | 'UNAUTHENTICATED'
+export type AuthStatus = 'AUTHENTICATED' | 'UNAUTHENTICATED'
 
 export interface SessionMeta {
   userId: string | null
@@ -23,12 +21,6 @@ export interface AuthContextValue {
   email: string | null
   status: AuthStatus
   isAuthenticated: boolean
-  tokenState: {
-    expiresAt: number | null
-    redVerifiedAt: number | null
-    isExpired: boolean
-    graceRemainingMs: number | null
-  }
   signOut: () => Promise<void>
   refreshMeta: () => Promise<void>
 }
@@ -36,15 +28,6 @@ export interface AuthContextValue {
 /* ──────────────────────────────────────────────────────────────────────
    Constantes
    ────────────────────────────────────────────────────────────────────── */
-
-const GRACE_PERIOD_MS = 30 * 60 * 1000
-
-/**
- * Si redVerifiedAt fue actualizado hace menos de este umbral,
- * refreshMeta() se salta la petición al SDK. Evita requests
- * redundantes cuando online + visibilitychange disparan en ráfaga.
- */
-const FRESHNESS_THRESHOLD_MS = 10_000
 
 const SESSION_META_KEY = 'spinus_session_meta'
 
@@ -105,7 +88,6 @@ function saveMeta(meta: SessionMeta): void {
 /**
  * Obtiene sesión del SDK de Supabase y sincroniza a spinus_session_meta.
  * El SDK lee de cookies en SSR, o de localStorage en client puro.
- * Si SDK retorna null (offline), se mantiene el último estado conocido.
  */
 async function syncFromSdkSession(currentMeta: SessionMeta): Promise<SessionMeta> {
   try {
@@ -113,7 +95,6 @@ async function syncFromSdkSession(currentMeta: SessionMeta): Promise<SessionMeta
     const { data, error } = await supabase.auth.getSession()
 
     if (error || !data.session) {
-      // SDK no tiene sesión — mantener estado actual si existe
       return currentMeta.userId ? currentMeta : { userId: null, expiresAt: null, redVerifiedAt: null, email: null }
     }
 
@@ -145,7 +126,6 @@ async function syncFromSdkSession(currentMeta: SessionMeta): Promise<SessionMeta
     saveMeta(newMeta)
     return newMeta
   } catch {
-    // Error — mantener estado actual si existe
     return currentMeta.userId ? currentMeta : { userId: null, expiresAt: null, redVerifiedAt: null, email: null }
   }
 }
@@ -155,42 +135,13 @@ async function syncFromSdkSession(currentMeta: SessionMeta): Promise<SessionMeta
    ────────────────────────────────────────────────────────────────────── */
 
 function validateToken(meta: SessionMeta): AuthStatus {
-  const now = Date.now()
-
   if (!meta.userId) return 'UNAUTHENTICATED'
 
-  if (meta.expiresAt && meta.expiresAt < now) {
+  if (meta.expiresAt && meta.expiresAt < Date.now()) {
     return 'UNAUTHENTICATED'
   }
 
-  if (!meta.redVerifiedAt) {
-    return 'UNAUTHENTICATED'
-  }
-
-  const elapsed = now - meta.redVerifiedAt
-  if (elapsed < GRACE_PERIOD_MS) {
-    return 'FRESH'
-  }
-
-  return 'GRACE_EXPIRED'
-}
-
-function computeTokenState(meta: SessionMeta): AuthContextValue['tokenState'] {
-  const now = Date.now()
-  const isExpired = meta.expiresAt ? meta.expiresAt < now : true
-
-  let graceRemainingMs: number | null = null
-  if (meta.redVerifiedAt) {
-    const remaining = GRACE_PERIOD_MS - (now - meta.redVerifiedAt)
-    graceRemainingMs = Math.max(0, remaining)
-  }
-
-  return {
-    expiresAt: meta.expiresAt,
-    redVerifiedAt: meta.redVerifiedAt,
-    isExpired,
-    graceRemainingMs,
-  }
+  return 'AUTHENTICATED'
 }
 
 /* ──────────────────────────────────────────────────────────────────────
@@ -211,81 +162,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [meta, setMeta] = useState<SessionMeta>(() => getStoredMeta())
   const [initialized, setInitialized] = useState(false)
 
-  // ── Refs para refreshMeta blindado (FASE A.3) ──
-
-  /** Referencia síncrona al estado meta — evita el hack de setMeta(current => ...) */
-  const metaRef = useRef<SessionMeta>(meta)
-  metaRef.current = meta
-
-  /** Mutex: true mientras refreshMeta está en curso → rechaza llamadas concurrentes */
-  const refreshingRef = useRef(false)
-
   const status = validateToken(meta)
-  const tokenState = computeTokenState(meta)
-  const isAuthenticated = meta.userId !== null && !tokenState.isExpired
+  const isAuthenticated = status === 'AUTHENTICATED'
 
   /**
    * RefreshMeta — Sincroniza con el SDK y actualiza spinus_session_meta.
-   *
-   * ── FASE A.3: Blindaje contra race conditions ──
-   *
-   * Tres protecciones:
-   *   1. Mutex (refreshingRef) — solo una petición a la vez
-   *   2. Debounce de frescura (FRESHNESS_THRESHOLD_MS) — si redVerifiedAt
-   *      fue actualizado hace <10s, no gastamos otra request
-   *   3. Lectura síncrona (metaRef) — sin hack de setState updater
-   *
-   * Se dispara desde:
-   *   - Evento online (Wi-Fi reconecta)
-   *   - Evento visibilitychange (médico desbloquea pantalla)
-   *   - Explícitamente vía hook
    */
   const refreshMeta = useCallback(async (): Promise<void> => {
-    // Guard 1: offline → no intentar
-    if (getStatus() === 'offline') return
-
-    // Guard 2: mutex → ya hay un refresh en curso
-    if (refreshingRef.current) return
-
-    // Guard 3: frescura → verificado hace menos de 10s, innecesario
-    const current = metaRef.current
-    if (
-      current.redVerifiedAt &&
-      (Date.now() - current.redVerifiedAt) < FRESHNESS_THRESHOLD_MS
-    ) {
-      return
-    }
-
-    refreshingRef.current = true
-    try {
-      const newMeta = await syncFromSdkSession(current)
-      setMeta(newMeta)
-    } finally {
-      refreshingRef.current = false
-    }
-  }, [])
+    const newMeta = await syncFromSdkSession(meta)
+    setMeta(newMeta)
+  }, [meta])
 
   /**
-   * SignOut explícito — ÚNICA fuente de verdad de limpieza de sesión.
+   * SignOut explícito — limpieza de sesión.
    *
-   * Secuencia obligatoria (FASE A.2):
-   *   1. Detener Mirror engine (cierra handle IDB)
-   *   2. Limpiar datos clínicos del mirror (IndexedDB)
-   *   3. Limpiar cookies sb-* y sessionStorage
-   *   4. SignOut del SDK de Supabase (best-effort, puede fallar offline)
-   *   5. Resetear estado interno del contexto
-   *
-   * Los pasos 1-3 son locales y DEBEN ejecutarse incluso si la red falla.
-   * El paso 4 se envuelve en catch — el cleanup local no depende de red.
+   * Secuencia:
+   *   1. Limpiar cookies sb-* y sessionStorage
+   *   2. SignOut del SDK de Supabase (best-effort)
+   *   3. Resetear estado interno del contexto
    */
   const signOut = useCallback(async (): Promise<void> => {
-    // 1. Detener el engine antes de borrar datos
-    await stopMirrorEngine()
-
-    // 2. Limpiar base local (IndexedDB)
-    await clearMirror()
-
-    // 3. Limpiar rastro de sesión en cookies y sessionStorage
+    // 1. Limpiar rastro de sesión en cookies y sessionStorage
     try {
       document.cookie.split(';').forEach(c => {
         const name = c.trim().split('=')[0]
@@ -302,7 +199,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // sessionStorage bloqueado (Safari private mode) — silent
     }
 
-    // 4. SignOut del SDK (best-effort — no bloquea si offline)
+    // 2. SignOut del SDK (best-effort)
     try {
       const supabase = createClient()
       await supabase.auth.signOut()
@@ -310,7 +207,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Red caída o SDK error — el cleanup local ya se ejecutó
     }
 
-    // 5. Resetear estado interno
+    // 3. Resetear estado interno
     const emptyMeta: SessionMeta = {
       userId: null,
       expiresAt: null,
@@ -324,30 +221,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
   /**
    * Inicialización — Hidratación híbrida
    *
-   * Paso 1: Leer spinus_session_meta del localStorage (inmediato, offline-safe)
-   *         → Esto nos da userId disponible para Mirror y Outbox SIN esperar SDK
-   *
-   * Paso 2: Si estamos online, sincronizar con SDK (getSession → cookies)
-   *         → Esto actualiza redVerifiedAt y mantiene la sesión fresca
-   *
-   * El resultado: incluso si SDK falla o las cookies expiran,
-   * siempre tenemos el último userId conocido guardado localmente.
+   * Paso 1: Leer spinus_session_meta del localStorage (inmediato)
+   * Paso 2: Sincronizar con SDK (getSession)
    */
   useEffect(() => {
     async function init() {
-      // Paso 1: Cargar estado local inmediatamente
       const storedMeta = getStoredMeta()
 
       if (storedMeta.userId) {
-        // Hay sesión guardada previamente — usarla inmediatamente
         setMeta(storedMeta)
       }
 
-      // Paso 2: Sincronizar con SDK si hay red
-      if (getStatus() !== 'offline') {
-        const syncedMeta = await syncFromSdkSession(storedMeta)
-        setMeta(syncedMeta)
-      }
+      const syncedMeta = await syncFromSdkSession(storedMeta)
+      setMeta(syncedMeta)
 
       setInitialized(true)
     }
@@ -358,7 +244,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   /**
    * Sync periódico — cada vez que la conexión cambia a online
    * o cuando la pestaña vuelve al foreground, refreshMeta actualiza
-   * redVerifiedAt para extender el grace period.
+   * la sesión.
    */
   useEffect(() => {
     if (!initialized) return
@@ -387,7 +273,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     email: meta.email,
     status,
     isAuthenticated,
-    tokenState,
     signOut,
     refreshMeta,
   }

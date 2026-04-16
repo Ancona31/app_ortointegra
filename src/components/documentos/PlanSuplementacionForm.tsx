@@ -6,8 +6,6 @@ import { useState, useCallback } from 'react'
 import { Printer, Loader2, RefreshCw } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { generarPdf } from '@/lib/mobileShare'
-import { enqueueOutbox } from '@/lib/outbox-engine'
-import { getStatus } from '@/lib/connectionMonitor'
 import { useToast } from '@/components/ui/Toast'
 import QRCode from 'qrcode'
 import { format } from 'date-fns'
@@ -226,7 +224,6 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
 
     // Flags de tracking para diferenciar errores
     let pdfGenerated = false
-    let persistedHow: 'supabase' | 'outbox' | null = null
 
     try {
       // 3. PDF PRIMERO — si falla, abortamos antes de persistir
@@ -280,68 +277,24 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
 
       pdfGenerated = true
 
-      // 4. Persistencia resiliente — CONDICIONAL a pacienteId
-      //    Si el plan no está vinculado a un expediente, solo se genera
-      //    el PDF como preview sin dejar huella en DB (comportamiento
-      //    intencional para generación rápida sin registro clínico).
+      // 4. Persistencia — CONDICIONAL a pacienteId
       if (pacienteId) {
-        const browserOffline = typeof navigator !== 'undefined' && navigator.onLine === false
-        const monitorOffline = getStatus() === 'offline'
-        const isTrulyOffline = browserOffline || monitorOffline
-
-        if (!isTrulyOffline) {
-          // Intento directo a Supabase con client_id para idempotencia
-          try {
-            const supabase = createClient()
-            const insertPayload: Record<string, unknown> = {
-              tipo: 'plan_suplementacion',
-              contenido,
-              client_id: clientId,
-              paciente_id: pacienteId,
-            }
-
-            const { error } = await supabase.from('documentos').insert(insertPayload)
-            if (error) throw error
-            persistedHow = 'supabase'
-          } catch {
-            // Red inestable, 5xx, o columna client_id sin desplegar:
-            // fallback al outbox que reintentará automáticamente.
-            await enqueueOutbox({
-              clientId,
-              action: 'INSERT',
-              resource: 'document',
-              subtype: 'plan_suplementacion',
-              payload: contenido,
-              tempRef: pacienteId,
-              endpoint: '/api/documentos',
-              method: 'POST',
-            })
-            persistedHow = 'outbox'
-          }
-        } else {
-          // Offline declarado → directo al outbox
-          await enqueueOutbox({
-            clientId,
-            action: 'INSERT',
-            resource: 'document',
-            subtype: 'plan_suplementacion',
-            payload: contenido,
-            tempRef: pacienteId,
-            endpoint: '/api/documentos',
-            method: 'POST',
-          })
-          persistedHow = 'outbox'
+        const supabase = createClient()
+        const insertPayload: Record<string, unknown> = {
+          tipo: 'plan_suplementacion',
+          contenido,
+          client_id: clientId,
+          paciente_id: pacienteId,
         }
+
+        const { error } = await supabase.from('documentos').insert(insertPayload)
+        if (error) throw error
       }
 
-      // 5. Feedback final diferenciado
       if (!pacienteId) {
-        // Sin expediente vinculado — solo confirmar generación
         toast.success('Plan generado')
-      } else if (persistedHow === 'supabase') {
-        toast.success('Plan guardado y sincronizado')
       } else {
-        toast.warning('Plan guardado localmente — se sincronizará al reconectar')
+        toast.success('Plan guardado')
       }
     } catch (err) {
       if (!pdfGenerated) {

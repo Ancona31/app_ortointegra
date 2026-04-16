@@ -6,13 +6,11 @@ import { createClient } from '@/lib/supabase/client'
 import { Paciente, Consulta } from '@/types'
 import { differenceInYears, parseISO, format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ArrowLeft, Printer, Stethoscope, Plus, Loader2, FileText, Lock, PenLine, WifiOff } from 'lucide-react'
+import { ArrowLeft, Printer, Stethoscope, Plus, Loader2, FileText, Lock, PenLine } from 'lucide-react'
 import Link from 'next/link'
 import { PRINT_CSS, markdownToHtml } from '@/lib/printStyles'
 import ReactMarkdown from 'react-markdown'
 import { useAuditAccess } from '@/hooks/useAudit'
-import { useHybridQuery } from '@/hooks/useHybridQuery'
-import { getPacienteLocal, getConsultasLocal } from '@/lib/read-mirror'
 
 type MedicoInfo = {
   nombre: string
@@ -34,44 +32,33 @@ export default function ConsultaDetallePage() {
   const { id, consultaId } = useParams<{ id: string; consultaId: string }>()
   useAuditAccess('consultas', consultaId)
 
-  // ── FASE C.2: Hybrid queries para paciente + consulta (offline-first) ──
-  const qPaciente = useHybridQuery<Paciente>({
-    key: `consulta-pac-${id}`,
-    localFetcher: async () => {
-      const local = await getPacienteLocal(id)
-      return local as unknown as Paciente | null
-    },
-    remoteFetcher: async () => {
-      const supabase = createClient()
-      const { data, error } = await supabase.from('pacientes').select('*').eq('id', id).single()
-      if (error) throw error
-      return data as Paciente
-    },
-  })
+  // ── Data fetching: direct Supabase queries ──
+  const [paciente, setPaciente] = useState<Paciente | null>(null)
+  const [consulta, setConsulta] = useState<Consulta | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  const qConsulta = useHybridQuery<Consulta>({
-    key: `consulta-det-${consultaId}`,
-    localFetcher: async () => {
-      const consultas = await getConsultasLocal(id, 100)
-      const found = consultas.find(c => c.id === consultaId)
-      return found as unknown as Consulta | null
-    },
-    remoteFetcher: async () => {
-      const supabase = createClient()
-      const { data, error } = await supabase.from('consultas').select('*').eq('id', consultaId).single()
-      if (error) throw error
-      return data as Consulta
-    },
-  })
+  useEffect(() => {
+    let cancelled = false
+    const supabase = createClient()
 
-  const paciente = qPaciente.data
-  const consulta = qConsulta.data
-  const loading = qPaciente.isLoading || qConsulta.isLoading
+    Promise.all([
+      supabase.from('pacientes').select('*').eq('id', id).single(),
+      supabase.from('consultas').select('*').eq('id', consultaId).single(),
+    ]).then(([pacRes, conRes]) => {
+      if (cancelled) return
+      if (!pacRes.error && pacRes.data) setPaciente(pacRes.data as Paciente)
+      if (!conRes.error && conRes.data) setConsulta(conRes.data as Consulta)
+      setLoading(false)
+    }).catch(() => {
+      if (!cancelled) setLoading(false)
+    })
 
-  // ── Datos complementarios: degradan con gracia si offline ──
+    return () => { cancelled = true }
+  }, [id, consultaId])
+
+  // ── Datos complementarios ──
   const [medicoInfo, setMedicoInfo] = useState<MedicoInfo | null>(null)
   const [addendums, setAddendums] = useState<Addendum[]>([])
-  const [addendumsFailed, setAddendumsFailed] = useState(false)
 
   // Addendum form
   const [showAddendum, setShowAddendum] = useState(false)
@@ -80,17 +67,17 @@ export default function ConsultaDetallePage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    // Perfil médico — best-effort (useMedicoInfo tiene cache en secureStorage)
+    // Perfil médico — best-effort
     fetch('/api/me/perfil-medico')
       .then(r => r.json())
       .then(({ medico }) => setMedicoInfo(medico))
       .catch(() => {})
 
-    // Addendums — best-effort, si falla offline se muestra aviso
+    // Addendums
     fetch(`/api/consultas/${consultaId}/addendum`)
       .then(r => r.json())
       .then(data => setAddendums(data.addendums ?? []))
-      .catch(() => setAddendumsFailed(true))
+      .catch(() => {})
   }, [consultaId])
 
   async function guardarAddendum() {
@@ -251,14 +238,6 @@ export default function ConsultaDetallePage() {
           <p className="text-slate-400 text-sm">Sin nota de evolución registrada</p>
         )}
       </div>
-
-      {/* Aviso offline si los addendums no cargaron */}
-      {addendumsFailed && (
-        <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-500">
-          <WifiOff size={14} className="flex-shrink-0" />
-          Información adicional (notas aclaratorias) solo disponible online.
-        </div>
-      )}
 
       {/* Addendums — notas aclaratorias */}
       {addendums.length > 0 && (

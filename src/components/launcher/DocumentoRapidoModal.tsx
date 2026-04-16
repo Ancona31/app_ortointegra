@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, Pill, FlaskConical, ScanLine, ClipboardList, BedDouble, PenLine, ShieldCheck, Receipt, WifiOff } from 'lucide-react'
-import { subscribe, getStatus } from '@/lib/connectionMonitor'
+import { X, Pill, FlaskConical, ScanLine, ClipboardList, BedDouble, PenLine, ShieldCheck, Receipt } from 'lucide-react'
 
 const TIPOS = [
   { tipo: 'receta',         label: 'Receta médica',          icon: Pill,          color: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' },
@@ -23,12 +22,6 @@ interface Props {
 
 export default function DocumentoRapidoModal({ open, onClose }: Props) {
   const router = useRouter()
-  const [isOnline, setIsOnline] = useState(() => getStatus() !== 'offline')
-
-  useEffect(() => {
-    const unsub = subscribe((status) => setIsOnline(status !== 'offline'))
-    return unsub
-  }, [])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -64,12 +57,6 @@ export default function DocumentoRapidoModal({ open, onClose }: Props) {
           </button>
         </div>
 
-        {!isOnline && (
-          <div className="mx-4 mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
-            <WifiOff size={13} className="shrink-0" />
-            <span>Sin conexion — la busqueda de pacientes no estara disponible. Puedes escribir los datos manualmente.</span>
-          </div>
-        )}
 
         <div className="p-4 grid grid-cols-2 gap-2">
           {TIPOS.map(({ tipo, label, icon: Icon, color }) => (

@@ -11,9 +11,6 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 import { generarPdf } from '@/lib/mobileShare'
-import { enqueueOutbox } from '@/lib/outbox-engine'
-import { getPatientOffline } from '@/lib/offlinePatients'
-import { getStatus } from '@/lib/connectionMonitor'
 import AutocompleteMedicamento from '@/components/AutocompleteMedicamento'
 import { MedicamentoDB } from '@/data/medicamentos'
 import { useToast } from '@/components/ui/Toast'
@@ -154,16 +151,6 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
         setPacienteData({ edad, sexo: sexo ?? undefined })
       }
 
-      // Fallback a cache local — se ejecuta si Supabase falla o retorna null
-      const leerDeCache = async () => {
-        try {
-          const cached = await getPatientOffline(pacienteId as string)
-          if (cached) aplicar(cached.fecha_nacimiento ?? null, cached.sexo)
-        } catch {
-          // cache vacío — no hacer nada
-        }
-      }
-
       try {
         const supabase = createClient()
         const res = await supabase
@@ -174,11 +161,9 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 
         if (res.data) {
           aplicar(res.data.fecha_nacimiento, res.data.sexo)
-        } else {
-          await leerDeCache()
         }
       } catch {
-        await leerDeCache()
+        // Sin red — no hacer nada
       }
     }
 
@@ -228,7 +213,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 
     // 2. Construcción de identidad — el folio sirve DOBLE propósito:
     //    - Identificador público del documento (QR de verificación)
-    //    - clientId del outbox-engine (idempotencia garantizada por el
+    //    - clientId para idempotencia (idempotencia garantizada por el
     //      índice único parcial en la tabla documentos)
     const folio = `R-${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`
     const contenido = {
@@ -250,7 +235,6 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 
     // Flags de tracking para diferenciar errores de PDF vs persistencia
     let pdfGenerated = false
-    let persistedHow: 'supabase' | 'outbox' | null = null
 
     try {
       // 3. PDF PRIMERO — si falla, abortamos antes de escribir nada.
@@ -324,68 +308,26 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 
       pdfGenerated = true
 
-      // 4. Persistencia resiliente — bypass inteligente según estado de red
-      const browserOffline = typeof navigator !== 'undefined' && navigator.onLine === false
-      const monitorOffline = getStatus() === 'offline'
-      const isTrulyOffline = browserOffline || monitorOffline
-
-      if (!isTrulyOffline) {
-        // Intento directo a Supabase con client_id para idempotencia
-        try {
-          const supabase = createClient()
-          const insertPayload: Record<string, unknown> = {
-            tipo: 'receta',
-            contenido,
-            client_id: folio,
-          }
-          if (pacienteId) insertPayload.paciente_id = pacienteId
-
-          const { error } = await supabase.from('documentos').insert(insertPayload)
-          if (error) throw error
-          persistedHow = 'supabase'
-        } catch {
-          // Red inestable, 5xx, o columna client_id todavía sin desplegar:
-          // fallback al outbox que reintentará automáticamente.
-          await enqueueOutbox({
-            clientId: folio,
-            action: 'INSERT',
-            resource: 'document',
-            subtype: 'receta',
-            payload: contenido,
-            tempRef: pacienteId || undefined,
-            endpoint: '/api/documentos',
-            method: 'POST',
-          })
-          persistedHow = 'outbox'
-        }
-      } else {
-        // Offline declarado → directo al outbox, sin intentar Supabase
-        await enqueueOutbox({
-          clientId: folio,
-          action: 'INSERT',
-          resource: 'document',
-          subtype: 'receta',
-          payload: contenido,
-          tempRef: pacienteId || undefined,
-          endpoint: '/api/documentos',
-          method: 'POST',
-        })
-        persistedHow = 'outbox'
+      // 4. Persistencia — insertar directamente en Supabase
+      const supabase = createClient()
+      const insertPayload: Record<string, unknown> = {
+        tipo: 'receta',
+        contenido,
+        client_id: folio,
       }
+      if (pacienteId) insertPayload.paciente_id = pacienteId
 
-      // 5. Feedback final — solo cuando el dato está físicamente persistido
-      if (persistedHow === 'supabase') {
-        toast.success('Receta guardada y sincronizada')
-      } else {
-        toast.warning('Receta guardada localmente — se sincronizará al reconectar')
-      }
+      const { error } = await supabase.from('documentos').insert(insertPayload)
+      if (error) throw error
+
+      toast.success('Receta guardada')
     } catch (err) {
       if (!pdfGenerated) {
         // El error ocurrió antes/durante el PDF → ningún orphan record
         toast.error('No se pudo generar el PDF. Intenta de nuevo.')
         setErrorGuardado('No se pudo generar el PDF. Intenta de nuevo.')
       } else {
-        // PDF OK pero persistencia colapsó (improbable: enqueueOutbox no hace network)
+        // PDF OK pero persistencia fallida
         toast.error('Receta generada pero no se pudo guardar. Revisa errores de sincronización.')
         setErrorGuardado('Error al guardar la receta.')
       }

@@ -66,11 +66,6 @@ function fetchProfile(): Promise<Profile | null> {
           // Persistir en secureStorage para acceso offline futuro
           if (profile) {
             secureStorage.set(PROFILE_CACHE_KEY, profile).catch(() => {})
-            // Warm-up de persistencia (dynamic import — no infla bundle inicial).
-            // Es idempotente: si ya está granted, retorna sin acción.
-            import('@/lib/storage-vault')
-              .then(m => m.requestPersistentStorage())
-              .catch(() => {})
           }
           return profile
         })

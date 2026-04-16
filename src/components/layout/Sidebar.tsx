@@ -7,7 +7,7 @@ import {
   ClipboardList, BedDouble, PenLine, ShieldCheck, Receipt,
   CalendarDays, BarChart2, Users, CreditCard, UserCircle,
   HelpCircle, ChevronRight, Menu, X, LogOut, Moon, Sun,
-  Building2, TrendingUp, UserPlus, LayoutDashboard, WifiOff,
+  Building2, TrendingUp, UserPlus, LayoutDashboard,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -16,7 +16,6 @@ import { useClinica } from '@/hooks/useClinica'
 import { useTheme } from '@/components/layout/ThemeProvider'
 import { useAuth } from '@/lib/auth-context'
 import { mutate } from 'swr'
-import { subscribe, getStatus } from '@/lib/connectionMonitor'
 
 /* ─── Tipos ───────────────────────────────────────────────── */
 
@@ -126,14 +125,7 @@ function groupHasActiveChild(group: NavGroup, pathname: string) {
   return group.children.some(c => leafIsActive(c.href, pathname))
 }
 
-const OFFLINE_ALLOWED_PREFIXES = ['/inicio', '/documentos']
-const OFFLINE_ALLOWED_GROUPS = new Set(['documentos'])
 
-function isRouteAvailableOffline(href: string): boolean {
-  const base = href.split('?')[0]
-  return OFFLINE_ALLOWED_PREFIXES.some(p => base === p || base.startsWith(p + '/')) ||
-    base.includes('/nueva-nota')
-}
 
 /* ─── Componente ──────────────────────────────────────────── */
 
@@ -146,12 +138,6 @@ export default function Sidebar() {
   const { colorPrimario, colorSecundario, nombreDisplay, subtitulo, logoUrl } = useClinica()
   const { dark, toggle } = useTheme()
   const { signOut } = useAuth()
-  const [isOnline, setIsOnline] = useState(() => getStatus() !== 'offline')
-
-  useEffect(() => {
-    const unsub = subscribe((status) => setIsOnline(status !== 'offline'))
-    return unsub
-  }, [])
 
   const isAdmin      = profile?.role === 'admin' || profile?.role === 'super_admin'
   const isSuperAdmin = profile?.role === 'super_admin'
@@ -258,15 +244,12 @@ export default function Sidebar() {
             /* Leaf */
             if (section.kind === 'leaf') {
               const active = leafIsActive(section.href, pathname)
-              const offlineBlocked = !isOnline && !isRouteAvailableOffline(section.href)
-              if (section.disabled || offlineBlocked) {
+              if (section.disabled) {
                 return (
                   <div key={section.href}
-                    title={offlineBlocked ? 'No disponible sin conexión' : undefined}
                     className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] opacity-35 cursor-not-allowed select-none">
                     <section.icon size={16} />
                     <span className="flex-1">{section.label}</span>
-                    {offlineBlocked && <WifiOff size={11} className="opacity-70" />}
                     {section.badge && (
                       <span className="ml-auto text-[9px] font-semibold bg-white/15 px-1.5 py-0.5 rounded-full leading-none">
                         {section.badge}
@@ -292,19 +275,14 @@ export default function Sidebar() {
             if (section.kind === 'group') {
               const isOpen    = expanded.has(section.key)
               const hasActive = groupHasActiveChild(section, pathname)
-              const groupAvailableOffline = OFFLINE_ALLOWED_GROUPS.has(section.key)
-              const groupBlocked = !isOnline && !groupAvailableOffline
 
               return (
                 <div key={section.key}>
                   {/* Header del grupo */}
                   <button
-                    onClick={() => { if (!groupBlocked) toggleGroup(section.key) }}
-                    title={groupBlocked ? 'No disponible sin conexión' : undefined}
+onClick={() => toggleGroup(section.key)}
                     className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150 ${
-                      groupBlocked
-                        ? 'opacity-35 cursor-not-allowed'
-                        : hasActive && !isOpen
+hasActive && !isOpen
                           ? 'text-white bg-white/10'
                           : isOpen
                             ? 'text-white/80'
@@ -313,30 +291,15 @@ export default function Sidebar() {
                   >
                     <section.icon size={16} className={hasActive ? 'opacity-100' : 'opacity-70'} />
                     <span className="flex-1 text-left">{section.label}</span>
-                    {groupBlocked
-                      ? <WifiOff size={11} className="opacity-70" />
-                      : <ChevronRight size={13} className={`opacity-50 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`} />
+{<ChevronRight size={13} className={`opacity-50 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`} />
                     }
                   </button>
 
                   {/* Sub-items */}
-                  {isOpen && !groupBlocked && (
+{isOpen && (
                     <div className="mt-0.5 ml-3 pl-3 border-l border-white/10 space-y-0.5">
                       {section.children.map(child => {
                         const childActive = leafIsActive(child.href, pathname)
-                        const childBlocked = !isOnline && !isRouteAvailableOffline(child.href)
-                        if (childBlocked) {
-                          return (
-                            <div key={child.href}
-                              title="No disponible sin conexión"
-                              className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-[12px] opacity-35 cursor-not-allowed select-none"
-                            >
-                              <child.icon size={13} className="opacity-60" />
-                              <span className="flex-1">{child.label}</span>
-                              <WifiOff size={10} className="opacity-70" />
-                            </div>
-                          )
-                        }
                         return (
                           <Link key={child.href} href={child.href} onClick={close}
                             style={childActive ? { backgroundColor: colorSecundario } : undefined}

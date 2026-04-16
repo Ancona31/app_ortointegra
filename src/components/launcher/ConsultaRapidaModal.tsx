@@ -3,9 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Search, User, X, ArrowRight, Loader2, UserPlus, ChevronLeft, WifiOff } from 'lucide-react'
-import { subscribe, getStatus } from '@/lib/connectionMonitor'
-import { searchPatientsOffline, createPatientOffline } from '@/lib/offlinePatients'
+import { Search, User, X, ArrowRight, Loader2, UserPlus, ChevronLeft } from 'lucide-react'
 import { differenceInYears, parseISO } from 'date-fns'
 
 type Paciente = {
@@ -30,13 +28,7 @@ interface Props {
 
 export default function ConsultaRapidaModal({ open, onClose }: Props) {
   const router = useRouter()
-  const [isOnline, setIsOnline] = useState(() => getStatus() !== 'offline')
-  const [offlineMsg, setOfflineMsg] = useState('')
-
-  useEffect(() => {
-    const unsub = subscribe((status) => setIsOnline(status !== 'offline'))
-    return unsub
-  }, [])
+  const [offlineMsg, setOfflineMsg] = useState("")
 
   const [query, setQuery]     = useState('')
   const [results, setResults] = useState<Paciente[]>([])
@@ -74,22 +66,6 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
     setLoading(true)
     setOfflineMsg('')
 
-    if (!isOnline) {
-      // Búsqueda desde cache local
-      const cached = await searchPatientsOffline(q)
-      setResults(cached.map(p => ({
-        id: p.id,
-        nombre: p.nombre,
-        apellidos: p.apellidos,
-        fecha_nacimiento: p.fecha_nacimiento ?? null,
-        numero_expediente: p.numero_expediente ?? null,
-        sexo: p.sexo ?? null,
-      })))
-      setLoading(false)
-      setSelected(0)
-      return
-    }
-
     const supabase = createClient()
     const { data } = await supabase
       .from('pacientes')
@@ -101,7 +77,7 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
     setResults(data || [])
     setLoading(false)
     setSelected(0)
-  }, [isOnline])
+  }, [])
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -141,19 +117,6 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
     setCreando(true)
 
     try {
-      if (!isOnline) {
-        // Crear paciente offline — se sincronizará al reconectar
-        const patient = await createPatientOffline({
-          nombre: formNombre.trim(),
-          apellidos: formApellidos.trim(),
-          fecha_nacimiento: formFechaNac || null,
-          consentimiento_otorgado: formConsentimiento,
-        })
-        onClose()
-        router.push(`/expediente/${patient.id}/nueva-nota`)
-        return
-      }
-
       const res = await fetch('/api/pacientes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -195,7 +158,6 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
       >
         {offlineMsg && (
           <div className="mx-4 mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
-            <WifiOff size={13} className="shrink-0" />
             <span>{offlineMsg}</span>
           </div>
         )}

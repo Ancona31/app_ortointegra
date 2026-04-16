@@ -4,8 +4,6 @@ import { useState } from 'react'
 import { Printer, Loader2, Plus, Trash2 } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { generarPdf } from '@/lib/mobileShare'
-import { enqueueOutbox } from '@/lib/outbox-engine'
-import { getStatus } from '@/lib/connectionMonitor'
 import { useToast } from '@/components/ui/Toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -98,7 +96,6 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
 
     // Flags de tracking para diferenciar errores
     let pdfGenerated = false
-    let persistedHow: 'supabase' | 'outbox' | null = null
 
     try {
       // 3. PDF PRIMERO — si falla, abortamos antes de persistir
@@ -131,62 +128,20 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
 
       pdfGenerated = true
 
-      // 4. Persistencia resiliente — bypass inteligente según estado de red
-      const browserOffline = typeof navigator !== 'undefined' && navigator.onLine === false
-      const monitorOffline = getStatus() === 'offline'
-      const isTrulyOffline = browserOffline || monitorOffline
-
-      if (!isTrulyOffline) {
-        // Intento directo a Supabase con client_id para idempotencia
-        try {
-          const supabase = createClient()
-          const insertPayload: Record<string, unknown> = {
-            tipo: 'nota_honorarios',
-            contenido,
-            client_id: clientId,
-          }
-          if (pacienteId) insertPayload.paciente_id = pacienteId
-
-          const { error } = await supabase.from('documentos').insert(insertPayload)
-          if (error) throw error
-          persistedHow = 'supabase'
-        } catch {
-          // Red inestable, 5xx, o columna client_id sin desplegar:
-          // fallback al outbox que reintentará automáticamente.
-          await enqueueOutbox({
-            clientId,
-            action: 'INSERT',
-            resource: 'document',
-            subtype: 'nota_honorarios',
-            payload: contenido,
-            tempRef: pacienteId || undefined,
-            endpoint: '/api/documentos',
-            method: 'POST',
-          })
-          persistedHow = 'outbox'
-        }
-      } else {
-        // Offline declarado → directo al outbox
-        await enqueueOutbox({
-          clientId,
-          action: 'INSERT',
-          resource: 'document',
-          subtype: 'nota_honorarios',
-          payload: contenido,
-          tempRef: pacienteId || undefined,
-          endpoint: '/api/documentos',
-          method: 'POST',
-        })
-        persistedHow = 'outbox'
+      // 4. Persistencia — insertar directamente en Supabase
+      const supabase = createClient()
+      const insertPayload: Record<string, unknown> = {
+        tipo: 'nota_honorarios',
+        contenido,
+        client_id: clientId,
       }
+      if (pacienteId) insertPayload.paciente_id = pacienteId
 
-      // 5. Feedback final diferenciado
-      const docLabel = tipoDoc === 'cotizacion' ? 'Cotización' : 'Recibo'
-      if (persistedHow === 'supabase') {
-        toast.success(`${docLabel} guardado y sincronizado`)
-      } else {
-        toast.warning(`${docLabel} guardado localmente — se sincronizará al reconectar`)
-      }
+      const { error } = await supabase.from('documentos').insert(insertPayload)
+      if (error) throw error
+
+      const docLabel = tipoDoc === 'cotizacion' ? 'Cotizacion' : 'Recibo'
+      toast.success(docLabel + ' guardado')
     } catch (err) {
       if (!pdfGenerated) {
         toast.error('No se pudo generar el PDF. Intenta de nuevo.')

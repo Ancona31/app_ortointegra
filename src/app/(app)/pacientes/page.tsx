@@ -7,12 +7,10 @@ import { PatientRowSkeleton } from '@/components/ui/Skeleton'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { differenceInYears, parseISO } from 'date-fns'
-import { useHybridQuery } from '@/hooks/useHybridQuery'
-import { getPacientesLocal, type PacienteLocal } from '@/lib/read-mirror'
-import FreshnessBadge from '@/components/ui/FreshnessBadge'
+import type { Paciente } from '@/types'
 
 /**
- * Límite unificado (local + remoto). 200 registros cubren el caseload
+ * Límite unificado. 200 registros cubren el caseload
  * típico de un médico activo. La búsqueda por nombre cubre el resto
  * de pacientes si alguien tiene más de 200.
  */
@@ -24,6 +22,8 @@ const SEARCH_DEBOUNCE_MS = 300
 export default function PacientesPage() {
   const [busqueda, setBusqueda] = useState('')
   const [busquedaDebounced, setBusquedaDebounced] = useState('')
+  const [data, setData] = useState<Paciente[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
   // Debounce del input → término que efectivamente dispara fetch
   useEffect(() => {
@@ -31,48 +31,46 @@ export default function PacientesPage() {
     return () => clearTimeout(id)
   }, [busqueda])
 
-  const q = useHybridQuery<PacienteLocal[]>({
-    key: `pacientes:${busquedaDebounced}`,
-    localFetcher: async () =>
-      getPacientesLocal({
-        activosOnly: true,
-        search: busquedaDebounced || undefined,
-        limit: PACIENTES_LIMIT,
-      }),
-    remoteFetcher: async () => {
-      const supabase = createClient()
-      let query = supabase
-        .from('pacientes')
-        .select('*')
-        .neq('activo', false)
+  useEffect(() => {
+    let cancelled = false
+    setIsLoading(true)
 
-      if (busquedaDebounced.length >= 2) {
-        query = query.or(
-          `nombre.ilike.%${busquedaDebounced}%,apellidos.ilike.%${busquedaDebounced}%,numero_expediente.ilike.%${busquedaDebounced}%`,
-        )
-      }
+    const supabase = createClient()
+    let query = supabase
+      .from('pacientes')
+      .select('*')
+      .neq('activo', false)
 
-      const { data, error } = await query
-        .order('created_at', { ascending: false })
-        .limit(PACIENTES_LIMIT)
+    if (busquedaDebounced.length >= 2) {
+      query = query.or(
+        `nombre.ilike.%${busquedaDebounced}%,apellidos.ilike.%${busquedaDebounced}%,numero_expediente.ilike.%${busquedaDebounced}%`,
+      )
+    }
 
-      if (error) throw error
-      return (data ?? []) as PacienteLocal[]
-    },
-  })
+    query
+      .order('created_at', { ascending: false })
+      .limit(PACIENTES_LIMIT)
+      .then((res: { data: Paciente[] | null; error: unknown }) => {
+        if (cancelled) return
+        if (res.error) { console.error(res.error); return }
+        setData((res.data ?? []) as Paciente[])
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false)
+      })
+
+    return () => { cancelled = true }
+  }, [busquedaDebounced])
 
   /**
    * Orden unificado client-side: created_at DESC (más recientes primero).
-   * El mirror devuelve por nombre ASC internamente — post-sort aquí
-   * preserva la UX del listing original sin tocar getPacientesLocal.
    * Costo despreciable para 200 registros.
    */
   const pacientes = useMemo(() => {
-    const rows = q.data ?? []
-    return [...rows].sort((a, b) =>
+    return [...data].sort((a, b) =>
       (b.created_at ?? '').localeCompare(a.created_at ?? ''),
     )
-  }, [q.data])
+  }, [data])
 
   const mostrarNotaLimite = pacientes.length >= PACIENTES_LIMIT
   const hayBusqueda = busquedaDebounced.length > 0
@@ -86,7 +84,6 @@ export default function PacientesPage() {
             <h1 className="text-2xl font-bold text-[#1a3a5c] flex items-center gap-2">
               <Users size={24} /> Pacientes
             </h1>
-            <FreshnessBadge state={q} />
           </div>
           <p className="text-slate-500 text-sm mt-1">
             {pacientes.length} pacientes{hayBusqueda ? ' encontrados' : ' registrados'}
@@ -115,7 +112,7 @@ export default function PacientesPage() {
 
       {/* Lista */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-        {q.isLoading ? (
+        {isLoading ? (
           <div className="divide-y divide-slate-100">
             {Array.from({ length: 8 }).map((_, i) => <PatientRowSkeleton key={i} />)}
           </div>
@@ -175,9 +172,7 @@ export default function PacientesPage() {
       {/* Nota de límite cuando hay >=200 registros */}
       {mostrarNotaLimite && (
         <p className="text-center text-xs text-slate-400 mt-4">
-          {q.source === 'local'
-            ? `Mostrando los ${PACIENTES_LIMIT} pacientes más recientes (Modo Offline)`
-            : `Mostrando los ${PACIENTES_LIMIT} pacientes más recientes`}
+          Mostrando los {PACIENTES_LIMIT} pacientes más recientes
         </p>
       )}
     </div>

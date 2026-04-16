@@ -13,13 +13,9 @@ import Image from 'next/image'
 import ConsultaRapidaModal from '@/components/launcher/ConsultaRapidaModal'
 import OnboardingModal from '@/components/onboarding/OnboardingModal'
 import ParticleCanvas from '@/components/launcher/ParticleCanvas'
-import OfflineReadinessPanel from '@/components/ui/OfflineReadinessPanel'
 import { useTheme } from '@/components/launcher/ThemeContext'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useClinica } from '@/hooks/useClinica'
-import { precacheFonts } from '@/lib/pdfClientFallback'
-import { precachePatients } from '@/lib/offlinePatients'
-import { requestPersistentStorage } from '@/lib/storage-vault'
 
 type GridMode = 'sin_pacientes' | 'nuevo' | 'activo'
 
@@ -83,190 +79,10 @@ export default function InicioPage() {
   useMedicoInfo()
   useClinica()
   useEffect(() => {
-    precacheFonts()
-    precachePatients()
-    // Prefetch chunks JS de TODAS las rutas críticas para navegación offline
-    router.prefetch('/dashboard')
-    router.prefetch('/agenda')
-    router.prefetch('/estadisticas')
-    router.prefetch('/documentos')
-    router.prefetch('/pacientes')
-    router.prefetch('/pacientes/nuevo')
-    router.prefetch('/expediente')
-    router.prefetch('/expediente/_')
-    router.prefetch('/expediente/_/nueva-nota')
-    router.prefetch('/expediente/_/editar')
-    router.prefetch('/expediente/_/documentos')
-    router.prefetch('/expediente/_/laboratorios/nuevo')
-    router.prefetch('/expediente/_/laboratorios/_')
-    router.prefetch('/expediente/_/consulta/_')
-    router.prefetch('/suplementacion')
-    // Warm-up: forzar descarga completa de los chunks JS de los 8 formularios
-    // El SW los intercepta y cachea automáticamente para modo offline.
-    // Helper: logguea la inyección ANTES del import dinámico
-    const logInject = (path: string) => {
-      // eslint-disable-next-line no-console
-      console.log('[Spinus] Inyectando script: ' + path)
-    }
-
-    logInject('@/components/documentos/RecetaForm')
-    const wRcta = import('@/components/documentos/RecetaForm')
-    logInject('@/components/documentos/SolicitudLabForm')
-    const wSLab = import('@/components/documentos/SolicitudLabForm')
-    logInject('@/components/documentos/SolicitudImagenForm')
-    const wSImg = import('@/components/documentos/SolicitudImagenForm')
-    logInject('@/components/documentos/PlanSuplementacionForm')
-    const wSupl = import('@/components/documentos/PlanSuplementacionForm')
-    logInject('@/components/documentos/SolicitudInternamientoForm')
-    const wInt = import('@/components/documentos/SolicitudInternamientoForm')
-    logInject('@/components/documentos/EscritoMedicoForm')
-    const wEsc = import('@/components/documentos/EscritoMedicoForm')
-    logInject('@/components/documentos/ConsentimientoInformadoForm')
-    const wCons = import('@/components/documentos/ConsentimientoInformadoForm')
-    logInject('@/components/documentos/NotaHonorariosForm')
-    const wHon = import('@/components/documentos/NotaHonorariosForm')
-
-    const formWarmups: Array<[string, Promise<unknown>]> = [
-      ['RecetaForm', wRcta],
-      ['SolicitudLabForm', wSLab],
-      ['SolicitudImagenForm', wSImg],
-      ['PlanSuplementacionForm', wSupl],
-      ['SolicitudInternamientoForm', wInt],
-      ['EscritoMedicoForm', wEsc],
-      ['ConsentimientoInformadoForm', wCons],
-      ['NotaHonorariosForm', wHon],
-    ]
-
-    Promise.all(
-      formWarmups.map(([name, p]) =>
-        p.then(() => {
-          // eslint-disable-next-line no-console
-          console.log('[Spinus warm-up] ✓', name)
-          return name
-        }).catch(err => {
-          // eslint-disable-next-line no-console
-          console.error('[Spinus warm-up] ✗', name, err)
-          return null
-        })
-      )
-    ).then(results => {
-      const ok = results.filter(Boolean).length
-      // eslint-disable-next-line no-console
-      console.log(`[Spinus warm-up] formularios listos: ${ok}/${formWarmups.length}`)
-    })
-
-    // Warm-up de renderers PDF
-    logInject('@/lib/pdf/RecetaPdf')
-    const pRcta = import('@/lib/pdf/RecetaPdf')
-    logInject('@/lib/pdf/SolicitudLabPdf')
-    const pSLab = import('@/lib/pdf/SolicitudLabPdf')
-    logInject('@/lib/pdf/SolicitudImagenPdf')
-    const pSImg = import('@/lib/pdf/SolicitudImagenPdf')
-    logInject('@/lib/pdf/PlanSuplementacionPdf')
-    const pSupl = import('@/lib/pdf/PlanSuplementacionPdf')
-    logInject('@/lib/pdf/NotaHonorariosPdf')
-    const pHon = import('@/lib/pdf/NotaHonorariosPdf')
-    logInject('@/lib/pdf/SolicitudInternamientoPdf')
-    const pInt = import('@/lib/pdf/SolicitudInternamientoPdf')
-    logInject('@/lib/pdf/EscritoMedicoPdf')
-    const pEsc = import('@/lib/pdf/EscritoMedicoPdf')
-    logInject('@/lib/pdf/ConsentimientoInformadoPdf')
-    const pCons = import('@/lib/pdf/ConsentimientoInformadoPdf')
-    logInject('@/lib/pdf/NotaEvolucionPdf')
-    const pEvo = import('@/lib/pdf/NotaEvolucionPdf')
-
-    const pdfWarmups: Array<[string, Promise<unknown>]> = [
-      ['RecetaPdf', pRcta],
-      ['SolicitudLabPdf', pSLab],
-      ['SolicitudImagenPdf', pSImg],
-      ['PlanSuplementacionPdf', pSupl],
-      ['NotaHonorariosPdf', pHon],
-      ['SolicitudInternamientoPdf', pInt],
-      ['EscritoMedicoPdf', pEsc],
-      ['ConsentimientoInformadoPdf', pCons],
-      ['NotaEvolucionPdf', pEvo],
-    ]
-
-    Promise.all(
-      pdfWarmups.map(([name, p]) =>
-        p.then(() => {
-          // eslint-disable-next-line no-console
-          console.log('[Spinus warm-up] ✓ PDF', name)
-          return name
-        }).catch(err => {
-          // eslint-disable-next-line no-console
-          console.error('[Spinus warm-up] ✗ PDF', name, err)
-          return null
-        })
-      )
-    ).then(results => {
-      const ok = results.filter(Boolean).length
-      // eslint-disable-next-line no-console
-      console.log(`[Spinus warm-up] renderers PDF listos: ${ok}/${pdfWarmups.length}`)
-      // eslint-disable-next-line no-console
-      console.log('[Spinus warm-up] todo listo — sistema blindado para offline')
-    })
-    // Fetch páginas críticas para que el SW cache todos sus chunks
-    const rutasWarmup = [
-      '/dashboard',
-      '/agenda',
-      '/estadisticas',
-      '/documentos',
-      '/pacientes',
-      '/pacientes/nuevo',
-      '/expediente',
-      '/expediente/_',
-      '/expediente/_/nueva-nota',
-      '/expediente/_/editar',
-      '/expediente/_/documentos',
-      '/expediente/_/laboratorios/nuevo',
-      '/expediente/_/laboratorios/_',
-      '/expediente/_/consulta/_',
-      '/suplementacion',
-    ]
-    rutasWarmup.forEach(r => { fetch(r).catch(() => {}) })
-
-    // Solicitar persistencia de storage al inicio de cada sesión del launcher
-    // Idempotente — si ya está granted, retorna sin acción. En Safari retorna
-    // 'unreliable' sin llamar la API real. Nunca bloquea el launcher.
-    requestPersistentStorage()
-      .then(status => {
-        // eslint-disable-next-line no-console
-        console.log('[Spinus] Persistent storage:', status)
-      })
-      .catch(() => {})
   }, [router])
 
   useEffect(() => {
     const supabase = createClient()
-
-    // Offline: saltar validación de sesión, cargar UI con datos cacheados
-    // para que el médico pueda acceder al launcher sin bloqueo
-    const isBrowserOffline =
-      typeof navigator !== 'undefined' && navigator.onLine === false
-
-    if (isBrowserOffline) {
-      // Estado mínimo fallback para que la UI no se quede colgada
-      const fallbackEstado: EstadoPerfil = {
-        porcentaje: 100,
-        requiereOnboarding: false,
-        gridMode: 'activo',
-        role: 'medico',
-        nombre: null,
-        plan: 'free',
-        planNombre: 'Free',
-        suscripcion_estado: 'trial',
-      }
-
-      // Intentar leer el estado del perfil (el SW lo puede tener cacheado si
-      // el médico abrió el launcher antes online); si falla, usar fallback
-      fetch('/api/me/estado-perfil')
-        .then(r => r.json())
-        .then((data: EstadoPerfil) => setEstado(data))
-        .catch(() => setEstado(fallbackEstado))
-        .finally(() => setLoading(false))
-      return
-    }
 
     supabase.auth.getUser().then(({ data: { user } }: { data: { user: { id: string } | null } }) => {
       if (!user) { router.push('/login'); return }
@@ -389,9 +205,7 @@ export default function InicioPage() {
           </div>
         </div>
 
-        {/* Offline readiness panel — estado del sistema */}
         <div className="mx-6 mt-3">
-          <OfflineReadinessPanel dark={dark} />
         </div>
 
         {/* Profile completion banner */}
@@ -506,7 +320,7 @@ export default function InicioPage() {
             </Link>
 
             {/* Dashboard — siempre accesible (Bloque 2.5: ruta offline-ready
-                con fallback al read-mirror y timeout en useProfile) */}
+                siempre accesible) */}
             <Link
               href="/dashboard"
               className={`launcher-card-2 group relative flex flex-col items-center justify-center gap-4 p-8 rounded-3xl border shadow-sm transition-all duration-300 min-h-[220px] hover:scale-[1.03] active:scale-[0.98] ${cardBase} ${cardHover}`}

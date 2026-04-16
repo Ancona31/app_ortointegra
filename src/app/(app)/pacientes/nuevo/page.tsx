@@ -6,9 +6,7 @@ import { ArrowLeft, ChevronDown, Save, Hash, Mail, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { useProfile } from '@/hooks/useProfile'
 import { validarEmail, validarTelefono, formatearTelefono } from '@/lib/validaciones'
-import { createPatientOffline } from '@/lib/offlinePatients'
 import { secureStorage } from '@/lib/secureStorage'
-import { getStatus } from '@/lib/connectionMonitor'
 
 type Medico = {
   id: string
@@ -115,18 +113,6 @@ export default function NuevoPacientePage() {
       consentimiento_otorgado: true,
     }
 
-    // Sprint 3 Hotfix — Detección offline reforzada:
-    // getStatus() puede retornar 'online' en el primer tick antes de que
-    // el connectionMonitor pingee. navigator.onLine cubre ese gap. Uno u
-    // otro en 'offline' → saltamos directo al flujo offline queue.
-    const offline =
-      getStatus() === 'offline' ||
-      (typeof navigator !== 'undefined' && navigator.onLine === false)
-    if (offline) {
-      await guardarOffline(payload)
-      return
-    }
-
     // Intento online con try/catch
     try {
       const res = await fetch('/api/pacientes', {
@@ -143,27 +129,7 @@ export default function NuevoPacientePage() {
       }
       router.push(`/expediente/${data.id}`)
     } catch {
-      // Red caída durante el fetch → fallback offline
-      await guardarOffline(payload)
-    }
-  }
-
-  async function guardarOffline(payload: Record<string, unknown>) {
-    try {
-      const cached = await createPatientOffline({
-        nombre: String(payload.nombre ?? ''),
-        apellidos: String(payload.apellidos ?? ''),
-        fecha_nacimiento: (payload.fecha_nacimiento as string | null) ?? null,
-        sexo: (payload.sexo as string | null) ?? null,
-        telefono: (payload.telefono as string | null) ?? null,
-        email: (payload.email as string | null) ?? null,
-        consentimiento_otorgado: true,
-        ...payload,
-      })
-      // Redirigir al expediente con el tempId — el cache ya lo tiene
-      router.push(`/expediente/${cached.id}`)
-    } catch (err) {
-      setError('No se pudo guardar localmente: ' + (err instanceof Error ? err.message : 'Error desconocido'))
+      setError("Error de conexion. Verifica tu internet e intenta de nuevo.")
       setLoading(false)
     }
   }
