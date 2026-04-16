@@ -1,4 +1,5 @@
 'use client'
+import { generateDocFileName } from '@/lib/patientUtils'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useState } from 'react'
 
@@ -86,7 +87,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
           urgente,
         },
         logoUrl,
-        filename: 'solicitud-imagenologia.pdf',
+        filename: generateDocFileName(paciente, 'Solicitud_Imagen'),
       })
 
       pdfGenerated = true

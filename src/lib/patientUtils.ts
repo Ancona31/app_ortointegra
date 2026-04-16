@@ -84,3 +84,52 @@ export function fechaHoyISO(): string {
 
 /** Fecha mínima razonable para un paciente (1900-01-01) */
 export const FECHA_MIN_NACIMIENTO = '1900-01-01'
+
+/* ──────────────────────────────────────────────────────────────────────
+   Nomenclatura de archivos PDF
+   ────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Elimina acentos y caracteres especiales de un string.
+ * "María José López-Ñúñez" → "Maria Jose Lopez-Nunez"
+ */
+function removeAccents(str: string): string {
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
+/**
+ * Genera un nombre de archivo estandarizado para documentos PDF.
+ *
+ * Formato: YYYY-MM-DD_HHmm_TipoDoc_NombrePaciente.pdf
+ * Ejemplo: 2026-04-16_1430_Receta_Juan_Garcia_Lopez.pdf
+ *
+ * - Reemplaza espacios por guiones bajos
+ * - Elimina acentos y caracteres no alfanuméricos (excepto - y _)
+ * - Si el paciente está vacío, usa "Sin_Nombre"
+ */
+export function generateDocFileName(
+  nombrePaciente: string,
+  tipoDocumento: string,
+  fecha?: Date,
+): string {
+  const d = fecha ?? new Date()
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+
+  const timestamp = `${yyyy}-${mm}-${dd}_${hh}${min}`
+
+  const tipo = removeAccents(tipoDocumento.trim())
+    .replace(/\s+/g, '_')
+    .replace(/[^a-zA-Z0-9_-]/g, '')
+
+  const paciente = nombrePaciente.trim()
+    ? removeAccents(nombrePaciente.trim())
+        .replace(/\s+/g, '_')
+        .replace(/[^a-zA-Z0-9_-]/g, '')
+    : 'Sin_Nombre'
+
+  return `${timestamp}_${tipo}_${paciente}.pdf`
+}

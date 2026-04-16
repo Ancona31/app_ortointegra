@@ -1,4 +1,5 @@
 'use client'
+import { generateDocFileName } from '@/lib/patientUtils'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 
 import { useState, useCallback } from 'react'
@@ -128,7 +129,7 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
           justificacion, instruccionesPaciente, indicacionesPiso,
         },
         logoUrl,
-        filename: 'solicitud-internamiento.pdf',
+        filename: generateDocFileName(paciente, 'Solicitud_Internamiento'),
       })
 
       pdfGenerated = true

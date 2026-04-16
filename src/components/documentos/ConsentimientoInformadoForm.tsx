@@ -1,5 +1,6 @@
 'use client'
 
+import { generateDocFileName } from '@/lib/patientUtils'
 import { useState } from 'react'
 import { Printer, Loader2, ChevronDown, ChevronUp, ShieldCheck } from 'lucide-react'
 import { flushSync } from 'react-dom'
@@ -187,7 +188,7 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
           secciones, imprimirDenegacion,
         },
         logoUrl,
-        filename: 'consentimiento-informado.pdf',
+        filename: generateDocFileName(paciente, 'Consentimiento_Informado'),
       })
 
       pdfGenerated = true

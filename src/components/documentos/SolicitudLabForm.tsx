@@ -1,4 +1,5 @@
 'use client'
+import { generateDocFileName } from '@/lib/patientUtils'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { generarPdf } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
@@ -100,7 +101,7 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
           notas: notas || undefined,
         },
         logoUrl,
-        filename: 'solicitud-laboratorio.pdf',
+        filename: generateDocFileName(paciente, 'Solicitud_Laboratorio'),
       })
 
       pdfGenerated = true

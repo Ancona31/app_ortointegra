@@ -1,4 +1,5 @@
 'use client'
+import { generateDocFileName } from '@/lib/patientUtils'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 
 import { useRef, useState } from 'react'
@@ -106,7 +107,7 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId }: 
         medico: medicoData,
         data: { paciente, fecha: fechaFmt, asunto, cuerpo: contenido },
         logoUrl,
-        filename: 'escrito-medico.pdf',
+        filename: generateDocFileName(paciente, 'Escrito_Medico'),
       })
 
       pdfGenerated = true

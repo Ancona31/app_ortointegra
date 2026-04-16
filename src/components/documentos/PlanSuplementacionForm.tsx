@@ -1,4 +1,5 @@
 'use client'
+import { generateDocFileName } from '@/lib/patientUtils'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useProfile } from '@/hooks/useProfile'
 
@@ -278,7 +279,7 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
           blogQrDataUrl: blogQrDataUrl || undefined,
         },
         logoUrl,
-        filename: 'plan-suplementacion.pdf',
+        filename: generateDocFileName(paciente, 'Plan_Suplementacion'),
       })
 
       pdfGenerated = true

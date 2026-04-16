@@ -1,4 +1,5 @@
 'use client'
+import { generateDocFileName } from '@/lib/patientUtils'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useCallback, useEffect, useState } from 'react'
 import { Printer, Loader2, Plus, Trash2, Save, FileText, AlertTriangle } from 'lucide-react'
@@ -338,7 +339,7 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
           aseguradora,
         },
         logoUrl,
-        filename: tipoDoc === 'cotizacion' ? 'cotizacion.pdf' : 'nota-honorarios.pdf',
+        filename: generateDocFileName(paciente, tipoDoc === 'cotizacion' ? 'Cotizacion' : 'Nota_Honorarios'),
       })
 
       pdfGenerated = true

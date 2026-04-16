@@ -1,5 +1,6 @@
 'use client'
 
+import { generateDocFileName } from '@/lib/patientUtils'
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, Trash2, Printer, Loader2 } from 'lucide-react'
 import { flushSync } from 'react-dom'
@@ -303,7 +304,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
           blogQrDataUrl: blogQrDataUrl || undefined,
         },
         logoUrl,
-        filename: 'receta-medica.pdf',
+        filename: generateDocFileName(paciente, 'Receta'),
       })
 
       pdfGenerated = true
