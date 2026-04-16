@@ -700,7 +700,7 @@ export default function HomePage() {
               </div>
               <h3 className="text-[16px] font-bold text-slate-900 mb-3">Siempre Disponible</h3>
               <p className="text-[14px] text-slate-500 leading-relaxed">
-                Acceso total desde cualquier dispositivo y respaldo automático en la nube. <strong className="text-slate-700">Tu consultorio nunca se detiene</strong> — ni siquiera sin conexión a internet.
+                Acceso total desde cualquier dispositivo y respaldo automático en la nube. <strong className="text-slate-700">Tu consultorio nunca se detiene</strong> — sincronización total en la nube en tiempo real.
               </p>
             </div>
           </div>
