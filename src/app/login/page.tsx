@@ -113,8 +113,7 @@ export default function LoginPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'login_exitoso' }),
       }).catch(() => {})
-      router.push('/inicio')
-      router.refresh()
+      window.location.href = '/inicio'
     }
   }
 

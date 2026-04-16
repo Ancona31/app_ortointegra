@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { Loader2 } from 'lucide-react'
 
 /* ──────────────────────────────────────────────────────────────────────
    Tipos
@@ -21,6 +22,7 @@ export interface AuthContextValue {
   email: string | null
   status: AuthStatus
   isAuthenticated: boolean
+  initialized: boolean
   signOut: () => Promise<void>
   refreshMeta: () => Promise<void>
 }
@@ -85,10 +87,6 @@ function saveMeta(meta: SessionMeta): void {
    Sincronizar metadata desde sesión del SDK (cookies)
    ────────────────────────────────────────────────────────────────────── */
 
-/**
- * Obtiene sesión del SDK de Supabase y sincroniza a spinus_session_meta.
- * El SDK lee de cookies en SSR, o de localStorage en client puro.
- */
 async function syncFromSdkSession(currentMeta: SessionMeta): Promise<SessionMeta> {
   try {
     const supabase = createClient()
@@ -165,24 +163,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const status = validateToken(meta)
   const isAuthenticated = status === 'AUTHENTICATED'
 
-  /**
-   * RefreshMeta — Sincroniza con el SDK y actualiza spinus_session_meta.
-   */
   const refreshMeta = useCallback(async (): Promise<void> => {
     const newMeta = await syncFromSdkSession(meta)
     setMeta(newMeta)
   }, [meta])
 
-  /**
-   * SignOut explícito — limpieza de sesión.
-   *
-   * Secuencia:
-   *   1. Limpiar cookies sb-* y sessionStorage
-   *   2. SignOut del SDK de Supabase (best-effort)
-   *   3. Resetear estado interno del contexto
-   */
   const signOut = useCallback(async (): Promise<void> => {
-    // 1. Limpiar rastro de sesión en cookies y sessionStorage
     try {
       document.cookie.split(';').forEach(c => {
         const name = c.trim().split('=')[0]
@@ -190,78 +176,46 @@ export function AuthProvider({ children }: AuthProviderProps) {
           document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
         }
       })
-    } catch {
-      // Cookie API puede fallar en contexts restringidos — silent
-    }
+    } catch { /* silent */ }
     try {
       sessionStorage.removeItem('spinus_active')
-    } catch {
-      // sessionStorage bloqueado (Safari private mode) — silent
-    }
+    } catch { /* silent */ }
 
-    // 2. SignOut del SDK (best-effort)
     try {
       const supabase = createClient()
       await supabase.auth.signOut()
-    } catch {
-      // Red caída o SDK error — el cleanup local ya se ejecutó
-    }
+    } catch { /* silent */ }
 
-    // 3. Resetear estado interno
     const emptyMeta: SessionMeta = {
-      userId: null,
-      expiresAt: null,
-      redVerifiedAt: null,
-      email: null,
+      userId: null, expiresAt: null, redVerifiedAt: null, email: null,
     }
     setMeta(emptyMeta)
     saveMeta(emptyMeta)
   }, [])
 
-  /**
-   * Inicialización — Hidratación híbrida
-   *
-   * Paso 1: Leer spinus_session_meta del localStorage (inmediato)
-   * Paso 2: Sincronizar con SDK (getSession)
-   */
+  // Inicialización: sync con SDK antes de renderizar children
   useEffect(() => {
     async function init() {
       const storedMeta = getStoredMeta()
-
       if (storedMeta.userId) {
         setMeta(storedMeta)
       }
-
       const syncedMeta = await syncFromSdkSession(storedMeta)
       setMeta(syncedMeta)
-
       setInitialized(true)
     }
-
     void init()
   }, [])
 
-  /**
-   * Sync periódico — cada vez que la conexión cambia a online
-   * o cuando la pestaña vuelve al foreground, refreshMeta actualiza
-   * la sesión.
-   */
+  // Sync en reconexión y visibilitychange
   useEffect(() => {
     if (!initialized) return
-
-    const handleOnline = () => {
-      void refreshMeta()
-    }
-
+    const handleOnline = () => { void refreshMeta() }
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        void refreshMeta()
-      }
+      if (document.visibilityState === 'visible') void refreshMeta()
     }
-
     window.addEventListener('online', handleOnline)
     document.addEventListener('visibilitychange', handleVisibility)
-
     return () => {
       window.removeEventListener('online', handleOnline)
       document.removeEventListener('visibilitychange', handleVisibility)
@@ -273,8 +227,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
     email: meta.email,
     status,
     isAuthenticated,
+    initialized,
     signOut,
     refreshMeta,
+  }
+
+  // Loading gate: NO renderizar children hasta que la sesión se resuelva
+  if (!initialized) {
+    return (
+      <AuthContext.Provider value={value}>
+        <div className="min-h-screen flex items-center justify-center bg-slate-50">
+          <Loader2 size={28} className="animate-spin text-[#1e5fa8]" />
+        </div>
+      </AuthContext.Provider>
+    )
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

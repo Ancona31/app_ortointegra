@@ -79,9 +79,6 @@ export default function InicioPage() {
   useMedicoInfo()
   useClinica()
   useEffect(() => {
-  }, [router])
-
-  useEffect(() => {
     const supabase = createClient()
 
     supabase.auth.getUser().then(({ data: { user } }: { data: { user: { id: string } | null } }) => {
@@ -319,9 +316,8 @@ export default function InicioPage() {
               </div>
             </Link>
 
-            {/* Dashboard — siempre accesible (Bloque 2.5: ruta offline-ready
-                siempre accesible) */}
-            <Link
+            {/* Dashboard — hard navigation para garantizar cookies frescas */}
+            <a
               href="/dashboard"
               className={`launcher-card-2 group relative flex flex-col items-center justify-center gap-4 p-8 rounded-3xl border shadow-sm transition-all duration-300 min-h-[220px] hover:scale-[1.03] active:scale-[0.98] ${cardBase} ${cardHover}`}
             >
@@ -339,7 +335,7 @@ export default function InicioPage() {
               }`}>
                 <ChevronRight size={18} />
               </div>
-            </Link>
+            </a>
           </div>
 
           {/* Quick activity row */}

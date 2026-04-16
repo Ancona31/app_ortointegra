@@ -22,7 +22,7 @@ const PWA_PUBLIC_ASSETS = new Set([
   '/offline',  // fallback del SW — debe ser accesible sin sesión
 ])
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   // Bypass inmediato para recursos críticos de la PWA
@@ -61,9 +61,15 @@ export async function proxy(request: NextRequest) {
   const publicApiPaths = ['/api/google/callback', '/api/stripe/webhook', '/api/stripe/checkout', '/api/stripe/portal', '/api/auth/registro', '/api/auth/complete-registro', '/api/auth/email-hook', '/api/auth/verify-email', '/api/auth/audit-login', '/api/auth/rate-limit']
   const isPublicApi = publicApiPaths.some(p => pathname.startsWith(p))
 
-  // Si no hay sesión y no está en ruta pública → redirigir a login
+  // Si no hay sesión y no está en ruta pública → verificar cookies antes de redirigir.
+  // getUser() puede fallar por latencia post-login (las cookies existen pero el
+  // servidor de Supabase aún no las procesó). Si hay cookie de sesión, dejar pasar.
   if (!user && !isLoginPage && !isPublicPage && !isPublicApi) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    const hasSessionCookie = request.cookies.getAll()
+      .some(c => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
+    if (!hasSessionCookie) {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
   }
 
   // Permitir acceso a /login aunque haya sesión activa
