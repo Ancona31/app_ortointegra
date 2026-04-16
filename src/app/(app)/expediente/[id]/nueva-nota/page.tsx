@@ -21,7 +21,7 @@ import { imprimirOCompartir } from '@/lib/mobileShare'
 import { secureStorage } from '@/lib/secureStorage'
 import { useAuditAccess } from '@/hooks/useAudit'
 import { subscribe, getStatus } from '@/lib/connectionMonitor'
-import { getPatientOffline } from '@/lib/offlinePatients'
+import { getPacienteLocal } from '@/lib/read-mirror'
 import { saveNoteOffline } from '@/lib/offlineNotes'
 import dynamic from 'next/dynamic'
 
@@ -157,20 +157,18 @@ export default function NuevaNotaPage() {
 
   useEffect(() => {
     fetch('/api/me/perfil-medico').then(r => r.json()).then(({ medico }) => setMedicoInfo(medico)).catch(() => {})
+    // FASE C.2: Mirror primero (instantáneo, offline-safe), Supabase como refresh
+    getPacienteLocal(id as string).then(cached => {
+      if (cached) setPaciente({ id: cached.id, nombre: cached.nombre, apellidos: cached.apellidos, fecha_nacimiento: cached.fecha_nacimiento ?? null, sexo: cached.sexo ?? null } as Paciente)
+    }).catch(() => {})
+    // Background refresh desde Supabase si hay red
     const supabase = createClient()
     supabase.from('pacientes').select('*').eq('id', id).single()
       .then((res: { data: Paciente | null }) => {
-        if (res.data) { setPaciente(res.data); return }
-        // Fallback: buscar en cache offline
-        return getPatientOffline(id as string).then(cached => {
-          if (cached) setPaciente({ id: cached.id, nombre: cached.nombre, apellidos: cached.apellidos, fecha_nacimiento: cached.fecha_nacimiento ?? null, sexo: cached.sexo ?? null } as Paciente)
-        }).catch(() => {})
+        if (res.data) setPaciente(res.data)
       })
       .catch(() => {
-        // Offline: cargar desde cache
-        getPatientOffline(id as string).then(cached => {
-          if (cached) setPaciente({ id: cached.id, nombre: cached.nombre, apellidos: cached.apellidos, fecha_nacimiento: cached.fecha_nacimiento ?? null, sexo: cached.sexo ?? null } as Paciente)
-        }).catch(() => {})
+        // Sin red — mirror ya cargó los datos arriba, nada que hacer
       })
     // Cargar medicamentos frecuentes y borrador (cifrados en secureStorage)
     secureStorage.get<{ nombre: string; count: number }[]>('med-frecuentes').then(data => {

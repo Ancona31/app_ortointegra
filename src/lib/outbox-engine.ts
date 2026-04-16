@@ -105,6 +105,8 @@ export interface FlushResult {
  * genérica de `syncItem`. El endpoint destino `/api/audit` se creará
  * en el hito siguiente.
  */
+// ADVERTENCIA DE AUDITORÍA: El user_id debe extraerse siempre de useAuth().userId.
+// NUNCA usar el SDK de Supabase directamente para evitar romper el blindaje offline.
 export interface AuditEventPayload {
   user_id: string
   action: 'read' | 'write' | 'delete' | 'export' | 'print'

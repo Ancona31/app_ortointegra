@@ -11,51 +11,31 @@ import path from 'path'
 const BUILD_ID = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) || 'dev-local'
 
 /**
- * Paths relativos (sin hash) de los chunks que buscamos en .next/static/chunks/
- * Next.js 16 con App Router genera chunks con nombres tipo:
- *   app/(app)/documentos/page-{hash}.js
- *   app/(launcher)/inicio/page-{hash}.js
- *   app/(app)/expediente/[id]/nueva-nota/page-{hash}.js
+ * FASE C.1: Precache agresivo — TODOS los chunks JS/CSS.
  *
- * Cada prefix representa una ruta crítica. Escaneamos el filesystem en
- * build time y matcheamos por prefijo, ignorando el hash.
+ * Antes se filtraba por CRITICAL_CHUNK_PREFIXES (19 rutas). Ahora se
+ * incluye todo .next/static/chunks/ para garantizar que formularios
+ * dinámicos (RecetaForm, SolicitudLabForm, etc.) y todas las páginas
+ * estén disponibles offline sin necesidad de visitarlas previamente.
+ *
+ * El install event usa Promise.allSettled — un chunk que falle no
+ * bloquea los demás. El synthetic fallback en el fetch handler sigue
+ * activo como red de seguridad para cualquier chunk que no se descargue.
  */
-const CRITICAL_CHUNK_PREFIXES = [
-  'app/(launcher)/inicio/page-',
-  'app/(launcher)/layout-',
-  'app/(app)/dashboard/page-',
-  'app/(app)/agenda/page-',
-  'app/(app)/estadisticas/page-',
-  'app/(app)/documentos/page-',
-  'app/(app)/pacientes/page-',
-  'app/(app)/pacientes/nuevo/page-',
-  'app/(app)/expediente/page-',
-  'app/(app)/expediente/[id]/page-',
-  'app/(app)/expediente/[id]/nueva-nota/page-',
-  'app/(app)/expediente/[id]/editar/page-',
-  'app/(app)/expediente/[id]/documentos/page-',
-  'app/(app)/expediente/[id]/laboratorios/nuevo/page-',
-  'app/(app)/expediente/[id]/laboratorios/[labId]/page-',
-  'app/(app)/expediente/[id]/consulta/[consultaId]/page-',
-  'app/(app)/suplementacion/page-',
-  'app/(app)/layout-',
-  'app/layout-',
-]
 
 /**
- * Lee chunks críticos combinando 2 fuentes:
+ * Lee TODOS los chunks combinando 2 fuentes:
  *
- * 1. .next/build-manifest.json → rootMainFiles (webpack/framework/main-app)
- *    + polyfillFiles (los chunks compartidos por TODAS las rutas)
+ * 1. .next/build-manifest.json → rootMainFiles + polyfillFiles
+ *    (webpack/framework/main-app compartidos por TODAS las rutas)
  *
- * 2. Escaneo del filesystem .next/static/chunks/ para encontrar los chunks
- *    específicos por ruta (page-{hash}.js, layout-{hash}.js) matcheando
- *    contra CRITICAL_CHUNK_PREFIXES.
+ * 2. Escaneo COMPLETO de .next/static/chunks/ — todos los .js y .css
+ *    sin filtro por prefijo. Incluye pages, layouts, components y
+ *    formularios dinámicos.
  *
  * Degradación elegante: si falla, retorna [] y el SW degrada a solo-HTML.
- * El warm-up del launcher cubre los chunks en ese caso.
  */
-function readCriticalChunks(): string[] {
+function readAllChunks(): string[] {
   const chunks = new Set<string>()
 
   // ── Fuente 1: build-manifest.json (root chunks compartidos) ──
@@ -120,26 +100,14 @@ function readCriticalChunks(): string[] {
     }
 
     const allFiles = walk(appChunksDir)
-    let routesFound = 0
 
-    for (const prefix of CRITICAL_CHUNK_PREFIXES) {
-      // Convertir el prefix en un path absoluto para comparación
-      const prefixAbs = path.join(appChunksDir, prefix).replace(/\\/g, '/')
-      const matching = allFiles.filter(f => {
-        const normalized = f.replace(/\\/g, '/')
-        return normalized.startsWith(prefixAbs)
-      })
-
-      if (matching.length > 0) routesFound++
-
-      for (const abs of matching) {
-        // Convertir a URL /_next/static/chunks/...
-        const rel = path.relative(
-          path.join(process.cwd(), '.next'),
-          abs
-        ).replace(/\\/g, '/')
-        chunks.add('/_next/' + rel)
-      }
+    // FASE C.1: incluir TODOS los archivos JS/CSS encontrados
+    for (const abs of allFiles) {
+      const rel = path.relative(
+        path.join(process.cwd(), '.next'),
+        abs
+      ).replace(/\\/g, '/')
+      chunks.add('/_next/' + rel)
     }
 
     // Escaneo explícito de .next/static/css/ — los archivos CSS de
@@ -169,11 +137,7 @@ function readCriticalChunks(): string[] {
     const cssCount = chunksArray.filter(c => c.endsWith('.css')).length
     // eslint-disable-next-line no-console
     console.log(
-      `[sw.js] Precache scan: ${routesFound}/${CRITICAL_CHUNK_PREFIXES.length} prefixes matched`
-    )
-    // eslint-disable-next-line no-console
-    console.log(
-      `[sw.js] Precache total: ${jsCount} JS + ${cssCount} CSS (${chunks.size} archivos)`
+      `[sw.js] Precache total (agresivo): ${jsCount} JS + ${cssCount} CSS (${chunks.size} archivos)`
     )
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -184,7 +148,7 @@ function readCriticalChunks(): string[] {
   return Array.from(chunks)
 }
 
-const CRITICAL_CHUNKS = readCriticalChunks()
+const ALL_CHUNKS = readAllChunks()
 
 const SW_CONTENT = `const CACHE = 'spinus-${BUILD_ID}'
 const FONT_CACHE = 'spinus-pdf-fonts-v1'
@@ -206,13 +170,14 @@ const PRECACHE_HTML = [
   '/expediente/_/laboratorios/_',
   '/expediente/_/consulta/_',
   '/suplementacion',
+  '/login',
   '/offline',
   '/logo.png',
   '/icon-192.png',
 ]
 
-// Chunks JS extraídos del app-build-manifest.json en build time
-const PRECACHE_CHUNKS = ${JSON.stringify(CRITICAL_CHUNKS)}
+// FASE C.1: TODOS los chunks JS/CSS del build (precache agresivo)
+const PRECACHE_CHUNKS = ${JSON.stringify(ALL_CHUNKS)}
 
 const PRECACHE = [...PRECACHE_HTML, ...PRECACHE_CHUNKS]
 
