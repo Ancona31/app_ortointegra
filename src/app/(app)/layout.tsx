@@ -8,6 +8,7 @@ import SessionGuard from '@/components/SessionGuard'
 import OfflineSync from '@/components/OfflineSync'
 import OfflineGate from '@/components/OfflineGate'
 import PersistenceWarning from '@/components/ui/PersistenceWarning'
+import GracePeriodBanner from '@/components/ui/GracePeriodBanner'
 import ChunkMissingListener from '@/components/ChunkMissingListener'
 import MirrorInitializer from '@/components/MirrorInitializer'
 import { AuthProvider } from '@/lib/auth-context'
@@ -25,6 +26,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <PageTransition>
                     <OfflineGate>
                       <PersistenceWarning />
+                      <GracePeriodBanner />
                       {children}
                     </OfflineGate>
                   </PageTransition>
