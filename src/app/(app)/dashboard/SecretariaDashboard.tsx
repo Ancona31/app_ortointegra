@@ -5,9 +5,9 @@ import Link from 'next/link'
 import { UserPlus, Users, ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Paciente } from '@/types'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { differenceInYears, parseISO } from 'date-fns'
+import { calcularEdad } from '@/lib/patientUtils'
 
 export default function SecretariaDashboard() {
   const [recientes, setRecientes] = useState<Paciente[]>([])
@@ -57,7 +57,7 @@ export default function SecretariaDashboard() {
           <div className="divide-y divide-slate-100">
             {recientes.map(p => {
               const edad = p.fecha_nacimiento
-                ? differenceInYears(new Date(), parseISO(p.fecha_nacimiento))
+                ? calcularEdad(p.fecha_nacimiento)
                 : null
               return (
                 <div key={p.id} className="flex items-center justify-between px-5 py-3">
@@ -68,7 +68,7 @@ export default function SecretariaDashboard() {
                     <div>
                       <p className="font-medium text-slate-800 text-sm">{p.nombre} {p.apellidos}</p>
                       <p className="text-xs text-slate-400">
-                        {edad !== null ? `${edad} años · ` : ''}
+                        {edad !== null ? `${edad.textoElegante} · ` : ''}
                         {p.created_at ? format(parseISO(p.created_at), "d MMM yyyy", { locale: es }) : ''}
                       </p>
                     </div>

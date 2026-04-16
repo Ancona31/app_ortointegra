@@ -1,8 +1,11 @@
 'use client'
 
-import { useState } from 'react'
-import { User, X } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { User, X, Loader2 } from 'lucide-react'
 import Portal from '@/components/ui/Portal'
+import { toTitleCase, calcularEdad, fechaHoyISO, FECHA_MIN_NACIMIENTO } from '@/lib/patientUtils'
+import type { DuplicatePatientResponse } from '@/types'
 
 type PacienteBusqueda = { id: string; nombre: string; apellidos: string; telefono: string | null }
 
@@ -15,18 +18,27 @@ export default function QuickPatientModal({
   onCreated: (p: PacienteBusqueda) => void
   onClose: () => void
 }) {
+  const router = useRouter()
   const partes = nombreInicial.trim().split(' ')
   const [nombre,    setNombre]    = useState(partes[0] ?? '')
   const [apellidos, setApellidos] = useState(partes.slice(1).join(' '))
-  const [edad,      setEdad]      = useState('')
+  const [fechaNac,  setFechaNac]  = useState('')
   const [email,     setEmail]     = useState('')
   const [saving,    setSaving]    = useState(false)
   const [error,     setError]     = useState('')
   const [consentimiento, setConsentimiento] = useState(false)
+  const [duplicateWarning, setDuplicateWarning] = useState<{ id: string; nombre: string; apellidos: string; numero_expediente: string | null } | null>(null)
+  const forceCreateRef = useRef(false)
+
+  const edadInfo = fechaNac ? calcularEdad(fechaNac) : null
 
   async function handleCreate() {
-    if (!nombre.trim() || !apellidos.trim() || !edad) {
-      setError('Nombre, apellidos y edad son requeridos.')
+    if (!nombre.trim() || !apellidos.trim()) {
+      setError('Nombre y apellidos son requeridos.')
+      return
+    }
+    if (!fechaNac) {
+      setError('Fecha de nacimiento es requerida.')
       return
     }
     if (!consentimiento) {
@@ -35,21 +47,41 @@ export default function QuickPatientModal({
     }
     setSaving(true)
     setError('')
-    const edadNum = parseInt(edad, 10)
-    const anio = new Date().getFullYear() - edadNum
-    const fecha_nacimiento = `${anio}-06-15`
+
+    const nombreLimpio = toTitleCase(nombre)
+    const apellidosLimpio = toTitleCase(apellidos)
 
     try {
       const res = await fetch('/api/pacientes', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ nombre: nombre.trim(), apellidos: apellidos.trim(), fecha_nacimiento, email: email.trim() || null, consentimiento_otorgado: true }),
+        body:    JSON.stringify({
+          nombre: nombreLimpio,
+          apellidos: apellidosLimpio,
+          fecha_nacimiento: fechaNac,
+          email: email.trim() || null,
+          consentimiento_otorgado: true,
+          ...(forceCreateRef.current ? { forceCreate: true } : {}),
+        }),
       })
-      const data = await res.json()
-      if (!res.ok) { setError(data.error ?? 'Error al crear paciente'); setSaving(false); return }
-      onCreated({ id: data.id, nombre: nombre.trim(), apellidos: apellidos.trim(), telefono: null })
+      const data = await res.json() as Record<string, unknown>
+
+      if (res.status === 409 && data.error === 'DUPLICATE_PATIENT') {
+        const dupData = data as unknown as DuplicatePatientResponse
+        setDuplicateWarning({
+          id: dupData.existingPatient.id,
+          nombre: dupData.existingPatient.nombre,
+          apellidos: dupData.existingPatient.apellidos,
+          numero_expediente: dupData.existingPatient.numero_expediente,
+        })
+        setSaving(false)
+        return
+      }
+
+      if (!res.ok) { setError((data.error as string) ?? 'Error al crear paciente'); setSaving(false); return }
+      onCreated({ id: (data.id as string) ?? '', nombre: nombreLimpio, apellidos: apellidosLimpio, telefono: null })
     } catch {
-      setError("Error de conexion. Intenta de nuevo.")
+      setError('Error de conexión. Intenta de nuevo.')
       setSaving(false)
     }
   }
@@ -72,6 +104,35 @@ export default function QuickPatientModal({
         <div className="px-6 py-5 space-y-3">
           {error && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
 
+          {duplicateWarning && (
+            <div className="bg-amber-50 border border-amber-300 px-3 py-3 rounded-xl space-y-2">
+              <p className="text-xs text-amber-800 font-medium">
+                ⚠️ Ya existe un paciente: {duplicateWarning.nombre} {duplicateWarning.apellidos}
+                {duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => router.push(`/expediente/${duplicateWarning.id}`)}
+                  className="flex-1 px-2 py-1.5 text-[11px] font-medium text-emerald-700 bg-white border border-emerald-300 rounded-lg hover:bg-emerald-50 transition-colors"
+                >
+                  Ir al expediente existente
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDuplicateWarning(null)
+                    forceCreateRef.current = true
+                    handleCreate()
+                  }}
+                  className="flex-1 px-2 py-1.5 text-[11px] font-medium text-amber-700 bg-white border border-amber-300 rounded-lg hover:bg-amber-50 transition-colors"
+                >
+                  Crear de todos modos
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">Nombre</label>
@@ -87,10 +148,20 @@ export default function QuickPatientModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">Edad</label>
-              <input type="number" min={0} max={120} value={edad} onChange={e => setEdad(e.target.value)}
-                placeholder="ej. 35"
-                className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all" />
+              <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">
+                Fecha de nacimiento
+              </label>
+              <input
+                type="date"
+                value={fechaNac}
+                onChange={e => setFechaNac(e.target.value)}
+                min={FECHA_MIN_NACIMIENTO}
+                max={fechaHoyISO()}
+                className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
+              />
+              {edadInfo && (
+                <p className="text-[11px] text-emerald-600 mt-1 font-medium">{edadInfo.textoElegante}</p>
+              )}
             </div>
             <div>
               <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">Correo</label>
@@ -119,10 +190,10 @@ export default function QuickPatientModal({
         </div>
 
         <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium text-[#86868b] hover:bg-slate-100 transition-colors">Cancelar</button>
+          <button onClick={onClose} disabled={saving} className="px-4 py-2 rounded-xl text-sm font-medium text-[#86868b] hover:bg-slate-100 transition-colors disabled:opacity-50">Cancelar</button>
           <button onClick={handleCreate} disabled={saving}
-            className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 transition-colors">
-            {saving ? 'Registrando...' : 'Crear y continuar'}
+            className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 transition-colors flex items-center gap-1.5">
+            {saving ? <><Loader2 size={14} className="animate-spin" /> Registrando...</> : 'Crear y continuar'}
           </button>
         </div>
       </div>

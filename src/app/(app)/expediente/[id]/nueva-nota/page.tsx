@@ -6,7 +6,7 @@ import Portal from '@/components/ui/Portal'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Paciente } from '@/types'
-import { differenceInYears, parseISO } from 'date-fns'
+import { calcularEdad } from '@/lib/patientUtils'
 import { flushSync } from 'react-dom'
 import {
   ArrowLeft, Save, Loader2, RotateCcw, Printer, Eye, Pencil,
@@ -245,7 +245,7 @@ export default function NuevaNotaPage() {
     if (!form.motivo_consulta) { setError('Ingresa al menos el motivo de consulta'); return }
     setGenerando(true); setError('')
     const edad = paciente?.fecha_nacimiento
-      ? differenceInYears(new Date(), parseISO(paciente.fecha_nacimiento)) : null
+      ? calcularEdad(paciente.fecha_nacimiento).anios : null
     try {
       const res = await fetch('/api/nota-medica', {
         method: 'POST',
@@ -368,7 +368,7 @@ export default function NuevaNotaPage() {
     try {
       const ahora = new Date()
       const edad = paciente.fecha_nacimiento
-        ? differenceInYears(ahora, parseISO(paciente.fecha_nacimiento)) : null
+        ? calcularEdad(paciente.fecha_nacimiento).anios : null
       const fechaHora = ahora.toLocaleString('es-MX', {
         day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true,
       })
@@ -603,7 +603,7 @@ export default function NuevaNotaPage() {
             {paciente && (
               <p className="text-slate-500 text-sm mt-0.5">
                 {paciente.nombre} {paciente.apellidos} ·{' '}
-                {paciente.fecha_nacimiento ? differenceInYears(new Date(), parseISO(paciente.fecha_nacimiento)) + ' años' : ''}
+                {paciente.fecha_nacimiento ? calcularEdad(paciente.fecha_nacimiento).textoElegante : ''}
               </p>
             )}
           </div>
@@ -1008,7 +1008,7 @@ modoNota === 'ia'
                 <div className="flex flex-wrap gap-2">
                   {paciente.fecha_nacimiento && (
                     <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-lg">
-                      {differenceInYears(new Date(), parseISO(paciente.fecha_nacimiento))} años
+                      {calcularEdad(paciente.fecha_nacimiento).textoElegante}
                     </span>
                   )}
                   {paciente.sexo && (

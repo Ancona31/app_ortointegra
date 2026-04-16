@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Paciente } from '@/types'
-import { differenceInYears, parseISO } from 'date-fns'
+import { calcularEdad } from '@/lib/patientUtils'
 import { AlertTriangle, Pencil, ChevronDown, Pill, Scissors, Users, Stethoscope, Phone } from 'lucide-react'
 import Link from 'next/link'
 
@@ -16,7 +16,7 @@ export default function TarjetaPaciente({ paciente, id, isDoctor }: Props) {
   const [antExpanded, setAntExpanded] = useState(false)
 
   const edad = paciente.fecha_nacimiento
-    ? differenceInYears(new Date(), parseISO(paciente.fecha_nacimiento))
+    ? calcularEdad(paciente.fecha_nacimiento)
     : null
 
   const tieneAntecedentes = !!(
@@ -58,7 +58,7 @@ export default function TarjetaPaciente({ paciente, id, isDoctor }: Props) {
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             {edad !== null && (
               <span className="text-[11px] font-semibold bg-white/15 text-white px-2 py-0.5 rounded-full">
-                {edad} años
+                {edad.textoElegante}
               </span>
             )}
             <span className="text-[11px] font-semibold bg-white/15 text-white px-2 py-0.5 rounded-full">

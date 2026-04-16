@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Paciente, Consulta } from '@/types'
-import { differenceInYears, parseISO, format } from 'date-fns'
+import { parseISO, format } from 'date-fns'
+import { calcularEdad } from '@/lib/patientUtils'
 import { es } from 'date-fns/locale'
 import { ArrowLeft, Printer, Stethoscope, Plus, Loader2, FileText, Lock, PenLine } from 'lucide-react'
 import Link from 'next/link'
@@ -116,7 +117,7 @@ export default function ConsultaDetallePage() {
       (consulta.medico_cedula_especialidad || medicoInfo?.cedula_especialidad) ? `Céd. Esp. ${consulta.medico_cedula_especialidad || medicoInfo?.cedula_especialidad}` : '',
     ].filter(Boolean).join(' · ')
     const logoUrl = consulta.medico_logo_url || medicoInfo?.logo_url || `${window.location.origin}/logo.png`
-    const edad = paciente.fecha_nacimiento ? differenceInYears(new Date(), parseISO(paciente.fecha_nacimiento)) : null
+    const edad = paciente.fecha_nacimiento ? calcularEdad(paciente.fecha_nacimiento).anios : null
     const fechaHora = format(parseISO(consulta.fecha), "dd 'de' MMMM 'de' yyyy, HH:mm 'hrs'", { locale: es })
     const notaHtml = markdownToHtml(consulta.notas_evolucion || '')
 

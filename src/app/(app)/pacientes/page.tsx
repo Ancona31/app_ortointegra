@@ -6,7 +6,7 @@ import { Users, Plus, Search, ChevronRight } from 'lucide-react'
 import { PatientRowSkeleton } from '@/components/ui/Skeleton'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { differenceInYears, parseISO } from 'date-fns'
+import { calcularEdad } from '@/lib/patientUtils'
 import type { Paciente } from '@/types'
 
 /**
@@ -137,7 +137,7 @@ export default function PacientesPage() {
           <div className="divide-y divide-slate-100">
             {pacientes.map(p => {
               const edad = p.fecha_nacimiento
-                ? differenceInYears(new Date(), parseISO(p.fecha_nacimiento))
+                ? calcularEdad(p.fecha_nacimiento)
                 : null
               const apellidosTxt = p.apellidos ?? ''
               return (
@@ -155,7 +155,7 @@ export default function PacientesPage() {
                         {p.nombre} {apellidosTxt}
                       </p>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        {edad !== null && `${edad} años · `}
+                        {edad !== null && `${edad.textoElegante} · `}
                         {p.sexo === 'M' ? 'Masculino' : p.sexo === 'F' ? 'Femenino' : 'Otro'}
                         {p.numero_expediente && ` · Exp. ${p.numero_expediente}`}
                       </p>

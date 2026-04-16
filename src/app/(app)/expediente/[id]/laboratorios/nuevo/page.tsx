@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useAuditAccess } from '@/hooks/useAudit'
 import { Paciente, ValoresLab, AnalisisIA, ResultadoLab } from '@/types'
 import { analizarLaboratorios } from '@/lib/analisis'
-import { differenceInYears, parseISO } from 'date-fns'
+import { calcularEdad } from '@/lib/patientUtils'
 import {
   ArrowLeft, FlaskConical, Upload, CheckCircle, AlertTriangle,
   AlertCircle, Loader2, Save, RotateCcw, Plus, Trash2, Clock, WifiOff,
@@ -215,7 +215,7 @@ export default function NuevoLaboratorioPage() {
   }
 
   const edad = paciente?.fecha_nacimiento
-    ? differenceInYears(new Date(), parseISO(paciente.fecha_nacimiento))
+    ? calcularEdad(paciente.fecha_nacimiento)
     : null
 
   return (
@@ -232,7 +232,7 @@ export default function NuevoLaboratorioPage() {
           {paciente && (
             <p className="text-slate-500 text-sm mt-0.5">
               {paciente.nombre} {paciente.apellidos}
-              {edad !== null ? ` · ${edad} años` : ''}
+              {edad !== null ? ` · ${edad.textoElegante}` : ''}
             </p>
           )}
         </div>

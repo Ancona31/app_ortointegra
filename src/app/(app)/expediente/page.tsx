@@ -5,7 +5,7 @@ import { Plus, Search, ChevronRight, FileText, Stethoscope } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Paciente } from '@/types'
-import { differenceInYears, parseISO } from 'date-fns'
+import { calcularEdad } from '@/lib/patientUtils'
 
 const PAGE_SIZE = 20
 
@@ -142,7 +142,7 @@ export default function ExpedientePage() {
           <>
             <div className="divide-y divide-slate-100">
               {pacientes.map((p, i) => {
-                const edad = p.fecha_nacimiento ? differenceInYears(new Date(), parseISO(p.fecha_nacimiento)) : null
+                const edad = p.fecha_nacimiento ? calcularEdad(p.fecha_nacimiento) : null
                 const avatarColor = AVATAR_COLORS[i % AVATAR_COLORS.length]
                 return (
                   <div key={p.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-slate-50/80 transition-colors group">
@@ -155,7 +155,7 @@ export default function ExpedientePage() {
                           {p.nombre} {p.apellidos}
                         </p>
                         <p className="text-[11px] text-[#86868b] mt-0.5">
-                          {edad !== null ? `${edad} años · ` : ''}
+                          {edad !== null ? `${edad.textoElegante} · ` : ''}
                           {p.sexo === 'M' ? 'Masculino' : p.sexo === 'F' ? 'Femenino' : 'Otro'}
                           {p.numero_expediente ? ` · ${p.numero_expediente}` : ''}
                         </p>

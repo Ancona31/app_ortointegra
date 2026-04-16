@@ -5,7 +5,7 @@ import { useParams, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useAuditAccess } from '@/hooks/useAudit'
 import { Paciente } from '@/types'
-import { differenceInYears, parseISO } from 'date-fns'
+import { calcularEdad } from '@/lib/patientUtils'
 import { ArrowLeft, Pill, FlaskConical, ScanLine, ClipboardList, BedDouble, PenLine, ShieldCheck, Receipt, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
@@ -71,7 +71,7 @@ function DocumentosPacienteContent() {
           {paciente && (
             <p className="text-slate-500 text-sm mt-0.5">
               {paciente.nombre} {paciente.apellidos}
-              {paciente.fecha_nacimiento ? ` · ${differenceInYears(new Date(), parseISO(paciente.fecha_nacimiento))} años` : ''}
+              {paciente.fecha_nacimiento ? ` · ${calcularEdad(paciente.fecha_nacimiento).textoElegante}` : ''}
             </p>
           )}
         </div>

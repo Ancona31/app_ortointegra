@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Search, User, X, ArrowRight, Loader2, UserPlus, ChevronLeft } from 'lucide-react'
-import { differenceInYears, parseISO } from 'date-fns'
+import { calcularEdad } from '@/lib/patientUtils'
 
 type Paciente = {
   id: string
@@ -184,7 +184,7 @@ export default function CommandPalette() {
               <ul className="py-2 max-h-80 overflow-y-auto">
                 {results.map((p, i) => {
                   const edad = p.fecha_nacimiento
-                    ? differenceInYears(new Date(), parseISO(p.fecha_nacimiento))
+                    ? calcularEdad(p.fecha_nacimiento)
                     : null
                   const activo = i === selected
                   return (
@@ -200,7 +200,7 @@ export default function CommandPalette() {
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-slate-800 text-sm truncate">{p.nombre} {p.apellidos}</p>
                           <p className="text-xs text-slate-400 mt-0.5">
-                            {edad !== null ? `${edad} años` : ''}
+                            {edad !== null ? edad.textoElegante : ''}
                             {edad !== null && p.sexo ? ' · ' : ''}
                             {p.sexo === 'M' ? 'Masculino' : p.sexo === 'F' ? 'Femenino' : ''}
                             {p.numero_expediente ? ` · ${p.numero_expediente}` : ''}

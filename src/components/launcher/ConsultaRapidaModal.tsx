@@ -4,7 +4,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Search, User, X, ArrowRight, Loader2, UserPlus, ChevronLeft } from 'lucide-react'
-import { differenceInYears, parseISO } from 'date-fns'
+import { toTitleCase, calcularEdad, fechaHoyISO, FECHA_MIN_NACIMIENTO } from '@/lib/patientUtils'
+import type { DuplicatePatientResponse } from '@/types'
 
 type Paciente = {
   id: string
@@ -41,6 +42,8 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
   const [formFechaNac, setFormFechaNac] = useState('')
   const [formConsentimiento, setFormConsentimiento] = useState(false)
   const [creando, setCreando]         = useState(false)
+  const [duplicateWarning, setDuplicateWarning] = useState<{ id: string; nombre: string; apellidos: string; numero_expediente: string | null } | null>(null)
+  const forceCreateRef = useRef(false)
 
   const inputRef    = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -51,6 +54,8 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
       setModoCrear(false); setOfflineMsg('')
       setFormNombre(''); setFormApellidos(''); setFormFechaNac('')
       setFormConsentimiento(false)
+      setDuplicateWarning(null)
+      forceCreateRef.current = false
       setTimeout(() => inputRef.current?.focus(), 50)
     }
   }, [open])
@@ -111,33 +116,53 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
     setModoCrear(true)
   }
 
+  const [formError, setFormError] = useState('')
+
   async function handleCrear(e: React.FormEvent) {
     e.preventDefault()
-    if (!formNombre.trim()) return
+    if (!formNombre.trim()) { setFormError('El nombre es requerido.'); return }
+    if (!formFechaNac) { setFormError('La fecha de nacimiento es requerida.'); return }
+    if (!formConsentimiento) { setFormError('El consentimiento es obligatorio.'); return }
     setCreando(true)
+    setFormError('')
 
     try {
       const res = await fetch('/api/pacientes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          nombre: formNombre.trim(),
-          apellidos: formApellidos.trim(),
+          nombre: toTitleCase(formNombre),
+          apellidos: toTitleCase(formApellidos),
           sexo: null,
-          fecha_nacimiento: formFechaNac || null,
-          consentimiento_otorgado: formConsentimiento,
+          fecha_nacimiento: formFechaNac,
+          consentimiento_otorgado: true,
+          ...(forceCreateRef.current ? { forceCreate: true } : {}),
         }),
       })
-      const data = await res.json() as { id?: string; error?: string }
+      const data = await res.json() as Record<string, unknown>
+
+      if (res.status === 409 && data.error === 'DUPLICATE_PATIENT') {
+        const dupData = data as unknown as DuplicatePatientResponse
+        setDuplicateWarning({
+          id: dupData.existingPatient.id,
+          nombre: dupData.existingPatient.nombre,
+          apellidos: dupData.existingPatient.apellidos,
+          numero_expediente: dupData.existingPatient.numero_expediente,
+        })
+        setCreando(false)
+        return
+      }
+
       if (!res.ok) {
-        console.error('[ConsultaRapidaModal] Error API:', data.error)
-        alert(`Error al crear paciente: ${data.error ?? 'Error desconocido'}`)
+        setFormError((data.error as string) ?? 'Error al crear paciente')
         return
       }
       if (data.id) {
         onClose()
-        router.push(`/expediente/${data.id}/nueva-nota`)
+        router.push(`/expediente/${data.id as string}/nueva-nota`)
       }
+    } catch {
+      setFormError('Error de conexión. Intenta de nuevo.')
     } finally {
       setCreando(false)
     }
@@ -186,8 +211,8 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
             {(results.length > 0 || mostrarOpcionCrear) && (
               <ul className="py-2 max-h-80 overflow-y-auto">
                 {results.map((p, i) => {
-                  const edad = p.fecha_nacimiento
-                    ? differenceInYears(new Date(), parseISO(p.fecha_nacimiento))
+                  const edadInfo = p.fecha_nacimiento
+                    ? calcularEdad(p.fecha_nacimiento)
                     : null
                   const activo = i === selected
                   return (
@@ -203,8 +228,8 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-slate-800 text-sm truncate">{p.nombre} {p.apellidos}</p>
                           <p className="text-xs text-slate-400 mt-0.5">
-                            {edad !== null ? `${edad} años` : ''}
-                            {edad !== null && p.sexo ? ' · ' : ''}
+                            {edadInfo ? edadInfo.textoElegante : ''}
+                            {edadInfo && p.sexo ? ' · ' : ''}
                             {p.sexo === 'M' ? 'Masculino' : p.sexo === 'F' ? 'Femenino' : ''}
                             {p.numero_expediente ? ` · ${p.numero_expediente}` : ''}
                           </p>
@@ -281,6 +306,41 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
             </div>
 
             <div className="p-4 space-y-3">
+              {formError && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{formError}</p>}
+
+              {duplicateWarning && (
+                <div className="bg-amber-50 border border-amber-300 px-3 py-3 rounded-xl space-y-2">
+                  <p className="text-xs text-amber-800 font-medium">
+                    ⚠️ Ya existe un paciente: {duplicateWarning.nombre} {duplicateWarning.apellidos}
+                    {duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose()
+                        router.push(`/expediente/${duplicateWarning.id}`)
+                      }}
+                      className="flex-1 px-2 py-1.5 text-[11px] font-medium text-[#1e5fa8] bg-white border border-[#1e5fa8]/30 rounded-lg hover:bg-blue-50 transition-colors"
+                    >
+                      Ir al expediente existente
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDuplicateWarning(null)
+                        forceCreateRef.current = true
+                        const formEl = document.querySelector<HTMLFormElement>('form')
+                        if (formEl) formEl.requestSubmit()
+                      }}
+                      className="flex-1 px-2 py-1.5 text-[11px] font-medium text-amber-700 bg-white border border-amber-300 rounded-lg hover:bg-amber-50 transition-colors"
+                    >
+                      Crear de todos modos
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[11px] font-medium text-slate-500 block mb-1">Nombre <span className="text-red-400">*</span></label>
@@ -311,9 +371,14 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
                   type="date"
                   value={formFechaNac}
                   onChange={e => setFormFechaNac(e.target.value)}
+                  min={FECHA_MIN_NACIMIENTO}
+                  max={fechaHoyISO()}
                   required
                   className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
                 />
+                {formFechaNac && (
+                  <p className="text-[11px] text-[#1e5fa8] mt-1 font-medium">{calcularEdad(formFechaNac).textoElegante}</p>
+                )}
               </div>
               <label className="flex items-start gap-2 cursor-pointer">
                 <input

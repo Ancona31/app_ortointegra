@@ -1,7 +1,8 @@
 'use client'
 
 import { Paciente, Consulta, Laboratorio, Documento } from '@/types'
-import { differenceInYears, parseISO, format } from 'date-fns'
+import { parseISO, format } from 'date-fns'
+import { calcularEdad } from '@/lib/patientUtils'
 import { es } from 'date-fns/locale'
 import { FileDown } from 'lucide-react'
 import { PRINT_CSS, markdownToHtml } from '@/lib/printStyles'
@@ -87,7 +88,7 @@ const EXTRA_CSS = `
 export default function ExportarExpedienteButton({ paciente, consultas, labs, documentos, addendums = [] }: Props) {
   function exportar() {
     const edad = paciente.fecha_nacimiento
-      ? differenceInYears(new Date(), parseISO(paciente.fecha_nacimiento))
+      ? calcularEdad(paciente.fecha_nacimiento)
       : null
 
     const fechaExport = format(new Date(), "d 'de' MMMM 'de' yyyy", { locale: es })
@@ -122,7 +123,7 @@ export default function ExportarExpedienteButton({ paciente, consultas, labs, do
         ${paciente.numero_expediente ? `<div class="dato"><span class="dato-label">Expediente:</span> ${paciente.numero_expediente}</div>` : '<div></div>'}
         <div class="dato"><span class="dato-label">Sexo:</span> ${paciente.sexo === 'M' ? 'Masculino' : paciente.sexo === 'F' ? 'Femenino' : 'Otro'}</div>
         ${paciente.fecha_nacimiento ? `<div class="dato"><span class="dato-label">Fecha nac.:</span> ${format(parseISO(paciente.fecha_nacimiento), 'dd/MM/yyyy')}</div>` : '<div></div>'}
-        ${edad !== null ? `<div class="dato"><span class="dato-label">Edad:</span> ${edad} años</div>` : '<div></div>'}
+        ${edad !== null ? `<div class="dato"><span class="dato-label">Edad:</span> ${edad.textoElegante}</div>` : '<div></div>'}
         ${paciente.peso_kg ? `<div class="dato"><span class="dato-label">Peso:</span> ${paciente.peso_kg} kg</div>` : '<div></div>'}
         ${paciente.talla_cm ? `<div class="dato"><span class="dato-label">Talla:</span> ${paciente.talla_cm} cm</div>` : '<div></div>'}
         ${paciente.imc ? `<div class="dato"><span class="dato-label">IMC:</span> ${paciente.imc} kg/m²</div>` : '<div></div>'}

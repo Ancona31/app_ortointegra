@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import type { DuplicatePatientResponse } from '@/types'
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,6 +37,43 @@ export async function POST(req: NextRequest) {
           { error: `Has alcanzado el límite de ${clinica.max_pacientes} pacientes de tu plan. Actualiza tu plan para continuar.` },
           { status: 403 }
         )
+      }
+    }
+
+    // ── Detección de duplicados ─────────────────────────────────
+    const inputNombre = (body.nombre as string ?? '').trim().toLowerCase()
+    const inputApellidos = (body.apellidos as string ?? '').trim().toLowerCase()
+    const inputFechaNac: string | null = body.fecha_nacimiento ?? null
+
+    if (!body.forceCreate && inputNombre && inputApellidos && inputFechaNac) {
+      const { data: duplicado } = await supabase
+        .from('pacientes')
+        .select('id, nombre, apellidos, numero_expediente, fecha_nacimiento')
+        .eq('clinica_id', profile.clinica_id)
+        .eq('fecha_nacimiento', inputFechaNac)
+        .neq('activo', false)
+        .limit(1)
+
+      // Supabase no soporta LOWER(TRIM(...)) en .eq(), así que filtramos en JS
+      const match = (duplicado ?? []).find(
+        (p) =>
+          p.nombre.trim().toLowerCase() === inputNombre &&
+          p.apellidos.trim().toLowerCase() === inputApellidos,
+      )
+
+      if (match) {
+        const response: DuplicatePatientResponse = {
+          error: 'DUPLICATE_PATIENT',
+          existingPatient: {
+            id: match.id as string,
+            nombre: match.nombre as string,
+            apellidos: match.apellidos as string,
+            numero_expediente: (match.numero_expediente as string | null) ?? null,
+            fecha_nacimiento: (match.fecha_nacimiento as string | null) ?? null,
+          },
+          message: 'Ya existe un paciente con estos datos',
+        }
+        return NextResponse.json(response, { status: 409 })
       }
     }
 

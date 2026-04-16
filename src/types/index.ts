@@ -1,3 +1,16 @@
+// ─── Detección de duplicados ──────────────────────────────────────────────────
+export interface DuplicatePatientResponse {
+  error: 'DUPLICATE_PATIENT'
+  existingPatient: {
+    id: string
+    nombre: string
+    apellidos: string
+    numero_expediente: string | null
+    fecha_nacimiento: string | null
+  }
+  message: string
+}
+
 // ─── Paciente ─────────────────────────────────────────────────────────────────
 export interface Paciente {
   id: string

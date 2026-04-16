@@ -1,12 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, ChevronDown, Save, Hash, Mail, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { useProfile } from '@/hooks/useProfile'
 import { validarEmail, validarTelefono, formatearTelefono } from '@/lib/validaciones'
 import { secureStorage } from '@/lib/secureStorage'
+import { toTitleCase, fechaHoyISO, FECHA_MIN_NACIMIENTO } from '@/lib/patientUtils'
+import type { DuplicatePatientResponse } from '@/types'
 
 type Medico = {
   id: string
@@ -30,6 +32,8 @@ export default function NuevoPacientePage() {
   const [error, setError] = useState('')
   const [expandido, setExpandido] = useState(false)
   const [consentimiento, setConsentimiento] = useState(false)
+  const [duplicateWarning, setDuplicateWarning] = useState<{ id: string; nombre: string; apellidos: string; numero_expediente: string | null } | null>(null)
+  const forceCreateRef = useRef(false)
 
   const isSecretaria = profile?.role === 'secretaria'
 
@@ -106,11 +110,14 @@ export default function NuevoPacientePage() {
 
     const payload = {
       ...form,
+      nombre: toTitleCase(form.nombre ?? ''),
+      apellidos: toTitleCase(form.apellidos ?? ''),
       peso_kg: form.peso_kg ? Math.round(parseFloat(form.peso_kg) * 10) / 10 : null,
       talla_cm: tallaCm,
       imc: imc ? parseFloat(imc) : null,
       medico_id: isSecretaria ? medicoSeleccionado : undefined,
       consentimiento_otorgado: true,
+      ...(forceCreateRef.current ? { forceCreate: true } : {}),
     }
 
     // Intento online con try/catch
@@ -122,6 +129,19 @@ export default function NuevoPacientePage() {
       })
 
       const data = await res.json().catch(() => ({}))
+
+      if (res.status === 409 && (data as DuplicatePatientResponse).error === 'DUPLICATE_PATIENT') {
+        const dupData = data as DuplicatePatientResponse
+        setDuplicateWarning({
+          id: dupData.existingPatient.id,
+          nombre: dupData.existingPatient.nombre,
+          apellidos: dupData.existingPatient.apellidos,
+          numero_expediente: dupData.existingPatient.numero_expediente,
+        })
+        setLoading(false)
+        return
+      }
+
       if (!res.ok) {
         setError('Error al guardar: ' + (data.error || 'Error desconocido'))
         setLoading(false)
@@ -209,7 +229,7 @@ export default function NuevoPacientePage() {
             <div>
               <label className={labelCls}>Fecha de nacimiento <span className="text-red-400">*</span></label>
               <input type="date" value={form.fecha_nacimiento || ''} onChange={e => set('fecha_nacimiento', e.target.value)}
-                required className={inputCls} />
+                min={FECHA_MIN_NACIMIENTO} max={fechaHoyISO()} required className={inputCls} />
             </div>
             <div>
               <label className={labelCls}>Sexo <span className="text-red-400">*</span></label>
@@ -320,6 +340,37 @@ export default function NuevoPacientePage() {
             </div>
           )}
         </div>
+
+        {duplicateWarning && (
+          <div className="bg-amber-50 border border-amber-300 px-4 py-4 rounded-xl space-y-3">
+            <p className="text-sm text-amber-800 font-medium">
+              ⚠️ Ya existe un paciente: {duplicateWarning.nombre} {duplicateWarning.apellidos}
+              {duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => router.push(`/expediente/${duplicateWarning.id}`)}
+                className="flex-1 px-3 py-2 text-sm font-medium text-[#1e5fa8] bg-white border border-[#1e5fa8]/30 rounded-xl hover:bg-blue-50 transition-colors"
+              >
+                Ir al expediente existente
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDuplicateWarning(null)
+                  forceCreateRef.current = true
+                  // Re-submit programmatically
+                  const formEl = document.querySelector('form')
+                  if (formEl) formEl.requestSubmit()
+                }}
+                className="flex-1 px-3 py-2 text-sm font-medium text-amber-700 bg-white border border-amber-300 rounded-xl hover:bg-amber-50 transition-colors"
+              >
+                Crear de todos modos
+              </button>
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">{error}</div>
