@@ -222,3 +222,23 @@ export const VALORES_REFERENCIA = {
 } as const
 
 export type ParametroLab = keyof typeof VALORES_REFERENCIA
+
+// ─── Honorarios / Plantillas ─────────────────────────────────────────────────
+export interface AseguradoraInfo {
+  nombre: string
+  poliza: string
+  cobertura: string
+}
+
+export interface HonorariosTemplate {
+  id: string
+  nombre: string
+  contenido: {
+    tipoDoc: 'honorarios' | 'cotizacion'
+    lineas: { concepto: string; precio: number }[]
+    divisa: 'MXN' | 'USD'
+    formaPago: string
+    notas: string
+    aseguradora: AseguradoraInfo | null
+  }
+}

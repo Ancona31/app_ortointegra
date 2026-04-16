@@ -260,8 +260,14 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
             const dosisPersonalizada = (sup && peso > 0)
               ? (dosisEnCapsulas(sup, peso) ?? s.dosis)
               : s.dosis
+            // Convertir presentacion (objeto) a string para el PDF
+            const pres = sup?.presentacion
+            const presTexto = pres
+              ? `${pres.contenido} ${sup.unidad}/${pres.tipo}${pres.nota ? ` (${pres.nota})` : ''}`
+              : null
+
             return {
-              nombre: s.nombre, dosis: dosisPersonalizada, presentacion: sup?.presentacion ?? null,
+              nombre: s.nombre, dosis: dosisPersonalizada, presentacion: presTexto,
               beneficio_clinico: sup?.beneficio_clinico ?? '',
               beneficio_paciente: sup?.beneficio_paciente ?? '',
               justificacion: s.justificacion,
