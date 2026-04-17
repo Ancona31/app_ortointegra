@@ -130,10 +130,36 @@ interface Props {
   diagnosticoInicial?: string
   pacienteId?: string
   medicamentosIniciales?: MedicamentoConVia[]
+  offlineMode?: boolean
+  onOfflineSave?: () => void
 }
 
-export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, medicamentosIniciales }: Props) {
-  const { medicoInfo } = useMedicoInfo()
+export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, medicamentosIniciales, offlineMode, onOfflineSave }: Props) {
+  const { medicoInfo: onlineMedicoInfo } = useMedicoInfo()
+
+  // In offline mode, read doctor profile from localStorage (pre-fetched with Base64 assets)
+  const offlineProfile = offlineMode ? (() => {
+    try {
+      const raw = localStorage.getItem('spinus_doctor_profile')
+      return raw ? JSON.parse(raw) : null
+    } catch { return null }
+  })() : null
+
+  const medicoInfo = offlineMode && offlineProfile ? {
+    ...onlineMedicoInfo,
+    nombre: offlineProfile.nombre,
+    especialidad: offlineProfile.especialidad,
+    cedula_profesional: offlineProfile.cedula_profesional,
+    cedula_especialidad: offlineProfile.cedula_especialidad,
+    universidad: offlineProfile.universidad,
+    direccion_consultorio: offlineProfile.direccion_consultorio,
+    telefono_consultorio: offlineProfile.telefono_consultorio,
+    color_primario: offlineProfile.color_primario,
+    color_secundario: offlineProfile.color_secundario,
+    logo_url: offlineProfile.logo_base64,
+    firma_url: offlineProfile.firma_base64,
+    clinica_nombre: offlineProfile.clinica_nombre,
+  } : onlineMedicoInfo
   const { isSuperAdmin } = useProfile()
   const toast = useToast()
   const [paciente, setPaciente] = useState(pacienteInicial)
@@ -311,20 +337,36 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 
       pdfGenerated = true
 
-      // 4. Persistencia — insertar directamente en Supabase
-      const supabase = createClient()
-      const insertPayload: Record<string, unknown> = {
-        tipo: 'receta',
-        contenido,
-        client_id: folio,
-        pdf_url: storagePath,
+      // 4. Persistencia
+      if (offlineMode) {
+        const { addDocument } = await import('@/lib/offline/db')
+        const { getOfflineIdentity } = await import('@/lib/offline/identity')
+        await addDocument({
+          id: crypto.randomUUID(),
+          temp_patient_id: pacienteId ?? 'unknown',
+          tipo: 'receta',
+          contenido,
+          created_at: new Date().toISOString(),
+          medico_id: getOfflineIdentity()?.userId ?? 'anonymous',
+          _syncStatus: 'pending',
+        })
+        toast.success('Receta guardada en bunker offline')
+        onOfflineSave?.()
+      } else {
+        const supabase = createClient()
+        const insertPayload: Record<string, unknown> = {
+          tipo: 'receta',
+          contenido,
+          client_id: folio,
+          pdf_url: storagePath,
+        }
+        if (pacienteId) insertPayload.paciente_id = pacienteId
+
+        const { error } = await supabase.from('documentos').insert(insertPayload)
+        if (error) throw error
+
+        toast.success('Receta guardada')
       }
-      if (pacienteId) insertPayload.paciente_id = pacienteId
-
-      const { error } = await supabase.from('documentos').insert(insertPayload)
-      if (error) throw error
-
-      toast.success('Receta guardada')
     } catch (err) {
       if (!pdfGenerated) {
         // El error ocurrió antes/durante el PDF → ningún orphan record

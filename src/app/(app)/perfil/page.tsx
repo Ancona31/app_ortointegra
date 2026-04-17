@@ -10,6 +10,7 @@ import EspecialidadSelector from '@/components/ui/EspecialidadSelector'
 import { validarTelefono, validarCedula, formatearTelefono } from '@/lib/validaciones'
 import FirmaCaptura from '@/components/perfil/FirmaCaptura'
 import { compressLogoImage } from '@/lib/compressImage'
+import { syncDoctorProfile } from '@/lib/offline/doctorProfile'
 
 type FormData = {
   titulo: string
@@ -177,6 +178,10 @@ export default function PerfilPage() {
       toast.error(d.error || 'Error al guardar')
     } else {
       toast.success('Cambios guardados correctamente')
+      // Sincronizar perfil para el módulo Offline-Mode
+      fetch('/api/me/perfil-medico').then(r => r.json()).then(d => {
+        if (d.medico) syncDoctorProfile(d.medico).catch(() => {})
+      }).catch(() => {})
     }
   }
 

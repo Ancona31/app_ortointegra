@@ -2,6 +2,7 @@ import useSWR from 'swr'
 import { useEffect } from 'react'
 import { MedicoInfo } from '@/types'
 import { secureStorage } from '@/lib/secureStorage'
+import { syncDoctorProfile } from '@/lib/offline/doctorProfile'
 
 const CACHE_KEY = 'cache_medico_info'
 
@@ -18,6 +19,8 @@ export function useMedicoInfo() {
       onSuccess: (d) => {
         // Cachear en secureStorage como respaldo offline
         secureStorage.set(CACHE_KEY, d)
+        // Sincronizar perfil para el módulo Offline-Mode (logo+firma→Base64)
+        syncDoctorProfile(d).catch(() => {})
       },
       onError: async () => {
         // Si no se puede hablar con el servidor, no hacer nada aquí —

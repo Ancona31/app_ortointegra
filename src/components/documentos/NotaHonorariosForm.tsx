@@ -10,13 +10,17 @@ import { useToast } from '@/components/ui/Toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
-import { useAuth } from '@/lib/auth-context'
-import { useProfile } from '@/hooks/useProfile'
 import type { AseguradoraInfo, HonorariosTemplate } from '@/types'
 
 interface Props {
   pacienteInicial?: string
   pacienteId?: string
+  offlineMode?: boolean
+  onOfflineSave?: () => void
+  /** userId del médico — si no se pasa, las plantillas se deshabilitan */
+  userId?: string | null
+  /** clinicaId — necesario para guardar plantillas */
+  clinicaId?: string | null
 }
 
 interface LineaConcepto {
@@ -67,10 +71,49 @@ function isFormEmpty(lineas: LineaConcepto[], paciente: string, notas: string, p
   )
 }
 
-export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }: Props) {
-  const { medicoInfo } = useMedicoInfo()
-  const { userId } = useAuth()
-  const { profile } = useProfile()
+export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, offlineMode, onOfflineSave, userId, clinicaId }: Props) {
+  const { medicoInfo: onlineMedicoInfo } = useMedicoInfo()
+
+  // In offline mode, read doctor profile from localStorage (pre-fetched with Base64 assets)
+  const offlineProfile = offlineMode ? (() => {
+    try {
+      const raw = localStorage.getItem('spinus_doctor_profile')
+      return raw ? JSON.parse(raw) : null
+    } catch { return null }
+  })() : null
+
+  const medicoInfo = offlineMode && offlineProfile ? {
+    ...onlineMedicoInfo,
+    nombre: offlineProfile.nombre,
+    especialidad: offlineProfile.especialidad,
+    cedula_profesional: offlineProfile.cedula_profesional,
+    cedula_especialidad: offlineProfile.cedula_especialidad,
+    universidad: offlineProfile.universidad,
+    direccion_consultorio: offlineProfile.direccion_consultorio,
+    telefono_consultorio: offlineProfile.telefono_consultorio,
+    color_primario: offlineProfile.color_primario,
+    color_secundario: offlineProfile.color_secundario,
+    logo_url: offlineProfile.logo_base64,
+    firma_url: offlineProfile.firma_base64,
+    clinica_nombre: offlineProfile.clinica_nombre,
+  } : onlineMedicoInfo
+
+  // Resolver userId/clinicaId: props > localStorage (funciona con y sin AuthProvider)
+  const resolvedUserId = userId ?? (() => {
+    try {
+      const raw = localStorage.getItem('spinus_session_meta')
+      return raw ? (JSON.parse(raw) as { userId?: string }).userId ?? null : null
+    } catch { return null }
+  })()
+  const resolvedClinicaId = clinicaId ?? (() => {
+    try {
+      const raw = localStorage.getItem('spinus_sec_cache_user_profile')
+      if (!raw) return null
+      // secureStorage cifra — no podemos leer directo. Fallback: null
+      return null
+    } catch { return null }
+  })()
+
   const toast = useToast()
 
   // ─── Form state ────────────────────────────────────────────────────────────
@@ -178,7 +221,7 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
   }
 
   async function doSaveTemplate(name: string, existingId?: string): Promise<void> {
-    if (!userId || !profile?.clinica_id) {
+    if (!resolvedUserId || !resolvedClinicaId) {
       toast.error('No se pudo determinar tu usuario o clínica')
       return
     }
@@ -196,7 +239,7 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
       } else {
         const { error } = await supabase
           .from('plantillas_honorarios')
-          .insert({ user_id: userId, clinica_id: profile.clinica_id, nombre: name, contenido })
+          .insert({ user_id: resolvedUserId, clinica_id: resolvedClinicaId, nombre: name, contenido })
         if (error) throw error
       }
 
@@ -346,20 +389,36 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
 
       pdfGenerated = true
 
-      const supabase = createClient()
-      const insertPayload: Record<string, unknown> = {
-        tipo: 'nota_honorarios',
-        contenido,
-        client_id: clientId,
-        pdf_url: storagePath,
+      if (offlineMode) {
+        const { addDocument } = await import('@/lib/offline/db')
+        const { getOfflineIdentity } = await import('@/lib/offline/identity')
+        await addDocument({
+          id: crypto.randomUUID(),
+          temp_patient_id: pacienteId ?? 'unknown',
+          tipo: 'nota_honorarios',
+          contenido,
+          created_at: new Date().toISOString(),
+          medico_id: getOfflineIdentity()?.userId ?? 'anonymous',
+          _syncStatus: 'pending',
+        })
+        toast.success('Nota de honorarios guardada en bunker offline')
+        onOfflineSave?.()
+      } else {
+        const supabase = createClient()
+        const insertPayload: Record<string, unknown> = {
+          tipo: 'nota_honorarios',
+          contenido,
+          client_id: clientId,
+          pdf_url: storagePath,
+        }
+        if (pacienteId) insertPayload.paciente_id = pacienteId
+
+        const { error } = await supabase.from('documentos').insert(insertPayload)
+        if (error) throw error
+
+        const docLabel = tipoDoc === 'cotizacion' ? 'Cotizacion' : 'Recibo'
+        toast.success(docLabel + ' guardado')
       }
-      if (pacienteId) insertPayload.paciente_id = pacienteId
-
-      const { error } = await supabase.from('documentos').insert(insertPayload)
-      if (error) throw error
-
-      const docLabel = tipoDoc === 'cotizacion' ? 'Cotizacion' : 'Recibo'
-      toast.success(docLabel + ' guardado')
     } catch (err) {
       if (!pdfGenerated) {
         toast.error('No se pudo generar el PDF. Intenta de nuevo.')

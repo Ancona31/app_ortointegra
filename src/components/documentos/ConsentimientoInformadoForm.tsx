@@ -15,6 +15,8 @@ interface Props {
   pacienteInicial?: string
   pacienteId?: string
   diagnosticoInicial?: string
+  offlineMode?: boolean
+  onOfflineSave?: () => void
 }
 
 const SECCIONES_DEFAULT = {
@@ -82,8 +84,32 @@ function SeccionCard({
   )
 }
 
-export default function ConsentimientoInformadoForm({ pacienteInicial = '', pacienteId, diagnosticoInicial = '' }: Props) {
-  const { medicoInfo } = useMedicoInfo()
+export default function ConsentimientoInformadoForm({ pacienteInicial = '', pacienteId, diagnosticoInicial = '', offlineMode, onOfflineSave }: Props) {
+  const { medicoInfo: onlineMedicoInfo } = useMedicoInfo()
+
+  // In offline mode, read doctor profile from localStorage (pre-fetched with Base64 assets)
+  const offlineProfile = offlineMode ? (() => {
+    try {
+      const raw = localStorage.getItem('spinus_doctor_profile')
+      return raw ? JSON.parse(raw) : null
+    } catch { return null }
+  })() : null
+
+  const medicoInfo = offlineMode && offlineProfile ? {
+    ...onlineMedicoInfo,
+    nombre: offlineProfile.nombre,
+    especialidad: offlineProfile.especialidad,
+    cedula_profesional: offlineProfile.cedula_profesional,
+    cedula_especialidad: offlineProfile.cedula_especialidad,
+    universidad: offlineProfile.universidad,
+    direccion_consultorio: offlineProfile.direccion_consultorio,
+    telefono_consultorio: offlineProfile.telefono_consultorio,
+    color_primario: offlineProfile.color_primario,
+    color_secundario: offlineProfile.color_secundario,
+    logo_url: offlineProfile.logo_base64,
+    firma_url: offlineProfile.firma_base64,
+    clinica_nombre: offlineProfile.clinica_nombre,
+  } : onlineMedicoInfo
   const toast = useToast()
 
   // Campos de identificación
@@ -194,20 +220,36 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
 
       pdfGenerated = true
 
-      // 5. Persistencia — insertar directamente en Supabase
-      const supabase = createClient()
-      const insertPayload: Record<string, unknown> = {
-        tipo: 'consentimiento_informado',
-        contenido,
-        client_id: clientId,
-        pdf_url: storagePath,
+      // 5. Persistencia
+      if (offlineMode) {
+        const { addDocument } = await import('@/lib/offline/db')
+        const { getOfflineIdentity } = await import('@/lib/offline/identity')
+        await addDocument({
+          id: crypto.randomUUID(),
+          temp_patient_id: pacienteId ?? 'unknown',
+          tipo: 'consentimiento_informado',
+          contenido,
+          created_at: new Date().toISOString(),
+          medico_id: getOfflineIdentity()?.userId ?? 'anonymous',
+          _syncStatus: 'pending',
+        })
+        toast.success('Consentimiento informado guardado en bunker offline')
+        onOfflineSave?.()
+      } else {
+        const supabase = createClient()
+        const insertPayload: Record<string, unknown> = {
+          tipo: 'consentimiento_informado',
+          contenido,
+          client_id: clientId,
+          pdf_url: storagePath,
+        }
+        if (pacienteId) insertPayload.paciente_id = pacienteId
+
+        const { error } = await supabase.from('documentos').insert(insertPayload)
+        if (error) throw error
+
+        toast.success('Consentimiento guardado')
       }
-      if (pacienteId) insertPayload.paciente_id = pacienteId
-
-      const { error } = await supabase.from('documentos').insert(insertPayload)
-      if (error) throw error
-
-      toast.success('Consentimiento guardado')
     } catch (err) {
       if (!pdfGenerated) {
         toast.error('No se pudo generar el PDF. Intenta de nuevo.')

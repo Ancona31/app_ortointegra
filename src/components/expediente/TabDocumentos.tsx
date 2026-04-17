@@ -5,7 +5,7 @@ import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
   AlertTriangle, Banknote, BedDouble, ClipboardList, Download, Eye, File,
-  FileText, FlaskConical, PenLine, Pill, ScanLine, ShieldCheck, Trash2,
+  FileText, FlaskConical, Loader2, PenLine, Pill, RefreshCw, ScanLine, ShieldCheck, Trash2,
 } from 'lucide-react'
 import Portal from '@/components/ui/Portal'
 import Link from 'next/link'
@@ -65,6 +65,57 @@ export default function TabDocumentos({ id, documentos, onVerDocumento, onElimin
     }
   }
 
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null)
+
+  async function regenerarYSubirPdf(doc: Documento) {
+    if (!doc.contenido || regeneratingId) return
+    setRegeneratingId(doc.id)
+    try {
+      const { generarPdf } = await import('@/lib/mobileShare')
+      const { getDoctorProfile } = await import('@/lib/offline/doctorProfile')
+      const profile = getDoctorProfile()
+
+      const medicoData = profile ? {
+        nombre: profile.nombre,
+        especialidad: profile.especialidad,
+        cedula_profesional: profile.cedula_profesional,
+        cedula_especialidad: profile.cedula_especialidad,
+        color_primario: profile.color_primario,
+        color_secundario: profile.color_secundario,
+        direccion_consultorio: profile.direccion_consultorio,
+        telefono_consultorio: profile.telefono_consultorio,
+        firma_url: profile.firma_base64,
+      } : null
+
+      const logoUrl = profile?.logo_base64 ?? undefined
+      const pacienteNombre = (doc.contenido as Record<string, unknown>).paciente as string ?? 'documento'
+
+      const { generateDocFileName } = await import('@/lib/patientUtils')
+      const tipoLabel = doc.tipo.replace(/_/g, '-')
+
+      const { storagePath } = await generarPdf({
+        tipo: doc.tipo,
+        medico: medicoData,
+        data: doc.contenido as Record<string, unknown>,
+        logoUrl,
+        filename: generateDocFileName(pacienteNombre, tipoLabel),
+        pacienteId: doc.paciente_id ?? undefined,
+      })
+
+      // Actualizar pdf_url en Supabase
+      if (storagePath) {
+        const supabase = createClient()
+        await supabase.from('documentos').update({ pdf_url: storagePath }).eq('id', doc.id)
+        // Mutar el doc localmente para que el botón cambie sin refetch
+        doc.pdf_url = storagePath
+      }
+    } catch (err) {
+      console.error('[TabDocumentos] regenerarPdf:', err)
+    } finally {
+      setRegeneratingId(null)
+    }
+  }
+
   return (
     <>
     <div className="space-y-3">
@@ -116,7 +167,7 @@ export default function TabDocumentos({ id, documentos, onVerDocumento, onElimin
                   </p>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  {doc.pdf_url && (
+                  {doc.pdf_url ? (
                     <button
                       onClick={() => descargarPdf(doc.pdf_url!)}
                       className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 font-medium px-2 py-1.5 rounded-lg hover:bg-emerald-50 transition-colors"
@@ -124,7 +175,16 @@ export default function TabDocumentos({ id, documentos, onVerDocumento, onElimin
                     >
                       <Download size={14} />
                     </button>
-                  )}
+                  ) : doc.contenido ? (
+                    <button
+                      onClick={() => regenerarYSubirPdf(doc)}
+                      disabled={regeneratingId === doc.id}
+                      className="flex items-center gap-1 text-xs text-[#1e5fa8] hover:text-[#1a3a5c] font-medium px-2 py-1.5 rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-50"
+                      title="Generar PDF"
+                    >
+                      {regeneratingId === doc.id ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                    </button>
+                  ) : null}
                   <button
                     onClick={() => onVerDocumento(doc)}
                     className="flex items-center gap-1 text-xs text-[#1e5fa8] hover:text-[#1a3a5c] font-medium px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors"

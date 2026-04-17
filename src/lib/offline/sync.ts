@@ -1,13 +1,12 @@
 /**
  * Sync-Bridge — Motor de reconciliación offline → Supabase.
  *
- * Este es el ÚNICO archivo del módulo offline que importa Supabase.
- * Solo se ejecuta cuando hay red disponible.
+ * Flujo en 3 fases:
+ *   1. Detectar matches: busca pacientes existentes con mismo nombre+fecha
+ *   2. Resolver matches: el médico confirma cada match o crea nuevo
+ *   3. Sincronizar documentos: resuelve temp_id → real_id y sube
  *
- * Flujo:
- * 1. Leer pacientes pending → buscar duplicados → crear o mapear ID
- * 2. Leer documentos pending → resolver temp_patient_id → crear en Supabase
- * 3. Marcar registros como synced o error
+ * Este es el ÚNICO archivo del módulo offline que importa Supabase.
  */
 
 import { createClient } from '@/lib/supabase/client'
@@ -15,31 +14,85 @@ import { toTitleCase } from '@/lib/patientUtils'
 import {
   getPendingPatients, getPendingDocuments,
   updatePatientStatus, updateDocumentStatus,
+  getAllPatients,
 } from './db'
-import type { SyncResult } from './types'
+import type { SyncResult, PendingMatch } from './types'
 
-export async function syncOfflineVault(medicoId?: string): Promise<SyncResult> {
+/**
+ * Fase 1: Detectar matches sin crear nada.
+ * Retorna los pacientes que tienen coincidencia en Supabase
+ * para que el médico confirme antes de vincular.
+ */
+export async function detectMatches(medicoId?: string): Promise<{
+  matches: PendingMatch[]
+  newPatients: string[]
+}> {
   const supabase = createClient()
-  const result: SyncResult = {
-    patients: { total: 0, synced: 0, errors: 0 },
-    documents: { total: 0, synced: 0, errors: 0 },
+  const pendingPatients = await getPendingPatients(medicoId)
+  const matches: PendingMatch[] = []
+  const newPatients: string[] = []
+
+  for (const patient of pendingPatients) {
+    const nombreNorm = toTitleCase(patient.nombre)
+    const apellidosNorm = toTitleCase(patient.apellidos)
+
+    const { data: existing } = await supabase
+      .from('pacientes')
+      .select('id, numero_expediente')
+      .ilike('nombre', nombreNorm)
+      .ilike('apellidos', apellidosNorm)
+      .eq('fecha_nacimiento', patient.fecha_nacimiento)
+      .neq('activo', false)
+      .limit(1)
+
+    if (existing && existing.length > 0) {
+      matches.push({
+        tempId: patient.id,
+        tempNombre: nombreNorm,
+        tempApellidos: apellidosNorm,
+        tempFechaNac: patient.fecha_nacimiento,
+        existingId: existing[0].id,
+        existingNumeroExpediente: existing[0].numero_expediente ?? null,
+      })
+    } else {
+      newPatients.push(patient.id)
+    }
   }
 
-  // ── Paso 1: Sincronizar pacientes ──
+  return { matches, newPatients }
+}
+
+/**
+ * Fase 2+3: Sincronizar con decisiones del médico ya tomadas.
+ *
+ * @param decisions — mapeo tempId → 'link' (vincular al existente) o 'create' (crear nuevo)
+ */
+export async function syncOfflineVault(
+  medicoId?: string,
+  decisions?: Map<string, 'link' | 'create'>,
+): Promise<SyncResult> {
+  const supabase = createClient()
+  const result: SyncResult = {
+    patients: { total: 0, synced: 0, errors: 0, matched: 0 },
+    documents: { total: 0, synced: 0, errors: 0 },
+    pendingMatches: [],
+  }
+
+  // ── Sincronizar pacientes ──
   const pendingPatients = await getPendingPatients(medicoId)
   result.patients.total = pendingPatients.length
 
-  const idMap = new Map<string, string>() // temp_id → real_id
+  const idMap = new Map<string, string>()
 
   for (const patient of pendingPatients) {
     try {
       const nombreNorm = toTitleCase(patient.nombre)
       const apellidosNorm = toTitleCase(patient.apellidos)
 
-      // Buscar duplicado por nombre + apellidos + fecha_nacimiento
+      // Buscar duplicado
       const { data: existing } = await supabase
         .from('pacientes')
-        .select('id')
+        .select('id, numero_expediente')
         .ilike('nombre', nombreNorm)
         .ilike('apellidos', apellidosNorm)
         .eq('fecha_nacimiento', patient.fecha_nacimiento)
@@ -47,11 +100,31 @@ export async function syncOfflineVault(medicoId?: string): Promise<SyncResult> {
         .limit(1)
 
       if (existing && existing.length > 0) {
-        // Paciente ya existe → mapear sin crear duplicado
-        idMap.set(patient.id, existing[0].id)
-        await updatePatientStatus(patient.id, 'synced', { _realId: existing[0].id })
-        result.patients.synced++
-        continue
+        const decision = decisions?.get(patient.id)
+
+        if (!decision) {
+          // Sin decisión → agregar a pendingMatches para que la UI pregunte
+          result.pendingMatches.push({
+            tempId: patient.id,
+            tempNombre: nombreNorm,
+            tempApellidos: apellidosNorm,
+            tempFechaNac: patient.fecha_nacimiento,
+            existingId: existing[0].id,
+            existingNumeroExpediente: existing[0].numero_expediente ?? null,
+          })
+          continue
+        }
+
+        if (decision === 'link') {
+          // Vincular al existente
+          idMap.set(patient.id, existing[0].id)
+          await updatePatientStatus(patient.id, 'synced', { _realId: existing[0].id })
+          result.patients.synced++
+          result.patients.matched++
+          continue
+        }
+
+        // decision === 'create' → caer al flujo de creación abajo
       }
 
       // Paciente nuevo → crear via API
@@ -66,7 +139,7 @@ export async function syncOfflineVault(medicoId?: string): Promise<SyncResult> {
           telefono: patient.telefono,
           email: patient.email,
           consentimiento_otorgado: true,
-          forceCreate: true, // Skip duplicate warning
+          forceCreate: true,
         }),
       })
 
@@ -86,26 +159,66 @@ export async function syncOfflineVault(medicoId?: string): Promise<SyncResult> {
     }
   }
 
-  // ── Paso 2: Sincronizar documentos ──
+  // Si hay matches pendientes, no sincronizar documentos de esos pacientes
+  if (result.pendingMatches.length > 0) {
+    return result
+  }
+
+  // Poblar idMap con pacientes ya synced de ejecuciones anteriores
+  // (sus _realId se guardaron en IndexedDB al sincronizarse)
+  const allPatients = await getAllPatients(medicoId)
+  for (const p of allPatients) {
+    if (p._syncStatus === 'synced' && p._realId && !idMap.has(p.id)) {
+      idMap.set(p.id, p._realId)
+    }
+  }
+
+  // ── Sincronizar documentos ──
   const pendingDocs = await getPendingDocuments(medicoId)
   result.documents.total = pendingDocs.length
 
   for (const doc of pendingDocs) {
     try {
-      // Resolver temp_patient_id → real_id
       const realPatientId = idMap.get(doc.temp_patient_id)
       if (!realPatientId) {
         throw new Error('Paciente no sincronizado aún')
       }
 
-      const { error } = await supabase.from('documentos').insert({
-        tipo: doc.tipo === 'nota_medica' ? 'informe_clinico' : doc.tipo,
-        contenido: doc.contenido,
-        paciente_id: realPatientId,
-        client_id: doc.id, // Idempotencia
-      })
+      const contenido = doc.contenido as Record<string, unknown>
 
-      if (error) throw new Error(error.message)
+      if (doc.tipo === 'nota_medica') {
+        const res = await fetch('/api/consultas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            paciente_id: realPatientId,
+            motivo_consulta: contenido.motivo_consulta ?? null,
+            exploracion_fisica: contenido.exploracion_fisica ?? null,
+            diagnosticos: contenido.diagnosticos
+              ? [{ descripcion: contenido.diagnosticos as string }]
+              : [],
+            plan_tratamiento: contenido.plan_tratamiento ?? null,
+            notas_evolucion: contenido.texto ?? null,
+            proxima_cita: null,
+            medicamentos: null,
+            nota_origen: 'manual',
+          }),
+        })
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Unknown' }))
+          throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`)
+        }
+      } else {
+        const { error } = await supabase.from('documentos').insert({
+          tipo: doc.tipo,
+          contenido,
+          paciente_id: realPatientId,
+          client_id: doc.id,
+        })
+
+        if (error) throw new Error(error.message)
+      }
 
       await updateDocumentStatus(doc.id, 'synced')
       result.documents.synced++

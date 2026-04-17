@@ -7,7 +7,7 @@ import {
   ClipboardList, BedDouble, PenLine, ShieldCheck, Receipt,
   CalendarDays, BarChart2, Users, CreditCard, UserCircle,
   HelpCircle, ChevronRight, Menu, X, LogOut, Moon, Sun,
-  Building2, TrendingUp, UserPlus, LayoutDashboard,
+  Building2, TrendingUp, UserPlus, LayoutDashboard, WifiOff,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -92,6 +92,7 @@ function navDoctor(isAdmin: boolean, isSuperAdmin: boolean): NavSection[] {
     { kind: 'divider' },
     { kind: 'leaf', href: '/perfil',  label: 'Mi perfil', icon: UserCircle },
     { kind: 'leaf', href: '/ayuda',   label: 'Ayuda',     icon: HelpCircle },
+    { kind: 'leaf', href: '/offline-mode', label: 'Modo Offline', icon: WifiOff },
   ]
 }
 
@@ -109,6 +110,7 @@ function navSecretaria(): NavSection[] {
     { kind: 'leaf', href: '/agenda', label: 'Agenda', icon: CalendarDays },
     { kind: 'divider' },
     { kind: 'leaf', href: '/perfil', label: 'Mi perfil', icon: UserCircle },
+    { kind: 'leaf', href: '/offline-mode', label: 'Modo Offline', icon: WifiOff },
   ]
 }
 

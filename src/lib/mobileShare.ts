@@ -198,9 +198,10 @@ export async function generarPdf(params: {
     const pdfBlob = new Blob([rawBlob], { type: 'application/pdf' })
     console.log('[generarPdf] 3/6 blob generado — size:', pdfBlob.size, 'bytes')
 
-    // ── Fase 5: upload a Storage (si hay pacienteId) ──
+    // ── Fase 5: upload a Storage (si hay pacienteId Y hay red) ──
     let storagePath: string | null = null
-    if (pacienteId) {
+    const hasNetwork = typeof navigator === 'undefined' || navigator.onLine !== false
+    if (pacienteId && hasNetwork) {
       phase = 'subiendo a Storage'
       try {
         const { createClient } = await import('@/lib/supabase/client')

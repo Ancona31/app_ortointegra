@@ -165,10 +165,36 @@ interface Props {
   pacienteInicial?: string
   diagnosticoInicial?: string
   pacienteId?: string
+  offlineMode?: boolean
+  onOfflineSave?: () => void
 }
 
-export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId }: Props) {
-  const { medicoInfo } = useMedicoInfo()
+export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, offlineMode, onOfflineSave }: Props) {
+  const { medicoInfo: onlineMedicoInfo } = useMedicoInfo()
+
+  // In offline mode, read doctor profile from localStorage (pre-fetched with Base64 assets)
+  const offlineProfile = offlineMode ? (() => {
+    try {
+      const raw = localStorage.getItem('spinus_doctor_profile')
+      return raw ? JSON.parse(raw) : null
+    } catch { return null }
+  })() : null
+
+  const medicoInfo = offlineMode && offlineProfile ? {
+    ...onlineMedicoInfo,
+    nombre: offlineProfile.nombre,
+    especialidad: offlineProfile.especialidad,
+    cedula_profesional: offlineProfile.cedula_profesional,
+    cedula_especialidad: offlineProfile.cedula_especialidad,
+    universidad: offlineProfile.universidad,
+    direccion_consultorio: offlineProfile.direccion_consultorio,
+    telefono_consultorio: offlineProfile.telefono_consultorio,
+    color_primario: offlineProfile.color_primario,
+    color_secundario: offlineProfile.color_secundario,
+    logo_url: offlineProfile.logo_base64,
+    firma_url: offlineProfile.firma_base64,
+    clinica_nombre: offlineProfile.clinica_nombre,
+  } : onlineMedicoInfo
   const { isSuperAdmin } = useProfile()
   const toast = useToast()
   const [paciente, setPaciente] = useState(pacienteInicial)
@@ -285,25 +311,42 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
 
       pdfGenerated = true
 
-      // 4. Persistencia — CONDICIONAL a pacienteId
-      if (pacienteId) {
-        const supabase = createClient()
-        const insertPayload: Record<string, unknown> = {
+      // 4. Persistencia
+      if (offlineMode) {
+        const { addDocument } = await import('@/lib/offline/db')
+        const { getOfflineIdentity } = await import('@/lib/offline/identity')
+        await addDocument({
+          id: crypto.randomUUID(),
+          temp_patient_id: pacienteId ?? 'unknown',
           tipo: 'plan_suplementacion',
           contenido,
-          client_id: clientId,
-          paciente_id: pacienteId,
-          pdf_url: storagePath,
+          created_at: new Date().toISOString(),
+          medico_id: getOfflineIdentity()?.userId ?? 'anonymous',
+          _syncStatus: 'pending',
+        })
+        toast.success('Plan de suplementacion guardado en bunker offline')
+        onOfflineSave?.()
+      } else {
+        // Persistencia — CONDICIONAL a pacienteId
+        if (pacienteId) {
+          const supabase = createClient()
+          const insertPayload: Record<string, unknown> = {
+            tipo: 'plan_suplementacion',
+            contenido,
+            client_id: clientId,
+            paciente_id: pacienteId,
+            pdf_url: storagePath,
+          }
+
+          const { error } = await supabase.from('documentos').insert(insertPayload)
+          if (error) throw error
         }
 
-        const { error } = await supabase.from('documentos').insert(insertPayload)
-        if (error) throw error
-      }
-
-      if (!pacienteId) {
-        toast.success('Plan generado')
-      } else {
-        toast.success('Plan guardado')
+        if (!pacienteId) {
+          toast.success('Plan generado')
+        } else {
+          toast.success('Plan guardado')
+        }
       }
     } catch (err) {
       if (!pdfGenerated) {

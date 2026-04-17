@@ -409,7 +409,7 @@ export default function DashboardPage() {
       {recientes.length > 0 && (
         <div className="animate-slide-up pb-6" style={{ animationDelay: '180ms' }}>
           <div className="flex items-center justify-between mb-3">
-            <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest">Recientes</p>
+            <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest">Consultas recientes</p>
             <Link href="/expediente" className="text-[11px] text-[#1e5fa8] hover:underline">
               Ver todos →
             </Link>
