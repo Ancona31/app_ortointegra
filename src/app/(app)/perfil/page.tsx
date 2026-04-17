@@ -16,6 +16,7 @@ type FormData = {
   especialidad: string
   cedula_profesional: string
   cedula_especialidad: string
+  universidad: string
   direccion_consultorio: string
   telefono_consultorio: string
 }
@@ -49,7 +50,7 @@ export default function PerfilPage() {
 
   const [form, setForm] = useState<FormData>({
     titulo: '', especialidad: '', cedula_profesional: '',
-    cedula_especialidad: '', direccion_consultorio: '', telefono_consultorio: '',
+    cedula_especialidad: '', universidad: '', direccion_consultorio: '', telefono_consultorio: '',
   })
   const [especialidades, setEspecialidades] = useState<string[]>([''])
   const [apariencia, setApariencia] = useState<Apariencia>({
@@ -90,6 +91,7 @@ export default function PerfilPage() {
           especialidad: espRaw,
           cedula_profesional: perfilData.medico.cedula_profesional || '',
           cedula_especialidad: perfilData.medico.cedula_especialidad || '',
+          universidad: perfilData.medico.universidad || '',
           direccion_consultorio: perfilData.medico.direccion_consultorio || '',
           telefono_consultorio: perfilData.medico.telefono_consultorio || '',
         })
@@ -236,6 +238,12 @@ export default function PerfilPage() {
                   <p className="text-[10px] text-red-500 mt-1">{validarCedula(form.cedula_especialidad)}</p>
                 )}
               </div>
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Universidad / Institución</label>
+              <input type="text" value={form.universidad}
+                onChange={e => setForm({ ...form, universidad: e.target.value })}
+                placeholder="Ej: Universidad Nacional Autónoma de México" className={inputClass} />
             </div>
           </div>
         </div>

@@ -3,9 +3,13 @@
 import { useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { AlertTriangle, ClipboardList, Eye, FileText, FlaskConical, Pill, ScanLine, Trash2 } from 'lucide-react'
+import {
+  AlertTriangle, Banknote, BedDouble, ClipboardList, Download, Eye, File,
+  FileText, FlaskConical, PenLine, Pill, ScanLine, ShieldCheck, Trash2,
+} from 'lucide-react'
 import Portal from '@/components/ui/Portal'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 
 const TIPO_DOC_LABEL: Record<string, string> = {
   receta: 'Receta',
@@ -16,7 +20,7 @@ const TIPO_DOC_LABEL: Record<string, string> = {
   escrito_medico: 'Escrito Médico',
   solicitud_internamiento: 'Solicitud de Internamiento',
   consentimiento_informado: 'Consentimiento Informado',
-  nota_honorarios: 'Nota de Honorarios',
+  nota_honorarios: 'Honorarios / Cotización',
 }
 const TIPO_DOC_COLOR: Record<string, string> = {
   receta: 'bg-blue-100 text-blue-700',
@@ -45,6 +49,22 @@ interface Props {
 export default function TabDocumentos({ id, documentos, onVerDocumento, onEliminarDocumento, hayMas, cargandoMas, onCargarMas }: Props) {
   const [docAEliminar, setDocAEliminar] = useState<{ id: string; tipo: string } | null>(null)
 
+  async function descargarPdf(pdfUrl: string) {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.storage
+        .from('documentos-pdf')
+        .createSignedUrl(pdfUrl, 900) // 15 min
+      if (error || !data?.signedUrl) {
+        console.error('[TabDocumentos] signed URL error:', error?.message)
+        return
+      }
+      window.open(data.signedUrl, '_blank')
+    } catch (err) {
+      console.error('[TabDocumentos] descargarPdf:', err)
+    }
+  }
+
   return (
     <>
     <div className="space-y-3">
@@ -69,10 +89,20 @@ export default function TabDocumentos({ id, documentos, onVerDocumento, onElimin
             {documentos.map((doc) => (
               <div key={doc.id} className="flex items-center px-3 sm:px-5 py-3 gap-3 sm:gap-4">
                 <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
-                  {doc.tipo === 'receta' && <Pill size={16} className="text-blue-600" />}
-                  {(doc.tipo === 'solicitud_lab' || doc.tipo === 'lab') && <FlaskConical size={16} className="text-emerald-600" />}
-                  {(doc.tipo === 'solicitud_imagen' || doc.tipo === 'imagen') && <ScanLine size={16} className="text-violet-600" />}
-                  {doc.tipo === 'plan_suplementacion' && <ClipboardList size={16} className="text-amber-600" />}
+                  {(() => {
+                    switch (doc.tipo) {
+                      case 'receta':                   return <Pill size={16} className="text-blue-600" />
+                      case 'solicitud_lab': case 'lab': return <FlaskConical size={16} className="text-emerald-600" />
+                      case 'solicitud_imagen': case 'imagen': return <ScanLine size={16} className="text-violet-600" />
+                      case 'plan_suplementacion':      return <ClipboardList size={16} className="text-amber-600" />
+                      case 'solicitud_internamiento':  return <BedDouble size={16} className="text-rose-600" />
+                      case 'escrito_medico':            return <PenLine size={16} className="text-teal-600" />
+                      case 'consentimiento_informado': return <ShieldCheck size={16} className="text-indigo-600" />
+                      case 'nota_honorarios':          return <Banknote size={16} className="text-orange-600" />
+                      case 'informe_clinico':          return <FileText size={16} className="text-slate-600" />
+                      default:                          return <File size={16} className="text-slate-400" />
+                    }
+                  })()}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -86,6 +116,15 @@ export default function TabDocumentos({ id, documentos, onVerDocumento, onElimin
                   </p>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
+                  {doc.pdf_url && (
+                    <button
+                      onClick={() => descargarPdf(doc.pdf_url!)}
+                      className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 font-medium px-2 py-1.5 rounded-lg hover:bg-emerald-50 transition-colors"
+                      title="Descargar PDF"
+                    >
+                      <Download size={14} />
+                    </button>
+                  )}
                   <button
                     onClick={() => onVerDocumento(doc)}
                     className="flex items-center gap-1 text-xs text-[#1e5fa8] hover:text-[#1a3a5c] font-medium px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors"

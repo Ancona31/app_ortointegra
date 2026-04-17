@@ -328,8 +328,9 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
       } : null
       const logoUrl = medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined
 
-      await generarPdf({
+      const { storagePath } = await generarPdf({
         tipo: 'nota_honorarios',
+        pacienteId,
         medico: medicoData,
         data: {
           paciente, fecha: fechaFmt, folio: folioDisplay, tipoDoc,
@@ -349,6 +350,7 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
         tipo: 'nota_honorarios',
         contenido,
         client_id: clientId,
+        pdf_url: storagePath,
       }
       if (pacienteId) insertPayload.paciente_id = pacienteId
 

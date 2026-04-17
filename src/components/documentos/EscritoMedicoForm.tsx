@@ -102,8 +102,9 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId }: 
       const logoUrl = medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined
       const fechaFmt = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
 
-      await generarPdf({
+      const { storagePath } = await generarPdf({
         tipo: 'escrito_medico',
+        pacienteId,
         medico: medicoData,
         data: { paciente, fecha: fechaFmt, asunto, cuerpo: contenido },
         logoUrl,
@@ -118,6 +119,7 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId }: 
         tipo: 'escrito_medico',
         contenido: docContenido,
         client_id: clientId,
+        pdf_url: storagePath,
       }
       if (pacienteId) insertPayload.paciente_id = pacienteId
 

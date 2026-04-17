@@ -9,7 +9,7 @@ export async function GET() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('nombre, titulo, especialidad, cedula_profesional, cedula_especialidad, clinica_id, direccion_consultorio, telefono_consultorio, firma_url')
+    .select('nombre, titulo, especialidad, cedula_profesional, cedula_especialidad, universidad, clinica_id, direccion_consultorio, telefono_consultorio, firma_url')
     .eq('id', user.id)
     .single()
 
@@ -54,6 +54,7 @@ export async function GET() {
       especialidad: profile.especialidad ?? '',
       cedula_profesional: profile.cedula_profesional ?? '',
       cedula_especialidad: profile.cedula_especialidad ?? '',
+      universidad: profile.universidad ?? '',
       logo_url,
       firma_url: firmaSignedUrl,
       color_primario,

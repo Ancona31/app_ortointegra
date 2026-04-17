@@ -11,9 +11,11 @@ interface Props {
   compact?: boolean
   /** Mostrar el símbolo "Rx" (solo recetas médicas) */
   showRx?: boolean
+  /** Texto adicional debajo de cédulas (ej: universidad, solo receta) */
+  extraCredencial?: string
 }
 
-export default function PdfHeader({ medico, colors, logoUrl, folio, fecha, compact, showRx }: Props) {
+export default function PdfHeader({ medico, colors, logoUrl, folio, fecha, compact, showRx, extraCredencial }: Props) {
   const nombre = medico?.nombre || 'Médico'
   const esp = medico?.especialidad || ''
   const cedProf = medico?.cedula_profesional || ''
@@ -145,6 +147,11 @@ export default function PdfHeader({ medico, colors, logoUrl, folio, fecha, compa
               </View>
             ) : null}
           </View>
+          {extraCredencial ? (
+            <Text style={{ fontSize: compact ? 6.5 : 7, color: '#888', marginTop: compact ? 1 : 2 }}>
+              {extraCredencial}
+            </Text>
+          ) : null}
           {contacto ? <Text style={s.contacto}>{contacto}</Text> : null}
         </View>
         {showRx ? (

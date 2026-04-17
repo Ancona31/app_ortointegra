@@ -129,6 +129,7 @@ export interface MedicoInfo {
   especialidad: string
   cedula_profesional: string
   cedula_especialidad: string
+  universidad?: string | null
   logo_url: string | null
   /** Signed URL (1h) de la firma autógrafa en PNG transparente */
   firma_url?: string | null

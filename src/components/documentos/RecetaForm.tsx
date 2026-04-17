@@ -278,8 +278,9 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
         pacienteData?.sexo === 'F' ? 'Femenino' :
         pacienteData?.sexo || ''
 
-      await generarPdf({
+      const { storagePath } = await generarPdf({
         tipo: 'receta',
+        pacienteId,
         medico: {
           nombre: doctorNombre,
           especialidad: doctorEspecialidad,
@@ -302,6 +303,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
           recomendaciones: recomendaciones || undefined,
           qrDataUrl,
           blogQrDataUrl: blogQrDataUrl || undefined,
+          universidad: medicoInfo?.universidad || undefined,
         },
         logoUrl,
         filename: generateDocFileName(paciente, 'Receta'),
@@ -315,6 +317,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
         tipo: 'receta',
         contenido,
         client_id: folio,
+        pdf_url: storagePath,
       }
       if (pacienteId) insertPayload.paciente_id = pacienteId
 

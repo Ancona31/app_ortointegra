@@ -122,36 +122,41 @@ async function compartirODescargar(blob: Blob, filename: string) {
   descargarBlob(blob, filename)
 }
 
-/** Genera PDF 100% en el cliente — sin servidor, sin delay, sin popup blocker */
+export interface GenerarPdfResult {
+  blob: Blob
+  storagePath: string | null
+}
+
+/**
+ * Genera PDF 100% en el cliente.
+ * Si se pasa pacienteId, sube el PDF a Supabase Storage (documentos-pdf)
+ * y retorna el storagePath. Si el upload falla, retorna storagePath=null
+ * pero el PDF se entrega al usuario normalmente.
+ */
 export async function generarPdf(params: {
   tipo: string
   medico: PdfMedicoData | null
   data: Record<string, unknown>
   logoUrl?: string
   filename?: string
-}): Promise<void> {
+  pacienteId?: string
+}): Promise<GenerarPdfResult> {
   // Guard de concurrencia: ignorar multi-clics
   if (isGenerating) {
-    // eslint-disable-next-line no-console
     console.warn('[generarPdf] ya hay una generación en curso — ignorando llamada duplicada')
-    return
+    throw new Error('Generación en curso')
   }
 
   isGenerating = true
-  const { tipo, medico, data, logoUrl, filename } = params
+  const { tipo, medico, data, logoUrl, filename, pacienteId } = params
   const defaultFilename = `${tipo.replace(/_/g, '-')}.pdf`
 
-  // Variable de fase para diagnosticar exactamente dónde falla
   let phase = 'inicio'
 
   try {
-    // eslint-disable-next-line no-console
-    console.log('[generarPdf] 1/5 inicio — tipo:', tipo)
+    console.log('[generarPdf] 1/6 inicio — tipo:', tipo)
 
     // ── Fase 1: resolver logo ──
-    // Si hay URL https del logo personalizado → convertir a Base64 data URL
-    // para que @react-pdf/renderer lo embeba sin depender de CORS/red.
-    // Si no hay logo o la URL no es https → fallback al logo de Spinus.
     phase = 'resolviendo logo'
     let effectiveLogoUrl: string | undefined = undefined
 
@@ -159,20 +164,19 @@ export async function generarPdf(params: {
       try {
         const res = await fetch(logoUrl)
         if (res.ok) {
-          const blob = await res.blob()
+          const fetchedBlob = await res.blob()
           effectiveLogoUrl = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader()
             reader.onloadend = () => resolve(reader.result as string)
             reader.onerror = reject
-            reader.readAsDataURL(blob)
+            reader.readAsDataURL(fetchedBlob)
           })
         }
       } catch {
-        // Fetch falló (red, CORS, URL rota) → caer al fallback
+        // Fetch falló → fallback
       }
     }
 
-    // Fallback: logo de Spinus en Base64 si no se pudo resolver el personalizado
     if (!effectiveLogoUrl) {
       const { LOGO_BASE64 } = await import('@/lib/pdf/logo')
       effectiveLogoUrl = LOGO_BASE64
@@ -181,11 +185,8 @@ export async function generarPdf(params: {
     // ── Fase 2: construir elemento react-pdf ──
     phase = 'construyendo elemento react-pdf'
     const element = await buildClientElement(tipo, medico, data, effectiveLogoUrl)
-    if (!element) {
-      throw new Error(`Tipo de documento no válido: ${tipo}`)
-    }
-    // eslint-disable-next-line no-console
-    console.log('[generarPdf] 2/5 elemento construido')
+    if (!element) throw new Error(`Tipo de documento no válido: ${tipo}`)
+    console.log('[generarPdf] 2/6 elemento construido')
 
     // ── Fase 3: renderizar a blob ──
     phase = 'renderizando PDF'
@@ -195,17 +196,42 @@ export async function generarPdf(params: {
     // ── Fase 4: blindar MIME type ──
     phase = 'blindando MIME type'
     const pdfBlob = new Blob([rawBlob], { type: 'application/pdf' })
-    // eslint-disable-next-line no-console
-    console.log('[generarPdf] 3/5 blob generado — size:', pdfBlob.size, 'bytes, type:', pdfBlob.type)
+    console.log('[generarPdf] 3/6 blob generado — size:', pdfBlob.size, 'bytes')
 
-    // ── Fase 5: disparar entrega ──
+    // ── Fase 5: upload a Storage (si hay pacienteId) ──
+    let storagePath: string | null = null
+    if (pacienteId) {
+      phase = 'subiendo a Storage'
+      try {
+        const { createClient } = await import('@/lib/supabase/client')
+        const supabase = createClient()
+        const finalName = filename ?? defaultFilename
+        const path = `${pacienteId}/${finalName}`
+
+        const { error: uploadError } = await supabase.storage
+          .from('documentos-pdf')
+          .upload(path, pdfBlob, {
+            contentType: 'application/pdf',
+            upsert: true,
+          })
+
+        if (uploadError) {
+          console.error('[generarPdf] upload falló:', uploadError.message)
+        } else {
+          storagePath = path
+          console.log('[generarPdf] 4/6 subido a Storage:', path)
+        }
+      } catch (storageErr) {
+        console.error('[generarPdf] Storage error:', storageErr)
+        // No lanzar — el PDF se entrega al usuario de todos modos
+      }
+    }
+
+    // ── Fase 6: disparar entrega al usuario ──
     phase = 'disparando entrega'
     const isMobile =
       /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
       window.innerWidth < 768
-
-    // eslint-disable-next-line no-console
-    console.log('[generarPdf] 4/5 disparando:', isMobile ? 'mobile (share)' : 'desktop (download)')
 
     const finalName = filename ?? defaultFilename
     if (isMobile) {
@@ -214,14 +240,13 @@ export async function generarPdf(params: {
       descargarBlob(pdfBlob, finalName)
     }
 
-    // eslint-disable-next-line no-console
-    console.log('[generarPdf] 5/5 completado')
+    console.log('[generarPdf] 6/6 completado', storagePath ? '(con Storage)' : '(sin Storage)')
+
+    return { blob: pdfBlob, storagePath }
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.error(`[generarPdf] falló en fase "${phase}":`, err)
     throw new Error('No se pudo generar el PDF.')
   } finally {
-    // Siempre liberar el guard, incluso en error
     isGenerating = false
   }
 }

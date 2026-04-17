@@ -90,8 +90,9 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
 
       const logoUrl = medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined
 
-      await generarPdf({
+      const { storagePath } = await generarPdf({
         tipo: 'solicitud_lab',
+        pacienteId,
         medico: medicoData,
         data: {
           paciente,
@@ -112,6 +113,7 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
         tipo: 'solicitud_lab',
         contenido,
         client_id: clientId,
+        pdf_url: storagePath,
       }
       if (pacienteId) insertPayload.paciente_id = pacienteId
 

@@ -22,6 +22,7 @@ export interface RecetaData {
   recomendaciones?: string
   qrDataUrl?: string
   blogQrDataUrl?: string
+  universidad?: string
 }
 
 export interface RecetaPdfProps {
@@ -489,6 +490,7 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
               folio={data.folio}
               compact
               showRx
+              extraCredencial={data.universidad}
             />
           </View>
         </View>

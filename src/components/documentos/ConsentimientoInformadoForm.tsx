@@ -177,8 +177,9 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
       const logoUrl = medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined
       const fechaFmt = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
 
-      await generarPdf({
+      const { storagePath } = await generarPdf({
         tipo: 'consentimiento_informado',
+        pacienteId,
         medico: medicoData,
         data: {
           paciente, lugar, fecha: fechaFmt, expediente, edad, idPaciente,
@@ -199,6 +200,7 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
         tipo: 'consentimiento_informado',
         contenido,
         client_id: clientId,
+        pdf_url: storagePath,
       }
       if (pacienteId) insertPayload.paciente_id = pacienteId
 

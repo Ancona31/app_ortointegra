@@ -118,8 +118,9 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
       const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
       const fechaIngresoFormat = fechaIngreso ? format(new Date(fechaIngreso + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es }) : undefined
 
-      await generarPdf({
+      const { storagePath } = await generarPdf({
         tipo: 'solicitud_internamiento',
+        pacienteId,
         medico: medicoData,
         data: {
           paciente, fecha: fechaFormat, fechaIngreso: fechaIngresoFormat, lugar,
@@ -140,6 +141,7 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
         tipo: 'solicitud_internamiento',
         contenido,
         client_id: clientId,
+        pdf_url: storagePath,
       }
       if (pacienteId) insertPayload.paciente_id = pacienteId
 

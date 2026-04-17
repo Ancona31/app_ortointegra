@@ -75,8 +75,9 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
 
       const logoUrl = medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined
 
-      await generarPdf({
+      const { storagePath } = await generarPdf({
         tipo: 'solicitud_imagen',
+        pacienteId,
         medico: medicoData,
         data: {
           paciente,
@@ -97,6 +98,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
         tipo: 'solicitud_imagen',
         contenido,
         client_id: clientId,
+        pdf_url: storagePath,
       }
       if (pacienteId) insertPayload.paciente_id = pacienteId
 

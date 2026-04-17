@@ -251,8 +251,9 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
       } : null
       const logoUrl = medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined
 
-      await generarPdf({
+      const { storagePath } = await generarPdf({
         tipo: 'plan_suplementacion',
+        pacienteId,
         medico: medicoData,
         data: {
           paciente, fecha: fechaFormat, diagnostico, peso,
@@ -292,6 +293,7 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
           contenido,
           client_id: clientId,
           paciente_id: pacienteId,
+          pdf_url: storagePath,
         }
 
         const { error } = await supabase.from('documentos').insert(insertPayload)
