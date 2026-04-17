@@ -117,17 +117,20 @@ export default function DashboardPage() {
     // Pacientes recientes — catch silencioso
     supabase
       .from('consultas')
-      .select('paciente_id, created_at, motivo_consulta, pacientes!inner(nombre, apellidos)')
+      .select('paciente_id, created_at, motivo_consulta, pacientes!inner(nombre, apellidos, activo)')
       .order('created_at', { ascending: false })
-      .limit(15)
-      .then(({ data }: { data: { paciente_id: string; created_at: string; motivo_consulta: string | null; pacientes: { nombre: string; apellidos: string } | { nombre: string; apellidos: string }[] }[] | null }) => {
+      .limit(30)
+      .then(({ data }: { data: { paciente_id: string; created_at: string; motivo_consulta: string | null; pacientes: { nombre: string; apellidos: string; activo?: boolean } | { nombre: string; apellidos: string; activo?: boolean }[] }[] | null }) => {
         if (!data) return
         const seen = new Set<string>()
         const unique: Reciente[] = []
         for (const c of data) {
+          // Filtrar pacientes con soft delete
+          const pac = (Array.isArray(c.pacientes) ? c.pacientes[0] : c.pacientes) as { nombre: string; apellidos: string; activo?: boolean } | null
+          if (pac?.activo === false) continue
+
           if (!seen.has(c.paciente_id) && unique.length < 5) {
             seen.add(c.paciente_id)
-            const pac = (Array.isArray(c.pacientes) ? c.pacientes[0] : c.pacientes) as { nombre: string; apellidos: string } | null
             unique.push({
               paciente_id: c.paciente_id,
               nombre: pac?.nombre ?? '',

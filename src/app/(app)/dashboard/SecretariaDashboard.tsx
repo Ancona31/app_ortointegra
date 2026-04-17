@@ -16,6 +16,7 @@ export default function SecretariaDashboard() {
     const supabase = createClient()
     supabase.from('pacientes')
       .select('*')
+      .neq('activo', false)
       .order('created_at', { ascending: false })
       .limit(5)
       .then(({ data }: { data: Paciente[] | null }) => setRecientes(data || []))
