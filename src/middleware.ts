@@ -57,6 +57,7 @@ export async function middleware(request: NextRequest) {
   const isPublicPage = ['/', '/forgot-password', '/reset-password', '/auth/confirm', '/auth/callback', '/auth/confirm-email', '/pricing', '/register', '/privacy', '/terms', '/offline'].includes(pathname)
     || pathname.startsWith('/r/')
     || pathname.startsWith('/offline-mode')
+    || pathname.startsWith('/offline-setup')
 
   // Rutas API que no requieren sesión (OAuth callbacks, Stripe webhook y Stripe checkout/portal que manejan su propia auth)
   const publicApiPaths = ['/api/google/callback', '/api/stripe/webhook', '/api/stripe/checkout', '/api/stripe/portal', '/api/auth/registro', '/api/auth/complete-registro', '/api/auth/email-hook', '/api/auth/verify-email', '/api/auth/audit-login', '/api/auth/rate-limit']

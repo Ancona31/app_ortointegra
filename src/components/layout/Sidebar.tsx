@@ -92,7 +92,7 @@ function navDoctor(isAdmin: boolean, isSuperAdmin: boolean): NavSection[] {
     { kind: 'divider' },
     { kind: 'leaf', href: '/perfil',  label: 'Mi perfil', icon: UserCircle },
     { kind: 'leaf', href: '/ayuda',   label: 'Ayuda',     icon: HelpCircle },
-    { kind: 'leaf', href: '/offline-mode', label: 'Modo Offline', icon: WifiOff },
+    { kind: 'leaf', href: '/offline-setup', label: 'Modo Offline', icon: WifiOff },
   ]
 }
 
@@ -110,7 +110,7 @@ function navSecretaria(): NavSection[] {
     { kind: 'leaf', href: '/agenda', label: 'Agenda', icon: CalendarDays },
     { kind: 'divider' },
     { kind: 'leaf', href: '/perfil', label: 'Mi perfil', icon: UserCircle },
-    { kind: 'leaf', href: '/offline-mode', label: 'Modo Offline', icon: WifiOff },
+    { kind: 'leaf', href: '/offline-setup', label: 'Modo Offline', icon: WifiOff },
   ]
 }
 
@@ -140,6 +140,13 @@ export default function Sidebar() {
   const { colorPrimario, colorSecundario, nombreDisplay, subtitulo, logoUrl } = useClinica()
   const { dark, toggle } = useTheme()
   const { signOut } = useAuth()
+
+  // Badge offline: verde si ya configuró, gris si no
+  const [bunkerReady, setBunkerReady] = useState(false)
+  useEffect(() => {
+    try { setBunkerReady(!!localStorage.getItem('spinus_session_meta') && !!localStorage.getItem('spinus_doctor_profile')) }
+    catch { /* silent */ }
+  }, [])
 
   const isAdmin      = profile?.role === 'admin' || profile?.role === 'super_admin'
   const isSuperAdmin = profile?.role === 'super_admin'
@@ -268,7 +275,11 @@ export default function Sidebar() {
                   }`}
                 >
                   <section.icon size={16} className={active ? 'opacity-100' : 'opacity-70'} />
-                  {section.label}
+                  <span className="flex-1">{section.label}</span>
+                  {section.href === '/offline-setup' && (
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${bunkerReady ? 'bg-emerald-400' : 'bg-white/25'}`}
+                      title={bunkerReady ? 'Búnker activo' : 'Requiere configuración'} />
+                  )}
                 </Link>
               )
             }

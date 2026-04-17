@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import {
-  UserPlus, FileText, RefreshCw, Trash2, AlertTriangle, CheckCircle2, X,
+  UserPlus, FileText, RefreshCw, Trash2, AlertTriangle, CheckCircle2, X, Shield,
   Loader2, WifiOff, Wifi, Pill, FlaskConical, ScanLine, ClipboardList,
   BedDouble, PenLine, ShieldCheck, Receipt,
 } from 'lucide-react'
@@ -318,6 +318,19 @@ export default function OfflineModePage() {
             <p className="text-sm font-bold text-red-800">Navegación privada detectada</p>
             <p className="text-xs text-red-600 mt-1 leading-relaxed">
               Estás usando modo privado o incógnito. Los datos capturados offline pueden perderse al cerrar esta ventana. Para garantizar la persistencia, usa una ventana normal del navegador.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Banner de onboarding — primera vez o sin datos sync */}
+      {totalPending === 0 && patients.length === 0 && documents.length === 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-start gap-3">
+          <Shield size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-blue-800">Entorno seguro activado</p>
+            <p className="text-xs text-blue-600 mt-1 leading-relaxed">
+              Tus datos se guardan localmente hasta detectar conexión. Registra pacientes y crea documentos — se sincronizarán automáticamente cuando haya red.
             </p>
           </div>
         </div>
