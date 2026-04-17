@@ -20,6 +20,7 @@ import Breadcrumbs from '@/components/layout/Breadcrumbs'
 import { imprimirOCompartir } from '@/lib/mobileShare'
 import { secureStorage } from '@/lib/secureStorage'
 import { useAuditAccess } from '@/hooks/useAudit'
+import CIE10Combobox from '@/components/ui/CIE10Combobox'
 import dynamic from 'next/dynamic'
 
 function FormCargando() {
@@ -92,7 +93,7 @@ export default function NuevaNotaPage() {
   const [paciente, setPaciente]     = useState<Paciente | null>(null)
 
   const [form, setForm] = useState({
-    motivo_consulta: '', exploracion_fisica: '', diagnosticos: '',
+    motivo_consulta: '', exploracion_fisica: '', diagnosticos: '', analisis: '',
     pronostico: '', plan_tratamiento: '', gabinete_laboratorios: '', proxima_cita: '',
   })
   const [medicamentos, setMedicamentos] = useState<MedRow[]>([{ ...MED_VACIA }])
@@ -132,6 +133,7 @@ export default function NuevaNotaPage() {
   })
   function toggleCampo(k: string) { setCamposExpandidos(p => ({ ...p, [k]: !p[k] })) }
 
+  const [complementoDx, setComplementoDx] = useState('')
   const suggestRef  = useRef<HTMLDivElement>(null)
   const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -283,11 +285,17 @@ export default function NuevaNotaPage() {
   function previewNotaManual() {
     if (!form.motivo_consulta) { setError('Ingresa al menos el motivo de consulta'); return }
     setError('')
+    // Diagnóstico: CIE-10 + complemento
+    const dxCompleto = complementoDx
+      ? `${form.diagnosticos} (${complementoDx})`
+      : form.diagnosticos
+
     const partes = [
       `**[SUBJETIVO]:**\n${form.motivo_consulta}`,
       `**[OBJETIVO]:**\n${form.exploracion_fisica || 'Sin exploración física registrada.'}`,
       `**[AUXILIARES DIAGNÓSTICOS]:**\n${form.gabinete_laboratorios || 'Estudios de gabinete y laboratorio pendientes.'}`,
-      `**[ANÁLISIS]:**\n${form.diagnosticos || 'Diagnóstico pendiente.'}`,
+      `**[DIAGNÓSTICO]:**\n${dxCompleto || 'Diagnóstico pendiente.'}`,
+      `**[ANÁLISIS]:**\n${form.analisis || 'Análisis clínico pendiente.'}`,
       `**[PLAN]:**\n${form.plan_tratamiento || 'Plan de tratamiento pendiente.'}`,
     ]
     setNotaGenerada(partes.join('\n\n'))
@@ -327,7 +335,13 @@ export default function NuevaNotaPage() {
       paciente_id: id,
       motivo_consulta: form.motivo_consulta,
       exploracion_fisica: form.exploracion_fisica,
-      diagnosticos: form.diagnosticos ? [{ descripcion: form.diagnosticos }] : [],
+      diagnosticos: form.diagnosticos
+        ? [{
+            descripcion: complementoDx
+              ? `${form.diagnosticos} (${complementoDx})`
+              : form.diagnosticos,
+          }]
+        : [],
       plan_tratamiento: form.plan_tratamiento,
       notas_evolucion: notaFinal,
       proxima_cita: form.proxima_cita || null,
@@ -668,7 +682,7 @@ modoNota === 'ia'
               <p className="text-xs text-amber-700 font-medium flex-1">Borrador restaurado — continúa donde lo dejaste</p>
               <button
                 onClick={() => {
-                  setForm({ motivo_consulta: '', exploracion_fisica: '', diagnosticos: '', pronostico: '', plan_tratamiento: '', gabinete_laboratorios: '', proxima_cita: '' })
+                  setForm({ motivo_consulta: '', exploracion_fisica: '', diagnosticos: '', analisis: '', pronostico: '', plan_tratamiento: '', gabinete_laboratorios: '', proxima_cita: '' })
                   setMedicamentos([{ ...MED_VACIA }])
                   secureStorage.remove(draftKey)
                   setBorradorRestaurado(false)
@@ -746,11 +760,18 @@ modoNota === 'ia'
                       className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
                   )}
                 </div>
-                {/* Diagnóstico — siempre visible */}
+                {/* Diagnóstico CIE-10 — siempre visible */}
                 <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">Diagnóstico(s) <span className="text-red-400">*</span></label>
-                  <input type="text" value={form.diagnosticos} onChange={e => update('diagnosticos', e.target.value)}
-                    placeholder="Ej: Diabetes mellitus tipo 2 descontrolada..."
+                  <label className="text-xs font-medium text-slate-500 block mb-1">Diagnóstico(s) CIE-10 <span className="text-red-400">*</span></label>
+                  <CIE10Combobox
+                    value={form.diagnosticos}
+                    onChange={val => update('diagnosticos', val)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500 block mb-1">Complemento de diagnóstico</label>
+                  <input type="text" value={complementoDx} onChange={e => setComplementoDx(e.target.value)}
+                    placeholder="Ej: nivel L4-L5, bilateral, agudizado..."
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
                 </div>
                 {/* Plan de tratamiento — expandible */}
@@ -801,10 +822,26 @@ modoNota === 'ia'
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-500 block mb-1">
-                    Diagnóstico(s) / Análisis <span className="text-red-400">*</span>
+                    Diagnóstico(s) CIE-10 <span className="text-red-400">*</span>
                   </label>
-                  <textarea value={form.diagnosticos} onChange={e => update('diagnosticos', e.target.value)}
-                    placeholder="Ej: Hernia discal L4-L5 DERECHA con radiculopatía L5. Lumbalgia crónica agudizada..."
+                  <CIE10Combobox
+                    value={form.diagnosticos}
+                    onChange={val => update('diagnosticos', val)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500 block mb-1">Complemento de diagnóstico</label>
+                  <textarea value={complementoDx} onChange={e => setComplementoDx(e.target.value)}
+                    placeholder="Detalles adicionales: niveles, lateralidad, severidad..."
+                    rows={2}
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500 block mb-1">
+                    Análisis clínico <span className="text-slate-400 font-normal">(opcional)</span>
+                  </label>
+                  <textarea value={form.analisis} onChange={e => update('analisis', e.target.value)}
+                    placeholder="Razonamiento clínico: correlación clínico-radiológica, evolución, consideraciones..."
                     rows={3}
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
                 </div>
