@@ -12,7 +12,6 @@ import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 
 const TIPOS_ESTUDIO = ['Radiografía', 'Resonancia Magnética (RMN)', 'Tomografía (TAC)', 'Ultrasonido', 'Densitometría Ósea', 'Gammagrafía', 'Mielograma', 'Electromiografía (EMG)']
-const REGIONES = ['Columna Cervical', 'Columna Torácica', 'Columna Lumbar', 'Columna Lumbosacra', 'Columna Total', 'Hombro Der.', 'Hombro Izq.', 'Codo Der.', 'Codo Izq.', 'Muñeca Der.', 'Muñeca Izq.', 'Cadera Der.', 'Cadera Izq.', 'Rodilla Der.', 'Rodilla Izq.', 'Tobillo Der.', 'Tobillo Izq.', 'Pie Der.', 'Pie Izq.', 'Pelvis', 'Tórax']
 
 type Estudio = { tipo: string; region: string; proyecciones?: string; indicacion?: string }
 
@@ -156,11 +155,8 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
               </div>
               <div className="sm:col-span-2">
                 <label className="text-xs text-slate-500 block mb-1">Región anatómica</label>
-                <input list={`regiones-${i}`} value={e.region} onChange={ev => updateEstudio(i, 'region', ev.target.value)} placeholder="Seleccionar o escribir..."
+                <input type="text" value={e.region} onChange={ev => updateEstudio(i, 'region', ev.target.value)} placeholder="Ej: Columna Lumbar, Rodilla Der."
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
-                <datalist id={`regiones-${i}`}>
-                  {REGIONES.map(r => <option key={r} value={r} />)}
-                </datalist>
               </div>
               <div>
                 <label className="text-xs text-slate-500 block mb-1">Proyecciones</label>
