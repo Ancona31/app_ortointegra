@@ -433,8 +433,9 @@ export default function DashboardPage() {
                       <p className="text-sm font-semibold text-[#1d1d1f] truncate">
                         {p.nombre} {p.apellidos}
                       </p>
-                      <p className="text-[11px] text-[#86868b]">
-                        {formatDistanceToNow(parseISO(p.created_at), { locale: es, addSuffix: true })}
+                      <p className="text-[11px] text-[#86868b] truncate">
+                        Última atención: {formatDistanceToNow(parseISO(p.created_at), { locale: es, addSuffix: true })}
+                        {p.motivo_consulta && ` · ${p.motivo_consulta}`}
                       </p>
                     </div>
                   </Link>
