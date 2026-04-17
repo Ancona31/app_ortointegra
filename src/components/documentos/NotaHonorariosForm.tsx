@@ -57,10 +57,11 @@ function maxDateISO(): string {
   return d.toISOString().split('T')[0]
 }
 
-/** True when all lines are blank / zero (form is "empty") */
-function isFormEmpty(lineas: LineaConcepto[], paciente: string, notas: string): boolean {
+/** True when the user hasn't entered meaningful data beyond the pre-filled patient name */
+function isFormEmpty(lineas: LineaConcepto[], paciente: string, notas: string, pacienteInicial: string): boolean {
+  const pacienteIntacto = paciente.trim() === '' || paciente.trim() === pacienteInicial.trim()
   return (
-    paciente.trim() === '' &&
+    pacienteIntacto &&
     notas.trim() === '' &&
     lineas.every(l => l.concepto.trim() === '' && l.precio === 0)
   )
@@ -150,7 +151,7 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
     const tpl = templates.find(t => t.id === templateId)
     if (!tpl) return
 
-    if (!isFormEmpty(lineas, paciente, notas)) {
+    if (!isFormEmpty(lineas, paciente, notas, pacienteInicial)) {
       setModalConfirm({
         titulo: 'Sobreescribir formulario',
         mensaje: 'El formulario tiene datos. ¿Deseas reemplazarlos con la plantilla seleccionada?',
@@ -714,7 +715,7 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId }:
       {/* ── Modal de confirmación — patrón Spinus (blur + slide) ──────────── */}
       {modalConfirm && (
         <Portal>
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+          <div className="fixed inset-0 z-[10000] flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
             <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden animate-slide-up" onClick={e => e.stopPropagation()}>
               <div className="px-6 pt-6 pb-4 text-center">
                 <div
