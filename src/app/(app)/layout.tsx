@@ -5,6 +5,7 @@ import { ToastProvider } from '@/components/ui/Toast'
 import CommandPalette from '@/components/CommandPalette'
 import PageTransition from '@/components/layout/PageTransition'
 import SessionGuard from '@/components/SessionGuard'
+import OfflineAlert from '@/components/ui/OfflineAlert'
 import { AuthProvider } from '@/lib/auth-context'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -12,6 +13,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <AuthProvider>
       <ToastProvider>
         <ThemeProvider>
+          <OfflineAlert />
           <div className="flex h-screen overflow-hidden">
             <Sidebar />
             <main className="flex-1 lg:ml-60 overflow-y-auto">
