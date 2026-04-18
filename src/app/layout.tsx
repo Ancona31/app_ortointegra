@@ -18,8 +18,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-full antialiased">
         {children}
-        {/* Kill-switch: desregistrar cualquier Service Worker zombie de deploys anteriores */}
-        <script dangerouslySetInnerHTML={{ __html: `if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(function(regs){regs.forEach(function(r){r.unregister()})})}` }} />
       </body>
     </html>
   )
