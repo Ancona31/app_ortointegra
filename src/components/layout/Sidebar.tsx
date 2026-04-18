@@ -207,7 +207,7 @@ export default function Sidebar() {
 
       {/* Overlay */}
       {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 bg-black/40 z-30" onClick={close} />
+        <div className="lg:hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-30" onClick={close} />
       )}
 
       {/* Sidebar */}
@@ -219,7 +219,7 @@ export default function Sidebar() {
         className={`
           fixed top-4 left-4 bottom-4 w-60 text-white z-40 flex flex-col rounded-3xl
           transition-transform duration-300
-          ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+          ${mobileOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1rem)] lg:translate-x-0'}
         `}
       >
         {/* Logo + nombre */}
