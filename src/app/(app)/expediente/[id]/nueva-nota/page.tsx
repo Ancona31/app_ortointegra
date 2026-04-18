@@ -85,6 +85,11 @@ const DOCS = [
 
 const MED_VACIA: MedRow = { nombre: '', dosis: '', frecuencia: '', duracion: '' }
 
+const EMPTY_FORM = {
+  motivo_consulta: '', exploracion_fisica: '', diagnosticos: '', analisis: '',
+  pronostico: '', plan_tratamiento: '', gabinete_laboratorios: '', proxima_cita: '',
+}
+
 export default function NuevaNotaPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
@@ -92,10 +97,7 @@ export default function NuevaNotaPage() {
   const [medicoInfo, setMedicoInfo] = useState<MedicoInfo | null>(null)
   const [paciente, setPaciente]     = useState<Paciente | null>(null)
 
-  const [form, setForm] = useState({
-    motivo_consulta: '', exploracion_fisica: '', diagnosticos: '', analisis: '',
-    pronostico: '', plan_tratamiento: '', gabinete_laboratorios: '', proxima_cita: '',
-  })
+  const [form, setForm] = useState({ ...EMPTY_FORM })
   const [medicamentos, setMedicamentos] = useState<MedRow[]>([{ ...MED_VACIA }])
   const [medCache, setMedCache]         = useState<string[]>([])
   const [showSuggest, setShowSuggest]   = useState<number | null>(null)
@@ -136,6 +138,8 @@ export default function NuevaNotaPage() {
   const [complementoDx, setComplementoDx] = useState('')
   const suggestRef  = useRef<HTMLDivElement>(null)
   const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const formRef = useRef(form)
+  useEffect(() => { formRef.current = form }, [form])
 
 
   // ── Carga datos + borrador ────────────────────────────────────
@@ -156,9 +160,18 @@ export default function NuevaNotaPage() {
       if (data) setMedCache(data.sort((a, b) => b.count - a.count).map(d => d.nombre))
     }).catch(() => {})
     secureStorage.get<{ form: typeof form; medicamentos: typeof medicamentos }>(`nota-draft-${id}`).then(parsed => {
-      if (!parsed) return
-      if (parsed.form) { setForm(parsed.form); setBorradorRestaurado(true) }
+      if (!parsed?.form) return
+      // Guard anti-race: si la promesa resolvió DESPUÉS de que el usuario
+      // empezó a teclear en cualquiera de los 8 campos, descartar el borrador
+      // para no sobrescribir entrada clínica viva.
+      const current = formRef.current
+      const vacio = Object.values(current).every(v => !v)
+      if (!vacio) return
+      // Spread sobre EMPTY_FORM por si un borrador viejo tiene campos faltantes
+      // tras un cambio de schema (evita undefined en inputs controlados).
+      setForm({ ...EMPTY_FORM, ...parsed.form })
       if (parsed.medicamentos?.length) setMedicamentos(parsed.medicamentos)
+      setBorradorRestaurado(true)
     }).catch(() => {})
     // Cargar última consulta para contexto
     const supabase2 = createClient()
