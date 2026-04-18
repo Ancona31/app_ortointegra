@@ -33,6 +33,33 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     :root {
       --cp: ${colorPrimario};
       --cs: ${colorSecundario};
+
+      /* ── Alias semánticos del color del usuario ── */
+      --user-primary: var(--cp);
+      --user-secondary: var(--cs);
+
+      /* ── Derivados con opacidad (color-mix) ── */
+      --user-primary-soft: color-mix(in srgb, var(--cp) 8%, transparent);
+      --user-primary-medium: color-mix(in srgb, var(--cp) 22%, transparent);
+      --user-primary-glow: color-mix(in srgb, var(--cp) 24%, transparent);
+
+      /* ── Paleta semántica universal (fija, no depende del usuario) ── */
+      --sem-consulta: #34c759;
+      --sem-consulta-soft: rgba(52,199,89,0.12);
+      --sem-documentos: #af52de;
+      --sem-documentos-soft: rgba(175,82,222,0.12);
+      --sem-agenda: #ff9500;
+      --sem-agenda-soft: rgba(255,149,0,0.12);
+      --sem-peligro: #ff3b30;
+      --sem-peligro-soft: rgba(255,59,48,0.1);
+      --sem-ok: #34c759;
+      --sem-neutro: #8e8e93;
+      --sem-neutro-soft: rgba(142,142,147,0.14);
+
+      /* ── Tokens de radio ── */
+      --radius-sm: 10px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
     }
 
     /* ── Fondos ── */
