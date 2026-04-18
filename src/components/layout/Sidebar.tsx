@@ -137,7 +137,7 @@ export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [expanded, setExpanded]     = useState<Set<string>>(new Set())
   const { profile }  = useProfile()
-  const { colorPrimario, colorSecundario, nombreDisplay, subtitulo, logoUrl } = useClinica()
+  const { nombreDisplay, subtitulo, logoUrl } = useClinica()
   const { dark, toggle } = useTheme()
   const { signOut } = useAuth()
 
@@ -200,7 +200,7 @@ export default function Sidebar() {
       <button
         onClick={() => setMobileOpen(!mobileOpen)}
         className="lg:hidden fixed top-4 left-4 z-50 text-white p-2 rounded-lg shadow-lg"
-        style={{ backgroundColor: colorPrimario }}
+        style={{ background: 'var(--cp)' }}
       >
         {mobileOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
@@ -212,10 +212,13 @@ export default function Sidebar() {
 
       {/* Sidebar */}
       <aside
-        style={{ backgroundColor: colorPrimario }}
+        style={{
+          background: 'linear-gradient(180deg, var(--cp) 0%, color-mix(in srgb, var(--cp) 50%, var(--cs)) 30%, var(--cs) 60%, color-mix(in srgb, var(--cs) 40%, white) 100%)',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.25)',
+        }}
         className={`
-          fixed top-0 left-0 h-full w-60 text-white z-40 flex flex-col
-          transition-transform duration-300 shadow-2xl
+          fixed top-4 left-4 bottom-4 w-60 text-white z-40 flex flex-col rounded-3xl
+          transition-transform duration-300
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}
       >
@@ -269,9 +272,8 @@ export default function Sidebar() {
               }
               return (
                 <Link key={section.href} href={section.href} onClick={close}
-                  style={active ? { backgroundColor: colorSecundario } : undefined}
                   className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150 ${
-                    active ? 'text-white shadow-sm' : 'text-white/55 hover:bg-white/10 hover:text-white'
+                    active ? 'bg-white text-[var(--cp)] shadow-sm' : 'text-white/55 hover:bg-white/10 hover:text-white'
                   }`}
                 >
                   <section.icon size={16} className={active ? 'opacity-100' : 'opacity-70'} />
@@ -315,9 +317,8 @@ hasActive && !isOpen
                         const childActive = leafIsActive(child.href, pathname)
                         return (
                           <Link key={child.href} href={child.href} onClick={close}
-                            style={childActive ? { backgroundColor: colorSecundario } : undefined}
                             className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-[12px] font-medium transition-all duration-150 ${
-                              childActive ? 'text-white shadow-sm' : 'text-white/50 hover:bg-white/10 hover:text-white'
+                              childActive ? 'bg-white text-[var(--cp)] shadow-sm' : 'text-white/50 hover:bg-white/10 hover:text-white'
                             }`}
                           >
                             <child.icon size={13} className={childActive ? 'opacity-100' : 'opacity-60'} />
@@ -337,11 +338,6 @@ hasActive && !isOpen
 
         {/* Footer */}
         <div className="px-3 py-3 border-t border-white/10 space-y-0.5">
-          {profile?.cedula_profesional && (
-            <p className="text-[10px] text-white/25 text-center mb-2 px-2">
-              Céd. {profile.cedula_profesional}
-            </p>
-          )}
           <button onClick={toggle}
             className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-white/50 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-150">
             {dark ? <Sun size={14} /> : <Moon size={14} />}
