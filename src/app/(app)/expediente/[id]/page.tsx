@@ -25,6 +25,7 @@ import TabLaboratorios from '@/components/expediente/TabLaboratorios'
 import TabGraficas from '@/components/expediente/TabGraficas'
 import TabDocumentos from '@/components/expediente/TabDocumentos'
 import ExportarExpedienteButton from '@/components/expediente/ExportarExpedienteButton' // TODO Fase 7: eliminar import de ExportarExpedienteButton no usado en page.tsx
+import ExpedienteCardsGrid, { type ProximaCita } from '@/components/expediente/ExpedienteCardsGrid'
 import dynamic from 'next/dynamic'
 
 function FormCargando() {
@@ -81,6 +82,7 @@ function ExpedientePacienteContent() {
   const [consultas, setConsultas] = useState<Consulta[]>([])
   const [documentos, setDocumentos] = useState<Documento[]>([])
   const [loadingPaciente, setLoadingPaciente] = useState(true)
+  const [proximaCita, setProximaCita] = useState<ProximaCita | null>(null)
 
   const { labs, todosLosParams, refetch: fetchLabs } = useLaboratoriosNormalizados(id)
 
@@ -128,6 +130,19 @@ function ExpedientePacienteContent() {
       .limit(QUERY_LIMIT)
       .then((res: { data: Documento[] | null }) => {
         if (!cancelled) setDocumentos((res.data ?? []) as Documento[])
+      })
+
+    // Próxima cita del paciente (solo scheduled/confirmed futuras)
+    supabase
+      .from('appointments')
+      .select('id, start_time, end_time, title, status')
+      .eq('paciente_id', id)
+      .in('status', ['scheduled', 'confirmed'])
+      .gte('start_time', new Date().toISOString())
+      .order('start_time', { ascending: true })
+      .limit(1)
+      .then((res: { data: ProximaCita[] | null }) => {
+        if (!cancelled) setProximaCita(res.data?.[0] ?? null)
       })
 
     return () => { cancelled = true }
@@ -297,6 +312,14 @@ function ExpedientePacienteContent() {
         addendums={allAddendums}
         isDoctor={isDoctor}
         onEditar={() => router.push(`/expediente/${id}/editar`)}
+      />
+
+      {/* Grid de cards — Fase 4 */}
+      <ExpedienteCardsGrid
+        paciente={paciente}
+        consultas={consultas}
+        proximaCita={proximaCita}
+        isDoctor={isDoctor}
       />
 
       {/* Acciones rápidas — solo médico */}

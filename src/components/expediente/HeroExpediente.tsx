@@ -8,9 +8,9 @@ import {
   Calendar,
   LayoutDashboard,
 } from 'lucide-react'
-import { differenceInDays, parseISO } from 'date-fns'
 import type { Paciente, Consulta, Laboratorio, Documento } from '@/types'
 import { calcularEdad } from '@/lib/patientUtils'
+import { ultimaConsultaLabel } from '@/lib/expedienteUtils'
 import ExportarExpedienteButton from './ExportarExpedienteButton'
 
 const SEXO_LABEL: Record<Paciente['sexo'], string> = {
@@ -38,22 +38,6 @@ type HeroExpedienteProps = {
 }
 
 const IOS_EASING = 'cubic-bezier(0.32, 0.72, 0, 1)'
-
-function ultimaConsultaLabel(consultas: Consulta[]): string {
-  if (!consultas.length) return 'Sin consultas'
-
-  const ordenadas = [...consultas].sort((a, b) => b.fecha.localeCompare(a.fecha))
-  const ultima = ordenadas[0]
-
-  const diff = differenceInDays(new Date(), parseISO(ultima.fecha))
-
-  if (diff === 0) return 'Hoy'
-  if (diff === 1) return 'Ayer'
-  if (diff < 7) return `Hace ${diff} días`
-  if (diff < 30) return `Hace ${Math.floor(diff / 7)} semanas`
-  if (diff < 365) return `Hace ${Math.floor(diff / 30)} meses`
-  return `Hace ${Math.floor(diff / 365)} años`
-}
 
 export default function HeroExpediente({
   paciente,
