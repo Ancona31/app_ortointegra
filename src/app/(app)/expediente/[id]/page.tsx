@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, Suspense } from 'react'
-import { useParams, useSearchParams, useRouter } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
 import { useAuditAccess } from '@/hooks/useAudit'
@@ -11,38 +11,23 @@ import Portal from '@/components/ui/Portal'
 import { Trash2, AlertTriangle, Loader2 } from 'lucide-react'
 
 import ModalVisorDocumento from '@/components/expediente/ModalVisorDocumento'
-import TarjetaPaciente from '@/components/expediente/TarjetaPaciente' // TODO Fase 7: eliminar import de TarjetaPaciente no usado
 import HeroExpediente from '@/components/expediente/HeroExpediente'
-import TabResumen from '@/components/expediente/TabResumen'
-import TabConsultas from '@/components/expediente/TabConsultas'
-import TabLaboratorios from '@/components/expediente/TabLaboratorios'
-import TabGraficas from '@/components/expediente/TabGraficas'
-import TabDocumentos from '@/components/expediente/TabDocumentos'
-import ExportarExpedienteButton from '@/components/expediente/ExportarExpedienteButton' // TODO Fase 7: eliminar import de ExportarExpedienteButton no usado en page.tsx
 import ExpedienteCardsGrid, { type ProximaCita } from '@/components/expediente/ExpedienteCardsGrid'
 import AccesosRapidos from '@/components/expediente/AccesosRapidos'
 import ModalConsultas from '@/components/expediente/ModalConsultas'
 import ModalDocumentos from '@/components/expediente/ModalDocumentos'
-
-type Tab = 'resumen' | 'consultas' | 'laboratorios' | 'graficas' | 'documentos'
 
 /** Límite de registros por query */
 const QUERY_LIMIT = 50
 
 function ExpedientePacienteContent() {
   const { id } = useParams<{ id: string }>()
-  const searchParams = useSearchParams()
   const router = useRouter()
   const { isDoctor } = useProfile()
   useAuditAccess('pacientes', id) // NOM-024: registrar acceso al expediente
 
   // ── Estados UI ──
   const [allAddendums, setAllAddendums] = useState<{ id: string; consulta_id: string; contenido: string; medico_nombre: string; created_at: string }[]>([])
-  const [tab, setTab] = useState<Tab>('resumen')
-  const [eliminandoLab, setEliminandoLab] = useState<string | null>(null)
-  const [confirmarEliminar, setConfirmarEliminar] = useState<string | null>(null)
-  const [graficasAbiertas, setGraficasAbiertas] = useState<Record<string, boolean>>({})
-  const [busquedaParam, setBusquedaParam] = useState('')
   const [docSeleccionado, setDocSeleccionado] = useState<Documento | null>(null)
   const [mostrarModalConsultas, setMostrarModalConsultas] = useState(false)
   const [mostrarModalDocumentos, setMostrarModalDocumentos] = useState(false)
@@ -57,7 +42,7 @@ function ExpedientePacienteContent() {
   const [loadingPaciente, setLoadingPaciente] = useState(true)
   const [proximaCita, setProximaCita] = useState<ProximaCita | null>(null)
 
-  const { labs, todosLosParams, refetch: fetchLabs } = useLaboratoriosNormalizados(id)
+  const { labs } = useLaboratoriosNormalizados(id)
 
   // Refetch helpers for child actions (delete doc, delete lab)
   const fetchDocumentos = useCallback(async () => {
@@ -121,14 +106,6 @@ function ExpedientePacienteContent() {
     return () => { cancelled = true }
   }, [id])
 
-  // ── Efecto de query string para seleccionar tab inicial ──
-  useEffect(() => {
-    const t = searchParams.get('tab')
-    if (t === 'laboratorios') setTab('laboratorios')
-    else if (t === 'graficas') setTab('graficas')
-    else if (t === 'documentos') setTab('documentos')
-  }, [searchParams])
-
   // ── Fetch de addendums (dependiente de consultas) ──
   useEffect(() => {
     if (!consultas || consultas.length === 0) {
@@ -161,16 +138,6 @@ function ExpedientePacienteContent() {
     }
   }
 
-  async function eliminarLab(labId: string) {
-    setEliminandoLab(labId)
-    const res = await fetch(`/api/laboratorios/${labId}`, { method: 'DELETE' })
-    if (res.ok) {
-      await fetchLabs()
-    }
-    setEliminandoLab(null)
-    setConfirmarEliminar(null)
-  }
-
   async function eliminarPaciente() {
     setEliminandoPaciente(true)
     setErrorEliminar('')
@@ -186,10 +153,6 @@ function ExpedientePacienteContent() {
     router.push('/expediente')
   }
 
-  function toggleGrafica(nombre: string) {
-    setGraficasAbiertas(prev => ({ ...prev, [nombre]: !prev[nombre] }))
-  }
-
   // ── Loading / not-found guards ─────────────────────────────
   if (loadingPaciente) {
     return <div className="text-center py-12 text-slate-400">Cargando expediente...</div>
@@ -197,20 +160,6 @@ function ExpedientePacienteContent() {
   if (!paciente) {
     return <div className="text-center py-12 text-slate-400">Paciente no encontrado</div>
   }
-
-  const paramsFiltrados = todosLosParams.filter(p =>
-    !busquedaParam || p.nombre.toLowerCase().includes(busquedaParam.toLowerCase())
-  )
-
-  const conTendencia = todosLosParams.filter(p => p.puntos.length > 1).length
-
-  const TABS: { key: Tab; label: string; count?: number }[] = [
-    { key: 'resumen', label: 'Resumen' },
-    { key: 'consultas', label: 'Consultas', count: consultas.length },
-    { key: 'laboratorios', label: 'Laboratorios', count: labs.length },
-    { key: 'graficas', label: 'Gráficas', count: todosLosParams.length || undefined },
-    ...(isDoctor ? [{ key: 'documentos' as Tab, label: 'Documentos', count: documentos.length || undefined }] : []),
-  ]
 
   return (
     <div className="max-w-4xl mx-auto space-y-4 animate-slide-up">
@@ -337,93 +286,6 @@ function ExpedientePacienteContent() {
         </>
       )}
 
-      {/* Tabs — macOS segmented control */}
-      <div className="bg-slate-100 p-1 rounded-xl flex gap-0.5 overflow-x-auto scrollbar-none">
-        {TABS.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap transition-all duration-150 min-w-fit ${
-              tab === t.key
-                ? 'bg-white shadow-sm text-[#1d1d1f] font-semibold'
-                : 'text-[#86868b] hover:text-[#3d3d3f]'
-            }`}
-          >
-            {t.label}
-            {t.count !== undefined && (
-              <span className={`ml-1 text-[10px] font-semibold ${tab === t.key ? 'text-[#86868b]' : 'text-slate-400'}`}>
-                {t.count}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* ── CONTENIDO DE TABS — con transición iOS ── */}
-      <div key={tab} className="animate-tab-enter">
-
-        {tab === 'resumen' && (
-          <TabResumen
-            id={id}
-            consultas={consultas}
-            labs={labs}
-            isDoctor={isDoctor}
-            onVerConsultas={() => setTab('consultas')}
-            onVerLaboratorios={() => setTab('laboratorios')}
-          />
-        )}
-
-        {tab === 'consultas' && (
-          <TabConsultas
-            id={id}
-            consultas={consultas}
-            isDoctor={isDoctor}
-            hayMas={false}
-            cargandoMas={false}
-            onCargarMas={() => {}}
-          />
-        )}
-
-        {tab === 'laboratorios' && (
-          <TabLaboratorios
-            id={id}
-            labs={labs}
-            isDoctor={isDoctor}
-            confirmarEliminar={confirmarEliminar}
-            eliminandoLab={eliminandoLab}
-            onConfirmarEliminar={setConfirmarEliminar}
-            onEliminarLab={eliminarLab}
-            hayMas={false}
-            cargandoMas={false}
-            onCargarMas={() => {}}
-          />
-        )}
-
-        {tab === 'graficas' && (
-          <TabGraficas
-            todosLosParams={todosLosParams}
-            paramsFiltrados={paramsFiltrados}
-            conTendencia={conTendencia}
-            busquedaParam={busquedaParam}
-            graficasAbiertas={graficasAbiertas}
-            onBusquedaChange={setBusquedaParam}
-            onToggleGrafica={toggleGrafica}
-          />
-        )}
-
-        {tab === 'documentos' && (
-          <TabDocumentos
-            id={id}
-            documentos={documentos}
-            onVerDocumento={setDocSeleccionado}
-            onEliminarDocumento={eliminarDocumento}
-            hayMas={false}
-            cargandoMas={false}
-            onCargarMas={() => {}}
-          />
-        )}
-
-      </div>
     </div>
   )
 }

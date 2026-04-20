@@ -71,7 +71,7 @@ export default function ModalShell({
 
   return (
     <Portal>
-      <div className={`fixed inset-0 ${zClass} flex items-end sm:items-center justify-center p-4`}>
+      <div className={`fixed inset-0 ${zClass} flex items-center justify-center p-4`}>
         <div
           className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in"
           onClick={onClose}
