@@ -8,6 +8,7 @@ import {
   CalendarDays, BarChart2, Users, CreditCard, UserCircle,
   HelpCircle, ChevronRight, Menu, X, LogOut, Moon, Sun,
   Building2, TrendingUp, UserPlus, LayoutDashboard, WifiOff,
+  Calculator,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -76,6 +77,7 @@ function navDoctor(isAdmin: boolean, isSuperAdmin: boolean): NavSection[] {
       ],
     },
     { kind: 'leaf', href: '/agenda', label: 'Agenda', icon: CalendarDays },
+    { kind: 'leaf', href: '/calculadoras-clinicas', label: 'Calculadoras', icon: Calculator },
     {
       kind: 'group', key: 'documentos', label: 'Documentos', icon: FileText,
       matchPaths: ['/documentos'],
