@@ -21,6 +21,8 @@ interface Props {
   maxWidth?: string
   /** z-50 por defecto. elevated=true usa z-[60] para apilarse sobre otro ModalShell */
   elevated?: boolean
+  /** Contenido fijo al pie del modal. No scrollea con el body. El consumidor maneja su propio padding. */
+  footer?: React.ReactNode
   children: React.ReactNode
 }
 
@@ -34,6 +36,7 @@ export default function ModalShell({
   headerRight,
   maxWidth = 'max-w-lg',
   elevated = false,
+  footer,
   children,
 }: Props) {
   const onCloseRef = useRef(onClose)
@@ -105,6 +108,11 @@ export default function ModalShell({
           <div className="flex-1 overflow-y-auto">
             {children}
           </div>
+          {footer && (
+            <div className="border-t border-slate-100 flex-shrink-0">
+              {footer}
+            </div>
+          )}
         </div>
       </div>
     </Portal>
