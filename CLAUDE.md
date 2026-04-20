@@ -217,3 +217,8 @@ Tu primer mensaje en cada sesión debe ser:
 1. Confirmar que leíste este `CLAUDE.md` completo
 2. Resumir en 3 líneas qué entendiste sobre el estado actual del módulo offline
 3. Esperar el objetivo del usuario antes de proponer cualquier cosa
+
+## Documentos de referencia para fases en progreso
+
+- **CALCULADORAS_ROADMAP.md** — Sistema de 200 calculadoras clínicas. Leer ANTES de trabajar en calculadoras.
+- **RESUMEN_DASHBOARD.md** — Dashboard del paciente en /expediente/[id]/estado. Leer ANTES de trabajar en esa página.
