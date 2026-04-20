@@ -9,7 +9,7 @@ import { useLaboratoriosNormalizados } from '@/hooks/useLaboratoriosNormalizados
 import { Paciente, Consulta, Documento } from '@/types'
 import Portal from '@/components/ui/Portal'
 import {
-  ArrowLeft, Stethoscope, FlaskConical, FileText, Trash2, AlertTriangle, Loader2,
+  Stethoscope, FlaskConical, FileText, Trash2, AlertTriangle, Loader2,
   Pill, ScanLine, ClipboardList, BedDouble, PenLine, ShieldCheck, Receipt, X, CalendarDays,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -17,14 +17,14 @@ import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 
 import ModalVisorDocumento from '@/components/expediente/ModalVisorDocumento'
-import Breadcrumbs from '@/components/layout/Breadcrumbs'
-import TarjetaPaciente from '@/components/expediente/TarjetaPaciente'
+import TarjetaPaciente from '@/components/expediente/TarjetaPaciente' // TODO Fase 7: eliminar import de TarjetaPaciente no usado
+import HeroExpediente from '@/components/expediente/HeroExpediente'
 import TabResumen from '@/components/expediente/TabResumen'
 import TabConsultas from '@/components/expediente/TabConsultas'
 import TabLaboratorios from '@/components/expediente/TabLaboratorios'
 import TabGraficas from '@/components/expediente/TabGraficas'
 import TabDocumentos from '@/components/expediente/TabDocumentos'
-import ExportarExpedienteButton from '@/components/expediente/ExportarExpedienteButton'
+import ExportarExpedienteButton from '@/components/expediente/ExportarExpedienteButton' // TODO Fase 7: eliminar import de ExportarExpedienteButton no usado en page.tsx
 import dynamic from 'next/dynamic'
 
 function FormCargando() {
@@ -288,26 +288,16 @@ function ExpedientePacienteContent() {
         </Portal>
       )}
 
-      {/* Breadcrumbs */}
-      <Breadcrumbs pacienteNombre={paciente ? `${paciente.nombre} ${paciente.apellidos}` : undefined} />
-
-      {/* Header — macOS style */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <Link
-            href="/expediente"
-            className="flex items-center gap-1 text-[#1e5fa8] hover:text-[#1a3a5c] text-sm font-medium transition-colors"
-          >
-            <ArrowLeft size={16} strokeWidth={2.5} />
-            <span>Pacientes</span>
-          </Link>
-          <span className="text-slate-300 select-none">/</span>
-          <h1 className="text-sm font-semibold text-[#1d1d1f] truncate">Expediente Clínico</h1>
-        </div>
-      </div>
-
       {/* Tarjeta del paciente */}
-      <TarjetaPaciente paciente={paciente} id={id} isDoctor={isDoctor} />
+      <HeroExpediente
+        paciente={paciente}
+        consultas={consultas}
+        labs={labs}
+        documentos={documentos}
+        addendums={allAddendums}
+        isDoctor={isDoctor}
+        onEditar={() => router.push(`/expediente/${id}/editar`)}
+      />
 
       {/* Acciones rápidas — solo médico */}
       {isDoctor && (
@@ -366,15 +356,8 @@ function ExpedientePacienteContent() {
             </div>
           </div>
 
-          {/* Exportar + eliminar */}
-          <div className="flex items-center justify-between">
-            <ExportarExpedienteButton
-              paciente={paciente}
-              consultas={consultas}
-              labs={labs}
-              documentos={documentos}
-              addendums={allAddendums}
-            />
+          {/* Eliminar (Exportar ahora vive dentro del Hero) */}
+          <div className="flex justify-end">
             <button
               onClick={() => setMostrarEliminarPaciente(true)}
               className="flex items-center gap-1.5 text-[11px] text-[#86868b] hover:text-red-500 transition-colors"
