@@ -289,9 +289,10 @@ export default function ExportarExpedienteButton({ paciente, consultas, labs, do
   return (
     <button
       onClick={exportar}
-      className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-[#1e5fa8] transition-colors py-1"
+      className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-[13px] font-medium text-slate-700 hover:border-slate-300 hover:text-slate-900 hover:shadow-sm active:scale-[0.98] transition-all duration-200"
+      style={{ transitionTimingFunction: 'cubic-bezier(0.32, 0.72, 0, 1)' }}
     >
-      <FileDown size={13} /> Exportar PDF
+      <FileDown size={14} /> Exportar
     </button>
   )
 }
