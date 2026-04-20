@@ -222,3 +222,15 @@ Tu primer mensaje en cada sesión debe ser:
 
 - **CALCULADORAS_ROADMAP.md** — Sistema de 200 calculadoras clínicas. Leer ANTES de trabajar en calculadoras.
 - **RESUMEN_DASHBOARD.md** — Dashboard del paciente en /expediente/[id]/estado. Leer ANTES de trabajar en esa página.
+
+---
+
+## 🪫 Deuda técnica conocida
+
+Lista de bugs/limitaciones aceptadas conscientemente. No corregir sin plan explícito — cada ítem tiene contexto que justifica dejarlo.
+
+1. **`regenerarYSubirPdf` muta `doc.pdf_url` local sin re-render.** Existe en `src/components/expediente/TabDocumentos.tsx` (línea ~110) y se replicó con el mismo bug en `src/components/expediente/ModalDocumentos.tsx` (Fase 6). Al regenerar un PDF, el botón de descarga no aparece hasta refetch manual. Arreglar con `setState` inmutable que reemplace el documento en la lista, no mutando el objeto por referencia.
+2. **`ModalVisorDocumento` no usa `ModalShell`.** No tiene click-outside, escape key, scroll lock ni focus trap. Migrar a `ModalShell` en Fase 7 con `elevated={true}` cuando se abra desde `ModalDocumentos`.
+3. **Z-index inconsistente entre modales legacy.** `QuickPatientModal` usa `z-[70]`, `ModalVisorDocumento` usa `z-50`, y había modales con `z-[9999]` antes de la limpieza de Fase 5. `ModalShell` ya estandariza (`z-50` / `z-[60]` con `elevated`). Unificar los legacy en Fase 7.
+4. **`ModalShell` sin focus trap.** Deuda de accesibilidad. El Tab puede escapar del modal. Agregar trap cuando tengamos auditoría a11y formal.
+5. **Modales de Consultas y Documentos sin paginación.** Límite hard de 50 registros heredado de `QUERY_LIMIT` en `page.tsx`. Si un paciente tiene >50 consultas/documentos, los restantes no se ven en el modal. Agregar scroll virtual o buscador interno en fase futura.
