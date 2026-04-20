@@ -9,12 +9,12 @@
 
 ## Estado actual
 
-**Fase 1 en ejecución por Claude Code al momento de redactar este doc.**
+**Fase 2 en progreso. Sub-sesión 1 completa (10 calculadoras Tipo 1 en producción). Sub-sesión 2 pendiente: integración de 5ª card 'Calculadoras clínicas' en dashboard /estado.**
 
 | Fase | Estado | Resultado |
 |---|---|---|
-| 1 — Infraestructura + IMC | 🔄 En progreso | — |
-| 2 — 10 calculadoras Tipo 1 | ⏸ Pendiente | — |
+| 1 — Infraestructura + IMC | ✅ Completa | IMC en producción |
+| 2 — 10 calculadoras Tipo 1 | 🔄 Sub-sesión 1 completa | 10 calculadoras Tipo 1 en producción; pendiente: 5ª card en /estado |
 | 3 — 20 calculadoras Tipo 2 | ⏸ Pendiente | — |
 | 4 — Calculadoras Tipo 3 | ⏸ Pendiente | — |
 | 5 — Calculadoras Tipo 4 | ⏸ Pendiente | — |
@@ -64,7 +64,7 @@ Médico marca criterios → output es clasificación categórica, no número.
 
 ---
 
-## Especialidades (18 total, 10 calculadoras cada una)
+## Especialidades (19 total, ~10 calculadoras cada una)
 
 1. Cardiología
 2. Nefrología
@@ -228,7 +228,9 @@ Cuando se navega desde `/estado` a una calculadora, se pasa `?paciente={id}` en 
 
 ---
 
-## Fase 1 — Lo que se está construyendo AHORA
+## Fase 1 — Completada (referencia)
+
+**Estado: ✅ Completada y en producción.**
 
 **Entregables:**
 - Tipos, categorías, registry (infraestructura)
@@ -381,3 +383,4 @@ Si un contrato cambia (ej. se agrega un tipo de input nuevo), documentar aquí:
 | Fecha | Cambio | Razón |
 |---|---|---|
 | 2026-04-20 | Creación inicial | Arranque Fase 1 |
+| 2026-04-19 | Fase 2 sub-sesión 1: 10 calculadoras Tipo 1 + corrección header de especialidades 18→19 + commit inicial de infraestructura Fase 1 (no commiteada previamente) | Cierre de batch de fórmulas matemáticas puras |
