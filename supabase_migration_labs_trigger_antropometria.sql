@@ -23,6 +23,16 @@
 -- No se nulea peso_kg / talla_cm al quedar sin mediciones: se mantiene
 -- el último valor conocido (decisión documentada en LABS_REDISEÑO_PLAN
 -- sub-fase 4, sección Riesgos).
+--
+-- Fallback para IMC (Opción B — decisión α): si la mutación solo aporta
+-- uno de los dos (ej. peso nuevo sin medición de talla), el IMC se
+-- calcula usando el valor faltante desde pacientes.peso_kg / talla_cm
+-- (último valor conocido). Así un INSERT de peso en un paciente con
+-- talla pre-existente actualiza el IMC correctamente.
+-- IMPORTANTE: peso_kg y talla_cm en pacientes siguen sincronizándose
+-- SOLO con valores provenientes de mediciones_analitos; nunca con su
+-- propio valor actual (sería no-op). El fallback aplica únicamente al
+-- cálculo del IMC.
 create or replace function public.sync_antropometria_paciente(p_paciente_id uuid)
 returns void
 language plpgsql
@@ -30,16 +40,20 @@ security definer
 set search_path = public
 as $$
 declare
-  v_peso  numeric;
-  v_talla numeric;
-  v_imc   numeric;
+  v_peso_medicion  numeric;
+  v_talla_medicion numeric;
+  v_peso_paciente  numeric;
+  v_talla_paciente numeric;
+  v_peso_final     numeric;
+  v_talla_final    numeric;
+  v_imc            numeric;
 begin
   if p_paciente_id is null then
     return;
   end if;
 
-  -- Última medición de peso (kg)
-  select m.valor into v_peso
+  -- Última medición de peso (kg) desde mediciones_analitos
+  select m.valor into v_peso_medicion
   from mediciones_analitos m
   join analitos_catalogo a on a.id = m.analito_id
   where m.paciente_id = p_paciente_id
@@ -47,8 +61,8 @@ begin
   order by m.medido_en desc
   limit 1;
 
-  -- Última medición de talla (cm)
-  select m.valor into v_talla
+  -- Última medición de talla (cm) desde mediciones_analitos
+  select m.valor into v_talla_medicion
   from mediciones_analitos m
   join analitos_catalogo a on a.id = m.analito_id
   where m.paciente_id = p_paciente_id
@@ -56,18 +70,31 @@ begin
   order by m.medido_en desc
   limit 1;
 
+  -- Estado actual en pacientes (último valor conocido) para fallback del IMC
+  select peso_kg, talla_cm into v_peso_paciente, v_talla_paciente
+  from pacientes
+  where id = p_paciente_id;
+
+  -- Valores efectivos para el cálculo del IMC: medición si existe, si no el
+  -- último conocido en pacientes. No se usa _final para escribir peso_kg /
+  -- talla_cm, solo para el IMC.
+  v_peso_final  := coalesce(v_peso_medicion,  v_peso_paciente);
+  v_talla_final := coalesce(v_talla_medicion, v_talla_paciente);
+
   -- IMC solo si ambos > 0 (evita división por cero y valores absurdos)
-  if v_peso is not null and v_talla is not null
-     and v_peso > 0 and v_talla > 0 then
-    v_imc := round(v_peso / ((v_talla / 100.0) * (v_talla / 100.0)), 1);
+  if v_peso_final is not null and v_talla_final is not null
+     and v_peso_final > 0 and v_talla_final > 0 then
+    v_imc := round(v_peso_final / ((v_talla_final / 100.0) * (v_talla_final / 100.0)), 1);
   end if;
 
-  -- UPDATE parcial: solo sobreescribe las columnas que tienen nuevo valor.
-  -- Si no hay historial (v_peso / v_talla NULL), mantiene el valor actual.
+  -- UPDATE parcial: peso_kg / talla_cm solo se sobreescriben con valores
+  -- provenientes de mediciones_analitos. IMC se recalcula usando el fallback.
+  -- Si no hay historial (v_*_medicion NULL), las columnas de peso/talla
+  -- mantienen su valor actual.
   update pacientes
-  set peso_kg    = coalesce(v_peso,  peso_kg),
-      talla_cm   = coalesce(v_talla, talla_cm),
-      imc        = coalesce(v_imc,   imc),
+  set peso_kg    = coalesce(v_peso_medicion,  peso_kg),
+      talla_cm   = coalesce(v_talla_medicion, talla_cm),
+      imc        = coalesce(v_imc,            imc),
       updated_at = now()
   where id = p_paciente_id;
 end;
@@ -124,11 +151,15 @@ create trigger mediciones_sync_antropometria
 
 -- ─── 4. Restringir ejecución directa (defensa-en-profundidad) ────
 -- sync_antropometria_paciente recibe paciente_id como argumento.
--- Sin REVOKE, cualquier authenticated podría llamarla directamente
--- desde SQL editor y forzar UPDATE de pacientes de otras clínicas
--- (el SECURITY DEFINER ignora RLS de pacientes durante el UPDATE).
+-- Sin REVOKE, cualquier rol podría llamarla directamente:
+--   - authenticated: vía SQL editor
+--   - anon:          vía POST /rest/v1/rpc/sync_antropometria_paciente (Supabase REST)
+--   - PUBLIC:        grant implícito a todos los roles en Postgres
+-- Al tener SECURITY DEFINER, la función ignora RLS de pacientes durante el UPDATE
+-- y permitiría vandalismo cross-clínica (forzar updated_at / recalcular peso/talla/imc
+-- en pacientes de otra clínica).
 --
 -- El trigger sigue funcionando porque los triggers se invocan con
 -- privilegios del owner, no del caller. Solo bloqueamos llamadas directas.
-revoke execute on function public.sync_antropometria_paciente(uuid) from public, authenticated;
-revoke execute on function public.trg_mediciones_antropometria() from public, authenticated;
+revoke execute on function public.sync_antropometria_paciente(uuid) from public, authenticated, anon;
+revoke execute on function public.trg_mediciones_antropometria() from public, authenticated, anon;
