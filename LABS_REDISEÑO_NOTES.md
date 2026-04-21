@@ -7,7 +7,7 @@ Notas vivas del rediseño del sistema de laboratorios. Se actualiza por sub-fase
 | # | Sub-fase | Estado | Commit |
 |---|---|---|---|
 | 0 | Cleanup y deuda técnica | ✅ Cerrada en 2026-04-21 | pendiente (Angel hace commit manual) |
-| 1A | Schema SQL: tablas + RLS + trigger | ⏳ SQL generados, esperando ejecución manual por Angel (2026-04-21) | — |
+| 1A | Schema SQL: tablas + RLS + trigger | ✅ Cerrada 2026-04-21 | pendiente (Angel hace commit manual) |
 | 1B | Seed del catálogo de analitos | ⏳ Pendiente | — |
 | 2 | Página base + Hero + secciones vacías | ⏳ Pendiente | — |
 | 3 | Modal "Agregar medición" + autocomplete + custom | ⏳ Pendiente | — |
@@ -64,6 +64,28 @@ Confirmados huérfanos al cierre de sub-fase 8:
 En Supabase:
 
 - Tabla `laboratorios` (confirmada borrable, data de prueba no productiva)
+
+## Registro de fixes post-ejecución sub-fase 1A
+
+Dos fixes aplicados después de la ejecución inicial en Supabase. Ambos están incorporados en el archivo SQL del repo, así que una migración desde cero queda correcta.
+
+### Fix 1 — REVOKE incluye rol `anon`
+
+El REVOKE EXECUTE original cubría `public` y `authenticated`, pero NO `anon`. En Supabase, `anon` es un rol independiente que puede llamar funciones RPC vía `POST /rest/v1/rpc/` sin autenticación. Sin ese REVOKE, cualquier cliente no autenticado podía disparar `sync_antropometria_paciente` bypaseando RLS de `pacientes`.
+
+Archivo actualizado: los 2 REVOKE en sección 4 de `supabase_migration_labs_trigger_antropometria.sql` ahora incluyen `public, authenticated, anon`.
+
+### Fix 2 — Fallback en cálculo de IMC (Opción B, decisión α)
+
+Bug descubierto en smoke test: al insertar medición de peso sin medición previa de talla en `mediciones_analitos`, el IMC no se recalculaba (v_talla quedaba NULL, el IF saltaba el recálculo).
+
+Comportamiento nuevo: la función `sync_antropometria_paciente` usa `COALESCE(medición, pacientes.*)` como valor efectivo para calcular IMC. Las columnas `peso_kg` y `talla_cm` en `pacientes` siguen sincronizándose SOLO con valores de `mediciones_analitos` (decisión α no modificada).
+
+Archivo actualizado: sección 1 del trigger — función completa reescrita en `supabase_migration_labs_trigger_antropometria.sql`.
+
+## Pendientes no bloqueantes
+
+- Regenerar `src/types/database.types.ts` usando Supabase CLI. Las 5 interfaces manuales en `src/types/index.ts` (CategoriaAnalito, BandsType, RangoAnalito, AnalitoCatalogo, MedicionAnalito) suplen por ahora. Puede hacerse antes de sub-fase 9 (QA final). Comando: `npx supabase gen types typescript --project-id <id> > src/types/database.types.ts`.
 
 ## Pendientes de cierre al final del rediseño
 
