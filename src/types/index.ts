@@ -224,6 +224,63 @@ export const VALORES_REFERENCIA = {
 
 export type ParametroLab = keyof typeof VALORES_REFERENCIA
 
+// ─── Laboratorios (rediseño sub-fase 1A) ─────────────────────────────────────
+// Interfaces del nuevo modelo mediciones_analitos + analitos_catalogo.
+// No confundir con Laboratorio / ResultadoLab / ValoresLab (legacy, mueren sub-fase 8).
+
+export type CategoriaAnalito =
+  | 'antropometria'
+  | 'signos_vitales'
+  | 'hematologia'
+  | 'quimica'
+  | 'hueso'
+  | 'endocrino'
+  | 'inmunologia'
+  | 'coagulacion'
+  | 'cardiaco'
+  | 'marcador_tumoral'
+  | 'vitaminas_minerales'
+  | 'otros'
+
+export type BandsType = 'high-bad' | 'low-bad' | 'low-and-high-bad' | 'none'
+
+export interface RangoAnalito {
+  ok_min?: number
+  ok_max?: number
+  warn_min?: number
+  warn_max?: number
+}
+
+export interface AnalitoCatalogo {
+  id: string
+  clave: string
+  nombre: string
+  nombres_alternativos: string[]
+  categoria: CategoriaAnalito
+  unidad: string
+  bands_type: BandsType
+  rango_default: RangoAnalito | null
+  rango_femenino: RangoAnalito | null
+  rango_masculino: RangoAnalito | null
+  precision_decimales: number
+  activo: boolean
+  created_at: string
+}
+
+export interface MedicionAnalito {
+  id: string
+  paciente_id: string
+  analito_id: string | null
+  nombre_custom: string | null
+  unidad_custom: string | null
+  categoria_custom: string | null
+  valor: number
+  medido_en: string
+  notas: string | null
+  creado_por: string
+  created_at: string
+}
+
 // ─── Honorarios / Plantillas ─────────────────────────────────────────────────
 export interface AseguradoraInfo {
   nombre: string
