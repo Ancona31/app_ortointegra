@@ -164,6 +164,13 @@ export interface Documento {
   tipo: TipoDocumento
   contenido: DocumentoContenido
   pdf_url?: string
+  // Metadata de uploads clínicos (sub-fase 6A). NULL en documentos generados por la app.
+  storage_bucket?: string | null
+  storage_path?: string | null
+  mime_type?: string | null
+  tamaño_bytes?: number | null
+  nombre_original?: string | null
+  subido_por?: string | null
   created_at?: string
 }
 

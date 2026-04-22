@@ -14,7 +14,7 @@ Notas vivas del rediseño del sistema de laboratorios. Se actualiza por sub-fase
 | 4 | Dropdown selector + detail header + tabla | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
 | 5 | Gráfica con bandas + tendencia + leyenda | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
 | 6A | Integración Documentos — migración SQL uploads | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
-| 6B | Integración Documentos — componentes UI | ⏳ Pendiente | — |
+| 6B | Integración Documentos — componentes UI | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
 | 7 | Card "Mediciones y Documentos" en ExpedienteCardsGrid | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
 | 8 | Migración /estado + drop tabla legacy | ⏳ Pendiente | — |
 | 9 | QA end-to-end + validaciones manuales | ⏳ Pendiente | — |
@@ -270,6 +270,191 @@ registros existentes de `pdf_url` → `storage_path` porque:
   esta sesión). El resto de la metadata de uploads (storage_path, etc.)
   se tipará manualmente en la interfaz `Documento` o equivalente al
   arrancar sub-fase 6B si hace falta antes de la regeneración.
+
+## Sub-fase 6B — decisiones de implementación
+
+- **Dependencia nueva**: `browser-image-compression@2.0.2` (pinned con
+  `--save-exact`). ~13KB gzipped. Usada solo para comprimir JPG/PNG
+  client-side antes del upload a Storage.
+- **Bypass de compresión para imágenes <500KB**: la librería agrega
+  overhead y puede degradar calidad en archivos ya optimizados. DICOM
+  y PDF nunca se comprimen.
+- **MIME normalizado para DICOM**: algunos navegadores reportan `.dcm`
+  como `application/octet-stream`. `inferirMime()` normaliza por
+  extensión para que la columna `mime_type` en DB siempre guarde
+  `application/dicom` — garantiza que el filtro de visor y futuras
+  queries por MIME funcionen consistentemente.
+- **Patrón de upload browser-direct (Opción A)**: NO hay precedente en
+  el repo. Los 3 usos previos de `storage.from` son server-side con
+  admin client. El bucket `labs-documentos` y sus policies
+  scope-by-clínica (sub-fase 6A) habilitan upload desde el cliente
+  autenticado. Flujo: validar → comprimir si imagen → generar UUID →
+  `storage.upload(path, file)` → `documentos.insert({..., storage_*})`.
+  Si el INSERT falla tras upload OK, rollback del archivo en Storage
+  con `remove([path])`.
+- **DICOM mini-viewer inline (Opción C)**: ~180 líneas en
+  `ModalPreviewDocumento.tsx`. Cornerstone v4 con `RenderingEngine`
+  dedicado por instancia (IDs únicos con `crypto.randomUUID()` para
+  no colisionar con el visor principal en `/dicom` o `DicomViewer`).
+  Tools: StackScrollTool (wheel), WindowLevelTool (primary drag),
+  ZoomTool (secondary drag). NO MPR, NO annotations, NO measurements.
+  Cleanup destruye ToolGroup + RenderingEngine. `useEffect` dep
+  `[url]` garantiza re-init al cambiar de documento. El indicador de
+  slice se removió — para DICOM single-frame (el 99% de uploads) es
+  "1 frame"; scroll navega pero no notifica a React. Si aparece caso
+  real de DICOM multi-frame y el contador es crítico, se agrega
+  después.
+- **`contenido` se guarda como `{}` o poblado — NO NULL**: el diseño
+  original de 6A proponía `contenido = NULL` para uploads. Desviación
+  necesaria porque cambiar el tipo TS a `contenido: DocumentoContenido | null`
+  rompe el consumidor `ModalVisorDocumento` (requiere
+  `Record<string, any>`). Alternativa: siempre `contenido = {}`
+  (vacío) o con `descripcion`/`fecha_estudio` si el usuario los
+  captura. El CHECK `documentos_tiene_origen_check` de 6A
+  (`contenido is not null OR storage_path is not null`) se sigue
+  cumpliendo (`{}` no es NULL). El trigger de límite 100 no depende
+  de `contenido`, depende de `tipo IN (...)`. Sin regresión funcional.
+- **Render-time sync en lugar de `setState dentro de useEffect`**:
+  en `ModalPreviewDocumento`, el reset del estado (`signedUrl`,
+  `urlError`) al cambiar de documento target usa el patrón de
+  snapshot (mismo del `claveSnapshot` de sub-fase 5) — el linter
+  `react-hooks/static-components` marca como error el `setState`
+  dentro del top-level de un effect con early return. El async load
+  de la signed URL sí vive en el `useEffect` porque no setState en la
+  primera sincronía.
+- **Signed URLs TTL 300s (5 min)**: regeneradas cada vez que se abre
+  el preview. NO cacheadas en estado global. Si el usuario deja el
+  modal abierto >5min, el recurso sigue funcionando porque el browser
+  ya lo tiene cargado (iframe/img/Cornerstone), solo fallará en
+  recargas forzadas post-expiración.
+- **Responsive desktop/mobile**: en `SeccionDocumentosLabs`, se
+  renderea tanto el grid (hidden md:grid) como la lista
+  (md:hidden) — CSS de Tailwind ocultaba el variante inadecuado
+  según breakpoint. Duplica el render pero es la solución más simple;
+  no se abstrajo un `useMediaQuery` porque es uso único aquí.
+- **Invalidación SWR**: `mutate(['documentos-labs', pacienteId])` +
+  `mutate(['stats-labs', pacienteId])` al terminar un upload (solo si
+  al menos uno OK) y al completar un delete. `useStatsLabs` cuenta
+  `documentos.count` con `head: true` — la re-query refresca el KPI
+  del Hero automáticamente.
+- **Delete end-to-end**: DELETE de tabla `documentos` primero (audit
+  log se dispara con el trigger `audit_documentos` existente en DB);
+  luego `storage.remove([path])`. Si Storage falla pero DB OK →
+  `console.warn` con "archivo huérfano" y continuar (no bloqueante).
+  El usuario ve éxito porque para él el documento desapareció de la
+  lista.
+- **`Documento` extendido en `src/types/index.ts`**: 6 columnas
+  nullable agregadas manualmente (`storage_bucket`, `storage_path`,
+  `mime_type`, `tamaño_bytes`, `nombre_original`, `subido_por`).
+  Pendiente de regenerar `database.types.ts` con Supabase CLI (ver
+  pendientes no bloqueantes de 6A — sigue abierto).
+- **`useProfile` en el padre**: `SeccionDocumentosLabs` lee
+  `profile.clinica_id` y `profile.id` una sola vez y los pasa como
+  props a `ModalSubirDocumento`. Si `clinica_id` es NULL (edge case
+  de usuario recién invitado), el botón "Subir documento" queda
+  disabled con tooltip "Configura tu clínica antes de subir
+  documentos". `ModalSubirDocumento` se monta solo cuando ambos
+  existen — double guarda.
+
+### Archivos creados
+
+- `src/lib/labs/upload-utils.ts` — validación (MIME + extensión +
+  tamaño por tipo), compresión condicional, construcción de path
+  `clinicas/{c}/pacientes/{p}/{uuid}.{ext}`, formateo de bytes.
+- `src/hooks/useDocumentosLabs.ts` — SWR hook filtrado por
+  `tipo IN ('resultado_laboratorio','estudio_imagen')`. Key
+  `['documentos-labs', pacienteId]`.
+- `src/components/labs/ModalSubirDocumento.tsx` — drag & drop + input
+  file + lista de archivos con tipo/fecha/descripción por item +
+  submit secuencial con progreso + mapeo de errores Supabase
+  (RLS 42501, check_violation del trigger 100, 413, red) + resumen
+  final si falla alguno.
+- `src/components/labs/CardDocumento.tsx` — variante grid (hover
+  shows delete) + variante list (compact row).
+- `src/components/labs/ModalPreviewDocumento.tsx` — preview por MIME:
+  PDF en `<iframe>`, imagen en `<img>`, DICOM en mini-visor
+  Cornerstone inline con cleanup completo. Footer con botón
+  "Descargar" (href a signed URL) + "Cerrar".
+
+### Archivos modificados
+
+- `src/types/index.ts` — interfaz `Documento` extendida con 6
+  columnas nullable de upload.
+- `src/components/labs/SeccionDocumentosLabs.tsx` — de stub a
+  componente orquestador completo (grid/list responsive + modal
+  subir + modal preview + modal confirm delete + invalidación SWR).
+- `package.json` / `package-lock.json` — `browser-image-compression@2.0.2`.
+
+### Cierre post-validación visual (2026-04-22)
+
+Validación end-to-end realizada por Angel en entorno `npm run dev`
+con paciente de prueba `c48ebdc5-edaa-4e21-b448-0f93b8d03b5b`.
+Todos los flujos verdes: upload múltiple (validación MIME + tamaño
++ compresión imágenes), estructura de path en Storage
+`clinicas/{uuid}/pacientes/{uuid}/{uuid}.{ext}` correcta, grid
+responsive (desktop 3 cols, mobile lista), preview por MIME
+funcional (PDF iframe / imagen `<img>` / DICOM mini-visor), delete
+con confirmación + invalidación SWR + update del KPI del Hero.
+
+Decisiones clave consolidadas del cierre:
+
+1. **`contenido` guardado como `{}` jsonb para uploads (desviación
+   consciente del diseño original de 6A)**. El diseño 6A propuso
+   `contenido = NULL` para uploads, pero cambiar
+   `Documento.contenido` a `DocumentoContenido | null` rompe el
+   consumidor existente `ModalVisorDocumento` que requiere
+   `Record<string, any>`. Mantener el tipo no-nullable y pasar
+   `{}` (posiblemente poblado con `descripcion`/`fecha_estudio` si
+   el usuario los captura) es funcionalmente equivalente: el CHECK
+   `documentos_tiene_origen_check` de 6A se sigue cumpliendo
+   porque `{}` no es NULL. El trigger de límite 100 depende de
+   `tipo IN (...)`, no de `contenido`. **Regla operacional**: la
+   distinción "upload vs generado por la app" se hace por
+   `storage_bucket IS NOT NULL` (o `storage_path IS NOT NULL`), no
+   por `contenido IS NULL`.
+
+2. **Fix hydration de `CardDocumento`**: el wrapper externo de la
+   card (grid y list) es `<div role="button" tabIndex={0}>` en
+   lugar de `<button>`, porque el trash icon anidado ya es
+   `<button>` y HTML prohíbe botones anidados (React 19 emite
+   hydration warning). Accesibilidad preservada con:
+   - `handleKeyDown` que dispara `onClick()` en Enter o Space con
+     `e.preventDefault()`.
+   - `focus:outline-none focus:ring-2 focus:ring-slate-300` para
+     foco visible al tabular.
+   - `cursor-pointer` para affordance visual.
+   El trash interno mantiene `e.stopPropagation()` en su
+   `onClick` para evitar burbujeo al div externo.
+
+3. **Mini-visor DICOM inline construido desde cero** (Opción C,
+   ~180 líneas en `ModalPreviewDocumento.tsx`). Cornerstone v4 con
+   `RenderingEngine` + `ToolGroup` dedicados por instancia (IDs
+   únicos vía `crypto.randomUUID()` con prefijos
+   `preview-engine-`, `preview-vp-`, `preview-tg-` para no
+   colisionar con el `DicomViewer` principal del módulo
+   `/dicom`). Scope intencionalmente reducido: StackScrollTool
+   (wheel), WindowLevelTool (primary drag), ZoomTool (secondary
+   drag), PanTool (auxiliary). **NO** MPR, **NO** annotations,
+   **NO** measurements, **NO** series panel, **NO** metadata
+   panel. Cleanup completo al desmontar: `ToolGroupManager.destroyToolGroup()` +
+   `engine.destroy()`. El blob del `fetch(signedUrl)` se gestiona
+   vía `wadouri.fileManager.add(file)` — no se usa
+   `URL.createObjectURL()` porque Cornerstone maneja el buffer
+   internamente.
+
+4. **Slice counter dinámico diferido**: se removió el listener de
+   `CORNERSTONE_IMAGE_RENDERED` por incertidumbre sobre su
+   confiabilidad en v4 (el evento emite desde el viewport, no
+   necesariamente del DOM element, y re-registrarlo en cada mount
+   introduce complejidad). Se muestra label estático "N frames ·
+   scroll para navegar · arrastra para W/L · clic derecho +
+   arrastra para zoom". Para single-frame DICOM (99% de uploads
+   clínicos típicos: una Rx o un TAC cortado) `N = 1` y no hay
+   diferencia práctica. Cuando aparezca un caso real de
+   multi-frame donde el contador dinámico sea crítico, se agrega
+   en un follow-up con polling ligero (requestAnimationFrame) o
+   con `viewport.element.addEventListener('wheel', ...)` como
+   proxy.
 
 ## Pendientes de cierre al final del rediseño
 
