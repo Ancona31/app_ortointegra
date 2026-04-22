@@ -8,7 +8,7 @@ Notas vivas del rediseño del sistema de laboratorios. Se actualiza por sub-fase
 |---|---|---|---|
 | 0 | Cleanup y deuda técnica | ✅ Cerrada en 2026-04-21 | pendiente (Angel hace commit manual) |
 | 1A | Schema SQL: tablas + RLS + trigger | ✅ Cerrada 2026-04-21 | pendiente (Angel hace commit manual) |
-| 1B | Seed del catálogo de analitos | ⏳ SQL generado 2026-04-21, esperando revisión clínica por Angel | — |
+| 1B | Seed del catálogo de analitos | ✅ Cerrada 2026-04-21 (175 analitos) | pendiente (Angel hace commit manual) |
 | 2 | Página base + Hero + secciones vacías | ⏳ Pendiente | — |
 | 3 | Modal "Agregar medición" + autocomplete + custom | ⏳ Pendiente | — |
 | 4 | Dropdown selector + detail header + tabla | ⏳ Pendiente | — |
@@ -82,6 +82,31 @@ Bug descubierto en smoke test: al insertar medición de peso sin medición previ
 Comportamiento nuevo: la función `sync_antropometria_paciente` usa `COALESCE(medición, pacientes.*)` como valor efectivo para calcular IMC. Las columnas `peso_kg` y `talla_cm` en `pacientes` siguen sincronizándose SOLO con valores de `mediciones_analitos` (decisión α no modificada).
 
 Archivo actualizado: sección 1 del trigger — función completa reescrita en `supabase_migration_labs_trigger_antropometria.sql`.
+
+## Registro de revisión clínica sub-fase 1B
+
+Seed generado con 175 analitos en 17 paneles. Revisión clínica por Angel (médico traumatólogo/columna) aplicó 3 ajustes post-revisión:
+
+### Ajuste 1 — urea: sinónimos
+
+Eliminado `'BUN x 2.14'` del array `nombres_alternativos` porque sugería (incorrectamente) que el analito `urea` se deriva de `bun`. Son analitos independientes; el laboratorio MX reporta uno u otro según su convención. Sinónimos finales: `urea serica`, `urea sérica`, `urea en sangre`, `nitrogeno ureico`.
+
+### Ajuste 2 — procalcitonina: rango clínicamente correcto
+
+Rango original `{"ok_max": 0.5}` pintaba verde en zona de infección bacteriana local-moderada (0.1-0.5 ng/mL). Cambiado a `{"ok_max": 0.1, "warn_max": 0.5}`. Semántica correcta: verde < 0.1, amarillo 0.1-0.5, rojo > 0.5.
+
+### Ajuste 3 — cea: comentario de variación por perfil
+
+Agregado comentario `-- verificar: cutoff 5 para no fumadores, 10 para fumadores` al INSERT. El rango hardcodeado (`ok_max: 5`) aplica a no fumadores. Para fumadores el cutoff literature-standard es 10. Modelado de "perfil del paciente" (fumador/no fumador) es deuda de V2 — no se implementa en V1.
+
+## Claves literales críticas confirmadas en DB
+
+Verificadas post-ejecución:
+
+- `peso` — categoria `antropometria`, unidad `kg` → usada por trigger de antropometría
+- `talla` — categoria `antropometria`, unidad `cm` → usada por trigger de antropometría
+- `ta_sistolica` — categoria `signos_vitales`, unidad `mmHg` → usada por UX especial del modal TA (sub-fase 3)
+- `ta_diastolica` — categoria `signos_vitales`, unidad `mmHg` → usada por UX especial del modal TA (sub-fase 3)
 
 ## Pendientes no bloqueantes
 
