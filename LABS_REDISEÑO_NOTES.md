@@ -10,7 +10,7 @@ Notas vivas del rediseño del sistema de laboratorios. Se actualiza por sub-fase
 | 1A | Schema SQL: tablas + RLS + trigger | ✅ Cerrada 2026-04-21 | pendiente (Angel hace commit manual) |
 | 1B | Seed del catálogo de analitos | ✅ Cerrada 2026-04-21 (175 analitos) | pendiente (Angel hace commit manual) |
 | 2 | Página base + Hero + secciones vacías | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
-| 3 | Modal "Agregar medición" + autocomplete + custom | ⏳ Pendiente | — |
+| 3 | Modal "Agregar medición" + autocomplete + custom | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
 | 4 | Dropdown selector + detail header + tabla | ⏳ Pendiente | — |
 | 5 | Gráfica con bandas + tendencia + leyenda | ⏳ Pendiente | — |
 | 6 | Integración Documentos | ⏳ Pendiente | — |

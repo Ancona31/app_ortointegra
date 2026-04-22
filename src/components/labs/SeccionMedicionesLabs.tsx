@@ -1,6 +1,9 @@
 'use client'
 
+import { useState } from 'react'
+import { useSWRConfig } from 'swr'
 import { Activity, Plus } from 'lucide-react'
+import ModalAgregarMedicion from '@/components/labs/ModalAgregarMedicion'
 
 const IOS_EASING = 'cubic-bezier(0.32, 0.72, 0, 1)'
 
@@ -8,7 +11,14 @@ type Props = {
   pacienteId: string
 }
 
-export default function SeccionMedicionesLabs({ pacienteId: _pacienteId }: Props) {
+export default function SeccionMedicionesLabs({ pacienteId }: Props) {
+  const [modalOpen, setModalOpen] = useState(false)
+  const { mutate } = useSWRConfig()
+
+  function handleSuccess() {
+    mutate(['stats-labs', pacienteId])
+  }
+
   return (
     <section>
       <div className="flex items-center justify-between mb-3">
@@ -17,7 +27,7 @@ export default function SeccionMedicionesLabs({ pacienteId: _pacienteId }: Props
         </h2>
         <button
           type="button"
-          onClick={() => console.log('TODO: sub-fase 3')}
+          onClick={() => setModalOpen(true)}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-[13px] font-medium text-slate-700 hover:border-slate-300 hover:text-slate-900 hover:shadow-sm active:scale-[0.98] transition-all duration-200"
           style={{ transitionTimingFunction: IOS_EASING }}
         >
@@ -38,6 +48,15 @@ export default function SeccionMedicionesLabs({ pacienteId: _pacienteId }: Props
           </p>
         </div>
       </div>
+
+      {modalOpen && (
+        <ModalAgregarMedicion
+          open
+          onClose={() => setModalOpen(false)}
+          pacienteId={pacienteId}
+          onSuccess={handleSuccess}
+        />
+      )}
     </section>
   )
 }
