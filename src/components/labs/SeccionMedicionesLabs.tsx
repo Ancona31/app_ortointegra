@@ -3,24 +3,32 @@
 import { useState, useMemo } from 'react'
 import { useSWRConfig } from 'swr'
 import { Activity, Plus } from 'lucide-react'
+import { parseISO, subMonths, subYears } from 'date-fns'
 import ModalAgregarMedicion from '@/components/labs/ModalAgregarMedicion'
 import DropdownSelectorAnalito from '@/components/labs/DropdownSelectorAnalito'
 import AnalitoDetailHeader from '@/components/labs/AnalitoDetailHeader'
 import TablaMediciones from '@/components/labs/TablaMediciones'
+import FiltroTemporal, { type RangoTemporal } from '@/components/labs/FiltroTemporal'
+import GraficaAnalito from '@/components/labs/GraficaAnalito'
+import LeyendaBandas from '@/components/labs/LeyendaBandas'
 import { useAnalitosRastreados } from '@/hooks/useAnalitosRastreados'
 import { useMedicionesAnalito } from '@/hooks/useMedicionesAnalito'
 import { useCatalogoAnalitos } from '@/hooks/useCatalogoAnalitos'
 import { useToast } from '@/components/ui/Toast'
+import type { Sexo } from '@/lib/labs/utils'
 
 const IOS_EASING = 'cubic-bezier(0.32, 0.72, 0, 1)'
 
 type Props = {
   pacienteId: string
+  sexoPaciente: Sexo
 }
 
-export default function SeccionMedicionesLabs({ pacienteId }: Props) {
+export default function SeccionMedicionesLabs({ pacienteId, sexoPaciente }: Props) {
   const [modalOpen, setModalOpen] = useState(false)
   const [claveUsuario, setClaveUsuario] = useState<string | null>(null)
+  const [rangoTemporal, setRangoTemporal] = useState<RangoTemporal>('todo')
+  const [claveSnapshot, setClaveSnapshot] = useState<string | null>(null)
   const { mutate } = useSWRConfig()
   const toast = useToast()
 
@@ -40,6 +48,13 @@ export default function SeccionMedicionesLabs({ pacienteId }: Props) {
     return ordenados[0]?.clave ?? null
   }, [analitos, claveUsuario])
 
+  // Reset del filtro temporal al cambiar de analito — pattern render-time sync
+  // (en lugar de useEffect) para evitar cascading renders.
+  if (claveSnapshot !== claveSeleccionada) {
+    setClaveSnapshot(claveSeleccionada)
+    setRangoTemporal('todo')
+  }
+
   const analitoSeleccionado = useMemo(
     () =>
       claveSeleccionada
@@ -57,6 +72,40 @@ export default function SeccionMedicionesLabs({ pacienteId }: Props) {
     pacienteId,
     claveSeleccionada,
   )
+
+  const contadoresPorRango = useMemo<Record<RangoTemporal, number>>(() => {
+    const now = new Date()
+    const cutoffs = {
+      '1m': subMonths(now, 1),
+      '3m': subMonths(now, 3),
+      '6m': subMonths(now, 6),
+      '1a': subYears(now, 1),
+      '5a': subYears(now, 5),
+    }
+    const countFrom = (cutoff: Date) =>
+      mediciones.filter(m => parseISO(m.medido_en) >= cutoff).length
+    return {
+      '1m': countFrom(cutoffs['1m']),
+      '3m': countFrom(cutoffs['3m']),
+      '6m': countFrom(cutoffs['6m']),
+      '1a': countFrom(cutoffs['1a']),
+      '5a': countFrom(cutoffs['5a']),
+      'todo': mediciones.length,
+    }
+  }, [mediciones])
+
+  const medicionesFiltradas = useMemo(() => {
+    if (rangoTemporal === 'todo') return mediciones
+    const now = new Date()
+    const cutoff = {
+      '1m': subMonths(now, 1),
+      '3m': subMonths(now, 3),
+      '6m': subMonths(now, 6),
+      '1a': subYears(now, 1),
+      '5a': subYears(now, 5),
+    }[rangoTemporal]
+    return mediciones.filter(m => parseISO(m.medido_en) >= cutoff)
+  }, [mediciones, rangoTemporal])
 
   function invalidarTodo() {
     mutate(['stats-labs', pacienteId])
@@ -130,18 +179,42 @@ export default function SeccionMedicionesLabs({ pacienteId }: Props) {
             />
           )}
 
+          {analitoSeleccionado && mediciones.length > 0 && (
+            <FiltroTemporal
+              rango={rangoTemporal}
+              contadores={contadoresPorRango}
+              onChange={setRangoTemporal}
+            />
+          )}
+
           {analitoSeleccionado && (
             medicionesLoading && mediciones.length === 0 ? (
               <div className="bg-white border border-slate-200 rounded-2xl p-4 text-[12px] text-slate-400 text-center">
                 Cargando…
               </div>
             ) : mediciones.length > 0 ? (
-              <TablaMediciones
-                mediciones={mediciones}
-                analito={analitoSeleccionado}
-                analitoCatalogo={analitoCatalogo}
-                onDelete={handleDelete}
-              />
+              <>
+                <GraficaAnalito
+                  analito={analitoSeleccionado}
+                  analitoCatalogo={analitoCatalogo}
+                  mediciones={medicionesFiltradas}
+                  sexoPaciente={sexoPaciente}
+                  onResetFiltro={() => setRangoTemporal('todo')}
+                />
+                <LeyendaBandas
+                  analito={analitoSeleccionado}
+                  analitoCatalogo={analitoCatalogo}
+                  sexoPaciente={sexoPaciente}
+                />
+                {medicionesFiltradas.length > 0 && (
+                  <TablaMediciones
+                    mediciones={medicionesFiltradas}
+                    analito={analitoSeleccionado}
+                    analitoCatalogo={analitoCatalogo}
+                    onDelete={handleDelete}
+                  />
+                )}
+              </>
             ) : null
           )}
         </div>

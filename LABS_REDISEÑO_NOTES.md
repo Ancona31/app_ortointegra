@@ -12,7 +12,7 @@ Notas vivas del rediseño del sistema de laboratorios. Se actualiza por sub-fase
 | 2 | Página base + Hero + secciones vacías | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
 | 3 | Modal "Agregar medición" + autocomplete + custom | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
 | 4 | Dropdown selector + detail header + tabla | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
-| 5 | Gráfica con bandas + tendencia + leyenda | ⏳ Pendiente | — |
+| 5 | Gráfica con bandas + tendencia + leyenda | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
 | 6 | Integración Documentos | ⏳ Pendiente | — |
 | 7 | Card "Mediciones y Documentos" en ExpedienteCardsGrid | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
 | 8 | Migración /estado + drop tabla legacy | ⏳ Pendiente | — |
@@ -138,6 +138,28 @@ Verificadas post-ejecución:
 - **Invalidación SWR en DELETE exitoso** — 3 keys: `['stats-labs', pacienteId]`, `['analitos-rastreados', pacienteId]`, `['mediciones-analito', pacienteId, claveSeleccionada]`. Misma invalidación ampliada en el `onSuccess` del modal de agregar (sub-fase 3) — vive en el padre `SeccionMedicionesLabs`, no se modificó `ModalAgregarMedicion.tsx`.
 - **Re-selección post-delete**: al eliminar la última medición del analito seleccionado, la `claveUsuario` queda "huérfana" (no existe en `analitos`). El `useMemo` de `claveSeleccionada` detecta y auto-cae al siguiente más reciente. Si no quedan analitos, cae a `null` → render vuelve al empty state. Sin useEffect.
 - **AnalitoDetailHeader recibe catálogo como prop**, no lo fetcha: lookup en `SeccionMedicionesLabs` con `catalogo.find(a => a.id === analitoSeleccionado.analitoId) ?? null`. Evita render extra esperando SWR y reutiliza cache compartido de `useCatalogoAnalitos`.
+
+## Sub-fase 5 — decisiones de implementación
+
+- **Librería**: Recharts 3.8.1 ya en bundle (confirmado por imports en `src/components/super-admin/charts/SerieCharts.tsx` y `src/app/(app)/estadisticas/page.tsx`). Cero instalación.
+- **Color primario del médico en SVG (`var(--cp)`)**: aplicada **Opción D** (style inline con var). Atributos SVG no resuelven CSS custom properties, pero el prop `style` sí. Patrón: `stroke="currentColor"` como fallback SVG + `style={{ stroke: 'var(--cp)', color: 'var(--cp)' }}` en `<Line>` — el style gana sobre el atributo. Para `dot`/`activeDot` Recharts reenvía el objeto como props al Dot interno, incluyendo `style`, que llega al `<circle>` como atributo `style="fill: var(--cp)"`. **Pendiente de verificación visual con devtools** por Angel: inspeccionar `<path stroke>` y `<circle fill>` computed values; si sale `currentColor` literal, caer a Opción E (resolver con `getComputedStyle` en `useEffect`). No hardcodeado.
+- **Colores de bandas**: 2B — no existen CSS vars semánticas en `globals.css` (solo `--azul-*`). Definidas como `BAND_COLORS` en `src/lib/labs/utils.ts` (fuente única). Verde `#10b981`/0.12, amarillo `#f59e0b`/0.15, rojo `#ef4444`/0.12. Pills en la leyenda y `<ReferenceArea>` de Recharts consumen desde ahí. Migrar a `var(--color-success)` etc. cuando el repo adopte tema semántico.
+- **Patrón Recharts replicado del super-admin**: `ResponsiveContainer` wrapper + `LineChart` con margin + `CartesianGrid strokeDasharray="3 3"` (vertical=false) + `XAxis`/`YAxis` con `tick={{fill, fontSize}}` + `Tooltip` con `content={(props) => <div tailwind>...</div>}` (no el default) + `Line type="monotone"` con `dot`/`activeDot` como objetos + `ReferenceArea` para bandas (ifOverflow="visible"). Tema claro (stroke `#e2e8f0`) en vez del oscuro del super-admin.
+- **yMin/yMax incluye bandas + 10% padding (decisión B)**: `min/max` sobre valores medidos + `rango.warn_min??ok_min` + `rango.warn_max??ok_max`; padding 10% del rango; clamp yMin>=0. Si maxBase==minBase (1 sola medición sin rangos), inflar ±10% del valor o ±1.
+- **statusOf por bands_type**: matriz exacta a spec del usuario.
+  - `high-bad`: `ok` si `valor <= ok_max`; `warn` si `valor <= warn_max`; `bad` si `valor > warn_max` (o `>ok_max` cuando no hay warn).
+  - `low-bad`: `ok` si `valor >= ok_min`; `warn` si `valor >= warn_min`; `bad` si `valor < warn_min` (o `<ok_min` cuando no hay warn).
+  - `low-and-high-bad`: `ok` dentro de `[ok_min, ok_max]`; `warn` en cualquiera de las franjas `[warn_min, ok_min)` / `(ok_max, warn_max]`; `bad` fuera.
+  - `none` o sin `analitoCatalogo`: `neutral` siempre.
+- **Override por sexo (`getRangoEffective`)**: `M + rango_masculino` → rango_masculino. `F + rango_femenino` → rango_femenino. `Otro`/`null` o analito sin override → `rango_default`. Custom (`analitoCatalogo=null`) → retorna `null`, `statusOf='neutral'`, `LeyendaBandas` muestra mensaje "sin rangos de referencia".
+- **Filtro temporal reset al cambiar analito**: patrón **render-time state sync** (no `useEffect`), alineado con la regla de sub-fase 4 ("setState dentro de useEffect es cascading-render error"). Tupla implícita `claveSnapshot`: si `claveSnapshot !== claveSeleccionada` durante render, `setClaveSnapshot(claveSeleccionada)` + `setRangoTemporal('todo')`. React re-ejecuta el render pero no commitea el intermedio.
+- **Filtro aplicado a gráfica Y tabla**: `medicionesFiltradas` derivado con `useMemo` desde `mediciones + rangoTemporal`; se pasa a `GraficaAnalito` y a `TablaMediciones`. `AnalitoDetailHeader` sigue recibiendo `mediciones` (histórico completo) — la intención del header es contexto clínico, no vista filtrada.
+- **Contadores del filtro**: `useMemo` único que calcula los 6 counts en una pasada (no 6 memos separados).
+- **Tooltip custom con `statusLabelDetailed`**: "En rango" / "Sobre/Bajo el rango normal" (warn) / "Fuera de rango alto/bajo" (bad) / "Sin rango de referencia" (neutral). Para `low-and-high-bad` usa `valor > rango.ok_max` para decidir si "alto" o "bajo".
+- **Tabla `TablaMediciones` NO se tocó**: ya recibe `mediciones` como prop desde sub-fase 4; ahora `SeccionMedicionesLabs` le pasa `medicionesFiltradas`. El expander interno `LIMITE_DEFAULT=10` sigue vivo — viewport management independiente del filtro temporal.
+- **Cadena de `sexoPaciente`**: `page.tsx` ya fetcha `Paciente.sexo` (`'M'|'F'|'Otro'`). Agregado `sexoPaciente={paciente.sexo}` al render de `SeccionMedicionesLabs`. De ahí se propaga a `GraficaAnalito` y `LeyendaBandas`. `AnalitoDetailHeader` NO lo recibe (no calcula bandas en esta sub-fase — sigue usando `bands_type` para delta-color únicamente).
+- **Placeholder + CTA "Ver todas"**: cuando `medicionesFiltradas.length===0` pero `mediciones.length>0`, `GraficaAnalito` renderea placeholder con botón que resetea filtro a `'todo'` (callback `onResetFiltro` desde el padre). La tabla se oculta en ese caso para evitar doble mensaje de "vacío".
+- **Verificación Opción D en runtime**: el `style={{ stroke: 'var(--cp)' }}` resolvió correctamente el primario del médico (`#1a3a5c`) en el SVG de Recharts sin requerir el fallback useEffect de Opción E. Navegador testeado: Chrome/Edge (Next.js 16 + Webpack en dev server). No se requirió hardcodear colores en ningún punto.
 
 ## Pendientes de cierre al final del rediseño
 

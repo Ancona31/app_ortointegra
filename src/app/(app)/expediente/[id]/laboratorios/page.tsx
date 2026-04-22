@@ -56,7 +56,7 @@ function LaboratoriosContent() {
 
       <SeccionDocumentosLabs pacienteId={id} />
 
-      <SeccionMedicionesLabs pacienteId={id} />
+      <SeccionMedicionesLabs pacienteId={id} sexoPaciente={paciente.sexo} />
     </div>
   )
 }
