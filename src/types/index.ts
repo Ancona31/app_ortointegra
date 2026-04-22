@@ -151,6 +151,8 @@ export type TipoDocumento =
   | 'escrito_medico'
   | 'nota_honorarios'
   | 'consentimiento_informado'
+  | 'resultado_laboratorio'
+  | 'estudio_imagen'
   // Legacy (documentos existentes en DB antes del rename)
   | 'lab'
   | 'imagen'

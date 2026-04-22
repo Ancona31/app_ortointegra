@@ -13,7 +13,8 @@ Notas vivas del rediseño del sistema de laboratorios. Se actualiza por sub-fase
 | 3 | Modal "Agregar medición" + autocomplete + custom | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
 | 4 | Dropdown selector + detail header + tabla | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
 | 5 | Gráfica con bandas + tendencia + leyenda | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
-| 6 | Integración Documentos | ⏳ Pendiente | — |
+| 6A | Integración Documentos — migración SQL uploads | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
+| 6B | Integración Documentos — componentes UI | ⏳ Pendiente | — |
 | 7 | Card "Mediciones y Documentos" en ExpedienteCardsGrid | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
 | 8 | Migración /estado + drop tabla legacy | ⏳ Pendiente | — |
 | 9 | QA end-to-end + validaciones manuales | ⏳ Pendiente | — |
@@ -160,6 +161,115 @@ Verificadas post-ejecución:
 - **Cadena de `sexoPaciente`**: `page.tsx` ya fetcha `Paciente.sexo` (`'M'|'F'|'Otro'`). Agregado `sexoPaciente={paciente.sexo}` al render de `SeccionMedicionesLabs`. De ahí se propaga a `GraficaAnalito` y `LeyendaBandas`. `AnalitoDetailHeader` NO lo recibe (no calcula bandas en esta sub-fase — sigue usando `bands_type` para delta-color únicamente).
 - **Placeholder + CTA "Ver todas"**: cuando `medicionesFiltradas.length===0` pero `mediciones.length>0`, `GraficaAnalito` renderea placeholder con botón que resetea filtro a `'todo'` (callback `onResetFiltro` desde el padre). La tabla se oculta en ese caso para evitar doble mensaje de "vacío".
 - **Verificación Opción D en runtime**: el `style={{ stroke: 'var(--cp)' }}` resolvió correctamente el primario del médico (`#1a3a5c`) en el SVG de Recharts sin requerir el fallback useEffect de Opción E. Navegador testeado: Chrome/Edge (Next.js 16 + Webpack en dev server). No se requirió hardcodear colores en ningún punto.
+
+## Sub-fase 6A — decisiones y fixes de implementación
+
+Sub-fase SQL-only. Ejecutada manualmente por Angel en Supabase SQL
+Editor en 6 pasos con validación entre cada uno el 2026-04-22. El
+archivo `supabase_migration_labs_documentos_upload.sql` en la raíz
+del repo contiene todo el SQL consolidado, con header de advertencia
+"NO EJECUTAR EN PRODUCCIÓN" — existe solo para trazabilidad y
+recreación en ambientes nuevos.
+
+### Orden de ejecución (6 pasos)
+
+1. **ALTER TABLE documentos ADD 6 columnas nullable**: `storage_bucket`,
+   `storage_path`, `mime_type`, `tamaño_bytes`, `nombre_original`,
+   `subido_por` (FK a `profiles(id) ON DELETE RESTRICT`). Todas
+   nullable para no romper los 494 registros existentes.
+2. **ALTER COLUMN contenido DROP NOT NULL**: permitir que uploads no
+   tengan contenido estructurado. Los 494 registros ya tenían
+   `contenido='{}'` o poblado, sin impacto.
+3. **ADD CONSTRAINT `documentos_tiene_origen_check`**: `contenido IS
+   NOT NULL OR storage_path IS NOT NULL`. Los 494 existentes pasan.
+4. **CREATE FUNCTION `enforce_limite_documentos_paciente()` + trigger
+   `trg_documentos_limite_paciente` (BEFORE INSERT)**: `SECURITY
+   DEFINER` + `search_path = public` + `REVOKE EXECUTE` de
+   `public, authenticated, anon` (mismo patrón del Fix 1 de sub-fase
+   1A para el trigger de antropometría).
+5. **Fix del trigger** — ver sección dedicada abajo.
+6. **4 policies en `storage.objects` para bucket `labs-documentos`**:
+   SELECT / INSERT / UPDATE / DELETE, scopeadas por clínica con
+   `storage.foldername(name)[2] = public.get_clinica_id()::text`.
+   Estructura de path esperada:
+   `clinicas/{clinica_id}/pacientes/{paciente_id}/{uuid}.{ext}`.
+
+### Fix del trigger — filtrado por tipo
+
+Versión 1 (inicial) contaba **todos** los documentos del paciente y
+rechazaba el INSERT 101 fuera cual fuera el `tipo`:
+
+```sql
+select count(*) into v_count
+from public.documentos
+where paciente_id = NEW.paciente_id;
+```
+
+Problema: un paciente con 100 recetas/informes/solicitudes acumuladas
+quedaba bloqueado para todo futuro `INSERT` en `documentos`, incluida
+la siguiente receta. Esto rompía flujos de consulta en producción.
+
+Versión 2 (ejecutada y versionada en el archivo SQL del repo):
+
+```sql
+if NEW.tipo not in ('resultado_laboratorio', 'estudio_imagen') then
+  return NEW;
+end if;
+
+select count(*) into v_count
+from public.documentos
+where paciente_id = NEW.paciente_id
+  and tipo in ('resultado_laboratorio', 'estudio_imagen');
+```
+
+Guarda temprana + count filtrado. Solo los uploads clínicos de
+`/laboratorios` entran en el cupo de 100. Documentos generados por la
+app no compiten por el cupo y no se bloquean.
+
+### Gap histórico observado — no se corrige aquí
+
+El bucket `documentos-pdf` (migración
+`supabase_migration_storage_documentos_pdf.sql`, abril 2026) tiene
+policies que solo validan `bucket_id = 'documentos-pdf'` sin scoping
+por clínica. Técnicamente cualquier usuario autenticado puede leer
+archivos de otras clínicas si conoce el path (UUID-based, difícil de
+adivinar, pero no imposible). El bucket nuevo `labs-documentos` sí
+scope por clínica vía `storage.foldername(name)[2]`.
+
+Este gap queda documentado pero **NO se toca en 6A** (fuera de scope).
+Candidato a hardening en una sub-fase de seguridad futura.
+
+### Decisión — NO se agrega FK `pdf_url` → `storage_path`
+
+La tabla `documentos` conviverá con 2 generaciones de documentos en
+paralelo:
+
+- **Generados por la app** (recetas, informes, etc.): siguen poblando
+  `contenido` jsonb + `pdf_url` (path en bucket `documentos-pdf`).
+- **Subidos en /laboratorios**: pueblan `storage_bucket =
+  'labs-documentos'` + `storage_path` + `mime_type` + `nombre_original`
+  + `subido_por`. `contenido` queda NULL.
+
+No se promueve `storage_path` como fuente única ni se migran los 494
+registros existentes de `pdf_url` → `storage_path` porque:
+
+1. El CHECK `documentos_tiene_origen_check` acepta ambos mecanismos
+   como válidos.
+2. Migrar los 494 registros introduce riesgo sin beneficio funcional
+   inmediato.
+3. Sub-fase 6B leerá `storage_path` cuando `storage_bucket IS NOT
+   NULL`, y `pdf_url` como fallback — la divergencia es manejable en
+   el cliente.
+
+### Pendiente no bloqueante de 6A
+
+- Regenerar `src/types/database.types.ts` con Supabase CLI. Las 6
+  columnas nuevas son nullable y quedarán tipadas automáticamente.
+  Mientras tanto, el union `TipoDocumento` de `src/types/index.ts` ya
+  incluye `'resultado_laboratorio'` y `'estudio_imagen'` (agregados en
+  esta sesión). El resto de la metadata de uploads (storage_path, etc.)
+  se tipará manualmente en la interfaz `Documento` o equivalente al
+  arrancar sub-fase 6B si hace falta antes de la regeneración.
 
 ## Pendientes de cierre al final del rediseño
 
