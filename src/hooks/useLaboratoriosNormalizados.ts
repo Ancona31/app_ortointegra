@@ -2,9 +2,39 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { parseISO, format } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
 import type { Laboratorio } from '@/types'
-import { normalizarKey, type ParamGrafica } from '@/components/expediente/TabGraficas'
 
 const QUERY_LIMIT = 50
+
+// Palabras que no distinguen el parámetro clínico (se ignoran al agrupar)
+const QUALIFIERS_IGNORAR = new Set([
+  'serica','serico','sericas','sericos',
+  'basal','en','ayunas','simple','total','completo','completa',
+  'plasmatica','plasmatico','venosa','venoso','capilar','capilary',
+  'sangre','sanguinea','sanguineo','urinaria','urinario',
+  'de','la','el','los','las','y','o',
+])
+
+export function normalizarKey(nombre: string): string {
+  return nombre
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')   // quitar acentos
+    .replace(/[^a-z0-9\s]/g, ' ')      // quitar puntuación
+    .split(/\s+/)
+    .filter(w => w.length >= 2 && !QUALIFIERS_IGNORAR.has(w))
+    .join(' ')
+    .trim()
+}
+
+type PuntoGrafica = { fechaLabel: string; fechaISO: string; valor: number; estado?: string }
+export type ParamGrafica = {
+  nombre: string
+  aliases: string[]
+  unidad: string
+  rango_ref?: string
+  rango_optimo?: string
+  puntos: PuntoGrafica[]
+}
 
 export function useLaboratoriosNormalizados(pacienteId: string) {
   const [labs, setLabs] = useState<Laboratorio[]>([])

@@ -9,7 +9,7 @@ Notas vivas del rediseño del sistema de laboratorios. Se actualiza por sub-fase
 | 0 | Cleanup y deuda técnica | ✅ Cerrada en 2026-04-21 | pendiente (Angel hace commit manual) |
 | 1A | Schema SQL: tablas + RLS + trigger | ✅ Cerrada 2026-04-21 | pendiente (Angel hace commit manual) |
 | 1B | Seed del catálogo de analitos | ✅ Cerrada 2026-04-21 (175 analitos) | pendiente (Angel hace commit manual) |
-| 2 | Página base + Hero + secciones vacías | ⏳ Pendiente | — |
+| 2 | Página base + Hero + secciones vacías | ⏳ En progreso | — |
 | 3 | Modal "Agregar medición" + autocomplete + custom | ⏳ Pendiente | — |
 | 4 | Dropdown selector + detail header + tabla | ⏳ Pendiente | — |
 | 5 | Gráfica con bandas + tendencia + leyenda | ⏳ Pendiente | — |
@@ -36,6 +36,7 @@ Resultado del grep `from.*laboratorios` en `src/`:
 4. **src/app/(app)/expediente/[id]/laboratorios/nuevo/page.tsx** — página de alta legacy. ELIMINAR en sub-fase 8.
 5. **src/app/api/laboratorios/route.ts** — API POST legacy. ELIMINAR en sub-fase 8.
 6. **src/app/api/laboratorios/[id]/route.ts** — API DELETE legacy. ELIMINAR en sub-fase 8.
+7. **src/app/(app)/laboratorios/page.tsx** (15665 bytes, Apr 7) — ⚠️ HALLAZGO ADICIONAL no detectado en sub-fase 0. Ruta standalone de laboratorios (no dentro del expediente). Revisar en sub-fase 8 para determinar si debe ELIMINARSE completa o MIGRARSE al nuevo modelo. El contenido de este archivo debe inspeccionarse al arrancar sub-fase 8 para decidir.
 
 NOTA: no existe `src/app/(app)/expediente/[id]/laboratorios/page.tsx` (la ruta raíz vieja). Solo hay subrutas `/nuevo` y `/[labId]`. Ventaja para sub-fase 2: crear el nuevo `page.tsx` raíz sin colisión.
 
@@ -60,6 +61,10 @@ Confirmados huérfanos al cierre de sub-fase 8:
 - `src/app/(app)/expediente/[id]/laboratorios/nuevo/page.tsx`
 - `src/app/api/laboratorios/route.ts`
 - `src/app/api/laboratorios/[id]/route.ts`
+
+A evaluar en sub-fase 8 (decidir eliminar vs migrar al inspeccionar contenido):
+
+- `src/app/(app)/laboratorios/page.tsx` (15665 bytes, Apr 7) — ruta standalone descubierta en validación visual de sub-fase 2
 
 En Supabase:
 
@@ -111,6 +116,7 @@ Verificadas post-ejecución:
 ## Pendientes no bloqueantes
 
 - Regenerar `src/types/database.types.ts` usando Supabase CLI. Las 5 interfaces manuales en `src/types/index.ts` (CategoriaAnalito, BandsType, RangoAnalito, AnalitoCatalogo, MedicionAnalito) suplen por ahora. Puede hacerse antes de sub-fase 9 (QA final). Comando: `npx supabase gen types typescript --project-id <id> > src/types/database.types.ts`.
+- `useStatsLabs` descarga `analito_id`/`nombre_custom` de TODAS las mediciones del paciente al cliente para hacer count distinct en JS (Set). Suficiente para cardinalidades típicas (decenas de mediciones por paciente). Si la cardinalidad escala a 500+ mediciones por paciente, promover a RPC Postgres con `count(distinct ...)` en sub-fase 9 o posterior. Origen de la decisión: sub-fase 2, evitar crear migración SQL fuera de scope.
 
 ## Pendientes de cierre al final del rediseño
 
