@@ -14,7 +14,7 @@ Notas vivas del rediseño del sistema de laboratorios. Se actualiza por sub-fase
 | 4 | Dropdown selector + detail header + tabla | ⏳ Pendiente | — |
 | 5 | Gráfica con bandas + tendencia + leyenda | ⏳ Pendiente | — |
 | 6 | Integración Documentos | ⏳ Pendiente | — |
-| 7 | Card "Laboratorios" en ExpedienteCardsGrid | ⏳ Pendiente | — |
+| 7 | Card "Mediciones y Documentos" en ExpedienteCardsGrid | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
 | 8 | Migración /estado + drop tabla legacy | ⏳ Pendiente | — |
 | 9 | QA end-to-end + validaciones manuales | ⏳ Pendiente | — |
 
@@ -117,6 +117,15 @@ Verificadas post-ejecución:
 
 - Regenerar `src/types/database.types.ts` usando Supabase CLI. Las 5 interfaces manuales en `src/types/index.ts` (CategoriaAnalito, BandsType, RangoAnalito, AnalitoCatalogo, MedicionAnalito) suplen por ahora. Puede hacerse antes de sub-fase 9 (QA final). Comando: `npx supabase gen types typescript --project-id <id> > src/types/database.types.ts`.
 - `useStatsLabs` descarga `analito_id`/`nombre_custom` de TODAS las mediciones del paciente al cliente para hacer count distinct en JS (Set). Suficiente para cardinalidades típicas (decenas de mediciones por paciente). Si la cardinalidad escala a 500+ mediciones por paciente, promover a RPC Postgres con `count(distinct ...)` en sub-fase 9 o posterior. Origen de la decisión: sub-fase 2, evitar crear migración SQL fuera de scope.
+
+## Sub-fase 7 — decisiones de implementación
+
+- **Posición en el grid**: 6ª card al final del markup en `ExpedienteCardsGrid.tsx`. Por el `grid-template-columns: repeat(auto-fit, minmax(260px, 1fr))`, en desktop ancho (≥3 columnas) queda en fila 2 posición 3 como se acordó. No se reordenó ninguna de las 5 cards existentes.
+- **Color del ícono**: teal-600 (`#0d9488`). Distinto del `#14b8a6` (teal-500) de "Última visita" para evitar duplicación cromática pero mantener la familia semántica teal = labs/estadística.
+- **Ícono**: `Activity` de lucide-react.
+- **Subtitle dinámico**: 4 variantes con pluralización singular/plural y separador `·` (U+00B7) idéntico al del Hero del expediente. Helper `labsSubtitle()` local al componente (no se extrajo a `src/lib/` porque es uso único — regla del proyecto: no abstraer hasta >1 consumidor).
+- **Consumidor del stats**: `useStatsLabs` extendido con 3ª query paralela a `documentos` filtrando `tipo IN ('resultado_laboratorio','estudio_imagen')` y retornando `documentosCount`. Hasta que sub-fase 6 implemente la subida, `documentosCount` retornará 0 (CHECK constraint extendido en sub-fase 1A permite los dos tipos nuevos en DB). Sin regresión en `HeroLabs` — solo lee `analitosTracked` y `ultimaMedicionISO`.
+- **Invalidación SWR**: la 3ª query comparte la misma key `['stats-labs', pacienteId]` — cuando sub-fase 3 llama `mutate()` tras crear una medición, ya refresca también el count de documentos automáticamente. Futuras subidas de documentos en sub-fase 6 deberán llamar esa misma `mutate()`.
 
 ## Pendientes de cierre al final del rediseño
 

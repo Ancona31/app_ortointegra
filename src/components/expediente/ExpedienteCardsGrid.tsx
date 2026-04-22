@@ -1,15 +1,44 @@
 'use client'
 
 import { useMemo } from 'react'
-import { Plus, Layers, Clock, Calendar, LayoutDashboard } from 'lucide-react'
+import { Plus, Layers, Clock, Calendar, LayoutDashboard, Activity } from 'lucide-react'
 import type { Paciente, Consulta } from '@/types'
 import ExpedienteCard from './ExpedienteCard'
+import { useStatsLabs } from '@/hooks/useStatsLabs'
 import {
   ultimaConsultaLabel,
   ultimaConsultaFecha,
   formatFechaRelativaFutura,
   formatFechaCompleta,
 } from '@/lib/expedienteUtils'
+
+function labsSubtitle(
+  analitosTracked: number,
+  documentosCount: number,
+  isLoading: boolean,
+  hasError: boolean,
+): string {
+  if (isLoading) return 'Cargando…'
+  if (hasError) return 'Mediciones longitudinales y archivos clínicos'
+  if (analitosTracked === 0 && documentosCount === 0) {
+    return 'Sin mediciones ni documentos'
+  }
+  const analitosTxt =
+    analitosTracked > 0
+      ? `${analitosTracked} ${analitosTracked === 1 ? 'analito' : 'analitos'}`
+      : ''
+  const docsTxt =
+    documentosCount > 0
+      ? `${documentosCount} ${documentosCount === 1 ? 'documento' : 'documentos'}`
+      : ''
+  if (analitosTracked > 0 && documentosCount > 0) {
+    return `${analitosTxt} \u00B7 ${docsTxt}`
+  }
+  if (analitosTracked > 0) {
+    return `${analitosTxt} ${analitosTracked === 1 ? 'rastreado' : 'rastreados'}`
+  }
+  return `${docsTxt} ${documentosCount === 1 ? 'clínico' : 'clínicos'}`
+}
 
 export type ProximaCita = {
   id: string
@@ -53,6 +82,14 @@ export default function ExpedienteCardsGrid({
   }, [consultas])
 
   const fechaUltimaConsulta = ultimaConsultaFecha(consultas)
+
+  const { stats, isLoading: isStatsLoading, error: statsError } = useStatsLabs(paciente.id)
+  const medicionesSubtitle = labsSubtitle(
+    stats.analitosTracked,
+    stats.documentosCount,
+    isStatsLoading,
+    !!statsError,
+  )
 
   return (
     <div
@@ -103,6 +140,15 @@ export default function ExpedienteCardsGrid({
         icon={LayoutDashboard}
         iconColor="#6366f1"
         href={`/expediente/${paciente.id}/estado`}
+      />
+
+      <ExpedienteCard
+        label="MEDICIONES & DOCUMENTOS"
+        title="Mediciones y Documentos"
+        subtitle={medicionesSubtitle}
+        icon={Activity}
+        iconColor="#0d9488"
+        href={`/expediente/${paciente.id}/laboratorios`}
       />
     </div>
   )

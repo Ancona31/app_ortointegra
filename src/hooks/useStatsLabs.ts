@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 export type StatsLabs = {
   analitosTracked: number
   ultimaMedicionISO: string | null
+  documentosCount: number
 }
 
 type Row = { analito_id: string | null; nombre_custom: string | null }
@@ -13,7 +14,7 @@ type Row = { analito_id: string | null; nombre_custom: string | null }
 async function fetchStatsLabs(pacienteId: string): Promise<StatsLabs> {
   const supabase = createClient()
 
-  const [rowsRes, lastRes] = await Promise.all([
+  const [rowsRes, lastRes, docsRes] = await Promise.all([
     supabase
       .from('mediciones_analitos')
       .select('analito_id, nombre_custom')
@@ -25,10 +26,16 @@ async function fetchStatsLabs(pacienteId: string): Promise<StatsLabs> {
       .order('medido_en', { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from('documentos')
+      .select('id', { count: 'exact', head: true })
+      .eq('paciente_id', pacienteId)
+      .in('tipo', ['resultado_laboratorio', 'estudio_imagen']),
   ])
 
   if (rowsRes.error) throw rowsRes.error
   if (lastRes.error) throw lastRes.error
+  if (docsRes.error) throw docsRes.error
 
   const rows = (rowsRes.data ?? []) as Row[]
   const tracked = new Set<string>()
@@ -42,6 +49,7 @@ async function fetchStatsLabs(pacienteId: string): Promise<StatsLabs> {
   return {
     analitosTracked: tracked.size,
     ultimaMedicionISO: last?.medido_en ?? null,
+    documentosCount: docsRes.count ?? 0,
   }
 }
 
@@ -56,7 +64,7 @@ export function useStatsLabs(pacienteId: string | undefined) {
   )
 
   return {
-    stats: data ?? { analitosTracked: 0, ultimaMedicionISO: null },
+    stats: data ?? { analitosTracked: 0, ultimaMedicionISO: null, documentosCount: 0 },
     isLoading,
     error,
     mutate,
