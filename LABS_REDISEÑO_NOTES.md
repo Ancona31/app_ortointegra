@@ -11,7 +11,7 @@ Notas vivas del rediseño del sistema de laboratorios. Se actualiza por sub-fase
 | 1B | Seed del catálogo de analitos | ✅ Cerrada 2026-04-21 (175 analitos) | pendiente (Angel hace commit manual) |
 | 2 | Página base + Hero + secciones vacías | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
 | 3 | Modal "Agregar medición" + autocomplete + custom | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
-| 4 | Dropdown selector + detail header + tabla | ⏳ Pendiente | — |
+| 4 | Dropdown selector + detail header + tabla | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
 | 5 | Gráfica con bandas + tendencia + leyenda | ⏳ Pendiente | — |
 | 6 | Integración Documentos | ⏳ Pendiente | — |
 | 7 | Card "Mediciones y Documentos" en ExpedienteCardsGrid | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
@@ -126,6 +126,18 @@ Verificadas post-ejecución:
 - **Subtitle dinámico**: 4 variantes con pluralización singular/plural y separador `·` (U+00B7) idéntico al del Hero del expediente. Helper `labsSubtitle()` local al componente (no se extrajo a `src/lib/` porque es uso único — regla del proyecto: no abstraer hasta >1 consumidor).
 - **Consumidor del stats**: `useStatsLabs` extendido con 3ª query paralela a `documentos` filtrando `tipo IN ('resultado_laboratorio','estudio_imagen')` y retornando `documentosCount`. Hasta que sub-fase 6 implemente la subida, `documentosCount` retornará 0 (CHECK constraint extendido en sub-fase 1A permite los dos tipos nuevos en DB). Sin regresión en `HeroLabs` — solo lee `analitosTracked` y `ultimaMedicionISO`.
 - **Invalidación SWR**: la 3ª query comparte la misma key `['stats-labs', pacienteId]` — cuando sub-fase 3 llama `mutate()` tras crear una medición, ya refresca también el count de documentos automáticamente. Futuras subidas de documentos en sub-fase 6 deberán llamar esa misma `mutate()`.
+
+## Sub-fase 4 — decisiones de implementación
+
+- **DELETE endpoint**: `src/app/api/labs/mediciones/[id]/route.ts`. Patrón unánime del repo (`documentos/[id]`, `consultas/[id]`, `appointments/[id]`, etc.). Usa `RouteContext<'/api/labs/mediciones/[id]'>` para tipado seguro del `ctx.params`. Audit log automático vía trigger `audit_mediciones_analitos` (aplicado en sub-fase 1A).
+- **Dropdown construido desde cero**: no hay `<Select>`/`<Listbox>` genérico en el repo. Replica el patrón de `AutocompleteAnalito` (sub-fase 3) — click-outside, keyboard ↑↓ Enter Esc, `IOS_EASING`, `normalizar()` NFD-strip, agrupado por categoría. No se abstrajo (regla anti-abstracción prematura — si aparece un 3er selector se refactoriza entonces).
+- **Clave efectiva derivada en render, NO en useEffect**: el linter de React 19 marca `setState dentro de useEffect` como cascading-render error. En vez de sincronizar con useEffect, derivo `claveSeleccionada` con `useMemo` sobre `[analitos, claveUsuario]`. Si la selección del usuario sigue viva → se respeta; si no (o si no hay) → cae al más reciente. Elimina el re-render extra y pasa lint estricto.
+- **Delta 2-color**: solo rojo/verde para `high-bad` y `low-bad`. `low-and-high-bad`, `none` y custom → gris neutro (decisión confirmada por Angel). La semántica correcta para `low-and-high-bad` requiere bandas — se resuelve en sub-fase 5.
+- **Same-day indicator**: comparación con `date-fns format(parseISO(iso), 'yyyy-MM-dd')` en local timezone (correcto para "día clínico" del médico que captura cerca de medianoche).
+- **Paginación de tabla**: default 10 últimas (DESC), botón "Ver todas (N)" expande a completo, "Ver menos" colapsa.
+- **Invalidación SWR en DELETE exitoso** — 3 keys: `['stats-labs', pacienteId]`, `['analitos-rastreados', pacienteId]`, `['mediciones-analito', pacienteId, claveSeleccionada]`. Misma invalidación ampliada en el `onSuccess` del modal de agregar (sub-fase 3) — vive en el padre `SeccionMedicionesLabs`, no se modificó `ModalAgregarMedicion.tsx`.
+- **Re-selección post-delete**: al eliminar la última medición del analito seleccionado, la `claveUsuario` queda "huérfana" (no existe en `analitos`). El `useMemo` de `claveSeleccionada` detecta y auto-cae al siguiente más reciente. Si no quedan analitos, cae a `null` → render vuelve al empty state. Sin useEffect.
+- **AnalitoDetailHeader recibe catálogo como prop**, no lo fetcha: lookup en `SeccionMedicionesLabs` con `catalogo.find(a => a.id === analitoSeleccionado.analitoId) ?? null`. Evita render extra esperando SWR y reutiliza cache compartido de `useCatalogoAnalitos`.
 
 ## Pendientes de cierre al final del rediseño
 
