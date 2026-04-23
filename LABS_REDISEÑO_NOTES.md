@@ -16,7 +16,9 @@ Notas vivas del rediseño del sistema de laboratorios. Se actualiza por sub-fase
 | 6A | Integración Documentos — migración SQL uploads | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
 | 6B | Integración Documentos — componentes UI | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
 | 7 | Card "Mediciones y Documentos" en ExpedienteCardsGrid | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
-| 8 | Migración /estado + drop tabla legacy | ⏳ Pendiente | — |
+| 8A | Migración exportador ARCO al nuevo modelo | ✅ Cerrada 2026-04-23 | pendiente (Angel hace commit manual) |
+| 8B | Migración /estado + ExportarExpedienteButton | ⏳ Pendiente | — |
+| 8C | Drop tabla legacy + eliminar código huérfano | ⏳ Pendiente | — |
 | 9 | QA end-to-end + validaciones manuales | ⏳ Pendiente | — |
 
 ## Consumidores de useLaboratoriosNormalizados (sub-fase 8)
@@ -455,6 +457,74 @@ Decisiones clave consolidadas del cierre:
    en un follow-up con polling ligero (requestAnimationFrame) o
    con `viewport.element.addEventListener('wheel', ...)` como
    proxy.
+
+## Sub-fase 8A — decisiones de implementación
+
+Sub-fase quirúrgica: único archivo tocado `src/app/api/paciente/[id]/exportar/route.ts`
+(endpoint ARCO de cumplimiento LFPDPPP Art. 28). Hallazgo crítico previo a
+la implementación: el endpoint NO tiene consumidor frontend ni backend
+actual (grep exhaustivo sin matches). Existe como API de cumplimiento
+invocable por admins vía curl cuando un paciente ejerce derecho de acceso
+formal. Severidad del riesgo de regresión es baja, pero la migración
+sigue siendo obligatoria antes del `DROP TABLE laboratorios` en 8C —
+invocación directa fallaría con "relation does not exist".
+
+### Shape change del JSON exportado
+
+**Breaking change consciente**, documentado para trazabilidad legal:
+
+| Campo | Antes (v1.0) | Después (v1.1) |
+|---|---|---|
+| `version` | `'v1.0'` | `'v1.1'` |
+| Key de labs | `laboratorios` | `mediciones` |
+| Shape de cada item | `{ id, paciente_id, fecha_toma, pdf_url, valores, resultados[], analisis_ia, created_at }` (examen completo con N resultados jsonb) | `{ id, paciente_id, analito_id, nombre_custom, unidad_custom, categoria_custom, valor, medido_en, notas, creado_por, created_at, analito: AnalitoCatalogo \| null }` (una fila plana por medición con catálogo embebido) |
+| `analisis_ia` | Presente (jsonb con suplementos/alertas/resumen IA) | **Removido** — feature no migrada al nuevo modelo |
+| `pdf_url` de labs | Inline en cada laboratorio | Ya vive en `documentos` con `tipo='resultado_laboratorio'` (sub-fase 6) |
+
+### LEFT JOIN a `analitos_catalogo`
+
+Sintaxis Supabase PostgREST: `.select('*, analito:analitos_catalogo(*)')`.
+Devuelve el analito como **objeto embebido** (no array) porque
+`mediciones_analitos.analito_id` es FK N:1 a `analitos_catalogo.id`. Para
+mediciones custom (`analito_id IS NULL`) el campo `analito` viene como
+`null` sin N+1 queries. Tipo inline:
+
+```ts
+type MedicionConAnalito = MedicionAnalito & {
+  analito: AnalitoCatalogo | null
+}
+```
+
+No se extendió el tipo global `MedicionAnalito` en `src/types/index.ts`
+porque el JOIN es específico al exportador y ningún otro consumidor lo
+necesita hoy (regla anti-abstracción prematura).
+
+### Lo que NO se tocó (consistente con scope declarado)
+
+- Tabla `laboratorios` sigue existiendo con sus 5 registros de prueba.
+  DROP ejecuta en 8C.
+- `useLaboratoriosNormalizados.ts` sigue vivo — consumidor único
+  `/expediente/[id]/page.tsx` migra en 8B.
+- Páginas legacy `/expediente/[id]/laboratorios/[labId]` y `/nuevo` +
+  APIs `/api/laboratorios/*` + ruta standalone `/laboratorios/page.tsx`:
+  eliminan en 8C.
+- Tipos legacy `Laboratorio`, `ResultadoLab`, `ValoresLab`, `AnalisisIA`
+  siguen huérfanos en `src/types/index.ts` — no afectan compilación.
+  Se borran en 8C.
+- `ExportarExpedienteButton.tsx` (export HTML client-side con
+  `window.print()`) consume `labs` como prop vía
+  `useLaboratoriosNormalizados`. Es otro flujo distinto al endpoint
+  ARCO. Migra en 8B como parte de `/estado`.
+
+### Validación
+
+- `npm run lint` en `route.ts`: 0 errores / 0 warnings nuevos (los 180
+  problemas del proyecto son preexistentes, verificado con filtro por
+  path).
+- `npm run build`: verde, todas las rutas compilan incluyendo
+  `/api/paciente/[id]/exportar`.
+- Validación funcional con curl: pendiente por Angel (requiere cookie
+  de sesión autenticada que Claude Code no posee).
 
 ## Pendientes de cierre al final del rediseño
 

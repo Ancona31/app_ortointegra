@@ -1,16 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { logAudit } from '@/lib/audit'
+import type { MedicionAnalito, AnalitoCatalogo } from '@/types'
 
 /**
  * POST /api/paciente/[id]/exportar — Derecho de Acceso (ARCO)
  *
  * LFPDPPP Art. 28: El titular tiene derecho a acceder a sus datos personales.
  * Genera un JSON con TODOS los datos del paciente: datos personales,
- * consultas con addendums, laboratorios, documentos y recetas.
+ * consultas con addendums, mediciones (con analito del catálogo embebido),
+ * documentos y recetas.
  *
  * Accesible por médicos y admins de la misma clínica.
  */
+type MedicionConAnalito = MedicionAnalito & {
+  analito: AnalitoCatalogo | null
+}
+
 export async function POST(req: NextRequest, ctx: RouteContext<'/api/paciente/[id]/exportar'>) {
   try {
     const supabase = await createClient()
@@ -38,12 +44,16 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/paciente/[i
     // Cargar todos los datos clínicos en paralelo
     const [
       { data: consultas },
-      { data: laboratorios },
+      { data: mediciones },
       { data: documentos },
       { data: addendums },
     ] = await Promise.all([
       supabase.from('consultas').select('*').eq('paciente_id', id).order('fecha', { ascending: false }),
-      supabase.from('laboratorios').select('*').eq('paciente_id', id).order('fecha_toma', { ascending: false }),
+      supabase
+        .from('mediciones_analitos')
+        .select('*, analito:analitos_catalogo(*)')
+        .eq('paciente_id', id)
+        .order('medido_en', { ascending: false }),
       supabase.from('documentos').select('*').eq('paciente_id', id).order('created_at', { ascending: false }),
       supabase.from('addendums').select('*').order('created_at', { ascending: true }),
     ])
@@ -66,11 +76,11 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/paciente/[i
 
     const expediente = {
       exportado_en: new Date().toISOString(),
-      version: 'v1.0',
+      version: 'v1.1',
       derecho_arco: 'ACCESO',
       paciente,
       consultas: consultasConAddendums,
-      laboratorios: laboratorios ?? [],
+      mediciones: (mediciones ?? []) as MedicionConAnalito[],
       documentos: documentos ?? [],
     }
 
