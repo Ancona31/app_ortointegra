@@ -29,7 +29,7 @@ export interface TempPatient {
   id: string
   nombre: string
   apellidos: string
-  fecha_nacimiento: string
+  fecha_nacimiento: string | null
   sexo: 'M' | 'F' | null
   telefono: string | null
   email: string | null
@@ -60,7 +60,7 @@ export interface PendingMatch {
   tempId: string
   tempNombre: string
   tempApellidos: string
-  tempFechaNac: string
+  tempFechaNac: string | null
   existingId: string
   existingNumeroExpediente: string | null
 }

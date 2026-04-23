@@ -50,7 +50,7 @@ export type PacienteContexto = {
   nombre: string
   apellidos: string
   sexo: 'M' | 'F' | 'Otro'
-  fecha_nacimiento: string
+  fecha_nacimiento: string | null
   peso_kg?: number
   talla_cm?: number
 }

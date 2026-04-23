@@ -121,7 +121,6 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
   async function handleCrear(e: React.FormEvent) {
     e.preventDefault()
     if (!formNombre.trim()) { setFormError('El nombre es requerido.'); return }
-    if (!formFechaNac) { setFormError('La fecha de nacimiento es requerida.'); return }
     if (!formConsentimiento) { setFormError('El consentimiento es obligatorio.'); return }
     setCreando(true)
     setFormError('')
@@ -134,7 +133,7 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
           nombre: toTitleCase(formNombre),
           apellidos: toTitleCase(formApellidos),
           sexo: null,
-          fecha_nacimiento: formFechaNac,
+          fecha_nacimiento: formFechaNac || null,
           consentimiento_otorgado: true,
           ...(forceCreateRef.current ? { forceCreate: true } : {}),
         }),
@@ -366,19 +365,19 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
                 </div>
               </div>
               <div>
-                <label className="text-[11px] font-medium text-slate-500 block mb-1">Fecha de nacimiento <span className="text-red-400">*</span></label>
+                <label className="text-[11px] font-medium text-slate-500 block mb-1">Fecha de nacimiento</label>
                 <input
                   type="date"
                   value={formFechaNac}
                   onChange={e => setFormFechaNac(e.target.value)}
                   min={FECHA_MIN_NACIMIENTO}
                   max={fechaHoyISO()}
-                  required
                   className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
                 />
                 {formFechaNac && (
                   <p className="text-[11px] text-[#1e5fa8] mt-1 font-medium">{calcularEdad(formFechaNac).textoElegante}</p>
                 )}
+                <p className="text-[11px] text-slate-500 mt-1.5 leading-snug">Recomendable para que la edad aparezca en recetas y documentos. Si se deja vacío, el campo edad quedará en blanco.</p>
               </div>
               <label className="flex items-start gap-2 cursor-pointer">
                 <input
@@ -405,7 +404,7 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
               </button>
               <button
                 type="submit"
-                disabled={creando || !formNombre.trim() || !formFechaNac || !formConsentimiento}
+                disabled={creando || !formNombre.trim() || !formConsentimiento}
                 className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#1e5fa8] rounded-xl hover:bg-[#1a3a5c] disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5 min-w-0"
               >
                 {creando

@@ -227,9 +227,10 @@ export default function NuevoPacientePage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className={labelCls}>Fecha de nacimiento <span className="text-red-400">*</span></label>
+              <label className={labelCls}>Fecha de nacimiento</label>
               <input type="date" value={form.fecha_nacimiento || ''} onChange={e => set('fecha_nacimiento', e.target.value)}
-                min={FECHA_MIN_NACIMIENTO} max={fechaHoyISO()} required className={inputCls} />
+                min={FECHA_MIN_NACIMIENTO} max={fechaHoyISO()} className={inputCls} />
+              <p className="text-xs text-slate-500 mt-1.5">Recomendable para que la edad aparezca en recetas y documentos. Si se deja vacío, el campo edad quedará en blanco.</p>
             </div>
             <div>
               <label className={labelCls}>Sexo <span className="text-red-400">*</span></label>

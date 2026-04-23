@@ -37,10 +37,6 @@ export default function QuickPatientModal({
       setError('Nombre y apellidos son requeridos.')
       return
     }
-    if (!fechaNac) {
-      setError('Fecha de nacimiento es requerida.')
-      return
-    }
     if (!consentimiento) {
       setError('Debes marcar el consentimiento del aviso de privacidad.')
       return
@@ -58,7 +54,7 @@ export default function QuickPatientModal({
         body:    JSON.stringify({
           nombre: nombreLimpio,
           apellidos: apellidosLimpio,
-          fecha_nacimiento: fechaNac,
+          fecha_nacimiento: fechaNac || null,
           email: email.trim() || null,
           consentimiento_otorgado: true,
           ...(forceCreateRef.current ? { forceCreate: true } : {}),
@@ -162,6 +158,7 @@ export default function QuickPatientModal({
               {edadInfo && (
                 <p className="text-[11px] text-emerald-600 mt-1 font-medium">{edadInfo.textoElegante}</p>
               )}
+              <p className="text-[11px] text-slate-500 mt-1.5 leading-snug">Recomendable para que la edad aparezca en recetas y documentos. Si se deja vacío, el campo edad quedará en blanco.</p>
             </div>
             <div>
               <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">Correo</label>

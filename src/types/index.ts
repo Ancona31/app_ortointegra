@@ -17,7 +17,7 @@ export interface Paciente {
   numero_expediente?: string
   nombre: string
   apellidos: string
-  fecha_nacimiento: string
+  fecha_nacimiento: string | null
   edad?: number
   sexo: 'M' | 'F' | 'Otro'
   peso_kg?: number

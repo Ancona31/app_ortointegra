@@ -73,7 +73,9 @@ export default function EstadoPacientePage() {
   }
 
   const nombreCompleto = `${paciente.nombre} ${paciente.apellidos}`.trim()
-  const edad = calcularEdad(paciente.fecha_nacimiento).anios
+  const edad = paciente.fecha_nacimiento
+    ? calcularEdad(paciente.fecha_nacimiento).anios
+    : null
   const sexoLabel = SEXO_LABEL[paciente.sexo]
   const expediente = paciente.numero_expediente ?? '—'
 

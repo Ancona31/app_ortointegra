@@ -2,7 +2,7 @@
 
 type DashboardHeroProps = {
   nombre: string
-  edad: number
+  edad: number | null
   sexo: string
   expediente: string
 }
@@ -20,8 +20,12 @@ export default function DashboardHero({ nombre, edad, sexo, expediente }: Dashbo
         {nombre}
       </h1>
       <p className="text-sm text-slate-500 mt-1">
-        <span className="font-medium text-slate-600">{edad} años</span>
-        {' · '}
+        {edad !== null && (
+          <>
+            <span className="font-medium text-slate-600">{edad} años</span>
+            {' · '}
+          </>
+        )}
         {sexo}
         {' · '}
         Exp. {expediente}

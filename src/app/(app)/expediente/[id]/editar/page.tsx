@@ -14,13 +14,14 @@ type Campo = {
   placeholder?: string
   options?: { value: string; label: string }[]
   required?: boolean
+  hint?: string
   section: string
 }
 
 const campos: Campo[] = [
   { section: 'personal', label: 'Nombre(s)', key: 'nombre', required: true, placeholder: 'Ej: Juan Carlos' },
   { section: 'personal', label: 'Apellidos', key: 'apellidos', required: true, placeholder: 'Ej: García López' },
-  { section: 'personal', label: 'Fecha de nacimiento', key: 'fecha_nacimiento', type: 'date', required: true },
+  { section: 'personal', label: 'Fecha de nacimiento', key: 'fecha_nacimiento', type: 'date', hint: 'Recomendable para que la edad aparezca en recetas y documentos. Si se deja vacío, el campo edad quedará en blanco.' },
   { section: 'personal', label: 'Sexo', key: 'sexo', options: [{ value: 'M', label: 'Masculino' }, { value: 'F', label: 'Femenino' }, { value: 'Otro', label: 'Otro' }], required: true },
   { section: 'personal', label: 'N° Expediente', key: 'numero_expediente', placeholder: 'Ej: OI-2025-001' },
   { section: 'antro', label: 'Peso (kg)', key: 'peso_kg', type: 'number', placeholder: '70' },
@@ -186,6 +187,9 @@ export default function EditarPacientePage() {
                       )}
                       {campo.key === 'email' && form.email && validarEmail(form.email) && (
                         <p className="text-[10px] text-red-500 mt-1">{validarEmail(form.email)}</p>
+                      )}
+                      {campo.hint && (
+                        <p className="text-xs text-slate-500 mt-1.5">{campo.hint}</p>
                       )}
                       </>
                     )}
