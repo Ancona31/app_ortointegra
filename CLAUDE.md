@@ -233,8 +233,8 @@ Lista de bugs/limitaciones aceptadas conscientemente. No corregir sin plan expl�
 2. **`ModalShell` sin focus trap.** Deuda de accesibilidad. El Tab puede escapar del modal. Agregar trap cuando tengamos auditoría a11y formal.
 3. **Modales de Consultas y Documentos sin paginación.** Límite hard de 50 registros heredado de `QUERY_LIMIT` en `page.tsx`. Si un paciente tiene >50 consultas/documentos, los restantes no se ven en el modal. Agregar scroll virtual o buscador interno en fase futura.
 4. ~~**`TabGraficas.tsx` vive temporalmente en disco como archivo utilitario.**~~ ✅ Resuelto (sub-fase 0 del rediseño de labs, 2026-04-21). Archivo eliminado; `normalizarKey` y `ParamGrafica` inlined en `src/hooks/useLaboratoriosNormalizados.ts`.
-5. **`useLaboratoriosNormalizados.ts` — borrar al final del rediseño de labs (sub-fase 8).** Único consumidor externo: `src/app/(app)/expediente/[id]/page.tsx`. Ver `LABS_REDISEÑO_NOTES.md` para orden de migración.
-6. **Tabla `laboratorios` legacy — DROP al final del rediseño de labs (sub-fase 8).** Consumidores además de `/estado`: `src/app/api/paciente/[id]/exportar/route.ts` (producción-crítico — migrar antes del drop). Ver detalles y orden estricto en `LABS_REDISEÑO_NOTES.md`.
+5. ~~**`useLaboratoriosNormalizados.ts` — borrar al final del rediseño de labs (sub-fase 8).**~~ ✅ Resuelto (sub-fase 8C1, 2026-04-23). Hook + todo el código legacy eliminado (`src/lib/analisis.ts`, `/api/laboratorios`, `/api/labs-extract`, páginas `/laboratorios/nuevo` y `/laboratorios/[labId]`, ruta standalone `/laboratorios`, tipos `Laboratorio`/`ResultadoLab`/`ValoresLab`/`AnalisisIA`/`VALORES_REFERENCIA`/`ParametroLab`/`Alerta`).
+6. **Tabla `laboratorios` legacy — pendiente `DROP TABLE` manual (sub-fase 8C2).** Código cliente ya eliminado en 8C1. Falta ejecutar `supabase_migration_labs_drop_legacy.sql` (DROP POLICY con referencia a `laboratorios` + recreate sin la referencia + `DROP TABLE` sin CASCADE). Ver detalles y validación post-ejecución en ese archivo SQL y en `LABS_REDISEÑO_NOTES.md`.
 
 ---
 

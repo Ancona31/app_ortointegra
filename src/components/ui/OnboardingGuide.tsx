@@ -105,26 +105,6 @@ const PAGE_CONTEXTS: PageContext[] = [
     ],
   },
   {
-    match: (p) => p.startsWith('/expediente/') && p.includes('/laboratorios/nuevo'),
-    tips: [
-      {
-        id: 'lab-nuevo',
-        title: 'Ingresar laboratorio',
-        message: 'Aquí puedes subir un documento PDF con los resultados de laboratorio de tu paciente para la extracción automática de valores con IA. Se recomiendan archivos de entre 4 a 8 hojas.',
-      },
-      {
-        id: 'lab-tiempo',
-        title: 'Tiempo de extracción',
-        message: 'La extracción automática de datos tarda aproximadamente de 2 a 3 minutos. Es importante que no salgas de esta ventana mientras se procesa el laboratorio.',
-      },
-      {
-        id: 'lab-manual',
-        title: 'Ingreso manual',
-        message: 'Si prefieres, también puedes ingresar los valores de laboratorio de forma manual. Los datos se guardan en el expediente y se grafican para ver la evolución cronológica del paciente.',
-      },
-    ],
-  },
-  {
     match: (p) => p.startsWith('/expediente/') && p.endsWith('/nueva-nota'),
     tips: [
       {
@@ -170,8 +150,8 @@ const PAGE_CONTEXTS: PageContext[] = [
       },
       {
         id: 'exp-labs',
-        title: 'Laboratorios con IA',
-        message: 'En la pestaña de Laboratorio puedes subir un PDF de resultados y la IA extraerá los valores automáticamente, o captúralos de forma manual. Los valores se grafican para que veas la evolución cronológica del paciente.',
+        title: 'Mediciones y documentos clínicos',
+        message: 'En la card "Mediciones y Documentos" registras valores longitudinales del paciente (glucosa, presión arterial, HbA1c, peso, etc.) con gráficas de evolución y bandas de referencia automáticas. También puedes subir PDFs, imágenes y estudios DICOM — todo vinculado al expediente.',
       },
     ],
   },

@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
 
   const { tabla, registroId } = await req.json()
 
-  const tablasPermitidas = ['pacientes', 'consultas', 'laboratorios', 'documentos']
+  const tablasPermitidas = ['pacientes', 'consultas', 'documentos']
   if (!tabla || !tablasPermitidas.includes(tabla)) {
     return NextResponse.json({ error: 'Tabla inválida' }, { status: 400 })
   }

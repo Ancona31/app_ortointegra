@@ -1,5 +1,4 @@
 import { Pill } from 'lucide-react'
-import Link from 'next/link'
 
 const SUPLEMENTOS = [
   { nombre: 'Vitamina D3 + K2', fn: 'Mineralización ósea y prevención de calcificación de tejidos blandos', lab: 'Vitamina D < 40 ng/mL', prioridad: 'alta' },
@@ -25,14 +24,6 @@ export default function SuplementacionPage() {
           <Pill size={24} /> Protocolo de Suplementación
         </h1>
         <p className="text-slate-500 text-sm mt-1">Stack de suplementación osteomuscular — enfoque en densidad mineral, inflamación y tejidos blandos</p>
-      </div>
-
-      <div className="bg-[#e8f4fd] border border-blue-200 rounded-xl p-4 mb-6">
-        <p className="text-sm text-[#1a3a5c] font-medium">
-          Para el análisis individualizado de un paciente, ve a{' '}
-          <Link href="/laboratorios" className="underline">Laboratorios</Link>
-          {' '}e ingresa sus valores. El sistema generará las recomendaciones automáticamente.
-        </p>
       </div>
 
       <div className="space-y-3">

@@ -20,7 +20,6 @@ export type AuditAccion =
   // Lecturas de datos clínicos
   | 'ver_expediente'
   | 'ver_consulta'
-  | 'ver_laboratorio'
   | 'ver_documento'
   | 'ver_pacientes'
   // Operaciones sobre documentos
@@ -99,7 +98,6 @@ export async function logAccess(
   const accionMap: Record<string, AuditAccion> = {
     pacientes: 'ver_expediente',
     consultas: 'ver_consulta',
-    laboratorios: 'ver_laboratorio',
     documentos: 'ver_documento',
   }
   await logAudit({

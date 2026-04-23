@@ -17,8 +17,9 @@ Notas vivas del rediseño del sistema de laboratorios. Se actualiza por sub-fase
 | 6B | Integración Documentos — componentes UI | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
 | 7 | Card "Mediciones y Documentos" en ExpedienteCardsGrid | ✅ Cerrada 2026-04-22 | pendiente (Angel hace commit manual) |
 | 8A | Migración exportador ARCO al nuevo modelo | ✅ Cerrada 2026-04-23 | pendiente (Angel hace commit manual) |
-| 8B | Migración /estado + ExportarExpedienteButton | ⏳ Pendiente | — |
-| 8C | Drop tabla legacy + eliminar código huérfano | ⏳ Pendiente | — |
+| 8B | Migración /estado + ExportarExpedienteButton | ✅ Cerrada 2026-04-23 | pendiente (Angel hace commit manual) |
+| 8C1 | Eliminar código legacy + deliverable SQL para 8C2 | ✅ Cerrada 2026-04-23 | pendiente (Angel hace commit manual) |
+| 8C2 | DROP TABLE laboratorios (SQL manual por Angel) | ⏳ Pendiente | — |
 | 9 | QA end-to-end + validaciones manuales | ⏳ Pendiente | — |
 
 ## Consumidores de useLaboratoriosNormalizados (sub-fase 8)
@@ -526,9 +527,116 @@ necesita hoy (regla anti-abstracción prematura).
 - Validación funcional con curl: pendiente por Angel (requiere cookie
   de sesión autenticada que Claude Code no posee).
 
+## Sub-fase 8C1 — decisiones de implementación
+
+Cerrada el 2026-04-23. Scope expandido de 9 a 13 archivos eliminados
+durante la investigación previa (sub-fase 8C1 — investigación).
+
+### Archivos eliminados (13)
+
+Código y rutas legacy:
+
+- `src/hooks/useLaboratoriosNormalizados.ts`
+- `src/app/(app)/expediente/[id]/laboratorios/[labId]/` (dir + `page.tsx`)
+- `src/app/(app)/expediente/[id]/laboratorios/nuevo/` (dir + `page.tsx`)
+- `src/app/(app)/laboratorios/` (dir + `page.tsx` standalone)
+- `src/app/api/laboratorios/` (dir + `route.ts` + `[id]/route.ts`)
+
+Módulo de IA para extracción PDF (huérfano tras borrar las 2 páginas legacy):
+
+- `src/lib/analisis.ts` (+ `analisis.test.ts`)
+- `src/app/api/labs-extract/` (dir + `route.ts` + `status/` + `worker/`)
+
+### Archivos modificados
+
+- `src/types/index.ts` — eliminados 7 exports legacy: `Laboratorio`,
+  `ResultadoLab`, `ValoresLab`, `AnalisisIA`, `Alerta`,
+  `VALORES_REFERENCIA`, `ParametroLab`. Conservado `SuplementoRec`
+  bajo nueva sección "Plan de Suplementación" (consumido por
+  `DocumentoContenido`). Limpiados dividers de secciones legacy.
+- `src/lib/audit.ts` — removido `'ver_laboratorio'` del union
+  `AuditAccion` y del `accionMap` en `logAccess`.
+- `src/lib/sentryPiiFilter.ts` — removido `/api/laboratorios` de
+  `SENSITIVE_API_PATHS`.
+- `src/app/api/audit/route.ts` — removido `'laboratorios'` de
+  `tablasPermitidas`.
+- `src/lib/rateLimit.ts` — removido `'labs-extract': 15` de `LIMITES`.
+- `src/app/(app)/suplementacion/page.tsx` — removido el callout azul
+  que apuntaba a `/laboratorios` (el feature de recomendaciones
+  automáticas a partir de valores de lab murió con `analizarLaboratorios`).
+  Removido `import Link from 'next/link'` que quedó huérfano.
+- `src/components/ui/OnboardingGuide.tsx` — removido bloque completo
+  de 3 tips de `/laboratorios/nuevo` (ruta ya no existe). Reemplazado
+  tip `exp-labs` con copy del nuevo módulo (card "Mediciones y Documentos",
+  captura longitudinal + gráficas + upload de DICOM/PDF/imagen).
+
+### Deliverable para 8C2
+
+- `supabase_migration_labs_drop_legacy.sql` — 3 pasos:
+  1. `DROP POLICY pacientes_delete_solo_sin_historial`.
+  2. `CREATE POLICY` recreada sin la referencia a `laboratorios`
+     (mantiene protección sobre `consultas` y `documentos`).
+  3. `DROP TABLE public.laboratorios;` sin CASCADE.
+  Prerequisito para que el DROP pase limpio: sin el paso 1-2 la
+  policy quedaría apuntando a una tabla inexistente y bloquearía
+  todo DELETE sobre `pacientes`.
+
+### Bloqueo para DROP sin CASCADE — por qué existe el paso 1-2
+
+La policy `pacientes_delete_solo_sin_historial`
+(`supabase_migration_retencion_expedientes.sql:83-92`) referencia
+`laboratorios` en su cláusula `USING`:
+
+```sql
+AND NOT EXISTS (SELECT 1 FROM laboratorios l WHERE l.paciente_id = pacientes.id)
+```
+
+Postgres NO dropea esa policy automáticamente con un `DROP TABLE`
+sin CASCADE. Quedaría apuntando a una tabla inexistente y cualquier
+`DELETE` sobre `pacientes` fallaría con `"relation laboratorios does
+not exist"`. Por eso el SQL de 8C2 recrea la policy antes de dropear
+la tabla, manteniendo la protección contra DELETE de pacientes con
+historial activo sobre `consultas` y `documentos`.
+
+### Decisiones de copy (aprobadas por Angel)
+
+1. `suplementacion/page.tsx`: eliminar callout azul entero, no
+   reemplazarlo. Razón: el feature prometido (recomendaciones
+   automáticas a partir de valores de lab) desaparece con
+   `analizarLaboratorios`. La página queda como referencia
+   educativa de stack de suplementos.
+2. `OnboardingGuide.tsx` — nuevo copy del tip `exp-labs`:
+   > "En la card 'Mediciones y Documentos' registras valores
+   > longitudinales del paciente (glucosa, presión arterial, HbA1c,
+   > peso, etc.) con gráficas de evolución y bandas de referencia
+   > automáticas. También puedes subir PDFs, imágenes y estudios
+   > DICOM — todo vinculado al expediente."
+
+### Validación
+
+- `npm run build` — verde.
+- `npm run lint` — sin errores nuevos.
+- `git grep` de términos legacy retorna 0 matches en `src/`
+  (`useLaboratoriosNormalizados`, `analizarLaboratorios`, `Laboratorio`
+  como tipo, `ResultadoLab`, `ValoresLab`, `AnalisisIA`,
+  `VALORES_REFERENCIA`, `ParametroLab`, `/api/laboratorios`,
+  `/api/labs-extract`).
+
+## Deuda menor (no bloquea 8C)
+
+Métrica `ia_labs_extract` del dashboard super-admin sigue expuesta en
+`src/app/api/super-admin/metricas/route.ts:94` y consumida por
+`src/app/(app)/super-admin/metricas/page.tsx:41,232`. El endpoint
+`/api/labs-extract` fue eliminado en 8C1, por lo que el contador
+devuelve 0 naturalmente (nadie escribe filas con `ruta='labs-extract'`
+a `rate_limits`). Limpiar en una pasada futura de limpieza de
+dashboards admin.
+
 ## Pendientes de cierre al final del rediseño
 
-- [ ] Sub-fase 8 ejecutada con orden estricto del bloque de riesgo
-- [ ] DROP TABLE laboratorios manual en Supabase después de sub-fase 8 verde
-- [ ] Verificar que Sentry no registra errores de "relation does not exist" post-drop
-- [ ] Cerrar items 2 y 3 de CLAUDE.md (useLaboratoriosNormalizados + tabla laboratorios)
+- [x] Sub-fase 8 ejecutada con orden estricto del bloque de riesgo
+- [ ] DROP TABLE laboratorios manual en Supabase (8C2, SQL en
+      `supabase_migration_labs_drop_legacy.sql`)
+- [ ] Verificar que Sentry no registra errores de "relation does not
+      exist" post-drop
+- [ ] Cerrar item 6 de CLAUDE.md (tabla laboratorios) tras ejecutar 8C2

@@ -28,7 +28,7 @@ const SENSITIVE_KEYS = [
 
 // Rutas API con datos clínicos sensibles
 const SENSITIVE_API_PATHS = [
-  '/api/pacientes', '/api/consultas', '/api/laboratorios',
+  '/api/pacientes', '/api/consultas',
   '/api/documentos', '/api/nota-medica', '/api/consulta-rapida',
   '/api/email/enviar-documento',
 ]
