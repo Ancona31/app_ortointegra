@@ -8,7 +8,7 @@ import {
   Calendar,
   LayoutDashboard,
 } from 'lucide-react'
-import type { Paciente, Consulta, Laboratorio, Documento } from '@/types'
+import type { Paciente, Consulta } from '@/types'
 import { calcularEdad } from '@/lib/patientUtils'
 import { ultimaConsultaLabel } from '@/lib/expedienteUtils'
 import ExportarExpedienteButton from './ExportarExpedienteButton'
@@ -30,8 +30,6 @@ type Addendum = {
 type HeroExpedienteProps = {
   paciente: Paciente
   consultas: Consulta[]
-  labs: Laboratorio[]
-  documentos: Documento[]
   addendums: Addendum[]
   isDoctor: boolean
   onEditar: () => void
@@ -42,8 +40,6 @@ const IOS_EASING = 'cubic-bezier(0.32, 0.72, 0, 1)'
 export default function HeroExpediente({
   paciente,
   consultas,
-  labs,
-  documentos,
   addendums,
   isDoctor,
   onEditar,
@@ -102,8 +98,6 @@ export default function HeroExpediente({
             <ExportarExpedienteButton
               paciente={paciente}
               consultas={consultas}
-              labs={labs}
-              documentos={documentos}
               addendums={addendums}
             />
           </div>

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { ArrowLeft, Ruler, Stethoscope, FlaskConical, BarChart3 } from 'lucide-react'
+import { ArrowLeft, Ruler, Stethoscope } from 'lucide-react'
 
 import { createClient } from '@/lib/supabase/client'
 import { calcularEdad } from '@/lib/patientUtils'
@@ -111,8 +111,6 @@ export default function EstadoPacientePage() {
         <DashboardCard icon={Stethoscope} iconColor="var(--cp)" title="Antecedentes médicos" summary="Historial clínico">
           <CardContentAntecedentes paciente={paciente} />
         </DashboardCard>
-        <DashboardCard icon={FlaskConical} iconColor="#14b8a6" title="Laboratorios" summary="Estudios y resultados" />
-        <DashboardCard icon={BarChart3} iconColor="#6366f1" title="Gráficas de evolución" summary="Tendencias de analitos" />
       </div>
     </div>
   )

@@ -5,7 +5,6 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
 import { useAuditAccess } from '@/hooks/useAudit'
-import { useLaboratoriosNormalizados } from '@/hooks/useLaboratoriosNormalizados'
 import { Paciente, Consulta, Documento } from '@/types'
 import Portal from '@/components/ui/Portal'
 import { Trash2, AlertTriangle, Loader2 } from 'lucide-react'
@@ -42,9 +41,7 @@ function ExpedientePacienteContent() {
   const [loadingPaciente, setLoadingPaciente] = useState(true)
   const [proximaCita, setProximaCita] = useState<ProximaCita | null>(null)
 
-  const { labs } = useLaboratoriosNormalizados(id)
-
-  // Refetch helpers for child actions (delete doc, delete lab)
+  // Refetch helper for child actions (delete doc)
   const fetchDocumentos = useCallback(async () => {
     const supabase = createClient()
     const { data } = await supabase
@@ -250,8 +247,6 @@ function ExpedientePacienteContent() {
       <HeroExpediente
         paciente={paciente}
         consultas={consultas}
-        labs={labs}
-        documentos={documentos}
         addendums={allAddendums}
         isDoctor={isDoctor}
         onEditar={() => router.push(`/expediente/${id}/editar`)}

@@ -235,3 +235,32 @@ Lista de bugs/limitaciones aceptadas conscientemente. No corregir sin plan expl�
 4. ~~**`TabGraficas.tsx` vive temporalmente en disco como archivo utilitario.**~~ ✅ Resuelto (sub-fase 0 del rediseño de labs, 2026-04-21). Archivo eliminado; `normalizarKey` y `ParamGrafica` inlined en `src/hooks/useLaboratoriosNormalizados.ts`.
 5. **`useLaboratoriosNormalizados.ts` — borrar al final del rediseño de labs (sub-fase 8).** Único consumidor externo: `src/app/(app)/expediente/[id]/page.tsx`. Ver `LABS_REDISEÑO_NOTES.md` para orden de migración.
 6. **Tabla `laboratorios` legacy — DROP al final del rediseño de labs (sub-fase 8).** Consumidores además de `/estado`: `src/app/api/paciente/[id]/exportar/route.ts` (producción-crítico — migrar antes del drop). Ver detalles y orden estricto en `LABS_REDISEÑO_NOTES.md`.
+
+---
+
+## 🔓 Pendientes de seguridad
+
+Hardening conocido pero no aplicado todavía. Cada ítem tiene fix planeado y momento previsto. No reordenar prioridades sin discusión.
+
+### QW3 — Restringir endpoint ARCO a super_admin y admin
+
+**Archivo afectado:** `src/app/api/paciente/[id]/exportar/route.ts`
+
+**Problema:** El endpoint `POST /api/paciente/[id]/exportar` devuelve JSON completo con todos los datos del paciente (consultas, mediciones, documentos, addendums, datos personales) para cumplimiento ARCO (LFPDPPP Art. 28). Actualmente requiere sesión autenticada pero NO valida el role del usuario. Cualquier médico autenticado puede invocarlo vía fetch/curl.
+
+**Origen:** Endpoint creado en sesión anterior como preparación para cumplimiento legal ARCO. Nunca se integró a UI de super-admin.
+
+**Fix planeado:**
+1. Agregar validación post-auth: `role IN ('super_admin', 'admin')`
+2. Si role no cumple → responder `403 Forbidden`
+3. Registrar intentos denegados en `audit_log` con `accion='arco_intento_denegado'`
+4. Mantener el registro de accesos exitosos con `accion='arco_acceso'` (ya existe)
+
+**Cuándo atacar:** Después del rediseño de labs (post sub-fase 8C y 9). Prioridad alta (riesgo de fuga de datos cross-usuario dentro de misma clínica, aunque endpoint esté dormido).
+
+**Alcance estimado:** 1 archivo, ~15 líneas, 20 min.
+
+**Decisiones ya tomadas:**
+- Roles permitidos: `super_admin` + `admin` (admin de clínica puede ejecutar ARCO para pacientes de su clínica; super_admin global puede para cualquier clínica).
+- Respuesta denegada: `403 Forbidden` con JSON `{ error: "forbidden" }`.
+- Audit log: sí registrar intentos denegados.
