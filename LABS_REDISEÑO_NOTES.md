@@ -19,7 +19,7 @@ Notas vivas del rediseño del sistema de laboratorios. Se actualiza por sub-fase
 | 8A | Migración exportador ARCO al nuevo modelo | ✅ Cerrada 2026-04-23 | pendiente (Angel hace commit manual) |
 | 8B | Migración /estado + ExportarExpedienteButton | ✅ Cerrada 2026-04-23 | pendiente (Angel hace commit manual) |
 | 8C1 | Eliminar código legacy + deliverable SQL para 8C2 | ✅ Cerrada 2026-04-23 | pendiente (Angel hace commit manual) |
-| 8C2 | DROP TABLE laboratorios (SQL manual por Angel) | ⏳ Pendiente | — |
+| 8C2 | DROP TABLE laboratorios (SQL manual por Angel) | ✅ Cerrada 2026-04-23 | — (SQL manual en Supabase) |
 | 9 | QA end-to-end + validaciones manuales | ⏳ Pendiente | — |
 
 ## Consumidores de useLaboratoriosNormalizados (sub-fase 8)
@@ -635,8 +635,33 @@ dashboards admin.
 ## Pendientes de cierre al final del rediseño
 
 - [x] Sub-fase 8 ejecutada con orden estricto del bloque de riesgo
-- [ ] DROP TABLE laboratorios manual en Supabase (8C2, SQL en
-      `supabase_migration_labs_drop_legacy.sql`)
+- [x] DROP TABLE laboratorios manual en Supabase (8C2 cerrada 2026-04-23)
+- [x] Cerrar item 6 de CLAUDE.md (tabla laboratorios) tras ejecutar 8C2
+- [ ] Sub-fase 9 — QA end-to-end + validaciones manuales
 - [ ] Verificar que Sentry no registra errores de "relation does not
-      exist" post-drop
-- [ ] Cerrar item 6 de CLAUDE.md (tabla laboratorios) tras ejecutar 8C2
+      exist" post-drop (incluido en sub-fase 9)
+
+## Sub-fase 8C2 — ejecución
+
+Ejecutada manualmente por Angel en Supabase SQL Editor el 2026-04-23
+sin incidentes. Los 3 pasos del archivo
+`supabase_migration_labs_drop_legacy.sql` corrieron en orden:
+
+1. `DROP POLICY pacientes_delete_solo_sin_historial`.
+2. `CREATE POLICY` recreada sin referencia a `laboratorios`
+   (protección conservada sobre `consultas` y `documentos`).
+3. `DROP TABLE public.laboratorios` sin CASCADE.
+
+Dependencias eliminadas automáticamente por el DROP: trigger
+`audit_laboratorios`, 8 RLS policies sobre la tabla, 2 índices
+(`idx_laboratorios_paciente`, `idx_laboratorios_paciente_fecha`),
+FK `laboratorios_paciente_id_fkey` y 5 registros de data de prueba.
+El bucket `laboratorios-pdf` ya había sido eliminado en sesiones
+anteriores.
+
+Validaciones post-ejecución OK:
+
+- `to_regclass('public.laboratorios')` retorna `NULL`.
+- Policy recreada menciona `consultas` y `documentos`, NO
+  `laboratorios`.
+- App navega sin errores de "relation laboratorios does not exist".
