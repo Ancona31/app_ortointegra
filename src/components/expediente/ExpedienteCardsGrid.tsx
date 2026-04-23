@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import { Plus, Layers, Clock, Calendar, LayoutDashboard, Activity } from 'lucide-react'
-import type { Paciente, Consulta } from '@/types'
+import type { Paciente, Consulta, Diagnostico } from '@/types'
 import ExpedienteCard from './ExpedienteCard'
 import { useStatsLabs } from '@/hooks/useStatsLabs'
 import {
@@ -61,7 +61,7 @@ export default function ExpedienteCardsGrid({
   proximaCita,
   isDoctor,
 }: ExpedienteCardsGridProps) {
-  const { diagnosticoPrincipal, fechaDiagnostico } = useMemo(() => {
+  const { diagnosticosCard, fechaDiagnostico } = useMemo(() => {
     const ordenadas = [...consultas].sort((a, b) => b.fecha.localeCompare(a.fecha))
     const conDx = ordenadas.find(
       (c) =>
@@ -69,17 +69,37 @@ export default function ExpedienteCardsGrid({
         c.diagnosticos.length > 0 &&
         !!c.diagnosticos[0]?.descripcion,
     )
-    if (!conDx?.diagnosticos?.[0]) {
+    if (!conDx?.diagnosticos?.length) {
       return {
-        diagnosticoPrincipal: null as string | null,
+        diagnosticosCard: [] as Diagnostico[],
         fechaDiagnostico: null as string | null,
       }
     }
     return {
-      diagnosticoPrincipal: conDx.diagnosticos[0].descripcion,
+      diagnosticosCard: conDx.diagnosticos.filter(d => d.descripcion?.trim()),
       fechaDiagnostico: ultimaConsultaFecha([conDx]),
     }
   }, [consultas])
+
+  const MAX_TITLE_LEN = 72
+  const formatDx = (d: Diagnostico): string =>
+    d.codigo_cie10 ? `${d.codigo_cie10} · ${d.descripcion}` : d.descripcion
+  const truncate = (s: string): string =>
+    s.length > MAX_TITLE_LEN ? `${s.slice(0, MAX_TITLE_LEN - 1).trimEnd()}…` : s
+
+  let diagnosticoTitle = 'Sin diagnóstico registrado'
+  let diagnosticoSubtitle: string | undefined
+  if (diagnosticosCard.length >= 1) {
+    diagnosticoTitle = truncate(formatDx(diagnosticosCard[0]))
+    const extra = diagnosticosCard.length - 1
+    if (extra > 0) {
+      diagnosticoSubtitle = fechaDiagnostico
+        ? `+${extra} más · ${fechaDiagnostico}`
+        : `+${extra} diagnóstico${extra === 1 ? '' : 's'} más`
+    } else {
+      diagnosticoSubtitle = fechaDiagnostico ? `Actualizado el ${fechaDiagnostico}` : undefined
+    }
+  }
 
   const fechaUltimaConsulta = ultimaConsultaFecha(consultas)
 
@@ -110,8 +130,8 @@ export default function ExpedienteCardsGrid({
 
       <ExpedienteCard
         label="DIAGNÓSTICO"
-        title={diagnosticoPrincipal ?? 'Sin diagnóstico registrado'}
-        subtitle={fechaDiagnostico ? `Actualizado el ${fechaDiagnostico}` : undefined}
+        title={diagnosticoTitle}
+        subtitle={diagnosticoSubtitle}
         icon={Layers}
         iconColor="#af52de"
       />

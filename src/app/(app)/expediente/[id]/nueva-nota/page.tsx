@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import Portal from '@/components/ui/Portal'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Paciente } from '@/types'
+import { Paciente, Diagnostico } from '@/types'
 import { calcularEdad } from '@/lib/patientUtils'
 import { flushSync } from 'react-dom'
 import {
@@ -20,7 +20,7 @@ import Breadcrumbs from '@/components/layout/Breadcrumbs'
 import { imprimirOCompartir } from '@/lib/mobileShare'
 import { secureStorage } from '@/lib/secureStorage'
 import { useAuditAccess } from '@/hooks/useAudit'
-import CIE10Combobox from '@/components/ui/CIE10Combobox'
+import DiagnosticosEditor from '@/components/documentos/DiagnosticosEditor'
 import dynamic from 'next/dynamic'
 
 function FormCargando() {
@@ -85,9 +85,25 @@ const DOCS = [
 
 const MED_VACIA: MedRow = { nombre: '', dosis: '', frecuencia: '', duracion: '' }
 
-const EMPTY_FORM = {
-  motivo_consulta: '', exploracion_fisica: '', diagnosticos: '', analisis: '',
+const EMPTY_FORM: {
+  motivo_consulta: string
+  exploracion_fisica: string
+  diagnosticos: Diagnostico[]
+  analisis: string
+  pronostico: string
+  plan_tratamiento: string
+  gabinete_laboratorios: string
+  proxima_cita: string
+} = {
+  motivo_consulta: '', exploracion_fisica: '', diagnosticos: [], analisis: '',
   pronostico: '', plan_tratamiento: '', gabinete_laboratorios: '', proxima_cita: '',
+}
+
+function formatDiagnosticosInline(dxs: Diagnostico[]): string {
+  return dxs
+    .filter(d => d.descripcion?.trim())
+    .map(d => d.codigo_cie10 ? `${d.codigo_cie10} · ${d.descripcion}` : d.descripcion)
+    .join(' + ')
 }
 
 export default function NuevaNotaPage() {
@@ -135,7 +151,6 @@ export default function NuevaNotaPage() {
   })
   function toggleCampo(k: string) { setCamposExpandidos(p => ({ ...p, [k]: !p[k] })) }
 
-  const [complementoDx, setComplementoDx] = useState('')
   const suggestRef  = useRef<HTMLDivElement>(null)
   const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const formRef = useRef(form)
@@ -159,17 +174,44 @@ export default function NuevaNotaPage() {
     secureStorage.get<{ nombre: string; count: number }[]>('med-frecuentes').then(data => {
       if (data) setMedCache(data.sort((a, b) => b.count - a.count).map(d => d.nombre))
     }).catch(() => {})
-    secureStorage.get<{ form: typeof form; medicamentos: typeof medicamentos }>(`nota-draft-${id}`).then(parsed => {
+    // Tipo laxo del draft para tolerar formato viejo (diagnosticos: string + complementoDx).
+    type DraftForm = Partial<Omit<typeof EMPTY_FORM, 'diagnosticos'>> & {
+      diagnosticos?: string | Diagnostico[]
+      complementoDx?: string
+    }
+    type DraftPayload = { form?: DraftForm; medicamentos?: typeof medicamentos; complementoDx?: string }
+    secureStorage.get<DraftPayload>(`nota-draft-${id}`).then(parsed => {
       if (!parsed?.form) return
       // Guard anti-race: si la promesa resolvió DESPUÉS de que el usuario
       // empezó a teclear en cualquiera de los 8 campos, descartar el borrador
       // para no sobrescribir entrada clínica viva.
       const current = formRef.current
-      const vacio = Object.values(current).every(v => !v)
+      const vacio = Object.values(current).every(v => Array.isArray(v) ? v.length === 0 : !v)
       if (!vacio) return
+      // Migración inline: drafts viejos guardaban diagnosticos como string y
+      // complementoDx como campo aparte. Convertir a Diagnostico[].
+      const raw = parsed.form
+      const migrated: Partial<typeof EMPTY_FORM> = {}
+      for (const [k, v] of Object.entries(raw)) {
+        if (k === 'diagnosticos' || k === 'complementoDx') continue
+        // @ts-expect-error — copia campo a campo, los tipos no-array son string
+        migrated[k] = v
+      }
+      const rawDx = raw.diagnosticos
+      const rawComp = (raw.complementoDx ?? parsed.complementoDx ?? '').trim()
+      if (typeof rawDx === 'string') {
+        const dxTrim = rawDx.trim()
+        migrated.diagnosticos = dxTrim
+          ? [{ descripcion: rawComp ? `${dxTrim} (${rawComp})` : dxTrim }]
+          : []
+      } else if (Array.isArray(rawDx)) {
+        migrated.diagnosticos = rawDx
+      } else {
+        migrated.diagnosticos = []
+      }
       // Spread sobre EMPTY_FORM por si un borrador viejo tiene campos faltantes
       // tras un cambio de schema (evita undefined en inputs controlados).
-      setForm({ ...EMPTY_FORM, ...parsed.form })
+      setForm({ ...EMPTY_FORM, ...migrated })
       if (parsed.medicamentos?.length) setMedicamentos(parsed.medicamentos)
       setBorradorRestaurado(true)
     }).catch(() => {})
@@ -196,7 +238,7 @@ export default function NuevaNotaPage() {
     if (notaSaved) return // no guardar borrador si la nota ya fue guardada en DB
     if (autosaveRef.current) clearTimeout(autosaveRef.current)
     autosaveRef.current = setTimeout(() => {
-      const tieneDatos = form.motivo_consulta || form.diagnosticos || form.exploracion_fisica
+      const tieneDatos = form.motivo_consulta || form.diagnosticos.length > 0 || form.exploracion_fisica
       if (!tieneDatos) return
       secureStorage.set(draftKey, { form, medicamentos }).then(() => {
         setUltimoGuardado(new Date())
@@ -261,6 +303,10 @@ export default function NuevaNotaPage() {
     setGenerando(true); setError('')
     const edad = paciente?.fecha_nacimiento
       ? calcularEdad(paciente.fecha_nacimiento).anios : null
+    const diagnosticosPrompt = form.diagnosticos
+      .filter(d => d.descripcion?.trim())
+      .map((d, i) => `${i + 1}. ${d.codigo_cie10 ? `[${d.codigo_cie10}] ` : ''}${d.descripcion.trim()}`)
+      .join('\n')
     try {
       const res = await fetch('/api/nota-medica', {
         method: 'POST',
@@ -273,7 +319,14 @@ export default function NuevaNotaPage() {
             paciente?.medicamentos_actuales ? `Medicamentos: ${paciente.medicamentos_actuales}` : null,
             paciente?.alergias ? `Alergias: ${paciente.alergias}` : null,
           ].filter(Boolean).join('. '),
-          ...form,
+          motivo_consulta: form.motivo_consulta,
+          exploracion_fisica: form.exploracion_fisica,
+          gabinete_laboratorios: form.gabinete_laboratorios,
+          analisis: form.analisis,
+          pronostico: form.pronostico,
+          plan_tratamiento: form.plan_tratamiento,
+          proxima_cita: form.proxima_cita,
+          diagnosticos: diagnosticosPrompt,
         }),
       })
       const data = await res.json()
@@ -298,16 +351,22 @@ export default function NuevaNotaPage() {
   function previewNotaManual() {
     if (!form.motivo_consulta) { setError('Ingresa al menos el motivo de consulta'); return }
     setError('')
-    // Diagnóstico: CIE-10 + complemento
-    const dxCompleto = complementoDx
-      ? `${form.diagnosticos} (${complementoDx})`
-      : form.diagnosticos
+    const dxValidos = form.diagnosticos.filter(d => d.descripcion?.trim())
+    const dxBlock = dxValidos.length === 0
+      ? 'Diagnóstico pendiente.'
+      : dxValidos.length === 1
+        ? (dxValidos[0].codigo_cie10
+            ? `${dxValidos[0].codigo_cie10} - ${dxValidos[0].descripcion.trim()}`
+            : dxValidos[0].descripcion.trim())
+        : dxValidos
+            .map((d, i) => `${i + 1}. ${d.codigo_cie10 ? `${d.codigo_cie10} - ` : ''}${d.descripcion.trim()}`)
+            .join('\n')
 
     const partes = [
       `**[SUBJETIVO]:**\n${form.motivo_consulta}`,
       `**[OBJETIVO]:**\n${form.exploracion_fisica || 'Sin exploración física registrada.'}`,
       `**[AUXILIARES DIAGNÓSTICOS]:**\n${form.gabinete_laboratorios || 'Estudios de gabinete y laboratorio pendientes.'}`,
-      `**[DIAGNÓSTICO]:**\n${dxCompleto || 'Diagnóstico pendiente.'}`,
+      `**[DIAGNÓSTICO]:**\n${dxBlock}`,
       `**[ANÁLISIS]:**\n${form.analisis || 'Análisis clínico pendiente.'}`,
       `**[PLAN]:**\n${form.plan_tratamiento || 'Plan de tratamiento pendiente.'}`,
     ]
@@ -320,7 +379,9 @@ export default function NuevaNotaPage() {
     const faltantes: string[] = []
     if (!form.motivo_consulta.trim()) faltantes.push('Motivo de consulta')
     if (!form.exploracion_fisica.trim()) faltantes.push('Exploración física')
-    if (!form.diagnosticos.trim()) faltantes.push('Diagnóstico')
+    if (form.diagnosticos.length === 0 || !form.diagnosticos.some(d => d.descripcion?.trim())) {
+      faltantes.push('Diagnóstico')
+    }
     if (!form.plan_tratamiento.trim()) faltantes.push('Plan de tratamiento')
     if (faltantes.length > 0) {
       setError(`Campos obligatorios: ${faltantes.join(', ')}`)
@@ -349,12 +410,11 @@ export default function NuevaNotaPage() {
       motivo_consulta: form.motivo_consulta,
       exploracion_fisica: form.exploracion_fisica,
       diagnosticos: form.diagnosticos
-        ? [{
-            descripcion: complementoDx
-              ? `${form.diagnosticos} (${complementoDx})`
-              : form.diagnosticos,
-          }]
-        : [],
+        .filter(d => d.descripcion?.trim())
+        .map(d => ({
+          ...(d.codigo_cie10 ? { codigo_cie10: d.codigo_cie10 } : {}),
+          descripcion: d.descripcion.trim(),
+        })),
       plan_tratamiento: form.plan_tratamiento,
       notas_evolucion: notaFinal,
       proxima_cita: form.proxima_cita || null,
@@ -695,7 +755,7 @@ modoNota === 'ia'
               <p className="text-xs text-amber-700 font-medium flex-1">Borrador restaurado — continúa donde lo dejaste</p>
               <button
                 onClick={() => {
-                  setForm({ motivo_consulta: '', exploracion_fisica: '', diagnosticos: '', analisis: '', pronostico: '', plan_tratamiento: '', gabinete_laboratorios: '', proxima_cita: '' })
+                  setForm({ ...EMPTY_FORM })
                   setMedicamentos([{ ...MED_VACIA }])
                   secureStorage.remove(draftKey)
                   setBorradorRestaurado(false)
@@ -776,16 +836,10 @@ modoNota === 'ia'
                 {/* Diagnóstico CIE-10 — siempre visible */}
                 <div>
                   <label className="text-xs font-medium text-slate-500 block mb-1">Diagnóstico(s) CIE-10 <span className="text-red-400">*</span></label>
-                  <CIE10Combobox
+                  <DiagnosticosEditor
                     value={form.diagnosticos}
-                    onChange={val => update('diagnosticos', val)}
+                    onChange={dx => setForm(prev => ({ ...prev, diagnosticos: dx }))}
                   />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">Complemento de diagnóstico</label>
-                  <input type="text" value={complementoDx} onChange={e => setComplementoDx(e.target.value)}
-                    placeholder="Ej: nivel L4-L5, bilateral, agudizado..."
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
                 </div>
                 {/* Plan de tratamiento — expandible */}
                 <div>
@@ -837,17 +891,10 @@ modoNota === 'ia'
                   <label className="text-xs font-medium text-slate-500 block mb-1">
                     Diagnóstico(s) CIE-10 <span className="text-red-400">*</span>
                   </label>
-                  <CIE10Combobox
+                  <DiagnosticosEditor
                     value={form.diagnosticos}
-                    onChange={val => update('diagnosticos', val)}
+                    onChange={dx => setForm(prev => ({ ...prev, diagnosticos: dx }))}
                   />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">Complemento de diagnóstico</label>
-                  <textarea value={complementoDx} onChange={e => setComplementoDx(e.target.value)}
-                    placeholder="Detalles adicionales: niveles, lateralidad, severidad..."
-                    rows={2}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-500 block mb-1">
@@ -1245,25 +1292,25 @@ modoNota === 'ia'
                   style={slideKey > 0 ? { animation: `${slideDir === 'right' ? 'slideFromRight' : 'slideFromLeft'} 0.3s cubic-bezier(0.32, 0.72, 0, 1)` } : undefined}
                 >
                   {docInline === 'receta' && (
-                    <RecetaFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} medicamentosIniciales={medicamentosParaReceta} />
+                    <RecetaFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} medicamentosIniciales={medicamentosParaReceta} />
                   )}
                   {docInline === 'lab' && (
-                    <SolicitudLabFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
+                    <SolicitudLabFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} />
                   )}
                   {docInline === 'imagen' && (
-                    <SolicitudImagenFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
+                    <SolicitudImagenFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} />
                   )}
                   {docInline === 'suplementacion' && (
-                    <PlanSupFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
+                    <PlanSupFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} />
                   )}
                   {docInline === 'internamiento' && (
-                    <InternamientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
+                    <InternamientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} />
                   )}
                   {docInline === 'escrito' && (
                     <EscritoFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} />
                   )}
                   {docInline === 'consentimiento' && (
-                    <ConsentimientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={form.diagnosticos} pacienteId={id} />
+                    <ConsentimientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} />
                   )}
                   {docInline === 'honorarios' && (
                     <HonorariosFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} />
