@@ -11,6 +11,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 import DOMPurify from 'dompurify'
+import { decodificarNbsp } from '@/lib/textUtils'
 
 interface Props {
   pacienteInicial?: string
@@ -89,8 +90,13 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
   async function imprimir() {
     // Pre-validación ANTES de cualquier side-effect — sanitización primero
     // para no mostrar "Generando..." de un escrito vacío.
-    const contenido = sanitizeEditorHtml(editorRef.current?.innerHTML ?? '')
+    // decodificarNbsp neutraliza los &nbsp; que contentEditable inyecta
+    // automáticamente; el resto de entidades HTML se preservan para no
+    // romper el marcado.
+    const contenido = decodificarNbsp(sanitizeEditorHtml(editorRef.current?.innerHTML ?? ''))
     if (!contenido.trim()) return
+
+    const asuntoLimpio = decodificarNbsp(asunto)
 
     flushSync(() => { setErrorGuardado(''); setImprimiendo(true) })
 
@@ -103,7 +109,7 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
     const docContenido = {
       paciente,
       fecha,
-      asunto,
+      asunto: asuntoLimpio,
       cuerpo: contenido,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     }
@@ -132,7 +138,7 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
         tipo: 'escrito_medico',
         pacienteId,
         medico: medicoData,
-        data: { paciente, fecha: fechaFmt, asunto, cuerpo: contenido },
+        data: { paciente, fecha: fechaFmt, asunto: asuntoLimpio, cuerpo: contenido },
         logoUrl,
         filename: generateDocFileName(paciente, 'Escrito_Medico'),
       })

@@ -6,6 +6,7 @@ import PdfWatermark from './PdfWatermark'
 import { BarraTop, BarraBottom } from './PdfBarras'
 import { baseStyles, getPdfColors, contrastText } from './PdfStyles'
 import type { PdfMedicoData, PdfColors } from './PdfStyles'
+import { decodificarEntidadesHTML } from '@/lib/textUtils'
 
 export interface EscritoMedicoData {
   paciente?: string
@@ -164,7 +165,7 @@ function parseHtmlToElements(html: string, colors: PdfColors): ReactElement[] {
             lineHeight: 1.4,
           }}
         >
-          {stripTags(seg.content)}
+          {decodificarEntidadesHTML(stripTags(seg.content))}
         </Text>
       )
       continue
@@ -183,7 +184,7 @@ function parseHtmlToElements(html: string, colors: PdfColors): ReactElement[] {
             lineHeight: 1.4,
           }}
         >
-          {stripTags(seg.content)}
+          {decodificarEntidadesHTML(stripTags(seg.content))}
         </Text>
       )
       continue
@@ -196,7 +197,7 @@ function parseHtmlToElements(html: string, colors: PdfColors): ReactElement[] {
     if (!hasFormatting) {
       elements.push(
         <Text key={`p-${i}`} style={bodyText}>
-          {stripTags(seg.content)}
+          {decodificarEntidadesHTML(stripTags(seg.content))}
         </Text>
       )
     } else {
@@ -211,7 +212,7 @@ function parseHtmlToElements(html: string, colors: PdfColors): ReactElement[] {
                 textDecoration: il.underline ? 'underline' : 'none',
               }}
             >
-              {il.text}
+              {decodificarEntidadesHTML(il.text)}
             </Text>
           ))}
         </Text>
@@ -315,7 +316,7 @@ export default function EscritoMedicoPdf({ medico, data, logoUrl }: EscritoMedic
             {data.paciente ? (
               <View style={baseStyles.datoField}>
                 <Text style={baseStyles.datoLabel}>PACIENTE</Text>
-                <Text style={baseStyles.datoValor}>{data.paciente}</Text>
+                <Text style={baseStyles.datoValor}>{decodificarEntidadesHTML(data.paciente)}</Text>
               </View>
             ) : null}
           </View>
@@ -323,7 +324,7 @@ export default function EscritoMedicoPdf({ medico, data, logoUrl }: EscritoMedic
           {/* Asunto */}
           {data.asunto ? (
             <View style={[s.asuntoBanner, { backgroundColor: colors.cp }]}>
-              <Text style={[s.asuntoText, { color: contrastText(colors.cp) }]}>{data.asunto}</Text>
+              <Text style={[s.asuntoText, { color: contrastText(colors.cp) }]}>{decodificarEntidadesHTML(data.asunto)}</Text>
             </View>
           ) : null}
 
