@@ -238,6 +238,17 @@ Lista de bugs/limitaciones aceptadas conscientemente. No corregir sin plan expl�
 
 ---
 
+## ✅ Rediseño de laboratorios — cerrado
+
+El rediseño del módulo de laboratorios se cerró el **2026-04-24** tras
+completar 10 sub-fases (0-7, 8A, 8B, 8C1, 8C2, 9) sin bugs funcionales
+detectados durante el QA end-to-end. Detalle por sub-fase y decisiones
+de implementación en `LABS_REDISEÑO_NOTES.md`. Mejoras UX identificadas
+durante el QA están listadas más abajo en "Mejoras post-rediseño de
+labs (retomar en sesión nueva)".
+
+---
+
 ## 🔓 Pendientes de seguridad
 
 Hardening conocido pero no aplicado todavía. Cada ítem tiene fix planeado y momento previsto. No reordenar prioridades sin discusión.
@@ -264,3 +275,158 @@ Hardening conocido pero no aplicado todavía. Cada ítem tiene fix planeado y mo
 - Roles permitidos: `super_admin` + `admin` (admin de clínica puede ejecutar ARCO para pacientes de su clínica; super_admin global puede para cualquier clínica).
 - Respuesta denegada: `403 Forbidden` con JSON `{ error: "forbidden" }`.
 - Audit log: sí registrar intentos denegados.
+
+---
+
+## Mejoras post-rediseño de labs (retomar en sesión nueva)
+
+Identificadas durante QA de sub-fase 9. Son mejoras UX, no bugs
+funcionales. Cada una es una sub-fase independiente.
+
+### Mejora A — Vista lista + eliminación múltiple de documentos
+
+**Módulo afectado:** `/expediente/[id]/laboratorios`, sección de
+documentos en la card "Mediciones y Documentos".
+
+**Problema:** eliminar múltiples documentos uno por uno es demasiado
+lento para el médico. Durante una consulta el médico puede necesitar
+limpiar varios estudios obsoletos y el flujo actual requiere un click +
+confirmación por cada uno.
+
+**Cambios requeridos:**
+- Toggle "Vista tarjetas (actual) / Vista lista" en el encabezado de
+  la sección de documentos. La vista lista muestra una fila por
+  documento con nombre, tipo, fecha, tamaño, acciones.
+- Modo eliminación múltiple: botón "Eliminar varios" activa checkboxes
+  en cada documento (aplica a ambas vistas).
+- Barra de acción flotante inferior con contador "Eliminar N
+  seleccionados" + botón cancelar.
+- Confirmación ÚNICA con lista de archivos antes de borrado definitivo.
+- Preservar el audit_log: una entrada por cada documento eliminado,
+  NO una entrada agregada.
+
+**Archivos probablemente afectados (por verificar al inicio de la
+sub-fase):**
+- `src/components/labs/DocumentosCard.tsx` o similar
+- `src/hooks/useDocumentosLabs.ts`
+- Posiblemente un nuevo componente `DocumentosListView.tsx`
+
+**Scope estimado:** sub-fase independiente, ~2-3 horas de trabajo.
+
+---
+
+### Mejora B — Optimización de PDF del exportar expediente
+
+**Módulo afectado:** botón "Exportar expediente" en el Hero del
+expediente (`HeroExpediente.tsx` o `ExportarExpedienteButton.tsx`).
+
+**Observaciones del PDF actual** (exportado el 2026-04-24 sobre el
+paciente de prueba "Prueba Prueba" con 20 consultas, generó 24 páginas):
+
+#### B1. Densidad y saltos de página
+**Problema:** 20 consultas → 24 páginas. Saltos de página agresivos
+entre consultas. Muchas consultas cortas (ej. nota "lumbago breve" del
+25/marzo) desperdician una página casi entera.
+
+**Fix propuesto:**
+- Permitir que consultas fluyan naturalmente en la página siguiente
+  sin forzar salto
+- Usar `page-break-inside: avoid` SOLO dentro de secciones internas
+  (`[SUBJETIVO]`, `[OBJETIVO]`, etc.) para evitar partir una sección
+  a la mitad — NO entre consultas enteras
+- Reducir márgenes top/bottom del documento (actualmente se ven
+  excesivos)
+
+#### B2. Portada ineficiente
+**Problema:** Header del médico (nombre, especialidad, cédulas) + datos
+del paciente + antecedentes ocupan la página 1 completa. El encabezado
+"CONSULTAS (20)" queda huérfano al final de la página 1 sin ninguna
+consulta debajo.
+
+**Fix propuesto:**
+- Compactar header del médico a ~1/3 de página (no ocupar la altura
+  completa)
+- Iniciar la primera consulta en la página 1 inmediatamente después
+  de antecedentes si cabe
+- El encabezado "CONSULTAS (N)" debe ir acompañado al menos de la
+  primera consulta
+
+#### B3. Falta firma médica al final de cada consulta
+**Problema:** el PDF no incluye firma del médico al final de cada nota,
+rompiendo consistencia con EscritoMedico y recetas que SÍ incluyen
+firma. Pérdida de valor legal/profesional del documento exportado.
+
+**Fix propuesto:**
+- Agregar bloque de firma al final de CADA consulta con:
+  - Línea horizontal separadora
+  - Nombre completo del médico: "Dr. Angel M. Ancona Pérez"
+  - Cédulas: "Cédula Prof.: 9552456 · Ced. Esp.: 12085805"
+  - Fecha de la consulta
+  - Opcional futuro: imagen de firma/sello escaneado si el sistema
+    lo soporta en alguna sub-fase posterior
+
+**Referencia:** replicar el patrón que ya usa
+`src/lib/pdf/EscritoMedicoPdf.tsx` en el bloque de firma al final del
+documento.
+
+#### B4. Header completo repetido en cada página
+**Problema:** el bloque del médico (foto/icono + nombre + especialidad
++ cédulas) aparece en las 24 páginas, consumiendo espacio innecesario
+en páginas internas.
+
+**Fix propuesto:**
+- Página 1: header completo (como actualmente)
+- Páginas 2+: header mínimo tipo "Expediente — [Nombre paciente] ·
+  continúa" en texto pequeño en la esquina superior, SIN el bloque
+  completo del médico
+
+#### B5. Duplicados visibles en el PDF
+**Problema:** en el PDF de prueba aparecen consultas duplicadas
+(ejemplos: "Gonalgia postraumática 17/abr" aparece 2 veces, "Contusión
+rodilla 2/abr" aparece 2 veces, notas de prueba "hug/asdf/sedge 11/abr"
+repetidas).
+
+**Por verificar al inicio de la sub-fase:**
+- Query SQL a `consultas` del paciente para confirmar si hay 20
+  consultas reales con duplicados de betatesting, o si el render
+  está imprimiendo cada consulta 2 veces
+- Si son duplicados reales en DB: considerar ofrecer filtro de fecha
+  en el botón "Exportar expediente" (ej. "Últimos 30 días", "Último
+  año", "Todo")
+- Si es bug de render: corregir el loop que itera consultas
+
+#### B6. Generación vía print del navegador (limitante)
+**Problema:** el footer muestra `about:blank` delatando que el PDF se
+genera vía print dialog del navegador, no vía librería PDF nativa.
+Esto limita el control fino de layout, pagebreaks inteligentes, y la
+consistencia con otros PDFs del sistema (EscritoMedico, recetas,
+consentimientos usan `@react-pdf/renderer`).
+
+**Fix propuesto (scope mayor):**
+- Migrar la generación del exportar expediente a `@react-pdf/renderer`
+- Esto desbloquea B1-B4 de forma limpia
+- Costo: sub-fase grande, probablemente 4-6 horas de trabajo
+- Beneficio adicional: consistencia visual con resto de PDFs del
+  sistema
+
+**Alternativa lite:** si no se quiere migrar, atacar B1-B5 via CSS
+`@media print` y ajustes de estructura HTML. Menos limpio pero más
+rápido.
+
+**Archivos probablemente afectados (por verificar al inicio de la
+sub-fase):**
+- `src/components/expediente/ExportarExpedienteButton.tsx`
+- Posiblemente una page/route de `/expediente/[id]/exportar` que
+  renderiza la vista imprimible
+- Si migración a @react-pdf/renderer: nuevo archivo
+  `src/lib/pdf/ExpedientePdf.tsx`
+
+**Scope estimado:**
+- Versión lite (CSS + ajustes estructurales para B1-B5 sin migrar):
+  ~2-3 horas
+- Versión completa (migrar a @react-pdf/renderer y resolver B1-B6):
+  ~4-6 horas
+
+---
+
+**Fin de sección "Mejoras post-rediseño de labs".**

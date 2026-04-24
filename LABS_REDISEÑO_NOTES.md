@@ -20,7 +20,7 @@ Notas vivas del rediseño del sistema de laboratorios. Se actualiza por sub-fase
 | 8B | Migración /estado + ExportarExpedienteButton | ✅ Cerrada 2026-04-23 | pendiente (Angel hace commit manual) |
 | 8C1 | Eliminar código legacy + deliverable SQL para 8C2 | ✅ Cerrada 2026-04-23 | pendiente (Angel hace commit manual) |
 | 8C2 | DROP TABLE laboratorios (SQL manual por Angel) | ✅ Cerrada 2026-04-23 | — (SQL manual en Supabase) |
-| 9 | QA end-to-end + validaciones manuales | ⏳ Pendiente | — |
+| 9 | QA end-to-end + validaciones manuales | ✅ Cerrada 2026-04-24 | pendiente (Angel hace commit manual) |
 
 ## Consumidores de useLaboratoriosNormalizados (sub-fase 8)
 
@@ -637,9 +637,9 @@ dashboards admin.
 - [x] Sub-fase 8 ejecutada con orden estricto del bloque de riesgo
 - [x] DROP TABLE laboratorios manual en Supabase (8C2 cerrada 2026-04-23)
 - [x] Cerrar item 6 de CLAUDE.md (tabla laboratorios) tras ejecutar 8C2
-- [ ] Sub-fase 9 — QA end-to-end + validaciones manuales
-- [ ] Verificar que Sentry no registra errores de "relation does not
-      exist" post-drop (incluido en sub-fase 9)
+- [x] Sub-fase 9 — QA end-to-end + validaciones manuales (cerrada 2026-04-24)
+- [x] Verificar que Sentry no registra errores de "relation does not
+      exist" post-drop (validado en sub-fase 9)
 
 ## Sub-fase 8C2 — ejecución
 
@@ -665,3 +665,34 @@ Validaciones post-ejecución OK:
 - Policy recreada menciona `consultas` y `documentos`, NO
   `laboratorios`.
 - App navega sin errores de "relation laboratorios does not exist".
+
+## Rediseño de laboratorios — cerrado
+
+- **Fecha de cierre:** 2026-04-24
+- **Total de sub-fases completadas:** 10 (0-7, 8A, 8B, 8C1, 8C2, 9)
+- **Bugs funcionales detectados durante QA:** 0
+
+Los 6 bloques de QA de sub-fase 9 (flujos críticos de mediciones,
+visualización y filtros, upload y preview de documentos, integraciones
+con resto del expediente, endpoints y exportación, estados extremos y
+edge cases) pasaron sin incidentes.
+
+## Deuda post-rediseño (sub-fases futuras)
+
+Identificadas durante QA de sub-fase 9. NO son bugs del rediseño — son
+mejoras UX que ameritan sub-fases independientes. El detalle accionable
+(problema, fix propuesto, archivos afectados, scope estimado) vive en
+`CLAUDE.md` bajo la sección "Mejoras post-rediseño de labs (retomar en
+sesión nueva)".
+
+Resumen de las 2 mejoras pendientes:
+
+1. **Vista lista + eliminación múltiple de documentos** en la card
+   "Mediciones y Documentos" del expediente. Toggle vista
+   tarjetas/lista + modo selección múltiple con barra flotante de
+   acción.
+2. **Optimización de PDF del exportar expediente.** Agrupa 6 subtareas
+   (B1-B6): densidad y saltos de página, portada ineficiente, falta de
+   firma médica por consulta, header repetido en todas las páginas,
+   posibles duplicados en el render, y evaluación de migración a
+   `@react-pdf/renderer`.
