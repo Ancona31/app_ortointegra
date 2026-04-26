@@ -47,3 +47,9 @@ next-env.d.ts
 .claude/
 
 .vercel
+
+# Fase A — archivos sensibles, mantener solo en local
+docs/schema-recovery-report-final.md
+docs/schema-recovery-q-results.md
+docs/schema-recovery-postgrest-openapi.json
+docs/schema-recovery-postgrest-tables.json
