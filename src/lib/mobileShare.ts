@@ -3,9 +3,10 @@
  * Sin dependencia del servidor — funciona online y offline.
  *
  * Estrategia de entrega:
- *  - Desktop: descarga vía <a download> (sobrevive async sin popup blocker)
+ *  - Desktop: abre el PDF en pestaña nueva con el visor nativo del browser
+ *             (el usuario decide imprimir/descargar/cerrar sin guardar)
  *  - Mobile:  navigator.share con File (estándar iOS/Android)
- *  - Fallback móvil: descarga vía <a download>
+ *  - Fallback móvil: abre en pestaña nueva
  *
  * imprimirOCompartir() — legacy: abre ventana print en desktop
  * generarPdf()         — genera PDF vía react-pdf en todas las plataformas
@@ -79,21 +80,30 @@ async function buildClientElement(
 }
 
 /**
- * Descarga el blob vía elemento <a download> oculto.
- * Este patrón es el único que sobrevive async work sin ser bloqueado
- * por popup blockers en Mac Chrome/Safari.
+ * Abre el blob en una pestaña nueva con el visor PDF nativo del browser.
+ * Usa <a target="_blank"> (no window.open) porque el click programático
+ * en anchor sobrevive trabajo async sin ser bloqueado por popup blockers
+ * en Mac Chrome/Safari. El usuario decide desde el visor si imprimir,
+ * descargar o cerrar sin guardar.
  */
-function descargarBlob(blob: Blob, filename: string) {
+function abrirBlobEnPestana(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = filename
+  a.target = '_blank'
+  a.rel = 'noopener'
   a.style.display = 'none'
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
-  // Liberar memoria tras 1s (suficiente para que el browser procese)
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
+  // 60s: el visor PDF necesita la URL viva mientras el usuario tenga la
+  // pestaña abierta. Tras la carga inicial el browser mantiene copia interna
+  // y revocar es seguro.
+  setTimeout(() => URL.revokeObjectURL(url), 60000)
+  // filename no se usa: el browser deriva el nombre del slug del blob.
+  // El nombre real ya quedó persistido en Storage; descargas desde el visor
+  // recibirán nombre genérico, aceptable.
+  void filename
 }
 
 /**
@@ -119,7 +129,7 @@ async function compartirODescargar(blob: Blob, filename: string) {
       console.warn('[generarPdf] navigator.share falló, fallback a descarga:', err)
     }
   }
-  descargarBlob(blob, filename)
+  abrirBlobEnPestana(blob, filename)
 }
 
 export interface GenerarPdfResult {
@@ -238,7 +248,7 @@ export async function generarPdf(params: {
     if (isMobile) {
       await compartirODescargar(pdfBlob, finalName)
     } else {
-      descargarBlob(pdfBlob, finalName)
+      abrirBlobEnPestana(pdfBlob, finalName)
     }
 
     console.log('[generarPdf] 6/6 completado', storagePath ? '(con Storage)' : '(sin Storage)')
