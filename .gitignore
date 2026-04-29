@@ -53,3 +53,6 @@ docs/schema-recovery-report-final.md
 docs/schema-recovery-q-results.md
 docs/schema-recovery-postgrest-openapi.json
 docs/schema-recovery-postgrest-tables.json
+
+# Fase B1 — reporte de diseño con detalles de hallazgos de seguridad
+docs/b1-design-report.md
