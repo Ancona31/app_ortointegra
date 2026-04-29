@@ -182,8 +182,8 @@ export async function generarPdf(params: {
             reader.readAsDataURL(fetchedBlob)
           })
         }
-      } catch {
-        // Fetch falló → fallback
+      } catch (e) {
+        console.warn('[generarPdf] fetch de logo falló, usando fallback:', e)
       }
     }
 

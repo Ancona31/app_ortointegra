@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
   const { user, error } = await requireSuperAdmin()
   if (error) return error
 
-  const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml']
+  const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/svg+xml']
   const MAX_SIZE = 5 * 1024 * 1024 // 5 MB
 
   const formData = await req.formData()
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   if (!file || !clinicaId) return NextResponse.json({ error: 'Faltan datos' }, { status: 400 })
 
   if (!ALLOWED_MIMES.includes(file.type)) {
-    return NextResponse.json({ error: 'Tipo de archivo no permitido. Solo JPG, PNG, WEBP o SVG.' }, { status: 400 })
+    return NextResponse.json({ error: 'Tipo de archivo no permitido. Solo JPG, PNG o SVG.' }, { status: 400 })
   }
   if (file.size > MAX_SIZE) {
     return NextResponse.json({ error: 'El archivo excede el límite de 5 MB.' }, { status: 400 })
