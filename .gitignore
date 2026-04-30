@@ -56,3 +56,6 @@ docs/schema-recovery-postgrest-tables.json
 
 # Fase B1 — reporte de diseño con detalles de hallazgos de seguridad
 docs/b1-design-report.md
+
+# Fase B2 — reporte de diseño con detalles de hallazgos de seguridad
+docs/b2-design-report.md

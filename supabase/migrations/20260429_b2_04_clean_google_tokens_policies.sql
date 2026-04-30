@@ -1,0 +1,114 @@
+-- =============================================================================
+-- 20260429_b2_04_clean_google_tokens_policies.sql
+--
+-- Propósito:
+--   Eliminar la policy ALL legacy `"Users manage own tokens"` en
+--   `public.google_tokens`. Es funcionalmente redundante con las 4 policies
+--   separadas por operación (`tokens_select_own`, `tokens_insert_own`,
+--   `tokens_update_own`, `tokens_delete_own`), todas con la misma
+--   condición `user_id = auth.uid()`.
+--
+-- Hallazgo Fase A que corrige:
+--   D6 — `google_tokens: 5 policies — 1 ALL legacy {public} + 4 separadas
+--   {authenticated}`. La ALL legacy heredada de migración antigua fue
+--   reemplazada por las 4 separadas pero nunca se eliminó. Convivencia
+--   inocua pero confusa: aumenta la matriz de policies a auditar y diluye
+--   el principio "una policy por (tabla, operación, rol)".
+--
+-- Decisión de diseño aplicada (presentar en reporte):
+--   Conservar las 4 separadas (todas {authenticated}) y eliminar la ALL
+--   legacy (`{public}`). Razón: las 4 ya cubren TODOS los comandos
+--   (SELECT, INSERT, UPDATE, DELETE) con la misma condición de filtro.
+--   Las 4 son TO authenticated (más estricto que TO public). Eliminar la
+--   legacy reduce superficie sin pérdida de funcionalidad.
+--
+-- Riesgo estimado: MUY BAJO.
+--   - Las 4 separadas ya existen y cubren los 4 comandos. Postgres aplica
+--     OR entre policies del mismo comando, por lo que el comportamiento
+--     EFECTIVO con las 5 hoy es exactamente el mismo que con las 4 tras
+--     eliminar la legacy: `user_id = auth.uid()`.
+--   - Ningún call-site nombra esta policy en código.
+--   - La diferencia técnica TO public vs TO authenticated en este caso
+--     es irrelevante porque la condición `auth.uid() = user_id` ya
+--     requiere sesión activa (`auth.uid()` es NULL para anon).
+--
+-- Hallazgo de auditoría de código (relevante):
+--   Búsqueda en src/, app/, lib/, components/, scripts/:
+--     - "Users manage own tokens": 0 hallazgos en código
+--     - "tokens_select_own"/"tokens_insert_own"/"tokens_update_own"/"tokens_delete_own": 0 hallazgos
+--   Las rutas que escriben en google_tokens
+--   (`src/app/api/google/oauth/callback`, `src/app/api/google/disconnect`,
+--    flujo de Google Calendar) acceden vía cliente del usuario o
+--    service_role; ninguna depende del nombre de policy eliminada.
+--
+-- Smoke tests recomendados (post-aplicación):
+--   1) Verificar que solo quedan 4 policies en google_tokens:
+--        SELECT polname, polcmd, polroles::regrole[]
+--        FROM pg_policy
+--        WHERE polrelid = 'public.google_tokens'::regclass
+--        ORDER BY polname;
+--      → Esperado: 4 filas:
+--        tokens_delete_own (cmd=d, roles={authenticated})
+--        tokens_insert_own (cmd=a, roles={authenticated})
+--        tokens_select_own (cmd=r, roles={authenticated})
+--        tokens_update_own (cmd=w, roles={authenticated})
+--   2) Como médico autenticado con Google Calendar conectado:
+--        SELECT count(*) FROM public.google_tokens WHERE user_id = auth.uid();
+--      → Devuelve 1 (su propio token, accesible vía tokens_select_own).
+--   3) Como médico autenticado intentando ver token ajeno:
+--        SELECT count(*) FROM public.google_tokens WHERE user_id <> auth.uid();
+--      → Devuelve 0 (RLS bloquea, igual que antes).
+--   4) Flujo end-to-end: conectar/desconectar Google Calendar desde
+--      `/configuracion` o `/calendario` → debe funcionar sin regresión.
+-- =============================================================================
+
+
+-- -----------------------------------------------------------------------------
+-- UP
+-- -----------------------------------------------------------------------------
+
+-- Elimina la policy ALL legacy {public}, redundante con las 4 separadas
+-- {authenticated} que ya cubren todos los comandos.
+DROP POLICY IF EXISTS "Users manage own tokens" ON public.google_tokens;
+
+
+-- -----------------------------------------------------------------------------
+-- DOWN
+-- -----------------------------------------------------------------------------
+-- Restaura la definición EXACTA del baseline
+-- (supabase/baseline/07_rls_policies.sql, líneas 341-345).
+--
+-- IMPORTANTE: bloque comentado para evitar ejecución silenciosa si se
+-- pega el archivo completo en SQL Editor. Para revertir, descomentar
+-- las líneas siguientes y ejecutarlas.
+
+-- DROP POLICY IF EXISTS "Users manage own tokens" ON public.google_tokens;
+-- CREATE POLICY "Users manage own tokens" ON public.google_tokens
+--   FOR ALL TO public
+--   USING (auth.uid() = user_id)
+--   WITH CHECK (auth.uid() = user_id);
+
+
+-- -----------------------------------------------------------------------------
+-- Verificación post-aplicación
+-- -----------------------------------------------------------------------------
+-- Pegar en SQL Editor y confirmar:
+--
+-- SELECT
+--   polname,
+--   polcmd,
+--   pg_get_expr(polqual, polrelid) AS using_clause,
+--   pg_get_expr(polwithcheck, polrelid) AS with_check_clause,
+--   roles.rolname AS to_role
+-- FROM pg_policy p
+-- JOIN pg_class c ON c.oid = p.polrelid
+-- LEFT JOIN LATERAL unnest(p.polroles) AS r(oid) ON TRUE
+-- LEFT JOIN pg_roles roles ON roles.oid = r.oid
+-- WHERE c.relname = 'google_tokens'
+-- ORDER BY polname, to_role;
+--
+-- Resultado esperado (4 filas, no 5):
+--   tokens_delete_own (d, authenticated, USING user_id = auth.uid())
+--   tokens_insert_own (a, authenticated, WITH CHECK user_id = auth.uid())
+--   tokens_select_own (r, authenticated, USING user_id = auth.uid())
+--   tokens_update_own (w, authenticated, USING + WITH CHECK user_id = auth.uid())

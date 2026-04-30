@@ -1,0 +1,297 @@
+-- =============================================================================
+-- 20260429_b2_01_drop_legacy_public_policies.sql
+--
+-- Propósito:
+--   Eliminar las policies legacy `TO public` que neutralizan vía OR las
+--   restrictivas `TO authenticated` en `clinicas`, `pacientes`, `consultas`
+--   y `documentos`. Esta es la migración que cierra REALMENTE la fuga
+--   cross-tenant abierta desde el origen del schema.
+--
+-- Hallazgos Fase A que cierra:
+--   C1 — `Tablas con datos de pacientes mezclan policies {public} y
+--   {authenticated}`. Postgres aplica OR entre policies del mismo comando,
+--   por lo que la rama laxa {public} domina y la restrictiva {authenticated}
+--   nunca surte efecto neto.
+--   C2 — `RLS de clinicas permite SELECT a cualquier authenticated`.
+--   La policy laxa `"Usuarios ven su clinica"` (FOR SELECT TO public,
+--   USING auth.uid() IS NOT NULL) expone columnas comerciales (plan,
+--   suscripcion_estado, stripe_customer_id, max_pacientes, etc.) de
+--   TODAS las clínicas. B1.01 ya añadió la policy restrictiva
+--   `clinicas_select_own_or_super_admin` PERO sigue inactiva mientras
+--   esta policy laxa siga viva. ESTA migración cierra el círculo.
+--
+-- Policies legacy a eliminar (9 en total, nombres EXACTOS del baseline
+-- 07_rls_policies.sql):
+--
+--   clinicas:
+--     - "Usuarios ven su clinica"                        (línea 169)
+--   pacientes:
+--     - pacientes_insert                                  (línea 474)
+--     - pacientes_update                                  (línea 500)
+--   consultas:
+--     - "Actualizar consultas solo medico"                (línea 179)
+--     - "Eliminar consultas solo medico"                  (línea 189)
+--     - "Insertar consultas solo medico"                  (línea 199)
+--     - "Ver consultas de pacientes de la clinica"        (línea 209)
+--   documentos:
+--     - "Insertar documentos solo medico"                 (línea 270)
+--     - "Ver documentos de la clinica"                    (línea 280)
+--
+-- Riesgo estimado: ALTO. Es la migración más impactante de toda la fase B.
+--   - Cambia el comportamiento NETO de RLS para 4 tablas.
+--   - Si alguna ruta legítima dependía de la rama laxa para funcionar,
+--     dejará de funcionar.
+--   - Auditoría completa del código (ver §1.x del reporte) confirma:
+--     ningún call-site nombra estas policies. Toda escritura cross-tenant
+--     legítima pasa por service_role (admin client) y bypasa RLS.
+--   - Cambios de comportamiento NETO esperados (TODOS deseables):
+--     A) `consultas` INSERT/UPDATE/DELETE: hoy un usuario con rol
+--        medico/super_admin podía operar sobre consultas de pacientes
+--        de OTRAS clínicas (la rama legacy filtra por rol, NO por
+--        tenant). Tras eliminar, queda solo `clinica_*` que filtra por
+--        `paciente_id IN pacientes WHERE clinica_id = get_clinica_id()`.
+--        Cierre real cross-tenant.
+--     B) `documentos` INSERT/SELECT/UPDATE/DELETE: análogo a consultas.
+--     C) `pacientes` INSERT/UPDATE: la legacy filtra por
+--        `clinica_id = get_my_clinica_id()`, IDÉNTICO al filtro de la
+--        authenticated `clinica_*`. Sin cambio de comportamiento neto
+--        para los call-sites actuales (auditados).
+--     D) `clinicas` SELECT: la legacy permitía a CUALQUIER authenticated
+--        ver TODAS las clínicas (USING auth.uid() IS NOT NULL). Tras
+--        eliminar, queda solo `clinicas_select_own_or_super_admin`
+--        (B1.01) que limita a "mi clínica" + super_admin. Cierre real
+--        de C2.
+--
+-- Hallazgo de auditoría de código (relevante — ver §1 del reporte):
+--   Las únicas escrituras de pacientes/consultas/documentos con cliente
+--   del USUARIO (no service_role) son:
+--     - src/app/api/pacientes/[id]/route.ts:57   (UPDATE pacientes)
+--     - src/app/api/pacientes/[id]/route.ts:86   (UPDATE soft delete)
+--     - src/app/api/consultas/route.ts:52        (INSERT consulta)
+--     - src/app/api/documentos/[id]/route.ts:20  (DELETE documento)
+--     - src/components/documentos/*.tsx          (INSERT documentos)
+--     - src/components/labs/ModalSubirDocumento.tsx:208 (INSERT documento)
+--     - src/components/expediente/ModalDocumentos.tsx:132 (UPDATE documento)
+--     - src/lib/offline/sync.ts:213              (INSERT documento)
+--   En TODAS estas, el endpoint/componente valida ownership o usa el
+--   paciente_id del propio expediente del usuario. Las policies
+--   `clinica_*` authenticated permiten esos casos correctamente.
+--   Ningún call-site requiere la rama laxa para funcionar.
+--
+-- Smoke tests CRÍTICOS (post-aplicación):
+--
+--   I. Verificación estructural — confirmar policies eliminadas:
+--      SELECT polname FROM pg_policy
+--      WHERE polrelid IN (
+--        'public.clinicas'::regclass,
+--        'public.pacientes'::regclass,
+--        'public.consultas'::regclass,
+--        'public.documentos'::regclass
+--      )
+--      ORDER BY polrelid::regclass::text, polname;
+--      → Esperado: NO aparece ninguna de las 9 listadas arriba.
+--
+--  II. Smoke funcional — flujo médico legítimo (paciente de su clínica):
+--      Como médico autenticado de Clínica A:
+--        1. SELECT * FROM consultas WHERE paciente_id = '<paciente de A>';
+--           → devuelve filas (clinica_select).
+--        2. INSERT INTO consultas (paciente_id, ...) VALUES ('<paciente de A>', ...);
+--           → éxito (clinica_insert).
+--        3. UPDATE consultas SET ... WHERE id = '<consulta del médico>';
+--           → éxito (clinica_update).
+--        4. UPDATE pacientes SET telefono = '5555555555' WHERE id = '<paciente de A>';
+--           → éxito (clinica_update).
+--      Probar end-to-end vía UI:
+--        - Crear consulta desde /consulta (ruta `/api/consultas`).
+--        - Editar paciente desde /pacientes/[id] (ruta `/api/pacientes/[id]`).
+--        - Subir documento desde /expediente/[id] (componentes `ModalSubirDocumento`, `*Form`).
+--        - Eliminar documento desde modal (ruta `/api/documentos/[id]`).
+--      Todos deben funcionar sin error.
+--
+-- III. Smoke CROSS-TENANT — confirmar cierre de fuga (CRÍTICO):
+--      Como médico autenticado de Clínica A intentando acceder a
+--      Clínica B:
+--        1. SELECT count(*) FROM consultas
+--           WHERE paciente_id = '<paciente de Clínica B>';
+--           → 0 (clinica_select bloquea).
+--        2. INSERT INTO consultas (paciente_id, ...) VALUES ('<paciente de B>', ...);
+--           → 0 rows affected o error de policy violation.
+--        3. UPDATE consultas SET motivo_consulta = 'evil'
+--           WHERE id = '<consulta de B>';
+--           → 0 rows affected.
+--        4. UPDATE pacientes SET nombre = 'evil' WHERE id = '<paciente de B>';
+--           → 0 rows affected.
+--        5. SELECT count(*) FROM clinicas;
+--           → 1 (solo la propia, ANTES devolvía N).
+--        6. SELECT stripe_customer_id FROM clinicas WHERE id <> get_clinica_id();
+--           → 0 filas (ANTES devolvía N filas con datos comerciales).
+--      Estos 6 puntos son la prueba real del cierre de C1+C2.
+--
+--  IV. Smoke super_admin — verificar que rama OR sigue activa:
+--      Como super_admin autenticado:
+--        SELECT count(*) FROM clinicas;
+--        → N (todas, vía B1.01 rama OR get_my_role() = 'super_admin').
+--
+-- Decisión de diseño aplicada (presentar en reporte):
+--   Eliminar las 9 policies en una sola migración (NO dividir en 4
+--   por tabla). Razón: las 4 tablas comparten el mismo modelo de fuga
+--   y la auditoría de impacto fue conjunta. Aplicar parcialmente (ej.
+--   solo `clinicas`) deja un estado mixto difícil de razonar. Si algo
+--   falla, el DOWN restaura las 9 a su definición exacta del baseline.
+-- =============================================================================
+
+
+-- -----------------------------------------------------------------------------
+-- UP
+-- -----------------------------------------------------------------------------
+
+-- clinicas ----------------------------------------------------------------
+DROP POLICY IF EXISTS "Usuarios ven su clinica" ON public.clinicas;
+
+-- pacientes ---------------------------------------------------------------
+DROP POLICY IF EXISTS pacientes_insert ON public.pacientes;
+DROP POLICY IF EXISTS pacientes_update ON public.pacientes;
+
+-- consultas ---------------------------------------------------------------
+DROP POLICY IF EXISTS "Actualizar consultas solo medico" ON public.consultas;
+DROP POLICY IF EXISTS "Eliminar consultas solo medico"  ON public.consultas;
+DROP POLICY IF EXISTS "Insertar consultas solo medico"  ON public.consultas;
+DROP POLICY IF EXISTS "Ver consultas de pacientes de la clinica" ON public.consultas;
+
+-- documentos --------------------------------------------------------------
+DROP POLICY IF EXISTS "Insertar documentos solo medico" ON public.documentos;
+DROP POLICY IF EXISTS "Ver documentos de la clinica"   ON public.documentos;
+
+
+-- -----------------------------------------------------------------------------
+-- DOWN
+-- -----------------------------------------------------------------------------
+-- Restaura las 9 policies con su definición EXACTA del baseline
+-- (supabase/baseline/07_rls_policies.sql).
+--
+-- IMPORTANTE: bloque comentado para evitar ejecución silenciosa si se
+-- pega el archivo completo en SQL Editor. Para revertir, descomentar
+-- las líneas siguientes y ejecutarlas.
+
+-- -- clinicas (línea 169 del baseline) -----------------------------------
+-- DROP POLICY IF EXISTS "Usuarios ven su clinica" ON public.clinicas;
+-- CREATE POLICY "Usuarios ven su clinica" ON public.clinicas
+--   FOR SELECT TO public
+--   USING (auth.uid() IS NOT NULL);
+
+-- -- pacientes (líneas 474, 500 del baseline) ------------------------------
+-- DROP POLICY IF EXISTS pacientes_insert ON public.pacientes;
+-- CREATE POLICY pacientes_insert ON public.pacientes
+--   FOR INSERT TO public
+--   WITH CHECK (clinica_id = get_my_clinica_id());
+
+-- DROP POLICY IF EXISTS pacientes_update ON public.pacientes;
+-- CREATE POLICY pacientes_update ON public.pacientes
+--   FOR UPDATE TO public
+--   USING (
+--     CASE get_my_role()
+--       WHEN 'medico'::text THEN (medico_id = auth.uid())
+--       ELSE (clinica_id = get_my_clinica_id())
+--     END
+--   );
+
+-- -- consultas (líneas 179, 189, 199, 209 del baseline) -------------------
+-- DROP POLICY IF EXISTS "Actualizar consultas solo medico" ON public.consultas;
+-- CREATE POLICY "Actualizar consultas solo medico" ON public.consultas
+--   FOR UPDATE TO public
+--   USING (
+--     auth.uid() IN (
+--       SELECT profiles.id FROM profiles
+--       WHERE profiles.role = ANY (ARRAY['medico'::text, 'super_admin'::text])
+--     )
+--   );
+
+-- DROP POLICY IF EXISTS "Eliminar consultas solo medico" ON public.consultas;
+-- CREATE POLICY "Eliminar consultas solo medico" ON public.consultas
+--   FOR DELETE TO public
+--   USING (
+--     auth.uid() IN (
+--       SELECT profiles.id FROM profiles
+--       WHERE profiles.role = ANY (ARRAY['medico'::text, 'super_admin'::text])
+--     )
+--   );
+
+-- DROP POLICY IF EXISTS "Insertar consultas solo medico" ON public.consultas;
+-- CREATE POLICY "Insertar consultas solo medico" ON public.consultas
+--   FOR INSERT TO public
+--   WITH CHECK (
+--     auth.uid() IN (
+--       SELECT profiles.id FROM profiles
+--       WHERE profiles.role = ANY (ARRAY['medico'::text, 'super_admin'::text])
+--     )
+--   );
+
+-- DROP POLICY IF EXISTS "Ver consultas de pacientes de la clinica" ON public.consultas;
+-- CREATE POLICY "Ver consultas de pacientes de la clinica" ON public.consultas
+--   FOR SELECT TO public
+--   USING (
+--     paciente_id IN (
+--       SELECT pacientes.id FROM pacientes
+--       WHERE pacientes.clinica_id = (
+--         SELECT profiles.clinica_id FROM profiles
+--         WHERE profiles.id = auth.uid()
+--       )
+--     )
+--   );
+
+-- -- documentos (líneas 270, 280 del baseline) ----------------------------
+-- DROP POLICY IF EXISTS "Insertar documentos solo medico" ON public.documentos;
+-- CREATE POLICY "Insertar documentos solo medico" ON public.documentos
+--   FOR INSERT TO public
+--   WITH CHECK (
+--     auth.uid() IN (
+--       SELECT profiles.id FROM profiles
+--       WHERE profiles.role = ANY (ARRAY['medico'::text, 'super_admin'::text])
+--     )
+--   );
+
+-- DROP POLICY IF EXISTS "Ver documentos de la clinica" ON public.documentos;
+-- CREATE POLICY "Ver documentos de la clinica" ON public.documentos
+--   FOR SELECT TO public
+--   USING (
+--     paciente_id IN (
+--       SELECT pacientes.id FROM pacientes
+--       WHERE pacientes.clinica_id = (
+--         SELECT profiles.clinica_id FROM profiles
+--         WHERE profiles.id = auth.uid()
+--       )
+--     )
+--   );
+
+
+-- -----------------------------------------------------------------------------
+-- Verificación post-aplicación
+-- -----------------------------------------------------------------------------
+-- Pegar en SQL Editor y confirmar que NO aparece ninguna policy {public}
+-- en estas 4 tablas:
+--
+-- SELECT
+--   c.relname AS tabla,
+--   p.polname,
+--   p.polcmd,
+--   roles.rolname AS to_role,
+--   pg_get_expr(p.polqual, p.polrelid) AS using_clause
+-- FROM pg_policy p
+-- JOIN pg_class c ON c.oid = p.polrelid
+-- LEFT JOIN LATERAL unnest(p.polroles) AS r(oid) ON TRUE
+-- LEFT JOIN pg_roles roles ON roles.oid = r.oid
+-- WHERE c.relname IN ('clinicas', 'pacientes', 'consultas', 'documentos')
+-- ORDER BY tabla, polname, to_role;
+--
+-- Resultado esperado:
+--   - clinicas: solo `clinicas_select_own_or_super_admin` (B1.01),
+--     to_role = 'authenticated'.
+--   - pacientes: solo `clinica_insert`, `clinica_update`,
+--     `pacientes_delete_solo_sin_historial`, `pacientes_select_activos`,
+--     `pacientes_select_inactivos_admin` — TODAS to_role = 'authenticated'.
+--   - consultas: solo `clinica_delete`, `clinica_insert`,
+--     `clinica_select`, `clinica_update` — TODAS to_role = 'authenticated'.
+--   - documentos: solo `clinica_delete`, `clinica_insert`,
+--     `clinica_select`, `clinica_update` — TODAS to_role = 'authenticated'.
+--
+-- NINGUNA fila debe tener to_role = 'public' en estas 4 tablas.

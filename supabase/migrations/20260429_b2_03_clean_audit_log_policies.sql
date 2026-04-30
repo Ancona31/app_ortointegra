@@ -1,0 +1,116 @@
+-- =============================================================================
+-- 20260429_b2_03_clean_audit_log_policies.sql
+--
+-- Propósito:
+--   Eliminar una de las dos policies SELECT duplicadas en `public.audit_log`.
+--   Ambas son FUNCIONALMENTE IDÉNTICAS — solo defieren en nombre y formato
+--   trivial (alias en el SELECT interno). Tener dos policies idénticas
+--   incrementa superficie de mantenimiento sin valor de seguridad.
+--
+-- Hallazgo Fase A que corrige:
+--   D7 — `audit_log: 2 policies SELECT funcionalmente idénticas (super_admin)`
+--   (docs/schema-recovery-report-final.md). Ambas:
+--     - audit_log_view_solo_super_admin
+--     - audit_super_admin_select
+--   tienen scope FOR SELECT TO authenticated y USING que evalúa
+--   `EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'super_admin')`.
+--
+-- Decisión de diseño aplicada (presentar en reporte):
+--   Conservar `audit_super_admin_select` (nombre más conciso, alineado con
+--   el patrón `<dominio>_<acción>` que usa el resto del schema:
+--   clinica_select, clinica_insert, owner_select, etc.).
+--   Eliminar `audit_log_view_solo_super_admin` (nombre verboso en español,
+--   no sigue el patrón).
+--   Si el usuario prefiere conservar el nombre en español, invertir el
+--   DROP/CREATE.
+--
+-- Riesgo estimado: MUY BAJO.
+--   - Ambas policies devuelven exactamente las mismas filas para el mismo
+--     conjunto de usuarios. Postgres aplica OR entre policies del mismo
+--     comando, por lo que tener una sola es lógicamente equivalente a
+--     tener ambas.
+--   - Ningún call-site nombra estas policies en código.
+--
+-- Hallazgo de auditoría de código (relevante):
+--   Búsqueda en src/, app/, lib/, components/, scripts/:
+--     - "audit_log_view_solo_super_admin": 0 hallazgos en código
+--     - "audit_super_admin_select": 0 hallazgos en código
+--   Ningún archivo de aplicación nombra estas policies. Solo aparecen en
+--   `supabase/baseline/07_rls_policies.sql` y en migraciones SQL legacy
+--   en raíz (`supabase_migration_audit_immutable.sql`).
+--
+-- Smoke tests recomendados (post-aplicación):
+--   1) Verificar que solo queda una policy SELECT en audit_log:
+--        SELECT polname
+--        FROM pg_policy
+--        WHERE polrelid = 'public.audit_log'::regclass
+--          AND polcmd = 'r'
+--        ORDER BY polname;
+--      → Esperado: 1 fila, `audit_super_admin_select`.
+--   2) Como super_admin autenticado:
+--        SELECT count(*) FROM public.audit_log;
+--      → Devuelve total de filas (acceso conserva lectura).
+--   3) Como médico autenticado (NO super_admin):
+--        SELECT count(*) FROM public.audit_log;
+--      → Devuelve 0 (sin acceso, igual que antes).
+--   4) Endpoint super-admin que lee audit_log
+--      (`/api/super-admin/dashboard/uso`, `/api/super-admin/dashboard/...`)
+--      → debe seguir funcionando (estos endpoints usan service_role, que
+--        bypasa RLS — pero la verificación confirma que ninguno depende
+--        del nombre de la policy eliminada).
+-- =============================================================================
+
+
+-- -----------------------------------------------------------------------------
+-- UP
+-- -----------------------------------------------------------------------------
+
+-- Elimina la policy duplicada con nombre verboso.
+-- Conserva `audit_super_admin_select` (definida en baseline líneas 120-129).
+DROP POLICY IF EXISTS audit_log_view_solo_super_admin ON public.audit_log;
+
+
+-- -----------------------------------------------------------------------------
+-- DOWN
+-- -----------------------------------------------------------------------------
+-- Restaura la definición EXACTA del baseline
+-- (supabase/baseline/07_rls_policies.sql, líneas 109-118).
+--
+-- IMPORTANTE: bloque comentado para evitar ejecución silenciosa si se pega
+-- el archivo completo en SQL Editor. Para revertir, descomentar las líneas
+-- siguientes y ejecutarlas.
+
+-- DROP POLICY IF EXISTS audit_log_view_solo_super_admin ON public.audit_log;
+-- CREATE POLICY audit_log_view_solo_super_admin ON public.audit_log
+--   FOR SELECT TO authenticated
+--   USING (
+--     EXISTS (
+--       SELECT 1 FROM profiles p
+--       WHERE p.id = auth.uid()
+--         AND p.role = 'super_admin'::text
+--     )
+--   );
+
+
+-- -----------------------------------------------------------------------------
+-- Verificación post-aplicación
+-- -----------------------------------------------------------------------------
+-- Pegar en SQL Editor y confirmar:
+--
+-- SELECT
+--   polname,
+--   polcmd,
+--   pg_get_expr(polqual, polrelid) AS using_clause,
+--   roles.rolname AS to_role
+-- FROM pg_policy p
+-- JOIN pg_class c ON c.oid = p.polrelid
+-- LEFT JOIN LATERAL unnest(p.polroles) AS r(oid) ON TRUE
+-- LEFT JOIN pg_roles roles ON roles.oid = r.oid
+-- WHERE c.relname = 'audit_log'
+-- ORDER BY polname, to_role;
+--
+-- Resultado esperado (1 fila, no 2):
+--   polname        = 'audit_super_admin_select'
+--   polcmd         = 'r'
+--   using_clause   contiene "EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'super_admin'::text)"
+--   to_role        = 'authenticated'

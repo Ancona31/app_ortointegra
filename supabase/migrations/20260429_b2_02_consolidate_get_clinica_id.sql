@@ -1,0 +1,216 @@
+-- =============================================================================
+-- 20260429_b2_02_consolidate_get_clinica_id.sql
+--
+-- Propósito:
+--   Consolidar las dos funciones helper duplicadas `get_clinica_id()` y
+--   `get_my_clinica_id()` en una sola (`get_clinica_id`). Reescribir las
+--   policies remanentes que aún usan `get_my_clinica_id()` para apuntar
+--   a `get_clinica_id()`. Eliminar la función duplicada.
+--
+-- Hallazgo Fase A que corrige:
+--   D8 — `Funciones helper de identidad duplicadas`. Las dos tienen
+--   firma idéntica (RETURNS uuid, LANGUAGE sql, STABLE, SECURITY DEFINER)
+--   y body funcionalmente idéntico:
+--     get_clinica_id():    SELECT clinica_id FROM profiles WHERE id = auth.uid()
+--     get_my_clinica_id(): SELECT clinica_id FROM profiles WHERE id = auth.uid()
+--   Tener ambas crea ambigüedad (¿cuál usar?) y duplica el work de
+--   B1.03 (search_path tuvo que aplicarse a las dos). Consolidar deja
+--   una única fuente de verdad.
+--
+-- Diferencias verificadas entre las dos funciones (baseline 05_functions.sql,
+-- líneas 20-37) — ninguna funcional:
+--   - Nombre (única diferencia real).
+--   - Tras B1.03 ambas tienen el mismo `SET search_path = public, pg_temp`.
+--   - El body es idéntico carácter a carácter.
+--
+-- DEPENDENCIA OBLIGATORIA con B2.01:
+--   B2.01 elimina las policies `pacientes_insert` y `pacientes_update`
+--   legacy {public}, que son 2 de las 3 referencias a
+--   `get_my_clinica_id()` en el baseline (líneas 477, 506). Si esta
+--   migración (B2.02) corre ANTES de B2.01, el `DROP FUNCTION
+--   get_my_clinica_id()` fallará con error de dependencia (Postgres
+--   protege con RESTRICT por defecto). El orden correcto es:
+--     B2.01 → B2.02
+--   (en realidad: B2.03 → B2.04 → B2.01 → B2.02 — ver §2.4 del reporte).
+--
+-- Auditoría completa de referencias a `get_my_clinica_id()`:
+--   En supabase/baseline/07_rls_policies.sql:
+--     línea 477 — pacientes_insert (legacy {public}) → ELIMINADA en B2.01
+--     línea 506 — pacientes_update (legacy {public}) → ELIMINADA en B2.01
+--     línea 557 — "Ver perfiles de la misma clinica"  → REESCRITA aquí
+--   En supabase/baseline/05_functions.sql:
+--     línea 30  — definición de la propia función     → ELIMINADA aquí
+--   En src/, app/, lib/, components/, scripts/:
+--     0 hallazgos en código de aplicación
+--     (las 4 menciones de "get_my_role()/get_my_clinica_id()" en src/
+--     son 0 — verificado con grep). Las funciones helper nunca se llaman
+--     desde JS via supabase.rpc; uso 100% interno de policies.
+--
+-- Plan de cambios en este archivo (en orden):
+--   1. Reescribir `"Ver perfiles de la misma clinica"` para que use
+--      `get_clinica_id()` en lugar de `get_my_clinica_id()`. Mantener
+--      el resto (FOR SELECT TO public, OR id = auth.uid()) IDÉNTICO.
+--      NOTA: la policy sigue siendo {public}, decisión documentada
+--      abajo. Limpiarla por completo (consolidar con `profiles_select_own`)
+--      queda fuera de scope de B2 y se trata en B3 si aplica.
+--   2. DROP FUNCTION public.get_my_clinica_id().
+--
+-- Decisión de diseño aplicada (presentar en reporte):
+--   - NO toco la policy `"Ver perfiles de la misma clinica"` más allá
+--     de cambiar la función referenciada. Mantengo TO public, mantengo
+--     el OR `id = auth.uid()`. Razón: consolidar `profiles` queda fuera
+--     de scope de B2 (B2 ataca pacientes/consultas/documentos/clinicas/
+--     audit_log/google_tokens). Eliminar la legacy de profiles podría
+--     romper algún flujo "ver médicos de mi clínica" que no auditamos
+--     a fondo. Documentado como bandera amarilla — se cierra en B3.
+--   - NO elimino `get_my_role()` aunque tras B2.01 quede sin uso en
+--     policies. Razón: las 4 funciones `sa_*` (B1.02) la invocan en su
+--     check de rol interno (`coalesce(public.get_my_role(), '') <> 'super_admin'`).
+--     Sigue viva.
+--   - DROP FUNCTION sin CASCADE intencionalmente. Si por algún motivo
+--     todavía hay referencias inesperadas (ej. una migración legacy en
+--     raíz que las recreó silenciosamente), el DROP fallará con error
+--     descriptivo y NO arrastrará policies inadvertidamente.
+--
+-- Riesgo estimado: MEDIO.
+--   - El bloque UP está envuelto en `BEGIN; ... COMMIT;` para hacer
+--     la operación atómica. El DROP POLICY + CREATE POLICY +
+--     DROP FUNCTION ocurren en una sola transacción: durante la
+--     aplicación, ningún usuario ve un estado intermedio donde la
+--     policy esté ausente. Postgres mantiene la policy vieja visible
+--     hasta el COMMIT, momento en el que el catálogo se actualiza
+--     atómicamente con la nueva. No hay ventana de inconsistencia.
+--   - DROP FUNCTION rechaza si quedan dependencias (RESTRICT). Si el
+--     DROP falla, toda la transacción se rollbackea automáticamente:
+--     la BD queda EXACTAMENTE como antes (policy vieja viva, función
+--     vieja viva, todo intacto). El operador puede investigar la
+--     dependencia residual sin haber introducido un estado parcial.
+--
+-- Smoke tests recomendados (post-aplicación):
+--   1) Verificar que `get_my_clinica_id()` ya no existe:
+--        SELECT proname FROM pg_proc
+--        WHERE pronamespace = 'public'::regnamespace
+--          AND proname IN ('get_clinica_id', 'get_my_clinica_id');
+--      → Esperado: 1 fila, `get_clinica_id`. NO debe aparecer
+--        `get_my_clinica_id`.
+--   2) Verificar que la policy reescrita usa `get_clinica_id`:
+--        SELECT
+--          polname,
+--          pg_get_expr(polqual, polrelid) AS using_clause
+--        FROM pg_policy
+--        WHERE polrelid = 'public.profiles'::regclass
+--          AND polname = 'Ver perfiles de la misma clinica';
+--      → Esperado: using_clause contiene "get_clinica_id()", NO
+--        "get_my_clinica_id()".
+--   3) Como cualquier médico autenticado:
+--        SELECT count(*) FROM public.profiles WHERE clinica_id = public.get_clinica_id();
+--      → Devuelve N (todos los miembros de su clínica), igual que antes.
+--   4) Probar UI:
+--        - /admin/usuarios — debe seguir mostrando todos los usuarios
+--          de la clínica.
+--        - /configuracion → equipo médico — idem.
+--   5) Probar que las funciones helper restantes siguen activas:
+--        SELECT public.get_clinica_id();
+--        SELECT public.get_my_role();
+--        SELECT public.get_max_pacientes();
+--        SELECT public.get_suscripcion_estado();
+--      → Las 4 devuelven valor (sin error).
+-- =============================================================================
+
+
+-- -----------------------------------------------------------------------------
+-- UP
+-- -----------------------------------------------------------------------------
+
+-- Bloque atómico: si cualquier sentencia falla (típicamente el DROP
+-- FUNCTION por dependencia residual), Postgres rollbackea TODO y la
+-- BD queda como antes. Sin BEGIN/COMMIT, SQL Editor ejecuta
+-- statement-by-statement y dejaría un estado parcial.
+BEGIN;
+
+-- Paso 1: reescribir la policy de profiles que aún usa get_my_clinica_id().
+-- Mantengo TO public y el OR `id = auth.uid()` IDÉNTICOS al baseline;
+-- el ÚNICO cambio es la función referenciada: get_my_clinica_id → get_clinica_id.
+DROP POLICY IF EXISTS "Ver perfiles de la misma clinica" ON public.profiles;
+CREATE POLICY "Ver perfiles de la misma clinica" ON public.profiles
+  FOR SELECT TO public
+  USING (
+    (clinica_id = public.get_clinica_id()) OR (id = auth.uid())
+  );
+
+-- Paso 2: eliminar la función duplicada. Sin CASCADE: si Postgres
+-- detecta dependencias residuales no auditadas, falla con error claro
+-- y se puede investigar antes de forzar. Como estamos dentro de la
+-- transacción, el fallo arrastra el rollback del Paso 1 también.
+DROP FUNCTION IF EXISTS public.get_my_clinica_id();
+
+COMMIT;
+
+
+-- -----------------------------------------------------------------------------
+-- DOWN
+-- -----------------------------------------------------------------------------
+-- Restaura la función eliminada con su definición EXACTA del baseline
+-- (supabase/baseline/05_functions.sql, líneas 30-37) más el atributo
+-- search_path que B1.03 le añadió (porque el down debe dejar la BD en
+-- un estado seguro, no en el estado más antiguo posible).
+-- Restaura también la policy original.
+--
+-- IMPORTANTE: bloque comentado para evitar ejecución silenciosa si se
+-- pega el archivo completo en SQL Editor. Para revertir, descomentar
+-- las líneas siguientes y ejecutarlas.
+
+-- -- Restaurar función ----------------------------------------------------
+-- CREATE OR REPLACE FUNCTION public.get_my_clinica_id()
+-- RETURNS uuid
+-- LANGUAGE sql
+-- STABLE
+-- SECURITY DEFINER
+-- AS $function$
+--   SELECT clinica_id FROM profiles WHERE id = auth.uid()
+-- $function$;
+-- ALTER FUNCTION public.get_my_clinica_id()
+--   SET search_path = public, pg_temp;
+
+-- -- Restaurar policy original (baseline líneas 553-558) ------------------
+-- DROP POLICY IF EXISTS "Ver perfiles de la misma clinica" ON public.profiles;
+-- CREATE POLICY "Ver perfiles de la misma clinica" ON public.profiles
+--   FOR SELECT TO public
+--   USING (
+--     (clinica_id = get_my_clinica_id()) OR (id = auth.uid())
+--   );
+
+
+-- -----------------------------------------------------------------------------
+-- Verificación post-aplicación
+-- -----------------------------------------------------------------------------
+-- Pegar en SQL Editor y confirmar:
+--
+-- -- 1. Función eliminada
+-- SELECT proname,
+--        pg_get_function_identity_arguments(oid) AS args,
+--        prosecdef AS security_definer,
+--        proconfig
+-- FROM pg_proc
+-- WHERE pronamespace = 'public'::regnamespace
+--   AND proname IN ('get_clinica_id', 'get_my_clinica_id', 'get_my_role')
+-- ORDER BY proname;
+--
+-- Resultado esperado: 2 filas (`get_clinica_id`, `get_my_role`).
+-- NO debe aparecer `get_my_clinica_id`.
+--
+-- -- 2. Policy reescrita
+-- SELECT
+--   polname,
+--   pg_get_expr(polqual, polrelid) AS using_clause,
+--   roles.rolname AS to_role
+-- FROM pg_policy p
+-- JOIN pg_class c ON c.oid = p.polrelid
+-- LEFT JOIN LATERAL unnest(p.polroles) AS r(oid) ON TRUE
+-- LEFT JOIN pg_roles roles ON roles.oid = r.oid
+-- WHERE c.relname = 'profiles'
+--   AND p.polname = 'Ver perfiles de la misma clinica';
+--
+-- Resultado esperado:
+--   using_clause contiene "(clinica_id = get_clinica_id()) OR (id = auth.uid())"
+--   to_role = 'public'
