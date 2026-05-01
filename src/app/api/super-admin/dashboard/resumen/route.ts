@@ -133,6 +133,7 @@ interface ClinicaPlanRow {
   id: string
   plan: string | null
   max_pacientes: number | null
+  es_vip_grant: boolean
   suscripcion_estado: string | null
   stripe_subscription_id: string | null
 }
@@ -274,7 +275,7 @@ function distribucionPlanes(rows: ReadonlyArray<ClinicaPlanRow>): DistribucionIt
   let pagando = 0
   let vip = 0
   for (const r of rows) {
-    if (r.max_pacientes === null) {
+    if (r.es_vip_grant) {
       vip++
       continue
     }
@@ -400,7 +401,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       admin.from('clinicas').select('created_at').gte('created_at', inicioMes12Iso),
       admin.from('consultas').select('created_at').gte('created_at', isoNDaysAgo(30)),
       admin.from('rate_limits').select('created_at').gte('created_at', isoNDaysAgo(30)),
-      admin.from('clinicas').select('id, plan, max_pacientes, suscripcion_estado, stripe_subscription_id'),
+      admin.from('clinicas').select('id, plan, max_pacientes, es_vip_grant, suscripcion_estado, stripe_subscription_id'),
       admin.from('documentos').select('tipo').gte('created_at', isoNDaysAgo(90)),
       obtenerMetricasStripe(),
     ])
@@ -425,6 +426,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       plan: r.plan === null || r.plan === undefined ? null : String(r.plan),
       max_pacientes:
         r.max_pacientes === null || r.max_pacientes === undefined ? null : Number(r.max_pacientes),
+      es_vip_grant: r.es_vip_grant === true,
       suscripcion_estado:
         r.suscripcion_estado === null || r.suscripcion_estado === undefined
           ? null

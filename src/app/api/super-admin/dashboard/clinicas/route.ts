@@ -17,6 +17,7 @@ import {
   type EstadoPago,
   type TipoCuenta,
 } from '@/lib/super-admin/types'
+import { clasificarPago } from '@/lib/super-admin/clasificarPago'
 
 const PAGE_SIZE = 50
 const MS_DAY = 86_400_000
@@ -31,6 +32,7 @@ interface ClinicaRowDb {
   max_medicos: number | null
   max_secretarias: number | null
   max_pacientes: number | null
+  es_vip_grant: boolean | null
   suspendida: boolean | null
   suscripcion_estado: string | null
   stripe_subscription_id: string | null
@@ -82,22 +84,6 @@ function clasificarTipo(raw: string | null): TipoCuenta {
   return raw === 'independiente' ? 'independiente' : 'clinica'
 }
 
-function clasificarPago(row: ClinicaRowDb): EstadoPago {
-  // VIP siempre gana
-  if (row.max_pacientes === null) return 'vip'
-  // Sin suscripción real de Stripe = gratuito (default seguro)
-  if (!row.stripe_subscription_id) return 'gratuito'
-  // Plan explícitamente 'free' = gratuito aunque haya un id viejo
-  if (!row.plan || row.plan === 'free') return 'gratuito'
-  // Estado real de la suscripción
-  const estado = row.suscripcion_estado
-  if (estado === 'trial') return 'trial'
-  if (estado === 'activo') return 'pagando'
-  if (estado === 'vencido') return 'pago_fallido'
-  if (estado === 'cancelado') return 'cancelado'
-  return 'gratuito'
-}
-
 function clasificarEstado(suspendida: boolean, ultimoAccesoIso: string | null): EstadoClinica {
   if (suspendida) return 'suspendida'
   if (!ultimoAccesoIso) return 'inactiva'
@@ -130,7 +116,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     let clinicasQuery = admin
       .from('clinicas')
       .select(
-        'id, nombre, nombre_display, logo_url, tipo, plan, max_medicos, max_secretarias, max_pacientes, suspendida, suscripcion_estado, stripe_subscription_id, created_at',
+        'id, nombre, nombre_display, logo_url, tipo, plan, max_medicos, max_secretarias, max_pacientes, es_vip_grant, suspendida, suscripcion_estado, stripe_subscription_id, created_at',
       )
       .order('created_at', { ascending: false })
       .limit(PAGE_SIZE + 1)
@@ -244,7 +230,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const itemsBuilt: ClinicaResumen[] = pageRows.map((row) => {
       const ultimoAccesoIso = lastSignByClinica.get(row.id) ?? null
       const tipo = clasificarTipo(row.tipo)
-      const estadoPago = clasificarPago(row)
+      const estadoPago = clasificarPago({
+        es_vip_grant: row.es_vip_grant === true,
+        stripe_subscription_id: row.stripe_subscription_id,
+        suscripcion_estado: row.suscripcion_estado ?? '',
+        plan: row.plan,
+      })
       const estado = clasificarEstado(row.suspendida === true, ultimoAccesoIso)
       return {
         id: row.id,
@@ -254,7 +245,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         tipo,
         plan: row.plan,
         estadoPago,
-        esVip: row.max_pacientes === null,
+        esVip: row.es_vip_grant === true,
         maxMedicos: row.max_medicos ?? 0,
         countMedicos: medicosByClinica.get(row.id) ?? 0,
         maxSecretarias: row.max_secretarias ?? 0,

@@ -146,6 +146,11 @@ export interface ClinicaResumen {
   tipo: TipoCuenta
   plan: string | null
   estadoPago: EstadoPago
+  /**
+   * Indica si la clínica tiene grant VIP activo.
+   * Se deriva de `clinicas.es_vip_grant` en BD (NO de `max_pacientes`,
+   * que era la regla derivativa anterior y resultó incorrecta).
+   */
   esVip: boolean
   maxMedicos: number
   countMedicos: number

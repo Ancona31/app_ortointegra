@@ -12,12 +12,12 @@ import {
   type ClinicaDetalle,
   type ClinicaResumen,
   type EstadoClinica,
-  type EstadoPago,
   type Rol,
   type SeriePunto,
   type TipoCuenta,
   type UsuarioClinica,
 } from '@/lib/super-admin/types'
+import { clasificarPago } from '@/lib/super-admin/clasificarPago'
 
 const MS_DAY = 86_400_000
 
@@ -31,6 +31,7 @@ interface ClinicaRowDb {
   max_medicos: number | null
   max_secretarias: number | null
   max_pacientes: number | null
+  es_vip_grant: boolean | null
   suspendida: boolean | null
   suscripcion_estado: string | null
   stripe_subscription_id: string | null
@@ -63,18 +64,6 @@ function isRol(value: string | null): Rol {
 
 function clasificarTipo(raw: string | null): TipoCuenta {
   return raw === 'independiente' ? 'independiente' : 'clinica'
-}
-
-function clasificarPago(row: ClinicaRowDb): EstadoPago {
-  if (row.max_pacientes === null) return 'vip'
-  if (!row.stripe_subscription_id) return 'gratuito'
-  if (!row.plan || row.plan === 'free') return 'gratuito'
-  const estado = row.suscripcion_estado
-  if (estado === 'trial') return 'trial'
-  if (estado === 'activo') return 'pagando'
-  if (estado === 'vencido') return 'pago_fallido'
-  if (estado === 'cancelado') return 'cancelado'
-  return 'gratuito'
 }
 
 function clasificarEstado(suspendida: boolean, ultimoAccesoIso: string | null): EstadoClinica {
@@ -129,7 +118,7 @@ export async function GET(
     const clinicaRes = await admin
       .from('clinicas')
       .select(
-        'id, nombre, nombre_display, logo_url, tipo, plan, max_medicos, max_secretarias, max_pacientes, suspendida, suscripcion_estado, stripe_subscription_id',
+        'id, nombre, nombre_display, logo_url, tipo, plan, max_medicos, max_secretarias, max_pacientes, es_vip_grant, suspendida, suscripcion_estado, stripe_subscription_id',
       )
       .eq('id', id)
       .maybeSingle()
@@ -255,8 +244,13 @@ export async function GET(
       logoUrl: clinicaRow.logo_url,
       tipo: clasificarTipo(clinicaRow.tipo),
       plan: clinicaRow.plan,
-      estadoPago: clasificarPago(clinicaRow),
-      esVip: clinicaRow.max_pacientes === null,
+      estadoPago: clasificarPago({
+        es_vip_grant: clinicaRow.es_vip_grant === true,
+        stripe_subscription_id: clinicaRow.stripe_subscription_id,
+        suscripcion_estado: clinicaRow.suscripcion_estado ?? '',
+        plan: clinicaRow.plan,
+      }),
+      esVip: clinicaRow.es_vip_grant === true,
       maxMedicos: clinicaRow.max_medicos ?? 0,
       countMedicos,
       maxSecretarias: clinicaRow.max_secretarias ?? 0,
