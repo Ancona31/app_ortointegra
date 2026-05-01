@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireSuperAdmin } from '@/lib/auth'
 import { logAudit } from '@/lib/audit'
+import { PLAN_LIMITS } from '@/lib/plans'
 
 export async function GET() {
   const { user, error } = await requireSuperAdmin()
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
   const auth = await requireSuperAdmin()
   if (auth.error) return auth.error
 
-  const { nombre, max_medicos, max_secretarias, adminNombre, adminEmail, adminPassword } = await req.json()
+  const { nombre, adminNombre, adminEmail, adminPassword } = await req.json()
 
   // Todas las clínicas requieren administrador al momento de creación
   if (!nombre || !adminNombre || !adminEmail || !adminPassword) {
@@ -72,7 +73,12 @@ export async function POST(req: NextRequest) {
   // 1. Crear clínica
   const { data: nuevaClinica, error } = await admin
     .from('clinicas')
-    .insert({ nombre, max_medicos, max_secretarias })
+    .insert({
+      nombre,
+      max_pacientes:   PLAN_LIMITS.free.max_pacientes,
+      max_medicos:     PLAN_LIMITS.free.max_medicos,
+      max_secretarias: PLAN_LIMITS.free.max_secretarias,
+    })
     .select('id')
     .single()
 
