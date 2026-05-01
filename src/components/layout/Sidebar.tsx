@@ -7,7 +7,7 @@ import {
   ClipboardList, BedDouble, PenLine, ShieldCheck, Receipt,
   CalendarDays, BarChart2, Users, CreditCard, UserCircle,
   HelpCircle, ChevronRight, Menu, X, LogOut, Moon, Sun,
-  Building2, TrendingUp, UserPlus, LayoutDashboard, WifiOff,
+  TrendingUp, UserPlus, WifiOff,
   Calculator,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
@@ -53,16 +53,12 @@ const DOCS_CHILDREN: NavLeaf[] = [
   { kind: 'leaf', href: '/documentos?tipo=honorarios',    label: 'Honorarios / Cotización', icon: Receipt },
 ]
 
-function navDoctor(isAdmin: boolean, isSuperAdmin: boolean): NavSection[] {
+function navDoctor(isAdmin: boolean): NavSection[] {
   const adminChildren: NavLeaf[] = [
     { kind: 'leaf', href: '/estadisticas',   label: 'Estadísticas',        icon: TrendingUp },
-    ...(isAdmin || isSuperAdmin ? [
+    ...(isAdmin ? [
       { kind: 'leaf' as const, href: '/admin/usuarios', label: 'Usuarios de la clínica', icon: Users },
       { kind: 'leaf' as const, href: '/billing',        label: 'Facturación',             icon: CreditCard },
-    ] : []),
-    ...(isSuperAdmin ? [
-      { kind: 'leaf' as const, href: '/super-admin/clinicas', label: 'Clínicas', icon: Building2 },
-      { kind: 'leaf' as const, href: '/super-admin/metricas', label: 'Métricas', icon: BarChart2 },
     ] : []),
   ]
 
@@ -85,12 +81,9 @@ function navDoctor(isAdmin: boolean, isSuperAdmin: boolean): NavSection[] {
     },
     {
       kind: 'group', key: 'administracion', label: 'Administración', icon: BarChart2,
-      matchPaths: ['/estadisticas', '/admin', '/billing', '/super-admin'],
+      matchPaths: ['/estadisticas', '/admin', '/billing'],
       children: adminChildren,
     },
-    ...(isSuperAdmin
-      ? [{ kind: 'leaf' as const, href: '/super-admin/dashboard', label: 'Dashboard Admin', icon: LayoutDashboard }]
-      : []),
     { kind: 'divider' },
     { kind: 'leaf', href: '/perfil',  label: 'Mi perfil', icon: UserCircle },
     { kind: 'leaf', href: '/ayuda',   label: 'Ayuda',     icon: HelpCircle },
@@ -150,13 +143,12 @@ export default function Sidebar() {
     catch { /* silent */ }
   }, [])
 
-  const isAdmin      = profile?.role === 'admin' || profile?.role === 'super_admin'
-  const isSuperAdmin = profile?.role === 'super_admin'
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin'
 
   const sections: NavSection[] =
     profile?.role === 'secretaria'
       ? navSecretaria()
-      : navDoctor(isAdmin, isSuperAdmin)
+      : navDoctor(isAdmin)
 
   /* Auto-expandir grupos con hijo activo */
   useEffect(() => {

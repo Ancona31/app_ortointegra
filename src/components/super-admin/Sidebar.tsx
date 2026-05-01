@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard,
   Building2,
@@ -11,9 +11,10 @@ import {
   ScrollText,
   AlertTriangle,
   Scale,
-  ExternalLink,
+  LogOut,
 } from 'lucide-react'
 import type { ReactElement } from 'react'
+import { createClient } from '@/lib/supabase/client'
 
 interface NavItem {
   href: string
@@ -33,6 +34,29 @@ const NAV: ReadonlyArray<NavItem> = [
 
 export default function SuperAdminSidebar(): ReactElement {
   const pathname = usePathname()
+  const router = useRouter()
+
+  async function handleLogout(): Promise<void> {
+    // NOM-024: registrar logout antes de cerrar sesión (no bloqueante)
+    try {
+      await fetch('/api/auth/audit-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'logout' }),
+      })
+    } catch { /* silent */ }
+
+    try { sessionStorage.removeItem('spinus_active') } catch { /* silent */ }
+    try { localStorage.removeItem('spinus_session_meta') } catch { /* silent */ }
+
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+    } catch { /* silent */ }
+
+    router.push('/login')
+    router.refresh()
+  }
 
   return (
     <aside className="hidden md:flex flex-col w-60 shrink-0 bg-slate-900 border-r border-slate-800 sticky top-0 h-screen">
@@ -84,13 +108,14 @@ export default function SuperAdminSidebar(): ReactElement {
 
       {/* Footer */}
       <div className="px-3 py-4 border-t border-slate-800 space-y-1">
-        <Link
-          href="/dashboard"
-          className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-slate-500 hover:text-slate-200 hover:bg-slate-800/60 transition-colors"
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-slate-500 hover:text-slate-200 hover:bg-slate-800/60 transition-colors"
         >
-          <ExternalLink size={14} />
-          Volver a la app médica
-        </Link>
+          <LogOut size={14} />
+          Cerrar sesión
+        </button>
       </div>
     </aside>
   )
