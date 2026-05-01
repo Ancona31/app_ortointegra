@@ -3,6 +3,7 @@ import type { ReactNode, ReactElement } from 'react'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import SuperAdminSidebar from '@/components/super-admin/Sidebar'
+import { ToastProvider } from '@/components/ui/Toast'
 
 export const metadata: Metadata = {
   title: 'Centro de control — Spinus®',
@@ -32,7 +33,9 @@ export default async function SuperAdminDashboardLayout({
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-100">
       <SuperAdminSidebar />
-      <div className="flex-1 min-w-0">{children}</div>
+      <div className="flex-1 min-w-0">
+        <ToastProvider>{children}</ToastProvider>
+      </div>
     </div>
   )
 }

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Crown } from 'lucide-react'
 import type { ReactElement } from 'react'
+import { useToast } from '@/components/ui/Toast'
 
 interface Props {
   clinicaId: string
@@ -13,6 +14,7 @@ interface Props {
 export default function VipToggle({ clinicaId, esVip, onChange }: Props): ReactElement {
   const [pending, setPending] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
+  const toast = useToast()
 
   const handleClick = async (): Promise<void> => {
     setPending(true)
@@ -23,21 +25,36 @@ export default function VipToggle({ clinicaId, esVip, onChange }: Props): ReactE
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: clinicaId,
-          // VIP = max_pacientes null (ilimitado); no-VIP = 15 (default original)
-          max_pacientes: esVip ? 15 : null,
+          es_vip_grant: !esVip,
         }),
       })
-      if (!res.ok) {
-        const json: unknown = await res.json().catch(() => ({}))
-        const msg =
-          typeof json === 'object' && json !== null && 'error' in json
-            ? String((json as { error: unknown }).error)
-            : 'Error al actualizar VIP'
-        throw new Error(msg)
+
+      const json: unknown = await res.json().catch(() => ({}))
+      const obj = (typeof json === 'object' && json !== null ? json : {}) as Record<string, unknown>
+      const msg =
+        typeof obj.message === 'string'
+          ? obj.message
+          : typeof obj.error === 'string'
+            ? obj.error
+            : 'Error desconocido'
+
+      if (res.ok) {
+        onChange(!esVip)
+        return
       }
-      onChange(!esVip)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido')
+
+      if (res.status === 409) {
+        setError(msg)
+        toast.warning(msg)
+        return
+      }
+
+      setError(msg)
+      toast.error(`Error: ${msg}`)
+    } catch {
+      const networkMsg = 'Error de red. Intenta de nuevo.'
+      setError(networkMsg)
+      toast.error(networkMsg)
     } finally {
       setPending(false)
     }

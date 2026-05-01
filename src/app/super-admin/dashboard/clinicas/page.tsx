@@ -60,7 +60,7 @@ export default function ClinicasDashboardPage(): ReactElement {
     return state.data.items.map((c) => {
       const override = vipOverrides[c.id]
       if (override === undefined) return c
-      return { ...c, esVip: override, estadoPago: override ? 'vip' as const : c.estadoPago }
+      return { ...c, esVip: override, estadoPago: override ? 'vip' as const : 'gratuito' as const }
     })
   }, [state, vipOverrides])
 
