@@ -86,11 +86,23 @@ function BillingContent() {
 
   async function abrirPortal() {
     setOpeningPortal(true)
-    const res = await fetch('/api/stripe/portal', { method: 'POST' })
-    const data = await res.json()
-    setOpeningPortal(false)
-    if (data.url) window.location.href = data.url
-    else alert(data.error || 'Error al abrir el portal')
+    try {
+      const res = await fetch('/api/stripe/portal', { method: 'POST' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        console.error('[abrirPortal] Error response:', res.status, data)
+        alert(data.message ?? data.error ?? 'No se pudo abrir el portal de Stripe. Intenta de nuevo.')
+        return
+      }
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+      else alert(data.error ?? 'Error al abrir el portal')
+    } catch (err) {
+      console.error('[abrirPortal] Error:', err)
+      alert('No se pudo abrir el portal de Stripe. Intenta de nuevo.')
+    } finally {
+      setOpeningPortal(false)
+    }
   }
 
   if (loading || loadingProfile) return <BillingSkeleton />
