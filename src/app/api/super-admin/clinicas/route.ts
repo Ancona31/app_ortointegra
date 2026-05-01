@@ -123,6 +123,106 @@ export async function PATCH(req: NextRequest) {
   const { id } = body
   if (!id) return NextResponse.json({ error: 'Falta el id' }, { status: 400 })
 
+  if ('es_vip_grant' in body && typeof body.es_vip_grant !== 'boolean') {
+    return NextResponse.json(
+      { error: 'invalid_type', message: 'es_vip_grant debe ser boolean' },
+      { status: 400 }
+    )
+  }
+
+  if (typeof body.es_vip_grant === 'boolean') {
+    const requested = body.es_vip_grant
+    const admin = createAdminClient()
+
+    const { data: row, error: selErr } = await admin
+      .from('clinicas')
+      .select('id, plan, suscripcion_estado, stripe_subscription_id, es_vip_grant, max_pacientes, max_medicos, max_secretarias')
+      .eq('id', id)
+      .maybeSingle()
+
+    if (selErr) {
+      return NextResponse.json(
+        { error: 'select_failed', message: selErr.message },
+        { status: 500 }
+      )
+    }
+    if (!row) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+
+    if (row.es_vip_grant === requested) {
+      return NextResponse.json({ ok: true, no_change: true, clinica: row })
+    }
+
+    if (requested === true) {
+      const { data: updated, error: updErr } = await admin
+        .from('clinicas')
+        .update({ es_vip_grant: true, max_pacientes: null })
+        .eq('id', id)
+        .select('*')
+        .single()
+
+      if (updErr) {
+        return NextResponse.json(
+          { error: 'update_failed', message: updErr.message },
+          { status: 500 }
+        )
+      }
+
+      await logAudit({
+        userId: auth.user.id,
+        accion: 'sa_toggle_vip',
+        tabla: 'clinicas',
+        registroId: String(id),
+        descripcion: JSON.stringify({ from: row.es_vip_grant, to: true }),
+      })
+
+      return NextResponse.json({ ok: true, clinica: updated })
+    }
+
+    if (
+      row.stripe_subscription_id &&
+      row.suscripcion_estado === 'activo' &&
+      row.plan !== 'free'
+    ) {
+      return NextResponse.json(
+        {
+          error: 'subscription_active',
+          message: 'Esta cuenta tiene suscripción activa en Stripe. Gestiona desde Stripe Dashboard.',
+        },
+        { status: 409 }
+      )
+    }
+
+    const { data: updated, error: updErr } = await admin
+      .from('clinicas')
+      .update({
+        es_vip_grant: false,
+        plan: 'free',
+        max_pacientes: 5,
+        max_medicos: 1,
+        max_secretarias: 0,
+      })
+      .eq('id', id)
+      .select('*')
+      .single()
+
+    if (updErr) {
+      return NextResponse.json(
+        { error: 'update_failed', message: updErr.message },
+        { status: 500 }
+      )
+    }
+
+    await logAudit({
+      userId: auth.user.id,
+      accion: 'sa_toggle_vip',
+      tabla: 'clinicas',
+      registroId: String(id),
+      descripcion: JSON.stringify({ from: row.es_vip_grant, to: false }),
+    })
+
+    return NextResponse.json({ ok: true, clinica: updated })
+  }
+
   const campos: Record<string, unknown> = {}
   if ('max_medicos' in body) campos.max_medicos = body.max_medicos
   if ('max_secretarias' in body) campos.max_secretarias = body.max_secretarias
