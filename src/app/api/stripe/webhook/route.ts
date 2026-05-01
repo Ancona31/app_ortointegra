@@ -110,18 +110,36 @@ export async function POST(req: NextRequest) {
       const clinicaId = subscription.metadata?.clinica_id
       if (!clinicaId) break
 
-      await admin.from('clinicas').update({
-        plan: 'free',
-        suscripcion_estado: 'cancelado',
+      const { data: row } = await admin
+        .from('clinicas')
+        .select('es_vip_grant')
+        .eq('id', clinicaId)
+        .maybeSingle()
+
+      const esVip = row?.es_vip_grant === true
+
+      const camposBase = {
+        plan: 'free' as const,
+        suscripcion_estado: 'cancelado' as const,
         stripe_subscription_id: null,
         stripe_price_id: null,
-        max_medicos: 1,
-        max_secretarias: 0,
-        max_pacientes: 5,
         suscripcion_ends_at: subscription.items.data[0]?.current_period_end
           ? new Date(subscription.items.data[0].current_period_end * 1000).toISOString()
           : null,
-      }).eq('id', clinicaId)
+      }
+
+      const camposLimites = esVip
+        ? {}
+        : {
+            max_medicos: PLAN_LIMITS.free.max_medicos,
+            max_secretarias: PLAN_LIMITS.free.max_secretarias,
+            max_pacientes: PLAN_LIMITS.free.max_pacientes,
+          }
+
+      await admin
+        .from('clinicas')
+        .update({ ...camposBase, ...camposLimites })
+        .eq('id', clinicaId)
       break
     }
 

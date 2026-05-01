@@ -35,11 +35,21 @@ export async function POST(req: NextRequest) {
 
   const { data: clinica } = await admin
     .from('clinicas')
-    .select('id, nombre, stripe_customer_id')
+    .select('id, nombre, stripe_customer_id, es_vip_grant')
     .eq('id', profile.clinica_id)
     .single()
 
   if (!clinica) return NextResponse.json({ error: 'Clínica no encontrada' }, { status: 404 })
+
+  if (clinica.es_vip_grant === true) {
+    return NextResponse.json(
+      {
+        error: 'vip_account',
+        message: 'Tu cuenta tiene acceso VIP completo. No necesitas suscribirte.',
+      },
+      { status: 409 }
+    )
+  }
 
   // Crear o reutilizar el customer en Stripe
   let customerId = clinica.stripe_customer_id

@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
 import { PLANS, formatPrecio, type PlanKey } from '@/lib/plans'
-import { CheckCircle, CreditCard, Loader2, ExternalLink, AlertTriangle, Zap, Users, UserCheck, FileText, ArrowUpRight } from 'lucide-react'
+import { CheckCircle, CreditCard, Loader2, ExternalLink, AlertTriangle, Zap, Users, UserCheck, FileText, ArrowUpRight, Sparkles } from 'lucide-react'
 import { BillingSkeleton } from '@/components/ui/Skeleton'
 import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
@@ -18,6 +18,8 @@ type ClinicaInfo = {
   trial_ends_at: string | null
   suscripcion_ends_at: string | null
   stripe_customer_id: string | null
+  stripe_subscription_id: string | null
+  es_vip_grant: boolean
   max_medicos: number
   max_secretarias: number
   max_pacientes: number | null
@@ -61,7 +63,7 @@ function BillingContent() {
     async function load() {
       const [{ data: c }, { data: medicos }, { data: secretarias }, { data: pacientes }] = await Promise.all([
         supabase.from('clinicas').select(
-          'plan, suscripcion_estado, trial_ends_at, suscripcion_ends_at, stripe_customer_id, max_medicos, max_secretarias, max_pacientes, tipo'
+          'plan, suscripcion_estado, trial_ends_at, suscripcion_ends_at, stripe_customer_id, stripe_subscription_id, es_vip_grant, max_medicos, max_secretarias, max_pacientes, tipo'
         ).eq('id', profile!.clinica_id!).single(),
         supabase.from('profiles').select('id', { count: 'exact' }).eq('clinica_id', profile!.clinica_id!).eq('role', 'medico'),
         supabase.from('profiles').select('id', { count: 'exact' }).eq('clinica_id', profile!.clinica_id!).eq('role', 'secretaria'),
@@ -98,6 +100,8 @@ function BillingContent() {
   const plan = PLANS[clinica.plan]
   const estado = ESTADO_CONFIG[clinica.suscripcion_estado] ?? ESTADO_CONFIG.free
   const tieneStripe = !!clinica.stripe_customer_id
+  const esVip = clinica.es_vip_grant
+  const tieneSuscripcionStripe = !!clinica.stripe_subscription_id
 
   return (
     <div className="max-w-3xl mx-auto space-y-5 animate-slide-up">
@@ -142,51 +146,82 @@ function BillingContent() {
       {/* Card del plan actual */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-6 py-5 border-b border-slate-100">
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <h2 className="text-lg font-bold text-slate-800">{plan.nombre}</h2>
-                <span className={`flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${estado.color}`}>
-                  {estado.icon} {estado.label}
-                </span>
+          {esVip ? (
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h2 className="text-lg font-bold text-slate-800">Plan VIP</h2>
+                  <span className="flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                    <Sparkles size={14} /> Acceso completo
+                  </span>
+                </div>
+                <p className="text-sm text-slate-600">Tienes acceso a todas las features de Spinus®.</p>
+                {tieneSuscripcionStripe && (
+                  <p className="text-xs text-slate-500 mt-2">
+                    Tienes una suscripción Stripe activa adicional. Puedes cancelarla desde el portal de Stripe.
+                  </p>
+                )}
               </div>
-              {clinica.plan !== 'free' && (
-                <p className="text-2xl font-bold text-[#1a3a5c]">
-                  {formatPrecio(plan.precio_mensual)}<span className="text-sm font-normal text-slate-400"> / mes</span>
-                </p>
-              )}
-              {clinica.suscripcion_ends_at && (
-                <p className="text-xs text-slate-400 mt-1">
-                  Próxima renovación: {format(parseISO(clinica.suscripcion_ends_at), "dd 'de' MMMM 'de' yyyy", { locale: es })}
-                </p>
-              )}
-              {clinica.suscripcion_estado === 'trial' && clinica.trial_ends_at && (
-                <p className="text-xs text-blue-600 mt-1">
-                  Trial hasta: {format(parseISO(clinica.trial_ends_at), "dd 'de' MMMM", { locale: es })}
-                </p>
+              {tieneSuscripcionStripe && (
+                <div className="flex gap-2 flex-shrink-0">
+                  <button
+                    onClick={abrirPortal}
+                    disabled={openingPortal}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-[#1a3a5c] text-white rounded-xl text-sm font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-60"
+                  >
+                    {openingPortal ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+                    Gestionar suscripción Stripe
+                  </button>
+                </div>
               )}
             </div>
-            <div className="flex gap-2 flex-shrink-0">
-              {tieneStripe && (
-                <button
-                  onClick={abrirPortal}
-                  disabled={openingPortal}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-[#1a3a5c] text-white rounded-xl text-sm font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-60"
-                >
-                  {openingPortal ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
-                  Gestionar
-                </button>
-              )}
-              {clinica.plan === 'free' || clinica.suscripcion_estado !== 'activo' ? (
-                <Link
-                  href="/pricing"
-                  className="flex items-center gap-1.5 px-4 py-2 bg-[#1e5fa8] text-white rounded-xl text-sm font-medium hover:bg-[#1a3a5c] transition-colors"
-                >
-                  <ArrowUpRight size={14} /> Actualizar plan
-                </Link>
-              ) : null}
+          ) : (
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h2 className="text-lg font-bold text-slate-800">{plan.nombre}</h2>
+                  <span className={`flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${estado.color}`}>
+                    {estado.icon} {estado.label}
+                  </span>
+                </div>
+                {clinica.plan !== 'free' && (
+                  <p className="text-2xl font-bold text-[#1a3a5c]">
+                    {formatPrecio(plan.precio_mensual)}<span className="text-sm font-normal text-slate-400"> / mes</span>
+                  </p>
+                )}
+                {clinica.suscripcion_ends_at && (
+                  <p className="text-xs text-slate-400 mt-1">
+                    Próxima renovación: {format(parseISO(clinica.suscripcion_ends_at), "dd 'de' MMMM 'de' yyyy", { locale: es })}
+                  </p>
+                )}
+                {clinica.suscripcion_estado === 'trial' && clinica.trial_ends_at && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    Trial hasta: {format(parseISO(clinica.trial_ends_at), "dd 'de' MMMM", { locale: es })}
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                {tieneStripe && (
+                  <button
+                    onClick={abrirPortal}
+                    disabled={openingPortal}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-[#1a3a5c] text-white rounded-xl text-sm font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-60"
+                  >
+                    {openingPortal ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+                    Gestionar
+                  </button>
+                )}
+                {clinica.plan === 'free' || clinica.suscripcion_estado !== 'activo' ? (
+                  <Link
+                    href="/pricing"
+                    className="flex items-center gap-1.5 px-4 py-2 bg-[#1e5fa8] text-white rounded-xl text-sm font-medium hover:bg-[#1a3a5c] transition-colors"
+                  >
+                    <ArrowUpRight size={14} /> Actualizar plan
+                  </Link>
+                ) : null}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Uso actual */}
@@ -217,21 +252,27 @@ function BillingContent() {
 
       {/* Features del plan */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-        <h3 className="text-sm font-semibold text-slate-600 mb-3">Incluido en tu plan</h3>
-        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {plan.features.map(f => (
-            <li key={f} className="flex items-center gap-2 text-sm text-slate-600">
-              <CheckCircle size={14} className="text-emerald-500 flex-shrink-0" />
-              {f}
-            </li>
-          ))}
-        </ul>
-        {clinica.plan !== 'premium' && (
-          <div className="mt-4 pt-4 border-t border-slate-100">
-            <Link href="/pricing" className="text-sm text-[#1e5fa8] hover:underline font-medium flex items-center gap-1">
-              Ver todos los planes y funcionalidades <ArrowUpRight size={14} />
-            </Link>
-          </div>
+        {esVip ? (
+          <h3 className="text-sm font-semibold text-slate-600">Acceso VIP — todo incluido</h3>
+        ) : (
+          <>
+            <h3 className="text-sm font-semibold text-slate-600 mb-3">Incluido en tu plan</h3>
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {plan.features.map(f => (
+                <li key={f} className="flex items-center gap-2 text-sm text-slate-600">
+                  <CheckCircle size={14} className="text-emerald-500 flex-shrink-0" />
+                  {f}
+                </li>
+              ))}
+            </ul>
+            {clinica.plan !== 'premium' && (
+              <div className="mt-4 pt-4 border-t border-slate-100">
+                <Link href="/pricing" className="text-sm text-[#1e5fa8] hover:underline font-medium flex items-center gap-1">
+                  Ver todos los planes y funcionalidades <ArrowUpRight size={14} />
+                </Link>
+              </div>
+            )}
+          </>
         )}
       </div>
 
