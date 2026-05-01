@@ -33,6 +33,21 @@ const nextConfig: NextConfig = {
       },
     ]
   },
+  images: {
+    // Permite cargar logos de clínicas desde Supabase Storage.
+    // El hostname se deriva de NEXT_PUBLIC_SUPABASE_URL para mantener una sola
+    // fuente de verdad entre entornos. El guard evita que el build truene si
+    // la variable no está poblada al momento de cargar el config.
+    remotePatterns: process.env.NEXT_PUBLIC_SUPABASE_URL
+      ? [
+          {
+            protocol: 'https' as const,
+            hostname: new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname,
+            pathname: '/storage/v1/object/public/**',
+          },
+        ]
+      : [],
+  },
   serverExternalPackages: [
     '@cornerstonejs/core',
     '@cornerstonejs/tools',
