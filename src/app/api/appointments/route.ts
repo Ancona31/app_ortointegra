@@ -75,6 +75,28 @@ export async function POST(req: NextRequest) {
     const profile = await getProfile(supabase)
     if (!profile?.clinica_id) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
+    // Gate Fase 8.1 (extendido en Fase 8.2): bloquear creación de citas si
+    // la clínica está cancelada, no es VIP y ya tiene >5 pacientes activos
+    // (ex-cliente pagado). Free de buena fe (≤5 pacientes) NO se ve afectado.
+    const { data: clinicaGate } = await supabase
+      .from('clinicas')
+      .select('suscripcion_estado, es_vip_grant')
+      .eq('id', profile.clinica_id)
+      .single()
+    if (clinicaGate?.suscripcion_estado === 'cancelado' && !clinicaGate?.es_vip_grant) {
+      const { count: activosCount } = await supabase
+        .from('pacientes')
+        .select('id', { count: 'exact', head: true })
+        .eq('clinica_id', profile.clinica_id)
+        .or('activo.eq.true,activo.is.null')
+      if ((activosCount ?? 0) > 5) {
+        return NextResponse.json(
+          { error: 'subscription_cancelled', message: 'Tu suscripción terminó. Reactívala desde Facturación para crear nuevas citas.' },
+          { status: 403 }
+        )
+      }
+    }
+
     const body = await req.json()
     const { title, start_time, end_time, paciente_id, notes, medico_id } = body
 

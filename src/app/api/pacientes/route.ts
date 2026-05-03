@@ -20,6 +20,28 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
 
+    // ── Gate Fase 8.1: bloquear creación si la clínica está cancelada,
+    //    no es VIP y ya tiene >5 pacientes activos (ex-cliente pagado).
+    //    Free de buena fe (≤5 pacientes) NO se ve afectado. ──
+    const { data: clinicaSub } = await supabase
+      .from('clinicas')
+      .select('suscripcion_estado, es_vip_grant')
+      .eq('id', profile.clinica_id)
+      .single()
+    if (clinicaSub?.suscripcion_estado === 'cancelado' && !clinicaSub?.es_vip_grant) {
+      const { count: activosCount } = await supabase
+        .from('pacientes')
+        .select('id', { count: 'exact', head: true })
+        .eq('clinica_id', profile.clinica_id)
+        .or('activo.eq.true,activo.is.null')
+      if ((activosCount ?? 0) > 5) {
+        return NextResponse.json(
+          { error: 'subscription_cancelled', message: 'Tu suscripción terminó. Reactívala desde Facturación para crear nuevos pacientes.' },
+          { status: 403 }
+        )
+      }
+    }
+
     // ── Verificar límite de pacientes (cuenta todos, incluso inactivos) ──
     const { data: clinica } = await supabase
       .from('clinicas')

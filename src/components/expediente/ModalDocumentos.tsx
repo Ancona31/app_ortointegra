@@ -11,6 +11,7 @@ import {
 import type { Documento } from '@/types'
 import ModalShell from '@/components/ui/ModalShell'
 import { createClient } from '@/lib/supabase/client'
+import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
 
 // Duplicado de TabDocumentos.tsx — Fase 7 eliminará TabDocumentos y esta queda como única fuente
 const TIPO_DOC_LABEL: Record<string, string> = {
@@ -73,6 +74,7 @@ export default function ModalDocumentos({
   const [docAEliminar, setDocAEliminar] = useState<string | null>(null)
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null)
   const [eliminando, setEliminando] = useState(false)
+  const { state: subState, openBloqueoModal } = useSubscriptionGate()
 
   // Duplicado de TabDocumentos.tsx — Fase 7 eliminará TabDocumentos y esta queda como única fuente
   async function descargarPdf(pdfUrl: string) {
@@ -153,7 +155,16 @@ export default function ModalDocumentos({
   const headerRight = (
     <Link
       href={`/expediente/${pacienteId}/documentos`}
-      onClick={onClose}
+      onClick={(e) => {
+        // Fase 8.2 hotfix: este Link era el único punto de entrada a
+        // /expediente/[id]/documentos no cubierto por intercept de UI.
+        if (subState.isBlocked) {
+          e.preventDefault()
+          openBloqueoModal()
+          return
+        }
+        onClose()
+      }}
       className="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors px-2"
     >
       + Nuevo documento

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Paciente } from '@/types'
 import { calcularEdad } from '@/lib/patientUtils'
+import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
 
 const PAGE_SIZE = 20
 
@@ -40,6 +41,15 @@ export default function ExpedientePage() {
   const [hayMas, setHayMas] = useState(false)
   const [total, setTotal] = useState<number | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { state: subState, openBloqueoModal } = useSubscriptionGate()
+
+  // Fase 8.2: handler reutilizable para intercept de creación
+  function interceptIfBlocked(e: React.MouseEvent) {
+    if (subState.isBlocked) {
+      e.preventDefault()
+      openBloqueoModal()
+    }
+  }
 
   async function cargar(busq: string, pag: number, acumular: boolean) {
     setLoading(true)
@@ -99,6 +109,7 @@ export default function ExpedientePage() {
         <Link
           href="/pacientes/nuevo"
           data-onboard="nuevo-paciente-exp"
+          onClick={interceptIfBlocked}
           className="flex items-center gap-1.5 px-4 py-2 bg-[#1e5fa8] text-white rounded-xl text-sm font-semibold hover:bg-[#1a3a5c] transition-colors shadow-sm"
         >
           <Plus size={15} strokeWidth={2.5} /> Nuevo paciente
@@ -133,7 +144,7 @@ export default function ExpedientePage() {
               {busqueda ? 'Intenta con otro nombre' : 'Registra tu primer paciente'}
             </p>
             {!busqueda && (
-              <Link href="/pacientes/nuevo" className="text-sm text-[#1e5fa8] font-medium hover:underline">
+              <Link href="/pacientes/nuevo" onClick={interceptIfBlocked} className="text-sm text-[#1e5fa8] font-medium hover:underline">
                 + Nuevo paciente
               </Link>
             )}
@@ -165,6 +176,7 @@ export default function ExpedientePage() {
                       <Link
                         href={`/expediente/${p.id}/nueva-nota`}
                         title="Nueva nota"
+                        onClick={interceptIfBlocked}
                         className="hidden sm:flex items-center gap-1 text-[11px] text-[#86868b] hover:text-[#1e5fa8] hover:bg-blue-50 px-2.5 py-1.5 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                       >
                         <FileText size={12} /> Nueva nota

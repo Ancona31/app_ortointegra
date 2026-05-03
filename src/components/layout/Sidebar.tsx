@@ -16,7 +16,19 @@ import { useProfile, clearProfileCache } from '@/hooks/useProfile'
 import { useClinica } from '@/hooks/useClinica'
 import { useTheme } from '@/components/layout/ThemeProvider'
 import { useAuth } from '@/lib/auth-context'
+import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
 import { mutate } from 'swr'
+
+// Fase 8.2: hrefs que abren features de pago. Si la suscripción está
+// bloqueada, el click muestra el BloqueoFeatureModal en vez de navegar.
+// Cubre los 8 documentos del navDoctor y "Nuevo paciente" del navSecretaria.
+const BLOCKED_LINK_PREFIXES = ['/documentos?tipo=']
+const BLOCKED_EXACT = new Set(['/pacientes/nuevo'])
+
+function isBlockedHref(href: string): boolean {
+  if (BLOCKED_EXACT.has(href)) return true
+  return BLOCKED_LINK_PREFIXES.some((p) => href.startsWith(p))
+}
 
 /* ─── Tipos ───────────────────────────────────────────────── */
 
@@ -135,6 +147,7 @@ export default function Sidebar() {
   const { nombreDisplay, subtitulo, logoUrl } = useClinica()
   const { dark, toggle } = useTheme()
   const { signOut } = useAuth()
+  const { state: subState, openBloqueoModal } = useSubscriptionGate()
 
   // Badge offline: verde si ya configuró, gris si no
   const [bunkerReady, setBunkerReady] = useState(false)
@@ -309,8 +322,16 @@ hasActive && !isOpen
                     <div className="mt-0.5 ml-3 pl-3 border-l border-white/10 space-y-0.5">
                       {section.children.map(child => {
                         const childActive = leafIsActive(child.href, pathname)
+                        const childBlocked = subState.isBlocked && isBlockedHref(child.href)
                         return (
-                          <Link key={child.href} href={child.href} onClick={close}
+                          <Link key={child.href} href={child.href}
+                            onClick={(e) => {
+                              close()
+                              if (childBlocked) {
+                                e.preventDefault()
+                                openBloqueoModal()
+                              }
+                            }}
                             className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-[12px] font-medium transition-all duration-150 ${
                               childActive ? 'bg-white text-[var(--cp)] shadow-sm' : 'text-white/50 hover:bg-white/10 hover:text-white'
                             }`}

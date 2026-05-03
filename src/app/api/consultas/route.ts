@@ -15,6 +15,28 @@ export async function POST(req: NextRequest) {
       .single()
     if (!profile?.clinica_id) return NextResponse.json({ error: 'Sin clínica' }, { status: 403 })
 
+    // Gate Fase 8.1: bloquear creación si la clínica está cancelada,
+    // no es VIP y ya tiene >5 pacientes activos (ex-cliente pagado).
+    // Free de buena fe (≤5 pacientes) NO se ve afectado.
+    const { data: clinicaGate } = await supabase
+      .from('clinicas')
+      .select('suscripcion_estado, es_vip_grant')
+      .eq('id', profile.clinica_id)
+      .single()
+    if (clinicaGate?.suscripcion_estado === 'cancelado' && !clinicaGate?.es_vip_grant) {
+      const { count: activosCount } = await supabase
+        .from('pacientes')
+        .select('id', { count: 'exact', head: true })
+        .eq('clinica_id', profile.clinica_id)
+        .or('activo.eq.true,activo.is.null')
+      if ((activosCount ?? 0) > 5) {
+        return NextResponse.json(
+          { error: 'subscription_cancelled', message: 'Tu suscripción terminó. Reactívala desde Facturación para crear nuevas consultas.' },
+          { status: 403 }
+        )
+      }
+    }
+
     const body = await req.json()
     const { paciente_id } = body
     if (!paciente_id) return NextResponse.json({ error: 'paciente_id requerido' }, { status: 400 })

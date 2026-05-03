@@ -5,6 +5,7 @@ import { Plus, Layers, Clock, Calendar, LayoutDashboard, Activity } from 'lucide
 import type { Paciente, Consulta, Diagnostico } from '@/types'
 import ExpedienteCard from './ExpedienteCard'
 import { useStatsLabs } from '@/hooks/useStatsLabs'
+import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
 import {
   ultimaConsultaLabel,
   ultimaConsultaFecha,
@@ -111,6 +112,14 @@ export default function ExpedienteCardsGrid({
     !!statsError,
   )
 
+  // Fase 8.2: si la suscripción está bloqueada, la card "Nueva consulta"
+  // pasa de Link a button con onClick que abre el BloqueoFeatureModal.
+  // ExpedienteCard renderiza Link si recibe `href`, button si recibe `onClick`.
+  const { state: subState, openBloqueoModal } = useSubscriptionGate()
+  const nuevaConsultaProps = subState.isBlocked
+    ? { onClick: openBloqueoModal }
+    : { href: `/expediente/${paciente.id}/nueva-nota` }
+
   return (
     <div
       className="grid gap-3 mb-8"
@@ -124,7 +133,7 @@ export default function ExpedienteCardsGrid({
           icon={Plus}
           iconColor=""
           variant="cta"
-          href={`/expediente/${paciente.id}/nueva-nota`}
+          {...nuevaConsultaProps}
         />
       )}
 

@@ -8,6 +8,9 @@ import CommandPalette from '@/components/CommandPalette'
 import PageTransition from '@/components/layout/PageTransition'
 import SessionGuard from '@/components/SessionGuard'
 import OfflineAlert from '@/components/ui/OfflineAlert'
+import SuscripcionBanner from '@/components/billing/SuscripcionBanner'
+import { SubscriptionGateProvider } from '@/components/billing/SubscriptionGateProvider'
+import { getSubscriptionState } from '@/lib/subscription'
 import { AuthProvider } from '@/lib/auth-context'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -27,25 +30,32 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect('/super-admin/dashboard')
   }
 
+  // Fase 8.2: estado de suscripción server-side. Single source of truth
+  // para SuscripcionBanner + intercepts de UI + layouts-guard hijos.
+  const subscriptionState = await getSubscriptionState(supabase)
+
   return (
     <AuthProvider>
       <ToastProvider>
         <ThemeProvider>
-          <OfflineAlert />
-          <div className="flex h-screen overflow-hidden">
-            <Sidebar />
-            <main className="flex-1 lg:ml-60 overflow-y-auto">
-              <div className="min-h-full pt-16 px-4 pb-6 lg:pt-8 lg:px-8 lg:pb-8">
-                <ErrorBoundary>
-                  <PageTransition>
-                    {children}
-                  </PageTransition>
-                </ErrorBoundary>
-              </div>
-            </main>
-          </div>
-          <CommandPalette />
-          <SessionGuard />
+          <SubscriptionGateProvider initialState={subscriptionState}>
+            <OfflineAlert />
+            <SuscripcionBanner desktopSidebarOffset />
+            <div className="flex h-screen overflow-hidden">
+              <Sidebar />
+              <main className="flex-1 lg:ml-60 overflow-y-auto">
+                <div className="min-h-full pt-16 px-4 pb-6 lg:pt-8 lg:px-8 lg:pb-8">
+                  <ErrorBoundary>
+                    <PageTransition>
+                      {children}
+                    </PageTransition>
+                  </ErrorBoundary>
+                </div>
+              </main>
+            </div>
+            <CommandPalette />
+            <SessionGuard />
+          </SubscriptionGateProvider>
         </ThemeProvider>
       </ToastProvider>
     </AuthProvider>

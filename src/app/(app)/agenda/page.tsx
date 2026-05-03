@@ -13,6 +13,7 @@ import { useToast } from '@/components/ui/Toast'
 import { useProfile } from '@/hooks/useProfile'
 import QuickPatientModal from '@/components/ui/QuickPatientModal'
 import Portal from '@/components/ui/Portal'
+import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
 
 /* ─── Tipos ────────────────────────────────────────────── */
 
@@ -790,6 +791,7 @@ export default function AgendaPage() {
   const [filtroMedico, setFiltroMedico] = useState<string>('')
   const { profile } = useProfile()
   const toast = useToast()
+  const { state: subState, openBloqueoModal } = useSubscriptionGate()
 
   const canEditHorario  = ['medico', 'admin', 'super_admin'].includes(profile?.role ?? '')
   const isSingleDoctor  = medicos.length <= 1
@@ -989,6 +991,8 @@ export default function AgendaPage() {
 
   /* ── Handlers ────────────────────────────────────────── */
   function handleDateClick(arg: DateClickArg) {
+    // Fase 8.2: bloqueo creación de citas si suscripción cancelada con >5 pacientes
+    if (subState.isBlocked) { openBloqueoModal(); return }
     const start = arg.date.toISOString()
     if (!isWithinBusinessHours(arg.date, horario)) {
       setConfirm({
@@ -1002,6 +1006,8 @@ export default function AgendaPage() {
   }
 
   function handleSelect(arg: DateSelectArg) {
+    // Fase 8.2: idem handleDateClick
+    if (subState.isBlocked) { openBloqueoModal(); return }
     if (!isWithinBusinessHours(arg.start, horario)) {
       setConfirm({
         message: 'La consulta se agendará fuera del horario de consulta. ¿Desea continuar?',
@@ -1184,7 +1190,11 @@ export default function AgendaPage() {
             </button>
           )}
           <button
-            onClick={() => { const now = new Date().toISOString(); setModal({ mode: 'create', start: now, end: addHour(now) }) }}
+            onClick={() => {
+              if (subState.isBlocked) { openBloqueoModal(); return }
+              const now = new Date().toISOString()
+              setModal({ mode: 'create', start: now, end: addHour(now) })
+            }}
             data-onboard="nueva-cita"
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a4f8c] transition-colors shadow-sm"
           >

@@ -16,6 +16,7 @@ import ParticleCanvas from '@/components/launcher/ParticleCanvas'
 import { useTheme } from '@/components/launcher/ThemeContext'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useClinica } from '@/hooks/useClinica'
+import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
 
 type GridMode = 'sin_pacientes' | 'nuevo' | 'activo'
 
@@ -68,6 +69,7 @@ function fechaCompleta(): string {
 export default function InicioPage() {
   const router = useRouter()
   const { dark } = useTheme()
+  const { state: subState, openBloqueoModal } = useSubscriptionGate()
   const [estado, setEstado] = useState<EstadoPerfil | null>(null)
   const [loading, setLoading] = useState(true)
   const [mostrarOnboarding, setMostrarOnboarding] = useState(false)
@@ -276,7 +278,13 @@ export default function InicioPage() {
 
             {/* Consulta rapida — primary */}
             <button
-              onClick={() => setModalConsulta(true)}
+              onClick={() => {
+                if (subState.isBlocked) {
+                  openBloqueoModal()
+                  return
+                }
+                setModalConsulta(true)
+              }}
               className={`launcher-card-0 group relative flex flex-col items-center justify-center gap-4 p-8 rounded-3xl border shadow-lg transition-all duration-300 min-h-[220px] sm:col-span-1 hover:scale-[1.03] active:scale-[0.98] ${
                 dark
                   ? 'bg-[#1a3a5c]/90 backdrop-blur-md border-[#1e5fa8]/30 text-white hover:shadow-[0_12px_40px_rgba(30,95,168,0.25)]'
@@ -298,6 +306,12 @@ export default function InicioPage() {
             {/* Documento rapido */}
             <Link
               href="/documentos"
+              onClick={(e) => {
+                if (subState.isBlocked) {
+                  e.preventDefault()
+                  openBloqueoModal()
+                }
+              }}
               className={`launcher-card-1 group relative flex flex-col items-center justify-center gap-4 p-8 rounded-3xl border shadow-sm transition-all duration-300 min-h-[220px] hover:scale-[1.03] active:scale-[0.98] ${cardBase} ${cardHover}`}
             >
               <div className="w-16 h-16 rounded-2xl bg-teal-500 flex items-center justify-center group-hover:bg-teal-600 transition-colors">

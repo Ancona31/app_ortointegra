@@ -51,16 +51,30 @@ export async function GET() {
   // Plan de la clínica
   let plan: PlanKey = 'free'
   let suscripcion_estado = 'free'
+  let es_vip_grant = false
+  let count_pacientes = 0
   if (profile.clinica_id) {
     const { data: clinica } = await supabase
       .from('clinicas')
-      .select('plan, suscripcion_estado')
+      .select('plan, suscripcion_estado, es_vip_grant')
       .eq('id', profile.clinica_id as string)
       .single()
     if (clinica) {
       plan = (clinica.plan as PlanKey) ?? 'free'
       suscripcion_estado = (clinica.suscripcion_estado as string) ?? 'free'
+      es_vip_grant = (clinica.es_vip_grant as boolean) ?? false
     }
+
+    // Count de pacientes activos para el gate de Fase 8.1.
+    // Filtro explícito por clinica_id + activo IS NOT FALSE para que el
+    // resultado coincida con el predicado de la policy RLS, sin depender
+    // del rol del caller (admin ve inactivos via pacientes_select_inactivos_admin).
+    const { count: activosCount } = await supabase
+      .from('pacientes')
+      .select('id', { count: 'exact', head: true })
+      .eq('clinica_id', profile.clinica_id as string)
+      .or('activo.eq.true,activo.is.null')
+    count_pacientes = activosCount ?? 0
   }
 
   return NextResponse.json({
@@ -72,5 +86,7 @@ export async function GET() {
     plan,
     planNombre: PLANS[plan]?.nombre ?? 'Free',
     suscripcion_estado,
+    es_vip_grant,
+    count_pacientes,
   })
 }
