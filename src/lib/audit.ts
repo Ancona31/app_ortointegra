@@ -42,6 +42,7 @@ export type AuditAccion =
   | 'sa_crear_clinica'
   | 'sa_eliminar_clinica'
   | 'sa_editar_clinica'
+  | 'sa_editar_limites'
   | 'sa_suspender_clinica'
   | 'sa_reactivar_clinica'
   | 'sa_upgrade_clinica'

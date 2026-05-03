@@ -1,6 +1,6 @@
 'use client'
 
-import { use, useCallback } from 'react'
+import { use, useCallback, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import {
@@ -9,6 +9,7 @@ import {
   ClipboardList,
   Cpu,
   FileText,
+  Pencil,
   RefreshCw,
   Users,
 } from 'lucide-react'
@@ -23,10 +24,12 @@ import {
   TipoBadge,
 } from '@/components/super-admin/clinicas/Badges'
 import { useAsyncResource } from '@/hooks/useAsyncResource'
+import { useToast } from '@/components/ui/Toast'
 import {
   clinicaDetalleSchema,
   type ClinicaDetalle,
   type Rol,
+  type TipoCuenta,
 } from '@/lib/super-admin/types'
 
 async function fetchDetalle(id: string): Promise<ClinicaDetalle> {
@@ -114,6 +117,76 @@ function DetalleContent({
   loading: boolean
 }): ReactElement {
   const c = data.resumen
+  const toast = useToast()
+  const [editando, setEditando] = useState<boolean>(false)
+  const [formMaxMedicos, setFormMaxMedicos] = useState<number>(c.maxMedicos)
+  const [formMaxSecretarias, setFormMaxSecretarias] = useState<number>(c.maxSecretarias)
+  const [mostrandoAvisoTipo, setMostrandoAvisoTipo] = useState<boolean>(false)
+  const [guardando, setGuardando] = useState<boolean>(false)
+
+  const iniciarEdicion = (): void => {
+    setFormMaxMedicos(c.maxMedicos)
+    setFormMaxSecretarias(c.maxSecretarias)
+    setEditando(true)
+  }
+
+  const cancelar = (): void => {
+    setEditando(false)
+    setMostrandoAvisoTipo(false)
+  }
+
+  const enviar = async (tipo?: TipoCuenta): Promise<void> => {
+    setGuardando(true)
+    try {
+      const body: Record<string, unknown> = {
+        max_medicos: formMaxMedicos,
+        max_secretarias: formMaxSecretarias,
+      }
+      if (tipo !== undefined) body.tipo = tipo
+
+      const res = await fetch(`/api/super-admin/clinicas/${c.id}/limites`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+      const json: unknown = await res.json().catch(() => ({}))
+      const obj = (typeof json === 'object' && json !== null ? json : {}) as Record<string, unknown>
+      const msg =
+        typeof obj.message === 'string'
+          ? obj.message
+          : typeof obj.error === 'string'
+            ? obj.error
+            : 'Error desconocido'
+
+      if (res.ok) {
+        toast.success('Límites actualizados')
+        setMostrandoAvisoTipo(false)
+        setEditando(false)
+        onReload()
+        return
+      }
+
+      if (res.status === 409) {
+        toast.warning(msg)
+      } else {
+        toast.error(msg)
+      }
+    } catch {
+      toast.error('Error de red. Intenta de nuevo.')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  const guardar = (): void => {
+    if (formMaxMedicos > 1 && c.tipo === 'independiente') {
+      setMostrandoAvisoTipo(true)
+      return
+    }
+    void enviar(undefined)
+  }
+
   return (
     <>
       <PageHeader
@@ -151,21 +224,67 @@ function DetalleContent({
                   VIP
                 </span>
               ) : null}
+              {c.esVip && !editando ? (
+                <button
+                  type="button"
+                  onClick={iniciarEdicion}
+                  className="ml-auto inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors"
+                >
+                  <Pencil size={12} />
+                  Editar límites
+                </button>
+              ) : null}
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
               <div>
                 <p className="text-[10.5px] uppercase tracking-wider text-slate-500">Médicos</p>
-                <p className="text-[15px] font-semibold text-slate-100 tabular-nums mt-0.5">
-                  {c.countMedicos}
-                  <span className="text-slate-600">/{c.maxMedicos}</span>
-                </p>
+                {editando ? (
+                  <div className="flex items-baseline gap-1 mt-0.5">
+                    <span className="text-[15px] font-semibold text-slate-100 tabular-nums">
+                      {c.countMedicos}
+                    </span>
+                    <span className="text-slate-600">/</span>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={formMaxMedicos}
+                      onChange={(e) => setFormMaxMedicos(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                      disabled={guardando}
+                      className="w-16 bg-slate-800 border border-slate-700 rounded px-1.5 py-0.5 text-[13px] text-slate-100 tabular-nums focus:outline-none focus:border-[#1e5fa8] disabled:opacity-50"
+                    />
+                  </div>
+                ) : (
+                  <p className="text-[15px] font-semibold text-slate-100 tabular-nums mt-0.5">
+                    {c.countMedicos}
+                    <span className="text-slate-600">/{c.maxMedicos}</span>
+                  </p>
+                )}
               </div>
               <div>
                 <p className="text-[10.5px] uppercase tracking-wider text-slate-500">Secretarias</p>
-                <p className="text-[15px] font-semibold text-slate-100 tabular-nums mt-0.5">
-                  {c.countSecretarias}
-                  <span className="text-slate-600">/{c.maxSecretarias}</span>
-                </p>
+                {editando ? (
+                  <div className="flex items-baseline gap-1 mt-0.5">
+                    <span className="text-[15px] font-semibold text-slate-100 tabular-nums">
+                      {c.countSecretarias}
+                    </span>
+                    <span className="text-slate-600">/</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={formMaxSecretarias}
+                      onChange={(e) => setFormMaxSecretarias(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                      disabled={guardando}
+                      className="w-16 bg-slate-800 border border-slate-700 rounded px-1.5 py-0.5 text-[13px] text-slate-100 tabular-nums focus:outline-none focus:border-[#1e5fa8] disabled:opacity-50"
+                    />
+                  </div>
+                ) : (
+                  <p className="text-[15px] font-semibold text-slate-100 tabular-nums mt-0.5">
+                    {c.countSecretarias}
+                    <span className="text-slate-600">/{c.maxSecretarias}</span>
+                  </p>
+                )}
               </div>
               <div>
                 <p className="text-[10.5px] uppercase tracking-wider text-slate-500">Último acceso</p>
@@ -180,6 +299,26 @@ function DetalleContent({
                 </p>
               </div>
             </div>
+            {editando ? (
+              <div className="flex items-center justify-end gap-2 mt-4 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={cancelar}
+                  disabled={guardando}
+                  className="text-[12px] font-medium px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={guardar}
+                  disabled={guardando}
+                  className="text-[12px] font-semibold px-3 py-1.5 rounded-lg bg-[#1e5fa8] hover:bg-[#1a548f] text-white transition-colors disabled:opacity-50"
+                >
+                  {guardando ? 'Guardando…' : 'Guardar'}
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -229,6 +368,45 @@ function DetalleContent({
           </div>
         </div>
       </div>
+
+      {mostrandoAvisoTipo ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => { if (!guardando) setMostrandoAvisoTipo(false) }}
+          />
+          <div className="relative bg-slate-900 border border-slate-800 rounded-xl p-6 max-w-md w-full shadow-2xl">
+            <h3 className="text-[15px] font-semibold text-slate-100 mb-2">
+              ¿Cambiar a tipo &ldquo;clínica&rdquo;?
+            </h3>
+            <p className="text-[12.5px] text-slate-400 leading-relaxed mb-5">
+              Esta cuenta es <span className="font-medium text-slate-200">independiente</span>{' '}
+              (un solo médico). Estás aumentando el límite a{' '}
+              <span className="font-medium text-slate-200">{formMaxMedicos} médicos</span>, lo
+              que normalmente corresponde al tipo <span className="font-medium text-slate-200">clínica</span>.
+              Puedes cambiar el tipo ahora o mantenerlo como independiente.
+            </p>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => { void enviar(undefined) }}
+                disabled={guardando}
+                className="text-[12px] font-medium px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors disabled:opacity-50"
+              >
+                Mantener como independiente
+              </button>
+              <button
+                type="button"
+                onClick={() => { void enviar('clinica') }}
+                disabled={guardando}
+                className="text-[12px] font-semibold px-3 py-2 rounded-lg bg-[#1e5fa8] hover:bg-[#1a548f] text-white transition-colors disabled:opacity-50"
+              >
+                {guardando ? 'Guardando…' : 'Guardar como clínica'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   )
 }
