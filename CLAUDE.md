@@ -141,6 +141,70 @@ Los siguientes archivos fueron eliminados intencionalmente en abril 2026 tras un
 
 ---
 
+## 💻 Entorno de desarrollo
+
+### Plataforma actual: Linux vía WSL 2
+
+**Cambio realizado el 2026-05-04:** El proyecto migró de desarrollo nativo
+en Windows a desarrollo en Linux vía WSL 2. Razones:
+
+- Compatibilidad nativa con Supabase CLI (que usa Docker para containers de Postgres/Auth/Storage)
+- Eliminación de problemas crónicos de line-endings CRLF/LF entre Windows y Vercel (Linux)
+- Alineación con el entorno real de producción (Vercel deploya en Linux)
+- Mejor performance de Node.js y Docker en filesystem nativo de Linux
+
+**Setup oficial:**
+- Windows 11 host
+- WSL 2 con Ubuntu 24.04 LTS
+- Filesystem del proyecto: `/home/ancoa/proyectos/app_ortointegra/` (NO en `/mnt/c/...`)
+- VS Code con extensión "WSL" (`ms-vscode-remote.remote-wsl`)
+- Trabajo activo SOLO desde WSL. La copia en Windows (`C:\\Users\\Ancona\\desktop\\app_ortointegra\\`)
+  queda como respaldo congelado (read-only, sin commits, sin npm install)
+
+### Versiones pinned
+
+Estas versiones están elegidas conscientemente. NO actualizar sin discusión:
+
+| Herramienta | Versión | Razón del pin |
+|---|---|---|
+| Node.js | 24.x | Alineado con `engines` de Vercel runtime |
+| npm | 11.x | Bundled con Node 24 |
+| Docker Desktop | 29.4.1 | Última estable al momento del setup |
+| Supabase CLI | 2.95.4 | Estable con varias semanas en el wild |
+| WSL Ubuntu | 24.04 LTS | Última LTS soportada |
+
+**Regla de actualización:** NO usar versiones de herramientas con menos de 1
+semana en el wild. Regla específica para herramientas que tocan datos médicos
+de producción (Supabase CLI, Docker). Ver `LOCAL_DEV.md` (pendiente de crear)
+para procedimiento de actualización.
+
+### Docker Desktop
+
+- Instalación con integración WSL 2 ("Use WSL 2 instead of Hyper-V" marcado)
+- Debe estar corriendo antes de cualquier comando `supabase start` o `supabase db pull`
+- Validación rápida desde WSL: `docker --version` debe responder sin errores
+
+### Estado actual de Supabase local (2026-05-04)
+
+**Pendiente de configurar:**
+- `supabase init` — crear `config.toml` y `seed.sql` (cuidando NO sobrescribir `baseline/` ni `migrations/`)
+- `supabase start` — levantar Postgres + Auth + Storage local en Docker
+- `supabase db pull` — replicar schema de prod a local (Session pooler IPv4)
+- `seed.sql` — crear cuentas representativas de cada caso (free virgen, free degradada, individual, premium VIP, premium cancelado, etc.)
+
+**Connection string para `db pull`** (Session pooler, IPv4):
+- Host: `aws-0-us-west-2.pooler.supabase.com`
+- Port: 5432
+- User: `postgres.qpnegmmpneseirfyplbf`
+
+### Notas para Claude Code
+
+- Los comandos asumen ejecución desde `~/proyectos/app_ortointegra/` en Ubuntu (NO desde `/mnt/c/...`)
+- Si Claude Code detecta paths de Windows (`C:\\` o `/mnt/c/`), reporta el problema antes de ejecutar
+- El `.env.local` está en `/home/ancoa/proyectos/app_ortointegra/.env.local` con permisos 600
+
+---
+
 ## ✏️ Buenas prácticas de TypeScript
 
 * NUNCA uses `any`. Usa tipos explícitos, generics, `unknown` o `Record<string, unknown>` según corresponda
@@ -238,6 +302,25 @@ Lista de bugs/limitaciones aceptadas conscientemente. No corregir sin plan expl�
 
 ---
 
+## 📋 Incidentes resueltos
+
+Registro corto de incidentes en producción y su resolución. Útil para contexto histórico cuando se retoman áreas afectadas. Forward-only: los archivos de migración originales se conservan; los reverts son migraciones explícitas con timestamp posterior.
+
+### 2026-05-04 — Recursión RLS en pacientes (Phase 8.1)
+
+**Síntoma:** usuarios no podían crear pacientes nuevos. Error en producción: `infinite recursion detected in policy for relation "pacientes"`. Reportado por betatester ~24 horas después de aplicar la migración.
+
+**Causa raíz:** la migración `20260503_phase81_block_post_cancellation.sql` creó una policy RLS RESTRICTIVE en `public.pacientes` cuyo `WITH CHECK` contenía un `SELECT count(*) FROM public.pacientes` — self-reference que dispara recursión infinita al evaluar cualquier INSERT. Postgres no valida policies semánticamente en `CREATE POLICY`, solo a runtime, por eso pasó silencioso hasta el primer intento de crear paciente. Las policies de `consultas` y `documentos` no eran auto-recursivas (referenciaban `pacientes`, no a sí mismas) pero compartían el predicado defectuoso.
+
+**Fix aplicado:** rollback de las 3 policies vía Supabase SQL Editor el 2026-05-04. Formalizado en repo como `20260504_revert_phase81_recursion.sql`.
+
+**Trade-off temporal vigente:** sin las 3 policies, el bloqueo a clínicas con `suscripcion_estado='cancelado'` queda solo en gates server-side de los 4 endpoints API. Frontend que inserta directo a Supabase (9 formularios de documentos) queda sin barrera RLS hasta aplicar el fix correcto.
+
+**Fix correcto pendiente:** reemplazar el predicado `count(pacientes) > 5` por una columna declarativa `clinicas.ha_tenido_acceso_premium boolean` one-way (false→true al primer pago/VIP). Sin self-reference, sin recursión posible. Ver PARTE 6 del plan de refactor de roles.
+
+**Lección:** policies RLS sobre tabla X que consultan a X dentro de su propio predicado son recursión infinita garantizada en runtime. Cualquier policy que necesite condiciones derivadas de la misma tabla debe usar columnas declarativas en otra tabla (típicamente la tabla "padre" del tenant — `clinicas` en nuestro caso) en lugar de agregaciones sobre la tabla restringida.
+
+---
 ## ✅ Rediseño de laboratorios — cerrado
 
 El rediseño del módulo de laboratorios se cerró el **2026-04-24** tras
