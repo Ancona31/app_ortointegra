@@ -105,3 +105,54 @@ incluyen patrones idempotentes donde es posible:
   capturó comentarios. Si existen en prod, no están aquí.
 - **Configuración de Supabase Auth**: providers, redirect URLs, email
   templates, etc. — viven fuera del schema y se configuran por dashboard.
+
+---
+
+## Evolución posterior al baseline (2026-04-26)
+
+Las migraciones aplicadas en producción **después** de la fecha de este
+baseline viven en `supabase/migrations/` con prefijo de timestamp.
+**Para reconstruir el estado actual de producción**, aplicar el baseline
+seguido de TODAS las migraciones en orden cronológico.
+
+Migraciones aplicadas a producción a la fecha:
+
+### B1 — Limpieza de seguridad (2026-04-27)
+- `20260427_b1_01_clinicas_rls.sql` — Restringe SELECT en `clinicas` a own-or-super-admin (cierra fuga cross-tenant C2)
+- `20260427_b1_02_sa_functions_role_check.sql` — Agrega check de rol en funciones `sa_*` SECURITY DEFINER (cierra C3)
+- `20260427_b1_03_security_definer_search_path.sql` — Pin de `search_path` en funciones SECURITY DEFINER
+
+### B2 — Consolidación de policies (2026-04-29)
+- `20260429_b2_01_drop_legacy_public_policies.sql` — Elimina policies legacy `{public}` y `{authenticated}` duplicadas en `pacientes`/`consultas`/`documentos` (cierra C1)
+- `20260429_b2_02_consolidate_get_clinica_id.sql` — Unifica función `get_clinica_id()`
+- `20260429_b2_03_clean_audit_log_policies.sql` — Limpia policies de `audit_log`
+- `20260429_b2_04_clean_google_tokens_policies.sql` — Limpia policies de `google_tokens`
+
+### VIP override administrativo (2026-04-30)
+- `20260430_vip_01_es_vip_grant.sql`
+  - Agrega columna `clinicas.es_vip_grant boolean NOT NULL DEFAULT false`
+  - **Cambia DEFAULT de `clinicas.max_pacientes` de 15 a 5** (alineación con plan free)
+  - Marca como VIP a 5 clínicas existentes (3 sin Stripe + 2 excepciones de super-admin)
+
+### Bloqueo post-cancelación (2026-05-03, "Phase 8.1")
+- `20260503_phase81_block_post_cancellation.sql` — 3 policies RLS RESTRICTIVE que bloquean INSERT en `pacientes`/`consultas`/`documentos` cuando `suscripcion_estado='cancelado'` AND `es_vip_grant=false` AND `count(pacientes activos) > 5`. UPDATE/SELECT siguen permitidos.
+
+---
+
+## Diferencias entre baseline y producción actual
+
+Para evitar confusión al leer el baseline, estos son los puntos donde el
+baseline diverge del estado real de producción a la fecha:
+
+| Tabla / objeto | Baseline dice | Prod actual dice | Migración responsable |
+|---|---|---|---|
+| `clinicas.max_pacientes` DEFAULT | 15 | 5 | `20260430_vip_01_es_vip_grant` |
+| `clinicas.es_vip_grant` | (no existe) | `boolean NOT NULL DEFAULT false` | `20260430_vip_01_es_vip_grant` |
+| Policies legacy en `pacientes`/`consultas`/`documentos` | presentes | eliminadas | `20260429_b2_01_drop_legacy_public_policies` |
+| Policies RESTRICTIVE bloqueo cancelación | (no existen) | 3 policies activas | `20260503_phase81_block_post_cancellation` |
+| Función `get_clinica_id()` | versión inicial | consolidada | `20260429_b2_02_consolidate_get_clinica_id` |
+
+Esta tabla NO es exhaustiva — para el detalle completo de cada cambio,
+leer el archivo de migración correspondiente. Los archivos de migración
+incluyen header con propósito, decisiones de producto, riesgo estimado
+y queries de verificación post-aplicación.
