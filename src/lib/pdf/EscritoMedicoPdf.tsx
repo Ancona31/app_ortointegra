@@ -1,5 +1,6 @@
 import React, { type ReactElement } from 'react'
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer'
+import type { JSONContent } from '@tiptap/core'
 import PdfHeader from './PdfHeader'
 import PdfFirma from './PdfFirma'
 import PdfWatermark from './PdfWatermark'
@@ -13,6 +14,9 @@ export interface EscritoMedicoData {
   fecha: string
   asunto?: string
   cuerpo: string
+  // Phase 2: campo persistido pero NO leído por este renderer todavía.
+  // Phase 3 reescribe el parser para consumir `doc` directamente.
+  doc?: { schema: 'tiptap-doc-v1'; content: JSONContent }
   folio?: string
 }
 

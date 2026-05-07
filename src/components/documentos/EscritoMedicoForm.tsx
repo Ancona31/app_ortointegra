@@ -2,8 +2,12 @@
 import { generateDocFileName } from '@/lib/patientUtils'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 
-import { useRef, useState } from 'react'
-import { Printer, Loader2, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignJustify, Minus } from 'lucide-react'
+import { useState } from 'react'
+import {
+  Printer, Loader2, Bold, Italic, Underline,
+  AlignLeft, AlignCenter, AlignRight, AlignJustify,
+  List, ListOrdered, Minus, RemoveFormatting,
+} from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { generarPdf } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
@@ -13,15 +17,28 @@ import { createClient } from '@/lib/supabase/client'
 import DOMPurify from 'dompurify'
 import { decodificarNbsp } from '@/lib/textUtils'
 
-interface Props {
-  pacienteInicial?: string
-  pacienteId?: string
-  offlineMode?: boolean
-  onOfflineSave?: () => void
-}
+import { useEditor, EditorContent } from '@tiptap/react'
+import { generateHTML } from '@tiptap/core'
+import StarterKit from '@tiptap/starter-kit'
+import UnderlineExt from '@tiptap/extension-underline'
+import TextAlign from '@tiptap/extension-text-align'
+import Placeholder from '@tiptap/extension-placeholder'
 
-// Sanitización con DOMPurify en lugar de regex — cubre SVG scripts,
-// iframes, event handlers y todos los vectores de XSS conocidos
+// Lista de extensiones — exportada para reuso en Phase 3
+// (visor + email rendering del JSON con el mismo schema).
+export const editorExtensions = [
+  StarterKit.configure({
+    heading: { levels: [1, 2, 3] },
+  }),
+  UnderlineExt,
+  TextAlign.configure({ types: ['heading', 'paragraph'] }),
+  Placeholder.configure({
+    placeholder: 'Redacta aquí el contenido del documento...',
+  }),
+]
+
+// Sanitización con DOMPurify — cubre SVG scripts, iframes, event handlers
+// y todos los vectores de XSS conocidos.
 function sanitizeEditorHtml(html: string): string {
   return DOMPurify.sanitize(html, {
     ALLOWED_TAGS: ['p', 'br', 'b', 'strong', 'i', 'em', 'u', 'h2', 'h3', 'div', 'span', 'hr', 'ul', 'ol', 'li'],
@@ -31,16 +48,58 @@ function sanitizeEditorHtml(html: string): string {
   })
 }
 
+// Aplana el HTML producido por TipTap para que el parser regex actual
+// de EscritoMedicoPdf.tsx (Phase 3 lo reemplaza) no pierda información:
+//   <h1> → <h2>     (parser legacy solo conoce h2/h3)
+//   <ul><li>x</li>… → <p>• x</p>…
+//   <ol><li>x</li>… → <p>1. x</p>…
+// Listas anidadas no soportadas — se aplanan al primer nivel.
+// Las alineaciones quedan como style="text-align:…" e igual son
+// ignoradas por el parser legacy (mismo comportamiento que pre-refactor).
+// TEMPORAL — se elimina junto al campo `cuerpo` en Phase 5.
+function postProcesarParaParserLegacy(html: string): string {
+  let out = html
+  out = out.replace(/<h1(\s[^>]*)?>/gi, '<h2$1>').replace(/<\/h1>/gi, '</h2>')
+  out = out.replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, (_m, inner: string) => {
+    const items = (inner.match(/<li[^>]*>([\s\S]*?)<\/li>/gi) ?? [])
+      .map(li => li
+        .replace(/<\/?li(?:\s[^>]*)?>/gi, '')
+        .replace(/<\/?p(?:\s[^>]*)?>/gi, '')
+        .trim()
+      )
+    return items.map(t => `<p>• ${t}</p>`).join('')
+  })
+  out = out.replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, (_m, inner: string) => {
+    const items = (inner.match(/<li[^>]*>([\s\S]*?)<\/li>/gi) ?? [])
+      .map(li => li
+        .replace(/<\/?li(?:\s[^>]*)?>/gi, '')
+        .replace(/<\/?p(?:\s[^>]*)?>/gi, '')
+        .trim()
+      )
+    return items.map((t, i) => `<p>${i + 1}. ${t}</p>`).join('')
+  })
+  return out
+}
+
+interface Props {
+  pacienteInicial?: string
+  pacienteId?: string
+  offlineMode?: boolean
+  onOfflineSave?: () => void
+}
+
 const TAMANOS = [
-  { label: 'Normal',  tag: 'p'  },
-  { label: 'Grande',  tag: 'h3' },
-  { label: 'Título',  tag: 'h2' },
-]
+  { label: 'Normal',           value: 'p'  },
+  { label: 'Título principal', value: 'h1' },
+  { label: 'Título',           value: 'h2' },
+  { label: 'Subtítulo',        value: 'h3' },
+] as const
 
 export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, offlineMode, onOfflineSave }: Props) {
   const { medicoInfo: onlineMedicoInfo } = useMedicoInfo()
 
-  // In offline mode, read doctor profile from localStorage (pre-fetched with Base64 assets)
+  // En offline mode, leer perfil del médico de localStorage (pre-fetched
+  // con assets en Base64).
   const offlineProfile = offlineMode ? (() => {
     try {
       const raw = localStorage.getItem('spinus_doctor_profile')
@@ -63,62 +122,69 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
     firma_url: offlineProfile.firma_base64,
     clinica_nombre: offlineProfile.clinica_nombre,
   } : onlineMedicoInfo
+
   const toast = useToast()
   const [paciente, setPaciente]       = useState(pacienteInicial)
   const [fecha, setFecha]             = useState(new Date().toISOString().split('T')[0])
   const [asunto, setAsunto]           = useState('')
-  const [isEmpty, setIsEmpty]         = useState(true)
   const [imprimiendo, setImprimiendo] = useState(false)
   const [errorGuardado, setErrorGuardado] = useState('')
-  const editorRef = useRef<HTMLDivElement>(null)
 
-  function exec(cmd: string, value?: string) {
-    document.execCommand(cmd, false, value ?? undefined)
-    editorRef.current?.focus()
+  const editor = useEditor({
+    extensions: editorExtensions,
+    immediatelyRender: false,
+    editorProps: {
+      attributes: {
+        class: 'min-h-[380px] p-5 text-sm leading-relaxed focus:outline-none escrito-editor-prose',
+      },
+    },
+  })
+
+  const isEmpty = editor?.isEmpty ?? true
+
+  function setBlockType(value: string) {
+    if (!editor) return
+    if (value === 'p')       editor.chain().focus().setParagraph().run()
+    else if (value === 'h1') editor.chain().focus().setHeading({ level: 1 }).run()
+    else if (value === 'h2') editor.chain().focus().setHeading({ level: 2 }).run()
+    else if (value === 'h3') editor.chain().focus().setHeading({ level: 3 }).run()
   }
 
-  function setTamano(tag: string) {
-    document.execCommand('formatBlock', false, tag)
-    editorRef.current?.focus()
-  }
-
-  function onEditorInput() {
-    const text = editorRef.current?.innerText?.trim() ?? ''
-    setIsEmpty(text === '')
+  function currentBlockValue(): string {
+    if (!editor) return 'p'
+    if (editor.isActive('heading', { level: 1 })) return 'h1'
+    if (editor.isActive('heading', { level: 2 })) return 'h2'
+    if (editor.isActive('heading', { level: 3 })) return 'h3'
+    return 'p'
   }
 
   async function imprimir() {
-    // Pre-validación ANTES de cualquier side-effect — sanitización primero
-    // para no mostrar "Generando..." de un escrito vacío.
-    // decodificarNbsp neutraliza los &nbsp; que contentEditable inyecta
-    // automáticamente; el resto de entidades HTML se preservan para no
-    // romper el marcado.
-    const contenido = decodificarNbsp(sanitizeEditorHtml(editorRef.current?.innerHTML ?? ''))
-    if (!contenido.trim()) return
+    if (!editor || editor.isEmpty) return
+
+    const docJson      = editor.getJSON()
+    const htmlBruto    = generateHTML(docJson, editorExtensions)
+    const htmlAplanado = postProcesarParaParserLegacy(htmlBruto)
+    const cuerpoSanitizado = decodificarNbsp(sanitizeEditorHtml(htmlAplanado))
+    if (!cuerpoSanitizado.trim()) return
 
     const asuntoLimpio = decodificarNbsp(asunto)
 
     flushSync(() => { setErrorGuardado(''); setImprimiendo(true) })
-
-    // 1. Feedback instantáneo
     toast.info('Generando escrito médico...')
 
-    // 2. Identidad — UUID v4 puro (los escritos médicos no tienen folio
-    //    público visible ni verificación externa)
     const clientId = crypto.randomUUID()
     const docContenido = {
       paciente,
       fecha,
       asunto: asuntoLimpio,
-      cuerpo: contenido,
+      doc: { schema: 'tiptap-doc-v1' as const, content: docJson },
+      cuerpo: cuerpoSanitizado,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     }
 
-    // Flags de tracking para diferenciar errores
     let pdfGenerated = false
 
     try {
-      // 3. PDF PRIMERO — si falla, abortamos antes de persistir
       const medicoData = medicoInfo ? {
         nombre: medicoInfo.nombre,
         especialidad: medicoInfo.especialidad,
@@ -138,14 +204,13 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
         tipo: 'escrito_medico',
         pacienteId,
         medico: medicoData,
-        data: { paciente, fecha: fechaFmt, asunto: asuntoLimpio, cuerpo: contenido },
+        data: { paciente, fecha: fechaFmt, asunto: asuntoLimpio, cuerpo: cuerpoSanitizado },
         logoUrl,
         filename: generateDocFileName(paciente, 'Escrito_Medico'),
       })
 
       pdfGenerated = true
 
-      // 4. Persistencia
       if (offlineMode) {
         const { addDocument } = await import('@/lib/offline/db')
         const { getOfflineIdentity } = await import('@/lib/offline/identity')
@@ -192,9 +257,55 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
 
   const inputCls = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]'
   const tbBtn = 'p-1.5 rounded text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-colors'
+  const tbBtnActive = 'p-1.5 rounded bg-slate-200 text-slate-800'
+  const btnCls = (active: boolean) => active ? tbBtnActive : tbBtn
 
   return (
     <div className="space-y-5">
+
+      {/* Estilo del placeholder + restauración de estilos default tras
+          preflight de Tailwind 4 (que resetea ul/ol/h1-h6).
+          Scopeado a .escrito-editor-prose — no afecta resto de la app. */}
+      <style>{`
+        .escrito-editor-prose p.is-editor-empty:first-child::before {
+          content: attr(data-placeholder);
+          float: left;
+          color: rgb(203 213 225);
+          pointer-events: none;
+          height: 0;
+        }
+        .escrito-editor-prose ul {
+          list-style-type: disc;
+          padding-left: 1.5em;
+        }
+        .escrito-editor-prose ol {
+          list-style-type: decimal;
+          padding-left: 1.5em;
+        }
+        .escrito-editor-prose h1 {
+          font-size: 1.5em;
+          font-weight: 700;
+          line-height: 1.3;
+          margin: 0.6em 0 0.3em;
+        }
+        .escrito-editor-prose h2 {
+          font-size: 1.25em;
+          font-weight: 700;
+          line-height: 1.3;
+          margin: 0.5em 0 0.3em;
+        }
+        .escrito-editor-prose h3 {
+          font-size: 1.1em;
+          font-weight: 700;
+          line-height: 1.3;
+          margin: 0.4em 0 0.2em;
+        }
+        .escrito-editor-prose hr {
+          border: 0;
+          border-top: 1px solid rgb(203 213 225);
+          margin: 0.75em 0;
+        }
+      `}</style>
 
       {/* Datos del documento */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
@@ -221,51 +332,43 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
         {/* Barra de herramientas */}
         <div className="flex items-center gap-0.5 px-3 py-2 border-b border-slate-100 bg-slate-50 flex-wrap gap-y-1">
 
-          {/* Tamaño de texto */}
           <select
-            onChange={e => setTamano(e.target.value)}
-            defaultValue="p"
+            onChange={e => setBlockType(e.target.value)}
+            value={currentBlockValue()}
             className="text-xs border border-slate-200 rounded px-2 py-1 mr-1 text-slate-600 bg-white focus:outline-none focus:ring-1 focus:ring-[#1e5fa8]/30"
           >
-            {TAMANOS.map(t => <option key={t.tag} value={t.tag}>{t.label}</option>)}
+            {TAMANOS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
 
           <div className="w-px h-5 bg-slate-200 mx-1" />
 
-          {/* Formato */}
-          <button onMouseDown={e => { e.preventDefault(); exec('bold') }}      title="Negrita (Ctrl+B)"    className={tbBtn}><Bold      size={14} /></button>
-          <button onMouseDown={e => { e.preventDefault(); exec('italic') }}    title="Itálica (Ctrl+I)"    className={tbBtn}><Italic    size={14} /></button>
-          <button onMouseDown={e => { e.preventDefault(); exec('underline') }} title="Subrayado (Ctrl+U)"  className={tbBtn}><Underline size={14} /></button>
+          <button onMouseDown={e => { e.preventDefault(); editor?.chain().focus().toggleBold().run() }}      title="Negrita (Ctrl+B)"   className={btnCls(!!editor?.isActive('bold'))}><Bold      size={14} /></button>
+          <button onMouseDown={e => { e.preventDefault(); editor?.chain().focus().toggleItalic().run() }}    title="Itálica (Ctrl+I)"   className={btnCls(!!editor?.isActive('italic'))}><Italic    size={14} /></button>
+          <button onMouseDown={e => { e.preventDefault(); editor?.chain().focus().toggleUnderline().run() }} title="Subrayado (Ctrl+U)" className={btnCls(!!editor?.isActive('underline'))}><Underline size={14} /></button>
 
           <div className="w-px h-5 bg-slate-200 mx-1" />
 
-          {/* Alineación */}
-          <button onMouseDown={e => { e.preventDefault(); exec('justifyLeft')  }} title="Izquierda"  className={tbBtn}><AlignLeft    size={14} /></button>
-          <button onMouseDown={e => { e.preventDefault(); exec('justifyCenter')}} title="Centrado"   className={tbBtn}><AlignCenter  size={14} /></button>
-          <button onMouseDown={e => { e.preventDefault(); exec('justifyFull')  }} title="Justificado" className={tbBtn}><AlignJustify size={14} /></button>
+          <button onMouseDown={e => { e.preventDefault(); editor?.chain().focus().toggleBulletList().run() }}  title="Lista con viñetas" className={btnCls(!!editor?.isActive('bulletList'))}><List         size={14} /></button>
+          <button onMouseDown={e => { e.preventDefault(); editor?.chain().focus().toggleOrderedList().run() }} title="Lista numerada"    className={btnCls(!!editor?.isActive('orderedList'))}><ListOrdered size={14} /></button>
 
           <div className="w-px h-5 bg-slate-200 mx-1" />
 
-          {/* Separador */}
-          <button onMouseDown={e => { e.preventDefault(); exec('insertHorizontalRule') }} title="Línea separadora" className={tbBtn}><Minus size={14} /></button>
+          <button onMouseDown={e => { e.preventDefault(); editor?.chain().focus().setTextAlign('left').run() }}    title="Izquierda"   className={btnCls(!!editor?.isActive({ textAlign: 'left' }))}><AlignLeft    size={14} /></button>
+          <button onMouseDown={e => { e.preventDefault(); editor?.chain().focus().setTextAlign('center').run() }}  title="Centrado"    className={btnCls(!!editor?.isActive({ textAlign: 'center' }))}><AlignCenter  size={14} /></button>
+          <button onMouseDown={e => { e.preventDefault(); editor?.chain().focus().setTextAlign('right').run() }}   title="Derecha"     className={btnCls(!!editor?.isActive({ textAlign: 'right' }))}><AlignRight   size={14} /></button>
+          <button onMouseDown={e => { e.preventDefault(); editor?.chain().focus().setTextAlign('justify').run() }} title="Justificado" className={btnCls(!!editor?.isActive({ textAlign: 'justify' }))}><AlignJustify size={14} /></button>
+
+          <div className="w-px h-5 bg-slate-200 mx-1" />
+
+          <button onMouseDown={e => { e.preventDefault(); editor?.chain().focus().setHorizontalRule().run() }}                  title="Línea separadora" className={tbBtn}><Minus            size={14} /></button>
+          <button onMouseDown={e => { e.preventDefault(); editor?.chain().focus().clearNodes().unsetAllMarks().run() }}         title="Limpiar formato"  className={tbBtn}><RemoveFormatting size={14} /></button>
         </div>
 
         {/* Área de escritura */}
-        <div className="relative">
-          {isEmpty && (
-            <p className="absolute top-5 left-5 text-sm text-slate-300 pointer-events-none select-none">
-              Redacta aquí el contenido del documento...
-            </p>
-          )}
-          <div
-            ref={editorRef}
-            contentEditable
-            suppressContentEditableWarning
-            onInput={onEditorInput}
-            className="min-h-[380px] p-5 text-sm leading-relaxed focus:outline-none"
-            style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: '10.5pt' }}
-          />
-        </div>
+        <EditorContent
+          editor={editor}
+          style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: '10.5pt' }}
+        />
       </div>
 
       {errorGuardado && (
