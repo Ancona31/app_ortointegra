@@ -1,5 +1,6 @@
 import React, { type ReactElement } from 'react'
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer'
+import type { Style } from '@react-pdf/types'
 import type { JSONContent } from '@tiptap/core'
 import PdfHeader from './PdfHeader'
 import PdfFirma from './PdfFirma'
@@ -227,6 +228,171 @@ function parseHtmlToElements(html: string, colors: PdfColors): ReactElement[] {
   return elements
 }
 
+/* ---------- TipTap JSON renderer (Phase 3) ---------- */
+
+type ProseNode = JSONContent
+type ProseMarks = JSONContent['marks']
+
+interface InlineStyle {
+  fontWeight?: number
+  fontStyle?: 'italic'
+  textDecoration?: 'underline'
+}
+
+interface RenderCtx {
+  colors: PdfColors
+  bodyStyle: { fontSize: number; color: string; lineHeight: number; textAlign: 'justify' }
+}
+
+function marksToStyle(marks: ProseMarks): InlineStyle {
+  const style: InlineStyle = {}
+  if (!marks) return style
+  for (const m of marks) {
+    if (m.type === 'bold') style.fontWeight = 700
+    else if (m.type === 'italic') style.fontStyle = 'italic'
+    else if (m.type === 'underline') style.textDecoration = 'underline'
+  }
+  return style
+}
+
+function getTextAlign(attrs: ProseNode['attrs']): 'left' | 'center' | 'right' | 'justify' | undefined {
+  const a = attrs?.textAlign
+  if (a === 'left' || a === 'center' || a === 'right' || a === 'justify') return a
+  return undefined
+}
+
+function renderInlineChildren(
+  nodes: ProseNode[] | undefined,
+  keyPrefix: string,
+): Array<ReactElement | string> {
+  const out: Array<ReactElement | string> = []
+  if (!nodes) return out
+  nodes.forEach((n, i) => {
+    if (n.type === 'text') {
+      const decoded = decodificarEntidadesHTML(n.text ?? '')
+      const style = marksToStyle(n.marks)
+      const hasMarks = Object.keys(style).length > 0
+      if (hasMarks) {
+        out.push(
+          <Text key={`${keyPrefix}-t-${i}`} style={style as Style}>
+            {decoded}
+          </Text>,
+        )
+      } else {
+        out.push(decoded)
+      }
+    } else if (n.type === 'hardBreak') {
+      out.push('\n')
+    }
+  })
+  return out
+}
+
+function renderParagraph(node: ProseNode, key: string, ctx: RenderCtx): ReactElement {
+  const align = getTextAlign(node.attrs)
+  return (
+    <Text key={key} style={align ? { ...ctx.bodyStyle, textAlign: align } : ctx.bodyStyle}>
+      {renderInlineChildren(node.content, key)}
+    </Text>
+  )
+}
+
+function renderHeading(node: ProseNode, key: string, ctx: RenderCtx): ReactElement {
+  const rawLevel = node.attrs?.level
+  const level: 1 | 2 | 3 = rawLevel === 1 || rawLevel === 3 ? rawLevel : 2
+  const sizeByLevel = { 1: 18, 2: 14, 3: 12 } as const
+  const marginTopByLevel = { 1: 16, 2: 14, 3: 10 } as const
+  const marginBottomByLevel = { 1: 8, 2: 6, 3: 4 } as const
+  const align = getTextAlign(node.attrs)
+  return (
+    <Text
+      key={key}
+      style={{
+        fontSize: sizeByLevel[level],
+        fontWeight: 700,
+        color: ctx.colors.cp,
+        marginTop: marginTopByLevel[level],
+        marginBottom: marginBottomByLevel[level],
+        lineHeight: 1.4,
+        ...(align ? { textAlign: align } : {}),
+      }}
+    >
+      {renderInlineChildren(node.content, key)}
+    </Text>
+  )
+}
+
+function renderListItem(
+  item: ProseNode,
+  marker: string,
+  ctx: RenderCtx,
+  depth: number,
+  itemKey: string,
+): ReactElement {
+  return (
+    <View key={itemKey} style={{ flexDirection: 'row', marginLeft: depth * 14, marginBottom: 2 }}>
+      <Text style={{ ...ctx.bodyStyle, width: 22, textAlign: 'left' }}>{marker}</Text>
+      <View style={{ flex: 1 }}>
+        {(item.content ?? [])
+          .map((child, i) => renderNode(child, `${itemKey}-c-${i}`, ctx, depth + 1))
+          .filter((el): el is ReactElement => el !== null)}
+      </View>
+    </View>
+  )
+}
+
+function renderList(
+  node: ProseNode,
+  key: string,
+  ctx: RenderCtx,
+  depth: number,
+  ordered: boolean,
+): ReactElement {
+  const start = ordered ? Number(node.attrs?.start ?? 1) : 0
+  const items = node.content ?? []
+  return (
+    <View key={key} style={{ marginVertical: 4 }}>
+      {items.map((item, i) => {
+        const marker = ordered ? `${start + i}.` : '•'
+        return renderListItem(item, marker, ctx, depth, `${key}-i-${i}`)
+      })}
+    </View>
+  )
+}
+
+function renderNode(node: ProseNode, key: string, ctx: RenderCtx, depth = 0): ReactElement | null {
+  switch (node.type) {
+    case 'paragraph':
+      return renderParagraph(node, key, ctx)
+    case 'heading':
+      return renderHeading(node, key, ctx)
+    case 'bulletList':
+      return renderList(node, key, ctx, depth, false)
+    case 'orderedList':
+      return renderList(node, key, ctx, depth, true)
+    case 'horizontalRule':
+      return (
+        <View
+          key={key}
+          style={{ borderBottomWidth: 0.75, borderBottomColor: '#d1d5db', marginVertical: 10 }}
+        />
+      )
+    default:
+      return null
+  }
+}
+
+function renderTipTapDoc(doc: JSONContent, colors: PdfColors): ReactElement[] {
+  const ctx: RenderCtx = {
+    colors,
+    bodyStyle: { fontSize: 10.5, color: '#1a1a1a', lineHeight: 1.75, textAlign: 'justify' },
+  }
+  const top = doc.content ?? []
+  return top
+    .map((n, i) => renderNode(n, `n-${i}`, ctx, 0))
+    .filter((el): el is ReactElement => el !== null)
+}
+
 /* ---------- Component ---------- */
 
 function buildStyles(_colors: PdfColors) {
@@ -283,7 +449,9 @@ function buildStyles(_colors: PdfColors) {
 export default function EscritoMedicoPdf({ medico, data, logoUrl }: EscritoMedicoProps) {
   const colors = getPdfColors(medico)
   const s = buildStyles(colors)
-  const bodyElements = parseHtmlToElements(data.cuerpo, colors)
+  const bodyElements = data.doc?.schema === 'tiptap-doc-v1'
+    ? renderTipTapDoc(data.doc.content, colors)
+    : parseHtmlToElements(data.cuerpo, colors)
 
   return (
     <Document>

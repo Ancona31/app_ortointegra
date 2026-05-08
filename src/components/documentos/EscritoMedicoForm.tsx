@@ -204,7 +204,7 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
         tipo: 'escrito_medico',
         pacienteId,
         medico: medicoData,
-        data: { paciente, fecha: fechaFmt, asunto: asuntoLimpio, cuerpo: cuerpoSanitizado },
+        data: { paciente, fecha: fechaFmt, asunto: asuntoLimpio, cuerpo: cuerpoSanitizado, doc: { schema: 'tiptap-doc-v1' as const, content: docJson } },
         logoUrl,
         filename: generateDocFileName(paciente, 'Escrito_Medico'),
       })

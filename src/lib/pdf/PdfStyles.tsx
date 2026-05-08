@@ -12,6 +12,7 @@ if (typeof window === 'undefined') {
       { src: path.join(fontsDir, 'Roboto-Medium.ttf'), fontWeight: 500 },
       { src: path.join(fontsDir, 'Roboto-Bold.ttf'), fontWeight: 700 },
       { src: path.join(fontsDir, 'Roboto-Italic.ttf'), fontWeight: 400, fontStyle: 'italic' },
+      { src: path.join(fontsDir, 'Roboto-BoldItalic.ttf'), fontWeight: 700, fontStyle: 'italic' },
     ],
   })
 } else {
@@ -22,6 +23,7 @@ if (typeof window === 'undefined') {
       { src: '/fonts/Roboto-Medium.ttf', fontWeight: 500 },
       { src: '/fonts/Roboto-Bold.ttf', fontWeight: 700 },
       { src: '/fonts/Roboto-Italic.ttf', fontWeight: 400, fontStyle: 'italic' },
+      { src: '/fonts/Roboto-BoldItalic.ttf', fontWeight: 700, fontStyle: 'italic' },
     ],
   })
 }

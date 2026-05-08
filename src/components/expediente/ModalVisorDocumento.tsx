@@ -5,6 +5,7 @@ import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Mail, Loader2, CheckCircle } from 'lucide-react'
 import ModalShell from '@/components/ui/ModalShell'
+import TipTapViewer from '@/components/documentos/TipTapViewer'
 
 const TIPO_DOC_LABEL: Record<string, string> = {
   receta: 'Receta',
@@ -248,12 +249,14 @@ export default function ModalVisorDocumento({ doc, onClose, pacienteEmail }: Pro
                 <span className="font-medium text-[#1a3a5c]">{doc.contenido.asunto}</span>
               </div>
             )}
-            {doc.contenido?.cuerpo && (
-              <div
-                className="text-sm text-slate-600 leading-relaxed border-t border-slate-100 pt-3"
-                style={{ fontFamily: 'Georgia, serif' }}
-                dangerouslySetInnerHTML={{ __html: doc.contenido.cuerpo }}
-              />
+            {(doc.contenido?.doc || doc.contenido?.cuerpo) && (
+              <div className="border-t border-slate-100 pt-3">
+                <TipTapViewer
+                  doc={doc.contenido?.doc}
+                  cuerpo={doc.contenido?.cuerpo}
+                  className="text-sm text-slate-600 leading-relaxed"
+                />
+              </div>
             )}
           </div>
         )}

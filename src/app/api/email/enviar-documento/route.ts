@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { Resend } from 'resend'
 import { logAudit } from '@/lib/audit'
+import { generateHTML } from '@tiptap/html'
+import type { JSONContent } from '@tiptap/core'
+import { editorExtensions } from '@/components/documentos/EscritoMedicoForm'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -196,9 +199,13 @@ function generarHtmlEmail(doc: { tipo: string; contenido: Record<string, any>; c
         <p style="margin:0;font-weight:600;color:#134e4a;font-size:15px;">${contenido.asunto}</p>
       </div>`
     }
-    if (contenido?.cuerpo) {
+    const docPayload = contenido?.doc as { schema?: string; content?: JSONContent } | undefined
+    const cuerpoHtml = docPayload?.schema === 'tiptap-doc-v1' && docPayload.content
+      ? generateHTML(docPayload.content, editorExtensions)
+      : (typeof contenido?.cuerpo === 'string' ? contenido.cuerpo : '')
+    if (cuerpoHtml) {
       cuerpo += `<div style="padding:16px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;font-family:Georgia,serif;font-size:14px;line-height:1.7;color:#334155;">
-        ${contenido.cuerpo}
+        ${cuerpoHtml}
       </div>`
     }
   } else if (tipo === 'consentimiento_informado') {
