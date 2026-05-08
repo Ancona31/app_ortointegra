@@ -332,6 +332,46 @@ labs (retomar en sesión nueva)".
 
 ---
 
+## ✅ Refactor del editor de Escrito Médico — cerrado (Phase 4 y 5 canceladas)
+
+**Phase 2 + Phase 3 cerradas y en producción** (2026-05-08):
+
+- Editor TipTap WYSIWYG con persistencia dual-write `doc` + `cuerpo` en
+  `documentos.contenido`
+- PDF / visor / email consumen JSON ProseMirror cuando
+  `doc.schema === 'tiptap-doc-v1'`
+- Roboto-BoldItalic registrada en `@react-pdf/renderer` para italic+bold
+  combinado
+- Hotfix `src/lib/documentos/editorExtensions.ts` — módulo neutro (sin
+  `'use client'`) compartido entre editor cliente, visor cliente y
+  handler server-side de email (evita arrastrar el árbol de cliente al
+  server al renderizar HTML del JSON)
+
+**Phase 4 (migración batch HTML → JSON) CANCELADA conscientemente.**
+**Phase 5 (eliminación de código legacy) CANCELADA conscientemente.**
+
+Razón: pocos escritos legacy en producción, no importantes para
+operación. El parser regex de fallback maneja escritos legacy con
+limitaciones aceptadas (italic gris #555, listas como `"• item"` en
+texto plano, alineaciones nuevas ignoradas, H1 demoteado a H2). El
+costo de migrar batch + eliminar legacy supera el beneficio dado el
+volumen residual de documentos afectados.
+
+**Lo que sigue VIVO por compatibilidad legacy** (NO eliminar sin
+discusión explícita y nuevo plan):
+
+- Campo `cuerpo` en `documentos.contenido` (HTML string)
+- `parseHtmlToElements` en `src/lib/pdf/EscritoMedicoPdf.tsx`
+- `postProcesarParaParserLegacy` en
+  `src/components/documentos/EscritoMedicoForm.tsx`
+
+**Importante para futuros editores:** los comentarios que dicen
+"TEMPORAL — Phase 5" o "TEMPORAL — se elimina en Phase 5" en el código
+deben **IGNORARSE**. Esa fase no se ejecutará. Es deuda técnica
+controlada, documentada y aceptada.
+
+---
+
 ## 🔓 Pendientes de seguridad
 
 Hardening conocido pero no aplicado todavía. Cada ítem tiene fix planeado y momento previsto. No reordenar prioridades sin discusión.
