@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 import DOMPurify from 'dompurify'
 import { generateHTML } from '@tiptap/core'
 import type { JSONContent } from '@tiptap/core'
-import { editorExtensions } from './EscritoMedicoForm'
+import { editorExtensions } from '@/lib/documentos/editorExtensions'
 
 interface Props {
   doc?: { schema: 'tiptap-doc-v1'; content: JSONContent } | null

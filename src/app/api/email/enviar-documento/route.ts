@@ -4,7 +4,7 @@ import { Resend } from 'resend'
 import { logAudit } from '@/lib/audit'
 import { generateHTML } from '@tiptap/html'
 import type { JSONContent } from '@tiptap/core'
-import { editorExtensions } from '@/components/documentos/EscritoMedicoForm'
+import { editorExtensions } from '@/lib/documentos/editorExtensions'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 

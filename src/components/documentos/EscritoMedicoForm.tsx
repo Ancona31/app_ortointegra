@@ -19,23 +19,7 @@ import { decodificarNbsp } from '@/lib/textUtils'
 
 import { useEditor, EditorContent } from '@tiptap/react'
 import { generateHTML } from '@tiptap/core'
-import StarterKit from '@tiptap/starter-kit'
-import UnderlineExt from '@tiptap/extension-underline'
-import TextAlign from '@tiptap/extension-text-align'
-import Placeholder from '@tiptap/extension-placeholder'
-
-// Lista de extensiones — exportada para reuso en Phase 3
-// (visor + email rendering del JSON con el mismo schema).
-export const editorExtensions = [
-  StarterKit.configure({
-    heading: { levels: [1, 2, 3] },
-  }),
-  UnderlineExt,
-  TextAlign.configure({ types: ['heading', 'paragraph'] }),
-  Placeholder.configure({
-    placeholder: 'Redacta aquí el contenido del documento...',
-  }),
-]
+import { editorExtensions } from '@/lib/documentos/editorExtensions'
 
 // Sanitización con DOMPurify — cubre SVG scripts, iframes, event handlers
 // y todos los vectores de XSS conocidos.
