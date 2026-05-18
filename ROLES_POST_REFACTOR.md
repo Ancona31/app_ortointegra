@@ -2,11 +2,11 @@
 
 > **Documento de referencia funcional del sistema de roles de Spinus después del refactor.**
 >
-> Integra todas las decisiones D1-D10, los hallazgos del scouting (83 entradas de bitácora) y la corrección del modelo del super_admin como rol puramente administrativo de plataforma.
+> Integra todas las decisiones D1-D10, los hallazgos del scouting (83 entradas de bitácora), la corrección del modelo del super_admin como rol puramente administrativo de plataforma, y la clarificación del modelo de tipos de cuenta (independiente vs clinica) con sus invariantes asociados.
 >
 > **Propósito:** servir como referencia única del comportamiento esperado del sistema. Cada cambio en el refactor debe alinearse con este modelo.
 >
-> **Última actualización:** durante sesión de scouting de roles previa al refactor.
+> **Última actualización:** durante Etapa 2 del refactor, clarificación del modelo de tipos de cuenta.
 
 ---
 
@@ -67,6 +67,39 @@ admin_clinica → 1 por clínica (típicamente, mínimo)
                 1-3 por clínica multi-usuario VIP
 secretaria    → 0-N por clínica (depende del plan/VIP)
 ```
+
+### 1.6 Mapeo plan → tipo de cuenta
+
+**Regla fundamental:** el `tipo` de la clínica refleja su composición real de personal, NO es etiqueta arbitraria. Los planes definen capacidad comercial; la presencia/ausencia de secretaria define el tipo.
+
+| Plan | Tipo esperado | max_medicos | max_secretarias | Comentario |
+|---|---|---|---|---|
+| `free` | `independiente` | 1 | 0 | Plan gratuito, médico solo |
+| `individual` | `independiente` | 1 | 0 | Plan pagado para médico solo (Dr. Ancona TYO, Dra. Ilse) |
+| `basica` | `clinica` | 2-3 (TBD) | 1+ (TBD) | Plan multi-usuario nivel entrada |
+| `pro` | `clinica` | 5+ (TBD) | 2+ (TBD) | Plan multi-usuario intermedio |
+| `premium` | `clinica` | 10+ (TBD) | 3+ (TBD) | Plan multi-usuario superior |
+
+**Reglas:**
+
+- Plan `individual` y `free`: cuentas individuales con UN solo médico. **NO permiten invitar secretarias ni médicos extras** sin pasar por VIP o upgrade comercial.
+- Plan `basica`/`pro`/`premium`: cuentas multi-usuario que requieren al menos UNA secretaria para considerarse "clínica" en el sentido del producto.
+- Los valores específicos de `max_medicos`/`max_secretarias` para los planes comerciales son TBD (a definir cuando se comercialicen).
+
+### 1.7 Regla crítica: invariante de secretaria para tipo='clinica'
+
+**Una cuenta SOLO puede ser `tipo='clinica'` si tiene al menos 1 secretaria activa.**
+
+Razón funcional: una cuenta con múltiples médicos sin secretaria es solo "múltiples consultorios individuales agrupados en una cuenta", lo cual rompe la lógica del modelo de producto. La secretaria es la **piedra angular** que define la "clínica" como unidad operativa.
+
+**Implicaciones:**
+
+- Cuenta sin secretaria → **NO puede tener tipo='clinica'**
+- Cuenta sin secretaria → **NO puede tener más de 1 médico**
+- Upgrade a multi-usuario (vía plan comercial o VIP) **DEBE incluir invitación de secretaria como primer paso**
+- Si super_admin otorga VIP con `max_medicos > 1`, también debe asegurar `max_secretarias >= 1`
+
+Ver **Sección 8: Invariantes 17 y 18** para enforcement formal.
 
 ---
 
@@ -362,7 +395,7 @@ Una clínica puede estar en cualquier combinación de:
 | **Override admin** | `es_vip_grant` boolean | Si tiene VIP otorgado por super_admin |
 | **Capacidad equipo** | `max_medicos`, `max_secretarias` | Límites numéricos de invitaciones |
 | **Suspensión** | `suspendida` boolean | Si super_admin la ha suspendido |
-| **Tipo** | independiente / clinica | Naturaleza histórica/marketing |
+| **Tipo** | independiente / clinica | Refleja composición real: independiente=1 médico+0 secretarias; clinica=N médicos+1+ secretarias |
 
 ### 4.2 Categorías derivadas
 
@@ -475,28 +508,39 @@ CREATE POLICY pacientes_insert ON pacientes
 
 ### 5.2 Invitación de médico nuevo a clínica multi-usuario
 
-**Pre-requisito:** la clínica tiene `max_medicos > total_medicos_actuales` (vía VIP o Stripe).
+**Pre-requisitos:**
+- La clínica tiene `max_medicos > total_medicos_actuales` (vía VIP o Stripe).
+- **Si será el 2do médico (o posterior): la clínica DEBE tener al menos 1 secretaria activa** (invariante de Sección 1.7).
+- Si no hay secretaria todavía, el admin debe invitarla PRIMERO antes de poder invitar médicos adicionales.
 
 ```
 1. Admin de clínica abre /admin/usuarios
 2. Click "Invitar médico"
-3. Llena email + nombre
-4. Sistema valida:
+3. Validación previa al sistema:
+   - Si total_medicos_actuales = 1 AND total_secretarias = 0:
+     → RECHAZAR con mensaje "Para agregar más médicos, primero invita a una secretaria"
+   - Si total_medicos_actuales >= 1 AND total_secretarias >= 1:
+     → Permitir continuar
+4. Llena email + nombre
+5. Sistema valida:
    - clinica_dentro_de_limite() = true
    - clinica_no_suspendida() = true
    - clinica_tiene_acceso() = true
-5. Envía email de invitación (vía tabla invitaciones)
-6. Médico invitado completa registro
-7. Se crea profile con:
+6. Envía email de invitación (vía tabla invitaciones)
+7. Médico invitado completa registro
+8. Se crea profile con:
    role: 'medico'
    es_admin_de_clinica: false   ← NO es admin, solo médico invitado
    clinica_id: [clínica del invitador]
-8. Médico nuevo puede hacer login y ver su área de trabajo
+9. Médico nuevo puede hacer login y ver su área de trabajo
+10. tipo de clínica se actualiza a 'clinica' (si era 'independiente' antes)
 ```
 
 ### 5.3 Invitación de secretaria
 
-**Pre-requisito:** la clínica tiene `max_secretarias > 0`.
+**Pre-requisitos:**
+- La clínica tiene `max_secretarias > 0` (vía VIP o plan comercial).
+- Es la **primera acción de upgrade** hacia tipo='clinica' multi-usuario. Las secretarias son la piedra angular del modelo.
 
 ```
 1. Admin de clínica abre /admin/usuarios
@@ -510,7 +554,11 @@ CREATE POLICY pacientes_insert ON pacientes
    es_admin_de_clinica: false
    clinica_id: [clínica]
 8. Secretaria entra al sistema y ve dashboard de agenda
+9. tipo de clínica se actualiza a 'clinica' si era 'independiente'
+   (la presencia de secretaria define el tipo)
 ```
+
+**Importante:** una clínica `independiente` que invita a su primera secretaria se convierte en `clinica`. Es transición unidireccional natural (no requiere acción manual del admin).
 
 ### 5.4 Creación de paciente
 
@@ -576,12 +624,18 @@ QuickPatientModal y ConsultaRapidaModal:
 
 ### 5.7 Otorgamiento de VIP (super_admin)
 
+**Pre-validación obligatoria:** si se quiere otorgar `max_medicos > 1`, debe garantizarse `max_secretarias >= 1` (ver Sección 1.7: invariante de secretaria).
+
 ```
 1. Angel (super_admin) entra a /super-admin/clinicas
 2. Selecciona clínica X
 3. Click "Otorgar VIP"
 4. Llena: max_medicos, max_secretarias, max_pacientes (números > defaults)
-5. Endpoint /api/super-admin/clinicas/[id]:
+5. Validación:
+   - Si max_medicos > 1 AND max_secretarias < 1 → RECHAZAR (rompe invariante)
+   - Si max_medicos = 1 AND max_secretarias = 0 → válido (independiente con VIP)
+   - Si max_medicos > 1 AND max_secretarias >= 1 → válido (clinica con VIP)
+6. Endpoint /api/super-admin/clinicas/[id]:
    UPDATE clinicas SET
      es_vip_grant = true,
      ha_tenido_acceso_premium = true,
@@ -589,9 +643,11 @@ QuickPatientModal y ConsultaRapidaModal:
      max_secretarias = Y,
      max_pacientes = Z
    WHERE id = clinica_id
-6. Audit log: 'sa_otorgar_vip' con detalles
-7. Clínica desbloquea capacidad de invitar usuarios
+7. Audit log: 'sa_otorgar_vip' con detalles
+8. Clínica desbloquea capacidad de invitar usuarios
 ```
+
+**Recordatorio:** otorgar VIP solo cambia los LÍMITES. NO crea automáticamente la secretaria. El admin de la clínica debe invitar a la secretaria como primer paso si quiere escalar a tipo='clinica'.
 
 ### 5.8 Retiro de VIP (super_admin)
 
@@ -703,7 +759,7 @@ SUPER_ADMIN (Angel) — PLATAFORMA
 └─ LFPDPPP: vía solicitudes ARCO formales (no acceso directo)
 
 
-CLÍNICA INDEPENDIENTE (1 médico solo)
+CLÍNICA INDEPENDIENTE (planes 'free' o 'individual', 1 médico solo)
 │
 └─ MÉDICO (rol=medico, es_admin_de_clinica=true)
    │
@@ -713,7 +769,8 @@ CLÍNICA INDEPENDIENTE (1 médico solo)
    └─ NO puede invitar usuarios (max_medicos=1, max_secretarias=0)
 
 
-CLÍNICA MULTI-USUARIO (con VIP o plan especial)
+CLÍNICA MULTI-USUARIO (planes 'basica'/'pro'/'premium' o VIP)
+REQUIERE al menos 1 secretaria (invariante 17)
 │
 ├─ MÉDICO ADMIN (rol=medico, es_admin_de_clinica=true)
 │  │
@@ -769,6 +826,12 @@ Verdades que SIEMPRE deben cumplirse:
 14. Las RLS no contienen referencias circulares (lección Phase 8.1)
 15. super_admin NO accede a datos clínicos vía RLS general (solo vía endpoints específicos)
 16. super_admin NO accede a PII sensible de pacientes (direcciones, teléfonos, emails, fechas exactas)
+17. **Toda clínica con `tipo='clinica'` debe tener al menos 1 secretaria activa.** Una cuenta sin secretaria es solo "múltiples consultorios solos en la misma cuenta", lo cual rompe la lógica del modelo de producto.
+18. **Toda clínica con `tipo='independiente'` debe tener exactamente 1 médico y 0 secretarias.** Si supera estos límites, automáticamente pasa a `tipo='clinica'` (cuando hay al menos 1 secretaria) o entra en estado de límite excedido.
+19. **System override del super_admin debe respetar el invariante 17:** si `max_medicos > 1`, entonces `max_secretarias >= 1` obligatorio. NO se puede otorgar capacidad multi-médico sin habilitar también secretarias.
+20. Mapeo plan → tipo (referencia Sección 1.6):
+    - `free`, `individual` → tipo='independiente' (1 médico, 0 secretarias)
+    - `basica`, `pro`, `premium` → tipo='clinica' (multi-usuario con secretaria obligatoria)
 
 ---
 
@@ -781,7 +844,8 @@ Antes de declarar el refactor completo, validar:
 - ✅ Crea pacientes asignados a sí mismo
 - ✅ Ve sus pacientes, NO de otros
 - ✅ Modifica branding de su consultorio
-- ❌ NO puede invitar usuarios (max=1)
+- ❌ NO puede invitar usuarios (max_medicos=1, max_secretarias=0)
+- ✅ Plan='free' o 'individual', tipo='independiente'
 
 ### Caso 2: Médico admin en clínica multi-usuario (OrtoIntegra)
 - ✅ Login normal
@@ -835,6 +899,18 @@ Antes de declarar el refactor completo, validar:
 - ✅ Crea pacientes sin problema
 - ✅ Solo Angel puede modificar `es_vip_grant`
 
+### Caso 10: Upgrade independiente → clinica (invariante 17)
+- Clínica con plan='individual' + tipo='independiente' + 1 médico + 0 secretarias
+- Admin intenta invitar a 2do médico → ❌ rechazo: "Primero invita a una secretaria"
+- Admin invita a secretaria → ✅ aceptado, tipo cambia a 'clinica'
+- Admin invita a 2do médico → ✅ aceptado (ya hay secretaria)
+
+### Caso 11: System override de VIP por super_admin (invariante 19)
+- Super_admin otorga VIP con max_medicos=3 y max_secretarias=0 → ❌ rechazo
+  Mensaje: "Si max_medicos > 1, max_secretarias debe ser >= 1"
+- Super_admin otorga VIP con max_medicos=3 y max_secretarias=1 → ✅ aceptado
+- Super_admin otorga VIP con max_medicos=1 y max_secretarias=0 → ✅ aceptado (independiente con VIP)
+
 ---
 
 ## Apéndice: glosario de funciones SECURITY DEFINER
@@ -846,6 +922,10 @@ Antes de declarar el refactor completo, validar:
 | `clinica_dentro_de_limite()` | Verificar si la clínica respeta `max_medicos` y `max_secretarias` | boolean |
 | `clinica_no_suspendida()` | Verificar si la clínica NO está suspendida | boolean |
 | `clinica_tiene_acceso()` | Verificar Phase 8.1 v2 (no cancelada con historia premium sin VIP) | boolean |
+
+**Notas sobre invariantes nuevos (17-20):**
+
+Los invariantes de tipo de cuenta (Sección 8, invariantes 17-19) se enforcearán principalmente vía **validación en aplicación TypeScript** (endpoints de invitación + system override). Opcionalmente puede agregarse un trigger BD para defensa en profundidad. Decisión final en Etapa 4/5.
 
 ---
 
