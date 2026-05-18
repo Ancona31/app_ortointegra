@@ -133,3 +133,30 @@ export function generateDocFileName(
 
   return `${timestamp}_${tipo}_${paciente}.pdf`
 }
+
+/* ──────────────────────────────────────────────────────────────────────
+   Edad → fecha de nacimiento ficticia
+   ────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Convierte una edad en años a una fecha de nacimiento ficticia
+ * usando convención 1 de enero del año calculado.
+ *
+ * Uso: cuando el paciente no recuerda su fecha exacta de nacimiento,
+ * el médico o secretaria ingresa solo la edad y este helper calcula
+ * una fecha ficticia compatible con la columna fecha_nacimiento.
+ *
+ * La convención 01-01 (1 de enero) hace evidente que es aproximada,
+ * a diferencia de una fecha intermedia del año que podría confundirse
+ * con un dato real.
+ *
+ * @param edad - Edad en años (entero positivo entre 0 y 120)
+ * @returns Fecha en formato 'YYYY-MM-DD'
+ * @example
+ *   edadAFechaFicticia(35) // → '1991-01-01' (si año actual es 2026)
+ */
+export function edadAFechaFicticia(edad: number): string {
+  const añoActual = new Date().getFullYear()
+  const añoNacimiento = añoActual - edad
+  return `${añoNacimiento}-01-01`
+}

@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useProfile } from '@/hooks/useProfile'
 import { validarEmail, validarTelefono, formatearTelefono } from '@/lib/validaciones'
 import { secureStorage } from '@/lib/secureStorage'
-import { toTitleCase, fechaHoyISO, FECHA_MIN_NACIMIENTO } from '@/lib/patientUtils'
+import { toTitleCase, fechaHoyISO, FECHA_MIN_NACIMIENTO, edadAFechaFicticia } from '@/lib/patientUtils'
 import type { DuplicatePatientResponse } from '@/types'
 
 type Medico = {
@@ -26,6 +26,7 @@ export default function NuevoPacientePage() {
   const router = useRouter()
   const { profile } = useProfile()
   const [form, setForm] = useState<Record<string, string>>({})
+  const [edad, setEdad] = useState('')
   const [medicoSeleccionado, setMedicoSeleccionado] = useState('')
   const [medicos, setMedicos] = useState<Medico[]>([])
   const [loading, setLoading] = useState(false)
@@ -108,10 +109,22 @@ export default function NuevoPacientePage() {
     const tallaCm = parseTallaCm(form.talla_cm || '')
     const imc = calcularIMC()
 
+    // Resolver fecha_nacimiento priorizando fecha explícita sobre edad
+    let fecha_nacimiento: string | null = null
+    if (form.fecha_nacimiento) {
+      fecha_nacimiento = form.fecha_nacimiento
+    } else if (edad.trim()) {
+      const edadNum = parseInt(edad, 10)
+      if (!isNaN(edadNum) && edadNum >= 0 && edadNum <= 120) {
+        fecha_nacimiento = edadAFechaFicticia(edadNum)
+      }
+    }
+
     const payload = {
       ...form,
       nombre: toTitleCase(form.nombre ?? ''),
       apellidos: toTitleCase(form.apellidos ?? ''),
+      fecha_nacimiento,
       peso_kg: form.peso_kg ? Math.round(parseFloat(form.peso_kg) * 10) / 10 : null,
       talla_cm: tallaCm,
       imc: imc ? parseFloat(imc) : null,
@@ -225,12 +238,24 @@ export default function NuevoPacientePage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className={labelCls}>Fecha de nacimiento</label>
               <input type="date" value={form.fecha_nacimiento || ''} onChange={e => set('fecha_nacimiento', e.target.value)}
                 min={FECHA_MIN_NACIMIENTO} max={fechaHoyISO()} className={inputCls} />
-              <p className="text-xs text-slate-500 mt-1.5">Recomendable para que la edad aparezca en recetas y documentos. Si se deja vacío, el campo edad quedará en blanco.</p>
+            </div>
+            <div>
+              <label className={labelCls}>Edad (opcional)</label>
+              <input
+                type="number"
+                min={0}
+                max={120}
+                value={edad}
+                onChange={e => setEdad(e.target.value)}
+                placeholder="Ej. 35"
+                className={inputCls}
+              />
+              <p className="text-xs text-slate-500 mt-1.5">Si no conoces la fecha exacta, ingresa solo la edad</p>
             </div>
             <div>
               <label className={labelCls}>Sexo <span className="text-red-400">*</span></label>

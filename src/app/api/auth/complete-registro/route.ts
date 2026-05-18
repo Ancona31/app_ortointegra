@@ -33,7 +33,8 @@ export async function POST(_req: NextRequest) {
 
   const { error } = await admin.from('profiles').insert({
     id: user.id,
-    role: 'admin',
+    role: 'medico',
+    es_admin_de_clinica: true,
     nombre: nombre ?? null,
     clinica_id,
     titulo: titulo ?? 'Dr.',

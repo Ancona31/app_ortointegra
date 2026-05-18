@@ -121,6 +121,14 @@ export async function POST(req: NextRequest) {
     const numero_expediente = `${prefix}${String(nextNum).padStart(4, '0')}`
 
     // ── Determinar medico_id ──────────────────────────────────────
+    // Validación: secretaria DEBE asignar medico_id explícitamente (invariante post-refactor)
+    // El frontend muestra dropdown obligatorio; el backend es defensa en profundidad.
+    if (profile.role === 'secretaria' && !body.medico_id) {
+      return NextResponse.json(
+        { error: 'Las secretarias deben asignar un médico al paciente' },
+        { status: 400 }
+      )
+    }
     const medico_id = body.medico_id
       || (['medico', 'admin', 'super_admin'].includes(profile.role) ? profile.id : null)
 

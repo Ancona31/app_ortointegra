@@ -1,13 +1,18 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { User, X, Loader2 } from 'lucide-react'
 import Portal from '@/components/ui/Portal'
-import { toTitleCase, calcularEdad, fechaHoyISO, FECHA_MIN_NACIMIENTO } from '@/lib/patientUtils'
+import { useProfile } from '@/hooks/useProfile'
+import { secureStorage } from '@/lib/secureStorage'
+import { toTitleCase, calcularEdad, fechaHoyISO, FECHA_MIN_NACIMIENTO, edadAFechaFicticia } from '@/lib/patientUtils'
 import type { DuplicatePatientResponse } from '@/types'
 
 type PacienteBusqueda = { id: string; nombre: string; apellidos: string; telefono: string | null }
+type Medico = { id: string; nombre: string; titulo: string | null; especialidad: string | null }
+
+const MEDICOS_CACHE_KEY = 'cache_medicos_clinica'
 
 export default function QuickPatientModal({
   nombreInicial,
@@ -19,18 +24,52 @@ export default function QuickPatientModal({
   onClose: () => void
 }) {
   const router = useRouter()
+  const { profile } = useProfile()
+  const isSecretaria = profile?.role === 'secretaria'
   const partes = nombreInicial.trim().split(' ')
   const [nombre,    setNombre]    = useState(partes[0] ?? '')
   const [apellidos, setApellidos] = useState(partes.slice(1).join(' '))
   const [fechaNac,  setFechaNac]  = useState('')
+  const [edad,      setEdad]      = useState('')
   const [email,     setEmail]     = useState('')
   const [saving,    setSaving]    = useState(false)
   const [error,     setError]     = useState('')
   const [consentimiento, setConsentimiento] = useState(false)
   const [duplicateWarning, setDuplicateWarning] = useState<{ id: string; nombre: string; apellidos: string; numero_expediente: string | null } | null>(null)
+  const [medicoSeleccionado, setMedicoSeleccionado] = useState('')
+  const [medicos, setMedicos] = useState<Medico[]>([])
   const forceCreateRef = useRef(false)
 
   const edadInfo = fechaNac ? calcularEdad(fechaNac) : null
+
+  // Cargar lista de médicos (secretaria) — red primero, cache como fallback
+  useEffect(() => {
+    if (!isSecretaria) return
+
+    let cancelled = false
+
+    async function cargarMedicos() {
+      try {
+        const r = await fetch('/api/clinica/medicos')
+        if (!r.ok) throw new Error('fetch failed')
+        const { medicos: lista } = await r.json() as { medicos: Medico[] }
+        if (cancelled) return
+        const rows = lista || []
+        setMedicos(rows)
+        secureStorage.set(MEDICOS_CACHE_KEY, rows).catch(() => {})
+      } catch {
+        try {
+          const cached = await secureStorage.get<Medico[]>(MEDICOS_CACHE_KEY)
+          if (!cancelled && Array.isArray(cached)) setMedicos(cached)
+        } catch {
+          // silencioso
+        }
+      }
+    }
+
+    cargarMedicos()
+    return () => { cancelled = true }
+  }, [isSecretaria])
 
   async function handleCreate() {
     if (!nombre.trim() || !apellidos.trim()) {
@@ -41,11 +80,26 @@ export default function QuickPatientModal({
       setError('Debes marcar el consentimiento del aviso de privacidad.')
       return
     }
+    if (isSecretaria && !medicoSeleccionado) {
+      setError('Debes seleccionar un médico para asignar el paciente')
+      return
+    }
     setSaving(true)
     setError('')
 
     const nombreLimpio = toTitleCase(nombre)
     const apellidosLimpio = toTitleCase(apellidos)
+
+    // Resolver fecha_nacimiento priorizando fecha explícita sobre edad
+    let fecha_nacimiento: string | null = null
+    if (fechaNac) {
+      fecha_nacimiento = fechaNac
+    } else if (edad.trim()) {
+      const edadNum = parseInt(edad, 10)
+      if (!isNaN(edadNum) && edadNum >= 0 && edadNum <= 120) {
+        fecha_nacimiento = edadAFechaFicticia(edadNum)
+      }
+    }
 
     try {
       const res = await fetch('/api/pacientes', {
@@ -54,9 +108,10 @@ export default function QuickPatientModal({
         body:    JSON.stringify({
           nombre: nombreLimpio,
           apellidos: apellidosLimpio,
-          fecha_nacimiento: fechaNac || null,
+          fecha_nacimiento,
           email: email.trim() || null,
           consentimiento_otorgado: true,
+          ...(isSecretaria ? { medico_id: medicoSeleccionado } : {}),
           ...(forceCreateRef.current ? { forceCreate: true } : {}),
         }),
       })
@@ -129,6 +184,32 @@ export default function QuickPatientModal({
             </div>
           )}
 
+          {isSecretaria && (
+            <div>
+              <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">
+                Médico responsable <span className="text-red-400">*</span>
+              </label>
+              <select
+                value={medicoSeleccionado}
+                onChange={e => setMedicoSeleccionado(e.target.value)}
+                required
+                className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
+              >
+                <option value="">Seleccionar médico...</option>
+                {medicos.map(m => (
+                  <option key={m.id} value={m.id}>
+                    {m.titulo ?? 'Dr.'} {m.nombre}{m.especialidad ? ` — ${m.especialidad}` : ''}
+                  </option>
+                ))}
+              </select>
+              {medicos.length === 0 && (
+                <p className="text-[11px] text-amber-600 mt-2">
+                  No hay médicos disponibles. Si estás sin conexión, conéctate al menos una vez para sincronizar la lista.
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">Nombre</label>
@@ -158,14 +239,29 @@ export default function QuickPatientModal({
               {edadInfo && (
                 <p className="text-[11px] text-emerald-600 mt-1 font-medium">{edadInfo.textoElegante}</p>
               )}
-              <p className="text-[11px] text-slate-500 mt-1.5 leading-snug">Recomendable para que la edad aparezca en recetas y documentos. Si se deja vacío, el campo edad quedará en blanco.</p>
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">Correo</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                placeholder="opcional"
-                className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all" />
+              <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">
+                Edad (opcional)
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={120}
+                value={edad}
+                onChange={e => setEdad(e.target.value)}
+                placeholder="Ej. 35"
+                className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
+              />
+              <p className="text-[11px] text-slate-500 mt-1 leading-snug">Si no conoces la fecha exacta, ingresa solo la edad</p>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">Correo</label>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+              placeholder="opcional"
+              className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all" />
           </div>
 
           <p className="text-[11px] text-[#86868b]">El expediente completo se puede editar después desde Pacientes.</p>

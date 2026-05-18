@@ -399,15 +399,17 @@ function QuickPatientModal({
 /* ─── Modal de cita ─────────────────────────────────────── */
 
 function AppointmentModal({
-  modal, onClose, onSave, onDelete, medicos, isSingleDoctor, defaultMedicoId,
+  modal, onClose, onSave, onDelete, medicos, defaultMedicoId,
+  hideMedicoDropdown, medicoDropdownRequired,
 }: {
   modal: ModalState
   onClose: () => void
   onSave: (data: Partial<Appointment> & { id?: string }) => Promise<void>
   onDelete: (id: string) => Promise<void>
   medicos: Medico[]
-  isSingleDoctor: boolean
   defaultMedicoId: string
+  hideMedicoDropdown: boolean
+  medicoDropdownRequired: boolean
 }) {
   const isEdit = modal.mode === 'edit'
   const apt    = modal.mode === 'edit' ? modal.appointment : null
@@ -433,11 +435,24 @@ function AppointmentModal({
   const [saving,      setSaving]      = useState(false)
   const [deleting,    setDeleting]    = useState(false)
 
+  // Sincronizar default cuando profile carga después del mount inicial.
+  // Solo aplica para creación de cita (no para edición de cita existente).
+  useEffect(() => {
+    if (!apt && defaultMedicoId && !medicoId) {
+      setMedicoId(defaultMedicoId)
+    }
+  }, [defaultMedicoId, apt, medicoId])
+
   const { results, loading: searchLoading } = usePacientes(search)
   const showDropdown = showSearch && search.trim().length >= 2
 
   async function handleSave() {
     if (!paciente || !startTime) return
+
+    // Defensa en profundidad: secretaria debe seleccionar médico
+    // (el `required` HTML5 ya bloquea el submit, pero validamos aquí también)
+    if (medicoDropdownRequired && !medicoId) return
+
     setSaving(true)
     const start_time = fromDatetimeLocal(startTime)
     await onSave({
@@ -612,16 +627,19 @@ function AppointmentModal({
             </div>
           )}
 
-          {/* Médico (solo modo multi-doctor) */}
-          {!isSingleDoctor && (
+          {/* Médico — ocultado para médicos sin admin y para clínicas single-doctor */}
+          {!hideMedicoDropdown && (
             <div>
-              <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">Médico</label>
+              <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">
+                Médico {medicoDropdownRequired && <span className="text-red-400">*</span>}
+              </label>
               <select
                 value={medicoId}
                 onChange={e => setMedicoId(e.target.value)}
+                required={medicoDropdownRequired}
                 className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all bg-white"
               >
-                <option value="">Sin asignar</option>
+                {!medicoDropdownRequired && <option value="">Sin asignar</option>}
                 {medicos.map(m => (
                   <option key={m.id} value={m.id}>{m.titulo ? `${m.titulo} ` : ''}{m.nombre}</option>
                 ))}
@@ -793,9 +811,20 @@ export default function AgendaPage() {
   const toast = useToast()
   const { state: subState, openBloqueoModal } = useSubscriptionGate()
 
+  const isMedicoSinAdmin = profile?.role === 'medico' && !profile?.es_admin_de_clinica
+  const isMedicoConAdmin = profile?.role === 'medico' && profile?.es_admin_de_clinica === true
+  const isSecretaria = profile?.role === 'secretaria'
+
   const canEditHorario  = ['medico', 'admin', 'super_admin'].includes(profile?.role ?? '')
   const isSingleDoctor  = medicos.length <= 1
-  const defaultMedicoId = isSingleDoctor ? (medicos[0]?.id ?? '') : ''
+  const defaultMedicoId = useMemo(() => {
+    // Médico (admin o no): default es él mismo
+    if (profile?.role === 'medico' && profile?.id) return profile.id
+    // Clínica single-doctor: el único médico
+    if (isSingleDoctor && medicos[0]?.id) return medicos[0].id
+    // Secretaria u otros: sin default (obligar elección)
+    return ''
+  }, [profile, isSingleDoctor, medicos])
 
   // Map medico_id → color index (stable order from API)
   const medicoColorMap = useMemo(() => {
@@ -1283,8 +1312,9 @@ export default function AgendaPage() {
           onSave={handleSave}
           onDelete={handleDelete}
           medicos={medicos}
-          isSingleDoctor={isSingleDoctor}
           defaultMedicoId={defaultMedicoId}
+          hideMedicoDropdown={isSingleDoctor || isMedicoSinAdmin}
+          medicoDropdownRequired={isSecretaria || isMedicoConAdmin}
         />
       )}
 

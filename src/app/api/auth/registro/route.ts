@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
       nombre:             nombreClinica,
       tipo,
       plan:               'free',
-      suscripcion_estado: 'activo',
+      suscripcion_estado: 'free',
       max_medicos:        limits.max_medicos,
       max_secretarias:    limits.max_secretarias,
       max_pacientes:      limits.max_pacientes,
@@ -80,20 +80,21 @@ export async function POST(req: NextRequest) {
   }
 
   // 3. Crear perfil
-  // Todos los dueños de cuenta son admin — independientes y clínicas
-  // En clínicas: admin no ocupa slot de médico, gestiona el equipo
-  // En independiente: admin ES el médico (billing lo cuenta como 1 médico)
-  const role = 'admin'
+  // Todos los dueños de cuenta son medico + es_admin_de_clinica=true
+  // Post-refactor: el rol 'admin' fue eliminado. El médico-dueño se distingue
+  // por el flag es_admin_de_clinica que le da privilegios sobre la clínica.
+  const role = 'medico'
 
   await admin.from('profiles').upsert({
-    id:                  newUser.user.id,
+    id:                   newUser.user.id,
     role,
+    es_admin_de_clinica:  true,
     nombre,
-    clinica_id:          clinica.id,
+    clinica_id:           clinica.id,
     titulo,
     especialidad,
-    cedula_profesional:  cedula_profesional  || null,
-    cedula_especialidad: cedula_especialidad || null,
+    cedula_profesional:   cedula_profesional  || null,
+    cedula_especialidad:  cedula_especialidad || null,
   })
 
   // 4. Generar link de confirmación y enviar via Resend (Supabase no envía nada)

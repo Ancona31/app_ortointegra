@@ -2,11 +2,11 @@
 
 > **Documento de referencia funcional del sistema de roles de Spinus después del refactor.**
 >
-> Integra todas las decisiones D1-D10, los hallazgos del scouting (83 entradas de bitácora), la corrección del modelo del super_admin como rol puramente administrativo de plataforma, y la clarificación del modelo de tipos de cuenta (independiente vs clinica) con sus invariantes asociados.
+> Integra todas las decisiones D1-D10, los hallazgos del scouting (83 entradas de bitácora), la corrección del modelo del super_admin como rol puramente administrativo de plataforma, la clarificación del modelo de tipos de cuenta (independiente vs clinica) con sus invariantes asociados, y el modelo de acceso completo del admin de clínica (analogía hospital, responsabilidad legal NOM-004/COFEPRIS/LFPDPPP).
 >
 > **Propósito:** servir como referencia única del comportamiento esperado del sistema. Cada cambio en el refactor debe alinearse con este modelo.
 >
-> **Última actualización:** durante Etapa 2 del refactor, clarificación del modelo de tipos de cuenta.
+> **Última actualización:** cierre de Etapa 3 del refactor, modelo de acceso completo del admin + privacidad bidireccional entre médicos invitados (esta última pendiente de implementación en Etapa 5).
 
 ---
 
@@ -55,7 +55,7 @@ profiles.es_admin_de_clinica → boolean (solo aplicable cuando role=medico)
 |---|---|---|---|
 | `super_admin` | Solo Angel (1 cuenta) | NO pertenece a clínica | Plataforma Spinus (administrativo, sin acceso a app médica) |
 | `medico` | Médico operativo | Pertenece a 1 clínica | Solo SUS pacientes + datos clínicos propios |
-| `medico + es_admin_de_clinica` | Médico que administra | Pertenece a 1 clínica | Sus pacientes + privilegios admin sobre clínica |
+| `medico + es_admin_de_clinica` | Médico que administra | Pertenece a 1 clínica | TODOS los pacientes de su clínica + acceso completo a expedientes + privilegios admin (responsabilidad legal NOM-004) |
 | `secretaria` | Personal administrativo | Pertenece a 1 clínica | TODOS los pacientes de su clínica (sin datos clínicos sensibles) |
 
 ### 1.5 Cardinalidad esperada
@@ -119,13 +119,13 @@ Ver **Sección 8: Invariantes 17 y 18** para enforcement formal.
 
 | Acción | super_admin | medico | medico+admin_clinica | secretaria |
 |---|---|---|---|---|
-| Ver pacientes de la clínica (lista admin) | 🔧 datos no sensibles | ❌ otros médicos | ❌ otros médicos | ✅ todos |
-| Ver propios pacientes | N/A | ✅ | ✅ | N/A |
+| Ver pacientes de la clínica (lista admin) | 🔧 datos no sensibles | ❌ otros médicos | ✅ todos (responsabilidad legal) | ✅ todos |
+| Ver propios pacientes | N/A | ✅ | ✅ (los suyos + los de otros) | N/A |
 | Ver pacientes inactivos | 🔧 lista admin | ❌ | ✅ todos clínica | ❌ |
-| Crear paciente | ❌ | ✅ asignado a sí mismo ⛔ | ✅ asignado a sí mismo ⛔ | ✅ con dropdown obligatorio ⛔ |
-| Modificar datos administrativos | ❌ | ✅ propios ⛔ | ✅ propios ⛔ | ✅ todos clínica ⛔ |
-| Modificar datos clínicos | ❌ | ✅ propios ⛔ | ✅ propios ⛔ | 🚫 bloqueado por trigger |
-| Eliminar paciente (soft delete) | ❌ excepto LFPDPPP | ✅ propios ⛔ | ✅ propios ⛔ | ❌ |
+| Crear paciente | ❌ | ✅ asignado a sí mismo ⛔ | ✅ asignado a sí mismo o a otro médico ⛔ | ✅ con dropdown obligatorio ⛔ |
+| Modificar datos administrativos | ❌ | ✅ propios ⛔ | ✅ todos clínica ⛔ | ✅ todos clínica ⛔ |
+| Modificar datos clínicos | ❌ | ✅ propios ⛔ | ✅ todos clínica ⛔ | 🚫 bloqueado por trigger |
+| Eliminar paciente (soft delete) | ❌ excepto LFPDPPP | ✅ propios ⛔ | ✅ todos clínica ⛔ | ❌ |
 | Hard DELETE paciente | ⚠️ solo emergencias formales | ❌ | ❌ | ❌ |
 | Restaurar paciente (activo=true) | ❌ excepto LFPDPPP | ✅ propios ⛔ | ✅ todos clínica ⛔ | ❌ |
 | Rectificar datos (LFPDPPP) | 🔧 vía solicitud ARCO formal | ❌ | ❌ | ❌ |
@@ -135,30 +135,35 @@ Ver **Sección 8: Invariantes 17 y 18** para enforcement formal.
 - "Datos administrativos" = nombre, apellidos, teléfono, email, dirección, fecha_nacimiento, sexo, número_expediente
 - "Datos clínicos" = peso_kg, talla_cm, imc, ant_patologicos, ant_quirurgicos, ant_familiares, alergias, medicamentos_actuales
 - Trigger `BEFORE UPDATE` bloquea modificación de campos clínicos por secretarias
+- Admin de clínica accede a todos los pacientes por responsabilidad legal (NOM-004-SSA3-2012, COFEPRIS, LFPDPPP). Ver Sección 4.6 para justificación normativa completa.
 
 ### 2.3 Consultas (tabla `consultas`)
 
 | Acción | super_admin | medico | medico+admin_clinica | secretaria |
 |---|---|---|---|---|
-| Ver/leer consultas | ❌ | ✅ de sus pacientes | ✅ de sus pacientes | ❌ |
-| Crear consulta | ❌ | ✅ de sus pacientes ⛔ | ✅ de sus pacientes ⛔ | ❌ |
-| Modificar consulta | ❌ | ✅ de sus pacientes ⛔ | ✅ de sus pacientes ⛔ | ❌ |
-| Eliminar consulta | ❌ | ✅ de sus pacientes ⛔ | ✅ de sus pacientes ⛔ | ❌ |
+| Ver/leer consultas | ❌ | ✅ de sus pacientes (las suyas) | ✅ todas clínica (cualquier médico) | ❌ |
+| Crear consulta | ❌ | ✅ de sus pacientes ⛔ | ✅ todas clínica ⛔ | ❌ |
+| Modificar consulta | ❌ | ✅ de sus pacientes ⛔ | ✅ todas clínica ⛔ | ❌ |
+| Eliminar consulta | ❌ | ✅ de sus pacientes ⛔ | ✅ todas clínica ⛔ | ❌ |
 | Ver conteos agregados | 🔧 dashboard | ❌ | ❌ | ❌ |
 
 **Decisión Q3:** secretaria sin acceso TOTAL a consultas (ni lectura).
+
+**⚠️ Privacidad bidireccional entre médicos invitados:** un médico (sin admin) NO ve consultas creadas por OTRO médico de la misma clínica, aunque el paciente sea el mismo. Solo el creador y el admin tienen acceso. Implementación en Etapa 5 (RLS).
 
 ### 2.4 Documentos (tabla `documentos`)
 
 | Acción | super_admin | medico | medico+admin_clinica | secretaria |
 |---|---|---|---|---|
-| Ver documentos (todos los tipos) | ❌ | ✅ de sus pacientes | ✅ de sus pacientes | ❌ |
-| Crear documento | ❌ | ✅ de sus pacientes ⛔ | ✅ de sus pacientes ⛔ | ❌ |
-| Modificar documento | ❌ | ✅ de sus pacientes ⛔ | ✅ de sus pacientes ⛔ | ❌ |
-| Eliminar documento | ❌ | ✅ de sus pacientes ⛔ | ✅ de sus pacientes ⛔ | ❌ |
+| Ver documentos (todos los tipos) | ❌ | ✅ de sus pacientes (los suyos) | ✅ todas clínica (cualquier médico) | ❌ |
+| Crear documento | ❌ | ✅ de sus pacientes ⛔ | ✅ todas clínica ⛔ | ❌ |
+| Modificar documento | ❌ | ✅ de sus pacientes ⛔ | ✅ todas clínica ⛔ | ❌ |
+| Eliminar documento | ❌ | ✅ de sus pacientes ⛔ | ✅ todas clínica ⛔ | ❌ |
 | Ver conteos agregados | 🔧 dashboard | ❌ | ❌ | ❌ |
 
 **Decisión Q3:** secretaria sin acceso a documentos, INCLUYENDO notas de honorarios. Privacidad clínica máxima.
+
+**⚠️ Privacidad bidireccional entre médicos invitados:** un médico (sin admin) NO ve documentos creados por OTRO médico de la misma clínica. Incluye fotos clínicas, recetas, notas. Solo el creador y el admin tienen acceso. Implementación en Etapa 5 (RLS).
 
 ### 2.5 Citas / Agenda (tabla `appointments`)
 
@@ -166,26 +171,30 @@ Ver **Sección 8: Invariantes 17 y 18** para enforcement formal.
 |---|---|---|---|---|
 | Ver citas | ❌ | ✅ propias | ✅ todas clínica | ✅ todas clínica |
 | Crear citas propias | ❌ | ✅ ⛔ | ✅ ⛔ | N/A |
-| Crear citas (de cualquier médico) | ❌ | ❌ | ❌ | ✅ ⛔ |
+| Crear citas (de cualquier médico) | ❌ | ❌ | ✅ ⛔ | ✅ ⛔ |
 | Modificar citas propias | ❌ | ✅ ⛔ | ✅ ⛔ | ✅ todas ⛔ |
-| Modificar citas de otros médicos | ❌ | ❌ | ❌ | ✅ ⛔ |
-| Eliminar citas | ❌ | ✅ propias ⛔ | ✅ propias ⛔ | ✅ todas clínica ⛔ |
-| Ver conteos agregados | 🔧 dashboard | ❌ | ✅ propias | ❌ |
+| Modificar citas de otros médicos | ❌ | ❌ | ✅ ⛔ | ✅ ⛔ |
+| Eliminar citas | ❌ | ✅ propias ⛔ | ✅ todas clínica ⛔ | ✅ todas clínica ⛔ |
+| Ver conteos agregados | 🔧 dashboard | ❌ | ✅ todas clínica | ❌ |
 
-**Nota:** Médico admin de clínica VE todas pero solo MODIFICA las suyas (limitación de propiedad).
+**Nota:** El admin de clínica puede agendar, modificar y cancelar cualquier cita de la clínica (coordinación de agendas como director médico de hospital). El dropdown del modal de Nueva Cita permite seleccionar a cualquier médico de la clínica, con default = self.
 
 ### 2.6 Mediciones de analitos (tabla `mediciones_analitos`)
 
 | Acción | super_admin | medico | medico+admin_clinica | secretaria |
 |---|---|---|---|---|
-| Ver mediciones | ❌ | ✅ de sus pacientes | ✅ de sus pacientes | ❌ |
-| Crear/modificar/eliminar | ❌ | ✅ de sus pacientes ⛔ | ✅ de sus pacientes ⛔ | ❌ |
+| Ver mediciones | ❌ | ✅ de sus pacientes (las suyas) | ✅ todas clínica | ❌ |
+| Crear/modificar/eliminar | ❌ | ✅ de sus pacientes ⛔ | ✅ todas clínica ⛔ | ❌ |
+
+**⚠️ Privacidad bidireccional:** un médico (sin admin) solo ve las mediciones que ÉL registró. Las mediciones registradas por OTROS médicos del mismo paciente son privadas.
 
 ### 2.7 Calculadora resultados (tabla `calculadora_resultados`)
 
 | Acción | super_admin | medico | medico+admin_clinica | secretaria |
 |---|---|---|---|---|
-| Ver / crear / modificar / eliminar | ❌ | ✅ de sus pacientes ⛔ | ✅ de sus pacientes ⛔ | ❌ |
+| Ver / crear / modificar / eliminar | ❌ | ✅ de sus pacientes (los suyos) ⛔ | ✅ todas clínica ⛔ | ❌ |
+
+**⚠️ Privacidad bidireccional:** un médico (sin admin) solo ve los resultados de calculadora que ÉL generó. Los resultados de otros médicos del mismo paciente son privados.
 
 ### 2.8 Profiles (la propia tabla)
 
@@ -380,6 +389,17 @@ El super_admin SOLO puede acceder a datos sensibles vía:
 - 🔓 **Operaciones de borrado/anonimización** (con audit log)
 - 🔓 **Funciones SECURITY DEFINER específicas** (no RLS general)
 
+### 3.6 Nota sobre el estado transitorio del refactor
+
+Durante Etapa 3 se aplicó un sub-paso bonus (`1.bis`) que corrige un blindspot del scouting original: se marcaron con `es_admin_de_clinica=true` los 9 profiles productivos que tenían `role='admin'` (un admin por clínica). Esto prepara el terreno para Etapa 4, que migrará `role='admin'` → `'medico'` y eliminará el rol legacy del CHECK constraint.
+
+Estado transitorio aceptable: los profiles tendrán simultáneamente `role='admin'` Y `es_admin_de_clinica=true` hasta Etapa 4. Este estado NO rompe nada porque:
+- El CHECK constraint sigue aceptando `role='admin'`
+- Las RLS actuales NO usan `es_admin_de_clinica` todavía (se usará en Etapa 5)
+- El código TS nuevo de Etapa 3 valida ambas condiciones combinadas correctamente
+
+Ver migración `20260518132155_etapa1bis_backfill_es_admin_de_clinica.sql` para detalles.
+
 ---
 
 ## 4. Estados de clínica y bloqueos
@@ -480,6 +500,40 @@ CREATE POLICY pacientes_insert ON pacientes
   );
 -- super_admin NO aparece aquí porque no debe crear pacientes vía app médica
 ```
+
+### 4.6 Justificación normativa del modelo de acceso del admin
+
+El médico con `es_admin_de_clinica=true` accede a TODOS los expedientes de su clínica (no solo a los suyos propios) por las siguientes razones regulatorias mexicanas:
+
+**Marco legal aplicable:**
+
+1. **NOM-004-SSA3-2012** (expediente clínico): la responsabilidad del expediente clínico recae sobre la institución sanitaria, no únicamente sobre el médico tratante. El admin de la clínica como representante legal debe poder garantizar la integridad y disponibilidad del expediente para auditorías.
+
+2. **COFEPRIS:** las auditorías regulatorias se dirigen a la institución (clínica/consultorio registrado), no al médico individual. El admin debe poder responder solicitudes formales presentando expedientes completos.
+
+3. **LFPDPPP** (Ley Federal de Protección de Datos Personales): el "responsable" del tratamiento de datos personales sensibles es la persona física o moral que decide sobre el tratamiento. En una clínica, esto es el admin/propietario, no cada médico individual.
+
+**Modelo análogo (hospital):**
+
+El admin de la clínica es equivalente al director médico de un hospital. Aunque el paciente tiene un médico tratante con responsabilidad clínica directa, el director médico mantiene acceso al expediente para:
+- Auditorías internas
+- Solicitudes formales (legales, regulatorias)
+- Garantía de cumplimiento de protocolos institucionales
+- Continuidad de cuidado en caso de ausencia del médico tratante
+
+**Privacidad entre médicos invitados (modelo pendiente Etapa 5):**
+
+A pesar de la visibilidad del admin, se mantiene **privacidad horizontal bidireccional** entre médicos invitados:
+- Dr. A NO ve consultas, documentos, mediciones ni calculadora de Dr. B
+- Dr. B NO ve consultas, documentos, mediciones ni calculadora de Dr. A
+- Ambos sí ven los datos del paciente (nombre, edad, alergias, antecedentes) si lo atienden
+- Solo el admin (responsable legal) ve TODO sin restricción
+
+Esta privacidad es crítica porque las fotos clínicas, notas y documentos generados por un médico son contenido sensible vinculado a su práctica profesional individual.
+
+**Secretaria:**
+
+La secretaria también ve TODOS los pacientes de la clínica (datos administrativos completos), pero NO accede a datos clínicos sensibles ni a consultas/documentos. Su rol es operativo (agenda, registro de pacientes), no clínico ni de auditoría.
 
 ---
 
@@ -589,13 +643,19 @@ CREATE POLICY pacientes_insert ON pacientes
 6. INSERT con medico_id = body.medico_id
 ```
 
-#### Flujo C: Quick modals (bloqueados para secretaria)
+#### Flujo C: Quick modals (adaptados según rol)
 
 ```
-QuickPatientModal y ConsultaRapidaModal:
-- Si profile.role === 'secretaria': mostrar mensaje "Usa el formulario completo"
-- Si profile.role === 'medico' o 'super_admin': funcionar normal
+QuickPatientModal:
+- Si profile.role === 'secretaria': mostrar dropdown OBLIGATORIO de médicos
+  de la clínica (sin opción "Sin asignar"). Validación HTML5 required +
+  validación JS pre-submit + backend (Fix 3) como triple defensa.
+- Si profile.role === 'medico' (con o sin admin): funcionar normal sin
+  dropdown, paciente se asigna automáticamente a sí mismo.
+- super_admin: NO usa este modal (no opera en app médica, ver Sección 3).
 ```
+
+**Implementado en Etapa 3 (Fix 5).** El modelo previo de "bloquear para secretaria" fue reemplazado por este modelo de "adaptar con dropdown" porque el flujo de la secretaria al agendar cita con paciente no registrado es operativamente legítimo.
 
 ### 5.5 Soft delete de paciente
 
@@ -774,14 +834,18 @@ REQUIERE al menos 1 secretaria (invariante 17)
 │
 ├─ MÉDICO ADMIN (rol=medico, es_admin_de_clinica=true)
 │  │
-│  ├─ Sus pacientes (privacidad médica)
-│  ├─ Ve TODAS las citas de la clínica
+│  ├─ TODOS los pacientes de la clínica (responsabilidad legal NOM-004)
+│  ├─ Acceso completo a consultas, documentos, mediciones y calculadora
+│  │  de CUALQUIER médico de la clínica
+│  ├─ Gestiona TODAS las citas (agendar, modificar, cancelar para cualquier médico)
 │  ├─ Privilegios admin: branding, Stripe, invitar, métricas
-│  └─ PERO: solo modifica SUS citas
+│  └─ Hard delete y LFPDPPP siguen siendo solo super_admin
 │
 ├─ MÉDICO INVITADO (rol=medico, es_admin_de_clinica=false)
 │  │
-│  ├─ Sus pacientes (privacidad médica)
+│  ├─ Solo SUS pacientes (los que ÉL atiende)
+│  ├─ Solo SUS consultas, documentos, mediciones y calculadora
+│  ├─ NO ve datos clínicos generados por otros médicos (privacidad bidireccional)
 │  ├─ Solo SUS citas
 │  └─ Sin capacidades admin
 │
@@ -832,6 +896,9 @@ Verdades que SIEMPRE deben cumplirse:
 20. Mapeo plan → tipo (referencia Sección 1.6):
     - `free`, `individual` → tipo='independiente' (1 médico, 0 secretarias)
     - `basica`, `pro`, `premium` → tipo='clinica' (multi-usuario con secretaria obligatoria)
+21. **Acceso completo del admin de clínica:** Médico con `es_admin_de_clinica=true` tiene acceso CRUD (lectura, creación, modificación, eliminación soft) a todos los pacientes, consultas, documentos, mediciones, calculadora y citas de su clínica. Justificación legal: NOM-004-SSA3-2012, COFEPRIS, LFPDPPP. Hard delete y operaciones ARCO siguen siendo exclusivas de super_admin.
+22. **Privacidad bidireccional entre médicos invitados (pendiente Etapa 5):** un médico con `es_admin_de_clinica=false` solo ve los datos clínicos que ÉL creó (consultas, documentos, fotos, mediciones, calculadora). NO ve los datos generados por otros médicos de la misma clínica, aunque el paciente sea común. La reciprocidad es estricta: A no ve los de B, B no ve los de A.
+23. **Datos del paciente vs datos generados:** los datos inherentes al paciente (nombre, edad, sexo, antecedentes, alergias, medicamentos actuales) son visibles a cualquier médico que lo atienda en la clínica. Los datos GENERADOS por médicos (consultas, documentos, etc.) están sujetos al invariante 22.
 
 ---
 
@@ -849,10 +916,13 @@ Antes de declarar el refactor completo, validar:
 
 ### Caso 2: Médico admin en clínica multi-usuario (OrtoIntegra)
 - ✅ Login normal
-- ✅ Sus pacientes (no los de otros médicos)
+- ✅ Ve TODOS los pacientes de la clínica (responsabilidad legal)
+- ✅ Acceso completo a consultas, documentos, mediciones y calculadora de cualquier médico
 - ✅ Ve agenda de toda la clínica
-- ✅ Modifica solo sus citas
+- ✅ Modifica y cancela cualquier cita (no solo las suyas)
+- ✅ Agenda citas para cualquier médico
 - ✅ Invita médico/secretaria (si VIP)
+- ❌ Hard delete y operaciones ARCO siguen siendo solo super_admin
 
 ### Caso 3: Médico invitado (Dr. Prueba en OrtoIntegra)
 - ✅ Login normal
@@ -915,6 +985,8 @@ Antes de declarar el refactor completo, validar:
 
 ## Apéndice: glosario de funciones SECURITY DEFINER
 
+### Funciones ya existentes
+
 | Función | Propósito | Devuelve |
 |---|---|---|
 | `get_clinica_id()` | Obtener `clinica_id` del usuario actual | uuid |
@@ -923,9 +995,20 @@ Antes de declarar el refactor completo, validar:
 | `clinica_no_suspendida()` | Verificar si la clínica NO está suspendida | boolean |
 | `clinica_tiene_acceso()` | Verificar Phase 8.1 v2 (no cancelada con historia premium sin VIP) | boolean |
 
-**Notas sobre invariantes nuevos (17-20):**
+### Funciones pendientes a crear en Etapa 5
 
-Los invariantes de tipo de cuenta (Sección 8, invariantes 17-19) se enforcearán principalmente vía **validación en aplicación TypeScript** (endpoints de invitación + system override). Opcionalmente puede agregarse un trigger BD para defensa en profundidad. Decisión final en Etapa 4/5.
+Para implementar el modelo "admin acceso completo + privacidad bidireccional entre médicos invitados", las RLS de Etapa 5 necesitarán helpers SECURITY DEFINER adicionales. Sin estos helpers, cada policy duplicaría queries similares contra `profiles`, generando RLS difíciles de leer y costosas en performance.
+
+| Función | Propósito | Devuelve |
+|---|---|---|
+| `soy_admin_de_clinica()` | Verificar si el usuario actual tiene `es_admin_de_clinica = true`. Centraliza la lógica que de otro modo se duplicaría en ~20-30 policies. | boolean |
+| `paciente_pertenece_a_mi_clinica(paciente_id uuid)` | Verificar si un paciente pertenece a la clínica del usuario actual. Útil para policies de consultas, documentos y mediciones que validan permiso vía el paciente referenciado. | boolean |
+
+**Notas sobre invariantes nuevos (17-23):**
+
+- Invariantes 17-20 (tipo de cuenta, secretaria, system override): enforce vía **validación en aplicación TypeScript** (endpoints de invitación + system override). Opcionalmente trigger BD para defensa en profundidad.
+- Invariante 21 (admin acceso completo): enforce vía **RLS en Etapa 5** usando `soy_admin_de_clinica()`.
+- Invariantes 22-23 (privacidad bidireccional entre médicos invitados): enforce vía **RLS en Etapa 5** combinando `medico_id = auth.uid()` con la función helper de admin para casos especiales.
 
 ---
 
