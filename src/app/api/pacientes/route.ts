@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { isMedico } from '@/lib/permissions'
 import type { DuplicatePatientResponse } from '@/types'
 
 export async function POST(req: NextRequest) {
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest) {
       )
     }
     const medico_id = body.medico_id
-      || (['medico', 'admin', 'super_admin'].includes(profile.role) ? profile.id : null)
+      || (isMedico(profile) ? profile.id : null)
 
     // ── LFPDPPP Art. 9: consentimiento expreso para datos sensibles de salud ──
     if (!body.consentimiento_otorgado) {

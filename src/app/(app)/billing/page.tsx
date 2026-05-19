@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
+import { canManageClinica } from '@/lib/permissions'
 import { PLANS, formatPrecio, type PlanKey } from '@/lib/plans'
 import { CheckCircle, CreditCard, Loader2, ExternalLink, AlertTriangle, Zap, Users, UserCheck, FileText, ArrowUpRight, Sparkles } from 'lucide-react'
 import { BillingSkeleton } from '@/components/ui/Skeleton'
@@ -51,7 +52,7 @@ function BillingContent() {
   const newPlan = searchParams.get('plan') as PlanKey | null
 
   useEffect(() => {
-    if (!loadingProfile && profile && !['admin', 'super_admin'].includes(profile.role)) {
+    if (!loadingProfile && profile && !canManageClinica(profile)) {
       router.push('/dashboard')
     }
   }, [profile, loadingProfile, router])

@@ -3,18 +3,19 @@
 import { useRouter } from 'next/navigation'
 import { AlertCircle } from 'lucide-react'
 import ModalShell from '@/components/ui/ModalShell'
+import { canManageClinica } from '@/lib/permissions'
+import type { Role } from '@/hooks/useProfile'
 
 type Props = {
   isOpen: boolean
   onClose: () => void
   role: string
+  esAdminDeClinica: boolean
 }
 
-const ADMIN_ROLES = ['admin', 'super_admin'] as const
-
-export default function BloqueoFeatureModal({ isOpen, onClose, role }: Props) {
+export default function BloqueoFeatureModal({ isOpen, onClose, role, esAdminDeClinica }: Props) {
   const router = useRouter()
-  const isAdmin = ADMIN_ROLES.includes(role as typeof ADMIN_ROLES[number])
+  const isAdmin = canManageClinica({ role: role as Role, es_admin_de_clinica: esAdminDeClinica })
 
   function handleReactivar() {
     onClose()

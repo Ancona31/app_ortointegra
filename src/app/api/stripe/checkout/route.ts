@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import stripe from '@/lib/stripe'
 import { PLANS, type PlanKey, type BillingInterval } from '@/lib/plans'
+import { canManageClinica } from '@/lib/permissions'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -25,11 +26,11 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient()
   const { data: profile } = await admin
     .from('profiles')
-    .select('clinica_id, role, nombre')
+    .select('clinica_id, role, nombre, es_admin_de_clinica')
     .eq('id', user.id)
     .single()
 
-  if (!profile?.clinica_id || !['admin', 'super_admin'].includes(profile.role)) {
+  if (!profile?.clinica_id || !canManageClinica(profile)) {
     return NextResponse.json({ error: 'Solo el administrador puede gestionar la suscripción' }, { status: 403 })
   }
 

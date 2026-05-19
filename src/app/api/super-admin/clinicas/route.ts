@@ -32,7 +32,7 @@ export async function GET() {
       : clinicaProfiles.filter(p => p.role === 'medico').length
 
     const usuarios = clinicaProfiles
-      .filter(p => ['medico', 'secretaria', 'admin'].includes(p.role))
+      .filter(p => ['medico', 'secretaria'].includes(p.role))
       .map(p => ({
         id:     p.id,
         nombre: p.nombre,

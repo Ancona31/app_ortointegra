@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { canManageClinica } from '@/lib/permissions'
 
 type AuthResult =
   | { user: { id: string }; error: null }
@@ -43,11 +44,11 @@ export async function requireAdmin(): Promise<AuthResult> {
 
   const { data: profile, error } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, es_admin_de_clinica')
     .eq('id', user.id)
     .single()
 
-  if (error || !profile || !['admin', 'super_admin'].includes(profile.role)) {
+  if (error || !profile || !canManageClinica(profile)) {
     return { user: null, error: NextResponse.json({ error: 'Sin permisos' }, { status: 403 }) }
   }
 

@@ -18,6 +18,7 @@ export type SubscriptionState = {
   es_vip_grant: boolean
   count_pacientes: number
   role: string
+  esAdminDeClinica: boolean
   isBlocked: boolean
 }
 
@@ -35,6 +36,7 @@ const FAIL_OPEN: SubscriptionState = {
   es_vip_grant: false,
   count_pacientes: 0,
   role: 'medico',
+  esAdminDeClinica: false,
   isBlocked: false,
 }
 
@@ -66,15 +68,16 @@ export async function getSubscriptionState(
 
     const { data: profile, error: profileErr } = await supabase
       .from('profiles')
-      .select('role, clinica_id')
+      .select('role, clinica_id, es_admin_de_clinica')
       .eq('id', user.id)
       .single()
     if (profileErr || !profile) return FAIL_OPEN
 
     const role = (profile.role as string) ?? 'medico'
+    const esAdminDeClinica = (profile.es_admin_de_clinica as boolean) === true
 
     if (!profile.clinica_id) {
-      return { ...FAIL_OPEN, role }
+      return { ...FAIL_OPEN, role, esAdminDeClinica }
     }
 
     const clinicaId = profile.clinica_id as string
@@ -84,7 +87,7 @@ export async function getSubscriptionState(
       .select('suscripcion_estado, es_vip_grant')
       .eq('id', clinicaId)
       .single()
-    if (clinicaErr || !clinica) return { ...FAIL_OPEN, role }
+    if (clinicaErr || !clinica) return { ...FAIL_OPEN, role, esAdminDeClinica }
 
     const suscripcion_estado = (clinica.suscripcion_estado as string) ?? 'free'
     const es_vip_grant = (clinica.es_vip_grant as boolean) ?? false
@@ -97,6 +100,7 @@ export async function getSubscriptionState(
         es_vip_grant,
         count_pacientes: 0,
         role,
+        esAdminDeClinica,
         isBlocked: false,
       }
     }
@@ -112,6 +116,7 @@ export async function getSubscriptionState(
         es_vip_grant,
         count_pacientes: 0,
         role,
+        esAdminDeClinica,
         isBlocked: false,
       }
     }
@@ -122,6 +127,7 @@ export async function getSubscriptionState(
       es_vip_grant,
       count_pacientes,
       role,
+      esAdminDeClinica,
       isBlocked: count_pacientes > 5,
     }
   } catch {

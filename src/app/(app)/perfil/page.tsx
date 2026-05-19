@@ -11,6 +11,7 @@ import { validarTelefono, validarCedula, formatearTelefono } from '@/lib/validac
 import FirmaCaptura from '@/components/perfil/FirmaCaptura'
 import { compressLogoImage } from '@/lib/compressImage'
 import { syncDoctorProfile } from '@/lib/offline/doctorProfile'
+import { isMedico } from '@/lib/permissions'
 
 type FormData = {
   titulo: string
@@ -69,7 +70,7 @@ export default function PerfilPage() {
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin'
 
   useEffect(() => {
-    if (!loadingProfile && profile && !['medico', 'admin', 'super_admin'].includes(profile.role)) {
+    if (!loadingProfile && profile && !isMedico(profile)) {
       router.push('/dashboard')
     }
   }, [profile, loadingProfile, router])

@@ -11,6 +11,7 @@ import { X, Calendar, User, Plus, Trash2, Settings } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ui/Toast'
 import { useProfile } from '@/hooks/useProfile'
+import { canManageClinica } from '@/lib/permissions'
 import QuickPatientModal from '@/components/ui/QuickPatientModal'
 import Portal from '@/components/ui/Portal'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
@@ -815,7 +816,7 @@ export default function AgendaPage() {
   const isMedicoConAdmin = profile?.role === 'medico' && profile?.es_admin_de_clinica === true
   const isSecretaria = profile?.role === 'secretaria'
 
-  const canEditHorario  = ['medico', 'admin', 'super_admin'].includes(profile?.role ?? '')
+  const canEditHorario  = canManageClinica(profile)
   const isSingleDoctor  = medicos.length <= 1
   const defaultMedicoId = useMemo(() => {
     // Médico (admin o no): default es él mismo

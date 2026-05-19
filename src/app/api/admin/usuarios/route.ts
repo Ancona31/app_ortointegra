@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { canManageClinica } from '@/lib/permissions'
 
 const ROLE_LEVEL: Record<string, number> = {
   secretaria: 1,
@@ -14,10 +15,10 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-  const { data: profile } = await supabase.from('profiles').select('role, clinica_id').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('profiles').select('role, clinica_id, es_admin_de_clinica').eq('id', user.id).single()
 
-  // Solo admin y super_admin pueden gestionar usuarios
-  if (!profile || !['admin', 'super_admin'].includes(profile.role)) {
+  // Solo admin de clínica puede gestionar usuarios
+  if (!profile || !canManageClinica(profile)) {
     return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
   }
 
@@ -65,10 +66,10 @@ export async function DELETE(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-  const { data: profile } = await supabase.from('profiles').select('role, clinica_id').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('profiles').select('role, clinica_id, es_admin_de_clinica').eq('id', user.id).single()
 
-  // Solo admin y super_admin pueden eliminar
-  if (!profile || !['admin', 'super_admin'].includes(profile.role)) {
+  // Solo admin de clínica puede eliminar
+  if (!profile || !canManageClinica(profile)) {
     return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
   }
 

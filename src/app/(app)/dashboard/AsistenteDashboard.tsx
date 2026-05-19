@@ -63,7 +63,7 @@ export default function AsistenteDashboard() {
         .from('profiles')
         .select('id, nombre, titulo')
         .eq('clinica_id', profile!.clinica_id!)
-        .in('role', ['medico', 'admin'])
+        .eq('role', 'medico')
         .order('nombre')
       setMedicos((medicosData as Medico[]) ?? [])
 

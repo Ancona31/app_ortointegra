@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { canManageClinica } from '@/lib/permissions'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -9,11 +10,11 @@ export async function POST(req: NextRequest) {
 
   const { data: creatorProfile } = await supabase
     .from('profiles')
-    .select('role, clinica_id')
+    .select('role, clinica_id, es_admin_de_clinica')
     .eq('id', user.id)
     .single()
 
-  if (!creatorProfile || !['medico', 'admin', 'super_admin'].includes(creatorProfile.role)) {
+  if (!creatorProfile || !canManageClinica(creatorProfile)) {
     return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
   }
 
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   if (!emailRegex.test(email)) return NextResponse.json({ error: 'Email inválido' }, { status: 400 })
   if (typeof password !== 'string' || password.length < 8) return NextResponse.json({ error: 'La contraseña debe tener al menos 8 caracteres' }, { status: 400 })
-  const rolesPermitidos = ['medico', 'secretaria', 'admin']
+  const rolesPermitidos = ['medico', 'secretaria']
   if (!rolesPermitidos.includes(role)) return NextResponse.json({ error: 'Rol inválido' }, { status: 400 })
 
   const clinicaId = creatorProfile.clinica_id
@@ -75,7 +76,7 @@ export async function POST(req: NextRequest) {
     role,
     nombre,
     clinica_id: clinicaId ?? null,
-    ...(['medico', 'admin'].includes(role) ? {
+    ...(role === 'medico' ? {
       titulo: titulo || 'Dr.',
       especialidad: especialidad || null,
       cedula_profesional: cedula_profesional || null,

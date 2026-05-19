@@ -6,6 +6,7 @@ import EspecialidadSelector from '@/components/ui/EspecialidadSelector'
 import Portal from '@/components/ui/Portal'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
+import { canManageClinica, isMedico } from '@/lib/permissions'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/components/ui/Toast'
 import { validarCedula } from '@/lib/validaciones'
@@ -38,7 +39,7 @@ export default function AdminUsuariosPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!loadingProfile && profile && !['admin', 'super_admin'].includes(profile.role)) {
+    if (!loadingProfile && profile && !canManageClinica(profile)) {
       router.push('/dashboard')
     }
   }, [profile, loadingProfile, router])
@@ -280,12 +281,12 @@ export default function AdminUsuariosPage() {
         </div>
         <div className="divide-y divide-slate-100">
           {usuarios.map(u => {
-            const isMedico = ['medico', 'admin', 'super_admin'].includes(u.role)
+            const esMedico = isMedico({ role: u.role })
             return (
               <div key={u.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-slate-50/60 transition-colors">
                 <div className="flex items-center gap-3">
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${isMedico ? 'bg-blue-50' : 'bg-violet-50'}`}>
-                    {isMedico
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${esMedico ? 'bg-blue-50' : 'bg-violet-50'}`}>
+                    {esMedico
                       ? <Shield size={15} className="text-[#1e5fa8]" />
                       : <UserCheck size={15} className="text-violet-600" />}
                   </div>

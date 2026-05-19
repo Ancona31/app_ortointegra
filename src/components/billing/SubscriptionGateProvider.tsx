@@ -57,6 +57,7 @@ export function SubscriptionGateProvider({
         isOpen={isOpen}
         onClose={closeModal}
         role={initialState.role}
+        esAdminDeClinica={initialState.esAdminDeClinica}
       />
     </SubscriptionGateContext.Provider>
   )

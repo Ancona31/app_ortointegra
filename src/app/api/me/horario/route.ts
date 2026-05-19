@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { canManageClinica } from '@/lib/permissions'
 
 async function getProfileAndClinica(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
   const { data } = await supabase
     .from('profiles')
-    .select('clinica_id, role')
+    .select('clinica_id, role, es_admin_de_clinica')
     .eq('id', user.id)
     .single()
   return data ? { ...data, userId: user.id } : null
@@ -40,7 +41,7 @@ export async function PUT(req: NextRequest) {
     const profile  = await getProfileAndClinica(supabase)
     if (!profile?.clinica_id) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-    if (!['medico', 'admin', 'super_admin'].includes(profile.role)) {
+    if (!canManageClinica(profile)) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 

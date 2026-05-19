@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { logAudit } from '@/lib/audit'
+import { canManageClinica } from '@/lib/permissions'
 
 /**
  * PUT /api/admin/paciente/[id]/rectificar — Derecho de Rectificación (ARCO)
@@ -28,11 +29,11 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/admin/pacien
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('clinica_id, role')
+      .select('clinica_id, role, es_admin_de_clinica')
       .eq('id', user.id)
       .single()
 
-    if (!profile?.clinica_id || !['admin', 'super_admin'].includes(profile.role)) {
+    if (!profile?.clinica_id || !canManageClinica(profile)) {
       return NextResponse.json({ error: 'Solo administradores pueden rectificar datos' }, { status: 403 })
     }
 
