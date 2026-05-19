@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireSuperAdmin } from '@/lib/auth'
 import { logAudit } from '@/lib/audit'
-import { PLAN_LIMITS } from '@/lib/plans'
 
 export async function GET() {
   const { user, error } = await requireSuperAdmin()
@@ -49,73 +48,6 @@ export async function GET() {
   })
 
   return NextResponse.json({ clinicas: result })
-}
-
-export async function POST(req: NextRequest) {
-  const auth = await requireSuperAdmin()
-  if (auth.error) return auth.error
-
-  const { nombre, adminNombre, adminEmail, adminPassword } = await req.json()
-
-  // Todas las clínicas requieren administrador al momento de creación
-  if (!nombre || !adminNombre || !adminEmail || !adminPassword) {
-    return NextResponse.json({ error: 'Se requieren nombre de clínica, nombre, email y contraseña del administrador' }, { status: 400 })
-  }
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!emailRegex.test(adminEmail)) return NextResponse.json({ error: 'Email del admin inválido' }, { status: 400 })
-  if (adminPassword.length < 8) return NextResponse.json({ error: 'La contraseña debe tener al menos 8 caracteres' }, { status: 400 })
-
-  const admin = createAdminClient()
-
-  // 1. Crear clínica
-  const { data: nuevaClinica, error } = await admin
-    .from('clinicas')
-    .insert({
-      nombre,
-      max_pacientes:   PLAN_LIMITS.free.max_pacientes,
-      max_medicos:     PLAN_LIMITS.free.max_medicos,
-      max_secretarias: PLAN_LIMITS.free.max_secretarias,
-    })
-    .select('id')
-    .single()
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-
-  // 2. Crear admin — revertir clínica si falla
-  const { data: newUser, error: authErr } = await admin.auth.admin.createUser({
-    email: adminEmail,
-    password: adminPassword,
-    email_confirm: true,
-  })
-
-  if (authErr) {
-    await admin.from('clinicas').delete().eq('id', nuevaClinica.id)
-    return NextResponse.json({ error: `Error al crear admin: ${authErr.message}` }, { status: 400 })
-  }
-
-  const { error: profileErr } = await admin.from('profiles').upsert({
-    id: newUser.user.id,
-    role: 'admin',
-    nombre: adminNombre,
-    clinica_id: nuevaClinica.id,
-    titulo: 'Dr.',
-  })
-
-  if (profileErr) {
-    await admin.auth.admin.deleteUser(newUser.user.id)
-    await admin.from('clinicas').delete().eq('id', nuevaClinica.id)
-    return NextResponse.json({ error: `Error al crear perfil: ${profileErr.message}` }, { status: 500 })
-  }
-
-  await logAudit({
-    userId: auth.user.id,
-    accion: 'sa_crear_clinica',
-    tabla: 'clinicas',
-    registroId: nuevaClinica.id,
-    descripcion: `nombre=${nombre}; admin=${adminEmail}`,
-  })
-
-  return NextResponse.json({ ok: true })
 }
 
 export async function PATCH(req: NextRequest) {
