@@ -35,7 +35,7 @@ export async function GET() {
   const pacienteMap = new Map(pacientes.map(p => [p.id, p]))
 
   // --- Resumen global ---
-  const totalMedicos = profiles.filter(p => p.role === 'medico' || p.role === 'admin').length
+  const totalMedicos = profiles.filter(p => p.role === 'medico').length
   const totalIA = rateLimits.length
 
   const resumen = {
@@ -49,7 +49,7 @@ export async function GET() {
 
   // --- Métricas por clínica ---
   const clinicasMetricas = clinicas.map(c => {
-    const medicosCli = profiles.filter(p => p.clinica_id === c.id && (p.role === 'medico' || p.role === 'admin'))
+    const medicosCli = profiles.filter(p => p.clinica_id === c.id && p.role === 'medico')
     const secretariasCli = profiles.filter(p => p.clinica_id === c.id && p.role === 'secretaria')
     const pacientesCli = pacientes.filter(p => p.clinica_id === c.id)
     const pacientesIds = new Set(pacientesCli.map(p => p.id))
@@ -72,7 +72,7 @@ export async function GET() {
 
   // --- Métricas por usuario (médicos y admins) ---
   const usuariosMetricas = profiles
-    .filter(p => p.role === 'medico' || p.role === 'admin' || p.role === 'super_admin')
+    .filter(p => p.role === 'medico')
     .map(p => {
       const clinica = clinicas.find(c => c.id === p.clinica_id)
       const pacientesUser = pacientes.filter(pac => pac.medico_id === p.id)

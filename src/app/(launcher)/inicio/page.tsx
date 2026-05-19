@@ -16,6 +16,7 @@ import ParticleCanvas from '@/components/launcher/ParticleCanvas'
 import { useTheme } from '@/components/launcher/ThemeContext'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useClinica } from '@/hooks/useClinica'
+import { useProfile } from '@/hooks/useProfile'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
 
 type GridMode = 'sin_pacientes' | 'nuevo' | 'activo'
@@ -70,6 +71,7 @@ export default function InicioPage() {
   const router = useRouter()
   const { dark } = useTheme()
   const { state: subState, openBloqueoModal } = useSubscriptionGate()
+  const { profile } = useProfile()
   const [estado, setEstado] = useState<EstadoPerfil | null>(null)
   const [loading, setLoading] = useState(true)
   const [mostrarOnboarding, setMostrarOnboarding] = useState(false)
@@ -152,6 +154,7 @@ export default function InicioPage() {
         <OnboardingModal
           onComplete={handleOnboardingComplete}
           role={estado.role}
+          esAdminDeClinica={profile?.es_admin_de_clinica === true}
           nombreInicial={estado.nombre}
         />
       )}

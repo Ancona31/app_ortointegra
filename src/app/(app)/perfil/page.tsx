@@ -11,7 +11,7 @@ import { validarTelefono, validarCedula, formatearTelefono } from '@/lib/validac
 import FirmaCaptura from '@/components/perfil/FirmaCaptura'
 import { compressLogoImage } from '@/lib/compressImage'
 import { syncDoctorProfile } from '@/lib/offline/doctorProfile'
-import { isMedico } from '@/lib/permissions'
+import { canManageClinica, isMedico } from '@/lib/permissions'
 
 type FormData = {
   titulo: string
@@ -67,7 +67,7 @@ export default function PerfilPage() {
   const [gcalConectado, setGcalConectado] = useState<boolean | null>(null)
   const [desconectandoGcal, setDesconectandoGcal] = useState(false)
 
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin'
+  const isAdmin = canManageClinica(profile)
 
   useEffect(() => {
     if (!loadingProfile && profile && !isMedico(profile)) {

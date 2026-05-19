@@ -3,13 +3,6 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { canManageClinica } from '@/lib/permissions'
 
-const ROLE_LEVEL: Record<string, number> = {
-  secretaria: 1,
-  medico: 2,
-  admin: 3,
-  super_admin: 4,
-}
-
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -31,11 +24,9 @@ export async function GET() {
     .select('*')
     .eq('clinica_id', profile.clinica_id)
 
-  const callerLevel = ROLE_LEVEL[profile.role] ?? 0
-
-  // Solo mostrar usuarios con rol MENOR al del solicitante
+  // Admin de clínica ve a todo su equipo, excepto a sí mismo
   const usuarios = (profiles || [])
-    .filter(p => (ROLE_LEVEL[p.role] ?? 0) < callerLevel)
+    .filter(p => p.id !== user.id)
     .map(p => {
       const authUser = authUsers?.users?.find(u => u.id === p.id)
       return {
@@ -43,6 +34,7 @@ export async function GET() {
         role: p.role,
         nombre: p.nombre,
         clinica_id: p.clinica_id,
+        es_admin_de_clinica: p.es_admin_de_clinica,
         email: authUser?.email ?? '—',
       }
     })
@@ -80,15 +72,8 @@ export async function DELETE(req: Request) {
   const admin = createAdminClient()
   const { data: targetProfile } = await admin.from('profiles').select('role, clinica_id').eq('id', userId).single()
 
-  if (profile.role !== 'super_admin' && targetProfile?.clinica_id !== profile.clinica_id) {
+  if (targetProfile?.clinica_id !== profile.clinica_id) {
     return NextResponse.json({ error: 'No puedes eliminar usuarios de otra clínica' }, { status: 403 })
-  }
-
-  const callerLevel = ROLE_LEVEL[profile.role] ?? 0
-  const targetLevel = ROLE_LEVEL[targetProfile?.role ?? ''] ?? 0
-
-  if (targetLevel >= callerLevel) {
-    return NextResponse.json({ error: 'No puedes eliminar a un usuario con igual o mayor rango' }, { status: 403 })
   }
 
   await admin.auth.admin.deleteUser(userId)

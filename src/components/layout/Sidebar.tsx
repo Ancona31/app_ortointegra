@@ -13,6 +13,7 @@ import {
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useProfile, clearProfileCache } from '@/hooks/useProfile'
+import { canManageClinica } from '@/lib/permissions'
 import { useClinica } from '@/hooks/useClinica'
 import { useTheme } from '@/components/layout/ThemeProvider'
 import { useAuth } from '@/lib/auth-context'
@@ -156,7 +157,7 @@ export default function Sidebar() {
     catch { /* silent */ }
   }, [])
 
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin'
+  const isAdmin = canManageClinica(profile)
 
   const sections: NavSection[] =
     profile?.role === 'secretaria'

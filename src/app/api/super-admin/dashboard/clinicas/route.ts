@@ -187,7 +187,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     for (const p of profiles) {
       if (!p.clinica_id) continue
       profileToClinica.set(p.id, p.clinica_id)
-      if (p.role === 'medico' || p.role === 'admin') {
+      if (p.role === 'medico') {
         medicosByClinica.set(p.clinica_id, (medicosByClinica.get(p.clinica_id) ?? 0) + 1)
       }
       if (p.role === 'secretaria') {

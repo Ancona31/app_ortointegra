@@ -11,25 +11,22 @@ export async function GET() {
 
   const admin = createAdminClient()
   const { data: clinicas } = await admin.from('clinicas').select('*').order('nombre')
-  const { data: profiles } = await admin.from('profiles').select('id, clinica_id, role, nombre')
+  const { data: profiles } = await admin.from('profiles').select('id, clinica_id, role, nombre, es_admin_de_clinica')
   const { data: authData } = await admin.auth.admin.listUsers()
   const authUsers = authData?.users ?? []
 
   const result = (clinicas || []).map(c => {
     const clinicaProfiles = (profiles || []).filter(p => p.clinica_id === c.id)
 
-    // Todos los dueños de cuenta son role='admin' (independientes y clínicas)
-    const adminProfile = clinicaProfiles.find(p => p.role === 'admin')
+    // Dueño/admin de la clínica: medico con es_admin_de_clinica=true
+    const adminProfile = clinicaProfiles.find(p => p.es_admin_de_clinica === true)
 
     const adminEmail = adminProfile
       ? (authUsers.find(u => u.id === adminProfile.id)?.email ?? null)
       : null
 
-    // Independiente: admin ES el médico → cuenta como 1
-    // Clínica: solo role='medico' ocupa slots
-    const count_medicos = c.tipo === 'independiente'
-      ? (adminProfile ? 1 : 0)
-      : clinicaProfiles.filter(p => p.role === 'medico').length
+    // Post-refactor: todos los médicos (admin de clínica + invitados) son role='medico'
+    const count_medicos = clinicaProfiles.filter(p => p.role === 'medico').length
 
     const usuarios = clinicaProfiles
       .filter(p => ['medico', 'secretaria'].includes(p.role))

@@ -21,16 +21,16 @@ export async function DELETE(req: NextRequest) {
   // Verificar que no sea el único admin de su clínica
   const { data: perfil } = await admin
     .from('profiles')
-    .select('role, clinica_id')
+    .select('role, clinica_id, es_admin_de_clinica')
     .eq('id', userId)
     .single()
 
-  if (perfil?.role === 'admin' && perfil.clinica_id) {
+  if (perfil?.es_admin_de_clinica === true && perfil.clinica_id) {
     const { count } = await admin
       .from('profiles')
       .select('*', { count: 'exact', head: true })
       .eq('clinica_id', perfil.clinica_id)
-      .eq('role', 'admin')
+      .eq('es_admin_de_clinica', true)
 
     if ((count ?? 0) <= 1) {
       return NextResponse.json(

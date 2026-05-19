@@ -221,7 +221,7 @@ export async function GET(
     const usuarios: UsuarioClinica[] = []
     for (const p of profiles) {
       const auth = authByProfileId.get(p.id)
-      if (p.role === 'medico' || p.role === 'admin') countMedicos++
+      if (p.role === 'medico') countMedicos++
       if (p.role === 'secretaria') countSecretarias++
       if (auth?.last_sign_in_at) {
         if (!ultimoAccesoIso || auth.last_sign_in_at > ultimoAccesoIso) {

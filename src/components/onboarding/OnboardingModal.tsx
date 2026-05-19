@@ -7,10 +7,13 @@ import FirmaCaptura from '@/components/perfil/FirmaCaptura'
 import { validarCedula } from '@/lib/validaciones'
 import { useToast } from '@/components/ui/Toast'
 import { mutate } from 'swr'
+import { canManageClinica } from '@/lib/permissions'
+import type { Role } from '@/hooks/useProfile'
 
 interface Props {
   onComplete: () => void
   role: string
+  esAdminDeClinica: boolean
   nombreInicial?: string | null
 }
 
@@ -26,9 +29,9 @@ const PASOS = [
 
 const TITULOS = ['Dr.', 'Dra.', 'Mtro.', 'Mtra.', 'Lic.', 'Ing.']
 
-export default function OnboardingModal({ onComplete, role, nombreInicial }: Props) {
+export default function OnboardingModal({ onComplete, role, esAdminDeClinica, nombreInicial }: Props) {
   const toast = useToast()
-  const isAdmin = role === 'admin' || role === 'super_admin'
+  const isAdmin = canManageClinica({ role: role as Role, es_admin_de_clinica: esAdminDeClinica })
 
   const [paso, setPaso] = useState<Paso>(1)
   const [guardando, setGuardando] = useState(false)

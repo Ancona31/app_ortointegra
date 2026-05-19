@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { format, formatDistanceToNow, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
+import { canManageClinica } from '@/lib/permissions'
 import { formatCitaHora } from './utils'
 import { StatusChip } from './StatusChip'
 
@@ -161,7 +162,7 @@ export default function DashboardPage() {
         const tipo = clinicaData?.tipo ?? 'independiente'
         setClinicaTipo(tipo)
 
-        const isClinicaAdmin = profile!.role === 'admin' && tipo === 'clinica'
+        const isClinicaAdmin = canManageClinica(profile) && tipo === 'clinica'
 
         let q = supabase
           .from('appointments')
@@ -200,7 +201,7 @@ export default function DashboardPage() {
   const abrirBusqueda = () =>
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))
 
-  const isClinicaAdmin = profile?.role === 'admin' && clinicaTipo === 'clinica'
+  const isClinicaAdmin = canManageClinica(profile) && clinicaTipo === 'clinica'
   const displayCitas   = soloMisCitas
     ? proximasCitas.filter(c => c.medico?.id === profile?.id)
     : proximasCitas

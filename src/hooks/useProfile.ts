@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { secureStorage } from '@/lib/secureStorage'
+import { canManageClinica } from '@/lib/permissions'
 
 export type Role = 'super_admin' | 'admin' | 'medico' | 'secretaria'
 
@@ -114,9 +115,9 @@ export function useProfile() {
   return {
     profile,
     loading,
-    isDoctor: profile?.role === 'medico' || profile?.role === 'super_admin' || profile?.role === 'admin',
+    isDoctor: profile?.role === 'medico',
     isSecretary: profile?.role === 'secretaria',
-    isAdmin: profile?.role === 'admin' || profile?.role === 'super_admin',
+    isAdmin: canManageClinica(profile),
     isSuperAdmin: profile?.role === 'super_admin',
   }
 }
