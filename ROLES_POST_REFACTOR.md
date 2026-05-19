@@ -1045,4 +1045,75 @@ Para implementar el modelo "admin acceso completo + privacidad bidireccional ent
 
 ---
 
+## Deudas conocidas post-Etapa 4.A (a resolver en Etapa 5)
+
+Esta sección consolida las deudas técnicas identificadas durante el refactor de Etapa 4.A. Se documentan aquí en lugar de en un archivo separado por coherencia con el resto del refactor.
+
+### Deuda crítica — Soft delete de pacientes bloqueado en producción
+
+**Estado:** 🔴 **BUG ACTIVO EN PRODUCCIÓN desde 2026-05-19**
+
+**Manifestación:** los admins de clínica (9 usuarios productivos) NO pueden eliminar expedientes desde la UI. Al intentarlo, ven el error: `new row violates row-level security policy for table "pacientes"`.
+
+**Causa raíz:** la policy `pacientes_select_inactivos_admin` filtra por `role IN ('admin', 'super_admin')`. Tras la migración del Sub-paso 4.A.8, todos los admins son `role='medico' + es_admin_de_clinica=true`, por lo que ya no matchean.
+
+**Por qué afecta el soft delete:** el backend hace `UPDATE pacientes SET activo=false`. El UPDATE en sí es permitido por `clinica_update`, pero al intentar devolver la fila modificada al cliente, Postgres evalúa las policies de SELECT. Como `activo=false`, no aplica `pacientes_select_activos`, y como el role ya no es 'admin', tampoco aplica `pacientes_select_inactivos_admin`. Resultado: "new row violates row-level security policy".
+
+**Endpoints afectados confirmados:**
+- `DELETE /api/pacientes/[id]` (soft delete normal)
+
+**Endpoints afectados probables (sin confirmar):**
+- `POST /api/admin/paciente/[id]/anonimizar` (derecho ARCO de cancelación)
+- Cualquier otro flujo UPDATE que marque `activo=false`
+
+**Decisión tomada (Sub-paso 4.A.9):** aceptar el bug y diferir a Etapa 5.
+
+**Razonamiento:** mantener disciplina de scope de Etapa 4.A. Etapa 5 reescribe todas las RLS de pacientes con el modelo nuevo (privacidad bidireccional + admin de clínica).
+
+**Workaround temporal:** los admins que necesiten eliminar un paciente deben contactar al desarrollador para eliminación manual vía SQL.
+
+**Prioridad en Etapa 5:** ALTA. Reescribir la policy con el modelo nuevo, reconociendo `(role='medico' AND es_admin_de_clinica=true)` como equivalente al admin legacy.
+
+### Deuda — RLS de pacientes/citas/documentos sin privacidad bidireccional
+
+**Estado:** 🟡 **Diferida intencionalmente desde el inicio**
+
+**Manifestación:** los médicos invitados ven TODOS los pacientes, citas y documentos de la clínica, no solo los suyos. La privacidad bidireccional entre médicos invitados (decisión arquitectónica documentada en §2.2-§2.7) NO está implementada en RLS actuales.
+
+**Causa raíz:** las policies actuales (`pacientes_select_activos`, `appointments.clinica_select`) filtran solo por `clinica_id`. No discriminan por `medico_id` ni por `es_admin_de_clinica`.
+
+**Decisión tomada:** programada para Etapa 5 desde el inicio del refactor.
+
+**Trabajo requerido en Etapa 5:**
+- Reescribir `pacientes_select_activos` con lógica de privacidad por médico tratante
+- Reescribir `appointments.clinica_select` con misma lógica
+- Reescribir policies de `consultas`, `documentos`, `mediciones`, `fotos`, `calculadora`
+- Mantener visibilidad amplia solo para admin de clínica (`es_admin_de_clinica=true`)
+- Mantener visibilidad amplia para secretaria (su modelo lo permite)
+
+### Deuda menor — /perfil para secretaria sin implementar
+
+**Estado:** 🟢 **Pre-existente, no relacionada al refactor**
+
+**Manifestación:** las secretarias pueden navegar a `/perfil` pero la página no muestra datos significativos. Solo necesitan ver/editar su nombre.
+
+**Decisión:** desarrollo posterior, sin urgencia. No bloquea operación.
+
+### Bitácora de hallazgos del refactor
+
+Durante el refactor de Etapa 4.A se documentaron hallazgos operativos en los mensajes de commits. Para referencia rápida, los más importantes:
+
+| Hallazgo | Sub-paso | Estado | Descripción breve |
+|---|---|---|---|
+| #93 | 4.A.2 | ✅ Resuelto en 4.A.8 | Modal Nueva Cita admin sin dropdown |
+| #94 | inicial | ⏳ Etapa 5 | Privacidad bidireccional entre médicos invitados |
+| #95 | 4.A.3 | ✅ Documentado | `max_medicos` cuenta TODOS los médicos (admin incluido) |
+| #96 | 4.A.6 | ✅ Resuelto en 4.A.6 | Dead code en `metricas/route.ts` línea 87 |
+| #97 | 4.A.5 | ✅ Documentado | `Record<TipoEnum>` puede omitirse en grep, build es salvaguarda |
+| #98 | 4.A.7 | 🔴 Reactivada — Etapa 5 | Policy `pacientes_select_inactivos_admin` con role legacy — bug activo en producción (ver arriba) |
+| #99 | 4.A.7 | ✅ Resuelto en 4.A.8 | Conteo de médicos en super-admin dashboard |
+| #100 | 4.A.8 | ✅ Documentado | En Supabase SQL Editor, usar DO block en vez de BEGIN/COMMIT manual |
+
+---
+
 **Fin del documento.**
