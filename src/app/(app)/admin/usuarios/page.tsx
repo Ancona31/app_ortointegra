@@ -5,7 +5,7 @@ import { Users, Plus, Trash2, Loader2, Shield, UserCheck, X, Eye, EyeOff, AlertT
 import EspecialidadSelector from '@/components/ui/EspecialidadSelector'
 import Portal from '@/components/ui/Portal'
 import { createClient } from '@/lib/supabase/client'
-import { useProfile } from '@/hooks/useProfile'
+import { useProfile, type Role } from '@/hooks/useProfile'
 import { canManageClinica, isMedico } from '@/lib/permissions'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/components/ui/Toast'
@@ -13,7 +13,7 @@ import { validarCedula } from '@/lib/validaciones'
 
 type Usuario = {
   id: string
-  role: 'super_admin' | 'admin' | 'medico' | 'secretaria'
+  role: Role
   nombre: string | null
   email: string
 }

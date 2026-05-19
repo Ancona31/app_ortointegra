@@ -42,14 +42,14 @@ interface PacienteOwnerRowDb {
 }
 
 function isRol(value: string | null): Rol {
-  if (value === 'super_admin' || value === 'admin' || value === 'medico' || value === 'secretaria') {
+  if (value === 'super_admin' || value === 'medico' || value === 'secretaria') {
     return value
   }
   return 'medico'
 }
 
 function parseRolFiltro(value: string | null): Rol | 'todos' {
-  if (value === 'super_admin' || value === 'admin' || value === 'medico' || value === 'secretaria') {
+  if (value === 'super_admin' || value === 'medico' || value === 'secretaria') {
     return value
   }
   return 'todos'

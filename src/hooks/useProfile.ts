@@ -5,7 +5,16 @@ import { createClient } from '@/lib/supabase/client'
 import { secureStorage } from '@/lib/secureStorage'
 import { canManageClinica } from '@/lib/permissions'
 
-export type Role = 'super_admin' | 'admin' | 'medico' | 'secretaria'
+/**
+ * Roles del sistema (modelo post-refactor Etapa 4).
+ *
+ * IMPORTANTE: este tipo está duplicado intencionalmente en
+ * src/lib/super-admin/types.ts:Rol. Si modificas uno, modifica el otro.
+ *
+ * 'admin' fue eliminado en Etapa 4 (refactor de roles). Los admins de
+ * clínica ahora son role='medico' + es_admin_de_clinica=true.
+ */
+export type Role = 'super_admin' | 'medico' | 'secretaria'
 
 export interface Profile {
   id: string

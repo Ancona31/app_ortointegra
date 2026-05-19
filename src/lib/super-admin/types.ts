@@ -108,7 +108,15 @@ export const resumenEjecutivoSchema: z.ZodType<ResumenEjecutivo> = z.object({
 export type TipoCuenta = 'clinica' | 'independiente'
 export type EstadoClinica = 'activa' | 'suspendida' | 'inactiva'
 export type EstadoPago = 'gratuito' | 'trial' | 'pagando' | 'vip' | 'pago_fallido' | 'cancelado'
-export type Rol = 'super_admin' | 'admin' | 'medico' | 'secretaria'
+/**
+ * Roles del sistema, vista de super-admin.
+ *
+ * IMPORTANTE: este tipo está duplicado intencionalmente en
+ * src/hooks/useProfile.ts:Role. Si modificas uno, modifica el otro.
+ *
+ * 'admin' fue eliminado en Etapa 4 (refactor de roles).
+ */
+export type Rol = 'super_admin' | 'medico' | 'secretaria'
 export type RetencionBadge = 'activo_7d' | 'tibio_14d' | 'frio_30d' | 'inactivo'
 
 export const tipoCuentaSchema = z.union([z.literal('clinica'), z.literal('independiente')])
@@ -127,7 +135,6 @@ export const estadoPagoSchema = z.union([
 ])
 export const rolSchema = z.union([
   z.literal('super_admin'),
-  z.literal('admin'),
   z.literal('medico'),
   z.literal('secretaria'),
 ])

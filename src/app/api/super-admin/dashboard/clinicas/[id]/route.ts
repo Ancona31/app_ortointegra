@@ -56,7 +56,7 @@ interface ConsultaRowDb {
 }
 
 function isRol(value: string | null): Rol {
-  if (value === 'super_admin' || value === 'admin' || value === 'medico' || value === 'secretaria') {
+  if (value === 'super_admin' || value === 'medico' || value === 'secretaria') {
     return value
   }
   return 'medico'

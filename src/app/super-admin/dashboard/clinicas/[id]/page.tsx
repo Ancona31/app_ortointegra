@@ -49,14 +49,12 @@ async function fetchDetalle(id: string): Promise<ClinicaDetalle> {
 
 const ROL_LABEL: Record<Rol, string> = {
   super_admin: 'Super Admin',
-  admin: 'Admin',
   medico: 'Médico',
   secretaria: 'Secretaria',
 }
 
 const ROL_CLASSES: Record<Rol, string> = {
   super_admin: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
-  admin: 'bg-[#1e5fa8]/10 text-[#4a9fd4] border-[#1e5fa8]/30',
   medico: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
   secretaria: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
 }
