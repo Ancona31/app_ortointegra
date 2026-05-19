@@ -48,7 +48,7 @@ export async function PUT(req: NextRequest) {
     const { horario } = await req.json()
     if (!horario) return NextResponse.json({ error: 'Horario requerido' }, { status: 400 })
 
-    // clinicas no tiene política UPDATE para authenticated — necesita admin
+    // clinicas no tiene política UPDATE para authenticated — necesita admin client (service role)
     const admin = createAdminClient()
     const { error } = await admin
       .from('clinicas')

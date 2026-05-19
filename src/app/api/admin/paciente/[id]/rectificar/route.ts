@@ -13,7 +13,7 @@ import { canManageClinica } from '@/lib/permissions'
  * teléfono, dirección, sexo). Los datos clínicos NO son rectificables
  * por esta vía — para eso existen los addendums.
  *
- * Solo accesible por admin de la misma clínica.
+ * Solo accesible por admin de clínica de la misma clínica.
  */
 
 const CAMPOS_PERMITIDOS = [

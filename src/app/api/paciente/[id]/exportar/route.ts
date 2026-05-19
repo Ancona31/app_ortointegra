@@ -11,7 +11,7 @@ import type { MedicionAnalito, AnalitoCatalogo } from '@/types'
  * consultas con addendums, mediciones (con analito del catálogo embebido),
  * documentos y recetas.
  *
- * Accesible por médicos y admins de la misma clínica.
+ * Accesible por médicos y admins de clínica de la misma clínica.
  */
 type MedicionConAnalito = MedicionAnalito & {
   analito: AnalitoCatalogo | null

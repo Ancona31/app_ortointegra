@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
   if (authError) return NextResponse.json({ error: authError.message }, { status: 400 })
 
   // Crear perfil con rol y clinica_id
-  // Admins y médicos guardan campos médicos — el admin siempre tiene acceso al expediente
+  // Todos los médicos (invitados y admins de clínica) guardan campos médicos
   await admin.from('profiles').upsert({
     id: newUser.user.id,
     role,

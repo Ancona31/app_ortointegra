@@ -14,7 +14,7 @@ import { canManageClinica } from '@/lib/permissions'
  * Los datos clínicos permanecen intactos pero dejan de ser vinculables
  * a una persona identificable.
  *
- * Solo accesible por admin de la misma clínica.
+ * Solo accesible por admin de clínica de la misma clínica.
  * Requiere confirmación explícita (confirmar: true en el body).
  */
 export async function POST(req: NextRequest, ctx: RouteContext<'/api/admin/paciente/[id]/anonimizar'>) {

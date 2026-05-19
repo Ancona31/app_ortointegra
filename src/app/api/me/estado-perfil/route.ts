@@ -17,7 +17,7 @@ export async function GET() {
 
   const role = profile.role as string
 
-  // Calcular porcentaje de completitud del perfil (médicos y admins)
+  // Calcular porcentaje de completitud del perfil (médicos: invitados y admins de clínica)
   let porcentaje = 0
   if (role !== 'secretaria') {
     if (profile.nombre) porcentaje += 25
@@ -68,7 +68,8 @@ export async function GET() {
     // Count de pacientes activos para el gate de Fase 8.1.
     // Filtro explícito por clinica_id + activo IS NOT FALSE para que el
     // resultado coincida con el predicado de la policy RLS, sin depender
-    // del rol del caller (admin ve inactivos via pacientes_select_inactivos_admin).
+    // del rol del caller (admin de clínica ve inactivos via pacientes_select_inactivos_admin;
+    // nota: nombre de la policy es legacy, se renombrará en Etapa 5 al reescribir RLS).
     const { count: activosCount } = await supabase
       .from('pacientes')
       .select('id', { count: 'exact', head: true })

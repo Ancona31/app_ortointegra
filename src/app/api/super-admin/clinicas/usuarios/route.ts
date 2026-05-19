@@ -18,7 +18,7 @@ export async function DELETE(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Verificar que no sea el único admin de su clínica
+  // Verificar que no sea el único admin de clínica (es_admin_de_clinica=true)
   const { data: perfil } = await admin
     .from('profiles')
     .select('role, clinica_id, es_admin_de_clinica')

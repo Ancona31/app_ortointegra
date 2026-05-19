@@ -70,7 +70,7 @@ export async function GET() {
     }
   })
 
-  // --- Métricas por usuario (médicos y admins) ---
+  // --- Métricas por usuario (médicos: invitados y admins de clínica) ---
   const usuariosMetricas = profiles
     .filter(p => p.role === 'medico')
     .map(p => {
@@ -84,7 +84,9 @@ export async function GET() {
       return {
         id: p.id,
         nombre: p.nombre || '—',
-        clinica: clinica ? (clinica.nombre_display || clinica.nombre) : (p.role === 'super_admin' ? 'Super Admin' : 'Sin clínica'),
+        // Post-refactor 4.A.6 (BITÁCORA #96): el array solo contiene role='medico',
+        // la rama 'super_admin' del ternario original nunca era alcanzable
+        clinica: clinica ? (clinica.nombre_display || clinica.nombre) : 'Sin clínica',
         role: p.role,
         pacientes: pacientesUser.length,
         consultas: consultasUser.length,
