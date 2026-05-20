@@ -83,7 +83,7 @@ Al cerrar Etapa 5, el sistema debe cumplir TODOS estos criterios:
 #### Técnicos
 
 - ✅ Todas las policies SELECT/UPDATE/DELETE de las 8 tablas relevantes reescritas con el modelo nuevo
-- ✅ 5 funciones `SECURITY DEFINER` nuevas creadas (3 que estaban como "fantasma" + 2 helpers nuevos)
+- ✅ 6 funciones `SECURITY DEFINER` (3 que estaban como fantasma + 3 helpers nuevos)
 - ✅ Tabla `consultas` con columna `medico_id` agregada y backfilleada
 - ✅ Storage policies del bucket `documentos-pdf` reescritas para discriminar por clínica
 - ✅ Policies duplicadas en `profiles` consolidadas
@@ -354,7 +354,7 @@ Además de las 3 fantasma, el reporte de RLS sugiere 2 helpers nuevos:
 | `soy_admin_de_clinica()` returns boolean | Centraliza el check `(role='medico' AND es_admin_de_clinica=true)`. Evita duplicar la lógica en ~20-30 policies. | Visibilidad amplia del admin sobre datos generados por otros médicos de su clínica |
 | `paciente_pertenece_a_mi_clinica(paciente_id uuid)` returns boolean | Verificar si un paciente pertenece a la clínica del usuario actual. Útil para policies de `consultas`, `documentos`, `mediciones` que validan permiso vía el paciente referenciado. | Validación de permiso para datos clínicos vinculados a un paciente |
 
-#### 2.4.3 Total: 5 funciones SECURITY DEFINER a crear en sub-paso 5.C
+#### 2.4.3 Total: 6 funciones SECURITY DEFINER a crear en sub-paso 5.C
 
 ```
 🆕 clinica_dentro_de_limite()         — enforce de límites (incluye 5 pacientes free)
@@ -437,9 +437,88 @@ Esta sección documenta las decisiones que afectan el diseño técnico de Etapa 
 2. Continuidad lógica: "después de Etapa 5 → resolver monetización" es secuencia natural.
 3. Decisiones cruzadas (ej. añadir `'vencido'` al predicado de `clinica_tiene_acceso()` durante Etapa 5) quedan documentadas en un solo lugar.
 
+#### D-T5: Modelo muchos-a-muchos para la relación paciente ↔ médico
+
+**Decisión:** la visibilidad de pacientes se modela como una relación muchos-a-muchos mediante una tabla de unión nueva, `paciente_medico`. La columna `pacientes.medico_id` se conserva, pero se reinterpreta: pasa de "médico tratante único" a "médico que creó el registro del paciente" (dato de auditoría/origen).
+
+**Contexto:** el modelo conceptual revisado el 2026-05-21 (diagrama de flujo del autor) estableció que un paciente puede ser atendido por varios médicos de la misma clínica. La columna única `pacientes.medico_id` no puede representar esto. Además, la auditoría de 5.A reveló que la visibilidad de pacientes HOY no depende de `medico_id` en absoluto (depende solo de `clinica_id`); la única policy que filtraba por médico fue eliminada el 2026-04-29.
+
+**Modelo resultante:**
+
+- `pacientes.medico_id` → médico que CREÓ el registro (auditoría, sin rol en visibilidad).
+- Tabla `paciente_medico` (paciente_id, medico_id) → médicos que ATIENDEN al paciente; es la base de la visibilidad.
+- Al crear un paciente, se inserta una fila inicial en `paciente_medico` con el médico asignado. Médicos adicionales se agregan después.
+
+**Visibilidad de pacientes resultante (resuelve H1):**
+
+- Médico invitado → solo pacientes con los que existe pareja en `paciente_medico`.
+- Médico admin de clínica → todos los pacientes de su clínica (+ filtro UI opcional).
+- Secretaria → todos los pacientes de su clínica (los gestiona, no es médico tratante).
+- super_admin → según su lógica administrativa.
+
+**Razones:**
+
+1. Es el único modelo que cumple el diagrama conceptual del autor (paciente compartido entre médicos).
+2. La alternativa "visibilidad derivada de consultas/documentos" falla con el paciente recién creado sin datos generados aún (quedaría invisible).
+3. Conservar `pacientes.medico_id` como "creador" preserva el dato de origen (útil para NOM-004) sin coste: el backfill copia el valor actual como primera fila de `paciente_medico`.
+
+**Implicación operativa — cambio de comportamiento:** tras Etapa 5, un médico invitado dejará de ver todos los pacientes de la clínica y verá solo los suyos. Es un cambio funcional visible, confirmado conscientemente por el autor.
+
+**Implicación operativa — puntos de integración:**
+
+- `src/app/api/pacientes/route.ts` (creación de pacientes) debe insertar la fila inicial en `paciente_medico`.
+- Las métricas de super-admin que atribuyen 1 paciente → 1 médico (`metricas/route.ts`, `dashboard/usuarios/route.ts`) deben ajustarse al modelo M:N.
+
+#### D-T6: Ejecución directa a producción con protocolo de 9 pasos (resuelve D5)
+
+**Decisión:** Etapa 5 se ejecuta directamente sobre la base de datos productiva, sin entorno de pruebas dedicado (ni Supabase local ni branching). Cada sub-paso se aplica bajo un protocolo estricto de 9 pasos.
+
+**Razones:**
+
+1. El flujo de ejecución directa con `DO` blocks atómicos + snapshot lógico + backups Pro ya fue validado en Etapa 4.A sin incidentes.
+2. Spinus está en beta con un cohort reducido; el riesgo está acotado.
+3. El protocolo de 9 pasos (especialmente la simulación de predicados READ-ONLY) sustituye parcialmente la función de un entorno de pruebas.
+
+**Protocolo de 9 pasos por sub-paso de BD:**
+
+1. Investigación con Claude Code (lectura pura) → diseñar el SQL exacto.
+2. Escribir DOS scripts: el UP (migración) y el DOWN (rollback). El rollback se escribe ANTES de aplicar, nunca se improvisa.
+3. Para policies: simular el predicado con `SELECT` READ-ONLY, sustituyendo `auth.uid()` por un UUID real de prueba, para validar la lógica antes de crear la policy.
+4. Snapshot lógico del estado actual (`pg_policies` / `pg_proc` / schema).
+5. Aplicar el UP vía `DO` block atómico con pre-flight + post-flight checks.
+6. Verificación SQL post-aplicación.
+7. Smoke test funcional en producción con cuentas reales de los 4 roles.
+8. Si OK → commit checkpoint. Si falla → rollback (DOWN, capa 1) o backup (capa 3).
+9. Solo entonces pasar al siguiente sub-paso.
+
+**Riesgo reconocido:** sin entorno aislado, un error de lógica en una policy podría manifestarse en producción. Mitigación principal: el paso 3 (simulación de predicado) y el paso 2 (rollback pre-escrito). Los sub-pasos de alto riesgo (5.B, 5.E, 5.F, 5.G) reciben smoke test extendido en el paso 7.
+
 ### 3.2 Decisiones pendientes
 
-Estas decisiones deben resolverse en el sub-paso **5.A** (antes de cualquier cambio en BD). Cada una tiene impacto en el diseño técnico.
+> ✅ **TODAS RESUELTAS el 2026-05-21 (sub-paso 5.A cerrado).**
+>
+> El detalle de cada decisión (contexto, opciones evaluadas, recomendación) se conserva abajo como registro histórico del razonamiento. La resolución final de cada una está en la tabla siguiente.
+
+**Resumen de resoluciones:**
+
+| Decisión | Resolución | Notas |
+|---|---|---|
+| D7 | **D7-A** | Agregar `consultas.medico_id uuid REFERENCES profiles(id)`, backfill `NULL` para legacy. Ver D-T1 y §5.B. |
+| H1 | **Resuelta vía modelo M:N** | Reemplaza la opción H1-B original. Médico invitado ve pacientes vía tabla `paciente_medico` (no vía `pacientes.medico_id`). Ver D-T5. |
+| D5 | **D5-B** | Ejecución directa a producción con protocolo de 9 pasos. Ver D-T6. |
+| D1 | **D1-B** | Una migración versionada por sub-paso. |
+| D2 | **D2-A** | Sub-paso 5.C dedicado a crear los helpers antes de las policies. |
+| D3 | **D3-A** | `RESTRICTIVE` para gates ortogonales (suspensión, límite de plan). |
+| D4 | **Confirmado** | Orden del plan: 5.B→5.C→5.E→5.F→5.G→5.H→5.I→5.J→5.K→5.L. |
+| D6 | **D6-C** | Rollback en 3 capas (snapshot lógico + `DO` block + backup Pro). |
+| D8 | **Sí** | `profiles`: cambiar `TO public` → `TO authenticated`. |
+| D9 | **Mantener** | `get_suscripcion_estado()` se conserva (útil para monetización §6 / auditoría). |
+| D10 | **OR explícito** | `super_admin` se maneja con `OR get_my_role() = 'super_admin'` explícito en cada policy. |
+| Nomenclatura | **N-C** | NO se renombran `documentos.subido_por` ni `mediciones_analitos.creado_por`. Solo se agrega `medico_id` a `consultas`. |
+
+> **Nota sobre H1:** la recomendación original era H1-B (`pacientes.medico_id = auth.uid()`). Fue superada por el modelo muchos-a-muchos (D-T5): la auditoría de 5.A reveló que `pacientes.medico_id` no interviene en la visibilidad actual, y el diagrama conceptual del autor estableció que un paciente puede tener varios médicos. La definición final de "médico atiende a paciente" es: **existe una pareja (paciente, médico) en la tabla `paciente_medico`.**
+
+---
 
 #### 🔴 Críticas (bloquean diseño)
 
@@ -493,7 +572,7 @@ Estas decisiones deben resolverse en el sub-paso **5.A** (antes de cualquier cam
 
 ##### D2: ¿Helpers `SECURITY DEFINER` en migración separada o misma que policies?
 
-- **D2-A:** Sub-paso 5.C dedicado solo a crear las 5 funciones, antes de tocar policies.
+- **D2-A:** Sub-paso 5.C dedicado solo a crear las 6 funciones, antes de tocar policies.
 - **D2-B:** Crear funciones en la misma migración que las policies que las usan.
 
 **Recomendación:** D2-A. Crear todas las funciones antes evita problemas de dependencia y permite testearlas individualmente.
@@ -573,6 +652,7 @@ Esta sección inventaría TODO lo que Etapa 5 va a tocar. Sirve como checklist m
 |---|---|---|
 | `pacientes` | Reescribir 2 policies SELECT + ajustar INSERT/UPDATE/DELETE | 5.E |
 | `consultas` | ⚠️ Migración schema (ADD `medico_id`) + reescribir 4 policies | 5.B + 5.F |
+| `paciente_medico` | 🆕 CREAR tabla de unión M:N (decisión D-T5) + backfill desde `pacientes.medico_id` | 5.B |
 | `documentos` | Reescribir 4 policies + auditar formularios frontend | 5.G |
 | `appointments` | Reescribir 4 policies (discriminar por médico) | 5.H |
 | `mediciones_analitos` | Reescribir 4 policies | 5.I |
@@ -639,7 +719,7 @@ Total: **28 policies de tablas** auditadas (Query 1) + **3 policies de Storage**
 
 ### 4.3 Inventario de funciones SECURITY DEFINER a crear
 
-Total: **5 funciones nuevas** en sub-paso 5.C.
+Total: **6 funciones nuevas** en sub-paso 5.C.
 
 | Función | Retorna | Propósito | Tablas que toca |
 |---|---|---|---|
@@ -648,12 +728,15 @@ Total: **5 funciones nuevas** en sub-paso 5.C.
 | `clinica_tiene_acceso()` | boolean | Phase 8.1 v2: acceso según `ha_tenido_acceso_premium` + estado | `clinicas` |
 | `soy_admin_de_clinica()` | boolean | Check `role='medico' AND es_admin_de_clinica=true` | `profiles` |
 | `paciente_pertenece_a_mi_clinica(paciente_id uuid)` | boolean | Validar que un paciente pertenece a la clínica del usuario | `pacientes` |
+| `soy_medico_tratante(paciente_id uuid)` | boolean | Validar que el usuario actual atiende al paciente (existe pareja en `paciente_medico`). Base de la visibilidad M:N de pacientes (D-T5). Nombre tentativo, se confirma al diseñar 5.C. | `paciente_medico` |
 
 **Restricciones de diseño (lección Phase 8.1):**
 - Todas `SECURITY DEFINER` + `STABLE`
 - `SET search_path` explícito
 - NINGUNA debe hacer `SELECT` sobre la misma tabla que la policy que la usará (evitar recursión)
 - `clinica_tiene_acceso()` debe usar la columna declarativa `clinicas.ha_tenido_acceso_premium`, no conteos recursivos
+- `paciente_pertenece_a_mi_clinica()` hace `SELECT` sobre `pacientes` → NO puede usarse en policies de `pacientes` (solo en policies de otras tablas: `consultas`, `documentos`, etc.)
+- `soy_medico_tratante()` hace `SELECT` sobre `paciente_medico` → se usa en la policy de `pacientes` (tablas distintas, sin recursión), pero NO debe usarse dentro de la policy de la propia tabla `paciente_medico`
 
 ### 4.4 Inventario de migraciones de schema
 
@@ -661,8 +744,12 @@ Total: **5 funciones nuevas** en sub-paso 5.C.
 |---|---|---|---|
 | `consultas.medico_id` | `ALTER TABLE consultas ADD COLUMN medico_id uuid REFERENCES profiles(id)` | 5.B | Alto |
 | Backfill `consultas` | `UPDATE consultas SET medico_id = NULL` (legacy queda NULL, decisión D-T1) | 5.B | Bajo (NULL explícito) |
+| `paciente_medico` (CREATE) | `CREATE TABLE paciente_medico (paciente_id uuid, medico_id uuid, ...)` — tabla de unión M:N, decisión D-T5 | 5.B | Alto |
+| Backfill `paciente_medico` | Insertar una fila por paciente existente, copiando `pacientes.medico_id` actual como primer médico tratante | 5.B | Medio |
 
-**Nota:** la decisión de nomenclatura (N-C, §3.2) implica que NO se renombran `documentos.subido_por` ni `mediciones_analitos.creado_por`. Solo se agrega `medico_id` a `consultas`.
+**Nota sobre nomenclatura:** la decisión N-C (§3.2) implica que NO se renombran `documentos.subido_por` ni `mediciones_analitos.creado_por`. Solo se agrega `medico_id` a `consultas`.
+
+**Nota sobre `paciente_medico`:** tabla de unión nueva que materializa la relación muchos-a-muchos paciente ↔ médico (decisión D-T5). Estructura mínima prevista: `paciente_id` (FK → `pacientes`), `medico_id` (FK → `profiles`), clave primaria compuesta `(paciente_id, medico_id)`, y posibles columnas de auditoría (`created_at`, `asignado_por`). La estructura exacta se define en la fase de diseño del sub-paso 5.B. El backfill toma el `pacientes.medico_id` actual de cada paciente y lo inserta como su primera fila de médico tratante; los pacientes con `medico_id` nulo (si los hubiera) requieren decisión puntual durante 5.B.
 
 ### 4.5 Inventario de archivos TS afectados
 
@@ -734,82 +821,129 @@ Esta sección describe el plan de ejecución de Etapa 5 a **nivel operativo**: o
 
 ### 5.A — Resolver decisiones pendientes
 
-**Objetivo:** cerrar todas las decisiones abiertas y los puntos ciegos antes de tocar BD. Sin este sub-paso, los demás no pueden diseñarse con precisión.
+> ✅ **COMPLETADO el 2026-05-21.**
 
-**Pre-requisitos:** ninguno (es el punto de partida).
+**Objetivo:** cerrar todas las decisiones abiertas y los puntos ciegos antes de tocar BD.
 
-**Tareas:**
+**Resultado — decisiones:** las 11 decisiones (D1-D10 + H1 + nomenclatura) quedaron resueltas y registradas en §3.2. Las más relevantes: modelo M:N para pacientes (D-T5), ejecución directa a producción con protocolo de 9 pasos (D-T6). Ver tabla de resoluciones en §3.2.
 
-1. **Resolver decisiones críticas** (§3.2): D7 (agregar `consultas.medico_id`), H1 (definición de "médico atiende a paciente"), D5 (configurar Supabase local).
-2. **Resolver decisiones operativas y cosméticas** (§3.2): D1, D2, D3, D4, D6, D8, D9, D10, nomenclatura.
-3. **Cerrar auditorías pendientes** (puntos ciegos identificados en §4):
-   - Auditar schema y policies de la tabla `addendums` (query READ-ONLY).
-   - Enumerar exhaustivamente los 10+ formularios frontend que hacen INSERT directo en `documentos` (grep en `src/`).
-   - Investigar cómo se accede al bucket `firmas-medicos` sin policies (¿service role?).
-   - Confirmar la estructura de carpetas del bucket `documentos-pdf` (¿`clinicas/{uuid}/...` o plana?).
+**Resultado — auditorías cerradas:** cinco investigaciones de lectura cerraron los puntos ciegos. Hallazgos:
 
-**Entregables:**
-- Todas las decisiones D1-D10 + H1 + nomenclatura resueltas y registradas en §3.
-- Schema de `addendums` documentado.
-- Lista exacta de formularios con INSERT directo.
-- Claridad sobre acceso a `firmas-medicos` y estructura de `documentos-pdf`.
+#### A.1 — Uso de `pacientes.medico_id` (hallazgo central)
 
-**Validación:** revisión conjunta de que no quedan decisiones abiertas ni puntos ciegos.
+La visibilidad de pacientes HOY **no depende de `medico_id`**: la policy `pacientes_select_activos` filtra solo por `clinica_id`. La única policy que filtraba por médico fue eliminada el 2026-04-29 (migración `20260429_b2_01`).
 
-**Riesgo:** — (no toca BD ni código).
+Consecuencias:
+- **Riesgo técnico bajo** para migrar a M:N: ~13 call-sites que listan pacientes dependen 100% de la RLS, no de `medico_id`. Ajustar la policy `pacientes_select_activos` los cubre a todos sin tocar código.
+- **Cambio de comportamiento** confirmado: hoy un médico invitado ve todos los pacientes de la clínica; tras Etapa 5 verá solo los suyos.
 
-**Rollback:** N/A (solo decisiones y lectura).
+#### A.2 — Tabla `addendums`
+
+Existe y está congelada desde su creación. Schema: `id`, `consulta_id` (FK → `consultas`, ON DELETE RESTRICT), `contenido`, `medico_id` (creador, NOT NULL, **sin FK**), `medico_nombre`, `created_at`. No tiene `clinica_id` ni `paciente_id`; se aísla vía JOIN `consultas → pacientes.clinica_id`. RLS habilitado, 2 policies (`addendums_select`, `addendums_insert`); **sin UPDATE ni DELETE → inmutable por diseño**. El INSERT actual NO valida `medico_id = auth.uid()` (control delegado al API route).
+
+#### A.3 — Formularios con INSERT directo a `documentos`
+
+Confirmado el hallazgo H3. **8 formularios** hacen INSERT directo client-side SIN setear `subido_por`: `RecetaForm`, `EscritoMedicoForm`, `ConsentimientoInformadoForm`, `SolicitudImagenForm`, `SolicitudLabForm`, `SolicitudInternamientoForm`, `NotaHonorariosForm`, `PlanSuplementacionForm`. También `sync.ts` del Búnker y el endpoint zombie `api/documentos/route.ts`. Único que SÍ setea `subido_por`: `ModalSubirDocumento.tsx` (uploader de labs).
+
+#### A.4 — Bucket `firmas-medicos`
+
+Acceso 100% server-side con service role (`createAdminClient`). El cliente nunca toca el bucket; recibe signed URLs efímeros vía `/api/me/perfil-medico`. Funciona sin policies porque service role bypassa RLS. **No requiere policies** — se documentará como intencional.
+
+#### A.5 — Bucket `documentos-pdf`
+
+Path **plano por paciente**: `{paciente_id}/{filename}`. NO tiene `clinicas/` ni `medico_id` en el path. Consecuencia para 5.K: la policy puede resolver pertenencia por subquery sobre `paciente_id`, **sin necesidad de mover archivos físicamente**. (No confundir con `labs-documentos`, que sí usa path jerárquico por clínica.)
+
+#### Puntos de integración detectados (insumo para sub-pasos siguientes)
+
+- `src/app/api/pacientes/route.ts:124-166` — único lugar que escribe `medico_id` al crear pacientes; debe insertar también la fila inicial en `paciente_medico` (sub-paso 5.B / 5.E).
+- `metricas/route.ts` y `dashboard/usuarios/route.ts` — métricas super-admin con atribución 1 paciente → 1 médico; ajustar al modelo M:N (sub-paso 5.E).
+- 8 formularios + `sync.ts` — corregir para setear `subido_por` (sub-paso 5.G).
+- `QuickPatientModal.tsx` / `pacientes/nuevo/page.tsx` — dropdown de selección única de médico; coherente con "asignar a un médico al crear" (decisión confirmada en 5.A).
+
+**Validación:** ✅ Sin decisiones abiertas ni puntos ciegos. Sub-paso 5.A cerrado.
+
+**Riesgo:** — (no tocó BD ni código; solo decisiones y lectura).
+
+**Rollback:** N/A.
 
 ---
 
-### 5.B — DDL: agregar `consultas.medico_id` + backfill
+### 5.B — DDL: `consultas.medico_id` + tabla `paciente_medico` + backfills
 
-**Objetivo:** agregar la columna `medico_id` a la tabla `consultas` para habilitar la privacidad bidireccional (invariante 22).
+**Objetivo:** preparar el schema para el modelo de visibilidad de Etapa 5. Dos cambios estructurales: (1) agregar `medico_id` a `consultas` para la privacidad bidireccional de consultas (invariante 22); (2) crear la tabla de unión `paciente_medico` para la visibilidad M:N de pacientes (decisión D-T5).
 
-**Pre-requisitos:** 5.A resuelto (decisión D7 confirmada como D7-A).
+**Pre-requisitos:** 5.A completado (D7-A y D-T5 confirmadas).
+
+**Importancia:** es el sub-paso DDL más crítico de Etapa 5. Es el único que crea estructura nueva, y el backfill de `paciente_medico` es la base de toda la visibilidad de pacientes. Bloquea 5.E (policies de pacientes) y 5.F (policies de consultas). Recibe el protocolo de 9 pasos completo (D-T6) con smoke test extendido.
 
 **Tareas:**
+
+*Parte 1 — `consultas.medico_id`:*
 
 1. Snapshot lógico de `consultas` (conteo de filas, estructura actual).
 2. `ALTER TABLE consultas ADD COLUMN medico_id uuid REFERENCES profiles(id)`.
 3. Backfill: las consultas legacy quedan con `medico_id = NULL` (decisión D-T1).
-4. Verificación post-migración: la columna existe, las filas legacy tienen NULL, el FK es válido.
+
+*Parte 2 — tabla `paciente_medico`:*
+
+4. Snapshot lógico de `pacientes` (conteo de filas, cuántas tienen `medico_id` no nulo).
+5. `CREATE TABLE paciente_medico` con: `paciente_id` (FK → `pacientes`), `medico_id` (FK → `profiles`), PK compuesta `(paciente_id, medico_id)`, columnas de auditoría (`created_at`, y opcionalmente `asignado_por`). La estructura exacta se cierra en la fase de diseño SQL del sub-paso.
+6. Habilitar RLS en `paciente_medico` (las policies de esta tabla se definen aquí o en 5.E, a decidir durante el diseño).
+7. Backfill: por cada paciente con `medico_id` no nulo, insertar una fila `(paciente_id, medico_id)` en `paciente_medico`. Decidir durante el diseño qué hacer con pacientes de `medico_id` nulo (si los hubiera): probablemente se omiten y se reportan para revisión manual.
+
+*Parte 3 — verificación:*
+
+8. Verificación post-migración:
+   - `consultas.medico_id` existe, FK válido, filas legacy en NULL.
+   - `paciente_medico` existe con RLS habilitado.
+   - Conteo: nº de filas en `paciente_medico` == nº de pacientes con `medico_id` no nulo (el backfill no perdió ni duplicó).
 
 **Entregables:**
 - Columna `consultas.medico_id` creada.
-- Migración registrada en `supabase/migrations/`.
+- Tabla `paciente_medico` creada y backfilleada.
+- Una o más migraciones registradas en `supabase/migrations/` (decisión D1-B: troceadas; se puede separar la Parte 1 de la Parte 2 en dos migraciones).
 
-**Validación:** query de verificación que confirme columna creada + conteo de filas NULL.
+**Validación:** queries de verificación que confirmen ambas estructuras + conteos de backfill correctos. Smoke test extendido: con una cuenta real, verificar que un paciente existente sigue visible para su médico tras el backfill.
 
-**Riesgo:** **Alto.** Es un `ALTER TABLE` sobre una tabla productiva con datos clínicos. Mitigación: snapshot lógico previo + backup Supabase Pro + `DO` block atómico.
+**Riesgo:** **Alto.** Dos cambios estructurales sobre tablas productivas con datos clínicos. El backfill de `paciente_medico` es el punto más delicado: si pierde filas, médicos dejan de ver pacientes suyos. Mitigación: snapshot lógico previo de ambas tablas + backup Supabase Pro + `DO` blocks atómicos + verificación de conteos + simulación previa del backfill (contar antes cuántas filas debería generar).
 
-**Rollback:** `ALTER TABLE consultas DROP COLUMN medico_id` (la columna es nueva, sin datos que perder porque legacy es NULL).
+**Rollback:**
+- `consultas.medico_id`: `ALTER TABLE consultas DROP COLUMN medico_id` (columna nueva, legacy en NULL, sin pérdida).
+- `paciente_medico`: `DROP TABLE paciente_medico` (tabla nueva; mientras ninguna policy de otra tabla la referencie todavía, el DROP es limpio).
+- Ambos scripts DOWN se escriben y revisan ANTES de aplicar (protocolo D-T6, paso 2).
+
+**Nota de integración:** tras crear `paciente_medico`, el endpoint `src/app/api/pacientes/route.ts` debe modificarse para insertar la fila inicial en la tabla de unión al crear cada paciente. Este cambio de código TS se coordina en el sub-paso 5.E (cuando se reescriben las policies de `pacientes`), no en 5.B — 5.B es solo DDL + backfill de datos existentes.
 
 ---
 
 ### 5.C — Crear helpers `SECURITY DEFINER`
 
-**Objetivo:** crear las 5 funciones helper que las policies de los sub-pasos siguientes van a usar.
+**Objetivo:** crear las 6 funciones helper que las policies de los sub-pasos siguientes van a usar.
 
-**Pre-requisitos:** 5.B aplicado (las funciones pueden referenciar el nuevo schema de `consultas`).
+**Pre-requisitos:** 5.B aplicado (las funciones pueden referenciar el nuevo schema de `consultas` y la tabla `paciente_medico`).
 
 **Tareas:**
 
-Crear las 5 funciones (ver inventario §4.3):
+Crear las 6 funciones (ver inventario §4.3):
 1. `clinica_dentro_de_limite()`
 2. `clinica_no_suspendida()`
 3. `clinica_tiene_acceso()`
 4. `soy_admin_de_clinica()`
 5. `paciente_pertenece_a_mi_clinica(paciente_id uuid)`
+6. `soy_medico_tratante(paciente_id uuid)` — base de la visibilidad M:N de pacientes (D-T5); nombre tentativo, se confirma al diseñar el SQL.
 
 **Restricciones de diseño (lección Phase 8.1, ver §7.1):**
 - Todas `SECURITY DEFINER` + `STABLE` + `SET search_path` explícito.
 - Ninguna debe hacer `SELECT` sobre la misma tabla que la policy que la usará (evitar recursión).
 - `clinica_tiene_acceso()` usa la columna declarativa `clinicas.ha_tenido_acceso_premium`.
+- `paciente_pertenece_a_mi_clinica()` hace `SELECT` sobre `pacientes`: usable solo en policies de otras tablas, NUNCA en la policy de `pacientes`.
+- `soy_medico_tratante()` hace `SELECT` sobre `paciente_medico`: se usa en la policy de `pacientes` (sin recursión, son tablas distintas), pero NO en la policy de la propia `paciente_medico`.
 - **Decisión durante diseño:** el predicado de `clinica_tiene_acceso()` debe incluir `'vencido'` como estado bloqueante (no solo `'cancelado'`), para cerrar el hallazgo C.2.a desde la RLS.
 
+**Pendiente de decidir al diseñar:** las policies de la propia tabla `paciente_medico` (quién puede ver/insertar/eliminar filas de unión). Se resuelven aquí o en 5.E — a confirmar durante el diseño SQL.
+
 **Entregables:**
-- 5 funciones creadas en producción.
+- 6 funciones creadas en producción.
 - Migración registrada.
 - Cada función probada individualmente con queries de prueba.
 
@@ -840,34 +974,70 @@ Crear las 5 funciones (ver inventario §4.3):
 
 ---
 
-### 5.E — Reescribir policies de pacientes
+### 5.E — Reescribir policies de pacientes + paciente_medico (modelo M:N)
 
-**Objetivo:** reescribir las policies de `pacientes` para implementar la visibilidad correcta por rol (invariantes 21, 22, 23) e integrar definitivamente el hotfix 5.D.
+**Objetivo:** implementar la visibilidad de pacientes del modelo M:N (D-T5). Es un sub-paso de 3 frentes coordinados: policies de BD, integración del INSERT, y ajuste de métricas. Los tres deben aplicarse juntos — si las policies M:N se activan pero el INSERT no puebla `paciente_medico`, los pacientes nuevos quedan invisibles para su propio médico.
 
-**Pre-requisitos:** 5.A resuelto (especialmente H1: definición de "médico atiende a paciente"), 5.C aplicado (helpers disponibles).
+**Pre-requisitos:** 5.B aplicado (tabla `paciente_medico` creada y backfilleada), 5.C aplicado (los 6 helpers disponibles, en especial `soy_medico_tratante()` y `soy_admin_de_clinica()`).
 
-**Tareas:**
+#### Frente BD-1 — Policies de `pacientes`
 
-1. Investigación con Claude Code: revisar las 5 policies actuales de `pacientes` y el modelo objetivo (`ROLES_POST_REFACTOR.md §2.2`).
-2. Diseñar el SQL exacto de las policies según la decisión H1:
-   - SELECT activos: médico invitado ve solo sus pacientes; admin ve todos; secretaria ve todos.
-   - SELECT inactivos: integrar hotfix 5.D al modelo definitivo.
-   - INSERT: agregar gates de suscripción (`clinica_dentro_de_limite()`, `clinica_no_suspendida()`).
-   - UPDATE: discriminación por médico + rol.
-   - DELETE (`pacientes_delete_solo_sin_historial`): restringir a `super_admin` (hallazgo H7).
-3. Aplicar vía `DO` block atómico con snapshot lógico previo.
-4. Verificación post-aplicación + smoke test funcional con los 4 roles.
+1. Investigación con Claude Code: revisar las 5 policies actuales de `pacientes` y el modelo objetivo (`ROLES_POST_REFACTOR.md §2.2`, invariantes 21-23).
+2. Diseñar el SQL exacto:
+   - **SELECT activos:** médico invitado ve solo pacientes donde `soy_medico_tratante(id)` es true; admin de clínica ve todos los de su clínica (`soy_admin_de_clinica()`); secretaria ve todos los de su clínica; `super_admin` según su lógica.
+   - **SELECT inactivos:** integrar el hotfix 5.D al modelo definitivo (la policy `pacientes_select_inactivos_admin` se alinea con el modelo nuevo).
+   - **INSERT:** agregar gates de suscripción (`clinica_dentro_de_limite()`, `clinica_no_suspendida()`).
+   - **UPDATE:** discriminación por médico tratante + rol.
+   - **DELETE** (`pacientes_delete_solo_sin_historial`): restringir a `super_admin` (hallazgo H7).
+3. ⚠️ Restricción anti-recursión: la policy de `pacientes` NO puede usar `paciente_pertenece_a_mi_clinica()` (esa función hace `SELECT` sobre `pacientes`). Sí puede usar `soy_medico_tratante()` (consulta `paciente_medico`, tabla distinta) y `soy_admin_de_clinica()` (consulta `profiles`).
+
+#### Frente BD-2 — Policies de la tabla `paciente_medico`
+
+4. Diseñar y crear las policies RLS de la propia tabla de unión `paciente_medico`:
+   - **SELECT:** un médico ve sus propias filas de unión; el admin de clínica ve las de su clínica.
+   - **INSERT:** quién puede asignar un médico a un paciente (médico que crea, admin, secretaria — a definir en el diseño).
+   - **DELETE:** quién puede desvincular un médico de un paciente.
+   - ⚠️ Estas policies NO deben usar `soy_medico_tratante()` (haría recursión sobre `paciente_medico`); se escriben con lógica directa.
+
+#### Frente TS-1 — Integración del INSERT de pacientes
+
+5. Modificar `src/app/api/pacientes/route.ts` (líneas ~124-166): al crear un paciente, además de setear `pacientes.medico_id` (creador), insertar la fila inicial en `paciente_medico` con el médico asignado. Esto es obligatorio: sin ello, ningún paciente nuevo queda vinculado.
+
+#### Frente TS-2 — Ajuste de métricas super-admin
+
+6. Ajustar las métricas que asumen atribución 1 paciente → 1 médico, ahora que un paciente puede tener varios médicos:
+   - `src/app/api/super-admin/metricas/route.ts` (líneas ~21, 78).
+   - `src/app/api/super-admin/dashboard/usuarios/route.ts` (líneas ~119, 133, 153).
+   El criterio exacto de las métricas (¿contar por creador? ¿por cada médico tratante?) se decide al diseñar este frente.
+
+#### Aplicación y validación
+
+7. Aplicar las policies vía `DO` block atómico con snapshot lógico previo. Aplicar los cambios TS como commits coordinados.
+8. Verificación post-aplicación + smoke test extendido con los 4 roles.
 
 **Entregables:**
-- Policies de `pacientes` reescritas según modelo nuevo.
+- Policies de `pacientes` reescritas con modelo M:N.
+- Policies de `paciente_medico` creadas.
 - Hotfix 5.D integrado y registrado como migración (cierra la deuda pendiente de 5.D).
-- Migración registrada en `supabase/migrations/`.
+- `api/pacientes/route.ts` poblando `paciente_medico`.
+- 2 métricas super-admin ajustadas.
+- Migración(es) registrada(s) en `supabase/migrations/` + commits TS.
 
-**Validación:** smoke test con médico invitado (ve solo sus pacientes), admin (ve todos), secretaria (ve todos), super_admin. Verificar soft delete sigue funcionando.
+**Validación:** smoke test exhaustivo —
+- Médico invitado A ve solo SUS pacientes; NO ve los de médico invitado B.
+- Admin de clínica ve todos los pacientes de la clínica.
+- Secretaria ve todos los pacientes de la clínica.
+- Crear un paciente nuevo → aparece en `paciente_medico` → visible para su médico.
+- Soft delete sigue funcionando (regresión del hotfix 5.D).
+- super_admin sin regresiones.
 
-**Riesgo:** **Alto.** `pacientes` es la tabla base que las demás referencian vía `paciente_pertenece_a_mi_clinica()`. Un error aquí cascada a todo. Mitigación: es la primera tabla que se reescribe, con validación exhaustiva antes de continuar a 5.F.
+**Riesgo:** **Alto.** `pacientes` es la tabla base y este sub-paso introduce el modelo M:N completo + cambios de código TS. Un error deja pacientes invisibles para sus médicos. Mitigación: es la primera tabla que se reescribe; validación exhaustiva antes de continuar a 5.F; simulación previa del predicado (protocolo D-T6, paso 3).
 
-**Rollback:** restaurar las 5 policies originales desde el snapshot lógico capturado al inicio del sub-paso.
+**Rollback:**
+- Policies de `pacientes`: restaurar las 5 originales desde snapshot lógico.
+- Policies de `paciente_medico`: `DROP POLICY` de las nuevas (la tabla queda con RLS pero sin policies = acceso denegado, estado seguro).
+- Cambios TS: `git revert` de los commits correspondientes.
+- Los 3 frentes se revierten de forma coordinada.
 
 ---
 
@@ -881,11 +1051,12 @@ Crear las 5 funciones (ver inventario §4.3):
 
 1. Investigación con Claude Code: revisar las 4 policies actuales (todas usan `EXISTS (paciente WHERE clinica_id)`).
 2. Diseñar el SQL exacto:
-   - SELECT: médico ve consultas con `medico_id = auth.uid()`; admin ve todas las de su clínica; `medico_id IS NULL` (legacy) visible solo para admin/super_admin (decisión D-T1).
-   - INSERT: validar `medico_id` y pertenencia del paciente a la clínica.
-   - UPDATE/DELETE: solo el creador o el admin.
-3. Aplicar vía `DO` block atómico con snapshot lógico previo.
-4. Verificación + smoke test.
+   - **SELECT:** médico ve consultas con `medico_id = auth.uid()`; admin de clínica ve todas las de su clínica (`soy_admin_de_clinica()`); `medico_id IS NULL` (legacy) visible solo para admin/`super_admin` (decisión D-T1).
+   - **INSERT:** validar `medico_id` y la pertenencia del paciente a la clínica vía `paciente_pertenece_a_mi_clinica(paciente_id)`.
+   - **UPDATE/DELETE:** solo el creador (`medico_id = auth.uid()`) o el admin de clínica.
+3. ⚠️ Nota anti-recursión: las policies de `consultas` SÍ pueden usar `paciente_pertenece_a_mi_clinica()` y `soy_medico_tratante()` — ambas consultan tablas distintas de `consultas` (`pacientes` y `paciente_medico` respectivamente), por lo que no generan recursión.
+4. Aplicar vía `DO` block atómico con snapshot lógico previo.
+5. Verificación + smoke test.
 
 **Entregables:**
 - 4 policies de `consultas` reescritas.
@@ -903,22 +1074,34 @@ Crear las 5 funciones (ver inventario §4.3):
 
 **Objetivo:** reescribir las 4 policies de `documentos` para privacidad bidireccional Y resolver el hallazgo H3 (formularios frontend con INSERT directo sin setear `subido_por`).
 
-**Pre-requisitos:** 5.A resuelto (lista exacta de formularios enumerada), 5.C aplicado, 5.E aplicado.
+**Pre-requisitos:** 5.A completado (lista de formularios ya enumerada, ver A.3), 5.C aplicado, 5.E aplicado.
 
 **Tareas:**
 
-1. Investigación con Claude Code: revisar las 4 policies + el inventario de formularios de 5.A.
+1. Investigación con Claude Code: revisar las 4 policies de `documentos`.
 2. Diseñar el SQL exacto:
-   - SELECT: médico ve documentos con `subido_por = auth.uid()`; admin ve todos; `subido_por IS NULL` (legacy) visible solo para admin/super_admin.
-   - INSERT/UPDATE/DELETE: privacidad bidireccional vía `subido_por`.
-3. **Auditar y corregir los 10+ formularios frontend** (hallazgo H3): cada formulario que hace INSERT directo en `documentos` debe setear `subido_por = auth.uid()`. Decidir si se centralizan en `/api/documentos` o se corrigen individualmente.
-4. Aplicar policies vía `DO` block atómico. Aplicar correcciones de formularios como cambios TS.
-5. Verificación + smoke test.
+   - **SELECT:** médico ve documentos con `subido_por = auth.uid()`; admin de clínica ve todos (`soy_admin_de_clinica()`); `subido_por IS NULL` (legacy) visible solo para admin/`super_admin`.
+   - **INSERT/UPDATE/DELETE:** privacidad bidireccional vía `subido_por`.
+   - ⚠️ Nota anti-recursión: la policy de `documentos` puede usar `paciente_pertenece_a_mi_clinica()` (consulta `pacientes`, tabla distinta) sin recursión.
+3. **Corregir los 8 formularios frontend** que hacen INSERT directo en `documentos` sin setear `subido_por` (hallazgo H3, confirmado en auditoría A.3). Lista exacta:
+   - `RecetaForm.tsx`
+   - `EscritoMedicoForm.tsx`
+   - `ConsentimientoInformadoForm.tsx`
+   - `SolicitudImagenForm.tsx`
+   - `SolicitudLabForm.tsx`
+   - `SolicitudInternamientoForm.tsx`
+   - `NotaHonorariosForm.tsx`
+   - `PlanSuplementacionForm.tsx`
+   
+   Cada uno debe setear `subido_por` con el `user.id` del usuario actual (obtenible client-side vía `supabase.auth.getUser()`). Además: revisar `sync.ts` del Búnker (INSERT client-side, también sin `subido_por`) y el endpoint zombie `api/documentos/route.ts` (ningún formulario lo invoca; evaluar si se elimina o se reactiva como ruta centralizada).
+4. ⚠️ Orden crítico: las correcciones de formularios deben aplicarse ANTES o EN EL MISMO despliegue que las policies. Si las policies filtran por `subido_por` y un formulario aún crea documentos con `subido_por NULL`, el médico no vería su propio documento recién creado.
+5. Aplicar policies vía `DO` block atómico. Aplicar correcciones de formularios como commits TS coordinados.
+6. Verificación + smoke test.
 
 **Entregables:**
 - 4 policies de `documentos` reescritas.
-- 10+ formularios corregidos para setear `subido_por`.
-- Migración registrada + commit de cambios TS.
+- 8 formularios corregidos para setear `subido_por` + decisión sobre `sync.ts` y el endpoint zombie.
+- Migración registrada + commits de cambios TS.
 
 **Validación:** smoke test — crear documento desde cada tipo de formulario y verificar que `subido_por` queda seteado. Médico A no ve documentos de médico B.
 
@@ -938,11 +1121,12 @@ Crear las 5 funciones (ver inventario §4.3):
 
 1. Investigación con Claude Code: revisar las 4 policies actuales (solo filtran `clinica_id`).
 2. Diseñar el SQL exacto:
-   - SELECT: médico invitado ve citas con `medico_id = auth.uid()`; admin y secretaria ven todas las de la clínica.
-   - INSERT: gate de suscripción + admin/secretaria pueden crear para cualquier médico.
-   - UPDATE/DELETE: médico invitado solo las suyas; admin/secretaria todas.
-3. Aplicar vía `DO` block atómico con snapshot previo.
-4. Verificación + smoke test.
+   - **SELECT:** médico invitado ve citas con `medico_id = auth.uid()`; admin de clínica (`soy_admin_de_clinica()`) y secretaria ven todas las de la clínica.
+   - **INSERT:** gate de suscripción + admin/secretaria pueden crear para cualquier médico.
+   - **UPDATE/DELETE:** médico invitado solo las suyas; admin/secretaria todas.
+3. ⚠️ Nota: `appointments` ya tiene columna `medico_id` (no requiere migración de schema). El caso de la secretaria —ve toda la agenda pero no es médico tratante— se resuelve con un OR de rol explícito en el predicado, no vía `soy_medico_tratante()`.
+4. Aplicar vía `DO` block atómico con snapshot previo.
+5. Verificación + smoke test.
 
 **Entregables:**
 - 4 policies de `appointments` reescritas.
@@ -960,27 +1144,28 @@ Crear las 5 funciones (ver inventario §4.3):
 
 **Objetivo:** reescribir las policies de `mediciones_analitos`, `calculadora_resultados` y `addendums` para privacidad bidireccional (invariante 22).
 
-**Pre-requisitos:** 5.A resuelto (schema de `addendums` auditado), 5.C aplicado, 5.E aplicado.
+**Pre-requisitos:** 5.A completado (schema de `addendums` ya auditado, ver A.2), 5.C aplicado, 5.E aplicado.
 
 **Tareas:**
 
 1. Investigación con Claude Code: revisar las policies de las 3 tablas.
    - `mediciones_analitos`: 4 policies, creador en columna `creado_por` (NOT NULL).
    - `calculadora_resultados`: 4 policies, creador en columna `medico_id` (NOT NULL).
-   - `addendums`: schema y policies a confirmar en 5.A.
-2. Diseñar el SQL exacto para las 3:
-   - SELECT: médico ve solo lo que él creó; admin ve todo de su clínica.
-   - INSERT/UPDATE/DELETE: privacidad bidireccional.
+   - `addendums`: 2 policies (`addendums_select`, `addendums_insert`), creador en `medico_id` (NOT NULL, sin FK); tabla inmutable (sin UPDATE ni DELETE por diseño); se aísla vía JOIN `consultas → pacientes.clinica_id`.
+2. Diseñar el SQL exacto:
+   - **`mediciones_analitos` y `calculadora_resultados`** — SELECT: médico ve solo lo que él creó (`creado_por` / `medico_id` = `auth.uid()`); admin ve todo de su clínica. INSERT/UPDATE/DELETE: privacidad bidireccional.
+   - **`addendums`** — modelo distinto: un addendum hereda la visibilidad de su consulta padre. SELECT: ves el addendum si ves la consulta referenciada por `consulta_id` (es decir, si la policy de `consultas` te deja ver esa consulta). NO se agregan UPDATE ni DELETE (se preserva la inmutabilidad por diseño). INSERT: alinear con quién puede escribir en esa consulta.
 3. Aplicar vía `DO` block atómico con snapshot previo.
 4. Verificación + smoke test.
 
 **Entregables:**
-- Policies de las 3 tablas reescritas.
+- Policies de `mediciones_analitos` y `calculadora_resultados` reescritas.
+- Policy `addendums_select` alineada a "heredar visibilidad de la consulta padre"; inmutabilidad preservada.
 - Migración registrada.
 
-**Validación:** smoke test — médico A registra medición/cálculo, médico B no lo ve, admin sí.
+**Validación:** smoke test — médico A registra medición/cálculo, médico B no lo ve, admin sí. Para addendums: médico A ve addendums de SUS consultas, no los de consultas de otro médico.
 
-**Riesgo:** **Bajo-medio.** Las 3 tablas tienen columna de creador NOT NULL (sin caso legacy NULL como `consultas`). `addendums` es la incógnita: depende de la auditoría de 5.A.
+**Riesgo:** **Bajo-medio.** `mediciones_analitos` y `calculadora_resultados` tienen creador NOT NULL (sin caso legacy NULL). `addendums` está bien acotada: inmutable y con scope heredado de `consultas`; su policy SELECT depende de que 5.F (consultas) ya esté aplicado.
 
 **Rollback:** restaurar policies originales desde snapshot.
 
@@ -1022,30 +1207,37 @@ Crear las 5 funciones (ver inventario §4.3):
 
 ### 5.K — Reescribir policies de Storage (bucket documentos-pdf)
 
-**Objetivo:** cerrar la brecha de seguridad del bucket `documentos-pdf` (3 policies permisivas que permiten acceso cross-clínica).
+**Objetivo:** cerrar la brecha de seguridad del bucket `documentos-pdf` — sus 3 policies actuales (`authenticated_select/insert/delete`) solo verifican `bucket_id`, permitiendo a cualquier usuario autenticado acceder a archivos de cualquier clínica.
 
-**Pre-requisitos:** 5.A resuelto (estructura de carpetas del bucket confirmada + acceso a `firmas-medicos` investigado).
+**Pre-requisitos:** 5.A completado (estructura de paths confirmada en A.5, acceso a `firmas-medicos` confirmado en A.4), 5.C aplicado (helper `paciente_pertenece_a_mi_clinica()` disponible).
+
+**Contexto de los hallazgos de 5.A (elimina incógnitas):**
+
+- **A.5 — `documentos-pdf`:** path plano `{paciente_id}/{filename}`. NO requiere mover archivos físicamente: la policy puede extraer el `paciente_id` del primer segmento del path y resolver pertenencia por subquery. La bifurcación de "alto riesgo / migrar archivos" que contemplaba el plan original queda descartada.
+- **A.4 — `firmas-medicos`:** acceso 100% server-side vía service role; el cliente nunca toca el bucket. NO requiere policies. Solo se documenta como decisión intencional.
 
 **Tareas:**
 
-1. Investigación con Claude Code: confirmar la estructura de paths actual del bucket `documentos-pdf`.
-2. **Bifurcación según hallazgo de 5.A:**
-   - **Si los paths YA están organizados como `clinicas/{uuid}/...`:** reescribir las 3 policies (`authenticated_select/insert/delete`) siguiendo el patrón de `labs-documentos`. Riesgo medio.
-   - **Si los paths NO están organizados por clínica:** se requiere además una migración de archivos en Storage (mover archivos a la nueva estructura). Riesgo alto. Esto podría justificar dividir 5.K en dos sub-pasos o diferirlo.
-3. Reescribir las 3 policies para discriminar por clínica.
-4. Evaluar `firmas-medicos`: si se accede vía service role y funciona, documentar; si requiere policies, agregarlas.
-5. Verificación + smoke test (descargar/subir documento desde 2 clínicas distintas).
+1. Investigación con Claude Code: revisar las 3 policies actuales de `documentos-pdf` y el patrón de referencia de `labs-documentos`.
+2. Diseñar el SQL exacto de las 3 policies nuevas. Estrategia: extraer `paciente_id` del path con `(storage.foldername(name))[1]` y validar que ese paciente pertenece a la clínica del usuario, vía `paciente_pertenece_a_mi_clinica()`.
+   - **SELECT:** solo si el `paciente_id` del path pertenece a la clínica del usuario.
+   - **INSERT/DELETE:** mismo criterio.
+3. Aplicar las 3 policies vía `DO` block atómico con snapshot lógico previo.
+4. Documentar `firmas-medicos` como "sin policies por diseño — acceso exclusivo service role" (no requiere cambios).
+5. Verificación + smoke test: usuario de Clínica A intenta acceder a un archivo de Clínica B (debe fallar); usuario de Clínica A accede a los suyos (debe funcionar).
 
 **Entregables:**
-- 3 policies de `documentos-pdf` reescritas con restricción por clínica.
-- Decisión documentada sobre `firmas-medicos`.
+- 3 policies de `documentos-pdf` reescritas con restricción por clínica (vía `paciente_id` del path).
+- `firmas-medicos` documentado como intencionalmente sin policies.
 - Migración registrada.
 
-**Validación:** smoke test — usuario de Clínica A NO puede acceder a archivos de Clínica B; usuario de Clínica A SÍ accede a los suyos.
+**Validación:** smoke test — usuario de Clínica A NO accede a archivos de Clínica B; usuario de Clínica A SÍ accede a los de su clínica.
 
-**Riesgo:** **Medio-alto.** El riesgo real depende del hallazgo de 5.A sobre la estructura de paths. Si requiere mover archivos físicos, el riesgo escala.
+**Riesgo:** **Medio.** Sin migración de archivos (descartada por A.5), el riesgo baja respecto a la estimación original. Es reescritura de 3 policies de Storage con un subquery. Mitigación: snapshot previo + simulación del predicado + smoke test cross-clínica.
 
-**Rollback:** restaurar las 3 policies originales desde snapshot. Si hubo migración de archivos, el rollback de archivos es más complejo (requiere plan específico documentado en el momento).
+**Limitación reconocida (riesgo residual aceptado):** el path `{paciente_id}/{filename}` no incluye `medico_id`, por lo que la policy de Storage discrimina hasta nivel **paciente**, no nivel documento individual. Consecuencia: dos médicos que comparten un mismo paciente (modelo M:N) podrían descargar archivos PDF uno del otro si conocen el path exacto. La tabla de metadatos `documentos` SÍ los oculta de los listados (vía `subido_por`, sub-paso 5.G), pero el archivo físico no queda protegido a nivel médico. Esta brecha residual es **menor y aceptable para Etapa 5**: el riesgo crítico (acceso cross-clínica) sí queda cerrado. Cerrar la brecha residual requeriría incluir `medico_id` en el path o servir los PDFs vía endpoint server-side — se difiere como posible mejora futura.
+
+**Rollback:** restaurar las 3 policies originales desde snapshot lógico. Sin migración de archivos, no hay rollback de Storage físico que gestionar.
 
 ---
 
@@ -1062,12 +1254,20 @@ Crear las 5 funciones (ver inventario §4.3):
    - Invariante 21: admin de clínica ve TODO de su clínica.
    - Invariante 22: privacidad bidireccional entre médicos invitados (A no ve lo de B, B no ve lo de A).
    - Invariante 23: datos del paciente visibles a médicos que lo atienden; datos generados privados.
-3. Smoke test transversal: login, crear paciente, crear consulta, subir documento, agendar cita, registrar medición, usar calculadora — con los 4 roles.
-4. Verificar que NO hay recursión RLS (revisar logs de Supabase, tiempos de respuesta).
-5. Verificar que el soft delete sigue funcionando (regresión del hotfix 5.D).
+3. **Validar escenarios del modelo M:N (decisión D-T5)** — no cubiertos por los 11 casos originales:
+   - **Paciente compartido:** un paciente vinculado a médico A y médico B (dos filas en `paciente_medico`). Ambos lo ven en su lista de pacientes. Pero médico A NO ve las consultas/documentos/mediciones creados por médico B sobre ese paciente, y viceversa (invariante 22 sigue vigente sobre datos generados).
+   - **Cambio de comportamiento confirmado:** un médico invitado que antes veía todos los pacientes de la clínica ahora ve SOLO los suyos. Verificar con una cuenta real que la lista se redujo correctamente.
+   - **Creación de paciente:** crear un paciente nuevo → confirmar que se generó la fila inicial en `paciente_medico` → confirmar que el paciente aparece en la lista de su médico.
+   - **Backfill correcto:** verificar que los pacientes existentes pre-Etapa 5 siguen visibles para su médico creador tras el backfill de `paciente_medico`.
+   - **Admin con filtro:** el admin de clínica ve todos los pacientes y puede filtrar por "solo los míos" (filtro UI).
+4. Smoke test transversal: login, crear paciente, crear consulta, subir documento, agendar cita, registrar medición, usar calculadora — con los 4 roles.
+5. Verificar que NO hay recursión RLS (revisar logs de Supabase, tiempos de respuesta). Atención especial a las policies que usan `soy_medico_tratante()` y `paciente_pertenece_a_mi_clinica()`.
+6. Verificar que el soft delete sigue funcionando (regresión del hotfix 5.D).
+7. Verificar la limitación residual de Storage documentada en §5.K: confirmar que el acceso cross-clínica a `documentos-pdf` quedó cerrado (lo crítico). La brecha residual entre médicos que comparten paciente es conocida y aceptada — solo se deja constancia, no bloquea el cierre.
 
 **Entregables:**
-- Checklist de los 11 casos, cada uno marcado ✅ o 🔴.
+- Checklist de los 11 casos del §9, cada uno marcado ✅ o 🔴.
+- Checklist de los 5 escenarios M:N (tarea 3), cada uno marcado ✅ o 🔴.
 - Reporte de validación final en la Bitácora §8.
 - Si todo pasa: Etapa 5 se declara CERRADA.
 
@@ -1079,11 +1279,14 @@ Crear las 5 funciones (ver inventario §4.3):
 
 **Criterio de cierre de Etapa 5:**
 - ✅ Los 11 casos del §9 pasan.
+- ✅ Los 5 escenarios M:N (tarea 3) pasan.
 - ✅ Invariantes 21, 22, 23 verificados en producción.
+- ✅ Cambio de comportamiento M:N confirmado (médico invitado ve solo sus pacientes).
 - ✅ Sin recursión RLS.
 - ✅ Sin regresiones (soft delete, login, CRUD básico).
+- ✅ Acceso cross-clínica a `documentos-pdf` cerrado.
 - ✅ Todas las migraciones registradas en `supabase/migrations/`.
-- ✅ `ROLES_POST_REFACTOR.md` actualizado (apéndice de funciones, línea 9 de estado).
+- ✅ `ROLES_POST_REFACTOR.md` actualizado (apéndice de funciones, línea 9 de estado, modelo M:N).
 
 ---
 
@@ -1202,6 +1405,8 @@ Etapa 5 es la etapa de mayor riesgo del refactor: toca RLS de BD productiva con 
 
 ### 7.3 Plan de rollback general
 
+> **Relación con el protocolo de ejecución (D-T6):** la decisión D-T6 (§3.1) establece un protocolo de 9 pasos por sub-paso de BD. Este plan de rollback es el componente de contención de ese protocolo. El paso 2 del protocolo (escribir el script DOWN antes de aplicar) y el paso 8 (rollback si el smoke test falla) se apoyan directamente en las 3 capas descritas aquí.
+
 Etapa 5 usa una estrategia de rollback en 3 capas (decisión D6-C):
 
 #### Capa 1 — Snapshot lógico por sub-paso
@@ -1233,8 +1438,10 @@ Backups automáticos de Supabase Pro como red final. Si algo se rompe de forma n
 
 #### Riesgos residuales reconocidos
 
-- **Migración de archivos en Storage (sub-paso 5.K):** si los paths de `documentos-pdf` requieren reorganización, el rollback de archivos físicos NO está cubierto por las 3 capas. Requeriría un plan específico documentado al momento de ejecutar 5.K.
-- **Cambios en código TS (sub-paso 5.G, formularios):** el rollback de código es vía `git revert`, independiente del rollback de BD. Ambos deben coordinarse.
+- **Backfill de `paciente_medico` (sub-paso 5.B):** es el punto más delicado de Etapa 5. Si el backfill pierde o duplica filas, médicos dejan de ver pacientes suyos (o ven ajenos). El rollback es `DROP TABLE paciente_medico` y re-ejecutar, pero exige detectar el error a tiempo. Mitigación: verificación de conteos (filas insertadas == pacientes con `medico_id` no nulo) y simulación previa del backfill.
+- **Cambios en código TS (sub-pasos 5.E y 5.G):** el rollback de código es vía `git revert`, independiente del rollback de BD. En 5.E (integración del INSERT de `paciente_medico` + métricas) y 5.G (8 formularios) los cambios TS y de BD deben revertirse de forma coordinada — revertir solo uno de los dos deja el sistema inconsistente.
+- **Brecha residual de Storage (sub-paso 5.K):** el path `{paciente_id}/{filename}` de `documentos-pdf` no permite discriminar por médico, solo por paciente. Dos médicos que comparten un paciente podrían acceder a archivos uno del otro si conocen el path. Es una limitación aceptada conscientemente (ver §5.K), no un fallo de rollback: el acceso cross-clínica sí queda cerrado.
+- **Cambio de comportamiento M:N (sub-paso 5.E):** tras 5.E, los médicos invitados dejan de ver todos los pacientes de la clínica. No es un error ni requiere rollback — es el comportamiento buscado (D-T5) — pero es un cambio visible para los usuarios; conviene tenerlo presente al validar.
 - **Ventana entre sub-pasos:** entre la aplicación de un sub-paso y el siguiente, el sistema puede quedar en un estado intermedio coherente pero no final. Mitigación: cada sub-paso se diseña para dejar el sistema funcional, no roto.
 
 ---
