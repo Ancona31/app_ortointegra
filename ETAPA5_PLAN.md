@@ -1,8 +1,8 @@
 # ETAPA 5 — PLAN DE EJECUCIÓN
 
-> **Estado:** 🟡 En planeación  
+> **Estado:** 🟡 En ejecución (sub-paso 5.B completado)  
 > **Fecha de creación:** 2026-05-20  
-> **Última actualización:** 2026-05-20 (esqueleto inicial)  
+> **Última actualización:** 2026-05-21 (sub-paso 5.B completado: 5.B.1, 5.B.2, 5.B.3)  
 > **Documento de referencia:** [ROLES_POST_REFACTOR.md](./ROLES_POST_REFACTOR.md)
 >
 > Este documento contiene el plan operativo detallado para implementar Etapa 5 del refactor de roles de Spinus, así como el plan post-Etapa 5 para resolver fugas económicas de enforcement de planes.
@@ -249,7 +249,7 @@ Investigación de lectura pura del repo, ejecutada el 2026-05-20. El reporte con
 |---|---|---|
 | 5.A | Resolver decisiones D1-D10, H1 con usuario | — |
 | 5.B | DDL: `consultas.medico_id` + backfill (decisión D7-A) | Alto |
-| 5.C | Crear 5 helpers SECURITY DEFINER | Bajo |
+| 5.C | Crear 6 helpers SECURITY DEFINER | Bajo |
 | 5.D | Fix mínimo bug soft delete (aislable, hotfix) | Bajo |
 | 5.E | Reescribir policies `pacientes` + RESTRICTIVE Phase 8.1 v2 | Alto |
 | 5.F | Policies `consultas` (requiere 5.B) | Alto |
@@ -743,9 +743,10 @@ Total: **6 funciones nuevas** en sub-paso 5.C.
 | Migración | Operación | Sub-paso | Riesgo |
 |---|---|---|---|
 | `consultas.medico_id` | `ALTER TABLE consultas ADD COLUMN medico_id uuid REFERENCES profiles(id)` | 5.B | Alto |
-| Backfill `consultas` | `UPDATE consultas SET medico_id = NULL` (legacy queda NULL, decisión D-T1) | 5.B | Bajo (NULL explícito) |
 | `paciente_medico` (CREATE) | `CREATE TABLE paciente_medico (paciente_id uuid, medico_id uuid, ...)` — tabla de unión M:N, decisión D-T5 | 5.B | Alto |
 | Backfill `paciente_medico` | Insertar una fila por paciente existente, copiando `pacientes.medico_id` actual como primer médico tratante | 5.B | Medio |
+
+**NOTA (Hallazgo #1 de 5.B.1):** se eliminó la tarea «Backfill `consultas` → `UPDATE consultas SET medico_id = NULL`». El `ALTER TABLE ... ADD COLUMN medico_id uuid` sin `DEFAULT` ya deja todas las filas existentes en `NULL` automáticamente; el `UPDATE` explícito es innecesario y además dañino: dispararía el trigger `audit_consultas`, reescribiendo las 77 filas e inundando `audit_log` sin razón.
 
 **Nota sobre nomenclatura:** la decisión N-C (§3.2) implica que NO se renombran `documentos.subido_por` ni `mediciones_analitos.creado_por`. Solo se agrega `medico_id` a `consultas`.
 
@@ -805,8 +806,8 @@ Esta sección describe el plan de ejecución de Etapa 5 a **nivel operativo**: o
 | Sub-paso | Objetivo | Riesgo | Estado |
 |---|---|---|---|
 | 5.A | Resolver decisiones pendientes + cerrar auditorías pendientes | — | ⏳ Pendiente |
-| 5.B | DDL: agregar `consultas.medico_id` + backfill NULL | Alto | ⏳ Pendiente |
-| 5.C | Crear 5 helpers `SECURITY DEFINER` | Bajo | ⏳ Pendiente |
+| 5.B | DDL: `consultas.medico_id` + tabla `paciente_medico` (M:N) + trigger latch `ha_tenido_acceso_premium` | Alto | ✅ Aplicado 2026-05-21 |
+| 5.C | Crear 6 helpers `SECURITY DEFINER` | Bajo | ⏳ Pendiente |
 | 5.D | Fix bug producción soft delete | Bajo | ✅ Aplicado 2026-05-20 |
 | 5.E | Reescribir policies de `pacientes` | Alto | ⏳ Pendiente |
 | 5.F | Reescribir policies de `consultas` | Alto | ⏳ Pendiente |
@@ -882,7 +883,7 @@ Path **plano por paciente**: `{paciente_id}/{filename}`. NO tiene `clinicas/` ni
 
 1. Snapshot lógico de `consultas` (conteo de filas, estructura actual).
 2. `ALTER TABLE consultas ADD COLUMN medico_id uuid REFERENCES profiles(id)`.
-3. Backfill: las consultas legacy quedan con `medico_id = NULL` (decisión D-T1).
+3. Sin `UPDATE` de backfill: el `ADD COLUMN` sin `DEFAULT` ya deja las consultas legacy en `medico_id = NULL` (decisión D-T1). **No** ejecutar `UPDATE consultas SET medico_id = NULL` — dispararía el trigger `audit_consultas` innecesariamente (Hallazgo #1 de 5.B.1).
 
 *Parte 2 — tabla `paciente_medico`:*
 
@@ -914,6 +915,28 @@ Path **plano por paciente**: `{paciente_id}/{filename}`. NO tiene `clinicas/` ni
 
 **Nota de integración:** tras crear `paciente_medico`, el endpoint `src/app/api/pacientes/route.ts` debe modificarse para insertar la fila inicial en la tabla de unión al crear cada paciente. Este cambio de código TS se coordina en el sub-paso 5.E (cuando se reescriben las policies de `pacientes`), no en 5.B — 5.B es solo DDL + backfill de datos existentes.
 
+#### Sub-pasos de ejecución de 5.B
+
+5.B se ejecutó en **tres migraciones** (decisión D1-B, troceadas). Las dos previstas (Parte 1 = 5.B.1, Parte 2 = 5.B.2) más una tercera descubierta durante la ejecución (5.B.3):
+
+- **5.B.1 — `consultas.medico_id`.** `ALTER TABLE consultas ADD COLUMN medico_id uuid REFERENCES profiles(id) ON DELETE SET NULL` + índice `idx_consultas_medico`. Sin `UPDATE` de backfill (el `ADD COLUMN` deja las 77 filas legacy en `NULL`; ver Hallazgo #1 en §4.4). ✅ Aplicado 2026-05-21, commit `1e7ea9f`.
+- **5.B.2 — tabla `paciente_medico` (M:N) + backfill.** `CREATE TABLE paciente_medico` (PK compuesta `(paciente_id, medico_id)`, FKs a `pacientes`/`profiles`, columna `asignado_por`, RLS habilitada sin policies) + backfill desde `pacientes.medico_id`. ✅ Aplicado 2026-05-21, commit `ff4b0d2`.
+- **5.B.3 — Trigger latch de `ha_tenido_acceso_premium`** (no previsto; ver detalle abajo). ✅ Aplicado 2026-05-21, commit `cf632c9`.
+
+#### 5.B.3 — Trigger latch de `ha_tenido_acceso_premium`
+
+> Sub-paso **no previsto** en el plan original; se descubrió durante el diseño de 5.C.
+
+**Motivo:** la columna `clinicas.ha_tenido_acceso_premium` se backfilleó una sola vez el 2026-05-18 (Etapa 1) y nunca más se actualizaba — cero escrituras en código, cero triggers; estaba "congelada". Esto bloqueaba el diseño de `clinica_tiene_acceso()` (GATE 2 de 5.C), que depende de esa columna para distinguir una clínica "free virgen" de una "free degradada".
+
+**Solución aplicada:** se creó la función `clinicas_latch_premium()` (`SECURITY INVOKER`) y el trigger `trg_clinicas_latch_premium` (`BEFORE INSERT OR UPDATE` sobre `clinicas`). Latch **one-way**: marca `ha_tenido_acceso_premium = true` cuando `es_vip_grant` es `true` O `stripe_subscription_id` no es `NULL`; nunca regresa a `false`.
+
+**Sin backfill correctivo:** el diagnóstico confirmó 0 clínicas desincronizadas.
+
+**Estado:** ✅ Aplicado a producción y verificado bajo protocolo D-T6. Commit `cf632c9`.
+
+**Rollback:** `DROP TRIGGER trg_clinicas_latch_premium ON clinicas;` + `DROP FUNCTION clinicas_latch_premium();`.
+
 ---
 
 ### 5.C — Crear helpers `SECURITY DEFINER`
@@ -934,7 +957,10 @@ Crear las 6 funciones (ver inventario §4.3):
 
 **Restricciones de diseño (lección Phase 8.1, ver §7.1):**
 - Todas `SECURITY DEFINER` + `STABLE` + `SET search_path` explícito.
-- Ninguna debe hacer `SELECT` sobre la misma tabla que la policy que la usará (evitar recursión).
+- **Mecanismo anti-recursión (corrige el wording previo):** lo que rompe la recursión RLS NO es "no tocar la misma tabla", sino que una función `SECURITY DEFINER` cuyo **dueño es `postgres`** (superusuario, BYPASSRLS) ejecuta su cuerpo **saltándose la RLS** — su `SELECT` interno no re-dispara las policies de la tabla consultada. Evidencia en producción: `get_clinica_id()` y `get_my_role()` ya hacen `SELECT` sobre `profiles` y se usan dentro de policies de `profiles` desde hace meses sin recursión. La recursión de Phase 8.1 ocurrió porque el `count(*)` estaba **inline en el predicado de la policy** (contexto `SECURITY INVOKER`, RLS activa), no dentro de una función `SECURITY DEFINER`.
+  - **Consecuencia:** 2 de los 6 helpers DEBEN consultar tablas que también se gatean, y es seguro vía el bypass: `clinica_dentro_de_limite()` (cuenta `pacientes` y se usa en la policy de `pacientes`) y `soy_admin_de_clinica()` (lee `profiles` y se usa en policies de `profiles`).
+  - **Condición NO negociable:** las 6 funciones deben crearse en el SQL Editor con **owner = `postgres`** para garantizar el bypass. Si alguna quedara con otro dueño sin BYPASSRLS, su `SELECT` interno sí dispararía RLS → recursión.
+  - **Regla conservadora (defensa en profundidad):** se reserva solo para los 2 helpers M:N que sí podrían recursar sobre su propia tabla — `paciente_pertenece_a_mi_clinica()` (no usar en la policy de `pacientes`) y `soy_medico_tratante()` (no usar en la policy de `paciente_medico`).
 - `clinica_tiene_acceso()` usa la columna declarativa `clinicas.ha_tenido_acceso_premium`.
 - `paciente_pertenece_a_mi_clinica()` hace `SELECT` sobre `pacientes`: usable solo en policies de otras tablas, NUNCA en la policy de `pacientes`.
 - `soy_medico_tratante()` hace `SELECT` sobre `paciente_medico`: se usa en la policy de `pacientes` (sin recursión, son tablas distintas), pero NO en la policy de la propia `paciente_medico`.
@@ -1387,7 +1413,7 @@ Etapa 5 es la etapa de mayor riesgo del refactor: toca RLS de BD productiva con 
 **Lecciones aplicables a Etapa 5:**
 
 1. **Nunca auto-referenciar una tabla dentro de su propia policy.** Si la policy de `pacientes` necesita información de `pacientes`, debe obtenerla vía una función `SECURITY DEFINER` que rompa el ciclo de evaluación de RLS.
-2. **Las funciones `SECURITY DEFINER` se ejecutan con los privilegios del creador**, saltándose las RLS. Esto las hace seguras para usar dentro de policies, siempre que toquen tablas distintas a la restringida.
+2. **Las funciones `SECURITY DEFINER` con owner `postgres` (superusuario, BYPASSRLS) ejecutan su cuerpo saltándose la RLS.** Por eso pueden consultar con seguridad **incluso la misma tabla** que la policy que las invoca: su `SELECT` interno no re-dispara las policies de esa tabla. Lo que causó la recursión de Phase 8.1 fue un `count(*)` **inline en el predicado de la policy** (contexto `SECURITY INVOKER`, RLS activa), no una función `SECURITY DEFINER`.
 3. **Validar performance después de aplicar policies**, no solo funcionalidad. Revisar tiempos de respuesta y logs de Supabase.
 4. **Las columnas declarativas en la tabla padre** (ej. `clinicas.ha_tenido_acceso_premium`) evitan conteos recursivos. En lugar de "contar pacientes para saber si tiene acceso premium", se lee un booleano ya calculado.
 
@@ -1395,13 +1421,15 @@ Etapa 5 es la etapa de mayor riesgo del refactor: toca RLS de BD productiva con 
 
 | ❌ Patrón peligroso | ✅ Alternativa segura |
 |---|---|
-| `SELECT` sobre tabla X dentro de policy de tabla X | Función `SECURITY DEFINER` que consulta tabla X, llamada desde la policy |
+| `SELECT`/`count(*)` **inline en el predicado de la policy** (contexto `SECURITY INVOKER`, RLS activa), sobre todo si consulta la propia tabla restringida | Encapsular ese `SELECT` en una función `SECURITY DEFINER` (owner `postgres`, BYPASSRLS) llamada desde la policy: puede consultar incluso la misma tabla sin recursión |
 | Conteos dinámicos dentro de policies (`count(*)`) | Columnas declarativas pre-calculadas en tabla padre |
 | `PERMISSIVE` + `OR` que diluye una restricción | `RESTRICTIVE` para gates ortogonales (suspensión, límite) |
 | Funciones sin `SECURITY DEFINER` que tocan tablas restringidas | Funciones `SECURITY DEFINER` + `STABLE` + `SET search_path` |
 | Policies con lógica duplicada copiada en cada tabla | Helpers centralizados (`soy_admin_de_clinica()`, etc.) |
 | Aplicar varias policies a la vez sin validar entre cada una | Aplicar sub-paso por sub-paso, validar antes de continuar |
 | `BEGIN/COMMIT` manual en Supabase SQL Editor | `DO` block atómico (lección Bitácora #100) |
+
+> **Aclaración (corrige el patrón previo):** el peligro NO es que una función `SECURITY DEFINER` consulte la misma tabla que la policy que la usa — eso es seguro cuando la función tiene owner `postgres` (BYPASSRLS), porque su cuerpo se ejecuta saltándose la RLS. El patrón realmente peligroso es poner el `SELECT`/`count(*)` **inline en el predicado de la policy** (se evalúa como el usuario invocante, con RLS activa), que fue exactamente la causa de la recursión de Phase 8.1.
 
 ### 7.3 Plan de rollback general
 
@@ -1457,6 +1485,16 @@ _Esta sección se llena durante la ejecución de Etapa 5._
 - ✅ Policy `pacientes_select_inactivos_admin` actualizada
 - ✅ Smoke test producción confirmado
 - 🟡 Pendiente: registrar migración en `supabase/migrations/` con timestamp
+
+### Sub-paso 5.B — DDL del modelo de visibilidad (aplicado 2026-05-21)
+
+Ejecutado en 3 migraciones bajo protocolo D-T6, todas aplicadas y verificadas en producción:
+
+- ✅ **5.B.1** — `consultas.medico_id` + FK + índice — commit `1e7ea9f`
+- ✅ **5.B.2** — tabla `paciente_medico` (M:N) + backfill — commit `ff4b0d2`
+- ✅ **5.B.3** — trigger latch `ha_tenido_acceso_premium` — commit `cf632c9`
+
+**Siguiente sub-paso:** 5.C (crear los 6 helpers `SECURITY DEFINER`).
 
 ---
 
