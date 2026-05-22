@@ -1,8 +1,8 @@
 # ETAPA 5 — PLAN DE EJECUCIÓN
 
-> **Estado:** 🟡 En ejecución (sub-paso 5.B completado)  
+> **Estado:** 🟡 En ejecución (sub-paso 5.C completado)  
 > **Fecha de creación:** 2026-05-20  
-> **Última actualización:** 2026-05-21 (sub-paso 5.B completado: 5.B.1, 5.B.2, 5.B.3)  
+> **Última actualización:** 2026-05-22 (sub-paso 5.C completado)  
 > **Documento de referencia:** [ROLES_POST_REFACTOR.md](./ROLES_POST_REFACTOR.md)
 >
 > Este documento contiene el plan operativo detallado para implementar Etapa 5 del refactor de roles de Spinus, así como el plan post-Etapa 5 para resolver fugas económicas de enforcement de planes.
@@ -301,7 +301,7 @@ Spinus tiene 4 estados de cuenta/clínica:
 | **C.2.e** | Sin RLS de respaldo (Phase 8.1 v2 fue revertida por recursión). Toda la validación depende de TypeScript. | 🔴 ALTA | Backend-only enforcement |
 | **C.4.a** | Stripe sin idempotencia explícita. `event.id` no verificado contra tabla de eventos procesados. Posible doble procesamiento en retries. | 🟡 BAJA | Mitigado por UPDATEs idempotentes |
 | **C.4.b** | `invoice.payment_failed` solo cambia estado, no notifica al usuario. Usuario no sabe que su pago falló. | 🟡 MEDIA | UX comercial degradada |
-| **C.3** | Conteo de pacientes incluye soft-deleted. Médico free queda atascado en 5 aunque haya eliminado pacientes. | 🟡 UX | Bloqueo injusto |
+| **C.3** | Conteo de pacientes para el tope incluye soft-deleted. ⚠️ **REVERTIDO (Camino 2, 2026-05-22):** contar el total (activos + soft-deleted) es el comportamiento DESEADO, no un bug — borrar no debe liberar cupo (cierra el bucle de abuso crear/borrar/crear). Ver nota en §6.1. | 🟢 Por diseño | Cierra fuga |
 | **C.5** | Sin contador UI "N de 5" pacientes. Usuario se topa con 403 sin aviso previo. | 🟡 UX | Conversión perdida |
 
 #### 2.3.4 Predicado único de bloqueo (estado actual)
@@ -329,7 +329,8 @@ isBlocked = (
 >
 > - ✅ Cierra C.2.b (suspendida), C.2.d (endpoints CRUD), C.2.e (RLS respaldo) — vía `clinica_no_suspendida()` + `clinica_tiene_acceso()` + RLS RESTRICTIVE
 > - ❌ **NO cierra C.2.a (vencido)** — el predicado planeado solo cubre `cancelado`
-> - ❌ NO cierra C.3, C.4.a, C.4.b, C.5 — son problemas ortogonales
+> - ❌ NO cierra C.4.a, C.4.b, C.5 — son problemas ortogonales
+> - ✅ C.3 quedó resuelto por diseño en 5.C (Camino 2): `clinica_dentro_de_limite()` cuenta el total a propósito (ver §6.1)
 >
 > **Acción requerida durante Etapa 5:** añadir `'vencido'` al predicado de `clinica_tiene_acceso()` para que la RLS lo enforce automáticamente, sin esperar a la sección §6 del documento.
 
@@ -807,7 +808,7 @@ Esta sección describe el plan de ejecución de Etapa 5 a **nivel operativo**: o
 |---|---|---|---|
 | 5.A | Resolver decisiones pendientes + cerrar auditorías pendientes | — | ⏳ Pendiente |
 | 5.B | DDL: `consultas.medico_id` + tabla `paciente_medico` (M:N) + trigger latch `ha_tenido_acceso_premium` | Alto | ✅ Aplicado 2026-05-21 |
-| 5.C | Crear 6 helpers `SECURITY DEFINER` | Bajo | ⏳ Pendiente |
+| 5.C | Crear 6 helpers `SECURITY DEFINER` | Bajo | ✅ Aplicado 2026-05-22 |
 | 5.D | Fix bug producción soft delete | Bajo | ✅ Aplicado 2026-05-20 |
 | 5.E | Reescribir policies de `pacientes` | Alto | ⏳ Pendiente |
 | 5.F | Reescribir policies de `consultas` | Alto | ⏳ Pendiente |
@@ -1017,6 +1018,8 @@ Crear las 6 funciones (ver inventario §4.3):
    - **DELETE** (`pacientes_delete_solo_sin_historial`): restringir a `super_admin` (hallazgo H7).
 3. ⚠️ Restricción anti-recursión: la policy de `pacientes` NO puede usar `paciente_pertenece_a_mi_clinica()` (esa función hace `SELECT` sobre `pacientes`). Sí puede usar `soy_medico_tratante()` (consulta `paciente_medico`, tabla distinta) y `soy_admin_de_clinica()` (consulta `profiles`).
 
+> **Nota `super_admin` (insumo del cierre de 5.C, 2026-05-22):** las policies de 5.E NO necesitan una cláusula `OR` para `super_admin`. El `super_admin` accede a los datos clínicos por los endpoints `/api/super-admin/*` usando el `service_role` de Supabase, que tiene `BYPASSRLS` — las policies RLS no se evalúan en ese camino. El helper `soy_admin_de_clinica()` excluye correctamente a `super_admin` (exige `role='medico'`), y eso es lo correcto. Por tanto, donde el punto 2 dice "`super_admin` según su lógica", esa lógica es: no se requiere predicado RLS adicional.
+
 #### Frente BD-2 — Policies de la tabla `paciente_medico`
 
 4. Diseñar y crear las policies RLS de la propia tabla de unión `paciente_medico`:
@@ -1056,6 +1059,7 @@ Crear las 6 funciones (ver inventario §4.3):
 - Crear un paciente nuevo → aparece en `paciente_medico` → visible para su médico.
 - Soft delete sigue funcionando (regresión del hotfix 5.D).
 - super_admin sin regresiones.
+- **Borde GATE 1 (off-by-one):** verificar explícitamente que una clínica free con tope 5 puede tener exactamente 5 pacientes y se bloquea el 6º, sin error off-by-one en `clinica_dentro_de_limite()` (hallazgo R3 de la auditoría de 5.C).
 
 **Riesgo:** **Alto.** `pacientes` es la tabla base y este sub-paso introduce el modelo M:N completo + cambios de código TS. Un error deja pacientes invisibles para sus médicos. Mitigación: es la primera tabla que se reescribe; validación exhaustiva antes de continuar a 5.F; simulación previa del predicado (protocolo D-T6, paso 3).
 
@@ -1334,10 +1338,12 @@ Los 8 hallazgos de §2.3, recapitulados:
 | C.2.b | `suspendida` es decorativa (0 referencias funcionales) | 🔴 Alta |
 | C.2.d | 6+ endpoints CRUD sin gate de suscripción | 🔴 Alta |
 | C.2.e | Sin RLS de respaldo (todo depende de TypeScript) | 🔴 Alta |
-| C.3 | Conteo de pacientes incluye soft-deleted | 🟡 UX |
+| C.3 | Conteo de pacientes incluye soft-deleted → **revertido por diseño (Camino 2); ya no es hallazgo** | 🟢 Por diseño |
 | C.4.a | Stripe sin idempotencia explícita | 🟡 Baja |
 | C.4.b | `invoice.payment_failed` no notifica al usuario | 🟡 Media |
 | C.5 | Sin contador UI "N de 5" pacientes | 🟡 UX |
+
+> **Reversión C.3 — Camino 2 (2026-05-22).** Durante el diseño de 5.C se revirtió conscientemente la conclusión original de C.3 (que el conteo del tope debía contar SOLO activos). Razón: contar solo activos abre un agujero de abuso — una clínica free podría crear 5 pacientes, hacer soft-delete de uno (baja el conteo), crear otro, borrar, crear… en bucle, usando la plataforma gratis sin límite real. **Decisión:** `clinica_dentro_de_limite()` cuenta el TOTAL de pacientes (activos + soft-deleted), de modo que borrar NO libera cupo y el bucle queda cerrado. **Implicación aceptada:** para una clínica free el tope es "histórico" — 5 = 5 altas totales en la vida de la cuenta free; borrar no devuelve espacio. Es el comportamiento deseado para monetización. Ya implementado y en producción: el helper cuenta sin filtro de `activo` (`20260522_etapa5c_helpers_rls.sql`).
 
 ### 6.2 Priorización de fugas económicas
 
@@ -1347,7 +1353,7 @@ Los 8 hallazgos de §2.3, recapitulados:
 | 2 | C.2.d — endpoints sin gate | Replicar `getSubscriptionState` en los 6+ endpoints faltantes | Medio |
 | 3 | C.2.b — `suspendida` decorativa | Activar `suspendida` en gates server-side + RLS | Medio |
 | 4 | C.2.e — sin RLS de respaldo | Cubierto parcialmente por Etapa 5 (ver §6.4) | — |
-| 5 | C.3 — conteo soft-deleted | Filtrar `activo IS NOT FALSE` en el conteo de `/api/pacientes` | Bajo |
+| 5 | C.3 — conteo soft-deleted | ❌ **CANCELADA (Camino 2, 2026-05-22):** NO filtrar por `activo`. El conteo del tope incluye soft-deleted a propósito (anti-abuso); ya implementado en `clinica_dentro_de_limite()` (5.C). | N/A |
 | 6 | C.4.b — sin notificación pago fallido | Email/notificación en webhook `invoice.payment_failed` | Medio |
 | 7 | C.4.a — Stripe sin idempotencia | Tabla `stripe_events_processed` + verificación de `event.id` | Medio |
 | 8 | C.5 — sin contador UI | Banner "N de 5" pre-emptive en frontend | Bajo |
@@ -1377,7 +1383,7 @@ El plan se organiza en 3 bloques. El detalle de cada bloque (SQL, archivos TS ex
 
 **Objetivo:** mejorar la experiencia y conversión.
 
-- Filtrar soft-deleted del conteo de pacientes (`activo IS NOT FALSE`).
+- ❌ ~~Filtrar soft-deleted del conteo de pacientes (`activo IS NOT FALSE`).~~ **CANCELADO (Camino 2, 2026-05-22):** el conteo del tope incluye soft-deleted a propósito (anti-abuso); resuelto en `clinica_dentro_de_limite()` (5.C).
 - Agregar contador "N de 5" pre-emptive en la UI, antes de que el usuario choque con el 403.
 
 ### 6.4 Solapamiento con Etapa 5
@@ -1390,11 +1396,12 @@ Etapa 5, al ejecutarse, cierra parcialmente varios hallazgos de monetización:
 | C.2.b (`suspendida`) | ✅ Sí (RLS) | `clinica_no_suspendida()` (5.C) la activa como gate RLS. Falta capa TS. |
 | C.2.d (endpoints sin gate) | ⚠️ Parcial | Las RLS nuevas (5.E-5.I) son un respaldo a nivel BD. Pero los gates TS explícitos siguen siendo necesarios para UX (mensaje claro vs error genérico). |
 | C.2.e (sin RLS de respaldo) | ✅ Sí | Etapa 5 implementa precisamente las RLS de respaldo. |
-| C.3, C.4.a, C.4.b, C.5 | ❌ No | Son ortogonales al refactor de roles. Se resuelven íntegramente en esta sección. |
+| C.3 | ✅ Sí (5.C) | Resuelto por diseño: `clinica_dentro_de_limite()` cuenta el total a propósito (Camino 2). Ya NO es acción pendiente de §6. |
+| C.4.a, C.4.b, C.5 | ❌ No | Son ortogonales al refactor de roles. Se resuelven íntegramente en esta sección. |
 
 **Conclusión:** tras Etapa 5, esta sección §6 se reduce esencialmente a:
 - Bloque M1 enfocado en la capa TypeScript (las RLS ya estarán).
-- Bloques M2 y M3 completos (no tocados por Etapa 5).
+- Bloque M2 completo (no tocado por Etapa 5) y Bloque M3 reducido al contador "N de 5" (C.5); el filtro de soft-delete (C.3) ya quedó resuelto por diseño en 5.C.
 
 ---
 
@@ -1495,6 +1502,23 @@ Ejecutado en 3 migraciones bajo protocolo D-T6, todas aplicadas y verificadas en
 - ✅ **5.B.3** — trigger latch `ha_tenido_acceso_premium` — commit `cf632c9`
 
 **Siguiente sub-paso:** 5.C (crear los 6 helpers `SECURITY DEFINER`).
+
+### Sub-paso 5.C — 6 helpers `SECURITY DEFINER` (aplicado 2026-05-22)
+
+Ejecutado en 1 migración (`20260522_etapa5c_helpers_rls.sql`) bajo protocolo D-T6, aplicada y verificada en producción. 6 helpers creados:
+
+- ✅ `soy_medico_tratante(uuid)` — base de la visibilidad M:N de pacientes.
+- ✅ `paciente_pertenece_a_mi_clinica(uuid)` — pertenencia de un paciente a la clínica del usuario.
+- ✅ `soy_admin_de_clinica()` — centraliza `role='medico' AND es_admin_de_clinica=true`.
+- ✅ `clinica_no_suspendida()` — gate de suspensión.
+- ✅ `clinica_dentro_de_limite()` — **GATE 1** (tope de pacientes).
+- ✅ `clinica_tiene_acceso()` — **GATE 2** (bloqueo solo-lectura de clínicas degradadas).
+
+**Patrón:** `LANGUAGE sql`, `STABLE`, `SECURITY DEFINER`, `SET search_path` explícito, `owner=postgres` (bypass anti-recursión). Todos fail-closed (devuelven `false` ante `auth.uid()` o clínica nula).
+
+**Verificación:** chunks 1-3 verificados; smoke test de los 6 con sesión simulada. Commit `27a5229`.
+
+**Siguiente sub-paso:** 5.E (policies de `pacientes` + `paciente_medico`).
 
 ---
 
