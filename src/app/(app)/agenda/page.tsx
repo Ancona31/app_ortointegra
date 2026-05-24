@@ -331,7 +331,7 @@ function QuickPatientModal({
       body:    JSON.stringify({ nombre: nombre.trim(), apellidos: apellidos.trim(), fecha_nacimiento, email: email.trim() || null }),
     })
     const data = await res.json()
-    if (!res.ok) { setError(data.error ?? 'Error al crear paciente'); setSaving(false); return }
+    if (!res.ok) { setError(data.message ?? data.error ?? 'Error al crear paciente'); setSaving(false); return }
     onCreated({ id: data.id, nombre: nombre.trim(), apellidos: apellidos.trim(), telefono: null })
   }
 

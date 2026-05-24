@@ -129,7 +129,7 @@ export default function QuickPatientModal({
         return
       }
 
-      if (!res.ok) { setError((data.error as string) ?? 'Error al crear paciente'); setSaving(false); return }
+      if (!res.ok) { setError((data.message as string) ?? (data.error as string) ?? 'Error al crear paciente'); setSaving(false); return }
       onCreated({ id: (data.id as string) ?? '', nombre: nombreLimpio, apellidos: apellidosLimpio, telefono: null })
     } catch {
       setError('Error de conexión. Intenta de nuevo.')

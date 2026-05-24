@@ -153,7 +153,7 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
       }
 
       if (!res.ok) {
-        setFormError((data.error as string) ?? 'Error al crear paciente')
+        setFormError((data.message as string) ?? (data.error as string) ?? 'Error al crear paciente')
         return
       }
       if (data.id) {

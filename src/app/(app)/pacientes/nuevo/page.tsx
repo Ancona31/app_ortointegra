@@ -156,7 +156,7 @@ export default function NuevoPacientePage() {
       }
 
       if (!res.ok) {
-        setError('Error al guardar: ' + (data.error || 'Error desconocido'))
+        setError('Error al guardar: ' + (data.message || data.error || 'Error desconocido'))
         setLoading(false)
         return
       }

@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 async function getProfile(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
-  const { data } = await supabase.from('profiles').select('id, clinica_id, role').eq('id', user.id).single()
+  const { data } = await supabase.from('profiles').select('id, clinica_id, role, es_admin_de_clinica').eq('id', user.id).single()
   return data ? { ...data, userId: user.id } : null
 }
 
@@ -70,6 +70,14 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext<'/api/paciente
     const supabase = await createClient()
     const profile = await getProfile(supabase)
     if (!profile?.clinica_id) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+    // Solo el médico admin de clínica puede archivar (soft-delete) pacientes
+    if (!(profile.role === 'medico' && profile.es_admin_de_clinica === true)) {
+      return NextResponse.json(
+        { error: 'Solo el administrador de la clínica puede archivar pacientes' },
+        { status: 403 }
+      );
+    }
 
     const { id } = await ctx.params
 

@@ -145,7 +145,7 @@ export async function syncOfflineVault(
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Unknown' }))
-        throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`)
+        throw new Error((err as { error?: string, message?: string }).message ?? (err as { error?: string }).error ?? `HTTP ${res.status}`)
       }
 
       const data = await res.json() as { id: string }
