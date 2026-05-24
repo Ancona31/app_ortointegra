@@ -1,8 +1,8 @@
 # ETAPA 5 — PLAN DE EJECUCIÓN
 
-> **Estado:** 🟡 En ejecución (sub-paso 5.C completado)  
+> **Estado:** 🟡 En ejecución (sub-paso 5.E completado)  
 > **Fecha de creación:** 2026-05-20  
-> **Última actualización:** 2026-05-22 (sub-paso 5.C completado)  
+> **Última actualización:** 2026-05-24 (sub-paso 5.E completado)  
 > **Documento de referencia:** [ROLES_POST_REFACTOR.md](./ROLES_POST_REFACTOR.md)
 >
 > Este documento contiene el plan operativo detallado para implementar Etapa 5 del refactor de roles de Spinus, así como el plan post-Etapa 5 para resolver fugas económicas de enforcement de planes.
@@ -806,11 +806,11 @@ Esta sección describe el plan de ejecución de Etapa 5 a **nivel operativo**: o
 
 | Sub-paso | Objetivo | Riesgo | Estado |
 |---|---|---|---|
-| 5.A | Resolver decisiones pendientes + cerrar auditorías pendientes | — | ⏳ Pendiente |
+| 5.A | Resolver decisiones pendientes + cerrar auditorías pendientes | — | ✅ Aplicado 2026-05-21 |
 | 5.B | DDL: `consultas.medico_id` + tabla `paciente_medico` (M:N) + trigger latch `ha_tenido_acceso_premium` | Alto | ✅ Aplicado 2026-05-21 |
 | 5.C | Crear 6 helpers `SECURITY DEFINER` | Bajo | ✅ Aplicado 2026-05-22 |
 | 5.D | Fix bug producción soft delete | Bajo | ✅ Aplicado 2026-05-20 |
-| 5.E | Reescribir policies de `pacientes` | Alto | ⏳ Pendiente |
+| 5.E | Reescribir policies de `pacientes` | Alto | ✅ Aplicado 2026-05-24 |
 | 5.F | Reescribir policies de `consultas` | Alto | ⏳ Pendiente |
 | 5.G | Reescribir policies de `documentos` + auditar formularios | Alto | ⏳ Pendiente |
 | 5.H | Reescribir policies de `appointments` | Medio | ⏳ Pendiente |
@@ -1002,6 +1002,8 @@ Crear las 6 funciones (ver inventario §4.3):
 ---
 
 ### 5.E — Reescribir policies de pacientes + paciente_medico (modelo M:N)
+
+> ✅ **Aplicado en producción el 2026-05-24.** Ver Bitácora §8.
 
 **Objetivo:** implementar la visibilidad de pacientes del modelo M:N (D-T5). Es un sub-paso de 3 frentes coordinados: policies de BD, integración del INSERT, y ajuste de métricas. Los tres deben aplicarse juntos — si las policies M:N se activan pero el INSERT no puebla `paciente_medico`, los pacientes nuevos quedan invisibles para su propio médico.
 
@@ -1519,6 +1521,22 @@ Ejecutado en 1 migración (`20260522_etapa5c_helpers_rls.sql`) bajo protocolo D-
 **Verificación:** chunks 1-3 verificados; smoke test de los 6 con sesión simulada. Commit `27a5229`.
 
 **Siguiente sub-paso:** 5.E (policies de `pacientes` + `paciente_medico`).
+
+### Sub-paso 5.E — Modelo médico-paciente M:N en `pacientes` (aplicado 2026-05-24)
+
+Ejecutado en 5 pasos (orden D5) bajo protocolo D-T6, todos aplicados y verificados en producción. Activa la visibilidad médico-paciente M:N para la tabla `pacientes`:
+
+- ✅ **Paso 1 — BD-2** — 3 policies RLS de la tabla de unión `paciente_medico` — commit `26cb331`.
+- ✅ **Paso 2 — TS-1a** — RPC `crear_paciente_con_medico` (`SECURITY DEFINER`) — commit `ba5b79f`.
+- ✅ **Paso 3 — TS-1b** — `route.ts` llama al RPC + 5 componentes + gate soft-delete — commit `88449fd`.
+- ✅ **Paso 4 — Backfill** — 6 vínculos M:N de pacientes huérfanos — commit `ba6b714`.
+- ✅ **Paso 5 — BD-1** — 5 policies RLS de `pacientes` con visibilidad M:N — commit `c4981b4`.
+
+**Verificación:** post-flight de cada paso + smoke test de los 4 roles (médico invitado ve solo sus pacientes; admin y secretaria ven todos; aislamiento entre clínicas confirmado).
+
+🟡 **Deuda pendiente:** quedan 2 pacientes de prueba en producción ("Refactor Roles" archivado, "Refactor 2" activo) pendientes de hard-delete.
+
+**Siguiente sub-paso:** DUP-RPC (mover la detección de duplicados al RPC), seguido del resto de la Etapa 5 (5.F consultas, etc.).
 
 ---
 
