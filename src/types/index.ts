@@ -9,6 +9,7 @@ export interface DuplicatePatientResponse {
     fecha_nacimiento: string | null
   }
   message: string
+  existingPatientIsMine?: boolean
 }
 
 // ─── Paciente ─────────────────────────────────────────────────────────────────

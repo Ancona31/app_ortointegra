@@ -41,43 +41,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 5. DETECCIÓN DE DUPLICADOS
-    const inputNombre = (body.nombre as string ?? '').trim().toLowerCase()
-    const inputApellidos = (body.apellidos as string ?? '').trim().toLowerCase()
-    const inputFechaNac: string | null = body.fecha_nacimiento ?? null
-
-    if (!body.forceCreate && inputNombre && inputApellidos && inputFechaNac) {
-      const { data: duplicado } = await supabase
-        .from('pacientes')
-        .select('id, nombre, apellidos, numero_expediente, fecha_nacimiento')
-        .eq('clinica_id', profile.clinica_id)
-        .eq('fecha_nacimiento', inputFechaNac)
-        .neq('activo', false)
-        .limit(1)
-
-      // Supabase no soporta LOWER(TRIM(...)) en .eq(), así que filtramos en JS
-      const match = (duplicado ?? []).find(
-        (p) =>
-          p.nombre.trim().toLowerCase() === inputNombre &&
-          p.apellidos.trim().toLowerCase() === inputApellidos,
-      )
-
-      if (match) {
-        const response: DuplicatePatientResponse = {
-          error: 'DUPLICATE_PATIENT',
-          existingPatient: {
-            id: match.id as string,
-            nombre: match.nombre as string,
-            apellidos: match.apellidos as string,
-            numero_expediente: (match.numero_expediente as string | null) ?? null,
-            fecha_nacimiento: (match.fecha_nacimiento as string | null) ?? null,
-          },
-          message: 'Ya existe un paciente con estos datos',
-        }
-        return NextResponse.json(response, { status: 409 })
-      }
-    }
-
     // 6. CALCULAR medico_id
     const medico_id =
       body.medico_id || (isMedico(profile) ? profile.id : null);
@@ -103,8 +66,22 @@ export async function POST(req: NextRequest) {
 
     // 8. LLAMAR AL RPC
     const { data, error } = await supabase
-      .rpc('crear_paciente_con_medico', { p_datos, p_medico_id: medico_id })
-      .single<{ id: string; numero_expediente: string }>();
+      .rpc('crear_paciente_con_medico_v2', {
+        p_datos,
+        p_medico_id: medico_id,
+        p_force_create: body.forceCreate === true,
+      })
+      .single<{
+        resultado: 'creado' | 'duplicado';
+        id: string | null;
+        numero_expediente: string | null;
+        dup_id: string | null;
+        dup_nombre: string | null;
+        dup_apellidos: string | null;
+        dup_numero_exp: string | null;
+        dup_fecha_nac: string | null;
+        dup_es_mio: boolean | null;
+      }>();
 
     // 9. MAPEAR ERRORES DEL RPC
     if (error) {
@@ -124,10 +101,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // 10. ÉXITO
+    // 10. RESULTADO DEL RPC
     if (!data) {
       return NextResponse.json({ error: 'Error interno' }, { status: 500 });
     }
+
+    // 10a. DUPLICADO DETECTADO — responder 409 con el contrato DuplicatePatientResponse
+    if (data.resultado === 'duplicado') {
+      const response: DuplicatePatientResponse = {
+        error: 'DUPLICATE_PATIENT',
+        existingPatient: {
+          id: data.dup_id as string,
+          nombre: data.dup_nombre as string,
+          apellidos: data.dup_apellidos as string,
+          numero_expediente: data.dup_numero_exp ?? null,
+          fecha_nacimiento: data.dup_fecha_nac ?? null,
+        },
+        message: 'Ya existe un paciente con estos datos',
+        existingPatientIsMine: data.dup_es_mio ?? false,
+      };
+      return NextResponse.json(response, { status: 409 });
+    }
+
+    // 10b. PACIENTE CREADO
     return NextResponse.json({
       id: data.id,
       numero_expediente: data.numero_expediente,

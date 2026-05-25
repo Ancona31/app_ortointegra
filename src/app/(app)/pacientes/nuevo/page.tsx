@@ -33,10 +33,13 @@ export default function NuevoPacientePage() {
   const [error, setError] = useState('')
   const [expandido, setExpandido] = useState(false)
   const [consentimiento, setConsentimiento] = useState(false)
-  const [duplicateWarning, setDuplicateWarning] = useState<{ id: string; nombre: string; apellidos: string; numero_expediente: string | null } | null>(null)
+  const [duplicateWarning, setDuplicateWarning] = useState<{ id: string; nombre: string; apellidos: string; numero_expediente: string | null; existingPatientIsMine: boolean } | null>(null)
+  const [vincularError, setVincularError] = useState<string | null>(null)
+  const [vinculando, setVinculando] = useState(false)
   const forceCreateRef = useRef(false)
 
   const isSecretaria = profile?.role === 'secretaria'
+  const esMedicoInvitado = profile?.role === 'medico' && profile?.es_admin_de_clinica !== true
 
   // Cargar lista de médicos (secretaria) — red primero, cache como fallback
   useEffect(() => {
@@ -150,6 +153,7 @@ export default function NuevoPacientePage() {
           nombre: dupData.existingPatient.nombre,
           apellidos: dupData.existingPatient.apellidos,
           numero_expediente: dupData.existingPatient.numero_expediente,
+          existingPatientIsMine: (dupData.existingPatientIsMine ?? false),
         })
         setLoading(false)
         return
@@ -164,6 +168,29 @@ export default function NuevoPacientePage() {
     } catch {
       setError("Error de conexion. Verifica tu internet e intenta de nuevo.")
       setLoading(false)
+    }
+  }
+
+  async function handleVincular() {
+    if (!duplicateWarning) return
+    setVinculando(true)
+    setVincularError(null)
+    try {
+      const res = await fetch(`/api/pacientes/${duplicateWarning.id}/vincular`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(isSecretaria ? { medico_id: medicoSeleccionado } : {}),
+      })
+      if (!res.ok) {
+        setVincularError('No se pudo conectar con el servidor. Verifica tu conexión e intenta de nuevo.')
+        setVinculando(false)
+        return
+      }
+      // Éxito: el médico queda vinculado al paciente existente → ir a su expediente
+      router.push(`/expediente/${duplicateWarning.id}`)
+    } catch {
+      setVincularError('No se pudo conectar con el servidor. Verifica tu conexión e intenta de nuevo.')
+      setVinculando(false)
     }
   }
 
@@ -369,30 +396,64 @@ export default function NuevoPacientePage() {
 
         {duplicateWarning && (
           <div className="bg-amber-50 border border-amber-300 px-4 py-4 rounded-xl space-y-3">
-            <p className="text-sm text-amber-800 font-medium">
-              ⚠️ Ya existe un paciente: {duplicateWarning.nombre} {duplicateWarning.apellidos}
-              {duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}
-            </p>
-            <div className="flex gap-2">
+            {duplicateWarning.existingPatientIsMine ? (
+              <p className="text-sm text-amber-800 font-medium">
+                ⚠️ Este paciente ya está en tu lista de pacientes: {duplicateWarning.nombre} {duplicateWarning.apellidos}
+                {duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}
+              </p>
+            ) : esMedicoInvitado ? (
+              <p className="text-sm text-amber-800 font-medium">
+                ⚠️ Este paciente ya está registrado en tu clínica, pero no aparece en tu lista porque aún no es tu paciente: {duplicateWarning.nombre} {duplicateWarning.apellidos}
+                {duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}. ¿Deseas vincularlo a tus pacientes?
+              </p>
+            ) : (
+              <p className="text-sm text-amber-800 font-medium">
+                ⚠️ Ya existe un paciente con los mismos datos: {duplicateWarning.nombre} {duplicateWarning.apellidos}
+                {duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}. ¿Es el mismo paciente o una persona distinta?
+              </p>
+            )}
+            {vincularError && <p className="text-xs text-red-600">{vincularError}</p>}
+            <div className="flex flex-col gap-2">
+              {duplicateWarning.existingPatientIsMine ? (
+                <button
+                  type="button"
+                  onClick={() => router.push(`/expediente/${duplicateWarning.id}`)}
+                  className="w-full px-3 py-2 text-sm font-semibold text-white bg-[#1e5fa8] rounded-xl hover:bg-[#1a3a5c] transition-colors"
+                >
+                  Ir a su expediente
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleVincular}
+                  disabled={vinculando}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold text-white bg-[#1e5fa8] rounded-xl hover:bg-[#1a3a5c] transition-colors disabled:opacity-60"
+                >
+                  {vinculando ? <><Loader2 size={14} className="animate-spin" /> Vinculando...</> : 'Es el mismo paciente'}
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => router.push(`/expediente/${duplicateWarning.id}`)}
-                className="flex-1 px-3 py-2 text-sm font-medium text-[#1e5fa8] bg-white border border-[#1e5fa8]/30 rounded-xl hover:bg-blue-50 transition-colors"
-              >
-                Ir al expediente existente
-              </button>
-              <button
-                type="button"
+                disabled={vinculando}
                 onClick={() => {
                   setDuplicateWarning(null)
+                  setVincularError(null)
                   forceCreateRef.current = true
                   // Re-submit programmatically
                   const formEl = document.querySelector('form')
                   if (formEl) formEl.requestSubmit()
                 }}
-                className="flex-1 px-3 py-2 text-sm font-medium text-amber-700 bg-white border border-amber-300 rounded-xl hover:bg-amber-50 transition-colors"
+                className="w-full px-3 py-2 text-sm font-medium text-amber-700 bg-white border border-amber-300 rounded-xl hover:bg-amber-50 transition-colors disabled:opacity-60"
               >
-                Crear de todos modos
+                Es otra persona, crear de todos modos
+              </button>
+              <button
+                type="button"
+                disabled={vinculando}
+                onClick={() => { setDuplicateWarning(null); setVincularError(null) }}
+                className="w-full px-3 py-2 text-sm font-medium text-[#86868b] bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-60"
+              >
+                Cancelar
               </button>
             </div>
           </div>
@@ -424,7 +485,7 @@ export default function NuevoPacientePage() {
             className="flex-1 text-center px-4 py-3 bg-slate-50 border border-slate-200 text-[#86868b] rounded-xl text-sm font-medium hover:bg-white transition-all">
             Cancelar
           </Link>
-          <button type="submit" disabled={loading}
+          <button type="submit" disabled={loading || vinculando}
             className="flex-1 flex items-center justify-center gap-2 bg-[#1e5fa8] text-white px-4 py-3 rounded-xl text-sm font-semibold hover:bg-[#1a3a5c] active:scale-[0.98] transition-all disabled:opacity-60 shadow-sm">
             {loading ? <><Loader2 size={15} className="animate-spin" /> Guardando...</> : <><Save size={15} /> Registrar e ir al expediente</>}
           </button>

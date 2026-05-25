@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Search, User, X, ArrowRight, Loader2, UserPlus, ChevronLeft } from 'lucide-react'
 import { toTitleCase, calcularEdad, fechaHoyISO, FECHA_MIN_NACIMIENTO } from '@/lib/patientUtils'
+import { useProfile } from '@/hooks/useProfile'
 import type { DuplicatePatientResponse } from '@/types'
 
 type Paciente = {
@@ -29,6 +30,8 @@ interface Props {
 
 export default function ConsultaRapidaModal({ open, onClose }: Props) {
   const router = useRouter()
+  const { profile } = useProfile()
+  const esMedicoInvitado = profile?.role === 'medico' && profile?.es_admin_de_clinica !== true
   const [offlineMsg, setOfflineMsg] = useState("")
 
   const [query, setQuery]     = useState('')
@@ -42,7 +45,9 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
   const [formFechaNac, setFormFechaNac] = useState('')
   const [formConsentimiento, setFormConsentimiento] = useState(false)
   const [creando, setCreando]         = useState(false)
-  const [duplicateWarning, setDuplicateWarning] = useState<{ id: string; nombre: string; apellidos: string; numero_expediente: string | null } | null>(null)
+  const [duplicateWarning, setDuplicateWarning] = useState<{ id: string; nombre: string; apellidos: string; numero_expediente: string | null; existingPatientIsMine: boolean } | null>(null)
+  const [vincularError, setVincularError] = useState<string | null>(null)
+  const [vinculando, setVinculando] = useState(false)
   const forceCreateRef = useRef(false)
 
   const inputRef    = useRef<HTMLInputElement>(null)
@@ -55,6 +60,8 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
       setFormNombre(''); setFormApellidos(''); setFormFechaNac('')
       setFormConsentimiento(false)
       setDuplicateWarning(null)
+      setVincularError(null)
+      setVinculando(false)
       forceCreateRef.current = false
       setTimeout(() => inputRef.current?.focus(), 50)
     }
@@ -147,6 +154,7 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
           nombre: dupData.existingPatient.nombre,
           apellidos: dupData.existingPatient.apellidos,
           numero_expediente: dupData.existingPatient.numero_expediente,
+          existingPatientIsMine: (dupData.existingPatientIsMine ?? false),
         })
         setCreando(false)
         return
@@ -164,6 +172,30 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
       setFormError('Error de conexión. Intenta de nuevo.')
     } finally {
       setCreando(false)
+    }
+  }
+
+  async function handleVincular() {
+    if (!duplicateWarning) return
+    setVinculando(true)
+    setVincularError(null)
+    try {
+      const res = await fetch(`/api/pacientes/${duplicateWarning.id}/vincular`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      if (!res.ok) {
+        setVincularError('No se pudo conectar con el servidor. Verifica tu conexión e intenta de nuevo.')
+        setVinculando(false)
+        return
+      }
+      // Éxito: mismo flujo que la creación normal → iniciar nota del paciente existente
+      onClose()
+      router.push(`/expediente/${duplicateWarning.id}/nueva-nota`)
+    } catch {
+      setVincularError('No se pudo conectar con el servidor. Verifica tu conexión e intenta de nuevo.')
+      setVinculando(false)
     }
   }
 
@@ -309,32 +341,66 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
 
               {duplicateWarning && (
                 <div className="bg-amber-50 border border-amber-300 px-3 py-3 rounded-xl space-y-2">
-                  <p className="text-xs text-amber-800 font-medium">
-                    ⚠️ Ya existe un paciente: {duplicateWarning.nombre} {duplicateWarning.apellidos}
-                    {duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}
-                  </p>
-                  <div className="flex gap-2">
+                  {duplicateWarning.existingPatientIsMine ? (
+                    <p className="text-xs text-amber-800 font-medium">
+                      ⚠️ Este paciente ya está en tu lista de pacientes: {duplicateWarning.nombre} {duplicateWarning.apellidos}
+                      {duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}
+                    </p>
+                  ) : esMedicoInvitado ? (
+                    <p className="text-xs text-amber-800 font-medium">
+                      ⚠️ Este paciente ya está registrado en tu clínica, pero no aparece en tu lista porque aún no es tu paciente: {duplicateWarning.nombre} {duplicateWarning.apellidos}
+                      {duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}. ¿Deseas vincularlo a tus pacientes?
+                    </p>
+                  ) : (
+                    <p className="text-xs text-amber-800 font-medium">
+                      ⚠️ Ya existe un paciente con los mismos datos: {duplicateWarning.nombre} {duplicateWarning.apellidos}
+                      {duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}. ¿Es el mismo paciente o una persona distinta?
+                    </p>
+                  )}
+                  {vincularError && <p className="text-[11px] text-red-600">{vincularError}</p>}
+                  <div className="flex flex-col gap-2">
+                    {duplicateWarning.existingPatientIsMine ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose()
+                          router.push(`/expediente/${duplicateWarning.id}/nueva-nota`)
+                        }}
+                        className="w-full px-2 py-1.5 text-[11px] font-semibold text-white bg-[#1e5fa8] rounded-lg hover:bg-[#1a3a5c] transition-colors"
+                      >
+                        Ir a su expediente
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleVincular}
+                        disabled={vinculando}
+                        className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] font-semibold text-white bg-[#1e5fa8] rounded-lg hover:bg-[#1a3a5c] transition-colors disabled:opacity-50"
+                      >
+                        {vinculando ? <><Loader2 size={12} className="animate-spin" /> Vinculando...</> : 'Es el mismo paciente'}
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={() => {
-                        onClose()
-                        router.push(`/expediente/${duplicateWarning.id}`)
-                      }}
-                      className="flex-1 px-2 py-1.5 text-[11px] font-medium text-[#1e5fa8] bg-white border border-[#1e5fa8]/30 rounded-lg hover:bg-blue-50 transition-colors"
-                    >
-                      Ir al expediente existente
-                    </button>
-                    <button
-                      type="button"
+                      disabled={vinculando}
                       onClick={() => {
                         setDuplicateWarning(null)
+                        setVincularError(null)
                         forceCreateRef.current = true
                         const formEl = document.querySelector<HTMLFormElement>('form')
                         if (formEl) formEl.requestSubmit()
                       }}
-                      className="flex-1 px-2 py-1.5 text-[11px] font-medium text-amber-700 bg-white border border-amber-300 rounded-lg hover:bg-amber-50 transition-colors"
+                      className="w-full px-2 py-1.5 text-[11px] font-medium text-amber-700 bg-white border border-amber-300 rounded-lg hover:bg-amber-50 transition-colors disabled:opacity-50"
                     >
-                      Crear de todos modos
+                      Es otra persona, crear de todos modos
+                    </button>
+                    <button
+                      type="button"
+                      disabled={vinculando}
+                      onClick={() => { setDuplicateWarning(null); setVincularError(null) }}
+                      className="w-full px-2 py-1.5 text-[11px] font-medium text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+                    >
+                      Cancelar
                     </button>
                   </div>
                 </div>
@@ -404,7 +470,7 @@ export default function ConsultaRapidaModal({ open, onClose }: Props) {
               </button>
               <button
                 type="submit"
-                disabled={creando || !formNombre.trim() || !formConsentimiento}
+                disabled={creando || vinculando || !formNombre.trim() || !formConsentimiento}
                 className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#1e5fa8] rounded-xl hover:bg-[#1a3a5c] disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5 min-w-0"
               >
                 {creando

@@ -26,6 +26,7 @@ export default function QuickPatientModal({
   const router = useRouter()
   const { profile } = useProfile()
   const isSecretaria = profile?.role === 'secretaria'
+  const esMedicoInvitado = profile?.role === 'medico' && profile?.es_admin_de_clinica !== true
   const partes = nombreInicial.trim().split(' ')
   const [nombre,    setNombre]    = useState(partes[0] ?? '')
   const [apellidos, setApellidos] = useState(partes.slice(1).join(' '))
@@ -35,7 +36,9 @@ export default function QuickPatientModal({
   const [saving,    setSaving]    = useState(false)
   const [error,     setError]     = useState('')
   const [consentimiento, setConsentimiento] = useState(false)
-  const [duplicateWarning, setDuplicateWarning] = useState<{ id: string; nombre: string; apellidos: string; numero_expediente: string | null } | null>(null)
+  const [duplicateWarning, setDuplicateWarning] = useState<{ id: string; nombre: string; apellidos: string; numero_expediente: string | null; existingPatientIsMine: boolean } | null>(null)
+  const [vincularError, setVincularError] = useState<string | null>(null)
+  const [vinculando, setVinculando] = useState(false)
   const [medicoSeleccionado, setMedicoSeleccionado] = useState('')
   const [medicos, setMedicos] = useState<Medico[]>([])
   const forceCreateRef = useRef(false)
@@ -124,6 +127,7 @@ export default function QuickPatientModal({
           nombre: dupData.existingPatient.nombre,
           apellidos: dupData.existingPatient.apellidos,
           numero_expediente: dupData.existingPatient.numero_expediente,
+          existingPatientIsMine: (dupData.existingPatientIsMine ?? false),
         })
         setSaving(false)
         return
@@ -134,6 +138,29 @@ export default function QuickPatientModal({
     } catch {
       setError('Error de conexión. Intenta de nuevo.')
       setSaving(false)
+    }
+  }
+
+  async function handleVincular() {
+    if (!duplicateWarning) return
+    setVinculando(true)
+    setVincularError(null)
+    try {
+      const res = await fetch(`/api/pacientes/${duplicateWarning.id}/vincular`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(isSecretaria ? { medico_id: medicoSeleccionado } : {}),
+      })
+      if (!res.ok) {
+        setVincularError('No se pudo conectar con el servidor. Verifica tu conexión e intenta de nuevo.')
+        setVinculando(false)
+        return
+      }
+      // Doble rol (§7): el callback decide (navegar o adjuntar a la cita en agenda)
+      onCreated({ id: duplicateWarning.id, nombre: duplicateWarning.nombre, apellidos: duplicateWarning.apellidos, telefono: null })
+    } catch {
+      setVincularError('No se pudo conectar con el servidor. Verifica tu conexión e intenta de nuevo.')
+      setVinculando(false)
     }
   }
 
@@ -157,28 +184,62 @@ export default function QuickPatientModal({
 
           {duplicateWarning && (
             <div className="bg-amber-50 border border-amber-300 px-3 py-3 rounded-xl space-y-2">
-              <p className="text-xs text-amber-800 font-medium">
-                ⚠️ Ya existe un paciente: {duplicateWarning.nombre} {duplicateWarning.apellidos}
-                {duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}
-              </p>
-              <div className="flex gap-2">
+              {duplicateWarning.existingPatientIsMine ? (
+                <p className="text-xs text-amber-800 font-medium">
+                  ⚠️ Este paciente ya está en tu lista de pacientes: {duplicateWarning.nombre} {duplicateWarning.apellidos}
+                  {duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}
+                </p>
+              ) : esMedicoInvitado ? (
+                <p className="text-xs text-amber-800 font-medium">
+                  ⚠️ Este paciente ya está registrado en tu clínica, pero no aparece en tu lista porque aún no es tu paciente: {duplicateWarning.nombre} {duplicateWarning.apellidos}
+                  {duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}. ¿Deseas vincularlo a tus pacientes?
+                </p>
+              ) : (
+                <p className="text-xs text-amber-800 font-medium">
+                  ⚠️ Ya existe un paciente con los mismos datos: {duplicateWarning.nombre} {duplicateWarning.apellidos}
+                  {duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}. ¿Es el mismo paciente o una persona distinta?
+                </p>
+              )}
+              {vincularError && <p className="text-[11px] text-red-600">{vincularError}</p>}
+              <div className="flex flex-col gap-2">
+                {duplicateWarning.existingPatientIsMine ? (
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/expediente/${duplicateWarning.id}`)}
+                    className="w-full px-2 py-1.5 text-[11px] font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors"
+                  >
+                    Ir a su expediente
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleVincular}
+                    disabled={vinculando}
+                    className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                  >
+                    {vinculando ? <><Loader2 size={12} className="animate-spin" /> Vinculando...</> : 'Es el mismo paciente'}
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => router.push(`/expediente/${duplicateWarning.id}`)}
-                  className="flex-1 px-2 py-1.5 text-[11px] font-medium text-emerald-700 bg-white border border-emerald-300 rounded-lg hover:bg-emerald-50 transition-colors"
-                >
-                  Ir al expediente existente
-                </button>
-                <button
-                  type="button"
+                  disabled={vinculando}
                   onClick={() => {
                     setDuplicateWarning(null)
+                    setVincularError(null)
                     forceCreateRef.current = true
                     handleCreate()
                   }}
-                  className="flex-1 px-2 py-1.5 text-[11px] font-medium text-amber-700 bg-white border border-amber-300 rounded-lg hover:bg-amber-50 transition-colors"
+                  className="w-full px-2 py-1.5 text-[11px] font-medium text-amber-700 bg-white border border-amber-300 rounded-lg hover:bg-amber-50 transition-colors disabled:opacity-50"
                 >
-                  Crear de todos modos
+                  Es otra persona, crear de todos modos
+                </button>
+                <button
+                  type="button"
+                  disabled={vinculando}
+                  onClick={() => { setDuplicateWarning(null); setVincularError(null) }}
+                  className="w-full px-2 py-1.5 text-[11px] font-medium text-[#86868b] bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+                >
+                  Cancelar
                 </button>
               </div>
             </div>
@@ -284,7 +345,7 @@ export default function QuickPatientModal({
 
         <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
           <button onClick={onClose} disabled={saving} className="px-4 py-2 rounded-xl text-sm font-medium text-[#86868b] hover:bg-slate-100 transition-colors disabled:opacity-50">Cancelar</button>
-          <button onClick={handleCreate} disabled={saving}
+          <button onClick={handleCreate} disabled={saving || vinculando}
             className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 transition-colors flex items-center gap-1.5">
             {saving ? <><Loader2 size={14} className="animate-spin" /> Registrando...</> : 'Crear y continuar'}
           </button>

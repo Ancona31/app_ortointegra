@@ -59,6 +59,8 @@ export type AuditAccion =
   | 'sa_ver_alertas'
   | 'sa_ver_legal'
   | 'sa_export_audit_csv'
+  // Vinculación médico-paciente (modelo M:N)
+  | 'vincular_medico'
 
 interface AuditParams {
   userId?: string | null
