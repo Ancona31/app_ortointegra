@@ -1,9 +1,9 @@
 # ETAPA 5 — PLAN DE EJECUCIÓN
 
-> **Estado:** 🟡 En ejecución (sub-paso 5.E completado)  
+> **Estado:** 🟡 En ejecución (sub-paso 5.E + DUP-RPC completados)  
 > **Fecha de creación:** 2026-05-20  
-> **Última actualización:** 2026-05-24 (sub-paso 5.E completado)  
-> **Documento de referencia:** [ROLES_POST_REFACTOR.md](./ROLES_POST_REFACTOR.md)
+> **Última actualización:** 2026-05-26 (sub-paso DUP-RPC completado)  
+> **Documentos de referencia:** [ROLES_POST_REFACTOR.md](./ROLES_POST_REFACTOR.md), [DUPRPC_PLAN.md](./DUPRPC_PLAN.md)
 >
 > Este documento contiene el plan operativo detallado para implementar Etapa 5 del refactor de roles de Spinus, así como el plan post-Etapa 5 para resolver fugas económicas de enforcement de planes.
 >
@@ -510,7 +510,7 @@ Esta sección documenta las decisiones que afectan el diseño técnico de Etapa 
 | D1 | **D1-B** | Una migración versionada por sub-paso. |
 | D2 | **D2-A** | Sub-paso 5.C dedicado a crear los helpers antes de las policies. |
 | D3 | **D3-A** | `RESTRICTIVE` para gates ortogonales (suspensión, límite de plan). |
-| D4 | **Confirmado** | Orden del plan: 5.B→5.C→5.E→5.F→5.G→5.H→5.I→5.J→5.K→5.L. |
+| D4 | **Confirmado** | Orden del plan: 5.B→5.C→5.E→DUP-RPC→5.F→5.G→5.H→5.I→5.J→5.K→5.L. |
 | D6 | **D6-C** | Rollback en 3 capas (snapshot lógico + `DO` block + backup Pro). |
 | D8 | **Sí** | `profiles`: cambiar `TO public` → `TO authenticated`. |
 | D9 | **Mantener** | `get_suscripcion_estado()` se conserva (útil para monetización §6 / auditoría). |
@@ -589,7 +589,7 @@ Esta sección documenta las decisiones que afectan el diseño técnico de Etapa 
 
 ##### D4: ¿Orden exacto de ejecución entre sub-pasos?
 
-El orden propuesto por el reporte de Claude Code es: 5.B → 5.C → 5.E → 5.F → 5.G → 5.H → 5.I → 5.J → 5.K (Storage) → 5.L (validación).
+El orden propuesto por el reporte de Claude Code es: 5.B → 5.C → 5.E → DUP-RPC → 5.F → 5.G → 5.H → 5.I → 5.J → 5.K (Storage) → 5.L (validación).
 
 **Recomendación:** mantener este orden con ajuste:
 1. **5.B antes:** DDL bloquea todo lo demás (consultas necesita medico_id).
@@ -811,6 +811,7 @@ Esta sección describe el plan de ejecución de Etapa 5 a **nivel operativo**: o
 | 5.C | Crear 6 helpers `SECURITY DEFINER` | Bajo | ✅ Aplicado 2026-05-22 |
 | 5.D | Fix bug producción soft delete | Bajo | ✅ Aplicado 2026-05-20 |
 | 5.E | Reescribir policies de `pacientes` | Alto | ✅ Aplicado 2026-05-24 |
+| DUP-RPC | Mover la detección de duplicados al RPC (M:N-aware) | Medio | ✅ Aplicado 2026-05-26 |
 | 5.F | Reescribir policies de `consultas` | Alto | ⏳ Pendiente |
 | 5.G | Reescribir policies de `documentos` + auditar formularios | Alto | ⏳ Pendiente |
 | 5.H | Reescribir policies de `appointments` | Medio | ⏳ Pendiente |
@@ -1073,6 +1074,20 @@ Crear las 6 funciones (ver inventario §4.3):
 
 ---
 
+### DUP-RPC — Detección de duplicados M:N-aware
+
+> ✅ **Pasos 1-3 aplicados en producción el 2026-05-26.** El Paso 4 (DROP de la función vieja) está programado como último paso antes de cerrar la Etapa 5. Ver Bitácora §8.
+
+**Objetivo:** tras el sub-paso 5.E un médico invitado solo ve sus propios pacientes, por lo que la detección de duplicados local en `route.ts` ya no detecta pacientes homónimos registrados por otros médicos de la clínica. DUP-RPC mueve la detección al RPC (`crear_paciente_con_medico_v2`, `SECURITY DEFINER`), que ve toda la clínica.
+
+**Frentes:** el RPC v2 con detección de duplicados; `route.ts` apuntando al RPC v2; el endpoint nuevo `POST /api/pacientes/[id]/vincular`; y 3 componentes de frontend con un modal de 3 acciones (vincular / crear de todos modos / cancelar) y texto variable por rol.
+
+**Plan detallado:** ver `DUPRPC_PLAN.md`.
+
+**Límite conocido:** una secretaria no puede vincular un paciente vía `/vincular` — la RLS de SELECT de `paciente_medico` la rechaza en el `.upsert()`. Workaround: el médico invitado realiza la vinculación desde su propia cuenta. Es un edge case aceptado, no un bloqueante.
+
+---
+
 ### 5.F — Reescribir policies de consultas
 
 **Objetivo:** reescribir las 4 policies de `consultas` para implementar privacidad bidireccional (invariante 22).
@@ -1319,6 +1334,7 @@ Crear las 6 funciones (ver inventario §4.3):
 - ✅ Acceso cross-clínica a `documentos-pdf` cerrado.
 - ✅ Todas las migraciones registradas en `supabase/migrations/`.
 - ✅ `ROLES_POST_REFACTOR.md` actualizado (apéndice de funciones, línea 9 de estado, modelo M:N).
+- ✅ Función vieja `crear_paciente_con_medico(jsonb, uuid)` eliminada (Paso 4 de DUP-RPC, ejecutado como último paso de la Etapa 5, después de 5.L y antes de declarar la etapa cerrada).
 
 ---
 
@@ -1536,7 +1552,22 @@ Ejecutado en 5 pasos (orden D5) bajo protocolo D-T6, todos aplicados y verificad
 
 🟡 **Deuda pendiente:** quedan 2 pacientes de prueba en producción ("Refactor Roles" archivado, "Refactor 2" activo) pendientes de hard-delete.
 
-**Siguiente sub-paso:** DUP-RPC (mover la detección de duplicados al RPC), seguido del resto de la Etapa 5 (5.F consultas, etc.).
+**Siguiente sub-paso:** DUP-RPC (ver entrada siguiente).
+
+### Sub-paso DUP-RPC — Detección de duplicados M:N-aware (aplicado 2026-05-26)
+
+Ejecutado con la estrategia V3 (RPC con nombre nuevo). De 4 pasos, los 3 primeros aplicados y verificados en producción; el Paso 4 está programado como último paso de la Etapa 5.
+
+- ✅ **Paso 1 — RPC v2** — RPC `crear_paciente_con_medico_v2` (`SECURITY DEFINER`) con detección de duplicados clínica-wide, creado en producción — commit `82fe223`.
+- ✅ **Paso 2 — Código** — `route.ts` apunta al RPC v2, endpoint nuevo `POST /api/pacientes/[id]/vincular`, 3 componentes con modal de 3 acciones y texto por rol — commit `ab1c587`.
+- ✅ **Paso 3 — Verificación en producción** — smoke test del camino médico end-to-end (detección de duplicado, vinculación como médico invitado, modo D-E).
+- ⏳ **Paso 4 — DROP de la función vieja** — `DROP FUNCTION crear_paciente_con_medico(jsonb, uuid)`. Programado como último paso antes de cerrar la Etapa 5 (tras 5.L); la función vieja se conserva como red de rollback hasta entonces.
+
+**Verificación:** smoke test en producción — la detección de duplicados clínica-wide funciona; la vinculación M:N es exitosa; el modo D-E (paciente que ya es propio del médico) verificado.
+
+🟡 **Límite conocido:** una secretaria no puede vincular un paciente vía `/vincular` (la RLS de SELECT de `paciente_medico` la rechaza en el `.upsert()`). Workaround: el médico invitado vincula desde su propia cuenta. Edge case aceptado.
+
+**Siguiente sub-paso:** 5.F — reescribir las policies de `consultas`.
 
 ---
 
