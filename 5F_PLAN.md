@@ -25,7 +25,7 @@ Reescribir las policies RLS de la tabla `consultas` para implementar la **privac
 | ID | Decisión |
 |---|---|
 | D-orden | El cableado de `medico_id` en `api/consultas/route.ts` (Paso 1) se despliega ANTES de aplicar las policies nuevas (Paso 3). Evita la ventana en la que una consulta nueva (aún con `medico_id` NULL) quedaría invisible para su creador bajo las policies nuevas. |
-| D-gate | 5.F incluye un gate RESTRICTIVE de suscripción para `consultas` (`consultas_gates_insert`), además de las 4 policies de privacidad. |
+| D-gate | 5.F incluye un gate RESTRICTIVE de suscripción para `consultas` (`consultas_gates_insert`), además de las 3 policies de privacidad (SELECT, INSERT, UPDATE). |
 | D-gate-helpers | El gate usa `clinica_no_suspendida() AND clinica_tiene_acceso()`. NO incluye `clinica_dentro_de_limite()` — el tope de pacientes free se aplica al crear pacientes, no consultas; una clínica free debe poder crear consultas ilimitadas sobre sus pacientes existentes. |
 | D-excliente | Una clínica que pagó, luego canceló, y hoy tiene ≤5 pacientes activos: NO puede crear consultas. Se alinea con el comportamiento de `pacientes` (que usa `clinica_tiene_acceso()`, el cual bloquea a todo ex-cliente con `ha_tenido_acceso_premium = true` sin importar el conteo). Consistencia entre tablas. |
 | D-legacy | Las consultas legacy con `medico_id IS NULL` son visibles solo para el admin de clínica (y super_admin). No se backfillean las consultas legacy — decisión heredada del plan. |
@@ -34,7 +34,7 @@ Reescribir las policies RLS de la tabla `consultas` para implementar la **privac
 | D-prefill | El pre-fill clínico de nueva-nota (carga el último Dx/medicación como contexto) pasa a mostrar, para un médico invitado, solo SU última consulta del paciente — no la de otros médicos. Se acepta: es coherente con la privacidad bidireccional (invariante 22). Cada médico tiene su propio contexto. |
 | D-arco | El endpoint ARCO de exportación: un médico invitado exporta solo SUS consultas; el expediente completo lo exporta el médico admin de clínica. Esto se cumple automáticamente con las policies de 5.F (la RLS de `consultas_select` limita al invitado y da todo al admin) — no requiere escalado a `service_role`. El endpoint ARCO ya está restringido a roles médico/admin. |
 
-## 4. Los 4 pasos de ejecución
+## 4. Los 5 pasos de ejecución
 
 ### Paso 1 — Endpoint: cablear `medico_id` + alinear el guard de suscripción (código, deploy Vercel)
 
@@ -146,6 +146,14 @@ Smoke test con sesiones simuladas (`SET LOCAL request.jwt.claims` dentro de `BEG
 - El médico admin ejecuta la exportación → el expediente contiene TODAS las consultas del paciente.
 - Confirma de paso que el endpoint ARCO solo es accesible a roles médico/admin.
 
+**Eje UPDATE (cobertura de policy aunque la app no la invoque):**
+
+- Médico A actualiza una consulta suya (vía cliente directo a Supabase) → permitido.
+- Médico B intenta actualizar una consulta del médico A → denegado.
+- Admin actualiza una consulta de cualquier médico de su clínica → permitido.
+
+Nota: la app no hace UPDATE de consultas (`[id]/route.ts` da 403 hard a PUT por inmutabilidad NOM-004), pero la policy `consultas_update` existe en la BD y debe probarse por completitud.
+
 **Eje gate de suscripción:**
 
 - Clínica con `suspendida = true` → NO puede INSERT una consulta.
@@ -168,7 +176,7 @@ Las lecturas de `consultas` cambian de semántica automáticamente al aplicar la
 - `consulta/[consultaId]/page.tsx` — abrir por URL una consulta de otro médico devolverá null; la UI debe manejar el null sin romperse.
 - `api/consultas/[id]/addendum/route.ts` — su verificación previa de la consulta dependerá de la nueva policy SELECT.
 - Endpoints de super-admin — usan `service_role`, NO afectados (confirmar en la auditoría).
-- `api/paciente/[id]/exportar/route.ts` (ARCO) — verificar si usa cliente de usuario o `service_role`.
+- `api/paciente/[id]/exportar/route.ts` (ARCO) — usa cliente de usuario (verificado en la auditoría); bajo las nuevas policies de 5.F, el médico invitado exporta solo sus consultas y el admin exporta todas (ver D-arco).
 - `src/app/(launcher)/inicio/page.tsx` — un count de consultas de los últimos 7 días (widget "pacientesSemana"). Un médico invitado verá solo su propio conteo, no el de la clínica. Cambio de UX a verificar.
 - `src/app/api/me/estado-perfil/route.ts` — un count de consultas que define el `gridMode` (layout inicial). Un médico invitado podría quedar atrapado en el modo inicial porque solo cuenta sus propias consultas. Verificar.
 - `src/app/(app)/expediente/[id]/nueva-nota/page.tsx` — el pre-fill de "última consulta para contexto" (Dx + medicamentos). Tras 5.F un médico invitado verá solo su propia última consulta. Comportamiento aceptado por la decisión D-prefill.
@@ -176,7 +184,7 @@ Las lecturas de `consultas` cambian de semántica automáticamente al aplicar la
 ## 6. Rollback y mitigación
 
 - **Paso 1 (endpoint):** rollback vía `git revert` del commit + redeploy.
-- **Paso 3 (policies):** rollback restaurando las 4 policies viejas desde el snapshot del Paso 2 (DROP de las 5 nuevas + CREATE de las 4 viejas).
+- **Paso 3 (policies):** rollback restaurando las 4 policies viejas desde el snapshot del Paso 2 (DROP de las 4 nuevas — consultas_select, consultas_insert, consultas_update, consultas_gates_insert — + CREATE de las 4 viejas).
 - **Acoplamiento:** si el Paso 3 se revierte pero el Paso 1 ya está desplegado, no hay ruptura — las consultas nuevas seguirán teniendo `medico_id` poblado, y las policies viejas (solo por clínica) las muestran igual. El cableado de `medico_id` es inofensivo bajo las policies viejas.
 - **Datos:** 5.F no hace backfill ni migración de datos. No toca filas existentes.
 - **Advertencia de rollback:** una vez aplicado el Paso 3, el Paso 1 deja de ser revertible de forma aislada. Si se revirtiera el endpoint (Paso 1) con las policies nuevas (Paso 3) ya activas, las consultas nuevas volverían a nacer con `medico_id` NULL y la policy `consultas_insert` (que exige `medico_id = auth.uid()`) las rechazaría — la creación de consultas quedaría rota. Tras el Paso 3, un rollback debe revertir Paso 3 y Paso 1 juntos, o ninguno.
