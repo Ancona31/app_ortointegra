@@ -162,6 +162,8 @@ Nota: la app no hace UPDATE de consultas (`[id]/route.ts` da 403 hard a PUT por 
 - Clínica con suscripción activa → SÍ puede INSERT.
 - Clínica free de buena fe → SÍ puede INSERT.
 
+Nota de cohorte (verificado en G.7, 2026-05-27): ninguna clínica de la cohorte actual de producción cumple los predicados de bloqueo (cero suspendidas; las únicas con estados `vencido`/`cancelado` están protegidas por `es_vip_grant=true`). El smoke de este eje obligatoriamente fabrica los estados vía `SET LOCAL` o creando una clínica de prueba ad-hoc — no aparecerán naturalmente en la cohorte.
+
 **No regresión:** crear una consulta como médico normal desde la app funciona end-to-end.
 
 ### Paso 5 — Checkpoint
