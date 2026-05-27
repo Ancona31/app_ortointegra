@@ -1,6 +1,6 @@
 # 5.F — Plan de ejecución: policies de `consultas` (privacidad bidireccional + gate de suscripción)
 
-> **Estado:** Diseño — pendiente de auditoría
+> **Estado:** Diseño auditado — pendiente de trazar scripts y código
 > **Fecha:** 2026-05-26
 > **Sub-paso de:** Etapa 5 (refactor de roles M:N)
 > **Pre-requisitos:** 5.B, 5.C, 5.E aplicados (verificado)
@@ -30,6 +30,9 @@ Reescribir las policies RLS de la tabla `consultas` para implementar la **privac
 | D-excliente | Una clínica que pagó, luego canceló, y hoy tiene ≤5 pacientes activos: NO puede crear consultas. Se alinea con el comportamiento de `pacientes` (que usa `clinica_tiene_acceso()`, el cual bloquea a todo ex-cliente con `ha_tenido_acceso_premium = true` sin importar el conteo). Consistencia entre tablas. |
 | D-legacy | Las consultas legacy con `medico_id IS NULL` son visibles solo para el admin de clínica (y super_admin). No se backfillean las consultas legacy — decisión heredada del plan. |
 | D-ui | El aviso de UI "estás viendo solo tus notas" en el expediente NO entra en 5.F. Se anota y se decide al final del sub-paso. |
+| D-delete | 5.F NO crea una policy DELETE para `consultas`. Se omite, espejando la decisión D3-A de 5.E (pacientes tampoco tiene policy DELETE). La tabla es inmutable (NOM-004); el endpoint `[id]/route.ts` da 403 hard. Sin policy DELETE, cualquier DELETE de cliente queda denegado por defecto. |
+| D-prefill | El pre-fill clínico de nueva-nota (carga el último Dx/medicación como contexto) pasa a mostrar, para un médico invitado, solo SU última consulta del paciente — no la de otros médicos. Se acepta: es coherente con la privacidad bidireccional (invariante 22). Cada médico tiene su propio contexto. |
+| D-arco | El endpoint ARCO de exportación: un médico invitado exporta solo SUS consultas; el expediente completo lo exporta el médico admin de clínica. Esto se cumple automáticamente con las policies de 5.F (la RLS de `consultas_select` limita al invitado y da todo al admin) — no requiere escalado a `service_role`. El endpoint ARCO ya está restringido a roles médico/admin. |
 
 ## 4. Los 4 pasos de ejecución
 
@@ -41,15 +44,27 @@ a) **Cablear `medico_id`** en el objeto del `.insert()` a la tabla `consultas`: 
 
 b) **Alinear el guard de suscripción inline.** El guard actual (~líneas 18-38) solo cubre 'cancelado' + >5 pacientes. Reemplazarlo / extenderlo para que bloquee los mismos casos que el gate RESTRICTIVE del Paso 3 cubrirá: clínica suspendida, y clínica sin acceso (ex-cliente 'vencido' o 'cancelado'). El propósito del guard del endpoint es devolver un HTTP 403 con un **mensaje claro** ANTES de que el INSERT toque la BD — porque si el INSERT lo bloquea solo la policy RESTRICTIVE, el error que llega al frontend es un genérico de Postgres sin contexto. El guard del endpoint y la policy RESTRICTIVE son defensa redundante a propósito: el guard da UX, la policy da garantía.
 
+El guard nuevo del endpoint replica la lógica de los gates en capa TypeScript (no invoca los helpers SQL). Debe leer de la tabla `clinicas` las columnas: `suspendida`, `suscripcion_estado`, `es_vip_grant`, `ha_tenido_acceso_premium`, `stripe_subscription_id`. Bloquea (HTTP 403 con mensaje claro) en dos casos: (1) clínica suspendida — mensaje sobre cuenta suspendida; (2) clínica sin acceso — ex-cliente con `ha_tenido_acceso_premium = true` y sin suscripción activa — mensaje sobre suscripción terminada y reactivación. El criterio del guard debe coincidir con el de la policy RESTRICTIVE `consultas_gates_insert` (`clinica_no_suspendida` + `clinica_tiene_acceso`) para que no haya un caso que el guard permita y la policy rechace (eso daría un error genérico de Postgres en vez de un 403 con mensaje).
+
 Este paso se despliega y se verifica en localhost ANTES de continuar al Paso 3.
 
 ### Paso 2 — Snapshot lógico
 
 Antes de tocar la BD, capturar la definición de las 4 policies actuales de `consultas` (vía `pg_policy` / `pg_get_expr`). Es la red de rollback del Paso 3.
 
+Además del snapshot, el Paso 2 ejecuta dos queries de diagnóstico READ-ONLY antes de continuar:
+
+- **Diagnóstico (a) — contar médicos invitados:** `SELECT count(*) FROM profiles WHERE role = 'medico' AND es_admin_de_clinica = false`. Si el resultado es > 0, significa que hay médicos invitados que, tras 5.F, no verán NINGUNA consulta legacy (todas tienen `medico_id` NULL por la deuda NOM-004). No es un bloqueante — D-legacy ya acepta no backfillear — pero exige una confirmación consciente antes de aplicar el Paso 3.
+- **Diagnóstico (b) — confirmar que ningún flujo de la secretaria lee `consultas`:** revisar (grep) que ninguna ruta accesible al rol `'secretaria'` haga una query `.from('consultas')` con el cliente de usuario. Las nuevas policies no incluyen a la secretaria en ninguna rama; si algún flujo de secretaria leyera `consultas`, habría una regresión silenciosa. Confirmar que no es el caso.
+
 ### Paso 3 — BD: reescribir las policies de `consultas` (SQL al Dashboard, DO block atómico)
 
-Script con `BEGIN; ... COMMIT;`, pre-flight (verifica que existen las 4 policies viejas), DROP de las 4 viejas, CREATE de las 5 nuevas, post-flight (verifica que quedan exactamente las 5 nuevas).
+Script con `BEGIN; ... COMMIT;`, pre-flight (verifica que existen las 4 policies viejas), DROP de las 4 viejas (incluida `clinica_delete`), CREATE de 4 nuevas (`consultas_select`, `consultas_insert`, `consultas_update`, `consultas_gates_insert`) — **sin `consultas_delete`** (ver D-delete) —, post-flight (verifica que quedan exactamente las 4 nuevas esperadas).
+
+El script se ejecuta como un DO block / transacción atómica (BEGIN...COMMIT) con pre-flight y post-flight, imitando el patrón de la migración de 5.E (`20260524_etapa5e_bd1_policies_pacientes.sql`):
+
+- **Pre-flight:** verifica que `consultas` tiene exactamente 4 policies y que existe la policy `clinica_insert` (nombre canario). Si no, aborta — protege contra un estado mixto inesperado.
+- **Post-flight:** verifica que tras los CREATE quedan exactamente las policies nuevas esperadas (por nombre). Si no coinciden, aborta.
 
 **SQL propuesto (BORRADOR — pendiente de auditoría):**
 
@@ -93,15 +108,10 @@ CREATE POLICY consultas_update ON public.consultas
     AND (public.soy_admin_de_clinica() OR medico_id = auth.uid())
   );
 
--- DELETE: solo el creador o el admin de clínica.
--- (La app no hace DELETE de cliente — [id]/route.ts da 403 hard —
---  pero la policy se define por completitud y coherencia.)
-CREATE POLICY consultas_delete ON public.consultas
-  FOR DELETE TO authenticated
-  USING (
-    public.paciente_pertenece_a_mi_clinica(paciente_id)
-    AND (public.soy_admin_de_clinica() OR medico_id = auth.uid())
-  );
+-- DELETE: NO se crea policy (ver D-delete). La tabla es inmutable
+-- (NOM-004); el endpoint [id]/route.ts da 403 hard. Sin policy DELETE,
+-- cualquier DELETE de cliente queda denegado por defecto. Mismo patrón
+-- que pacientes en 5.E (D3-A).
 
 -- Gate RESTRICTIVE de suscripción para INSERT.
 CREATE POLICY consultas_gates_insert ON public.consultas
@@ -130,6 +140,12 @@ Smoke test con sesiones simuladas (`SET LOCAL request.jwt.claims` dentro de `BEG
 - Admin de clínica → ve la consulta de A y la de B.
 - Consulta legacy (`medico_id` NULL) → visible solo para el admin.
 
+**Eje ARCO:**
+
+- Un médico invitado ejecuta la exportación ARCO de un paciente → el expediente exportado contiene solo SUS consultas.
+- El médico admin ejecuta la exportación → el expediente contiene TODAS las consultas del paciente.
+- Confirma de paso que el endpoint ARCO solo es accesible a roles médico/admin.
+
 **Eje gate de suscripción:**
 
 - Clínica con `suspendida = true` → NO puede INSERT una consulta.
@@ -153,6 +169,9 @@ Las lecturas de `consultas` cambian de semántica automáticamente al aplicar la
 - `api/consultas/[id]/addendum/route.ts` — su verificación previa de la consulta dependerá de la nueva policy SELECT.
 - Endpoints de super-admin — usan `service_role`, NO afectados (confirmar en la auditoría).
 - `api/paciente/[id]/exportar/route.ts` (ARCO) — verificar si usa cliente de usuario o `service_role`.
+- `src/app/(launcher)/inicio/page.tsx` — un count de consultas de los últimos 7 días (widget "pacientesSemana"). Un médico invitado verá solo su propio conteo, no el de la clínica. Cambio de UX a verificar.
+- `src/app/api/me/estado-perfil/route.ts` — un count de consultas que define el `gridMode` (layout inicial). Un médico invitado podría quedar atrapado en el modo inicial porque solo cuenta sus propias consultas. Verificar.
+- `src/app/(app)/expediente/[id]/nueva-nota/page.tsx` — el pre-fill de "última consulta para contexto" (Dx + medicamentos). Tras 5.F un médico invitado verá solo su propia última consulta. Comportamiento aceptado por la decisión D-prefill.
 
 ## 6. Rollback y mitigación
 
@@ -160,6 +179,7 @@ Las lecturas de `consultas` cambian de semántica automáticamente al aplicar la
 - **Paso 3 (policies):** rollback restaurando las 4 policies viejas desde el snapshot del Paso 2 (DROP de las 5 nuevas + CREATE de las 4 viejas).
 - **Acoplamiento:** si el Paso 3 se revierte pero el Paso 1 ya está desplegado, no hay ruptura — las consultas nuevas seguirán teniendo `medico_id` poblado, y las policies viejas (solo por clínica) las muestran igual. El cableado de `medico_id` es inofensivo bajo las policies viejas.
 - **Datos:** 5.F no hace backfill ni migración de datos. No toca filas existentes.
+- **Advertencia de rollback:** una vez aplicado el Paso 3, el Paso 1 deja de ser revertible de forma aislada. Si se revirtiera el endpoint (Paso 1) con las policies nuevas (Paso 3) ya activas, las consultas nuevas volverían a nacer con `medico_id` NULL y la policy `consultas_insert` (que exige `medico_id = auth.uid()`) las rechazaría — la creación de consultas quedaría rota. Tras el Paso 3, un rollback debe revertir Paso 3 y Paso 1 juntos, o ninguno.
 
 ## 7. Fuera de alcance de 5.F
 
