@@ -1140,7 +1140,7 @@ Crear las 6 funciones (ver inventario §4.3):
    - `NotaHonorariosForm.tsx`
    - `PlanSuplementacionForm.tsx`
    
-   Cada uno debe setear `subido_por` con el `user.id` del usuario actual (obtenible client-side vía `supabase.auth.getUser()`). Además: revisar `sync.ts` del Búnker (INSERT client-side, también sin `subido_por`) y el endpoint zombie `api/documentos/route.ts` (ningún formulario lo invoca; evaluar si se elimina o se reactiva como ruta centralizada).
+   Cada uno debe setear `subido_por` con el `user.id` del usuario actual (obtenible client-side vía `supabase.auth.getUser()`). Además: revisar `sync.ts` del Búnker (INSERT client-side, también sin `subido_por`) y el endpoint zombie `api/documentos/route.ts` (ningún formulario lo invoca; evaluar si se elimina o se reactiva como ruta centralizada). Además, si este sub-paso toca el guard TS de suscripción del endpoint de documentos, alinear su token de error (`subscription_cancelled` → `subscription_inactive`) con el patrón ya aplicado en 5.F; la unificación formal de tokens es trabajo del Bloque M1 (§6.3).
 4. ⚠️ Orden crítico: las correcciones de formularios deben aplicarse ANTES o EN EL MISMO despliegue que las policies. Si las policies filtran por `subido_por` y un formulario aún crea documentos con `subido_por NULL`, el médico no vería su propio documento recién creado.
 5. Aplicar policies vía `DO` block atómico. Aplicar correcciones de formularios como commits TS coordinados.
 6. Verificación + smoke test.
@@ -1170,6 +1170,7 @@ Crear las 6 funciones (ver inventario §4.3):
 2. Diseñar el SQL exacto:
    - **SELECT:** médico invitado ve citas con `medico_id = auth.uid()`; admin de clínica (`soy_admin_de_clinica()`) y secretaria ven todas las de la clínica.
    - **INSERT:** gate de suscripción + admin/secretaria pueden crear para cualquier médico.
+   - **Endpoint TS:** si se toca el guard de suscripción del endpoint `POST /api/appointments`, alinear su token (`subscription_cancelled` → `subscription_inactive`) con 5.F; la unificación formal es del Bloque M1 (§6.3).
    - **UPDATE/DELETE:** médico invitado solo las suyas; admin/secretaria todas.
 3. ⚠️ Nota: `appointments` ya tiene columna `medico_id` (no requiere migración de schema). El caso de la secretaria —ve toda la agenda pero no es médico tratante— se resuelve con un OR de rol explícito en el predicado, no vía `soy_medico_tratante()`.
 4. Aplicar vía `DO` block atómico con snapshot previo.
@@ -1387,6 +1388,7 @@ El plan se organiza en 3 bloques. El detalle de cada bloque (SQL, archivos TS ex
 - Añadir `'vencido'` al predicado de bloqueo en `src/lib/subscription.ts`.
 - Identificar y cerrar los 6+ endpoints CRUD sin gate: `/api/labs/mediciones`, `/api/consultas/[id]/addendum`, `PUT /api/pacientes/[id]`, `/api/email/enviar-documento`, `/api/nota-medica`, `/api/consulta-rapida`, `GuardarExpedienteBtn.tsx`.
 - Activar `suspendida` como gate funcional server-side.
+- Unificar el token de error de los gates de suscripción: hoy `/api/consultas` ya emite `subscription_inactive` (migrado en 5.F), pero `/api/documentos` y `/api/appointments` aún emiten el token legacy `subscription_cancelled`. Homogeneizar los tres a `subscription_inactive` para telemetría consistente. Ningún consumidor frontend ramifica por token (solo muestran `message`), por lo que el rename no rompe UX.
 
 **Nota de solapamiento:** si Etapa 5 implementó `clinica_no_suspendida()` y `clinica_tiene_acceso()` como gates RLS (sub-paso 5.C), parte de este bloque ya estará cubierto a nivel BD. Este bloque se enfoca en la capa de aplicación TypeScript.
 
