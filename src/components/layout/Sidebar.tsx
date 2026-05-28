@@ -76,7 +76,7 @@ function navDoctor(isAdmin: boolean): NavSection[] {
   ]
 
   return [
-    { kind: 'leaf', href: '/inicio', label: 'Inicio', icon: Home },
+    { kind: 'leaf', href: '/dashboard', label: 'Dashboard', icon: Home },
     {
       kind: 'group', key: 'pacientes', label: 'Pacientes', icon: Stethoscope,
       matchPaths: ['/expediente', '/suplementacion', '/pacientes'],
