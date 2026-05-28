@@ -15,26 +15,50 @@ export async function POST(req: NextRequest) {
       .single()
     if (!profile?.clinica_id) return NextResponse.json({ error: 'Sin clínica' }, { status: 403 })
 
-    // Gate Fase 8.1: bloquear creación si la clínica está cancelada,
-    // no es VIP y ya tiene >5 pacientes activos (ex-cliente pagado).
-    // Free de buena fe (≤5 pacientes) NO se ve afectado.
+    // Gate 5.F: replica en TS la lógica de los helpers clinica_no_suspendida()
+    // y clinica_tiene_acceso() para devolver HTTP 403 con mensaje claro ANTES
+    // de que el INSERT toque la BD. La garantía real vive en la policy
+    // RESTRICTIVE consultas_gates_insert (5.F Paso 3); este guard es UX.
+    // Tokens reutilizan los que emite el RPC de pacientes post-5.E.
     const { data: clinicaGate } = await supabase
       .from('clinicas')
-      .select('suscripcion_estado, es_vip_grant')
+      .select('suspendida, suscripcion_estado, es_vip_grant, ha_tenido_acceso_premium, stripe_subscription_id')
       .eq('id', profile.clinica_id)
       .single()
-    if (clinicaGate?.suscripcion_estado === 'cancelado' && !clinicaGate?.es_vip_grant) {
-      const { count: activosCount } = await supabase
-        .from('pacientes')
-        .select('id', { count: 'exact', head: true })
-        .eq('clinica_id', profile.clinica_id)
-        .or('activo.eq.true,activo.is.null')
-      if ((activosCount ?? 0) > 5) {
-        return NextResponse.json(
-          { error: 'subscription_cancelled', message: 'Tu suscripción terminó. Reactívala desde Facturación para crear nuevas consultas.' },
-          { status: 403 }
-        )
-      }
+
+    // Check defensivo: si la query falló (BD saturada, FK rota, error
+    // transitorio), fail-CLOSED. Alinea el comportamiento con
+    // clinica_no_suspendida() en SQL (fail-CLOSED vía COALESCE(..., false)).
+    if (!clinicaGate) {
+      return NextResponse.json(
+        { error: 'clinic_lookup_failed', message: 'Error temporal. Intenta de nuevo en unos segundos.' },
+        { status: 503 }
+      )
+    }
+
+    // Caso A: clínica suspendida (espeja clinica_no_suspendida() = false)
+    if (clinicaGate.suspendida === true) {
+      return NextResponse.json(
+        { error: 'clinic_suspended', message: 'Tu cuenta está suspendida. Contacta a soporte para reactivarla.' },
+        { status: 403 }
+      )
+    }
+
+    // Caso B: clínica sin acceso (espeja clinica_tiene_acceso() = false).
+    // Bloquea solo a ex-cliente premium sin VIP-grant y sin suscripción
+    // activa. Lógica derivada por De Morgan de las 3 ramas del helper SQL:
+    //   tiene_acceso = VIP OR (stripe AND activo) OR no_premium
+    //   bloquear = NOT VIP AND NOT (stripe AND activo) AND NOT no_premium
+    const tieneVip = clinicaGate.es_vip_grant === true
+    const tieneSuscripcionActiva =
+      clinicaGate.stripe_subscription_id != null &&
+      clinicaGate.suscripcion_estado === 'activo'
+    const esFreeDeBuenaFe = clinicaGate.ha_tenido_acceso_premium !== true
+    if (!tieneVip && !tieneSuscripcionActiva && !esFreeDeBuenaFe) {
+      return NextResponse.json(
+        { error: 'subscription_inactive', message: 'Tu suscripción terminó. Reactívala desde Facturación para crear nuevas consultas.' },
+        { status: 403 }
+      )
     }
 
     const body = await req.json()
@@ -73,6 +97,7 @@ export async function POST(req: NextRequest) {
 
     const { data: consulta, error } = await supabase.from('consultas').insert({
       paciente_id,
+      medico_id: user.id,
       fecha: new Date().toISOString(),
       motivo_consulta:           body.motivo_consulta || null,
       exploracion_fisica:        body.exploracion_fisica || null,

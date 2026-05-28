@@ -432,7 +432,7 @@ export default function NuevaNotaPage() {
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: 'Error desconocido' }))
 
-        setError(data.error || 'No se pudo guardar la nota.')
+        setError(data.message || data.error || 'No se pudo guardar la nota.')
         setGuardando(false)
         return
       }
