@@ -164,7 +164,7 @@ export default function NuevoPacientePage() {
         setLoading(false)
         return
       }
-      router.push(`/expediente/${data.id}`)
+      router.push(isSecretaria ? '/dashboard' : `/expediente/${data.id}`)
     } catch {
       setError("Error de conexion. Verifica tu internet e intenta de nuevo.")
       setLoading(false)
@@ -187,7 +187,7 @@ export default function NuevoPacientePage() {
         return
       }
       // Éxito: el médico queda vinculado al paciente existente → ir a su expediente
-      router.push(`/expediente/${duplicateWarning.id}`)
+      router.push(isSecretaria ? '/dashboard' : `/expediente/${duplicateWarning.id}`)
     } catch {
       setVincularError('No se pudo conectar con el servidor. Verifica tu conexión e intenta de nuevo.')
       setVinculando(false)
@@ -199,7 +199,7 @@ export default function NuevoPacientePage() {
 
       {/* Header macOS */}
       <div className="flex items-center gap-2 mb-5">
-        <Link href="/expediente" className="flex items-center gap-1 text-[#1e5fa8] hover:text-[#1a3a5c] text-sm font-medium transition-colors">
+        <Link href={isSecretaria ? '/pacientes' : '/expediente'} className="flex items-center gap-1 text-[#1e5fa8] hover:text-[#1a3a5c] text-sm font-medium transition-colors">
           <ArrowLeft size={16} strokeWidth={2.5} />
           <span>Pacientes</span>
         </Link>
@@ -417,7 +417,7 @@ export default function NuevoPacientePage() {
               {duplicateWarning.existingPatientIsMine ? (
                 <button
                   type="button"
-                  onClick={() => router.push(`/expediente/${duplicateWarning.id}`)}
+                  onClick={() => router.push(isSecretaria ? '/dashboard' : `/expediente/${duplicateWarning.id}`)}
                   className="w-full px-3 py-2 text-sm font-semibold text-white bg-[#1e5fa8] rounded-xl hover:bg-[#1a3a5c] transition-colors"
                 >
                   Ir a su expediente
@@ -481,7 +481,7 @@ export default function NuevoPacientePage() {
 
         {/* Acciones */}
         <div className="flex gap-3 pb-8">
-          <Link href="/expediente"
+          <Link href={isSecretaria ? '/pacientes' : '/expediente'}
             className="flex-1 text-center px-4 py-3 bg-slate-50 border border-slate-200 text-[#86868b] rounded-xl text-sm font-medium hover:bg-white transition-all">
             Cancelar
           </Link>

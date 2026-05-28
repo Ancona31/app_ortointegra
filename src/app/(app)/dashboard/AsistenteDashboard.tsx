@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { UserPlus, Users, ChevronRight, CalendarDays, Stethoscope, FolderOpen, User } from 'lucide-react'
+import { UserPlus, Users, ChevronRight, CalendarDays, User } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
 import { Paciente } from '@/types'
@@ -144,18 +144,6 @@ export default function AsistenteDashboard() {
                     <span>· {cita.medico.titulo} {cita.medico.nombre}</span>
                   )}
                 </div>
-                {cita.paciente_id && (
-                  <div className="flex items-center gap-1.5 pt-0.5">
-                    <Link href={`/expediente/${cita.paciente_id}/nueva-nota`}
-                      className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a3a5c] transition-colors">
-                      <Stethoscope size={10} /> Iniciar consulta
-                    </Link>
-                    <Link href={`/expediente/${cita.paciente_id}`}
-                      className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-[#1e5fa8] bg-blue-50 hover:bg-blue-100 transition-colors">
-                      <FolderOpen size={10} /> Expediente
-                    </Link>
-                  </div>
-                )}
               </div>
             </div>
           ))

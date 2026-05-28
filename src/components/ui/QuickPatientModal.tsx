@@ -205,7 +205,7 @@ export default function QuickPatientModal({
                 {duplicateWarning.existingPatientIsMine ? (
                   <button
                     type="button"
-                    onClick={() => router.push(`/expediente/${duplicateWarning.id}`)}
+                    onClick={() => router.push(isSecretaria ? '/dashboard' : `/expediente/${duplicateWarning.id}`)}
                     className="w-full px-2 py-1.5 text-[11px] font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors"
                   >
                     Ir a su expediente

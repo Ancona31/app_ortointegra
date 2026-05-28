@@ -106,19 +106,16 @@ function navDoctor(isAdmin: boolean): NavSection[] {
 
 function navSecretaria(): NavSection[] {
   return [
-    { kind: 'leaf', href: '/inicio', label: 'Inicio',  icon: Home },
+    { kind: 'leaf', href: '/dashboard', label: 'Dashboard', icon: Home },
     {
       kind: 'group', key: 'pacientes', label: 'Pacientes', icon: Stethoscope,
-      matchPaths: ['/expediente', '/pacientes'],
+      matchPaths: ['/pacientes'],
       children: [
-        { kind: 'leaf', href: '/pacientes/nuevo', label: 'Nuevo paciente', icon: UserPlus },
-        { kind: 'leaf', href: '/expediente',      label: 'Expediente',     icon: Stethoscope },
+        { kind: 'leaf', href: '/pacientes',       label: 'Lista de pacientes', icon: Stethoscope },
+        { kind: 'leaf', href: '/pacientes/nuevo', label: 'Nuevo paciente',     icon: UserPlus },
       ],
     },
     { kind: 'leaf', href: '/agenda', label: 'Agenda', icon: CalendarDays },
-    { kind: 'divider' },
-    { kind: 'leaf', href: '/perfil', label: 'Mi perfil', icon: UserCircle },
-    { kind: 'leaf', href: '/offline-setup', label: 'Modo Offline', icon: WifiOff },
   ]
 }
 

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Search, User, X, ArrowRight, Loader2, UserPlus, ChevronLeft } from 'lucide-react'
 import { calcularEdad } from '@/lib/patientUtils'
+import { useProfile } from '@/hooks/useProfile'
 
 type Paciente = {
   id: string
@@ -24,6 +25,7 @@ function parsearNombre(q: string) {
 
 export default function CommandPalette() {
   const router = useRouter()
+  const { isSecretary } = useProfile()
   const [open, setOpen]       = useState(false)
   const [query, setQuery]     = useState('')
   const [results, setResults] = useState<Paciente[]>([])
@@ -105,7 +107,7 @@ export default function CommandPalette() {
 
   function navegar(id: string) {
     setOpen(false)
-    router.push(`/expediente/${id}`)
+    router.push(isSecretary ? '/pacientes' : `/expediente/${id}`)
   }
 
   function abrirCrear() {
@@ -134,7 +136,7 @@ export default function CommandPalette() {
       const data = await res.json()
       if (data.id) {
         setOpen(false)
-        router.push(`/expediente/${data.id}`)
+        router.push(isSecretary ? '/pacientes' : `/expediente/${data.id}`)
       }
     } finally {
       setCreando(false)
