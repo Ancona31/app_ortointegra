@@ -299,7 +299,6 @@ Lista de bugs/limitaciones aceptadas conscientemente. No corregir sin plan expl�
 4. ~~**`TabGraficas.tsx` vive temporalmente en disco como archivo utilitario.**~~ ✅ Resuelto (sub-fase 0 del rediseño de labs, 2026-04-21). Archivo eliminado; `normalizarKey` y `ParamGrafica` inlined en `src/hooks/useLaboratoriosNormalizados.ts`.
 5. ~~**`useLaboratoriosNormalizados.ts` — borrar al final del rediseño de labs (sub-fase 8).**~~ ✅ Resuelto (sub-fase 8C1, 2026-04-23). Hook + todo el código legacy eliminado (`src/lib/analisis.ts`, `/api/laboratorios`, `/api/labs-extract`, páginas `/laboratorios/nuevo` y `/laboratorios/[labId]`, ruta standalone `/laboratorios`, tipos `Laboratorio`/`ResultadoLab`/`ValoresLab`/`AnalisisIA`/`VALORES_REFERENCIA`/`ParametroLab`/`Alerta`).
 6. ~~**Tabla `laboratorios` legacy — pendiente `DROP TABLE` manual (sub-fase 8C2).**~~ ✅ Resuelto (sub-fase 8C2, 2026-04-23). Tabla `laboratorios` y todas sus dependencias eliminadas en sub-fase 8C2. Policy `pacientes_delete_solo_sin_historial` recreada sin referencia a la tabla. Bucket `laboratorios-pdf` ya se había eliminado en sesiones anteriores.
-7. **Cuatro pantallas leen `data.error` (token técnico) en vez de `data.message`.** En `src/app/register/page.tsx:95,98`, `src/app/(app)/admin/usuarios/page.tsx:82`, `src/app/(app)/expediente/[id]/editar/page.tsx:112` y `src/app/(app)/expediente/[id]/consulta/[consultaId]/page.tsx:99` (addendum). El handler de error de estos fetch muestra el código técnico (ej. `subscription_inactive`) en lugar del mensaje legible que el endpoint sí envía en `data.message`. Detectado durante 5.F al verificar consumidores aguas abajo; el call site de `nueva-nota/page.tsx` tenía la misma deuda y se corrigió en 5.F. El patrón correcto (`data.message || data.error || <genérico>`) ya es la convención dominante del codebase (5 call sites lo usan). Fix: cambiar una línea por pantalla. Fuera de alcance de Etapa 5 (no es de roles); recogerlo como sub-proyecto de "limpieza de mensajes de error en frontend", barriendo el codebase por si hay más call sites con la misma deuda.
 
 ---
 
@@ -399,26 +398,6 @@ Hardening conocido pero no aplicado todavía. Cada ítem tiene fix planeado y mo
 - Roles permitidos: `super_admin` + `admin` (admin de clínica puede ejecutar ARCO para pacientes de su clínica; super_admin global puede para cualquier clínica).
 - Respuesta denegada: `403 Forbidden` con JSON `{ error: "forbidden" }`.
 - Audit log: sí registrar intentos denegados.
-
-### QW4 — Ocultar identificador interno `medico_id` en exportación ARCO
-
-**Archivo afectado:** `src/app/api/paciente/[id]/exportar/route.ts`
-
-**Problema:** El endpoint de exportación ARCO hace `select('*')` sobre `consultas`. Tras 5.F, la columna `consultas.medico_id` (UUID interno del médico, antes siempre NULL) queda poblada, por lo que ese UUID empieza a aparecer en el JSON exportado al paciente. No es dato sensible del paciente ni revela nada que el expediente no exponga ya en forma legible (`medico_nombre`, `medico_cedula_*`), pero es higiene de exportación: no conviene filtrar identificadores internos del sistema hacia afuera.
-
-**Origen:** Detectado durante 5.F al verificar consumidores de `consultas.medico_id`. El `select('*')` precede a 5.F; la columna simplemente estaba vacía hasta ahora.
-
-**Fix planeado:**
-1. Reemplazar el `select('*')` sobre `consultas` por una lista explícita de columnas que excluya `medico_id` (y revisar si otras columnas internas tipo `client_id` residual también deben excluirse).
-2. Verificar que ninguna otra parte del JSON ARCO dependa de `consultas.medico_id`.
-
-**Cuándo atacar:** Sin urgencia (cosmético, no fuga de datos sensibles). Agrupable con QW3 (mismo endpoint) en una sola sesión de hardening de ARCO.
-
-**Alcance estimado:** 1 archivo, ~5 líneas, 15 min.
-
-**Decisiones ya tomadas:**
-- No se toca en 5.F (fuera de alcance: 5.F es policies de `consultas` + guard de creación, no exportación).
-- La regla de visibilidad ARCO (médico invitado exporta solo sus consultas; admin exporta todas) ya queda correcta por las policies de 5.F (D-arco); esta deuda es solo sobre qué columnas se serializan, no sobre cuáles filas.
 
 ---
 
