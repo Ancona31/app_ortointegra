@@ -52,7 +52,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-    const { data: profile } = await supabase.from('profiles').select('clinica_id').eq('id', user.id).single()
+    const { data: profile } = await supabase.from('profiles').select('id, clinica_id, role, es_admin_de_clinica').eq('id', user.id).single()
     if (!profile?.clinica_id) return NextResponse.json({ error: 'Sin clínica' }, { status: 403 })
 
     const { id } = await ctx.params
@@ -82,7 +82,51 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
     if (paciente_id !== undefined) updates.paciente_id = paciente_id || null
     if (notes       !== undefined) updates.notes       = notes || null
     if (status      !== undefined) updates.status      = status
-    if (medico_id   !== undefined) updates.medico_id   = medico_id || null
+    // 5.H Paso 1: Validar cambio de medico_id según rol (D-5.H-3).
+    // Médico invitado NO puede transferir su cita a otro médico (defense in depth
+    // con la policy de Paso 3; mensaje claro al usuario en lugar de RLS 42501).
+    if (medico_id !== undefined) {
+      const esMedicoInvitado = profile.role === 'medico' && !profile.es_admin_de_clinica
+      const esAdminOSecretaria = (profile.role === 'medico' && profile.es_admin_de_clinica) || profile.role === 'secretaria'
+
+      if (esMedicoInvitado) {
+        // Médico invitado: solo puede mantener su propio UUID
+        if (medico_id !== null && medico_id !== profile.id) {
+          return NextResponse.json(
+            { error: 'forbidden_transfer', message: 'No puedes transferir tu cita a otro médico.' },
+            { status: 403 }
+          )
+        }
+        updates.medico_id = profile.id
+      } else if (esAdminOSecretaria) {
+        // Admin/secretaria: medico_id es obligatorio, validar pertenencia a clínica
+        if (!medico_id) {
+          return NextResponse.json(
+            { error: 'medico_id_required', message: 'Debes seleccionar un médico para la cita.' },
+            { status: 400 }
+          )
+        }
+        const { data: medicoValido } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', medico_id)
+          .eq('clinica_id', profile.clinica_id)
+          .eq('role', 'medico')
+          .maybeSingle()
+        if (!medicoValido) {
+          return NextResponse.json(
+            { error: 'medico_invalido', message: 'El médico seleccionado no pertenece a tu clínica.' },
+            { status: 400 }
+          )
+        }
+        updates.medico_id = medico_id
+      } else {
+        return NextResponse.json(
+          { error: 'forbidden', message: 'Tu rol no puede modificar citas.' },
+          { status: 403 }
+        )
+      }
+    }
 
     // RLS filtra por clinica_id
     const { data: apt, error } = await supabase

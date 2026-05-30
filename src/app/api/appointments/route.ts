@@ -28,7 +28,7 @@ async function getProfile(supabase: Awaited<ReturnType<typeof createClient>>) {
   if (!user) return null
   const { data } = await supabase
     .from('profiles')
-    .select('id, clinica_id, role')
+    .select('id, clinica_id, role, es_admin_de_clinica')
     .eq('id', user.id)
     .single()
   return data ? { ...data, userId: user.id } : null
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
         .or('activo.eq.true,activo.is.null')
       if ((activosCount ?? 0) > 5) {
         return NextResponse.json(
-          { error: 'subscription_cancelled', message: 'Tu suscripción terminó. Reactívala desde Facturación para crear nuevas citas.' },
+          { error: 'subscription_inactive', message: 'Tu suscripción terminó. Reactívala desde Facturación para crear nuevas citas.' },
           { status: 403 }
         )
       }
@@ -102,6 +102,45 @@ export async function POST(req: NextRequest) {
 
     if (!title || !start_time || !end_time) {
       return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
+    }
+
+    // 5.H Paso 1: Determinar medico_id según rol (D-5.H-3).
+    // Defense in depth: el frontend ya oculta el dropdown para médico invitado,
+    // pero validamos server-side por si manipulan el request directamente.
+    let finalMedicoId: string
+    const esMedicoInvitado = profile.role === 'medico' && !profile.es_admin_de_clinica
+    const esAdminOSecretaria = (profile.role === 'medico' && profile.es_admin_de_clinica) || profile.role === 'secretaria'
+
+    if (esMedicoInvitado) {
+      // Médico invitado: forzar su propio UUID, ignorar lo que envíe el body
+      finalMedicoId = profile.userId
+    } else if (esAdminOSecretaria) {
+      // Admin/secretaria: aceptar body.medico_id, validar pertenencia a clínica
+      if (!medico_id) {
+        return NextResponse.json(
+          { error: 'medico_id_required', message: 'Debes seleccionar un médico para la cita.' },
+          { status: 400 }
+        )
+      }
+      const { data: medicoValido } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', medico_id)
+        .eq('clinica_id', profile.clinica_id)
+        .eq('role', 'medico')
+        .maybeSingle()
+      if (!medicoValido) {
+        return NextResponse.json(
+          { error: 'medico_invalido', message: 'El médico seleccionado no pertenece a tu clínica.' },
+          { status: 400 }
+        )
+      }
+      finalMedicoId = medico_id
+    } else {
+      return NextResponse.json(
+        { error: 'forbidden', message: 'Tu rol no puede crear citas.' },
+        { status: 403 }
+      )
     }
 
     // RLS filtra por clinica_id
@@ -116,7 +155,7 @@ export async function POST(req: NextRequest) {
         end_time,
         notes:           notes || null,
         status:          'scheduled',
-        medico_id:        medico_id || null,
+        medico_id:        finalMedicoId,
         gcal_sync_status: 'pending',
       })
       .select()

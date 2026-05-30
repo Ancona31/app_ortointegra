@@ -109,7 +109,7 @@ export default function EditarPacientePage() {
     setGuardando(false)
     if (!res.ok) {
       const data = await res.json().catch(() => ({ error: 'Error desconocido' }))
-      setError(data.error || 'No se pudo guardar.')
+      setError(data.message || data.error || 'No se pudo guardar.')
     } else { router.push(`/expediente/${id}`) }
   }
 

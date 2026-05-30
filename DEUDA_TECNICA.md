@@ -155,6 +155,37 @@ Estado: 🔴 abierta · 🟡 en progreso · 🟢 resuelta (se elimina al cerrar)
 - **Relación con E5-DT-2:** comparten archivo. Al rediseñar el endpoint se
   resuelven ambas deudas.
 
+### E5-DT-8 — Duplicación visual transitoria de citas al cambiar horario
+- **Estado:** 🔴 abierta
+- **Detectada:** Etapa 5, sub-paso 5.H Paso 1 — smoke tests funcionales (2026-05-30)
+- **Archivo afectado:** src/app/(app)/agenda/page.tsx (ejecutarDrop ~líneas 1080-1100 + handlers de FullCalendar y `optimisticEvent`)
+- **Descripción:** Al cambiar el horario de una cita (drag&drop o resize en
+  el calendario), la UI muestra ocasionalmente la cita DUPLICADA visualmente
+  (la original + la nueva posición). La acción del usuario para "borrar el
+  duplicado" elimina ambas instancias de la UI, pero en BD nunca existieron
+  dos citas — solo había un source. Tras recargar la página, el estado
+  vuelve a la verdad de BD. Reproducción intermitente: ocurrió una vez, al
+  repetir el mismo escenario no se reprodujo.
+- **Impacto:** confusión del usuario que ve "duplicados" inexistentes.
+  Riesgo de que un usuario borre lo que cree son duplicados y elimine la
+  cita real. Sin impacto en integridad de datos en BD.
+- **Origen:** comportamiento preexistente del componente de agenda; no
+  introducido por 5.H Paso 1. Posible race condition entre la actualización
+  optimista (`optimisticEvent.remove()`/`refetch()`) y el render del
+  calendar library.
+- **Fix:** investigar el flujo de `optimisticEvent` en `agenda/page.tsx`,
+  validar el orden remove/refetch en la rama de éxito de `ejecutarDrop`
+  (hoy solo se limpia en la rama de error), evaluar si la librería de
+  calendar gestiona mutaciones correctamente. Sub-proyecto dedicado al
+  componente de agenda.
+- **Cuándo atacar:** sin urgencia inmediata. NO bloquea Paso 1 ni Pasos 2-5
+  de 5.H. Verificar primero en producción tras 5.H completo si el bug se
+  reproduce (posible que el lag del servidor local agrave la race condition).
+- **Contexto de detección:** detectado durante prueba local (`npm run dev`
+  en `localhost:3000`); el cableado server-side del Paso 1 (medico_id por
+  rol + validación admin/secretaria) NO está relacionado y funcionó
+  correctamente en todos los smoke tests.
+
 ---
 
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)

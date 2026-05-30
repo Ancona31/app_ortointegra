@@ -96,7 +96,7 @@ export default function ConsultaDetallePage() {
     setGuardandoAddendum(false)
 
     if (!res.ok) {
-      setError(data.error || 'No se pudo guardar el addendum')
+      setError(data.message || data.error || 'No se pudo guardar el addendum')
       return
     }
 

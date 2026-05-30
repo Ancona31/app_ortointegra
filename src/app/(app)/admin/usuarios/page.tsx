@@ -79,7 +79,7 @@ export default function AdminUsuariosPage() {
     const data = await res.json()
     setGuardando(false)
 
-    if (!res.ok) { setError(data.error || 'Error al crear usuario'); return }
+    if (!res.ok) { setError(data.message || data.error || 'Error al crear usuario'); return }
 
     toast.success(`Usuario ${form.email} creado exitosamente`)
     setEspecialidades([''])

@@ -92,10 +92,10 @@ export default function RegisterPage() {
 
     if (!res.ok) {
       if (res.status === 409) {
-        setError(data.error)
+        setError(data.message || data.error)
         setTimeout(() => router.push('/login'), 2000)
       } else {
-        setError(data.error || 'Error al crear la cuenta. Intenta de nuevo.')
+        setError(data.message || data.error || 'Error al crear la cuenta. Intenta de nuevo.')
       }
       return
     }

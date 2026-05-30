@@ -1085,8 +1085,8 @@ export default function AgendaPage() {
 
     if (!res.ok) {
       arg.revert()
-      const { error } = await res.json().catch(() => ({ error: 'Error desconocido' }))
-      toast.error(error ?? 'Error de conexión — cita devuelta a su horario original')
+      const { error, message } = await res.json().catch(() => ({ error: 'Error desconocido' }))
+      toast.error(message || error || 'Error de conexión — cita devuelta a su horario original')
       return
     }
 
@@ -1151,8 +1151,8 @@ export default function AgendaPage() {
       // Rollback: remover evento optimista y refrescar desde servidor
       if (optimisticEvent) optimisticEvent.remove()
       refetch()
-      const { error } = await res.json().catch(() => ({ error: 'Error desconocido' }))
-      toast.error(error ?? 'No se pudo guardar la cita')
+      const { error, message } = await res.json().catch(() => ({ error: 'Error desconocido' }))
+      toast.error(message || error || 'No se pudo guardar la cita')
       return
     }
 
