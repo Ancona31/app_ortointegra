@@ -813,7 +813,7 @@ Esta sección describe el plan de ejecución de Etapa 5 a **nivel operativo**: o
 | 5.E | Reescribir policies de `pacientes` | Alto | ✅ Aplicado 2026-05-24 |
 | DUP-RPC | Mover la detección de duplicados al RPC (M:N-aware) | Medio | ✅ Aplicado 2026-05-26 |
 | 5.F | Reescribir policies de `consultas` | Alto | ✅ Aplicado |
-| 5.G | Reescribir policies de `documentos` + auditar formularios | Alto | ⏳ Pendiente |
+| 5.G | Reescribir policies de `documentos` + auditar formularios | Alto | ✅ Aplicado |
 | 5.H | Reescribir policies de `appointments` | Medio | ⏳ Pendiente |
 | 5.I | Reescribir policies de `mediciones` + `calculadora` + `addendums` | Bajo-medio | ⏳ Pendiente |
 | 5.J | Limpieza menor (`profiles`, `invitaciones`, huérfanas) | Bajo | ⏳ Pendiente |
@@ -1596,6 +1596,35 @@ Ejecutado en 5 pasos bajo protocolo D-T6, todos aplicados y verificados en produ
 - **E5-DT-4** — `SecretariaDashboard.tsx` huérfano (código muerto coexiste con `AsistenteDashboard.tsx`).
 
 **Siguiente sub-paso:** DUP-RPC Paso 4 (DROP de la función vieja `crear_paciente_con_medico(jsonb, uuid)`) como último paso antes de cerrar la Etapa 5.
+
+### Sub-paso 5.G — Policies de `documentos` con privacidad absoluta del creador (aplicado 2026-05-30)
+
+Ejecutado en 6 pasos bajo protocolo D-T6, todos aplicados y verificados en producción. Implementa la trazabilidad absoluta en `documentos` (solo el creador ve/inserta/modifica/borra, sin excepción de admin) + gate RESTRICTIVE de suscripción en INSERT + DELETE habilitado con hard delete completo (fila + objeto en bucket). A diferencia de 5.F que omitió DELETE (notas inmutables), aquí el creador puede borrar sus documentos (D-5.G-3); los documentos generados (recetas, cotizaciones, solicitudes) son instrumentos profesionales del médico, no datos clínicos del paciente bajo NOM-004/ARCO.
+
+- ✅ **Paso 1 — Cableado `subido_por` en 9 call sites de INSERT** — 8 formularios en `src/components/documentos/*.tsx` (Receta, EscritoMedico, ConsentimientoInformado, SolicitudImagen, SolicitudLab, SolicitudInternamiento, NotaHonorarios, PlanSuplementacion) con patrón `getUser() + chequeo defensivo + subido_por: user.id`; `sync.ts:213` con bailout para `doc.medico_id === 'anonymous'` (Dec-Paso1-2: marca 'error' + continue para no quedar 'pending' silencioso). Eliminación del endpoint zombie `POST /api/documentos/route.ts` (cero call sites). Verificado en producción (5 formularios probados funcionalmente con `subido_por` correcto). Commit `74682c4`.
+- ✅ **Paso 2 — Hard delete completo en Ruta A** — `src/app/api/documentos/[id]/route.ts` extendido: SELECT con `pdf_url`; delete con `.select('id')` para distinguir éxito de "RLS bloqueó silenciosamente"; guard 403 si `deleted` vacío (mitigación EJE 5.2 de auditoría: blinda contra divergencia futura entre policies SELECT/DELETE); remove del objeto en bucket `documentos-pdf` solo si fila confirmada borrada; warning + continue si Storage falla (espeja Ruta B). Validado funcionalmente: receta de prueba borrada → fila desapareció + PDF desapareció del bucket. Commit `bfe4368`.
+- ✅ **Paso 3 — Snapshot lógico + diagnósticos** — Snapshot de las 4 policies viejas (`clinica_*` con predicado EXISTS por clínica) capturado en SQL Editor. Diagnóstico (a): 669 documentos legacy con `subido_por NULL`, 190 con PDF asociado, 25 nuevos post-Paso 1 con `subido_por` poblado (total 694). Diagnóstico (b): 4 endpoints aguas abajo identificados (me/stats, me/estadisticas, paciente/[id]/exportar, email/enviar-documento) + 3 lecturas cliente directas (expediente page, hooks de labs); todos cambian comportamiento de forma esperada/aceptable, ningún endpoint requiere modificación TypeScript antes del Paso 4.
+- ✅ **Paso 4 — 5 policies nuevas** — Migración `20260530_etapa5g_paso4_policies_documentos.sql` con un solo bloque BEGIN/COMMIT atómico (PRE-FLIGHT con verificación de RLS habilitada + 4 policies viejas + 3 helpers existentes; DROPs; 5 CREATEs nuevas; POST-FLIGHT con `IS DISTINCT FROM` normalizado contra colación). Policies: `documentos_select` (creador OR legacy NULL) AND tenant-scope; `documentos_insert` con trazabilidad rígida (`subido_por = auth.uid()`); `documentos_update` con USING + WITH CHECK idénticos; `documentos_delete` con `subido_por = auth.uid()` (D-5.G-3, diferencia clave vs 5.F); `documentos_gates_insert` RESTRICTIVE con `clinica_no_suspendida() AND clinica_tiene_acceso()`. Sin rama `soy_admin_de_clinica()` en ninguna policy (D-5.G-1). Reutiliza helpers de 5.C. Commit `9645c91`.
+- ✅ **Paso 5 — Smoke test producción** — 3 confirmaciones de metadata (5 policies con nombres/tipos/comandos/roles correctos; predicados USING/WITH CHECK literales idénticos al diseño con rama NULL solo en SELECT; RLS habilitado con 5 policies totales sin residuos) + 4 smoke tests funcionales con `SET LOCAL ROLE authenticated`: SELECT con clínica multi-médico real (20 míos + 536 legacy de mi clínica + 0 ajenos de los 5 docs del médico invitado); INSERT caso feliz (`solicitud_imagen` creada con `subido_por` correcto); INSERT cross-doctor bloqueado por RLS con SQLSTATE 42501 (trazabilidad rígida); DELETE de doc ajeno bloqueado (`filas_borradas = 0`) + SELECT post-bloqueo lo oculta (doble validación de D-5.G-1 en DELETE y SELECT).
+- ✅ **Paso 6 — Checkpoint** — Esta entrada de Bitácora + actualización de §5 tabla a "Aplicado" + registro de deudas residuales en `DEUDA_TECNICA.md` (E5-DT-5, E5-DT-6, E5-DT-7).
+
+**Decisiones de producto cerradas durante el sub-paso:**
+
+- **D-5.G-1 (trazabilidad absoluta):** admin de clínica NO ve documentos ajenos. Sin rama `soy_admin_de_clinica()` en ninguna policy. Diferencia clave vs 5.F donde admin sí veía consultas ajenas. Justificación: los documentos generados (recetas, cotizaciones, solicitudes) son instrumentos profesionales del médico tratante, no datos compartidos de la clínica.
+- **D-5.G-2 (legacy NULL, Opción C):** rama `subido_por IS NULL` SOLO en SELECT. INSERT/UPDATE/DELETE estrictos sin rama NULL. Sin backfill. 669 legacy quedan visibles intra-clínica vía SELECT, no modificables/borrables. Hoy clínicas mono-médico (leak 0); a futuro, los legacy se reducen orgánicamente.
+- **D-5.G-3 (DELETE habilitado, hard delete):** documentos no están bajo NOM-004 ni ARCO. Policy DELETE presente. Ruta A del DELETE extendida para borrar también el PDF del bucket. Mitigación EJE 5.2 (`.select('id')` + guard 403) blinda contra divergencia futura entre policies SELECT/DELETE.
+- **D-5.G-4 (sync.ts cadena de custodia):** `subido_por = doc.medico_id` (médico que creó el doc offline), NO usuario que sincroniza. Bailout con `updateDocumentStatus('error')` + continue si `doc.medico_id === 'anonymous'`.
+- **D-5.G-ARCO:** los documentos generados están fuera del alcance ARCO. Si el paciente solicita copia, el médico la genera de nuevo manualmente. El endpoint `/api/paciente/[id]/exportar` queda con `documentos` incompleto tras Paso 4 — deuda E5-DT-7 registrada, sin acción en 5.G (endpoint hoy sin call site activo).
+
+🟡 **Deudas residuales** registradas en `DEUDA_TECNICA.md`:
+
+- **E5-DT-5** — Colisión de path de PDF por timestamp de minuto (esquema de naming preexistente; fix: añadir segundos o sufijo aleatorio a `generateDocFileName`).
+- **E5-DT-6** — UX 403 silencioso en DELETE de documento ajeno (frontend no muestra mensaje al usuario; sin impacto hoy en clínica mono-médico).
+- **E5-DT-7** — Endpoint ARCO exportar incluye documentos (debe eliminarse; vinculado a QW3 de CLAUDE.md).
+
+🟡 **Brecha conocida del bucket `documentos-pdf`:** las policies del bucket de Storage permiten DELETE a cualquier `authenticated` (cross-clínica abiertas). 5.G cierra la tabla pero NO el bucket. La defensa práctica es que sin acceso al SELECT de la tabla, el médico ajeno no obtiene el `pdf_url` para invocar `.remove()`. Cierre formal del bucket es trabajo de 5.K.
+
+**Siguiente sub-paso:** 5.H (token `subscription_cancelled` → `subscription_inactive` en `/api/consultas` ya migrado en 5.F; falta auditar otros endpoints — Bloque M1).
 
 ---
 

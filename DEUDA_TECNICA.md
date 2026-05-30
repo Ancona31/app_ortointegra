@@ -79,6 +79,82 @@ Estado: 🔴 abierta · 🟡 en progreso · 🟢 resuelta (se elimina al cerrar)
 - **Posible resolución:** confirmar que es huérfano (grep de su nombre) y
   eliminarlo.
 
+### E5-DT-5 — Colisión de path de PDF por timestamp de minuto
+- **Estado:** 🔴 abierta
+- **Detectada:** Etapa 5, sub-paso 5.G Paso 2 (2026-05-30, EJE 3.3 de auditoría)
+- **Archivos afectados:**
+  - src/lib/mobileShare.ts:220 (construcción del path)
+  - src/lib/patientUtils.ts:122-134 (`generateDocFileName`)
+- **Descripción:** El path del PDF generado en bucket `documentos-pdf` se
+  construye como `${pacienteId}/${finalName}` donde `finalName` incluye
+  timestamp con resolución de minuto (`YYYY-MM-DD_HHmm_Tipo_Nombre.pdf`). Dos
+  documentos del mismo paciente, mismo tipo, mismo nombre, generados dentro del
+  mismo minuto, comparten path. Con `upsert: true` en el `.upload()`, el
+  segundo sobrescribe al primero — quedan 2 filas en `documentos` apuntando al
+  mismo objeto. Si se borra UNA fila (vía Ruta A del DELETE, ahora con hard
+  delete del bucket), el PDF desaparece y la otra fila queda con `pdf_url`
+  huérfano (botón de descarga roto).
+- **Impacto:** baja probabilidad real (requiere generación duplicada dentro
+  del mismo minuto). Inofensivo en operación normal; ofensivo si dos médicos
+  generan el mismo tipo de documento al mismo paciente casi simultáneamente
+  (escenario futuro en clínicas multi-médico).
+- **Origen:** esquema de naming preexistente, no introducido por 5.G.
+- **Fix:** añadir segundos (`HHmmss`) o un sufijo aleatorio corto (uuid de 4-6
+  caracteres) a `finalName` en `generateDocFileName`. Cambio acotado a una
+  función; el resto del flujo (insert con `pdf_url`, descarga via signed URL,
+  delete con hard-delete del bucket) ya es compatible con paths únicos.
+- **Cuándo atacar:** sin urgencia hoy; revisar antes de habilitar clínicas
+  multi-médico de uso intensivo.
+
+### E5-DT-6 — UX del 403 silencioso en DELETE de documento ajeno
+- **Estado:** 🔴 abierta
+- **Detectada:** Etapa 5, sub-paso 5.G Paso 2 (2026-05-30, EJE C.2 de re-auditoría)
+- **Archivos afectados:**
+  - src/app/(app)/expediente/[id]/page.tsx:131-136 (función `eliminarDocumento`)
+  - src/app/api/documentos/[id]/route.ts (handler que retorna 403)
+- **Descripción:** Tras 5.G Paso 4, la policy `documentos_delete` filtra por
+  `subido_por = auth.uid()`. Si un médico no-creador intenta borrar un
+  documento ajeno (vía URL manipulada o por error), el handler retorna 403 con
+  body `{ error: 'No se pudo eliminar' }`. El frontend solo lee `res.ok`
+  (línea 133) y no muestra mensaje al usuario — la lista no se recarga, el
+  modal se queda igual, el médico ve "no pasó nada" sin saber por qué.
+- **Impacto:** UX confusa cuando 5.G Paso 4 entra en clínicas multi-médico.
+  Hoy con clínica mono-médico el escenario no se materializa (no hay docs
+  ajenos visibles que intentar borrar). En clínicas multi-médico, el médico
+  no entendería por qué falla.
+- **Origen:** UX preexistente del componente; las policies de 5.F (consultas)
+  tenían la misma carencia.
+- **Fix:** parsear el body del response no-ok y mostrar un toast con el
+  mensaje (`'No se pudo eliminar'` o un texto más descriptivo). Patrón
+  consistente con cómo otros endpoints del repo manejan errores.
+- **Cuándo atacar:** antes de habilitar clínicas multi-médico, o cuando se
+  reactive el flujo donde un usuario pueda chocar contra docs ajenos.
+
+### E5-DT-7 — Endpoint ARCO exportar incluye documentos (fuera de alcance)
+- **Estado:** 🔴 abierta
+- **Detectada:** Etapa 5, sub-paso 5.G Paso 3 — diagnóstico (b) (2026-05-30)
+- **Archivo afectado:** src/app/api/paciente/[id]/exportar/route.ts:57
+- **Descripción:** El endpoint hace `.from('documentos').select('*').eq('paciente_id', id)`
+  con cliente de usuario. Tras 5.G Paso 4, el array `documentos` del export se
+  reduce a "documentos que el solicitante subió + legacy NULL" — queda
+  incompleto si el paciente tiene documentos de otros médicos de la clínica.
+- **Decisiones ya tomadas (D-5.G-ARCO):** los documentos generados (recetas,
+  cotizaciones, solicitudes, escritos médicos) están **fuera del alcance
+  ARCO** — son instrumentos profesionales del médico tratante, no datos
+  personales del paciente. Si un paciente necesita una copia, el médico la
+  genera de nuevo manualmente. Por tanto este endpoint NO debe incluir
+  `documentos` en su payload final.
+- **Fix:** eliminar la lectura de `documentos` del Promise.all del endpoint
+  (líneas 47-58); el array `documentos` debería desaparecer del JSON
+  exportado. Re-evaluar otros campos del export para coherencia con la regla
+  "documentos generados son del médico, no del paciente".
+- **Cuándo atacar:** vinculado a QW3 de CLAUDE.md ("rediseño del export ARCO
+  con gate de admin y service_role"). Endpoint hoy sin call site activo
+  (`ExportarExpedienteButton.tsx` no lo invoca), por lo que el impacto
+  operacional es cero. Se ataca cuando se reactive el flujo ARCO.
+- **Relación con E5-DT-2:** comparten archivo. Al rediseñar el endpoint se
+  resuelven ambas deudas.
+
 ---
 
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)
