@@ -812,7 +812,7 @@ Esta sección describe el plan de ejecución de Etapa 5 a **nivel operativo**: o
 | 5.D | Fix bug producción soft delete | Bajo | ✅ Aplicado 2026-05-20 |
 | 5.E | Reescribir policies de `pacientes` | Alto | ✅ Aplicado 2026-05-24 |
 | DUP-RPC | Mover la detección de duplicados al RPC (M:N-aware) | Medio | ✅ Aplicado 2026-05-26 |
-| 5.F | Reescribir policies de `consultas` | Alto | ⏳ Pendiente |
+| 5.F | Reescribir policies de `consultas` | Alto | ✅ Aplicado |
 | 5.G | Reescribir policies de `documentos` + auditar formularios | Alto | ⏳ Pendiente |
 | 5.H | Reescribir policies de `appointments` | Medio | ⏳ Pendiente |
 | 5.I | Reescribir policies de `mediciones` + `calculadora` + `addendums` | Bajo-medio | ⏳ Pendiente |
@@ -1570,6 +1570,32 @@ Ejecutado con la estrategia V3 (RPC con nombre nuevo). De 4 pasos, los 3 primero
 🟡 **Límite conocido:** una secretaria no puede vincular un paciente vía `/vincular` (la RLS de SELECT de `paciente_medico` la rechaza en el `.upsert()`). Workaround: el médico invitado vincula desde su propia cuenta. Edge case aceptado.
 
 **Siguiente sub-paso:** 5.F — reescribir las policies de `consultas`.
+
+### Sub-paso 5.F — Policies de `consultas` con privacidad bidireccional (aplicado 2026-05-30)
+
+Ejecutado en 5 pasos bajo protocolo D-T6, todos aplicados y verificados en producción. Implementa la privacidad bidireccional en `consultas` (médico ve por `medico_id = auth.uid()`, admin ve todas las de su clínica) y un gate RESTRICTIVE de suscripción en INSERT. La ejecución incluyó una sub-fase no planeada de control de acceso de secretaria que destapó el diagnóstico (b) del Paso 2 y se resolvió antes del Paso 3.
+
+- ✅ **Paso 1 — Cableado `medico_id` + guard alineado a helpers + fix UX** — `medico_id` poblado en el INSERT del endpoint, guard TS reemplaza la lógica legacy Fase 8.1 espejando `clinica_no_suspendida()` AND `clinica_tiene_acceso()` con check defensivo fail-CLOSED, `nueva-nota/page.tsx` lee `data.message`. Verificado en producción 2026-05-28 (consultas nuevas con `medico_id` poblado, legacy NULL). Commit `0c9e22e`.
+- ✅ **Paso 2 — Snapshot lógico + diagnósticos** — Snapshot de las 4 policies viejas capturado (red de rollback). Diagnóstico (a): 1 médico invitado = cuenta de prueba del propio Angel → D-legacy confirmado sin impacto real. Diagnóstico (b): destapó que 6 flujos accesibles a secretaria leen `consultas` con cliente de usuario. Bloqueante para el Paso 3, resuelto vía sub-fase de control de acceso secretaria antes de continuar.
+- ✅ **Sub-fase Control de acceso secretaria** (no planeada, ejecutada 2026-05-30) — 7 archivos modificados: 2 layouts server-side nuevos (`(app)/expediente/layout.tsx`, `(launcher)/inicio/layout.tsx`) que rebotan secretaria a `/dashboard`; `Sidebar.tsx` `navSecretaria()` reducida a Dashboard + Pacientes (Lista + Nuevo) + Agenda; limpieza UX completa de entradas a `/expediente` por rol en `AsistenteDashboard.tsx`, `pacientes/nuevo/page.tsx`, `QuickPatientModal.tsx`, `CommandPalette.tsx`. Adicionalmente corrección del leaf "Inicio" → "Dashboard" del médico (commit propio). Verificado en producción: secretaria bloqueada, médico intacto.
+- ✅ **Paso 3 — 4 policies nuevas + gate RESTRICTIVE** — Migración `20260530_etapa5f_paso3_policies_consultas.sql` con un solo bloque BEGIN/COMMIT atómico (PRE-FLIGHT con verificación de RLS habilitada + 4 policies viejas + 4 helpers existentes; DROPs; 4 CREATEs nuevas; POST-FLIGHT con `IS DISTINCT FROM` normalizado contra colación). Policies: `consultas_select` (médico ve suyas OR admin) AND tenant-scope; `consultas_insert` con trazabilidad rígida (`medico_id = auth.uid()`); `consultas_update` con trazabilidad bidireccional (USING + WITH CHECK idénticos); `consultas_gates_insert` RESTRICTIVE con `clinica_no_suspendida() AND clinica_tiene_acceso()`. NO se creó policy DELETE (D-delete). Reutiliza helpers de 5.C. Commit `c3cade3`.
+- ✅ **Paso 4 — Smoke test producción** — 3 confirmaciones de metadata (4 policies con nombres/tipos/comandos/roles correctos; predicados USING/WITH CHECK literales idénticos al diseño; RLS habilitado con 4 policies totales sin residuos) + 4 smoke tests funcionales con `SET LOCAL ROLE authenticated`: SELECT como admin (3 consultas visibles incluida legacy); INSERT caso feliz (consulta creada con `medico_id` propio); DELETE bloqueado por ausencia de policy (D-delete); INSERT cross-doctor bloqueado por RLS con SQLSTATE 42501 (trazabilidad rígida).
+- ✅ **Paso 5 — Checkpoint** — Esta entrada de Bitácora + actualización de §5 tabla a "Aplicado".
+
+**Decisiones de producto cerradas conscientemente durante la auditoría del Paso 3:**
+
+- **Confirm-1 (Addendum, Lectura A):** solo el médico original o admin puede agregar addendum a una consulta. Médico suplente debe crear su propia consulta nueva. Coherente con trazabilidad rígida.
+- **Confirm-2 (gridMode, Lectura A):** `/api/me/estado-perfil` mide madurez del usuario (cuántas consultas ha hecho ÉL), no del tenant. Médico nuevo en clínica madura aparece en `gridMode='nuevo'` hasta hacer sus propias 5 consultas.
+- **FK `consultas_medico_id_fkey` ON DELETE SET NULL** confirmado deseado: si un médico es borrado, sus consultas pasan al régimen legacy (solo admin las ve), preservando cadena de custodia clínica.
+
+🟡 **Deudas residuales** registradas en `DEUDA_TECNICA.md` (commit `0cb719d`):
+
+- **E5-DT-1** — 4 pantallas leen `data.error` en vez de `data.message` (detectado durante 5.F Paso 1).
+- **E5-DT-2** — `medico_id` en exportación ARCO (`/api/paciente/[id]/exportar`).
+- **E5-DT-3** — Ruta `/pacientes/[id]` no existe (deuda preexistente expuesta por la sub-fase de secretaria).
+- **E5-DT-4** — `SecretariaDashboard.tsx` huérfano (código muerto coexiste con `AsistenteDashboard.tsx`).
+
+**Siguiente sub-paso:** DUP-RPC Paso 4 (DROP de la función vieja `crear_paciente_con_medico(jsonb, uuid)`) como último paso antes de cerrar la Etapa 5.
 
 ---
 
