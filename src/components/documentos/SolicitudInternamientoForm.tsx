@@ -178,11 +178,15 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
         onOfflineSave?.()
       } else {
         const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('No autenticado')
+
         const insertPayload: Record<string, unknown> = {
           tipo: 'solicitud_internamiento',
           contenido,
           client_id: clientId,
           pdf_url: storagePath,
+          subido_por: user.id,
         }
         if (pacienteId) insertPayload.paciente_id = pacienteId
 

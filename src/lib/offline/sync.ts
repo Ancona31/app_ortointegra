@@ -210,11 +210,26 @@ export async function syncOfflineVault(
           throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`)
         }
       } else {
+        // 5.G Paso 1: bailout si el documento offline carece de identidad real
+        // (medico_id = 'anonymous' fallback de getOfflineIdentity). No se puede
+        // cumplir cadena de custodia (D-5.G-4) sin un UUID real; marcar 'error'
+        // y saltar para que no se reintente en silencio.
+        if (doc.medico_id === 'anonymous') {
+          // eslint-disable-next-line no-console
+          console.warn('[sync] Documento offline sin identidad real (anonymous):', doc.id)
+          await updateDocumentStatus(doc.id, 'error', {
+            _syncError: 'Documento sin identidad real (anonymous)',
+          })
+          result.documents.errors++
+          continue
+        }
+
         const { error } = await supabase.from('documentos').insert({
           tipo: doc.tipo,
           contenido,
           paciente_id: realPatientId,
           client_id: doc.id,
+          subido_por: doc.medico_id,
         })
 
         if (error) throw new Error(error.message)

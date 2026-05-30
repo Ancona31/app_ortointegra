@@ -237,11 +237,15 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
         onOfflineSave?.()
       } else {
         const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('No autenticado')
+
         const insertPayload: Record<string, unknown> = {
           tipo: 'consentimiento_informado',
           contenido,
           client_id: clientId,
           pdf_url: storagePath,
+          subido_por: user.id,
         }
         if (pacienteId) insertPayload.paciente_id = pacienteId
 

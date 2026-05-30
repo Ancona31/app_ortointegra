@@ -330,12 +330,16 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
         // Persistencia — CONDICIONAL a pacienteId
         if (pacienteId) {
           const supabase = createClient()
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) throw new Error('No autenticado')
+
           const insertPayload: Record<string, unknown> = {
             tipo: 'plan_suplementacion',
             contenido,
             client_id: clientId,
             paciente_id: pacienteId,
             pdf_url: storagePath,
+            subido_por: user.id,
           }
 
           const { error } = await supabase.from('documentos').insert(insertPayload)

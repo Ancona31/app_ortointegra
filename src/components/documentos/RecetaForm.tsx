@@ -354,11 +354,15 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
         onOfflineSave?.()
       } else {
         const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('No autenticado')
+
         const insertPayload: Record<string, unknown> = {
           tipo: 'receta',
           contenido,
           client_id: folio,
           pdf_url: storagePath,
+          subido_por: user.id,
         }
         if (pacienteId) insertPayload.paciente_id = pacienteId
 
