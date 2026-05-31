@@ -59,10 +59,23 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/consultas/[
     // Verificar que la consulta existe y pertenece a la clínica (RLS)
     const { data: consulta } = await supabase
       .from('consultas')
-      .select('id')
+      .select('id, medico_id')
       .eq('id', id)
       .single()
     if (!consulta) return NextResponse.json({ error: 'Nota no encontrada' }, { status: 404 })
+
+    // 5.I Paso 3: Validación de autoría (D-5.I-H2 interpretación A estricta)
+    // Solo el médico que generó la consulta puede agregar addendums.
+    // Admin NO puede addendar consultas ajenas.
+    // Consultas legacy con medico_id NULL (deuda E5-DT-11, fuga activa
+    // documentada 2026-05-31) quedan permanentemente no-addendables: no hay
+    // autor identificable, fail-closed total. Fix de la fuga: sesión separada.
+    if (consulta.medico_id !== user.id) {
+      return NextResponse.json(
+        { error: 'forbidden_addendum', message: 'Solo el médico que generó la consulta puede agregar notas aclaratorias.' },
+        { status: 403 }
+      )
+    }
 
     const medicoNombre = `${profile.titulo || ''} ${profile.nombre || ''}`.trim()
 
