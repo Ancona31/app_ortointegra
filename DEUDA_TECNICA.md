@@ -186,6 +186,37 @@ Estado: 🔴 abierta · 🟡 en progreso · 🟢 resuelta (se elimina al cerrar)
   rol + validación admin/secretaria) NO está relacionado y funcionó
   correctamente en todos los smoke tests.
 
+### E5-DT-9 — Citas legacy con medico_id NULL en producción
+- **Estado:** 🔴 abierta
+- **Detectada:** Etapa 5, sub-paso 5.H Paso 2 — diagnóstico (a) (2026-05-30)
+- **Archivos afectados:** datos en producción (`public.appointments`), no código.
+- **Descripción:** En el diagnóstico (a) del Paso 2 se detectaron 2 citas con
+  `medico_id NULL` en producción, ambas creadas antes del cableado del Paso 1
+  (que ahora exige `medico_id` server-side):
+  - `6d1006a6-4fbf-42ee-8d2b-573d2baf48b8` ("Prueba Prueba", OrtoIntegra,
+    creada el 2026-05-04 por la secretaria de la clínica).
+  - `98baf83a-6b10-4c3e-a75e-79325b77600a` ("Alan Ramirez", Dra. Ilse Casillas,
+    creada el 2026-04-05).
+  Tras 5.H Paso 3 aplicado: estas citas son INVISIBLES para médicos invitados
+  (el predicado no tiene rama `medico_id IS NULL`). Admin y secretaria de sus
+  respectivas clínicas las siguen viendo (sus ramas `soy_admin_de_clinica()`
+  y `get_my_role() = 'secretaria'` no dependen de `medico_id`).
+- **Decisiones ya tomadas (D-5.H-NULL):** aceptar orfandad. Sin backfill ni
+  rama NULL en las policies. El cableado del Paso 1 (validación server-side
+  `medico_id_required`) garantiza que no se creen nuevas citas NULL en el
+  futuro.
+- **Impacto:** bajo. Solo afecta a las 2 citas existentes; cada admin de
+  clínica decidirá si las asigna manualmente o las borra. Sin impacto en
+  flujos vivos (las dos citas son del pasado: 5 may y 5 abr).
+- **Fix:** opcional, decisión del admin de cada clínica:
+  - Asignar `medico_id` desde la UI (abrir cita, seleccionar médico, guardar).
+  - Borrar la cita si ya no tiene valor histórico.
+  - O dejarla en orfandad permanente (admin sigue viéndola).
+- **Cuándo atacar:** sin urgencia. No bloquea ningún flujo; cada admin lo
+  resuelve cuando lo decida en su clínica. Para OrtoIntegra (Dr. Ancona):
+  decidido dejarla en orfandad (registro de prueba histórica).
+- **Relación con E5-DT-8:** independientes.
+
 ---
 
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)

@@ -814,7 +814,7 @@ Esta sección describe el plan de ejecución de Etapa 5 a **nivel operativo**: o
 | DUP-RPC | Mover la detección de duplicados al RPC (M:N-aware) | Medio | ✅ Aplicado 2026-05-26 |
 | 5.F | Reescribir policies de `consultas` | Alto | ✅ Aplicado |
 | 5.G | Reescribir policies de `documentos` + auditar formularios | Alto | ✅ Aplicado |
-| 5.H | Reescribir policies de `appointments` | Medio | ⏳ Pendiente |
+| 5.H | Reescribir policies de `appointments` | Medio | ✅ Aplicado |
 | 5.I | Reescribir policies de `mediciones` + `calculadora` + `addendums` | Bajo-medio | ⏳ Pendiente |
 | 5.J | Limpieza menor (`profiles`, `invitaciones`, huérfanas) | Bajo | ⏳ Pendiente |
 | 5.K | Reescribir policies de Storage (bucket `documentos-pdf`) | Medio-alto | ⏳ Pendiente |
@@ -1625,6 +1625,37 @@ Ejecutado en 6 pasos bajo protocolo D-T6, todos aplicados y verificados en produ
 🟡 **Brecha conocida del bucket `documentos-pdf`:** las policies del bucket de Storage permiten DELETE a cualquier `authenticated` (cross-clínica abiertas). 5.G cierra la tabla pero NO el bucket. La defensa práctica es que sin acceso al SELECT de la tabla, el médico ajeno no obtiene el `pdf_url` para invocar `.remove()`. Cierre formal del bucket es trabajo de 5.K.
 
 **Siguiente sub-paso:** 5.H (token `subscription_cancelled` → `subscription_inactive` en `/api/consultas` ya migrado en 5.F; falta auditar otros endpoints — Bloque M1).
+
+### Sub-paso 5.H — Policies de `appointments` con discriminación por rol (aplicado 2026-05-30)
+
+Ejecutado en 5 pasos bajo protocolo D-T6, todos aplicados y verificados en producción. Implementa el modelo de visibilidad por rol en `appointments`: médico invitado ve solo SUS citas (`medico_id = auth.uid()`); admin de clínica (`soy_admin_de_clinica()`) y secretaria (`get_my_role() = 'secretaria'`) ven TODAS las citas de la clínica. Diferencia clave vs 5.F/5.G: 5.H introduce la rama explícita de secretaria como rol legítimo de gestión de agenda. Corrige además un bug histórico: el endpoint `GET /api/appointments` retornaba toda la clínica a cualquier authenticated, contradiciendo el modelo declarado en `permissions.ts`; tras el Paso 3, la RLS hace cumplir la regla.
+
+- ✅ **Paso 1 — Cableado de `medico_id` por rol en endpoints + migración de token + cierre E5-DT-1** — Endpoint POST `/api/appointments` y PUT `/api/appointments/[id]`: `getProfile()` extendido con `es_admin_de_clinica`; lógica ramificada por rol (médico invitado → `medico_id = profile.userId` forzado; admin/secretaria → `body.medico_id` validado contra `profiles` de su clínica vía `clinica_id + role = 'medico'`); rechazo de `medico_id === null` universal en PUT (simetría con POST); errores claros (`medico_id_required`, `medico_invalido`, `forbidden_transfer`). Token `subscription_cancelled` → `subscription_inactive` (alineación con 5.F y patrón del Bloque M1). Cierre completo de E5-DT-1 (6 ocurrencias): añadir `data.message` al chain de error handling + unificar `??`→`||` en `agenda/page.tsx` (call sites de `handleSave` y `ejecutarDrop`), `register/page.tsx`, `admin/usuarios/page.tsx`, `expediente/[id]/editar/page.tsx`, `expediente/[id]/consulta/[consultaId]/page.tsx`. Triple defensa para cambio de `medico_id` (frontend UI + TS endpoint + RLS Paso 3). Verificado funcionalmente: SELECT desde la app con cuenta admin, INSERT con asignación a Dr. Prueba, transferencia validada en BD. Commit `ffb484b`.
+- ✅ **Paso 2 — Snapshot lógico + diagnósticos** — Snapshot de las 4 policies viejas (`clinica_*` con predicado plano `clinica_id = get_clinica_id()`) capturado en SQL Editor. Diagnóstico (a): 24 citas totales en BD, 22 con `medico_id` poblado, 2 con `medico_id NULL` (1 de OrtoIntegra, 1 de Dra. Ilse Casillas), 7 médicos en 7 clínicas, distribución de status `scheduled` 17, `confirmed` 6, `cancelled` 1. Diagnóstico (b): 6 flujos de lectura identificados (GET endpoint, `/inicio` count, `AsistenteDashboard`, `dashboard/page.tsx`, expediente "próxima cita", endpoint `[id]`); ninguno requiere modificación TypeScript antes del Paso 3. Hallazgo importante: el filtro client-side de `dashboard/page.tsx:177` (`eq('medico_id', profile.id)` para no-admin) se vuelve redundante con la RLS nueva — se mantiene como defense in depth.
+- ✅ **Paso 3 — 5 policies nuevas** — Migración `20260530_etapa5h_paso3_policies_appointments.sql` con un solo bloque BEGIN/COMMIT atómico (PRE-FLIGHT con verificación de RLS habilitada + 4 policies viejas + **5 helpers** existentes — incluye `get_my_role()` por primera vez en una migración de policies; DROPs; 5 CREATEs nuevas; POST-FLIGHT con `IS DISTINCT FROM` normalizado contra colación). Policies: `appointments_select` con 3 ramas de rol AND tenant-scope; `appointments_insert` y `appointments_delete` con mismo predicado; `appointments_update` con USING + WITH CHECK idénticos (transferencia rígida); `appointments_gates_insert` RESTRICTIVE con `clinica_no_suspendida() AND clinica_tiene_acceso()`. Sin rama `medico_id IS NULL` en ninguna policy (D-5.H-NULL). Reutiliza helpers de 5.C + `get_my_role()` de baseline (usado por primera vez aquí en producción para `appointments`, ya existente desde 5.E para `pacientes`). Commit `f3d203f`.
+- ✅ **Paso 4 — Smoke tests producción** — 3 confirmaciones de metadata (5 policies con nombres/tipos/comandos/roles correctos; predicados USING/WITH CHECK literales idénticos al diseño con 3 ramas; RLS habilitado con 5 policies totales sin residuos) + 6 smoke tests funcionales con `SET LOCAL ROLE authenticated` simulando los 3 roles: Smoke 1 SELECT como médico invitado sin citas (0 visibles ✓); Smoke 2 SELECT como médico invitado con cita propia (1 visible — la suya ✓, 0 ajenas ✓, 0 legacy NULL ✓); Smoke 3 SELECT como secretaria (9 visibles, todas de su clínica, 0 de otras ✓); Smoke 4 SELECT como admin (idéntico a secretaria: 9 visibles ✓); Smoke 5 INSERT cross-doctor desde médico invitado (RLS violation SQLSTATE 42501 ✓); Smoke 6 DELETE de cita ajena desde médico invitado (doble bloqueo: 0 filas borradas + 0 fila visible para él ✓). Validación visual desde UI también confirmada: creé cita "Prueba 3" asignada al Dr. Prueba desde dropdown, persistida correctamente.
+- ✅ **Paso 5 — Checkpoint** — Esta entrada de Bitácora + actualización de §5 tabla a "Aplicado" + registro de E5-DT-9 en `DEUDA_TECNICA.md` (orfandad de citas legacy NULL).
+
+**Decisiones de producto cerradas durante el sub-paso:**
+
+- **D-5.H-1 (visibilidad por rol):** médico invitado ve solo SUS citas; admin de clínica (`soy_admin_de_clinica()`) y secretaria (`get_my_role() = 'secretaria'`) ven TODAS las citas de la clínica. Admin y secretaria son indistinguibles operacionalmente en `appointments` (ambos gestionan agenda completa). La rama secretaria es NUEVA respecto a 5.F y 5.G — primer sub-paso donde el rol secretaria interviene en las policies de una tabla operativa.
+- **D-5.H-2 (sin helper nuevo):** descartada la creación de `puede_gestionar_agenda()`. Patrón vigente del proyecto: `get_my_role() = 'secretaria'` inline (heredado de 5.E para `pacientes`). Mantiene consistencia con código en producción y evita complejidad innecesaria.
+- **D-5.H-3 (cableado por rol en endpoints):** triple defensa para cambio de `medico_id` — frontend (UX, oculta dropdown para médico invitado), TS endpoint (mensaje claro `forbidden_transfer`), RLS (última línea SQLSTATE 42501).
+- **D-5.H-4 (alineación de token):** `subscription_cancelled` → `subscription_inactive` en `/api/appointments`, alineado con 5.F y patrón del Bloque M1.
+- **D-5.H-NULL (orfandad legacy):** 2 citas con `medico_id NULL` en producción quedan invisibles para médicos invitados tras Paso 3. Admin/secretaria de sus clínicas las siguen viendo. Sin backfill ni rama NULL en policies. Registrado como E5-DT-9.
+- **D-5.H-FLUJO5 (próxima cita en expediente):** aceptar que médico invitado no ve "próxima cita" en expediente si la agendó otro médico. Coherente con D-5.H-1; sin acción requerida.
+
+🟡 **Deudas residuales** registradas en `DEUDA_TECNICA.md`:
+
+- **E5-DT-8** — Duplicación visual transitoria de citas al cambiar horario (preexistente, detectada durante smoke tests del Paso 1; registrada en commit `ffb484b`).
+- **E5-DT-9** — Citas legacy con `medico_id NULL` en producción (2 citas detectadas en diagnóstico (a) del Paso 2; orfandad aceptada bajo D-5.H-NULL).
+
+🟢 **Comportamientos esperados sin acción adicional:**
+
+- Filtro client-side de `dashboard/page.tsx:177` (`eq('medico_id', profile.id)` para no-admin) queda redundante con la RLS, se mantiene como defense in depth.
+- Bug histórico del `GET /api/appointments` (cualquier authenticated veía toda la clínica) corregido por el Paso 3.
+
+**Siguiente sub-paso:** 5.I según orden D4 (línea 513 del plan rector).
 
 ---
 
