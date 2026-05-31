@@ -815,7 +815,7 @@ Esta sección describe el plan de ejecución de Etapa 5 a **nivel operativo**: o
 | 5.F | Reescribir policies de `consultas` | Alto | ✅ Aplicado |
 | 5.G | Reescribir policies de `documentos` + auditar formularios | Alto | ✅ Aplicado |
 | 5.H | Reescribir policies de `appointments` | Medio | ✅ Aplicado |
-| 5.I | Reescribir policies de `mediciones` + `calculadora` + `addendums` | Bajo-medio | ⏳ Pendiente |
+| 5.I | Reescribir policies de `mediciones` + `calculadora` + `addendums` | Bajo-medio | ✅ Aplicado |
 | 5.J | Limpieza menor (`profiles`, `invitaciones`, huérfanas) | Bajo | ⏳ Pendiente |
 | 5.K | Reescribir policies de Storage (bucket `documentos-pdf`) | Medio-alto | ⏳ Pendiente |
 | 5.L | Validación final: 11 Casos del §9 | — | ⏳ Pendiente |
@@ -1656,6 +1656,40 @@ Ejecutado en 5 pasos bajo protocolo D-T6, todos aplicados y verificados en produ
 - Bug histórico del `GET /api/appointments` (cualquier authenticated veía toda la clínica) corregido por el Paso 3.
 
 **Siguiente sub-paso:** 5.I según orden D4 (línea 513 del plan rector).
+
+### Sub-paso 5.I — Policies de `addendums` + `mediciones_analitos` con privacidad bidireccional (aplicado 2026-05-31)
+
+Ejecutado en 5 pasos bajo protocolo D-T6 (con Paso 1.bis adicional tras hallazgo H-2 de auditoría), todos aplicados y verificados en producción. Implementa el modelo de privacidad bidireccional en 2 tablas: médico creador ve SOLO lo suyo, admin de clínica ve TODO de su clínica para auditoría; INSERT/UPDATE/DELETE solo permitidos al creador (no admin). Diferencias clave vs sub-pasos anteriores: 5.I introduce el modelo "hereda de consultas" en addendums + la autoría rígida D-5.I-H2 (solo el médico autor de la consulta padre puede addendar). `calculadora_resultados` queda FUERA del alcance (D-5.I-CALCULADORA, feature en eliminación). Sin rama de secretaria (features clínicas exclusivas del médico).
+
+- ✅ **Paso 1 — Gates de suscripción TS-side + mitigación DELETE + fix E5-DT-1** — Endpoints POST `/api/labs/mediciones` y POST `/api/consultas/[id]/addendum` reciben gate canónico replicado de `/api/consultas` (suspendida → 403 clinic_suspended; sin VIP ni suscripción activa ni free de buena fe → 403 subscription_inactive; lookup fail → 503 clinic_lookup_failed con mensaje legible). DELETE `/api/labs/mediciones/[id]` recibe mitigación EJE 5.2 (`.select('id')` + guard 403 si vacío, igual patrón que 5.G). Frontend `ModalAgregarMedicion.tsx:149` recibe fix de E5-DT-1 (ternaria con `data.message` primero). Validado con 3 smoke tests funcionales en `localhost:3000` (caso feliz medición + caso feliz addendum + DELETE medición). Commit `1a27fac`.
+- ✅ **Paso 1.bis — Validación de autoría TS-side en addendum (D-5.I-H2)** — Tras hallazgo H-2 de la auditoría del SQL del Paso 3 (gap conocido en `addendums_insert`: cualquier médico de la clínica podía addendar cualquier consulta), se cerró D-5.I-H2 con interpretación A estricta: SOLO el médico autor de la consulta puede addendar, admin NO puede addendar consultas ajenas, consultas legacy con `medico_id NULL` quedan permanentemente no-addendables (fail-closed total, Opción A). Cableado server-side: extender SELECT de consulta padre a `'id, medico_id'`; insertar gate `if (consulta.medico_id !== user.id) → 403 forbidden_addendum` con mensaje legible. Validado con 2 smoke tests funcionales (caso feliz autor + caso bloqueado huérfana). Commit `db4b15d`.
+- ✅ **Paso 2 — Snapshot lógico + diagnósticos** — Snapshot de las 6 policies viejas (2 addendums con EXISTS JOIN consultas→pacientes; 4 `clinica_*` mediciones con EXISTS pacientes) capturado en SQL Editor. Conteo del dataset: 5 addendums totales, 27 mediciones totales, 1 solo médico distinto (Dr. Ancona), 4 pacientes con mediciones, 5 consultas con addendums, todos en OrtoIntegra. Diagnósticos: 0 filas legacy NULL en discriminadores (`medico_id` addendums y `creado_por` mediciones son NOT NULL por schema), 0 cross-doctor histórico en ambas tablas (transición visualmente invisible para datos actuales), bug latente detectado en `mediciones_analitos.clinica_update` (USING sin WITH CHECK) corregido en las policies nuevas. Hallazgo colateral: 87 consultas huérfanas legacy con `medico_id NULL` en producción (69 IA + 17 manual), fuga ya cerrada según smoke del 2026-05-31 con notas IA y manual recién creadas (ambas con `medico_id` poblado correctamente). Registrado como E5-DT-11.
+- ✅ **Paso 3 — 8 policies nuevas** — Migración `20260531_etapa5i_paso3_policies_addendums_mediciones.sql` con un solo bloque BEGIN/COMMIT atómico (PRE-FLIGHT con verificación de RLS habilitada en ambas tablas + 2 policies viejas en addendums + 4 viejas en mediciones + 4 helpers existentes; DROPs; 8 CREATEs nuevas; POST-FLIGHT con `IS DISTINCT FROM` normalizado contra colación). Policies de addendums: `addendums_select` con creador OR admin + EXISTS JOIN consultas→pacientes; `addendums_insert` con autoría rígida del autor de la consulta (D-5.I-H2: `addendums.medico_id = auth.uid() AND ... AND c.medico_id = auth.uid()`); `addendums_gates_insert` RESTRICTIVE. Policies de mediciones_analitos: `mediciones_select` con creador OR admin + EXISTS pacientes; `mediciones_insert/update/delete` solo al creador (sin rama admin: D-5.I-3 "mediciones son ayuda al médico"); `mediciones_update` con USING+WITH CHECK idénticos (corrige bug latente); `mediciones_gates_insert` RESTRICTIVE. Reutiliza 4 helpers de 5.C y baseline (sin `get_my_role()`, sin rama IS NULL). Commit `fd6adf9`.
+- ✅ **Paso 4 — Smoke tests producción** — 3 confirmaciones de metadata (8 policies con nombres/tipos/comandos/roles correctos en pg_policy; predicados USING/WITH CHECK literales coincidentes con el diseño incluyendo la línea D-5.I-H2 `AND (c.medico_id = auth.uid())` en `addendums_insert`; RLS habilitado con 3 policies en addendums + 5 en mediciones, sin residuos) + 6 smoke tests funcionales con `SET LOCAL ROLE authenticated`: SELECT mediciones admin (27 visibles, 0 de otra clínica ✓); SELECT mediciones invitado (0 visibles, privacidad bidireccional ✓); INSERT cross-doctor mediciones bloqueado (42501 ✓); INSERT addendum desde invitado sobre consulta ajena bloqueado (42501 ✓); INSERT addendum admin sobre consulta huérfana bloqueado (fail-closed total ✓); INSERT addendum del autor sobre su propia consulta exitoso (caso feliz ✓).
+- ✅ **Paso 5 — Checkpoint** — Esta entrada de Bitácora + actualización de §5 tabla a "Aplicado" + registro de E5-DT-10 y E5-DT-11 en `DEUDA_TECNICA.md`.
+
+**Decisiones de producto cerradas durante el sub-paso:**
+
+- **D-5.I-1 (alcance reducido):** 2 tablas en este sub-paso. `calculadora_resultados` queda FUERA por estar en proceso de eliminación; sus 4 policies `clinica_*` actuales NO se modifican hasta que la feature se dropea junto con la tabla.
+- **D-5.I-2 (addendums idéntico a consultas + D-5.I-H2):** modelo análogo a 5.F pero con autoría rígida adicional: SOLO el médico autor de la consulta puede addendar (no cualquier médico de la clínica como permitía el patrón histórico). Cierre del hallazgo H-2 de la auditoría.
+- **D-5.I-3 (mediciones con UPDATE/DELETE al creador):** mediciones son "ayuda al médico, no documentación inmutable" (decisión del producto), por eso UPDATE/DELETE están permitidos pero solo al creador (sin rama admin). Admin sigue viendo todo de su clínica para auditoría vía SELECT.
+- **D-5.I-ARCO (alcance ARCO):** export ARCO incluye SOLO addendums. Mediciones de laboratorio quedan FUERA del export (son ayuda al médico, no documentación clínica formal del expediente legal). Documentos también fuera (cubierto por D-5.G-ARCO). El endpoint dormante `/api/paciente/[id]/exportar` requiere limpieza para eliminar el SELECT de `mediciones_analitos` — registrado como E5-DT-10.
+- **D-5.I-GATES:** gate RESTRICTIVE de suscripción en INSERT de ambas tablas, replicando patrón 5.F/5.G/5.H. Gate TS-side canónico en endpoints (5 columnas reales del schema: `suspendida, suscripcion_estado, es_vip_grant, ha_tenido_acceso_premium, stripe_subscription_id`; sin `vip_expira_en` que no existe).
+- **D-5.I-DELETE:** mitigación EJE 5.2 aplicada al DELETE de mediciones (igual patrón que 5.G para evitar UX silenciosa cuando RLS bloquea).
+- **D-5.I-CALCULADORA:** `calculadora_resultados` queda con sus 4 policies actuales sin tocar. Bug histórico aceptado conscientemente porque la feature desaparece.
+- **D-5.I-H2 (autoría rígida + Opción A fail-closed):** SOLO el médico autor de la consulta puede addendar. Admin NO puede addendar consultas ajenas (interpretación A estricta). Consultas legacy con `medico_id NULL` quedan permanentemente no-addendables (fail-closed total). Cierra colateralmente el hallazgo H-1 de la auditoría previa (addendum del admin invisible para médico tratante) porque admin ya no puede crear addendums sobre consultas ajenas.
+
+🟡 **Deudas residuales** registradas en `DEUDA_TECNICA.md`:
+
+- **E5-DT-10** — Endpoint ARCO `/api/paciente/[id]/exportar:53` incluye `mediciones_analitos` en el payload; debe eliminarse para alinear con D-5.I-ARCO (solo addendums en export).
+- **E5-DT-11** — 87 consultas huérfanas legacy con `medico_id NULL` en producción (69 IA + 17 manual). Fuga ya cerrada según smoke del 2026-05-31 en ambos flujos. Quedan permanentemente no-addendables bajo D-5.I-H2 Opción A. Backfill puntual opcional con SQL si surge necesidad.
+
+🟢 **Comportamientos esperados sin acción adicional:**
+
+- Hallazgo H-1 de auditoría previa (addendum del admin invisible para médico tratante) cierra colateralmente con D-5.I-H2: el admin ya no puede crear addendums sobre consultas ajenas, así que el escenario no se materializa.
+- Comentario de la migración 5.F que afirmaba "solo el médico original o admin pueden agregar addendum" supersedido por D-5.I-H2; queda como nota documental.
+
+**Siguiente sub-paso:** 5.J según orden D4 (línea 513 del plan rector).
 
 ---
 

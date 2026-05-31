@@ -217,6 +217,49 @@ Estado: 🔴 abierta · 🟡 en progreso · 🟢 resuelta (se elimina al cerrar)
   decidido dejarla en orfandad (registro de prueba histórica).
 - **Relación con E5-DT-8:** independientes.
 
+### E5-DT-10 — Endpoint ARCO incluye mediciones_analitos
+- **Estado:** 🔴 abierta
+- **Detectada:** Etapa 5, sub-paso 5.I (2026-05-31)
+- **Archivo afectado:** `src/app/api/paciente/[id]/exportar/route.ts:53`
+- **Descripción:** El endpoint ARCO de export de datos de paciente (dormante,
+  sin call site activo según diagnóstico (b) de 5.G) incluye un SELECT a
+  `mediciones_analitos` en el payload de export. Bajo D-5.I-ARCO, ARCO aplica
+  SOLO sobre addendums; mediciones quedan FUERA (son ayuda al médico, no
+  documentación clínica formal del expediente legal del paciente).
+- **Fix pendiente:** eliminar el SELECT de `mediciones_analitos` del endpoint
+  exportar.
+- **Cuándo atacar:** sin urgencia (endpoint dormante). Junto con la limpieza
+  pendiente de E5-DT-7 (eliminar SELECT de `documentos` del mismo endpoint
+  bajo D-5.G-ARCO).
+- **Relación con E5-DT-7:** ambas piden eliminar contenido del endpoint ARCO
+  dormante para alinear con las decisiones de scope (D-5.G-ARCO + D-5.I-ARCO).
+
+### E5-DT-11 — Consultas huérfanas legacy con medico_id NULL
+- **Estado:** 🔴 abierta
+- **Detectada:** Etapa 5, sub-paso 5.I Paso 1.bis (2026-05-31)
+- **Archivo afectado:** datos en producción (`public.consultas`), no código.
+- **Descripción:** 87 consultas con `medico_id IS NULL` en producción,
+  distribuidas en 7 clínicas (la mayoría en OrtoIntegra). Origen mixto:
+  69 con `nota_origen='ia'` + 17 con `nota_origen='manual'`. Rango temporal:
+  25 mar 2026 → 27 may 2026.
+- **Fuga cerrada:** smoke test del 2026-05-31 con notas IA y manual recién
+  creadas en ambos flujos arrojó `medico_id` poblado correctamente. La fuga
+  fue cerrada en algún commit anterior (probablemente durante 5.F o 5.H) sin
+  registro explícito.
+- **Impacto tras 5.I aplicado:** estas 87 consultas quedan permanentemente
+  no-addendables bajo D-5.I-H2 interpretación A estricta + Opción A fail-closed
+  (no hay autor identificable → ni autor ni admin pueden addendar). Admin
+  puede VERLAS vía `consultas_select` (rama admin), pero no puede agregar
+  addendums.
+- **Fix opcional:** backfill puntual vía SQL Editor asignando `medico_id` a
+  consultas legítimas (no "Prueba Prueba") que requieran addendum futuro.
+  Operación admin manual con UPDATE puntual; sin urgencia (las 87 son
+  legacy histórica, sin demanda activa).
+- **Cuándo atacar:** sin urgencia. Backfill solo si surge necesidad clínica
+  específica de addendar alguna consulta huérfana real.
+- **Relación con otras deudas:** independiente de E5-DT-10. Es deuda de datos,
+  no de código.
+
 ---
 
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)
