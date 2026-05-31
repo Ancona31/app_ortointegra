@@ -32,11 +32,19 @@ export async function DELETE(
       return NextResponse.json({ error: 'Medición no encontrada' }, { status: 404 })
     }
 
-    const { error } = await supabase
+    const { data: deleted, error: deleteError } = await supabase
       .from('mediciones_analitos')
       .delete()
       .eq('id', id)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      .select('id')
+
+    if (deleteError) {
+      return NextResponse.json({ error: 'Error al eliminar' }, { status: 500 })
+    }
+
+    if (!deleted || deleted.length === 0) {
+      return NextResponse.json({ error: 'No se pudo eliminar' }, { status: 403 })
+    }
 
     return NextResponse.json({ ok: true })
   } catch (err: unknown) {

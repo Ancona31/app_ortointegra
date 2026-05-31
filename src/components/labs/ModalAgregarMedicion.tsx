@@ -146,7 +146,10 @@ export default function ModalAgregarMedicion({ open, onClose, pacienteId, onSucc
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        const msg = typeof data?.error === 'string' ? data.error : 'Error al guardar'
+        const msg =
+          typeof data?.message === 'string' ? data.message :
+          typeof data?.error === 'string' ? data.error :
+          'Error al guardar'
         setError(msg)
         setSubmitting(false)
         return

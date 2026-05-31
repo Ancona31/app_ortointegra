@@ -15,6 +15,40 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/consultas/[
       .single()
     if (!profile?.clinica_id) return NextResponse.json({ error: 'Sin clínica' }, { status: 403 })
 
+    // 5.I Paso 1: Gate de suscripción (D-5.I-GATES, replicado de /api/consultas)
+    const { data: clinicaGate } = await supabase
+      .from('clinicas')
+      .select('suspendida, suscripcion_estado, es_vip_grant, ha_tenido_acceso_premium, stripe_subscription_id')
+      .eq('id', profile.clinica_id)
+      .single()
+
+    if (!clinicaGate) {
+      return NextResponse.json(
+        { error: 'clinic_lookup_failed', message: 'Error temporal. Intenta de nuevo en unos segundos.' },
+        { status: 503 }
+      )
+    }
+
+    if (clinicaGate.suspendida === true) {
+      return NextResponse.json(
+        { error: 'clinic_suspended', message: 'Tu cuenta está suspendida. Contacta a soporte para reactivarla.' },
+        { status: 403 }
+      )
+    }
+
+    const tieneVip = clinicaGate.es_vip_grant === true
+    const tieneSuscripcionActiva =
+      clinicaGate.stripe_subscription_id != null &&
+      clinicaGate.suscripcion_estado === 'activo'
+    const esFreeDeBuenaFe = clinicaGate.ha_tenido_acceso_premium !== true
+
+    if (!tieneVip && !tieneSuscripcionActiva && !esFreeDeBuenaFe) {
+      return NextResponse.json(
+        { error: 'subscription_inactive', message: 'Tu suscripción terminó. Reactívala desde Facturación para crear nuevas notas aclaratorias.' },
+        { status: 403 }
+      )
+    }
+
     const { id } = await ctx.params
     const { contenido } = await req.json()
 
