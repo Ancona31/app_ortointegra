@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Agenda · Prototipo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  html, body { margin: 0; height: 100%; background: #eef1f5; font-family: "Plus Jakarta Sans", system-ui, sans-serif; }
+  #root { height: 100%; }
+  * { box-sizing: border-box; }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: #cdd6e2; border-radius: 9px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="calendar-data.js"></script>
+<script src="theme.js"></script>
+<script type="text/babel" src="calendar-ui.jsx"></script>
+<script type="text/babel" src="calendar-week.jsx"></script>
+<script type="text/babel" src="agenda-shell.jsx"></script>
+<script type="text/babel" src="agenda-views.jsx"></script>
+<script type="text/babel" src="agenda-modal.jsx"></script>
+
+<script type="text/babel">
+const { useState } = React;
+const C = window.CAL;
+const DOW_LONG = { Lun: 'Lunes', Mar: 'Martes', Mié: 'Miércoles', Jue: 'Jueves', Vie: 'Viernes', Sáb: 'Sábado', Dom: 'Domingo' };
+
+// NOTE: the brand palette is INHERITED from the signed-in user's profile
+// (Mi perfil › Apariencia → primary + secondary, any hex). There is no
+// palette chooser inside the Agenda. All chrome derives from
+// window.BRAND.primary / .secondary via theme.js → window.brand().
+
+// ---------- Month view ----------
+function MonthView({ appts, activeDocs, onPickDay }) {
+  const T = window.SURF();
+  // May 2026: 1st = Friday. Grid Mon..Sun, 5 weeks.
+  const firstDow = 4; // Mon=0 ... Fri=4
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let d = 1; d <= 31; d++) cells.push(d);
+  while (cells.length % 7) cells.push(null);
+  const labels = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Sun'];
+  const apptsForDate = (date) => {
+    const idx = date - 25; if (idx < 0 || idx > 6) return [];
+    return appts.filter(a => a.day === idx && (a.source === 'gcal' || activeDocs.includes(a.doctor)));
+  };
+  return (
+    <div style={{ padding: '14px 30px 28px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 1, background: T.monthGap, border: `1px solid ${T.monthGap}`, borderRadius: 14, overflow: 'hidden' }}>
+        {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(l => (
+          <div key={l} style={{ background: T.monthHead, textAlign: 'center', padding: '10px 0', fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: T.muted }}>{l}</div>
+        ))}
+        {cells.map((d, i) => {
+          const list = d ? apptsForDate(d) : [];
+          const isToday = d === 27;
+          const weekend = d && ((i % 7) >= 5);
+          return (
+            <div key={i} onClick={() => d && list.length >= 0 && onPickDay(d - 25)} style={{
+              background: d ? (weekend ? T.monthWeekend : T.monthCell) : T.monthEmpty, minHeight: 116, padding: 8,
+              cursor: d ? 'pointer' : 'default', position: 'relative',
+            }}>
+              {d && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <span style={{ width: 26, height: 26, borderRadius: '50%', display: 'grid', placeItems: 'center', fontSize: 13, fontWeight: 700,
+                      background: isToday ? '#1b3a66' : 'transparent', color: isToday ? '#fff' : (weekend ? T.muted2 : T.text) }}>{d}</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 2 }}>
+                    {list.slice(0, 3).map(a => {
+                      const ext = a.source === 'gcal';
+                      const col = ext ? window.extTok().dot : window.docTok(C.doctors[a.doctor]).color;
+                      return (
+                        <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: T.text, overflow: 'hidden' }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: col, flex: '0 0 auto' }} />
+                          <span style={{ color: T.muted, fontWeight: 700 }}>{a.start}</span>
+                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ext ? a.title : a.patient}</span>
+                        </div>
+                      );
+                    })}
+                    {list.length > 3 && <div style={{ fontSize: 11, fontWeight: 700, color: T.muted, paddingLeft: 11 }}>+{list.length - 3} más</div>}
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function AgendaApp() {
+  const [appts, setAppts] = useState(C.appts.map(a => ({ ...a })));
+  const [view, setView] = useState('Semana');
+  const [selDay, setSelDay] = useState(2); // Wed 27 (today)
+  const [activeDocs, setActiveDocs] = useState(['ancona', 'mendez']);
+  const [detail, setDetail] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [dark, setDark] = useState(() => localStorage.getItem('ag-dark') === '1');
+  window.__dark = dark;
+  // PROD: primary/secondary are inherited from the signed-in user's profile
+  // (Mi perfil › Apariencia). Any two hex colors work — all chrome derives
+  // from them via theme.js. Hardcoded to the Spinus default for this demo.
+  window.BRAND = { primary: '#1a3a5c', secondary: '#1e5fa8' };
+  const T = window.SURF();
+  React.useEffect(() => { localStorage.setItem('ag-dark', dark ? '1' : '0'); }, [dark]);
+
+  const flash = (msg) => { setToast(msg); setTimeout(() => setToast(t => t === msg ? null : t), 2200); };
+  const toggleDoc = (id) => setActiveDocs(d => d.includes(id) ? (d.length === 1 ? d : d.filter(x => x !== id)) : [...d, id]);
+  const docVisible = (a) => a.source === 'gcal' || activeDocs.includes(a.doctor);
+
+  function reschedule(a, newStart, col) {
+    setAppts(list => list.map(x => x.id === a.id ? {
+      ...x, start: C.fmt(newStart),
+      day: col.dayIdx != null ? col.dayIdx : x.day,
+      doctor: col.doctorId != null ? col.doctorId : x.doctor,
+    } : x));
+    flash(`Cita de ${a.patient} reagendada a las ${C.fmt(newStart)}`);
+  }
+  function quickCreate(col, min) {
+    setDraft({ day: col.dayIdx != null ? col.dayIdx : selDay, doctor: col.doctorId || activeDocs[0] || 'ancona',
+      start: C.fmt(min), dur: 30, status: 'agendada', type: 'primera' });
+  }
+  function saveAppt(data) {
+    if (data.id) { setAppts(l => l.map(x => x.id === data.id ? { ...data } : x)); flash('Cambios guardados'); }
+    else { const id = Math.max(0, ...appts.map(a => a.id)) + 1; setAppts(l => [...l, { ...data, id }]); flash('Cita creada'); }
+    setDraft(null); setDetail(null);
+  }
+  function deleteAppt(data) { setAppts(l => l.filter(x => x.id !== data.id)); setDraft(null); setDetail(null); flash('Cita eliminada'); }
+
+  // build columns + label per view
+  let columns = [], label = '', headers = null;
+  if (view === 'Semana') {
+    columns = C.days.map(d => ({ key: 'd' + d.idx, dayIdx: d.idx, today: d.today, weekend: d.weekend, dropLabel: d.dow,
+      header: dayHeader(d), filter: a => a.day === d.idx && docVisible(a) }));
+    label = C.rangeLabel;
+  } else if (view === 'Día') {
+    const d = C.days[selDay];
+    columns = [{ key: 'day', dayIdx: d.idx, today: d.today, weekend: d.weekend,
+      header: <div key="h" style={{ flex: 1, padding: '6px 0' }} />, filter: a => a.day === d.idx && docVisible(a) }];
+    label = `${DOW_LONG[d.dow]} ${d.date} ${C.monthLabel}`;
+  } else if (view === 'Recurso') {
+    const d = C.days[selDay];
+    columns = activeDocs.map(id => {
+      const doc = C.doctors[id];
+      return { key: id, doctorId: id, dayIdx: d.idx, today: d.today, weekend: d.weekend, dropLabel: doc.short,
+        header: (
+          <div key={id} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, padding: '9px 0 11px',
+            borderRadius: '11px 11px 0 0', background: window.docTok(doc).soft, boxShadow: `inset 0 -3px 0 ${window.docTok(doc).color}` }}>
+            <Avatar name={doc.short.replace(/Dra?\. /, '')} color={window.docTok(doc).color} size={26} />
+            <div style={{ textAlign: 'left' }}><div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, whiteSpace: 'nowrap' }}>{doc.short}</div>
+              <div style={{ fontSize: 11, color: T.muted, fontWeight: 600, whiteSpace: 'nowrap' }}>{doc.specialty}</div></div>
+          </div>
+        ),
+        filter: a => a.day === d.idx && a.doctor === id && a.source === 'clinic' };
+    });
+    label = `${DOW_LONG[d.dow]} ${d.date} ${C.monthLabel}`;
+  } else { label = `${C.monthLabel === 'May 2026' ? 'Mayo 2026' : C.monthLabel}`; }
+
+  const dayNav = (view === 'Día' || view === 'Recurso');
+  const onPrev = () => dayNav && setSelDay(d => Math.max(0, d - 1));
+  const onNext = () => dayNav && setSelDay(d => Math.min(6, d + 1));
+  const onToday = () => setSelDay(2);
+
+  return (
+    <div style={{ display: 'flex', height: '100%', background: T.appBg }}>
+      <Sidebar dark={dark} onToggleDark={() => setDark(v => !v)} />
+      <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', background: T.mainBg, overflow: 'hidden' }}>
+        <PageHeader />
+        <AgendaToolbar view={view} setView={setView} activeDocs={activeDocs} toggleDoc={toggleDoc}
+          label={label} onPrev={onPrev} onNext={onNext} onToday={onToday} onNew={() => quickCreate({ dayIdx: selDay }, 9 * 60)} />
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+          {view === 'Mes' ? (
+            <MonthView appts={appts} activeDocs={activeDocs} onPickDay={(idx) => { setSelDay(idx); setView('Día'); }} />
+          ) : (
+            <>
+              {(view === 'Semana' || view === 'Recurso') && <ColHeaders columns={columns} />}
+              {view === 'Día' && <div style={{ height: 8 }} />}
+              <TimeGrid columns={columns} appts={appts} onSelect={setDetail} onQuickCreate={quickCreate} onReschedule={reschedule} />
+            </>
+          )}
+        </div>
+      </main>
+
+      {detail && <DetailPanelX a={detail} onClose={() => setDetail(null)} onEdit={(a) => { setDetail(null); setDraft(a); }} />}
+      {draft && <ApptModal draft={draft} onClose={() => setDraft(null)} onSave={saveAppt} onDelete={deleteAppt} />}
+      {toast && (
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 300,
+          background: '#15243e', color: '#fff', padding: '12px 20px', borderRadius: 12, fontSize: 13.5, fontWeight: 600,
+          boxShadow: '0 10px 30px rgba(10,22,44,.35)', animation: 'calPanelIn .2s ease' }}>{toast}</div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<AgendaApp />);
+</script>
+</body>
+</html>
