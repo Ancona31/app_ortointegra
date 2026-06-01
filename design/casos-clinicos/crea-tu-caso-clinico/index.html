@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Crea tu Caso Clínico · Handoff de diseño</title>
+<link rel="stylesheet" href="assets/spinus.css" />
+<style>
+  body { background: var(--bg); }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px 90px; }
+
+  /* Hero */
+  .hero { background: var(--navy-grad); border-radius: var(--r-xl); color: #fff; padding: 46px 44px; margin: 26px 0 34px; box-shadow: var(--sh-navy); position: relative; overflow: hidden; }
+  .hero::after { content: ""; position: absolute; right: -80px; top: -80px; width: 320px; height: 320px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.10), transparent 70%); }
+  .hero-eyebrow { font-size: 12.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--on-navy-dim); }
+  .hero h1 { font-size: 42px; font-weight: 700; letter-spacing: -.02em; margin: 12px 0 14px; line-height: 1.05; }
+  .hero p { font-size: 16px; color: var(--on-navy); max-width: 620px; line-height: 1.55; margin: 0 0 26px; }
+  .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; position: relative; z-index: 1; }
+  .hero-btn { display: inline-flex; align-items: center; gap: 9px; font-family: var(--font); font-weight: 600; font-size: 15px; padding: 14px 24px; border-radius: var(--r-md); cursor: pointer; text-decoration: none; transition: transform .2s var(--ease); }
+  .hero-btn:active { transform: scale(.97); }
+  .hero-btn.primary { background: #fff; color: var(--navy-700); }
+  .hero-btn.ghost { background: rgba(255,255,255,.12); color: #fff; }
+  .hero-meta { margin-top: 26px; font-size: 13px; color: var(--on-navy-dim); display: flex; gap: 18px; flex-wrap: wrap; }
+
+  .sec-label { font-size: 12px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); margin: 40px 0 16px; }
+
+  /* Exec summary */
+  .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 14px; }
+  .sum-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 20px; box-shadow: var(--sh-sm); }
+  .sum-num { width: 30px; height: 30px; border-radius: 9px; background: var(--accent-soft); color: var(--accent-strong); display: grid; place-items: center; font-weight: 800; font-size: 14px; margin-bottom: 12px; }
+  .sum-card h3 { font-size: 15px; font-weight: 700; color: var(--ink); margin: 0 0 7px; }
+  .sum-card p { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 0; }
+
+  /* MVP table */
+  .scope { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; box-shadow: var(--sh-sm); }
+  .scope-row { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 0; }
+  .scope-row > div { padding: 15px 20px; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+  .scope-head > div { background: var(--surface-2); font-weight: 700; color: var(--ink); font-size: 12.5px; letter-spacing: .02em; }
+  .scope-row b { color: var(--ink); font-weight: 600; }
+  .scope-row small { color: var(--muted); display: block; margin-top: 2px; }
+  .chk { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+  .chk.y { color: var(--green-ink); }
+  .chk.l { color: var(--accent-strong); }
+  .chk.n { color: var(--muted-2); }
+
+  /* Docs grid */
+  .docs { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px,1fr)); gap: 14px; }
+  .doc { display: flex; gap: 14px; align-items: flex-start; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 18px; box-shadow: var(--sh-sm); text-decoration: none; transition: transform .2s var(--ease), box-shadow .2s var(--ease); }
+  .doc:hover { transform: translateY(-3px); box-shadow: var(--sh-lg); }
+  .doc-num { flex: 0 0 auto; width: 42px; height: 42px; border-radius: 12px; background: var(--navy-700); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 15px; }
+  .doc h3 { font-size: 14.5px; font-weight: 700; color: var(--ink); margin: 2px 0 5px; }
+  .doc p { font-size: 12.5px; color: var(--muted); line-height: 1.45; margin: 0; }
+
+  .note { display: flex; gap: 12px; background: var(--amber-soft); border: 1px solid #f5d6b0; border-radius: var(--r-lg); padding: 18px 20px; margin-top: 18px; }
+  .note b { color: #b45309; }
+  .note p { margin: 0; font-size: 13.5px; color: #92561a; line-height: 1.55; }
+
+  @media (max-width: 640px) {
+    .hero { padding: 32px 24px; } .hero h1 { font-size: 32px; }
+    .scope-row { grid-template-columns: 1.3fr .85fr; } .scope-row .col-aud { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="hero-eyebrow">Spinus EHR · Handoff de diseño UX/UI</div>
+    <h1>Crea tu Caso Clínico</h1>
+    <p>Documenta un caso con imágenes, radiografías y video; anótalo como en una <i>story</i> —incluido el ángulo de Cobb— y expórtalo a PDF o redes, con la privacidad del paciente cuidada por defecto. Todo dentro de Spinus.</p>
+    <div class="hero-actions">
+      <a class="hero-btn primary" href="Crea tu Caso Clinico.html">▶ Abrir prototipo navegable</a>
+      <a class="hero-btn ghost" href="docs/00-Propuesta.md">Leer la propuesta</a>
+    </div>
+    <div class="hero-meta">
+      <span>Prototipo interactivo</span><span>·</span><span>7 documentos de PM</span><span>·</span><span>Design tokens de Spinus</span>
+    </div>
+  </header>
+
+  <div class="sec-label">Resumen ejecutivo</div>
+  <div class="summary">
+    <div class="sum-card"><div class="sum-num">1</div><h3>Vive dentro de Spinus</h3><p>Reusa tu sidebar, paciente, DICOM y design system. Ruta lazy + Error Boundary + feature flag: no puede romper el resto.</p></div>
+    <div class="sum-card"><div class="sum-num">2</div><h3>El anotador es el diferenciador</h3><p>Simple como Instagram, pero clínico: flecha, círculo, texto, difuminado y <b>medidor de ángulo de Cobb</b>.</p></div>
+    <div class="sum-card"><div class="sum-num">3</div><h3>Privacidad como riel</h3><p>Aviso fuerte + consentimiento obligatorio + difuminado de rostro + aviso legal. El médico decide bajo su responsabilidad.</p></div>
+    <div class="sum-card"><div class="sum-num">4</div><h3>Una fuente, muchos formatos</h3><p>El mismo caso sale a PDF, Story, Carrusel y Feed. Cuatro plantillas: Académico, Clínico, Divulgativo, Marca.</p></div>
+    <div class="sum-card"><div class="sum-num">5</div><h3>MVP angosto a propósito</h3><p>Pensado para solo-founder que prioriza estabilidad. Cada pieza reusa algo que ya tienes.</p></div>
+  </div>
+
+  <div class="sec-label">Corte de alcance — MVP vs Fase 2</div>
+  <div class="scope">
+    <div class="scope-row scope-head"><div>Capacidad</div><div>MVP (v1)</div><div class="col-aud">Notas</div></div>
+    <div class="scope-row"><div><b>Fotos · radiografías · texto</b></div><div><span class="chk y">✓ Sí</span></div><div class="col-aud"><small>Núcleo del caso de columna</small></div></div>
+    <div class="scope-row"><div><b>Comparativo antes / después</b></div><div><span class="chk y">✓ Sí</span></div><div class="col-aud"><small>El formato más potente en cirugía</small></div></div>
+    <div class="scope-row"><div><b>Anotación</b> · flecha, círculo, texto, trazo</div><div><span class="chk y">✓ Sí</span></div><div class="col-aud"><small>Un gesto = una herramienta</small></div></div>
+    <div class="scope-row"><div><b>Difuminado / pixelado</b></div><div><span class="chk y">✓ Sí</span></div><div class="col-aud"><small>Innegociable por privacidad</small></div></div>
+    <div class="scope-row"><div><b>Medidor de ángulo de Cobb</b></div><div><span class="chk y">✓ Sí</span></div><div class="col-aud"><small>El gancho clínico único</small></div></div>
+    <div class="scope-row"><div><b>Video corto</b> (adjunto reproducible)</div><div><span class="chk y">✓ Sí</span></div><div class="col-aud"><small>Sin edición/recorte en v1</small></div></div>
+    <div class="scope-row"><div><b>Export</b> · PDF + Story</div><div><span class="chk y">✓ Sí</span></div><div class="col-aud"><small>Carrusel/Feed como variantes</small></div></div>
+    <div class="scope-row"><div>Recorte de video · regla · editor de plantillas</div><div><span class="chk n">Fase 2</span></div><div class="col-aud"><small>Una vez validado el MVP</small></div></div>
+    <div class="scope-row" style="--b:0"><div>Integración Meta API · texto con IA</div><div><span class="chk n">Fuera</span></div><div class="col-aud"><small>Riesgo desproporcionado</small></div></div>
+  </div>
+
+  <div class="sec-label">Documentos del handoff</div>
+  <div class="docs">
+    <a class="doc" href="docs/00-Propuesta.md"><div class="doc-num">00</div><div><h3>Propuesta de alcance</h3><p>Qué construir, MVP vs Fase 2 y por qué cada decisión.</p></div></a>
+    <a class="doc" href="docs/01-Arquitectura-de-informacion.md"><div class="doc-num">01</div><div><h3>Arquitectura de información</h3><p>Pantallas, flujos de creación y exportación, navegación.</p></div></a>
+    <a class="doc" href="docs/02-Pantallas.md"><div class="doc-num">02</div><div><h3>Especificación de pantallas</h3><p>Detalle de cada pantalla del prototipo.</p></div></a>
+    <a class="doc" href="docs/03-Componentes.md"><div class="doc-num">03</div><div><h3>Componentes</h3><p>Inventario de componentes reutilizables.</p></div></a>
+    <a class="doc" href="docs/04-Design-tokens.md"><div class="doc-num">04</div><div><h3>Design tokens</h3><p>Colores, tipografía, radios, sombras — extraídos de Spinus.</p></div></a>
+    <a class="doc" href="docs/05-Decision-record.md"><div class="doc-num">05</div><div><h3>Decision record</h3><p>Registro de decisiones de producto y su justificación.</p></div></a>
+    <a class="doc" href="docs/06-Gaps-y-preguntas.md"><div class="doc-num">06</div><div><h3>Gaps y preguntas</h3><p>Lo que requiere tu decisión antes de construir.</p></div></a>
+    <a class="doc" href="docs/README.md"><div class="doc-num" style="background:var(--accent)">i</div><div><h3>Índice del handoff</h3><p>Cómo usar el paquete y estructura de archivos.</p></div></a>
+  </div>
+
+  <div class="note">
+    <div><p><b>Antes de construir:</b> quedan 4 decisiones tuyas (cuotas de video, evidencia de consentimiento + validación legal, permisos por rol, y confirmar el corte MVP). La detección de rostro ya se resolvió: <b>sin IA</b>, difuminado manual. Todo en <a href="docs/06-Gaps-y-preguntas.md" style="color:#b45309;font-weight:700;">Gaps y preguntas</a>.</p></div>
+  </div>
+
+</div>
+</body>
+</html>

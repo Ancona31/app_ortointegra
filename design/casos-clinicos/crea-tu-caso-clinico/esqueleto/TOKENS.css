@@ -1,0 +1,117 @@
+/* ============================================================================
+   SPINUS · CREA TU CASO CLÍNICO — DESIGN TOKENS (esqueleto)
+   ----------------------------------------------------------------------------
+   Este archivo es la ÚNICA fuente de verdad de colores, medidas, radios,
+   sombras, tipografía y dimensiones del módulo. Está pensado para que lo
+   adaptes a tu app (Tailwind 4 / CSS vars / lo que uses) SIN copiar lógica.
+
+   Cómo usarlo con Claude Code:
+   - Mapea estas variables a tus tokens existentes de Spinus (o reúsalas tal cual).
+   - Las medidas están en px salvo donde se indica. La animación usa el mismo
+     easing iOS-strict de Spinus.
+   ============================================================================ */
+
+:root {
+  /* ── MARCA / NAVY CORPORATIVO ───────────────────────────────────────────── */
+  --navy-900: #0f2741;
+  --navy-800: #14375c;   /* sidebar (arriba) */
+  --navy-700: #1a3a5c;   /* azul corporativo principal · botón primario */
+  --navy-600: #1d4674;
+  --navy-500: #1c5689;   /* sidebar (abajo) */
+  --navy-grad: linear-gradient(176deg, #15395d 0%, #173f68 55%, #1c5689 100%); /* fondo sidebar */
+  --navy-card-grad: linear-gradient(150deg, #1a3f66 0%, #14365a 100%);          /* cards oscuras */
+
+  /* ── SUPERFICIES ────────────────────────────────────────────────────────── */
+  --bg: #f3f6fb;          /* fondo de la app */
+  --bg-sunken: #eef2f8;   /* fondos hundidos / segmentos */
+  --surface: #ffffff;     /* cards */
+  --surface-2: #f7f9fc;   /* inputs / slots */
+  --border: #e7edf5;      /* borde card sutil */
+  --border-strong: #d8e1ee;
+
+  /* ── TEXTO ──────────────────────────────────────────────────────────────── */
+  --ink: #1b2940;         /* primario (navy casi negro) */
+  --ink-2: #3f5068;       /* secundario */
+  --muted: #64748b;       /* gris pizarra */
+  --muted-2: #94a3b8;     /* placeholders */
+  --on-navy: #eaf2fb;     /* texto sobre navy */
+  --on-navy-dim: #a9c2dc;
+
+  /* ── ACENTOS Y ESTADO ───────────────────────────────────────────────────── */
+  --accent: #2f6fb0;      /* link / acción / foco */
+  --accent-strong: #2563a8;
+  --accent-soft: #e8f1fb; /* fondo badge azul · halo de foco */
+  --green: #15a06b;  --green-soft: #e7f7ef;  --green-ink: #15803d;  /* confirmado / publicado */
+  --amber: #f5862f;  --amber-soft: #fdf0e2;                         /* borrador / aviso */
+  --red:   #e0566b;  --red-soft: #fdecef;                           /* error / eliminar */
+  --purple: #7c5cf0;
+
+  /* ── GRADIENTES DE MÓDULO (tiles de categoría) ──────────────────────────── */
+  --grad-purple: linear-gradient(135deg, #9a7cf5 0%, #6d3fe0 100%);
+  --grad-blue:   linear-gradient(135deg, #4d8ef5 0%, #2563eb 100%);
+  --grad-orange: linear-gradient(135deg, #fba43c 0%, #f5732a 100%);
+  --grad-teal:   linear-gradient(135deg, #34d8c4 0%, #0d9488 100%);
+  --grad-rose:   linear-gradient(135deg, #f78fb0 0%, #e0566b 100%);
+
+  /* ── PALETA DE ANOTACIÓN CLÍNICA (cerrada · con significado) ─────────────── */
+  --anno-red:   #ef4444;  /* patología / hallazgo */
+  --anno-amber: #f59e0b;  /* atención / referencia */
+  --anno-green: #16a34a;  /* normal / corregido */
+  --anno-blue:  #2f6fb0;  /* medición / marca */
+  --anno-white: #ffffff;  /* neutro */
+
+  /* ── RADIOS ─────────────────────────────────────────────────────────────── */
+  --r-sm: 10px;   /* botones, inputs */
+  --r-md: 14px;   /* cards internas (≈ rounded-2xl) */
+  --r-lg: 20px;   /* cards principales (≈ rounded-3xl) */
+  --r-xl: 28px;   /* sidebar, modales */
+  --r-pill: 999px;
+
+  /* ── SOMBRAS ────────────────────────────────────────────────────────────── */
+  --sh-xs: 0 1px 2px rgba(20,40,70,.06);
+  --sh-sm: 0 1px 3px rgba(20,40,70,.07), 0 1px 2px rgba(20,40,70,.04);
+  --sh-md: 0 6px 20px rgba(22,45,80,.08), 0 1px 3px rgba(22,45,80,.05);
+  --sh-lg: 0 18px 48px rgba(18,40,75,.14);
+  --sh-navy: 0 18px 44px rgba(20,55,100,.30);
+
+  /* ── TIPOGRAFÍA ─────────────────────────────────────────────────────────── */
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+          "Inter", "Segoe UI", system-ui, sans-serif;
+  /* Escala de tamaños (px):
+     título página 33/700 (-.02em) · título caso 25/700 · h-bloque 15/700
+     cuerpo 14–14.5/400-500 · eyebrow 12/700 uppercase (.09em) · legal 8.5–11
+     Mínimo en UI: 11px (excepto aviso legal del export). */
+
+  /* ── MOVIMIENTO ─────────────────────────────────────────────────────────── */
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);   /* easing iOS-strict de Spinus */
+  /* transiciones 0.2–0.32s · CSS puro (sin Framer Motion) */
+
+  /* ── DIMENSIONES DE LAYOUT ──────────────────────────────────────────────── */
+  --sidebar-w: 264px;        /* 0 en móvil (drawer) */
+  --content-max: 1180px;     /* ancho máximo de contenido, centrado */
+  /* breakpoints: 1080px (rail→1col), 880px (sidebar→drawer), 560px (mobile) */
+
+  /* ── DIMENSIONES DE COMPONENTES (referencia) ────────────────────────────── */
+  /* Card de caso: portada 148px alto · grid auto-fill minmax(290px,1fr) gap 18
+     Editor: grid 1fr / 332px · gap 26 · rail sticky top 18
+     Export: grid 380px / 1fr · gap 26 · preview sticky
+     Miniatura media: aspect 4/3 · radio --r-md
+     Slots de subida: borde 1.5px dashed --border-strong
+     Switch iOS: 46×27, perilla 21
+     Botón: padding 10/16 (lg 13/22) · radio --r-sm/--r-md
+     Pill/badge: padding 5/11 · radio --r-pill · font 12.5/600 */
+
+  /* ── ANOTADOR (medidas del editor de anotaciones) ───────────────────────── */
+  /* Lienzo: espacio de coords FIJO 300×400 (viewBox), aspecto 3/4,
+            alto min(100%,64vh), max-width 92vw, radio 18px.
+     Fondo del anotador: #0b1016 (oscuro tipo stories).
+     Grosor de trazo (multiplicador "size" × base):
+            base flecha/círculo/trazo = 4 · base ángulo = 3.5
+            niveles de tamaño = [0.6, 1, 1.6, 2.4]
+            texto base = 15px × size · etiqueta wrap a width min(82%, Nch)
+     Manijas (handles) de extremo: r 11 (flecha/círculo) · r 9 (ángulo)
+            blanco con borde del color de la anotación.
+     Hit-area invisible para seleccionar: stroke transparente 22 (mobile-friendly).
+     Difuminado: backdrop-filter blur(9px) + mosaico repeating-conic-gradient.
+     touch-action: none SOLO en el lienzo (el dock sigue deslizándose). */
+}

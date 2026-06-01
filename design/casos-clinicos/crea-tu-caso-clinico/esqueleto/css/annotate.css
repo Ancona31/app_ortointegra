@@ -1,0 +1,52 @@
+/* ---------- EDITOR DE ANOTACIONES (stories) ---------- */
+.annot { position: fixed; inset: 0; z-index: 60; background: #0b1016; display: flex; flex-direction: column; color: #fff; user-select: none; -webkit-user-select: none; }
+.annot-top { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; gap: 10px; }
+.annot-top-mid { display: flex; gap: 6px; }
+.annot-icon-btn { width: 42px; height: 42px; border-radius: 13px; background: rgba(255,255,255,.08); border: none; color: #fff; display: grid; place-items: center; cursor: pointer; transition: background .2s var(--ease); }
+.annot-icon-btn:hover { background: rgba(255,255,255,.16); }
+.annot-icon-btn:disabled { opacity: .3; cursor: default; }
+.annot-icon-btn.danger { background: rgba(224,86,107,.18); color: #ff8a9e; }
+.annot-icon-btn.danger:hover { background: rgba(224,86,107,.30); }
+.annot-done { display: inline-flex; align-items: center; gap: 7px; background: #fff; color: var(--navy-700); border: none; font-family: var(--font); font-weight: 700; font-size: 15px; padding: 11px 20px; border-radius: 13px; cursor: pointer; }
+.annot-done:hover { background: #eaf2fb; }
+
+.annot-stage { flex: 1; display: grid; place-items: center; padding: 8px 16px; min-height: 0; }
+.annot-canvas-wrap { position: relative; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
+.annot-canvas { position: relative; height: min(100%, 64vh); aspect-ratio: 3/4; max-width: 92vw; border-radius: 18px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.6); cursor: crosshair; touch-action: none; -webkit-touch-callout: none; }
+.annot-grid { position: absolute; inset: 0; opacity: .12; background-image: linear-gradient(rgba(255,255,255,.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.6) 1px, transparent 1px); background-size: 30px 30px; pointer-events: none; }
+.annot-svg { position: absolute; inset: 0; pointer-events: none; }
+.annot-svg line, .annot-svg ellipse, .annot-svg path, .annot-svg circle { pointer-events: stroke; }
+.annot-svg ellipse { pointer-events: visibleStroke; }
+.annot-svg g, .annot-svg circle, .annot-svg rect, .annot-svg text { pointer-events: auto; }
+
+.blur-region { position: absolute; border-radius: 4px; backdrop-filter: blur(9px) contrast(.85) brightness(1.05); -webkit-backdrop-filter: blur(9px); background-image: repeating-conic-gradient(rgba(255,255,255,.06) 0% 25%, rgba(0,0,0,.06) 0% 50%); background-size: 9px 9px; cursor: move; }
+
+.text-label { position: absolute; transform: translate(-50%, -50%); font-weight: 700; line-height: 1.25; padding: 6px 12px; border-radius: 11px; box-shadow: 0 4px 14px rgba(0,0,0,.35); cursor: move; max-width: 80%; text-align: center; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+.text-input-inline { background: transparent; border: none; outline: none; color: inherit; font-family: var(--font); font-size: inherit; font-weight: 700; line-height: 1.25; width: auto; max-width: min(60vw, 360px); text-align: center; }
+.text-input-inline::placeholder { color: rgba(255,255,255,.7); }
+
+.annot-del { position: absolute; bottom: -8px; left: 50%; transform: translate(-50%, 100%); display: inline-flex; align-items: center; gap: 7px; background: var(--red); color: #fff; border: none; font-family: var(--font); font-size: 13px; font-weight: 600; padding: 9px 15px; border-radius: 11px; cursor: pointer; box-shadow: var(--sh-md); }
+
+.annot-hint { text-align: center; font-size: 12.5px; color: #cdd8e8; padding: 9px 16px; display: flex; align-items: center; justify-content: center; gap: 7px; }
+.annot-hint svg { opacity: .8; }
+
+.annot-controls { display: flex; align-items: center; justify-content: center; gap: 22px; padding: 8px 16px 10px; flex-wrap: wrap; }
+.annot-colors { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.swatch { width: 30px; height: 30px; border-radius: 50%; border: 2.5px solid; cursor: pointer; transition: transform .18s var(--ease); position: relative; }
+.swatch.on { transform: scale(1.18); box-shadow: 0 0 0 3px rgba(255,255,255,.25); }
+.swatch.on::after { content: ""; position: absolute; inset: -7px; border: 2px solid #fff; border-radius: 50%; }
+.annot-color-name { font-size: 12px; color: #9fb1c6; margin-left: 4px; min-width: 70px; }
+
+/* control de tamaño / grosor */
+.annot-sizes { display: flex; align-items: center; gap: 4px; background: rgba(255,255,255,.06); border-radius: 999px; padding: 4px; }
+.sizedot { width: 34px; height: 34px; border-radius: 50%; border: none; background: transparent; display: grid; place-items: center; cursor: pointer; transition: background .18s var(--ease); }
+.sizedot:hover { background: rgba(255,255,255,.08); }
+.sizedot.on { background: rgba(255,255,255,.16); }
+.sizedot span { display: block; border-radius: 50%; background: #cdd8e8; transition: background .18s var(--ease); }
+.sizedot.on span { background: #fff; }
+
+.annot-dock { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 10px 12px calc(14px + env(safe-area-inset-bottom)); background: rgba(255,255,255,.04); border-top: 1px solid rgba(255,255,255,.08); overflow-x: auto; }
+.dock-tool { display: flex; flex-direction: column; align-items: center; gap: 5px; background: none; border: none; color: #9fb1c6; font-family: var(--font); font-size: 11px; font-weight: 600; padding: 9px 14px; border-radius: 14px; cursor: pointer; transition: all .2s var(--ease); flex: 0 0 auto; }
+.dock-tool:hover { color: #fff; background: rgba(255,255,255,.06); }
+.dock-tool.on { color: #fff; background: var(--navy-700); }
+.dock-tool.on svg { transform: translateY(-1px); }

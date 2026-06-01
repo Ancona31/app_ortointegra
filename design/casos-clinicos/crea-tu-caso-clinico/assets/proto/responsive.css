@@ -1,0 +1,49 @@
+/* ---------- RESPONSIVE ---------- */
+@media (max-width: 1080px) {
+  .editor-grid { grid-template-columns: 1fr; }
+  .editor-rail { position: static; flex-direction: column; }
+  .export-grid { grid-template-columns: 1fr; }
+  .export-stage { position: static; order: -1; }
+}
+
+@media (max-width: 880px) {
+  :root { --sidebar-w: 0px; }
+  .shell-side {
+    position: fixed; inset: 0 auto 0 0; z-index: 80; width: 286px; padding: 12px;
+    transform: translateX(-110%); transition: transform .32s var(--ease); flex: none;
+  }
+  .shell-side.open { transform: translateX(0); box-shadow: 0 0 60px rgba(0,0,0,.4); }
+  .sidebar { position: static; height: 100%; border-radius: var(--r-lg); }
+  .side-close { display: grid; }
+  .shell-scrim { display: block; position: fixed; inset: 0; z-index: 70; background: rgba(10,20,35,.45); backdrop-filter: blur(2px); }
+
+  .mobile-bar { display: flex; align-items: center; gap: 14px; position: sticky; top: 0; z-index: 40;
+    background: rgba(243,246,251,.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border);
+    padding: 12px 18px; }
+  .mb-menu { width: 40px; height: 40px; border-radius: 11px; background: var(--surface); border: 1px solid var(--border);
+    display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 0 11px; cursor: pointer; }
+  .mb-menu span { height: 2px; background: var(--ink); border-radius: 2px; }
+  .mb-title { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: var(--ink); }
+  .mb-title svg { color: var(--accent); }
+  .mb-spacer { flex: 1; }
+
+  .page, .editor, .export { padding-left: 18px; padding-right: 18px; padding-top: 18px; }
+  .page-title { font-size: 26px; }
+  .page-head { flex-direction: column; }
+  .page-head > .btn { align-self: stretch; justify-content: center; }
+  .tpl-list { grid-template-columns: 1fr; }
+  .editor-top { flex-wrap: wrap; gap: 10px; }
+  .editor-top-actions { flex: 1; justify-content: flex-end; }
+  .autosave { display: none; }
+}
+
+@media (max-width: 560px) {
+  .cases-grid { grid-template-columns: 1fr; }
+  .slots-row { grid-template-columns: 1fr; }
+  .toolbar { flex-direction: column; align-items: stretch; }
+  .seg { overflow-x: auto; }
+  .annot-canvas { height: min(100%, 56vh); }
+  .dock-tool span { display: none; }
+  .dock-tool { padding: 12px; }
+  .editor-top-actions .btn span { display: none; }
+}
