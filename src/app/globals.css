@@ -70,6 +70,19 @@
   --ag-gcal-accent: #7c5cdb;
   --ag-gcal-bg1: #f3eefc;
   --ag-gcal-bg2: #efe9fb;
+
+  /* MODAL de cita (sub-fase 4) — variante clara. Nombrados para que la
+     sub-fase 6 (dark) añada las contrapartes en html.dark. */
+  --ag-modal-overlay: rgba(0, 0, 0, .40);
+  --ag-modal-bg: #ffffff;
+  --ag-input-bg: #ffffff;
+  --ag-input-border: #e2e8f0;            /* ~slate-200 */
+  --ag-input-focus-ring: rgba(30, 95, 168, .30);
+  --ag-input-focus-border: #93b4d8;
+  --ag-modal-icon-bg: #eff4f9;           /* azul muy suave (~blue-50) */
+  --ag-btn-ghost-hover: #f1f5f9;         /* ~slate-100 */
+  --ag-patient-card-bg: #eff4f9;         /* azul suave (~blue-50) */
+  --ag-patient-card-border: #c9dcfb;     /* azul (~blue-200), alineado con scheduled-border */
 }
 
 html {

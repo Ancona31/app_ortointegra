@@ -7,7 +7,8 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
 import { EventClickArg, EventDropArg, DateSelectArg, EventInput, EventContentArg, DayHeaderContentArg } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
-import { X, Calendar, User, Plus, Trash2, Settings, Lock, LayoutGrid, Columns3, Square, ChevronDown } from 'lucide-react'
+import { X, Calendar, User, Plus, Trash2, Settings, Lock, LayoutGrid, Columns3, Square, ChevronDown, FileText } from 'lucide-react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ui/Toast'
 import { useProfile } from '@/hooks/useProfile'
@@ -389,7 +390,7 @@ function QuickPatientModal({
 
 function AppointmentModal({
   modal, onClose, onSave, onDelete, medicos, defaultMedicoId,
-  hideMedicoDropdown, medicoDropdownRequired,
+  hideMedicoDropdown, medicoDropdownRequired, canVerExpediente,
 }: {
   modal: ModalState
   onClose: () => void
@@ -399,6 +400,7 @@ function AppointmentModal({
   defaultMedicoId: string
   hideMedicoDropdown: boolean
   medicoDropdownRequired: boolean
+  canVerExpediente: boolean
 }) {
   const isEdit = modal.mode === 'edit'
   const apt    = modal.mode === 'edit' ? modal.appointment : null
@@ -467,45 +469,45 @@ function AppointmentModal({
 
   return (
     <Portal>
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md animate-modal-enter overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: 'var(--ag-modal-overlay)' }} onClick={onClose} />
+      <div className="relative rounded-[22px] w-full max-w-[480px] max-h-[92vh] flex flex-col animate-modal-enter overflow-hidden"
+        style={{ background: 'var(--ag-modal-bg)', boxShadow: '0 30px 80px rgba(16, 32, 64, .28)' }}>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
-              <Calendar size={15} className="text-blue-600" />
-            </div>
-            <h2 className="font-semibold text-[15px] text-[#1d1d1f]">
-              {isEdit ? 'Editar cita' : 'Nueva cita'}
-            </h2>
+        <div className="flex items-center gap-3 px-[22px] py-[18px] border-b" style={{ borderColor: 'var(--ag-hairline)' }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'var(--ag-modal-icon-bg)' }}>
+            <Calendar size={20} style={{ color: 'var(--ag-brand-primary)' }} />
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
-            <X size={18} />
+          <h2 className="text-[18px] font-extrabold" style={{ color: 'var(--ag-ink)' }}>
+            {isEdit ? 'Editar cita' : 'Nueva cita'}
+          </h2>
+          <button onClick={onClose} className="ml-auto p-1 transition-opacity hover:opacity-70" style={{ color: 'var(--ag-muted2)' }}>
+            <X size={20} />
           </button>
         </div>
 
         {/* Body */}
-        <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+        <div className="px-[22px] py-5 space-y-4 flex-1 min-h-0 overflow-y-auto">
 
           {/* Paciente — campo principal y obligatorio */}
           <div>
-            <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">
+            <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
               Paciente <span className="text-red-400">*</span>
             </label>
             {paciente ? (
-              <div className="flex items-center justify-between px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-xl">
+              <div className="flex items-center justify-between px-3 py-2.5 rounded-xl border"
+                style={{ background: 'var(--ag-patient-card-bg)', borderColor: 'var(--ag-patient-card-border)' }}>
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-[#1e5fa8] flex items-center justify-center flex-shrink-0">
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--ag-brand-secondary)' }}>
                     <span className="text-[10px] font-bold text-white">{paciente.nombre[0]}{paciente.apellidos[0]}</span>
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-blue-900">{paciente.nombre} {paciente.apellidos}</p>
-                    {paciente.telefono && <p className="text-[11px] text-blue-600">{paciente.telefono}</p>}
+                    <p className="text-sm font-semibold" style={{ color: 'var(--ag-ink)' }}>{paciente.nombre} {paciente.apellidos}</p>
+                    {paciente.telefono && <p className="text-[11px]" style={{ color: 'var(--ag-brand-secondary)' }}>{paciente.telefono}</p>}
                   </div>
                 </div>
-                <button onClick={() => { setPaciente(null); setSearch('') }} className="text-blue-400 hover:text-blue-600">
+                <button onClick={() => { setPaciente(null); setSearch('') }} className="transition-opacity hover:opacity-70" style={{ color: 'var(--ag-muted)' }}>
                   <X size={14} />
                 </button>
               </div>
@@ -517,29 +519,32 @@ function AppointmentModal({
                   onChange={e => { setSearch(e.target.value); setShowSearch(true) }}
                   onFocus={() => setShowSearch(true)}
                   placeholder="Buscar paciente por nombre o apellido..."
-                  className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
+                  className="w-full px-3 py-2.5 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
                 />
                 {showDropdown && (
-                  <div className="absolute z-10 top-full mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
-                    {searchLoading && <div className="px-3 py-2.5 text-xs text-[#86868b]">Buscando...</div>}
+                  <div className="absolute z-10 top-full mt-1 w-full rounded-xl border shadow-lg overflow-hidden"
+                    style={{ background: 'var(--ag-modal-bg)', borderColor: 'var(--ag-input-border)' }}>
+                    {searchLoading && <div className="px-3 py-2.5 text-xs" style={{ color: 'var(--ag-muted)' }}>Buscando...</div>}
                     {results.map(p => (
                       <button key={p.id}
-                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0"
+                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors border-b last:border-0 hover:bg-[var(--ag-btn-ghost-hover)]"
+                        style={{ borderColor: 'var(--ag-hairline)' }}
                         onClick={() => { setPaciente(p); setSearch(''); setShowSearch(false) }}
                       >
                         <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
                           <span className="text-[10px] font-bold text-blue-700">{p.nombre[0]}{p.apellidos[0]}</span>
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-[#1d1d1f]">{p.nombre} {p.apellidos}</p>
-                          {p.telefono && <p className="text-[11px] text-[#86868b]">{p.telefono}</p>}
+                          <p className="text-sm font-medium" style={{ color: 'var(--ag-ink)' }}>{p.nombre} {p.apellidos}</p>
+                          {p.telefono && <p className="text-[11px]" style={{ color: 'var(--ag-muted)' }}>{p.telefono}</p>}
                         </div>
                       </button>
                     ))}
                     {/* Opción de registro rápido */}
                     {!searchLoading && (
                       <button
-                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-emerald-50 transition-colors border-t border-slate-100"
+                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-emerald-50 transition-colors border-t"
+                        style={{ borderColor: 'var(--ag-hairline)' }}
                         onClick={() => { setShowSearch(false); setQuickCreate(true) }}
                       >
                         <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
@@ -559,7 +564,7 @@ function AppointmentModal({
 
           {/* Fecha y hora de inicio */}
           <div>
-            <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">
+            <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
               Fecha y hora de inicio
             </label>
             <input
@@ -567,30 +572,29 @@ function AppointmentModal({
               value={startTime}
               step={900}
               onChange={e => setStartTime(e.target.value)}
-              className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
+              className="w-full px-3 py-2.5 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
             />
           </div>
 
           {/* Duración */}
           <div>
-            <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">Duración</label>
+            <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>Duración</label>
             <div className="flex flex-wrap gap-2">
               {DURATIONS.map(d => (
                 <button key={d.value} type="button" onClick={() => setDuration(d.value)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
-                    duration === d.value
-                      ? 'bg-[#1e5fa8] text-white border-[#1e5fa8]'
-                      : 'bg-white text-[#64748b] border-slate-200 hover:border-blue-300 hover:text-blue-600'
-                  }`}
+                  className="px-4 py-2 rounded-full text-[13px] font-bold border transition-all"
+                  style={duration === d.value
+                    ? { background: 'var(--ag-brand-primary)', color: '#fff', borderColor: 'var(--ag-brand-primary)' }
+                    : { background: 'var(--ag-input-bg)', color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}
                 >
                   {d.label}
                 </button>
               ))}
             </div>
             {startTime && (
-              <p className="text-[11px] text-[#86868b] mt-1.5">
+              <p className="text-[12.5px] mt-2.5" style={{ color: 'var(--ag-muted)' }}>
                 Termina a las{' '}
-                <span className="font-semibold text-[#1d1d1f]">
+                <span className="font-bold" style={{ color: 'var(--ag-text)' }}>
                   {toDatetimeLocal(addMinutes(fromDatetimeLocal(startTime), duration)).slice(11, 16)}
                 </span>
               </p>
@@ -600,18 +604,22 @@ function AppointmentModal({
           {/* Estado (solo edición) */}
           {isEdit && (
             <div>
-              <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">Estado</label>
+              <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>Estado</label>
               <div className="grid grid-cols-2 gap-2">
-                {(Object.entries(STATUS_CONFIG) as [Status, typeof STATUS_CONFIG[Status]][]).map(([key, cfg]) => (
-                  <button key={key} onClick={() => setStatus(key)}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
-                      status === key ? `${cfg.bg} ${cfg.text} border-current` : 'bg-white text-[#86868b] border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    <span className={`w-2 h-2 rounded-full ${status === key ? cfg.dot : 'bg-slate-300'}`} />
-                    {cfg.label}
-                  </button>
-                ))}
+                {(Object.entries(STATUS_CONFIG) as [Status, typeof STATUS_CONFIG[Status]][]).map(([key, cfg]) => {
+                  const on = status === key
+                  return (
+                    <button key={key} onClick={() => setStatus(key)}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all"
+                      style={on
+                        ? { background: `var(--ag-status-${key}-bg)`, color: `var(--ag-status-${key}-text)`, border: `1.5px solid var(--ag-status-${key}-dot)` }
+                        : { background: 'var(--ag-input-bg)', color: 'var(--ag-text)', border: '1.5px solid var(--ag-input-border)' }}
+                    >
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: `var(--ag-status-${key}-dot)` }} />
+                      {cfg.label}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           )}
@@ -619,49 +627,62 @@ function AppointmentModal({
           {/* Médico — ocultado para médicos sin admin y para clínicas single-doctor */}
           {!hideMedicoDropdown && (
             <div>
-              <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">
+              <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
                 Médico {medicoDropdownRequired && <span className="text-red-400">*</span>}
               </label>
-              <select
-                value={medicoId}
-                onChange={e => setMedicoId(e.target.value)}
-                required={medicoDropdownRequired}
-                className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all bg-white"
-              >
-                {!medicoDropdownRequired && <option value="">Sin asignar</option>}
-                {medicos.map(m => (
-                  <option key={m.id} value={m.id}>{m.titulo ? `${m.titulo} ` : ''}{m.nombre}</option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={medicoId}
+                  onChange={e => setMedicoId(e.target.value)}
+                  required={medicoDropdownRequired}
+                  className="w-full pl-3 pr-9 py-2.5 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all appearance-none cursor-pointer"
+                >
+                  {!medicoDropdownRequired && <option value="">Sin asignar</option>}
+                  {medicos.map(m => (
+                    <option key={m.id} value={m.id}>{m.titulo ? `${m.titulo} ` : ''}{m.nombre}</option>
+                  ))}
+                </select>
+                <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--ag-muted)' }} />
+              </div>
             </div>
           )}
 
           {/* Notas */}
           <div>
-            <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wider mb-1.5">Notas</label>
+            <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>Notas</label>
             <textarea value={notes} onChange={e => setNotes(e.target.value)}
               placeholder="Instrucciones, observaciones..."
               rows={3}
-              className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all resize-none"
+              className="w-full px-3 py-2.5 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all resize-none"
             />
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between gap-3">
+        <div className="px-[22px] py-3.5 border-t flex items-center gap-2" style={{ borderColor: 'var(--ag-hairline)' }}>
           {isEdit && (
             <button onClick={handleDelete} disabled={deleting}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50">
-              <Trash2 size={14} />
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50">
+              <Trash2 size={15} />
               {deleting ? 'Eliminando...' : 'Eliminar'}
             </button>
           )}
+          {/* Expediente — solo visible para quien puede ver expedientes (isDoctor)
+              y cuando hay paciente seleccionado. Barrera real: expediente/layout.tsx. */}
+          {canVerExpediente && paciente && (
+            <Link href={`/expediente/${paciente.id}`}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)]"
+              style={{ color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}>
+              <FileText size={15} />
+              Expediente
+            </Link>
+          )}
           <div className="flex items-center gap-2 ml-auto">
-            <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium text-[#86868b] hover:bg-slate-100 transition-colors">
+            <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-bold transition-colors hover:bg-[var(--ag-btn-ghost-hover)]" style={{ color: 'var(--ag-muted)' }}>
               Cancelar
             </button>
             <button onClick={handleSave} disabled={saving || !paciente || !startTime}
-              className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a4f8c] disabled:opacity-50 transition-colors">
+              className="px-5 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 transition-all hover:brightness-95 shadow-sm bg-[linear-gradient(135deg,var(--ag-brand-primary),var(--ag-brand-secondary))]">
               {saving ? 'Guardando...' : isEdit ? 'Guardar cambios' : 'Agendar cita'}
             </button>
           </div>
@@ -921,7 +942,7 @@ export default function AgendaPage() {
   const [citaCreada,   setCitaCreada]   = useState(false)
   const [medicos,      setMedicos]      = useState<Medico[]>([])
   const [filtroMedico, setFiltroMedico] = useState<string>('')
-  const { profile } = useProfile()
+  const { profile, isDoctor } = useProfile()
   const toast = useToast()
   const { state: subState, openBloqueoModal } = useSubscriptionGate()
 
@@ -1485,6 +1506,7 @@ export default function AgendaPage() {
           defaultMedicoId={defaultMedicoId}
           hideMedicoDropdown={isSingleDoctor || isMedicoSinAdmin}
           medicoDropdownRequired={isSecretaria || isMedicoConAdmin}
+          canVerExpediente={isDoctor}
         />
       )}
 
