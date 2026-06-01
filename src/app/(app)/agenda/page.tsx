@@ -801,15 +801,15 @@ const MemoizedEventContent = memo(function MemoizedEventContent({
 
   const root: CSSProperties = {
     height: '100%', boxSizing: 'border-box', overflow: 'hidden', cursor: 'pointer',
-    background: 'var(--ag-surface)',
-    border: '1px solid var(--ag-border-card)',
+    background: `var(--ag-status-${status}-bg)`,
+    border: `1px solid var(--ag-status-${status}-border)`,
     borderLeft: `3.5px solid ${dot}`,
     borderRadius: '9px',
     boxShadow: 'var(--ag-shadow-card)',
     display: 'flex', flexDirection: 'column', gap: '1px',
     justifyContent: tier === 'tiny' ? 'center' : 'flex-start',
     padding: tier === 'tiny' ? '2px 8px' : '4px 9px',
-    opacity: isCancelled ? 0.62 : 1,
+    opacity: isCancelled ? 0.7 : 1,
   }
   const nameStyle: CSSProperties = isCancelled
     ? { ...NAME_BASE, textDecoration: 'line-through' }
