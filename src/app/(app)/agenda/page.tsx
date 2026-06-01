@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo, memo, type CSSProperties } from 'react'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
 import { EventClickArg, EventDropArg, DateSelectArg, EventInput, EventContentArg } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
-import { X, Calendar, User, Plus, Trash2, Settings } from 'lucide-react'
+import { X, Calendar, User, Plus, Trash2, Settings, Lock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ui/Toast'
 import { useProfile } from '@/hooks/useProfile'
@@ -53,18 +53,6 @@ const STATUS_CONFIG: Record<Status, { label: string; bg: string; text: string; d
   cancelled:  { label: 'Cancelada',  bg: 'bg-red-50',    text: 'text-red-700',    dot: 'bg-red-500'    },
   no_show:    { label: 'No asistió', bg: 'bg-orange-50', text: 'text-orange-700', dot: 'bg-orange-500' },
 }
-
-// Paleta de colores por médico (Google Calendar multi-calendar style)
-const DOCTOR_COLORS: { bg: string; text: string; border: string }[] = [
-  { bg: '#EFF6FF', text: '#1e40af', border: '#3b82f6' }, // blue
-  { bg: '#F0FDF4', text: '#166534', border: '#22c55e' }, // green
-  { bg: '#FDF4FF', text: '#7e22ce', border: '#a855f7' }, // purple
-  { bg: '#FFF7ED', text: '#9a3412', border: '#f97316' }, // orange
-  { bg: '#F0FDFA', text: '#065f46', border: '#14b8a6' }, // teal
-  { bg: '#FFFBEB', text: '#92400e', border: '#f59e0b' }, // amber
-  { bg: '#F5F3FF', text: '#4c1d95', border: '#8b5cf6' }, // violet
-  { bg: '#FFF1F2', text: '#9f1239', border: '#ef4444' }, // rose
-]
 
 // Paleta pastel estilo Google Calendar
 const STATUS_STYLE: Record<Status, { bg: string; text: string; border: string }> = {
@@ -730,68 +718,184 @@ function ConfirmModal({ message, onConfirm, onCancel }: {
 
 type EventColor = { bg: string; text: string; border: string }
 
+/* Breakpoints de altura renderizada de la tarjeta (px). El tier se decide
+   midiendo el alto real del contenedor con ResizeObserver (ver abajo): es
+   lo más fiable con FullCalendar, cuyo alto de evento depende de la duración
+   y del alto de hora del grid, no calculable con certeza solo desde datos.
+   Calibrados al grid real: slot de 30min = 1.8rem ≈ 28.8px (globals.css),
+   así una cita de 1h ≈ 57.6px → cae en 'full' y el layout (con line-heights
+   ajustados abajo) cabe sin recortar el nombre. */
+const CARD_TINY_MAX = 40
+const CARD_COMPACT_MAX = 56
+
+/* Estilo neutro del chip de médico (handoff). El contenido (2 iniciales,
+   solo multi-doctor) lo decide el event source; aquí solo se estiliza. */
+const CHIP_STYLE: CSSProperties = {
+  fontSize: '9px', fontWeight: 800, letterSpacing: '.02em',
+  borderRadius: '5px', padding: '1px 5px', lineHeight: 1.4, flexShrink: 0,
+  background: 'var(--ag-chip-bg)', color: 'var(--ag-chip-text)',
+}
+const NAME_BASE: CSSProperties = {
+  fontSize: '12px', fontWeight: 700, color: 'var(--ag-ink)', lineHeight: 1.25,
+  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0,
+  // flexShrink:0 → el nombre nunca se comprime; ante desborde se recorta la
+  // fila de estado (última), nunca el nombre.
+  flexShrink: 0,
+}
+const STATUS_DOT: CSSProperties = {
+  width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+}
+
 const MemoizedEventContent = memo(function MemoizedEventContent({
-  timeText, title, pacNombre, status, colorStyle, doctorInitial,
+  timeText, title, pacNombre, status, doctorInitial,
 }: {
   timeText: string; title: string; pacNombre: string | null
-  status: Status; colorStyle?: EventColor; doctorInitial?: string
+  status: Status; doctorInitial?: string
 }) {
-  const s = colorStyle ?? STATUS_STYLE[status]
-  return (
-    <div style={{
-      background:     s.bg,
-      borderLeft:     `3px solid ${s.border}`,
-      borderRadius:   '6px',
-      padding:        '3px 7px',
-      height:         '100%',
-      overflow:       'hidden',
-      boxSizing:      'border-box',
-      cursor:         'pointer',
-      display:        'flex',
-      flexDirection:  'column',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-        <span style={{ fontSize: '10px', color: s.text, opacity: 0.6, lineHeight: 1.2, fontWeight: 500, flex: 1 }}>
-          {timeText}
-        </span>
-        {doctorInitial && (
-          <span style={{
-            fontSize: '9px', fontWeight: 700, color: s.text,
-            background: s.border + '33', borderRadius: '3px',
-            padding: '0 3px', lineHeight: '14px', flexShrink: 0,
-          }}>
-            {doctorInitial}
-          </span>
-        )}
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [height, setHeight] = useState<number | null>(null)
+
+  // Mide el alto real asignado por FullCalendar (root con height:100%).
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el) return
+    const update = () => setHeight(el.getBoundingClientRect().height)
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  // height null = aún sin medir → 'full' hasta el primer ResizeObserver.
+  const tier: 'tiny' | 'compact' | 'full' =
+    height == null ? 'full'
+      : height < CARD_TINY_MAX ? 'tiny'
+        : height < CARD_COMPACT_MAX ? 'compact'
+          : 'full'
+
+  const dot = `var(--ag-status-${status}-dot)`
+  const txt = `var(--ag-status-${status}-text)`
+  const isCancelled = status === 'cancelled'
+  const name = pacNombre ?? title
+
+  const root: CSSProperties = {
+    height: '100%', boxSizing: 'border-box', overflow: 'hidden', cursor: 'pointer',
+    background: 'var(--ag-surface)',
+    border: '1px solid var(--ag-border-card)',
+    borderLeft: `3.5px solid ${dot}`,
+    borderRadius: '9px',
+    boxShadow: 'var(--ag-shadow-card)',
+    display: 'flex', flexDirection: 'column', gap: '1px',
+    justifyContent: tier === 'tiny' ? 'center' : 'flex-start',
+    padding: tier === 'tiny' ? '2px 8px' : '4px 9px',
+    opacity: isCancelled ? 0.62 : 1,
+  }
+  const nameStyle: CSSProperties = isCancelled
+    ? { ...NAME_BASE, textDecoration: 'line-through' }
+    : NAME_BASE
+  const chip = doctorInitial ? <span style={CHIP_STYLE}>{doctorInitial}</span> : null
+
+  // tiny: punto de estado + nombre, una fila centrada. Sin hora ni chip.
+  if (tier === 'tiny') {
+    return (
+      <div ref={rootRef} style={root}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: 0 }}>
+          <span style={{ ...STATUS_DOT, background: dot }} />
+          <span style={nameStyle}>{name}</span>
+        </div>
       </div>
-      <div style={{
-        fontSize:     '11.5px',
-        fontWeight:   700,
-        color:        s.text,
-        lineHeight:   1.3,
-        marginTop:    '2px',
-        wordBreak:    'break-word',
-        overflowWrap: 'break-word',
-        whiteSpace:   'normal',
-      }}>
-        {pacNombre ?? title}
+    )
+  }
+
+  const timeRow = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: 0 }}>
+      <span style={{ fontSize: '10.5px', fontWeight: 600, lineHeight: 1.2, color: 'var(--ag-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {timeText}
+      </span>
+      {chip}
+    </div>
+  )
+
+  // compact: fila hora + chip, luego nombre. Sin fila de estado.
+  if (tier === 'compact') {
+    return (
+      <div ref={rootRef} style={root}>
+        {timeRow}
+        <span style={nameStyle}>{name}</span>
+      </div>
+    )
+  }
+
+  // full: fila hora + chip, nombre, fila (punto + estado corto).
+  return (
+    <div ref={rootRef} style={root}>
+      {timeRow}
+      <span style={nameStyle}>{name}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+        <span style={{ ...STATUS_DOT, background: dot }} />
+        <span style={{ fontSize: '10.5px', fontWeight: 600, lineHeight: 1.2, color: txt }}>{STATUS_CONFIG[status].label}</span>
       </div>
     </div>
   )
 })
 
+/* Logo oficial "G" de Google (4 colores), SVG inline. Sin dependencias ni
+   assets externos. Tamaño por prop (12px en la tarjeta). */
+function GoogleGIcon({ size = 12 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true" style={{ display: 'block', flexShrink: 0 }}>
+      <path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z" />
+      <path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.31-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z" />
+      <path fill="#FBBC05" d="M11.69 28.18C11.25 26.86 11 25.45 11 24s.25-2.86.69-4.18v-5.7H4.34C2.85 17.09 2 20.45 2 24s.85 6.91 2.34 9.88l7.35-5.7z" />
+      <path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z" />
+    </svg>
+  )
+}
+
+/* Tarjeta de evento externo de Google Calendar (no arrastrable). Solo
+   presentación: la lógica de fetch/dedupe de Google no se toca. */
+const GoogleEventCard = memo(function GoogleEventCard({
+  timeText, title,
+}: { timeText: string; title: string }) {
+  const label = title.replace(/^🔒\s*/, '') // el emoji lo agrega gcalSource; aquí se muestra el icono
+  return (
+    <div style={{
+      height: '100%', boxSizing: 'border-box', overflow: 'hidden',
+      color: 'var(--ag-gcal-text)',
+      border: '1px dashed var(--ag-gcal-border)',
+      borderLeft: '3px solid var(--ag-gcal-accent)',
+      borderRadius: '9px', padding: '5px 9px',
+      background: 'repeating-linear-gradient(135deg, var(--ag-gcal-bg1), var(--ag-gcal-bg1) 8px, var(--ag-gcal-bg2) 8px, var(--ag-gcal-bg2) 9px)',
+      display: 'flex', flexDirection: 'column', gap: '2px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: 0 }}>
+        <GoogleGIcon size={12} />
+        <Lock size={11} style={{ flexShrink: 0 }} />
+        <span style={{ fontSize: '10.5px', fontWeight: 600, opacity: 0.85, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {timeText}
+        </span>
+      </div>
+      <span style={{ fontSize: '12px', fontWeight: 700, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {label}
+      </span>
+    </div>
+  )
+})
+
 function renderEventContent(arg: EventContentArg) {
-  const apt = arg.event.extendedProps as Appointment & { colorStyle?: EventColor; doctorInitial?: string }
-  if (!apt?.status) return <>{arg.event.title}</>
-  const pac = apt.pacientes
+  const ext = arg.event.extendedProps as (Appointment & { doctorInitial?: string }) & { isGcalBlock?: boolean }
+  if (ext?.isGcalBlock) {
+    return <GoogleEventCard timeText={arg.timeText} title={arg.event.title} />
+  }
+  if (!ext?.status) return <>{arg.event.title}</>
+  const pac = ext.pacientes
   return (
     <MemoizedEventContent
       timeText={arg.timeText}
-      title={apt.title}
+      title={ext.title}
       pacNombre={pac ? `${pac.nombre} ${pac.apellidos}` : null}
-      status={apt.status}
-      colorStyle={apt.colorStyle}
-      doctorInitial={apt.doctorInitial}
+      status={ext.status}
+      doctorInitial={ext.doctorInitial}
     />
   )
 }
@@ -826,13 +930,6 @@ export default function AgendaPage() {
     // Secretaria u otros: sin default (obligar elección)
     return ''
   }, [profile, isSingleDoctor, medicos])
-
-  // Map medico_id → color index (stable order from API)
-  const medicoColorMap = useMemo(() => {
-    const map = new Map<string, number>()
-    medicos.forEach((m, i) => map.set(m.id, i))
-    return map
-  }, [medicos])
 
   useEffect(() => {
     fetch('/api/me/horario')
@@ -905,16 +1002,12 @@ export default function AgendaPage() {
       const apts: Appointment[] = data.appointments ?? []
 
       success(apts.map(apt => {
-        let colorStyle: { bg: string; text: string; border: string }
+        // Color = ESTADO (siempre). El médico solo se identifica por el chip.
+        const colorStyle = STATUS_STYLE[apt.status] ?? STATUS_STYLE.scheduled
         let doctorInitial: string | undefined
-
         if (!isSingleDoctor && apt.medico_id) {
-          const idx = medicoColorMap.get(apt.medico_id) ?? 0
-          colorStyle = DOCTOR_COLORS[idx % DOCTOR_COLORS.length]
           const m = apt.medico
           if (m) doctorInitial = m.nombre.slice(0, 2).toUpperCase()
-        } else {
-          colorStyle = STATUS_STYLE[apt.status] ?? STATUS_STYLE.scheduled
         }
 
         return {
@@ -931,7 +1024,7 @@ export default function AgendaPage() {
     } catch (err: unknown) {
       failure(err instanceof Error ? err : new Error('Error cargando citas'))
     }
-  }, [isSingleDoctor, medicoColorMap, filtroMedico])
+  }, [isSingleDoctor, filtroMedico])
 
   /* ── Event source: eventos personales de Google Calendar ── */
   const gcalSource = useCallback(async (
@@ -961,9 +1054,10 @@ export default function AgendaPage() {
           start:           e.start?.dateTime ?? e.start?.date ?? '',
           end:             e.end?.dateTime ?? e.end?.date ?? undefined,
           allDay:          !e.start?.dateTime,
-          backgroundColor: '#f3e8ff',
-          borderColor:     '#c084fc',
-          textColor:       '#7c3aed',
+          // Harness transparente: la GoogleEventCard pinta su propio fondo/borde.
+          backgroundColor: 'transparent',
+          borderColor:     'transparent',
+          textColor:       '#6d4ec0',
           editable:        false,
           extendedProps:   { isGcalBlock: true },
         }))
@@ -995,16 +1089,12 @@ export default function AgendaPage() {
   /* ── Helper: construir EventInput desde datos de cita ── */
   function buildEventInput(data: Partial<Appointment> & { id?: string }): EventInput {
     const status = data.status ?? 'scheduled'
-    let colorStyle: EventColor
+    // Color = ESTADO (siempre). El médico solo se identifica por el chip.
+    const colorStyle: EventColor = STATUS_STYLE[status] ?? STATUS_STYLE.scheduled
     let doctorInitial: string | undefined
-
     if (!isSingleDoctor && data.medico_id) {
-      const idx = medicoColorMap.get(data.medico_id) ?? 0
-      colorStyle = DOCTOR_COLORS[idx % DOCTOR_COLORS.length]
       const m = medicos.find(m => m.id === data.medico_id)
       if (m) doctorInitial = m.nombre.slice(0, 2).toUpperCase()
-    } else {
-      colorStyle = STATUS_STYLE[status] ?? STATUS_STYLE.scheduled
     }
 
     return {
@@ -1237,10 +1327,12 @@ export default function AgendaPage() {
       {citaCreada && <div data-onboard="cita-creada" className="hidden" />}
 
       {/* ── Leyenda ─────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        {isSingleDoctor ? (
-          // Modo de un solo médico — leyenda por estado
-          (Object.entries(STATUS_CONFIG) as [Status, typeof STATUS_CONFIG[Status]][]).map(([key, cfg]) => (
+      {/* Solo single-doctor: leyenda por estado. La leyenda multi-doctor
+          (puntos de color por médico) se eliminó: las tarjetas ya no se
+          colorean por médico, así que prometía un código de color inexistente. */}
+      {isSingleDoctor && (
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          {(Object.entries(STATUS_CONFIG) as [Status, typeof STATUS_CONFIG[Status]][]).map(([key, cfg]) => (
             <div key={key} className="flex items-center gap-1.5">
               <span
                 className="w-3 h-3 rounded-sm flex-shrink-0"
@@ -1248,25 +1340,9 @@ export default function AgendaPage() {
               />
               <span className="text-[11px] text-[#86868b] font-medium">{cfg.label}</span>
             </div>
-          ))
-        ) : (
-          // Modo multi-doctor — leyenda por médico
-          medicos.map((m, i) => {
-            const c = DOCTOR_COLORS[i % DOCTOR_COLORS.length]
-            return (
-              <div key={m.id} className="flex items-center gap-1.5">
-                <span
-                  className="w-3 h-3 rounded-sm flex-shrink-0"
-                  style={{ backgroundColor: c.bg, borderLeft: `3px solid ${c.border}` }}
-                />
-                <span className="text-[11px] text-[#86868b] font-medium">
-                  {m.titulo ? `${m.titulo} ` : ''}{m.nombre}
-                </span>
-              </div>
-            )
-          })
-        )}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Calendario ──────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden" style={{ minHeight: '70vh' }}>

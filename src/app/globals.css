@@ -8,6 +8,55 @@
   --azul-medio: #1e5fa8;
   --azul-claro: #4a9fd4;
   --azul-suave: #e8f4fd;
+
+  /* ── Agenda design tokens (modo claro) ──────────────────────────────
+     Prefijo --ag-*. El dark mode (sub-fase 6) añadirá las contrapartes
+     en html.dark. NO incrustar hex en las reglas de tarjeta: usar var(). */
+
+  /* Superficies */
+  --ag-bg-app: #eef1f5;
+  --ag-bg-main: #fbfcfe;
+  --ag-surface: #ffffff;
+  --ag-grid-col: #ffffff;
+  /* Bordes y líneas */
+  --ag-border-card: #e7ecf3;
+  --ag-hour-line: #eef1f6;
+  --ag-col-line: #f1f4f8;
+  --ag-hairline: #eef1f6;
+  /* Texto */
+  --ag-ink: #15243e;
+  --ag-text: #27364f;
+  --ag-muted: #7c8aa0;
+  --ag-muted2: #9aa6b8;
+  --ag-faint: #aab4c4;
+  /* Marca (Spinus) */
+  --ag-brand-primary: #1a3a5c;
+  --ag-brand-secondary: #1e5fa8;
+  --ag-now-line: #ef4444;
+  /* Sombra tarjeta (claro) */
+  --ag-shadow-card: 0 1px 2px rgba(16, 32, 64, .05);
+  /* Chip de médico (neutro, sin color de médico) */
+  --ag-chip-bg: #eef1f6;
+  --ag-chip-text: #7c8aa0;
+
+  /* ESTADO — mapeo id DB (inglés) → estilo handoff (dot/text/bg/border).
+     La tarjeta "clean" usa solo dot + text; bg/border quedan para el
+     modal de la sub-fase 4. */
+  --ag-status-scheduled-dot: #2f6fed;  --ag-status-scheduled-text: #1d4ed8;
+  --ag-status-scheduled-bg: #e9f0fe;   --ag-status-scheduled-border: #c9dcfb;
+  --ag-status-confirmed-dot: #16a34a;  --ag-status-confirmed-text: #15803d;
+  --ag-status-confirmed-bg: #e7f6ec;   --ag-status-confirmed-border: #bfe6cb;
+  --ag-status-cancelled-dot: #dc2626;  --ag-status-cancelled-text: #b91c1c;
+  --ag-status-cancelled-bg: #fbecec;   --ag-status-cancelled-border: #f1c9c9;
+  --ag-status-no_show-dot: #64748b;    --ag-status-no_show-text: #475569;
+  --ag-status-no_show-bg: #eef1f6;     --ag-status-no_show-border: #d4dbe5;
+
+  /* Google Calendar (eventos externos) */
+  --ag-gcal-text: #6d4ec0;
+  --ag-gcal-border: #ddd0f5;
+  --ag-gcal-accent: #7c5cdb;
+  --ag-gcal-bg1: #f3eefc;
+  --ag-gcal-bg2: #efe9fb;
 }
 
 html {
