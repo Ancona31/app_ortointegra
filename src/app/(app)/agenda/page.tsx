@@ -967,6 +967,18 @@ export default function AgendaPage() {
     calendarRef.current?.getApi().refetchEvents()
   }
 
+  /* ── Refetch al cambiar el filtro de médico ─────────────
+     Se dispara DESPUÉS del commit del estado (no en el onChange síncrono),
+     cuando appointmentSourceRef.current ya apunta al appointmentSource
+     recreado con el filtroMedico nuevo → el fetch sale con el médico
+     correcto. El guard de primer render evita el doble fetch en montaje
+     (FullCalendar ya hace su fetch inicial por sí mismo). */
+  const filtroFirstRender = useRef(true)
+  useEffect(() => {
+    if (filtroFirstRender.current) { filtroFirstRender.current = false; return }
+    refetch()
+  }, [filtroMedico])
+
   /* ── Supabase Realtime — debounced (max 1 refetch/sec) ── */
   const realtimeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
@@ -1315,7 +1327,7 @@ export default function AgendaPage() {
           {!isSingleDoctor && (
             <select
               value={filtroMedico}
-              onChange={e => { setFiltroMedico(e.target.value); refetch() }}
+              onChange={e => setFiltroMedico(e.target.value)}
               className="px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
             >
               <option value="">Todos los médicos</option>
