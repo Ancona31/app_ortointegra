@@ -44,6 +44,17 @@
   --ag-chip-bg: #eef1f6;
   --ag-chip-text: #7c8aa0;
 
+  /* VISTA MES (sub-fase 7) — variante clara. La sub-fase 6 (dark) añadirá
+     las contrapartes en html.dark. El círculo de HOY reusa --ag-brand-primary
+     y el punto de los chips reusa --ag-status-*-dot (NO duplicar). */
+  --ag-month-cell: #ffffff;          /* fondo celda día normal */
+  --ag-month-weekend: #fafbfc;       /* fondo celda fin de semana/inhábil */
+  --ag-month-other-day: #f4f6f9;     /* fondo celda de otro mes */
+  --ag-month-head: #f7f9fc;          /* fondo fila de headers de Mes */
+  --ag-month-gap: #e7ecf3;           /* color de líneas/bordes de rejilla */
+  --ag-month-today-bg: color-mix(in srgb, var(--ag-brand-primary) 10%, white); /* tinte hoy, hereda marca */
+  --ag-month-num: #64748b;           /* color número de día normal */
+
   /* SEGMENTED CONTROL de vistas (Mes/Semana/Día). Nombrados para que
      la sub-fase 6 (dark) añada las contrapartes en html.dark. */
   --ag-segment-bg: #eef1f6;
@@ -325,9 +336,9 @@ body {
 /* Día actual — fondo azul claro distintivo */
 .fc .fc-day-today { background: #e8f2ff !important; }
 
-/* Vista mes — círculo en el número */
+/* Vista mes — círculo en el número (hereda la marca del usuario vía --cp/--cs) */
 .fc-daygrid .fc-day-today .fc-daygrid-day-number {
-  background: #1e5fa8;
+  background: var(--ag-brand-primary);
   color: white !important;
   border-radius: 50%;
   width: 26px;
@@ -517,9 +528,67 @@ body {
   ) !important;
 }
 
-/* Más eventos */
+/* Más eventos — "+N más" (sub-fase 7), alineado bajo los chips */
 .fc .fc-daygrid-more-link {
-  color: #1e5fa8;
+  color: var(--ag-muted);
   font-size: 11px;
+  font-weight: 700;
+  padding-left: 11px;
+}
+
+/* ── VISTA MES (sub-fase 7) — todo prefijado .fc-daygrid para NO tocar
+   Semana/Día (.fc-timegrid). Tokens --ag-month-* en :root. ── */
+
+/* Altura MÍNIMA por celda (~handoff 116px) para una rejilla alta y pareja.
+   .fc-daygrid-day-frame = contenedor interno de la celda; darle min-height
+   crece la fila sin fijar altura de vista (height="auto" se conserva). */
+.fc-daygrid .fc-daygrid-day-frame { min-height: 116px; }
+
+/* Fondo de celdas. Orden = especificidad equivalente, gana el último:
+   base → fin de semana → otro mes. HOY se resuelve aparte (con !important). */
+.fc-daygrid .fc-daygrid-day { background: var(--ag-month-cell); }
+.fc-daygrid .fc-day-sat,
+.fc-daygrid .fc-day-sun { background: var(--ag-month-weekend); }
+.fc-daygrid .fc-day-other { background: var(--ag-month-other-day); }
+
+/* Líneas de rejilla hairline — versión .fc-daygrid más específica que la
+   global .fc td/.fc th (que NO se toca). */
+.fc-daygrid td,
+.fc-daygrid th { border-color: var(--ag-month-gap) !important; }
+
+/* Número de día normal (más específica que .fc .fc-daygrid-day-number). */
+.fc-daygrid .fc-daygrid-day-number {
+  color: var(--ag-month-num);
+  font-size: 13px;
   font-weight: 600;
 }
+
+/* Fila de headers de Mes (LUN MAR…). Solo daygrid: no afecta time-grid. */
+.fc-daygrid .fc-col-header-cell { background: var(--ag-month-head); }
+
+/* Día de hoy en Mes — regla NUEVA más específica que la global
+   .fc .fc-day-today (#e8f2ff, intacta para el time-grid). */
+.fc-daygrid .fc-day-today { background: var(--ag-month-today-bg) !important; }
+
+/* Fin de semana / inhábil — en Mes el hatching de celda completa se ve
+   pesado: se neutraliza SOLO aquí. El time-grid conserva su hatching
+   (la global .fc .fc-non-business NO se toca). El fondo lo da --ag-month-weekend. */
+.fc-daygrid .fc-non-business { background-image: none !important; }
+
+/* Popover del "+N más" (antes sin estilo). */
+.fc-daygrid .fc-popover,
+.fc .fc-more-popover {
+  background: var(--ag-surface) !important;
+  border: 1px solid var(--ag-border-card) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--ag-shadow-card), 0 12px 28px rgba(16, 32, 64, .14) !important;
+  overflow: hidden;
+}
+.fc .fc-popover-header {
+  background: var(--ag-month-head) !important;
+  color: var(--ag-ink) !important;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 8px 10px !important;
+}
+.fc .fc-popover-body { padding: 8px !important; }

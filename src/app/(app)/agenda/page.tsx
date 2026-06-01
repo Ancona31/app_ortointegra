@@ -903,7 +903,44 @@ const GoogleEventCard = memo(function GoogleEventCard({
   )
 })
 
+/* Chip plano de cita para la Vista Mes (dayGridMonth). Branch DEDICADO: NO
+   comparte chrome con MemoizedEventContent (tarjetas de Semana/Día). Una sola
+   fila: marcador (punto por estado o "G" de Google) + hora (700) + nombre
+   (ellipsis). Sin border/sombra/fondo de tarjeta. */
+const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg }) {
+  const ext = arg.event.extendedProps as (Appointment & { doctorInitial?: string }) & { isGcalBlock?: boolean }
+  const isGcal = !!ext?.isGcalBlock
+  const status = ext?.status
+  const isCancelled = status === 'cancelled'
+  // Google: quitar el 🔒 que agrega gcalSource (el ícono G ya lo distingue).
+  const name = isGcal ? arg.event.title.replace(/^🔒\s*/, '') : arg.event.title
+
+  const marker = isGcal
+    ? <GoogleGIcon size={10} />
+    : <span style={{ width: 6, height: 6, borderRadius: '50%', flex: '0 0 auto', background: status ? `var(--ag-status-${status}-dot)` : 'var(--ag-muted)' }} />
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 5, minWidth: 0,
+      fontSize: 11, color: 'var(--ag-text)', cursor: 'pointer', overflow: 'hidden',
+      opacity: isCancelled ? 0.62 : 1,
+    }}>
+      {marker}
+      {arg.timeText && (
+        <span style={{ fontWeight: 700, color: 'var(--ag-muted)', flex: '0 0 auto' }}>{arg.timeText}</span>
+      )}
+      <span style={{
+        fontWeight: 600, minWidth: 0,
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        textDecoration: isCancelled ? 'line-through' : 'none',
+      }}>{name}</span>
+    </div>
+  )
+})
+
 function renderEventContent(arg: EventContentArg) {
+  // Vista Mes: chip plano dedicado. El camino de Semana/Día (abajo) queda intacto.
+  if (arg.view.type === 'dayGridMonth') return <MonthChip arg={arg} />
   const ext = arg.event.extendedProps as (Appointment & { doctorInitial?: string }) & { isGcalBlock?: boolean }
   if (ext?.isGcalBlock) {
     return <GoogleEventCard timeText={arg.timeText} title={arg.event.title} />
@@ -1472,6 +1509,7 @@ export default function AgendaPage() {
           slotMinTime="07:00:00"
           slotMaxTime="21:00:00"
           allDaySlot={false}
+          dayMaxEvents={3}
           nowIndicator
           selectable
           selectMirror
