@@ -7,7 +7,7 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
 import { EventClickArg, EventDropArg, DateSelectArg, EventInput, EventContentArg, DayHeaderContentArg } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
-import { X, Calendar, User, Plus, Trash2, Settings, Lock } from 'lucide-react'
+import { X, Calendar, User, Plus, Trash2, Settings, Lock, LayoutGrid, Columns3, Square, ChevronDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ui/Toast'
 import { useProfile } from '@/hooks/useProfile'
@@ -902,10 +902,19 @@ function renderEventContent(arg: EventContentArg) {
 
 /* ─── Página principal ─────────────────────────────────── */
 
+// Segmentos del control de vistas. Íconos lucide representativos:
+// LayoutGrid (rejilla = Mes), Columns3 (columnas = Semana), Square (Día).
+const VIEWS = [
+  { type: 'dayGridMonth', label: 'Mes',    icon: LayoutGrid },
+  { type: 'timeGridWeek', label: 'Semana', icon: Columns3 },
+  { type: 'timeGridDay',  label: 'Día',    icon: Square },
+] as const
+
 export default function AgendaPage() {
   const calendarRef = useRef<InstanceType<typeof FullCalendar>>(null)
   const [modal,        setModal]        = useState<ModalState>({ mode: 'closed' })
   const [isMobile,     setIsMobile]     = useState(false)
+  const [currentView,  setCurrentView]  = useState<string>('timeGridWeek')
   const [horario,      setHorario]      = useState<Horario>(HORARIO_DEFAULT)
   const [horarioOpen,  setHorarioOpen]  = useState(false)
   const [confirm,      setConfirm]      = useState<{ message: string; onConfirm: () => void; onCancel: () => void } | null>(null)
@@ -1323,23 +1332,68 @@ export default function AgendaPage() {
           <p className="text-sm text-[#86868b] mt-0.5">Gestión de citas clínicas</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
+          {/* Segmented control de vistas — desktop only (móvil queda fijo en Día,
+              igual que hoy). Sincronizado con la vista real vía datesSet. */}
+          {!isMobile && (
+            <div
+              role="tablist"
+              aria-label="Vista del calendario"
+              className="inline-flex"
+              style={{ background: 'var(--ag-segment-bg)', borderRadius: 10, padding: 3, gap: 2 }}
+            >
+              {VIEWS.map(v => {
+                const active = currentView === v.type
+                const Ico = v.icon
+                return (
+                  <button
+                    key={v.type}
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => {
+                      const api = calendarRef.current?.getApi()
+                      if (!api) return
+                      api.changeView(v.type)
+                      setCurrentView(v.type)
+                    }}
+                    className={`inline-flex items-center gap-1.5 transition-all ${active ? '' : 'hover:opacity-70'}`}
+                    style={{
+                      border: 'none', cursor: 'pointer', borderRadius: 8, padding: '6px 13px',
+                      fontSize: 12.5, fontWeight: active ? 700 : 600,
+                      ...(active
+                        ? { background: 'var(--ag-segment-active-bg)', color: 'var(--ag-segment-active-text)', boxShadow: 'var(--ag-segment-active-shadow)' }
+                        : { background: 'transparent', color: 'var(--ag-segment-text)' }),
+                    }}
+                  >
+                    <Ico size={15} />
+                    {v.label}
+                  </button>
+                )
+              })}
+            </div>
+          )}
           {/* Filtro por médico — solo en modo multi-doctor */}
           {!isSingleDoctor && (
-            <select
-              value={filtroMedico}
-              onChange={e => setFiltroMedico(e.target.value)}
-              className="px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
-            >
-              <option value="">Todos los médicos</option>
-              {medicos.map(m => (
-                <option key={m.id} value={m.id}>{m.titulo ? `${m.titulo} ` : ''}{m.nombre}</option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                value={filtroMedico}
+                onChange={e => setFiltroMedico(e.target.value)}
+                className="appearance-none pl-3 pr-9 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-[var(--ag-surface)] border border-[var(--ag-border-card)] text-[var(--ag-text)] hover:bg-[var(--ag-bg-app)]"
+              >
+                <option value="">Todos los médicos</option>
+                {medicos.map(m => (
+                  <option key={m.id} value={m.id}>{m.titulo ? `${m.titulo} ` : ''}{m.nombre}</option>
+                ))}
+              </select>
+              <ChevronDown
+                size={15}
+                className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--ag-muted)]"
+              />
+            </div>
           )}
           {canEditHorario && (
             <button
               onClick={() => setHorarioOpen(true)}
-              className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-colors"
+              className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors bg-[var(--ag-surface)] border border-[var(--ag-border-card)] text-[var(--ag-text)] hover:bg-[var(--ag-bg-app)]"
               title="Configurar horario de consulta"
             >
               <Settings size={15} />
@@ -1353,7 +1407,7 @@ export default function AgendaPage() {
               setModal({ mode: 'create', start: now, end: addHour(now) })
             }}
             data-onboard="nueva-cita"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a4f8c] transition-colors shadow-sm"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all shadow-sm hover:brightness-95 bg-[linear-gradient(135deg,var(--ag-brand-primary),var(--ag-brand-secondary))]"
           >
             <Plus size={15} />
             Nueva cita
@@ -1382,7 +1436,7 @@ export default function AgendaPage() {
       )}
 
       {/* ── Calendario ──────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden" style={{ minHeight: '70vh' }}>
+      <div className="agenda-fc bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden" style={{ minHeight: '70vh' }}>
         <FullCalendar
           ref={calendarRef}
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -1390,8 +1444,9 @@ export default function AgendaPage() {
           locale={esLocale}
           headerToolbar={isMobile
             ? { left: 'prev,next', center: 'title', right: 'today' }
-            : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' }
+            : { left: 'prev,next today', center: 'title', right: '' }
           }
+          datesSet={arg => setCurrentView(arg.view.type)}
           buttonText={{ today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día' }}
           slotMinTime="07:00:00"
           slotMaxTime="21:00:00"

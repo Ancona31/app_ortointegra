@@ -44,6 +44,14 @@
   --ag-chip-bg: #eef1f6;
   --ag-chip-text: #7c8aa0;
 
+  /* SEGMENTED CONTROL de vistas (Mes/Semana/Día). Nombrados para que
+     la sub-fase 6 (dark) añada las contrapartes en html.dark. */
+  --ag-segment-bg: #eef1f6;
+  --ag-segment-active-bg: #ffffff;
+  --ag-segment-active-shadow: 0 1px 3px rgba(16, 32, 64, .12);
+  --ag-segment-text: #7c8aa0;
+  --ag-segment-active-text: var(--ag-brand-primary);
+
   /* ESTADO — mapeo id DB (inglés) → estilo handoff (dot/text/bg/border).
      La tarjeta "clean" usa solo dot + text; bg/border quedan para el
      modal de la sub-fase 4. */
@@ -231,6 +239,38 @@ body {
 .fc .fc-today-button:hover {
   background: #0f2540 !important;
   border-color: #0f2540 !important;
+}
+
+/* ── Refinamientos de toolbar SOLO para la agenda (`.agenda-fc`) ──
+   Namespaced para NO afectar el CalendarWidget del dashboard, que es un
+   `.fc` sin este wrapper. Las reglas globales `.fc` de arriba quedan
+   intactas; estas son más específicas y solo aplican en la agenda. */
+.agenda-fc .fc-toolbar {
+  padding: 14px 18px;
+}
+.agenda-fc .fc-toolbar-title {
+  font-size: 16px !important;
+  font-weight: 800;
+  color: var(--ag-ink);
+}
+.agenda-fc .fc-button {
+  border-color: var(--ag-border-card) !important;
+  color: var(--ag-text) !important;
+  border-radius: 10px !important;
+}
+.agenda-fc .fc-today-button {
+  background: var(--ag-brand-primary) !important;
+  border-color: var(--ag-brand-primary) !important;
+  color: #fff !important; /* gana a `.agenda-fc .fc-button` (misma especificidad, va después) */
+}
+.agenda-fc .fc-today-button:hover {
+  background: var(--ag-ink) !important;
+  border-color: var(--ag-ink) !important;
+  color: #fff !important;
+}
+.agenda-fc .fc-today-button:disabled {
+  opacity: .55;            /* FullCalendar lo deshabilita cuando ya estás en hoy */
+  color: #fff !important;  /* texto legible aun atenuado */
 }
 
 /* Cabecera de días */
