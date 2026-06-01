@@ -40,6 +40,7 @@
   --ag-hatch: rgba(120, 134, 158, .05); /* color del hatching fuera-de-horario */
   /* Sombra tarjeta (claro) */
   --ag-shadow-card: 0 1px 2px rgba(16, 32, 64, .05);
+  --ag-shadow-pop: 0 12px 28px rgba(16, 32, 64, .14);
   /* Chip de médico (neutro, sin color de médico) */
   --ag-chip-bg: #eef1f6;
   --ag-chip-text: #7c8aa0;
@@ -577,18 +578,192 @@ body {
 
 /* Popover del "+N más" (antes sin estilo). */
 .fc-daygrid .fc-popover,
-.fc .fc-more-popover {
+.fc-daygrid .fc-more-popover {
   background: var(--ag-surface) !important;
   border: 1px solid var(--ag-border-card) !important;
   border-radius: 12px !important;
-  box-shadow: var(--ag-shadow-card), 0 12px 28px rgba(16, 32, 64, .14) !important;
+  box-shadow: var(--ag-shadow-card), var(--ag-shadow-pop) !important;
   overflow: hidden;
 }
-.fc .fc-popover-header {
+.fc-daygrid .fc-popover-header {
   background: var(--ag-month-head) !important;
   color: var(--ag-ink) !important;
   font-size: 12.5px;
   font-weight: 700;
   padding: 8px 10px !important;
 }
-.fc .fc-popover-body { padding: 8px !important; }
+.fc-daygrid .fc-popover-body { padding: 8px !important; }
+
+/* ════════════════════════════════════════════════════════════════
+   AGENDA — MODO OSCURO (sub-fase 6). Contrapartes de los --ag-*.
+   Valores del handoff design/agenda/design_handoff_agenda/theme.js
+   (objetos dark / statusDark / extDark). --ag-brand-primary/secondary
+   NO se redefinen (siguen heredando --cp/--cs del usuario; la marca de
+   "hoy" se aclara aparte en la Parte C-bis). ◆ = valor derivado (sin
+   equivalente directo en el handoff), aprobado por el PO.
+   ════════════════════════════════════════════════════════════════ */
+html.dark {
+  /* Superficies */
+  --ag-bg-app: #0c1420;
+  --ag-bg-main: #0f1828;
+  --ag-surface: #1b2a40;
+  --ag-grid-col: transparent;                 /* ◆ columnas transparentes sobre mainBg */
+  /* Bordes y líneas */
+  --ag-border-card: #2a3b57;
+  --ag-hour-line: rgba(255, 255, 255, .07);
+  --ag-col-line: rgba(255, 255, 255, .05);
+  --ag-hairline: rgba(255, 255, 255, .08);
+  /* Texto */
+  --ag-ink: #e8eef6;
+  --ag-text: #cdd8e6;
+  --ag-muted: #8b9bb0;
+  --ag-muted2: #6b7a90;
+  --ag-faint: #5d6b80;
+  /* Marca: --ag-brand-* NO se tocan */
+  --ag-now-line: #f87171;
+  /* Today / hatch / sombras */
+  --ag-today-bg: rgba(47, 111, 237, .10);
+  --ag-today-ring: rgba(91, 140, 255, .30);
+  --ag-hatch: rgba(255, 255, 255, .03);
+  --ag-shadow-card: 0 1px 3px rgba(0, 0, 0, .45);
+  --ag-shadow-pop: 0 12px 28px rgba(0, 0, 0, .55);
+  /* Chip médico */
+  --ag-chip-bg: #16233a;
+  --ag-chip-text: #cdd8e6;                    /* ◆ ≈ dark.text */
+  /* Vista Mes */
+  --ag-month-cell: #141f33;
+  --ag-month-weekend: #0e1828;
+  --ag-month-other-day: #0c1422;
+  --ag-month-head: #101a2b;
+  --ag-month-gap: #22324c;
+  --ag-month-today-bg: color-mix(in srgb, var(--ag-brand-secondary) 12%, #0f1828); /* aclarado handoff */
+  --ag-month-num: #8b9bb0;                    /* ◆ ≈ dark.muted */
+  /* Segmented control */
+  --ag-segment-bg: #16233a;
+  --ag-segment-active-bg: #27395a;
+  --ag-segment-active-shadow: none;           /* ◆ Material elimina sombras en dark */
+  --ag-segment-text: #8b9bb0;
+  --ag-segment-active-text: #dbe7ff;          /* handoff dark.segActiveText */
+  /* Estado (mapeo inglés DB → statusDark español del handoff) */
+  --ag-status-scheduled-dot: #6b9bff;  --ag-status-scheduled-text: #a9c8ff;
+  --ag-status-scheduled-bg: rgba(47, 111, 237, .18);  --ag-status-scheduled-border: rgba(91, 140, 255, .36);
+  --ag-status-confirmed-dot: #34d399;  --ag-status-confirmed-text: #7eecb4;
+  --ag-status-confirmed-bg: rgba(22, 163, 74, .18);   --ag-status-confirmed-border: rgba(52, 211, 153, .34);
+  --ag-status-cancelled-dot: #f87171;  --ag-status-cancelled-text: #fca5a5;
+  --ag-status-cancelled-bg: rgba(220, 38, 38, .18);   --ag-status-cancelled-border: rgba(248, 113, 113, .34);
+  --ag-status-no_show-dot: #9fb0c4;    --ag-status-no_show-text: #c7d2e0;
+  --ag-status-no_show-bg: rgba(120, 134, 158, .22);   --ag-status-no_show-border: rgba(148, 163, 184, .40);
+  /* Google Calendar (extDark) */
+  --ag-gcal-text: #c4b5fd;
+  --ag-gcal-border: rgba(167, 139, 250, .36);
+  --ag-gcal-accent: #a78bfa;
+  --ag-gcal-bg1: rgba(124, 92, 219, .18);
+  --ag-gcal-bg2: rgba(124, 92, 219, .12);     /* ◆ variante más tenue de extDark.bg */
+  /* Modal / input / patient-card */
+  --ag-modal-overlay: rgba(2, 6, 14, .58);
+  --ag-modal-bg: #152135;
+  --ag-input-bg: #16233a;
+  --ag-input-border: #2a3b57;
+  --ag-input-focus-ring: rgba(91, 140, 255, .30);     /* ◆ */
+  --ag-input-focus-border: #5b8cff;                   /* ◆ */
+  --ag-modal-icon-bg: #1f2f48;                        /* ◆ ≈ dark.rowIconBg */
+  --ag-btn-ghost-hover: #1f2f48;                      /* ◆ */
+  --ag-patient-card-bg: rgba(47, 111, 237, .12);      /* ◆ ≈ scheduled-bg tenue */
+  --ag-patient-card-border: rgba(91, 140, 255, .36);  /* ◆ = scheduled-border dark */
+}
+
+/* ── PARTE B — FullCalendar: vars nativas --fc-* en dark. Se definen en el
+   ROOT .fc (no en el wrapper .agenda-fc): el bloque .fc{} (líneas ~212-216)
+   re-declara estas vars en el propio root, así que ponerlas en el wrapper
+   queda SOMBREADO. Sigue NAMESPACED (.agenda-fc .fc) → no toca el
+   CalendarWidget del dashboard (.fc sin wrapper .agenda-fc). */
+html.dark .agenda-fc .fc {
+  --fc-border-color: rgba(255, 255, 255, .07);
+  --fc-today-bg-color: rgba(47, 111, 237, .10);
+  --fc-highlight-color: rgba(47, 111, 237, .18);
+  --fc-page-bg-color: #0f1828;
+  --fc-neutral-bg-color: #16233a;             /* ◆ neutro oscuro p/ popover y celdas deshabilitadas */
+  /* --fc-event-border-color queda transparent (no se toca) */
+}
+
+/* ── PARTE C — Overrides namespaced de reglas .fc con hex claro horneado.
+   Las reglas ya tokenizadas (today-col time-grid, hour/col lines,
+   now-indicator, hatch, more-link, bloque Mes .fc-daygrid, .fc-toolbar-title
+   que usa --ag-ink) se resuelven solas con la Parte A y NO se repiten. */
+
+/* Toolbar (global .fc .fc-toolbar: bg #ffffff + border #f1f5f9) */
+html.dark .agenda-fc .fc-toolbar {
+  background: var(--ag-surface);
+  border-bottom-color: var(--ag-border-card);
+}
+
+/* Botones prev/next (global .fc .fc-button: bg #ffffff). color/borde ya
+   vienen de --ag-text/--ag-border-card vía .agenda-fc .fc-button (tokenizado). */
+html.dark .agenda-fc .fc-button {
+  background: var(--ag-surface) !important;
+}
+html.dark .agenda-fc .fc-button:hover {
+  background: var(--ag-btn-ghost-hover) !important;
+  color: var(--ag-ink) !important;
+  border-color: var(--ag-border-card) !important;
+}
+/* (.fc-today-button conserva --ag-brand-primary: es marca, texto blanco legible — decisión PO 🟠2) */
+
+/* Cabecera de días — SOLO time-grid (Mes usa --ag-month-head, ya tokenizado).
+   Global .fc .fc-col-header-cell: bg #ffffff + border-bottom #f1f5f9. */
+html.dark .agenda-fc .fc-timegrid .fc-col-header-cell {
+  background: var(--ag-surface);
+  border-bottom-color: var(--fc-border-color) !important;
+}
+
+/* Marco + líneas grises horneadas (#f1f5f9). Mes ya cubierto por --ag-month-gap;
+   el override de td/th se acota a .fc-timegrid para no pisar la rejilla de Mes. */
+html.dark .agenda-fc .fc-scrollgrid { border-color: var(--ag-border-card) !important; }
+html.dark .agenda-fc .fc-timegrid td,
+html.dark .agenda-fc .fc-timegrid th { border-color: var(--ag-hour-line) !important; }
+
+/* Selección de slot (global .fc .fc-highlight: #dbeafe) */
+html.dark .agenda-fc .fc-highlight { background: var(--fc-highlight-color) !important; }
+
+/* ── PARTE C-bis — Marca de "hoy" ACLARADA en dark (decisión PO 🟠1/handoff).
+   El navy de marca saturado se perdería contra el fondo #0f1828, así que se
+   mezcla hacia el fondo. El texto blanco del header (render inline) se conserva. */
+
+/* Header de "hoy" del time-grid (Semana/Día) */
+html.dark .agenda-fc .fc-timegrid .fc-col-header-cell.fc-day-today {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ag-brand-secondary) 55%, #0f1828),
+    color-mix(in srgb, var(--ag-brand-secondary) 42%, #0f1828)
+  ) !important;
+}
+
+/* Círculo de "hoy" de Mes */
+html.dark .agenda-fc .fc-daygrid .fc-day-today .fc-daygrid-day-number {
+  background: color-mix(in srgb, var(--ag-brand-secondary) 55%, #0f1828) !important;
+}
+
+/* ── Flecos dark sub-fase 6 ─────────────────────────────────────────
+   FIX 1 — esquina blanca del time-grid. El fondo lo pinta la regla nativa
+   .fc .fc-scrollgrid-section-sticky > * { background: var(--fc-page-bg-color) }
+   sobre las celdas-cromo <td> de la fila de header (incluida la esquina del
+   gutter). Con la Parte B ya corregida --fc-page-bg-color es oscuro, pero
+   para que la esquina se funda SIN COSTURA con los headers de día (que usan
+   --ag-surface) se repinta la celda-cromo del header con el mismo token.
+   Cubre la esquina y el cromo tras los headers (inocuo: el <th> de cada día
+   ya pinta su propio fondo encima). El gutter de horas del cuerpo
+   (.fc-timegrid-slot-label) hereda el fondo oscuro del scroller; su borde lo
+   cubre la regla td/th del time-grid (Parte C). */
+html.dark .agenda-fc .fc-scrollgrid-section-header > * {
+  background: var(--ag-surface);
+}
+
+/* FIX 2 — línea clara bajo los headers de Mes. El border-bottom viene de
+   la global .fc .fc-col-header-cell (#f1f5f9, 2 clases) que gana sobre
+   .fc-daygrid th (month-gap, 1 clase). Override más específico (4 clases)
+   con el token de rejilla de Mes ya oscuro. Los bordes laterales del header
+   y de las celdas ya usan --ag-month-gap; el .fc-scrollgrid de Mes ya lo
+   cubre la Parte C (--ag-border-card). */
+html.dark .agenda-fc .fc-daygrid .fc-col-header-cell {
+  border-bottom-color: var(--ag-month-gap) !important;
+}

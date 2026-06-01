@@ -493,7 +493,7 @@ function AppointmentModal({
           {/* Paciente — campo principal y obligatorio */}
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
-              Paciente <span className="text-red-400">*</span>
+              Paciente <span className="text-red-500">*</span>
             </label>
             {paciente ? (
               <div className="flex items-center justify-between px-3 py-2.5 rounded-xl border"
@@ -531,8 +531,8 @@ function AppointmentModal({
                         style={{ borderColor: 'var(--ag-hairline)' }}
                         onClick={() => { setPaciente(p); setSearch(''); setShowSearch(false) }}
                       >
-                        <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                          <span className="text-[10px] font-bold text-blue-700">{p.nombre[0]}{p.apellidos[0]}</span>
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--ag-brand-secondary)' }}>
+                          <span className="text-[10px] font-bold text-white">{p.nombre[0]}{p.apellidos[0]}</span>
                         </div>
                         <div>
                           <p className="text-sm font-medium" style={{ color: 'var(--ag-ink)' }}>{p.nombre} {p.apellidos}</p>
@@ -547,12 +547,12 @@ function AppointmentModal({
                         style={{ borderColor: 'var(--ag-hairline)' }}
                         onClick={() => { setShowSearch(false); setQuickCreate(true) }}
                       >
-                        <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                        <div className="w-7 h-7 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0">
                           <Plus size={13} className="text-emerald-600" />
                         </div>
                         <div>
                           <p className="text-sm font-medium text-emerald-700">Registrar "{search}"</p>
-                          <p className="text-[11px] text-emerald-500">Crear nuevo paciente y continuar</p>
+                          <p className="text-[11px] text-emerald-600">Crear nuevo paciente y continuar</p>
                         </div>
                       </button>
                     )}
@@ -628,7 +628,7 @@ function AppointmentModal({
           {!hideMedicoDropdown && (
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
-                Médico {medicoDropdownRequired && <span className="text-red-400">*</span>}
+                Médico {medicoDropdownRequired && <span className="text-red-500">*</span>}
               </label>
               <div className="relative">
                 <select
