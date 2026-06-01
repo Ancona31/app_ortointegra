@@ -29,10 +29,15 @@
   --ag-muted: #7c8aa0;
   --ag-muted2: #9aa6b8;
   --ag-faint: #aab4c4;
-  /* Marca (Spinus) */
-  --ag-brand-primary: #1a3a5c;
-  --ag-brand-secondary: #1e5fa8;
+  /* Marca (Spinus) — hereda el color del usuario (--cp/--cs los inyecta
+     ThemeProvider en :root, siempre con fallback). Mismo mecanismo que el Sidebar. */
+  --ag-brand-primary: var(--cp, #1a3a5c);
+  --ag-brand-secondary: var(--cs, #1e5fa8);
   --ag-now-line: #ef4444;
+  /* Time-grid (sub-fase 2) — la sub-fase 6 añadirá las contrapartes en html.dark */
+  --ag-today-bg: #eff4f9;             /* tinte columna de hoy */
+  --ag-today-ring: #9ab7d8;           /* ring inset columna de hoy */
+  --ag-hatch: rgba(120, 134, 158, .05); /* color del hatching fuera-de-horario */
   /* Sombra tarjeta (claro) */
   --ag-shadow-card: 0 1px 2px rgba(16, 32, 64, .05);
   /* Chip de médico (neutro, sin color de médico) */
@@ -243,6 +248,27 @@ body {
   text-decoration: none !important;
 }
 
+/* Header de día APILADO — solo time-grid (Semana/Día). Mes (sub-fase 7)
+   conserva su header por defecto vía el guard de vista en dayHeaderContent.
+   El color del texto lo fija el render inline según estado del día. */
+.fc-timegrid .ag-dayhead {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+.fc-timegrid .ag-dayhead-dow {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.fc-timegrid .ag-dayhead-num {
+  font-size: 18px;
+  font-weight: 800;
+  margin-top: 1px;
+}
+
 /* Día actual — fondo azul claro distintivo */
 .fc .fc-day-today { background: #e8f2ff !important; }
 
@@ -265,33 +291,49 @@ body {
   padding: 4px 6px;
 }
 
-/* Vista semana/día — rectángulo azul completo en el header del día actual */
+/* Vista semana/día — caja de "hoy" con gradiente de marca (hereda --cp/--cs).
+   El texto blanco lo da el render inline del header apilado (dayHeaderContent). */
 .fc-timegrid .fc-col-header-cell.fc-day-today {
-  background: #1e5fa8 !important;
-  border-radius: 0;
+  background: linear-gradient(
+    180deg,
+    var(--ag-brand-primary),
+    color-mix(in srgb, var(--ag-brand-primary) 78%, var(--ag-brand-secondary))
+  ) !important;
+  border-radius: 11px 11px 0 0;
+  padding: 8px 0 10px;
 }
-.fc-timegrid .fc-col-header-cell.fc-day-today .fc-col-header-cell-cushion {
-  color: white !important;
-  background: transparent !important;
-  border-radius: 0 !important;
-  width: auto !important;
-  height: auto !important;
-  display: block !important;
+
+/* Columna de HOY en el cuerpo del time-grid — tinte + ring inset.
+   Más específica que el .fc .fc-day-today global (#e8f2ff, que se deja
+   intacto para la vista Mes / sub-fase 7). */
+.fc-timegrid .fc-timegrid-col.fc-day-today {
+  background: var(--ag-today-bg) !important;
+  box-shadow: inset 0 0 0 1.5px var(--ag-today-ring);
 }
 
 /* Bordes de grilla — ultra suaves */
 .fc .fc-scrollgrid { border-color: #f1f5f9 !important; }
 .fc td, .fc th    { border-color: #f1f5f9 !important; }
-.fc .fc-timegrid-slot-minor { border-style: dashed !important; border-color: #f8fafc !important; }
 
-/* Altura de franjas horarias — suficiente para nombres largos */
+/* Líneas de hora del time-grid — token (contraparte oscura en sub-fase 6) */
+.fc-timegrid .fc-timegrid-slot { border-color: var(--ag-hour-line) !important; }
+/* Media hora (:30) — sin línea visible, según handoff */
+.fc .fc-timegrid-slot-minor { border-top-style: none !important; }
+
+/* Separadores verticales entre columnas de día (Fase A) — división sutil con
+   --ag-col-line en lugar de la cuadrícula rígida. Columnas TRANSPARENTES (sin
+   fondo opaco): conservan las líneas de hora de la capa .fc-timegrid-slots
+   detrás. Prefijado .fc-timegrid → no afecta Mes. */
+.fc-timegrid .fc-timegrid-col { border-color: var(--ag-col-line) !important; }
+
+/* Altura de franjas horarias — suficiente para nombres largos. NO cambiar. */
 .fc .fc-timegrid-slot { height: 1.8rem !important; }
 
-/* Etiquetas de hora */
+/* Etiquetas del gutter de horas */
 .fc .fc-timegrid-slot-label-cushion {
-  font-size: 11px;
-  color: #94a3b8;
-  font-weight: 500;
+  font-size: 11.5px;
+  color: var(--ag-faint);
+  font-weight: 600;
   padding-right: 8px;
 }
 
@@ -394,17 +436,18 @@ body {
 
 /* Now-indicator — línea fina roja con punto */
 .fc .fc-timegrid-now-indicator-line {
-  border-color: #ef4444 !important;
-  border-width: 1.5px !important;
+  border-color: var(--ag-now-line) !important;
+  border-width: 2px !important;
+  opacity: .85;
 }
 .fc .fc-timegrid-now-indicator-arrow {
   border: none !important;
-  width: 10px;
-  height: 10px;
-  background: #ef4444;
+  width: 8px;
+  height: 8px;
+  background: var(--ag-now-line);
   border-radius: 50%;
-  margin-top: -5px;
-  margin-left: -5px;
+  margin-top: -4px;
+  margin-left: -4px;
 }
 
 /* Selección de slot */
@@ -413,11 +456,11 @@ body {
 /* Horas fuera del horario de consulta — patrón diagonal "no disponible" */
 .fc .fc-non-business {
   background: repeating-linear-gradient(
-    45deg,
-    rgba(148, 163, 184, 0.07),
-    rgba(148, 163, 184, 0.07) 3px,
-    transparent 3px,
-    transparent 10px
+    135deg,
+    var(--ag-hatch),
+    var(--ag-hatch) 6px,
+    transparent 6px,
+    transparent 12px
   ) !important;
 }
 

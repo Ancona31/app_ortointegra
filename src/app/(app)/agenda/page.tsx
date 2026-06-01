@@ -5,7 +5,7 @@ import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
-import { EventClickArg, EventDropArg, DateSelectArg, EventInput, EventContentArg } from '@fullcalendar/core'
+import { EventClickArg, EventDropArg, DateSelectArg, EventInput, EventContentArg, DayHeaderContentArg } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
 import { X, Calendar, User, Plus, Trash2, Settings, Lock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -1276,6 +1276,31 @@ export default function AgendaPage() {
     }
   }
 
+  // Header de día apilado para Semana/Día. Mes (sub-fase 7) conserva su
+  // header por defecto devolviendo arg.text sin tocar. El estado "inhábil"
+  // se deriva del MISMO objeto `horario` que alimenta businessHours (no se
+  // inventa lógica de horario): un día es hábil si horario[dia].activo === true.
+  function renderDayHeader(arg: DayHeaderContentArg) {
+    if (arg.view.type === 'dayGridMonth') return arg.text
+
+    const diaInfo = DIAS.find(d => d.fc === arg.date.getDay())
+    const habil   = diaInfo ? (horario[diaInfo.key]?.activo ?? false) : false
+    const abbr    = diaInfo ? diaInfo.label.slice(0, 3).toUpperCase() : arg.text
+
+    // Color por estado: HOY (blanco) > inhábil (atenuado) > hábil normal.
+    let dowColor: string, numColor: string
+    if (arg.isToday)  { dowColor = 'rgba(255,255,255,.72)'; numColor = '#fff' }
+    else if (!habil)  { dowColor = 'var(--ag-faint)';       numColor = 'var(--ag-muted2)' }
+    else              { dowColor = 'var(--ag-muted)';       numColor = 'var(--ag-text)' }
+
+    return (
+      <span className="ag-dayhead">
+        <span className="ag-dayhead-dow" style={{ color: dowColor }}>{abbr}</span>
+        <span className="ag-dayhead-num" style={{ color: numColor }}>{arg.date.getDate()}</span>
+      </span>
+    )
+  }
+
   return (
     <div className="flex flex-col">
 
@@ -1367,6 +1392,7 @@ export default function AgendaPage() {
           eventResizableFromStart
           businessHours={horarioToBusinessHours(horario)}
           eventSources={eventSourcesStable}
+          dayHeaderContent={renderDayHeader}
           eventContent={renderEventContent}
           dateClick={handleDateClick}
           select={handleSelect}
