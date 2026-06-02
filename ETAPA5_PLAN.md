@@ -816,7 +816,7 @@ Esta sección describe el plan de ejecución de Etapa 5 a **nivel operativo**: o
 | 5.G | Reescribir policies de `documentos` + auditar formularios | Alto | ✅ Aplicado |
 | 5.H | Reescribir policies de `appointments` | Medio | ✅ Aplicado |
 | 5.I | Reescribir policies de `mediciones` + `calculadora` + `addendums` | Bajo-medio | ✅ Aplicado |
-| 5.J | Limpieza menor (`profiles`, `invitaciones`, huérfanas) | Bajo | ⏳ Pendiente |
+| 5.J | Limpieza menor (`profiles`, `invitaciones`, huérfanas) | Bajo | ✅ Aplicado |
 | 5.K | Reescribir policies de Storage (bucket `documentos-pdf`) | Medio-alto | ⏳ Pendiente |
 | 5.L | Validación final: 11 Casos del §9 | — | ⏳ Pendiente |
 
@@ -1690,6 +1690,40 @@ Ejecutado en 5 pasos bajo protocolo D-T6 (con Paso 1.bis adicional tras hallazgo
 - Comentario de la migración 5.F que afirmaba "solo el médico original o admin pueden agregar addendum" supersedido por D-5.I-H2; queda como nota documental.
 
 **Siguiente sub-paso:** 5.J según orden D4 (línea 513 del plan rector).
+
+### Sub-paso 5.J — Limpieza menor profiles + invitaciones (aplicado 2026-06-02)
+
+Ejecutado en 5 pasos bajo protocolo D-T6, todos aplicados y verificados en producción. Implementa la limpieza cosmética planeada en el plan rector: consolidación de policies duplicadas de `profiles` (4 → 2), endurecimiento de policies de `invitaciones` (cierre de bug histórico admin_* sin gate de rol), naming uniforme `tabla_operacion` consistente con 5.F-5.I, formalización de `TO authenticated` (D8). Diferencias clave vs sub-pasos anteriores: 5.J no es refactor estructural sino limpieza; sin gates RESTRICTIVE de suscripción (no aplica al modelo de identidad); sin cambios de código TypeScript.
+
+**Contexto de seguridad crítico:** durante el diseño del Paso 2 (auditoría con ojos frescos del SQL) se detectaron 4 vulnerabilidades 🔴 cross-tenant en `profiles` (auto-reasignación de `clinica_id`, auto-promoción a `super_admin`, auto-promoción a `es_admin_de_clinica`, sin trigger de auditoría) más 2 🟡 (storage policies sin auditar, paciente_medico auto-asignación). El trabajo se transfirió temporalmente al chat "Auditor de seguridad de Spinus" que cerró las 3 vulnerabilidades 🔴 activas con: (a) eliminación de la ruta muerta `/api/auth/complete-registro` (commit `8c3c007`); (b) trigger guardián de columnas sensibles `BEFORE UPDATE` en `profiles` que congela `role`, `clinica_id`, `es_admin_de_clinica` para `auth.uid() IS NOT NULL` (migración `20260602_sec_proteger_columnas_sensibles_profiles.sql`). 6 deudas residuales registradas como E5-DT-13 a E5-DT-18. Sin breach activo. Tras el cierre del auditor, 5.J Paso 2 se retomó y aplicó.
+
+- ✅ **Paso 1 — Snapshot lógico + diagnóstico** — Snapshot de las 7 policies actuales (4 profiles + 3 invitaciones). Hallazgo transversal crítico: baseline ≠ producción para profiles (3 migraciones post-baseline: `20260429_b2_02` reescribió predicado de SELECT legacy `get_my_clinica_id → get_clinica_id` y eliminó la función huérfana; `20260518083036_etapa1` agregó columna `es_admin_de_clinica`; `20260519114652_etapa4a8` migró 9 `role='admin' → 'medico' + es_admin_de_clinica=true` y removió `'admin'` del CHECK). invitaciones = baseline = producción. Cero call sites TS-side de `.from('invitaciones')` (tabla huérfana de código; flujo real de "agregar usuario" es vía `/api/admin/crear-usuario` con admin client). ~40 call sites de `.from('profiles')` analizados, todos compatibles con el modelo nuevo.
+- ✅ **Paso 2 — 5 policies nuevas + cierre de vulnerabilidades cross-tenant** — Migración `20260602_etapa5j_paso2_policies_profiles_invitaciones.sql` con un solo bloque BEGIN/COMMIT atómico (PRE-FLIGHT con conteo de 4 policies viejas en profiles + 3 viejas en invitaciones + 3 helpers + get_suscripcion_estado conservada por D9; DROPs; 5 CREATEs nuevas; POST-FLIGHT con `IS DISTINCT FROM` normalizado contra colación). Policies de profiles: `profiles_select` con 3 ramas (propio OR admin OR secretaria) + tenant-scope; `profiles_update` con 2 ramas (propio OR admin) + USING+WITH CHECK idénticos. Policies de invitaciones: `invitaciones_select/insert/delete` con `clinica_id = get_clinica_id() AND soy_admin_de_clinica()` (cierre de bug histórico admin_*). Aplicada DESPUÉS del trigger guardián de columnas sensibles del auditor de seguridad (defensa en profundidad combinada). Commit `6a37a31`.
+- ✅ **Paso 3 — Smoke tests producción** — 3 confirmaciones de metadata (5 policies con nombres/tipos/comandos/roles correctos en pg_policy; predicados USING/WITH CHECK literales coincidentes con el diseño incluyendo las 3 ramas de `profiles_select` y USING+WITH CHECK idénticos en `profiles_update`; RLS habilitado con 2 policies en profiles + 3 en invitaciones, sin residuos) + 7 smoke tests funcionales con `SET LOCAL ROLE authenticated`: SELECT profiles admin (3 perfiles OrtoIntegra, 0 ajenos ✓); SELECT profiles invitado (1 perfil propio, 0 ajenos, privacidad estricta ✓); SELECT profiles secretaria (3 perfiles OrtoIntegra, rama secretaria funciona ✓); UPDATE cross-doctor invitado bloqueado (0 filas afectadas ✓); UPDATE admin sobre perfil ajeno exitoso (1 fila, BD lista para botón "editar usuario" futuro ✓); INSERT invitaciones invitado bloqueado (42501, bug histórico cerrado ✓); INSERT invitaciones admin exitoso (caso feliz ✓).
+- ✅ **Paso 4 — Migración versionada** — Cubierto por commit del Paso 2 (`6a37a31`). Archivo SQL versionado en `supabase/migrations/` para reproducibilidad en preview/branches.
+- ✅ **Paso 5 — Checkpoint** — Esta entrada de Bitácora + actualización de §5 tabla a "Aplicado" + registro de E5-DT-19 en `DEUDA_TECNICA.md`.
+
+**Decisiones de producto cerradas durante el sub-paso:**
+
+- **D-5.J-PROFILES-SELECT (3 ramas):** propio perfil OR admin OR secretaria, dentro del tenant. Admin y secretaria ven todos los perfiles de su clínica (necesario para listado de equipo en `/admin/usuarios`, validación server-side de `medico_id`, JOINs con nombres de médicos). Médico invitado solo ve su propio perfil (privacidad estricta).
+- **D-5.J-PROFILES-UPDATE (2 ramas):** propio perfil OR admin, dentro del tenant. USING + WITH CHECK idénticos. Sin rama secretaria: secretaria no gestiona personal. Defensa contra escalada de tenant en dos capas: (1) WITH CHECK a nivel de fila (admin no puede reasignar `clinica_id` de perfiles AJENOS); (2) Trigger guardián a nivel de columna del auditor de seguridad (congela `role`, `clinica_id`, `es_admin_de_clinica` para `auth.uid() IS NOT NULL`, cierra el hueco que la rama `OR id=auth.uid()` del WITH CHECK dejaba abierto para auto-reasignación).
+- **D-5.J-INVITACIONES-ROL:** solo admin (`soy_admin_de_clinica()`) puede gestionar invitaciones. Cierra el bug histórico de las policies `admin_*` del baseline que no validaban rol pese al prefijo. Tabla queda endurecida aunque sin call sites activos (flujo real es vía `/api/admin/crear-usuario`).
+- **D-5.J-PUBLIC→AUTHENTICATED:** las 2 policies legacy de profiles eran `TO public`, semánticamente neutras (su predicado ya exigía `auth.uid()`), pero conviene formalizar `TO authenticated` (D8).
+- **D-5.J-GET-SUSCRIPCION:** `get_suscripcion_estado()` se conserva intencionalmente sin cambio (D9). Función huérfana sin call sites actuales pero útil para Etapa 6 o queries de auditoría.
+- **D-5.J-SUPER-ADMIN:** NO añadir rama `super_admin` en policies. Super_admin opera vía `service_role` (Mecanismo 1, ya operativo en `/api/super-admin/**`). El único super_admin en producción (con `clinica_id=NULL`) puede verse y editarse a sí mismo vía la rama `id = auth.uid()`.
+- **D-5.J-NAMING:** renombrar las 7 policies viejas a patrón `tabla_operacion` consistente con 5.F-5.I (`profiles_select`, `profiles_update`, `invitaciones_select`, `invitaciones_insert`, `invitaciones_delete`). Limpieza de naming heterogéneo (mezcla de español con comillas + inglés snake_case + prefijos `admin_*` engañosos).
+
+🟡 **Deudas residuales registradas en `DEUDA_TECNICA.md` durante el sub-paso:**
+
+- **E5-DT-19** (formalizada en este checkpoint): falta endpoint PATCH + UI para que admin edite perfiles de su clínica. BD ya está lista tras 5.J (rama admin en `profiles_update`); pendiente endpoint TS-side y modal de edición en `/admin/usuarios`.
+- **E5-DT-13 a E5-DT-18** (registradas por el auditor de seguridad durante la pausa, commit `6a8b511`): Pieza 3 trigger de auditoría forense, storage policies sin auditar, paciente_medico auto-asignación intra-clínica, comparación timing-safe en email-hook, limpieza signUp comment + reenviar-confirmacion no auditada, apunte preventivo BEFORE INSERT.
+
+🟢 **Comportamientos esperados sin acción adicional:**
+
+- El trigger guardián del auditor de seguridad y las nuevas policies de profiles operan en dos planos ortogonales (columna vs fila). El trigger BEFORE UPDATE corre antes que la policy WITH CHECK; ambas defienden contra vectores complementarios.
+- super_admin único en producción sigue operando vía `service_role` para todo lo que va más allá de editar su propio perfil.
+
+**Siguiente sub-paso:** 5.K según orden D4 (cierre formal del bucket de Storage `documentos-pdf`, brecha conocida).
 
 ---
 

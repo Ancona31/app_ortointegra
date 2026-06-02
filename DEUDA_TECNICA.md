@@ -378,6 +378,39 @@ Estado: 🔴 abierta · 🟡 en progreso · 🟢 resuelta (se elimina al cerrar)
   el modelo de alta de usuarios.
 - **Cuándo atacar:** N/A hasta que cambie el modelo.
 
+### E5-DT-19 — Falta endpoint + UI para que admin edite perfiles de su clínica
+- **Estado:** 🟡 abierta
+- **Detectada:** Etapa 5, sub-paso 5.J (2026-06-02), durante discusión de
+  decisión D-5.J-PROFILES-UPDATE.
+- **Archivo afectado:** `src/app/admin/usuarios/page.tsx` (UI) +
+  `src/app/api/admin/usuarios/` (falta endpoint PATCH).
+- **Descripción:** La página `/admin/usuarios` actualmente solo permite
+  ELIMINAR usuarios; no tiene botón "Editar" para que el admin de clínica
+  corrija datos profesionales (nombre, título, especialidad, cédulas,
+  dirección, teléfono, firma) de sus médicos y secretarias. La intención
+  de producto SÍ es permitirlo, por lo que la decisión D-5.J-PROFILES-UPDATE
+  añadió la rama admin al predicado de la policy de UPDATE de profiles.
+- **Fix pendiente:** (a) crear endpoint PATCH `/api/admin/usuarios/[id]`
+  con validación de inputs (cédulas, role no editable por admin),
+  whitelist explícita de campos editables, y verificación de que el target
+  pertenece a la clínica del admin caller; (b) añadir botón "Editar" y
+  modal con formulario de edición en la UI de `/admin/usuarios`; (c)
+  smoke tests del flujo completo.
+- **BD ya está lista:** tras 5.J, la policy `profiles_update` tiene rama
+  admin (`USING (id = auth.uid() OR soy_admin_de_clinica()) AND tenant
+  scope`, con WITH CHECK idéntico). El trigger guardián de columnas
+  sensibles del auditor de seguridad (`20260602_sec_proteger_columnas_sensibles_profiles.sql`)
+  protege automáticamente que el admin NO pueda cambiar `role`,
+  `clinica_id` o `es_admin_de_clinica` de los usuarios que edita. El
+  endpoint solo necesita whitelist server-side de columnas seguras y
+  validación de tenant.
+- **Cuándo atacar:** sin urgencia operativa. Se materializa cuando surja
+  necesidad real (un admin reporta que necesita corregir datos de un
+  miembro de su equipo). Trabajo de feature, no de seguridad.
+- **Relación con E5-DT-13 a E5-DT-18:** independiente. Las del auditor son
+  de hardening de seguridad; ésta es de capacidad funcional planeada en
+  el modelo de roles.
+
 ---
 
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)
