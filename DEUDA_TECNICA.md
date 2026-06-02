@@ -260,6 +260,124 @@ Estado: 🔴 abierta · 🟡 en progreso · 🟢 resuelta (se elimina al cerrar)
 - **Relación con otras deudas:** independiente de E5-DT-10. Es deuda de datos,
   no de código.
 
+### E5-DT-13 — Pieza 3 del auditor: trigger de auditoría forense en profiles
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de seguridad (2026-06-02), Pieza 3 del plan de remediación.
+- **Archivo afectado:** Base de datos en producción (no código).
+- **Descripción:** Tras el cierre de las vulnerabilidades 🔴 1.1/1.2/1.3
+  con el trigger guardián de columnas sensibles
+  (`20260602_sec_proteger_columnas_sensibles_profiles.sql`), el cierre
+  forense queda pendiente. Hoy, cualquier UPDATE legítimo a `profiles`
+  (vía service_role) no deja huella propia en `audit_log`. Si en el
+  futuro se requiere reconstruir cuándo y quién cambió `role`,
+  `clinica_id` o `es_admin_de_clinica` de algún usuario, no hay rastro.
+- **Fix pendiente:** Crear trigger AFTER UPDATE en profiles que registre
+  en `audit_log` cualquier cambio de las 3 columnas sensibles. Antes de
+  diseñar, inspeccionar la estructura de `audit_log` (columnas, tipo,
+  formato del payload) para alinearse con el patrón existente.
+- **Cuándo atacar:** Sin urgencia (no es agujero abierto). En sesión del
+  auditor de seguridad de Spinus.
+- **Relación con otras deudas:** Continuación natural del trigger
+  guardián de la Pieza 2. Cierra el plan de remediación completo del
+  auditor.
+
+### E5-DT-14 — Storage policies sin auditar (EJE 6 de la investigación cross-tenant)
+- **Estado:** 🟡 abierta
+- **Detectada:** Auditoría de seguridad (2026-06-02), EJE 6 del reporte de
+  investigación cross-tenant.
+- **Archivo afectado:** Policies de `storage.objects` en producción (no
+  presentes en el repo).
+- **Descripción:** Los 4 buckets de Supabase Storage (`clinica-logos`
+  público, `documentos-pdf`, `firmas-medicos`, `labs-documentos` privados)
+  tienen policies de `storage.objects` que NO están exportadas en el repo.
+  El baseline `09_storage_buckets.sql` lo dice explícitamente. Si esas
+  policies usan `get_clinica_id()` (que tras el trigger guardián de la
+  Pieza 2 ya no es manipulable) o paths enumerables tipo
+  `/<clinica_uuid>/...`, podrían ser vectores adicionales no auditados.
+- **Fix pendiente:** Exportar las policies de `storage.objects` vía
+  dashboard de Supabase o Management API, agregarlas al repo
+  (`supabase/baseline/`), y auditarlas en una sesión del auditor de
+  seguridad.
+- **Cuándo atacar:** Sin urgencia (no se ha detectado breach activo).
+  En sesión del auditor de seguridad de Spinus.
+- **Relación con otras deudas:** Complementa el cierre de vulnerabilidades
+  cross-tenant. Hace falta para tener visibilidad completa del modelo de
+  seguridad.
+
+### E5-DT-15 — paciente_medico auto-asignación intra-clínica (EJE 10.3)
+- **Estado:** 🟡 abierta
+- **Detectada:** Auditoría de seguridad (2026-06-02), EJE 10.3 del reporte
+  de investigación cross-tenant.
+- **Archivo afectado:** Policy `paciente_medico_insert` en
+  `supabase/migrations/<5.E BD-2>:36-45`.
+- **Descripción:** La policy actual permite a cualquier médico/secretaria
+  de la clínica insertar un vínculo `paciente_medico` con
+  `medico_id = auth.uid()` para cualquier paciente de su clínica. Un
+  médico no-admin puede auto-asignarse como tratante de un paciente que
+  pertenece a un colega y, vía `soy_medico_tratante()`, leerlo. Derrota
+  la privacidad por-médico que 5.E pretendió ("médico invitado ve SOLO
+  sus pacientes"). No es cross-tenant (no cruza clínicas), pero es un
+  agujero de privacidad intra-clínica entre médicos.
+- **Fix pendiente:** Decidir si endurecer la policy (restringir INSERT
+  a admin/secretaria, quitar la rama de auto-asignación) o aceptarlo
+  como decisión de diseño documentada (ejemplo: secretaria es quien
+  asigna, médico no-admin no puede). Decisión de producto pendiente.
+- **Cuándo atacar:** Sin urgencia. En sesión del auditor de seguridad
+  o como sub-paso de Etapa 5 si decides endurecer.
+- **Relación con otras deudas:** Independiente del trigger guardián
+  de la Pieza 2. Es deuda de modelo de policy, no de vulnerabilidad
+  técnica.
+
+### E5-DT-16 — Comparación no-constant-time en email-hook
+- **Estado:** 🟡 abierta (menor)
+- **Detectada:** Auditoría de seguridad (2026-06-02), hallazgo lateral.
+- **Archivo afectado:** `src/app/api/auth/email-hook/route.ts`.
+- **Descripción:** La verificación de la firma del email-hook usa
+  comparación `===` que no es constant-time. En teoría permite ataques
+  de timing para inferir la firma byte a byte. En la práctica, el
+  vector es muy difícil de explotar (latencia de red >> diferencia de
+  tiempo del comparación). Hardening defensivo.
+- **Fix pendiente:** Reemplazar `===` por `crypto.timingSafeEqual()`
+  de Node.js para comparación constant-time.
+- **Cuándo atacar:** Sin urgencia. Fix pequeño que puede agruparse con
+  otras tareas de hardening.
+
+### E5-DT-17 — Limpieza: comentario huérfano signUp + reenviar-confirmacion no auditada
+- **Estado:** 🟡 abierta (limpieza)
+- **Detectada:** Auditoría de seguridad (2026-06-02), hallazgo lateral
+  durante eliminación de complete-registro.
+- **Archivo afectado:** Código con comentario huérfano sobre flujo signUp
+  revertido (ubicación exacta a determinar) y endpoint
+  `/api/auth/reenviar-confirmacion` no auditado.
+- **Descripción:** Tras eliminar `/api/auth/complete-registro` (vestigio
+  del flujo signUp revertido el 2026-04-02), quedó un comentario huérfano
+  en el código que referencia el flujo desaparecido. Separadamente, el
+  endpoint `/api/auth/reenviar-confirmacion` no fue auditado en la sesión
+  del 2026-06-02 (fuera de alcance). Conviene revisarlo para confirmar
+  que no es otra ruta muerta o que está correctamente blindado.
+- **Fix pendiente:** (a) eliminar el comentario huérfano; (b) auditar
+  el endpoint `reenviar-confirmacion` y decidir si es necesario o también
+  es ruta muerta.
+- **Cuándo atacar:** Sin urgencia. Limpieza menor.
+
+### E5-DT-18 — Apunte preventivo: trigger BEFORE INSERT si se añade policy INSERT a profiles
+- **Estado:** ⚪ preventiva (no es deuda actual, es recordatorio futuro)
+- **Detectada:** Auditoría de seguridad (2026-06-02), apunte de Claude
+  Code durante diseño del trigger guardián de la Pieza 2.
+- **Archivo afectado:** Trigger guardián en
+  `supabase/migrations/20260602_sec_proteger_columnas_sensibles_profiles.sql`.
+- **Descripción:** El trigger guardián actual es BEFORE UPDATE: previene
+  cambios maliciosos de `role`, `clinica_id` y `es_admin_de_clinica` en
+  profiles existentes. NO cubre INSERT porque hoy `profiles` no tiene
+  policy INSERT (el alta de usuarios va por endpoint admin con
+  service_role). Si en el futuro se agrega una policy INSERT para
+  `authenticated` en profiles (cambio de modelo significativo), el
+  trigger debe extenderse con un BEFORE INSERT análogo que valide las
+  3 columnas sensibles.
+- **Acción pendiente:** Recordatorio. Aplica solo si se decide cambiar
+  el modelo de alta de usuarios.
+- **Cuándo atacar:** N/A hasta que cambie el modelo.
+
 ---
 
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)
