@@ -1,8 +1,8 @@
 # Rediseño del Modo IA — Nueva Nota Médica
 
-> **Estado:** Planeación cerrada. SF0 aplicada (tipos + schema base).
-> Pendiente ampliar schema con medicamentos y ejecutar SF1. Última
-> actualización: 2026-06-03.
+> **Estado:** SF0 y SF0.5 cerradas. App migrada a @google/genai (SDK viejo
+> eliminado, IA muerta de consulta-rapida borrada). Pendiente ejecutar SF1
+> (modelo 3.5 + JSON + medicamentos). Última actualización: 2026-06-03.
 
 ## Objetivo
 Reducir la fricción del modo IA de la Nueva Nota Médica: reemplazar el
@@ -62,8 +62,8 @@ nota narrativa como los campos estructurados para persistencia.
   comorbilidades) pero sin verborrea y con respuesta rápida (objetivo: pocos
   segundos).
 - **Backend stateless:** la conversación de la entrevista se mantiene en el
-  cliente y se reenvía en cada llamada (mismo patrón que consulta-rapida). El
-  servidor no almacena sesión.
+  cliente y se reenvía en cada llamada (patrón stateless; el cliente mantiene
+  el historial). El servidor no almacena sesión.
 - **startChat desde el inicio:** el backend usa startChat + JSON desde la
   primera sub-fase (historial vacío en one-shot) para no reescribir la llamada
   dos veces.
@@ -107,6 +107,16 @@ proxima_cita siguen siendo entrada estructurada del formulario, sin cambio.
   - REQUIERE AMPLIACIÓN: el schema original no incluía medicamentos. Se
     añadirá el array medicamentos[] a NotaEstructurada y al responseSchema
     antes de SF1.
+- **SF0.5 — Migración de SDK + limpieza (COMPLETADA):** se migró el único
+  consumidor de IA vivo (/api/nota-medica) y el schema de SF0 del SDK EOL
+  @google/generative-ai al nuevo @google/genai (pineado exacto 2.4.0). Se
+  borró la IA muerta de consulta-rapida (ruta API + widget huérfano) y se
+  limpiaron referencias inertes (rateLimit, sentryPiiFilter, SEGURIDAD.md).
+  La migración fue swap puro: misma calidad de nota verificada por smoke
+  test, sin cambio de modelo (seguía 2.5-flash) ni de formato. Desbloquea el
+  uso de thinkingConfig nativo en SF1.
+  - Nota: el modelo NO se cambió en SF0.5 (sigue 2.5-flash). El cambio a 3.5
+    + JSON + medicamentos es SF1.
 - **SF1 — Backend startChat + JSON:** /api/nota-medica migra a startChat con
   responseMimeType JSON + responseSchema, one-shot (historial vacío). Frontend
   mapea narrativa para no romper el preview; estructurado aún sin usar.
@@ -138,8 +148,19 @@ Cadena de dependencias: SF0 → SF1 → SF2 → SF3 → SF4.
   /api/nota-medica pero el backend los ignora hoy.
 - El nombre del paciente nunca llega a Gemini (se descarta server-side).
 - consulta-rapida es el patrón de referencia para startChat + historial +
-  anonimización inline.
+  anonimización inline. ⚠️ Eliminada en SF0.5: el patrón startChat ya NO se
+  toma de consulta-rapida (borrada), sino de la documentación oficial de
+  @google/genai (ai.chats.create) directamente.
+- ✅ RESUELTA (SF0.5): el SDK @google/generative-ai estaba EOL y debía
+  migrarse. Migración completada a @google/genai (pineado exacto 2.4.0); el
+  SDK viejo fue desinstalado del árbol de dependencias.
 - El parsing de medicamentos desde texto libre es el punto de mayor riesgo de
   error (cruce de datos entre varios medicamentos, campos mal asignados). La
   confirmación humana en el panel de revisión es la mitigación. El refinamiento
   del prompt para parsing robusto es de la fase de prompt posterior.
+- DEUDA (no resuelta): la tabla de rate limits de IA en SEGURIDAD.md puede
+  tener otra fila obsoleta (/api/labs-extract) cuya ruta ya no existe.
+  Pendiente de revisión, fuera del alcance de este proyecto.
+- DEUDA (no resuelta): quedan 22 vulnerabilidades de npm audit (16 moderate,
+  6 high) preexistentes en el árbol de dependencias, ajenas a la migración.
+  Pendiente revisar con npm audit (sin fix --force) como tarea aparte.
