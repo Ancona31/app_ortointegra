@@ -120,7 +120,6 @@ El sistema implementa dos capas de rate limiting:
 |---|---|
 | `/api/labs-extract` | 15 solicitudes / 24 horas |
 | `/api/nota-medica` | 20 solicitudes / 24 horas |
-| `/api/consulta-rapida` | 50 solicitudes / 24 horas |
 
 **Por IP** (endpoint público):
 

@@ -5,7 +5,6 @@ import { NextResponse } from 'next/server'
 // Límites por ruta: máximo de llamadas permitidas en 24 horas por usuario
 const LIMITES: Record<string, number> = {
   'nota-medica':    20,
-  'consulta-rapida': 50,
 }
 
 /**
