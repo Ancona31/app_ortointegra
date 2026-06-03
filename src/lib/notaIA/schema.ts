@@ -1,4 +1,4 @@
-import { SchemaType, type ResponseSchema } from '@google/generative-ai'
+import { Type, type Schema } from '@google/genai'
 import type { Diagnostico } from '@/types'
 
 /**
@@ -45,58 +45,58 @@ export interface NotaIAResponse {
 
 // ---------- responseSchema de Gemini (mismo shape, sin oneOf) ----------
 
-export const notaIAResponseSchema: ResponseSchema = {
-  type: SchemaType.OBJECT,
+export const notaIAResponseSchema: Schema = {
+  type: Type.OBJECT,
   properties: {
     status: {
-      type: SchemaType.STRING,
+      type: Type.STRING,
       format: 'enum',
       enum: ['completa', 'faltan_datos'],
     },
     preguntas: {
-      type: SchemaType.ARRAY,
+      type: Type.ARRAY,
       items: {
-        type: SchemaType.OBJECT,
+        type: Type.OBJECT,
         properties: {
-          id: { type: SchemaType.STRING },
-          pregunta: { type: SchemaType.STRING },
-          opciones: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-          permite_texto_libre: { type: SchemaType.BOOLEAN },
+          id: { type: Type.STRING },
+          pregunta: { type: Type.STRING },
+          opciones: { type: Type.ARRAY, items: { type: Type.STRING } },
+          permite_texto_libre: { type: Type.BOOLEAN },
         },
         required: ['id', 'pregunta', 'opciones', 'permite_texto_libre'],
       },
     },
     nota: {
-      type: SchemaType.OBJECT,
+      type: Type.OBJECT,
       nullable: true, // null cuando faltan datos; ver decisión en el reporte
       properties: {
-        narrativa: { type: SchemaType.STRING },
+        narrativa: { type: Type.STRING },
         estructurado: {
-          type: SchemaType.OBJECT,
+          type: Type.OBJECT,
           properties: {
-            motivo_consulta: { type: SchemaType.STRING },
-            exploracion_fisica: { type: SchemaType.STRING },
-            plan_tratamiento: { type: SchemaType.STRING },
+            motivo_consulta: { type: Type.STRING },
+            exploracion_fisica: { type: Type.STRING },
+            plan_tratamiento: { type: Type.STRING },
             diagnosticos: {
-              type: SchemaType.ARRAY,
+              type: Type.ARRAY,
               items: {
-                type: SchemaType.OBJECT,
+                type: Type.OBJECT,
                 properties: {
-                  codigo_cie10: { type: SchemaType.STRING },
-                  descripcion: { type: SchemaType.STRING },
+                  codigo_cie10: { type: Type.STRING },
+                  descripcion: { type: Type.STRING },
                 },
                 required: ['descripcion'], // codigo_cie10 es opcional
               },
             },
             medicamentos: {
-              type: SchemaType.ARRAY,
+              type: Type.ARRAY,
               items: {
-                type: SchemaType.OBJECT,
+                type: Type.OBJECT,
                 properties: {
-                  nombre: { type: SchemaType.STRING },
-                  dosis: { type: SchemaType.STRING },
-                  frecuencia: { type: SchemaType.STRING },
-                  duracion: { type: SchemaType.STRING },
+                  nombre: { type: Type.STRING },
+                  dosis: { type: Type.STRING },
+                  frecuencia: { type: Type.STRING },
+                  duracion: { type: Type.STRING },
                 },
                 required: ['nombre'], // solo nombre; dosis/frecuencia/duracion opcionales (IA omite lo que no sabe)
               },
