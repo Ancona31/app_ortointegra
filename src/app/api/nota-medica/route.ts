@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleGenAI } from '@google/genai'
 import { createClient } from '@/lib/supabase/server'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { sanitizePromptInput, sanitizeNumber } from '@/lib/sanitize'
 import { anonimizarTexto } from '@/lib/anonimizar'
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! })
 
 export async function POST(req: NextRequest) {
   try {
@@ -88,9 +88,11 @@ Diagnóstico clínico preciso con terminología de la especialidad ${especialida
 PROHIBIDO mencionar medicamentos, fármacos, nombres comerciales, denominaciones genéricas, dosis, vía de administración, frecuencia ni duración de ningún tratamiento farmacológico. El médico los registra por separado en el apartado de Terapéutica Empleada.
 Incluye ÚNICAMENTE: indicaciones no farmacológicas pertinentes para la especialidad ${especialidad} (rehabilitación, restricciones funcionales, dieta, procedimientos, interconsultas, vigilancia de signos de alarma, etc.) y cronograma de seguimiento o próxima valoración.`
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
-    const response = await model.generateContent(prompt)
-    const nota = response.response.text()
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+    })
+    const nota = response.text ?? ''
     return NextResponse.json({ nota })
 
   } catch (err: unknown) {
