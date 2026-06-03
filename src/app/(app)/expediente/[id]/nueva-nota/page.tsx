@@ -331,7 +331,13 @@ export default function NuevaNotaPage() {
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
-      setNotaGenerada(data.nota)
+      // SF1: la respuesta ahora es NotaIAResponse (objeto). Solo consumimos la
+      // narrativa para el preview; estructurado/medicamentos se cablean en SF2.
+      const narrativa = data?.nota?.narrativa
+      if (typeof narrativa !== 'string' || !narrativa.trim()) {
+        throw new Error('La IA no devolvió una nota válida. Intenta de nuevo.')
+      }
+      setNotaGenerada(narrativa)
     } catch (e: unknown) {
       const msg = (e instanceof Error ? e.message : '').toLowerCase()
       if (msg.includes('timeout') || msg.includes('deadline'))
