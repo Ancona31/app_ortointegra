@@ -17,11 +17,19 @@ export interface PreguntaIA {
   permite_texto_libre: boolean
 }
 
+export interface MedicamentoIA {
+  nombre: string
+  dosis?: string
+  frecuencia?: string
+  duracion?: string
+}
+
 export interface NotaEstructurada {
   motivo_consulta: string
   exploracion_fisica: string
   plan_tratamiento: string
   diagnosticos: Diagnostico[]
+  medicamentos: MedicamentoIA[]
 }
 
 export interface NotaIAContenido {
@@ -80,8 +88,21 @@ export const notaIAResponseSchema: ResponseSchema = {
                 required: ['descripcion'], // codigo_cie10 es opcional
               },
             },
+            medicamentos: {
+              type: SchemaType.ARRAY,
+              items: {
+                type: SchemaType.OBJECT,
+                properties: {
+                  nombre: { type: SchemaType.STRING },
+                  dosis: { type: SchemaType.STRING },
+                  frecuencia: { type: SchemaType.STRING },
+                  duracion: { type: SchemaType.STRING },
+                },
+                required: ['nombre'], // solo nombre; dosis/frecuencia/duracion opcionales (IA omite lo que no sabe)
+              },
+            },
           },
-          required: ['motivo_consulta', 'exploracion_fisica', 'plan_tratamiento', 'diagnosticos'],
+          required: ['motivo_consulta', 'exploracion_fisica', 'plan_tratamiento', 'diagnosticos', 'medicamentos'],
         },
       },
       required: ['narrativa', 'estructurado'],
