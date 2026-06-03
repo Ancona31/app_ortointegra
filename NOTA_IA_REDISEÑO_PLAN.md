@@ -1,6 +1,8 @@
 # Rediseño del Modo IA — Nueva Nota Médica
 
-> **Estado:** Planeación cerrada. Pendiente ejecución desde SF0. Última actualización: 2026-06-03.
+> **Estado:** Planeación cerrada. SF0 aplicada (tipos + schema base).
+> Pendiente ampliar schema con medicamentos y ejecutar SF1. Última
+> actualización: 2026-06-03.
 
 ## Objetivo
 Reducir la fricción del modo IA de la Nueva Nota Médica: reemplazar el
@@ -22,9 +24,15 @@ nota narrativa como los campos estructurados para persistencia.
 - **Entrada única:** un solo textarea obligatorio reemplaza los campos
   narrativos del modo IA (motivo, exploración, gabinete, plan). NO puede ir
   vacío para generar.
-- **Medicamentos (D1):** la tabla de terapéutica queda estructurada, FUERA del
-  campo único. Se preserva el guardrail actual que prohíbe a Gemini mencionar
-  fármacos en el plan.
+- **Medicamentos (D1 — actualizada):** la IA extrae a la tabla estructurada
+  de Terapéutica los medicamentos que el médico haya escrito en el texto de
+  entrada (transcripción literal, NO invención). Si el médico no menciona
+  medicamentos, la IA los omite. Soporta múltiples medicamentos (array). La
+  IA NO infiere via_administracion: se mantiene el default 'Oral' y el médico
+  ajusta excepciones. Queda DEROGADO el guardrail anterior que prohibía a la
+  IA mencionar cualquier fármaco; el motivo original (la IA prescribía sin
+  que el médico lo pidiera) queda igualmente cubierto, porque la IA solo
+  transcribe lo que el médico ya escribió, nunca inventa prescripciones.
 - **CIE-10 (D2):** la IA propone código solo si lo halla con confianza; si no,
   registra el diagnóstico en texto sin código (mismo comportamiento que el
   campo manual sin selección de catálogo). Cero invención de códigos. El
@@ -33,6 +41,10 @@ nota narrativa como los campos estructurados para persistencia.
   si la guarda o la descarta en el panel inferior existente. La revisión debe
   permitir ver/corregir los diagnósticos y códigos extraídos, no solo la
   narrativa.
+  La confirmación de los medicamentos extraídos en el panel de revisión es
+  OBLIGATORIA (no opcional), porque alimentan una receta real. Si la IA no
+  está segura de un campo de un medicamento, debe dejarlo vacío para que el
+  médico lo complete, nunca cruzar datos entre medicamentos ni inventar.
 - **Entrevista:** si falta contexto crítico, la IA devuelve TODAS las preguntas
   en UNA sola tanda (no de a una). Si el texto viene completo, genera directo
   sin preguntar. Cada pregunta ofrece opciones + opción de texto libre.
@@ -40,9 +52,15 @@ nota narrativa como los campos estructurados para persistencia.
   como hoy) + campos extraídos (motivo_consulta, exploracion_fisica,
   plan_tratamiento, diagnosticos[]) para poblar las columnas que hoy alimentan
   PDF, estadísticas y "último diagnóstico".
-- **Modelo:** se mantiene Gemini (gemini-2.5-flash) por estar ya integrado con
-  el pipeline de anonimización y la revisión regulatoria. No se cambia de
-  proveedor en esta etapa. Nota: verificar migración de versión si aplica.
+- **Modelo (actualizada):** se actualiza de gemini-2.5-flash a Gemini 3.5
+  Flash, sujeto a verificación de acceso vía API y compatibilidad con
+  responseSchema. Motivo: es el modelo que ofrece la velocidad y calidad
+  objetivo (referencia: experiencia en la app web de Gemini). Si la
+  verificación falla, se permanece en 2.5-flash y se reevalúa.
+- **Razonamiento del modelo:** nivel medio/bajo, NO apagado. Objetivo: criterio
+  clínico encendido (que la IA entienda el contexto, p. ej. implicaciones de
+  comorbilidades) pero sin verborrea y con respuesta rápida (objetivo: pocos
+  segundos).
 - **Backend stateless:** la conversación de la entrevista se mantiene en el
   cliente y se reenvía en cada llamada (mismo patrón que consulta-rapida). El
   servidor no almacena sesión.
@@ -61,23 +79,34 @@ nota narrativa como los campos estructurados para persistencia.
       "motivo_consulta": "...",
       "exploracion_fisica": "...",
       "plan_tratamiento": "...",
-      "diagnosticos": []
+      "diagnosticos": [],
+      "medicamentos": [
+        { "nombre": "...", "dosis": "...", "frecuencia": "...", "duracion": "..." }
+      ]
     }
   }
 }
 ```
 Notas: el responseSchema de Gemini no soporta uniones (oneOf); ambos campos
 (preguntas y nota) van siempre presentes, status es el discriminador plano.
-codigo_cie10 es opcional.
+codigo_cie10 es opcional. nota.estructurado ahora incluye medicamentos[] (cada
+uno { nombre, dosis, frecuencia, duracion }); via_administracion NO la genera
+la IA (default 'Oral' en persistencia, ver Mapeo).
 
 Mapeo a persistencia (tabla consultas): estructurado.* → columnas
 homónimas; narrativa → notas_evolucion; preguntas[] no se persiste.
-medicamentos, pronostico, proxima_cita siguen siendo entrada estructurada del
-formulario, sin cambio.
+estructurado.medicamentos[] → columna medicamentos (jsonb) de la tabla
+consultas, que pre-carga la receta. (Antes el plan decía que medicamentos era
+entrada estructurada del formulario sin cambio; ahora la IA también puede
+poblarlos. El médico confirma/edita antes de guardar.) pronostico y
+proxima_cita siguen siendo entrada estructurada del formulario, sin cambio.
 
 ## Plan de sub-fases
 - **SF0 — Tipos + schema:** módulo neutro con tipos TS y responseSchema. Sin
   runtime.
+  - REQUIERE AMPLIACIÓN: el schema original no incluía medicamentos. Se
+    añadirá el array medicamentos[] a NotaEstructurada y al responseSchema
+    antes de SF1.
 - **SF1 — Backend startChat + JSON:** /api/nota-medica migra a startChat con
   responseMimeType JSON + responseSchema, one-shot (historial vacío). Frontend
   mapea narrativa para no romper el preview; estructurado aún sin usar.
@@ -110,3 +139,7 @@ Cadena de dependencias: SF0 → SF1 → SF2 → SF3 → SF4.
 - El nombre del paciente nunca llega a Gemini (se descarta server-side).
 - consulta-rapida es el patrón de referencia para startChat + historial +
   anonimización inline.
+- El parsing de medicamentos desde texto libre es el punto de mayor riesgo de
+  error (cruce de datos entre varios medicamentos, campos mal asignados). La
+  confirmación humana en el panel de revisión es la mitigación. El refinamiento
+  del prompt para parsing robusto es de la fase de prompt posterior.
