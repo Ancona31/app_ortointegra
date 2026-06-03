@@ -817,7 +817,7 @@ Esta sección describe el plan de ejecución de Etapa 5 a **nivel operativo**: o
 | 5.H | Reescribir policies de `appointments` | Medio | ✅ Aplicado |
 | 5.I | Reescribir policies de `mediciones` + `calculadora` + `addendums` | Bajo-medio | ✅ Aplicado |
 | 5.J | Limpieza menor (`profiles`, `invitaciones`, huérfanas) | Bajo | ✅ Aplicado |
-| 5.K | Reescribir policies de Storage (bucket `documentos-pdf`) | Medio-alto | ⏳ Pendiente |
+| 5.K | Reescribir policies de Storage (bucket `documentos-pdf`) | Medio | ✅ Aplicado |
 | 5.L | Validación final: 11 Casos del §9 | — | ⏳ Pendiente |
 
 ---
@@ -1724,6 +1724,42 @@ Ejecutado en 5 pasos bajo protocolo D-T6, todos aplicados y verificados en produ
 - super_admin único en producción sigue operando vía `service_role` para todo lo que va más allá de editar su propio perfil.
 
 **Siguiente sub-paso:** 5.K según orden D4 (cierre formal del bucket de Storage `documentos-pdf`, brecha conocida).
+
+### Sub-paso 5.K — Reescribir policies de Storage del bucket documentos-pdf (cerrado 2026-06-03)
+
+Sub-paso ejecutado fuera del flujo principal de Etapa 5 por la sesión dedicada "Auditor de seguridad de Spinus" durante el cierre de E5-DT-14 (Eje 6 de la investigación cross-tenant). El trabajo cubrió las Tareas 1-5 del plan original con dos endurecimientos por encima del scope planeado.
+
+**Vector cerrado:** las 3 policies `authenticated_select/insert/delete` del bucket `documentos-pdf` solo verificaban `bucket_id = 'documentos-pdf'`, permitiendo a cualquier usuario autenticado de cualquier clínica leer, subir y borrar cualquier archivo. Esto era fuga cross-tenant ACTIVA de PHI (recetas, notas, los 8 formularios de documentos). Brecha pre-existente desde la creación del bucket (2026-03-25), no regresión del refactor.
+
+- ✅ **Tarea 1 — Investigación** — Revisadas las 3 policies actuales de `documentos-pdf` y el patrón de referencia de `labs-documentos` (cubierta implícitamente por el auditor durante el diseño del fix).
+- ✅ **Tarea 2 — Diseño SQL** — Estrategia confirmada: extraer `paciente_id` del primer segmento del path vía `(storage.foldername(name))[1]`. Variante metodológica respecto al plan: el plan rector apuntaba a usar `paciente_pertenece_a_mi_clinica()` (discriminación nivel-clínica); el auditor aplicó `soy_medico_tratante()` (discriminación nivel-médico-tratante), MÁS estricta que lo planeado. Adicionalmente, blindó el casteo `::uuid` con un CASE-guard de regex UUID para que la policy resista futuros barridos del bucket con `.list()`.
+- ✅ **Tarea 3 — Aplicar las 3 policies vía DO block atómico** — Migración versionada `20260603_sec_documentos_pdf_acceso_tratante.sql` con BEGIN/COMMIT + PRE-FLIGHT + DROPs + CREATEs + POST-FLIGHT. Commit `ad5cea4`.
+- ✅ **Tarea 4 — Documentar firmas-medicos como sin policies por diseño** — EXCEDIDA: el auditor no solo lo documentó como intencional sino que añadió una policy RESTRICTIVE explícita que niega todo acceso de `authenticated`/`anon` al bucket, dejando solo `service_role` operativo. Migración versionada `20260603_sec_blindaje_bucket_firmas_medicos.sql`. Defensa en profundidad: la RESTRICTIVE sobrevive a errores futuros (si alguien añade una PERMISSIVE por descuido, la RESTRICTIVE sigue bloqueando).
+- ✅ **Tarea 5 — Smoke tests cross-clínica** — Validados en producción: médico tratante ve sus 3 documentos (caso feliz ✓); no-tratante de otra clínica ve 0 documentos (vector cross-tenant cerrado ✓); backend con bypass de RLS ve los 3 (no se rompe service_role ✓). Verificación operativa adicional en la app por el usuario el 2026-06-03: generación y acceso a documentos funcionan sin error tras el cambio.
+
+**Endurecimientos del auditor por encima del plan original (defensa en profundidad):**
+
+- **Helper más estricto en documentos-pdf:** uso de `soy_medico_tratante()` (médico vinculado al paciente vía `paciente_medico`) en lugar de `paciente_pertenece_a_mi_clinica()` (cualquier médico/secretaria de la clínica). Reduce el grupo de usuarios con acceso al archivo físico, aunque NO cierra completamente la "limitación residual aceptada" del plan (médicos que comparten un mismo paciente siguen pudiendo acceder a archivos uno del otro si conocen el path exacto, brecha conocida y aceptada conscientemente desde el plan original).
+- **Blindaje RESTRICTIVE de firmas-medicos:** el plan solo pedía documentar el bucket como "sin policies por diseño". El auditor añadió defensa explícita contra futuros errores de configuración.
+- **CASE-guard de regex UUID en path:** previene errores de casteo si alguna vez se invoca `.list()` sobre el bucket. Detalle de implementación no especificado en el plan original.
+
+**Buckets confirmados sin cambios (todos OK):**
+
+- `clinica-logos` (público, no PHI, sin cambios intencionalmente).
+- `labs-documentos` (patrón seguro `foldername[1]='clinicas' AND foldername[2]=get_clinica_id()`, sirvió de referencia).
+- `casos-clinicos` (patrón seguro `foldername`, no estaba en el inventario del plan rector L200-205 porque es posterior a la redacción del plan).
+
+🟡 **Deudas residuales registradas durante el sub-paso** (en `DEUDA_TECNICA.md`):
+
+- **E5-DT-20** — Seguridad cliente de firmas (alta prioridad): cache de firma base64 en localStorage sin caducidad (vía persistente expuesta a XSS/dispositivo compartido). Requiere sesión enfocada anti-XSS.
+- **E5-DT-21** — Divergencia creador vs tratante en `documentos-pdf` (latente): policy de tabla `documentos` usa `subido_por` (creador); policy de Storage usa `soy_medico_tratante` (tratante). Coinciden bajo mono-médico; pueden desincronizar bajo multi-médico real.
+- **E5-DT-22** — 15 documentos huérfanos en `documentos-pdf` (1 sin vínculo en `paciente_medico` + 14 de pacientes ya eliminados). Aceptados como daño colateral de beta. Quedan inaccesibles vía app.
+
+🟢 **Limitación residual aceptada (heredada del plan original, NO cerrada):**
+
+El path `{paciente_id}/{filename}` no incluye `medico_id`. Médicos que comparten un mismo paciente (modelo M:N) pueden descargar archivos físicos uno del otro si conocen el path exacto. La policy de tabla `documentos` (`subido_por`) sí oculta los registros del listado UI, pero el archivo binario en Storage queda accesible para cualquier tratante del paciente. Brecha menor reconocida desde el diseño original (L1286 del plan rector), aceptable para Etapa 5 porque el vector crítico (acceso cross-clínica) sí queda cerrado. Cerrar la brecha residual requeriría mover archivos a path con `medico_id` o servir los PDFs vía endpoint server-side; se difiere como posible mejora futura.
+
+**Siguiente sub-paso:** 5.L según orden D4 (validación final integrada de Etapa 5). Nota: la Tarea 7 de 5.L se mantiene sin cambios — la brecha residual médico-a-médico sigue siendo "conocida y aceptada", solo se deja constancia, no bloquea el cierre formal.
 
 ---
 
