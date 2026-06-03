@@ -282,27 +282,39 @@ Estado: 🔴 abierta · 🟡 en progreso · 🟢 resuelta (se elimina al cerrar)
   auditor.
 
 ### E5-DT-14 — Storage policies sin auditar (EJE 6 de la investigación cross-tenant)
-- **Estado:** 🟡 abierta
+- **Estado:** 🟢 resuelta (2026-06-03) — se conserva como ancla de
+  trazabilidad de los residuales E5-DT-20/21/22 (nuevos) y E5-DT-15/16/18
+  (heredados, siguen abiertos).
 - **Detectada:** Auditoría de seguridad (2026-06-02), EJE 6 del reporte de
   investigación cross-tenant.
-- **Archivo afectado:** Policies de `storage.objects` en producción (no
-  presentes en el repo).
-- **Descripción:** Los 4 buckets de Supabase Storage (`clinica-logos`
-  público, `documentos-pdf`, `firmas-medicos`, `labs-documentos` privados)
-  tienen policies de `storage.objects` que NO están exportadas en el repo.
-  El baseline `09_storage_buckets.sql` lo dice explícitamente. Si esas
-  policies usan `get_clinica_id()` (que tras el trigger guardián de la
-  Pieza 2 ya no es manipulable) o paths enumerables tipo
-  `/<clinica_uuid>/...`, podrían ser vectores adicionales no auditados.
-- **Fix pendiente:** Exportar las policies de `storage.objects` vía
-  dashboard de Supabase o Management API, agregarlas al repo
-  (`supabase/baseline/`), y auditarlas en una sesión del auditor de
-  seguridad.
-- **Cuándo atacar:** Sin urgencia (no se ha detectado breach activo).
-  En sesión del auditor de seguridad de Spinus.
-- **Relación con otras deudas:** Complementa el cierre de vulnerabilidades
-  cross-tenant. Hace falta para tener visibilidad completa del modelo de
-  seguridad.
+- **Archivo afectado:** Policies de `storage.objects` en producción.
+- **Descripción (original):** Los 4 buckets de Supabase Storage
+  (`clinica-logos` público, `documentos-pdf`, `firmas-medicos`,
+  `labs-documentos` privados) tenían policies de `storage.objects` no
+  exportadas ni auditadas. El baseline `09_storage_buckets.sql` lo decía
+  explícitamente.
+- **Cierre (2026-06-03):** auditados los 4 buckets.
+  - `firmas-medicos`: blindado con policy RESTRICTIVE (deny-all a
+    authenticated/anon, acotada por bucket_id). Aplicado y validado.
+    Registro: `supabase/migrations/20260603_sec_blindaje_bucket_firmas_medicos.sql`.
+  - `documentos-pdf`: las 3 policies abiertas
+    (`authenticated_select/insert/delete`, que solo exigían `bucket_id`)
+    se reemplazaron por 3 policies atadas a
+    `soy_medico_tratante(<paciente_id del path>)` con CASE-guard del cast a
+    uuid. Cierra fuga cross-tenant E intra-clínica. Aplicado y validado.
+    Registro: `supabase/migrations/20260603_sec_documentos_pdf_acceso_tratante.sql`.
+  - `labs-documentos` y `casos-clinicos`: ya estaban correctamente acotados
+    por bucket (PERMISSIVE por clínica/tratante). Sin cambios.
+  - `clinica-logos`: público a propósito (logos no son PHI). Sin cambios.
+  - Smoke tests (transacciones revertidas) y validación operativa posterior
+    en la app: OK. Detalle en los dos archivos de migración citados.
+- **Residuales abiertos tras el cierre:**
+  - E5-DT-20 (nuevo) — seguridad de cliente de las firmas autógrafas.
+  - E5-DT-21 (nuevo) — divergencia creador vs. tratante en documentos-pdf.
+  - E5-DT-22 (nuevo) — documentos-pdf sin policy UPDATE: verificado, sin
+    acción requerida.
+  - E5-DT-15, E5-DT-16, E5-DT-18 (heredados de la auditoría 2026-06-02):
+    siguen abiertos, sin cambio.
 
 ### E5-DT-15 — paciente_medico auto-asignación intra-clínica (EJE 10.3)
 - **Estado:** 🟡 abierta
@@ -410,6 +422,82 @@ Estado: 🔴 abierta · 🟡 en progreso · 🟢 resuelta (se elimina al cerrar)
 - **Relación con E5-DT-13 a E5-DT-18:** independiente. Las del auditor son
   de hardening de seguridad; ésta es de capacidad funcional planeada en
   el modelo de roles.
+
+### E5-DT-20 — Seguridad de cliente de las firmas autógrafas
+- **Estado:** 🔴 abierta (ALTA PRIORIDAD)
+- **Detectada:** Cierre de E5-DT-14 / auditoría de storage (Eje 6), 2026-06-03.
+- **Archivos afectados:**
+  - src/lib/offline/doctorProfile.ts — cache base64 en localStorage, clave
+    `'spinus_doctor_profile'`, campo `firma_base64`.
+  - src/app/api/me/perfil-medico, src/app/api/me/firma — signed URLs de 1h
+    en respuestas JSON.
+- **Descripción:** La firma autógrafa del médico se expone al cliente como
+  signed URL de 1h, necesario para estamparla en los PDFs que se generan en
+  el navegador con `@react-pdf/renderer`. El blindaje del bucket
+  `firmas-medicos` (RESTRICTIVE, ver E5-DT-14) cierra el acceso directo al
+  bucket, pero NO cubre la superficie de cliente, que sigue abierta:
+  - **Vector principal:** la firma se cachea como base64 SIN caducidad en
+    `localStorage` (`doctorProfile.ts`, `firma_base64`). Persiste
+    indefinidamente en el dispositivo, sobrevive a la expiración de la
+    signed URL y queda expuesta a XSS o a un dispositivo compartido.
+  - **Vectores menores:** signed URLs de 1h circulando en respuestas JSON
+    (`/api/me/perfil-medico`, `/api/me/firma`); firma presente en el DOM
+    durante la generación del PDF.
+- **Fix pendiente:** quitar / cifrar / caducar el cache base64 de
+  `localStorage` + revisión anti-XSS del flujo. Es seguridad de **cliente**,
+  no de bucket.
+- **Cuándo atacar:** sesión de seguridad de cliente dedicada (alcance propio,
+  no es continuación del blindaje de storage).
+- **Relación con otras deudas:** surge del mismo cierre que E5-DT-14, pero su
+  superficie (cliente) es ortogonal al blindaje de bucket ya aplicado.
+
+### E5-DT-21 — documentos-pdf: divergencia creador vs. tratante
+- **Estado:** 🔴 abierta (LATENTE — no se materializa en mono-médico)
+- **Detectada:** Cierre de E5-DT-14 / auditoría de storage (Eje 6), 2026-06-03.
+- **Archivos afectados:**
+  - supabase/migrations/20260530_etapa5g_paso4_policies_documentos.sql
+    (policies de la fila `public.documentos`: `subido_por = auth.uid()`).
+  - supabase/migrations/20260603_sec_documentos_pdf_acceso_tratante.sql
+    (policies de storage: `soy_medico_tratante(...)`).
+- **Descripción:** La policy de la **fila** en `public.documentos` autoriza
+  por **creador** (`subido_por = auth.uid()`), mientras que la policy de
+  **storage** (aplicada 2026-06-03) autoriza por **tratante**
+  (`soy_medico_tratante(<paciente_id>)`). Ambos predicados coinciden solo en
+  clínicas **mono-médico** (estado actual: creador == tratante). Si se
+  habilitan clínicas multi-médico o se reasigna el tratante de un paciente,
+  pueden desincronizarse: un creador no-tratante podría tener la fila pero no
+  poder subir/leer el PDF (documento sin PDF), o un PDF quedar inaccesible
+  para quien sí ve la fila.
+- **Fix pendiente:** decidir el modelo unificado (atar fila y storage al
+  mismo predicado) antes de habilitar multi-médico o reasignación de
+  tratante. No requiere acción mientras las clínicas sean mono-médico.
+- **Cuándo atacar:** antes de habilitar clínicas multi-médico.
+- **Relación con otras deudas:** comparte el disparador "revisar antes de
+  multi-médico" con E5-DT-5 (colisión de path) y E5-DT-6 (UX del 403 en
+  DELETE ajeno).
+
+### E5-DT-22 — documentos-pdf sin policy UPDATE (verificada, sin acción)
+- **Estado:** 🟢 resuelta (2026-06-03) — verificación cerrada, NO hay nada
+  que construir. No reabrir.
+- **Detectada:** Cierre de E5-DT-14 / auditoría de storage (Eje 6), 2026-06-03.
+- **Archivo afectado:** Policies de `storage.objects` para el bucket
+  `documentos-pdf` (no hay, ni debe haber, policy `FOR UPDATE`).
+- **Conclusión (inequívoca):** **NO se requiere** una policy `UPDATE` en
+  `documentos-pdf`. Esto NO es una tarea pendiente; es una verificación que
+  resultó negativa.
+  - **Razón:** la regeneración de documentos usa `upsert: true` en el
+    `.upload()` (src/lib/mobileShare.ts), que se resuelve por la ruta
+    **INSERT**, ya cubierta por la `WITH CHECK` de
+    `documentos_pdf_insert_tratante`. No interviene ninguna operación UPDATE
+    a nivel `storage.objects`.
+  - **Verificación funcional:** el usuario regeneró un documento existente en
+    la app el 2026-06-03 — funcionó sin error.
+  - **Por qué NO añadir una policy UPDATE:** sería contraproducente. Abriría
+    una operación de escritura hoy cerrada, ampliando la superficie de ataque
+    sin ningún beneficio funcional.
+- **Acción requerida:** ninguna. Solo reabrir si Supabase cambia el
+  comportamiento de storage-api (p.ej. si el upsert dejara de resolverse por
+  INSERT). Cualquiera que lea esta entrada NO debe construir nada.
 
 ---
 

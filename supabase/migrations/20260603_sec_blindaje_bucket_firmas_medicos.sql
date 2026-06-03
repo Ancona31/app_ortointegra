@@ -1,0 +1,111 @@
+-- ============================================================
+-- SEC — Blindaje RESTRICTIVE del bucket privado firmas-medicos
+-- Fecha: 2026-06-03 · Protocolo D-T6
+--
+-- ⚠️  YA APLICADO EN PRODUCCIÓN el 2026-06-03 — NO re-ejecutar.
+--     Aplicado vía SQL Editor del dashboard (Protocolo D-T6, NO
+--     Supabase CLI). Este archivo es un REGISTRO DOCUMENTAL del SQL
+--     ya ejecutado, no una migración pendiente.
+-- ============================================================
+-- QUÉ HACE Y POR QUÉ
+-- firmas-medicos es un bucket PRIVADO de Supabase Storage que guarda
+-- las firmas autógrafas de los médicos. Es un activo crítico: una fuga
+-- o un acceso indebido habilita falsificación de recetas y documentos
+-- médicos. Los paths son <medico_id>/firma.png — PREDECIBLES — así que
+-- un acceso de lectura cross-médico bastaría para estampar la firma de
+-- otro profesional en un documento ajeno.
+--
+-- La política RESTRICTIVE creada aquí NIEGA TODO acceso (SELECT /
+-- INSERT / UPDATE / DELETE) a los roles `authenticated` y `anon`, y
+-- SOLO sobre este bucket. El resto de buckets quedan intactos.
+--
+-- El service_role (backend) NO se ve afectado: bypassa RLS por
+-- definición. Todo el acceso legítimo a firmas (subir, generar signed
+-- URL para estampar en PDFs, borrar) corre por service_role vía
+-- createAdminClient. El navegador NUNCA toca el bucket directamente.
+--
+-- POR QUÉ RESTRICTIVE Y NO SOLO "SIN POLÍTICAS"
+-- El bucket ya estaba cerrado de facto: RLS activo en storage.objects y
+-- sin políticas PERMISSIVE que lo abrieran. Pero ese estado dependía de
+-- una AUSENCIA frágil — bastaba que alguien añadiera una permisiva por
+-- descuido (p.ej. al configurar otro bucket) para abrir una brecha.
+-- La RESTRICTIVE es un candado técnico que sobrevive a ese error: aunque
+-- se agregue una PERMISSIVE, la RESTRICTIVE sigue bloqueando (en RLS el
+-- acceso requiere que TODAS las restrictivas pasen Y al menos una
+-- permisiva). Para abrir el bucket hay que BORRAR deliberadamente esta
+-- política, no basta con olvidar una ausencia.
+--
+-- VALIDACIÓN REALIZADA AL APLICAR (2026-06-03)
+--   - PRE-FLIGHT: 0 políticas previas con el nombre firmas_medicos_deny_all_users.
+--   - POST-FLIGHT: política creada como RESTRICTIVE, FOR ALL, roles {anon, authenticated}.
+--   - 3 smoke tests en transacciones revertidas (ROLLBACK):
+--       a) usuario authenticated lee firmas-medicos → 0 visibles (BLOQUEADO).
+--       b) rol con bypass RLS (service_role) lee firmas-medicos → 11 visibles (backend OK).
+--       c) usuario authenticated lee otros buckets (documentos-pdf: 222) → intactos
+--          (la restrictiva está acotada por bucket_id, no se desborda).
+-- ============================================================
+
+-- ---------- UP (SQL literal aplicado) ----------
+CREATE POLICY "firmas_medicos_deny_all_users"
+  ON storage.objects
+  AS RESTRICTIVE
+  FOR ALL
+  TO authenticated, anon
+  USING (bucket_id <> 'firmas-medicos')
+  WITH CHECK (bucket_id <> 'firmas-medicos');
+
+-- ---------- DOWN (rollback) — referencia, no se ejecuta ----------
+-- ROLLBACK:
+-- DROP POLICY IF EXISTS "firmas_medicos_deny_all_users" ON storage.objects;
+
+
+-- ============================================================
+-- PATRÓN REUTILIZABLE PARA BUCKETS SENSIBLES
+-- ============================================================
+-- Esta es la parte importante del archivo: cómo blindar CUALQUIER
+-- bucket privado sensible cuyo acceso legítimo va 100% por backend.
+--
+-- Pasos:
+--   1. Confirmar RLS activo en storage.objects (lo está por defecto en
+--      Supabase). Sin RLS, ninguna política aplica.
+--   2. Confirmar que TODO acceso legítimo va por service_role y que el
+--      navegador NUNCA toca el bucket directo (ni lectura ni escritura;
+--      las descargas se sirven vía signed URLs generadas en backend).
+--      ⚠️ Si el navegador SÍ necesita acceso directo, este patrón NO
+--      aplica tal cual — ver NOTA de firmas-pacientes abajo.
+--   3. Aplicar la política RESTRICTIVE, sustituyendo <nombre-bucket>:
+--        CREATE POLICY "<bucket>_deny_all_users"
+--          ON storage.objects
+--          AS RESTRICTIVE
+--          FOR ALL
+--          TO authenticated, anon
+--          USING (bucket_id <> '<nombre-bucket>')
+--          WITH CHECK (bucket_id <> '<nombre-bucket>');
+--   4. Smoke tests (en transacciones revertidas):
+--        - usuario authenticated → 0 objetos del bucket (BLOQUEADO).
+--        - service_role / bypass RLS → ve los objetos (backend OK).
+--        - usuario authenticated → otros buckets intactos (no se desborda).
+--
+-- ------------------------------------------------------------
+-- NOTA IMPORTANTE PARA UN FUTURO BUCKET firmas-pacientes
+-- (diferencia de modelo de propiedad — NO copiar a ciegas)
+-- ------------------------------------------------------------
+-- firmas-medicos usa el modelo "TODO por backend / CERO acceso de
+-- usuario". Antes de copiar este patrón a firmas-pacientes, DECIDIR el
+-- modelo de acceso:
+--
+--   · Si las firmas de pacientes también se sirven SOLO por backend
+--     (lo más probable: el backend genera signed URLs para estampar el
+--     consentimiento/documento), el patrón aplica IDÉNTICO — basta
+--     cambiar el nombre del bucket a 'firmas-pacientes'.
+--
+--   · Si en cambio el médico tratante necesitara ACCESO DIRECTO desde
+--     el navegador a la firma del paciente, este patrón NO basta:
+--     haría falta una capa PERMISSIVE adicional por-clínica /
+--     por-médico-tratante (similar al modelo de labs_documentos), y la
+--     RESTRICTIVE tendría que ajustarse para no bloquear ese acceso
+--     legítimo. En ese caso, diseñar la permisiva ANTES de aplicar la
+--     restrictiva.
+--
+-- NO copiar el patrón sin tomar primero esa decisión de modelo de acceso.
+-- ============================================================
