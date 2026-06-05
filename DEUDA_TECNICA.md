@@ -501,4 +501,35 @@ Estado: 🔴 abierta · 🟡 en progreso · 🟢 resuelta (se elimina al cerrar)
 
 ---
 
+## Nota IA — Rediseño
+
+### NIA-DT-1 — Separador inconsistente en profiles.especialidad
+- **Estado:** 🔴 abierta
+- **Detectada:** Investigación read-only de la nota IA (2026-06-05).
+- **Archivos afectados:**
+  - src/app/(app)/perfil/page.tsx (escritura con ' · ' + lectura que solo
+    reconoce ' · ')
+  - src/app/register/page.tsx (escritura con ' · ')
+  - src/components/onboarding/OnboardingModal.tsx (escritura con ', ')
+  - src/lib/especialidades.ts (catálogo fijo de 39 especialidades, sin
+    validación aplicada)
+- **Descripción:** El campo profiles.especialidad (text, máx 2 especialidades
+  concatenadas) se guarda con separadores distintos según el punto de captura:
+  perfil (perfil/page.tsx) y registro (register/page.tsx) usan ' · '; onboarding
+  (OnboardingModal.tsx) usa ', '. La lectura del perfil (perfil/page.tsx) solo
+  reconoce ' · ', por lo que un médico que cargó 2 especialidades vía onboarding
+  no se re-parsea correctamente al editar su perfil (queda como una sola
+  entrada). Además, no hay validación contra el catálogo (especialidades.ts) ni
+  constraint en DB.
+- **Impacto:** gestión de perfiles inconsistente; afecta a cualquier consumidor
+  que intente separar las especialidades.
+- **Mitigación recomendada:** unificar a un solo separador en los 3 puntos de
+  captura y normalizar la lectura, en una sesión dedicada de perfiles (scope
+  independiente del rediseño de la nota IA).
+- **Nota:** la nota IA queda blindada vía split tolerante en su backend (ver
+  NOTA_IA_PROMPT_DISEÑO.md, "Pendiente al implementar (SF3)"), así que esta deuda
+  no la bloquea.
+
+---
+
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)

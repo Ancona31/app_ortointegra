@@ -238,8 +238,16 @@ de la narrativa (en [PLAN]) COMO en el arreglo "medicamentos", y deben coincidir
 - Ampliar schema.ts: añadir la estructura de "bloques" (título + preguntas) al
   envelope de preguntas (Opción 1). El schema actual tiene preguntas planas.
 - Reemplazar el systemInstruction actual por este prompt.
-- Sustituir {ESPECIALIDADES} por el valor real de profiles (formato según
-  investigación pendiente).
+- Sustituir {ESPECIALIDADES} por el valor real de profiles.especialidad. NOTA
+  DE IMPLEMENTACIÓN: profiles.especialidad es un campo text (no array), con
+  máximo 2 especialidades concatenadas y un separador INCONSISTENTE en
+  producción (' · ' desde perfil/registro, ', ' desde onboarding). El backend
+  de la nota IA es responsable de leer ese campo, separarlo de forma tolerante
+  a ambos separadores (ej. split(/\s*·\s*|\s*,\s*/)) y entregar al prompt una
+  lista limpia de especialidades. El prompt solo recibe la lista ya procesada;
+  NO debe depender del formato crudo. Esta traducción vive en el backend, de
+  modo que si el bug del separador (ver DEUDA_TECNICA) se corrige a futuro, el
+  prompt NO requiere ajustes.
 - Aplicar el cambio de narrativa 5 → 4 secciones (auxiliares dentro de [OBJETIVO]).
 - Bench de latencia y calidad del prompt nuevo (casos de medicina general y
   subespecialidad).
