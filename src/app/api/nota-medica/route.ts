@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { GoogleGenAI, ThinkingLevel } from '@google/genai'
+import { GoogleGenAI, ThinkingLevel, type Content } from '@google/genai'
 import { createClient } from '@/lib/supabase/server'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { sanitizePromptInput, sanitizeNumber } from '@/lib/sanitize'
-import { anonimizarTexto } from '@/lib/anonimizar'
+import { anonimizarTexto, anonimizarHistorial } from '@/lib/anonimizar'
 import { notaIAResponseSchema, type NotaIAResponse } from '@/lib/notaIA/schema'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! })
@@ -103,37 +103,62 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
 
-    // Sanitizar inputs + anonimizar PII antes de enviar a Gemini.
+    // ── Contrato NUEVO multi-turno ─────────────────────────────────────────
+    // body: { paciente?, mensaje, historial? }
+    // 'mensaje' = texto del turno actual; 'historial' = conversación previa.
+    // Backend stateless: reconstruimos el chat en cada llamada.
+    //
     // LFPDPPP Art. 9: datos de salud son sensibles y requieren minimización
     // al compartir con terceros (Google Gemini). Se preservan datos clínicos
     // (síntomas, signos, diagnósticos) pero se redactan nombres, IDs, contacto.
-    const motivo_consulta       = anonimizarTexto(sanitizePromptInput(body.motivo_consulta, 1000))
-    const exploracion_fisica    = anonimizarTexto(sanitizePromptInput(body.exploracion_fisica, 1000))
-    const diagnosticos          = anonimizarTexto(sanitizePromptInput(body.diagnosticos, 500))
-    const plan_tratamiento      = anonimizarTexto(sanitizePromptInput(body.plan_tratamiento, 500))
-    const gabinete_laboratorios = anonimizarTexto(sanitizePromptInput(body.gabinete_laboratorios, 1000))
-    const antecedentes          = anonimizarTexto(sanitizePromptInput(body.antecedentes, 500))
-    const edad             = sanitizeNumber(body.edad)
-    const peso             = sanitizeNumber(body.peso)
-    const talla            = sanitizeNumber(body.talla)
-    const sexo             = ['M', 'F'].includes(body.sexo) ? body.sexo as 'M' | 'F' : null
 
-    // Prompt clínico nuevo (4 secciones + lógica de entrevista) → systemInstruction.
-    // Los DATOS del paciente/consulta van como mensaje del usuario (abajo).
-    const systemInstruction = buildSystemInstruction(especialidades)
+    // Validar mensaje (obligatorio, string no vacío tras sanitizar + anonimizar)
+    const mensaje = anonimizarTexto(sanitizePromptInput(body.mensaje, 4000))
+    if (!mensaje) {
+      return NextResponse.json(
+        { error: "El campo 'mensaje' es obligatorio." },
+        { status: 400 }
+      )
+    }
 
-    const datosClinicos = `DATOS CLÍNICOS DEL PACIENTE:
+    // Anonimizar historial ANTES de traducir al formato del SDK.
+    // Defensa en profundidad: cada texto se re-anonimiza (los user-turns ya
+    // venían sanitizados; los model-turns NO se re-sanitizan para no corromper
+    // su JSON).
+    const historialInput: { rol: 'user' | 'model'; texto: string }[] =
+      Array.isArray(body.historial) ? body.historial : []
+    const historialAnon = anonimizarHistorial(historialInput)
+    const historialSDK: Content[] = historialAnon.map((m) => ({
+      role: m.rol,
+      parts: [{ text: m.texto }],
+    }))
+
+    // Encabezado demográfico SOLO en turno 1 (cuando viene 'paciente').
+    let datosPaciente = ''
+    if (body.paciente) {
+      const edad  = sanitizeNumber(body.paciente.edad)
+      const peso  = sanitizeNumber(body.paciente.peso)
+      const talla = sanitizeNumber(body.paciente.talla)
+      const sexo  = ['M', 'F'].includes(body.paciente.sexo)
+        ? (body.paciente.sexo as 'M' | 'F')
+        : null
+      const antecedentes = anonimizarTexto(
+        sanitizePromptInput(body.paciente.antecedentes, 500)
+      )
+
+      datosPaciente = `DATOS CLÍNICOS DEL PACIENTE:
 - Edad: ${edad ? edad + ' años' : 'no especificada'}
 - Sexo: ${sexo === 'M' ? 'Masculino' : sexo === 'F' ? 'Femenino' : 'no especificado'}
 - Peso: ${peso ? peso + ' kg' : 'no especificado'} | Talla: ${talla ? talla + ' cm' : 'no especificada'}
-${antecedentes ? `- Antecedentes: ${antecedentes}` : ''}
+${antecedentes ? `- Antecedentes: ${antecedentes}` : ''}`
+    }
 
-DATOS DE LA CONSULTA:
-${motivo_consulta ? `- Motivo / padecimiento actual: ${motivo_consulta}` : ''}
-${exploracion_fisica ? `- Exploración física: ${exploracion_fisica}` : ''}
-${diagnosticos ? `- Diagnóstico(s): ${diagnosticos}` : ''}
-${gabinete_laboratorios ? `- Gabinete y laboratorios: ${gabinete_laboratorios}` : ''}
-${plan_tratamiento ? `- Plan: ${plan_tratamiento}` : ''}`
+    // Mensaje efectivo del turno: turno 1 = demográficos + mensaje; resto = solo mensaje.
+    const mensajeEfectivo = datosPaciente
+      ? `${datosPaciente}\n\n${mensaje}`
+      : mensaje
+
+    const systemInstruction = buildSystemInstruction(especialidades)
 
     const chat = ai.chats.create({
       model: 'gemini-3.5-flash',
@@ -144,10 +169,10 @@ ${plan_tratamiento ? `- Plan: ${plan_tratamiento}` : ''}`
         responseSchema: notaIAResponseSchema,
         maxOutputTokens: 8192,
       },
-      history: [], // SF1 one-shot; SF3 llenará el historial de la entrevista
+      history: historialSDK, // multi-turno: reconstruye la entrevista previa
     })
 
-    const response = await chat.sendMessage({ message: datosClinicos })
+    const response = await chat.sendMessage({ message: mensajeEfectivo })
 
     const raw = response.text
     if (!raw) {
