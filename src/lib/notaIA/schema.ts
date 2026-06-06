@@ -5,16 +5,21 @@ import type { Diagnostico } from '@/types'
  * Contrato de la salida JSON del modo IA de Nueva Nota Médica (SF0).
  * Módulo neutro: solo tipos + responseSchema. Sin runtime ni side effects.
  * El responseSchema de Gemini NO soporta uniones (oneOf): ambos campos
- * (preguntas y nota) van siempre presentes; `status` es el discriminador plano.
+ * (bloques y nota) van siempre presentes; `status` es el discriminador plano.
  */
 
 // ---------- Tipos TypeScript del contrato ----------
 
-export interface PreguntaIA {
+export interface PreguntaBloque {
   id: string
   pregunta: string
   opciones: string[]
   permite_texto_libre: boolean
+}
+
+export interface BloqueIA {
+  titulo: string
+  preguntas: PreguntaBloque[]
 }
 
 export interface MedicamentoIA {
@@ -39,7 +44,7 @@ export interface NotaIAContenido {
 
 export interface NotaIAResponse {
   status: 'completa' | 'faltan_datos'
-  preguntas: PreguntaIA[] // [] cuando status === 'completa'
+  bloques: BloqueIA[] // [] cuando status === 'completa'; máx 3 bloques
   nota: NotaIAContenido | null // null cuando status === 'faltan_datos'
 }
 
@@ -53,17 +58,27 @@ export const notaIAResponseSchema: Schema = {
       format: 'enum',
       enum: ['completa', 'faltan_datos'],
     },
-    preguntas: {
-      type: Type.ARRAY,
+    bloques: {
+      type: Type.ARRAY, // máx 3 bloques (tope reforzado en el prompt, no en el schema)
       items: {
         type: Type.OBJECT,
         properties: {
-          id: { type: Type.STRING },
-          pregunta: { type: Type.STRING },
-          opciones: { type: Type.ARRAY, items: { type: Type.STRING } },
-          permite_texto_libre: { type: Type.BOOLEAN },
+          titulo: { type: Type.STRING },
+          preguntas: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                id: { type: Type.STRING },
+                pregunta: { type: Type.STRING },
+                opciones: { type: Type.ARRAY, items: { type: Type.STRING } },
+                permite_texto_libre: { type: Type.BOOLEAN },
+              },
+              required: ['id', 'pregunta', 'opciones', 'permite_texto_libre'],
+            },
+          },
         },
-        required: ['id', 'pregunta', 'opciones', 'permite_texto_libre'],
+        required: ['titulo', 'preguntas'],
       },
     },
     nota: {
@@ -108,5 +123,5 @@ export const notaIAResponseSchema: Schema = {
       required: ['narrativa', 'estructurado'],
     },
   },
-  required: ['status', 'preguntas'],
+  required: ['status', 'bloques'],
 }
