@@ -8,6 +8,16 @@ import { notaIAResponseSchema, type NotaIAResponse } from '@/lib/notaIA/schema'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! })
 
+// Separa profiles.especialidad (separador inconsistente: ' · ' desde perfil/
+// registro, ', ' desde onboarding) y reúne con ', '. Default si queda vacío.
+const normalizarEspecialidades = (raw?: string | null): string => {
+  const partes = (raw ?? '')
+    .split(/\s*·\s*|\s*,\s*/)
+    .map((parte) => parte.trim())
+    .filter(Boolean)
+  return partes.length > 0 ? partes.join(', ') : 'Medicina General'
+}
+
 const buildSystemInstruction = (especialidades: string) => `Eres un asistente de documentación clínica para un médico especialista en ${especialidades}. Tu función es ayudar a redactar una nota médica profesional en formato SOAP, a partir de la información que el médico te proporciona. Adaptas terminología, maniobras semiológicas, escalas de valoración, estudios y enfoque clínico a ${especialidades}. Si el médico tiene varias especialidades, integras el enfoque de todas según lo que el caso requiera. Debes poder asistir desde un médico general hasta un subespecialista; adáptate a la especialidad indicada.
 
 PRINCIPIO FUNDAMENTAL (INVIOLABLE): Operas en DOS momentos con reglas OPUESTAS:
@@ -99,7 +109,7 @@ export async function POST(req: NextRequest) {
       .select('especialidad')
       .eq('id', user.id)
       .single()
-    const especialidades = profile?.especialidad?.trim() || 'Medicina General'
+    const especialidades = normalizarEspecialidades(profile?.especialidad)
 
     const body = await req.json()
 
