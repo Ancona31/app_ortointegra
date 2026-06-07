@@ -3,10 +3,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import Portal from '@/components/ui/Portal'
+import ModalShell from '@/components/ui/ModalShell'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Paciente, Diagnostico } from '@/types'
-import type { MedicamentoIA } from '@/lib/notaIA/schema'
+import type { MedicamentoIA, BloqueIA, NotaIAResponse } from '@/lib/notaIA/schema'
 import { calcularEdad } from '@/lib/patientUtils'
 import { flushSync } from 'react-dom'
 import {
@@ -121,6 +122,10 @@ export default function NuevaNotaPage() {
 
   const [modoNota, setModoNota]         = useState<'ia' | 'manual'>('ia')
   const [notaGenerada, setNotaGenerada] = useState('')
+  const [bloquesEntrevista, setBloquesEntrevista]     = useState<BloqueIA[]>([])
+  const [historialEntrevista, setHistorialEntrevista] = useState<{ rol: 'user' | 'model'; texto: string }[]>([])
+  const [respuestasEntrevista, setRespuestasEntrevista] = useState<Record<string, string>>({})
+  const [bloqueActual, setBloqueActual] = useState(0)
   const [modoEdicion, setModoEdicion]   = useState(false)
   const [pronosticoExpandido, setPronosticoExpandido] = useState(false)
   const [generando, setGenerando]       = useState(false)
@@ -256,6 +261,10 @@ export default function NuevaNotaPage() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
+  // Entrevista: al recibir un set nuevo de preguntas (o limpiarlas), volver al
+  // primer bloque. Mantiene la lógica del sub-paso A intacta.
+  useEffect(() => { setBloqueActual(0) }, [bloquesEntrevista])
+
   // ── Helpers de medicamentos ───────────────────────────────────
   function getSuggestions(query: string): string[] {
     if (!query.trim()) return medCache.slice(0, 6)
@@ -295,70 +304,146 @@ export default function NuevaNotaPage() {
     setForm(prev => ({ ...prev, [field]: val }))
   }
 
-  // ── Generar nota con Gemini ───────────────────────────────────
+  // ── Helpers de IA (compartidos por generarNota y responderEntrevista) ──
+  function construirPaciente() {
+    const edad = paciente?.fecha_nacimiento
+      ? calcularEdad(paciente.fecha_nacimiento).anios : null
+    return {
+      edad, sexo: paciente?.sexo, peso: paciente?.peso_kg, talla: paciente?.talla_cm,
+      antecedentes: [
+        paciente?.ant_patologicos, paciente?.ant_quirurgicos,
+        paciente?.medicamentos_actuales ? `Medicamentos: ${paciente.medicamentos_actuales}` : null,
+        paciente?.alergias ? `Alergias: ${paciente.alergias}` : null,
+      ].filter(Boolean).join('. '),
+    }
+  }
+
+  function mapearErrorIA(e: unknown) {
+    const msg = (e instanceof Error ? e.message : '').toLowerCase()
+    if (msg.includes('timeout') || msg.includes('deadline'))
+      setError('La IA tardó demasiado en responder. Intenta de nuevo en unos segundos.')
+    else if (msg.includes('rate') || msg.includes('quota') || msg.includes('429'))
+      setError('Se alcanzó el límite de uso de la IA. Espera un minuto e intenta de nuevo.')
+    else if (msg.includes('network') || msg.includes('fetch'))
+      setError('Error de conexión. Verifica tu internet e intenta de nuevo.')
+    else
+      setError('No se pudo generar la nota. Intenta de nuevo o escríbela manualmente.')
+  }
+
+  // Cablea la nota final ('completa') al form y limpia el estado de entrevista.
+  function aplicarNotaCompleta(data: NotaIAResponse) {
+    const narrativa = data.nota?.narrativa
+    if (typeof narrativa !== 'string' || !narrativa.trim()) {
+      throw new Error('La IA no devolvió una nota válida. Intenta de nuevo.')
+    }
+    setNotaGenerada(narrativa)
+    const dx = data.nota?.estructurado?.diagnosticos
+    if (Array.isArray(dx) && dx.length > 0) {
+      setForm(prev => ({ ...prev, diagnosticos: dx }))
+    }
+    // REEMPLAZAR siempre al generar (regenerar = nueva versión). Guard lista
+    // vacía: conservar [{...MED_VACIA}] para el invariante ≥1 fila de removeMed.
+    const medsIA = data.nota?.estructurado?.medicamentos
+    setMedicamentos(
+      Array.isArray(medsIA) && medsIA.length > 0
+        ? medsIA.map((m: MedicamentoIA) => ({ nombre: m.nombre ?? '', dosis: '', frecuencia: '', duracion: '' }))
+        : [{ ...MED_VACIA }]
+    )
+    setBloquesEntrevista([])
+    setHistorialEntrevista([])
+    setRespuestasEntrevista({})
+  }
+
+  // ── Generar nota con Gemini (turno 1) ─────────────────────────
   async function generarNota() {
     if (!form.motivo_consulta.trim()) { setError('Describe el caso antes de generar la nota'); return }
     setGenerando(true); setError('')
-    const edad = paciente?.fecha_nacimiento
-      ? calcularEdad(paciente.fecha_nacimiento).anios : null
     try {
       const res = await fetch('/api/nota-medica', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          paciente: {
-            edad, sexo: paciente?.sexo, peso: paciente?.peso_kg, talla: paciente?.talla_cm,
-            antecedentes: [
-              paciente?.ant_patologicos, paciente?.ant_quirurgicos,
-              paciente?.medicamentos_actuales ? `Medicamentos: ${paciente.medicamentos_actuales}` : null,
-              paciente?.alergias ? `Alergias: ${paciente.alergias}` : null,
-            ].filter(Boolean).join('. '),
-          },
+          paciente: construirPaciente(),
           mensaje: form.motivo_consulta,
           historial: [],
         }),
       })
-      const data = await res.json()
+      const rawText = await res.text()
+      const data = JSON.parse(rawText) as NotaIAResponse & { error?: string }
       if (data.error) throw new Error(data.error)
-      // La respuesta es NotaIAResponse (objeto). Consumimos la narrativa para el
-      // preview y, en SF3, el estructurado para poblar el form (ver abajo).
-      const narrativa = data?.nota?.narrativa
-      if (typeof narrativa !== 'string' || !narrativa.trim()) {
-        throw new Error('La IA no devolvió una nota válida. Intenta de nuevo.')
-      }
-      setNotaGenerada(narrativa)
-      // SF3: cablear el estructurado de la IA al form SOLO en nota final
-      // ('completa'). No es una UI editable: pobla form.diagnosticos (columna
-      // diagnosticos al guardar) y precarga la tabla de medicamentos con nombres.
-      // En 'faltan_datos' no hay nota/estructurado — no se cablea nada.
-      if (data.status === 'completa' && data.nota) {
-        const dx = data.nota.estructurado?.diagnosticos
-        if (Array.isArray(dx) && dx.length > 0) {
-          setForm(prev => ({ ...prev, diagnosticos: dx }))
-        }
-        // Decisión: REEMPLAZAR siempre al generar (regenerar = nueva versión).
-        // Guard lista vacía: conservar [{...MED_VACIA}] para mantener el
-        // invariante ≥1 fila que removeMed asume.
-        const medsIA = data.nota.estructurado?.medicamentos
-        setMedicamentos(
-          Array.isArray(medsIA) && medsIA.length > 0
-            ? medsIA.map((m: MedicamentoIA) => ({ nombre: m.nombre ?? '', dosis: '', frecuencia: '', duracion: '' }))
-            : [{ ...MED_VACIA }]
-        )
+      if (data.status === 'faltan_datos') {
+        // Entrevista turno 1: guardar preguntas e iniciar el historial crudo.
+        setNotaGenerada('')
+        setBloquesEntrevista(Array.isArray(data.bloques) ? data.bloques : [])
+        setHistorialEntrevista([
+          { rol: 'user', texto: form.motivo_consulta },
+          { rol: 'model', texto: rawText },
+        ])
+        setRespuestasEntrevista({})
+      } else {
+        aplicarNotaCompleta(data)
       }
     } catch (e: unknown) {
-      const msg = (e instanceof Error ? e.message : '').toLowerCase()
-      if (msg.includes('timeout') || msg.includes('deadline'))
-        setError('La IA tardó demasiado en responder. Intenta de nuevo en unos segundos.')
-      else if (msg.includes('rate') || msg.includes('quota') || msg.includes('429'))
-        setError('Se alcanzó el límite de uso de la IA. Espera un minuto e intenta de nuevo.')
-      else if (msg.includes('network') || msg.includes('fetch'))
-        setError('Error de conexión. Verifica tu internet e intenta de nuevo.')
-      else
-        setError('No se pudo generar la nota. Intenta de nuevo o escríbela manualmente.')
+      mapearErrorIA(e)
     } finally {
       setGenerando(false)
     }
+  }
+
+  // ── Responder entrevista (turno 2+) ───────────────────────────
+  async function responderEntrevista() {
+    // Concatena "pregunta: respuesta" en orden de bloques/preguntas; omite sin responder.
+    const partes: string[] = []
+    for (const bloque of bloquesEntrevista) {
+      for (const preg of bloque.preguntas) {
+        const resp = respuestasEntrevista[preg.id]?.trim()
+        if (resp) partes.push(`${preg.pregunta}: ${resp}`)
+      }
+    }
+    if (partes.length === 0) { setError('Responde al menos una pregunta antes de enviar.'); return }
+    const mensaje = partes.join('\n')
+    setGenerando(true); setError('')
+    try {
+      const res = await fetch('/api/nota-medica', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paciente: construirPaciente(),   // re-enviar (Opción B): conserva demográficos
+          mensaje,
+          historial: historialEntrevista,
+        }),
+      })
+      const rawText = await res.text()
+      const data = JSON.parse(rawText) as NotaIAResponse & { error?: string }
+      if (data.error) throw new Error(data.error)
+      if (data.status === 'faltan_datos') {
+        // La IA pide más: acumular el turno y mostrar las nuevas preguntas.
+        setNotaGenerada('')
+        setHistorialEntrevista(prev => [
+          ...prev,
+          { rol: 'user', texto: mensaje },
+          { rol: 'model', texto: rawText },
+        ])
+        setBloquesEntrevista(Array.isArray(data.bloques) ? data.bloques : [])
+        setRespuestasEntrevista({})
+      } else {
+        aplicarNotaCompleta(data)
+      }
+    } catch (e: unknown) {
+      mapearErrorIA(e)
+    } finally {
+      setGenerando(false)
+    }
+  }
+
+  // Aborta toda la entrevista y cierra el modal. Conserva form.motivo_consulta
+  // (el médico vuelve al textarea para editar/regenerar). No-op mientras envía.
+  function cancelarEntrevista() {
+    if (generando) return
+    setBloquesEntrevista([])
+    setHistorialEntrevista([])
+    setRespuestasEntrevista({})
+    setBloqueActual(0)
   }
 
   // ── Previsualizar nota en modo manual ─────────────────────────
@@ -625,6 +710,14 @@ export default function NuevaNotaPage() {
     }))
 
   const nombrePaciente = paciente ? `${paciente.nombre} ${paciente.apellidos}` : ''
+
+  // Entrevista: bloque en curso + validación de completitud (navegación del modal).
+  const bloqueEnCurso = bloquesEntrevista[bloqueActual]
+  const esUltimoBloque = bloqueActual === bloquesEntrevista.length - 1
+  const faltanEnBloque = bloqueEnCurso
+    ? bloqueEnCurso.preguntas.filter(p => !(respuestasEntrevista[p.id] ?? '').trim()).length
+    : 0
+  const bloqueCompleto = !!bloqueEnCurso && faltanEnBloque === 0
 
   // Error de generación y panel de resultado: se renderizan en distinta posición
   // según el modo. En IA van pegados bajo el botón generar; en manual van al fondo.
@@ -957,6 +1050,91 @@ modoNota === 'ia'
                   : <><Sparkles size={18} /> Generar con Spinus</>
                 }
               </button>
+              <ModalShell
+                open={bloquesEntrevista.length > 0}
+                onClose={cancelarEntrevista}
+                title="Spinus necesita más información"
+                subtitle="Responde para completar la nota"
+                icon={<Sparkles size={15} className="text-[#1e5fa8]" />}
+                iconBg="bg-[#1e5fa8]/10"
+                footer={
+                  <div className="flex items-center gap-2 p-4">
+                    <button onClick={cancelarEntrevista} disabled={generando}
+                      className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-40">
+                      Cancelar
+                    </button>
+                    <div className="flex-1" />
+                    <button onClick={() => setBloqueActual(i => i - 1)} disabled={bloqueActual === 0 || generando}
+                      className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                      Anterior
+                    </button>
+                    {esUltimoBloque ? (
+                      <button onClick={responderEntrevista} disabled={!bloqueCompleto || generando}
+                        className="px-5 py-2 text-sm font-semibold bg-[#1e5fa8] text-white rounded-lg hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 flex items-center gap-2">
+                        {generando ? <><Loader2 size={15} className="animate-spin" /> Enviando...</> : 'Enviar respuestas'}
+                      </button>
+                    ) : (
+                      <button onClick={() => setBloqueActual(i => i + 1)} disabled={!bloqueCompleto}
+                        className="px-5 py-2 text-sm font-semibold bg-[#1e5fa8] text-white rounded-lg hover:bg-[#1a3a5c] transition-colors disabled:opacity-50">
+                        Siguiente
+                      </button>
+                    )}
+                  </div>
+                }
+              >
+                <div className="p-5 space-y-4">
+                  {/* Progreso */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                        Bloque {bloqueActual + 1} de {bloquesEntrevista.length}
+                      </p>
+                      {!bloqueCompleto && faltanEnBloque > 0 && (
+                        <p className="text-[11px] text-amber-600">Faltan {faltanEnBloque} por responder</p>
+                      )}
+                    </div>
+                    <div className="flex gap-1">
+                      {bloquesEntrevista.map((_, i) => (
+                        <div key={i} className={`h-1 flex-1 rounded-full ${i <= bloqueActual ? 'bg-[#1e5fa8]' : 'bg-slate-200'}`} />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Preguntas del bloque actual */}
+                  {bloqueEnCurso && (
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-bold text-slate-700">{bloqueEnCurso.titulo}</h3>
+                      {bloqueEnCurso.preguntas.map(preg => {
+                        const respondida = !!(respuestasEntrevista[preg.id] ?? '').trim()
+                        return (
+                          <div key={preg.id} className="space-y-1.5">
+                            <p className="text-sm text-slate-700 flex items-start gap-1.5">
+                              <span className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${respondida ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                              <span>{preg.pregunta}</span>
+                            </p>
+                            {preg.opciones.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 pl-3">
+                                {preg.opciones.map(op => (
+                                  <button key={op} type="button"
+                                    onClick={() => setRespuestasEntrevista(prev => ({ ...prev, [preg.id]: op }))}
+                                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${respuestasEntrevista[preg.id] === op ? 'bg-[#1e5fa8] text-white border-[#1e5fa8]' : 'bg-white text-slate-600 border-slate-300 hover:border-slate-400'}`}>
+                                    {op}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            <input type="text"
+                              value={respuestasEntrevista[preg.id] ?? ''}
+                              onChange={e => setRespuestasEntrevista(prev => ({ ...prev, [preg.id]: e.target.value }))}
+                              placeholder="Escribe tu respuesta..."
+                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </ModalShell>
               {panelResultado}
             </>
           )}
