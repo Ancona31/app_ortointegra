@@ -92,7 +92,17 @@ Cuando faltan datos: status "faltan_datos"; "bloques" es un arreglo de máximo 3
 
 Cuando tienes contexto suficiente: status "completa"; "bloques" es un arreglo vacío; "nota" contiene "narrativa" (el texto completo de la nota SOAP con las 4 secciones [SUBJETIVO], [OBJETIVO], [ANÁLISIS], [PLAN], incluyendo el tratamiento con medicamentos en el texto del [PLAN]) y "estructurado" con: "motivo_consulta" (conciso), "exploracion_fisica" (hallazgos), "plan_tratamiento" (plan no farmacológico e indicaciones, sin medicamentos), "diagnosticos" (arreglo de objetos con "codigo_cie10" si hay certeza y "descripcion" con formato "Descripción oficial - complemento LATERALIDAD").
 
-COHERENCIA: el diagnóstico de la narrativa y el de "diagnosticos" deben ser el mismo.`
+COHERENCIA: el diagnóstico de la narrativa y el de "diagnosticos" deben ser el mismo.
+
+PRESENTACIÓN DE LA NOTA (formato markdown — NUNCA altera el contenido):
+El contenido clínico y las reglas de arriba SIEMPRE mandan. El formato es solo presentación: no agrega, omite ni reinterpreta información. Aplica markdown así:
+- Encabezados de sección: escribe SIEMPRE las 4 secciones como **[SUBJETIVO]:**, **[OBJETIVO]:**, **[ANÁLISIS]:**, **[PLAN]:** (con dobles asteriscos y corchetes, exactamente así). No uses ## ni otro formato de encabezado.
+- Etiquetas de campo en negrita: cada subcampo inicia con su etiqueta en negrita y dos puntos. Ej.: **Motivo de consulta:**, **Padecimiento actual:**, **Antecedentes relevantes:**, **Exploración física:**, **Estudios de gabinete:**, **Impresión diagnóstica:**, **Juicio clínico:**, **Diagnóstico diferencial:**, **Tratamiento farmacológico:**, **Medidas no farmacológicas:**, **Estudios solicitados:**, **Educación al paciente:**, **Signos de alarma:**, **Seguimiento:**.
+- Datos clave en negrita dentro del texto: diagnósticos con su código (ej. **M75.1 — Síndrome del manguito rotador DERECHO**), medicamentos con dosis (ej. **Celecoxib 200mg**), signos semiológicos relevantes (ej. **Neer positivo**, **Lasègue negativo**) y valores clave (ej. **4/5**, **90°**). Usa la negrita con criterio, solo en lo que el médico busca de un vistazo — nunca en frases enteras.
+- Viñetas (con guion "- ") para listas de elementos discretos: impresión diagnóstica cuando hay varios diagnósticos, diagnósticos diferenciales (cada uno en su viñeta, con el nombre en negrita), pruebas semiológicas cuando son varias, y en el [PLAN]: tratamiento farmacológico (un fármaco por viñeta), medidas no farmacológicas, estudios solicitados y signos de alarma.
+- Prosa (sin viñetas) para el padecimiento actual y el juicio clínico: son narrativa y razonamiento, se leen mejor corridos.
+- Dentro del [PLAN], usa los subcampos en negrita como subencabezados para organizar el plan (tratamiento farmacológico, medidas, estudios, educación, signos de alarma, seguimiento).
+- No uses emojis, ni bloques de código, ni tablas, ni colores. Solo negrita, viñetas y las etiquetas de sección. Mantén la nota concisa: el formato organiza, no agrega longitud.`
 
 const MAX_INTENTOS = 3
 

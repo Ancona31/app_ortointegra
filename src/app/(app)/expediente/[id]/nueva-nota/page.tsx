@@ -6,13 +6,14 @@ import Portal from '@/components/ui/Portal'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Paciente, Diagnostico } from '@/types'
+import type { MedicamentoIA } from '@/lib/notaIA/schema'
 import { calcularEdad } from '@/lib/patientUtils'
 import { flushSync } from 'react-dom'
 import {
   ArrowLeft, Save, Loader2, RotateCcw, Printer, Eye, Pencil,
   Pill, FlaskConical, ScanLine, ClipboardList, CheckCircle2,
-  BedDouble, PenLine, ShieldCheck, Receipt, Plus, Trash2, X, FileText, ChevronDown,
-  ChevronLeft, ChevronRight,
+  BedDouble, PenLine, ShieldCheck, Receipt, Plus, Trash2, X, FileText,
+  ChevronLeft, ChevronRight, ChevronDown, Sparkles,
 } from 'lucide-react'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
@@ -121,6 +122,7 @@ export default function NuevaNotaPage() {
   const [modoNota, setModoNota]         = useState<'ia' | 'manual'>('ia')
   const [notaGenerada, setNotaGenerada] = useState('')
   const [modoEdicion, setModoEdicion]   = useState(false)
+  const [pronosticoExpandido, setPronosticoExpandido] = useState(false)
   const [generando, setGenerando]       = useState(false)
   const [guardando, setGuardando]       = useState(false)
   const [imprimiendo, setImprimiendo]   = useState(false)
@@ -146,10 +148,6 @@ export default function NuevaNotaPage() {
   const [ultimoGuardado, setUltimoGuardado] = useState<Date | null>(null)
   const [borradorRestaurado, setBorradorRestaurado] = useState(false)
   const [ultimaConsulta, setUltimaConsulta] = useState<{ diagnosticos: string; medicamentos: MedRow[] | null } | null>(null)
-  const [camposExpandidos, setCamposExpandidos] = useState<Record<string, boolean>>({
-    exploracion: false, gabinete: false, plan: false,
-  })
-  function toggleCampo(k: string) { setCamposExpandidos(p => ({ ...p, [k]: !p[k] })) }
 
   const suggestRef  = useRef<HTMLDivElement>(null)
   const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -299,45 +297,55 @@ export default function NuevaNotaPage() {
 
   // ── Generar nota con Gemini ───────────────────────────────────
   async function generarNota() {
-    if (!form.motivo_consulta) { setError('Ingresa al menos el motivo de consulta'); return }
+    if (!form.motivo_consulta.trim()) { setError('Describe el caso antes de generar la nota'); return }
     setGenerando(true); setError('')
     const edad = paciente?.fecha_nacimiento
       ? calcularEdad(paciente.fecha_nacimiento).anios : null
-    const diagnosticosPrompt = form.diagnosticos
-      .filter(d => d.descripcion?.trim())
-      .map((d, i) => `${i + 1}. ${d.codigo_cie10 ? `[${d.codigo_cie10}] ` : ''}${d.descripcion.trim()}`)
-      .join('\n')
     try {
       const res = await fetch('/api/nota-medica', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          paciente: `${paciente?.nombre} ${paciente?.apellidos}`,
-          edad, sexo: paciente?.sexo, peso: paciente?.peso_kg, talla: paciente?.talla_cm,
-          antecedentes: [
-            paciente?.ant_patologicos, paciente?.ant_quirurgicos,
-            paciente?.medicamentos_actuales ? `Medicamentos: ${paciente.medicamentos_actuales}` : null,
-            paciente?.alergias ? `Alergias: ${paciente.alergias}` : null,
-          ].filter(Boolean).join('. '),
-          motivo_consulta: form.motivo_consulta,
-          exploracion_fisica: form.exploracion_fisica,
-          gabinete_laboratorios: form.gabinete_laboratorios,
-          analisis: form.analisis,
-          pronostico: form.pronostico,
-          plan_tratamiento: form.plan_tratamiento,
-          proxima_cita: form.proxima_cita,
-          diagnosticos: diagnosticosPrompt,
+          paciente: {
+            edad, sexo: paciente?.sexo, peso: paciente?.peso_kg, talla: paciente?.talla_cm,
+            antecedentes: [
+              paciente?.ant_patologicos, paciente?.ant_quirurgicos,
+              paciente?.medicamentos_actuales ? `Medicamentos: ${paciente.medicamentos_actuales}` : null,
+              paciente?.alergias ? `Alergias: ${paciente.alergias}` : null,
+            ].filter(Boolean).join('. '),
+          },
+          mensaje: form.motivo_consulta,
+          historial: [],
         }),
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
-      // SF1: la respuesta ahora es NotaIAResponse (objeto). Solo consumimos la
-      // narrativa para el preview; estructurado/medicamentos se cablean en SF2.
+      // La respuesta es NotaIAResponse (objeto). Consumimos la narrativa para el
+      // preview y, en SF3, el estructurado para poblar el form (ver abajo).
       const narrativa = data?.nota?.narrativa
       if (typeof narrativa !== 'string' || !narrativa.trim()) {
         throw new Error('La IA no devolvió una nota válida. Intenta de nuevo.')
       }
       setNotaGenerada(narrativa)
+      // SF3: cablear el estructurado de la IA al form SOLO en nota final
+      // ('completa'). No es una UI editable: pobla form.diagnosticos (columna
+      // diagnosticos al guardar) y precarga la tabla de medicamentos con nombres.
+      // En 'faltan_datos' no hay nota/estructurado — no se cablea nada.
+      if (data.status === 'completa' && data.nota) {
+        const dx = data.nota.estructurado?.diagnosticos
+        if (Array.isArray(dx) && dx.length > 0) {
+          setForm(prev => ({ ...prev, diagnosticos: dx }))
+        }
+        // Decisión: REEMPLAZAR siempre al generar (regenerar = nueva versión).
+        // Guard lista vacía: conservar [{...MED_VACIA}] para mantener el
+        // invariante ≥1 fila que removeMed asume.
+        const medsIA = data.nota.estructurado?.medicamentos
+        setMedicamentos(
+          Array.isArray(medsIA) && medsIA.length > 0
+            ? medsIA.map((m: MedicamentoIA) => ({ nombre: m.nombre ?? '', dosis: '', frecuencia: '', duracion: '' }))
+            : [{ ...MED_VACIA }]
+        )
+      }
     } catch (e: unknown) {
       const msg = (e instanceof Error ? e.message : '').toLowerCase()
       if (msg.includes('timeout') || msg.includes('deadline'))
@@ -381,17 +389,24 @@ export default function NuevaNotaPage() {
 
   // ── Validar y mostrar confirmación antes de guardar ───────────
   function intentarGuardar() {
-    // NOM-004-SSA3: validar campos obligatorios
-    const faltantes: string[] = []
-    if (!form.motivo_consulta.trim()) faltantes.push('Motivo de consulta')
-    if (!form.exploracion_fisica.trim()) faltantes.push('Exploración física')
-    if (form.diagnosticos.length === 0 || !form.diagnosticos.some(d => d.descripcion?.trim())) {
-      faltantes.push('Diagnóstico')
-    }
-    if (!form.plan_tratamiento.trim()) faltantes.push('Plan de tratamiento')
-    if (faltantes.length > 0) {
-      setError(`Campos obligatorios: ${faltantes.join(', ')}`)
-      return
+    if (modoNota === 'manual') {
+      // NOM-004-SSA3: en modo manual el médico captura a mano → 4 obligatorios
+      const faltantes: string[] = []
+      if (!form.motivo_consulta.trim()) faltantes.push('Motivo de consulta')
+      if (!form.exploracion_fisica.trim()) faltantes.push('Exploración física')
+      if (form.diagnosticos.length === 0 || !form.diagnosticos.some(d => d.descripcion?.trim())) {
+        faltantes.push('Diagnóstico')
+      }
+      if (!form.plan_tratamiento.trim()) faltantes.push('Plan de tratamiento')
+      if (faltantes.length > 0) {
+        setError(`Campos obligatorios: ${faltantes.join(', ')}`)
+        return
+      }
+    } else {
+      // Modo IA: exploración física y plan van DENTRO de la narrativa; el dx puede
+      // no venir como bloqueo. Solo validamos lo mínimo: el caso y que haya nota.
+      if (!form.motivo_consulta.trim()) { setError('Describe el caso antes de guardar.'); return }
+      if (!notaGenerada.trim()) { setError('Genera la nota antes de guardar.'); return }
     }
     // Si el médico marcó "No mostrar de nuevo", guardar directo
     const skipModal = localStorage.getItem('spinus_skip_confirm_nota') === '1'
@@ -504,7 +519,6 @@ export default function NuevaNotaPage() {
       }
 
       const notaHtml = notaToHtml(notaParaImprimir)
-      const medsParaPDF = medicamentos.filter(m => m.nombre.trim())
 
       const _html = `<!DOCTYPE html>
 <html lang="es">
@@ -541,11 +555,6 @@ export default function NuevaNotaPage() {
   .nota-content p { margin-bottom: 3px; }
   .nota-content strong { font-weight: 600; color: #111; }
   .fecha-box { margin-top: 12px; background: ${cs}10; border-left: 3px solid ${cs}; border-radius: 0 4px 4px 0; padding: 6px 12px; font-size: 9pt; }
-  /* Terapéutica empleada */
-  .terapeutica { width: 100%; border-collapse: collapse; font-size: 9pt; margin-top: 6px; }
-  .terapeutica th { background: ${cp}15; color: ${cp}; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 10px; text-align: left; border-bottom: 1.5px solid ${cp}40; font-weight: 700; }
-  .terapeutica td { padding: 5px 10px; border-bottom: 1px dotted #e2e8f0; color: #2d2d2d; }
-  .terapeutica tr:last-child td { border-bottom: none; }
   /* Firma */
   .footer-area { margin-top: 60px; display: flex; justify-content: flex-end; }
   .firma { text-align: center; min-width: 240px; }
@@ -582,14 +591,6 @@ export default function NuevaNotaPage() {
     </div>
     <div class="titulo-nota">Nota de Evolución Médica</div>
     <div class="nota-content">${notaHtml}</div>
-    ${medsParaPDF.length > 0 ? `
-    <div class="seccion-header"><div class="seccion-linea"></div><div class="seccion-titulo">Terapéutica Empleada</div><div class="seccion-linea"></div></div>
-    <table class="terapeutica">
-      <thead><tr><th>Medicamento</th><th>Dosis</th><th>Frecuencia</th><th>Duración</th></tr></thead>
-      <tbody>
-        ${medsParaPDF.map(m => `<tr><td>${m.nombre}</td><td>${m.dosis || '—'}</td><td>${m.frecuencia || '—'}</td><td>${m.duracion || '—'}</td></tr>`).join('')}
-      </tbody>
-    </table>` : ''}
     ${form.proxima_cita ? `<div class="fecha-box"><strong>Próxima cita:</strong> ${form.proxima_cita}</div>` : ''}
     <div class="footer-area">
       <div class="firma">
@@ -624,6 +625,75 @@ export default function NuevaNotaPage() {
     }))
 
   const nombrePaciente = paciente ? `${paciente.nombre} ${paciente.apellidos}` : ''
+
+  // Error de generación y panel de resultado: se renderizan en distinta posición
+  // según el modo. En IA van pegados bajo el botón generar; en manual van al fondo.
+  const bloqueError = error ? (
+    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
+  ) : null
+
+  const panelResultado = notaGenerada ? (
+    <>
+      {/* Nota generada / previsualizada */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="font-semibold text-slate-700 text-sm">Nota médica</h2>
+              {modoNota === 'ia' ? (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-[#1e5fa8]/10 text-[#1e5fa8] border border-[#1e5fa8]/20">
+                  <Sparkles size={9} />
+                  Nota IA
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+                  <PenLine size={9} />
+                  Nota manual
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {modoEdicion ? 'Editando texto' : 'Vista previa — haz clic en Editar para modificar'}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setModoEdicion(!modoEdicion)}
+              className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition-colors ${modoEdicion ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-slate-100 border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+              {modoEdicion ? <><Eye size={12} /> Vista previa</> : <><Pencil size={12} /> Editar</>}
+            </button>
+            <button
+              onClick={modoNota === 'ia' ? generarNota : previewNotaManual}
+              disabled={generando || !form.motivo_consulta.trim()}
+              className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 px-2 py-1 disabled:opacity-40">
+              <RotateCcw size={12} /> {modoNota === 'ia' ? 'Regenerar' : 'Actualizar'}
+            </button>
+          </div>
+        </div>
+        <div className="p-5">
+          {modoEdicion ? (
+            <textarea value={notaGenerada} onChange={e => setNotaGenerada(e.target.value)} rows={22}
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 resize-y" />
+          ) : (
+            <div className="prose prose-sm max-w-none prose-headings:text-[#1a3a5c] prose-headings:font-bold prose-headings:text-sm prose-headings:mt-4 prose-headings:mb-1 prose-strong:text-[#1a3a5c] prose-strong:font-semibold prose-p:text-slate-700 prose-p:leading-relaxed prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-li:text-slate-700">
+              <ReactMarkdown>{notaGenerada}</ReactMarkdown>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Acciones imprimir / guardar */}
+      <div className="flex gap-3 pb-6">
+        <button onClick={imprimir} disabled={imprimiendo}
+          className="flex items-center gap-2 px-5 py-2.5 border-2 border-[#1a3a5c] text-[#1a3a5c] rounded-lg text-sm font-medium hover:bg-[#1a3a5c] hover:text-white transition-colors disabled:opacity-50">
+          {imprimiendo ? <><Loader2 size={16} className="animate-spin" /> Generando...</> : <><Printer size={16} /> Imprimir</>}
+        </button>
+        <button onClick={intentarGuardar} disabled={guardando}
+          className="flex-1 flex items-center justify-center gap-2 bg-[#1e5fa8] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-60">
+          {guardando ? <><Loader2 size={16} className="animate-spin" /> Guardando...</> : <><Save size={16} /> Guardar en expediente</>}
+        </button>
+      </div>
+    </>
+  ) : null
 
   // ── Render ────────────────────────────────────────────────────
   return (
@@ -733,11 +803,11 @@ export default function NuevaNotaPage() {
 onClick={() => { setModoNota('ia'); setNotaGenerada(''); setError('') }}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
 modoNota === 'ia'
-                    ? 'bg-[#4285F4]/10 text-[#4285F4] border border-[#4285F4]/30 shadow-sm'
+                    ? 'bg-[#1e5fa8]/10 text-[#1e5fa8] border border-[#1e5fa8]/30 shadow-sm'
                     : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
               }`}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="flex-shrink-0"><path d="M12 2C12 2 13.8 9 19 12C13.8 15 12 22 12 22C12 22 10.2 15 5 12C10.2 9 12 2 12 2Z" fill="currentColor"/></svg>
+              <Sparkles size={14} className="flex-shrink-0" />
               Crear nota con IA
             </button>
             <button
@@ -780,9 +850,8 @@ modoNota === 'ia'
                 <h2 className="font-semibold text-slate-700 text-sm">Datos de la consulta</h2>
                 {modoNota === 'ia' ? (
                   <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
-                    Completa los campos y
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="inline text-[#4285F4]"><path d="M12 2C12 2 13.8 9 19 12C13.8 15 12 22 12 22C12 22 10.2 15 5 12C10.2 9 12 2 12 2Z" fill="#4285F4"/></svg>
-                    <span className="text-[#4285F4] font-medium">Gemini</span> redactará la nota médica
+                    Describe el caso y
+                    <span className="text-[#1e5fa8] font-medium">Spinus</span> redactará la nota médica
                   </p>
                 ) : (
                   <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
@@ -800,68 +869,21 @@ modoNota === 'ia'
             </div>
 
             {modoNota === 'ia' ? (
-              /* ── Modo IA: campos compactos / expandibles ── */
-              <div className="p-5 space-y-4">
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">Motivo de consulta <span className="text-red-400">*</span></label>
-                  <input type="text" value={form.motivo_consulta} onChange={e => update('motivo_consulta', e.target.value)}
-                    placeholder="Ej: Dolor abdominal agudo, cefalea persistente..."
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-                </div>
-                {/* Exploración física — expandible */}
-                <div>
-                  <button type="button" onClick={() => toggleCampo('exploracion')}
-                    className="flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors mb-1 w-full text-left">
-                    <ChevronDown size={13} className={`transition-transform duration-200 ${camposExpandidos.exploracion ? 'rotate-180' : ''}`} />
-                    Exploración física <span className="text-red-400">*</span>
-                    <span className="text-slate-300 font-normal ml-1">Gemini la complementa</span>
-                    {form.exploracion_fisica && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#1e5fa8]" />}
-                  </button>
-                  {camposExpandidos.exploracion && (
-                    <textarea value={form.exploracion_fisica} onChange={e => update('exploracion_fisica', e.target.value)}
-                      placeholder="Ej: Abdomen blando, no doloroso a la palpación..."
-                      rows={3} autoFocus
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-                  )}
-                </div>
-                {/* Gabinete — expandible */}
-                <div>
-                  <button type="button" onClick={() => toggleCampo('gabinete')}
-                    className="flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors mb-1 w-full text-left">
-                    <ChevronDown size={13} className={`transition-transform duration-200 ${camposExpandidos.gabinete ? 'rotate-180' : ''}`} />
-                    Gabinete y Laboratorios
-                    {form.gabinete_laboratorios && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#1e5fa8]" />}
-                  </button>
-                  {camposExpandidos.gabinete && (
-                    <textarea value={form.gabinete_laboratorios} onChange={e => update('gabinete_laboratorios', e.target.value)}
-                      placeholder="Ej: BH, QS, EGO, Rx de tórax PA..."
-                      rows={2} autoFocus
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-                  )}
-                </div>
-                {/* Diagnóstico CIE-10 — siempre visible */}
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">Diagnóstico(s) CIE-10 <span className="text-red-400">*</span></label>
-                  <DiagnosticosEditor
-                    value={form.diagnosticos}
-                    onChange={dx => setForm(prev => ({ ...prev, diagnosticos: dx }))}
-                  />
-                </div>
-                {/* Plan de tratamiento — expandible */}
-                <div>
-                  <button type="button" onClick={() => toggleCampo('plan')}
-                    className="flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors mb-1 w-full text-left">
-                    <ChevronDown size={13} className={`transition-transform duration-200 ${camposExpandidos.plan ? 'rotate-180' : ''}`} />
-                    Plan de tratamiento <span className="text-red-400">*</span>
-                    {form.plan_tratamiento && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#1e5fa8]" />}
-                  </button>
-                  {camposExpandidos.plan && (
-                    <textarea value={form.plan_tratamiento} onChange={e => update('plan_tratamiento', e.target.value)}
-                      placeholder="Ej: Ajuste de tratamiento, interconsulta, seguimiento..."
-                      rows={2} autoFocus
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-                  )}
-                </div>
+              /* ── Modo IA: input único — el médico redacta el caso completo ── */
+              <div className="p-5">
+                <label className="text-xs font-medium text-slate-500 block mb-1.5">
+                  Descripción del caso <span className="text-red-400">*</span>
+                </label>
+                <textarea
+                  value={form.motivo_consulta}
+                  onChange={e => update('motivo_consulta', e.target.value)}
+                  placeholder="Describe el caso con tus palabras: motivo de consulta, hallazgos de la exploración, estudios, impresión diagnóstica y plan. Spinus estructurará la nota a partir de lo que escribas."
+                  rows={10}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
+                />
+                <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+                  Escribe en lenguaje natural. No necesitas separar por secciones — Spinus lo hace por ti.
+                </p>
               </div>
             ) : (
               /* ── Modo manual: todos los campos expandidos ── */
@@ -924,6 +946,21 @@ modoNota === 'ia'
             )}
           </div>
 
+          {/* ── Modo IA: error + botón generar + resultado, todo bajo el textarea ── */}
+          {modoNota === 'ia' && (
+            <>
+              {bloqueError}
+              <button onClick={generarNota} disabled={generando || !form.motivo_consulta.trim()}
+                className="w-full py-3 bg-[#1e5fa8] text-white rounded-xl font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                {generando
+                  ? <><Loader2 size={18} className="animate-spin" /> Redactando nota médica...</>
+                  : <><Sparkles size={18} /> Generar con Spinus</>
+                }
+              </button>
+              {panelResultado}
+            </>
+          )}
+
           {/* Terapéutica empleada */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
@@ -978,7 +1015,7 @@ modoNota === 'ia'
                 )
               })}
               {medicamentos.every(m => !m.nombre.trim()) && (
-                <p className="text-xs text-slate-400 text-center py-2">Sin medicamentos — usa el botón "Agregar" o comienza a escribir</p>
+                <p className="text-xs text-slate-400 text-center py-2">Sin medicamentos — usa el botón “Agregar” o comienza a escribir</p>
               )}
               <div className="pt-1">
                 <button type="button" onClick={addMed}
@@ -989,108 +1026,47 @@ modoNota === 'ia'
             </div>
           </div>
 
-          {/* Pronóstico y próxima cita */}
+          {/* Pronóstico y próxima cita — colapsable, colapsado por defecto */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
-              <h2 className="font-semibold text-slate-700 text-sm">Pronóstico y seguimiento</h2>
-            </div>
-            <div className="p-5 space-y-4">
-              <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Pronóstico <span className="text-slate-400 font-normal">(opcional)</span></label>
-                <input type="text" value={form.pronostico} onChange={e => update('pronostico', e.target.value)}
-                  placeholder="Ej: Favorable a mediano plazo con tratamiento conservador..."
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+            <button
+              type="button"
+              onClick={() => setPronosticoExpandido(e => !e)}
+              className={`w-full flex items-center justify-between px-5 py-3 bg-slate-50 text-left hover:bg-slate-100 transition-colors ${pronosticoExpandido ? 'border-b border-slate-100' : ''}`}
+            >
+              <h2 className="font-semibold text-slate-700 text-sm">
+                Pronóstico y seguimiento <span className="text-slate-400 font-normal">(opcional)</span>
+              </h2>
+              <ChevronDown size={16} className={`text-slate-400 transition-transform duration-200 ${pronosticoExpandido ? 'rotate-180' : ''}`} />
+            </button>
+            {pronosticoExpandido && (
+              <div className="p-5 space-y-4">
+                <div>
+                  <label className="text-xs font-medium text-slate-500 block mb-1">Pronóstico <span className="text-slate-400 font-normal">(opcional)</span></label>
+                  <input type="text" value={form.pronostico} onChange={e => update('pronostico', e.target.value)}
+                    placeholder="Ej: Favorable a mediano plazo con tratamiento conservador..."
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500 block mb-1">Próxima cita</label>
+                  <input type="text" value={form.proxima_cita} onChange={e => update('proxima_cita', e.target.value)}
+                    placeholder="Ej: En 4 semanas, 15 de abril 2026..."
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                </div>
               </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Próxima cita</label>
-                <input type="text" value={form.proxima_cita} onChange={e => update('proxima_cita', e.target.value)}
-                  placeholder="Ej: En 4 semanas, 15 de abril 2026..."
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-              </div>
-            </div>
+            )}
           </div>
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
-          )}
-
-          {/* Botón generar / previsualizar */}
-          {modoNota === 'ia' ? (
-            <button onClick={generarNota} disabled={generando || !form.motivo_consulta}
-              className="w-full py-3 bg-[#4285F4] text-white rounded-xl font-medium hover:bg-[#3367d6] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-              {generando
-                ? <><Loader2 size={18} className="animate-spin" /> Redactando nota médica...</>
-                : <><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2C12 2 13.8 9 19 12C13.8 15 12 22 12 22C12 22 10.2 15 5 12C10.2 9 12 2 12 2Z" fill="white"/></svg> Generar con Gemini</>
-              }
-            </button>
-          ) : (
-            <button onClick={previewNotaManual} disabled={!form.motivo_consulta}
-              className="w-full py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#142d4a] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-              <PenLine size={18} />
-              Previsualizar nota
-            </button>
-          )}
-
-          {/* Nota generada / previsualizad */}
-          {notaGenerada && (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="font-semibold text-slate-700 text-sm">Nota médica</h2>
-                    {modoNota === 'ia' ? (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-[#4285F4]/10 text-[#4285F4] border border-[#4285F4]/20">
-                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none"><path d="M12 2C12 2 13.8 9 19 12C13.8 15 12 22 12 22C12 22 10.2 15 5 12C10.2 9 12 2 12 2Z" fill="currentColor"/></svg>
-                        Nota IA
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
-                        <PenLine size={9} />
-                        Nota manual
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {modoEdicion ? 'Editando texto' : 'Vista previa — haz clic en Editar para modificar'}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setModoEdicion(!modoEdicion)}
-                    className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition-colors ${modoEdicion ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-slate-100 border-slate-200 text-slate-600 hover:border-slate-300'}`}>
-                    {modoEdicion ? <><Eye size={12} /> Vista previa</> : <><Pencil size={12} /> Editar</>}
-                  </button>
-                  <button
-                    onClick={modoNota === 'ia' ? generarNota : previewNotaManual}
-                    className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 px-2 py-1">
-                    <RotateCcw size={12} /> {modoNota === 'ia' ? 'Regenerar' : 'Actualizar'}
-                  </button>
-                </div>
-              </div>
-              <div className="p-5">
-                {modoEdicion ? (
-                  <textarea value={notaGenerada} onChange={e => setNotaGenerada(e.target.value)} rows={22}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 resize-y" />
-                ) : (
-                  <div className="prose prose-sm max-w-none prose-headings:text-[#1a3a5c] prose-headings:font-bold prose-headings:text-sm prose-headings:mt-4 prose-headings:mb-1 prose-strong:text-[#1a3a5c] prose-strong:font-semibold prose-p:text-slate-700 prose-p:leading-relaxed prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-li:text-slate-700">
-                    <ReactMarkdown>{notaGenerada}</ReactMarkdown>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Acciones imprimir / guardar */}
-          {notaGenerada && (
-            <div className="flex gap-3 pb-6">
-              <button onClick={imprimir} disabled={imprimiendo}
-                className="flex items-center gap-2 px-5 py-2.5 border-2 border-[#1a3a5c] text-[#1a3a5c] rounded-lg text-sm font-medium hover:bg-[#1a3a5c] hover:text-white transition-colors disabled:opacity-50">
-                {imprimiendo ? <><Loader2 size={16} className="animate-spin" /> Generando...</> : <><Printer size={16} /> Imprimir</>}
+          {/* ── Modo manual: error + botón previsualizar + resultado, al fondo (como hoy) ── */}
+          {modoNota === 'manual' && (
+            <>
+              {bloqueError}
+              <button onClick={previewNotaManual} disabled={!form.motivo_consulta}
+                className="w-full py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#142d4a] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                <PenLine size={18} />
+                Previsualizar nota
               </button>
-              <button onClick={intentarGuardar} disabled={guardando}
-                className="flex-1 flex items-center justify-center gap-2 bg-[#1e5fa8] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-60">
-                {guardando ? <><Loader2 size={16} className="animate-spin" /> Guardando...</> : <><Save size={16} /> Guardar en expediente</>}
-              </button>
-            </div>
+              {panelResultado}
+            </>
           )}
         </div>
 

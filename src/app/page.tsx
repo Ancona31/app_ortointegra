@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Calendar, FileText, Shield, Brain, ArrowRight, Stethoscope, BarChart3, Pill, MonitorCheck, Clock, Search, Users, Activity, Zap, Smartphone, Laptop, MousePointerClick, FolderOpen, Share2, Scale, LockKeyhole, Wifi } from 'lucide-react'
+import { Calendar, FileText, Shield, Brain, ArrowRight, Stethoscope, BarChart3, Pill, MonitorCheck, Clock, Search, Users, Activity, Zap, Smartphone, Laptop, MousePointerClick, FolderOpen, Share2, Scale, LockKeyhole, Wifi, Sparkles } from 'lucide-react'
 import NeuralBackground from '@/components/ui/NeuralBackground'
 
 const features = [
@@ -198,11 +198,6 @@ export default function HomePage() {
 
 
         <div className="relative mx-auto max-w-6xl px-4 sm:px-8 pt-20 sm:pt-28 pb-10 sm:pb-14 text-center">
-          <div className="inline-flex items-center gap-2 bg-white/80 backdrop-blur-xl border border-slate-200/60 rounded-full px-4 py-1.5 mb-8 shadow-sm">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[12px] font-semibold text-slate-600 tracking-wide uppercase">Plataforma verificada por Google</span>
-          </div>
-
           <h1 className="text-[40px] sm:text-[56px] font-bold text-slate-900 tracking-tight leading-[1.1]">
             Menos tiempo en la pantalla,
             <br />
@@ -294,7 +289,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Section: Powered by Gemini */}
+      {/* Section: Powered by AI */}
       <section className="bg-slate-100/40 backdrop-blur-md border-y border-white/30">
         <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-20">
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-10 sm:p-14">
@@ -302,21 +297,10 @@ export default function HomePage() {
             <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-transparent pointer-events-none" />
 
             <div className="relative flex flex-col lg:flex-row items-center gap-8 lg:gap-14">
-              {/* Gemini logo */}
+              {/* AI logo */}
               <div className="flex-shrink-0">
                 <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center">
-                  <svg viewBox="0 0 28 28" className="w-12 h-12 sm:w-14 sm:h-14">
-                    <defs>
-                      <linearGradient id="gemini-g1" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#4285F4" />
-                        <stop offset="25%" stopColor="#9B72CB" />
-                        <stop offset="50%" stopColor="#D96570" />
-                        <stop offset="75%" stopColor="#D96570" />
-                        <stop offset="100%" stopColor="#9B72CB" />
-                      </linearGradient>
-                    </defs>
-                    <path d="M14 0C14 7.732 7.732 14 0 14c7.732 0 14 6.268 14 14 0-7.732 6.268-14 14-14C20.268 14 14 7.732 14 0Z" fill="url(#gemini-g1)" />
-                  </svg>
+                  <Sparkles className="w-12 h-12 sm:w-14 sm:h-14 text-white" />
                 </div>
               </div>
 
@@ -324,14 +308,14 @@ export default function HomePage() {
               <div className="text-center lg:text-left flex-1">
                 <p className="text-[11px] font-semibold text-white/50 uppercase tracking-widest mb-3">Potenciado por inteligencia artificial</p>
                 <h2 className="text-[24px] sm:text-[30px] font-bold text-white tracking-tight leading-tight">
-                  Google Gemini es tu aliado
+                  Spinus es tu aliado
                   <br className="hidden sm:block" />
-                  <span className="bg-gradient-to-r from-[#4285F4] via-[#9B72CB] to-[#D96570] bg-clip-text text-transparent">
+                  <span className="text-[#4a9fd4]">
                     para cada consulta
                   </span>
                 </h2>
                 <p className="mt-4 text-[15px] text-white/60 leading-relaxed max-w-lg mx-auto lg:mx-0">
-                  La IA analiza laboratorios, estructura notas médicas y te asiste en tiempo real. Tú aportas el criterio clínico — Gemini se encarga del trabajo pesado.
+                  La IA analiza laboratorios, estructura notas médicas y te asiste en tiempo real. Tú aportas el criterio clínico — Spinus se encarga del trabajo pesado.
                 </p>
                 <div className="mt-6 flex flex-wrap items-center justify-center lg:justify-start gap-3">
                   {['Notas médicas con IA', 'Análisis de laboratorios', 'Consulta rápida'].map((tag) => (

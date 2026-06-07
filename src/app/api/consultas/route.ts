@@ -65,17 +65,33 @@ export async function POST(req: NextRequest) {
     const { paciente_id } = body
     if (!paciente_id) return NextResponse.json({ error: 'paciente_id requerido' }, { status: 400 })
 
-    // NOM-004-SSA3: campos obligatorios de la nota clínica
-    const camposFaltantes: string[] = []
-    if (!body.motivo_consulta?.trim()) camposFaltantes.push('Motivo de consulta')
-    if (!body.exploracion_fisica?.trim()) camposFaltantes.push('Exploración física')
-    if (!body.diagnosticos || (Array.isArray(body.diagnosticos) && body.diagnosticos.length === 0)) camposFaltantes.push('Diagnóstico')
-    if (!body.plan_tratamiento?.trim()) camposFaltantes.push('Plan de tratamiento')
-    if (camposFaltantes.length > 0) {
+    const notaOrigen: 'ia' | 'manual' =
+      body.nota_origen === 'manual' ? 'manual' : 'ia'
+
+    // motivo_consulta es la única columna NOT NULL de consultas → obligatoria en
+    // ambos modos (en IA es el textarea del caso).
+    if (!body.motivo_consulta?.trim()) {
       return NextResponse.json(
-        { error: `Campos obligatorios faltantes: ${camposFaltantes.join(', ')}` },
+        { error: 'Campos obligatorios faltantes: Motivo de consulta' },
         { status: 400 }
       )
+    }
+
+    // NOM-004-SSA3: en modo MANUAL el médico captura a mano → exploración,
+    // diagnóstico y plan son obligatorios. En modo IA esos van DENTRO de la
+    // narrativa (exploración/plan) o pueden no venir (dx); no se exigen aquí.
+    // Defensa en profundidad: el endpoint no confía solo en el frontend.
+    if (notaOrigen === 'manual') {
+      const camposFaltantes: string[] = []
+      if (!body.exploracion_fisica?.trim()) camposFaltantes.push('Exploración física')
+      if (!body.diagnosticos || (Array.isArray(body.diagnosticos) && body.diagnosticos.length === 0)) camposFaltantes.push('Diagnóstico')
+      if (!body.plan_tratamiento?.trim()) camposFaltantes.push('Plan de tratamiento')
+      if (camposFaltantes.length > 0) {
+        return NextResponse.json(
+          { error: `Campos obligatorios faltantes: ${camposFaltantes.join(', ')}` },
+          { status: 400 }
+        )
+      }
     }
 
     // RLS filtra por clinica_id automáticamente
@@ -91,9 +107,6 @@ export async function POST(req: NextRequest) {
       .select('logo_url')
       .eq('id', profile.clinica_id)
       .single()
-
-    const notaOrigen: 'ia' | 'manual' =
-      body.nota_origen === 'manual' ? 'manual' : 'ia'
 
     const { data: consulta, error } = await supabase.from('consultas').insert({
       paciente_id,
