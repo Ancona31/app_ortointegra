@@ -58,7 +58,7 @@ function AppMockup() {
       {/* Sidebar */}
       <div className="w-[180px] bg-white/90 border-r border-slate-200/60 p-4 flex-shrink-0 hidden sm:block">
         <div className="flex items-center gap-2 mb-6">
-          <Image src="/logo-spinus.png" alt="Spinus" width={24} height={24} className="object-contain" />
+          <Image src="/logo-spinus.png" alt="Spinus" width={800} height={777} className="object-contain h-6 w-auto" />
           <span className="text-[11px] font-bold text-slate-800">Spinus®</span>
         </div>
         <div className="space-y-1">
@@ -171,7 +171,7 @@ export default function HomePage() {
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/60">
         <nav className="mx-auto max-w-6xl flex items-center justify-between px-4 sm:px-8 h-14">
           <div className="flex items-center gap-2.5">
-            <Image src="/logo-spinus.png" alt="Spinus" width={36} height={36} className="object-contain" />
+            <Image src="/logo-spinus.png" alt="Spinus" width={800} height={777} className="object-contain h-9 w-auto" />
             <span className="text-[17px] font-bold text-slate-900 tracking-tight">Spinus®</span>
           </div>
           <div className="flex items-center gap-3">
@@ -723,7 +723,7 @@ export default function HomePage() {
         <div className="mx-auto max-w-6xl px-4 sm:px-8 py-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2.5">
-              <Image src="/logo-spinus.png" alt="Spinus" width={28} height={28} className="object-contain" />
+              <Image src="/logo-spinus.png" alt="Spinus" width={800} height={777} className="object-contain h-7 w-auto" />
               <span className="text-[13px] text-slate-500">&copy; {new Date().getFullYear()} Spinus®. Todos los derechos reservados.</span>
             </div>
             <div className="flex items-center gap-6">

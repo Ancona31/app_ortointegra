@@ -171,9 +171,9 @@ export default function InicioPage() {
             <Image
               src="/logo-spinus.png"
               alt="Spinus"
-              width={56}
-              height={56}
-              className="rounded-xl"
+              width={800}
+              height={777}
+              className="rounded-xl h-14 w-auto"
             />
             <span className={`text-lg font-semibold tracking-wide ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
               Spinus<span className="align-super text-xs">&reg;</span>

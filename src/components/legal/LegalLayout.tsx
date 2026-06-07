@@ -13,9 +13,9 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
             <Image
               src="/logo-spinus.png"
               alt="Spinus"
-              width={36}
-              height={36}
-              className="object-contain"
+              width={800}
+              height={777}
+              className="object-contain h-9 w-auto"
               priority
             />
             <span className="text-[17px] font-bold text-slate-900 tracking-tight">Spinus®</span>
@@ -48,9 +48,9 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
               <Image
                 src="/logo-spinus.png"
                 alt="Spinus"
-                width={28}
-                height={28}
-                className="object-contain"
+                width={800}
+                height={777}
+                className="object-contain h-7 w-auto"
               />
               <span className="text-[13px] text-slate-500">
                 &copy; {year} Spinus®. Todos los derechos reservados.

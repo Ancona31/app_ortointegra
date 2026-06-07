@@ -65,9 +65,9 @@ export default function SuperAdminSidebar(): ReactElement {
         <Image
           src="/logo-spinus.png"
           alt="Spinus"
-          width={28}
-          height={28}
-          className="object-contain"
+          width={800}
+          height={777}
+          className="object-contain h-7 w-auto"
           priority
         />
         <div className="flex flex-col leading-none">
