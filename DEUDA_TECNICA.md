@@ -531,7 +531,7 @@ Estado: 🔴 abierta · 🟡 en progreso · 🟢 resuelta (se elimina al cerrar)
   no la bloquea.
 
 ### NIA-DT-2 — Rate limit obsoleto con entrevista multi-turno
-- **Estado:** 🔴 abierta
+- **Estado:** 🟡 mitigada
 - **Detectada:** Refactor de la nota IA a dos llamadas + entrevista multi-turno
   (2026-06-06).
 - **Archivos afectados:**
@@ -551,6 +551,10 @@ Estado: 🔴 abierta · 🟡 en progreso · 🟢 resuelta (se elimina al cerrar)
   vez de "por llamada", de forma que los turnos de entrevista no consuman cupo.
   Revisar de forma holística junto con el resto del rate limiting cuando se cablee
   el frontend de la entrevista.
+- **Resolución (2026-06-07):** Mitigado subiendo el límite a 60/24h (opción a). La
+  opción b (contar "por nota generada" —status completa— en vez de "por llamada")
+  queda como mejora futura si el límite por llamada resulta insuficiente o impreciso
+  en uso real.
 
 ---
 
