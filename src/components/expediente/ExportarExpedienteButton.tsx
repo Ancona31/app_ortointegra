@@ -30,7 +30,6 @@ const EXTRA_CSS = `
     margin-bottom:6px;
   }
   .consulta-fecha { font-weight:700; color:#1a3a5c; font-size:9.5pt; }
-  .consulta-motivo { font-size:8.5pt; color:#64748b; }
   .diag-chip {
     display:inline-block; background:#eef3fa; color:#1a3a5c; font-size:7.5pt;
     padding:1px 6px; border-radius:3px; margin:2px 2px 2px 0;
@@ -134,7 +133,6 @@ export default function ExportarExpedienteButton({ paciente, consultas, addendum
           <div class="consulta-bloque">
             <div class="consulta-header">
               <span class="consulta-fecha">${fecha}</span>
-              <span class="consulta-motivo">${c.motivo_consulta}</span>
             </div>
             ${diagnosticosHtml ? `<div style="margin-bottom:6px">${diagnosticosHtml}</div>` : ''}
             ${c.notas_evolucion ? `<div class="nota-content">${markdownToHtml(c.notas_evolucion)}</div>` : ''}

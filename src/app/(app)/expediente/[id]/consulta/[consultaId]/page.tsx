@@ -29,6 +29,18 @@ type Addendum = {
   created_at: string
 }
 
+// Mismo patrón que ModalConsultas: muestra el primer diagnóstico (CIE-10 ·
+// descripción) y cae al motivo_consulta si la consulta no tiene diagnóstico.
+function diagnosticoTexto(c: Consulta): string {
+  const primero = c.diagnosticos?.[0]
+  if (primero?.descripcion) {
+    return primero.codigo_cie10
+      ? `${primero.codigo_cie10} · ${primero.descripcion}`
+      : primero.descripcion
+  }
+  return c.motivo_consulta || 'Consulta sin detalles'
+}
+
 export default function ConsultaDetallePage() {
   const { id, consultaId } = useParams<{ id: string; consultaId: string }>()
   useAuditAccess('consultas', consultaId)
@@ -217,8 +229,8 @@ export default function ConsultaDetallePage() {
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-5 border-b border-slate-100">
           <div>
-            <span className="text-xs text-slate-400 block mb-1">Motivo de consulta</span>
-            <p className="text-sm font-medium text-slate-800">{consulta.motivo_consulta}</p>
+            <span className="text-xs text-slate-400 block mb-1">Diagnóstico</span>
+            <p className="text-sm font-medium text-slate-800">{diagnosticoTexto(consulta)}</p>
           </div>
           <div>
             <span className="text-xs text-slate-400 block mb-1">Próxima cita</span>
