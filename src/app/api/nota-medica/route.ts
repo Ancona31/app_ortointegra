@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { GoogleGenAI, ThinkingLevel, type Content } from '@google/genai'
+import { GoogleGenAI, ThinkingLevel, FinishReason, type Content } from '@google/genai'
 import { createClient } from '@/lib/supabase/server'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { sanitizePromptInput, sanitizeNumber } from '@/lib/sanitize'
 import { anonimizarTexto, anonimizarHistorial } from '@/lib/anonimizar'
-import { notaIAResponseSchema, type NotaIAResponse } from '@/lib/notaIA/schema'
+import { notaIAResponseSchema, medicamentosExtraccionSchema, type NotaIAResponse, type NotaIAContenido, type MedicamentoIA, type MedicamentosExtraccion } from '@/lib/notaIA/schema'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! })
 
@@ -70,7 +70,7 @@ FORMATO SOAP DE LA NOTA FINAL. Cuando generes la nota (status "completa"), redá
 - Juicio clínico: breve correlación entre los hallazgos y el diagnóstico. Es REDACCIÓN del razonamiento que sustenta el diagnóstico YA establecido por el médico, NO una opinión diagnóstica tuya ni diagnósticos alternativos.
 
 [PLAN]
-- Tratamiento: los medicamentos y tratamientos que el médico INDICÓ, transcritos fielmente. Para cada medicamento que el médico haya especificado: nombre, dosis, vía, frecuencia y duración tal como el médico los dio (no inventes datos que el médico no escribió; si falta un dato, omítelo). Incluye intervenciones, medidas físicas y cuidados generales que el médico haya indicado. NUNCA inventes ni sugieras tratamientos que el médico no indicó.
+- Tratamiento: los medicamentos y tratamientos que el médico INDICÓ, transcritos fielmente. Para cada medicamento que el médico haya especificado: nombre, dosis, vía, frecuencia y duración tal como el médico los dio (no inventes datos que el médico no escribió; si falta un dato, omítelo — por ejemplo, si el médico no dio la duración, NO la inventes: redacta el tratamiento sin ese dato). Incluye intervenciones, medidas físicas y cuidados generales que el médico haya indicado. NUNCA inventes ni sugieras tratamientos que el médico no indicó.
 - Estudios solicitados: los que el médico haya indicado. Si el médico confirmó que no requiere estudios, escribe: "Por el momento no se requieren estudios adicionales."
 - Educación al paciente: indicación general de que se explicó al paciente la naturaleza de su padecimiento y las medidas para evitar perpetuar o agravar el daño, adaptada al diagnóstico.
 - Signos de alarma: los datos de alarma pertinentes al diagnóstico establecido, por los cuales el paciente debe buscar atención inmediata.
@@ -90,9 +90,121 @@ FORMATO DE RESPUESTA (JSON OBLIGATORIO): Respondes SIEMPRE con un único objeto 
 
 Cuando faltan datos: status "faltan_datos"; "bloques" es un arreglo de máximo 3 bloques, cada bloque con un "titulo" y su arreglo de "preguntas"; "nota" es null. Cada pregunta tiene: "id" (identificador corto y único), "pregunta" (texto claro y clínicamente preciso), "opciones" (arreglo de respuestas sugeridas para elegir; puede ir vacío si la pregunta es abierta), "permite_texto_libre" (casi siempre true).
 
-Cuando tienes contexto suficiente: status "completa"; "bloques" es un arreglo vacío; "nota" contiene "narrativa" (el texto completo de la nota SOAP con las 4 secciones [SUBJETIVO], [OBJETIVO], [ANÁLISIS], [PLAN], incluyendo el tratamiento con medicamentos en el texto del [PLAN]) y "estructurado" con: "motivo_consulta" (conciso), "exploracion_fisica" (hallazgos), "plan_tratamiento" (plan no farmacológico e indicaciones, sin medicamentos), "diagnosticos" (arreglo de objetos con "codigo_cie10" si hay certeza y "descripcion" con formato "Descripción oficial - complemento LATERALIDAD"), y "medicamentos" (arreglo de objetos con "nombre", "dosis", "frecuencia", "duracion"; solo los que el médico indicó, omitiendo campos no dados; arreglo vacío si no hay).
+Cuando tienes contexto suficiente: status "completa"; "bloques" es un arreglo vacío; "nota" contiene "narrativa" (el texto completo de la nota SOAP con las 4 secciones [SUBJETIVO], [OBJETIVO], [ANÁLISIS], [PLAN], incluyendo el tratamiento con medicamentos en el texto del [PLAN]) y "estructurado" con: "motivo_consulta" (conciso), "exploracion_fisica" (hallazgos), "plan_tratamiento" (plan no farmacológico e indicaciones, sin medicamentos), "diagnosticos" (arreglo de objetos con "codigo_cie10" si hay certeza y "descripcion" con formato "Descripción oficial - complemento LATERALIDAD").
 
-COHERENCIA: los medicamentos aparecen TANTO en el texto de la narrativa (en [PLAN]) COMO en el arreglo "medicamentos", y deben coincidir (mismos fármacos, mismas dosis). El diagnóstico de la narrativa y el de "diagnosticos" deben ser el mismo.`
+COHERENCIA: el diagnóstico de la narrativa y el de "diagnosticos" deben ser el mismo.`
+
+const MAX_INTENTOS = 3
+
+// Umbral de longitud por campo: un valor desbocado delata un loop de repetición
+// del modelo. Es la red determinista — un campo así NUNCA pasa como válido.
+const LIMITES_CAMPO = {
+  codigo_cie10: 20,
+  descripcion: 400,
+} as const
+
+// Devuelve el nombre del campo desbocado, o null si todas las longitudes son sanas.
+const validarLongitudes = (nota: NotaIAContenido): string | null => {
+  for (const d of nota.estructurado.diagnosticos) {
+    if ((d.codigo_cie10 ?? '').length > LIMITES_CAMPO.codigo_cie10) return 'diagnostico.codigo_cie10'
+    if ((d.descripcion ?? '').length > LIMITES_CAMPO.descripcion) return 'diagnostico.descripcion'
+  }
+  return null
+}
+
+type EvalResult =
+  | { ok: true; parsed: NotaIAResponse }
+  | { ok: false; motivo: string }
+
+// Clasifica la respuesta: defectuosa (truncada / vacía / JSON inválido / campo
+// desbocado por loop) o válida con su JSON parseado.
+const evaluarRespuesta = (
+  finishReason: FinishReason | undefined,
+  raw: string | undefined,
+): EvalResult => {
+  if (finishReason === FinishReason.MAX_TOKENS) return { ok: false, motivo: 'finishReason MAX_TOKENS' }
+  if (!raw) return { ok: false, motivo: 'respuesta vacía' }
+  let parsed: NotaIAResponse
+  try {
+    parsed = JSON.parse(raw) as NotaIAResponse
+  } catch {
+    return { ok: false, motivo: 'JSON inválido' }
+  }
+  if (parsed.nota) {
+    const campo = validarLongitudes(parsed.nota)
+    if (campo) return { ok: false, motivo: `campo desbocado: ${campo}` }
+  }
+  return { ok: true, parsed }
+}
+
+// Reintenta el MISMO turno (mismo historial + mensaje) hasta MAX_INTENTOS si la
+// respuesta es defectuosa. Cada intento reconstruye el chat desde cero (no acumula
+// turnos). Devuelve la nota válida, o null si todos los intentos fallaron.
+const generarNotaConReintentos = async (
+  systemInstruction: string,
+  history: Content[],
+  mensaje: string,
+): Promise<NotaIAResponse | null> => {
+  for (let intento = 1; intento <= MAX_INTENTOS; intento++) {
+    const chat = ai.chats.create({
+      model: 'gemini-3.5-flash',
+      config: {
+        systemInstruction,
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        responseMimeType: 'application/json',
+        responseSchema: notaIAResponseSchema,
+        maxOutputTokens: 8192,
+      },
+      history,
+    })
+    const response = await chat.sendMessage({ message: mensaje })
+    const resultado = evaluarRespuesta(response.candidates?.[0]?.finishReason, response.text)
+    if (resultado.ok) return resultado.parsed
+  }
+  return null
+}
+
+// ── Llamada 2: extracción de medicamentos desde la narrativa ──────────────────
+// Prompt mínimo + schema chico + maxOutputTokens bajo. Determinista; si falla,
+// devuelve [] (la llamada 1 ya es buena; el PLAN de la narrativa conserva los
+// medicamentos por NOM-004). No lanza error.
+const EXTRACCION_SYSTEM_INSTRUCTION = `Eres un extractor de datos clínicos. Recibes el texto de una nota médica en formato SOAP. Tu ÚNICA tarea es extraer el NOMBRE de cada medicamento indicado en la sección [PLAN] / tratamiento y devolverlo como JSON conforme al schema. REGLAS: extrae SOLO el nombre del fármaco (ej. Meloxicam, Metocarbamol); NO extraigas dosis, frecuencia ni duración. Extrae SOLO fármacos escritos explícitamente en el texto; NUNCA inventes ni completes fármacos que no aparezcan. Si el texto no menciona ningún medicamento, devuelve arreglo vacío. Responde ÚNICAMENTE con el objeto JSON.`
+
+const MAX_INTENTOS_EXTRACCION = 2
+
+// Red mínima: la extracción ahora devuelve SOLO el nombre (alta entropía, no hace
+// loop). Un nombre desbocado (>80, el maxLength del schema) delataría un loop.
+const medicamentoDesbocado = (meds: MedicamentoIA[]): boolean =>
+  meds.some((m) => (m.nombre ?? '').length > 80)
+
+const extraerMedicamentos = async (narrativa: string): Promise<MedicamentoIA[]> => {
+  for (let intento = 1; intento <= MAX_INTENTOS_EXTRACCION; intento++) {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.5-flash',
+      contents: narrativa,
+      config: {
+        systemInstruction: EXTRACCION_SYSTEM_INSTRUCTION,
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        responseMimeType: 'application/json',
+        responseSchema: medicamentosExtraccionSchema,
+        maxOutputTokens: 512,
+      },
+    })
+    const finishReason = response.candidates?.[0]?.finishReason
+    const raw = response.text
+    if (finishReason === FinishReason.MAX_TOKENS || !raw) continue
+    let parsed: MedicamentosExtraccion
+    try {
+      parsed = JSON.parse(raw) as MedicamentosExtraccion
+    } catch {
+      continue
+    }
+    const meds = Array.isArray(parsed.medicamentos) ? parsed.medicamentos : []
+    if (medicamentoDesbocado(meds)) continue
+    return meds
+  }
+  return []
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -170,30 +282,29 @@ ${antecedentes ? `- Antecedentes: ${antecedentes}` : ''}`
 
     const systemInstruction = buildSystemInstruction(especialidades)
 
-    const chat = ai.chats.create({
-      model: 'gemini-3.5-flash',
-      config: {
-        systemInstruction,
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-        responseMimeType: 'application/json',
-        responseSchema: notaIAResponseSchema,
-        maxOutputTokens: 8192,
-      },
-      history: historialSDK, // multi-turno: reconstruye la entrevista previa
-    })
-
-    const response = await chat.sendMessage({ message: mensajeEfectivo })
-
-    const raw = response.text
-    if (!raw) {
-      return NextResponse.json({ error: 'La IA no devolvió contenido. Intenta de nuevo.' }, { status: 502 })
+    const parsed = await generarNotaConReintentos(systemInstruction, historialSDK, mensajeEfectivo)
+    if (!parsed) {
+      return NextResponse.json(
+        { error: 'La IA tuvo un problema al generar la nota. Intenta de nuevo.' },
+        { status: 502 }
+      )
     }
-    let parsed: NotaIAResponse
-    try {
-      parsed = JSON.parse(raw) as NotaIAResponse
-    } catch {
-      return NextResponse.json({ error: 'La IA devolvió una respuesta con formato inválido.' }, { status: 502 })
+
+    // Llamada 2 (extracción de medicamentos) SOLO cuando la nota es final
+    // ('completa'). En 'faltan_datos' (entrevista) cae directo al return de
+    // abajo, sin extracción. La llamada 2 NO cuenta para el rate limit.
+    if (parsed.status === 'completa' && parsed.nota) {
+      let meds: MedicamentoIA[] = []
+      try {
+        meds = await extraerMedicamentos(parsed.nota.narrativa)
+      } catch (errExtraccion) {
+        // B5: la llamada 2 NUNCA tumba una nota buena. Ante cualquier fallo,
+        // tabla vacía; el [PLAN] de la narrativa ya conserva los medicamentos.
+        console.error('Extracción de medicamentos falló, tabla vacía:', errExtraccion)
+      }
+      parsed.nota.estructurado.medicamentos = meds
     }
+
     return NextResponse.json(parsed)
 
   } catch (err: unknown) {

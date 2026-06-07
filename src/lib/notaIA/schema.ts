@@ -48,6 +48,11 @@ export interface NotaIAResponse {
   nota: NotaIAContenido | null // null cuando status === 'faltan_datos'
 }
 
+// Contrato de la llamada 2 (extracción de medicamentos desde la narrativa).
+export interface MedicamentosExtraccion {
+  medicamentos: MedicamentoIA[]
+}
+
 // ---------- responseSchema de Gemini (mismo shape, sin oneOf) ----------
 
 export const notaIAResponseSchema: Schema = {
@@ -97,31 +102,40 @@ export const notaIAResponseSchema: Schema = {
               items: {
                 type: Type.OBJECT,
                 properties: {
-                  codigo_cie10: { type: Type.STRING },
-                  descripcion: { type: Type.STRING },
+                  codigo_cie10: { type: Type.STRING, maxLength: '20', description: 'código CIE-10, ej. S53.0' },
+                  descripcion: { type: Type.STRING, maxLength: '400', description: 'descripción del diagnóstico' },
                 },
                 required: ['descripcion'], // codigo_cie10 es opcional
               },
             },
-            medicamentos: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  nombre: { type: Type.STRING },
-                  dosis: { type: Type.STRING },
-                  frecuencia: { type: Type.STRING },
-                  duracion: { type: Type.STRING },
-                },
-                required: ['nombre'], // solo nombre; dosis/frecuencia/duracion opcionales (IA omite lo que no sabe)
-              },
-            },
           },
-          required: ['motivo_consulta', 'exploracion_fisica', 'plan_tratamiento', 'diagnosticos', 'medicamentos'],
+          required: ['motivo_consulta', 'exploracion_fisica', 'plan_tratamiento', 'diagnosticos'],
         },
       },
       required: ['narrativa', 'estructurado'],
     },
   },
   required: ['status', 'bloques'],
+}
+
+// ---------- responseSchema de la extracción de medicamentos (llamada 2) ----------
+// Extracción SOLO-NOMBRE: dosis/frecuencia/duracion son campos de baja entropía
+// que hacían loop (MAX_TOKENS). El médico los completa en la tabla del frontend;
+// la narrativa del [PLAN] conserva la posología completa por NOM-004.
+
+export const medicamentosExtraccionSchema: Schema = {
+  type: Type.OBJECT,
+  properties: {
+    medicamentos: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          nombre: { type: Type.STRING, maxLength: '80', description: 'nombre del fármaco' },
+        },
+        required: ['nombre'], // solo nombre; dosis/frecuencia/duracion opcionales (IA omite lo que no sabe)
+      },
+    },
+  },
+  required: ['medicamentos'],
 }
