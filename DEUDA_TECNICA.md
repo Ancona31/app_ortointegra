@@ -530,6 +530,28 @@ Estado: 🔴 abierta · 🟡 en progreso · 🟢 resuelta (se elimina al cerrar)
   NOTA_IA_PROMPT_DISEÑO.md, "Pendiente al implementar (SF3)"), así que esta deuda
   no la bloquea.
 
+### NIA-DT-2 — Rate limit obsoleto con entrevista multi-turno
+- **Estado:** 🔴 abierta
+- **Detectada:** Refactor de la nota IA a dos llamadas + entrevista multi-turno
+  (2026-06-06).
+- **Archivos afectados:**
+  - src/lib/rateLimit.ts (límite 'nota-medica' = 20/24h, conteo por llamada)
+  - src/app/api/nota-medica/route.ts (cada turno de entrevista = 1 llamada al
+    endpoint)
+- **Descripción:** El límite actual de 'nota-medica' (20/24h) cuenta 1 por CADA
+  llamada al endpoint. Con el nuevo modelo de entrevista, una sola nota puede
+  consumir varias llamadas: 1 por cada turno de la entrevista (el médico responde
+  preguntas en varios turnos) + la generación final. Además, la llamada 2
+  (extracción de medicamentos) es interna y NO cuenta para el rate limit
+  (correcto). El límite "por llamada" ya no refleja "por nota".
+- **Impacto:** un médico que use la entrevista a fondo puede agotar el cupo
+  diario con pocas notas reales; el límite ya no mide lo que pretende.
+- **Mitigación recomendada:** decidir entre (a) subir el límite a ~60-80/24h para
+  absorber la entrevista, o (b) contar "por nota generada" (status completa) en
+  vez de "por llamada", de forma que los turnos de entrevista no consuman cupo.
+  Revisar de forma holística junto con el resto del rate limiting cuando se cablee
+  el frontend de la entrevista.
+
 ---
 
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)
