@@ -63,7 +63,8 @@ export default function ExpedientePage() {
       .range(pag * PAGE_SIZE, pag * PAGE_SIZE + PAGE_SIZE)
 
     if (busq.trim()) {
-      query = query.or(`nombre.ilike.%${busq}%,apellidos.ilike.%${busq}%`)
+      const busqNorm = busq.trim().replace(/\s+/g, ' ')
+      query = query.or(`nombre.ilike.%${busqNorm}%,apellidos.ilike.%${busqNorm}%`)
     }
 
     const { data, count } = await query

@@ -266,11 +266,12 @@ function usePacientes(query: string) {
     const timer = setTimeout(async () => {
       setLoading(true)
       const supabase = createClient()
+      const queryNorm = query.trim().replace(/\s+/g, ' ')
       const { data } = await supabase
         .from('pacientes')
         .select('id, nombre, apellidos, telefono')
         .neq('activo', false)
-        .or(`nombre.ilike.%${query}%,apellidos.ilike.%${query}%`)
+        .or(`nombre.ilike.%${queryNorm}%,apellidos.ilike.%${queryNorm}%`)
         .order('apellidos')
         .limit(8)
       setResults(data ?? [])

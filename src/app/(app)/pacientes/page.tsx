@@ -42,8 +42,9 @@ export default function PacientesPage() {
       .neq('activo', false)
 
     if (busquedaDebounced.length >= 2) {
+      const busquedaDebouncedNorm = busquedaDebounced.trim().replace(/\s+/g, ' ')
       query = query.or(
-        `nombre.ilike.%${busquedaDebounced}%,apellidos.ilike.%${busquedaDebounced}%,numero_expediente.ilike.%${busquedaDebounced}%`,
+        `nombre.ilike.%${busquedaDebouncedNorm}%,apellidos.ilike.%${busquedaDebouncedNorm}%,numero_expediente.ilike.%${busquedaDebouncedNorm}%`,
       )
     }
 

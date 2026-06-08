@@ -73,11 +73,12 @@ function DocumentosContent() {
       setBuscando(true)
 
       const supabase = createClient()
+      const busquedaNorm = busqueda.trim().replace(/\s+/g, ' ')
       const { data, error } = await supabase
         .from('pacientes')
         .select('id, nombre, apellidos')
         .neq('activo', false)
-        .or(`nombre.ilike.%${busqueda}%,apellidos.ilike.%${busqueda}%`)
+        .or(`nombre.ilike.%${busquedaNorm}%,apellidos.ilike.%${busquedaNorm}%`)
         .limit(8)
 
       if (!error) {

@@ -72,11 +72,12 @@ export default function CommandPalette() {
     if (!q.trim()) { setResults([]); return }
     setLoading(true)
     const supabase = createClient()
+    const qNorm = q.trim().replace(/\s+/g, ' ')
     const { data } = await supabase
       .from('pacientes')
       .select('id, nombre, apellidos, fecha_nacimiento, numero_expediente, sexo')
       .neq('activo', false)
-      .or(`nombre.ilike.%${q}%,apellidos.ilike.%${q}%`)
+      .or(`nombre.ilike.%${qNorm}%,apellidos.ilike.%${qNorm}%`)
       .order('apellidos')
       .limit(8)
     setResults(data || [])
