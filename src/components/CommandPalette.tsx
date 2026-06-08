@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Search, User, X, ArrowRight, Loader2, UserPlus, ChevronLeft } from 'lucide-react'
 import { calcularEdad } from '@/lib/patientUtils'
 import { useProfile } from '@/hooks/useProfile'
+import type { DuplicatePatientResponse } from '@/types'
 
 type Paciente = {
   id: string
@@ -39,6 +40,9 @@ export default function CommandPalette() {
   const [formFechaNac, setFormFechaNac] = useState('')
   const [formConsentimiento, setFormConsentimiento] = useState(false)
   const [creando, setCreando]       = useState(false)
+  const [duplicateWarning, setDuplicateWarning] = useState<DuplicatePatientResponse | null>(null)
+  const forceCreateRef = useRef(false)
+  const formRef = useRef<HTMLFormElement>(null)
 
   const inputRef    = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -132,15 +136,24 @@ export default function CommandPalette() {
           sexo: null,
           fecha_nacimiento: formFechaNac || null,
           consentimiento_otorgado: formConsentimiento,
+          ...(forceCreateRef.current ? { forceCreate: true } : {}),
         }),
       })
       const data = await res.json()
+
+      if (res.status === 409 && data.error === 'DUPLICATE_PATIENT') {
+        setDuplicateWarning(data as DuplicatePatientResponse)
+        return
+      }
+
       if (data.id) {
         setOpen(false)
+        setDuplicateWarning(null)
         router.push(isSecretary ? '/pacientes' : `/expediente/${data.id}`)
       }
     } finally {
       setCreando(false)
+      forceCreateRef.current = false
     }
   }
 
@@ -266,7 +279,7 @@ export default function CommandPalette() {
 
         {/* ── MODO REGISTRO RÁPIDO ────────────────────────── */}
         {modoCrear && (
-          <form onSubmit={handleCrear}>
+          <form ref={formRef} onSubmit={handleCrear}>
             {/* Header */}
             <div className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-100">
               <button
@@ -284,6 +297,52 @@ export default function CommandPalette() {
                 <X size={16} />
               </button>
             </div>
+
+            {duplicateWarning && (
+              <div className="px-4 pt-4">
+                <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4">
+                  <p className="mb-3 text-sm font-semibold text-amber-800">
+                    ⚠️ Este paciente ya está en tu lista de pacientes:{' '}
+                    {duplicateWarning.existingPatient.nombre} {duplicateWarning.existingPatient.apellidos}
+                    {duplicateWarning.existingPatient.numero_expediente && (
+                      <> (Exp. #{duplicateWarning.existingPatient.numero_expediente})</>
+                    )}
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const id = duplicateWarning.existingPatient.id;
+                        setDuplicateWarning(null);
+                        setOpen(false);
+                        router.push(isSecretary ? '/pacientes' : `/expediente/${id}`);
+                      }}
+                      className="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                    >
+                      Ir a su expediente
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        forceCreateRef.current = true;
+                        setDuplicateWarning(null);
+                        formRef.current?.requestSubmit();
+                      }}
+                      className="w-full rounded-xl border-2 border-amber-400 bg-white px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50"
+                    >
+                      Es otra persona, crear de todos modos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDuplicateWarning(null)}
+                      className="w-full rounded-xl bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-200"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Campos */}
             <div className="p-4 space-y-3">

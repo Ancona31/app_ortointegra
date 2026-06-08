@@ -499,6 +499,25 @@ Estado: 🔴 abierta · 🟡 en progreso · 🟢 resuelta (se elimina al cerrar)
   comportamiento de storage-api (p.ej. si el upsert dejara de resolverse por
   INSERT). Cualquiera que lea esta entrada NO debe construir nada.
 
+### E5-DT-23 — unaccent instalada pero no cableada en búsqueda/detección
+- **Estado:** 🟡 abierta
+- **Detectada:** Sesión de fix de Bug #1/Bug #2 (2026-06-08).
+- **Archivo afectado:** Queries de búsqueda en 6 componentes cliente (CommandPalette, ConsultaRapidaModal, /expediente, /pacientes, /documentos, /agenda) + query de detección TS-side en `/api/pacientes/route.ts`.
+- **Descripción:** La extensión Postgres `unaccent` está instalada en producción y `authenticated` tiene permiso de EXECUTE (verificado empíricamente el 2026-06-08 con `SELECT unaccent('Pérez García')` que devolvió `Perez Garcia`). Sin embargo, NO está cableada en ninguna query del repo: ni el RPC `crear_paciente_con_medico_v2`, ni las 6 barras de búsqueda, ni el bloque de detección TS-side la usan. Como `ilike` de Postgres es case-insensitive pero NO accent-insensitive, búsquedas tipo "perez" no encuentran "Pérez" con tilde, y la detección TS-side no detecta duplicados cuando uno tiene tilde y el otro no.
+- **Fix pendiente:** Cablear `unaccent` en los predicados ilike de queries de búsqueda y detección. Patrón sugerido para client-side: `.filter('unaccent(nombre)', 'ilike', unaccent_normalized_input)`. Patrón sugerido para SQL: `unaccent(nombre) ILIKE unaccent(input)`. Tradeoff: mejora UX de búsqueda pero requiere refactorizar 6 barras + endpoint + posible función wrapper si el filter de PostgREST no soporta funciones directas en la columna.
+- **Cuándo atacar:** Sin urgencia. Es mejora real de UX pero no bloquea funcionalidad. Cuando se reciban reportes concretos de "no encuentro a Pérez si escribo Perez" o cuando se decida una sesión dedicada de mejora de búsqueda.
+- **Relación con otras deudas:** Independiente. No bloquea ni es bloqueada por otras.
+
+### E5-DT-24 — Médico invitado sin visibilidad cross-médico en detección TS-side de duplicados
+- **Estado:** 🟡 abierta (limitación aceptada conscientemente)
+- **Detectada:** Sesión de fix de Bug #1 (2026-06-08), durante auditoría con ojos frescos del Bloque B.
+- **Archivo afectado:** `src/app/api/pacientes/route.ts` (bloque de detección TS-side añadido en commit del 2026-06-08).
+- **Descripción:** La detección TS-side de duplicados (añadida para cubrir el caso "sin fecha de nacimiento" que el RPC no cubre) corre bajo el cliente authenticated con la RLS actual de `pacientes`. La policy `pacientes_select_activos` permite ver todos los pacientes de la clínica si el usuario es admin o secretaria, pero solo los propios (vía `soy_medico_tratante(id)` que consulta `paciente_medico`) si es médico invitado no-admin. Por tanto, un médico invitado intentando crear un paciente sin fecha que ya existe registrado por OTRO médico de la misma clínica NO disparará la alerta TS-side. Además, el RPC tampoco respalda este caso (solo detecta cuando hay fecha). Brecha real: sin fecha + médico invitado + duplicado registrado por colega = duplicado se crea.
+- **Mitigación parcial actual:** Para admin/secretaria (incluyendo Angel como admin de OrtoIntegra) la detección funciona completa porque la RLS deja ver todos los pacientes de la clínica. Para mono-médico también funciona (no hay otros médicos en la clínica que puedan haber registrado al paciente). La brecha solo se materializa en clínicas multi-médico con médicos invitados no-admin.
+- **Fix pendiente:** Dos opciones: (a) modificar la query TS-side para usar admin client (createAdminClient con service_role) cuando se necesita ver toda la clínica para detección; (b) crear un RPC SECURITY DEFINER dedicado solo para detección sin-fecha que bypassse RLS de forma controlada. Ambas requieren auditoría de seguridad.
+- **Cuándo atacar:** Cuando se habilite multi-médico real con médicos invitados activos. Mientras Angel siga como admin único de OrtoIntegra, no se materializa.
+- **Relación con otras deudas:** Conectada a E5-DT-21 (divergencia creador vs tratante en `documentos-pdf`) — ambas son consecuencias de que la app está siendo migrada de mono-médico a multi-médico y hay vectores latentes.
+
 ---
 
 ## Nota IA — Rediseño

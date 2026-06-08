@@ -26,6 +26,30 @@ export function toTitleCase(str: string): string {
     .join(' ')
 }
 
+/**
+ * Normaliza un string para búsqueda y comparación de pacientes.
+ *
+ * Aplica: trim() + colapso de espacios internos + lowercase.
+ * NO normaliza tildes: la extensión unaccent está instalada en BD pero
+ * todavía no cableada en las queries de búsqueda/detección (deuda E5-DT-23).
+ *
+ * Convergente con la primera mitad de toTitleCase: ambos aplican trim +
+ * colapso de espacios; toTitleCase añade capitalización; este helper añade
+ * lowercase para normalizar input antes de comparar contra valores ya
+ * guardados con toTitleCase (que mantiene tildes y capitalización).
+ *
+ * Uso típico:
+ * - Input al endpoint /api/pacientes para detección TS-side de duplicados.
+ * - Cualquier comparación case-insensitive entre input y valor en BD.
+ *
+ * @param s String a normalizar (puede ser null/undefined; devuelve '').
+ * @returns String normalizado o cadena vacía si entrada inválida.
+ */
+export function normalizarParaBusqueda(s: string | null | undefined): string {
+  if (!s) return '';
+  return s.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
 /* ──────────────────────────────────────────────────────────────────────
    Cálculo de edad — precisión médica
    ────────────────────────────────────────────────────────────────────── */

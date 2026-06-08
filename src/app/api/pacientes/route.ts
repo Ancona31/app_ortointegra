@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isMedico } from '@/lib/permissions';
+import { normalizarParaBusqueda } from '@/lib/patientUtils';
 import type { DuplicatePatientResponse } from '@/types';
 
 export async function POST(req: NextRequest) {
@@ -63,6 +64,71 @@ export async function POST(req: NextRequest) {
       alergias: body.alergias ?? null,
       medicamentos_actuales: body.medicamentos_actuales ?? null,
     };
+
+    // ─── DETECCIÓN TS-SIDE DE DUPLICADOS (Bug #1 fix, 2026-06-08) ──────────────
+    // El RPC crear_paciente_con_medico_v2 tiene un gate que SOLO dispara la
+    // detección si llega fecha_nacimiento (líneas 134-144 del RPC). Como 3 de
+    // los 4 modales no recogen fecha o la marcan opcional, la alerta dispara
+    // <10% de las veces y los duplicados se cuelan.
+    //
+    // Esta detección TS-side cubre el caso "sin fecha": busca por nombre+apellidos
+    // con normalización equivalente a la del RPC (lower + trim + colapso espacios
+    // vía helper normalizarParaBusqueda).
+    //
+    // Exclusividad con el RPC:
+    // - Si HAY fecha → el RPC lo cubre. Este bloque NO interviene.
+    // - Si NO HAY fecha → el fix TS detecta. El RPC se salta detección por su gate.
+    // Por tanto nunca compiten sobre el mismo input; no hay doble 409.
+    //
+    // Limitaciones aceptadas (registradas como deudas):
+    // - E5-DT-23: tildes no normalizadas (unaccent instalada pero no cableada).
+    // - E5-DT-24: médico invitado (no admin) solo ve sus propios pacientes por
+    //   RLS, así que no detecta cross-médico sin fecha. Para admin/secretaria
+    //   funciona completo (RLS deja ver todos los pacientes de la clínica).
+    //
+    // Saltamos si forceCreate=true (usuario ya confirmó "es otra persona").
+    // Si la query falla → log y dejar pasar (fail-open): el RPC sigue siendo
+    // el guard primario cuando hay fecha.
+    if (body.forceCreate !== true) {
+      const nombreNorm    = normalizarParaBusqueda(p_datos.nombre);
+      const apellidosNorm = normalizarParaBusqueda(p_datos.apellidos);
+      const fechaNorm     = p_datos.fecha_nacimiento;
+
+      if (nombreNorm && apellidosNorm && !fechaNorm) {
+        const { data: candidatos, error: candError } = await supabase
+          .from('pacientes')
+          .select('id, nombre, apellidos, numero_expediente, fecha_nacimiento, medico_id')
+          .eq('clinica_id', profile.clinica_id)
+          .or('activo.is.true,activo.is.null')
+          .filter('nombre', 'ilike', nombreNorm)
+          .filter('apellidos', 'ilike', apellidosNorm)
+          .order('created_at', { ascending: true })
+          .limit(1);
+
+        if (candError) {
+          console.error('[pacientes] Error en detección TS-side de duplicados:', candError);
+          // No bloqueamos: fail-open hacia el RPC.
+        } else if (candidatos && candidatos.length > 0) {
+          const dup = candidatos[0];
+          const dup_es_mio = dup.medico_id === medico_id;
+
+          const response: DuplicatePatientResponse = {
+            error: 'DUPLICATE_PATIENT',
+            existingPatient: {
+              id: dup.id,
+              nombre: dup.nombre,
+              apellidos: dup.apellidos,
+              numero_expediente: dup.numero_expediente,
+              fecha_nacimiento: dup.fecha_nacimiento,
+            },
+            message: 'Ya existe un paciente con estos datos',
+            existingPatientIsMine: dup_es_mio,
+          };
+          return NextResponse.json(response, { status: 409 });
+        }
+      }
+    }
+    // ─── FIN DETECCIÓN TS-SIDE ─────────────────────────────────────────────────
 
     // 8. LLAMAR AL RPC
     const { data, error } = await supabase
