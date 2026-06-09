@@ -161,9 +161,39 @@ server-side ni allowlist** (solo valida auth).
 
 ## Protocolos
 
-- **Desde Fase 1: Protocolo D-T6.** Una query a la vez vía SQL Editor (nunca CLI), validación
-  con Angel antes de la siguiente, stop + mitigación ante resultado inesperado, smoke test tras
-  cada cambio, luego validación a nivel app. Producción — los errores son fatales.
-- Claude Code: investigador read-only / propone diffs y se detiene; nunca git. Angel corre
-  tsc/lint/git y commitea manualmente.
-- Deuda transversal -> `DEUDA_TECNICA.md`. Deuda acotada a un sub-paso -> "Fuera de alcance" de este plan.
+### Producción — regla rectora
+Trabajamos sobre la base de datos en PRODUCCIÓN. **No se aplica nada que pueda romper
+producción.** Cualquier duda sobre seguridad de un cambio = no se aplica hasta resolverla.
+Los errores son fatales e irreversibles para datos clínicos reales.
+
+### Gate de auditoría obligatorio (todo script SQL o código nuevo)
+Antes de aplicar CUALQUIER script o cambio de código:
+1. **Propuesta** — Claude Code redacta el script/diff (read-only, no ejecuta nada).
+2. **Auditoría** — Claude Code audita la propuesta y dictamina riesgos de ruptura
+   (trigger protector, RLS, FKs, dependencias, reescritura/bloqueo de tabla, snapshots
+   NOM-004, puntos de lectura, intentos previos, etc.). Read-only, solo dictamen.
+3. **Corrección** — si hay riesgo, se corrige.
+4. **Re-auditoría** — la versión corregida vuelve al paso 2.
+5. **Aplicación** — solo cuando el auditor corrobora que es seguro. Recién ahí entra D-T6.
+
+### Mitigación y rollback obligatorios (todo script SQL)
+Ningún script SQL se ejecuta sin traer, junto al script:
+- **Mitigación**: qué hacer si una query devuelve un resultado inesperado (cuándo parar,
+  qué revisar antes de continuar).
+- **Rollback**: el SQL exacto que revierte el cambio, validado de antemano. Si un cambio no
+  es razonablemente reversible, se rediseña o no se aplica.
+
+### Protocolo D-T6 (ejecución, solo tras visto bueno de auditoría)
+Una query a la vez vía SQL Editor (NUNCA Supabase CLI). Angel ejecuta cada query, valida el
+resultado con Claude antes de la siguiente, para y activa mitigación ante cualquier resultado
+inesperado, hace smoke test tras cada cambio, y luego valida a nivel app.
+
+### División de ejecución
+- **Claude Code**: investiga (read-only), propone scripts/diffs, audita, propone mitigación y
+  rollback. NUNCA ejecuta SQL, NUNCA git, y **NUNCA corre build ni lint ni tsc**.
+- **Angel**: corre build/lint/tsc directo en consola, ejecuta las queries SQL en el SQL Editor
+  una a una, y hace git add/commit/push manualmente.
+
+### Tracking de deuda
+Deuda transversal -> `DEUDA_TECNICA.md`. Deuda acotada a un sub-paso -> "Fuera de alcance" de
+este plan.

@@ -39,6 +39,7 @@
     "@types/qrcode": "^1.5.6",
     "browser-image-compression": "2.0.2",
     "date-fns": "^4.1.0",
+    "date-fns-tz": "^3.2.0",
     "dicom-parser": "^1.8.21",
     "dompurify": "^3.3.3",
     "googleapis": "^171.4.0",
