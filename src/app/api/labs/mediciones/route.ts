@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { CrearMedicionSchema } from '@/lib/labs/schemas'
-
-function combinarFechaHora(fecha: string, hora: string): string {
-  const local = new Date(`${fecha}T${hora}:00`)
-  if (Number.isNaN(local.getTime())) throw new Error('Fecha/hora inválida')
-  return local.toISOString()
-}
+import { fechaHoraLocalAInstante } from '@/lib/dates'
 
 export async function POST(req: NextRequest) {
   try {
@@ -83,7 +78,7 @@ export async function POST(req: NextRequest) {
     if (pacError) return NextResponse.json({ error: pacError.message }, { status: 500 })
     if (!paciente) return NextResponse.json({ error: 'Paciente no encontrado' }, { status: 404 })
 
-    const medidoEn = combinarFechaHora(input.fecha, input.hora)
+    const medidoEn = fechaHoraLocalAInstante(input.fecha, input.hora)
     const notas = input.notas?.trim() || null
 
     if (input.tipo === 'catalogo') {
