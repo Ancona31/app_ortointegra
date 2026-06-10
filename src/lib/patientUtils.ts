@@ -1,4 +1,5 @@
-import { differenceInYears, differenceInMonths, differenceInDays, parseISO } from 'date-fns'
+import { differenceInYears, differenceInMonths, differenceInDays } from 'date-fns'
+import { hoyEnTZ, fechaSoloSegura } from '@/lib/dates'
 
 /* ──────────────────────────────────────────────────────────────────────
    Title Case — normalización de nombres de pacientes
@@ -70,8 +71,8 @@ export interface EdadPaciente {
  *   - ≥ 2 años       → "X años"
  */
 export function calcularEdad(fechaNacimiento: string): EdadPaciente {
-  const nacimiento = parseISO(fechaNacimiento)
-  const hoy = new Date()
+  const nacimiento = fechaSoloSegura(fechaNacimiento)
+  const hoy = fechaSoloSegura(hoyEnTZ())
 
   const anios = differenceInYears(hoy, nacimiento)
   const totalMeses = differenceInMonths(hoy, nacimiento)
@@ -102,8 +103,7 @@ export function calcularEdad(fechaNacimiento: string): EdadPaciente {
 
 /** Fecha de hoy en formato YYYY-MM-DD (para attr max de input[type=date]) */
 export function fechaHoyISO(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return hoyEnTZ()
 }
 
 /** Fecha mínima razonable para un paciente (1900-01-01) */
@@ -180,7 +180,7 @@ export function generateDocFileName(
  *   edadAFechaFicticia(35) // → '1991-01-01' (si año actual es 2026)
  */
 export function edadAFechaFicticia(edad: number): string {
-  const añoActual = new Date().getFullYear()
-  const añoNacimiento = añoActual - edad
-  return `${añoNacimiento}-01-01`
+  const anioActual = Number(hoyEnTZ().slice(0, 4))
+  const anioNacimiento = anioActual - edad
+  return `${anioNacimiento}-01-01`
 }

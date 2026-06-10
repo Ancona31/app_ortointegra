@@ -1,6 +1,7 @@
 import { differenceInDays, parseISO, format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { Consulta } from '@/types'
+import { hoyEnTZ, fechaSoloSegura, renderEnTZ } from '@/lib/dates'
 
 /** Etiqueta relativa de la última consulta: "Hoy", "Ayer", "Hace 3 días"... */
 export function ultimaConsultaLabel(consultas: Consulta[]): string {
@@ -9,7 +10,7 @@ export function ultimaConsultaLabel(consultas: Consulta[]): string {
   const ordenadas = [...consultas].sort((a, b) => b.fecha.localeCompare(a.fecha))
   const ultima = ordenadas[0]
 
-  const diff = differenceInDays(new Date(), parseISO(ultima.fecha))
+  const diff = differenceInDays(fechaSoloSegura(hoyEnTZ()), fechaSoloSegura(ultima.fecha))
 
   if (diff === 0) return 'Hoy'
   if (diff === 1) return 'Ayer'
@@ -28,7 +29,8 @@ export function ultimaConsultaFecha(consultas: Consulta[]): string | null {
 
 /** Etiqueta relativa futura: "Hoy", "Mañana", "En 3 días", "Vencida". */
 export function formatFechaRelativaFutura(fecha: string): string {
-  const diff = differenceInDays(parseISO(fecha), new Date())
+  if (!fecha) return 'Sin fecha'
+  const diff = differenceInDays(fechaSoloSegura(renderEnTZ(fecha, 'yyyy-MM-dd')), fechaSoloSegura(hoyEnTZ()))
   if (diff < 0) return 'Vencida'
   if (diff === 0) return 'Hoy'
   if (diff === 1) return 'Mañana'

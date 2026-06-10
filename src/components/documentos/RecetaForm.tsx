@@ -1,6 +1,6 @@
 'use client'
 
-import { generateDocFileName } from '@/lib/patientUtils'
+import { generateDocFileName, calcularEdad } from '@/lib/patientUtils'
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, Trash2, Printer, Loader2 } from 'lucide-react'
 import { flushSync } from 'react-dom'
@@ -173,9 +173,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     async function cargarDatosPaciente() {
       // Helper: aplicar datos (edad + sexo) al state desde cualquier fuente
       const aplicar = (fechaNac: string | null, sexo: string | null | undefined) => {
-        const edad = fechaNac
-          ? Math.floor((Date.now() - new Date(fechaNac).getTime()) / (365.25 * 24 * 3600 * 1000))
-          : null
+        const edad = fechaNac ? calcularEdad(fechaNac).anios : null
         setPacienteData({ edad, sexo: sexo ?? undefined })
       }
 
