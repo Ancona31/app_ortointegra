@@ -12,6 +12,7 @@ import QRCode from 'qrcode'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
+import { hoyEnTZ } from '@/lib/dates'
 
 type Presentacion = {
   tipo: string      // 'cápsula' | 'tableta' | 'cucharada' | 'scoop'
@@ -198,7 +199,7 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
   const { isSuperAdmin } = useProfile()
   const toast = useToast()
   const [paciente, setPaciente] = useState(pacienteInicial)
-  const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
+  const [fecha, setFecha] = useState(hoyEnTZ())
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
   const [pesoKg, setPesoKg] = useState('')
   const [seleccionados, setSeleccionados] = useState<SupSelec[]>([])

@@ -14,6 +14,7 @@ import { useToast } from '@/components/ui/Toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
+import { hoyEnTZ } from '@/lib/dates'
 import DOMPurify from 'dompurify'
 import { decodificarNbsp } from '@/lib/textUtils'
 
@@ -109,7 +110,7 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
 
   const toast = useToast()
   const [paciente, setPaciente]       = useState(pacienteInicial)
-  const [fecha, setFecha]             = useState(new Date().toISOString().split('T')[0])
+  const [fecha, setFecha]             = useState(hoyEnTZ())
   const [asunto, setAsunto]           = useState('')
   const [imprimiendo, setImprimiendo] = useState(false)
   const [errorGuardado, setErrorGuardado] = useState('')

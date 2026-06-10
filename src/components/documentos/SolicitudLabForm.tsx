@@ -12,6 +12,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import AutocompleteEstudio from '@/components/AutocompleteEstudio'
 import { createClient } from '@/lib/supabase/client'
+import { hoyEnTZ } from '@/lib/dates'
 
 const ESTUDIOS_PRESET = [
   'Biometría Hemática',
@@ -62,7 +63,7 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
   } : onlineMedicoInfo
   const toast = useToast()
   const [paciente, setPaciente] = useState(pacienteInicial)
-  const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
+  const [fecha, setFecha] = useState(hoyEnTZ())
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
   const [estudios, setEstudios] = useState<string[]>([''])
   const [notas, setNotas] = useState('')

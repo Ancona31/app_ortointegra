@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/Toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
+import { hoyEnTZ } from '@/lib/dates'
 
 interface Props {
   pacienteInicial?: string
@@ -67,7 +68,7 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
   } : onlineMedicoInfo
   const toast = useToast()
   const [paciente, setPaciente] = useState(pacienteInicial)
-  const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
+  const [fecha, setFecha] = useState(hoyEnTZ())
   const [fechaIngreso, setFechaIngreso] = useState('')
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
   const [diagnosticosSecundarios, setDiagnosticosSecundarios] = useState<string[]>([''])

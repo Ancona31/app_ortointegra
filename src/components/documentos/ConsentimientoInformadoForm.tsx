@@ -9,6 +9,7 @@ import { useToast } from '@/components/ui/Toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
+import { hoyEnTZ } from '@/lib/dates'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 
 interface Props {
@@ -115,7 +116,7 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
   // Campos de identificación
   const [paciente, setPaciente]               = useState(pacienteInicial)
   const [lugar, setLugar]                     = useState('')
-  const [fecha, setFecha]                     = useState(new Date().toISOString().split('T')[0])
+  const [fecha, setFecha]                     = useState(hoyEnTZ())
   const [expediente, setExpediente]           = useState('')
   const [edad, setEdad]                       = useState('')
   const [idPaciente, setIdPaciente]           = useState('')

@@ -12,6 +12,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 import { generarPdf } from '@/lib/mobileShare'
+import { hoyEnTZ } from '@/lib/dates'
 import AutocompleteMedicamento from '@/components/AutocompleteMedicamento'
 import { MedicamentoDB } from '@/data/medicamentos'
 import { useToast } from '@/components/ui/Toast'
@@ -201,7 +202,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     ? medicamentosIniciales
     : [{ nombre_comercial: '', presentacion: '', dosis: '', principio_activo: '', indicacion: '', via_administracion: 'Oral' }]
 
-  const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
+  const [fecha, setFecha] = useState(hoyEnTZ())
   const [medicamentos, setMedicamentos] = useState<MedicamentoConVia[]>(medInicial)
   const [sugerenciasDosis, setSugerenciasDosis] = useState<string[]>(medInicial.map(() => ''))
   const [recomendaciones, setRecomendaciones] = useState('')

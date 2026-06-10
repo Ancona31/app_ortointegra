@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/Toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
+import { hoyEnTZ } from '@/lib/dates'
 
 const TIPOS_ESTUDIO = ['Radiografía', 'Resonancia Magnética (RMN)', 'Tomografía (TAC)', 'Ultrasonido', 'Densitometría Ósea', 'Gammagrafía', 'Mielograma', 'Electromiografía (EMG)']
 
@@ -51,7 +52,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
   } : onlineMedicoInfo
   const toast = useToast()
   const [paciente, setPaciente] = useState(pacienteInicial)
-  const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
+  const [fecha, setFecha] = useState(hoyEnTZ())
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
   const [estudios, setEstudios] = useState<Estudio[]>([{ tipo: '', region: '', proyecciones: '', indicacion: '' }])
   const [urgente, setUrgente] = useState(false)

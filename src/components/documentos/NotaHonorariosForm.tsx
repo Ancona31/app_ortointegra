@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/Toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
+import { hoyEnTZ, desplazarFecha } from '@/lib/dates'
 import type { AseguradoraInfo, HonorariosTemplate } from '@/types'
 
 interface Props {
@@ -49,16 +50,6 @@ function roundCurrency(n: number): number {
 
 function fmt(n: number, divisa: Divisa = 'MXN'): string {
   return roundCurrency(n).toLocaleString(divisa === 'MXN' ? 'es-MX' : 'en-US', { style: 'currency', currency: divisa })
-}
-
-function todayISO(): string {
-  return new Date().toISOString().split('T')[0]
-}
-
-function maxDateISO(): string {
-  const d = new Date()
-  d.setFullYear(d.getFullYear() + 1)
-  return d.toISOString().split('T')[0]
 }
 
 /** True when the user hasn't entered meaningful data beyond the pre-filled patient name */
@@ -119,7 +110,7 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, o
   // ─── Form state ────────────────────────────────────────────────────────────
   const [tipoDoc, setTipoDoc]             = useState<TipoDoc>('honorarios')
   const [paciente, setPaciente]           = useState(pacienteInicial)
-  const [fecha, setFecha]                 = useState(todayISO)
+  const [fecha, setFecha]                 = useState(hoyEnTZ)
   const [formaPago, setFormaPago]         = useState('Efectivo')
   const [folio, setFolio]                 = useState(() => generarFolio('honorarios'))
   const [imprimiendo, setImprimiendo]     = useState(false)
@@ -187,7 +178,7 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, o
     setLineas(newLineas.length > 0 ? newLineas : [{ id: 1, concepto: '', precio: 0 }])
     setNextId((newLineas.length > 0 ? newLineas.length : 1) + 1)
     setFolio(generarFolio(c.tipoDoc))
-    setFecha(todayISO())
+    setFecha(hoyEnTZ())
   }
 
   function applyTemplate(templateId: string): void {
@@ -510,7 +501,7 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, o
               value={fecha}
               onChange={e => setFecha(e.target.value)}
               min="1900-01-01"
-              max={maxDateISO()}
+              max={desplazarFecha(hoyEnTZ(), { anios: 1 })}
               className={inputCls}
             />
           </div>
