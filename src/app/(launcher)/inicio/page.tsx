@@ -18,6 +18,7 @@ import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useClinica } from '@/hooks/useClinica'
 import { useProfile } from '@/hooks/useProfile'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
+import { hoyEnTZ, desplazarFecha, fechaHoraLocalAInstante } from '@/lib/dates'
 
 type GridMode = 'sin_pacientes' | 'nuevo' | 'activo'
 
@@ -98,21 +99,22 @@ export default function InicioPage() {
         .finally(() => setLoading(false))
 
       // Fetch quick stats
-      const today = new Date().toISOString().split('T')[0]
-      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      const inicioHoy = fechaHoraLocalAInstante(hoyEnTZ(), '00:00')
+      const inicioManana = fechaHoraLocalAInstante(desplazarFecha(hoyEnTZ(), { dias: 1 }), '00:00')
+      const inicioSemana = fechaHoraLocalAInstante(desplazarFecha(hoyEnTZ(), { dias: -7 }), '00:00')
 
       supabase
         .from('appointments')
         .select('id', { count: 'exact', head: true })
-        .gte('start_time', today)
-        .lt('start_time', new Date(Date.now() + 86_400_000).toISOString().split('T')[0])
+        .gte('start_time', inicioHoy)
+        .lt('start_time', inicioManana)
         .then((res: { count: number | null }) => setCitasHoy(res.count ?? 0))
         .catch(() => {})
 
       supabase
         .from('consultas')
         .select('id', { count: 'exact', head: true })
-        .gte('created_at', weekAgo)
+        .gte('created_at', inicioSemana)
         .then((res: { count: number | null }) => setPacientesSemana(res.count ?? 0))
         .catch(() => {})
     })

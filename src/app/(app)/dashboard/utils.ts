@@ -1,10 +1,9 @@
-import { format, parseISO, isToday, isTomorrow } from 'date-fns'
-import { es } from 'date-fns/locale'
+import { hoyEnTZ, desplazarFecha, renderEnTZ } from '@/lib/dates'
 
 export function formatCitaHora(start_time: string) {
-  const date = parseISO(start_time)
-  const hora = format(date, 'HH:mm')
-  if (isToday(date))    return `Hoy · ${hora}`
-  if (isTomorrow(date)) return `Mañana · ${hora}`
-  return format(date, "EEE d MMM · HH:mm", { locale: es })
+  const diaCita = renderEnTZ(start_time, 'yyyy-MM-dd')
+  const hora = renderEnTZ(start_time, 'HH:mm')
+  if (diaCita === hoyEnTZ()) return `Hoy · ${hora}`
+  if (diaCita === desplazarFecha(hoyEnTZ(), { dias: 1 })) return `Mañana · ${hora}`
+  return renderEnTZ(start_time, "EEE d MMM · HH:mm")
 }
