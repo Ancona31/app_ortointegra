@@ -36,6 +36,33 @@ Orden de aplicación: una migración a la vez vía SQL Editor manual en
 Supabase Dashboard. Auditar cada una con Claude Code antes de aplicar.
 Todas las migraciones deben traer UP + DOWN explícitos.
 
+### 2.0 — Refactor de `src/lib/dates.ts`
+
+Esta es la primera tarea de Fase 2, anterior a cualquier migración SQL. Se
+hace en código TypeScript, NO en BD.
+
+**Archivo a modificar:** `src/lib/dates.ts`
+
+Cambios:
+- La constante `TZ_CLINICA` deja de usarse directamente en los helpers
+  consumidos por código de citas/consultas/documentos.
+- Cambiar firmas de helpers para aceptar timezone como parámetro explícito:
+  - `fechaHoraLocalAInstante(fecha: string, hora: string, timezone: string): string`
+  - `hoyEnTZ(timezone: string): string`
+  - Otros helpers que internamente usen TZ deben recibir el parámetro
+    igualmente.
+- Mantener compatibilidad para callers que aún no pasan timezone: si
+  `timezone` es undefined, hacer fallback a `'America/Mexico_City'`. Esto
+  evita romper código existente durante la transición.
+
+Validación:
+- `npx tsc --noEmit` debe pasar.
+- Smoke test manual: la app sigue funcionando idéntico antes de la
+  migración SQL (los callers actuales sin timezone usan el fallback).
+
+Por qué va antes: la sección 2.6 (actualizar APIs de citas) consume estos
+helpers con 3 args. Si no se refactoriza primero, 2.6 no compila.
+
 ### 2.1 — Migración SQL #1: crear tabla `consultorios`
 
 **Archivo nuevo:** `supabase/migrations/AAAA_consultorios_01_table.sql`
@@ -48,37 +75,69 @@ DDL completo:
   caracteres). Para UI compacta (agenda, sidebar, selector).
 - FK `clinica_id → clinicas(id)` ON DELETE RESTRICT ON UPDATE NO ACTION.
 - FK `medico_id → profiles(id)` ON DELETE RESTRICT ON UPDATE NO ACTION.
-- Default del JSONB `horario`: 7 días con `activo: false`, estructura espejo
-  de `clinicas.horario_consulta`.
-- 3 índices: UNIQUE PARCIAL del default
-  (`WHERE es_default = true AND activo = true`), parcial de activos
-  (`WHERE activo = true`), simple de `clinica_id`.
+- Default del JSONB `horario`: estructura espejo de
+  `clinicas.horario_consulta`, con todos los días en `activo: false`. Valores
+  `inicio`/`fin` coinciden con los del default de `clinicas`:
+
+```json
+  {
+    "lunes":     {"activo": false, "inicio": "09:00", "fin": "19:00"},
+    "martes":    {"activo": false, "inicio": "09:00", "fin": "19:00"},
+    "miercoles": {"activo": false, "inicio": "09:00", "fin": "19:00"},
+    "jueves":    {"activo": false, "inicio": "09:00", "fin": "19:00"},
+    "viernes":   {"activo": false, "inicio": "09:00", "fin": "19:00"},
+    "sabado":    {"activo": false, "inicio": "09:00", "fin": "14:00"},
+    "domingo":   {"activo": false, "inicio": "09:00", "fin": "14:00"}
+  }
+```
+
+- 3 índices:
+
+```sql
+CREATE UNIQUE INDEX consultorios_default_unico ON public.consultorios (medico_id) WHERE es_default = true AND activo = true;
+CREATE INDEX consultorios_medico_activo ON public.consultorios (medico_id) WHERE activo = true;
+CREATE INDEX consultorios_clinica ON public.consultorios (clinica_id);
+```
 
 Rollback: `DROP TABLE public.consultorios CASCADE;`
-
-> NOTA: El campo `nombre_corto` y su CHECK constraint deben re-auditarse con Claude
-> Code antes de aplicar esta migración. El usuario solicitó esta auditoría
-> adicional explícitamente en Fase 1.
 
 ### 2.2 — Migración SQL #2: funciones y triggers de `consultorios`
 
 **Archivo nuevo:** `supabase/migrations/AAAA_consultorios_02_triggers.sql`
 
-3 funciones + 3 triggers:
+4 funciones + 4 triggers:
 - `update_consultorios_updated_at()` (sin SECURITY DEFINER, sin search_path).
   BEFORE UPDATE → NEW.updated_at = now().
 - `enforce_cap_10_consultorios_activos()` (SECURITY DEFINER +
   SET search_path TO 'public'). BEFORE INSERT/UPDATE.
   Bloquea con `RAISE EXCEPTION` si
   COUNT(*) WHERE medico_id = NEW.medico_id AND activo = true >= 10.
-- `enforce_consultorio_default_invariants()` (SECURITY DEFINER +
-  SET search_path TO 'public'). BEFORE INSERT + BEFORE UPDATE.
-  - INSERT: si no existe otro consultorio activo del médico → fuerza
+- `enforce_consultorio_default_insert()` (SECURITY DEFINER +
+  SET search_path TO 'public'). BEFORE INSERT (row-level).
+  - Si no existe otro consultorio activo del médico → fuerza
     NEW.es_default = true.
-  - UPDATE: bloquea archivar (activo true→false) o desmarcar
-    (es_default true→false) cuando esto dejaría al médico sin default activo.
+  - Único propósito: garantizar que el primer consultorio de un médico
+    siempre nace como default.
+- `enforce_consultorio_default_existencia()` (SECURITY DEFINER +
+  SET search_path TO 'public'). AFTER UPDATE OR DELETE (statement-level).
+  - Evalúa al final del statement: si para algún medico_id afectado, el
+    COUNT(*) WHERE es_default = true AND activo = true es 0 → RAISE
+    EXCEPTION. Es decir, garantiza la invariante "≥1 default activo"
+    como propiedad del set, no fila por fila.
+  - Esto permite que un UPDATE atómico de tipo
+    `UPDATE consultorios SET es_default = (id = :target) WHERE medico_id = :m AND activo = true`
+    funcione: el statement deja A=false y B=true simultáneamente, y el
+    trigger valida que el conteo final = 1 al cierre del statement.
+    El BEFORE-ROW no podría tolerar este transitorio.
 
-Rollback: DROP de los 3 triggers + DROP de las 3 funciones.
+Nota sobre unicidad y existencia:
+- Unicidad del default ("≤1 default activo por médico"): garantizada por
+  el índice UNIQUE PARCIAL de la sección 2.1.
+- Existencia del default ("≥1 default activo por médico, cuando hay
+  ≥1 activo"): garantizada por `enforce_consultorio_default_existencia`.
+- Cap de 10 activos: garantizada por `enforce_cap_10_consultorios_activos`.
+
+Rollback: DROP de los 4 triggers + DROP de las 4 funciones.
 
 ### 2.3 — Migración SQL #3: RLS de `consultorios`
 
@@ -105,8 +164,7 @@ Rollback: DROP de las 4 policies + DISABLE RLS.
 **Archivo nuevo:** `supabase/migrations/AAAA_consultorios_04_snapshot.sql`
 
 Para CADA una de las 2 tablas (`appointments`, `consultas`):
-- ADD COLUMN `consultorio_id uuid REFERENCES public.consultorios(id)
-  ON DELETE SET NULL ON UPDATE NO ACTION`.
+- ADD COLUMN `consultorio_id uuid` (sin REFERENCES inline).
 - ADD COLUMN `consultorio_nombre text`.
 - ADD COLUMN `consultorio_nombre_corto text` (nullable, sin backfill).
 - ADD COLUMN `consultorio_direccion text`.
@@ -117,10 +175,21 @@ Para CADA una de las 2 tablas (`appointments`, `consultas`):
 - CREATE INDEX `idx_<tabla>_consultorio ON <tabla>(consultorio_id)
   WHERE consultorio_id IS NOT NULL`.
 
-Rollback: DROP de los índices, CONSTRAINTS y COLUMNS de ambas tablas.
+Tras los ADD COLUMN, añadir las FKs como CONSTRAINTs nombrados separados:
 
-> NOTA: La columna snapshot `consultorio_nombre_corto` debe re-auditarse con Claude
-> Code antes de aplicar.
+```sql
+ALTER TABLE public.appointments ADD CONSTRAINT appointments_consultorio_id_fkey FOREIGN KEY (consultorio_id) REFERENCES public.consultorios(id) ON DELETE SET NULL ON UPDATE NO ACTION;
+ALTER TABLE public.consultas ADD CONSTRAINT consultas_consultorio_id_fkey FOREIGN KEY (consultorio_id) REFERENCES public.consultorios(id) ON DELETE SET NULL ON UPDATE NO ACTION;
+```
+
+Rollback: DROP de los índices, CONSTRAINTS (incluidos los FKs nombrados:
+appointments_consultorio_id_fkey, consultas_consultorio_id_fkey) y COLUMNS
+de ambas tablas.
+NOTA: Si hubo escrituras posteriores al UP (es decir, hay filas con
+consultorio_id IS NOT NULL), el rollback con DROP COLUMN pierde los
+snapshots irreversiblemente. Antes de ejecutar el DOWN: hacer pg_dump o
+COPY de las columnas snapshot de las filas afectadas como respaldo.
+PostgreSQL no tiene DROP COLUMN reversible nativo.
 
 ### 2.5 — APIs CRUD de `consultorios`
 
@@ -129,14 +198,20 @@ Rollback: DROP de los índices, CONSTRAINTS y COLUMNS de ambas tablas.
   autenticado), POST (crear).
 - `src/app/api/consultorios/[id]/route.ts` — GET (uno), PATCH (editar),
   DELETE (archivar = UPDATE activo=false + fecha_baja=now()).
-- `src/app/api/consultorios/[id]/marcar-default/route.ts` — PATCH (mueve el
-  flag es_default; trigger T3 garantiza unicidad).
+- `src/app/api/consultorios/[id]/marcar-default/route.ts` — PATCH.
+  Ejecuta un UPDATE atómico que cambia el es_default de TODOS los
+  consultorios activos del médico en una sola sentencia:
+  `UPDATE consultorios SET es_default = (id = :target_id), updated_at = now() WHERE medico_id = :medico_id AND activo = true`.
+  Esto evita estados intermedios donde 0 o 2 consultorios tengan
+  es_default = true. El índice UNIQUE PARCIAL garantiza unicidad final;
+  `enforce_consultorio_default_existencia` (statement-level) garantiza
+  existencia.
 
 Reglas server-side:
 - Validación de body con Zod.
 - Validación de TZ contra lista IANA en API (no en BD).
-- Validación de cap de 10 (defensa redundante con trigger T2).
-- Validación de unicidad de default (defensa redundante con trigger T3).
+- Validación de cap de 10 (defensa redundante con enforce_cap_10_consultorios_activos).
+- Validación de unicidad de default (defensa redundante con el índice UNIQUE PARCIAL de 2.1).
 - POST y PATCH aceptan campos `nombre` y `nombre_corto`.
 - Si `nombre_corto` no se envía y `nombre.length <= 12`, autocompletar
   `nombre_corto = nombre` server-side.
@@ -185,12 +260,7 @@ investigación I-1b).
 
 ### 3.2 — Módulo de fechas
 
-**Archivo a modificar:** `src/lib/dates.ts`
-
-- La constante `TZ_CLINICA` deja de ser global. Los helpers que la usaban
-  deben aceptar `timezone` como parámetro explícito.
-- Mantener compatibilidad: si no se pasa timezone, usar fallback
-  `'America/Mexico_City'`.
+Movido a sección 2.0 (inicio de Fase 2). Ver allí.
 
 ### 3.3 — Hook de consultorios
 
@@ -227,6 +297,14 @@ investigación I-1b).
 - Footer del dropdown: link "Gestionar consultorios" → `/perfil`.
 - Al hacer click en otro consultorio: modal de confirmación "¿Cambiar a X
   consultorio?" → "Cancelar" / "Sí, cambiar".
+
+Verificación obligatoria (de auditoría):
+Implementar fallback en el render: si `consultorio.nombre_corto` es NULL
+(caso edge: snapshot heredado antes de que la API poblara el campo, o
+datos sembrados manualmente sin nombre_corto), mostrar `consultorio.nombre`
+truncado a 12 caracteres en su lugar. NO mostrar string vacío. Esta
+verificación es obligatoria porque toda fila legacy nace con
+`consultorio_nombre_corto` NULL desde el día 1 post-deploy.
 
 **Archivo a modificar:** `src/components/sidebar/Sidebar.tsx` (o equivalente,
 identificar en Fase 3 inicial).
@@ -311,6 +389,10 @@ identificar en Fase 3 inicial).
     solo, badge oculto.
   - Nota arriba del calendario: "Cada cita se muestra en la hora local de su
     consultorio."
+  - Fallback obligatorio: si `consultorio_nombre_corto` (snapshot de la
+    cita) es NULL, el badge usa `consultorio_nombre` truncado a 12 caracteres.
+    Esta verificación es obligatoria porque las citas legacy y las creadas
+    antes de que la API poble nombre_corto tendrán este campo en NULL.
 - Layout de la card de evento en FullCalendar:
 HH:MM - HH:MM
 Nombre del paciente
@@ -454,7 +536,7 @@ por
 
 ### 6.3 — Monitoreo
 - Sentry 48h post-deploy.
-- Verificar logs de Supabase por errores de trigger T2/T3.
+- Verificar logs de Supabase por errores de enforce_cap_10_consultorios_activos, enforce_consultorio_default_insert y enforce_consultorio_default_existencia.
 
 ### 6.4 — Cierre
 - Documentar en `DEUDA_TECNICA.md`:
@@ -519,15 +601,6 @@ estricta que la de BD. Si alguien mete un emoji, API podría rechazar
 algo que la BD aceptaría. No es bug — es asimetría conocida y aceptada.
 No requiere acción correctiva. Documentado aquí para evitar perseguir
 un "bug" fantasma en el futuro.
-
----
-
-## Decisiones pendientes de re-auditoría
-
-- Antes de aplicar la migración 2.1 (creación de tabla `consultorios`),
-  re-auditar con Claude Code la columna `nombre_corto` y su CHECK constraint.
-- Antes de aplicar la migración 2.4 (ALTERs de `appointments` y `consultas`),
-  re-auditar con Claude Code la nueva columna snapshot `consultorio_nombre_corto`.
 
 ---
 
