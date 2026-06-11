@@ -18,14 +18,14 @@ Decisiones de producto consolidadas:
 - Soft delete vía `activo` boolean + `fecha_baja` timestamptz.
 - Default obligatorio: 1 consultorio default activo por médico.
 - Sin backfill: citas/consultas viejas quedan sin consultorio (nullable).
-- Snapshot inmutable de nombre/alias/dirección/teléfono/timezone en
+- Snapshot inmutable de nombre/nombre_corto/dirección/teléfono/timezone en
   `appointments` y `consultas`.
 - TZ por consultorio (hora de pared del consultorio es la verdad).
 - Selector "consultorio activo" en sidebar, visible solo si ≥2 consultorios.
 - Modal de onboarding bloqueante al login si count = 0.
 - Cambio automático silencioso del activo al iniciar consulta de cita con
   snapshot (toast informativo).
-- Cada consultorio tiene un alias corto (máx 12 caracteres) para UI compacta
+- Cada consultorio tiene un nombre corto (máx 12 caracteres) para UI compacta
   + nombre completo para PDFs y documentos formales.
 
 ---
@@ -42,9 +42,9 @@ Todas las migraciones deben traer UP + DOWN explícitos.
 
 DDL completo:
 - Tabla `public.consultorios` con columnas: id, clinica_id, medico_id,
-  nombre, alias, direccion, telefono, timezone, horario, es_default, activo,
+  nombre, nombre_corto, direccion, telefono, timezone, horario, es_default, activo,
   fecha_baja, created_at, updated_at.
-- Columna `alias`: text NOT NULL, CHECK char_length BETWEEN 1 AND 12 (máx 12
+- Columna `nombre_corto`: text NOT NULL, CHECK char_length BETWEEN 1 AND 12 (máx 12
   caracteres). Para UI compacta (agenda, sidebar, selector).
 - FK `clinica_id → clinicas(id)` ON DELETE RESTRICT ON UPDATE NO ACTION.
 - FK `medico_id → profiles(id)` ON DELETE RESTRICT ON UPDATE NO ACTION.
@@ -56,7 +56,7 @@ DDL completo:
 
 Rollback: `DROP TABLE public.consultorios CASCADE;`
 
-> NOTA: El campo `alias` y su CHECK constraint deben re-auditarse con Claude
+> NOTA: El campo `nombre_corto` y su CHECK constraint deben re-auditarse con Claude
 > Code antes de aplicar esta migración. El usuario solicitó esta auditoría
 > adicional explícitamente en Fase 1.
 
@@ -108,7 +108,7 @@ Para CADA una de las 2 tablas (`appointments`, `consultas`):
 - ADD COLUMN `consultorio_id uuid REFERENCES public.consultorios(id)
   ON DELETE SET NULL ON UPDATE NO ACTION`.
 - ADD COLUMN `consultorio_nombre text`.
-- ADD COLUMN `consultorio_alias text` (nullable, sin backfill).
+- ADD COLUMN `consultorio_nombre_corto text` (nullable, sin backfill).
 - ADD COLUMN `consultorio_direccion text`.
 - ADD COLUMN `consultorio_telefono text`.
 - ADD COLUMN `consultorio_timezone text`.
@@ -119,7 +119,7 @@ Para CADA una de las 2 tablas (`appointments`, `consultas`):
 
 Rollback: DROP de los índices, CONSTRAINTS y COLUMNS de ambas tablas.
 
-> NOTA: La columna snapshot `consultorio_alias` debe re-auditarse con Claude
+> NOTA: La columna snapshot `consultorio_nombre_corto` debe re-auditarse con Claude
 > Code antes de aplicar.
 
 ### 2.5 — APIs CRUD de `consultorios`
@@ -137,10 +137,10 @@ Reglas server-side:
 - Validación de TZ contra lista IANA en API (no en BD).
 - Validación de cap de 10 (defensa redundante con trigger T2).
 - Validación de unicidad de default (defensa redundante con trigger T3).
-- POST y PATCH aceptan campos `nombre` y `alias`.
-- Si `alias` no se envía y `nombre.length <= 12`, autocompletar
-  `alias = nombre` server-side.
-- Validación: `alias` length entre 1 y 12.
+- POST y PATCH aceptan campos `nombre` y `nombre_corto`.
+- Si `nombre_corto` no se envía y `nombre.length <= 12`, autocompletar
+  `nombre_corto = nombre` server-side.
+- Validación: `nombre_corto` length entre 1 y 12.
 - Mensajes de error legibles para el frontend.
 
 ### 2.6 — Actualizar APIs de creación de citas y consultas
@@ -148,7 +148,7 @@ Reglas server-side:
 **Archivos a modificar:**
 - `src/app/api/appointments/route.ts`:
   - Aceptar `consultorio_id` en body.
-  - Snapshot al INSERT: leer consultorio actual y copiar nombre, alias,
+  - Snapshot al INSERT: leer consultorio actual y copiar nombre, nombre_corto,
     dirección, teléfono y timezone a las columnas snapshot.
   - Construir `start_time` y `end_time` usando
     `fechaHoraLocalAInstante(fecha, hora, consultorio.timezone)` del módulo
@@ -157,13 +157,13 @@ Reglas server-side:
     `consultorio.timezone`. Fallback a `'America/Mexico_City'` si NULL.
 - `src/app/api/appointments/[id]/route.ts`:
   - PATCH: si se cambia `consultorio_id`, refrescar snapshot completo (incluye
-    alias).
+    nombre_corto).
   - Misma lógica de TZ que el POST.
 - `src/app/api/consultas/route.ts` (o donde se cree la consulta):
   - Si la consulta se crea desde una cita: copiar snapshot completo de cita a
-    consulta (incluye alias).
+    consulta (incluye nombre_corto).
   - Si es walk-in: snapshot del consultorio activo enviado por el cliente
-    (incluye alias).
+    (incluye nombre_corto).
 
 ### 2.7 — Eliminar código muerto
 
@@ -179,8 +179,8 @@ investigación I-1b).
 **Archivo a modificar:** `src/types/index.ts`
 
 - Añadir interfaz `Consultorio` con todos los campos de la tabla (incluido
-  `alias`).
-- Añadir `consultorio_id` y campos snapshot (incluido `consultorio_alias`) a
+  `nombre_corto`).
+- Añadir `consultorio_id` y campos snapshot (incluido `consultorio_nombre_corto`) a
   `Appointment` y `Consulta`.
 
 ### 3.2 — Módulo de fechas
@@ -220,9 +220,9 @@ investigación I-1b).
 **Archivo nuevo:** `src/components/sidebar/ConsultorioActivoSelector.tsx`
 
 - Visible solo si `consultorios.length >= 2`.
-- Card con label "CONSULTORIO ACTIVO" + alias del consultorio + chevron.
-- El selector muestra `consultorio.alias` (no `nombre`).
-- Dropdown con lista plana de consultorios activos (alias) + check en el
+- Card con label "CONSULTORIO ACTIVO" + nombre corto del consultorio + chevron.
+- El selector muestra `consultorio.nombre_corto` (no `nombre`).
+- Dropdown con lista plana de consultorios activos (nombre_corto) + check en el
   actual.
 - Footer del dropdown: link "Gestionar consultorios" → `/perfil`.
 - Al hacer click en otro consultorio: modal de confirmación "¿Cambiar a X
@@ -244,9 +244,9 @@ identificar en Fase 3 inicial).
 - Texto explicativo (2 líneas): "Spinus ahora soporta múltiples consultorios.
   Configura tu consultorio principal para continuar."
 - Campos:
-  - Nombre (text, obligatorio, vacío + texto ayuda). Campo "Alias corto"
+  - Nombre (text, obligatorio, vacío + texto ayuda). Campo "Nombre corto"
     (máx 12 caracteres) aparece debajo SOLO si el nombre escrito supera los
-    12 caracteres. Si nombre ≤12, el alias se autocompleta server-side con
+    12 caracteres. Si nombre ≤12, el nombre corto se autocompleta server-side con
     el mismo valor.
   - Dirección (text, obligatorio, pre-llenado desde
     `profiles.direccion_consultorio`).
@@ -276,21 +276,21 @@ identificar en Fase 3 inicial).
   documentos. Hasta 10 consultorios activos por médico."
 - Botón "+ Agregar consultorio".
 - Lista de cards (una por consultorio activo): cada card muestra el `nombre`
-  completo (no el alias), dirección, teléfono, badge "Default" si aplica.
+  completo (no el nombre corto), dirección, teléfono, badge "Default" si aplica.
 - Botones por card: "Editar" (modal completo, permite editar ambos campos:
-  nombre y alias), "Editar horario" (modal de horario M1 + P1), "Marcar como
+  nombre y nombre_corto), "Editar horario" (modal de horario M1 + P1), "Marcar como
   default", "Archivar" (deshabilitado si es el único activo).
 - Sección colapsable de "Archivados" debajo.
 
 **Archivo nuevo:** `src/components/consultorios/EditConsultorioModal.tsx`
 
-- Modal de edición completo: nombre, alias, dirección, teléfono, timezone.
+- Modal de edición completo: nombre, nombre_corto, dirección, teléfono, timezone.
 - Sin campo horario (se edita en modal aparte).
 
 **Archivo nuevo:** `src/components/consultorios/EditHorarioConsultorioModal.tsx`
 
 - Reutiliza componente UI de "Horario de consulta" existente.
-- Añade desplegable arriba (usando alias) para cambiar entre consultorios sin
+- Añade desplegable arriba (usando nombre_corto) para cambiar entre consultorios sin
   cerrar.
 - Pre-seleccionado en el consultorio del cual se abrió.
 
@@ -305,7 +305,7 @@ identificar en Fase 3 inicial).
 - FullCalendar config:
   - `timeZone="local"` (modo "respeta offset embebido en cada ISO").
 - Render de eventos:
-  - El badge visual por consultorio usa el `alias` del consultorio, no el
+  - El badge visual por consultorio usa el `nombre_corto` del consultorio, no el
     nombre completo.
   - Si médico tiene ≥2 consultorios activos: badge visible (N2-b). Si tiene 1
     solo, badge oculto.
@@ -314,7 +314,7 @@ identificar en Fase 3 inicial).
 - Layout de la card de evento en FullCalendar:
 HH:MM - HH:MM
 Nombre del paciente
-📍 [alias del consultorio]
+📍 [nombre_corto del consultorio]
 ● Estado
   La línea de consultorio aparece SOLO si el médico tiene ≥2 consultorios
   activos (N2-b).
@@ -336,7 +336,7 @@ Nombre del paciente
 Lógica:
 - Si la cita tiene `consultorio_id` snapshot Y es distinto al activo actual:
   cambiar activo silenciosamente + toast informativo "Consultorio activo
-  cambiado a [alias] (consultorio de la cita)".
+  cambiado a [nombre_corto] (consultorio de la cita)".
 - Si no tiene snapshot: no hacer nada (CC1).
 
 Walk-in (sin cita previa): el médico selecciona consultorio manualmente desde
@@ -363,7 +363,7 @@ Para cada uno de los 8 documentos, en este orden:
 - Reemplazar lectura de `medico.direccion_consultorio` por
   `consultorio.direccion` recibido como prop.
 - Misma lógica para `consultorio.telefono`.
-- Los PDFs usan `consultorio.nombre` (completo) en el membrete. El alias NO
+- Los PDFs usan `consultorio.nombre` (completo) en el membrete. El nombre_corto NO
   aparece en PDFs.
 - Si no se recibe consultorio (consultas viejas): fallback al activo actual
   del médico.
@@ -476,12 +476,58 @@ por
 
 ---
 
+## Notas para Fase 2.5 (API) — ajustes detectados en auditoría
+
+Estos 3 puntos no afectan el SQL de las migraciones 2.1 ni 2.4 (ya
+auditadas y aprobadas), pero deben aplicarse al implementar la capa API
+en Fase 2.5.
+
+### A. Regla del PATCH cuando `nombre` cambia a >12 chars sin enviar `nombre_corto`
+
+Escenario: el médico edita un consultorio existente cambiando solo el
+`nombre` de "CDMX" (4 chars) a "Hospital Ángeles del Pedregal" (29 chars).
+El body del PATCH NO incluye `nombre_corto`.
+
+Regla obligatoria en el endpoint PATCH:
+- Si el body NO contiene `nombre_corto` explícitamente: conservar el
+  `nombre_corto` previo intacto. NO re-derivar desde el nuevo `nombre`.
+- Solo re-autocompletar `nombre_corto = nombre` cuando el cliente mande
+  explícitamente `nombre_corto: null` o `nombre_corto: ''` Y el nuevo
+  `nombre.length <= 12`.
+
+Esto evita que un PATCH parcial deje el consultorio en estado inválido
+por el CHECK de BD.
+
+### B. Validación Zod: trim + rechazar whitespace-only
+
+El CHECK de BD `char_length(nombre_corto) BETWEEN 1 AND 12` acepta
+`"   "` (3 espacios). Para evitar `nombre_corto` inútil:
+- En el schema Zod de POST y PATCH: aplicar `.trim()` ANTES de validar.
+- Validar que el resultado del trim tenga `length >= 1`.
+- El trim aplica también a `nombre` por simetría.
+
+### C. Asimetría JS .length vs char_length (Postgres)
+
+Para texto BMP normal (español, ASCII): `string.length` (JS) y
+`char_length(text)` (Postgres) coinciden.
+
+Para emojis y caracteres astrales: divergen. JS cuenta unidades UTF-16
+(emoji = 2), Postgres cuenta code points (emoji = 1).
+
+Implicación: la validación de longitud en API usando `.length` es más
+estricta que la de BD. Si alguien mete un emoji, API podría rechazar
+algo que la BD aceptaría. No es bug — es asimetría conocida y aceptada.
+No requiere acción correctiva. Documentado aquí para evitar perseguir
+un "bug" fantasma en el futuro.
+
+---
+
 ## Decisiones pendientes de re-auditoría
 
 - Antes de aplicar la migración 2.1 (creación de tabla `consultorios`),
-  re-auditar con Claude Code la columna `alias` y su CHECK constraint.
+  re-auditar con Claude Code la columna `nombre_corto` y su CHECK constraint.
 - Antes de aplicar la migración 2.4 (ALTERs de `appointments` y `consultas`),
-  re-auditar con Claude Code la nueva columna snapshot `consultorio_alias`.
+  re-auditar con Claude Code la nueva columna snapshot `consultorio_nombre_corto`.
 
 ---
 
