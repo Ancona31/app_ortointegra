@@ -130,6 +130,14 @@ Rollback: `DROP TABLE public.consultorios CASCADE;`
     trigger valida que el conteo final = 1 al cierre del statement.
     El BEFORE-ROW no podría tolerar este transitorio.
 
+Convención de errores en RAISE EXCEPTION:
+Las funciones `enforce_cap_10_consultorios_activos` y
+`enforce_consultorio_default_existencia` usan
+`RAISE EXCEPTION ... USING errcode = 'check_violation'` para alinearse al
+patrón del repo (`enforce_limite_documentos_paciente`). Esto permite a la
+capa API discriminar errores por SQLSTATE (23514) en lugar de string
+matching frágil sobre el mensaje.
+
 Nota sobre unicidad y existencia:
 - Unicidad del default ("≤1 default activo por médico"): garantizada por
   el índice UNIQUE PARCIAL de la sección 2.1.
@@ -555,6 +563,15 @@ por
 - Escritura a Google Calendar.
 - Migración de TZ en `api/labs/mediciones/route.ts` (corregido en proyecto
   precursor pero no usa TZ por consultorio).
+- Detección de UPDATE manual de `medico_id` en consultorios (transferencia
+  entre médicos vía SQL Editor). El trigger
+  `enforce_consultorio_default_existencia` solo verifica el `medico_id` de
+  `old_consultorios`; una transferencia manual A→B podría dejar al médico
+  receptor con activos≥1 y defaults=0 sin detectarse. Mitigado por:
+  (a) RLS UPDATE con `WITH CHECK medico_id = auth.uid()` (las APIs no
+  permiten transferir), (b) regla de producto "consultorios no se
+  comparten entre médicos". Riesgo residual aceptado: solo aplica a SQL
+  manual del dueño en SQL Editor.
 
 ---
 
@@ -601,6 +618,19 @@ estricta que la de BD. Si alguien mete un emoji, API podría rechazar
 algo que la BD aceptaría. No es bug — es asimetría conocida y aceptada.
 No requiere acción correctiva. Documentado aquí para evitar perseguir
 un "bug" fantasma en el futuro.
+
+### D. Mapeo del error crudo 23505 en `consultorios_default_unico`
+
+En el endpoint `POST /api/consultorios`, manejar el error
+`unique_violation` (SQLSTATE 23505) cuando proviene del índice
+`consultorios_default_unico`. Escenario: dos INSERTs concurrentes del
+primer consultorio del mismo médico (carrera improbable pero posible).
+La BD garantiza integridad (segundo INSERT falla); el frontend debe
+recibir mensaje amigable + opción de retry, no el error crudo de Postgres.
+
+Implementación sugerida: capturar el error, identificar por nombre de
+constraint (`consultorios_default_unico`), retornar HTTP 409 con cuerpo
+`{ error: 'Conflicto creando consultorio default. Reintenta.' }`.
 
 ---
 
