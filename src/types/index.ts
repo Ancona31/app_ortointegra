@@ -57,6 +57,86 @@ export interface Consulta {
   medico_cedula_especialidad?: string | null
   medico_logo_url?: string | null
   created_at?: string
+  // Snapshot inmutable del consultorio (Fase 2.6 multiconsultorio).
+  // Se congela al momento de crear la consulta. Si null, es consulta legacy
+  // pre-multiconsultorio (renderizador usa fallback a datos del médico).
+  consultorio_id?: string | null
+  consultorio_nombre?: string | null
+  consultorio_nombre_corto?: string | null
+  consultorio_direccion?: string | null
+  consultorio_telefono?: string | null
+  consultorio_timezone?: string | null
+}
+
+/**
+ * Cita agendada en calendario (tabla appointments).
+ *
+ * Espejo completo del schema BD. Incluye snapshot inmutable de consultorio
+ * (Fase 2.6 multiconsultorio): los 6 campos consultorio_* se congelan al
+ * momento de crear la cita y pueden actualizarse vía PATCH antes de que la
+ * cita se convierta en consulta.
+ */
+export interface Appointment {
+  id: string
+  clinica_id: string
+  paciente_id: string | null
+  created_by: string | null
+  title: string
+  start_time: string
+  end_time: string
+  status: 'scheduled' | 'confirmed' | 'cancelled' | 'no_show'
+  notes: string | null
+  google_event_id: string | null
+  whatsapp_sent_at?: string | null
+  whatsapp_reminder_sent_at?: string | null
+  gcal_sync_status: 'synced' | 'pending' | 'failed'
+  medico_id: string | null
+  // Identificador de idempotencia del outbox-engine offline. La feature
+  // del outbox fue eliminada en abril 2026 (ver CLAUDE.md), pero la columna
+  // persiste en BD por convención forward-only de migraciones. Conservado
+  // en el tipo por fidelidad al schema; ningún código nuevo debe usarlo.
+  client_id?: string | null
+  created_at?: string
+  updated_at?: string
+  // Snapshot inmutable del consultorio (Fase 2.6).
+  consultorio_id?: string | null
+  consultorio_nombre?: string | null
+  consultorio_nombre_corto?: string | null
+  consultorio_direccion?: string | null
+  consultorio_telefono?: string | null
+  consultorio_timezone?: string | null
+}
+
+/**
+ * Consultorio del médico (tabla consultorios — Fase 2.1).
+ *
+ * Espejo completo del schema BD. Un médico puede tener hasta 10 consultorios
+ * activos (cap enforzado por trigger BD). Soft-delete vía activo=false +
+ * fecha_baja; archivados no se exponen al usuario por diseño (R1).
+ */
+export interface Consultorio {
+  id: string
+  clinica_id: string
+  medico_id: string
+  nombre: string
+  nombre_corto: string
+  direccion: string
+  telefono: string | null
+  timezone: string
+  horario: {
+    lunes: { activo: boolean; inicio: string; fin: string }
+    martes: { activo: boolean; inicio: string; fin: string }
+    miercoles: { activo: boolean; inicio: string; fin: string }
+    jueves: { activo: boolean; inicio: string; fin: string }
+    viernes: { activo: boolean; inicio: string; fin: string }
+    sabado: { activo: boolean; inicio: string; fin: string }
+    domingo: { activo: boolean; inicio: string; fin: string }
+  }
+  es_default: boolean
+  activo: boolean
+  fecha_baja: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface Diagnostico {
