@@ -28,8 +28,8 @@ export const TZ_CLINICA = 'America/Mexico_City'
  * Reemplaza el patrón roto new Date().toISOString().split('T')[0].
  * Bugs 1 y 2.
  */
-export function hoyEnTZ(): string {
-  return formatInTimeZone(new Date(), TZ_CLINICA, 'yyyy-MM-dd')
+export function hoyEnTZ(timezone: string = TZ_CLINICA): string {
+  return formatInTimeZone(new Date(), timezone, 'yyyy-MM-dd')
 }
 
 /**
@@ -57,8 +57,12 @@ export function desplazarFecha(
  * servidor (Vercel = UTC).
  * Bug 3.
  */
-export function fechaHoraLocalAInstante(fecha: string, hora: string): string {
-  const instante = fromZonedTime(`${fecha}T${hora}:00`, TZ_CLINICA)
+export function fechaHoraLocalAInstante(
+  fecha: string,
+  hora: string,
+  timezone: string = TZ_CLINICA,
+): string {
+  const instante = fromZonedTime(`${fecha}T${hora}:00`, timezone)
   if (Number.isNaN(instante.getTime())) {
     throw new Error('Fecha/hora inválida')
   }
@@ -84,6 +88,10 @@ export function fechaSoloSegura(fechaISO: string): Date {
  * locale español. instante puede ser un Date o un ISO string.
  * Bug 4 (preparación del render simétrico de citas).
  */
-export function renderEnTZ(instante: string | Date, formato: string): string {
-  return formatInTimeZone(instante, TZ_CLINICA, formato, { locale: es })
+export function renderEnTZ(
+  instante: string | Date,
+  formato: string,
+  timezone: string = TZ_CLINICA,
+): string {
+  return formatInTimeZone(instante, timezone, formato, { locale: es })
 }
