@@ -12,6 +12,7 @@ import SuscripcionBanner from '@/components/billing/SuscripcionBanner'
 import { SubscriptionGateProvider } from '@/components/billing/SubscriptionGateProvider'
 import { getSubscriptionState } from '@/lib/subscription'
 import { AuthProvider } from '@/lib/auth-context'
+import { ConsultorioActivoProvider } from '@/contexts/ConsultorioActivoContext'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -39,22 +40,24 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <ToastProvider>
         <ThemeProvider>
           <SubscriptionGateProvider initialState={subscriptionState}>
-            <OfflineAlert />
-            <SuscripcionBanner desktopSidebarOffset />
-            <div className="flex h-screen overflow-hidden">
-              <Sidebar />
-              <main className="flex-1 lg:ml-60 overflow-y-auto">
-                <div className="min-h-full pt-16 px-4 pb-6 lg:pt-8 lg:px-8 lg:pb-8">
-                  <ErrorBoundary>
-                    <PageTransition>
-                      {children}
-                    </PageTransition>
-                  </ErrorBoundary>
-                </div>
-              </main>
-            </div>
-            <CommandPalette />
-            <SessionGuard />
+            <ConsultorioActivoProvider>
+              <OfflineAlert />
+              <SuscripcionBanner desktopSidebarOffset />
+              <div className="flex h-screen overflow-hidden">
+                <Sidebar />
+                <main className="flex-1 lg:ml-60 overflow-y-auto">
+                  <div className="min-h-full pt-16 px-4 pb-6 lg:pt-8 lg:px-8 lg:pb-8">
+                    <ErrorBoundary>
+                      <PageTransition>
+                        {children}
+                      </PageTransition>
+                    </ErrorBoundary>
+                  </div>
+                </main>
+              </div>
+              <CommandPalette />
+              <SessionGuard />
+            </ConsultorioActivoProvider>
           </SubscriptionGateProvider>
         </ThemeProvider>
       </ToastProvider>
