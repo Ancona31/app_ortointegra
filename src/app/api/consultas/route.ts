@@ -62,8 +62,25 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { paciente_id } = body
+    const { paciente_id, consultorio_id } = body
     if (!paciente_id) return NextResponse.json({ error: 'paciente_id requerido' }, { status: 400 })
+
+    // Fase 2.6: consultorio_id es obligatorio para nuevas consultas (multiconsultorio).
+    if (!consultorio_id) {
+      return NextResponse.json(
+        { error: 'consultorio_id_required', message: 'Debes seleccionar un consultorio para la consulta.' },
+        { status: 400 }
+      )
+    }
+
+    // Validar formato UUID antes de query (evita 500 con entrada malformada).
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!UUID_REGEX.test(consultorio_id)) {
+      return NextResponse.json(
+        { error: 'consultorio_invalido', message: 'consultorio_id no tiene formato UUID válido.' },
+        { status: 400 }
+      )
+    }
 
     const notaOrigen: 'ia' | 'manual' =
       body.nota_origen === 'manual' ? 'manual' : 'ia'
@@ -102,6 +119,28 @@ export async function POST(req: NextRequest) {
       .single()
     if (!paciente) return NextResponse.json({ error: 'Paciente no encontrado' }, { status: 404 })
 
+    // Fase 2.6: validar consultorio y cargar snapshot inmutable.
+    // El consultorio debe existir, estar activo, y pertenecer al médico
+    // autenticado (que es siempre el dueño de la consulta).
+    const { data: consultorio, error: errConsultorio } = await supabase
+      .from('consultorios')
+      .select('id, nombre, nombre_corto, direccion, telefono, timezone')
+      .eq('id', consultorio_id)
+      .eq('medico_id', user.id)
+      .eq('activo', true)
+      .maybeSingle()
+
+    if (errConsultorio) {
+      console.error('[POST /api/consultas] error cargando consultorio:', errConsultorio)
+      return NextResponse.json({ error: errConsultorio.message }, { status: 500 })
+    }
+    if (!consultorio) {
+      return NextResponse.json(
+        { error: 'consultorio_invalido', message: 'El consultorio no existe, está archivado, o no te pertenece.' },
+        { status: 400 }
+      )
+    }
+
     const { data: clinica } = await supabase
       .from('clinicas')
       .select('logo_url')
@@ -125,6 +164,13 @@ export async function POST(req: NextRequest) {
       medico_cedula_profesional: profile.cedula_profesional || null,
       medico_cedula_especialidad: profile.cedula_especialidad || null,
       medico_logo_url:           clinica?.logo_url || null,
+      // Snapshot inmutable del consultorio (Fase 2.6).
+      consultorio_id:            consultorio.id,
+      consultorio_nombre:        consultorio.nombre,
+      consultorio_nombre_corto:  consultorio.nombre_corto,
+      consultorio_direccion:     consultorio.direccion,
+      consultorio_telefono:      consultorio.telefono,
+      consultorio_timezone:      consultorio.timezone,
     }).select().single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
