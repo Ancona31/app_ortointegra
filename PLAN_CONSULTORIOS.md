@@ -202,10 +202,28 @@ PostgreSQL no tiene DROP COLUMN reversible nativo.
 ### 2.5 — APIs CRUD de `consultorios`
 
 **Archivos nuevos:**
-- `src/app/api/consultorios/route.ts` — GET (listar activos del médico
-  autenticado), POST (crear).
+- `src/app/api/consultorios/route.ts` — GET (listar SOLO activos del
+  médico autenticado), POST (crear).
+  El GET filtra `activo = true` server-side. NO acepta query parameter
+  para incluir archivados. Los consultorios archivados son invisibles
+  para el usuario final por diseño (R1): persisten en BD para integridad
+  referencial de snapshots históricos en appointments/consultas, pero
+  no se exponen vía API.
 - `src/app/api/consultorios/[id]/route.ts` — GET (uno), PATCH (editar),
   DELETE (archivar = UPDATE activo=false + fecha_baja=now()).
+  Reglas de validación en DELETE (defensa en profundidad: API + frontend):
+  Antes de ejecutar el UPDATE de archivado, la API valida:
+  - El consultorio existe y pertenece al médico autenticado. Si no →
+    404.
+  - NO es el único consultorio activo del médico. Si lo es → 409 con
+    mensaje "No puedes borrar tu único consultorio. Debes tener al menos
+    uno."
+  - Si es el consultorio default Y hay otros activos → 409 con mensaje
+    "Marca otro consultorio como default antes de borrar este."
+  - Si pasa todas las validaciones → ejecuta el UPDATE de archivado y
+    responde 200 con `{ ok: true }`.
+  El frontend (sección 3.7) implementa validaciones equivalentes para UX
+  limpia, pero la API valida server-side como defensa.
 - `src/app/api/consultorios/[id]/marcar-default/route.ts` — PATCH.
   Ejecuta un UPDATE atómico que cambia el es_default de TODOS los
   consultorios activos del médico en una sola sentencia:
@@ -214,10 +232,18 @@ PostgreSQL no tiene DROP COLUMN reversible nativo.
   es_default = true. El índice UNIQUE PARCIAL garantiza unicidad final;
   `enforce_consultorio_default_existencia` (statement-level) garantiza
   existencia.
+  Comportamiento idempotente: si el consultorio target ya es default
+  actual, el endpoint responde 200 sin error. El UPDATE atómico ejecuta
+  igual (es no-op a nivel de datos), garantizando consistencia frente a
+  estados intermedios o llamadas duplicadas del cliente.
 
 Reglas server-side:
 - Validación de body con Zod.
-- Validación de TZ contra lista IANA en API (no en BD).
+- Validación de timezone: usar `Intl.supportedValuesOf('timeZone')`
+  (Node 20+, disponible en el runtime de Next.js) para verificar que el
+  string enviado es una zona IANA válida. Cualquier zona IANA real es
+  aceptada (no lista hardcoded a México). Si la zona es inválida → 400
+  con mensaje "Zona horaria inválida".
 - Validación de cap de 10 (defensa redundante con enforce_cap_10_consultorios_activos).
 - Validación de unicidad de default (defensa redundante con el índice UNIQUE PARCIAL de 2.1).
 - POST y PATCH aceptan campos `nombre` y `nombre_corto`.
@@ -365,8 +391,25 @@ identificar en Fase 3 inicial).
   completo (no el nombre corto), dirección, teléfono, badge "Default" si aplica.
 - Botones por card: "Editar" (modal completo, permite editar ambos campos:
   nombre y nombre_corto), "Editar horario" (modal de horario M1 + P1), "Marcar como
-  default", "Archivar" (deshabilitado si es el único activo).
-- Sección colapsable de "Archivados" debajo.
+  default", "Borrar".
+  Comportamiento del botón "Borrar" (validaciones UI = espejo de API):
+  - Si el consultorio es el ÚNICO activo del médico → botón deshabilitado
+    con tooltip: "No puedes borrar tu único consultorio. Debes tener al
+    menos uno."
+  - Si el consultorio es el default Y hay otros activos → al hacer click,
+    aparece modal explicando: "Este es tu consultorio default. Marca otro
+    como default antes de borrar este." Sin opción "Borrar de todas formas".
+  - Si el consultorio NO es default Y NO es el único → al hacer click,
+    aparece modal de confirmación irreversible: "¿Estás seguro de borrar
+    este consultorio? Esta acción NO se puede deshacer." con 2 botones:
+    - "Cancelar"
+    - "Editar en lugar de borrar" (cierra el modal y abre el de edición)
+    - "Sí, borrar" (en color de advertencia, ej. rojo).
+  El médico NO ve los consultorios borrados en ningún lado de la UI. El
+  borrado es irreversible desde la perspectiva del usuario, aunque a nivel
+  de BD sea soft-delete (UPDATE activo=false + fecha_baja=now()) para
+  preservar la integridad de los snapshots históricos en
+  appointments/consultas.
 
 **Archivo nuevo:** `src/components/consultorios/EditConsultorioModal.tsx`
 
@@ -572,6 +615,11 @@ por
   permiten transferir), (b) regla de producto "consultorios no se
   comparten entre médicos". Riesgo residual aceptado: solo aplica a SQL
   manual del dueño en SQL Editor.
+- Endpoint o vista de "consultorios archivados / restaurar consultorio":
+  los consultorios archivados se preservan en BD para integridad
+  referencial pero NO se exponen a usuario final por diseño (decisión R1).
+  Si en el futuro se necesita restauración, será endpoint admin o
+  super-admin con vista separada.
 
 ---
 
