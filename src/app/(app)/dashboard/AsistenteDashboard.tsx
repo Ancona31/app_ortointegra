@@ -2,14 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { UserPlus, Users, ChevronRight, CalendarDays, User } from 'lucide-react'
+import { UserPlus, Users, ChevronRight, CalendarDays, CalendarPlus, User } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
 import { Paciente } from '@/types'
 import { format, parseISO } from 'date-fns'
 import { calcularEdad } from '@/lib/patientUtils'
 import { es } from 'date-fns/locale'
-import CalendarWidget from '@/components/calendario/CalendarWidget'
 import { StatusChip } from './StatusChip'
 import { formatCitaHora } from './utils'
 
@@ -28,7 +27,6 @@ type Medico = { id: string; nombre: string; titulo: string }
 export default function AsistenteDashboard() {
   const { profile } = useProfile()
   const [recientes,     setRecientes]     = useState<Paciente[]>([])
-  const [conectado,     setConectado]     = useState<boolean | null>(null)
   const [proximasCitas, setProximasCitas] = useState<ProximaCita[]>([])
   const [medicos,       setMedicos]       = useState<Medico[]>([])
   const [filtroMedico,  setFiltroMedico]  = useState<string>('todos')
@@ -44,13 +42,6 @@ export default function AsistenteDashboard() {
       .order('created_at', { ascending: false })
       .limit(5)
       .then(({ data }: { data: Paciente[] | null }) => setRecientes(data || []))
-  }, [])
-
-  useEffect(() => {
-    fetch('/api/google/events')
-      .then(r => r.json())
-      .then(data => setConectado(data.connected ?? false))
-      .catch(() => setConectado(false))
   }, [])
 
   useEffect(() => {
@@ -167,6 +158,21 @@ export default function AsistenteDashboard() {
         <ChevronRight size={20} className="text-[#1e5fa8] group-hover:translate-x-1 transition-transform" />
       </Link>
 
+      {/* Agendar nueva cita */}
+      <Link href="/agenda"
+        className="flex items-center justify-between p-6 bg-white rounded-2xl border-2 border-[#1e5fa8] hover:bg-blue-50 transition-all group shadow-sm">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-[#1e5fa8] rounded-xl flex items-center justify-center">
+            <CalendarPlus size={24} className="text-white" />
+          </div>
+          <div>
+            <p className="font-bold text-[#1a3a5c] text-lg">Agendar nueva cita</p>
+            <p className="text-slate-500 text-sm">Abrir la agenda de la clínica</p>
+          </div>
+        </div>
+        <ChevronRight size={20} className="text-[#1e5fa8] group-hover:translate-x-1 transition-transform" />
+      </Link>
+
       {/* Pacientes recientes */}
       {recientes.length > 0 && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -202,9 +208,6 @@ export default function AsistenteDashboard() {
           </div>
         </div>
       )}
-
-      {/* Calendario */}
-      <CalendarWidget conectado={conectado} setConectado={setConectado} />
     </div>
   )
 }
