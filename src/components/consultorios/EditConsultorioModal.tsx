@@ -1,31 +1,39 @@
 'use client'
 
-import { useState } from 'react'
-import { useConsultorios } from '@/hooks/useConsultorios'
-import { useProfile } from '@/hooks/useProfile'
-import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
+import { useState, useEffect } from 'react'
 import { useToast } from '@/components/ui/Toast'
 import ModalShell from '@/components/ui/ModalShell'
 import { Consultorio } from '@/types'
 import { ZONAS_MEXICO, CHIPS_RAPIDOS } from '@/lib/consultorios/zonas-mexico'
 
-export default function PrimerConsultorioModal() {
-  const { isDoctor } = useProfile()
-  const { consultorios, isLoading, mutate } = useConsultorios()
-  const { state } = useSubscriptionGate()
+interface Props {
+  open: boolean
+  onClose: () => void
+  consultorio: Consultorio
+  onSuccess: (consultorioActualizado: Consultorio) => void
+}
+
+export default function EditConsultorioModal({ open, onClose, consultorio, onSuccess }: Props) {
   const toast = useToast()
 
-  const [nombre, setNombre] = useState('')
-  const [nombreCorto, setNombreCorto] = useState('')
-  const [direccion, setDireccion] = useState('')
-  const [telefono, setTelefono] = useState('')
-  const [timezone, setTimezone] = useState('')
+  const [nombre, setNombre] = useState(consultorio.nombre)
+  const [nombreCorto, setNombreCorto] = useState(consultorio.nombre_corto)
+  const [direccion, setDireccion] = useState(consultorio.direccion)
+  const [telefono, setTelefono] = useState(consultorio.telefono ?? '')
+  const [timezone, setTimezone] = useState(consultorio.timezone)
   const [submitting, setSubmitting] = useState(false)
 
-  if (!isDoctor) return null
-  if (isLoading) return null
-  if (consultorios.length > 0) return null
-  if (state.isBlocked) return null
+  // Re-sincronizar estado cuando cambia el consultorio o se reabre el modal.
+  useEffect(() => {
+    if (open) {
+      setNombre(consultorio.nombre)
+      setNombreCorto(consultorio.nombre_corto)
+      setDireccion(consultorio.direccion)
+      setTelefono(consultorio.telefono ?? '')
+      setTimezone(consultorio.timezone)
+      setSubmitting(false)
+    }
+  }, [open, consultorio])
 
   const requiereNombreCorto = nombre.trim().length > 12
   const canSubmit =
@@ -40,37 +48,73 @@ export default function PrimerConsultorioModal() {
     setSubmitting(true)
 
     try {
-      const body: Record<string, unknown> = {
-        nombre: nombre.trim(),
-        direccion: direccion.trim(),
-        timezone,
+      // Detectar cambios. Solo enviar campos que efectivamente cambiaron.
+      const body: Record<string, unknown> = {}
+
+      const nombreTrim = nombre.trim()
+      const nombreCortoTrim = nombreCorto.trim()
+      const direccionTrim = direccion.trim()
+      const telefonoTrim = telefono.trim()
+
+      if (nombreTrim !== consultorio.nombre) {
+        body.nombre = nombreTrim
       }
-      if (requiereNombreCorto) {
-        body.nombre_corto = nombreCorto.trim()
+      if (direccionTrim !== consultorio.direccion) {
+        body.direccion = direccionTrim
       }
-      if (telefono.trim().length > 0) {
-        body.telefono = telefono.trim()
+      if (timezone !== consultorio.timezone) {
+        body.timezone = timezone
       }
 
-      const res = await fetch('/api/consultorios', {
-        method: 'POST',
+      // Teléfono: si el médico lo borró, enviar null para limpiar.
+      const telefonoOriginal = consultorio.telefono ?? ''
+      if (telefonoTrim !== telefonoOriginal) {
+        body.telefono = telefonoTrim.length > 0 ? telefonoTrim : null
+      }
+
+      // Lógica de nombre_corto:
+      // - Si nombre cambió y ahora es ≤12: enviar nombre_corto: null para que server recalcule.
+      // - Si nombre cambió y ahora es >12: enviar el nombre_corto que escribió el médico.
+      // - Si nombre no cambió pero nombre_corto cambió: enviar el nuevo (o null si queda vacío y nombre ≤12).
+      // - Si nada cambió: no enviar nombre_corto.
+      const nombreCambio = nombreTrim !== consultorio.nombre
+      const nombreCortoCambio = nombreCortoTrim !== consultorio.nombre_corto
+
+      if (nombreCambio && nombreTrim.length <= 12) {
+        body.nombre_corto = null
+      } else if (nombreCambio && nombreTrim.length > 12) {
+        body.nombre_corto = nombreCortoTrim
+      } else if (!nombreCambio && nombreCortoCambio) {
+        if (nombreCortoTrim.length === 0 && nombreTrim.length <= 12) {
+          body.nombre_corto = null
+        } else {
+          body.nombre_corto = nombreCortoTrim
+        }
+      }
+
+      if (Object.keys(body).length === 0) {
+        toast.info('No hay cambios para guardar.')
+        setSubmitting(false)
+        return
+      }
+
+      const res = await fetch(`/api/consultorios/${consultorio.id}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        toast.error(data.error ?? 'Error al crear el consultorio. Intenta de nuevo.')
+        toast.error(data.error ?? 'Error al actualizar el consultorio.')
         setSubmitting(false)
         return
       }
 
-      const { consultorio } = await res.json() as { consultorio: Consultorio }
-      await mutate(
-        (cur) => ({ consultorios: [...(cur?.consultorios ?? []), consultorio] }),
-        { revalidate: false }
-      )
-      toast.success('Consultorio creado. Puedes agregar más desde tu perfil → Mis consultorios.')
+      const { consultorio: actualizado } = await res.json() as { consultorio: Consultorio }
+      toast.success('Consultorio actualizado.')
+      onSuccess(actualizado)
+      onClose()
     } catch {
       toast.error('Error de red. Verifica tu conexión.')
       setSubmitting(false)
@@ -79,32 +123,32 @@ export default function PrimerConsultorioModal() {
 
   return (
     <ModalShell
-      open={true}
-      onClose={() => { /* bloqueante: no-op intencional */ }}
-      hideClose
-      title="Configura tu consultorio"
-      subtitle="Paso único de configuración"
+      open={open}
+      onClose={submitting ? () => {} : onClose}
+      title="Editar consultorio"
+      subtitle={consultorio.nombre}
       maxWidth="max-w-lg"
       footer={
-        <div className="flex flex-col gap-2 px-5 py-3.5">
-          <p className="text-[11px] text-slate-500 text-center">
-            Configuración completa disponible en tu perfil.
-          </p>
+        <div className="flex gap-2 px-5 py-3.5">
+          <button
+            type="button"
+            onClick={submitting ? undefined : onClose}
+            disabled={submitting}
+            className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Cancelar
+          </button>
           <button
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-[var(--cp)] hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-[var(--cp)] hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {submitting ? 'Guardando…' : 'Guardar consultorio'}
+            {submitting ? 'Guardando…' : 'Guardar cambios'}
           </button>
         </div>
       }
     >
       <div className="px-5 py-5 space-y-4">
-        <p className="text-sm text-slate-600">
-          Spinus ahora soporta múltiples consultorios. Configura tu consultorio principal para continuar.
-        </p>
-
         <div>
           <label className="block text-xs font-semibold text-slate-700 mb-1">
             Nombre del consultorio <span className="text-red-500">*</span>
