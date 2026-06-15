@@ -21,6 +21,8 @@ interface Props {
   maxWidth?: string
   /** z-50 por defecto. elevated=true usa z-[60] para apilarse sobre otro ModalShell */
   elevated?: boolean
+  /** Oculta el botón X del header. Útil para modales bloqueantes (ej. onboarding). */
+  hideClose?: boolean
   /** Contenido fijo al pie del modal. No scrollea con el body. El consumidor maneja su propio padding. */
   footer?: React.ReactNode
   children: React.ReactNode
@@ -36,6 +38,7 @@ export default function ModalShell({
   headerRight,
   maxWidth = 'max-w-lg',
   elevated = false,
+  hideClose = false,
   footer,
   children,
 }: Props) {
@@ -96,13 +99,15 @@ export default function ModalShell({
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
               {headerRight}
-              <button
-                onClick={onClose}
-                className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-[#86868b] transition-colors"
-                aria-label="Cerrar"
-              >
-                <X size={14} />
-              </button>
+              {!hideClose && (
+                <button
+                  onClick={onClose}
+                  className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-[#86868b] transition-colors"
+                  aria-label="Cerrar"
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
           </div>
           <div className="flex-1 overflow-y-auto">
