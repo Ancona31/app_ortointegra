@@ -160,15 +160,22 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Fase 2.6: validar consultorio y cargar snapshot inmutable.
+    // Fase 2.6 + F3-5c: validar consultorio y cargar snapshot inmutable.
     // El consultorio debe existir, estar activo, y pertenecer al médico
-    // al que se le agendará la cita (finalMedicoId), no al usuario autenticado
-    // (porque puede ser secretaria agendando para un médico).
-    const { data: consultorio, error: errConsultorio } = await supabase
+    // al que se le agendará la cita (finalMedicoId).
+    // Usamos admin client porque tras la migración 06 (RLS consultorios
+    // owner-only), un admin de clínica NO ve los consultorios de invitados
+    // vía RLS, pero SÍ debe poder agendarles citas. finalMedicoId ya quedó
+    // validado contra la clínica del caller (líneas 142-154), así que el
+    // bypass de RLS es seguro. Defensa en profundidad: filtramos por
+    // clinica_id por si hubiera drift de datos.
+    const adminConsultorio = createAdminClient()
+    const { data: consultorio, error: errConsultorio } = await adminConsultorio
       .from('consultorios')
       .select('id, nombre, nombre_corto, direccion, telefono, timezone')
       .eq('id', consultorio_id)
       .eq('medico_id', finalMedicoId)
+      .eq('clinica_id', profile.clinica_id)
       .eq('activo', true)
       .maybeSingle()
 
