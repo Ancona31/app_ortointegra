@@ -179,11 +179,19 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       }
 
       // Cargar consultorio y validar ownership/activo.
-      const { data: consultorio, error: errConsultorio } = await supabase
+      // F3-6a+c.1: validar consultorio con admin client (espejo del POST).
+      // Tras la migración 06 (RLS consultorios owner-only), un admin de
+      // clínica NO ve los consultorios de invitados vía RLS. medicoIdEfectivo
+      // ya quedó validado contra la clínica del caller (rama de cambio de
+      // médico L101-122 o vía RLS de appointments L63-67), así que el bypass
+      // de RLS es seguro. Defensa en profundidad: filtramos por clinica_id.
+      const adminConsultorio = createAdminClient()
+      const { data: consultorio, error: errConsultorio } = await adminConsultorio
         .from('consultorios')
         .select('id, nombre, nombre_corto, direccion, telefono, timezone')
         .eq('id', consultorio_id)
         .eq('medico_id', medicoIdEfectivo)
+        .eq('clinica_id', profile.clinica_id)
         .eq('activo', true)
         .maybeSingle()
 
