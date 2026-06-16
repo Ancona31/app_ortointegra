@@ -1390,6 +1390,10 @@ export default function AgendaPage() {
           existing.setExtendedProp('colorStyle', ev.extendedProps?.colorStyle)
           existing.setExtendedProp('notes', data.notes ?? existing.extendedProps.notes)
           existing.setExtendedProp('pacientes', data.paciente_id ? existing.extendedProps.pacientes : null)
+          // F3-6 fix Bug 1: actualizar también médico y consultorio_id (optimistic).
+          existing.setExtendedProp('doctorInitial', ev.extendedProps?.doctorInitial)
+          existing.setExtendedProp('medico_id', data.medico_id ?? null)
+          existing.setExtendedProp('consultorio_id', data.consultorio_id ?? existing.extendedProps.consultorio_id)
         }
       } else {
         // Crear evento optimista temporal
@@ -1413,6 +1417,21 @@ export default function AgendaPage() {
     }
 
     const json = await res.json()
+
+    // F3-6 fix Bug 1: en edición, sincronizar snapshots completos desde el server
+    // (los 6 consultorio_* que el backend recalcula al cambiar consultorio_id,
+    // y mantiene coherencia para re-edición y badge de timezone).
+    if (isEdit && json.appointment) {
+      const existing = api?.getEventById(data.id!)
+      if (existing) {
+        existing.setExtendedProp('consultorio_id', json.appointment.consultorio_id)
+        existing.setExtendedProp('consultorio_nombre', json.appointment.consultorio_nombre)
+        existing.setExtendedProp('consultorio_nombre_corto', json.appointment.consultorio_nombre_corto)
+        existing.setExtendedProp('consultorio_direccion', json.appointment.consultorio_direccion)
+        existing.setExtendedProp('consultorio_telefono', json.appointment.consultorio_telefono)
+        existing.setExtendedProp('consultorio_timezone', json.appointment.consultorio_timezone)
+      }
+    }
 
     if (!isEdit && optimisticEvent && json.appointment?.id) {
       // Reemplazar evento optimista con el real (que tiene ID de DB)
