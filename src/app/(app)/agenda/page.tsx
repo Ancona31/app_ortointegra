@@ -16,6 +16,9 @@ import { canManageClinica } from '@/lib/permissions'
 import QuickPatientModal from '@/components/ui/QuickPatientModal'
 import Portal from '@/components/ui/Portal'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
+import { useConsultorios } from '@/hooks/useConsultorios'
+import { useConsultoriosDeMedico } from '@/hooks/useConsultoriosDeMedico'
+import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 
 /* ─── Tipos ────────────────────────────────────────────── */
 
@@ -33,6 +36,13 @@ type Appointment = {
   google_event_id: string | null
   gcal_sync_status: 'synced' | 'pending' | 'failed'
   updated_at: string
+  // F3-6: snapshots de consultorio (persistidos en POST/PUT, devueltos en GET).
+  consultorio_id: string | null
+  consultorio_nombre: string | null
+  consultorio_nombre_corto: string | null
+  consultorio_direccion: string | null
+  consultorio_telefono: string | null
+  consultorio_timezone: string | null
   pacientes?: { id: string; nombre: string; apellidos: string; telefono: string | null } | null
   medico?: { id: string; nombre: string; titulo: string } | null
 }
@@ -427,6 +437,44 @@ function AppointmentModal({
   const [saving,      setSaving]      = useState(false)
   const [deleting,    setDeleting]    = useState(false)
 
+  // F3-6: hook de consultorio activo (siempre disponible bajo el Provider).
+  const { consultorioActivo } = useConsultorioActivo()
+
+  // F3-6: hooks de consultorios. Se llaman AMBOS incondicionalmente (reglas
+  // de hooks). El discriminador hideMedicoDropdown decide cuál se usa.
+  // - hideMedicoDropdown=true → médico operando para sí (owner-scope).
+  // - hideMedicoDropdown=false → admin/secretaria operando para otro médico.
+  const ownerConsultorios = useConsultorios()
+  const operativoConsultorios = useConsultoriosDeMedico(hideMedicoDropdown ? null : medicoId)
+
+  const consultoriosList = hideMedicoDropdown
+    ? ownerConsultorios.consultorios
+    : operativoConsultorios.consultorios
+  const consultorioDefaultDelTarget = hideMedicoDropdown
+    ? ownerConsultorios.consultorioDefault
+    : operativoConsultorios.consultorioDefault
+
+  // State del consultorio seleccionado.
+  // Pre-selección cascada: apt (edición) → activo del sidebar si está en lista
+  // → default del target → vacío.
+  const [consultorioId, setConsultorioId] = useState<string>(() => {
+    if (apt?.consultorio_id) return apt.consultorio_id
+    if (consultorioActivo && consultoriosList.some(c => c.id === consultorioActivo.id)) {
+      return consultorioActivo.id
+    }
+    return consultorioDefaultDelTarget?.id ?? ''
+  })
+
+  // F3-6: reset al cambiar médico.
+  // En edición sin cambio de médico: preservar snapshot.
+  // En edición con cambio de médico, o creación: ajustar al default del nuevo target.
+  useEffect(() => {
+    if (apt && medicoId === apt.medico_id) return
+    if (consultoriosList.some(c => c.id === consultorioId)) return
+    const next = consultorioDefaultDelTarget?.id ?? ''
+    setConsultorioId(next)
+  }, [medicoId, consultoriosList, consultorioDefaultDelTarget?.id, apt, consultorioId])
+
   // Sincronizar default cuando profile carga después del mount inicial.
   // Solo aplica para creación de cita (no para edición de cita existente).
   useEffect(() => {
@@ -444,9 +492,16 @@ function AppointmentModal({
     // Defensa en profundidad: secretaria debe seleccionar médico
     // (el `required` HTML5 ya bloquea el submit, pero validamos aquí también)
     if (medicoDropdownRequired && !medicoId) return
+    if (!consultorioId) return  // F3-6: consultorio obligatorio
 
     setSaving(true)
     const start_time = fromDatetimeLocal(startTime)
+
+    // F3-6: enviar consultorio_id en creación SIEMPRE; en edición SOLO si cambió.
+    // Evita re-validación innecesaria del consultorio en el backend cuando se edita
+    // hora/status sin tocar consultorio.
+    const consultorioChanged = !apt || consultorioId !== apt.consultorio_id
+
     await onSave({
       id:          apt?.id,
       title:       `${paciente.nombre} ${paciente.apellidos}`,
@@ -456,6 +511,7 @@ function AppointmentModal({
       status,
       paciente_id: paciente.id,
       medico_id:   medicoId || null,
+      ...(consultorioChanged ? { consultorio_id: consultorioId } : {}),
       updated_at:  apt?.updated_at,
     })
     setSaving(false)
@@ -648,6 +704,36 @@ function AppointmentModal({
             </div>
           )}
 
+          {/* F3-6: Dropdown de consultorios. Siempre visible. */}
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
+              Consultorio <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <select
+                value={consultorioId}
+                onChange={e => setConsultorioId(e.target.value)}
+                required
+                disabled={consultoriosList.length === 0}
+                className="w-full pl-3 pr-9 py-2.5 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {consultoriosList.length === 0 ? (
+                  <option value="">Sin consultorios disponibles</option>
+                ) : (
+                  <>
+                    <option value="">— Selecciona consultorio —</option>
+                    {consultoriosList.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre}{c.es_default ? ' (default)' : ''}
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
+              <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--ag-muted)' }} />
+            </div>
+          </div>
+
           {/* Notas */}
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>Notas</label>
@@ -682,7 +768,7 @@ function AppointmentModal({
             <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-bold transition-colors hover:bg-[var(--ag-btn-ghost-hover)]" style={{ color: 'var(--ag-muted)' }}>
               Cancelar
             </button>
-            <button onClick={handleSave} disabled={saving || !paciente || !startTime}
+            <button onClick={handleSave} disabled={saving || !paciente || !startTime || !consultorioId}
               className="px-5 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 transition-all hover:brightness-95 shadow-sm bg-[linear-gradient(135deg,var(--ag-brand-primary),var(--ag-brand-secondary))]">
               {saving ? 'Guardando...' : isEdit ? 'Guardar cambios' : 'Agendar cita'}
             </button>
