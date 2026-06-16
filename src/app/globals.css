@@ -391,8 +391,9 @@ body {
    detrás. Prefijado .fc-timegrid → no afecta Mes. */
 .fc-timegrid .fc-timegrid-col { border-color: var(--ag-col-line) !important; }
 
-/* Altura de franjas horarias — suficiente para nombres largos. NO cambiar. */
-.fc .fc-timegrid-slot { height: 1.8rem !important; }
+/* Altura de franjas horarias — suficiente para nombres largos y badge de TZ.
+   NO REDUCIR (los nombres dejarían de caber). Aumentar es seguro. */
+.fc .fc-timegrid-slot { height: 2.16rem !important; }
 
 /* Etiquetas del gutter de horas */
 .fc .fc-timegrid-slot-label-cushion {

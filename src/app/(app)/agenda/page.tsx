@@ -19,6 +19,7 @@ import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvid
 import { useConsultorios } from '@/hooks/useConsultorios'
 import { useConsultoriosDeMedico } from '@/hooks/useConsultoriosDeMedico'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
+import { ZONAS_MEXICO } from '@/lib/consultorios/zonas-mexico'
 
 /* ─── Tipos ────────────────────────────────────────────── */
 
@@ -251,6 +252,27 @@ function calcDuration(startIso: string, endIso: string) {
 
 function addMinutes(iso: string, mins: number) {
   const d = new Date(iso); d.setMinutes(d.getMinutes() + mins); return d.toISOString()
+}
+
+/* ─── F3-6e: helpers para badge de timezone ─── */
+function regionDeTimezone(tz: string | null): string {
+  if (!tz) return ''
+  const zona = ZONAS_MEXICO.find(z => z.value === tz)
+  if (!zona) return tz  // fallback al IANA crudo
+  return zona.label.split('—')[0].trim()  // em-dash U+2014
+}
+
+function horaEnTZ(startTimeISO: string, tz: string): string {
+  try {
+    return new Intl.DateTimeFormat('es-MX', {
+      timeZone: tz,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(new Date(startTimeISO))
+  } catch {
+    return ''
+  }
 }
 
 /* ─── Helpers ──────────────────────────────────────────── */
@@ -830,8 +852,8 @@ type EventColor = { bg: string; text: string; border: string }
    midiendo el alto real del contenedor con ResizeObserver (ver abajo): es
    lo más fiable con FullCalendar, cuyo alto de evento depende de la duración
    y del alto de hora del grid, no calculable con certeza solo desde datos.
-   Calibrados al grid real: slot de 30min = 1.8rem ≈ 28.8px (globals.css),
-   así una cita de 1h ≈ 57.6px → cae en 'full' y el layout (con line-heights
+   Calibrados al grid real: slot de 30min = 2.16rem ≈ 34.56px (globals.css),
+   así una cita de 1h ≈ 69.12px → cae en 'full' y el layout (con line-heights
    ajustados abajo) cabe sin recortar el nombre. */
 const CARD_TINY_MAX = 40
 const CARD_COMPACT_MAX = 56
@@ -853,12 +875,19 @@ const NAME_BASE: CSSProperties = {
 const STATUS_DOT: CSSProperties = {
   width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
 }
+const tzDiffStyle: CSSProperties = {
+  fontSize: '9.5px',
+  fontWeight: 500,
+  lineHeight: 1.2,
+  color: 'var(--ag-muted)',
+  fontStyle: 'italic',
+}
 
 const MemoizedEventContent = memo(function MemoizedEventContent({
-  timeText, title, pacNombre, status, doctorInitial,
+  timeText, title, pacNombre, status, doctorInitial, tzDiff,
 }: {
   timeText: string; title: string; pacNombre: string | null
-  status: Status; doctorInitial?: string
+  status: Status; doctorInitial?: string; tzDiff?: string
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const [height, setHeight] = useState<number | null>(null)
@@ -930,6 +959,7 @@ const MemoizedEventContent = memo(function MemoizedEventContent({
       <div ref={rootRef} style={root}>
         {timeRow}
         <span style={nameStyle}>{name}</span>
+        {tzDiff && <span style={tzDiffStyle}>{tzDiff}</span>}
       </div>
     )
   }
@@ -939,6 +969,7 @@ const MemoizedEventContent = memo(function MemoizedEventContent({
     <div ref={rootRef} style={root}>
       {timeRow}
       <span style={nameStyle}>{name}</span>
+      {tzDiff && <span style={tzDiffStyle}>{tzDiff}</span>}
       <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
         <span style={{ ...STATUS_DOT, background: dot }} />
         <span style={{ fontSize: '10.5px', fontWeight: 600, lineHeight: 1.2, color: txt }}>{STATUS_CONFIG[status].label}</span>
@@ -1025,7 +1056,7 @@ const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg }) {
   )
 })
 
-function renderEventContent(arg: EventContentArg) {
+function renderEventContent(arg: EventContentArg, navegadorTZ: string) {
   // Vista Mes: chip plano dedicado. El camino de Semana/Día (abajo) queda intacto.
   if (arg.view.type === 'dayGridMonth') return <MonthChip arg={arg} />
   const ext = arg.event.extendedProps as (Appointment & { doctorInitial?: string }) & { isGcalBlock?: boolean }
@@ -1034,6 +1065,26 @@ function renderEventContent(arg: EventContentArg) {
   }
   if (!ext?.status) return <>{arg.event.title}</>
   const pac = ext.pacientes
+
+  // F3-6e: badge de hora en TZ del consultorio si la hora resultante difiere
+  // de la hora en TZ del navegador. Comparamos horas resultantes, no strings
+  // IANA, para evitar falsos positivos entre zonas del mismo offset (las 8
+  // zonas UTC-6 mexicanas son IANA distintas pero comparten hora de pared).
+  let tzDiff: string | undefined
+  const consultorioTZ = ext.consultorio_timezone
+  // F3-6e: usar arg.event.start (Date) en vez de ext.start_time (ISO de extendedProps)
+  // para que el badge se actualice correctamente tras drag/resize. FullCalendar
+  // actualiza arg.event.start automáticamente, pero NO toca extendedProps.start_time.
+  const startISO = arg.event.start?.toISOString()
+  if (consultorioTZ && startISO) {
+    const horaConsultorio = horaEnTZ(startISO, consultorioTZ)
+    const horaNavegador = horaEnTZ(startISO, navegadorTZ)
+    if (horaConsultorio && horaConsultorio !== horaNavegador) {
+      const region = regionDeTimezone(consultorioTZ)
+      tzDiff = `${horaConsultorio} hora ${region}`
+    }
+  }
+
   return (
     <MemoizedEventContent
       timeText={arg.timeText}
@@ -1041,6 +1092,7 @@ function renderEventContent(arg: EventContentArg) {
       pacNombre={pac ? `${pac.nombre} ${pac.apellidos}` : null}
       status={ext.status}
       doctorInitial={ext.doctorInitial}
+      tzDiff={tzDiff}
     />
   )
 }
@@ -1084,6 +1136,17 @@ export default function AgendaPage() {
     // Secretaria u otros: sin default (obligar elección)
     return ''
   }, [profile, isSingleDoctor, medicos])
+
+  // F3-6e: TZ del navegador (estable) + wrapper para inyectarla a renderEventContent.
+  const navegadorTZ = useMemo(
+    () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+    []
+  )
+
+  const renderEC = useCallback(
+    (arg: EventContentArg) => renderEventContent(arg, navegadorTZ),
+    [navegadorTZ]
+  )
 
   useEffect(() => {
     fetch('/api/me/horario')
@@ -1636,7 +1699,7 @@ export default function AgendaPage() {
           businessHours={horarioToBusinessHours(horario)}
           eventSources={eventSourcesStable}
           dayHeaderContent={renderDayHeader}
-          eventContent={renderEventContent}
+          eventContent={renderEC}
           dateClick={handleDateClick}
           select={handleSelect}
           eventClick={handleEventClick}
