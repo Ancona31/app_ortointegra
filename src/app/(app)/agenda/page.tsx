@@ -1133,6 +1133,17 @@ export default function AgendaPage() {
     refetch()
   }, [filtroMedico])
 
+  // F3-6 fix: refetch al cargar médicos para que el chip se calcule con
+  // isSingleDoctor correcto. En el primer render medicos=[] → isSingleDoctor=true,
+  // el closure de appointmentSource captura ese valor y no calcula doctorInitial.
+  // Cuando médicos cargan, este efecto fuerza un refetch que reevalúa con el
+  // closure nuevo (isSingleDoctor=false en clínicas multi-médico).
+  const firstRenderMedicosRef = useRef(true)
+  useEffect(() => {
+    if (firstRenderMedicosRef.current) { firstRenderMedicosRef.current = false; return }
+    refetch()
+  }, [isSingleDoctor])
+
   /* ── Supabase Realtime — debounced (max 1 refetch/sec) ── */
   const realtimeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
