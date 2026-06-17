@@ -7,7 +7,7 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
 import { EventClickArg, EventDropArg, DateSelectArg, EventInput, EventContentArg, DayHeaderContentArg } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
-import { X, Calendar, User, Plus, Trash2, Settings, Lock, LayoutGrid, Columns3, Square, ChevronDown, FileText } from 'lucide-react'
+import { X, Calendar, User, Plus, Trash2, Settings, Lock, LayoutGrid, Columns3, Square, ChevronDown, FileText, Stethoscope, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ui/Toast'
@@ -460,7 +460,7 @@ function AppointmentModal({
   const [deleting,    setDeleting]    = useState(false)
 
   // F3-6: hook de consultorio activo (siempre disponible bajo el Provider).
-  const { consultorioActivo } = useConsultorioActivo()
+  const { consultorioActivo, cambiarActivo } = useConsultorioActivo()
 
   // F3-6: hooks de consultorios. Se llaman AMBOS incondicionalmente (reglas
   // de hooks). El discriminador hideMedicoDropdown decide cuál se usa.
@@ -475,6 +475,17 @@ function AppointmentModal({
   const consultorioDefaultDelTarget = hideMedicoDropdown
     ? ownerConsultorios.consultorioDefault
     : operativoConsultorios.consultorioDefault
+
+  // F3-7b: solo si la cita es del médico autenticado y su consultorio existe en la lista
+  const citaConsultorio = apt?.consultorio_id
+    ? consultoriosList.find(c => c.id === apt.consultorio_id)
+    : undefined
+  const showIniciarConsulta =
+    isEdit &&
+    canVerExpediente &&
+    paciente &&
+    defaultMedicoId === apt?.medico_id &&
+    citaConsultorio
 
   // State del consultorio seleccionado.
   // Pre-selección cascada: apt (edición) → activo del sidebar si está en lista
@@ -561,7 +572,17 @@ function AppointmentModal({
           <h2 className="text-[18px] font-extrabold" style={{ color: 'var(--ag-ink)' }}>
             {isEdit ? 'Editar cita' : 'Nueva cita'}
           </h2>
-          <button onClick={onClose} className="ml-auto p-1 transition-opacity hover:opacity-70" style={{ color: 'var(--ag-muted2)' }}>
+          {canVerExpediente && paciente && (
+            <Link
+              href={`/expediente/${paciente.id}`}
+              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)]"
+              style={{ color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}
+            >
+              <FileText size={14} />
+              Expediente
+            </Link>
+          )}
+          <button onClick={onClose} className={`${canVerExpediente && paciente ? '' : 'ml-auto'} p-1 transition-opacity hover:opacity-70`} style={{ color: 'var(--ag-muted2)' }}>
             <X size={20} />
           </button>
         </div>
@@ -770,20 +791,28 @@ function AppointmentModal({
         {/* Footer */}
         <div className="px-[22px] py-3.5 border-t flex items-center gap-2" style={{ borderColor: 'var(--ag-hairline)' }}>
           {isEdit && (
-            <button onClick={handleDelete} disabled={deleting}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50">
-              <Trash2 size={15} />
-              {deleting ? 'Eliminando...' : 'Eliminar'}
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              title={deleting ? 'Eliminando...' : 'Eliminar cita'}
+              aria-label={deleting ? 'Eliminando cita' : 'Eliminar cita'}
+              className="flex items-center justify-center p-2.5 rounded-xl text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+            >
+              {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
             </button>
           )}
-          {/* Expediente — solo visible para quien puede ver expedientes (isDoctor)
-              y cuando hay paciente seleccionado. Barrera real: expediente/layout.tsx. */}
-          {canVerExpediente && paciente && (
-            <Link href={`/expediente/${paciente.id}`}
+          {showIniciarConsulta && (
+            <Link
+              href={`/expediente/${paciente.id}/nueva-nota`}
+              onClick={() => {
+                cambiarActivo(citaConsultorio!)
+                onClose()
+              }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)]"
-              style={{ color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}>
-              <FileText size={15} />
-              Expediente
+              style={{ color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}
+            >
+              <Stethoscope size={15} />
+              Iniciar consulta
             </Link>
           )}
           <div className="flex items-center gap-2 ml-auto">
@@ -792,7 +821,7 @@ function AppointmentModal({
             </button>
             <button onClick={handleSave} disabled={saving || !paciente || !startTime || !consultorioId}
               className="px-5 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 transition-all hover:brightness-95 shadow-sm bg-[linear-gradient(135deg,var(--ag-brand-primary),var(--ag-brand-secondary))]">
-              {saving ? 'Guardando...' : isEdit ? 'Guardar cambios' : 'Agendar cita'}
+              {saving ? 'Guardando...' : 'Guardar'}
             </button>
           </div>
         </div>
