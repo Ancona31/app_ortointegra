@@ -24,6 +24,7 @@ import { secureStorage } from '@/lib/secureStorage'
 import { useAuditAccess } from '@/hooks/useAudit'
 import DiagnosticosEditor from '@/components/documentos/DiagnosticosEditor'
 import dynamic from 'next/dynamic'
+import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 
 function FormCargando() {
   return (
@@ -111,6 +112,7 @@ function formatDiagnosticosInline(dxs: Diagnostico[]): string {
 export default function NuevaNotaPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const { consultorioActivo } = useConsultorioActivo()
   useAuditAccess('consultas', id) // NOM-024: registrar acceso a nota médica
   const [medicoInfo, setMedicoInfo] = useState<MedicoInfo | null>(null)
   const [paciente, setPaciente]     = useState<Paciente | null>(null)
@@ -513,6 +515,7 @@ export default function NuevaNotaPage() {
 
     const payload = {
       paciente_id: id,
+      consultorio_id: consultorioActivo?.id,
       motivo_consulta: form.motivo_consulta,
       exploracion_fisica: form.exploracion_fisica,
       diagnosticos: form.diagnosticos
@@ -780,7 +783,7 @@ export default function NuevaNotaPage() {
           className="flex items-center gap-2 px-5 py-2.5 border-2 border-[#1a3a5c] text-[#1a3a5c] rounded-lg text-sm font-medium hover:bg-[#1a3a5c] hover:text-white transition-colors disabled:opacity-50">
           {imprimiendo ? <><Loader2 size={16} className="animate-spin" /> Generando...</> : <><Printer size={16} /> Imprimir</>}
         </button>
-        <button onClick={intentarGuardar} disabled={guardando}
+        <button onClick={intentarGuardar} disabled={guardando || !consultorioActivo}
           className="flex-1 flex items-center justify-center gap-2 bg-[#1e5fa8] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-60">
           {guardando ? <><Loader2 size={16} className="animate-spin" /> Guardando...</> : <><Save size={16} /> Guardar en expediente</>}
         </button>
@@ -831,7 +834,8 @@ export default function NuevaNotaPage() {
                 </button>
                 <button
                   onClick={guardar}
-                  className="px-4 py-3.5 text-sm font-bold text-[#1e5fa8] hover:bg-blue-50 transition-colors"
+                  disabled={!consultorioActivo}
+                  className="px-4 py-3.5 text-sm font-bold text-[#1e5fa8] hover:bg-blue-50 transition-colors disabled:opacity-40"
                 >
                   Guardar nota
                 </button>
@@ -860,6 +864,11 @@ export default function NuevaNotaPage() {
               <p className="text-slate-500 text-sm mt-0.5">
                 {paciente.nombre} {paciente.apellidos} ·{' '}
                 {paciente.fecha_nacimiento ? calcularEdad(paciente.fecha_nacimiento).textoElegante : ''}
+              </p>
+            )}
+            {consultorioActivo && (
+              <p className="text-xs text-slate-500 mt-1">
+                Atendiendo en: <span className="font-semibold text-[#1e5fa8]">{consultorioActivo.nombre_corto || consultorioActivo.nombre}</span>
               </p>
             )}
           </div>
@@ -1336,7 +1345,7 @@ modoNota === 'ia'
                     : 'Completa y genera la nota para activar este panel'}
                 </p>
                 {notaGenerada && (
-                  <button onClick={intentarGuardar} disabled={guardando}
+                  <button onClick={intentarGuardar} disabled={guardando || !consultorioActivo}
                     className="mt-1 flex items-center gap-2 px-4 py-2 bg-[#1e5fa8] text-white rounded-lg text-xs font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-60">
                     {guardando ? <><Loader2 size={13} className="animate-spin" /> Guardando...</> : <><Save size={13} /> Guardar nota</>}
                   </button>
