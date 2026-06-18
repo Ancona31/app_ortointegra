@@ -5,7 +5,7 @@ import PdfHeader from './PdfHeader'
 import PdfWatermark from './PdfWatermark'
 import { BarraTop, BarraBottom } from './PdfBarras'
 import { baseStyles, getPdfColors, contrastText } from './PdfStyles'
-import type { PdfMedicoData, PdfColors } from './PdfStyles'
+import type { PdfMedicoData, PdfColors, PdfConsultorioData } from './PdfStyles'
 
 /* ------------------------------------------------------------------ */
 /*  Tipos                                                              */
@@ -46,6 +46,7 @@ export interface ConsentimientoProps {
   medico: PdfMedicoData | null
   data: ConsentimientoData
   logoUrl?: string
+  consultorio?: PdfConsultorioData
 }
 
 const SECCION_LABELS: Array<{ key: string; num: string; titulo: string }> = [
@@ -236,6 +237,7 @@ export default function ConsentimientoInformadoPdf({
   medico,
   data,
   logoUrl,
+  consultorio,
 }: ConsentimientoProps) {
   const colors = getPdfColors(medico)
   const nombre = medico?.nombre || 'Médico'
@@ -581,13 +583,14 @@ export default function ConsentimientoInformadoPdf({
               folio={data.folio}
               fecha={data.fecha}
               compact
+              consultorio={consultorio}
             />
           </View>
         </View>
 
         {/* Footer fixed */}
         <View fixed style={s.footerFixed}>
-          <BarraBottom colors={colors} medico={medico} />
+          <BarraBottom colors={colors} medico={medico} consultorio={consultorio} />
         </View>
 
         <PdfWatermark logoUrl={logoUrl} />
@@ -685,11 +688,12 @@ export default function ConsentimientoInformadoPdf({
               folio={data.folio}
               fecha={data.fecha}
               compact
+              consultorio={consultorio}
             />
           </View>
         </View>
         <View fixed style={s.footerFixed}>
-          <BarraBottom colors={colors} medico={medico} />
+          <BarraBottom colors={colors} medico={medico} consultorio={consultorio} />
         </View>
 
         <PdfWatermark logoUrl={logoUrl} />
@@ -714,11 +718,12 @@ export default function ConsentimientoInformadoPdf({
               folio={data.folio}
               fecha={data.fecha}
               compact
+              consultorio={consultorio}
             />
           </View>
         </View>
         <View fixed style={s.footerFixed}>
-          <BarraBottom colors={colors} medico={medico} />
+          <BarraBottom colors={colors} medico={medico} consultorio={consultorio} />
         </View>
 
         <PdfWatermark logoUrl={logoUrl} />
@@ -773,11 +778,12 @@ export default function ConsentimientoInformadoPdf({
                 folio={data.folio}
                 fecha={data.fecha}
                 compact
+                consultorio={consultorio}
               />
             </View>
           </View>
           <View fixed style={s.footerFixed}>
-            <BarraBottom colors={colors} medico={medico} />
+            <BarraBottom colors={colors} medico={medico} consultorio={consultorio} />
           </View>
 
           <PdfWatermark logoUrl={logoUrl} />
