@@ -4,7 +4,7 @@ import PdfHeader from './PdfHeader'
 import PdfFirma from './PdfFirma'
 import { BarraTop, BarraBottom } from './PdfBarras'
 import { baseStyles, getPdfColors, contrastText } from './PdfStyles'
-import type { PdfMedicoData } from './PdfStyles'
+import type { PdfMedicoData, PdfConsultorioData } from './PdfStyles'
 
 /* ------------------------------------------------------------------ */
 /*  Tipos                                                              */
@@ -31,6 +31,7 @@ export interface NotaEvolucionProps {
   medico: PdfMedicoData | null
   data: NotaEvolucionData
   logoUrl?: string
+  consultorio?: PdfConsultorioData
 }
 
 /* ------------------------------------------------------------------ */
@@ -52,7 +53,7 @@ export function renderNotaEvolucion(props: NotaEvolucionProps) {
   return <NotaEvolucionPdf {...props} />
 }
 
-export default function NotaEvolucionPdf({ medico, data, logoUrl }: NotaEvolucionProps) {
+export default function NotaEvolucionPdf({ medico, data, logoUrl, consultorio }: NotaEvolucionProps) {
   const colors = getPdfColors(medico)
 
   const s = StyleSheet.create({
@@ -246,13 +247,14 @@ export default function NotaEvolucionPdf({ medico, data, logoUrl }: NotaEvolucio
               folio={data.folio}
               fecha={data.fecha}
               compact
+              consultorio={consultorio}
             />
           </View>
         </View>
 
         {/* Footer fixed — se repite en cada página */}
         <View fixed style={s.footerFixed}>
-          <BarraBottom colors={colors} medico={medico} />
+          <BarraBottom colors={colors} medico={medico} consultorio={consultorio} />
         </View>
 
         <View style={{ flex: 1 }}>

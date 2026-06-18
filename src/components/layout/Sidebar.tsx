@@ -13,6 +13,7 @@ import {
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useProfile, clearProfileCache } from '@/hooks/useProfile'
+import ConsultorioActivoSelector from '@/components/sidebar/ConsultorioActivoSelector'
 import { canManageClinica } from '@/lib/permissions'
 import { useClinica } from '@/hooks/useClinica'
 import { useTheme } from '@/components/layout/ThemeProvider'
@@ -248,6 +249,8 @@ export default function Sidebar() {
             </p>
           </div>
         </div>
+
+        <ConsultorioActivoSelector />
 
         {/* Navegación */}
         <nav className="flex-1 px-2.5 py-3 overflow-y-auto space-y-0.5">

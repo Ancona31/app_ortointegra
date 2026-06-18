@@ -98,10 +98,27 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { title, start_time, end_time, paciente_id, notes, medico_id } = body
+    const { title, start_time, end_time, paciente_id, notes, medico_id, consultorio_id } = body
 
     if (!title || !start_time || !end_time) {
       return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
+    }
+
+    // Fase 2.6: consultorio_id es obligatorio para nuevas citas (multiconsultorio).
+    if (!consultorio_id) {
+      return NextResponse.json(
+        { error: 'consultorio_id_required', message: 'Debes seleccionar un consultorio para la cita.' },
+        { status: 400 }
+      )
+    }
+
+    // Validar formato UUID antes de query (evita 500 con entrada malformada).
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!UUID_REGEX.test(consultorio_id)) {
+      return NextResponse.json(
+        { error: 'consultorio_invalido', message: 'consultorio_id no tiene formato UUID válido.' },
+        { status: 400 }
+      )
     }
 
     // 5.H Paso 1: Determinar medico_id según rol (D-5.H-3).
@@ -143,6 +160,36 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Fase 2.6 + F3-5c: validar consultorio y cargar snapshot inmutable.
+    // El consultorio debe existir, estar activo, y pertenecer al médico
+    // al que se le agendará la cita (finalMedicoId).
+    // Usamos admin client porque tras la migración 06 (RLS consultorios
+    // owner-only), un admin de clínica NO ve los consultorios de invitados
+    // vía RLS, pero SÍ debe poder agendarles citas. finalMedicoId ya quedó
+    // validado contra la clínica del caller (líneas 142-154), así que el
+    // bypass de RLS es seguro. Defensa en profundidad: filtramos por
+    // clinica_id por si hubiera drift de datos.
+    const adminConsultorio = createAdminClient()
+    const { data: consultorio, error: errConsultorio } = await adminConsultorio
+      .from('consultorios')
+      .select('id, nombre, nombre_corto, direccion, telefono, timezone')
+      .eq('id', consultorio_id)
+      .eq('medico_id', finalMedicoId)
+      .eq('clinica_id', profile.clinica_id)
+      .eq('activo', true)
+      .maybeSingle()
+
+    if (errConsultorio) {
+      console.error('[POST /api/appointments] error cargando consultorio:', errConsultorio)
+      return NextResponse.json({ error: errConsultorio.message }, { status: 500 })
+    }
+    if (!consultorio) {
+      return NextResponse.json(
+        { error: 'consultorio_invalido', message: 'El consultorio no existe, está archivado, o no pertenece al médico seleccionado.' },
+        { status: 400 }
+      )
+    }
+
     // RLS filtra por clinica_id
     const { data: apt, error } = await supabase
       .from('appointments')
@@ -157,6 +204,13 @@ export async function POST(req: NextRequest) {
         status:          'scheduled',
         medico_id:        finalMedicoId,
         gcal_sync_status: 'pending',
+        // Snapshot inmutable del consultorio (Fase 2.6).
+        consultorio_id:            consultorio.id,
+        consultorio_nombre:        consultorio.nombre,
+        consultorio_nombre_corto:  consultorio.nombre_corto,
+        consultorio_direccion:     consultorio.direccion,
+        consultorio_telefono:      consultorio.telefono,
+        consultorio_timezone:      consultorio.timezone,
       })
       .select()
       .single()

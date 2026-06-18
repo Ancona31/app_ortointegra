@@ -577,4 +577,37 @@ Estado: 🔴 abierta · 🟡 en progreso · 🟢 resuelta (se elimina al cerrar)
 
 ---
 
+## Fase 3 — Multiconsultorio
+
+### F3-10-DT-01 — Regeneración de PDF en ModalDocumentos lee legacy
+
+**Detectado en:** F3-10 (cableado de PDFs al consultorio activo)
+**Estado:** Aceptado — NO refactorizar
+
+**Contexto:**
+`ModalDocumentos.regenerarYSubirPdf` (src/components/ui/ModalDocumentos.tsx)
+solo se invoca para documentos sin pdf_url (legacy/fallidos). Para esos
+docs no hay snapshot ni consulta_id, por lo que el único origen disponible
+es `profiles.direccion_consultorio` / `profiles.telefono_consultorio`
+(campos legacy).
+
+**Por qué NO se cablea al consultorio activo:**
+- Regenerar un PDF viejo con datos del consultorio activo de HOY falsearía
+  el lugar de emisión histórico (riesgo legal NOM-004).
+- Los docs sin pdf_url son anteriores a F3-10 → no tienen relación con el
+  multiconsultorio actual.
+- La reimpresión normal sirve los bytes congelados (inmutable), no usa esta
+  función.
+
+**Decisión:**
+Mantener regenerarYSubirPdf leyendo del legacy. NO eliminar
+profiles.direccion_consultorio / telefono_consultorio.
+
+**Consecuencia conocida:**
+Si un médico regenera un doc viejo y nunca configuró los campos legacy
+en /perfil, el PDF saldrá sin dir/tel. Aceptable: docs viejos son
+inherentemente best-effort.
+
+---
+
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)

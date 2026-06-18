@@ -3,7 +3,7 @@ import PdfHeader from './PdfHeader'
 import PdfWatermark from './PdfWatermark'
 import { BarraTop, BarraBottom } from './PdfBarras'
 import { getPdfColors, contrastText } from './PdfStyles'
-import type { PdfMedicoData, PdfColors } from './PdfStyles'
+import type { PdfMedicoData, PdfColors, PdfConsultorioData } from './PdfStyles'
 
 export interface RecetaData {
   paciente: string
@@ -29,6 +29,7 @@ export interface RecetaPdfProps {
   medico: PdfMedicoData | null
   data: RecetaData
   logoUrl?: string
+  consultorio?: PdfConsultorioData
 }
 
 /** Helper para renderToBuffer — retorna el JSX con tipo correcto */
@@ -244,7 +245,7 @@ function FirmaInline({ medico, colors }: { medico: PdfMedicoData | null; colors:
    Componente principal — RecetaPdf
    ──────────────────────────────────────────────────────────────── */
 
-export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
+export default function RecetaPdf({ medico, data, logoUrl, consultorio }: RecetaPdfProps) {
   const colors = getPdfColors(medico)
 
   const s = StyleSheet.create({
@@ -491,13 +492,14 @@ export default function RecetaPdf({ medico, data, logoUrl }: RecetaPdfProps) {
               compact
               showRx
               extraCredencial={data.universidad}
+              consultorio={consultorio}
             />
           </View>
         </View>
 
         {/* Footer fixed — se repite en cada página */}
         <View fixed style={s.footerFixed}>
-          <BarraBottom colors={colors} medico={medico} />
+          <BarraBottom colors={colors} medico={medico} consultorio={consultorio} />
         </View>
 
         <PdfWatermark logoUrl={logoUrl} />

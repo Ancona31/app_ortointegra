@@ -57,12 +57,12 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
 
     const { id } = await ctx.params
     const body = await req.json()
-    const { title, start_time, end_time, paciente_id, notes, status, medico_id, updated_at: clientUpdatedAt } = body
+    const { title, start_time, end_time, paciente_id, notes, status, medico_id, consultorio_id, updated_at: clientUpdatedAt } = body
 
     // RLS filtra por clinica_id
     const { data: existing } = await supabase
       .from('appointments')
-      .select('id, google_event_id, gcal_sync_status, updated_at')
+      .select('id, google_event_id, gcal_sync_status, updated_at, medico_id')
       .eq('id', id)
       .single()
 
@@ -126,6 +126,93 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
           { status: 403 }
         )
       }
+    }
+
+    // Fase 2.6: snapshot de consultorio.
+    // Si el cliente está cambiando medico_id (admin/secretaria), DEBE enviar
+    // consultorio_id también — el consultorio del médico viejo no es válido
+    // para el médico nuevo. Esto preserva el invariante "consultorio pertenece
+    // al médico de la cita" que el POST garantiza.
+    const cambiaMedico =
+      updates.medico_id !== undefined &&
+      updates.medico_id !== existing.medico_id
+
+    if (cambiaMedico && consultorio_id === undefined) {
+      return NextResponse.json(
+        {
+          error: 'consultorio_id_required',
+          message: 'Al cambiar de médico, debes seleccionar el consultorio del nuevo médico.',
+        },
+        { status: 400 }
+      )
+    }
+
+    // Si el cliente envía consultorio_id, validar y actualizar snapshot.
+    // Si NO viene Y el médico no cambia, la cita conserva su snapshot actual.
+    if (consultorio_id !== undefined) {
+      // null o string vacío → rechazar (N3).
+      if (consultorio_id === null || consultorio_id === '') {
+        return NextResponse.json(
+          { error: 'consultorio_invalido', message: 'consultorio_id no puede ser nulo o vacío. Si no quieres cambiar el consultorio, omite el campo.' },
+          { status: 400 }
+        )
+      }
+
+      // Validar formato UUID.
+      const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      if (!UUID_REGEX.test(consultorio_id)) {
+        return NextResponse.json(
+          { error: 'consultorio_invalido', message: 'consultorio_id no tiene formato UUID válido.' },
+          { status: 400 }
+        )
+      }
+
+      // Determinar el medico_id efectivo del dueño de la cita después del UPDATE.
+      // Si el cliente está cambiando medico_id, usar el nuevo; si no, el actual de BD.
+      const medicoIdEfectivo = (updates.medico_id as string | undefined) ?? existing.medico_id
+
+      if (!medicoIdEfectivo) {
+        return NextResponse.json(
+          { error: 'cita_sin_medico', message: 'La cita no tiene médico asignado. No se puede asignar consultorio.' },
+          { status: 400 }
+        )
+      }
+
+      // Cargar consultorio y validar ownership/activo.
+      // F3-6a+c.1: validar consultorio con admin client (espejo del POST).
+      // Tras la migración 06 (RLS consultorios owner-only), un admin de
+      // clínica NO ve los consultorios de invitados vía RLS. medicoIdEfectivo
+      // ya quedó validado contra la clínica del caller (rama de cambio de
+      // médico L101-122 o vía RLS de appointments L63-67), así que el bypass
+      // de RLS es seguro. Defensa en profundidad: filtramos por clinica_id.
+      const adminConsultorio = createAdminClient()
+      const { data: consultorio, error: errConsultorio } = await adminConsultorio
+        .from('consultorios')
+        .select('id, nombre, nombre_corto, direccion, telefono, timezone')
+        .eq('id', consultorio_id)
+        .eq('medico_id', medicoIdEfectivo)
+        .eq('clinica_id', profile.clinica_id)
+        .eq('activo', true)
+        .maybeSingle()
+
+      if (errConsultorio) {
+        console.error('[PUT /api/appointments/[id]] error cargando consultorio:', errConsultorio)
+        return NextResponse.json({ error: errConsultorio.message }, { status: 500 })
+      }
+      if (!consultorio) {
+        return NextResponse.json(
+          { error: 'consultorio_invalido', message: 'El consultorio no existe, está archivado, o no pertenece al médico de la cita.' },
+          { status: 400 }
+        )
+      }
+
+      // Agregar los 6 campos snapshot al updates.
+      updates.consultorio_id            = consultorio.id
+      updates.consultorio_nombre        = consultorio.nombre
+      updates.consultorio_nombre_corto  = consultorio.nombre_corto
+      updates.consultorio_direccion     = consultorio.direccion
+      updates.consultorio_telefono      = consultorio.telefono
+      updates.consultorio_timezone      = consultorio.timezone
     }
 
     // RLS filtra por clinica_id

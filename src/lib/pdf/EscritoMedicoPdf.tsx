@@ -7,7 +7,7 @@ import PdfFirma from './PdfFirma'
 import PdfWatermark from './PdfWatermark'
 import { BarraTop, BarraBottom } from './PdfBarras'
 import { baseStyles, getPdfColors, contrastText } from './PdfStyles'
-import type { PdfMedicoData, PdfColors } from './PdfStyles'
+import type { PdfMedicoData, PdfColors, PdfConsultorioData } from './PdfStyles'
 import { decodificarEntidadesHTML } from '@/lib/textUtils'
 
 export interface EscritoMedicoData {
@@ -25,6 +25,7 @@ export interface EscritoMedicoProps {
   medico: PdfMedicoData | null
   data: EscritoMedicoData
   logoUrl?: string
+  consultorio?: PdfConsultorioData
 }
 
 /** Helper para renderToBuffer — retorna el JSX con tipo correcto */
@@ -446,7 +447,7 @@ function buildStyles(_colors: PdfColors) {
   })
 }
 
-export default function EscritoMedicoPdf({ medico, data, logoUrl }: EscritoMedicoProps) {
+export default function EscritoMedicoPdf({ medico, data, logoUrl, consultorio }: EscritoMedicoProps) {
   const colors = getPdfColors(medico)
   const s = buildStyles(colors)
   const bodyElements = data.doc?.schema === 'tiptap-doc-v1'
@@ -467,13 +468,14 @@ export default function EscritoMedicoPdf({ medico, data, logoUrl }: EscritoMedic
               folio={data.folio}
               fecha={data.fecha}
               compact
+              consultorio={consultorio}
             />
           </View>
         </View>
 
         {/* Footer fixed — se repite en cada página */}
         <View fixed style={s.footerFixed}>
-          <BarraBottom colors={colors} medico={medico} />
+          <BarraBottom colors={colors} medico={medico} consultorio={consultorio} />
         </View>
 
         <PdfWatermark logoUrl={logoUrl} />

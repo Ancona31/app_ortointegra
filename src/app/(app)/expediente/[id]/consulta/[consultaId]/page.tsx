@@ -195,6 +195,11 @@ export default function ConsultaDetallePage() {
               {paciente.nombre} {paciente.apellidos} ·{' '}
               {format(parseISO(consulta.fecha), "dd 'de' MMMM 'de' yyyy", { locale: es })}
             </p>
+            {consulta.consultorio_nombre && (
+              <p className="text-xs text-slate-500 mt-1">
+                Atendido en: <span className="font-semibold text-[#1e5fa8]">{consulta.consultorio_nombre_corto || consulta.consultorio_nombre}</span>
+              </p>
+            )}
           </div>
         </div>
 

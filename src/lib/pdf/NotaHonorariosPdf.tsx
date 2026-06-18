@@ -4,7 +4,7 @@ import PdfFirma from './PdfFirma'
 import PdfWatermark from './PdfWatermark'
 import { BarraTop, BarraBottom } from './PdfBarras'
 import { getPdfColors } from './PdfStyles'
-import type { PdfMedicoData } from './PdfStyles'
+import type { PdfMedicoData, PdfConsultorioData } from './PdfStyles'
 
 export interface NotaHonorariosData {
   paciente?: string
@@ -27,6 +27,7 @@ export interface NotaHonorariosProps {
   medico: PdfMedicoData | null
   data: NotaHonorariosData
   logoUrl?: string
+  consultorio?: PdfConsultorioData
 }
 
 function fmt(n: number, divisa: 'MXN' | 'USD'): string {
@@ -40,7 +41,7 @@ export function renderNotaHonorarios(props: NotaHonorariosProps) {
   return <NotaHonorariosPdf {...props} />
 }
 
-export default function NotaHonorariosPdf({ medico, data, logoUrl }: NotaHonorariosProps) {
+export default function NotaHonorariosPdf({ medico, data, logoUrl, consultorio }: NotaHonorariosProps) {
   const colors = getPdfColors(medico)
   const esCotizacion = data.tipoDoc === 'cotizacion'
   const titulo = esCotizacion ? 'Cotización' : 'Recibo de Honorarios'
@@ -302,13 +303,14 @@ export default function NotaHonorariosPdf({ medico, data, logoUrl }: NotaHonorar
               folio={data.folio}
               fecha={data.fecha}
               compact
+              consultorio={consultorio}
             />
           </View>
         </View>
 
         {/* Footer fixed */}
         <View fixed style={s.footerFixed}>
-          <BarraBottom colors={colors} medico={medico} />
+          <BarraBottom colors={colors} medico={medico} consultorio={consultorio} />
         </View>
 
         <PdfWatermark logoUrl={logoUrl} />

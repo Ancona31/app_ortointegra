@@ -3,7 +3,7 @@ import PdfHeader from './PdfHeader'
 import PdfWatermark from './PdfWatermark'
 import { BarraTop, BarraBottom } from './PdfBarras'
 import { baseStyles, getPdfColors, contrastText } from './PdfStyles'
-import type { PdfMedicoData, PdfColors } from './PdfStyles'
+import type { PdfMedicoData, PdfColors, PdfConsultorioData } from './PdfStyles'
 
 export interface SolicitudInternamientoData {
   paciente: string
@@ -28,6 +28,7 @@ export interface SolicitudInternamientoProps {
   medico: PdfMedicoData | null
   data: SolicitudInternamientoData
   logoUrl?: string
+  consultorio?: PdfConsultorioData
 }
 
 export function renderSolicitudInternamiento(props: SolicitudInternamientoProps) {
@@ -258,7 +259,7 @@ function buildStyles(colors: PdfColors) {
   })
 }
 
-export default function SolicitudInternamientoPdf({ medico, data, logoUrl }: SolicitudInternamientoProps) {
+export default function SolicitudInternamientoPdf({ medico, data, logoUrl, consultorio }: SolicitudInternamientoProps) {
   const colors = getPdfColors(medico)
   const s = buildStyles(colors)
   const nombre = medico?.nombre || 'Médico'
@@ -272,13 +273,13 @@ export default function SolicitudInternamientoPdf({ medico, data, logoUrl }: Sol
         <View fixed style={s.headerFixed}>
           <BarraTop colors={colors} />
           <View style={s.headerInner}>
-            <PdfHeader medico={medico} colors={colors} logoUrl={logoUrl} folio={data.folio} fecha={data.fecha} compact />
+            <PdfHeader medico={medico} colors={colors} logoUrl={logoUrl} folio={data.folio} fecha={data.fecha} compact consultorio={consultorio} />
           </View>
         </View>
 
         {/* Footer fixed — se repite en cada página */}
         <View fixed style={s.footerFixed}>
-          <BarraBottom colors={colors} medico={medico} />
+          <BarraBottom colors={colors} medico={medico} consultorio={consultorio} />
         </View>
 
         <PdfWatermark logoUrl={logoUrl} />
@@ -430,12 +431,12 @@ export default function SolicitudInternamientoPdf({ medico, data, logoUrl }: Sol
           <View fixed style={s.headerFixed}>
             <BarraTop colors={colors} />
             <View style={s.headerInner}>
-              <PdfHeader medico={medico} colors={colors} logoUrl={logoUrl} compact />
+              <PdfHeader medico={medico} colors={colors} logoUrl={logoUrl} compact consultorio={consultorio} />
             </View>
           </View>
 
           <View fixed style={s.footerFixed}>
-            <BarraBottom colors={colors} medico={medico} />
+            <BarraBottom colors={colors} medico={medico} consultorio={consultorio} />
           </View>
 
           <PdfWatermark logoUrl={logoUrl} />

@@ -7,7 +7,7 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
 import { EventClickArg, EventDropArg, DateSelectArg, EventInput, EventContentArg, DayHeaderContentArg } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
-import { X, Calendar, User, Plus, Trash2, Settings, Lock, LayoutGrid, Columns3, Square, ChevronDown, FileText } from 'lucide-react'
+import { X, Calendar, User, Plus, Trash2, Settings, Lock, LayoutGrid, Columns3, Square, ChevronDown, FileText, Stethoscope, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ui/Toast'
@@ -16,6 +16,10 @@ import { canManageClinica } from '@/lib/permissions'
 import QuickPatientModal from '@/components/ui/QuickPatientModal'
 import Portal from '@/components/ui/Portal'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
+import { useConsultorios } from '@/hooks/useConsultorios'
+import { useConsultoriosDeMedico } from '@/hooks/useConsultoriosDeMedico'
+import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
+import { ZONAS_MEXICO } from '@/lib/consultorios/zonas-mexico'
 
 /* ─── Tipos ────────────────────────────────────────────── */
 
@@ -33,6 +37,13 @@ type Appointment = {
   google_event_id: string | null
   gcal_sync_status: 'synced' | 'pending' | 'failed'
   updated_at: string
+  // F3-6: snapshots de consultorio (persistidos en POST/PUT, devueltos en GET).
+  consultorio_id: string | null
+  consultorio_nombre: string | null
+  consultorio_nombre_corto: string | null
+  consultorio_direccion: string | null
+  consultorio_telefono: string | null
+  consultorio_timezone: string | null
   pacientes?: { id: string; nombre: string; apellidos: string; telefono: string | null } | null
   medico?: { id: string; nombre: string; titulo: string } | null
 }
@@ -243,6 +254,27 @@ function addMinutes(iso: string, mins: number) {
   const d = new Date(iso); d.setMinutes(d.getMinutes() + mins); return d.toISOString()
 }
 
+/* ─── F3-6e: helpers para badge de timezone ─── */
+function regionDeTimezone(tz: string | null): string {
+  if (!tz) return ''
+  const zona = ZONAS_MEXICO.find(z => z.value === tz)
+  if (!zona) return tz  // fallback al IANA crudo
+  return zona.label.split('—')[0].trim()  // em-dash U+2014
+}
+
+function horaEnTZ(startTimeISO: string, tz: string): string {
+  try {
+    return new Intl.DateTimeFormat('es-MX', {
+      timeZone: tz,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(new Date(startTimeISO))
+  } catch {
+    return ''
+  }
+}
+
 /* ─── Helpers ──────────────────────────────────────────── */
 
 function toDatetimeLocal(iso: string) {
@@ -427,6 +459,55 @@ function AppointmentModal({
   const [saving,      setSaving]      = useState(false)
   const [deleting,    setDeleting]    = useState(false)
 
+  // F3-6: hook de consultorio activo (siempre disponible bajo el Provider).
+  const { consultorioActivo, cambiarActivo } = useConsultorioActivo()
+
+  // F3-6: hooks de consultorios. Se llaman AMBOS incondicionalmente (reglas
+  // de hooks). El discriminador hideMedicoDropdown decide cuál se usa.
+  // - hideMedicoDropdown=true → médico operando para sí (owner-scope).
+  // - hideMedicoDropdown=false → admin/secretaria operando para otro médico.
+  const ownerConsultorios = useConsultorios()
+  const operativoConsultorios = useConsultoriosDeMedico(hideMedicoDropdown ? null : medicoId)
+
+  const consultoriosList = hideMedicoDropdown
+    ? ownerConsultorios.consultorios
+    : operativoConsultorios.consultorios
+  const consultorioDefaultDelTarget = hideMedicoDropdown
+    ? ownerConsultorios.consultorioDefault
+    : operativoConsultorios.consultorioDefault
+
+  // F3-7b: solo si la cita es del médico autenticado y su consultorio existe en la lista
+  const citaConsultorio = apt?.consultorio_id
+    ? consultoriosList.find(c => c.id === apt.consultorio_id)
+    : undefined
+  const showIniciarConsulta =
+    isEdit &&
+    canVerExpediente &&
+    paciente &&
+    defaultMedicoId === apt?.medico_id &&
+    citaConsultorio
+
+  // State del consultorio seleccionado.
+  // Pre-selección cascada: apt (edición) → activo del sidebar si está en lista
+  // → default del target → vacío.
+  const [consultorioId, setConsultorioId] = useState<string>(() => {
+    if (apt?.consultorio_id) return apt.consultorio_id
+    if (consultorioActivo && consultoriosList.some(c => c.id === consultorioActivo.id)) {
+      return consultorioActivo.id
+    }
+    return consultorioDefaultDelTarget?.id ?? ''
+  })
+
+  // F3-6: reset al cambiar médico.
+  // En edición sin cambio de médico: preservar snapshot.
+  // En edición con cambio de médico, o creación: ajustar al default del nuevo target.
+  useEffect(() => {
+    if (apt && medicoId === apt.medico_id) return
+    if (consultoriosList.some(c => c.id === consultorioId)) return
+    const next = consultorioDefaultDelTarget?.id ?? ''
+    setConsultorioId(next)
+  }, [medicoId, consultoriosList, consultorioDefaultDelTarget?.id, apt, consultorioId])
+
   // Sincronizar default cuando profile carga después del mount inicial.
   // Solo aplica para creación de cita (no para edición de cita existente).
   useEffect(() => {
@@ -444,9 +525,16 @@ function AppointmentModal({
     // Defensa en profundidad: secretaria debe seleccionar médico
     // (el `required` HTML5 ya bloquea el submit, pero validamos aquí también)
     if (medicoDropdownRequired && !medicoId) return
+    if (!consultorioId) return  // F3-6: consultorio obligatorio
 
     setSaving(true)
     const start_time = fromDatetimeLocal(startTime)
+
+    // F3-6: enviar consultorio_id en creación SIEMPRE; en edición SOLO si cambió.
+    // Evita re-validación innecesaria del consultorio en el backend cuando se edita
+    // hora/status sin tocar consultorio.
+    const consultorioChanged = !apt || consultorioId !== apt.consultorio_id
+
     await onSave({
       id:          apt?.id,
       title:       `${paciente.nombre} ${paciente.apellidos}`,
@@ -456,6 +544,7 @@ function AppointmentModal({
       status,
       paciente_id: paciente.id,
       medico_id:   medicoId || null,
+      ...(consultorioChanged ? { consultorio_id: consultorioId } : {}),
       updated_at:  apt?.updated_at,
     })
     setSaving(false)
@@ -483,7 +572,17 @@ function AppointmentModal({
           <h2 className="text-[18px] font-extrabold" style={{ color: 'var(--ag-ink)' }}>
             {isEdit ? 'Editar cita' : 'Nueva cita'}
           </h2>
-          <button onClick={onClose} className="ml-auto p-1 transition-opacity hover:opacity-70" style={{ color: 'var(--ag-muted2)' }}>
+          {canVerExpediente && paciente && (
+            <Link
+              href={`/expediente/${paciente.id}`}
+              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)]"
+              style={{ color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}
+            >
+              <FileText size={14} />
+              Expediente
+            </Link>
+          )}
+          <button onClick={onClose} className={`${canVerExpediente && paciente ? '' : 'ml-auto'} p-1 transition-opacity hover:opacity-70`} style={{ color: 'var(--ag-muted2)' }}>
             <X size={20} />
           </button>
         </div>
@@ -648,6 +747,36 @@ function AppointmentModal({
             </div>
           )}
 
+          {/* F3-6: Dropdown de consultorios. Siempre visible. */}
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
+              Consultorio <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <select
+                value={consultorioId}
+                onChange={e => setConsultorioId(e.target.value)}
+                required
+                disabled={consultoriosList.length === 0}
+                className="w-full pl-3 pr-9 py-2.5 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {consultoriosList.length === 0 ? (
+                  <option value="">Sin consultorios disponibles</option>
+                ) : (
+                  <>
+                    <option value="">— Selecciona consultorio —</option>
+                    {consultoriosList.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre}{c.es_default ? ' (default)' : ''}
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
+              <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--ag-muted)' }} />
+            </div>
+          </div>
+
           {/* Notas */}
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>Notas</label>
@@ -662,29 +791,37 @@ function AppointmentModal({
         {/* Footer */}
         <div className="px-[22px] py-3.5 border-t flex items-center gap-2" style={{ borderColor: 'var(--ag-hairline)' }}>
           {isEdit && (
-            <button onClick={handleDelete} disabled={deleting}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50">
-              <Trash2 size={15} />
-              {deleting ? 'Eliminando...' : 'Eliminar'}
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              title={deleting ? 'Eliminando...' : 'Eliminar cita'}
+              aria-label={deleting ? 'Eliminando cita' : 'Eliminar cita'}
+              className="flex items-center justify-center p-2.5 rounded-xl text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+            >
+              {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
             </button>
           )}
-          {/* Expediente — solo visible para quien puede ver expedientes (isDoctor)
-              y cuando hay paciente seleccionado. Barrera real: expediente/layout.tsx. */}
-          {canVerExpediente && paciente && (
-            <Link href={`/expediente/${paciente.id}`}
+          {showIniciarConsulta && (
+            <Link
+              href={`/expediente/${paciente.id}/nueva-nota`}
+              onClick={() => {
+                cambiarActivo(citaConsultorio!)
+                onClose()
+              }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)]"
-              style={{ color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}>
-              <FileText size={15} />
-              Expediente
+              style={{ color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}
+            >
+              <Stethoscope size={15} />
+              Iniciar consulta
             </Link>
           )}
           <div className="flex items-center gap-2 ml-auto">
             <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-bold transition-colors hover:bg-[var(--ag-btn-ghost-hover)]" style={{ color: 'var(--ag-muted)' }}>
               Cancelar
             </button>
-            <button onClick={handleSave} disabled={saving || !paciente || !startTime}
+            <button onClick={handleSave} disabled={saving || !paciente || !startTime || !consultorioId}
               className="px-5 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 transition-all hover:brightness-95 shadow-sm bg-[linear-gradient(135deg,var(--ag-brand-primary),var(--ag-brand-secondary))]">
-              {saving ? 'Guardando...' : isEdit ? 'Guardar cambios' : 'Agendar cita'}
+              {saving ? 'Guardando...' : 'Guardar'}
             </button>
           </div>
         </div>
@@ -744,8 +881,8 @@ type EventColor = { bg: string; text: string; border: string }
    midiendo el alto real del contenedor con ResizeObserver (ver abajo): es
    lo más fiable con FullCalendar, cuyo alto de evento depende de la duración
    y del alto de hora del grid, no calculable con certeza solo desde datos.
-   Calibrados al grid real: slot de 30min = 1.8rem ≈ 28.8px (globals.css),
-   así una cita de 1h ≈ 57.6px → cae en 'full' y el layout (con line-heights
+   Calibrados al grid real: slot de 30min = 2.16rem ≈ 34.56px (globals.css),
+   así una cita de 1h ≈ 69.12px → cae en 'full' y el layout (con line-heights
    ajustados abajo) cabe sin recortar el nombre. */
 const CARD_TINY_MAX = 40
 const CARD_COMPACT_MAX = 56
@@ -767,12 +904,19 @@ const NAME_BASE: CSSProperties = {
 const STATUS_DOT: CSSProperties = {
   width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
 }
+const tzDiffStyle: CSSProperties = {
+  fontSize: '9.5px',
+  fontWeight: 500,
+  lineHeight: 1.2,
+  color: 'var(--ag-muted)',
+  fontStyle: 'italic',
+}
 
 const MemoizedEventContent = memo(function MemoizedEventContent({
-  timeText, title, pacNombre, status, doctorInitial,
+  timeText, title, pacNombre, status, doctorInitial, tzDiff,
 }: {
   timeText: string; title: string; pacNombre: string | null
-  status: Status; doctorInitial?: string
+  status: Status; doctorInitial?: string; tzDiff?: string
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const [height, setHeight] = useState<number | null>(null)
@@ -844,6 +988,7 @@ const MemoizedEventContent = memo(function MemoizedEventContent({
       <div ref={rootRef} style={root}>
         {timeRow}
         <span style={nameStyle}>{name}</span>
+        {tzDiff && <span style={tzDiffStyle}>{tzDiff}</span>}
       </div>
     )
   }
@@ -853,6 +998,7 @@ const MemoizedEventContent = memo(function MemoizedEventContent({
     <div ref={rootRef} style={root}>
       {timeRow}
       <span style={nameStyle}>{name}</span>
+      {tzDiff && <span style={tzDiffStyle}>{tzDiff}</span>}
       <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
         <span style={{ ...STATUS_DOT, background: dot }} />
         <span style={{ fontSize: '10.5px', fontWeight: 600, lineHeight: 1.2, color: txt }}>{STATUS_CONFIG[status].label}</span>
@@ -939,7 +1085,7 @@ const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg }) {
   )
 })
 
-function renderEventContent(arg: EventContentArg) {
+function renderEventContent(arg: EventContentArg, navegadorTZ: string) {
   // Vista Mes: chip plano dedicado. El camino de Semana/Día (abajo) queda intacto.
   if (arg.view.type === 'dayGridMonth') return <MonthChip arg={arg} />
   const ext = arg.event.extendedProps as (Appointment & { doctorInitial?: string }) & { isGcalBlock?: boolean }
@@ -948,6 +1094,26 @@ function renderEventContent(arg: EventContentArg) {
   }
   if (!ext?.status) return <>{arg.event.title}</>
   const pac = ext.pacientes
+
+  // F3-6e: badge de hora en TZ del consultorio si la hora resultante difiere
+  // de la hora en TZ del navegador. Comparamos horas resultantes, no strings
+  // IANA, para evitar falsos positivos entre zonas del mismo offset (las 8
+  // zonas UTC-6 mexicanas son IANA distintas pero comparten hora de pared).
+  let tzDiff: string | undefined
+  const consultorioTZ = ext.consultorio_timezone
+  // F3-6e: usar arg.event.start (Date) en vez de ext.start_time (ISO de extendedProps)
+  // para que el badge se actualice correctamente tras drag/resize. FullCalendar
+  // actualiza arg.event.start automáticamente, pero NO toca extendedProps.start_time.
+  const startISO = arg.event.start?.toISOString()
+  if (consultorioTZ && startISO) {
+    const horaConsultorio = horaEnTZ(startISO, consultorioTZ)
+    const horaNavegador = horaEnTZ(startISO, navegadorTZ)
+    if (horaConsultorio && horaConsultorio !== horaNavegador) {
+      const region = regionDeTimezone(consultorioTZ)
+      tzDiff = `${horaConsultorio} hora ${region}`
+    }
+  }
+
   return (
     <MemoizedEventContent
       timeText={arg.timeText}
@@ -955,6 +1121,7 @@ function renderEventContent(arg: EventContentArg) {
       pacNombre={pac ? `${pac.nombre} ${pac.apellidos}` : null}
       status={ext.status}
       doctorInitial={ext.doctorInitial}
+      tzDiff={tzDiff}
     />
   )
 }
@@ -998,6 +1165,17 @@ export default function AgendaPage() {
     // Secretaria u otros: sin default (obligar elección)
     return ''
   }, [profile, isSingleDoctor, medicos])
+
+  // F3-6e: TZ del navegador (estable) + wrapper para inyectarla a renderEventContent.
+  const navegadorTZ = useMemo(
+    () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+    []
+  )
+
+  const renderEC = useCallback(
+    (arg: EventContentArg) => renderEventContent(arg, navegadorTZ),
+    [navegadorTZ]
+  )
 
   useEffect(() => {
     fetch('/api/me/horario')
@@ -1046,6 +1224,17 @@ export default function AgendaPage() {
     if (filtroFirstRender.current) { filtroFirstRender.current = false; return }
     refetch()
   }, [filtroMedico])
+
+  // F3-6 fix: refetch al cargar médicos para que el chip se calcule con
+  // isSingleDoctor correcto. En el primer render medicos=[] → isSingleDoctor=true,
+  // el closure de appointmentSource captura ese valor y no calcula doctorInitial.
+  // Cuando médicos cargan, este efecto fuerza un refetch que reevalúa con el
+  // closure nuevo (isSingleDoctor=false en clínicas multi-médico).
+  const firstRenderMedicosRef = useRef(true)
+  useEffect(() => {
+    if (firstRenderMedicosRef.current) { firstRenderMedicosRef.current = false; return }
+    refetch()
+  }, [isSingleDoctor])
 
   /* ── Supabase Realtime — debounced (max 1 refetch/sec) ── */
   const realtimeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1304,6 +1493,10 @@ export default function AgendaPage() {
           existing.setExtendedProp('colorStyle', ev.extendedProps?.colorStyle)
           existing.setExtendedProp('notes', data.notes ?? existing.extendedProps.notes)
           existing.setExtendedProp('pacientes', data.paciente_id ? existing.extendedProps.pacientes : null)
+          // F3-6 fix Bug 1: actualizar también médico y consultorio_id (optimistic).
+          existing.setExtendedProp('doctorInitial', ev.extendedProps?.doctorInitial)
+          existing.setExtendedProp('medico_id', data.medico_id ?? null)
+          existing.setExtendedProp('consultorio_id', data.consultorio_id ?? existing.extendedProps.consultorio_id)
         }
       } else {
         // Crear evento optimista temporal
@@ -1327,6 +1520,21 @@ export default function AgendaPage() {
     }
 
     const json = await res.json()
+
+    // F3-6 fix Bug 1: en edición, sincronizar snapshots completos desde el server
+    // (los 6 consultorio_* que el backend recalcula al cambiar consultorio_id,
+    // y mantiene coherencia para re-edición y badge de timezone).
+    if (isEdit && json.appointment) {
+      const existing = api?.getEventById(data.id!)
+      if (existing) {
+        existing.setExtendedProp('consultorio_id', json.appointment.consultorio_id)
+        existing.setExtendedProp('consultorio_nombre', json.appointment.consultorio_nombre)
+        existing.setExtendedProp('consultorio_nombre_corto', json.appointment.consultorio_nombre_corto)
+        existing.setExtendedProp('consultorio_direccion', json.appointment.consultorio_direccion)
+        existing.setExtendedProp('consultorio_telefono', json.appointment.consultorio_telefono)
+        existing.setExtendedProp('consultorio_timezone', json.appointment.consultorio_timezone)
+      }
+    }
 
     if (!isEdit && optimisticEvent && json.appointment?.id) {
       // Reemplazar evento optimista con el real (que tiene ID de DB)
@@ -1520,7 +1728,7 @@ export default function AgendaPage() {
           businessHours={horarioToBusinessHours(horario)}
           eventSources={eventSourcesStable}
           dayHeaderContent={renderDayHeader}
-          eventContent={renderEventContent}
+          eventContent={renderEC}
           dateClick={handleDateClick}
           select={handleSelect}
           eventClick={handleEventClick}

@@ -4,7 +4,7 @@ import PdfFirma from './PdfFirma'
 import PdfWatermark from './PdfWatermark'
 import { BarraTop, BarraBottom } from './PdfBarras'
 import { baseStyles, getPdfColors, contrastText } from './PdfStyles'
-import type { PdfMedicoData } from './PdfStyles'
+import type { PdfMedicoData, PdfConsultorioData } from './PdfStyles'
 
 export interface SolicitudImagenData {
   paciente: string
@@ -19,6 +19,7 @@ export interface SolicitudImagenProps {
   medico: PdfMedicoData | null
   data: SolicitudImagenData
   logoUrl?: string
+  consultorio?: PdfConsultorioData
 }
 
 /** Helper para renderToBuffer — retorna el JSX con tipo correcto */
@@ -26,7 +27,7 @@ export function renderSolicitudImagen(props: SolicitudImagenProps) {
   return <SolicitudImagenPdf {...props} />
 }
 
-export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudImagenProps) {
+export default function SolicitudImagenPdf({ medico, data, logoUrl, consultorio }: SolicitudImagenProps) {
   const colors = getPdfColors(medico)
 
   const s = StyleSheet.create({
@@ -176,13 +177,14 @@ export default function SolicitudImagenPdf({ medico, data, logoUrl }: SolicitudI
               folio={data.folio}
               fecha={data.fecha}
               compact
+              consultorio={consultorio}
             />
           </View>
         </View>
 
         {/* Footer fixed — se repite en cada página */}
         <View fixed style={s.footerFixed}>
-          <BarraBottom colors={colors} medico={medico} />
+          <BarraBottom colors={colors} medico={medico} consultorio={consultorio} />
         </View>
 
         <PdfWatermark logoUrl={logoUrl} />

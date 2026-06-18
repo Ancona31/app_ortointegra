@@ -1,5 +1,5 @@
 import { View, Text, Image, StyleSheet } from '@react-pdf/renderer'
-import type { PdfMedicoData, PdfColors } from './PdfStyles'
+import type { PdfMedicoData, PdfColors, PdfConsultorioData } from './PdfStyles'
 
 interface Props {
   medico: PdfMedicoData | null
@@ -13,15 +13,17 @@ interface Props {
   showRx?: boolean
   /** Texto adicional debajo de cédulas (ej: universidad, solo receta) */
   extraCredencial?: string
+  /** F3-10: consultorio activo. Si llega, sus datos prevalecen sobre los del medico legacy. */
+  consultorio?: PdfConsultorioData
 }
 
-export default function PdfHeader({ medico, colors, logoUrl, folio, fecha, compact, showRx, extraCredencial }: Props) {
+export default function PdfHeader({ medico, colors, logoUrl, folio, fecha, compact, showRx, extraCredencial, consultorio }: Props) {
   const nombre = medico?.nombre || 'Médico'
   const esp = medico?.especialidad || ''
   const cedProf = medico?.cedula_profesional || ''
   const cedEsp = medico?.cedula_especialidad || ''
-  const dir = medico?.direccion_consultorio || ''
-  const tel = medico?.telefono_consultorio || ''
+  const dir = consultorio?.direccion || medico?.direccion_consultorio || ''
+  const tel = consultorio?.telefono || medico?.telefono_consultorio || ''
 
   const contactoParts = [dir, tel ? `Tel: ${tel}` : ''].filter(Boolean)
   const contacto = contactoParts.join('  ·  ')

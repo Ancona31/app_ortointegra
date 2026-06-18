@@ -11,6 +11,7 @@ import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 import { hoyEnTZ } from '@/lib/dates'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
+import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 
 interface Props {
   pacienteInicial?: string
@@ -87,6 +88,7 @@ function SeccionCard({
 
 export default function ConsentimientoInformadoForm({ pacienteInicial = '', pacienteId, diagnosticoInicial = '', offlineMode, onOfflineSave }: Props) {
   const { medicoInfo: onlineMedicoInfo } = useMedicoInfo()
+  const { consultorioActivo } = useConsultorioActivo()
 
   // In offline mode, read doctor profile from localStorage (pre-fetched with Base64 assets)
   const offlineProfile = offlineMode ? (() => {
@@ -204,6 +206,12 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
       const logoUrl = medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined
       const fechaFmt = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
 
+      const consultorioData = consultorioActivo ? {
+        nombre: consultorioActivo.nombre,
+        direccion: consultorioActivo.direccion,
+        telefono: consultorioActivo.telefono,
+      } : undefined
+
       const { storagePath } = await generarPdf({
         tipo: 'consentimiento_informado',
         pacienteId,
@@ -217,6 +225,7 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
         },
         logoUrl,
         filename: generateDocFileName(paciente, 'Consentimiento_Informado'),
+        consultorio: consultorioData,
       })
 
       pdfGenerated = true

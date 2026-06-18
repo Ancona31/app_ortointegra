@@ -12,7 +12,7 @@
  * generarPdf()         — genera PDF vía react-pdf en todas las plataformas
  */
 
-import type { PdfMedicoData } from '@/lib/pdf/PdfStyles'
+import type { PdfMedicoData, PdfConsultorioData } from '@/lib/pdf/PdfStyles'
 
 type DocType =
   | 'solicitud_lab'
@@ -34,45 +34,46 @@ async function buildClientElement(
   medico: PdfMedicoData | null,
   data: Record<string, unknown>,
   logoUrl?: string,
+  consultorio?: PdfConsultorioData,
 ) {
-  const props = { medico, data, logoUrl }
+  const props = { medico, data, logoUrl, consultorio }
 
   switch (tipo as DocType) {
     case 'receta': {
       const { renderReceta } = await import('@/lib/pdf/RecetaPdf')
-      return renderReceta({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl })
+      return renderReceta({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl, consultorio: props.consultorio })
     }
     case 'solicitud_lab': {
       const { renderSolicitudLab } = await import('@/lib/pdf/SolicitudLabPdf')
-      return renderSolicitudLab({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl })
+      return renderSolicitudLab({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl, consultorio: props.consultorio })
     }
     case 'solicitud_imagen': {
       const { renderSolicitudImagen } = await import('@/lib/pdf/SolicitudImagenPdf')
-      return renderSolicitudImagen({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl })
+      return renderSolicitudImagen({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl, consultorio: props.consultorio })
     }
     case 'plan_suplementacion': {
       const { renderPlanSuplementacion } = await import('@/lib/pdf/PlanSuplementacionPdf')
-      return renderPlanSuplementacion({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl })
+      return renderPlanSuplementacion({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl, consultorio: props.consultorio })
     }
     case 'nota_honorarios': {
       const { renderNotaHonorarios } = await import('@/lib/pdf/NotaHonorariosPdf')
-      return renderNotaHonorarios({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl })
+      return renderNotaHonorarios({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl, consultorio: props.consultorio })
     }
     case 'solicitud_internamiento': {
       const { renderSolicitudInternamiento } = await import('@/lib/pdf/SolicitudInternamientoPdf')
-      return renderSolicitudInternamiento({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl })
+      return renderSolicitudInternamiento({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl, consultorio: props.consultorio })
     }
     case 'escrito_medico': {
       const { renderEscritoMedico } = await import('@/lib/pdf/EscritoMedicoPdf')
-      return renderEscritoMedico({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl })
+      return renderEscritoMedico({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl, consultorio: props.consultorio })
     }
     case 'consentimiento_informado': {
       const { renderConsentimiento } = await import('@/lib/pdf/ConsentimientoInformadoPdf')
-      return renderConsentimiento({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl })
+      return renderConsentimiento({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl, consultorio: props.consultorio })
     }
     case 'nota_evolucion': {
       const { renderNotaEvolucion } = await import('@/lib/pdf/NotaEvolucionPdf')
-      return renderNotaEvolucion({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl })
+      return renderNotaEvolucion({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl, consultorio: props.consultorio })
     }
     default:
       return null
@@ -150,6 +151,7 @@ export async function generarPdf(params: {
   logoUrl?: string
   filename?: string
   pacienteId?: string
+  consultorio?: PdfConsultorioData
 }): Promise<GenerarPdfResult> {
   // Guard de concurrencia: ignorar multi-clics
   if (isGenerating) {
@@ -158,7 +160,7 @@ export async function generarPdf(params: {
   }
 
   isGenerating = true
-  const { tipo, medico, data, logoUrl, filename, pacienteId } = params
+  const { tipo, medico, data, logoUrl, filename, pacienteId, consultorio } = params
   const defaultFilename = `${tipo.replace(/_/g, '-')}.pdf`
 
   let phase = 'inicio'
@@ -194,7 +196,7 @@ export async function generarPdf(params: {
 
     // ── Fase 2: construir elemento react-pdf ──
     phase = 'construyendo elemento react-pdf'
-    const element = await buildClientElement(tipo, medico, data, effectiveLogoUrl)
+    const element = await buildClientElement(tipo, medico, data, effectiveLogoUrl, consultorio)
     if (!element) throw new Error(`Tipo de documento no válido: ${tipo}`)
     console.log('[generarPdf] 2/6 elemento construido')
 

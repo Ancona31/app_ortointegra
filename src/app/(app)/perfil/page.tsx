@@ -3,15 +3,21 @@
 import { useState, useEffect, useRef } from 'react'
 import { useProfile } from '@/hooks/useProfile'
 import { useRouter } from 'next/navigation'
-import { Loader2, Save, Palette, Upload, X, CalendarDays, CheckCircle2, LogIn, LogOut, PenLine } from 'lucide-react'
+import { Loader2, Save, Palette, Upload, X, CalendarDays, CheckCircle2, LogIn, LogOut, PenLine, Plus, Pencil, Trash2, Star, MapPin } from 'lucide-react'
 import { PerfilSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import EspecialidadSelector from '@/components/ui/EspecialidadSelector'
-import { validarTelefono, validarCedula, formatearTelefono } from '@/lib/validaciones'
+import { validarTelefono, validarCedula } from '@/lib/validaciones'
 import FirmaCaptura from '@/components/perfil/FirmaCaptura'
 import { compressLogoImage } from '@/lib/compressImage'
 import { syncDoctorProfile } from '@/lib/offline/doctorProfile'
 import { canManageClinica, isMedico } from '@/lib/permissions'
+import { useConsultorios } from '@/hooks/useConsultorios'
+import { Consultorio } from '@/types'
+import AddConsultorioModal from '@/components/consultorios/AddConsultorioModal'
+import EditConsultorioModal from '@/components/consultorios/EditConsultorioModal'
+import DeleteConsultorioModal from '@/components/consultorios/DeleteConsultorioModal'
+import { ZONAS_MEXICO } from '@/lib/consultorios/zonas-mexico'
 
 type FormData = {
   titulo: string
@@ -67,7 +73,113 @@ export default function PerfilPage() {
   const [gcalConectado, setGcalConectado] = useState<boolean | null>(null)
   const [desconectandoGcal, setDesconectandoGcal] = useState(false)
 
+  // F3-5b: Mis consultorios
+  const { consultorios, mutate: mutateConsultorios, isLoading: loadingConsultorios } = useConsultorios()
+  const [showAdd, setShowAdd] = useState(false)
+  const [editingConsultorio, setEditingConsultorio] = useState<Consultorio | null>(null)
+  const [deletingConsultorio, setDeletingConsultorio] = useState<Consultorio | null>(null)
+
   const isAdmin = canManageClinica(profile)
+
+  // F3-5b: helpers para sección "Mis consultorios"
+  const offsetDeTimezone = (tz: string): string => {
+    const zona = ZONAS_MEXICO.find(z => z.value === tz)
+    if (!zona) return ''
+    const match = zona.label.match(/UTC[+-]\d+/)
+    return match ? match[0] : ''
+  }
+
+  const puedeIniciarBorrado = (c: Consultorio): boolean => {
+    if (consultorios.length === 1) return false
+    if (c.es_default && consultorios.length > 1) return false
+    return true
+  }
+
+  const tooltipBorrar = (c: Consultorio): string => {
+    if (consultorios.length === 1) {
+      return 'No puedes borrar tu único consultorio. Crea otro primero.'
+    }
+    if (c.es_default && consultorios.length > 1) {
+      return 'Marca otro consultorio como predeterminado antes de borrar este.'
+    }
+    return 'Borrar consultorio'
+  }
+
+  const handleClickBorrar = (c: Consultorio) => {
+    if (!puedeIniciarBorrado(c)) return
+    setDeletingConsultorio(c)
+  }
+
+  const handleConsultorioCreado = (creado: Consultorio) => {
+    mutateConsultorios(
+      (cur) => ({ consultorios: [...(cur?.consultorios ?? []), creado] }),
+      { revalidate: false }
+    )
+  }
+
+  const handleConsultorioActualizado = (actualizado: Consultorio) => {
+    mutateConsultorios(
+      (cur) => ({
+        consultorios: (cur?.consultorios ?? []).map(c =>
+          c.id === actualizado.id ? actualizado : c
+        )
+      }),
+      { revalidate: false }
+    )
+  }
+
+  const handleMarcarDefault = async (consultorio: Consultorio) => {
+    if (consultorio.es_default) return
+    try {
+      const res = await fetch(`/api/consultorios/${consultorio.id}/marcar-default`, {
+        method: 'PATCH',
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        toast.error(data.error ?? 'No se pudo marcar como predeterminado.')
+        return
+      }
+      mutateConsultorios(
+        (cur) => ({
+          consultorios: (cur?.consultorios ?? []).map(c => ({
+            ...c,
+            es_default: c.id === consultorio.id,
+          }))
+        }),
+        { revalidate: false }
+      )
+      toast.success('Consultorio predeterminado actualizado.')
+    } catch {
+      toast.error('Error de red. Verifica tu conexión.')
+    }
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deletingConsultorio) return
+    const res = await fetch(`/api/consultorios/${deletingConsultorio.id}`, {
+      method: 'DELETE',
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      toast.error(data.error ?? 'No se pudo borrar el consultorio.')
+      throw new Error('Delete failed')
+    }
+    mutateConsultorios(
+      (cur) => ({
+        consultorios: (cur?.consultorios ?? []).filter(c => c.id !== deletingConsultorio.id)
+      }),
+      { revalidate: false }
+    )
+    toast.success('Consultorio borrado.')
+    setDeletingConsultorio(null)
+  }
+
+  const handleEditarEnLugar = () => {
+    const target = deletingConsultorio
+    if (!target) return
+    setDeletingConsultorio(null)
+    setEditingConsultorio(target)
+  }
 
   useEffect(() => {
     if (!loadingProfile && profile && !isMedico(profile)) {
@@ -254,27 +366,97 @@ export default function PerfilPage() {
           </div>
         </div>
 
-        {/* Consultorio */}
+        {/* Mis consultorios */}
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div className="px-5 pt-4 pb-1 flex items-baseline gap-2">
-            <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest">Consultorio</p>
-            <span className="text-[10px] text-[#86868b]">Requerido en recetas (RIS)</span>
+          <div className="px-5 pt-4 pb-1 flex items-baseline justify-between gap-2 flex-wrap">
+            <div className="flex items-baseline gap-2">
+              <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest">Mis consultorios</p>
+              <span className="text-[10px] text-[#86868b]">Hasta 10 activos</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowAdd(true)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium text-[var(--cp)] bg-[var(--cp)]/10 hover:bg-[var(--cp)]/15 transition-colors"
+            >
+              <Plus size={12} />
+              Agregar
+            </button>
           </div>
-          <div className="px-5 pb-5 space-y-3">
-            <div>
-              <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Dirección</label>
-              <input type="text" value={form.direccion_consultorio} onChange={e => setForm({ ...form, direccion_consultorio: e.target.value })}
-                placeholder="Ej: Calle 60 #400, Col. Centro, Mérida, Yucatán" className={inputClass} />
-            </div>
-            <div>
-              <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Teléfono</label>
-              <input type="tel" inputMode="numeric" value={form.telefono_consultorio}
-                onChange={e => setForm({ ...form, telefono_consultorio: formatearTelefono(e.target.value) })}
-                placeholder="Ej: 999 123 4567" maxLength={12} className={inputClass} />
-              {form.telefono_consultorio && validarTelefono(form.telefono_consultorio) && (
-                <p className="text-[10px] text-red-500 mt-1">{validarTelefono(form.telefono_consultorio)}</p>
-              )}
-            </div>
+
+          <div className="px-5 pb-5 pt-2">
+            {loadingConsultorios ? (
+              <div className="space-y-2">
+                <div className="skeleton h-16 rounded-xl" />
+                <div className="skeleton h-16 rounded-xl" />
+              </div>
+            ) : consultorios.length === 0 ? (
+              <p className="text-xs text-slate-500 py-2">
+                No tienes consultorios activos. Agrega tu primer consultorio.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {consultorios.map((c) => (
+                  <div key={c.id} className="flex items-start gap-3 px-3 py-3 bg-white border border-slate-200 rounded-xl hover:border-slate-300 transition-colors">
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-[var(--cp)]/10 text-[var(--cp)]">
+                      <MapPin size={16} />
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold text-slate-900 leading-tight">{c.nombre}</p>
+                        {c.es_default && (
+                          <span className="inline-flex items-center text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[var(--cp)]/10 text-[var(--cp)]">
+                            Default
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5 min-w-0">
+                        <span className="truncate">{c.direccion}</span>
+                        {c.telefono && (
+                          <>
+                            <span className="text-slate-300 shrink-0">·</span>
+                            <span className="shrink-0">{c.telefono}</span>
+                          </>
+                        )}
+                      </div>
+
+                      <p className="text-[10px] text-slate-400 mt-0.5">{offsetDeTimezone(c.timezone)}</p>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      {!c.es_default && (
+                        <button
+                          type="button"
+                          onClick={() => handleMarcarDefault(c)}
+                          title="Marcar como predeterminado"
+                          className="w-7 h-7 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-[var(--cp)] hover:bg-[var(--cp)]/10 transition-colors"
+                        >
+                          <Star size={13} />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setEditingConsultorio(c)}
+                        title="Editar"
+                        className="w-7 h-7 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleClickBorrar(c)}
+                        disabled={!puedeIniciarBorrado(c)}
+                        title={tooltipBorrar(c)}
+                        className="w-7 h-7 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -452,6 +634,32 @@ export default function PerfilPage() {
         </button>
 
       </form>
+
+      {/* Modales F3-5b */}
+      <AddConsultorioModal
+        open={showAdd}
+        onClose={() => setShowAdd(false)}
+        onSuccess={handleConsultorioCreado}
+      />
+
+      {editingConsultorio && (
+        <EditConsultorioModal
+          open={true}
+          onClose={() => setEditingConsultorio(null)}
+          consultorio={editingConsultorio}
+          onSuccess={handleConsultorioActualizado}
+        />
+      )}
+
+      {deletingConsultorio && (
+        <DeleteConsultorioModal
+          open={true}
+          onClose={() => setDeletingConsultorio(null)}
+          consultorio={deletingConsultorio}
+          onEditarEnLugar={handleEditarEnLugar}
+          onConfirmDelete={handleConfirmDelete}
+        />
+      )}
     </div>
   )
 }
