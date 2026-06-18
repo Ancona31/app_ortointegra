@@ -81,10 +81,14 @@ export function ConsultorioActivoProvider({ children }: { children: ReactNode })
   )
 }
 
+// Fallback silencioso sin Provider (route group (offline) no lo monta).
+// Bajo Provider funciona normal. Throw defensivo removido a propósito (F3-10.3.0).
+const FALLBACK_CTX: ConsultorioActivoContextType = {
+  consultorioActivo: null,
+  cambiarActivo: () => {},
+  isLoading: false,
+}
+
 export function useConsultorioActivo() {
-  const ctx = useContext(ConsultorioActivoContext)
-  if (!ctx) {
-    throw new Error('useConsultorioActivo debe usarse dentro de ConsultorioActivoProvider')
-  }
-  return ctx
+  return useContext(ConsultorioActivoContext) ?? FALLBACK_CTX
 }
