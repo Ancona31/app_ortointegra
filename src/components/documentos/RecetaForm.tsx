@@ -7,6 +7,7 @@ import { flushSync } from 'react-dom'
 import QRCode from 'qrcode'
 import { Medicamento, MedicoInfo } from '@/types'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
+import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { useProfile } from '@/hooks/useProfile'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -137,6 +138,7 @@ interface Props {
 
 export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, medicamentosIniciales, offlineMode, onOfflineSave }: Props) {
   const { medicoInfo: onlineMedicoInfo } = useMedicoInfo()
+  const { consultorioActivo } = useConsultorioActivo()
 
   // In offline mode, read doctor profile from localStorage (pre-fetched with Base64 assets)
   const offlineProfile = offlineMode ? (() => {
@@ -303,6 +305,12 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
         pacienteData?.sexo === 'F' ? 'Femenino' :
         pacienteData?.sexo || ''
 
+      const consultorioData = consultorioActivo ? {
+        nombre: consultorioActivo.nombre,
+        direccion: consultorioActivo.direccion,
+        telefono: consultorioActivo.telefono,
+      } : undefined
+
       const { storagePath } = await generarPdf({
         tipo: 'receta',
         pacienteId,
@@ -332,6 +340,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
         },
         logoUrl,
         filename: generateDocFileName(paciente, 'Receta'),
+        consultorio: consultorioData,
       })
 
       pdfGenerated = true

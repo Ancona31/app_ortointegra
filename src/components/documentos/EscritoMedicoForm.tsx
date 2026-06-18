@@ -1,6 +1,7 @@
 'use client'
 import { generateDocFileName } from '@/lib/patientUtils'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
+import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 
 import { useState } from 'react'
 import {
@@ -82,6 +83,7 @@ const TAMANOS = [
 
 export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, offlineMode, onOfflineSave }: Props) {
   const { medicoInfo: onlineMedicoInfo } = useMedicoInfo()
+  const { consultorioActivo } = useConsultorioActivo()
 
   // En offline mode, leer perfil del médico de localStorage (pre-fetched
   // con assets en Base64).
@@ -185,6 +187,12 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
       const logoUrl = medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined
       const fechaFmt = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
 
+      const consultorioData = consultorioActivo ? {
+        nombre: consultorioActivo.nombre,
+        direccion: consultorioActivo.direccion,
+        telefono: consultorioActivo.telefono,
+      } : undefined
+
       const { storagePath } = await generarPdf({
         tipo: 'escrito_medico',
         pacienteId,
@@ -192,6 +200,7 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
         data: { paciente, fecha: fechaFmt, asunto: asuntoLimpio, cuerpo: cuerpoSanitizado, doc: { schema: 'tiptap-doc-v1' as const, content: docJson } },
         logoUrl,
         filename: generateDocFileName(paciente, 'Escrito_Medico'),
+        consultorio: consultorioData,
       })
 
       pdfGenerated = true

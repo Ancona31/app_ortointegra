@@ -1,6 +1,7 @@
 'use client'
 import { generateDocFileName } from '@/lib/patientUtils'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
+import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 
 import { useState, useCallback } from 'react'
 import { Printer, Loader2, Plus, Trash2 } from 'lucide-react'
@@ -42,6 +43,7 @@ const REQUERIMIENTOS = [
 
 export default function SolicitudInternamientoForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, offlineMode, onOfflineSave }: Props) {
   const { medicoInfo: onlineMedicoInfo } = useMedicoInfo()
+  const { consultorioActivo } = useConsultorioActivo()
 
   // In offline mode, read doctor profile from localStorage (pre-fetched with Base64 assets)
   const offlineProfile = offlineMode ? (() => {
@@ -145,6 +147,12 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
       const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
       const fechaIngresoFormat = fechaIngreso ? format(new Date(fechaIngreso + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es }) : undefined
 
+      const consultorioData = consultorioActivo ? {
+        nombre: consultorioActivo.nombre,
+        direccion: consultorioActivo.direccion,
+        telefono: consultorioActivo.telefono,
+      } : undefined
+
       const { storagePath } = await generarPdf({
         tipo: 'solicitud_internamiento',
         pacienteId,
@@ -158,6 +166,7 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
         },
         logoUrl,
         filename: generateDocFileName(paciente, 'Solicitud_Internamiento'),
+        consultorio: consultorioData,
       })
 
       pdfGenerated = true

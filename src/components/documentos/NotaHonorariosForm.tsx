@@ -1,6 +1,7 @@
 'use client'
 import { generateDocFileName } from '@/lib/patientUtils'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
+import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { useCallback, useEffect, useState } from 'react'
 import { Printer, Loader2, Plus, Trash2, Save, FileText, AlertTriangle } from 'lucide-react'
 import Portal from '@/components/ui/Portal'
@@ -64,6 +65,7 @@ function isFormEmpty(lineas: LineaConcepto[], paciente: string, notas: string, p
 
 export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, offlineMode, onOfflineSave, userId, clinicaId }: Props) {
   const { medicoInfo: onlineMedicoInfo } = useMedicoInfo()
+  const { consultorioActivo } = useConsultorioActivo()
 
   // In offline mode, read doctor profile from localStorage (pre-fetched with Base64 assets)
   const offlineProfile = offlineMode ? (() => {
@@ -363,6 +365,12 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, o
       } : null
       const logoUrl = medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined
 
+      const consultorioData = consultorioActivo ? {
+        nombre: consultorioActivo.nombre,
+        direccion: consultorioActivo.direccion,
+        telefono: consultorioActivo.telefono,
+      } : undefined
+
       const { storagePath } = await generarPdf({
         tipo: 'nota_honorarios',
         pacienteId,
@@ -376,6 +384,7 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, o
         },
         logoUrl,
         filename: generateDocFileName(paciente, tipoDoc === 'cotizacion' ? 'Cotizacion' : 'Nota_Honorarios'),
+        consultorio: consultorioData,
       })
 
       pdfGenerated = true

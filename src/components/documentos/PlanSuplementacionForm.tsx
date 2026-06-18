@@ -1,6 +1,7 @@
 'use client'
 import { generateDocFileName } from '@/lib/patientUtils'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
+import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { useProfile } from '@/hooks/useProfile'
 
 import { useState, useCallback } from 'react'
@@ -172,6 +173,7 @@ interface Props {
 
 export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, offlineMode, onOfflineSave }: Props) {
   const { medicoInfo: onlineMedicoInfo } = useMedicoInfo()
+  const { consultorioActivo } = useConsultorioActivo()
 
   // In offline mode, read doctor profile from localStorage (pre-fetched with Base64 assets)
   const offlineProfile = offlineMode ? (() => {
@@ -278,6 +280,12 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
       } : null
       const logoUrl = medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined
 
+      const consultorioData = consultorioActivo ? {
+        nombre: consultorioActivo.nombre,
+        direccion: consultorioActivo.direccion,
+        telefono: consultorioActivo.telefono,
+      } : undefined
+
       const { storagePath } = await generarPdf({
         tipo: 'plan_suplementacion',
         pacienteId,
@@ -308,6 +316,7 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
         },
         logoUrl,
         filename: generateDocFileName(paciente, 'Plan_Suplementacion'),
+        consultorio: consultorioData,
       })
 
       pdfGenerated = true

@@ -1,6 +1,7 @@
 'use client'
 import { generateDocFileName } from '@/lib/patientUtils'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
+import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { useState } from 'react'
 
 import { Printer, Loader2 } from 'lucide-react'
@@ -26,6 +27,7 @@ interface Props {
 
 export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, offlineMode, onOfflineSave }: Props) {
   const { medicoInfo: onlineMedicoInfo } = useMedicoInfo()
+  const { consultorioActivo } = useConsultorioActivo()
 
   // In offline mode, read doctor profile from localStorage (pre-fetched with Base64 assets)
   const offlineProfile = offlineMode ? (() => {
@@ -102,6 +104,12 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
 
       const logoUrl = medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined
 
+      const consultorioData = consultorioActivo ? {
+        nombre: consultorioActivo.nombre,
+        direccion: consultorioActivo.direccion,
+        telefono: consultorioActivo.telefono,
+      } : undefined
+
       const { storagePath } = await generarPdf({
         tipo: 'solicitud_imagen',
         pacienteId,
@@ -115,6 +123,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
         },
         logoUrl,
         filename: generateDocFileName(paciente, 'Solicitud_Imagen'),
+        consultorio: consultorioData,
       })
 
       pdfGenerated = true
