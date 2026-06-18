@@ -61,6 +61,13 @@ export interface PdfMedicoData {
   email_consultorio?: string
 }
 
+/** Datos del consultorio activo para los PDFs (F3-10) */
+export interface PdfConsultorioData {
+  nombre: string
+  direccion: string
+  telefono: string | null
+}
+
 export function getPdfColors(medico: PdfMedicoData | null): PdfColors {
   return {
     cp: medico?.color_primario ?? '#004A99',

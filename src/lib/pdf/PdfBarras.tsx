@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet } from '@react-pdf/renderer'
-import type { PdfMedicoData, PdfColors } from './PdfStyles'
+import type { PdfMedicoData, PdfColors, PdfConsultorioData } from './PdfStyles'
 import { contrastText } from './PdfStyles'
 
 export function BarraTop({ colors }: { colors: PdfColors }) {
@@ -14,11 +14,13 @@ export function BarraTop({ colors }: { colors: PdfColors }) {
 interface BarraBottomProps {
   colors: PdfColors
   medico: PdfMedicoData | null
+  /** F3-10: consultorio activo. Si llega, dir/tel prevalecen sobre los del medico legacy. */
+  consultorio?: PdfConsultorioData
 }
 
-export function BarraBottom({ colors, medico }: BarraBottomProps) {
-  const dir = medico?.direccion_consultorio ?? ''
-  const tel = medico?.telefono_consultorio ?? ''
+export function BarraBottom({ colors, medico, consultorio }: BarraBottomProps) {
+  const dir = consultorio?.direccion || medico?.direccion_consultorio || ''
+  const tel = consultorio?.telefono || medico?.telefono_consultorio || ''
   const email = medico?.email_consultorio ?? ''
 
   const contactoParts = [
