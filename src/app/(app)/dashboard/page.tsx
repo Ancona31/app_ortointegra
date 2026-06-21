@@ -12,6 +12,8 @@ import { createClient } from '@/lib/supabase/client'
 import { canManageClinica } from '@/lib/permissions'
 import { formatCitaHora } from './utils'
 import { StatusChip } from './StatusChip'
+import { useConsultorios } from '@/hooks/useConsultorios'
+import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 
 /* ─── Helpers ─────────────────────────────────────────────── */
 
@@ -38,6 +40,7 @@ type ProximaCita = {
   start_time: string
   status: string
   paciente_id: string | null
+  consultorio_id: string | null
   pacientes: { nombre: string; apellidos: string } | null
   medico: { id: string; nombre: string; titulo: string } | null
 }
@@ -91,6 +94,8 @@ const AVATAR_COLORS = [
 
 export default function DashboardPage() {
   const { profile, loading: loadingProfile } = useProfile()
+  const { consultorios } = useConsultorios()
+  const { cambiarActivo } = useConsultorioActivo()
   const [recientes,      setRecientes]      = useState<Reciente[]>([])
   const [totalPacientes, setTotalPacientes] = useState<number | null>(null)
   const [proximasCitas,  setProximasCitas]  = useState<ProximaCita[]>([])
@@ -166,7 +171,7 @@ export default function DashboardPage() {
 
         let q = supabase
           .from('appointments')
-          .select('id, title, start_time, status, paciente_id, pacientes(nombre, apellidos), medico:profiles!appointments_medico_id_fkey(id, nombre, titulo)')
+          .select('id, title, start_time, status, paciente_id, consultorio_id, pacientes(nombre, apellidos), medico:profiles!appointments_medico_id_fkey(id, nombre, titulo)')
           .eq('clinica_id', profile!.clinica_id!)
           .gt('start_time', new Date().toISOString())
           .in('status', ['scheduled', 'confirmed'])
@@ -206,6 +211,12 @@ export default function DashboardPage() {
     ? proximasCitas.filter(c => c.medico?.id === profile?.id)
     : proximasCitas
   const proximaCita    = proximasCitas[0] ?? null
+
+  const iniciarConsulta = (cita: ProximaCita) => {
+    if (!cita.consultorio_id) return
+    const consultorio = consultorios.find(c => c.id === cita.consultorio_id)
+    if (consultorio) cambiarActivo(consultorio)
+  }
 
   return (
     <div className="max-w-3xl mx-auto space-y-8 py-2">
@@ -268,10 +279,14 @@ export default function DashboardPage() {
                     </div>
                     {cita.paciente_id && (
                       <div className="flex items-center gap-1.5 pt-0.5">
-                        <Link href={`/expediente/${cita.paciente_id}/nueva-nota`}
-                          className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a3a5c] transition-colors">
-                          <Stethoscope size={10} /> Iniciar consulta
-                        </Link>
+                        {cita.medico?.id === profile?.id && (
+                          <Link
+                            href={`/expediente/${cita.paciente_id}/nueva-nota`}
+                            onClick={() => iniciarConsulta(cita)}
+                            className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a3a5c] transition-colors">
+                            <Stethoscope size={10} /> Iniciar consulta
+                          </Link>
+                        )}
                         <Link href={`/expediente/${cita.paciente_id}`}
                           className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-[#1e5fa8] bg-blue-50 hover:bg-blue-100 transition-colors">
                           <FolderOpen size={10} /> Expediente
@@ -317,6 +332,7 @@ export default function DashboardPage() {
                     <div className="flex items-center gap-2">
                       <Link
                         href={`/expediente/${proximaCita.paciente_id}/nueva-nota`}
+                        onClick={() => iniciarConsulta(proximaCita)}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a3a5c] transition-colors"
                       >
                         <Stethoscope size={11} /> Iniciar consulta
