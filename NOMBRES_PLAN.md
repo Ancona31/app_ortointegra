@@ -1,199 +1,152 @@
 # NOMBRES_PLAN.md — Normalización de nombres de médicos en `profiles`
 
-> Plan operativo. Estrategia: **expand/contract** (cambio en paralelo). Agregar lo nuevo,
-> migrar manteniendo lo legacy vivo, y contraer (DROP de `nombre`) en un proyecto futuro y
-> separado. Protocolo D-T6 aplica desde la Fase 1 (Fase 0 ya completada, read-only).
+> Objetivo: el nombre del médico tiene UNA sola fuente de verdad — tres columnas estructuradas
+> (`nombres`, `apellido_paterno`, `apellido_materno`) + `titulo`. La app arma lo que necesite
+> (nombre completo, o título + primer apellido) directamente desde ellas, en el punto de render.
+> La columna legacy `nombre` se ELIMINA al final. Sin dual-write, sin espejo, sin parseo
+> permanente, sin columnas duplicadas.
 
 ---
 
-## Decisiones congeladas (no re-litigar)
+## Modelo objetivo (cómo debe quedar)
 
-1. Solo se normaliza `profiles`. La tabla `pacientes` **no se toca** en este proyecto.
-2. Esquema objetivo: conservar `titulo` (ya existe) + agregar `nombres`, `apellido_paterno`,
-   `apellido_materno` (este último siempre **NULLABLE**).
-3. Migración **aditiva**. La columna legacy `nombre` se **mantiene viva** durante toda la
-   transición. El DROP es un paso futuro y separado (Fase 6, fuera de alcance aquí).
-4. Backfill = **sugerencia inicial**, no fuente de verdad. Cada médico confirma/corrige en su perfil.
+- Fuente de verdad = 3 columnas estructuradas en `profiles`: `nombres`, `apellido_paterno`,
+  `apellido_materno` (nullable) + `titulo` (ya existe).
+- El médico captura esos campos por separado al registrarse y en su perfil. Nunca se guarda un
+  nombre pegado.
+- La app arma al vuelo, en el punto de render, según necesidad:
+  - Nombre completo (recetas, PDFs, documentos legales): titulo + nombres + apellido_paterno + apellido_materno.
+  - Nombre corto (lista de médicos, chips, agenda): titulo + apellido_paterno.
+  - Orden de médicos: por apellido_paterno.
+- `nombre` legacy NO sobrevive: solo se mantiene como fallback de lectura DURANTE la transición,
+  y se DROPEA en la última fase. No se sincroniza, no es fuente de verdad.
+
+NO HAY dual-write, NO HAY espejo a `nombre`, NO HAY helper que parsee un string pegado.
+
+---
+
+## Orden de ejecución (re-secuenciado — lecturas antes que captura)
+
+Fase 1 (esquema) ✅ → Fase 2 (migrar datos) → Fase 4 (migrar lecturas) → Fase 3 (captura/formularios)
+→ Fase 5 (endpoint+orden) → Fase 6 (DROP nombre)
+
+Razón del orden: migrar las lecturas a campos estructurados ANTES de abrir los formularios nuevos
+permite que el registro nuevo capture campos separados y funcione de inmediato, SIN necesidad de
+escribir `nombre` (sin espejo). Precondición dura: la Fase 2 debe estar 100% completa y verificada
+(los 15 médicos con sus 3 campos poblados) ANTES de activar las lecturas nuevas en Fase 4, para que
+ningún médico salga con nombre vacío.
+
+---
+
+## Por qué hay transición (y no se borra `nombre` el día 1)
+
+Hoy las recetas, PDFs legales (NOM-004) y la agenda LEEN `profiles.nombre` ya compuesto. Si se
+dropea antes de migrar quién lo lee, se rompe producción. Por eso: agregar columnas → migrar el
+dato viejo → migrar las lecturas → migrar la captura → dropear `nombre`. Es para no romper.
+
+---
+
+## Decisiones congeladas
+
+1. Solo se normaliza `profiles`. La tabla `pacientes` NO se toca.
+2. Esquema: `titulo` (existe) + `nombres`, `apellido_paterno`, `apellido_materno` (materno nullable).
+3. `nombre` legacy se elimina al final del proyecto (Fase 6 = parte del objetivo, no opcional).
+4. La captura (registro/onboarding/perfil/alta-admin) escribe los 3 campos separados. No escribe
+   un nombre pegado.
 5. `apellido_materno` siempre nullable (extranjeros, apellido único, compuestos).
 
 ---
 
-## Hechos verificados (Fase 0 — inventario read-only)
+## Estado actual (hechos verificados)
 
-**Estructura.** `profiles.nombre` = text NULLABLE sin default (`supabase/baseline/02_tables.sql:401`);
-`profiles.titulo` = text NULLABLE default `'Dr.'` (`:406`). `role` NOT NULL default `'medico'` (`:400`).
-`es_admin_de_clinica` boolean NOT NULL default false añadida en
-`supabase/migrations/20260518083036_etapa1_schema_declarativo.sql:41-42`. No hay tipos generados;
-contrato manual en `src/hooks/useProfile.ts:17-30`.
-
-**Trigger protector = DENYLIST de 3 columnas.** `proteger_columnas_sensibles_profiles()`
-(`supabase/migrations/20260602_sec_proteger_columnas_sensibles_profiles.sql:53-79`, BEFORE UPDATE)
-solo bloquea cambios a `role`, `clinica_id`, `es_admin_de_clinica` (`:63-71`). Exento cuando
-`auth.uid() IS NULL` (service_role/migraciones). **Las columnas nuevas NO chocan con el trigger;
-no se modifica el trigger en este proyecto.**
-
-**RLS.** `profiles_update` permite al médico escribir su propia fila (id = auth.uid()) o al admin
-sobre su clínica (`...etapa5j_paso2_policies_profiles_invitaciones.sql:184-196`). `nombre` y `titulo`
-**ya son editables hoy** por el propio médico. No se requieren cambios de RLS para Fases 1–5.
-
-**Composición de nombre.** Único punto de composición online:
-`src/app/api/me/perfil-medico/route.ts:38` → `${titulo} ${nombre}`.trim(); el campo `medico.nombre`
-devuelto ya lleva el título. Composición duplicada en otros 3 sitios:
-`src/app/api/consultas/route.ts:123` (snapshot `consultas.medico_nombre`),
-`src/app/api/consultas/[id]/addendum/route.ts:80` (snapshot `addendums.medico_nombre`),
-`src/app/api/email/enviar-documento/route.ts:108`.
-
-**PDFs / firma legal** leen `medico.nombre` ya compuesto (sin `titulo` separado):
-`src/lib/pdf/PdfFirma.tsx`, `PdfHeader.tsx`, `header.ts`; contratos de tipo sin `titulo`:
-`src/types/index.ts:76-90` (MedicoInfo), `src/lib/pdf/PdfStyles.tsx:50` (PdfMedicoData).
-Espejo offline: `src/lib/offline/doctorProfile.ts`.
-
-**Snapshots inmutables (NOM-004).** `consultas.medico_nombre`, `addendums.medico_nombre`,
-recetas `medico_nombre` — congelados, valor jurídico. El backfill NO los toca.
-
-**Orden / búsqueda.** `.order('nombre')` en `src/app/api/clinica/medicos/route.ts:22` y
-`src/app/(app)/dashboard/AsistenteDashboard.tsx:63-64`; `.ilike('nombre')` en
-`src/app/api/super-admin/dashboard/usuarios/route.ts:96`. **No existe orden por apellido.**
-
-**Form "Mi Perfil".** `src/app/(app)/perfil/page.tsx`. El campo `nombre` NO se edita hoy
-(solo se muestra read-only en el preview de membrete `:386`). PUT a
-`src/app/api/me/perfil-medico/route.ts:69-87` escribe directo a `profiles` **sin validación
-server-side ni allowlist** (solo valida auth).
-
-**`paciente_medico` SELECT.** Un médico no-admin solo lee su propio vínculo
-(`medico_id = auth.uid()`); el admin ve los de su clínica
-(`...20260524_etapa5e_bd2_policies_paciente_medico.sql:28-34`).
+- Fase 1 APLICADA: `profiles` ya tiene `nombres`, `apellido_paterno`, `apellido_materno` (text
+  NULLABLE) y `nombre_confirmado` (boolean NOT NULL DEFAULT false). 19 filas: 15 role='medico',
+  3 secretaria, 1 super_admin. Las 4 columnas nuevas vacías.
+- Trigger `proteger_columnas_sensibles_profiles` (BEFORE UPDATE) protege solo role/clinica_id/
+  es_admin_de_clinica. Las columnas de nombre NO están protegidas → editables por el médico.
+- RLS `profiles_update`: el médico edita su propia fila a nivel fila (sin restricción por columna).
+- El nombre se compone hoy en 4 sitios que leen `nombre`: `api/me/perfil-medico/route.ts:38`,
+  `api/consultas/route.ts:123` (snapshot), `api/consultas/[id]/addendum/route.ts:80` (snapshot),
+  `api/email/enviar-documento/route.ts:108`. Los PDFs leen `nombre` ya compuesto.
+- Captura actual escribe `nombre`: `api/auth/registro`, `OnboardingModal`, `api/admin/crear-usuario`.
+- `.order('nombre')` en `api/clinica/medicos/route.ts:22` y `AsistenteDashboard.tsx:63-64`.
+- Snapshots NOM-004 (`consultas.medico_nombre`, `addendums.medico_nombre`, recetas) son
+  inmutables y NO se re-derivan ni se tocan nunca.
 
 ---
 
-## Orden duro de ejecución
-[Fase 0 OK]  ->  Fase 1  ->  Fase 2  ->  Fase 3  ->  Fase 4  ->  Fase 5   (Fase 6 = futuro)
-(inventario)     (schema)    (backfill) (perfil)   (helper)    (endpoint)
+## Fases
 
----
+### Fase 1 — Esquema aditivo — ✅ HECHA
+Columnas agregadas y verificadas. (`nombre_confirmado` queda disponible para marcar filas con
+datos confiables; útil mientras `nombre` siga vivo.)
 
-## Fase 1 — Migración aditiva de esquema
+### Fase 2 — Migración de datos existentes (la migración real, no "sugerencia")
+- Pasar los 15 médicos actuales de `nombre` → las 3 columnas estructuradas, UNA vez.
+- UPDATEs explícitos por id, con valores ya resueltos y revisados a mano (no parser genérico en prod).
+- Casos sucios (Dr. Prueba, Orto, "JUAREZALVARADO" pegado, inicial "M.") se resuelven a mano en el
+  mismo set; no se fuerza heurística.
+- `nombre`/`titulo` legacy NO se tocan (siguen alimentando los PDFs hasta Fase 4).
+- Marcar `nombre_confirmado = true` en las filas migradas con dato bueno.
+- ESTA FASE DEBE QUEDAR COMPLETA Y VERIFICADA ANTES DE LA FASE 4.
 
-- ALTER aditivo a `profiles`: `nombres` (text, NULLABLE), `apellido_paterno` (text, NULLABLE),
-  `apellido_materno` (text, NULLABLE), `nombre_confirmado` (boolean NOT NULL DEFAULT false).
-- Las columnas de nombre entran NULLABLE: filas existentes no tienen valor y la tabla está endurecida.
-- La obligatoriedad de `nombres` / `apellido_paterno` se aplica en validación (Fase 3), no como
-  NOT NULL de columna.
-- `titulo` y `nombre` intactos.
-- Bajo D-T6: una query a la vez, validación con Angel, smoke test.
+### Fase 4 — Migrar puntos de lectura a campos estructurados
+- Los 4 sitios de composición + PDFs + agenda + recetas dejan de leer `nombre` y arman desde los
+  3 campos: completo = titulo + nombres + apellido_paterno + apellido_materno; corto = titulo + apellido_paterno.
+- Snapshots NOM-004 ya escritos NO se tocan (valor jurídico). Los snapshots NUEVOS se componen
+  desde los campos estructurados.
+- CUIDADO: los PDFs legales requieren el nombre completo correcto; verificar caso por caso con
+  smoke test (generar receta de prueba y confirmar el nombre).
 
----
+### Fase 3 — Captura nativa en los 3 campos (formularios)
+- Registro, onboarding y alta-admin (panel del médico admin) dejan de capturar un nombre pegado y
+  capturan `nombres` / `apellido_paterno` / `apellido_materno` por separado.
+- "Mi Perfil" agrega edición de esos 3 campos (hoy no edita el nombre), para corregir casos mal
+  capturados (p. ej. "Juárez Alvarado" pegado).
+- Validación: `nombres` + `apellido_paterno` obligatorios; `apellido_materno` opcional.
+- Validación server-side con allowlist explícita de columnas en el PUT `api/me/perfil-medico`
+  (hoy escribe directo sin validar) y en los endpoints de alta.
+- SIN espejo a `nombre`: como las lecturas (Fase 4) ya consumen los campos estructurados, la
+  captura nueva NO necesita escribir `nombre`.
 
-## Fase 2 — Backfill como sugerencia
+### Fase 5 — Endpoint `/api/clinica/medicos` + orden
+- SELECT pasa a traer los 3 campos. `.order('nombre')` → `.order('apellido_paterno')`.
+- Actualizar consumidores (QuickPatientModal, pacientes/nuevo, agenda).
 
-- Parsear `nombre` -> columnas nuevas con heurística de nombre mexicano (últimos dos tokens =
-  apellidos como propuesta). Explícitamente propuesta, no verdad.
-- Deja `nombre_confirmado = false` en todas las filas backfilleadas.
-- NO toca snapshots NOM-004. Ejecutado con rol elevado (exento del trigger por `auth.uid() NULL`).
-- `nombre` legacy permanece intacto y sigue siendo la fuente de display.
-
----
-
-## Fase 3 — Form "Mi Perfil" + confirmación + DUAL-WRITE + validación server-side
-
-- Exponer `nombres`, `apellido_paterno`, `apellido_materno` en el form para que cada médico
-  confirme/corrija. Validación: `nombres` + `apellido_paterno` obligatorios; `apellido_materno` opcional.
-- **DUAL-WRITE (decisión clave):** al guardar, escribir las columnas nuevas Y recomponer `nombre`
-  legacy desde ellas, conservando su semántica actual (nombre completo, sin título). Así
-  `nombre` sigue siendo válido y **ningún punto de composición / PDF / firma legal / snapshot
-  se toca en este proyecto**. Marcar `nombre_confirmado = true` al confirmar.
-- **Cerrar la brecha de validación server-side (deuda detectada):** el PUT
-  `src/app/api/me/perfil-medico/route.ts:69-87` escribe directo sin allowlist. Antes de exponer
-  los campos nuevos, añadir una allowlist explícita de columnas editables, o cualquier campo del
-  body entra a `profiles`.
-- RLS y trigger ya permiten esta escritura (ver Hechos verificados); no se modifican.
-
----
-
-## Fase 4 — Helper de nombre corto (NO migración masiva)
-
-- Los puntos de lectura existentes **se quedan con `nombre`** (gracias al dual-write siguen correctos).
-- Solo se AGREGA un helper centralizado para el rediseño de UI:
-  - `nombreCorto` = `titulo` + `apellido_paterno` -> "Dr. Ancona", **solo si `nombre_confirmado = true`**;
-    si no, fallback a `nombre` legacy.
-  - `nombreCompleto` con fallback a `nombre`.
-- Este proyecto deja el modelo + el helper listos; el rediseño de UI los consume después.
-
----
-
-## Fase 5 — Endpoint `/api/clinica/medicos` + orden por apellido
-
-- Ampliar el SELECT (hoy `id, nombre, titulo, especialidad`, `route.ts:19`) para incluir
-  `apellido_paterno`, `apellido_materno`, `nombres`, `nombre_confirmado`.
-- Migrar `.order('nombre')` -> `.order('apellido_paterno')` cuando los datos estén confirmados
-  (afecta `clinica/medicos/route.ts:22` y `AsistenteDashboard.tsx:63-64`). Considerar índice.
-- Actualizar consumidores: `QuickPatientModal.tsx`, `pacientes/nuevo/page.tsx`, `agenda/page.tsx`.
+### Fase 6 — DROP de `nombre` (cierre del objetivo, NO opcional)
+- Precondición dura: CERO puntos de lectura/escritura dependiendo de `nombre`, todos los médicos
+  con los 3 campos poblados.
+- `ALTER TABLE profiles DROP COLUMN nombre`. Queda una sola fuente de verdad.
 
 ---
 
 ## Fuera de alcance
-
-- **Fase 6 — DROP de `nombre`** (proyecto futuro y separado). Gate: 100% de médicos con
-  `nombre_confirmado = true` + cero puntos de lectura dependiendo de `nombre`. Requiere antes
-  consolidar la composición duplicada y los contratos de tipo (ver Deuda).
-- Normalización de nombres en `pacientes` (decisión congelada #1).
-
----
-
-## Deuda a registrar en DEUDA_TECNICA.md (no se resuelve aquí)
-
-- Composición `titulo + nombre` duplicada en 4 sitios (`perfil-medico:38`, `consultas:123`,
-  `addendum:80`, `email:108`) — consolidar antes del DROP de Fase 6.
-- Contratos `MedicoInfo` (`types/index.ts:76-90`) y `PdfMedicoData` (`PdfStyles.tsx:50`) asumen
-  `nombre`-con-título embebido, sin `titulo` separado — trabajo de Fase 6.
-
----
-
-## Decisiones de diseño (resueltas por el inventario)
-
-- Trigger protector: DENYLIST de 3 columnas; las nuevas no chocan. No se toca el trigger.
-- RLS de UPDATE: el médico ya puede auto-editar su fila. No se toca la RLS.
-- `nombre` legacy: **dual-write** (se recompone desde las columnas nuevas), NO se congela.
-  Mantiene viva toda la cadena PDF/firma/snapshot sin cambios.
-- `nombre_confirmado boolean DEFAULT false`: adoptado. Gatea el helper de nombre corto y el DROP futuro.
+- Normalización de nombres en `pacientes`.
 
 ---
 
 ## Protocolos
 
 ### Producción — regla rectora
-Trabajamos sobre la base de datos en PRODUCCIÓN. **No se aplica nada que pueda romper
-producción.** Cualquier duda sobre seguridad de un cambio = no se aplica hasta resolverla.
-Los errores son fatales e irreversibles para datos clínicos reales.
+Base de datos en PRODUCCIÓN. No se aplica nada que pueda romperla. Ante duda no resuelta → NO-GO.
 
 ### Gate de auditoría obligatorio (todo script SQL o código nuevo)
-Antes de aplicar CUALQUIER script o cambio de código:
-1. **Propuesta** — Claude Code redacta el script/diff (read-only, no ejecuta nada).
-2. **Auditoría** — Claude Code audita la propuesta y dictamina riesgos de ruptura
-   (trigger protector, RLS, FKs, dependencias, reescritura/bloqueo de tabla, snapshots
-   NOM-004, puntos de lectura, intentos previos, etc.). Read-only, solo dictamen.
-3. **Corrección** — si hay riesgo, se corrige.
-4. **Re-auditoría** — la versión corregida vuelve al paso 2.
-5. **Aplicación** — solo cuando el auditor corrobora que es seguro. Recién ahí entra D-T6.
+1. Propuesta (Claude Code, read-only). 2. Auditoría de riesgos de ruptura. 3. Corrección.
+4. Re-auditoría. 5. Aplicación solo con visto bueno. La auditoría de DB la corre Angel con
+queries de lectura en el SQL Editor (Claude Code no usa CLI).
 
 ### Mitigación y rollback obligatorios (todo script SQL)
-Ningún script SQL se ejecuta sin traer, junto al script:
-- **Mitigación**: qué hacer si una query devuelve un resultado inesperado (cuándo parar,
-  qué revisar antes de continuar).
-- **Rollback**: el SQL exacto que revierte el cambio, validado de antemano. Si un cambio no
-  es razonablemente reversible, se rediseña o no se aplica.
+Cada script trae su mitigación (cuándo parar, qué revisar) y su rollback exacto validado de
+antemano. Si no es razonablemente reversible, se rediseña o no se aplica.
 
-### Protocolo D-T6 (ejecución, solo tras visto bueno de auditoría)
-Una query a la vez vía SQL Editor (NUNCA Supabase CLI). Angel ejecuta cada query, valida el
-resultado con Claude antes de la siguiente, para y activa mitigación ante cualquier resultado
-inesperado, hace smoke test tras cada cambio, y luego valida a nivel app.
+### Protocolo D-T6 (ejecución)
+Una query a la vez en SQL Editor (NUNCA CLI). Angel ejecuta, valida con Claude antes de la
+siguiente, para y mitiga ante lo inesperado, smoke test tras cada cambio, luego valida en la app.
 
 ### División de ejecución
-- **Claude Code**: investiga (read-only), propone scripts/diffs, audita, propone mitigación y
-  rollback. NUNCA ejecuta SQL, NUNCA git, y **NUNCA corre build ni lint ni tsc**.
-- **Angel**: corre build/lint/tsc directo en consola, ejecuta las queries SQL en el SQL Editor
-  una a una, y hace git add/commit/push manualmente.
+- Claude Code: investiga (read-only), propone scripts/diffs, audita, da mitigación y rollback.
+  NUNCA ejecuta SQL, NUNCA git, NUNCA build/lint/tsc.
+- Angel: corre build/lint/tsc en consola, ejecuta SQL en el editor una a una, hace git manual.
 
 ### Tracking de deuda
-Deuda transversal -> `DEUDA_TECNICA.md`. Deuda acotada a un sub-paso -> "Fuera de alcance" de
-este plan.
+Transversal → DEUDA_TECNICA.md. Acotada a un sub-paso → "Fuera de alcance" de este plan.
