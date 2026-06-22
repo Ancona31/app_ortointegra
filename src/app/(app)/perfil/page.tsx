@@ -18,6 +18,7 @@ import AddConsultorioModal from '@/components/consultorios/AddConsultorioModal'
 import EditConsultorioModal from '@/components/consultorios/EditConsultorioModal'
 import DeleteConsultorioModal from '@/components/consultorios/DeleteConsultorioModal'
 import { ZONAS_MEXICO } from '@/lib/consultorios/zonas-mexico'
+import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 
 type FormData = {
   titulo: string
@@ -565,7 +566,7 @@ export default function PerfilPage() {
                       </div>
                     )}
                     <div>
-                      <p className="text-white font-bold text-sm">{form.titulo} {profile?.nombre}</p>
+                      <p className="text-white font-bold text-sm">{componerNombreMedicoCompleto({ titulo: form.titulo, nombres: profile?.nombres, apellido_paterno: profile?.apellido_paterno, apellido_materno: profile?.apellido_materno }) || 'Médico'}</p>
                       <p className="text-white/70 text-xs">{form.especialidad || 'Especialidad'}</p>
                     </div>
                   </div>

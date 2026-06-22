@@ -27,6 +27,9 @@ export interface Profile {
   titulo?: string | null
   universidad?: string | null
   es_admin_de_clinica?: boolean
+  nombres?: string | null
+  apellido_paterno?: string | null
+  apellido_materno?: string | null
 }
 
 const PROFILE_CACHE_KEY = 'cache_user_profile'

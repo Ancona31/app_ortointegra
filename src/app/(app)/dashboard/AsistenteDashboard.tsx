@@ -11,6 +11,7 @@ import { calcularEdad } from '@/lib/patientUtils'
 import { es } from 'date-fns/locale'
 import { StatusChip } from './StatusChip'
 import { formatCitaHora } from './utils'
+import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 
 type ProximaCita = {
   id: string
@@ -19,10 +20,10 @@ type ProximaCita = {
   status: string
   paciente_id: string | null
   pacientes: { nombre: string; apellidos: string } | null
-  medico: { id: string; nombre: string; titulo: string } | null
+  medico: { id: string; titulo: string | null; nombres: string | null; apellido_paterno: string | null; apellido_materno: string | null } | null
 }
 
-type Medico = { id: string; nombre: string; titulo: string }
+type Medico = { id: string; titulo: string | null; nombres: string | null; apellido_paterno: string | null; apellido_materno: string | null }
 
 export default function AsistenteDashboard() {
   const { profile } = useProfile()
@@ -52,7 +53,7 @@ export default function AsistenteDashboard() {
       // Médicos de la clínica
       const { data: medicosData } = await supabase
         .from('profiles')
-        .select('id, nombre, titulo')
+        .select('id, titulo, nombres, apellido_paterno, apellido_materno')
         .eq('clinica_id', profile!.clinica_id!)
         .eq('role', 'medico')
         .order('nombre')
@@ -61,7 +62,7 @@ export default function AsistenteDashboard() {
       // Próximas citas de toda la clínica
       const { data: citasData } = await supabase
         .from('appointments')
-        .select('id, title, start_time, status, paciente_id, pacientes(nombre, apellidos), medico:profiles!appointments_medico_id_fkey(id, nombre, titulo)')
+        .select('id, title, start_time, status, paciente_id, pacientes(nombre, apellidos), medico:profiles!appointments_medico_id_fkey(id, titulo, nombres, apellido_paterno, apellido_materno)')
         .eq('clinica_id', profile!.clinica_id!)
         .gt('start_time', new Date().toISOString())
         .in('status', ['scheduled', 'confirmed'])
@@ -104,7 +105,7 @@ export default function AsistenteDashboard() {
               >
                 <option value="todos" className="text-[#1d1d1f]">Todos los médicos</option>
                 {medicos.map(m => (
-                  <option key={m.id} value={m.id} className="text-[#1d1d1f]">{m.titulo} {m.nombre}</option>
+                  <option key={m.id} value={m.id} className="text-[#1d1d1f]">{componerNombreMedicoCompleto(m)}</option>
                 ))}
               </select>
             )}
@@ -132,7 +133,7 @@ export default function AsistenteDashboard() {
                 <div className="flex items-center gap-2 text-[11px] text-[#86868b]">
                   <span>{formatCitaHora(cita.start_time)}</span>
                   {cita.medico && (
-                    <span>· {cita.medico.titulo} {cita.medico.nombre}</span>
+                    <span>· {componerNombreMedicoCompleto(cita.medico)}</span>
                   )}
                 </div>
               </div>

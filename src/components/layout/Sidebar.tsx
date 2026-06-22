@@ -15,6 +15,7 @@ import { useRouter } from 'next/navigation'
 import { useProfile, clearProfileCache } from '@/hooks/useProfile'
 import ConsultorioActivoSelector from '@/components/sidebar/ConsultorioActivoSelector'
 import { canManageClinica } from '@/lib/permissions'
+import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import { useClinica } from '@/hooks/useClinica'
 import { useTheme } from '@/components/layout/ThemeProvider'
 import { useAuth } from '@/lib/auth-context'
@@ -240,7 +241,7 @@ export default function Sidebar() {
           </div>
           <div className="text-center">
             <p className="font-semibold text-sm leading-tight">
-              {nombreDisplay ?? profile?.nombre ?? ''}
+              {nombreDisplay ?? (componerNombreMedicoCompleto(profile ?? {}) || '')}
             </p>
             <p className="text-[11px] opacity-40 mt-0.5 leading-tight">
               {profile?.role === 'secretaria'

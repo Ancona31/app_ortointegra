@@ -14,6 +14,7 @@ import { formatCitaHora } from './utils'
 import { StatusChip } from './StatusChip'
 import { useConsultorios } from '@/hooks/useConsultorios'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
+import { componerNombreMedicoCorto } from '@/lib/nombreMedico'
 
 /* ─── Helpers ─────────────────────────────────────────────── */
 
@@ -42,7 +43,7 @@ type ProximaCita = {
   paciente_id: string | null
   consultorio_id: string | null
   pacientes: { nombre: string; apellidos: string } | null
-  medico: { id: string; nombre: string; titulo: string } | null
+  medico: { id: string; titulo: string | null; apellido_paterno: string | null } | null
 }
 
 /* ─── Config ──────────────────────────────────────────────── */
@@ -171,7 +172,7 @@ export default function DashboardPage() {
 
         let q = supabase
           .from('appointments')
-          .select('id, title, start_time, status, paciente_id, consultorio_id, pacientes(nombre, apellidos), medico:profiles!appointments_medico_id_fkey(id, nombre, titulo)')
+          .select('id, title, start_time, status, paciente_id, consultorio_id, pacientes(nombre, apellidos), medico:profiles!appointments_medico_id_fkey(id, titulo, apellido_paterno)')
           .eq('clinica_id', profile!.clinica_id!)
           .gt('start_time', new Date().toISOString())
           .in('status', ['scheduled', 'confirmed'])
@@ -199,8 +200,7 @@ export default function DashboardPage() {
   if (loadingProfile) return <DashboardSkeleton />
   if (profile?.role === 'secretaria') return <AsistenteDashboard />
 
-  const nombre = profile?.nombre ?? ''
-  const titulo = profile?.titulo ? `${profile.titulo} ` : ''
+  const primerNombre = profile?.nombres ? profile.nombres.split(' ')[0] : ''
   const hoy    = format(new Date(), "EEEE, d 'de' MMMM", { locale: es })
 
   const abrirBusqueda = () =>
@@ -225,7 +225,7 @@ export default function DashboardPage() {
       <div className="animate-slide-up" style={{ animationDelay: '0ms' }}>
         <p className="text-sm text-[#86868b] capitalize mb-1">{hoy}</p>
         <h1 className="text-[28px] font-bold tracking-tight text-[#1d1d1f] leading-tight">
-          {saludo()}{nombre ? `, ${titulo}${nombre}` : ''}
+          {saludo()}{primerNombre ? `, ${primerNombre}` : ''}
         </h1>
       </div>
 
@@ -274,7 +274,7 @@ export default function DashboardPage() {
                     <div className="flex items-center gap-2 text-[11px] text-[#86868b]">
                       <span>{formatCitaHora(cita.start_time)}</span>
                       {!soloMisCitas && cita.medico && (
-                        <span>· {cita.medico.titulo} {cita.medico.nombre}</span>
+                        <span>· {componerNombreMedicoCorto(cita.medico)}</span>
                       )}
                     </div>
                     {cita.paciente_id && (

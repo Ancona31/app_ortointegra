@@ -138,8 +138,8 @@ export default function InicioPage() {
 
   if (!estado) return null
 
-  const nombreMedico = estado.nombre
-    ? estado.nombre.replace(/^(Dr\.|Dra\.|Mtro\.|Mtra\.|Lic\.|Ing\.)\s*/i, '').split(' ')[0]
+  const nombreMedico = profile?.nombres
+    ? profile.nombres.split(' ')[0]
     : null
 
   const cardBase = dark
