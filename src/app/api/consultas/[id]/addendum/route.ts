@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 
 /* ── POST /api/consultas/[id]/addendum — agregar nota aclaratoria ── */
 export async function POST(req: NextRequest, ctx: RouteContext<'/api/consultas/[id]/addendum'>) {
@@ -10,7 +11,7 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/consultas/[
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('id, clinica_id, nombre, titulo')
+      .select('id, clinica_id, nombre, titulo, nombres, apellido_paterno, apellido_materno')
       .eq('id', user.id)
       .single()
     if (!profile?.clinica_id) return NextResponse.json({ error: 'Sin clínica' }, { status: 403 })
@@ -77,7 +78,12 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/consultas/[
       )
     }
 
-    const medicoNombre = `${profile.titulo || ''} ${profile.nombre || ''}`.trim()
+    const medicoNombre = componerNombreMedicoCompleto({
+      titulo: profile.titulo,
+      nombres: profile.nombres,
+      apellido_paterno: profile.apellido_paterno,
+      apellido_materno: profile.apellido_materno,
+    }) || null
 
     const { data: addendum, error } = await supabase.from('addendums').insert({
       consulta_id: id,

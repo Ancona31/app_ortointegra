@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 
 /* ── POST /api/consultas — crear nota médica ───────────── */
 export async function POST(req: NextRequest) {
@@ -10,7 +11,7 @@ export async function POST(req: NextRequest) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('id, clinica_id, role, nombre, titulo, especialidad, cedula_profesional, cedula_especialidad')
+      .select('id, clinica_id, role, nombre, titulo, nombres, apellido_paterno, apellido_materno, especialidad, cedula_profesional, cedula_especialidad')
       .eq('id', user.id)
       .single()
     if (!profile?.clinica_id) return NextResponse.json({ error: 'Sin clínica' }, { status: 403 })
@@ -159,7 +160,12 @@ export async function POST(req: NextRequest) {
       proxima_cita:              body.proxima_cita || null,
       medicamentos:              body.medicamentos || null,
       nota_origen:               notaOrigen,
-      medico_nombre:             `${profile.titulo || ''} ${profile.nombre || ''}`.trim() || null,
+      medico_nombre:             componerNombreMedicoCompleto({
+        titulo: profile.titulo,
+        nombres: profile.nombres,
+        apellido_paterno: profile.apellido_paterno,
+        apellido_materno: profile.apellido_materno,
+      }) || null,
       medico_especialidad:       profile.especialidad || null,
       medico_cedula_profesional: profile.cedula_profesional || null,
       medico_cedula_especialidad: profile.cedula_especialidad || null,
