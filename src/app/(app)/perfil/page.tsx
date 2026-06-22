@@ -22,6 +22,9 @@ import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 
 type FormData = {
   titulo: string
+  nombres: string
+  apellido_paterno: string
+  apellido_materno: string
   especialidad: string
   cedula_profesional: string
   cedula_especialidad: string
@@ -58,7 +61,8 @@ export default function PerfilPage() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [form, setForm] = useState<FormData>({
-    titulo: '', especialidad: '', cedula_profesional: '',
+    titulo: '', nombres: '', apellido_paterno: '', apellido_materno: '',
+    especialidad: '', cedula_profesional: '',
     cedula_especialidad: '', universidad: '', direccion_consultorio: '', telefono_consultorio: '',
   })
   const [especialidades, setEspecialidades] = useState<string[]>([''])
@@ -203,6 +207,9 @@ export default function PerfilPage() {
         setEspecialidades(espArray.length > 0 ? espArray : [''])
         setForm({
           titulo: perfilData.medico.titulo || 'Dr.',
+          nombres: perfilData.medico.nombres || '',
+          apellido_paterno: perfilData.medico.apellido_paterno || '',
+          apellido_materno: perfilData.medico.apellido_materno || '',
           especialidad: espRaw,
           cedula_profesional: perfilData.medico.cedula_profesional || '',
           cedula_especialidad: perfilData.medico.cedula_especialidad || '',
@@ -248,6 +255,10 @@ export default function PerfilPage() {
     const errCedEsp = validarCedula(form.cedula_especialidad)
     if (errTel || errCed || errCedEsp) {
       toast.error(errTel || errCed || errCedEsp || 'Revisa los campos')
+      return
+    }
+    if (!form.nombres.trim() || !form.apellido_paterno.trim()) {
+      toast.error('El nombre y el apellido paterno son obligatorios')
       return
     }
     setGuardando(true)
@@ -333,6 +344,26 @@ export default function PerfilPage() {
                 <option value="Dr.">Dr.</option>
                 <option value="Dra.">Dra.</option>
               </select>
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Nombre(s) <span className="text-red-400">*</span></label>
+              <input type="text" value={form.nombres}
+                onChange={e => setForm({ ...form, nombres: e.target.value })}
+                placeholder="Ej: Juan Carlos" className={inputClass} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Apellido paterno <span className="text-red-400">*</span></label>
+                <input type="text" value={form.apellido_paterno}
+                  onChange={e => setForm({ ...form, apellido_paterno: e.target.value })}
+                  placeholder="Ej: García" className={inputClass} />
+              </div>
+              <div>
+                <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Apellido materno</label>
+                <input type="text" value={form.apellido_materno}
+                  onChange={e => setForm({ ...form, apellido_materno: e.target.value })}
+                  placeholder="Opcional" className={inputClass} />
+              </div>
             </div>
             <div>
               <label className="text-[11px] font-medium text-[#86868b] block mb-1.5">Especialidad</label>
@@ -566,7 +597,7 @@ export default function PerfilPage() {
                       </div>
                     )}
                     <div>
-                      <p className="text-white font-bold text-sm">{componerNombreMedicoCompleto({ titulo: form.titulo, nombres: profile?.nombres, apellido_paterno: profile?.apellido_paterno, apellido_materno: profile?.apellido_materno }) || 'Médico'}</p>
+                      <p className="text-white font-bold text-sm">{componerNombreMedicoCompleto({ titulo: form.titulo, nombres: form.nombres, apellido_paterno: form.apellido_paterno, apellido_materno: form.apellido_materno }) || 'Médico'}</p>
                       <p className="text-white/70 text-xs">{form.especialidad || 'Especialidad'}</p>
                     </div>
                   </div>

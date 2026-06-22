@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
+import { PerfilMedicoUpdateSchema } from '@/lib/perfil/schemas'
 
 export async function GET() {
   const supabase = await createClient()
@@ -80,11 +81,41 @@ export async function PUT(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-  const { direccion_consultorio, telefono_consultorio, especialidad, cedula_profesional, cedula_especialidad, titulo, nombre, universidad } = await req.json()
+  const body = await req.json().catch(() => null)
+  if (!body || typeof body !== 'object') {
+    return NextResponse.json({ error: 'Body inválido' }, { status: 400 })
+  }
 
-  const updateData: Record<string, string | undefined> = { direccion_consultorio, telefono_consultorio, especialidad, cedula_profesional, cedula_especialidad, titulo }
-  if (nombre !== undefined) updateData.nombre = nombre
-  if (universidad !== undefined) updateData.universidad = universidad
+  const parsed = PerfilMedicoUpdateSchema.safeParse(body)
+  if (!parsed.success) {
+    const first = parsed.error.issues[0]
+    return NextResponse.json({ error: first?.message ?? 'Datos inválidos' }, { status: 400 })
+  }
+
+  // Actualización parcial: solo las keys realmente presentes en el body.
+  // (Keys fuera de la allowlist ya fueron descartadas por Zod.)
+  // IMPORTANTE: iterar `key in body` (no parsed.data) es load-bearing. El transform de
+  // apellido_materno devuelve null para undefined; iterar parsed.data nularía
+  // apellido_materno en flujos que no lo envían (onboarding/altas). NO refactorizar a
+  // parsed.data suelto. (Fase 3.A — NOMBRES_PLAN.md)
+  const ALLOWED = [
+    'titulo', 'nombres', 'apellido_paterno', 'apellido_materno',
+    'especialidad', 'cedula_profesional', 'cedula_especialidad',
+    'universidad', 'direccion_consultorio', 'telefono_consultorio',
+  ] as const
+  const updateData: Record<string, string | boolean | null> = {}
+  for (const key of ALLOWED) {
+    if (key in body) updateData[key] = parsed.data[key] ?? null
+  }
+
+  // El médico confirma su propio nombre al editar nombres/apellido_paterno.
+  if ('nombres' in body || 'apellido_paterno' in body) {
+    updateData.nombre_confirmado = true
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    return NextResponse.json({ ok: true })
+  }
 
   const { error } = await supabase
     .from('profiles')

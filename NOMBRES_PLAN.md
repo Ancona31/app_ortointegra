@@ -2,126 +2,104 @@
 
 > Objetivo: el nombre del médico tiene UNA sola fuente de verdad — tres columnas estructuradas
 > (`nombres`, `apellido_paterno`, `apellido_materno`) + `titulo`. La app arma lo que necesite
-> (nombre completo, o título + primer apellido) directamente desde ellas, en el punto de render.
-> La columna legacy `nombre` se ELIMINA al final. Sin dual-write, sin espejo, sin parseo
-> permanente, sin columnas duplicadas.
+> (completo, corto, o primer nombre) directamente desde ellas, en el punto de render, vía las
+> funciones de src/lib/nombreMedico.ts. La columna legacy `nombre` se ELIMINA al final (Fase 6).
+> Sin dual-write, sin espejo, sin parseo permanente.
 
 ---
 
-## Modelo objetivo (cómo debe quedar)
+## Estado actual (al cierre de Fase 4)
 
-- Fuente de verdad = 3 columnas estructuradas en `profiles`: `nombres`, `apellido_paterno`,
-  `apellido_materno` (nullable) + `titulo` (ya existe).
-- El médico captura esos campos por separado al registrarse y en su perfil. Nunca se guarda un
-  nombre pegado.
-- La app arma al vuelo, en el punto de render, según necesidad:
-  - Nombre completo (recetas, PDFs, documentos legales): titulo + nombres + apellido_paterno + apellido_materno.
-  - Nombre corto (lista de médicos, chips, agenda): titulo + apellido_paterno.
-  - Orden de médicos: por apellido_paterno.
-- `nombre` legacy NO sobrevive: solo se mantiene como fallback de lectura DURANTE la transición,
-  y se DROPEA en la última fase. No se sincroniza, no es fuente de verdad.
+- Fase 1 ✅ esquema aditivo aplicado y verificado.
+- Fase 2 ✅ datos migrados: 13 médicos + 3 secretarias poblados, nombre_confirmado=true. Cuentas
+  basura (Dr. Prueba, Orto) quedan en NULL deliberadamente.
+- Fase 4 ✅ COMPLETA (lecturas migradas a campos estructurados):
+  - 4.A ✅ funciones componerNombreMedicoCompleto / componerNombreMedicoCorto + tipo CamposNombre
+    (src/lib/nombreMedico.ts); MedicoInfo y PdfMedicoData con campos estructurados;
+    api/me/perfil-medico compone desde estructura.
+  - 4.B ✅ los 5 PDFs + 8 forms + ModalDocumentos componen desde estructura. Offline NO migrado
+    (se acepta "Médico" en PDFs offline; la feature offline se eliminará).
+  - 4.C ✅ snapshots consultas.medico_nombre y addendums.medico_nombre componen desde estructura
+    (solo documentos nuevos; los viejos no se tocan). RecetaForm:255 ya correcto desde 4.A.
+  - 4.D ✅ displays migrados con mapa de formato por display (ver abajo). Interface Profile
+    extendida con los 3 campos estructurados.
+- Secretarias: título quitado (titulo=NULL) y nombres estructurados poblados manualmente.
 
-NO HAY dual-write, NO HAY espejo a `nombre`, NO HAY helper que parsee un string pegado.
-
----
-
-## Orden de ejecución (re-secuenciado — lecturas antes que captura)
-
-Fase 1 (esquema) ✅ → Fase 2 (migrar datos) → Fase 4 (migrar lecturas) → Fase 3 (captura/formularios)
-→ Fase 5 (endpoint+orden) → Fase 6 (DROP nombre)
-
-Razón del orden: migrar las lecturas a campos estructurados ANTES de abrir los formularios nuevos
-permite que el registro nuevo capture campos separados y funcione de inmediato, SIN necesidad de
-escribir `nombre` (sin espejo). Precondición dura: la Fase 2 debe estar 100% completa y verificada
-(los 15 médicos con sus 3 campos poblados) ANTES de activar las lecturas nuevas en Fase 4, para que
-ningún médico salga con nombre vacío.
-
----
-
-## Por qué hay transición (y no se borra `nombre` el día 1)
-
-Hoy las recetas, PDFs legales (NOM-004) y la agenda LEEN `profiles.nombre` ya compuesto. Si se
-dropea antes de migrar quién lo lee, se rompe producción. Por eso: agregar columnas → migrar el
-dato viejo → migrar las lecturas → migrar la captura → dropear `nombre`. Es para no romper.
+## Mapa de formato por display (decidido en 4.D)
+- Dashboard saludo: PRIMER NOMBRE.
+- Dashboard médico en próxima cita: CORTO (titulo + apellido_paterno).
+- AsistenteDashboard dropdown + cita: COMPLETO.
+- Sidebar: COMPLETO.
+- Mi Perfil preview de PDF: COMPLETO (+ fallback 'Médico', replica PdfHeader).
+- Launcher /inicio: PRIMER NOMBRE.
+- REGLA GENERAL para dropdowns de selección de médico: COMPLETO (por riesgo de apellidos
+  repetidos en la clínica — la secretaria debe poder distinguir médicos homónimos).
 
 ---
 
 ## Decisiones congeladas
 
 1. Solo se normaliza `profiles`. La tabla `pacientes` NO se toca.
-2. Esquema: `titulo` (existe) + `nombres`, `apellido_paterno`, `apellido_materno` (materno nullable).
-3. `nombre` legacy se elimina al final del proyecto (Fase 6 = parte del objetivo, no opcional).
-4. La captura (registro/onboarding/perfil/alta-admin) escribe los 3 campos separados. No escribe
-   un nombre pegado.
-5. `apellido_materno` siempre nullable (extranjeros, apellido único, compuestos).
+2. Esquema: `titulo` + `nombres`, `apellido_paterno`, `apellido_materno` (materno nullable).
+3. `nombre` legacy se elimina al final (Fase 6, no opcional).
+4. La captura escribe los 3 campos separados. No escribe un nombre pegado.
+5. `apellido_materno` siempre nullable.
+6. Secretarias (y no-médicos) NO llevan título. La captura (Fase 3) no debe asignarles título.
 
 ---
 
-## Estado actual (hechos verificados)
+## Orden de ejecución (re-secuenciado)
+Fase 1 ✅ → Fase 2 ✅ → Fase 4 ✅ → **Fase 3 (siguiente)** → Fase 5 → Fase 6.
+Razón: migrar lecturas (4) antes de captura (3) permite que la captura nueva funcione de inmediato
+sin escribir `nombre`. Precondición cumplida: los médicos tienen sus 3 campos poblados.
 
-- Fase 1 APLICADA: `profiles` ya tiene `nombres`, `apellido_paterno`, `apellido_materno` (text
-  NULLABLE) y `nombre_confirmado` (boolean NOT NULL DEFAULT false). 19 filas: 15 role='medico',
-  3 secretaria, 1 super_admin. Las 4 columnas nuevas vacías.
-- Trigger `proteger_columnas_sensibles_profiles` (BEFORE UPDATE) protege solo role/clinica_id/
-  es_admin_de_clinica. Las columnas de nombre NO están protegidas → editables por el médico.
-- RLS `profiles_update`: el médico edita su propia fila a nivel fila (sin restricción por columna).
-- El nombre se compone hoy en 4 sitios que leen `nombre`: `api/me/perfil-medico/route.ts:38`,
-  `api/consultas/route.ts:123` (snapshot), `api/consultas/[id]/addendum/route.ts:80` (snapshot),
-  `api/email/enviar-documento/route.ts:108`. Los PDFs leen `nombre` ya compuesto.
-- Captura actual escribe `nombre`: `api/auth/registro`, `OnboardingModal`, `api/admin/crear-usuario`.
-- `.order('nombre')` en `api/clinica/medicos/route.ts:22` y `AsistenteDashboard.tsx:63-64`.
-- Snapshots NOM-004 (`consultas.medico_nombre`, `addendums.medico_nombre`, recetas) son
-  inmutables y NO se re-derivan ni se tocan nunca.
+Control operacional: no se dan de alta médicos nuevos hasta completar Fase 3 (evita snapshots con
+nombre vacío en la ventana 4→3). El owner controla las altas (solo betatesters, ninguno nuevo
+previsto).
 
 ---
 
-## Fases
+## Fase 3 — Captura nativa en los 3 campos (SIGUIENTE)
+- Estado: 3.A ✅ aplicada (Mi Perfil edita los 3 campos + validación Zod/allowlist en el PUT
+  api/me/perfil-medico; deja de escribir `nombre`). GAP CONOCIDO que cierra 3.C: OnboardingModal
+  paso 1 sigue mandando `nombre` pegado al mismo PUT; tras 3.A ese `nombre` se descarta (no se
+  persiste) y el PUT responde 200 — es comportamiento esperado, NO un bug. 3.C migra onboarding
+  a los 3 campos.
+- Registro, onboarding y alta-admin (panel del médico admin) capturan nombres / apellido_paterno /
+  apellido_materno por separado. Dejan de escribir un nombre pegado.
+- "Mi Perfil" agrega edición de esos 3 campos (hoy no edita el nombre).
+- Validación: nombres + apellido_paterno obligatorios; apellido_materno opcional.
+- Validación server-side con allowlist explícita de columnas en el PUT api/me/perfil-medico (hoy
+  escribe directo sin validar) y en los endpoints de alta.
+- SECRETARIAS / NO-MÉDICOS SIN TÍTULO: el alta de una secretaria no debe asignar título (titulo
+  NULL o no capturado). Resolver en los formularios de captura.
+- SIN espejo a `nombre`: como las lecturas (Fase 4) ya consumen estructura, la captura NO escribe
+  `nombre`.
+- Follow-up del preview de perfil: cuando el form edite los campos de nombre, el preview (:568)
+  debe usar form.* en vez de profile.* para reaccionar en vivo mientras se escribe.
 
-### Fase 1 — Esquema aditivo — ✅ HECHA
-Columnas agregadas y verificadas. (`nombre_confirmado` queda disponible para marcar filas con
-datos confiables; útil mientras `nombre` siga vivo.)
+## Fase 5 — Endpoints + orden + agenda
+- /api/clinica/medicos: SELECT pasa a traer los campos estructurados; .order('nombre') →
+  .order('apellido_paterno'). Actualizar consumidores.
+- Migrar displays diferidos de 4.D (dependen de los endpoints compartidos):
+  - Agenda: dropdowns de médico (COMPLETO) e iniciales de chip (componer desde nombres[0]+
+    apellido_paterno[0], NO slice(0,2) del string corto).
+  - QuickPatientModal, pacientes/nuevo: dropdowns de médico en COMPLETO.
+- AsistenteDashboard:55 .order('nombre') → migrar a apellido_paterno aquí.
+- api/email/enviar-documento:108 (lee profile.nombre en vivo) → migrar a composición estructurada.
+- Joins vivos de appointments que aún seleccionen profiles.nombre → migrar.
 
-### Fase 2 — Migración de datos existentes (la migración real, no "sugerencia")
-- Pasar los 15 médicos actuales de `nombre` → las 3 columnas estructuradas, UNA vez.
-- UPDATEs explícitos por id, con valores ya resueltos y revisados a mano (no parser genérico en prod).
-- Casos sucios (Dr. Prueba, Orto, "JUAREZALVARADO" pegado, inicial "M.") se resuelven a mano en el
-  mismo set; no se fuerza heurística.
-- `nombre`/`titulo` legacy NO se tocan (siguen alimentando los PDFs hasta Fase 4).
-- Marcar `nombre_confirmado = true` en las filas migradas con dato bueno.
-- ESTA FASE DEBE QUEDAR COMPLETA Y VERIFICADA ANTES DE LA FASE 4.
-
-### Fase 4 — Migrar puntos de lectura a campos estructurados
-- Los 4 sitios de composición + PDFs + agenda + recetas dejan de leer `nombre` y arman desde los
-  3 campos: completo = titulo + nombres + apellido_paterno + apellido_materno; corto = titulo + apellido_paterno.
-- Snapshots NOM-004 ya escritos NO se tocan (valor jurídico). Los snapshots NUEVOS se componen
-  desde los campos estructurados.
-- CUIDADO: los PDFs legales requieren el nombre completo correcto; verificar caso por caso con
-  smoke test (generar receta de prueba y confirmar el nombre).
-
-### Fase 3 — Captura nativa en los 3 campos (formularios)
-- Registro, onboarding y alta-admin (panel del médico admin) dejan de capturar un nombre pegado y
-  capturan `nombres` / `apellido_paterno` / `apellido_materno` por separado.
-- "Mi Perfil" agrega edición de esos 3 campos (hoy no edita el nombre), para corregir casos mal
-  capturados (p. ej. "Juárez Alvarado" pegado).
-- Validación: `nombres` + `apellido_paterno` obligatorios; `apellido_materno` opcional.
-- Validación server-side con allowlist explícita de columnas en el PUT `api/me/perfil-medico`
-  (hoy escribe directo sin validar) y en los endpoints de alta.
-- SIN espejo a `nombre`: como las lecturas (Fase 4) ya consumen los campos estructurados, la
-  captura nueva NO necesita escribir `nombre`.
-
-### Fase 5 — Endpoint `/api/clinica/medicos` + orden
-- SELECT pasa a traer los 3 campos. `.order('nombre')` → `.order('apellido_paterno')`.
-- Actualizar consumidores (QuickPatientModal, pacientes/nuevo, agenda).
-
-### Fase 6 — DROP de `nombre` (cierre del objetivo, NO opcional)
-- Precondición dura: CERO puntos de lectura/escritura dependiendo de `nombre`, todos los médicos
-  con los 3 campos poblados.
-- `ALTER TABLE profiles DROP COLUMN nombre`. Queda una sola fuente de verdad.
+## Fase 6 — DROP de `nombre` (cierre, NO opcional)
+- Precondición: CERO lecturas/escrituras de `nombre` en la app; todos los médicos con 3 campos.
+- Pendientes conocidos a cerrar antes del DROP: stripe/checkout:60 (fallback profile.nombre),
+  cualquier SELECT que aún incluya `nombre` (inerte pero presente).
+- `ALTER TABLE profiles DROP COLUMN nombre`. Una sola fuente de verdad.
 
 ---
 
 ## Fuera de alcance
 - Normalización de nombres en `pacientes`.
+- Migración del modo offline (la feature se eliminará).
 
 ---
 
@@ -131,22 +109,21 @@ datos confiables; útil mientras `nombre` siga vivo.)
 Base de datos en PRODUCCIÓN. No se aplica nada que pueda romperla. Ante duda no resuelta → NO-GO.
 
 ### Gate de auditoría obligatorio (todo script SQL o código nuevo)
-1. Propuesta (Claude Code, read-only). 2. Auditoría de riesgos de ruptura. 3. Corrección.
-4. Re-auditoría. 5. Aplicación solo con visto bueno. La auditoría de DB la corre Angel con
-queries de lectura en el SQL Editor (Claude Code no usa CLI).
+1. Propuesta (Claude Code, read-only). 2. Auditoría de riesgos. 3. Corrección. 4. Re-auditoría.
+5. Aplicación solo con visto bueno. Decisiones de diseño no triviales → consulta de arquitectura
+primero. La auditoría de DB la corre Angel con queries de lectura en el SQL Editor.
 
 ### Mitigación y rollback obligatorios (todo script SQL)
-Cada script trae su mitigación (cuándo parar, qué revisar) y su rollback exacto validado de
-antemano. Si no es razonablemente reversible, se rediseña o no se aplica.
+Cada script trae mitigación y rollback exacto validado de antemano.
 
 ### Protocolo D-T6 (ejecución)
 Una query a la vez en SQL Editor (NUNCA CLI). Angel ejecuta, valida con Claude antes de la
-siguiente, para y mitiga ante lo inesperado, smoke test tras cada cambio, luego valida en la app.
+siguiente, smoke test tras cada cambio, luego valida en la app.
 
 ### División de ejecución
-- Claude Code: investiga (read-only), propone scripts/diffs, audita, da mitigación y rollback.
-  NUNCA ejecuta SQL, NUNCA git, NUNCA build/lint/tsc.
-- Angel: corre build/lint/tsc en consola, ejecuta SQL en el editor una a una, hace git manual.
+- Claude Code: investiga (read-only), propone diffs/scripts, audita. NUNCA git/build/lint/tsc/SQL.
+- Angel: corre build/lint/tsc, ejecuta SQL, hace git manual. Push diferido: TODO se pushea al
+  terminar todas las fases (se acumulan commits en local).
 
 ### Tracking de deuda
 Transversal → DEUDA_TECNICA.md. Acotada a un sub-paso → "Fuera de alcance" de este plan.
