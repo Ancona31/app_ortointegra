@@ -269,6 +269,10 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
 
       const medicoData = medicoInfo ? {
         nombre: medicoInfo.nombre,
+        titulo: medicoInfo.titulo ?? null,
+        nombres: medicoInfo.nombres ?? null,
+        apellido_paterno: medicoInfo.apellido_paterno ?? null,
+        apellido_materno: medicoInfo.apellido_materno ?? null,
         especialidad: medicoInfo.especialidad,
         cedula_profesional: medicoInfo.cedula_profesional,
         cedula_especialidad: medicoInfo.cedula_especialidad,

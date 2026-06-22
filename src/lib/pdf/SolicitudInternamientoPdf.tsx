@@ -4,6 +4,7 @@ import PdfWatermark from './PdfWatermark'
 import { BarraTop, BarraBottom } from './PdfBarras'
 import { baseStyles, getPdfColors, contrastText } from './PdfStyles'
 import type { PdfMedicoData, PdfColors, PdfConsultorioData } from './PdfStyles'
+import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 
 export interface SolicitudInternamientoData {
   paciente: string
@@ -262,7 +263,12 @@ function buildStyles(colors: PdfColors) {
 export default function SolicitudInternamientoPdf({ medico, data, logoUrl, consultorio }: SolicitudInternamientoProps) {
   const colors = getPdfColors(medico)
   const s = buildStyles(colors)
-  const nombre = medico?.nombre || 'Médico'
+  const nombre = componerNombreMedicoCompleto({
+    titulo: medico?.titulo,
+    nombres: medico?.nombres,
+    apellido_paterno: medico?.apellido_paterno,
+    apellido_materno: medico?.apellido_materno,
+  }) || 'Médico'
   const cedProf = medico?.cedula_profesional || ''
   const cedEsp = medico?.cedula_especialidad || ''
 

@@ -4,6 +4,7 @@ import PdfWatermark from './PdfWatermark'
 import { BarraTop, BarraBottom } from './PdfBarras'
 import { getPdfColors, contrastText } from './PdfStyles'
 import type { PdfMedicoData, PdfColors, PdfConsultorioData } from './PdfStyles'
+import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 
 export interface RecetaData {
   paciente: string
@@ -184,7 +185,12 @@ function parseRecomendaciones(text: string, cpColor: string) {
    ──────────────────────────────────────────────────────────────── */
 
 function FirmaInline({ medico, colors }: { medico: PdfMedicoData | null; colors: PdfColors }) {
-  const nombre = medico?.nombre || 'Médico'
+  const nombre = componerNombreMedicoCompleto({
+    titulo: medico?.titulo,
+    nombres: medico?.nombres,
+    apellido_paterno: medico?.apellido_paterno,
+    apellido_materno: medico?.apellido_materno,
+  }) || 'Médico'
   const cedProf = medico?.cedula_profesional || ''
   const cedEsp = medico?.cedula_especialidad || ''
 

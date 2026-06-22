@@ -1,5 +1,6 @@
 import { View, Text, Image, StyleSheet } from '@react-pdf/renderer'
 import type { PdfMedicoData, PdfColors, PdfConsultorioData } from './PdfStyles'
+import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 
 interface Props {
   medico: PdfMedicoData | null
@@ -18,7 +19,12 @@ interface Props {
 }
 
 export default function PdfHeader({ medico, colors, logoUrl, folio, fecha, compact, showRx, extraCredencial, consultorio }: Props) {
-  const nombre = medico?.nombre || 'Médico'
+  const nombre = componerNombreMedicoCompleto({
+    titulo: medico?.titulo,
+    nombres: medico?.nombres,
+    apellido_paterno: medico?.apellido_paterno,
+    apellido_materno: medico?.apellido_materno,
+  }) || 'Médico'
   const esp = medico?.especialidad || ''
   const cedProf = medico?.cedula_profesional || ''
   const cedEsp = medico?.cedula_especialidad || ''

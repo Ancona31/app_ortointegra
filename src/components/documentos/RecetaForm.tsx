@@ -316,6 +316,10 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
         pacienteId,
         medico: {
           nombre: doctorNombre,
+          titulo: medicoInfo?.titulo ?? null,
+          nombres: medicoInfo?.nombres ?? null,
+          apellido_paterno: medicoInfo?.apellido_paterno ?? null,
+          apellido_materno: medicoInfo?.apellido_materno ?? null,
           especialidad: doctorEspecialidad,
           cedula_profesional: cedProf,
           cedula_especialidad: cedEsp,

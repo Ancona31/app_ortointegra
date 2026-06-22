@@ -12,6 +12,7 @@ import type { Documento } from '@/types'
 import ModalShell from '@/components/ui/ModalShell'
 import { createClient } from '@/lib/supabase/client'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
+import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 
 // Duplicado de TabDocumentos.tsx — Fase 7 eliminará TabDocumentos y esta queda como única fuente
 const TIPO_DOC_LABEL: Record<string, string> = {
@@ -75,6 +76,7 @@ export default function ModalDocumentos({
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null)
   const [eliminando, setEliminando] = useState(false)
   const { state: subState, openBloqueoModal } = useSubscriptionGate()
+  const { medicoInfo } = useMedicoInfo()
 
   // Duplicado de TabDocumentos.tsx — Fase 7 eliminará TabDocumentos y esta queda como única fuente
   async function descargarPdf(pdfUrl: string) {
@@ -104,6 +106,10 @@ export default function ModalDocumentos({
 
       const medicoData = profile ? {
         nombre: profile.nombre,
+        titulo: medicoInfo?.titulo ?? null,
+        nombres: medicoInfo?.nombres ?? null,
+        apellido_paterno: medicoInfo?.apellido_paterno ?? null,
+        apellido_materno: medicoInfo?.apellido_materno ?? null,
         especialidad: profile.especialidad,
         cedula_profesional: profile.cedula_profesional,
         cedula_especialidad: profile.cedula_especialidad,

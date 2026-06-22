@@ -4,6 +4,7 @@ import type { ReactElement } from 'react'
 import PdfHeader from './PdfHeader'
 import PdfWatermark from './PdfWatermark'
 import { BarraTop, BarraBottom } from './PdfBarras'
+import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import { baseStyles, getPdfColors, contrastText } from './PdfStyles'
 import type { PdfMedicoData, PdfColors, PdfConsultorioData } from './PdfStyles'
 
@@ -152,7 +153,12 @@ interface CompactHeaderProps {
 }
 
 function CompactHeader({ medico, colors, logoUrl, paciente, procedimiento }: CompactHeaderProps) {
-  const nombre = medico?.nombre || 'Médico'
+  const nombre = componerNombreMedicoCompleto({
+    titulo: medico?.titulo,
+    nombres: medico?.nombres,
+    apellido_paterno: medico?.apellido_paterno,
+    apellido_materno: medico?.apellido_materno,
+  }) || 'Médico'
   const cedProf = medico?.cedula_profesional || ''
   const cedEsp = medico?.cedula_especialidad || ''
 
@@ -240,7 +246,12 @@ export default function ConsentimientoInformadoPdf({
   consultorio,
 }: ConsentimientoProps) {
   const colors = getPdfColors(medico)
-  const nombre = medico?.nombre || 'Médico'
+  const nombre = componerNombreMedicoCompleto({
+    titulo: medico?.titulo,
+    nombres: medico?.nombres,
+    apellido_paterno: medico?.apellido_paterno,
+    apellido_materno: medico?.apellido_materno,
+  }) || 'Médico'
   const cedProf = medico?.cedula_profesional || ''
   const cedEsp = medico?.cedula_especialidad || ''
 
