@@ -48,6 +48,10 @@ export interface PdfColors {
 /** Datos del médico necesarios para los PDFs */
 export interface PdfMedicoData {
   nombre: string
+  titulo?: string | null
+  nombres?: string | null
+  apellido_paterno?: string | null
+  apellido_materno?: string | null
   especialidad?: string
   cedula_profesional?: string
   cedula_especialidad?: string

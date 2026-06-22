@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 
 export async function GET() {
   const supabase = await createClient()
@@ -9,7 +10,7 @@ export async function GET() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('nombre, titulo, especialidad, cedula_profesional, cedula_especialidad, universidad, clinica_id, direccion_consultorio, telefono_consultorio, firma_url')
+    .select('nombre, titulo, nombres, apellido_paterno, apellido_materno, especialidad, cedula_profesional, cedula_especialidad, universidad, clinica_id, direccion_consultorio, telefono_consultorio, firma_url')
     .eq('id', user.id)
     .single()
 
@@ -35,7 +36,12 @@ export async function GET() {
   }
 
   const titulo = profile.titulo ?? 'Dr.'
-  const nombreCompleto = `${titulo} ${profile.nombre ?? ''}`.trim()
+  const nombreCompleto = componerNombreMedicoCompleto({
+    titulo,
+    nombres: profile.nombres,
+    apellido_paterno: profile.apellido_paterno,
+    apellido_materno: profile.apellido_materno,
+  })
 
   // Generar signed URL (1h) para la firma si existe
   let firmaSignedUrl: string | null = null
@@ -51,6 +57,9 @@ export async function GET() {
     medico: {
       nombre: nombreCompleto,
       titulo,
+      nombres: profile.nombres ?? null,
+      apellido_paterno: profile.apellido_paterno ?? null,
+      apellido_materno: profile.apellido_materno ?? null,
       especialidad: profile.especialidad ?? '',
       cedula_profesional: profile.cedula_profesional ?? '',
       cedula_especialidad: profile.cedula_especialidad ?? '',

@@ -155,6 +155,10 @@ export interface SuplementoRec {
 // ─── Médico (perfil del doctor autenticado) ───────────────────────────────────
 export interface MedicoInfo {
   nombre: string
+  titulo?: string | null
+  nombres?: string | null
+  apellido_paterno?: string | null
+  apellido_materno?: string | null
   especialidad: string
   cedula_profesional: string
   cedula_especialidad: string
