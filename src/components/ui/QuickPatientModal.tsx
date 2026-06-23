@@ -7,10 +7,11 @@ import Portal from '@/components/ui/Portal'
 import { useProfile } from '@/hooks/useProfile'
 import { secureStorage } from '@/lib/secureStorage'
 import { toTitleCase, calcularEdad, fechaHoyISO, FECHA_MIN_NACIMIENTO, edadAFechaFicticia } from '@/lib/patientUtils'
+import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import type { DuplicatePatientResponse } from '@/types'
 
 type PacienteBusqueda = { id: string; nombre: string; apellidos: string; telefono: string | null }
-type Medico = { id: string; nombre: string; titulo: string | null; especialidad: string | null }
+type Medico = { id: string; titulo: string | null; nombres: string | null; apellido_paterno: string | null; apellido_materno: string | null; especialidad: string | null }
 
 const MEDICOS_CACHE_KEY = 'cache_medicos_clinica'
 
@@ -259,7 +260,7 @@ export default function QuickPatientModal({
                 <option value="">Seleccionar médico...</option>
                 {medicos.map(m => (
                   <option key={m.id} value={m.id}>
-                    {m.titulo ?? 'Dr.'} {m.nombre}{m.especialidad ? ` — ${m.especialidad}` : ''}
+                    {componerNombreMedicoCompleto(m)}{m.especialidad ? ` — ${m.especialidad}` : ''}
                   </option>
                 ))}
               </select>

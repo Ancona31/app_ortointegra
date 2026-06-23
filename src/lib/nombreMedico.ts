@@ -23,3 +23,13 @@ export function componerNombreMedicoCorto(campos: CamposNombre): string {
     .filter(Boolean)
     .join(' ')
 }
+
+/**
+ * Iniciales para chip/avatar: 1ª letra de nombres + 1ª letra de apellido_paterno.
+ * Mayúsculas. Si faltan ambos campos devuelve '' (chip vacío, nunca "undefined").
+ */
+export function componerInicialesMedico(campos: CamposNombre): string {
+  const n = campos.nombres?.trim()?.[0] ?? ''
+  const a = campos.apellido_paterno?.trim()?.[0] ?? ''
+  return (n + a).toUpperCase()
+}

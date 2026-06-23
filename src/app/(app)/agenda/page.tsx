@@ -18,6 +18,7 @@ import Portal from '@/components/ui/Portal'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
 import { useConsultorios } from '@/hooks/useConsultorios'
 import { useConsultoriosDeMedico } from '@/hooks/useConsultoriosDeMedico'
+import { componerNombreMedicoCompleto, componerInicialesMedico } from '@/lib/nombreMedico'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { ZONAS_MEXICO } from '@/lib/consultorios/zonas-mexico'
 
@@ -45,12 +46,12 @@ type Appointment = {
   consultorio_telefono: string | null
   consultorio_timezone: string | null
   pacientes?: { id: string; nombre: string; apellidos: string; telefono: string | null } | null
-  medico?: { id: string; nombre: string; titulo: string } | null
+  medico?: { id: string; titulo: string | null; nombres: string | null; apellido_paterno: string | null; apellido_materno: string | null } | null
 }
 
 type PacienteBusqueda = { id: string; nombre: string; apellidos: string; telefono: string | null }
 
-type Medico = { id: string; nombre: string; titulo: string; especialidad?: string | null }
+type Medico = { id: string; titulo: string | null; nombres: string | null; apellido_paterno: string | null; apellido_materno: string | null; especialidad?: string | null }
 
 type ModalState =
   | { mode: 'closed' }
@@ -739,7 +740,7 @@ function AppointmentModal({
                 >
                   {!medicoDropdownRequired && <option value="">Sin asignar</option>}
                   {medicos.map(m => (
-                    <option key={m.id} value={m.id}>{m.titulo ? `${m.titulo} ` : ''}{m.nombre}</option>
+                    <option key={m.id} value={m.id}>{componerNombreMedicoCompleto(m)}</option>
                   ))}
                 </select>
                 <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--ag-muted)' }} />
@@ -1276,7 +1277,7 @@ export default function AgendaPage() {
         let doctorInitial: string | undefined
         if (!isSingleDoctor && apt.medico_id) {
           const m = apt.medico
-          if (m) doctorInitial = m.nombre.slice(0, 2).toUpperCase()
+          if (m) doctorInitial = componerInicialesMedico(m)
         }
 
         return {
@@ -1363,7 +1364,7 @@ export default function AgendaPage() {
     let doctorInitial: string | undefined
     if (!isSingleDoctor && data.medico_id) {
       const m = medicos.find(m => m.id === data.medico_id)
-      if (m) doctorInitial = m.nombre.slice(0, 2).toUpperCase()
+      if (m) doctorInitial = componerInicialesMedico(m)
     }
 
     return {
@@ -1648,7 +1649,7 @@ export default function AgendaPage() {
               >
                 <option value="">Todos los médicos</option>
                 {medicos.map(m => (
-                  <option key={m.id} value={m.id}>{m.titulo ? `${m.titulo} ` : ''}{m.nombre}</option>
+                  <option key={m.id} value={m.id}>{componerNombreMedicoCompleto(m)}</option>
                 ))}
               </select>
               <ChevronDown

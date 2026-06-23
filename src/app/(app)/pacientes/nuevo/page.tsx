@@ -8,12 +8,15 @@ import { useProfile } from '@/hooks/useProfile'
 import { validarEmail, validarTelefono, formatearTelefono } from '@/lib/validaciones'
 import { secureStorage } from '@/lib/secureStorage'
 import { toTitleCase, fechaHoyISO, FECHA_MIN_NACIMIENTO, edadAFechaFicticia } from '@/lib/patientUtils'
+import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import type { DuplicatePatientResponse } from '@/types'
 
 type Medico = {
   id: string
-  nombre: string
   titulo: string | null
+  nombres: string | null
+  apellido_paterno: string | null
+  apellido_materno: string | null
   especialidad: string | null
 }
 
@@ -236,7 +239,7 @@ export default function NuevoPacientePage() {
               <option value="">Seleccionar médico...</option>
               {medicos.map(m => (
                 <option key={m.id} value={m.id}>
-                  {m.titulo ?? 'Dr.'} {m.nombre}{m.especialidad ? ` — ${m.especialidad}` : ''}
+                  {componerNombreMedicoCompleto(m)}{m.especialidad ? ` — ${m.especialidad}` : ''}
                 </option>
               ))}
             </select>

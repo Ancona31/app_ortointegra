@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
     // RLS filtra por clinica_id
     let query = supabase
       .from('appointments')
-      .select('*, pacientes(id, nombre, apellidos, telefono), medico:profiles!appointments_medico_id_fkey(id, nombre, titulo)')
+      .select('*, pacientes(id, nombre, apellidos, telefono), medico:profiles!appointments_medico_id_fkey(id, titulo, nombres, apellido_paterno, apellido_materno)')
       .eq('clinica_id', profile.clinica_id)
       .order('start_time', { ascending: true })
 
