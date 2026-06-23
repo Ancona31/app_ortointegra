@@ -8,7 +8,7 @@
 
 ---
 
-## Estado actual (al cierre de Fase 4)
+## Estado actual (al cierre de Fase 3)
 
 - Fase 1 ✅ esquema aditivo aplicado y verificado.
 - Fase 2 ✅ datos migrados: 13 médicos + 3 secretarias poblados, nombre_confirmado=true. Cuentas
@@ -23,6 +23,16 @@
     (solo documentos nuevos; los viejos no se tocan). RecetaForm:255 ya correcto desde 4.A.
   - 4.D ✅ displays migrados con mapa de formato por display (ver abajo). Interface Profile
     extendida con los 3 campos estructurados.
+- Fase 3 ✅ COMPLETA (captura migrada a campos estructurados):
+  - 3.A ✅ Mi Perfil edita los 3 campos + validación Zod/allowlist en el PUT api/me/perfil-medico.
+  - 3.B ✅ alta-admin y registro capturan 3 campos; regla secretaria-sin-título (titulo NULL
+    explícito anula el DEFAULT 'Dr.'); nombre_confirmado condicional (secretaria true, médico
+    invitado false); GET admin/usuarios compone el nombre. Validado: secretaria→titulo NULL,
+    médico invitado→nombre_confirmado=false. Registro nuevo NO probado en vivo (se validará al
+    pushear; el código es simétrico a crear-usuario, ya validado).
+  - 3.C ✅ OnboardingModal captura 3 campos (cierra el gap de 3.A); fix de estado-perfil
+    (completitud lee `nombres`, no `nombre` legacy → corrige banner/modal que nunca desaparecían).
+    Validado en local: onboarding guarda 3 campos + nombre_confirmado=true; banner desaparece.
 - Secretarias: título quitado (titulo=NULL) y nombres estructurados poblados manualmente.
 
 ## Mapa de formato por display (decidido en 4.D)
@@ -60,11 +70,7 @@ previsto).
 ---
 
 ## Fase 3 — Captura nativa en los 3 campos (SIGUIENTE)
-- Estado: 3.A ✅ aplicada (Mi Perfil edita los 3 campos + validación Zod/allowlist en el PUT
-  api/me/perfil-medico; deja de escribir `nombre`). GAP CONOCIDO que cierra 3.C: OnboardingModal
-  paso 1 sigue mandando `nombre` pegado al mismo PUT; tras 3.A ese `nombre` se descarta (no se
-  persiste) y el PUT responde 200 — es comportamiento esperado, NO un bug. 3.C migra onboarding
-  a los 3 campos.
+- Estado: ✅ COMPLETA (3.A + 3.B + 3.C). Gap de onboarding CERRADO en 3.C.
 - Registro, onboarding y alta-admin (panel del médico admin) capturan nombres / apellido_paterno /
   apellido_materno por separado. Dejan de escribir un nombre pegado.
 - "Mi Perfil" agrega edición de esos 3 campos (hoy no edita el nombre).
@@ -96,6 +102,16 @@ previsto).
 - `ALTER TABLE profiles DROP COLUMN nombre`. Una sola fuente de verdad.
 
 ---
+
+## Pendientes descubiertos (fuera del proyecto de nombres)
+- Redundancia registro↔onboarding: el registro y el onboarding piden ambos título+nombre+
+  especialidad. Es rediseño de flujo de alta (decisión de producto), NO parte de la
+  normalización de nombres. Analizar aparte.
+- Login con Google (OAuth): planeado; cambia cómo se capturan los nombres en el alta (no pasa
+  por el formulario). Interactúa con esta normalización pero es proyecto separado.
+- Cuentas creadas por el registro VIEJO (desplegado) tienen `nombre` legacy poblado; se
+  resolverán al pushear el código nuevo. Verificar antes de Fase 6 que no queden escritores de
+  `nombre` activos en producción.
 
 ## Fuera de alcance
 - Normalización de nombres en `pacientes`.
