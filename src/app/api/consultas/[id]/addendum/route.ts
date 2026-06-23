@@ -11,7 +11,7 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/consultas/[
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('id, clinica_id, nombre, titulo, nombres, apellido_paterno, apellido_materno')
+      .select('id, clinica_id, titulo, nombres, apellido_paterno, apellido_materno')
       .eq('id', user.id)
       .single()
     if (!profile?.clinica_id) return NextResponse.json({ error: 'Sin clínica' }, { status: 403 })

@@ -56,7 +56,7 @@ export default function AsistenteDashboard() {
         .select('id, titulo, nombres, apellido_paterno, apellido_materno')
         .eq('clinica_id', profile!.clinica_id!)
         .eq('role', 'medico')
-        .order('nombre')
+        .order('apellido_paterno')
       setMedicos((medicosData as Medico[]) ?? [])
 
       // Próximas citas de toda la clínica

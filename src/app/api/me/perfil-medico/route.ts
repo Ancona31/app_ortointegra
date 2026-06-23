@@ -11,7 +11,7 @@ export async function GET() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('nombre, titulo, nombres, apellido_paterno, apellido_materno, especialidad, cedula_profesional, cedula_especialidad, universidad, clinica_id, direccion_consultorio, telefono_consultorio, firma_url')
+    .select('titulo, nombres, apellido_paterno, apellido_materno, especialidad, cedula_profesional, cedula_especialidad, universidad, clinica_id, direccion_consultorio, telefono_consultorio, firma_url')
     .eq('id', user.id)
     .single()
 

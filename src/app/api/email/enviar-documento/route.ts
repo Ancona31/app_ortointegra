@@ -5,6 +5,7 @@ import { logAudit } from '@/lib/audit'
 import { generateHTML } from '@tiptap/html'
 import type { JSONContent } from '@tiptap/core'
 import { editorExtensions } from '@/lib/documentos/editorExtensions'
+import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -101,11 +102,16 @@ export async function POST(req: NextRequest) {
   // ── Obtener perfil del médico ──
   const { data: profile } = await supabase
     .from('profiles')
-    .select('nombre, titulo, especialidad')
+    .select('titulo, nombres, apellido_paterno, apellido_materno')
     .eq('id', user.id)
     .single()
 
-  const medicoNombre = [profile?.titulo, profile?.nombre].filter(Boolean).join(' ') || doc.contenido?.medico || 'Tu médico'
+  const medicoNombre = componerNombreMedicoCompleto({
+    titulo: profile?.titulo,
+    nombres: profile?.nombres,
+    apellido_paterno: profile?.apellido_paterno,
+    apellido_materno: profile?.apellido_materno,
+  }) || doc.contenido?.medico || 'Tu médico'
   const tipoLabel = TIPO_LABEL[doc.tipo] || doc.tipo
   const html = generarHtmlEmail(doc, medicoNombre, tipoLabel)
 
