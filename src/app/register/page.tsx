@@ -56,7 +56,9 @@ export default function RegisterPage() {
 
   const [especialidades, setEspecialidades] = useState<string[]>([''])
   const [form, setForm] = useState({
-    nombre:             '',
+    nombres:            '',
+    apellido_paterno:   '',
+    apellido_materno:   '',
     email:              '',
     password:           '',
     nombreClinica:      '',
@@ -174,9 +176,24 @@ export default function RegisterPage() {
                 </select>
               </div>
               <div className="col-span-2">
-                <label className="text-xs font-medium text-slate-500 block mb-1">Nombre completo *</label>
-                <input type="text" value={form.nombre} onChange={set('nombre')}
-                  placeholder="Ej: Juan Pérez" required autoFocus
+                <label className="text-xs font-medium text-slate-500 block mb-1">Nombre(s) *</label>
+                <input type="text" value={form.nombres} onChange={set('nombres')}
+                  placeholder="Ej: Juan" required autoFocus
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Apellido paterno *</label>
+                <input type="text" value={form.apellido_paterno} onChange={set('apellido_paterno')}
+                  placeholder="Ej: Pérez" required
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Apellido materno</label>
+                <input type="text" value={form.apellido_materno} onChange={set('apellido_materno')}
+                  placeholder="Ej: García"
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
               </div>
             </div>

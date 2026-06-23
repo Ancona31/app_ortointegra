@@ -30,3 +30,60 @@ export const PerfilMedicoUpdateSchema = z.object({
 })
 
 export type PerfilMedicoUpdateInput = z.infer<typeof PerfilMedicoUpdateSchema>
+
+/**
+ * Altas (NOMBRES_PLAN.md, Fase 3.B). A diferencia del PUT parcial de 3.A,
+ * crear-usuario y registro CREAN el perfil: nombres + apellido_paterno son
+ * OBLIGATORIOS. apellido_materno nullable (vacío → null). NUNCA escriben `nombre`.
+ */
+const nombreAltaShape = {
+  nombres: z.string().trim().min(1, 'El nombre es obligatorio'),
+  apellido_paterno: z.string().trim().min(1, 'El apellido paterno es obligatorio'),
+  apellido_materno: z
+    .string()
+    .trim()
+    .nullable()
+    .optional()
+    .transform((v) => (v ? v : null)),
+}
+
+// ── Alta-admin: discriminated union por rol ──
+// medico → datos médicos opcionales (se conserva el comportamiento actual:
+//          título cae a 'Dr.' en la ruta, especialidad/cédulas pueden ir vacías).
+// secretaria → SIN datos médicos. El título NULL se fuerza en la ruta, no aquí.
+const CrearUsuarioBase = {
+  email: z.email('Email inválido'),
+  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
+  ...nombreAltaShape,
+}
+
+export const CrearUsuarioSchema = z.discriminatedUnion('role', [
+  z.object({
+    role: z.literal('medico'),
+    ...CrearUsuarioBase,
+    titulo: z.string().trim().optional(),
+    especialidad: z.string().trim().optional(),
+    cedula_profesional: z.string().trim().optional(),
+    cedula_especialidad: z.string().trim().optional(),
+  }),
+  z.object({
+    role: z.literal('secretaria'),
+    ...CrearUsuarioBase,
+  }),
+])
+export type CrearUsuarioInput = z.infer<typeof CrearUsuarioSchema>
+
+// ── Registro (auto-alta médico-dueño): siempre médico, datos médicos requeridos
+//    como hoy (titulo/especialidad/cedula_profesional obligatorios). ──
+export const RegistroSchema = z.object({
+  email: z.email('Correo electrónico inválido'),
+  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
+  ...nombreAltaShape,
+  nombreClinica: z.string().trim().min(1, 'El nombre del consultorio es obligatorio'),
+  titulo: z.string().trim().min(1),
+  especialidad: z.string().trim().min(1, 'La especialidad es obligatoria'),
+  cedula_profesional: z.string().trim().min(1, 'La cédula profesional es obligatoria'),
+  cedula_especialidad: z.string().trim().nullable().optional().transform((v) => (v ? v : null)),
+  tipo: z.enum(['independiente', 'clinica']).default('independiente'),
+})
+export type RegistroInput = z.infer<typeof RegistroSchema>

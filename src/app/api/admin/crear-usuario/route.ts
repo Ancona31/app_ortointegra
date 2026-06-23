@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { canManageClinica } from '@/lib/permissions'
+import { CrearUsuarioSchema } from '@/lib/perfil/schemas'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -18,14 +19,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
   }
 
-  const { email, password, nombre, role, titulo, especialidad, cedula_profesional, cedula_especialidad } = await req.json()
-  if (!email || !password || !role) return NextResponse.json({ error: 'Faltan campos' }, { status: 400 })
+  const parsed = CrearUsuarioSchema.safeParse(await req.json().catch(() => null))
+  if (!parsed.success) {
+    const first = parsed.error.issues[0]
+    return NextResponse.json({ error: first?.message ?? 'Datos inválidos' }, { status: 400 })
+  }
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!emailRegex.test(email)) return NextResponse.json({ error: 'Email inválido' }, { status: 400 })
-  if (typeof password !== 'string' || password.length < 8) return NextResponse.json({ error: 'La contraseña debe tener al menos 8 caracteres' }, { status: 400 })
-  const rolesPermitidos = ['medico', 'secretaria']
-  if (!rolesPermitidos.includes(role)) return NextResponse.json({ error: 'Rol inválido' }, { status: 400 })
+  // Campos presentes en AMBAS variantes → desestructuración directa segura.
+  const { email, password, role, nombres, apellido_paterno, apellido_materno } = parsed.data
+
+  // C2 — campos exclusivos de médico: estrechar SOBRE parsed.data (la discriminante
+  // se lee del objeto, no de una copia desestructurada) para que TS narre la unión.
+  // Para secretaria → null EXPLÍCITO (el upsert escribe la columna con NULL y anula
+  // el DEFAULT 'Dr.' de 02_tables.sql:406; omitirla dejaría actuar el default).
+  const titulo = parsed.data.role === 'medico' ? (parsed.data.titulo || 'Dr.') : null
+  const especialidad = parsed.data.role === 'medico' ? (parsed.data.especialidad || null) : null
+  const cedula_profesional = parsed.data.role === 'medico' ? (parsed.data.cedula_profesional || null) : null
+  const cedula_especialidad = parsed.data.role === 'medico' ? (parsed.data.cedula_especialidad || null) : null
 
   const clinicaId = creatorProfile.clinica_id
   const admin = createAdminClient()
@@ -69,19 +79,23 @@ export async function POST(req: NextRequest) {
 
   if (authError) return NextResponse.json({ error: authError.message }, { status: 400 })
 
-  // Crear perfil con rol y clinica_id
-  // Todos los médicos (invitados y admins de clínica) guardan campos médicos
+  // Crear perfil. Nombre en 3 campos estructurados (NO `nombre` legacy).
+  // C1 — nombre_confirmado condicional al rol: secretaria→true (el admin captura
+  // su nombre y no hay onboarding que lo reconfirme); médico invitado→false (lo
+  // confirmará en su onboarding, 3.C).
+  // titulo/especialidad/cédulas ya vienen resueltos arriba (null para secretaria).
   await admin.from('profiles').upsert({
     id: newUser.user.id,
     role,
-    nombre,
+    nombres,
+    apellido_paterno,
+    apellido_materno,
+    nombre_confirmado: parsed.data.role === 'secretaria',
     clinica_id: clinicaId ?? null,
-    ...(role === 'medico' ? {
-      titulo: titulo || 'Dr.',
-      especialidad: especialidad || null,
-      cedula_profesional: cedula_profesional || null,
-      cedula_especialidad: cedula_especialidad || null,
-    } : {}),
+    titulo,
+    especialidad,
+    cedula_profesional,
+    cedula_especialidad,
   })
 
   return NextResponse.json({ ok: true })

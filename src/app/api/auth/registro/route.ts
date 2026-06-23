@@ -4,6 +4,7 @@ import { Resend } from 'resend'
 import { PLAN_LIMITS } from '@/lib/plans'
 import { checkAuthRateLimit } from '@/lib/rateLimit'
 import { logAudit } from '@/lib/audit'
+import { RegistroSchema } from '@/lib/perfil/schemas'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -16,27 +17,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Has excedido el límite de registros. Intenta más tarde.' }, { status: 429 })
   }
 
+  const parsed = RegistroSchema.safeParse(await req.json().catch(() => null))
+  if (!parsed.success) {
+    const first = parsed.error.issues[0]
+    return NextResponse.json({ error: first?.message ?? 'Faltan campos obligatorios' }, { status: 400 })
+  }
   const {
-    email, password, nombre, nombreClinica,
-    titulo, especialidad, cedula_profesional, cedula_especialidad,
-    tipo = 'independiente',
-  } = await req.json()
-
-  if (!email || !password || !nombre || !nombreClinica || !titulo || !especialidad || !cedula_profesional) {
-    return NextResponse.json({ error: 'Faltan campos obligatorios' }, { status: 400 })
-  }
-
-  if (!['independiente', 'clinica'].includes(tipo)) {
-    return NextResponse.json({ error: 'Tipo de cuenta inválido' }, { status: 400 })
-  }
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!emailRegex.test(email)) {
-    return NextResponse.json({ error: 'Correo electrónico inválido' }, { status: 400 })
-  }
-  if (typeof password !== 'string' || password.length < 8) {
-    return NextResponse.json({ error: 'La contraseña debe tener al menos 8 caracteres' }, { status: 400 })
-  }
+    email, password, nombres, apellido_paterno, apellido_materno, nombreClinica,
+    titulo, especialidad, cedula_profesional, cedula_especialidad, tipo,
+  } = parsed.data
 
   const admin = createAdminClient()
 
@@ -89,7 +78,10 @@ export async function POST(req: NextRequest) {
     id:                   newUser.user.id,
     role,
     es_admin_de_clinica:  true,
-    nombre,
+    nombres,
+    apellido_paterno,
+    apellido_materno,
+    nombre_confirmado:    true,   // el dueño captura su propio nombre
     clinica_id:           clinica.id,
     titulo,
     especialidad,
@@ -112,7 +104,7 @@ export async function POST(req: NextRequest) {
       from: 'Spinus <noreply@mail.spinus.com.mx>',
       to: email,
       subject: 'Confirma tu cuenta — Spinus',
-      html: generarEmailConfirmacion(nombre, confirmUrl),
+      html: generarEmailConfirmacion(nombres, confirmUrl),
     })
   }
 

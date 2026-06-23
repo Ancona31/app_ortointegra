@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { canManageClinica } from '@/lib/permissions'
+import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 
 export async function GET() {
   const supabase = await createClient()
@@ -29,10 +30,18 @@ export async function GET() {
     .filter(p => p.id !== user.id)
     .map(p => {
       const authUser = authUsers?.users?.find(u => u.id === p.id)
+      // nombre se COMPONE desde campos estructurados (NOMBRES_PLAN.md, Fase 4).
+      // Filas migradas en Fase 2 ya tienen los 3 campos poblados. Se conserva la
+      // key `nombre` en la respuesta → page.tsx / type Usuario no cambian.
       return {
         id: p.id,
         role: p.role,
-        nombre: p.nombre,
+        nombre: componerNombreMedicoCompleto({
+          titulo: p.titulo,
+          nombres: p.nombres,
+          apellido_paterno: p.apellido_paterno,
+          apellido_materno: p.apellido_materno,
+        }),
         clinica_id: p.clinica_id,
         es_admin_de_clinica: p.es_admin_de_clinica,
         email: authUser?.email ?? '—',

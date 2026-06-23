@@ -33,7 +33,7 @@ export default function AdminUsuariosPage() {
   const [showForm, setShowForm] = useState(false)
   const [showPass, setShowPass] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<Usuario | null>(null)
-  const [form, setForm] = useState({ email: '', password: '', nombre: '', role: 'secretaria', titulo: 'Dr.', cedula_profesional: '', cedula_especialidad: '' })
+  const [form, setForm] = useState({ email: '', password: '', nombres: '', apellido_paterno: '', apellido_materno: '', role: 'secretaria', titulo: 'Dr.', cedula_profesional: '', cedula_especialidad: '' })
   const [especialidades, setEspecialidades] = useState<string[]>([''])
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
@@ -83,7 +83,7 @@ export default function AdminUsuariosPage() {
 
     toast.success(`Usuario ${form.email} creado exitosamente`)
     setEspecialidades([''])
-    setForm({ email: '', password: '', nombre: '', role: 'secretaria', titulo: 'Dr.', cedula_profesional: '', cedula_especialidad: '' })
+    setForm({ email: '', password: '', nombres: '', apellido_paterno: '', apellido_materno: '', role: 'secretaria', titulo: 'Dr.', cedula_profesional: '', cedula_especialidad: '' })
     setShowForm(false)
     cargarUsuarios()
   }
@@ -152,7 +152,9 @@ export default function AdminUsuariosPage() {
 
             <form id="form-nuevo-usuario" onSubmit={crearUsuario} className="px-5 py-4 space-y-3 overflow-y-auto flex-1">
               {[
-                { label: 'Nombre completo', type: 'text', key: 'nombre', placeholder: 'Ej: María González', required: true },
+                { label: 'Nombre(s)', type: 'text', key: 'nombres', placeholder: 'Ej: María', required: true },
+                { label: 'Apellido paterno', type: 'text', key: 'apellido_paterno', placeholder: 'Ej: González', required: true },
+                { label: 'Apellido materno', type: 'text', key: 'apellido_materno', placeholder: 'Ej: López (opcional)', required: false },
                 { label: 'Correo electrónico', type: 'email', key: 'email', placeholder: 'correo@email.com', required: true },
               ].map(f => (
                 <div key={f.key}>
