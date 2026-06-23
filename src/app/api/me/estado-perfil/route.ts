@@ -9,7 +9,7 @@ export async function GET() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, nombre, especialidad, cedula_profesional, cedula_especialidad, firma_url, clinica_id')
+    .select('role, nombres, especialidad, cedula_profesional, cedula_especialidad, firma_url, clinica_id')
     .eq('id', user.id)
     .single()
 
@@ -20,7 +20,7 @@ export async function GET() {
   // Calcular porcentaje de completitud del perfil (médicos: invitados y admins de clínica)
   let porcentaje = 0
   if (role !== 'secretaria') {
-    if (profile.nombre) porcentaje += 25
+    if (profile.nombres) porcentaje += 25
     if (profile.especialidad) porcentaje += 25
     if (profile.cedula_profesional) porcentaje += 25
     if (profile.cedula_especialidad) porcentaje += 10
@@ -83,7 +83,6 @@ export async function GET() {
     requiereOnboarding,
     gridMode,
     role,
-    nombre: profile.nombre ?? null,
     plan,
     planNombre: PLANS[plan]?.nombre ?? 'Free',
     suscripcion_estado,

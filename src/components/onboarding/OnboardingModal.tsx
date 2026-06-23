@@ -14,7 +14,6 @@ interface Props {
   onComplete: () => void
   role: string
   esAdminDeClinica: boolean
-  nombreInicial?: string | null
 }
 
 type Paso = 1 | 2 | 3 | 4 | 5
@@ -29,7 +28,7 @@ const PASOS = [
 
 const TITULOS = ['Dr.', 'Dra.', 'Mtro.', 'Mtra.', 'Lic.', 'Ing.']
 
-export default function OnboardingModal({ onComplete, role, esAdminDeClinica, nombreInicial }: Props) {
+export default function OnboardingModal({ onComplete, role, esAdminDeClinica }: Props) {
   const toast = useToast()
   const isAdmin = canManageClinica({ role: role as Role, es_admin_de_clinica: esAdminDeClinica })
 
@@ -38,7 +37,9 @@ export default function OnboardingModal({ onComplete, role, esAdminDeClinica, no
 
   // Paso 1: Datos personales
   const [titulo, setTitulo] = useState('Dr.')
-  const [nombre, setNombre] = useState(nombreInicial ?? '')
+  const [nombres, setNombres] = useState('')
+  const [apellidoPaterno, setApellidoPaterno] = useState('')
+  const [apellidoMaterno, setApellidoMaterno] = useState('')
   const [especialidades, setEspecialidades] = useState<string[]>([''])
   const [universidad, setUniversidad] = useState('')
 
@@ -63,7 +64,8 @@ export default function OnboardingModal({ onComplete, role, esAdminDeClinica, no
 
   // ── Guardar paso 1 ──────────────────────────────────────────
   async function guardarPaso1(): Promise<boolean> {
-    if (!nombre.trim()) { toast.error('El nombre es obligatorio'); return false }
+    if (!nombres.trim()) { toast.error('El nombre es obligatorio'); return false }
+    if (!apellidoPaterno.trim()) { toast.error('El apellido paterno es obligatorio'); return false }
     const especialidad = especialidades.filter(Boolean).join(', ')
     if (!especialidad) { toast.error('La especialidad es obligatoria'); return false }
 
@@ -72,7 +74,14 @@ export default function OnboardingModal({ onComplete, role, esAdminDeClinica, no
       const res = await fetch('/api/me/perfil-medico', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ titulo, nombre: nombre.trim(), especialidad, universidad: universidad.trim() || undefined }),
+        body: JSON.stringify({
+          titulo,
+          nombres: nombres.trim(),
+          apellido_paterno: apellidoPaterno.trim(),
+          apellido_materno: apellidoMaterno.trim() || null,
+          especialidad,
+          universidad: universidad.trim() || undefined,
+        }),
       })
       if (!res.ok) throw new Error()
       await mutate('/api/me/perfil-medico')
@@ -257,12 +266,34 @@ export default function OnboardingModal({ onComplete, role, esAdminDeClinica, no
                   </select>
                 </div>
                 <div className="col-span-2">
-                  <label className="text-xs font-medium text-slate-500 block mb-1">Nombre completo <span className="text-red-400">*</span></label>
+                  <label className="text-xs font-medium text-slate-500 block mb-1">Nombre(s) <span className="text-red-400">*</span></label>
                   <input
                     type="text"
-                    value={nombre}
-                    onChange={e => setNombre(e.target.value)}
-                    placeholder="Ej: Juan García López"
+                    value={nombres}
+                    onChange={e => setNombres(e.target.value)}
+                    placeholder="Ej: Juan"
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-500 block mb-1">Apellido paterno <span className="text-red-400">*</span></label>
+                  <input
+                    type="text"
+                    value={apellidoPaterno}
+                    onChange={e => setApellidoPaterno(e.target.value)}
+                    placeholder="Ej: García"
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500 block mb-1">Apellido materno</label>
+                  <input
+                    type="text"
+                    value={apellidoMaterno}
+                    onChange={e => setApellidoMaterno(e.target.value)}
+                    placeholder="Ej: López"
                     className={inputCls}
                   />
                 </div>

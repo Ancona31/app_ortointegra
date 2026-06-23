@@ -27,7 +27,6 @@ interface EstadoPerfil {
   requiereOnboarding: boolean
   gridMode: GridMode
   role: string
-  nombre: string | null
   plan: string
   planNombre: string
   suscripcion_estado: string
@@ -157,7 +156,6 @@ export default function InicioPage() {
           onComplete={handleOnboardingComplete}
           role={estado.role}
           esAdminDeClinica={profile?.es_admin_de_clinica === true}
-          nombreInicial={estado.nombre}
         />
       )}
 
