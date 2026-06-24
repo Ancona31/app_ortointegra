@@ -398,7 +398,6 @@ CREATE TABLE IF NOT EXISTS public.plantillas_honorarios (
 CREATE TABLE IF NOT EXISTS public.profiles (
   id                      uuid NOT NULL,
   role                    text NOT NULL DEFAULT 'medico'::text,
-  nombre                  text,
   nombres                 text,
   apellido_paterno        text,
   apellido_materno        text,

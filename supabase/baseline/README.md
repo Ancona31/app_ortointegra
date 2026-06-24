@@ -26,7 +26,7 @@ Aplicar en este orden, **uno por uno**, contra una base limpia:
 5. `05_functions.sql`      — 17 funciones custom (helpers, triggers genéricos, reportes super-admin)
 6. `06_triggers.sql`       — 12 triggers activos
 7. `07_rls_policies.sql`   — `ENABLE ROW LEVEL SECURITY` + 60 policies tal como están en prod
-8. `08_view.sql`           — vista `audit_log_view`
+8. `08_view.sql`           — sin vistas (`audit_log_view` eliminada en Fase 5.D, ver migración `20260624_nombres_02_drop_audit_log_view.sql`)
 9. `09_storage_buckets.sql`— 4 storage buckets (policies de storage requieren paso manual)
 
 El orden importa: las funciones del paso 5 son referenciadas por triggers
