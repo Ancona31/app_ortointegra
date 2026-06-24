@@ -8,7 +8,7 @@
 
 ---
 
-## Estado actual (al cierre de Fase 3)
+## Estado actual — PROYECTO COMPLETO (Fase 1 → 6)
 
 - Fase 1 ✅ esquema aditivo aplicado y verificado.
 - Fase 2 ✅ datos migrados: 13 médicos + 3 secretarias poblados, nombre_confirmado=true. Cuentas
@@ -34,6 +34,26 @@
     (completitud lee `nombres`, no `nombre` legacy → corrige banner/modal que nunca desaparecían).
     Validado en local: onboarding guarda 3 campos + nombre_confirmado=true; banner desaparece.
 - Secretarias: título quitado (titulo=NULL) y nombres estructurados poblados manualmente.
+- Fase 5 ✅ COMPLETA (últimos lectores migrados + auditoría DB):
+  - 5.A ✅ /api/clinica/medicos + agenda (dropdowns COMPLETO, iniciales chip vía
+    componerInicialesMedico) + join appointments. Commit f4ca00b.
+  - 5.B ✅ email/enviar-documento compone nombre + order por apellido_paterno en
+    AsistenteDashboard + limpieza de 3 SELECTs inertes. Commit eb86fe0.
+  - 5.C ✅ super-admin (5 endpoints: metricas, clinicas, dashboard/usuarios, audit,
+    clinicas/[id]) + Stripe checkout componen desde estructura + quita Profile.nombre del tipo.
+    Quita pre-filtro .ilike('nombre') de usuarios (corrige bug de búsqueda por email). Commit
+    de6268e. Grep-cero confirmado: ningún código lee profiles.nombre.
+  - 5.D ✅ Auditoría DB: DROP de la vista huérfana audit_log_view + recreación de sa_top_medicos
+    componiendo desde estructura. RLS/columnas generadas/constraints/índices: sin dependencias.
+    pg_depend y publicación realtime sobre profiles.nombre: cero.
+- Fase 6 ✅ COMPLETA: DROP COLUMN nombre ejecutado en prod (sin respaldo, decisión auditada).
+  Smoke test en vivo (6 pruebas) pasa. Migraciones versionadas (nombres_01..04) + baseline
+  sincronizado (02_tables sin nombre, 05_functions con sa_top_medicos nuevo, 08_view sin
+  audit_log_view, README actualizado).
+- RESULTADO: el nombre del médico tiene UNA sola fuente de verdad (titulo + nombres +
+  apellido_paterno + apellido_materno), compuesta en el punto de render vía
+  src/lib/nombreMedico.ts. La columna legacy `nombre` ya no existe. Sin dual-write, sin espejo,
+  sin parseo permanente. OBJETIVO CUMPLIDO.
 
 ## Mapa de formato por display (decidido en 4.D)
 - Dashboard saludo: PRIMER NOMBRE.
@@ -112,6 +132,14 @@ previsto).
 - Cuentas creadas por el registro VIEJO (desplegado) tienen `nombre` legacy poblado; se
   resolverán al pushear el código nuevo. Verificar antes de Fase 6 que no queden escritores de
   `nombre` activos en producción.
+- PUSH PENDIENTE: ~13 commits locales sin pushear (push diferido). origin/main sigue en 5316cf7.
+  Nada de este proyecto está desplegado aún.
+- Dato sucio: la cuenta de superadmin tiene apellido con guión literal "-" (sale "Dr. Superadmin
+  -" en el ranking de Uso). Cosmético, limpiar cuando convenga.
+- Cuentas de prueba creadas por registro VIEJO desplegado dejaban clínicas huérfanas; se
+  limpiaron 4 en esta sesión. El flujo de borrado de cuentas no elimina la fila de clinicas —
+  revisar si hay un endpoint de borrado o si es manual.
+- Smoke test de super-admin (5.C) en vivo: validado en esta sesión junto al smoke test post-DROP.
 
 ## Fuera de alcance
 - Normalización de nombres en `pacientes`.
