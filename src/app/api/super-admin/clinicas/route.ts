@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireSuperAdmin } from '@/lib/auth'
 import { logAudit } from '@/lib/audit'
+import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 
 export async function GET() {
   const { user, error } = await requireSuperAdmin()
@@ -10,7 +11,7 @@ export async function GET() {
 
   const admin = createAdminClient()
   const { data: clinicas } = await admin.from('clinicas').select('*').order('nombre')
-  const { data: profiles } = await admin.from('profiles').select('id, clinica_id, role, nombre, es_admin_de_clinica')
+  const { data: profiles } = await admin.from('profiles').select('id, clinica_id, role, titulo, nombres, apellido_paterno, apellido_materno, es_admin_de_clinica')
   const { data: authData } = await admin.auth.admin.listUsers()
   const authUsers = authData?.users ?? []
 
@@ -31,7 +32,10 @@ export async function GET() {
       .filter(p => ['medico', 'secretaria'].includes(p.role))
       .map(p => ({
         id:     p.id,
-        nombre: p.nombre,
+        nombre: componerNombreMedicoCompleto({
+          titulo: p.titulo, nombres: p.nombres,
+          apellido_paterno: p.apellido_paterno, apellido_materno: p.apellido_materno,
+        }),
         role:   p.role,
         email:  authUsers.find(u => u.id === p.id)?.email ?? null,
       }))
@@ -41,7 +45,10 @@ export async function GET() {
       count_medicos,
       count_secretarias: clinicaProfiles.filter(p => p.role === 'secretaria').length,
       admin: adminProfile
-        ? { id: adminProfile.id, nombre: adminProfile.nombre, email: adminEmail }
+        ? { id: adminProfile.id, nombre: componerNombreMedicoCompleto({
+            titulo: adminProfile.titulo, nombres: adminProfile.nombres,
+            apellido_paterno: adminProfile.apellido_paterno, apellido_materno: adminProfile.apellido_materno,
+          }), email: adminEmail }
         : null,
       usuarios,
     }

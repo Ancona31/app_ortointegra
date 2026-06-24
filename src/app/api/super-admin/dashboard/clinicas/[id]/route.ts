@@ -18,6 +18,7 @@ import {
   type UsuarioClinica,
 } from '@/lib/super-admin/types'
 import { clasificarPago } from '@/lib/super-admin/clasificarPago'
+import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 
 const MS_DAY = 86_400_000
 
@@ -41,7 +42,10 @@ interface ProfileRowDb {
   id: string
   clinica_id: string | null
   role: string | null
-  nombre: string | null
+  titulo: string | null
+  nombres: string | null
+  apellido_paterno: string | null
+  apellido_materno: string | null
 }
 
 interface PacienteRowDb {
@@ -132,7 +136,7 @@ export async function GET(
     const [profilesRes, pacientesRes, authRes, documentosCount, iaCount] = await Promise.all([
       admin
         .from('profiles')
-        .select('id, clinica_id, role, nombre')
+        .select('id, clinica_id, role, titulo, nombres, apellido_paterno, apellido_materno')
         .eq('clinica_id', id),
       admin.from('pacientes').select('id, clinica_id').eq('clinica_id', id),
       admin.auth.admin.listUsers({ perPage: 1000 }),
@@ -156,7 +160,10 @@ export async function GET(
       id: String(p.id),
       clinica_id: p.clinica_id === null ? null : String(p.clinica_id),
       role: p.role === null ? null : String(p.role),
-      nombre: p.nombre === null ? null : String(p.nombre),
+      titulo: p.titulo ?? null,
+      nombres: p.nombres ?? null,
+      apellido_paterno: p.apellido_paterno ?? null,
+      apellido_materno: p.apellido_materno ?? null,
     }))
     const pacientes: PacienteRowDb[] = (pacientesRes.data ?? []).map((p) => ({
       id: String(p.id),
@@ -231,7 +238,10 @@ export async function GET(
       usuarios.push({
         id: p.id,
         email: auth?.email ?? '',
-        nombre: p.nombre ?? '',
+        nombre: componerNombreMedicoCompleto({
+          titulo: p.titulo, nombres: p.nombres,
+          apellido_paterno: p.apellido_paterno, apellido_materno: p.apellido_materno,
+        }),
         rol: isRol(p.role),
         ultimoLoginIso: auth?.last_sign_in_at ?? null,
       })

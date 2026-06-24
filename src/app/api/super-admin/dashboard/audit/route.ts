@@ -14,6 +14,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { requireSuperAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { logAudit } from '@/lib/audit'
+import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import type { AuditLogEntry, AuditLogResponse } from '@/lib/super-admin/types'
 
 const PAGE_SIZE = 50
@@ -31,7 +32,10 @@ interface AuditRowDb {
 
 interface ProfileRowDb {
   id: string
-  nombre: string | null
+  titulo: string | null
+  nombres: string | null
+  apellido_paterno: string | null
+  apellido_materno: string | null
 }
 
 function buildCsvLine(fields: string[]): string {
@@ -106,11 +110,15 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       if (userIds.length > 0) {
         const profilesRes = await admin
           .from('profiles')
-          .select('id, nombre')
+          .select('id, titulo, nombres, apellido_paterno, apellido_materno')
           .in('id', userIds)
         if (!profilesRes.error) {
           for (const p of (profilesRes.data ?? []) as ProfileRowDb[]) {
-            if (p.nombre) nombrePorId.set(p.id, p.nombre)
+            const nombre = componerNombreMedicoCompleto({
+              titulo: p.titulo, nombres: p.nombres,
+              apellido_paterno: p.apellido_paterno, apellido_materno: p.apellido_materno,
+            })
+            if (nombre) nombrePorId.set(p.id, nombre)
           }
         }
       }
@@ -167,11 +175,15 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     if (userIds.length > 0) {
       const profilesRes = await admin
         .from('profiles')
-        .select('id, nombre')
+        .select('id, titulo, nombres, apellido_paterno, apellido_materno')
         .in('id', userIds)
       if (!profilesRes.error) {
         for (const p of (profilesRes.data ?? []) as ProfileRowDb[]) {
-          if (p.nombre) nombrePorId.set(p.id, p.nombre)
+          const nombre = componerNombreMedicoCompleto({
+            titulo: p.titulo, nombres: p.nombres,
+            apellido_paterno: p.apellido_paterno, apellido_materno: p.apellido_materno,
+          })
+          if (nombre) nombrePorId.set(p.id, nombre)
         }
       }
     }

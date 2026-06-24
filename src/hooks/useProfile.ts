@@ -19,7 +19,6 @@ export type Role = 'super_admin' | 'medico' | 'secretaria'
 export interface Profile {
   id: string
   role: Role
-  nombre?: string | null
   clinica_id?: string | null
   cedula_profesional?: string | null
   cedula_especialidad?: string | null

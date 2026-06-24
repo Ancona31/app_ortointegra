@@ -9,6 +9,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { requireSuperAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { logAudit } from '@/lib/audit'
+import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import {
   calcularRetencion,
   type RetencionBadge,
@@ -23,7 +24,10 @@ interface ProfileRowDb {
   id: string
   clinica_id: string | null
   role: string | null
-  nombre: string | null
+  titulo: string | null
+  nombres: string | null
+  apellido_paterno: string | null
+  apellido_materno: string | null
 }
 
 interface ClinicaRowDb {
@@ -88,12 +92,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     let profilesQuery = admin
       .from('profiles')
-      .select('id, clinica_id, role, nombre')
+      .select('id, clinica_id, role, titulo, nombres, apellido_paterno, apellido_materno')
       .order('id', { ascending: true })
       .limit(PAGE_SIZE + 1)
 
     if (rolFiltro !== 'todos') profilesQuery = profilesQuery.eq('role', rolFiltro)
-    if (q) profilesQuery = profilesQuery.ilike('nombre', `%${q}%`)
     if (cursor) profilesQuery = profilesQuery.gt('id', cursor)
 
     const profilesRes = await profilesQuery
@@ -175,7 +178,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       const ultimoLoginIso = a?.last_sign_in_at ?? null
       return {
         id: p.id,
-        nombre: p.nombre ?? '',
+        nombre: componerNombreMedicoCompleto({
+          titulo: p.titulo, nombres: p.nombres,
+          apellido_paterno: p.apellido_paterno, apellido_materno: p.apellido_materno,
+        }),
         email: a?.email ?? '',
         rol: isRol(p.role),
         clinicaId: p.clinica_id,

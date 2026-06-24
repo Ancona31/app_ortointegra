@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import stripe from '@/lib/stripe'
 import { PLANS, type PlanKey, type BillingInterval } from '@/lib/plans'
 import { canManageClinica } from '@/lib/permissions'
+import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient()
   const { data: profile } = await admin
     .from('profiles')
-    .select('clinica_id, role, nombre, es_admin_de_clinica')
+    .select('clinica_id, role, titulo, nombres, apellido_paterno, apellido_materno, es_admin_de_clinica')
     .eq('id', user.id)
     .single()
 
@@ -57,7 +58,10 @@ export async function POST(req: NextRequest) {
   if (!customerId) {
     const customer = await stripe.customers.create({
       email: user.email,
-      name: clinica.nombre ?? profile.nombre ?? undefined,
+      name: clinica.nombre ?? (componerNombreMedicoCompleto({
+        titulo: profile.titulo, nombres: profile.nombres,
+        apellido_paterno: profile.apellido_paterno, apellido_materno: profile.apellido_materno,
+      }) || undefined),
       metadata: { clinica_id: clinica.id, user_id: user.id },
     })
     customerId = customer.id

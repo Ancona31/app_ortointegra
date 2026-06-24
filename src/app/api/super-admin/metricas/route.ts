@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireSuperAdmin } from '@/lib/auth'
+import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 
 export async function GET() {
   const { error } = await requireSuperAdmin()
@@ -17,7 +18,7 @@ export async function GET() {
     rateRes,
   ] = await Promise.all([
     admin.from('clinicas').select('id, nombre, nombre_display').order('nombre').limit(10000),
-    admin.from('profiles').select('id, nombre, clinica_id, role').limit(10000),
+    admin.from('profiles').select('id, titulo, nombres, apellido_paterno, apellido_materno, clinica_id, role').limit(10000),
     admin.from('pacientes').select('id, clinica_id, medico_id, created_at').limit(10000),
     admin.from('consultas').select('id, paciente_id, created_at').limit(10000),
     admin.from('documentos').select('id, paciente_id, tipo, created_at').limit(10000),
@@ -83,7 +84,12 @@ export async function GET() {
 
       return {
         id: p.id,
-        nombre: p.nombre || '—',
+        nombre: componerNombreMedicoCompleto({
+          titulo: p.titulo,
+          nombres: p.nombres,
+          apellido_paterno: p.apellido_paterno,
+          apellido_materno: p.apellido_materno,
+        }) || '—',
         // Post-refactor 4.A.6 (BITÁCORA #96): el array solo contiene role='medico',
         // la rama 'super_admin' del ternario original nunca era alcanzable
         clinica: clinica ? (clinica.nombre_display || clinica.nombre) : 'Sin clínica',
