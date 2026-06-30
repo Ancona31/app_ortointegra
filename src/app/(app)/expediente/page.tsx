@@ -53,7 +53,7 @@ export default function ExpedientePage() {
   const [medicos, setMedicos] = useState<MedicoOpcion[]>([])
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { state: subState, openBloqueoModal } = useSubscriptionGate()
-  const { profile } = useProfile()
+  const { profile, isSecretary } = useProfile()
 
   // Fase 8.2: handler reutilizable para intercept de creación
   function interceptIfBlocked(e: React.MouseEvent) {
@@ -316,7 +316,7 @@ export default function ExpedientePage() {
         ) : (
           <>
             <div className="hidden md:block">
-              <TablaPacientesExpediente pacientes={pacientes} orden={orden} direccion={direccion} onOrden={cambiarOrden} />
+              <TablaPacientesExpediente pacientes={pacientes} orden={orden} direccion={direccion} onOrden={cambiarOrden} mostrarAcciones={!isSecretary && !!profile} />
             </div>
             <div className="divide-y divide-slate-100 md:hidden">
               {pacientes.map((p, i) => {

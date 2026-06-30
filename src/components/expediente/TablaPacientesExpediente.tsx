@@ -4,6 +4,7 @@ import { ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react'
 import { calcularEdad } from '@/lib/patientUtils'
 import { renderEnTZ } from '@/lib/dates'
 import { ListaChipsMedicos } from '@/components/expediente/ChipMedico'
+import { KebabAccionesPaciente } from '@/components/expediente/KebabAccionesPaciente'
 import type { PacienteExpediente, OrdenColumna, OrdenDireccion } from '@/lib/expediente/fetchPacientes'
 
 const AVATAR_COLORS = [
@@ -19,10 +20,9 @@ interface Props {
   orden: OrdenColumna
   direccion: OrdenDireccion
   onOrden: (col: OrdenColumna) => void
+  mostrarAcciones: boolean
 }
 
-// Encabezado ordenable: clic dispara onOrden(col). La flechita refleja si esta
-// columna es la activa y en qué dirección.
 function ThOrdenable({
   col,
   orden,
@@ -65,7 +65,7 @@ function Th({ children }: { children: React.ReactNode }) {
   )
 }
 
-export function TablaPacientesExpediente({ pacientes, orden, direccion, onOrden }: Props) {
+export function TablaPacientesExpediente({ pacientes, orden, direccion, onOrden, mostrarAcciones }: Props) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse">
@@ -76,6 +76,7 @@ export function TablaPacientesExpediente({ pacientes, orden, direccion, onOrden 
             <ThOrdenable col="numero_expediente" orden={orden} direccion={direccion} onOrden={onOrden}>Expediente</ThOrdenable>
             <ThOrdenable col="created_at" orden={orden} direccion={direccion} onOrden={onOrden}>Fecha de ingreso</ThOrdenable>
             <Th>Médicos</Th>
+            {mostrarAcciones && <th className="w-12 px-4 py-3" aria-label="Acciones" />}
           </tr>
         </thead>
         <tbody>
@@ -110,6 +111,11 @@ export function TablaPacientesExpediente({ pacientes, orden, direccion, onOrden 
                 <td className="px-4 py-3.5">
                   <ListaChipsMedicos medicos={p.medicos} />
                 </td>
+                {mostrarAcciones && (
+                  <td className="px-4 py-3.5">
+                    <KebabAccionesPaciente pacienteId={p.id} />
+                  </td>
+                )}
               </tr>
             )
           })}
