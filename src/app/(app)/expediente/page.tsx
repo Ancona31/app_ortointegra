@@ -7,6 +7,7 @@ import { calcularEdad } from '@/lib/patientUtils'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
 import { fetchPacientesExpediente, type PacienteExpediente } from '@/lib/expediente/fetchPacientes'
 import { ListaChipsMedicos } from '@/components/expediente/ChipMedico'
+import { TablaPacientesExpediente } from '@/components/expediente/TablaPacientesExpediente'
 
 const AVATAR_COLORS = [
   'bg-violet-100 text-violet-700',
@@ -159,7 +160,10 @@ export default function ExpedientePage() {
           </div>
         ) : (
           <>
-            <div className="divide-y divide-slate-100">
+            <div className="hidden md:block">
+              <TablaPacientesExpediente pacientes={pacientes} />
+            </div>
+            <div className="divide-y divide-slate-100 md:hidden">
               {pacientes.map((p, i) => {
                 const edad = p.fecha_nacimiento ? calcularEdad(p.fecha_nacimiento) : null
                 const avatarColor = AVATAR_COLORS[i % AVATAR_COLORS.length]
