@@ -1,10 +1,16 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
-// Sub-fase control de acceso secretaria: bloqueo server-side de TODO el árbol
-// /expediente para el rol 'secretaria'. La secretaria gestiona agenda y alta de
-// pacientes, NO el expediente clínico. Cubre lista + detalle + sub-rutas por
-// composición; los layouts subscription-gate de sub-rutas siguen aplicándose.
+// Control de acceso — LISTA de pacientes (/expediente).
+//
+// Este layout cubre la LISTA y, por composición, el subárbol [id]/. El bloqueo
+// de rol de la secretaria se movió a /expediente/[id]/layout.tsx: la secretaria
+// SÍ puede ver la lista de pacientes (roster) pero NO el expediente clínico del
+// paciente (que vive bajo [id]/).
+//
+// Aquí solo se exige sesión. La RLS del RPC listar_pacientes_expediente
+// (SECURITY INVOKER) acota los datos de la lista por clínica/rol; la secretaria
+// ve el roster + chips de médico, nada clínico.
 export default async function ExpedienteLayout({
   children,
 }: {
@@ -15,14 +21,6 @@ export default async function ExpedienteLayout({
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role === 'secretaria') redirect('/dashboard')
 
   return <>{children}</>
 }
