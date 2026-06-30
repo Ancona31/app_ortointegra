@@ -451,7 +451,6 @@ export default function OnboardingGuide() {
         setPhase('bubble')
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname])
 
   // ── 5. Observe DOM for dynamic data-onboard elements ──
@@ -484,7 +483,6 @@ export default function OnboardingGuide() {
   // ── 7. Cleanup on unmount ──
   useEffect(() => {
     return () => stopAudio()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ── Actions ──

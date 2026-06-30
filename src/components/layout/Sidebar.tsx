@@ -81,7 +81,7 @@ function navDoctor(isAdmin: boolean): NavSection[] {
     { kind: 'leaf', href: '/dashboard', label: 'Dashboard', icon: Home },
     {
       kind: 'group', key: 'pacientes', label: 'Pacientes', icon: Stethoscope,
-      matchPaths: ['/expediente', '/suplementacion', '/pacientes'],
+      matchPaths: ['/expediente', '/suplementacion'],
       children: [
         { kind: 'leaf', href: '/expediente',    label: 'Expediente',      icon: Stethoscope },
         { kind: 'leaf', href: '/suplementacion', label: 'Suplementación', icon: Pill },
