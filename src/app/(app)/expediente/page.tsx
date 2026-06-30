@@ -3,12 +3,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { Plus, Search, ChevronRight, FileText, Stethoscope } from 'lucide-react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
-import { Paciente } from '@/types'
 import { calcularEdad } from '@/lib/patientUtils'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
-
-const PAGE_SIZE = 20
+import { fetchPacientesExpediente, type PacienteExpediente } from '@/lib/expediente/fetchPacientes'
+import { ListaChipsMedicos } from '@/components/expediente/ChipMedico'
 
 const AVATAR_COLORS = [
   'bg-violet-100 text-violet-700',
@@ -34,12 +32,13 @@ function PacienteSkeleton() {
 }
 
 export default function ExpedientePage() {
-  const [pacientes, setPacientes] = useState<Paciente[]>([])
+  const [pacientes, setPacientes] = useState<PacienteExpediente[]>([])
   const [busqueda, setBusqueda] = useState('')
   const [loading, setLoading] = useState(true)
   const [pagina, setPagina] = useState(0)
   const [hayMas, setHayMas] = useState(false)
   const [total, setTotal] = useState<number | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { state: subState, openBloqueoModal } = useSubscriptionGate()
 
@@ -53,29 +52,23 @@ export default function ExpedientePage() {
 
   async function cargar(busq: string, pag: number, acumular: boolean) {
     setLoading(true)
-    const supabase = createClient()
+    setError(null)
 
-    let query = supabase
-      .from('pacientes')
-      .select('*', { count: 'exact' })
-      .neq('activo', false)
-      .order('apellidos')
-      .range(pag * PAGE_SIZE, pag * PAGE_SIZE + PAGE_SIZE)
+    try {
+      const resp = await fetchPacientesExpediente({ q: busq, pag })
 
-    if (busq.trim()) {
-      const busqNorm = busq.trim().replace(/\s+/g, ' ')
-      query = query.or(`nombre.ilike.%${busqNorm}%,apellidos.ilike.%${busqNorm}%`)
+      // El route solo devuelve total en la carga inicial sin búsqueda; en el
+      // resto de cargas total=null y se conserva el contador previo.
+      if (resp.total !== null) setTotal(resp.total)
+      setHayMas(resp.hayMas)
+      setPacientes(prev => acumular ? [...prev, ...resp.pacientes] : resp.pacientes)
+    } catch (e) {
+      // No borramos los pacientes ya mostrados (caso "Cargar más"); solo
+      // registramos el error para que el render decida cómo mostrarlo.
+      setError(e instanceof Error ? e.message : 'No se pudo cargar la lista de pacientes')
+    } finally {
+      setLoading(false)
     }
-
-    const { data, count } = await query
-    const resultado = data || []
-    const hayMasResultados = resultado.length > PAGE_SIZE
-    if (hayMasResultados) resultado.pop()
-
-    if (!busq.trim() && pag === 0) setTotal(count ?? null)
-    setHayMas(hayMasResultados)
-    setPacientes(prev => acumular ? [...prev, ...resultado] : resultado)
-    setLoading(false)
   }
 
   useEffect(() => {
@@ -135,6 +128,20 @@ export default function ExpedientePage() {
           <div className="divide-y divide-slate-100">
             {[1,2,3,4,5].map(i => <PacienteSkeleton key={i} />)}
           </div>
+        ) : error && pacientes.length === 0 ? (
+          <div className="py-16 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-rose-50 flex items-center justify-center mx-auto mb-4">
+              <Stethoscope size={24} className="text-rose-300" />
+            </div>
+            <p className="text-sm font-medium text-[#3d3d3f]">No se pudo cargar la lista</p>
+            <p className="text-xs text-[#86868b] mt-1 mb-4">{error}</p>
+            <button
+              onClick={() => cargar(busqueda, pagina, false)}
+              className="text-sm text-[#1e5fa8] font-medium hover:underline"
+            >
+              Reintentar
+            </button>
+          </div>
         ) : pacientes.length === 0 ? (
           <div className="py-16 text-center">
             <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
@@ -171,6 +178,9 @@ export default function ExpedientePage() {
                           {p.sexo === 'M' ? 'Masculino' : p.sexo === 'F' ? 'Femenino' : 'Otro'}
                           {p.numero_expediente ? ` · ${p.numero_expediente}` : ''}
                         </p>
+                        <div className="mt-1">
+                          <ListaChipsMedicos medicos={p.medicos} />
+                        </div>
                       </div>
                     </Link>
                     <div className="flex items-center gap-1 flex-shrink-0 ml-3">
@@ -199,6 +209,11 @@ export default function ExpedientePage() {
                 >
                   {loading ? 'Cargando...' : 'Cargar más pacientes'}
                 </button>
+              </div>
+            )}
+            {error && pacientes.length > 0 && (
+              <div className="px-5 pb-3.5 text-center">
+                <p className="text-xs text-rose-600">{error}</p>
               </div>
             )}
           </>
