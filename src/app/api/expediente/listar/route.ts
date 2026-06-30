@@ -1,36 +1,30 @@
 // src/app/api/expediente/listar/route.ts
 // ─────────────────────────────────────────────────────────────────────────────
-// SUB-FASE 1 — API route que envuelve el RPC listar_pacientes_expediente.
-//
-// Por qué un API route (y no supabase.rpc() directo desde el cliente):
-//   - El resto del proyecto invoca RPC server-side; mantiene la convención.
-//   - Centraliza en UN solo lugar el tipado manual del cliente UNTYPED (un typo
-//     de columna no lo atrapa tsc; aquí queda acotado y revisable).
-//   - La página nunca toca la DB directamente.
-//
-// Contrato del RPC (commit 5d7112c):
-//   listar_pacientes_expediente(
-//     p_busqueda text, p_medico_id uuid, p_fecha_desde timestamptz,
-//     p_fecha_hasta timestamptz, p_orden text, p_direccion text,
-//     p_limite int, p_offset int)
-//   → TABLE(id, numero_expediente, nombre, apellidos, fecha_nacimiento date,
-//           sexo, created_at, activo, clinica_id, medicos jsonb)
-//
-// SUB-FASE 1: solo búsqueda + paginación + orden por defecto (created_at desc).
-// Filtros (médico, rango de fecha) y orden por columna → sub-fase posterior;
-// aquí esos parámetros del RPC van en NULL/default.
+// API route que envuelve el RPC listar_pacientes_expediente.
+// Centraliza el tipado manual del cliente UNTYPED; la página nunca toca la DB.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { fechaHoraLocalAInstante, desplazarFecha } from '@/lib/dates'
 
-// Tamaño de página fijo (igual al de la pantalla actual). Se pide PAGE_SIZE + 1
-// para deducir "hay más" sin un count por página.
 const PAGE_SIZE = 20
 
-// ── Tipo manual de una fila del RPC (cliente UNTYPED) ────────────────────────
-// Debe calzar EXACTAMENTE con el RETURNS TABLE del RPC. Un desajuste aquí no lo
-// atrapa tsc; se valida en runtime y en el smoke test.
+const ORDEN_VALIDO = ['nombre', 'apellidos', 'numero_expediente', 'fecha_nacimiento', 'medico', 'created_at'] as const
+const DIRECCION_VALIDA = ['asc', 'desc'] as const
+type OrdenValido = typeof ORDEN_VALIDO[number]
+type DireccionValida = typeof DIRECCION_VALIDA[number]
+
+function esOrdenValido(s: string): s is OrdenValido {
+  return (ORDEN_VALIDO as readonly string[]).includes(s)
+}
+function esDireccionValida(s: string): s is DireccionValida {
+  return (DIRECCION_VALIDA as readonly string[]).includes(s)
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/
+
 interface MedicoChip {
   id: string
   titulo: string | null
@@ -44,9 +38,9 @@ interface FilaPacienteRPC {
   numero_expediente: string | null
   nombre: string
   apellidos: string
-  fecha_nacimiento: string | null // date serializada a 'YYYY-MM-DD'
+  fecha_nacimiento: string | null
   sexo: string | null
-  created_at: string // timestamptz ISO
+  created_at: string
   activo: boolean | null
   clinica_id: string
   medicos: MedicoChip[] | null
@@ -64,25 +58,46 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
 
-  // ── Parámetros de SUB-FASE 1 ───────────────────────────────────────────────
-  // Búsqueda: término crudo con trim; el RPC ya colapsa espacios internamente.
-  // NULL si viene vacío → desactiva el filtro.
   const busquedaRaw = (searchParams.get('q') ?? '').trim()
   const p_busqueda = busquedaRaw.length > 0 ? busquedaRaw : null
 
-  // Página (0-based), validada entero no negativo.
   const pagRaw = Number.parseInt(searchParams.get('pag') ?? '0', 10)
   const pag = Number.isFinite(pagRaw) && pagRaw >= 0 ? pagRaw : 0
 
-  // ── Llamada al RPC ─────────────────────────────────────────────────────────
-  // Se pide PAGE_SIZE + 1 para saber si hay siguiente página sin contar.
+  const ordenRaw = searchParams.get('orden') ?? ''
+  const p_orden: OrdenValido = esOrdenValido(ordenRaw) ? ordenRaw : 'created_at'
+  const direccionRaw = searchParams.get('direccion') ?? ''
+  const p_direccion: DireccionValida = esDireccionValida(direccionRaw) ? direccionRaw : 'desc'
+
+  const medicoRaw = searchParams.get('medico') ?? ''
+  const p_medico_id: string | null = UUID_RE.test(medicoRaw) ? medicoRaw : null
+
+  const desdeRaw = searchParams.get('desde') ?? ''
+  const hastaRaw = searchParams.get('hasta') ?? ''
+  let p_fecha_desde: string | null = null
+  let p_fecha_hasta: string | null = null
+  try {
+    if (FECHA_RE.test(desdeRaw)) {
+      p_fecha_desde = fechaHoraLocalAInstante(desdeRaw, '00:00')
+    }
+  } catch {
+    p_fecha_desde = null
+  }
+  try {
+    if (FECHA_RE.test(hastaRaw)) {
+      p_fecha_hasta = fechaHoraLocalAInstante(desplazarFecha(hastaRaw, { dias: 1 }), '00:00')
+    }
+  } catch {
+    p_fecha_hasta = null
+  }
+
   const { data, error } = await supabase.rpc('listar_pacientes_expediente', {
     p_busqueda,
-    p_medico_id: null,
-    p_fecha_desde: null,
-    p_fecha_hasta: null,
-    p_orden: 'created_at',
-    p_direccion: 'desc',
+    p_medico_id,
+    p_fecha_desde,
+    p_fecha_hasta,
+    p_orden,
+    p_direccion,
     p_limite: PAGE_SIZE + 1,
     p_offset: pag * PAGE_SIZE,
   })
@@ -96,19 +111,11 @@ export async function GET(req: NextRequest) {
   }
 
   const filas = (data ?? []) as FilaPacienteRPC[]
-
-  // "Hay más": si llegaron PAGE_SIZE + 1, hay siguiente página. Se descarta la
-  // fila sobrante antes de responder.
   const hayMas = filas.length > PAGE_SIZE
   const pacientes = hayMas ? filas.slice(0, PAGE_SIZE) : filas
 
-  // ── Count head del total — SOLO en la carga inicial sin búsqueda ───────────
-  // Decisión cerrada: contador fijo de la clínica, no se recalcula al filtrar.
-  // La RLS de `pacientes` ya acota por clínica/rol; el count (servido por el
-  // índice compuesto) da el total visible. Solo en pag 0 sin búsqueda; en
-  // cualquier otro caso total = null y el cliente conserva el que ya tenía.
   let total: number | null = null
-  if (pag === 0 && p_busqueda === null) {
+  if (pag === 0 && p_busqueda === null && p_medico_id === null && p_fecha_desde === null && p_fecha_hasta === null) {
     const { count, error: countError } = await supabase
       .from('pacientes')
       .select('id', { count: 'exact', head: true })
@@ -116,8 +123,6 @@ export async function GET(req: NextRequest) {
     if (!countError) {
       total = count ?? 0
     }
-    // Si el count falla, la lista NO se rompe: total queda null y el header
-    // simplemente no muestra número en esta carga.
   }
 
   return NextResponse.json({ pacientes, hayMas, total })

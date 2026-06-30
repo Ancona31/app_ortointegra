@@ -1,13 +1,18 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Search, ChevronRight, FileText, Stethoscope } from 'lucide-react'
+import { Plus, Search, ChevronRight, FileText, Stethoscope, ArrowUp, ArrowDown } from 'lucide-react'
 import Link from 'next/link'
 import { calcularEdad } from '@/lib/patientUtils'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
-import { fetchPacientesExpediente, type PacienteExpediente } from '@/lib/expediente/fetchPacientes'
+import { fetchPacientesExpediente, type PacienteExpediente, type OrdenColumna, type OrdenDireccion } from '@/lib/expediente/fetchPacientes'
 import { ListaChipsMedicos } from '@/components/expediente/ChipMedico'
 import { TablaPacientesExpediente } from '@/components/expediente/TablaPacientesExpediente'
+import { useProfile } from '@/hooks/useProfile'
+import { isMedicoInvitado } from '@/lib/permissions'
+import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
+
+type MedicoOpcion = { id: string; titulo: string | null; nombres: string | null; apellido_paterno: string | null; apellido_materno: string | null }
 
 const AVATAR_COLORS = [
   'bg-violet-100 text-violet-700',
@@ -40,8 +45,15 @@ export default function ExpedientePage() {
   const [hayMas, setHayMas] = useState(false)
   const [total, setTotal] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [orden, setOrden] = useState<OrdenColumna>('created_at')
+  const [direccion, setDireccion] = useState<OrdenDireccion>('desc')
+  const [medicoId, setMedicoId] = useState<string>('')
+  const [fechaDesde, setFechaDesde] = useState<string>('')
+  const [fechaHasta, setFechaHasta] = useState<string>('')
+  const [medicos, setMedicos] = useState<MedicoOpcion[]>([])
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { state: subState, openBloqueoModal } = useSubscriptionGate()
+  const { profile } = useProfile()
 
   // Fase 8.2: handler reutilizable para intercept de creación
   function interceptIfBlocked(e: React.MouseEvent) {
@@ -51,12 +63,26 @@ export default function ExpedientePage() {
     }
   }
 
-  async function cargar(busq: string, pag: number, acumular: boolean) {
+  async function cargar(
+    busq: string,
+    pag: number,
+    acumular: boolean,
+    ordenArg: OrdenColumna = orden,
+    dirArg: OrdenDireccion = direccion,
+    medicoArg: string = medicoId,
+    desdeArg: string = fechaDesde,
+    hastaArg: string = fechaHasta,
+  ) {
     setLoading(true)
     setError(null)
 
     try {
-      const resp = await fetchPacientesExpediente({ q: busq, pag })
+      const resp = await fetchPacientesExpediente({
+        q: busq, pag, orden: ordenArg, direccion: dirArg,
+        medicoId: medicoArg || null,
+        fechaDesde: desdeArg || null,
+        fechaHasta: hastaArg || null,
+      })
 
       // El route solo devuelve total en la carga inicial sin búsqueda; en el
       // resto de cargas total=null y se conserva el contador previo.
@@ -84,11 +110,76 @@ export default function ExpedientePage() {
   function cargarMas() {
     const siguiente = pagina + 1
     setPagina(siguiente)
-    cargar(busqueda, siguiente, true)
+    cargar(busqueda, siguiente, true, orden, direccion, medicoId, fechaDesde, fechaHasta)
   }
 
+  // Clic en columna (header o dropdown): misma columna alterna dirección; otra
+  // columna salta a 'asc'. Resetea a pág 0 y recarga con los valores nuevos
+  // EXPLÍCITOS (anti-stale-closure: setState es async, no se confía en el estado).
+  function cambiarOrden(col: OrdenColumna) {
+    const nuevaDir: OrdenDireccion = col === orden ? (direccion === 'asc' ? 'desc' : 'asc') : 'asc'
+    setOrden(col)
+    setDireccion(nuevaDir)
+    setPagina(0)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    cargar(busqueda, 0, false, col, nuevaDir, medicoId, fechaDesde, fechaHasta)
+  }
+
+  // Botón de dirección: alterna asc/desc sobre la columna vigente.
+  function cambiarDireccion() {
+    const nuevaDir: OrdenDireccion = direccion === 'asc' ? 'desc' : 'asc'
+    setDireccion(nuevaDir)
+    setPagina(0)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    cargar(busqueda, 0, false, orden, nuevaDir, medicoId, fechaDesde, fechaHasta)
+  }
+
+  // Filtros (aplicación instantánea): cada cambio resetea a pág 0, limpia el
+  // debounce pendiente y recarga pasando el valor nuevo EXPLÍCITO (anti-stale).
+  function cambiarMedico(id: string) {
+    setMedicoId(id); setPagina(0)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    cargar(busqueda, 0, false, orden, direccion, id, fechaDesde, fechaHasta)
+  }
+  function cambiarFechaDesde(v: string) {
+    setFechaDesde(v); setPagina(0)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    cargar(busqueda, 0, false, orden, direccion, medicoId, v, fechaHasta)
+  }
+  function cambiarFechaHasta(v: string) {
+    setFechaHasta(v); setPagina(0)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    cargar(busqueda, 0, false, orden, direccion, medicoId, fechaDesde, v)
+  }
+
+  // Carga la lista de médicos para el dropdown, recortada por rol: el médico
+  // invitado solo se ve a sí mismo (UX, no seguridad — la RLS ya limita).
+  useEffect(() => {
+    let cancelado = false
+    async function cargarMedicos() {
+      try {
+        const r = await fetch('/api/clinica/medicos')
+        if (!r.ok) return
+        const { medicos: lista } = await r.json() as { medicos: MedicoOpcion[] }
+        if (cancelado) return
+        if (isMedicoInvitado(profile) && profile?.id) {
+          const soloEl = (lista || []).filter(m => m.id === profile.id)
+          setMedicos(soloEl)
+          setMedicoId(profile.id)
+          cargar(busqueda, 0, false, orden, direccion, profile.id, fechaDesde, fechaHasta)
+        } else {
+          setMedicos(lista || [])
+        }
+      } catch {
+        // dropdown queda vacío (solo "Todos"); no rompe la página.
+      }
+    }
+    cargarMedicos()
+    return () => { cancelado = true }
+  }, [profile])
+
   return (
-    <div className="max-w-4xl mx-auto space-y-4 animate-slide-up">
+    <div className="max-w-6xl mx-auto space-y-4 animate-slide-up">
 
       {/* Header */}
       <div className="flex items-end justify-between">
@@ -111,16 +202,80 @@ export default function ExpedientePage() {
         </Link>
       </div>
 
-      {/* Buscador macOS */}
-      <div className="relative">
-        <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#86868b]" />
-        <input
-          type="text"
-          placeholder="Buscar por nombre o apellido..."
-          value={busqueda}
-          onChange={e => setBusqueda(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-[#1d1d1f] placeholder:text-[#86868b] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 transition-all shadow-sm"
-        />
+      {/* Barra: buscador (siempre visible) + filtros avanzados (solo desktop) */}
+      <div className="flex flex-col md:flex-row md:items-end gap-2">
+        {/* Buscador — siempre visible (móvil y desktop) */}
+        <div className="relative flex-1">
+          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#86868b]" />
+          <input
+            type="text"
+            placeholder="Buscar por nombre o apellido..."
+            value={busqueda}
+            onChange={e => setBusqueda(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-[#1d1d1f] placeholder:text-[#86868b] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 transition-all shadow-sm"
+          />
+        </div>
+
+        {/* Filtros avanzados — solo desktop (md+). En móvil se ocultan para no
+            desbordar; se expondrán en sub-fase 5. */}
+        <div className="hidden md:flex md:items-end gap-2">
+          <div>
+            <label className="block text-[11px] text-[#86868b] mb-1">Médico</label>
+            <select
+              value={medicoId}
+              onChange={e => cambiarMedico(e.target.value)}
+              className="py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 transition-all shadow-sm"
+            >
+              {!isMedicoInvitado(profile) && <option value="">Todos los médicos</option>}
+              {medicos.map(m => <option key={m.id} value={m.id}>{componerNombreMedicoCompleto(m)}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[11px] text-[#86868b] mb-1">Ingreso desde</label>
+            <input
+              type="date"
+              value={fechaDesde}
+              onChange={e => cambiarFechaDesde(e.target.value)}
+              className="py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 transition-all shadow-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] text-[#86868b] mb-1">hasta</label>
+            <input
+              type="date"
+              value={fechaHasta}
+              onChange={e => cambiarFechaHasta(e.target.value)}
+              className="py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 transition-all shadow-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] text-[#86868b] mb-1">Ordenar por</label>
+            <select
+              value={orden}
+              onChange={e => cambiarOrden(e.target.value as OrdenColumna)}
+              className="py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 transition-all shadow-sm"
+            >
+              <option value="apellidos">Apellido</option>
+              <option value="nombre">Nombre</option>
+              <option value="numero_expediente">Expediente</option>
+              <option value="fecha_nacimiento">F. nacimiento</option>
+              <option value="created_at">F. ingreso</option>
+              <option value="medico">Médico</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-[11px] text-[#86868b] mb-1">&nbsp;</label>
+            <button
+              type="button"
+              onClick={cambiarDireccion}
+              aria-label={direccion === 'asc' ? 'Orden ascendente' : 'Orden descendente'}
+              title={direccion === 'asc' ? 'Ascendente' : 'Descendente'}
+              className="py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-[#86868b] hover:text-[#1e5fa8] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 transition-all shadow-sm"
+            >
+              {direccion === 'asc' ? <ArrowUp size={15} /> : <ArrowDown size={15} />}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Lista */}
@@ -161,7 +316,7 @@ export default function ExpedientePage() {
         ) : (
           <>
             <div className="hidden md:block">
-              <TablaPacientesExpediente pacientes={pacientes} />
+              <TablaPacientesExpediente pacientes={pacientes} orden={orden} direccion={direccion} onOrden={cambiarOrden} />
             </div>
             <div className="divide-y divide-slate-100 md:hidden">
               {pacientes.map((p, i) => {
