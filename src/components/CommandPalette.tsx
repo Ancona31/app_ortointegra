@@ -112,7 +112,7 @@ export default function CommandPalette() {
 
   function navegar(id: string) {
     setOpen(false)
-    router.push(isSecretary ? '/pacientes' : `/expediente/${id}`)
+    router.push(isSecretary ? '/expediente' : `/expediente/${id}`)
   }
 
   function abrirCrear() {
@@ -149,7 +149,7 @@ export default function CommandPalette() {
       if (data.id) {
         setOpen(false)
         setDuplicateWarning(null)
-        router.push(isSecretary ? '/pacientes' : `/expediente/${data.id}`)
+        router.push(isSecretary ? '/expediente' : `/expediente/${data.id}`)
       }
     } finally {
       setCreando(false)
@@ -315,7 +315,7 @@ export default function CommandPalette() {
                         const id = duplicateWarning.existingPatient.id;
                         setDuplicateWarning(null);
                         setOpen(false);
-                        router.push(isSecretary ? '/pacientes' : `/expediente/${id}`);
+                        router.push(isSecretary ? '/expediente' : `/expediente/${id}`);
                       }}
                       className="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
                     >

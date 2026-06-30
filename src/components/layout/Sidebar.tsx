@@ -111,9 +111,9 @@ function navSecretaria(): NavSection[] {
     { kind: 'leaf', href: '/dashboard', label: 'Dashboard', icon: Home },
     {
       kind: 'group', key: 'pacientes', label: 'Pacientes', icon: Stethoscope,
-      matchPaths: ['/pacientes'],
+      matchPaths: ['/expediente'],
       children: [
-        { kind: 'leaf', href: '/pacientes',       label: 'Lista de pacientes', icon: Stethoscope },
+        { kind: 'leaf', href: '/expediente',      label: 'Expediente',         icon: Stethoscope },
         { kind: 'leaf', href: '/pacientes/nuevo', label: 'Nuevo paciente',     icon: UserPlus },
       ],
     },

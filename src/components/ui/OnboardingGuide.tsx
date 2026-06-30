@@ -77,24 +77,6 @@ const PAGE_CONTEXTS: PageContext[] = [
     ],
   },
   {
-    match: (p) => p === '/pacientes',
-    tips: [
-      {
-        id: 'pac-lista',
-        title: 'Expediente clínico',
-        message: 'Aquí aparecen todos los pacientes que se han registrado. Elige uno para abrir su expediente o búscalo en la barra de búsqueda. Si no está tu paciente, también puedes hacer un "registro express" y saltar a tu consulta inmediatamente.',
-        highlight: 'nuevo-paciente',
-      },
-      {
-        id: 'pac-nuevo',
-        title: 'Registro express',
-        message: 'Haz clic en "Nuevo Paciente" para crear un expediente rápido. Solo necesitas nombre y un dato de contacto — en segundos estarás listo para comenzar tu consulta.',
-        highlight: 'nuevo-paciente',
-        action: { label: 'Nuevo paciente', href: '/pacientes/nuevo' },
-      },
-    ],
-  },
-  {
     match: (p) => p === '/pacientes/nuevo',
     tips: [
       {
