@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Search, ChevronRight, FileText, Stethoscope, ArrowUp, ArrowDown } from 'lucide-react'
+import { Plus, Search, Stethoscope, ArrowUp, ArrowDown } from 'lucide-react'
 import Link from 'next/link'
 import { calcularEdad } from '@/lib/patientUtils'
+import { renderEnTZ } from '@/lib/dates'
+import { KebabAccionesPaciente } from '@/components/expediente/KebabAccionesPaciente'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
 import { fetchPacientesExpediente, type PacienteExpediente, type OrdenColumna, type OrdenDireccion } from '@/lib/expediente/fetchPacientes'
 import { ListaChipsMedicos } from '@/components/expediente/ChipMedico'
@@ -22,11 +24,20 @@ const AVATAR_COLORS = [
   'bg-rose-100 text-rose-700',
 ]
 
+const ETIQUETA_ORDEN: Record<OrdenColumna, string> = {
+  apellidos: 'Apellido',
+  nombre: 'Nombre',
+  numero_expediente: 'Expediente',
+  fecha_nacimiento: 'Edad',
+  created_at: 'Fecha de ingreso',
+  medico: 'Médico',
+}
+
 function PacienteSkeleton() {
   return (
     <div className="flex items-center justify-between px-5 py-4 animate-pulse">
       <div className="flex items-center gap-4">
-        <div className="w-9 h-9 rounded-xl bg-slate-100" />
+        <div className="w-10 h-10 rounded-xl bg-slate-100" />
         <div className="space-y-2">
           <div className="h-3 w-36 bg-slate-100 rounded-full" />
           <div className="h-2.5 w-24 bg-slate-100 rounded-full" />
@@ -54,6 +65,7 @@ export default function ExpedientePage() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { state: subState, openBloqueoModal } = useSubscriptionGate()
   const { profile, isSecretary } = useProfile()
+  const mostrarAcciones = !isSecretary && !!profile
 
   // Fase 8.2: handler reutilizable para intercept de creación
   function interceptIfBlocked(e: React.MouseEvent) {
@@ -279,93 +291,46 @@ export default function ExpedientePage() {
       </div>
 
       {/* Lista */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm">
-        {loading && pacientes.length === 0 ? (
+      {loading && pacientes.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm">
           <div className="divide-y divide-slate-100">
             {[1,2,3,4,5].map(i => <PacienteSkeleton key={i} />)}
           </div>
-        ) : error && pacientes.length === 0 ? (
-          <div className="py-16 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-rose-50 flex items-center justify-center mx-auto mb-4">
-              <Stethoscope size={24} className="text-rose-300" />
-            </div>
-            <p className="text-sm font-medium text-[#3d3d3f]">No se pudo cargar la lista</p>
-            <p className="text-xs text-[#86868b] mt-1 mb-4">{error}</p>
-            <button
-              onClick={() => cargar(busqueda, pagina, false)}
-              className="text-sm text-[#1e5fa8] font-medium hover:underline"
-            >
-              Reintentar
-            </button>
+        </div>
+      ) : error && pacientes.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm py-16 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-rose-50 flex items-center justify-center mx-auto mb-4">
+            <Stethoscope size={24} className="text-rose-300" />
           </div>
-        ) : pacientes.length === 0 ? (
-          <div className="py-16 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
-              <Stethoscope size={24} className="text-slate-300" />
-            </div>
-            <p className="text-sm font-medium text-[#3d3d3f]">No se encontraron pacientes</p>
-            <p className="text-xs text-[#86868b] mt-1 mb-4">
-              {busqueda ? 'Intenta con otro nombre' : 'Registra tu primer paciente'}
-            </p>
-            {!busqueda && (
-              <Link href="/pacientes/nuevo" onClick={interceptIfBlocked} className="text-sm text-[#1e5fa8] font-medium hover:underline">
-                + Nuevo paciente
-              </Link>
-            )}
+          <p className="text-sm font-medium text-[#3d3d3f]">No se pudo cargar la lista</p>
+          <p className="text-xs text-[#86868b] mt-1 mb-4">{error}</p>
+          <button onClick={() => cargar(busqueda, pagina, false)} className="text-sm text-[#1e5fa8] font-medium hover:underline">
+            Reintentar
+          </button>
+        </div>
+      ) : pacientes.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm py-16 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+            <Stethoscope size={24} className="text-slate-300" />
           </div>
-        ) : (
-          <>
-            <div className="hidden md:block">
-              <TablaPacientesExpediente pacientes={pacientes} orden={orden} direccion={direccion} onOrden={cambiarOrden} mostrarAcciones={!isSecretary && !!profile} />
-            </div>
-            <div className="divide-y divide-slate-100 md:hidden">
-              {pacientes.map((p, i) => {
-                const edad = p.fecha_nacimiento ? calcularEdad(p.fecha_nacimiento) : null
-                const avatarColor = AVATAR_COLORS[i % AVATAR_COLORS.length]
-                return (
-                  <div key={p.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-slate-50/80 transition-colors group">
-                    <Link href={`/expediente/${p.id}`} className="flex items-center gap-3.5 flex-1 min-w-0">
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarColor}`}>
-                        {p.nombre.charAt(0)}{p.apellidos.charAt(0)}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-[#1d1d1f] truncate">
-                          {p.nombre} {p.apellidos}
-                        </p>
-                        <p className="text-[11px] text-[#86868b] mt-0.5">
-                          {edad !== null ? `${edad.textoElegante} · ` : ''}
-                          {p.sexo === 'M' ? 'Masculino' : p.sexo === 'F' ? 'Femenino' : 'Otro'}
-                          {p.numero_expediente ? ` · ${p.numero_expediente}` : ''}
-                        </p>
-                        <div className="mt-1">
-                          <ListaChipsMedicos medicos={p.medicos} />
-                        </div>
-                      </div>
-                    </Link>
-                    <div className="flex items-center gap-1 flex-shrink-0 ml-3">
-                      <Link
-                        href={`/expediente/${p.id}/nueva-nota`}
-                        title="Nueva nota"
-                        onClick={interceptIfBlocked}
-                        className="hidden sm:flex items-center gap-1 text-[11px] text-[#86868b] hover:text-[#1e5fa8] hover:bg-blue-50 px-2.5 py-1.5 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                      >
-                        <FileText size={12} /> Nueva nota
-                      </Link>
-                      <Link href={`/expediente/${p.id}`}>
-                        <ChevronRight size={16} className="text-slate-300 group-hover:text-[#86868b] transition-colors" />
-                      </Link>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+          <p className="text-sm font-medium text-[#3d3d3f]">No se encontraron pacientes</p>
+          <p className="text-xs text-[#86868b] mt-1 mb-4">
+            {busqueda ? 'Intenta con otro nombre' : 'Registra tu primer paciente'}
+          </p>
+          {!busqueda && (
+            <Link href="/pacientes/nuevo" onClick={interceptIfBlocked} className="text-sm text-[#1e5fa8] font-medium hover:underline">
+              + Nuevo paciente
+            </Link>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* DESKTOP: tabla dentro de bloque blanco */}
+          <div className="hidden md:block bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm">
+            <TablaPacientesExpediente pacientes={pacientes} orden={orden} direccion={direccion} onOrden={cambiarOrden} mostrarAcciones={mostrarAcciones} />
             {hayMas && (
               <div className="px-5 py-3.5 border-t border-slate-100 text-center">
-                <button
-                  onClick={cargarMas}
-                  disabled={loading}
-                  className="text-sm text-[#1e5fa8] hover:text-[#1a3a5c] font-medium disabled:opacity-40 transition-colors"
-                >
+                <button onClick={cargarMas} disabled={loading} className="text-sm text-[#1e5fa8] hover:text-[#1a3a5c] font-medium disabled:opacity-40 transition-colors">
                   {loading ? 'Cargando...' : 'Cargar más pacientes'}
                 </button>
               </div>
@@ -375,9 +340,75 @@ export default function ExpedientePage() {
                 <p className="text-xs text-rose-600">{error}</p>
               </div>
             )}
-          </>
-        )}
-      </div>
+          </div>
+
+          {/* MÓVIL: resumen + tarjetas individuales */}
+          <div className="md:hidden space-y-3">
+            <div className="flex items-center gap-1.5 px-1 text-[11px] text-[#86868b]">
+              {direccion === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
+              <span>Ordenado por <span className="font-semibold text-[#3d3d3f]">{ETIQUETA_ORDEN[orden]}</span> · {direccion === 'asc' ? 'Asc.' : 'Desc.'}</span>
+            </div>
+
+            {pacientes.map((p, i) => {
+              const edad = p.fecha_nacimiento ? calcularEdad(p.fecha_nacimiento) : null
+              const avatarColor = AVATAR_COLORS[i % AVATAR_COLORS.length]
+              const sexoLabel = p.sexo === 'M' ? 'Masculino' : p.sexo === 'F' ? 'Femenino' : 'Otro'
+              return (
+                <div key={p.id} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm px-5 py-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarColor}`}>
+                        {p.nombre.charAt(0)}{p.apellidos.charAt(0)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-[#1d1d1f] truncate">
+                          {p.nombre} {p.apellidos}
+                        </p>
+                        <p className="text-[11px] text-[#86868b] mt-0.5">
+                          {edad !== null ? `${edad.textoElegante} · ` : ''}{sexoLabel}
+                        </p>
+                      </div>
+                    </div>
+                    {mostrarAcciones && (
+                      <div className="flex-shrink-0">
+                        <KebabAccionesPaciente pacienteId={p.id} />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-3 pl-[3.375rem] space-y-1.5">
+                    <div className="flex items-baseline gap-2 text-[12px]">
+                      <span className="text-[#86868b] w-20 flex-shrink-0">Expediente</span>
+                      <span className="text-[#3d3d3f] font-medium">{p.numero_expediente || '—'}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[12px]">
+                      <span className="text-[#86868b] w-20 flex-shrink-0">Médicos</span>
+                      <span className="min-w-0"><ListaChipsMedicos medicos={p.medicos} /></span>
+                    </div>
+                    <div className="flex items-baseline gap-2 text-[12px]">
+                      <span className="text-[#86868b] w-20 flex-shrink-0">Ingreso</span>
+                      <span className="text-[#3d3d3f] font-medium">{p.created_at ? renderEnTZ(p.created_at, 'd MMM yyyy') : '—'}</span>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+
+            {hayMas && (
+              <div className="text-center pt-1">
+                <button onClick={cargarMas} disabled={loading} className="text-sm text-[#1e5fa8] hover:text-[#1a3a5c] font-medium disabled:opacity-40 transition-colors">
+                  {loading ? 'Cargando...' : 'Cargar más pacientes'}
+                </button>
+              </div>
+            )}
+            {error && pacientes.length > 0 && (
+              <div className="text-center">
+                <p className="text-xs text-rose-600">{error}</p>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }
