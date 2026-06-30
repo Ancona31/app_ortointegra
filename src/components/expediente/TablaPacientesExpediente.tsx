@@ -1,12 +1,11 @@
 'use client'
 
-import { ChevronsUpDown } from 'lucide-react'
+import { ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react'
 import { calcularEdad } from '@/lib/patientUtils'
 import { renderEnTZ } from '@/lib/dates'
 import { ListaChipsMedicos } from '@/components/expediente/ChipMedico'
-import type { PacienteExpediente } from '@/lib/expediente/fetchPacientes'
+import type { PacienteExpediente, OrdenColumna, OrdenDireccion } from '@/lib/expediente/fetchPacientes'
 
-// Paleta de avatares por índice (mismo criterio que la card de la lista).
 const AVATAR_COLORS = [
   'bg-violet-100 text-violet-700',
   'bg-blue-100 text-blue-700',
@@ -15,42 +14,67 @@ const AVATAR_COLORS = [
   'bg-rose-100 text-rose-700',
 ]
 
-// Encabezado de columna. Las flechitas de orden son INERTES en sub-fase 2:
-// el orden funcional por columna se cablea en la sub-fase 3 (junto con filtros).
-function ThOrdenable({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+interface Props {
+  pacientes: PacienteExpediente[]
+  orden: OrdenColumna
+  direccion: OrdenDireccion
+  onOrden: (col: OrdenColumna) => void
+}
+
+// Encabezado ordenable: clic dispara onOrden(col). La flechita refleja si esta
+// columna es la activa y en qué dirección.
+function ThOrdenable({
+  col,
+  orden,
+  direccion,
+  onOrden,
+  children,
+}: {
+  col: OrdenColumna
+  orden: OrdenColumna
+  direccion: OrdenDireccion
+  onOrden: (col: OrdenColumna) => void
+  children: React.ReactNode
+}) {
+  const activa = orden === col
   return (
-    <th className={`text-left text-[11px] font-semibold uppercase tracking-wide text-[#86868b] px-4 py-3 ${className}`}>
-      <span className="inline-flex items-center gap-1">
+    <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-[#86868b] px-4 py-3">
+      <button
+        type="button"
+        onClick={() => onOrden(col)}
+        className="inline-flex items-center gap-1 hover:text-[#1e5fa8] transition-colors"
+      >
         {children}
-        <ChevronsUpDown size={12} className="text-slate-300" />
-      </span>
+        {activa ? (
+          direccion === 'asc'
+            ? <ChevronUp size={12} className="text-[#1e5fa8]" />
+            : <ChevronDown size={12} className="text-[#1e5fa8]" />
+        ) : (
+          <ChevronsUpDown size={12} className="text-slate-300" />
+        )}
+      </button>
     </th>
   )
 }
 
-// Encabezado simple (sin orden), p. ej. Médicos.
-function Th({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className={`text-left text-[11px] font-semibold uppercase tracking-wide text-[#86868b] px-4 py-3 ${className}`}>
+    <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-[#86868b] px-4 py-3">
       {children}
     </th>
   )
 }
 
-interface Props {
-  pacientes: PacienteExpediente[]
-}
-
-export function TablaPacientesExpediente({ pacientes }: Props) {
+export function TablaPacientesExpediente({ pacientes, orden, direccion, onOrden }: Props) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse">
         <thead>
           <tr className="border-b border-slate-100">
-            <ThOrdenable>Paciente</ThOrdenable>
-            <ThOrdenable>Edad</ThOrdenable>
-            <ThOrdenable>Expediente</ThOrdenable>
-            <ThOrdenable>Fecha de ingreso</ThOrdenable>
+            <ThOrdenable col="apellidos" orden={orden} direccion={direccion} onOrden={onOrden}>Paciente</ThOrdenable>
+            <ThOrdenable col="fecha_nacimiento" orden={orden} direccion={direccion} onOrden={onOrden}>Edad</ThOrdenable>
+            <ThOrdenable col="numero_expediente" orden={orden} direccion={direccion} onOrden={onOrden}>Expediente</ThOrdenable>
+            <ThOrdenable col="created_at" orden={orden} direccion={direccion} onOrden={onOrden}>Fecha de ingreso</ThOrdenable>
             <Th>Médicos</Th>
           </tr>
         </thead>
