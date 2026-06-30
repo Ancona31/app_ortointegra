@@ -16,6 +16,14 @@ export type OrdenColumna =
 
 export type OrdenDireccion = 'asc' | 'desc'
 
+export type MedicoOpcion = {
+  id: string
+  titulo: string | null
+  nombres: string | null
+  apellido_paterno: string | null
+  apellido_materno: string | null
+}
+
 export interface PacienteExpediente {
   id: string
   numero_expediente: string | null

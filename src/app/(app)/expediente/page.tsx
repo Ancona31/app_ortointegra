@@ -1,20 +1,19 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Search, Stethoscope, ArrowUp, ArrowDown } from 'lucide-react'
+import { Plus, Search, Stethoscope, ArrowUp, ArrowDown, ListFilter } from 'lucide-react'
 import Link from 'next/link'
 import { calcularEdad } from '@/lib/patientUtils'
 import { renderEnTZ } from '@/lib/dates'
 import { KebabAccionesPaciente } from '@/components/expediente/KebabAccionesPaciente'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
-import { fetchPacientesExpediente, type PacienteExpediente, type OrdenColumna, type OrdenDireccion } from '@/lib/expediente/fetchPacientes'
+import { fetchPacientesExpediente, type PacienteExpediente, type OrdenColumna, type OrdenDireccion, type MedicoOpcion } from '@/lib/expediente/fetchPacientes'
 import { ListaChipsMedicos } from '@/components/expediente/ChipMedico'
 import { TablaPacientesExpediente } from '@/components/expediente/TablaPacientesExpediente'
+import { SheetFiltrosExpediente } from '@/components/expediente/SheetFiltrosExpediente'
 import { useProfile } from '@/hooks/useProfile'
 import { isMedicoInvitado } from '@/lib/permissions'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
-
-type MedicoOpcion = { id: string; titulo: string | null; nombres: string | null; apellido_paterno: string | null; apellido_materno: string | null }
 
 const AVATAR_COLORS = [
   'bg-violet-100 text-violet-700',
@@ -62,10 +61,14 @@ export default function ExpedientePage() {
   const [fechaDesde, setFechaDesde] = useState<string>('')
   const [fechaHasta, setFechaHasta] = useState<string>('')
   const [medicos, setMedicos] = useState<MedicoOpcion[]>([])
+  const [sheetAbierto, setSheetAbierto] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { state: subState, openBloqueoModal } = useSubscriptionGate()
   const { profile, isSecretary } = useProfile()
   const mostrarAcciones = !isSecretary && !!profile
+  const ocultarTodosMedicos = isMedicoInvitado(profile)
+  const medicoPorDefecto = isMedicoInvitado(profile) && profile?.id ? profile.id : ''
+  const hayFiltrosActivos = (medicoId !== medicoPorDefecto) || fechaDesde !== '' || fechaHasta !== ''
 
   // Fase 8.2: handler reutilizable para intercept de creación
   function interceptIfBlocked(e: React.MouseEvent) {
@@ -164,6 +167,19 @@ export default function ExpedientePage() {
     cargar(busqueda, 0, false, orden, direccion, medicoId, fechaDesde, v)
   }
 
+  // Aplicación del bottom-sheet de filtros (móvil): promueve el borrador del
+  // sheet al estado real en UNA sola recarga, con valores EXPLÍCITOS (anti-stale).
+  function aplicarFiltrosSheet(f: { medicoId: string; fechaDesde: string; fechaHasta: string; orden: OrdenColumna; direccion: OrdenDireccion }) {
+    setMedicoId(f.medicoId)
+    setFechaDesde(f.fechaDesde)
+    setFechaHasta(f.fechaHasta)
+    setOrden(f.orden)
+    setDireccion(f.direccion)
+    setPagina(0)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    cargar(busqueda, 0, false, f.orden, f.direccion, f.medicoId, f.fechaDesde, f.fechaHasta)
+  }
+
   // Carga la lista de médicos para el dropdown, recortada por rol: el médico
   // invitado solo se ve a sí mismo (UX, no seguridad — la RLS ya limita).
   useEffect(() => {
@@ -216,16 +232,27 @@ export default function ExpedientePage() {
 
       {/* Barra: buscador (siempre visible) + filtros avanzados (solo desktop) */}
       <div className="flex flex-col md:flex-row md:items-end gap-2">
-        {/* Buscador — siempre visible (móvil y desktop) */}
-        <div className="relative flex-1">
-          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#86868b]" />
-          <input
-            type="text"
-            placeholder="Buscar por nombre o apellido..."
-            value={busqueda}
-            onChange={e => setBusqueda(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-[#1d1d1f] placeholder:text-[#86868b] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 transition-all shadow-sm"
-          />
+        {/* Buscador (siempre visible) + botón embudo (solo móvil) */}
+        <div className="flex items-center gap-2 flex-1">
+          <div className="relative flex-1">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#86868b]" />
+            <input
+              type="text"
+              placeholder="Buscar por nombre o apellido..."
+              value={busqueda}
+              onChange={e => setBusqueda(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-[#1d1d1f] placeholder:text-[#86868b] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 transition-all shadow-sm"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setSheetAbierto(true)}
+            aria-label="Filtrar y ordenar"
+            className="md:hidden relative flex-shrink-0 p-2.5 bg-white border border-slate-200 rounded-xl text-[#86868b] hover:text-[#1e5fa8] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 transition-all shadow-sm"
+          >
+            <ListFilter size={18} />
+            {hayFiltrosActivos && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#1e5fa8] rounded-full ring-2 ring-white" />}
+          </button>
         </div>
 
         {/* Filtros avanzados — solo desktop (md+). En móvil se ocultan para no
@@ -409,6 +436,20 @@ export default function ExpedientePage() {
           </div>
         </>
       )}
+
+      <SheetFiltrosExpediente
+        open={sheetAbierto}
+        onClose={() => setSheetAbierto(false)}
+        medicoId={medicoId}
+        fechaDesde={fechaDesde}
+        fechaHasta={fechaHasta}
+        orden={orden}
+        direccion={direccion}
+        medicos={medicos}
+        ocultarTodosMedicos={ocultarTodosMedicos}
+        medicoPorDefecto={medicoPorDefecto}
+        onAplicar={aplicarFiltrosSheet}
+      />
     </div>
   )
 }
