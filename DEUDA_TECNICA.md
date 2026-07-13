@@ -610,4 +610,20 @@ inherentemente best-effort.
 
 ---
 
+## Dependencias / Entorno
+
+### DEP-DT-1 — Vulnerabilidades de dependencias npm (npm audit)
+
+**Detectado:** 2026-07-06, durante verificación de entorno (npm ci tras actualización de node a v24.15.0).
+
+**Estado:** `npm ci` reporta 32 vulnerabilidades (1 baja, 23 moderadas, 8 altas) en el árbol de dependencias. La instalación es limpia y coincide con producción (Vercel usa npm ci desde el mismo lock); las vulnerabilidades están en dependencias transitivas, no en dependencias directas declaradas.
+
+**Regla crítica:** NO ejecutar `npm audit fix --force`. Reescribe package-lock.json y puede cambiar versiones de paquetes rompiendo compatibilidad (Next 16 / React 19 / stack actual). Cualquier corrección debe hacerse revisando cada vulnerabilidad individualmente, validando que la versión objetivo es compatible, y probando build + smoke antes de commitear.
+
+**Warnings de deprecación conocidos (transitivos, no accionables directamente):** inflight@1.0.6, lodash.get@4.4.2, glob@7.2.3, dommatrix@1.0.3, node-domexception@1.0.0. Dependen de que los mantenedores de las librerías padre los actualicen.
+
+**Acción pendiente (proyecto aparte, NO bloquea billing):** correr `npm audit` (sin fix) para inventariar las 8 vulnerabilidades altas, determinar cuáles afectan runtime de producción vs. dev/build únicamente, y decidir mitigaciones caso por caso. Sesión dedicada, fuera del proyecto de cierre de fugas de billing Stripe.
+
+---
+
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)
