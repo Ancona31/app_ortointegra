@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import stripe from '@/lib/stripe'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPlanByPriceId, PLAN_LIMITS, type PlanKey } from '@/lib/plans'
+import { logger } from '@/lib/logger'
 import type Stripe from 'stripe'
 
 export const runtime = 'nodejs'
@@ -16,9 +17,9 @@ async function actualizarClinica(
   priceId: string,
   estado: 'activo' | 'vencido' | 'cancelado',
   periodEnd?: number | null,
-) {
+): Promise<{ error: unknown }> {
   const limits = PLAN_LIMITS[plan]
-  await admin.from('clinicas').update({
+  const { error: errPrincipal } = await admin.from('clinicas').update({
     plan,
     suscripcion_estado: estado,
     stripe_subscription_id: subscriptionId,
@@ -29,15 +30,25 @@ async function actualizarClinica(
     suscripcion_ends_at: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
   }).eq('id', clinicaId)
 
+  if (errPrincipal) {
+    logger.error('STRIPE-WEBHOOK', `Fallo UPDATE clinica ${clinicaId} estado=${estado}`)
+    return { error: errPrincipal }
+  }
+
   // Planes de clínica: convertir cuenta a tipo='clinica'
   // El dueño ya es admin de clínica por defecto desde el registro (es_admin_de_clinica=true)
   if (PLANES_CLINICA.includes(plan)) {
-    await admin.from('clinicas').update({ tipo: 'clinica' }).eq('id', clinicaId)
+    const { error: errTipo } = await admin.from('clinicas').update({ tipo: 'clinica' }).eq('id', clinicaId)
+    if (errTipo) {
+      logger.error('STRIPE-WEBHOOK', `Fallo UPDATE tipo=clinica ${clinicaId}`)
+      return { error: errTipo }
+    }
   }
+
+  return { error: null }
 }
 
 function getSubscriptionIdFromInvoice(invoice: Stripe.Invoice): string | null {
-  // Stripe v21: invoice.parent.subscription_details.subscription
   const subDetails = invoice.parent?.subscription_details
   if (!subDetails) return null
   const sub = subDetails.subscription
@@ -57,8 +68,11 @@ export async function POST(req: NextRequest) {
   try {
     event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET)
   } catch {
+    logger.warn('STRIPE-WEBHOOK', 'Firma invalida rechazada')
     return NextResponse.json({ error: 'Firma inválida' }, { status: 400 })
   }
+
+  logger.info('STRIPE-WEBHOOK', `Evento recibido tipo=${event.type} id=${event.id}`)
 
   const admin = createAdminClient()
 
@@ -75,12 +89,16 @@ export async function POST(req: NextRequest) {
       const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
       const priceId = subscription.items.data[0]?.price.id ?? ''
 
-      await actualizarClinica(
+      const { error } = await actualizarClinica(
         admin, clinicaId, planKey,
         subscription.id, priceId,
         'activo',
         subscription.items.data[0]?.current_period_end,
       )
+      if (error) {
+        return NextResponse.json({ error: 'db_error' }, { status: 500 })
+      }
+      logger.info('STRIPE-WEBHOOK', `checkout.completed aplicado clinica=${clinicaId} estado=activo`)
       break
     }
 
@@ -96,12 +114,16 @@ export async function POST(req: NextRequest) {
       if (subscription.status === 'past_due' || subscription.status === 'unpaid') estado = 'vencido'
       if (subscription.status === 'canceled') estado = 'cancelado'
 
-      await actualizarClinica(
+      const { error } = await actualizarClinica(
         admin, clinicaId, planKey,
         subscription.id, priceId,
         estado,
         subscription.items.data[0]?.current_period_end,
       )
+      if (error) {
+        return NextResponse.json({ error: 'db_error' }, { status: 500 })
+      }
+      logger.info('STRIPE-WEBHOOK', `subscription.updated aplicado clinica=${clinicaId} status=${subscription.status} estado=${estado}`)
       break
     }
 
@@ -110,11 +132,16 @@ export async function POST(req: NextRequest) {
       const clinicaId = subscription.metadata?.clinica_id
       if (!clinicaId) break
 
-      const { data: row } = await admin
+      const { data: row, error: errSelect } = await admin
         .from('clinicas')
         .select('es_vip_grant')
         .eq('id', clinicaId)
         .maybeSingle()
+
+      if (errSelect) {
+        logger.error('STRIPE-WEBHOOK', `Fallo SELECT es_vip_grant ${clinicaId}`)
+        return NextResponse.json({ error: 'db_error' }, { status: 500 })
+      }
 
       const esVip = row?.es_vip_grant === true
 
@@ -136,10 +163,16 @@ export async function POST(req: NextRequest) {
             max_pacientes: PLAN_LIMITS.free.max_pacientes,
           }
 
-      await admin
+      const { error: errUpdate } = await admin
         .from('clinicas')
         .update({ ...camposBase, ...camposLimites })
         .eq('id', clinicaId)
+
+      if (errUpdate) {
+        logger.error('STRIPE-WEBHOOK', `Fallo UPDATE deleted ${clinicaId}`)
+        return NextResponse.json({ error: 'db_error' }, { status: 500 })
+      }
+      logger.info('STRIPE-WEBHOOK', `subscription.deleted aplicado clinica=${clinicaId} vip=${esVip}`)
       break
     }
 
@@ -148,16 +181,26 @@ export async function POST(req: NextRequest) {
       const subscriptionId = getSubscriptionIdFromInvoice(invoice)
       if (!subscriptionId) break
 
-      const { data: clinica } = await admin
+      const { data: clinica, error: errSelect } = await admin
         .from('clinicas')
         .select('id')
         .eq('stripe_subscription_id', subscriptionId)
-        .single()
+        .maybeSingle()
+
+      if (errSelect) {
+        logger.error('STRIPE-WEBHOOK', `Fallo SELECT payment_failed sub=${subscriptionId}`)
+        return NextResponse.json({ error: 'db_error' }, { status: 500 })
+      }
 
       if (clinica) {
-        await admin.from('clinicas')
+        const { error: errUpdate } = await admin.from('clinicas')
           .update({ suscripcion_estado: 'vencido' })
           .eq('id', clinica.id)
+        if (errUpdate) {
+          logger.error('STRIPE-WEBHOOK', `Fallo UPDATE payment_failed clinica=${clinica.id}`)
+          return NextResponse.json({ error: 'db_error' }, { status: 500 })
+        }
+        logger.info('STRIPE-WEBHOOK', `invoice.payment_failed aplicado clinica=${clinica.id} estado=vencido`)
       }
       break
     }
@@ -167,16 +210,26 @@ export async function POST(req: NextRequest) {
       const subscriptionId = getSubscriptionIdFromInvoice(invoice)
       if (!subscriptionId) break
 
-      const { data: clinica } = await admin
+      const { data: clinica, error: errSelect } = await admin
         .from('clinicas')
         .select('id')
         .eq('stripe_subscription_id', subscriptionId)
-        .single()
+        .maybeSingle()
+
+      if (errSelect) {
+        logger.error('STRIPE-WEBHOOK', `Fallo SELECT payment_succeeded sub=${subscriptionId}`)
+        return NextResponse.json({ error: 'db_error' }, { status: 500 })
+      }
 
       if (clinica) {
-        await admin.from('clinicas')
+        const { error: errUpdate } = await admin.from('clinicas')
           .update({ suscripcion_estado: 'activo' })
           .eq('id', clinica.id)
+        if (errUpdate) {
+          logger.error('STRIPE-WEBHOOK', `Fallo UPDATE payment_succeeded clinica=${clinica.id}`)
+          return NextResponse.json({ error: 'db_error' }, { status: 500 })
+        }
+        logger.info('STRIPE-WEBHOOK', `invoice.payment_succeeded aplicado clinica=${clinica.id} estado=activo`)
       }
       break
     }
