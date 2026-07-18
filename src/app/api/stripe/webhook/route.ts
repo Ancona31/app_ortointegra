@@ -9,26 +9,21 @@ export const runtime = 'nodejs'
 
 const PLANES_CLINICA: PlanKey[] = ['basica', 'pro', 'premium']
 
-// Mapea subscription.status de Stripe a nuestro suscripcion_estado.
-// Devuelve null para status NO productivos (no se debe escribir estado ni sub_id).
 function mapStatusToEstado(status: Stripe.Subscription.Status): 'activo' | 'vencido' | 'cancelado' | null {
   switch (status) {
     case 'active':
       return 'activo'
     case 'past_due':
-      return 'activo'      // gracia: el corte llega vía unpaid/canceled tras dunning
+      return 'activo'
     case 'unpaid':
       return 'vencido'
     case 'canceled':
       return 'cancelado'
     default:
-      // incomplete, incomplete_expired, paused, trialing → no productivo
       return null
   }
 }
 
-// Resuelve el PlanKey de una suscripción: metadata.plan validado primero,
-// luego getPlanByPriceId. Devuelve null si ninguna fuente da un plan válido de pago.
 function resolvePlanKey(subscription: Stripe.Subscription, priceId: string): PlanKey | null {
   const metaPlan = subscription.metadata?.plan
   if (metaPlan && metaPlan in PLAN_LIMITS && metaPlan !== 'free') {
@@ -39,6 +34,12 @@ function resolvePlanKey(subscription: Stripe.Subscription, priceId: string): Pla
     return derived
   }
   return null
+}
+
+// True si el error de Stripe indica que el recurso ya no existe (permanente).
+function isStripeResourceMissing(err: unknown): boolean {
+  const e = err as { statusCode?: number; code?: string }
+  return e?.statusCode === 404 || e?.code === 'resource_missing'
 }
 
 async function actualizarClinica(
@@ -62,8 +63,6 @@ async function actualizarClinica(
     max_secretarias: limits.max_secretarias,
     max_pacientes: limits.max_pacientes,
     suscripcion_ends_at: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
-    // Planes de clínica: convertir cuenta a tipo='clinica' en el mismo UPDATE.
-    // El dueño ya es admin de clínica por defecto desde el registro (es_admin_de_clinica=true)
     ...(esClinica ? { tipo: 'clinica' as const } : {}),
   }).eq('id', clinicaId)
 
@@ -103,6 +102,23 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
 
+  // Idempotencia (SELECT-first): si el event.id ya fue ackeado con éxito, ack sin reprocesar.
+  const { data: yaProcesado, error: errDedupSelect } = await admin
+    .from('stripe_webhook_events')
+    .select('event_id')
+    .eq('event_id', event.id)
+    .maybeSingle()
+
+  if (errDedupSelect) {
+    logger.error('STRIPE-WEBHOOK', `Fallo SELECT idempotencia event=${event.id}`)
+    return NextResponse.json({ error: 'db_error' }, { status: 500 })
+  }
+
+  if (yaProcesado) {
+    logger.info('STRIPE-WEBHOOK', `Evento duplicado ignorado id=${event.id} (ya procesado)`)
+    return NextResponse.json({ received: true, duplicate: true })
+  }
+
   switch (event.type) {
 
     case 'checkout.session.completed': {
@@ -112,13 +128,22 @@ export async function POST(req: NextRequest) {
       const clinicaId = session.metadata?.clinica_id
       if (!clinicaId) break
 
-      const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
+      let subscription: Stripe.Subscription
+      try {
+        subscription = await stripe.subscriptions.retrieve(session.subscription as string)
+      } catch (err) {
+        if (isStripeResourceMissing(err)) {
+          logger.warn('STRIPE-WEBHOOK', `checkout.completed sub inexistente clinica=${clinicaId} (no-op)`)
+          break
+        }
+        logger.error('STRIPE-WEBHOOK', `checkout.completed retrieve fallo clinica=${clinicaId}`)
+        return NextResponse.json({ error: 'stripe_retrieve_error' }, { status: 500 })
+      }
+
       const priceId = subscription.items.data[0]?.price.id ?? ''
 
       const estado = mapStatusToEstado(subscription.status)
       if (estado === null) {
-        // Status no productivo (ej. incomplete por SCA/3DS pendiente): no escribir nada.
-        // customer.subscription.updated aplicará el estado cuando el pago se confirme.
         logger.info('STRIPE-WEBHOOK', `checkout.completed no-productivo clinica=${clinicaId} status=${subscription.status} (no-write)`)
         break
       }
@@ -143,13 +168,26 @@ export async function POST(req: NextRequest) {
     }
 
     case 'customer.subscription.updated': {
-      const subscription = event.data.object as Stripe.Subscription
-      const clinicaId = subscription.metadata?.clinica_id
+      const payloadSub = event.data.object as Stripe.Subscription
+      const clinicaId = payloadSub.metadata?.clinica_id
       if (!clinicaId) break
+
+      // Refetch: leer el estado autoritativo actual (cierra out-of-order).
+      let subscription: Stripe.Subscription
+      try {
+        subscription = await stripe.subscriptions.retrieve(payloadSub.id)
+      } catch (err) {
+        if (isStripeResourceMissing(err)) {
+          // Sub borrada en Stripe: su estado terminal lo aplica subscription.deleted. No-op, no reintentar.
+          logger.warn('STRIPE-WEBHOOK', `subscription.updated sub inexistente clinica=${clinicaId} (no-op)`)
+          break
+        }
+        logger.error('STRIPE-WEBHOOK', `subscription.updated retrieve fallo clinica=${clinicaId}`)
+        return NextResponse.json({ error: 'stripe_retrieve_error' }, { status: 500 })
+      }
 
       const estado = mapStatusToEstado(subscription.status)
       if (estado === null) {
-        // Status no productivo: no escribir estado ni stripe_subscription_id (protege el latch).
         logger.info('STRIPE-WEBHOOK', `subscription.updated no-productivo clinica=${clinicaId} status=${subscription.status} (no-write)`)
         break
       }
@@ -224,8 +262,6 @@ export async function POST(req: NextRequest) {
     }
 
     case 'invoice.payment_failed': {
-      // Fase 3: invoice.* NO escribe suscripcion_estado. Solo registra.
-      // El estado lo proyecta exclusivamente customer.subscription.* (unpaid/canceled tras dunning).
       const invoice = event.data.object as Stripe.Invoice
       const subscriptionId = getSubscriptionIdFromInvoice(invoice)
       logger.info('STRIPE-WEBHOOK', `invoice.payment_failed registrado sub=${subscriptionId ?? 'null'} (no-write)`)
@@ -233,12 +269,25 @@ export async function POST(req: NextRequest) {
     }
 
     case 'invoice.payment_succeeded': {
-      // Fase 3: invoice.* NO escribe suscripcion_estado. Solo registra.
       const invoice = event.data.object as Stripe.Invoice
       const subscriptionId = getSubscriptionIdFromInvoice(invoice)
       logger.info('STRIPE-WEBHOOK', `invoice.payment_succeeded registrado sub=${subscriptionId ?? 'null'} (no-write)`)
       break
     }
+  }
+
+  // Idempotencia (INSERT-last): registrar el event.id tras ackear con 200 (todo camino sin 500).
+  // ON CONFLICT DO NOTHING absorbe la carrera de redelivery concurrente.
+  // Los caminos que respondieron 500 ya salieron por return y NO llegan aquí (Stripe reintenta).
+  const { error: errDedupInsert } = await admin
+    .from('stripe_webhook_events')
+    .upsert(
+      { event_id: event.id, type: event.type },
+      { onConflict: 'event_id', ignoreDuplicates: true },
+    )
+
+  if (errDedupInsert) {
+    logger.warn('STRIPE-WEBHOOK', `Fallo INSERT idempotencia event=${event.id} (efecto ya aplicado)`)
   }
 
   return NextResponse.json({ received: true })

@@ -626,4 +626,35 @@ inherentemente best-effort.
 
 ---
 
+## Billing — Cierre de fugas Stripe
+
+### BILL-DT-1 — Limpieza programada de stripe_webhook_events (idempotencia)
+
+**Detectado:** 2026-07-13, durante diseño de Deploy 3 (Fase 4 idempotencia).
+
+**Estado:** 🔴 abierta (sin urgencia — años de margen).
+
+**Contexto:** La tabla `stripe_webhook_events` (creada en Deploy 3, migración
+`20260713_billing_01`) registra un row por cada evento de Stripe procesado,
+para dedup at-least-once. NO se depura sola: crece indefinidamente (1 fila por
+evento).
+
+**Impacto:** Nulo a corto/mediano plazo. Filas diminutas (`event_id` text PK +
+`type` + timestamp), lookup por PK; Postgres maneja millones de filas sin
+degradación. Se está a años de que importe. NO es urgente.
+
+**Acción pendiente (proyecto aparte, NO bloquea nada):** cuando el volumen
+crezca o al cerrar el proyecto de billing, agregar limpieza programada. Stripe
+no reentrega eventos pasados ~3 días, así que filas viejas no tienen valor
+funcional. Sugerido: job vía `pg_cron` o función programada de Supabase con
+margen generoso para conservar valor de auditoría:
+
+```sql
+DELETE FROM public.stripe_webhook_events WHERE processed_at < now() - interval '90 days';
+```
+
+Aislado; no toca el webhook ni la lógica de billing.
+
+---
+
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)
