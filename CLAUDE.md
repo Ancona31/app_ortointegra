@@ -314,11 +314,62 @@ Registro corto de incidentes en producción y su resolución. Útil para context
 
 **Fix aplicado:** rollback de las 3 policies vía Supabase SQL Editor el 2026-05-04. Formalizado en repo como `20260504_revert_phase81_recursion.sql`.
 
-**Trade-off temporal vigente:** sin las 3 policies, el bloqueo a clínicas con `suscripcion_estado='cancelado'` queda solo en gates server-side de los 4 endpoints API. Frontend que inserta directo a Supabase (9 formularios de documentos) queda sin barrera RLS hasta aplicar el fix correcto.
+**Alcance exacto del rollback:** se revirtió la **implementación recursiva** de Phase 8.1 (el predicado auto-referencial `count(pacientes) > 5`), NO el concepto de barrera RLS de suscripción. La distinción importa: el rollback dejó un hueco temporal, no una decisión de arquitectura.
 
-**Fix correcto pendiente:** reemplazar el predicado `count(pacientes) > 5` por una columna declarativa `clinicas.ha_tenido_acceso_premium boolean` one-way (false→true al primer pago/VIP). Sin self-reference, sin recursión posible. Ver PARTE 6 del plan de refactor de roles.
+**Trade-off que estuvo vigente entre 2026-05-04 y 2026-05-24/31:** sin las 3 policies, el bloqueo a clínicas sin acceso quedó solo en gates server-side de los 4 endpoints API. El frontend que inserta directo a Supabase (9 formularios de documentos) quedó sin barrera RLS durante esa ventana. **Este párrafo describe una situación pasada, ya resuelta — ver la actualización de abajo.**
+
+**Fix correcto (que estaba pendiente): APLICADO.** Ver actualización 2026-07-18.
 
 **Lección:** policies RLS sobre tabla X que consultan a X dentro de su propio predicado son recursión infinita garantizada en runtime. Cualquier policy que necesite condiciones derivadas de la misma tabla debe usar columnas declarativas en otra tabla (típicamente la tabla "padre" del tenant — `clinicas` en nuestro caso) en lugar de agregaciones sobre la tabla restringida.
+
+---
+
+### 2026-07-18 — Actualización: la barrera RLS de suscripción está ACTIVA (corrige la nota de 2026-05-04)
+
+> ⚠️ **LEER ANTES DE TOCAR CUALQUIER COSA RELACIONADA CON BLOQUEO POR SUSCRIPCIÓN.**
+> La nota de 2026-05-04 arriba afirmaba que no había barrera RLS. **Esa afirmación es OBSOLETA
+> desde el 2026-05-30/31.** La barrera fue recreada y está en producción.
+
+**Qué pasó:** el refactor de roles (etapa 5) implementó exactamente el "fix correcto pendiente" que la nota vieja describía: reemplazar el predicado agregado y auto-referencial por una **columna latch declarativa** `clinicas.ha_tenido_acceso_premium boolean` (one-way, false→true al primer pago/VIP, vía trigger en `20260521_etapa5b3_trigger_latch_premium.sql`). Sin self-reference sobre la tabla restringida, sin recursión posible.
+
+**Helper que implementa el gate** — `public.clinica_tiene_acceso()` (GATE 2), creado en `20260522_etapa5c_helpers_rls.sql:142`, `SECURITY DEFINER`, consulta `public.clinicas` (tabla padre) y nunca la tabla restringida:
+
+```sql
+SELECT EXISTS (
+  SELECT 1 FROM public.clinicas c
+  WHERE c.id = public.get_clinica_id()
+    AND (
+      c.es_vip_grant IS TRUE
+      OR (c.stripe_subscription_id IS NOT NULL
+          AND c.suscripcion_estado = 'activo')
+      OR c.ha_tenido_acceso_premium IS NOT TRUE
+    )
+);
+```
+
+Es decir: VIP, o suscripción Stripe activa, o clínica free-virgen (que nunca tuvo premium) → tienen acceso. **Free degradada** (tuvo premium y lo perdió) → queda en solo-lectura. El bloqueo es la negación de ese predicado.
+
+**Policies RESTRICTIVE de INSERT en producción.** Las 7 usan el mismo predicado `public.clinica_no_suspendida() AND public.clinica_tiene_acceso()` (nótese: el helper es `clinica_no_suspendida()`, en forma **positiva** — no existe ningún `clinica_esta_suspendida()`):
+
+| Tabla | Policy | Migración | Aplicado a prod |
+|---|---|---|---|
+| `pacientes` | `pacientes_gates_insert` | `20260524_etapa5e_bd1_policies_pacientes.sql:96` | 2026-05-24 |
+| `consultas` | `consultas_gates_insert` | `20260530_etapa5f_paso3_policies_consultas.sql:130` | 2026-05-30 |
+| `documentos` | `documentos_gates_insert` | `20260530_etapa5g_paso4_policies_documentos.sql:139` | 2026-05-30 |
+| `appointments` | `appointments_gates_insert` | `20260530_etapa5h_paso3_policies_appointments.sql:145` | 2026-05-30 |
+| `addendums` | `addendums_gates_insert` | `20260531_etapa5i_paso3_policies_addendums_mediciones.sql:158` | 2026-05-31 |
+| `mediciones_analitos` | `mediciones_gates_insert` | `20260531_etapa5i_paso3_policies_addendums_mediciones.sql:239` | 2026-05-31 |
+| `consultorios` | `consultorios_gates_insert` | `20260615_consultorios_03_rls.sql:81` | 2026-06-15 |
+
+El helper también está cableado dentro del RPC de creación de pacientes (`20260524_etapa5e_ts1a_rpc_crear_paciente_con_medico.sql:88`).
+
+Nota: las **recetas no son una tabla** — son filas de `documentos`, ya cubiertas por `documentos_gates_insert`. No existe tabla `archivos_paciente`.
+
+**⚠️ ADVERTENCIA PARA FUTUROS EDITORES:**
+
+1. **NO "restaures" ni dupliques esta RLS creyéndola muerta.** Ya existe y funciona. Crear una segunda policy de gate sobre las mismas tablas es cómo se reintroducen bugs de recursión.
+2. **NO quites estas policies creyéndolas redundantes** con los gates server-side. Son defense-in-depth deliberado: el frontend inserta directo a Supabase en varios formularios, sin pasar por ningún endpoint API.
+3. **El gate RLS y el gate server-side NO comparten predicado.** RLS usa `clinica_tiene_acceso()` (basado en el latch `ha_tenido_acceso_premium`); `src/lib/subscription.ts` usa `suscripcion_estado='cancelado' && !es_vip_grant && count_pacientes > 5`. Coexisten y responden a criterios distintos. **No los "unifiques" sin un plan explícito** — cambiar uno para que coincida con el otro altera quién queda bloqueado en producción.
 
 ---
 ## ✅ Rediseño de laboratorios — cerrado

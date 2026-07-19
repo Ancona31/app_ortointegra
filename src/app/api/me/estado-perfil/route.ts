@@ -68,8 +68,9 @@ export async function GET() {
     // Count de pacientes activos para el gate de Fase 8.1.
     // Filtro explícito por clinica_id + activo IS NOT FALSE para que el
     // resultado coincida con el predicado de la policy RLS, sin depender
-    // del rol del caller (admin de clínica ve inactivos via pacientes_select_inactivos_admin;
-    // nota: nombre de la policy es legacy, se renombrará en Etapa 5 al reescribir RLS).
+    // del rol del caller (admin de clínica ve inactivos via
+    // pacientes_select_inactivos_admin, nombre vigente tras la reescritura de
+    // RLS de etapa 5.E — en producción desde 2026-05-24).
     const { count: activosCount } = await supabase
       .from('pacientes')
       .select('id', { count: 'exact', head: true })

@@ -10,8 +10,15 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  *            && count_pacientes_activos > 5
  *
  * "Paciente activo" = (activo = true OR activo IS NULL), idéntico al usado
- * por la policy RLS pacientes_select_activos y por la policy
- * *_block_post_cancellation creada en Fase 8.1.
+ * por la policy RLS pacientes_select_activos (etapa 5.E, en prod desde
+ * 2026-05-24).
+ *
+ * OJO — este predicado NO es el mismo que el de la barrera RLS. Las policies
+ * *_gates_insert (etapa 5.E-5.I) NO cuentan pacientes: usan el helper
+ * clinica_tiene_acceso(), basado en el latch clinicas.ha_tenido_acceso_premium.
+ * Son dos criterios distintos que coexisten a propósito. No unificar uno con
+ * el otro sin plan explícito — cambia quién queda bloqueado en producción.
+ * Ver CLAUDE.md § "2026-07-18 — la barrera RLS de suscripción está ACTIVA".
  */
 export type SubscriptionState = {
   suscripcion_estado: string
@@ -27,9 +34,10 @@ export type SubscriptionState = {
  * suscripción. NUNCA bloquear por bugs de infra: un fallo de red, una
  * query rota o un user sin sesión deben dejar pasar al usuario para que
  * la app siga funcionando, no para abrir el feature de pago. La barrera
- * real son las RLS policies de Fase 8.1; este helper alimenta la UX
- * (banner + modal-on-click) y la Capa 2 (layout-guards). Si el helper
- * falla, las RLS siguen vivas.
+ * real son las policies RLS RESTRICTIVE *_gates_insert (etapa 5.E-5.I, en
+ * producción desde 2026-05-30/31); este helper alimenta la UX (banner +
+ * modal-on-click) y la Capa 2 (layout-guards). Si el helper falla, las RLS
+ * siguen vivas.
  */
 const FAIL_OPEN: SubscriptionState = {
   suscripcion_estado: 'free',

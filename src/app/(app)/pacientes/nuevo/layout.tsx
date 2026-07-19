@@ -4,7 +4,8 @@ import { getSubscriptionState } from '@/lib/subscription'
 
 // Capa 2 Fase 8.2: bloqueo server-side de la ruta de creación de
 // paciente. Defense in depth sobre el gate del endpoint /api/pacientes
-// (Fase 8.1) y la RLS pacientes_block_post_cancellation.
+// (Fase 8.1) y la RLS pacientes_gates_insert (etapa 5.E, RESTRICTIVE, en
+// producción desde 2026-05-24).
 export default async function NuevoPacienteLayout({
   children,
 }: {
