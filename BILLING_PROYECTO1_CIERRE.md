@@ -1,7 +1,10 @@
 # BILLING — Proyecto 1: Cierre de fugas Stripe en el webhook
 
 **Fecha de cierre:** 2026-07-18
-**Estado:** ✅ **COMPLETO** — 4 deploys en producción + reconciliación de datos ejecutada.
+**Estado:** ✅ **CERRADO** — 4 deploys en producción + reconciliación de datos
+ejecutada. **Sangrado cerrado y drift reconciliado.** Dos hallazgos del scope
+original (Paso 6 del handoff) fueron **reclasificados a deuda por decisión
+informada** — ver §9. No quedan cabos sueltos sin destino explícito.
 **Plan de origen:** `BILLING_FIX_PLAN.md` (Fases 0–6) · Diagnóstico: `BILLING_ANALISIS_MEJORA.md`
 
 ---
@@ -230,7 +233,42 @@ idempotencia → refetch → escritura de estado) se ejecuta como se diseñó.
 
 ---
 
-## 9. Deuda derivada
+## 9. Trazabilidad del scope comprometido (Paso 6 del handoff)
+
+El handoff original del proyecto comprometía un **"Paso 6"** con tres hallazgos.
+Durante la ejecución, los hallazgos se **renumeraron** al esquema `P#` / `A#` de
+`BILLING_FIX_PLAN.md`, y en esa renumeración se perdió la trazabilidad de dos de
+ellos. Esta tabla cierra el hueco: **cada hallazgo original tiene aquí un destino
+explícito.**
+
+| Hallazgo original (handoff) | Destino | Detalle |
+|---|---|---|
+| **3.A** — carrera de creación de customers duplicados | 🟡 **DEUDA** → `AUD-3.A` | **Diferido con trigger**, por decisión informada de Angel (2026-07-19) con el scope original a la vista. Riesgo no materializado (cero duplicados en prod), contenido por el `UNIQUE` de `clinicas.stripe_customer_id`. **No ejecutado en código.** |
+| **3.B** — fallback silencioso `?? 'individual'` en el plan | ✅ **RESUELTO** | Ejecutado en el **Deploy 2**, bajo el ID **`A1`**. `resolvePlanKey` ahora valida y responde `500` + log en vez de degradar silenciosamente al plan `'individual'`. |
+| **`invoice.payment_action_required`** — handler ausente | 🟡 **DEUDA** → `AUD-PAR` | **Mitigado y diferido con trigger**, por decisión informada de Angel (2026-07-19). El correo de "pago fallido" y la página alojada de actualización de pago (§6) ya cubren aviso y resolución. **No ejecutado en código.** |
+
+### Nota de corrección de este documento
+
+> **El cierre inicial de este reporte declaró el proyecto terminado sin verificar
+> el Paso 6 del handoff contra lo efectivamente entregado.** De los tres
+> hallazgos, solo **3.B** se había ejecutado (como `A1`); **3.A** y
+> **`payment_action_required`** quedaron sin ejecutar **y sin documentar** —
+> invisibles tanto en el reporte como en `DEUDA_TECNICA.md`.
+>
+> El hueco lo detectó **Angel en una auditoría posterior (2026-07-19)**,
+> comparando el handoff original contra lo entregado. Con el scope original a la
+> vista, decidió **reclasificar ambos a deuda** por criterio riesgo/beneficio, en
+> vez de reabrir el webhook recién estabilizado.
+>
+> La distinción importa y debe quedar registrada: los dos hallazgos están
+> **diferidos por decisión informada, con trigger de reapertura**, no
+> **omitidos**. Pero llegaron a ese estado **después** de haber estado
+> temporalmente perdidos, y eso es un fallo del proceso de cierre, no del
+> criterio técnico. Ver §11 (Lecciones).
+
+---
+
+## 10. Deuda derivada
 
 **Toda la deuda derivada de este proyecto está registrada en
 `DEUDA_TECNICA.md`** (secciones *Billing — Cierre de fugas Stripe* y
@@ -242,7 +280,47 @@ idempotencia → refetch → escritura de estado) se ejecuta como se diseñó.
 - **BILL-DT-4** — Alinear el predicado UX de `subscription.ts` con la RLS real.
 - **BILL-DT-5** — Verificar la suscripción a los eventos `invoice.payment_failed`
   / `invoice.payment_succeeded` en el Dashboard de Stripe.
+- **AUD-3.A** — Carrera de creación de customers duplicados (hallazgo 3.A del
+  handoff, diferido con trigger).
+- **AUD-PAR** — Handler `invoice.payment_action_required` ausente (mitigado,
+  diferido con trigger).
 - **DEP-DT-1** — Vulnerabilidades de dependencias npm (`npm audit`).
+
+---
+
+## 11. Lecciones — reglas permanentes de cierre de proyecto
+
+Estas reglas nacen del fallo documentado en §9 y aplican a **todo** cierre de
+proyecto en este repo, no solo a billing.
+
+### Regla 1 — Checklist del scope comprometido, hallazgo por hallazgo
+
+**Todo cierre de proyecto DEBE incluir un checklist explícito del scope
+comprometido** (handoff, plan, o documento de alcance original) **contra lo
+efectivamente entregado, hallazgo por hallazgo.**
+
+No basta con enumerar lo que se hizo. Hay que recorrer la lista de lo que se
+**prometió** y marcar el destino de cada ítem. Un cierre que solo mira hacia
+atrás desde el código entregado es estructuralmente incapaz de detectar lo que
+nunca se tocó — que es exactamente lo que pasó aquí.
+
+Destinos válidos para un hallazgo: **resuelto** (con el ID del deploy),
+**diferido a deuda** (con entrada en `DEUDA_TECNICA.md` y trigger de reapertura),
+o **descartado** (con la razón). **No existe el destino "no se mencionó".**
+
+### Regla 2 — Tabla de mapeo ante cualquier renumeración de hallazgos
+
+**Cualquier renumeración de hallazgos** — como la de este proyecto, de `3.A`/`3.B`
+al esquema `P#`/`A#` — **DEBE incluir una tabla de mapeo
+`old-ID → new-ID → destino`.**
+
+La renumeración fue precisamente el mecanismo por el que se perdieron 3.A y
+`payment_action_required`: al dejar de existir con su nombre original, dejaron de
+ser buscables en el nuevo esquema, y nadie notó su ausencia porque no había
+contra qué contrastar.
+
+**Un hallazgo sin mapeo explícito es un cabo suelto**, aunque la decisión de
+fondo sobre él haya sido correcta.
 
 ---
 

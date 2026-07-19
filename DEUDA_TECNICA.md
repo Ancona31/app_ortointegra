@@ -795,4 +795,68 @@ Dashboard, fuera del repo.
 
 ---
 
+### AUD-3.A — Carrera de creación de customers duplicados
+
+**Detectado:** auditoría read-only inicial del Proyecto 1 (hallazgo **3.A** del
+handoff original). **Reclasificado a deuda por decisión de Angel el 2026-07-19**,
+con el scope original a la vista.
+
+**Estado:** 🟡 abierta — **riesgo NO materializado**.
+
+**Ubicación:** `src/app/api/stripe/checkout/route.ts:57-68`.
+
+**Contexto:** dos requests concurrentes de checkout de la **misma clínica**
+pueden crear **dos `stripe_customer_id`** distintos, porque la creación del
+customer no es idempotente: entre el "¿ya existe?" y el "créalo" hay ventana.
+
+**Verificado en producción** (SELECT 5.b.1 del Paso 0): **cero duplicados
+actuales**. Además, el constraint `UNIQUE` sobre `clinicas.stripe_customer_id`
+**contiene el peor caso** — la segunda escritura falla en vez de dejar la clínica
+con dos customers vinculados.
+
+**Criterio de diferimiento:** carrera de baja probabilidad, sin casos reales
+observados, y contenida por el `UNIQUE`. Reabrir el flujo de checkout de un
+webhook **recién estabilizado** tiene peor relación riesgo/beneficio que diferir.
+No es omisión: es una decisión informada.
+
+**Fix pendiente:** creación **idempotente** del customer — buscar por
+`metadata.clinica_id` antes de crear, o usar una **idempotency key** de Stripe
+derivada del `clinica_id`.
+
+**Trigger para atacar:** el **primer customer duplicado real** detectado en
+Stripe, **O** la siguiente vez que se toque `checkout/route.ts` por cualquier
+motivo (aprovechar que el archivo ya está abierto y bajo prueba).
+
+---
+
+### AUD-PAR — Handler `invoice.payment_action_required` ausente
+
+**Detectado:** handoff original del Proyecto 1 (era parte del **"Paso 6"**).
+**Reclasificado a deuda por decisión de Angel el 2026-07-19.**
+
+**Estado:** 🟡 abierta — **mitigado**.
+
+**Contexto:** el webhook **no maneja** `invoice.payment_action_required`, el
+evento que Stripe emite cuando un cobro requiere **acción del cliente** (típicamente
+autenticación **SCA / 3DS**). El evento tampoco está suscrito en el Dashboard de
+Stripe.
+
+**Mitigación actual:** el **correo de "pago fallido"** de Stripe y la **página
+alojada de actualización de método de pago** (ambos activados el 2026-07-18/19,
+ver `BILLING_PROYECTO1_CIERRE.md` §6) ya cubren tanto el **aviso** al cliente
+como la **ruta de resolución**, sin necesidad de un handler propio en el webhook.
+
+**Criterio de diferimiento:** mitigado por infraestructura ya activa, y poco
+común en el escenario real del producto (pago con tarjeta síncrono en México).
+Decisión informada, no omisión.
+
+**Fix pendiente:** si se decide, agregar el handler en el webhook **y** suscribir
+el evento en el Dashboard de Stripe. Ambas cosas, o ninguna: un handler sin
+suscripción es código muerto.
+
+**Trigger para atacar:** el **primer `past_due` causado por SCA** detectado en
+los logs de Vercel.
+
+---
+
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)
