@@ -657,4 +657,142 @@ Aislado; no toca el webhook ni la lógica de billing.
 
 ---
 
+### BILL-DT-2 — Handler super-admin de VIP no normaliza `suscripcion_estado`
+
+**Detectado:** 2026-07-13, en el Paso 0 (diagnóstico) del Proyecto 1 de billing.
+Confirmado como **causa raíz del drift** de las 4 clínicas reconciliadas el
+2026-07-18.
+
+**Estado:** 🔴 abierta (sin urgencia — el drift histórico ya fue reconciliado).
+
+**Contexto:** El handler super-admin que activa/revoca el acceso VIP de una
+clínica manipula `es_vip_grant`, pero **no normaliza `suscripcion_estado`**:
+
+- **Al activar VIP** marca `suscripcion_estado = 'activo'` indebidamente. Ese
+  valor es mentira: la clínica no tiene suscripción Stripe, tiene un grant.
+- **Al revocar VIP** no revierte el estado, dejándolo colgado en `'activo'` sin
+  vínculo Stripe alguno.
+
+Esto produjo el drift cosmético de 4 clínicas (Star Médica —ex-VIP revocado— y
+el grupo VIP Playamed / Urrea / Arámbula) detectado en el Paso 0. **Ese drift ya
+se reconciló el 2026-07-18** (UPDATE `'activo'` → `'free'`); lo que queda abierto
+es la **causa**, que volverá a generar drift en la próxima activación o
+revocación de VIP.
+
+**Impacto:** cosmético hoy. El acceso VIP real nunca dependió de
+`suscripcion_estado` sino de `es_vip_grant`, y el bloqueo depende del latch
+`ha_tenido_acceso_premium`; por eso el drift no causó fuga de acceso ni de
+capital. Pero ensucia el censo, confunde cualquier diagnóstico futuro de billing
+y obliga a reconciliar a mano cada vez.
+
+**Fix correcto:** que el acceso VIP dependa **únicamente de `es_vip_grant`**, sin
+tocar `suscripcion_estado` en ningún sentido. El handler super-admin debe dejar
+`suscripcion_estado` bajo control exclusivo del webhook de Stripe
+(`customer.subscription.*` como escritor único, decisión de diseño del Deploy 2).
+Al activar o revocar VIP, `suscripcion_estado` no debe modificarse.
+
+**Cuándo atacar:** antes de la próxima activación o revocación de VIP, o en una
+sesión dedicada al handler super-admin. Fuera del alcance del Proyecto 1 de
+billing (así estaba declarado en `BILLING_FIX_PLAN.md`, sección "Problemas fuera
+de alcance").
+
+---
+
+### BILL-DT-3 — Rechazo de RLS (`42501`) no se traduce a `403` limpio en rutas de INSERT
+
+**Detectado:** Proyecto 1 de billing (2026-07), al revisar el comportamiento de
+las 7 policies RESTRICTIVE `*_gates_insert`.
+
+**Estado:** 🔴 abierta (UX / higiene de errores, sin implicación de seguridad).
+
+**Contexto:** Cuando una clínica sin acceso intenta un INSERT sobre una tabla
+protegida (`pacientes`, `consultas`, `documentos`, `appointments`, `addendums`,
+`mediciones_analitos`, `consultorios`), Postgres rechaza con el código
+**`42501` (insufficient privilege)**. Ese error sube crudo por la pila: el
+usuario no recibe un `403` con un mensaje comprensible, sino un fallo genérico
+o un código técnico.
+
+**Impacto:** el bloqueo **funciona correctamente** — la barrera no tiene fuga.
+Lo que falla es la explicación: el médico ve un error opaco en vez de "tu
+suscripción no permite esta acción". Agravado en los formularios que insertan
+directo a Supabase sin pasar por un endpoint API, donde no hay capa server-side
+que pueda interceptar y traducir.
+
+**Fix pendiente:** interceptar el código `42501` en las rutas de INSERT (y en el
+wrapper del cliente Supabase para los formularios directos) y responder `403`
+con un mensaje legible. Debe distinguirse de otros rechazos de RLS que no sean
+por suscripción.
+
+**Mitigación actual:** `SuscripcionBanner` ya avisa al usuario del estado de su
+suscripción antes de que intente la acción, por lo que el error opaco rara vez
+es la primera señal que recibe.
+
+**Cuándo atacar:** sin urgencia. Agrupable con el sub-proyecto "limpieza de
+mensajes de error en frontend" (ver E5-DT-1).
+
+---
+
+### BILL-DT-4 — Predicado UX de `subscription.ts` divergente de la RLS real
+
+**Detectado:** 2026-07-18, durante el Deploy 4 (Fase 6 reducida) del Proyecto 1
+de billing.
+
+**Estado:** 🔴 abierta (higiene de código, **baja prioridad**, sin fuga).
+
+**Contexto:** Existen dos predicados distintos que deciden "esta clínica está
+bloqueada", y **no coinciden**:
+
+- **RLS (barrera real, en producción):** `public.clinica_tiene_acceso()` —
+  basado en el latch `clinicas.ha_tenido_acceso_premium`, más `es_vip_grant` y
+  `suscripcion_estado = 'activo'`.
+- **UX (`src/lib/subscription.ts`):** `isBlocked = suscripcion_estado ===
+  'cancelado' && !es_vip_grant && count_pacientes > 5`.
+
+**Impacto:** ninguno en seguridad — la barrera que efectivamente bloquea es la
+RLS, y funciona. La divergencia solo puede producir un caso donde la UI no
+anticipe un bloqueo que la RLS sí aplicará (o al revés). **El banner
+`SuscripcionBanner` ya cubre el aviso al usuario**, que era la razón original
+por la que se quería alinear el predicado; por eso la Fase 6 se redujo
+deliberadamente y esto quedó como deuda en vez de ejecutarse.
+
+**Fix pendiente:** alinear el predicado UX con `clinica_tiene_acceso()`, o
+—preferible— hacer que la UI consulte el veredicto real en vez de reimplementarlo.
+
+**⚠️ Advertencia:** `CLAUDE.md` advierte explícitamente que estos dos predicados
+**no deben "unificarse" sin un plan explícito**, porque cambiar uno para que
+coincida con el otro **altera quién queda bloqueado en producción**. Cualquier
+intervención aquí requiere censo previo de a quién afecta el cambio.
+
+**Cuándo atacar:** sin urgencia. Solo si la divergencia empieza a producir
+confusión real en usuarios.
+
+---
+
+### BILL-DT-5 — Verificar suscripción a eventos `invoice.*` en el Dashboard de Stripe
+
+**Detectado:** Paso 0.b del Proyecto 1 de billing (2026-07).
+
+**Estado:** 🟡 **acción de verificación pendiente** (no es deuda de código).
+
+**Contexto:** El Paso 0.b estableció que los eventos
+**`invoice.payment_failed`** e **`invoice.payment_succeeded`** debían suscribirse
+en el endpoint del webhook **después** de que los Deploys 1 y 2 estuvieran en
+producción — el orden importaba porque antes del Deploy 2 los handlers de
+`invoice.*` todavía escribían `suscripcion_estado` y habrían agravado el drift.
+
+**Ambos deploys ya están en producción**, por lo que la precondición se cumple.
+
+**Acción pendiente:** entrar al Dashboard de Stripe → configuración del endpoint
+del webhook → **confirmar si `invoice.payment_failed` e
+`invoice.payment_succeeded` ya están suscritos**. Si no lo están, suscribirlos.
+
+**Nota:** tras el Deploy 2, `invoice.*` **ya no escribe `suscripcion_estado`**
+(single-writer: solo `customer.subscription.*`). Suscribir estos eventos es
+seguro y aporta observabilidad del ciclo de cobro, no riesgo de drift.
+
+**Cuándo atacar:** en cualquier momento. Es una verificación de 2 minutos en el
+Dashboard, fuera del repo.
+
+---
+
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)
