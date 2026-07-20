@@ -378,6 +378,7 @@ export default function NuevoPacientePage() {
                 <div className="space-y-3">
                   {[
                     { key: 'alergias',             label: 'Alergias',                    placeholder: 'Medicamentos, alimentos...' },
+                    { key: 'ant_no_patologicos',    label: 'Antecedentes personales no patológicos', placeholder: 'Tabaquismo, alcoholismo, actividad física, alimentación...' },
                     { key: 'ant_patologicos',       label: 'Antecedentes patológicos',    placeholder: 'DM2, HTA, hipotiroidismo...' },
                     { key: 'ant_quirurgicos',       label: 'Antecedentes quirúrgicos',    placeholder: 'Cirugías previas...' },
                     { key: 'ant_familiares',        label: 'Antecedentes familiares',     placeholder: 'Enfermedades relevantes en familia...' },

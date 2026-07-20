@@ -29,6 +29,7 @@ const campos: Campo[] = [
   { section: 'contacto', label: 'Teléfono', key: 'telefono', type: 'tel', placeholder: 'Ej: 999 123 4567' },
   { section: 'contacto', label: 'Email', key: 'email', type: 'email', placeholder: 'paciente@email.com' },
   { section: 'contacto', label: 'Dirección', key: 'direccion', placeholder: 'Calle, colonia, ciudad' },
+  { section: 'antecedentes', label: 'Antecedentes personales no patológicos', key: 'ant_no_patologicos', placeholder: 'Tabaquismo, alcoholismo, actividad física, alimentación...' },
   { section: 'antecedentes', label: 'Antecedentes patológicos', key: 'ant_patologicos', placeholder: 'DM2, HTA, hipotiroidismo...' },
   { section: 'antecedentes', label: 'Antecedentes quirúrgicos', key: 'ant_quirurgicos', placeholder: 'Cirugías previas...' },
   { section: 'antecedentes', label: 'Antecedentes familiares', key: 'ant_familiares', placeholder: 'Enfermedades relevantes en familia...' },

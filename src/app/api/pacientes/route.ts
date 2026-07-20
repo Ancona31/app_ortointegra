@@ -58,6 +58,7 @@ export async function POST(req: NextRequest) {
       telefono: body.telefono ?? null,
       email: body.email ?? null,
       direccion: body.direccion ?? null,
+      ant_no_patologicos: body.ant_no_patologicos ?? null,
       ant_patologicos: body.ant_patologicos ?? null,
       ant_quirurgicos: body.ant_quirurgicos ?? null,
       ant_familiares: body.ant_familiares ?? null,

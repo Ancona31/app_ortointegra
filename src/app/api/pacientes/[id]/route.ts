@@ -31,7 +31,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/pacientes/[i
     const allowed = [
       'nombre', 'apellidos', 'fecha_nacimiento', 'sexo', 'telefono', 'email',
       'direccion', 'peso_kg', 'talla_cm', 'imc',
-      'ant_patologicos', 'ant_quirurgicos', 'ant_familiares',
+      'ant_no_patologicos', 'ant_patologicos', 'ant_quirurgicos', 'ant_familiares',
       'alergias', 'medicamentos_actuales',
     ]
     const updates: Record<string, unknown> = {}

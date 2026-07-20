@@ -3,6 +3,7 @@ import type { Paciente } from '@/types'
 type Props = { paciente: Paciente }
 
 const ITEMS = [
+  { key: 'ant_no_patologicos',    label: 'No patológicos' },
   { key: 'ant_patologicos',       label: 'Patológicos' },
   { key: 'ant_quirurgicos',       label: 'Quirúrgicos' },
   { key: 'ant_familiares',        label: 'Familiares' },

@@ -93,13 +93,15 @@ export default function ExportarExpedienteButton({ paciente, consultas, addendum
     `
 
     // ── Antecedentes ───────────────────────────────────────────────────
-    const tieneAntecedentes = paciente.alergias || paciente.ant_patologicos ||
+    const tieneAntecedentes = paciente.alergias || paciente.ant_no_patologicos ||
+      paciente.ant_patologicos ||
       paciente.ant_quirurgicos || paciente.ant_familiares || paciente.medicamentos_actuales
 
     const antecedentesHtml = tieneAntecedentes ? `
       <div class="seccion-titulo">Antecedentes</div>
       ${paciente.alergias ? `<div class="alergia-box">⚠ <strong>Alergias:</strong> ${paciente.alergias}</div>` : ''}
       <div class="antecedentes-grid">
+        ${paciente.ant_no_patologicos ? `<div class="ant-item"><div class="ant-label">No patológicos</div>${paciente.ant_no_patologicos}</div>` : ''}
         ${paciente.ant_patologicos ? `<div class="ant-item"><div class="ant-label">Patológicos</div>${paciente.ant_patologicos}</div>` : ''}
         ${paciente.ant_quirurgicos ? `<div class="ant-item"><div class="ant-label">Quirúrgicos</div>${paciente.ant_quirurgicos}</div>` : ''}
         ${paciente.ant_familiares ? `<div class="ant-item"><div class="ant-label">Familiares</div>${paciente.ant_familiares}</div>` : ''}

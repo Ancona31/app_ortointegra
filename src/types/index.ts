@@ -28,6 +28,7 @@ export interface Paciente {
   email?: string
   direccion?: string
   // Antecedentes
+  ant_no_patologicos?: string
   ant_patologicos?: string
   ant_quirurgicos?: string
   ant_familiares?: string
