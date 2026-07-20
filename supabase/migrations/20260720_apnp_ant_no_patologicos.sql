@@ -1,8 +1,15 @@
--- Aplicado a producción: 2026-07-20. Documental; no re-ejecutar a ciegas.
--- Miniproyecto APNP: agrega ant_no_patologicos a pacientes y lo integra al RPC de alta.
+-- ============================================================================
+-- MIGRACIÓN DOCUMENTAL — NO EJECUTAR MANUALMENTE
+-- ============================================================================
+-- Aplicado a producción: 2026-07-20 vía SQL Editor (protocolo D-T6).
+-- Este archivo refleja cambios YA vigentes en prod; existe solo para historial.
+-- El ALTER TABLE usa IF NOT EXISTS y el CREATE OR REPLACE es idempotente,
+-- por lo que re-ejecutarlo no rompe, pero NO debe correrse a ciegas.
+-- Miniproyecto APNP: columna ant_no_patologicos + integración al RPC de alta.
+-- ============================================================================
 
 ALTER TABLE public.pacientes
-  ADD COLUMN ant_no_patologicos text;
+  ADD COLUMN IF NOT EXISTS ant_no_patologicos text;
 
 NOTIFY pgrst, 'reload schema';
 
