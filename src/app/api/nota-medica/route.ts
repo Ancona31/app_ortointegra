@@ -5,6 +5,7 @@ import { checkRateLimit } from '@/lib/rateLimit'
 import { sanitizePromptInput, sanitizeNumber } from '@/lib/sanitize'
 import { anonimizarTexto, anonimizarHistorial } from '@/lib/anonimizar'
 import { notaIAResponseSchema, medicamentosExtraccionSchema, type NotaIAResponse, type NotaIAContenido, type MedicamentoIA, type MedicamentosExtraccion } from '@/lib/notaIA/schema'
+import { logger } from '@/lib/logger'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! })
 
@@ -86,6 +87,14 @@ Ejemplo: "S53.0 — Luxación de la cabeza del radio - Codo de niñera IZQUIERDO
 
 REGLAS DE CALIDAD: concisa y concreta (no extensa por extenderse, sin redundancias); cronológica (eventos en orden); clara (sin ambigüedades ni abreviaturas no universales). Si una sección del SOAP no tiene información dada o confirmada por el médico, omítela o indícalo de forma mínima, sin rellenar con contenido inventado.
 
+EXTENSIÓN Y DENSIDAD (aplica EXCLUSIVAMENTE a la narrativa de la nota final, status "completa"; NO limita ni acorta las preguntas del interrogatorio en status "faltan_datos"):
+- Presupuesto: la narrativa completa (las 4 secciones juntas) apunta a un MÁXIMO de ~3,000 caracteres. Los casos simples deben quedar muy por debajo. La extensión es proporcional a la complejidad del caso descrito por el médico, nunca al deseo de rellenar.
+- Densidad no es omisión: a mayor contexto que el médico aporte, la nota es más completa en CONTENIDO clínico, no más larga en caracteres de relleno. Refuerza —sin repetir— la regla de presentación de que el formato organiza y no agrega longitud.
+- Jerarquía de compresión (qué es intocable al densificar): NUNCA omitas ni adelgaces los hallazgos clínicos (padecimiento actual, exploración física, resultados de estudios), la impresión diagnóstica ni las indicaciones de tratamiento. Si necesitas recortar, hazlo en lo periférico: educación al paciente y signos de alarma en 1-2 líneas densas; seguimiento en 1 línea.
+- Estilo telegráfico-clínico: prohibidas las fórmulas de relleno ("cabe mencionar", "es importante destacar", "se procede a", "de forma importante" y similares). Tras la primera mención completa del paciente ("Paciente masculino de X años…"), refiérete a él de forma directa, sin repetir el encuadre.
+- Juicio clínico que INTEGRA, no re-narra: prohibido repetir la historia del padecimiento ya escrita en [SUBJETIVO]. El juicio es solo correlación clínico-estudios, razonamiento y decisión, en 3-5 líneas.
+- Boilerplate directo: los negativos y frases estándar van en su forma mínima (ej. "No se requieren estudios adicionales."), sin expandirlos.
+
 FORMATO DE RESPUESTA (JSON OBLIGATORIO): Respondes SIEMPRE con un único objeto JSON conforme al schema proporcionado, sin texto fuera del JSON. El objeto tiene tres campos: "status" ("faltan_datos" o "completa"), "bloques" (arreglo de bloques temáticos), y "nota" (objeto o null).
 
 Cuando faltan datos: status "faltan_datos"; "bloques" es un arreglo de máximo 3 bloques, cada bloque con un "titulo" y su arreglo de "preguntas"; "nota" es null. Cada pregunta tiene: "id" (identificador corto y único), "pregunta" (texto claro y clínicamente preciso), "opciones" (arreglo de respuestas sugeridas para elegir; puede ir vacío si la pregunta es abierta), "permite_texto_libre" (casi siempre true).
@@ -97,9 +106,9 @@ COHERENCIA: el diagnóstico de la narrativa y el de "diagnosticos" deben ser el 
 PRESENTACIÓN DE LA NOTA (formato markdown — NUNCA altera el contenido):
 El contenido clínico y las reglas de arriba SIEMPRE mandan. El formato es solo presentación: no agrega, omite ni reinterpreta información. Aplica markdown así:
 - Encabezados de sección: escribe SIEMPRE las 4 secciones como **[SUBJETIVO]:**, **[OBJETIVO]:**, **[ANÁLISIS]:**, **[PLAN]:** (con dobles asteriscos y corchetes, exactamente así). No uses ## ni otro formato de encabezado.
-- Etiquetas de campo en negrita: cada subcampo inicia con su etiqueta en negrita y dos puntos. Ej.: **Motivo de consulta:**, **Padecimiento actual:**, **Antecedentes relevantes:**, **Exploración física:**, **Estudios de gabinete:**, **Impresión diagnóstica:**, **Juicio clínico:**, **Diagnóstico diferencial:**, **Tratamiento farmacológico:**, **Medidas no farmacológicas:**, **Estudios solicitados:**, **Educación al paciente:**, **Signos de alarma:**, **Seguimiento:**.
+- Etiquetas de campo en negrita: cada subcampo inicia con su etiqueta en negrita y dos puntos. Ej.: **Motivo de consulta:**, **Padecimiento actual:**, **Antecedentes relevantes:**, **Exploración física:**, **Estudios de gabinete:**, **Impresión diagnóstica:**, **Juicio clínico:**, **Diagnóstico diferencial:**, **Tratamiento farmacológico:**, **Medidas no farmacológicas:**, **Estudios solicitados:**, **Educación al paciente:**, **Signos de alarma:**, **Seguimiento:**. Cada sub-encabezado inicia SIEMPRE en su propia línea (precedido de un salto de línea): NUNCA lo continúes en la misma línea del texto anterior ni fusiones dos subcampos en una sola línea.
 - Datos clave en negrita dentro del texto: diagnósticos con su código (ej. **M75.1 — Síndrome del manguito rotador DERECHO**), medicamentos con dosis (ej. **Celecoxib 200mg**), signos semiológicos relevantes (ej. **Neer positivo**, **Lasègue negativo**) y valores clave (ej. **4/5**, **90°**). Usa la negrita con criterio, solo en lo que el médico busca de un vistazo — nunca en frases enteras.
-- Viñetas (con guion "- ") para listas de elementos discretos: impresión diagnóstica cuando hay varios diagnósticos, diagnósticos diferenciales (cada uno en su viñeta, con el nombre en negrita), pruebas semiológicas cuando son varias, y en el [PLAN]: tratamiento farmacológico (un fármaco por viñeta), medidas no farmacológicas, estudios solicitados y signos de alarma.
+- Viñetas EXCLUSIVAMENTE con guion y espacio "- " (ej. "- Reposo relativo"). PROHIBIDO usar el asterisco "*" como marca de viñeta. Usa viñetas para listas de elementos discretos: impresión diagnóstica cuando hay varios diagnósticos, diagnósticos diferenciales (cada uno en su viñeta, con el nombre en negrita), pruebas semiológicas cuando son varias, y en el [PLAN]: tratamiento farmacológico (un fármaco por viñeta), medidas no farmacológicas, estudios solicitados y signos de alarma.
 - Prosa (sin viñetas) para el padecimiento actual y el juicio clínico: son narrativa y razonamiento, se leen mejor corridos.
 - Dentro del [PLAN], usa los subcampos en negrita como subencabezados para organizar el plan (tratamiento farmacológico, medidas, estudios, educación, signos de alarma, seguimiento).
 - No uses emojis, ni bloques de código, ni tablas, ni colores. Solo negrita, viñetas y las etiquetas de sección. Mantén la nota concisa: el formato organiza, no agrega longitud.`
@@ -169,7 +178,20 @@ const generarNotaConReintentos = async (
     })
     const response = await chat.sendMessage({ message: mensaje })
     const resultado = evaluarRespuesta(response.candidates?.[0]?.finishReason, response.text)
-    if (resultado.ok) return resultado.parsed
+    if (resultado.ok) {
+      // warn (no info) a propósito: logger.info es dev-only; warn es visible en
+      // producción. Telemetría sin PII, solo conteos de tokens del usageMetadata.
+      logger.warn('NOTA-IA-USAGE', JSON.stringify({
+        llamada: 'nota',
+        intento,
+        status: resultado.parsed.status,
+        promptTokens: response.usageMetadata?.promptTokenCount ?? null,
+        outputTokens: response.usageMetadata?.candidatesTokenCount ?? null,
+        thoughtsTokens: response.usageMetadata?.thoughtsTokenCount ?? null,
+        totalTokens: response.usageMetadata?.totalTokenCount ?? null,
+      }))
+      return resultado.parsed
+    }
   }
   return null
 }
@@ -211,6 +233,16 @@ const extraerMedicamentos = async (narrativa: string): Promise<MedicamentoIA[]> 
     }
     const meds = Array.isArray(parsed.medicamentos) ? parsed.medicamentos : []
     if (medicamentoDesbocado(meds)) continue
+    // warn (no info) a propósito: logger.info es dev-only; warn es visible en
+    // producción. Telemetría sin PII, solo conteos de tokens del usageMetadata.
+    logger.warn('NOTA-IA-USAGE', JSON.stringify({
+      llamada: 'extraccion',
+      intento,
+      promptTokens: response.usageMetadata?.promptTokenCount ?? null,
+      outputTokens: response.usageMetadata?.candidatesTokenCount ?? null,
+      thoughtsTokens: response.usageMetadata?.thoughtsTokenCount ?? null,
+      totalTokens: response.usageMetadata?.totalTokenCount ?? null,
+    }))
     return meds
   }
   return []
