@@ -72,6 +72,10 @@ export interface NotaRenderData {
     cedulaEspecialidad: string
     logoUrl: string
     firmaUrl: string
+    // Colores del perfil para tematizar el PDF. Ausentes → la plantilla cae a
+    // su paleta azul del mockup (fallback total en derivarPaletaNota).
+    colorPrimario?: string
+    colorSecundario?: string
   }
   consultorio: {
     nombre: string
@@ -151,6 +155,12 @@ function construirMedicoDesdeConsulta(c: Consulta, vivo?: MedicoInfo | null): No
     // Paquete Firma. Hasta entonces se resuelve contra el perfil vivo aunque el
     // resto del bloque médico sea snapshot inmutable.
     firmaUrl: vivo?.firma_url ?? '',
+    // MISMA EXCEPCIÓN que la firma: no existe snapshot de color en consultas
+    // (solo medico_nombre/especialidad/cedulas/logo_url). El color vive en
+    // clinicas y se resuelve contra el perfil vivo, así que notas históricas
+    // reflejan el color ACTUAL de la clínica. Deuda futura: consultas.medico_color_*.
+    colorPrimario: vivo?.color_primario ?? undefined,
+    colorSecundario: vivo?.color_secundario ?? undefined,
   }
 }
 
@@ -162,6 +172,8 @@ function construirMedicoDesdeVivo(vivo: MedicoInfo): NotaRenderData['medico'] {
     cedulaEspecialidad: vivo.cedula_especialidad ?? '',
     logoUrl: vivo.logo_url ?? '',
     firmaUrl: vivo.firma_url ?? '',
+    colorPrimario: vivo.color_primario ?? undefined,
+    colorSecundario: vivo.color_secundario ?? undefined,
   }
 }
 
@@ -169,7 +181,10 @@ function construirAddendums(addendums?: AddendumInput[]): AddendumRender[] {
   return (addendums ?? []).map((a) => ({
     parseado: parseNota(decodificarEntidadesHTML(a.contenido)),
     medicoNombre: a.medico_nombre ?? '',
-    fechaFormateada: a.created_at ? renderEnTZ(a.created_at, FMT_FECHA) : '',
+    // Fecha + hora en la zona de la clínica: "22 de julio de 2026 · 10:33 a.m.".
+    fechaFormateada: a.created_at
+      ? `${renderEnTZ(a.created_at, FMT_FECHA)} · ${formatearHoraCompacta(a.created_at)}`
+      : '',
   }))
 }
 

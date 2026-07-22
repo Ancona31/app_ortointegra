@@ -129,7 +129,8 @@ describe('buildNotaRenderData — addendums formateados', () => {
     const r = buildNotaRenderData({ origen: 'consulta', consulta: consultaSnapshot, paciente, medicoVivo, addendums })
     expect(r.addendums).toHaveLength(1)
     expect(r.addendums[0].medicoNombre).toBe('Dr. Vivo')
-    expect(r.addendums[0].fechaFormateada).toBe('22 de julio de 2026')
+    // 2026-07-22T15:00:00Z → 09:00 en America/Mexico_City (UTC-6, sin DST)
+    expect(r.addendums[0].fechaFormateada).toBe('22 de julio de 2026 · 9:00 a.m.')
     expect(r.addendums[0].parseado.secciones[0].tipo).toBe('desconocida')
   })
 
@@ -244,5 +245,33 @@ describe('buildNotaRenderData — origen formulario (datos en vuelo)', () => {
     expect(r.proximaCita).toBeNull()
     expect(r.notaOrigen).toBeNull()
     expect(r.signosVitales).toBeNull()
+  })
+})
+
+describe('buildNotaRenderData — colores del perfil para tematizar el PDF', () => {
+  it("origen 'formulario': toma color primario y secundario del médico vivo", () => {
+    const r = buildNotaRenderData({
+      origen: 'formulario',
+      paciente,
+      medicoVivo,
+      fecha: '2026-07-21T15:00:00Z',
+      notasEvolucion: null,
+      diagnosticos: [],
+      motivoConsulta: '',
+    })
+    expect(r.medico.colorPrimario).toBe('#1a3a5c')
+    expect(r.medico.colorSecundario).toBe('#1e5fa8')
+  })
+
+  it("origen 'consulta': el color sale del médico vivo (no hay snapshot de color)", () => {
+    const r = buildNotaRenderData({ origen: 'consulta', consulta: consultaSnapshot, paciente, medicoVivo })
+    expect(r.medico.colorPrimario).toBe('#1a3a5c')
+    expect(r.medico.colorSecundario).toBe('#1e5fa8')
+  })
+
+  it("origen 'consulta' sin médico vivo → color undefined (la plantilla cae al fallback azul)", () => {
+    const r = buildNotaRenderData({ origen: 'consulta', consulta: consultaSnapshot, paciente })
+    expect(r.medico.colorPrimario).toBeUndefined()
+    expect(r.medico.colorSecundario).toBeUndefined()
   })
 })

@@ -3,6 +3,7 @@ import type { Style } from '@react-pdf/types'
 import type { ReactElement } from 'react'
 import { t } from './PdfStyles'
 import type { PdfMedicoData, PdfConsultorioData } from './PdfStyles'
+import { derivarPaletaNota, type PaletaNota } from './paletaNota'
 import type { NotaRenderData } from '@/lib/notaRenderData'
 import type { SeccionNota, BloqueNota, SpanTexto, TipoSeccion } from '@/lib/notaParser'
 import type { SignosVitales } from '@/types'
@@ -16,6 +17,7 @@ import type { SignosVitales } from '@/types'
  * Internamente el render usa SOLO `data` (NotaRenderData) + `logoUrl` ya
  * resuelto a base64 por el pipeline; `medico`/`consultorio` se aceptan por
  * compatibilidad de firma y se ignoran (los datos vivos ya vienen en `data`).
+ * El color también viaja en `data.medico.colorPrimario/colorSecundario`.
  */
 export interface NotaEvolucionProps {
   medico?: PdfMedicoData | null
@@ -25,194 +27,196 @@ export interface NotaEvolucionProps {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Paleta fija (del spec — NO usar getPdfColors)                      */
+/*  Neutros NO teñibles + familia addendum (literales)                 */
 /* ------------------------------------------------------------------ */
 
-const C = {
-  navy: '#102f50',
-  chipFill: '#dbe8f4',
-  ink: '#0b2540',
-  accent: '#1f5f9e',
+const N = {
+  valueInk: '#16202c',
   labelInk: '#2c3a49',
   muted: '#6a7a8b',
   hair: '#d2dce6',
-  cardBg: '#eef4fa',
-  valueInk: '#16202c',
-  vitalsTitle: '#dce8f4',
-  vitalsSub: '#9db8d3',
   faint: '#e4ebf2',
-  sectionBar: '#2b74bd',
+  white: '#fff',
+  // Familia addendum: rojo semántico (marca la corrección). EXCLUIDA del
+  // theming del perfil — no debe teñirse con el color de la clínica.
   addBorder: '#eccdc8',
   addAccent: '#a83232',
   addBg: '#fbeeec',
-  white: '#fff',
 } as const
 
 /* ------------------------------------------------------------------ */
-/*  Estilos                                                            */
+/*  Estilos — factory tematizada por la paleta derivada del perfil     */
 /* ------------------------------------------------------------------ */
 
-const s = StyleSheet.create({
-  page: {
-    fontFamily: 'Roboto',
-    fontSize: 9,
-    color: C.labelInk,
-    backgroundColor: C.white,
-    paddingTop: 44.64,
-    paddingRight: 36,
-    paddingBottom: 50.4,
-    paddingLeft: 36,
-  },
+function crearEstilos(P: PaletaNota) {
+  return StyleSheet.create({
+    page: {
+      fontFamily: 'Roboto',
+      fontSize: 9,
+      color: N.labelInk,
+      backgroundColor: N.white,
+      paddingTop: 44.64,
+      paddingRight: 36,
+      paddingBottom: 50.4,
+      paddingLeft: 36,
+    },
 
-  /* Header */
-  header: { marginBottom: 0 },
-  headerRow: { flexDirection: 'row', alignItems: 'center' },
-  chip: {
-    width: 28.5,
-    height: 28.5,
-    borderRadius: 14.25,
-    borderWidth: 1.125,
-    borderColor: C.navy,
-    backgroundColor: C.chipFill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  chipLogo: { width: 28.5, height: 28.5, objectFit: 'contain' },
-  chipIniciales: { fontSize: 9, fontWeight: 700, color: C.navy },
-  headerCol: { flex: 1, paddingHorizontal: 9 },
-  medNombre: { fontSize: 12, fontWeight: 700, color: C.ink },
-  medEsp: { fontSize: 8.25, fontFamily: 'Roboto', fontStyle: 'italic', fontWeight: 400, color: C.accent, marginTop: 1 },
-  medMeta: { fontSize: 7.125, marginTop: 1.5 },
-  metaLabel: { fontWeight: 700, color: C.labelInk },
-  metaValor: { fontWeight: 400, color: C.muted },
-  metaSep: { color: C.hair },
-  fechaChip: {
-    backgroundColor: C.cardBg,
-    borderWidth: 1,
-    borderColor: C.chipFill,
-    borderRadius: 5.25,
-    paddingVertical: 3.5,
-    paddingHorizontal: 9,
-    alignItems: 'flex-end',
-  },
-  fechaChipEyebrow: { fontSize: 6.375, fontWeight: 700, color: C.accent, letterSpacing: 1 },
-  fechaChipFecha: { fontSize: 10.5, fontWeight: 700, color: C.ink },
-  fechaChipHora: { fontSize: 8.625, fontWeight: 700, color: C.accent },
-  headerRule: { height: 2.25, borderRadius: 1.5, backgroundColor: C.navy, marginTop: 5.25 },
+    /* Header */
+    header: { marginBottom: 0 },
+    headerRow: { flexDirection: 'row', alignItems: 'center' },
+    chip: {
+      width: 28.5,
+      height: 28.5,
+      borderRadius: 14.25,
+      borderWidth: 1.125,
+      borderColor: P.structure,
+      backgroundColor: P.borderSoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    chipLogo: { width: 28.5, height: 28.5, objectFit: 'contain' },
+    chipIniciales: { fontSize: 9, fontWeight: 700, color: P.structure },
+    headerCol: { flex: 1, paddingHorizontal: 9 },
+    medNombre: { fontSize: 12, fontWeight: 700, color: P.textStrong },
+    medEsp: { fontSize: 8.25, fontFamily: 'Roboto', fontStyle: 'italic', fontWeight: 400, color: P.accent, marginTop: 1 },
+    medMeta: { fontSize: 7.125, marginTop: 1.5 },
+    metaLabel: { fontWeight: 700, color: N.labelInk },
+    metaValor: { fontWeight: 400, color: N.muted },
+    metaSep: { color: N.hair },
+    fechaChip: {
+      backgroundColor: P.bgSoft,
+      borderWidth: 1,
+      borderColor: P.borderSoft,
+      borderRadius: 5.25,
+      paddingVertical: 3.5,
+      paddingHorizontal: 9,
+      alignItems: 'flex-end',
+    },
+    fechaChipEyebrow: { fontSize: 6.375, fontWeight: 700, color: P.accent, letterSpacing: 1 },
+    fechaChipFecha: { fontSize: 10.5, fontWeight: 700, color: P.textStrong },
+    fechaChipHora: { fontSize: 8.625, fontWeight: 700, color: P.accent },
+    headerRule: { height: 2.25, borderRadius: 1.5, backgroundColor: P.structure, marginTop: 5.25 },
 
-  /* Título */
-  tituloWrap: { marginTop: 6, marginBottom: 1.5 },
-  eyebrow: { fontSize: 7.5, fontWeight: 700, color: C.accent, letterSpacing: 1.5 },
-  tituloDoc: { fontSize: 18.75, fontWeight: 700, color: C.ink },
+    /* Título */
+    tituloWrap: { marginTop: 6, marginBottom: 1.5 },
+    eyebrow: { fontSize: 7.5, fontWeight: 700, color: P.accent, letterSpacing: 1.5 },
+    tituloDoc: { fontSize: 18.75, fontWeight: 700, color: P.textStrong },
 
-  /* Barra paciente */
-  pacienteCard: {
-    backgroundColor: C.cardBg,
-    borderWidth: 1,
-    borderColor: C.hair,
-    borderLeftWidth: 3,
-    borderLeftColor: C.navy,
-    borderRadius: 6,
-    overflow: 'hidden',
-  },
-  pacienteBanda: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 4.5,
-    paddingHorizontal: 9,
-  },
-  pacienteIzq: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
-  pacienteNombre: { fontSize: 12.75, fontWeight: 700, color: C.ink },
-  pacienteTag: { fontSize: 7.5, fontWeight: 700, color: C.accent, letterSpacing: 1, textTransform: 'uppercase', marginLeft: 6 },
-  pacienteMeta: { fontSize: 9.5, fontWeight: 500, color: C.valueInk, textAlign: 'right' },
-  pacienteUnidad: { fontWeight: 400, color: C.muted },
-  pacienteSep: { color: C.hair },
+    /* Barra paciente */
+    pacienteCard: {
+      backgroundColor: P.bgSoft,
+      borderWidth: 1,
+      borderColor: N.hair,
+      borderLeftWidth: 3,
+      borderLeftColor: P.structure,
+      borderRadius: 6,
+      overflow: 'hidden',
+    },
+    pacienteBanda: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 4.5,
+      paddingHorizontal: 9,
+    },
+    pacienteIzq: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
+    pacienteNombre: { fontSize: 12.75, fontWeight: 700, color: P.textStrong },
+    pacienteTag: { fontSize: 7.5, fontWeight: 700, color: P.accent, letterSpacing: 1, textTransform: 'uppercase', marginLeft: 6 },
+    pacienteMeta: { fontSize: 9.5, fontWeight: 500, color: N.valueInk, textAlign: 'right' },
+    pacienteUnidad: { fontWeight: 400, color: N.muted },
+    pacienteSep: { color: N.hair },
 
-  /* Barra vitales */
-  vitalesCard: {
-    marginTop: 4,
-    borderWidth: 1,
-    borderColor: C.hair,
-    borderRadius: 6,
-    overflow: 'hidden',
-    flexDirection: 'row',
-  },
-  vitalesHead: { backgroundColor: C.navy, paddingHorizontal: 10.5, justifyContent: 'center', alignItems: 'center' },
-  vitalesHeadA: { fontSize: 8.25, fontWeight: 700, color: C.vitalsTitle },
-  vitalesHeadB: { fontSize: 6.375, fontWeight: 400, color: C.vitalsSub, letterSpacing: 0.6 },
-  vitalTile: {
-    flex: 1,
-    paddingVertical: 3,
-    paddingHorizontal: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderLeftWidth: 1,
-    borderLeftColor: C.faint,
-  },
-  vitalLabel: { fontSize: 6.375, fontWeight: 700, color: C.muted, textTransform: 'uppercase' },
-  vitalValor: { fontSize: 11.25, fontWeight: 700, color: C.ink, marginTop: 1.5 },
-  vitalUnidad: { fontSize: 6.75, fontWeight: 400, color: C.muted },
+    /* Barra vitales */
+    vitalesCard: {
+      marginTop: 4,
+      borderWidth: 1,
+      borderColor: N.hair,
+      borderRadius: 6,
+      overflow: 'hidden',
+      flexDirection: 'row',
+    },
+    vitalesHead: { backgroundColor: P.structure, paddingHorizontal: 10.5, justifyContent: 'center', alignItems: 'center' },
+    vitalesHeadA: { fontSize: 8.25, fontWeight: 700, color: P.vitalsTitle },
+    vitalesHeadB: { fontSize: 6.375, fontWeight: 400, color: P.vitalsSub, letterSpacing: 0.6 },
+    vitalTile: {
+      flex: 1,
+      paddingVertical: 3,
+      paddingHorizontal: 6,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderLeftWidth: 1,
+      borderLeftColor: N.faint,
+    },
+    vitalLabel: { fontSize: 6.375, fontWeight: 700, color: N.muted, textTransform: 'uppercase' },
+    vitalValor: { fontSize: 11.25, fontWeight: 700, color: P.textStrong, marginTop: 1.5 },
+    vitalUnidad: { fontSize: 6.75, fontWeight: 400, color: N.muted },
 
-  /* Secciones */
-  secciones: { marginTop: 5.25 },
-  seccionRow: { flexDirection: 'row', gap: 12, paddingBottom: 4.5 },
-  seccionRowBorde: { borderTopWidth: 1, borderTopColor: C.hair, paddingTop: 4.5 },
-  etiquetaCol: { width: 58, flexDirection: 'row' },
-  accentBar: { width: 2.25, borderRadius: 1.5, backgroundColor: C.sectionBar },
-  etiquetaTexto: { flex: 1, paddingLeft: 6 },
-  seccionNumero: { fontSize: 15, fontWeight: 700, color: C.accent },
-  seccionTitulo: { fontSize: 8.25, fontWeight: 700, color: C.ink, letterSpacing: 0.9, textTransform: 'uppercase', marginTop: 5.25 },
-  seccionSubtitulo: { fontSize: 7.125, fontFamily: 'Roboto', fontStyle: 'italic', fontWeight: 400, color: C.muted, marginTop: 2.25 },
-  cuerpoCol: { flex: 1 },
+    /* Secciones */
+    secciones: { marginTop: 3.75 },
+    seccionRow: { flexDirection: 'row', gap: 12, paddingBottom: 3.5 },
+    seccionRowBorde: { borderTopWidth: 1, borderTopColor: N.hair, paddingTop: 3.5 },
+    etiquetaCol: { width: 58, flexDirection: 'row' },
+    accentBar: { width: 2.25, borderRadius: 1.5, backgroundColor: P.accentSoft },
+    etiquetaTexto: { flex: 1, paddingLeft: 6 },
+    seccionNumero: { fontSize: 15, fontWeight: 700, color: P.accent },
+    seccionTitulo: { fontSize: 8.25, fontWeight: 700, color: P.textStrong, letterSpacing: 0.9, textTransform: 'uppercase', marginTop: 5.25 },
+    seccionSubtitulo: { fontSize: 7.125, fontFamily: 'Roboto', fontStyle: 'italic', fontWeight: 400, color: N.muted, marginTop: 2.25 },
+    cuerpoCol: { flex: 1 },
 
-  /* Bloques de texto */
-  parrafo: { fontSize: 9, lineHeight: 1.3, color: C.labelInk, textAlign: 'justify' },
-  parrafoItem: { fontSize: 9, lineHeight: 1.3, color: C.labelInk, textAlign: 'justify', paddingLeft: 6 },
-  bold: { fontWeight: 700, color: C.navy },
+    /* Bloques de texto */
+    parrafo: { fontSize: 9, lineHeight: 1.3, color: N.labelInk, textAlign: 'justify' },
+    parrafoItem: { fontSize: 9, lineHeight: 1.3, color: N.labelInk, textAlign: 'justify', paddingLeft: 6 },
+    bold: { fontWeight: 700, color: P.structure },
 
-  /* Firma */
-  firmaWrap: { alignItems: 'flex-end', marginTop: 14 },
-  firmaCaja: { width: 223.2, alignItems: 'center' },
-  firmaEspacio: { height: 45.36, alignItems: 'center', justifyContent: 'flex-end' },
-  firmaImg: { maxHeight: 45.36, maxWidth: 223.2, objectFit: 'contain' },
-  firmaLinea: { width: '100%', borderTopWidth: 1.125, borderTopColor: C.navy, paddingTop: 5.25, alignItems: 'center' },
-  firmaNombre: { fontSize: 9.75, fontWeight: 700, color: C.ink },
-  firmaMeta: { fontSize: 7.875, fontWeight: 400, color: C.muted, lineHeight: 1.5, textAlign: 'center' },
+    /* Firma */
+    // Empuja la firma al fondo del área de contenido cuando sobra espacio (nota
+    // de 1 página). En overflow, el free space es 0 → colapsa a 0 y la firma
+    // fluye tras el contenido en la última página (pagina sin romperse).
+    firmaSpacer: { flexGrow: 1 },
+    firmaWrap: { alignItems: 'flex-end', marginTop: 10 },
+    firmaCaja: { width: 223.2, alignItems: 'center' },
+    firmaEspacio: { height: 45.36, alignItems: 'center', justifyContent: 'flex-end' },
+    firmaImg: { maxHeight: 45.36, maxWidth: 223.2, objectFit: 'contain' },
+    firmaLinea: { width: '100%', borderTopWidth: 1.125, borderTopColor: P.structure, paddingTop: 4, alignItems: 'center' },
+    firmaNombre: { fontSize: 9.75, fontWeight: 700, color: P.textStrong },
+    firmaMeta: { fontSize: 7.875, fontWeight: 400, color: N.muted, lineHeight: 1.3, textAlign: 'center' },
 
-  /* Addendums */
-  addCard: {
-    marginTop: 6,
-    borderWidth: 1,
-    borderColor: C.addBorder,
-    borderLeftWidth: 3,
-    borderLeftColor: C.addAccent,
-    borderRadius: 6,
-    backgroundColor: C.addBg,
-    paddingVertical: 6,
-    paddingHorizontal: 9,
-  },
-  addTitulo: { fontSize: 7.5, fontWeight: 700, color: C.addAccent, letterSpacing: 0.9 },
-  addMeta: { fontSize: 7.125, fontWeight: 400, color: C.muted, marginTop: 1.5 },
-  addCuerpo: { marginTop: 3 },
-  addParrafo: { fontSize: 8.25, lineHeight: 1.35, color: C.labelInk, textAlign: 'justify' },
-  addParrafoItem: { fontSize: 8.25, lineHeight: 1.35, color: C.labelInk, textAlign: 'justify', paddingLeft: 6 },
+    /* Addendums */
+    addCard: {
+      marginTop: 6,
+      borderWidth: 1,
+      borderColor: N.addBorder,
+      borderLeftWidth: 3,
+      borderLeftColor: N.addAccent,
+      borderRadius: 6,
+      backgroundColor: N.addBg,
+      paddingVertical: 6,
+      paddingHorizontal: 9,
+    },
+    addTitulo: { fontSize: 7.5, fontWeight: 700, color: N.addAccent, letterSpacing: 0.9 },
+    addMeta: { fontSize: 7.125, fontWeight: 400, color: N.muted, marginTop: 1.5 },
+    addCuerpo: { marginTop: 3 },
+    addParrafo: { fontSize: 8.25, lineHeight: 1.35, color: N.labelInk, textAlign: 'justify' },
+    addParrafoItem: { fontSize: 8.25, lineHeight: 1.35, color: N.labelInk, textAlign: 'justify', paddingLeft: 6 },
 
-  /* Footer */
-  footer: {
-    position: 'absolute',
-    bottom: 24,
-    left: 36,
-    right: 36,
-    borderTopWidth: 1,
-    borderTopColor: C.faint,
-    paddingTop: 6.75,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  footerTexto: { fontSize: 7.125, fontWeight: 400, color: C.muted },
-})
+    /* Footer */
+    footer: {
+      position: 'absolute',
+      bottom: 24,
+      left: 36,
+      right: 36,
+      borderTopWidth: 1,
+      borderTopColor: N.faint,
+      paddingTop: 6.75,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    footerTexto: { fontSize: 7.125, fontWeight: 400, color: N.muted },
+  })
+}
+
+type EstilosNota = ReturnType<typeof crearEstilos>
 
 /* ------------------------------------------------------------------ */
 /*  Metadatos de secciones                                             */
@@ -282,6 +286,7 @@ function renderBloques(
   bloquesRaw: BloqueNota[],
   parrafoStyle: Style,
   itemStyle: Style,
+  boldStyle: Style,
   keyPrefix: string,
 ): ReactElement[] {
   const bloques = fusionarEncabezadoItem(bloquesRaw)
@@ -290,7 +295,7 @@ function renderBloques(
     const base = esItem ? itemStyle : parrafoStyle
     const spans = bloque.spans.map((sp, j) =>
       sp.bold
-        ? <Text key={j} style={s.bold}>{t(sp.texto)}</Text>
+        ? <Text key={j} style={boldStyle}>{t(sp.texto)}</Text>
         : <Text key={j}>{t(sp.texto)}</Text>,
     )
     return (
@@ -323,7 +328,7 @@ function tituloDe(sec: SeccionNota): string {
 /*  Sub-componentes                                                    */
 /* ------------------------------------------------------------------ */
 
-function HeaderNota({ data, logoUrl }: { data: NotaRenderData; logoUrl?: string }) {
+function HeaderNota({ data, logoUrl, s }: { data: NotaRenderData; logoUrl?: string; s: EstilosNota }) {
   const iniciales = data.medico.nombre
     .split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
   const cedProf = data.medico.cedulaProfesional
@@ -358,7 +363,7 @@ function HeaderNota({ data, logoUrl }: { data: NotaRenderData; logoUrl?: string 
   )
 }
 
-function BarraPaciente({ paciente }: { paciente: NotaRenderData['paciente'] }) {
+function BarraPaciente({ paciente, s }: { paciente: NotaRenderData['paciente']; s: EstilosNota }) {
   const sexo = paciente.sexo === 'M' ? 'Masculino' : paciente.sexo === 'F' ? 'Femenino' : paciente.sexo === 'Otro' ? 'Otro' : '—'
   const edad = paciente.edad ? `${paciente.edad.anios} años` : '—'
 
@@ -403,7 +408,7 @@ function tilesVitales(sv: SignosVitales): Array<{ label: string; valor: string; 
   return tiles
 }
 
-function BarraVitales({ sv }: { sv: SignosVitales }) {
+function BarraVitales({ sv, s }: { sv: SignosVitales; s: EstilosNota }) {
   const tiles = tilesVitales(sv)
   if (tiles.length === 0) return null
   return (
@@ -423,7 +428,7 @@ function BarraVitales({ sv }: { sv: SignosVitales }) {
   )
 }
 
-function SeccionItem({ numero, seccion, primera }: { numero: string; seccion: SeccionNota; primera: boolean }) {
+function SeccionItem({ numero, seccion, primera, s }: { numero: string; seccion: SeccionNota; primera: boolean; s: EstilosNota }) {
   return (
     <View style={primera ? s.seccionRow : [s.seccionRow, s.seccionRowBorde]}>
       <View style={s.etiquetaCol} minPresenceAhead={38}>
@@ -435,13 +440,13 @@ function SeccionItem({ numero, seccion, primera }: { numero: string; seccion: Se
         </View>
       </View>
       <View style={s.cuerpoCol}>
-        {renderBloques(seccion.bloques, s.parrafo, s.parrafoItem, `sec-${numero}`)}
+        {renderBloques(seccion.bloques, s.parrafo, s.parrafoItem, s.bold, `sec-${numero}`)}
       </View>
     </View>
   )
 }
 
-function FirmaNota({ medico }: { medico: NotaRenderData['medico'] }) {
+function FirmaNota({ medico, s }: { medico: NotaRenderData['medico']; s: EstilosNota }) {
   const ceds = [
     medico.cedulaProfesional ? `Cédula Prof. ${medico.cedulaProfesional}` : '',
     medico.cedulaEspecialidad ? `Cédula Esp. ${medico.cedulaEspecialidad}` : '',
@@ -463,13 +468,13 @@ function FirmaNota({ medico }: { medico: NotaRenderData['medico'] }) {
   )
 }
 
-function AddendumCard({ addendum }: { addendum: NotaRenderData['addendums'][number] }) {
+function AddendumCard({ addendum, s }: { addendum: NotaRenderData['addendums'][number]; s: EstilosNota }) {
   return (
     <View style={s.addCard} wrap={false}>
       <Text style={s.addTitulo}>{t('NOTA ACLARATORIA (ADDENDUM)')}</Text>
       <Text style={s.addMeta}>{t(`${addendum.medicoNombre} · ${addendum.fechaFormateada}`)}</Text>
       <View style={s.addCuerpo}>
-        {renderBloques(addendum.parseado.secciones.flatMap((sec) => sec.bloques), s.addParrafo, s.addParrafoItem, 'add')}
+        {renderBloques(addendum.parseado.secciones.flatMap((sec) => sec.bloques), s.addParrafo, s.addParrafoItem, s.bold, 'add')}
       </View>
     </View>
   )
@@ -484,6 +489,11 @@ export function renderNotaEvolucion(props: NotaEvolucionProps) {
 }
 
 export default function NotaEvolucionPdf({ data, logoUrl }: NotaEvolucionProps) {
+  // Paleta derivada del color del perfil (data.medico.color*). Sin color válido
+  // → fallback total a la paleta azul del mockup (ver derivarPaletaNota).
+  const P = derivarPaletaNota(data.medico.colorPrimario, data.medico.colorSecundario)
+  const s = crearEstilos(P)
+
   const secciones = ordenarSecciones(data.notaParseada.secciones)
   const pac = data.paciente.nombreCompleto
   const fecha = data.fechaFormateada
@@ -491,7 +501,7 @@ export default function NotaEvolucionPdf({ data, logoUrl }: NotaEvolucionProps) 
   return (
     <Document>
       <Page size="LETTER" style={s.page}>
-        <HeaderNota data={data} logoUrl={logoUrl} />
+        <HeaderNota data={data} logoUrl={logoUrl} s={s} />
 
         {/* Footer fixed */}
         <View style={s.footer} fixed>
@@ -510,8 +520,8 @@ export default function NotaEvolucionPdf({ data, logoUrl }: NotaEvolucionProps) 
           <Text style={s.tituloDoc}>{t('Nota de Evolución Médica')}</Text>
         </View>
 
-        <BarraPaciente paciente={data.paciente} />
-        {data.signosVitales ? <BarraVitales sv={data.signosVitales} /> : null}
+        <BarraPaciente paciente={data.paciente} s={s} />
+        {data.signosVitales ? <BarraVitales sv={data.signosVitales} s={s} /> : null}
 
         {/* Secciones */}
         <View style={s.secciones}>
@@ -521,14 +531,20 @@ export default function NotaEvolucionPdf({ data, logoUrl }: NotaEvolucionProps) 
               numero={String(i + 1).padStart(2, '0')}
               seccion={sec}
               primera={i === 0}
+              s={s}
             />
           ))}
         </View>
 
-        <FirmaNota medico={data.medico} />
+        {/* Sin addendums, un spacer flexible ancla la firma al fondo (1 página).
+            Con addendums NO se ancla: la firma va tras las secciones y los
+            addendums (correcciones firmadas) la siguen, conservando el orden. */}
+        {data.addendums.length === 0 ? <View style={s.firmaSpacer} /> : null}
+
+        <FirmaNota medico={data.medico} s={s} />
 
         {data.addendums.map((add, i) => (
-          <AddendumCard key={`addendum-${i}`} addendum={add} />
+          <AddendumCard key={`addendum-${i}`} addendum={add} s={s} />
         ))}
       </Page>
     </Document>
