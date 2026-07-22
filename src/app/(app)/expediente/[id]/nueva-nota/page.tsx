@@ -6,7 +6,7 @@ import Portal from '@/components/ui/Portal'
 import ModalShell from '@/components/ui/ModalShell'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Paciente, Diagnostico } from '@/types'
+import { Paciente, Diagnostico, MedicamentoConsulta, SignosVitales } from '@/types'
 import type { MedicamentoIA, BloqueIA, NotaIAResponse } from '@/lib/notaIA/schema'
 import { calcularEdad } from '@/lib/patientUtils'
 import { flushSync } from 'react-dom'
@@ -25,6 +25,8 @@ import { useAuditAccess } from '@/hooks/useAudit'
 import DiagnosticosEditor from '@/components/documentos/DiagnosticosEditor'
 import dynamic from 'next/dynamic'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
+import SignosVitalesCard, { type SignosVitalesForm } from '@/components/expediente/SignosVitalesCard'
+import { fueraDeLimitesDuros, type SignoVitalKey } from '@/lib/signosVitalesRangos'
 
 function FormCargando() {
   return (
@@ -69,7 +71,6 @@ type MedicoInfo = {
   direccion_consultorio: string; telefono_consultorio: string
 }
 
-type MedRow = { nombre: string; dosis: string; frecuencia: string; duracion: string }
 type MedicamentoConVia = {
   nombre_comercial: string; presentacion: string; dosis: string
   principio_activo: string; indicacion: string; via_administracion: string
@@ -86,7 +87,7 @@ const DOCS = [
   { key: 'honorarios',     label: 'Honorarios / Cotización',   icon: Receipt,       color: 'border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100' },
 ]
 
-const MED_VACIA: MedRow = { nombre: '', dosis: '', frecuencia: '', duracion: '' }
+const MED_VACIA: MedicamentoConsulta = { nombre: '', dosis: '', frecuencia: '', duracion: '' }
 
 const EMPTY_FORM: {
   motivo_consulta: string
@@ -109,6 +110,20 @@ function formatDiagnosticosInline(dxs: Diagnostico[]): string {
     .join(' + ')
 }
 
+// Fase 3: convierte los strings del form de vitales a números; omite vacíos.
+// Objeto vacío → undefined (la key NO se envía al payload; consulta sin vitales).
+function construirSignosVitalesPayload(sv: SignosVitalesForm): SignosVitales | undefined {
+  const out: SignosVitales = {}
+  const campos: (keyof SignosVitalesForm)[] = ['ta_sistolica', 'ta_diastolica', 'fc', 'fr', 'temp', 'spo2']
+  for (const c of campos) {
+    const raw = sv[c]?.trim()
+    if (!raw) continue
+    const n = Number(raw)
+    if (Number.isFinite(n)) out[c] = n
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
 export default function NuevaNotaPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
@@ -118,7 +133,9 @@ export default function NuevaNotaPage() {
   const [paciente, setPaciente]     = useState<Paciente | null>(null)
 
   const [form, setForm] = useState({ ...EMPTY_FORM })
-  const [medicamentos, setMedicamentos] = useState<MedRow[]>([{ ...MED_VACIA }])
+  const [medicamentos, setMedicamentos] = useState<MedicamentoConsulta[]>([{ ...MED_VACIA }])
+  const [signosVitales, setSignosVitales] = useState<SignosVitalesForm>({})
+  const [erroresVitales, setErroresVitales] = useState<Set<SignoVitalKey>>(new Set())
   const [medCache, setMedCache]         = useState<string[]>([])
   const [showSuggest, setShowSuggest]   = useState<number | null>(null)
 
@@ -154,7 +171,7 @@ export default function NuevaNotaPage() {
   }
   const [ultimoGuardado, setUltimoGuardado] = useState<Date | null>(null)
   const [borradorRestaurado, setBorradorRestaurado] = useState(false)
-  const [ultimaConsulta, setUltimaConsulta] = useState<{ diagnosticos: string; medicamentos: MedRow[] | null } | null>(null)
+  const [ultimaConsulta, setUltimaConsulta] = useState<{ diagnosticos: string; medicamentos: MedicamentoConsulta[] | null } | null>(null)
 
   const suggestRef  = useRef<HTMLDivElement>(null)
   const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -184,7 +201,7 @@ export default function NuevaNotaPage() {
       diagnosticos?: string | Diagnostico[]
       complementoDx?: string
     }
-    type DraftPayload = { form?: DraftForm; medicamentos?: typeof medicamentos; complementoDx?: string }
+    type DraftPayload = { form?: DraftForm; medicamentos?: typeof medicamentos; signosVitales?: SignosVitalesForm; complementoDx?: string }
     secureStorage.get<DraftPayload>(`nota-draft-${id}`).then(parsed => {
       if (!parsed?.form) return
       // Guard anti-race: si la promesa resolvió DESPUÉS de que el usuario
@@ -218,6 +235,7 @@ export default function NuevaNotaPage() {
       // tras un cambio de schema (evita undefined en inputs controlados).
       setForm({ ...EMPTY_FORM, ...migrated })
       if (parsed.medicamentos?.length) setMedicamentos(parsed.medicamentos)
+      if (parsed.signosVitales) setSignosVitales(parsed.signosVitales)
       setBorradorRestaurado(true)
     }).catch(() => {})
     // Cargar última consulta para contexto
@@ -245,12 +263,12 @@ export default function NuevaNotaPage() {
     autosaveRef.current = setTimeout(() => {
       const tieneDatos = form.motivo_consulta || form.diagnosticos.length > 0 || form.exploracion_fisica
       if (!tieneDatos) return
-      secureStorage.set(draftKey, { form, medicamentos }).then(() => {
+      secureStorage.set(draftKey, { form, medicamentos, signosVitales }).then(() => {
         setUltimoGuardado(new Date())
       })
     }, 1500)
     return () => { if (autosaveRef.current) clearTimeout(autosaveRef.current) }
-  }, [form, medicamentos, notaSaved])
+  }, [form, medicamentos, signosVitales, notaSaved])
 
   // Cerrar autocomplete al hacer clic fuera
   useEffect(() => {
@@ -273,7 +291,7 @@ export default function NuevaNotaPage() {
     return medCache.filter(n => n.toLowerCase().includes(query.toLowerCase())).slice(0, 6)
   }
 
-  async function saveMedCache(meds: MedRow[]) {
+  async function saveMedCache(meds: MedicamentoConsulta[]) {
     try {
       const nombres = meds.filter(m => m.nombre.trim()).map(m => m.nombre.trim())
       if (!nombres.length) return
@@ -289,7 +307,7 @@ export default function NuevaNotaPage() {
     } catch {}
   }
 
-  function updateMed(i: number, field: keyof MedRow, val: string) {
+  function updateMed(i: number, field: keyof MedicamentoConsulta, val: string) {
     setMedicamentos(prev => prev.map((m, idx) => idx === i ? { ...m, [field]: val } : m))
   }
 
@@ -495,6 +513,27 @@ export default function NuevaNotaPage() {
       if (!form.motivo_consulta.trim()) { setError('Describe el caso antes de guardar.'); return }
       if (!notaGenerada.trim()) { setError('Genera la nota antes de guardar.'); return }
     }
+    // Fase 3: si hay AL MENOS un signo vital capturado, fc es obligatoria (>0)
+    // y todos los capturados deben caer dentro de los límites fisiológicos duros.
+    // El semáforo clínico (vigilar/fuera) NUNCA bloquea; esto sí.
+    const svValidar = construirSignosVitalesPayload(signosVitales)
+    if (svValidar) {
+      const nuevosErrores = new Set<SignoVitalKey>()
+      const fcMissing = !(typeof svValidar.fc === 'number' && svValidar.fc > 0)
+      if (fcMissing) nuevosErrores.add('fc')
+      for (const key of ['ta_sistolica', 'ta_diastolica', 'fc', 'fr', 'temp', 'spo2'] as SignoVitalKey[]) {
+        const val = svValidar[key]
+        if (typeof val === 'number' && fueraDeLimitesDuros(key, val)) nuevosErrores.add(key)
+      }
+      if (nuevosErrores.size > 0) {
+        setErroresVitales(nuevosErrores)
+        setError(fcMissing
+          ? 'Signos vitales: la frecuencia cardíaca (FC) es obligatoria y mayor que 0 si capturas algún signo vital.'
+          : 'Signos vitales: hay valores fuera del rango fisiológico posible. Corrígelos para guardar.')
+        return
+      }
+      setErroresVitales(new Set())
+    }
     // Si el médico marcó "No mostrar de nuevo", guardar directo
     const skipModal = localStorage.getItem('spinus_skip_confirm_nota') === '1'
     if (skipModal) {
@@ -510,6 +549,7 @@ export default function NuevaNotaPage() {
     setGuardando(true)
 
     const medsConDatos = medicamentos.filter(m => m.nombre.trim())
+    const svPayload = construirSignosVitalesPayload(signosVitales)
     const notaFinal = notaGenerada
       + (form.pronostico.trim() ? `\n\n**[PRONÓSTICO]:**\n${form.pronostico.trim()}` : '')
 
@@ -529,6 +569,7 @@ export default function NuevaNotaPage() {
       proxima_cita: form.proxima_cita || null,
       medicamentos: medsConDatos.length ? medsConDatos : null,
       nota_origen: modoNota,
+      ...(svPayload ? { signos_vitales: svPayload } : {}),
     }
 
     try {
@@ -792,6 +833,8 @@ export default function NuevaNotaPage() {
   ) : null
 
   // ── Render ────────────────────────────────────────────────────
+  // Aviso suave (no bloquea): la nota se guardará sin signos vitales.
+  const sinVitalesCapturados = construirSignosVitalesPayload(signosVitales) === undefined
   return (
     <div className="max-w-7xl mx-auto">
 
@@ -813,6 +856,11 @@ export default function NuevaNotaPage() {
                   Una vez guardada, <span className="font-bold text-red-600">no podrá modificarse</span> por motivos de seguridad y cumplimiento normativo.
                   Si necesitas hacer correcciones después, podrás agregar una nota aclaratoria (addendum).
                 </p>
+                {sinVitalesCapturados && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3 text-left">
+                    ⚠ No capturaste signos vitales en esta nota.
+                  </p>
+                )}
                 <label className="flex items-center justify-center gap-2 mt-4 cursor-pointer">
                   <input
                     type="checkbox"
@@ -935,6 +983,8 @@ modoNota === 'ia'
                 onClick={() => {
                   setForm({ ...EMPTY_FORM })
                   setMedicamentos([{ ...MED_VACIA }])
+                  setSignosVitales({})
+                  setErroresVitales(new Set())
                   secureStorage.remove(draftKey)
                   setBorradorRestaurado(false)
                 }}
@@ -944,6 +994,13 @@ modoNota === 'ia'
               </button>
             </div>
           )}
+
+          {/* Signos vitales — visible en ambos modos (IA y manual) */}
+          <SignosVitalesCard
+            value={signosVitales}
+            onChange={setSignosVitales}
+            errores={erroresVitales}
+          />
 
           {/* Formulario de la consulta */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">

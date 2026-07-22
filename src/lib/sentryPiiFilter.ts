@@ -23,7 +23,7 @@ const SENSITIVE_KEYS = [
   'paciente', 'nombre', 'apellido', 'email', 'correo', 'telefono',
   'celular', 'curp', 'rfc', 'direccion', 'domicilio', 'diagnostico',
   'motivo_consulta', 'exploracion', 'antecedentes', 'medicamentos',
-  'recomendaciones', 'contenido', 'notas_evolucion',
+  'recomendaciones', 'contenido', 'notas_evolucion', 'signos', 'vitales',
 ]
 
 // Rutas API con datos clínicos sensibles

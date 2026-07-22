@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
+import { fueraDeLimitesDuros, type SignoVitalKey } from '@/lib/signosVitalesRangos'
 
 /* ── POST /api/consultas — crear nota médica ───────────── */
 export async function POST(req: NextRequest) {
@@ -112,6 +113,47 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Fase 3: validación de signos vitales, ESTRICTAMENTE condicional a su
+    // presencia. Ausente/null → null (offline-mode y clientes viejos no lo
+    // envían y deben seguir funcionando intactos). Si viene, se valida estricto.
+    const VITALES_KEYS = [
+      'ta_sistolica', 'ta_diastolica', 'fc', 'fr', 'temp', 'spo2', 'peso_kg', 'talla_cm',
+    ] as const
+    let signosVitalesValidado: Record<string, number> | null = null
+    const svRaw: unknown = body.signos_vitales
+    if (svRaw !== undefined && svRaw !== null) {
+      if (typeof svRaw !== 'object' || Array.isArray(svRaw)) {
+        return NextResponse.json({ error: 'signos_vitales_invalido' }, { status: 400 })
+      }
+      const validado: Record<string, number> = {}
+      for (const [k, v] of Object.entries(svRaw as Record<string, unknown>)) {
+        if (!VITALES_KEYS.includes(k as (typeof VITALES_KEYS)[number])) {
+          return NextResponse.json({ error: 'signos_vitales_invalido' }, { status: 400 })
+        }
+        if (typeof v !== 'number' || !Number.isFinite(v)) {
+          return NextResponse.json({ error: 'signos_vitales_invalido' }, { status: 400 })
+        }
+        validado[k] = v
+      }
+      // fc obligatoria y > 0 dentro del objeto
+      if (!(validado.fc > 0)) {
+        return NextResponse.json({ error: 'signos_vitales_invalido' }, { status: 400 })
+      }
+      // Límites duros para las 6 vitales; peso_kg/talla_cm solo number finito > 0.
+      const VITALES_CON_LIMITE: SignoVitalKey[] = ['ta_sistolica', 'ta_diastolica', 'fc', 'fr', 'temp', 'spo2']
+      for (const key of VITALES_CON_LIMITE) {
+        if (key in validado && fueraDeLimitesDuros(key, validado[key])) {
+          return NextResponse.json({ error: 'signos_vitales_invalido' }, { status: 400 })
+        }
+      }
+      for (const key of ['peso_kg', 'talla_cm'] as const) {
+        if (key in validado && !(validado[key] > 0)) {
+          return NextResponse.json({ error: 'signos_vitales_invalido' }, { status: 400 })
+        }
+      }
+      signosVitalesValidado = validado
+    }
+
     // RLS filtra por clinica_id automáticamente
     const { data: paciente } = await supabase
       .from('pacientes')
@@ -159,6 +201,7 @@ export async function POST(req: NextRequest) {
       notas_evolucion:           body.notas_evolucion || null,
       proxima_cita:              body.proxima_cita || null,
       medicamentos:              body.medicamentos || null,
+      signos_vitales:            signosVitalesValidado ?? null,
       nota_origen:               notaOrigen,
       medico_nombre:             componerNombreMedicoCompleto({
         titulo: profile.titulo,
