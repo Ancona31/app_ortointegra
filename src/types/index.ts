@@ -38,6 +38,29 @@ export interface Paciente {
   updated_at?: string
 }
 
+// ─── Signos vitales (snapshot por consulta) ──────────────────────────────────
+// Todos los campos numéricos y opcionales; ausente/undefined = no capturado.
+export interface SignosVitales {
+  ta_sistolica?: number
+  ta_diastolica?: number
+  fc?: number
+  fr?: number
+  temp?: number
+  spo2?: number
+  peso_kg?: number
+  talla_cm?: number
+}
+
+// Medicamento tal como se guarda en consultas.medicamentos (jsonb). Shape real
+// del formulario de nueva-nota (MedRow). NO confundir con Medicamento (recetas),
+// que tiene una forma distinta.
+export interface MedicamentoConsulta {
+  nombre: string
+  dosis: string
+  frecuencia: string
+  duracion: string
+}
+
 // ─── Consulta / Expediente ────────────────────────────────────────────────────
 export interface Consulta {
   id: string
@@ -49,6 +72,15 @@ export interface Consulta {
   plan_tratamiento?: string
   notas_evolucion?: string
   proxima_cita?: string
+  // Médico que creó la nota (id vivo del profile). Snapshot inmutable aparte
+  // en los campos medico_* de abajo.
+  medico_id?: string
+  // Medicamentos prescritos en la consulta (jsonb). Ver MedicamentoConsulta.
+  medicamentos?: MedicamentoConsulta[]
+  // Pronóstico clínico de la consulta.
+  pronostico?: string
+  // Snapshot de signos vitales tomados en la consulta.
+  signos_vitales?: SignosVitales | null
   // Origen de la nota: 'ia' = Gemini, 'manual' = escrita por el médico
   nota_origen?: 'ia' | 'manual'
   // Médico que creó la nota — inmutable tras la creación
