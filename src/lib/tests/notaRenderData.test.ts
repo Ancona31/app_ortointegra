@@ -160,6 +160,48 @@ describe('buildNotaRenderData — fechas y paciente', () => {
   })
 })
 
+describe('buildNotaRenderData — horaFormateada compacta', () => {
+  it("origen 'consulta': deriva la hora de la fecha en TZ clínica, compacta 'a.m.'", () => {
+    // 2026-07-21T15:00:00Z → 09:00 en America/Mexico_City (UTC-6, sin DST)
+    const r = buildNotaRenderData({ origen: 'consulta', consulta: consultaSnapshot, paciente })
+    expect(r.horaFormateada).toBe('9:00 a.m.')
+  })
+
+  it("origen 'formulario': usa la hora actual con el formato compacto esperado", () => {
+    const r = buildNotaRenderData({
+      origen: 'formulario',
+      paciente,
+      medicoVivo,
+      fecha: '2026-07-21T15:00:00Z',
+      notasEvolucion: null,
+      diagnosticos: [],
+      motivoConsulta: '',
+    })
+    expect(r.horaFormateada).toMatch(/^\d{1,2}:\d{2}\s[ap]\.m\.$/)
+  })
+})
+
+describe('buildNotaRenderData — fechaCorta para el chip de encabezado', () => {
+  it("origen 'consulta': formato corto 'dd / mmm / yyyy' en minúsculas sin puntos", () => {
+    // 2026-07-21T15:00:00Z → 21 jul 2026 en America/Mexico_City
+    const r = buildNotaRenderData({ origen: 'consulta', consulta: consultaSnapshot, paciente })
+    expect(r.fechaCorta).toBe('21 / jul / 2026')
+  })
+
+  it("origen 'formulario': deriva la fecha corta de input.fecha", () => {
+    const r = buildNotaRenderData({
+      origen: 'formulario',
+      paciente,
+      medicoVivo,
+      fecha: '2026-07-21T15:00:00Z',
+      notasEvolucion: null,
+      diagnosticos: [],
+      motivoConsulta: '',
+    })
+    expect(r.fechaCorta).toBe('21 / jul / 2026')
+  })
+})
+
 describe('buildNotaRenderData — origen formulario (datos en vuelo)', () => {
   it('arma la nota desde fuentes vivas sin snapshot', () => {
     const r = buildNotaRenderData({

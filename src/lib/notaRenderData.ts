@@ -18,6 +18,28 @@ import { decodificarEntidadesHTML } from '@/lib/textUtils'
 /** Formato de fecha legible en español para encabezados de nota y addendums. */
 const FMT_FECHA = "d 'de' MMMM 'de' yyyy"
 
+/**
+ * Formatea una hora al formato compacto del encabezado de nota: "11:50 a.m.".
+ * renderEnTZ con locale es produce p.ej. "11:50 a. m." (minúsculas con espacio
+ * interno); se compacta el "a. m." → "a.m." (y "p. m." → "p.m.") sin espacio.
+ */
+function formatearHoraCompacta(instante: string | Date): string {
+  return renderEnTZ(instante, 'h:mm a')
+    .toLowerCase()
+    .replace(/([ap])\.?\s*m\.?/i, '$1.m.')
+}
+
+/**
+ * Formatea una fecha al formato corto del chip de encabezado: "21 / jul / 2026".
+ * renderEnTZ con locale es produce el mes abreviado con punto ("jul."); se pasa
+ * a minúsculas y se eliminan los puntos para dejar "21 / jul / 2026".
+ */
+function formatearFechaCorta(instante: string | Date): string {
+  return renderEnTZ(instante, 'dd / MMM / yyyy')
+    .toLowerCase()
+    .replace(/\./g, '')
+}
+
 /** Addendum tal como llega desde BD (input; el módulo no lo consulta). */
 export interface AddendumInput {
   contenido: string | null
@@ -58,6 +80,8 @@ export interface NotaRenderData {
     telefono: string
   }
   fechaFormateada: string
+  fechaCorta: string
+  horaFormateada: string
   diagnosticos: Diagnostico[]
   motivoConsulta: string
   signosVitales: SignosVitales | null
@@ -163,6 +187,8 @@ export function buildNotaRenderData(input: BuildNotaInput): NotaRenderData {
         telefono: c.consultorio_telefono ?? '',
       },
       fechaFormateada: renderEnTZ(c.fecha, FMT_FECHA),
+      fechaCorta: formatearFechaCorta(c.fecha),
+      horaFormateada: formatearHoraCompacta(c.fecha),
       diagnosticos: c.diagnosticos ?? [],
       motivoConsulta: c.motivo_consulta ?? '',
       signosVitales: c.signos_vitales ?? null,
@@ -183,6 +209,8 @@ export function buildNotaRenderData(input: BuildNotaInput): NotaRenderData {
       telefono: input.consultorio?.telefono ?? '',
     },
     fechaFormateada: renderEnTZ(input.fecha, FMT_FECHA),
+    fechaCorta: formatearFechaCorta(input.fecha),
+    horaFormateada: formatearHoraCompacta(new Date()),
     diagnosticos: input.diagnosticos,
     motivoConsulta: input.motivoConsulta,
     signosVitales: input.signosVitales ?? null,

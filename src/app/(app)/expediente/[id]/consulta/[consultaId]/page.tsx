@@ -3,24 +3,16 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Paciente, Consulta } from '@/types'
+import { Paciente, Consulta, MedicoInfo } from '@/types'
 import { parseISO, format } from 'date-fns'
-import { calcularEdad } from '@/lib/patientUtils'
+import { generateDocFileName } from '@/lib/patientUtils'
 import { es } from 'date-fns/locale'
 import { ArrowLeft, Printer, Stethoscope, Plus, Loader2, FileText, Lock, PenLine, Sparkles } from 'lucide-react'
 import Link from 'next/link'
-import { PRINT_CSS, markdownToHtml } from '@/lib/printStyles'
 import ReactMarkdown from 'react-markdown'
 import { useAuditAccess } from '@/hooks/useAudit'
-
-type MedicoInfo = {
-  nombre: string
-  especialidad: string
-  cedula_profesional: string
-  cedula_especialidad: string
-  logo_url: string | null
-  firma_url: string | null
-}
+import { buildNotaRenderData } from '@/lib/notaRenderData'
+import { generarPdf } from '@/lib/mobileShare'
 
 type Addendum = {
   id: string
@@ -78,6 +70,7 @@ export default function ConsultaDetallePage() {
   const [addendumTexto, setAddendumTexto] = useState('')
   const [guardandoAddendum, setGuardandoAddendum] = useState(false)
   const [error, setError] = useState('')
+  const [imprimiendo, setImprimiendo] = useState(false)
 
   useEffect(() => {
     // Perfil médico — best-effort
@@ -117,62 +110,42 @@ export default function ConsultaDetallePage() {
     setShowAddendum(false)
   }
 
-  function imprimir() {
+  async function imprimir() {
     if (!paciente || !consulta) return
-    const ventana = window.open('', '_blank', 'width=800,height=600')
-    if (!ventana) return
+    setError('')
+    setImprimiendo(true)
+    try {
+      // Refresco best-effort: la firma es un signed URL con TTL 1h que pudo
+      // expirar si la página lleva rato abierta. Fallo (offline/error) → cae a
+      // medicoInfo del estado, sin bloquear la generación. El snapshot
+      // definitivo llegará con consultas.medico_firma_path (Paquete Firma).
+      let medicoVivo = medicoInfo
+      try {
+        const { medico } = await fetch('/api/me/perfil-medico').then(r => r.json())
+        if (medico) medicoVivo = medico
+      } catch { /* sin red: conservar medicoInfo del estado */ }
 
-    const doctorNombre = consulta.medico_nombre || medicoInfo?.nombre || 'Médico'
-    const doctorEspecialidad = consulta.medico_especialidad || medicoInfo?.especialidad || ''
-    const cedulas = [
-      (consulta.medico_cedula_profesional || medicoInfo?.cedula_profesional) ? `Céd. Prof. ${consulta.medico_cedula_profesional || medicoInfo?.cedula_profesional}` : '',
-      (consulta.medico_cedula_especialidad || medicoInfo?.cedula_especialidad) ? `Céd. Esp. ${consulta.medico_cedula_especialidad || medicoInfo?.cedula_especialidad}` : '',
-    ].filter(Boolean).join(' · ')
-    const logoUrl = consulta.medico_logo_url || medicoInfo?.logo_url || `${window.location.origin}/logo.png`
-    const edad = paciente.fecha_nacimiento ? calcularEdad(paciente.fecha_nacimiento).anios : null
-    const fechaHora = format(parseISO(consulta.fecha), "dd 'de' MMMM 'de' yyyy, HH:mm 'hrs'", { locale: es })
-    const notaHtml = markdownToHtml(consulta.notas_evolucion || '')
-
-    const addendumsHtml = addendums.length > 0
-      ? `<div style="margin-top:24px;border-top:2px solid #e2e8f0;padding-top:16px;">
-          <h3 style="font-size:11pt;font-weight:bold;color:#1a3a5c;margin-bottom:8px;">Notas aclaratorias (Addendums)</h3>
-          ${addendums.map(a => `
-            <div style="margin-bottom:12px;padding:10px;background:#f8fafc;border-left:3px solid #1e5fa8;border-radius:4px;">
-              <p style="font-size:9pt;color:#64748b;margin:0 0 4px;">${format(parseISO(a.created_at), "dd/MM/yyyy HH:mm", { locale: es })} — ${a.medico_nombre}</p>
-              <p style="font-size:10pt;color:#334155;margin:0;white-space:pre-line;">${a.contenido}</p>
-            </div>
-          `).join('')}
-        </div>`
-      : ''
-
-    ventana.document.write(`
-<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Nota Médica</title>
-<style>${PRINT_CSS}</style></head><body>
-  <div class="header">
-    <img class="logo" src="${logoUrl}" onerror="this.style.display='none'" />
-    <div>
-      <div class="doctor-name">${doctorNombre}</div>
-      ${doctorEspecialidad ? `<div class="especialidad">${doctorEspecialidad}</div>` : ''}
-      ${cedulas ? `<div class="credenciales">${cedulas}</div>` : ''}
-    </div>
-  </div>
-  <div class="titulo">Nota de Evolución Médica</div>
-  <div class="datos-grid">
-    <div class="dato"><span class="dato-label">Paciente:</span><span>${paciente.nombre} ${paciente.apellidos}</span></div>
-    <div class="dato"><span class="dato-label">Fecha y hora:</span><span>${fechaHora}</span></div>
-    <div class="dato"><span class="dato-label">Edad:</span><span>${edad !== null ? edad + ' años' : '—'}</span></div>
-    <div class="dato"><span class="dato-label">Sexo:</span><span>${paciente.sexo === 'M' ? 'Masculino' : 'Femenino'}</span></div>
-    ${paciente.peso_kg ? `<div class="dato"><span class="dato-label">Peso:</span><span>${paciente.peso_kg} kg</span></div>` : ''}
-    ${paciente.talla_cm ? `<div class="dato"><span class="dato-label">Talla:</span><span>${paciente.talla_cm} cm</span></div>` : ''}
-  </div>
-  <div class="nota-content">${notaHtml}</div>
-  ${consulta.proxima_cita ? `<div class="proxima-cita"><strong>Próxima cita:</strong> ${consulta.proxima_cita}</div>` : ''}
-  ${addendumsHtml}
-  <div class="footer"><div class="firma">${medicoInfo?.firma_url ? `<img src="${medicoInfo.firma_url}" style="max-height:60px;max-width:160px;display:block;margin:0 auto 6px;object-fit:contain;" />` : ''}<p>${doctorNombre}</p>${(consulta.medico_cedula_profesional || medicoInfo?.cedula_profesional) ? `<p>Céd. Prof. ${consulta.medico_cedula_profesional || medicoInfo?.cedula_profesional}</p>` : ''}</div></div>
-</body></html>`)
-    ventana.document.close()
-    ventana.focus()
-    setTimeout(() => ventana.print(), 500)
+      const notaRenderData = buildNotaRenderData({
+        origen: 'consulta',
+        consulta,
+        paciente,
+        addendums,
+        medicoVivo,
+      })
+      await generarPdf({
+        tipo: 'nota_evolucion',
+        medico: null,
+        data: { ...notaRenderData },
+        logoUrl: notaRenderData.medico.logoUrl,
+        filename: generateDocFileName(notaRenderData.paciente.nombreCompleto, 'Nota-Evolucion'),
+      })
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[ConsultaDetalle] imprimir falló:', err)
+      setError('No se pudo generar el PDF. Intenta de nuevo.')
+    } finally {
+      setImprimiendo(false)
+    }
   }
 
   if (loading) return <div className="text-center py-12 text-slate-400">Cargando...</div>
@@ -219,9 +192,12 @@ export default function ConsultaDetallePage() {
           </span>
           <button
             onClick={imprimir}
-            className="flex items-center gap-2 px-4 py-2 border-2 border-[#1a3a5c] text-[#1a3a5c] rounded-lg text-sm font-medium hover:bg-[#1a3a5c] hover:text-white transition-colors"
+            disabled={imprimiendo}
+            className="flex items-center gap-2 px-4 py-2 border-2 border-[#1a3a5c] text-[#1a3a5c] rounded-lg text-sm font-medium hover:bg-[#1a3a5c] hover:text-white transition-colors disabled:opacity-50"
           >
-            <Printer size={16} /> Imprimir
+            {imprimiendo
+              ? <><Loader2 size={16} className="animate-spin" /> Generando...</>
+              : <><Printer size={16} /> Imprimir</>}
           </button>
         </div>
       </div>
