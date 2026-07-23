@@ -43,11 +43,12 @@ const ESTADO_LABEL: Record<EstadoVital, string> = {
   fuera: 'Fuera de rango',
 }
 
+/** `label` se usa en md+; `short` (etiqueta corta con la unidad integrada) en <768px. */
 const SINGLES = [
-  { key: 'fc', label: 'FREC. CARDÍACA', unit: 'lpm', aria: 'Frecuencia cardíaca', width: 46, inputMode: 'numeric' },
-  { key: 'fr', label: 'FREC. RESP.', unit: 'rpm', aria: 'Frecuencia respiratoria', width: 42, inputMode: 'numeric' },
-  { key: 'temp', label: 'TEMPERATURA', unit: '°C', aria: 'Temperatura', width: 52, inputMode: 'decimal', step: '0.1' },
-  { key: 'spo2', label: 'SpO₂', unit: '%', aria: 'Saturación de oxígeno', width: 46, inputMode: 'numeric' },
+  { key: 'fc', label: 'FREC. CARDÍACA', short: 'FC · lpm', unit: 'lpm', aria: 'Frecuencia cardíaca', inputMode: 'numeric' },
+  { key: 'fr', label: 'FREC. RESP.', short: 'FR · rpm', unit: 'rpm', aria: 'Frecuencia respiratoria', inputMode: 'numeric' },
+  { key: 'temp', label: 'TEMPERATURA', short: 'T · °C', unit: '°C', aria: 'Temperatura', inputMode: 'decimal', step: '0.1' },
+  { key: 'spo2', label: 'SpO₂', short: 'SpO₂ · %', unit: '%', aria: 'Saturación de oxígeno', inputMode: 'numeric' },
 ] as const
 
 function parseNum(s: string | undefined): number | undefined {
@@ -70,14 +71,21 @@ const CSS = `
 .sv-card .sv-tile { position:relative; background:#fbfdff; border:1px solid #e6edf4; border-radius:14px; overflow:hidden; min-width:0; }
 .sv-card .sv-tile--error { box-shadow: inset 0 0 0 1px #e5484d; border-color:#e5484d; }
 .sv-card .sv-bar { height:3px; width:100%; }
-.sv-card .sv-body { padding:7px 13px 9px; }
+.sv-card .sv-body { display:block; cursor:text; padding:7px 13px 9px; }
 .sv-card .sv-label-row { display:flex; align-items:center; gap:5px; margin-bottom:3px; }
 .sv-card .sv-dot { width:9px; height:9px; border-radius:9999px; flex-shrink:0; }
 .sv-card .sv-label { font-size:11px; font-weight:700; letter-spacing:.04em; color:#6b8299; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sv-card .sv-label--sm { display:none; }
 .sv-card .sv-value-row { display:flex; align-items:baseline; gap:4px; }
 .sv-card .sv-sep { font-size:22px; font-weight:700; color:#c2cfdb; }
 .sv-card .sv-unit { font-size:12px; font-weight:600; color:#9fb1c2; }
 .sv-card .sv-input { border:none; outline:none; background:transparent; font-weight:800; font-size:19px; padding:0; max-width:100%; -moz-appearance:textfield; }
+.sv-card .sv-input[data-k="ta_sistolica"] { width:34px; }
+.sv-card .sv-input[data-k="ta_diastolica"] { width:30px; }
+.sv-card .sv-input[data-k="fc"] { width:46px; }
+.sv-card .sv-input[data-k="fr"] { width:42px; }
+.sv-card .sv-input[data-k="temp"] { width:52px; }
+.sv-card .sv-input[data-k="spo2"] { width:46px; }
 .sv-card .sv-input::-webkit-outer-spin-button,
 .sv-card .sv-input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
 .sv-card .sv-input::placeholder { color:#9fb1c2; font-weight:800; }
@@ -86,9 +94,21 @@ const CSS = `
   .sv-card .sv-grid { grid-template-columns:1.45fr 1fr 1fr 1fr 1fr; gap:0; padding:0; }
   .sv-card .sv-tile { background:transparent; border:none; border-right:1px solid #eef2f7; border-radius:0; }
   .sv-card .sv-tile:last-child { border-right:none; }
-  .sv-card .sv-body { padding:8px 3px 10px; }
+  .sv-card .sv-body { padding:8px 4px 10px; min-height:44px; }
   .sv-card .sv-dot { display:none; }
-  .sv-card .sv-input { font-size:15px; }
+  /* etiqueta corta con unidad integrada arriba; abajo solo el valor */
+  .sv-card .sv-label-row { justify-content:center; gap:0; margin-bottom:2px; }
+  .sv-card .sv-label { font-size:10px; letter-spacing:.02em; text-align:center; }
+  .sv-card .sv-label--lg { display:none; }
+  .sv-card .sv-label--sm { display:inline; }
+  .sv-card .sv-unit { display:none; }
+  /* glifos centrados: el ancho fijo en px desbordaba la celda angosta */
+  .sv-card .sv-value-row { justify-content:center; gap:2px; }
+  .sv-card .sv-input { font-size:15px; text-align:center; }
+  .sv-card .sv-input[data-k] { width:100%; }
+  .sv-card .sv-input[data-k="ta_sistolica"],
+  .sv-card .sv-input[data-k="ta_diastolica"] { width:2.6em; }
+  .sv-card .sv-sep { font-size:16px; }
 }
 `
 
@@ -154,7 +174,7 @@ export default function SignosVitalesCard({ value, onChange, errores }: SignosVi
         {/* Presión arterial (tile combinado sys/dia) */}
         <div className={`sv-tile${paError ? ' sv-tile--error' : ''}`}>
           <div className="sv-bar" style={{ background: COLORS[estadoPA].accent }} />
-          <div className="sv-body">
+          <label className="sv-body">
             <div className="sv-label-row">
               <span
                 className="sv-dot"
@@ -163,33 +183,36 @@ export default function SignosVitalesCard({ value, onChange, errores }: SignosVi
                 aria-label={ESTADO_LABEL[estadoPA]}
                 title={ESTADO_LABEL[estadoPA]}
               />
-              <span className="sv-label">Presión arterial</span>
+              <span className="sv-label sv-label--lg">Presión arterial</span>
+              <span className="sv-label sv-label--sm">PA · mmHg</span>
             </div>
             <div className="sv-value-row">
               <input
                 className="sv-input"
+                data-k="ta_sistolica"
                 type="number"
                 inputMode="numeric"
                 aria-label="Presión arterial sistólica"
                 placeholder="—"
-                style={{ width: 34, color: COLORS[estadoPA].valor }}
+                style={{ color: COLORS[estadoPA].valor }}
                 value={value.ta_sistolica ?? ''}
                 onChange={(e) => setField('ta_sistolica', e.target.value)}
               />
               <span className="sv-sep">/</span>
               <input
                 className="sv-input"
+                data-k="ta_diastolica"
                 type="number"
                 inputMode="numeric"
                 aria-label="Presión arterial diastólica"
                 placeholder="—"
-                style={{ width: 30, color: COLORS[estadoPA].valor }}
+                style={{ color: COLORS[estadoPA].valor }}
                 value={value.ta_diastolica ?? ''}
                 onChange={(e) => setField('ta_diastolica', e.target.value)}
               />
               <span className="sv-unit">mmHg</span>
             </div>
-          </div>
+          </label>
         </div>
 
         {/* Resto de signos (un input cada uno) */}
@@ -198,7 +221,7 @@ export default function SignosVitalesCard({ value, onChange, errores }: SignosVi
           return (
             <div key={cfg.key} className={`sv-tile${tileError ? ' sv-tile--error' : ''}`}>
               <div className="sv-bar" style={{ background: COLORS[estado].accent }} />
-              <div className="sv-body">
+              <label className="sv-body">
                 <div className="sv-label-row">
                   <span
                     className="sv-dot"
@@ -207,23 +230,25 @@ export default function SignosVitalesCard({ value, onChange, errores }: SignosVi
                     aria-label={ESTADO_LABEL[estado]}
                     title={ESTADO_LABEL[estado]}
                   />
-                  <span className="sv-label">{cfg.label}</span>
+                  <span className="sv-label sv-label--lg">{cfg.label}</span>
+                  <span className="sv-label sv-label--sm">{cfg.short}</span>
                 </div>
                 <div className="sv-value-row">
                   <input
                     className="sv-input"
+                    data-k={cfg.key}
                     type="number"
                     inputMode={cfg.inputMode}
                     step={'step' in cfg ? cfg.step : undefined}
                     aria-label={cfg.aria}
                     placeholder="—"
-                    style={{ width: cfg.width, color: COLORS[estado].valor }}
+                    style={{ color: COLORS[estado].valor }}
                     value={value[cfg.key] ?? ''}
                     onChange={(e) => setField(cfg.key, e.target.value)}
                   />
                   <span className="sv-unit">{cfg.unit}</span>
                 </div>
-              </div>
+              </label>
             </div>
           )
         })}
