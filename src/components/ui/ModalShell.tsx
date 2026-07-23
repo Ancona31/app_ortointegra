@@ -25,6 +25,8 @@ interface Props {
   hideClose?: boolean
   /** Contenido fijo al pie del modal. No scrollea con el body. El consumidor maneja su propio padding. */
   footer?: React.ReactNode
+  // En <768px el modal ocupa la pantalla completa (h-dvh). Default: false.
+  fullscreenMobile?: boolean
   children: React.ReactNode
 }
 
@@ -40,6 +42,7 @@ export default function ModalShell({
   elevated = false,
   hideClose = false,
   footer,
+  fullscreenMobile = false,
   children,
 }: Props) {
   const onCloseRef = useRef(onClose)
@@ -77,13 +80,13 @@ export default function ModalShell({
 
   return (
     <Portal>
-      <div className={`fixed inset-0 ${zClass} flex items-center justify-center p-4`}>
+      <div className={`fixed inset-0 ${zClass} flex items-center justify-center p-4${fullscreenMobile ? ' max-md:p-0 max-md:items-start' : ''}`}>
         <div
           className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in"
           onClick={onClose}
         />
         <div
-          className={`relative bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full ${maxWidth} max-h-[85vh] flex flex-col animate-modal-enter overflow-hidden`}
+          className={`relative bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full ${maxWidth} max-h-[85vh] flex flex-col animate-modal-enter overflow-hidden${fullscreenMobile ? ' max-md:h-dvh max-md:max-h-dvh max-md:max-w-full max-md:rounded-none' : ''}`}
         >
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 flex-shrink-0">
             <div className="flex items-center gap-2.5 min-w-0">
@@ -110,7 +113,7 @@ export default function ModalShell({
               )}
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto overscroll-contain">
             {children}
           </div>
           {footer && (
