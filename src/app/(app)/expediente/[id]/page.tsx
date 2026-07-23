@@ -26,7 +26,6 @@ function ExpedientePacienteContent() {
   useAuditAccess('pacientes', id) // NOM-024: registrar acceso al expediente
 
   // ── Estados UI ──
-  const [allAddendums, setAllAddendums] = useState<{ id: string; consulta_id: string; contenido: string; medico_nombre: string; created_at: string }[]>([])
   const [docSeleccionado, setDocSeleccionado] = useState<Documento | null>(null)
   const [mostrarModalConsultas, setMostrarModalConsultas] = useState(false)
   const [mostrarModalDocumentos, setMostrarModalDocumentos] = useState(false)
@@ -102,31 +101,6 @@ function ExpedientePacienteContent() {
 
     return () => { cancelled = true }
   }, [id])
-
-  // ── Fetch de addendums (dependiente de consultas) ──
-  useEffect(() => {
-    if (!consultas || consultas.length === 0) {
-      setAllAddendums([])
-      return
-    }
-
-    const ids = consultas.map(c => c.id)
-    let cancelled = false
-    const supabase = createClient()
-
-    supabase.from('addendums')
-      .select('id, consulta_id, contenido, medico_nombre, created_at')
-      .in('consulta_id', ids)
-      .order('created_at', { ascending: true })
-      .then((res: { data: { id: string; consulta_id: string; contenido: string; medico_nombre: string; created_at: string }[] | null }) => {
-        if (cancelled) return
-        setAllAddendums(res.data || [])
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [consultas])
 
   async function eliminarDocumento(docId: string) {
     const res = await fetch(`/api/documentos/${docId}`, { method: 'DELETE' })
@@ -247,7 +221,6 @@ function ExpedientePacienteContent() {
       <HeroExpediente
         paciente={paciente}
         consultas={consultas}
-        addendums={allAddendums}
         isDoctor={isDoctor}
         onEditar={() => router.push(`/expediente/${id}/editar`)}
       />

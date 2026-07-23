@@ -1,191 +1,170 @@
 'use client'
 
-import { Paciente, Consulta } from '@/types'
-import { parseISO, format } from 'date-fns'
-import { calcularEdad } from '@/lib/patientUtils'
-import { es } from 'date-fns/locale'
-import { FileDown } from 'lucide-react'
-import { PRINT_CSS, markdownToHtml } from '@/lib/printStyles'
-
-type Addendum = { id: string; consulta_id: string; contenido: string; medico_nombre: string; created_at: string }
+import { useState } from 'react'
+import { FileDown, Loader2 } from 'lucide-react'
+import type { Paciente, Consulta, MedicoInfo } from '@/types'
+import { createClient } from '@/lib/supabase/client'
+import { useClinica } from '@/hooks/useClinica'
+import { buildHojaFrontalData } from '@/lib/hojaFrontalData'
+import { buildNotaRenderData } from '@/lib/notaRenderData'
+import { componerNombreMedicoCompleto, type CamposNombre } from '@/lib/nombreMedico'
+import { generateDocFileName } from '@/lib/patientUtils'
+import { generarPdf } from '@/lib/mobileShare'
 
 interface Props {
   paciente: Paciente
-  consultas: Consulta[]
-  addendums?: Addendum[]
 }
 
-const EXTRA_CSS = `
-  .seccion-titulo {
-    font-size:11pt; font-weight:700; color:#1a3a5c; text-transform:uppercase;
-    border-bottom:2px solid #1e5fa8; padding-bottom:4px; margin:18px 0 10px;
-    letter-spacing:0.4px;
-  }
-  .consulta-bloque {
-    page-break-inside:avoid; border:1px solid #d1d9e6; border-radius:4px;
-    padding:10px 12px; margin-bottom:12px;
-  }
-  .consulta-header {
-    display:flex; justify-content:space-between; align-items:baseline;
-    margin-bottom:6px;
-  }
-  .consulta-fecha { font-weight:700; color:#1a3a5c; font-size:9.5pt; }
-  .diag-chip {
-    display:inline-block; background:#eef3fa; color:#1a3a5c; font-size:7.5pt;
-    padding:1px 6px; border-radius:3px; margin:2px 2px 2px 0;
-  }
-  .antecedentes-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
-  .ant-item { font-size:8.5pt; }
-  .ant-label { font-weight:700; color:#1a3a5c; font-size:8pt; margin-bottom:2px; }
-  .alergia-box {
-    background:#fff1f2; border:1px solid #fecdd3; border-radius:4px;
-    padding:5px 10px; font-size:8.5pt; color:#9f1239;
-    margin-bottom:8px;
-  }
-  .proxima { background:#e8f4fd; border-left:3px solid #1e5fa8; padding:4px 8px; font-size:8pt; margin-top:6px; }
-`
+type AddendumRow = {
+  id: string
+  consulta_id: string
+  contenido: string
+  medico_nombre: string
+  created_at: string
+}
 
-export default function ExportarExpedienteButton({ paciente, consultas, addendums = [] }: Props) {
-  function exportar() {
-    const edad = paciente.fecha_nacimiento
-      ? calcularEdad(paciente.fecha_nacimiento)
-      : null
+type MedicoClinica = CamposNombre & { id: string; es_admin_de_clinica?: boolean }
 
-    const fechaExport = format(new Date(), "d 'de' MMMM 'de' yyyy", { locale: es })
+const IOS_EASING = 'cubic-bezier(0.32, 0.72, 0, 1)'
 
-    // Doctor info from most recent consulta that has it
-    const consultaConMedico = consultas.find(c => c.medico_nombre)
-    const medicoNombre = consultaConMedico?.medico_nombre ?? ''
-    const medicoEspecialidad = consultaConMedico?.medico_especialidad ?? ''
-    const medicoCedProf = consultaConMedico?.medico_cedula_profesional ?? ''
-    const medicoCedEsp = consultaConMedico?.medico_cedula_especialidad ?? ''
-    const medicoLogo = consultaConMedico?.medico_logo_url ?? ''
+export default function ExportarExpedienteButton({ paciente }: Props) {
+  const { clinica } = useClinica()
+  const [generando, setGenerando] = useState(false)
+  const [conteo, setConteo] = useState<number | null>(null)
+  const [error, setError] = useState('')
 
-    // ── Encabezado del médico ──────────────────────────────────────────
-    const headerHtml = medicoNombre ? `
-      <div class="header">
-        ${medicoLogo ? `<img class="logo" src="${medicoLogo}" alt="logo"/>` : ''}
-        <div>
-          <div class="doctor-name">${medicoNombre}</div>
-          ${medicoEspecialidad ? `<div class="especialidad">${medicoEspecialidad}</div>` : ''}
-          <div class="credenciales">
-            ${medicoCedProf ? `Cédula Prof.: ${medicoCedProf}` : ''}
-            ${medicoCedEsp ? ` · Ced. Esp.: ${medicoCedEsp}` : ''}
-          </div>
-        </div>
-      </div>
-    ` : ''
+  async function exportar() {
+    if (generando) return
+    setError('')
+    setConteo(null)
+    setGenerando(true)
 
-    // ── Datos del paciente ─────────────────────────────────────────────
-    const datosHtml = `
-      <div class="datos-grid">
-        <div class="dato"><span class="dato-label">Nombre:</span> ${paciente.nombre} ${paciente.apellidos}</div>
-        ${paciente.numero_expediente ? `<div class="dato"><span class="dato-label">Expediente:</span> ${paciente.numero_expediente}</div>` : '<div></div>'}
-        <div class="dato"><span class="dato-label">Sexo:</span> ${paciente.sexo === 'M' ? 'Masculino' : paciente.sexo === 'F' ? 'Femenino' : 'Otro'}</div>
-        ${paciente.fecha_nacimiento ? `<div class="dato"><span class="dato-label">Fecha nac.:</span> ${format(parseISO(paciente.fecha_nacimiento), 'dd/MM/yyyy')}</div>` : '<div></div>'}
-        ${edad !== null ? `<div class="dato"><span class="dato-label">Edad:</span> ${edad.textoElegante}</div>` : '<div></div>'}
-        ${paciente.peso_kg ? `<div class="dato"><span class="dato-label">Peso:</span> ${paciente.peso_kg} kg</div>` : '<div></div>'}
-        ${paciente.talla_cm ? `<div class="dato"><span class="dato-label">Talla:</span> ${paciente.talla_cm} cm</div>` : '<div></div>'}
-        ${paciente.imc ? `<div class="dato"><span class="dato-label">IMC:</span> ${paciente.imc} kg/m²</div>` : '<div></div>'}
-        ${paciente.telefono ? `<div class="dato"><span class="dato-label">Teléfono:</span> ${paciente.telefono}</div>` : '<div></div>'}
-        ${paciente.email ? `<div class="dato"><span class="dato-label">Email:</span> ${paciente.email}</div>` : '<div></div>'}
-      </div>
-    `
+    try {
+      const supabase = createClient()
 
-    // ── Antecedentes ───────────────────────────────────────────────────
-    const tieneAntecedentes = paciente.alergias || paciente.ant_no_patologicos ||
-      paciente.ant_patologicos ||
-      paciente.ant_quirurgicos || paciente.ant_familiares || paciente.medicamentos_actuales
+      // ── Consultas: fetch propio, SIN límite y en orden cronológico ──
+      // No se consumen las props del Hero: ésas vienen acotadas a 50 y en
+      // orden descendente, lo que truncaría el expediente en silencio.
+      const { data: consultasData, error: errConsultas } = await supabase
+        .from('consultas')
+        .select('*')
+        .eq('paciente_id', paciente.id)
+        .order('fecha', { ascending: true })
 
-    const antecedentesHtml = tieneAntecedentes ? `
-      <div class="seccion-titulo">Antecedentes</div>
-      ${paciente.alergias ? `<div class="alergia-box">⚠ <strong>Alergias:</strong> ${paciente.alergias}</div>` : ''}
-      <div class="antecedentes-grid">
-        ${paciente.ant_no_patologicos ? `<div class="ant-item"><div class="ant-label">No patológicos</div>${paciente.ant_no_patologicos}</div>` : ''}
-        ${paciente.ant_patologicos ? `<div class="ant-item"><div class="ant-label">Patológicos</div>${paciente.ant_patologicos}</div>` : ''}
-        ${paciente.ant_quirurgicos ? `<div class="ant-item"><div class="ant-label">Quirúrgicos</div>${paciente.ant_quirurgicos}</div>` : ''}
-        ${paciente.ant_familiares ? `<div class="ant-item"><div class="ant-label">Familiares</div>${paciente.ant_familiares}</div>` : ''}
-        ${paciente.medicamentos_actuales ? `<div class="ant-item"><div class="ant-label">Medicamentos actuales</div>${paciente.medicamentos_actuales}</div>` : ''}
-      </div>
-    ` : ''
+      if (errConsultas) throw new Error(errConsultas.message)
+      const consultas = (consultasData ?? []) as Consulta[]
+      setConteo(consultas.length)
 
-    // ── Consultas ──────────────────────────────────────────────────────
-    const consultasHtml = consultas.length === 0 ? '' : `
-      <div class="seccion-titulo">Consultas (${consultas.length})</div>
-      ${consultas.map(c => {
-        const fecha = format(parseISO(c.fecha), "d 'de' MMMM 'de' yyyy", { locale: es })
-        const diagnosticosHtml = (c.diagnosticos || []).map(d =>
-          `<span class="diag-chip">${d.codigo_cie10 ? `${d.codigo_cie10} · ` : ''}${d.descripcion}</span>`
-        ).join('')
+      // ── Addendums de TODAS esas consultas, en un solo query ──
+      let addendums: AddendumRow[] = []
+      if (consultas.length > 0) {
+        const { data } = await supabase
+          .from('addendums')
+          .select('id, consulta_id, contenido, medico_nombre, created_at')
+          .in('consulta_id', consultas.map((c) => c.id))
+          .order('created_at', { ascending: true })
+        addendums = (data ?? []) as AddendumRow[]
+      }
 
-        const consultaAddendums = addendums.filter(a => a.consulta_id === c.id)
-        const addendumsHtml = consultaAddendums.length === 0 ? '' : `
-          <div style="margin-top:8px;border-top:1px solid #e2e8f0;padding-top:6px;">
-            <div style="font-size:7.5pt;font-weight:600;color:#1e5fa8;margin-bottom:4px;">Notas aclaratorias (${consultaAddendums.length})</div>
-            ${consultaAddendums.map(a => `
-              <div style="margin-bottom:6px;padding:5px 8px;background:#f0f4ff;border-left:2px solid #1e5fa8;border-radius:3px;">
-                <div style="font-size:7pt;color:#64748b;">${format(parseISO(a.created_at), "dd/MM/yyyy HH:mm", { locale: es })} — ${a.medico_nombre}</div>
-                <div style="font-size:8pt;color:#334155;white-space:pre-line;">${a.contenido}</div>
-              </div>
-            `).join('')}
-          </div>
-        `
+      // ── Perfil vivo, UNA sola vez para las N notas ──
+      // La firma es un signed URL con TTL 1h; se refresca aquí y se reutiliza.
+      // Best-effort: sin red se genera igual, sin firma.
+      let medicoVivo: MedicoInfo | null = null
+      try {
+        const { medico } = await fetch('/api/me/perfil-medico').then((r) => r.json())
+        if (medico) medicoVivo = medico
+      } catch {
+        /* sin red → las notas salen sin firma ni datos vivos */
+      }
 
-        return `
-          <div class="consulta-bloque">
-            <div class="consulta-header">
-              <span class="consulta-fecha">${fecha}</span>
-            </div>
-            ${diagnosticosHtml ? `<div style="margin-bottom:6px">${diagnosticosHtml}</div>` : ''}
-            ${c.notas_evolucion ? `<div class="nota-content">${markdownToHtml(c.notas_evolucion)}</div>` : ''}
-            ${c.plan_tratamiento ? `<div style="margin-top:6px;font-size:8.5pt"><strong>Plan:</strong> ${c.plan_tratamiento}</div>` : ''}
-            ${c.proxima_cita ? `<div class="proxima">Próxima cita: ${c.proxima_cita}</div>` : ''}
-            ${addendumsHtml}
-          </div>
-        `
-      }).join('')}
-    `
+      // ── Responsable del expediente = admin de la clínica (custodia NOM-004),
+      //    NO el autor de las notas. Fallback defensivo: el médico en sesión. ──
+      let responsableNombre = medicoVivo ? componerNombreMedicoCompleto(medicoVivo) : ''
+      try {
+        const { medicos } = await fetch('/api/clinica/medicos').then((r) => r.json())
+        const admin = ((medicos ?? []) as MedicoClinica[]).find((m) => m.es_admin_de_clinica === true)
+        if (admin) responsableNombre = componerNombreMedicoCompleto(admin)
+      } catch {
+        /* sin red → queda el fallback */
+      }
 
-    // ── Footer ─────────────────────────────────────────────────────────
-    const footerHtml = `
-      <div style="margin-top:24px;border-top:1px solid #d1d9e6;padding-top:8px;font-size:7.5pt;color:#94a3b8;display:flex;justify-content:space-between">
-        <span>Spinus® · Expediente exportado el ${fechaExport}</span>
-        <span>Documento confidencial — uso médico exclusivo</span>
-      </div>
-    `
+      const hojaFrontal = buildHojaFrontalData({
+        paciente,
+        clinica: {
+          nombre: clinica?.nombre_display ?? clinica?.nombre ?? '',
+          subtitulo: clinica?.subtitulo,
+          logoUrl: clinica?.logo_url,
+        },
+        responsableNombre,
+        // Apertura = primera nota real del expediente (array ascendente).
+        fechaAperturaISO: consultas[0]?.fecha ?? null,
+        colorPrimario: clinica?.color_primario,
+        colorSecundario: clinica?.color_secundario,
+      })
 
-    const html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8"/>
-  <title>Expediente — ${paciente.nombre} ${paciente.apellidos}</title>
-  <style>${PRINT_CSS}${EXTRA_CSS}</style>
-</head>
-<body>
-  ${headerHtml}
-  <div class="titulo">Expediente Clínico</div>
-  ${datosHtml}
-  ${antecedentesHtml}
-  ${consultasHtml}
-  ${footerHtml}
-</body>
-</html>`
+      const notas = consultas.map((consulta) =>
+        buildNotaRenderData({
+          origen: 'consulta',
+          consulta,
+          paciente,
+          addendums: addendums.filter((a) => a.consulta_id === consulta.id),
+          medicoVivo,
+        }),
+      )
 
-    const win = window.open('', '_blank')
-    if (!win) return
-    win.document.write(html)
-    win.document.close()
-    win.focus()
-    setTimeout(() => win.print(), 600)
+      await generarPdf({
+        tipo: 'expediente_completo',
+        medico: null,
+        data: { hojaFrontal, notas },
+        logoUrl: clinica?.logo_url ?? medicoVivo?.logo_url ?? undefined,
+        filename: generateDocFileName(hojaFrontal.paciente.nombreCompleto, 'Expediente'),
+        // SIN pacienteId a propósito: el expediente completo NO se persiste
+        // en Storage, solo se entrega al médico.
+      })
+
+      // NOM-024: exportar el expediente íntegro no es una lectura más.
+      // fire-and-forget, no bloquea ni revierte nada si falla.
+      fetch('/api/audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tabla: 'pacientes',
+          registroId: paciente.id,
+          accion: 'exportar_expediente',
+        }),
+      }).catch(() => {})
+    } catch (err) {
+      console.error('[ExportarExpediente] falló:', err)
+      setError('No se pudo generar el expediente. Intenta de nuevo.')
+    } finally {
+      setGenerando(false)
+      setConteo(null)
+    }
   }
 
   return (
-    <button
-      onClick={exportar}
-      className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-[13px] font-medium text-slate-700 hover:border-slate-300 hover:text-slate-900 hover:shadow-sm active:scale-[0.98] transition-all duration-200"
-      style={{ transitionTimingFunction: 'cubic-bezier(0.32, 0.72, 0, 1)' }}
-    >
-      <FileDown size={14} /> Exportar
-    </button>
+    <div className="flex flex-col items-end gap-1">
+      <button
+        type="button"
+        onClick={exportar}
+        disabled={generando}
+        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-[13px] font-medium text-slate-700 hover:border-slate-300 hover:text-slate-900 hover:shadow-sm active:scale-[0.98] transition-all duration-200 disabled:opacity-60 disabled:active:scale-100"
+        style={{ transitionTimingFunction: IOS_EASING }}
+      >
+        {generando ? (
+          <>
+            <Loader2 size={14} className="animate-spin" />
+            {conteo === null
+              ? 'Generando expediente…'
+              : `Generando expediente — ${conteo} ${conteo === 1 ? 'nota' : 'notas'}`}
+          </>
+        ) : (
+          <>
+            <FileDown size={14} /> Exportar
+          </>
+        )}
+      </button>
+      {error && <span className="text-[11px] text-red-500">{error}</span>}
+    </div>
   )
 }

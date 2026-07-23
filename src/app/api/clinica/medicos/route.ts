@@ -16,7 +16,7 @@ export async function GET() {
 
   const { data: medicos } = await supabase
     .from('profiles')
-    .select('id, titulo, nombres, apellido_paterno, apellido_materno, especialidad')
+    .select('id, titulo, nombres, apellido_paterno, apellido_materno, especialidad, es_admin_de_clinica')
     .eq('clinica_id', profile.clinica_id)
     .eq('role', 'medico')
     .order('apellido_paterno')

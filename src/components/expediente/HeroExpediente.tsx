@@ -19,18 +19,9 @@ const SEXO_LABEL: Record<Paciente['sexo'], string> = {
   Otro: 'Otro',
 }
 
-type Addendum = {
-  id: string
-  consulta_id: string
-  contenido: string
-  medico_nombre: string
-  created_at: string
-}
-
 type HeroExpedienteProps = {
   paciente: Paciente
   consultas: Consulta[]
-  addendums: Addendum[]
   isDoctor: boolean
   onEditar: () => void
 }
@@ -40,7 +31,6 @@ const IOS_EASING = 'cubic-bezier(0.32, 0.72, 0, 1)'
 export default function HeroExpediente({
   paciente,
   consultas,
-  addendums,
   isDoctor,
   onEditar,
 }: HeroExpedienteProps) {
@@ -95,11 +85,9 @@ export default function HeroExpediente({
             >
               <Pencil size={14} /> Editar
             </button>
-            <ExportarExpedienteButton
-              paciente={paciente}
-              consultas={consultas}
-              addendums={addendums}
-            />
+            {/* El botón hace su propio fetch de consultas/addendums: las props
+                del Hero vienen acotadas a 50 y en orden descendente. */}
+            <ExportarExpedienteButton paciente={paciente} />
           </div>
         )}
       </div>

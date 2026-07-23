@@ -8,8 +8,7 @@
  *  - Mobile:  navigator.share con File (estándar iOS/Android)
  *  - Fallback móvil: abre en pestaña nueva
  *
- * imprimirOCompartir() — legacy: abre ventana print en desktop
- * generarPdf()         — genera PDF vía react-pdf en todas las plataformas
+ * generarPdf() — genera PDF vía react-pdf en todas las plataformas.
  */
 
 import type { PdfMedicoData, PdfConsultorioData } from '@/lib/pdf/PdfStyles'
@@ -24,6 +23,7 @@ type DocType =
   | 'escrito_medico'
   | 'consentimiento_informado'
   | 'nota_evolucion'
+  | 'expediente_completo'
 
 /** Guard de concurrencia — evita ejecuciones paralelas por multi-clic */
 let isGenerating = false
@@ -74,6 +74,12 @@ async function buildClientElement(
     case 'nota_evolucion': {
       const { renderNotaEvolucion } = await import('@/lib/pdf/NotaEvolucionPdf')
       return renderNotaEvolucion({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl, consultorio: props.consultorio })
+    }
+    case 'expediente_completo': {
+      // Documento compuesto: hoja frontal + N notas. No lleva `medico` ni
+      // `consultorio` — todo viaja dentro de `data`.
+      const { renderExpedienteCompleto } = await import('@/lib/pdf/ExpedienteCompletoPdf')
+      return renderExpedienteCompleto({ data: props.data as never, logoUrl: props.logoUrl })
     }
     default:
       return null
@@ -262,17 +268,4 @@ export async function generarPdf(params: {
   } finally {
     isGenerating = false
   }
-}
-
-/**
- * Legacy: mantiene compatibilidad con formularios que aún envían HTML.
- * Desktop: abre ventana print. Móvil: no soportado (usar generarPdf).
- */
-export async function imprimirOCompartir(html: string, _filename = 'documento.pdf') {
-  const ventana = window.open('', '_blank', 'width=800,height=600')
-  if (!ventana) return
-  ventana.document.write(html)
-  ventana.document.close()
-  ventana.focus()
-  setTimeout(() => ventana.print(), 500)
 }

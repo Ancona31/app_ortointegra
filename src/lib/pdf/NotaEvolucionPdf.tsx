@@ -55,7 +55,9 @@ function crearEstilos(P: PaletaNota) {
       fontSize: 9,
       color: N.labelInk,
       backgroundColor: N.white,
-      paddingTop: 44.64,
+      // Gobierna también al header `fixed` (está en flujo, no absoluto): en las
+      // páginas 2+ el membrete arranca a 24pt del borde superior.
+      paddingTop: 24,
       paddingRight: 36,
       paddingBottom: 50.4,
       paddingLeft: 36,
@@ -99,7 +101,9 @@ function crearEstilos(P: PaletaNota) {
     headerRule: { height: 2.25, borderRadius: 1.5, backgroundColor: P.structure, marginTop: 5.25 },
 
     /* Título */
-    tituloWrap: { marginTop: 6, marginBottom: 1.5 },
+    // El aire recuperado del margen superior se reinvierte aquí: separa el
+    // título de la banda del paciente, que antes iban pegados.
+    tituloWrap: { marginTop: 6, marginBottom: 13.5 },
     eyebrow: { fontSize: 7.5, fontWeight: 700, color: P.accent, letterSpacing: 1.5 },
     tituloDoc: { fontSize: 18.75, fontWeight: 700, color: P.textStrong },
 
@@ -481,17 +485,34 @@ function AddendumCard({ addendum, s }: { addendum: NotaRenderData['addendums'][n
 }
 
 /* ------------------------------------------------------------------ */
-/*  Componente principal                                               */
+/*  Página — reutilizable como sección de un Document mayor            */
 /* ------------------------------------------------------------------ */
 
-export function renderNotaEvolucion(props: NotaEvolucionProps) {
-  return <NotaEvolucionPdf {...props} />
+export interface PaginaNotaProps {
+  data: NotaRenderData
+  logoUrl?: string
+  /**
+   * Paleta ya derivada. Ausente → se deriva aquí de `data.medico.color*`.
+   * El expediente completo la hoistea: todas sus notas son de la misma clínica
+   * y `derivarPaletaNota` hace bucles de contraste WCAG que no vale repetir N
+   * veces. (`crearEstilos` sí corre por página: `StyleSheet.create` es la
+   * identidad en react-pdf, así que solo construye un objeto literal.)
+   */
+  paleta?: PaletaNota
+  /**
+   * Cómo pagina el pie:
+   *  - 'suelta': nota impresa sola. Solo muestra "Pág. X de Y" si ella misma
+   *    ocupa más de una página — el Document contiene únicamente esta nota.
+   *  - 'expediente': nota dentro del expediente completo. SIEMPRE pagina, con
+   *    la numeración continua del Document entero (`pageNumber`/`totalPages`
+   *    son globales al documento en react-pdf, no relativos al Page).
+   */
+  contexto: 'suelta' | 'expediente'
 }
 
-export default function NotaEvolucionPdf({ data, logoUrl }: NotaEvolucionProps) {
-  // Paleta derivada del color del perfil (data.medico.color*). Sin color válido
-  // → fallback total a la paleta azul del mockup (ver derivarPaletaNota).
-  const P = derivarPaletaNota(data.medico.colorPrimario, data.medico.colorSecundario)
+export function PaginaNota({ data, logoUrl, paleta, contexto }: PaginaNotaProps) {
+  // Sin color válido → fallback total a la paleta azul del mockup.
+  const P = paleta ?? derivarPaletaNota(data.medico.colorPrimario, data.medico.colorSecundario)
   const s = crearEstilos(P)
 
   const secciones = ordenarSecciones(data.notaParseada.secciones)
@@ -499,54 +520,71 @@ export default function NotaEvolucionPdf({ data, logoUrl }: NotaEvolucionProps) 
   const fecha = data.fechaFormateada
 
   return (
-    <Document>
-      <Page size="LETTER" style={s.page}>
-        <HeaderNota data={data} logoUrl={logoUrl} s={s} />
+    <Page size="LETTER" style={s.page}>
+      <HeaderNota data={data} logoUrl={logoUrl} s={s} />
 
-        {/* Footer fixed */}
-        <View style={s.footer} fixed>
-          <Text style={s.footerTexto}>{t('Nota de Evolución Médica')}</Text>
-          <Text
-            style={s.footerTexto}
-            render={({ pageNumber, totalPages }) =>
-              t(totalPages > 1 ? `${pac} · ${fecha} · Pág. ${pageNumber} de ${totalPages}` : `${pac} · ${fecha}`)
-            }
+      {/* Footer fixed */}
+      <View style={s.footer} fixed>
+        <Text style={s.footerTexto}>{t('Nota de Evolución Médica')}</Text>
+        <Text
+          style={s.footerTexto}
+          render={({ pageNumber, totalPages }) =>
+            t(contexto === 'expediente' || totalPages > 1
+              ? `${pac} · ${fecha} · Pág. ${pageNumber} de ${totalPages}`
+              : `${pac} · ${fecha}`)
+          }
+        />
+      </View>
+
+      {/* Título */}
+      <View style={s.tituloWrap}>
+        <Text style={s.eyebrow}>{t('EXPEDIENTE CLÍNICO')}</Text>
+        <Text style={s.tituloDoc}>{t('Nota de Evolución Médica')}</Text>
+      </View>
+
+      <BarraPaciente paciente={data.paciente} s={s} />
+      {data.signosVitales ? <BarraVitales sv={data.signosVitales} s={s} /> : null}
+
+      {/* Secciones */}
+      <View style={s.secciones}>
+        {secciones.map((sec, i) => (
+          <SeccionItem
+            key={`${sec.tipo}-${i}`}
+            numero={String(i + 1).padStart(2, '0')}
+            seccion={sec}
+            primera={i === 0}
+            s={s}
           />
-        </View>
-
-        {/* Título */}
-        <View style={s.tituloWrap}>
-          <Text style={s.eyebrow}>{t('EXPEDIENTE CLÍNICO')}</Text>
-          <Text style={s.tituloDoc}>{t('Nota de Evolución Médica')}</Text>
-        </View>
-
-        <BarraPaciente paciente={data.paciente} s={s} />
-        {data.signosVitales ? <BarraVitales sv={data.signosVitales} s={s} /> : null}
-
-        {/* Secciones */}
-        <View style={s.secciones}>
-          {secciones.map((sec, i) => (
-            <SeccionItem
-              key={`${sec.tipo}-${i}`}
-              numero={String(i + 1).padStart(2, '0')}
-              seccion={sec}
-              primera={i === 0}
-              s={s}
-            />
-          ))}
-        </View>
-
-        {/* Sin addendums, un spacer flexible ancla la firma al fondo (1 página).
-            Con addendums NO se ancla: la firma va tras las secciones y los
-            addendums (correcciones firmadas) la siguen, conservando el orden. */}
-        {data.addendums.length === 0 ? <View style={s.firmaSpacer} /> : null}
-
-        <FirmaNota medico={data.medico} s={s} />
-
-        {data.addendums.map((add, i) => (
-          <AddendumCard key={`addendum-${i}`} addendum={add} s={s} />
         ))}
-      </Page>
+      </View>
+
+      {/* Sin addendums, un spacer flexible ancla la firma al fondo (1 página).
+          Con addendums NO se ancla: la firma va tras las secciones y los
+          addendums (correcciones firmadas) la siguen, conservando el orden. */}
+      {data.addendums.length === 0 ? <View style={s.firmaSpacer} /> : null}
+
+      <FirmaNota medico={data.medico} s={s} />
+
+      {data.addendums.map((add, i) => (
+        <AddendumCard key={`addendum-${i}`} addendum={add} s={s} />
+      ))}
+    </Page>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Documento standalone — contrato intacto (flujos A y B′)            */
+/* ------------------------------------------------------------------ */
+
+export function renderNotaEvolucion(props: NotaEvolucionProps) {
+  return <NotaEvolucionPdf {...props} />
+}
+
+export default function NotaEvolucionPdf({ data, logoUrl }: NotaEvolucionProps) {
+  const paleta = derivarPaletaNota(data.medico.colorPrimario, data.medico.colorSecundario)
+  return (
+    <Document>
+      <PaginaNota data={data} logoUrl={logoUrl} paleta={paleta} contexto="suelta" />
     </Document>
   )
 }

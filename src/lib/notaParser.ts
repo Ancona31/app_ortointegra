@@ -71,7 +71,8 @@ function clasificarG36(nombre: string): TipoSeccion {
 
 /**
  * Clasifica el texto interno de un encabezado bold como sección G2 legacy.
- * Misma semántica tolerante que SOAP_HEADERS (printStyles.ts): letra + paréntesis
+ * Semántica tolerante heredada del parser HTML legacy (`printStyles.ts`,
+ * eliminado con el export del expediente en Fase 6): letra + paréntesis
  * ( o （ U+FF08) para S/O/A/P, o la palabra Pronóstico (con o sin acento).
  * Devuelve null si no es un encabezado G2 (→ el llamador lo trata como cuerpo).
  */

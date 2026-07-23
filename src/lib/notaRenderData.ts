@@ -18,13 +18,50 @@ import { decodificarEntidadesHTML } from '@/lib/textUtils'
 /** Formato de fecha legible en español para encabezados de nota y addendums. */
 const FMT_FECHA = "d 'de' MMMM 'de' yyyy"
 
+/** Placeholder cuando una fecha no es renderizable. */
+const SIN_FECHA = '—'
+
+type Instante = string | Date | null | undefined
+
+/**
+ * Formatea en la zona de la clínica SIN poder lanzar. Devuelve null si el valor
+ * está ausente o no representa una fecha real.
+ *
+ * `renderEnTZ` delega en `formatInTimeZone`, que lanza `RangeError: Invalid time
+ * value` ante una fecha inválida. Eso era tolerable cuando cada PDF formateaba
+ * una nota: reventaba esa nota y ya. Desde el export del expediente completo
+ * (Fase 6) se formatean N notas en un solo documento, y una sola fila corrupta
+ * tumbaba el PDF entero. Aquí la fila degrada y el resto del expediente sale.
+ *
+ * Doble red a propósito: el chequeo con `new Date()` cubre el caso normal, y el
+ * try/catch cubre que el parser de date-fns y el de `Date` no coincidan al 100%
+ * en formatos raros.
+ */
+function renderFechaSegura(instante: Instante, formato: string): string | null {
+  if (instante === null || instante === undefined || instante === '') return null
+  const parsed = instante instanceof Date ? instante : new Date(instante)
+  if (Number.isNaN(parsed.getTime())) return null
+  try {
+    return renderEnTZ(instante, formato)
+  } catch {
+    return null
+  }
+}
+
+/** Fecha larga del encabezado: "21 de julio de 2026". Inválida → "—". */
+function formatearFechaLarga(instante: Instante): string {
+  return renderFechaSegura(instante, FMT_FECHA) ?? SIN_FECHA
+}
+
 /**
  * Formatea una hora al formato compacto del encabezado de nota: "11:50 a.m.".
  * renderEnTZ con locale es produce p.ej. "11:50 a. m." (minúsculas con espacio
  * interno); se compacta el "a. m." → "a.m." (y "p. m." → "p.m.") sin espacio.
  */
-function formatearHoraCompacta(instante: string | Date): string {
-  return renderEnTZ(instante, 'h:mm a')
+function formatearHoraCompacta(instante: Instante): string {
+  const salida = renderFechaSegura(instante, 'h:mm a')
+  if (salida === null) return SIN_FECHA
+  return salida
     .toLowerCase()
     .replace(/([ap])\.?\s*m\.?/i, '$1.m.')
 }
@@ -34,10 +71,27 @@ function formatearHoraCompacta(instante: string | Date): string {
  * renderEnTZ con locale es produce el mes abreviado con punto ("jul."); se pasa
  * a minúsculas y se eliminan los puntos para dejar "21 / jul / 2026".
  */
-function formatearFechaCorta(instante: string | Date): string {
-  return renderEnTZ(instante, 'dd / MMM / yyyy')
+function formatearFechaCorta(instante: Instante): string {
+  const salida = renderFechaSegura(instante, 'dd / MMM / yyyy')
+  if (salida === null) return SIN_FECHA
+  return salida
     .toLowerCase()
     .replace(/\./g, '')
+}
+
+/**
+ * `consultas.proxima_cita` es una columna TEXT LIBRE (baseline/02_tables.sql:186),
+ * no un timestamp. Las notas viejas guardan ahí cosas como "en 2 semanas" o
+ * "al terminar rehabilitación", perfectamente legítimas.
+ *
+ * Por eso este campo NO cae a "—" cuando no parsea: se devuelve el texto tal
+ * cual, que es exactamente lo que el médico escribió. Solo se formatea cuando
+ * el valor sí es una fecha.
+ */
+function formatearProximaCita(valor: string | null | undefined): string | null {
+  const texto = valor?.trim()
+  if (!texto) return null
+  return renderFechaSegura(texto, FMT_FECHA) ?? texto
 }
 
 /** Addendum tal como llega desde BD (input; el módulo no lo consulta). */
@@ -177,14 +231,23 @@ function construirMedicoDesdeVivo(vivo: MedicoInfo): NotaRenderData['medico'] {
   }
 }
 
+/**
+ * "22 de julio de 2026 · 10:33 a.m.". Devuelve '' si `created_at` falta o no es
+ * una fecha real: el addendum se sigue mostrando, solo pierde el sello de tiempo.
+ */
+function formatearFechaAddendum(createdAt: string | null | undefined): string {
+  const fecha = renderFechaSegura(createdAt, FMT_FECHA)
+  if (fecha === null) return ''
+  return `${fecha} · ${formatearHoraCompacta(createdAt)}`
+}
+
 function construirAddendums(addendums?: AddendumInput[]): AddendumRender[] {
   return (addendums ?? []).map((a) => ({
     parseado: parseNota(decodificarEntidadesHTML(a.contenido)),
     medicoNombre: a.medico_nombre ?? '',
     // Fecha + hora en la zona de la clínica: "22 de julio de 2026 · 10:33 a.m.".
-    fechaFormateada: a.created_at
-      ? `${renderEnTZ(a.created_at, FMT_FECHA)} · ${formatearHoraCompacta(a.created_at)}`
-      : '',
+    // Ausente o corrupta → '' (la plantilla ya tolera el addendum sin fecha).
+    fechaFormateada: formatearFechaAddendum(a.created_at),
   }))
 }
 
@@ -201,13 +264,13 @@ export function buildNotaRenderData(input: BuildNotaInput): NotaRenderData {
         direccion: c.consultorio_direccion ?? '',
         telefono: c.consultorio_telefono ?? '',
       },
-      fechaFormateada: renderEnTZ(c.fecha, FMT_FECHA),
+      fechaFormateada: formatearFechaLarga(c.fecha),
       fechaCorta: formatearFechaCorta(c.fecha),
       horaFormateada: formatearHoraCompacta(c.fecha),
       diagnosticos: c.diagnosticos ?? [],
       motivoConsulta: c.motivo_consulta ?? '',
       signosVitales: c.signos_vitales ?? null,
-      proximaCita: c.proxima_cita ? renderEnTZ(c.proxima_cita, FMT_FECHA) : null,
+      proximaCita: formatearProximaCita(c.proxima_cita),
       notaOrigen: c.nota_origen ?? null,
       notaParseada: parseNota(decodificarEntidadesHTML(c.notas_evolucion)),
       addendums: construirAddendums(addendums),
@@ -223,13 +286,13 @@ export function buildNotaRenderData(input: BuildNotaInput): NotaRenderData {
       direccion: input.consultorio?.direccion ?? '',
       telefono: input.consultorio?.telefono ?? '',
     },
-    fechaFormateada: renderEnTZ(input.fecha, FMT_FECHA),
+    fechaFormateada: formatearFechaLarga(input.fecha),
     fechaCorta: formatearFechaCorta(input.fecha),
     horaFormateada: formatearHoraCompacta(new Date()),
     diagnosticos: input.diagnosticos,
     motivoConsulta: input.motivoConsulta,
     signosVitales: input.signosVitales ?? null,
-    proximaCita: input.proximaCita ? renderEnTZ(input.proximaCita, FMT_FECHA) : null,
+    proximaCita: formatearProximaCita(input.proximaCita),
     notaOrigen: input.notaOrigen ?? null,
     notaParseada: parseNota(decodificarEntidadesHTML(input.notasEvolucion)),
     addendums: [],

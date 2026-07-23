@@ -275,3 +275,123 @@ describe('buildNotaRenderData — colores del perfil para tematizar el PDF', () 
     expect(r.medico.colorSecundario).toBeUndefined()
   })
 })
+
+// ── Robustez ante fechas corruptas o texto libre ──────────────────────────
+// Regresión Fase 6: exportar un expediente completo formatea N notas en un
+// solo PDF. Antes, una sola fila con fecha inválida lanzaba
+// "RangeError: Invalid time value" desde renderEnTZ y tumbaba TODO el
+// documento. El builder ahora degrada la fila y nunca lanza.
+
+describe('buildNotaRenderData — proxima_cita es TEXT libre, no un timestamp', () => {
+  function conProximaCita(valor: string) {
+    return buildNotaRenderData({
+      origen: 'consulta',
+      consulta: { ...consultaMinima, proxima_cita: valor },
+      paciente,
+    })
+  }
+
+  it('texto libre no-fecha se muestra TAL CUAL, sin lanzar', () => {
+    expect(() => conProximaCita('en 2 semanas')).not.toThrow()
+    expect(conProximaCita('en 2 semanas').proximaCita).toBe('en 2 semanas')
+  })
+
+  it('otras redacciones libres de notas viejas sobreviven intactas', () => {
+    expect(conProximaCita('al terminar rehabilitación').proximaCita).toBe('al terminar rehabilitación')
+    expect(conProximaCita('PRN').proximaCita).toBe('PRN')
+  })
+
+  it('cuando SÍ es una fecha, se formatea como antes', () => {
+    expect(conProximaCita('2026-08-01T15:00:00Z').proximaCita).toBe('1 de agosto de 2026')
+  })
+
+  it('vacío o solo espacios → null', () => {
+    expect(conProximaCita('').proximaCita).toBeNull()
+    expect(conProximaCita('   ').proximaCita).toBeNull()
+  })
+
+  it('ausente → null', () => {
+    const r = buildNotaRenderData({ origen: 'consulta', consulta: consultaMinima, paciente })
+    expect(r.proximaCita).toBeNull()
+  })
+
+  it("origen 'formulario' aplica el mismo criterio", () => {
+    const r = buildNotaRenderData({
+      origen: 'formulario',
+      paciente,
+      medicoVivo,
+      fecha: '2026-07-21T15:00:00Z',
+      notasEvolucion: null,
+      diagnosticos: [],
+      motivoConsulta: '',
+      proximaCita: 'cuando el paciente lo requiera',
+    })
+    expect(r.proximaCita).toBe('cuando el paciente lo requiera')
+  })
+})
+
+describe('buildNotaRenderData — fecha de consulta inválida', () => {
+  const consultaRota: Consulta = { ...consultaMinima, fecha: 'no-es-una-fecha' }
+
+  it('no lanza y devuelve la nota renderizable', () => {
+    expect(() => buildNotaRenderData({ origen: 'consulta', consulta: consultaRota, paciente })).not.toThrow()
+  })
+
+  it('los tres campos de fecha caen a "—" en vez de reventar el PDF', () => {
+    const r = buildNotaRenderData({ origen: 'consulta', consulta: consultaRota, paciente })
+    expect(r.fechaFormateada).toBe('—')
+    expect(r.fechaCorta).toBe('—')
+    expect(r.horaFormateada).toBe('—')
+  })
+
+  it('el resto de la nota se construye normal (el contenido clínico no se pierde)', () => {
+    const r = buildNotaRenderData({ origen: 'consulta', consulta: consultaRota, paciente })
+    expect(r.motivoConsulta).toBe('Cefalea')
+    expect(r.paciente.nombreCompleto).toBe('Juan Pérez López')
+  })
+
+  it("origen 'formulario' con fecha inválida tampoco lanza", () => {
+    const r = buildNotaRenderData({
+      origen: 'formulario',
+      paciente,
+      medicoVivo,
+      fecha: 'basura',
+      notasEvolucion: null,
+      diagnosticos: [],
+      motivoConsulta: '',
+    })
+    expect(r.fechaFormateada).toBe('—')
+    expect(r.fechaCorta).toBe('—')
+    // horaFormateada usa new Date() en este flujo → siempre válida.
+    expect(r.horaFormateada).not.toBe('—')
+  })
+})
+
+describe('buildNotaRenderData — addendum con created_at corrupto', () => {
+  const addendums: AddendumInput[] = [
+    { contenido: 'Aclaración con fecha rota', medico_nombre: 'Dr. X', created_at: 'invalid' },
+    { contenido: 'Aclaración sin fecha', medico_nombre: 'Dr. Y', created_at: null },
+    { contenido: 'Aclaración válida', medico_nombre: 'Dr. Z', created_at: '2026-07-22T16:33:00Z' },
+  ]
+
+  it('no lanza', () => {
+    expect(() =>
+      buildNotaRenderData({ origen: 'consulta', consulta: consultaMinima, paciente, addendums }),
+    ).not.toThrow()
+  })
+
+  it('los addendums con fecha corrupta o ausente conservan su contenido, sin sello de tiempo', () => {
+    const r = buildNotaRenderData({ origen: 'consulta', consulta: consultaMinima, paciente, addendums })
+    expect(r.addendums).toHaveLength(3)
+    expect(r.addendums[0].fechaFormateada).toBe('')
+    expect(r.addendums[0].medicoNombre).toBe('Dr. X')
+    expect(r.addendums[0].parseado.secciones.length).toBeGreaterThan(0)
+    expect(r.addendums[1].fechaFormateada).toBe('')
+  })
+
+  it('el addendum sano de la misma nota sigue mostrando fecha y hora', () => {
+    const r = buildNotaRenderData({ origen: 'consulta', consulta: consultaMinima, paciente, addendums })
+    expect(r.addendums[2].fechaFormateada).toContain('22 de julio de 2026')
+    expect(r.addendums[2].fechaFormateada).toContain('·')
+  })
+})
