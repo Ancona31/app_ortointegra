@@ -170,6 +170,13 @@ export default function NuevaNotaPage() {
   const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const formRef = useRef(form)
   useEffect(() => { formRef.current = form }, [form])
+  const notaGeneradaRef = useRef(notaGenerada)
+  useEffect(() => { notaGeneradaRef.current = notaGenerada }, [notaGenerada])
+  // Se enciende al primer clic en el selector IA/manual. El toggle limpia
+  // notaGenerada, así que notaGeneradaRef NO detecta esa interacción: sin este
+  // ref, un borrador que resuelve tarde pisaría la vía que el médico acaba de
+  // elegir (y con ella nota_origen).
+  const modoTocadoRef = useRef(false)
 
 
   // ── Carga datos + borrador ────────────────────────────────────
@@ -194,15 +201,19 @@ export default function NuevaNotaPage() {
       diagnosticos?: string | Diagnostico[]
       complementoDx?: string
     }
-    type DraftPayload = { form?: DraftForm; medicamentos?: typeof medicamentos; signosVitales?: SignosVitalesForm; complementoDx?: string }
+    type DraftPayload = {
+      form?: DraftForm; medicamentos?: typeof medicamentos; signosVitales?: SignosVitalesForm
+      complementoDx?: string; notaGenerada?: string; modoNota?: 'ia' | 'manual'
+    }
     secureStorage.get<DraftPayload>(`nota-draft-${id}`).then(parsed => {
       if (!parsed?.form) return
       // Guard anti-race: si la promesa resolvió DESPUÉS de que el usuario
-      // empezó a teclear en cualquiera de los 8 campos, descartar el borrador
+      // empezó a teclear en cualquiera de los 8 campos, ya tiene una nota viva
+      // en esta sesión, o ya eligió vía en el selector, descartar el borrador
       // para no sobrescribir entrada clínica viva.
       const current = formRef.current
       const vacio = Object.values(current).every(v => Array.isArray(v) ? v.length === 0 : !v)
-      if (!vacio) return
+      if (!vacio || notaGeneradaRef.current || modoTocadoRef.current) return
       // Migración inline: drafts viejos guardaban diagnosticos como string y
       // complementoDx como campo aparte. Convertir a Diagnostico[].
       const raw = parsed.form
@@ -229,6 +240,9 @@ export default function NuevaNotaPage() {
       setForm({ ...EMPTY_FORM, ...migrated })
       if (parsed.medicamentos?.length) setMedicamentos(parsed.medicamentos)
       if (parsed.signosVitales) setSignosVitales(parsed.signosVitales)
+      // Duck-typing: los drafts v1 no traen estos campos → no-op.
+      if (typeof parsed.notaGenerada === 'string' && parsed.notaGenerada) setNotaGenerada(parsed.notaGenerada)
+      if (parsed.modoNota === 'ia' || parsed.modoNota === 'manual') setModoNota(parsed.modoNota)
       setBorradorRestaurado(true)
     }).catch(() => {})
     // Cargar última consulta para contexto
@@ -254,14 +268,14 @@ export default function NuevaNotaPage() {
     if (notaSaved) return // no guardar borrador si la nota ya fue guardada en DB
     if (autosaveRef.current) clearTimeout(autosaveRef.current)
     autosaveRef.current = setTimeout(() => {
-      const tieneDatos = form.motivo_consulta || form.diagnosticos.length > 0 || form.exploracion_fisica
+      const tieneDatos = form.motivo_consulta || form.diagnosticos.length > 0 || form.exploracion_fisica || notaGenerada.trim()
       if (!tieneDatos) return
-      secureStorage.set(draftKey, { form, medicamentos, signosVitales }).then(() => {
+      secureStorage.set(draftKey, { form, medicamentos, signosVitales, notaGenerada, modoNota }).then(() => {
         setUltimoGuardado(new Date())
       })
     }, 1500)
     return () => { if (autosaveRef.current) clearTimeout(autosaveRef.current) }
-  }, [form, medicamentos, signosVitales, notaSaved])
+  }, [form, medicamentos, signosVitales, notaGenerada, modoNota, notaSaved])
 
   // Cerrar autocomplete al hacer clic fuera
   useEffect(() => {
@@ -852,7 +866,7 @@ export default function NuevaNotaPage() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-1.5 flex gap-1">
             <button
               type="button"
-onClick={() => { setModoNota('ia'); setNotaGenerada(''); setError('') }}
+onClick={() => { modoTocadoRef.current = true; setModoNota('ia'); setNotaGenerada(''); setError('') }}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
 modoNota === 'ia'
                     ? 'bg-[#1e5fa8]/10 text-[#1e5fa8] border border-[#1e5fa8]/30 shadow-sm'
@@ -864,7 +878,7 @@ modoNota === 'ia'
             </button>
             <button
               type="button"
-              onClick={() => { setModoNota('manual'); setNotaGenerada(''); setError('') }}
+              onClick={() => { modoTocadoRef.current = true; setModoNota('manual'); setNotaGenerada(''); setError('') }}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
                 modoNota === 'manual'
                   ? 'bg-slate-100 text-[#1a3a5c] border border-slate-300 shadow-sm'
@@ -887,6 +901,8 @@ modoNota === 'ia'
                   setMedicamentos([{ ...MED_VACIA }])
                   setSignosVitales({})
                   setErroresVitales(new Set())
+                  // modoNota NO se resetea: es elección de vía, no contenido del borrador.
+                  setNotaGenerada('')
                   secureStorage.remove(draftKey)
                   setBorradorRestaurado(false)
                 }}
