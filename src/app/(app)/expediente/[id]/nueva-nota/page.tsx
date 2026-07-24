@@ -14,7 +14,7 @@ import {
   ArrowLeft, Save, Loader2, RotateCcw, Printer, Eye, Pencil,
   Pill, FlaskConical, ScanLine, ClipboardList, CheckCircle2,
   BedDouble, PenLine, ShieldCheck, Receipt, Plus, Trash2, X, FileText,
-  ChevronLeft, ChevronRight, ChevronDown, Sparkles,
+  ChevronLeft, ChevronRight, ChevronDown, Sparkles, AlertTriangle,
 } from 'lucide-react'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
@@ -138,6 +138,13 @@ export default function NuevaNotaPage() {
   const [historialEntrevista, setHistorialEntrevista] = useState<{ rol: 'user' | 'model'; texto: string }[]>([])
   const [respuestasEntrevista, setRespuestasEntrevista] = useState<Record<string, string>>({})
   const [bloqueActual, setBloqueActual] = useState(0)
+  // Máquina de estados del modal del funnel de nota.
+  // 'revision'|'contexto'|'confirmacion'|'exito' se implementan en pasos 1.2–1.5
+  const [estadoModal, setEstadoModal] = useState<
+    'generando' | 'entrevista' | 'revision' | 'contexto' | 'confirmacion' | 'exito' | null
+  >(null)
+  // Errores de IA mostrados DENTRO del modal (nunca en la página tras el backdrop).
+  const [errorModal, setErrorModal]     = useState<string | null>(null)
   const [modoEdicion, setModoEdicion]   = useState(false)
   const [pronosticoExpandido, setPronosticoExpandido] = useState(false)
   const [generando, setGenerando]       = useState(false)
@@ -345,16 +352,20 @@ export default function NuevaNotaPage() {
     }
   }
 
-  function mapearErrorIA(e: unknown) {
+  // R16: mapea el fallo a un mensaje accionable. El status HTTP manda (la API
+  // responde siempre {error} en español, así que el heurístico de mensaje no
+  // distinguía 401/429/502 y todos caían al genérico). El heurístico queda solo
+  // como respaldo del 500, cuyo mensaje viene crudo del SDK de Gemini.
+  function mapearErrorIA(e: unknown, status: number | null): string {
+    if (status === 401) return 'Tu sesión expiró. Recarga la página e inicia sesión de nuevo.'
+    if (status === 429) return 'Alcanzaste el límite de notas con IA por hoy. Intenta más tarde.'
+    if (status === 400) return 'La petición no es válida. Revisa el caso e intenta de nuevo.'
+    if (status === 502) return 'El servicio de IA falló al generar la nota. Intenta de nuevo.'
+    if (status === null) return 'Sin conexión. Verifica tu internet e intenta de nuevo.'
     const msg = (e instanceof Error ? e.message : '').toLowerCase()
     if (msg.includes('timeout') || msg.includes('deadline'))
-      setError('La IA tardó demasiado en responder. Intenta de nuevo en unos segundos.')
-    else if (msg.includes('rate') || msg.includes('quota') || msg.includes('429'))
-      setError('Se alcanzó el límite de uso de la IA. Espera un minuto e intenta de nuevo.')
-    else if (msg.includes('network') || msg.includes('fetch'))
-      setError('Error de conexión. Verifica tu internet e intenta de nuevo.')
-    else
-      setError('No se pudo generar la nota. Intenta de nuevo o escríbela manualmente.')
+      return 'La IA tardó demasiado en responder. Intenta de nuevo en unos segundos.'
+    return 'No se pudo generar la nota. Intenta de nuevo o escríbela manualmente.'
   }
 
   // Cablea la nota final ('completa') al form y limpia el estado de entrevista.
@@ -379,12 +390,18 @@ export default function NuevaNotaPage() {
     setBloquesEntrevista([])
     setHistorialEntrevista([])
     setRespuestasEntrevista({})
+    // ÚLTIMA línea a propósito: si la narrativa era inválida, el throw de arriba
+    // cortó antes y el modal sigue abierto mostrando el error del catch.
+    // T1: cerrar → panel inline. En 1.2 esta línea muta a setEstadoModal('revision').
+    setEstadoModal(null)
   }
 
   // ── Generar nota con Gemini (turno 1) ─────────────────────────
   async function generarNota() {
-    if (!form.motivo_consulta.trim()) { setError('Describe el caso antes de generar la nota'); return }
+    if (!validarParaAbrir()) return
     setGenerando(true); setError('')
+    setErrorModal(null); setEstadoModal('generando')
+    let httpStatus: number | null = null
     try {
       const res = await fetch('/api/nota-medica', {
         method: 'POST',
@@ -395,23 +412,33 @@ export default function NuevaNotaPage() {
           historial: [],
         }),
       })
+      httpStatus = res.status
       const rawText = await res.text()
       const data = JSON.parse(rawText) as NotaIAResponse & { error?: string }
       if (data.error) throw new Error(data.error)
       if (data.status === 'faltan_datos') {
         // Entrevista turno 1: guardar preguntas e iniciar el historial crudo.
+        const bloques = Array.isArray(data.bloques) ? data.bloques : []
+        // B1: sin bloques no hay entrevista que mostrar. Antes el modal no abría
+        // (open dependía de bloquesEntrevista.length) y el fallo era silencioso;
+        // ahora nos quedamos en 'generando' para ofrecer Reintentar.
+        if (bloques.length === 0) {
+          setErrorModal('La IA no devolvió preguntas válidas. Intenta de nuevo.')
+          return
+        }
         setNotaGenerada('')
-        setBloquesEntrevista(Array.isArray(data.bloques) ? data.bloques : [])
+        setBloquesEntrevista(bloques)
         setHistorialEntrevista([
           { rol: 'user', texto: form.motivo_consulta },
           { rol: 'model', texto: rawText },
         ])
         setRespuestasEntrevista({})
+        setEstadoModal('entrevista')
       } else {
         aplicarNotaCompleta(data)
       }
     } catch (e: unknown) {
-      mapearErrorIA(e)
+      setErrorModal(mapearErrorIA(e, httpStatus))
     } finally {
       setGenerando(false)
     }
@@ -427,9 +454,12 @@ export default function NuevaNotaPage() {
         if (resp) partes.push(`${preg.pregunta}: ${resp}`)
       }
     }
-    if (partes.length === 0) { setError('Responde al menos una pregunta antes de enviar.'); return }
+    // B2: este guard salta con el modal ABIERTO; en página quedaba tras el backdrop.
+    if (partes.length === 0) { setErrorModal('Responde al menos una pregunta antes de enviar.'); return }
     const mensaje = partes.join('\n')
     setGenerando(true); setError('')
+    setErrorModal(null)
+    let httpStatus: number | null = null
     try {
       const res = await fetch('/api/nota-medica', {
         method: 'POST',
@@ -440,24 +470,31 @@ export default function NuevaNotaPage() {
           historial: historialEntrevista,
         }),
       })
+      httpStatus = res.status
       const rawText = await res.text()
       const data = JSON.parse(rawText) as NotaIAResponse & { error?: string }
       if (data.error) throw new Error(data.error)
       if (data.status === 'faltan_datos') {
         // La IA pide más: acumular el turno y mostrar las nuevas preguntas.
+        const bloques = Array.isArray(data.bloques) ? data.bloques : []
+        // B1: conservar la entrevista en curso y ofrecer Enviar como reintento.
+        if (bloques.length === 0) {
+          setErrorModal('La IA no devolvió preguntas válidas. Intenta de nuevo.')
+          return
+        }
         setNotaGenerada('')
         setHistorialEntrevista(prev => [
           ...prev,
           { rol: 'user', texto: mensaje },
           { rol: 'model', texto: rawText },
         ])
-        setBloquesEntrevista(Array.isArray(data.bloques) ? data.bloques : [])
+        setBloquesEntrevista(bloques)
         setRespuestasEntrevista({})
       } else {
         aplicarNotaCompleta(data)
       }
     } catch (e: unknown) {
-      mapearErrorIA(e)
+      setErrorModal(mapearErrorIA(e, httpStatus))
     } finally {
       setGenerando(false)
     }
@@ -471,6 +508,8 @@ export default function NuevaNotaPage() {
     setHistorialEntrevista([])
     setRespuestasEntrevista({})
     setBloqueActual(0)
+    setEstadoModal(null)
+    setErrorModal(null)
   }
 
   // ── Previsualizar nota en modo manual ─────────────────────────
@@ -499,6 +538,41 @@ export default function NuevaNotaPage() {
     setNotaGenerada(partes.join('\n\n'))
   }
 
+  // Fase 3: si hay AL MENOS un signo vital capturado, fc es obligatoria (>0)
+  // y todos los capturados deben caer dentro de los límites fisiológicos duros.
+  // El semáforo clínico (vigilar/fuera) NUNCA bloquea; esto sí.
+  // Compartida por intentarGuardar y validarParaAbrir. Los mensajes van a la
+  // página (setError): ambos llamadores corren con el modal cerrado.
+  function validarVitalesDuros(): boolean {
+    const svValidar = construirSignosVitalesPayload(signosVitales)
+    // R14: sin vitales capturados también hay que limpiar. Antes esta rama no
+    // hacía nada y los tiles quedaban en rojo tras vaciar los campos.
+    if (!svValidar) { setErroresVitales(new Set()); return true }
+    const nuevosErrores = new Set<SignoVitalKey>()
+    const fcMissing = !(typeof svValidar.fc === 'number' && svValidar.fc > 0)
+    if (fcMissing) nuevosErrores.add('fc')
+    for (const key of ['ta_sistolica', 'ta_diastolica', 'fc', 'fr', 'temp', 'spo2'] as SignoVitalKey[]) {
+      const val = svValidar[key]
+      if (typeof val === 'number' && fueraDeLimitesDuros(key, val)) nuevosErrores.add(key)
+    }
+    if (nuevosErrores.size > 0) {
+      setErroresVitales(nuevosErrores)
+      setError(fcMissing
+        ? 'Signos vitales: la frecuencia cardíaca (FC) es obligatoria y mayor que 0 si capturas algún signo vital.'
+        : 'Signos vitales: hay valores fuera del rango fisiológico posible. Corrígelos para guardar.')
+      return false
+    }
+    setErroresVitales(new Set())
+    return true
+  }
+
+  // Puerta de entrada al modal del funnel: si falla, los errores se pintan en
+  // la página (banner + tiles) y el modal NO llega a abrirse.
+  function validarParaAbrir(): boolean {
+    if (!form.motivo_consulta.trim()) { setError('Describe el caso antes de generar.'); return false }
+    return validarVitalesDuros()
+  }
+
   // ── Validar y mostrar confirmación antes de guardar ───────────
   function intentarGuardar() {
     if (modoNota === 'manual') {
@@ -520,27 +594,7 @@ export default function NuevaNotaPage() {
       if (!form.motivo_consulta.trim()) { setError('Describe el caso antes de guardar.'); return }
       if (!notaGenerada.trim()) { setError('Genera la nota antes de guardar.'); return }
     }
-    // Fase 3: si hay AL MENOS un signo vital capturado, fc es obligatoria (>0)
-    // y todos los capturados deben caer dentro de los límites fisiológicos duros.
-    // El semáforo clínico (vigilar/fuera) NUNCA bloquea; esto sí.
-    const svValidar = construirSignosVitalesPayload(signosVitales)
-    if (svValidar) {
-      const nuevosErrores = new Set<SignoVitalKey>()
-      const fcMissing = !(typeof svValidar.fc === 'number' && svValidar.fc > 0)
-      if (fcMissing) nuevosErrores.add('fc')
-      for (const key of ['ta_sistolica', 'ta_diastolica', 'fc', 'fr', 'temp', 'spo2'] as SignoVitalKey[]) {
-        const val = svValidar[key]
-        if (typeof val === 'number' && fueraDeLimitesDuros(key, val)) nuevosErrores.add(key)
-      }
-      if (nuevosErrores.size > 0) {
-        setErroresVitales(nuevosErrores)
-        setError(fcMissing
-          ? 'Signos vitales: la frecuencia cardíaca (FC) es obligatoria y mayor que 0 si capturas algún signo vital.'
-          : 'Signos vitales: hay valores fuera del rango fisiológico posible. Corrígelos para guardar.')
-        return
-      }
-      setErroresVitales(new Set())
-    }
+    if (!validarVitalesDuros()) return
     // Si el médico marcó "No mostrar de nuevo", guardar directo
     const skipModal = localStorage.getItem('spinus_skip_confirm_nota') === '1'
     if (skipModal) {
@@ -815,6 +869,131 @@ export default function NuevaNotaPage() {
         </Portal>
       )}
 
+      {/* Modal del funnel de nota — máquina de estados (Paso 1.1). Vive al
+          nivel raíz: ya no lo desmonta el toggle IA/manual. */}
+      <ModalShell
+        open={estadoModal !== null}
+        onClose={cancelarEntrevista}
+        fullscreenMobile
+        hideClose={generando && !errorModal}
+        title={estadoModal === 'generando' ? 'Spinus está redactando tu nota' : 'Spinus necesita más información'}
+        subtitle={estadoModal === 'generando' ? 'Unos segundos…' : 'Responde para completar la nota'}
+        icon={<Sparkles size={15} className="text-[#1e5fa8]" />}
+        iconBg="bg-[#1e5fa8]/10"
+        footer={estadoModal === 'entrevista' ? (
+          <div className="flex items-center gap-2 p-4">
+            <button onClick={cancelarEntrevista} disabled={generando}
+              className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-40">
+              Cancelar
+            </button>
+            <div className="flex-1" />
+            <button onClick={() => setBloqueActual(i => i - 1)} disabled={bloqueActual === 0 || generando}
+              className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+              Anterior
+            </button>
+            {esUltimoBloque ? (
+              <button onClick={responderEntrevista} disabled={!bloqueCompleto || generando}
+                className="px-5 py-2 text-sm font-semibold bg-[#1e5fa8] text-white rounded-lg hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 flex items-center gap-2">
+                {generando ? <><Loader2 size={15} className="animate-spin" /> Enviando...</> : 'Enviar respuestas'}
+              </button>
+            ) : (
+              <button onClick={() => setBloqueActual(i => i + 1)} disabled={!bloqueCompleto}
+                className="px-5 py-2 text-sm font-semibold bg-[#1e5fa8] text-white rounded-lg hover:bg-[#1a3a5c] transition-colors disabled:opacity-50">
+                Siguiente
+              </button>
+            )}
+          </div>
+        ) : undefined}
+      >
+        {estadoModal === 'generando' && (errorModal ? (
+          <div className="px-5 py-12 flex flex-col items-center text-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
+              <AlertTriangle size={22} className="text-red-500" />
+            </div>
+            <p className="text-sm text-slate-600 leading-relaxed max-w-xs">{errorModal}</p>
+            <div className="flex items-center gap-2 mt-1">
+              <button onClick={cancelarEntrevista}
+                className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
+                Cerrar
+              </button>
+              <button onClick={generarNota}
+                className="px-5 py-2 text-sm font-semibold bg-[#1e5fa8] text-white rounded-lg hover:bg-[#1a3a5c] transition-colors flex items-center gap-2">
+                <RotateCcw size={14} /> Reintentar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="px-5 py-12 flex flex-col items-center text-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-[#1e5fa8]/10 flex items-center justify-center">
+              <Sparkles size={22} className="text-[#1e5fa8]" />
+            </div>
+            <Loader2 size={20} className="animate-spin text-[#1e5fa8]" />
+            <p className="text-sm text-slate-500">Estructurando tu nota…</p>
+          </div>
+        ))}
+        {estadoModal === 'entrevista' && (
+          <>
+          <div className="p-5 space-y-4">
+            {/* Progreso */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                  Bloque {bloqueActual + 1} de {bloquesEntrevista.length}
+                </p>
+                {!bloqueCompleto && faltanEnBloque > 0 && (
+                  <p className="text-[11px] text-amber-600">Faltan {faltanEnBloque} por responder</p>
+                )}
+              </div>
+              <div className="flex gap-1">
+                {bloquesEntrevista.map((_, i) => (
+                  <div key={i} className={`h-1 flex-1 rounded-full ${i <= bloqueActual ? 'bg-[#1e5fa8]' : 'bg-slate-200'}`} />
+                ))}
+              </div>
+            </div>
+
+            {/* Preguntas del bloque actual */}
+            {bloqueEnCurso && (
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-slate-700">{bloqueEnCurso.titulo}</h3>
+                {bloqueEnCurso.preguntas.map(preg => {
+                  const respondida = !!(respuestasEntrevista[preg.id] ?? '').trim()
+                  return (
+                    <div key={preg.id} className="space-y-1.5">
+                      <p className="text-sm text-slate-700 flex items-start gap-1.5">
+                        <span className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${respondida ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                        <span>{preg.pregunta}</span>
+                      </p>
+                      {preg.opciones.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 pl-3">
+                          {preg.opciones.map(op => (
+                            <button key={op} type="button"
+                              onClick={() => setRespuestasEntrevista(prev => ({ ...prev, [preg.id]: op }))}
+                              className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${respuestasEntrevista[preg.id] === op ? 'bg-[#1e5fa8] text-white border-[#1e5fa8]' : 'bg-white text-slate-600 border-slate-300 hover:border-slate-400'}`}>
+                              {op}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <input type="text"
+                        value={respuestasEntrevista[preg.id] ?? ''}
+                        onChange={e => setRespuestasEntrevista(prev => ({ ...prev, [preg.id]: e.target.value }))}
+                        placeholder="Escribe tu respuesta..."
+                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+            {errorModal && (
+              <div className="mx-5 mb-5 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs">
+                {errorModal}
+              </div>
+            )}
+          </>
+        )}
+      </ModalShell>
+
       {/* Breadcrumbs + Header — ancho completo */}
       <div className="mb-5 space-y-4">
         <Breadcrumbs pacienteNombre={paciente ? `${paciente.nombre} ${paciente.apellidos}` : undefined} />
@@ -1034,91 +1213,6 @@ modoNota === 'ia'
                   : <><Sparkles size={18} /> Generar con Spinus</>
                 }
               </button>
-              <ModalShell
-                open={bloquesEntrevista.length > 0}
-                onClose={cancelarEntrevista}
-                title="Spinus necesita más información"
-                subtitle="Responde para completar la nota"
-                icon={<Sparkles size={15} className="text-[#1e5fa8]" />}
-                iconBg="bg-[#1e5fa8]/10"
-                footer={
-                  <div className="flex items-center gap-2 p-4">
-                    <button onClick={cancelarEntrevista} disabled={generando}
-                      className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-40">
-                      Cancelar
-                    </button>
-                    <div className="flex-1" />
-                    <button onClick={() => setBloqueActual(i => i - 1)} disabled={bloqueActual === 0 || generando}
-                      className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                      Anterior
-                    </button>
-                    {esUltimoBloque ? (
-                      <button onClick={responderEntrevista} disabled={!bloqueCompleto || generando}
-                        className="px-5 py-2 text-sm font-semibold bg-[#1e5fa8] text-white rounded-lg hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 flex items-center gap-2">
-                        {generando ? <><Loader2 size={15} className="animate-spin" /> Enviando...</> : 'Enviar respuestas'}
-                      </button>
-                    ) : (
-                      <button onClick={() => setBloqueActual(i => i + 1)} disabled={!bloqueCompleto}
-                        className="px-5 py-2 text-sm font-semibold bg-[#1e5fa8] text-white rounded-lg hover:bg-[#1a3a5c] transition-colors disabled:opacity-50">
-                        Siguiente
-                      </button>
-                    )}
-                  </div>
-                }
-              >
-                <div className="p-5 space-y-4">
-                  {/* Progreso */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                        Bloque {bloqueActual + 1} de {bloquesEntrevista.length}
-                      </p>
-                      {!bloqueCompleto && faltanEnBloque > 0 && (
-                        <p className="text-[11px] text-amber-600">Faltan {faltanEnBloque} por responder</p>
-                      )}
-                    </div>
-                    <div className="flex gap-1">
-                      {bloquesEntrevista.map((_, i) => (
-                        <div key={i} className={`h-1 flex-1 rounded-full ${i <= bloqueActual ? 'bg-[#1e5fa8]' : 'bg-slate-200'}`} />
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Preguntas del bloque actual */}
-                  {bloqueEnCurso && (
-                    <div className="space-y-4">
-                      <h3 className="text-sm font-bold text-slate-700">{bloqueEnCurso.titulo}</h3>
-                      {bloqueEnCurso.preguntas.map(preg => {
-                        const respondida = !!(respuestasEntrevista[preg.id] ?? '').trim()
-                        return (
-                          <div key={preg.id} className="space-y-1.5">
-                            <p className="text-sm text-slate-700 flex items-start gap-1.5">
-                              <span className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${respondida ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                              <span>{preg.pregunta}</span>
-                            </p>
-                            {preg.opciones.length > 0 && (
-                              <div className="flex flex-wrap gap-1.5 pl-3">
-                                {preg.opciones.map(op => (
-                                  <button key={op} type="button"
-                                    onClick={() => setRespuestasEntrevista(prev => ({ ...prev, [preg.id]: op }))}
-                                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${respuestasEntrevista[preg.id] === op ? 'bg-[#1e5fa8] text-white border-[#1e5fa8]' : 'bg-white text-slate-600 border-slate-300 hover:border-slate-400'}`}>
-                                    {op}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                            <input type="text"
-                              value={respuestasEntrevista[preg.id] ?? ''}
-                              onChange={e => setRespuestasEntrevista(prev => ({ ...prev, [preg.id]: e.target.value }))}
-                              placeholder="Escribe tu respuesta..."
-                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              </ModalShell>
               {panelResultado}
             </>
           )}
