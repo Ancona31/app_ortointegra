@@ -884,6 +884,11 @@ export default function NuevaNotaPage() {
   // y de notasEvolucion de imprimir(). Lo que se ve es lo que se sella.
   const notaFinal = notaGenerada
     + (form.pronostico.trim() ? `\n\n**[PRONÓSTICO]:**\n${form.pronostico.trim()}` : '')
+  // Diagnósticos en lectura dentro de la revisión (R7): el estructurado es el que
+  // alimenta payload, receta y los 7 formularios de documentos. Optional chaining
+  // por consistencia con el resto del archivo: un dx malformado no debe reventar
+  // el render dentro del modal.
+  const dxValidos = form.diagnosticos.filter(d => d.descripcion?.trim())
   const meta = metaDelModal(estadoModal)
   return (
     <div className="max-w-7xl mx-auto">
@@ -1163,6 +1168,57 @@ export default function NuevaNotaPage() {
                 <div className="prose prose-sm max-w-none prose-headings:text-[#1a3a5c] prose-headings:font-bold prose-headings:text-sm prose-headings:mt-4 prose-headings:mb-1 prose-strong:text-[#1a3a5c] prose-strong:font-semibold prose-p:text-slate-700 prose-p:leading-relaxed prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-li:text-slate-700">
                   <ReactMarkdown>{notaFinal}</ReactMarkdown>
                 </div>
+              )}
+            </div>
+
+            {/* ── Medicamentos detectados (solo IA) ── */}
+            {modoNota === 'ia' && medicamentos.some(m => m.nombre.trim()) && (
+              <div className="border-t border-slate-100 pt-4">
+                <p className="text-xs text-slate-500 mb-2">
+                  Detecté estos medicamentos (precargarán tu receta):
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {/* Índice del array REAL: puede haber filas vacías intercaladas
+                      (IA con nombre nulo, o la tabla T4 que sigue viva hasta 2.1). */}
+                  {medicamentos.map((m, i) => m.nombre.trim() ? (
+                    <span key={i}
+                      className="inline-flex items-center gap-1 pl-3 pr-1 py-1 rounded-full border border-[#1e5fa8]/20 bg-[#1e5fa8]/5 text-xs text-[#1a3a5c]">
+                      {m.nombre.trim()}
+                      <button type="button" onClick={() => removeMed(i)}
+                        aria-label={`Quitar ${m.nombre.trim()}`}
+                        className="relative w-7 h-7 flex items-center justify-center rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors after:absolute after:-inset-2 after:content-['']">
+                        <X size={13} />
+                      </button>
+                    </span>
+                  ) : null)}
+                </div>
+              </div>
+            )}
+
+            {/* ── Diagnósticos (lectura, ambos modos) ── */}
+            <div className="border-t border-slate-100 pt-4">
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Diagnósticos</h3>
+              {dxValidos.length > 0 ? (
+                <ul className="space-y-1">
+                  {dxValidos.map((d, i) => (
+                    <li key={i} className="text-sm text-slate-700 leading-relaxed">
+                      {d.codigo_cie10 ? (
+                        <><span className="font-semibold text-[#1a3a5c]">{d.codigo_cie10}</span> — {d.descripcion.trim()}</>
+                      ) : d.descripcion.trim()}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                /* N1: solo alcanzable en IA (manual valida ≥1 dx antes de abrir). Se MUESTRA
+                   en vez de ocultarse: la invisibilidad del dx fue justo R7. */
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  Sin diagnóstico estructurado — la nota se guardará sin código CIE-10.
+                </p>
+              )}
+              {modoNota === 'ia' && (
+                <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+                  ¿Algo incorrecto? Regenera la nota con más contexto.
+                </p>
               )}
             </div>
 
