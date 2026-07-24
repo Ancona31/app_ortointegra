@@ -82,6 +82,21 @@ const DOCS = [
 
 const MED_VACIA: MedicamentoConsulta = { nombre: '', dosis: '', frecuencia: '', duracion: '' }
 
+// Máquina de estados del modal del funnel de nota (paso 1.1).
+type EstadoModal = 'generando' | 'entrevista' | 'revision' | 'contexto' | 'confirmacion' | 'exito' | null
+
+// Header del ModalShell por estado. 'confirmacion' y 'exito' todavía no tienen
+// superficie propia (pasos 1.4/1.5) y caen al default junto con la entrevista:
+// reproduce exactamente la semántica del ternario que existía antes del lookup.
+function metaDelModal(e: EstadoModal): { title: string; subtitle: string; maxWidth: string } {
+  switch (e) {
+    case 'revision':  return { title: 'Tu nota está lista',              subtitle: 'Revísala antes de guardar',       maxWidth: 'max-w-2xl' }
+    case 'contexto':  return { title: 'Ajusta el contexto',              subtitle: 'La nota se generará de nuevo',    maxWidth: 'max-w-2xl' }
+    case 'generando': return { title: 'Spinus está redactando tu nota',  subtitle: 'Unos segundos…',                  maxWidth: 'max-w-lg'  }
+    default:          return { title: 'Spinus necesita más información', subtitle: 'Responde para completar la nota', maxWidth: 'max-w-lg'  }
+  }
+}
+
 const EMPTY_FORM: {
   motivo_consulta: string
   exploracion_fisica: string
@@ -139,13 +154,19 @@ export default function NuevaNotaPage() {
   const [respuestasEntrevista, setRespuestasEntrevista] = useState<Record<string, string>>({})
   const [bloqueActual, setBloqueActual] = useState(0)
   // Máquina de estados del modal del funnel de nota.
-  // 'revision'|'contexto'|'confirmacion'|'exito' se implementan en pasos 1.2–1.5
-  const [estadoModal, setEstadoModal] = useState<
-    'generando' | 'entrevista' | 'revision' | 'contexto' | 'confirmacion' | 'exito' | null
-  >(null)
+  // 'confirmacion'|'exito' se implementan en pasos 1.4–1.5
+  const [estadoModal, setEstadoModal] = useState<EstadoModal>(null)
   // Errores de IA mostrados DENTRO del modal (nunca en la página tras el backdrop).
   const [errorModal, setErrorModal]     = useState<string | null>(null)
   const [modoEdicion, setModoEdicion]   = useState(false)
+  // R12: la nota se editó a mano → regenerar/actualizar avisa antes de pisarla.
+  const [notaEditada, setNotaEditada]   = useState<boolean>(false)
+  // Confirmaciones inline (swap de botones): pisar la nota dentro del modal,
+  // descartarla desde el ancla de la página.
+  const [confirmarPisado, setConfirmarPisado]         = useState<boolean>(false)
+  const [confirmarDescarte, setConfirmarDescarte]     = useState<boolean>(false)
+  // Colapso del dictado dentro del ancla (mismo patrón que pronosticoExpandido).
+  const [dictadoExpandido, setDictadoExpandido]       = useState<boolean>(false)
   const [pronosticoExpandido, setPronosticoExpandido] = useState(false)
   const [generando, setGenerando]       = useState(false)
   const [guardando, setGuardando]       = useState(false)
@@ -390,10 +411,14 @@ export default function NuevaNotaPage() {
     setBloquesEntrevista([])
     setHistorialEntrevista([])
     setRespuestasEntrevista({})
+    // R12: la nota nueva reemplaza a la anterior, así que la edición sucia muere
+    // con ella y la revisión arranca siempre en preview.
+    setModoEdicion(false)
+    setNotaEditada(false)
     // ÚLTIMA línea a propósito: si la narrativa era inválida, el throw de arriba
     // cortó antes y el modal sigue abierto mostrando el error del catch.
-    // T1: cerrar → panel inline. En 1.2 esta línea muta a setEstadoModal('revision').
-    setEstadoModal(null)
+    // Muere T1: ya no hay panel inline; el modal muta al estado de revisión.
+    setEstadoModal('revision')
   }
 
   // ── Generar nota con Gemini (turno 1) ─────────────────────────
@@ -426,7 +451,10 @@ export default function NuevaNotaPage() {
           setErrorModal('La IA no devolvió preguntas válidas. Intenta de nuevo.')
           return
         }
-        setNotaGenerada('')
+        // Δ2: NO se vacía notaGenerada. Regenerar puede derivar en entrevista; si
+        // el médico la cancela, el ancla debe devolverle la nota anterior intacta
+        // (§7: cerrar nunca destruye). El único consumidor que dependía del vaciado
+        // era el panel inline, que muere en este mismo paso.
         setBloquesEntrevista(bloques)
         setHistorialEntrevista([
           { rol: 'user', texto: form.motivo_consulta },
@@ -482,7 +510,7 @@ export default function NuevaNotaPage() {
           setErrorModal('La IA no devolvió preguntas válidas. Intenta de nuevo.')
           return
         }
-        setNotaGenerada('')
+        // Δ2: ver generarNota — la nota previa sobrevive a un turno de entrevista.
         setHistorialEntrevista(prev => [
           ...prev,
           { rol: 'user', texto: mensaje },
@@ -510,11 +538,12 @@ export default function NuevaNotaPage() {
     setBloqueActual(0)
     setEstadoModal(null)
     setErrorModal(null)
+    setConfirmarPisado(false)
   }
 
   // ── Previsualizar nota en modo manual ─────────────────────────
   function previewNotaManual() {
-    if (!form.motivo_consulta) { setError('Ingresa al menos el motivo de consulta'); return }
+    if (!validarManualParaAbrir()) return
     setError('')
     const dxValidos = form.diagnosticos.filter(d => d.descripcion?.trim())
     const dxBlock = dxValidos.length === 0
@@ -536,6 +565,10 @@ export default function NuevaNotaPage() {
       `**[PLAN]:**\n${form.plan_tratamiento || 'Plan de tratamiento pendiente.'}`,
     ]
     setNotaGenerada(partes.join('\n\n'))
+    // R12: "Actualizar" pisa la nota igual que regenerar → resetea la edición sucia.
+    setModoEdicion(false)
+    setNotaEditada(false)
+    setEstadoModal('revision')
   }
 
   // Fase 3: si hay AL MENOS un signo vital capturado, fc es obligatoria (>0)
@@ -573,28 +606,56 @@ export default function NuevaNotaPage() {
     return validarVitalesDuros()
   }
 
+  // Puerta de entrada de la vía manual. NOM-004-SSA3: aquí el médico captura a
+  // mano, así que los 4 obligatorios se exigen ANTES de abrir la revisión (en IA
+  // viven dentro de la narrativa). intentarGuardar delega en esta misma función,
+  // de modo que la validación de entrada y la de salida no pueden divergir.
+  function validarManualParaAbrir(): boolean {
+    const faltantes: string[] = []
+    if (!form.motivo_consulta.trim()) faltantes.push('Motivo de consulta')
+    if (!form.exploracion_fisica.trim()) faltantes.push('Exploración física')
+    if (form.diagnosticos.length === 0 || !form.diagnosticos.some(d => d.descripcion?.trim())) {
+      faltantes.push('Diagnóstico')
+    }
+    if (!form.plan_tratamiento.trim()) faltantes.push('Plan de tratamiento')
+    if (faltantes.length > 0) {
+      setError(`Campos obligatorios: ${faltantes.join(', ')}`)
+      return false
+    }
+    return validarVitalesDuros()
+  }
+
+  // R8: única vía de apertura de la revisión (ancla + botón sticky de documentos).
+  // En manual NO reconstruye la nota: eso pisaría las ediciones a mano (R12). La
+  // reconstrucción es explícita, vía "Actualizar" dentro del modal.
+  function abrirRevision(): void {
+    const ok = modoNota === 'manual' ? validarManualParaAbrir() : validarParaAbrir()
+    if (!ok) return
+    setError('')
+    setEstadoModal('revision')
+  }
+
+  // Δ6/R12: regenerar (IA) o actualizar (manual) pisa la nota. Con edición sucia
+  // el botón muta primero a confirmación inline; esta función es el "sí".
+  function ejecutarPisado(): void {
+    setConfirmarPisado(false)
+    if (modoNota === 'ia') setEstadoModal('contexto')
+    else previewNotaManual()
+  }
+
   // ── Validar y mostrar confirmación antes de guardar ───────────
   function intentarGuardar() {
     if (modoNota === 'manual') {
-      // NOM-004-SSA3: en modo manual el médico captura a mano → 4 obligatorios
-      const faltantes: string[] = []
-      if (!form.motivo_consulta.trim()) faltantes.push('Motivo de consulta')
-      if (!form.exploracion_fisica.trim()) faltantes.push('Exploración física')
-      if (form.diagnosticos.length === 0 || !form.diagnosticos.some(d => d.descripcion?.trim())) {
-        faltantes.push('Diagnóstico')
-      }
-      if (!form.plan_tratamiento.trim()) faltantes.push('Plan de tratamiento')
-      if (faltantes.length > 0) {
-        setError(`Campos obligatorios: ${faltantes.join(', ')}`)
-        return
-      }
+      // NOM-004-SSA3: los 4 obligatorios + vitales duros viven en el helper, que
+      // es el mismo que valida la apertura de la revisión.
+      if (!validarManualParaAbrir()) return
     } else {
       // Modo IA: exploración física y plan van DENTRO de la narrativa; el dx puede
       // no venir como bloqueo. Solo validamos lo mínimo: el caso y que haya nota.
       if (!form.motivo_consulta.trim()) { setError('Describe el caso antes de guardar.'); return }
       if (!notaGenerada.trim()) { setError('Genera la nota antes de guardar.'); return }
+      if (!validarVitalesDuros()) return
     }
-    if (!validarVitalesDuros()) return
     // Si el médico marcó "No mostrar de nuevo", guardar directo
     const skipModal = localStorage.getItem('spinus_skip_confirm_nota') === '1'
     if (skipModal) {
@@ -660,6 +721,10 @@ export default function NuevaNotaPage() {
   }
 
   // ── Imprimir nota (pipeline react-pdf, patrón B′) ─────────────
+  // T3: sin llamador hasta 1.5 (Estado Éxito) — no eliminar. El botón pre-guardado
+  // murió con el panel inline en 1.2 y el post-guardado nace en 1.5; conservar el
+  // handler evita reponer las 8 fuentes de estado que lee (R11). Genera 3 warnings
+  // de no-unused-vars (imprimir, imprimiendo, Printer): esperados, no rompen lint.
   async function imprimir() {
     if (!paciente) return
     setError('')
@@ -739,72 +804,87 @@ export default function NuevaNotaPage() {
     <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
   ) : null
 
-  const panelResultado = notaGenerada ? (
-    <>
-      {/* Nota generada / previsualizada */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="font-semibold text-slate-700 text-sm">Nota médica</h2>
-              {modoNota === 'ia' ? (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-[#1e5fa8]/10 text-[#1e5fa8] border border-[#1e5fa8]/20">
-                  <Sparkles size={9} />
-                  Nota IA
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
-                  <PenLine size={9} />
-                  Nota manual
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {modoEdicion ? 'Editando texto' : 'Vista previa — haz clic en Editar para modificar'}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setModoEdicion(!modoEdicion)}
-              className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition-colors ${modoEdicion ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-slate-100 border-slate-200 text-slate-600 hover:border-slate-300'}`}>
-              {modoEdicion ? <><Eye size={12} /> Vista previa</> : <><Pencil size={12} /> Editar</>}
-            </button>
-            <button
-              onClick={modoNota === 'ia' ? generarNota : previewNotaManual}
-              disabled={generando || !form.motivo_consulta.trim()}
-              className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 px-2 py-1 disabled:opacity-40">
-              <RotateCcw size={12} /> {modoNota === 'ia' ? 'Regenerar' : 'Actualizar'}
-            </button>
-          </div>
-        </div>
-        <div className="p-5">
-          {modoEdicion ? (
-            <textarea value={notaGenerada} onChange={e => setNotaGenerada(e.target.value)} rows={22}
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 resize-y" />
-          ) : (
-            <div className="prose prose-sm max-w-none prose-headings:text-[#1a3a5c] prose-headings:font-bold prose-headings:text-sm prose-headings:mt-4 prose-headings:mb-1 prose-strong:text-[#1a3a5c] prose-strong:font-semibold prose-p:text-slate-700 prose-p:leading-relaxed prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-li:text-slate-700">
-              <ReactMarkdown>{notaGenerada}</ReactMarkdown>
-            </div>
-          )}
-        </div>
+  // Ancla de la Card Captura: hay nota, el modal está cerrado y aún no se guardó.
+  // Sustituye al CTA propio de cada vía (montaje con ?? más abajo).
+  // TERNARIO CON null A PROPÓSITO: con `&&` el valor falso sería `false`, que NO es
+  // nullish, así que el `??` del montaje no dispararía y la card quedaría sin CTA.
+  const anclaNota = (notaGenerada && estadoModal === null && !notaSaved) ? (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="px-5 py-3 bg-emerald-50 border-b border-emerald-100 flex items-center gap-2">
+        <CheckCircle2 size={15} className="text-emerald-500 flex-shrink-0" />
+        <h2 className="font-semibold text-emerald-700 text-sm">Nota lista</h2>
+        {modoNota === 'ia' ? (
+          <span className="ml-auto inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-[#1e5fa8]/10 text-[#1e5fa8] border border-[#1e5fa8]/20">
+            <Sparkles size={9} />
+            Nota IA
+          </span>
+        ) : (
+          <span className="ml-auto inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+            <PenLine size={9} />
+            Nota manual
+          </span>
+        )}
       </div>
+      <div className="p-5 space-y-4">
+        {/* Dictado colapsado, solo lectura */}
+        <button type="button" onClick={() => setDictadoExpandido(v => !v)} className="w-full text-left group">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">
+            {modoNota === 'ia' ? 'Tu dictado' : 'Motivo de consulta'}
+          </p>
+          <p className={`text-xs text-slate-600 leading-relaxed whitespace-pre-wrap ${dictadoExpandido ? '' : 'line-clamp-3'}`}>
+            {form.motivo_consulta}
+          </p>
+          <span className="text-[11px] text-[#1e5fa8] mt-1 inline-block group-hover:underline">
+            {dictadoExpandido ? 'Ocultar' : 'Ver completo'}
+          </span>
+        </button>
 
-      {/* Acciones imprimir / guardar */}
-      <div className="flex gap-3 pb-6">
-        <button onClick={imprimir} disabled={imprimiendo || !medicoInfo}
-          className="flex items-center gap-2 px-5 py-2.5 border-2 border-[#1a3a5c] text-[#1a3a5c] rounded-lg text-sm font-medium hover:bg-[#1a3a5c] hover:text-white transition-colors disabled:opacity-50">
-          {imprimiendo ? <><Loader2 size={16} className="animate-spin" /> Generando...</> : <><Printer size={16} /> Imprimir</>}
-        </button>
-        <button onClick={intentarGuardar} disabled={guardando || !consultorioActivo}
-          className="flex-1 flex items-center justify-center gap-2 bg-[#1e5fa8] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-60">
-          {guardando ? <><Loader2 size={16} className="animate-spin" /> Guardando...</> : <><Save size={16} /> Guardar en expediente</>}
-        </button>
+        {confirmarDescarte ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 space-y-2">
+            <p className="text-xs text-amber-800 leading-relaxed">
+              Descartarás la nota generada. Tu dictado y los datos capturados se conservan.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setNotaGenerada('')
+                  setNotaEditada(false)
+                  setModoEdicion(false)
+                  setConfirmarDescarte(false)
+                }}
+                className="px-3 py-1.5 text-xs font-semibold bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors">
+                Sí, empezar de nuevo
+              </button>
+              <button onClick={() => setConfirmarDescarte(false)}
+                className="px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+                Conservar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <button onClick={abrirRevision}
+              className="flex-1 flex items-center justify-center gap-2 bg-[#1e5fa8] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-[#1a3a5c] transition-colors">
+              <Eye size={16} /> Revisar y guardar
+            </button>
+            <button onClick={() => setConfirmarDescarte(true)}
+              className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+              <RotateCcw size={14} /> Empezar de nuevo
+            </button>
+          </div>
+        )}
       </div>
-    </>
+    </div>
   ) : null
 
   // ── Render ────────────────────────────────────────────────────
   // Aviso suave (no bloquea): la nota se guardará sin signos vitales.
   const sinVitalesCapturados = construirSignosVitalesPayload(signosVitales) === undefined
+  // Preview REAL del estado de revisión: réplica exacta de notaFinal de guardar()
+  // y de notasEvolucion de imprimir(). Lo que se ve es lo que se sella.
+  const notaFinal = notaGenerada
+    + (form.pronostico.trim() ? `\n\n**[PRONÓSTICO]:**\n${form.pronostico.trim()}` : '')
+  const meta = metaDelModal(estadoModal)
   return (
     <div className="max-w-7xl mx-auto">
 
@@ -845,7 +925,7 @@ export default function NuevaNotaPage() {
               </div>
               <div className="border-t border-slate-100 grid grid-cols-2">
                 <button
-                  onClick={() => setMostrarConfirmacion(false)}
+                  onClick={() => { setMostrarConfirmacion(false); setEstadoModal('revision') }}
                   className="px-4 py-3.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors border-r border-slate-100"
                 >
                   Revisar nota
@@ -875,11 +955,25 @@ export default function NuevaNotaPage() {
         open={estadoModal !== null}
         onClose={cancelarEntrevista}
         fullscreenMobile
+        maxWidth={meta.maxWidth}
         hideClose={generando && !errorModal}
-        title={estadoModal === 'generando' ? 'Spinus está redactando tu nota' : 'Spinus necesita más información'}
-        subtitle={estadoModal === 'generando' ? 'Unos segundos…' : 'Responde para completar la nota'}
+        title={meta.title}
+        subtitle={meta.subtitle}
         icon={<Sparkles size={15} className="text-[#1e5fa8]" />}
         iconBg="bg-[#1e5fa8]/10"
+        headerRight={estadoModal === 'revision' ? (
+          modoNota === 'ia' ? (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-[#1e5fa8]/10 text-[#1e5fa8] border border-[#1e5fa8]/20">
+              <Sparkles size={9} />
+              Nota IA
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+              <PenLine size={9} />
+              Nota manual
+            </span>
+          )
+        ) : undefined}
         footer={estadoModal === 'entrevista' ? (
           <div className="flex items-center gap-2 p-4">
             <button onClick={cancelarEntrevista} disabled={generando}
@@ -902,6 +996,34 @@ export default function NuevaNotaPage() {
                 Siguiente
               </button>
             )}
+          </div>
+        ) : estadoModal === 'revision' ? (
+          <div className="flex items-center gap-2 p-4">
+            <button onClick={cancelarEntrevista}
+              className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
+              Cerrar
+            </button>
+            <div className="flex-1" />
+            {/* T2: cierra el modal de estados y abre el confirm clásico de forma
+                SECUENCIAL (nunca apilado). En 1.4 esto pasa a estado 'confirmacion'. */}
+            <button
+              onClick={() => { setErrorModal(null); setEstadoModal(null); intentarGuardar() }}
+              disabled={guardando || !consultorioActivo}
+              className="px-5 py-2 text-sm font-semibold bg-[#1e5fa8] text-white rounded-lg hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 flex items-center gap-2">
+              {guardando ? <><Loader2 size={15} className="animate-spin" /> Guardando...</> : <><Save size={15} /> Guardar nota</>}
+            </button>
+          </div>
+        ) : estadoModal === 'contexto' ? (
+          <div className="flex items-center gap-2 p-4">
+            <button onClick={() => { setEstadoModal('revision'); setErrorModal(null) }}
+              className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
+              Cancelar
+            </button>
+            <div className="flex-1" />
+            <button onClick={generarNota} disabled={!form.motivo_consulta.trim()}
+              className="px-5 py-2 text-sm font-semibold bg-[#1e5fa8] text-white rounded-lg hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 flex items-center gap-2">
+              <Sparkles size={15} /> Regenerar nota
+            </button>
           </div>
         ) : undefined}
       >
@@ -991,6 +1113,112 @@ export default function NuevaNotaPage() {
               </div>
             )}
           </>
+        )}
+        {estadoModal === 'revision' && (
+          <div className="p-5 space-y-5">
+            {/* ── La nota ── */}
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <p className="text-xs text-slate-400">
+                  {modoEdicion ? 'Editando texto' : 'Vista previa — haz clic en Editar para modificar'}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setModoEdicion(!modoEdicion)}
+                    className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition-colors ${modoEdicion ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-slate-100 border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                    {modoEdicion ? <><Eye size={12} /> Vista previa</> : <><Pencil size={12} /> Editar</>}
+                  </button>
+                  <button
+                    onClick={() => { if (notaEditada) { setConfirmarPisado(true); return } ejecutarPisado() }}
+                    disabled={generando || !form.motivo_consulta.trim()}
+                    className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 px-2 py-1 disabled:opacity-40">
+                    <RotateCcw size={12} /> {modoNota === 'ia' ? 'Regenerar' : 'Actualizar'}
+                  </button>
+                </div>
+              </div>
+
+              {/* R12: la confirmación solo advierte; nada se pisa hasta confirmar */}
+              {confirmarPisado && (
+                <div className="mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 space-y-2">
+                  <p className="text-xs text-amber-800 leading-relaxed">Perderás tus cambios — ¿Continuar?</p>
+                  <div className="flex gap-2">
+                    <button onClick={ejecutarPisado}
+                      className="px-3 py-1.5 text-xs font-semibold bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors">
+                      {modoNota === 'ia' ? 'Sí, regenerar' : 'Sí, actualizar'}
+                    </button>
+                    <button onClick={() => setConfirmarPisado(false)}
+                      className="px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+                      Conservar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {modoEdicion ? (
+                <textarea
+                  value={notaGenerada}
+                  onChange={e => { setNotaGenerada(e.target.value); setNotaEditada(true) }}
+                  rows={16}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 resize-y" />
+              ) : (
+                <div className="prose prose-sm max-w-none prose-headings:text-[#1a3a5c] prose-headings:font-bold prose-headings:text-sm prose-headings:mt-4 prose-headings:mb-1 prose-strong:text-[#1a3a5c] prose-strong:font-semibold prose-p:text-slate-700 prose-p:leading-relaxed prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-li:text-slate-700">
+                  <ReactMarkdown>{notaFinal}</ReactMarkdown>
+                </div>
+              )}
+            </div>
+
+            {/* ── Seguimiento ── */}
+            <div className="border-t border-slate-100 pt-4">
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Seguimiento</h3>
+              {modoEdicion ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 block mb-1">Pronóstico <span className="text-slate-400 font-normal">(opcional)</span></label>
+                    <input type="text" value={form.pronostico} onChange={e => update('pronostico', e.target.value)}
+                      placeholder="Ej: Favorable a mediano plazo con tratamiento conservador..."
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 block mb-1">Próxima cita</label>
+                    <input type="text" value={form.proxima_cita} onChange={e => update('proxima_cita', e.target.value)}
+                      placeholder="Ej: En 4 semanas, 15 de abril 2026..."
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1 min-w-0">
+                    <p className="text-xs text-slate-500">
+                      <span className="text-slate-400">Pronóstico: </span>
+                      <span className="text-slate-600 break-words">{form.pronostico.trim() || '—'}</span>
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      <span className="text-slate-400">Próxima cita: </span>
+                      <span className="text-slate-600 break-words">{form.proxima_cita.trim() || '—'}</span>
+                    </p>
+                  </div>
+                  <button onClick={() => setModoEdicion(true)}
+                    className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border bg-slate-100 border-slate-200 text-slate-600 hover:border-slate-300 transition-colors flex-shrink-0">
+                    <Pencil size={12} /> Editar
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {estadoModal === 'contexto' && (
+          <div className="p-5 space-y-3">
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Corrige o amplía el contexto; la nota se generará de nuevo.
+            </p>
+            <textarea
+              value={form.motivo_consulta}
+              onChange={e => update('motivo_consulta', e.target.value)}
+              rows={10}
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Tu nota actual se conserva hasta que la nueva esté lista.
+            </p>
+          </div>
         )}
       </ModalShell>
 
@@ -1206,14 +1434,15 @@ modoNota === 'ia'
           {modoNota === 'ia' && (
             <>
               {bloqueError}
-              <button onClick={generarNota} disabled={generando || !form.motivo_consulta.trim()}
-                className="w-full py-3 bg-[#1e5fa8] text-white rounded-xl font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-                {generando
-                  ? <><Loader2 size={18} className="animate-spin" /> Redactando nota médica...</>
-                  : <><Sparkles size={18} /> Generar con Spinus</>
-                }
-              </button>
-              {panelResultado}
+              {anclaNota ?? (
+                <button onClick={generarNota} disabled={generando || !form.motivo_consulta.trim()}
+                  className="w-full py-3 bg-[#1e5fa8] text-white rounded-xl font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                  {generando
+                    ? <><Loader2 size={18} className="animate-spin" /> Redactando nota médica...</>
+                    : <><Sparkles size={18} /> Generar con Spinus</>
+                  }
+                </button>
+              )}
             </>
           )}
 
@@ -1316,12 +1545,13 @@ modoNota === 'ia'
           {modoNota === 'manual' && (
             <>
               {bloqueError}
-              <button onClick={previewNotaManual} disabled={!form.motivo_consulta}
-                className="w-full py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#142d4a] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-                <PenLine size={18} />
-                Previsualizar nota
-              </button>
-              {panelResultado}
+              {anclaNota ?? (
+                <button onClick={previewNotaManual} disabled={!form.motivo_consulta}
+                  className="w-full py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#142d4a] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                  <PenLine size={18} />
+                  Previsualizar nota
+                </button>
+              )}
             </>
           )}
         </div>
@@ -1413,10 +1643,11 @@ modoNota === 'ia'
                     ? 'Guarda la nota para poder generar documentos desde aquí'
                     : 'Completa y genera la nota para activar este panel'}
                 </p>
+                {/* R8: una sola vía de guardado — este botón abre la revisión */}
                 {notaGenerada && (
-                  <button onClick={intentarGuardar} disabled={guardando || !consultorioActivo}
+                  <button onClick={abrirRevision} disabled={guardando || !consultorioActivo}
                     className="mt-1 flex items-center gap-2 px-4 py-2 bg-[#1e5fa8] text-white rounded-lg text-xs font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-60">
-                    {guardando ? <><Loader2 size={13} className="animate-spin" /> Guardando...</> : <><Save size={13} /> Guardar nota</>}
+                    {guardando ? <><Loader2 size={13} className="animate-spin" /> Guardando...</> : <><Save size={13} /> Revisar y guardar</>}
                   </button>
                 )}
               </div>
