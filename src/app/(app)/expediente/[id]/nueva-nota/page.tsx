@@ -12,8 +12,8 @@ import { buildNotaRenderData } from '@/lib/notaRenderData'
 import {
   ArrowLeft, Save, Loader2, RotateCcw, Printer, Eye, Pencil,
   Pill, FlaskConical, ScanLine, ClipboardList, CheckCircle2,
-  BedDouble, PenLine, ShieldCheck, Receipt, Plus, Trash2, X, FileText,
-  ChevronLeft, ChevronRight, ChevronDown, Sparkles, AlertTriangle,
+  BedDouble, PenLine, ShieldCheck, Receipt, X, FileText,
+  ChevronLeft, ChevronRight, Mic, Sparkles, AlertTriangle,
 } from 'lucide-react'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
@@ -145,9 +145,6 @@ export default function NuevaNotaPage() {
   const [medicamentos, setMedicamentos] = useState<MedicamentoConsulta[]>([{ ...MED_VACIA }])
   const [signosVitales, setSignosVitales] = useState<SignosVitalesForm>({})
   const [erroresVitales, setErroresVitales] = useState<Set<SignoVitalKey>>(new Set())
-  const [medCache, setMedCache]         = useState<string[]>([])
-  const [showSuggest, setShowSuggest]   = useState<number | null>(null)
-
   const [modoNota, setModoNota]         = useState<'ia' | 'manual'>('ia')
   const [notaGenerada, setNotaGenerada] = useState('')
   const [bloquesEntrevista, setBloquesEntrevista]     = useState<BloqueIA[]>([])
@@ -168,7 +165,6 @@ export default function NuevaNotaPage() {
   const [confirmarDescarte, setConfirmarDescarte]     = useState<boolean>(false)
   // Colapso del dictado dentro del ancla (mismo patrón que pronosticoExpandido).
   const [dictadoExpandido, setDictadoExpandido]       = useState<boolean>(false)
-  const [pronosticoExpandido, setPronosticoExpandido] = useState(false)
   const [generando, setGenerando]       = useState(false)
   const [guardando, setGuardando]       = useState(false)
   const [imprimiendo, setImprimiendo]   = useState(false)
@@ -194,7 +190,6 @@ export default function NuevaNotaPage() {
   const [borradorRestaurado, setBorradorRestaurado] = useState(false)
   const [ultimaConsulta, setUltimaConsulta] = useState<{ diagnosticos: string; medicamentos: MedicamentoConsulta[] | null } | null>(null)
 
-  const suggestRef  = useRef<HTMLDivElement>(null)
   const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const formRef = useRef(form)
   useEffect(() => { formRef.current = form }, [form])
@@ -220,10 +215,7 @@ export default function NuevaNotaPage() {
       .catch(() => {
         // Sin red — mirror ya cargó los datos arriba, nada que hacer
       })
-    // Cargar medicamentos frecuentes y borrador (cifrados en secureStorage)
-    secureStorage.get<{ nombre: string; count: number }[]>('med-frecuentes').then(data => {
-      if (data) setMedCache(data.sort((a, b) => b.count - a.count).map(d => d.nombre))
-    }).catch(() => {})
+    // Cargar borrador (cifrado en secureStorage).
     // Tipo laxo del draft para tolerar formato viejo (diagnosticos: string + complementoDx).
     type DraftForm = Partial<Omit<typeof EMPTY_FORM, 'diagnosticos'>> & {
       diagnosticos?: string | Diagnostico[]
@@ -305,51 +297,11 @@ export default function NuevaNotaPage() {
     return () => { if (autosaveRef.current) clearTimeout(autosaveRef.current) }
   }, [form, medicamentos, signosVitales, notaGenerada, modoNota, notaSaved])
 
-  // Cerrar autocomplete al hacer clic fuera
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (suggestRef.current && !suggestRef.current.contains(e.target as Node)) {
-        setShowSuggest(null)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
   // Entrevista: al recibir un set nuevo de preguntas (o limpiarlas), volver al
   // primer bloque. Mantiene la lógica del sub-paso A intacta.
   useEffect(() => { setBloqueActual(0) }, [bloquesEntrevista])
 
   // ── Helpers de medicamentos ───────────────────────────────────
-  function getSuggestions(query: string): string[] {
-    if (!query.trim()) return medCache.slice(0, 6)
-    return medCache.filter(n => n.toLowerCase().includes(query.toLowerCase())).slice(0, 6)
-  }
-
-  async function saveMedCache(meds: MedicamentoConsulta[]) {
-    try {
-      const nombres = meds.filter(m => m.nombre.trim()).map(m => m.nombre.trim())
-      if (!nombres.length) return
-      const existing = await secureStorage.get<{ nombre: string; count: number }[]>('med-frecuentes')
-      const data = existing ?? []
-      nombres.forEach(nombre => {
-        const idx = data.findIndex(d => d.nombre.toLowerCase() === nombre.toLowerCase())
-        if (idx >= 0) data[idx].count++
-        else data.push({ nombre, count: 1 })
-      })
-      await secureStorage.set('med-frecuentes', data)
-      setMedCache(data.sort((a, b) => b.count - a.count).map(d => d.nombre))
-    } catch {}
-  }
-
-  function updateMed(i: number, field: keyof MedicamentoConsulta, val: string) {
-    setMedicamentos(prev => prev.map((m, idx) => idx === i ? { ...m, [field]: val } : m))
-  }
-
-  function addMed() {
-    setMedicamentos(prev => [...prev, { ...MED_VACIA }])
-  }
-
   function removeMed(i: number) {
     if (medicamentos.length === 1) { setMedicamentos([{ ...MED_VACIA }]); return }
     setMedicamentos(prev => prev.filter((_, idx) => idx !== i))
@@ -719,7 +671,6 @@ export default function NuevaNotaPage() {
         return
       }
 
-      saveMedCache(medsConDatos)
       secureStorage.remove(draftKey)
       setNotaSaved(true)
       setEstadoModal('exito')
@@ -1377,34 +1328,6 @@ export default function NuevaNotaPage() {
         ════════════════════════════════ */}
         <div className="lg:col-span-3 space-y-5">
 
-          {/* Selector de modo */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-1.5 flex gap-1">
-            <button
-              type="button"
-onClick={() => { modoTocadoRef.current = true; setModoNota('ia'); setNotaGenerada(''); setError('') }}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
-modoNota === 'ia'
-                    ? 'bg-[#1e5fa8]/10 text-[#1e5fa8] border border-[#1e5fa8]/30 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              <Sparkles size={14} className="flex-shrink-0" />
-              Crear nota con IA
-            </button>
-            <button
-              type="button"
-              onClick={() => { modoTocadoRef.current = true; setModoNota('manual'); setNotaGenerada(''); setError('') }}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
-                modoNota === 'manual'
-                  ? 'bg-slate-100 text-[#1a3a5c] border border-slate-300 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              <PenLine size={14} className="flex-shrink-0" />
-              Crear nota manual
-            </button>
-          </div>
-
           {/* Banner borrador restaurado */}
           {borradorRestaurado && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-3">
@@ -1436,10 +1359,11 @@ modoNota === 'ia'
           />
 
           {/* Formulario de la consulta */}
+          {!notaSaved && (
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h2 className="font-semibold text-slate-700 text-sm">Datos de la consulta</h2>
+                <h2 className="font-semibold text-slate-700 text-sm">Cuéntame la consulta</h2>
                 {modoNota === 'ia' ? (
                   <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
                     Describe el caso y
@@ -1466,13 +1390,25 @@ modoNota === 'ia'
                 <label className="text-xs font-medium text-slate-500 block mb-1.5">
                   Descripción del caso <span className="text-red-400">*</span>
                 </label>
-                <textarea
-                  value={form.motivo_consulta}
-                  onChange={e => update('motivo_consulta', e.target.value)}
-                  placeholder="Describe el caso con tus palabras: motivo de consulta, hallazgos de la exploración, estudios, impresión diagnóstica y plan. Spinus estructurará la nota a partir de lo que escribas."
-                  rows={10}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
-                />
+                <div className="relative">
+                  <textarea
+                    value={form.motivo_consulta}
+                    onChange={e => update('motivo_consulta', e.target.value)}
+                    disabled={generando}
+                    placeholder="Ej.: Paciente con dolor lumbar de 2 semanas tras cargar peso, sin irradiación, Lasègue negativo, fuerza y reflejos normales. Indico naproxeno 500 mg cada 12 h por 7 días, ejercicios de McKenzie, cita en 2 semanas."
+                    rows={10}
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
+                  />
+                  <button
+                    type="button"
+                    disabled
+                    title="Dictado por voz — próximamente"
+                    aria-label="Dictado por voz — próximamente"
+                    className="absolute bottom-3 right-3 text-slate-300 cursor-not-allowed"
+                  >
+                    <Mic size={18} />
+                  </button>
+                </div>
                 <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
                   Escribe en lenguaje natural. No necesitas separar por secciones — Spinus lo hace por ti.
                 </p>
@@ -1537,128 +1473,48 @@ modoNota === 'ia'
               </div>
             )}
           </div>
+          )}
 
           {/* ── Modo IA: error + botón generar + resultado, todo bajo el textarea ── */}
           {modoNota === 'ia' && (
             <>
               {bloqueError}
               {anclaNota ?? (!notaSaved && (
-                <button onClick={generarNota} disabled={generando || !form.motivo_consulta.trim()}
-                  className="w-full py-3 bg-[#1e5fa8] text-white rounded-xl font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-                  {generando
-                    ? <><Loader2 size={18} className="animate-spin" /> Redactando nota médica...</>
-                    : <><Sparkles size={18} /> Generar con Spinus</>
-                  }
-                </button>
+                <>
+                  <button onClick={generarNota} disabled={generando || !form.motivo_consulta.trim()}
+                    className="w-full py-3 bg-[#1e5fa8] text-white rounded-xl font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                    {generando
+                      ? <><Loader2 size={18} className="animate-spin" /> Redactando nota médica...</>
+                      : <><Sparkles size={18} /> Generar con Spinus</>
+                    }
+                  </button>
+                  <button type="button"
+                    onClick={() => { modoTocadoRef.current = true; setModoNota('manual'); setNotaGenerada(''); setError('') }}
+                    className="block mx-auto mt-2 text-center text-sm text-slate-500 hover:text-[#1e5fa8] transition-colors">
+                    Prefiero escribirla yo
+                  </button>
+                </>
               ))}
             </>
           )}
-
-          {/* Terapéutica empleada */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
-              <h2 className="font-semibold text-slate-700 text-sm flex items-center gap-2">
-                <Pill size={14} className="text-blue-500" />
-                Terapéutica empleada
-              </h2>
-              <p className="text-xs text-slate-400 mt-0.5">Se imprime en la nota y pre-carga la receta</p>
-            </div>
-            <div className="p-4 space-y-2" ref={suggestRef}>
-              <div className="hidden sm:grid sm:grid-cols-12 gap-2 px-1 mb-1">
-                <span className="col-span-4 text-xs font-medium text-slate-400 uppercase tracking-wide">Medicamento</span>
-                <span className="col-span-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Dosis</span>
-                <span className="col-span-2 text-xs font-medium text-slate-400 uppercase tracking-wide">Frecuencia</span>
-                <span className="col-span-2 text-xs font-medium text-slate-400 uppercase tracking-wide">Duración</span>
-                <span className="col-span-1" />
-              </div>
-              {medicamentos.map((med, i) => {
-                const suggestions = getSuggestions(med.nombre)
-                const mostrarSuggest = showSuggest === i && suggestions.length > 0
-                return (
-                  <div key={i} className="grid grid-cols-2 sm:grid-cols-12 gap-2 relative">
-                    <div className="col-span-2 sm:col-span-4 relative">
-                      <input type="text" value={med.nombre}
-                        onChange={e => updateMed(i, 'nombre', e.target.value)}
-                        onFocus={() => setShowSuggest(i)}
-                        placeholder="Ej: Ketorolaco"
-                        className="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-                      {mostrarSuggest && (
-                        <div className="absolute top-full left-0 right-0 z-20 bg-white border border-slate-200 rounded-lg shadow-lg mt-1 overflow-hidden">
-                          {suggestions.map(s => (
-                            <button key={s} type="button"
-                              onMouseDown={() => { updateMed(i, 'nombre', s); setShowSuggest(null) }}
-                              className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
-                              {s}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <input type="text" value={med.dosis} onChange={e => updateMed(i, 'dosis', e.target.value)}
-                      placeholder="Dosis" className="col-span-1 sm:col-span-3 px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-                    <input type="text" value={med.frecuencia} onChange={e => updateMed(i, 'frecuencia', e.target.value)}
-                      placeholder="Frecuencia" className="col-span-1 sm:col-span-2 px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-                    <input type="text" value={med.duracion} onChange={e => updateMed(i, 'duracion', e.target.value)}
-                      placeholder="Duración" className="col-span-1 sm:col-span-2 px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-                    <button type="button" onClick={() => removeMed(i)}
-                      className="col-span-1 sm:col-span-1 flex items-center justify-center text-slate-300 hover:text-red-400 transition-colors">
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                )
-              })}
-              {medicamentos.every(m => !m.nombre.trim()) && (
-                <p className="text-xs text-slate-400 text-center py-2">Sin medicamentos — usa el botón “Agregar” o comienza a escribir</p>
-              )}
-              <div className="pt-1">
-                <button type="button" onClick={addMed}
-                  className="flex items-center gap-1.5 text-xs font-medium text-[#1e5fa8] hover:text-[#1a3a5c] transition-colors">
-                  <Plus size={14} /> Agregar medicamento
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Pronóstico y próxima cita — colapsable, colapsado por defecto */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setPronosticoExpandido(e => !e)}
-              className={`w-full flex items-center justify-between px-5 py-3 bg-slate-50 text-left hover:bg-slate-100 transition-colors ${pronosticoExpandido ? 'border-b border-slate-100' : ''}`}
-            >
-              <h2 className="font-semibold text-slate-700 text-sm">
-                Pronóstico y seguimiento <span className="text-slate-400 font-normal">(opcional)</span>
-              </h2>
-              <ChevronDown size={16} className={`text-slate-400 transition-transform duration-200 ${pronosticoExpandido ? 'rotate-180' : ''}`} />
-            </button>
-            {pronosticoExpandido && (
-              <div className="p-5 space-y-4">
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">Pronóstico <span className="text-slate-400 font-normal">(opcional)</span></label>
-                  <input type="text" value={form.pronostico} onChange={e => update('pronostico', e.target.value)}
-                    placeholder="Ej: Favorable a mediano plazo con tratamiento conservador..."
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">Próxima cita</label>
-                  <input type="text" value={form.proxima_cita} onChange={e => update('proxima_cita', e.target.value)}
-                    placeholder="Ej: En 4 semanas, 15 de abril 2026..."
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-                </div>
-              </div>
-            )}
-          </div>
 
           {/* ── Modo manual: error + botón previsualizar + resultado, al fondo (como hoy) ── */}
           {modoNota === 'manual' && (
             <>
               {bloqueError}
               {anclaNota ?? (!notaSaved && (
-                <button onClick={previewNotaManual} disabled={!form.motivo_consulta}
-                  className="w-full py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#142d4a] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-                  <PenLine size={18} />
-                  Previsualizar nota
-                </button>
+                <>
+                  <button onClick={previewNotaManual} disabled={!form.motivo_consulta}
+                    className="w-full py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#142d4a] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                    <PenLine size={18} />
+                    Previsualizar nota
+                  </button>
+                  <button type="button"
+                    onClick={() => { modoTocadoRef.current = true; setModoNota('ia'); setNotaGenerada(''); setError('') }}
+                    className="block mx-auto mt-2 text-center text-sm text-slate-500 hover:text-[#1e5fa8] transition-colors">
+                    Volver a crear con IA
+                  </button>
+                </>
               ))}
             </>
           )}
