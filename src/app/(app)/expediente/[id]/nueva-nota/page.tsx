@@ -84,15 +84,16 @@ const MED_VACIA: MedicamentoConsulta = { nombre: '', dosis: '', frecuencia: '', 
 // Máquina de estados del modal del funnel de nota (paso 1.1).
 type EstadoModal = 'generando' | 'entrevista' | 'revision' | 'contexto' | 'confirmacion' | 'exito' | null
 
-// Header del ModalShell por estado. 'confirmacion' (paso 1.4) usa header vacío:
-// su superficie es un bloque centrado en el cuerpo (ícono rojo + título con glow),
-// fiel al M6. 'exito' (paso 1.5) todavía cae al default junto con la entrevista.
+// Header del ModalShell por estado. 'confirmacion' (paso 1.4) y 'exito' (paso 1.5)
+// usan header vacío: su superficie es un bloque centrado en el cuerpo (ícono +
+// título), fieles a M6/M7. El resto conserva header con ícono Spinus.
 function metaDelModal(e: EstadoModal): { title: string; subtitle: string; maxWidth: string } {
   switch (e) {
     case 'revision':     return { title: 'Tu nota está lista',              subtitle: 'Revísala antes de guardar',       maxWidth: 'max-w-2xl' }
     case 'contexto':     return { title: 'Ajusta el contexto',              subtitle: 'La nota se generará de nuevo',    maxWidth: 'max-w-2xl' }
     case 'generando':    return { title: 'Spinus está redactando tu nota',  subtitle: 'Unos segundos…',                  maxWidth: 'max-w-lg'  }
     case 'confirmacion': return { title: '',                                subtitle: '',                                maxWidth: 'max-w-md'  }
+    case 'exito':        return { title: '',                                subtitle: '',                                maxWidth: 'max-w-md'  }
     default:             return { title: 'Spinus necesita más información', subtitle: 'Responde para completar la nota', maxWidth: 'max-w-lg'  }
   }
 }
@@ -548,6 +549,8 @@ export default function NuevaNotaPage() {
   function cerrarModalPorEstado() {
     if (guardando) return
     if (estadoModal === 'confirmacion') { setEstadoModal('revision'); return }
+    // Éxito: nota ya sellada, nada que proteger — cierre limpio a post-guardado.
+    if (estadoModal === 'exito') { setEstadoModal(null); return }
     cancelarEntrevista()
   }
 
@@ -719,7 +722,7 @@ export default function NuevaNotaPage() {
       saveMedCache(medsConDatos)
       secureStorage.remove(draftKey)
       setNotaSaved(true)
-      setEstadoModal(null)
+      setEstadoModal('exito')
       setErrorModal(null)
       setDocInline(null)
     } catch {
@@ -736,7 +739,7 @@ export default function NuevaNotaPage() {
   // de no-unused-vars (imprimir, imprimiendo, Printer): esperados, no rompen lint.
   async function imprimir() {
     if (!paciente) return
-    setError('')
+    setErrorModal(null)
     setImprimiendo(true)
     try {
       // Refresco best-effort: la firma es un signed URL con TTL 1h que pudo
@@ -747,7 +750,7 @@ export default function NuevaNotaPage() {
         const { medico } = await fetch('/api/me/perfil-medico').then(r => r.json())
         if (medico) medicoVivo = medico
       } catch { /* sin red: conservar medicoInfo del estado */ }
-      if (!medicoVivo) { setError('No se pudo cargar el perfil médico.'); return }
+      if (!medicoVivo) { setErrorModal('No se pudo cargar el perfil médico.'); return }
 
       // Réplica EXACTA de notaFinal de guardar(): el pronóstico se concatena a la
       // narrativa (misma fuente que la consulta guardada → PDF idéntico en B′).
@@ -779,22 +782,24 @@ export default function NuevaNotaPage() {
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('[NuevaNota] imprimir falló:', err)
-      setError('No se pudo generar el PDF. Intenta de nuevo.')
+      setErrorModal('No se pudo generar el PDF. Intenta de nuevo.')
     } finally {
       setImprimiendo(false)
     }
   }
 
   // ── Medicamentos → formato RecetaForm ─────────────────────────
+  // Paso 1.5: precarga solo-nombre. La posología se captura en la receta (su
+  // destino real, D4). Mueren la "dosis fantasma" y la concatenación frec · dur.
   const medicamentosParaReceta: MedicamentoConVia[] = medicamentos
     .filter(m => m.nombre.trim())
     .map(m => ({
       nombre_comercial: m.nombre,
-      presentacion: '',
-      dosis: m.dosis,
-      principio_activo: '',
-      indicacion: [m.frecuencia, m.duracion].filter(Boolean).join(' · '),
       via_administracion: 'Oral',
+      presentacion: '',
+      principio_activo: '',
+      indicacion: '',
+      dosis: '',
     }))
 
   const nombrePaciente = paciente ? `${paciente.nombre} ${paciente.apellidos}` : ''
@@ -912,7 +917,7 @@ export default function NuevaNotaPage() {
         hideClose={(generando && !errorModal) || estadoModal === 'confirmacion'}
         title={meta.title}
         subtitle={meta.subtitle}
-        icon={<Sparkles size={15} className="text-[#1e5fa8]" />}
+        icon={estadoModal === 'confirmacion' || estadoModal === 'exito' ? undefined : <Sparkles size={15} className="text-[#1e5fa8]" />}
         iconBg="bg-[#1e5fa8]/10"
         headerRight={estadoModal === 'revision' ? (
           modoNota === 'ia' ? (
@@ -989,6 +994,40 @@ export default function NuevaNotaPage() {
               className="px-5 py-2 text-sm font-semibold bg-[#1e5fa8] text-white rounded-lg hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 flex items-center gap-2">
               {guardando ? <><Loader2 size={15} className="animate-spin" /> Guardando...</> : <><Save size={15} /> Guardar nota</>}
             </button>
+          </div>
+        ) : estadoModal === 'exito' ? (
+          <div className="p-4 space-y-2.5">
+            {/* Primario único: la recompensa es la receta (blueprint §5.2). */}
+            <button
+              onClick={() => { setEstadoModal(null); setDocInline('receta') }}
+              className="w-full flex items-center justify-center gap-2 bg-[#1e5fa8] text-white px-5 py-3 rounded-lg text-sm font-semibold hover:bg-[#1a3a5c] transition-colors">
+              <Pill size={16} /> Generar receta
+              {medicamentosParaReceta.length > 0 && (
+                <span className="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-white/20">
+                  {medicamentosParaReceta.length} medicamento{medicamentosParaReceta.length === 1 ? '' : 's'}
+                </span>
+              )}
+            </button>
+            {/* Secundarios (ghost, wrap). Todos alcanzan el post-guardado sin re-guardar. */}
+            <div className="flex flex-wrap items-center justify-center gap-1">
+              <button
+                onClick={() => { setEstadoModal(null); setTimeout(() => document.querySelector('[data-onboard="panel-documentos"]')?.scrollIntoView({ behavior: 'smooth' }), 0) }}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
+                <FileText size={15} /> Otros documentos
+              </button>
+              <button onClick={imprimir} disabled={imprimiendo}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-40">
+                {imprimiendo ? <><Loader2 size={15} className="animate-spin" /> Imprimiendo...</> : <><Printer size={15} /> Imprimir nota</>}
+              </button>
+              <Link href={`/expediente/${id}`}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
+                <Eye size={15} /> Ver expediente
+              </Link>
+              <button onClick={() => setEstadoModal(null)}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
+                <X size={15} /> Cerrar
+              </button>
+            </div>
           </div>
         ) : undefined}
       >
@@ -1273,6 +1312,22 @@ export default function NuevaNotaPage() {
             `}</style>
           </>
         )}
+        {estadoModal === 'exito' && (
+          <div className="px-6 pt-8 pb-6 flex flex-col items-center text-center gap-3">
+            <div className="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center">
+              <CheckCircle2 size={30} className="text-emerald-500" />
+            </div>
+            <h3 className="text-lg font-bold text-[#1d1d1f]">Nota guardada</h3>
+            <p className="text-sm text-[#3d3d3f] leading-relaxed max-w-xs">
+              Quedó sellada en el expediente.
+            </p>
+            {errorModal && (
+              <div className="w-full mt-1 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs">
+                {errorModal}
+              </div>
+            )}
+          </div>
+        )}
       </ModalShell>
 
       {/* Breadcrumbs + Header — ancho completo */}
@@ -1487,7 +1542,7 @@ modoNota === 'ia'
           {modoNota === 'ia' && (
             <>
               {bloqueError}
-              {anclaNota ?? (
+              {anclaNota ?? (!notaSaved && (
                 <button onClick={generarNota} disabled={generando || !form.motivo_consulta.trim()}
                   className="w-full py-3 bg-[#1e5fa8] text-white rounded-xl font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
                   {generando
@@ -1495,7 +1550,7 @@ modoNota === 'ia'
                     : <><Sparkles size={18} /> Generar con Spinus</>
                   }
                 </button>
-              )}
+              ))}
             </>
           )}
 
@@ -1598,13 +1653,13 @@ modoNota === 'ia'
           {modoNota === 'manual' && (
             <>
               {bloqueError}
-              {anclaNota ?? (
+              {anclaNota ?? (!notaSaved && (
                 <button onClick={previewNotaManual} disabled={!form.motivo_consulta}
                   className="w-full py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#142d4a] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
                   <PenLine size={18} />
                   Previsualizar nota
                 </button>
-              )}
+              ))}
             </>
           )}
         </div>
