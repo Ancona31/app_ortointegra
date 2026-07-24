@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import Portal from '@/components/ui/Portal'
 import ModalShell from '@/components/ui/ModalShell'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -85,15 +84,16 @@ const MED_VACIA: MedicamentoConsulta = { nombre: '', dosis: '', frecuencia: '', 
 // Máquina de estados del modal del funnel de nota (paso 1.1).
 type EstadoModal = 'generando' | 'entrevista' | 'revision' | 'contexto' | 'confirmacion' | 'exito' | null
 
-// Header del ModalShell por estado. 'confirmacion' y 'exito' todavía no tienen
-// superficie propia (pasos 1.4/1.5) y caen al default junto con la entrevista:
-// reproduce exactamente la semántica del ternario que existía antes del lookup.
+// Header del ModalShell por estado. 'confirmacion' (paso 1.4) usa header vacío:
+// su superficie es un bloque centrado en el cuerpo (ícono rojo + título con glow),
+// fiel al M6. 'exito' (paso 1.5) todavía cae al default junto con la entrevista.
 function metaDelModal(e: EstadoModal): { title: string; subtitle: string; maxWidth: string } {
   switch (e) {
-    case 'revision':  return { title: 'Tu nota está lista',              subtitle: 'Revísala antes de guardar',       maxWidth: 'max-w-2xl' }
-    case 'contexto':  return { title: 'Ajusta el contexto',              subtitle: 'La nota se generará de nuevo',    maxWidth: 'max-w-2xl' }
-    case 'generando': return { title: 'Spinus está redactando tu nota',  subtitle: 'Unos segundos…',                  maxWidth: 'max-w-lg'  }
-    default:          return { title: 'Spinus necesita más información', subtitle: 'Responde para completar la nota', maxWidth: 'max-w-lg'  }
+    case 'revision':     return { title: 'Tu nota está lista',              subtitle: 'Revísala antes de guardar',       maxWidth: 'max-w-2xl' }
+    case 'contexto':     return { title: 'Ajusta el contexto',              subtitle: 'La nota se generará de nuevo',    maxWidth: 'max-w-2xl' }
+    case 'generando':    return { title: 'Spinus está redactando tu nota',  subtitle: 'Unos segundos…',                  maxWidth: 'max-w-lg'  }
+    case 'confirmacion': return { title: '',                                subtitle: '',                                maxWidth: 'max-w-md'  }
+    default:             return { title: 'Spinus necesita más información', subtitle: 'Responde para completar la nota', maxWidth: 'max-w-lg'  }
   }
 }
 
@@ -172,7 +172,6 @@ export default function NuevaNotaPage() {
   const [guardando, setGuardando]       = useState(false)
   const [imprimiendo, setImprimiendo]   = useState(false)
   const [error, setError]               = useState('')
-  const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false)
   const [notaSaved, setNotaSaved]       = useState(false)
   const [docInline, setDocInlineRaw]    = useState<string | null>(null)
   const [slideDir, setSlideDir]         = useState<'left' | 'right'>('right')
@@ -541,6 +540,17 @@ export default function NuevaNotaPage() {
     setConfirmarPisado(false)
   }
 
+  // onClose despachador del ModalShell (X / backdrop / Escape). El guard de
+  // guardando va PRIMERO: durante el POST el modal es inerte. En 'confirmacion'
+  // X/backdrop/Escape RETROCEDEN a revisión (blueprint §5.1), nunca cierran. El
+  // resto delega en cancelarEntrevista() — el cierre a ancla que hacía todo estado
+  // hasta 1.3, con sus resets íntegros y el guard de generando incluido.
+  function cerrarModalPorEstado() {
+    if (guardando) return
+    if (estadoModal === 'confirmacion') { setEstadoModal('revision'); return }
+    cancelarEntrevista()
+  }
+
   // ── Previsualizar nota en modo manual ─────────────────────────
   function previewNotaManual() {
     if (!validarManualParaAbrir()) return
@@ -656,18 +666,13 @@ export default function NuevaNotaPage() {
       if (!notaGenerada.trim()) { setError('Genera la nota antes de guardar.'); return }
       if (!validarVitalesDuros()) return
     }
-    // Si el médico marcó "No mostrar de nuevo", guardar directo
-    const skipModal = localStorage.getItem('spinus_skip_confirm_nota') === '1'
-    if (skipModal) {
-      guardar()
-    } else {
-      setMostrarConfirmacion(true)
-    }
+    // Confirmación universal (blueprint §5.1): SIEMPRE muta al estado de
+    // confirmación. Murió el flag spinus_skip_confirm_nota y su checkbox.
+    setEstadoModal('confirmacion')
   }
 
   // ── Guardar nota ──────────────────────────────────────────────
   async function guardar() {
-    setMostrarConfirmacion(false)
     setGuardando(true)
 
     const medsConDatos = medicamentos.filter(m => m.nombre.trim())
@@ -704,7 +709,9 @@ export default function NuevaNotaPage() {
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: 'Error desconocido' }))
 
-        setError(data.message || data.error || 'No se pudo guardar la nota.')
+        // Error DENTRO del modal (estado 'confirmacion'): el banner de página
+        // quedaría tras el backdrop. Reintento natural con [Guardar nota].
+        setErrorModal(data.message || data.error || 'No se pudo guardar la nota.')
         setGuardando(false)
         return
       }
@@ -712,9 +719,11 @@ export default function NuevaNotaPage() {
       saveMedCache(medsConDatos)
       secureStorage.remove(draftKey)
       setNotaSaved(true)
+      setEstadoModal(null)
+      setErrorModal(null)
       setDocInline(null)
     } catch {
-      setError("Error de conexion. Verifica tu internet e intenta de nuevo.")
+      setErrorModal("Error de conexion. Verifica tu internet e intenta de nuevo.")
     }
 
     setGuardando(false)
@@ -893,75 +902,14 @@ export default function NuevaNotaPage() {
   return (
     <div className="max-w-7xl mx-auto">
 
-      {/* Modal de confirmación antes de guardar — inmutabilidad NOM-004 */}
-      {mostrarConfirmacion && (
-        <Portal>
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
-              <div className="px-6 pt-6 pb-4 text-center">
-                <div className="w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center bg-red-50" style={{ animation: 'pulse 1.5s ease-in-out infinite' }}>
-                  <Save size={24} className="text-red-500" />
-                </div>
-                <h2 className="text-lg font-bold text-[#1d1d1f]">
-                  <span className="inline-block" style={{ animation: 'alertGlow 2s ease-in-out infinite' }}>
-                    ¿Guardar esta nota?
-                  </span>
-                </h2>
-                <p className="text-sm text-[#3d3d3f] mt-3 leading-relaxed">
-                  Una vez guardada, <span className="font-bold text-red-600">no podrá modificarse</span> por motivos de seguridad y cumplimiento normativo.
-                  Si necesitas hacer correcciones después, podrás agregar una nota aclaratoria (addendum).
-                </p>
-                {sinVitalesCapturados && (
-                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3 text-left">
-                    ⚠ No capturaste signos vitales en esta nota.
-                  </p>
-                )}
-                <label className="flex items-center justify-center gap-2 mt-4 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    onChange={e => {
-                      if (e.target.checked) localStorage.setItem('spinus_skip_confirm_nota', '1')
-                      else localStorage.removeItem('spinus_skip_confirm_nota')
-                    }}
-                    className="w-3.5 h-3.5 rounded border-slate-300 text-[#1e5fa8]"
-                  />
-                  <span className="text-xs text-slate-400">No mostrar de nuevo</span>
-                </label>
-              </div>
-              <div className="border-t border-slate-100 grid grid-cols-2">
-                <button
-                  onClick={() => { setMostrarConfirmacion(false); setEstadoModal('revision') }}
-                  className="px-4 py-3.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors border-r border-slate-100"
-                >
-                  Revisar nota
-                </button>
-                <button
-                  onClick={guardar}
-                  disabled={!consultorioActivo}
-                  className="px-4 py-3.5 text-sm font-bold text-[#1e5fa8] hover:bg-blue-50 transition-colors disabled:opacity-40"
-                >
-                  Guardar nota
-                </button>
-              </div>
-            </div>
-          </div>
-          <style>{`
-            @keyframes alertGlow {
-              0%, 100% { color: #1d1d1f; }
-              50% { color: #dc2626; }
-            }
-          `}</style>
-        </Portal>
-      )}
-
       {/* Modal del funnel de nota — máquina de estados (Paso 1.1). Vive al
           nivel raíz: ya no lo desmonta el toggle IA/manual. */}
       <ModalShell
         open={estadoModal !== null}
-        onClose={cancelarEntrevista}
+        onClose={cerrarModalPorEstado}
         fullscreenMobile
         maxWidth={meta.maxWidth}
-        hideClose={generando && !errorModal}
+        hideClose={(generando && !errorModal) || estadoModal === 'confirmacion'}
         title={meta.title}
         subtitle={meta.subtitle}
         icon={<Sparkles size={15} className="text-[#1e5fa8]" />}
@@ -1009,10 +957,10 @@ export default function NuevaNotaPage() {
               Cerrar
             </button>
             <div className="flex-1" />
-            {/* T2: cierra el modal de estados y abre el confirm clásico de forma
-                SECUENCIAL (nunca apilado). En 1.4 esto pasa a estado 'confirmacion'. */}
+            {/* Confirmación universal (1.4): el modal NO se cierra; intentarGuardar
+                muta a 'confirmacion'. Murió T2 (el apilado Portal-sobre-modal). */}
             <button
-              onClick={() => { setErrorModal(null); setEstadoModal(null); intentarGuardar() }}
+              onClick={() => { setErrorModal(null); intentarGuardar() }}
               disabled={guardando || !consultorioActivo}
               className="px-5 py-2 text-sm font-semibold bg-[#1e5fa8] text-white rounded-lg hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 flex items-center gap-2">
               {guardando ? <><Loader2 size={15} className="animate-spin" /> Guardando...</> : <><Save size={15} /> Guardar nota</>}
@@ -1028,6 +976,18 @@ export default function NuevaNotaPage() {
             <button onClick={generarNota} disabled={!form.motivo_consulta.trim()}
               className="px-5 py-2 text-sm font-semibold bg-[#1e5fa8] text-white rounded-lg hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 flex items-center gap-2">
               <Sparkles size={15} /> Regenerar nota
+            </button>
+          </div>
+        ) : estadoModal === 'confirmacion' ? (
+          <div className="flex items-center gap-2 p-4">
+            <button onClick={() => setEstadoModal('revision')} disabled={guardando}
+              className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-40">
+              Volver a revisar
+            </button>
+            <div className="flex-1" />
+            <button onClick={guardar} disabled={guardando}
+              className="px-5 py-2 text-sm font-semibold bg-[#1e5fa8] text-white rounded-lg hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 flex items-center gap-2">
+              {guardando ? <><Loader2 size={15} className="animate-spin" /> Guardando...</> : <><Save size={15} /> Guardar nota</>}
             </button>
           </div>
         ) : undefined}
@@ -1275,6 +1235,43 @@ export default function NuevaNotaPage() {
               Tu nota actual se conserva hasta que la nueva esté lista.
             </p>
           </div>
+        )}
+        {estadoModal === 'confirmacion' && (
+          <>
+            <div className="px-6 pt-6 pb-4 text-center">
+              <div className="w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center bg-red-50" style={{ animation: 'pulse 1.5s ease-in-out infinite' }}>
+                <Save size={24} className="text-red-500" />
+              </div>
+              <h3 className="text-lg font-bold text-[#1d1d1f]">
+                <span className="inline-block" style={{ animation: 'alertGlow 2s ease-in-out infinite' }}>
+                  ¿Guardar esta nota?
+                </span>
+              </h3>
+              <p className="text-sm text-[#3d3d3f] mt-3 leading-relaxed">
+                Una vez guardada, <span className="font-bold text-red-600">no podrá modificarse</span> por motivos de seguridad y cumplimiento normativo.
+                Si necesitas hacer correcciones después, podrás agregar una nota aclaratoria (addendum).
+              </p>
+              {sinVitalesCapturados && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3 text-left">
+                  ⚠ No capturaste signos vitales en esta nota.
+                </p>
+              )}
+            </div>
+            {errorModal && (
+              <div className="mx-5 mb-5 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs">
+                {errorModal}
+              </div>
+            )}
+            {/* alertGlow vivía en un <style> dentro del Portal (ya muerto) y NO
+                está en globals.css. Se relocaliza aquí para no tocar globals.css
+                y que el glow del título siga animando (render byte-idéntico). */}
+            <style>{`
+              @keyframes alertGlow {
+                0%, 100% { color: #1d1d1f; }
+                50% { color: #dc2626; }
+              }
+            `}</style>
+          </>
         )}
       </ModalShell>
 
