@@ -21,6 +21,7 @@
   --sp-primary-border:     color-mix(in srgb, var(--cs, #1e5fa8) 18%, #fff);  /* borde de bloque destacado */
   --sp-primary-track:      color-mix(in srgb, var(--cs, #1e5fa8) 22%, #fff);  /* track del spinner y anillo inactivo */
   --sp-primary-focus:      color-mix(in srgb, var(--cs, #1e5fa8) 8%, transparent); /* halo de foco (4px spread) */
+  --sp-primary-text:       var(--sp-primary);  /* marca-como-tinta; en dark se aclara */
 
   /* Marca / cromo de app */
   /* No usar: el sidebar se tematiza en Sidebar.tsx:223. Evita segunda fuente de verdad. */
@@ -243,6 +244,104 @@
   --sp-ease-in:     cubic-bezier(.4, 0, 1, 1);      /* salidas */
   --sp-ease-inout:  cubic-bezier(.4, 0, .2, 1);     /* movimiento entre estados */
   --sp-ease-spring: cubic-bezier(.34, 1.32, .64, 1);/* aparición del check */
+}
+
+
+/* ============================================================================
+   MODO OSCURO — override de TOKENS, no de clases.
+   Paleta DERIVADA de las 76 reglas html.dark de ThemeProvider.tsx (Material
+   Dark ya en producción). Ningún valor es inventado: cada token cita su origen.
+   Va FUERA de @layer components, junto a :root: solo declara custom properties.
+   Gana a :root por especificidad (0,1,1) vs (0,1,0), no por orden de fuente.
+   ========================================================================== */
+html.dark {
+  /* — SUPERFICIES (elevación Material) — */
+  --sp-app-bg:           #121212;              /* TP:110,114 */
+  --sp-surface:          #1e1e1e;              /* TP:117  .bg-white (dp1) */
+  --sp-surface-sunken:   #242424;              /* TP:118,160  input/textarea */
+  --sp-surface-muted:    #2c2c2c;              /* TP:119,169 (dp4) */
+  --sp-surface-empty:    #242424;              /* TP:118 */
+  --sp-surface-slot:     #242424;              /* TP:118 */
+  --sp-backdrop:         rgba(0,0,0,.8);       /* TP:223 */
+
+  /* — TINTA — el dark desplegado tiene 6 escalones; los 13 niveles colapsan
+       a ellos. Las pérdidas caen en el extremo bajo (hints, placeholders). */
+  --sp-ink-900:  rgba(255,255,255,.87);        /* TP:136 */
+  --sp-ink-800:  rgba(255,255,255,.87);        /* TP:132,137 */
+  --sp-ink-700:  rgba(255,255,255,.75);        /* TP:138,186 */
+  --sp-ink-600:  rgba(255,255,255,.60);        /* TP:134,139 */
+  --sp-ink-500:  rgba(255,255,255,.50);        /* TP:140 */
+  --sp-ink-400:  rgba(255,255,255,.50);        /* TP:140 — colapso */
+  --sp-ink-350:  rgba(255,255,255,.38);        /* TP:141 */
+  --sp-ink-300:  rgba(255,255,255,.38);        /* TP:141 — colapso */
+  --sp-ink-250:  rgba(255,255,255,.38);        /* TP:141 — colapso */
+  --sp-ink-200:  rgba(255,255,255,.38);        /* TP:165 placeholder */
+  --sp-ink-icon: rgba(255,255,255,.38);        /* TP:141 — colapso */
+  --sp-ink-150:  rgba(255,255,255,.28);        /* TP:142 */
+  --sp-ink-100:  rgba(255,255,255,.28);        /* TP:142 — colapso */
+
+  /* — LÍNEAS — */
+  --sp-line-divider: rgba(255,255,255,.08);    /* TP:125,128 */
+  --sp-line-soft:    rgba(255,255,255,.08);    /* TP:125 */
+  --sp-line-card:    rgba(255,255,255,.12);    /* TP:124 */
+  --sp-line-input:   rgba(255,255,255,.12);    /* TP:163 */
+  --sp-line-chip:    rgba(255,255,255,.12);    /* TP:124 */
+  --sp-line-frame:   rgba(255,255,255,.12);    /* TP:124 */
+  --sp-line-strong:  rgba(255,255,255,.16);    /* TP:126 */
+  --sp-line-dash:    rgba(255,255,255,.16);    /* TP:126 */
+  --sp-line-capture: color-mix(in srgb, var(--cs, #1e5fa8) 30%, transparent);
+                                               /* TP:205-212 patrón borde de marca */
+
+  /* — MARCA —
+     El FILL no se toca: ThemeProvider tampoco altera ningún .bg-[#…] de marca
+     en dark. Solo la marca-como-TINTA se aclara (TP:146-149). */
+  --sp-primary-hover:    color-mix(in srgb, var(--cs, #1e5fa8) 88%, #fff);
+      /* INVERTIDO respecto a claro: en dark el hover ACLARA. Con var(--cp) el
+         botón cae a 1.07–1.76:1 contra la card y desaparece. */
+  --sp-primary-active:   color-mix(in srgb, var(--cs, #1e5fa8) 76%, #fff);
+  --sp-primary-text:     color-mix(in srgb, var(--cs, #1e5fa8) 45%, #fff);
+      /* TP:146-149 (#60a5fa=6.56:1). El 45% da 7.85–9.51:1 en las 6 paletas. */
+  --sp-primary-ink:      color-mix(in srgb, var(--cs, #1e5fa8) 45%, #fff);  /* TP:215-216 */
+  --sp-primary-bg:       color-mix(in srgb, var(--cs, #1e5fa8) 14%, transparent); /* TP:192-202 */
+  --sp-primary-bg-soft:  color-mix(in srgb, var(--cs, #1e5fa8) 10%, transparent);
+  --sp-primary-bg-faint: color-mix(in srgb, var(--cs, #1e5fa8)  7%, transparent);
+  --sp-primary-border:   color-mix(in srgb, var(--cs, #1e5fa8) 25%, transparent); /* TP:205-212 */
+  --sp-primary-track:    color-mix(in srgb, var(--cs, #1e5fa8) 25%, transparent);
+  --sp-primary-focus:    color-mix(in srgb, var(--cs, #1e5fa8) 28%, transparent);
+      /* SIN respaldo directo — EXTRAPOLADO. El 8% de claro da 1.056:1 en dark.
+         --sp-focus-ring lo consume vía var(), no hace falta redeclararlo. */
+
+  /* — SEMÁNTICOS — */
+  --sp-success:          #34d399;                   /* TP:150 */
+  --sp-success-dot:      #34d399;                   /* TP:150 */
+  --sp-success-online:   #34d399;                   /* TP:150 */
+  --sp-success-strong:   #6ee7b7;                   /* TP:217 */
+  --sp-success-bg:       rgba(16,185,129,.14);      /* TP:193 */
+  --sp-success-bg-alt:   rgba(16,185,129,.14);      /* TP:193 */
+  --sp-success-border:   rgba(16,185,129,.25);      /* TP:208 */
+  --sp-success-card-brd: rgba(16,185,129,.25);      /* TP:208 */
+  --sp-warn:             #fcd34d;                   /* TP:219 (gana a TP:153) */
+  --sp-warn-strong:      #fbbf24;                   /* TP:153 */
+  --sp-warn-dot:         #fbbf24;                   /* TP:153 */
+  --sp-warn-bg:          rgba(245,158,11,.14);      /* TP:195 */
+  --sp-warn-bg-badge:    rgba(245,158,11,.22);      /* EXTRAPOLADO (sin fuente) */
+  --sp-warn-border:      rgba(245,158,11,.25);      /* TP:212 */
+  --sp-danger:           #f87171;                   /* TP:151,152 */
+  --sp-danger-strong:    #fca5a5;                   /* TP:218 */
+  --sp-danger-ink:       #fca5a5;                   /* TP:218 */
+  --sp-danger-bg:        rgba(239,68,68,.14);       /* TP:194 */
+  --sp-danger-border:    rgba(239,68,68,.25);       /* TP:210 */
+
+  /* — SOMBRAS — Material sustituye elevación por color — */
+  --sp-shadow-flat:          none;                      /* TP:173 */
+  --sp-shadow-raised:        none;                      /* TP:174 */
+  --sp-shadow-raised-ok:     none;                      /* TP:174 */
+  --sp-shadow-btn:           none;                      /* TP:173 */
+  --sp-shadow-btn-lg:        none;                      /* TP:173 */
+  --sp-shadow-btn-m:         none;                      /* TP:173 */
+  --sp-primary-shadow-press: none;                      /* TP:173 */
+  --sp-shadow-modal:         0 20px 40px rgba(0,0,0,.8);/* TP:175-177 */
+  --sp-shadow-frame:         0 20px 40px rgba(0,0,0,.8);/* TP:175-177 */
 }
 
 
