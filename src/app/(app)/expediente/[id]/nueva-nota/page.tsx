@@ -819,7 +819,7 @@ export default function NuevaNotaPage() {
   // Error de generación y panel de resultado: se renderizan en distinta posición
   // según el modo. En IA van pegados bajo el botón generar; en manual van al fondo.
   const bloqueError = error ? (
-    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
+    <div className="sp-banner sp-banner--danger">{error}</div>
   ) : null
 
   // Ancla de la Card Captura: hay nota, el modal está cerrado y aún no se guardó.
@@ -827,71 +827,73 @@ export default function NuevaNotaPage() {
   // TERNARIO CON null A PROPÓSITO: con `&&` el valor falso sería `false`, que NO es
   // nullish, así que el `??` del montaje no dispararía y la card quedaría sin CTA.
   const anclaNota = (notaGenerada && estadoModal === null && !notaSaved) ? (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      <div className="px-5 py-3 bg-emerald-50 border-b border-emerald-100 flex items-center gap-2">
-        <CheckCircle2 size={15} className="text-emerald-500 flex-shrink-0" />
-        <h2 className="font-semibold text-emerald-700 text-sm">Nota lista</h2>
+    /* La banda verde muere: el título vive dentro del padding uniforme de la
+       card. El verde del texto se pierde por regla del sistema (.sp-title-card
+       es tinta); la señal de "listo" queda en el ✓ y en el borde/sombra de
+       --anchor. */
+    <div className="sp-card sp-card--anchor space-y-4">
+      <div className="flex items-center gap-2">
+        <CheckCircle2 className="text-[var(--sp-success)] flex-shrink-0" />
+        <h2 className="sp-title-card">Nota lista</h2>
         {modoNota === 'ia' ? (
-          <span className="ml-auto inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-[#1e5fa8]/10 text-[#1e5fa8] border border-[#1e5fa8]/20">
-            <Sparkles size={9} />
+          <span className="sp-badge ml-auto">
+            <Sparkles />
             Nota IA
           </span>
         ) : (
-          <span className="ml-auto inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
-            <PenLine size={9} />
+          <span className="sp-badge ml-auto">
+            <PenLine />
             Nota manual
           </span>
         )}
       </div>
-      <div className="p-5 space-y-4">
-        {/* Dictado colapsado, solo lectura */}
-        <button type="button" onClick={() => setDictadoExpandido(v => !v)} className="w-full text-left group">
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">
-            {modoNota === 'ia' ? 'Tu dictado' : 'Motivo de consulta'}
-          </p>
-          <p className={`text-xs text-slate-600 leading-relaxed whitespace-pre-wrap ${dictadoExpandido ? '' : 'line-clamp-3'}`}>
-            {form.motivo_consulta}
-          </p>
-          <span className="text-[11px] text-[#1e5fa8] mt-1 inline-block group-hover:underline">
-            {dictadoExpandido ? 'Ocultar' : 'Ver completo'}
-          </span>
-        </button>
+      {/* Dictado colapsado, solo lectura */}
+      <button type="button" onClick={() => setDictadoExpandido(v => !v)} className="w-full text-left group">
+        <p className="sp-label mb-1">
+          {modoNota === 'ia' ? 'Tu dictado' : 'Motivo de consulta'}
+        </p>
+        <p className={`sp-secondary whitespace-pre-wrap ${dictadoExpandido ? '' : 'line-clamp-3'}`}>
+          {form.motivo_consulta}
+        </p>
+        <span className="sp-hint text-[var(--sp-primary-text)] mt-1 inline-block group-hover:underline">
+          {dictadoExpandido ? 'Ocultar' : 'Ver completo'}
+        </span>
+      </button>
 
-        {confirmarDescarte ? (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 space-y-2">
-            <p className="text-xs text-amber-800 leading-relaxed">
-              Descartarás la nota generada. Tu dictado y los datos capturados se conservan.
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  setNotaGenerada('')
-                  setNotaEditada(false)
-                  setModoEdicion(false)
-                  setConfirmarDescarte(false)
-                }}
-                className="px-3 py-1.5 text-xs font-semibold bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors">
-                Sí, empezar de nuevo
-              </button>
-              <button onClick={() => setConfirmarDescarte(false)}
-                className="px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
-                Conservar
-              </button>
-            </div>
-          </div>
-        ) : (
+      {confirmarDescarte ? (
+        <div className="sp-banner sp-banner--warn flex-col items-start gap-2">
+          <p>
+            Descartarás la nota generada. Tu dictado y los datos capturados se conservan.
+          </p>
           <div className="flex gap-2">
-            <button onClick={abrirRevision}
-              className="flex-1 flex items-center justify-center gap-2 bg-[#1e5fa8] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-[#1a3a5c] transition-colors">
-              <Eye size={16} /> Revisar y guardar
+            {/* C0 no expone botón de advertencia; color inline sobre tokens
+                warn, mismo patrón que el swap R12 del modal. */}
+            <button
+              onClick={() => {
+                setNotaGenerada('')
+                setNotaEditada(false)
+                setModoEdicion(false)
+                setConfirmarDescarte(false)
+              }}
+              className="sp-btn sp-btn--compact"
+              style={{ background: 'var(--sp-warn-bg-badge)', color: 'var(--sp-warn)' }}>
+              Sí, empezar de nuevo
             </button>
-            <button onClick={() => setConfirmarDescarte(true)}
-              className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
-              <RotateCcw size={14} /> Empezar de nuevo
+            <button onClick={() => setConfirmarDescarte(false)} className="sp-btn sp-btn--compact">
+              Conservar
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <button onClick={abrirRevision} className="sp-btn sp-btn--primary flex-1">
+            <Eye size={17} /> Revisar y guardar
+          </button>
+          <button onClick={() => setConfirmarDescarte(true)} className="sp-btn sp-btn--secondary">
+            <RotateCcw size={17} /> Empezar de nuevo
+          </button>
+        </div>
+      )}
     </div>
   ) : null
 
@@ -1373,20 +1375,24 @@ export default function NuevaNotaPage() {
       <div className="mb-5 space-y-4">
         <Breadcrumbs pacienteNombre={paciente ? `${paciente.nombre} ${paciente.apellidos}` : undefined} />
         <div className="flex items-center gap-3">
-          <Link href={`/expediente/${id}`} className="text-slate-400 hover:text-slate-600">
+          {/* Solo el color se migra: el sistema no expone clase de ícono-botón
+              y hover:text-slate-600 no tiene regla en ThemeProvider, así que en
+              oscuro la flecha se oscurecía justo al interactuar con ella. */}
+          <Link href={`/expediente/${id}`}
+            className="text-[var(--sp-ink-icon)] hover:text-[var(--sp-ink-500)] transition-colors">
             <ArrowLeft size={20} />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-[#1a3a5c]">Nueva Nota Médica</h1>
+            <h1 className="sp-title-page">Nueva Nota Médica</h1>
             {paciente && (
-              <p className="text-slate-500 text-sm mt-0.5">
+              <p className="sp-secondary mt-0.5">
                 {paciente.nombre} {paciente.apellidos} ·{' '}
                 {paciente.fecha_nacimiento ? calcularEdad(paciente.fecha_nacimiento).textoElegante : ''}
               </p>
             )}
             {consultorioActivo && (
-              <p className="text-xs text-slate-500 mt-1">
-                Atendiendo en: <span className="font-semibold text-[#1e5fa8]">{consultorioActivo.nombre_corto || consultorioActivo.nombre}</span>
+              <p className="sp-hint mt-1">
+                Atendiendo en: <span className="font-semibold text-[var(--sp-primary-text)]">{consultorioActivo.nombre_corto || consultorioActivo.nombre}</span>
               </p>
             )}
           </div>
@@ -1414,13 +1420,15 @@ export default function NuevaNotaPage() {
             COLUMNA IZQUIERDA (3/5)
             Formulario + nota generada
         ════════════════════════════════ */}
-        <div className="lg:col-span-3 space-y-5">
+        {/* --sp-gap-block (18px). NO existe en la escala de Tailwind (20px/24px):
+            la arbitraria es intencional, no "corregir" a space-y-5. */}
+        <div className="lg:col-span-3 space-y-[var(--sp-gap-block)]">
 
           {/* Banner borrador restaurado */}
           {borradorRestaurado && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-3">
-              <RotateCcw size={15} className="text-amber-500 flex-shrink-0" />
-              <p className="text-xs text-amber-700 font-medium flex-1">Borrador restaurado — continúa donde lo dejaste</p>
+            <div className="sp-banner sp-banner--warn">
+              <RotateCcw />
+              <p className="flex-1">Borrador restaurado — continúa donde lo dejaste</p>
               <button
                 onClick={() => {
                   setForm({ ...EMPTY_FORM })
@@ -1432,7 +1440,7 @@ export default function NuevaNotaPage() {
                   secureStorage.remove(draftKey)
                   setBorradorRestaurado(false)
                 }}
-                className="text-xs text-amber-600 hover:text-amber-800 underline"
+                className="sp-btn sp-btn--compact"
               >
                 Descartar
               </button>
@@ -1446,37 +1454,43 @@ export default function NuevaNotaPage() {
             errores={erroresVitales}
           />
 
-          {/* Formulario de la consulta */}
+          {/* Formulario de la consulta.
+              La banda gris muere: el título vive dentro del padding uniforme de
+              .sp-card--hero (--sp-line-capture y --sp-pad-card-hero están
+              declarados en C0 como "de la Card Captura"). overflow-hidden se cae
+              con la banda — ya no hay fondo que recortar, y así no puede
+              recortar los halos de foco. */}
           {!notaSaved && (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <div className="sp-card sp-card--hero">
+            <div className="flex items-start justify-between gap-3 mb-4">
               <div>
-                <h2 className="font-semibold text-slate-700 text-sm">Cuéntame la consulta</h2>
+                <h2 className="sp-title-card">Cuéntame la consulta</h2>
                 {modoNota === 'ia' ? (
-                  <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                  <p className="sp-hint mt-0.5 flex items-center gap-1">
                     Describe el caso y
-                    <span className="text-[#1e5fa8] font-medium">Spinus</span> redactará la nota médica
+                    <span className="font-semibold text-[var(--sp-primary-text)]">Spinus</span> redactará la nota médica
                   </p>
                 ) : (
-                  <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
-                    <PenLine size={11} className="text-slate-400" />
+                  <p className="sp-hint mt-0.5 flex items-center gap-1">
+                    <PenLine size={11} />
                     Redacta la nota clínica directamente — sin IA
                   </p>
                 )}
               </div>
               {ultimoGuardado && !notaSaved && (
-                <div className="flex items-center gap-1.5 text-[10px] text-emerald-600">
-                  <CheckCircle2 size={11} />
+                /* C0 no expone badge de éxito; color inline sobre tokens success. */
+                <span className="sp-badge" style={{ background: 'var(--sp-success-bg)', color: 'var(--sp-success)' }}>
+                  <CheckCircle2 />
                   Borrador guardado
-                </div>
+                </span>
               )}
             </div>
 
             {modoNota === 'ia' ? (
               /* ── Modo IA: input único — el médico redacta el caso completo ── */
-              <div className="p-5">
-                <label className="text-xs font-medium text-slate-500 block mb-1.5">
-                  Descripción del caso <span className="text-red-400">*</span>
+              <div>
+                <label className="sp-label-field block mb-1.5">
+                  Descripción del caso <span className="text-[var(--sp-danger)]">*</span>
                 </label>
                 <div className="relative">
                   <textarea
@@ -1485,25 +1499,29 @@ export default function NuevaNotaPage() {
                     disabled={generando}
                     placeholder="Ej.: Paciente con dolor lumbar de 2 semanas tras cargar peso, sin irradiación, Lasègue negativo, fuerza y reflejos normales. Indico naproxeno 500 mg cada 12 h por 7 días, ejercicios de McKenzie, cita en 2 semanas."
                     rows={10}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]"
+                    className="sp-textarea sp-textarea--capture"
                   />
+                  {/* Los 54px de padding inferior de --capture reservan esta
+                      franja; el badge ocupa de 12px a 33px desde el fondo. */}
                   <button
                     type="button"
                     disabled
                     title="Dictado por voz — próximamente"
                     aria-label="Dictado por voz — próximamente"
-                    className="absolute bottom-3 right-3 text-slate-300 cursor-not-allowed"
+                    className="sp-badge sp-badge--deferred absolute bottom-3 right-3 cursor-not-allowed"
                   >
-                    <Mic size={18} />
+                    <Mic />
                   </button>
                 </div>
-                <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+                <p className="sp-hint mt-2">
                   Escribe en lenguaje natural. No necesitas separar por secciones — Spinus lo hace por ti.
                 </p>
               </div>
             ) : (
-              /* ── Modo manual: todos los campos expandidos ── */
-              <div className="p-5 space-y-4">
+              /* ── Modo manual: todos los campos expandidos ──
+                 B1: solo se retira p-5 (el padding lo da .sp-card--hero).
+                 Los campos SOAP de dentro NO se tocan — son C4. */
+              <div className="space-y-4">
                 <div>
                   <label className="text-xs font-medium text-slate-500 block mb-1">
                     Motivo de consulta / Subjetivo <span className="text-red-400">*</span>
@@ -1573,15 +1591,17 @@ export default function NuevaNotaPage() {
               {anclaNota ?? (!notaSaved && (
                 <>
                   <button onClick={generarNota} disabled={generando || !form.motivo_consulta.trim()}
-                    className="w-full py-3 bg-[#1e5fa8] text-white rounded-xl font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                    className="sp-btn sp-btn--primary sp-btn--primary-block">
                     {generando
                       ? <><Loader2 size={18} className="animate-spin" /> Redactando nota médica...</>
                       : <><Sparkles size={18} /> Generar con Spinus</>
                     }
                   </button>
+                  {/* w-fit: .sp-link-alt lleva border-bottom punteado; con `block`
+                      a secas el subrayado cruzaría toda la columna. */}
                   <button type="button"
                     onClick={() => { cancelarEntrevista(); setMedicamentos([{ ...MED_VACIA }]); modoTocadoRef.current = true; setModoNota('manual'); setNotaGenerada(''); setError('') }}
-                    className="block mx-auto mt-2 text-center text-sm text-slate-500 hover:text-[#1e5fa8] transition-colors">
+                    className="sp-link-alt block w-fit mx-auto mt-2">
                     Prefiero escribirla yo
                   </button>
                 </>
@@ -1600,13 +1620,14 @@ export default function NuevaNotaPage() {
               {anclaNota ?? (!notaSaved && (
                 <>
                   <button onClick={previewNotaManual} disabled={!form.motivo_consulta}
-                    className="w-full py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#142d4a] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                    className="sp-btn sp-btn--primary sp-btn--primary-block">
                     <PenLine size={18} />
                     Previsualizar nota
                   </button>
+                  {/* w-fit: ver la nota del link alterno de la vía IA. */}
                   <button type="button"
                     onClick={() => { cancelarEntrevista(); setForm(f => ({ ...f, exploracion_fisica: '', analisis: '', gabinete_laboratorios: '', plan_tratamiento: '' })); modoTocadoRef.current = true; setModoNota('ia'); setNotaGenerada(''); setError('') }}
-                    className="block mx-auto mt-2 text-center text-sm text-slate-500 hover:text-[#1e5fa8] transition-colors">
+                    className="sp-link-alt block w-fit mx-auto mt-2">
                     Usar IA
                   </button>
                 </>
