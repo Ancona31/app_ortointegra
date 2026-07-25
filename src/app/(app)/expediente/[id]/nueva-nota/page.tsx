@@ -87,14 +87,18 @@ type EstadoModal = 'generando' | 'entrevista' | 'revision' | 'contexto' | 'confi
 // Header del ModalShell por estado. 'confirmacion' (paso 1.4) y 'exito' (paso 1.5)
 // usan header vacío: su superficie es un bloque centrado en el cuerpo (ícono +
 // título), fieles a M6/M7. El resto conserva header con ícono Spinus.
-function metaDelModal(e: EstadoModal): { title: string; subtitle: string; maxWidth: string } {
+// La geometría sustituye a maxWidth (paso 3.2.B): ancho y anclaje son un solo
+// eje en la spec, no dos. 'entrevista' cae en el default y es un estado alto
+// ('work'), como revisión y contexto: los tres se anclan a top:60px para que
+// el header no salte entre transiciones.
+function metaDelModal(e: EstadoModal): { title: string; subtitle: string; geometry: 'work' | 'decide' | 'done' | 'wait' } {
   switch (e) {
-    case 'revision':     return { title: 'Tu nota está lista',              subtitle: 'Revísala antes de guardar',       maxWidth: 'max-w-2xl' }
-    case 'contexto':     return { title: 'Ajusta el contexto',              subtitle: 'La nota se generará de nuevo',    maxWidth: 'max-w-2xl' }
-    case 'generando':    return { title: 'Spinus está redactando tu nota',  subtitle: 'Unos segundos…',                  maxWidth: 'max-w-lg'  }
-    case 'confirmacion': return { title: '',                                subtitle: '',                                maxWidth: 'max-w-md'  }
-    case 'exito':        return { title: '',                                subtitle: '',                                maxWidth: 'max-w-md'  }
-    default:             return { title: 'Spinus necesita más información', subtitle: 'Responde para completar la nota', maxWidth: 'max-w-lg'  }
+    case 'revision':     return { title: 'Tu nota está lista',              subtitle: 'Revísala antes de guardar',       geometry: 'work'   }
+    case 'contexto':     return { title: 'Ajusta el contexto',              subtitle: 'La nota se generará de nuevo',    geometry: 'work'   }
+    case 'generando':    return { title: 'Spinus está redactando tu nota',  subtitle: 'Unos segundos…',                  geometry: 'wait'   }
+    case 'confirmacion': return { title: '',                                subtitle: '',                                geometry: 'decide' }
+    case 'exito':        return { title: '',                                subtitle: '',                                geometry: 'done'   }
+    default:             return { title: 'Spinus necesita más información', subtitle: 'Responde para completar la nota', geometry: 'work'   }
   }
 }
 
@@ -897,7 +901,7 @@ export default function NuevaNotaPage() {
         open={estadoModal !== null}
         onClose={cerrarModalPorEstado}
         fullscreenMobile
-        maxWidth={meta.maxWidth}
+        spinusGeometry={meta.geometry}
         hideClose={(generando && !errorModal) || estadoModal === 'confirmacion'}
         title={meta.title}
         subtitle={meta.subtitle}
@@ -917,7 +921,7 @@ export default function NuevaNotaPage() {
           )
         ) : undefined}
         footer={estadoModal === 'entrevista' ? (
-          <div className="flex items-center gap-2 p-4">
+          <div className="flex items-center gap-2 p-4 md:px-6">
             <button onClick={cancelarEntrevista} disabled={generando}
               className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-40">
               Cancelar
@@ -940,7 +944,7 @@ export default function NuevaNotaPage() {
             )}
           </div>
         ) : estadoModal === 'revision' ? (
-          <div className="flex items-center gap-2 p-4">
+          <div className="flex items-center gap-2 p-4 md:px-6">
             <button onClick={cancelarEntrevista}
               className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
               Cerrar
@@ -956,7 +960,7 @@ export default function NuevaNotaPage() {
             </button>
           </div>
         ) : estadoModal === 'contexto' ? (
-          <div className="flex items-center gap-2 p-4">
+          <div className="flex items-center gap-2 p-4 md:px-6">
             <button onClick={() => { setEstadoModal('revision'); setErrorModal(null) }}
               className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
               Cancelar
@@ -968,7 +972,7 @@ export default function NuevaNotaPage() {
             </button>
           </div>
         ) : estadoModal === 'confirmacion' ? (
-          <div className="flex items-center gap-2 p-4">
+          <div className="flex items-center gap-2 p-4 md:px-6">
             <button onClick={() => setEstadoModal('revision')} disabled={guardando}
               className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-40">
               Volver a revisar
@@ -980,7 +984,7 @@ export default function NuevaNotaPage() {
             </button>
           </div>
         ) : estadoModal === 'exito' ? (
-          <div className="p-4 space-y-2.5">
+          <div className="p-4 md:px-6 space-y-2.5">
             {/* Primario único: la recompensa es la receta (blueprint §5.2). */}
             <button
               onClick={() => { setEstadoModal(null); setDocInline('receta') }}
@@ -1021,7 +1025,7 @@ export default function NuevaNotaPage() {
             desmonta. overflow-x-hidden contiene el slide horizontal de ±60px. */}
         <div key={estadoModal} className={`overflow-x-hidden ${claseTransicion(estadoModal, prevEstadoRef.current)}`}>
         {estadoModal === 'generando' && (errorModal ? (
-          <div className="px-5 py-12 flex flex-col items-center text-center gap-3">
+          <div className="px-4 py-12 md:px-6 flex flex-col items-center text-center gap-3">
             <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
               <AlertTriangle size={22} className="text-red-500" />
             </div>
@@ -1038,7 +1042,7 @@ export default function NuevaNotaPage() {
             </div>
           </div>
         ) : (
-          <div className="px-5 py-12 flex flex-col items-center text-center gap-3">
+          <div className="px-4 py-12 md:px-6 flex flex-col items-center text-center gap-3">
             <div className="w-12 h-12 rounded-full bg-[#1e5fa8]/10 flex items-center justify-center">
               <Sparkles size={22} className="text-[#1e5fa8]" />
             </div>
@@ -1048,7 +1052,7 @@ export default function NuevaNotaPage() {
         ))}
         {estadoModal === 'entrevista' && (
           <>
-          <div className="p-5 space-y-4">
+          <div className="p-4 md:p-6 space-y-4">
             {/* Progreso */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -1108,7 +1112,7 @@ export default function NuevaNotaPage() {
           </>
         )}
         {estadoModal === 'revision' && (
-          <div className="p-5 space-y-5">
+          <div className="p-4 md:p-6 space-y-5">
             {/* ── La nota ── */}
             <div>
               <div className="flex items-center justify-between gap-2 mb-2">
@@ -1250,7 +1254,7 @@ export default function NuevaNotaPage() {
           </div>
         )}
         {estadoModal === 'contexto' && (
-          <div className="p-5 space-y-3">
+          <div className="p-4 md:p-6 space-y-3">
             <p className="text-xs text-slate-500 leading-relaxed">
               Corrige o amplía el contexto; la nota se generará de nuevo.
             </p>
@@ -1266,7 +1270,7 @@ export default function NuevaNotaPage() {
         )}
         {estadoModal === 'confirmacion' && (
           <>
-            <div className="px-6 pt-6 pb-4 text-center">
+            <div className="px-4 md:px-6 pt-6 pb-4 text-center">
               <div className="w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center bg-red-50 ring-4 ring-red-100" style={{ animation: 'pulse 1.5s ease-in-out infinite' }}>
                 <Save size={24} className="text-red-500" />
               </div>
@@ -1293,7 +1297,7 @@ export default function NuevaNotaPage() {
           </>
         )}
         {estadoModal === 'exito' && (
-          <div className="px-6 pt-8 pb-6 flex flex-col items-center text-center gap-4">
+          <div className="px-4 md:px-6 pt-8 pb-6 flex flex-col items-center text-center gap-4">
             <div className="w-16 h-16 rounded-full bg-emerald-50 ring-4 ring-emerald-100 flex items-center justify-center">
               <CheckCircle2 size={34} className="text-emerald-500" />
             </div>

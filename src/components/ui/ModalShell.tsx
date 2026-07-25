@@ -9,6 +9,17 @@ import Portal from '@/components/ui/Portal'
 let modalStack = 0
 let prevBodyOverflow = ''
 
+// Geometría del sistema de diseño Spinus, por forma de estado. Solo actúa en
+// ≥768px: por debajo manda `fullscreenMobile` (rangos disjuntos, no compiten).
+// Strings literales completos: el scanner de Tailwind 4 lee el fuente como
+// texto y no generaría el CSS de una clase armada por concatenación.
+const SP_GEO = {
+  work:   { wrap: 'md:items-start md:pt-[60px]', panel: 'md:max-w-[724px] md:max-h-[calc(100vh-120px)]' },
+  decide: { wrap: '',                            panel: 'md:max-w-[620px]' },
+  done:   { wrap: '',                            panel: 'md:max-w-[600px]' },
+  wait:   { wrap: '',                            panel: 'md:max-w-[560px]' },
+} as const
+
 interface Props {
   open: boolean
   onClose: () => void
@@ -27,6 +38,14 @@ interface Props {
   footer?: React.ReactNode
   // En <768px el modal ocupa la pantalla completa (h-dvh). Default: false.
   fullscreenMobile?: boolean
+  /**
+   * Geometría del sistema de diseño (solo funnel de nota). Ausente = geometría legacy.
+   *   work   → 724px, anclado a top:60px  (entrevista · revisión · contexto)
+   *   decide → 620px, centrado            (confirmación)
+   *   done   → 600px, centrado            (éxito)
+   *   wait   → 560px, centrado            (generando)
+   */
+  spinusGeometry?: 'work' | 'decide' | 'done' | 'wait'
   children: React.ReactNode
 }
 
@@ -43,6 +62,7 @@ export default function ModalShell({
   hideClose = false,
   footer,
   fullscreenMobile = false,
+  spinusGeometry,
   children,
 }: Props) {
   const onCloseRef = useRef(onClose)
@@ -77,18 +97,21 @@ export default function ModalShell({
   if (!open) return null
 
   const zClass = elevated ? 'z-[60]' : 'z-50'
+  // Sin la prop, geo es null y los 5 segmentos de abajo son '': el className
+  // resultante es idéntico carácter por carácter al de los 16 consumidores.
+  const geo = spinusGeometry ? SP_GEO[spinusGeometry] : null
 
   return (
     <Portal>
-      <div className={`fixed inset-0 ${zClass} flex items-center justify-center p-4${fullscreenMobile ? ' max-md:p-0 max-md:items-start' : ''}`}>
+      <div className={`fixed inset-0 ${zClass} flex items-center justify-center p-4${fullscreenMobile ? ' max-md:p-0 max-md:items-start' : ''}${geo?.wrap ? ` ${geo.wrap}` : ''}`}>
         <div
-          className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in"
+          className={`absolute inset-0 ${geo ? 'bg-[var(--sp-backdrop)]' : 'bg-black/40 backdrop-blur-sm'} animate-fade-in`}
           onClick={onClose}
         />
         <div
-          className={`relative bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full ${maxWidth} max-h-[85vh] flex flex-col animate-modal-enter overflow-hidden${fullscreenMobile ? ' max-md:h-dvh max-md:max-h-dvh max-md:max-w-full max-md:rounded-none' : ''}`}
+          className={`relative ${geo ? 'bg-white' : 'bg-white/95 backdrop-blur-xl'} rounded-2xl shadow-2xl w-full ${maxWidth} max-h-[85vh] flex flex-col animate-modal-enter overflow-hidden${fullscreenMobile ? ' max-md:h-dvh max-md:max-h-dvh max-md:max-w-full max-md:rounded-none' : ''}${geo ? ` ${geo.panel} md:rounded-[var(--sp-r-modal)] md:shadow-[var(--sp-shadow-modal)] md:transition-[max-width] md:duration-[240ms] md:ease-[cubic-bezier(.4,0,.2,1)]` : ''}`}
         >
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 flex-shrink-0">
+          <div className={`flex items-center justify-between px-5 py-4 border-b ${geo ? 'border-[var(--sp-line-divider)] md:px-6' : 'border-slate-100'} flex-shrink-0`}>
             <div className="flex items-center gap-2.5 min-w-0">
               {icon && (
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${iconBg ?? 'bg-slate-50'}`}>
@@ -117,7 +140,7 @@ export default function ModalShell({
             {children}
           </div>
           {footer && (
-            <div className="border-t border-slate-100 flex-shrink-0">
+            <div className={`border-t ${geo ? 'border-[var(--sp-line-divider)]' : 'border-slate-100'} flex-shrink-0`}>
               {footer}
             </div>
           )}

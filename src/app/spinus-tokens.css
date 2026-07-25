@@ -248,7 +248,15 @@
 
 /* ============================================================================
    COMPONENTES
+   ----------------------------------------------------------------------------
+   Van en @layer components para que las utilidades de Tailwind (que viven en
+   @layer utilities) puedan sobrescribirlas puntualmente. Sin la capa, el CSS
+   sin capa gana a TODO lo capado y ninguna utilidad podría ajustar una .sp-*.
+   El bloque :root queda FUERA a propósito: los tokens de marca conviven con
+   el <style> sin capa que inyecta ThemeProvider.
+   El cuerpo NO se re-indentó: así el diff prueba que solo se añadieron llaves.
    ========================================================================== */
+@layer components {
 
 /* --- 1. BASE ------------------------------------------------------------- */
 /* Neutralizado: el repo ya lo cubre / se reintroduce scoped si hace falta. */
@@ -705,3 +713,5 @@ a:hover { color: var(--sp-primary-active); }
   .sp-spinner, .sp-dots span { animation-duration: var(--sp-dur-spin) !important; animation-iteration-count: infinite !important; }
 }
 */
+
+} /* fin @layer components */
