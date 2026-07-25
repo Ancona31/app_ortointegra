@@ -1,0 +1,707 @@
+/* ============================================================================
+   SPINUS · SISTEMA DE DISEÑO — Funnel de Nota Médica
+   Extraído 1:1 de los mockups M1–M10 / M9a–M9d.
+   Uso: importar antes de Tailwind, o mapear en @theme (ver §Tailwind al final).
+   ========================================================================== */
+
+:root {
+
+  /* ---------------------------------------------------------------------
+     1. COLOR — PRIMARIO
+     --------------------------------------------------------------------- */
+  /* Primario cableado a --cp/--cs (ThemeProvider). Fallback = azul Spinus para
+     rutas sin provider. Semánticos y neutrales NO se tematizan a propósito. */
+  --sp-primary:            var(--cs, #1e5fa8);  /* botón primario, links, acentos, chip activo */
+  --sp-primary-hover:      var(--cp, #1a3a5c);  /* hover botón primario (salto al primario de marca) */
+  --sp-primary-active:     color-mix(in srgb, var(--sp-primary-hover) 85%, #000);  /* active/pressed + hover de link */
+  --sp-primary-ink:        color-mix(in srgb, var(--cs, #1e5fa8) 40%, var(--sp-ink-700));  /* texto sobre fondo primario suave (chips) */
+  --sp-primary-bg:         color-mix(in srgb, var(--cs, #1e5fa8) 12%, #fff);  /* fondo de contenedor de ícono y badge IA */
+  --sp-primary-bg-soft:    color-mix(in srgb, var(--cs, #1e5fa8) 8%, #fff);   /* fondo de bloque destacado (pronóstico, paso activo) */
+  --sp-primary-bg-faint:   color-mix(in srgb, var(--cs, #1e5fa8) 5%, #fff);   /* fondo de fila informativa / paso completado */
+  --sp-primary-border:     color-mix(in srgb, var(--cs, #1e5fa8) 18%, #fff);  /* borde de bloque destacado */
+  --sp-primary-track:      color-mix(in srgb, var(--cs, #1e5fa8) 22%, #fff);  /* track del spinner y anillo inactivo */
+  --sp-primary-focus:      color-mix(in srgb, var(--cs, #1e5fa8) 8%, transparent); /* halo de foco (4px spread) */
+
+  /* Marca / cromo de app */
+  /* No usar: el sidebar se tematiza en Sidebar.tsx:223. Evita segunda fuente de verdad. */
+  /* --sp-nav-from:           #123a63;     sidebar gradiente 0%   */
+  /* --sp-nav-mid:            #16456f;     sidebar gradiente 55%  */
+  /* --sp-nav-to:             #1b527f;     sidebar gradiente 100% */
+  /* --sp-nav-avatar:         #0e2c4d; */
+
+  /* ---------------------------------------------------------------------
+     2. COLOR — SEMÁNTICO
+     --------------------------------------------------------------------- */
+  /* Éxito / dentro de rango */
+  --sp-success:            #16a34a;  /* check de éxito, valores en rango, ícono vitales */
+  --sp-success-dot:        #22c55e;  /* punto de semáforo en tile OK */
+  --sp-success-online:     #34d399;  /* indicador de conexión (offline pill) */
+  --sp-success-bg:         #e9f7ef;  /* anillo del check de éxito */
+  --sp-success-bg-alt:     #e9f5ee;  /* contenedor de ícono de vitales */
+  --sp-success-border:     #cfe6d6;  /* borde de tile en rango */
+  --sp-success-strong:     #0f7a52;  /* etiquetas de entrega móvil / marcadores verdes */
+  --sp-success-card-brd:   #bfe0cb;  /* borde de la Card Ancla ("Nota lista") */
+
+  /* Advertencia / a vigilar */
+  --sp-warn:               #b45309;  /* texto de banner y badge ámbar */
+  --sp-warn-strong:        #d97706;  /* valor fuera de rango, link de banner */
+  --sp-warn-bg:            #fef6e7;  /* fondo de banner (borrador, cambios sin guardar) */
+  --sp-warn-bg-badge:      #fdecc8;  /* fondo del badge "1 a vigilar" */
+  --sp-warn-border:        #f4dfae;
+  --sp-warn-dot:           #f59e0b;  /* punto de semáforo en tile a vigilar */
+
+  /* Peligro / irreversible / obligatorio */
+  --sp-danger:             #c0392b;  /* asterisco de campo obligatorio, ícono de warning */
+  --sp-danger-strong:      #a02525;  /* negrita dentro del bloque de peligro */
+  --sp-danger-ink:         #8c2f2f;  /* cuerpo de texto del bloque de peligro */
+  --sp-danger-bg:          #fdf2f2;
+  --sp-danger-border:      #f3c9c9;
+
+  /* ---------------------------------------------------------------------
+     3. COLOR — NEUTRALES (escala única, rol fijo por token)
+     --------------------------------------------------------------------- */
+  --sp-ink-900:            #14345c;  /* títulos de nivel documento (H1 de lienzo) */
+  --sp-ink-800:            #173156;  /* TÍTULO: modal, card, sección, valor de campo */
+  --sp-ink-700:            #3b4a5c;  /* CUERPO: párrafos, valores, texto de nota */
+  --sp-ink-600:            #4b5b6e;  /* cuerpo sobre fondo gris (chip de contexto) */
+  --sp-ink-500:            #5a6b81;  /* SECUNDARIO: subtítulos de página, botón secundario */
+  --sp-ink-400:            #6b7b8f;  /* TERCIARIO: links ghost, "Cerrar", botón texto */
+  --sp-ink-350:            #8a99ac;  /* ETIQUETAS y meta: labels mayúsculas, subtítulo modal */
+  --sp-ink-300:            #9aa7b6;  /* HINT: microcopy bajo un control */
+  --sp-ink-250:            #94a3b8;  /* texto de elemento diferido (slot de voz) */
+  --sp-ink-200:            #aab6c4;  /* PLACEHOLDER de input/textarea */
+  --sp-ink-icon:           #a3b1c4;  /* íconos de acción secundaria (✕, editar, borrar) */
+  --sp-ink-150:            #b7c2cf;  /* ícono de estado vacío */
+  --sp-ink-100:            #c3ccd8;  /* chevron inerte, borde punteado */
+
+  --sp-line-strong:        #cbd5e1;  /* borde de checkbox */
+  --sp-line-dash:          #b9c4d2;  /* borde punteado (slot diferido, underline de link) */
+  --sp-line-input:         #d5deea;  /* BORDE DE CONTROL: input, textarea, botón secundario */
+  --sp-line-chip:          #d7e0ec;  /* borde de chip inactivo */
+  --sp-line-soft:          #e2e8f0;  /* borde de card interna / botón terciario */
+  --sp-line-card:          #e6ebf2;  /* BORDE DE CARD contenedora */
+  --sp-line-divider:       #eef1f6;  /* DIVISOR dentro del modal (header/footer) */
+  --sp-line-frame:         #dbe3ee;  /* borde del viewport/frame */
+  --sp-line-capture:       color-mix(in srgb, var(--cs, #1e5fa8) 20%, #fff);  /* borde de la Card Captura (protagonista) */
+
+  --sp-surface:            #ffffff;  /* superficie de card y modal */
+  --sp-surface-sunken:     #fbfcfe;  /* fondo de input/textarea y card interna */
+  --sp-surface-muted:      #eef2f7;  /* fondo de sección/chip neutro/nota al pie */
+  --sp-surface-empty:      #f1f4f8;  /* fondo de ícono en estado vacío */
+  --sp-surface-slot:       #f4f7fb;  /* fondo de control diferido */
+  --sp-app-bg:             #f5f8fc;  /* fondo de la aplicación */
+  --sp-canvas-bg:          #e9edf3;  /* fondo del lienzo de mockups (no va a la app) */
+  --sp-bezel:              #0f1e30;  /* bisel de teléfono (solo mockups) */
+
+  --sp-backdrop:           rgba(15, 32, 56, .55); /* backdrop ÚNICO del modal */
+
+  /* ---------------------------------------------------------------------
+     4. RADIOS — dos familias: CONTENEDOR y CONTROL
+     --------------------------------------------------------------------- */
+  --sp-r-modal:            20px;  /* modal, frame de viewport */
+  --sp-r-card:             16px;  /* card contenedora (vitales, captura, contexto) */
+  --sp-r-icon-lg:          15px;  /* contenedor de ícono 56px (confirmación) */
+  --sp-r-input:            14px;  /* textarea grande de captura */
+  --sp-r-cta:              14px;  /* botón primario full-width en móvil */
+  --sp-r-card-inner:       13px;  /* card interna (bloque de nota, filas de acción) */
+  --sp-r-btn:              12px;  /* botón (desktop), tile de vital, badge grande */
+  --sp-r-field:            12px;  /* input/textarea estándar, banner */
+  --sp-r-icon-md:          11px;  /* contenedor de ícono 38–44px */
+  --sp-r-field-sm:         11px;  /* fila de diagnóstico, input compacto */
+  --sp-r-btn-sm:           10px;  /* botón compacto, ícono-botón 34px */
+  --sp-r-btn-xs:            9px;  /* botón inline dentro de card interna */
+  --sp-r-note:              8px;  /* bloque de texto embebido */
+  --sp-r-checkbox:          6px;
+  --sp-r-pill:            999px;  /* chip, badge, pill, punto */
+
+  /* ---------------------------------------------------------------------
+     5. ESPACIADO — base 4px (múltiplos exactos usados)
+     --------------------------------------------------------------------- */
+  --sp-1:   4px;   --sp-1-5: 6px;   --sp-2:   8px;   --sp-2-5: 10px;
+  --sp-3:  12px;   --sp-3-5: 14px;  --sp-4:  16px;   --sp-4-5: 18px;
+  --sp-5:  20px;   --sp-5-5: 22px;  --sp-6:  24px;   --sp-6-5: 26px;
+  --sp-7:  28px;   --sp-7-5: 30px;  --sp-8:  32px;   --sp-8-5: 34px;
+  --sp-9:  36px;   --sp-10: 40px;   --sp-11: 44px;   --sp-12: 48px;
+
+  /* Aplicaciones fijas (no improvisar) */
+  --sp-pad-card:           18px 20px;   /* padding de card contenedora */
+  --sp-pad-card-hero:      22px;        /* padding de la Card Captura y de edición */
+  --sp-pad-card-inner:     18px 20px;   /* padding de card interna del modal */
+  --sp-pad-modal-head:     20px 24px;   /* header de modal desktop */
+  --sp-pad-modal-body:     22px 24px 8px;
+  --sp-pad-modal-foot:     16px 24px;
+  --sp-pad-modal-head-m:   8px 16px 12px;  /* móvil */
+  --sp-pad-modal-body-m:   14px 16px 8px;
+  --sp-pad-modal-foot-m:   11px 16px 16px; /* el 16px inferior cubre el home indicator */
+  --sp-gap-section:        20px;   /* entre secciones del cuerpo del modal */
+  --sp-gap-block:          18px;   /* entre cards de la página */
+  --sp-gap-item:           10px;   /* entre chips / botones hermanos */
+  --sp-gap-tiles:          12px;   /* entre tiles de vitales */
+  --sp-gap-label:           6px;   /* label → control */
+  --sp-gap-title-sub:       4px;   /* título → subtítulo */
+
+  /* ---------------------------------------------------------------------
+     6. SOMBRAS — 6 niveles, uno por rol
+     --------------------------------------------------------------------- */
+  --sp-shadow-flat:    0 1px 2px rgba(16, 42, 73, .04);      /* card en reposo */
+  --sp-shadow-raised:  0 6px 22px color-mix(in srgb, var(--cs, #1e5fa8) 9%, transparent);   /* card protagonista (marca) */
+  --sp-shadow-raised-ok: 0 6px 22px rgba(15, 122, 82, .10);  /* card ancla (verde) */
+  --sp-shadow-btn:     0 8px 20px color-mix(in srgb, var(--cs, #1e5fa8) 28%, transparent);  /* botón primario */
+  --sp-shadow-btn-lg:  0 10px 24px color-mix(in srgb, var(--cs, #1e5fa8) 30%, transparent); /* CTA de recompensa (éxito) */
+  --sp-shadow-btn-m:   0 8px 18px color-mix(in srgb, var(--cs, #1e5fa8) 28%, transparent);  /* botón primario móvil */
+  --sp-primary-shadow-press: 0 4px 12px color-mix(in srgb, var(--cs, #1e5fa8) 24%, transparent); /* botón primario :active */
+  --sp-shadow-modal:   0 40px 90px rgba(10, 25, 45, .45);    /* modal sobre backdrop */
+  --sp-shadow-frame:   0 30px 80px rgba(16, 42, 73, .16);    /* frame de mockup */
+  --sp-focus-ring:     0 0 0 4px var(--sp-primary-focus);    /* halo de zona activa */
+
+  /* ---------------------------------------------------------------------
+     7. BORDES — grosores
+     --------------------------------------------------------------------- */
+  --sp-bw-hair:   1px;    /* todo borde estructural */
+  --sp-bw-accent: 1.5px;  /* card protagonista y zona de edición activa */
+  --sp-bw-bar:    3px;    /* barra lateral de bloque destacado, aro de marcador */
+  --sp-bw-dash:   1px;    /* punteado de elemento diferido */
+
+  /* ---------------------------------------------------------------------
+     8. TIPOGRAFÍA
+     --------------------------------------------------------------------- */
+  /* La familia NO cambia; la spec aporta pesos, tamaños y color. */
+  --sp-font: system-ui, -apple-system, sans-serif;
+
+  /* Escala real usada (px). Nombre = rol, no tamaño. */
+  --sp-fs-h1:        34px;  /* título de documento (lienzo) */
+  --sp-fs-page:      30px;  /* H1 de página ("Nueva Nota Médica") */
+  --sp-fs-success:   27px;  /* título de estado de éxito desktop */
+  --sp-fs-confirm:   26px;  /* pregunta de confirmación */
+  --sp-fs-modal:     19px;  /* título de modal desktop */
+  --sp-fs-card:      20px;  /* título de card */
+  --sp-fs-vitals:    18px;  /* título de card secundaria */
+  --sp-fs-question:  16px;  /* pregunta de entrevista, título de sección grande */
+  --sp-fs-body-lg:   16px;  /* párrafo de confirmación */
+  --sp-fs-btn:       17px;  /* botón primario full-width */
+  --sp-fs-btn-md:  15.5px;  /* botón primario inline */
+  --sp-fs-btn-sm:    15px;  /* botón secundario */
+  --sp-fs-body:    14.5px;  /* cuerpo de nota, valor de campo */
+  --sp-fs-body-sm:   14px;  /* cuerpo denso, chip, secundario de página */
+  --sp-fs-meta:    13.5px;  /* subtítulo de modal, link ghost, botón compacto */
+  --sp-fs-chip:      14px;
+  --sp-fs-hint:    12.5px;  /* microcopy bajo control */
+  --sp-fs-label:     13px;  /* etiqueta de sección mayúsculas */
+  --sp-fs-label-sm:  12px;  /* etiqueta de campo mayúsculas */
+  --sp-fs-badge:     12px;
+  --sp-fs-legal:     11px;  /* microcopy legal en footer, label de tile */
+  --sp-fs-tile:    10.5px;  /* label de tile de vital */
+
+  --sp-lh-tight:   1.2;   /* títulos ≥26px */
+  --sp-lh-title:   1.3;   /* títulos 16–20px */
+  --sp-lh-snug:    1.45;  /* valores de campo, listas */
+  --sp-lh-body:    1.55;  /* cuerpo denso, hints */
+  --sp-lh-note:    1.62;  /* texto de la nota médica (lectura sostenida) */
+  --sp-lh-legal:   1.4;
+
+  --sp-ls-tight:  -0.02em; /* títulos ≥26px */
+  --sp-ls-label:   0.04em; /* etiquetas mayúsculas 12–13px */
+  --sp-ls-label-w: 0.05em; /* etiquetas mayúsculas ≤11px */
+  --sp-ls-caps:    0.06em; /* etiqueta de card en mayúsculas */
+  --sp-ls-eyebrow: 0.08em; /* eyebrow de bloque de anotación */
+
+  --sp-fw-regular: 400;
+  --sp-fw-medium:  500;
+  --sp-fw-semi:    600;   /* labels de acción, links, texto de botón secundario */
+  --sp-fw-bold:    700;   /* títulos de card/modal, botón primario, etiquetas */
+  --sp-fw-black:   800;   /* títulos de página y de estado, valores de vitales */
+
+  /* ---------------------------------------------------------------------
+     9. GEOMETRÍA
+     --------------------------------------------------------------------- */
+  --sp-modal-w-work:    724px;  /* Estados con trabajo por hacer: 1 · 2 · edición */
+  --sp-modal-w-decide:  620px;  /* Estado 3 · decisión binaria */
+  --sp-modal-w-done:    600px;  /* Estado 4 · éxito */
+  --sp-modal-w-wait:    560px;  /* Estado 0 · espera */
+  --sp-modal-top:        60px;  /* offset superior de modal alto (anclado arriba) */
+  --sp-modal-h-max:     calc(100vh - 120px);
+
+  --sp-sidebar-w:       256px;
+  --sp-rail-w:          320px;  /* columna derecha (contexto/documentos) */
+  --sp-content-max:     820px;
+
+  --sp-tap:              44px;  /* ÁREA TÁCTIL MÍNIMA — nunca menor */
+  --sp-ctrl-h-desktop:   48px;  /* altura efectiva de botón desktop (13px pad + 15.5px) */
+  --sp-ctrl-h-mobile:    48px;
+
+  /* ---------------------------------------------------------------------
+     10. MOVIMIENTO
+     --------------------------------------------------------------------- */
+  --sp-dur-micro:   120ms;  /* hover, chip toggle */
+  --sp-dur-fast:    180ms;  /* fade de contenido saliente */
+  --sp-dur-base:    240ms;  /* cross-fade entre estados, mutación de header */
+  --sp-dur-slide:   320ms;  /* slide horizontal entre estados (2↔3) */
+  --sp-dur-enter:   280ms;  /* entrada del modal */
+  --sp-dur-check:   520ms;  /* dibujo del check de éxito */
+  --sp-dur-spin:    900ms;  /* giro del spinner */
+  --sp-ease-out:    cubic-bezier(.2, 0, 0, 1);      /* entradas (decelera) */
+  --sp-ease-in:     cubic-bezier(.4, 0, 1, 1);      /* salidas */
+  --sp-ease-inout:  cubic-bezier(.4, 0, .2, 1);     /* movimiento entre estados */
+  --sp-ease-spring: cubic-bezier(.34, 1.32, .64, 1);/* aparición del check */
+}
+
+
+/* ============================================================================
+   COMPONENTES
+   ========================================================================== */
+
+/* --- 1. BASE ------------------------------------------------------------- */
+/* Neutralizado: el repo ya lo cubre / se reintroduce scoped si hace falta. */
+/*
+body {
+  margin: 0;
+  font-family: var(--sp-font);
+  background: var(--sp-app-bg);
+  color: var(--sp-ink-700);
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--sp-primary); text-decoration: none; }
+a:hover { color: var(--sp-primary-active); }
+*/
+
+
+/* --- 2. TIPOGRAFÍA POR ROL ---------------------------------------------- */
+.sp-title-page   { font-size: var(--sp-fs-page);    font-weight: var(--sp-fw-black); line-height: var(--sp-lh-tight); letter-spacing: var(--sp-ls-tight); color: var(--sp-ink-800); margin: 0; }
+.sp-title-state  { font-size: var(--sp-fs-success); font-weight: var(--sp-fw-black); line-height: var(--sp-lh-tight); letter-spacing: var(--sp-ls-tight); color: var(--sp-ink-800); }
+.sp-title-modal  { font-size: var(--sp-fs-modal);   font-weight: var(--sp-fw-black); line-height: var(--sp-lh-title); color: var(--sp-ink-800); }
+.sp-sub-modal    { font-size: var(--sp-fs-meta);    font-weight: var(--sp-fw-regular); line-height: var(--sp-lh-legal); color: var(--sp-ink-350); margin-top: 1px; }
+.sp-title-card   { font-size: var(--sp-fs-card);    font-weight: var(--sp-fw-black); line-height: var(--sp-lh-title); color: var(--sp-ink-800); }
+.sp-title-sec    { font-size: var(--sp-fs-body);    font-weight: var(--sp-fw-bold);  color: var(--sp-ink-800); }
+.sp-label        { font-size: var(--sp-fs-label);   font-weight: var(--sp-fw-bold); letter-spacing: var(--sp-ls-label); color: var(--sp-ink-350); text-transform: uppercase; }
+.sp-label-field  { font-size: var(--sp-fs-label-sm);font-weight: var(--sp-fw-bold); letter-spacing: var(--sp-ls-label); color: var(--sp-ink-800); text-transform: uppercase; }
+.sp-label-eyebrow{ font-size: var(--sp-fs-label-sm);font-weight: var(--sp-fw-bold); letter-spacing: var(--sp-ls-label-w); color: var(--sp-primary); text-transform: uppercase; }
+.sp-body         { font-size: var(--sp-fs-body);    line-height: var(--sp-lh-snug);  color: var(--sp-ink-700); }
+.sp-note         { font-size: var(--sp-fs-body);    line-height: var(--sp-lh-note);  color: var(--sp-ink-700); }
+.sp-secondary    { font-size: var(--sp-fs-body-sm); line-height: var(--sp-lh-body);  color: var(--sp-ink-500); }
+.sp-hint         { font-size: var(--sp-fs-hint);    line-height: var(--sp-lh-body);  color: var(--sp-ink-300); }
+.sp-legal        { font-size: var(--sp-fs-legal);   line-height: var(--sp-lh-legal); color: var(--sp-ink-350); }
+
+
+/* --- 3. BOTONES --------------------------------------------------------- */
+.sp-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-gap-item);
+  min-height: var(--sp-tap);
+  font-family: inherit; font-weight: var(--sp-fw-bold);
+  border-radius: var(--sp-r-btn); border: none; cursor: pointer;
+  transition: background var(--sp-dur-micro) var(--sp-ease-out),
+              box-shadow var(--sp-dur-micro) var(--sp-ease-out),
+              transform var(--sp-dur-micro) var(--sp-ease-out);
+}
+.sp-btn--primary {
+  background: var(--sp-primary); color: #fff;
+  font-size: var(--sp-fs-btn-md); padding: 13px 26px;
+  box-shadow: var(--sp-shadow-btn);
+}
+.sp-btn--primary:hover  { background: var(--sp-primary-hover); }
+.sp-btn--primary:active { background: var(--sp-primary-active); transform: translateY(1px); box-shadow: var(--sp-primary-shadow-press); }
+.sp-btn--primary:disabled { background: #b6c6da; box-shadow: none; cursor: not-allowed; }
+
+/* Full-width: único primario de la pantalla (captura, CTA de éxito, móvil) */
+.sp-btn--primary-block {
+  width: 100%; font-size: var(--sp-fs-btn); padding: 16px;
+  border-radius: var(--sp-r-cta); box-shadow: var(--sp-shadow-btn);
+}
+.sp-btn--reward { box-shadow: var(--sp-shadow-btn-lg); } /* CTA de recompensa (receta) */
+
+.sp-btn--secondary {
+  background: var(--sp-surface); color: var(--sp-ink-500);
+  border: var(--sp-bw-hair) solid var(--sp-line-input);
+  font-weight: var(--sp-fw-semi); font-size: var(--sp-fs-btn-sm); padding: 13px 24px;
+}
+.sp-btn--secondary:hover { background: var(--sp-surface-muted); color: var(--sp-ink-700); }
+
+/* Terciario: rejilla de acciones post-guardado */
+.sp-btn--tertiary {
+  background: var(--sp-surface); color: var(--sp-ink-700);
+  border: var(--sp-bw-hair) solid var(--sp-line-soft);
+  font-weight: var(--sp-fw-semi); font-size: var(--sp-fs-body-sm); padding: 13px;
+}
+.sp-btn--tertiary:hover { border-color: var(--sp-line-input); background: var(--sp-surface-sunken); }
+
+/* Compacto: acción inline dentro de una card interna ("Editar", "Regenerar") */
+.sp-btn--compact {
+  background: var(--sp-surface); color: var(--sp-primary);
+  border: var(--sp-bw-hair) solid var(--sp-line-input);
+  font-weight: var(--sp-fw-semi); font-size: var(--sp-fs-meta);
+  padding: 7px 13px; border-radius: var(--sp-r-btn-xs); min-height: 34px;
+}
+.sp-btn--compact:hover { background: var(--sp-primary-bg); border-color: var(--sp-primary-track); }
+
+/* Ghost / texto: "Cancelar", "Cerrar" — sin borde, jamás compite */
+.sp-btn--ghost {
+  background: transparent; border: none; color: var(--sp-ink-350);
+  font-weight: var(--sp-fw-semi); font-size: var(--sp-fs-btn-sm); padding: 13px 6px;
+}
+.sp-btn--ghost:hover { color: var(--sp-ink-500); }
+
+/* Link con subrayado punteado: vía alterna ("Prefiero escribirla yo") */
+.sp-link-alt {
+  font-size: var(--sp-fs-body-sm); color: var(--sp-ink-400);
+  border-bottom: 1px dashed var(--sp-line-dash); padding-bottom: 1px;
+}
+.sp-link-alt:hover { color: var(--sp-ink-700); border-bottom-color: var(--sp-ink-400); }
+
+/* Ícono dentro de botón: 17–19px, stroke 2, currentColor, gap 8–10px, va a la
+   IZQUIERDA salvo "Siguiente" (chevron a la derecha = avance). */
+.sp-btn svg { flex: 0 0 auto; }
+
+
+/* --- 4. CHIPS ----------------------------------------------------------- */
+.sp-chip {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  min-height: var(--sp-tap);
+  padding: 0 18px;
+  background: var(--sp-surface); border: var(--sp-bw-hair) solid var(--sp-line-chip);
+  color: var(--sp-primary-ink); font-size: var(--sp-fs-chip); font-weight: var(--sp-fw-semi);
+  border-radius: var(--sp-r-pill); cursor: pointer;
+  transition: background var(--sp-dur-micro) var(--sp-ease-out),
+              border-color var(--sp-dur-micro) var(--sp-ease-out);
+}
+.sp-chip:hover { border-color: var(--sp-primary-track); background: var(--sp-primary-bg-faint); }
+.sp-chip[aria-pressed="true"], .sp-chip--selected {
+  background: var(--sp-primary); border-color: var(--sp-primary); color: #fff;
+}
+/* Chip de medicamento: lleva ✕, padding derecho reducido para el botón */
+.sp-chip--removable { padding: 9px 12px 9px 15px; }
+.sp-chip__remove {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; margin: -10px -4px -10px 0; /* área táctil 44px sin agrandar el chip */
+  padding: 10px; box-sizing: content-box;
+  color: var(--sp-ink-icon); background: none; border: none; cursor: pointer;
+}
+.sp-chip__remove:hover { color: var(--sp-danger); }
+.sp-chip__remove svg { width: 14px; height: 14px; stroke-width: 2.2; }
+/* Chip neutro de contexto (edad, sexo): sin borde, fondo gris */
+.sp-chip--meta {
+  background: var(--sp-surface-muted); border: none; color: var(--sp-ink-600);
+  font-size: var(--sp-fs-body-sm); padding: 5px 12px; min-height: 0;
+}
+
+
+/* --- 5. CARDS ----------------------------------------------------------- */
+.sp-card {                       /* contenedora de la página */
+  background: var(--sp-surface);
+  border: var(--sp-bw-hair) solid var(--sp-line-card);
+  border-radius: var(--sp-r-card);
+  padding: var(--sp-pad-card);
+  box-shadow: var(--sp-shadow-flat);
+}
+.sp-card--hero {                 /* protagonista: la única con elevación azul */
+  border-width: var(--sp-bw-accent); border-color: var(--sp-line-capture);
+  padding: var(--sp-pad-card-hero);
+  box-shadow: var(--sp-shadow-raised);
+}
+.sp-card--anchor {               /* Card Ancla: nota ya generada */
+  border-width: var(--sp-bw-accent); border-color: var(--sp-success-card-brd);
+  padding: var(--sp-pad-card-hero);
+  box-shadow: var(--sp-shadow-raised-ok);
+}
+.sp-card-inner {                 /* agrupa una sección DENTRO del modal */
+  background: var(--sp-surface-sunken);
+  border: var(--sp-bw-hair) solid var(--sp-line-card);
+  border-radius: var(--sp-r-card-inner);
+  padding: var(--sp-pad-card-inner);
+}
+.sp-row {                        /* fila de dato editable (diagnóstico) */
+  display: flex; align-items: center; justify-content: space-between;
+  border: var(--sp-bw-hair) solid var(--sp-line-soft);
+  border-radius: var(--sp-r-field-sm);
+  padding: 12px 14px; background: var(--sp-surface);
+}
+
+
+/* --- 6. MODAL ----------------------------------------------------------- */
+.sp-backdrop {                   /* UNO por ciclo de modal; nunca se remonta */
+  position: fixed; inset: 0; background: var(--sp-backdrop); z-index: 50;
+  animation: sp-fade-in var(--sp-dur-base) var(--sp-ease-out);
+}
+.sp-modal {
+  position: fixed; z-index: 51; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--sp-surface);
+  border-radius: var(--sp-r-modal);
+  box-shadow: var(--sp-shadow-modal);
+  animation: sp-modal-in var(--sp-dur-enter) var(--sp-ease-out);
+}
+.sp-modal--work   { width: var(--sp-modal-w-work);   top: var(--sp-modal-top); max-height: var(--sp-modal-h-max); }
+.sp-modal--decide { width: var(--sp-modal-w-decide); top: 50%; transform: translate(-50%, -50%); }
+.sp-modal--done   { width: var(--sp-modal-w-done);   top: 50%; transform: translate(-50%, -50%); }
+.sp-modal--wait   { width: var(--sp-modal-w-wait);   top: 50%; transform: translate(-50%, -50%); }
+
+.sp-modal__header {
+  flex: 0 0 auto; display: flex; align-items: center; gap: var(--sp-3-5);
+  padding: var(--sp-pad-modal-head);
+  border-bottom: var(--sp-bw-hair) solid var(--sp-line-divider);
+}
+.sp-modal__body {
+  flex: 1 1 auto; overflow-y: auto; padding: var(--sp-pad-modal-body);
+  overscroll-behavior: contain;
+}
+.sp-modal__footer {              /* SIEMPRE visible: nunca dentro del scroll */
+  flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
+  gap: var(--sp-4); padding: var(--sp-pad-modal-foot);
+  background: var(--sp-surface);
+  border-top: var(--sp-bw-hair) solid var(--sp-line-divider);
+}
+
+/* Móvil: el modal ES la pantalla */
+/* 768px = md de Tailwind, breakpoint único del repo. */
+@media (max-width: 768px) {
+  .sp-modal, .sp-modal--work, .sp-modal--decide, .sp-modal--done, .sp-modal--wait {
+    inset: 0; width: 100%; max-height: none; top: 0; left: 0;
+    transform: none; border-radius: 0;
+    height: 100dvh;               /* dvh evita el brinco al abrir el teclado */
+    animation: sp-slide-in var(--sp-dur-slide) var(--sp-ease-inout);
+  }
+  .sp-modal__header { padding: var(--sp-pad-modal-head-m); }
+  .sp-modal__body   { padding: var(--sp-pad-modal-body-m); }
+  .sp-modal__footer {
+    padding: var(--sp-pad-modal-foot-m);
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+}
+
+
+/* --- 7. CONTENEDOR DE ÍCONO -------------------------------------------- */
+.sp-icobox {                     /* cuadrado redondeado: identidad del header */
+  display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: 44px; height: 44px; border-radius: var(--sp-r-icon-md);
+  background: var(--sp-primary-bg); color: var(--sp-primary);
+}
+.sp-icobox--sm { width: 38px; height: 38px; }
+.sp-icobox--lg { width: 56px; height: 56px; border-radius: var(--sp-r-icon-lg); }
+.sp-icobox--success { background: var(--sp-success-bg-alt); color: var(--sp-success); }
+.sp-icobox svg { width: 22px; height: 22px; }
+.sp-icobox--sm svg { width: 19px; height: 19px; }
+.sp-icobox--lg svg { width: 28px; height: 28px; }
+
+/* Medallón de éxito: círculo relleno + anillo de halo (2 capas concéntricas) */
+.sp-medal {
+  width: 96px; height: 96px; border-radius: 50%;
+  background: var(--sp-success-bg);           /* anillo = 13px de halo */
+  display: flex; align-items: center; justify-content: center;
+}
+.sp-medal__core {
+  width: 70px; height: 70px; border-radius: 50%;
+  background: var(--sp-success);
+  display: flex; align-items: center; justify-content: center;
+  animation: sp-pop var(--sp-dur-check) var(--sp-ease-spring);
+}
+.sp-medal__core svg { width: 40px; height: 40px; stroke: #fff; stroke-width: 2.6; fill: none;
+  stroke-linecap: round; stroke-linejoin: round; }
+/* Trazo del check dibujándose */
+.sp-medal__core path { stroke-dasharray: 32; stroke-dashoffset: 32;
+  animation: sp-draw var(--sp-dur-check) var(--sp-ease-out) 120ms forwards; }
+
+
+/* --- 8. INPUTS / TEXTAREA ---------------------------------------------- */
+.sp-input, .sp-textarea {
+  width: 100%; box-sizing: border-box;
+  background: var(--sp-surface-sunken);
+  border: var(--sp-bw-hair) solid var(--sp-line-input);
+  border-radius: var(--sp-r-field);
+  padding: 11px 13px;
+  font-family: inherit; font-size: var(--sp-fs-body); line-height: var(--sp-lh-snug);
+  color: var(--sp-ink-700);
+  min-height: var(--sp-tap);
+  transition: border-color var(--sp-dur-micro) var(--sp-ease-out),
+              box-shadow var(--sp-dur-micro) var(--sp-ease-out);
+}
+.sp-input::placeholder, .sp-textarea::placeholder { color: var(--sp-ink-200); }
+.sp-input:focus, .sp-textarea:focus {
+  outline: none; background: var(--sp-surface);
+  border-color: var(--sp-primary); border-width: var(--sp-bw-accent);
+  box-shadow: var(--sp-focus-ring);
+}
+.sp-textarea { min-height: 88px; resize: vertical; line-height: var(--sp-lh-body); }
+.sp-textarea--capture {          /* el textarea protagonista de la captura */
+  min-height: 210px; border-radius: var(--sp-r-input);
+  padding: 16px 18px 54px;       /* 54px inferior reserva el slot de voz */
+  font-size: 15px; line-height: 1.6;
+}
+
+
+/* --- 9. BADGES --------------------------------------------------------- */
+.sp-badge {
+  display: inline-flex; align-items: center; gap: var(--sp-1-5);
+  background: var(--sp-primary-bg); color: var(--sp-primary);
+  font-size: var(--sp-fs-badge); font-weight: var(--sp-fw-bold);
+  padding: 6px 12px; border-radius: var(--sp-r-pill); white-space: nowrap;
+}
+.sp-badge svg { width: 13px; height: 13px; }
+.sp-badge--warn   { background: var(--sp-warn-bg-badge); color: var(--sp-warn); font-size: var(--sp-fs-label); padding: 6px 14px; }
+.sp-badge--inline {              /* badge DENTRO de un botón primario */
+  background: rgba(255,255,255,.24); color: #fff;
+  font-size: 12.5px; padding: 4px 11px;
+}
+.sp-badge--deferred {            /* elemento de proyecto futuro (voz) */
+  background: var(--sp-surface-muted); color: var(--sp-ink-250);
+  border: 1px dashed var(--sp-line-dash);
+  font-size: 10.5px; letter-spacing: .04em; padding: 4px 9px;
+}
+
+
+/* --- 10. BANNERS ------------------------------------------------------- */
+.sp-banner {
+  display: flex; align-items: center; gap: var(--sp-3);
+  border-radius: var(--sp-r-field); padding: 13px 18px;
+  font-size: var(--sp-fs-body-sm); font-weight: var(--sp-fw-semi);
+}
+.sp-banner--warn   { background: var(--sp-warn-bg);   border: var(--sp-bw-hair) solid var(--sp-warn-border);   color: var(--sp-warn); }
+.sp-banner--danger { background: var(--sp-danger-bg); border: var(--sp-bw-hair) solid var(--sp-danger-border); color: var(--sp-danger-ink);
+                     align-items: flex-start; border-radius: var(--sp-r-card-inner); padding: 14px 16px;
+                     font-weight: var(--sp-fw-regular); font-size: var(--sp-fs-body); line-height: var(--sp-lh-snug); }
+.sp-banner--info   { background: var(--sp-primary-bg-faint); border: none; color: var(--sp-ink-500);
+                     font-weight: var(--sp-fw-regular); font-size: var(--sp-fs-label); padding: 14px 16px; }
+.sp-banner svg { flex: 0 0 auto; }
+
+/* Bloque destacado dentro de la nota (pronóstico) */
+.sp-callout {
+  background: var(--sp-primary-bg-soft);
+  border-left: var(--sp-bw-bar) solid var(--sp-primary);
+  border-radius: var(--sp-r-note);
+  padding: 11px 14px;
+}
+
+
+/* --- 11. PROGRESO SEGMENTADO (Estado 1 · entrevista) ------------------ */
+.sp-progress { display: flex; align-items: center; gap: var(--sp-3); }
+.sp-progress__label {
+  font-size: var(--sp-fs-badge); font-weight: var(--sp-fw-bold);
+  letter-spacing: .03em; color: var(--sp-ink-350); white-space: nowrap;
+}
+.sp-progress__track { flex: 1; display: flex; gap: var(--sp-1-5); }
+.sp-progress__seg {
+  flex: 1; height: 7px; border-radius: 4px; background: color-mix(in srgb, var(--cs, #1e5fa8) 16%, #fff);
+  transition: background var(--sp-dur-base) var(--sp-ease-out);
+}
+.sp-progress__seg--done { background: var(--sp-primary); }
+@media (max-width: 768px) { .sp-progress__seg { height: 6px; } .sp-progress__track { gap: 5px; } }
+
+
+/* --- 12. LISTA DE PASOS (Estado 0 · "Estructurando la nota") ---------- */
+.sp-steps { display: flex; flex-direction: column; gap: 9px; width: 100%; }
+.sp-step {
+  display: flex; align-items: center; gap: 11px;
+  padding: 11px 15px; border-radius: var(--sp-r-field-sm);
+  font-size: var(--sp-fs-body-sm);
+}
+.sp-step--done    { background: var(--sp-primary-bg-faint); color: var(--sp-ink-700); }
+.sp-step--done svg { stroke: var(--sp-success); stroke-width: 2.4; width: 17px; height: 17px; fill: none; }
+.sp-step--active  { background: var(--sp-primary-bg-soft); border: var(--sp-bw-hair) solid var(--sp-primary-border);
+                    color: var(--sp-ink-800); font-weight: var(--sp-fw-semi); }
+.sp-step--pending { background: transparent; color: var(--sp-ink-200); }
+.sp-step__dot {                  /* aro del paso pendiente */
+  width: 17px; height: 17px; border-radius: 50%;
+  border: 2px solid var(--sp-line-soft); flex: 0 0 17px;
+}
+.sp-spinner {                    /* aro del paso activo */
+  width: 17px; height: 17px; border-radius: 50%; flex: 0 0 17px;
+  border: 2px solid var(--sp-primary-track); border-top-color: var(--sp-primary);
+  animation: sp-spin var(--sp-dur-spin) linear infinite;
+}
+.sp-spinner--xl { width: 86px; height: 86px; border-width: 2px; border-radius: 24px; } /* anillo del ícono */
+
+/* Tres puntos indicadores bajo la lista: onda de opacidad, no de escala */
+.sp-dots { display: flex; gap: 7px; }
+.sp-dots span {
+  width: 9px; height: 9px; border-radius: 50%; background: var(--sp-primary);
+  animation: sp-wave 1.2s var(--sp-ease-inout) infinite;
+}
+.sp-dots span:nth-child(2) { animation-delay: .16s; }
+.sp-dots span:nth-child(3) { animation-delay: .32s; }
+
+
+/* --- 13. ZONA DE EDICIÓN ACTIVA (Estado 2 · edición) ------------------ */
+.sp-editzone {
+  border: var(--sp-bw-accent) solid var(--sp-primary);
+  border-radius: var(--sp-r-field);
+  background: var(--sp-surface);
+  padding: 15px 16px;
+  font-size: var(--sp-fs-body-sm); line-height: var(--sp-lh-note); color: var(--sp-ink-700);
+  box-shadow: var(--sp-focus-ring);
+}
+
+
+/* --- 14. TILE DE SIGNO VITAL (card conservada) ------------------------ */
+.sp-tile {
+  border: var(--sp-bw-hair) solid var(--sp-success-border);
+  border-radius: var(--sp-r-btn); padding: 12px 14px;
+}
+.sp-tile--watch { border-color: var(--sp-warn-border); }
+.sp-tile__label {
+  display: flex; align-items: center; gap: var(--sp-1-5);
+  font-size: var(--sp-fs-tile); letter-spacing: var(--sp-ls-label-w); color: var(--sp-ink-350);
+}
+.sp-tile__label::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--sp-success-dot); }
+.sp-tile--watch .sp-tile__label::before { background: var(--sp-warn-dot); }
+.sp-tile__value { margin-top: var(--sp-2); font-size: 24px; font-weight: var(--sp-fw-black); color: var(--sp-success); }
+.sp-tile--watch .sp-tile__value { color: var(--sp-warn-strong); }
+.sp-tile__unit { font-size: var(--sp-fs-badge); font-weight: var(--sp-fw-regular); color: var(--sp-ink-350); }
+.sp-tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--sp-gap-tiles); }
+@media (max-width: 768px) {      /* móvil: strip horizontal, no rejilla */
+  .sp-tiles { display: flex; gap: var(--sp-2); overflow-x: auto; scrollbar-width: none; }
+  .sp-tiles > * { flex: 0 0 auto; padding: 7px 11px; }
+  .sp-tile__value { font-size: 16px; }
+}
+
+
+/* --- 15. REJILLAS ------------------------------------------------------ */
+.sp-grid-2   { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }        /* SOAP manual */
+.sp-grid-2-1 { display: grid; grid-template-columns: 1.5fr 1fr; gap: var(--sp-3-5); }    /* seguimiento */
+.sp-grid-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }           /* éxito 2×2 */
+@media (max-width: 768px) {
+  .sp-grid-2, .sp-grid-2-1 { grid-template-columns: 1fr; gap: var(--sp-3); }
+  .sp-grid-actions { grid-template-columns: 1fr; gap: var(--sp-2-5); }
+}
+
+
+/* --- 16. CHECKBOX ------------------------------------------------------ */
+.sp-check { display: flex; align-items: center; gap: 11px; cursor: pointer; min-height: var(--sp-tap); }
+.sp-check__box {
+  width: 22px; height: 22px; flex: 0 0 22px; border-radius: var(--sp-r-checkbox);
+  border: var(--sp-bw-accent) solid var(--sp-line-strong); background: var(--sp-surface);
+}
+.sp-check input:checked + .sp-check__box { background: var(--sp-primary); border-color: var(--sp-primary); }
+.sp-check__label { font-size: var(--sp-fs-body); color: var(--sp-ink-700); }
+
+
+/* ============================================================================
+   ANIMACIONES
+   ========================================================================== */
+@keyframes sp-fade-in   { from { opacity: 0 } to { opacity: 1 } }
+@keyframes sp-modal-in  { from { opacity: 0; transform: translateX(-50%) translateY(12px) scale(.985) }
+                          to   { opacity: 1; transform: translateX(-50%) translateY(0)    scale(1) } }
+@keyframes sp-slide-in  { from { transform: translateX(100%) } to { transform: translateX(0) } }
+@keyframes sp-spin      { to { transform: rotate(360deg) } }
+@keyframes sp-pop       { 0% { transform: scale(.6); opacity: 0 } 60% { transform: scale(1.04) } 100% { transform: scale(1); opacity: 1 } }
+@keyframes sp-draw      { to { stroke-dashoffset: 0 } }
+@keyframes sp-wave      { 0%, 100% { opacity: .28 } 50% { opacity: 1 } }
+
+/* Cross-fade entre estados del modal (0→1, 1→2): el contenedor NO se remonta,
+   solo el contenido interior. Se cruza con un leve desplazamiento vertical. */
+@keyframes sp-state-in  { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+@keyframes sp-state-out { from { opacity: 1 } to { opacity: 0; transform: translateY(-6px) } }
+.sp-state-enter { animation: sp-state-in  var(--sp-dur-base) var(--sp-ease-out); }
+.sp-state-exit  { animation: sp-state-out var(--sp-dur-fast) var(--sp-ease-in) forwards; }
+
+/* Slide horizontal entre estados hermanos (2↔3): avance a la izquierda,
+   retroceso a la derecha. Patrón de app nativa. */
+@keyframes sp-push-fwd  { from { opacity: 0; transform: translateX(24px) } to { opacity: 1; transform: none } }
+@keyframes sp-push-back { from { opacity: 0; transform: translateX(-24px) } to { opacity: 1; transform: none } }
+.sp-push-forward  { animation: sp-push-fwd  var(--sp-dur-slide) var(--sp-ease-inout); }
+.sp-push-backward { animation: sp-push-back var(--sp-dur-slide) var(--sp-ease-inout); }
+
+/* Neutralizado: el repo ya lo cubre / se reintroduce scoped si hace falta. */
+/*
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important;
+                            transition-duration: .01ms !important; }
+  .sp-spinner, .sp-dots span { animation-duration: var(--sp-dur-spin) !important; animation-iteration-count: infinite !important; }
+}
+*/

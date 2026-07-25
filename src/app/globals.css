@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./spinus-tokens.css";
 @plugin "@tailwindcss/typography";
 
 :root {
