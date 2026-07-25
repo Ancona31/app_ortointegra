@@ -1489,7 +1489,7 @@ export default function NuevaNotaPage() {
                     }
                   </button>
                   <button type="button"
-                    onClick={() => { modoTocadoRef.current = true; setModoNota('manual'); setNotaGenerada(''); setError('') }}
+                    onClick={() => { cancelarEntrevista(); setMedicamentos([{ ...MED_VACIA }]); modoTocadoRef.current = true; setModoNota('manual'); setNotaGenerada(''); setError('') }}
                     className="block mx-auto mt-2 text-center text-sm text-slate-500 hover:text-[#1e5fa8] transition-colors">
                     Prefiero escribirla yo
                   </button>
@@ -1510,9 +1510,9 @@ export default function NuevaNotaPage() {
                     Previsualizar nota
                   </button>
                   <button type="button"
-                    onClick={() => { modoTocadoRef.current = true; setModoNota('ia'); setNotaGenerada(''); setError('') }}
+                    onClick={() => { cancelarEntrevista(); setForm(f => ({ ...f, exploracion_fisica: '', analisis: '', gabinete_laboratorios: '', plan_tratamiento: '' })); modoTocadoRef.current = true; setModoNota('ia'); setNotaGenerada(''); setError('') }}
                     className="block mx-auto mt-2 text-center text-sm text-slate-500 hover:text-[#1e5fa8] transition-colors">
-                    Volver a crear con IA
+                    Usar IA
                   </button>
                 </>
               ))}
