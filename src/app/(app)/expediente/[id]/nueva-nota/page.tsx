@@ -98,6 +98,35 @@ function metaDelModal(e: EstadoModal): { title: string; subtitle: string; maxWid
   }
 }
 
+// Clase de animación del contenido del modal según la transición entre estados
+// (paso 3.1). Solo motion: 2→3 avanza (slide desde la derecha), 3→2 retrocede,
+// 3→4 celebra con checkPop; el resto es cross-fade. La dirección se deriva del
+// estado anterior sin estado de render extra (prevEstadoRef leído en render).
+function claseTransicion(estado: EstadoModal, prev: EstadoModal): string {
+  if (estado === 'confirmacion' && prev === 'revision') return 'animate-slide-from-right'
+  if (estado === 'revision' && prev === 'confirmacion') return 'animate-slide-from-left'
+  if (estado === 'exito' && prev === 'confirmacion') return 'animate-check-pop'
+  return 'animate-fade-in'
+}
+
+// Mensajes rotativos del Estado 0 (paso 3.1). Componente aislado: su re-render
+// no toca el modal. Al aparecer errorModal la rama de 'generando' cambia y este
+// hijo se desmonta → el interval se limpia solo (la rotación se detiene).
+const MENSAJES_GENERANDO = [
+  'Leyendo tu dictado…',
+  'Estructurando la nota…',
+  'Redactando la exploración…',
+  'Casi listo…',
+]
+function MensajesRotativos() {
+  const [i, setI] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setI(prev => (prev + 1) % MENSAJES_GENERANDO.length), 2000)
+    return () => clearInterval(id)
+  }, [])
+  return <p className="text-sm text-slate-500">{MENSAJES_GENERANDO[i]}</p>
+}
+
 const EMPTY_FORM: {
   motivo_consulta: string
   exploracion_fisica: string
@@ -195,6 +224,10 @@ export default function NuevaNotaPage() {
   useEffect(() => { formRef.current = form }, [form])
   const notaGeneradaRef = useRef(notaGenerada)
   useEffect(() => { notaGeneradaRef.current = notaGenerada }, [notaGenerada])
+  // Paso 3.1: estado anterior del modal para derivar la dirección del slide.
+  // Se lee en render (aún tiene el valor previo); el efecto lo actualiza después.
+  const prevEstadoRef = useRef<EstadoModal>(null)
+  useEffect(() => { prevEstadoRef.current = estadoModal }, [estadoModal])
   // Se enciende al primer clic en el selector IA/manual. El toggle limpia
   // notaGenerada, así que notaGeneradaRef NO detecta esa interacción: sin este
   // ref, un borrador que resuelve tarde pisaría la vía que el médico acaba de
@@ -959,8 +992,9 @@ export default function NuevaNotaPage() {
                 </span>
               )}
             </button>
-            {/* Secundarios (ghost, wrap). Todos alcanzan el post-guardado sin re-guardar. */}
-            <div className="flex flex-wrap items-center justify-center gap-1">
+            {/* Secundarios (ghost). Separados del primario por un filete; en una
+                sola fila, con flex-wrap como fallback en anchos estrechos (M7). */}
+            <div className="flex flex-nowrap max-md:flex-wrap items-center justify-center gap-1 mt-2 pt-3 border-t border-slate-100">
               <button
                 onClick={() => { setEstadoModal(null); setTimeout(() => document.querySelector('[data-onboard="panel-documentos"]')?.scrollIntoView({ behavior: 'smooth' }), 0) }}
                 className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
@@ -982,6 +1016,10 @@ export default function NuevaNotaPage() {
           </div>
         ) : undefined}
       >
+        {/* Wrapper de remount por estado (paso 3.1): key fuerza el re-montaje del
+            contenido en cada transición; el ModalShell (backdrop) nunca se
+            desmonta. overflow-x-hidden contiene el slide horizontal de ±60px. */}
+        <div key={estadoModal} className={`overflow-x-hidden ${claseTransicion(estadoModal, prevEstadoRef.current)}`}>
         {estadoModal === 'generando' && (errorModal ? (
           <div className="px-5 py-12 flex flex-col items-center text-center gap-3">
             <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
@@ -1005,7 +1043,7 @@ export default function NuevaNotaPage() {
               <Sparkles size={22} className="text-[#1e5fa8]" />
             </div>
             <Loader2 size={20} className="animate-spin text-[#1e5fa8]" />
-            <p className="text-sm text-slate-500">Estructurando tu nota…</p>
+            <MensajesRotativos />
           </div>
         ))}
         {estadoModal === 'entrevista' && (
@@ -1229,11 +1267,11 @@ export default function NuevaNotaPage() {
         {estadoModal === 'confirmacion' && (
           <>
             <div className="px-6 pt-6 pb-4 text-center">
-              <div className="w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center bg-red-50" style={{ animation: 'pulse 1.5s ease-in-out infinite' }}>
+              <div className="w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center bg-red-50 ring-4 ring-red-100" style={{ animation: 'pulse 1.5s ease-in-out infinite' }}>
                 <Save size={24} className="text-red-500" />
               </div>
               <h3 className="text-lg font-bold text-[#1d1d1f]">
-                <span className="inline-block" style={{ animation: 'alertGlow 2s ease-in-out infinite' }}>
+                <span className="inline-block animate-alert-glow">
                   ¿Guardar esta nota?
                 </span>
               </h3>
@@ -1252,21 +1290,12 @@ export default function NuevaNotaPage() {
                 {errorModal}
               </div>
             )}
-            {/* alertGlow vivía en un <style> dentro del Portal (ya muerto) y NO
-                está en globals.css. Se relocaliza aquí para no tocar globals.css
-                y que el glow del título siga animando (render byte-idéntico). */}
-            <style>{`
-              @keyframes alertGlow {
-                0%, 100% { color: #1d1d1f; }
-                50% { color: #dc2626; }
-              }
-            `}</style>
           </>
         )}
         {estadoModal === 'exito' && (
-          <div className="px-6 pt-8 pb-6 flex flex-col items-center text-center gap-3">
-            <div className="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center">
-              <CheckCircle2 size={30} className="text-emerald-500" />
+          <div className="px-6 pt-8 pb-6 flex flex-col items-center text-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-emerald-50 ring-4 ring-emerald-100 flex items-center justify-center">
+              <CheckCircle2 size={34} className="text-emerald-500" />
             </div>
             <h3 className="text-lg font-bold text-[#1d1d1f]">Nota guardada</h3>
             <p className="text-sm text-[#3d3d3f] leading-relaxed max-w-xs">
@@ -1279,6 +1308,7 @@ export default function NuevaNotaPage() {
             )}
           </div>
         )}
+        </div>
       </ModalShell>
 
       {/* Breadcrumbs + Header — ancho completo */}
@@ -1479,6 +1509,9 @@ export default function NuevaNotaPage() {
           {modoNota === 'ia' && (
             <>
               {bloqueError}
+              {/* Región CTA conmutable (paso 3.1): fade suave al mutar entre el
+                  CTA de generación y el ancla "Nota lista". */}
+              <div key={notaGenerada ? 'ancla' : 'cta'} className="animate-fade-in">
               {anclaNota ?? (!notaSaved && (
                 <>
                   <button onClick={generarNota} disabled={generando || !form.motivo_consulta.trim()}
@@ -1495,6 +1528,7 @@ export default function NuevaNotaPage() {
                   </button>
                 </>
               ))}
+              </div>
             </>
           )}
 
@@ -1502,6 +1536,9 @@ export default function NuevaNotaPage() {
           {modoNota === 'manual' && (
             <>
               {bloqueError}
+              {/* Región CTA conmutable (paso 3.1): fade suave al mutar entre el
+                  CTA de previsualización y el ancla "Nota lista". */}
+              <div key={notaGenerada ? 'ancla' : 'cta'} className="animate-fade-in">
               {anclaNota ?? (!notaSaved && (
                 <>
                   <button onClick={previewNotaManual} disabled={!form.motivo_consulta}
@@ -1516,6 +1553,7 @@ export default function NuevaNotaPage() {
                   </button>
                 </>
               ))}
+              </div>
             </>
           )}
         </div>

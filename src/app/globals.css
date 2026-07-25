@@ -497,6 +497,31 @@ body {
   0%   { transform: translateX(-60px); opacity: 0; }
   100% { transform: translateX(0);     opacity: 1; }
 }
+/* Utilitarias de slide direccional — usadas por las transiciones del modal de nota */
+.animate-slide-from-right {
+  animation: slideFromRight 0.3s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+.animate-slide-from-left {
+  animation: slideFromLeft 0.3s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+/* Estado Éxito (3→4) — check sobrio, sin rebote */
+@keyframes checkPop {
+  from { opacity: 0; transform: scale(0.8); }
+  to   { opacity: 1; transform: scale(1);   }
+}
+.animate-check-pop {
+  animation: checkPop 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+/* Glow del título de la confirmación (migrado del <style> inline de nueva-nota) */
+@keyframes alertGlow {
+  0%, 100% { color: #1d1d1f; }
+  50%      { color: #dc2626; }
+}
+.animate-alert-glow {
+  animation: alertGlow 2s ease-in-out infinite;
+}
 
 @keyframes marquee {
   0%   { transform: translateX(0); }
@@ -783,4 +808,14 @@ html.dark .agenda-fc .fc-scrollgrid-section-header > * {
    cubre la Parte C (--ag-border-card). */
 html.dark .agenda-fc .fc-daygrid .fc-col-header-cell {
   border-bottom-color: var(--ag-month-gap) !important;
+}
+
+/* ── Reduced motion ──
+   Neutraliza las animaciones de entrada/transición para quienes lo piden.
+   `.animate-spin` (loaders) queda EXCLUIDO: congelarlo a media rotación deja
+   los spinners visualmente rotos. El resto degrada a cero movimiento. */
+@media (prefers-reduced-motion: reduce) {
+  [class*="animate-"]:not(.animate-spin) {
+    animation: none !important;
+  }
 }
