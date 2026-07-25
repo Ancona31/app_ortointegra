@@ -51,6 +51,17 @@
   --sp-warn-border:        #f4dfae;
   --sp-warn-dot:           #f59e0b;  /* punto de semáforo en tile a vigilar */
 
+  /* Semáforo de signos vitales (card conservada).
+     NO se reutilizan --sp-success/warn/danger: están afinados para banners y
+     botones, y la card usa verdes y ámbares desplazados hacia el azul. Medida
+     a mano, ΔE ≈ 25 en el verde y ≈ 22 en el ámbar — sustituirlos cambiaría
+     el modo claro de forma visible. El valor CLARO de abajo es el hex original
+     de la card, así que en claro no cambia nada; el OSCURO es la semántica
+     oscura que este mismo archivo ya publica. */
+  --sp-vital-ok:           #17976a;  --sp-vital-ok-accent:     #2fb488;
+  --sp-vital-watch:        #c07d10;  --sp-vital-watch-accent:  #e6a521;
+  --sp-vital-out:          #c62f3b;  --sp-vital-out-accent:    #e5484d;
+
   /* Peligro / irreversible / obligatorio */
   --sp-danger:             #c0392b;  /* asterisco de campo obligatorio, ícono de warning */
   --sp-danger-strong:      #a02525;  /* negrita dentro del bloque de peligro */
@@ -331,6 +342,12 @@ html.dark {
   --sp-danger-ink:       #fca5a5;                   /* TP:218 */
   --sp-danger-bg:        rgba(239,68,68,.14);       /* TP:194 */
   --sp-danger-border:    rgba(239,68,68,.25);       /* TP:210 */
+
+  /* — SEMÁFORO DE VITALES — espejo oscuro. Aquí sí converge con la semántica
+       genérica: los hexes de la card solo divergen en la paleta clara. */
+  --sp-vital-ok:         #34d399;  --sp-vital-ok-accent:    #34d399;  /* = --sp-success */
+  --sp-vital-watch:      #fcd34d;  --sp-vital-watch-accent: #fbbf24;  /* = --sp-warn / --sp-warn-dot */
+  --sp-vital-out:        #f87171;  --sp-vital-out-accent:   #f87171;  /* = --sp-danger */
 
   /* — SOMBRAS — Material sustituye elevación por color — */
   --sp-shadow-flat:          none;                      /* TP:173 */
