@@ -578,7 +578,10 @@ a:hover { color: var(--sp-primary-active); }
 .sp-icobox {                     /* cuadrado redondeado: identidad del header */
   display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
   width: 44px; height: 44px; border-radius: var(--sp-r-icon-md);
-  background: var(--sp-primary-bg); color: var(--sp-primary);
+  /* El FONDO conserva --sp-primary-bg; solo el ÍCONO usa --sp-primary-text:
+     marca en rol de tinta; en dark se aclara vía C0. Con --sp-primary daba
+     ≈1.9:1 sobre superficie oscura. En claro no cambia nada. */
+  background: var(--sp-primary-bg); color: var(--sp-primary-text);
 }
 .sp-icobox--sm { width: 38px; height: 38px; }
 .sp-icobox--lg { width: 56px; height: 56px; border-radius: var(--sp-r-icon-lg); }
@@ -636,7 +639,10 @@ a:hover { color: var(--sp-primary-active); }
 /* --- 9. BADGES --------------------------------------------------------- */
 .sp-badge {
   display: inline-flex; align-items: center; gap: var(--sp-1-5);
-  background: var(--sp-primary-bg); color: var(--sp-primary);
+  /* Mismo criterio que .sp-icobox: el FONDO queda en --sp-primary-bg y solo el
+     TEXTO usa --sp-primary-text. Marca en rol de tinta; en dark se aclara vía
+     C0. Con --sp-primary daba ≈1.9:1 sobre superficie oscura. */
+  background: var(--sp-primary-bg); color: var(--sp-primary-text);
   font-size: var(--sp-fs-badge); font-weight: var(--sp-fw-bold);
   padding: 6px 12px; border-radius: var(--sp-r-pill); white-space: nowrap;
 }

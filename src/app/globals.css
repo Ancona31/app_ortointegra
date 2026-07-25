@@ -515,10 +515,14 @@ body {
   animation: checkPop 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
-/* Glow del título de la confirmación (migrado del <style> inline de nueva-nota) */
+/* Glow del título de la confirmación (migrado del <style> inline de nueva-nota).
+   Paso 3.2.C1: los colores pasan a tokens. Las declaraciones de una animación
+   ganan a cualquier declaración normal, así que los literales anulaban el color
+   de .sp-title-state y el override dark nunca llegaba: #1d1d1f sobre #1E1E1E
+   daba ≈1.0:1 y el título desaparecía media parte de cada ciclo. */
 @keyframes alertGlow {
-  0%, 100% { color: #1d1d1f; }
-  50%      { color: #dc2626; }
+  0%, 100% { color: var(--sp-ink-800); }
+  50%      { color: var(--sp-danger); }
 }
 .animate-alert-glow {
   animation: alertGlow 2s ease-in-out infinite;

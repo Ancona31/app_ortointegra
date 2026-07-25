@@ -100,6 +100,11 @@ export default function ModalShell({
   // Sin la prop, geo es null y los 5 segmentos de abajo son '': el className
   // resultante es idéntico carácter por carácter al de los 16 consumidores.
   const geo = spinusGeometry ? SP_GEO[spinusGeometry] : null
+  // Header sin contenido alguno (confirmación: title/subtitle vacíos, sin ícono,
+  // sin headerRight, con hideClose): renderizarlo deja una franja blanca con
+  // divisor y nada dentro. El `!!geo` lo acota al funnel — para los 15
+  // consumidores legacy geo es null y esto es siempre false.
+  const headerVacio = !!geo && !icon && !title && !subtitle && !headerRight
 
   return (
     <Portal>
@@ -111,20 +116,24 @@ export default function ModalShell({
         <div
           className={`relative ${geo ? 'bg-white' : 'bg-white/95 backdrop-blur-xl'} rounded-2xl shadow-2xl w-full ${maxWidth} max-h-[85vh] flex flex-col animate-modal-enter overflow-hidden${fullscreenMobile ? ' max-md:h-dvh max-md:max-h-dvh max-md:max-w-full max-md:rounded-none' : ''}${geo ? ` ${geo.panel} md:rounded-[var(--sp-r-modal)] md:shadow-[var(--sp-shadow-modal)] md:transition-[max-width] md:duration-[240ms] md:ease-[cubic-bezier(.4,0,.2,1)]` : ''}`}
         >
+          {!headerVacio && (
           <div className={`flex items-center justify-between px-5 py-4 border-b ${geo ? 'border-[var(--sp-line-divider)] md:px-6' : 'border-slate-100'} flex-shrink-0`}>
-            <div className="flex items-center gap-2.5 min-w-0">
+            <div className={`flex items-center ${geo ? 'gap-3.5' : 'gap-2.5'} min-w-0`}>
               {icon && (
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${iconBg ?? 'bg-slate-50'}`}>
+                <div className={geo ? 'sp-icobox' : `w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${iconBg ?? 'bg-slate-50'}`}>
                   {icon}
                 </div>
               )}
               <div className="min-w-0">
-                <h2 className="text-sm font-semibold text-[#1d1d1f] truncate">{title}</h2>
-                {subtitle && <p className="text-[11px] text-[#86868b] truncate">{subtitle}</p>}
+                <h2 className={geo ? 'sp-title-modal truncate' : 'text-sm font-semibold text-[#1d1d1f] truncate'}>{title}</h2>
+                {subtitle && <p className={geo ? 'sp-sub-modal truncate' : 'text-[11px] text-[#86868b] truncate'}>{subtitle}</p>}
               </div>
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
               {headerRight}
+              {/* El botón de cierre NO se migra: el sistema no expone clase de
+                  ícono-botón y sus colores actuales ya están cubiertos en dark
+                  por ThemeProvider. */}
               {!hideClose && (
                 <button
                   onClick={onClose}
@@ -136,6 +145,7 @@ export default function ModalShell({
               )}
             </div>
           </div>
+          )}
           <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
             {children}
           </div>

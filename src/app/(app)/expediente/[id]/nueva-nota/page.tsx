@@ -11,7 +11,7 @@ import { calcularEdad, generateDocFileName } from '@/lib/patientUtils'
 import { buildNotaRenderData } from '@/lib/notaRenderData'
 import {
   ArrowLeft, Save, Loader2, RotateCcw, Printer, Eye, Pencil,
-  Pill, FlaskConical, ScanLine, ClipboardList, CheckCircle2,
+  Pill, FlaskConical, ScanLine, ClipboardList, CheckCircle2, Check,
   BedDouble, PenLine, ShieldCheck, Receipt, X, FileText,
   ChevronLeft, ChevronRight, Mic, Sparkles, AlertTriangle,
 } from 'lucide-react'
@@ -103,32 +103,48 @@ function metaDelModal(e: EstadoModal): { title: string; subtitle: string; geomet
 }
 
 // Clase de animación del contenido del modal según la transición entre estados
-// (paso 3.1). Solo motion: 2→3 avanza (slide desde la derecha), 3→2 retrocede,
-// 3→4 celebra con checkPop; el resto es cross-fade. La dirección se deriva del
-// estado anterior sin estado de render extra (prevEstadoRef leído en render).
+// (paso 3.1). Solo motion: 2→3 avanza (slide desde la derecha), 3→2 retrocede;
+// el resto es cross-fade. La dirección se deriva del estado anterior sin estado
+// de render extra (prevEstadoRef leído en render).
+// 3→4 ya NO devuelve animate-check-pop (paso 3.2.C1): la celebración la hace
+// .sp-medal__core con sp-pop, y los transforms anidados se MULTIPLICAN — el
+// scale(.8) del wrapper contra el scale(.6) del medallón lo arrancaba a 0.48 y
+// metía el overshoot del resorte dentro de un padre todavía escalando.
 function claseTransicion(estado: EstadoModal, prev: EstadoModal): string {
   if (estado === 'confirmacion' && prev === 'revision') return 'animate-slide-from-right'
   if (estado === 'revision' && prev === 'confirmacion') return 'animate-slide-from-left'
-  if (estado === 'exito' && prev === 'confirmacion') return 'animate-check-pop'
   return 'animate-fade-in'
 }
 
-// Mensajes rotativos del Estado 0 (paso 3.1). Componente aislado: su re-render
-// no toca el modal. Al aparecer errorModal la rama de 'generando' cambia y este
-// hijo se desmonta → el interval se limpia solo (la rotación se detiene).
-const MENSAJES_GENERANDO = [
-  'Leyendo tu dictado…',
-  'Estructurando la nota…',
-  'Redactando la exploración…',
-  'Casi listo…',
+// Lista de pasos del Estado 0 (paso 3.2.C1, evoluciona los mensajes rotativos
+// de 3.1). Componente aislado: su re-render no toca el modal. Al aparecer
+// errorModal la rama de 'generando' cambia y este hijo se desmonta → el
+// interval se limpia solo (la progresión se detiene).
+// Los pasos NO corresponden a eventos reales: es progresión temporizada, la
+// misma honestidad que los mensajes que sustituye, mejor presentada. El índice
+// CLAMPEA en el último paso — ciclar des-completaría pasos ya marcados como
+// hechos; sostener la señal de "sigue trabajando" es tarea de los .sp-dots.
+const PASOS_GENERANDO = [
+  'Leyendo tu dictado',
+  'Estructurando la nota',
+  'Redactando la exploración',
 ]
-function MensajesRotativos() {
+function PasosGenerando() {
   const [i, setI] = useState(0)
   useEffect(() => {
-    const id = setInterval(() => setI(prev => (prev + 1) % MENSAJES_GENERANDO.length), 2000)
+    const id = setInterval(() => setI(prev => Math.min(prev + 1, PASOS_GENERANDO.length - 1)), 2000)
     return () => clearInterval(id)
   }, [])
-  return <p className="text-sm text-slate-500">{MENSAJES_GENERANDO[i]}</p>
+  return (
+    <ol className="sp-steps max-w-xs" role="status">
+      {PASOS_GENERANDO.map((texto, idx) => (
+        <li key={texto} className={`sp-step ${idx < i ? 'sp-step--done' : idx === i ? 'sp-step--active' : 'sp-step--pending'}`}>
+          {idx < i ? <Check /> : idx === i ? <span className="sp-spinner" /> : <span className="sp-step__dot" />}
+          {texto}
+        </li>
+      ))}
+    </ol>
+  )
 }
 
 const EMPTY_FORM: {
@@ -896,7 +912,10 @@ export default function NuevaNotaPage() {
     <div className="max-w-7xl mx-auto">
 
       {/* Modal del funnel de nota — máquina de estados (Paso 1.1). Vive al
-          nivel raíz: ya no lo desmonta el toggle IA/manual. */}
+          nivel raíz: ya no lo desmonta el toggle IA/manual.
+          Paso 3.2.C1: el Sparkles del header va sin size ni clase de color
+          (.sp-icobox fija 22px y el color de tinta) y ya no se pasa iconBg
+          — bajo spinusGeometry esa prop es inerte. */}
       <ModalShell
         open={estadoModal !== null}
         onClose={cerrarModalPorEstado}
@@ -905,17 +924,18 @@ export default function NuevaNotaPage() {
         hideClose={(generando && !errorModal) || estadoModal === 'confirmacion'}
         title={meta.title}
         subtitle={meta.subtitle}
-        icon={estadoModal === 'confirmacion' || estadoModal === 'exito' ? undefined : <Sparkles size={15} className="text-[#1e5fa8]" />}
-        iconBg="bg-[#1e5fa8]/10"
+        icon={estadoModal === 'confirmacion' || estadoModal === 'exito' ? undefined : <Sparkles />}
         headerRight={estadoModal === 'revision' ? (
+          /* max-md:hidden: con el título a 19px y el badge a 12px, en 375px el
+             título truncaría. El indicador es redundante en móvil. */
           modoNota === 'ia' ? (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-[#1e5fa8]/10 text-[#1e5fa8] border border-[#1e5fa8]/20">
-              <Sparkles size={9} />
+            <span className="sp-badge max-md:hidden">
+              <Sparkles />
               Nota IA
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
-              <PenLine size={9} />
+            <span className="sp-badge max-md:hidden">
+              <PenLine />
               Nota manual
             </span>
           )
@@ -974,13 +994,14 @@ export default function NuevaNotaPage() {
         ) : estadoModal === 'confirmacion' ? (
           <div className="flex items-center gap-2 p-4 md:px-6">
             <button onClick={() => setEstadoModal('revision')} disabled={guardando}
-              className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-40">
+              className="sp-btn sp-btn--ghost disabled:opacity-40">
               Volver a revisar
             </button>
             <div className="flex-1" />
-            <button onClick={guardar} disabled={guardando}
-              className="px-5 py-2 text-sm font-semibold bg-[#1e5fa8] text-white rounded-lg hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 flex items-center gap-2">
-              {guardando ? <><Loader2 size={15} className="animate-spin" /> Guardando...</> : <><Save size={15} /> Guardar nota</>}
+            {/* Sin disabled:opacity-50: .sp-btn--primary:disabled ya trae su
+                propio tratamiento y superponerlos lo lavaba. */}
+            <button onClick={guardar} disabled={guardando} className="sp-btn sp-btn--primary">
+              {guardando ? <><Loader2 size={17} className="animate-spin" /> Guardando...</> : <><Save size={17} /> Guardar nota</>}
             </button>
           </div>
         ) : estadoModal === 'exito' ? (
@@ -988,33 +1009,31 @@ export default function NuevaNotaPage() {
             {/* Primario único: la recompensa es la receta (blueprint §5.2). */}
             <button
               onClick={() => { setEstadoModal(null); setDocInline('receta') }}
-              className="w-full flex items-center justify-center gap-2 bg-[#1e5fa8] text-white px-5 py-3 rounded-lg text-sm font-semibold hover:bg-[#1a3a5c] transition-colors">
-              <Pill size={16} /> Generar receta
+              className="sp-btn sp-btn--primary sp-btn--primary-block sp-btn--reward">
+              <Pill size={17} /> Generar receta
               {medicamentosParaReceta.length > 0 && (
-                <span className="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-white/20">
+                <span className="sp-badge sp-badge--inline">
                   {medicamentosParaReceta.length} medicamento{medicamentosParaReceta.length === 1 ? '' : 's'}
                 </span>
               )}
             </button>
-            {/* Secundarios (ghost). Separados del primario por un filete; en una
-                sola fila, con flex-wrap como fallback en anchos estrechos (M7). */}
-            <div className="flex flex-nowrap max-md:flex-wrap items-center justify-center gap-1 mt-2 pt-3 border-t border-slate-100">
+            {/* Terciarios en rejilla 2×2, separados del primario por un filete.
+                En móvil C0 colapsa .sp-grid-actions a una sola columna. */}
+            <div className="sp-grid-actions mt-2 pt-3 border-t border-[var(--sp-line-divider)]">
               <button
                 onClick={() => { setEstadoModal(null); setTimeout(() => document.querySelector('[data-onboard="panel-documentos"]')?.scrollIntoView({ behavior: 'smooth' }), 0) }}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
-                <FileText size={15} /> Otros documentos
+                className="sp-btn sp-btn--tertiary">
+                <FileText size={17} /> Otros documentos
               </button>
               <button onClick={imprimir} disabled={imprimiendo}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-40">
-                {imprimiendo ? <><Loader2 size={15} className="animate-spin" /> Imprimiendo...</> : <><Printer size={15} /> Imprimir nota</>}
+                className="sp-btn sp-btn--tertiary disabled:opacity-40">
+                {imprimiendo ? <><Loader2 size={17} className="animate-spin" /> Imprimiendo...</> : <><Printer size={17} /> Imprimir nota</>}
               </button>
-              <Link href={`/expediente/${id}`}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
-                <Eye size={15} /> Ver expediente
+              <Link href={`/expediente/${id}`} className="sp-btn sp-btn--tertiary">
+                <Eye size={17} /> Ver expediente
               </Link>
-              <button onClick={() => setEstadoModal(null)}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
-                <X size={15} /> Cerrar
+              <button onClick={() => setEstadoModal(null)} className="sp-btn sp-btn--tertiary">
+                <X size={17} /> Cerrar
               </button>
             </div>
           </div>
@@ -1031,23 +1050,24 @@ export default function NuevaNotaPage() {
             </div>
             <p className="text-sm text-slate-600 leading-relaxed max-w-xs">{errorModal}</p>
             <div className="flex items-center gap-2 mt-1">
-              <button onClick={cancelarEntrevista}
-                className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
+              <button onClick={cancelarEntrevista} className="sp-btn sp-btn--ghost">
                 Cerrar
               </button>
-              <button onClick={generarNota}
-                className="px-5 py-2 text-sm font-semibold bg-[#1e5fa8] text-white rounded-lg hover:bg-[#1a3a5c] transition-colors flex items-center gap-2">
-                <RotateCcw size={14} /> Reintentar
+              <button onClick={generarNota} className="sp-btn sp-btn--primary">
+                <RotateCcw size={17} /> Reintentar
               </button>
             </div>
           </div>
         ) : (
-          <div className="px-4 py-12 md:px-6 flex flex-col items-center text-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-[#1e5fa8]/10 flex items-center justify-center">
-              <Sparkles size={22} className="text-[#1e5fa8]" />
+          <div className="px-4 py-12 md:px-6 flex flex-col items-center text-center gap-6">
+            {/* AMBAS clases: --xl solo redeclara la caja; el color del aro y la
+                animación sp-spin vienen de .sp-spinner. */}
+            <div className="relative flex items-center justify-center">
+              <span className="sp-spinner sp-spinner--xl absolute" aria-hidden="true" />
+              <span className="sp-icobox sp-icobox--lg"><Sparkles /></span>
             </div>
-            <Loader2 size={20} className="animate-spin text-[#1e5fa8]" />
-            <MensajesRotativos />
+            <PasosGenerando />
+            <span className="sp-dots" aria-hidden="true"><span /><span /><span /></span>
           </div>
         ))}
         {estadoModal === 'entrevista' && (
@@ -1271,26 +1291,31 @@ export default function NuevaNotaPage() {
         {estadoModal === 'confirmacion' && (
           <>
             <div className="px-4 md:px-6 pt-6 pb-4 text-center">
-              <div className="w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center bg-red-50 ring-4 ring-red-100" style={{ animation: 'pulse 1.5s ease-in-out infinite' }}>
-                <Save size={24} className="text-red-500" />
+              {/* El sistema no expone variante de peligro para .sp-icobox: la
+                  geometría es --lg y el color va inline sobre tokens danger. */}
+              <div className="sp-icobox sp-icobox--lg mx-auto mb-4"
+                style={{ background: 'var(--sp-danger-bg)', color: 'var(--sp-danger)', animation: 'pulse 1.5s ease-in-out infinite' }}>
+                <Save />
               </div>
-              <h3 className="text-lg font-bold text-[#1d1d1f]">
+              {/* --sp-fs-confirm existe como token pero ninguna .sp-* lo consume;
+                  la arbitraria lo referencia en vez de duplicar el literal. */}
+              <h3 className="sp-title-state text-[length:var(--sp-fs-confirm)]">
                 <span className="inline-block animate-alert-glow">
                   ¿Guardar esta nota?
                 </span>
               </h3>
-              <p className="text-sm text-[#3d3d3f] mt-3 leading-relaxed">
-                Una vez guardada, <span className="font-bold text-red-600">no podrá modificarse</span> por motivos de seguridad y cumplimiento normativo.
+              <p className="sp-body text-[length:var(--sp-fs-body-lg)] mt-3">
+                Una vez guardada, <span className="font-bold text-[var(--sp-danger-strong)]">no podrá modificarse</span> por motivos de seguridad y cumplimiento normativo.
                 Si necesitas hacer correcciones después, podrás agregar una nota aclaratoria (addendum).
               </p>
               {sinVitalesCapturados && (
-                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3 text-left">
+                <p className="sp-banner sp-banner--warn mt-3">
                   ⚠ No capturaste signos vitales en esta nota.
                 </p>
               )}
             </div>
             {errorModal && (
-              <div className="mx-5 mb-5 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs">
+              <div className="sp-banner sp-banner--danger mx-5 mb-5">
                 {errorModal}
               </div>
             )}
@@ -1298,15 +1323,18 @@ export default function NuevaNotaPage() {
         )}
         {estadoModal === 'exito' && (
           <div className="px-4 md:px-6 pt-8 pb-6 flex flex-col items-center text-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-emerald-50 ring-4 ring-emerald-100 flex items-center justify-center">
-              <CheckCircle2 size={34} className="text-emerald-500" />
+            <div className="sp-medal">
+              {/* Check (1 path, ≈22.6u) y NO CheckCircle2: ese renderiza DOS
+                  paths y el arco de ~52u queda partido para siempre bajo el
+                  stroke-dasharray:32 con que .sp-medal__core dibuja el trazo. */}
+              <div className="sp-medal__core"><Check /></div>
             </div>
-            <h3 className="text-lg font-bold text-[#1d1d1f]">Nota guardada</h3>
-            <p className="text-sm text-[#3d3d3f] leading-relaxed max-w-xs">
+            <h3 className="sp-title-state">Nota guardada</h3>
+            <p className="sp-body max-w-xs">
               Quedó sellada en el expediente.
             </p>
             {errorModal && (
-              <div className="w-full mt-1 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs">
+              <div className="sp-banner sp-banner--danger w-full mt-1">
                 {errorModal}
               </div>
             )}
