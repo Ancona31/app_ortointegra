@@ -690,7 +690,9 @@ a:hover { color: var(--sp-primary-active); }
 }
 .sp-progress__track { flex: 1; display: flex; gap: var(--sp-1-5); }
 .sp-progress__seg {
-  flex: 1; height: 7px; border-radius: 4px; background: color-mix(in srgb, var(--cs, #1e5fa8) 16%, #fff);
+  /* Enrutado por token: la mezcla contra #fff literal invertía la lectura del
+     progreso en modo oscuro. */
+  flex: 1; height: 7px; border-radius: 4px; background: var(--sp-primary-track);
   transition: background var(--sp-dur-base) var(--sp-ease-out);
 }
 .sp-progress__seg--done { background: var(--sp-primary); }

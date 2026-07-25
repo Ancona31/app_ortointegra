@@ -942,31 +942,34 @@ export default function NuevaNotaPage() {
         ) : undefined}
         footer={estadoModal === 'entrevista' ? (
           <div className="flex items-center gap-2 p-4 md:px-6">
+            {/* max-md:hidden: con las métricas de .sp-btn los 3 botones suman
+                397px en el último bloque contra 343px útiles. La X del header
+                ejecuta cancelarEntrevista() — el mismo handler — así que en
+                móvil no se pierde la salida. */}
             <button onClick={cancelarEntrevista} disabled={generando}
-              className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-40">
+              className="sp-btn sp-btn--ghost disabled:opacity-40 max-md:hidden">
               Cancelar
             </button>
             <div className="flex-1" />
             <button onClick={() => setBloqueActual(i => i - 1)} disabled={bloqueActual === 0 || generando}
-              className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+              className="sp-btn sp-btn--secondary disabled:opacity-40 disabled:cursor-not-allowed">
               Anterior
             </button>
             {esUltimoBloque ? (
               <button onClick={responderEntrevista} disabled={!bloqueCompleto || generando}
-                className="px-5 py-2 text-sm font-semibold bg-[#1e5fa8] text-white rounded-lg hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 flex items-center gap-2">
-                {generando ? <><Loader2 size={15} className="animate-spin" /> Enviando...</> : 'Enviar respuestas'}
+                className="sp-btn sp-btn--primary">
+                {generando ? <><Loader2 size={17} className="animate-spin" /> Enviando...</> : 'Enviar respuestas'}
               </button>
             ) : (
               <button onClick={() => setBloqueActual(i => i + 1)} disabled={!bloqueCompleto}
-                className="px-5 py-2 text-sm font-semibold bg-[#1e5fa8] text-white rounded-lg hover:bg-[#1a3a5c] transition-colors disabled:opacity-50">
+                className="sp-btn sp-btn--primary">
                 Siguiente
               </button>
             )}
           </div>
         ) : estadoModal === 'revision' ? (
           <div className="flex items-center gap-2 p-4 md:px-6">
-            <button onClick={cancelarEntrevista}
-              className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
+            <button onClick={cancelarEntrevista} className="sp-btn sp-btn--ghost">
               Cerrar
             </button>
             <div className="flex-1" />
@@ -975,20 +978,20 @@ export default function NuevaNotaPage() {
             <button
               onClick={() => { setErrorModal(null); intentarGuardar() }}
               disabled={guardando || !consultorioActivo}
-              className="px-5 py-2 text-sm font-semibold bg-[#1e5fa8] text-white rounded-lg hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 flex items-center gap-2">
-              {guardando ? <><Loader2 size={15} className="animate-spin" /> Guardando...</> : <><Save size={15} /> Guardar nota</>}
+              className="sp-btn sp-btn--primary">
+              {guardando ? <><Loader2 size={17} className="animate-spin" /> Guardando...</> : <><Save size={17} /> Guardar nota</>}
             </button>
           </div>
         ) : estadoModal === 'contexto' ? (
           <div className="flex items-center gap-2 p-4 md:px-6">
             <button onClick={() => { setEstadoModal('revision'); setErrorModal(null) }}
-              className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
+              className="sp-btn sp-btn--ghost">
               Cancelar
             </button>
             <div className="flex-1" />
             <button onClick={generarNota} disabled={!form.motivo_consulta.trim()}
-              className="px-5 py-2 text-sm font-semibold bg-[#1e5fa8] text-white rounded-lg hover:bg-[#1a3a5c] transition-colors disabled:opacity-50 flex items-center gap-2">
-              <Sparkles size={15} /> Regenerar nota
+              className="sp-btn sp-btn--primary">
+              <Sparkles size={17} /> Regenerar nota
             </button>
           </div>
         ) : estadoModal === 'confirmacion' ? (
@@ -1076,16 +1079,18 @@ export default function NuevaNotaPage() {
             {/* Progreso */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                <p className="sp-label">
                   Bloque {bloqueActual + 1} de {bloquesEntrevista.length}
                 </p>
                 {!bloqueCompleto && faltanEnBloque > 0 && (
-                  <p className="text-[11px] text-amber-600">Faltan {faltanEnBloque} por responder</p>
+                  <p className="sp-hint text-[var(--sp-warn)]">Faltan {faltanEnBloque} por responder</p>
                 )}
               </div>
-              <div className="flex gap-1">
+              {/* Solo __track/__seg: .sp-progress pondría la etiqueta y la barra
+                  en la misma fila y obligaría a reubicar "Faltan N". */}
+              <div className="sp-progress__track">
                 {bloquesEntrevista.map((_, i) => (
-                  <div key={i} className={`h-1 flex-1 rounded-full ${i <= bloqueActual ? 'bg-[#1e5fa8]' : 'bg-slate-200'}`} />
+                  <div key={i} className={`sp-progress__seg ${i <= bloqueActual ? 'sp-progress__seg--done' : ''}`} />
                 ))}
               </div>
             </div>
@@ -1093,13 +1098,13 @@ export default function NuevaNotaPage() {
             {/* Preguntas del bloque actual */}
             {bloqueEnCurso && (
               <div className="space-y-4">
-                <h3 className="text-sm font-bold text-slate-700">{bloqueEnCurso.titulo}</h3>
+                <h3 className="sp-title-sec">{bloqueEnCurso.titulo}</h3>
                 {bloqueEnCurso.preguntas.map(preg => {
                   const respondida = !!(respuestasEntrevista[preg.id] ?? '').trim()
                   return (
                     <div key={preg.id} className="space-y-1.5">
-                      <p className="text-sm text-slate-700 flex items-start gap-1.5">
-                        <span className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${respondida ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                      <p className="sp-body flex items-start gap-1.5">
+                        <span className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${respondida ? 'bg-[var(--sp-success-dot)]' : 'bg-[var(--sp-warn-dot)]'}`} />
                         <span>{preg.pregunta}</span>
                       </p>
                       {preg.opciones.length > 0 && (
@@ -1107,7 +1112,7 @@ export default function NuevaNotaPage() {
                           {preg.opciones.map(op => (
                             <button key={op} type="button"
                               onClick={() => setRespuestasEntrevista(prev => ({ ...prev, [preg.id]: op }))}
-                              className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${respuestasEntrevista[preg.id] === op ? 'bg-[#1e5fa8] text-white border-[#1e5fa8]' : 'bg-white text-slate-600 border-slate-300 hover:border-slate-400'}`}>
+                              className={`sp-chip ${respuestasEntrevista[preg.id] === op ? 'sp-chip--selected' : ''}`}>
                               {op}
                             </button>
                           ))}
@@ -1117,7 +1122,7 @@ export default function NuevaNotaPage() {
                         value={respuestasEntrevista[preg.id] ?? ''}
                         onChange={e => setRespuestasEntrevista(prev => ({ ...prev, [preg.id]: e.target.value }))}
                         placeholder="Escribe tu respuesta..."
-                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                        className="sp-input" />
                     </div>
                   )
                 })}
@@ -1125,7 +1130,7 @@ export default function NuevaNotaPage() {
             )}
           </div>
             {errorModal && (
-              <div className="mx-5 mb-5 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs">
+              <div className="sp-banner sp-banner--danger mx-5 mb-5">
                 {errorModal}
               </div>
             )}
@@ -1133,37 +1138,49 @@ export default function NuevaNotaPage() {
         )}
         {estadoModal === 'revision' && (
           <div className="p-4 md:p-6 space-y-5">
+            {/* Cambios sin guardar — encima del cuerpo, no junto al botón: la
+                advertencia es sobre el estado de la nota, no sobre la acción.
+                Se calla mientras el swap de confirmación (R12) está abierto,
+                que ya dice lo mismo y con más precisión. */}
+            {notaEditada && !confirmarPisado && (
+              <p className="sp-banner sp-banner--warn">
+                <AlertTriangle />
+                Tienes cambios sin guardar. Regenerar con IA los perderá.
+              </p>
+            )}
             {/* ── La nota ── */}
             <div>
               <div className="flex items-center justify-between gap-2 mb-2">
-                <p className="text-xs text-slate-400">
+                <p className="sp-hint">
                   {modoEdicion ? 'Editando texto' : 'Vista previa — haz clic en Editar para modificar'}
                 </p>
                 <div className="flex items-center gap-2">
                   <button onClick={() => setModoEdicion(!modoEdicion)}
-                    className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition-colors ${modoEdicion ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-slate-100 border-slate-200 text-slate-600 hover:border-slate-300'}`}>
-                    {modoEdicion ? <><Eye size={12} /> Vista previa</> : <><Pencil size={12} /> Editar</>}
+                    className="sp-btn sp-btn--compact">
+                    {modoEdicion ? <><Eye size={15} /> Vista previa</> : <><Pencil size={15} /> Editar</>}
                   </button>
                   <button
                     onClick={() => { if (notaEditada) { setConfirmarPisado(true); return } ejecutarPisado() }}
                     disabled={generando || !form.motivo_consulta.trim()}
-                    className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 px-2 py-1 disabled:opacity-40">
-                    <RotateCcw size={12} /> {modoNota === 'ia' ? 'Regenerar' : 'Actualizar'}
+                    className="sp-btn sp-btn--compact disabled:opacity-40">
+                    <RotateCcw size={15} /> {modoNota === 'ia' ? 'Regenerar' : 'Actualizar'}
                   </button>
                 </div>
               </div>
 
               {/* R12: la confirmación solo advierte; nada se pisa hasta confirmar */}
               {confirmarPisado && (
-                <div className="mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 space-y-2">
-                  <p className="text-xs text-amber-800 leading-relaxed">Perderás tus cambios — ¿Continuar?</p>
+                <div className="sp-banner sp-banner--warn flex-col items-start gap-2 mb-3">
+                  <p>Perderás tus cambios — ¿Continuar?</p>
                   <div className="flex gap-2">
+                    {/* C0 no expone botón de advertencia; el color va inline
+                        sobre tokens warn, mismo patrón que el icobox de peligro. */}
                     <button onClick={ejecutarPisado}
-                      className="px-3 py-1.5 text-xs font-semibold bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors">
+                      className="sp-btn sp-btn--compact"
+                      style={{ background: 'var(--sp-warn-bg-badge)', color: 'var(--sp-warn)' }}>
                       {modoNota === 'ia' ? 'Sí, regenerar' : 'Sí, actualizar'}
                     </button>
-                    <button onClick={() => setConfirmarPisado(false)}
-                      className="px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+                    <button onClick={() => setConfirmarPisado(false)} className="sp-btn sp-btn--compact">
                       Conservar
                     </button>
                   </div>
@@ -1171,11 +1188,14 @@ export default function NuevaNotaPage() {
               )}
 
               {modoEdicion ? (
+                /* .sp-editzone gana a .sp-textarea (va después, misma
+                   especificidad) en borde, radio, fondo, padding y halo;
+                   sobreviven width/box-sizing/resize. font-mono es deliberado. */
                 <textarea
                   value={notaGenerada}
                   onChange={e => { setNotaGenerada(e.target.value); setNotaEditada(true) }}
                   rows={16}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 resize-y" />
+                  className="sp-textarea sp-editzone font-mono" />
               ) : (
                 <div className="prose prose-sm max-w-none prose-headings:text-[#1a3a5c] prose-headings:font-bold prose-headings:text-sm prose-headings:mt-4 prose-headings:mb-1 prose-strong:text-[#1a3a5c] prose-strong:font-semibold prose-p:text-slate-700 prose-p:leading-relaxed prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-li:text-slate-700">
                   <ReactMarkdown>{notaFinal}</ReactMarkdown>
@@ -1185,21 +1205,24 @@ export default function NuevaNotaPage() {
 
             {/* ── Medicamentos detectados (solo IA) ── */}
             {modoNota === 'ia' && medicamentos.some(m => m.nombre.trim()) && (
-              <div className="border-t border-slate-100 pt-4">
-                <p className="text-xs text-slate-500 mb-2">
+              <div className="sp-card-inner">
+                <p className="sp-secondary mb-2">
                   Detecté estos medicamentos (precargarán tu receta):
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {/* Índice del array REAL: puede haber filas vacías intercaladas
                       (IA con nombre nulo, o la tabla T4 que sigue viva hasta 2.1). */}
                   {medicamentos.map((m, i) => m.nombre.trim() ? (
-                    <span key={i}
-                      className="inline-flex items-center gap-1 pl-3 pr-1 py-1 rounded-full border border-[#1e5fa8]/20 bg-[#1e5fa8]/5 text-xs text-[#1a3a5c]">
+                    /* cursor-auto: el chip NO es clicable, solo su ✕ lo es. */
+                    <span key={i} className="sp-chip sp-chip--removable cursor-auto">
                       {m.nombre.trim()}
+                      {/* .sp-chip__remove YA resuelve los 44px táctiles con
+                          margen negativo + content-box: nada de after:-inset-2,
+                          acumularlos daría 60px y solaparía chips vecinos. */}
                       <button type="button" onClick={() => removeMed(i)}
                         aria-label={`Quitar ${m.nombre.trim()}`}
-                        className="relative w-7 h-7 flex items-center justify-center rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors after:absolute after:-inset-2 after:content-['']">
-                        <X size={13} />
+                        className="sp-chip__remove">
+                        <X />
                       </button>
                     </span>
                   ) : null)}
@@ -1208,14 +1231,14 @@ export default function NuevaNotaPage() {
             )}
 
             {/* ── Diagnósticos (lectura, ambos modos) ── */}
-            <div className="border-t border-slate-100 pt-4">
-              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Diagnósticos</h3>
+            <div className="sp-card-inner">
+              <h3 className="sp-label mb-2">Diagnósticos</h3>
               {dxValidos.length > 0 ? (
                 <ul className="space-y-1">
                   {dxValidos.map((d, i) => (
-                    <li key={i} className="text-sm text-slate-700 leading-relaxed">
+                    <li key={i} className="sp-body">
                       {d.codigo_cie10 ? (
-                        <><span className="font-semibold text-[#1a3a5c]">{d.codigo_cie10}</span> — {d.descripcion.trim()}</>
+                        <><span className="font-semibold text-[var(--sp-primary-text)]">{d.codigo_cie10}</span> — {d.descripcion.trim()}</>
                       ) : d.descripcion.trim()}
                     </li>
                   ))}
@@ -1223,50 +1246,52 @@ export default function NuevaNotaPage() {
               ) : (
                 /* N1: solo alcanzable en IA (manual valida ≥1 dx antes de abrir). Se MUESTRA
                    en vez de ocultarse: la invisibilidad del dx fue justo R7. */
-                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <p className="sp-banner sp-banner--warn">
                   Sin diagnóstico estructurado — la nota se guardará sin código CIE-10.
                 </p>
               )}
               {modoNota === 'ia' && (
-                <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+                <p className="sp-hint mt-2">
                   ¿Algo incorrecto? Regenera la nota con más contexto.
                 </p>
               )}
             </div>
 
             {/* ── Seguimiento ── */}
-            <div className="border-t border-slate-100 pt-4">
-              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Seguimiento</h3>
+            <div className="sp-card-inner">
+              <h3 className="sp-label mb-2">Seguimiento</h3>
               {modoEdicion ? (
                 <div className="space-y-3">
                   <div>
-                    <label className="text-xs font-medium text-slate-500 block mb-1">Pronóstico <span className="text-slate-400 font-normal">(opcional)</span></label>
+                    {/* Convención M8: la opcionalidad se señala por AUSENCIA de
+                        asterisco, no con el sufijo "(opcional)". */}
+                    <label className="sp-label-field block mb-1">Pronóstico</label>
                     <input type="text" value={form.pronostico} onChange={e => update('pronostico', e.target.value)}
                       placeholder="Ej: Favorable a mediano plazo con tratamiento conservador..."
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                      className="sp-input" />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-slate-500 block mb-1">Próxima cita</label>
+                    <label className="sp-label-field block mb-1">Próxima cita</label>
                     <input type="text" value={form.proxima_cita} onChange={e => update('proxima_cita', e.target.value)}
                       placeholder="Ej: En 4 semanas, 15 de abril 2026..."
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                      className="sp-input" />
                   </div>
                 </div>
               ) : (
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1 min-w-0">
-                    <p className="text-xs text-slate-500">
-                      <span className="text-slate-400">Pronóstico: </span>
-                      <span className="text-slate-600 break-words">{form.pronostico.trim() || '—'}</span>
+                    <p className="sp-secondary">
+                      <span className="text-[var(--sp-ink-350)]">Pronóstico: </span>
+                      <span className="break-words">{form.pronostico.trim() || '—'}</span>
                     </p>
-                    <p className="text-xs text-slate-500">
-                      <span className="text-slate-400">Próxima cita: </span>
-                      <span className="text-slate-600 break-words">{form.proxima_cita.trim() || '—'}</span>
+                    <p className="sp-secondary">
+                      <span className="text-[var(--sp-ink-350)]">Próxima cita: </span>
+                      <span className="break-words">{form.proxima_cita.trim() || '—'}</span>
                     </p>
                   </div>
                   <button onClick={() => setModoEdicion(true)}
-                    className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border bg-slate-100 border-slate-200 text-slate-600 hover:border-slate-300 transition-colors flex-shrink-0">
-                    <Pencil size={12} /> Editar
+                    className="sp-btn sp-btn--compact flex-shrink-0">
+                    <Pencil size={15} /> Editar
                   </button>
                 </div>
               )}
@@ -1275,15 +1300,16 @@ export default function NuevaNotaPage() {
         )}
         {estadoModal === 'contexto' && (
           <div className="p-4 md:p-6 space-y-3">
-            <p className="text-xs text-slate-500 leading-relaxed">
+            <p className="sp-secondary">
               Corrige o amplía el contexto; la nota se generará de nuevo.
             </p>
+            {/* resize-y se cae: .sp-textarea ya trae resize: vertical. */}
             <textarea
               value={form.motivo_consulta}
               onChange={e => update('motivo_consulta', e.target.value)}
               rows={10}
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-            <p className="text-[11px] text-slate-400 leading-relaxed">
+              className="sp-textarea" />
+            <p className="sp-hint">
               Tu nota actual se conserva hasta que la nueva esté lista.
             </p>
           </div>
