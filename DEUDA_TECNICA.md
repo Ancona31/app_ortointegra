@@ -859,4 +859,584 @@ los logs de Vercel.
 
 ---
 
+## Funnel de nota — Fase A
+
+Deuda detectada durante el rediseño del funnel de nota
+(`/expediente/[id]/nueva-nota`), Fase A (pasos 1.1 → 3.3). Registrada en el
+sub-paso 3.3b (2026-07-26), después de que 3.3a moviera líneas en `page.tsx`,
+`globals.css` y `spinus-tokens.css`: todas las referencias de abajo están
+verificadas contra el árbol posterior a esa limpieza.
+
+**La numeración FN-DT-N es fija.** `FN-DT-20` está citado desde
+`src/app/spinus-tokens.css:229-231`; no reasignar números al reordenar.
+
+> **Lee esto antes de atacar FN-DT-7 … FN-DT-16.** Las diez son síntomas de una
+> misma raíz, no diez bugs independientes: el modo oscuro se implementa en
+> `src/components/layout/ThemeProvider.tsx` **cazando clases de Tailwind** —
+> ~76 reglas `html.dark .clase { … !important }` inyectadas en un `<style>`
+> (:97-229). Todo lo que no sea exactamente una clase se le escapa: estilos
+> inline, valores arbitrarios (`bg-white/95`), hex propios (`#EF5350`),
+> selectores compuestos que no matchean ningún elemento real, y clases de
+> Tailwind que nadie se acordó de listar. Arreglarlas una por una añade más
+> reglas al mismo montón y multiplica los conflictos de FN-DT-9. El arreglo
+> estructural es migrar el dark a tokens —como ya hizo el paso 3.2.C0 con el
+> bloque `html.dark` de `spinus-tokens.css`— y adelgazar `ThemeProvider` hasta
+> dejarlo solo con el color de perfil (`--cp`/`--cs`). **Atacar en bloque, no en
+> goteo.**
+
+### FN-DT-1 — `consultas.medicamentos`: la DB guarda `null`, el tipo no lo admite
+- **Estado:** 🔴 abierta
+- **Detectada:** Funnel de nota, Fase A (2026-07-26)
+- **Archivos afectados:**
+  - src/types/index.ts:79 (`medicamentos?: MedicamentoConsulta[]`)
+  - src/app/(app)/expediente/[id]/nueva-nota/page.tsx:700 (escritura)
+- **Descripción:** `Consulta.medicamentos` está tipado como opcional pero **no
+  anulable**. El funnel escribe explícitamente `null` cuando no hay
+  medicamentos: `medicamentos: medsConDatos.length ? medsConDatos : null`
+  (page.tsx:700). Es decir, la columna jsonb tiene tres estados reales
+  (ausente, `null`, array) y el tipo solo declara dos. Fusiona dos ítems del
+  plan que eran el mismo problema visto desde los dos lados: "normalizar
+  `null`/`[]`" y "verificar `types/index.ts`".
+- **Impacto:** latente. TypeScript no lo atrapa porque las filas llegan de
+  Supabase con tipado laxo y nadie asigna la fila cruda al tipo; el guard
+  `?.`/truthy que usan los consumidores actuales funciona igual con `null` que
+  con `undefined`. El riesgo aparece cuando alguien escriba
+  `consulta.medicamentos.map(...)` confiando en el tipo, o cuando se generen
+  tipos con `supabase gen types` y las dos definiciones diverjan.
+- **Origen:** el shape lo fijó el formulario de nueva-nota; el tipo se escribió
+  después, mirando el formulario y no la columna.
+- **Fix:** decidir UNA forma canónica y aplicarla en los dos extremos. Opción
+  preferida: normalizar a `[]` en la API (`/api/consultas`) y migración que
+  convierta los `null` existentes; alternativa barata: cambiar el tipo a
+  `medicamentos?: MedicamentoConsulta[] | null` y dejar la DB como está.
+- **Cuándo atacar:** antes de generar tipos de Supabase o de escribir cualquier
+  lector nuevo de `consultas.medicamentos`.
+
+### FN-DT-2 — `RecetaForm` no reacciona a cambios de `medicamentosIniciales`
+- **Estado:** 🔴 abierta
+- **Detectada:** Funnel de nota, Fase A (2026-07-26)
+- **Archivos afectados:**
+  - src/components/documentos/RecetaForm.tsx:201-207
+  - src/app/(app)/expediente/[id]/nueva-nota/page.tsx:786-795 (`medicamentosParaReceta`)
+- **Descripción:** `medInicial` se calcula en el cuerpo del componente
+  (RecetaForm.tsx:201-204) y se pasa como **valor inicial** de
+  `useState(medInicial)` (:206) y de `sugerenciasDosis` (:207). React ignora el
+  valor inicial en todos los renders posteriores al montaje: si la prop
+  `medicamentosIniciales` cambia con el formulario montado, la lista no se
+  entera. No hay ningún `useEffect` que sincronice (los `setMedicamentos` de
+  :213-227 son todos de interacción del usuario).
+- **Impacto:** hoy no se materializa. En el funnel la receta se abre desde el
+  Estado Éxito o desde el panel de documentos, con la nota ya guardada y los
+  medicamentos congelados; y cada apertura monta el form de cero. Es una trampa
+  para el futuro: cualquier flujo que edite medicamentos con la receta abierta
+  —incluido el fix de FN-DT-19— mostrará datos viejos sin avisar.
+- **Origen:** patrón "props como estado inicial", común en el resto de los
+  formularios de documentos.
+- **Fix:** `useEffect` que resincronice cuando cambie la prop, o forzar remount
+  con `key={...}` desde el llamador. La segunda es una línea y no toca el form.
+- **Cuándo atacar:** junto con FN-DT-19, que es lo que lo va a despertar.
+
+### FN-DT-3 — `env(safe-area-inset-*)` sin `viewport-fit=cover`: resuelve a 0 en iOS
+- **Estado:** 🔴 abierta
+- **Detectada:** Funnel de nota, Fase A (2026-07-26)
+- **Archivos afectados:**
+  - src/app/layout.tsx (sin `export const viewport`; :13 declara
+    `apple-mobile-web-app-status-bar-style: black-translucent`)
+  - src/components/ui/ModalShell.tsx:117 (panel fullscreen móvil)
+- **Descripción:** `env(safe-area-inset-*)` solo devuelve valores distintos de
+  cero si el viewport declara `viewport-fit=cover`. `src/app/layout.tsx` no
+  exporta `viewport` ni emite esa meta, así que cualquier `env(...)` del repo
+  vale 0 en iOS. Y sí importa: `:13` pide barra de estado translúcida, que es
+  justo lo que mete el contenido debajo del notch y del home indicator en modo
+  standalone.
+- **Impacto:** hoy **cero consumidores**: la única regla que usaba
+  `env(safe-area-inset-bottom)` era el `.sp-modal__footer` móvil de la sección
+  `6. MODAL` de `spinus-tokens.css`, borrada en 3.3a junto con el resto del
+  bloque muerto (`grep -rn "safe-area" src/ public/` no devuelve nada). Queda
+  como deuda latente: el modal del funnel es fullscreen en móvil
+  (`max-md:h-dvh`, ModalShell.tsx:117) y su footer no reserva el home
+  indicator, así que el primer intento de arreglarlo con `env()` fallará en
+  silencio y parecerá un bug de CSS.
+- **Origen:** el `layout.tsx` es anterior a la API `viewport` de Next; nunca se
+  migró.
+- **Fix:** `export const viewport: Viewport = { viewportFit: 'cover' }` en
+  `src/app/layout.tsx` (API de Next 16 — **verificar en
+  `node_modules/next/dist/docs/` antes de escribirlo**), y recién entonces
+  añadir `padding-bottom: max(Npx, env(safe-area-inset-bottom))` donde toque.
+- **Cuándo atacar:** cuando se retome el pulido móvil del modal, o al primer
+  reporte de botón tapado por el home indicator.
+
+### FN-DT-4 — `secureStorage` traga la cuota en silencio y el chip "Borrador guardado" miente
+- **Estado:** 🔴 abierta
+- **Detectada:** Funnel de nota, Fase A (2026-07-26)
+- **Archivos afectados:**
+  - src/lib/secureStorage.ts:60-95 (`set`)
+  - src/app/(app)/expediente/[id]/nueva-nota/page.tsx:344-346, :1465-1470
+- **Descripción:** `secureStorage.set()` envuelve el `localStorage.setItem` de
+  la rama cifrada en un `try` (:89) cuyo `catch` (:90-92) intenta el fallback
+  sin cifrar dentro de **otro `catch {}` vacío**. Un `QuotaExceededError` —o
+  cualquier fallo de escritura— se traga entero y la promesa resuelve como si
+  todo hubiera ido bien. El autosave del funnel encadena
+  `.then(() => setUltimoGuardado(new Date()))` (page.tsx:345), así que el chip
+  verde "Borrador guardado" (:1465-1470) se enciende sin que exista borrador.
+- **Impacto:** el médico cree tener red de seguridad y no la tiene. Si el
+  navegador está al límite de cuota (varios pacientes con borradores, PWA con
+  caché llena), un cierre accidental de pestaña pierde la nota completa
+  mostrando "Borrador guardado" hasta el último segundo. Baja frecuencia, alto
+  costo cuando pasa.
+- **Origen:** los `catch {}` son deliberados (evitar que un fallo de
+  `localStorage` tumbe la app); lo que falta es propagar el resultado.
+- **Fix:** que `set()` devuelva `Promise<boolean>` (o rechace) y que el
+  llamador solo encienda el chip si fue verdad; en el fallo, mostrar aviso.
+  ~10 líneas entre los dos archivos.
+- **Cuándo atacar:** prioridad media-alta — es el único ítem de esta tanda con
+  pérdida de datos clínicos como resultado posible.
+
+### FN-DT-5 — `ModalShell` sin focus trap
+- **Estado:** 🔴 abierta
+- **Detectada:** Funnel de nota, Fase A (2026-07-26). Deuda preexistente,
+  registrada antes en `CLAUDE.md`.
+- **Archivo afectado:** src/components/ui/ModalShell.tsx:71-89
+- **Descripción:** el modal maneja `Escape` con un listener global (:81-89) y
+  el scroll-lock, pero **no gestiona el foco**: no lo mueve al panel al abrir,
+  no atrapa el `Tab` dentro del diálogo (se escapa a la página de atrás, bajo
+  el backdrop) y no lo restaura al elemento que abrió el modal al cerrar.
+- **Impacto:** accesibilidad (WCAG 2.4.3 / patrón `dialog` de ARIA). Afecta a
+  los **16 consumidores** de `ModalShell`, incluido el funnel de nota completo,
+  donde el modal es la superficie principal de trabajo. Sin impacto para el
+  usuario de ratón.
+- **⚠️ DUPLICADA:** esta entrada y el ítem 2 de `CLAUDE.md`
+  §"Deuda técnica conocida" ("`ModalShell` sin focus trap") son la misma deuda.
+  **Al cerrarla hay que borrar las dos**, no solo esta.
+- **Fix:** focus trap estándar (primer elemento enfocable al abrir, ciclo de
+  `Tab`/`Shift+Tab` acotado al panel, restauración al cerrar) + `role="dialog"`
+  y `aria-modal="true"`. Un solo archivo.
+- **Cuándo atacar:** cuando haya auditoría de accesibilidad formal, o antes si
+  entra un requisito de a11y por contrato.
+
+### FN-DT-6 — Catálogo `cat_cie10` incompleto degrada el autocomplete de la vía manual
+- **Estado:** 🔴 abierta
+- **Detectada:** Funnel de nota, Fase A — QA de la vía manual (2026-07-26)
+- **Archivos afectados:**
+  - src/app/api/cie10/route.ts:26-31 (query a `cat_cie10`)
+  - src/components/ui/CIE10Combobox.tsx:56 (consumidor)
+  - src/components/documentos/DiagnosticosEditor.tsx:4 (lo monta la vía manual)
+- **Descripción:** el endpoint busca por código o descripción con `ilike` y
+  `.limit(15)` sobre `cat_cie10`. **El código es correcto**: la deuda es de
+  datos — la tabla no tiene el catálogo CIE-10 completo, así que diagnósticos
+  frecuentes no aparecen al teclear y el médico termina escribiendo la
+  descripción libre sin código.
+- **Impacto:** notas guardadas sin CIE-10 donde sí había código aplicable.
+  Afecta a la calidad del expediente y a cualquier explotación estadística
+  futura. No bloquea: el editor acepta diagnóstico sin código a propósito.
+- **Origen:** la tabla se sembró parcialmente; nunca se cargó el catálogo
+  oficial completo.
+- **Fix:** cargar el catálogo CIE-10 completo (fuente oficial de la SSA) en
+  `cat_cie10` vía migración de datos. Revisar de paso si conviene índice
+  `pg_trgm`/`unaccent` para que el `ilike` escale (ver E5-DT-23, que ya apunta
+  a `unaccent` instalada pero no cableada).
+- **Cuándo atacar:** independiente del funnel; es carga de datos + un índice.
+
+### FN-DT-7 — 🔴 BUG VIVO: 15 de 16 modales con panel casi blanco en modo oscuro
+- **Estado:** 🔴 **abierta — bug de producción, no deuda latente**
+- **Detectada:** Funnel de nota, Fase A (2026-07-26)
+- **Archivos afectados:**
+  - src/components/layout/ThemeProvider.tsx:117 (`html.dark .bg-white`)
+  - src/components/ui/ModalShell.tsx:117 (clase del panel)
+  - src/app/(app)/expediente/[id]/nueva-nota/page.tsx:913 (único que pasa `spinusGeometry`)
+- **Descripción:** la regla de superficie del modo oscuro es
+  `html.dark .bg-white { background-color: #1E1E1E !important }`
+  (ThemeProvider:117) — matchea la clase `bg-white` **exacta**. El panel de
+  `ModalShell` usa
+  `${geo ? 'bg-white' : 'bg-white/95 backdrop-blur-xl'}` (:117): con geometría
+  del sistema aplica `bg-white` y se oscurece; sin ella aplica `bg-white/95`,
+  que es **otra clase** y no matchea nada. `geo` solo es no-nulo cuando el
+  llamador pasa `spinusGeometry`, y el único que lo hace es el funnel de nota
+  (page.tsx:913).
+- **Impacto:** **de los 16 consumidores de `ModalShell`, 15 abren en modo
+  oscuro un panel blanco al 95%** sobre el backdrop. No es un matiz estético:
+  es un flash de pantalla blanca en una app que un médico usa de noche y en
+  quirófano. Está en producción hoy.
+- **Origen:** el `bg-white/95 backdrop-blur-xl` es el chrome legacy del modal
+  (efecto vidrio); la regla dark de ThemeProvider se escribió para `bg-white` a
+  secas y nadie cruzó las dos.
+- **Fix inmediato (una línea, seguro):** añadir
+  `html.dark .bg-white\\/95 { background-color: #1E1E1E !important }` a
+  ThemeProvider. **Fix correcto:** que el panel legacy también use la superficie
+  tokenizada (`var(--sp-surface)`), que ya resuelve claro y oscuro.
+- **Cuándo atacar:** **ya.** Es el único ítem de esta sección que no puede
+  esperar al proyecto de tokenización del dark.
+
+### FN-DT-8 — Regla de backdrop de ThemeProvider que no matchea ningún selector real
+- **Estado:** 🔴 abierta
+- **Detectada:** Funnel de nota, Fase A (2026-07-26)
+- **Archivo afectado:** src/components/layout/ThemeProvider.tsx:222-223
+- **Descripción:** la única regla dark de la sección "Modales" es
+  `html.dark .fixed.inset-0.bg-black\/50 { background-color: rgba(0,0,0,0.8) }`
+  — un selector compuesto que exige las tres clases en el mismo elemento. Los
+  backdrops reales usan otra cosa: `bg-black/40` en `ModalShell.tsx:113` (rama
+  legacy), en el portal de documentos del funnel (`page.tsx:1855`) y en ~8
+  sitios más; los dos `bg-black/50` de la app
+  (`agenda/page.tsx:363`, `QuickPatientModal.tsx:171`) son `absolute`, no
+  `.fixed`, así que tampoco entran.
+- **Matiz verificado:** dentro del árbol de `ThemeProvider`
+  (`(app)/layout.tsx:41`) el selector sí alcanza **exactamente un** elemento:
+  el overlay de `OfflineAlert.tsx:48`, que no es el backdrop de un modal. Los
+  otros dos `.fixed…bg-black/50` del repo viven en `(offline)/offline-mode`,
+  fuera del provider. Neto: la regla existe para los modales y no llega a
+  ninguno.
+- **Impacto:** cosmético. Los backdrops quedan al 40% de negro en oscuro en vez
+  del 80% previsto, así que el fondo se transparenta más de la cuenta. El
+  funnel no lo sufre: su backdrop usa `var(--sp-backdrop)` (ModalShell:113),
+  que sí tiene override dark en `spinus-tokens.css:276`.
+- **Origen:** la regla se escribió contra un markup que después cambió de
+  opacidad y de posicionamiento.
+- **Fix:** dentro del proyecto de tokenización, borrar la regla y llevar todos
+  los backdrops a `var(--sp-backdrop)` — que es el patrón que el funnel ya
+  demostró que funciona.
+- **Cuándo atacar:** con el bloque FN-DT-7…16.
+
+### FN-DT-9 — Selectores duplicados en ThemeProvider, con valores en conflicto
+- **Estado:** 🔴 abierta
+- **Detectada:** Funnel de nota, Fase A (2026-07-26)
+- **Archivo afectado:** src/components/layout/ThemeProvider.tsx:146-154, :215-220
+- **Descripción:** tres selectores están declarados dos veces en el mismo
+  `<style>`, en bloques distintos ("Colores primarios desaturados" y "Texto de
+  badges"), y en dos de los tres los valores **no coinciden**:
+
+  | Selector | 1.ª declaración | 2.ª declaración | Gana |
+  |---|---|---|---|
+  | `.text-blue-600` | `#60a5fa` (:154) | `#93c5fd` (:215) | la 2.ª |
+  | `.text-amber-700` | `#fbbf24` (:153) | `#fcd34d` (:219) | la 2.ª |
+  | `.text-[#1a3a5c]` | `#93c5fd` (:148) | `#93c5fd` (:216) | empate (duplicado inerte) |
+
+  Misma especificidad y mismo `!important`, así que decide el orden: siempre
+  gana la segunda.
+- **Impacto:** ninguno visual hoy (el resultado es determinista), pero es una
+  trampa de mantenimiento: quien edite :153-154 para ajustar un color no verá
+  ningún cambio y perderá el rato buscando por qué.
+- **Origen:** el bloque de badges (:204-220) se añadió después sin revisar si
+  los selectores ya existían arriba.
+- **Fix:** dejar una sola declaración por selector. Trivial, pero hacerlo
+  dentro del proyecto de tokenización para no tocar el archivo dos veces.
+- **Cuándo atacar:** con el bloque FN-DT-7…16.
+
+### FN-DT-10 — Tinta `.38` (hint/placeholder) falla AA en modo oscuro
+- **Estado:** 🔴 abierta
+- **Detectada:** Funnel de nota, Fase A (2026-07-26)
+- **Archivo afectado:** src/components/layout/ThemeProvider.tsx:141, :164-165
+- **Descripción:** el modo oscuro mapea `.text-slate-400` a
+  `rgba(255,255,255,0.38)` (:141) y pinta **todos** los placeholders nativos con
+  el mismo valor (:164-165, con `!important`). Compuesto sobre la superficie de
+  card `#1E1E1E` eso equivale a `#737373`: **≈3.5:1**. Sobre el fondo de input
+  `#242424`, **≈3.4:1**. WCAG AA para texto normal pide 4.5:1.
+- **Impacto:** falla de contraste en toda la app en modo oscuro, no solo en el
+  funnel — `.text-slate-400` es la clase de hints, unidades y textos de apoyo,
+  y los placeholders son la guía de captura de cada formulario. El `.38` viene
+  de la escala de Material para texto **desactivado**, que no es lo mismo que
+  texto secundario.
+- **Origen:** copia literal de la tabla de Material Design Dark Theme
+  documentada en el comentario :97-107, aplicada a un rol que no le
+  correspondía.
+- **Fix:** subir a `0.50-0.60` (Material usa `.60` para texto secundario), o
+  mejor: borrar la regla y dejar que el hint lo resuelva `--sp-ink-*` del
+  bloque `html.dark` de `spinus-tokens.css`, que ya está calibrado.
+- **Cuándo atacar:** con el bloque FN-DT-7…16.
+
+### FN-DT-11 — El foco en oscuro pierde el color de borde (ThemeProvider gana a `.sp-input:focus`)
+- **Estado:** 🔴 abierta
+- **Detectada:** Funnel de nota, Fase A (2026-07-26)
+- **Archivos afectados:**
+  - src/components/layout/ThemeProvider.tsx:157-163
+  - src/app/spinus-tokens.css:594-598 (`.sp-input:focus, .sp-textarea:focus`)
+  - src/components/expediente/SignosVitalesCard.tsx:98-108 (precedente del fix)
+- **Descripción:** ThemeProvider pinta en oscuro **todos** los `input`,
+  `textarea` y `select` con `border-color: rgba(255,255,255,0.12) !important`
+  (:157-163). `.sp-input:focus` declara `border-color: var(--sp-primary)` sin
+  `!important` y dentro de `@layer components`, que pierde contra cualquier
+  declaración de autor sin capa. Resultado: al enfocar un campo en oscuro
+  sobrevive el halo (`box-shadow`, que ThemeProvider no toca) pero el borde se
+  queda gris.
+- **Impacto:** el foco se señala a medias en modo oscuro, en todos los campos
+  del funnel y de la app. Afecta a usabilidad y a navegación por teclado —
+  emparentado con FN-DT-5.
+- **Origen:** `spinus-tokens.css` se instaló en `@layer components` a propósito
+  (paso 3.2.B) para no pelear con Tailwind; ThemeProvider inyecta sin capa, así
+  que gana siempre.
+- **Fix:** ya hay precedente resuelto en el repo:
+  `SignosVitalesCard.tsx:98-108` documenta este mismo choque y lo gana subiendo
+  especificidad con selectores de atributo (`[data-k]`, `[data-estado]`), sin
+  trucos de orden de capas. Replicar, o eliminar la regla de ThemeProvider al
+  tokenizar el dark.
+- **Cuándo atacar:** con el bloque FN-DT-7…16.
+
+### FN-DT-12 — Bordes y textos de los tiles de documentos sin regla dark
+- **Estado:** 🔴 abierta
+- **Detectada:** Funnel de nota, Fase A (2026-07-26)
+- **Archivos afectados:**
+  - src/app/(app)/expediente/[id]/nueva-nota/page.tsx:71-79 (`DOCS`), :1801-1808 (render)
+  - src/components/layout/ThemeProvider.tsx:192-219
+- **Descripción:** cada tile de documento lleva la tripleta
+  `border-<color>-200 bg-<color>-50 text-<color>-700` (page.tsx:72-79).
+  ThemeProvider cubre los 11 fondos `bg-*-50` (:192-202), pero de los bordes
+  solo `blue`, `emerald`, `red` y `amber` (:205-212) y de los textos solo
+  `emerald-700`, `red-700` y `amber-700` (:217-219). Quedan **sin regla dark**:
+  `border-violet-200`, `border-rose-200`, `border-teal-200`, `border-indigo-200`,
+  `border-orange-200`; y `text-blue-700`, `text-violet-700`, `text-rose-700`,
+  `text-teal-700`, `text-indigo-700`, `text-orange-700`.
+- **Impacto:** en el Estado de Cierre (`notaSaved`), donde el panel de
+  documentos es el protagonista a ancho completo, el tile activo queda con
+  borde claro y texto oscuro (p. ej. `text-violet-700` ≈ `#6d28d9`) sobre un
+  tinte translúcido oscuro: ilegible. Afecta a 6 de los 8 formatos.
+- **Origen:** la lista de badges de ThemeProvider se escribió a mano para los
+  colores que existían entonces; `DOCS` creció después.
+- **Fix:** parte del proyecto de tokenización — el chrome del panel de
+  documentos debería usar `.sp-*` como el resto del Cierre. Parche provisional:
+  completar las 11 reglas faltantes.
+- **Cuándo atacar:** con el bloque FN-DT-7…16.
+
+### FN-DT-13 — Verde del semáforo de vitales bajo AA en modo claro móvil
+- **Estado:** 🔴 abierta
+- **Detectada:** Funnel de nota, Fase A (2026-07-26)
+- **Archivos afectados:**
+  - src/app/spinus-tokens.css:61 (`--sp-vital-ok: #17976a`), :40 (`--sp-success-bg: #e9f7ef`), :351 (override dark)
+  - src/components/expediente/SignosVitalesCard.tsx:105, :158, :76, :109-129
+- **Descripción:** `--sp-vital-ok` (`#17976a`) hace dos trabajos y falla
+  distinto en cada uno:
+  - **Valor en rango** (`.sv-input[data-estado="normal"]`, :105) sobre
+    `--sp-surface` blanco → **3.70:1**. En desktop el valor es 19px/800 (:89):
+    califica como texto grande y AA pide 3:1, así que pasa. En móvil el valor
+    baja a **15px** (:124, dentro del `@media (max-width:767px)` :109-129):
+    deja de ser texto grande, AA exige 4.5:1 y **falla**.
+  - **Badge "Todo en rango"** (:158) a 12px/700 (:76) sobre `--sp-success-bg`
+    `#e9f7ef` → **3.35:1**: falla en desktop y en móvil.
+
+  En modo oscuro el token se sobrescribe a `#34d399` (:351), que sobre
+  `#121212` da ≈9.7:1 y pasa de sobra. **El defecto es exclusivo del modo
+  claro**, y solo del móvil para el valor.
+- **Impacto:** agravado por el layout móvil, donde `.sv-dot` se oculta (:115) y
+  el color del número queda como **único** portador del estado clínico. Un
+  usuario con baja visión o una pantalla al sol pierde la señal de "en rango".
+- **Origen:** el verde se eligió mirando el desktop; la reducción tipográfica
+  móvil llegó después y cruzó el umbral de "texto grande" sin que nadie
+  recalculara.
+- **Fix:** oscurecer `--sp-vital-ok` en claro hasta ≥4.5:1 sobre blanco (a la
+  altura de `#0f7a55` / `#15803d`) y revisar el par badge/`--sp-success-bg`.
+  Verificar de paso `--sp-vital-watch` y `--sp-vital-out` con el mismo método.
+- **Cuándo atacar:** con la auditoría de contraste (junto a FN-DT-10 y
+  FN-DT-21).
+
+### FN-DT-14 — Alergias sin sustituto tras retirar el Contexto en el Cierre (+ `#EF5350` inline)
+- **Estado:** 🔴 abierta
+- **Detectada:** Funnel de nota, Fase A — paso 3.2.C5 (2026-07-26)
+- **Archivo afectado:** src/app/(app)/expediente/[id]/nueva-nota/page.tsx:1661, :1687-1691
+- **Descripción:** dos defectos en el mismo bloque:
+  1. **Desaparece cuando más falta hace.** La alerta de alergias vive dentro
+     del panel "Contexto del paciente", montado bajo `{!notaSaved && paciente}`
+     (:1661). Al guardar la nota, el Cierre (blueprint §5.3) retira el panel
+     entero y la alerta se va con él — justo en la pantalla desde la que el
+     médico genera la receta. El razonamiento de §5.3 (los formularios se
+     prellenan solos) vale para diagnósticos y medicamentos, pero **no** para
+     una contraindicación que el médico necesita leer al prescribir.
+  2. **Inmune al modo oscuro.** El rojo va inline:
+     `style={{ backgroundColor: '#EF5350' }}` (:1688). ThemeProvider solo caza
+     clases, así que ninguna regla dark lo alcanza. El mismo hex aparece inline
+     en otros 10 puntos del repo, con el mismo problema.
+- **Impacto:** seguridad del paciente en el caso 1 (riesgo bajo pero
+  consecuencia alta: prescribir sin ver la alergia en pantalla); cosmético en
+  el caso 2.
+- **Origen:** (1) decisión consciente de §5.3 cuyo alcance se pasó de largo;
+  (2) el hex inline precede al sistema de tokens.
+- **Fix:** re-emitir la alerta de alergias en el Cierre —una banda compacta
+  sobre el panel de documentos, o dentro del CTA de receta— usando
+  `var(--sp-danger)`/`var(--sp-danger-bg)` en vez del hex inline.
+- **Cuándo atacar:** alta entre las de UX; el sub-fix del hex puede ir con el
+  bloque de tokenización.
+
+### FN-DT-15 — `.sp-btn--primary:disabled` sin token ni override dark
+- **Estado:** 🔴 abierta
+- **Detectada:** Funnel de nota, Fase A (2026-07-26)
+- **Archivo afectado:** src/app/spinus-tokens.css:429
+- **Descripción:** `.sp-btn--primary:disabled { background: #b6c6da; box-shadow:
+  none; cursor: not-allowed; }` — hex literal, sin token declarado en la
+  sección de color y **sin ninguna contraparte en el bloque `html.dark`**.
+- **Impacto:** en modo oscuro un primario deshabilitado se queda azul-gris
+  claro (`#b6c6da`) sobre superficie `#1E1E1E`: parece habilitado y destacado,
+  exactamente lo contrario de lo que comunica. Afecta a los CTA principales del
+  funnel (page.tsx:1605, :1634) y a los footers del modal, que es donde más
+  tiempo pasa un botón deshabilitado (esperando motivo de consulta, esperando
+  consultorio activo).
+- **Origen:** el gris fijo de disabled es una decisión declarada del sistema
+  (paso 3.2), pero se escribió como literal en vez de token, así que C0 no
+  tenía dónde sobrescribirlo.
+- **Fix:** promoverlo a token (`--sp-btn-disabled-bg` o similar) en la sección
+  de color y darle valor dark en el bloque `html.dark`.
+- **Cuándo atacar:** con el bloque FN-DT-7…16; es el más barato de todos.
+
+### FN-DT-16 — `DiagnosticosEditor` / `CIE10Combobox` sin tokenizar
+- **Estado:** 🔴 abierta
+- **Detectada:** Funnel de nota, Fase A — paso 3.2.C4 (2026-07-26)
+- **Archivos afectados:**
+  - src/components/documentos/DiagnosticosEditor.tsx:67, :79
+  - src/components/ui/CIE10Combobox.tsx:128, :134-136, :151, :159, :167-171, :180
+- **Descripción:** son el único bloque de la vía manual que no pasó por la
+  migración a `.sp-*` de 3.2.C4: siguen con clases crudas
+  (`border-slate-200`, `text-slate-400`, `bg-white`, `text-[#1e5fa8]`,
+  `focus:ring-[#1e5fa8]/30`). Se quedaron fuera por alcance: C4 reestructuró la
+  rejilla SOAP del formulario, no el interior de sus componentes hijos.
+- **Impacto:** dependen enteramente de que ThemeProvider siga cazando esas
+  clases exactas, con las lagunas que eso implica: `hover:text-slate-900`
+  (DiagnosticosEditor:79) no tiene regla dark, y el ítem seleccionado del
+  dropdown `bg-[#1e5fa8]/5 text-[#1e5fa8]` (CIE10Combobox:167) tampoco. El
+  input del combobox tampoco hereda el foco del sistema, así que arrastra
+  FN-DT-11 por su cuenta. Visualmente, el editor de diagnósticos rompe la
+  continuidad de la rejilla SOAP que lo rodea.
+- **Origen:** alcance deliberado de C4; queda anotado aquí para que no se
+  pierda.
+- **Fix:** migrar el input a `.sp-input`, el dropdown a superficie/tinta
+  tokenizadas y el ítem activo a `--sp-primary-bg`/`--sp-primary-text`. Dos
+  archivos, sin cambios de comportamiento.
+- **Cuándo atacar:** con el bloque FN-DT-7…16, o cuando se retome la vía
+  manual.
+
+### FN-DT-17 — `OnboardingGuide` huérfano (+ botón de `/ayuda` que limpia `spinus_onboarding`)
+- **Estado:** 🔴 abierta
+- **Detectada:** Funnel de nota, Fase A — paso 3.2-bis (2026-07-26)
+- **Archivos afectados:**
+  - src/components/ui/OnboardingGuide.tsx (700 líneas, cero importadores)
+  - src/app/(app)/ayuda/page.tsx:155-165 (botón), :158 (`removeItem('spinus_onboarding')`)
+  - audios del tutorial en `public/`
+- **Descripción:** el `OnboardingGuide` fue retirado del producto (decisión del
+  plan §3.2-bis: Spinus apuesta por una experiencia autoexplicativa, que es lo
+  que el funnel resuelve). Ya no se monta en ningún lado —
+  `grep -rn "OnboardingGuide" src/` solo devuelve el propio archivo — pero
+  siguen vivos el componente, sus audios y el botón "Volver a ver el tutorial
+  paso a paso" de `/ayuda`, que borra `spinus_onboarding` (:158) y recarga la
+  página (:159) para que no ocurra absolutamente nada.
+- **Impacto:** ~700 líneas de código muerto y **un botón roto en producción**:
+  el usuario pide el tutorial, la página se recarga y no aparece nada. Peor que
+  no tener el botón.
+- **Origen:** el retiro del guide se hizo quitando su montaje, no eliminándolo.
+  El paso 3.3a ya purgó las anclas `data-onboard` sin lector
+  (`consulta-completa`, `modal-doc-iconos`), **conservando
+  `data-onboard="panel-documentos"`** (page.tsx:1777), que tiene consumidor
+  vivo en el `querySelector` del Estado Éxito (:1017).
+- **Fix:** borrar `OnboardingGuide.tsx`, sus audios de `public/` y el botón de
+  `/ayuda:155-165`. Antes de borrar, `grep` de `spinus_onboarding` y de los
+  nombres de los audios (protocolo 2 de `CLAUDE.md`). **No tocar
+  `panel-documentos`.**
+- **Cuándo atacar:** mini-proyecto aparte (toca varios módulos), previsto para
+  Fase B.
+
+### FN-DT-18 — Divergencia narrativa ↔ estructurado (edición manual y guard de regeneración)
+- **Estado:** 🔴 abierta — limitación conocida, documentada a propósito
+- **Detectada:** Funnel de nota, Fase A (2026-07-26)
+- **Archivo afectado:** src/app/(app)/expediente/[id]/nueva-nota/page.tsx:1186, :691-700, :208, :1135, :1153
+- **Descripción:** en el estado de revisión el médico puede editar la nota a
+  mano; el textarea escribe **solo** `notaGenerada` (:1186). El estructurado
+  —`form.diagnosticos` y `medicamentos`— se queda como lo dejó la IA. Al
+  guardar, el payload envía las dos cosas: diagnósticos (:691-696), narrativa
+  (:698) y medicamentos (:700). Si el médico corrige el diagnóstico dentro del
+  texto, la consulta queda con una narrativa que dice A y un CIE-10 que dice B,
+  y la receta se precarga desde el estructurado viejo. El flag `notaEditada`
+  (:208) solo alimenta la advertencia de que regenerar pisará la edición
+  (:1135) y el swap de confirmación (:1153): **avisa, no reconcilia.**
+- **Impacto:** calidad del expediente. Un dato clínico contradictorio dentro de
+  la misma consulta inmutable; el estructurado es lo que alimenta explotación
+  estadística y precarga de documentos, así que gana el que el médico no
+  editó. Baja frecuencia (requiere editar el texto de un diagnóstico en vez de
+  regenerar), consecuencia difícil de detectar después.
+- **Origen:** preexistente al funnel — es consecuencia del diseño dual
+  narrativa+estructurado de la nota IA, no algo que Fase A introdujera.
+- **Fix (opciones, ninguna trivial):** (a) tras editar a mano, marcar el
+  estructurado como "posiblemente desalineado" y pedir confirmación explícita
+  antes de guardar; (b) re-extraer el estructurado desde la narrativa editada
+  con una llamada de IA acotada; (c) bloquear la edición de las secciones que
+  espejan el estructurado y obligar a corregirlas en sus campos.
+- **Cuándo atacar:** requiere decisión de producto antes que código. No
+  abordable dentro del funnel sin ampliar alcance.
+
+### FN-DT-19 — Mejora: precarga de receta desde DB + botón de receta en la vista de consulta
+- **Estado:** 🔴 abierta — mejora, no defecto
+- **Detectada:** Funnel de nota, Fase A (2026-07-26). Origen:
+  `BLUEPRINT_FUNNEL_NOTA.md:272`.
+- **Archivos afectados (previstos):**
+  - src/app/(app)/expediente/[id]/consulta/[consultaId]/page.tsx
+  - src/components/documentos/RecetaForm.tsx (ver FN-DT-2)
+- **Descripción:** la precarga de medicamentos en la receta solo existe
+  **dentro** del funnel: `medicamentosParaReceta` (page.tsx:786-795) se deriva
+  del estado en memoria y muere al salir de la pantalla. Desde la vista de una
+  consulta ya guardada no hay botón de receta, y si se llega por otra vía el
+  formulario arranca vacío aunque `consultas.medicamentos` tenga los datos.
+- **Impacto:** el médico que necesita reimprimir o ajustar la receta de una
+  consulta anterior la recaptura a mano. Fricción pura, sin riesgo clínico.
+- **Fix:** leer `consultas.medicamentos` de la DB y mapearlo al shape de
+  `RecetaForm` (el mismo mapeo de page.tsx:786-795, que ya existe), más un
+  botón "Generar receta" en la vista de consulta. **Depende de FN-DT-2**: si el
+  formulario se monta con la receta abierta y los datos llegan después, la
+  precarga no reaccionará. Y roza FN-DT-1: la columna puede venir `null`.
+- **Cuándo atacar:** Fase B, junto con FN-DT-2.
+
+### FN-DT-20 — Geometría del modal duplicada entre `ModalShell` y los tokens
+- **Estado:** 🔴 abierta
+- **Detectada:** Funnel de nota, Fase A — paso 3.2.B, ampliada en 3.3a (2026-07-26)
+- **Archivos afectados:**
+  - src/app/spinus-tokens.css:229-237 (tokens + comentario que cita esta deuda)
+  - src/app/spinus-tokens.css:142-147 (`--sp-pad-modal-*`)
+  - src/components/ui/ModalShell.tsx:16-21 (`SP_GEO`)
+- **Descripción:** la geometría del modal del funnel está declarada **dos
+  veces**. Los tokens `--sp-modal-w-work|decide|done|wait`, `--sp-modal-top` y
+  `--sp-modal-h-max` (spinus-tokens.css:232-237) son la spec canónica pero no
+  los consume ningún `.sp-*`; `ModalShell` los espeja con literales de Tailwind
+  en `SP_GEO` (`md:max-w-[724px]`, `md:pt-[60px]`,
+  `md:max-h-[calc(100vh-120px)]`, ModalShell.tsx:17-20). Cambiar el ancho de un
+  estado obliga a editar los dos sitios, y nada avisa si divergen.
+- **Añadido en 3.3a:** al borrar la sección muerta `6. MODAL` de
+  `spinus-tokens.css` (las clases `.sp-backdrop` / `.sp-modal*`, que ningún
+  componente usaba), los **6 custom properties `--sp-pad-modal-*`
+  (:142-147) perdieron su único consumidor**. Se conservaron deliberadamente:
+  son parte de la misma spec y los consumiría un `ModalShell` cableado a
+  tokens. **Cerrar FN-DT-20 debe resolver también su destino** — cablearlos
+  junto con la geometría, o borrarlos si se decide que el padding se queda en
+  utilidades.
+- **Impacto:** ninguno funcional. Riesgo de divergencia silenciosa y una spec
+  que miente sobre quién manda.
+- **Origen:** 3.2.B implementó la geometría con utilidades de Tailwind (decisión
+  correcta entonces: el ancho es responsive y las utilidades lo expresan mejor
+  que un `width` fijo) mientras el token file ya traía los valores.
+- **Fix:** cablear `SP_GEO` a los tokens (`md:max-w-[var(--sp-modal-w-work)]`
+  y equivalentes) y decidir de paso el destino de `--sp-pad-modal-*`. Al
+  cerrarla, **borrar el comentario de spinus-tokens.css:229-231**, que cita
+  esta entrada por su ID.
+- **Cuándo atacar:** cuando se migre el resto de Spinus al sistema de diseño —
+  ahí `ModalShell` deja de tener rama legacy y el cableado se vuelve natural.
+
+### FN-DT-21 — Contraste AA de las paletas de clínica (texto blanco sobre `--cs`)
+- **Estado:** 🔴 abierta
+- **Detectada:** Funnel de nota, Fase A — auditoría de contraste (2026-07-26)
+- **Archivos afectados:**
+  - src/app/(app)/perfil/page.tsx:42-48 (`PALETAS`)
+  - src/components/layout/ThemeProvider.tsx:34-35, :66-69
+- **Descripción:** el médico elige la paleta de su clínica desde el perfil; el
+  secundario alimenta `--cs` (ThemeProvider:35), que ThemeProvider usa como
+  fondo de todos los botones primarios reescribiendo `bg-[#1e5fa8]` (:66). El
+  texto de esos botones es blanco. Con la paleta **"Verde médico"**
+  (`secundario: '#0d9488'`, perfil/page.tsx:44) el par da **3.74:1**, por
+  debajo del 4.5:1 que pide AA para texto normal. No está verificado el resto
+  del catálogo (6 paletas).
+- **Impacto:** transversal, no del funnel: afecta a cualquier CTA primario de
+  cualquier pantalla para los médicos con esa paleta. Es una función de
+  personalización que puede llevar al usuario a un estado inaccesible sin
+  avisarle.
+- **Origen:** las paletas se eligieron por estética de marca; nunca se validó
+  el contraste del par botón/texto.
+- **Fix:** validar las 7 paletas del catálogo y ajustar los secundarios que no
+  lleguen a 4.5:1; o derivar el color del texto del botón por luminancia del
+  fondo (blanco o tinta oscura según corresponda), que además blinda paletas
+  futuras.
+- **Cuándo atacar:** con la auditoría de contraste (junto a FN-DT-10 y
+  FN-DT-13). Independiente del proyecto de tokenización del dark.
+
+---
+
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)
