@@ -1518,64 +1518,91 @@ export default function NuevaNotaPage() {
                 </p>
               </div>
             ) : (
-              /* ── Modo manual: todos los campos expandidos ──
-                 B1: solo se retira p-5 (el padding lo da .sp-card--hero).
-                 Los campos SOAP de dentro NO se tocan — son C4. */
+              /* ── Modo manual: rejilla SOAP (C4) ──
+                 Los 6 campos dejan de ser hermanos apilados y pasan a la
+                 rejilla del sistema (.sp-grid-2, M8). El padding lo da
+                 .sp-card--hero desde C3: aquí NO va p-5.
+                 Orden de fuente idéntico al previo — la tabulación no cambia.
+                 min-w-0 en cada celda: sin él, el min-width:auto del grid item
+                 lo fija el ancho intrínseco del textarea (~200px, cols=20 por
+                 defecto) y la rejilla desborda por debajo de ~1150px de
+                 viewport, donde la columna 3/5 deja ~180px por celda. */
               <div className="space-y-4">
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">
-                    Motivo de consulta / Subjetivo <span className="text-red-400">*</span>
-                  </label>
-                  <textarea value={form.motivo_consulta} onChange={e => update('motivo_consulta', e.target.value)}
-                    placeholder="Ej: Paciente refiere cuadro de 3 días de evolución con dolor en región lumbar derecha irradiado a miembro inferior..."
-                    rows={4}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+
+                {/* Fila 1 — los dos pilares NOM: qué refiere y qué se halló */}
+                <div className="sp-grid-2 sp-grid-2--soap">
+                  {/* flex-col + flex-1: si una etiqueta envuelve a 2 líneas y su
+                      pareja no, el textarea absorbe la diferencia y la fila
+                      queda a ras. Los min-h siguen siendo el piso. */}
+                  <div className="min-w-0 flex flex-col">
+                    <label className="sp-label-field block mb-1.5">
+                      Motivo de consulta / Subjetivo <span className="text-[var(--sp-danger)]">*</span>
+                    </label>
+                    {/* 78px: spec de la rejilla, sin equivalente en C0. Gana al
+                        min-height:88px de .sp-textarea porque las utilidades de
+                        Tailwind (@layer utilities) van después de las .sp-*
+                        (@layer components). Los rows= se caen: manda el min-h. */}
+                    <textarea value={form.motivo_consulta} onChange={e => update('motivo_consulta', e.target.value)}
+                      placeholder="Ej: Paciente refiere cuadro de 3 días de evolución con dolor en región lumbar derecha irradiado a miembro inferior..."
+                      className="sp-textarea min-h-[78px] flex-1" />
+                  </div>
+                  <div className="min-w-0 flex flex-col">
+                    <label className="sp-label-field block mb-1.5">
+                      Exploración física / Objetivo <span className="text-[var(--sp-danger)]">*</span>
+                    </label>
+                    <textarea value={form.exploracion_fisica} onChange={e => update('exploracion_fisica', e.target.value)}
+                      placeholder="Ej: TA 120/80 mmHg, FC 72 lpm, FR 16 rpm, T° 36.5°C. Paciente consciente, orientado, cooperador. Abdomen blando, no doloroso a la palpación..."
+                      className="sp-textarea min-h-[78px] flex-1" />
+                  </div>
                 </div>
+
+                {/* Banda full-width — opcional y a menudo vacío: no merece
+                    media rejilla, y así no descuadra la simetría de la fila 1.
+                    Sin flex: no tiene pareja con la que alinearse. */}
                 <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">
-                    Exploración física / Objetivo <span className="text-red-400">*</span>
+                  <label className="sp-label-field block mb-1.5">
+                    Auxiliares diagnósticos
                   </label>
-                  <textarea value={form.exploracion_fisica} onChange={e => update('exploracion_fisica', e.target.value)}
-                    placeholder="Ej: TA 120/80 mmHg, FC 72 lpm, FR 16 rpm, T° 36.5°C. Paciente consciente, orientado, cooperador. Abdomen blando, no doloroso a la palpación..."
-                    rows={5}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">
-                    Auxiliares diagnósticos <span className="text-slate-400 font-normal">(opcional)</span>
-                  </label>
+                  {/* Sin "(opcional)": la ausencia del asterisco lo señala (C2) */}
                   <textarea value={form.gabinete_laboratorios} onChange={e => update('gabinete_laboratorios', e.target.value)}
                     placeholder="Ej: BH con leucocitosis leve. Rx de tórax sin infiltrados. RMN columna lumbar: hernia discal L4-L5..."
-                    rows={3}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+                    className="sp-textarea min-h-[66px]" />
                 </div>
+
+                {/* Banda full-width — lista que crece: rompe a ancho completo.
+                    DiagnosticosEditor conserva su layout y su combobox (fuera
+                    del alcance de C4); no necesita nada del contenedor. */}
                 <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">
-                    Diagnóstico(s) CIE-10 <span className="text-red-400">*</span>
+                  <label className="sp-label-field block mb-1.5">
+                    Diagnóstico(s) CIE-10 <span className="text-[var(--sp-danger)]">*</span>
                   </label>
                   <DiagnosticosEditor
                     value={form.diagnosticos}
                     onChange={dx => setForm(prev => ({ ...prev, diagnosticos: dx }))}
                   />
                 </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">
-                    Análisis clínico <span className="text-slate-400 font-normal">(opcional)</span>
-                  </label>
-                  <textarea value={form.analisis} onChange={e => update('analisis', e.target.value)}
-                    placeholder="Razonamiento clínico: correlación clínico-radiológica, evolución, consideraciones..."
-                    rows={3}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
+
+                {/* Fila 2 — el cierre del razonamiento: por qué y qué se hace */}
+                <div className="sp-grid-2 sp-grid-2--soap">
+                  <div className="min-w-0 flex flex-col">
+                    <label className="sp-label-field block mb-1.5">
+                      Análisis clínico
+                    </label>
+                    {/* 66px: spec de la rejilla, sin equivalente en C0 */}
+                    <textarea value={form.analisis} onChange={e => update('analisis', e.target.value)}
+                      placeholder="Razonamiento clínico: correlación clínico-radiológica, evolución, consideraciones..."
+                      className="sp-textarea min-h-[66px] flex-1" />
+                  </div>
+                  <div className="min-w-0 flex flex-col">
+                    <label className="sp-label-field block mb-1.5">
+                      Plan de tratamiento <span className="text-[var(--sp-danger)]">*</span>
+                    </label>
+                    <textarea value={form.plan_tratamiento} onChange={e => update('plan_tratamiento', e.target.value)}
+                      placeholder="Ej: Reposo relativo. Fisioterapia 2 veces por semana por 6 semanas. Restricción de cargas. Control en 4 semanas. Signos de alarma: déficit neurológico progresivo..."
+                      className="sp-textarea min-h-[66px] flex-1" />
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">
-                    Plan de tratamiento <span className="text-red-400">*</span>
-                  </label>
-                  <textarea value={form.plan_tratamiento} onChange={e => update('plan_tratamiento', e.target.value)}
-                    placeholder="Ej: Reposo relativo. Fisioterapia 2 veces por semana por 6 semanas. Restricción de cargas. Control en 4 semanas. Signos de alarma: déficit neurológico progresivo..."
-                    rows={4}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]" />
-                </div>
+
               </div>
             )}
           </div>

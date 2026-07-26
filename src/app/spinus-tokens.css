@@ -791,6 +791,12 @@ a:hover { color: var(--sp-primary-active); }
   .sp-grid-2, .sp-grid-2-1 { grid-template-columns: 1fr; gap: var(--sp-3); }
   .sp-grid-actions { grid-template-columns: 1fr; gap: var(--sp-2-5); }
 }
+/* SOAP: entre 1024 y 1150px, lg: ya estrechó la columna a 3/5 y cada celda
+   queda en ~180px — por debajo del ancho útil de un textarea. Rango real de
+   un iPad en horizontal. Fuera de esa banda la rejilla se comporta normal. */
+@media (min-width: 1024px) and (max-width: 1150px) {
+  .sp-grid-2--soap { grid-template-columns: 1fr; gap: var(--sp-3); }
+}
 
 
 /* --- 16. CHECKBOX ------------------------------------------------------ */
