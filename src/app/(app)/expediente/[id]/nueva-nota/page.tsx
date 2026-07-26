@@ -1400,28 +1400,29 @@ export default function NuevaNotaPage() {
 
         {/* Marcador para onboarding: consulta completa (nota guardada, sin modal abierto) */}
         {notaSaved && !docInline && <div data-onboard="consulta-completa" className="hidden" />}
-
-        {/* Banner de éxito */}
-        {notaSaved && (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
-            <CheckCircle2 size={20} className="text-emerald-500 flex-shrink-0" />
-            <p className="text-sm font-medium text-emerald-700">Nota guardada en el expediente</p>
-            <Link href={`/expediente/${id}`} data-onboard="ver-expediente" className="ml-auto text-xs text-emerald-600 hover:underline whitespace-nowrap">
-              Ver expediente →
-            </Link>
-          </div>
-        )}
       </div>
 
-      {/* ── Grid de dos columnas ── */}
-      <div className="lg:grid lg:grid-cols-5 lg:gap-6 lg:items-start space-y-5 lg:space-y-0">
+      {/* ── Grid de dos columnas · una sola columna en Cierre ──
+          Con la nota guardada (blueprint §5.3) la página deja de ser de captura:
+          la rejilla colapsa y los documentos pasan a protagonista a ancho completo.
+          El overlay de documentos (createPortal, z-[9999]) es HERMANO de este
+          contenedor y monta en document.body: ninguna clase de aquí lo alcanza. */}
+      <div className={notaSaved
+        ? 'space-y-[var(--sp-gap-block)]'
+        : 'lg:grid lg:grid-cols-5 lg:gap-6 lg:items-start space-y-5 lg:space-y-0'}>
 
         {/* ════════════════════════════════
-            COLUMNA IZQUIERDA (3/5)
-            Formulario + nota generada
+            COLUMNA IZQUIERDA (3/5) — solo en Captura
+            En Cierre desaparece entera: la Card Captura ya estaba apagada, el
+            ancla no puede existir (su condición incluye !notaSaved) y el bloque
+            de error es inalcanzable (abrirRevision hace setError('') y es la
+            ÚNICA vía de apertura de la revisión, R8). Lo único vivo era la card
+            de vitales y el banner de borrador, que no tiene sentido sobre una
+            nota ya sellada.
         ════════════════════════════════ */}
         {/* --sp-gap-block (18px). NO existe en la escala de Tailwind (20px/24px):
             la arbitraria es intencional, no "corregir" a space-y-5. */}
+        {!notaSaved && (
         <div className="lg:col-span-3 space-y-[var(--sp-gap-block)]">
 
           {/* Banner borrador restaurado */}
@@ -1460,7 +1461,6 @@ export default function NuevaNotaPage() {
               declarados en C0 como "de la Card Captura"). overflow-hidden se cae
               con la banda — ya no hay fondo que recortar, y así no puede
               recortar los halos de foco. */}
-          {!notaSaved && (
           <div className="sp-card sp-card--hero">
             <div className="flex items-start justify-between gap-3 mb-4">
               <div>
@@ -1606,7 +1606,6 @@ export default function NuevaNotaPage() {
               </div>
             )}
           </div>
-          )}
 
           {/* ── Modo IA: error + botón generar + resultado, todo bajo el textarea ── */}
           {modoNota === 'ia' && (
@@ -1615,7 +1614,7 @@ export default function NuevaNotaPage() {
               {/* Región CTA conmutable (paso 3.1): fade suave al mutar entre el
                   CTA de generación y el ancla "Nota lista". */}
               <div key={notaGenerada ? 'ancla' : 'cta'} className="animate-fade-in">
-              {anclaNota ?? (!notaSaved && (
+              {anclaNota ?? (
                 <>
                   <button onClick={generarNota} disabled={generando || !form.motivo_consulta.trim()}
                     className="sp-btn sp-btn--primary sp-btn--primary-block">
@@ -1632,7 +1631,7 @@ export default function NuevaNotaPage() {
                     Prefiero escribirla yo
                   </button>
                 </>
-              ))}
+              )}
               </div>
             </>
           )}
@@ -1644,7 +1643,7 @@ export default function NuevaNotaPage() {
               {/* Región CTA conmutable (paso 3.1): fade suave al mutar entre el
                   CTA de previsualización y el ancla "Nota lista". */}
               <div key={notaGenerada ? 'ancla' : 'cta'} className="animate-fade-in">
-              {anclaNota ?? (!notaSaved && (
+              {anclaNota ?? (
                 <>
                   <button onClick={previewNotaManual} disabled={!form.motivo_consulta}
                     className="sp-btn sp-btn--primary sp-btn--primary-block">
@@ -1658,20 +1657,23 @@ export default function NuevaNotaPage() {
                     Usar IA
                   </button>
                 </>
-              ))}
+              )}
               </div>
             </>
           )}
         </div>
+        )}
 
         {/* ════════════════════════════════
-            COLUMNA DERECHA (2/5)
-            Panel de documentos — sticky
+            COLUMNA DERECHA (2/5) en Captura · bloque de Documentos en Cierre
         ════════════════════════════════ */}
-        <div className="lg:col-span-2 lg:sticky lg:top-6 space-y-4">
+        <div className={notaSaved ? '' : 'lg:col-span-2 lg:sticky lg:top-6 space-y-4'}>
 
-          {/* ── Panel contextual del paciente ── */}
-          {paciente && (
+          {/* ── Panel contextual del paciente ──
+              No sobrevive al Cierre (decisión §5.3): existe para informar
+              mientras se redacta, y los formularios de documentos se prellenan
+              solos desde form.diagnosticos y medicamentosParaReceta. */}
+          {!notaSaved && paciente && (
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Contexto del paciente</p>
@@ -1733,12 +1735,35 @@ export default function NuevaNotaPage() {
             </div>
           )}
 
-          {/* ── Panel de documentos ── */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-              <FileText size={14} className="text-slate-400" />
-              <h2 className="font-semibold text-slate-700 text-sm">Documentos del paciente</h2>
-            </div>
+          {/* ── Panel de documentos ──
+              En Cierre es el protagonista: chrome del sistema y rejilla a 4.
+              En Captura conserva su chrome actual intacto — migrarlo cambiaría
+              el estado de captura, que no es objetivo de C5. */}
+          <div className={notaSaved
+            ? 'sp-card'
+            : 'bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden'}>
+
+            {notaSaved ? (
+              /* Encabezado del Cierre: ABSORBE el banner verde en vez de
+                 duplicar el mensaje. .sp-title-card y no .sp-title-page (ya lo
+                 usa el H1 de la página) ni .sp-title-state (identidad del
+                 Estado 4 del modal, que el médico acaba de ver).
+                 CheckCircle2 sin size ni color: .sp-icobox svg los fija. */
+              <div className="flex items-center gap-3 mb-4">
+                <div className="sp-icobox sp-icobox--sm sp-icobox--success">
+                  <CheckCircle2 />
+                </div>
+                <div>
+                  <h2 className="sp-title-card">Nota guardada</h2>
+                  <p className="sp-hint mt-0.5">Genera los documentos de esta consulta</p>
+                </div>
+              </div>
+            ) : (
+              <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                <FileText size={14} className="text-slate-400" />
+                <h2 className="font-semibold text-slate-700 text-sm">Documentos del paciente</h2>
+              </div>
+            )}
 
             {!notaSaved ? (
               /* Estado: esperando que se guarde la nota */
@@ -1760,28 +1785,38 @@ export default function NuevaNotaPage() {
                 )}
               </div>
             ) : (
-              /* Estado: nota guardada — panel activo */
-              <div className="p-4 space-y-3" data-onboard="panel-documentos">
-                {/* Receta destacada si hay medicamentos */}
-                {medicamentosParaReceta.length > 0 && (
-                  <button onClick={() => setDocInline(docInline === 'receta' ? null : 'receta')}
-                    className={`w-full flex items-center gap-2 py-2.5 px-3 rounded-xl border-2 text-sm font-semibold transition-all ${docInline === 'receta' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100'}`}>
-                    <Pill size={15} />
-                    <span className="text-left leading-tight">
-                      {docInline === 'receta' ? 'Cerrar receta' : `Receta médica`}
-                    </span>
-                    <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-normal ${docInline === 'receta' ? 'bg-white/20' : 'bg-blue-100 text-blue-600'}`}>
-                      {medicamentosParaReceta.length} med.
-                    </span>
-                  </button>
-                )}
+              /* Estado: nota guardada — panel activo.
+                 data-onboard="panel-documentos" SE CONSERVA: es el único ancla
+                 con consumidor vivo — el querySelector de "Otros documentos"
+                 del Estado Éxito depende de él. */
+              <div className="space-y-3" data-onboard="panel-documentos">
 
-                {/* Grid de documentos */}
-                <div className="grid grid-cols-2 gap-2">
+                {/* Rejilla única: la receta destacada entra como celda de ancho
+                    completo en vez de vivir fuera. Sin medicamentos son 8
+                    formatos → 4×2 exacto; con receta promovida quedan 7 → 4+3,
+                    equilibrado por la banda de arriba. El sistema no expone
+                    rejilla de 4: la composición es layout, va con utilidades
+                    (regla de C1–C4). Sin ternario de notaSaved: esta rama del
+                    panel SOLO se monta con la nota guardada. */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+
+                  {medicamentosParaReceta.length > 0 && (
+                    <button onClick={() => setDocInline(docInline === 'receta' ? null : 'receta')}
+                      className={`col-span-full flex items-center gap-2 py-2.5 px-3 rounded-xl border-2 text-sm font-semibold transition-all ${docInline === 'receta' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100'}`}>
+                      <Pill size={15} />
+                      <span className="text-left leading-tight">
+                        {docInline === 'receta' ? 'Cerrar receta' : `Receta médica`}
+                      </span>
+                      <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-normal ${docInline === 'receta' ? 'bg-white/20' : 'bg-blue-100 text-blue-600'}`}>
+                        {medicamentosParaReceta.length} med.
+                      </span>
+                    </button>
+                  )}
+
                   {DOCS.filter(d => !(d.key === 'receta' && medicamentosParaReceta.length > 0)).map(({ key, label, icon: Icon, color }) => (
                     <button key={key}
                       onClick={() => setDocInline(docInline === key ? null : key)}
-                      className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-center text-xs font-medium leading-tight ${docInline === key ? color + ' border-current' : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'}`}>
+                      className={`flex flex-col items-center gap-1.5 p-4 rounded-xl border-2 transition-all text-center text-xs font-medium leading-tight ${docInline === key ? color + ' border-current' : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'}`}>
                       <Icon size={17} />
                       {label}
                     </button>
@@ -1799,6 +1834,27 @@ export default function NuevaNotaPage() {
             )}
           </div>
         </div>
+
+        {/* ════════════════════════════════
+            CIERRE — salida del funnel
+            Los vitales no se re-emiten: sobre una nota sellada la card seguiría
+            editable y sus ediciones no persisten (autosave cortado por
+            notaSaved) — ilusión de integridad en un registro inmutable. El
+            Cierre tiene un solo propósito: documentar y concluir.
+        ════════════════════════════════ */}
+        {notaSaved && (
+          /* Primario único de la pantalla, en flujo y no sticky: el Cierre es
+             corto y una barra fija taparía la última fila de la rejilla —
+             además el overlay de documentos (z-[9999]) la cubriría al abrir un
+             formulario. <Link> y no router.push: .sp-btn ya se usa sobre Link en
+             el Estado Éxito, y conserva prefetch y clic-central. Sin --reward:
+             esa sombra es del CTA de receta del Estado 4. */
+          <Link href={`/expediente/${id}`}
+            className="sp-btn sp-btn--primary sp-btn--primary-block">
+            <Check size={18} />
+            Concluir consulta
+          </Link>
+        )}
 
       </div>
 
