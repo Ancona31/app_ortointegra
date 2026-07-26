@@ -226,6 +226,9 @@
   /* ---------------------------------------------------------------------
      9. GEOMETRÍA
      --------------------------------------------------------------------- */
+  /* Spec canónica de la geometría del modal del funnel. Ningún .sp-* los
+     consume: ModalShell.tsx los espeja con literales (md:max-w-[724px],
+     md:pt-[60px], calc(100vh-120px)); cablearlo a estos tokens es FN-DT-20. */
   --sp-modal-w-work:    724px;  /* Estados con trabajo por hacer: 1 · 2 · edición */
   --sp-modal-w-decide:  620px;  /* Estado 3 · decisión binaria */
   --sp-modal-w-done:    600px;  /* Estado 4 · éxito */
@@ -539,58 +542,6 @@ a:hover { color: var(--sp-primary-active); }
 }
 
 
-/* --- 6. MODAL ----------------------------------------------------------- */
-.sp-backdrop {                   /* UNO por ciclo de modal; nunca se remonta */
-  position: fixed; inset: 0; background: var(--sp-backdrop); z-index: 50;
-  animation: sp-fade-in var(--sp-dur-base) var(--sp-ease-out);
-}
-.sp-modal {
-  position: fixed; z-index: 51; left: 50%; transform: translateX(-50%);
-  display: flex; flex-direction: column; overflow: hidden;
-  background: var(--sp-surface);
-  border-radius: var(--sp-r-modal);
-  box-shadow: var(--sp-shadow-modal);
-  animation: sp-modal-in var(--sp-dur-enter) var(--sp-ease-out);
-}
-.sp-modal--work   { width: var(--sp-modal-w-work);   top: var(--sp-modal-top); max-height: var(--sp-modal-h-max); }
-.sp-modal--decide { width: var(--sp-modal-w-decide); top: 50%; transform: translate(-50%, -50%); }
-.sp-modal--done   { width: var(--sp-modal-w-done);   top: 50%; transform: translate(-50%, -50%); }
-.sp-modal--wait   { width: var(--sp-modal-w-wait);   top: 50%; transform: translate(-50%, -50%); }
-
-.sp-modal__header {
-  flex: 0 0 auto; display: flex; align-items: center; gap: var(--sp-3-5);
-  padding: var(--sp-pad-modal-head);
-  border-bottom: var(--sp-bw-hair) solid var(--sp-line-divider);
-}
-.sp-modal__body {
-  flex: 1 1 auto; overflow-y: auto; padding: var(--sp-pad-modal-body);
-  overscroll-behavior: contain;
-}
-.sp-modal__footer {              /* SIEMPRE visible: nunca dentro del scroll */
-  flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
-  gap: var(--sp-4); padding: var(--sp-pad-modal-foot);
-  background: var(--sp-surface);
-  border-top: var(--sp-bw-hair) solid var(--sp-line-divider);
-}
-
-/* Móvil: el modal ES la pantalla */
-/* 768px = md de Tailwind, breakpoint único del repo. */
-@media (max-width: 768px) {
-  .sp-modal, .sp-modal--work, .sp-modal--decide, .sp-modal--done, .sp-modal--wait {
-    inset: 0; width: 100%; max-height: none; top: 0; left: 0;
-    transform: none; border-radius: 0;
-    height: 100dvh;               /* dvh evita el brinco al abrir el teclado */
-    animation: sp-slide-in var(--sp-dur-slide) var(--sp-ease-inout);
-  }
-  .sp-modal__header { padding: var(--sp-pad-modal-head-m); }
-  .sp-modal__body   { padding: var(--sp-pad-modal-body-m); }
-  .sp-modal__footer {
-    padding: var(--sp-pad-modal-foot-m);
-    padding-bottom: max(16px, env(safe-area-inset-bottom));
-  }
-}
-
-
 /* --- 7. CONTENEDOR DE ÍCONO -------------------------------------------- */
 .sp-icobox {                     /* cuadrado redondeado: identidad del header */
   display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
@@ -812,21 +763,10 @@ a:hover { color: var(--sp-primary-active); }
 /* ============================================================================
    ANIMACIONES
    ========================================================================== */
-@keyframes sp-fade-in   { from { opacity: 0 } to { opacity: 1 } }
-@keyframes sp-modal-in  { from { opacity: 0; transform: translateX(-50%) translateY(12px) scale(.985) }
-                          to   { opacity: 1; transform: translateX(-50%) translateY(0)    scale(1) } }
-@keyframes sp-slide-in  { from { transform: translateX(100%) } to { transform: translateX(0) } }
 @keyframes sp-spin      { to { transform: rotate(360deg) } }
 @keyframes sp-pop       { 0% { transform: scale(.6); opacity: 0 } 60% { transform: scale(1.04) } 100% { transform: scale(1); opacity: 1 } }
 @keyframes sp-draw      { to { stroke-dashoffset: 0 } }
 @keyframes sp-wave      { 0%, 100% { opacity: .28 } 50% { opacity: 1 } }
-
-/* Cross-fade entre estados del modal (0→1, 1→2): el contenedor NO se remonta,
-   solo el contenido interior. Se cruza con un leve desplazamiento vertical. */
-@keyframes sp-state-in  { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
-@keyframes sp-state-out { from { opacity: 1 } to { opacity: 0; transform: translateY(-6px) } }
-.sp-state-enter { animation: sp-state-in  var(--sp-dur-base) var(--sp-ease-out); }
-.sp-state-exit  { animation: sp-state-out var(--sp-dur-fast) var(--sp-ease-in) forwards; }
 
 /* Slide horizontal entre estados hermanos (2↔3): avance a la izquierda,
    retroceso a la derecha. Patrón de app nativa. */

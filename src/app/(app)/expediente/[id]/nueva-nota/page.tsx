@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import ModalShell from '@/components/ui/ModalShell'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Paciente, Diagnostico, MedicamentoConsulta, SignosVitales, MedicoInfo } from '@/types'
 import type { MedicamentoIA, BloqueIA, NotaIAResponse } from '@/lib/notaIA/schema'
@@ -13,7 +13,7 @@ import {
   ArrowLeft, Save, Loader2, RotateCcw, Printer, Eye, Pencil,
   Pill, FlaskConical, ScanLine, ClipboardList, CheckCircle2, Check,
   BedDouble, PenLine, ShieldCheck, Receipt, X, FileText,
-  ChevronLeft, ChevronRight, Mic, Sparkles, AlertTriangle,
+  Mic, Sparkles, AlertTriangle,
 } from 'lucide-react'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
@@ -106,10 +106,10 @@ function metaDelModal(e: EstadoModal): { title: string; subtitle: string; geomet
 // (paso 3.1). Solo motion: 2→3 avanza (slide desde la derecha), 3→2 retrocede;
 // el resto es cross-fade. La dirección se deriva del estado anterior sin estado
 // de render extra (prevEstadoRef leído en render).
-// 3→4 ya NO devuelve animate-check-pop (paso 3.2.C1): la celebración la hace
-// .sp-medal__core con sp-pop, y los transforms anidados se MULTIPLICAN — el
-// scale(.8) del wrapper contra el scale(.6) del medallón lo arrancaba a 0.48 y
-// metía el overshoot del resorte dentro de un padre todavía escalando.
+// 3→4 NO lleva animación propia de celebración (paso 3.2.C1): la hace
+// .sp-medal__core con sp-pop, y los transforms anidados se MULTIPLICAN — un
+// scale(.8) en el wrapper contra el scale(.6) del medallón lo arrancaría a 0.48
+// y metería el overshoot del resorte dentro de un padre todavía escalando.
 function claseTransicion(estado: EstadoModal, prev: EstadoModal): string {
   if (estado === 'confirmacion' && prev === 'revision') return 'animate-slide-from-right'
   if (estado === 'revision' && prev === 'confirmacion') return 'animate-slide-from-left'
@@ -184,7 +184,6 @@ function construirSignosVitalesPayload(sv: SignosVitalesForm): SignosVitales | u
 
 export default function NuevaNotaPage() {
   const { id } = useParams<{ id: string }>()
-  const router = useRouter()
   const { consultorioActivo } = useConsultorioActivo()
   useAuditAccess('consultas', id) // NOM-024: registrar acceso a nota médica
   const [medicoInfo, setMedicoInfo] = useState<MedicoInfo | null>(null)
@@ -201,7 +200,6 @@ export default function NuevaNotaPage() {
   const [respuestasEntrevista, setRespuestasEntrevista] = useState<Record<string, string>>({})
   const [bloqueActual, setBloqueActual] = useState(0)
   // Máquina de estados del modal del funnel de nota.
-  // 'confirmacion'|'exito' se implementan en pasos 1.4–1.5
   const [estadoModal, setEstadoModal] = useState<EstadoModal>(null)
   // Errores de IA mostrados DENTRO del modal (nunca en la página tras el backdrop).
   const [errorModal, setErrorModal]     = useState<string | null>(null)
@@ -348,7 +346,7 @@ export default function NuevaNotaPage() {
       })
     }, 1500)
     return () => { if (autosaveRef.current) clearTimeout(autosaveRef.current) }
-  }, [form, medicamentos, signosVitales, notaGenerada, modoNota, notaSaved])
+  }, [form, medicamentos, signosVitales, notaGenerada, modoNota, notaSaved, draftKey])
 
   // Entrevista: al recibir un set nuevo de preguntas (o limpiarlas), volver al
   // primer bloque. Mantiene la lógica del sub-paso A intacta.
@@ -563,7 +561,6 @@ export default function NuevaNotaPage() {
   function previewNotaManual() {
     if (!validarManualParaAbrir()) return
     setError('')
-    const dxValidos = form.diagnosticos.filter(d => d.descripcion?.trim())
     const dxBlock = dxValidos.length === 0
       ? 'Diagnóstico pendiente.'
       : dxValidos.length === 1
@@ -685,8 +682,6 @@ export default function NuevaNotaPage() {
 
     const medsConDatos = medicamentos.filter(m => m.nombre.trim())
     const svPayload = construirSignosVitalesPayload(signosVitales)
-    const notaFinal = notaGenerada
-      + (form.pronostico.trim() ? `\n\n**[PRONÓSTICO]:**\n${form.pronostico.trim()}` : '')
 
     const payload = {
       paciente_id: id,
@@ -737,10 +732,8 @@ export default function NuevaNotaPage() {
   }
 
   // ── Imprimir nota (pipeline react-pdf, patrón B′) ─────────────
-  // T3: sin llamador hasta 1.5 (Estado Éxito) — no eliminar. El botón pre-guardado
-  // murió con el panel inline en 1.2 y el post-guardado nace en 1.5; conservar el
-  // handler evita reponer las 8 fuentes de estado que lee (R11). Genera 3 warnings
-  // de no-unused-vars (imprimir, imprimiendo, Printer): esperados, no rompen lint.
+  // Lo consume el botón "Imprimir nota" del Estado Éxito. Conservar el handler
+  // evita reponer las 8 fuentes de estado que lee (R11).
   async function imprimir() {
     if (!paciente) return
     setErrorModal(null)
@@ -756,18 +749,13 @@ export default function NuevaNotaPage() {
       } catch { /* sin red: conservar medicoInfo del estado */ }
       if (!medicoVivo) { setErrorModal('No se pudo cargar el perfil médico.'); return }
 
-      // Réplica EXACTA de notaFinal de guardar(): el pronóstico se concatena a la
-      // narrativa (misma fuente que la consulta guardada → PDF idéntico en B′).
-      const notasEvolucion = notaGenerada
-        + (form.pronostico.trim() ? `\n\n**[PRONÓSTICO]:**\n${form.pronostico.trim()}` : '')
-
       const notaRenderData = buildNotaRenderData({
         origen: 'formulario',
         paciente,
         medicoVivo,
         consultorio: consultorioActivo,
         fecha: new Date().toISOString(),
-        notasEvolucion,
+        notasEvolucion: notaFinal,
         diagnosticos: form.diagnosticos.filter(d => d.descripcion?.trim()),
         motivoConsulta: form.motivo_consulta,
         signosVitales: construirSignosVitalesPayload(signosVitales) ?? null,
@@ -1213,7 +1201,7 @@ export default function NuevaNotaPage() {
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {/* Índice del array REAL: puede haber filas vacías intercaladas
-                      (IA con nombre nulo, o la tabla T4 que sigue viva hasta 2.1). */}
+                      (la IA puede devolver un nombre nulo). */}
                   {medicamentos.map((m, i) => m.nombre.trim() ? (
                     /* cursor-auto: el chip NO es clicable, solo su ✕ lo es. */
                     <span key={i} className="sp-chip sp-chip--removable cursor-auto">
@@ -1397,9 +1385,6 @@ export default function NuevaNotaPage() {
             )}
           </div>
         </div>
-
-        {/* Marcador para onboarding: consulta completa (nota guardada, sin modal abierto) */}
-        {notaSaved && !docInline && <div data-onboard="consulta-completa" className="hidden" />}
       </div>
 
       {/* ── Grid de dos columnas · una sola columna en Cierre ──
@@ -1645,7 +1630,7 @@ export default function NuevaNotaPage() {
               <div key={notaGenerada ? 'ancla' : 'cta'} className="animate-fade-in">
               {anclaNota ?? (
                 <>
-                  <button onClick={previewNotaManual} disabled={!form.motivo_consulta}
+                  <button onClick={previewNotaManual} disabled={!form.motivo_consulta.trim()}
                     className="sp-btn sp-btn--primary sp-btn--primary-block">
                     <PenLine size={18} />
                     Previsualizar nota
@@ -1896,7 +1881,7 @@ export default function NuevaNotaPage() {
 
                 {/* Row 2: Document type icons */}
                 <div className="px-4 sm:px-5 pb-2.5 -mt-0.5">
-                  <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide" data-onboard="modal-doc-iconos">
+                  <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
                     {DOCS.map(({ key, label, icon: Icon, color }) => {
                       const isActive = key === docInline
                       const colorClasses = color.split(' ')

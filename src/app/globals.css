@@ -506,15 +506,6 @@ body {
   animation: slideFromLeft 0.3s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
-/* Estado Éxito (3→4) — check sobrio, sin rebote */
-@keyframes checkPop {
-  from { opacity: 0; transform: scale(0.8); }
-  to   { opacity: 1; transform: scale(1);   }
-}
-.animate-check-pop {
-  animation: checkPop 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
-}
-
 /* Glow del título de la confirmación (migrado del <style> inline de nueva-nota).
    Paso 3.2.C1: los colores pasan a tokens. Las declaraciones de una animación
    ganan a cualquier declaración normal, así que los literales anulaban el color
