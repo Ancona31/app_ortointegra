@@ -234,6 +234,39 @@ para procedimiento de actualización.
 
 ---
 
+## 🖥️ Landing pública — reglas permanentes
+
+Aplican a `src/app/page.tsx` (landing pública) y a todo componente que
+viva dentro de ella. Fuera de scope: `(launcher)/inicio/page.tsx` (home
+del médico logueado). Origen: sección 1 de `PLAN_LANDING_SPINUS.md`.
+
+1. **Tokens de movimiento:** ningún componente de la landing usa un valor de
+   duración, easing o distancia que no salga de `--sp-dur-*`, `--sp-ease-*`
+   o de la extensión `--lp-*`. Sin excepciones.
+2. **Solo se anima `transform` y `opacity`.** Nunca `width`, `height`, `top`
+   ni `left`: provocan relayout y ahí nace el jank.
+3. **`useReducedMotion` se implementa junto a cada animación**, nunca como
+   parche final. `globals.css:822` ya tiene el bloque
+   `prefers-reduced-motion`; se extiende, no se crea otro.
+
+> ### ⚠️ REGLA 4 — TRAMPA DE NOMBRES (la que más se equivoca)
+>
+> **`--cp` (#1a3a5c) es el navy oscuro y `--cs` (#1e5fa8) es el azul
+> brillante. `--sp-primary` apunta a `--cs`, no a `--cp`.**
+>
+> **Está invertido respecto a lo intuitivo.** Verifica el token antes de
+> usarlo; no deduzcas por el nombre.
+
+5. **La firma del Teaser 2 nunca toca la red.** Sin `fetch`, sin
+   `toDataURL` fuera del componente, sin Supabase. Comentario obligatorio
+   en el archivo para que ningún refactor futuro lo "mejore".
+6. **Capturas:** cuenta demo, cero PII, jamás producción ni con datos
+   difuminados.
+7. **Sin dependencias nuevas más allá de `motion`.** Nada de Three.js,
+   GSAP, Lenis, librerías de QR ni smooth-scroll.
+
+---
+
 ## 📁 Estructura del proyecto
 
 * `src/app/` — páginas y API routes (App Router)
@@ -264,8 +297,24 @@ para procedimiento de actualización.
 
 ## ⚖️ Cumplimiento normativo mexicano
 
+> ### ⚠️ EL MARCO LEGAL DE DATOS PERSONALES CAMBIÓ EN 2025 — VERIFICA ANTES DE ESCRIBIR TEXTO LEGAL
+>
+> La LFPDPPP de 2010 fue **abrogada el 21/03/2025**. La ley vigente es la
+> **nueva LFPDPPP** (DOF 20/03/2025, en vigor desde el 21/03/2025, reformada
+> el 14/11/2025). **Su reglamento sigue pendiente a julio de 2026**;
+> supletoriamente aplica el reglamento de 2011 en lo que no contradiga la
+> nueva ley.
+>
+> **Consecuencia operativa:** cualquier aviso de privacidad, consentimiento,
+> cláusula o texto legal que generes **debe verificarse contra el texto
+> vigente antes de publicarse**. No cites artículos ni nombres de autoridad
+> de memoria, y no reutilices redacción anterior a marzo de 2025 sin
+> revisarla — el articulado y la autoridad cambiaron.
+
 * Esta app maneja datos de salud regulados por la NOM-004-SSA3-2012 y NOM-024-SSA3-2012
-* Los datos de salud son datos personales sensibles bajo la LFPDPPP
+* Los datos de salud son datos personales sensibles bajo la LFPDPPP vigente (DOF 20/03/2025, reformada 14/11/2025)
+* **La autoridad es la Secretaría Anticorrupción y Buen Gobierno (SABG).** El INAI fue disuelto: ninguna referencia al INAI es válida en texto nuevo
+* **Las multas se duplican tratándose de datos personales sensibles**, y un expediente clínico lo es. Toda sanción por incumplimiento aplica aquí en su versión duplicada
 * Las notas clínicas son inmutables — correcciones se hacen vía addendum
 * Los expedientes nunca se borran — se usa soft delete con retención mínima de 5 años
 * Todo acceso a expedientes debe quedar registrado en `audit_log`
@@ -431,7 +480,7 @@ Hardening conocido pero no aplicado todavía. Cada ítem tiene fix planeado y mo
 
 **Archivo afectado:** `src/app/api/paciente/[id]/exportar/route.ts`
 
-**Problema:** El endpoint `POST /api/paciente/[id]/exportar` devuelve JSON completo con todos los datos del paciente (consultas, mediciones, documentos, addendums, datos personales) para cumplimiento ARCO (LFPDPPP Art. 28). Actualmente requiere sesión autenticada pero NO valida el role del usuario. Cualquier médico autenticado puede invocarlo vía fetch/curl.
+**Problema:** El endpoint `POST /api/paciente/[id]/exportar` devuelve JSON completo con todos los datos del paciente (consultas, mediciones, documentos, addendums, datos personales) para cumplimiento ARCO (derechos ARCO bajo la LFPDPPP vigente de 2025 — el "Art. 28" que citaba esta línea es de la ley abrogada de 2010; verificar el artículo correcto antes de citarlo en cualquier texto de cara al usuario). Actualmente requiere sesión autenticada pero NO valida el role del usuario. Cualquier médico autenticado puede invocarlo vía fetch/curl.
 
 **Origen:** Endpoint creado en sesión anterior como preparación para cumplimiento legal ARCO. Nunca se integró a UI de super-admin.
 

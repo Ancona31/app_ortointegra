@@ -11,6 +11,55 @@ Estado: 🔴 abierta · 🟡 en progreso · 🟢 resuelta (se elimina al cerrar)
 
 ---
 
+## 🔴 CUMPLIMIENTO REGULATORIO — PRIORIDAD MÁXIMA (bloqueante de lanzamiento)
+
+### RG-01 · Certificación NOM-024-SSA3-2012 ante DGIS
+
+**Estado:** no iniciado
+**Prioridad:** extremadamente alta — resolver marco legal ANTES del lanzamiento
+**Scope:** proyecto independiente. NO es parte de ningún trabajo de UI/landing.
+
+**Contexto**
+La NOM-004-SSA3-2012 regula el contenido del expediente clínico y obliga al
+MÉDICO. La NOM-024-SSA3-2012 regula el SISTEMA que lo gestiona y es la que
+aplica a Spinus. Quien la certifica es la DGIS (Dirección General de
+Información en Salud, Secretaría de Salud), mediante auditoría técnica.
+
+**Requisitos conocidos (verificar contra el texto oficial del DOF 30/11/2012)**
+- [ ] Catálogos oficiales de la Secretaría de Salud
+- [ ] CIE-10 en diagnósticos
+- [ ] Guías de Intercambio de Información en Salud (GIIS)
+- [ ] Interoperabilidad: HL7 / FHIR / DICOM
+- [ ] Seguridad de datos e integridad de registros
+- [ ] Trazabilidad: quién registró qué y cuándo
+
+**Preguntas abiertas antes de lanzar**
+- [ ] ¿Qué se puede operar y facturar legalmente SIN certificación?
+- [ ] ¿La obligación recae en el prestador de servicios de salud o en el
+      proveedor de software?
+- [ ] ¿Qué se puede y qué NO se puede afirmar en marketing sin el aval?
+- [ ] Verificar decreto DOF 15/01/2026, reforma a Ley General de Salud
+      Art. 71 Ter (digitalización obligatoria + interoperabilidad)
+- [ ] Costo, duración y prerrequisitos del proceso ante DGIS
+
+**Bloqueantes previos**
+- [ ] Audit log incompleto (existe, falta cobertura total de eventos)
+- [ ] Dashboard de super-admin sin pulir
+- [ ] Aviso de privacidad desactualizado: la LFPDPPP de 2010 fue abrogada
+      el 21/03/2025 por la nueva LFPDPPP (DOF 20/03/2025, reformada
+      14/11/2025). El INAI ya no existe; la autoridad es la Secretaría
+      Anticorrupción y Buen Gobierno. Aplica también a dranconacolumna.com
+      y al agente de WhatsApp.
+- [ ] Contrato de encargado del tratamiento con los médicos suscriptores
+- [ ] Definir y documentar política de acceso del super-admin a datos
+      clínicos de otros médicos
+
+**Riesgo si se ignora:** exposición médico-legal directa al titular
+(persona física, titular de la marca y responsable del tratamiento de datos
+sensibles de pacientes de terceros).
+
+---
+
 ## Etapa 5 — Refactor de roles
 
 ### E5-DT-1 — Cuatro pantallas leen data.error en vez de data.message
@@ -1436,6 +1485,92 @@ verificadas contra el árbol posterior a esa limpieza.
   futuras.
 - **Cuándo atacar:** con la auditoría de contraste (junto a FN-DT-10 y
   FN-DT-13). Independiente del proyecto de tokenización del dark.
+
+---
+
+## Landing pública — auditoría de rediseño (julio 2026)
+
+Deuda detectada durante la auditoría y el plan de rediseño de la landing
+pública (`src/app/page.tsx`). Transcrita desde la sección 10 de
+`PLAN_LANDING_SPINUS.md` (2026-07-28). Ninguno de estos ítems es scope del
+rediseño en sí: son consecuencias o hallazgos colaterales del plan.
+
+**Ver también:** `RG-01 · Certificación NOM-024-SSA3-2012 ante DGIS` —
+apartado de prioridad máxima al inicio de este archivo, bloqueante de
+lanzamiento oficial. Proyecto independiente, no es scope de este plan.
+
+### LP-DT-1 — Réplica HTML/CSS de la receta desfasable respecto al PDF real
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de landing (2026-07-28)
+- **Descripción:** Réplica HTML/CSS de la receta desfasable respecto al PDF
+  real.
+
+### LP-DT-2 — Recapturar imágenes de landing cuando cambie la UI
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de landing (2026-07-28)
+- **Descripción:** Recapturar imágenes de landing cuando cambie la UI de
+  agenda, expediente o recetas. Manifest con fecha y versión en
+  `/public/capturas/`.
+
+### LP-DT-3 — Unificar la app a Inter
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de landing (2026-07-28)
+- **Descripción:** Unificar la app a Inter; al hacerlo, recapturar.
+
+### LP-DT-4 — Generación de PDF no probada en gama media/baja
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de landing (2026-07-28)
+- **Descripción:** Generación de PDF no probada en gama media/baja — riesgo
+  aceptado.
+
+### LP-DT-5 — Estado vacío del visor DICOM en móvil
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de landing (2026-07-28)
+- **Descripción:** Estado vacío del visor DICOM en móvil — hoy no existe.
+  Debe mostrar "Disponible en computadora", no un visor roto.
+
+### LP-DT-6 — Bug de sync de Google Calendar
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de landing (2026-07-28)
+- **Descripción:** Bug de sync de Google Calendar — bloquea el claim "en
+  tiempo real" en toda la página.
+
+### LP-DT-7 — Dashboard que los médicos no entienden
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de landing (2026-07-28)
+- **Descripción:** Dashboard — si los médicos no entienden qué es (razón por
+  la que se quitó de la landing), es señal de producto, no de copy.
+
+### LP-DT-8 — Almacenamiento de DICOM
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de landing (2026-07-28)
+- **Descripción:** Almacenamiento de DICOM — verificar Postgres vs Storage.
+
+### LP-DT-9 — Página de verificación de recetas
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de landing (2026-07-28)
+- **Descripción:** Página de verificación de recetas: minimización de datos
+  (la farmacia no necesita nombre completo ni CIE-10), `noindex`, y vigencia
+  del enlace.
+
+### LP-DT-10 — Renderizador de recomendaciones inconsistente
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de landing (2026-07-28)
+- **Descripción:** Renderizador de recomendaciones inconsistente entre PDF
+  (parseado, con formato) y página web (texto crudo con emojis a la vista).
+  El paciente ve la peor de las dos.
+
+### LP-DT-11 — Marca de agua del PDF detrás de la tabla de medicamentos
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de landing (2026-07-28)
+- **Descripción:** Marca de agua del PDF detrás de la tabla de medicamentos
+  — ensucia el dato más importante al fotocopiar.
+
+### LP-DT-12 — Alineación del bloque final del PDF
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de landing (2026-07-28)
+- **Descripción:** Alineación del bloque final del PDF ("SOLICITAR CITA…")
+  fuera de la caja de alarma.
 
 ---
 
