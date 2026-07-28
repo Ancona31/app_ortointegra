@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Calendar, FileText, Shield, Brain, ArrowRight, Stethoscope, BarChart3, Pill, MonitorCheck, Clock, Search, Users, Activity, Zap, Smartphone, Laptop, MousePointerClick, FolderOpen, Share2, Scale, LockKeyhole, Wifi, Sparkles } from 'lucide-react'
 import NeuralBackground from '@/components/ui/NeuralBackground'
+import Reveal from '@/components/landing/motion/Reveal'
 
 const features = [
   {
@@ -403,7 +404,8 @@ export default function HomePage() {
       {/* Section: Portabilidad */}
       <section className="bg-slate-100/40 backdrop-blur-md border-y border-white/30">
         <div className="mx-auto max-w-6xl px-4 sm:px-8 py-20 sm:py-28">
-          <div className="text-center mb-14">
+          {/* Prueba de humo F0 del sistema de movimiento — único uso de <Reveal> por ahora */}
+          <Reveal className="text-center mb-14">
             <div className="inline-flex items-center gap-2 bg-violet-50 rounded-full px-3.5 py-1 mb-6">
               <Smartphone className="w-3.5 h-3.5 text-violet-600" />
               <span className="text-[11px] font-semibold text-violet-600 uppercase tracking-wider">Portabilidad máxima</span>
@@ -414,7 +416,7 @@ export default function HomePage() {
             <p className="mt-4 text-[16px] text-slate-500 max-w-2xl mx-auto leading-relaxed">
               Accede desde tu computadora, tablet o celular. La misma experiencia fluida en cualquier pantalla — sin instalar nada, sin actualizaciones manuales.
             </p>
-          </div>
+          </Reveal>
 
           <div className="grid sm:grid-cols-3 gap-4">
             {[

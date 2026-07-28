@@ -96,6 +96,15 @@
   --ag-btn-ghost-hover: #f1f5f9;         /* ~slate-100 */
   --ag-patient-card-bg: #eff4f9;         /* azul suave (~blue-50) */
   --ag-patient-card-border: #c9dcfb;     /* azul (~blue-200), alineado con scheduled-border */
+
+  /* ── Extensión de landing (movimiento) ─────────────────────────────
+     Prefijo --lp-. EXTIENDE la escala de --sp-dur- y --sp-ease- de
+     spinus-tokens.css, NO la sustituye. Solo cubre los dos registros que
+     la app no necesita: entrada de sección y escenario cinematográfico.
+     Ver PLAN_LANDING_SPINUS.md §2.3. */
+  --lp-dur-section: 420ms;                        /* entrada de sección */
+  --lp-dur-cine:    900ms;                        /* escenario cinematográfico */
+  --lp-ease-cine:   cubic-bezier(.65, 0, .35, 1); /* solo los 4 escenarios Apple */
 }
 
 html {
