@@ -45,7 +45,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <SuscripcionBanner desktopSidebarOffset />
               <div className="flex h-screen overflow-hidden">
                 <Sidebar />
-                <main className="flex-1 lg:ml-60 overflow-y-auto">
+                <main className="flex-1 lg:ml-64 overflow-y-auto">
                   <div className="min-h-full pt-16 px-4 pb-6 lg:pt-8 lg:px-8 lg:pb-8">
                     <ErrorBoundary>
                       <PageTransition>
