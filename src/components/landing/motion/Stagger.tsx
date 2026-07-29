@@ -19,8 +19,12 @@ interface StaggerProps {
  *
  * Cada hijo se envuelve en un `motion.div`, así que el wrapper —no el hijo—
  * pasa a ser el item del grid/flex del contenedor. Solo anima `transform` y
- * `opacity` (regla permanente 2 de CLAUDE.md). Con `prefers-reduced-motion`
- * el contenedor se renderiza tal cual, sin wrappers ni animación.
+ * `opacity` (regla permanente 2 de CLAUDE.md).
+ *
+ * `prefers-reduced-motion` NO ramifica el render: el árbol de DOM (incluidos
+ * los wrappers por hijo) es idéntico en servidor y cliente. Ver el comentario
+ * largo de `Reveal.tsx` para el porqué y para las dos capas que resuelven la
+ * preferencia. `data-lp-reveal` va en los wrappers, que son los que animan.
  */
 export default function Stagger({
   children,
@@ -30,10 +34,6 @@ export default function Stagger({
 }: StaggerProps): React.JSX.Element {
   const reducedMotion = useReducedMotion()
 
-  if (reducedMotion) {
-    return <div className={className}>{children}</div>
-  }
-
   return (
     <motion.div
       className={className}
@@ -42,18 +42,25 @@ export default function Stagger({
       viewport={{ once: true, amount: 0.2 }}
       variants={{
         hidden: {},
-        visible: { transition: { staggerChildren: gap, delayChildren: delay } },
+        visible: {
+          transition: reducedMotion
+            ? { staggerChildren: 0, delayChildren: 0 }
+            : { staggerChildren: gap, delayChildren: delay },
+        },
       }}
     >
       {Children.map(children, (child, i) => (
         <motion.div
           key={i}
+          data-lp-reveal=""
           variants={{
             hidden: { opacity: 0, y: DIST.reveal },
             visible: {
               opacity: 1,
               y: 0,
-              transition: { duration: DUR.base, ease: EASE.out },
+              transition: reducedMotion
+                ? { duration: 0 }
+                : { duration: DUR.base, ease: EASE.out },
             },
           }}
         >

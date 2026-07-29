@@ -823,4 +823,17 @@ html.dark .agenda-fc .fc-daygrid .fc-col-header-cell {
   [class*="animate-"]:not(.animate-spin) {
     animation: none !important;
   }
+
+  /*
+   * Reveals de la landing (`Reveal.tsx` / `Stagger.tsx`). El árbol de DOM es
+   * el mismo con y sin reducir-movimiento —ramificar el render provocaba
+   * hydration mismatch y dejaba la sección invisible—, así que la preferencia
+   * se resuelve aquí: se fuerza el estado final visible.
+   * `!important` es obligatorio: `motion` escribe estilos inline.
+   */
+  [data-lp-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
 }
