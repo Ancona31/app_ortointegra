@@ -52,7 +52,7 @@ export default function OfflineAlert() {
           </div>
           <h2 className="text-lg font-bold text-slate-800">Sin conexión</h2>
           <p className="text-sm text-slate-500 mt-3 leading-relaxed">
-            No se detecta conexión o es de mala calidad. Espera a que se estabilice la red o cambia a modo offline.
+            No se detecta conexión o es de mala calidad. Espera a que se estabilice la red.
           </p>
           <div className="flex items-center justify-center gap-2 mt-4 text-xs text-slate-400">
             <Loader2 size={12} className="animate-spin" />
