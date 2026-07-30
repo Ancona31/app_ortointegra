@@ -10,7 +10,7 @@ export default function SeccionNav() {
       <nav className="mx-auto max-w-6xl flex items-center justify-between px-4 sm:px-8 h-14">
         <div className="flex items-center gap-2.5">
           <Image src="/logo-spinus.png" alt="Spinus" width={800} height={777} className="object-contain h-9 w-auto" />
-          <span className="text-[17px] font-bold text-slate-900 tracking-tight">Spinus®</span>
+          <span className="text-[17px] font-bold text-slate-900 tracking-tight">Spinus</span>
         </div>
         <div className="flex items-center gap-3">
           <Link

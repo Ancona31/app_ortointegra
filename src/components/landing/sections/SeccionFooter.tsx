@@ -11,7 +11,7 @@ export default function SeccionFooter() {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <Image src="/logo-spinus.png" alt="Spinus" width={800} height={777} className="object-contain h-7 w-auto" />
-            <span className="text-[13px] text-slate-500">&copy; {new Date().getFullYear()} Spinus®. Todos los derechos reservados.</span>
+            <span className="text-[13px] text-slate-500">&copy; {new Date().getFullYear()} Spinus. Todos los derechos reservados.</span>
           </div>
           <div className="flex items-center gap-6">
             <Link href="/privacy" className="text-[13px] text-slate-500 hover:text-slate-700 transition-colors duration-200">

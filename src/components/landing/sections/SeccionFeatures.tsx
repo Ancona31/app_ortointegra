@@ -47,7 +47,7 @@ const features = [
   },
 ]
 
-/* Features — infinite marquee */
+/* Features */
 export default function SeccionFeatures() {
   return (
     <section className="pb-20 sm:pb-28">
@@ -56,17 +56,12 @@ export default function SeccionFeatures() {
         <p className="mt-3 text-[15px] text-slate-500">Cada herramienta resuelve un problema real de tu día a día.</p>
       </div>
 
-      <div className="relative overflow-hidden group/marquee">
-        {/* Fade edges */}
-        <div className="absolute left-0 top-0 bottom-0 w-16 sm:w-32 bg-gradient-to-r from-white/30 to-transparent z-10 pointer-events-none" />
-        <div className="absolute right-0 top-0 bottom-0 w-16 sm:w-32 bg-gradient-to-l from-white/30 to-transparent z-10 pointer-events-none" />
-
-        <div className="flex gap-4 animate-[marquee_35s_linear_infinite] group-hover/marquee:[animation-play-state:paused] w-max">
-          {/* Render cards twice for seamless loop */}
-          {[...features, ...features].map((f, i) => (
+      <div className="mx-auto max-w-6xl px-4 sm:px-8">
+        <div className="flex flex-wrap justify-center gap-4">
+          {features.map((f) => (
             <div
-              key={`${f.title}-${i}`}
-              className="flex-shrink-0 w-[280px] sm:w-[320px] bg-white rounded-2xl border border-slate-200/60 p-6 shadow-sm hover:shadow-[0_4px_20px_rgba(30,95,168,0.10)] hover:border-[#1e5fa8]/15 hover:-translate-y-1 active:scale-[0.98] transition-all duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] cursor-default"
+              key={f.title}
+              className="w-[280px] sm:w-[320px] bg-white rounded-2xl border border-slate-200/60 p-6 shadow-sm hover:shadow-[0_4px_20px_rgba(30,95,168,0.10)] hover:border-[#1e5fa8]/15 hover:-translate-y-1 active:scale-[0.98] transition-all duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] cursor-default"
             >
               <div className={`w-11 h-11 rounded-xl ${f.bg} flex items-center justify-center mb-4`}>
                 {f.icon}

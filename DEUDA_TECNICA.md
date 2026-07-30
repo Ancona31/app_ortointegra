@@ -1572,6 +1572,74 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
 - **Descripción:** Alineación del bloque final del PDF ("SOLICITAR CITA…")
   fuera de la caja de alarma.
 
+### LP-DT-13 — Mini-mockup falso en SeccionExpediente
+- **Estado:** 🔴 abierta
+- **Detectada:** F1.2 tanda (a) — eliminaciones (2026-07-30)
+- **Descripción:** `src/components/landing/sections/SeccionExpediente.tsx:40-72`
+  dibuja en JSX una tarjeta de paciente inexistente ("Carlos Méndez Ríos,
+  Exp. #1042") con contadores y timeline inventados. Es una violación de
+  fidelidad conocida: la landing muestra una UI que no es captura real del
+  producto. Se conserva deliberadamente en la tanda (a) por decisión de PM
+  para no dejar el grid `lg:grid-cols-2` de esa sección con una columna
+  vacía mientras no exista el reemplazo.
+- **Condición de cierre:** se elimina al integrar Video 1.
+
+### LP-DT-14 — NeuralBackground sin uso en la landing
+- **Estado:** 🔴 abierta
+- **Detectada:** F1.2 tanda (a) — eliminaciones (2026-07-30)
+- **Descripción:** NeuralBackground: sin uso en landing; conservado por
+  `/login`. Evaluar en rediseño de auth. El archivo
+  (`src/components/ui/NeuralBackground.tsx`, 325 líneas) queda como único
+  consumidor `src/app/login/page.tsx:8,126`. Arrastra canvas 2D,
+  `requestAnimationFrame` autoperpetuado y 5 listeners de `window`
+  (`mousemove`, `mouseleave`, `touchmove`, `touchend`, `resize`); no
+  registra `visibilitychange`, así que el rAF sigue corriendo con la pestaña
+  oculta salvo throttling del navegador. Además pinta su propio degradado de
+  fondo con contexto `alpha: false`, por lo que en `/login` el color de
+  fondo depende del canvas.
+
+### LP-DT-15 — Proyecto aparte: barrido de ® fuera de la landing
+- **Estado:** 🔴 abierta
+- **Detectada:** F1.2 tanda (a) — eliminaciones (2026-07-30)
+- **Descripción:** Quedan **43 símbolos ® en 23 archivos** fuera de la
+  landing pública (zonas 3, 4, 5, 6a y 6b del inventario reconciliado de
+  F1.2: app logueada, config/metadata, documentos legales, auth y entrada, y
+  otras superficies públicas). La marca está EN TRÁMITE ante IMPI
+  (exp. 3594483, sin registro concedido), así que usar ® es infracción.
+  F1.2 solo corrigió los 2 de la landing (`SeccionNav`, `SeccionFooter`); un
+  tercero se fue con `SeccionMockup` y un cuarto
+  (`SeccionInterfaz.tsx:45`) se resuelve con el copy de la tanda (c).
+  `src/lib/pdf/PdfBarras.tsx:60` se corrigió aparte en micro-commit por ser
+  cara al paciente.
+- **Notas especiales antes de tocar nada:**
+  - `src/components/legal/TerminosContent.tsx:711` — el ® **es el objeto de
+    la afirmación jurídica** ("La marca **Spinus®** y sus…"), y es la única
+    línea del repo con dos símbolos. No es un reemplazo de texto trivial.
+  - `src/app/(app)/perfil/page.tsx:43` — `'Spinus® (defecto)'` es el nombre
+    de un tema de color; **posible string persistido en DB — verificar**
+    antes de cambiarlo. Su gemelo congelado está en
+    `design/agenda/design_handoff_agenda/theme.js:60`.
+  - `src/app/manifest.json/route.ts:5` — es el **nombre de la PWA ya
+    instalada en dispositivos**; cambiarlo afecta instalaciones existentes.
+- **No tocar:** `SPINUS_LANDING_MAESTRO.md:518,520,563` (son la instrucción
+  misma de eliminar el ® y la nota del trámite IMPI), `CLAUDE.md:3`,
+  `.env.example:2` y el `design/**` congelado.
+
+### LP-DT-16 — Baseline de ESLint: 215 problemas preexistentes
+- **Estado:** 🔴 abierta
+- **Detectada:** F1.2 tanda (a) — eliminaciones (2026-07-30)
+- **Descripción:** `npx eslint .` sale con **exit 1 y 215 problemas
+  (126 errores, 89 warnings)** en un árbol sin cambios. La mayoría son los
+  prototipos de `design/**/*.jsx` (`'Icon' is not defined`,
+  `react/jsx-no-undef`), que no forman parte del build, más warnings
+  repartidos por la app. `npx tsc --noEmit` sí sale limpio (exit 0).
+- **Criterio vigente:** la validación de las fases es **no-regresión contra
+  215/126/89**, no exit 0. Cualquier fase que suba ese número introdujo
+  deuda nueva y debe corregirla antes de cerrar.
+- **Condición de cierre:** excluir `design/` de la configuración de ESLint
+  (es handoff congelado, no código de producción) y luego atacar el
+  remanente real de `src/`.
+
 ---
 
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)

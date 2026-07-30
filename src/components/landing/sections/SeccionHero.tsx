@@ -3,15 +3,23 @@
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 
-/* Hero */
+/* Hero
+   Lavado de --cs al 4% (§3.1, banda 3–5%) — sustituye al NeuralBackground.
+   Hex literal, NO var(--cs): el provider que la define solo se monta en
+   (app)/layout.tsx, así que en la landing pública var() nunca resolvería. */
 export default function SeccionHero() {
   return (
-    <section className="relative overflow-hidden">
+    <section
+      className="relative overflow-hidden"
+      style={{ background: 'color-mix(in srgb, #1e5fa8 4%, #fff)' }}
+    >
       {/* Gradient orbs */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-gradient-to-b from-[#1e5fa8]/8 via-violet-500/5 to-transparent rounded-full blur-3xl pointer-events-none" />
 
 
-      <div className="relative mx-auto max-w-6xl px-4 sm:px-8 pt-20 sm:pt-28 pb-10 sm:pb-14 text-center">
+      {/* pb-24 = 96px: mínimo de aire de §3.3 en la costura con Features, que
+          no declara padding superior. Los 128/72 generales son F1.3. */}
+      <div className="relative mx-auto max-w-6xl px-4 sm:px-8 pt-20 sm:pt-28 pb-24 text-center">
         <h1 className="text-[40px] sm:text-[56px] font-bold text-slate-900 tracking-tight leading-[1.1]">
           Menos tiempo en la pantalla,
           <br />
