@@ -137,7 +137,12 @@ export default function SeccionSeguridad() {
                 {t.icon}
               </div>
               <h3 className="text-[16px] font-bold text-slate-900 mb-3">{t.title}</h3>
-              <p className="text-[14px] text-slate-500 leading-relaxed">{t.desc}</p>
+              {/* F1.3·d3 — rol cuerpo: 17px · 1.65. Ver SeccionFeatures.tsx.
+                  Estas 3 tarjetas tienen cuerpos de largo desigual y comparten
+                  altura por `items-stretch` (ver la nota de la escalera arriba):
+                  al subir de 14 a 17 crecen las tres a la vez, así que la
+                  retícula no se descuadra — la más larga sigue mandando. */}
+              <p className="text-[17px] text-slate-500 leading-[1.65]">{t.desc}</p>
             </div>
           ))}
         </div>

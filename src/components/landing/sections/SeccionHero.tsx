@@ -181,7 +181,37 @@ export default function SeccionHero() {
               Creada por un cirujano de columna que la usa todos los días
             </p>
 
-            <p className="mt-4 text-[17px] sm:text-[19px] text-slate-500 max-w-2xl leading-relaxed">
+            {/* ═══ ROL BAJADA (F1.3·d3) ═══
+                19px · tracking -0.01em · leading 1.55 (§3.2). La bajada es el
+                párrafo que sigue al titular de una sección y lo explica: uno
+                por sección, SEIS en total — este, SeccionFeatures,
+                SeccionExpediente, SeccionInterfaz, SeccionPortabilidad y
+                SeccionCTA. Las otras cuatro secciones no tienen bajada y no
+                hay que inventarles una.
+
+                Esta es la única que ya estaba en 19 (venía de `17px sm:19px`);
+                las otras cinco subían desde 15 o 16. El `leading-relaxed` de
+                Tailwind (1.625) baja a 1.55: a 19px, 1.625 abre demasiado y
+                la bajada empieza a leerse como cuerpo. El -0.01em es la
+                mitad del que lleva el titular de sección — a este tamaño
+                todavía compensa algo, pero mucho menos.
+
+                ⚠️⚠️ NUNCA APLIQUES ESTE ROL —NI EL DE CUERPO— CON UN SELECTOR.
+                Un `section p { }` en globals.css o un `[&_p]:text-[17px]` en
+                un contenedor parece la solución obvia y ES UN BUG SILENCIOSO:
+                barre también los párrafos de los dos mockups (el panel
+                simulado de SeccionInterfaz y la tarjeta de paciente de
+                SeccionExpediente), que están calibrados a 13/14px para
+                parecer UI real. Medido: con selector, a 390px de ancho el
+                documento pasa de 390 a 493px de scrollWidth — scroll
+                horizontal en móvil. Ni `npm run build` ni el lint lo
+                detectan, y a 1440 no se nota. Los 12 sitios de d3 se
+                escribieron CLASE POR CLASE por esto. Si añades un párrafo
+                nuevo, dale la clase a mano.
+
+                El régimen de CUERPO (17px · 1.65) está en SeccionFeatures.tsx
+                y comparte esta advertencia. */}
+            <p className="mt-4 text-[19px] text-slate-500 max-w-2xl tracking-[-0.01em] leading-[1.55]">
               Expedientes, agenda e inteligencia artificial en una sola plataforma. Sin vendedores, sin trámites.
             </p>
 

@@ -42,7 +42,10 @@ export default function SeccionCTA() {
           <h2 className="relative text-[clamp(30px,4vw,46px)] font-bold text-white tracking-[-0.03em] leading-[1.10] max-w-2xl mx-auto">
             Tu consultorio merece software hecho para ayudarte, no para cumplir un requisito.
           </h2>
-          <p className="relative mt-3 text-[15px] text-white/70 max-w-lg mx-auto">
+          {/* F1.3·d3 — rol bajada: 19px · -0.01em · 1.55. Ver SeccionHero.tsx.
+              Es la única bajada sobre superficie navy, y la única con un <br />
+              duro: el corte entre las dos frases es intencional. */}
+          <p className="relative mt-3 text-[19px] text-white/70 max-w-lg mx-auto tracking-[-0.01em] leading-[1.55]">
             Sin pláticas con vendedores. Sin letras chiquitas. Sin trámites.
             <br />
             Crea tu cuenta y empieza a usarla hoy — así de simple.

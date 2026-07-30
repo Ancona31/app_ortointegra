@@ -98,7 +98,8 @@ export default function SeccionInterfaz() {
               <br className="hidden sm:block" />
               <span className="text-slate-400">ya sabes usar Spinus</span>
             </h2>
-            <p className="mt-6 text-[16px] text-slate-500 leading-relaxed max-w-lg">
+            {/* F1.3·d3 — rol bajada: 19px · -0.01em · 1.55. Ver SeccionHero.tsx. */}
+            <p className="mt-6 text-[19px] text-slate-500 max-w-lg tracking-[-0.01em] leading-[1.55]">
               Sin configuraciones, sin formatos rígidos, sin capacitación. Cada pantalla está diseñada para que el siguiente paso sea obvio — desde que llega el paciente hasta que se va con su receta.
             </p>
             <div className="mt-8 space-y-4">
@@ -113,7 +114,11 @@ export default function SeccionInterfaz() {
                   <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center flex-shrink-0 mt-0.5">
                     {item.icon}
                   </div>
-                  <p className="text-[14px] text-slate-600 leading-relaxed">{item.text}</p>
+                  {/* F1.3·d3 — rol cuerpo: 17px · 1.65. Ver SeccionFeatures.tsx.
+                      ⚠️ NO confundir con el `text-[13px]` de :75, que es una
+                      etiqueta del panel simulado y queda fuera de d3 por el
+                      mismo criterio que excluyó su kicker en d1. */}
+                  <p className="text-[17px] text-slate-600 leading-[1.65]">{item.text}</p>
                 </div>
               ))}
             </div>

@@ -137,7 +137,9 @@ export default function SeccionFeatures() {
           <h2 className="text-[clamp(30px,4vw,46px)] font-bold text-slate-900 tracking-[-0.03em] leading-[1.10]">
             Lo que resuelve desde el primer día
           </h2>
-          <p className="mt-3 text-[15px] text-slate-500">Cada herramienta resuelve un problema real de tu día a día.</p>
+          {/* F1.3·d3 — rol bajada: 19px · -0.01em · 1.55. Ver SeccionHero.tsx
+              (incluida la advertencia de NO aplicar esto con selector). */}
+          <p className="mt-3 text-[19px] text-slate-500 tracking-[-0.01em] leading-[1.55]">Cada herramienta resuelve un problema real de tu día a día.</p>
         </div>
 
         <div className="grid sm:grid-cols-3 gap-4">
@@ -149,7 +151,31 @@ export default function SeccionFeatures() {
               <div className="p-6">
                 <div className="mb-4">{f.icon}</div>
                 <h3 className="text-[15px] font-semibold text-slate-900">{f.title}</h3>
-                <p className="mt-2 text-[13px] text-slate-500 leading-relaxed">{f.desc}</p>
+                {/* ═══ ROL CUERPO (F1.3·d3) ═══
+                    17px · tracking normal · leading 1.65 (§3.2). Es el texto
+                    corrido de la landing: SEIS sitios — este, SeccionExpediente,
+                    SeccionInterfaz, SeccionPortabilidad, SeccionSeguridad y los
+                    cuatro párrafos de SeccionHistoria (que lo heredan del div
+                    contenedor, no párrafo a párrafo).
+
+                    Venían de 13, 14 y 15px: tres tamaños distintos para el
+                    mismo rol, que es justo lo que d3 cierra. 17 es el mínimo
+                    cómodo para leer un párrafo entero, y 1.65 es más abierto
+                    que el 1.55 de la bajada a propósito — a menor tamaño, más
+                    interlínea. Sustituye a `leading-relaxed` (1.625), que
+                    quedaba cerca pero no era un valor del sistema.
+
+                    ⚠️ TRACKING NORMAL SIGNIFICA AUSENCIA DE CLASE, no
+                    `tracking-normal`. Nada en la cadena de ancestros toca el
+                    letter-spacing de la landing (verificado: computed =
+                    "normal" en los seis sitios), así que la clase no haría
+                    nada. A 17px no hay apelmazamiento que compensar — el
+                    tracking negativo es cosa de titulares. No se lo pongas.
+
+                    ⚠️ Este rol NO se aplica con selector. La advertencia
+                    completa, con la medición del scroll horizontal que
+                    provoca, está en SeccionHero.tsx junto al rol bajada. */}
+                <p className="mt-2 text-[17px] text-slate-500 leading-[1.65]">{f.desc}</p>
               </div>
               {f.media ? <div className="mt-auto overflow-hidden rounded-b-2xl" /> : null}
             </div>

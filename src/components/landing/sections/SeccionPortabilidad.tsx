@@ -32,7 +32,8 @@ export default function SeccionPortabilidad() {
               landing con slate-500 apoyado DIRECTAMENTE en franja son esta y
               la del pie de abajo; el slate-500 de las tarjetas va sobre
               blanco y se queda. Si esta sección vuelve a blanco, revertir. */}
-          <p className="mt-4 text-[16px] text-[#5a6b81] max-w-2xl mx-auto leading-relaxed">
+          {/* F1.3·d3 — rol bajada: 19px · -0.01em · 1.55. Ver SeccionHero.tsx. */}
+          <p className="mt-4 text-[19px] text-[#5a6b81] max-w-2xl mx-auto tracking-[-0.01em] leading-[1.55]">
             Accede desde tu computadora, tablet o celular. Adaptada a cada pantalla, sin instalar nada de una tienda de apps.
           </p>
         </Reveal>
@@ -79,7 +80,10 @@ export default function SeccionPortabilidad() {
               <div className="flex-shrink-0 mt-0.5">{item.icon}</div>
               <div className="min-w-0">
                 <h3 className="text-[14px] font-semibold text-slate-900">{item.title}</h3>
-                <p className="mt-2 text-[13px] text-slate-500 leading-relaxed">{item.desc}</p>
+                {/* F1.3·d3 — rol cuerpo: 17px · 1.65. Ver SeccionFeatures.tsx.
+                    ⚠️ El `text-[13px]` de más abajo en este archivo es el pie
+                    de la sección: es CAPTION, otro rol, y lo resuelve d4. */}
+                <p className="mt-2 text-[17px] text-slate-500 leading-[1.65]">{item.desc}</p>
               </div>
             </div>
           ))}

@@ -56,7 +56,14 @@ export default function SeccionHistoria() {
                 Angel (pendiente §9). c2 solo aplicó lo mecánico: badge,
                 cierre del 4º párrafo, DICOM en la lista de módulos, grafía
                 "Ángel" y cédulas. NO lo tomes por olvido ni lo redactes tú. */}
-            <div className="mt-6 space-y-4 text-[15px] text-slate-600 leading-relaxed">
+            {/* F1.3·d3 — rol cuerpo: 17px · 1.65. Ver SeccionFeatures.tsx.
+                Único sitio donde el rol vive en el CONTENEDOR y no en el <p>:
+                los 4 párrafos lo heredan. Se deja así a propósito —repetir la
+                clase cuatro veces no añade nada—, pero ojo: esto es herencia
+                sobre un div concreto, NO un selector. Si añades un 5º párrafo
+                aquí dentro, hereda solo. Si lo sacas fuera de este div,
+                dale la clase a mano. */}
+            <div className="mt-6 space-y-4 text-[17px] text-slate-600 leading-[1.65]">
               <p>
                 Todo empezó en un quirófano. Entre cirugías de columna, notas médicas escritas a mano y un software que tardaba más en cargar que la propia consulta, el <strong className="text-slate-800">Dr. Ángel Ancona</strong> se hizo una pregunta simple: <em className="text-[#1e5fa8]">&ldquo;¿Por qué la tecnología médica no funciona como la tecnología que usamos en nuestra vida diaria?&rdquo;</em>
               </p>
