@@ -19,7 +19,9 @@ export default function SeccionPortabilidad() {
             {/* F1.3·d1 — rol kicker: 12px · +0.12em · 1.0. Ver SeccionHero.tsx. */}
             <span className="text-[12px] font-semibold text-violet-600 uppercase tracking-[0.12em] leading-none">Portabilidad máxima</span>
           </div>
-          <h2 className="text-[28px] sm:text-[38px] font-bold text-slate-900 tracking-tight leading-[1.15]">
+          {/* F1.3·d2 — rol titular de sección: clamp(30,4vw,46) · -0.03em ·
+              1.10. Ver SeccionFeatures.tsx. */}
+          <h2 className="text-[clamp(30px,4vw,46px)] font-bold text-slate-900 tracking-[-0.03em] leading-[1.10]">
             Tu consultorio en cualquier lugar
           </h2>
           {/* ⚠️ #5a6b81 (tinta 500 de §3.1) en vez de text-slate-500, y NO es

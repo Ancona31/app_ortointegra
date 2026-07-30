@@ -131,7 +131,45 @@ export default function SeccionHero() {
               Expediente clínico electrónico para consultorios privados
             </p>
 
-            <h1 className="mt-4 text-[40px] sm:text-[56px] font-bold text-slate-900 tracking-tight leading-[1.1]">
+            {/* ═══ ROL H1 DE LA LANDING (F1.3·d2) ═══
+                text-[clamp(40px,7vw,72px)] · tracking -0.04em · leading 1.02
+                (§3.2). Rol de un solo sitio: este es el único H1 de la
+                página. El régimen de los OCHO titulares de sección es otro y
+                está declarado en `SeccionFeatures.tsx`.
+
+                Venía de `40px sm:56px` con `tracking-tight` (-0.025em) y
+                `leading-[1.1]`. El techo sube de 56 a 72 y el tracking y el
+                leading se cierran con él: a 72px lo que a 56 se leía normal
+                queda suelto. Por eso este rol NO comparte valores con el
+                titular de sección aunque los dos sean "texto grande en
+                negrita" — a esta escala el ajuste óptico es distinto.
+
+                ⚠️ 7vw es agresivo a propósito y el clamp entrega tamaño de
+                ESCRITORIO sobre columna estrecha en un punto: a 1024px de
+                viewport 7vw ya vale 71.7px —a un pelo del tope— pero la
+                columna del texto mide solo 461px. Medido ahí: 5 líneas,
+                H1 de 366px (eran 4L y 246px) y hero de 867 (era 748). Es el
+                peor caso de la curva y es aceptable — pero si una tanda
+                futura mete texto más largo en este H1, mídelo a 1024 antes
+                que a 390 o a 1920.
+
+                Medido en el resto de la curva: a 1920 pasa de 2 a 4 líneas,
+                +171px de caja de H1 — el hero solo crece 50 porque es
+                `items-center` y manda la columna del mockup. A 390 el tamaño
+                no se mueve (el clamp topa en su piso de 40, que es lo que ya
+                tenía) pero el bloque ADELGAZA 13px: el leading baja de 1.1 a
+                1.02. En móvil esta tanda quita alto, no lo añade.
+
+                El sangrado de la columna derecha por el borde (§3.4)
+                sobrevive en los cinco anchos medidos: su borde derecho sigue
+                coincidiendo con el ancho del documento (1018/1274/1434/1914).
+                El alto del H1 no toca el cálculo del gutter.
+
+                El <br /> de abajo es duro y no es responsive (a diferencia
+                del `hidden sm:block` que usan los h2 de dos líneas). A 72px
+                el corte forzado es lo que sostiene el balance de las dos
+                mitades de la frase; a 40px cae igual donde caería solo. */}
+            <h1 className="mt-4 text-[clamp(40px,7vw,72px)] font-bold text-slate-900 tracking-[-0.04em] leading-[1.02]">
               Menos tiempo en la pantalla,
               <br />
               <span className="bg-gradient-to-r from-[#1a3a5c] to-[#4a9fd4] bg-clip-text text-transparent">

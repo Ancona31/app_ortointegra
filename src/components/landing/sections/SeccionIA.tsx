@@ -56,7 +56,23 @@ export default function SeccionIA() {
                   mientras el bug de sync siga abierto, §11) y su contenido
                   —analiza laboratorios, estructura notas— ya lo dicen los
                   chips. */}
-              <h2 className="text-[24px] sm:text-[30px] font-bold text-white tracking-tight leading-tight">
+              {/* F1.3·d2 — rol titular de sección: clamp(30,4vw,46) · -0.03em ·
+                  1.10. Ver SeccionFeatures.tsx. Este y el de SeccionCTA son
+                  los dos que más suben (venían de 24/30px, dos escalones por
+                  debajo del resto) y los únicos sobre superficie navy.
+                  El `leading-tight` que tenía (1.25) también sale: el rol
+                  declara 1.10.
+
+                  ⚠️ NO es frágil pese a vivir en columna: la columna real de
+                  este h2 mide 848px de 1280 en adelante (es el `flex-1` de un
+                  flex que a lg pone el icono a la izquierda), no la mitad del
+                  contenedor. A 4vw el clamp topa en 46 mucho antes de que esa
+                  columna apriete: medido a 390/1024/1280/1440/1920, la frase
+                  —la más larga de los ocho titulares— NO gana ni una línea en
+                  ningún ancho (4/2/2/2/2, idéntico al antes). Los +26px que
+                  crece la sección a 1280 son leading y tamaño, no reflow.
+                  Medido, no deducido. */}
+              <h2 className="text-[clamp(30px,4vw,46px)] font-bold text-white tracking-[-0.03em] leading-[1.10]">
                 Tú aportas el criterio clínico — Spinus se encarga del trabajo pesado.
               </h2>
               {/* Chips: HOY son etiquetas, no controles. En F4 se vuelven el

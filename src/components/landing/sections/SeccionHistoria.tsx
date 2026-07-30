@@ -40,7 +40,9 @@ export default function SeccionHistoria() {
               <span className="text-[12px] font-semibold text-[#1e5fa8] uppercase tracking-[0.12em] leading-none">Mi historia</span>
             </div>
 
-            <h2 className="text-[28px] sm:text-[38px] font-bold text-slate-900 tracking-tight leading-[1.15]">
+            {/* F1.3·d2 — rol titular de sección: clamp(30,4vw,46) · -0.03em ·
+                1.10. Ver SeccionFeatures.tsx. */}
+            <h2 className="text-[clamp(30px,4vw,46px)] font-bold text-slate-900 tracking-[-0.03em] leading-[1.10]">
               La Historia de{' '}
               <span className="bg-gradient-to-r from-[#1a3a5c] to-[#4a9fd4] bg-clip-text text-transparent">
                 Spinus

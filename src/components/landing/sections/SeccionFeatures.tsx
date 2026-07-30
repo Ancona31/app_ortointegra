@@ -99,6 +99,41 @@ export default function SeccionFeatures() {
             cambio en los encabezados de Portabilidad y Seguridad, que son el
             mismo elemento (bloque de titular → retícula). */}
         <div className="max-w-2xl mb-12">
+          {/* ═══ ROL TITULAR DE SECCIÓN (F1.3·d2) ═══
+              text-[clamp(30px,4vw,46px)] · tracking -0.03em · leading 1.10
+              (§3.2). Vale para los OCHO titulares de sección de la landing:
+              este, SeccionExpediente, SeccionInterfaz, SeccionHistoria,
+              SeccionPortabilidad, SeccionSeguridad, SeccionIA y SeccionCTA.
+
+              Este archivo es la referencia porque es el primer <h2> real en
+              orden de lectura y porque ya estaba en el valor de destino antes
+              de d2 — los otros siete se movieron hacia aquí, no al revés.
+
+              Venían de dos escalones distintos: seis a `28/38px` con
+              `tracking-tight` (-0.025em) y `leading-[1.15]`, y dos —los dos
+              bloques navy, IA y CTA— a `24/30px`. Ese segundo grupo era el
+              problema real: un titular de sección a 30px no compite con un
+              H1 de 56 y la jerarquía se aplanaba justo en las dos secciones
+              que más peso narrativo cargan. Ahora los ocho entran por el
+              mismo clamp y la diferencia entre secciones la hace el contexto
+              (ancho de columna, color de superficie), no el tamaño.
+
+              El clamp sustituye al par `28px sm:38px`: entre 750px y 1150px
+              de viewport el tamaño ya no salta en el breakpoint, interpola.
+              Por debajo de 750 se queda en 30 (era 28: +2px en móvil) y por
+              encima de 1150 tope en 46 (era 38: +8px en escritorio).
+
+              ⚠️ NO es el único texto grande de la landing. El H1 del hero
+              (`SeccionHero.tsx`) tiene su propio régimen —clamp(40,7vw,72),
+              -0.04em, 1.02— y es DELIBERADAMENTE más apretado en tracking y
+              en leading: a 72px el interletraje y el interlineado que un
+              titular de 46 necesita para respirar se ven sueltos. No unifiques
+              los dos roles en uno.
+
+              ⚠️ `SeccionProblema.tsx:87` es un <p>, no un <h2>, y hace de
+              titular de esa sección. Ya está en estos tres valores. Que sea
+              <p> es decisión semántica de esa sección, no un olvido — no lo
+              conviertas en <h2> ni lo saques de este régimen. */}
           <h2 className="text-[clamp(30px,4vw,46px)] font-bold text-slate-900 tracking-[-0.03em] leading-[1.10]">
             Lo que resuelve desde el primer día
           </h2>

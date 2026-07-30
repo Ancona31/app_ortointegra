@@ -27,7 +27,19 @@ export default function SeccionCTA() {
           {/* Shine overlay */}
           <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none" />
 
-          <h2 className="relative text-[24px] sm:text-[30px] font-bold text-white tracking-tight max-w-2xl mx-auto">
+          {/* F1.3·d2 — rol titular de sección: clamp(30,4vw,46) · -0.03em ·
+              1.10. Ver SeccionFeatures.tsx. Junto con el de SeccionIA, el que
+              más sube (venía de 24/30px). Antes no declaraba leading y tomaba
+              el del <body>; ahora lo declara como los otros siete.
+
+              Este gana UNA LÍNEA (medido a 1280: 2L/90px → 3L/152px, +62 de
+              bloque, +61 de sección) porque su `max-w-2xl` (672px) es más
+              estrecho que lo que el clamp asume: a partir de ~1150px el
+              tamaño topa en 46 pero la caja no crece. Es el titular que más
+              alto añade de los ocho, y se aceptó. Si una tanda futura quiere recuperar esos 62px, el
+              cambio es el max-w, no el tamaño — el rol no se rompe por una
+              sección. */}
+          <h2 className="relative text-[clamp(30px,4vw,46px)] font-bold text-white tracking-[-0.03em] leading-[1.10] max-w-2xl mx-auto">
             Tu consultorio merece software hecho para ayudarte, no para cumplir un requisito.
           </h2>
           <p className="relative mt-3 text-[15px] text-white/70 max-w-lg mx-auto">
