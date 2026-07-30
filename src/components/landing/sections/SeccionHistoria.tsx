@@ -91,10 +91,19 @@ export default function SeccionHistoria() {
                 el valor que ya usaba el par título→descripción de las cards
                 del bento (SeccionFeatures.tsx). */}
             <div className="mt-8 pt-6 border-t-[0.5px] border-[#e6ebf2]">
-              <p className="text-[17px] font-bold text-slate-900 tracking-tight">
+              {/* F1.3·d4 — LA FIRMA NO TOMA ROL, pero se calibra al PAR DEL H3
+                  DE CARD: 19px · -0.015em · 1.30 (ver SeccionFeatures.tsx).
+                  Sube desde 17, donde coincidía con el cuerpo que tiene encima
+                  y se leía como un párrafo más en vez de como el rótulo que
+                  cierra la narrativa. No es H3 de card —no hay card— pero
+                  necesita el mismo peso visual: es un nombre propio actuando
+                  de rótulo. Su `tracking-tight` (-0.025em) baja a -0.015em por
+                  lo mismo. Debajo va su cargo, que sí es caption. */}
+              <p className="text-[19px] font-bold text-slate-900 tracking-[-0.015em] leading-[1.30]">
                 Dr. Ángel M. Ancona Pérez
               </p>
-              <p className="text-[13px] text-[#1e5fa8] font-semibold mt-2">
+              {/* F1.3·d4 — rol caption: 13px · 1.45. Ver SeccionFooter.tsx. */}
+              <p className="text-[13px] text-[#1e5fa8] font-semibold leading-[1.45] mt-2">
                 Fundador, Traumatólogo y Cirujano de Columna
               </p>
             </div>

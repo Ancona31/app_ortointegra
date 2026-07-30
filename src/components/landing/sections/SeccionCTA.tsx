@@ -58,13 +58,13 @@ export default function SeccionCTA() {
           <div className="relative mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
               href="/register"
-              className="inline-flex items-center gap-2 bg-white text-[#1a3a5c] px-7 py-3.5 rounded-xl text-[15px] font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
+              className="inline-flex items-center gap-2 bg-white text-[#1a3a5c] px-7 py-3.5 rounded-xl text-[15px] font-semibold tracking-[-0.01em] leading-none shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
             >
               Empieza gratis <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
               href="/pricing"
-              className="inline-flex items-center px-7 py-3.5 rounded-xl text-[15px] font-semibold text-white border border-white/30 hover:bg-white/10 hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
+              className="inline-flex items-center px-7 py-3.5 rounded-xl text-[15px] font-semibold tracking-[-0.01em] leading-none text-white border border-white/30 hover:bg-white/10 hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
             >
               Ver planes
             </Link>

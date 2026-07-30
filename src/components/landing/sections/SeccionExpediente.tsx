@@ -45,11 +45,31 @@ export default function SeccionExpediente() {
                 { icon: <QrCode className="w-4 h-4 text-emerald-500" />, text: 'QR verificable en cada receta' },
               ].map((item) => (
                 <div key={item.text} className="flex items-start gap-3">
-                  {/* `mt-0.5` = 2px: alineación ÓPTICA del cuadro de icono
+                  {/* `-mt-0.5` = −2px: alineación ÓPTICA del cuadro de icono
                       contra la primera línea de texto, no ritmo. Excluido de
                       §3.3 por decisión de PM (c1) y ratificado en c3. No lo
-                      subas a 8 ni lo reportes como fuera de escala. */}
-                  <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      subas a 8 ni lo reportes como fuera de escala.
+
+                      F1.3·d4 — CAMBIÓ DE SIGNO, y el motivo importa. Era
+                      `mt-0.5` (+2px), calibrado cuando el texto iba a 14px con
+                      `leading-relaxed` (lh 22.75). d3 lo pasó a 17px/1.65
+                      (lh 28.05) y eso movió el centro de la primera línea 2.6px
+                      hacia abajo, invalidando la calibración.
+
+                      Medido a 390 y 1440 con el +2px puesto: el centro de la
+                      primera línea quedaba 4.0px POR ENCIMA del centro del
+                      cuadro, en las 7 filas de las dos secciones. Es decir el
+                      +2px empujaba el icono en la dirección contraria a la que
+                      corrige — con `mt-0` el desfase habría sido 2px, con +2px
+                      fue 4.
+
+                      Geometría: cuadro de 32 (centro en 16), primera línea de
+                      28.05 (centro en 14.03) → el cuadro debe subir 1.97px.
+                      −2px deja el desfase en 0.03px. Si una tanda futura toca
+                      el tamaño o el leading del cuerpo, ESTE VALOR HAY QUE
+                      RECALCULARLO: no es una constante, es función de
+                      (alto de cuadro − line-height) / 2. */}
+                  <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center flex-shrink-0 -mt-0.5">
                     {item.icon}
                   </div>
                   {/* F1.3·d3 — rol cuerpo: 17px · 1.65. Ver SeccionFeatures.tsx. */}

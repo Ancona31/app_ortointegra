@@ -79,9 +79,26 @@ export default function SeccionIA() {
                   selector del Teaser 1 (§5.4) y ahí pasan a <button>; mientras
                   tanto siguen siendo <span> a propósito. El de búsqueda salió
                   en c2: Ctrl+K no es IA (§7·4). */}
+              {/* F1.3·d4 — los 2 chips toman rol CAPTION (no botón): 13px ·
+                  1.45. Ver SeccionFooter.tsx. Suben desde 11px, el salto más
+                  grande de esta tanda.
+
+                  ⚠️ CAPTION Y NO BOTÓN A PROPÓSITO, aunque la pastilla lo
+                  insinúe. Hoy son spans: etiquetan lo que la IA hace, no se
+                  pulsan. Darles el rol de botón (15px) los haría prometer una
+                  interacción que no existe. En F4 se vuelven controles reales
+                  como selector del Teaser 1 (§5.4) y ESE es el momento de
+                  moverlos al rol botón — no antes.
+
+                  ⚠️ El comentario va AQUÍ, en el div padre, y no pegado al
+                  span: el callback del map devuelve JSX entre paréntesis y solo
+                  admite UN hijo raíz. Un comentario JSX insertado delante del
+                  span lo convierte en dos, y el build cae con
+                  "Expected '</', got 'ident'". Mismo cuidado en cualquier map
+                  de la landing. */}
               <div className="mt-6 flex flex-wrap items-center justify-center lg:justify-start gap-3">
                 {['Notas médicas con IA', 'Análisis de laboratorios'].map((tag) => (
-                  <span key={tag} className="text-[11px] font-medium text-white/70 bg-white/10 px-3 py-1.5 rounded-full">
+                  <span key={tag} className="text-[13px] font-medium text-white/70 bg-white/10 px-3 py-1.5 rounded-full leading-[1.45]">
                     {tag}
                   </span>
                 ))}

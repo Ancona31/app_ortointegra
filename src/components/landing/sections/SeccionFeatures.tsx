@@ -150,7 +150,29 @@ export default function SeccionFeatures() {
             >
               <div className="p-6">
                 <div className="mb-4">{f.icon}</div>
-                <h3 className="text-[15px] font-semibold text-slate-900">{f.title}</h3>
+                {/* ═══ ROL H3 DE CARD (F1.3·d4) ═══
+                    19px · tracking -0.015em · leading 1.30 (§3.2). TRES sitios,
+                    11 instancias: las 5 cards del bento (aquí), las 3 de
+                    SeccionPortabilidad y las 3 de SeccionSeguridad.
+
+                    Venían de 15, 14 y 16px — tres tamaños para el mismo rol,
+                    el mismo patrón que d2 cerró en titulares y d3 en cuerpo.
+                    A 19px el título de card queda por encima del cuerpo (17)
+                    sin llegar al titular de sección (30–46): es el escalón
+                    intermedio que faltaba, y por eso coincide en tamaño con la
+                    bajada aunque sean roles distintos — los separa el peso.
+
+                    ⚠️ EL ROL NO DEFINE EL PESO. Aquí y en Portabilidad los H3
+                    siguen en `font-semibold`; en Seguridad, en `font-bold`.
+                    Esa diferencia es anterior a d4 y se conserva a propósito:
+                    el rol fija tamaño, tracking y leading, nada más. Si una
+                    tanda futura quiere unificar pesos, es otra decisión y otro
+                    barrido — no la cuele aquí.
+
+                    El -0.015em es el escalón más suave de la escala de
+                    tracking (titular -0.03, H1 -0.04, bajada -0.01): a 19px en
+                    negrita todavía compensa, pero poco. */}
+                <h3 className="text-[19px] font-semibold text-slate-900 tracking-[-0.015em] leading-[1.30]">{f.title}</h3>
                 {/* ═══ ROL CUERPO (F1.3·d3) ═══
                     17px · tracking normal · leading 1.65 (§3.2). Es el texto
                     corrido de la landing: SEIS sitios — este, SeccionExpediente,

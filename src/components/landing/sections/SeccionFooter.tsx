@@ -46,16 +46,40 @@ export default function SeccionFooter() {
           {/* F1.3·c3 — `gap-2` (8). Ver SeccionNav.tsx: mismo lockup. */}
           <div className="flex items-center gap-2">
             <Image src="/logo-spinus.png" alt="Spinus" width={800} height={777} className="object-contain h-7 w-auto" />
-            <span className="text-[13px] text-slate-500">La columna vertebral de tu práctica médica</span>
+            {/* ═══ ROL CAPTION (F1.3·d4) ═══
+                13px · tracking normal · leading 1.45 (§3.2). Es el escalón más
+                bajo de la escala y el último de la tanda (d). Ocho instancias:
+                esta línea, los 3 links de este footer, la fila de contacto y
+                copyright de abajo, el cargo del Dr. Ancona en SeccionHistoria,
+                el pie de SeccionPortabilidad y los 2 chips de SeccionIA.
+
+                Casi todas ya estaban en 13; las que se movieron son la fila de
+                copyright (12 → 13) y los chips de IA (11 → 13). Con eso, 11 y
+                12px dejan de existir como tamaños de TEXTO en la landing —
+                sobreviven solo dentro de los dos mockups, donde son UI falsa
+                y están fuera de la tanda a propósito.
+
+                ⚠️ TRACKING NORMAL = AUSENCIA DE CLASE, igual que en cuerpo
+                (ver SeccionFeatures.tsx). A 13px la tentación es abrir el
+                tracking, pero eso es el rol KICKER (12px, +0.12em, uppercase),
+                que es otra cosa: el kicker es una versalita corta y el caption
+                es texto en caja baja. No los mezcles.
+
+                ⚠️ 1.45 es MÁS CERRADO que el 1.65 del cuerpo, al revés de lo
+                que sugiere la regla "a menor tamaño, más interlínea". Es
+                deliberado: los captions son de una o dos líneas y suelen vivir
+                en filas horizontales, donde un leading abierto los descuadra
+                contra el elemento vecino. La regla vale para texto corrido. */}
+            <span className="text-[13px] text-slate-500 leading-[1.45]">La columna vertebral de tu práctica médica</span>
           </div>
           <div className="flex items-center gap-6">
-            <Link href="/privacy" className="text-[13px] text-slate-500 hover:text-slate-700 transition-colors duration-200">
+            <Link href="/privacy" className="text-[13px] text-slate-500 leading-[1.45] hover:text-slate-700 transition-colors duration-200">
               Aviso de privacidad
             </Link>
-            <Link href="/terms" className="text-[13px] text-slate-500 hover:text-slate-700 transition-colors duration-200">
+            <Link href="/terms" className="text-[13px] text-slate-500 leading-[1.45] hover:text-slate-700 transition-colors duration-200">
               Términos de servicio
             </Link>
-            <Link href="/pricing" className="text-[13px] text-slate-500 hover:text-slate-700 transition-colors duration-200">
+            <Link href="/pricing" className="text-[13px] text-slate-500 leading-[1.45] hover:text-slate-700 transition-colors duration-200">
               Planes
             </Link>
           </div>
@@ -64,7 +88,7 @@ export default function SeccionFooter() {
         {/* Fila 2 — contacto y copyright.
             Hex literal en vez de var(--sp-ink-350) por html.dark (ver
             SeccionProblema.tsx). */}
-        <div className="mt-6 pt-6 border-t-[0.5px] border-[#e6ebf2] flex flex-col sm:flex-row items-center justify-between gap-2 text-[12px] text-[#8a99ac]">
+        <div className="mt-6 pt-6 border-t-[0.5px] border-[#e6ebf2] flex flex-col sm:flex-row items-center justify-between gap-2 text-[13px] text-[#8a99ac] leading-[1.45]">
           <a
             href="mailto:soporte@spinus.com.mx"
             className="hover:text-slate-600 transition-colors duration-200"

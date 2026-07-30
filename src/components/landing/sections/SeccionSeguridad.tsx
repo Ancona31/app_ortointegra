@@ -136,7 +136,10 @@ export default function SeccionSeguridad() {
               <div className={`w-12 h-12 rounded-xl ${t.iconBg} flex items-center justify-center mb-6`}>
                 {t.icon}
               </div>
-              <h3 className="text-[16px] font-bold text-slate-900 mb-3">{t.title}</h3>
+              {/* F1.3·d4 — rol H3 de card: 19px · -0.015em · 1.30.
+                  Ver SeccionFeatures.tsx. El `font-bold` (los otros dos sitios
+                  van semibold) se conserva: el rol no define peso. */}
+              <h3 className="text-[19px] font-bold text-slate-900 tracking-[-0.015em] leading-[1.30] mb-3">{t.title}</h3>
               {/* F1.3·d3 — rol cuerpo: 17px · 1.65. Ver SeccionFeatures.tsx.
                   Estas 3 tarjetas tienen cuerpos de largo desigual y comparten
                   altura por `items-stretch` (ver la nota de la escalera arriba):

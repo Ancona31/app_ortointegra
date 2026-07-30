@@ -109,9 +109,14 @@ export default function SeccionInterfaz() {
                 { icon: <Calendar className="w-4 h-4 text-violet-500" />, text: 'Arrastra y suelta las citas en la agenda' },
               ].map((item) => (
                 <div key={item.text} className="flex items-start gap-3">
-                  {/* `mt-0.5` = alineación óptica de 2px, no ritmo. Blindado
-                      en c3 — ver SeccionExpediente.tsx. */}
-                  <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  {/* `-mt-0.5` = alineación óptica de −2px, no ritmo. Blindado
+                      en c3 — ver SeccionExpediente.tsx, donde está la
+                      geometría completa.
+                      F1.3·d4 — cambió de signo (era +2px): d3 pasó el cuerpo a
+                      17px/1.65 y la calibración vieja, hecha contra 14px/1.625,
+                      dejó de valer. Medido: el +2px alejaba 4.0px en vez de
+                      acercar. */}
+                  <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center flex-shrink-0 -mt-0.5">
                     {item.icon}
                   </div>
                   {/* F1.3·d3 — rol cuerpo: 17px · 1.65. Ver SeccionFeatures.tsx.

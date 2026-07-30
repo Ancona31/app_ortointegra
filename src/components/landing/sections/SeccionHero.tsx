@@ -177,7 +177,25 @@ export default function SeccionHero() {
               </span>
             </h1>
 
-            <p className="mt-6 text-[15px] sm:text-[17px] font-semibold text-[#1e5fa8]/80 tracking-wide italic">
+            {/* F1.3·d4 (cerrado) — el crédito italic es rol CUERPO completo:
+                17px plano · tracking normal · leading 1.65. Ver
+                SeccionFeatures.tsx.
+
+                Los dos desvíos que d4 dejó abiertos se cierran aquí:
+                  · Era `text-[15px] sm:text-[17px]`. El par responsive cae:
+                    en móvil era el ÚNICO texto de contenido de la landing a
+                    15px, tamaño que a partir de d4 pertenece al rol BOTÓN.
+                    Esto es una atribución de autoría, no un rótulo ni un
+                    control — se lee, luego es cuerpo, y el cuerpo no cambia
+                    de tamaño por breakpoint.
+                  · Era `tracking-wide` (+0.025em). El cuerpo va en tracking
+                    normal, que es AUSENCIA de clase.
+
+                Lo que SÍ se conserva y no es desvío: `italic` y
+                `font-semibold`. El rol fija tamaño, tracking y leading; el
+                estilo y el peso son de este sitio. La cursiva es lo que marca
+                la atribución. */}
+            <p className="mt-6 text-[17px] font-semibold text-[#1e5fa8]/80 italic leading-[1.65]">
               Creada por un cirujano de columna que la usa todos los días
             </p>
 
@@ -230,14 +248,14 @@ export default function SeccionHero() {
                   secundario de al lado, que ya usaba gap-2. */}
               <Link
                 href="/register"
-                className="group inline-flex items-center gap-2 bg-gradient-to-r from-[#1a3a5c] to-[#1e5fa8] text-white px-7 py-3.5 rounded-xl text-[15px] font-semibold shadow-[0_4px_24px_rgba(30,95,168,0.3)] hover:shadow-[0_8px_32px_rgba(30,95,168,0.4)] hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
+                className="group inline-flex items-center gap-2 bg-gradient-to-r from-[#1a3a5c] to-[#1e5fa8] text-white px-7 py-3.5 rounded-xl text-[15px] font-semibold tracking-[-0.01em] leading-none shadow-[0_4px_24px_rgba(30,95,168,0.3)] hover:shadow-[0_8px_32px_rgba(30,95,168,0.4)] hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
               >
                 Empieza gratis
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-200" />
               </Link>
               <Link
                 href="/pricing"
-                className="inline-flex items-center gap-2 text-slate-700 px-7 py-3.5 rounded-xl text-[15px] font-semibold bg-white border border-slate-200/60 shadow-sm hover:shadow-md hover:border-slate-300 hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
+                className="inline-flex items-center gap-2 text-slate-700 px-7 py-3.5 rounded-xl text-[15px] font-semibold tracking-[-0.01em] leading-none bg-white border border-slate-200/60 shadow-sm hover:shadow-md hover:border-slate-300 hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
               >
                 Ver planes
               </Link>

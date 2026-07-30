@@ -74,12 +74,30 @@ export default function SeccionPortabilidad() {
                  porque no diverge de la doctrina de card — está fuera de
                  escala, que es otro problema (ver SeccionSeguridad.tsx).
                · `mt-0.5` del icono: alineación óptica de 2px, BLINDADO.
+                 F1.3·d4 (cierre) — MEDIDO Y CONFIRMADO CORRECTO, no se tocó.
+                 Aquí el icono es un SVG suelto de 20px y se alinea contra la
+                 primera línea del H3 (19px · 1.30 → 24.69px), no contra el
+                 cuerpo. Fórmula: mt = (line-height − alto del elemento) / 2
+                 = (24.69 − 20) / 2 = +2.35px. El valor puesto (2px) deja un
+                 residuo de 0.34px, medido idéntico a 390 y a 1440. Se queda
+                 en `mt-0.5`: corregir un tercio de píxel exigiría un
+                 `mt-[2.35px]` fuera de escala que además caducaría al primer
+                 cambio de line-height del H3.
+
+                 ⚠️ EL SIGNO ES OPUESTO AL DE SeccionExpediente E Interfaz, y
+                 no es incoherencia. Allí el cuadro (32px) es MÁS ALTO que su
+                 línea (28.05) y hay que SUBIRLO (−2px); aquí el icono (20px)
+                 es MÁS BAJO que la suya (24.69) y hay que BAJARLO (+2.35).
+                 Es la misma fórmula con geometrías distintas. No las
+                 unifiques al mismo valor.
                · `mt-2` de la descripción, antes mt-1: ritmo real, no
                  interlínea óptica. Justificación en SeccionHistoria.tsx. */
             <div key={item.title} className="bg-white px-6 py-6 flex items-start gap-3">
               <div className="flex-shrink-0 mt-0.5">{item.icon}</div>
               <div className="min-w-0">
-                <h3 className="text-[14px] font-semibold text-slate-900">{item.title}</h3>
+                {/* F1.3·d4 — rol H3 de card: 19px · -0.015em · 1.30.
+                    Ver SeccionFeatures.tsx. */}
+                <h3 className="text-[19px] font-semibold text-slate-900 tracking-[-0.015em] leading-[1.30]">{item.title}</h3>
                 {/* F1.3·d3 — rol cuerpo: 17px · 1.65. Ver SeccionFeatures.tsx.
                     ⚠️ El `text-[13px]` de más abajo en este archivo es el pie
                     de la sección: es CAPTION, otro rol, y lo resuelve d4. */}
@@ -91,7 +109,9 @@ export default function SeccionPortabilidad() {
 
         {/* Pie de franja, no un 4º ítem: aplica SOLO a la nota médica (§7·9,
             lo único verificado). No generalizar a "funciona sin conexión". */}
-        <p className="mt-4 text-[13px] text-[#5a6b81]">
+        {/* F1.3·d4 — rol caption: 13px · 1.45. Ver SeccionFooter.tsx. Es el
+            caption que d3 dejó anotado aquí como "lo resuelve d4". */}
+        <p className="mt-4 text-[13px] text-[#5a6b81] leading-[1.45]">
           Si se te cae la conexión, el borrador de tu nota médica sigue donde lo dejaste.
         </p>
       </div>
