@@ -69,7 +69,8 @@ export default function SeccionHistoria() {
               </p>
             </div>
 
-            <div className="mt-10 pt-6 border-t border-slate-200/60">
+            {/* F1.3·b2: divisor de firma a 0.5px/#e6ebf2. */}
+            <div className="mt-10 pt-6 border-t-[0.5px] border-[#e6ebf2]">
               <p className="text-[17px] font-bold text-slate-900 tracking-tight">
                 Dr. Ángel M. Ancona Pérez
               </p>

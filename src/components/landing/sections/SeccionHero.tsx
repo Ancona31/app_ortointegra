@@ -10,12 +10,18 @@ import { ArrowRight } from 'lucide-react'
    OJO: var(--sp-*) SÍ resuelve aquí — sale del :root estático de
    spinus-tokens.css, que globals.css importa en el layout raíz. La trampa
    es solo con --cs/--cp. */
+/* F1.3·b2 — la <section> va SIN `relative overflow-hidden`. Ambos existían
+   SOLO para el orbe absoluto que b1 eliminó. El sangrado de la columna
+   derecha en lg+ NO depende de ellos: lo produce la geometría del contenedor
+   de abajo (`lg:max-w-none` + `lg:pr-0` + el pl calculado), que llega exacto
+   al borde del viewport sin desbordarlo — no había nada que recortar. La
+   sombra del marco sí se derrama por la derecha, pero `box-shadow` no entra
+   en el área desbordable, así que no aparece scroll horizontal.
+   ⚠️ Si alguna tanda futura vuelve a meter una capa `absolute` aquí, tendrá
+   que reponer el `relative` — no lo des por presente. */
 export default function SeccionHero() {
   return (
-    <section
-      className="relative overflow-hidden"
-      style={{ background: 'color-mix(in srgb, #1e5fa8 4%, #fff)' }}
-    >
+    <section style={{ background: 'color-mix(in srgb, #1e5fa8 4%, #fff)' }}>
       {/* F1.3·b1: aquí vivía un orbe de 800×500 con blur-3xl y un degradado
           que pasaba por violet-500. Eliminado por dos motivos de §3.1: el
           violeta no representa ningún dato del producto (los semánticos solo
@@ -30,8 +36,15 @@ export default function SeccionHero() {
           por columna: la costura se pierde sin que nada falle visiblemente.
           A partir de lg el contenedor suelta su max-w y calcula a mano el
           gutter izquierdo que tendría max-w-6xl (72rem), con pr-0, para que
-          la columna derecha sangre por el borde (§3.4, hero asimétrico). */}
-      <div className="relative mx-auto max-w-6xl px-4 sm:px-8 pt-20 sm:pt-28 pb-24 lg:max-w-none lg:pl-[max(2rem,calc((100vw-72rem)/2+2rem))] lg:pr-0">
+          la columna derecha sangre por el borde (§3.4, hero asimétrico).
+          F1.3·b2: este div tampoco lleva ya `relative`. Era el bloque de
+          contención del mismo orbe muerto, y con él fuera ningún descendiente
+          de esta sección está posicionado. Sin offsets ni z-index, `relative`
+          y `static` maquetan idéntico: retirarlo no mueve un píxel.
+          ⚠️ Mismo aviso que en la <section>: si una tanda futura mete aquí
+          una capa `absolute`, tendrá que reponer el `relative` — no lo des
+          por presente. */}
+      <div className="mx-auto max-w-6xl px-4 sm:px-8 pt-20 sm:pt-28 pb-24 lg:max-w-none lg:pl-[max(2rem,calc((100vw-72rem)/2+2rem))] lg:pr-0">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <div>
             <p className="text-[11px] font-semibold text-[#1e5fa8] uppercase tracking-wider">
@@ -76,8 +89,8 @@ export default function SeccionHero() {
               propósito. NO dibujar interfaz en JSX: sería una UI falsa, el
               mismo defecto de LP-DT-13. Ver LP-DT-17. */}
           <div aria-hidden className="hidden lg:block">
-            <div className="rounded-2xl lg:rounded-r-none border border-slate-200/60 bg-white shadow-sm overflow-hidden">
-              <div className="flex items-center gap-1.5 px-4 py-3 border-b border-slate-200/60">
+            <div className="rounded-2xl lg:rounded-r-none border-[0.5px] border-[#e6ebf2] bg-white shadow-sm overflow-hidden">
+              <div className="flex items-center gap-1.5 px-4 py-3 border-b-[0.5px] border-[#e6ebf2]">
                 <span className="w-2.5 h-2.5 rounded-full bg-slate-200" />
                 <span className="w-2.5 h-2.5 rounded-full bg-slate-200" />
                 <span className="w-2.5 h-2.5 rounded-full bg-slate-200" />

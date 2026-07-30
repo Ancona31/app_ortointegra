@@ -20,11 +20,13 @@ import Image from 'next/image'
    footer cierra el documento: nada se desplaza por debajo, así que el blur
    solo pagaba compositor sin producir efecto. El Nav SÍ lo conserva (§4.4)
    porque ahí el contenido sí pasa por debajo — no unificar los dos casos.
-   El `border-slate-200/60` se queda tal cual: los bordes 0.5px/#e6ebf2 son
-   la tanda b2. */
+
+   F1.3·b2: los dos bordes de este archivo pasan a 0.5px/#e6ebf2. El de
+   arriba es la excepción 2 (chrome, como el del Nav); el de la fila 2 es
+   un divisor interno y va al mismo valor por coherencia. */
 export default function SeccionFooter() {
   return (
-    <footer className="border-t border-slate-200/60 bg-white">
+    <footer className="border-t-[0.5px] border-[#e6ebf2] bg-white">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-8">
         {/* Fila 1 — marca + tagline · enlaces */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -48,7 +50,7 @@ export default function SeccionFooter() {
         {/* Fila 2 — contacto y copyright.
             Hex literal en vez de var(--sp-ink-350) por html.dark (ver
             SeccionProblema.tsx). */}
-        <div className="mt-6 pt-6 border-t border-slate-200/60 flex flex-col sm:flex-row items-center justify-between gap-2 text-[12px] text-[#8a99ac]">
+        <div className="mt-6 pt-6 border-t-[0.5px] border-[#e6ebf2] flex flex-col sm:flex-row items-center justify-between gap-2 text-[12px] text-[#8a99ac]">
           <a
             href="mailto:soporte@spinus.com.mx"
             className="hover:text-slate-600 transition-colors duration-200"

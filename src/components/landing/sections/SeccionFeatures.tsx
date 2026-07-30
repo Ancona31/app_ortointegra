@@ -57,16 +57,31 @@ const features: Feature[] = [
 ]
 
 /* Features — grid bento
-   Sin padding-top: los 96px de aire de §3.3 los aporta ahora el pb-24 de
+   Sin padding-top: los 128px de aire de §3.3 los aporta ahora el pb-32 de
    SeccionProblema.tsx, la sección inmediatamente anterior (antes venía del
    hero, antes de que la franja se insertara en medio). La cadena completa:
-     Hero (pb-24, SeccionHero.tsx:30) → [96px] → Franja (sin pt … pb-24)
-     → [96px] → Features (sin pt)
-   Dos costuras de 96px exactos, el mínimo de §3.3, iguales en todos los
-   breakpoints. No añadir pt aquí. */
+     Hero (pb-24, SeccionHero.tsx) → [96px] → Franja (sin pt … pb-32)
+     → [128px] → Features (sin pt)
+   Las dos costuras son exactas y ASIMÉTRICAS (96 arriba, 128 abajo),
+   iguales en todos los breakpoints. No añadir pt aquí.
+
+   El 128 de esta costura subió desde 96 en el QA visual de b2: con esta
+   sección y la franja ambas en blanco, el corte cromático desapareció y
+   96px quedaban por debajo del umbral en que el h2 de aquí se lee como
+   párrafo nuevo en vez de sección nueva. El motivo completo está en el
+   contrato de SeccionProblema.tsx, que es donde vive el padding — si
+   cambias uno, actualiza los dos comentarios: son el mismo contrato
+   escrito en dos archivos.
+
+   F1.3·b2 · `bg-white` explícito: NO es redundante. Sin él esta sección
+   heredaba el `--background: #f8fafc` del body (globals.css:25,135), no
+   blanco — quedaba medio tono por debajo de sus hermanas blancas
+   (Interfaz, Expediente, Seguridad), que sí lo declaran. La alternancia
+   blanco/#f5f8fc es un sistema y debe leerse en el código, no depender de
+   un default global que vive fuera de la landing. */
 export default function SeccionFeatures() {
   return (
-    <section className="pb-20 sm:pb-28">
+    <section className="bg-white pb-20 sm:pb-28">
       <div className="mx-auto max-w-6xl px-4 sm:px-8">
         <div className="max-w-2xl mb-14">
           <h2 className="text-[clamp(30px,4vw,46px)] font-bold text-slate-900 tracking-[-0.03em] leading-[1.10]">

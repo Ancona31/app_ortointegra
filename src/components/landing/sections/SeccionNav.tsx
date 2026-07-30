@@ -3,10 +3,15 @@
 import Link from 'next/link'
 import Image from 'next/image'
 
-/* Nav — sticky necesita z alto para quedar sobre todo */
+/* Nav — sticky necesita z alto para quedar sobre todo
+
+   F1.3·b2: excepción 1 al borde 0.5px/#e6ebf2 — es chrome, no superficie.
+   El `bg-white/80` + `backdrop-blur-xl` SÍ se quedan (§4.4): aquí el
+   contenido pasa por debajo al hacer scroll, que es justo el caso que el
+   blur resuelve. El Footer no, y por eso allí se quitó. No unificarlos. */
 export default function SeccionNav() {
   return (
-    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/60">
+    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b-[0.5px] border-[#e6ebf2]">
       <nav className="mx-auto max-w-6xl flex items-center justify-between px-4 sm:px-8 h-14">
         <div className="flex items-center gap-2.5">
           <Image src="/logo-spinus.png" alt="Spinus" width={800} height={777} className="object-contain h-9 w-auto" />

@@ -1727,8 +1727,37 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
   DevTools: es donde el síntoma se manifiesta.
 
 ### LP-DT-19 — Problema↔Features sin separación cromática (padding donado)
-- **Estado:** 🔴 abierta
+- **Estado:** 🟠 abierta — **síntoma mitigado por aire, causa raíz intacta**
 - **Detectada:** auditoría de F1.3 tanda (b) — superficies (2026-07-30)
+- **Actualizada:** QA visual de F1.3 tanda (b2) (2026-07-30)
+
+> **⚠️ ACTUALIZACIÓN b2 — LEER ANTES QUE EL CUERPO DE ABAJO.**
+> Dos hechos que el texto original daba por fijos ya NO lo son:
+> 1. **`SeccionProblema` sí declara superficie:** `bg-white` explícito. Lo
+>    que sigue prohibido es darle una superficie *distinta* a la de
+>    Features, no declarar la misma. La cita textual que este ítem hacía
+>    del comentario de contrato (*"Añadir pt aquí, o superficie de fondo,
+>    rompe las dos a la vez"*) ya no existe en el archivo: se corrigió a
+>    *"Añadir pt aquí rompe las dos a la vez"*, porque un `bg` no mueve
+>    ningún padding y la redacción vieja afirmaba algo falso.
+> 2. **La costura Problema↔Features es de 128px, no de 96.** El `pb-24` de
+>    Problema pasó a `pb-32`. La cadena vigente es
+>    `Hero (pb-24) → [96px] → Problema (sin pt … pb-32) → [128px] → Features`,
+>    asimétrica a propósito.
+>
+> **Qué resuelve eso y qué no.** La separación cromática **sigue ausente**:
+> el par continúa siendo la única pareja consecutiva con la misma
+> superficie, y la causa raíz — el padding donado — está intacta. Lo que se
+> mitigó es el *síntoma*: a 96px la costura era comparable al interlineado
+> de la propia frase (`leading-[1.10]` sobre ~46px ≈ 50px), y frase y
+> titular del bento se leían como un bloque continuo. A 128px la jerarquía
+> se recupera **sin tocar la arquitectura de padding**. El ítem no se
+> cierra: se degrada de 🔴 a 🟠.
+>
+> **La Opción B sigue disponible y sigue siendo la única solución real.**
+> Ver "Condición de cierre" abajo — sin cambios, salvo que el reparto ahora
+> parte de 128px, no de 96: `SeccionFeatures` tomaría `pt-32` y
+> `SeccionProblema` soltaría su `pb-32`.
 - **Descripción:** la alternancia de superficies de §3.1 deja **un único par
   de secciones consecutivas con la misma superficie**: `SeccionProblema`
   (blanca) y `SeccionFeatures` (blanca). Leen como una sola región blanca de
@@ -1736,20 +1765,22 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
   suelta de 46px al 74% de ancho contra `<h2>` + bajada + retícula de 5
   cards). No es error de asignación: es forzado, y por dos causas distintas
   que coinciden en la misma costura.
-- **Causa raíz — padding donado:** `SeccionFeatures` no declara `pt`. Sus
-  96px de aire superior los dona el `pb-24` de `SeccionProblema.tsx:29`, y
-  **el padding donado se pinta con la superficie del donante**. Darle una
-  franja a Features haría que la banda de color arrancase en el borde
-  superior del `<h2>`, con 0px de aire sobre el titular. Lo mismo impide
-  darle superficie propia a Problema — su comentario de contrato ya lo dice
-  (`SeccionProblema.tsx:15`: *"Añadir pt aquí, o superficie de fondo, rompe
-  las dos a la vez"*). La cadena completa es
-  `Hero (pb-24) → [96px] → Problema (sin pt … pb-24) → [96px] → Features
-  (sin pt)`, documentada en los tres contratos de costura de
-  `SeccionHero.tsx:23-29`, `SeccionProblema.tsx:7-15` y
-  `SeccionFeatures.tsx:59-66`.
+- **Causa raíz — padding donado (INTACTA tras b2):** `SeccionFeatures` no
+  declara `pt`. Sus 128px de aire superior los dona el `pb-32` de
+  `SeccionProblema`, y **el padding donado se pinta con la superficie del
+  donante**. Darle una franja a Features haría que la banda de color
+  arrancase en el borde superior del `<h2>`, con 0px de aire sobre el
+  titular. Simétricamente, Problema no puede tomar una superficie
+  *distinta* de la de Features: los 128px que dona quedarían teñidos y la
+  costura se leería como banda de color pegada al titular siguiente. Por
+  eso ambas comparten `bg-white` — la igualdad de superficie no es
+  descuido, es la única asignación que el padding donado admite. La cadena
+  vigente es `Hero (pb-24) → [96px] → Problema (sin pt … pb-32) → [128px]
+  → Features (sin pt)`, documentada en los tres contratos de costura de
+  `SeccionHero.tsx`, `SeccionProblema.tsx` y `SeccionFeatures.tsx` (sin
+  número de línea a propósito: se desplazan en cada tanda).
 - **Por qué tampoco sirve un borde:** un `border-b` en la `<section>` de
-  Problema cae en su borde inferior, es decir **96px por debajo de su texto
+  Problema cae en su borde inferior, es decir **128px por debajo de su texto
   y 0px por encima del `<h2>` de Features**. El filete quedaría pegado al
   titular siguiente en vez de a mitad del aire. La arquitectura de padding
   donado hace que **tanto un cambio de superficie como un borde aterricen
@@ -1764,12 +1795,13 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
   (Opción B de la auditoría) exigía repartir el padding en 2 archivos y
   reescribir los **tres** contratos de costura, que es justo lo que la
   tanda (b) tenía prohibido tocar.
-- **Efecto visible:** cero riesgo funcional. Solo lectura: el visitante no
-  percibe frontera entre la tesis del problema y la retícula de
-  capacidades. Discutible si es defecto — la franja del problema es la
+- **Efecto visible (tras b2):** cero riesgo funcional. Solo lectura: el
+  visitante sigue sin percibir *frontera de superficie* entre la tesis del
+  problema y la retícula de capacidades, pero con 128px sí percibe cambio
+  de bloque. Discutible si es defecto — la franja del problema es la
   bisagra hacia el bento y encadenarlas tiene lectura propia.
 - **Condición de cierre:** tanda futura que reparta el padding donado —
-  `SeccionFeatures` toma `pt-24`, `SeccionProblema` suelta su `pb-24` — y
+  `SeccionFeatures` toma `pt-32`, `SeccionProblema` suelta su `pb-32` — y
   con eso Features puede recibir `bg-[#f5f8fc]`. La colisión se muda
   entonces a Features↔IA, ambas franja, enmascarada por el bloque navy de
   `SeccionIA.tsx:10`. **Reescribir los tres contratos de costura en el mismo
