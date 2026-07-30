@@ -22,18 +22,22 @@ export default function SeccionIA() {
             {/* Text */}
             <div className="text-center lg:text-left flex-1">
               <p className="text-[11px] font-semibold text-white/50 uppercase tracking-widest mb-3">Potenciado por inteligencia artificial</p>
+              {/* §7·4: el subtitular ES el titular. El h2 anterior ("Spinus es
+                  tu aliado / para cada consulta") no salía del maestro, y la
+                  primera oración del párrafo que vivía aquí se eliminó por dos
+                  motivos: afirmaba "te asiste en tiempo real" (prohibido
+                  mientras el bug de sync siga abierto, §11) y su contenido
+                  —analiza laboratorios, estructura notas— ya lo dicen los
+                  chips. */}
               <h2 className="text-[24px] sm:text-[30px] font-bold text-white tracking-tight leading-tight">
-                Spinus es tu aliado
-                <br className="hidden sm:block" />
-                <span className="text-[#4a9fd4]">
-                  para cada consulta
-                </span>
+                Tú aportas el criterio clínico — Spinus se encarga del trabajo pesado.
               </h2>
-              <p className="mt-4 text-[15px] text-white/60 leading-relaxed max-w-lg mx-auto lg:mx-0">
-                La IA analiza laboratorios, estructura notas médicas y te asiste en tiempo real. Tú aportas el criterio clínico — Spinus se encarga del trabajo pesado.
-              </p>
+              {/* Chips: HOY son etiquetas, no controles. En F4 se vuelven el
+                  selector del Teaser 1 (§5.4) y ahí pasan a <button>; mientras
+                  tanto siguen siendo <span> a propósito. El de búsqueda salió
+                  en c2: Ctrl+K no es IA (§7·4). */}
               <div className="mt-6 flex flex-wrap items-center justify-center lg:justify-start gap-3">
-                {['Notas médicas con IA', 'Análisis de laboratorios', 'Consulta rápida'].map((tag) => (
+                {['Notas médicas con IA', 'Análisis de laboratorios'].map((tag) => (
                   <span key={tag} className="text-[11px] font-medium text-white/70 bg-white/10 px-3 py-1.5 rounded-full">
                     {tag}
                   </span>

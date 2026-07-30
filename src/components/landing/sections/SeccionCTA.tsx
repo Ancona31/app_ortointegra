@@ -13,24 +13,40 @@ export default function SeccionCTA() {
   return (
     <section style={{ background: 'color-mix(in srgb, #1e5fa8 4%, #fff)' }}>
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-20">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#1a3a5c] to-[#1e5fa8] p-10 sm:p-14 text-center shadow-[0_8px_32px_rgba(30,95,168,0.3)]">
+        {/* Degradado VERTICAL (to-b). §7·13 prohíbe izq→der aquí: en un bloque
+            de ancho completo el eje horizontal delata la caja y parte el
+            titular en dos temperaturas. El par de color no cambia. */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-[#1a3a5c] to-[#1e5fa8] p-10 sm:p-14 text-center shadow-[0_8px_32px_rgba(30,95,168,0.3)]">
           {/* Shine overlay */}
           <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none" />
 
-          <h2 className="relative text-[24px] sm:text-[30px] font-bold text-white tracking-tight">
-            Tu consultorio merece mejor tecnología
+          <h2 className="relative text-[24px] sm:text-[30px] font-bold text-white tracking-tight max-w-2xl mx-auto">
+            Tu consultorio merece software hecho para ayudarte, no para cumplir un requisito.
           </h2>
           <p className="relative mt-3 text-[15px] text-white/70 max-w-lg mx-auto">
             Sin pláticas con vendedores. Sin letras chiquitas. Sin trámites.
             <br />
             Crea tu cuenta y empieza a usarla hoy — así de simple.
           </p>
-          <Link
-            href="/register"
-            className="relative inline-flex items-center gap-2 mt-8 bg-white text-[#1a3a5c] px-7 py-3.5 rounded-2xl text-[15px] font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
-          >
-            Crear cuenta <ArrowRight className="w-4 h-4" />
-          </Link>
+          {/* Mismo par de CTAs que el hero (§7·13), con las mismas etiquetas:
+              "Empieza gratis" + "Ver planes". El secundario NO puede copiar el
+              del hero (blanco sólido sobre fondo claro) porque aquí competiría
+              con el primario blanco sobre navy — va en ghost. El `relative` se
+              movió al contenedor: lo necesita para quedar sobre el shine. */}
+          <div className="relative mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Link
+              href="/register"
+              className="inline-flex items-center gap-2 bg-white text-[#1a3a5c] px-7 py-3.5 rounded-2xl text-[15px] font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
+            >
+              Empieza gratis <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link
+              href="/pricing"
+              className="inline-flex items-center px-7 py-3.5 rounded-2xl text-[15px] font-semibold text-white border border-white/30 hover:bg-white/10 hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
+            >
+              Ver planes
+            </Link>
+          </div>
         </div>
       </div>
     </section>

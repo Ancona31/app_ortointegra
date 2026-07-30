@@ -2,6 +2,7 @@
 
 import SeccionNav from '@/components/landing/sections/SeccionNav'
 import SeccionHero from '@/components/landing/sections/SeccionHero'
+import SeccionProblema from '@/components/landing/sections/SeccionProblema'
 import SeccionFeatures from '@/components/landing/sections/SeccionFeatures'
 import SeccionIA from '@/components/landing/sections/SeccionIA'
 import SeccionExpediente from '@/components/landing/sections/SeccionExpediente'
@@ -17,6 +18,7 @@ export default function HomePage() {
     <main className="min-h-screen relative" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', WebkitFontSmoothing: 'antialiased' }}>
       <SeccionNav />
       <SeccionHero />
+      <SeccionProblema />
       <SeccionFeatures />
       <SeccionIA />
       <SeccionExpediente />

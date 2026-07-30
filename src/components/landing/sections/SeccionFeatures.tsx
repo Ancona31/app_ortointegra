@@ -57,8 +57,13 @@ const features: Feature[] = [
 ]
 
 /* Features — grid bento
-   Sin padding-top: los 96px de aire de §3.3 en la costura con el hero los
-   aporta SeccionHero.tsx:20-22. No añadir pt aquí. */
+   Sin padding-top: los 96px de aire de §3.3 los aporta ahora el pb-24 de
+   SeccionProblema.tsx, la sección inmediatamente anterior (antes venía del
+   hero, antes de que la franja se insertara en medio). La cadena completa:
+     Hero (pb-24, SeccionHero.tsx:30) → [96px] → Franja (sin pt … pb-24)
+     → [96px] → Features (sin pt)
+   Dos costuras de 96px exactos, el mínimo de §3.3, iguales en todos los
+   breakpoints. No añadir pt aquí. */
 export default function SeccionFeatures() {
   return (
     <section className="pb-20 sm:pb-28">
