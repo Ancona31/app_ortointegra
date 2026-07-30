@@ -13,7 +13,7 @@ import { Activity } from 'lucide-react'
 export default function SeccionHistoria() {
   return (
     <section className="bg-[#f5f8fc]">
-      <div className="mx-auto max-w-6xl px-4 sm:px-8 py-20 sm:py-28">
+      <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
           {/* Foto del Dr. Ancona — §7·11 retira el badge de estetoscopio que
               flotaba sobre la esquina: adorno sin contenido sobre un retrato

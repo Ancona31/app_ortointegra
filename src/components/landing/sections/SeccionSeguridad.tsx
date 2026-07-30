@@ -85,7 +85,7 @@ const tarjetas: Tarjeta[] = [
 export default function SeccionSeguridad() {
   return (
     <section className="bg-white">
-      <div className="mx-auto max-w-6xl px-4 sm:px-8 py-20 sm:py-28">
+      <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
         <div className="text-center mb-14">
           <div className="inline-flex items-center gap-2 bg-blue-50 rounded-full px-3.5 py-1 mb-6">
             <Shield className="w-3.5 h-3.5 text-[#1e5fa8]" />
@@ -111,7 +111,18 @@ export default function SeccionSeguridad() {
               bento y las 3 de Portabilidad. Si la QA visual las considera
               insuficientes, la salida NO es devolver el blur: es rellenarlas
               de #f5f8fc invirtiendo card y sección. No abrir una segunda
-              doctrina de card para esta sección sola. */}
+              doctrina de card para esta sección sola.
+
+              ⚠️ EL PADDING INTERIOR NO ENTRA EN ESA DOCTRINA (decisión de
+              PM en c1). La doctrina única cubre fondo, borde y sombra —
+              nada más. Que estas cards usen `p-8` (32) y las del bento
+              `p-6` (24) NO es incoherencia pendiente de barrer: ambos
+              están en la escala de §3.3 y responden a densidades de
+              contenido distintas. No los unifiques.
+              (Matiz: el `px-6 py-5` de los ítems de Portabilidad es otro
+              caso. El 24 horizontal está en escala; el `py-5` = 20 NO lo
+              está, y c3 lo corrige — pero por fuera de escala, no por
+              divergir de estas dos.) */}
           {tarjetas.map((t) => (
             <div
               key={t.title}

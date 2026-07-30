@@ -73,6 +73,18 @@ const features: Feature[] = [
    cambias uno, actualiza los dos comentarios: son el mismo contrato
    escrito en dos archivos.
 
+   ⚠️ OJO AL DESNIVEL QUE INTRODUJO c1. El `pb` de ESTA sección sí sigue
+   el régimen general (`pb-16 sm:pb-24 lg:pb-32` → 64/96/128, costura de
+   128/192/256 contra SeccionIA), pero el aire de ARRIBA sigue siendo el
+   128 plano que dona la franja. En lg esta sección abre con 128 y cierra
+   con 256: el doble. Es consecuencia directa de mantener el contrato
+   literal (opción (a) de la auditoría de c1) y está aceptado, no es un
+   descuido. La causa de fondo —el padding donado— es LP-DT-19, que sigue
+   abierta: su condición de cierre es que esta sección tome su propio pt
+   y la franja suelte el pb-32. Si alguna tanda la ejecuta, el pt que
+   tome debe ser `pt-16 sm:pt-24 lg:pt-32` como todas, NO un pt-32 plano,
+   o el desnivel se congela en el código en vez de resolverse.
+
    F1.3·b2 · `bg-white` explícito: NO es redundante. Sin él esta sección
    heredaba el `--background: #f8fafc` del body (globals.css:25,135), no
    blanco — quedaba medio tono por debajo de sus hermanas blancas
@@ -81,7 +93,7 @@ const features: Feature[] = [
    un default global que vive fuera de la landing. */
 export default function SeccionFeatures() {
   return (
-    <section className="bg-white pb-20 sm:pb-28">
+    <section className="bg-white pb-16 sm:pb-24 lg:pb-32">
       <div className="mx-auto max-w-6xl px-4 sm:px-8">
         <div className="max-w-2xl mb-14">
           <h2 className="text-[clamp(30px,4vw,46px)] font-bold text-slate-900 tracking-[-0.03em] leading-[1.10]">

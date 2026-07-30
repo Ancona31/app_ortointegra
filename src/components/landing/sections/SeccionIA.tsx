@@ -11,7 +11,7 @@ import { Sparkles } from 'lucide-react'
 export default function SeccionIA() {
   return (
     <section className="bg-[#f5f8fc]">
-      <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-20">
+      <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-10 sm:p-14">
           {/* Subtle shine */}
           <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-transparent pointer-events-none" />

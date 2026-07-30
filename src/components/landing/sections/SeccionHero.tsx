@@ -30,8 +30,56 @@ export default function SeccionHero() {
           glassmorphism. El lavado del `style` de arriba es TODA la decoración
           de fondo que esta sección debe tener. No reintroducir capas aquí. */}
 
-      {/* pb-24 = 96px: mínimo de aire de §3.3 en la costura con Features, que
-          no declara padding superior. Los 128/72 generales son F1.3.
+      {/* ═══ RÉGIMEN DE ESPACIADO DE LA LANDING (F1.3·c1) ═══
+          Esta nota vive aquí porque aquí vivía la afirmación que sustituye —
+          decía "los 128/72 generales son F1.3", y el 72 NUNCA llegó a
+          existir: no está en la escala de §3.3 (8·12·16·24·32·48·64·96·128)
+          y en móvil habría dejado costuras de 72px, por debajo del mínimo
+          de 96. Vale para las 12 secciones, no solo para esta.
+
+          Padding de sección = `py-16 sm:py-24 lg:py-32` → 64 / 96 / 128.
+          Tres peldaños, no dos: 64→128 directo duplicaba el padding en un
+          solo breakpoint y dejaba la tablet vertical (640–1023px) con
+          padding de escritorio sobre un ancho todavía estrecho.
+          Costura normal resultante = 128 / 192 / 256.
+
+          ⚠️ 256 NO ES UN VALOR DE LA ESCALA, y no hace falta que lo sea:
+          una costura es la SUMA de dos paddings, no un token. Los tokens
+          son los 128 de cada lado, y esos sí están en escala. No busques
+          256 en §3.3 ni lo reportes como violación — tampoco el 192.
+
+          ⚠️ §3.3 LEGISLA EL RITMO VERTICAL ENTRE BLOQUES, NO LA FORMA DE
+          LOS CONTROLES. Quedan FUERA de la escala por decisión de PM en
+          c1, y NO son deuda pendiente: `px-7 py-3.5` de los cuatro botones
+          grandes (dos aquí abajo, dos en SeccionCTA), `px-3.5 py-1` de las
+          cinco pastillas de kicker, `py-1.5` de los links del nav y los
+          chips de IA, `py-2.5` de las pestañas del mockup, y el `mt-0.5`
+          de 2px que alinea ópticamente icono contra primera línea. Un
+          botón de `px-8 py-4` no es este botón con el padding corregido:
+          es otro botón. No los "normalices" en una tanda futura.
+
+          El `gap-px` de SeccionPortabilidad tampoco es ritmo — es la
+          técnica que dibuja los divisores de la franja. Ver allí.
+
+          ─── CONTRATO DE COSTURA ─── no tocar sin releer §3.3.
+          pb-24 = 96px, la costura con SeccionProblema (no con Features:
+          la franja se insertó en medio y esta línea se quedó vieja hasta
+          c1). Es el mínimo de aire de §3.3, SIN variante responsive: vale
+          96 en los tres breakpoints. La cadena completa:
+            Hero (pb-24) → [96] → Problema (sin pt … pb-32) → [128] → Features
+          Las dos costuras son exactas, asimétricas e iguales en todos los
+          breakpoints. Los tres valores viven en tres archivos y son UN
+          SOLO contrato: si cambias uno, actualiza los tres comentarios.
+
+          ⚠️ QUEDAN POR DEBAJO DEL ENTORNO, Y ES DELIBERADO. Antes de c1 el
+          entorno eran costuras de 192–224; ahora son 128/192/256, así que
+          en lg estas dos valen 0.375× y 0.5× de la costura normal. Se
+          decidió mantenerlas literales (opción (a) de la auditoría de c1)
+          en vez de darles variante responsive: la alternativa exigía un
+          pb-48 = 192px que tampoco está en la escala. Si el QA visual ve
+          la segunda costura enana contra los 256 de lg, se ajusta ahí y
+          con el render delante — no por aritmética.
+
           ⚠️ El pb-24 vive en ESTE div, el contenedor del grid. NO lo repartas
           por columna: la costura se pierde sin que nada falle visiblemente.
           A partir de lg el contenedor suelta su max-w y calcula a mano el
@@ -44,7 +92,7 @@ export default function SeccionHero() {
           ⚠️ Mismo aviso que en la <section>: si una tanda futura mete aquí
           una capa `absolute`, tendrá que reponer el `relative` — no lo des
           por presente. */}
-      <div className="mx-auto max-w-6xl px-4 sm:px-8 pt-20 sm:pt-28 pb-24 lg:max-w-none lg:pl-[max(2rem,calc((100vw-72rem)/2+2rem))] lg:pr-0">
+      <div className="mx-auto max-w-6xl px-4 sm:px-8 pt-16 sm:pt-24 lg:pt-32 pb-24 lg:max-w-none lg:pl-[max(2rem,calc((100vw-72rem)/2+2rem))] lg:pr-0">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <div>
             <p className="text-[11px] font-semibold text-[#1e5fa8] uppercase tracking-wider">

@@ -8,7 +8,7 @@ import { Calendar, Zap, MousePointerClick } from 'lucide-react'
 export default function SeccionInterfaz() {
   return (
     <section className="bg-white">
-      <div className="mx-auto max-w-6xl px-4 sm:px-8 py-20 sm:py-28">
+      <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
           {/* Left: visual */}
           <div className="order-2 lg:order-1">

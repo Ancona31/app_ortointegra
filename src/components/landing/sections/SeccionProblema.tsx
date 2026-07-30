@@ -6,8 +6,8 @@ import type { JSX } from 'react'
 
    ⚠️ CONTRATO DE COSTURA — no tocar sin releer §3.3.
    Esta sección NO declara padding superior.
-   Los 96px de aire por arriba los aporta el pb-24 de SeccionHero.tsx:30;
-   los 128px por abajo los aporta el pb-32 de aquí, porque SeccionFeatures
+   Los 96px de aire por arriba los aporta el pb-24 de SeccionHero; los
+   128px por abajo los aporta el pb-32 de aquí, porque SeccionFeatures
    tampoco declara pt (ver su comentario de cabecera). La cadena es:
      Hero (pb-24) → [96px] → Franja (sin pt … pb-32) → [128px] → Features
    Las dos costuras son EXACTAS y ASIMÉTRICAS, e iguales en todos los
@@ -22,6 +22,22 @@ import type { JSX } from 'react'
    128px la jerarquía vuelve. La de arriba se queda en 96 porque ahí sí
    hay corte cromático: el lavado del hero cambia de color contra este
    blanco y no necesita que el aire haga el trabajo solo.
+
+   ⚠️ EL ENTORNO CAMBIÓ EN c1 — ESTOS DOS VALORES NO.
+   Cuando b2 los fijó, las costuras vecinas medían 192–224px. Desde c1 el
+   padding de sección es `py-16 sm:py-24 lg:py-32` y la costura normal
+   mide 128 / 192 / 256 (móvil / sm / lg). Es decir: estas dos costuras
+   pasaron de valer ~0.43–0.57× del entorno a valer 0.375× (la de 96) y
+   0.5× (la de 128) en lg. En móvil, en cambio, la de 128 quedó EXACTA a
+   la costura normal y la de 96 a 0.75× — ahí el contrato lee mejor que
+   antes. El régimen completo está en el comentario de cabecera del div
+   de SeccionHero.
+   Se mantuvieron literales a propósito (opción (a) de la auditoría de
+   c1): darles variante responsive exigía un pb-48 = 192px, que no está
+   en la escala de §3.3 y habría que declarar como excepción. Si el QA
+   visual ve la costura de abajo enana contra los 256 de lg, se ajusta
+   con el render delante — no por aritmética, y actualizando los TRES
+   comentarios en el mismo cambio.
 
    F1.3·b2 · el `bg-white` NO viola ese contrato: el contrato es de
    ESPACIADO, y una superficie no mueve ningún padding. Sí es un cambio

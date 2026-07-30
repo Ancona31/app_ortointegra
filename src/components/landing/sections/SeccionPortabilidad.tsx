@@ -10,7 +10,7 @@ import Reveal from '@/components/landing/motion/Reveal'
 export default function SeccionPortabilidad() {
   return (
     <section className="bg-[#f5f8fc]">
-      <div className="mx-auto max-w-6xl px-4 sm:px-8 py-20 sm:py-28">
+      <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
         {/* Prueba de humo F0 del sistema de movimiento — único uso de <Reveal> por ahora */}
         <Reveal className="text-center mb-14">
           <div className="inline-flex items-center gap-2 bg-violet-50 rounded-full px-3.5 py-1 mb-6">

@@ -23,7 +23,20 @@ import Image from 'next/image'
 
    F1.3·b2: los dos bordes de este archivo pasan a 0.5px/#e6ebf2. El de
    arriba es la excepción 2 (chrome, como el del Nav); el de la fila 2 es
-   un divisor interno y va al mismo valor por coherencia. */
+   un divisor interno y va al mismo valor por coherencia.
+
+   ⚠️ F1.3·c1 — EL `py-8` DE ABAJO ES CHROME Y NO SIGUE EL RÉGIMEN DE
+   SECCIÓN, PERO LA COSTURA QUE FORMA ESTÁ EN EL SUELO DE §3.3.
+   El footer no es una sección de contenido: se queda en `py-8` (32)
+   mientras las 12 secciones pasaron a `py-16 sm:py-24 lg:py-32`. La
+   costura con SeccionCTA es su pb + estos 32:
+     móvil  64 + 32 =  96  ← EXACTAMENTE el mínimo de §3.3, sin margen
+     sm     96 + 32 = 128
+     lg    128 + 32 = 160
+   Cualquier bajada futura de este `py-8` o del `py-16` base del CTA
+   perfora el mínimo en móvil sin que nada falle visiblemente. Si hace
+   falta comprimir el cierre, comprime por dentro (las filas), no por
+   este padding. */
 export default function SeccionFooter() {
   return (
     <footer className="border-t-[0.5px] border-[#e6ebf2] bg-white">

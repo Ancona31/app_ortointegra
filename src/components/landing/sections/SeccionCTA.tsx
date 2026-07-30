@@ -12,7 +12,7 @@ import { ArrowRight } from 'lucide-react'
 export default function SeccionCTA() {
   return (
     <section style={{ background: 'color-mix(in srgb, #1e5fa8 4%, #fff)' }}>
-      <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-20">
+      <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
         {/* Degradado VERTICAL (to-b). §7·13 prohíbe izq→der aquí: en un bloque
             de ancho completo el eje horizontal delata la caja y parte el
             titular en dos temperaturas. El par de color no cambia. */}

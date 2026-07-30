@@ -11,7 +11,7 @@ import { Search, Zap, FolderOpen, QrCode, Layers } from 'lucide-react'
 export default function SeccionExpediente() {
   return (
     <section className="bg-white">
-      <div className="mx-auto max-w-6xl px-4 sm:px-8 py-20 sm:py-28">
+      <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
         {/* §3.4: dos columnas invertidas — medio a la izquierda, texto a la
             derecha. La inversión va con order-*, NO moviendo el JSX: en móvil
             (una columna) debe seguir leyéndose texto → mockup, para no abrir
