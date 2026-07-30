@@ -2,6 +2,25 @@
 @import "./spinus-tokens.css";
 @plugin "@tailwindcss/typography";
 
+/* ── Familia tipográfica de la landing (§3.2) ───────────────────────────
+   Genera la utilidad `font-lp`, que consume la variable que next/font
+   declara en src/app/(landing)/layout.tsx. Fuera de ese subárbol nadie
+   usa `font-lp`, así que la app sigue en system-ui (body, línea ~118).
+
+   ⚠️ El `inline` NO es opcional. Sin él, Tailwind emite
+   `:root { --font-lp: var(--lp-font), … }` y resuelve `var(--lp-font)`
+   EN :root — donde todavía no existe, porque la declara la clase de
+   next/font sobre el <div> envolvente de la landing. El resultado sería
+   "invalid at computed-value time" y la familia entera caería.
+   Con `inline`, el valor se incrusta en la utilidad y `var(--lp-font)`
+   se resuelve en el elemento que lleva la clase, que es el correcto.
+
+   La cadena de respaldo replica la de `body` para que el swap de
+   `display: swap` no salte a una familia distinta de la que ya se ve. */
+@theme inline {
+  --font-lp: var(--lp-font), system-ui, -apple-system, sans-serif;
+}
+
 :root {
   --background: #f8fafc;
   --foreground: #1e293b;

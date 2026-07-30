@@ -1706,6 +1706,26 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
   ese contenedor. No requiere cambio estructural: el marco ya tiene la
   proporción (`aspect-[16/10]`) y el sangrado.
 
+### LP-DT-18 — `min-h-screen` usa `100vh` donde §4.3·10 pide `100dvh`
+- **Estado:** 🔴 abierta
+- **Detectada:** auditoría de F1.3 tanda (a) — route group + Inter (2026-07-30)
+- **Descripción:** `src/app/(landing)/page.tsx:18` aplica `min-h-screen` al
+  `<main>` de la landing. En Tailwind 4 esa utilidad es
+  `min-height: 100vh`. §4.3·10 del maestro es explícito: **"Móvil: `100dvh`
+  nunca `100vh`"**. `100vh` en iOS/Android no descuenta la barra de
+  direcciones, así que el alto reservado excede el viewport real y aparece
+  un salto al mostrarse/ocultarse la barra al hacer scroll.
+- **Por qué no se corrigió al detectarlo:** se detectó en la línea que la
+  tanda (a) estaba editando (retirada del `fontFamily` inline). Protocolo 1
+  de `CLAUDE.md` prohíbe aprovechar un cambio para arreglar lo que se ve de
+  paso, y (a) tenía prohibido tocar espaciado. Se registra en vez de
+  colarlo.
+- **Alcance:** 1 archivo, 1 clase (`min-h-screen` → `min-h-dvh`).
+- **Condición de cierre:** aplicarlo en F1.3 tanda (c) —espaciado— o, si
+  esa tanda no llega a tocar `page.tsx`, en F6 (pulido/móvil real vía
+  preview de Vercel). Verificar en iOS real, no en el emulador de
+  DevTools: es donde el síntoma se manifiesta.
+
 ---
 
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)

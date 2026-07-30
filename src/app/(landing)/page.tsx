@@ -13,9 +13,14 @@ import SeccionSeguridad from '@/components/landing/sections/SeccionSeguridad'
 import SeccionCTA from '@/components/landing/sections/SeccionCTA'
 import SeccionFooter from '@/components/landing/sections/SeccionFooter'
 
+/* Sin `fontFamily` inline en el <main>: la familia la hereda de la utilidad
+   `font-lp` del layout de este grupo (§3.2). Un inline aquí volvería a
+   pisarla y el fallo se diagnosticaría como "Inter no cargó", que sería
+   falso. El `WebkitFontSmoothing` inline también salió: estaba declarado
+   tres veces — globals.css `body` y el `antialiased` de layout.tsx:19. */
 export default function HomePage() {
   return (
-    <main className="min-h-screen relative" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', WebkitFontSmoothing: 'antialiased' }}>
+    <main className="min-h-screen relative">
       <SeccionNav />
       <SeccionHero />
       <SeccionProblema />
