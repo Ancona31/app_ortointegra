@@ -16,9 +16,13 @@ export default function SeccionHero() {
       className="relative overflow-hidden"
       style={{ background: 'color-mix(in srgb, #1e5fa8 4%, #fff)' }}
     >
-      {/* Gradient orbs */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-gradient-to-b from-[#1e5fa8]/8 via-violet-500/5 to-transparent rounded-full blur-3xl pointer-events-none" />
-
+      {/* F1.3·b1: aquí vivía un orbe de 800×500 con blur-3xl y un degradado
+          que pasaba por violet-500. Eliminado por dos motivos de §3.1: el
+          violeta no representa ningún dato del producto (los semánticos solo
+          se usan para datos reales), y blur-3xl sobre una capa de ese tamaño
+          es el mismo coste de compositor móvil por el que se eliminó el
+          glassmorphism. El lavado del `style` de arriba es TODA la decoración
+          de fondo que esta sección debe tener. No reintroducir capas aquí. */}
 
       {/* pb-24 = 96px: mínimo de aire de §3.3 en la costura con Features, que
           no declara padding superior. Los 128/72 generales son F1.3.

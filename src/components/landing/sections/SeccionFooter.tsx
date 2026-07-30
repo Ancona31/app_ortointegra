@@ -14,10 +14,17 @@ import Image from 'next/image'
 
    NO lleva enlace "Cómo protegemos tu información": la ruta no existe todavía
    y enlazarla sería un 404 en producción. Tampoco WhatsApp: no hay número.
-   Ambos entran cuando existan, no antes. */
+   Ambos entran cuando existan, no antes.
+
+   F1.3·b1: fuera `backdrop-blur-xl` y `bg-white/80` → `bg-white` opaco. El
+   footer cierra el documento: nada se desplaza por debajo, así que el blur
+   solo pagaba compositor sin producir efecto. El Nav SÍ lo conserva (§4.4)
+   porque ahí el contenido sí pasa por debajo — no unificar los dos casos.
+   El `border-slate-200/60` se queda tal cual: los bordes 0.5px/#e6ebf2 son
+   la tanda b2. */
 export default function SeccionFooter() {
   return (
-    <footer className="border-t border-slate-200/60 bg-white/80 backdrop-blur-xl">
+    <footer className="border-t border-slate-200/60 bg-white">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-8">
         {/* Fila 1 — marca + tagline · enlaces */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">

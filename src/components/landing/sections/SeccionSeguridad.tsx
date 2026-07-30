@@ -57,20 +57,34 @@ const tarjetas: Tarjeta[] = [
   },
 ]
 
-/* §3.4·10 pide las 3 tarjetas EN ESCALERA, no en fila, y §5.10 fija los
-   offsets en 0/24/48px ESTÁTICOS — es layout, no movimiento: por eso vive
-   aquí y no en F2.a. Las clases van literales para que el escáner de
-   Tailwind las encuentre; derivarlas con plantilla las borraría del build.
-   El escalón arranca en sm: en móvil las tarjetas se apilan planas. */
-const ESCALERA = ['sm:mt-0', 'sm:mt-6', 'sm:mt-12'] as const
+/* ⚠️ NO REINTRODUCIR LA ESCALERA. §3.4·10 pide las 3 tarjetas escalonadas y
+   §5.10 fija los offsets en 0/24/48px, pero la QA visual de F1.3·b1 lo
+   descartó y la decisión es firme, no un pendiente. Aquí vivía
+   `const ESCALERA = ['sm:mt-0','sm:mt-6','sm:mt-12']` aplicado con
+   `items-start`. Falla por dos motivos:
+     · Las 3 tarjetas tienen cuerpos de largo distinto, así que con
+       `items-start` sus alturas también difieren. Offset desigual sobre
+       altura desigual no dibuja una diagonal: dibuja un zigzag. Los tres
+       títulos y los tres cuerpos acaban a alturas que no guardan relación
+       entre sí y lee como error de maquetación, no como intención.
+     · El `sm:mt-12` empujaba la tercera tarjeta fuera del ancho de
+       contenido: su borde derecho se salía del contenedor.
+   Si una tanda futura quiere recuperar el escalón, la condición previa es
+   igualar las alturas de los cuerpos (o fijar altura de tarjeta), no
+   reponer los `mt`. Registrado en DEUDA_TECNICA.md (LP-DT-20). */
 
 /* Section: Seguridad
    El array no es adorno: F2.a necesita una lista iterable para el Stagger,
    porque §4.4 prohíbe envolver los hijos en wrappers extra (rompen el span
-   del grid) y obliga a variantes padre→hijo sobre este map. */
+   del grid) y obliga a variantes padre→hijo sobre este map.
+
+   Superficie BLANCA (§3.1), explícita. La fija el CTA: su lavado
+   color-mix resuelve a ≈#f6f9fc, a un punto por canal de la franja #f5f8fc.
+   Una Seguridad en franja se fundiría con el bloque siguiente en una sola
+   banda. Por eso rompe la alternancia respecto a Historia y lo hace bien. */
 export default function SeccionSeguridad() {
   return (
-    <section className="bg-slate-100/40 backdrop-blur-md border-y border-white/30">
+    <section className="bg-white">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-20 sm:py-28">
         <div className="text-center mb-14">
           <div className="inline-flex items-center gap-2 bg-blue-50 rounded-full px-3.5 py-1 mb-6">
@@ -83,13 +97,25 @@ export default function SeccionSeguridad() {
           </h2>
         </div>
 
-        {/* items-start es lo que hace visible la escalera: sin él las tarjetas
-            se estiran a la altura de la fila y el mt no desplaza nada. */}
-        <div className="grid sm:grid-cols-3 gap-6 items-start">
-          {tarjetas.map((t, i) => (
+        {/* `items-stretch` explícito (es el default de grid, pero aquí importa
+            que se lea): las 3 tarjetas arrancan alineadas arriba y comparten
+            altura, que es justo lo que la escalera rompía. Cambiarlo a
+            `items-start` devuelve las alturas desiguales. */}
+        <div className="grid sm:grid-cols-3 gap-6 items-stretch">
+          {/* ⚠️ Estas tarjetas son las que MÁS pierden en b1: eran el último
+              glass de la landing (bg-white/30 + backdrop-blur-md), es decir
+              azulejos esmerilados, y pasan a blanco sobre una sección blanca
+              — el relleno queda a 1.00:1 y solo las dibujan el filete y la
+              sombra. Es deliberado: doctrina única de card de §3.1 (bg-white
+              + border-[0.5px] #e6ebf2 + shadow-sm), la misma de las 5 del
+              bento y las 3 de Portabilidad. Si la QA visual las considera
+              insuficientes, la salida NO es devolver el blur: es rellenarlas
+              de #f5f8fc invirtiendo card y sección. No abrir una segunda
+              doctrina de card para esta sección sola. */}
+          {tarjetas.map((t) => (
             <div
               key={t.title}
-              className={`bg-white/30 backdrop-blur-md rounded-2xl border border-white/30 p-8 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200 ${ESCALERA[i]}`}
+              className="bg-white rounded-2xl border-[0.5px] border-[#e6ebf2] p-8 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200"
             >
               <div className={`w-12 h-12 rounded-xl ${t.iconBg} flex items-center justify-center mb-5`}>
                 {t.icon}

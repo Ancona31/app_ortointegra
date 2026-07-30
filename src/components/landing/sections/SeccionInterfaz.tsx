@@ -2,10 +2,12 @@
 
 import { Calendar, Zap, MousePointerClick } from 'lucide-react'
 
-/* Section: Interfaz intuitiva */
+/* Section: Interfaz intuitiva
+   Superficie BLANCA (§3.1), explícita. Mismo motivo que en Expediente: el
+   panel `#f8fafc` de la izquierda quedaría invertido sobre franja. */
 export default function SeccionInterfaz() {
   return (
-    <section className="bg-slate-100/40 backdrop-blur-md border-y border-white/30">
+    <section className="bg-white">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-20 sm:py-28">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
           {/* Left: visual */}

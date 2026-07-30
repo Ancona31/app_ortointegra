@@ -2,10 +2,15 @@
 
 import { Search, Zap, FolderOpen, QrCode, Layers } from 'lucide-react'
 
-/* Section: Expediente electrónico */
+/* Section: Expediente electrónico
+   Superficie BLANCA (§3.1). El `bg-white` va EXPLÍCITO, no por ausencia de
+   clase: la alternancia es un sistema y debe leerse en el código.
+   Que sea blanca protege además al panel de la izquierda: su `#f8fafc`
+   contra franja `#f5f8fc` daría 1.02:1 e invertido (el panel más claro que
+   su fondo). Sobre blanco al menos va en el sentido correcto. */
 export default function SeccionExpediente() {
   return (
-    <section className="bg-slate-100/40 backdrop-blur-md border-y border-white/30">
+    <section className="bg-white">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-20 sm:py-28">
         {/* §3.4: dos columnas invertidas — medio a la izquierda, texto a la
             derecha. La inversión va con order-*, NO moviendo el JSX: en móvil

@@ -1726,6 +1726,91 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
   preview de Vercel). Verificar en iOS real, no en el emulador de
   DevTools: es donde el síntoma se manifiesta.
 
+### LP-DT-19 — Problema↔Features sin separación cromática (padding donado)
+- **Estado:** 🔴 abierta
+- **Detectada:** auditoría de F1.3 tanda (b) — superficies (2026-07-30)
+- **Descripción:** la alternancia de superficies de §3.1 deja **un único par
+  de secciones consecutivas con la misma superficie**: `SeccionProblema`
+  (blanca) y `SeccionFeatures` (blanca). Leen como una sola región blanca de
+  ~700px; lo único que las distingue es el salto tipográfico (una frase
+  suelta de 46px al 74% de ancho contra `<h2>` + bajada + retícula de 5
+  cards). No es error de asignación: es forzado, y por dos causas distintas
+  que coinciden en la misma costura.
+- **Causa raíz — padding donado:** `SeccionFeatures` no declara `pt`. Sus
+  96px de aire superior los dona el `pb-24` de `SeccionProblema.tsx:29`, y
+  **el padding donado se pinta con la superficie del donante**. Darle una
+  franja a Features haría que la banda de color arrancase en el borde
+  superior del `<h2>`, con 0px de aire sobre el titular. Lo mismo impide
+  darle superficie propia a Problema — su comentario de contrato ya lo dice
+  (`SeccionProblema.tsx:15`: *"Añadir pt aquí, o superficie de fondo, rompe
+  las dos a la vez"*). La cadena completa es
+  `Hero (pb-24) → [96px] → Problema (sin pt … pb-24) → [96px] → Features
+  (sin pt)`, documentada en los tres contratos de costura de
+  `SeccionHero.tsx:23-29`, `SeccionProblema.tsx:7-15` y
+  `SeccionFeatures.tsx:59-66`.
+- **Por qué tampoco sirve un borde:** un `border-b` en la `<section>` de
+  Problema cae en su borde inferior, es decir **96px por debajo de su texto
+  y 0px por encima del `<h2>` de Features**. El filete quedaría pegado al
+  titular siguiente en vez de a mitad del aire. La arquitectura de padding
+  donado hace que **tanto un cambio de superficie como un borde aterricen
+  asimétricos en esa costura**. No hay solución dentro de b1 ni de b2.
+- **Restricción adicional (independiente de la anterior):** aunque el
+  padding se repartiera, Problema no puede tomar franja mientras siga
+  inmediatamente después del Hero: el lavado `color-mix(#1e5fa8 4%, #fff)`
+  de `SeccionHero.tsx:17` resuelve a ≈`#f6f9fc`, a un punto por canal de la
+  franja `#f5f8fc`. Son el mismo color. Problema queda blanca por decisión
+  de PM y por aritmética.
+- **Decisión de PM:** se asume el par sin separación. La alternativa
+  (Opción B de la auditoría) exigía repartir el padding en 2 archivos y
+  reescribir los **tres** contratos de costura, que es justo lo que la
+  tanda (b) tenía prohibido tocar.
+- **Efecto visible:** cero riesgo funcional. Solo lectura: el visitante no
+  percibe frontera entre la tesis del problema y la retícula de
+  capacidades. Discutible si es defecto — la franja del problema es la
+  bisagra hacia el bento y encadenarlas tiene lectura propia.
+- **Condición de cierre:** tanda futura que reparta el padding donado —
+  `SeccionFeatures` toma `pt-24`, `SeccionProblema` suelta su `pb-24` — y
+  con eso Features puede recibir `bg-[#f5f8fc]`. La colisión se muda
+  entonces a Features↔IA, ambas franja, enmascarada por el bloque navy de
+  `SeccionIA.tsx:10`. **Reescribir los tres contratos de costura en el mismo
+  cambio, no después:** si el reparto se aplica sin actualizarlos, los
+  comentarios pasan a describir una cadena que ya no existe y el siguiente
+  editor confía en ellos.
+
+### LP-DT-20 — Escalera de tarjetas de Seguridad DESCARTADA (§3.4·10 y §5.10 sin efecto)
+- **Estado:** ⚪ cerrada como decisión — **no es un pendiente**
+- **Decidida:** QA visual de F1.3 tanda (b1) — superficies (2026-07-30)
+- **Qué decía el maestro:** §3.4·10 pide las 3 tarjetas de Seguridad **en
+  escalera, no en fila**, y §5.10 fija los offsets en **0/24/48px estáticos**.
+  Se implementó en F1.2 tanda (c2) como
+  `const ESCALERA = ['sm:mt-0','sm:mt-6','sm:mt-12']` sobre un grid con
+  `items-start`.
+- **Por qué se descarta:** la QA visual sobre el render real mostró dos
+  fallos que la ficha de diseño no anticipaba.
+  1. **Zigzag, no diagonal.** Las 3 tarjetas tienen cuerpos de longitud muy
+     distinta (`SeccionSeguridad.tsx`, array `tarjetas`: 2 líneas / 1 línea /
+     2 líneas), y `items-start` —necesario para que el `mt` desplace algo—
+     impide que igualen altura. Offset desigual **sobre** altura desigual no
+     produce una diagonal legible: los tres títulos y los tres cuerpos acaban
+     a alturas sin relación entre sí. Lee como error de maquetación, que es
+     el efecto contrario al buscado.
+  2. **Desbordamiento horizontal.** El `sm:mt-12` de la tercera tarjeta la
+     empujaba fuera del ancho de contenido: su borde derecho salía del
+     contenedor `max-w-6xl`.
+- **Qué quedó en su lugar:** grid con `items-stretch` explícito. Las 3
+  tarjetas alineadas arriba y con altura compartida.
+- **Efecto sobre el maestro:** **§3.4·10 y §5.10 quedan sin efecto para esta
+  sección.** No hay que "volver a intentarlo" ni queda trabajo abierto. El
+  requisito de §3.4 que sí sigue vigente —que ningún esqueleto se repita dos
+  veces seguidas— lo cumple igual: Seguridad es la única retícula de 3
+  tarjetas centradas de la landing, y sus vecinas (Historia a 2 columnas con
+  retrato, CTA navy centrado) no comparten esqueleto.
+- **Condición para revisitarlo (solo si alguien lo pide, no pendiente):**
+  igualar la altura de los cuerpos de las 3 tarjetas, o fijar altura de
+  tarjeta, **antes** de reponer cualquier offset. Reponer los `mt` sin eso
+  reproduce el zigzag idéntico. El comentario de advertencia vive en
+  `SeccionSeguridad.tsx`, justo encima del componente.
+
 ---
 
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)

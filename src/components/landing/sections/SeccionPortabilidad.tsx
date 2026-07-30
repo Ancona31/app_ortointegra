@@ -3,10 +3,13 @@
 import { Smartphone, Laptop, Globe } from 'lucide-react'
 import Reveal from '@/components/landing/motion/Reveal'
 
-/* Section: Portabilidad */
+/* Section: Portabilidad
+   Superficie FRANJA (§3.1). Es la asignación que más trabaja de las seis:
+   las 3 tarjetas de la franja horizontal son blancas, y sobre franja pasan
+   a leerse como tarjetas en vez de como aire con filete. */
 export default function SeccionPortabilidad() {
   return (
-    <section className="bg-slate-100/40 backdrop-blur-md border-y border-white/30">
+    <section className="bg-[#f5f8fc]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-20 sm:py-28">
         {/* Prueba de humo F0 del sistema de movimiento — único uso de <Reveal> por ahora */}
         <Reveal className="text-center mb-14">
@@ -17,7 +20,15 @@ export default function SeccionPortabilidad() {
           <h2 className="text-[28px] sm:text-[38px] font-bold text-slate-900 tracking-tight leading-[1.15]">
             Tu consultorio en cualquier lugar
           </h2>
-          <p className="mt-4 text-[16px] text-slate-500 max-w-2xl mx-auto leading-relaxed">
+          {/* ⚠️ #5a6b81 (tinta 500 de §3.1) en vez de text-slate-500, y NO es
+              adelanto del barrido de tinta: es reparación de lo que rompió el
+              cambio de superficie. slate-500 da 4.76:1 sobre blanco (AA) pero
+              4.47:1 sobre esta franja — falla el 4.5 por 0.03. #5a6b81 da
+              5.11:1 aquí y 5.45:1 sobre blanco. Las únicas dos líneas de esta
+              landing con slate-500 apoyado DIRECTAMENTE en franja son esta y
+              la del pie de abajo; el slate-500 de las tarjetas va sobre
+              blanco y se queda. Si esta sección vuelve a blanco, revertir. */}
+          <p className="mt-4 text-[16px] text-[#5a6b81] max-w-2xl mx-auto leading-relaxed">
             Accede desde tu computadora, tablet o celular. Adaptada a cada pantalla, sin instalar nada de una tienda de apps.
           </p>
         </Reveal>
@@ -56,7 +67,7 @@ export default function SeccionPortabilidad() {
 
         {/* Pie de franja, no un 4º ítem: aplica SOLO a la nota médica (§7·9,
             lo único verificado). No generalizar a "funciona sin conexión". */}
-        <p className="mt-4 text-[13px] text-slate-500">
+        <p className="mt-4 text-[13px] text-[#5a6b81]">
           Si se te cae la conexión, el borrador de tu nota médica sigue donde lo dejaste.
         </p>
       </div>

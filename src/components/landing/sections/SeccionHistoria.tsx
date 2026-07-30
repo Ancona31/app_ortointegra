@@ -3,10 +3,16 @@
 import Image from 'next/image'
 import { Activity } from 'lucide-react'
 
-/* Section: La Historia de Spinus */
+/* Section: La Historia de Spinus
+   Superficie FRANJA (§3.1). No es solo alternancia: Problema e Historia son
+   las dos únicas secciones sin ningún contenedor interno que las defienda, y
+   esta franja es lo único que separa a Historia de sus vecinas. Queda entre Interfaz
+   (blanca) y Seguridad (blanca) — corte por ambos lados. Si alguna futura
+   tanda la pasa a blanco, Historia y Seguridad se funden en una sola mancha
+   de ~1400px. Verificar ese par antes de tocar esta línea. */
 export default function SeccionHistoria() {
   return (
-    <section className="bg-slate-100/40 backdrop-blur-md border-y border-white/30">
+    <section className="bg-[#f5f8fc]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-20 sm:py-28">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
           {/* Foto del Dr. Ancona — §7·11 retira el badge de estetoscopio que
