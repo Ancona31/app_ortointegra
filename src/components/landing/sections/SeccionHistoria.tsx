@@ -36,7 +36,8 @@ export default function SeccionHistoria() {
               <Activity className="w-3.5 h-3.5 text-[#1e5fa8]" />
               {/* §7·11: "MI historia", nunca "nuestra" — no hay equipo. El
                   uppercase lo pone el CSS, como en los kickers hermanos. */}
-              <span className="text-[11px] font-semibold text-[#1e5fa8] uppercase tracking-wider">Mi historia</span>
+              {/* F1.3·d1 — rol kicker: 12px · +0.12em · 1.0. Ver SeccionHero.tsx. */}
+              <span className="text-[12px] font-semibold text-[#1e5fa8] uppercase tracking-[0.12em] leading-none">Mi historia</span>
             </div>
 
             <h2 className="text-[28px] sm:text-[38px] font-bold text-slate-900 tracking-tight leading-[1.15]">

@@ -107,7 +107,27 @@ export default function SeccionHero() {
       <div className="mx-auto max-w-6xl px-4 sm:px-8 pt-16 sm:pt-24 lg:pt-32 pb-24 lg:max-w-none lg:pl-[max(2rem,calc((100vw-72rem)/2+2rem))] lg:pr-0">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <div>
-            <p className="text-[11px] font-semibold text-[#1e5fa8] uppercase tracking-wider">
+            {/* ═══ ROL KICKER DE LA LANDING (F1.3·d1) ═══
+                12px · tracking +0.12em · leading 1.0 (§3.2). Vale para los
+                SIETE kickers de la landing, no solo para este: aquí abajo,
+                SeccionExpediente, SeccionInterfaz (el del texto, :87),
+                SeccionHistoria, SeccionIA, SeccionPortabilidad y
+                SeccionSeguridad.
+
+                Antes eran 11px con `tracking-wider` (0.05em), salvo el de
+                SeccionIA que iba en `tracking-widest` (0.1em). El tracking
+                abierto es lo que hace legible una versalita a tamaño chico:
+                +0.12em no es decoración, compensa el apelmazamiento que
+                produce el uppercase.
+
+                ⚠️ EL OCTAVO KICKER NO ENTRA. `SeccionInterfaz.tsx:57`
+                ("Flujo de trabajo típico") vive DENTRO del panel simulado y
+                queda fuera de F1.3 por la misma decisión que excluye el
+                mockup de Expediente. Se queda en 11px a propósito: es UI
+                falsa, no texto de la landing. Si una auditoría futura
+                reporta "un kicker a 11px suelto", la respuesta es esta nota
+                — no lo unifiques hasta que F0.c sustituya el panel. */}
+            <p className="text-[12px] font-semibold text-[#1e5fa8] uppercase tracking-[0.12em] leading-none">
               Expediente clínico electrónico para consultorios privados
             </p>
 

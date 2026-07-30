@@ -16,7 +16,8 @@ export default function SeccionPortabilidad() {
         <Reveal className="text-center mb-12">
           <div className="inline-flex items-center gap-2 bg-violet-50 rounded-full px-3.5 py-1 mb-6">
             <Smartphone className="w-3.5 h-3.5 text-violet-600" />
-            <span className="text-[11px] font-semibold text-violet-600 uppercase tracking-wider">Portabilidad máxima</span>
+            {/* F1.3·d1 — rol kicker: 12px · +0.12em · 1.0. Ver SeccionHero.tsx. */}
+            <span className="text-[12px] font-semibold text-violet-600 uppercase tracking-[0.12em] leading-none">Portabilidad máxima</span>
           </div>
           <h2 className="text-[28px] sm:text-[38px] font-bold text-slate-900 tracking-tight leading-[1.15]">
             Tu consultorio en cualquier lugar

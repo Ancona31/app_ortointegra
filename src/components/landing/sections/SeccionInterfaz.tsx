@@ -84,7 +84,12 @@ export default function SeccionInterfaz() {
           <div className="order-1 lg:order-2">
             <div className="inline-flex items-center gap-2 bg-emerald-50 rounded-full px-3.5 py-1 mb-6">
               <MousePointerClick className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider">Interfaz intuitiva</span>
+              {/* F1.3·d1 — rol kicker: 12px · +0.12em · 1.0. Ver SeccionHero.tsx.
+                  NO confundir con el `text-[11px]` de :57 ("Flujo de trabajo
+                  típico"): ese vive dentro del panel simulado y queda fuera
+                  de F1.3 a propósito. Son dos kickers de este archivo con
+                  tamaños distintos y está bien así. */}
+              <span className="text-[12px] font-semibold text-emerald-600 uppercase tracking-[0.12em] leading-none">Interfaz intuitiva</span>
             </div>
             <h2 className="text-[28px] sm:text-[38px] font-bold text-slate-900 tracking-tight leading-[1.15]">
               Si sabes usar tu celular,{' '}

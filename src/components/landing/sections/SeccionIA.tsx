@@ -42,7 +42,13 @@ export default function SeccionIA() {
 
             {/* Text */}
             <div className="text-center lg:text-left flex-1">
-              <p className="text-[11px] font-semibold text-white/50 uppercase tracking-widest mb-3">Potenciado por inteligencia artificial</p>
+              {/* F1.3·d1 — rol kicker: 12px · +0.12em · 1.0. Ver SeccionHero.tsx.
+                  Este era el ÚNICO en `tracking-widest` (0.1em); los otros seis
+                  venían de `tracking-wider` (0.05em). Ahora los siete van al
+                  mismo +0.12em, así que este es el que menos se mueve en
+                  tracking y el que más en tamaño relativo: es el kicker más
+                  largo de la landing y el único sin pastilla que lo contenga. */}
+              <p className="text-[12px] font-semibold text-white/50 uppercase tracking-[0.12em] leading-none mb-3">Potenciado por inteligencia artificial</p>
               {/* §7·4: el subtitular ES el titular. El h2 anterior ("Spinus es
                   tu aliado / para cada consulta") no salía del maestro, y la
                   primera oración del párrafo que vivía aquí se eliminó por dos

@@ -23,7 +23,8 @@ export default function SeccionExpediente() {
           <div className="order-1 lg:order-2">
             <div className="inline-flex items-center gap-2 bg-blue-50 rounded-full px-3.5 py-1 mb-6">
               <FolderOpen className="w-3.5 h-3.5 text-[#1e5fa8]" />
-              <span className="text-[11px] font-semibold text-[#1e5fa8] uppercase tracking-wider">Expediente electrónico</span>
+              {/* F1.3·d1 — rol kicker: 12px · +0.12em · 1.0. Ver SeccionHero.tsx. */}
+              <span className="text-[12px] font-semibold text-[#1e5fa8] uppercase tracking-[0.12em] leading-none">Expediente electrónico</span>
             </div>
             <h2 className="text-[28px] sm:text-[38px] font-bold text-slate-900 tracking-tight leading-[1.15]">
               El expediente que se adapta a tu ritmo,
