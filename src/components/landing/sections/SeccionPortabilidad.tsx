@@ -1,6 +1,6 @@
 'use client'
 
-import { Smartphone, Laptop, Share2 } from 'lucide-react'
+import { Smartphone, Laptop, Globe } from 'lucide-react'
 import Reveal from '@/components/landing/motion/Reveal'
 
 /* Section: Portabilidad */
@@ -18,43 +18,47 @@ export default function SeccionPortabilidad() {
             Tu consultorio en cualquier lugar
           </h2>
           <p className="mt-4 text-[16px] text-slate-500 max-w-2xl mx-auto leading-relaxed">
-            Accede desde tu computadora, tablet o celular. La misma experiencia fluida en cualquier pantalla — sin instalar nada, sin actualizaciones manuales.
+            Accede desde tu computadora, tablet o celular. Adaptada a cada pantalla, sin instalar nada de una tienda de apps.
           </p>
         </Reveal>
 
-        <div className="grid sm:grid-cols-3 gap-4">
+        {/* §3.4: franja horizontal delgada de 3 ítems (antes eran 3 tarjetas
+            grandes). Siguen siendo 3 — ninguno se elimina; el tercero solo
+            cambia de nombre. El gap-px sobre el fondo de borde dibuja los
+            divisores como filete de 1px sin bordes por tarjeta. */}
+        <div className="grid sm:grid-cols-3 gap-px bg-[#e6ebf2] rounded-2xl overflow-hidden border-[0.5px] border-[#e6ebf2]">
           {[
             {
-              icon: <Laptop className="w-7 h-7 text-[#1e5fa8]" />,
-              title: 'Desktop',
-              desc: 'La experiencia completa con sidebar, atajos de teclado y vista expandida del expediente.',
-              bg: 'bg-blue-50',
+              icon: <Laptop className="w-5 h-5 text-[#8a99ac]" />,
+              title: 'Computadora',
+              desc: 'La experiencia completa: sidebar, atajos y expediente expandido.',
             },
             {
-              icon: <Smartphone className="w-7 h-7 text-violet-600" />,
+              icon: <Smartphone className="w-5 h-5 text-[#8a99ac]" />,
               title: 'Tablet y celular',
-              desc: 'Interfaz adaptada al tacto. Revisa citas, consulta expedientes y genera documentos sobre la marcha.',
-              bg: 'bg-violet-50',
+              desc: 'Interfaz adaptada al tacto. Revisa citas y consulta expedientes donde estés.',
             },
             {
-              icon: <Share2 className="w-7 h-7 text-emerald-600" />,
-              title: '100% en la nube',
-              desc: 'Tus datos sincronizados en tiempo real. Si un dispositivo falla, accede desde otro sin perder nada.',
-              bg: 'bg-emerald-50',
+              icon: <Globe className="w-5 h-5 text-[#8a99ac]" />,
+              title: 'Sin instalaciones',
+              desc: 'Corre en el navegador y se actualiza sola.',
             },
           ].map((item) => (
-            <div
-              key={item.title}
-              className="bg-white rounded-2xl border border-slate-200/60 p-8 shadow-sm text-center hover:shadow-[0_4px_20px_rgba(30,95,168,0.10)] hover:border-[#1e5fa8]/15 hover:-translate-y-1 transition-all duration-200 ease-[cubic-bezier(0.32,0.72,0,1)]"
-            >
-              <div className={`w-14 h-14 rounded-2xl ${item.bg} flex items-center justify-center mx-auto mb-5`}>
-                {item.icon}
+            <div key={item.title} className="bg-white px-6 py-5 flex items-start gap-3">
+              <div className="flex-shrink-0 mt-0.5">{item.icon}</div>
+              <div className="min-w-0">
+                <h3 className="text-[14px] font-semibold text-slate-900">{item.title}</h3>
+                <p className="mt-1 text-[13px] text-slate-500 leading-relaxed">{item.desc}</p>
               </div>
-              <h3 className="text-[16px] font-semibold text-slate-900">{item.title}</h3>
-              <p className="mt-2 text-[13px] text-slate-500 leading-relaxed">{item.desc}</p>
             </div>
           ))}
         </div>
+
+        {/* Pie de franja, no un 4º ítem: aplica SOLO a la nota médica (§7·9,
+            lo único verificado). No generalizar a "funciona sin conexión". */}
+        <p className="mt-4 text-[13px] text-slate-500">
+          Si se te cae la conexión, el borrador de tu nota médica sigue donde lo dejaste.
+        </p>
       </div>
     </section>
   )

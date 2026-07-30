@@ -1687,6 +1687,25 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
   (es handoff congelado, no código de producción) y luego atacar el
   remanente real de `src/`.
 
+### LP-DT-17 — Marco de captura vacío en el hero
+- **Estado:** 🔴 abierta
+- **Detectada:** F1.2 tanda (c1) — copy de secciones de producto (2026-07-30)
+- **Descripción:** `src/components/landing/sections/SeccionHero.tsx:70-81`
+  renderiza el marco de ventana de la columna derecha (tres puntos, borde,
+  radio, lienzo `--sp-surface-muted`) **sin contenido**. §7·1 pide ahí una
+  captura real de la agenda sangrando por el borde derecho, pero F0.b
+  (cuenta demo) y F0.c (auditoría visual de la app) están bloqueadas y la
+  captura no existe.
+- **Decisión de PM:** espacio reservado declarado, NO mockup en JSX. Se
+  eligió dejar el marco vacío antes que dibujar una interfaz falsa —
+  justo el defecto que LP-DT-13 registra en `SeccionExpediente`.
+- **Efecto visible:** en pantallas `lg+` se ve un rectángulo liso con
+  cromo de ventana. Debajo de `lg` el marco va `hidden`, así que en móvil
+  no hay hueco.
+- **Condición de cierre:** F0.c produce la captura real y se inserta en
+  ese contenedor. No requiere cambio estructural: el marco ya tiene la
+  proporción (`aspect-[16/10]`) y el sangrado.
+
 ---
 
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)

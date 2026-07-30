@@ -1,14 +1,18 @@
 'use client'
 
-import { Search, Zap, FolderOpen, Share2 } from 'lucide-react'
+import { Search, Zap, FolderOpen, QrCode, Layers } from 'lucide-react'
 
 /* Section: Expediente electrónico */
 export default function SeccionExpediente() {
   return (
     <section className="bg-slate-100/40 backdrop-blur-md border-y border-white/30">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-20 sm:py-28">
+        {/* §3.4: dos columnas invertidas — medio a la izquierda, texto a la
+            derecha. La inversión va con order-*, NO moviendo el JSX: en móvil
+            (una columna) debe seguir leyéndose texto → mockup, para no abrir
+            la sección con una UI falsa (LP-DT-13). */}
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-          <div>
+          <div className="order-1 lg:order-2">
             <div className="inline-flex items-center gap-2 bg-blue-50 rounded-full px-3.5 py-1 mb-6">
               <FolderOpen className="w-3.5 h-3.5 text-[#1e5fa8]" />
               <span className="text-[11px] font-semibold text-[#1e5fa8] uppercase tracking-wider">Expediente electrónico</span>
@@ -23,9 +27,10 @@ export default function SeccionExpediente() {
             </p>
             <div className="mt-8 space-y-4">
               {[
-                { icon: <Zap className="w-4 h-4 text-amber-500" />, text: 'Nota médica generada con IA en segundos — tú solo validas y firmas' },
-                { icon: <Search className="w-4 h-4 text-violet-500" />, text: 'Búsqueda global con Ctrl+K — encuentra cualquier paciente al instante' },
-                { icon: <Share2 className="w-4 h-4 text-emerald-500" />, text: 'Envía documentos por email o genera QR verificable para recetas' },
+                { icon: <Zap className="w-4 h-4 text-amber-500" />, text: 'Nota médica que la IA estructura — tú validas y firmas' },
+                { icon: <Search className="w-4 h-4 text-violet-500" />, text: 'Búsqueda rápida — ⌘K / Ctrl+K, encuentra cualquier paciente al instante' },
+                { icon: <Layers className="w-4 h-4 text-sky-500" />, text: 'Guarda los cortes clave del estudio y ábrelos con el visor integrado' },
+                { icon: <QrCode className="w-4 h-4 text-emerald-500" />, text: 'QR verificable en cada receta' },
               ].map((item) => (
                 <div key={item.text} className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -37,8 +42,8 @@ export default function SeccionExpediente() {
             </div>
           </div>
 
-          {/* Mini mockup: patient record */}
-          <div className="bg-[#f8fafc] rounded-2xl border border-slate-200/60 p-6 shadow-sm">
+          {/* Mini mockup: patient record — LP-DT-13, se elimina con el Video 1 */}
+          <div className="order-2 lg:order-1 bg-[#f8fafc] rounded-2xl border border-slate-200/60 p-6 shadow-sm">
             <div className="flex items-center gap-3 mb-5">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#1a3a5c] to-[#1e5fa8] flex items-center justify-center text-white text-[13px] font-bold">CM</div>
               <div>
