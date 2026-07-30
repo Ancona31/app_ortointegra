@@ -13,7 +13,9 @@ export default function SeccionNav() {
   return (
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b-[0.5px] border-[#e6ebf2]">
       <nav className="mx-auto max-w-6xl flex items-center justify-between px-4 sm:px-8 h-14">
-        <div className="flex items-center gap-2.5">
+        {/* F1.3·c3 — `gap-2` (8), no gap-2.5: 10 no está en la escala. Mismo
+            cambio en el lockup del Footer, que es el mismo lockup. */}
+        <div className="flex items-center gap-2">
           <Image src="/logo-spinus.png" alt="Spinus" width={800} height={777} className="object-contain h-9 w-auto" />
           <span className="text-[17px] font-bold text-slate-900 tracking-tight">Spinus</span>
         </div>

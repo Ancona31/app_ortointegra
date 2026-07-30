@@ -86,7 +86,8 @@ export default function SeccionSeguridad() {
   return (
     <section className="bg-white">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
-        <div className="text-center mb-14">
+        {/* F1.3·c3 — `mb-12` (48). Ver SeccionFeatures.tsx. */}
+        <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 bg-blue-50 rounded-full px-3.5 py-1 mb-6">
             <Shield className="w-3.5 h-3.5 text-[#1e5fa8]" />
             <span className="text-[11px] font-semibold text-[#1e5fa8] uppercase tracking-wider">Seguridad clínica</span>
@@ -119,16 +120,17 @@ export default function SeccionSeguridad() {
               `p-6` (24) NO es incoherencia pendiente de barrer: ambos
               están en la escala de §3.3 y responden a densidades de
               contenido distintas. No los unifiques.
-              (Matiz: el `px-6 py-5` de los ítems de Portabilidad es otro
-              caso. El 24 horizontal está en escala; el `py-5` = 20 NO lo
-              está, y c3 lo corrige — pero por fuera de escala, no por
-              divergir de estas dos.) */}
+              (Matiz: el `px-6 py-5` de los ítems de Portabilidad era otro
+              caso. El 24 horizontal estaba en escala; el `py-5` = 20 no lo
+              estaba, y c3 ya lo subió a `py-6` — por estar fuera de escala,
+              no por divergir de estas dos.) */}
           {tarjetas.map((t) => (
             <div
               key={t.title}
               className="bg-white rounded-2xl border-[0.5px] border-[#e6ebf2] p-8 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200"
             >
-              <div className={`w-12 h-12 rounded-xl ${t.iconBg} flex items-center justify-center mb-5`}>
+              {/* F1.3·c3 — `mb-6` (24), no mb-5: 20 no está en la escala. */}
+              <div className={`w-12 h-12 rounded-xl ${t.iconBg} flex items-center justify-center mb-6`}>
                 {t.icon}
               </div>
               <h3 className="text-[16px] font-bold text-slate-900 mb-3">{t.title}</h3>

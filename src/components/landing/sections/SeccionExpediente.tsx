@@ -16,7 +16,10 @@ export default function SeccionExpediente() {
             derecha. La inversión va con order-*, NO moviendo el JSX: en móvil
             (una columna) debe seguir leyéndose texto → mockup, para no abrir
             la sección con una UI falsa (LP-DT-13). */}
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+        {/* F1.3·c3 — `lg:gap-24` (96), no gap-20: 80 no está en la escala de
+            §3.3. Las tres secciones de dos columnas (esta, Interfaz e
+            Historia) comparten el mismo par `gap-12 lg:gap-24`. */}
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-center">
           <div className="order-1 lg:order-2">
             <div className="inline-flex items-center gap-2 bg-blue-50 rounded-full px-3.5 py-1 mb-6">
               <FolderOpen className="w-3.5 h-3.5 text-[#1e5fa8]" />
@@ -27,7 +30,7 @@ export default function SeccionExpediente() {
               <br className="hidden sm:block" />
               <span className="text-slate-400">no al revés</span>
             </h2>
-            <p className="mt-5 text-[16px] text-slate-500 leading-relaxed max-w-lg">
+            <p className="mt-6 text-[16px] text-slate-500 leading-relaxed max-w-lg">
               Diseñado para que captures la información clínica en el menor número de clics posible. Notas médicas, laboratorios, imagen, recetas y consentimientos — todo vinculado al mismo paciente, accesible al instante.
             </p>
             <div className="mt-8 space-y-4">
@@ -38,6 +41,10 @@ export default function SeccionExpediente() {
                 { icon: <QrCode className="w-4 h-4 text-emerald-500" />, text: 'QR verificable en cada receta' },
               ].map((item) => (
                 <div key={item.text} className="flex items-start gap-3">
+                  {/* `mt-0.5` = 2px: alineación ÓPTICA del cuadro de icono
+                      contra la primera línea de texto, no ritmo. Excluido de
+                      §3.3 por decisión de PM (c1) y ratificado en c3. No lo
+                      subas a 8 ni lo reportes como fuera de escala. */}
                   <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center flex-shrink-0 mt-0.5">
                     {item.icon}
                   </div>
@@ -49,7 +56,7 @@ export default function SeccionExpediente() {
 
           {/* Mini mockup: patient record — LP-DT-13, se elimina con el Video 1 */}
           <div className="order-2 lg:order-1 bg-[#f8fafc] rounded-2xl border border-slate-200/60 p-6 shadow-sm">
-            <div className="flex items-center gap-3 mb-5">
+            <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#1a3a5c] to-[#1e5fa8] flex items-center justify-center text-white text-[13px] font-bold">CM</div>
               <div>
                 <p className="text-[14px] font-semibold text-slate-800">Carlos Méndez Ríos</p>

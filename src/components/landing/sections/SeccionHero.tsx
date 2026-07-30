@@ -58,6 +58,18 @@ export default function SeccionHero() {
           botón de `px-8 py-4` no es este botón con el padding corregido:
           es otro botón. No los "normalices" en una tanda futura.
 
+          ⚠️ c3 RATIFICÓ EL BLINDAJE DEL `mt-0.5` Y RESOLVIÓ EL `mt-1`, QUE
+          NO ES LO MISMO. El `mt-0.5` de 2px corrige un desalineamiento
+          geométrico entre un cuadro de icono y la primera línea de texto:
+          es una corrección, no un espacio, y sigue fuera de §3.3
+          (SeccionExpediente, SeccionInterfaz, SeccionPortabilidad). El
+          `mt-1` de 4px que había en SeccionHistoria y SeccionPortabilidad
+          NO corregía nada —dos bloques de texto apilados en flujo normal,
+          sin icono ni baseline de por medio—, así que se leía como espacio
+          y c3 lo subió a 8. Criterio para futuras tandas: ¿hay una
+          desalineación física que compensar? Es óptico. ¿Solo hay dos
+          cosas apiladas? Es ritmo, y va a la escala.
+
           El `gap-px` de SeccionPortabilidad tampoco es ritmo — es la
           técnica que dibuja los divisores de la franja. Ver allí.
 
@@ -107,7 +119,7 @@ export default function SeccionHero() {
               </span>
             </h1>
 
-            <p className="mt-5 text-[15px] sm:text-[17px] font-semibold text-[#1e5fa8]/80 tracking-wide italic">
+            <p className="mt-6 text-[15px] sm:text-[17px] font-semibold text-[#1e5fa8]/80 tracking-wide italic">
               Creada por un cirujano de columna que la usa todos los días
             </p>
 
@@ -122,10 +134,15 @@ export default function SeccionHero() {
                 valor un botón de 48px de alto y una card de 400px leían igual
                 de redondeados. La escala completa está declarada en
                 SeccionInterfaz.tsx. No los devuelvas a rounded-2xl. */}
-            <div className="mt-10 flex flex-col sm:flex-row items-start gap-3">
+            {/* F1.3·c3 — `mt-8` (32), no mt-10: 40 no está en la escala. */}
+            <div className="mt-8 flex flex-col sm:flex-row items-start gap-3">
+              {/* F1.3·c3 — `gap-2` (8), no gap-2.5: 10 no está en la escala.
+                  El separador texto↔icono NO es geometría de control (eso es
+                  el px-7 py-3.5, que no se toca), y de paso iguala al botón
+                  secundario de al lado, que ya usaba gap-2. */}
               <Link
                 href="/register"
-                className="group inline-flex items-center gap-2.5 bg-gradient-to-r from-[#1a3a5c] to-[#1e5fa8] text-white px-7 py-3.5 rounded-xl text-[15px] font-semibold shadow-[0_4px_24px_rgba(30,95,168,0.3)] hover:shadow-[0_8px_32px_rgba(30,95,168,0.4)] hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
+                className="group inline-flex items-center gap-2 bg-gradient-to-r from-[#1a3a5c] to-[#1e5fa8] text-white px-7 py-3.5 rounded-xl text-[15px] font-semibold shadow-[0_4px_24px_rgba(30,95,168,0.3)] hover:shadow-[0_8px_32px_rgba(30,95,168,0.4)] hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
               >
                 Empieza gratis
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-200" />
@@ -145,7 +162,8 @@ export default function SeccionHero() {
               mismo defecto de LP-DT-13. Ver LP-DT-17. */}
           <div aria-hidden className="hidden lg:block">
             <div className="rounded-2xl lg:rounded-r-none border-[0.5px] border-[#e6ebf2] bg-white shadow-sm overflow-hidden">
-              <div className="flex items-center gap-1.5 px-4 py-3 border-b-[0.5px] border-[#e6ebf2]">
+              {/* F1.3·c3 — `gap-2` (8), no gap-1.5: 6 no está en la escala. */}
+              <div className="flex items-center gap-2 px-4 py-3 border-b-[0.5px] border-[#e6ebf2]">
                 <span className="w-2.5 h-2.5 rounded-full bg-slate-200" />
                 <span className="w-2.5 h-2.5 rounded-full bg-slate-200" />
                 <span className="w-2.5 h-2.5 rounded-full bg-slate-200" />

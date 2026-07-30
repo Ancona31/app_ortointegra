@@ -17,11 +17,18 @@ export default function SeccionIA() {
             El cuadro de icono de aquí abajo (w-20) se queda en rounded-2xl
             por la escalera declarada en SeccionInterfaz.tsx — coincide en
             valor con este contenedor por tamaño, no por copiarlo. */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-10 sm:p-14">
+        {/* F1.3·c3 — `p-8 sm:p-12` (32/48). Eran 40/56, y ninguno de los dos
+            está en la escala de §3.3. Mismo par en el bloque navy de
+            SeccionCTA.tsx: son las dos superficies grandes de la landing y
+            comparten padding interior a propósito. */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8 sm:p-12">
           {/* Subtle shine */}
           <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-transparent pointer-events-none" />
 
-          <div className="relative flex flex-col lg:flex-row items-center gap-8 lg:gap-14">
+          {/* F1.3·c3 — `lg:gap-12` (48), no gap-14: 56 no está en la escala.
+              Baja en vez de subir a 64 porque el salto desde el gap-8 (32) de
+              móvil ya es de un peldaño y medio; 32→64 duplicaría. */}
+          <div className="relative flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
             {/* AI logo */}
             <div className="flex-shrink-0">
               {/* `bg-white/10` se queda: es un tinte sobre navy opaco, misma

@@ -95,7 +95,10 @@ export default function SeccionFeatures() {
   return (
     <section className="bg-white pb-16 sm:pb-24 lg:pb-32">
       <div className="mx-auto max-w-6xl px-4 sm:px-8">
-        <div className="max-w-2xl mb-14">
+        {/* F1.3·c3 — `mb-12` (48), no mb-14: 56 no está en la escala. Mismo
+            cambio en los encabezados de Portabilidad y Seguridad, que son el
+            mismo elemento (bloque de titular → retícula). */}
+        <div className="max-w-2xl mb-12">
           <h2 className="text-[clamp(30px,4vw,46px)] font-bold text-slate-900 tracking-[-0.03em] leading-[1.10]">
             Lo que resuelve desde el primer día
           </h2>

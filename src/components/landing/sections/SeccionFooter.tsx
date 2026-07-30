@@ -43,7 +43,8 @@ export default function SeccionFooter() {
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-8">
         {/* Fila 1 — marca + tagline · enlaces */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5">
+          {/* F1.3·c3 — `gap-2` (8). Ver SeccionNav.tsx: mismo lockup. */}
+          <div className="flex items-center gap-2">
             <Image src="/logo-spinus.png" alt="Spinus" width={800} height={777} className="object-contain h-7 w-auto" />
             <span className="text-[13px] text-slate-500">La columna vertebral de tu práctica médica</span>
           </div>

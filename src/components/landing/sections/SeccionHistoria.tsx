@@ -14,7 +14,8 @@ export default function SeccionHistoria() {
   return (
     <section className="bg-[#f5f8fc]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+        {/* F1.3·c3 — `lg:gap-24` (96). Ver SeccionExpediente.tsx. */}
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-center">
           {/* Foto del Dr. Ancona — §7·11 retira el badge de estetoscopio que
               flotaba sobre la esquina: adorno sin contenido sobre un retrato
               real. Pendiente (deuda, no bloqueante): foto en pasillo de
@@ -69,12 +70,21 @@ export default function SeccionHistoria() {
               </p>
             </div>
 
-            {/* F1.3·b2: divisor de firma a 0.5px/#e6ebf2. */}
-            <div className="mt-10 pt-6 border-t-[0.5px] border-[#e6ebf2]">
+            {/* F1.3·b2: divisor de firma a 0.5px/#e6ebf2.
+                F1.3·c3: `mt-8` (32), no mt-10 — 40 no está en la escala.
+                Y el `mt-2` de abajo era `mt-1` (4): se resolvió como RITMO,
+                no como interlínea óptica. El criterio de c3: el `mt-0.5` de
+                2px corrige un desalineamiento geométrico entre un cuadro de
+                icono y la primera línea de texto; aquí no hay nada que
+                corregir — son dos bloques de texto apilados en flujo normal
+                y los 4px se PERCIBEN como espacio. Sube a 8, que es además
+                el valor que ya usaba el par título→descripción de las cards
+                del bento (SeccionFeatures.tsx). */}
+            <div className="mt-8 pt-6 border-t-[0.5px] border-[#e6ebf2]">
               <p className="text-[17px] font-bold text-slate-900 tracking-tight">
                 Dr. Ángel M. Ancona Pérez
               </p>
-              <p className="text-[13px] text-[#1e5fa8] font-semibold mt-1">
+              <p className="text-[13px] text-[#1e5fa8] font-semibold mt-2">
                 Fundador, Traumatólogo y Cirujano de Columna
               </p>
             </div>

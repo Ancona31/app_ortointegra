@@ -21,7 +21,9 @@ export default function SeccionCTA() {
             rounded-3xl: un tercer radio existiendo solo para ellos. 16 es el
             valor de superficie del sistema y aquí no hay motivo para excepción.
             Ver la escala completa en SeccionInterfaz.tsx. */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-[#1a3a5c] to-[#1e5fa8] p-10 sm:p-14 text-center shadow-[0_8px_32px_rgba(30,95,168,0.3)]">
+        {/* F1.3·c3 — `p-8 sm:p-12` (32/48), no 40/56. Ver SeccionIA.tsx: los
+            dos bloques navy comparten padding interior. */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-[#1a3a5c] to-[#1e5fa8] p-8 sm:p-12 text-center shadow-[0_8px_32px_rgba(30,95,168,0.3)]">
           {/* Shine overlay */}
           <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none" />
 

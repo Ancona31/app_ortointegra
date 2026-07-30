@@ -49,7 +49,8 @@ export default function SeccionInterfaz() {
   return (
     <section className="bg-white">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+        {/* F1.3·c3 — `lg:gap-24` (96). Ver SeccionExpediente.tsx. */}
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-center">
           {/* Left: visual */}
           <div className="order-2 lg:order-1">
             <div className="bg-[#f8fafc] rounded-2xl border border-slate-200/60 p-6 shadow-sm space-y-4">
@@ -90,7 +91,7 @@ export default function SeccionInterfaz() {
               <br className="hidden sm:block" />
               <span className="text-slate-400">ya sabes usar Spinus</span>
             </h2>
-            <p className="mt-5 text-[16px] text-slate-500 leading-relaxed max-w-lg">
+            <p className="mt-6 text-[16px] text-slate-500 leading-relaxed max-w-lg">
               Sin configuraciones, sin formatos rígidos, sin capacitación. Cada pantalla está diseñada para que el siguiente paso sea obvio — desde que llega el paciente hasta que se va con su receta.
             </p>
             <div className="mt-8 space-y-4">
@@ -100,6 +101,8 @@ export default function SeccionInterfaz() {
                 { icon: <Calendar className="w-4 h-4 text-violet-500" />, text: 'Arrastra y suelta las citas en la agenda' },
               ].map((item) => (
                 <div key={item.text} className="flex items-start gap-3">
+                  {/* `mt-0.5` = alineación óptica de 2px, no ritmo. Blindado
+                      en c3 — ver SeccionExpediente.tsx. */}
                   <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center flex-shrink-0 mt-0.5">
                     {item.icon}
                   </div>
