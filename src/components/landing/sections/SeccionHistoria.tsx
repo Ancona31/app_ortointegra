@@ -25,7 +25,7 @@ export default function SeccionHistoria() {
               alt="Dr. Ángel M. Ancona Pérez — Fundador de Spinus"
               width={480}
               height={600}
-              className="rounded-3xl shadow-xl object-cover w-full max-w-[420px]"
+              className="rounded-2xl shadow-xl object-cover w-full max-w-[420px]"
             />
           </div>
 

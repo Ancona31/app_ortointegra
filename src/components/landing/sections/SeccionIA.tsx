@@ -12,7 +12,12 @@ export default function SeccionIA() {
   return (
     <section className="bg-[#f5f8fc]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-10 sm:p-14">
+        {/* F1.3·c2 — 16px, no 24. Mismo motivo que el bloque navy de
+            SeccionCTA.tsx: eran las dos únicas superficies a rounded-3xl.
+            El cuadro de icono de aquí abajo (w-20) se queda en rounded-2xl
+            por la escalera declarada en SeccionInterfaz.tsx — coincide en
+            valor con este contenedor por tamaño, no por copiarlo. */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-10 sm:p-14">
           {/* Subtle shine */}
           <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-transparent pointer-events-none" />
 

@@ -115,17 +115,24 @@ export default function SeccionHero() {
               Expedientes, agenda e inteligencia artificial en una sola plataforma. Sin vendedores, sin trámites.
             </p>
 
+            {/* F1.3·c2 — radio de CONTROL = 12px (`rounded-xl`). Los cuatro
+                botones grandes de la landing (estos dos y los dos de
+                SeccionCTA) bajaron aquí de 16 a 12: 16 es el radio de las
+                SUPERFICIES (cards, bloques navy, foto), y con ambos al mismo
+                valor un botón de 48px de alto y una card de 400px leían igual
+                de redondeados. La escala completa está declarada en
+                SeccionInterfaz.tsx. No los devuelvas a rounded-2xl. */}
             <div className="mt-10 flex flex-col sm:flex-row items-start gap-3">
               <Link
                 href="/register"
-                className="group inline-flex items-center gap-2.5 bg-gradient-to-r from-[#1a3a5c] to-[#1e5fa8] text-white px-7 py-3.5 rounded-2xl text-[15px] font-semibold shadow-[0_4px_24px_rgba(30,95,168,0.3)] hover:shadow-[0_8px_32px_rgba(30,95,168,0.4)] hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
+                className="group inline-flex items-center gap-2.5 bg-gradient-to-r from-[#1a3a5c] to-[#1e5fa8] text-white px-7 py-3.5 rounded-xl text-[15px] font-semibold shadow-[0_4px_24px_rgba(30,95,168,0.3)] hover:shadow-[0_8px_32px_rgba(30,95,168,0.4)] hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
               >
                 Empieza gratis
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-200" />
               </Link>
               <Link
                 href="/pricing"
-                className="inline-flex items-center gap-2 text-slate-700 px-7 py-3.5 rounded-2xl text-[15px] font-semibold bg-white border border-slate-200/60 shadow-sm hover:shadow-md hover:border-slate-300 hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
+                className="inline-flex items-center gap-2 text-slate-700 px-7 py-3.5 rounded-xl text-[15px] font-semibold bg-white border border-slate-200/60 shadow-sm hover:shadow-md hover:border-slate-300 hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
               >
                 Ver planes
               </Link>

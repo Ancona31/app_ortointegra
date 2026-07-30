@@ -4,7 +4,47 @@ import { Calendar, Zap, MousePointerClick } from 'lucide-react'
 
 /* Section: Interfaz intuitiva
    Superficie BLANCA (§3.1), explícita. Mismo motivo que en Expediente: el
-   panel `#f8fafc` de la izquierda quedaría invertido sobre franja. */
+   panel `#f8fafc` de la izquierda quedaría invertido sobre franja.
+
+   ═══ ESCALERA DE RADIOS DE LA LANDING (F1.3·c2) ═══
+   Esta nota vive aquí porque el panel de abajo es el único sitio donde los
+   tres peldaños se ven anidados en el mismo bloque: contenedor 16 → fila 12
+   → cuadro del número 8. Vale para las 12 secciones, no solo para esta.
+
+   EL RADIO ESCALA CON EL TAMAÑO DEL ELEMENTO. No hay un valor único:
+
+     8px  (`rounded-lg`)  — cuadros de icono de 32px (w-8): aquí abajo (×2),
+                            SeccionExpediente.tsx
+     12px (`rounded-xl`)  — CONTROLES (los 4 botones grandes del hero y el
+                            CTA, los 3 del nav) y SUB-CARDS internas (las
+                            filas del flujo de aquí abajo, las pestañas y
+                            los renglones del mockup de Expediente).
+                            También el cuadro de icono de 48px (w-12) de
+                            SeccionSeguridad.tsx.
+     16px (`rounded-2xl`) — SUPERFICIES: cards de Features, paneles de
+                            mockup, bloques navy de IA y CTA, la franja de
+                            Portabilidad, el marco del hero, la foto de
+                            SeccionHistoria. También el cuadro de icono de
+                            80px (w-20) de SeccionIA.
+
+   ⚠️ ESTO NO ES UNA VIOLACIÓN PENDIENTE DE UNIFICAR — es la decisión de PM
+   de c2, y el código ya la cumple entero. Un cuadro de 32px con radio 16
+   se lee como una pastilla, no como un cuadro; el mismo 16 sobre una card
+   de 400px apenas se percibe. Que dos elementos de tamaños distintos
+   compartan número sería la incoherencia, no al revés. Si una auditoría
+   futura reporta "tres radios distintos en cuadros de icono", la respuesta
+   es esta nota: NO los unifiques.
+
+   ⚠️ EL 16 DE UN CUADRO DE ICONO Y EL 16 DE UNA CARD COINCIDEN POR TAMAÑO,
+   NO POR PARENTESCO. Si el cuadro de icono de SeccionIA dejara de ser de
+   80px, su radio baja con él — no se queda en 16 "porque el contenedor
+   navy también es 16".
+
+   FUERA DE LA ESCALERA, y a propósito: `rounded-full` (las 5 pastillas de
+   kicker, los 2 chips de IA, los 3 puntos del marco del hero, el avatar y
+   la barra del timeline de Expediente), el `lg:rounded-r-none` del marco
+   del hero (es el sangrado de §3.4·1, no un radio) y el `rounded-b-2xl`
+   del sello de la card DICOM en SeccionFeatures.tsx. Ninguno es deuda. */
 export default function SeccionInterfaz() {
   return (
     <section className="bg-white">

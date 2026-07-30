@@ -21,16 +21,21 @@ export default function SeccionNav() {
             cuenta"), no para el que ya tiene cuenta. "Planes" se oculta en
             móvil; los otros dos no, para que el sólido visible ahí sea el
             correcto. */}
+        {/* F1.3·c2 — los tres son CONTROLES: 12px (`rounded-xl`) los tres.
+            "Crear cuenta" ya estaba bien; los dos links subieron desde
+            rounded-lg (8px), que es el radio de los cuadros de icono de 32px,
+            no el de un control. El hover de fondo hace visible el radio de los
+            links, así que la diferencia se notaba al pasar el cursor. */}
         <div className="flex items-center gap-3">
           <Link
             href="/pricing"
-            className="hidden sm:inline-flex text-[13px] font-medium text-slate-600 hover:text-slate-900 transition-colors duration-200 px-3 py-1.5 rounded-lg hover:bg-slate-100"
+            className="hidden sm:inline-flex text-[13px] font-medium text-slate-600 hover:text-slate-900 transition-colors duration-200 px-3 py-1.5 rounded-xl hover:bg-slate-100"
           >
             Planes
           </Link>
           <Link
             href="/login"
-            className="inline-flex text-[13px] font-medium text-slate-600 hover:text-slate-900 transition-colors duration-200 px-3 py-1.5 rounded-lg hover:bg-slate-100"
+            className="inline-flex text-[13px] font-medium text-slate-600 hover:text-slate-900 transition-colors duration-200 px-3 py-1.5 rounded-xl hover:bg-slate-100"
           >
             Iniciar sesión
           </Link>

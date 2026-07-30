@@ -16,7 +16,12 @@ export default function SeccionCTA() {
         {/* Degradado VERTICAL (to-b). §7·13 prohíbe izq→der aquí: en un bloque
             de ancho completo el eje horizontal delata la caja y parte el
             titular en dos temperaturas. El par de color no cambia. */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-[#1a3a5c] to-[#1e5fa8] p-10 sm:p-14 text-center shadow-[0_8px_32px_rgba(30,95,168,0.3)]">
+        {/* F1.3·c2 — 16px (`rounded-2xl`), no 24. Los dos bloques navy de la
+            landing (este y el de SeccionIA) eran las dos únicas superficies a
+            rounded-3xl: un tercer radio existiendo solo para ellos. 16 es el
+            valor de superficie del sistema y aquí no hay motivo para excepción.
+            Ver la escala completa en SeccionInterfaz.tsx. */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-[#1a3a5c] to-[#1e5fa8] p-10 sm:p-14 text-center shadow-[0_8px_32px_rgba(30,95,168,0.3)]">
           {/* Shine overlay */}
           <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none" />
 
@@ -36,13 +41,13 @@ export default function SeccionCTA() {
           <div className="relative mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
               href="/register"
-              className="inline-flex items-center gap-2 bg-white text-[#1a3a5c] px-7 py-3.5 rounded-2xl text-[15px] font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
+              className="inline-flex items-center gap-2 bg-white text-[#1a3a5c] px-7 py-3.5 rounded-xl text-[15px] font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
             >
               Empieza gratis <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
               href="/pricing"
-              className="inline-flex items-center px-7 py-3.5 rounded-2xl text-[15px] font-semibold text-white border border-white/30 hover:bg-white/10 hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
+              className="inline-flex items-center px-7 py-3.5 rounded-xl text-[15px] font-semibold text-white border border-white/30 hover:bg-white/10 hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
             >
               Ver planes
             </Link>
