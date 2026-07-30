@@ -1668,16 +1668,20 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
   misma de eliminar el ® y la nota del trámite IMPI), `CLAUDE.md:3`,
   `.env.example:2` y el `design/**` congelado.
 
-### LP-DT-16 — Baseline de ESLint: 215 problemas preexistentes
+### LP-DT-16 — Baseline de ESLint: 214 problemas preexistentes
 - **Estado:** 🔴 abierta
 - **Detectada:** F1.2 tanda (a) — eliminaciones (2026-07-30)
-- **Descripción:** `npx eslint .` sale con **exit 1 y 215 problemas
-  (126 errores, 89 warnings)** en un árbol sin cambios. La mayoría son los
+- **Descripción:** `npx eslint .` sale con **exit 1 y 214 problemas
+  (125 errores, 89 warnings)** en un árbol sin cambios. La mayoría son los
   prototipos de `design/**/*.jsx` (`'Icon' is not defined`,
   `react/jsx-no-undef`), que no forman parte del build, más warnings
   repartidos por la app. `npx tsc --noEmit` sí sale limpio (exit 0).
+- **Corrección de la cifra (auditoría de F1.2 tanda (b), 2026-07-30):** el
+  registro original decía 215/126/89. La medición en limpio sobre el árbol
+  de `4b99bf7` da **214/125/89** — un error menos, ya resuelto en la propia
+  tanda (a). Los warnings coinciden exacto.
 - **Criterio vigente:** la validación de las fases es **no-regresión contra
-  215/126/89**, no exit 0. Cualquier fase que suba ese número introdujo
+  214/125/89**, no exit 0. Cualquier fase que suba ese número introdujo
   deuda nueva y debe corregirla antes de cerrar.
 - **Condición de cierre:** excluir `design/` de la configuración de ESLint
   (es handoff congelado, no código de producción) y luego atacar el

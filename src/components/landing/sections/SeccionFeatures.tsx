@@ -1,73 +1,87 @@
 'use client'
 
-import { Calendar, FileText, Shield, Brain, BarChart3, Pill, MonitorCheck } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { Calendar, FileText, Brain, Pill, MonitorCheck } from 'lucide-react'
 
-const features = [
+interface Feature {
+  icon: ReactNode
+  title: string
+  desc: string
+  /** Borde de la card (§3.1: 0.5px). #1e5fa8 marca la card DICOM. */
+  border: string
+  /** Columnas que ocupa en la retícula de 3. Ausente = 1. */
+  span?: 2
+  /** Reserva la zona de medio a sangre. F2.b inserta ahí el video DICOM
+   *  con scrub por scroll + contador n/N (§5.3). Vacía por ahora. */
+  media?: boolean
+}
+
+/* El orden del array ES el orden de la retícula (§3.4: bento asimétrico):
+   fila 1 → DICOM (2 col) · Expedientes
+   fila 2 → Recetas · Documentación con IA · Agenda
+   DICOM arriba-izquierda no es estético: la cascada diagonal de F2.a nace
+   de esa card (§5.3). No reordenar sin releer esa ficha. */
+const features: Feature[] = [
   {
-    icon: <FileText className="w-6 h-6 text-[#1e5fa8]" />,
+    icon: <MonitorCheck className="w-6 h-6 text-[#1e5fa8]" />,
+    title: 'Visor DICOM',
+    desc: 'Abre el estudio completo desde el disco, sin instalar nada y sin costo extra. Guarda en el expediente los cortes que importan — hasta 100 por paciente.',
+    border: 'border-[#1e5fa8]',
+    span: 2,
+    media: true,
+  },
+  {
+    icon: <FileText className="w-6 h-6 text-[#8a99ac]" />,
     title: 'Expedientes electrónicos',
     desc: 'Toda la historia clínica de tu paciente a un clic. Sin papel, sin búsquedas.',
-    bg: 'bg-blue-50',
+    border: 'border-[#e6ebf2]',
   },
   {
-    icon: <Calendar className="w-6 h-6 text-violet-600" />,
-    title: 'Agenda inteligente',
-    desc: 'Arrastra, suelta y listo. Tu agenda sincronizada con Google Calendar en tiempo real.',
-    bg: 'bg-violet-50',
-  },
-  {
-    icon: <Brain className="w-6 h-6 text-emerald-600" />,
-    title: 'IA clínica',
-    desc: 'Tus notas clínicas listas en segundos, no en minutos. La IA analiza labs por ti.',
-    bg: 'bg-emerald-50',
-  },
-  {
-    icon: <Shield className="w-6 h-6 text-amber-600" />,
-    title: 'Seguridad de grado médico',
-    desc: 'Cifrado AES-256, auditoría completa y cumplimiento con NOM-004 y LFPDPPP.',
-    bg: 'bg-amber-50',
-  },
-  {
-    icon: <BarChart3 className="w-6 h-6 text-teal-600" />,
-    title: 'Dashboard en tiempo real',
-    desc: 'Visualiza tu práctica de un vistazo. Pacientes, citas y estadísticas al instante.',
-    bg: 'bg-teal-50',
-  },
-  {
-    icon: <Pill className="w-6 h-6 text-rose-600" />,
+    icon: <Pill className="w-6 h-6 text-[#8a99ac]" />,
     title: 'Recetas con QR',
-    desc: 'Recetas digitales verificables. Tu paciente las recibe directo en su correo.',
-    bg: 'bg-rose-50',
+    desc: 'Membretadas, con QR verificable. Envíalas por correo o entrégalas impresas.',
+    border: 'border-[#e6ebf2]',
   },
   {
-    icon: <MonitorCheck className="w-6 h-6 text-sky-600" />,
-    title: 'Visor DICOM',
-    desc: 'Tomografías y resonancias en tu navegador. Sin instalar nada.',
-    bg: 'bg-sky-50',
+    icon: <Brain className="w-6 h-6 text-[#8a99ac]" />,
+    title: 'Documentación con IA',
+    desc: 'Describe los hallazgos y la IA estructura la nota. Tú validas y firmas.',
+    border: 'border-[#e6ebf2]',
+  },
+  {
+    icon: <Calendar className="w-6 h-6 text-[#8a99ac]" />,
+    title: 'Agenda',
+    desc: 'Arrastra, suelta y listo. Sincronizada con Google Calendar.',
+    border: 'border-[#e6ebf2]',
   },
 ]
 
-/* Features */
+/* Features — grid bento
+   Sin padding-top: los 96px de aire de §3.3 en la costura con el hero los
+   aporta SeccionHero.tsx:20-22. No añadir pt aquí. */
 export default function SeccionFeatures() {
   return (
     <section className="pb-20 sm:pb-28">
-      <div className="text-center mb-14 px-4 sm:px-8">
-        <h2 className="text-[28px] sm:text-[34px] font-bold text-slate-900 tracking-tight">Todo lo que necesitas</h2>
-        <p className="mt-3 text-[15px] text-slate-500">Cada herramienta resuelve un problema real de tu día a día.</p>
-      </div>
-
       <div className="mx-auto max-w-6xl px-4 sm:px-8">
-        <div className="flex flex-wrap justify-center gap-4">
+        <div className="max-w-2xl mb-14">
+          <h2 className="text-[clamp(30px,4vw,46px)] font-bold text-slate-900 tracking-[-0.03em] leading-[1.10]">
+            Lo que resuelve desde el primer día
+          </h2>
+          <p className="mt-3 text-[15px] text-slate-500">Cada herramienta resuelve un problema real de tu día a día.</p>
+        </div>
+
+        <div className="grid sm:grid-cols-3 gap-4">
           {features.map((f) => (
             <div
               key={f.title}
-              className="w-[280px] sm:w-[320px] bg-white rounded-2xl border border-slate-200/60 p-6 shadow-sm hover:shadow-[0_4px_20px_rgba(30,95,168,0.10)] hover:border-[#1e5fa8]/15 hover:-translate-y-1 active:scale-[0.98] transition-all duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] cursor-default"
+              className={`flex flex-col bg-white rounded-2xl border-[0.5px] ${f.border} ${f.span === 2 ? 'sm:col-span-2' : ''} shadow-sm hover:shadow-[0_4px_20px_rgba(30,95,168,0.10)] hover:-translate-y-1 active:scale-[0.98] transition-all duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] cursor-default`}
             >
-              <div className={`w-11 h-11 rounded-xl ${f.bg} flex items-center justify-center mb-4`}>
-                {f.icon}
+              <div className="p-6">
+                <div className="mb-4">{f.icon}</div>
+                <h3 className="text-[15px] font-semibold text-slate-900">{f.title}</h3>
+                <p className="mt-2 text-[13px] text-slate-500 leading-relaxed">{f.desc}</p>
               </div>
-              <h3 className="text-[15px] font-semibold text-slate-900">{f.title}</h3>
-              <p className="mt-2 text-[13px] text-slate-500 leading-relaxed">{f.desc}</p>
+              {f.media ? <div className="mt-auto overflow-hidden rounded-b-2xl" /> : null}
             </div>
           ))}
         </div>
