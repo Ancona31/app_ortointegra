@@ -238,9 +238,6 @@ export default function LoginPage() {
                   Regístrate gratis
                 </Link>
               </p>
-              <a href="/offline-mode" className="block text-xs text-amber-500 hover:text-amber-600 transition-colors mt-3">
-                ¿Sin conexión? Entrar al modo de emergencia →
-              </a>
             </div>
           </form>
         </div>

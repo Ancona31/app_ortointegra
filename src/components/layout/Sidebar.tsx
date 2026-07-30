@@ -7,7 +7,7 @@ import {
   ClipboardList, BedDouble, PenLine, ShieldCheck, Receipt,
   CalendarDays, BarChart2, Users, CreditCard, UserCircle,
   HelpCircle, ChevronRight, Menu, X, LogOut, Moon, Sun,
-  TrendingUp, UserPlus, WifiOff,
+  TrendingUp, UserPlus,
   Calculator,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
@@ -102,7 +102,6 @@ function navDoctor(isAdmin: boolean): NavSection[] {
     { kind: 'divider' },
     { kind: 'leaf', href: '/perfil',  label: 'Mi perfil', icon: UserCircle },
     { kind: 'leaf', href: '/ayuda',   label: 'Ayuda',     icon: HelpCircle },
-    { kind: 'leaf', href: '/offline-setup', label: 'Modo Offline', icon: WifiOff },
   ]
 }
 
@@ -148,13 +147,6 @@ export default function Sidebar() {
   const { dark, toggle } = useTheme()
   const { signOut } = useAuth()
   const { state: subState, openBloqueoModal } = useSubscriptionGate()
-
-  // Badge offline: verde si ya configuró, gris si no
-  const [bunkerReady, setBunkerReady] = useState(false)
-  useEffect(() => {
-    try { setBunkerReady(!!localStorage.getItem('spinus_session_meta') && !!localStorage.getItem('spinus_doctor_profile')) }
-    catch { /* silent */ }
-  }, [])
 
   const isAdmin = canManageClinica(profile)
 
@@ -220,13 +212,12 @@ export default function Sidebar() {
       {/* Sidebar */}
       <aside
         style={{
-          background: 'linear-gradient(180deg, var(--cp) 0%, color-mix(in srgb, var(--cp) 50%, var(--cs)) 30%, var(--cs) 60%, color-mix(in srgb, var(--cs) 40%, white) 100%)',
-          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.25)',
+          background: 'hsl(from var(--cp, #1a3a5c) h s 20%)',
         }}
         className={`
-          fixed top-4 left-4 bottom-4 w-60 text-white z-40 flex flex-col rounded-3xl
+          fixed inset-y-0 left-0 w-64 text-white z-40 flex flex-col
           transition-transform duration-300
-          ${mobileOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1rem)] lg:translate-x-0'}
+          ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}
       >
         {/* Logo + nombre */}
@@ -287,10 +278,6 @@ export default function Sidebar() {
                 >
                   <section.icon size={16} className={active ? 'opacity-100' : 'opacity-70'} />
                   <span className="flex-1">{section.label}</span>
-                  {section.href === '/offline-setup' && (
-                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${bunkerReady ? 'bg-emerald-400' : 'bg-white/25'}`}
-                      title={bunkerReady ? 'Búnker activo' : 'Requiere configuración'} />
-                  )}
                 </Link>
               )
             }
@@ -366,7 +353,7 @@ hasActive && !isOpen
             Cerrar sesión
           </button>
           <Link href="/privacidad" target="_blank"
-            className="block text-center text-[10px] text-white/20 hover:text-white/40 transition-colors pt-2">
+            className="block text-center text-[10px] text-white/40 hover:text-white/70 transition-colors pt-2">
             Aviso de Privacidad
           </Link>
         </div>

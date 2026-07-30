@@ -6,7 +6,7 @@ import { useSubscriptionGate } from './SubscriptionGateProvider'
 
 type Props = {
   /**
-   * Si true, en desktop (lg+) el banner se desplaza `lg:ml-60` para no
+   * Si true, en desktop (lg+) el banner se desplaza `lg:ml-64` para no
    * superponerse al sidebar fixed de (app)/layout.tsx (ancho 240px,
    * mismo offset que usa <main>). En launcher (sin sidebar) NO se pasa.
    */
@@ -36,7 +36,7 @@ export default function SuscripcionBanner({ desktopSidebarOffset = false }: Prop
   const { state } = useSubscriptionGate()
   if (!state.isBlocked) return null
 
-  const offsetClass = desktopSidebarOffset ? ' lg:ml-60' : ''
+  const offsetClass = desktopSidebarOffset ? ' lg:ml-64' : ''
 
   return (
     <div className={`sticky top-0 z-40 border-b border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30${offsetClass}`}>

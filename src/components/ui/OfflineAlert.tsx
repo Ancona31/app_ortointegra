@@ -9,8 +9,7 @@ import { WifiOff, Loader2 } from 'lucide-react'
  * Flujo:
  *   1. navigator.onLine pasa a false → debounce 4s
  *   2. Si no reconecta → modal full-screen con blur, NO dismissable
- *   3. Dos opciones: esperar (la red vuelve y el modal se quita solo) o ir al offline-mode
- *   4. Si reconecta → modal desaparece automáticamente
+ *   3. Si reconecta → modal desaparece automáticamente
  *
  * AISLADO: no importa AuthContext, Supabase ni hooks complejos.
  */
@@ -53,20 +52,12 @@ export default function OfflineAlert() {
           </div>
           <h2 className="text-lg font-bold text-slate-800">Sin conexión</h2>
           <p className="text-sm text-slate-500 mt-3 leading-relaxed">
-            No se detecta conexión o es de mala calidad. Espera a que se estabilice la red o cambia a modo offline.
+            No se detecta conexión o es de mala calidad. Espera a que se estabilice la red.
           </p>
           <div className="flex items-center justify-center gap-2 mt-4 text-xs text-slate-400">
             <Loader2 size={12} className="animate-spin" />
             <span>Esperando reconexión...</span>
           </div>
-        </div>
-        <div className="px-6 pb-6 pt-2">
-          <a
-            href="/offline-mode"
-            className="block w-full py-3 bg-amber-600 text-white rounded-xl font-semibold text-sm text-center hover:bg-amber-700 transition-colors"
-          >
-            Entrar a Modo Offline
-          </a>
         </div>
       </div>
     </div>

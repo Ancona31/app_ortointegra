@@ -1488,6 +1488,49 @@ verificadas contra el árbol posterior a esa limpieza.
 
 ---
 
+## Modo offline — Desmantelamiento
+
+### OFF-DT-1 — Matar el modo offline definitivamente
+- **Estado:** 🟡 en progreso — paso 1 aplicado, resto pendiente.
+- **Detectada:** Sesión de desenlace del modo offline (2026-07-29).
+- **Archivos afectados (ya modificados en el paso 1):**
+  - src/components/layout/Sidebar.tsx
+  - src/components/SessionGuard.tsx
+  - src/components/ui/OfflineAlert.tsx
+  - src/app/login/page.tsx
+- **Contexto:** el modo offline no es funcional sin conexión real: estando en
+  línea se puede entrar y navegar, pero si de verdad no hay red la aplicación
+  no opera. Esto estaba generando incongruencias con los beta testers, que
+  llegaban al búnker justo cuando no servía.
+- **Lo que ya se hizo (paso 1 — solo desenlazar, sin borrar lógica):**
+  - Se eliminó la entrada "Modo Offline" del menú de `navDoctor` en
+    `src/components/layout/Sidebar.tsx`, junto con su estado `bunkerReady`, el
+    badge del render y el import de `WifiOff`.
+  - `SessionGuard.tsx` dejó de redirigir a `/offline-mode` cuando no hay red;
+    `UNAUTHENTICATED` ahora va siempre a `/login`.
+  - `OfflineAlert.tsx` conserva el aviso de pérdida de red, pero se le quitó el
+    botón "Entrar a Modo Offline" y se corrigió el copy que lo mencionaba.
+  - Se quitó el link "¿Sin conexión? Entrar al modo de emergencia" de
+    `src/app/login/page.tsx`.
+  - **Resultado:** ya no queda ningún punto de entrada visible al usuario hacia
+    el modo offline.
+- **Lo que sigue vivo y pendiente de matar:**
+  - Las páginas `/offline-mode` y `/offline-setup` siguen existiendo y son
+    accesibles por URL directa.
+  - Los bypass de auth de esas dos rutas en `src/middleware.ts:59-60`.
+  - Todo el subsistema: service worker, cache, `secureStorage`, el fallback
+    offline de `useClinica`, la lógica de detección de red, y las claves de
+    localStorage `spinus_session_meta` y `spinus_doctor_profile`.
+  - `OfflineAlert` quedó sin ninguna acción de usuario: es un modal full-screen
+    no dismissable cuyo único escape es que `navigator.onLine` vuelva a `true`,
+    o recargar la página. Si la detección da un falso positivo, el usuario
+    queda atrapado hasta recargar. Evaluar al matar el modo offline (opción
+    considerada y descartada por ahora: un botón "Reintentar" que solo re-corra
+    la detección).
+- **Decisión pendiente:** definir si el modo offline se elimina por completo o
+  se reimplementa funcionando de verdad. El paso 1 no compromete ninguna de las
+  dos vías.
+
 ## Landing pública — auditoría de rediseño (julio 2026)
 
 Deuda detectada durante la auditoría y el plan de rediseño de la landing

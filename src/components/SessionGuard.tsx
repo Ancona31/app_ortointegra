@@ -6,9 +6,7 @@
  * Espera a que AuthProvider termine de inicializar antes de actuar.
  * Si initialized es false → no hace nada (el loading gate del Provider
  * ya muestra un spinner).
- * Si initialized es true y status === 'UNAUTHENTICATED':
- *   - Online → redirect a /login
- *   - Offline → redirect a /offline-mode (evita loop login↔inicio)
+ * Si initialized es true y status === 'UNAUTHENTICATED' → redirect a /login.
  */
 
 import { useEffect } from 'react'
@@ -22,11 +20,7 @@ export default function SessionGuard() {
   useEffect(() => {
     if (!initialized) return
     if (status === 'UNAUTHENTICATED') {
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        window.location.href = '/offline-mode'
-      } else {
-        router.push('/login')
-      }
+      router.push('/login')
     }
   }, [status, initialized, router])
 
