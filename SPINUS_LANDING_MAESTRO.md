@@ -233,6 +233,28 @@ Teaser 1 y tras el Teaser 2 ("Empieza gratis →" en línea, sin bloque).
 > corte franja→blanco por arriba y deja blanco→blanco por abajo, caso que ya
 > existe resuelto entre Problema y Features y que aquí llega con costura de
 > 128/192/256 — el doble de los 128 que allí bastaron.
+>
+> ⚠️ **LA FILA 12b PESA MUCHO MENOS QUE SUS VECINAS, y eso NO es un problema
+> de orden.** Anotado durante la resecuenciación de superficies (2026-07-31),
+> cuando se sospechó que el FAQ había quedado a media página. Se verificó
+> contra el DOM servido y **el orden es el correcto**: el FAQ es la 12ª de 14
+> y debajo solo quedan el CTA y el footer, que es exactamente donde §7·12b lo
+> quiere. Lo que sí es cierto es que **se lee como sección menor**, y la causa
+> es su propio esqueleto, aprobado:
+>
+> - es la **única sección en columna estrecha** — `max-w-2xl` (672px) dentro
+>   del `max-w-6xl` (1152px) común, o sea la mitad del ancho de contenido;
+> - arranca con **nueve filas colapsadas** de poca altura, así que en reposo
+>   ocupa una fracción de lo que ocupan Control, Seguridad o el bento;
+> - no lleva visual propio: ni captura, ni retícula, ni figura.
+>
+> Las tres cosas son deliberadas y **ninguna se toca ahora**: la columna
+> estrecha es lo que impide que 12b repita esqueleto, y el acordeón colapsado
+> es lo que la hace escaneable. Pero si en **F6** el último tercio de la
+> página se siente flojo o desequilibrado, la causa está AQUÍ y no en la
+> secuencia — no vuelvas a mover el FAQ buscándola. Las palancas serían dar
+> peso al bloque (ancho, encabezado con más aire, un ítem abierto por
+> defecto), no reordenar.
 
 ---
 

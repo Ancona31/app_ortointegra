@@ -101,13 +101,42 @@ const tarjetas: Tarjeta[] = [
    porque §4.4 prohíbe envolver los hijos en wrappers extra (rompen el span
    del grid) y obliga a variantes padre→hijo sobre este map.
 
-   Superficie BLANCA (§3.1), explícita. La fija el CTA: su lavado
-   color-mix resuelve a ≈#f6f9fc, a un punto por canal de la franja #f5f8fc.
-   Una Seguridad en franja se fundiría con el bloque siguiente en una sola
-   banda. Por eso rompe la alternancia respecto a Historia y lo hace bien. */
+   ═══ SUPERFICIE: FRANJA #f5f8fc, y el motivo por el que ANTES era blanca
+       ya no existe ═══
+   Hasta la tanda de resecuenciación esta sección estaba clavada en blanco y
+   el comentario que lo justificaba decía, con razón en su momento: «la fija
+   el CTA — su lavado color-mix resuelve a ≈#f6f9fc, a un punto por canal de
+   la franja #f5f8fc, así que una Seguridad en franja se fundiría con el
+   bloque siguiente en una sola banda».
+   Ese razonamiento CADUCÓ cuando se insertó `SeccionFAQ` entre Seguridad y
+   el CTA. Seguridad ya no es vecina del cierre: entre las dos hay una
+   sección blanca entera. El único argumento que la ataba al blanco era la
+   adyacencia con el lavado, y la adyacencia se rompió. Nadie volvió a
+   mirarlo, y el efecto colateral fue una tirada de TRES blancos seguidos
+   —Control, Seguridad, FAQ— que dejaba el último tercio de la página sin
+   corte cromático.
+   Con la franja aquí, la cola queda `Historia (franja) → Control (blanco) →
+   Seguridad (franja) → FAQ (blanco) → CTA (oscuro)`. Alternancia limpia y
+   ninguna franja pegada a un lavado.
+
+   ⚠️ QUÉ LA VOLVERÍA A BLOQUEAR — dos condiciones, cualquiera de las dos:
+     1. Que el FAQ se mueva de sitio o desaparezca y Seguridad vuelva a ser
+        vecina directa del CTA. Ahí regresa intacto el argumento de arriba:
+        franja + lavado = una sola banda de ~1200px. Si tocas el orden en
+        `(landing)/page.tsx`, esta superficie se revisa CON él.
+     2. Que Control (`SeccionControl.tsx`) pase a franja. Hoy no puede
+        —Historia está en franja y es la única sección sin contenedor
+        interno que la defienda—, pero si algún día Historia se mueve y
+        Control gana la franja, esta sección tendría franja arriba y tendría
+        que volver a blanco.
+   El `py-16 sm:py-24 lg:py-32` de abajo es PROPIO, no donado: cambiar el
+   `bg` aquí no tiñe padding ajeno, al contrario de lo que pasa en la
+   costura Problema↔Features (LP-DT-19).
+   Las 3 tarjetas son `bg-white`, así que pasan de blanco-sobre-blanco a
+   blanco-sobre-franja: el contraste interno GANA con este cambio. */
 export default function SeccionSeguridad() {
   return (
-    <section className="bg-white">
+    <section className="bg-[#f5f8fc]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
         {/* F1.3·c3 — `mb-12` (48). Ver SeccionFeatures.tsx. */}
         <div className="text-center mb-12">

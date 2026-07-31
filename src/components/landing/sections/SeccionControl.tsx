@@ -31,6 +31,12 @@ import { DIST, DUR, EASE, SPRING, STAGGER } from '@/components/landing/motion/to
    El `#f5f8fc` entra igual por dentro —la franja del bloque 1 y el zócalo del
    bloque 2 lo llevan— así que la sección tiene contraste interno sin pelearse
    con su vecina. No vuelvas a intentarlo sin mover Historia primero.
+   ACTUALIZACIÓN (resecuenciación de superficies, 2026-07-31): `SeccionSeguridad`
+   pasó de blanco a franja, así que esta sección ya no cierra una tirada de
+   tres blancos sino que es el ÚNICO blanco entre dos franjas (Historia arriba,
+   Seguridad abajo). El blanco de aquí dejó de ser el mal menor y pasó a ser el
+   que sostiene la alternancia de toda la cola de la página: si lo cambias,
+   rompes dos costuras a la vez, no una.
 
    ⚠️ EL KICKER NO DICE "TU PRÁCTICA, TUYA". Dice "CONTROL Y AUTONOMÍA".
    El anterior colisionaba con el titular de Seguridad ("Tu práctica,
@@ -230,8 +236,33 @@ export default function SeccionControl() {
               Regla 8 del spec: dos columnas desde 1024 con la visual a 520px;
               entre 768 y 1024, dos columnas con la visual a 420px; por debajo
               de 768, una columna. `items-end` alinea los dos por abajo, que es
-              lo que hace que la figura se apoye en la línea del texto. */}
-          <div className="grid gap-6 md:grid-cols-[420px_1fr] md:items-end md:gap-12 lg:grid-cols-[520px_1fr]">
+              lo que hace que la figura se apoye en la línea del texto.
+
+              ═══ `relative` — EL ZÓCALO SE ANCLA AQUÍ DESDE md, NO EN LA
+                  COLUMNA VISUAL. Es el arreglo del desbalance medido ═══
+              El bloque 1 es una card: el `#f5f8fc` lo pinta su propio
+              contenedor, a ancho completo. El bloque 2 no tenía card — su
+              tinte era solo el zócalo, que vivía DENTRO de la columna visual.
+              Resultado medido a 1440 (contenedor útil 1088 = max-w-6xl 1152 −
+              px-8 64): el bloque 1 teñía 1088px y el bloque 2 teñía 520, o sea
+              el 48%, dejando 568px de blanco desnudo a la derecha. Y empeoraba
+              al ensanchar: 420/704 = 60% a 768, 520/960 = 54% a 1024, 48% a
+              1152+. Las dos hipótesis obvias eran falsas y conviene descartar-
+              las por escrito: el grid SÍ llenaba su fila (520 + 48 + 520 =
+              1088, exacto), y el zócalo NO había perdido ancho con el cambio
+              de asset (es `inset-x-0`, su ancho no depende de la imagen). La
+              causa era de OTRO tipo: los dos bloques no teñían con el mismo
+              elemento.
+              La corrección es este `relative` más el `md:static` de la columna
+              visual: desde md el contenedor de bloque pasa a ser el ancestro
+              posicionado, así que el zócalo `inset-x-0` cubre los 1088px
+              enteros y los dos bloques quedan como dos cards de ancho
+              idéntico — que es lo que §3.4·10b describe y no cumplía.
+              EN MÓVIL NO CAMBIA NADA: por debajo de md la columna visual sigue
+              siendo `relative` y el zócalo sigue acotado a ella, que es lo
+              correcto porque ahí el bloque es una sola columna y un zócalo de
+              bloque se metería por detrás del texto apilado. */}
+          <div className="relative grid gap-6 md:grid-cols-[420px_1fr] md:items-end md:gap-12 lg:grid-cols-[520px_1fr]">
             {/* Columna visual. El `mb-7` de móvil NO es ritmo y por eso escapa
                 a §3.3: la tarjeta sobresale 24px por debajo del contenedor
                 (`-bottom-6`), y un `gap` no puede compensar un desbordamiento
@@ -240,10 +271,22 @@ export default function SeccionControl() {
                 `overflow-hidden` aquí: lo recortaría.
 
                 ═══ COMPOSICIÓN MÓVIL (<768) — POR QUÉ NO ES COMO ESCRITORIO ═══
-                Desde md la columna tiene ancho FIJO (420/520), así que el
-                zócalo es una caja acotada y basta con anclar el marco a la
-                izquierda (`md:left-6`) y la tarjeta a la derecha
-                (`md:right-0`): el solape sale solo y vale 32/20.
+                Desde md esta columna es `static` a propósito (ver el comentario
+                del contenedor de bloque): deja de posicionar nada y las tres
+                capas absolutas —zócalo, marco y tarjeta— pasan a resolverse
+                todas contra el MISMO ancestro, el contenedor del bloque. Se
+                mueven juntas, y por eso la geometría no se descuadra: la
+                columna 1 arranca en x=0 del bloque, así que `md:left-6` sigue
+                cayendo en x=24 exactamente igual que antes.
+                Lo único que hubo que reescribir es la tarjeta: estaba anclada
+                con `md:right-0`, que contra el bloque entero la habría lanzado
+                al borde derecho de los 1088px. Ahora va con `left` explícito
+                —252 en md, 304 en lg— que son los mismos píxeles que producía
+                el `right-0` contra la columna (420 − 168 y 520 − 216). Ver su
+                propio comentario.
+                Bajo md la columna sigue siendo `relative` y la caja es ella,
+                no el bloque: todo lo que sigue en este comentario describe ESE
+                caso y no ha cambiado.
                 En móvil la columna es FLUIDA y el zócalo se estira a todo el
                 ancho disponible. Con las mismas anclas, marco y tarjeta se
                 separaban al crecer el viewport —a 711 de ancho quedaban a
@@ -276,13 +319,27 @@ export default function SeccionControl() {
                 centrado hay aire simétrico (15px a cada lado a 390) sin que
                 nada se salga. Si alguien vuelve a intentar centrar la figura
                 sola, esto es lo que se rompe. */}
-            <div className="relative mb-7 h-[284px] md:mb-0 md:h-[358px] lg:h-[410px]">
+            <div className="relative mb-7 h-[284px] md:static md:mb-0 md:h-[358px] lg:h-[410px]">
               {/* §5.10b · capa 2 — zócalo + foto entran JUNTOS como una pieza.
                   `origin-bottom` porque la regla 4 del spec exige que la
                   figura quede anclada al borde inferior del zócalo: escalando
                   desde el centro, el anclaje se rompería durante la entrada.
                   Escala final 1 → bajo reduced-motion `transform: none` da el
-                  estado correcto sin trabajo extra. */}
+                  estado correcto sin trabajo extra.
+
+                  ⚠️ ESTE `inset-0` YA NO MIDE LO MISMO EN LOS DOS REGÍMENES, y
+                  es intencional. Bajo md resuelve contra la columna visual
+                  (~358 de ancho a 390); desde md resuelve contra el contenedor
+                  del bloque, o sea los 1088px enteros a 1440. La consecuencia
+                  para el MOVIMIENTO: en escritorio el `scale: 0.72` ahora
+                  encoge una caja de 1088 y no una de 520, así que lo que entra
+                  es LA CARD COMPLETA creciendo desde su borde inferior, no la
+                  figura sola. El estado final es idéntico al pixel; lo que
+                  cambia es el recorrido. Se aceptó a cambio de conservar el
+                  wrapper único: separar zócalo y foto en dos capas los
+                  desacoplaría durante la entrada —cada uno escalando desde su
+                  propio origen— y es justo lo que este comentario lleva
+                  prohibiendo desde el principio. */}
               <motion.div
                 data-lp-reveal=""
                 className="absolute inset-0 origin-bottom"
@@ -292,7 +349,14 @@ export default function SeccionControl() {
                 transition={transicion ?? SPRING.soft}
               >
                 {/* Zócalo. Arranca 24px más abajo (20 en móvil) para que la
-                    figura sobresalga por arriba. */}
+                    figura sobresalga por arriba.
+                    `inset-x-0` NO SE TOCA y es lo que hace todo el trabajo: el
+                    zócalo mide siempre el ancho de su ancestro posicionado, y
+                    lo que cambió es el ancestro, no esta clase. Bajo md sigue
+                    siendo la columna visual; desde md es el bloque, y el
+                    zócalo cubre los 1088px — mismo ancho, mismo `rounded-2xl`
+                    y mismo borde 0.5px que la card del bloque 1. Ahí es donde
+                    los dos bloques se igualan. */}
                 <div className="absolute inset-x-0 bottom-0 top-5 rounded-2xl border-[0.5px] border-[#e6ebf2] bg-[#f5f8fc] md:top-6" />
                 {/* Marco de la foto, anclado al borde inferior del zócalo.
                     ⚠️ EL RECORTE ES GEOMETRÍA CALCULADA, NO UN ENCUADRE A OJO.
@@ -352,6 +416,21 @@ export default function SeccionControl() {
                   A 1440 el marco acaba en x=324 y la tarjeta abre en x=304:
                   20px de solape, dentro del máximo de 20–36 que fija el spec.
 
+                  ⚠️ EL `md:right-0` MURIÓ AL ENSANCHAR EL ZÓCALO — no lo
+                  repongas. Con la columna visual en `md:static`, esta tarjeta
+                  se resuelve contra el BLOQUE (1088px a 1440), no contra la
+                  columna, y un `right-0` la habría mandado al borde derecho
+                  del bloque, fuera de la figura y encima del texto. Va con
+                  `left` explícito, y los dos valores son ARITMÉTICA, no gusto:
+                  son el mismo píxel que producía el `right-0` contra la
+                  columna, porque la columna 1 arranca en x=0 del bloque.
+                    md  columna 420 − tarjeta 168 = 252  → marco 24–284, solape 32
+                    lg  columna 520 − tarjeta 216 = 304  → marco 24–324, solape 20
+                  Es decir: solape idéntico al de antes en los dos
+                  breakpoints. Si tocas el ancho de la tarjeta o el de la
+                  columna del grid, RECALCULA los dos `left` con esa resta — ya
+                  no hay un `right-0` que lo haga solo.
+
                   ⚠️ EL SOLAPE MÓVIL (52px) SE SALE DE ESE 20–36 A PROPÓSITO.
                   El rango del spec se escribió para escritorio; en móvil el
                   ancho de 360 obliga a 52 (ver el comentario de la columna
@@ -368,7 +447,7 @@ export default function SeccionControl() {
               <motion.div
                 data-lp-reveal=""
                 aria-hidden
-                className="absolute -bottom-6 left-[calc(50%_-_14px)] w-[178px] overflow-hidden rounded-xl border-[0.5px] border-[#e6ebf2] bg-white md:bottom-7 md:left-auto md:right-0 md:w-[168px] lg:w-[216px]"
+                className="absolute -bottom-6 left-[calc(50%_-_14px)] w-[178px] overflow-hidden rounded-xl border-[0.5px] border-[#e6ebf2] bg-white md:bottom-7 md:left-[252px] md:w-[168px] lg:left-[304px] lg:w-[216px]"
                 initial={{ opacity: 0, x: 24 }}
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true, amount: 0.25 }}
@@ -416,8 +495,25 @@ export default function SeccionControl() {
               </motion.div>
             </div>
 
-            {/* Columna de texto */}
-            <div className="md:pb-6">
+            {/* Columna de texto.
+                ⚠️ EL PADDING ES PROPIO Y SOLO EXISTE DESDE md, porque solo
+                desde md este texto se apoya SOBRE el zócalo. Antes flotaba en
+                el blanco de la sección y le bastaba un `pb-6` de ritmo; ahora
+                su borde derecho es el borde de la card y necesita el mismo
+                colchón que el bloque 1 le da a su contenido: 32 (`p-8`), en
+                escala de §3.3. `pb-6` → `pb-8` por lo mismo — alinea el pie
+                del texto con el aire interior del bloque de arriba.
+                CONSECUENCIA ACEPTADA (PM, 2026-07-31): con `pr-8` el ancho
+                útil del párrafo baja de 520 a 488 y reflowea de 4 a 5 líneas a
+                1440. Es el precio de que el bloque tenga card; se aceptó
+                explícitamente. No lo "arregles" subiendo el `max-w-[520px]`:
+                ese tope es de medida de línea, no de caja.
+                Bajo md no aplica ninguno de los dos y el móvil queda intacto.
+                El hueco vertical sobre el texto (`md:items-end` deja ~176px a
+                1440) NO se compensa: manda la regla 4 del spec —figura anclada
+                al borde inferior— y con el tinte a ancho completo ese espacio
+                es aire dentro de una card, no un hueco. */}
+            <div className="md:pb-8 md:pr-8">
               <h3 className="text-[24px] font-semibold text-[#14345c] tracking-[-0.015em] leading-[1.30]">
                 Tu asistente m&eacute;dico, en la misma cuenta
               </h3>
