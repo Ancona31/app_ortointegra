@@ -79,6 +79,43 @@ export const SPRING = {
 } as const
 
 /**
+ * Ritmo del acordeón-conversación de la FAQ (§5.14). Valores en SEGUNDOS.
+ *
+ * ⚠️ SON TOKENS NUEVOS, no venían de §4.2. Se declaran aquí porque la regla
+ * permanente 1 de CLAUDE.md prohíbe números sueltos en los componentes, no
+ * porque el sistema pidiera una escala nueva. Solo los consume `SeccionFAQ`.
+ *
+ * ⚠️ LA CALIBRACIÓN DE LA PRIMERA FICHA ESTABA MAL Y NO DEBE VOLVER. Decía
+ * indicador de 330ms y typing de 14ms POR CARÁCTER:
+ *   · 330ms es aproximadamente un ciclo de pulso — se lee como parpadeo, no
+ *     como "está escribiendo", y encima retrasaba la respuesta sin comunicar
+ *     nada. Los indicadores de chat que funcionan viven ~800–1200ms.
+ *   · 14ms/carácter son 5.6s para una respuesta de 400 caracteres. Nadie
+ *     espera 5.6s por un texto que ya decidió leer.
+ * Corregido por el PM: 900ms de indicador y 22ms por PALABRA.
+ */
+export const CHAT = {
+  /** 100ms — el indicador no arranca en el mismo cuadro que el panel. */
+  indicadorEntra: 0.1,
+  /** 900ms de indicador en pantalla. */
+  indicadorDura: 0.9,
+  /**
+   * 1000ms — burbuja y typing arrancan cuando el indicador se apaga.
+   * Es `indicadorEntra + indicadorDura`; va literal porque `as const` sobre
+   * una suma pierde el tipo estrecho. Si mueves uno de los dos, mueve este.
+   */
+  respuesta: 1.0,
+  /** 22ms por PALABRA (no por carácter). */
+  palabra: 0.022,
+  /** 450ms por ciclo de pulso del punto. Con `repeat: 1` son 2 ciclos = 900ms,
+   *  justo la ventana del indicador. `repeat` FINITO: §12 prohíbe los loops
+   *  infinitos y un indicador de escritura es el sitio donde más tienta. */
+  pulso: 0.45,
+  /** 80ms de desfase entre los 3 puntos del indicador. */
+  pulsoDesfase: 0.08,
+} as const
+
+/**
  * Tramos de scroll para `useScroll({ offset })`. Espejo de §4.2.
  * Sintaxis de motion: "<borde del target> <borde del contenedor>".
  */

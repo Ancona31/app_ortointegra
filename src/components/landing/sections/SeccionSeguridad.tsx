@@ -28,8 +28,31 @@ interface Tarjeta {
      prohíbe en Portabilidad.
    · "Tu consultorio nunca se detiene" / "Acceso total" / "Privacidad
      Absoluta" / "blindada" — absolutos sin respaldo. Había 12 en 65 líneas.
-   · La bitácora NO se menciona: la verificación de §10 sobre qué accesos
-     cubre hoy sigue abierta. Cuando se cierre, su lugar es la tarjeta 2. */
+
+   ⚠️ LA TARJETA 2 CAMBIÓ EN LA TANDA DE LA FAQ (2026-07-31) POR DOS MOTIVOS
+   INDEPENDIENTES. No revientas nada revirtiéndola, pero reintroduces un claim
+   falso:
+
+   1. "Cada médico solo accede a sus pacientes" ERA FALSO para el médico
+      administrador de clínica, que es el caso normal en cualquier cuenta
+      multi-médico. La policy `pacientes_select_activos` admite tres ramas
+      —`soy_admin_de_clinica()`, rol `secretaria`, o `soy_medico_tratante(id)`—
+      (`20260524_etapa5e_bd1_policies_pacientes.sql:52-63`), y
+      `consultas_select` deja pasar `medico_id = auth.uid() OR
+      soy_admin_de_clinica()` (`20260530_etapa5f_paso3_policies_consultas.sql:80-92`).
+      O sea: el admin ve los expedientes de todo su equipo. Decirlo en voz
+      alta es mejor que esperar a que lo descubra un director médico.
+   2. LA FRASE DE LA BITÁCORA YA PUEDE ESCRIBIRSE. La verificación de §10
+      estaba abierta y esta tanda la cerró: `useAuditAccess` está montado en
+      las cinco páginas que leen datos clínicos —expediente (`page.tsx:26`),
+      consulta (`consulta/[consultaId]/page.tsx:38`), nueva nota (`:188`),
+      documentos (`:44`) y laboratorios (`:18`)—, y `/api/audit` valida sesión
+      server-side antes de escribir.
+      ⚠️ CON UN ASTERISCO QUE CONVIENE NO OLVIDAR: el registro es
+      fire-and-forget desde el cliente (`useAudit.ts:16-19`) y `logAudit`
+      traga los errores (`audit.ts:84-86`). Si el POST falla, el acceso ocurre
+      igual y no queda rastro. Es el mismo defecto que LP-DT-21 y por eso el
+      copy dice "queda registrado", no "queda registrado siempre". */
 const tarjetas: Tarjeta[] = [
   {
     icon: <Scale className="w-6 h-6 text-[#1e5fa8]" />,
@@ -47,7 +70,7 @@ const tarjetas: Tarjeta[] = [
     icon: <Database className="w-6 h-6 text-violet-600" />,
     iconBg: 'bg-violet-50',
     title: 'Tu información, separada',
-    desc: 'Cada médico solo accede a sus pacientes, a nivel de base de datos.',
+    desc: 'Cada médico ve solo a sus pacientes. En cuentas de clínica, el administrador ve los expedientes de todo su equipo. Cada acceso queda registrado en bitácora.',
   },
   {
     icon: <DatabaseBackup className="w-6 h-6 text-emerald-600" />,

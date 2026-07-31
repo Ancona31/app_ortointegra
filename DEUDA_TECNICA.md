@@ -1868,7 +1868,27 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
   `audit_log`, o quede en cola persistente hasta tenerla.
 
 ### LP-DT-22 — QW3 sube de prioridad: el endpoint ARCO queda expuesto por el copy de la landing
-- **Estado:** 🔴 abierta — **prioridad elevada**
+- **Estado:** ✅ **cerrada (2026-07-31)** — QW3 aplicado en la tanda de la FAQ,
+  antes de que el copy que lo motivaba llegara a producción.
+  **Qué se hizo:** `src/app/api/paciente/[id]/exportar/route.ts` gatea ahora con
+  `canManageClinica(profile)` ANTES de tocar la base (un médico invitado no
+  puede ni confirmar que el paciente existe), responde `403 { error:
+  "forbidden" }` y registra el intento con la acción nueva
+  `arco_intento_denegado` (`src/lib/audit.ts`), con `await` y no
+  fire-and-forget: aquí no hay nada que entregar al usuario, así que no hay
+  prisa que justifique perder el evento.
+  **⚠️ Una desviación respecto al plan original de QW3, deliberada:**
+  **super_admin NO entra.** QW3 decía "super_admin + admin", pero se escribió
+  antes del refactor de roles de la etapa 4. Hoy `permissions.ts:31-34` fija la
+  doctrina contraria ("super_admin opera EXCLUSIVAMENTE vía
+  /api/super-admin/*"), y aunque entrara no serviría: la ruta usa el cliente
+  con sesión y las policies de `pacientes` no tienen rama de super_admin
+  (decisión D2-A), así que se llevaría un 404 después de pasar el gate — lo
+  peor de los dos mundos. El `admin` legacy tampoco existe desde
+  `20260519114652_etapa4a8_eliminar_rol_admin_legacy.sql`.
+  **Lo que sigue pendiente y NO lo cubre este cierre:** el endpoint continúa
+  sin UI. Nadie lo invoca desde la app; se protegió, no se integró.
+- **Estado anterior:** 🔴 abierta — **prioridad elevada**
 - **Detectada:** el pendiente es previo (ver `CLAUDE.md` § Pendientes de
   seguridad, QW3). La **elevación de prioridad** es de esta adenda (2026-07-30)
 - **Descripción:** `src/app/api/paciente/[id]/exportar/route.ts` devuelve JSON
@@ -1973,6 +1993,92 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
   justificar por qué no.
 - **Condición de cierre:** ninguna tarjeta de Seguridad por debajo de ~240px de
   ancho en ningún breakpoint.
+
+### LP-DT-26 — Retirar las cifras de soporte dejó a Premium sin escalón propio
+- **Estado:** 🔴 abierta — decisión de producto, no técnica
+- **Detectada:** tanda de la FAQ (2026-07-31)
+- **Descripción:** `plans.ts` publicaba dos compromisos de tiempo sin nada
+  detrás —"Soporte prioritario <24h" en Pro y "SLA de respuesta <8h" en
+  Premium—, sin ticketing, sin turnos y sin cláusula en los términos. El PM
+  ordenó sustituir ambos por "Soporte prioritario" sin cifra, para que la FAQ
+  pública pudiera comprometer UN techo ("nuestro objetivo es responder dentro
+  de las 24 horas hábiles") sin contradecir a `/pricing`. Aplicado.
+- **Lo que quedó torcido, y se deja anotado en vez de resolverlo por cuenta
+  propia:**
+  1. **Premium repite una línea que ya hereda.** Sus features abren con "Todo
+     lo de Clínica Pro", que ya incluye "Soporte prioritario". Sin cifras, la
+     línea propia de Premium no aporta nada: el escalón de soporte entre Pro y
+     Premium desapareció.
+  2. **Clínica Básica no lista soporte prioritario en absoluto**, pero la
+     pregunta 6 de la FAQ dice "los planes de clínica cuentan con atención
+     prioritaria" — y Básica es un plan de clínica. O la línea entra en
+     Básica, o la FAQ dice "los planes Pro y Premium".
+- **Por qué no se arregló aquí:** reempaquetar planes es de producto. La
+  instrucción era sustituir las cifras, no redistribuir features.
+- **Condición de cierre:** que la lista de features de los tres planes de
+  clínica y la pregunta 6 de la FAQ describan el mismo producto.
+
+### LP-DT-27 — Nueve `role="region"` seguidos en la FAQ son ruido de landmarks
+- **Estado:** 🔴 abierta — a11y, menor
+- **Detectada:** tanda de la FAQ (2026-07-31)
+- **Descripción:** cada panel del acordeón lleva `role="region"` +
+  `aria-labelledby`, según la instrucción de accesibilidad de la tanda. Es el
+  patrón del APG de acordeón, **pero el propio APG advierte de no usar `region`
+  cuando hay muchos paneles** (orientativamente más de ~6) porque cada uno se
+  convierte en un landmark y el menú de landmarks del lector de pantalla se
+  llena de ruido. Aquí son **nueve**.
+- **Por qué se dejó así:** el `role` venía indicado explícitamente en la
+  instrucción, y quitarlo tiene coste: sin `role`, el `aria-labelledby` del
+  panel deja de tener efecto (un `div` sin rol no toma nombre accesible).
+- **Fix propuesto:** cambiar `role="region"` por `role="group"` en los nueve.
+  `group` conserva el nombre accesible vía `aria-labelledby` y NO es landmark.
+  Una línea en `SeccionFAQ.tsx`.
+- **Condición de cierre:** verificar con un lector de pantalla real (VoiceOver
+  o NVDA) que el panel sigue anunciándose con el texto de su pregunta y que la
+  lista de landmarks de la página no crece en nueve entradas.
+
+### LP-DT-28 — LP-DT-25 empeora: la tarjeta 2 de Seguridad triplicó su cuerpo
+- **Estado:** 🔴 abierta — **agrava una deuda preexistente, no la crea**
+- **Detectada:** tanda de la FAQ (2026-07-31)
+- **Descripción:** la corrección de B4 sustituyó el cuerpo de la tarjeta "Tu
+  información, separada" —una línea— por tres frases (médico, admin de clínica,
+  bitácora). Las 3 tarjetas comparten altura por `items-stretch`, así que la
+  más larga manda: la retícula entera crece.
+  LP-DT-25 ya medía que a 640px cada tarjeta cae a **176px de ancho** con
+  cuerpos de hasta 11 líneas; con este cuerpo, la columna del medio empeora en
+  ese tramo.
+- **Ojo con el diagnóstico:** el problema NO es el copy nuevo —que corrige un
+  claim falso y no se toca— sino el `sm:grid-cols-3` de `SeccionSeguridad.tsx`,
+  que mete tres columnas a partir de 640px. El fix es el de LP-DT-25 (subir el
+  corte a `md`, con `sm:grid-cols-2` en medio), y barre también
+  `SeccionFeatures.tsx:145` y `SeccionPortabilidad.tsx:53`.
+- **Condición de cierre:** la de LP-DT-25 — ninguna tarjeta de Seguridad por
+  debajo de ~240px de ancho en ningún breakpoint.
+
+### LP-DT-29 — El aviso de privacidad declara a Anthropic como encargado activo, y ya no lo es
+- **Estado:** 🔴 abierta — **documento legal desfasado**
+- **Detectada:** auditoría previa a la FAQ (2026-07-31)
+- **Descripción:** `AvisoPrivacidadContent.tsx:113-118` lista *"Anthropic, PBC
+  (Claude) — Extracción estructurada de resultados de laboratorio a partir de
+  archivos PDF"* con `status: 'activa'`, y `:475-476` repite que la plataforma
+  usa IA "de Google (Gemini) y Anthropic (Claude)". **Ese código murió en la
+  sub-fase 8C1 del rediseño de labs (2026-04-23)**, que eliminó
+  `/api/labs-extract`. Hoy el único proveedor de IA con callsite vivo en `src/`
+  es Google: `gemini-3.5-flash` en `nota-medica/route.ts:169,215`.
+  `@anthropic-ai/sdk` sigue en `package.json:15` como dependencia muerta (cero
+  imports).
+- **Por qué importa:** un aviso de privacidad que declara una transferencia
+  internacional de datos sensibles que no ocurre es un defecto del documento,
+  no un exceso de prudencia — describe mal el tratamiento real. Y la FAQ
+  pública enlaza al aviso.
+- **Fix:** pasar la fila de Anthropic a `status` histórico o retirarla, quitar
+  la mención de `:475-476`, subir la versión del aviso, y desinstalar
+  `@anthropic-ai/sdk`.
+- **⚠️ Verificar antes de retirarla del todo:** si hay planes cercanos de
+  reintroducir extracción de labs con Claude, conviene dejarla declarada; lo
+  que no puede quedarse es `status: 'activa'` describiendo algo que no pasa.
+- **Condición de cierre:** que los encargados listados en el aviso coincidan
+  uno a uno con los que reciben datos en el código.
 
 ---
 

@@ -176,6 +176,7 @@ seguidas:**
 | 10b | Tu práctica, tuya | 2 bloques APILADOS: franja con abanico de PDFs + zócalo con foto anclada y tarjeta encima |
 | 11 | Historia | retrato izq. chico, texto largo der. |
 | 12 | Precio + beta | 2 tarjetas centradas, una acentuada |
+| 12b | FAQ | columna estrecha centrada, filas apiladas de ancho completo |
 | 13 | CTA + footer | navy centrado ancho completo |
 
 **CTAs sembrados** [E1]: además de hero y cierre, un CTA discreto tras el
@@ -550,6 +551,104 @@ deben estar, sin trabajo extra.
 ### 5.12 Precio + beta — tejido
 `Reveal` + `CountUp` en cupos restantes.
 
+### 5.12b FAQ — tejido · acordeón-conversación
+
+**IMPLEMENTADA** en `SeccionFAQ.tsx` (no esperó a F2.a). La tabla es lo que hay
+en el código, no una intención. Copy y verificación de cada claim en
+`src/components/landing/faq-contenido.ts`; ubicación y superficie, razonadas en
+el propio componente y en `(landing)/page.tsx`.
+
+Abrir un ítem simula que el fundador responde un mensaje: avatar, indicador de
+escritura y respuesta apareciendo. La coreografía ES el argumento — la sección
+va en primera persona y firmada, así que el patrón dice quién contesta antes de
+que se lea una sola palabra.
+
+**FASE A — al abrir:**
+
+| Capa | Prop | Origen→destino | Disparo | Easing |
+|---|---|---|---|---|
+| Marcador (`+`) | rotate | 0→45° | +0ms, `--sp-dur-base` | ease-out |
+| Ítem y TODOS sus hermanos | `layout="position"` | posición, no tamaño | +0ms | `SPRING.soft` |
+| Avatar | opacity | 0→1 | +0ms | `SPRING.snap` |
+| Indicador (3 puntos, `repeat: 1`) | opacity | 0→1→0 | +100ms, dura 900ms | lineal |
+| Burbuja | opacity, y | 0→1, 12→0 | +1000ms | `SPRING.soft` |
+| Texto | índice de PALABRA | 0→n, 22ms/palabra | +1000ms | lineal |
+
+**FASE B — al cerrar:** inverso, sin indicador y sin typing. Cerrar no es
+responder. Además la respuesta queda ENTERA pintada aunque se cierre a media
+escritura: es lo que hace instantánea la reapertura.
+**ENTRADA de la sección:** ítems en stagger 70ms (`STAGGER.siblings`), con
+variantes padre→hijo sobre el `<ul>`.
+**RM:** sin indicador y sin typing — la respuesta aparece completa al instante.
+Los dos son decorativos y no pueden retrasar contenido real.
+
+> ⚠️ **ES `layout="position"`, NO `layout` A SECAS, Y LA DIFERENCIA ES TODA LA
+> FICHA.** Verificado en el paquete embarcado
+> (`motion-dom/dist/index.d.ts:887-889`): con `"position"` el TAMAÑO cambia de
+> golpe y solo se anima la POSICIÓN. Eso convierte la restricción "el
+> contenedor reserva su alto final desde el principio" en algo literal en vez
+> de una intención, y evita tres problemas de una:
+> * **Cero `scale` ⇒ cero deformación.** Motion solo corrige `borderRadius` y
+>   `boxShadow` (`scale-correction.mjs:6-16`); el texto se estira salvo que
+>   cada hijo sea a su vez nodo de proyección, y eso son ~27 nodos midiendo por
+>   clic para nada.
+> * **Evita escalar DESDE altura 0.** `delta-calc.mjs:20-24` corrige el `scale`
+>   solo si sale `NaN`, y `N/0` es `Infinity`, que no lo es. Un panel que se
+>   despliega desde 0 con `layout` completo entra justo por ahí.
+> * **Los hermanos de abajo SÍ tienen que animar.** Sin `layout` en cada uno se
+>   teletransportan a su nueva posición en el primer cuadro mientras el de
+>   arriba se abre. Por eso el prop va en TODOS los `<li>`.
+> Sigue cumpliendo §4.3·1: `buildProjectionTransform`
+> (`projection/styles/transform.mjs`) solo emite `translate3d()` y `scale()`,
+> jamás `width`/`height`.
+
+> ⚠️ **EL TYPING NO MUTA `textContent` Y NO ES UN DETALLE DE ESTILO.** Las
+> palabras se pintan TODAS desde el primer cuadro, cada una en su `<span>`, y
+> lo que se revela es el COLOR (`transparent` → heredado). Las cajas de línea
+> son definitivas desde el principio ⇒ el texto no refluye ni una vez y el
+> `scrollHeight` del documento no se mueve. Mutar `textContent` recalcularía el
+> layout del párrafo en cada tick y —peor— dejaría media respuesta en el árbol
+> de accesibilidad: un lector de pantalla que entre a mitad lee una frase
+> cortada. Por eso tampoco hay `aria-live`, que anunciaría palabra por palabra.
+> El progreso va en `MotionValue` + suscripción que escribe al DOM, nunca en
+> estado de React (§4.3·2).
+
+> ⚠️ **EL INDICADOR VA EN `absolute` SOBRE LA BURBUJA, NO EN EL FLUJO.** Si
+> ocupara su propia línea, la burbuja aparecería debajo y el ítem crecería a
+> mitad de la coreografía — justo el reflujo que todo el patrón evita.
+> Flotando sobre la burbuja (que ya está colocada, solo que a opacity 0) el
+> alto del panel es el definitivo desde el primer cuadro.
+
+⚠️ **CALIBRACIÓN CORREGIDA — LOS NÚMEROS DE LA PRIMERA FICHA ESTABAN MAL.**
+Decía indicador de 330ms y typing de 14ms **por carácter**. 330ms es
+aproximadamente un ciclo de pulso: se lee como parpadeo, no como "está
+escribiendo", y encima retrasaba la respuesta sin comunicar nada. Y 14ms/carácter
+son 5.6s para una respuesta de 400 caracteres, que nadie espera por un texto que
+ya decidió leer. Valores vigentes: **900ms** de indicador y **22ms por PALABRA**.
+Tokens en `CHAT.*` de `tokens.ts`.
+
+⚠️ **VARIOS ÍTEMS ABIERTOS A LA VEZ, no uno.** Con acordeón exclusivo cada clic
+son DOS animaciones de layout (cerrar + abrir) más el reflujo de todo lo que hay
+entre ambos, y si el que se cierra está ARRIBA el contenido sube bajo el cursor
+y el usuario pierde el sitio. Así hay una sola animación por clic.
+
+⚠️ **EL TYPING CORRE UNA VEZ POR ÍTEM, igual que el indicador.** La alternativa
+—"un clic durante el typing lo completa"— se descartó: es una afordancia
+invisible (el clic que da un impaciente cae en el encabezado, que CIERRA) y una
+zona de clic sobre el cuerpo pelea con la selección de texto, que en una FAQ sí
+se usa. La fricción real es reabrir algo ya leído, y esto la elimina entera por
+el coste de un booleano. Además deja un escape que se descubre solo: cerrar y
+reabrir da el texto instantáneo.
+
+**Presupuesto:** 6 capas propias del ítem que abre (marcador, layout, avatar,
+indicador, burbuja, texto) más los hermanos de abajo animando su posición.
+Excede el techo de 4 de §4.3·3 a sabiendas y por el mismo motivo que §5.10b: ese
+techo habla de *escenarios* con scrub de vídeo, y esto es tejido — todo
+`transform`/`opacity`, sin una sola propiedad que provoque relayout. Con una
+diferencia que conviene tener presente: 5.10b anima seis capas UNA vez al entrar
+la sección, y esto se dispara en cada clic. Por eso el `scale` del avatar se
+retiró de la ficha original: era la capa más prescindible.
+
 ### 5.13 CTA final — tejido
 `Reveal` + scale .97→1 en botón. Último beat: sin fuegos artificiales.
 
@@ -753,13 +852,80 @@ URL de imagen en ambos sitios.
 
 **12 · Precio + beta (nueva; sustituye a la calculadora eliminada)** —
 Precio transparente, un plan, sin "contáctanos" [E1]. **Límites del free
-tier PUBLICADOS** (1 nota IA/24h, tope de pacientes, retención 12 meses) —
-nadie en el sector lo hace; convierte "sin letras chiquitas" en prueba.
+tier PUBLICADOS** —nadie en el sector lo hace; convierte "sin letras
+chiquitas" en prueba— pero **PUBLICA LOS REALES**:
+
+> ⚠️ **DOS DE LOS TRES LÍMITES QUE ESTA LÍNEA DABA POR BUENOS NO EXISTEN.**
+> Decía *"(1 nota IA/24h, tope de pacientes, retención 12 meses)"*. Corregido
+> el 2026-07-31 tras verificarlo contra el código:
+>
+> | Lo que decía | Lo que hay | Dónde |
+> |---|---|---|
+> | 1 nota IA / 24h | **60 llamadas / 24h, iguales para TODOS los planes** | `rateLimit.ts:8` |
+> | retención 12 meses | **no existe**: ni cron, ni TTL, ni purga | grep sin resultados |
+> | tope de pacientes | **5**, y es tope duro en BD | `plans.ts:29,129` · `clinica_dentro_de_limite()` |
+>
+> El límite de IA **no está segmentado por plan**: `LIMITES` es un mapa por
+> RUTA, no por suscripción, así que un free y un premium tienen el mismo
+> cupo. Si F5 publica "1 nota IA/24h" estará inventando una restricción que el
+> producto no aplica, en la sección cuyo argumento entero es que aquí no hay
+> letras chiquitas. Antes de publicar cualquier cifra de free, léela en
+> `plans.ts` y en `rateLimit.ts`, no aquí.
 "Acceso beta · cupos limitados" con CountUp — escasez real. Declarar beta.
 SIN testimonios ni stats inventadas (no hay clientes; el gremio es chico).
 Razón de la calculadora eliminada: con números honestos (5 pacientes × 7
 min = 35 min/día) argumentaba EN CONTRA; el Teaser 1 demuestra lo que ella
 afirmaba.
+
+**12b · FAQ (nueva, 2026-07-31)** — Kicker "PREGUNTAS FRECUENTES" **sin
+pastilla** (Seguridad, su vecina de arriba, usa `bg-blue-50`; dos idénticas
+seguidas era repetición). Titular: "Lo que me preguntan antes de decidirse".
+Bajo él, la autoría en rol caption: "Respondo yo — Dr. Ángel M. Ancona Pérez,
+cirujano de columna y autor de Spinus."
+
+**EL COPY DE LAS 9 RESPUESTAS NO SE DUPLICA AQUÍ.** Vive en
+`src/components/landing/faq-contenido.ts`, junto a la verificación en código de
+cada cláusula — que es donde tiene que estar para que nadie la ensanche sin ver
+qué la sostiene. Ese archivo es módulo NEUTRO (sin `'use client'`) porque lo
+consumen los dos lados de la frontera RSC: el componente cliente y el layout de
+servidor que emite el JSON-LD.
+
+**Decisión de PM: PRIMERA PERSONA, firmada por el fundador.** Es la única voz
+coherente con la coreografía (§5.12b) y la que responde de frente la objeción de
+continuidad. No es promoción de práctica médica: es el fundador de Spinus
+respondiendo por su producto.
+
+⚠️ **TRES CLÁUSULAS QUE NO SE TOCAN, cada una con su motivo:**
+(a) **"en proceso de certificación", NUNCA "certificado"** — no hay folio DGIS.
+Ver RG-01 en §11: Huli sí lo tiene (DGIS-CER-P-007-2024-09) y lo exhibe en cada
+página. Decir "certificado" es falso y además comprobable en un registro público.
+(b) **"El cumplimiento es del médico"** — mismo criterio que §7·10. Ninguna
+plataforma cumple la NOM-004 por su usuario, y esta pregunta existe justamente
+para decirlo antes de que alguien lo asuma al revés.
+(c) **"nuestro objetivo es responder dentro de las 24 horas hábiles", NUNCA un
+SLA por plan** — y por eso, en esta misma tanda, se retiraron las cifras `<24h`
+y `<8h` de `plans.ts:98,118`. La landing compromete UN techo; la página de
+precios no puede prometer dos plazos distintos con nada detrás.
+
+⚠️ **LA PREGUNTA 9 DEPENDE DE UNA CLÁUSULA DE LOS TÉRMINOS QUE ANTES NO
+EXISTÍA.** Dice que la plataforma seguiría 90 días disponible y remata "está
+escrito en los términos de servicio, no es una promesa de buena voluntad".
+Se escribió: `TerminosContent.tsx`, sección **19 · Continuidad y cese definitivo
+del servicio** (versión v2.1). Las tres secciones que iban detrás se renumeraron
+(19→20, 20→21, 21→22); los `id` de ancla no cambiaron. **Si alguien borra esa
+sección, la respuesta 9 pasa a ser mentira: van juntas.**
+
+⚠️ **JSON-LD FAQPage — PRIMER structured data del repo.** Vive en
+`(landing)/layout.tsx`, que es servidor. **No esperes rich results de Google ni
+los vendas:** están restringidos desde 2023 a sitios de gobierno y de salud
+reconocidos, y Spinus no entra. El objetivo declarado es otro y ese sí se
+cumple: contenido estructurado que un LLM pueda citar.
+
+**Superficie BLANCA y ubicación pegada al CTA** — las dos razonadas en
+`SeccionFAQ.tsx` y en `(landing)/page.tsx`. Resumen: el lavado del CTA resuelve
+a ≈#f6f9fc, a un punto de la franja, así que franja aquí fundiría las dos
+secciones (mismo acorralamiento que dejó a Seguridad en blanco); el contraste lo
+ponen las filas del acordeón, rellenas de `#f5f8fc`.
 
 **13 · CTA final + footer** — Titular: "Tu consultorio merece software
 hecho para ayudarte, no para cumplir un requisito." **Mención multi-cuenta
@@ -846,7 +1012,7 @@ Cada fase: auditoría → aplicación → `tsc --noEmit + eslint` (WSL) o build
 |---|---|
 | grep -rn "®" en todo el repo | F1.2 |
 | Instalación PWA en iOS real | copy de Portabilidad |
-| ¿Bitácora de auditoría cubre accesos a datos clínicos hoy? | copy de Seguridad |
+| ~~¿Bitácora de auditoría cubre accesos a datos clínicos hoy?~~ | ✅ **CERRADA 2026-07-31** — sí. `useAuditAccess` está montado en las 5 páginas que leen datos clínicos: expediente (`page.tsx:26`), consulta (`:38`), nueva nota (`:188`), documentos (`:44`) y laboratorios (`:18`); `/api/audit` valida sesión server-side. ⚠️ **Con asterisco:** es fire-and-forget desde el cliente (`useAudit.ts:16-19`) y `logAudit` traga los errores (`audit.ts:84-86`) — si el POST falla, el acceso ocurre igual y no queda rastro (mismo defecto que LP-DT-21). Por eso el copy dice "queda registrado", no "queda registrado siempre". La frase ya está en la tarjeta 2 de Seguridad y en la pregunta 2 de la FAQ |
 | ¿Página de verificación de recetas indexable? (site:spinus.com.mx) | URGENTE, ya delegado a otro chat |
 | Node de la Mac vs WSL (v24) → .nvmrc | higiene |
 | ¿"Próxima cita" se llama así en la app? | copy Flujo |
@@ -869,9 +1035,33 @@ cada página: desventaja competitiva activa.**
 ## 12 · LO QUE NO SE HACE (lista negra)
 
 Scroll secuestrado · secciones pegajosas fuera de los 2 teasers · cursor
-custom · partículas · loops infinitos · texto letra-por-letra fuera del
-hero · glassmorphism · Three.js/GSAP/Lenis/librerías QR · testimonios
-inventados · badges de colores arbitrarios · hover que cambia tamaño de
-fuente (desplaza layout; usar color + subrayado desplegable + icono 3px) ·
-valores de color/espacio/duración fuera de las tablas de este documento ·
-claims no verificados contra el producto.
+custom · partículas · **loops infinitos** · **texto que se escribe solo, donde
+el acto de escribir no ES el mensaje** · glassmorphism ·
+Three.js/GSAP/Lenis/librerías QR · testimonios inventados · badges de colores
+arbitrarios · hover que cambia tamaño de fuente (desplaza layout; usar color +
+subrayado desplegable + icono 3px) · valores de color/espacio/duración fuera de
+las tablas de este documento · claims no verificados contra el producto.
+
+> ⚠️ **LA ENTRADA DEL TYPING SE REESCRIBIÓ EL 2026-07-31, y la vieja estaba
+> caducada desde antes.** Decía *"texto letra-por-letra fuera del hero"*, lo
+> que dejaba el typing permitido SOLO en el hero. Pero el hero (§5.1) no tiene
+> typing —sus capas son opacity/y/blur— y el Teaser 1 (§5.5) sí lo tiene, en
+> dos capas. O sea que la regla llevaba tiempo prohibiendo lo único que el
+> documento manda hacer, y autorizando lo único que nadie hace.
+>
+> **La regla vigente es de intención, no de ubicación:** el texto se escribe
+> solo donde el ACTO DE ESCRIBIR ES EL MENSAJE. Hoy son dos sitios y ninguno
+> más:
+> * **Teaser 1 (§5.5)** — la IA redactando la nota. El typing *es* la
+>   demostración; sin él no hay nada que enseñar.
+> * **FAQ (§5.12b)** — el fundador contestando. El typing *es* la firma:
+>   convierte una lista de preguntas en alguien respondiendo.
+>
+> Decorar con typing sigue prohibido. Un titular que se teclea, un kicker que
+> aparece letra a letra o un contador con efecto máquina de escribir son
+> exactamente lo que esta línea existe para frenar.
+>
+> ⚠️ **"Loops infinitos" NO se relajó, y el indicador de escritura es donde
+> más tienta romperlo.** Los 3 puntos de §5.12b llevan `repeat: 1` — dos ciclos
+> de 450ms, 900ms en total, y se acabó. `repeat: Infinity` en un indicador de
+> chat es el caso de libro de esta prohibición.

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import { PREGUNTAS_FAQ } from '@/components/landing/faq-contenido'
 
 /* Layout de la landing pública — §3.2
    Existe por una sola razón: montar Inter SOLO aquí. El layout raíz
@@ -54,6 +55,47 @@ export const metadata: Metadata = {
    · `h-full`, `h-screen`, `flex`, `grid` → recortan o reflujan el árbol.
    Tampoco emite <html> ni <body>: ya los emite src/app/layout.tsx:11,19 y
    repetirlos aquí es DOM inválido. */
+/* JSON-LD de la FAQ (§7·12b). Es el PRIMER structured data del repo: hasta
+   esta tanda no había un solo `application/ld+json` en `src/`.
+
+   ⚠️ NO ESPERES EL ACORDEÓN EN GOOGLE, Y NO LO VENDAS COMO SI. Los rich
+   results de FAQPage están restringidos desde 2023 a sitios de gobierno y de
+   salud reconocidos; Spinus no entra. El objetivo declarado es otro y ese sí
+   se cumple: dar contenido estructurado que un LLM pueda citar cuando le
+   pregunten si conviene contratarlo.
+
+   Va en el layout y no en la sección por dos motivos: este archivo es
+   componente de SERVIDOR (el `<script>` sale en el HTML inicial sin coste de
+   cliente) y es donde ya vive la metadata de `/`. La contrapartida es que el
+   dato tiene que estar en un módulo neutro —`faq-contenido.ts`— porque
+   importar una constante desde un `'use client'` devuelve una referencia de
+   cliente, no el valor.
+
+   `dangerouslySetInnerHTML` no es una licencia: es la única forma de emitir
+   JSON crudo sin que React escape las comillas. La entrada es una constante
+   del repo, no input de usuario, y `JSON.stringify` cierra el paso a
+   `</script>` en el contenido. */
+const jsonLdFaq = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: PREGUNTAS_FAQ.map((item) => ({
+    '@type': 'Question',
+    name: item.pregunta,
+    acceptedAnswer: { '@type': 'Answer', text: item.respuesta },
+  })),
+}
+
+/* ⚠️ EL WRAPPER SIGUE DESNUDO — el `<script>` es hermano, no clase nueva.
+   Todo lo que dice el comentario de arriba sobre no tocar este `<div>` sigue
+   vigente; el fragmento existe solo para colgar el JSON-LD al lado. */
 export default function LandingLayout({ children }: { children: React.ReactNode }) {
-  return <div className={`${inter.variable} font-lp`}>{children}</div>
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdFaq) }}
+      />
+      <div className={`${inter.variable} font-lp`}>{children}</div>
+    </>
+  )
 }

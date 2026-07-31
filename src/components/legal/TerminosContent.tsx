@@ -28,8 +28,14 @@ import {
   ExternalLink,
 } from 'lucide-react'
 
-const TERMINOS_VERSION = 'v2.0'
-const TERMINOS_FECHA = '9 de abril de 2026'
+/* v2.1 (2026-07-31): entra la sección 19, "Continuidad y cese definitivo del
+   servicio", y con ella se renumeran las tres que iban detrás (19→20, 20→21,
+   21→22). Los `id` de ancla NO cambiaron: los enlaces existentes siguen vivos.
+   La versión sube porque la sección nueva añade una obligación de Spinus
+   —aviso previo y 90 días de exportación— que antes no estaba escrita, no
+   porque se reordenara la numeración. */
+const TERMINOS_VERSION = 'v2.1'
+const TERMINOS_FECHA = '31 de julio de 2026'
 
 interface SectionProps {
   id: string
@@ -75,9 +81,10 @@ const TOC: Array<{ id: string; num: string; title: string }> = [
   { id: 'limitacion', num: '16', title: 'Limitación de responsabilidad' },
   { id: 'propiedad-intelectual', num: '17', title: 'Propiedad intelectual' },
   { id: 'terminacion', num: '18', title: 'Suspensión y terminación' },
-  { id: 'modificaciones', num: '19', title: 'Modificaciones a los términos' },
-  { id: 'jurisdiccion', num: '20', title: 'Legislación aplicable y jurisdicción' },
-  { id: 'contacto', num: '21', title: 'Contacto' },
+  { id: 'continuidad', num: '19', title: 'Continuidad y cese definitivo del servicio' },
+  { id: 'modificaciones', num: '20', title: 'Modificaciones a los términos' },
+  { id: 'jurisdiccion', num: '21', title: 'Legislación aplicable y jurisdicción' },
+  { id: 'contacto', num: '22', title: 'Contacto' },
 ]
 
 export default function TerminosContent() {
@@ -741,10 +748,52 @@ export default function TerminosContent() {
               </p>
             </Section>
 
-            {/* 19 */}
+            {/* 19 — ⚠️ SECCIÓN NUEVA (2026-07-31). NO LA BORRES SIN BORRAR
+                TAMBIÉN LA PREGUNTA 9 DE LA FAQ PÚBLICA.
+                La landing responde "¿Qué pasa si Spinus deja de operar?" con
+                un aviso previo y 90 días de ventana de exportación, y remata:
+                "Está escrito en los términos de servicio, no es una promesa de
+                buena voluntad" (`components/landing/faq-contenido.ts`). Antes
+                de esta tanda NO estaba escrito en ningún sitio: lo único que
+                había era la sección 18, que cubre la terminación de UNA cuenta
+                (30 días), no el cese de la Plataforma.
+                Las dos cosas van juntas: si esta sección desaparece, aquella
+                respuesta pasa a ser falsa. */}
+            <Section
+              id="continuidad"
+              num="19"
+              title="Continuidad y cese definitivo del servicio"
+              icon={<History size={14} />}
+            >
+              <p>
+                En caso de que Spinus decida discontinuar la Plataforma de forma definitiva, lo
+                notificará con anticipación a los titulares de las cuentas activas, por correo
+                electrónico y mediante aviso dentro de la propia Plataforma.
+              </p>
+              <p>
+                A partir de dicha notificación, la Plataforma permanecerá disponible en modo de
+                consulta y exportación durante un plazo de{' '}
+                <strong className="text-[#1d1d1f]">noventa (90) días naturales</strong>, durante el
+                cual el usuario médico podrá descargar el historial clínico de sus pacientes en los
+                formatos que la Plataforma ofrezca. Concluido ese plazo, el acceso cesará y la
+                información dejará de estar disponible a través de la Plataforma.
+              </p>
+              <p>
+                Este plazo es adicional e independiente del previsto en la sección 18 para la
+                terminación de una cuenta individual.
+              </p>
+              <p>
+                La obligación de conservar el expediente clínico conforme a la NOM-004-SSA3-2012
+                corresponde al profesional de la salud, no a Spinus. La ventana de exportación
+                descrita en esta sección es el medio previsto para que el usuario médico pueda
+                cumplir con dicha obligación.
+              </p>
+            </Section>
+
+            {/* 20 */}
             <Section
               id="modificaciones"
-              num="19"
+              num="20"
               title="Modificaciones a los términos"
               icon={<RefreshCw size={14} />}
             >
@@ -756,10 +805,10 @@ export default function TerminosContent() {
               </p>
             </Section>
 
-            {/* 20 */}
+            {/* 21 */}
             <Section
               id="jurisdiccion"
-              num="20"
+              num="21"
               title="Legislación aplicable y jurisdicción"
               icon={<Scale size={14} />}
             >
@@ -772,8 +821,8 @@ export default function TerminosContent() {
               </p>
             </Section>
 
-            {/* 21 */}
-            <Section id="contacto" num="21" title="Contacto" icon={<Mail size={14} />}>
+            {/* 22 */}
+            <Section id="contacto" num="22" title="Contacto" icon={<Mail size={14} />}>
               <p>
                 Para cualquier consulta sobre los presentes Términos y Condiciones, puede
                 contactarnos en:

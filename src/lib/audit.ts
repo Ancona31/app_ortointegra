@@ -34,6 +34,11 @@ export type AuditAccion =
   | 'logout'
   // Derechos ARCO (LFPDPPP)
   | 'arco_acceso'
+  /* Intento de exportación ARCO rechazado por rol insuficiente (QW3).
+     Acción propia y no `acceso_denegado` genérico a propósito: un intento
+     contra el endpoint que devuelve el expediente ENTERO en JSON merece poder
+     filtrarse solo en el panel de auditoría. */
+  | 'arco_intento_denegado'
   | 'arco_rectificacion'
   | 'arco_cancelacion'
   // Acceso no autorizado

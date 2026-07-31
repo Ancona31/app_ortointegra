@@ -11,6 +11,7 @@ import SeccionInterfaz from '@/components/landing/sections/SeccionInterfaz'
 import SeccionHistoria from '@/components/landing/sections/SeccionHistoria'
 import SeccionControl from '@/components/landing/sections/SeccionControl'
 import SeccionSeguridad from '@/components/landing/sections/SeccionSeguridad'
+import SeccionFAQ from '@/components/landing/sections/SeccionFAQ'
 import SeccionCTA from '@/components/landing/sections/SeccionCTA'
 import SeccionFooter from '@/components/landing/sections/SeccionFooter'
 
@@ -43,6 +44,18 @@ export default function HomePage() {
           pegada a Historia. */}
       <SeccionControl />
       <SeccionSeguridad />
+      {/* ⚠️ LA FAQ VA AQUÍ, PEGADA AL CIERRE, Y NO ES INDIFERENTE.
+          Una FAQ es el último manejador de objeciones: su trabajo es despejar
+          lo que frena el clic, justo antes de pedirlo. Ponerla más arriba
+          interrumpe la demostración del producto (los teasers y el bento) con
+          letra pequeña, y ponerla después del CTA la entierra donde nadie
+          baja.
+          Cuando F5 monte §12 (Precio + beta), esta sección NO se mueve: 12b
+          queda entre el precio y el cierre, que es el orden canónico —
+          "cuánto cuesta" → "sí, pero…" → "empieza". Su posición es estable en
+          el código y en la tabla de §3.4, cosa que no puede decirse del resto
+          del archivo (ver el aviso de arriba). */}
+      <SeccionFAQ />
       <SeccionCTA />
       <SeccionFooter />
     </main>

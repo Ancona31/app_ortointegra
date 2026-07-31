@@ -95,7 +95,16 @@ export const PLANS: Record<PlanKey, Plan> = {
       'Todo lo de Clínica Básica',
       '5 médicos + 2 secretarias',
       'Estadísticas por médico',
-      'Soporte prioritario <24h',
+      // ⚠️ SIN CIFRA A PROPÓSITO (2026-07-31). Decía "Soporte prioritario
+      // <24h" y Premium decía "SLA de respuesta <8h": dos compromisos de
+      // tiempo publicados en /pricing sin nada detrás que los sostenga —ni
+      // ticketing, ni turnos, ni cláusula en los términos— y contra los que
+      // la FAQ pública (§7·12b, pregunta 6) tendría que competir. La landing
+      // compromete UN techo ("nuestro objetivo es responder dentro de las 24
+      // horas hábiles") y aquí solo se dice que el plan tiene prioridad.
+      // Si algún día hay un SLA de verdad, vuelve la cifra — a los dos sitios
+      // a la vez, no solo a este.
+      'Soporte prioritario',
     ],
     priceId: {
       monthly: process.env.STRIPE_PRICE_PRO_MONTHLY ?? null,
@@ -115,7 +124,13 @@ export const PLANS: Record<PlanKey, Plan> = {
       'Todo lo de Clínica Pro',
       '10 médicos + 2 secretarias',
       'Onboarding personalizado',
-      'SLA de respuesta <8h',
+      // Ver la nota de `pro`. ⚠️ QUEDA REDUNDANTE CON "Todo lo de Clínica
+      // Pro", que ya incluye esta línea: sin cifras, Premium deja de tener
+      // un escalón propio de soporte. Se conserva porque la instrucción era
+      // sustituir las dos cifras por este rótulo, no reempaquetar los planes
+      // — decidir si Premium recupera un diferenciador (o si la línea
+      // desaparece de aquí) es de producto, no de esta tanda.
+      'Soporte prioritario',
       'Factura mensual',
     ],
     priceId: {
