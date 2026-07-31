@@ -237,7 +237,45 @@ export default function SeccionControl() {
                 (`-bottom-6`), y un `gap` no puede compensar un desbordamiento
                 —mide desde el borde de la caja, no desde lo que se sale—. Los
                 28px dejan 4px de aire real bajo la tarjeta. Sin
-                `overflow-hidden` aquí: lo recortaría. */}
+                `overflow-hidden` aquí: lo recortaría.
+
+                ═══ COMPOSICIÓN MÓVIL (<768) — POR QUÉ NO ES COMO ESCRITORIO ═══
+                Desde md la columna tiene ancho FIJO (420/520), así que el
+                zócalo es una caja acotada y basta con anclar el marco a la
+                izquierda (`md:left-6`) y la tarjeta a la derecha
+                (`md:right-0`): el solape sale solo y vale 32/20.
+                En móvil la columna es FLUIDA y el zócalo se estira a todo el
+                ancho disponible. Con las mismas anclas, marco y tarjeta se
+                separaban al crecer el viewport —a 711 de ancho quedaban a
+                255px el uno del otro, ya sin solape— y a 390 la figura
+                quedaba pegada al borde izquierdo con la tarjeta despegada en
+                el derecho: dos elementos sueltos, no una composición.
+                Por eso en móvil las dos piezas se posicionan desde el CENTRO
+                y no desde los bordes. El grupo mide
+                  202 (marco) + 178 (tarjeta) − 52 (solape) = 328
+                y se centra: marco en `50% − 164`, tarjeta en `50% − 14`
+                (= 164 − 202 + 52). El solape queda CLAVADO en 52px sea cual
+                sea el ancho, que es justo lo que las anclas a los bordes no
+                podían garantizar.
+
+                ⚠️ POR QUÉ 328 Y NO MÁS: es el ancho útil a 360 (360 − 32 de
+                `px-4`). El grupo no puede crecer sin desbordar el zócalo en
+                el móvil más estrecho que soportamos. Y como 202 y 178 son
+                geometría de componente que no se toca, lo único ajustable
+                era el solape: 52 es el mínimo que hace que el grupo quepa.
+                No es un valor estético, es el que cierra la ecuación.
+
+                ⚠️ LA FIGURA NO QUEDA CENTRADA EN EL ZÓCALO, Y NO PUEDE.
+                Se pidió centrarla; es imposible junto con las otras dos
+                condiciones. Centrada, su borde derecho cae en `50% + 101`, y
+                una tarjeta de 178 que empiece antes de ese punto termina en
+                `50% + 279` — fuera del zócalo por ~70px a 390. O la figura se
+                centra y la tarjeta se sale, o el conjunto se centra y la
+                figura queda a la izquierda de su eje. Se eligió lo segundo:
+                el objetivo era que se leyeran como una pieza, y con el grupo
+                centrado hay aire simétrico (15px a cada lado a 390) sin que
+                nada se salga. Si alguien vuelve a intentar centrar la figura
+                sola, esto es lo que se rompe. */}
             <div className="relative mb-7 h-[284px] md:mb-0 md:h-[358px] lg:h-[410px]">
               {/* §5.10b · capa 2 — zócalo + foto entran JUNTOS como una pieza.
                   `origin-bottom` porque la regla 4 del spec exige que la
@@ -258,30 +296,49 @@ export default function SeccionControl() {
                 <div className="absolute inset-x-0 bottom-0 top-5 rounded-2xl border-[0.5px] border-[#e6ebf2] bg-[#f5f8fc] md:top-6" />
                 {/* Marco de la foto, anclado al borde inferior del zócalo.
                     ⚠️ EL RECORTE ES GEOMETRÍA CALCULADA, NO UN ENCUADRE A OJO.
-                    Recorta el PNG original (1281×832) a la región x 369–1009,
-                    y 10–832 — comprobado que contiene el bbox real del sujeto,
-                    que medido sobre el canal alfa es x 384–991, y 44–831.
+                    Asset actual (2026-07-31, reemplazo con el fondo mejor
+                    tratado): 1281×832, mismas dimensiones que el anterior pero
+                    CON EL SUJETO EN OTRO SITIO — bbox sobre el canal alfa
+                    x 328–934, y 14–802 (el viejo era x 384–991, y 44–831). Por
+                    eso la región de recorte cambió entera; la anterior
+                    (x 369–1009, y 10–832) ya no vale y no debe reaparecer.
+                    Región vigente: x 319–943, y 0–803 (624×803).
+                    Cómo salió, por si el asset vuelve a cambiar:
+                      · abajo manda la regla 4 — el borde inferior de la región
+                        es el del sujeto (803), no el del canvas (832), o la
+                        figura flotaría 29px sobre el zócalo;
+                      · con el bottom clavado, el alto máximo es 803 (top=0) y
+                        el ancho sale del ratio del marco: 803×300/386 = 624;
+                      · los 17px que sobran sobre el sujeto (607 de ancho) se
+                        reparten a los lados, que es lo que hacía el encuadre
+                        anterior (13/15).
                     Si el asset cambia, RECALCULA con la fórmula del spec:
                       escala   = anchoDelMarco / anchoDeLaRegión
                       imgWidth = anchoOriginal × escala
                       left     = −xRegión × escala
                       top      = −yRegión × escala
                     Los tres juegos de valores salen de ahí y cuadran:
-                      lg  300/640=0.46875 → 601 · −173 · −5   (alto 386)
-                      md  260/640=0.40625 → 521 · −150 · −4   (alto 334)
-                      sm  202/640=0.31563 → 404 · −117 · −3   (alto 260)
+                      lg  300/624=0.48077 → 616 · −153 · 0   (alto 386)
+                      md  260/624=0.41667 → 534 · −133 · 0   (alto 334)
+                      sm  202/624=0.32372 → 415 · −103 · 0   (alto 260)
+                    `top` es 0 en los tres porque la región arranca en y=0: no
+                    es que falte, es que el sujeto ya casi toca el borde alto.
+                    Los anchos van redondeados HACIA ARRIBA a propósito — con
+                    616/534/415 el alto de la región escalada da 386.1/334.7/
+                    260.2 y cubre el marco entero; truncando hacia abajo
+                    asomaría una línea del zócalo bajo los pies.
                     `max-w-none` es obligatorio: el preflight de Tailwind pone
                     `max-width:100%` a toda `img` y aplastaría el encuadre.
                     `h-auto` cumple la regla 9 — el ancho fija la escala y el
                     alto sigue; nunca se deforma. */}
-                <div className="absolute bottom-0 left-1.5 h-[260px] w-[202px] overflow-hidden md:left-6 md:h-[334px] md:w-[260px] lg:h-[386px] lg:w-[300px]">
+                <div className="absolute bottom-0 left-[calc(50%_-_164px)] h-[260px] w-[202px] overflow-hidden md:left-6 md:h-[334px] md:w-[260px] lg:h-[386px] lg:w-[300px]">
                   <Image
                     src="/landing/asistente-medico.png"
                     alt="Asistente médica de clínica sosteniendo expedientes"
                     width={1281}
                     height={832}
-                    sizes="(min-width: 1024px) 601px, (min-width: 768px) 521px, 404px"
-                    className="absolute -left-[117px] -top-[3px] h-auto w-[404px] max-w-none md:-left-[150px] md:-top-[4px] md:w-[521px] lg:-left-[173px] lg:-top-[5px] lg:w-[601px]"
+                    sizes="(min-width: 1024px) 616px, (min-width: 768px) 534px, 415px"
+                    className="absolute -left-[103px] top-0 h-auto w-[415px] max-w-none md:-left-[133px] md:w-[534px] lg:-left-[153px] lg:w-[616px]"
                   />
                 </div>
               </motion.div>
@@ -293,11 +350,25 @@ export default function SeccionControl() {
                   que dice ya está en el cuerpo del texto de al lado.
                   Regla 5: pisa el borde derecho del marco sin tapar las manos.
                   A 1440 el marco acaba en x=324 y la tarjeta abre en x=304:
-                  20px de solape, dentro del máximo de 20–36 que fija el spec. */}
+                  20px de solape, dentro del máximo de 20–36 que fija el spec.
+
+                  ⚠️ EL SOLAPE MÓVIL (52px) SE SALE DE ESE 20–36 A PROPÓSITO.
+                  El rango del spec se escribió para escritorio; en móvil el
+                  ancho de 360 obliga a 52 (ver el comentario de la columna
+                  visual). Lo que importa es dónde CAE, no cuánto mide, y a
+                  52px cae sobre las etiquetas y el borde de las carpetas:
+                  medido sobre el asset, la tarjeta arranca en x=781 y las
+                  manos terminan en x=720 — 61px de margen, ~20px en pantalla.
+                  El techo real es 65px de solape; a partir de ahí empieza a
+                  comerse los dedos. La cara nunca entra en juego: la tarjeta
+                  arranca en y=317 del asset y la cara acaba en y=280.
+                  Si alguien toca el ancho de la tarjeta o del marco móvil,
+                  RECALCULA los dos `calc()` — el solape es una resta entre
+                  ellos, no un valor independiente. */}
               <motion.div
                 data-lp-reveal=""
                 aria-hidden
-                className="absolute -bottom-6 right-0 w-[178px] overflow-hidden rounded-xl border-[0.5px] border-[#e6ebf2] bg-white md:bottom-7 md:w-[168px] lg:w-[216px]"
+                className="absolute -bottom-6 left-[calc(50%_-_14px)] w-[178px] overflow-hidden rounded-xl border-[0.5px] border-[#e6ebf2] bg-white md:bottom-7 md:left-auto md:right-0 md:w-[168px] lg:w-[216px]"
                 initial={{ opacity: 0, x: 24 }}
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true, amount: 0.25 }}
