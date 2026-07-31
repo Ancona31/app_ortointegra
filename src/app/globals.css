@@ -124,6 +124,63 @@
   --lp-dur-section: 420ms;                        /* entrada de sección */
   --lp-dur-cine:    900ms;                        /* escenario cinematográfico */
   --lp-ease-cine:   cubic-bezier(.65, 0, .35, 1); /* solo los 4 escenarios Apple */
+
+  /* ── Escala de color de la landing ─────────────────────────────────
+     Prefijo --lp-. NO usar los tokens --sp-* del producto: se redefinen
+     bajo html.dark y ThemeProvider deja esa clase colgada al salir de
+     (app), así que la landing se invertiría. Tampoco hex literales: son
+     ~68 sitios y duplicarían la tabla en el código.
+
+     ⚠️ REGLA PERMANENTE: estas variables NO se redefinen bajo html.dark,
+     nunca. Esa inmunidad es su razón de existir.
+
+     PROCEDENCIA DE LOS VALORES — no todos salen de §3.1, y conviene que
+     el próximo editor no los busque ahí en vano. De
+     SPINUS_LANDING_MAESTRO.md §3.1 salen: la tinta 900/700/500, los dos
+     azules de marca, la franja, el borde y el 4% de --lp-wash (§3.1 pide
+     "lavado de --cs al 3–5%"). Los otros cuatro NO están en §3.1 y se
+     fijan al valor MEDIDO del uso actual de la landing: --lp-accent-bg
+     = blue-50, --lp-surface-sunken = slate-50, --lp-border-strong =
+     slate-300 y --lp-hover-surface = slate-100 (valores de Tailwind 4,
+     que NO coinciden con los de v3 — ver §1 de la auditoría).
+     Ver §2 de la auditoría de F1.3 (e) para el mapa de migración por rol. */
+
+  /* Tinta */
+  --lp-ink-900: #14345c;   /* titulares, H3 de card, firma */
+  --lp-ink-700: #3b4a5c;   /* cuerpo de lista, links de nav */
+  --lp-ink-500: #5a6b81;   /* bajadas, cuerpo de card, captions, iconos */
+
+  /* Marca */
+  --lp-navy:       #1a3a5c;
+  --lp-accent:     #1e5fa8;
+  /* Canales sueltos del acento, SIN envolver en rgb(): existe para
+     componer sombras con alfa — rgb(var(--lp-accent-rgb) / .30) — que es
+     lo que hoy va como rgba(30,95,168,.10/.30/.40) en cuatro sitios.
+     Si cambia --lp-accent, hay que cambiar esto a mano: son dos
+     declaraciones del mismo color y CSS no puede derivar una de otra. */
+  --lp-accent-rgb: 30 95 168;
+  --lp-accent-bg:  #eff6ff;    /* fondo de pastilla de kicker */
+
+  /* Superficies */
+  --lp-surface:        #ffffff;
+  --lp-surface-alt:    #f5f8fc;  /* franjas alternas */
+  --lp-surface-sunken: #f8fafc;  /* paneles hundidos, marco reservado del hero */
+  --lp-wash: color-mix(in srgb, var(--lp-accent) 4%, #fff);  /* apertura y cierre */
+
+  /* Bordes */
+  --lp-border:         #e6ebf2;
+  --lp-border-strong:  #cad5e2;                  /* hover */
+  --lp-border-inverse: rgb(255 255 255 / .30);   /* sobre navy */
+
+  /* Inverso — texto y tintes sobre superficie oscura */
+  --lp-ink-inverse:        #ffffff;
+  --lp-ink-inverse-70:     rgb(255 255 255 / .70);
+  --lp-ink-inverse-50:     rgb(255 255 255 / .50);
+  --lp-surface-inverse-5:  rgb(255 255 255 / .05);
+  --lp-surface-inverse-10: rgb(255 255 255 / .10);
+
+  /* Hover */
+  --lp-hover-surface: #f1f5f9;
 }
 
 html {
