@@ -172,13 +172,66 @@ seguidas:**
 | 7 | TEASER 2 | documento izq., controles der. |
 | 8 | Flujo 5 pasos | lista numerada izq., titular der. |
 | 9 | Portabilidad | franja horizontal delgada de 3 ítems |
-| 10 | Seguridad | 3 tarjetas EN ESCALERA (no en fila) |
+| 10 | Seguridad | 3 tarjetas en fila ⚠️ |
+| 10b | Tu práctica, tuya | 2 bloques APILADOS: franja con abanico de PDFs + zócalo con foto anclada y tarjeta encima |
 | 11 | Historia | retrato izq. chico, texto largo der. |
 | 12 | Precio + beta | 2 tarjetas centradas, una acentuada |
 | 13 | CTA + footer | navy centrado ancho completo |
 
 **CTAs sembrados** [E1]: además de hero y cierre, un CTA discreto tras el
 Teaser 1 y tras el Teaser 2 ("Empieza gratis →" en línea, sin bloque).
+
+> ⚠️ **La fila 10 ya NO dice "en escalera", y no es un olvido.** La escalera
+> se descartó en la QA visual de F1.3 (b1) y §5.10 quedó sin efecto para esa
+> sección: con cuerpos de largo desigual, offset desigual sobre altura
+> desigual dibuja un zigzag, y el tercer `mt` sacaba la tarjeta del
+> contenedor. Detalle completo en **LP-DT-20**. No la reintroduzcas.
+> Seguridad quedó en **3 tarjetas, sin cuarta y sin pie**: la línea de
+> portabilidad de datos que llegó a vivir ahí se movió a la sección 10b, que
+> es donde ese contenido es una garantía y no una nota al pie.
+>
+> ⚠️ **La fila 10b se numera así a propósito: NO renumeres la tabla.** Las
+> referencias cruzadas de §5 y §7 van por número (§5.10, §5.11, §7·10, §7·13)
+> y correrlas de sitio rompería media docena de punteros. Sección nueva =
+> sufijo de letra.
+>
+> ⚠️ **EL ORDEN IMPLEMENTADO NO ES EL DE ESTA TABLA, y conviene saberlo antes
+> de mover nada.** `src/app/(landing)/page.tsx` monta hoy: … Portabilidad →
+> Interfaz → **Historia → 10b → Seguridad** → CTA. Es decir, respecto a la
+> tabla están intercambiados **8 con 9** (Interfaz va después de
+> Portabilidad) y **10 con 11** (Historia va antes que Seguridad). La
+> consecuencia para 10b es concreta: en la tabla cierra el bloque de
+> confianza antes de la parte personal, pero **en el código lo abre**, porque
+> Historia ya pasó. Si alguna tanda reordena para alinear código y tabla,
+> 10b viaja pegada a Seguridad, no a Historia.
+>
+> **Por qué 10b no repite esqueleto** (§3.4 exige que ninguno se repita): dos
+> bloques APILADOS de ancho completo, cada uno con su propio visual. El
+> primero es una franja horizontal `#f5f8fc` con texto a la izquierda y un
+> abanico de tres hojas PDF a la derecha; el segundo es un zócalo `#f5f8fc`
+> con la foto de la asistente **anclada a su borde inferior** y una tarjeta
+> de agenda pisándole el borde derecho. Ninguna otra sección apila dos
+> bloques de ancho completo con visual propio: las dobles columnas
+> (Expediente, Interfaz, Historia) son asimétricas con el medio a un lado,
+> las retículas (Features, Seguridad) son tarjetas iguales en fila, y la
+> franja de Portabilidad es una sola tira de tres ítems. El anclaje de la
+> figura al zócalo —que sobresale por arriba y se apoya abajo— no aparece en
+> ningún otro sitio de la página.
+>
+> ⚠️ **ESTE ESQUELETO SUSTITUYE AL ANTERIOR, que eran dos columnas simétricas
+> separadas por un filete vertical.** Aquel se implementó y se descartó al
+> llegar el diseño aprobado. Con él murió la coreografía de `scaleY` ligado al
+> scroll que describía §5.10b: ver el aviso de allí. No lo reintroduzcas.
+>
+> **Superficie de 10b: BLANCA, y la elección estaba acorralada.** Sus dos
+> vecinas tienen la superficie clavada por motivos ya documentados: Historia
+> debe seguir en franja (es lo único que la separa, no tiene contenedor
+> interno) y Seguridad debe seguir en blanco (el lavado del CTA resuelve a
+> ≈#f6f9fc, a un punto de la franja). Con las dos fijas, insertar en medio
+> rompe una costura cromática sí o sí. Blanco rompe la barata: conserva el
+> corte franja→blanco por arriba y deja blanco→blanco por abajo, caso que ya
+> existe resuelto entre Problema y Features y que aquí llega con costura de
+> 128/192/256 — el doble de los 128 que allí bastaron.
 
 ---
 
@@ -270,8 +323,46 @@ texto ELIMINADA. **Presupuesto:** máx 2 capas simultáneas en scroll; blur
 solo en carga.
 
 ### 5.2 Franja del problema — tejido
-`Reveal` del bloque completo. La segunda mitad de la frase ya está en
---sp-ink-350 (baja de contraste tipográfica, no animada).
+La frase es una bisagra y su estructura retórica es enunciado → **giro**.
+La coreografía es esa estructura: el bloque entra entero y el remate llega
+un beat después, para que el giro aterrice solo.
+
+| Capa | Prop | Origen→destino | Tramo | Easing |
+|---|---|---|---|---|
+| Frase (el `<p>`) | opacity,y | 0→1, 24→0 | entrada +0ms, `--lp-dur-section` | ease-out |
+| Remate (el `<span>`) | **opacity** | .25→1 | entrada +`--sp-dur-base` (240ms), `--lp-dur-section` | ease-out |
+
+⚠️ **EL REMATE ANIMA `opacity` Y NADA MÁS. No le pongas `y`.** Es un
+`<span>` inline dentro del `<p>`, y `transform` no aplica a elementos
+inline: haría falta `inline-block`, que **impide que el texto rompa por
+dentro**. Medido con la tipografía real: el remate ("— no para ayudar al
+médico.", 27 caracteres) es una tirada de **392px** que como `inline-block`
+sería indivisible, contra líneas de **358px a 390 de viewport** y **328px a
+360** — desborda por 34 y 64px respectivamente. A 768 sí cabría (521px de
+línea), pero la coreografía no puede depender del breakpoint. `opacity` sí
+aplica a inline y además no toca el layout: la frase ocupa su caja desde el
+primer cuadro y solo aparece la tinta.
+
+⚠️ **Arranca en .25, NO en 0.** Con 0 hay 240ms de hueco en mitad de una
+frase, que se lee como fallo de render, no como énfasis. Desde .25 el
+remate está presente y lo que ocurre es que **se oscurece**, que es
+exactamente lo que dice el copy.
+
+**Móvil:** idéntico. La franja pasa de `sm:w-[74%]` a ancho completo, pero
+eso es layout, no coreografía; ninguna distancia cambia.
+**RM:** `data-lp-reveal` en el `<p>` **y también en el `<span>`** — la regla
+de `globals.css:905` targetea el atributo, no sus descendientes, así que sin
+el segundo el remate se quedaría en .25 para siempre.
+
+> ⚠️ **ESTA FICHA CORRIGE UN DATO CADUCADO.** Decía: *"La segunda mitad de
+> la frase ya está en `--sp-ink-350` (baja de contraste tipográfica, no
+> animada)"*. **Ya no es cierto y no debe volver.** El QA de F1.3 (b2)
+> **invirtió el énfasis**: hoy la PRIMERA mitad va apagada en `#5a6b81`
+> (ink-500, 5.45:1) y el REMATE va oscuro en `#14345c` (ink-900, 12.53:1) —
+> `SeccionProblema.tsx:87,89`. El `#8a99ac` (ink-350) que la ficha vieja
+> daba por hecho mide **2.90:1** y está proscrito como texto. El golpe está
+> en el giro, no en el enunciado; el gris caía antes sobre el remate y lo
+> apagaba justo donde debía pegar.
 
 ### 5.3 Grid bento — tejido + ESCENARIO DICOM
 - Grid: `Stagger` diagonal desde DICOM (delays 0/.09/.18/.27/.36s) + `Tilt`.
@@ -343,7 +434,115 @@ Números en gradación de un solo tono azul (nunca 5 colores).
 `Stagger` horizontal 70ms. Nada más: es franja de apoyo.
 
 ### 5.10 Seguridad — tejido
-`Stagger` en 3 tarjetas en escalera (offsets verticales 0/24/48px estáticos).
+`Stagger` en las 3 tarjetas (70ms, `STAGGER.siblings`).
+
+> ⚠️ **LA ESCALERA ESTÁ DESCARTADA — esta ficha decía "en escalera (offsets
+> verticales 0/24/48px estáticos)" y ese inciso QUEDA SIN EFECTO.** La QA
+> visual de F1.3 (b1) lo descartó: con cuerpos de largo desigual e
+> `items-start`, offset desigual sobre altura desigual dibuja un zigzag, no
+> una diagonal, y el tercer `mt` sacaba la tarjeta del contenedor. El grid
+> lleva hoy `items-stretch` explícito. **F2.a NO debe reponer los offsets.**
+> Motivo completo en **LP-DT-20** y aviso en el propio
+> `SeccionSeguridad.tsx`. El `Stagger` sí se mantiene: es lo único de esta
+> ficha que sigue vigente.
+
+### 5.10b Tu práctica, tuya — tejido
+
+**IMPLEMENTADA** en `SeccionControl.tsx` (no esperó a F2.a). La tabla es lo
+que hay en el código, no una intención.
+
+Dos bloques apilados: una franja con el abanico de PDFs y un zócalo con la
+foto anclada y la tarjeta de agenda encima. La coreografía cuenta la frase
+del bloque 2 en dos tiempos — **primero está la asistente, después aparece
+la cita**—, que es justo lo que el copy afirma.
+
+| Capa | Prop | Origen→destino | Tramo | Easing |
+|---|---|---|---|---|
+| Encabezado (kicker+h2, un solo div) | opacity,y | 0→1, 24→0 | entrada +0ms, `--lp-dur-section` | ease-out |
+| Hoja A (atrás, izq.) | opacity,y,rotate,scale | 0→1, 28→0, −10→0, .94→1 | entrada +0ms | `SPRING.soft` |
+| Hoja C (atrás, der.) | ídem | ídem | entrada +90ms (`STAGGER.deck`) | `SPRING.soft` |
+| Hoja B (delante, centro) | ídem | ídem | entrada +180ms | `SPRING.soft` |
+| **Zócalo + foto** (una sola pieza) | opacity,scale | 0→1, .72→1 | entrada +0ms, `origin-bottom` | `SPRING.soft` |
+| **Tarjeta de agenda** | opacity,x | 0→1, 24→0 | entrada **+180ms** | `SPRING.soft` |
+
+El mazo se arma **hacia el lector**: el orden del array `HOJAS` es a la vez
+orden de pintado (la central va última, así queda al frente sin `z-index`) y
+orden de entrada. Los dos bloques de TEXTO no se animan: la cabeza de cada
+uno es su visual.
+
+> ⚠️ **EL FILETE DIVISOR VERTICAL Y SU `scaleY` LIGADO AL SCROLL YA NO
+> EXISTEN.** La versión anterior de esta sección era dos columnas simétricas
+> con un filete de protagonista, y esta ficha describía su trazado. Al pasar
+> al esqueleto de franja + zócalo se quedó sin sitio, y la ficha se retiró
+> **para no dejar una instrucción muerta que F2.a implementara**. No la
+> resucites: si ves `useScroll`/`useMotionValue` en `SeccionControl.tsx`,
+> alguien lo hizo sin leer esto.
+
+> ⚠️ **PRESUPUESTO EXCEDIDO A SABIENDAS: 6 capas, no 4.** §4.3·3 pone el
+> techo en 4 simultáneas. Se acepta porque §4.3·3 habla de *escenarios*
+> —momentos cinematográficos con scrub de vídeo— y esto es tejido: seis
+> transformaciones sobre elementos de 104×132, 300×386 y 216px, todas
+> `transform`/`opacity`, sin una sola propiedad que provoque relayout.
+
+⚠️ **`origin-bottom` EN EL ZÓCALO+FOTO, NO EL CENTRO.** La regla 4 del spec
+de diseño exige que la figura quede apoyada en el borde inferior del zócalo;
+escalando desde el centro, el anclaje se rompe durante toda la entrada y la
+figura llega flotando. Con origen abajo, el punto de apoyo no se mueve ni un
+cuadro.
+
+⚠️ **LA ROTACIÓN DEL ABANICO VIVE EN UN WRAPPER, NO EN LA CAPA ANIMADA.**
+`motion` escribe su `rotate` animado dentro de `transform` inline, y la regla
+`[data-lp-reveal]` fuerza `transform: none !important` bajo reduced-motion:
+todo lo que dependa de ese transform desaparece con la preferencia activa.
+Con la rotación en un wrapper propio queda fuera del alcance de motion.
+
+> ⚠️ **MATIZ MEDIDO — el razonamiento obvio es INCOMPLETO y conviene saberlo
+> antes de aplicar el mismo patrón en otra sección.** Tailwind 4 **no**
+> compila `rotate-[8deg]` a `transform: rotate()`: emite la propiedad
+> independiente `rotate: -8deg`, y `transform: none` **no la toca**.
+> Verificado emulando `prefers-reduced-motion: reduce`: el computed del
+> wrapper es `rotate: -8deg` / `transform: none` y el abanico se ve entero.
+> Es decir, en este código concreto sobreviviría incluso sin wrapper.
+> El wrapper se mantiene porque no depende de ese detalle del compilador: la
+> versión anterior de esta sección ponía la rotación en un
+> `style={{ transform: 'rotate(...)' }}`, que sí era un `transform` real, y
+> ahí el aplanado habría sido seguro. **Regla práctica para F2.a: si el
+> estado final de una capa se expresa con `transform`, sácalo del elemento
+> que anima.**
+
+> ⚠️ **HALLAZGO NUEVO — UN `transform` NO PROVOCA RELAYOUT PERO SÍ DESBORDA.**
+> La tarjeta entra con `x: 24`. En móvil su borde en reposo queda a 374 de un
+> viewport de 390 —16px de holgura—, así que **mientras dura la entrada**
+> sobresale 8px y el documento gana scroll horizontal. Medido con prueba
+> causal: ocultando solo la tarjeta, `scrollWidth` cae de 398 a 390.
+> La sección lleva `overflow-x-clip` por esto. `clip` y no `hidden`: `hidden`
+> crearía un contenedor de scroll y arrastraría el eje Y a `auto`, y el eje Y
+> tiene que quedar intacto porque la tarjeta desborda 24px por abajo en móvil
+> a propósito.
+> **Lección general para F2.a:** la regla "solo `transform` y `opacity`"
+> protege del jank, NO del desbordamiento. Cualquier capa que entre con
+> desplazamiento lateral cerca del borde del viewport necesita esta
+> comprobación.
+
+⚠️ **TOKENS QUE ESTA SECCIÓN AÑADIÓ A `tokens.ts`**, porque la regla
+permanente 1 de CLAUDE.md no admite números sueltos en los componentes:
+`STAGGER.deck` (90ms, tercer peldaño tras 70/80) y `SPRING.soft/snap/heavy`
+(estaban en §4.2 pero **no** en el archivo, que es su espejo). `OFFSETS.*`
+también se declaró y **quedó sin consumidores** al morir el filete; se
+mantiene como espejo de §4.2, igual que `SPRING.snap/heavy`.
+
+⚠️ **DISTANCIA 24 Y NADA MÁS** para los reveals de bloque (`DIST.reveal`).
+Los 28px de las hojas, el `.72` del zócalo y el `x: 24` de la tarjeta son
+geometría de entrada dentro de un spring, no ritmo de reveal: van en el
+componente por el mismo criterio que el `w-20 h-20` de SeccionIA.
+
+**Móvil:** misma coreografía, sin cambios de distancia. La tarjeta pasa a
+178px y sobresale por debajo del zócalo (`-bottom-6`), que es lo que el spec
+de diseño pide.
+**RM:** `data-lp-reveal` en las seis capas. Todas tienen estado final con
+`transform` identidad (scale 1, x 0, rotate 0), así que el
+`transform: none !important` de `globals.css:905` las deja exactamente donde
+deben estar, sin trabajo extra.
 
 ### 5.11 Historia — tejido
 `Parallax` leve en retrato + `Stagger` de párrafos. Movimiento = calma.
@@ -477,15 +676,69 @@ médica sigue donde lo dejaste" (SOLO la nota — verificado).
   vigente." (NUNCA "cumple automáticamente" — el obligado es el médico.
   LFPDPPP = la NUEVA, DOF 20/03/2025; el INAI no existe, autoridad = SABG.)
 - "Tu información, separada": "Cada médico solo accede a sus pacientes, a
-  nivel de base de datos. Cada acceso queda registrado en bitácora."
-- "Siempre disponible": "Acceso desde cualquier dispositivo, con respaldo
-  automático en la nube." (Verificado: Supabase Pro, diario, 7 días.)
+  nivel de base de datos." ⚠️ **La segunda frase de esta tarjeta ("Cada
+  acceso queda registrado en bitácora") está OMITIDA A PROPÓSITO en el
+  código, no olvidada.** La verificación de §10 sobre qué accesos cubre hoy
+  la bitácora sigue abierta; hasta cerrarla, la frase no se escribe. Cuando
+  se cierre, su sitio es esta tarjeta.
+- "Respaldo automático": "Tus expedientes se respaldan solos, todos los
+  días. Si algo falla, la información sigue ahí." (Verificado: Supabase Pro,
+  diario, 7 días.) ⚠️ **El título es "Respaldo automático", no "Siempre
+  disponible"**: el copy anterior prometía disponibilidad, que es un
+  absoluto sin respaldo, y el implementado promete respaldo, que sí está
+  verificado.
+⚠️ **SIN PIE DE SECCIÓN.** La línea de portabilidad de datos vivió aquí unas
+horas y se retiró: a 13px bajo tres tarjetas se leía como nota al pie, no
+como garantía. Su contenido es ahora la sección **10b**. No la devuelvas.
 **ELIMINADO:** "Ni siquiera nosotros podemos leer tus notas" (falso:
 service_role + IA server-side; riesgo legal y de gremio — Angel es
 competidor de su cliente). Bloque de refuerzo (evaluar): "Tus pacientes
 son tuyos. Como cirujano en ejercicio, me comprometo a no usar la
 información clínica de mis colegas para nada." Enlace: "Cómo protegemos tu
-información" → página de política.
+información" → página de política (la ruta NO existe todavía; enlazarla
+sería un 404 — ver `SeccionFooter.tsx`).
+
+**10b · Tu práctica, tuya (nueva, 2026-07-30)** — Kicker "TU PRÁCTICA,
+TUYA" **sin pastilla** (sus dos vecinas usan la misma `bg-blue-50`; tres
+seguidas idénticas era repetición). Titular: "Tu información y tu equipo,
+bajo tu control". Sin bajada. Dos bloques del mismo peso separados por
+filete vertical (esqueleto en §3.4·10b):
+- **"Tus expedientes son tuyos"**: "Descarga el historial clínico de
+  cualquier paciente en PDF cuando quieras. Se genera en tu dispositivo, sin
+  pasar por nuestros servidores. Y si algún día dejas de usar Spinus, tus
+  expedientes siguen ahí y los sigues pudiendo descargar."
+- **"Tu asistente médico, en la misma cuenta"**: "Da de alta a tu asistente
+  para que gestione tu agenda: crea, mueve y cancela citas. Tú llegas y tu
+  paciente ya está en tu consulta. Sin acceso a expedientes ni a notas
+  clínicas — solo a la agenda."
+
+⚠️ **CADA CLÁUSULA ESTÁ ACOTADA A CÓDIGO VERIFICADO. NO ENSANCHAR** — una
+versión previa decía "exporta todos los expedientes" y "expediente
+completo", y **las dos eran falsas**:
+- **"de cualquier paciente", NUNCA "todos"**: el botón recibe UN paciente y
+  se monta una vez por página de expediente
+  (`ExportarExpedienteButton.tsx:30`, `HeroExpediente.tsx:90`). No existe
+  export masivo.
+- **"historial clínico", NUNCA "expediente completo"**: el PDF lleva hoja
+  frontal + N notas con diagnósticos, signos vitales y addendums, y **NO**
+  recetas, documentos, laboratorios ni DICOM
+  (`ExpedienteCompletoPdf.tsx:25-29`).
+- **"en tu dispositivo"**: 100% cliente con @react-pdf/renderer, sin servidor
+  y sin persistir en Storage (`mobileShare.ts:1-12`).
+- **"si algún día dejas de usar Spinus… los sigues pudiendo descargar"**: las
+  9 policies RESTRICTIVE de gate son `FOR INSERT` —no existe ningún
+  `_gates_update`— y los `SELECT` de `pacientes`, `consultas` y `addendums`
+  no están gateados; el gate de UI solo intercepta creación.
+- **"asistente médico", NUNCA "secretaria"** (decisión de PM). El enum de la
+  BD sigue siendo `secretaria` y no se toca; lo que se alinea es el rótulo
+  visible de la UI de alta (**LP-DT-23**). ⚠️ Esto **invalida** la mención
+  multi-cuenta de §7·13, que sí decía "secretaria": ver el aviso allí.
+- **"crea, mueve y cancela citas"** y **"sin acceso a expedientes ni a notas
+  clínicas"**: verificado en `ROLES_POST_REFACTOR.md:171-176` y `:150,164`.
+- **"da de alta", NUNCA "invita"**: no hay correo de invitación; el admin
+  teclea email y contraseña (`admin/usuarios/page.tsx:36,74`).
+- **SIN PRECIOS NI PLANES.** El asistente exige plan de clínica (Individual
+  tiene `max_secretarias: 0`), pero esta sección no habla de dinero.
 
 **11 · Historia** — Badge "MI HISTORIA" (nunca "nuestra"). PRIMERA persona.
 Foto del pasillo de hospital (recorte hombros-arriba; badge de estetoscopio
@@ -509,11 +762,42 @@ min = 35 min/día) argumentaba EN CONTRA; el Teaser 1 demuestra lo que ella
 afirmaba.
 
 **13 · CTA final + footer** — Titular: "Tu consultorio merece software
-hecho para ayudarte, no para cumplir un requisito." CTA "Empieza gratis" +
-"Ver planes". Degradado vertical/radial (nunca izq→der). Footer: contacto
+hecho para ayudarte, no para cumplir un requisito." **Mención multi-cuenta
+(añadida 2026-07-30):** "¿Clínica con varios médicos? Da de alta a tu equipo
+y a tu secretaria en una sola cuenta." Luego CTA "Empieza gratis" + "Ver
+planes". Degradado vertical/radial (nunca izq→der).
+⚠️ **LA MENCIÓN VA ANTES DE LOS BOTONES, NO DEBAJO.** La propuesta inicial
+la ponía debajo; se movió tras medir: cuesta los mismos ~43px de caja pero
+deja los botones como último elemento antes del footer. Texto bajo el botón
+invita a leerlo en vez de pulsarlo, que es lo contrario de lo que un cierre
+debe hacer. Orden: titular → promesa → matiz → acción.
+⚠️ **TRES RESTRICCIONES DE COPY, cada una con motivo verificado:**
+(a) **"da de alta", NUNCA "invita"** — no existe correo de invitación: el
+admin teclea email y contraseña (`admin/usuarios/page.tsx:36,74`).
+(b) **"secretaria"** — ⚠️ **DECISIÓN REVERTIDA, ESTA LÍNEA ESTÁ EN CONFLICTO
+CON §7·10b Y HAY QUE RESOLVERLA ANTES DE PUBLICAR.** El 2026-07-30 se decidió
+primero que la palabra pública fuera "secretaria" (y así quedó escrita esta
+mención y así lo registra LP-DT-23); horas después, al redactar §7·10b, se
+decidió lo contrario: **"asistente médico", NO "secretaria"**. Hoy la landing
+usa las DOS palabras para el mismo rol, con una sección de por medio. Hay que
+elegir una y propagarla a los tres sitios (esta mención, §7·10b y el rótulo
+de la UI de alta), y reescribir LP-DT-23, que documenta la decisión vieja.
+Nada de esto se tocó por cuenta propia: el copy es del PM.
+(c) **SIN PRECIO** — el multi-cuenta empieza en Clínica Básica ($1,990/mes);
+el plan Individual tiene `max_secretarias: 0` (`plans.ts:44`). Nombrar cifras
+mete un salto de 3× en un cierre que no habla de dinero.
+La capacidad es real y contratable: 8 price IDs configurados, checkout en
+`api/stripe/checkout/route.ts`, y la secretaria agenda de verdad
+(`ROLES_POST_REFACTOR.md:171-176`).
+Footer: contacto
 real (correo + WhatsApp — su ausencia es la mayor señal de desconfianza),
 nombre y cédulas, "Cómo protegemos tu información", tagline, Aviso de
 privacidad (⚠️ verificar que no cite INAI/ley 2010), Términos, Planes.
+⚠️ **Lo implementado diverge de esa lista a propósito**, y está razonado en
+`SeccionFooter.tsx:6-17`: sin WhatsApp (no hay número), sin autoría ni
+cédulas (es footer de SaaS, no firma profesional — esos datos viven en
+Historia) y sin enlace a "Cómo protegemos tu información" (la ruta no
+existe; sería un 404). Entran cuando existan, no antes.
 
 **Global:** `grep -rn "®"` → eliminar TODAS las apariciones (nav, sidebar,
 mockups, imagen 5, footer, PDFs, registro — mín. 6 sitios). Marca EN

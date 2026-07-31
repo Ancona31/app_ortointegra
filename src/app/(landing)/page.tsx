@@ -9,6 +9,7 @@ import SeccionExpediente from '@/components/landing/sections/SeccionExpediente'
 import SeccionPortabilidad from '@/components/landing/sections/SeccionPortabilidad'
 import SeccionInterfaz from '@/components/landing/sections/SeccionInterfaz'
 import SeccionHistoria from '@/components/landing/sections/SeccionHistoria'
+import SeccionControl from '@/components/landing/sections/SeccionControl'
 import SeccionSeguridad from '@/components/landing/sections/SeccionSeguridad'
 import SeccionCTA from '@/components/landing/sections/SeccionCTA'
 import SeccionFooter from '@/components/landing/sections/SeccionFooter'
@@ -30,6 +31,17 @@ export default function HomePage() {
       <SeccionPortabilidad />
       <SeccionInterfaz />
       <SeccionHistoria />
+      {/* ⚠️ EL ORDEN DE ESTE ARCHIVO NO ES EL DE LA TABLA DE §3.4, y esta
+          sección lo hace visible. La tabla numera Seguridad=10 y Historia=11;
+          aquí Historia va ANTES que Seguridad, así que "entre Seguridad e
+          Historia" resuelve a este hueco, el único que las tiene por vecinas.
+          Consecuencia: SeccionControl cierra la parte personal y ABRE el
+          bloque de confianza, en vez de cerrarlo. La divergencia de orden es
+          previa (también Portabilidad e Interfaz están intercambiadas
+          respecto a §3.4·9 y §3.4·8) y no se resuelve aquí; si alguna tanda
+          la reordena, esta sección debe viajar con Seguridad, no quedarse
+          pegada a Historia. */}
+      <SeccionControl />
       <SeccionSeguridad />
       <SeccionCTA />
       <SeccionFooter />

@@ -50,4 +50,43 @@ export const STAGGER = {
   siblings: 0.07,
   /** 80ms en listas secuenciales (pasos, timeline). PLAN §2.3. */
   list: 0.08,
+  /**
+   * 90ms — mazo abanicado de documentos (SeccionControl). Tercer peldaño de
+   * la escalera 70/80/90: los 3 elementos se solapan en el espacio, así que
+   * necesitan más separación en el tiempo que unos hermanos en retícula para
+   * que se lea el orden de apilado.
+   *
+   * ⚠️ Es un valor NUEVO, no venía de §4.2 del maestro. Se declara aquí
+   * porque la regla permanente 1 de CLAUDE.md prohíbe números sueltos en los
+   * componentes, no porque el sistema pidiera un tercer escalón. Si en QA se
+   * decide que 80ms basta, este token desaparece y `deck` pasa a `list`.
+   */
+  deck: 0.09,
+} as const
+
+/**
+ * Springs. Espejo de §4.2 del maestro, que los declara pero que hasta ahora
+ * no estaban en este archivo — `motion` los consume como objeto, no como
+ * variable CSS, así que no tienen contrapartida en globals.css.
+ */
+export const SPRING = {
+  /** Entradas de escenario: llega y asienta sin rebote visible. §4.2. */
+  soft: { type: 'spring', stiffness: 120, damping: 20 },
+  /** Respuesta inmediata de control. §4.2. Sin consumidores todavía. */
+  snap: { type: 'spring', stiffness: 300, damping: 30 },
+  /** Masa alta, para lo que debe sentirse pesado. §4.2. Sin consumidores. */
+  heavy: { type: 'spring', stiffness: 60, damping: 18 },
+} as const
+
+/**
+ * Tramos de scroll para `useScroll({ offset })`. Espejo de §4.2.
+ * Sintaxis de motion: "<borde del target> <borde del contenedor>".
+ */
+export const OFFSETS = {
+  /** Entrada: del 90% al 35% del viewport. §4.2 OFF_ENTRADA. */
+  entrada: ['start 0.9', 'start 0.35'],
+  /** Travesía completa del elemento por el viewport. §4.2 OFF_TRAVESIA. */
+  travesia: ['start end', 'end start'],
+  /** Anclado (escenarios sticky). §4.2 OFF_ANCLADO. */
+  anclado: ['start start', 'end end'],
 } as const

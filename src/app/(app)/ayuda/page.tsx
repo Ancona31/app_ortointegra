@@ -38,8 +38,10 @@ const faqs = [
     a: 'Cada receta generada incluye un código QR único. Al escanearlo, se abre una página pública que muestra los datos de la receta para que la farmacia o el paciente puedan verificar su autenticidad.',
   },
   {
-    q: '¿Puedo agregar secretarias a mi cuenta?',
-    a: 'Sí. Desde Administración → Usuarios puedes crear cuentas con rol "Secretaria". Tienen acceso limitado — pueden ver pacientes y agendar citas, pero no generan documentos médicos ni acceden a notas clínicas.',
+    // El rótulo público del rol es "asistente médico" (LP-DT-23). El valor del
+    // enum en BD sigue siendo `secretaria` y no se toca: es interno.
+    q: '¿Puedo agregar asistentes médicos a mi cuenta?',
+    a: 'Sí. Desde Administración → Usuarios puedes crear cuentas con rol "Asistente Médico/a". Tienen acceso limitado — pueden ver pacientes y agendar citas, pero no generan documentos médicos ni acceden a notas clínicas.',
   },
 ]
 

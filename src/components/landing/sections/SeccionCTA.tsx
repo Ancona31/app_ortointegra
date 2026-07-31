@@ -50,6 +50,66 @@ export default function SeccionCTA() {
             <br />
             Crea tu cuenta y empieza a usarla hoy — así de simple.
           </p>
+          {/* ═══ MENCIÓN MULTI-CUENTA — ANTES DE LOS BOTONES, NO DEBAJO ═══
+              §7·13. La propuesta inicial la ponía bajo los botones; se movió
+              aquí con argumento medido: cuesta los mismos ~43px de caja pero
+              deja los botones como último elemento del documento antes del
+              footer. Texto debajo del botón invita a leerlo en vez de
+              pulsarlo, que es lo contrario de lo que un cierre debe hacer.
+              El orden queda titular → promesa → matiz → acción.
+              ⚠️ Si una tanda futura la baja, medir antes: a 390 esta línea ya
+              ocupa 2 renglones, y ahí el bloque de cierre acumula ~487px.
+
+              ⚠️ COPY ACOTADO A LO VERIFICADO. NO lo ensanches:
+                · "da de alta", NUNCA "invita": no existe correo de
+                  invitación. El admin teclea email y contraseña él mismo
+                  (`admin/usuarios/page.tsx:36,74` → `/api/admin/crear-usuario`).
+                · "asistente médico", NUNCA "secretaria". ⚠️ ESTO REVIERTE LA
+                  DECISIÓN DEL 2026-07-30 POR LA MAÑANA, que había fijado
+                  "secretaria" y así se escribió esta línea. La sección
+                  SeccionControl.tsx usa "asistente médico" y la landing no
+                  puede llamar de dos formas al mismo rol a un scroll de
+                  distancia. El enum de la BD sigue siendo `secretaria` y NO
+                  se toca (`permissions.ts:52-54`); lo que queda por alinear
+                  es la ayuda (`ayuda/page.tsx:41`, dice "Secretaria"). La UI
+                  de alta ya dice "Asistente Médico/a"
+                  (`admin/usuarios/page.tsx:183`) y por tanto YA está bien.
+                  Ver LP-DT-23, reescrita con esta decisión.
+                · SIN PRECIO a propósito. El multi-cuenta empieza en Clínica
+                  Básica ($1,990/mes, `plans.ts:63-83`), no en Individual, que
+                  tiene `max_secretarias: 0` y `max_medicos: 1` (`:44-45`).
+                  Nombrar el precio aquí mete un salto de 3× en un cierre que
+                  hoy no habla de dinero.
+                · La capacidad SÍ existe y es contratable: los 8 price IDs
+                  están definidos, el checkout vive en
+                  `api/stripe/checkout/route.ts` y la secretaria agenda de
+                  verdad (`ROLES_POST_REFACTOR.md:171-176`, `agenda/page.tsx:526`).
+
+              F1.3·d4 — rol caption: 13px · 1.45. Ver SeccionFooter.tsx.
+              `mt-6` (24) está en la escala de §3.3 y los botones conservan su
+              `mt-8`. El `relative` NO es opcional: sin él la línea queda por
+              debajo del shine (mismo motivo que el del contenedor de botones,
+              comentado abajo).
+
+              ⚠️ `text-white` A PLENO, NO `text-white/70`. Es contraintuitivo
+              —la bajada de aquí arriba SÍ va al 70%— y tiene medición detrás.
+              El degradado es vertical (#1a3a5c → #1e5fa8) y esta línea cae más
+              abajo que la bajada, o sea sobre el extremo CLARO. Muestreado en
+              píxel real sobre la captura:
+                white/70 → texto #bcccde sobre #225893 = 4.45:1  FALLA AA
+                white/80 → 5.29:1 ok, pero el 80% NO existe en la escala
+                           inversa que declaró e1 (100 / 70 / 50)
+                white    → 7.28:1 ok
+              A 13px el umbral es 4.5 sin excepción de texto grande, así que
+              el 70% se queda a 0.05 de pasar. Curiosidad que explica por qué
+              la bajada sí puede: a 19px el umbral es el mismo, pero ella vive
+              más arriba en el degradado y mide 4.87.
+              El matiz visual lo da el TAMAÑO (13 contra los 15 del botón y
+              los 19 de la bajada), no el alfa. Si una tanda futura la baja al
+              70% "por coherencia con la bajada", reintroduce el fallo. */}
+          <p className="relative mt-6 text-[13px] text-white leading-[1.45]">
+            &iquest;Cl&iacute;nica con varios m&eacute;dicos? Da de alta a tu equipo y a tu asistente m&eacute;dico en una sola cuenta.
+          </p>
           {/* Mismo par de CTAs que el hero (§7·13), con las mismas etiquetas:
               "Empieza gratis" + "Ver planes". El secundario NO puede copiar el
               del hero (blanco sólido sobre fondo claro) porque aquí competiría

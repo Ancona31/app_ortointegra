@@ -1845,4 +1845,135 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
 
 ---
 
+### LP-DT-21 — Audit del export de expediente es fire-and-forget (hueco de trazabilidad NOM-024)
+- **Estado:** 🔴 abierta
+- **Detectada:** auditoría de la adenda de contenido previa a F1.3 (e) (2026-07-30)
+- **Descripción:** `src/components/expediente/ExportarExpedienteButton.tsx:127-135`
+  registra la exportación en `audit_log` con
+  `fetch('/api/audit', …).catch(() => {})`. El `.catch` vacío es deliberado
+  —el comentario de arriba dice "no bloquea ni revierte nada si falla"— pero
+  la consecuencia es que **si el POST falla, el PDF se entrega igual y no
+  queda ningún rastro de la exportación**. El PDF ya se generó en el cliente
+  antes de esa llamada, así que no hay forma de revertirlo.
+- **Por qué importa ahora:** exportar un expediente íntegro no es una lectura
+  más; el propio comentario del archivo lo invoca ("NOM-024"). Y desde esta
+  adenda la landing **anuncia la capacidad en público**
+  (`SeccionSeguridad.tsx`, pie de sección), lo que sube el volumen esperado
+  de uso y con él el de eventos perdidos.
+- **Fix propuesto:** reintentar una vez con backoff corto; si el segundo
+  intento también falla, encolar en `localStorage` vía `secureStorage` y
+  drenar al siguiente arranque. NO bloquear la entrega del PDF: el médico no
+  puede quedarse sin sus datos porque falle la bitácora.
+- **Condición de cierre:** que toda exportación entregada tenga entrada en
+  `audit_log`, o quede en cola persistente hasta tenerla.
+
+### LP-DT-22 — QW3 sube de prioridad: el endpoint ARCO queda expuesto por el copy de la landing
+- **Estado:** 🔴 abierta — **prioridad elevada**
+- **Detectada:** el pendiente es previo (ver `CLAUDE.md` § Pendientes de
+  seguridad, QW3). La **elevación de prioridad** es de esta adenda (2026-07-30)
+- **Descripción:** `src/app/api/paciente/[id]/exportar/route.ts` devuelve JSON
+  con TODO el expediente (datos personales, consultas, addendums, mediciones,
+  documentos) y **solo exige sesión autenticada: no valida el role**. QW3 ya
+  planeaba restringirlo a `super_admin` + `admin`.
+- **Qué cambia con la adenda:** hasta hoy el endpoint estaba dormido y sin UI.
+  A partir de que la landing dice públicamente *"Llévate tu información cuando
+  quieras"*, **es el primer sitio donde mirará quien vaya a buscar cómo se
+  exporta**. Un pendiente sin visibilidad pasa a ser superficie de ataque
+  documentada por nuestro propio marketing.
+- **Ojo con la confusión:** el endpoint ARCO **no es** lo que la landing
+  anuncia. El copy describe el botón de PDF cliente
+  (`ExportarExpedienteButton.tsx`), que sí está acotado por RLS. Son dos
+  caminos distintos hacia el mismo dato y solo uno está protegido.
+- **Fix:** el ya descrito en QW3 (validar role post-auth, `403` con
+  `{ error: "forbidden" }`, registrar `arco_intento_denegado` en `audit_log`).
+  ~15 líneas, 1 archivo.
+- **Condición de cierre:** QW3 aplicado. Debería ir **antes** de que la landing
+  con este copy llegue a producción.
+
+### LP-DT-23 — Nombre público del rol: "asistente médico" (decisión revertida el mismo día)
+- **Estado:** ✅ cerrada (2026-07-31) — las cuatro superficies visibles dicen lo mismo
+- **Detectada:** auditoría de la adenda de contenido previa a F1.3 (e) (2026-07-30)
+- **⚠️ ESTA FICHA SUSTITUYE A SU VERSIÓN ANTERIOR, QUE DECÍA LO CONTRARIO.**
+  El 2026-07-30 por la mañana se decidió que la palabra pública fuera
+  **"secretaria"** ("es la del médico mexicano") y esta ficha lo registró así.
+  Ese mismo día, al redactar la sección "Tu práctica, tuya", el PM revirtió:
+  la palabra pública es **"asistente médico"**. Si estás leyendo una copia
+  vieja de este registro o un comentario que diga "secretaria es la decisión",
+  está caducado.
+- **Estado por superficie:**
+
+  | Superficie | Dice | ¿Alineado? |
+  |---|---|---|
+  | `SeccionControl.tsx` (landing) | "asistente médico" | ✅ |
+  | `SeccionCTA.tsx` (landing) | "asistente médico" | ✅ corregido en esta tanda |
+  | `admin/usuarios/page.tsx:183` (UI de alta) | "Asistente Médico/a" | ✅ ya lo estaba |
+  | `ayuda/page.tsx:41-42` (FAQ) | "asistentes médicos" / rol "Asistente Médico/a" | ✅ corregido 2026-07-31 |
+  | `profiles.role` (enum de BD) | `secretaria` | ⬜ **NO SE TOCA** |
+
+- **⚠️ EL ENUM NO ENTRA EN ESTO.** `permissions.ts:52-54` y toda la capa de
+  RLS usan el valor `secretaria`. Renombrarlo es una migración con RLS,
+  policies y `isSecretaria()` de por medio, y **no aporta nada**: es un valor
+  interno que ningún usuario ve. Lo que se unifica es el RÓTULO.
+- **Cierre:** el FAQ se corrigió el 2026-07-31 con el resto de la unificación.
+  No queda ninguna superficie visible diciendo "secretaria"; el único sitio
+  donde sobrevive la palabra es el valor del enum en BD y los comentarios que
+  explican por qué no se toca.
+
+### LP-DT-24 — `ROLES_POST_REFACTOR.md` desfasado: marca como TBD límites que `plans.ts` ya tiene concretos
+- **Estado:** 🔴 abierta
+- **Detectada:** auditoría de la adenda de contenido previa a F1.3 (e) (2026-07-30)
+- **Descripción:** `ROLES_POST_REFACTOR.md:75-87` (§1.6, mapeo plan → tipo de
+  cuenta) da los límites de los planes comerciales como rangos con "(TBD)" y
+  remata: *"Los valores específicos de `max_medicos`/`max_secretarias` para los
+  planes comerciales son TBD (a definir cuando se comercialicen)"*.
+  **Ya están definidos y en producción** en `src/lib/plans.ts`:
+
+  | plan | `max_medicos` | `max_secretarias` | línea |
+  |---|---|---|---|
+  | `basica` | 3 | 1 | `plans.ts:68-69` |
+  | `pro` | 5 | 2 | `plans.ts:88-89` |
+  | `premium` | 10 | 2 | `plans.ts:110-111` |
+
+  Y se aplican de verdad: `src/app/api/admin/crear-usuario/route.ts:64-68`
+  rechaza con 403 al alcanzar el tope.
+- **Riesgo:** el doc de roles es la referencia que se consulta para decidir
+  qué promete cada plan. Que diga "TBD" invita a inventar cifras. Nótese que
+  `premium` **no sube de secretarias** respecto a `pro` (2 en ambos), cosa que
+  el rango "3+ (TBD)" del doc contradice de frente.
+- **Fuente de verdad:** `plans.ts`. El doc se sincroniza con él, no al revés.
+- **Condición de cierre:** §1.6 de `ROLES_POST_REFACTOR.md` con los valores
+  reales y sin "TBD".
+
+### LP-DT-25 — La retícula de Seguridad se rompe entre 640 y 768px (preexistente)
+- **Estado:** 🔴 abierta — **preexistente, NO introducida por la adenda**
+- **Detectada:** auditoría de la adenda de contenido previa a F1.3 (e)
+  (2026-07-30), midiendo el layout con un cuarto elemento
+- **Descripción:** `SeccionSeguridad.tsx` usa `grid sm:grid-cols-3`, y `sm`
+  entra en **640px**. Medido en navegador sobre el ancho útil real (1088px a
+  1440; el contenedor `max-w-6xl` mide 1152 **exteriores** y `px-8` come 32 por
+  lado):
+
+  | viewport | ancho/tarjeta | alto de tarjeta | H3 | cuerpo |
+  |---|---|---|---|---|
+  | 1440 | 346.67px | 286.88 | 1/1/1 L | 4/3/3 L |
+  | 1024 | 304px | 314.92 | 1/1/1 L | 5/3/3 L |
+  | 768 | 218.67px | 395.70 | **2/2/2 L** | 7/4/6 L |
+  | 640 | **176px** | **507.89** | **2/3/2 L** | **11/6/8 L** |
+
+  A 640px cada tarjeta mide 176px, el título parte en hasta 3 líneas y un
+  cuerpo llega a 11. Tres columnas a ese ancho no son una retícula, son tres
+  tiras.
+- **Por qué no se arregló en la adenda:** el alcance aprobado era añadir un pie
+  de sección (opción C), que **no toca la retícula**. Cambiar el breakpoint es
+  una decisión de layout con su propia QA visual.
+- **Fix propuesto:** subir el corte a `md:grid-cols-3` (768px) y dejar
+  `sm:grid-cols-2` en medio, o pasar directo de 1 a 3 columnas en `lg`. Medir
+  antes: el mismo patrón `sm:grid-cols-3` está en `SeccionFeatures.tsx:145` y
+  `SeccionPortabilidad.tsx:53`, así que la decisión debería barrer las tres o
+  justificar por qué no.
+- **Condición de cierre:** ninguna tarjeta de Seguridad por debajo de ~240px de
+  ancho en ningún breakpoint.
+
+---
+
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)
