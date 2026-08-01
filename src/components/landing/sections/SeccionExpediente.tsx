@@ -39,12 +39,22 @@ export default function SeccionExpediente() {
             <p className="mt-6 text-[19px] text-[var(--lp-ink-500)] max-w-lg tracking-[-0.01em] leading-[1.55]">
               Diseñado para que captures la información clínica en el menor número de clics posible. Notas médicas, laboratorios, imagen, recetas y consentimientos — todo vinculado al mismo paciente, accesible al instante.
             </p>
+            {/* F1.3·e4 — LAS CUATRO VIÑETAS ERAN DE CUATRO COLORES distintos
+                (amber-500, violet-500, sky-500, emerald-500). Pasan todas a
+                --lp-accent por §3.1: los semánticos solo se usan cuando
+                representan un dato real, y aquí no había dato — son cuatro
+                elementos del mismo rango en una misma lista, y el color no los
+                distinguía por nada. De paso cierra un hueco de contraste: los
+                cuatro caían entre 2.04:1 y 4.21:1, todos por debajo del 3:1 de
+                gráfico informativo salvo uno. En acento dan 6.45:1.
+                NO CONFUNDIR con las 3 barras del timeline de abajo (:100-102),
+                que sí son semánticas y sí sobreviven. */}
             <div className="mt-8 space-y-4">
               {[
-                { icon: <Zap className="w-4 h-4 text-amber-500" />, text: 'Nota médica que la IA estructura — tú validas y firmas' },
-                { icon: <Search className="w-4 h-4 text-violet-500" />, text: 'Búsqueda rápida — ⌘K / Ctrl+K, encuentra cualquier paciente al instante' },
-                { icon: <Layers className="w-4 h-4 text-sky-500" />, text: 'Guarda los cortes clave del estudio y ábrelos con el visor integrado' },
-                { icon: <QrCode className="w-4 h-4 text-emerald-500" />, text: 'QR verificable en cada receta' },
+                { icon: <Zap className="w-4 h-4 text-[var(--lp-accent)]" />, text: 'Nota médica que la IA estructura — tú validas y firmas' },
+                { icon: <Search className="w-4 h-4 text-[var(--lp-accent)]" />, text: 'Búsqueda rápida — ⌘K / Ctrl+K, encuentra cualquier paciente al instante' },
+                { icon: <Layers className="w-4 h-4 text-[var(--lp-accent)]" />, text: 'Guarda los cortes clave del estudio y ábrelos con el visor integrado' },
+                { icon: <QrCode className="w-4 h-4 text-[var(--lp-accent)]" />, text: 'QR verificable en cada receta' },
               ].map((item) => (
                 <div key={item.text} className="flex items-start gap-3">
                   {/* `-mt-0.5` = −2px: alineación ÓPTICA del cuadro de icono

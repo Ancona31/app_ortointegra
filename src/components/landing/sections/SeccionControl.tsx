@@ -41,8 +41,11 @@ import { DIST, DUR, EASE, SPRING, STAGGER } from '@/components/landing/motion/to
    ⚠️ EL KICKER NO DICE "TU PRÁCTICA, TUYA". Dice "CONTROL Y AUTONOMÍA".
    El anterior colisionaba con el titular de Seguridad ("Tu práctica,
    protegida"), que queda pocos cientos de px más abajo. Va SIN pastilla:
-   Historia y Seguridad usan las dos `bg-blue-50` y una tercera igual
-   seguidas serían tres idénticas consecutivas.
+   Historia y Seguridad usan las dos la pastilla de acento
+   (`--lp-accent-bg`/`--lp-accent`) y una tercera igual seguidas serían tres
+   idénticas consecutivas. El argumento se REFORZÓ en F1.3·e4: las cinco
+   pastillas de kicker de la landing son ahora idénticas entre sí —antes dos de
+   ellas eran verde y violeta—, así que aquí una pastilla cantaría todavía más.
 
    ═══ QUÉ SE DESVÍA DEL SPEC DE DISEÑO, Y POR QUÉ ═══
    El spec se escribió sin conocer el sistema de la página. El PM corrigió

@@ -54,20 +54,25 @@ export default function SeccionPortabilidad() {
             "corrige" nada — abre tres canales grises de 8px y destruye la
             franja. Si una auditoría futura lo reporta como valor fuera de
             escala, la respuesta es esta nota. */}
+        {/* F1.3·e4 — los 3 iconos eran #8a99ac: 2.90:1 sobre el blanco de la
+            tarjeta, por debajo del 3:1 que WCAG pide a un gráfico informativo.
+            Pasan a --lp-ink-500 (5.45:1) — tinta, no acento. Ver la nota del
+            bento en SeccionFeatures.tsx: la decisión de PM fue la misma en los
+            dos sitios y por el mismo motivo. */}
         <div className="grid sm:grid-cols-3 gap-px bg-[#e6ebf2] rounded-2xl overflow-hidden border-[0.5px] border-[#e6ebf2]">
           {[
             {
-              icon: <Laptop className="w-5 h-5 text-[#8a99ac]" />,
+              icon: <Laptop className="w-5 h-5 text-[var(--lp-ink-500)]" />,
               title: 'Computadora',
               desc: 'La experiencia completa: sidebar, atajos y expediente expandido.',
             },
             {
-              icon: <Smartphone className="w-5 h-5 text-[#8a99ac]" />,
+              icon: <Smartphone className="w-5 h-5 text-[var(--lp-ink-500)]" />,
               title: 'Tablet y celular',
               desc: 'Interfaz adaptada al tacto. Revisa citas y consulta expedientes donde estés.',
             },
             {
-              icon: <Globe className="w-5 h-5 text-[#8a99ac]" />,
+              icon: <Globe className="w-5 h-5 text-[var(--lp-ink-500)]" />,
               title: 'Sin instalaciones',
               desc: 'Corre en el navegador y se actualiza sola.',
             },

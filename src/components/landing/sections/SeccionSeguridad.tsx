@@ -3,12 +3,16 @@
 import type { ReactNode } from 'react'
 import { Shield, Scale, Database, DatabaseBackup } from 'lucide-react'
 
+/* F1.3·e4 — AQUÍ HABÍA UN CAMPO `iconBg: string`. Cada tarjeta traía el suyo
+   (blue-50, violet-50, emerald-50) con sus iconos a juego, y el propio comentario
+   del campo ya lo declaraba deuda de §3.1: los semánticos decoraban en vez de
+   representar un dato. La tanda e4 los unifica a --lp-accent-bg/--lp-accent, y
+   un campo cuyo valor es idéntico en las tres filas no es dato: es una constante
+   disfrazada de configuración. El fondo vive ahora en el JSX del render, una
+   sola vez. Si alguna vez una tarjeta necesita OTRO fondo por un motivo real,
+   reponer el campo es trivial — pero que el motivo exista primero. */
 interface Tarjeta {
   icon: ReactNode
-  /** Fondo del contenedor del icono. Los semánticos (violeta, esmeralda) aquí
-   *  decoran en vez de representar datos reales del producto — deuda de §3.1
-   *  que barre F1.3 en toda la landing, no esta sección sola. */
-  iconBg: string
   title: string
   desc: ReactNode
 }
@@ -55,8 +59,7 @@ interface Tarjeta {
       copy dice "queda registrado", no "queda registrado siempre". */
 const tarjetas: Tarjeta[] = [
   {
-    icon: <Scale className="w-6 h-6 text-[#1e5fa8]" />,
-    iconBg: 'bg-blue-50',
+    icon: <Scale className="w-6 h-6 text-[var(--lp-accent)]" />,
     title: 'Conforme a la norma',
     desc: (
       <>
@@ -67,14 +70,12 @@ const tarjetas: Tarjeta[] = [
     ),
   },
   {
-    icon: <Database className="w-6 h-6 text-violet-600" />,
-    iconBg: 'bg-violet-50',
+    icon: <Database className="w-6 h-6 text-[var(--lp-accent)]" />,
     title: 'Tu información, separada',
     desc: 'Cada médico ve solo a sus pacientes. En cuentas de clínica, el administrador ve los expedientes de todo su equipo. Cada acceso queda registrado en bitácora.',
   },
   {
-    icon: <DatabaseBackup className="w-6 h-6 text-emerald-600" />,
-    iconBg: 'bg-emerald-50',
+    icon: <DatabaseBackup className="w-6 h-6 text-[var(--lp-accent)]" />,
     title: 'Respaldo automático',
     desc: 'Tus expedientes se respaldan solos, todos los días. Si algo falla, la información sigue ahí.',
   },
@@ -141,8 +142,8 @@ export default function SeccionSeguridad() {
         {/* F1.3·c3 — `mb-12` (48). Ver SeccionFeatures.tsx. */}
         <div className="text-center mb-12">
           {/* F1.3·e3 — pastilla de kicker unificada: --lp-accent-bg / --lp-accent.
-              Los `iconBg` semánticos de las tres cards de abajo NO entran aquí
-              (tanda e4): son otra decisión. */}
+              e4 llevó los fondos de icono de las tres cards al mismo par, así
+              que la sección entera va con un solo acento. */}
           <div className="inline-flex items-center gap-2 bg-[var(--lp-accent-bg)] rounded-full px-3.5 py-1 mb-6">
             <Shield className="w-3.5 h-3.5 text-[var(--lp-accent)]" />
             {/* F1.3·d1 — rol kicker: 12px · +0.12em · 1.0. Ver SeccionHero.tsx. */}
@@ -188,7 +189,7 @@ export default function SeccionSeguridad() {
               className="bg-white rounded-2xl border-[0.5px] border-[#e6ebf2] p-8 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200"
             >
               {/* F1.3·c3 — `mb-6` (24), no mb-5: 20 no está en la escala. */}
-              <div className={`w-12 h-12 rounded-xl ${t.iconBg} flex items-center justify-center mb-6`}>
+              <div className="w-12 h-12 rounded-xl bg-[var(--lp-accent-bg)] flex items-center justify-center mb-6">
                 {t.icon}
               </div>
               {/* F1.3·d4 — rol H3 de card: 19px · -0.015em · 1.30.

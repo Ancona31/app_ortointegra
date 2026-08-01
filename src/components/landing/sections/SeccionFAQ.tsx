@@ -38,8 +38,10 @@ import { PREGUNTAS_FAQ } from '@/components/landing/faq-contenido'
    a franja sin mover el CTA.
 
    ⚠️ KICKER SIN PASTILLA, por el mismo motivo que en 10b: la sección de
-   arriba (Seguridad) usa `bg-blue-50` y dos pastillas idénticas seguidas son
-   repetición. */
+   arriba (Seguridad) lleva la pastilla de acento
+   (`--lp-accent-bg`/`--lp-accent`) y dos pastillas idénticas seguidas son
+   repetición. Desde F1.3·e4 las cinco pastillas de la landing son idénticas,
+   con lo que "dos seguidas" es literal, no aproximado. */
 
 /* ⚠️ §12 SE REESCRIBIÓ PARA QUE ESTA SECCIÓN EXISTA — no la estás violando.
    La lista negra decía "texto letra-por-letra fuera del hero", y esa entrada

@@ -59,13 +59,18 @@ export default function SeccionInterfaz() {
                   al más profundo (#1a3a5c, paso 5) — refuerza el avance del flujo.
                   Los 5 pasos interpolan SOLO entre esos dos valores de §3.1 con
                   color-mix; inventar azules intermedios sería color fuera de
-                  tabla (§12). Los 5 tonos pasan AA con texto blanco. */}
+                  tabla (§12). Los 5 tonos pasan AA con texto blanco.
+
+                  F1.3·e4 — la gradación SOBREVIVE tal cual: sí representa un
+                  dato (el avance del flujo) y por eso §3.1 la admite. Lo único
+                  que cambió son los dos hex literales, ahora --lp-accent y
+                  --lp-navy. Los porcentajes del color-mix no se tocan. */}
               {[
-                { step: '1', label: 'Paciente llega', desc: 'La tarjeta "Próxima cita" te muestra quién sigue', tone: '#1e5fa8' },
-                { step: '2', label: 'Abrir expediente', desc: 'Un clic desde la cita', tone: 'color-mix(in srgb, #1e5fa8 75%, #1a3a5c)' },
-                { step: '3', label: 'Nota médica con IA', desc: 'Describe los hallazgos, la IA estructura la nota', tone: 'color-mix(in srgb, #1e5fa8 50%, #1a3a5c)' },
-                { step: '4', label: 'Generar receta', desc: 'Selecciona medicamentos, sale membretada y con QR', tone: 'color-mix(in srgb, #1e5fa8 25%, #1a3a5c)' },
-                { step: '5', label: 'Enviar al paciente', desc: 'Email automático con la receta adjunta', tone: '#1a3a5c' },
+                { step: '1', label: 'Paciente llega', desc: 'La tarjeta "Próxima cita" te muestra quién sigue', tone: 'var(--lp-accent)' },
+                { step: '2', label: 'Abrir expediente', desc: 'Un clic desde la cita', tone: 'color-mix(in srgb, var(--lp-accent) 75%, var(--lp-navy))' },
+                { step: '3', label: 'Nota médica con IA', desc: 'Describe los hallazgos, la IA estructura la nota', tone: 'color-mix(in srgb, var(--lp-accent) 50%, var(--lp-navy))' },
+                { step: '4', label: 'Generar receta', desc: 'Selecciona medicamentos, sale membretada y con QR', tone: 'color-mix(in srgb, var(--lp-accent) 25%, var(--lp-navy))' },
+                { step: '5', label: 'Enviar al paciente', desc: 'Email automático con la receta adjunta', tone: 'var(--lp-navy)' },
               ].map((item) => (
                 <div key={item.step} className="flex items-center gap-4 bg-white rounded-xl border border-slate-200/60 px-4 py-3">
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: item.tone }}>
@@ -114,11 +119,15 @@ export default function SeccionInterfaz() {
             <p className="mt-6 text-[19px] text-[var(--lp-ink-500)] max-w-lg tracking-[-0.01em] leading-[1.55]">
               Sin configuraciones, sin formatos rígidos, sin capacitación. Cada pantalla está diseñada para que el siguiente paso sea obvio — desde que llega el paciente hasta que se va con su receta.
             </p>
+            {/* F1.3·e4 — las tres viñetas eran emerald-500, amber-500 y
+                violet-500. Mismo criterio que las cuatro de
+                SeccionExpediente.tsx: color sin dato detrás, y de 2.04:1 a
+                4.21:1 de contraste. Todas a --lp-accent (6.45:1). */}
             <div className="mt-8 space-y-4">
               {[
-                { icon: <MousePointerClick className="w-4 h-4 text-emerald-500" />, text: 'No necesitas capacitación para empezar' },
-                { icon: <Zap className="w-4 h-4 text-amber-500" />, text: 'Búsqueda rápida — ⌘K / Ctrl+K' },
-                { icon: <Calendar className="w-4 h-4 text-violet-500" />, text: 'Arrastra y suelta las citas en la agenda' },
+                { icon: <MousePointerClick className="w-4 h-4 text-[var(--lp-accent)]" />, text: 'No necesitas capacitación para empezar' },
+                { icon: <Zap className="w-4 h-4 text-[var(--lp-accent)]" />, text: 'Búsqueda rápida — ⌘K / Ctrl+K' },
+                { icon: <Calendar className="w-4 h-4 text-[var(--lp-accent)]" />, text: 'Arrastra y suelta las citas en la agenda' },
               ].map((item) => (
                 <div key={item.text} className="flex items-start gap-3">
                   {/* `-mt-0.5` = alineación óptica de −2px, no ritmo. Blindado

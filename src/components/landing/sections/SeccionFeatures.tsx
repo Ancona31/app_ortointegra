@@ -16,6 +16,15 @@ interface Feature {
   media?: boolean
 }
 
+/* F1.3·e4 — LOS 4 ICONOS NO-DICOM ERAN #8a99ac: 2.90:1 sobre el blanco de la
+   card, por debajo del 3:1 de gráfico informativo. Pasan a --lp-ink-500
+   (5.45:1).
+   ⚠️ INK-500, NO ACENTO, Y ES DECISIÓN DE PM — no un descuido. Subirlos a
+   --lp-accent los pondría a competir con el borde de la card DICOM, que es el
+   único acento de esta sección y lo que jerarquiza el bento entero. El
+   contraste se arregla con tinta; el acento se reserva. No los "unifiques" con
+   los iconos de Expediente e Interfaz, que sí son de acento por otro motivo. */
+
 /* El orden del array ES el orden de la retícula (§3.4: bento asimétrico):
    fila 1 → DICOM (2 col) · Expedientes
    fila 2 → Recetas · Documentación con IA · Agenda
@@ -31,25 +40,25 @@ const features: Feature[] = [
     media: true,
   },
   {
-    icon: <FileText className="w-6 h-6 text-[#8a99ac]" />,
+    icon: <FileText className="w-6 h-6 text-[var(--lp-ink-500)]" />,
     title: 'Expedientes electrónicos',
     desc: 'Toda la historia clínica de tu paciente a un clic. Sin papel, sin búsquedas.',
     border: 'border-[#e6ebf2]',
   },
   {
-    icon: <Pill className="w-6 h-6 text-[#8a99ac]" />,
+    icon: <Pill className="w-6 h-6 text-[var(--lp-ink-500)]" />,
     title: 'Recetas con QR',
     desc: 'Membretadas, con QR verificable. Envíalas por correo o entrégalas impresas.',
     border: 'border-[#e6ebf2]',
   },
   {
-    icon: <Brain className="w-6 h-6 text-[#8a99ac]" />,
+    icon: <Brain className="w-6 h-6 text-[var(--lp-ink-500)]" />,
     title: 'Documentación con IA',
     desc: 'Describe los hallazgos y la IA estructura la nota. Tú validas y firmas.',
     border: 'border-[#e6ebf2]',
   },
   {
-    icon: <Calendar className="w-6 h-6 text-[#8a99ac]" />,
+    icon: <Calendar className="w-6 h-6 text-[var(--lp-ink-500)]" />,
     title: 'Agenda',
     desc: 'Arrastra, suelta y listo. Sincronizada con Google Calendar.',
     border: 'border-[#e6ebf2]',
