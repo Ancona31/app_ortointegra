@@ -5,7 +5,7 @@ import { Shield, Scale, Database, DatabaseBackup } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import Reveal from '@/components/landing/motion/Reveal'
 import Stagger, { VARIANTES_ITEM } from '@/components/landing/motion/Stagger'
-import { DUR, EASE } from '@/components/landing/motion/tokens'
+import { DIST, DUR, EASE, SPRING } from '@/components/landing/motion/tokens'
 
 /* F1.3·e4 — AQUÍ HABÍA UN CAMPO `iconBg: string`. Cada tarjeta traía el suyo
    (blue-50, violet-50, emerald-50) con sus iconos a juego, y el propio comentario
@@ -191,20 +191,27 @@ export default function SeccionSeguridad() {
             descartada en LP-DT-20, y un wrapper por hijo lo habría deshecho.
             ⚠️ SIGUE SIN ESCALERA. a2 tampoco repone los offsets 0/24/48.
 
-            ⚠️ EL `hover:-translate-y-1` DE LAS TARJETAS QUEDA MUERTO DESDE ESTA
-            TANDA, y a diferencia del bento AQUÍ NADIE LO TIENE ASIGNADO.
-            Mecánica verificada en el paquete embarcado
-            (`motion-dom/.../build-transform.mjs:65-67`): al volver los valores
-            de transform a su default, `motion` escribe `transform: none`
-            inline, y el inline gana a la utilidad de Tailwind. En cuanto la
-            tarjeta anima `y`, su transform es de motion.
-            El bento tiene a a3 esperándolo (Tilt absorbe hover y pulsado); esta
-            sección NO está en el alcance de a3, así que el levantamiento se
-            queda sin dueño hasta que alguien lo asigne. Se deja el `hover:` en
-            el className a propósito: es la especificación de lo que hay que
-            reproducir, y borrarlo perdería el dato.
-            Lo que SÍ sobrevive es `hover:shadow-lg` — la sombra no es
-            transform —, así que el hover sigue teniendo respuesta visible. */}
+            ⚠️ EL LEVANTAMIENTO YA TIENE DUEÑO — a3 LO RECUPERÓ, Y ESTA SECCIÓN
+            SE INCLUYÓ POR ESO. a2 lo dejó muerto: en cuanto la tarjeta anima
+            `y`, motion escribe `transform` inline y gana a la utilidad
+            `hover:-translate-y-1` (`motion-dom/.../build-transform.mjs:65-67`).
+            Ahora es un `whileHover` con `DIST.elevacionHover` — el mismo 4px de
+            antes, dicho donde motion sí lo respeta.
+
+            ⚠️ AQUÍ NO HAY `useTilt`, Y ES DELIBERADO. La inclinación es solo
+            del bento (§4.4 dice "5 cards del grid", y son esas cinco). Estas
+            tres comparten el gesto de elevarse pero no el de inclinarse: el
+            bento es la retícula de producto, donde el tilt premia la
+            exploración; esta es la sección de garantías, donde tres tarjetas
+            girando a la vez restarían seriedad al único bloque de la página
+            cuyo trabajo es transmitir formalidad. Si una tanda futura quiere
+            unificarlos, es decisión de PM, no limpieza.
+
+            `hover:shadow-lg` se queda en CSS: la sombra no es transform, así
+            que aquí nunca estuvo muerta y no hay nada que absorber. Por eso
+            estas tarjetas conservan su `transition-all`, al revés que las del
+            bento — allí motion reescribe el `box-shadow` cada cuadro y la
+            transición CSS estorbaba. */}
         <Stagger className="grid sm:grid-cols-3 gap-6 items-stretch">
           {/* ⚠️ Estas tarjetas son las que MÁS pierden en b1: eran el último
               glass de la landing (bg-white/30 + backdrop-blur-md), es decir
@@ -233,7 +240,8 @@ export default function SeccionSeguridad() {
               data-lp-reveal=""
               variants={VARIANTES_ITEM}
               transition={transicionItem}
-              className="bg-[var(--lp-surface)] rounded-2xl border-[0.5px] border-[var(--lp-border)] p-8 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-[var(--sp-dur-micro)]"
+              whileHover={{ y: -DIST.elevacionHover, transition: SPRING.snap }}
+              className="bg-[var(--lp-surface)] rounded-2xl border-[0.5px] border-[var(--lp-border)] p-8 shadow-sm hover:shadow-lg transition-all duration-[var(--sp-dur-micro)]"
             >
               {/* F1.3·c3 — `mb-6` (24), no mb-5: 20 no está en la escala. */}
               <div className="w-12 h-12 rounded-xl bg-[var(--lp-accent-bg)] flex items-center justify-center mb-6">

@@ -5,6 +5,7 @@ import { Calendar, FileText, Brain, Pill, MonitorCheck } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import Stagger, { VARIANTES_ITEM } from '@/components/landing/motion/Stagger'
 import { DUR, EASE, STAGGER } from '@/components/landing/motion/tokens'
+import { useTilt } from '@/hooks/useTilt'
 
 interface Feature {
   icon: ReactNode
@@ -111,6 +112,18 @@ export default function SeccionFeatures() {
     ? { duration: 0 }
     : { duration: DUR.section, ease: EASE.out }
 
+  /* ⚠️ UN `useTilt` POR CARD, y por eso las cinco llamadas están DESENROLLADAS
+     en un array y no dentro del `.map`. Las reglas de los hooks prohíben
+     llamarlos en un bucle cuyo número de vueltas pueda cambiar; aquí el array
+     `features` es una constante de módulo de 5 elementos, pero escribirlo como
+     `features.map(() => useTilt())` es exactamente el patrón que el lint de
+     react-hooks rechaza, y con razón: nada impide que una tanda futura filtre
+     ese array y rompa el orden de los hooks entre renders.
+     Si el bento gana o pierde una card, esta lista se ajusta a mano — es el
+     precio de que cada card tenga su propio par de MotionValue, que es lo que
+     permite que solo se incline la que tiene el cursor encima. */
+  const tilts = [useTilt(), useTilt(), useTilt(), useTilt(), useTilt()]
+
   return (
     <section className="bg-[var(--lp-surface)] pb-16 sm:pb-24 lg:pb-32">
       <div className="mx-auto max-w-6xl px-4 sm:px-8">
@@ -183,26 +196,33 @@ export default function SeccionFeatures() {
             El valor es `STAGGER.deck` (90ms), el mismo peldaño que el mazo de
             Control, porque §5.3 fija esos delays y no otros.
 
-            ⚠️ EL `hover:-translate-y-1` Y EL `active:scale-[0.98]` DE ABAJO
-            QUEDAN MUERTOS DESDE ESTA TANDA, y es un estado transitorio
-            ACEPTADO, no un descuido. Verificado en el paquete embarcado
-            (`motion-dom/.../build-transform.mjs:65-67`): cuando los valores de
-            transform vuelven a su default, `motion` escribe `transform: none`
-            INLINE, y un estilo inline gana a cualquier utilidad de Tailwind.
-            En cuanto esta card anima `y`, su transform pasa a ser de motion.
-            El PM ya lo previó al reservarlos para a3 ("NO los toques aquí, los
-            absorbe Tilt"): a3 los convierte en `whileHover`/`whileTap`. Hasta
-            entonces el hover sigue leyéndose por la sombra, que NO es transform
-            y sí sobrevive. No los borres mientras tanto: son la especificación
-            de lo que a3 tiene que reproducir. */}
+            ⚠️ EL HOVER DE ESTAS CARDS YA NO VIVE EN CSS — LO ABSORBIÓ `useTilt`
+            EN a3, y esto cierra el estado transitorio que abrió a2.
+            Se retiraron cuatro clases y ninguna es un descarte: `shadow-sm` y
+            `hover:shadow-[0_4px_20px_…/0.10]` los emite ahora el hook como un
+            solo `box-shadow` de dos capas (la de reposo vale exactamente lo que
+            valía `shadow-sm`); `hover:-translate-y-1` es el `whileHover` con
+            `DIST.elevacionHover`; y `active:scale-[0.98]` es el `whileTap` con
+            `TILT.pulsado`. También cae el `transition-all`: una transición CSS
+            sobre `box-shadow` pelearía con el valor que motion reescribe en
+            cada cuadro y produciría arrastre.
+            El motivo por el que había que absorberlas está verificado en el
+            paquete (`motion-dom/.../build-transform.mjs:65-67`): en cuanto la
+            card anima `y`, motion escribe `transform` inline —y `transform:
+            none` al volver al default—, y el inline gana a la utilidad de
+            Tailwind. Convivir era imposible; no era una preferencia.
+            ⚠️ NO devuelvas ninguna de las cuatro "por si acaso": reintroducirlas
+            no las revive, solo deja clases muertas que la próxima auditoría
+            tendrá que volver a diagnosticar. */}
         <Stagger className="grid sm:grid-cols-3 gap-4" gap={STAGGER.deck}>
-          {features.map((f) => (
+          {features.map((f, i) => (
             <motion.div
               key={f.title}
               data-lp-reveal=""
               variants={VARIANTES_ITEM}
               transition={transicionItem}
-              className={`flex flex-col bg-[var(--lp-surface)] rounded-2xl border-[0.5px] ${f.border} ${f.span === 2 ? 'sm:col-span-2' : ''} shadow-sm hover:shadow-[0_4px_20px_rgb(var(--lp-accent-rgb)/0.10)] hover:-translate-y-1 active:scale-[0.98] transition-all duration-[var(--sp-dur-micro)] ease-[var(--sp-ease-out)] cursor-default`}
+              {...tilts[i]}
+              className={`flex flex-col bg-[var(--lp-surface)] rounded-2xl border-[0.5px] ${f.border} ${f.span === 2 ? 'sm:col-span-2' : ''} cursor-default`}
             >
               <div className="p-6">
                 <div className="mb-4">{f.icon}</div>

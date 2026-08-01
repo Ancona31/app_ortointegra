@@ -372,7 +372,40 @@ espejo. Divergencia = bug (deuda §15).
 > secuencias donde el orden de aparición ES el contenido —los 5 pasos del flujo
 > de §5.8— y `STAGGER.deck` (90ms) para la cascada diagonal del bento (§5.3).
 > `SeccionInterfaz.tsx` es el único archivo donde conviven los dos primeros.
-| `<Tilt>` | hover ±3°, sombra sigue ángulo, <100ms | 5 cards del grid |
+| `useTilt()` | hover ±3°, sombra sigue ángulo, <100ms | 5 cards del grid |
+
+> ⚠️ **ES UN HOOK (`src/hooks/useTilt.ts`), NO EL COMPONENTE `<Tilt>` QUE ESTA
+> FILA ANUNCIABA.** Decisión de PM en F2.a·a3 (B3), forzada por el propio
+> sistema: un componente envolvente reintroduce el wrapper que esta misma tabla
+> prohíbe dos filas más arriba, y lo haría justo sobre la card con
+> `sm:col-span-2`. Es el mismo defecto que obligó a reescribir `Stagger`.
+>
+> **Absorbe el hover que antes vivía en CSS.** Desde a2, `hover:-translate-y-1`
+> y `active:scale-[0.98]` estaban MUERTOS en las cards del bento: en cuanto una
+> card anima `y`, `motion` escribe `transform` inline y gana a la utilidad de
+> Tailwind (`motion-dom/.../build-transform.mjs:65-67`). a3 los reproduce como
+> `whileHover`/`whileTap`, que es la única forma de que convivan con la
+> inclinación. **Las cuatro clases retiradas no se reponen: reintroducirlas no
+> las revive.**
+>
+> **`SeccionSeguridad` recibe SOLO el levantamiento**, sin inclinación y sin el
+> hook — sus 3 tarjetas habían perdido el mismo `hover:-translate-y-1` en a2 y
+> se quedaban sin dueño. El tilt sigue siendo exclusivo del bento.
+>
+> ⚠️ **LA SOMBRA ES UNA EXCEPCIÓN DECLARADA A §4.3·1**, que solo admite
+> `transform` y `opacity`. §4.4 pide que la sombra siga al ángulo y eso no se
+> puede hacer con `transform` sin sacarla a una capa propia por card. Se acepta
+> el repintado porque está acotado: una card cada vez, solo con ratón, solo
+> mientras el cursor está encima. Si F6 mide coste, la salida es una capa
+> absoluta con `opacity`, no retirar la sombra.
+>
+> **Táctil y reduced-motion se resuelven sin ramificar el render** (§4.3·7): el
+> descarte va en el handler (`pointerType !== 'mouse'`, más estricto que el
+> filtro propio de motion, que deja pasar `pen`) y el aplanado lo da el
+> `transform: none !important` de `globals.css:924`, porque las cards llevan
+> `data-lp-reveal` por ser hijas del `Stagger`. El guard del handler existe
+> además para que **la sombra tampoco se mueva** bajo la preferencia: la regla
+> CSS no cubre `box-shadow`.
 | `<Parallax>` | OFF_TRAVESIA, y +40→−40 | títulos, foto Historia |
 | `<CountUp>` | MotionValue directo al DOM | cupos beta |
 | Nav | transparente→sólido+blur, logo encoge, barra progreso 2px, continuo | siempre |

@@ -64,6 +64,58 @@ export const EASE = {
 export const DIST = {
   /** 24px — desplazamiento vertical de todo reveal. PLAN §2.3. */
   reveal: 24,
+  /**
+   * 4px — levantamiento al pasar el cursor sobre una card.
+   *
+   * ⚠️ NO es un valor nuevo: es el `hover:-translate-y-1` que las cards del
+   * bento y las de Seguridad llevaban en CSS desde antes de F2.a. Sube aquí en
+   * a3 porque desde a2 esa utilidad está MUERTA — `motion` escribe `transform`
+   * inline en cuanto la card anima `y`, y el inline gana a la clase
+   * (`motion-dom/.../build-transform.mjs:65-67`). Lo que a3 hace es
+   * reproducirlo con `whileHover`, y para eso el número tiene que estar en el
+   * sistema.
+   * Lo consumen DOS sitios con mecánicas distintas: el bento (dentro de
+   * `useTilt`) y `SeccionSeguridad`, que recibe solo el levantamiento y ninguna
+   * inclinación.
+   */
+  elevacionHover: 4,
+} as const
+
+/**
+ * Inclinación de card hacia el cursor (`useTilt`, §4.4). Solo bento.
+ *
+ * ⚠️ SOLO ESCRITORIO. El handler descarta todo lo que no sea `pointerType ===
+ * 'mouse'`, así que en táctil estos valores no llegan a aplicarse nunca (§4.3·10
+ * dice "sin hover: `Tilt` no existe"). El gesto `whileHover` de `motion` ya
+ * filtra `touch` por su cuenta —verificado en `motion-dom/.../gestures/hover.mjs:4-6`—
+ * pero NO filtra `pen`; por eso el guard estricto vive en nuestro handler.
+ */
+export const TILT = {
+  /** ±3° — §4.4 ("hover ±3°"). El recorrido total es 6° de borde a borde. */
+  angulo: 3,
+  /**
+   * 1000px de perspectiva, aplicada con `transformPerspective` en el style de
+   * CADA card y NO en el contenedor de la retícula: ahí crearía un bloque
+   * contenedor nuevo para cualquier descendiente posicionado.
+   * A 1000px la deformación es perceptible sin llegar a leerse como truco —
+   * por debajo de ~600 el escorzo delata el efecto a 3°, que es lo contrario
+   * de lo que busca un tejido "discreto" (§4.1).
+   */
+  perspectiva: 1000,
+  /** .98 — reproduce el `active:scale-[0.98]` que el bento tenía en CSS. */
+  pulsado: 0.98,
+  /**
+   * Sombra que sigue al ángulo (§4.4). Se compone SOBRE la sombra de reposo,
+   * no la sustituye: `useTilt` emite las dos en el mismo `box-shadow` y esta
+   * segunda entra con alfa 0 en reposo. Así el estado quieto de la card es
+   * exactamente el `shadow-sm` de antes.
+   */
+  sombraRecorrido: 8,
+  sombraBlur: 20,
+  /** .10 — el mismo alfa del `hover:shadow-[0_4px_20px_…/0.10]` absorbido. */
+  sombraAlfa: 0.1,
+  /** Sombra de reposo. Es el valor literal de `shadow-sm` de Tailwind 4. */
+  sombraReposo: '0px 1px 2px 0px rgb(0 0 0 / 0.05)',
 } as const
 
 /** Retrasos incrementales en SEGUNDOS. */
