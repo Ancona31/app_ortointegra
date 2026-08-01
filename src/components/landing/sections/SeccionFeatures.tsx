@@ -155,7 +155,7 @@ export default function SeccionFeatures() {
           {features.map((f) => (
             <div
               key={f.title}
-              className={`flex flex-col bg-[var(--lp-surface)] rounded-2xl border-[0.5px] ${f.border} ${f.span === 2 ? 'sm:col-span-2' : ''} shadow-sm hover:shadow-[0_4px_20px_rgb(var(--lp-accent-rgb)/0.10)] hover:-translate-y-1 active:scale-[0.98] transition-all duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] cursor-default`}
+              className={`flex flex-col bg-[var(--lp-surface)] rounded-2xl border-[0.5px] ${f.border} ${f.span === 2 ? 'sm:col-span-2' : ''} shadow-sm hover:shadow-[0_4px_20px_rgb(var(--lp-accent-rgb)/0.10)] hover:-translate-y-1 active:scale-[0.98] transition-all duration-[var(--sp-dur-micro)] ease-[var(--sp-ease-out)] cursor-default`}
             >
               <div className="p-6">
                 <div className="mb-4">{f.icon}</div>

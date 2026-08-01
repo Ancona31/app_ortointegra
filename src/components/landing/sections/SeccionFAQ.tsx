@@ -217,7 +217,7 @@ function ItemFAQ({ pregunta, respuesta, sinMovimiento }: ItemProps): React.JSX.E
           /* ⚠️ `-outline-offset-2`: el `overflow-hidden` del `<li>` recortaría
              un foco dibujado por fuera. Con offset negativo se dibuja dentro y
              el usuario de teclado lo ve entero. */
-          className="flex w-full cursor-pointer items-center justify-between gap-4 px-6 py-6 text-left transition-colors duration-200 hover:bg-[var(--lp-surface)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--lp-accent)]"
+          className="flex w-full cursor-pointer items-center justify-between gap-4 px-6 py-6 text-left transition-colors duration-[var(--sp-dur-micro)] hover:bg-[var(--lp-surface)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--lp-accent)]"
         >
           {/* F1.3·d4 — rol H3 de card: 19px · -0.015em · 1.30. */}
           <span className="text-[19px] font-semibold text-[var(--lp-ink-900)] tracking-[-0.015em] leading-[1.30]">

@@ -1,6 +1,7 @@
 'use client'
 
 import { Search, Zap, FolderOpen, QrCode, Layers } from 'lucide-react'
+import Reveal from '@/components/landing/motion/Reveal'
 
 /* Section: Expediente electrónico
    Superficie BLANCA (§3.1). El `bg-white` va EXPLÍCITO, no por ausencia de
@@ -19,7 +20,16 @@ export default function SeccionExpediente() {
         {/* F1.3·c3 — `lg:gap-24` (96), no gap-20: 80 no está en la escala de
             §3.3. Las tres secciones de dos columnas (esta, Interfaz e
             Historia) comparten el mismo par `gap-12 lg:gap-24`. */}
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-center">
+        {/* §5.6 · F2.a·a1 — EL `<Reveal>` ES LA RETÍCULA, no un envoltorio.
+            Toma las clases del grid tal cual (7.1 de la auditoría de F2.a):
+            así el `order-*` de las dos columnas sigue resolviendo contra un
+            padre `grid` directo. Si esto se envolviera en vez de sustituirse,
+            el grid pasaría a ser nieto y la inversión de columnas de §3.4·6
+            se rompería sin error de build.
+            §5.6 pide además `Parallax` en el título — eso es a4, y anida
+            dentro de este reveal. Las 4 viñetas de :53 reciben su `Stagger`
+            en a2, también anidado. */}
+        <Reveal className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-center">
           <div className="order-1 lg:order-2">
             {/* F1.3·e3 — pastilla de kicker unificada: --lp-accent-bg / --lp-accent.
                 Cambio de hex literal a variable; el color no se mueve. */}
@@ -124,7 +134,7 @@ export default function SeccionExpediente() {
               ))}
             </div>
           </div>
-        </div>
+        </Reveal>
       </div>
     </section>
   )

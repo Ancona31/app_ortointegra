@@ -1,4 +1,8 @@
+'use client'
+
 import type { JSX } from 'react'
+import { motion, useReducedMotion } from 'motion/react'
+import { DIST, DUR, EASE } from '@/components/landing/motion/tokens'
 
 /* Franja del problema — §7·2, esqueleto de §3.4·2
    Tesis de producto (§2·3) enunciada de golpe, sin adorno: es la bisagra
@@ -87,16 +91,84 @@ import type { JSX } from 'react'
    la cierra F1.3 en bloque; no la resuelvas devolviéndole slate-900 a
    esta sección. */
 export default function SeccionProblema(): JSX.Element {
+  /* Un solo `useReducedMotion` para la sección. NO ramifica el render: el árbol
+     de DOM es idéntico con y sin la preferencia (ramificarlo provoca hydration
+     mismatch — ver `Reveal.tsx` y §4.3·7). Lo único que cambia es la
+     transición; el estado final lo fuerza `[data-lp-reveal]` en
+     globals.css:922. */
+  const sinMovimiento = useReducedMotion()
+  const instantaneo = { duration: 0, delay: 0 }
+
   return (
     <section className="bg-[var(--lp-surface)]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 pb-32">
         {/* §3.4·2: a sangría izquierda, 74% de ancho, sin centrar. Por debajo
             de sm el 74% deja ~17 caracteres por línea, así que ahí va a ancho
             completo. */}
-        <p className="w-full sm:w-[74%] text-[clamp(30px,4vw,46px)] font-bold text-[var(--lp-ink-500)] tracking-[-0.03em] leading-[1.10]">
+        {/* ═══ §5.2 — POR QUÉ ESTA SECCIÓN NO USA `<Reveal>` ═══
+            Es la única de las ocho de F2.a·a1 que no lo usa, y no es descuido.
+            `Reveal` renderiza un `motion.div`, y un `<div>` DENTRO de un `<p>`
+            es HTML inválido: el parser del navegador cierra el párrafo antes
+            del div y parte la frase en dos bloques. El remate tiene que animar
+            desde dentro del `<p>`, así que aquí manda el patrón de variantes
+            padre→hijo — el mismo de `SeccionFAQ.tsx:424`.
+
+            Y hace falta que sea padre→hijo, no dos `whileInView` sueltos: la
+            ficha pide que el remate entre 240ms DESPUÉS de la frase, o sea
+            medido contra el MISMO disparo. Con disparador propio, el `<span>`
+            vive en la última línea del párrafo y su umbral del 25% se cumple
+            mucho más tarde que el del bloque entero — el desfase dejaría de
+            ser 240ms y pasaría a depender de la velocidad del scroll. */}
+        <motion.p
+          data-lp-reveal=""
+          className="w-full sm:w-[74%] text-[clamp(30px,4vw,46px)] font-bold text-[var(--lp-ink-500)] tracking-[-0.03em] leading-[1.10]"
+          initial="oculto"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.25 }}
+          variants={{
+            oculto: { opacity: 0, y: DIST.reveal },
+            visible: {
+              opacity: 1,
+              y: 0,
+              transition: sinMovimiento ? instantaneo : { duration: DUR.section, ease: EASE.out },
+            },
+          }}
+        >
           Los sistemas de expediente electrónico son lentos, complejos y pensados para cumplir regulaciones{' '}
-          <span className="text-[var(--lp-ink-900)]">&mdash; no para ayudar al médico.</span>
-        </p>
+          {/* ⚠️ EL REMATE ANIMA `opacity` Y NADA MÁS. NO le pongas `y`.
+              Es un `<span>` inline y `transform` no aplica a elementos inline:
+              haría falta `inline-block`, que impide que el texto rompa por
+              dentro. Medido con la tipografía real, el remate es una tirada de
+              392px que como `inline-block` sería indivisible, contra líneas de
+              358px a 390 de viewport y 328px a 360 — desborda por 34 y 64px.
+              `opacity` sí aplica a inline y no toca el layout: la frase ocupa
+              su caja desde el primer cuadro y solo aparece la tinta.
+
+              ⚠️ ARRANCA EN .25, NO EN 0. Con 0 hay 240ms de hueco en mitad de
+              una frase, que se lee como fallo de render y no como énfasis.
+              Desde .25 el remate está presente y lo que ocurre es que SE
+              OSCURECE, que es exactamente lo que dice el copy.
+
+              ⚠️ `data-lp-reveal` VA TAMBIÉN AQUÍ, no solo en el `<p>`. La regla
+              de globals.css:922 targetea el atributo, no sus descendientes: sin
+              este segundo, bajo prefers-reduced-motion el remate se quedaría en
+              .25 para siempre mientras el resto de la frase llega a 1. */}
+          <motion.span
+            data-lp-reveal=""
+            className="text-[var(--lp-ink-900)]"
+            variants={{
+              oculto: { opacity: 0.25 },
+              visible: {
+                opacity: 1,
+                transition: sinMovimiento
+                  ? instantaneo
+                  : { duration: DUR.section, ease: EASE.out, delay: DUR.base },
+              },
+            }}
+          >
+            &mdash; no para ayudar al médico.
+          </motion.span>
+        </motion.p>
       </div>
     </section>
   )

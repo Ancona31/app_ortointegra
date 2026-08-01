@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { Shield, Scale, Database, DatabaseBackup } from 'lucide-react'
+import Reveal from '@/components/landing/motion/Reveal'
 
 /* F1.3·e4 — AQUÍ HABÍA UN CAMPO `iconBg: string`. Cada tarjeta traía el suyo
    (blue-50, violet-50, emerald-50) con sus iconos a juego, y el propio comentario
@@ -140,7 +141,18 @@ export default function SeccionSeguridad() {
     <section className="bg-[var(--lp-surface-alt)]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
         {/* F1.3·c3 — `mb-12` (48). Ver SeccionFeatures.tsx. */}
-        <div className="text-center mb-12">
+        {/* §5.10 · F2.a·a1 — EL `<Reveal>` TOMA EL `mb-12`, no envuelve un div
+            que lo lleve (7.1 de la auditoría de F2.a). Idéntico a
+            `SeccionPortabilidad.tsx:16`, que es el mismo elemento: bloque de
+            titular seguido de retícula.
+            ⚠️ SOLO EL ENCABEZADO. Las 3 tarjetas de :186 NO entran en a1: su
+            ficha pide `Stagger` (`STAGGER.siblings`) y eso es a2. Hasta
+            entonces el encabezado entra y las tarjetas están quietas — es un
+            estado intermedio, no un olvido.
+            ⚠️ Y SIGUEN SIN ESCALERA (LP-DT-20). Ni a1 ni a2 reponen los
+            offsets verticales: `items-stretch` de :164 es lo que los
+            sustituyó. */}
+        <Reveal className="text-center mb-12">
           {/* F1.3·e3 — pastilla de kicker unificada: --lp-accent-bg / --lp-accent.
               e4 llevó los fondos de icono de las tres cards al mismo par, así
               que la sección entera va con un solo acento. */}
@@ -155,7 +167,7 @@ export default function SeccionSeguridad() {
             Tu práctica,{' '}
             <span className="text-[var(--lp-ink-500)]">protegida</span>
           </h2>
-        </div>
+        </Reveal>
 
         {/* `items-stretch` explícito (es el default de grid, pero aquí importa
             que se lea): las 3 tarjetas arrancan alineadas arriba y comparten
@@ -186,7 +198,7 @@ export default function SeccionSeguridad() {
           {tarjetas.map((t) => (
             <div
               key={t.title}
-              className="bg-[var(--lp-surface)] rounded-2xl border-[0.5px] border-[var(--lp-border)] p-8 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200"
+              className="bg-[var(--lp-surface)] rounded-2xl border-[0.5px] border-[var(--lp-border)] p-8 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-[var(--sp-dur-micro)]"
             >
               {/* F1.3·c3 — `mb-6` (24), no mb-5: 20 no está en la escala. */}
               <div className="w-12 h-12 rounded-xl bg-[var(--lp-accent-bg)] flex items-center justify-center mb-6">

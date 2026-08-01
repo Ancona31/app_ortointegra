@@ -20,11 +20,33 @@ type Bezier = readonly [number, number, number, number]
 
 /** Duraciones en SEGUNDOS (motion no acepta ms). */
 export const DUR = {
-  /** 120ms — hover, feedback. Origen: `--sp-dur-micro`. */
+  /**
+   * 120ms — hover y feedback de control. Origen: `--sp-dur-micro`.
+   *
+   * Los 12 hover de la landing pasaron a este valor en F2.a·a1; antes corrían
+   * a 200ms, que no está en la escala de §4.2. En el CSS de esos sitios se
+   * escribe `duration-[var(--sp-dur-micro)]`, no el número: este espejo es
+   * para `motion`, que no lee variables CSS.
+   */
   micro: 0.12,
-  /** 240ms — reveal de card. Origen: `--sp-dur-base`. */
+  /**
+   * 240ms — cross-fade entre estados y micro-interacciones. Origen:
+   * `--sp-dur-base`.
+   *
+   * ⚠️ YA NO ES LA DURACIÓN DEL REVEAL. §4.2 decía «240ms (reveals)» y el PM
+   * lo corrigió en F2.a·a1 (B1): la entrada de bloque es `section` (420ms).
+   * Lo que sigue vivo aquí es el DESFASE del remate de §5.2
+   * (`SeccionProblema.tsx`), que entra 240ms después de la frase — ahí `base`
+   * es un retraso, no una duración.
+   */
   base: 0.24,
-  /** 420ms — entrada de sección. Origen: `--lp-dur-section`. */
+  /**
+   * 420ms — entrada de sección Y de bloque. Origen: `--lp-dur-section`.
+   *
+   * Es la duración de TODO reveal de tejido desde F2.a·a1: `Reveal.tsx`, el
+   * encabezado de `SeccionControl.tsx:147` y las fichas §5.2 / §5.10b hablan
+   * las tres de este valor. Si encuentras un reveal a 240, es anterior a a1.
+   */
   section: 0.42,
   /** 900ms — escenario cinematográfico (los 4 momentos Apple). Origen: `--lp-dur-cine`. */
   cine: 0.9,

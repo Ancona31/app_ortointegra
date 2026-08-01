@@ -1,6 +1,7 @@
 'use client'
 
 import { Calendar, Zap, MousePointerClick } from 'lucide-react'
+import Reveal from '@/components/landing/motion/Reveal'
 
 /* Section: Interfaz intuitiva
    Superficie BLANCA (§3.1), explícita. Mismo motivo que en Expediente: el
@@ -50,7 +51,16 @@ export default function SeccionInterfaz() {
     <section className="bg-[var(--lp-surface)]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
         {/* F1.3·c3 — `lg:gap-24` (96). Ver SeccionExpediente.tsx. */}
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-center">
+        {/* §5.8 · F2.a·a1 — EL `<Reveal>` ES LA RETÍCULA. Mismo criterio que
+            `SeccionExpediente.tsx`: toma las clases del grid en vez de
+            envolverlo, para que el `order-*` de las columnas siga resolviendo
+            contra un padre `grid` directo.
+            ⚠️ ESTA ES LA SECCIÓN "FLUJO 5 PASOS" DE §5.8, aunque el archivo se
+            llame Interfaz: §3.4·8 la describe como "lista numerada izq.,
+            titular der." y es exactamente el panel de :68-84. El `Stagger`
+            vertical de 80ms (`STAGGER.list`) que pide esa ficha para las 5
+            filas es a2, anidado dentro de este reveal — no lo busques aquí. */}
+        <Reveal className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-center">
           {/* Left: visual */}
           <div className="order-2 lg:order-1">
             <div className="bg-[#f8fafc] rounded-2xl border border-slate-200/60 p-6 shadow-sm space-y-4">
@@ -149,7 +159,7 @@ export default function SeccionInterfaz() {
               ))}
             </div>
           </div>
-        </div>
+        </Reveal>
       </div>
     </section>
   )

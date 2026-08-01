@@ -1,6 +1,7 @@
 'use client'
 
 import { Sparkles } from 'lucide-react'
+import Reveal from '@/components/landing/motion/Reveal'
 
 /* Section: Powered by AI
    Superficie FRANJA (§3.1). Alternancia de F1.3·b1: Features blanca →
@@ -32,7 +33,14 @@ export default function SeccionIA() {
             del CTA es el cierre de marca (navy → acento) y este es un bloque de
             producto. Si alguna vez se unifican, el orden es al revés: primero
             se sube el alfa del kicker, después se cambia la superficie. */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8 sm:p-12">
+        {/* §5.4 · F2.a·a1 — EL `<Reveal>` TOMA LAS CLASES DEL BLOQUE NAVY, no
+            lo envuelve. Envolverlo metería un `<div>` de más entre el
+            contenedor de padding y la superficie, y el sistema de movimiento
+            de esta landing evita wrappers por norma (§4.4). Mismo patrón que
+            `SeccionPortabilidad.tsx:16`: el elemento que anima ES el bloque.
+            Los chips de :116 reciben su `Stagger` en la tanda a2 — anidado
+            dentro de este reveal, no en su lugar. */}
+        <Reveal className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8 sm:p-12">
           {/* Subtle shine */}
           <div className="absolute inset-0 bg-gradient-to-br from-[var(--lp-surface-inverse-5)] via-transparent to-transparent pointer-events-none" />
 
@@ -121,7 +129,7 @@ export default function SeccionIA() {
               </div>
             </div>
           </div>
-        </div>
+        </Reveal>
       </div>
     </section>
   )

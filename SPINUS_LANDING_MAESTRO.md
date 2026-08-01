@@ -272,8 +272,8 @@ un mismo elemento:**
 ### 4.2 Tokens (extienden los de la app, no los sustituyen)
 
 ```
-DURACIONES  --sp-dur-micro 120ms (hover) · --sp-dur-base 240ms (reveals)
-            --lp-dur-section 420ms · --lp-dur-cine 900ms
+DURACIONES  --sp-dur-micro 120ms (hover) · --sp-dur-base 240ms (cross-fade)
+            --lp-dur-section 420ms (TODO reveal de tejido) · --lp-dur-cine 900ms
 EASINGS     --sp-ease-out cubic-bezier(.2,0,0,1)  → todo el tejido
             --lp-ease-cine cubic-bezier(.65,0,.35,1) → solo escenarios
 SPRINGS     soft {stiffness:120,damping:20} · snap {300,30} · heavy {60,18}
@@ -285,6 +285,27 @@ OFFSETS     OFF_ENTRADA ["start 0.9","start 0.35"]
 `tokens.ts` es espejo manual del CSS (motion exige números): cada constante
 comenta su token de origen; el bloque --lp-* de globals.css referencia el
 espejo. Divergencia = bug (deuda §15).
+
+> ⚠️ **ESTA TABLA DECÍA «--sp-dur-base 240ms (reveals)» Y ERA FALSO EN DOS
+> DIRECCIONES.** Corregido por el PM el 2026-08-01 (decisión B1 de F2.a·a1).
+> El dato viejo contradecía a las propias fichas de §5: §5.2 y §5.10b dan las
+> dos `--lp-dur-section` para la entrada de bloque, y `SeccionControl.tsx:147`
+> ya animaba a 420 desde que se implementó. O sea que había **dos duraciones
+> vivas en producción para el mismo gesto** — 240 en `Reveal.tsx` y 420 en
+> Control — y la tabla respaldaba la equivocada.
+>
+> **Régimen vigente, sin excepciones:**
+> * **420ms (`--lp-dur-section`)** — toda entrada de bloque o de sección. Es
+>   lo que hace `Reveal.tsx` desde a1.
+> * **240ms (`--sp-dur-base`)** — cross-fade entre estados y micro-interacción.
+>   En el tejido su uso vivo es de **retraso**, no de duración: es el desfase
+>   del remate de §5.2.
+> * **120ms (`--sp-dur-micro`)** — hover. Los 12 hover de la landing corrían a
+>   **200ms**, valor que nunca estuvo en esta tabla; a1 los bajó a este token
+>   y escribió el ÚNICO easing del tejido (`--sp-ease-out`) donde
+>   `SeccionFeatures.tsx` tenía un `cubic-bezier(0.32,0.72,0,1)` suelto.
+>   Quedan 3 sin barrer en `SeccionHero.tsx:269,272,276` — fuera del alcance
+>   de a1, pendientes de F2.b.
 
 ### 4.3 Reglas de rendimiento [E2 + techo físico]
 
@@ -673,6 +694,53 @@ retiró de la ficha original: era la capa más prescindible.
 
 ### 5.13 CTA final — tejido
 `Reveal` + scale .97→1 en botón. Último beat: sin fuegos artificiales.
+
+**IMPLEMENTADA** en `SeccionCTA.tsx` (F2.a·a1). El `Reveal` toma las clases del
+bloque navy en vez de envolverlo, igual que en §5.4.
+
+⚠️ **EL `scale` DEL BOTÓN VA EN UN ENVOLTORIO, y es la única excepción a la
+norma anti-wrappers de §4.4 en toda la tanda a1.** El `<Link>` ya tiene dos
+`transform` propios en CSS (`hover:-translate-y-0.5` y `active:scale-[0.97]`).
+Si `motion` animara el Link directamente escribiría un `transform` **inline**
+sobre él, que gana a las utilidades de Tailwind y a su propia `transition`: el
+botón perdería el levantamiento al pasar el cursor y el hundido al pulsar, sin
+que fallara build ni lint. Absorber esos gestos en `whileHover`/`whileTap` es
+trabajo de **a3**, que hará lo mismo con el hover de las cards del bento. Con
+el envoltorio hay dos dueños de `transform` y ninguno pisa al otro. **Cuando a3
+absorba los gestos, este envoltorio puede desaparecer.**
+
+El disparador del botón es PROPIO, no heredado del bloque: "último beat"
+significa que aterriza cuando el botón entra en cuadro, no cuando entra la
+sección. El `.97` va literal en el componente por el criterio de §5.10b
+(geometría de entrada, no ritmo de reveal) — no generó token nuevo.
+
+### 5.13b Footer — tejido
+
+**IMPLEMENTADA** en `SeccionFooter.tsx` (F2.a·a1). Ficha creada por decisión de
+PM (B7): hasta a1 el footer era la única pieza de la página sin entrada en §5,
+y esa ausencia se leía como olvido en vez de como decisión.
+
+| Capa | Prop | Origen→destino | Disparo | Easing |
+|---|---|---|---|---|
+| Contenedor (las dos filas) | opacity,y | 0→1, 24→0 | entrada +0ms, `--lp-dur-section` | ease-out |
+
+**Una sola capa, y el resto se declara AUSENTE a propósito:**
+* **Sin `Parallax`.** Es cierre, no contenido. Un pie que se desplaza al
+  scrollear compite con el CTA que tiene justo encima, que es lo último que
+  debe capturar la atención.
+* **Sin `Stagger` en los tres enlaces.** Escalonar un pie de página es decorar
+  por decorar: nadie lee un footer en orden.
+
+⚠️ **EL `<Reveal>` TOMA EL `py-8` DEL CONTENEDOR, NO LO ENVUELVE.** Ese padding
+es la mitad del contrato de costura con §5.13 que documenta la cabecera del
+propio archivo: 96 / 128 / 160 según breakpoint, y **en móvil es exactamente el
+mínimo de 96 de §3.3, sin un píxel de margen**. Un envoltorio que lo duplicara
+o un div interior que lo desplazara perforan ese mínimo sin que nada falle
+visiblemente. Sobre el mismo elemento el modelo de caja no se mueve:
+`transform` y `opacity` no tocan el padding.
+
+**Móvil:** idéntico. **RM:** `data-lp-reveal` en el contenedor; estado final
+con `transform` identidad, así que `globals.css:922` lo deja donde debe.
 
 ---
 

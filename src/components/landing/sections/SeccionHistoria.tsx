@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { Activity } from 'lucide-react'
+import Reveal from '@/components/landing/motion/Reveal'
 
 /* Section: La Historia de Spinus
    Superficie FRANJA (§3.1). No es solo alternancia: Problema e Historia son
@@ -15,7 +16,15 @@ export default function SeccionHistoria() {
     <section className="bg-[var(--lp-surface-alt)]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
         {/* F1.3·c3 — `lg:gap-24` (96). Ver SeccionExpediente.tsx. */}
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-center">
+        {/* §5.11 · F2.a·a1 — EL `<Reveal>` ES LA RETÍCULA, mismo criterio que
+            Expediente e Interfaz.
+            ⚠️ §5.11 NO PIDE UN REVEAL: su ficha dice "`Parallax` leve en
+            retrato + `Stagger` de párrafos", y las dos cosas son a4 y a2.
+            Este reveal lo añade el PM en a1 para que las ocho secciones
+            quietas entren igual; las dos capas de la ficha anidan dentro, no
+            lo sustituyen. Si a4 encuentra el retrato ya moviéndose, es por
+            esto y no es un duplicado. */}
+        <Reveal className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-center">
           {/* Foto del Dr. Ancona — §7·11 retira el badge de estetoscopio que
               flotaba sobre la esquina: adorno sin contenido sobre un retrato
               real. Pendiente (deuda, no bloqueante): foto en pasillo de
@@ -116,7 +125,7 @@ export default function SeccionHistoria() {
               </p>
             </div>
           </div>
-        </div>
+        </Reveal>
       </div>
     </section>
   )

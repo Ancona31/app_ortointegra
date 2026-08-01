@@ -69,19 +69,19 @@ export default function SeccionNav() {
         <div className="flex items-center gap-3">
           <Link
             href="/pricing"
-            className="hidden sm:inline-flex text-[15px] font-medium text-[var(--lp-ink-700)] hover:text-[var(--lp-ink-900)] transition-colors duration-200 px-3 py-1.5 rounded-xl hover:bg-[var(--lp-hover-surface)] tracking-[-0.01em] leading-none"
+            className="hidden sm:inline-flex text-[15px] font-medium text-[var(--lp-ink-700)] hover:text-[var(--lp-ink-900)] transition-colors duration-[var(--sp-dur-micro)] px-3 py-1.5 rounded-xl hover:bg-[var(--lp-hover-surface)] tracking-[-0.01em] leading-none"
           >
             Planes
           </Link>
           <Link
             href="/login"
-            className="inline-flex text-[15px] font-medium text-[var(--lp-ink-700)] hover:text-[var(--lp-ink-900)] transition-colors duration-200 px-3 py-1.5 rounded-xl hover:bg-[var(--lp-hover-surface)] tracking-[-0.01em] leading-none"
+            className="inline-flex text-[15px] font-medium text-[var(--lp-ink-700)] hover:text-[var(--lp-ink-900)] transition-colors duration-[var(--sp-dur-micro)] px-3 py-1.5 rounded-xl hover:bg-[var(--lp-hover-surface)] tracking-[-0.01em] leading-none"
           >
             Iniciar sesión
           </Link>
           <Link
             href="/register"
-            className="text-[15px] font-semibold text-[var(--lp-ink-inverse)] bg-gradient-to-r from-[var(--lp-navy)] to-[var(--lp-accent)] px-4 py-2 rounded-xl hover:shadow-[0_4px_24px_rgb(var(--lp-accent-rgb)/0.3)] active:scale-[0.97] transition-all duration-200 tracking-[-0.01em] leading-none"
+            className="text-[15px] font-semibold text-[var(--lp-ink-inverse)] bg-gradient-to-r from-[var(--lp-navy)] to-[var(--lp-accent)] px-4 py-2 rounded-xl hover:shadow-[0_4px_24px_rgb(var(--lp-accent-rgb)/0.3)] active:scale-[0.97] transition-all duration-[var(--sp-dur-micro)] tracking-[-0.01em] leading-none"
           >
             Crear cuenta
           </Link>

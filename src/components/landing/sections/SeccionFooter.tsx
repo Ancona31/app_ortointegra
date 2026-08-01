@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
+import Reveal from '@/components/landing/motion/Reveal'
 
 /* Footer — §7·13
    Dos filas porque entran dos elementos nuevos: tagline y contacto. La
@@ -40,7 +41,21 @@ import Image from 'next/image'
 export default function SeccionFooter() {
   return (
     <footer className="border-t-[0.5px] border-[var(--lp-border)] bg-[var(--lp-surface)]">
-      <div className="mx-auto max-w-6xl px-4 sm:px-8 py-8">
+      {/* ═══ §5.13b · F2.a·a1 — REVEAL SIMPLE, SIN PARALLAX ═══
+          Decisión de PM (B7): el footer no tenía ficha en §5 del maestro y
+          ahora la tiene. Es CIERRE, no contenido — entra como un bloque y se
+          acabó. Nada de `Parallax` (a4) ni de `Stagger` en los tres enlaces:
+          escalonar un pie de página es decorar por decorar.
+
+          El `<Reveal>` TOMA las clases del contenedor, no lo envuelve (7.1 de
+          la auditoría de F2.a). Aquí importa más que en las otras siete: el
+          `py-8` es la mitad del CONTRATO DE COSTURA con SeccionCTA que
+          documenta el comentario de cabecera de este archivo (96/128/160 según
+          breakpoint, y en móvil justo el mínimo de §3.3 sin margen). Moverlo a
+          un div interior o duplicarlo en un envoltorio perforaría ese mínimo
+          sin que nada falle visiblemente. Sobre el mismo elemento, el modelo
+          de caja es idéntico: `transform` y `opacity` no tocan el padding. */}
+      <Reveal className="mx-auto max-w-6xl px-4 sm:px-8 py-8">
         {/* Fila 1 — marca + tagline · enlaces */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           {/* F1.3·c3 — `gap-2` (8). Ver SeccionNav.tsx: mismo lockup. */}
@@ -73,13 +88,13 @@ export default function SeccionFooter() {
             <span className="text-[13px] text-[var(--lp-ink-500)] leading-[1.45]">La columna vertebral de tu práctica médica</span>
           </div>
           <div className="flex items-center gap-6">
-            <Link href="/privacy" className="text-[13px] text-[var(--lp-ink-500)] leading-[1.45] hover:text-[var(--lp-ink-700)] transition-colors duration-200">
+            <Link href="/privacy" className="text-[13px] text-[var(--lp-ink-500)] leading-[1.45] hover:text-[var(--lp-ink-700)] transition-colors duration-[var(--sp-dur-micro)]">
               Aviso de privacidad
             </Link>
-            <Link href="/terms" className="text-[13px] text-[var(--lp-ink-500)] leading-[1.45] hover:text-[var(--lp-ink-700)] transition-colors duration-200">
+            <Link href="/terms" className="text-[13px] text-[var(--lp-ink-500)] leading-[1.45] hover:text-[var(--lp-ink-700)] transition-colors duration-[var(--sp-dur-micro)]">
               Términos de servicio
             </Link>
-            <Link href="/pricing" className="text-[13px] text-[var(--lp-ink-500)] leading-[1.45] hover:text-[var(--lp-ink-700)] transition-colors duration-200">
+            <Link href="/pricing" className="text-[13px] text-[var(--lp-ink-500)] leading-[1.45] hover:text-[var(--lp-ink-700)] transition-colors duration-[var(--sp-dur-micro)]">
               Planes
             </Link>
           </div>
@@ -96,13 +111,13 @@ export default function SeccionFooter() {
               peldaño entre ellos no representaba nada. */}
           <a
             href="mailto:soporte@spinus.com.mx"
-            className="hover:text-[var(--lp-ink-700)] transition-colors duration-200"
+            className="hover:text-[var(--lp-ink-700)] transition-colors duration-[var(--sp-dur-micro)]"
           >
             soporte@spinus.com.mx
           </a>
           <span>&copy; {new Date().getFullYear()} Spinus. Todos los derechos reservados.</span>
         </div>
-      </div>
+      </Reveal>
     </footer>
   )
 }

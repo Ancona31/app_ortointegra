@@ -2,6 +2,9 @@
 
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
+import { motion, useReducedMotion } from 'motion/react'
+import Reveal from '@/components/landing/motion/Reveal'
+import { DUR, EASE } from '@/components/landing/motion/tokens'
 
 /* CTA
    Lavado de --cs al 4% (§3.1, banda 3–5%) — sustituye al NeuralBackground.
@@ -16,6 +19,10 @@ import { ArrowRight } from 'lucide-react'
    sí carga, y que no se redefine bajo html.dark. Con fallback sólido propio.
    Es la misma variable que abre la página en SeccionHero.tsx. */
 export default function SeccionCTA() {
+  /* Un solo `useReducedMotion`, sin ramificar el render (§4.3·7). Ver
+     `Reveal.tsx`. */
+  const sinMovimiento = useReducedMotion()
+
   return (
     <section style={{ background: 'var(--lp-wash)' }}>
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
@@ -29,7 +36,10 @@ export default function SeccionCTA() {
             Ver la escala completa en SeccionInterfaz.tsx. */}
         {/* F1.3·c3 — `p-8 sm:p-12` (32/48), no 40/56. Ver SeccionIA.tsx: los
             dos bloques navy comparten padding interior. */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-[var(--lp-navy)] to-[var(--lp-accent)] p-8 sm:p-12 text-center shadow-[0_8px_32px_rgb(var(--lp-accent-rgb)/0.3)]">
+        {/* §5.13 · F2.a·a1 — EL `<Reveal>` TOMA LAS CLASES DEL BLOQUE NAVY, no
+            lo envuelve. Mismo criterio que `SeccionIA.tsx`, que es su gemelo
+            de superficie. */}
+        <Reveal className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-[var(--lp-navy)] to-[var(--lp-accent)] p-8 sm:p-12 text-center shadow-[0_8px_32px_rgb(var(--lp-accent-rgb)/0.3)]">
           {/* Shine overlay */}
           <div className="absolute inset-0 bg-gradient-to-br from-[var(--lp-surface-inverse-10)] via-transparent to-transparent pointer-events-none" />
 
@@ -127,20 +137,60 @@ export default function SeccionCTA() {
               con el primario blanco sobre navy — va en ghost. El `relative` se
               movió al contenedor: lo necesita para quedar sobre el shine. */}
           <div className="relative mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link
-              href="/register"
-              className="inline-flex items-center gap-2 bg-[var(--lp-ink-inverse)] text-[var(--lp-navy)] px-7 py-3.5 rounded-xl text-[15px] font-semibold tracking-[-0.01em] leading-none shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
+            {/* ═══ §5.13 · `scale .97→1` — VA EN UN ENVOLTORIO, Y AQUÍ SÍ ES LA
+                OPCIÓN CORRECTA aunque el resto de a1 evite envoltorios ═══
+                El `<Link>` de dentro ya tiene DOS transform propios en CSS:
+                `hover:-translate-y-0.5` y `active:scale-[0.97]`. Si `motion`
+                animara el Link directamente, escribiría un `transform` INLINE
+                sobre él y los dos morirían en silencio — inline gana a
+                utilidad, y al terminar la animación motion deja `transform`
+                puesto (o `none`), que también gana. El botón perdería el
+                levantamiento al pasar el cursor y el hundido al pulsar, sin
+                que nada falle en build ni en lint.
+                Absorberlos en gestos de motion (`whileHover`/`whileTap`) es
+                justo lo que el PM reservó para a3 con el hover de
+                `SeccionFeatures.tsx:158` ("NO los toques aquí, los absorbe
+                Tilt"). Mismo problema, misma respuesta: se aplaza.
+                Con el envoltorio hay dos dueños de transform y ninguno pisa al
+                otro — el div anima la entrada, el Link conserva hover y pulsado.
+                Cuando a3 absorba los gestos, este envoltorio puede desaparecer.
+
+                Disparador propio y no compartido con el bloque: §5.13 lo llama
+                "último beat", o sea que aterriza cuando el botón entra en
+                cuadro, no cuando entra la sección.
+
+                El `.97` va literal por el criterio ya fijado en §5.10b: es
+                geometría de entrada, no ritmo de reveal — el mismo criterio por
+                el que el `.72` del zócalo y el `x: 24` de la tarjeta viven en
+                `SeccionControl.tsx` y no en `tokens.ts`. Sin token nuevo.
+
+                Sin `opacity`: el bloque ya la trajo. Solo el `scale`. */}
+            <motion.div
+              data-lp-reveal=""
+              initial={{ scale: 0.97 }}
+              whileInView={{ scale: 1 }}
+              viewport={{ once: true, amount: 0.25 }}
+              transition={
+                sinMovimiento
+                  ? { duration: 0, delay: 0 }
+                  : { duration: DUR.section, ease: EASE.out }
+              }
             >
-              Empieza gratis <ArrowRight className="w-4 h-4" />
-            </Link>
+              <Link
+                href="/register"
+                className="inline-flex items-center gap-2 bg-[var(--lp-ink-inverse)] text-[var(--lp-navy)] px-7 py-3.5 rounded-xl text-[15px] font-semibold tracking-[-0.01em] leading-none shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-[var(--sp-dur-micro)]"
+              >
+                Empieza gratis <ArrowRight className="w-4 h-4" />
+              </Link>
+            </motion.div>
             <Link
               href="/pricing"
-              className="inline-flex items-center px-7 py-3.5 rounded-xl text-[15px] font-semibold tracking-[-0.01em] leading-none text-[var(--lp-ink-inverse)] border border-[var(--lp-border-inverse)] hover:bg-[var(--lp-surface-inverse-10)] hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
+              className="inline-flex items-center px-7 py-3.5 rounded-xl text-[15px] font-semibold tracking-[-0.01em] leading-none text-[var(--lp-ink-inverse)] border border-[var(--lp-border-inverse)] hover:bg-[var(--lp-surface-inverse-10)] hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-[var(--sp-dur-micro)]"
             >
               Ver planes
             </Link>
           </div>
-        </div>
+        </Reveal>
       </div>
     </section>
   )
