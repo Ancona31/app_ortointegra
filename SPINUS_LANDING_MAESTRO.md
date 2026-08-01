@@ -33,8 +33,20 @@ acabado visual impecable con animación Motion.
   instrucción hasta que la actual esté confirmada.
 - Ningún código se escribe sin: prompt de auditoría → reporte del auditor →
   correcciones → re-auditoría → "sin bloqueantes" → prompt de aplicación.
-- Claude Code corre en WSL: `next build` está BLOQUEADO (rutas UNC). Validar
-  con `npx tsc --noEmit && npx eslint .`. En Mac, `npm run build` sí corre.
+- **`npm run build` SÍ CORRE EN WSL, y esta línea decía lo contrario.**
+  Corregido el 2026-08-01 (F2.a·a2) tras ejecutarlo: `✓ Compiled successfully`,
+  exit 0, desde `~/proyectos/app_ortointegra`. Lo que falla es lanzarlo **desde
+  el lado Windows**, donde el CWD es una ruta UNC (`\\wsl.localhost\…`) y
+  `cmd.exe` la rechaza — el error es del anfitrión, no del proyecto, y se
+  confundió con un bloqueo del build.
+  **Consecuencia: llevábamos todo el proyecto validando de menos en esta
+  máquina.** `tsc` y `eslint` no compilan las rutas ni ejecutan la generación
+  estática; el build sí, y es lo único que habría cazado un fallo de
+  prerender o de frontera RSC. La validación completa de cada tanda es
+  `npm run build && npx tsc --noEmit && npx eslint .`, los tres **dentro de
+  WSL**. Invocación desde el lado Windows, si hace falta:
+  `wsl.exe -d Ubuntu -- bash -ic 'cd ~/proyectos/app_ortointegra && npm run build'`
+  (`bash -ic`, no `-lc`: nvm se carga en `.bashrc` y con `-lc` no hay `node`).
 - Commits como checkpoints tras smoke test en dev server. NUNCA push a main
   sin indicación explícita de Angel. Prompts siempre en bloque de código.
 - Ante desacuerdo o dato faltante: investigar (historial, web, prompt de
@@ -300,12 +312,12 @@ espejo. Divergencia = bug (deuda §15).
 > * **240ms (`--sp-dur-base`)** — cross-fade entre estados y micro-interacción.
 >   En el tejido su uso vivo es de **retraso**, no de duración: es el desfase
 >   del remate de §5.2.
-> * **120ms (`--sp-dur-micro`)** — hover. Los 12 hover de la landing corrían a
->   **200ms**, valor que nunca estuvo en esta tabla; a1 los bajó a este token
->   y escribió el ÚNICO easing del tejido (`--sp-ease-out`) donde
->   `SeccionFeatures.tsx` tenía un `cubic-bezier(0.32,0.72,0,1)` suelto.
->   Quedan 3 sin barrer en `SeccionHero.tsx:269,272,276` — fuera del alcance
->   de a1, pendientes de F2.b.
+> * **120ms (`--sp-dur-micro`)** — hover. Los **15** hover de la landing corrían
+>   a **200ms**, valor que nunca estuvo en esta tabla; a1 bajó 12 y a2 los 3
+>   restantes de `SeccionHero.tsx`. También se sustituyó el único easing suelto
+>   del tejido —un `cubic-bezier(0.32,0.72,0,1)` en `SeccionFeatures.tsx`— por
+>   `--sp-ease-out`. **No queda ningún `duration-200` en la landing**
+>   (verificado con grep tras a2).
 
 ### 4.3 Reglas de rendimiento [E2 + techo físico]
 
@@ -337,6 +349,29 @@ espejo. Divergencia = bug (deuda §15).
 |---|---|---|
 | `<Reveal>` | OFF_ENTRADA, opacity 0→1, y 24→0, once | secciones |
 | `<Stagger>` | `staggerChildren` 70ms — SIN wrappers extra (rompen grid span; usar variantes padre→hijo) | grids, listas |
+
+> ⚠️ **`<Stagger>` SE REESCRIBIÓ EN F2.a·a2 y esta fila ya describe lo
+> implementado, no una intención.** El componente es hoy SOLO el contenedor de
+> variantes padre: no emite ningún elemento propio, y cada hijo anima porque el
+> consumidor lo escribe como `motion.*` con las variantes compartidas que
+> `Stagger.tsx` exporta. La versión anterior sí envolvía a cada hijo y por eso
+> rompía el `col-span` de la card DICOM, el `gap-px` de Portabilidad y el
+> `items-stretch` de Seguridad. Pudo reescribirse sin migración porque no tenía
+> un solo consumidor.
+>
+> **Dos variantes exportadas, y elegir mal la segunda es un defecto visible:**
+> * `VARIANTES_ITEM` — `opacity` + `y: 24`. El caso normal.
+> * `VARIANTES_ITEM_FUNDIDO` — solo `opacity`. **Obligatoria cuando el
+>   contenedor pinta un fondo que se ve entre sus hijos**, porque el hueco que
+>   el hijo vacía al desplazarse se pinta de ese fondo. Caso vivo: la franja de
+>   Portabilidad, cuyo `gap-px` sobre `bg-[var(--lp-border)]` habría mostrado
+>   una banda #e6ebf2 de 24px sobre cada tarjeta durante los 420ms del reveal.
+>
+> **El `gap` se elige por la naturaleza de la lista, no por costumbre:**
+> `STAGGER.siblings` (70ms) para hermanos sin orden, `STAGGER.list` (80ms) para
+> secuencias donde el orden de aparición ES el contenido —los 5 pasos del flujo
+> de §5.8— y `STAGGER.deck` (90ms) para la cascada diagonal del bento (§5.3).
+> `SeccionInterfaz.tsx` es el único archivo donde conviven los dos primeros.
 | `<Tilt>` | hover ±3°, sombra sigue ángulo, <100ms | 5 cards del grid |
 | `<Parallax>` | OFF_TRAVESIA, y +40→−40 | títulos, foto Historia |
 | `<CountUp>` | MotionValue directo al DOM | cupos beta |

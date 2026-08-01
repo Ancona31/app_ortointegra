@@ -266,14 +266,14 @@ export default function SeccionHero() {
                   secundario de al lado, que ya usaba gap-2. */}
               <Link
                 href="/register"
-                className="group inline-flex items-center gap-2 bg-gradient-to-r from-[var(--lp-navy)] to-[var(--lp-accent)] text-[var(--lp-ink-inverse)] px-7 py-3.5 rounded-xl text-[15px] font-semibold tracking-[-0.01em] leading-none shadow-[0_4px_24px_rgb(var(--lp-accent-rgb)/0.3)] hover:shadow-[0_8px_32px_rgb(var(--lp-accent-rgb)/0.4)] hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
+                className="group inline-flex items-center gap-2 bg-gradient-to-r from-[var(--lp-navy)] to-[var(--lp-accent)] text-[var(--lp-ink-inverse)] px-7 py-3.5 rounded-xl text-[15px] font-semibold tracking-[-0.01em] leading-none shadow-[0_4px_24px_rgb(var(--lp-accent-rgb)/0.3)] hover:shadow-[0_8px_32px_rgb(var(--lp-accent-rgb)/0.4)] hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-[var(--sp-dur-micro)]"
               >
                 Empieza gratis
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-200" />
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-[var(--sp-dur-micro)]" />
               </Link>
               <Link
                 href="/pricing"
-                className="inline-flex items-center gap-2 text-[var(--lp-ink-700)] px-7 py-3.5 rounded-xl text-[15px] font-semibold tracking-[-0.01em] leading-none bg-[var(--lp-surface)] border border-[var(--lp-border)] shadow-sm hover:shadow-md hover:border-[var(--lp-border-strong)] hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
+                className="inline-flex items-center gap-2 text-[var(--lp-ink-700)] px-7 py-3.5 rounded-xl text-[15px] font-semibold tracking-[-0.01em] leading-none bg-[var(--lp-surface)] border border-[var(--lp-border)] shadow-sm hover:shadow-md hover:border-[var(--lp-border-strong)] hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-[var(--sp-dur-micro)]"
               >
                 Ver planes
               </Link>

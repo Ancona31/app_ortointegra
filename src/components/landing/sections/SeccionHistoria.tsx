@@ -2,7 +2,10 @@
 
 import Image from 'next/image'
 import { Activity } from 'lucide-react'
+import { motion, useReducedMotion } from 'motion/react'
 import Reveal from '@/components/landing/motion/Reveal'
+import Stagger, { VARIANTES_ITEM } from '@/components/landing/motion/Stagger'
+import { DUR, EASE } from '@/components/landing/motion/tokens'
 
 /* Section: La Historia de Spinus
    Superficie FRANJA (§3.1). No es solo alternancia: Problema e Historia son
@@ -12,6 +15,13 @@ import Reveal from '@/components/landing/motion/Reveal'
    tanda la pasa a blanco, Historia y Seguridad se funden en una sola mancha
    de ~1400px. Verificar ese par antes de tocar esta línea. */
 export default function SeccionHistoria() {
+  /* Un solo `useReducedMotion` para la sección, sin ramificar el render
+     (§4.3·7). Ver `Reveal.tsx`. */
+  const sinMovimiento = useReducedMotion()
+  const transicionItem = sinMovimiento
+    ? { duration: 0 }
+    : { duration: DUR.section, ease: EASE.out }
+
   return (
     <section className="bg-[var(--lp-surface-alt)]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
@@ -80,22 +90,33 @@ export default function SeccionHistoria() {
                 sobre un div concreto, NO un selector. Si añades un 5º párrafo
                 aquí dentro, hereda solo. Si lo sacas fuera de este div,
                 dale la clase a mano. */}
-            <div className="mt-6 space-y-4 text-[17px] text-[var(--lp-ink-700)] leading-[1.65]">
-              <p>
+            {/* ═══ §5.11 · STAGGER DE LOS 4 PÁRRAFOS, 70ms (F2.a·a2) ═══
+                "Movimiento = calma": son hermanos, no una secuencia, así que
+                van a `STAGGER.siblings` y no a `list`.
+                ⚠️ EL `<Stagger>` HEREDA LAS CLASES DE TEXTO DEL DIV QUE
+                SUSTITUYE, y eso es condición para que esto siga funcionando:
+                el comentario de d3 de abajo avisa de que este es el único
+                sitio de la landing donde el rol CUERPO vive en el CONTENEDOR y
+                los 4 párrafos lo heredan. `Stagger` renderiza un `div` con la
+                misma `className`, así que la cadena de herencia no se mueve —
+                pero si alguien le quita la clase al contenedor, los cuatro
+                párrafos caen al tamaño por defecto de golpe. */}
+            <Stagger className="mt-6 space-y-4 text-[17px] text-[var(--lp-ink-700)] leading-[1.65]">
+              <motion.p data-lp-reveal="" variants={VARIANTES_ITEM} transition={transicionItem}>
                 Todo empezó en un quirófano. Entre cirugías de columna, notas médicas escritas a mano y un software que tardaba más en cargar que la propia consulta, el <strong className="text-[var(--lp-ink-900)]">Dr. Ángel Ancona</strong> se hizo una pregunta simple: <em className="text-[var(--lp-accent)]">&ldquo;¿Por qué la tecnología médica no funciona como la tecnología que usamos en nuestra vida diaria?&rdquo;</em>
-              </p>
-              <p>
+              </motion.p>
+              <motion.p data-lp-reveal="" variants={VARIANTES_ITEM} transition={transicionItem}>
                 La respuesta no existía. Los sistemas de expedientes electrónicos estaban diseñados por ingenieros que nunca habían pisado un consultorio a las 7 de la mañana con 20 pacientes esperando. Eran lentos, complejos y pensados para cumplir regulaciones — no para ayudar al médico.
-              </p>
-              <p>
+              </motion.p>
+              <motion.p data-lp-reveal="" variants={VARIANTES_ITEM} transition={transicionItem}>
                 Así nació <strong className="text-[var(--lp-ink-900)]">Spinus</strong>. El nombre viene de la raíz latina <em>spina</em> — columna. Porque así como la columna vertebral es el eje que sostiene y conecta todo el cuerpo humano, Spinus es el eje tecnológico que sostiene y conecta toda tu práctica médica: expedientes, agenda, recetas, laboratorios, imagen DICOM e inteligencia artificial en un solo lugar.
-              </p>
-              <p>
+              </motion.p>
+              <motion.p data-lp-reveal="" variants={VARIANTES_ITEM} transition={transicionItem}>
                 {/* §7·11: "y el de miles de colegas" implicaba una base de
                     usuarios que no existe. El producto está en beta. */}
                 No es un software hecho por una empresa de tecnología que luego buscó médicos. Es un software hecho por un médico que aprendió tecnología para resolver su propio problema — uno que comparten miles de colegas.
-              </p>
-            </div>
+              </motion.p>
+            </Stagger>
 
             {/* F1.3·b2: divisor de firma a 0.5px/#e6ebf2.
                 F1.3·c3: `mt-8` (32), no mt-10 — 40 no está en la escala.

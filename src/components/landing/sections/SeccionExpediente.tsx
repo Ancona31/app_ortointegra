@@ -1,7 +1,10 @@
 'use client'
 
 import { Search, Zap, FolderOpen, QrCode, Layers } from 'lucide-react'
+import { motion, useReducedMotion } from 'motion/react'
 import Reveal from '@/components/landing/motion/Reveal'
+import Stagger, { VARIANTES_ITEM } from '@/components/landing/motion/Stagger'
+import { DUR, EASE } from '@/components/landing/motion/tokens'
 
 /* Section: Expediente electrónico
    Superficie BLANCA (§3.1). El `bg-white` va EXPLÍCITO, no por ausencia de
@@ -10,6 +13,13 @@ import Reveal from '@/components/landing/motion/Reveal'
    contra franja `#f5f8fc` daría 1.02:1 e invertido (el panel más claro que
    su fondo). Sobre blanco al menos va en el sentido correcto. */
 export default function SeccionExpediente() {
+  /* Un solo `useReducedMotion` para la sección, sin ramificar el render
+     (§4.3·7). Ver `Reveal.tsx`. */
+  const sinMovimiento = useReducedMotion()
+  const transicionItem = sinMovimiento
+    ? { duration: 0 }
+    : { duration: DUR.section, ease: EASE.out }
+
   return (
     <section className="bg-[var(--lp-surface)]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
@@ -59,14 +69,25 @@ export default function SeccionExpediente() {
                 gráfico informativo salvo uno. En acento dan 6.45:1.
                 NO CONFUNDIR con las 3 barras del timeline de abajo (:100-102),
                 que sí son semánticas y sí sobreviven. */}
-            <div className="mt-8 space-y-4">
+            {/* §5.6 · viñetas — `STAGGER.siblings` (70ms) por defecto: son
+                cuatro hermanas del mismo rango, no una secuencia. Anida DENTRO
+                del `<Reveal>` que a1 puso en la retícula, no lo sustituye: el
+                reveal trae la columna entera y estas cuatro caen en cascada
+                dentro. */}
+            <Stagger className="mt-8 space-y-4">
               {[
                 { icon: <Zap className="w-4 h-4 text-[var(--lp-accent)]" />, text: 'Nota médica que la IA estructura — tú validas y firmas' },
                 { icon: <Search className="w-4 h-4 text-[var(--lp-accent)]" />, text: 'Búsqueda rápida — ⌘K / Ctrl+K, encuentra cualquier paciente al instante' },
                 { icon: <Layers className="w-4 h-4 text-[var(--lp-accent)]" />, text: 'Guarda los cortes clave del estudio y ábrelos con el visor integrado' },
                 { icon: <QrCode className="w-4 h-4 text-[var(--lp-accent)]" />, text: 'QR verificable en cada receta' },
               ].map((item) => (
-                <div key={item.text} className="flex items-start gap-3">
+                <motion.div
+                  key={item.text}
+                  data-lp-reveal=""
+                  variants={VARIANTES_ITEM}
+                  transition={transicionItem}
+                  className="flex items-start gap-3"
+                >
                   {/* `-mt-0.5` = −2px: alineación ÓPTICA del cuadro de icono
                       contra la primera línea de texto, no ritmo. Excluido de
                       §3.3 por decisión de PM (c1) y ratificado en c3. No lo
@@ -96,9 +117,9 @@ export default function SeccionExpediente() {
                   </div>
                   {/* F1.3·d3 — rol cuerpo: 17px · 1.65. Ver SeccionFeatures.tsx. */}
                   <p className="text-[17px] text-[var(--lp-ink-700)] leading-[1.65]">{item.text}</p>
-                </div>
+                </motion.div>
               ))}
-            </div>
+            </Stagger>
           </div>
 
           {/* Mini mockup: patient record — LP-DT-13, se elimina con el Video 1 */}

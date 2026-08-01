@@ -1,7 +1,10 @@
 'use client'
 
 import { Calendar, Zap, MousePointerClick } from 'lucide-react'
+import { motion, useReducedMotion } from 'motion/react'
 import Reveal from '@/components/landing/motion/Reveal'
+import Stagger, { VARIANTES_ITEM } from '@/components/landing/motion/Stagger'
+import { DUR, EASE, STAGGER } from '@/components/landing/motion/tokens'
 
 /* Section: Interfaz intuitiva
    Superficie BLANCA (§3.1), explícita. Mismo motivo que en Expediente: el
@@ -47,6 +50,13 @@ import Reveal from '@/components/landing/motion/Reveal'
    del hero (es el sangrado de §3.4·1, no un radio) y el `rounded-b-2xl`
    del sello de la card DICOM en SeccionFeatures.tsx. Ninguno es deuda. */
 export default function SeccionInterfaz() {
+  /* Un solo `useReducedMotion` para la sección, sin ramificar el render
+     (§4.3·7). Ver `Reveal.tsx`. */
+  const sinMovimiento = useReducedMotion()
+  const transicionItem = sinMovimiento
+    ? { duration: 0 }
+    : { duration: DUR.section, ease: EASE.out }
+
   return (
     <section className="bg-[var(--lp-surface)]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
@@ -63,7 +73,21 @@ export default function SeccionInterfaz() {
         <Reveal className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-center">
           {/* Left: visual */}
           <div className="order-2 lg:order-1">
-            <div className="bg-[#f8fafc] rounded-2xl border border-slate-200/60 p-6 shadow-sm space-y-4">
+            {/* ═══ §5.8 · STAGGER VERTICAL 80ms (F2.a·a2) ═══
+                `STAGGER.list`, no `siblings`: §4.2 reserva los 80ms para las
+                "listas secuenciales" y esto es la definición del caso — el
+                orden de aparición DIBUJA la secuencia del flujo, del paciente
+                que llega al correo que sale. Las viñetas de más abajo, que son
+                hermanas sin orden, sí van a 70ms. La diferencia entre los dos
+                tokens es exactamente esa y aquí se ve la única vez que conviven
+                en un mismo archivo.
+
+                El `<p>` de "Flujo de trabajo típico" queda FUERA de la cascada
+                a propósito: no es un paso, es el rótulo del panel. Como no es
+                un `motion.*`, `staggerChildren` ni lo cuenta ni lo retrasa —
+                está desde el primer cuadro, que es lo que debe hacer un
+                encabezado. */}
+            <Stagger className="bg-[#f8fafc] rounded-2xl border border-slate-200/60 p-6 shadow-sm space-y-4" gap={STAGGER.list}>
               <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Flujo de trabajo típico</p>
               {/* `tone`: gradación de UN solo azul, del más claro (#1e5fa8, paso 1)
                   al más profundo (#1a3a5c, paso 5) — refuerza el avance del flujo.
@@ -82,7 +106,13 @@ export default function SeccionInterfaz() {
                 { step: '4', label: 'Generar receta', desc: 'Selecciona medicamentos, sale membretada y con QR', tone: 'color-mix(in srgb, var(--lp-accent) 25%, var(--lp-navy))' },
                 { step: '5', label: 'Enviar al paciente', desc: 'Email automático con la receta adjunta', tone: 'var(--lp-navy)' },
               ].map((item) => (
-                <div key={item.step} className="flex items-center gap-4 bg-white rounded-xl border border-slate-200/60 px-4 py-3">
+                <motion.div
+                  key={item.step}
+                  data-lp-reveal=""
+                  variants={VARIANTES_ITEM}
+                  transition={transicionItem}
+                  className="flex items-center gap-4 bg-white rounded-xl border border-slate-200/60 px-4 py-3"
+                >
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: item.tone }}>
                     <span className="text-[12px] font-bold text-white">{item.step}</span>
                   </div>
@@ -90,9 +120,9 @@ export default function SeccionInterfaz() {
                     <p className="text-[13px] font-semibold text-slate-800">{item.label}</p>
                     <p className="text-[11px] text-slate-400">{item.desc}</p>
                   </div>
-                </div>
+                </motion.div>
               ))}
-            </div>
+            </Stagger>
           </div>
 
           {/* Right: text */}
@@ -133,13 +163,22 @@ export default function SeccionInterfaz() {
                 violet-500. Mismo criterio que las cuatro de
                 SeccionExpediente.tsx: color sin dato detrás, y de 2.04:1 a
                 4.21:1 de contraste. Todas a --lp-accent (6.45:1). */}
-            <div className="mt-8 space-y-4">
+            {/* §5.8 · viñetas — `STAGGER.siblings` (70ms), no `list`: son
+                hermanas sin secuencia, al revés que los 5 pasos del panel de
+                arriba. Ver la nota de allí. */}
+            <Stagger className="mt-8 space-y-4">
               {[
                 { icon: <MousePointerClick className="w-4 h-4 text-[var(--lp-accent)]" />, text: 'No necesitas capacitación para empezar' },
                 { icon: <Zap className="w-4 h-4 text-[var(--lp-accent)]" />, text: 'Búsqueda rápida — ⌘K / Ctrl+K' },
                 { icon: <Calendar className="w-4 h-4 text-[var(--lp-accent)]" />, text: 'Arrastra y suelta las citas en la agenda' },
               ].map((item) => (
-                <div key={item.text} className="flex items-start gap-3">
+                <motion.div
+                  key={item.text}
+                  data-lp-reveal=""
+                  variants={VARIANTES_ITEM}
+                  transition={transicionItem}
+                  className="flex items-start gap-3"
+                >
                   {/* `-mt-0.5` = alineación óptica de −2px, no ritmo. Blindado
                       en c3 — ver SeccionExpediente.tsx, donde está la
                       geometría completa.
@@ -155,9 +194,9 @@ export default function SeccionInterfaz() {
                       etiqueta del panel simulado y queda fuera de d3 por el
                       mismo criterio que excluyó su kicker en d1. */}
                   <p className="text-[17px] text-[var(--lp-ink-700)] leading-[1.65]">{item.text}</p>
-                </div>
+                </motion.div>
               ))}
-            </div>
+            </Stagger>
           </div>
         </Reveal>
       </div>

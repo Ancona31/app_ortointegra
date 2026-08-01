@@ -1,13 +1,23 @@
 'use client'
 
 import { Smartphone, Laptop, Globe } from 'lucide-react'
+import { motion, useReducedMotion } from 'motion/react'
 import Reveal from '@/components/landing/motion/Reveal'
+import Stagger, { VARIANTES_ITEM_FUNDIDO } from '@/components/landing/motion/Stagger'
+import { DUR, EASE } from '@/components/landing/motion/tokens'
 
 /* Section: Portabilidad
    Superficie FRANJA (§3.1). Es la asignación que más trabaja de las seis:
    las 3 tarjetas de la franja horizontal son blancas, y sobre franja pasan
    a leerse como tarjetas en vez de como aire con filete. */
 export default function SeccionPortabilidad() {
+  /* Un solo `useReducedMotion` para la sección, sin ramificar el render
+     (§4.3·7). Ver `Reveal.tsx`. */
+  const sinMovimiento = useReducedMotion()
+  const transicionItem = sinMovimiento
+    ? { duration: 0 }
+    : { duration: DUR.section, ease: EASE.out }
+
   return (
     <section className="bg-[var(--lp-surface-alt)]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
@@ -59,7 +69,25 @@ export default function SeccionPortabilidad() {
             Pasan a --lp-ink-500 (5.45:1) — tinta, no acento. Ver la nota del
             bento en SeccionFeatures.tsx: la decisión de PM fue la misma en los
             dos sitios y por el mismo motivo. */}
-        <div className="grid sm:grid-cols-3 gap-px bg-[var(--lp-border)] rounded-2xl overflow-hidden border-[0.5px] border-[var(--lp-border)]">
+        {/* ═══ §5.9 · STAGGER HORIZONTAL 70ms (F2.a·a2) ═══
+            El `<Stagger>` ES la retícula y no emite nada, que aquí es
+            condición de supervivencia: el `gap-px` blindado arriba dibuja los
+            divisores dejando ver el fondo del contenedor por una rendija de
+            1px, y cualquier elemento intercalado entre la retícula y las
+            tarjetas lo destruye.
+
+            ⚠️ LOS ÍTEMS ANIMAN SOLO `opacity` — SIN `y`, Y NO ES UN OLVIDO.
+            Es la única de las seis retículas de a2 con esta variante, porque es
+            la única cuyo contenedor PINTA UN FONDO que se ve entre los hijos.
+            Con `y: 24` la tarjeta se desplaza pero su celda no, así que el
+            hueco que vacía por arriba se pinta de #e6ebf2 y aparece una banda
+            gris de 24px sobre cada tarjeta durante los 420ms del reveal —
+            exactamente la banda que la auditoría de F2.a atribuyó a los
+            wrappers, solo que aquí la causa es el desplazamiento vertical, no
+            el wrapper. §5.9 pide "Stagger horizontal 70ms. Nada más: es franja
+            de apoyo", así que el fundido cumple la ficha entera.
+            Si alguna tanda futura le devuelve el `y`, la banda vuelve. */}
+        <Stagger className="grid sm:grid-cols-3 gap-px bg-[var(--lp-border)] rounded-2xl overflow-hidden border-[0.5px] border-[var(--lp-border)]">
           {[
             {
               icon: <Laptop className="w-5 h-5 text-[var(--lp-ink-500)]" />,
@@ -101,7 +129,13 @@ export default function SeccionPortabilidad() {
                  unifiques al mismo valor.
                · `mt-2` de la descripción, antes mt-1: ritmo real, no
                  interlínea óptica. Justificación en SeccionHistoria.tsx. */
-            <div key={item.title} className="bg-[var(--lp-surface)] px-6 py-6 flex items-start gap-3">
+            <motion.div
+              key={item.title}
+              data-lp-reveal=""
+              variants={VARIANTES_ITEM_FUNDIDO}
+              transition={transicionItem}
+              className="bg-[var(--lp-surface)] px-6 py-6 flex items-start gap-3"
+            >
               <div className="flex-shrink-0 mt-0.5">{item.icon}</div>
               <div className="min-w-0">
                 {/* F1.3·d4 — rol H3 de card: 19px · -0.015em · 1.30.
@@ -112,9 +146,9 @@ export default function SeccionPortabilidad() {
                     de la sección: es CAPTION, otro rol, y lo resuelve d4. */}
                 <p className="mt-2 text-[17px] text-[var(--lp-ink-500)] leading-[1.65]">{item.desc}</p>
               </div>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </Stagger>
 
         {/* Pie de franja, no un 4º ítem: aplica SOLO a la nota médica (§7·9,
             lo único verificado). No generalizar a "funciona sin conexión". */}

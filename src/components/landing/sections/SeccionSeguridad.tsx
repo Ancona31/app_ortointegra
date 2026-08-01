@@ -2,7 +2,10 @@
 
 import type { ReactNode } from 'react'
 import { Shield, Scale, Database, DatabaseBackup } from 'lucide-react'
+import { motion, useReducedMotion } from 'motion/react'
 import Reveal from '@/components/landing/motion/Reveal'
+import Stagger, { VARIANTES_ITEM } from '@/components/landing/motion/Stagger'
+import { DUR, EASE } from '@/components/landing/motion/tokens'
 
 /* F1.3·e4 — AQUÍ HABÍA UN CAMPO `iconBg: string`. Cada tarjeta traía el suyo
    (blue-50, violet-50, emerald-50) con sus iconos a juego, y el propio comentario
@@ -137,6 +140,13 @@ const tarjetas: Tarjeta[] = [
    Las 3 tarjetas son `bg-white`, así que pasan de blanco-sobre-blanco a
    blanco-sobre-franja: el contraste interno GANA con este cambio. */
 export default function SeccionSeguridad() {
+  /* Un solo `useReducedMotion` para la sección, sin ramificar el render
+     (§4.3·7). Ver `Reveal.tsx`. */
+  const sinMovimiento = useReducedMotion()
+  const transicionItem = sinMovimiento
+    ? { duration: 0 }
+    : { duration: DUR.section, ease: EASE.out }
+
   return (
     <section className="bg-[var(--lp-surface-alt)]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
@@ -173,7 +183,29 @@ export default function SeccionSeguridad() {
             que se lea): las 3 tarjetas arrancan alineadas arriba y comparten
             altura, que es justo lo que la escalera rompía. Cambiarlo a
             `items-start` devuelve las alturas desiguales. */}
-        <div className="grid sm:grid-cols-3 gap-6 items-stretch">
+        {/* ═══ §5.10 · STAGGER DE LAS 3 TARJETAS, 70ms (F2.a·a2) ═══
+            El `<Stagger>` ES la retícula y no emite nada, así que el
+            `items-stretch` de abajo sigue actuando sobre las tarjetas y las
+            tres siguen compartiendo altura. Eso importa más aquí que en
+            ninguna otra sección: es justo lo que sustituyó a la escalera
+            descartada en LP-DT-20, y un wrapper por hijo lo habría deshecho.
+            ⚠️ SIGUE SIN ESCALERA. a2 tampoco repone los offsets 0/24/48.
+
+            ⚠️ EL `hover:-translate-y-1` DE LAS TARJETAS QUEDA MUERTO DESDE ESTA
+            TANDA, y a diferencia del bento AQUÍ NADIE LO TIENE ASIGNADO.
+            Mecánica verificada en el paquete embarcado
+            (`motion-dom/.../build-transform.mjs:65-67`): al volver los valores
+            de transform a su default, `motion` escribe `transform: none`
+            inline, y el inline gana a la utilidad de Tailwind. En cuanto la
+            tarjeta anima `y`, su transform es de motion.
+            El bento tiene a a3 esperándolo (Tilt absorbe hover y pulsado); esta
+            sección NO está en el alcance de a3, así que el levantamiento se
+            queda sin dueño hasta que alguien lo asigne. Se deja el `hover:` en
+            el className a propósito: es la especificación de lo que hay que
+            reproducir, y borrarlo perdería el dato.
+            Lo que SÍ sobrevive es `hover:shadow-lg` — la sombra no es
+            transform —, así que el hover sigue teniendo respuesta visible. */}
+        <Stagger className="grid sm:grid-cols-3 gap-6 items-stretch">
           {/* ⚠️ Estas tarjetas son las que MÁS pierden en b1: eran el último
               glass de la landing (bg-white/30 + backdrop-blur-md), es decir
               azulejos esmerilados, y pasan a blanco sobre una sección blanca
@@ -196,8 +228,11 @@ export default function SeccionSeguridad() {
               estaba, y c3 ya lo subió a `py-6` — por estar fuera de escala,
               no por divergir de estas dos.) */}
           {tarjetas.map((t) => (
-            <div
+            <motion.div
               key={t.title}
+              data-lp-reveal=""
+              variants={VARIANTES_ITEM}
+              transition={transicionItem}
               className="bg-[var(--lp-surface)] rounded-2xl border-[0.5px] border-[var(--lp-border)] p-8 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-[var(--sp-dur-micro)]"
             >
               {/* F1.3·c3 — `mb-6` (24), no mb-5: 20 no está en la escala. */}
@@ -214,9 +249,9 @@ export default function SeccionSeguridad() {
                   al subir de 14 a 17 crecen las tres a la vez, así que la
                   retícula no se descuadra — la más larga sigue mandando. */}
               <p className="text-[17px] text-[var(--lp-ink-500)] leading-[1.65]">{t.desc}</p>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </Stagger>
       </div>
     </section>
   )

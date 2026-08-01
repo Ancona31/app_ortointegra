@@ -2,6 +2,9 @@
 
 import type { ReactNode } from 'react'
 import { Calendar, FileText, Brain, Pill, MonitorCheck } from 'lucide-react'
+import { motion, useReducedMotion } from 'motion/react'
+import Stagger, { VARIANTES_ITEM } from '@/components/landing/motion/Stagger'
+import { DUR, EASE, STAGGER } from '@/components/landing/motion/tokens'
 
 interface Feature {
   icon: ReactNode
@@ -101,6 +104,13 @@ const features: Feature[] = [
    blanco/#f5f8fc es un sistema y debe leerse en el código, no depender de
    un default global que vive fuera de la landing. */
 export default function SeccionFeatures() {
+  /* Un solo `useReducedMotion` para la sección, sin ramificar el render
+     (§4.3·7). Ver `Reveal.tsx`. */
+  const sinMovimiento = useReducedMotion()
+  const transicionItem = sinMovimiento
+    ? { duration: 0 }
+    : { duration: DUR.section, ease: EASE.out }
+
   return (
     <section className="bg-[var(--lp-surface)] pb-16 sm:pb-24 lg:pb-32">
       <div className="mx-auto max-w-6xl px-4 sm:px-8">
@@ -151,10 +161,47 @@ export default function SeccionFeatures() {
           <p className="mt-3 text-[19px] text-[var(--lp-ink-500)] tracking-[-0.01em] leading-[1.55]">Cada herramienta resuelve un problema real de tu día a día.</p>
         </div>
 
-        <div className="grid sm:grid-cols-3 gap-4">
+        {/* ═══ §5.3 · CASCADA DIAGONAL DEL BENTO (F2.a·a2) ═══
+            El `<Stagger>` ES la retícula: toma las clases del grid y no emite
+            nada, así que el `sm:col-span-2` de abajo sigue viviendo en el ítem
+            de la retícula y la card DICOM conserva su doble ancho. Ese era el
+            bloqueante que §4.4 nombra y el motivo de la reescritura.
+
+            ⚠️ VA CON `staggerChildren`, NO CON UN `delay` POR CARD, Y ESTO SE
+            APARTA A PROPÓSITO DE LA INSTRUCCIÓN DE LA TANDA. El encargo decía
+            "delay: i * STAGGER.deck en cada card, como en Control". Produce los
+            mismos números —el orden del array es el índice, así que
+            0/.09/.18/.27/.36 salen igual— pero "como en Control" implica que
+            cada card lleve su propio `whileInView`, y AHÍ está el fallo: las 3
+            hojas de Control caben en una caja de 150px y sus disparadores
+            coinciden por fuerza, mientras que este bento son DOS FILAS que
+            suman ~600px. Con disparador por card, la fila 2 entra en cuadro
+            bastante después que la fila 1 y la cascada se REINICIA a mitad:
+            deja de leerse como una diagonal y pasa a leerse como dos grupos.
+            Con `staggerChildren` hay UN disparador para la retícula entera y la
+            diagonal se dibuja completa, que es lo que pide §5.3.
+            El valor es `STAGGER.deck` (90ms), el mismo peldaño que el mazo de
+            Control, porque §5.3 fija esos delays y no otros.
+
+            ⚠️ EL `hover:-translate-y-1` Y EL `active:scale-[0.98]` DE ABAJO
+            QUEDAN MUERTOS DESDE ESTA TANDA, y es un estado transitorio
+            ACEPTADO, no un descuido. Verificado en el paquete embarcado
+            (`motion-dom/.../build-transform.mjs:65-67`): cuando los valores de
+            transform vuelven a su default, `motion` escribe `transform: none`
+            INLINE, y un estilo inline gana a cualquier utilidad de Tailwind.
+            En cuanto esta card anima `y`, su transform pasa a ser de motion.
+            El PM ya lo previó al reservarlos para a3 ("NO los toques aquí, los
+            absorbe Tilt"): a3 los convierte en `whileHover`/`whileTap`. Hasta
+            entonces el hover sigue leyéndose por la sombra, que NO es transform
+            y sí sobrevive. No los borres mientras tanto: son la especificación
+            de lo que a3 tiene que reproducir. */}
+        <Stagger className="grid sm:grid-cols-3 gap-4" gap={STAGGER.deck}>
           {features.map((f) => (
-            <div
+            <motion.div
               key={f.title}
+              data-lp-reveal=""
+              variants={VARIANTES_ITEM}
+              transition={transicionItem}
               className={`flex flex-col bg-[var(--lp-surface)] rounded-2xl border-[0.5px] ${f.border} ${f.span === 2 ? 'sm:col-span-2' : ''} shadow-sm hover:shadow-[0_4px_20px_rgb(var(--lp-accent-rgb)/0.10)] hover:-translate-y-1 active:scale-[0.98] transition-all duration-[var(--sp-dur-micro)] ease-[var(--sp-ease-out)] cursor-default`}
             >
               <div className="p-6">
@@ -209,9 +256,9 @@ export default function SeccionFeatures() {
                 <p className="mt-2 text-[17px] text-[var(--lp-ink-500)] leading-[1.65]">{f.desc}</p>
               </div>
               {f.media ? <div className="mt-auto overflow-hidden rounded-b-2xl" /> : null}
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </Stagger>
       </div>
     </section>
   )
