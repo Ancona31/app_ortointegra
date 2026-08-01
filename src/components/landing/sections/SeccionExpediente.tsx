@@ -2,6 +2,7 @@
 
 import { Search, Zap, FolderOpen, QrCode, Layers } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
+import Parallax from '@/components/landing/motion/Parallax'
 import Reveal from '@/components/landing/motion/Reveal'
 import Stagger, { VARIANTES_ITEM } from '@/components/landing/motion/Stagger'
 import { DUR, EASE } from '@/components/landing/motion/tokens'
@@ -40,7 +41,19 @@ export default function SeccionExpediente() {
             dentro de este reveal. Las 4 viñetas de :53 reciben su `Stagger`
             en a2, también anidado. */}
         <Reveal className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-center">
-          <div className="order-1 lg:order-2">
+          {/* ═══ §5.6 · F2.a·a4 — PARALLAX DE LA COLUMNA DE TEXTO ═══
+              Se mueve la columna ENTERA contra la del mockup, que es el
+              parallax de dos columnas de manual: la profundidad nace de que las
+              dos mitades viajen a distinta velocidad. Un `Parallax` sobre el
+              `<h2>` suelto era inviable —chocaba con su bajada, a `mt-6`— y
+              mover el bloque de titular tampoco servía aquí: dejaba las viñetas
+              (`mt-8` = 32px) en el camino. Con la columna entera no queda
+              ningún hueco interno que violar.
+              ⚠️ EL `Parallax` TOMA EL `order-*`, NO LO ENVUELVE, y aquí no es
+              estilo sino obligación: `order` solo actúa sobre un hijo directo
+              de la retícula. Envolviendo, la inversión de columnas de §3.4·6 se
+              rompería en `lg` sin error de build. */}
+          <Parallax className="order-1 lg:order-2">
             {/* F1.3·e3 — pastilla de kicker unificada: --lp-accent-bg / --lp-accent.
                 Cambio de hex literal a variable; el color no se mueve. */}
             <div className="inline-flex items-center gap-2 bg-[var(--lp-accent-bg)] rounded-full px-3.5 py-1 mb-6">
@@ -120,7 +133,7 @@ export default function SeccionExpediente() {
                 </motion.div>
               ))}
             </Stagger>
-          </div>
+          </Parallax>
 
           {/* Mini mockup: patient record — LP-DT-13, se elimina con el Video 1 */}
           <div className="order-2 lg:order-1 bg-[#f8fafc] rounded-2xl border border-slate-200/60 p-6 shadow-sm">

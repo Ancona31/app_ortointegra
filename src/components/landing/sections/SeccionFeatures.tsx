@@ -5,6 +5,7 @@ import { Calendar, FileText, Brain, Pill, MonitorCheck } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import Stagger, { VARIANTES_ITEM } from '@/components/landing/motion/Stagger'
 import { DUR, EASE, STAGGER } from '@/components/landing/motion/tokens'
+import Parallax from '@/components/landing/motion/Parallax'
 import { useTilt } from '@/hooks/useTilt'
 
 interface Feature {
@@ -130,7 +131,14 @@ export default function SeccionFeatures() {
         {/* F1.3·c3 — `mb-12` (48), no mb-14: 56 no está en la escala. Mismo
             cambio en los encabezados de Portabilidad y Seguridad, que son el
             mismo elemento (bloque de titular → retícula). */}
-        <div className="max-w-2xl mb-12">
+        {/* §5.3 · F2.a·a4 — `Parallax` sobre el BLOQUE de encabezado, no sobre
+            el `<h2>`. El titular suelto choca con su bajada, que aquí está a
+            `mt-3` (12px): a cualquier distancia perceptible el uno se mete
+            encima de la otra. Moviendo el bloque entero el hueco interno no
+            existe, y lo que se recorre es el `mb-12` (48px) que lo separa de
+            la retícula — con ±24 despeja por 24. La justificación completa
+            está en `Parallax.tsx`. */}
+        <Parallax className="max-w-2xl mb-12">
           {/* ═══ ROL TITULAR DE SECCIÓN (F1.3·d2) ═══
               text-[clamp(30px,4vw,46px)] · tracking -0.03em · leading 1.10
               (§3.2). Vale para los OCHO titulares de sección de la landing:
@@ -172,7 +180,7 @@ export default function SeccionFeatures() {
           {/* F1.3·d3 — rol bajada: 19px · -0.01em · 1.55. Ver SeccionHero.tsx
               (incluida la advertencia de NO aplicar esto con selector). */}
           <p className="mt-3 text-[19px] text-[var(--lp-ink-500)] tracking-[-0.01em] leading-[1.55]">Cada herramienta resuelve un problema real de tu día a día.</p>
-        </div>
+        </Parallax>
 
         {/* ═══ §5.3 · CASCADA DIAGONAL DEL BENTO (F2.a·a2) ═══
             El `<Stagger>` ES la retícula: toma las clases del grid y no emite

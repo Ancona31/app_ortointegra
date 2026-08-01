@@ -289,7 +289,7 @@ DURACIONES  --sp-dur-micro 120ms (hover) · --sp-dur-base 240ms (cross-fade)
 EASINGS     --sp-ease-out cubic-bezier(.2,0,0,1)  → todo el tejido
             --lp-ease-cine cubic-bezier(.65,0,.35,1) → solo escenarios
 SPRINGS     soft {stiffness:120,damping:20} · snap {300,30} · heavy {60,18}
-DISTANCIAS  reveal y:24 · stagger 70ms · listas secuenciales 80ms
+DISTANCIAS  reveal y:24 · parallax y:±24 · stagger 70ms · listas secuenciales 80ms
 OFFSETS     OFF_ENTRADA ["start 0.9","start 0.35"]
             OFF_TRAVESIA ["start end","end start"]
             OFF_ANCLADO ["start start","end end"]
@@ -406,7 +406,46 @@ espejo. Divergencia = bug (deuda §15).
 > `data-lp-reveal` por ser hijas del `Stagger`. El guard del handler existe
 > además para que **la sombra tampoco se mueva** bajo la preferencia: la regla
 > CSS no cubre `box-shadow`.
-| `<Parallax>` | OFF_TRAVESIA, y +40→−40 | títulos, foto Historia |
+| `<Parallax>` | OFF_TRAVESIA, y +24→−24 | bloque de encabezado o columna de texto, foto Historia |
+
+> ⚠️ **ESTA FILA DECÍA «y +40→−40» EN «títulos», Y LAS DOS COSAS ERAN
+> INAPLICABLES.** Corregido en F2.a·a4 con la medición delante.
+>
+> **1 · El `<h2>` desnudo no es un objetivo viable a NINGUNA distancia útil.**
+> El titular se mueve y su bajada no, así que el recorrido se come el hueco
+> entre los dos. Medido en las seis secciones:
+>
+> | Sección | Hueco bajo el titular | A ±40 |
+> |---|---|---|
+> | Features | `mt-3` = 12px | solapa 28px |
+> | Portabilidad | `mt-4` = 16px | solapa 24px |
+> | Expediente · Interfaz · Historia | `mt-6` = 24px | solapa 16px |
+> | Seguridad | cierra el bloque, `mb-12` = 48px | despeja 8px |
+>
+> Cinco de seis se solapaban —texto de 46px encima de texto de 19px— y bajar la
+> distancia no lo salva: respetar los 12px de Features exigiría ±8, que no se
+> percibe. **Lo que se mueve es el bloque, no el titular:** encabezado completo
+> (titular + bajada) en Features, Portabilidad y Seguridad; columna de texto
+> entera contra la del mockup en Expediente e Interfaz —ahí el bloque de
+> titular tampoco bastaba, dejaba las viñetas (`mt-8`) en el camino—; y la foto
+> en Historia, único caso que la ficha ya pedía sobre el elemento correcto.
+>
+> **2 · ±24 y no ±40.** Con 40 el encabezado despejaba la retícula por 8px, y
+> ocho píxeles se los lleva por delante el primer cambio de tipografía o de
+> espaciado, en silencio. Con 24 el margen es de 24. Token: `DIST.parallax`.
+>
+> **3 · `Parallax` y `Reveal` NUNCA en el mismo elemento:** los dos animan `y` y
+> el continuo pisaría al puntual. Van anidados, parallax fuera —es el dueño de
+> la posición y quien debe llevar el `mb-*`— y reveal dentro.
+>
+> ⚠️ **NO "OPTIMICES" LAS 7 INSTANCIAS CON UN `useScroll` DE PÁGINA.** Se
+> evaluó y se descartó con el código del paquete delante: `motion` ya comparte
+> el listener por contenedor de scroll vía `WeakMap`
+> (`framer-motion/.../scroll/track.mjs:6-8,34-55`) y batchea medición y
+> notificación en el orden lectura→escritura que evita el layout thrashing. Las
+> 7 son **1 listener + 1 de resize**, no 7 de cada. Hacerlo a mano obligaría a
+> leer `offsetTop` fuera de la fase de lectura de motion, o sea a provocar el
+> forced reflow que hoy no ocurre.
 | `<CountUp>` | MotionValue directo al DOM | cupos beta |
 | Nav | transparente→sólido+blur, logo encoge, barra progreso 2px, continuo | siempre |
 

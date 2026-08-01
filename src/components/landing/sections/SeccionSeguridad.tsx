@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import { Shield, Scale, Database, DatabaseBackup } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
+import Parallax from '@/components/landing/motion/Parallax'
 import Reveal from '@/components/landing/motion/Reveal'
 import Stagger, { VARIANTES_ITEM } from '@/components/landing/motion/Stagger'
 import { DIST, DUR, EASE, SPRING } from '@/components/landing/motion/tokens'
@@ -162,7 +163,16 @@ export default function SeccionSeguridad() {
             ⚠️ Y SIGUEN SIN ESCALERA (LP-DT-20). Ni a1 ni a2 reponen los
             offsets verticales: `items-stretch` de :164 es lo que los
             sustituyó. */}
-        <Reveal className="text-center mb-12">
+        {/* §5.10 · F2.a·a4 — parallax fuera, reveal dentro. Los dos animan `y`
+            y no caben en el mismo elemento; el `mb-12` va en el de fuera. El
+            razonamiento completo está en `SeccionPortabilidad.tsx`, que tiene
+            la misma estructura.
+            Nota: este es el ÚNICO de los seis titulares que habría sobrevivido
+            solo —no tiene bajada debajo, cierra el bloque y le quedan los 48px
+            del `mb-12`—, pero va como los demás para que las seis secciones se
+            muevan igual. */}
+        <Parallax className="text-center mb-12">
+          <Reveal>
           {/* F1.3·e3 — pastilla de kicker unificada: --lp-accent-bg / --lp-accent.
               e4 llevó los fondos de icono de las tres cards al mismo par, así
               que la sección entera va con un solo acento. */}
@@ -177,7 +187,8 @@ export default function SeccionSeguridad() {
             Tu práctica,{' '}
             <span className="text-[var(--lp-ink-500)]">protegida</span>
           </h2>
-        </Reveal>
+          </Reveal>
+        </Parallax>
 
         {/* `items-stretch` explícito (es el default de grid, pero aquí importa
             que se lea): las 3 tarjetas arrancan alineadas arriba y comparten

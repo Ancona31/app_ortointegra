@@ -79,6 +79,21 @@ export const DIST = {
    * inclinación.
    */
   elevacionHover: 4,
+  /**
+   * ±24px — recorrido del `Parallax` a lo largo de `OFFSETS.travesia`.
+   *
+   * ⚠️ §4.2 DEL MAESTRO DECÍA ±40 Y EL PM LO BAJÓ A 24 EN F2.a·a4, con el
+   * cálculo delante. Con ±40 el bloque de encabezado despejaba la retícula de
+   * abajo por solo 8px (`mb-12` = 48 menos los 40 de recorrido) en Features,
+   * Portabilidad y Seguridad: cualquier cambio futuro de tipografía o de
+   * espaciado lo convierte en solape SIN que falle nada. A 24 el margen es de
+   * 24px, y en móvil —donde la costura interna es la mitad— esos 16px extra
+   * son la diferencia.
+   * Coincide en número con `DIST.reveal` por casualidad y no por parentesco:
+   * uno es el desplazamiento de una entrada puntual y el otro el recorrido de
+   * una capa continua. Si una tanda mueve uno, el otro NO se mueve con él.
+   */
+  parallax: 24,
 } as const
 
 /**

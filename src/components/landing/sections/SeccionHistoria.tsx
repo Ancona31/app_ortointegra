@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import { Activity } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
+import Parallax from '@/components/landing/motion/Parallax'
 import Reveal from '@/components/landing/motion/Reveal'
 import Stagger, { VARIANTES_ITEM } from '@/components/landing/motion/Stagger'
 import { DUR, EASE } from '@/components/landing/motion/tokens'
@@ -39,7 +40,22 @@ export default function SeccionHistoria() {
               flotaba sobre la esquina: adorno sin contenido sobre un retrato
               real. Pendiente (deuda, no bloqueante): foto en pasillo de
               hospital sin fondo IA, recorte hombros-arriba. */}
-          <div className="flex justify-center">
+          {/* ═══ §5.11 · F2.a·a4 — "Parallax leve en retrato" ═══
+              Es el ÚNICO de los siete que la ficha pedía literalmente sobre el
+              elemento que se mueve, y el único caso limpio de manual: la foto
+              tiene columna propia, así que no hay hermano al que pisar. Los
+              otros seis tuvieron que pasar del titular al bloque o a la
+              columna — ver `Parallax.tsx`.
+              ⚠️ EL `Parallax` TOMA EL `flex justify-center` EN VEZ DE ENVOLVER
+              LA IMAGEN, y no es cosmético: la `<Image>` lleva `w-full
+              max-w-[420px]`, y ese `w-full` se resuelve contra su padre. Con un
+              envoltorio de ancho ajustado al contenido, el ancho de la imagen
+              pasaría a depender de sí mismo. Tomando la clase, la imagen sigue
+              siendo hija directa del mismo contenedor flex de siempre.
+              Holgura vertical: la columna vive en un grid `items-center` con
+              `py-16` (64px) de sección, y en móvil queda a `gap-12` (48px) del
+              texto — los ±24 despejan en los dos casos. */}
+          <Parallax className="flex justify-center">
             <Image
               src="/landing/dr-ancona.jpg"
               alt="Dr. Ángel M. Ancona Pérez — Fundador de Spinus"
@@ -47,7 +63,7 @@ export default function SeccionHistoria() {
               height={600}
               className="rounded-2xl shadow-xl object-cover w-full max-w-[420px]"
             />
-          </div>
+          </Parallax>
 
           {/* Narrativa */}
           <div>

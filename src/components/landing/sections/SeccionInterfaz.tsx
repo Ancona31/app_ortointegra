@@ -2,6 +2,7 @@
 
 import { Calendar, Zap, MousePointerClick } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
+import Parallax from '@/components/landing/motion/Parallax'
 import Reveal from '@/components/landing/motion/Reveal'
 import Stagger, { VARIANTES_ITEM } from '@/components/landing/motion/Stagger'
 import { DUR, EASE, STAGGER } from '@/components/landing/motion/tokens'
@@ -126,7 +127,11 @@ export default function SeccionInterfaz() {
           </div>
 
           {/* Right: text */}
-          <div className="order-1 lg:order-2">
+          {/* §5.8 · F2.a·a4 — parallax de la columna de texto contra la del
+              panel. Mismo criterio y mismo motivo que `SeccionExpediente.tsx`,
+              incluido el que el `Parallax` tome el `order-*` en vez de
+              envolverlo: `order` solo actúa sobre hijos directos del grid. */}
+          <Parallax className="order-1 lg:order-2">
             {/* F1.3·e3 — ERA UNA PASTILLA ESMERALDA (`bg-emerald-50` +
                 `text-emerald-600`). Dos motivos, en este orden:
                   1. Contraste: emerald-600 sobre emerald-50 daba 3.47:1 en un
@@ -197,7 +202,7 @@ export default function SeccionInterfaz() {
                 </motion.div>
               ))}
             </Stagger>
-          </div>
+          </Parallax>
         </Reveal>
       </div>
     </section>

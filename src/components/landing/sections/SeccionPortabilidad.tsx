@@ -2,6 +2,7 @@
 
 import { Smartphone, Laptop, Globe } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
+import Parallax from '@/components/landing/motion/Parallax'
 import Reveal from '@/components/landing/motion/Reveal'
 import Stagger, { VARIANTES_ITEM_FUNDIDO } from '@/components/landing/motion/Stagger'
 import { DUR, EASE } from '@/components/landing/motion/tokens'
@@ -21,9 +22,19 @@ export default function SeccionPortabilidad() {
   return (
     <section className="bg-[var(--lp-surface-alt)]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
-        {/* Prueba de humo F0 del sistema de movimiento — único uso de <Reveal> por ahora */}
         {/* F1.3·c3 — `mb-12` (48). Ver SeccionFeatures.tsx. */}
-        <Reveal className="text-center mb-12">
+        {/* ═══ §5.9 · F2.a·a4 — PARALLAX FUERA, REVEAL DENTRO ═══
+            Los dos animan `y`, así que NO pueden vivir en el mismo elemento:
+            el continuo del parallax pisaría el 24→0 puntual de la entrada.
+            En dos elementos anidados cada uno compone el suyo y no se estorban.
+            El orden es el que es por dos motivos: el `mb-12` tiene que ir en el
+            de fuera para que el recorrido se lo coma él y no un hijo, y el
+            parallax es el dueño de la POSICIÓN del bloque mientras que el
+            reveal solo lo trae a escena una vez.
+            (La nota "prueba de humo F0, único uso de <Reveal> por ahora" que
+            vivía aquí caducó en a1: hoy lo usan ocho secciones.) */}
+        <Parallax className="text-center mb-12">
+          <Reveal>
           {/* F1.3·e3 — ERA UNA PASTILLA VIOLETA (`bg-violet-50` +
               `text-violet-600`). Pasa a la pastilla única por §3.1 "los
               semánticos solo para datos reales": el violeta no representaba
@@ -50,7 +61,8 @@ export default function SeccionPortabilidad() {
           <p className="mt-4 text-[19px] text-[var(--lp-ink-500)] max-w-2xl mx-auto tracking-[-0.01em] leading-[1.55]">
             Accede desde tu computadora, tablet o celular. Adaptada a cada pantalla, sin instalar nada de una tienda de apps.
           </p>
-        </Reveal>
+          </Reveal>
+        </Parallax>
 
         {/* §3.4: franja horizontal delgada de 3 ítems (antes eran 3 tarjetas
             grandes). Siguen siendo 3 — ninguno se elimina; el tercero solo
