@@ -127,7 +127,7 @@ export default function SeccionHero() {
                 falsa, no texto de la landing. Si una auditoría futura
                 reporta "un kicker a 11px suelto", la respuesta es esta nota
                 — no lo unifiques hasta que F0.c sustituya el panel. */}
-            <p className="text-[12px] font-semibold text-[#1e5fa8] uppercase tracking-[0.12em] leading-none">
+            <p className="text-[12px] font-semibold text-[var(--lp-accent)] uppercase tracking-[0.12em] leading-none">
               Expediente clínico electrónico para consultorios privados
             </p>
 
@@ -172,7 +172,15 @@ export default function SeccionHero() {
             <h1 className="mt-4 text-[clamp(40px,7vw,72px)] font-bold text-[var(--lp-ink-900)] tracking-[-0.04em] leading-[1.02]">
               Menos tiempo en la pantalla,
               <br />
-              <span className="bg-gradient-to-r from-[#1a3a5c] to-[#4a9fd4] bg-clip-text text-transparent">
+              {/* F1.3·e3 — ERA UN DEGRADADO RECORTADO
+                  (`from-[#1a3a5c] to-[#4a9fd4]` + `bg-clip-text`). Se eliminó
+                  por contraste: el barrido del degradado da 4.40:1 en su peor
+                  punto (el extremo #4a9fd4 sobre el lavado del hero), por
+                  debajo de AAA y sin margen. Sólido en --lp-accent da 6.10:1.
+                  Con este cambio y el de SeccionHistoria, #4a9fd4 desaparece
+                  de la landing entera. NO lo repongas: un texto cuyo contraste
+                  depende de en qué píxel lo midas no es texto accesible. */}
+              <span className="text-[var(--lp-accent)]">
                 más tiempo con tu paciente
               </span>
             </h1>
@@ -195,7 +203,11 @@ export default function SeccionHero() {
                 `font-semibold`. El rol fija tamaño, tracking y leading; el
                 estilo y el peso son de este sitio. La cursiva es lo que marca
                 la atribución. */}
-            <p className="mt-6 text-[17px] font-semibold text-[#1e5fa8]/80 italic leading-[1.65]">
+            {/* F1.3·e3 — el alfa `/80` CAE. Era #1e5fa8 al 80% sobre el lavado
+                del hero: 4.00:1, fallo de AA por 0.5 en un texto de 17px que
+                no es decorativo. Sólido da 6.10:1. Si vuelves a bajarle opacidad
+                a este párrafo, vuelves a romperlo. */}
+            <p className="mt-6 text-[17px] font-semibold text-[var(--lp-accent)] italic leading-[1.65]">
               Creada por un cirujano de columna que la usa todos los días
             </p>
 

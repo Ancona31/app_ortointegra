@@ -14,10 +14,14 @@ export default function SeccionPortabilidad() {
         {/* Prueba de humo F0 del sistema de movimiento — único uso de <Reveal> por ahora */}
         {/* F1.3·c3 — `mb-12` (48). Ver SeccionFeatures.tsx. */}
         <Reveal className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 bg-violet-50 rounded-full px-3.5 py-1 mb-6">
-            <Smartphone className="w-3.5 h-3.5 text-violet-600" />
+          {/* F1.3·e3 — ERA UNA PASTILLA VIOLETA (`bg-violet-50` +
+              `text-violet-600`). Pasa a la pastilla única por §3.1 "los
+              semánticos solo para datos reales": el violeta no representaba
+              nada del producto. Ver la nota larga en SeccionInterfaz.tsx. */}
+          <div className="inline-flex items-center gap-2 bg-[var(--lp-accent-bg)] rounded-full px-3.5 py-1 mb-6">
+            <Smartphone className="w-3.5 h-3.5 text-[var(--lp-accent)]" />
             {/* F1.3·d1 — rol kicker: 12px · +0.12em · 1.0. Ver SeccionHero.tsx. */}
-            <span className="text-[12px] font-semibold text-violet-600 uppercase tracking-[0.12em] leading-none">Portabilidad máxima</span>
+            <span className="text-[12px] font-semibold text-[var(--lp-accent)] uppercase tracking-[0.12em] leading-none">Portabilidad máxima</span>
           </div>
           {/* F1.3·d2 — rol titular de sección: clamp(30,4vw,46) · -0.03em ·
               1.10. Ver SeccionFeatures.tsx. */}

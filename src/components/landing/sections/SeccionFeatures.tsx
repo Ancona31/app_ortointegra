@@ -7,7 +7,7 @@ interface Feature {
   icon: ReactNode
   title: string
   desc: string
-  /** Borde de la card (§3.1: 0.5px). #1e5fa8 marca la card DICOM. */
+  /** Borde de la card (§3.1: 0.5px). --lp-accent marca la card DICOM. */
   border: string
   /** Columnas que ocupa en la retícula de 3. Ausente = 1. */
   span?: 2
@@ -23,10 +23,10 @@ interface Feature {
    de esa card (§5.3). No reordenar sin releer esa ficha. */
 const features: Feature[] = [
   {
-    icon: <MonitorCheck className="w-6 h-6 text-[#1e5fa8]" />,
+    icon: <MonitorCheck className="w-6 h-6 text-[var(--lp-accent)]" />,
     title: 'Visor DICOM',
     desc: 'Abre el estudio completo desde el disco, sin instalar nada y sin costo extra. Guarda en el expediente los cortes que importan — hasta 100 por paciente.',
-    border: 'border-[#1e5fa8]',
+    border: 'border-[var(--lp-accent)]',
     span: 2,
     media: true,
   },

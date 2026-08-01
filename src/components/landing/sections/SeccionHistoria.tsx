@@ -32,19 +32,27 @@ export default function SeccionHistoria() {
 
           {/* Narrativa */}
           <div>
-            <div className="inline-flex items-center gap-2 bg-blue-50 rounded-full px-3.5 py-1 mb-6">
-              <Activity className="w-3.5 h-3.5 text-[#1e5fa8]" />
+            {/* F1.3·e3 — la pastilla de kicker es la MISMA en las cinco:
+                --lp-accent-bg de fondo, --lp-accent en icono y texto. Aquí solo
+                cambia el hex literal por la variable (el color no se mueve). */}
+            <div className="inline-flex items-center gap-2 bg-[var(--lp-accent-bg)] rounded-full px-3.5 py-1 mb-6">
+              <Activity className="w-3.5 h-3.5 text-[var(--lp-accent)]" />
               {/* §7·11: "MI historia", nunca "nuestra" — no hay equipo. El
                   uppercase lo pone el CSS, como en los kickers hermanos. */}
               {/* F1.3·d1 — rol kicker: 12px · +0.12em · 1.0. Ver SeccionHero.tsx. */}
-              <span className="text-[12px] font-semibold text-[#1e5fa8] uppercase tracking-[0.12em] leading-none">Mi historia</span>
+              <span className="text-[12px] font-semibold text-[var(--lp-accent)] uppercase tracking-[0.12em] leading-none">Mi historia</span>
             </div>
 
             {/* F1.3·d2 — rol titular de sección: clamp(30,4vw,46) · -0.03em ·
                 1.10. Ver SeccionFeatures.tsx. */}
             <h2 className="text-[clamp(30px,4vw,46px)] font-bold text-[var(--lp-ink-900)] tracking-[-0.03em] leading-[1.10]">
               La Historia de{' '}
-              <span className="bg-gradient-to-r from-[#1a3a5c] to-[#4a9fd4] bg-clip-text text-transparent">
+              {/* F1.3·e3 — ERA UN DEGRADADO RECORTADO, gemelo del que había en
+                  el H1 del hero. Aquí el peor punto del barrido daba 3.16:1
+                  sobre el blanco de la sección — a 0.16 de fallar AA en un
+                  titular. Sólido en --lp-accent da 6.05:1. Ver la nota larga en
+                  SeccionHero.tsx. */}
+              <span className="text-[var(--lp-accent)]">
                 Spinus
               </span>
             </h2>
@@ -65,7 +73,7 @@ export default function SeccionHistoria() {
                 dale la clase a mano. */}
             <div className="mt-6 space-y-4 text-[17px] text-[var(--lp-ink-700)] leading-[1.65]">
               <p>
-                Todo empezó en un quirófano. Entre cirugías de columna, notas médicas escritas a mano y un software que tardaba más en cargar que la propia consulta, el <strong className="text-[var(--lp-ink-900)]">Dr. Ángel Ancona</strong> se hizo una pregunta simple: <em className="text-[#1e5fa8]">&ldquo;¿Por qué la tecnología médica no funciona como la tecnología que usamos en nuestra vida diaria?&rdquo;</em>
+                Todo empezó en un quirófano. Entre cirugías de columna, notas médicas escritas a mano y un software que tardaba más en cargar que la propia consulta, el <strong className="text-[var(--lp-ink-900)]">Dr. Ángel Ancona</strong> se hizo una pregunta simple: <em className="text-[var(--lp-accent)]">&ldquo;¿Por qué la tecnología médica no funciona como la tecnología que usamos en nuestra vida diaria?&rdquo;</em>
               </p>
               <p>
                 La respuesta no existía. Los sistemas de expedientes electrónicos estaban diseñados por ingenieros que nunca habían pisado un consultorio a las 7 de la mañana con 20 pacientes esperando. Eran lentos, complejos y pensados para cumplir regulaciones — no para ayudar al médico.
@@ -103,7 +111,7 @@ export default function SeccionHistoria() {
                 Dr. Ángel M. Ancona Pérez
               </p>
               {/* F1.3·d4 — rol caption: 13px · 1.45. Ver SeccionFooter.tsx. */}
-              <p className="text-[13px] text-[#1e5fa8] font-semibold leading-[1.45] mt-2">
+              <p className="text-[13px] text-[var(--lp-accent)] font-semibold leading-[1.45] mt-2">
                 Fundador, Traumatólogo y Cirujano de Columna
               </p>
             </div>

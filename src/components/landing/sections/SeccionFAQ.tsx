@@ -225,7 +225,7 @@ function ItemFAQ({ pregunta, respuesta, sinMovimiento }: ItemProps): React.JSX.E
               lo dice `aria-expanded`; anunciarlo dos veces es ruido. */}
           <motion.span
             aria-hidden
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#1e5fa8]"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[var(--lp-accent)]"
             animate={{ rotate: abierto ? 45 : 0 }}
             transition={sinMovimiento ? instantaneo : { duration: DUR.base, ease: EASE.out }}
           >
@@ -387,7 +387,7 @@ export default function SeccionFAQ() {
           {/* F1.3·c3 — `mb-12` (48). Ver SeccionSeguridad.tsx. */}
           <div className="mb-12">
             {/* F1.3·d1 — rol kicker: 12px · +0.12em · 1.0. Ver SeccionHero.tsx. */}
-            <p className="text-[12px] font-semibold text-[#1e5fa8] uppercase tracking-[0.12em] leading-none">
+            <p className="text-[12px] font-semibold text-[var(--lp-accent)] uppercase tracking-[0.12em] leading-none">
               Preguntas frecuentes
             </p>
             {/* F1.3·d2 — rol titular de sección: clamp(30,4vw,46) · -0.03em · 1.10. */}

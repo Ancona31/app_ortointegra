@@ -144,7 +144,7 @@ export default function SeccionControl() {
           transition={transicion ?? { duration: DUR.section, ease: EASE.out }}
         >
           {/* F1.3·d1 — rol kicker: 12px · +0.12em · 1.0. Ver SeccionHero.tsx. */}
-          <p className="text-[12px] font-semibold text-[#1e5fa8] uppercase tracking-[0.12em] leading-none">
+          <p className="text-[12px] font-semibold text-[var(--lp-accent)] uppercase tracking-[0.12em] leading-none">
             Control y autonom&iacute;a
           </p>
           {/* F1.3·d2 — rol titular de sección: clamp(30,4vw,46) · -0.03em · 1.10. */}

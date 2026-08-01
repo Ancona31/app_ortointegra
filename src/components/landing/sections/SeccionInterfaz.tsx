@@ -82,14 +82,26 @@ export default function SeccionInterfaz() {
 
           {/* Right: text */}
           <div className="order-1 lg:order-2">
-            <div className="inline-flex items-center gap-2 bg-emerald-50 rounded-full px-3.5 py-1 mb-6">
-              <MousePointerClick className="w-3.5 h-3.5 text-emerald-600" />
+            {/* F1.3·e3 — ERA UNA PASTILLA ESMERALDA (`bg-emerald-50` +
+                `text-emerald-600`). Dos motivos, en este orden:
+                  1. Contraste: emerald-600 sobre emerald-50 daba 3.47:1 en un
+                     texto de 12px — fallo de AA. En --lp-accent da 5.92:1.
+                  2. §3.1 "los semánticos solo para datos reales": el verde no
+                     representaba ningún estado del producto, solo decoraba la
+                     sección.
+                La tensión con "un acento por sección" la resolvió el PM a favor
+                de esto: el acento de sección ya lo da la SUPERFICIE
+                (blanco/franja/lavado/navy), no la pastilla. Las cinco pastillas
+                de kicker de la landing son ahora idénticas. NO la revuelvas a
+                verde. */}
+            <div className="inline-flex items-center gap-2 bg-[var(--lp-accent-bg)] rounded-full px-3.5 py-1 mb-6">
+              <MousePointerClick className="w-3.5 h-3.5 text-[var(--lp-accent)]" />
               {/* F1.3·d1 — rol kicker: 12px · +0.12em · 1.0. Ver SeccionHero.tsx.
                   NO confundir con el `text-[11px]` de :57 ("Flujo de trabajo
                   típico"): ese vive dentro del panel simulado y queda fuera
                   de F1.3 a propósito. Son dos kickers de este archivo con
                   tamaños distintos y está bien así. */}
-              <span className="text-[12px] font-semibold text-emerald-600 uppercase tracking-[0.12em] leading-none">Interfaz intuitiva</span>
+              <span className="text-[12px] font-semibold text-[var(--lp-accent)] uppercase tracking-[0.12em] leading-none">Interfaz intuitiva</span>
             </div>
             {/* F1.3·d2 — rol titular de sección: clamp(30,4vw,46) · -0.03em ·
                 1.10. Ver SeccionFeatures.tsx. */}

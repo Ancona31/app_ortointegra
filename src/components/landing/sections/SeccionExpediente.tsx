@@ -21,10 +21,12 @@ export default function SeccionExpediente() {
             Historia) comparten el mismo par `gap-12 lg:gap-24`. */}
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-center">
           <div className="order-1 lg:order-2">
-            <div className="inline-flex items-center gap-2 bg-blue-50 rounded-full px-3.5 py-1 mb-6">
-              <FolderOpen className="w-3.5 h-3.5 text-[#1e5fa8]" />
+            {/* F1.3·e3 — pastilla de kicker unificada: --lp-accent-bg / --lp-accent.
+                Cambio de hex literal a variable; el color no se mueve. */}
+            <div className="inline-flex items-center gap-2 bg-[var(--lp-accent-bg)] rounded-full px-3.5 py-1 mb-6">
+              <FolderOpen className="w-3.5 h-3.5 text-[var(--lp-accent)]" />
               {/* F1.3·d1 — rol kicker: 12px · +0.12em · 1.0. Ver SeccionHero.tsx. */}
-              <span className="text-[12px] font-semibold text-[#1e5fa8] uppercase tracking-[0.12em] leading-none">Expediente electrónico</span>
+              <span className="text-[12px] font-semibold text-[var(--lp-accent)] uppercase tracking-[0.12em] leading-none">Expediente electrónico</span>
             </div>
             {/* F1.3·d2 — rol titular de sección: clamp(30,4vw,46) · -0.03em ·
                 1.10. Ver SeccionFeatures.tsx. */}

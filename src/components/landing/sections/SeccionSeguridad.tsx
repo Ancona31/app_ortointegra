@@ -140,10 +140,13 @@ export default function SeccionSeguridad() {
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
         {/* F1.3·c3 — `mb-12` (48). Ver SeccionFeatures.tsx. */}
         <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 bg-blue-50 rounded-full px-3.5 py-1 mb-6">
-            <Shield className="w-3.5 h-3.5 text-[#1e5fa8]" />
+          {/* F1.3·e3 — pastilla de kicker unificada: --lp-accent-bg / --lp-accent.
+              Los `iconBg` semánticos de las tres cards de abajo NO entran aquí
+              (tanda e4): son otra decisión. */}
+          <div className="inline-flex items-center gap-2 bg-[var(--lp-accent-bg)] rounded-full px-3.5 py-1 mb-6">
+            <Shield className="w-3.5 h-3.5 text-[var(--lp-accent)]" />
             {/* F1.3·d1 — rol kicker: 12px · +0.12em · 1.0. Ver SeccionHero.tsx. */}
-            <span className="text-[12px] font-semibold text-[#1e5fa8] uppercase tracking-[0.12em] leading-none">Seguridad clínica</span>
+            <span className="text-[12px] font-semibold text-[var(--lp-accent)] uppercase tracking-[0.12em] leading-none">Seguridad clínica</span>
           </div>
           {/* F1.3·d2 — rol titular de sección: clamp(30,4vw,46) · -0.03em ·
               1.10. Ver SeccionFeatures.tsx. */}
