@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
+import { motion, useScroll, useTransform } from 'motion/react'
+import { NAV } from '@/components/landing/motion/tokens'
 
 /* Nav — sticky necesita z alto para quedar sobre todo
 
@@ -9,18 +11,81 @@ import Image from 'next/image'
    El `bg-white/80` + `backdrop-blur-xl` SÍ se quedan (§4.4): aquí el
    contenido pasa por debajo al hacer scroll, que es justo el caso que el
    blur resuelve. El Footer no, y por eso allí se quitó. No unificarlos. */
-/* ⚠️ F1.3·e5 — el `bg-white/80` de abajo NO pasa a --lp-surface y es
-   deliberado. --lp-surface es blanco OPACO; lo que sostiene el chrome aquí es
-   la translucidez que alimenta al `backdrop-blur-xl`. Cablearlo a la variable
-   con modificador de opacidad cambiaría el modo de mezcla por un color-mix en
-   oklab para no ganar nada. El borde sí va a --lp-border. */
+/* ⚠️ F1.3·e5 — el `bg-white/80` NO pasa a --lp-surface y es deliberado.
+   --lp-surface es blanco OPACO; lo que sostiene el chrome aquí es la
+   translucidez que alimenta al `backdrop-blur-xl`. Cablearlo a la variable con
+   modificador de opacidad cambiaría el modo de mezcla por un color-mix en oklab
+   para no ganar nada. El borde sí va a --lp-border.
+   ⚠️ F2.a·a5 — ESE ARGUMENTO SIGUE VIGENTE, PERO LAS CLASES CAMBIARON DE
+   ELEMENTO: `bg-white/80`, el blur y el borde ya no viven en el `<header>`,
+   sino en la capa de fondo de abajo, que es la que anima su opacidad. La
+   translucidez no se tocó — solo se movió. */
+
+/* ═══ §4.4 · NAV LIGADO AL SCROLL (F2.a·a5) ═══
+   Tres capas, un solo `useScroll` (§4.3·4). El progreso NO pasa por estado de
+   React (§4.3·2): son `MotionValue` derivados con `useTransform`.
+
+   ⚠️⚠️ NUNCA ENVUELVAS ESTE COMPONENTE EN UN `motion.div`. `(landing)/layout.tsx:50-52`
+   lo advierte con nombre y apellido: un `transform`, un `will-change` o un
+   `contain` en CUALQUIER ancestro rompe el `sticky top-0` — sin error de build,
+   sin aviso de lint, y el síntoma (un nav que deja de pegarse) se diagnostica
+   mal casi siempre. Y `motion` escribe `will-change` en cuanto anima algo.
+   Por eso aquí NO anima el `<header>`: animan sus HIJOS. Un elemento sticky
+   con transform propio seguiría siendo sticky, pero no hace falta gastarlo.
+
+   ⚠️ EL BORDE SE MOVIÓ AL INTERIOR DE LA CAPA DE FONDO, así que el `<header>`
+   pierde los 0.5px que el `border-b` le añadía a su caja. El hero arranca
+   medio píxel más arriba. Es invisible y se anota solo porque en este proyecto
+   las costuras se miden. */
 export default function SeccionNav() {
+  const { scrollY, scrollYProgress } = useScroll()
+
+  /* Fondo: transparente arriba del todo → sólido en cuanto pasan 64px.
+     Se anima OPACIDAD y no `background-color` porque §4.3·1 solo admite
+     `transform` y `opacity` — un color de fondo animado repinta en cada
+     cuadro. Por eso el fondo es una capa propia y no una clase del header. */
+  const opacidadFondo = useTransform(scrollY, [0, NAV.umbral], [0, 1])
+  const escalaLogo = useTransform(scrollY, [0, NAV.umbral], [1, NAV.escalaLogo])
+
   return (
-    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b-[0.5px] border-[var(--lp-border)]">
-      <nav className="mx-auto max-w-6xl flex items-center justify-between px-4 sm:px-8 h-14">
+    <header className="sticky top-0 z-50">
+      {/* CAPA 1 — fondo. `absolute inset-0` resuelve contra el `<header>`, que
+          por ser `sticky` ya es un elemento posicionado: no hace falta añadirle
+          `relative` (y añadírselo sería redundante, no incorrecto).
+          `data-lp-reveal` SÍ va aquí: bajo reduced-motion la regla de
+          globals.css:922 lo deja en `opacity: 1`, o sea el nav sólido de
+          siempre. Es exactamente el estado correcto — la legibilidad del chrome
+          no es decorativa y no puede depender de una preferencia de
+          movimiento. */}
+      <motion.div
+        aria-hidden
+        data-lp-reveal=""
+        className="absolute inset-0 bg-white/80 backdrop-blur-xl border-b-[0.5px] border-[var(--lp-border)]"
+        style={{ opacity: opacidadFondo }}
+      />
+      {/* `relative` obligatorio: sin él el contenido del nav queda POR DEBAJO
+          de la capa de fondo, que es un hermano anterior en el orden de
+          pintado. */}
+      <nav className="relative mx-auto max-w-6xl flex items-center justify-between px-4 sm:px-8 h-14">
         {/* F1.3·c3 — `gap-2` (8), no gap-2.5: 10 no está en la escala. Mismo
             cambio en el lockup del Footer, que es el mismo lockup. */}
-        <div className="flex items-center gap-2">
+        {/* CAPA 2 — el lockup encoge. Escala el LOCKUP COMPLETO (isotipo +
+            wordmark), no solo la imagen: escalando únicamente el isotipo, el
+            `gap-2` se mantendría fijo mientras su vecino mengua y el conjunto
+            se vería descuadrado. `origin-left` para que encoja hacia el borde
+            de la página y no hacia su propio centro, que lo despegaría del
+            margen.
+            ⚠️ LA BARRA NO ENCOGE CON ÉL. La `h-14` es fija y no se anima:
+            animar la altura es relayout (§4.3·1). Decisión consciente del PM
+            (B5), no un pendiente — es menos de lo que hacen las referencias.
+            `data-lp-reveal`: bajo reduced-motion `transform: none` deja el
+            logo a tamaño completo, que es su estado de reposo arriba de la
+            página. Correcto sin trabajo extra. */}
+        <motion.div
+          data-lp-reveal=""
+          className="flex items-center gap-2 origin-left"
+          style={{ scale: escalaLogo }}
+        >
           <Image src="/logo-spinus.png" alt="Spinus" width={800} height={777} className="object-contain h-9 w-auto" />
           {/* ═══ EL WORDMARK NO TOMA ROL DE TEXTO (F1.3·d4) ═══
               Se queda en 17px. Es el pendiente que d1 dejó abierto y lo cierra
@@ -36,7 +101,7 @@ export default function SeccionNav() {
               (-0.025em) tampoco es el de ningún rol — es el ajuste del lockup.
               No lo barras. */}
           <span className="text-[17px] font-bold text-[var(--lp-ink-900)] tracking-tight">Spinus</span>
-        </div>
+        </motion.div>
         {/* Jerarquía §7·0: el sólido es para el visitante nuevo ("Crear
             cuenta"), no para el que ya tiene cuenta. "Planes" se oculta en
             móvil; los otros dos no, para que el sólido visible ahí sea el
@@ -87,6 +152,46 @@ export default function SeccionNav() {
           </Link>
         </div>
       </nav>
+
+      {/* ═══ CAPA 3 — BARRA DE PROGRESO ═══
+          `scaleX` sobre una barra de ancho completo, con `origin-left`. Es
+          `transform`, así que cumple §4.3·1; animar `width` habría sido
+          relayout en cada cuadro. Va después del `<nav>` para pintarse encima
+          del borde de la capa de fondo.
+          El alto sale de `NAV.altoBarra` por `style` y no de una clase: un
+          `h-[2px]` sería un número suelto en el componente.
+
+          ⚠️⚠️ ESTA CAPA NO LLEVA `data-lp-reveal`, Y ES EL ÚNICO SITIO DE LA
+          LANDING DONDE ESE ATRIBUTO PRODUCIRÍA EL ESTADO EQUIVOCADO.
+          La regla de `globals.css:922-926` fuerza `transform: none !important`
+          porque asume que "estado final de un reveal" = sin transform. Para un
+          fade o un desplazamiento eso es correcto. Para un `scaleX` de
+          progreso significa `scaleX(1)`, o sea **barra llena y permanente**,
+          que es la mentira exacta que una barra de progreso no puede contar:
+          diría "has llegado al final" nada más cargar la página.
+          Si añades el atributo aquí "por coherencia", rompes la barra. La
+          coherencia del sistema está en el resto de capas, no en esta.
+
+          ⚠️ Y POR ESO LA BARRA SIGUE VIVA BAJO reduced-motion — decisión
+          razonada, no descuido. La preferencia existe para reducir movimiento
+          que el usuario no provocó o que se mueve más de lo que él se mueve:
+          parallax, autoplay, deslizamientos con inercia. Esta barra es un
+          reflejo 1:1 de su propia acción, sin easing, sin retardo y sin
+          recorrido propio — si el usuario no scrollea, no se mueve nada. Y es
+          INFORMACIÓN: cuánto queda de página no está dicho en ningún otro
+          sitio de la landing. Congelarla no reduciría movimiento, solo
+          borraría el dato. Las otras dos capas sí se congelan, que es donde la
+          preferencia sí tiene sentido.
+
+          `aria-hidden` porque duplica visualmente lo que la barra de scroll
+          nativa ya expone a la tecnología asistiva. Un `role="progressbar"`
+          exigiría mantener `aria-valuenow`, y eso obliga a pasar el progreso
+          por estado de React — justo lo que §4.3·2 prohíbe. */}
+      <motion.div
+        aria-hidden
+        className="absolute bottom-0 inset-x-0 origin-left bg-[var(--lp-accent)]"
+        style={{ height: NAV.altoBarra, scaleX: scrollYProgress }}
+      />
     </header>
   )
 }

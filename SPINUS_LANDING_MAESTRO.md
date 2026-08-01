@@ -449,6 +449,38 @@ espejo. Divergencia = bug (deuda §15).
 | `<CountUp>` | MotionValue directo al DOM | cupos beta |
 | Nav | transparente→sólido+blur, logo encoge, barra progreso 2px, continuo | siempre |
 
+> **IMPLEMENTADO** en `SeccionNav.tsx` (F2.a·a5). Tres capas, un solo
+> `useScroll` (§4.3·4), umbral de 64px (`NAV.umbral`).
+>
+> ⚠️ **LA BARRA DEL NAV NO SE ANIMA EN ALTURA, y no es un recorte de alcance.**
+> La `h-14` es fija: animar la altura es relayout y §4.3·1 no lo admite. El
+> logo encoge (`scale` del lockup completo, `origin-left`) dentro de una barra
+> que no se mueve. Es menos de lo que hacen Linear o Stripe y está aceptado por
+> el PM (B5).
+>
+> ⚠️ **EL FONDO ES UNA CAPA `absolute`, NO UNA CLASE DEL `<header>`.** Animar
+> `background-color` viola §4.3·1, así que lo que anima es la `opacity` de una
+> capa que lleva el `bg-white/80`, el `backdrop-blur-xl` y el borde. El
+> argumento de F1.3·e5 sobre la translucidez se conserva intacto: las clases
+> cambiaron de elemento, no de valor.
+>
+> ⚠️⚠️ **`[data-lp-reveal]` TIENE UNA EXCEPCIÓN, Y ES LA BARRA DE PROGRESO.**
+> La regla de `globals.css:922-926` fuerza `transform: none !important` porque
+> asume que el estado final de un reveal es "sin transform". Sobre un `scaleX`
+> de progreso eso significa **barra llena permanente** — diría "fin de página"
+> nada más cargar. La barra es la única capa de la landing que NO lleva el
+> atributo. Antes de añadírselo a cualquier capa nueva, pregúntate si su estado
+> final es realmente `transform: none`.
+>
+> **Bajo reduced-motion la barra sigue viva, y es decisión razonada:** refleja
+> 1:1 una acción del propio usuario, sin easing ni recorrido propio, y es
+> información que no está dicha en ningún otro sitio. Congelarla no reduciría
+> movimiento, borraría el dato. Las otras dos capas sí se congelan.
+>
+> **Pendiente medido en F6:** el `backdrop-blur-xl` de la capa de fondo puede
+> seguir costando compositor aunque esté a `opacity: 0` arriba de la página.
+> No se resolvió en a5 a propósito — sin medición no hay decisión.
+
 ---
 
 ## 5 · COREOGRAFÍA POR SECCIÓN (fichas completas)

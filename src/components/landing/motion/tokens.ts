@@ -205,6 +205,37 @@ export const CHAT = {
 } as const
 
 /**
+ * Nav que se transforma al scrollear (§4.4, tanda F2.a·a5). Solo lo consume
+ * `SeccionNav.tsx`.
+ *
+ * ⚠️ NO HAY TOKEN DE ALTURA DE BARRA, y esa ausencia es la decisión de fondo:
+ * la `h-14` del nav NO se anima. Animar la altura es relayout y §4.3·1 no lo
+ * admite, así que el logo encoge dentro de una barra que no se mueve. Es menos
+ * de lo que hacen Linear o Stripe y está aceptado por el PM (B5) — no es un
+ * pendiente.
+ */
+export const NAV = {
+  /**
+   * 64px de scroll para completar la transformación. Valor de la escala de
+   * §3.3, y elegido porque es ~la altura del propio nav (`h-14` = 56): el
+   * fondo termina de solidificarse justo cuando la primera franja de contenido
+   * ha pasado por debajo, que es cuando el blur empieza a tener algo que
+   * resolver.
+   */
+  umbral: 64,
+  /**
+   * .85 — escala final del lockup completo (isotipo + wordmark), con origen a
+   * la izquierda para que encoja hacia el borde y no hacia su centro.
+   * Lleva los 36px del isotipo a 30.6. Por debajo de ~.8 el wordmark de 17px
+   * empieza a verse blando: un `scale` rasteriza y luego escala, no
+   * re-renderiza la fuente.
+   */
+  escalaLogo: 0.85,
+  /** 2px de barra de progreso. Lo fija §4.4 explícitamente. */
+  altoBarra: 2,
+} as const
+
+/**
  * Tramos de scroll para `useScroll({ offset })`. Espejo de §4.2.
  * Sintaxis de motion: "<borde del target> <borde del contenedor>".
  */
