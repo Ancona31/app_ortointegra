@@ -1688,7 +1688,16 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
   remanente real de `src/`.
 
 ### LP-DT-17 — Marco de captura vacío en el hero
-- **Estado:** 🔴 abierta
+- **Estado:** ✅ **CERRADA (2026-08-01)** — `public/landing/dashboard-spinus.png`
+  (1882×958) montada en el marco con `next/image`, `priority` y recorte por
+  `object-cover` / `object-left` a la región x 0–1533. El marco conservó
+  proporción, cromo y sangrado; solo se sustituyó el lienzo vacío y se
+  colorearon los tres puntos del semáforo. La fórmula del recorte y el porqué
+  de recortar por la derecha están en `SeccionHero.tsx`.
+- **Nota de cierre:** la condición decía "F0.c produce la captura real". F0.c
+  sigue ABIERTA como auditoría visual de la app; lo que se cerró es este
+  hueco concreto. Ver **LP-DT-30** y **LP-DT-31**, que nacen de esta captura.
+- **Estado original:** 🔴 abierta
 - **Detectada:** F1.2 tanda (c1) — copy de secciones de producto (2026-07-30)
 - **Descripción:** `src/components/landing/sections/SeccionHero.tsx:70-81`
   renderiza el marco de ventana de la columna derecha (tres puntos, borde,
@@ -2079,6 +2088,54 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
   que no puede quedarse es `status: 'activa'` describiendo algo que no pasa.
 - **Condición de cierre:** que los encargados listados en el aviso coincidan
   uno a uno con los que reciben datos en el código.
+
+---
+
+### LP-DT-30 — La captura del hero lleva una fecha que envejece
+
+- **Estado:** 🟠 abierta — **pendiente de decisión de Angel**
+- **Detectada:** al montar la captura del hero (2026-08-01)
+- **Descripción:** `public/landing/dashboard-spinus.png` muestra
+  «Sábado, 1 De Agosto» y «Buenas tardes, Angel» sobre la tarjeta de próximas
+  citas, que a su vez dice «lun 3 ago · 09:00». En octubre la landing seguirá
+  enseñando una agenda de agosto.
+- **Por qué importa más de lo que parece:** es **el mismo defecto por el que se
+  eliminó el mockup original**, que estaba clavado en abril. La diferencia es
+  que aquel era UI falsa en JSX (LP-DT-13) y este es producto real, así que no
+  viola §2.2 — pero el síntoma que ve el visitante es idéntico: un producto que
+  parece abandonado. Y está en el hero, donde §1 sitúa el juicio de 50ms.
+- **Dos salidas, y la decisión es de Angel:**
+  1. **Aceptar como deuda** y recapturar cada cierto tiempo. Barato ahora, pero
+     entra en la cola de LP-DT-2 (recapturar cuando cambie la UI) y depende de
+     que alguien se acuerde.
+  2. **Recapturar sin el bloque de saludo**, encuadrando desde «PRÓXIMAS
+     CITAS» hacia abajo. Elimina la fecha *y* el nombre de pila, y de paso
+     sube el contenido de producto a la zona alta del marco. Cuesta una
+     captura nueva.
+  La fecha relativa de la tarjeta («lun 3 ago») envejece igual, así que la
+  opción 2 solo resuelve del todo si el recorte también la deja fuera.
+- **Condición de cierre:** Angel elige 1 o 2. Si elige 1, esta entrada se marca
+  como aceptada y se enlaza a LP-DT-2.
+
+### LP-DT-31 — La app llama «Buscar paciente» a lo que la landing llama «Búsqueda rápida»
+
+- **Estado:** 🔴 abierta
+- **Detectada:** al montar la captura del hero (2026-08-01)
+- **Descripción:** el panel de accesos rápidos del dashboard rotula el buscador
+  como **«Buscar paciente»** (visible en la captura, con su `Ctrl K` al lado).
+  La landing lo llama **«Búsqueda rápida»** en tres sitios:
+  `SeccionExpediente.tsx:55`, `SeccionInterfaz.tsx:129` y el copy de §7·8.
+- **Por qué es una regla y no una minucia:** §7·6 del maestro lo exige
+  literalmente — *«Un solo nombre para el buscador en TODA la página: "Búsqueda
+  rápida"»*. Con la captura montada, las dos palabras conviven **en la misma
+  pantalla**: el visitante lee «Búsqueda rápida» en el texto y ve «Buscar
+  paciente» en la imagen de al lado.
+- **Alcance probable:** rótulo de la UI del dashboard, más el resto de sitios
+  de la app donde aparezca el mismo control. **No se tocó en esta tanda a
+  propósito:** el alcance era la landing, y cambiar un rótulo de la app obliga
+  además a **recapturar** — o sea que va junto con LP-DT-30, no por separado.
+- **Condición de cierre:** un solo nombre en app y landing, y captura
+  regenerada con él.
 
 ---
 

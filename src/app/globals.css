@@ -176,6 +176,19 @@
   --lp-wash: #f6f9fc;  /* apertura y cierre */
 
   /* Bordes */
+  /* Semáforo del cromo de ventana del hero (macOS). Los hex son los del
+     sistema operativo, no una paleta nuestra.
+     ⚠️ SON LA ÚNICA EXCEPCIÓN A §3.1 "los semánticos solo para datos reales",
+     y está razonada: estos tres puntos no representan un estado del producto
+     —no hay nada rojo, ámbar ni verde que informen—, son la REPRODUCCIÓN de un
+     control del sistema operativo, del mismo modo que el marco de ventana
+     reproduce una ventana. Su trabajo es que la captura se lea como "la app
+     corriendo" y no como una imagen pegada (§6·4). Fuera de este cromo, la
+     prohibición de §3.1 sigue entera: no los uses para nada más. */
+  --lp-chrome-close: #ff5f57;
+  --lp-chrome-min:   #febc2e;
+  --lp-chrome-max:   #28c840;
+
   --lp-border:         #e6ebf2;
   --lp-border-strong:  #cad5e2;                  /* hover */
   --lp-border-inverse: rgb(255 255 255 / .30);   /* sobre navy */

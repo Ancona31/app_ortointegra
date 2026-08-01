@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowRight } from 'lucide-react'
 
 /* Hero
@@ -280,29 +281,79 @@ export default function SeccionHero() {
             </div>
           </div>
 
-          {/* Espacio reservado para la captura real de la agenda (§7·1).
-              F0.c mete aquí la captura; hasta entonces el marco va VACÍO a
-              propósito. NO dibujar interfaz en JSX: sería una UI falsa, el
-              mismo defecto de LP-DT-13. Ver LP-DT-17. */}
-          <div aria-hidden className="hidden lg:block">
+          {/* ═══ CAPTURA REAL DEL PANEL PRINCIPAL (§7·1) — CIERRA LP-DT-17 ═══
+              Aquí vivía el marco VACÍO que la deuda registraba, con su lienzo
+              `--lp-surface-sunken` y su rótulo de espacio reservado. El marco
+              se queda —proporción, cromo y sangrado ya estaban calculados—; lo
+              que entra es la captura.
+
+              ⚠️ RECORTE: LA CAPTURA NO ES 16:10 Y NO SE DEFORMA.
+              El archivo mide 1882×958 (ratio 1.965), y el marco es 16:10
+              (1.6). Para entrar sin deformar (regla 9 del spec de Control: el
+              ancho fija la escala, el alto sigue) hay que RECORTAR ancho:
+                alto útil     = 958 (todo)
+                ancho a 16:10 = 958 × 1.6 = 1532.8 → 1533
+                sobran        = 1882 − 1533 = 349px, el 18.5% del ancho
+              La región mostrada es x 0–1533, y 0–958. Se recorta por la
+              DERECHA, y eso lo decide §3.4·1: esta columna SANGRA por el borde
+              del viewport (`lg:rounded-r-none` + el `lg:pr-0` del contenedor),
+              o sea que su borde derecho ya está declarado como corte. Lo que
+              queda fuera es el panel de accesos rápidos a partir de su mitad y
+              la card de DICOM — ningún texto queda partido: las etiquetas del
+              panel terminan en x≈1500 y el corte cae en el hueco entre la
+              tercera y la cuarta card de módulos.
+              Recortar por la izquierda habría costado la barra lateral, que es
+              justo lo que §7·9 vende ("sidebar, atajos y expediente
+              expandido") y lo que da borde oscuro al lado que toca la columna
+              de texto.
+
+              ⚠️ EL RECORTE LO HACE `object-cover` + `object-left`, NO
+              ARITMÉTICA A MANO, y la diferencia con `SeccionControl.tsx` es
+              deliberada: allí hay que anclar un SUJETO dentro de su bbox alfa
+              y por eso se calculan escala, left y top; aquí el recorte es un
+              simple anclaje de borde, que CSS resuelve nativamente y sin
+              deformar. Si alguna tanda cambia la proporción del marco, el
+              recorte se recalcula solo — con offsets a mano habría que
+              rehacer los números.
+
+              ⚠️ `priority` PORQUE ES EL LCP, y el `sizes` no es cosmético: el
+              marco va `hidden lg:block`, así que por debajo de 1024 la imagen
+              no se muestra. El tramo `1px` del `sizes` hace que el preload de
+              `priority` elija ahí el candidato más pequeño del srcset en vez
+              de bajar la captura entera a un móvil que nunca la va a pintar.
+              El 56vw sale de medir el ancho renderizado real: el marco mide
+              ~464 CSS px a 1024 y ~720 a 1920, y sobre él `object-cover`
+              escala la fuente un 22.8% — pico de ~56vw a 1024, que es el ancho
+              relativo mayor de la curva.
+
+              ⚠️ YA NO VA `aria-hidden`. El marco vacío era decorativo; una
+              captura del producto no lo es, y su `alt` describe lo que se ve
+              en pantalla. El cromo de ventana sí queda oculto a la
+              tecnología asistiva: no comunica nada. */}
+          <div className="hidden lg:block">
             <div className="rounded-2xl lg:rounded-r-none border-[0.5px] border-[var(--lp-border)] bg-[var(--lp-surface)] shadow-sm overflow-hidden">
               {/* F1.3·c3 — `gap-2` (8), no gap-1.5: 6 no está en la escala. */}
-              <div className="flex items-center gap-2 px-4 py-3 border-b-[0.5px] border-[var(--lp-border)]">
-                <span className="w-2.5 h-2.5 rounded-full bg-slate-200" />
-                <span className="w-2.5 h-2.5 rounded-full bg-slate-200" />
-                <span className="w-2.5 h-2.5 rounded-full bg-slate-200" />
+              {/* Semáforo macOS: los tres puntos eran `bg-slate-200` (grises).
+                  Los colores salen de --lp-chrome-*, declarados en globals.css
+                  con la única excepción razonada a §3.1 — son reproducción de
+                  un control del sistema operativo, no semántica de producto.
+                  Sin sombras dramáticas ni degradados (§3.1): el cromo tiene
+                  que desaparecer detrás de la captura, no competir con ella. */}
+              <div aria-hidden className="flex items-center gap-2 px-4 py-3 border-b-[0.5px] border-[var(--lp-border)]">
+                <span className="w-2.5 h-2.5 rounded-full bg-[var(--lp-chrome-close)]" />
+                <span className="w-2.5 h-2.5 rounded-full bg-[var(--lp-chrome-min)]" />
+                <span className="w-2.5 h-2.5 rounded-full bg-[var(--lp-chrome-max)]" />
               </div>
-              {/* ⚠️ F1.3·e5 — ESTA LÍNEA ERA `bg-[var(--sp-surface-muted)]` Y ERA
-                  LA ÚLTIMA PUERTA ABIERTA A html.dark EN TODA LA LANDING. Los
-                  tokens --sp-* se redefinen bajo esa clase, que ThemeProvider
-                  deja colgada al salir de (app): un médico con dark activo que
-                  navegara del lado cliente a la landing veía este marco en
-                  oscuro sobre una página clara. --lp-surface-sunken tiene el
-                  mismo valor (#f8fafc) y es inmune por contrato.
-                  NO devuelvas ningún --sp-* a este archivo. Cuando F0.c meta
-                  la captura real aquí, este div desaparece — pero mientras
-                  exista, va en --lp-*. */}
-              <div className="aspect-[16/10] bg-[var(--lp-surface-sunken)]" />
+              <div className="relative aspect-[16/10]">
+                <Image
+                  src="/landing/dashboard-spinus.png"
+                  alt="Panel principal de Spinus: barra lateral con Dashboard, Pacientes, Agenda, Calculadoras, Documentos y Administración; tarjeta de próximas citas con la consulta de un paciente y botones para iniciar consulta o abrir su expediente; y accesos directos a los módulos de expediente, agenda, documentos y visor DICOM."
+                  fill
+                  sizes="(min-width: 1024px) 56vw, 1px"
+                  priority
+                  className="object-cover object-left"
+                />
+              </div>
             </div>
           </div>
         </div>
