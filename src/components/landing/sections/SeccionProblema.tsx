@@ -88,7 +88,7 @@ import type { JSX } from 'react'
    esta sección. */
 export default function SeccionProblema(): JSX.Element {
   return (
-    <section className="bg-white">
+    <section className="bg-[var(--lp-surface)]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 pb-32">
         {/* §3.4·2: a sangría izquierda, 74% de ancho, sin centrar. Por debajo
             de sm el 74% deja ~17 caracteres por línea, así que ahí va a ancho

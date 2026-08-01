@@ -10,7 +10,7 @@ import { Search, Zap, FolderOpen, QrCode, Layers } from 'lucide-react'
    su fondo). Sobre blanco al menos va en el sentido correcto. */
 export default function SeccionExpediente() {
   return (
-    <section className="bg-white">
+    <section className="bg-[var(--lp-surface)]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
         {/* §3.4: dos columnas invertidas — medio a la izquierda, texto a la
             derecha. La inversión va con order-*, NO moviendo el JSX: en móvil
@@ -81,7 +81,7 @@ export default function SeccionExpediente() {
                       el tamaño o el leading del cuerpo, ESTE VALOR HAY QUE
                       RECALCULARLO: no es una constante, es función de
                       (alto de cuadro − line-height) / 2. */}
-                  <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center flex-shrink-0 -mt-0.5">
+                  <div className="w-8 h-8 rounded-lg bg-[var(--lp-surface-sunken)] flex items-center justify-center flex-shrink-0 -mt-0.5">
                     {item.icon}
                   </div>
                   {/* F1.3·d3 — rol cuerpo: 17px · 1.65. Ver SeccionFeatures.tsx. */}

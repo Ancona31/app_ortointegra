@@ -202,7 +202,7 @@ function ItemFAQ({ pregunta, respuesta, sinMovimiento }: ItemProps): React.JSX.E
           transition: sinMovimiento ? instantaneo : { duration: DUR.base, ease: EASE.out },
         },
       }}
-      className="overflow-hidden rounded-2xl border-[0.5px] border-[#e6ebf2] bg-[#f5f8fc]"
+      className="overflow-hidden rounded-2xl border-[0.5px] border-[var(--lp-border)] bg-[var(--lp-surface-alt)]"
     >
       {/* El botón va DENTRO del h3: el encabezado da la estructura al lector
           de pantalla y el botón la interacción. Al revés (h3 dentro del
@@ -217,7 +217,7 @@ function ItemFAQ({ pregunta, respuesta, sinMovimiento }: ItemProps): React.JSX.E
           /* ⚠️ `-outline-offset-2`: el `overflow-hidden` del `<li>` recortaría
              un foco dibujado por fuera. Con offset negativo se dibuja dentro y
              el usuario de teclado lo ve entero. */
-          className="flex w-full cursor-pointer items-center justify-between gap-4 px-6 py-6 text-left transition-colors duration-200 hover:bg-white focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#1e5fa8]"
+          className="flex w-full cursor-pointer items-center justify-between gap-4 px-6 py-6 text-left transition-colors duration-200 hover:bg-[var(--lp-surface)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--lp-accent)]"
         >
           {/* F1.3·d4 — rol H3 de card: 19px · -0.015em · 1.30. */}
           <span className="text-[19px] font-semibold text-[var(--lp-ink-900)] tracking-[-0.015em] leading-[1.30]">
@@ -227,7 +227,7 @@ function ItemFAQ({ pregunta, respuesta, sinMovimiento }: ItemProps): React.JSX.E
               lo dice `aria-expanded`; anunciarlo dos veces es ruido. */}
           <motion.span
             aria-hidden
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[var(--lp-accent)]"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--lp-surface)] text-[var(--lp-accent)]"
             animate={{ rotate: abierto ? 45 : 0 }}
             transition={sinMovimiento ? instantaneo : { duration: DUR.base, ease: EASE.out }}
           >
@@ -268,7 +268,7 @@ function ItemFAQ({ pregunta, respuesta, sinMovimiento }: ItemProps): React.JSX.E
             cerrada: { opacity: 0 },
             abierta: { opacity: 1, transition: sinMovimiento ? instantaneo : SPRING.snap },
           }}
-          className="h-8 w-8 shrink-0 overflow-hidden rounded-full border-[0.5px] border-[#e6ebf2]"
+          className="h-8 w-8 shrink-0 overflow-hidden rounded-full border-[0.5px] border-[var(--lp-border)]"
         >
           <Image
             src="/landing/dr-ancona-avatar.jpg"
@@ -309,7 +309,7 @@ function ItemFAQ({ pregunta, respuesta, sinMovimiento }: ItemProps): React.JSX.E
                   }
                 : { opacity: 0, transition: instantaneo },
             }}
-            className="absolute left-0 top-0 flex items-center gap-1 rounded-2xl rounded-tl-sm border-[0.5px] border-[#e6ebf2] bg-white px-4 py-3"
+            className="absolute left-0 top-0 flex items-center gap-1 rounded-2xl rounded-tl-sm border-[0.5px] border-[var(--lp-border)] bg-[var(--lp-surface)] px-4 py-3"
           >
             {[0, 1, 2].map((i) => (
               /* `repeat: 1` = dos ciclos = 900ms. FINITO: §12 prohíbe los
@@ -331,7 +331,11 @@ function ItemFAQ({ pregunta, respuesta, sinMovimiento }: ItemProps): React.JSX.E
                       }
                     : { opacity: 0.35, transition: instantaneo },
                 }}
-                className="block h-1.5 w-1.5 rounded-full bg-[#8a99ac]"
+                /* F1.3·e5 — era `bg-[#8a99ac]`. No se cambió por contraste (un
+                   punto de 1.5px es decoración y no tiene umbral que cumplir)
+                   sino por higiene: era el último hex de tinta suelto del
+                   archivo. */
+                className="block h-1.5 w-1.5 rounded-full bg-[var(--lp-ink-500)]"
               />
             ))}
           </motion.span>
@@ -351,7 +355,7 @@ function ItemFAQ({ pregunta, respuesta, sinMovimiento }: ItemProps): React.JSX.E
                   : { ...SPRING.soft, delay: conEscritura ? CHAT.respuesta : 0 },
               },
             }}
-            className="rounded-2xl rounded-tl-sm border-[0.5px] border-[#e6ebf2] bg-white px-4 py-3"
+            className="rounded-2xl rounded-tl-sm border-[0.5px] border-[var(--lp-border)] bg-[var(--lp-surface)] px-4 py-3"
           >
             {/* F1.3·d3 — rol cuerpo: 17px · tracking normal · 1.65.
                 ⚠️ EL ESPACIO VA DENTRO DEL SPAN, no entre spans sueltos: así
@@ -359,7 +363,7 @@ function ItemFAQ({ pregunta, respuesta, sinMovimiento }: ItemProps): React.JSX.E
                 palabras y `pintar` puede indexarlos sin corregir. El salto de
                 línea sigue funcionando igual — el espacio final de cada span
                 es una oportunidad de corte como cualquier otra. */}
-            <p ref={cuerpoRef} className="text-[17px] text-[#3b4a5c] leading-[1.65]">
+            <p ref={cuerpoRef} className="text-[17px] text-[var(--lp-ink-700)] leading-[1.65]">
               {palabras.map((palabra, i) => (
                 <span key={i}>{i < total - 1 ? `${palabra} ` : palabra}</span>
               ))}
@@ -383,7 +387,7 @@ export default function SeccionFAQ() {
   const sinMovimiento = useReducedMotion() ?? false
 
   return (
-    <section className="bg-white">
+    <section className="bg-[var(--lp-surface)]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
         <div className="mx-auto max-w-2xl">
           {/* F1.3·c3 — `mb-12` (48). Ver SeccionSeguridad.tsx. */}

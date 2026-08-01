@@ -19,9 +19,15 @@ import { ArrowRight } from 'lucide-react'
    en el área desbordable, así que no aparece scroll horizontal.
    ⚠️ Si alguna tanda futura vuelve a meter una capa `absolute` aquí, tendrá
    que reponer el `relative` — no lo des por presente. */
+/* F1.3·e5 — el lavado de apertura sale de --lp-wash, que trae su propio
+   fallback sólido (#f6f9fc) tras un @supports en globals.css. Aquí ya no se
+   escribe el color-mix a mano: si se escribiera, un navegador sin color-mix se
+   quedaría sin fondo y ningún fallback lo cubriría. El cierre (SeccionCTA.tsx)
+   usa exactamente esta misma variable — son las dos únicas superficies lavadas
+   de la landing y tienen que moverse juntas. */
 export default function SeccionHero() {
   return (
-    <section style={{ background: 'color-mix(in srgb, #1e5fa8 4%, #fff)' }}>
+    <section style={{ background: 'var(--lp-wash)' }}>
       {/* F1.3·b1: aquí vivía un orbe de 800×500 con blur-3xl y un degradado
           que pasaba por violet-500. Eliminado por dos motivos de §3.1: el
           violeta no representa ningún dato del producto (los semánticos solo
@@ -260,14 +266,14 @@ export default function SeccionHero() {
                   secundario de al lado, que ya usaba gap-2. */}
               <Link
                 href="/register"
-                className="group inline-flex items-center gap-2 bg-gradient-to-r from-[#1a3a5c] to-[#1e5fa8] text-white px-7 py-3.5 rounded-xl text-[15px] font-semibold tracking-[-0.01em] leading-none shadow-[0_4px_24px_rgba(30,95,168,0.3)] hover:shadow-[0_8px_32px_rgba(30,95,168,0.4)] hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
+                className="group inline-flex items-center gap-2 bg-gradient-to-r from-[var(--lp-navy)] to-[var(--lp-accent)] text-[var(--lp-ink-inverse)] px-7 py-3.5 rounded-xl text-[15px] font-semibold tracking-[-0.01em] leading-none shadow-[0_4px_24px_rgb(var(--lp-accent-rgb)/0.3)] hover:shadow-[0_8px_32px_rgb(var(--lp-accent-rgb)/0.4)] hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
               >
                 Empieza gratis
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-200" />
               </Link>
               <Link
                 href="/pricing"
-                className="inline-flex items-center gap-2 text-[var(--lp-ink-700)] px-7 py-3.5 rounded-xl text-[15px] font-semibold tracking-[-0.01em] leading-none bg-white border border-slate-200/60 shadow-sm hover:shadow-md hover:border-slate-300 hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
+                className="inline-flex items-center gap-2 text-[var(--lp-ink-700)] px-7 py-3.5 rounded-xl text-[15px] font-semibold tracking-[-0.01em] leading-none bg-[var(--lp-surface)] border border-[var(--lp-border)] shadow-sm hover:shadow-md hover:border-[var(--lp-border-strong)] hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
               >
                 Ver planes
               </Link>
@@ -279,14 +285,24 @@ export default function SeccionHero() {
               propósito. NO dibujar interfaz en JSX: sería una UI falsa, el
               mismo defecto de LP-DT-13. Ver LP-DT-17. */}
           <div aria-hidden className="hidden lg:block">
-            <div className="rounded-2xl lg:rounded-r-none border-[0.5px] border-[#e6ebf2] bg-white shadow-sm overflow-hidden">
+            <div className="rounded-2xl lg:rounded-r-none border-[0.5px] border-[var(--lp-border)] bg-[var(--lp-surface)] shadow-sm overflow-hidden">
               {/* F1.3·c3 — `gap-2` (8), no gap-1.5: 6 no está en la escala. */}
-              <div className="flex items-center gap-2 px-4 py-3 border-b-[0.5px] border-[#e6ebf2]">
+              <div className="flex items-center gap-2 px-4 py-3 border-b-[0.5px] border-[var(--lp-border)]">
                 <span className="w-2.5 h-2.5 rounded-full bg-slate-200" />
                 <span className="w-2.5 h-2.5 rounded-full bg-slate-200" />
                 <span className="w-2.5 h-2.5 rounded-full bg-slate-200" />
               </div>
-              <div className="aspect-[16/10] bg-[var(--sp-surface-muted)]" />
+              {/* ⚠️ F1.3·e5 — ESTA LÍNEA ERA `bg-[var(--sp-surface-muted)]` Y ERA
+                  LA ÚLTIMA PUERTA ABIERTA A html.dark EN TODA LA LANDING. Los
+                  tokens --sp-* se redefinen bajo esa clase, que ThemeProvider
+                  deja colgada al salir de (app): un médico con dark activo que
+                  navegara del lado cliente a la landing veía este marco en
+                  oscuro sobre una página clara. --lp-surface-sunken tiene el
+                  mismo valor (#f8fafc) y es inmune por contrato.
+                  NO devuelvas ningún --sp-* a este archivo. Cuando F0.c meta
+                  la captura real aquí, este div desaparece — pero mientras
+                  exista, va en --lp-*. */}
+              <div className="aspect-[16/10] bg-[var(--lp-surface-sunken)]" />
             </div>
           </div>
         </div>

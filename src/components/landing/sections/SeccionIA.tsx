@@ -10,7 +10,7 @@ import { Sparkles } from 'lucide-react'
    (1.065:1) dejándolo decorativo. Separa la superficie, no el borde. */
 export default function SeccionIA() {
   return (
-    <section className="bg-[#f5f8fc]">
+    <section className="bg-[var(--lp-surface-alt)]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
         {/* F1.3·c2 — 16px, no 24. Mismo motivo que el bloque navy de
             SeccionCTA.tsx: eran las dos únicas superficies a rounded-3xl.
@@ -21,9 +21,20 @@ export default function SeccionIA() {
             está en la escala de §3.3. Mismo par en el bloque navy de
             SeccionCTA.tsx: son las dos superficies grandes de la landing y
             comparten padding interior a propósito. */}
+        {/* ⚠️ F1.3·e5 — EL GRADIENTE SLATE SE QUEDA. NO ES DEUDA PENDIENTE.
+            La tanda evaluó pasarlo a --lp-navy para unificar los dos bloques
+            oscuros de la landing (este y el del CTA) y lo DESCARTÓ con número:
+            slate-900/800 es casi negro, --lp-navy es #1a3a5c, bastante más
+            claro. El kicker de :51 va en blanco al 50% y sobre este slate mide
+            5.02:1; recalculado sobre #1a3a5c cae a 4.16:1 — fallo de AA a 12px.
+            O sea que "unificar" costaría romper un nodo que e5 vino a proteger.
+            Además el contraste entre los dos bloques oscuros es intencional: el
+            del CTA es el cierre de marca (navy → acento) y este es un bloque de
+            producto. Si alguna vez se unifican, el orden es al revés: primero
+            se sube el alfa del kicker, después se cambia la superficie. */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8 sm:p-12">
           {/* Subtle shine */}
-          <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-transparent pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-br from-[var(--lp-surface-inverse-5)] via-transparent to-transparent pointer-events-none" />
 
           {/* F1.3·c3 — `lg:gap-12` (48), no gap-14: 56 no está en la escala.
               Baja en vez de subir a 64 porque el salto desde el gap-8 (32) de
@@ -35,8 +46,8 @@ export default function SeccionIA() {
                   familia que los chips de abajo y que el ghost del CTA — no es
                   glassmorphism. El `backdrop-blur-sm` sí salió: desenfocar un
                   degradado opaco no produce nada visible, solo coste. */}
-              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white/10 flex items-center justify-center">
-                <Sparkles className="w-12 h-12 sm:w-14 sm:h-14 text-white" />
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-[var(--lp-surface-inverse-10)] flex items-center justify-center">
+                <Sparkles className="w-12 h-12 sm:w-14 sm:h-14 text-[var(--lp-ink-inverse)]" />
               </div>
             </div>
 
@@ -48,7 +59,12 @@ export default function SeccionIA() {
                   mismo +0.12em, así que este es el que menos se mueve en
                   tracking y el que más en tamaño relativo: es el kicker más
                   largo de la landing y el único sin pastilla que lo contenga. */}
-              <p className="text-[12px] font-semibold text-white/50 uppercase tracking-[0.12em] leading-none mb-3">Potenciado por inteligencia artificial</p>
+              {/* ⚠️ F1.3·e5 — `text-white/50` → --lp-ink-inverse-50, que es
+                  EXACTAMENTE rgb(255 255 255 / .50). Mide 5.02:1 sobre el
+                  slate de esta caja y ese margen es lo único que lo mantiene
+                  en AA a 12px: no bajes el alfa ni aclares la superficie de
+                  debajo sin re-medirlo. Ver la nota del gradiente arriba. */}
+              <p className="text-[12px] font-semibold text-[var(--lp-ink-inverse-50)] uppercase tracking-[0.12em] leading-none mb-3">Potenciado por inteligencia artificial</p>
               {/* §7·4: el subtitular ES el titular. El h2 anterior ("Spinus es
                   tu aliado / para cada consulta") no salía del maestro, y la
                   primera oración del párrafo que vivía aquí se eliminó por dos
@@ -72,7 +88,7 @@ export default function SeccionIA() {
                   ningún ancho (4/2/2/2/2, idéntico al antes). Los +26px que
                   crece la sección a 1280 son leading y tamaño, no reflow.
                   Medido, no deducido. */}
-              <h2 className="text-[clamp(30px,4vw,46px)] font-bold text-white tracking-[-0.03em] leading-[1.10]">
+              <h2 className="text-[clamp(30px,4vw,46px)] font-bold text-[var(--lp-ink-inverse)] tracking-[-0.03em] leading-[1.10]">
                 Tú aportas el criterio clínico — Spinus se encarga del trabajo pesado.
               </h2>
               {/* Chips: HOY son etiquetas, no controles. En F4 se vuelven el
@@ -98,7 +114,7 @@ export default function SeccionIA() {
                   de la landing. */}
               <div className="mt-6 flex flex-wrap items-center justify-center lg:justify-start gap-3">
                 {['Notas médicas con IA', 'Análisis de laboratorios'].map((tag) => (
-                  <span key={tag} className="text-[13px] font-medium text-white/70 bg-white/10 px-3 py-1.5 rounded-full leading-[1.45]">
+                  <span key={tag} className="text-[13px] font-medium text-[var(--lp-ink-inverse-70)] bg-[var(--lp-surface-inverse-10)] px-3 py-1.5 rounded-full leading-[1.45]">
                     {tag}
                   </span>
                 ))}

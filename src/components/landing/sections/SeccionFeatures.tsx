@@ -43,25 +43,25 @@ const features: Feature[] = [
     icon: <FileText className="w-6 h-6 text-[var(--lp-ink-500)]" />,
     title: 'Expedientes electrónicos',
     desc: 'Toda la historia clínica de tu paciente a un clic. Sin papel, sin búsquedas.',
-    border: 'border-[#e6ebf2]',
+    border: 'border-[var(--lp-border)]',
   },
   {
     icon: <Pill className="w-6 h-6 text-[var(--lp-ink-500)]" />,
     title: 'Recetas con QR',
     desc: 'Membretadas, con QR verificable. Envíalas por correo o entrégalas impresas.',
-    border: 'border-[#e6ebf2]',
+    border: 'border-[var(--lp-border)]',
   },
   {
     icon: <Brain className="w-6 h-6 text-[var(--lp-ink-500)]" />,
     title: 'Documentación con IA',
     desc: 'Describe los hallazgos y la IA estructura la nota. Tú validas y firmas.',
-    border: 'border-[#e6ebf2]',
+    border: 'border-[var(--lp-border)]',
   },
   {
     icon: <Calendar className="w-6 h-6 text-[var(--lp-ink-500)]" />,
     title: 'Agenda',
     desc: 'Arrastra, suelta y listo. Sincronizada con Google Calendar.',
-    border: 'border-[#e6ebf2]',
+    border: 'border-[var(--lp-border)]',
   },
 ]
 
@@ -102,7 +102,7 @@ const features: Feature[] = [
    un default global que vive fuera de la landing. */
 export default function SeccionFeatures() {
   return (
-    <section className="bg-white pb-16 sm:pb-24 lg:pb-32">
+    <section className="bg-[var(--lp-surface)] pb-16 sm:pb-24 lg:pb-32">
       <div className="mx-auto max-w-6xl px-4 sm:px-8">
         {/* F1.3·c3 — `mb-12` (48), no mb-14: 56 no está en la escala. Mismo
             cambio en los encabezados de Portabilidad y Seguridad, que son el
@@ -155,7 +155,7 @@ export default function SeccionFeatures() {
           {features.map((f) => (
             <div
               key={f.title}
-              className={`flex flex-col bg-white rounded-2xl border-[0.5px] ${f.border} ${f.span === 2 ? 'sm:col-span-2' : ''} shadow-sm hover:shadow-[0_4px_20px_rgba(30,95,168,0.10)] hover:-translate-y-1 active:scale-[0.98] transition-all duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] cursor-default`}
+              className={`flex flex-col bg-[var(--lp-surface)] rounded-2xl border-[0.5px] ${f.border} ${f.span === 2 ? 'sm:col-span-2' : ''} shadow-sm hover:shadow-[0_4px_20px_rgb(var(--lp-accent-rgb)/0.10)] hover:-translate-y-1 active:scale-[0.98] transition-all duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] cursor-default`}
             >
               <div className="p-6">
                 <div className="mb-4">{f.icon}</div>

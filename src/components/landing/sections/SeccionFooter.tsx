@@ -39,7 +39,7 @@ import Image from 'next/image'
    este padding. */
 export default function SeccionFooter() {
   return (
-    <footer className="border-t-[0.5px] border-[#e6ebf2] bg-white">
+    <footer className="border-t-[0.5px] border-[var(--lp-border)] bg-[var(--lp-surface)]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-8">
         {/* Fila 1 — marca + tagline · enlaces */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -73,25 +73,30 @@ export default function SeccionFooter() {
             <span className="text-[13px] text-[var(--lp-ink-500)] leading-[1.45]">La columna vertebral de tu práctica médica</span>
           </div>
           <div className="flex items-center gap-6">
-            <Link href="/privacy" className="text-[13px] text-[var(--lp-ink-500)] leading-[1.45] hover:text-slate-700 transition-colors duration-200">
+            <Link href="/privacy" className="text-[13px] text-[var(--lp-ink-500)] leading-[1.45] hover:text-[var(--lp-ink-700)] transition-colors duration-200">
               Aviso de privacidad
             </Link>
-            <Link href="/terms" className="text-[13px] text-[var(--lp-ink-500)] leading-[1.45] hover:text-slate-700 transition-colors duration-200">
+            <Link href="/terms" className="text-[13px] text-[var(--lp-ink-500)] leading-[1.45] hover:text-[var(--lp-ink-700)] transition-colors duration-200">
               Términos de servicio
             </Link>
-            <Link href="/pricing" className="text-[13px] text-[var(--lp-ink-500)] leading-[1.45] hover:text-slate-700 transition-colors duration-200">
+            <Link href="/pricing" className="text-[13px] text-[var(--lp-ink-500)] leading-[1.45] hover:text-[var(--lp-ink-700)] transition-colors duration-200">
               Planes
             </Link>
           </div>
         </div>
 
         {/* Fila 2 — contacto y copyright.
-            Hex literal en vez de var(--sp-ink-350) por html.dark (ver
-            SeccionProblema.tsx). */}
-        <div className="mt-6 pt-6 border-t-[0.5px] border-[#e6ebf2] flex flex-col sm:flex-row items-center justify-between gap-2 text-[13px] text-[var(--lp-ink-500)] leading-[1.45]">
+            La prohibición de var(--sp-ink-350) por html.dark SIGUE VIGENTE (ver
+            SeccionProblema.tsx); lo que sustituyó al hex literal es --lp-*, que
+            es inmune por contrato. */}
+        <div className="mt-6 pt-6 border-t-[0.5px] border-[var(--lp-border)] flex flex-col sm:flex-row items-center justify-between gap-2 text-[13px] text-[var(--lp-ink-500)] leading-[1.45]">
+          {/* F1.3·e5 — este hover era `slate-600`, mientras los tres links de
+              arriba usaban `slate-700` para el mismo gesto. Los cuatro hover de
+              tinta del pie quedan ahora en --lp-ink-700: la diferencia de un
+              peldaño entre ellos no representaba nada. */}
           <a
             href="mailto:soporte@spinus.com.mx"
-            className="hover:text-slate-600 transition-colors duration-200"
+            className="hover:text-[var(--lp-ink-700)] transition-colors duration-200"
           >
             soporte@spinus.com.mx
           </a>

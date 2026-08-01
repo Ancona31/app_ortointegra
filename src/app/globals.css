@@ -165,7 +165,15 @@
   --lp-surface:        #ffffff;
   --lp-surface-alt:    #f5f8fc;  /* franjas alternas */
   --lp-surface-sunken: #f8fafc;  /* paneles hundidos, marco reservado del hero */
-  --lp-wash: color-mix(in srgb, var(--lp-accent) 4%, #fff);  /* apertura y cierre */
+  /* ⚠️ EL VALOR SÓLIDO ES EL FALLBACK, NO UN DESCUIDO — Y EL ORDEN IMPORTA.
+     #f6f9fc es el resultado MEDIDO de la mezcla de abajo. Se declara primero
+     para que un navegador sin `color-mix()` se quede con él: ese navegador
+     descarta la declaración del @supports por no entenderla, y sin este par
+     la apertura y el cierre de la landing se quedarían sin fondo resuelto.
+     Si cambias --lp-accent o el 4%, RE-MIDE el sólido y actualízalo aquí: son
+     dos declaraciones del mismo color y CSS no puede derivar una de la otra,
+     igual que pasa con --lp-accent-rgb. */
+  --lp-wash: #f6f9fc;  /* apertura y cierre */
 
   /* Bordes */
   --lp-border:         #e6ebf2;
@@ -181,6 +189,15 @@
 
   /* Hover */
   --lp-hover-surface: #f1f5f9;
+}
+
+/* Par del fallback de --lp-wash. Va FUERA del bloque de arriba y DESPUÉS de
+   él: un @supports no puede vivir dentro de una regla, y si se declarara
+   antes, la línea sólida lo pisaría. Ver la nota junto a --lp-wash. */
+@supports (background: color-mix(in srgb, #000 4%, #fff)) {
+  :root {
+    --lp-wash: color-mix(in srgb, var(--lp-accent) 4%, #fff);
+  }
 }
 
 html {

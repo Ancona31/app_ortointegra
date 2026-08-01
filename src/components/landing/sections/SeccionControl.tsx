@@ -134,7 +134,7 @@ export default function SeccionControl() {
        que `overflow-x: clip` con el eje Y en `visible` es una combinación
        legal que no coerciona — y el eje Y hay que dejarlo intacto porque la
        tarjeta desborda 24px por abajo en móvil a propósito (`-bottom-6`). */
-    <section className="bg-white overflow-x-clip">
+    <section className="bg-[var(--lp-surface)] overflow-x-clip">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
         {/* §5.10b · capa 1 — el encabezado entra como UN bloque (kicker y
             titular juntos) para no gastar dos capas del presupuesto. */}
@@ -160,7 +160,7 @@ export default function SeccionControl() {
             sueltos. 24 en móvil / 32 en escritorio, los dos en escala. */}
         <div className="flex flex-col gap-6 lg:gap-8">
           {/* ═══════════ BLOQUE 1 — expedientes portables ═══════════ */}
-          <div className="rounded-2xl border-[0.5px] border-[#e6ebf2] bg-[#f5f8fc] p-8 grid gap-8 lg:grid-cols-[1fr_300px] lg:gap-12 lg:items-center">
+          <div className="rounded-2xl border-[0.5px] border-[var(--lp-border)] bg-[var(--lp-surface-alt)] p-8 grid gap-8 lg:grid-cols-[1fr_300px] lg:gap-12 lg:items-center">
             <div>
               {/* ═══ H3 DE BLOQUE A 24px — EXCEPCIÓN DECLARADA ═══
                   El rol H3 de card de F1.3·d4 son 19px y cubre 11 instancias
@@ -181,7 +181,7 @@ export default function SeccionControl() {
                 Tus expedientes son tuyos
               </h3>
               {/* F1.3·d3 — rol cuerpo: 17px · tracking normal · 1.65. */}
-              <p className="mt-3 max-w-[560px] text-[17px] text-[#3b4a5c] leading-[1.65]">
+              <p className="mt-3 max-w-[560px] text-[17px] text-[var(--lp-ink-700)] leading-[1.65]">
                 Descarga el historial cl&iacute;nico de cualquier paciente en PDF cuando quieras. Se genera en tu dispositivo, sin pasar por nuestros servidores. Y si alg&uacute;n d&iacute;a dejas de usar Spinus, tus expedientes siguen ah&iacute; y los sigues pudiendo descargar.
               </p>
             </div>
@@ -217,7 +217,7 @@ export default function SeccionControl() {
                       stagger 90ms (`STAGGER.deck`), spring soft. */}
                   <motion.div
                     data-lp-reveal=""
-                    className="relative h-[112px] w-[88px] rounded-lg border-[0.5px] border-[#e6ebf2] bg-white px-3 pt-3.5 md:h-[132px] md:w-[104px]"
+                    className="relative h-[112px] w-[88px] rounded-lg border-[0.5px] border-[var(--lp-border)] bg-[var(--lp-surface)] px-3 pt-3.5 md:h-[132px] md:w-[104px]"
                     initial={{ opacity: 0, y: 28, rotate: -10, scale: 0.94 }}
                     whileInView={{ opacity: 1, y: 0, rotate: 0, scale: 1 }}
                     viewport={{ once: true, amount: 0.25 }}
@@ -225,10 +225,10 @@ export default function SeccionControl() {
                   >
                     <div className="flex flex-col gap-1.5">
                       {hoja.barras.map((ancho) => (
-                        <div key={ancho} className="h-1 rounded-[2px] bg-[#e6ebf2]" style={{ width: ancho }} />
+                        <div key={ancho} className="h-1 rounded-[2px] bg-[var(--lp-border)]" style={{ width: ancho }} />
                       ))}
                     </div>
-                    <span className="absolute bottom-3 left-3 text-[10px] font-bold text-[#1e5fa8] md:text-[11px]">PDF</span>
+                    <span className="absolute bottom-3 left-3 text-[10px] font-bold text-[var(--lp-accent)] md:text-[11px]">PDF</span>
                   </motion.div>
                 </div>
               ))}
@@ -360,7 +360,7 @@ export default function SeccionControl() {
                     zócalo cubre los 1088px — mismo ancho, mismo `rounded-2xl`
                     y mismo borde 0.5px que la card del bloque 1. Ahí es donde
                     los dos bloques se igualan. */}
-                <div className="absolute inset-x-0 bottom-0 top-5 rounded-2xl border-[0.5px] border-[#e6ebf2] bg-[#f5f8fc] md:top-6" />
+                <div className="absolute inset-x-0 bottom-0 top-5 rounded-2xl border-[0.5px] border-[var(--lp-border)] bg-[var(--lp-surface-alt)] md:top-6" />
                 {/* Marco de la foto, anclado al borde inferior del zócalo.
                     ⚠️ EL RECORTE ES GEOMETRÍA CALCULADA, NO UN ENCUADRE A OJO.
                     Asset actual (2026-07-31, reemplazo con el fondo mejor
@@ -450,13 +450,13 @@ export default function SeccionControl() {
               <motion.div
                 data-lp-reveal=""
                 aria-hidden
-                className="absolute -bottom-6 left-[calc(50%_-_14px)] w-[178px] overflow-hidden rounded-xl border-[0.5px] border-[#e6ebf2] bg-white md:bottom-7 md:left-[252px] md:w-[168px] lg:left-[304px] lg:w-[216px]"
+                className="absolute -bottom-6 left-[calc(50%_-_14px)] w-[178px] overflow-hidden rounded-xl border-[0.5px] border-[var(--lp-border)] bg-[var(--lp-surface)] md:bottom-7 md:left-[252px] md:w-[168px] lg:left-[304px] lg:w-[216px]"
                 initial={{ opacity: 0, x: 24 }}
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true, amount: 0.25 }}
                 transition={transicion ?? { ...SPRING.soft, delay: 0.18 }}
               >
-                <div className="flex items-center justify-between border-b-[0.5px] border-[#e6ebf2] px-3 py-2.5">
+                <div className="flex items-center justify-between border-b-[0.5px] border-[var(--lp-border)] px-3 py-2.5">
                   <span className="text-[11.5px] font-semibold text-[var(--lp-ink-900)] lg:text-[12px]">Agenda &middot; martes</span>
                   {/* Dos rótulos con visibilidad por breakpoint en vez de uno
                       recortado por JS: el árbol de DOM queda idéntico en
@@ -471,28 +471,28 @@ export default function SeccionControl() {
                     <div key={fila.hora} className="flex items-center gap-2">
                       <span
                         className={`w-8 shrink-0 text-[10.5px] lg:w-9 lg:text-[11px] ${
-                          fila.estado === 'creada' ? 'font-semibold text-[#1e5fa8]' : 'text-[var(--lp-ink-500)]'
+                          fila.estado === 'creada' ? 'font-semibold text-[var(--lp-accent)]' : 'text-[var(--lp-ink-500)]'
                         }`}
                       >
                         {fila.hora}
                       </span>
                       {fila.estado === 'creada' ? (
-                        <span className="flex h-5 flex-1 items-center rounded-md bg-[#1e5fa8] px-[9px] text-[9.5px] font-semibold text-white lg:h-[22px] lg:rounded-[7px] lg:text-[10px]">
+                        <span className="flex h-5 flex-1 items-center rounded-md bg-[var(--lp-accent)] px-[9px] text-[9.5px] font-semibold text-[var(--lp-ink-inverse)] lg:h-[22px] lg:rounded-[7px] lg:text-[10px]">
                           Cita creada
                         </span>
                       ) : (
                         <span
                           className={`h-5 flex-1 rounded-md lg:h-[22px] lg:rounded-[7px] ${
                             fila.estado === 'existente'
-                              ? 'border-[0.5px] border-[#e6ebf2] bg-[#f5f8fc]'
-                              : 'border-[0.5px] border-dashed border-[#cad5e2]'
+                              ? 'border-[0.5px] border-[var(--lp-border)] bg-[var(--lp-surface-alt)]'
+                              : 'border-[0.5px] border-dashed border-[var(--lp-border-strong)]'
                           }`}
                         />
                       )}
                     </div>
                   ))}
                 </div>
-                <div className="border-t-[0.5px] border-[#e6ebf2] bg-[#f5f8fc] px-3 py-[9px] text-[10px] text-[var(--lp-ink-500)] lg:text-[10.5px]">
+                <div className="border-t-[0.5px] border-[var(--lp-border)] bg-[var(--lp-surface-alt)] px-3 py-[9px] text-[10px] text-[var(--lp-ink-500)] lg:text-[10.5px]">
                   Expedientes y notas &middot; sin acceso
                 </div>
               </motion.div>
@@ -554,7 +554,7 @@ export default function SeccionControl() {
               <p className="mt-2 text-[13px] text-[var(--lp-ink-500)] leading-[1.45]">
                 (disponible en cuentas de cl&iacute;nica)
               </p>
-              <p className="mt-3 max-w-[520px] text-[17px] text-[#3b4a5c] leading-[1.65]">
+              <p className="mt-3 max-w-[520px] text-[17px] text-[var(--lp-ink-700)] leading-[1.65]">
                 Da de alta a tu asistente para que gestione tu agenda: crea, mueve y cancela citas. T&uacute; llegas y tu paciente ya est&aacute; en tu consulta. Sin acceso a expedientes ni a notas cl&iacute;nicas &mdash; solo a la agenda.
               </p>
             </div>

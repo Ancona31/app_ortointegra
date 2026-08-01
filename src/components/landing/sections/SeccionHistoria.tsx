@@ -12,7 +12,7 @@ import { Activity } from 'lucide-react'
    de ~1400px. Verificar ese par antes de tocar esta línea. */
 export default function SeccionHistoria() {
   return (
-    <section className="bg-[#f5f8fc]">
+    <section className="bg-[var(--lp-surface-alt)]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
         {/* F1.3·c3 — `lg:gap-24` (96). Ver SeccionExpediente.tsx. */}
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-center">
@@ -98,7 +98,7 @@ export default function SeccionHistoria() {
                 y los 4px se PERCIBEN como espacio. Sube a 8, que es además
                 el valor que ya usaba el par título→descripción de las cards
                 del bento (SeccionFeatures.tsx). */}
-            <div className="mt-8 pt-6 border-t-[0.5px] border-[#e6ebf2]">
+            <div className="mt-8 pt-6 border-t-[0.5px] border-[var(--lp-border)]">
               {/* F1.3·d4 — LA FIRMA NO TOMA ROL, pero se calibra al PAR DEL H3
                   DE CARD: 19px · -0.015em · 1.30 (ver SeccionFeatures.tsx).
                   Sube desde 17, donde coincidía con el cuerpo que tiene encima

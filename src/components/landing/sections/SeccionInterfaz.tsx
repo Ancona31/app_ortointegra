@@ -47,7 +47,7 @@ import { Calendar, Zap, MousePointerClick } from 'lucide-react'
    del sello de la card DICOM en SeccionFeatures.tsx. Ninguno es deuda. */
 export default function SeccionInterfaz() {
   return (
-    <section className="bg-white">
+    <section className="bg-[var(--lp-surface)]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
         {/* F1.3·c3 — `lg:gap-24` (96). Ver SeccionExpediente.tsx. */}
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-center">
@@ -137,7 +137,7 @@ export default function SeccionInterfaz() {
                       17px/1.65 y la calibración vieja, hecha contra 14px/1.625,
                       dejó de valer. Medido: el +2px alejaba 4.0px en vez de
                       acercar. */}
-                  <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center flex-shrink-0 -mt-0.5">
+                  <div className="w-8 h-8 rounded-lg bg-[var(--lp-surface-sunken)] flex items-center justify-center flex-shrink-0 -mt-0.5">
                     {item.icon}
                   </div>
                   {/* F1.3·d3 — rol cuerpo: 17px · 1.65. Ver SeccionFeatures.tsx.

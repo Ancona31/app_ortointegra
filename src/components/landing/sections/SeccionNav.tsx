@@ -9,9 +9,14 @@ import Image from 'next/image'
    El `bg-white/80` + `backdrop-blur-xl` SÍ se quedan (§4.4): aquí el
    contenido pasa por debajo al hacer scroll, que es justo el caso que el
    blur resuelve. El Footer no, y por eso allí se quitó. No unificarlos. */
+/* ⚠️ F1.3·e5 — el `bg-white/80` de abajo NO pasa a --lp-surface y es
+   deliberado. --lp-surface es blanco OPACO; lo que sostiene el chrome aquí es
+   la translucidez que alimenta al `backdrop-blur-xl`. Cablearlo a la variable
+   con modificador de opacidad cambiaría el modo de mezcla por un color-mix en
+   oklab para no ganar nada. El borde sí va a --lp-border. */
 export default function SeccionNav() {
   return (
-    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b-[0.5px] border-[#e6ebf2]">
+    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b-[0.5px] border-[var(--lp-border)]">
       <nav className="mx-auto max-w-6xl flex items-center justify-between px-4 sm:px-8 h-14">
         {/* F1.3·c3 — `gap-2` (8), no gap-2.5: 10 no está en la escala. Mismo
             cambio en el lockup del Footer, que es el mismo lockup. */}
@@ -64,19 +69,19 @@ export default function SeccionNav() {
         <div className="flex items-center gap-3">
           <Link
             href="/pricing"
-            className="hidden sm:inline-flex text-[15px] font-medium text-[var(--lp-ink-700)] hover:text-slate-900 transition-colors duration-200 px-3 py-1.5 rounded-xl hover:bg-slate-100 tracking-[-0.01em] leading-none"
+            className="hidden sm:inline-flex text-[15px] font-medium text-[var(--lp-ink-700)] hover:text-[var(--lp-ink-900)] transition-colors duration-200 px-3 py-1.5 rounded-xl hover:bg-[var(--lp-hover-surface)] tracking-[-0.01em] leading-none"
           >
             Planes
           </Link>
           <Link
             href="/login"
-            className="inline-flex text-[15px] font-medium text-[var(--lp-ink-700)] hover:text-slate-900 transition-colors duration-200 px-3 py-1.5 rounded-xl hover:bg-slate-100 tracking-[-0.01em] leading-none"
+            className="inline-flex text-[15px] font-medium text-[var(--lp-ink-700)] hover:text-[var(--lp-ink-900)] transition-colors duration-200 px-3 py-1.5 rounded-xl hover:bg-[var(--lp-hover-surface)] tracking-[-0.01em] leading-none"
           >
             Iniciar sesión
           </Link>
           <Link
             href="/register"
-            className="text-[15px] font-semibold text-white bg-gradient-to-r from-[#1a3a5c] to-[#1e5fa8] px-4 py-2 rounded-xl hover:shadow-[0_4px_24px_rgba(30,95,168,0.3)] active:scale-[0.97] transition-all duration-200 tracking-[-0.01em] leading-none"
+            className="text-[15px] font-semibold text-[var(--lp-ink-inverse)] bg-gradient-to-r from-[var(--lp-navy)] to-[var(--lp-accent)] px-4 py-2 rounded-xl hover:shadow-[0_4px_24px_rgb(var(--lp-accent-rgb)/0.3)] active:scale-[0.97] transition-all duration-200 tracking-[-0.01em] leading-none"
           >
             Crear cuenta
           </Link>

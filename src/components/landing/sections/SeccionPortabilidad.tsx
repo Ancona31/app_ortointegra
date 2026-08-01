@@ -9,7 +9,7 @@ import Reveal from '@/components/landing/motion/Reveal'
    a leerse como tarjetas en vez de como aire con filete. */
 export default function SeccionPortabilidad() {
   return (
-    <section className="bg-[#f5f8fc]">
+    <section className="bg-[var(--lp-surface-alt)]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
         {/* Prueba de humo F0 del sistema de movimiento — único uso de <Reveal> por ahora */}
         {/* F1.3·c3 — `mb-12` (48). Ver SeccionFeatures.tsx. */}
@@ -59,7 +59,7 @@ export default function SeccionPortabilidad() {
             Pasan a --lp-ink-500 (5.45:1) — tinta, no acento. Ver la nota del
             bento en SeccionFeatures.tsx: la decisión de PM fue la misma en los
             dos sitios y por el mismo motivo. */}
-        <div className="grid sm:grid-cols-3 gap-px bg-[#e6ebf2] rounded-2xl overflow-hidden border-[0.5px] border-[#e6ebf2]">
+        <div className="grid sm:grid-cols-3 gap-px bg-[var(--lp-border)] rounded-2xl overflow-hidden border-[0.5px] border-[var(--lp-border)]">
           {[
             {
               icon: <Laptop className="w-5 h-5 text-[var(--lp-ink-500)]" />,
@@ -101,7 +101,7 @@ export default function SeccionPortabilidad() {
                  unifiques al mismo valor.
                · `mt-2` de la descripción, antes mt-1: ritmo real, no
                  interlínea óptica. Justificación en SeccionHistoria.tsx. */
-            <div key={item.title} className="bg-white px-6 py-6 flex items-start gap-3">
+            <div key={item.title} className="bg-[var(--lp-surface)] px-6 py-6 flex items-start gap-3">
               <div className="flex-shrink-0 mt-0.5">{item.icon}</div>
               <div className="min-w-0">
                 {/* F1.3·d4 — rol H3 de card: 19px · -0.015em · 1.30.

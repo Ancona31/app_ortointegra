@@ -137,7 +137,7 @@ const tarjetas: Tarjeta[] = [
    blanco-sobre-franja: el contraste interno GANA con este cambio. */
 export default function SeccionSeguridad() {
   return (
-    <section className="bg-[#f5f8fc]">
+    <section className="bg-[var(--lp-surface-alt)]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
         {/* F1.3·c3 — `mb-12` (48). Ver SeccionFeatures.tsx. */}
         <div className="text-center mb-12">
@@ -186,7 +186,7 @@ export default function SeccionSeguridad() {
           {tarjetas.map((t) => (
             <div
               key={t.title}
-              className="bg-white rounded-2xl border-[0.5px] border-[#e6ebf2] p-8 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200"
+              className="bg-[var(--lp-surface)] rounded-2xl border-[0.5px] border-[var(--lp-border)] p-8 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200"
             >
               {/* F1.3·c3 — `mb-6` (24), no mb-5: 20 no está en la escala. */}
               <div className="w-12 h-12 rounded-xl bg-[var(--lp-accent-bg)] flex items-center justify-center mb-6">
