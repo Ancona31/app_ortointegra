@@ -169,7 +169,7 @@ export default function SeccionHero() {
                 del `hidden sm:block` que usan los h2 de dos líneas). A 72px
                 el corte forzado es lo que sostiene el balance de las dos
                 mitades de la frase; a 40px cae igual donde caería solo. */}
-            <h1 className="mt-4 text-[clamp(40px,7vw,72px)] font-bold text-slate-900 tracking-[-0.04em] leading-[1.02]">
+            <h1 className="mt-4 text-[clamp(40px,7vw,72px)] font-bold text-[var(--lp-ink-900)] tracking-[-0.04em] leading-[1.02]">
               Menos tiempo en la pantalla,
               <br />
               <span className="bg-gradient-to-r from-[#1a3a5c] to-[#4a9fd4] bg-clip-text text-transparent">
@@ -229,7 +229,7 @@ export default function SeccionHero() {
 
                 El régimen de CUERPO (17px · 1.65) está en SeccionFeatures.tsx
                 y comparte esta advertencia. */}
-            <p className="mt-4 text-[19px] text-slate-500 max-w-2xl tracking-[-0.01em] leading-[1.55]">
+            <p className="mt-4 text-[19px] text-[var(--lp-ink-500)] max-w-2xl tracking-[-0.01em] leading-[1.55]">
               Expedientes, agenda e inteligencia artificial en una sola plataforma. Sin vendedores, sin trámites.
             </p>
 
@@ -255,7 +255,7 @@ export default function SeccionHero() {
               </Link>
               <Link
                 href="/pricing"
-                className="inline-flex items-center gap-2 text-slate-700 px-7 py-3.5 rounded-xl text-[15px] font-semibold tracking-[-0.01em] leading-none bg-white border border-slate-200/60 shadow-sm hover:shadow-md hover:border-slate-300 hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
+                className="inline-flex items-center gap-2 text-[var(--lp-ink-700)] px-7 py-3.5 rounded-xl text-[15px] font-semibold tracking-[-0.01em] leading-none bg-white border border-slate-200/60 shadow-sm hover:shadow-md hover:border-slate-300 hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
               >
                 Ver planes
               </Link>

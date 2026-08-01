@@ -93,13 +93,13 @@ export default function SeccionInterfaz() {
             </div>
             {/* F1.3·d2 — rol titular de sección: clamp(30,4vw,46) · -0.03em ·
                 1.10. Ver SeccionFeatures.tsx. */}
-            <h2 className="text-[clamp(30px,4vw,46px)] font-bold text-slate-900 tracking-[-0.03em] leading-[1.10]">
+            <h2 className="text-[clamp(30px,4vw,46px)] font-bold text-[var(--lp-ink-900)] tracking-[-0.03em] leading-[1.10]">
               Si sabes usar tu celular,{' '}
               <br className="hidden sm:block" />
-              <span className="text-slate-400">ya sabes usar Spinus</span>
+              <span className="text-[var(--lp-ink-500)]">ya sabes usar Spinus</span>
             </h2>
             {/* F1.3·d3 — rol bajada: 19px · -0.01em · 1.55. Ver SeccionHero.tsx. */}
-            <p className="mt-6 text-[19px] text-slate-500 max-w-lg tracking-[-0.01em] leading-[1.55]">
+            <p className="mt-6 text-[19px] text-[var(--lp-ink-500)] max-w-lg tracking-[-0.01em] leading-[1.55]">
               Sin configuraciones, sin formatos rígidos, sin capacitación. Cada pantalla está diseñada para que el siguiente paso sea obvio — desde que llega el paciente hasta que se va con su receta.
             </p>
             <div className="mt-8 space-y-4">
@@ -123,7 +123,7 @@ export default function SeccionInterfaz() {
                       ⚠️ NO confundir con el `text-[13px]` de :75, que es una
                       etiqueta del panel simulado y queda fuera de d3 por el
                       mismo criterio que excluyó su kicker en d1. */}
-                  <p className="text-[17px] text-slate-600 leading-[1.65]">{item.text}</p>
+                  <p className="text-[17px] text-[var(--lp-ink-700)] leading-[1.65]">{item.text}</p>
                 </div>
               ))}
             </div>

@@ -21,10 +21,10 @@ export default function SeccionPortabilidad() {
           </div>
           {/* F1.3·d2 — rol titular de sección: clamp(30,4vw,46) · -0.03em ·
               1.10. Ver SeccionFeatures.tsx. */}
-          <h2 className="text-[clamp(30px,4vw,46px)] font-bold text-slate-900 tracking-[-0.03em] leading-[1.10]">
+          <h2 className="text-[clamp(30px,4vw,46px)] font-bold text-[var(--lp-ink-900)] tracking-[-0.03em] leading-[1.10]">
             Tu consultorio en cualquier lugar
           </h2>
-          {/* ⚠️ #5a6b81 (tinta 500 de §3.1) en vez de text-slate-500, y NO es
+          {/* ⚠️ #5a6b81 (tinta 500 de §3.1) en vez de text-[var(--lp-ink-500)], y NO es
               adelanto del barrido de tinta: es reparación de lo que rompió el
               cambio de superficie. slate-500 da 4.76:1 sobre blanco (AA) pero
               4.47:1 sobre esta franja — falla el 4.5 por 0.03. #5a6b81 da
@@ -33,7 +33,7 @@ export default function SeccionPortabilidad() {
               la del pie de abajo; el slate-500 de las tarjetas va sobre
               blanco y se queda. Si esta sección vuelve a blanco, revertir. */}
           {/* F1.3·d3 — rol bajada: 19px · -0.01em · 1.55. Ver SeccionHero.tsx. */}
-          <p className="mt-4 text-[19px] text-[#5a6b81] max-w-2xl mx-auto tracking-[-0.01em] leading-[1.55]">
+          <p className="mt-4 text-[19px] text-[var(--lp-ink-500)] max-w-2xl mx-auto tracking-[-0.01em] leading-[1.55]">
             Accede desde tu computadora, tablet o celular. Adaptada a cada pantalla, sin instalar nada de una tienda de apps.
           </p>
         </Reveal>
@@ -97,11 +97,11 @@ export default function SeccionPortabilidad() {
               <div className="min-w-0">
                 {/* F1.3·d4 — rol H3 de card: 19px · -0.015em · 1.30.
                     Ver SeccionFeatures.tsx. */}
-                <h3 className="text-[19px] font-semibold text-slate-900 tracking-[-0.015em] leading-[1.30]">{item.title}</h3>
+                <h3 className="text-[19px] font-semibold text-[var(--lp-ink-900)] tracking-[-0.015em] leading-[1.30]">{item.title}</h3>
                 {/* F1.3·d3 — rol cuerpo: 17px · 1.65. Ver SeccionFeatures.tsx.
                     ⚠️ El `text-[13px]` de más abajo en este archivo es el pie
                     de la sección: es CAPTION, otro rol, y lo resuelve d4. */}
-                <p className="mt-2 text-[17px] text-slate-500 leading-[1.65]">{item.desc}</p>
+                <p className="mt-2 text-[17px] text-[var(--lp-ink-500)] leading-[1.65]">{item.desc}</p>
               </div>
             </div>
           ))}
@@ -111,7 +111,7 @@ export default function SeccionPortabilidad() {
             lo único verificado). No generalizar a "funciona sin conexión". */}
         {/* F1.3·d4 — rol caption: 13px · 1.45. Ver SeccionFooter.tsx. Es el
             caption que d3 dejó anotado aquí como "lo resuelve d4". */}
-        <p className="mt-4 text-[13px] text-[#5a6b81] leading-[1.45]">
+        <p className="mt-4 text-[13px] text-[var(--lp-ink-500)] leading-[1.45]">
           Si se te cae la conexión, el borrador de tu nota médica sigue donde lo dejaste.
         </p>
       </div>

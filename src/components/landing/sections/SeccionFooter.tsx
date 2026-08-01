@@ -70,16 +70,16 @@ export default function SeccionFooter() {
                 deliberado: los captions son de una o dos líneas y suelen vivir
                 en filas horizontales, donde un leading abierto los descuadra
                 contra el elemento vecino. La regla vale para texto corrido. */}
-            <span className="text-[13px] text-slate-500 leading-[1.45]">La columna vertebral de tu práctica médica</span>
+            <span className="text-[13px] text-[var(--lp-ink-500)] leading-[1.45]">La columna vertebral de tu práctica médica</span>
           </div>
           <div className="flex items-center gap-6">
-            <Link href="/privacy" className="text-[13px] text-slate-500 leading-[1.45] hover:text-slate-700 transition-colors duration-200">
+            <Link href="/privacy" className="text-[13px] text-[var(--lp-ink-500)] leading-[1.45] hover:text-slate-700 transition-colors duration-200">
               Aviso de privacidad
             </Link>
-            <Link href="/terms" className="text-[13px] text-slate-500 leading-[1.45] hover:text-slate-700 transition-colors duration-200">
+            <Link href="/terms" className="text-[13px] text-[var(--lp-ink-500)] leading-[1.45] hover:text-slate-700 transition-colors duration-200">
               Términos de servicio
             </Link>
-            <Link href="/pricing" className="text-[13px] text-slate-500 leading-[1.45] hover:text-slate-700 transition-colors duration-200">
+            <Link href="/pricing" className="text-[13px] text-[var(--lp-ink-500)] leading-[1.45] hover:text-slate-700 transition-colors duration-200">
               Planes
             </Link>
           </div>
@@ -88,7 +88,7 @@ export default function SeccionFooter() {
         {/* Fila 2 — contacto y copyright.
             Hex literal en vez de var(--sp-ink-350) por html.dark (ver
             SeccionProblema.tsx). */}
-        <div className="mt-6 pt-6 border-t-[0.5px] border-[#e6ebf2] flex flex-col sm:flex-row items-center justify-between gap-2 text-[13px] text-[#8a99ac] leading-[1.45]">
+        <div className="mt-6 pt-6 border-t-[0.5px] border-[#e6ebf2] flex flex-col sm:flex-row items-center justify-between gap-2 text-[13px] text-[var(--lp-ink-500)] leading-[1.45]">
           <a
             href="mailto:soporte@spinus.com.mx"
             className="hover:text-slate-600 transition-colors duration-200"

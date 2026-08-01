@@ -23,14 +23,19 @@ import { PREGUNTAS_FAQ } from '@/components/landing/faq-contenido'
    El sitio es entre Seguridad y el CTA, y el CTA no admite franja al lado: su
    lavado `color-mix(in srgb, #1e5fa8 4%, #fff)` resuelve a ≈#f6f9fc, a UN
    punto por canal de la franja #f5f8fc (`SeccionCTA.tsx:14`). Una FAQ en
-   franja se fundiría con el cierre en una sola banda de ~1200px, que es
-   exactamente el motivo por el que Seguridad se quedó en blanco
-   (`SeccionSeguridad.tsx:80-84`).
+   franja se fundiría con el cierre en una sola banda de ~1200px.
+   ⚠️ ESTE COMENTARIO CITABA A SEGURIDAD COMO PRECEDENTE ("es exactamente el
+   motivo por el que Seguridad se quedó en blanco") Y YA NO VALE. Seguridad
+   pasó a franja en la resecuenciación de superficies del 2026-07-31,
+   precisamente porque ESTA sección se metió en medio y dejó de ser vecina del
+   CTA. El argumento del lavado sigue siendo válido, pero solo para quien tenga
+   el CTA al lado — que ahora es la FAQ y ya no Seguridad. Sin punteros a
+   líneas concretas de ese archivo: se desplazan en cada tanda y por eso los
+   dos que había aquí apuntaban a sitios equivocados.
    El contraste lo pone el INTERIOR, no la sección: las filas del acordeón van
-   rellenas de #f5f8fc. Es la salida que `SeccionSeguridad.tsx:116-118` ya
-   dejaba nombrada ("rellenarlas de #f5f8fc invirtiendo card y sección") y la
-   misma resolución que el PM dio para 10b el 2026-07-31 — contraste interno
-   en vez de pelearse con la vecina. No la pases a franja sin mover el CTA.
+   rellenas de #f5f8fc, que es la misma resolución que el PM dio para 10b el
+   2026-07-31 — contraste interno en vez de pelearse con la vecina. No la pases
+   a franja sin mover el CTA.
 
    ⚠️ KICKER SIN PASTILLA, por el mismo motivo que en 10b: la sección de
    arriba (Seguridad) usa `bg-blue-50` y dos pastillas idénticas seguidas son
@@ -213,7 +218,7 @@ function ItemFAQ({ pregunta, respuesta, sinMovimiento }: ItemProps): React.JSX.E
           className="flex w-full cursor-pointer items-center justify-between gap-4 px-6 py-6 text-left transition-colors duration-200 hover:bg-white focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#1e5fa8]"
         >
           {/* F1.3·d4 — rol H3 de card: 19px · -0.015em · 1.30. */}
-          <span className="text-[19px] font-semibold text-[#14345c] tracking-[-0.015em] leading-[1.30]">
+          <span className="text-[19px] font-semibold text-[var(--lp-ink-900)] tracking-[-0.015em] leading-[1.30]">
             {pregunta}
           </span>
           {/* §5.14 · capa 1 — el marcador. `aria-hidden` porque su estado ya
@@ -386,14 +391,14 @@ export default function SeccionFAQ() {
               Preguntas frecuentes
             </p>
             {/* F1.3·d2 — rol titular de sección: clamp(30,4vw,46) · -0.03em · 1.10. */}
-            <h2 className="mt-4 text-[clamp(30px,4vw,46px)] font-bold text-[#14345c] tracking-[-0.03em] leading-[1.10]">
+            <h2 className="mt-4 text-[clamp(30px,4vw,46px)] font-bold text-[var(--lp-ink-900)] tracking-[-0.03em] leading-[1.10]">
               Lo que me preguntan antes de decidirse
             </h2>
             {/* F1.3·d4 — rol caption: 13px · 1.45. Ver SeccionFooter.tsx.
                 Aquí vive la autoría, y por eso los avatares de abajo llevan
                 `alt=""`: decir quién responde una vez basta, repetirlo nueve
                 veces convierte la firma en ruido. */}
-            <p className="mt-4 text-[13px] text-[#5a6b81] leading-[1.45]">
+            <p className="mt-4 text-[13px] text-[var(--lp-ink-500)] leading-[1.45]">
               Respondo yo &mdash; Dr. &Aacute;ngel M. Ancona P&eacute;rez, cirujano de columna y
               autor de Spinus.
             </p>

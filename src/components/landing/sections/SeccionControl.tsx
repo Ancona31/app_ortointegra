@@ -148,7 +148,7 @@ export default function SeccionControl() {
             Control y autonom&iacute;a
           </p>
           {/* F1.3·d2 — rol titular de sección: clamp(30,4vw,46) · -0.03em · 1.10. */}
-          <h2 className="mt-4 text-[clamp(30px,4vw,46px)] font-bold text-[#14345c] tracking-[-0.03em] leading-[1.10]">
+          <h2 className="mt-4 text-[clamp(30px,4vw,46px)] font-bold text-[var(--lp-ink-900)] tracking-[-0.03em] leading-[1.10]">
             Tu informaci&oacute;n y tu equipo, bajo tu control
           </h2>
         </motion.div>
@@ -174,7 +174,7 @@ export default function SeccionControl() {
                   −0.02em; manda el rol. Si una tanda futura mete un tercer
                   sitio con visual propio, este 24 pasa a ser rol y se declara
                   en §3.2. */}
-              <h3 className="text-[24px] font-semibold text-[#14345c] tracking-[-0.015em] leading-[1.30]">
+              <h3 className="text-[24px] font-semibold text-[var(--lp-ink-900)] tracking-[-0.015em] leading-[1.30]">
                 Tus expedientes son tuyos
               </h3>
               {/* F1.3·d3 — rol cuerpo: 17px · tracking normal · 1.65. */}
@@ -454,11 +454,11 @@ export default function SeccionControl() {
                 transition={transicion ?? { ...SPRING.soft, delay: 0.18 }}
               >
                 <div className="flex items-center justify-between border-b-[0.5px] border-[#e6ebf2] px-3 py-2.5">
-                  <span className="text-[11.5px] font-semibold text-[#14345c] lg:text-[12px]">Agenda &middot; martes</span>
+                  <span className="text-[11.5px] font-semibold text-[var(--lp-ink-900)] lg:text-[12px]">Agenda &middot; martes</span>
                   {/* Dos rótulos con visibilidad por breakpoint en vez de uno
                       recortado por JS: el árbol de DOM queda idéntico en
                       servidor y cliente, sin matchMedia ni hydration mismatch. */}
-                  <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[#5a6b81] lg:text-[10px]">
+                  <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--lp-ink-500)] lg:text-[10px]">
                     <span className="lg:hidden">Asist.</span>
                     <span className="hidden lg:inline">Asistente</span>
                   </span>
@@ -468,7 +468,7 @@ export default function SeccionControl() {
                     <div key={fila.hora} className="flex items-center gap-2">
                       <span
                         className={`w-8 shrink-0 text-[10.5px] lg:w-9 lg:text-[11px] ${
-                          fila.estado === 'creada' ? 'font-semibold text-[#1e5fa8]' : 'text-[#5a6b81]'
+                          fila.estado === 'creada' ? 'font-semibold text-[#1e5fa8]' : 'text-[var(--lp-ink-500)]'
                         }`}
                       >
                         {fila.hora}
@@ -489,13 +489,42 @@ export default function SeccionControl() {
                     </div>
                   ))}
                 </div>
-                <div className="border-t-[0.5px] border-[#e6ebf2] bg-[#f5f8fc] px-3 py-[9px] text-[10px] text-[#5a6b81] lg:text-[10.5px]">
+                <div className="border-t-[0.5px] border-[#e6ebf2] bg-[#f5f8fc] px-3 py-[9px] text-[10px] text-[var(--lp-ink-500)] lg:text-[10.5px]">
                   Expedientes y notas &middot; sin acceso
                 </div>
               </motion.div>
             </div>
 
             {/* Columna de texto.
+                ═══ `md:relative md:z-10` — SIN ESTO EL TEXTO DESAPARECE ═══
+                Regresión real, detectada en QA tras ensanchar el zócalo. Desde
+                md la capa 2 resuelve contra el bloque, así que el zócalo
+                —opaco, `bg-[#f5f8fc]`— se extiende por ENCIMA de esta columna
+                y la tapa entera. Medido con `elementFromPoint` en el centro de
+                la columna: devolvía el div del zócalo, no el texto.
+                ⚠️ NO ES ORDEN DE DOM, y el matiz importa porque decide el
+                arreglo. El zócalo va ANTES que esta columna en el árbol; aun
+                así gana, porque es `position: absolute` y esta columna es
+                contenido en flujo con `position: static`: en el orden de
+                pintado de CSS, los posicionados con z-index auto se pintan
+                DESPUÉS de todo el contenido en flujo no posicionado. Mover el
+                zócalo de sitio en el DOM no arreglaría nada.
+                El síntoma que lo delata: el texto se veía en el primer cuadro
+                de la animación y luego desaparecía — porque la capa 2 entra
+                con `opacity: 0` y el zócalo solo tapa cuando termina de
+                aparecer. Nunca fue un problema de render ni de layout: la caja
+                del texto siempre midió 520×214 en su sitio correcto.
+                La corrección es de CAPA, no de geometría: z-index positivo
+                sobre el texto lo sube al paso 9 del orden de pintado, por
+                encima del paso 8 donde vive la capa 2. Se prefiere esto a
+                bajar el zócalo con z negativo, que exigiría además `isolate`
+                en el contenedor del bloque —sin él, un z negativo se iría por
+                detrás del `bg-white` de la sección y desaparecerían zócalo y
+                figura— y tocaría la capa que sí funciona.
+                Va con prefijo `md:` porque bajo md no hay solape: ahí la capa
+                2 sigue acotada a la columna visual y el texto está en otra
+                fila del grid.
+
                 ⚠️ EL PADDING ES PROPIO Y SOLO EXISTE DESDE md, porque solo
                 desde md este texto se apoya SOBRE el zócalo. Antes flotaba en
                 el blanco de la sección y le bastaba un `pb-6` de ritmo; ahora
@@ -513,13 +542,13 @@ export default function SeccionControl() {
                 1440) NO se compensa: manda la regla 4 del spec —figura anclada
                 al borde inferior— y con el tinte a ancho completo ese espacio
                 es aire dentro de una card, no un hueco. */}
-            <div className="md:pb-8 md:pr-8">
-              <h3 className="text-[24px] font-semibold text-[#14345c] tracking-[-0.015em] leading-[1.30]">
+            <div className="md:relative md:z-10 md:pb-8 md:pr-8">
+              <h3 className="text-[24px] font-semibold text-[var(--lp-ink-900)] tracking-[-0.015em] leading-[1.30]">
                 Tu asistente m&eacute;dico, en la misma cuenta
               </h3>
               {/* F1.3·d4 — rol caption: 13px · 1.45. El spec pedía 14; manda el
                   rol de la página. Ver SeccionFooter.tsx. */}
-              <p className="mt-2 text-[13px] text-[#5a6b81] leading-[1.45]">
+              <p className="mt-2 text-[13px] text-[var(--lp-ink-500)] leading-[1.45]">
                 (disponible en cuentas de cl&iacute;nica)
               </p>
               <p className="mt-3 max-w-[520px] text-[17px] text-[#3b4a5c] leading-[1.65]">

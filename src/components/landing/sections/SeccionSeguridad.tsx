@@ -61,8 +61,8 @@ const tarjetas: Tarjeta[] = [
     desc: (
       <>
         La estructura del expediente y los formatos siguen la{' '}
-        <strong className="text-slate-700">NOM-004</strong>, y el tratamiento de datos se rige por la{' '}
-        <strong className="text-slate-700">LFPDPPP</strong> vigente.
+        <strong className="text-[var(--lp-ink-700)]">NOM-004</strong>, y el tratamiento de datos se rige por la{' '}
+        <strong className="text-[var(--lp-ink-700)]">LFPDPPP</strong> vigente.
       </>
     ),
   },
@@ -147,9 +147,9 @@ export default function SeccionSeguridad() {
           </div>
           {/* F1.3·d2 — rol titular de sección: clamp(30,4vw,46) · -0.03em ·
               1.10. Ver SeccionFeatures.tsx. */}
-          <h2 className="text-[clamp(30px,4vw,46px)] font-bold text-slate-900 tracking-[-0.03em] leading-[1.10]">
+          <h2 className="text-[clamp(30px,4vw,46px)] font-bold text-[var(--lp-ink-900)] tracking-[-0.03em] leading-[1.10]">
             Tu práctica,{' '}
-            <span className="text-slate-400">protegida</span>
+            <span className="text-[var(--lp-ink-500)]">protegida</span>
           </h2>
         </div>
 
@@ -191,13 +191,13 @@ export default function SeccionSeguridad() {
               {/* F1.3·d4 — rol H3 de card: 19px · -0.015em · 1.30.
                   Ver SeccionFeatures.tsx. El `font-bold` (los otros dos sitios
                   van semibold) se conserva: el rol no define peso. */}
-              <h3 className="text-[19px] font-bold text-slate-900 tracking-[-0.015em] leading-[1.30] mb-3">{t.title}</h3>
+              <h3 className="text-[19px] font-bold text-[var(--lp-ink-900)] tracking-[-0.015em] leading-[1.30] mb-3">{t.title}</h3>
               {/* F1.3·d3 — rol cuerpo: 17px · 1.65. Ver SeccionFeatures.tsx.
                   Estas 3 tarjetas tienen cuerpos de largo desigual y comparten
                   altura por `items-stretch` (ver la nota de la escalera arriba):
                   al subir de 14 a 17 crecen las tres a la vez, así que la
                   retícula no se descuadra — la más larga sigue mandando. */}
-              <p className="text-[17px] text-slate-500 leading-[1.65]">{t.desc}</p>
+              <p className="text-[17px] text-[var(--lp-ink-500)] leading-[1.65]">{t.desc}</p>
             </div>
           ))}
         </div>

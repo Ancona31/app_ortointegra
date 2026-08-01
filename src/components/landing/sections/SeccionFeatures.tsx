@@ -134,12 +134,12 @@ export default function SeccionFeatures() {
               titular de esa sección. Ya está en estos tres valores. Que sea
               <p> es decisión semántica de esa sección, no un olvido — no lo
               conviertas en <h2> ni lo saques de este régimen. */}
-          <h2 className="text-[clamp(30px,4vw,46px)] font-bold text-slate-900 tracking-[-0.03em] leading-[1.10]">
+          <h2 className="text-[clamp(30px,4vw,46px)] font-bold text-[var(--lp-ink-900)] tracking-[-0.03em] leading-[1.10]">
             Lo que resuelve desde el primer día
           </h2>
           {/* F1.3·d3 — rol bajada: 19px · -0.01em · 1.55. Ver SeccionHero.tsx
               (incluida la advertencia de NO aplicar esto con selector). */}
-          <p className="mt-3 text-[19px] text-slate-500 tracking-[-0.01em] leading-[1.55]">Cada herramienta resuelve un problema real de tu día a día.</p>
+          <p className="mt-3 text-[19px] text-[var(--lp-ink-500)] tracking-[-0.01em] leading-[1.55]">Cada herramienta resuelve un problema real de tu día a día.</p>
         </div>
 
         <div className="grid sm:grid-cols-3 gap-4">
@@ -172,7 +172,7 @@ export default function SeccionFeatures() {
                     El -0.015em es el escalón más suave de la escala de
                     tracking (titular -0.03, H1 -0.04, bajada -0.01): a 19px en
                     negrita todavía compensa, pero poco. */}
-                <h3 className="text-[19px] font-semibold text-slate-900 tracking-[-0.015em] leading-[1.30]">{f.title}</h3>
+                <h3 className="text-[19px] font-semibold text-[var(--lp-ink-900)] tracking-[-0.015em] leading-[1.30]">{f.title}</h3>
                 {/* ═══ ROL CUERPO (F1.3·d3) ═══
                     17px · tracking normal · leading 1.65 (§3.2). Es el texto
                     corrido de la landing: SEIS sitios — este, SeccionExpediente,
@@ -197,7 +197,7 @@ export default function SeccionFeatures() {
                     ⚠️ Este rol NO se aplica con selector. La advertencia
                     completa, con la medición del scroll horizontal que
                     provoca, está en SeccionHero.tsx junto al rol bajada. */}
-                <p className="mt-2 text-[17px] text-slate-500 leading-[1.65]">{f.desc}</p>
+                <p className="mt-2 text-[17px] text-[var(--lp-ink-500)] leading-[1.65]">{f.desc}</p>
               </div>
               {f.media ? <div className="mt-auto overflow-hidden rounded-b-2xl" /> : null}
             </div>

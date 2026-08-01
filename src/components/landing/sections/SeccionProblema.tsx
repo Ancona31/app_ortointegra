@@ -52,13 +52,22 @@ import type { JSX } from 'react'
    Lo que SÍ rompería la costura es darle a esta sección un fondo distinto
    al de Features: ahí la segunda costura se vería como banda de color.
 
-   ⚠️ LOS DOS HEX VAN LITERALES, no var(--sp-ink-500) ni var(--sp-ink-900).
-   Los tokens de tinta se invierten bajo html.dark, y esa clase la añade
-   ThemeProvider.tsx:17 sin retirarla nunca al salir de (app): un médico
-   con dark activo que navegue del lado cliente a la landing la arrastra y
-   dejaría esta frase en tinta clara sobre fondo blanco. Vale para el
-   #5a6b81 y para el #14345c por igual — no "arregles" ninguno pasándolo
-   a token.
+   ⚠️ LOS DOS COLORES VAN EN --lp-ink-*, Y LA PROHIBICIÓN VIEJA SEGUÍA
+   SIENDO CORRECTA — lo que cambió es que ya existe un token que la cumple.
+   Este comentario decía "los dos hex van LITERALES, no var(--sp-ink-500) ni
+   var(--sp-ink-900) … no 'arregles' ninguno pasándolo a token", y el motivo
+   era real: los tokens --sp-* SÍ se invierten bajo html.dark, y esa clase la
+   añade ThemeProvider.tsx:17 sin retirarla nunca al salir de (app), así que
+   un médico con dark activo que navegue del lado cliente a la landing la
+   arrastra y dejaría esta frase en tinta clara sobre fondo blanco.
+   La tanda F1.3·e2 cableó --lp-ink-500 / --lp-ink-900, que existen
+   EXACTAMENTE para este problema: globals.css declara que no se redefinen
+   bajo html.dark nunca ("esa inmunidad es su razón de existir"), y está
+   verificado — html.dark redefine 64 variables y ninguna es --lp-*.
+   O sea que la regla no se relajó: sigue prohibido usar --sp-* aquí. Lo que
+   se permite es --lp-*, y solo mientras esa inmunidad se mantenga. Si alguien
+   llega a redefinir un --lp-ink-* bajo html.dark, este archivo vuelve a hex
+   literal el mismo día.
 
    ⚠️ ÉNFASIS INVERTIDO EN EL QA DE b2 — NO LO REVIERTAS AL LEERLO RARO.
    La primera mitad va en ink-500 (#5a6b81) y el remate en ink-900
@@ -84,9 +93,9 @@ export default function SeccionProblema(): JSX.Element {
         {/* §3.4·2: a sangría izquierda, 74% de ancho, sin centrar. Por debajo
             de sm el 74% deja ~17 caracteres por línea, así que ahí va a ancho
             completo. */}
-        <p className="w-full sm:w-[74%] text-[clamp(30px,4vw,46px)] font-bold text-[#5a6b81] tracking-[-0.03em] leading-[1.10]">
+        <p className="w-full sm:w-[74%] text-[clamp(30px,4vw,46px)] font-bold text-[var(--lp-ink-500)] tracking-[-0.03em] leading-[1.10]">
           Los sistemas de expediente electrónico son lentos, complejos y pensados para cumplir regulaciones{' '}
-          <span className="text-[#14345c]">&mdash; no para ayudar al médico.</span>
+          <span className="text-[var(--lp-ink-900)]">&mdash; no para ayudar al médico.</span>
         </p>
       </div>
     </section>

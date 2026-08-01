@@ -42,7 +42,7 @@ export default function SeccionHistoria() {
 
             {/* F1.3·d2 — rol titular de sección: clamp(30,4vw,46) · -0.03em ·
                 1.10. Ver SeccionFeatures.tsx. */}
-            <h2 className="text-[clamp(30px,4vw,46px)] font-bold text-slate-900 tracking-[-0.03em] leading-[1.10]">
+            <h2 className="text-[clamp(30px,4vw,46px)] font-bold text-[var(--lp-ink-900)] tracking-[-0.03em] leading-[1.10]">
               La Historia de{' '}
               <span className="bg-gradient-to-r from-[#1a3a5c] to-[#4a9fd4] bg-clip-text text-transparent">
                 Spinus
@@ -63,15 +63,15 @@ export default function SeccionHistoria() {
                 sobre un div concreto, NO un selector. Si añades un 5º párrafo
                 aquí dentro, hereda solo. Si lo sacas fuera de este div,
                 dale la clase a mano. */}
-            <div className="mt-6 space-y-4 text-[17px] text-slate-600 leading-[1.65]">
+            <div className="mt-6 space-y-4 text-[17px] text-[var(--lp-ink-700)] leading-[1.65]">
               <p>
-                Todo empezó en un quirófano. Entre cirugías de columna, notas médicas escritas a mano y un software que tardaba más en cargar que la propia consulta, el <strong className="text-slate-800">Dr. Ángel Ancona</strong> se hizo una pregunta simple: <em className="text-[#1e5fa8]">&ldquo;¿Por qué la tecnología médica no funciona como la tecnología que usamos en nuestra vida diaria?&rdquo;</em>
+                Todo empezó en un quirófano. Entre cirugías de columna, notas médicas escritas a mano y un software que tardaba más en cargar que la propia consulta, el <strong className="text-[var(--lp-ink-900)]">Dr. Ángel Ancona</strong> se hizo una pregunta simple: <em className="text-[#1e5fa8]">&ldquo;¿Por qué la tecnología médica no funciona como la tecnología que usamos en nuestra vida diaria?&rdquo;</em>
               </p>
               <p>
                 La respuesta no existía. Los sistemas de expedientes electrónicos estaban diseñados por ingenieros que nunca habían pisado un consultorio a las 7 de la mañana con 20 pacientes esperando. Eran lentos, complejos y pensados para cumplir regulaciones — no para ayudar al médico.
               </p>
               <p>
-                Así nació <strong className="text-slate-800">Spinus</strong>. El nombre viene de la raíz latina <em>spina</em> — columna. Porque así como la columna vertebral es el eje que sostiene y conecta todo el cuerpo humano, Spinus es el eje tecnológico que sostiene y conecta toda tu práctica médica: expedientes, agenda, recetas, laboratorios, imagen DICOM e inteligencia artificial en un solo lugar.
+                Así nació <strong className="text-[var(--lp-ink-900)]">Spinus</strong>. El nombre viene de la raíz latina <em>spina</em> — columna. Porque así como la columna vertebral es el eje que sostiene y conecta todo el cuerpo humano, Spinus es el eje tecnológico que sostiene y conecta toda tu práctica médica: expedientes, agenda, recetas, laboratorios, imagen DICOM e inteligencia artificial en un solo lugar.
               </p>
               <p>
                 {/* §7·11: "y el de miles de colegas" implicaba una base de
@@ -99,7 +99,7 @@ export default function SeccionHistoria() {
                   necesita el mismo peso visual: es un nombre propio actuando
                   de rótulo. Su `tracking-tight` (-0.025em) baja a -0.015em por
                   lo mismo. Debajo va su cargo, que sí es caption. */}
-              <p className="text-[19px] font-bold text-slate-900 tracking-[-0.015em] leading-[1.30]">
+              <p className="text-[19px] font-bold text-[var(--lp-ink-900)] tracking-[-0.015em] leading-[1.30]">
                 Dr. Ángel M. Ancona Pérez
               </p>
               {/* F1.3·d4 — rol caption: 13px · 1.45. Ver SeccionFooter.tsx. */}

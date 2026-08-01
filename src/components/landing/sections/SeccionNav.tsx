@@ -30,7 +30,7 @@ export default function SeccionNav() {
               cuerpo, el wordmark NO se mueve con él. Y su `tracking-tight`
               (-0.025em) tampoco es el de ningún rol — es el ajuste del lockup.
               No lo barras. */}
-          <span className="text-[17px] font-bold text-slate-900 tracking-tight">Spinus</span>
+          <span className="text-[17px] font-bold text-[var(--lp-ink-900)] tracking-tight">Spinus</span>
         </div>
         {/* Jerarquía §7·0: el sólido es para el visitante nuevo ("Crear
             cuenta"), no para el que ya tiene cuenta. "Planes" se oculta en
@@ -64,13 +64,13 @@ export default function SeccionNav() {
         <div className="flex items-center gap-3">
           <Link
             href="/pricing"
-            className="hidden sm:inline-flex text-[15px] font-medium text-slate-600 hover:text-slate-900 transition-colors duration-200 px-3 py-1.5 rounded-xl hover:bg-slate-100 tracking-[-0.01em] leading-none"
+            className="hidden sm:inline-flex text-[15px] font-medium text-[var(--lp-ink-700)] hover:text-slate-900 transition-colors duration-200 px-3 py-1.5 rounded-xl hover:bg-slate-100 tracking-[-0.01em] leading-none"
           >
             Planes
           </Link>
           <Link
             href="/login"
-            className="inline-flex text-[15px] font-medium text-slate-600 hover:text-slate-900 transition-colors duration-200 px-3 py-1.5 rounded-xl hover:bg-slate-100 tracking-[-0.01em] leading-none"
+            className="inline-flex text-[15px] font-medium text-[var(--lp-ink-700)] hover:text-slate-900 transition-colors duration-200 px-3 py-1.5 rounded-xl hover:bg-slate-100 tracking-[-0.01em] leading-none"
           >
             Iniciar sesión
           </Link>
