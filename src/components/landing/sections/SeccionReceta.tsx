@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, ImagePlus, PenLine } from 'lucide-react'
 import { animate, useMotionValue, useMotionValueEvent, useReducedMotion, useScroll } from 'motion/react'
 import { DUR, EASE, OFFSETS, RECETA } from '@/components/landing/motion/tokens'
-import RecetaPapel from '@/components/landing/teaser2/RecetaPapel'
+import ModalFirma, { type Firma } from '@/components/landing/teaser2/FirmaCanvas'
+import RecetaPapel, { TINTA_FIRMA } from '@/components/landing/teaser2/RecetaPapel'
 import { FORMATOS, PALETAS, type PaletaReceta } from '@/components/landing/teaser2/receta-demo'
 
 /* ═══ §5.7 · TEASER 2 — ESCENARIO ANCLADO QUE ENTREGA EL CONTROL (F3) ═══
@@ -40,11 +41,116 @@ import { FORMATOS, PALETAS, type PaletaReceta } from '@/components/landing/tease
    anclaje solo tiene sentido donde existen las dos columnas, y eso es `lg`.
    El conductor del progreso usa EL MISMO umbral: si se separan, el visitante
    se queda en una escena que no avanza ni con scroll ni con el dedo. */
+/**
+ * Tipos de imagen que acepta el slot del logo.
+ *
+ * ⚠️ SVG ESTÁ EXCLUIDO A PROPÓSITO Y NO SE REABRE. Un SVG es un documento XML
+ * que puede llevar `<script>` y manejadores de evento dentro; pintarlo en la
+ * página es ejecutarlo. PNG/JPG/WebP se decodifican como píxeles y no tienen
+ * esa superficie. Aquí ni siquiera hay servidor al que subirlo —el archivo no
+ * sale de la pestaña—, pero el riesgo es en el navegador del visitante, que es
+ * precisamente donde se abriría.
+ *
+ * El `accept` del input es UNA PISTA PARA EL SELECTOR, no una barrera: el
+ * visitante puede elegir "todos los archivos". La comprobación real es la de
+ * `alElegirLogo`.
+ */
+const TIPOS_LOGO: readonly string[] = ['image/png', 'image/jpeg', 'image/webp']
+
+/** 2 MB. Un logo de membrete razonable pesa dos órdenes de magnitud menos; el
+ *  tope existe para que arrastrar un RAW de 40 MB no congele la pestaña. */
+const MAX_LOGO = 2 * 1024 * 1024
+
 export default function SeccionReceta() {
   const ancla = useRef<HTMLDivElement>(null)
   const reducedMotion = useReducedMotion()
   const [paleta, setPaleta] = useState<PaletaReceta>(PALETAS[0])
   const [paso, setPaso] = useState(0)
+
+  /* La firma vive AQUÍ y no en la hoja: el disparador está en la columna de
+     controles y el destino en la columna del documento, así que el estado tiene
+     que estar en el ancestro común. `RecetaPapel` la recibe y la repinta; el
+     modal se la devuelve al aceptar. Son puntos normalizados, nunca una imagen
+     — ver el aviso de `FirmaCanvas.tsx`, la firma no toca la red ni el disco. */
+  const [firma, setFirma] = useState<Firma | null>(null)
+  const [firmando, setFirmando] = useState(false)
+  const disparador = useRef<HTMLButtonElement>(null)
+
+  /* El foco vuelve al botón que abrió, y se devuelve ANTES de desmontar el
+     modal: si se dejara al desmontaje, el navegador lo manda al `body` y quien
+     navega con teclado reaparece al principio de la página.
+     `preventScroll` NO es opcional aquí: enfocar arrastra el elemento a la
+     vista, y esta escena está ANCLADA AL SCROLL —cualquier scroll que no venga
+     del visitante mueve el ensamblaje de la receta por su cuenta—. Encima
+     `globals.css:233` pone `scroll-behavior: smooth`, así que el salto sería
+     además animado y bien visible. */
+  const cerrarFirma = useCallback((): void => {
+    setFirmando(false)
+    disparador.current?.focus({ preventScroll: true })
+  }, [])
+
+  function aplicarFirma(nueva: Firma): void {
+    setFirma(nueva)
+    cerrarFirma()
+  }
+
+  /* ═══ LOGO DEL MEMBRETE ═══════════════════════════════════════════════════
+     ⚠️⚠️ LA IMAGEN NUNCA SALE DE LA PESTAÑA. MISMA REGLA QUE LA FIRMA.
+     Está PROHIBIDO añadir aquí o en cualquier consumidor: `fetch`,
+     `XMLHttpRequest`, `sendBeacon` o cualquier subida; Supabase o cualquier
+     bucket; localStorage, sessionStorage, IndexedDB o cookies; y leer el
+     archivo a base64 para "guardarlo". Lo único que existe es un object URL
+     —una referencia local al `File` que ya está en memoria— que se pinta como
+     `background-image` y muere al recargar. El visitante que prueba el teaser
+     con el logo real de su consultorio tiene que poder confiar en eso, y es lo
+     único coherente con lo que la página promete en Seguridad. Si una tanda
+     futura necesita persistirlo, eso es el producto, detrás del registro. */
+  const [logo, setLogo] = useState<string | null>(null)
+  const [errorLogo, setErrorLogo] = useState<string | null>(null)
+  const idLogo = useId()
+  /* El object URL vivo, en un ref y no en estado: hay que revocarlo desde sitios
+     donde leer el estado daría un valor viejo (el propio reemplazo) y desde la
+     limpieza de desmontaje, que con `[]` solo ve el primer render. */
+  const urlLogo = useRef<string | null>(null)
+
+  /* Revocar es OBLIGATORIO: cada `createObjectURL` ancla el `File` entero en
+     memoria hasta que se suelta, así que sin esto cambiar de logo diez veces
+     deja diez imágenes retenidas. Va con `[]` —solo desmontaje— y NO con
+     `[logo]`: en desarrollo React monta, limpia y vuelve a montar los efectos,
+     y con `[logo]` esa limpieza revocaría el URL recién creado dejando el slot
+     roto solo en dev. Los reemplazos los revocan los dos handlers de abajo. */
+  useEffect(() => () => {
+    if (urlLogo.current) URL.revokeObjectURL(urlLogo.current)
+  }, [])
+
+  function alElegirLogo(e: React.ChangeEvent<HTMLInputElement>): void {
+    const archivo = e.target.files?.[0]
+    /* El value se limpia SIEMPRE y antes de cualquier return: sin esto, quitar
+       el logo y volver a elegir EL MISMO archivo no dispara `change` —el value
+       no cambió— y el control parece muerto. */
+    e.target.value = ''
+    if (!archivo) return
+    if (!TIPOS_LOGO.includes(archivo.type)) {
+      setErrorLogo('Ese formato no se admite. Sube un PNG, un JPG o un WebP.')
+      return
+    }
+    if (archivo.size > MAX_LOGO) {
+      setErrorLogo('La imagen pesa más de 2 MB. Prueba con una versión más ligera.')
+      return
+    }
+    if (urlLogo.current) URL.revokeObjectURL(urlLogo.current)
+    const url = URL.createObjectURL(archivo)
+    urlLogo.current = url
+    setLogo(url)
+    setErrorLogo(null)
+  }
+
+  function quitarLogo(): void {
+    if (urlLogo.current) URL.revokeObjectURL(urlLogo.current)
+    urlLogo.current = null
+    setLogo(null)
+    setErrorLogo(null)
+  }
 
   /* UN SOLO valor de avance para toda la escena (§4.3·4): las quince capas de
      la hoja derivan de él con `useTransform`. NUNCA pasa por estado de React
@@ -142,7 +248,7 @@ export default function SeccionReceta() {
                 apaisada la hoja se sale por abajo del `h-dvh` y el pie —QR y
                 firma, o sea la mitad interactiva— queda fuera de cuadro. */}
             <div className="mt-8 lg:mt-0 mx-auto w-full max-w-[520px] lg:max-w-[min(520px,calc(74dvh*612/792))] lg:col-start-1 lg:row-start-1 lg:row-span-4 lg:self-center">
-              <RecetaPapel progreso={avance} paleta={paleta} />
+              <RecetaPapel progreso={avance} paleta={paleta} firma={firma} logo={logo} />
               {/* Botón de paso — SOLO móvil, y desaparece al completar. Bajo
                   `prefers-reduced-motion` lo esconde `globals.css`: ahí la hoja
                   ya se sirve armada y este control no gobernaría nada. */}
@@ -166,9 +272,108 @@ export default function SeccionReceta() {
                 <p className="text-[17px] font-semibold leading-[1.5] text-[var(--lp-ink-inverse)]">
                   Configura tu firma una vez. Se estampa sola en todos tus documentos.
                 </p>
+                {/* El copy anterior decía "Dibújala aquí, sobre la receta" y
+                    describía un canvas incrustado en la hoja que ya no existe:
+                    era demasiado pequeño para trazar nada reconocible. Ahora se
+                    dibuja en un lienzo grande y la hoja MUESTRA el resultado. */}
                 <p className="mt-2 text-[15px] leading-[1.5] text-[var(--lp-ink-inverse-50)]">
-                  Dibújala aquí, sobre la receta — o sube una foto de tu firma.
+                  Dibújala en grande y aparece en la receta — o sube una foto de tu firma.
                 </p>
+                {/* ═══ LOS DOS CONTROLES REALES DEL TEASER, EN UNA SOLA FILA ═══
+                    Van juntos porque son la misma promesa —"este documento es
+                    tuyo"— y porque compartir fila cuesta CERO altura frente a
+                    apilarlos, dentro de un `sticky h-dvh` con el presupuesto de
+                    arriba. Viven fuera de toda `Capa` animada, así que nunca son
+                    un destino de tabulador invisible durante el ensamblaje.
+
+                    ⚠️ JERARQUÍA DELIBERADA: la firma es PRIMARIA (relleno blanco
+                    sólido) y el logo SECUNDARIO (contorno). Si los dos fueran
+                    sólidos volveríamos al problema que esta tanda corrige — un
+                    control principal que no se distingue de lo que tiene al
+                    lado. */}
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  {/* ── PRIMARIO · firma ──
+                      Relleno blanco sobre navy: el mismo recurso del CTA final
+                      (`SeccionCTA.tsx:181`), ya probado en la página.
+
+                      ⚠️ EL PROBLEMA QUE ESTO ARREGLA NO ERA EL TEXTO, ERA LA
+                      SUPERFICIE, y conviene tener los números antes de "suavizarlo":
+                      el relleno anterior (blanco al 5% sobre navy, #26445f) medía
+                      1.15:1 contra el fondo y su borde `--lp-border-inverse`
+                      (blanco 30%, #59718a) medía 2.30:1 — POR DEBAJO del 3:1 que
+                      WCAG 1.4.11 exige al contorno de un control. O sea que no
+                      era solo que se perdiera: no era conforme. Ahora el relleno
+                      da 11.64:1 contra el fondo y el texto `--lp-navy` sobre
+                      blanco da 11.64:1 (AAA), 10.63:1 en hover sobre
+                      `--lp-hover-surface`.
+
+                      ⚠️ NI EL PADDING NI LA ALTURA SUBEN, y es intencional: con
+                      `leading-none` la caja pasa de `1+10+13+10+1 = 35px` a
+                      `10+15+10 = 35px` — el borde que se va paga el tipo que
+                      crece. El `py-3.5` del CTA costaría +16px y el presupuesto
+                      de altura de arriba no lo tiene. El icono va a 14px y no a
+                      16 por lo mismo: a 16 el line box sube a 16 y la caja a 36. */}
+                  <button
+                    ref={disparador}
+                    type="button"
+                    onClick={() => setFirmando(true)}
+                    aria-haspopup="dialog"
+                    className="inline-flex items-center gap-2 rounded-xl bg-[var(--lp-ink-inverse)] px-5 py-2.5 text-[15px] font-semibold leading-none tracking-[-0.01em] text-[var(--lp-navy)] shadow-lg transition-all duration-[var(--sp-dur-micro)] hover:bg-[var(--lp-hover-surface)] active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--lp-ink-inverse)]"
+                  >
+                    <PenLine className="w-3.5 h-3.5" aria-hidden />
+                    {firma ? 'Cambiar mi firma' : 'Dibujar mi firma'}
+                  </button>
+
+                  {/* ── SECUNDARIO · logo ──
+                      Input real + `<label>` con estilo de botón, y NO un botón
+                      que dispare `input.click()`: así el control sigue siendo un
+                      input de archivo nativo, alcanzable con Tab y anunciado por
+                      el lector de pantalla con el texto del label. `sr-only` y no
+                      `hidden`/`display:none` — esto último lo sacaría del orden
+                      de tabulación. El anillo de foco se pinta sobre el label vía
+                      `peer-focus-visible`, porque el que recibe el foco es el
+                      input, que es invisible.
+
+                      ⚠️ El contorno usa `--lp-ink-inverse` (blanco puro, 11.64:1)
+                      y no `--lp-border-inverse` (blanco 30%, 2.30:1) por lo dicho
+                      arriba: un contorno de control por debajo de 3:1 no es
+                      conforme. Es 2px más alto que el primario por el borde; la
+                      fila mide 37px. */}
+                  <input
+                    id={idLogo}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={alElegirLogo}
+                    className="peer sr-only"
+                  />
+                  <label
+                    htmlFor={idLogo}
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-[var(--lp-ink-inverse)] bg-[var(--lp-surface-inverse-10)] px-4 py-2.5 text-[15px] font-semibold leading-none tracking-[-0.01em] text-[var(--lp-ink-inverse)] transition-colors duration-[var(--sp-dur-micro)] hover:bg-[var(--lp-surface-inverse-5)] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--lp-ink-inverse)]"
+                  >
+                    <ImagePlus className="w-3.5 h-3.5" aria-hidden />
+                    {logo ? 'Cambiar mi logo' : 'Subir mi logo'}
+                  </label>
+
+                  {logo ? (
+                    <button
+                      type="button"
+                      onClick={quitarLogo}
+                      className="text-[14px] font-semibold leading-none text-[var(--lp-ink-inverse-70)] underline underline-offset-4 transition-colors duration-[var(--sp-dur-micro)] hover:text-[var(--lp-ink-inverse)]"
+                    >
+                      Quitar logo
+                    </button>
+                  ) : null}
+                </div>
+
+                {/* Solo aparece si el archivo se rechaza, así que su altura no
+                    entra en el presupuesto del estado normal. Va en blanco pleno
+                    y no en un rojo: la escala `--lp-*` no tiene token de error y
+                    la regla de esta tanda prohíbe hex nuevos. */}
+                {errorLogo ? (
+                  <p role="alert" className="mt-3 text-[13px] leading-[1.45] text-[var(--lp-ink-inverse)]">
+                    {errorLogo}
+                  </p>
+                ) : null}
               </div>
 
               {/* ── Color del membrete ── */}
@@ -203,9 +408,10 @@ export default function SeccionReceta() {
                     </button>
                   ))}
                 </div>
-                <p className="mt-3 text-[13px] leading-[1.45] text-[var(--lp-ink-inverse-50)]">
-                  Personalízalo con tu logo — disponible al registrarte.
-                </p>
+                {/* Aquí decía "Personalízalo con tu logo — disponible al
+                    registrarte". Se retira: el logo YA se puede poner aquí
+                    mismo, y prometer para después algo que el visitante acaba de
+                    hacer es peor que no decir nada. */}
               </div>
 
               {/* ── Los otros 7 formatos ── */}
@@ -244,6 +450,13 @@ export default function SeccionReceta() {
           </div>
         </div>
       </div>
+
+      {/* El modal se monta solo cuando hace falta y se porta a `document.body`
+          por su cuenta: aquí dentro estaría atrapado por el `overflow-hidden`
+          de la hoja y por los `transform` que `motion` escribe en las capas. */}
+      {firmando ? (
+        <ModalFirma tinta={TINTA_FIRMA} onCerrar={cerrarFirma} onAceptar={aplicarFirma} />
+      ) : null}
     </section>
   )
 }

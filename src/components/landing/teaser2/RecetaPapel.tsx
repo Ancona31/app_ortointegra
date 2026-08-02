@@ -2,7 +2,7 @@
 
 import { motion, useTransform, type MotionValue } from 'motion/react'
 import { RECETA } from '@/components/landing/motion/tokens'
-import FirmaCanvas from './FirmaCanvas'
+import { TrazoFirma, type Firma } from './FirmaCanvas'
 import { QR_BANDAS, QR_LADO } from './qr-receta-demo'
 import {
   DIAGNOSTICO,
@@ -93,6 +93,13 @@ const PAPEL = {
   selloFirma: '#c0c0c0',
   fondoLogo: '#fafbfc',
 } as const
+
+/**
+ * La tinta de la firma. Se exporta para que el lienzo grande firme con EL MISMO
+ * negro que la hoja: si el modal repitiera el hex por su cuenta, un cambio aquí
+ * dejaría la vista previa de un color y la receta de otro, y nada lo detectaría.
+ */
+export const TINTA_FIRMA = PAPEL.tinta
 
 /**
  * Ventana de un elemento dentro del tramo de su beat. Los `n` elementos se
@@ -225,9 +232,24 @@ function BandaQR({ indice, progreso }: { indice: number; progreso: MotionValue<n
 interface RecetaPapelProps {
   progreso: MotionValue<number>
   paleta: PaletaReceta
+  /**
+   * La firma aceptada en el modal, o `null` si el visitante no ha firmado. La
+   * hoja SOLO LA MUESTRA: la línea de firma no es interactiva y el disparador
+   * vive en la columna de controles de `SeccionReceta`. El estado es de la
+   * sección, no de la hoja.
+   */
+  firma: Firma | null
+  /**
+   * Object URL del logo que el visitante subió, o `null`. Como la firma, la hoja
+   * SOLO LO MUESTRA: el control vive en la columna de `SeccionReceta`, que es
+   * también quien crea y REVOCA el URL. No lo revoques desde aquí.
+   *
+   * ⚠️ La imagen nunca sale de la pestaña — ver el aviso de `SeccionReceta`.
+   */
+  logo: string | null
 }
 
-export default function RecetaPapel({ progreso, paleta }: RecetaPapelProps): React.JSX.Element {
+export default function RecetaPapel({ progreso, paleta, firma, logo }: RecetaPapelProps): React.JSX.Element {
   /* La barra inferior cierra el membrete y llega desde ABAJO, simétrica a la
      de arriba: las dos son el papel membretado, no contenido. */
   const cierreOpacity = useTransform(progreso, [...RECETA.tramo.membrete], [0, 1])
@@ -258,19 +280,55 @@ export default function RecetaPapel({ progreso, paleta }: RecetaPapelProps): Rea
           <div style={{ height: u(14), background: paleta.navy }} />
           <div style={{ height: u(2), background: paleta.acento }} />
           <div className="flex items-center" style={{ gap: u(10), padding: `${u(8)} ${u(50)} 0` }}>
-            {/* Slot del logo con candado — §5.7. El candado ES el mensaje: hay
-                un hueco reservado para tu marca y se abre al registrarte. */}
+            {/* ═══ SLOT DEL LOGO ═══
+                Aquí había un CANDADO, y la idea era un curiosity gap:
+                "personalízalo al registrarte". No funcionaba — un candado sobre
+                un hueco no dice "tu marca va aquí", dice "esto está roto o te
+                falta algo". Ahora el hueco es real: el visitante sube su logo
+                desde los controles y lo ve aquí al instante.
+
+                ⚠️ EL VACÍO NO LLEVA LAS PALABRAS "TU LOGO", y no es un descuido.
+                El círculo mide u(52), o sea 44px en una hoja de 520 y 39px en
+                una de 358: "TU LOGO" ahí dentro caería a 5–6px, exactamente el
+                cuerpo que la cabecera de este archivo documenta como ILEGIBLE A
+                PROPÓSITO. Un rótulo de control ilegible no comunica, decora. Lo
+                que sí se lee es el glifo de imagen —marco, sol y horizonte, el
+                mismo vocabulario que cualquier hueco de foto— y sobre todo el
+                botón "Subir mi logo" de la columna de al lado, que es donde vive
+                el texto porque es donde se puede leer.
+                Se construye igual que el candado al que sustituye: SVG en línea,
+                dimensionado con `u()` y en los grises del papel. */}
             <div
-              className="flex shrink-0 items-center justify-center"
+              className="flex shrink-0 items-center justify-center overflow-hidden"
               style={{
                 width: u(52), height: u(52), borderRadius: u(26),
                 border: `${u(1.5)} solid ${PAPEL.bordeLogo}`, background: PAPEL.fondoLogo,
+                /* Con `box-sizing: border-box` (preflight) esto NO cambia el
+                   tamaño exterior del círculo: solo mete el logo hacia dentro
+                   para que no muerda el filete. Cero relayout del membrete. */
+                padding: u(4),
               }}
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke={PAPEL.principio} strokeWidth={1.6} aria-hidden style={{ width: u(20), height: u(20) }}>
-                <rect x="3" y="11" width="18" height="11" rx="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
+              {logo ? (
+                /* `background-image` y no `<img>`: dentro de una réplica de
+                   documento el logo es decorativo —no hay `alt` que escribir que
+                   no sea ruido—, y de paso evita `next/image`, que para un
+                   object URL exigiría `unoptimized` y medidas.
+                   `bg-contain` y NO `bg-cover`: cubrir llenaría el círculo pero
+                   RECORTA, y recortar la marca de alguien es peor defecto que
+                   dejar aire alrededor. Contain nunca deforma ni corta. */
+                <div
+                  aria-hidden
+                  className="h-full w-full bg-contain bg-center bg-no-repeat"
+                  style={{ backgroundImage: `url("${logo}")` }}
+                />
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" stroke={PAPEL.principio} strokeWidth={1.6} aria-hidden style={{ width: u(20), height: u(20) }}>
+                  <rect x="3" y="4" width="18" height="16" rx="2" />
+                  <circle cx="8.5" cy="9.5" r="1.5" />
+                  <path d="m21 15-5-5L7 20" />
+                </svg>
+              )}
             </div>
             <div className="min-w-0 flex-1">
               <p style={{ fontSize: u(13), fontWeight: 700, color: paleta.navy, letterSpacing: u(0.3), lineHeight: 1.2 }}>
@@ -370,10 +428,14 @@ export default function RecetaPapel({ progreso, paleta }: RecetaPapelProps): Rea
             </div>
 
             <Capa progreso={progreso} tramo={RECETA.tramo.firma} className="text-center" style={{ minWidth: u(190) }}>
-              {/* El canvas se apoya SOBRE la línea punteada: lo que el visitante
-                  traza queda encima del filete, como una firma de verdad. */}
+              {/* La firma se apoya SOBRE la línea punteada, como una firma de
+                  verdad. El hueco se reserva SIEMPRE, haya trazo o no: si el
+                  alto dependiera de si hay firma, aceptarla movería el pie de la
+                  hoja y eso es relayout dentro de una escena anclada al scroll.
+                  Vacío no se dibuja nada —la receta real tampoco tiene ahí una
+                  caja punteada— y así la hoja sigue leyéndose como documento. */}
               <div className="relative" style={{ height: u(44), marginBottom: u(4) }}>
-                <FirmaCanvas tinta={PAPEL.tinta} className="absolute inset-0" />
+                {firma ? <TrazoFirma firma={firma} tinta={PAPEL.tinta} className="absolute inset-0" /> : null}
               </div>
               <div style={{ borderTop: `${u(1)} dashed ${paleta.navy}`, paddingTop: u(5) }}>
                 <p style={{ fontSize: u(8.5), fontWeight: 700, color: paleta.navy }}>{MEDICO.nombre}</p>
