@@ -181,7 +181,7 @@ seguidas:**
 | 4 | Bloque IA | navy ancho completo, texto a la izquierda |
 | 5 | TEASER 1 | dos columnas: dictado / nota |
 | 6 | Expediente | dos columnas invertidas: **video real** izq., texto der. |
-| 7 | TEASER 2 | documento izq., controles der. |
+| 7 | TEASER 2 | documento izq., controles der. · **superficie NAVY a ancho completo** (única que no repite vecino — ver nota 1 de §5.7) |
 | 8 | Flujo 5 pasos | lista numerada izq., titular der. |
 | 9 | Portabilidad | franja horizontal delgada de 3 ítems |
 | 10 | Seguridad | 3 tarjetas en fila ⚠️ |
@@ -766,6 +766,75 @@ fuente del PDF real, no la de la landing (deuda de desfase §15).
 **Móvil:** ensamblaje en 5 pasos por toque; fase B idéntica.
 CTA sembrado inline al salir.
 
+> ⚠️ **IMPLEMENTADO (F3, 2026-08-02)** en `SeccionReceta.tsx` +
+> `components/landing/teaser2/`. La ficha de arriba es la intención; estas ocho
+> notas son lo que corre.
+>
+> **1 · LA SUPERFICIE ES NAVY A ANCHO COMPLETO, y era la única posible.** La
+> sección entra entre Expediente (`--lp-surface`) y Portabilidad
+> (`--lp-surface-alt`): en blanco repite la de la que viene, en `alt` repite la
+> de la que sigue. Navy deja la cadena blanco → navy → alt sin dos superficies
+> iguales seguidas. Además lo que se enseña es una HOJA BLANCA, y sobre fondo
+> oscuro se lee como un documento sobre una mesa —foco único de §4.1— mientras
+> los controles se leen como controles. Precedente no contiguo en §3.4·4.
+>
+> **2 · EL ANCLAJE ES `lg`, NO `sm`, y el conductor del progreso usa el MISMO
+> umbral.** Por debajo de `lg` la retícula cae a una columna y la hoja (673px)
+> más los controles (~600px) suman ~1 300px dentro de un `sticky h-dvh`: anclar
+> ahí sirve media escena fuera de cuadro y sin forma de alcanzarla, porque el
+> scroll está ocupado gobernando el ensamblaje. Es un desvío consciente de la
+> definición de "móvil" de §5.2 (previo a `sm`) y vale SOLO para esta ficha.
+>
+> **3 · LOS TOQUES NO SON UNA VERSIÓN REDUCIDA.** Los 5 pasos llevan el avance
+> al final de cada beat (`RECETA.pasos`), o sea recorren exactamente los mismos
+> tramos que el scroll. Un solo `MotionValue` de avance para toda la escena
+> (§4.3·4) que escribe o el scroll o el dedo, decidido en un `ref` resuelto tras
+> montar — sin ramificar el render (§4.3·7).
+>
+> **4 · LOS ÍNDICES DE LA TABLA SE RECONCILIAN ASÍ.** "Cajas … índice 0→4"
+> nombra cuatro y cuenta cinco: son las 4 cajas de datos **más la caja de
+> diagnóstico**, que si no se quedaba sin beat. "Filas medicamentos, índice
+> 0→3" con 3 medicamentos son **la barra de sección + encabezado de tabla como
+> elemento 0** y las 3 filas. Nada de la hoja queda fuera de un beat.
+>
+> **5 · EL QR SE ARMA POR BANDAS, NO POR MÓDULOS.** Son 441 módulos oscuros
+> (versión 3, nivel M): animar uno a uno son 441 valores y 441 nodos, que se
+> comen el presupuesto de §4.3·3 ellos solos. Van repartidos en **8 bandas
+> diagonales**, un `<path>` cada una, y la aparición barre el símbolo como una
+> impresión. Generado con el paquete `qrcode` que YA es dependencia (lo usa la
+> receta real) — §12 prohíbe librerías QR nuevas y generarlo en cliente, y esto
+> no es ninguna de las dos: es un artefacto estático.
+>
+> **6 · LA HOJA ESCALA CON UNIDADES DE CONTENEDOR Y LOS NÚMEROS DEL PDF SON
+> LITERALES.** `--rx-u = 100cqw / 612` (612pt = ancho de carta en
+> `@react-pdf`), así que cada valor escrito en la réplica ES el valor de
+> `RecetaPdf.tsx`. Auditar el desfase pasa a ser comparar dos columnas de
+> cifras. La hoja no se re-maqueta a ningún ancho: se encoge como papel.
+>
+> **7 · LA FUENTE NO ES LA DEL PDF, y es el único punto donde la réplica cede.**
+> §5.7 pide igualar la del PDF (Roboto). La única copia de Roboto del repo son
+> ~2.6MB de base64 dentro de `src/lib/pdf/fonts.ts`, un módulo que solo se
+> importa dinámicamente al generar un PDF; servirlo a la landing —o añadir una
+> segunda familia por webfont— es peso nuevo en la página cuyo LCP ya está
+> presupuestado en §4.3·9. La hoja usa Inter, que ya está cargada. Va a la misma
+> deuda de desfase.
+>
+> **8 · `/demo/receta` ESTRENA LA MINIMIZACIÓN QUE LA PÁGINA REAL NO TIENE:**
+> iniciales del paciente y **sin diagnóstico ni CIE-10**, más `noindex` y sin
+> `®`. Es la política que §11 tiene pendiente para `/r/[folio]`. No la
+> "alinees" con la real copiándole el nombre completo — sería una regresión de
+> privacidad en nombre de la consistencia.
+>
+> ⚠️ **HALLAZGO ABIERTO — EL NOMBRE DE LA PACIENTE NO COINCIDE CON EL VIDEO.**
+> La orden pedía verificarlo "con acentos incluidos". Verificado contra el
+> primer fotograma (`public/landing/expediente-demo-poster.jpg`): la cuenta
+> demo escribe **"Ana Gomez Sanchez"**, SIN acentos (y "Dr. Angel Perez"
+> también). El teaser usa la forma correcta, "Ana Gómez Sánchez", porque es la
+> que confirmó Angel y porque en el demo se controla cada carácter. **El hilo
+> narrativo se sostiene, pero la cuenta demo tiene una falta de ortografía en
+> producción de cara al video.** Se arregla sembrando de nuevo la cuenta (F0.b)
+> y regrabando, no desacentuando la landing.
+
 ### 5.8 Flujo 5 pasos — tejido
 `Stagger` vertical 80ms — el orden de aparición DIBUJA la secuencia.
 Números en gradación de un solo tono azul (nunca 5 colores).
@@ -1184,7 +1253,12 @@ rápida» — la misma incoherencia que **LP-DT-31** registró desde la captura 
 hero, ahora en un segundo sitio.
 
 **7 · Teaser 2** — ver §5.7. Documento estrella: receta membretada con QR y
-firma. Medicamentos demo: PENDIENTES de Angel (§14).
+firma. ~~Medicamentos demo: PENDIENTES de Angel (§14).~~ **RESUELTO
+(2026-08-02):** Angel entregó **3** medicamentos, no 4 — Celecoxib 200 mg,
+Pregabalina 75 mg y Paracetamol 1 g, sobre M54.4 (lumbago con radiculopatía)
+en Ana Gómez Sánchez, 27 años. Viven en
+`components/landing/teaser2/receta-demo.ts`, que es la ÚNICA fuente: la hoja
+del teaser y `/demo/receta` leen de ahí para no poder divergir.
 
 **8 · Flujo** — Titular: "Si sabes usar tu celular, ya sabes usar Spinus".
 Subtítulo: "Sin configuraciones, sin formatos rígidos, sin capacitación.
@@ -1426,7 +1500,7 @@ infracción. "Spinus" a secas hasta el título.
 | F1.4 | Server component | | page.tsx a RSC; secciones sin motion primero. Alcance reducido: el valor está en page.tsx, no en las 13 |
 | F2.a | Movimiento tejido | | Tokens §4.2, patrones §4.4 en todas las secciones. Stagger SIN wrappers |
 | F2.b | Escenario Hero ~~+ card DICOM~~ | | Ficha §5.1. **§5.3 fuera: el escenario DICOM está cancelado** (sin asset — ver el aviso de §5.3) |
-| F3 | Teaser 2 | | QR estático + /demo/receta PRIMERO; luego ensamblaje→firma→color→candado |
+| F3 | Teaser 2 | ✅ **APLICADA 2026-08-02** | QR estático + /demo/receta + ensamblaje→firma→color→candado. Notas de implementación al pie de §5.7 |
 | F4 | Teaser 1 | | Requiere formato de nota congelado + textos clínicos de Angel |
 | F5 | Precio/beta + footer + JSON-LD | | §7.12–13 + sameAs |
 | F6 | Pulido | | Contraste AA global, Lighthouse, cero cuadros caídos medidos, móvil real vía preview de Vercel |
@@ -1443,7 +1517,9 @@ Cada fase: auditoría → aplicación → `tsc --noEmit + eslint` (WSL) o build
 2. **Textos clínicos del Teaser 1** (dictado crudo + nota completa × 3
    escenarios). Los escribe Angel: un médico detecta texto clínico de IA
    genérica — es donde más se juega la credibilidad con el gremio.
-3. **4 medicamentos de la receta demo** (ficticios, clínicamente coherentes).
+3. ~~**4 medicamentos de la receta demo** (ficticios, clínicamente coherentes).~~
+   ✅ **ENTREGADO 2026-08-02** — fueron 3, no 4, y con eso se implementó F3.
+   En `components/landing/teaser2/receta-demo.ts`. Ver §7·7.
 4. Foto real en pasillo de hospital (sin fondo IA) — no bloqueante.
 5. Confirmar formato final de la nota post-rediseño (congela el Teaser 1).
 

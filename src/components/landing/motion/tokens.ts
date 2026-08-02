@@ -372,6 +372,61 @@ export const HERO = {
 } as const
 
 /**
+ * Teaser 2 · receta interactiva (§5.7, fase F3). Solo lo consume el árbol de
+ * `components/landing/teaser2/` y `SeccionReceta.tsx`.
+ *
+ * Los cinco tramos son los de la ficha, sin redondear. Se expresan como
+ * fracciones del progreso de `OFFSETS.anclado` sobre el contenedor de 260vh, y
+ * SE SOLAPAN a propósito: cada beat empieza antes de que termine el anterior
+ * (0.12 dentro de 0–0.16, 0.24 dentro de 0.12–0.28…), que es lo que hace que el
+ * documento se lea como que se ARMA y no como cinco apariciones sueltas.
+ *
+ * ⚠️ EL PRESUPUESTO DE §4.3·3 (máx. 4 capas simultáneas) SOBREVIVE AL SOLAPE, y
+ * conviene entender por qué antes de añadir un sexto beat: los solapes son de
+ * 0.04 de progreso y dentro de cada beat los elementos van escalonados, así que
+ * en un cuadro cualquiera hay 2–3 capas escribiendo. Lo que NO se puede hacer es
+ * dar a los 3+4+3+8 elementos su propio tramo completo.
+ */
+export const RECETA = {
+  tramo: {
+    /** Membrete: entra desde arriba y se posa. §5.7. */
+    membrete: [0, 0.16],
+    /** Las 4 cajas (paciente · edad · sexo · fecha), escalonadas dentro. */
+    cajas: [0.12, 0.28],
+    /** Las 3 filas de medicamentos, escalonadas dentro. */
+    medicamentos: [0.24, 0.46],
+    /** Las 8 bandas del QR. Ver `qr-receta-demo.ts` para por qué son bandas. */
+    qr: [0.42, 0.62],
+    /** La línea de firma VACÍA — la tinta la pone el visitante en la fase B. */
+    firma: [0.58, 0.7],
+  },
+  /**
+   * −80px de caída del membrete. Es la única distancia grande del escenario y
+   * la ficha la fija: el membrete llega de fuera del papel, no de dentro.
+   * ⚠️ EXIGE `overflow-hidden` EN LA HOJA. Prueba causal: a −80 el bloque queda
+   * 80px por encima de su sitio, o sea FUERA del borde superior del papel; sin
+   * recorte se pinta sobre la sección de arriba durante los primeros 0.16 del
+   * tramo. No crea scroll (el desbordamiento hacia arriba no genera barra) pero
+   * sí un fantasma visible.
+   */
+  membreteY: -80,
+  /**
+   * 12px para las cajas de datos. La ficha da este número para las cajas y NO
+   * da ninguno para las filas de medicamentos ("stagger interno" a secas): las
+   * filas reutilizan este mismo valor a propósito, para que dentro de la hoja
+   * haya UN vocabulario de distancia y no dos. Si alguna vez se separan, que
+   * sea por una decisión, no por descuido.
+   */
+  cajaY: 12,
+  /**
+   * Los 5 pasos del ensamblaje por TOQUE en móvil (§5.7). Cada valor es el
+   * final de un beat, así que tocar cinco veces recorre exactamente la misma
+   * coreografía que el scroll en escritorio — no es una versión reducida.
+   */
+  pasos: [0.16, 0.28, 0.46, 0.62, 0.7],
+} as const
+
+/**
  * Tramos de scroll para `useScroll({ offset })`. Espejo de §4.2.
  * Sintaxis de motion: "<borde del target> <borde del contenedor>".
  */

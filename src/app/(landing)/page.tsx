@@ -6,6 +6,7 @@ import SeccionProblema from '@/components/landing/sections/SeccionProblema'
 import SeccionFeatures from '@/components/landing/sections/SeccionFeatures'
 import SeccionIA from '@/components/landing/sections/SeccionIA'
 import SeccionExpediente from '@/components/landing/sections/SeccionExpediente'
+import SeccionReceta from '@/components/landing/sections/SeccionReceta'
 import SeccionPortabilidad from '@/components/landing/sections/SeccionPortabilidad'
 import SeccionInterfaz from '@/components/landing/sections/SeccionInterfaz'
 import SeccionHistoria from '@/components/landing/sections/SeccionHistoria'
@@ -29,6 +30,13 @@ export default function HomePage() {
       <SeccionFeatures />
       <SeccionIA />
       <SeccionExpediente />
+      {/* Teaser 2 (§3.4 fila 7): va DESPUÉS de Expediente, que es donde lo
+          coloca la tabla y donde el hilo narrativo lo pide — el video termina
+          con el expediente de Ana Gómez Sánchez abierto y aquí se emite su
+          receta. Es también el motivo de que su superficie sea navy: entre el
+          blanco de Expediente y el `alt` de Portabilidad no hay ninguna otra
+          que no repita a un vecino. Razonado en `SeccionReceta.tsx`. */}
+      <SeccionReceta />
       <SeccionPortabilidad />
       <SeccionInterfaz />
       <SeccionHistoria />

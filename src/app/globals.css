@@ -966,6 +966,19 @@ html.dark .agenda-fc .fc-daygrid .fc-col-header-cell {
     transform: none !important;
     transition: none !important;
   }
+
+  /*
+   * Botón "armar la receta paso N" del Teaser 2 (§5.7, móvil). Con la
+   * preferencia activa, la regla de arriba ya sirve la hoja ARMADA —todas sus
+   * capas llevan `data-lp-reveal`—, así que el control no gobernaría nada:
+   * cinco toques sin efecto visible se leen como que la página está rota.
+   * Se esconde aquí y no con `useReducedMotion` en el componente porque
+   * ramificar el render con un valor solo-cliente es el bug de §4.3·7.
+   * La fase interactiva (firma, color, QR) NO se toca: no es movimiento.
+   */
+  [data-lp-paso] {
+    display: none !important;
+  }
 }
 
 /* ── Salida del bloque de texto del hero: NO EXISTE EN MÓVIL ──────────

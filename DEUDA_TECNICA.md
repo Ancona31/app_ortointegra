@@ -1547,6 +1547,27 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
 - **Detectada:** Auditoría de landing (2026-07-28)
 - **Descripción:** Réplica HTML/CSS de la receta desfasable respecto al PDF
   real.
+- **Materializada en F3 (2026-08-02):** la réplica ya existe —
+  `src/components/landing/teaser2/RecetaPapel.tsx`— y copia a mano
+  `src/lib/pdf/RecetaPdf.tsx`, `PdfHeader.tsx` y `PdfBarras.tsx`. **Nada
+  detecta el desfase**: ni el build, ni el lint, ni un test. Si alguien cambia
+  el PDF real, la landing enseña un documento que ya no se emite.
+- **Mitigación aplicada, que NO cierra la deuda pero la hace auditable:** la
+  unidad de la réplica es `--rx-u = 100cqw / 612`, y 612pt es el ancho de una
+  hoja carta en `@react-pdf`. Cada número escrito con `u(n)` es LITERALMENTE
+  el número del PDF (`u(8)` ↔ `fontSize: 8`, `u(50)` ↔
+  `paddingHorizontal: 50`). Comparar las dos versiones es comparar dos
+  columnas de cifras, no reinterpretar un diseño. **Quien toque `RecetaPdf`
+  tiene que abrir también `RecetaPapel`.**
+- **Desvío conocido y aceptado:** la réplica usa **Inter**, no Roboto. §5.7
+  pedía igualar la fuente del PDF; la única copia de Roboto del repo son
+  ~2.6MB de base64 en `src/lib/pdf/fonts.ts`, importado dinámicamente solo al
+  generar PDFs. Servirlo a la landing, o añadir una segunda familia por
+  webfont, es peso nuevo contra el presupuesto de LCP de §4.3·9. Se prefiere
+  el desvío tipográfico al coste de carga.
+- **Condición de cierre:** o un test de snapshot que renderice los dos y
+  compare geometría, o aceptar el desfase como permanente y anotarlo en la
+  cabecera de los dos archivos.
 
 ### LP-DT-2 — Recapturar imágenes de landing cuando cambie la UI
 - **Estado:** 🔴 abierta
@@ -1595,6 +1616,17 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
 - **Descripción:** Página de verificación de recetas: minimización de datos
   (la farmacia no necesita nombre completo ni CIE-10), `noindex`, y vigencia
   del enlace.
+- **Actualización F3 (2026-08-02) — YA EXISTE LA REFERENCIA, y sigue sin
+  aplicarse a la página real.** `src/app/demo/receta/page.tsx` (lo que abre el
+  QR del Teaser 2) implementa **iniciales del paciente**, **sin diagnóstico ni
+  CIE-10** y **`robots: noindex`**. La página real
+  (`src/app/r/[folio]/page.tsx:104,113`) sigue publicando nombre completo y
+  diagnóstico tras una URL adivinable, y sin `noindex`. Portar la política es
+  copiar tres decisiones de un archivo al otro; lo que falta de verdad es la
+  **vigencia del enlace**, que sí necesita esquema (¿caduca? ¿a los cuántos
+  días? ¿qué se responde después?).
+- ⚠️ **NO "unifiques" las dos páginas igualando la demo a la real.** La demo es
+  la que está bien.
 
 ### LP-DT-10 — Renderizador de recomendaciones inconsistente
 - **Estado:** 🔴 abierta
@@ -2218,6 +2250,32 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
   hacerlo de todas formas), capturar **solo la ventana**, sin escritorio ni
   cromo de navegador, y activar el marco HTML comentado. Las dos cosas van en
   el mismo movimiento: asset limpio + marco descomentado.
+
+### LP-DT-35 — La cuenta demo escribe los nombres sin acentos, y el Video 1 los lleva grabados
+- **Estado:** 🔴 abierta
+- **Detectada:** F3 · Teaser 2 (2026-08-02), al verificar el hilo narrativo
+  entre el video de Expediente y la receta del teaser
+- **Descripción:** La cuenta demo tiene los nombres mal escritos y eso está
+  **grabado en píxeles** en `public/landing/expediente-demo.mp4/webm` y en su
+  póster. Verificado en el primer fotograma
+  (`public/landing/expediente-demo-poster.jpg`):
+  - paciente: **«Ana Gomez Sanchez»** — debería ser «Ana Gómez Sánchez»
+  - médico: **«Dr. Angel Perez»** — debería ser «Dr. Ángel Pérez»
+  - en la misma lista, «Pedro Jiménez Moreno» y «Juan García Bustamante» SÍ
+    van acentuados, así que no es una decisión de la cuenta: son faltas.
+- **Por qué importa:** el video es la pieza que sostiene «producto real en
+  movimiento» (§6). Un nombre sin acentos en la interfaz que se está usando
+  para vender rigor se lee exactamente como lo que es. Y F3 acaba de crear un
+  segundo punto de contacto: la receta del teaser nombra a la misma paciente
+  bien escrita, así que las dos secciones se contradicen a dos scrolls de
+  distancia.
+- **Decisión tomada en F3:** el teaser y `/demo/receta` usan la forma
+  **correcta** («Ana Gómez Sánchez»). No se replica la falta. El hilo
+  narrativo se sostiene igual — nadie lee «Gomez» y «Gómez» como dos personas.
+- **Corrección:** resembrar la cuenta demo con acentos (F0.b) y **regrabar el
+  Video 1**. No se arregla desde la landing.
+- ⚠️ **No lo "arregles" desacentuando `receta-demo.ts`.** Sería propagar la
+  falta a la única superficie donde hoy está bien.
 
 ---
 
