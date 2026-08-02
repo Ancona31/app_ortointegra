@@ -180,7 +180,7 @@ seguidas:**
 | 3 | Grid 5 cards | bento asimétrico, DICOM 2× |
 | 4 | Bloque IA | navy ancho completo, texto a la izquierda |
 | 5 | TEASER 1 | dos columnas: dictado / nota |
-| 6 | Expediente | dos columnas invertidas: video izq., texto der. |
+| 6 | Expediente | dos columnas invertidas: **video real** izq., texto der. |
 | 7 | TEASER 2 | documento izq., controles der. |
 | 8 | Flujo 5 pasos | lista numerada izq., titular der. |
 | 9 | Portabilidad | franja horizontal delgada de 3 ítems |
@@ -581,8 +581,57 @@ y firmas." **Móvil:** 6 pasos discretos con botón siguiente.
 CTA sembrado inline al salir de la sección.
 
 ### 5.6 Expediente — tejido + VIDEO 1
-Dos columnas invertidas. `Reveal` + `Parallax` título. El video (§6) entra
-con `Reveal`; autoplay al entrar en viewport.
+
+**IMPLEMENTADA.** Dos columnas invertidas. La tabla es lo que hay en el código.
+
+| Capa | Prop | Origen→destino | Tramo | Easing |
+|---|---|---|---|---|
+| Retícula entera | opacity,y | 0→1, 24→0 | entrada, `--lp-dur-section` | ease-out |
+| Columna de texto | y | +24→−24 | `OFF_TRAVESIA` | lineal/scroll |
+| 4 viñetas | opacity,y | 0→1, 24→0 | stagger 70ms tras la entrada | ease-out |
+| Video | — | — | — | — |
+
+⚠️ **EL VIDEO NO ANIMA NADA PROPIO, y esa fila vacía es la ficha.** Entra
+dentro del `Reveal` de la retícula (a1) y se mueve con el `Parallax` de la
+columna vecina (a4) — nada más. **Ningún scrub, ningún `useScroll` sobre él:**
+el scrub de vídeo es del DICOM (§5.3) y es lo que lo distingue. Si algún día
+ves `useScroll` en `SeccionExpediente.tsx`, alguien confundió las dos fichas.
+
+Lo único que el video hace por su cuenta es reproducirse UNA vez al entrar en
+cuadro, y lo gatea el navegador —Chrome y Safari no reproducen automático lo
+que está fuera de viewport—, no código nuestro.
+
+**Al terminar rebobina al primer fotograma y se para ahí.** No es bucle: el
+elemento queda en pausa. Antes se congelaba en el último fotograma y se leía
+como atascado.
+
+⚠️ **EL PÓSTER SE QUEDA COMO ESTÁ Y NO HAY QUE REGENERARLO.** Se evaluó
+cambiarlo al fotograma del expediente abierto para conservar esa imagen en
+reposo, y **no funcionaría**: el póster solo gobierna el estado ANTERIOR a la
+primera reproducción. Después, el elemento pinta su fotograma actual —el 0,
+tras el rebobinado—, así que un póster distinto solo lograría que el antes y el
+después mostraran pantallas diferentes. El precio asumido es que en reposo se
+ve la lista de pacientes y no el expediente; se acepta porque el fotograma
+inicial es la afordancia correcta del clic de repetición.
+
+**Un clic (o Enter/Espacio) sobre el área del video lo repite desde el
+principio.** El área entera es un `<button>` nativo: sin icono de play, sin
+barra y sin cromo de reproductor (§6·4), solo `cursor-pointer` y anillo de foco
+—que no es cromo, es lo que WCAG 2.4.7 exige a un control enfocable—. El
+`aria-label` del botón describe acción y contenido en una frase y el `<video>`
+va `aria-hidden` para no anunciarse dos veces.
+
+⚠️ **ESTA SECCIÓN NO SANGRA POR LA IZQUIERDA. Se probó y se retiró.** El borde
+izquierdo es el de lectura: las catorce secciones arrancan en la misma x y esa
+columna invisible sostiene el ritmo de la página. Romperla en un solo sitio se
+lee como descuadre, no como recurso. **El sangrado es un recurso de borde
+DERECHO en esta landing** —donde no hay nada que alinear— y no es simétrico.
+El ancho se recupera con el reparto `lg:grid-cols-[5fr_4fr]`, y las columnas
+van `items-start` porque el video es ~180px más bajo que su texto y centrarlo
+lo dejaba flotando.
+
+⚠️ **`Parallax` en la COLUMNA DE TEXTO, no en el título.** El título suelto
+chocaba con su bajada; el detalle está en §4.4.
 
 ### 5.7 TEASER 2 · Receta — ESCENARIO ANCLADO → INTERACTIVO
 Contenedor `h-[260vh]`. **Fase A (scroll 0–0.70) — ensamblaje:**
@@ -885,13 +934,55 @@ con `transform` identidad, así que `globals.css:922` lo deja donde debe.
 
 ## 6 · VIDEOS [E2: producto real en movimiento — patrón Linear/Loom]
 
-**Decisión: 2 videos, no 3.** El de "8 documentos" NO va (carrusel que nadie
-ve + canibaliza el Teaser 2). Los otros 7 formatos → miniaturas en Teaser 2.
+> ⚠️ **DECISIÓN NUEVA (2026-08-01): UN SOLO VIDEO, NO DOS.** Angel canceló el
+> Video 2. La tabla de abajo se conserva porque documenta el porqué de cada
+> uno, pero **la fila 2 está MUERTA**.
+>
+> **Consecuencia directa sobre F2.b, que hay que resolver antes de empezarla:**
+> la ficha §5.3 describe la card DICOM como escenario con scrub —`currentTime`
+> ligado al scroll, contador n/N recorriendo los cortes— y **eso ya no existe**.
+> La card DICOM se resuelve sin video o se replantea entera. Lo que NO puede
+> pasar es que F2.b implemente §5.3 tal como está escrita: pediría un asset que
+> nadie va a grabar.
+> El `media: true` de `SeccionFeatures.tsx:15,211` sigue reservando esa zona y
+> **se queda hasta que se decida con qué se llena** — no lo retires por leer
+> esto.
+>
+> **Lo que el Video 1 conserva:** sigue siendo el único de la página y su sitio
+> no cambia.
+
+**Decisión previa: 2 videos, no 3.** El de "8 documentos" NO va (carrusel que
+nadie ve + canibaliza el Teaser 2). Los otros 7 formatos → miniaturas en
+Teaser 2.
 
 | # | Contenido | Ubicación | Modo |
 |---|---|---|---|
-| 1 | Entrar → buscar paciente (⌘K) → abrir expediente → nota con IA | Sección Expediente | Bucle autoplay 20–30s |
-| 2 | Visor DICOM recorriendo cortes | Card DICOM | **Scrub por scroll** (currentTime ligado al progreso) |
+| 1 | Lista de pacientes → búsqueda → expediente abierto | Sección Expediente | **Una pasada, 15s** — sin bucle |
+| ~~2~~ | ~~Visor DICOM recorriendo cortes~~ | ~~Card DICOM~~ | **CANCELADO 2026-08-01** |
+
+> ⚠️ **EL VIDEO 1 NO VA EN BUCLE, y esta tabla decía «Bucle autoplay 20–30s».**
+> Cambiado el 2026-08-01 por decisión de Angel. Corre UNA vez al entrar en
+> cuadro y se congela en su último fotograma —el expediente abierto—, que es
+> exactamente la imagen fija que sustituye al mockup eliminado.
+>
+> **El motivo es de accesibilidad, no estético.** Con `loop` había movimiento
+> automático continuo y sin forma de pararlo, porque §6·4 prohíbe `controls`:
+> eso es WCAG 2.2.2 incumplido y obligaba a elegir entre un botón de pausa
+> (reabrir §6·4) o dejarlo roto. Sin bucle no hay nada continuo que parar y las
+> dos reglas conviven. **Residual documentado en LP-DT-33:** el criterio 2.2.2
+> se dispara por DURACIÓN (>5s), no por repetición, así que una pasada de 15s
+> todavía lo roza; aceptado por el PM.
+>
+> **Consecuencia para cualquier vídeo futuro de esta landing:** el bucle deja
+> de ser el modo por defecto. Si alguna tanda quiere uno, tiene que resolver
+> 2.2.2 primero.
+
+⚠️ **EL CONTENIDO DE LA FILA 1 NO ES EL QUE ESTA TABLA PROMETÍA.** Decía
+"Entrar → buscar paciente (⌘K) → abrir expediente → nota con IA". El asset
+grabado son 15s de lista de pacientes → búsqueda por nombre → expediente
+abierto: **sin login, sin ⌘K y sin la nota con IA**. No es un defecto —el
+recorrido se lee igual— pero si alguna tanda futura escribe copy apoyándose en
+"se ve la nota con IA", estará describiendo un video que no existe.
 
 **Grabación ("que no parezca video"):**
 1. Pantalla Retina de la Mac (nunca monitor externo — artefactos de
@@ -970,6 +1061,19 @@ firmas" · "Búsqueda rápida — ⌘K / Ctrl+K, encuentra cualquier paciente al
 instante" · "Guarda los cortes clave del estudio y ábrelos con el visor
 integrado" · "QR verificable en cada receta". [+ Video 1]
 (Un solo nombre para el buscador en TODA la página: "Búsqueda rápida".)
+
+⚠️ **LA COLUMNA DEL MEDIO YA NO ES UN MOCKUP DIBUJADO — ES EL VIDEO 1 REAL**
+(2026-08-01). El mini-mockup de tarjeta de paciente que ocupaba ese sitio se
+eliminó al montarlo y **LP-DT-13 queda cerrada**: la landing no dibuja ninguna
+interfaz en JSX, así que §2·2 se cumple sin excepciones. Con él se fueron sus
+13 nodos de contraste entre 2.51 y 2.63, sus cinco tamaños fuera de escala
+(10/11/12/13/14px) y los tres semánticos de su timeline, que e2 y e4 habían
+excluido por ser UI falsa.
+
+⚠️ **EL ASSET ACTUAL NO PUEDE PUBLICARSE: muestra «Spinus®».** Ver **LP-DT-32**.
+Y el buscador de la app se rotula «Buscar por nombre o apellido», no «Búsqueda
+rápida» — la misma incoherencia que **LP-DT-31** registró desde la captura del
+hero, ahora en un segundo sitio.
 
 **7 · Teaser 2** — ver §5.7. Documento estrella: receta membretada con QR y
 firma. Medicamentos demo: PENDIENTES de Angel (§14).

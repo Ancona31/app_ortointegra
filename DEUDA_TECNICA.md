@@ -1616,7 +1616,16 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
   fuera de la caja de alarma.
 
 ### LP-DT-13 — Mini-mockup falso en SeccionExpediente
-- **Estado:** 🔴 abierta
+- **Estado:** ✅ **CERRADA (2026-08-01)** — eliminada al montar el Video 1.
+  Con el bloque se fueron sus 13 nodos de contraste entre 2.51 y 2.63, sus
+  cinco tamaños fuera de escala (10/11/12/13/14px) y los tres semánticos de su
+  timeline, que e2 y e4 habían excluido explícitamente por ser UI falsa. Ningún
+  import quedó huérfano: los cinco iconos de `lucide-react` los siguen usando
+  el kicker y las viñetas.
+- **Efecto de alcance:** con esta y LP-DT-17 cerradas, **la landing ya no
+  dibuja ninguna interfaz en JSX**. La regla de fidelidad visual de §2·2 se
+  cumple sin excepciones vivas.
+- **Estado original:** 🔴 abierta
 - **Detectada:** F1.2 tanda (a) — eliminaciones (2026-07-30)
 - **Descripción:** `src/components/landing/sections/SeccionExpediente.tsx:40-72`
   dibuja en JSX una tarjeta de paciente inexistente ("Carlos Méndez Ríos,
@@ -2136,6 +2145,79 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
   además a **recapturar** — o sea que va junto con LP-DT-30, no por separado.
 - **Condición de cierre:** un solo nombre en app y landing, y captura
   regenerada con él.
+
+---
+
+### LP-DT-32 — El Video 1 muestra «Spinus®»: bloquea la publicación de la landing
+
+- **Estado:** 🔴 **abierta — BLOQUEA EL MERGE A `main`**
+- **Decisión de Angel (2026-08-01):** se publica así **por ahora**. NO se
+  corrige en esta tanda ni en las siguientes de F2: se corrige **al cerrar
+  LP-DT-15 y regrabar**, en ese orden.
+  ⚠️ **Y hasta entonces esta rama no se mergea a `main` sin autorización
+  EXPLÍCITA de Angel.** No basta con que el resto de la fase esté verde: el ®
+  es infracción sobre una marca en trámite, y el visto bueno tiene que ser suyo
+  y nombrando esta deuda. Si estás preparando el merge y lees esto, para y
+  pregunta.
+- **Detectada:** al montar el Video 1 (2026-08-01), revisando el póster
+- **Descripción:** `public/landing/expediente-demo.mp4` / `.webm` es una captura
+  de PANTALLA con el navegador visible, y el título de pestaña dice
+  **«Spinus®»**. §7·Global del maestro no admite lectura: la marca está **en
+  trámite ante IMPI (exp. 3594483), sin registro concedido**, y usar ® es
+  **infracción**. El vídeo está montado para no dejar la sección coja, pero
+  **esta rama no puede ir a producción así**.
+- **⚠️ Y NO SE ARREGLA REGRABANDO SIN MÁS — DEPENDE DE LP-DT-15.** El ® no lo
+  pinta la landing: lo pinta **la app**. LP-DT-15 («barrido de ® fuera de la
+  landing») sigue abierta, así que *cualquier* grabación nueva de la app puede
+  volver a capturarlo, en la pestaña o en la propia interfaz. **El orden
+  correcto es: cerrar LP-DT-15 → regrabar → montar.** Nadie había conectado las
+  dos deudas; grabar antes del barrido es repetir el trabajo.
+- **El cromo del sistema en el asset se separó a LP-DT-34**, que Angel aceptó
+  de forma independiente.
+- **Segundo defecto, menor:** las cinco filas de pacientes ponen «1 ago 2026»,
+  así que envejece igual que LP-DT-30. Al regrabar, sembrar fechas variadas.
+- **Condición de cierre:** asset regenerado sin ®, sin cromo de navegador y sin
+  fechas que envejezcan, con el marco HTML activado.
+
+### LP-DT-33 — El Video 1 no se puede pausar: WCAG 2.2.2
+
+- **Estado:** 🟢 **CERRADA con residual aceptado (2026-08-01)** — se retiró el
+  `loop`. El vídeo corre una vez y se congela en el último fotograma, así que
+  **no queda movimiento automático continuo que parar**: desaparece el conflicto
+  entre 2.2.2 y la prohibición de `controls` de §6·4, sin botón de pausa y sin
+  reabrir esa regla. También deja de ser el único bucle infinito de la página,
+  que rozaba §12.
+- ⚠️ **RESIDUAL, y se deja escrito en vez de declarar cumplimiento pleno:** el
+  criterio 2.2.2 se dispara por **duración** —«lasts more than five seconds»—
+  y no por repetición, así que una pasada única de 15s todavía cae dentro de su
+  literalidad. La lectura del PM es que sin bucle no hay nada que parar, y se
+  acepta; pero si en F6 el barrido de accesibilidad quiere cumplimiento
+  literal, las dos salidas limpias siguen siendo:
+  1. **Pausar bajo `prefers-reduced-motion`** con un `ref` + efecto que llame a
+     `pause()`. No ramifica el render (§4.3·7): el árbol es idéntico y solo
+     cambia un efecto secundario.
+  2. **Recortar el asset a ≤5s**, que lo saca del alcance del criterio. Cambia
+     el contenido: el recorrido actual no cabe en 5 segundos.
+  La opción de un botón de pausa queda descartada: choca con §6·4 y ya no hace
+  falta.
+
+### LP-DT-34 — El Video 1 lleva cromo del sistema grabado (aceptado)
+
+- **Estado:** 🟠 abierta — **aceptada conscientemente por Angel (2026-08-01)**
+- **Descripción:** el asset es una captura de PANTALLA, no de ventana: se ven
+  el semáforo de macOS, la pestaña del navegador, los iconos de extensiones y
+  el fondo de escritorio alrededor. §6·1 pide capturar la ventana y §6·4 pone
+  el marco de ventana en HTML alrededor, de modo que el vídeo se lea como «la
+  interfaz corriendo» y no como un vídeo incrustado.
+- **Consecuencia en el código, para que nadie la deshaga por error:** el vídeo
+  se monta **SIN** el marco HTML del hero. Superponerlo daría **dos semáforos
+  anidados**, que es exactamente el efecto que §6·4 quiere evitar. El bloque de
+  marco está escrito y comentado dentro de `SeccionExpediente.tsx`, listo para
+  activarse — **no lo borres**: es la mitad del trabajo de la próxima grabación.
+- **Condición de cierre:** al regrabar (junto con LP-DT-32, que obliga a
+  hacerlo de todas formas), capturar **solo la ventana**, sin escritorio ni
+  cromo de navegador, y activar el marco HTML comentado. Las dos cosas van en
+  el mismo movimiento: asset limpio + marco descomentado.
 
 ---
 
