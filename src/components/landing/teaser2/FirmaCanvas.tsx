@@ -384,7 +384,23 @@ export default function ModalFirma({ tinta, onCerrar, onAceptar }: ModalFirmaPro
     trazo.push(normalizar(p))
   }
 
-  function terminar(): void {
+  /**
+   * Cierra el trazo. Lo llaman `pointerup` Y `pointercancel`, y los dos hacen lo
+   * mismo A PROPÓSITO: si el gesto se cancela a media firma, lo trazado hasta
+   * ahí es tinta que el visitante ya vio en pantalla: descartarlo sería borrarle
+   * algo delante de los ojos. Sin tratar `pointercancel` el trazo quedaría
+   * abierto y el siguiente contacto dibujaría una recta desde donde se cortó.
+   *
+   * La captura se suelta explícitamente. El navegador la libera solo al terminar
+   * el puntero, así que esto es higiene, no necesidad — pero deja el estado del
+   * elemento sin depender de esa implicitud. `hasPointerCapture` antes de soltar
+   * porque `releasePointerCapture` con un `pointerId` que ya no está capturado
+   * lanza `NotFoundError`, y eso sí rompería el gesto siguiente.
+   */
+  function terminar(e: React.PointerEvent<HTMLCanvasElement>): void {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    }
     if (actual.current) trazos.current.push(actual.current)
     actual.current = null
   }
@@ -459,10 +475,30 @@ export default function ModalFirma({ tinta, onCerrar, onAceptar }: ModalFirmaPro
               150px para que en un teléfono siga siendo dibujable. */}
           <canvas
             ref={montarLienzo}
-            /* `touch-none` (touch-action: none) es OBLIGATORIO y no es
-               cosmético: sin él, arrastrar el dedo sobre el canvas hace scroll
-               y firmar en móvil es imposible. */
-            className="relative block aspect-[5/2] max-h-[300px] min-h-[150px] w-full touch-none cursor-crosshair"
+            /* ⚠️⚠️ `touchAction` VA EN LÍNEA Y NO COMO CLASE `touch-none`. NO LO
+               "LIMPIES" MOVIÉNDOLO A UNA UTILIDAD DE TAILWIND: ya estuvo así y
+               era un bug de producción — en móvil el trazo se cortaba a medio
+               gesto y en escritorio no pasaba nada.
+
+               Causa: `globals.css:248` declara `* { touch-action: manipulation }`
+               FUERA de toda capa, y `@import "tailwindcss"` mete TODAS las
+               utilidades dentro de `@layer utilities`. En la cascada, lo no
+               capado gana a lo capado sin importar la especificidad, así que
+               `.touch-none` (0,1,0) perdía contra `*` (0,0,0). Medido en el
+               navegador: con la clase puesta, el `touch-action` computado del
+               canvas era `manipulation`. Un estilo en línea sí gana a una regla
+               de autor sin `!important`, y por eso vive aquí.
+
+               Y por qué rompía justo así: `manipulation` solo desactiva el
+               doble-tap-zoom, SIGUE PERMITIENDO EL PANEO. El navegador dejaba
+               pasar el `pointerdown` y los primeros `pointermove`, decidía que
+               el arrastre era un scroll, se quedaba con el puntero y emitía
+               `pointercancel`. `setPointerCapture` no protege de esto: la
+               captura evita que el evento cambie de destino, no que el gesto
+               nativo reclame el puntero. Y no se veía en escritorio porque
+               `touch-action` no gobierna el ratón. */
+            style={{ touchAction: 'none' }}
+            className="relative block aspect-[5/2] max-h-[300px] min-h-[150px] w-full cursor-crosshair"
             onPointerDown={empezar}
             onPointerMove={seguir}
             onPointerUp={terminar}
