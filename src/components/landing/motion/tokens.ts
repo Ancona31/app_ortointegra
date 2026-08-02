@@ -236,6 +236,142 @@ export const NAV = {
 } as const
 
 /**
+ * Escenario del hero (§5.1, tanda F2.b). Solo lo consume `SeccionHero.tsx`.
+ *
+ * ⚠️ LA FICHA §5.1 REPARTÍA ESTO EN TRES FASES Y LA SEGUNDA NO ERA
+ * IMPLEMENTABLE TAL COMO ESTABA ESCRITA. Pedía la ENTRADA de la captura
+ * ligada al scroll con `OFF_ENTRADA` sobre la propia captura, y la captura
+ * del hero está SIEMPRE por encima del pliegue: su borde superior arranca en
+ * el 26–48% del viewport según el ancho (medido con la geometría documentada
+ * en `SeccionHero.tsx`: marco de 464px a 1024 y de ~720 a 1920), o sea SIEMPRE
+ * por delante del `start 0.35` que cierra el tramo. El progreso vale 1 desde el
+ * primer cuadro y no hay forma de bajarlo, porque exigiría scroll negativo.
+ * La entrada, escrita así, no la vería nadie nunca — y de paso costaría el LCP
+ * (ver `capturaY`). Por eso la ENTRADA de la captura es de CARGA, como el resto
+ * de §5.1·A, y lo único ligado al scroll es la DERIVA. §5.1 ya está corregida.
+ */
+export const HERO = {
+  /**
+   * Distancias de entrada, en forma de VARIABLE CSS y no de número — y esa es
+   * la decisión de fondo de la tanda.
+   *
+   * §5.1 pide las mismas distancias al 60% en móvil. Elegir el `initial` en JS
+   * obliga a leer el ancho del viewport, que es un valor solo-cliente: es el
+   * hydration mismatch de §4.3·7 con otro disfraz (el servidor emitiría 30px y
+   * el cliente 18). Resolverlo en CSS es exactamente lo que esa regla manda, y
+   * aquí además sale gratis: las cuatro variables viven en `globals.css` con su
+   * override bajo `@media (width < 40rem)`, el SSR emite
+   * `translateY(var(--lp-hero-y-h1))` —CSS válido, sin JS de por medio— y
+   * `motion` resuelve la variable al arrancar la animación, vía
+   * `getComputedStyle` (`motion-dom/.../DOMKeyframesResolver.mjs:20-32` +
+   * `css-variables-conversion.mjs:29-40`). El keyframe de origen queda en
+   * "30px" y el de destino en 0: mismo tipo dimensional, interpolación normal.
+   *
+   * Espejo de los valores declarados en CSS (escritorio / móvil):
+   *   kicker 14/8 · h1 30/18 · texto 20/12 · ctas 16/10
+   * Los de móvil son los de escritorio ×0.6 redondeados al entero; §5.1 fija
+   * expresamente los dos del centro (18 y 12).
+   */
+  y: {
+    kicker: 'var(--lp-hero-y-kicker)',
+    h1: 'var(--lp-hero-y-h1)',
+    texto: 'var(--lp-hero-y-texto)',
+    ctas: 'var(--lp-hero-y-ctas)',
+  },
+  /**
+   * Retrasos de la entrada de carga, en SEGUNDOS. Son los de §5.1 tal cual.
+   *
+   * ⚠️ NO son un `Stagger`: los cinco intervalos son distintos (90·90·120·90)
+   * porque el tercer beat abre paso al bloque de texto largo. `STAGGER.deck`
+   * vale 90ms por coincidencia y no por parentesco — si mueves uno, el otro NO
+   * se mueve con él.
+   */
+  retraso: {
+    kicker: 0,
+    h1a: 0.09,
+    h1b: 0.18,
+    /** Autoría y bajada entran JUNTAS: §5.1 las trata como una sola capa. */
+    texto: 0.3,
+    ctas: 0.39,
+    /**
+     * 0.48 — la captura cierra la secuencia. No sale de §5.1, que la tenía en
+     * scroll (ver el aviso de arriba): es el sexto peldaño de la escalera de
+     * 90ms. Cierra en 0.48 + `DUR.cine` = 1.38s desde la hidratación, que es
+     * largo a propósito — es el remate del escenario, no tejido.
+     */
+    captura: 0.48,
+  },
+  /**
+   * 8px de desenfoque inicial de las DOS líneas del H1. §5.1 lo presupuesta
+   * ahí y §4.3·6 lo acota: es el filtro más caro y solo existe en carga. Nunca
+   * en scroll, nunca en otra capa de esta sección.
+   */
+  blur: 8,
+  /**
+   * 120px de recorrido de entrada de la captura, y .88 de escala.
+   *
+   * ⚠️ LA CAPTURA NO ANIMA `opacity`, Y NO ES UN OLVIDO — ES EL LCP.
+   * Es el elemento LCP de la página (por eso lleva `priority`). Chrome
+   * DESCARTA como candidato a LCP todo elemento con opacidad 0, así que un
+   * fundido de entrada mueve la marca desde "la imagen pintó" hasta
+   * "hidrató + terminó la animación", que en red lenta son segundos contra el
+   * presupuesto de §4.3·9 (LCP < 2.5s). `y` y `scale` no tienen ese efecto: el
+   * elemento se pinta —desplazado y un 12% menor— y la marca se registra ahí.
+   * El HTML del servidor ya sale con ese transform, así que tampoco hay salto
+   * de layout: `transform` no reflowa y no computa CLS.
+   */
+  capturaY: 120,
+  capturaEscala: 0.88,
+  /** 1.03 — deriva de la captura DENTRO de su marco (ver `SeccionHero.tsx`). */
+  deriva: 1.03,
+  /** .96→1 de los CTAs, con `SPRING.soft`. §5.1. */
+  ctasEscala: 0.96,
+  /** Salida del bloque de texto: −70px y hasta .25 de opacidad. §5.1·C. */
+  salidaY: -70,
+  salidaOpacidad: 0.25,
+  /**
+   * Fracciones de progreso de `OFFSETS.salida` sobre la `<section>`. Los dos
+   * tramos de scroll de §5.1 caen aquí porque hay un único `useScroll` en el
+   * escenario (§4.3·4).
+   *
+   * ⚠️⚠️ ESTOS DOS NÚMEROS ERAN 0.45 Y 0.70 SOBRE `OFFSETS.travesia`, Y ESO
+   * SERVÍA LA PÁGINA CON EL TEXTO YA DESVANECIDO. Regresión de color reportada
+   * y corregida el 2026-08-01, el mismo día que se aplicó F2.b.
+   *
+   * La travesía mide el recorrido del hero por el viewport ENTERO, incluida la
+   * parte que el hero nunca hace: por estar pegado al techo del documento (bajo
+   * un nav `sticky` de 56px) ya sale del primer cuadro con
+   * `(vh − 56) / (vh + altoHero)` de recorrido hecho. Con el alto real del hero
+   * (~750px a lg) eso vale **0.51 a 1440×900, 0.56 a 1920×1080 y 0.63 a
+   * 2560×1440** — SIEMPRE por encima del 0.45 en el que arrancaba la salida.
+   * Resultado: la columna de texto se servía con `opacity` entre .92 y .75 y
+   * con y ≈ −8 a −25px. Ningún elemento perdió su color; lo que se veía era el
+   * H1 y el botón primario **lavados por la opacidad del ancestro**, y por eso
+   * el mismo degradado se veía más claro aquí que en el nav.
+   *
+   * ⚠️ NINGUNA CONSTANTE SOBRE `travesia` ARREGLA ESTO — no subas el 0.45 y ya.
+   * La fracción ya recorrida en reposo CRECE con la altura del viewport y
+   * tiende a 1: cualquier umbral fijo se rompe en la pantalla siguiente. Lo que
+   * hay que anclar es el CERO, y de eso se ocupa `OFFSETS.salida`.
+   *
+   * Con la travesía sustituida por `OFFSETS.salida`, la conversión de los dos
+   * tramos de la ficha es:
+   *   · salida  0.45 → **0** — el 0.45 ya quedaba por DEBAJO de la posición de
+   *     reposo en todas las pantallas medidas, o sea que la ficha ya pedía
+   *     "desde el principio de lo alcanzable". Ahora eso es literal y exacto.
+   *   · deriva  0.70 → **0.30** — es el mismo punto de la página: el 0.70 de la
+   *     travesía caía en scrollY ≈ 313 a 1440×900, y 0.30 de este tramo cae en
+   *     282. La diferencia es que ahora NO se mueve con el tamaño de la
+   *     pantalla (con la travesía el mismo 0.70 valía 313, 253 y 149px según el
+   *     monitor).
+   */
+  tramo: {
+    salidaInicio: 0,
+    derivaInicio: 0.3,
+  },
+} as const
+
+/**
  * Tramos de scroll para `useScroll({ offset })`. Espejo de §4.2.
  * Sintaxis de motion: "<borde del target> <borde del contenedor>".
  */
@@ -246,4 +382,27 @@ export const OFFSETS = {
   travesia: ['start end', 'end start'],
   /** Anclado (escenarios sticky). §4.2 OFF_ANCLADO. */
   anclado: ['start start', 'end end'],
+  /**
+   * Salida: del techo del viewport hasta desaparecer por arriba. 0 cuando el
+   * borde superior del elemento toca el borde superior del contenedor, 1 cuando
+   * lo toca su borde inferior.
+   *
+   * ⚠️ ES UN CUARTO TRAMO Y §4.2 SOLO DECLARA TRES. Se añade en la corrección
+   * de F2.b (2026-08-01) porque `travesia` NO SIRVE PARA UN ELEMENTO QUE
+   * ARRANCA PEGADO AL TECHO DEL DOCUMENTO: su progreso en reposo no es 0, es
+   * `(vh − 56) / (vh + alto)` —0.51 a 1440×900, 0.63 a 2560×1440— y CRECE con
+   * la altura del viewport, así que ningún umbral constante sobre ella está a
+   * salvo. Ver el detalle en `HERO.tramo`, que es donde se pagó el error.
+   *
+   * Este tramo ancla el 0 a la posición de reposo por construcción: lo que
+   * queda por debajo lo clampa el propio `useScroll`
+   * (`framer-motion/.../scroll/offsets/index.mjs:57`, `clamp(0, 1, …)`), así que
+   * el HTML del servidor y el primer cuadro coinciden en el estado inicial
+   * exacto. Su longitud es EXACTAMENTE el scroll alcanzable del elemento.
+   *
+   * Úsalo para cualquier capa que deba estar quieta al cargar y moverse al
+   * scrollear. `travesia` sigue siendo lo correcto para lo que entra desde
+   * abajo (los 7 `Parallax`): ahí el 0 sí es alcanzable.
+   */
+  salida: ['start start', 'end start'],
 } as const

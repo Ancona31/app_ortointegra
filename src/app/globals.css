@@ -125,6 +125,23 @@
   --lp-dur-cine:    900ms;                        /* escenario cinematográfico */
   --lp-ease-cine:   cubic-bezier(.65, 0, .35, 1); /* solo los 4 escenarios Apple */
 
+  /* Distancias de la entrada de carga del hero (§5.1·A, tanda F2.b).
+     Espejo de `HERO.y` en components/landing/motion/tokens.ts.
+
+     ⚠️ ESTAS CUATRO SON VARIABLES CSS Y NO NÚMEROS EN EL COMPONENTE POR UN
+     MOTIVO CONCRETO: §5.1 pide las mismas distancias al 60% en móvil, y
+     elegirlas en JS obliga a leer el ancho del viewport —valor solo-cliente—
+     para decidir el estado inicial. Eso es el hydration mismatch de §4.3·7 con
+     otro disfraz. Aquí el override vive en un `@media` (al final del archivo,
+     junto al de la salida del texto) y el HTML del servidor ya sale correcto.
+     `motion` resuelve la variable al arrancar la animación. Ver la nota larga
+     en `HERO.y` antes de mover ningún valor: NO son la escala de §3.3, son
+     recorridos de movimiento, como `DIST.reveal`. */
+  --lp-hero-y-kicker: 14px;
+  --lp-hero-y-h1:     30px;
+  --lp-hero-y-texto:  20px;
+  --lp-hero-y-ctas:   16px;
+
   /* ── Escala de color de la landing ─────────────────────────────────
      Prefijo --lp-. NO usar los tokens --sp-* del producto: se redefinen
      bajo html.dark y ThemeProvider deja esa clase colgada al salir de
@@ -934,7 +951,50 @@ html.dark .agenda-fc .fc-daygrid .fc-col-header-cell {
    */
   [data-lp-reveal] {
     opacity: 1 !important;
+    /*
+     * `filter` entra en la lista en F2.b: las dos líneas del H1 del hero
+     * arrancan en `blur(8px)` (§5.1·A) y el HTML del servidor ya sale con ese
+     * filtro inline. Sin esta línea, quien pide reducir movimiento vería el
+     * titular desenfocado hasta que hidrate — el mismo defecto de "estado
+     * inicial pegado" que dejó una sección invisible en 60ff25c, con otra
+     * propiedad. Es la ÚNICA capa de la landing con `filter` (el del nav es
+     * `backdrop-filter`, que esto no toca); si algún día una card lleva un
+     * desenfoque DECORATIVO y estático, esta línea se lo comería y habrá que
+     * estrechar el selector.
+     */
+    filter: none !important;
     transform: none !important;
     transition: none !important;
+  }
+}
+
+/* ── Salida del bloque de texto del hero: NO EXISTE EN MÓVIL ──────────
+   §5.1 elimina la fase C por debajo de `sm`: en viewport corto el bloque se
+   va hacia arriba mientras todavía se está leyendo, y pelea con la lectura en
+   vez de acompañarla. La captura no entra en esta regla porque a ese ancho ni
+   siquiera se monta (`hidden lg:block`).
+
+   ⚠️ SE RESUELVE AQUÍ Y NO EN EL COMPONENTE, por lo mismo que las
+   `--lp-hero-y-*`: ramificar el render con el ancho del viewport es el
+   hydration mismatch de §4.3·7. El componente monta SIEMPRE la capa y sus
+   suscripciones al scroll; lo que este bloque descarta son sus escrituras.
+   Es trabajo desperdiciado por debajo de 640px, no un fallo visible — el
+   mismo trato que `Parallax` le da a reduced-motion.
+
+   `width < 40rem` es la sintaxis que el propio Tailwind 4 genera para
+   `max-sm:`, no una de otra escala. "Móvil" en las fichas de §5 significa el
+   estado previo a `sm` — ver §5.2, que lo dice con esas palabras. */
+@media (width < 40rem) {
+  :root {
+    /* Las mismas distancias de §5.1·A al 60%, redondeadas al entero. */
+    --lp-hero-y-kicker: 8px;
+    --lp-hero-y-h1:     18px;
+    --lp-hero-y-texto:  12px;
+    --lp-hero-y-ctas:   10px;
+  }
+
+  [data-lp-hero-salida] {
+    opacity: 1 !important;
+    transform: none !important;
   }
 }

@@ -293,7 +293,20 @@ DISTANCIAS  reveal y:24 · parallax y:±24 · stagger 70ms · listas secuenciale
 OFFSETS     OFF_ENTRADA ["start 0.9","start 0.35"]
             OFF_TRAVESIA ["start end","end start"]
             OFF_ANCLADO ["start start","end end"]
+            OFF_SALIDA ["start start","end start"]   ← añadido en F2.b
 ```
+
+> ⚠️ **OFF_SALIDA ES UN CUARTO TRAMO, añadido el 2026-08-01 al corregir una
+> regresión de F2.b.** Va del techo del viewport hasta que el elemento
+> desaparece por arriba. Existe porque **`OFF_TRAVESIA` no sirve para un
+> elemento que arranca ya en pantalla**: su progreso en reposo no es 0 sino
+> `(vh − alto sobre él)/(vh + alto propio)` —0.51 a 1440×900 y 0.63 a 2560×1440
+> en el caso del hero—, y esa fracción CRECE con la altura del viewport, así que
+> ningún umbral constante sobre ella está a salvo. Ese fue el defecto: el hero
+> se servía con su texto ya desvanecido. `OFF_SALIDA` ancla el 0 a la posición
+> de reposo por construcción y su longitud es exactamente el scroll alcanzable.
+> **Criterio:** ¿la capa entra desde abajo? `OFF_TRAVESIA`. ¿Está en pantalla al
+> cargar y solo se va? `OFF_SALIDA`. Detalle en la nota 4 de §5.1.
 `tokens.ts` es espejo manual del CSS (motion exige números): cada constante
 comenta su token de origen; el bloque --lp-* de globals.css referencia el
 espejo. Divergencia = bug (deuda §15).
@@ -505,6 +518,77 @@ RM = con prefers-reduced-motion: estado final vía `[data-lp-reveal]`.
 texto ELIMINADA. **Presupuesto:** máx 2 capas simultáneas en scroll; blur
 solo en carga.
 
+> ⚠️ **IMPLEMENTADO en `SeccionHero.tsx` (F2.b). La tabla de arriba describe la
+> intención; estas cuatro correcciones describen lo que corre.**
+>
+> **1 · LA ENTRADA DE LA CAPTURA NO PODÍA IR LIGADA AL SCROLL, y la fila 6 lo
+> pedía.** `OFF_ENTRADA` cierra en `start 0.35` y la captura del hero está
+> siempre por encima del pliegue: su borde superior arranca entre el **26% y el
+> 48% del viewport** según el ancho (medido con la geometría documentada en el
+> propio archivo — marco de 464px a 1024, ~720 a 1920, nav `sticky` de 56
+> encima). El progreso vale **1 en el primer cuadro** y solo bajaría con scroll
+> negativo, que no existe: **esa entrada no la vería nadie nunca**. Pasa a la
+> fase de carga como sexto beat (+480ms, `--lp-dur-cine`), que es el único
+> momento en que puede verse. **Lo ligado al scroll es solo la deriva**, y
+> cuelga de la travesía de la sección, no de `OFF_ENTRADA`.
+>
+> **2 · LA CAPTURA NO ANIMA `opacity`, Y ES POR EL LCP.** Es el elemento LCP de
+> la página. Chrome descarta como candidato a LCP todo elemento con opacidad 0,
+> así que un fundido mueve la marca desde "la imagen pintó" —que con el preload
+> de `priority` ocurre antes de que baje el bundle— hasta "hidrató y terminó la
+> animación": segundos en red lenta, contra el presupuesto de §4.3·9. `y` y
+> `scale` no tienen ese efecto (el elemento se pinta, solo que desplazado) ni
+> computan CLS. **Regla que queda para las tres fases que faltan: ninguna capa
+> que contenga al LCP arranca en opacidad 0.**
+>
+> **3 · LA DERIVA VA SOBRE LA CAPTURA, DENTRO DEL MARCO.** Aplicada al marco,
+> un 1.03 empuja su borde derecho ~11px fuera del viewport —esa columna sangra
+> por el borde (§3.4·1)— y un `transform` SÍ genera área desbordable, al
+> contrario que la `box-shadow`. Sería scroll horizontal. Dentro, el
+> `overflow-hidden` del marco recorta y se lee como la captura acercándose.
+> Corolario general: **en el hero solo se puede escalar hacia abajo**; hacia
+> arriba, nunca sobre el marco.
+>
+> **4 · UN SOLO `useScroll` (§4.3·4), y NO puede ser el de `OFF_TRAVESIA`.**
+> Las dos capas continuas derivan de él: salida del texto 0→1 y deriva 0.30→1
+> sobre **`OFF_SALIDA`** — dos capas como mucho, que es el presupuesto.
+>
+> ⚠️⚠️ **ESTE PUNTO DECÍA "el de la travesía… salida 0.45→1, deriva 0.70→1" Y
+> ERA UNA REGRESIÓN DE COLOR EN PRODUCCIÓN.** Reportada y corregida el
+> 2026-08-01, horas después de aplicar F2.b. `OFF_TRAVESIA` mide el recorrido
+> por el viewport ENTERO, incluida la parte que un elemento pegado al techo del
+> documento nunca hace: bajo el nav `sticky` de 56px, el hero sale del primer
+> cuadro con `(vh − 56)/(vh + altoHero)` ya recorrido — **0.51 a 1440×900, 0.56
+> a 1920×1080, 0.63 a 2560×1440** —, siempre por delante del 0.45. La página se
+> servía con la columna de texto a `opacity` .92–.75 y y ≈ −8/−25px: el H1
+> lavado hacia azul claro y el botón primario visiblemente más claro que el
+> MISMO botón del nav. **Ninguna clase de color había cambiado** — el CSS
+> compilado daba `color: var(--lp-ink-900)` y `color: var(--lp-accent)` en las
+> dos líneas, y un único utilitario compartido para el degradado de los dos
+> botones. Era la opacidad del ancestro.
+>
+> **Y no se arregla subiendo el umbral:** la fracción ya recorrida en reposo
+> CRECE con la altura del viewport y tiende a 1, así que cualquier constante
+> sobre `OFF_TRAVESIA` se rompe en la pantalla siguiente. Lo que hay que anclar
+> es el CERO. De ahí el cuarto tramo de §4.2.
+>
+> **Lección transferible a los tres escenarios que faltan:** `OFF_TRAVESIA`
+> vale para lo que ENTRA desde abajo (los 7 `Parallax`); para lo que arranca ya
+> en pantalla, su progreso en reposo no es 0 y hay que usar `OFF_SALIDA` o un
+> tramo anclado.
+>
+> **Móvil y RM se resuelven en CSS, sin ramificar el render** (§4.3·7): las
+> distancias ×0.6 son cuatro `--lp-hero-y-*` con override en
+> `@media (width < 40rem)` —el componente pasa la VARIABLE, no el número, y
+> `motion` la resuelve al arrancar—, y la eliminación de la salida en móvil es
+> `[data-lp-hero-salida]` en ese mismo bloque. `[data-lp-reveal]` neutraliza
+> además `filter` desde esta tanda, por el blur del H1.
+>
+> **Las dos líneas del H1 son `block`, ya no las separa un `<br />`.** Es
+> obligado, no cosmético: `transform` y `filter` no aplican a caja inline (la
+> misma trampa que §5.2 documenta para el remate). Maqueta idéntica. Lo que NO
+> se puede usar es `inline-block`, que sí volvería indivisible cada mitad.
+
 ### 5.2 Franja del problema — tejido
 La frase es una bisagra y su estructura retórica es enunciado → **giro**.
 La coreografía es esa estructura: el bloque entra entero y el remate llega
@@ -547,18 +631,42 @@ el segundo el remate se quedaría en .25 para siempre.
 > en el giro, no en el enunciado; el gris caía antes sobre el remate y lo
 > apagaba justo donde debía pegar.
 
-### 5.3 Grid bento — tejido + ESCENARIO DICOM
+### 5.3 Grid bento — tejido (el ESCENARIO DICOM está CANCELADO)
+
+> ⚠️⚠️ **EL ESCENARIO DE LA CARD DICOM NO SE IMPLEMENTA. Decisión de Angel,
+> 2026-08-01, tomada al abrir F2.b.** La tabla de abajo se conserva como
+> registro de lo que se diseñó, pero **NO es una instrucción viva**: describe un
+> scrub de `currentTime` sobre un video que ya no se va a grabar (§6 canceló el
+> Video 2 el mismo día). Ninguna tanda debe implementarla mientras no exista el
+> asset.
+>
+> **Estado vigente de la card DICOM:** ESTÁTICA. Se queda con el tejido que ya
+> tiene del bento —`Stagger` diagonal (§4.4·`STAGGER.deck`) y `useTilt`, ambos
+> de F2.a·a3— y con nada más. No es una entrega a medias: es el estado en el que
+> se queda hasta que existan LAS DOS cosas que le faltan, un asset grabado y el
+> rediseño del visor.
+>
+> **El `media: true` de `SeccionFeatures.tsx:15,211` SE QUEDA.** Reserva la
+> zona a media sangre de la card y no lo retires por leer esto — §6 ya lo dice
+> con las mismas palabras. Lo que reserva sigue sin decidirse.
+>
+> **Alcance real de F2.b, por tanto: solo §5.1.** De los cuatro escenarios
+> Apple de §4.1, este deja de ser uno hasta nuevo aviso; quedan Hero (hecho),
+> Teaser 1 (F4) y Teaser 2 (F3).
+
 - Grid: `Stagger` diagonal desde DICOM (delays 0/.09/.18/.27/.36s) + `Tilt`.
-- **Card DICOM (escenario):** OFF_ENTRADA sobre la card.
+- **Card DICOM (escenario):** OFF_ENTRADA sobre la card. — ⛔ CANCELADO, ver aviso.
+
 | Capa | Prop | Origen→destino | Tramo |
 |---|---|---|---|
-| Card | scale,opacity | .96→1, 0→1 | 0–0.25 |
-| Video DICOM | `currentTime` | 0→duración | 0.20–0.85 |
-| Contador n/N | número | 1→N | 0.20–0.85 |
-| Etiqueta | opacity,y | 0→1, 10→0 | 0.10–0.35 |
-El scroll RECORRE los cortes (scrub de video, ver §6). >0.85 queda en el
-último corte; retroceder retrocede la serie. **Móvil:** arrastre horizontal
-del dedo sobre la card controla el currentTime.
+| ~~Card~~ | ~~scale,opacity~~ | ~~.96→1, 0→1~~ | ~~0–0.25~~ |
+| ~~Video DICOM~~ | ~~`currentTime`~~ | ~~0→duración~~ | ~~0.20–0.85~~ |
+| ~~Contador n/N~~ | ~~número~~ | ~~1→N~~ | ~~0.20–0.85~~ |
+| ~~Etiqueta~~ | ~~opacity,y~~ | ~~0→1, 10→0~~ | ~~0.10–0.35~~ |
+
+~~El scroll RECORRE los cortes (scrub de video, ver §6). >0.85 queda en el
+último corte; retroceder retrocede la serie.~~ **~~Móvil:~~** ~~arrastre
+horizontal del dedo sobre la card controla el currentTime.~~
 
 ### 5.4 Bloque IA — tejido
 `Reveal` del bloque navy; chips en `Stagger` 70ms. Los chips son el
@@ -1317,7 +1425,7 @@ infracción. "Spinus" a secas hasta el título.
 | F1.3 | Sistema visual | | Inter (crear route group landing) + escala tipo/espaciado + tokens Spinus (fuera slate/violet) + superficies planas |
 | F1.4 | Server component | | page.tsx a RSC; secciones sin motion primero. Alcance reducido: el valor está en page.tsx, no en las 13 |
 | F2.a | Movimiento tejido | | Tokens §4.2, patrones §4.4 en todas las secciones. Stagger SIN wrappers |
-| F2.b | Escenario Hero + card DICOM | | Fichas §5.1 y §5.3 |
+| F2.b | Escenario Hero ~~+ card DICOM~~ | | Ficha §5.1. **§5.3 fuera: el escenario DICOM está cancelado** (sin asset — ver el aviso de §5.3) |
 | F3 | Teaser 2 | | QR estático + /demo/receta PRIMERO; luego ensamblaje→firma→color→candado |
 | F4 | Teaser 1 | | Requiere formato de nota congelado + textos clínicos de Angel |
 | F5 | Precio/beta + footer + JSON-LD | | §7.12–13 + sameAs |

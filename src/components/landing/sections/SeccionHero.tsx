@@ -1,8 +1,11 @@
 'use client'
 
+import { useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowRight } from 'lucide-react'
+import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react'
+import { DUR, EASE, HERO, OFFSETS, SPRING } from '@/components/landing/motion/tokens'
 
 /* Hero
    Lavado de --cs al 4% (§3.1, banda 3–5%) — sustituye al NeuralBackground.
@@ -26,9 +29,72 @@ import { ArrowRight } from 'lucide-react'
    quedaría sin fondo y ningún fallback lo cubriría. El cierre (SeccionCTA.tsx)
    usa exactamente esta misma variable — son las dos únicas superficies lavadas
    de la landing y tienen que moverse juntas. */
+/* ═══ §5.1 · EL HERO ES UN ESCENARIO (F2.b) ═══
+   Registro Apple (§4.1): duraciones largas, `--lp-ease-cine`, un foco. El
+   resto de la landing es tejido y NO se parece a esto.
+
+   ⚠️⚠️ LA FICHA REPARTÍA EL ESCENARIO EN TRES FASES Y LA SEGUNDA NO ERA
+   IMPLEMENTABLE. Pedía la ENTRADA de la captura ligada al scroll con
+   `OFF_ENTRADA` sobre la propia captura. Medido con la geometría que este
+   archivo ya documenta —marco de 464px a 1024 de viewport, ~720 a 1920, nav
+   `sticky` de 56 por encima—, el borde superior de la captura arranca entre el
+   26% y el 48% del viewport según el ancho. `OFF_ENTRADA` termina en
+   `start 0.35`: el progreso vale 1 (o casi) EN EL PRIMER CUADRO y solo bajaría
+   con scroll negativo, que no existe. **Esa entrada no la vería nadie nunca.**
+   Por eso la entrada de la captura es de CARGA, como el resto de §5.1·A, y lo
+   único ligado al scroll es la deriva. §5.1 del maestro ya está corregida.
+
+   ⚠️ UN SOLO `useScroll` (§4.3·4) — `OFFSETS.salida` sobre la `<section>`. Las
+   dos capas continuas (salida del texto y deriva de la captura) derivan de él
+   con `useTransform`, y sus tramos NO se solapan con nada más: 0→1 y 0.30→1 son
+   DOS capas simultáneas como mucho, que es el presupuesto que fija §5.1.
+   El progreso NUNCA pasa por estado de React (§4.3·2).
+
+   ⚠️ REDUCED MOTION NO RAMIFICA EL RENDER (§4.3·7), ni siquiera el rango de
+   los `useTransform` — es la lección de a4. El árbol es idéntico siempre; la
+   preferencia se resuelve en dos capas, igual que en `Reveal.tsx`: aquí
+   poniendo la transición a 0, y en `globals.css` con `[data-lp-reveal]`, que
+   desde esta tanda también neutraliza `filter` (por el blur del H1). */
 export default function SeccionHero() {
+  const seccionRef = useRef<HTMLElement>(null)
+  const reducedMotion = useReducedMotion()
+
+  /* ⚠️⚠️ `salida` Y NO `travesia`, Y ESTO YA COSTÓ UNA REGRESIÓN (2026-08-01,
+     el mismo día de F2.b). La travesía mide el recorrido del hero por el
+     viewport entero, incluida la parte que este hero NUNCA hace: por estar
+     pegado al techo del documento bajo un nav `sticky` de 56px, sale del primer
+     cuadro con `(vh − 56) / (vh + altoHero)` ya recorrido — 0.51 a 1440×900,
+     0.63 a 2560×1440 —, o sea por delante del tramo en el que arrancaba la
+     salida. La página se servía con la columna de texto a `opacity` .92–.75:
+     el H1 lavado hacia azul claro y el botón primario más claro que el mismo
+     botón del nav, sin que ninguna clase de color hubiera cambiado.
+     `OFFSETS.salida` ancla el 0 a la posición de reposo por construcción, y lo
+     que cae por debajo lo clampa el propio `useScroll`. Subir el umbral NO era
+     alternativa: la fracción ya recorrida crece con la altura del viewport. */
+  const { scrollYProgress } = useScroll({ target: seccionRef, offset: [...OFFSETS.salida] })
+
+  /* §5.1·C — el bloque de texto se va y se apaga mientras el hero cruza. Las
+     dos capas salen del MISMO tramo, así que viajan juntas por definición. */
+  const salidaY = useTransform(scrollYProgress, [HERO.tramo.salidaInicio, 1], [0, HERO.salidaY])
+  const salidaOpacidad = useTransform(
+    scrollYProgress,
+    [HERO.tramo.salidaInicio, 1],
+    [1, HERO.salidaOpacidad],
+  )
+
+  /* §5.1·B (deriva) — la captura sigue acercándose despacio cuando el texto ya
+     se está yendo. `useTransform` clampa fuera del rango, así que por debajo de
+     `derivaInicio` vale exactamente 1: el HTML del servidor sale sin transform
+     y no hay salto al hidratar. El 0.30 es el 0.70 de la ficha traducido al
+     tramo anclado — mismo punto de la página, ver `HERO.tramo`. */
+  const derivaEscala = useTransform(scrollYProgress, [HERO.tramo.derivaInicio, 1], [1, HERO.deriva])
+
+  /* Rama de reduced-motion de TODA la fase de carga. Es la de `Reveal.tsx`:
+     la animación no corre y el estado final lo fuerza `[data-lp-reveal]`. */
+  const sinMovimiento = { duration: 0, delay: 0 }
+
   return (
-    <section style={{ background: 'var(--lp-wash)' }}>
+    <section ref={seccionRef} style={{ background: 'var(--lp-wash)' }}>
       {/* F1.3·b1: aquí vivía un orbe de 800×500 con blur-3xl y un degradado
           que pasaba por violet-500. Eliminado por dos motivos de §3.1: el
           violeta no representa ningún dato del producto (los semánticos solo
@@ -113,7 +179,28 @@ export default function SeccionHero() {
           por presente. */}
       <div className="mx-auto max-w-6xl px-4 sm:px-8 pt-16 sm:pt-24 lg:pt-32 pb-24 lg:max-w-none lg:pl-[max(2rem,calc((100vw-72rem)/2+2rem))] lg:pr-0">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-          <div>
+          {/* ═══ §5.1·C — CAPA DE SALIDA ═══
+              La columna de texto ENTERA es la capa que se va (−70px y hasta
+              .25 de opacidad). Es el mismo criterio de a4 con `Parallax`: lo
+              que se mueve es el bloque, nunca el titular suelto, porque el
+              recorrido se comería el hueco entre el titular y su bajada.
+              Aquí no hay conflicto con las entradas de §5.1·A aunque las dos
+              animen `y`: la salida vive en el PADRE y las entradas en cada
+              hijo. Son dos transforms anidados, no dos dueños de un mismo
+              `transform` — que es lo que `Parallax` prohíbe.
+
+              `data-lp-hero-salida` es el gancho del `@media (width < 40rem)`
+              de globals.css: §5.1 ELIMINA esta fase en móvil (en viewport
+              corto el texto se va mientras todavía se lee). La capa se monta
+              igual y lo que se descarta son sus escrituras — ramificar el
+              render con el ancho es el hydration mismatch de §4.3·7.
+              `data-lp-reveal` es el otro gancho, el de reduced-motion, y
+              hacen falta LOS DOS: son dos preferencias distintas. */}
+          <motion.div
+            data-lp-reveal=""
+            data-lp-hero-salida=""
+            style={{ y: salidaY, opacity: salidaOpacidad }}
+          >
             {/* ═══ ROL KICKER DE LA LANDING (F1.3·d1) ═══
                 12px · tracking +0.12em · leading 1.0 (§3.2). Vale para los
                 SIETE kickers de la landing, no solo para este: aquí abajo,
@@ -134,9 +221,22 @@ export default function SeccionHero() {
                 falsa, no texto de la landing. Si una auditoría futura
                 reporta "un kicker a 11px suelto", la respuesta es esta nota
                 — no lo unifiques hasta que F0.c sustituya el panel. */}
-            <p className="text-[12px] font-semibold text-[var(--lp-accent)] uppercase tracking-[0.12em] leading-none">
+            {/* §5.1·A · beat 1 — abre el escenario. Registro de TEJIDO
+                (`--lp-dur-section` + `--sp-ease-out`), no cine: §5.1 solo
+                manda el registro Apple a las dos líneas del H1. */}
+            <motion.p
+              data-lp-reveal=""
+              className="text-[12px] font-semibold text-[var(--lp-accent)] uppercase tracking-[0.12em] leading-none"
+              initial={{ opacity: 0, y: HERO.y.kicker }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={
+                reducedMotion
+                  ? sinMovimiento
+                  : { duration: DUR.section, ease: EASE.out, delay: HERO.retraso.kicker }
+              }
+            >
               Expediente clínico electrónico para consultorios privados
-            </p>
+            </motion.p>
 
             {/* ═══ ROL H1 DE LA LANDING (F1.3·d2) ═══
                 text-[clamp(40px,7vw,72px)] · tracking -0.04em · leading 1.02
@@ -172,13 +272,43 @@ export default function SeccionHero() {
                 coincidiendo con el ancho del documento (1018/1274/1434/1914).
                 El alto del H1 no toca el cálculo del gutter.
 
-                El <br /> de abajo es duro y no es responsive (a diferencia
-                del `hidden sm:block` que usan los h2 de dos líneas). A 72px
-                el corte forzado es lo que sostiene el balance de las dos
-                mitades de la frase; a 40px cae igual donde caería solo. */}
+                El corte entre las dos mitades es duro y no es responsive (a
+                diferencia del `hidden sm:block` que usan los h2 de dos
+                líneas). A 72px el corte forzado es lo que sostiene el balance
+                de las dos mitades de la frase; a 40px cae igual donde caería
+                solo.
+
+                ⚠️ F2.b — ESE CORTE YA NO LO HACE UN `<br />`, y el cambio es
+                obligado, no cosmético. §5.1 anima las DOS LÍNEAS POR SEPARADO
+                (`y` + `blur`, con 90ms de desfase entre ellas), y `transform`
+                y `filter` NO APLICAN a una caja inline: es la misma trampa que
+                §5.2 documenta para el remate de la franja del problema. Ahí la
+                salida fue renunciar al `y`; aquí la ficha lo exige, así que
+                cada línea pasa a ser una caja `block`.
+                **Maqueta idéntica al `<br />`**: cada mitad empieza en línea
+                nueva y sigue partiéndose sola por dentro si no cabe —que es lo
+                que ocurre a 1024, donde esta columna mide 461px y el H1 cae en
+                5 líneas—. Lo que NO se puede hacer es `inline-block`: eso sí
+                convertiría cada mitad en una caja indivisible. */}
             <h1 className="mt-4 text-[clamp(40px,7vw,72px)] font-bold text-[var(--lp-ink-900)] tracking-[-0.04em] leading-[1.02]">
-              Menos tiempo en la pantalla,
-              <br />
+              {/* §5.1·A · beats 2 y 3 — el ÚNICO sitio de la landing con
+                  registro cine en carga: 900ms y `--lp-ease-cine`.
+                  El `blur` está presupuestado aquí y SOLO aquí (§4.3·6): es el
+                  filtro más caro, existe durante la carga y desaparece. No lo
+                  lleves a ninguna capa de scroll. */}
+              <motion.span
+                data-lp-reveal=""
+                className="block"
+                initial={{ opacity: 0, y: HERO.y.h1, filter: `blur(${HERO.blur}px)` }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                transition={
+                  reducedMotion
+                    ? sinMovimiento
+                    : { duration: DUR.cine, ease: EASE.cine, delay: HERO.retraso.h1a }
+                }
+              >
+                Menos tiempo en la pantalla,
+              </motion.span>
               {/* F1.3·e3 — ERA UN DEGRADADO RECORTADO
                   (`from-[#1a3a5c] to-[#4a9fd4]` + `bg-clip-text`). Se eliminó
                   por contraste: el barrido del degradado da 4.40:1 en su peor
@@ -187,9 +317,19 @@ export default function SeccionHero() {
                   Con este cambio y el de SeccionHistoria, #4a9fd4 desaparece
                   de la landing entera. NO lo repongas: un texto cuyo contraste
                   depende de en qué píxel lo midas no es texto accesible. */}
-              <span className="text-[var(--lp-accent)]">
+              <motion.span
+                data-lp-reveal=""
+                className="block text-[var(--lp-accent)]"
+                initial={{ opacity: 0, y: HERO.y.h1, filter: `blur(${HERO.blur}px)` }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                transition={
+                  reducedMotion
+                    ? sinMovimiento
+                    : { duration: DUR.cine, ease: EASE.cine, delay: HERO.retraso.h1b }
+                }
+              >
                 más tiempo con tu paciente
-              </span>
+              </motion.span>
             </h1>
 
             {/* F1.3·d4 (cerrado) — el crédito italic es rol CUERPO completo:
@@ -214,9 +354,26 @@ export default function SeccionHero() {
                 del hero: 4.00:1, fallo de AA por 0.5 en un texto de 17px que
                 no es decorativo. Sólido da 6.10:1. Si vuelves a bajarle opacidad
                 a este párrafo, vuelves a romperlo. */}
-            <p className="mt-6 text-[17px] font-semibold text-[var(--lp-accent)] italic leading-[1.65]">
+            {/* §5.1·A · beat 4 — la autoría y la bajada son UNA SOLA CAPA en
+                la ficha, así que comparten retraso, duración y easing exactos.
+                Son dos `<p>` con la misma transición y NO un `motion.div` que
+                las envuelva: el wrapper es justo lo que §4.4 prohíbe desde a2,
+                y aquí además tendría que absorber los `mt-*` de los dos
+                párrafos para no alterar el ritmo. Si tocas una transición,
+                toca la otra — o dejan de ser una capa. */}
+            <motion.p
+              data-lp-reveal=""
+              className="mt-6 text-[17px] font-semibold text-[var(--lp-accent)] italic leading-[1.65]"
+              initial={{ opacity: 0, y: HERO.y.texto }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={
+                reducedMotion
+                  ? sinMovimiento
+                  : { duration: DUR.section, ease: EASE.out, delay: HERO.retraso.texto }
+              }
+            >
               Creada por un cirujano de columna que la usa todos los días
-            </p>
+            </motion.p>
 
             {/* ═══ ROL BAJADA (F1.3·d3) ═══
                 19px · tracking -0.01em · leading 1.55 (§3.2). La bajada es el
@@ -248,9 +405,20 @@ export default function SeccionHero() {
 
                 El régimen de CUERPO (17px · 1.65) está en SeccionFeatures.tsx
                 y comparte esta advertencia. */}
-            <p className="mt-4 text-[19px] text-[var(--lp-ink-500)] max-w-2xl tracking-[-0.01em] leading-[1.55]">
+            {/* §5.1·A · beat 4 (segunda mitad de la capa — ver la autoría). */}
+            <motion.p
+              data-lp-reveal=""
+              className="mt-4 text-[19px] text-[var(--lp-ink-500)] max-w-2xl tracking-[-0.01em] leading-[1.55]"
+              initial={{ opacity: 0, y: HERO.y.texto }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={
+                reducedMotion
+                  ? sinMovimiento
+                  : { duration: DUR.section, ease: EASE.out, delay: HERO.retraso.texto }
+              }
+            >
               Expedientes, agenda e inteligencia artificial en una sola plataforma. Sin vendedores, sin trámites.
-            </p>
+            </motion.p>
 
             {/* F1.3·c2 — radio de CONTROL = 12px (`rounded-xl`). Los cuatro
                 botones grandes de la landing (estos dos y los dos de
@@ -260,7 +428,25 @@ export default function SeccionHero() {
                 de redondeados. La escala completa está declarada en
                 SeccionInterfaz.tsx. No los devuelvas a rounded-2xl. */}
             {/* F1.3·c3 — `mt-8` (32), no mt-10: 40 no está en la escala. */}
-            <div className="mt-8 flex flex-col sm:flex-row items-start gap-3">
+            {/* §5.1·A · beat 5 — cierra la secuencia del texto. Único sitio
+                con `SPRING.soft` (§4.2): un muelle sin rebote visible, que es
+                lo que pide la ficha para el par de botones. El contenedor que
+                ya existía ES la capa; no se añade ninguno.
+                ⚠️ El `scale` de entrada no pelea con el `active:scale-[0.97]`
+                de los dos botones: viven en elementos distintos (este div
+                contra cada `<Link>`) y son propiedades separadas del árbol de
+                transform. El defecto de a2 —motion escribiendo `transform`
+                inline y matando la utilidad de Tailwind— aparece cuando LOS
+                DOS caen en el mismo elemento, y aquí no es el caso. */}
+            <motion.div
+              data-lp-reveal=""
+              className="mt-8 flex flex-col sm:flex-row items-start gap-3"
+              initial={{ opacity: 0, y: HERO.y.ctas, scale: HERO.ctasEscala }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={
+                reducedMotion ? sinMovimiento : { ...SPRING.soft, delay: HERO.retraso.ctas }
+              }
+            >
               {/* F1.3·c3 — `gap-2` (8), no gap-2.5: 10 no está en la escala.
                   El separador texto↔icono NO es geometría de control (eso es
                   el px-7 py-3.5, que no se toca), y de paso iguala al botón
@@ -278,8 +464,8 @@ export default function SeccionHero() {
               >
                 Ver planes
               </Link>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
 
           {/* ═══ CAPTURA REAL DEL PANEL PRINCIPAL (§7·1) — CIERRA LP-DT-17 ═══
               Aquí vivía el marco VACÍO que la deuda registraba, con su lienzo
@@ -329,9 +515,46 @@ export default function SeccionHero() {
               ⚠️ YA NO VA `aria-hidden`. El marco vacío era decorativo; una
               captura del producto no lo es, y su `alt` describe lo que se ve
               en pantalla. El cromo de ventana sí queda oculto a la
-              tecnología asistiva: no comunica nada. */}
+              tecnología asistiva: no comunica nada.
+
+              ⚠️ F2.b — LA CAPTURA NO ANIMA `opacity`, Y ES LA DECISIÓN DE ESTA
+              TANDA SOBRE EL LCP. §5.1 pedía `opacity 0→1` junto con `y` y
+              `scale`. Este elemento es el LCP de la página (por eso lleva
+              `priority`), y Chrome DESCARTA como candidato a LCP cualquier
+              elemento con opacidad 0: un fundido de entrada mueve la marca
+              desde "la imagen pintó" —que con el preload de `priority` ocurre
+              antes de que baje el bundle— hasta "hidrató y además terminó la
+              animación". En red lenta son segundos contra el presupuesto de
+              §4.3·9 (LCP < 2.5s), y por un fundido que nadie estaba pidiendo.
+              `y` y `scale` no tienen ese efecto: el elemento SE PINTA, solo que
+              desplazado y un 12% menor, y la marca se registra en ese pintado.
+              Tampoco hay salto de layout — `transform` no reflowa, así que no
+              computa CLS — ni depende de JS: el HTML del servidor ya sale con
+              el transform escrito.
+              Corolario para cualquier tanda futura: **ninguna capa que
+              contenga al LCP puede arrancar en opacidad 0.** */}
           <div className="hidden lg:block">
-            <div className="rounded-2xl lg:rounded-r-none border-[0.5px] border-[var(--lp-border)] bg-[var(--lp-surface)] shadow-sm overflow-hidden">
+            {/* §5.1·B (entrada) — el MARCO ENTERO es la capa que sube y asienta
+                (120px, .88→1, registro cine). Va en el marco y no en la imagen
+                porque lo que entra es "la ventana", con su cromo: partirlos
+                delataría el montaje.
+                `scale` SIEMPRE < 1 durante el recorrido, y eso importa: esta
+                columna sangra por el borde derecho del viewport (ver arriba),
+                así que una escala > 1 empujaría su borde fuera del documento y
+                un `transform` SÍ genera área desbordable —al contrario que la
+                `box-shadow` de la que habla la nota de F1.3·b2—. Sería scroll
+                horizontal. Encoger es seguro; agrandar, no. */}
+            <motion.div
+              data-lp-reveal=""
+              className="rounded-2xl lg:rounded-r-none border-[0.5px] border-[var(--lp-border)] bg-[var(--lp-surface)] shadow-sm overflow-hidden"
+              initial={{ y: HERO.capturaY, scale: HERO.capturaEscala }}
+              animate={{ y: 0, scale: 1 }}
+              transition={
+                reducedMotion
+                  ? sinMovimiento
+                  : { duration: DUR.cine, ease: EASE.cine, delay: HERO.retraso.captura }
+              }
+            >
               {/* F1.3·c3 — `gap-2` (8), no gap-1.5: 6 no está en la escala. */}
               {/* Semáforo macOS: los tres puntos eran `bg-slate-200` (grises).
                   Los colores salen de --lp-chrome-*, declarados en globals.css
@@ -344,7 +567,24 @@ export default function SeccionHero() {
                 <span className="w-2.5 h-2.5 rounded-full bg-[var(--lp-chrome-min)]" />
                 <span className="w-2.5 h-2.5 rounded-full bg-[var(--lp-chrome-max)]" />
               </div>
-              <div className="relative aspect-[16/10]">
+              {/* §5.1·B (deriva) — 1→1.03 mientras el hero termina de cruzar.
+                  ⚠️ LA DERIVA VA EN LA CAPTURA, NO EN EL MARCO, y no es una
+                  licencia: es lo que dice la ficha ("Captura deriva") y es
+                  además lo único que no rompe nada. Sobre el marco, un 1.03
+                  empujaría el borde derecho ~11px fuera del viewport —esta
+                  columna ya llega justa al borde— y eso es scroll horizontal.
+                  Aquí el `overflow-hidden` del marco recorta el excedente y lo
+                  que se ve es la captura acercándose dentro de su ventana, que
+                  es el gesto que pide el escenario.
+                  Es una capa SEPARADA de la entrada de arriba a propósito: dos
+                  dueños del mismo `transform` en un solo elemento (uno de
+                  carga, otro de scroll) se pisan — el `style` con MotionValue
+                  gana y la entrada se pierde. */}
+              <motion.div
+                data-lp-reveal=""
+                className="relative aspect-[16/10]"
+                style={{ scale: derivaEscala }}
+              >
                 <Image
                   src="/landing/dashboard-spinus.png"
                   alt="Panel principal de Spinus: barra lateral con Dashboard, Pacientes, Agenda, Calculadoras, Documentos y Administración; tarjeta de próximas citas con la consulta de un paciente y botones para iniciar consulta o abrir su expediente; y accesos directos a los módulos de expediente, agenda, documentos y visor DICOM."
@@ -353,8 +593,8 @@ export default function SeccionHero() {
                   priority
                   className="object-cover object-left"
                 />
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
           </div>
         </div>
       </div>
