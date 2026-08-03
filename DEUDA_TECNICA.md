@@ -1669,7 +1669,25 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
 - **Condición de cierre:** se elimina al integrar Video 1.
 
 ### LP-DT-14 — NeuralBackground sin uso en la landing
-- **Estado:** 🔴 abierta
+- **Estado:** ✅ **CERRADA (rediseño de /login, 2026-08-03)** — archivo
+  eliminado (`src/components/ui/NeuralBackground.tsx`, 325 líneas). Se cumplió
+  la condición que la entrada misma fijaba: su único consumidor era `/login`, y
+  el rediseño le dio un fondo propio —`--lp-wash` en
+  `src/app/login/layout.tsx`, el mismo lavado de `--cs` al 4% que §3.1 mandó
+  para el hero y el CTA—, así que el canvas se quedó sin trabajo antes de
+  borrarse. Con él se van el `requestAnimationFrame` autoperpetuado, los 5
+  listeners de `window` y el contexto `alpha: false` que hacía que el color de
+  fondo de `/login` dependiera del canvas.
+- **Verificación previa al borrado** (Protocolo 2 de `CLAUDE.md`):
+  `grep -rn "NeuralBackground" src/` → 3 coincidencias, **todas comentarios**
+  (`login/page.tsx:37`, `SeccionHero.tsx:11`, `SeccionCTA.tsx:10`, las tres
+  documentando que el lavado CSS lo sustituye). **Cero imports, cero JSX.**
+  Las coincidencias fuera de `src/` son este documento y
+  `SPINUS_LANDING_MAESTRO.md:140`.
+- **Efecto en el lint:** el archivo aportaba 1 error de ESLint (`prefer-const`
+  en `NeuralBackground.tsx:70`). Es uno de los dos problemas que bajan el
+  baseline de LP-DT-16 de 214 a 212 en esta tanda.
+- **Estado original:** 🔴 abierta
 - **Detectada:** F1.2 tanda (a) — eliminaciones (2026-07-30)
 - **Descripción:** NeuralBackground: sin uso en landing; conservado por
   `/login`. Evaluar en rediseño de auth. El archivo
@@ -1685,10 +1703,27 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
 ### LP-DT-15 — Proyecto aparte: barrido de ® fuera de la landing
 - **Estado:** 🔴 abierta
 - **Detectada:** F1.2 tanda (a) — eliminaciones (2026-07-30)
+- **Actualización (rediseño de /login, 2026-08-03):** **41 símbolos en 22
+  archivos.** Bajan 2 símbolos y 1 archivo: `src/app/login/page.tsx` salió del
+  inventario. Eran el `<h1>` ("Spinus" con el símbolo) y la línea de copyright
+  del pie; los dos desaparecieron en la reescritura del render, no se
+  reemplazaron por texto equivalente.
+  ⚠️ **El archivo NO vuelve a entrar por sus comentarios.** La reescritura
+  documenta la eliminación en prosa —"sin símbolo de marca registrada"— sin
+  escribir el glifo, precisamente para que el `grep -rn "®"` que este registro
+  usa como inventario no lo cuente como pendiente. Si alguna tanda futura
+  reintroduce el símbolo en un comentario de ese archivo, romperá el conteo.
+  ⚠️ **`src/app/login/layout.tsx` NO cierra el `<title>`.** El nuevo layout de
+  `/login` se creó deliberadamente SIN `metadata` propia, así que la pestaña
+  sigue mostrando el "Spinus®" del layout raíz (`src/app/layout.tsx:5`), que
+  sigue contado aquí. Pisarlo con un `metadata` por ruta habría escondido el
+  síntoma en una ruta dejándolo vivo en las otras veinte; se arregla en el
+  archivo raíz, de una vez, cuando se ataque este registro.
 - **Descripción:** Quedan **43 símbolos ® en 23 archivos** fuera de la
   landing pública (zonas 3, 4, 5, 6a y 6b del inventario reconciliado de
   F1.2: app logueada, config/metadata, documentos legales, auth y entrada, y
-  otras superficies públicas). La marca está EN TRÁMITE ante IMPI
+  otras superficies públicas) — cifra de origen, ver la actualización de
+  arriba. La marca está EN TRÁMITE ante IMPI
   (exp. 3594483, sin registro concedido), así que usar ® es infracción.
   F1.2 solo corrigió los 2 de la landing (`SeccionNav`, `SeccionFooter`); un
   tercero se fue con `SeccionMockup` y un cuarto
@@ -2529,6 +2564,224 @@ control» de `globals.css`.
   quiere reducir el JS de la landing, el trabajo real está en `motion` y en el
   árbol de `Reveal`/`Stagger`, no en mover directivas `'use client'` de sitio.
   Esa sí sería una fase con premisa medible, y sería otra.
+
+### LP-DT-41 — Destello del formulario de /login antes del redirect por sesión válida
+- **Estado:** 🔴 abierta
+- **Detectada:** rediseño de /login (2026-08-03)
+- **Descripción:** quien llega a `/login` **con sesión local válida** ve el
+  formulario de acceso completo —logo, campos, botón— durante unas décimas
+  antes de que la página lo mande a `/inicio`. No es un fallo de render: es el
+  orden natural del flujo. `src/app/login/page.tsx` monta su árbol de forma
+  síncrona y el redirect vive dentro del `useEffect`, colgado de la promesa de
+  `supabase.auth.getSession()`. Entre pintar y resolver esa promesa hay un
+  hueco, y en ese hueco lo que está en pantalla es la pantalla de "no tienes
+  sesión" servida a alguien que sí la tiene.
+- **Precisión sobre el nombre:** se le ha llamado "el destello de *comprobando
+  sesión*", pero **no existe ninguna cadena con ese texto**: `grep -rn
+  "omprobando" src/` no devuelve nada, y `SessionGuard.tsx` no pinta rótulo
+  alguno (`return null`). Lo que destella es el formulario en sí. Se anota
+  porque buscar ese literal para arreglarlo es perder una tarde.
+- **Por qué NO se arregló en el rediseño:** está **fuera de scope por
+  decisión explícita** de esa tanda. El arreglo no es visual —no se resuelve
+  con un estado de carga bonito, que sería cambiar un destello por otro— sino
+  **de flujo**: hay que decidir dónde se resuelve la sesión antes de pintar.
+  Tocarlo obliga a entrar en el blindaje offline del `useEffect` (Sprint 3
+  Hotfix), que es justo lo que la tanda tenía prohibido mover.
+- **Direcciones posibles, ninguna elegida:** (a) resolver la sesión en
+  servidor y redirigir antes de pintar, lo que choca de frente con el blindaje
+  offline —que existe *porque* el proxy server-side empuja a `/login` en gray
+  zone mientras la sesión de cliente sigue viva—; (b) un gate de carga en el
+  layout de `/login` hasta que `getSession` resuelva, que cambia el destello
+  por una espera y penaliza al visitante SIN sesión, que es el caso mayoritario
+  y el legítimo. **La (b) es más barata y probablemente peor.** Cualquiera de
+  las dos es una sesión propia con su auditoría.
+- **Condición de cierre:** decisión de Angel sobre (a) o (b) y una tanda que
+  pueda tocar la lógica de sesión.
+
+### LP-DT-42 — `/privacidad` y `/privacy`: ruta duplicada sin canónica declarada
+- **Estado:** 🔴 abierta
+- **Detectada:** rediseño de /login (2026-08-03), al cambiar el enlace legal
+  del pie de esa pantalla. Fuera de scope de esa tanda.
+- **Descripción:** existen **dos rutas** para el mismo aviso de privacidad y
+  ninguna está declarada como canónica:
+  - `src/app/privacidad/page.tsx` → `<AvisoPrivacidadContent />`
+  - `src/app/privacy/page.tsx` → `<AvisoPrivacidadContent />`
+
+  Renderizan **el mismo componente**, con metadata equivalente. No hay
+  redirect de una a otra, ni `alternates.canonical`, ni nada en el proxy que
+  las reconcilie: las dos responden 200 con el mismo contenido.
+- **Reparto actual de enlazadores** (`grep -rn '"/privacy"\|"/privacidad"' src/`),
+  que es lo que hace que esto no sea teórico:
+  - → **`/privacy`**: `SeccionFooter.tsx:91` (landing pública),
+    `(app)/ayuda/page.tsx:270`, `login/page.tsx` (desde esta tanda).
+  - → **`/privacidad`**: `pacientes/nuevo/page.tsx:480`,
+    `QuickPatientModal.tsx:340`, `CommandPalette.tsx:392`,
+    `ConsultaRapidaModal.tsx:458`, `TerminosContent.tsx:166,642`,
+    `LegalLayout.tsx:61`, `Sidebar.tsx:355`.
+
+  O sea: **la landing y `/login` apuntan a una, y casi toda la app logueada a
+  la otra.** El rediseño de /login movió su enlace a `/privacy` por coherencia
+  con el footer de la landing, no porque `/privacy` sea la canónica — no lo es
+  todavía, porque nadie la ha declarado.
+- **Por qué importa y no es cosmético:**
+  1. **SEO** — contenido duplicado en dos URLs indexables sin `canonical`. Es
+     el mismo tipo de problema que la verificación de recetas indexable que
+     §10 del maestro tiene abierto.
+  2. **Consentimiento** — el aviso de privacidad es el documento que §
+     "Cumplimiento normativo" de `CLAUDE.md` exige antes de crear un paciente.
+     Dos URLs vivas para el documento legal significa dos sitios donde puede
+     divergir la versión si algún día una de las dos deja de leer el
+     componente compartido. Hoy no divergen; el riesgo es estructural.
+- **Lo que NO hay que hacer:** borrar una de las dos a secas. Ocho enlazadores
+  apuntan a `/privacidad`, y hay enlaces vivos fuera del repo (correos,
+  documentos ya enviados) que no se pueden reescribir. La salida es elegir
+  canónica, poner un **redirect permanente** desde la otra y propagar los
+  enlaces internos — no un `git rm`.
+- **Decisión pendiente de Angel:** cuál de las dos es la canónica. `/privacy`
+  tiene a su favor la coherencia con `/terms` y `/pricing`, que ya están en
+  inglés; `/privacidad` tiene a su favor que es la que más enlaces internos
+  concentra y la que probablemente está en enlaces externos.
+- **Alcance estimado:** 1 redirect + 8 enlaces internos + verificar que ningún
+  correo transaccional ya enviado apunte a la que se retire.
+
+### LP-DT-43 — Rate-limit de login: consume presupuesto en logins EXITOSOS y no es atómico
+- **Estado:** 🔴 abierta — **PRIORIDAD MÁXIMA, NO DIFERIBLE**
+- **Detectada:** auditoría del cerrojo de doble envío de /login (2026-08-03)
+- **Cuándo se ataca:** rama propia `fix/rate-limit-login`, en cuanto
+  `feature/rediseno-login` esté mergeada. No se mete en la rama del rediseño.
+- **Defecto (a) — el presupuesto se gasta aunque aciertes la contraseña.**
+  `checkAuthRateLimit` inserta una fila por cada intento **recibido**
+  (`src/lib/rateLimit.ts:88`), antes de saber si la contraseña es correcta:
+  la llamada al endpoint sale en `src/app/login/page.tsx:130` y
+  `signInWithPassword` no corre hasta `:161`. Ningún camino descuenta al
+  acertar — los únicos `DELETE` de `ip_rate_limits` son la limpieza de filas
+  ya vencidas (`rateLimit.ts:91-97`). Umbral **5 por email en ventana
+  deslizante de 15 minutos** (`src/app/api/auth/rate-limit/route.ts:19`,
+  corte en `rateLimit.ts:84`), y el producto **no expone ninguna vía de
+  desbloqueo**: solo esperar.
+- **Defecto (b) — `count` e `insert` no son atómicos.** El conteo
+  (`rateLimit.ts:75-81`) y la inserción (`:88`) son dos viajes separados. Dos
+  peticiones concurrentes pueden contar el mismo total y ambas insertar.
+  **Verificado que no hay red de seguridad en la base:** la tabla solo tiene
+  `PRIMARY KEY (id)` (`supabase/baseline/02_tables.sql:272-278`) y su único
+  índice es un btree **no único** sobre `(ip, ruta, created_at)`
+  (`supabase/baseline/03_indexes.sql:102-103`). Ni restricción única ni
+  `UPSERT` que pueda apoyarse en una.
+- **⚠️ RIESGO AL CORREGIR (a):** el reseteo del contador debe ocurrir **SOLO
+  tras confirmación real de sesión válida**. Cualquier reseteo antes de esa
+  confirmación convierte el limitador en fuerza bruta ilimitada. Este es el
+  punto donde un arreglo apresurado es peor que el defecto.
+- **VALIDACIÓN — ninguna herramienta automática cubre esto.** Ni `tsc`, ni
+  `eslint`, ni `next build` ven nada aquí: no es un error de tipos ni de
+  compilación, es comportamiento de la ruta de auth contra la base. Exige
+  **prueba deliberada con escritura real en `ip_rate_limits` y `audit_log`.**
+  - Aritmética a tener presente al medir: **una llamada exitosa a
+    `login_email` inserta DOS filas**, no una — `login_email` para el email
+    (`route.ts:39`) y `login_ip` para la IP (`route.ts:52`). Lo que hay que
+    contar es la fila con `ruta = 'auth:login_email:<email>'`.
+  - `ip_rate_limits` se escribe con `createAdminClient()` (service role,
+    `rateLimit.ts:71,88`), así que **no es consultable desde el cliente**.
+    Canal de medición que no necesita service role: el 200 del endpoint
+    devuelve `remaining` (`route.ts:65`), calculado como `limite - total - 1`
+    (`rateLimit.ts:99`). De ahí **`filas = 4 − remaining`** — es el servidor
+    contando sus propias filas. Con un email inexistente y virgen el estado
+    previo es 0 por construcción; cada ronda de prueba necesita un email
+    distinto para no gastar el presupuesto de 5/15 min y contaminar la
+    siguiente medición.
+  - Sobre `audit_log`: con email inexistente el 200 del rate-limit **no
+    escribe nada** (`logAudit` solo corre en las ramas `blocked`,
+    `route.ts:41,54`). Lo que sí escribe es `/api/auth/audit-login` con
+    `login_fallido` tras el `signInWithPassword` fallido
+    (`login/page.tsx:229-233` → `logLogin({ success: false })`).
+  - **⚠️ NOTA DE MÉTODO — verificada el 2026-08-03. El doble clic de Claude
+    in Chrome NO reproduce la rendija del mismo tick.** Dispara dos `click`
+    reales separados por **~1.5 ms**, y a esa distancia React 19 ya hizo el
+    flush síncrono de `setLoading(true)`: el botón está `disabled` y **no
+    emite el segundo `click`**. Consecuencia para quien vaya a validar esto:
+    **un doble clic de extensión que sale limpio demuestra `disabled={loading}`
+    (`login/page.tsx:469`), NO el cerrojo `submitLockRef`** — con el cerrojo
+    roto el resultado sería idéntico, así que ese experimento no distingue
+    una cosa de la otra y no vale como confirmación.
+    Para **ejercer el cerrojo de verdad** hay que forzar dos `click()` en el
+    **mismo task síncrono**, rellenando los campos con el **setter nativo de
+    `HTMLInputElement`** + evento `input` (si no, React no toma el estado y
+    se envía el formulario vacío). Resultado de esa prueba el 2026-08-03:
+    **2 entradas al handler → 1 petición → 1 fila.** El cerrojo funciona.
+- **Mitigación parcial ya en producción, que NO cierra esta deuda:** el
+  cerrojo síncrono `submitLockRef` de `login/page.tsx:105,153-154` impide que
+  un doble clic duplique el gasto. Reduce la sangría; no toca ninguno de los
+  dos defectos de arriba.
+
+### LP-DT-44 — Cobertura de lint perdida en `login/page.tsx` por el `try/finally`
+- **Estado:** 🔴 abierta — aceptada conscientemente, revisar en versiones
+  futuras del plugin
+- **Detectada:** auditoría del cerrojo de doble envío de /login (2026-08-03)
+- **Descripción:** el `try/finally` del cerrojo (`src/app/login/page.tsx:163`
+  y `:251-266`) **desactiva el compilador de React sobre todo el componente**.
+  No es un efecto colateral misterioso: es un bail-out **declarado** del
+  propio plugin. En `eslint-plugin-react-hooks` 7.0.1,
+  `cjs/eslint-plugin-react-hooks.development.js:23982-23988`:
+
+  ```js
+  if (hasNode(stmt.get('finalizer'))) {
+    builder.errors.push({
+      reason: `(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause`,
+      category: ErrorCategory.Todo,
+  ```
+
+  Es decir: el compilador **no sabe** bajar un `finalizer` a su HIR
+  (`ErrorCategory.Todo` = funcionalidad no implementada, no error del código).
+  Al no compilar el componente, **todas** las reglas respaldadas por el
+  compilador dejan de emitir para él.
+- **Consecuencia:** `react-hooks/set-state-in-effect` dejó de reportar y **el
+  defecto del `useEffect` (`:107-140`) SIGUE VIVO, ahora invisible.** El
+  archivo pasa el lint en verde sin que nadie lo haya arreglado.
+- **Verificado que la causa es `finally` en exclusiva.** Seis componentes
+  sintéticos con el mismo `useEffect` infractor, idénticos salvo el handler,
+  bajo la config del repo: sin `try` **reporta**; `try/finally` calla;
+  `try/catch` sin `finally` **reporta**; `try/catch/finally` calla;
+  `try/finally` sin el flag `navegando` calla; `try/catch` **con** el flag
+  `navegando` reporta. Ni `try` en general ni el flag tienen nada que ver.
+  El bail-out es **por componente, no por archivo**: un séptimo caso con dos
+  componentes en un mismo módulo —uno con el `finally`, otro con el efecto—
+  sí reporta. En `login/page.tsx` coinciden en el mismo componente, y por eso
+  ahí se pierde el archivo entero.
+- **Se evaluó y se DESCARTÓ migrar a `try/catch`** para recuperar la regla:
+  - El `return` del 429 (`:192`) sale sin pasar por el `catch` ni por el
+    final del `try`: **quedaría sin liberar el ref**, cerrojo echado hasta
+    recargar.
+  - Las dos salidas normales tienen **requisitos opuestos** y caen en el mismo
+    punto: la rama de credenciales (`:222-233`) debe liberar, la de éxito
+    (`:234-250`) no debe. Una liberación al final del `try` reabriría el botón
+    durante el hueco de `window.location.href` — el defecto exacto que
+    `:251-265` existe para matar.
+  - `finally` cubre **gratis** las salidas que alguien añada en el futuro;
+    `catch` obliga a acordarse en cada una. Con tres puntos de liberación
+    explícitos hoy no quedaría ningún camino suelto, pero el patrón es frágil
+    por construcción.
+- **⚠️ EL BASELINE DE ESLINT BAJÓ DE 212 A 211 Y ESO NO ES UNA MEJORA.** Es
+  **un archivo menos analizado**, no un defecto corregido. Cualquiera que
+  compare los dos números sin leer esta nota leerá progreso donde hay pérdida
+  de cobertura. (211 verificado con `npx eslint .` el 2026-08-03.)
+- **Condición de cierre:** que una versión futura de
+  `eslint-plugin-react-hooks` implemente el lowering del `finalizer` — el
+  `ErrorCategory.Todo` dice que está pendiente, no que sea imposible. Al
+  actualizar el plugin, **volver a correr el lint sobre este archivo** y
+  arreglar lo que reaparezca.
+
+### LP-DT-45 — Botón de login inerte tras excepción
+- **Estado:** 🔴 abierta
+- **Detectada:** al auditar las salidas del handler de /login (2026-08-03)
+- **Descripción:** en las rutas de **excepción** —`createClient()` (`:201`),
+  `supabase.auth.signOut()` (`:208`), `supabase.auth.signInWithPassword()`
+  (`:211`)— no se ejecuta ningún `setLoading(false)`. `loading` se queda en
+  `true` desde `:164` y el `disabled={loading}` del botón (`:469`) lo deja
+  **muerto hasta recargar la página**.
+- **Es un defecto PREVIO al cerrojo de doble envío e independiente de él.**
+  El `finally` (`:265`) **sí** libera `submitLockRef`; lo que no baja es el
+  `disabled`. El ref suelto no sirve de nada mientras el atributo siga puesto.
+  Conviene tenerlo escrito porque invita a diagnosticar mal: quien vea el
+  botón muerto pensará que falló el cerrojo, y el cerrojo funcionó.
 
 ---
 

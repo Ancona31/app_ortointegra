@@ -279,6 +279,57 @@
   --lp-surface-inverse-5:  rgb(255 255 255 / .05);
   --lp-surface-inverse-10: rgb(255 255 255 / .10);
 
+  /*
+   * ═══ ESTADO: PELIGRO Y AVISO (rediseño de /login) ════════════════════════
+   * Los valores NO son nuevos: son COPIA LITERAL de los `--sp-danger-*` y
+   * `--sp-warn-*` de `spinus-tokens.css:47-52,66-70`, que es la fuente de
+   * tokens del producto. Cada línea comenta de cuál deriva. No se ajustó ni
+   * un dígito: el objetivo es que el aviso de /login se vea EXACTAMENTE
+   * igual que el mismo aviso dentro de la app.
+   *
+   * ⚠️ ENTONCES ¿POR QUÉ DUPLICARLOS EN LA ESCALA --lp-* EN VEZ DE USAR LOS
+   * --sp-* DIRECTAMENTE? Porque los --sp-* SÍ se redefinen bajo `html.dark`
+   * (`spinus-tokens.css:337-347`: --sp-warn pasa a #fcd34d y --sp-danger a
+   * #f87171, ambos pensados para fondo oscuro) y `ThemeProvider` deja esa
+   * clase colgada en <html> al salir de (app). Un usuario que cierra sesión
+   * desde el tema oscuro llegaría a /login —que es superficie clara— con el
+   * ámbar de dark mode sobre el fondo claro: texto #fcd34d sobre
+   * rgba(245,158,11,.14) compuesto sobre blanco, ilegible.
+   *
+   * ESA INMUNIDAD ES LA RAZÓN DE EXISTIR DEL PREFIJO --lp-*, y está escrita
+   * como regla permanente arriba (línea ~162): estas variables NO se
+   * redefinen bajo `html.dark`, nunca. Si algún día /login gana modo oscuro,
+   * la respuesta es una superficie oscura propia, no redefinir estos ocho.
+   *
+   * PRECEDENTE DE FORMA: `--lp-dur-*`. Igual que aquellos EXTIENDEN la escala
+   * de `--sp-dur-*` sin sustituirla, estos extienden la de estado. La app
+   * sigue consumiendo los --sp-* y nadie los toca.
+   *
+   * CONTRASTE MEDIDO (fórmula de luminancia relativa de WCAG 2.x), porque
+   * los dos pares se usan como texto sobre su propio fondo:
+   * · --lp-danger-ink #8c2f2f sobre --lp-danger-bg #fdf2f2 → 7.48:1
+   * · --lp-warn       #b45309 sobre --lp-warn-bg   #fef6e7 → 4.68:1
+   * El ámbar pasa AA de texto normal con 0.18 de margen: es el par ajustado
+   * de los dos. Si alguna tanda aclara #b45309 "un poco", lo tumba.
+   *
+   * ⚠️ --lp-danger Y --lp-warn-strong SON TOKENS DE ICONO, NO DE TEXTO. Medido:
+   * --lp-warn-strong #d97706 sobre --lp-warn-bg da **2.97:1**, así que NO sirve
+   * ni para el enlace del propio aviso — el "Volver al dashboard" de /login usa
+   * --lp-warn con subrayado, no este. Los dos iconos que sí los llevan van
+   * `aria-hidden` y junto a un texto que dice lo mismo, que es lo que los deja
+   * fuera del umbral de 1.4.11. Antes de usar cualquiera de los dos como texto,
+   * MÍDELO sobre su fondo.
+   */
+  --lp-danger:        #c0392b;  /* ← --sp-danger        · icono del bloque de error */
+  --lp-danger-ink:    #8c2f2f;  /* ← --sp-danger-ink    · texto del bloque de error */
+  --lp-danger-bg:     #fdf2f2;  /* ← --sp-danger-bg */
+  --lp-danger-border: #f3c9c9;  /* ← --sp-danger-border */
+
+  --lp-warn:          #b45309;  /* ← --sp-warn          · texto del aviso */
+  --lp-warn-strong:   #d97706;  /* ← --sp-warn-strong   · SOLO icono del aviso (2.97:1 — no es texto) */
+  --lp-warn-bg:       #fef6e7;  /* ← --sp-warn-bg */
+  --lp-warn-border:   #f4dfae;  /* ← --sp-warn-border */
+
   /* Hover */
   --lp-hover-surface: #f1f5f9;
 
