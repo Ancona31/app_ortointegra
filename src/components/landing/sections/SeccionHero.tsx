@@ -177,7 +177,20 @@ export default function SeccionHero() {
           ⚠️ Mismo aviso que en la <section>: si una tanda futura mete aquí
           una capa `absolute`, tendrá que reponer el `relative` — no lo des
           por presente. */}
-      <div className="mx-auto max-w-6xl px-4 sm:px-8 pt-16 sm:pt-24 lg:pt-32 pb-24 lg:max-w-none lg:pl-[max(2rem,calc((100vw-72rem)/2+2rem))] lg:pr-0">
+      {/* ⚠️ `100%` Y NO `100vw` — F6·f2. Es el mismo defecto que
+          `SeccionExpediente.tsx:66-71` documenta haber eliminado de allí: el
+          navegador CUENTA LA BARRA DE SCROLL DENTRO DE `100vw`, y esta página
+          siempre tiene barra. Medido a 1440 con barra de 15px, el cálculo daba
+          176px de padding izquierdo cuando lo que alinea con un contenedor
+          `max-w-6xl` centrado son 168.5px: la columna del hero quedaba ~7.5px
+          a la derecha del borde izquierdo del resto de la página.
+          `100%` resuelve contra el ancho de contenido del ancestro —la
+          `<section>`, que no tiene padding propio—, o sea el viewport YA SIN
+          la barra. Misma fórmula, origen correcto.
+          El sangrado por la DERECHA sobrevive intacto: lo dan `lg:max-w-none`
+          y `lg:pr-0`, que no se tocan. Es el recurso de §3.4·1 y sigue siendo
+          asimétrico a propósito. */}
+      <div className="mx-auto max-w-6xl px-4 sm:px-8 pt-16 sm:pt-24 lg:pt-32 pb-24 lg:max-w-none lg:pl-[max(2rem,calc((100%-72rem)/2+2rem))] lg:pr-0">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           {/* ═══ §5.1·C — CAPA DE SALIDA ═══
               La columna de texto ENTERA es la capa que se va (−70px y hasta

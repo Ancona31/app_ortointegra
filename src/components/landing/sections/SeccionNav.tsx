@@ -86,7 +86,29 @@ export default function SeccionNav() {
           className="flex items-center gap-2 origin-left"
           style={{ scale: escalaLogo }}
         >
-          <Image src="/logo-spinus.png" alt="Spinus" width={800} height={777} className="object-contain h-9 w-auto" />
+          {/* ⚠️ `sizes` Y `loading` NO SON OPCIONALES AQUÍ, y sin ellos esto era
+              el peor elemento de la página en relación peso/píxel pintado.
+              Sin `sizes`, `next/image` no sabe a qué tamaño se va a pintar y el
+              navegador se llevaba el candidato de **1920px de ancho** del
+              srcset — medido en el HTML del build— para un isotipo que ocupa
+              37×36 CSS px. Con `sizes="40px"` elige de la escala pequeña
+              (48/96px), que es lo que de verdad hace falta incluso a 3x.
+              Y `loading="eager"`: estaba en `lazy` estando SOBRE EL PLIEGUE, o
+              sea que el navegador lo aplazaba a propósito. No lleva `priority`
+              a propósito: eso añadiría un `<link rel=preload>` que competiría
+              con el de la captura del hero, que sí es el LCP.
+              `width`/`height` se quedan en los 800×777 intrínsecos: son los que
+              fijan la proporción, no el tamaño de descarga — de eso manda
+              `sizes`. */}
+          <Image
+            src="/logo-spinus.png"
+            alt="Spinus"
+            width={800}
+            height={777}
+            sizes="40px"
+            loading="eager"
+            className="object-contain h-9 w-auto"
+          />
           {/* ═══ EL WORDMARK NO TOMA ROL DE TEXTO (F1.3·d4) ═══
               Se queda en 17px. Es el pendiente que d1 dejó abierto y lo cierra
               el PM en d4: "Spinus" junto al isotipo no es texto de la landing,
