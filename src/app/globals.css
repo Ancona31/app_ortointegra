@@ -2,6 +2,25 @@
 @import "./spinus-tokens.css";
 @plugin "@tailwindcss/typography";
 
+/* ── Familia tipográfica de la landing (§3.2) ───────────────────────────
+   Genera la utilidad `font-lp`, que consume la variable que next/font
+   declara en src/app/(landing)/layout.tsx. Fuera de ese subárbol nadie
+   usa `font-lp`, así que la app sigue en system-ui (body, línea ~118).
+
+   ⚠️ El `inline` NO es opcional. Sin él, Tailwind emite
+   `:root { --font-lp: var(--lp-font), … }` y resuelve `var(--lp-font)`
+   EN :root — donde todavía no existe, porque la declara la clase de
+   next/font sobre el <div> envolvente de la landing. El resultado sería
+   "invalid at computed-value time" y la familia entera caería.
+   Con `inline`, el valor se incrusta en la utilidad y `var(--lp-font)`
+   se resuelve en el elemento que lleva la clase, que es el correcto.
+
+   La cadena de respaldo replica la de `body` para que el swap de
+   `display: swap` no salte a una familia distinta de la que ya se ve. */
+@theme inline {
+  --font-lp: var(--lp-font), system-ui, -apple-system, sans-serif;
+}
+
 :root {
   --background: #f8fafc;
   --foreground: #1e293b;
@@ -96,6 +115,224 @@
   --ag-btn-ghost-hover: #f1f5f9;         /* ~slate-100 */
   --ag-patient-card-bg: #eff4f9;         /* azul suave (~blue-50) */
   --ag-patient-card-border: #c9dcfb;     /* azul (~blue-200), alineado con scheduled-border */
+
+  /* ── Extensión de landing (movimiento) ─────────────────────────────
+     Prefijo --lp-. EXTIENDE la escala de --sp-dur- y --sp-ease- de
+     spinus-tokens.css, NO la sustituye. Solo cubre los dos registros que
+     la app no necesita: entrada de sección y escenario cinematográfico.
+     Ver PLAN_LANDING_SPINUS.md §2.3. */
+  --lp-dur-section: 420ms;                        /* entrada de sección */
+  --lp-dur-cine:    900ms;                        /* escenario cinematográfico */
+  --lp-ease-cine:   cubic-bezier(.65, 0, .35, 1); /* solo los 4 escenarios Apple */
+  /* Vuelta completa del haz del borde (§5.12). Es un TERCER registro y no un
+     peldaño más de la escala: los otros miden una transición que empieza y
+     acaba; este mide un ciclo que no acaba nunca.
+     ⚠️ HISTORIAL, PORQUE ESTE VALOR NO SE LEE SOLO: 6s → 4s → 3s. Y el último
+     salto NO es "más rápido porque sí": el gradiente pasó de UN arco a TRES
+     (0°, 120°, 240°), así que lo que gobierna la sensación ya no es la vuelta
+     sino el intervalo entre pasadas por un mismo punto del borde, que es la
+     vuelta ENTRE TRES. A 3s eso da una pasada por segundo. Si algún día se
+     cambia el número de arcos, este número se recalcula con él: con un solo
+     arco, 3s sería frenético. */
+  --lp-dur-glint:   3s;                           /* solo el borde de §5.12 */
+
+  /* Distancias de la entrada de carga del hero (§5.1·A, tanda F2.b).
+     Espejo de `HERO.y` en components/landing/motion/tokens.ts.
+
+     ⚠️ ESTAS CUATRO SON VARIABLES CSS Y NO NÚMEROS EN EL COMPONENTE POR UN
+     MOTIVO CONCRETO: §5.1 pide las mismas distancias al 60% en móvil, y
+     elegirlas en JS obliga a leer el ancho del viewport —valor solo-cliente—
+     para decidir el estado inicial. Eso es el hydration mismatch de §4.3·7 con
+     otro disfraz. Aquí el override vive en un `@media` (al final del archivo,
+     junto al de la salida del texto) y el HTML del servidor ya sale correcto.
+     `motion` resuelve la variable al arrancar la animación. Ver la nota larga
+     en `HERO.y` antes de mover ningún valor: NO son la escala de §3.3, son
+     recorridos de movimiento, como `DIST.reveal`. */
+  --lp-hero-y-kicker: 14px;
+  --lp-hero-y-h1:     30px;
+  --lp-hero-y-texto:  20px;
+  --lp-hero-y-ctas:   16px;
+
+  /* ── Escala de color de la landing ─────────────────────────────────
+     Prefijo --lp-. NO usar los tokens --sp-* del producto: se redefinen
+     bajo html.dark y ThemeProvider deja esa clase colgada al salir de
+     (app), así que la landing se invertiría. Tampoco hex literales: son
+     ~68 sitios y duplicarían la tabla en el código.
+
+     ⚠️ REGLA PERMANENTE: estas variables NO se redefinen bajo html.dark,
+     nunca. Esa inmunidad es su razón de existir.
+
+     PROCEDENCIA DE LOS VALORES — no todos salen de §3.1, y conviene que
+     el próximo editor no los busque ahí en vano. De
+     SPINUS_LANDING_MAESTRO.md §3.1 salen: la tinta 900/700/500, los dos
+     azules de marca, la franja, el borde y el 4% de --lp-wash (§3.1 pide
+     "lavado de --cs al 3–5%"). Los otros cuatro NO están en §3.1 y se
+     fijan al valor MEDIDO del uso actual de la landing: --lp-accent-bg
+     = blue-50, --lp-surface-sunken = slate-50, --lp-border-strong =
+     slate-300 y --lp-hover-surface = slate-100 (valores de Tailwind 4,
+     que NO coinciden con los de v3 — ver §1 de la auditoría).
+     Ver §2 de la auditoría de F1.3 (e) para el mapa de migración por rol. */
+
+  /* Tinta */
+  --lp-ink-900: #14345c;   /* titulares, H3 de card, firma */
+  --lp-ink-700: #3b4a5c;   /* cuerpo de lista, links de nav */
+  --lp-ink-500: #5a6b81;   /* bajadas, cuerpo de card, captions, iconos */
+
+  /* Marca */
+  --lp-navy:       #1a3a5c;
+  --lp-accent:     #1e5fa8;
+  /* Canales sueltos del acento, SIN envolver en rgb(): existe para
+     componer sombras con alfa — rgb(var(--lp-accent-rgb) / .30) — que es
+     lo que hoy va como rgba(30,95,168,.10/.30/.40) en cuatro sitios.
+     Si cambia --lp-accent, hay que cambiar esto a mano: son dos
+     declaraciones del mismo color y CSS no puede derivar una de otra. */
+  --lp-accent-rgb: 30 95 168;
+  --lp-accent-bg:  #eff6ff;    /* fondo de pastilla de kicker */
+
+  /* Superficies */
+  --lp-surface:        #ffffff;
+  --lp-surface-alt:    #f5f8fc;  /* franjas alternas */
+  --lp-surface-sunken: #f8fafc;  /* paneles hundidos, marco reservado del hero */
+  /* ⚠️ EL VALOR SÓLIDO ES EL FALLBACK, NO UN DESCUIDO — Y EL ORDEN IMPORTA.
+     #f6f9fc es el resultado MEDIDO de la mezcla de abajo. Se declara primero
+     para que un navegador sin `color-mix()` se quede con él: ese navegador
+     descarta la declaración del @supports por no entenderla, y sin este par
+     la apertura y el cierre de la landing se quedarían sin fondo resuelto.
+     Si cambias --lp-accent o el 4%, RE-MIDE el sólido y actualízalo aquí: son
+     dos declaraciones del mismo color y CSS no puede derivar una de la otra,
+     igual que pasa con --lp-accent-rgb. */
+  --lp-wash: #f6f9fc;  /* apertura y cierre */
+
+  /* Bordes */
+  /* Semáforo del cromo de ventana del hero (macOS). Los hex son los del
+     sistema operativo, no una paleta nuestra.
+     ⚠️ SON LA ÚNICA EXCEPCIÓN A §3.1 "los semánticos solo para datos reales",
+     y está razonada: estos tres puntos no representan un estado del producto
+     —no hay nada rojo, ámbar ni verde que informen—, son la REPRODUCCIÓN de un
+     control del sistema operativo, del mismo modo que el marco de ventana
+     reproduce una ventana. Su trabajo es que la captura se lea como "la app
+     corriendo" y no como una imagen pegada (§6·4). Fuera de este cromo, la
+     prohibición de §3.1 sigue entera: no los uses para nada más. */
+  --lp-chrome-close: #ff5f57;
+  --lp-chrome-min:   #febc2e;
+  --lp-chrome-max:   #28c840;
+
+  --lp-border:         #e6ebf2;
+  --lp-border-strong:  #cad5e2;                  /* hover */
+  --lp-border-inverse: rgb(255 255 255 / .30);   /* sobre navy */
+
+  /*
+   * ═══ BORDES DE CONTROL (F6·f3) — NO CONFUNDIR CON LOS DE ARRIBA ═════════
+   * Existen porque WCAG 1.4.11 exige 3:1 al contorno de un COMPONENTE DE
+   * INTERFAZ, y los tres tokens de arriba no llegan:
+   *   --lp-border          #e6ebf2          1.20:1 sobre blanco
+   *   --lp-border-strong   #cad5e2          1.42:1 sobre blanco
+   *   --lp-border-inverse  blanco al 30%    2.45:1 sobre --lp-navy
+   *
+   * ⚠️ Y AUN ASÍ NO SE SUBEN, A PROPÓSITO. 1.4.11 aplica a controles, no a
+   * bordes decorativos: el filete de 0.5px de las cards, los divisores del
+   * footer y del nav, y los mockups de §5.9 son SUPERFICIE o SEPARACIÓN, no
+   * contorno de nada accionable. Están a 1.20:1 porque así se diseñó la
+   * página, y subir `--lp-border` cambiaría el aspecto de las ~28 cards de
+   * la landing para corregir dos botones. Por eso el token es nuevo y no
+   * un reajuste del viejo: separa el rol, no lo pisa.
+   *
+   * CUÁNDO USAR ESTOS Y NO LOS DE ARRIBA — la prueba es una sola pregunta:
+   * ¿el borde es lo ÚNICO que dibuja el límite de algo que se puede pulsar,
+   * enfocar o escribir? Si sí, va aquí. Si el control ya tiene relleno
+   * contrastado o contorno blanco pleno (`--lp-ink-inverse`, 11.64:1 sobre
+   * navy — ver el primario de §5.7), NO hace falta: el límite ya está.
+   *
+   * VALORES MEDIDOS (fórmula de luminancia relativa de WCAG 2.x):
+   * · #7d8ea3 → L 0.2633 → 3.35:1 contra #ffffff.  Es el gris azulado más
+   *   claro que deja margen sobre el umbral; #8697ab, el siguiente peldaño
+   *   hacia arriba, da 2.99:1 y NO pasa. No lo aclares "un poco".
+   * · blanco al 40% sobre --lp-navy compone #75889d → L 0.2410 → 3.23:1.
+   *   Al 30% son 2.45:1 y al 38% ronda 3.10:1; el 40% es el escalón limpio
+   *   con margen.
+   * Si cambias --lp-navy, RE-MIDE el inverso: su contraste depende del
+   * fondo sobre el que se compone, no del alfa.
+   *
+   * No hay `--lp-border-control-strong` para el hover, y es deliberado: hoy
+   * un solo consumidor cambia el borde al pasar el ratón (el «Ver planes»
+   * del hero) y apunta directo a `--lp-ink-500` (5.44:1). Un token con un
+   * único uso sería abstracción especulativa; cuando haya un segundo, se
+   * declara.
+   */
+  --lp-border-control:         #7d8ea3;               /* 3.35:1 sobre blanco */
+  --lp-border-control-inverse: rgb(255 255 255 / .40); /* 3.23:1 sobre navy */
+
+  /* Inverso — texto y tintes sobre superficie oscura */
+  --lp-ink-inverse:        #ffffff;
+  --lp-ink-inverse-70:     rgb(255 255 255 / .70);
+  /*
+   * ⚠️ --lp-ink-inverse-50 NO SIRVE SOBRE NAVY. Mide 4.20:1 contra --lp-navy,
+   * por debajo del 4.5 de AA para texto normal, y en F6·f1 se retiraron de ahí
+   * sus tres usos (dos en §5.12, uno en §5.7) que pasaron a -70 (6.58:1).
+   * Su contrato queda ESTRECHADO a las cajas de gradiente slate, que son más
+   * oscuras: ahí mide 5.23:1 sobre slate-900 y 4.80:1 en el punto más claro
+   * del gradiente (slate-800), y pasa. Hoy tiene un único consumidor legítimo,
+   * el kicker de §5.4 (`SeccionIA.tsx:75`).
+   * Si vas a usarlo sobre cualquier otro fondo, MÍDELO ANTES.
+   */
+  --lp-ink-inverse-50:     rgb(255 255 255 / .50);
+  --lp-surface-inverse-5:  rgb(255 255 255 / .05);
+  --lp-surface-inverse-10: rgb(255 255 255 / .10);
+
+  /* Hover */
+  --lp-hover-surface: #f1f5f9;
+
+  /*
+   * Color del anillo de foco. Lo consume la regla única de más abajo; las
+   * superficies oscuras lo redefinen a blanco sobre sí mismas.
+   * ⚠️ NO EXISTE UN SOLO COLOR QUE VALGA PARA LAS DOS SUPERFICIES, y está
+   * medido: para cumplir el 3:1 de WCAG 1.4.11 contra blanco Y contra navy a
+   * la vez, el anillo tendría que tener una luminancia relativa entre 0.221 y
+   * 0.300, y ningún token de la escala cae ahí (accent 0.113, ink-500 0.143,
+   * ink-700 0.066, border-strong 0.656). Por eso el color es una VARIABLE que
+   * hereda, y no una constante.
+   */
+  --lp-focus: var(--lp-accent);
+}
+
+/*
+ * ═══ ANILLO DE FOCO ÚNICO DE LA LANDING (F6·f1) ═══════════════════════════
+ * Antes cada control declaraba —o no— su propio anillo: 11 de 32 lo tenían, y
+ * los tres enlaces del nav no. El problema de fondo no era esos 21 controles,
+ * era que el patrón fuese opcional: el siguiente que alguien añada nace sin
+ * anillo. Con esta regla nace con él.
+ *
+ * `:where()` le da especificidad CERO a propósito. Los 11 controles que ya
+ * declaran su `focus-visible:outline-*` siguen ganando sin tocarlos, y
+ * cualquiera puede seguir personalizando el suyo. Esto es el suelo, no el techo.
+ *
+ * ⚠️ VA ACOTADA A `.font-lp`, o sea al envoltorio de la landing, y no es
+ * arbitrario: `globals.css` lo comparte el producto entero (login, agenda,
+ * expediente…). Una regla de foco global sería un cambio de alcance que esta
+ * tanda no audita. Se engancha a `.font-lp` porque es la clase que el layout
+ * ya pone en su `<div>` envolvente y así no hay que tocar ese archivo, que
+ * lleva un aviso expreso de mantenerse desnudo.
+ *
+ * Contraste del indicador (1.4.11 exige 3:1): sobre superficie clara el anillo
+ * es `--lp-accent`, 6.45:1 contra blanco. Sobre navy pasa a `--lp-ink-inverse`,
+ * 11.64:1. La redefinición la hace cada contenedor oscuro con la utilidad
+ * `[--lp-focus:var(--lp-ink-inverse)]`, y las tarjetas blancas DENTRO de una
+ * franja oscura la revierten a acento — si no, un anillo blanco sobre tarjeta
+ * blanca sería invisible.
+ */
+.font-lp :where(a, button, summary, [tabindex]:not([tabindex="-1"])):focus-visible,
+.font-lp :where(input, select, textarea):focus-visible {
+  outline: 2px solid var(--lp-focus);
+  outline-offset: 2px;
+}
+
+/* Par del fallback de --lp-wash. Va FUERA del bloque de arriba y DESPUÉS de
+   él: un @supports no puede vivir dentro de una regla, y si se declarara
+   antes, la línea sólida lo pisaría. Ver la nota junto a --lp-wash. */
+@supports (background: color-mix(in srgb, #000 4%, #fff)) {
+  :root {
+    --lp-wash: color-mix(in srgb, var(--lp-accent) 4%, #fff);
+  }
 }
 
 html {
@@ -519,11 +756,6 @@ body {
   animation: alertGlow 2s ease-in-out infinite;
 }
 
-@keyframes marquee {
-  0%   { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-
 @keyframes dropGlow {
   0%   { box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
   50%  { box-shadow: 0 0 12px 4px rgba(34,197,94,0.3); }
@@ -806,6 +1038,81 @@ html.dark .agenda-fc .fc-daygrid .fc-col-header-cell {
   border-bottom-color: var(--ag-month-gap) !important;
 }
 
+/* ── Destello del borde de la tarjeta recomendada (§5.12, F5·b) ──────────
+   Un gradiente cónico que recorre el perímetro de la tarjeta de Individual.
+
+   ⚠️⚠️ SE ANIMA `rotate` DE UN ELEMENTO, NO EL ÁNGULO DEL GRADIENTE. Es la
+   decisión de coste de este efecto y no es intercambiable. La vía "obvia"
+   —registrar `@property --angle` y animar `conic-gradient(from var(--angle))`—
+   obliga al navegador a RE-RASTERIZAR el degradado del elemento entero en cada
+   cuadro, para siempre: es trabajo de pintado en el hilo principal a 60 Hz
+   sobre una caja de ~420×560. Rotando el elemento, el degradado se rasteriza
+   UNA vez y cada cuadro solo cambia una transformada, que resuelve el
+   compositor sin pintar ni maquetar. Mismo resultado en pantalla, coste de otro
+   orden. Si alguien "simplifica" esto a `@property`, está pagando repintado
+   permanente por nada.
+
+   Se anima la propiedad independiente `rotate` y NO `transform`, para que el
+   centrado (`-translate-x/y-1/2`, que pone Tailwind) siga siendo suyo y no haya
+   que repetirlo dentro del keyframe. Al detenerse queda en `rotate: 0` y sigue
+   centrado.
+
+   `linear` es obligatorio y no es un easing "fuera de la escala": un bucle
+   cerrado con cualquier curva se nota frenar y acelerar en la costura. No es
+   una curva del sistema, es la ausencia de curva. */
+@keyframes lp-giro-borde {
+  to { rotate: 1turn; }
+}
+
+.lp-borde-destello {
+  animation: lp-giro-borde var(--lp-dur-glint) linear infinite;
+}
+
+/* ── Capas de tejido en espera (F6·f1b) ──────────────────────────────────
+   `data-lp-espera` lo ponen SOLO `Reveal` y `Stagger`; se levanta con
+   `data-lp-visto` en cuanto la capa entra en pantalla. Mientras no está visto,
+   el subárbol se saca del orden de tabulación: antes 21 de los 31 focusables
+   de la página eran alcanzables con Tab estando a `opacity: 0`.
+
+   ⚠️ `visibility` Y NO `inert`, y la razón es esta hoja. `inert` sería mejor
+   en casi todo —no toca el renderizado, así que no hay riesgo de romper
+   transiciones, y limpia también el árbol de accesibilidad— pero es un
+   ATRIBUTO HTML: no se puede revertir desde CSS, así que ni el bloque de
+   `prefers-reduced-motion` de abajo ni la escotilla de teclado podrían
+   levantarlo, y la única vía sería ramificar el render con `useReducedMotion`,
+   que es el bug que ya costó un ciclo. `visibility` se gobierna entero desde
+   aquí, que es donde tienen que vivir las dos reversiones.
+
+   ⚠️ Y NO CUELGA DE `data-lp-reveal`: ese atributo lo llevan también las capas
+   de carga del hero, las de la receta y las de `Parallax`, que no son
+   `whileInView` y nunca recibirían el `data-lp-visto`. Quedarían ocultas para
+   siempre. */
+[data-lp-espera]:not([data-lp-visto]) {
+  visibility: hidden;
+}
+
+/* ── Escotilla de teclado ──
+   `RevelarPorTeclado.tsx` pone `data-lp-teclado` en <html> a la primera señal
+   de navegación sin ratón. A partir de ahí el tejido se sirve en su estado
+   final: visible, alcanzable y sin animación pendiente.
+
+   Cubre el contenedor Y sus descendientes con `data-lp-reveal` porque en
+   `Stagger` la marca vive en el contenedor y son los HIJOS los que llevan el
+   `opacity: 0` inline: levantar solo el contenedor dejaría los ítems invisibles.
+
+   ⚠️ ACOTADO A LOS SUBÁRBOLES `data-lp-espera`, no a toda la página. Así el
+   tejido se aplana pero las dos escenas ligadas al scroll —el hero y el
+   ensamblaje de la receta— y los `Parallax` conservan su coreografía: no son
+   alcanzables por Tab de todas formas, así que aplanarlas no compraría nada y
+   costaría la mitad del diseño de la página. */
+html[data-lp-teclado] [data-lp-espera],
+html[data-lp-teclado] [data-lp-espera] [data-lp-reveal] {
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+}
+
 /* ── Reduced motion ──
    Neutraliza las animaciones de entrada/transición para quienes lo piden.
    `.animate-spin` (loaders) queda EXCLUIDO: congelarlo a media rotación deja
@@ -813,5 +1120,98 @@ html.dark .agenda-fc .fc-daygrid .fc-col-header-cell {
 @media (prefers-reduced-motion: reduce) {
   [class*="animate-"]:not(.animate-spin) {
     animation: none !important;
+  }
+
+  /*
+   * Reveals de la landing (`Reveal.tsx` / `Stagger.tsx`). El árbol de DOM es
+   * el mismo con y sin reducir-movimiento —ramificar el render provocaba
+   * hydration mismatch y dejaba la sección invisible—, así que la preferencia
+   * se resuelve aquí: se fuerza el estado final visible.
+   * `!important` es obligatorio: `motion` escribe estilos inline.
+   */
+  [data-lp-reveal] {
+    opacity: 1 !important;
+    /*
+     * `filter` entra en la lista en F2.b: las dos líneas del H1 del hero
+     * arrancan en `blur(8px)` (§5.1·A) y el HTML del servidor ya sale con ese
+     * filtro inline. Sin esta línea, quien pide reducir movimiento vería el
+     * titular desenfocado hasta que hidrate — el mismo defecto de "estado
+     * inicial pegado" que dejó una sección invisible en 60ff25c, con otra
+     * propiedad. Es la ÚNICA capa de la landing con `filter` (el del nav es
+     * `backdrop-filter`, que esto no toca); si algún día una card lleva un
+     * desenfoque DECORATIVO y estático, esta línea se lo comería y habrá que
+     * estrechar el selector.
+     */
+    filter: none !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  /*
+   * El estado de espera NO EXISTE bajo esta preferencia. La regla de arriba ya
+   * sirve las capas en su estado final visible, así que ocultarlas dejaría
+   * contenido que se ve pero no se puede tabular — el mismo defecto al revés.
+   * Se anula sobre `[data-lp-espera]` y no sobre `[data-lp-reveal]` porque en
+   * `Stagger` la marca vive en el contenedor, que no lleva `data-lp-reveal`.
+   */
+  [data-lp-espera] {
+    visibility: visible !important;
+  }
+
+  /*
+   * Botón "armar la receta paso N" del Teaser 2 (§5.7, móvil). Con la
+   * preferencia activa, la regla de arriba ya sirve la hoja ARMADA —todas sus
+   * capas llevan `data-lp-reveal`—, así que el control no gobernaría nada:
+   * cinco toques sin efecto visible se leen como que la página está rota.
+   * Se esconde aquí y no con `useReducedMotion` en el componente porque
+   * ramificar el render con un valor solo-cliente es el bug de §4.3·7.
+   * La fase interactiva (firma, color, QR) NO se toca: no es movimiento.
+   */
+  [data-lp-paso] {
+    display: none !important;
+  }
+
+  /*
+   * Destello del borde de la tarjeta recomendada (§5.12). SE DETIENE, y es el
+   * caso de manual de esta preferencia: movimiento continuo, permanente y que
+   * no responde a ninguna acción del visitante. La regla `[class*="animate-"]`
+   * de arriba NO lo alcanza —la clase se llama `lp-borde-destello`, no
+   * `animate-*`—, así que se apaga aquí explícitamente.
+   * Se para en `rotate: 0`, con el borde de acento intacto: quien reduce
+   * movimiento sigue viendo la tarjeta destacada, solo que sin el barrido.
+   */
+  .lp-borde-destello {
+    animation: none !important;
+  }
+}
+
+/* ── Salida del bloque de texto del hero: NO EXISTE EN MÓVIL ──────────
+   §5.1 elimina la fase C por debajo de `sm`: en viewport corto el bloque se
+   va hacia arriba mientras todavía se está leyendo, y pelea con la lectura en
+   vez de acompañarla. La captura no entra en esta regla porque a ese ancho ni
+   siquiera se monta (`hidden lg:block`).
+
+   ⚠️ SE RESUELVE AQUÍ Y NO EN EL COMPONENTE, por lo mismo que las
+   `--lp-hero-y-*`: ramificar el render con el ancho del viewport es el
+   hydration mismatch de §4.3·7. El componente monta SIEMPRE la capa y sus
+   suscripciones al scroll; lo que este bloque descarta son sus escrituras.
+   Es trabajo desperdiciado por debajo de 640px, no un fallo visible — el
+   mismo trato que `Parallax` le da a reduced-motion.
+
+   `width < 40rem` es la sintaxis que el propio Tailwind 4 genera para
+   `max-sm:`, no una de otra escala. "Móvil" en las fichas de §5 significa el
+   estado previo a `sm` — ver §5.2, que lo dice con esas palabras. */
+@media (width < 40rem) {
+  :root {
+    /* Las mismas distancias de §5.1·A al 60%, redondeadas al entero. */
+    --lp-hero-y-kicker: 8px;
+    --lp-hero-y-h1:     18px;
+    --lp-hero-y-texto:  12px;
+    --lp-hero-y-ctas:   10px;
+  }
+
+  [data-lp-hero-salida] {
+    opacity: 1 !important;
+    transform: none !important;
   }
 }

@@ -1,0 +1,293 @@
+'use client'
+
+import type { ReactNode } from 'react'
+import { Calendar, FileText, Brain, Pill, MonitorCheck } from 'lucide-react'
+import { motion, useReducedMotion } from 'motion/react'
+import Stagger, { VARIANTES_ITEM } from '@/components/landing/motion/Stagger'
+import { DUR, EASE, STAGGER } from '@/components/landing/motion/tokens'
+import Parallax from '@/components/landing/motion/Parallax'
+import { useTilt } from '@/hooks/useTilt'
+
+interface Feature {
+  icon: ReactNode
+  title: string
+  desc: string
+  /** Borde de la card (§3.1: 0.5px). --lp-accent marca la card DICOM. */
+  border: string
+  /** Columnas que ocupa en la retícula de 3. Ausente = 1. */
+  span?: 2
+  /** Reserva la zona de medio a sangre. F2.b inserta ahí el video DICOM
+   *  con scrub por scroll + contador n/N (§5.3). Vacía por ahora. */
+  media?: boolean
+}
+
+/* F1.3·e4 — LOS 4 ICONOS NO-DICOM ERAN #8a99ac: 2.90:1 sobre el blanco de la
+   card, por debajo del 3:1 de gráfico informativo. Pasan a --lp-ink-500
+   (5.45:1).
+   ⚠️ INK-500, NO ACENTO, Y ES DECISIÓN DE PM — no un descuido. Subirlos a
+   --lp-accent los pondría a competir con el borde de la card DICOM, que es el
+   único acento de esta sección y lo que jerarquiza el bento entero. El
+   contraste se arregla con tinta; el acento se reserva. No los "unifiques" con
+   los iconos de Expediente e Interfaz, que sí son de acento por otro motivo. */
+
+/* El orden del array ES el orden de la retícula (§3.4: bento asimétrico):
+   fila 1 → DICOM (2 col) · Expedientes
+   fila 2 → Recetas · Documentación con IA · Agenda
+   DICOM arriba-izquierda no es estético: la cascada diagonal de F2.a nace
+   de esa card (§5.3). No reordenar sin releer esa ficha. */
+const features: Feature[] = [
+  {
+    icon: <MonitorCheck className="w-6 h-6 text-[var(--lp-accent)]" />,
+    title: 'Visor DICOM',
+    desc: 'Abre el estudio completo desde el disco, sin instalar nada y sin costo extra. Guarda en el expediente los cortes que importan — hasta 100 por paciente.',
+    border: 'border-[var(--lp-accent)]',
+    span: 2,
+    media: true,
+  },
+  {
+    icon: <FileText className="w-6 h-6 text-[var(--lp-ink-500)]" />,
+    title: 'Expedientes electrónicos',
+    desc: 'Toda la historia clínica de tu paciente a un clic. Sin papel, sin búsquedas.',
+    border: 'border-[var(--lp-border)]',
+  },
+  {
+    icon: <Pill className="w-6 h-6 text-[var(--lp-ink-500)]" />,
+    title: 'Recetas con QR',
+    desc: 'Membretadas, con QR verificable. Envíalas por correo o entrégalas impresas.',
+    border: 'border-[var(--lp-border)]',
+  },
+  {
+    icon: <Brain className="w-6 h-6 text-[var(--lp-ink-500)]" />,
+    title: 'Documentación con IA',
+    desc: 'Describe los hallazgos y la IA estructura la nota. Tú validas y firmas.',
+    border: 'border-[var(--lp-border)]',
+  },
+  {
+    icon: <Calendar className="w-6 h-6 text-[var(--lp-ink-500)]" />,
+    title: 'Agenda',
+    desc: 'Arrastra, suelta y listo. Sincronizada con Google Calendar.',
+    border: 'border-[var(--lp-border)]',
+  },
+]
+
+/* Features — grid bento
+   Sin padding-top: los 128px de aire de §3.3 los aporta ahora el pb-32 de
+   SeccionProblema.tsx, la sección inmediatamente anterior (antes venía del
+   hero, antes de que la franja se insertara en medio). La cadena completa:
+     Hero (pb-24, SeccionHero.tsx) → [96px] → Franja (sin pt … pb-32)
+     → [128px] → Features (sin pt)
+   Las dos costuras son exactas y ASIMÉTRICAS (96 arriba, 128 abajo),
+   iguales en todos los breakpoints. No añadir pt aquí.
+
+   El 128 de esta costura subió desde 96 en el QA visual de b2: con esta
+   sección y la franja ambas en blanco, el corte cromático desapareció y
+   96px quedaban por debajo del umbral en que el h2 de aquí se lee como
+   párrafo nuevo en vez de sección nueva. El motivo completo está en el
+   contrato de SeccionProblema.tsx, que es donde vive el padding — si
+   cambias uno, actualiza los dos comentarios: son el mismo contrato
+   escrito en dos archivos.
+
+   ⚠️ OJO AL DESNIVEL QUE INTRODUJO c1. El `pb` de ESTA sección sí sigue
+   el régimen general (`pb-16 sm:pb-24 lg:pb-32` → 64/96/128, costura de
+   128/192/256 contra SeccionIA), pero el aire de ARRIBA sigue siendo el
+   128 plano que dona la franja. En lg esta sección abre con 128 y cierra
+   con 256: el doble. Es consecuencia directa de mantener el contrato
+   literal (opción (a) de la auditoría de c1) y está aceptado, no es un
+   descuido. La causa de fondo —el padding donado— es LP-DT-19, que sigue
+   abierta: su condición de cierre es que esta sección tome su propio pt
+   y la franja suelte el pb-32. Si alguna tanda la ejecuta, el pt que
+   tome debe ser `pt-16 sm:pt-24 lg:pt-32` como todas, NO un pt-32 plano,
+   o el desnivel se congela en el código en vez de resolverse.
+
+   F1.3·b2 · `bg-white` explícito: NO es redundante. Sin él esta sección
+   heredaba el `--background: #f8fafc` del body (globals.css:25,135), no
+   blanco — quedaba medio tono por debajo de sus hermanas blancas
+   (Interfaz, Expediente, Seguridad), que sí lo declaran. La alternancia
+   blanco/#f5f8fc es un sistema y debe leerse en el código, no depender de
+   un default global que vive fuera de la landing. */
+export default function SeccionFeatures() {
+  /* Un solo `useReducedMotion` para la sección, sin ramificar el render
+     (§4.3·7). Ver `Reveal.tsx`. */
+  const sinMovimiento = useReducedMotion()
+  const transicionItem = sinMovimiento
+    ? { duration: 0 }
+    : { duration: DUR.section, ease: EASE.out }
+
+  /* ⚠️ UN `useTilt` POR CARD, y por eso las cinco llamadas están DESENROLLADAS
+     en un array y no dentro del `.map`. Las reglas de los hooks prohíben
+     llamarlos en un bucle cuyo número de vueltas pueda cambiar; aquí el array
+     `features` es una constante de módulo de 5 elementos, pero escribirlo como
+     `features.map(() => useTilt())` es exactamente el patrón que el lint de
+     react-hooks rechaza, y con razón: nada impide que una tanda futura filtre
+     ese array y rompa el orden de los hooks entre renders.
+     Si el bento gana o pierde una card, esta lista se ajusta a mano — es el
+     precio de que cada card tenga su propio par de MotionValue, que es lo que
+     permite que solo se incline la que tiene el cursor encima. */
+  const tilts = [useTilt(), useTilt(), useTilt(), useTilt(), useTilt()]
+
+  return (
+    <section className="bg-[var(--lp-surface)] pb-16 sm:pb-24 lg:pb-32">
+      <div className="mx-auto max-w-6xl px-4 sm:px-8">
+        {/* F1.3·c3 — `mb-12` (48), no mb-14: 56 no está en la escala. Mismo
+            cambio en los encabezados de Portabilidad y Seguridad, que son el
+            mismo elemento (bloque de titular → retícula). */}
+        {/* §5.3 · F2.a·a4 — `Parallax` sobre el BLOQUE de encabezado, no sobre
+            el `<h2>`. El titular suelto choca con su bajada, que aquí está a
+            `mt-3` (12px): a cualquier distancia perceptible el uno se mete
+            encima de la otra. Moviendo el bloque entero el hueco interno no
+            existe, y lo que se recorre es el `mb-12` (48px) que lo separa de
+            la retícula — con ±24 despeja por 24. La justificación completa
+            está en `Parallax.tsx`. */}
+        <Parallax className="max-w-2xl mb-12">
+          {/* ═══ ROL TITULAR DE SECCIÓN (F1.3·d2) ═══
+              text-[clamp(30px,4vw,46px)] · tracking -0.03em · leading 1.10
+              (§3.2). Vale para los OCHO titulares de sección de la landing:
+              este, SeccionExpediente, SeccionInterfaz, SeccionHistoria,
+              SeccionPortabilidad, SeccionSeguridad, SeccionIA y SeccionCTA.
+
+              Este archivo es la referencia porque es el primer <h2> real en
+              orden de lectura y porque ya estaba en el valor de destino antes
+              de d2 — los otros siete se movieron hacia aquí, no al revés.
+
+              Venían de dos escalones distintos: seis a `28/38px` con
+              `tracking-tight` (-0.025em) y `leading-[1.15]`, y dos —los dos
+              bloques navy, IA y CTA— a `24/30px`. Ese segundo grupo era el
+              problema real: un titular de sección a 30px no compite con un
+              H1 de 56 y la jerarquía se aplanaba justo en las dos secciones
+              que más peso narrativo cargan. Ahora los ocho entran por el
+              mismo clamp y la diferencia entre secciones la hace el contexto
+              (ancho de columna, color de superficie), no el tamaño.
+
+              El clamp sustituye al par `28px sm:38px`: entre 750px y 1150px
+              de viewport el tamaño ya no salta en el breakpoint, interpola.
+              Por debajo de 750 se queda en 30 (era 28: +2px en móvil) y por
+              encima de 1150 tope en 46 (era 38: +8px en escritorio).
+
+              ⚠️ NO es el único texto grande de la landing. El H1 del hero
+              (`SeccionHero.tsx`) tiene su propio régimen —clamp(40,7vw,72),
+              -0.04em, 1.02— y es DELIBERADAMENTE más apretado en tracking y
+              en leading: a 72px el interletraje y el interlineado que un
+              titular de 46 necesita para respirar se ven sueltos. No unifiques
+              los dos roles en uno.
+
+              ⚠️ `SeccionProblema.tsx:87` es un <p>, no un <h2>, y hace de
+              titular de esa sección. Ya está en estos tres valores. Que sea
+              <p> es decisión semántica de esa sección, no un olvido — no lo
+              conviertas en <h2> ni lo saques de este régimen. */}
+          <h2 className="text-[clamp(30px,4vw,46px)] font-bold text-[var(--lp-ink-900)] tracking-[-0.03em] leading-[1.10]">
+            Lo que resuelve desde el primer día
+          </h2>
+          {/* F1.3·d3 — rol bajada: 19px · -0.01em · 1.55. Ver SeccionHero.tsx
+              (incluida la advertencia de NO aplicar esto con selector). */}
+          <p className="mt-3 text-[19px] text-[var(--lp-ink-500)] tracking-[-0.01em] leading-[1.55]">Cada herramienta resuelve un problema real de tu día a día.</p>
+        </Parallax>
+
+        {/* ═══ §5.3 · CASCADA DIAGONAL DEL BENTO (F2.a·a2) ═══
+            El `<Stagger>` ES la retícula: toma las clases del grid y no emite
+            nada, así que el `sm:col-span-2` de abajo sigue viviendo en el ítem
+            de la retícula y la card DICOM conserva su doble ancho. Ese era el
+            bloqueante que §4.4 nombra y el motivo de la reescritura.
+
+            ⚠️ VA CON `staggerChildren`, NO CON UN `delay` POR CARD, Y ESTO SE
+            APARTA A PROPÓSITO DE LA INSTRUCCIÓN DE LA TANDA. El encargo decía
+            "delay: i * STAGGER.deck en cada card, como en Control". Produce los
+            mismos números —el orden del array es el índice, así que
+            0/.09/.18/.27/.36 salen igual— pero "como en Control" implica que
+            cada card lleve su propio `whileInView`, y AHÍ está el fallo: las 3
+            hojas de Control caben en una caja de 150px y sus disparadores
+            coinciden por fuerza, mientras que este bento son DOS FILAS que
+            suman ~600px. Con disparador por card, la fila 2 entra en cuadro
+            bastante después que la fila 1 y la cascada se REINICIA a mitad:
+            deja de leerse como una diagonal y pasa a leerse como dos grupos.
+            Con `staggerChildren` hay UN disparador para la retícula entera y la
+            diagonal se dibuja completa, que es lo que pide §5.3.
+            El valor es `STAGGER.deck` (90ms), el mismo peldaño que el mazo de
+            Control, porque §5.3 fija esos delays y no otros.
+
+            ⚠️ EL HOVER DE ESTAS CARDS YA NO VIVE EN CSS — LO ABSORBIÓ `useTilt`
+            EN a3, y esto cierra el estado transitorio que abrió a2.
+            Se retiraron cuatro clases y ninguna es un descarte: `shadow-sm` y
+            `hover:shadow-[0_4px_20px_…/0.10]` los emite ahora el hook como un
+            solo `box-shadow` de dos capas (la de reposo vale exactamente lo que
+            valía `shadow-sm`); `hover:-translate-y-1` es el `whileHover` con
+            `DIST.elevacionHover`; y `active:scale-[0.98]` es el `whileTap` con
+            `TILT.pulsado`. También cae el `transition-all`: una transición CSS
+            sobre `box-shadow` pelearía con el valor que motion reescribe en
+            cada cuadro y produciría arrastre.
+            El motivo por el que había que absorberlas está verificado en el
+            paquete (`motion-dom/.../build-transform.mjs:65-67`): en cuanto la
+            card anima `y`, motion escribe `transform` inline —y `transform:
+            none` al volver al default—, y el inline gana a la utilidad de
+            Tailwind. Convivir era imposible; no era una preferencia.
+            ⚠️ NO devuelvas ninguna de las cuatro "por si acaso": reintroducirlas
+            no las revive, solo deja clases muertas que la próxima auditoría
+            tendrá que volver a diagnosticar. */}
+        <Stagger className="grid sm:grid-cols-3 gap-4" gap={STAGGER.deck}>
+          {features.map((f, i) => (
+            <motion.div
+              key={f.title}
+              data-lp-reveal=""
+              variants={VARIANTES_ITEM}
+              transition={transicionItem}
+              {...tilts[i]}
+              className={`flex flex-col bg-[var(--lp-surface)] rounded-2xl border-[0.5px] ${f.border} ${f.span === 2 ? 'sm:col-span-2' : ''} cursor-default`}
+            >
+              <div className="p-6">
+                <div className="mb-4">{f.icon}</div>
+                {/* ═══ ROL H3 DE CARD (F1.3·d4) ═══
+                    19px · tracking -0.015em · leading 1.30 (§3.2). TRES sitios,
+                    11 instancias: las 5 cards del bento (aquí), las 3 de
+                    SeccionPortabilidad y las 3 de SeccionSeguridad.
+
+                    Venían de 15, 14 y 16px — tres tamaños para el mismo rol,
+                    el mismo patrón que d2 cerró en titulares y d3 en cuerpo.
+                    A 19px el título de card queda por encima del cuerpo (17)
+                    sin llegar al titular de sección (30–46): es el escalón
+                    intermedio que faltaba, y por eso coincide en tamaño con la
+                    bajada aunque sean roles distintos — los separa el peso.
+
+                    ⚠️ EL ROL NO DEFINE EL PESO. Aquí y en Portabilidad los H3
+                    siguen en `font-semibold`; en Seguridad, en `font-bold`.
+                    Esa diferencia es anterior a d4 y se conserva a propósito:
+                    el rol fija tamaño, tracking y leading, nada más. Si una
+                    tanda futura quiere unificar pesos, es otra decisión y otro
+                    barrido — no la cuele aquí.
+
+                    El -0.015em es el escalón más suave de la escala de
+                    tracking (titular -0.03, H1 -0.04, bajada -0.01): a 19px en
+                    negrita todavía compensa, pero poco. */}
+                <h3 className="text-[19px] font-semibold text-[var(--lp-ink-900)] tracking-[-0.015em] leading-[1.30]">{f.title}</h3>
+                {/* ═══ ROL CUERPO (F1.3·d3) ═══
+                    17px · tracking normal · leading 1.65 (§3.2). Es el texto
+                    corrido de la landing: SEIS sitios — este, SeccionExpediente,
+                    SeccionInterfaz, SeccionPortabilidad, SeccionSeguridad y los
+                    cuatro párrafos de SeccionHistoria (que lo heredan del div
+                    contenedor, no párrafo a párrafo).
+
+                    Venían de 13, 14 y 15px: tres tamaños distintos para el
+                    mismo rol, que es justo lo que d3 cierra. 17 es el mínimo
+                    cómodo para leer un párrafo entero, y 1.65 es más abierto
+                    que el 1.55 de la bajada a propósito — a menor tamaño, más
+                    interlínea. Sustituye a `leading-relaxed` (1.625), que
+                    quedaba cerca pero no era un valor del sistema.
+
+                    ⚠️ TRACKING NORMAL SIGNIFICA AUSENCIA DE CLASE, no
+                    `tracking-normal`. Nada en la cadena de ancestros toca el
+                    letter-spacing de la landing (verificado: computed =
+                    "normal" en los seis sitios), así que la clase no haría
+                    nada. A 17px no hay apelmazamiento que compensar — el
+                    tracking negativo es cosa de titulares. No se lo pongas.
+
+                    ⚠️ Este rol NO se aplica con selector. La advertencia
+                    completa, con la medición del scroll horizontal que
+                    provoca, está en SeccionHero.tsx junto al rol bajada. */}
+                <p className="mt-2 text-[17px] text-[var(--lp-ink-500)] leading-[1.65]">{f.desc}</p>
+              </div>
+              {f.media ? <div className="mt-auto overflow-hidden rounded-b-2xl" /> : null}
+            </motion.div>
+          ))}
+        </Stagger>
+      </div>
+    </section>
+  )
+}

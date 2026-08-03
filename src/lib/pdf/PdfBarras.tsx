@@ -57,7 +57,7 @@ export function BarraBottom({ colors, medico, consultorio }: BarraBottomProps) {
       <View style={{ width: '100%', height: 2, backgroundColor: colors.cs }} />
       <View style={s.contactRow}>
         {contactoParts ? <Text style={s.contactText}>{contactoParts}</Text> : null}
-        <Text style={s.branding}>Documento generado por Spinus® — La columna vertebral de tu práctica médica</Text>
+        <Text style={s.branding}>Documento generado por Spinus — La columna vertebral de tu práctica médica</Text>
       </View>
     </View>
   )

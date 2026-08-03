@@ -11,6 +11,55 @@ Estado: 🔴 abierta · 🟡 en progreso · 🟢 resuelta (se elimina al cerrar)
 
 ---
 
+## 🔴 CUMPLIMIENTO REGULATORIO — PRIORIDAD MÁXIMA (bloqueante de lanzamiento)
+
+### RG-01 · Certificación NOM-024-SSA3-2012 ante DGIS
+
+**Estado:** no iniciado
+**Prioridad:** extremadamente alta — resolver marco legal ANTES del lanzamiento
+**Scope:** proyecto independiente. NO es parte de ningún trabajo de UI/landing.
+
+**Contexto**
+La NOM-004-SSA3-2012 regula el contenido del expediente clínico y obliga al
+MÉDICO. La NOM-024-SSA3-2012 regula el SISTEMA que lo gestiona y es la que
+aplica a Spinus. Quien la certifica es la DGIS (Dirección General de
+Información en Salud, Secretaría de Salud), mediante auditoría técnica.
+
+**Requisitos conocidos (verificar contra el texto oficial del DOF 30/11/2012)**
+- [ ] Catálogos oficiales de la Secretaría de Salud
+- [ ] CIE-10 en diagnósticos
+- [ ] Guías de Intercambio de Información en Salud (GIIS)
+- [ ] Interoperabilidad: HL7 / FHIR / DICOM
+- [ ] Seguridad de datos e integridad de registros
+- [ ] Trazabilidad: quién registró qué y cuándo
+
+**Preguntas abiertas antes de lanzar**
+- [ ] ¿Qué se puede operar y facturar legalmente SIN certificación?
+- [ ] ¿La obligación recae en el prestador de servicios de salud o en el
+      proveedor de software?
+- [ ] ¿Qué se puede y qué NO se puede afirmar en marketing sin el aval?
+- [ ] Verificar decreto DOF 15/01/2026, reforma a Ley General de Salud
+      Art. 71 Ter (digitalización obligatoria + interoperabilidad)
+- [ ] Costo, duración y prerrequisitos del proceso ante DGIS
+
+**Bloqueantes previos**
+- [ ] Audit log incompleto (existe, falta cobertura total de eventos)
+- [ ] Dashboard de super-admin sin pulir
+- [ ] Aviso de privacidad desactualizado: la LFPDPPP de 2010 fue abrogada
+      el 21/03/2025 por la nueva LFPDPPP (DOF 20/03/2025, reformada
+      14/11/2025). El INAI ya no existe; la autoridad es la Secretaría
+      Anticorrupción y Buen Gobierno. Aplica también a dranconacolumna.com
+      y al agente de WhatsApp.
+- [ ] Contrato de encargado del tratamiento con los médicos suscriptores
+- [ ] Definir y documentar política de acceso del super-admin a datos
+      clínicos de otros médicos
+
+**Riesgo si se ignora:** exposición médico-legal directa al titular
+(persona física, titular de la marca y responsable del tratamiento de datos
+sensibles de pacientes de terceros).
+
+---
+
 ## Etapa 5 — Refactor de roles
 
 ### E5-DT-1 — Cuatro pantallas leen data.error en vez de data.message
@@ -1481,6 +1530,1005 @@ verificadas contra el árbol posterior a esa limpieza.
 - **Decisión pendiente:** definir si el modo offline se elimina por completo o
   se reimplementa funcionando de verdad. El paso 1 no compromete ninguna de las
   dos vías.
+
+## Landing pública — auditoría de rediseño (julio 2026)
+
+Deuda detectada durante la auditoría y el plan de rediseño de la landing
+pública (`src/app/page.tsx`). Transcrita desde la sección 10 de
+`PLAN_LANDING_SPINUS.md` (2026-07-28). Ninguno de estos ítems es scope del
+rediseño en sí: son consecuencias o hallazgos colaterales del plan.
+
+**Ver también:** `RG-01 · Certificación NOM-024-SSA3-2012 ante DGIS` —
+apartado de prioridad máxima al inicio de este archivo, bloqueante de
+lanzamiento oficial. Proyecto independiente, no es scope de este plan.
+
+### LP-DT-1 — Réplica HTML/CSS de la receta desfasable respecto al PDF real
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de landing (2026-07-28)
+- **Descripción:** Réplica HTML/CSS de la receta desfasable respecto al PDF
+  real.
+- **Materializada en F3 (2026-08-02):** la réplica ya existe —
+  `src/components/landing/teaser2/RecetaPapel.tsx`— y copia a mano
+  `src/lib/pdf/RecetaPdf.tsx`, `PdfHeader.tsx` y `PdfBarras.tsx`. **Nada
+  detecta el desfase**: ni el build, ni el lint, ni un test. Si alguien cambia
+  el PDF real, la landing enseña un documento que ya no se emite.
+- **Mitigación aplicada, que NO cierra la deuda pero la hace auditable:** la
+  unidad de la réplica es `--rx-u = 100cqw / 612`, y 612pt es el ancho de una
+  hoja carta en `@react-pdf`. Cada número escrito con `u(n)` es LITERALMENTE
+  el número del PDF (`u(8)` ↔ `fontSize: 8`, `u(50)` ↔
+  `paddingHorizontal: 50`). Comparar las dos versiones es comparar dos
+  columnas de cifras, no reinterpretar un diseño. **Quien toque `RecetaPdf`
+  tiene que abrir también `RecetaPapel`.**
+- **Desvío conocido y aceptado:** la réplica usa **Inter**, no Roboto. §5.7
+  pedía igualar la fuente del PDF; la única copia de Roboto del repo son
+  ~2.6MB de base64 en `src/lib/pdf/fonts.ts`, importado dinámicamente solo al
+  generar PDFs. Servirlo a la landing, o añadir una segunda familia por
+  webfont, es peso nuevo contra el presupuesto de LCP de §4.3·9. Se prefiere
+  el desvío tipográfico al coste de carga.
+- **Condición de cierre:** o un test de snapshot que renderice los dos y
+  compare geometría, o aceptar el desfase como permanente y anotarlo en la
+  cabecera de los dos archivos.
+
+### LP-DT-2 — Recapturar imágenes de landing cuando cambie la UI
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de landing (2026-07-28)
+- **Descripción:** Recapturar imágenes de landing cuando cambie la UI de
+  agenda, expediente o recetas. Manifest con fecha y versión en
+  `/public/capturas/`.
+
+### LP-DT-3 — Unificar la app a Inter
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de landing (2026-07-28)
+- **Descripción:** Unificar la app a Inter; al hacerlo, recapturar.
+
+### LP-DT-4 — Generación de PDF no probada en gama media/baja
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de landing (2026-07-28)
+- **Descripción:** Generación de PDF no probada en gama media/baja — riesgo
+  aceptado.
+
+### LP-DT-5 — Estado vacío del visor DICOM en móvil
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de landing (2026-07-28)
+- **Descripción:** Estado vacío del visor DICOM en móvil — hoy no existe.
+  Debe mostrar "Disponible en computadora", no un visor roto.
+
+### LP-DT-6 — Bug de sync de Google Calendar
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de landing (2026-07-28)
+- **Descripción:** Bug de sync de Google Calendar — bloquea el claim "en
+  tiempo real" en toda la página.
+
+### LP-DT-7 — Dashboard que los médicos no entienden
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de landing (2026-07-28)
+- **Descripción:** Dashboard — si los médicos no entienden qué es (razón por
+  la que se quitó de la landing), es señal de producto, no de copy.
+
+### LP-DT-8 — Almacenamiento de DICOM
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de landing (2026-07-28)
+- **Descripción:** Almacenamiento de DICOM — verificar Postgres vs Storage.
+
+### LP-DT-9 — Página de verificación de recetas
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de landing (2026-07-28)
+- **Descripción:** Página de verificación de recetas: minimización de datos
+  (la farmacia no necesita nombre completo ni CIE-10), `noindex`, y vigencia
+  del enlace.
+- **Actualización F3 (2026-08-02) — YA EXISTE LA REFERENCIA, y sigue sin
+  aplicarse a la página real.** `src/app/demo/receta/page.tsx` (lo que abre el
+  QR del Teaser 2) implementa **iniciales del paciente**, **sin diagnóstico ni
+  CIE-10** y **`robots: noindex`**. La página real
+  (`src/app/r/[folio]/page.tsx:104,113`) sigue publicando nombre completo y
+  diagnóstico tras una URL adivinable, y sin `noindex`. Portar la política es
+  copiar tres decisiones de un archivo al otro; lo que falta de verdad es la
+  **vigencia del enlace**, que sí necesita esquema (¿caduca? ¿a los cuántos
+  días? ¿qué se responde después?).
+- ⚠️ **NO "unifiques" las dos páginas igualando la demo a la real.** La demo es
+  la que está bien.
+
+### LP-DT-10 — Renderizador de recomendaciones inconsistente
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de landing (2026-07-28)
+- **Descripción:** Renderizador de recomendaciones inconsistente entre PDF
+  (parseado, con formato) y página web (texto crudo con emojis a la vista).
+  El paciente ve la peor de las dos.
+
+### LP-DT-11 — Marca de agua del PDF detrás de la tabla de medicamentos
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de landing (2026-07-28)
+- **Descripción:** Marca de agua del PDF detrás de la tabla de medicamentos
+  — ensucia el dato más importante al fotocopiar.
+
+### LP-DT-12 — Alineación del bloque final del PDF
+- **Estado:** 🔴 abierta
+- **Detectada:** Auditoría de landing (2026-07-28)
+- **Descripción:** Alineación del bloque final del PDF ("SOLICITAR CITA…")
+  fuera de la caja de alarma.
+
+### LP-DT-13 — Mini-mockup falso en SeccionExpediente
+- **Estado:** ✅ **CERRADA (2026-08-01)** — eliminada al montar el Video 1.
+  Con el bloque se fueron sus 13 nodos de contraste entre 2.51 y 2.63, sus
+  cinco tamaños fuera de escala (10/11/12/13/14px) y los tres semánticos de su
+  timeline, que e2 y e4 habían excluido explícitamente por ser UI falsa. Ningún
+  import quedó huérfano: los cinco iconos de `lucide-react` los siguen usando
+  el kicker y las viñetas.
+- **Efecto de alcance:** con esta y LP-DT-17 cerradas, **la landing ya no
+  dibuja ninguna interfaz en JSX**. La regla de fidelidad visual de §2·2 se
+  cumple sin excepciones vivas.
+- **Estado original:** 🔴 abierta
+- **Detectada:** F1.2 tanda (a) — eliminaciones (2026-07-30)
+- **Descripción:** `src/components/landing/sections/SeccionExpediente.tsx:40-72`
+  dibuja en JSX una tarjeta de paciente inexistente ("Carlos Méndez Ríos,
+  Exp. #1042") con contadores y timeline inventados. Es una violación de
+  fidelidad conocida: la landing muestra una UI que no es captura real del
+  producto. Se conserva deliberadamente en la tanda (a) por decisión de PM
+  para no dejar el grid `lg:grid-cols-2` de esa sección con una columna
+  vacía mientras no exista el reemplazo.
+- **Condición de cierre:** se elimina al integrar Video 1.
+
+### LP-DT-14 — NeuralBackground sin uso en la landing
+- **Estado:** 🔴 abierta
+- **Detectada:** F1.2 tanda (a) — eliminaciones (2026-07-30)
+- **Descripción:** NeuralBackground: sin uso en landing; conservado por
+  `/login`. Evaluar en rediseño de auth. El archivo
+  (`src/components/ui/NeuralBackground.tsx`, 325 líneas) queda como único
+  consumidor `src/app/login/page.tsx:8,126`. Arrastra canvas 2D,
+  `requestAnimationFrame` autoperpetuado y 5 listeners de `window`
+  (`mousemove`, `mouseleave`, `touchmove`, `touchend`, `resize`); no
+  registra `visibilitychange`, así que el rAF sigue corriendo con la pestaña
+  oculta salvo throttling del navegador. Además pinta su propio degradado de
+  fondo con contexto `alpha: false`, por lo que en `/login` el color de
+  fondo depende del canvas.
+
+### LP-DT-15 — Proyecto aparte: barrido de ® fuera de la landing
+- **Estado:** 🔴 abierta
+- **Detectada:** F1.2 tanda (a) — eliminaciones (2026-07-30)
+- **Descripción:** Quedan **43 símbolos ® en 23 archivos** fuera de la
+  landing pública (zonas 3, 4, 5, 6a y 6b del inventario reconciliado de
+  F1.2: app logueada, config/metadata, documentos legales, auth y entrada, y
+  otras superficies públicas). La marca está EN TRÁMITE ante IMPI
+  (exp. 3594483, sin registro concedido), así que usar ® es infracción.
+  F1.2 solo corrigió los 2 de la landing (`SeccionNav`, `SeccionFooter`); un
+  tercero se fue con `SeccionMockup` y un cuarto
+  (`SeccionInterfaz.tsx:45`) se resuelve con el copy de la tanda (c).
+  `src/lib/pdf/PdfBarras.tsx:60` se corrigió aparte en micro-commit por ser
+  cara al paciente.
+- **Notas especiales antes de tocar nada:**
+  - `src/components/legal/TerminosContent.tsx:711` — el ® **es el objeto de
+    la afirmación jurídica** ("La marca **Spinus®** y sus…"), y es la única
+    línea del repo con dos símbolos. No es un reemplazo de texto trivial.
+  - `src/app/(app)/perfil/page.tsx:43` — `'Spinus® (defecto)'` es el nombre
+    de un tema de color; **posible string persistido en DB — verificar**
+    antes de cambiarlo. Su gemelo congelado está en
+    `design/agenda/design_handoff_agenda/theme.js:60`.
+  - `src/app/manifest.json/route.ts:5` — es el **nombre de la PWA ya
+    instalada en dispositivos**; cambiarlo afecta instalaciones existentes.
+- **No tocar:** `SPINUS_LANDING_MAESTRO.md:518,520,563` (son la instrucción
+  misma de eliminar el ® y la nota del trámite IMPI), `CLAUDE.md:3`,
+  `.env.example:2` y el `design/**` congelado.
+
+### LP-DT-16 — Baseline de ESLint: 214 problemas preexistentes
+- **Estado:** 🔴 abierta
+- **Detectada:** F1.2 tanda (a) — eliminaciones (2026-07-30)
+- **Descripción:** `npx eslint .` sale con **exit 1 y 214 problemas
+  (125 errores, 89 warnings)** en un árbol sin cambios. La mayoría son los
+  prototipos de `design/**/*.jsx` (`'Icon' is not defined`,
+  `react/jsx-no-undef`), que no forman parte del build, más warnings
+  repartidos por la app. `npx tsc --noEmit` sí sale limpio (exit 0).
+- **Corrección de la cifra (auditoría de F1.2 tanda (b), 2026-07-30):** el
+  registro original decía 215/126/89. La medición en limpio sobre el árbol
+  de `4b99bf7` da **214/125/89** — un error menos, ya resuelto en la propia
+  tanda (a). Los warnings coinciden exacto.
+- **Criterio vigente:** la validación de las fases es **no-regresión contra
+  214/125/89**, no exit 0. Cualquier fase que suba ese número introdujo
+  deuda nueva y debe corregirla antes de cerrar.
+- **Condición de cierre:** excluir `design/` de la configuración de ESLint
+  (es handoff congelado, no código de producción) y luego atacar el
+  remanente real de `src/`.
+
+### LP-DT-17 — Marco de captura vacío en el hero
+- **Estado:** ✅ **CERRADA (2026-08-01)** — `public/landing/dashboard-spinus.png`
+  (1882×958) montada en el marco con `next/image`, `priority` y recorte por
+  `object-cover` / `object-left` a la región x 0–1533. El marco conservó
+  proporción, cromo y sangrado; solo se sustituyó el lienzo vacío y se
+  colorearon los tres puntos del semáforo. La fórmula del recorte y el porqué
+  de recortar por la derecha están en `SeccionHero.tsx`.
+- **Nota de cierre:** la condición decía "F0.c produce la captura real". F0.c
+  sigue ABIERTA como auditoría visual de la app; lo que se cerró es este
+  hueco concreto. Ver **LP-DT-30** y **LP-DT-31**, que nacen de esta captura.
+- **Estado original:** 🔴 abierta
+- **Detectada:** F1.2 tanda (c1) — copy de secciones de producto (2026-07-30)
+- **Descripción:** `src/components/landing/sections/SeccionHero.tsx:70-81`
+  renderiza el marco de ventana de la columna derecha (tres puntos, borde,
+  radio, lienzo `--sp-surface-muted`) **sin contenido**. §7·1 pide ahí una
+  captura real de la agenda sangrando por el borde derecho, pero F0.b
+  (cuenta demo) y F0.c (auditoría visual de la app) están bloqueadas y la
+  captura no existe.
+- **Decisión de PM:** espacio reservado declarado, NO mockup en JSX. Se
+  eligió dejar el marco vacío antes que dibujar una interfaz falsa —
+  justo el defecto que LP-DT-13 registra en `SeccionExpediente`.
+- **Efecto visible:** en pantallas `lg+` se ve un rectángulo liso con
+  cromo de ventana. Debajo de `lg` el marco va `hidden`, así que en móvil
+  no hay hueco.
+- **Condición de cierre:** F0.c produce la captura real y se inserta en
+  ese contenedor. No requiere cambio estructural: el marco ya tiene la
+  proporción (`aspect-[16/10]`) y el sangrado.
+
+### LP-DT-18 — `min-h-screen` usa `100vh` donde §4.3·10 pide `100dvh`
+- **Estado:** 🟢 **CERRADA (F6·f3, 2026-08-02)** — `min-h-screen` → `min-h-dvh`
+  en `src/app/(landing)/page.tsx`. Era el único sitio de la landing.
+  ⚠️ **Residual honesto:** la condición de cierre pedía verificar en iOS real,
+  y esta tanda NO validó en navegador (lo hace Angel). El cambio de utilidad es
+  mecánico y `dvh` está soportado desde iOS 15.4 / Chrome 108, así que el
+  riesgo de regresión es nulo; lo que queda sin confirmar es que el síntoma
+  original —el salto al mostrarse la barra de direcciones— desaparezca. Si
+  Angel lo ve todavía, la causa es otra y esta entrada se reabre.
+- **Detectada:** auditoría de F1.3 tanda (a) — route group + Inter (2026-07-30)
+- **Descripción:** `src/app/(landing)/page.tsx:18` aplica `min-h-screen` al
+  `<main>` de la landing. En Tailwind 4 esa utilidad es
+  `min-height: 100vh`. §4.3·10 del maestro es explícito: **"Móvil: `100dvh`
+  nunca `100vh`"**. `100vh` en iOS/Android no descuenta la barra de
+  direcciones, así que el alto reservado excede el viewport real y aparece
+  un salto al mostrarse/ocultarse la barra al hacer scroll.
+- **Por qué no se corrigió al detectarlo:** se detectó en la línea que la
+  tanda (a) estaba editando (retirada del `fontFamily` inline). Protocolo 1
+  de `CLAUDE.md` prohíbe aprovechar un cambio para arreglar lo que se ve de
+  paso, y (a) tenía prohibido tocar espaciado. Se registra en vez de
+  colarlo.
+- **Alcance:** 1 archivo, 1 clase (`min-h-screen` → `min-h-dvh`).
+- **Condición de cierre:** aplicarlo en F1.3 tanda (c) —espaciado— o, si
+  esa tanda no llega a tocar `page.tsx`, en F6 (pulido/móvil real vía
+  preview de Vercel). Verificar en iOS real, no en el emulador de
+  DevTools: es donde el síntoma se manifiesta.
+
+### LP-DT-19 — Problema↔Features sin separación cromática (padding donado)
+- **Estado:** 🟠 abierta — **síntoma mitigado por aire, causa raíz intacta**
+- **Detectada:** auditoría de F1.3 tanda (b) — superficies (2026-07-30)
+- **Actualizada:** QA visual de F1.3 tanda (b2) (2026-07-30)
+
+> **⚠️ ACTUALIZACIÓN b2 — LEER ANTES QUE EL CUERPO DE ABAJO.**
+> Dos hechos que el texto original daba por fijos ya NO lo son:
+> 1. **`SeccionProblema` sí declara superficie:** `bg-white` explícito. Lo
+>    que sigue prohibido es darle una superficie *distinta* a la de
+>    Features, no declarar la misma. La cita textual que este ítem hacía
+>    del comentario de contrato (*"Añadir pt aquí, o superficie de fondo,
+>    rompe las dos a la vez"*) ya no existe en el archivo: se corrigió a
+>    *"Añadir pt aquí rompe las dos a la vez"*, porque un `bg` no mueve
+>    ningún padding y la redacción vieja afirmaba algo falso.
+> 2. **La costura Problema↔Features es de 128px, no de 96.** El `pb-24` de
+>    Problema pasó a `pb-32`. La cadena vigente es
+>    `Hero (pb-24) → [96px] → Problema (sin pt … pb-32) → [128px] → Features`,
+>    asimétrica a propósito.
+>
+> **Qué resuelve eso y qué no.** La separación cromática **sigue ausente**:
+> el par continúa siendo la única pareja consecutiva con la misma
+> superficie, y la causa raíz — el padding donado — está intacta. Lo que se
+> mitigó es el *síntoma*: a 96px la costura era comparable al interlineado
+> de la propia frase (`leading-[1.10]` sobre ~46px ≈ 50px), y frase y
+> titular del bento se leían como un bloque continuo. A 128px la jerarquía
+> se recupera **sin tocar la arquitectura de padding**. El ítem no se
+> cierra: se degrada de 🔴 a 🟠.
+>
+> **La Opción B sigue disponible y sigue siendo la única solución real.**
+> Ver "Condición de cierre" abajo — sin cambios, salvo que el reparto ahora
+> parte de 128px, no de 96: `SeccionFeatures` tomaría `pt-32` y
+> `SeccionProblema` soltaría su `pb-32`.
+- **Descripción:** la alternancia de superficies de §3.1 deja **un único par
+  de secciones consecutivas con la misma superficie**: `SeccionProblema`
+  (blanca) y `SeccionFeatures` (blanca). Leen como una sola región blanca de
+  ~700px; lo único que las distingue es el salto tipográfico (una frase
+  suelta de 46px al 74% de ancho contra `<h2>` + bajada + retícula de 5
+  cards). No es error de asignación: es forzado, y por dos causas distintas
+  que coinciden en la misma costura.
+- **Causa raíz — padding donado (INTACTA tras b2):** `SeccionFeatures` no
+  declara `pt`. Sus 128px de aire superior los dona el `pb-32` de
+  `SeccionProblema`, y **el padding donado se pinta con la superficie del
+  donante**. Darle una franja a Features haría que la banda de color
+  arrancase en el borde superior del `<h2>`, con 0px de aire sobre el
+  titular. Simétricamente, Problema no puede tomar una superficie
+  *distinta* de la de Features: los 128px que dona quedarían teñidos y la
+  costura se leería como banda de color pegada al titular siguiente. Por
+  eso ambas comparten `bg-white` — la igualdad de superficie no es
+  descuido, es la única asignación que el padding donado admite. La cadena
+  vigente es `Hero (pb-24) → [96px] → Problema (sin pt … pb-32) → [128px]
+  → Features (sin pt)`, documentada en los tres contratos de costura de
+  `SeccionHero.tsx`, `SeccionProblema.tsx` y `SeccionFeatures.tsx` (sin
+  número de línea a propósito: se desplazan en cada tanda).
+- **Por qué tampoco sirve un borde:** un `border-b` en la `<section>` de
+  Problema cae en su borde inferior, es decir **128px por debajo de su texto
+  y 0px por encima del `<h2>` de Features**. El filete quedaría pegado al
+  titular siguiente en vez de a mitad del aire. La arquitectura de padding
+  donado hace que **tanto un cambio de superficie como un borde aterricen
+  asimétricos en esa costura**. No hay solución dentro de b1 ni de b2.
+- **Restricción adicional (independiente de la anterior):** aunque el
+  padding se repartiera, Problema no puede tomar franja mientras siga
+  inmediatamente después del Hero: el lavado `color-mix(#1e5fa8 4%, #fff)`
+  de `SeccionHero.tsx:17` resuelve a ≈`#f6f9fc`, a un punto por canal de la
+  franja `#f5f8fc`. Son el mismo color. Problema queda blanca por decisión
+  de PM y por aritmética.
+- **Decisión de PM:** se asume el par sin separación. La alternativa
+  (Opción B de la auditoría) exigía repartir el padding en 2 archivos y
+  reescribir los **tres** contratos de costura, que es justo lo que la
+  tanda (b) tenía prohibido tocar.
+- **Efecto visible (tras b2):** cero riesgo funcional. Solo lectura: el
+  visitante sigue sin percibir *frontera de superficie* entre la tesis del
+  problema y la retícula de capacidades, pero con 128px sí percibe cambio
+  de bloque. Discutible si es defecto — la franja del problema es la
+  bisagra hacia el bento y encadenarlas tiene lectura propia.
+- **Condición de cierre:** tanda futura que reparta el padding donado —
+  `SeccionFeatures` toma `pt-32`, `SeccionProblema` suelta su `pb-32` — y
+  con eso Features puede recibir `bg-[#f5f8fc]`. La colisión se muda
+  entonces a Features↔IA, ambas franja, enmascarada por el bloque navy de
+  `SeccionIA.tsx:10`. **Reescribir los tres contratos de costura en el mismo
+  cambio, no después:** si el reparto se aplica sin actualizarlos, los
+  comentarios pasan a describir una cadena que ya no existe y el siguiente
+  editor confía en ellos.
+
+### LP-DT-20 — Escalera de tarjetas de Seguridad DESCARTADA (§3.4·10 y §5.10 sin efecto)
+- **Estado:** ⚪ cerrada como decisión — **no es un pendiente**
+- **Decidida:** QA visual de F1.3 tanda (b1) — superficies (2026-07-30)
+- **Qué decía el maestro:** §3.4·10 pide las 3 tarjetas de Seguridad **en
+  escalera, no en fila**, y §5.10 fija los offsets en **0/24/48px estáticos**.
+  Se implementó en F1.2 tanda (c2) como
+  `const ESCALERA = ['sm:mt-0','sm:mt-6','sm:mt-12']` sobre un grid con
+  `items-start`.
+- **Por qué se descarta:** la QA visual sobre el render real mostró dos
+  fallos que la ficha de diseño no anticipaba.
+  1. **Zigzag, no diagonal.** Las 3 tarjetas tienen cuerpos de longitud muy
+     distinta (`SeccionSeguridad.tsx`, array `tarjetas`: 2 líneas / 1 línea /
+     2 líneas), y `items-start` —necesario para que el `mt` desplace algo—
+     impide que igualen altura. Offset desigual **sobre** altura desigual no
+     produce una diagonal legible: los tres títulos y los tres cuerpos acaban
+     a alturas sin relación entre sí. Lee como error de maquetación, que es
+     el efecto contrario al buscado.
+  2. **Desbordamiento horizontal.** El `sm:mt-12` de la tercera tarjeta la
+     empujaba fuera del ancho de contenido: su borde derecho salía del
+     contenedor `max-w-6xl`.
+- **Qué quedó en su lugar:** grid con `items-stretch` explícito. Las 3
+  tarjetas alineadas arriba y con altura compartida.
+- **Efecto sobre el maestro:** **§3.4·10 y §5.10 quedan sin efecto para esta
+  sección.** No hay que "volver a intentarlo" ni queda trabajo abierto. El
+  requisito de §3.4 que sí sigue vigente —que ningún esqueleto se repita dos
+  veces seguidas— lo cumple igual: Seguridad es la única retícula de 3
+  tarjetas centradas de la landing, y sus vecinas (Historia a 2 columnas con
+  retrato, CTA navy centrado) no comparten esqueleto.
+- **Condición para revisitarlo (solo si alguien lo pide, no pendiente):**
+  igualar la altura de los cuerpos de las 3 tarjetas, o fijar altura de
+  tarjeta, **antes** de reponer cualquier offset. Reponer los `mt` sin eso
+  reproduce el zigzag idéntico. El comentario de advertencia vive en
+  `SeccionSeguridad.tsx`, justo encima del componente.
+
+---
+
+### LP-DT-21 — Audit del export de expediente es fire-and-forget (hueco de trazabilidad NOM-024)
+- **Estado:** 🔴 abierta
+- **Detectada:** auditoría de la adenda de contenido previa a F1.3 (e) (2026-07-30)
+- **Descripción:** `src/components/expediente/ExportarExpedienteButton.tsx:127-135`
+  registra la exportación en `audit_log` con
+  `fetch('/api/audit', …).catch(() => {})`. El `.catch` vacío es deliberado
+  —el comentario de arriba dice "no bloquea ni revierte nada si falla"— pero
+  la consecuencia es que **si el POST falla, el PDF se entrega igual y no
+  queda ningún rastro de la exportación**. El PDF ya se generó en el cliente
+  antes de esa llamada, así que no hay forma de revertirlo.
+- **Por qué importa ahora:** exportar un expediente íntegro no es una lectura
+  más; el propio comentario del archivo lo invoca ("NOM-024"). Y desde esta
+  adenda la landing **anuncia la capacidad en público**
+  (`SeccionSeguridad.tsx`, pie de sección), lo que sube el volumen esperado
+  de uso y con él el de eventos perdidos.
+- **Fix propuesto:** reintentar una vez con backoff corto; si el segundo
+  intento también falla, encolar en `localStorage` vía `secureStorage` y
+  drenar al siguiente arranque. NO bloquear la entrega del PDF: el médico no
+  puede quedarse sin sus datos porque falle la bitácora.
+- **Condición de cierre:** que toda exportación entregada tenga entrada en
+  `audit_log`, o quede en cola persistente hasta tenerla.
+
+### LP-DT-22 — QW3 sube de prioridad: el endpoint ARCO queda expuesto por el copy de la landing
+- **Estado:** ✅ **cerrada (2026-07-31)** — QW3 aplicado en la tanda de la FAQ,
+  antes de que el copy que lo motivaba llegara a producción.
+  **Qué se hizo:** `src/app/api/paciente/[id]/exportar/route.ts` gatea ahora con
+  `canManageClinica(profile)` ANTES de tocar la base (un médico invitado no
+  puede ni confirmar que el paciente existe), responde `403 { error:
+  "forbidden" }` y registra el intento con la acción nueva
+  `arco_intento_denegado` (`src/lib/audit.ts`), con `await` y no
+  fire-and-forget: aquí no hay nada que entregar al usuario, así que no hay
+  prisa que justifique perder el evento.
+  **⚠️ Una desviación respecto al plan original de QW3, deliberada:**
+  **super_admin NO entra.** QW3 decía "super_admin + admin", pero se escribió
+  antes del refactor de roles de la etapa 4. Hoy `permissions.ts:31-34` fija la
+  doctrina contraria ("super_admin opera EXCLUSIVAMENTE vía
+  /api/super-admin/*"), y aunque entrara no serviría: la ruta usa el cliente
+  con sesión y las policies de `pacientes` no tienen rama de super_admin
+  (decisión D2-A), así que se llevaría un 404 después de pasar el gate — lo
+  peor de los dos mundos. El `admin` legacy tampoco existe desde
+  `20260519114652_etapa4a8_eliminar_rol_admin_legacy.sql`.
+  **Lo que sigue pendiente y NO lo cubre este cierre:** el endpoint continúa
+  sin UI. Nadie lo invoca desde la app; se protegió, no se integró.
+- **Estado anterior:** 🔴 abierta — **prioridad elevada**
+- **Detectada:** el pendiente es previo (ver `CLAUDE.md` § Pendientes de
+  seguridad, QW3). La **elevación de prioridad** es de esta adenda (2026-07-30)
+- **Descripción:** `src/app/api/paciente/[id]/exportar/route.ts` devuelve JSON
+  con TODO el expediente (datos personales, consultas, addendums, mediciones,
+  documentos) y **solo exige sesión autenticada: no valida el role**. QW3 ya
+  planeaba restringirlo a `super_admin` + `admin`.
+- **Qué cambia con la adenda:** hasta hoy el endpoint estaba dormido y sin UI.
+  A partir de que la landing dice públicamente *"Llévate tu información cuando
+  quieras"*, **es el primer sitio donde mirará quien vaya a buscar cómo se
+  exporta**. Un pendiente sin visibilidad pasa a ser superficie de ataque
+  documentada por nuestro propio marketing.
+- **Ojo con la confusión:** el endpoint ARCO **no es** lo que la landing
+  anuncia. El copy describe el botón de PDF cliente
+  (`ExportarExpedienteButton.tsx`), que sí está acotado por RLS. Son dos
+  caminos distintos hacia el mismo dato y solo uno está protegido.
+- **Fix:** el ya descrito en QW3 (validar role post-auth, `403` con
+  `{ error: "forbidden" }`, registrar `arco_intento_denegado` en `audit_log`).
+  ~15 líneas, 1 archivo.
+- **Condición de cierre:** QW3 aplicado. Debería ir **antes** de que la landing
+  con este copy llegue a producción.
+
+### LP-DT-23 — Nombre público del rol: "asistente médico" (decisión revertida el mismo día)
+- **Estado:** ✅ cerrada (2026-07-31) — las cuatro superficies visibles dicen lo mismo
+- **Detectada:** auditoría de la adenda de contenido previa a F1.3 (e) (2026-07-30)
+- **⚠️ ESTA FICHA SUSTITUYE A SU VERSIÓN ANTERIOR, QUE DECÍA LO CONTRARIO.**
+  El 2026-07-30 por la mañana se decidió que la palabra pública fuera
+  **"secretaria"** ("es la del médico mexicano") y esta ficha lo registró así.
+  Ese mismo día, al redactar la sección "Tu práctica, tuya", el PM revirtió:
+  la palabra pública es **"asistente médico"**. Si estás leyendo una copia
+  vieja de este registro o un comentario que diga "secretaria es la decisión",
+  está caducado.
+- **Estado por superficie:**
+
+  | Superficie | Dice | ¿Alineado? |
+  |---|---|---|
+  | `SeccionControl.tsx` (landing) | "asistente médico" | ✅ |
+  | `SeccionCTA.tsx` (landing) | "asistente médico" | ✅ corregido en esta tanda |
+  | `admin/usuarios/page.tsx:183` (UI de alta) | "Asistente Médico/a" | ✅ ya lo estaba |
+  | `ayuda/page.tsx:41-42` (FAQ) | "asistentes médicos" / rol "Asistente Médico/a" | ✅ corregido 2026-07-31 |
+  | `profiles.role` (enum de BD) | `secretaria` | ⬜ **NO SE TOCA** |
+
+- **⚠️ EL ENUM NO ENTRA EN ESTO.** `permissions.ts:52-54` y toda la capa de
+  RLS usan el valor `secretaria`. Renombrarlo es una migración con RLS,
+  policies y `isSecretaria()` de por medio, y **no aporta nada**: es un valor
+  interno que ningún usuario ve. Lo que se unifica es el RÓTULO.
+- **Cierre:** el FAQ se corrigió el 2026-07-31 con el resto de la unificación.
+  No queda ninguna superficie visible diciendo "secretaria"; el único sitio
+  donde sobrevive la palabra es el valor del enum en BD y los comentarios que
+  explican por qué no se toca.
+
+### LP-DT-24 — `ROLES_POST_REFACTOR.md` desfasado: marca como TBD límites que `plans.ts` ya tiene concretos
+- **Estado:** 🔴 abierta
+- **Detectada:** auditoría de la adenda de contenido previa a F1.3 (e) (2026-07-30)
+- **Descripción:** `ROLES_POST_REFACTOR.md:75-87` (§1.6, mapeo plan → tipo de
+  cuenta) da los límites de los planes comerciales como rangos con "(TBD)" y
+  remata: *"Los valores específicos de `max_medicos`/`max_secretarias` para los
+  planes comerciales son TBD (a definir cuando se comercialicen)"*.
+  **Ya están definidos y en producción** en `src/lib/plans.ts`:
+
+  | plan | `max_medicos` | `max_secretarias` | línea |
+  |---|---|---|---|
+  | `basica` | 3 | 1 | `plans.ts:68-69` |
+  | `pro` | 5 | 2 | `plans.ts:88-89` |
+  | `premium` | 10 | 2 | `plans.ts:110-111` |
+
+  Y se aplican de verdad: `src/app/api/admin/crear-usuario/route.ts:64-68`
+  rechaza con 403 al alcanzar el tope.
+- **Riesgo:** el doc de roles es la referencia que se consulta para decidir
+  qué promete cada plan. Que diga "TBD" invita a inventar cifras. Nótese que
+  `premium` **no sube de secretarias** respecto a `pro` (2 en ambos), cosa que
+  el rango "3+ (TBD)" del doc contradice de frente.
+- **Fuente de verdad:** `plans.ts`. El doc se sincroniza con él, no al revés.
+- **Condición de cierre:** §1.6 de `ROLES_POST_REFACTOR.md` con los valores
+  reales y sin "TBD".
+
+### LP-DT-25 — La retícula de Seguridad se rompe entre 640 y 768px (preexistente)
+- **Estado:** 🟠 **PARCIALMENTE RESUELTA (F6·f3, 2026-08-02)** — no cerrada.
+
+> **⚠️ ACTUALIZACIÓN F6·f3 — LEER ANTES QUE LA TABLA DE ABAJO.**
+> `SeccionSeguridad.tsx` pasó de `sm:grid-cols-3` a **`md:grid-cols-3`**. Lo
+> que eso arregla y lo que NO, con la misma medición de la tabla:
+>
+> | viewport | antes | ahora |
+> |---|---|---|
+> | 640 | 176px/tarjeta (3 col) | **576px (1 col)** ✅ |
+> | 768 | 218.67px (3 col) | **218.67px (3 col)** ❌ sin cambio |
+> | 1024 | 304px | 304px ✅ |
+>
+> **La franja 640–767 desaparece; la de 768–1023 sigue igual.** La condición
+> de cierre de este ítem es "ninguna tarjeta por debajo de ~240px en ningún
+> breakpoint", y a 768px son 218.67 — así que **no se cierra**. Cerrarla exige
+> `lg:grid-cols-3` (1024 → 304px), que es un cambio de composición mayor y no
+> estaba en el alcance de f3.
+>
+> **No se metió `sm:grid-cols-2` en medio**, pese a que el "fix propuesto" de
+> abajo lo sugería: son 3 tarjetas y dos columnas dejan la tercera huérfana a
+> media fila.
+>
+> **Y NO barre las otras dos retículas.** `SeccionFeatures.tsx:225` y
+> `SeccionPortabilidad.tsx:102` siguen en `sm:grid-cols-3`. El ítem pedía "las
+> tres o justificar por qué no": la justificación es que el alcance aprobado de
+> f3 nombraba Seguridad, y esas dos **no tienen medición propia** — sus
+> contenidos son más cortos y podrían aguantar los 176px sin partir títulos,
+> pero eso hay que medirlo, no suponerlo. **Quedan abiertas aquí.**
+
+- **Detectada:** auditoría de la adenda de contenido previa a F1.3 (e)
+  (2026-07-30), midiendo el layout con un cuarto elemento
+- **Descripción:** `SeccionSeguridad.tsx` usa `grid sm:grid-cols-3`, y `sm`
+  entra en **640px**. Medido en navegador sobre el ancho útil real (1088px a
+  1440; el contenedor `max-w-6xl` mide 1152 **exteriores** y `px-8` come 32 por
+  lado):
+
+  | viewport | ancho/tarjeta | alto de tarjeta | H3 | cuerpo |
+  |---|---|---|---|---|
+  | 1440 | 346.67px | 286.88 | 1/1/1 L | 4/3/3 L |
+  | 1024 | 304px | 314.92 | 1/1/1 L | 5/3/3 L |
+  | 768 | 218.67px | 395.70 | **2/2/2 L** | 7/4/6 L |
+  | 640 | **176px** | **507.89** | **2/3/2 L** | **11/6/8 L** |
+
+  A 640px cada tarjeta mide 176px, el título parte en hasta 3 líneas y un
+  cuerpo llega a 11. Tres columnas a ese ancho no son una retícula, son tres
+  tiras.
+- **Por qué no se arregló en la adenda:** el alcance aprobado era añadir un pie
+  de sección (opción C), que **no toca la retícula**. Cambiar el breakpoint es
+  una decisión de layout con su propia QA visual.
+- **Fix propuesto:** subir el corte a `md:grid-cols-3` (768px) y dejar
+  `sm:grid-cols-2` en medio, o pasar directo de 1 a 3 columnas en `lg`. Medir
+  antes: el mismo patrón `sm:grid-cols-3` está en `SeccionFeatures.tsx:145` y
+  `SeccionPortabilidad.tsx:53`, así que la decisión debería barrer las tres o
+  justificar por qué no.
+- **Condición de cierre:** ninguna tarjeta de Seguridad por debajo de ~240px de
+  ancho en ningún breakpoint.
+
+### LP-DT-26 — Retirar las cifras de soporte dejó a Premium sin escalón propio
+- **Estado:** 🔴 abierta — decisión de producto, no técnica
+- **Detectada:** tanda de la FAQ (2026-07-31)
+- **Descripción:** `plans.ts` publicaba dos compromisos de tiempo sin nada
+  detrás —"Soporte prioritario <24h" en Pro y "SLA de respuesta <8h" en
+  Premium—, sin ticketing, sin turnos y sin cláusula en los términos. El PM
+  ordenó sustituir ambos por "Soporte prioritario" sin cifra, para que la FAQ
+  pública pudiera comprometer UN techo ("nuestro objetivo es responder dentro
+  de las 24 horas hábiles") sin contradecir a `/pricing`. Aplicado.
+- **Lo que quedó torcido, y se deja anotado en vez de resolverlo por cuenta
+  propia:**
+  1. **Premium repite una línea que ya hereda.** Sus features abren con "Todo
+     lo de Clínica Pro", que ya incluye "Soporte prioritario". Sin cifras, la
+     línea propia de Premium no aporta nada: el escalón de soporte entre Pro y
+     Premium desapareció.
+  2. **Clínica Básica no lista soporte prioritario en absoluto**, pero la
+     pregunta 6 de la FAQ dice "los planes de clínica cuentan con atención
+     prioritaria" — y Básica es un plan de clínica. O la línea entra en
+     Básica, o la FAQ dice "los planes Pro y Premium".
+- **Por qué no se arregló aquí:** reempaquetar planes es de producto. La
+  instrucción era sustituir las cifras, no redistribuir features.
+- **Condición de cierre:** que la lista de features de los tres planes de
+  clínica y la pregunta 6 de la FAQ describan el mismo producto.
+
+### LP-DT-27 — Nueve `role="region"` seguidos en la FAQ son ruido de landmarks
+- **Estado:** 🔴 abierta — a11y, menor
+- **Detectada:** tanda de la FAQ (2026-07-31)
+- **Descripción:** cada panel del acordeón lleva `role="region"` +
+  `aria-labelledby`, según la instrucción de accesibilidad de la tanda. Es el
+  patrón del APG de acordeón, **pero el propio APG advierte de no usar `region`
+  cuando hay muchos paneles** (orientativamente más de ~6) porque cada uno se
+  convierte en un landmark y el menú de landmarks del lector de pantalla se
+  llena de ruido. Aquí son **nueve**.
+- **Por qué se dejó así:** el `role` venía indicado explícitamente en la
+  instrucción, y quitarlo tiene coste: sin `role`, el `aria-labelledby` del
+  panel deja de tener efecto (un `div` sin rol no toma nombre accesible).
+- **Fix propuesto:** cambiar `role="region"` por `role="group"` en los nueve.
+  `group` conserva el nombre accesible vía `aria-labelledby` y NO es landmark.
+  Una línea en `SeccionFAQ.tsx`.
+- **Condición de cierre:** verificar con un lector de pantalla real (VoiceOver
+  o NVDA) que el panel sigue anunciándose con el texto de su pregunta y que la
+  lista de landmarks de la página no crece en nueve entradas.
+
+### LP-DT-28 — LP-DT-25 empeora: la tarjeta 2 de Seguridad triplicó su cuerpo
+- **Estado:** 🟢 **CERRADA (F6·f3, 2026-08-02)** — este ítem describía el
+  agravamiento **en el tramo 640–767**, y ese tramo ya no existe: con
+  `md:grid-cols-3` las tres tarjetas van a una columna de 576px ahí, donde el
+  cuerpo largo de la tarjeta 2 no parte nada. Lo que sigue vivo es la deuda
+  madre, **LP-DT-25**, por la banda 768–1023 (218.67px/tarjeta). No dupliques
+  el seguimiento: se hace allí.
+- **Detectada:** tanda de la FAQ (2026-07-31)
+- **Descripción:** la corrección de B4 sustituyó el cuerpo de la tarjeta "Tu
+  información, separada" —una línea— por tres frases (médico, admin de clínica,
+  bitácora). Las 3 tarjetas comparten altura por `items-stretch`, así que la
+  más larga manda: la retícula entera crece.
+  LP-DT-25 ya medía que a 640px cada tarjeta cae a **176px de ancho** con
+  cuerpos de hasta 11 líneas; con este cuerpo, la columna del medio empeora en
+  ese tramo.
+- **Ojo con el diagnóstico:** el problema NO es el copy nuevo —que corrige un
+  claim falso y no se toca— sino el `sm:grid-cols-3` de `SeccionSeguridad.tsx`,
+  que mete tres columnas a partir de 640px. El fix es el de LP-DT-25 (subir el
+  corte a `md`, con `sm:grid-cols-2` en medio), y barre también
+  `SeccionFeatures.tsx:145` y `SeccionPortabilidad.tsx:53`.
+- **Condición de cierre:** la de LP-DT-25 — ninguna tarjeta de Seguridad por
+  debajo de ~240px de ancho en ningún breakpoint.
+
+### LP-DT-29 — El aviso de privacidad declara a Anthropic como encargado activo, y ya no lo es
+- **Estado:** 🔴 abierta — **documento legal desfasado**
+- **Detectada:** auditoría previa a la FAQ (2026-07-31)
+- **Descripción:** `AvisoPrivacidadContent.tsx:113-118` lista *"Anthropic, PBC
+  (Claude) — Extracción estructurada de resultados de laboratorio a partir de
+  archivos PDF"* con `status: 'activa'`, y `:475-476` repite que la plataforma
+  usa IA "de Google (Gemini) y Anthropic (Claude)". **Ese código murió en la
+  sub-fase 8C1 del rediseño de labs (2026-04-23)**, que eliminó
+  `/api/labs-extract`. Hoy el único proveedor de IA con callsite vivo en `src/`
+  es Google: `gemini-3.5-flash` en `nota-medica/route.ts:169,215`.
+  `@anthropic-ai/sdk` sigue en `package.json:15` como dependencia muerta (cero
+  imports).
+- **Por qué importa:** un aviso de privacidad que declara una transferencia
+  internacional de datos sensibles que no ocurre es un defecto del documento,
+  no un exceso de prudencia — describe mal el tratamiento real. Y la FAQ
+  pública enlaza al aviso.
+- **Fix:** pasar la fila de Anthropic a `status` histórico o retirarla, quitar
+  la mención de `:475-476`, subir la versión del aviso, y desinstalar
+  `@anthropic-ai/sdk`.
+- **⚠️ Verificar antes de retirarla del todo:** si hay planes cercanos de
+  reintroducir extracción de labs con Claude, conviene dejarla declarada; lo
+  que no puede quedarse es `status: 'activa'` describiendo algo que no pasa.
+- **Condición de cierre:** que los encargados listados en el aviso coincidan
+  uno a uno con los que reciben datos en el código.
+
+---
+
+### LP-DT-30 — La captura del hero lleva una fecha que envejece
+
+- **Estado:** 🟠 abierta — **pendiente de decisión de Angel**
+- **Detectada:** al montar la captura del hero (2026-08-01)
+- **Descripción:** `public/landing/dashboard-spinus.png` muestra
+  «Sábado, 1 De Agosto» y «Buenas tardes, Angel» sobre la tarjeta de próximas
+  citas, que a su vez dice «lun 3 ago · 09:00». En octubre la landing seguirá
+  enseñando una agenda de agosto.
+- **Por qué importa más de lo que parece:** es **el mismo defecto por el que se
+  eliminó el mockup original**, que estaba clavado en abril. La diferencia es
+  que aquel era UI falsa en JSX (LP-DT-13) y este es producto real, así que no
+  viola §2.2 — pero el síntoma que ve el visitante es idéntico: un producto que
+  parece abandonado. Y está en el hero, donde §1 sitúa el juicio de 50ms.
+- **Dos salidas, y la decisión es de Angel:**
+  1. **Aceptar como deuda** y recapturar cada cierto tiempo. Barato ahora, pero
+     entra en la cola de LP-DT-2 (recapturar cuando cambie la UI) y depende de
+     que alguien se acuerde.
+  2. **Recapturar sin el bloque de saludo**, encuadrando desde «PRÓXIMAS
+     CITAS» hacia abajo. Elimina la fecha *y* el nombre de pila, y de paso
+     sube el contenido de producto a la zona alta del marco. Cuesta una
+     captura nueva.
+  La fecha relativa de la tarjeta («lun 3 ago») envejece igual, así que la
+  opción 2 solo resuelve del todo si el recorte también la deja fuera.
+- **Condición de cierre:** Angel elige 1 o 2. Si elige 1, esta entrada se marca
+  como aceptada y se enlaza a LP-DT-2.
+
+### LP-DT-31 — La app llama «Buscar paciente» a lo que la landing llama «Búsqueda rápida»
+
+- **Estado:** 🔴 abierta
+- **Detectada:** al montar la captura del hero (2026-08-01)
+- **Descripción:** el panel de accesos rápidos del dashboard rotula el buscador
+  como **«Buscar paciente»** (visible en la captura, con su `Ctrl K` al lado).
+  La landing lo llama **«Búsqueda rápida»** en tres sitios:
+  `SeccionExpediente.tsx:55`, `SeccionInterfaz.tsx:129` y el copy de §7·8.
+- **Por qué es una regla y no una minucia:** §7·6 del maestro lo exige
+  literalmente — *«Un solo nombre para el buscador en TODA la página: "Búsqueda
+  rápida"»*. Con la captura montada, las dos palabras conviven **en la misma
+  pantalla**: el visitante lee «Búsqueda rápida» en el texto y ve «Buscar
+  paciente» en la imagen de al lado.
+- **Alcance probable:** rótulo de la UI del dashboard, más el resto de sitios
+  de la app donde aparezca el mismo control. **No se tocó en esta tanda a
+  propósito:** el alcance era la landing, y cambiar un rótulo de la app obliga
+  además a **recapturar** — o sea que va junto con LP-DT-30, no por separado.
+- **Condición de cierre:** un solo nombre en app y landing, y captura
+  regenerada con él.
+
+---
+
+### LP-DT-32 — El Video 1 muestra «Spinus®»
+
+- **Estado:** 🟠 **abierta — YA NO BLOQUEA EL MERGE** (autorización de Angel,
+  2026-08-02)
+
+> **⚠️ ACTUALIZACIÓN F6·f3 — ESTE ÍTEM CAMBIÓ DE NATURALEZA, NO DE CONTENIDO.**
+> El título y el estado decían **«bloquea la publicación de la landing»** y
+> **«BLOQUEA EL MERGE A `main`»**, con la instrucción expresa de parar y
+> preguntar a Angel antes de mergear. **Angel dio esa autorización el
+> 2026-08-02, nombrando esta deuda: decide publicar con el ® en el vídeo.**
+> La condición que el propio ítem exigía —visto bueno suyo y explícito— está
+> cumplida, así que la barrera se retira.
+>
+> **Lo que NO cambia, y es todo lo demás:** el ® sigue siendo uso de un
+> símbolo de registro sobre una marca **en trámite y sin conceder**, el
+> defecto sigue abierto, y la corrección sigue siendo la misma y en el mismo
+> orden. Esto es una **decisión de riesgo asumida por el titular del
+> proyecto**, no un problema resuelto ni una reevaluación de §7·Global. Nadie
+> debe leer este cambio de estado como que el ® pasó a ser aceptable.
+
+- **Decisión de Angel (2026-08-01, ampliada el 2026-08-02):** se publica así
+  **por ahora**. NO se corrige en F2 ni en F6: se corrige **al cerrar LP-DT-15
+  y regrabar**, en ese orden.
+- **Detectada:** al montar el Video 1 (2026-08-01), revisando el póster
+- **Descripción:** `public/landing/expediente-demo.mp4` / `.webm` es una captura
+  de PANTALLA con el navegador visible, y el título de pestaña dice
+  **«Spinus®»**. §7·Global del maestro no admite lectura: la marca está **en
+  trámite ante IMPI (exp. 3594483), sin registro concedido**, y usar ® es
+  **infracción**. El vídeo está montado para no dejar la sección coja, pero
+  **esta rama no puede ir a producción así**.
+- **⚠️ Y NO SE ARREGLA REGRABANDO SIN MÁS — DEPENDE DE LP-DT-15.** El ® no lo
+  pinta la landing: lo pinta **la app**. LP-DT-15 («barrido de ® fuera de la
+  landing») sigue abierta, así que *cualquier* grabación nueva de la app puede
+  volver a capturarlo, en la pestaña o en la propia interfaz. **El orden
+  correcto es: cerrar LP-DT-15 → regrabar → montar.** Nadie había conectado las
+  dos deudas; grabar antes del barrido es repetir el trabajo.
+- **El cromo del sistema en el asset se separó a LP-DT-34**, que Angel aceptó
+  de forma independiente.
+- **Segundo defecto, menor:** las cinco filas de pacientes ponen «1 ago 2026»,
+  así que envejece igual que LP-DT-30. Al regrabar, sembrar fechas variadas.
+- **Condición de cierre:** asset regenerado sin ®, sin cromo de navegador y sin
+  fechas que envejezcan, con el marco HTML activado.
+
+### LP-DT-33 — El Video 1 no se puede pausar: WCAG 2.2.2
+
+- **Estado:** 🟢 **CERRADA con residual aceptado (2026-08-01)** — se retiró el
+  `loop`. El vídeo corre una vez y se congela en el último fotograma, así que
+  **no queda movimiento automático continuo que parar**: desaparece el conflicto
+  entre 2.2.2 y la prohibición de `controls` de §6·4, sin botón de pausa y sin
+  reabrir esa regla. También deja de ser el único bucle infinito de la página,
+  que rozaba §12.
+- ⚠️ **RESIDUAL, y se deja escrito en vez de declarar cumplimiento pleno:** el
+  criterio 2.2.2 se dispara por **duración** —«lasts more than five seconds»—
+  y no por repetición, así que una pasada única de 15s todavía cae dentro de su
+  literalidad. La lectura del PM es que sin bucle no hay nada que parar, y se
+  acepta; pero si en F6 el barrido de accesibilidad quiere cumplimiento
+  literal, las dos salidas limpias siguen siendo:
+  1. **Pausar bajo `prefers-reduced-motion`** con un `ref` + efecto que llame a
+     `pause()`. No ramifica el render (§4.3·7): el árbol es idéntico y solo
+     cambia un efecto secundario.
+  2. **Recortar el asset a ≤5s**, que lo saca del alcance del criterio. Cambia
+     el contenido: el recorrido actual no cabe en 5 segundos.
+  La opción de un botón de pausa queda descartada: choca con §6·4 y ya no hace
+  falta.
+
+### LP-DT-34 — El Video 1 lleva cromo del sistema grabado (aceptado)
+
+- **Estado:** 🟠 abierta — **aceptada conscientemente por Angel (2026-08-01)**
+- **Descripción:** el asset es una captura de PANTALLA, no de ventana: se ven
+  el semáforo de macOS, la pestaña del navegador, los iconos de extensiones y
+  el fondo de escritorio alrededor. §6·1 pide capturar la ventana y §6·4 pone
+  el marco de ventana en HTML alrededor, de modo que el vídeo se lea como «la
+  interfaz corriendo» y no como un vídeo incrustado.
+- **Consecuencia en el código, para que nadie la deshaga por error:** el vídeo
+  se monta **SIN** el marco HTML del hero. Superponerlo daría **dos semáforos
+  anidados**, que es exactamente el efecto que §6·4 quiere evitar. El bloque de
+  marco está escrito y comentado dentro de `SeccionExpediente.tsx`, listo para
+  activarse — **no lo borres**: es la mitad del trabajo de la próxima grabación.
+- **Condición de cierre:** al regrabar (junto con LP-DT-32, que obliga a
+  hacerlo de todas formas), capturar **solo la ventana**, sin escritorio ni
+  cromo de navegador, y activar el marco HTML comentado. Las dos cosas van en
+  el mismo movimiento: asset limpio + marco descomentado.
+
+### LP-DT-35 — La cuenta demo escribe los nombres sin acentos, y el Video 1 los lleva grabados
+- **Estado:** 🔴 abierta
+- **Detectada:** F3 · Teaser 2 (2026-08-02), al verificar el hilo narrativo
+  entre el video de Expediente y la receta del teaser
+- **Descripción:** La cuenta demo tiene los nombres mal escritos y eso está
+  **grabado en píxeles** en `public/landing/expediente-demo.mp4/webm` y en su
+  póster. Verificado en el primer fotograma
+  (`public/landing/expediente-demo-poster.jpg`):
+  - paciente: **«Ana Gomez Sanchez»** — debería ser «Ana Gómez Sánchez»
+  - médico: **«Dr. Angel Perez»** — debería ser «Dr. Ángel Pérez»
+  - en la misma lista, «Pedro Jiménez Moreno» y «Juan García Bustamante» SÍ
+    van acentuados, así que no es una decisión de la cuenta: son faltas.
+- **Por qué importa:** el video es la pieza que sostiene «producto real en
+  movimiento» (§6). Un nombre sin acentos en la interfaz que se está usando
+  para vender rigor se lee exactamente como lo que es. Y F3 acaba de crear un
+  segundo punto de contacto: la receta del teaser nombra a la misma paciente
+  bien escrita, así que las dos secciones se contradicen a dos scrolls de
+  distancia.
+- **Decisión tomada en F3:** el teaser y `/demo/receta` usan la forma
+  **correcta** («Ana Gómez Sánchez»). No se replica la falta. El hilo
+  narrativo se sostiene igual — nadie lee «Gomez» y «Gómez» como dos personas.
+- **Corrección:** resembrar la cuenta demo con acentos (F0.b) y **regrabar el
+  Video 1**. No se arregla desde la landing.
+- ⚠️ **No lo "arregles" desacentuando `receta-demo.ts`.** Sería propagar la
+  falta a la única superficie donde hoy está bien.
+
+---
+
+## F6·f3 — lo que la última tanda antes del merge deja documentado
+
+Cinco hallazgos de la auditoría de F6 que **no se aplican** y quedan
+registrados con su medición. Ninguno bloquea el merge. Los cuatro puntos que
+sí se aplicaron (bordes de control, skip link, retícula de Seguridad, `dvh`)
+están anotados en LP-DT-18, LP-DT-25 y LP-DT-28, y en el bloque de «bordes de
+control» de `globals.css`.
+
+### LP-DT-36 — La landing y el producto comparten una sola hoja de CSS
+
+- **Estado:** 🟠 abierta — **rendimiento, aceptada; el fix es estructural**
+- **Detectada:** auditoría de F6 (2026-08-02)
+- **Descripción:** `/` sirve **una única hoja con el CSS de la app entera**.
+  Medido sobre el build de esta tanda
+  (`.next/static/css/3a3275540edac12b.css`):
+
+  | métrica | valor |
+  |---|---|
+  | tamaño sin comprimir | **183.961 B** (~180 KB) |
+  | bloques `{` | **2.355** |
+  | de ellos, at-rules | 257 (130 `@supports`, 71 `@property`, 29 `@keyframes`, 21 `@media`, 5 `@layer`) |
+  | selectores de regla contados en la auditoría | **1.306** |
+
+  El visitante de la landing descarga y parsea, en la ruta crítica, las reglas
+  del expediente, la agenda, el visor DICOM, el super-admin y los modales —
+  ninguna de las cuales puede llegar a aplicarse en `/`.
+- **Por qué NO se arregla aquí, y por qué no es un `content` mal configurado:**
+  en **Tailwind 4** el barrido de fuentes se declara desde el CSS con
+  `@source`, y la unidad de salida es el **entry point**. Partirlo obliga a
+  crear una segunda hoja de entrada con su `@source` acotado al árbol de la
+  landing (`src/app/(landing)/**` + `src/components/landing/**`) y a cablearla
+  solo en el layout de ese route group, dejando `globals.css` para el resto.
+  Eso son: un archivo CSS nuevo, un import movido, y una **duplicación
+  deliberada del bloque `:root`** de tokens `--lp-*` o su extracción a un
+  tercer archivo compartido — más la verificación de que ninguna utilidad que
+  la landing usa vive fuera de sus dos árboles (`ModalShell`, iconos, etc.).
+  No es una línea de configuración: es una reestructuración del pipeline de
+  estilos, y hacerla en la tanda previa al merge sería exactamente el tipo de
+  cambio que este proyecto ya pagó caro.
+- **⚠️ Antes de atacarlo, mide el beneficio real.** 180 KB sin comprimir NO son
+  180 KB en red: con Brotli una hoja de utilidades comprime muy bien y el coste
+  dominante puede ser el **parseo**, no la descarga. Si nadie ha medido LCP/CLS
+  con y sin la hoja partida, el ahorro es una hipótesis.
+- **Condición de cierre:** `/` sirve una hoja cuyo contenido sea solo el CSS
+  alcanzable desde la landing, con las métricas de arriba medidas de nuevo y
+  una comparación de LCP antes/después que justifique el cambio.
+
+### LP-DT-37 — La banda 768–1023 de §5.11 (Control) es una composición fija estirada
+
+- **Estado:** 🟠 abierta — **layout, tablet vertical**
+- **Detectada:** auditoría de F6 (2026-08-02)
+- **Descripción:** `SeccionControl.tsx` compone su mockup con **posiciones y
+  tamaños absolutos en píxeles**, y solo tiene dos juegos: `md:` (768) y `lg:`
+  (1024). Contados en el archivo: **38 utilidades `md:` y 28 `lg:`**, entre
+  ellas `md:w-[534px]`, `md:h-[358px]`, `md:left-[252px]`, `md:w-[168px]`,
+  `md:left-[124px]`, `md:left-[62px]`, `md:-left-[133px]`.
+
+  El problema es que ese juego `md:` tiene que servir **todo** el tramo
+  768–1023. El ancho útil es `viewport − 64` (contenedor `max-w-6xl` con
+  `px-8`), o sea:
+
+  | viewport | ancho útil | composición vigente |
+  |---|---|---|
+  | 768 | 704px | juego `md:` |
+  | 1023 | 959px | juego `md:` |
+  | 1024 | 960px | juego `lg:` |
+  | ≥1216 | 1088px (tope) | juego `lg:` |
+
+  Son **255px de holgura, un 36% de crecimiento**, con cada pieza clavada al
+  píxel. La figura y la tarjeta flotante no acompañan al contenedor: se quedan
+  ancladas donde las dejó el juego `md:` y el aire se acumula a un lado. A
+  1023px la composición está calculada para un lienzo 255px más estrecho del
+  que ocupa.
+- **Por qué no se corrigió:** el alcance de f3 eran cuatro puntos nombrados y
+  este no estaba. Además el arreglo correcto no es añadir un tercer juego de
+  píxeles —sería el mismo defecto con más ramas— sino pasar la composición a
+  unidades relativas al contenedor (`%`, `cqw` con container queries, o una
+  retícula), y eso es un rediseño de la sección con su propia QA visual.
+- **⚠️ No lo confundas con LP-DT-25.** Aquella es la retícula de Seguridad
+  (tarjetas que encogen); esta es el mockup de Control (piezas que no se mueven
+  cuando deberían). Coinciden en la banda por la misma razón —768 es donde este
+  proyecto salta de móvil a escritorio sin peldaño intermedio— pero son
+  arreglos distintos.
+- **Condición de cierre:** la composición de §5.11 mantiene sus proporciones a
+  768, 900 y 1023px sin que aparezca aire asimétrico.
+
+### LP-DT-38 — Quedan colores crudos de Tailwind en dos secciones (no tres)
+
+- **Estado:** 🟠 abierta — **coherencia de tokens, menor**
+- **Detectada:** auditoría de F6 (2026-08-02)
+- **Descripción:** §3.1 y la regla de la landing piden que todo color salga de
+  la escala `--lp-*`. Sobreviven **9 declaraciones vivas** en dos archivos:
+
+  | archivo | línea | valor crudo | qué pinta |
+  |---|---|---|---|
+  | `SeccionInterfaz.tsx` | 91 | `bg-[#f8fafc]` | fondo del panel de flujo |
+  | `SeccionInterfaz.tsx` | 91 | `border-slate-200/60` | borde del panel |
+  | `SeccionInterfaz.tsx` | 92 | `text-slate-400` | rótulo del panel |
+  | `SeccionInterfaz.tsx` | 115 | `bg-white` + `border-slate-200/60` | tarjeta de paso |
+  | `SeccionInterfaz.tsx` | 118 | `text-white` | número del paso |
+  | `SeccionInterfaz.tsx` | 121 | `text-slate-800` | título del paso |
+  | `SeccionInterfaz.tsx` | 122 | `text-slate-400` | descripción del paso |
+  | `SeccionIA.tsx` | 43 | `from-slate-900 via-slate-800 to-slate-900` | caja de gradiente |
+
+  Los equivalentes ya existen: `#f8fafc` **es** `--lp-surface-sunken`,
+  `bg-white` es `--lp-surface`, `text-white` es `--lp-ink-inverse`.
+- **⚠️ CORRECCIÓN AL ENUNCIADO DEL HALLAZGO: `SeccionHero.tsx` NO TIENE
+  NINGUNO.** El hallazgo se anotó como «Interfaz, IA y Hero». Verificado línea
+  a línea: los cuatro hits de Hero (`#4a9fd4` en :27, :339, :341, :343 y
+  `from-[#1a3a5c] to-[#4a9fd4]`) están **todos dentro de comentarios** que
+  documentan colores ya eliminados en F1.3·e3. Son prosa histórica, no código.
+  **No los "limpies": borrar esos comentarios borra el motivo por el que
+  #4a9fd4 no debe volver** (daba 4.40:1 en su peor punto).
+- **⚠️ Y EL GRADIENTE DE `SeccionIA.tsx:43` NO ES UN DESCUIDO — TIENE CONTRATO
+  ESCRITO.** El propio archivo (:28) razona que `slate-900/800` es casi negro y
+  `--lp-navy` es bastante más claro, o sea que **no son intercambiables**.
+  Además `--lp-ink-inverse-50` tiene su contrato ESTRECHADO a esa caja
+  precisamente por ser más oscura que navy: mide 5.23:1 sobre slate-900 y
+  4.80:1 en el punto más claro del gradiente (ver el aviso en `globals.css`).
+  **Sustituir el slate por navy rompe ese cálculo y tira el kicker de §5.4 por
+  debajo de AA.** Si se tokeniza, hay que crear tokens para el gradiente, no
+  reapuntarlo a los que ya hay.
+- **Por qué no se aplicó:** los 8 de `SeccionInterfaz` son mecánicos pero tocan
+  un mockup cuyo aspecto nadie iba a validar en esta tanda, y el de
+  `SeccionIA` no es mecánico en absoluto (ver arriba). Cambiar color sin QA
+  visual en la tanda previa al merge no compensa.
+- **Condición de cierre:** los 8 de `SeccionInterfaz` migrados a `--lp-*` con
+  QA visual del panel de flujo; el de `SeccionIA` resuelto **con tokens
+  propios** y re-midiendo el kicker, o declarado excepción permanente en
+  `globals.css` junto a la nota de `--lp-ink-inverse-50`.
+
+### LP-DT-39 — Sin `scrollbar-gutter: stable`: la landing salta al abrir modal
+
+- **Estado:** 🟠 abierta — **el fix es global y la landing no puede decidirlo
+  sola**
+- **Detectada:** auditoría de F6 (2026-08-02)
+- **Descripción:** `globals.css` no declara `scrollbar-gutter` en ningún sitio
+  (verificado: cero ocurrencias en todo el repo). En navegadores de escritorio
+  con barra de scroll clásica —Windows, y Chrome/Firefox en Linux—, cuando algo
+  bloquea el scroll del `<body>` la barra desaparece, el viewport gana ~15px de
+  ancho y **todo el contenido centrado se desplaza lateralmente**. En la landing
+  el disparador concreto es el modal de firma del Teaser 2
+  (`FirmaCanvas.tsx`), que se monta en `document.body` vía portal.
+- **⚠️ POR QUÉ NO SE APLICÓ, Y ES EL MOTIVO ENTERO:** el fix natural es una
+  línea, `html { scrollbar-gutter: stable; }` — pero `globals.css` **lo
+  comparte el producto entero**: login, agenda, expediente, visor DICOM,
+  super-admin. Reservar el canal de la barra en `html` cambia el ancho útil de
+  **todas** esas pantallas, incluidas las que ya reservan espacio por su cuenta
+  o las que tienen scroll interno. Es un cambio de alcance global metido en la
+  tanda previa al merge de una rama de landing, y esta tanda no audita el
+  producto. Es exactamente el patrón que el Protocolo 1 de `CLAUDE.md`
+  prohíbe.
+  Acotarlo a `.font-lp` **no funciona**: el que scrollea es el `<html>`, no el
+  `<div>` envolvente de la landing.
+- **Alternativas, para quien lo retome:** (a) aplicarlo global de verdad, con
+  QA de las pantallas del producto — es la salida limpia; (b) compensar el
+  ancho de la barra con `padding-right` al bloquear el scroll, que es más
+  código y más frágil; (c) aceptarlo: en macOS y en todo móvil las barras son
+  superpuestas y el salto no existe.
+- **Condición de cierre:** abrir y cerrar el modal de firma en Chrome/Windows
+  sin desplazamiento lateral del contenido, y las pantallas del producto sin
+  regresión de ancho.
+
+### LP-DT-40 — F1.4 (convertir secciones de la landing a Server Components): **NO APLICABLE**
+
+- **Estado:** ⚪ **DESCARTADA — no es deuda, es una fase que no procede**
+- **Decidida:** auditoría de F6 (2026-08-02)
+- **Qué proponía F1.4:** quitar `'use client'` de las secciones de la landing
+  para reducir el JS enviado al visitante.
+- **Por qué no procede, con la medición:** las **16** secciones de
+  `src/components/landing/sections/` llevan `'use client'`, y **14 de las 16
+  usan APIs que solo existen en cliente** — `useState`, `useRef`, `useScroll`,
+  `useTransform`, `useReducedMotion`, `motion.*`, `whileInView`, `whileHover`,
+  `onClick`. Contado por archivo:
+
+  | secciones | ocurrencias de API de cliente |
+  |---|---|
+  | Hero, FAQ | 32 cada una |
+  | Receta | 23 · Control 19 |
+  | Nav, Historia 11 · Problema 10 · Expediente 9 · Interfaz 8 | |
+  | CTA, Features, Precio, Seguridad 7 · Portabilidad 5 | |
+  | **Footer, IA** | **0** |
+
+  Las **dos** candidatas reales son `SeccionFooter` y `SeccionIA`. Y ninguna de
+  las dos sirve: **las dos importan `Reveal`**, que es un componente de
+  cliente. Convertirlas en Server Components no elimina ese import — lo deja
+  igual, solo cambia quién lo declara. **El JS enviado sería prácticamente el
+  mismo.**
+- **Y el objetivo que F1.4 perseguía ya está cubierto por otra vía:** `/` se
+  **prerenderiza estáticamente** (aparece como `○ (Static)` en la salida de
+  `next build`). El visitante recibe el HTML completo de las 16 secciones desde
+  el servidor, sin esperar a hidratar. Lo que F1.4 quería —HTML de servidor—
+  ya lo da el prerender; lo que no daría es menos JS, que es lo que el párrafo
+  anterior descarta.
+- **⚠️ Consecuencia práctica:** **no abras una fase para esto.** Si alguien
+  quiere reducir el JS de la landing, el trabajo real está en `motion` y en el
+  árbol de `Reveal`/`Stagger`, no en mover directivas `'use client'` de sitio.
+  Esa sí sería una fase con premisa medible, y sería otra.
 
 ---
 

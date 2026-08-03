@@ -1,0 +1,123 @@
+'use client'
+
+import Link from 'next/link'
+import Image from 'next/image'
+import Reveal from '@/components/landing/motion/Reveal'
+
+/* Footer — §7·13
+   Dos filas porque entran dos elementos nuevos: tagline y contacto. La
+   ausencia de un contacto real es, según §7·13, la mayor señal de
+   desconfianza de una landing de SaaS médico.
+
+   NO lleva la autoría ni las cédulas del fundador que §7·13 enumera: es un
+   footer de SaaS, no una firma profesional. Esos datos viven en la sección
+   Historia, que es donde el visitante busca quién está detrás.
+
+   NO lleva enlace "Cómo protegemos tu información": la ruta no existe todavía
+   y enlazarla sería un 404 en producción. Tampoco WhatsApp: no hay número.
+   Ambos entran cuando existan, no antes.
+
+   F1.3·b1: fuera `backdrop-blur-xl` y `bg-white/80` → `bg-white` opaco. El
+   footer cierra el documento: nada se desplaza por debajo, así que el blur
+   solo pagaba compositor sin producir efecto. El Nav SÍ lo conserva (§4.4)
+   porque ahí el contenido sí pasa por debajo — no unificar los dos casos.
+
+   F1.3·b2: los dos bordes de este archivo pasan a 0.5px/#e6ebf2. El de
+   arriba es la excepción 2 (chrome, como el del Nav); el de la fila 2 es
+   un divisor interno y va al mismo valor por coherencia.
+
+   ⚠️ F1.3·c1 — EL `py-8` DE ABAJO ES CHROME Y NO SIGUE EL RÉGIMEN DE
+   SECCIÓN, PERO LA COSTURA QUE FORMA ESTÁ EN EL SUELO DE §3.3.
+   El footer no es una sección de contenido: se queda en `py-8` (32)
+   mientras las 12 secciones pasaron a `py-16 sm:py-24 lg:py-32`. La
+   costura con SeccionCTA es su pb + estos 32:
+     móvil  64 + 32 =  96  ← EXACTAMENTE el mínimo de §3.3, sin margen
+     sm     96 + 32 = 128
+     lg    128 + 32 = 160
+   Cualquier bajada futura de este `py-8` o del `py-16` base del CTA
+   perfora el mínimo en móvil sin que nada falle visiblemente. Si hace
+   falta comprimir el cierre, comprime por dentro (las filas), no por
+   este padding. */
+export default function SeccionFooter() {
+  return (
+    <footer className="border-t-[0.5px] border-[var(--lp-border)] bg-[var(--lp-surface)]">
+      {/* ═══ §5.13b · F2.a·a1 — REVEAL SIMPLE, SIN PARALLAX ═══
+          Decisión de PM (B7): el footer no tenía ficha en §5 del maestro y
+          ahora la tiene. Es CIERRE, no contenido — entra como un bloque y se
+          acabó. Nada de `Parallax` (a4) ni de `Stagger` en los tres enlaces:
+          escalonar un pie de página es decorar por decorar.
+
+          El `<Reveal>` TOMA las clases del contenedor, no lo envuelve (7.1 de
+          la auditoría de F2.a). Aquí importa más que en las otras siete: el
+          `py-8` es la mitad del CONTRATO DE COSTURA con SeccionCTA que
+          documenta el comentario de cabecera de este archivo (96/128/160 según
+          breakpoint, y en móvil justo el mínimo de §3.3 sin margen). Moverlo a
+          un div interior o duplicarlo en un envoltorio perforaría ese mínimo
+          sin que nada falle visiblemente. Sobre el mismo elemento, el modelo
+          de caja es idéntico: `transform` y `opacity` no tocan el padding. */}
+      <Reveal className="mx-auto max-w-6xl px-4 sm:px-8 py-8">
+        {/* Fila 1 — marca + tagline · enlaces */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          {/* F1.3·c3 — `gap-2` (8). Ver SeccionNav.tsx: mismo lockup. */}
+          <div className="flex items-center gap-2">
+            <Image src="/logo-spinus.png" alt="Spinus" width={800} height={777} className="object-contain h-7 w-auto" />
+            {/* ═══ ROL CAPTION (F1.3·d4) ═══
+                13px · tracking normal · leading 1.45 (§3.2). Es el escalón más
+                bajo de la escala y el último de la tanda (d). Ocho instancias:
+                esta línea, los 3 links de este footer, la fila de contacto y
+                copyright de abajo, el cargo del Dr. Ancona en SeccionHistoria,
+                el pie de SeccionPortabilidad y los 2 chips de SeccionIA.
+
+                Casi todas ya estaban en 13; las que se movieron son la fila de
+                copyright (12 → 13) y los chips de IA (11 → 13). Con eso, 11 y
+                12px dejan de existir como tamaños de TEXTO en la landing —
+                sobreviven solo dentro de los dos mockups, donde son UI falsa
+                y están fuera de la tanda a propósito.
+
+                ⚠️ TRACKING NORMAL = AUSENCIA DE CLASE, igual que en cuerpo
+                (ver SeccionFeatures.tsx). A 13px la tentación es abrir el
+                tracking, pero eso es el rol KICKER (12px, +0.12em, uppercase),
+                que es otra cosa: el kicker es una versalita corta y el caption
+                es texto en caja baja. No los mezcles.
+
+                ⚠️ 1.45 es MÁS CERRADO que el 1.65 del cuerpo, al revés de lo
+                que sugiere la regla "a menor tamaño, más interlínea". Es
+                deliberado: los captions son de una o dos líneas y suelen vivir
+                en filas horizontales, donde un leading abierto los descuadra
+                contra el elemento vecino. La regla vale para texto corrido. */}
+            <span className="text-[13px] text-[var(--lp-ink-500)] leading-[1.45]">La columna vertebral de tu práctica médica</span>
+          </div>
+          <div className="flex items-center gap-6">
+            <Link href="/privacy" className="text-[13px] text-[var(--lp-ink-500)] leading-[1.45] hover:text-[var(--lp-ink-700)] transition-colors duration-[var(--sp-dur-micro)]">
+              Aviso de privacidad
+            </Link>
+            <Link href="/terms" className="text-[13px] text-[var(--lp-ink-500)] leading-[1.45] hover:text-[var(--lp-ink-700)] transition-colors duration-[var(--sp-dur-micro)]">
+              Términos de servicio
+            </Link>
+            <Link href="/pricing" className="text-[13px] text-[var(--lp-ink-500)] leading-[1.45] hover:text-[var(--lp-ink-700)] transition-colors duration-[var(--sp-dur-micro)]">
+              Planes
+            </Link>
+          </div>
+        </div>
+
+        {/* Fila 2 — contacto y copyright.
+            La prohibición de var(--sp-ink-350) por html.dark SIGUE VIGENTE (ver
+            SeccionProblema.tsx); lo que sustituyó al hex literal es --lp-*, que
+            es inmune por contrato. */}
+        <div className="mt-6 pt-6 border-t-[0.5px] border-[var(--lp-border)] flex flex-col sm:flex-row items-center justify-between gap-2 text-[13px] text-[var(--lp-ink-500)] leading-[1.45]">
+          {/* F1.3·e5 — este hover era `slate-600`, mientras los tres links de
+              arriba usaban `slate-700` para el mismo gesto. Los cuatro hover de
+              tinta del pie quedan ahora en --lp-ink-700: la diferencia de un
+              peldaño entre ellos no representaba nada. */}
+          <a
+            href="mailto:soporte@spinus.com.mx"
+            className="hover:text-[var(--lp-ink-700)] transition-colors duration-[var(--sp-dur-micro)]"
+          >
+            soporte@spinus.com.mx
+          </a>
+          <span>&copy; {new Date().getFullYear()} Spinus. Todos los derechos reservados.</span>
+        </div>
+      </Reveal>
+    </footer>
+  )
+}

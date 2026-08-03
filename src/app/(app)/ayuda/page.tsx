@@ -7,19 +7,48 @@ import {
   MousePointerClick, ArrowRight, ExternalLink,
 } from 'lucide-react'
 
-/* ── FAQ ── */
+/* ── FAQ ──
+   ⚠️ ESTA FAQ Y LA PÚBLICA (`components/landing/faq-contenido.ts`) HABLAN DEL
+   MISMO PRODUCTO. No son la misma lista —esta es operativa, para quien ya
+   entró; aquella responde objeciones de compra— pero cuando dicen lo mismo
+   tienen que decirlo igual. El 2026-07-31 se corrigieron aquí seis
+   divergencias, tres de ellas claims que §7·10 del maestro prohíbe
+   explícitamente y que estaban vivos en producción:
+
+     · "Cumplimos con la NOM-004-SSA3 y la LFPDPPP" — el obligado por esas
+       normas es el MÉDICO, no el software. Ninguna plataforma puede cumplir
+       la NOM-004 por su usuario, y decirlo en la app es exactamente el claim
+       que la landing tiene prohibido.
+     · "RLS para que cada médico solo vea sus datos" — FALSO para el médico
+       administrador de clínica, que ve los expedientes de todo su equipo
+       (`20260524_etapa5e_bd1_policies_pacientes.sql:52-63`). Mismo error que
+       se corrigió en `SeccionSeguridad.tsx` en esta tanda.
+     · "se cifra con AES-256-GCM en tránsito y en reposo" — inflado. El
+       AES-256-GCM que el aviso de privacidad respalda es el de los TOKENS
+       OAuth de Google (`AvisoPrivacidadContent.tsx:365`); el reposo de la
+       base es "a nivel de proveedor" (`:363`). No inventes el algoritmo de
+       otro.
+     · "se sincronizan bidireccional … y viceversa" — el bug de sync de Google
+       Calendar sigue abierto (§11 del maestro). Es el mismo motivo por el que
+       §7·9 prohíbe "en tiempo real" en la landing.
+     · "Spinus®" — la marca está EN TRÁMITE ante IMPI (exp. 3594483), sin
+       registro concedido: usar ® es infracción (§7·Global).
+     · "No necesitas instalar nada" — chocaba con lo que la landing dice en
+       Portabilidad. Ojo con el matiz: tampoco se promete lo contrario, porque
+       la instalación PWA en iOS real sigue SIN verificar (§10). Lo que se
+       afirma es lo único comprobado: que no hay que bajar nada de una tienda. */
 const faqs = [
   {
     q: '¿Mis datos están seguros?',
-    a: 'Sí. Toda la información se cifra con AES-256-GCM en tránsito y en reposo. La base de datos tiene Row Level Security (RLS) para que cada médico solo vea sus datos. Cumplimos con la NOM-004-SSA3 y la LFPDPPP.',
+    a: 'Sí. La información viaja cifrada con TLS y la base de datos está cifrada en reposo a nivel de proveedor. Row Level Security (RLS) los separa dentro de la propia base: cada médico ve solo a sus pacientes y, en cuentas de clínica, el administrador ve los expedientes de todo su equipo. La estructura del expediente sigue la NOM-004-SSA3 y el tratamiento de datos se rige por la LFPDPPP vigente; el obligado por esas normas eres tú, y Spinus te da la estructura para cumplirlas.',
   },
   {
     q: '¿Cómo conecto Google Calendar?',
-    a: 'Ve a Agenda y haz clic en el botón "Conectar Google Calendar". Se abrirá una ventana de Google donde autorizas el acceso. Una vez conectado, tus citas se sincronizan bidireccional — lo que creas en la app aparece en tu calendario y viceversa.',
+    a: 'Ve a Agenda y haz clic en el botón "Conectar Google Calendar". Se abrirá una ventana de Google donde autorizas el acceso. Una vez conectado, tus citas se sincronizan con tu calendario de Google.',
   },
   {
-    q: '¿Puedo usar Spinus® desde mi celular?',
-    a: 'Sí. La app es 100% responsive y funciona en cualquier navegador. No necesitas instalar nada — solo abre spinus.com.mx desde tu celular o tablet.',
+    q: '¿Puedo usar Spinus desde mi celular?',
+    a: 'Sí. La app se adapta a cualquier pantalla y funciona en cualquier navegador — solo abre spinus.com.mx desde tu celular o tablet. No necesitas descargar nada de una tienda de apps.',
   },
   {
     q: '¿Cómo cambio de plan?',
@@ -27,7 +56,13 @@ const faqs = [
   },
   {
     q: '¿Qué pasa si cancelo mi suscripción?',
-    a: 'Tu cuenta pasa al plan gratuito al final del periodo pagado. No pierdes tus datos — siguen ahí, pero algunas funciones premium se desactivan.',
+    /* Antes decía "algunas funciones premium se desactivan", que describe mal
+       lo que pasa: no se apaga ninguna función, se bloquea la CREACIÓN. Las
+       policies de gate son todas `FOR INSERT` y los SELECT/UPDATE no están
+       gateados, así que lo existente se sigue consultando y editando. Es
+       literalmente lo que dice el banner (`SuscripcionBanner.tsx:50-51`) y la
+       pregunta 1 de la FAQ pública. */
+    a: 'Tu cuenta pasa al plan gratuito al final del periodo pagado. Conservas el acceso: puedes consultar, editar y descargar todo lo que ya tienes. Lo que se bloquea es crear pacientes, consultas y documentos nuevos.',
   },
   {
     q: '¿La IA reemplaza mi criterio médico?',
@@ -38,8 +73,18 @@ const faqs = [
     a: 'Cada receta generada incluye un código QR único. Al escanearlo, se abre una página pública que muestra los datos de la receta para que la farmacia o el paciente puedan verificar su autenticidad.',
   },
   {
-    q: '¿Puedo agregar secretarias a mi cuenta?',
-    a: 'Sí. Desde Administración → Usuarios puedes crear cuentas con rol "Secretaria". Tienen acceso limitado — pueden ver pacientes y agendar citas, pero no generan documentos médicos ni acceden a notas clínicas.',
+    // El rótulo público del rol es "asistente médico" (LP-DT-23). El valor del
+    // enum en BD sigue siendo `secretaria` y no se toca: es interno.
+    q: '¿Puedo agregar asistentes médicos a mi cuenta?',
+    /* "Ven la lista de pacientes" es exacto y hay que conservarlo: la policy
+       `pacientes_select_activos` incluye el rol `secretaria`, así que el
+       asistente SÍ ve la ficha de todos los pacientes de la clínica. Lo que
+       no ve son consultas ni documentos (`consultas_select` solo admite
+       `medico_id = auth.uid() OR soy_admin_de_clinica()`).
+       ⚠️ La FAQ pública lo resume como "ve la lista de pacientes y la agenda,
+       nunca las notas ni los documentos". Si alguien acorta esta respuesta a
+       "solo la agenda", las dos dejan de coincidir Y la corta es la falsa. */
+    a: 'Sí. Desde Administración → Usuarios puedes crear cuentas con rol "Asistente Médico/a". Ven la lista de pacientes y la agenda —crean, mueven y cancelan citas—, pero no acceden a notas clínicas ni a documentos médicos.',
   },
 ]
 
@@ -117,7 +162,8 @@ export default function AyudaPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-900">Centro de ayuda</h1>
-            <p className="text-sm text-slate-500">Todo lo que necesitas para sacarle el máximo a Spinus®</p>
+            {/* Sin ® — §7·Global: marca en trámite ante IMPI (exp. 3594483). */}
+            <p className="text-sm text-slate-500">Todo lo que necesitas para sacarle el máximo a Spinus</p>
           </div>
         </div>
       </div>
