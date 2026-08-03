@@ -1669,7 +1669,25 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
 - **Condición de cierre:** se elimina al integrar Video 1.
 
 ### LP-DT-14 — NeuralBackground sin uso en la landing
-- **Estado:** 🔴 abierta
+- **Estado:** ✅ **CERRADA (rediseño de /login, 2026-08-03)** — archivo
+  eliminado (`src/components/ui/NeuralBackground.tsx`, 325 líneas). Se cumplió
+  la condición que la entrada misma fijaba: su único consumidor era `/login`, y
+  el rediseño le dio un fondo propio —`--lp-wash` en
+  `src/app/login/layout.tsx`, el mismo lavado de `--cs` al 4% que §3.1 mandó
+  para el hero y el CTA—, así que el canvas se quedó sin trabajo antes de
+  borrarse. Con él se van el `requestAnimationFrame` autoperpetuado, los 5
+  listeners de `window` y el contexto `alpha: false` que hacía que el color de
+  fondo de `/login` dependiera del canvas.
+- **Verificación previa al borrado** (Protocolo 2 de `CLAUDE.md`):
+  `grep -rn "NeuralBackground" src/` → 3 coincidencias, **todas comentarios**
+  (`login/page.tsx:37`, `SeccionHero.tsx:11`, `SeccionCTA.tsx:10`, las tres
+  documentando que el lavado CSS lo sustituye). **Cero imports, cero JSX.**
+  Las coincidencias fuera de `src/` son este documento y
+  `SPINUS_LANDING_MAESTRO.md:140`.
+- **Efecto en el lint:** el archivo aportaba 1 error de ESLint (`prefer-const`
+  en `NeuralBackground.tsx:70`). Es uno de los dos problemas que bajan el
+  baseline de LP-DT-16 de 214 a 212 en esta tanda.
+- **Estado original:** 🔴 abierta
 - **Detectada:** F1.2 tanda (a) — eliminaciones (2026-07-30)
 - **Descripción:** NeuralBackground: sin uso en landing; conservado por
   `/login`. Evaluar en rediseño de auth. El archivo
@@ -1685,10 +1703,27 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
 ### LP-DT-15 — Proyecto aparte: barrido de ® fuera de la landing
 - **Estado:** 🔴 abierta
 - **Detectada:** F1.2 tanda (a) — eliminaciones (2026-07-30)
+- **Actualización (rediseño de /login, 2026-08-03):** **41 símbolos en 22
+  archivos.** Bajan 2 símbolos y 1 archivo: `src/app/login/page.tsx` salió del
+  inventario. Eran el `<h1>` ("Spinus" con el símbolo) y la línea de copyright
+  del pie; los dos desaparecieron en la reescritura del render, no se
+  reemplazaron por texto equivalente.
+  ⚠️ **El archivo NO vuelve a entrar por sus comentarios.** La reescritura
+  documenta la eliminación en prosa —"sin símbolo de marca registrada"— sin
+  escribir el glifo, precisamente para que el `grep -rn "®"` que este registro
+  usa como inventario no lo cuente como pendiente. Si alguna tanda futura
+  reintroduce el símbolo en un comentario de ese archivo, romperá el conteo.
+  ⚠️ **`src/app/login/layout.tsx` NO cierra el `<title>`.** El nuevo layout de
+  `/login` se creó deliberadamente SIN `metadata` propia, así que la pestaña
+  sigue mostrando el "Spinus®" del layout raíz (`src/app/layout.tsx:5`), que
+  sigue contado aquí. Pisarlo con un `metadata` por ruta habría escondido el
+  síntoma en una ruta dejándolo vivo en las otras veinte; se arregla en el
+  archivo raíz, de una vez, cuando se ataque este registro.
 - **Descripción:** Quedan **43 símbolos ® en 23 archivos** fuera de la
   landing pública (zonas 3, 4, 5, 6a y 6b del inventario reconciliado de
   F1.2: app logueada, config/metadata, documentos legales, auth y entrada, y
-  otras superficies públicas). La marca está EN TRÁMITE ante IMPI
+  otras superficies públicas) — cifra de origen, ver la actualización de
+  arriba. La marca está EN TRÁMITE ante IMPI
   (exp. 3594483, sin registro concedido), así que usar ® es infracción.
   F1.2 solo corrigió los 2 de la landing (`SeccionNav`, `SeccionFooter`); un
   tercero se fue con `SeccionMockup` y un cuarto
@@ -2529,6 +2564,85 @@ control» de `globals.css`.
   quiere reducir el JS de la landing, el trabajo real está en `motion` y en el
   árbol de `Reveal`/`Stagger`, no en mover directivas `'use client'` de sitio.
   Esa sí sería una fase con premisa medible, y sería otra.
+
+### LP-DT-41 — Destello del formulario de /login antes del redirect por sesión válida
+- **Estado:** 🔴 abierta
+- **Detectada:** rediseño de /login (2026-08-03)
+- **Descripción:** quien llega a `/login` **con sesión local válida** ve el
+  formulario de acceso completo —logo, campos, botón— durante unas décimas
+  antes de que la página lo mande a `/inicio`. No es un fallo de render: es el
+  orden natural del flujo. `src/app/login/page.tsx` monta su árbol de forma
+  síncrona y el redirect vive dentro del `useEffect`, colgado de la promesa de
+  `supabase.auth.getSession()`. Entre pintar y resolver esa promesa hay un
+  hueco, y en ese hueco lo que está en pantalla es la pantalla de "no tienes
+  sesión" servida a alguien que sí la tiene.
+- **Precisión sobre el nombre:** se le ha llamado "el destello de *comprobando
+  sesión*", pero **no existe ninguna cadena con ese texto**: `grep -rn
+  "omprobando" src/` no devuelve nada, y `SessionGuard.tsx` no pinta rótulo
+  alguno (`return null`). Lo que destella es el formulario en sí. Se anota
+  porque buscar ese literal para arreglarlo es perder una tarde.
+- **Por qué NO se arregló en el rediseño:** está **fuera de scope por
+  decisión explícita** de esa tanda. El arreglo no es visual —no se resuelve
+  con un estado de carga bonito, que sería cambiar un destello por otro— sino
+  **de flujo**: hay que decidir dónde se resuelve la sesión antes de pintar.
+  Tocarlo obliga a entrar en el blindaje offline del `useEffect` (Sprint 3
+  Hotfix), que es justo lo que la tanda tenía prohibido mover.
+- **Direcciones posibles, ninguna elegida:** (a) resolver la sesión en
+  servidor y redirigir antes de pintar, lo que choca de frente con el blindaje
+  offline —que existe *porque* el proxy server-side empuja a `/login` en gray
+  zone mientras la sesión de cliente sigue viva—; (b) un gate de carga en el
+  layout de `/login` hasta que `getSession` resuelva, que cambia el destello
+  por una espera y penaliza al visitante SIN sesión, que es el caso mayoritario
+  y el legítimo. **La (b) es más barata y probablemente peor.** Cualquiera de
+  las dos es una sesión propia con su auditoría.
+- **Condición de cierre:** decisión de Angel sobre (a) o (b) y una tanda que
+  pueda tocar la lógica de sesión.
+
+### LP-DT-42 — `/privacidad` y `/privacy`: ruta duplicada sin canónica declarada
+- **Estado:** 🔴 abierta
+- **Detectada:** rediseño de /login (2026-08-03), al cambiar el enlace legal
+  del pie de esa pantalla. Fuera de scope de esa tanda.
+- **Descripción:** existen **dos rutas** para el mismo aviso de privacidad y
+  ninguna está declarada como canónica:
+  - `src/app/privacidad/page.tsx` → `<AvisoPrivacidadContent />`
+  - `src/app/privacy/page.tsx` → `<AvisoPrivacidadContent />`
+
+  Renderizan **el mismo componente**, con metadata equivalente. No hay
+  redirect de una a otra, ni `alternates.canonical`, ni nada en el proxy que
+  las reconcilie: las dos responden 200 con el mismo contenido.
+- **Reparto actual de enlazadores** (`grep -rn '"/privacy"\|"/privacidad"' src/`),
+  que es lo que hace que esto no sea teórico:
+  - → **`/privacy`**: `SeccionFooter.tsx:91` (landing pública),
+    `(app)/ayuda/page.tsx:270`, `login/page.tsx` (desde esta tanda).
+  - → **`/privacidad`**: `pacientes/nuevo/page.tsx:480`,
+    `QuickPatientModal.tsx:340`, `CommandPalette.tsx:392`,
+    `ConsultaRapidaModal.tsx:458`, `TerminosContent.tsx:166,642`,
+    `LegalLayout.tsx:61`, `Sidebar.tsx:355`.
+
+  O sea: **la landing y `/login` apuntan a una, y casi toda la app logueada a
+  la otra.** El rediseño de /login movió su enlace a `/privacy` por coherencia
+  con el footer de la landing, no porque `/privacy` sea la canónica — no lo es
+  todavía, porque nadie la ha declarado.
+- **Por qué importa y no es cosmético:**
+  1. **SEO** — contenido duplicado en dos URLs indexables sin `canonical`. Es
+     el mismo tipo de problema que la verificación de recetas indexable que
+     §10 del maestro tiene abierto.
+  2. **Consentimiento** — el aviso de privacidad es el documento que §
+     "Cumplimiento normativo" de `CLAUDE.md` exige antes de crear un paciente.
+     Dos URLs vivas para el documento legal significa dos sitios donde puede
+     divergir la versión si algún día una de las dos deja de leer el
+     componente compartido. Hoy no divergen; el riesgo es estructural.
+- **Lo que NO hay que hacer:** borrar una de las dos a secas. Ocho enlazadores
+  apuntan a `/privacidad`, y hay enlaces vivos fuera del repo (correos,
+  documentos ya enviados) que no se pueden reescribir. La salida es elegir
+  canónica, poner un **redirect permanente** desde la otra y propagar los
+  enlaces internos — no un `git rm`.
+- **Decisión pendiente de Angel:** cuál de las dos es la canónica. `/privacy`
+  tiene a su favor la coherencia con `/terms` y `/pricing`, que ya están en
+  inglés; `/privacidad` tiene a su favor que es la que más enlaces internos
+  concentra y la que probablemente está en enlaces externos.
+- **Alcance estimado:** 1 redirect + 8 enlaces internos + verificar que ningún
+  correo transaccional ya enviado apunte a la que se retire.
 
 ---
 

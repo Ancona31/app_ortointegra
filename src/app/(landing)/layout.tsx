@@ -1,40 +1,28 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
 import { PREGUNTAS_FAQ } from '@/components/landing/faq-contenido'
 import { PLANS } from '@/lib/plans'
+import { inter } from '@/lib/fonts'
 
 /* Layout de la landing pública — §3.2
-   Existe por una sola razón: montar Inter SOLO aquí. El layout raíz
-   (src/app/layout.tsx) lo comparten /login, /register, /pricing, /privacy,
-   /terms, /forgot-password, /reset-password y los grupos (app), (launcher)
-   y (offline); declarar la fuente ahí la mandaría al producto entero, que
-   es justo lo que §3.2 prohíbe ("solo en la landing"). El route group no
-   aparece en la URL: `/` sigue siendo `/`.
+   ⚠️ ESTE COMENTARIO DECÍA "existe por una sola razón: montar Inter SOLO
+   aquí". YA NO ES CIERTO y no debe volver a escribirse así. La fuente vive
+   ahora en `@/lib/fonts`, único call-site de `Inter()` del repo, y este
+   layout es UNO de sus consumidores: el otro es `src/app/login/layout.tsx`,
+   que estrena la familia con el rediseño de /login. Los dos son legítimos.
 
-   ⚠️ `axes: ['opsz']` es CORRECTO pese a que la doc embarcada diga otra cosa.
-   node_modules/next/dist/docs/01-app/03-api-reference/02-components/font.md:170
-   afirma que el eje extra de Inter es `slnt` — se quedó en Inter v3. La
-   fuente de verdad es el JSON que el validador realmente lee:
-   node_modules/next/dist/compiled/@next/font/dist/google/font-data.json,
-   entrada "Inter" → [{opsz 14–32}, {wght 100–900}]. `slnt` no existe.
-   Verificar SIEMPRE contra ese JSON, nunca contra la prosa de la doc.
+   Lo que SÍ sigue vigente es el motivo por el que la fuente no sube al
+   layout raíz: `src/app/layout.tsx` lo comparten /register, /pricing,
+   /privacy, /terms, /forgot-password, /reset-password y los grupos (app),
+   (launcher) y (offline); declararla ahí la mandaría al producto entero,
+   que es lo que §3.2 prohíbe. Montarla por layout es lo que la mantiene
+   acotada a las dos rutas que la usan.
 
-   `latin-ext` es obligatorio, no opcional: sin él se rompen "Ángel",
-   "Pérez", "práctica", "diseñado".
+   Este archivo conserva además su otra razón de ser, que nunca fue la
+   fuente: la metadata de `/` y los dos bloques de JSON-LD de más abajo.
+   El route group no aparece en la URL: `/` sigue siendo `/`.
 
-   Sin `adjustFontFallback: false` — se deja en su default `true`, que es
-   lo que genera la métrica de respaldo ajustada y protege el CLS del
-   presupuesto de §4.3·9.
-
-   Sin `font-optical-sizing` forzado — se deja en el `auto` del navegador.
-   Inter v4 se diseñó para eso, y la tanda (d) debe juzgar la escala
-   tipográfica con el eje ya activo, no neutralizado. */
-const inter = Inter({
-  subsets: ['latin', 'latin-ext'],
-  axes: ['opsz'],
-  variable: '--lp-font',
-  display: 'swap',
-})
+   Las opciones de la instancia (axes, subsets, display) y el porqué de cada
+   una están documentados en `src/lib/fonts.ts`. No se duplican aquí. */
 
 /* Metadata propia de `/`. Sobrescribe la del layout raíz SOLO para esta
    ruta: /login, /register y compañía no cuelgan de este grupo y siguen
