@@ -260,7 +260,13 @@ export default function SeccionReceta() {
                   type="button"
                   data-lp-paso=""
                   onClick={siguientePaso}
-                  className="lg:hidden mt-6 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--lp-surface-inverse-10)] border border-[var(--lp-border-inverse)] px-7 py-3.5 text-[15px] font-semibold leading-none tracking-[-0.01em] text-[var(--lp-ink-inverse)] active:scale-[0.97] transition-transform duration-[var(--sp-dur-micro)]"
+                  /* ⚠️ F6·f3 — `--lp-border-control-inverse` (blanco 40%,
+                     3.23:1 sobre navy) y no `--lp-border-inverse` (30%,
+                     2.45:1): WCAG 1.4.11. El RELLENO se queda en
+                     `--lp-surface-inverse-10` (1.35:1) a propósito — el
+                     criterio pide 3:1 al límite del control, y aquí lo dibuja
+                     el borde; el relleno no lo dibuja solo. */
+                  className="lg:hidden mt-6 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--lp-surface-inverse-10)] border border-[var(--lp-border-control-inverse)] px-7 py-3.5 text-[15px] font-semibold leading-none tracking-[-0.01em] text-[var(--lp-ink-inverse)] active:scale-[0.97] transition-transform duration-[var(--sp-dur-micro)]"
                 >
                   Armar la receta · paso {paso + 1} de {RECETA.pasos.length}
                   <ArrowRight className="w-4 h-4" />
@@ -396,7 +402,15 @@ export default function SeccionReceta() {
                       className={`inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-[13px] font-semibold leading-none transition-colors duration-[var(--sp-dur-micro)] ${
                         p.id === paleta.id
                           ? 'border-[var(--lp-ink-inverse)] text-[var(--lp-ink-inverse)] bg-[var(--lp-surface-inverse-10)]'
-                          : 'border-[var(--lp-border-inverse)] text-[var(--lp-ink-inverse-70)] hover:bg-[var(--lp-surface-inverse-5)]'
+                          /* ⚠️ F6·f3 — el NO seleccionado sube a
+                             `--lp-border-control-inverse` (3.23:1). Antes iba a
+                             `--lp-border-inverse` (2.45:1) y era el caso de
+                             manual de 1.4.11: sin relleno, el borde era todo
+                             el control. El seleccionado sigue en blanco pleno
+                             (11.64:1), así que el salto de estado se mantiene
+                             visible — que es lo que pide la segunda mitad del
+                             criterio, la que habla de ESTADOS. */
+                          : 'border-[var(--lp-border-control-inverse)] text-[var(--lp-ink-inverse-70)] hover:bg-[var(--lp-surface-inverse-5)]'
                       }`}
                     >
                       {/* Dos mitades: el navy manda en las barras y el acento en

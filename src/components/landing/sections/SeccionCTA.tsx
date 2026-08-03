@@ -187,9 +187,16 @@ export default function SeccionCTA() {
                 Empieza gratis <ArrowRight className="w-4 h-4" />
               </Link>
             </motion.div>
+            {/* ⚠️ F6·f3 — `--lp-border-control-inverse` (blanco 40%, 3.23:1
+                sobre navy), no `--lp-border-inverse` (30%, 2.45:1): este botón
+                no tiene relleno en reposo, así que su borde es su único límite
+                y WCAG 1.4.11 le exige 3:1. Es el mismo cambio que en el par de
+                §5.7. No lo devuelvas al token de 30% «por coherencia» con el
+                filete decorativo de las cards: son roles distintos, y el
+                bloque de globals.css lo explica. */}
             <Link
               href="/pricing"
-              className="inline-flex items-center px-7 py-3.5 rounded-xl text-[15px] font-semibold tracking-[-0.01em] leading-none text-[var(--lp-ink-inverse)] border border-[var(--lp-border-inverse)] hover:bg-[var(--lp-surface-inverse-10)] hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-[var(--sp-dur-micro)]"
+              className="inline-flex items-center px-7 py-3.5 rounded-xl text-[15px] font-semibold tracking-[-0.01em] leading-none text-[var(--lp-ink-inverse)] border border-[var(--lp-border-control-inverse)] hover:bg-[var(--lp-surface-inverse-10)] hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-[var(--sp-dur-micro)]"
             >
               Ver planes
             </Link>

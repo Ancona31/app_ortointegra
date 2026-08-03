@@ -223,7 +223,25 @@ export default function SeccionSeguridad() {
             estas tarjetas conservan su `transition-all`, al revés que las del
             bento — allí motion reescribe el `box-shadow` cada cuadro y la
             transición CSS estorbaba. */}
-        <Stagger className="grid sm:grid-cols-3 gap-6 items-stretch">
+        {/* ⚠️ F6·f3 — EL CORTE ES `md:` (768), NO `sm:` (640). Mitiga LP-DT-25
+            y LP-DT-28, que no se cierran del todo (ver la deuda). Medido sobre
+            el ancho útil real —`max-w-6xl` con `px-8`, o sea viewport − 64— y
+            `gap-6` (24) entre columnas:
+              · 640px con `sm:` → (576 − 48) / 3 = 176px por tarjeta, títulos
+                partidos en hasta 3 líneas y cuerpos de 11. Tres columnas a ese
+                ancho no son una retícula, son tres tiras.
+              · 640px con `md:` → 1 columna a 576px. Resuelto.
+              · 768px → (704 − 48) / 3 = 218.67px. MEJOR que 176, pero todavía
+                por debajo de los ~240px que LP-DT-25 puso como condición de
+                cierre. La banda 768–1023 sigue estrecha; está anotado.
+            NO se metió `sm:grid-cols-2` en medio: son 3 tarjetas, y dos
+            columnas dejan la tercera huérfana a media fila.
+            ⚠️ Este cambio NO barre `SeccionFeatures.tsx:225` ni
+            `SeccionPortabilidad.tsx:102`, que siguen en `sm:grid-cols-3` con
+            contenidos más cortos. La deuda pedía "las tres o justificar por
+            qué no": el alcance de f3 era esta sección, y las otras dos no
+            tienen medición propia. Quedan abiertas en LP-DT-25. */}
+        <Stagger className="grid md:grid-cols-3 gap-6 items-stretch">
           {/* ⚠️ Estas tarjetas son las que MÁS pierden en b1: eran el último
               glass de la landing (bg-white/30 + backdrop-blur-md), es decir
               azulejos esmerilados, y pasan a blanco sobre una sección blanca

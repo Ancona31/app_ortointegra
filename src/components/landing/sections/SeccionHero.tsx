@@ -94,7 +94,20 @@ export default function SeccionHero() {
   const sinMovimiento = { duration: 0, delay: 0 }
 
   return (
-    <section ref={seccionRef} style={{ background: 'var(--lp-wash)' }}>
+    /* ⚠️ F6·f3 — `id="contenido"` y `tabIndex={-1}` son el DESTINO del skip
+       link de `(landing)/page.tsx`. Si renombras el id, renómbralo allí; si
+       quitas el `tabIndex`, Safari no mueve el foco al saltar y el enlace pasa
+       a hacer solo scroll, que no es lo que 2.4.1 pide. El `-1` lo deja fuera
+       del orden de tabulación (nadie lo pisa navegando) y la regla de foco de
+       globals.css lo excluye a propósito
+       —`[tabindex]:not([tabindex="-1"])`— así que no se dibuja un anillo
+       alrededor de media pantalla. */
+    <section
+      ref={seccionRef}
+      id="contenido"
+      tabIndex={-1}
+      style={{ background: 'var(--lp-wash)' }}
+    >
       {/* F1.3·b1: aquí vivía un orbe de 800×500 con blur-3xl y un degradado
           que pasaba por violet-500. Eliminado por dos motivos de §3.1: el
           violeta no representa ningún dato del producto (los semánticos solo
@@ -471,9 +484,18 @@ export default function SeccionHero() {
                 Empieza gratis
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-[var(--sp-dur-micro)]" />
               </Link>
+              {/* ⚠️ F6·f3 — EL BORDE ES `--lp-border-control`, NO `--lp-border`,
+                  y no es un descuido de coherencia con las cards de al lado.
+                  Este botón es blanco sobre `--lp-wash`: el borde es LO ÚNICO
+                  que dibuja su límite, así que WCAG 1.4.11 le exige 3:1 y
+                  `--lp-border` mide 1.20:1. El hover baja a `--lp-ink-500`
+                  (5.44:1) y no a `--lp-border-strong` (1.42:1), que habría
+                  REDUCIDO el contraste al interactuar. Ver el bloque de
+                  «bordes de control» en globals.css antes de unificarlo con
+                  el filete de las cards. */}
               <Link
                 href="/pricing"
-                className="inline-flex items-center gap-2 text-[var(--lp-ink-700)] px-7 py-3.5 rounded-xl text-[15px] font-semibold tracking-[-0.01em] leading-none bg-[var(--lp-surface)] border border-[var(--lp-border)] shadow-sm hover:shadow-md hover:border-[var(--lp-border-strong)] hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-[var(--sp-dur-micro)]"
+                className="inline-flex items-center gap-2 text-[var(--lp-ink-700)] px-7 py-3.5 rounded-xl text-[15px] font-semibold tracking-[-0.01em] leading-none bg-[var(--lp-surface)] border border-[var(--lp-border-control)] shadow-sm hover:shadow-md hover:border-[var(--lp-ink-500)] hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-[var(--sp-dur-micro)]"
               >
                 Ver planes
               </Link>

@@ -25,12 +25,50 @@ import SeccionFooter from '@/components/landing/sections/SeccionFooter'
    tres veces — globals.css `body` y el `antialiased` de layout.tsx:19. */
 export default function HomePage() {
   return (
-    <main className="min-h-screen relative">
+    /* F6·f3 — `min-h-dvh`, NO `min-h-screen`. Cierra LP-DT-18. En Tailwind 4
+       `min-h-screen` es `100vh`, y §4.3·10 del maestro es explícito: "Móvil:
+       `100dvh` nunca `100vh`". `100vh` en iOS/Android no descuenta la barra de
+       direcciones, así que el alto reservado excede el viewport real y aparece
+       un salto al mostrarse/ocultarse la barra con el scroll. No lo devuelvas
+       a `screen`. */
+    <main className="min-h-dvh relative">
       {/* No pinta nada. Es el único listener de la página para la escotilla de
           teclado de los reveals: sin él, sacar los controles ocultos del orden
           de tabulación dejaría media página inalcanzable. Ver el aviso largo
           de `RevelarPorTeclado.tsx` antes de moverlo o quitarlo. */}
       <RevelarPorTeclado />
+      {/* ═══ SKIP LINK (F6·f3 · WCAG 2.4.1) ═══════════════════════════════
+          Primer elemento tabulable de la página, y tiene que seguir siéndolo:
+          va ANTES de `<SeccionNav />` y cualquier cosa que se cuele por encima
+          se lo roba. `RevelarPorTeclado` no cuenta — devuelve `null`.
+
+          ⚠️ APUNTA A LA `<section>` DEL HERO, NO A ESTE `<main>`, y no es un
+          atajo: el nav vive DENTRO de `<main>`, así que saltar a `<main>`
+          dejaría los tres enlaces del nav todavía por delante en el orden de
+          tabulación — o sea un skip link que no salta nada. El destino tiene
+          que estar PASADO el nav, y el hero es el primer contenido que lo
+          está. Si alguna tanda saca el nav fuera de `<main>`, este href puede
+          volver a `#contenido` sobre el propio `<main>`.
+
+          `sr-only` + `focus:not-sr-only`: invisible salvo con foco, que es lo
+          que pide el patrón. `focus:fixed` y no `absolute` para que siga
+          alcanzable si se llega con Shift+Tab desde media página; el `fixed`
+          va en el propio enlace y NO en un ancestro, así que no toca la
+          cadena del `sticky` del nav (ver el aviso de `(landing)/layout.tsx`).
+          `z-[60]` porque el nav es `z-50` y si no queda por debajo del blur.
+
+          Contraste del anillo: el enlace se pinta sobre `--lp-surface`
+          (blanco) y el anillo lo dibuja la regla única de `globals.css` en
+          `--lp-focus` → `--lp-accent`. Con `outline-offset: 2px` el anillo cae
+          sobre el fondo del hero, que es `--lp-wash` (#f6f9fc): el acento mide
+          6.45:1 contra blanco y 6.36:1 contra ese lavado — muy por encima del
+          3:1 de 1.4.11. No hace falta redefinir `--lp-focus` aquí. */}
+      <a
+        href="#contenido"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:inline-flex focus:items-center focus:rounded-xl focus:border focus:border-[var(--lp-border-control)] focus:bg-[var(--lp-surface)] focus:px-5 focus:py-3 focus:text-[15px] focus:font-semibold focus:leading-none focus:tracking-[-0.01em] focus:text-[var(--lp-ink-900)] focus:shadow-lg"
+      >
+        Saltar al contenido
+      </a>
       <SeccionNav />
       <SeccionHero />
       <SeccionProblema />

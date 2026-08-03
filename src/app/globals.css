@@ -221,6 +221,47 @@
   --lp-border-strong:  #cad5e2;                  /* hover */
   --lp-border-inverse: rgb(255 255 255 / .30);   /* sobre navy */
 
+  /*
+   * ═══ BORDES DE CONTROL (F6·f3) — NO CONFUNDIR CON LOS DE ARRIBA ═════════
+   * Existen porque WCAG 1.4.11 exige 3:1 al contorno de un COMPONENTE DE
+   * INTERFAZ, y los tres tokens de arriba no llegan:
+   *   --lp-border          #e6ebf2          1.20:1 sobre blanco
+   *   --lp-border-strong   #cad5e2          1.42:1 sobre blanco
+   *   --lp-border-inverse  blanco al 30%    2.45:1 sobre --lp-navy
+   *
+   * ⚠️ Y AUN ASÍ NO SE SUBEN, A PROPÓSITO. 1.4.11 aplica a controles, no a
+   * bordes decorativos: el filete de 0.5px de las cards, los divisores del
+   * footer y del nav, y los mockups de §5.9 son SUPERFICIE o SEPARACIÓN, no
+   * contorno de nada accionable. Están a 1.20:1 porque así se diseñó la
+   * página, y subir `--lp-border` cambiaría el aspecto de las ~28 cards de
+   * la landing para corregir dos botones. Por eso el token es nuevo y no
+   * un reajuste del viejo: separa el rol, no lo pisa.
+   *
+   * CUÁNDO USAR ESTOS Y NO LOS DE ARRIBA — la prueba es una sola pregunta:
+   * ¿el borde es lo ÚNICO que dibuja el límite de algo que se puede pulsar,
+   * enfocar o escribir? Si sí, va aquí. Si el control ya tiene relleno
+   * contrastado o contorno blanco pleno (`--lp-ink-inverse`, 11.64:1 sobre
+   * navy — ver el primario de §5.7), NO hace falta: el límite ya está.
+   *
+   * VALORES MEDIDOS (fórmula de luminancia relativa de WCAG 2.x):
+   * · #7d8ea3 → L 0.2633 → 3.35:1 contra #ffffff.  Es el gris azulado más
+   *   claro que deja margen sobre el umbral; #8697ab, el siguiente peldaño
+   *   hacia arriba, da 2.99:1 y NO pasa. No lo aclares "un poco".
+   * · blanco al 40% sobre --lp-navy compone #75889d → L 0.2410 → 3.23:1.
+   *   Al 30% son 2.45:1 y al 38% ronda 3.10:1; el 40% es el escalón limpio
+   *   con margen.
+   * Si cambias --lp-navy, RE-MIDE el inverso: su contraste depende del
+   * fondo sobre el que se compone, no del alfa.
+   *
+   * No hay `--lp-border-control-strong` para el hover, y es deliberado: hoy
+   * un solo consumidor cambia el borde al pasar el ratón (el «Ver planes»
+   * del hero) y apunta directo a `--lp-ink-500` (5.44:1). Un token con un
+   * único uso sería abstracción especulativa; cuando haya un segundo, se
+   * declara.
+   */
+  --lp-border-control:         #7d8ea3;               /* 3.35:1 sobre blanco */
+  --lp-border-control-inverse: rgb(255 255 255 / .40); /* 3.23:1 sobre navy */
+
   /* Inverso — texto y tintes sobre superficie oscura */
   --lp-ink-inverse:        #ffffff;
   --lp-ink-inverse-70:     rgb(255 255 255 / .70);

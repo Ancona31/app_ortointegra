@@ -1757,7 +1757,14 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
   proporción (`aspect-[16/10]`) y el sangrado.
 
 ### LP-DT-18 — `min-h-screen` usa `100vh` donde §4.3·10 pide `100dvh`
-- **Estado:** 🔴 abierta
+- **Estado:** 🟢 **CERRADA (F6·f3, 2026-08-02)** — `min-h-screen` → `min-h-dvh`
+  en `src/app/(landing)/page.tsx`. Era el único sitio de la landing.
+  ⚠️ **Residual honesto:** la condición de cierre pedía verificar en iOS real,
+  y esta tanda NO validó en navegador (lo hace Angel). El cambio de utilidad es
+  mecánico y `dvh` está soportado desde iOS 15.4 / Chrome 108, así que el
+  riesgo de regresión es nulo; lo que queda sin confirmar es que el síntoma
+  original —el salto al mostrarse la barra de direcciones— desaparezca. Si
+  Angel lo ve todavía, la causa es otra y esta entrada se reabre.
 - **Detectada:** auditoría de F1.3 tanda (a) — route group + Inter (2026-07-30)
 - **Descripción:** `src/app/(landing)/page.tsx:18` aplica `min-h-screen` al
   `<main>` de la landing. En Tailwind 4 esa utilidad es
@@ -2015,7 +2022,35 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
   reales y sin "TBD".
 
 ### LP-DT-25 — La retícula de Seguridad se rompe entre 640 y 768px (preexistente)
-- **Estado:** 🔴 abierta — **preexistente, NO introducida por la adenda**
+- **Estado:** 🟠 **PARCIALMENTE RESUELTA (F6·f3, 2026-08-02)** — no cerrada.
+
+> **⚠️ ACTUALIZACIÓN F6·f3 — LEER ANTES QUE LA TABLA DE ABAJO.**
+> `SeccionSeguridad.tsx` pasó de `sm:grid-cols-3` a **`md:grid-cols-3`**. Lo
+> que eso arregla y lo que NO, con la misma medición de la tabla:
+>
+> | viewport | antes | ahora |
+> |---|---|---|
+> | 640 | 176px/tarjeta (3 col) | **576px (1 col)** ✅ |
+> | 768 | 218.67px (3 col) | **218.67px (3 col)** ❌ sin cambio |
+> | 1024 | 304px | 304px ✅ |
+>
+> **La franja 640–767 desaparece; la de 768–1023 sigue igual.** La condición
+> de cierre de este ítem es "ninguna tarjeta por debajo de ~240px en ningún
+> breakpoint", y a 768px son 218.67 — así que **no se cierra**. Cerrarla exige
+> `lg:grid-cols-3` (1024 → 304px), que es un cambio de composición mayor y no
+> estaba en el alcance de f3.
+>
+> **No se metió `sm:grid-cols-2` en medio**, pese a que el "fix propuesto" de
+> abajo lo sugería: son 3 tarjetas y dos columnas dejan la tercera huérfana a
+> media fila.
+>
+> **Y NO barre las otras dos retículas.** `SeccionFeatures.tsx:225` y
+> `SeccionPortabilidad.tsx:102` siguen en `sm:grid-cols-3`. El ítem pedía "las
+> tres o justificar por qué no": la justificación es que el alcance aprobado de
+> f3 nombraba Seguridad, y esas dos **no tienen medición propia** — sus
+> contenidos son más cortos y podrían aguantar los 176px sin partir títulos,
+> pero eso hay que medirlo, no suponerlo. **Quedan abiertas aquí.**
+
 - **Detectada:** auditoría de la adenda de contenido previa a F1.3 (e)
   (2026-07-30), midiendo el layout con un cuarto elemento
 - **Descripción:** `SeccionSeguridad.tsx` usa `grid sm:grid-cols-3`, y `sm`
@@ -2088,7 +2123,12 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
   lista de landmarks de la página no crece en nueve entradas.
 
 ### LP-DT-28 — LP-DT-25 empeora: la tarjeta 2 de Seguridad triplicó su cuerpo
-- **Estado:** 🔴 abierta — **agrava una deuda preexistente, no la crea**
+- **Estado:** 🟢 **CERRADA (F6·f3, 2026-08-02)** — este ítem describía el
+  agravamiento **en el tramo 640–767**, y ese tramo ya no existe: con
+  `md:grid-cols-3` las tres tarjetas van a una columna de 576px ahí, donde el
+  cuerpo largo de la tarjeta 2 no parte nada. Lo que sigue vivo es la deuda
+  madre, **LP-DT-25**, por la banda 768–1023 (218.67px/tarjeta). No dupliques
+  el seguimiento: se hace allí.
 - **Detectada:** tanda de la FAQ (2026-07-31)
 - **Descripción:** la corrección de B4 sustituyó el cuerpo de la tarjeta "Tu
   información, separada" —una línea— por tres frases (médico, admin de clínica,
@@ -2180,17 +2220,29 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
 
 ---
 
-### LP-DT-32 — El Video 1 muestra «Spinus®»: bloquea la publicación de la landing
+### LP-DT-32 — El Video 1 muestra «Spinus®»
 
-- **Estado:** 🔴 **abierta — BLOQUEA EL MERGE A `main`**
-- **Decisión de Angel (2026-08-01):** se publica así **por ahora**. NO se
-  corrige en esta tanda ni en las siguientes de F2: se corrige **al cerrar
-  LP-DT-15 y regrabar**, en ese orden.
-  ⚠️ **Y hasta entonces esta rama no se mergea a `main` sin autorización
-  EXPLÍCITA de Angel.** No basta con que el resto de la fase esté verde: el ®
-  es infracción sobre una marca en trámite, y el visto bueno tiene que ser suyo
-  y nombrando esta deuda. Si estás preparando el merge y lees esto, para y
-  pregunta.
+- **Estado:** 🟠 **abierta — YA NO BLOQUEA EL MERGE** (autorización de Angel,
+  2026-08-02)
+
+> **⚠️ ACTUALIZACIÓN F6·f3 — ESTE ÍTEM CAMBIÓ DE NATURALEZA, NO DE CONTENIDO.**
+> El título y el estado decían **«bloquea la publicación de la landing»** y
+> **«BLOQUEA EL MERGE A `main`»**, con la instrucción expresa de parar y
+> preguntar a Angel antes de mergear. **Angel dio esa autorización el
+> 2026-08-02, nombrando esta deuda: decide publicar con el ® en el vídeo.**
+> La condición que el propio ítem exigía —visto bueno suyo y explícito— está
+> cumplida, así que la barrera se retira.
+>
+> **Lo que NO cambia, y es todo lo demás:** el ® sigue siendo uso de un
+> símbolo de registro sobre una marca **en trámite y sin conceder**, el
+> defecto sigue abierto, y la corrección sigue siendo la misma y en el mismo
+> orden. Esto es una **decisión de riesgo asumida por el titular del
+> proyecto**, no un problema resuelto ni una reevaluación de §7·Global. Nadie
+> debe leer este cambio de estado como que el ® pasó a ser aceptable.
+
+- **Decisión de Angel (2026-08-01, ampliada el 2026-08-02):** se publica así
+  **por ahora**. NO se corrige en F2 ni en F6: se corrige **al cerrar LP-DT-15
+  y regrabar**, en ese orden.
 - **Detectada:** al montar el Video 1 (2026-08-01), revisando el póster
 - **Descripción:** `public/landing/expediente-demo.mp4` / `.webm` es una captura
   de PANTALLA con el navegador visible, y el título de pestaña dice
@@ -2276,6 +2328,207 @@ lanzamiento oficial. Proyecto independiente, no es scope de este plan.
   Video 1**. No se arregla desde la landing.
 - ⚠️ **No lo "arregles" desacentuando `receta-demo.ts`.** Sería propagar la
   falta a la única superficie donde hoy está bien.
+
+---
+
+## F6·f3 — lo que la última tanda antes del merge deja documentado
+
+Cinco hallazgos de la auditoría de F6 que **no se aplican** y quedan
+registrados con su medición. Ninguno bloquea el merge. Los cuatro puntos que
+sí se aplicaron (bordes de control, skip link, retícula de Seguridad, `dvh`)
+están anotados en LP-DT-18, LP-DT-25 y LP-DT-28, y en el bloque de «bordes de
+control» de `globals.css`.
+
+### LP-DT-36 — La landing y el producto comparten una sola hoja de CSS
+
+- **Estado:** 🟠 abierta — **rendimiento, aceptada; el fix es estructural**
+- **Detectada:** auditoría de F6 (2026-08-02)
+- **Descripción:** `/` sirve **una única hoja con el CSS de la app entera**.
+  Medido sobre el build de esta tanda
+  (`.next/static/css/3a3275540edac12b.css`):
+
+  | métrica | valor |
+  |---|---|
+  | tamaño sin comprimir | **183.961 B** (~180 KB) |
+  | bloques `{` | **2.355** |
+  | de ellos, at-rules | 257 (130 `@supports`, 71 `@property`, 29 `@keyframes`, 21 `@media`, 5 `@layer`) |
+  | selectores de regla contados en la auditoría | **1.306** |
+
+  El visitante de la landing descarga y parsea, en la ruta crítica, las reglas
+  del expediente, la agenda, el visor DICOM, el super-admin y los modales —
+  ninguna de las cuales puede llegar a aplicarse en `/`.
+- **Por qué NO se arregla aquí, y por qué no es un `content` mal configurado:**
+  en **Tailwind 4** el barrido de fuentes se declara desde el CSS con
+  `@source`, y la unidad de salida es el **entry point**. Partirlo obliga a
+  crear una segunda hoja de entrada con su `@source` acotado al árbol de la
+  landing (`src/app/(landing)/**` + `src/components/landing/**`) y a cablearla
+  solo en el layout de ese route group, dejando `globals.css` para el resto.
+  Eso son: un archivo CSS nuevo, un import movido, y una **duplicación
+  deliberada del bloque `:root`** de tokens `--lp-*` o su extracción a un
+  tercer archivo compartido — más la verificación de que ninguna utilidad que
+  la landing usa vive fuera de sus dos árboles (`ModalShell`, iconos, etc.).
+  No es una línea de configuración: es una reestructuración del pipeline de
+  estilos, y hacerla en la tanda previa al merge sería exactamente el tipo de
+  cambio que este proyecto ya pagó caro.
+- **⚠️ Antes de atacarlo, mide el beneficio real.** 180 KB sin comprimir NO son
+  180 KB en red: con Brotli una hoja de utilidades comprime muy bien y el coste
+  dominante puede ser el **parseo**, no la descarga. Si nadie ha medido LCP/CLS
+  con y sin la hoja partida, el ahorro es una hipótesis.
+- **Condición de cierre:** `/` sirve una hoja cuyo contenido sea solo el CSS
+  alcanzable desde la landing, con las métricas de arriba medidas de nuevo y
+  una comparación de LCP antes/después que justifique el cambio.
+
+### LP-DT-37 — La banda 768–1023 de §5.11 (Control) es una composición fija estirada
+
+- **Estado:** 🟠 abierta — **layout, tablet vertical**
+- **Detectada:** auditoría de F6 (2026-08-02)
+- **Descripción:** `SeccionControl.tsx` compone su mockup con **posiciones y
+  tamaños absolutos en píxeles**, y solo tiene dos juegos: `md:` (768) y `lg:`
+  (1024). Contados en el archivo: **38 utilidades `md:` y 28 `lg:`**, entre
+  ellas `md:w-[534px]`, `md:h-[358px]`, `md:left-[252px]`, `md:w-[168px]`,
+  `md:left-[124px]`, `md:left-[62px]`, `md:-left-[133px]`.
+
+  El problema es que ese juego `md:` tiene que servir **todo** el tramo
+  768–1023. El ancho útil es `viewport − 64` (contenedor `max-w-6xl` con
+  `px-8`), o sea:
+
+  | viewport | ancho útil | composición vigente |
+  |---|---|---|
+  | 768 | 704px | juego `md:` |
+  | 1023 | 959px | juego `md:` |
+  | 1024 | 960px | juego `lg:` |
+  | ≥1216 | 1088px (tope) | juego `lg:` |
+
+  Son **255px de holgura, un 36% de crecimiento**, con cada pieza clavada al
+  píxel. La figura y la tarjeta flotante no acompañan al contenedor: se quedan
+  ancladas donde las dejó el juego `md:` y el aire se acumula a un lado. A
+  1023px la composición está calculada para un lienzo 255px más estrecho del
+  que ocupa.
+- **Por qué no se corrigió:** el alcance de f3 eran cuatro puntos nombrados y
+  este no estaba. Además el arreglo correcto no es añadir un tercer juego de
+  píxeles —sería el mismo defecto con más ramas— sino pasar la composición a
+  unidades relativas al contenedor (`%`, `cqw` con container queries, o una
+  retícula), y eso es un rediseño de la sección con su propia QA visual.
+- **⚠️ No lo confundas con LP-DT-25.** Aquella es la retícula de Seguridad
+  (tarjetas que encogen); esta es el mockup de Control (piezas que no se mueven
+  cuando deberían). Coinciden en la banda por la misma razón —768 es donde este
+  proyecto salta de móvil a escritorio sin peldaño intermedio— pero son
+  arreglos distintos.
+- **Condición de cierre:** la composición de §5.11 mantiene sus proporciones a
+  768, 900 y 1023px sin que aparezca aire asimétrico.
+
+### LP-DT-38 — Quedan colores crudos de Tailwind en dos secciones (no tres)
+
+- **Estado:** 🟠 abierta — **coherencia de tokens, menor**
+- **Detectada:** auditoría de F6 (2026-08-02)
+- **Descripción:** §3.1 y la regla de la landing piden que todo color salga de
+  la escala `--lp-*`. Sobreviven **9 declaraciones vivas** en dos archivos:
+
+  | archivo | línea | valor crudo | qué pinta |
+  |---|---|---|---|
+  | `SeccionInterfaz.tsx` | 91 | `bg-[#f8fafc]` | fondo del panel de flujo |
+  | `SeccionInterfaz.tsx` | 91 | `border-slate-200/60` | borde del panel |
+  | `SeccionInterfaz.tsx` | 92 | `text-slate-400` | rótulo del panel |
+  | `SeccionInterfaz.tsx` | 115 | `bg-white` + `border-slate-200/60` | tarjeta de paso |
+  | `SeccionInterfaz.tsx` | 118 | `text-white` | número del paso |
+  | `SeccionInterfaz.tsx` | 121 | `text-slate-800` | título del paso |
+  | `SeccionInterfaz.tsx` | 122 | `text-slate-400` | descripción del paso |
+  | `SeccionIA.tsx` | 43 | `from-slate-900 via-slate-800 to-slate-900` | caja de gradiente |
+
+  Los equivalentes ya existen: `#f8fafc` **es** `--lp-surface-sunken`,
+  `bg-white` es `--lp-surface`, `text-white` es `--lp-ink-inverse`.
+- **⚠️ CORRECCIÓN AL ENUNCIADO DEL HALLAZGO: `SeccionHero.tsx` NO TIENE
+  NINGUNO.** El hallazgo se anotó como «Interfaz, IA y Hero». Verificado línea
+  a línea: los cuatro hits de Hero (`#4a9fd4` en :27, :339, :341, :343 y
+  `from-[#1a3a5c] to-[#4a9fd4]`) están **todos dentro de comentarios** que
+  documentan colores ya eliminados en F1.3·e3. Son prosa histórica, no código.
+  **No los "limpies": borrar esos comentarios borra el motivo por el que
+  #4a9fd4 no debe volver** (daba 4.40:1 en su peor punto).
+- **⚠️ Y EL GRADIENTE DE `SeccionIA.tsx:43` NO ES UN DESCUIDO — TIENE CONTRATO
+  ESCRITO.** El propio archivo (:28) razona que `slate-900/800` es casi negro y
+  `--lp-navy` es bastante más claro, o sea que **no son intercambiables**.
+  Además `--lp-ink-inverse-50` tiene su contrato ESTRECHADO a esa caja
+  precisamente por ser más oscura que navy: mide 5.23:1 sobre slate-900 y
+  4.80:1 en el punto más claro del gradiente (ver el aviso en `globals.css`).
+  **Sustituir el slate por navy rompe ese cálculo y tira el kicker de §5.4 por
+  debajo de AA.** Si se tokeniza, hay que crear tokens para el gradiente, no
+  reapuntarlo a los que ya hay.
+- **Por qué no se aplicó:** los 8 de `SeccionInterfaz` son mecánicos pero tocan
+  un mockup cuyo aspecto nadie iba a validar en esta tanda, y el de
+  `SeccionIA` no es mecánico en absoluto (ver arriba). Cambiar color sin QA
+  visual en la tanda previa al merge no compensa.
+- **Condición de cierre:** los 8 de `SeccionInterfaz` migrados a `--lp-*` con
+  QA visual del panel de flujo; el de `SeccionIA` resuelto **con tokens
+  propios** y re-midiendo el kicker, o declarado excepción permanente en
+  `globals.css` junto a la nota de `--lp-ink-inverse-50`.
+
+### LP-DT-39 — Sin `scrollbar-gutter: stable`: la landing salta al abrir modal
+
+- **Estado:** 🟠 abierta — **el fix es global y la landing no puede decidirlo
+  sola**
+- **Detectada:** auditoría de F6 (2026-08-02)
+- **Descripción:** `globals.css` no declara `scrollbar-gutter` en ningún sitio
+  (verificado: cero ocurrencias en todo el repo). En navegadores de escritorio
+  con barra de scroll clásica —Windows, y Chrome/Firefox en Linux—, cuando algo
+  bloquea el scroll del `<body>` la barra desaparece, el viewport gana ~15px de
+  ancho y **todo el contenido centrado se desplaza lateralmente**. En la landing
+  el disparador concreto es el modal de firma del Teaser 2
+  (`FirmaCanvas.tsx`), que se monta en `document.body` vía portal.
+- **⚠️ POR QUÉ NO SE APLICÓ, Y ES EL MOTIVO ENTERO:** el fix natural es una
+  línea, `html { scrollbar-gutter: stable; }` — pero `globals.css` **lo
+  comparte el producto entero**: login, agenda, expediente, visor DICOM,
+  super-admin. Reservar el canal de la barra en `html` cambia el ancho útil de
+  **todas** esas pantallas, incluidas las que ya reservan espacio por su cuenta
+  o las que tienen scroll interno. Es un cambio de alcance global metido en la
+  tanda previa al merge de una rama de landing, y esta tanda no audita el
+  producto. Es exactamente el patrón que el Protocolo 1 de `CLAUDE.md`
+  prohíbe.
+  Acotarlo a `.font-lp` **no funciona**: el que scrollea es el `<html>`, no el
+  `<div>` envolvente de la landing.
+- **Alternativas, para quien lo retome:** (a) aplicarlo global de verdad, con
+  QA de las pantallas del producto — es la salida limpia; (b) compensar el
+  ancho de la barra con `padding-right` al bloquear el scroll, que es más
+  código y más frágil; (c) aceptarlo: en macOS y en todo móvil las barras son
+  superpuestas y el salto no existe.
+- **Condición de cierre:** abrir y cerrar el modal de firma en Chrome/Windows
+  sin desplazamiento lateral del contenido, y las pantallas del producto sin
+  regresión de ancho.
+
+### LP-DT-40 — F1.4 (convertir secciones de la landing a Server Components): **NO APLICABLE**
+
+- **Estado:** ⚪ **DESCARTADA — no es deuda, es una fase que no procede**
+- **Decidida:** auditoría de F6 (2026-08-02)
+- **Qué proponía F1.4:** quitar `'use client'` de las secciones de la landing
+  para reducir el JS enviado al visitante.
+- **Por qué no procede, con la medición:** las **16** secciones de
+  `src/components/landing/sections/` llevan `'use client'`, y **14 de las 16
+  usan APIs que solo existen en cliente** — `useState`, `useRef`, `useScroll`,
+  `useTransform`, `useReducedMotion`, `motion.*`, `whileInView`, `whileHover`,
+  `onClick`. Contado por archivo:
+
+  | secciones | ocurrencias de API de cliente |
+  |---|---|
+  | Hero, FAQ | 32 cada una |
+  | Receta | 23 · Control 19 |
+  | Nav, Historia 11 · Problema 10 · Expediente 9 · Interfaz 8 | |
+  | CTA, Features, Precio, Seguridad 7 · Portabilidad 5 | |
+  | **Footer, IA** | **0** |
+
+  Las **dos** candidatas reales son `SeccionFooter` y `SeccionIA`. Y ninguna de
+  las dos sirve: **las dos importan `Reveal`**, que es un componente de
+  cliente. Convertirlas en Server Components no elimina ese import — lo deja
+  igual, solo cambia quién lo declara. **El JS enviado sería prácticamente el
+  mismo.**
+- **Y el objetivo que F1.4 perseguía ya está cubierto por otra vía:** `/` se
+  **prerenderiza estáticamente** (aparece como `○ (Static)` en la salida de
+  `next build`). El visitante recibe el HTML completo de las 16 secciones desde
+  el servidor, sin esperar a hidratar. Lo que F1.4 quería —HTML de servidor—
+  ya lo da el prerender; lo que no daría es menos JS, que es lo que el párrafo
+  anterior descarta.
+- **⚠️ Consecuencia práctica:** **no abras una fase para esto.** Si alguien
+  quiere reducir el JS de la landing, el trabajo real está en `motion` y en el
+  árbol de `Reveal`/`Stagger`, no en mover directivas `'use client'` de sitio.
+  Esa sí sería una fase con premisa medible, y sería otra.
 
 ---
 

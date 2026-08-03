@@ -619,10 +619,15 @@ export default function ModalFirma({ tinta, onCerrar, onAceptar }: ModalFirmaPro
             Borrar
           </button>
           <div className="flex items-center gap-2">
+            {/* ⚠️ F6·f3 — `--lp-border-control` (3.35:1), no `--lp-border`
+                (1.20:1): botón sin relleno sobre el blanco del modal, o sea
+                que su contorno es su único límite y cae bajo WCAG 1.4.11. El
+                marco del lienzo de arriba (línea 560) SÍ se queda en
+                `--lp-border`: eso es superficie, no control. */}
             <button
               type="button"
               onClick={onCerrar}
-              className="rounded-xl border border-[var(--lp-border)] px-4 py-2.5 text-[14px] font-semibold leading-none text-[var(--lp-ink-700)] transition-colors duration-[var(--sp-dur-micro)] hover:bg-[var(--lp-hover-surface)]"
+              className="rounded-xl border border-[var(--lp-border-control)] px-4 py-2.5 text-[14px] font-semibold leading-none text-[var(--lp-ink-700)] transition-colors duration-[var(--sp-dur-micro)] hover:bg-[var(--lp-hover-surface)]"
             >
               Cancelar
             </button>
