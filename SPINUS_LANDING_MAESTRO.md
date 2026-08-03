@@ -956,8 +956,194 @@ deben estar, sin trabajo extra.
 ### 5.11 Historia — tejido
 `Parallax` leve en retrato + `Stagger` de párrafos. Movimiento = calma.
 
-### 5.12 Precio + beta — tejido
-`Reveal` + `CountUp` en cupos restantes.
+### 5.12 Precio — tejido
+
+**IMPLEMENTADA** en `SeccionPrecio.tsx` (F5, 2026-08-02). El título de esta
+ficha era «Precio + beta»: **la parte de beta se cae**. No hay cupos, no hay
+contador y no hay oferta de lanzamiento — ver abajo.
+
+`Reveal` en el encabezado y en el pie; `Stagger` en las dos tarjetas, con
+`VARIANTES_ITEM` sobre los hijos (nunca un wrapper: la lección de F2.a·a2).
+Nada de escenario: es tejido, como el resto del cierre.
+
+**~~`CountUp`~~ — CANCELADO.** Su único destino era el contador de cupos beta,
+que ya no existe. **No quedó código sin consumidor: `CountUp` nunca llegó a
+escribirse** — cero coincidencias en `src/`. Esta línea era una intención del
+plan, no un componente. Si alguien lo busca para reutilizarlo, no está.
+
+**Dos planes y solo dos** (decisión de PM): Free e Individual. Los tres de
+clínica van con un enlace discreto a `/pricing`. Cuatro columnas convierten la
+landing en una página de precios.
+
+**Origen único de datos:** cada cifra y cada viñeta se leen de `src/lib/plans.ts`
+en tiempo de render — precios, `features`, `max_pacientes` y el "desde" de
+clínica. No hay copias. El mismo módulo alimenta el JSON-LD, así que el precio
+visible y el estructurado no pueden divergir.
+
+**Ubicación: ANTES de la FAQ**, no entre la FAQ y el CTA. Es el orden que
+`(landing)/page.tsx` ya documentaba: «cuánto cuesta → sí, pero… → empieza». La
+FAQ es el último manejador de objeciones y el precio es lo que más objeciones
+genera; su respuesta «¿Puedo probarlo sin compromiso?» contesta justamente esa.
+
+**Superficie: navy.** Entra entre Seguridad (`--lp-surface-alt`) y FAQ
+(`--lp-surface`), así que no puede ser ninguna de las dos. `--lp-wash` está
+reservado a apertura y cierre y además es #f6f9fc contra #f5f8fc: a ojo sería la
+repetición que se evita. Navy tiene precedente no contiguo en §3.4·4 y §5.7, y
+presta el idioma de "objetos blancos sobre mesa oscura" que ya usa la receta.
+
+**Lo que NO se publica, y por qué:**
+
+| Hueco | Estado | Condición para abrirlo |
+|---|---|---|
+| Límite de notas con IA | **No se menciona** | Hoy son 60/24 h iguales para todos los planes y Angel va a cambiarlo. Publicar un número sería anunciar algo falso. Hueco preparado en la lista de Free. |
+| Oferta de lanzamiento / escasez | **No se monta** | El cupón no existe en Stripe. El bloque iría entre la bajada y las tarjetas. |
+| `sameAs` de Organization | **Array ausente** | No hay un solo perfil social en el repo. Se añade cuando Angel confirme las cuentas. |
+
+**Free se publica con sus carencias a la vista** — sin visor DICOM y sin
+extracción de labs con IA (`plans.ts:31-36` vs `:48-56`), dentro de la misma
+lista y no en una nota al pie. Es un **tier permanente, no un trial**: "no
+caduca", nunca "14 días". El «Sin letras chiquitas» del CTA final solo se
+sostiene si estos límites están impresos, y publicarlos es lo que lo convierte
+en prueba.
+
+**Coherencia con §5.12b** verificada contra `faq-contenido.ts:94-96`: sin
+tarjeta, no caduca, cinco pacientes, cancelación sin llamadas. Si se toca una de
+las dos, se toca la otra.
+
+**Nota al pie literal de `/pricing:217`** (MXN, IVA no incluido, cancelable) para
+que las dos páginas no se contradigan.
+
+#### Jerarquía y borde animado (F5·b, 2026-08-02)
+
+La tarjeta de **Individual** se lee como la recomendada por cuatro señales, no
+por una: pastilla «Recomendado» con el tratamiento de kicker
+(`--lp-accent-bg` + `--lp-accent`), checks en `--lp-accent` frente a los de Free
+en `--lp-ink-inverse-70`, relleno blanco sólido con sombra, y el borde animado.
+El texto de las viñetas de Free NO se apaga: apagar la viñeta ordena, apagar el
+contenido penaliza la lectura de lo que sí incluye el plan.
+
+**Los dos botones ya no dicen lo mismo:** «Crear cuenta gratis» y «Empezar con
+Individual». **Los dos siguen apuntando a `/register`**, y eso es un hallazgo,
+no una omisión — ver más abajo.
+
+**Borde animado — «Animated Border Glow». `rotate` de un elemento, NO el ángulo
+del gradiente.** DOS capas con el mismo `conic-gradient` estático y el mismo
+giro: el **anillo nítido** y, debajo, una **copia desenfocada** que sangra hacia
+afuera. Cada capa recorta su propio cuadrado giratorio (200 % del ancho, para
+que el círculo inscrito cubra la diagonal en cualquier ángulo); el relleno
+interior (`rounded-[14px]`) tapa el centro y deja ver el anillo. Bajo el haz,
+`--lp-accent` al 40 % como borde en reposo: **el haz lo recorre, no lo
+sustituye**.
+
+> ⚠️ **LA PRIMERA VERSIÓN (F5·b) NO SE VEÍA, y las cuatro causas estaban a la
+> vez.** Queda escrito para que no se repitan: haz en **blanco** en vez de
+> acento (sobre navy se confundía con la propia tarjeta blanca); arco de
+> **~122° difuminados** —un tercio del círculo— que diluía la luz hasta
+> desaparecer; borde de **1px**, por el que el haz no tenía por dónde asomar; y
+> **sin capa de glow**, que es la que hace que se lea como luz y no como una
+> línea de color girando. Cualquiera de las cuatro basta para matar el efecto.
+
+**Parámetros calibrados** (verificados sobre el CSS y el HTML del build):
+
+| Parámetro | Valor | Por qué |
+|---|---|---|
+| Grosor del borde visible | **3px** (`p-[3px]`) | 1px no deja ver el haz; radio interior 16−3 = 13px |
+| Número de haces | **3**, a 0° / 120° / 240° | con uno solo, cada punto del borde pasaba casi toda la vuelta a oscuras esperando la luz |
+| Arco luminoso | **32° cada uno** (núcleo ±16°, acento ±8°) | 3 × 32° = **96° = 27% encendido**, con huecos de 88°. Tres arcos del largo antiguo (58°) sumarían 173° y serían un borde brillante girando, no luces que recorren |
+| Núcleo del haz | **`--lp-ink-inverse`** (blanco) | ver el aviso de abajo — es la decisión contraintuitiva del efecto |
+| Flancos del haz | `--lp-accent` (a ±8° del núcleo) | son los que tiñen de azul el halo: sin ellos sería una línea blanca |
+| Vuelta completa | **3s** (`--lp-dur-glint`) | con 3 arcos, lo que se percibe es el intervalo entre pasadas = vuelta / 3 → **1 pasada por segundo**. Historial 6s → 4s → 3s; si cambia el nº de arcos, se recalcula |
+| Desenfoque del glow | **10px** | aplicado tras el recorte de su span, así el halo se derrama con la forma de la tarjeta |
+| Base en reposo | **`--lp-border-inverse`** | mismo token que el borde de la Free; medido en 2.45:1 sobre navy |
+| Sombra | en el **contenedor**, no en el relleno | el relleno es hermano posterior de las capas: su sombra se pintaba sobre el anillo |
+
+> ⚠️⚠️ **EL NÚCLEO DEL HAZ ES BLANCO Y NO `--lp-accent`, A PROPÓSITO. NO LO
+> "CORRIJAS" DE VUELTA.** El efecto de referencia usa color puro, así que esto
+> se ve mal a primera vista y tienta arreglarlo. **Ya se hizo dos veces y las
+> dos no se veía nada.** La referencia corre sobre fondo casi negro; aquí el
+> fondo YA ES AZUL. Medido contra `--lp-navy` (#1a3a5c):
+>
+> | | contraste |
+> |---|---|
+> | `--lp-accent` pleno | **1.81:1** ← techo del acento puro |
+> | `--lp-accent` al 40 % (base anterior) | **1.27:1** ← indistinguible |
+> | `--lp-border-inverse` | 2.45:1 |
+> | `--lp-ink-inverse` (blanco) | **11.64:1** |
+>
+> 1.81:1 es el **techo**: no lo arregla más grosor, ni más glow, ni más
+> velocidad — no hay contraste que repartir. El acento no desaparece, se mueve a
+> los flancos, que son los que colorean el halo. **Si algún día la sección deja
+> de ser navy, re-mide antes de volver al acento puro.**
+
+⚠️ **El contenedor de la tarjeta NO lleva `overflow-hidden`** — recortarlo ahí
+mata el glow, que es justo lo que pasaba antes. Recorta **cada capa por su
+cuenta**, así que el cuadrado giratorio nunca escapa y no hay desbordamiento de
+*layout*. Lo único que sale del borde es el desenfoque, que es *ink overflow*:
+no genera barra de scroll, igual que una `box-shadow`, y son ~10px muy dentro
+del `px-4 sm:px-8` de la sección. `isolate` es obligatorio: sin él los `-z-*` de
+las capas se van por detrás del fondo de la sección.
+
+* **Coste.** La vía alternativa —`@property --angle` animando
+  `conic-gradient(from var(--angle))`— re-rasteriza el degradado del elemento
+  entero en cada cuadro, para siempre. Rotando, el degradado se pinta una vez y
+  cada cuadro solo cambia una transformada: lo resuelve el compositor, sin
+  pintado ni maquetación. Mismo resultado, coste de otro orden.
+* Se anima la propiedad independiente `rotate`, no `transform`, para que el
+  centrado siga siendo de Tailwind y al detenerse quede en `rotate: 0` y centrado.
+* `linear` obligatorio: cualquier curva se nota frenar en la costura del bucle.
+  No es un easing fuera de tabla, es la ausencia de easing.
+* Token nuevo **`--lp-dur-glint`**. Tercer registro, no un peldaño más: los
+  otros miden una transición que acaba, este un ciclo que no acaba. Valor
+  calibrado en la tabla de arriba.
+* `aria-hidden` en las dos capas, sin rol ni texto. El `overflow-hidden` **de
+  cada capa** no es opcional: sin él el cuadrado giratorio asoma y genera scroll
+  horizontal en móvil. En el contenedor de la tarjeta, en cambio, estorba.
+* **Se detiene bajo `prefers-reduced-motion`**, en `globals.css`, dentro del
+  bloque que ya existía — no se ramifica el render. La regla
+  `[class*="animate-"]` NO lo alcanza (la clase es `lp-borde-destello`), así que
+  se apaga explícitamente. Quien reduce movimiento sigue viendo el borde de
+  acento y la tarjeta destacada; solo pierde el barrido.
+
+> ⚠️ **ESTO ES UNA EXCEPCIÓN EXPRESA A «loops infinitos» DE §12.** La lista
+> negra lo prohíbe y el propio §12 subraya que no se relajó. Se autoriza aquí,
+> acotada y solo aquí, bajo cuatro condiciones que son las que la hacen
+> defendible: es decorativa y `aria-hidden`; **se detiene** con
+> `prefers-reduced-motion`; no repinta (compositor); y no sustituye información
+> —el borde existe en reposo—. **No es precedente para otro loop.** Cualquier
+> otro movimiento permanente sigue prohibido, y el indicador de escritura de
+> §5.12b sigue con `repeat: 1`.
+
+**Notas médicas con IA** entran en la lista de Individual **sin número**: el
+tope vive en `rateLimit.ts` (`nota-medica: 60`/24 h) y hoy no distingue plan.
+⚠️ **Free las tiene igual** —`checkRateLimit` nunca mira el plan— pero NO
+figuran en su lista: discrepancia real entre copy y runtime, anotada en
+`plans.ts` y pendiente de la decisión de Angel. Las dos listas se resuelven
+juntas cuando el límite se diferencie.
+
+⚠️ **No hay compra para quien no tiene cuenta, y por eso los dos botones van a
+`/register`.** `/api/stripe/checkout` exige sesión (401 sin usuario),
+`clinica_id` y rol de administrador, y rechaza `free`; su único consumidor,
+`/pricing`, resuelve el 401 mandando a `/login?redirect=/pricing`, que para un
+visitante sin cuenta es un muro. `/register` tampoco lee ningún `?plan=`. Para
+que «Empezar con Individual» signifique algo hace falta una de dos: que
+`/register` acepte el plan y encadene el checkout tras el alta, o un checkout
+anónimo. **Ninguna de las dos existe; no se inventó ninguna.**
+
+#### Datos estructurados (F5)
+
+Segundo `<script type="application/ld+json">` en `(landing)/layout.tsx`, con un
+`@graph` de tres entidades enlazadas por `@id`: **Organization**,
+**SoftwareApplication** (con `applicationCategory`, `featureList` y dos `offers`;
+la de pago con `UnitPriceSpecification` y `unitCode: 'MON'` para que 649 se lea
+como mensual y no como pago único) y **Person** para el fundador. El FAQPage
+anterior se queda en su propio `<script>`, intacto.
+
+⚠️ **El cruce con `dranconacolumna.com` está a medias por diseño.** Aquí se
+declara `Person.sameAs → dranconacolumna.com` y la imagen
+`/landing/dr-ancona.jpg` que ya sirve §5.11. Para que la identidad se resuelva,
+el otro sitio debe apuntar de vuelta a `https://www.spinus.com.mx` y usar
+**exactamente esa misma URL de imagen**. Es trabajo fuera de este repo y sin él
+la mitad de aquí no cumple su función.
 
 ### 5.12b FAQ — tejido · acordeón-conversación
 
@@ -1582,3 +1768,12 @@ las tablas de este documento · claims no verificados contra el producto.
 > más tienta romperlo.** Los 3 puntos de §5.12b llevan `repeat: 1` — dos ciclos
 > de 450ms, 900ms en total, y se acabó. `repeat: Infinity` en un indicador de
 > chat es el caso de libro de esta prohibición.
+>
+> ⚠️ **UNA SOLA EXCEPCIÓN, AUTORIZADA POR EL PM EL 2026-08-02: el destello del
+> borde de la tarjeta recomendada (§5.12·F5·b).** Es el único loop infinito de
+> la landing. Se admite porque cumple las cuatro condiciones que lo hacen
+> defendible —decorativo y `aria-hidden`, **se detiene** con
+> `prefers-reduced-motion`, no repinta (gira una transformada en el compositor,
+> no anima el ángulo del gradiente) y no sustituye información, porque el borde
+> sigue ahí en reposo—. **No es precedente.** Un loop que incumpla cualquiera de
+> las cuatro sigue prohibido, y "pero el borde lo hace" no es un argumento.

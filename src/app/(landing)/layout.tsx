@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { PREGUNTAS_FAQ } from '@/components/landing/faq-contenido'
+import { PLANS } from '@/lib/plans'
 
 /* Layout de la landing pública — §3.2
    Existe por una sola razón: montar Inter SOLO aquí. El layout raíz
@@ -85,7 +86,101 @@ const jsonLdFaq = {
   })),
 }
 
-/* ⚠️ EL WRAPPER SIGUE DESNUDO — el `<script>` es hermano, no clase nueva.
+/* ═══ GRAFO DE ENTIDADES (F5) — Organization + SoftwareApplication + Person ══
+   El FAQPage de arriba responde "¿qué dudas resuelve?". Esto responde las tres
+   preguntas que un modelo necesita para hablar de Spinus sin leer la página:
+   QUÉ es, CUÁNTO cuesta y QUIÉN lo hizo. Va en un segundo `<script>` y no
+   fundido con el FAQPage: son grafos independientes, los buscadores los
+   combinan igual, y así el bloque que ya estaba en producción no se toca.
+
+   ⚠️ EL PRECIO SALE DE `plans.ts`, COMO EN LA SECCIÓN. Un precio distinto en el
+   HTML visible y en el structured data es la peor versión del problema: el
+   modelo cita el que no ves. Con el módulo como origen único no puede pasar.
+
+   ⚠️ `sameAs` DE LA ORGANIZACIÓN VA VACÍO A PROPÓSITO — NO LO RELLENES A OJO.
+   No hay un solo perfil social en el repo: el footer solo enlaza /privacy,
+   /terms, /pricing y un mailto. Inventar URLs de redes en `sameAs` es afirmar
+   como dato algo sin verificar, que es justo lo contrario de para qué existe
+   este grafo. Cuando Angel confirme las cuentas reales, se añade el array.
+
+   ⚠️ EL CRUCE CON dranconacolumna.com ES UN CONTRATO DE DOS LADOS Y AQUÍ SOLO
+   ESTÁ UNO. Para que la identidad del fundador se resuelva como la misma
+   persona, el otro sitio tiene que (1) apuntar de vuelta a
+   https://www.spinus.com.mx en su propio `sameAs` y (2) usar EXACTAMENTE la
+   misma URL de imagen que se declara aquí. Mientras eso no se haga, el enlace
+   es unidireccional y no cumple su función. No es trabajo de este repo, pero
+   sin ello esta mitad no sirve de nada.
+   La URL de la foto es la que la landing ya sirve en §5.11
+   (`SeccionHistoria.tsx:60`), así que no se introduce un asset nuevo. */
+const SITIO = 'https://www.spinus.com.mx'
+
+const jsonLdGrafo = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': `${SITIO}/#organization`,
+      name: 'Spinus',
+      url: SITIO,
+      logo: `${SITIO}/logo-spinus.png`,
+      email: 'soporte@spinus.com.mx',
+      description:
+        'Sistema de gestión clínica para cirugía de columna, traumatología y ortopedia: expediente electrónico, notas médicas, recetas con QR verificable y visor DICOM.',
+      areaServed: 'MX',
+      founder: { '@id': `${SITIO}/#fundador` },
+    },
+    {
+      '@type': 'SoftwareApplication',
+      '@id': `${SITIO}/#software`,
+      name: 'Spinus',
+      url: SITIO,
+      applicationCategory: 'HealthApplication',
+      operatingSystem: 'Web',
+      inLanguage: 'es-MX',
+      publisher: { '@id': `${SITIO}/#organization` },
+      /* Las prestaciones también salen del módulo: es la misma lista que ve el
+         visitante en la tarjeta de Individual. */
+      featureList: PLANS.individual.features,
+      offers: [
+        {
+          '@type': 'Offer',
+          name: PLANS.free.nombre,
+          price: PLANS.free.precio_mensual,
+          priceCurrency: 'MXN',
+          url: `${SITIO}/register`,
+          description: `Plan gratuito permanente, hasta ${PLANS.free.max_pacientes} pacientes. No requiere tarjeta.`,
+        },
+        {
+          '@type': 'Offer',
+          name: PLANS.individual.nombre,
+          price: PLANS.individual.precio_mensual,
+          priceCurrency: 'MXN',
+          url: `${SITIO}/pricing`,
+          /* `unitCode: 'MON'` es el código UN/CEFACT de "mes". Es lo que
+             convierte 649 en "649 al mes" para quien lee el grafo; sin esto la
+             cifra es ambigua y se puede citar como pago único. */
+          priceSpecification: {
+            '@type': 'UnitPriceSpecification',
+            price: PLANS.individual.precio_mensual,
+            priceCurrency: 'MXN',
+            referenceQuantity: { '@type': 'QuantitativeValue', value: 1, unitCode: 'MON' },
+          },
+        },
+      ],
+    },
+    {
+      '@type': 'Person',
+      '@id': `${SITIO}/#fundador`,
+      name: 'Dr. Ángel M. Ancona Pérez',
+      jobTitle: 'Cirujano de columna y fundador de Spinus',
+      image: `${SITIO}/landing/dr-ancona.jpg`,
+      worksFor: { '@id': `${SITIO}/#organization` },
+      sameAs: ['https://dranconacolumna.com'],
+    },
+  ],
+}
+
+/* ⚠️ EL WRAPPER SIGUE DESNUDO — los `<script>` son hermanos, no clase nueva.
    Todo lo que dice el comentario de arriba sobre no tocar este `<div>` sigue
    vigente; el fragmento existe solo para colgar el JSON-LD al lado. */
 export default function LandingLayout({ children }: { children: React.ReactNode }) {
@@ -94,6 +189,10 @@ export default function LandingLayout({ children }: { children: React.ReactNode 
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdFaq) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdGrafo) }}
       />
       <div className={`${inter.variable} font-lp`}>{children}</div>
     </>

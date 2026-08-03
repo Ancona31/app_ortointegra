@@ -115,20 +115,52 @@ function prepararLienzo(canvas: HTMLCanvasElement): Lienzo | null {
 /** Caja de destino en CSS px sobre la que se desnormalizan los puntos. */
 interface Destino { x: number; y: number; ancho: number; alto: number }
 
-/** Desnormaliza y traza. Es el único sitio donde los 0–1 se vuelven píxeles. */
+/** Punto medio de dos. La curva de abajo se apoya entera en esto. */
+function medio(a: Punto, b: Punto): Punto {
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+}
+
+/**
+ * Desnormaliza y traza. Es el único sitio donde los 0–1 se vuelven píxeles.
+ *
+ * ⚠️ ESTA GEOMETRÍA ESTÁ DUPLICADA A PROPÓSITO EN EL TRAZADO EN VIVO DE
+ * `ModalFirma`, Y LAS DOS TIENEN QUE MOVERSE JUNTAS. Aquí se dibuja la firma
+ * entera de una vez; allí se dibuja incrementalmente, segmento a segmento, según
+ * llega el puntero. Si una usa curvas y la otra rectas, la vista previa del
+ * modal deja de ser el resultado que acaba en la receta — que es la propiedad
+ * que sostiene todo este componente.
+ *
+ * La curva: se pasa por los PUNTOS MEDIOS de cada par consecutivo usando el
+ * punto de en medio como control (`quadraticCurveTo`). Unir las muestras con
+ * `lineTo` daba una polilínea, y a la velocidad a la que se mueve un ratón las
+ * muestras quedan lejos: se veían los segmentos rectos. Con los medios como
+ * extremos la tangente es continua en cada unión y la línea se lee como un
+ * trazo de pluma.
+ */
 function trazar(ctx: CanvasRenderingContext2D, trazos: readonly Trazo[], destino: Destino, tinta: string): void {
   ctx.strokeStyle = tinta
   ctx.lineWidth = Math.max(1, destino.ancho * GROSOR)
   for (const trazo of trazos) {
+    if (trazo.length === 0) continue
+    const pts = trazo.map((p) => ({
+      x: destino.x + p.x * destino.ancho,
+      y: destino.y + p.y * destino.alto,
+    }))
     ctx.beginPath()
-    trazo.forEach((p, i) => {
-      const x = destino.x + p.x * destino.ancho
-      const y = destino.y + p.y * destino.alto
-      /* El `lineTo` corre también para i=0: un toque suelto es un punto, y con
-         `lineCap: round` un segmento de longitud cero se pinta como tal. */
-      if (i === 0) ctx.moveTo(x, y)
-      ctx.lineTo(x, y)
-    })
+    ctx.moveTo(pts[0].x, pts[0].y)
+    if (pts.length === 1) {
+      /* Un toque suelto también es tinta: con `lineCap: round`, un segmento de
+         longitud cero se pinta como punto. */
+      ctx.lineTo(pts[0].x, pts[0].y)
+    } else {
+      for (let i = 1; i < pts.length; i++) {
+        const m = medio(pts[i - 1], pts[i])
+        ctx.quadraticCurveTo(pts[i - 1].x, pts[i - 1].y, m.x, m.y)
+      }
+      /* La cola: del último medio al último punto real, que si no se queda a
+         mitad de camino del final del gesto. */
+      ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y)
+    }
     ctx.stroke()
   }
 }
@@ -243,6 +275,11 @@ export default function ModalFirma({ tinta, onCerrar, onAceptar }: ModalFirmaPro
   const medida = useRef({ ancho: 0, alto: 0 })
   /** Origen del lienzo en coordenadas de viewport, fijado al empezar el trazo. */
   const origen = useRef({ x: 0, y: 0 })
+  /* Las dos anclas de la curva incremental: la última muestra recibida (que hace
+     de punto de control) y el último punto medio dibujado (que es donde se quedó
+     la pluma). Van en refs porque se escriben varias veces por cuadro. */
+  const ultimoPunto = useRef<Punto>({ x: 0, y: 0 })
+  const ultimoMedio = useRef<Punto>({ x: 0, y: 0 })
   const [hayTrazo, setHayTrazo] = useState(false)
 
   /* `onCerrar` por ref, como en `ModalShell`: si entrara en las dependencias del
@@ -343,9 +380,11 @@ export default function ModalFirma({ tinta, onCerrar, onAceptar }: ModalFirmaPro
   /** Posición del puntero en CSS px del lienzo. El origen se mide UNA vez, al
    *  empezar el trazo: con el puntero capturado y el fondo bloqueado el lienzo
    *  no se mueve, así que medirlo en cada `pointermove` sería forzar un reflujo
-   *  por evento a cambio de nada. */
-  function punto(e: React.PointerEvent<HTMLCanvasElement>): Punto {
-    return { x: e.clientX - origen.current.x, y: e.clientY - origen.current.y }
+   *  por evento a cambio de nada.
+   *  Toma coordenadas sueltas y no un evento de React porque los eventos
+   *  fusionados que lee `seguir` son `PointerEvent` nativos, no sintéticos. */
+  function punto(clientX: number, clientY: number): Punto {
+    return { x: clientX - origen.current.x, y: clientY - origen.current.y }
   }
 
   /** De CSS px del lienzo a 0–1. Es el único sitio donde se normaliza. */
@@ -363,8 +402,12 @@ export default function ModalFirma({ tinta, onCerrar, onAceptar }: ModalFirmaPro
     origen.current = { x: caja.left, y: caja.top }
     const ctx = pluma()
     if (!ctx || medida.current.ancho < 1) return
-    const p = punto(e)
+    const p = punto(e.clientX, e.clientY)
     actual.current = [normalizar(p)]
+    /* Los dos anclas de la curva incremental arrancan en el punto de contacto:
+       mientras no haya un segundo punto, la "curva" es un punto. */
+    ultimoPunto.current = p
+    ultimoMedio.current = p
     ctx.beginPath()
     ctx.moveTo(p.x, p.y)
     /* Un punto suelto también es tinta: un toque corto debe dejar marca. */
@@ -373,15 +416,55 @@ export default function ModalFirma({ tinta, onCerrar, onAceptar }: ModalFirmaPro
     if (!hayTrazo) setHayTrazo(true)
   }
 
+  /**
+   * ⚠️ CADA MUESTRA DIBUJA SOLO SU PROPIO SEGMENTO, CON SU `beginPath`. NO
+   * VUELVAS A DEJAR EL CAMINO ABIERTO ENTRE EVENTOS: así estaba y era un bug de
+   * rendimiento en escritorio. Con un único `beginPath` en `pointerdown` y un
+   * `stroke()` por cada `pointermove`, el camino acumula todo el trazo y cada
+   * `stroke()` REDIBUJA ENTERO lo acumulado — 1+2+…+N, o sea O(N²) —, así que la
+   * firma se iba frenando dentro del propio gesto. Con el ratón, que muestrea
+   * mucho más que un dedo, se notaba enseguida; en táctil aguantaba y por eso no
+   * saltó al arreglar el móvil. Ahora cada muestra es trabajo constante.
+   *
+   * ⚠️ Y SE LEEN LOS EVENTOS FUSIONADOS. El navegador entrega `pointermove` una
+   * vez por cuadro y guarda dentro las muestras físicas intermedias; quedarse
+   * solo con `e.clientX/clientY` tira todas menos la última, y con el ratón
+   * rápido eso deja los puntos tan separados que la línea sale poligonal. Es la
+   * otra mitad del "se ve en segmentos". Al recuperarlas, además, la curva tiene
+   * con qué suavizar.
+   *
+   * No hace falta envolver esto en `requestAnimationFrame`: el navegador YA
+   * alinea la entrega de `pointermove` al cuadro —por eso existen los eventos
+   * fusionados—, así que esto es un repintado por cuadro. Añadir un buffer de
+   * rAF encima solo metería un cuadro de retraso, y en una superficie de dibujo
+   * la latencia es la experiencia.
+   */
   function seguir(e: React.PointerEvent<HTMLCanvasElement>): void {
     const trazo = actual.current
     if (!trazo) return
     const ctx = pluma()
     if (!ctx) return
-    const p = punto(e)
-    ctx.lineTo(p.x, p.y)
-    ctx.stroke()
-    trazo.push(normalizar(p))
+    const nativo = e.nativeEvent
+    /* Safari tardó en implementarlo; si no está, la muestra suelta vale. */
+    const fusionados = typeof nativo.getCoalescedEvents === 'function'
+      ? nativo.getCoalescedEvents()
+      : []
+    const muestras: readonly { clientX: number; clientY: number }[] =
+      fusionados.length > 0 ? fusionados : [nativo]
+
+    for (const muestra of muestras) {
+      const p = punto(muestra.clientX, muestra.clientY)
+      const m = medio(ultimoPunto.current, p)
+      /* Mismo trazo que `trazar`, en versión incremental: se avanza del medio
+         anterior al nuevo medio, con el punto de en medio como control. */
+      ctx.beginPath()
+      ctx.moveTo(ultimoMedio.current.x, ultimoMedio.current.y)
+      ctx.quadraticCurveTo(ultimoPunto.current.x, ultimoPunto.current.y, m.x, m.y)
+      ctx.stroke()
+      ultimoMedio.current = m
+      ultimoPunto.current = p
+      trazo.push(normalizar(p))
+    }
   }
 
   /**
@@ -401,7 +484,21 @@ export default function ModalFirma({ tinta, onCerrar, onAceptar }: ModalFirmaPro
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId)
     }
-    if (actual.current) trazos.current.push(actual.current)
+    const trazo = actual.current
+    if (trazo) {
+      /* La cola. La curva incremental deja la pluma en el ÚLTIMO PUNTO MEDIO, o
+         sea a medio camino de la última muestra: sin esto, cada trazo se queda
+         corto por media muestra respecto a donde se levantó el dedo. Es el mismo
+         `lineTo` final que cierra el bucle de `trazar`. */
+      const ctx = trazo.length > 1 ? pluma() : null
+      if (ctx) {
+        ctx.beginPath()
+        ctx.moveTo(ultimoMedio.current.x, ultimoMedio.current.y)
+        ctx.lineTo(ultimoPunto.current.x, ultimoPunto.current.y)
+        ctx.stroke()
+      }
+      trazos.current.push(trazo)
+    }
     actual.current = null
   }
 

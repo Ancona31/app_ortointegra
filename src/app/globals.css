@@ -124,6 +124,17 @@
   --lp-dur-section: 420ms;                        /* entrada de sección */
   --lp-dur-cine:    900ms;                        /* escenario cinematográfico */
   --lp-ease-cine:   cubic-bezier(.65, 0, .35, 1); /* solo los 4 escenarios Apple */
+  /* Vuelta completa del haz del borde (§5.12). Es un TERCER registro y no un
+     peldaño más de la escala: los otros miden una transición que empieza y
+     acaba; este mide un ciclo que no acaba nunca.
+     ⚠️ HISTORIAL, PORQUE ESTE VALOR NO SE LEE SOLO: 6s → 4s → 3s. Y el último
+     salto NO es "más rápido porque sí": el gradiente pasó de UN arco a TRES
+     (0°, 120°, 240°), así que lo que gobierna la sensación ya no es la vuelta
+     sino el intervalo entre pasadas por un mismo punto del borde, que es la
+     vuelta ENTRE TRES. A 3s eso da una pasada por segundo. Si algún día se
+     cambia el número de arcos, este número se recalcula con él: con un solo
+     arco, 3s sería frenético. */
+  --lp-dur-glint:   3s;                           /* solo el borde de §5.12 */
 
   /* Distancias de la entrada de carga del hero (§5.1·A, tanda F2.b).
      Espejo de `HERO.y` en components/landing/motion/tokens.ts.
@@ -933,6 +944,36 @@ html.dark .agenda-fc .fc-daygrid .fc-col-header-cell {
   border-bottom-color: var(--ag-month-gap) !important;
 }
 
+/* ── Destello del borde de la tarjeta recomendada (§5.12, F5·b) ──────────
+   Un gradiente cónico que recorre el perímetro de la tarjeta de Individual.
+
+   ⚠️⚠️ SE ANIMA `rotate` DE UN ELEMENTO, NO EL ÁNGULO DEL GRADIENTE. Es la
+   decisión de coste de este efecto y no es intercambiable. La vía "obvia"
+   —registrar `@property --angle` y animar `conic-gradient(from var(--angle))`—
+   obliga al navegador a RE-RASTERIZAR el degradado del elemento entero en cada
+   cuadro, para siempre: es trabajo de pintado en el hilo principal a 60 Hz
+   sobre una caja de ~420×560. Rotando el elemento, el degradado se rasteriza
+   UNA vez y cada cuadro solo cambia una transformada, que resuelve el
+   compositor sin pintar ni maquetar. Mismo resultado en pantalla, coste de otro
+   orden. Si alguien "simplifica" esto a `@property`, está pagando repintado
+   permanente por nada.
+
+   Se anima la propiedad independiente `rotate` y NO `transform`, para que el
+   centrado (`-translate-x/y-1/2`, que pone Tailwind) siga siendo suyo y no haya
+   que repetirlo dentro del keyframe. Al detenerse queda en `rotate: 0` y sigue
+   centrado.
+
+   `linear` es obligatorio y no es un easing "fuera de la escala": un bucle
+   cerrado con cualquier curva se nota frenar y acelerar en la costura. No es
+   una curva del sistema, es la ausencia de curva. */
+@keyframes lp-giro-borde {
+  to { rotate: 1turn; }
+}
+
+.lp-borde-destello {
+  animation: lp-giro-borde var(--lp-dur-glint) linear infinite;
+}
+
 /* ── Reduced motion ──
    Neutraliza las animaciones de entrada/transición para quienes lo piden.
    `.animate-spin` (loaders) queda EXCLUIDO: congelarlo a media rotación deja
@@ -978,6 +1019,19 @@ html.dark .agenda-fc .fc-daygrid .fc-col-header-cell {
    */
   [data-lp-paso] {
     display: none !important;
+  }
+
+  /*
+   * Destello del borde de la tarjeta recomendada (§5.12). SE DETIENE, y es el
+   * caso de manual de esta preferencia: movimiento continuo, permanente y que
+   * no responde a ninguna acción del visitante. La regla `[class*="animate-"]`
+   * de arriba NO lo alcanza —la clase se llama `lp-borde-destello`, no
+   * `animate-*`—, así que se apaga aquí explícitamente.
+   * Se para en `rotate: 0`, con el borde de acento intacto: quien reduce
+   * movimiento sigue viendo la tarjeta destacada, solo que sin el barrido.
+   */
+  .lp-borde-destello {
+    animation: none !important;
   }
 }
 

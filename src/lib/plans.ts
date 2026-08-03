@@ -28,6 +28,14 @@ export const PLANS: Record<PlanKey, Plan> = {
     max_secretarias: 0,
     max_pacientes: 5,
     color: 'slate',
+    /* ⚠️ LAS NOTAS CON IA NO ESTÁN EN ESTA LISTA Y EL PRODUCTO SÍ LAS DA A FREE.
+       No es un descuido: es una discrepancia REAL entre el copy y el runtime,
+       y se deja anotada en vez de resolverse por cuenta propia. `rateLimit.ts`
+       aplica el mismo tope de 60/24 h a todo el mundo sin mirar el plan, así
+       que hoy un usuario Free las tiene igual que uno de pago. Añadirlas aquí
+       sería prometer algo que Angel está a punto de restringir; quitárselas al
+       runtime es decisión suya, no de este archivo. Cuando el límite se
+       diferencie por plan, esta lista y la de `individual` se resuelven juntas. */
     features: [
       'Hasta 5 pacientes',
       'Expedientes clínicos',
@@ -45,15 +53,31 @@ export const PLANS: Record<PlanKey, Plan> = {
     max_secretarias: 0,
     max_pacientes: null,
     color: 'blue',
+    /* ⚠️ ESTA LISTA ES COPY DE CARA AL CLIENTE Y LA LEEN TRES SUPERFICIES:
+       la landing (§5.12), /pricing y /billing. Solo va aquí lo que el producto
+       hace HOY. Cambios de 2026-08-02:
+       · «Extracción de labs con IA» — RETIRADA. La función ya no existe:
+         `/api/labs-extract` se eliminó en la sub-fase 8C1 del rediseño de labs
+         (2026-04-23) y la única ruta de IA que queda es `/api/nota-medica`.
+         Sobrevive `/api/labs/mediciones`, que es CRUD, no extracción. No la
+         devuelvas a la lista sin que exista el endpoint.
+       · «Google Calendar integrado» → «Sincronización con Google Calendar».
+         Lo anterior sugería que Google vive dentro de la app.
+       · «Nota de honorarios» — RETIRADA por redundante: es uno de los 8
+         formatos que ya cubre «Todos los tipos de documentos». */
     features: [
       'Pacientes ilimitados',
+      /* ⚠️ SIN NÚMERO, Y ES DELIBERADO. El tope vive en `rateLimit.ts`
+         (`nota-medica: 60` cada 24 h) y HOY NO DISTINGUE PLAN: `checkRateLimit`
+         recibe `userId` y ruta, nunca el plan. Angel va a diferenciarlo, así
+         que publicar la cifra sería anunciar algo a punto de dejar de ser
+         cierto. Cuando se diferencie, el número entra aquí. */
+      'Notas médicas con IA',
       'Todos los tipos de documentos',
       'Visor DICOM',
-      'Extracción de labs con IA',
-      'Google Calendar integrado',
+      'Sincronización con Google Calendar',
       'Estadísticas clínicas',
       'Envío de docs por email',
-      'Nota de honorarios',
     ],
     priceId: {
       monthly: process.env.STRIPE_PRICE_INDIVIDUAL_MONTHLY ?? null,

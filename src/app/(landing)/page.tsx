@@ -12,6 +12,7 @@ import SeccionInterfaz from '@/components/landing/sections/SeccionInterfaz'
 import SeccionHistoria from '@/components/landing/sections/SeccionHistoria'
 import SeccionControl from '@/components/landing/sections/SeccionControl'
 import SeccionSeguridad from '@/components/landing/sections/SeccionSeguridad'
+import SeccionPrecio from '@/components/landing/sections/SeccionPrecio'
 import SeccionFAQ from '@/components/landing/sections/SeccionFAQ'
 import SeccionCTA from '@/components/landing/sections/SeccionCTA'
 import SeccionFooter from '@/components/landing/sections/SeccionFooter'
@@ -58,11 +59,21 @@ export default function HomePage() {
           interrumpe la demostración del producto (los teasers y el bento) con
           letra pequeña, y ponerla después del CTA la entierra donde nadie
           baja.
-          Cuando F5 monte §12 (Precio + beta), esta sección NO se mueve: 12b
-          queda entre el precio y el cierre, que es el orden canónico —
-          "cuánto cuesta" → "sí, pero…" → "empieza". Su posición es estable en
-          el código y en la tabla de §3.4, cosa que no puede decirse del resto
-          del archivo (ver el aviso de arriba). */}
+          F5 montó §5.12 (Precio) y esta sección NO se movió, tal como estaba
+          previsto: 12b queda entre el precio y el cierre, que es el orden
+          canónico — "cuánto cuesta" → "sí, pero…" → "empieza". Su posición es
+          estable en el código y en la tabla de §3.4, cosa que no puede decirse
+          del resto del archivo (ver el aviso de arriba). */}
+      {/* ⚠️ EL PRECIO VA ANTES DE LA FAQ, y esa era ya la decisión escrita en
+          este archivo antes de F5. La alternativa —precio entre la FAQ y el
+          cierre— pone la mayor fuente de objeciones DESPUÉS del único bloque
+          que existe para resolverlas, y deja al visitante con la duda recién
+          abierta y nada entre ella y el botón. Además la FAQ contesta de frente
+          "¿Puedo probarlo sin compromiso?": leerla antes de conocer el precio
+          la desperdicia. Si alguna tanda lo mueve, la superficie navy de la
+          sección tiene que revisarse con él — está elegida por los vecinos que
+          tiene aquí, no por gusto (razonado en `SeccionPrecio.tsx`). */}
+      <SeccionPrecio />
       <SeccionFAQ />
       <SeccionCTA />
       <SeccionFooter />
