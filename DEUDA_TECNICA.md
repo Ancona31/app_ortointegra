@@ -2644,6 +2644,145 @@ control» de `globals.css`.
 - **Alcance estimado:** 1 redirect + 8 enlaces internos + verificar que ningún
   correo transaccional ya enviado apunte a la que se retire.
 
+### LP-DT-43 — Rate-limit de login: consume presupuesto en logins EXITOSOS y no es atómico
+- **Estado:** 🔴 abierta — **PRIORIDAD MÁXIMA, NO DIFERIBLE**
+- **Detectada:** auditoría del cerrojo de doble envío de /login (2026-08-03)
+- **Cuándo se ataca:** rama propia `fix/rate-limit-login`, en cuanto
+  `feature/rediseno-login` esté mergeada. No se mete en la rama del rediseño.
+- **Defecto (a) — el presupuesto se gasta aunque aciertes la contraseña.**
+  `checkAuthRateLimit` inserta una fila por cada intento **recibido**
+  (`src/lib/rateLimit.ts:88`), antes de saber si la contraseña es correcta:
+  la llamada al endpoint sale en `src/app/login/page.tsx:130` y
+  `signInWithPassword` no corre hasta `:161`. Ningún camino descuenta al
+  acertar — los únicos `DELETE` de `ip_rate_limits` son la limpieza de filas
+  ya vencidas (`rateLimit.ts:91-97`). Umbral **5 por email en ventana
+  deslizante de 15 minutos** (`src/app/api/auth/rate-limit/route.ts:19`,
+  corte en `rateLimit.ts:84`), y el producto **no expone ninguna vía de
+  desbloqueo**: solo esperar.
+- **Defecto (b) — `count` e `insert` no son atómicos.** El conteo
+  (`rateLimit.ts:75-81`) y la inserción (`:88`) son dos viajes separados. Dos
+  peticiones concurrentes pueden contar el mismo total y ambas insertar.
+  **Verificado que no hay red de seguridad en la base:** la tabla solo tiene
+  `PRIMARY KEY (id)` (`supabase/baseline/02_tables.sql:272-278`) y su único
+  índice es un btree **no único** sobre `(ip, ruta, created_at)`
+  (`supabase/baseline/03_indexes.sql:102-103`). Ni restricción única ni
+  `UPSERT` que pueda apoyarse en una.
+- **⚠️ RIESGO AL CORREGIR (a):** el reseteo del contador debe ocurrir **SOLO
+  tras confirmación real de sesión válida**. Cualquier reseteo antes de esa
+  confirmación convierte el limitador en fuerza bruta ilimitada. Este es el
+  punto donde un arreglo apresurado es peor que el defecto.
+- **VALIDACIÓN — ninguna herramienta automática cubre esto.** Ni `tsc`, ni
+  `eslint`, ni `next build` ven nada aquí: no es un error de tipos ni de
+  compilación, es comportamiento de la ruta de auth contra la base. Exige
+  **prueba deliberada con escritura real en `ip_rate_limits` y `audit_log`.**
+  - Aritmética a tener presente al medir: **una llamada exitosa a
+    `login_email` inserta DOS filas**, no una — `login_email` para el email
+    (`route.ts:39`) y `login_ip` para la IP (`route.ts:52`). Lo que hay que
+    contar es la fila con `ruta = 'auth:login_email:<email>'`.
+  - `ip_rate_limits` se escribe con `createAdminClient()` (service role,
+    `rateLimit.ts:71,88`), así que **no es consultable desde el cliente**.
+    Canal de medición que no necesita service role: el 200 del endpoint
+    devuelve `remaining` (`route.ts:65`), calculado como `limite - total - 1`
+    (`rateLimit.ts:99`). De ahí **`filas = 4 − remaining`** — es el servidor
+    contando sus propias filas. Con un email inexistente y virgen el estado
+    previo es 0 por construcción; cada ronda de prueba necesita un email
+    distinto para no gastar el presupuesto de 5/15 min y contaminar la
+    siguiente medición.
+  - Sobre `audit_log`: con email inexistente el 200 del rate-limit **no
+    escribe nada** (`logAudit` solo corre en las ramas `blocked`,
+    `route.ts:41,54`). Lo que sí escribe es `/api/auth/audit-login` con
+    `login_fallido` tras el `signInWithPassword` fallido
+    (`login/page.tsx:229-233` → `logLogin({ success: false })`).
+  - **⚠️ NOTA DE MÉTODO — verificada el 2026-08-03. El doble clic de Claude
+    in Chrome NO reproduce la rendija del mismo tick.** Dispara dos `click`
+    reales separados por **~1.5 ms**, y a esa distancia React 19 ya hizo el
+    flush síncrono de `setLoading(true)`: el botón está `disabled` y **no
+    emite el segundo `click`**. Consecuencia para quien vaya a validar esto:
+    **un doble clic de extensión que sale limpio demuestra `disabled={loading}`
+    (`login/page.tsx:469`), NO el cerrojo `submitLockRef`** — con el cerrojo
+    roto el resultado sería idéntico, así que ese experimento no distingue
+    una cosa de la otra y no vale como confirmación.
+    Para **ejercer el cerrojo de verdad** hay que forzar dos `click()` en el
+    **mismo task síncrono**, rellenando los campos con el **setter nativo de
+    `HTMLInputElement`** + evento `input` (si no, React no toma el estado y
+    se envía el formulario vacío). Resultado de esa prueba el 2026-08-03:
+    **2 entradas al handler → 1 petición → 1 fila.** El cerrojo funciona.
+- **Mitigación parcial ya en producción, que NO cierra esta deuda:** el
+  cerrojo síncrono `submitLockRef` de `login/page.tsx:105,153-154` impide que
+  un doble clic duplique el gasto. Reduce la sangría; no toca ninguno de los
+  dos defectos de arriba.
+
+### LP-DT-44 — Cobertura de lint perdida en `login/page.tsx` por el `try/finally`
+- **Estado:** 🔴 abierta — aceptada conscientemente, revisar en versiones
+  futuras del plugin
+- **Detectada:** auditoría del cerrojo de doble envío de /login (2026-08-03)
+- **Descripción:** el `try/finally` del cerrojo (`src/app/login/page.tsx:163`
+  y `:251-266`) **desactiva el compilador de React sobre todo el componente**.
+  No es un efecto colateral misterioso: es un bail-out **declarado** del
+  propio plugin. En `eslint-plugin-react-hooks` 7.0.1,
+  `cjs/eslint-plugin-react-hooks.development.js:23982-23988`:
+
+  ```js
+  if (hasNode(stmt.get('finalizer'))) {
+    builder.errors.push({
+      reason: `(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause`,
+      category: ErrorCategory.Todo,
+  ```
+
+  Es decir: el compilador **no sabe** bajar un `finalizer` a su HIR
+  (`ErrorCategory.Todo` = funcionalidad no implementada, no error del código).
+  Al no compilar el componente, **todas** las reglas respaldadas por el
+  compilador dejan de emitir para él.
+- **Consecuencia:** `react-hooks/set-state-in-effect` dejó de reportar y **el
+  defecto del `useEffect` (`:107-140`) SIGUE VIVO, ahora invisible.** El
+  archivo pasa el lint en verde sin que nadie lo haya arreglado.
+- **Verificado que la causa es `finally` en exclusiva.** Seis componentes
+  sintéticos con el mismo `useEffect` infractor, idénticos salvo el handler,
+  bajo la config del repo: sin `try` **reporta**; `try/finally` calla;
+  `try/catch` sin `finally` **reporta**; `try/catch/finally` calla;
+  `try/finally` sin el flag `navegando` calla; `try/catch` **con** el flag
+  `navegando` reporta. Ni `try` en general ni el flag tienen nada que ver.
+  El bail-out es **por componente, no por archivo**: un séptimo caso con dos
+  componentes en un mismo módulo —uno con el `finally`, otro con el efecto—
+  sí reporta. En `login/page.tsx` coinciden en el mismo componente, y por eso
+  ahí se pierde el archivo entero.
+- **Se evaluó y se DESCARTÓ migrar a `try/catch`** para recuperar la regla:
+  - El `return` del 429 (`:192`) sale sin pasar por el `catch` ni por el
+    final del `try`: **quedaría sin liberar el ref**, cerrojo echado hasta
+    recargar.
+  - Las dos salidas normales tienen **requisitos opuestos** y caen en el mismo
+    punto: la rama de credenciales (`:222-233`) debe liberar, la de éxito
+    (`:234-250`) no debe. Una liberación al final del `try` reabriría el botón
+    durante el hueco de `window.location.href` — el defecto exacto que
+    `:251-265` existe para matar.
+  - `finally` cubre **gratis** las salidas que alguien añada en el futuro;
+    `catch` obliga a acordarse en cada una. Con tres puntos de liberación
+    explícitos hoy no quedaría ningún camino suelto, pero el patrón es frágil
+    por construcción.
+- **⚠️ EL BASELINE DE ESLINT BAJÓ DE 212 A 211 Y ESO NO ES UNA MEJORA.** Es
+  **un archivo menos analizado**, no un defecto corregido. Cualquiera que
+  compare los dos números sin leer esta nota leerá progreso donde hay pérdida
+  de cobertura. (211 verificado con `npx eslint .` el 2026-08-03.)
+- **Condición de cierre:** que una versión futura de
+  `eslint-plugin-react-hooks` implemente el lowering del `finalizer` — el
+  `ErrorCategory.Todo` dice que está pendiente, no que sea imposible. Al
+  actualizar el plugin, **volver a correr el lint sobre este archivo** y
+  arreglar lo que reaparezca.
+
+### LP-DT-45 — Botón de login inerte tras excepción
+- **Estado:** 🔴 abierta
+- **Detectada:** al auditar las salidas del handler de /login (2026-08-03)
+- **Descripción:** en las rutas de **excepción** —`createClient()` (`:201`),
+  `supabase.auth.signOut()` (`:208`), `supabase.auth.signInWithPassword()`
+  (`:211`)— no se ejecuta ningún `setLoading(false)`. `loading` se queda en
+  `true` desde `:164` y el `disabled={loading}` del botón (`:469`) lo deja
+  **muerto hasta recargar la página**.
+- **Es un defecto PREVIO al cerrojo de doble envío e independiente de él.**
+  El `finally` (`:265`) **sí** libera `submitLockRef`; lo que no baja es el
+  `disabled`. El ref suelto no sirve de nada mientras el atributo siga puesto.
+  Conviene tenerlo escrito porque invita a diagnosticar mal: quien vea el
+  botón muerto pensará que falló el cerrojo, y el cerrojo funcionó.
+
 ---
 
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)
