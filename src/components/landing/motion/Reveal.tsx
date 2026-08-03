@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { DIST, DUR, EASE } from './tokens'
 
@@ -39,10 +39,35 @@ interface RevealProps {
  */
 export default function Reveal({ children, className, delay = 0 }: RevealProps): React.JSX.Element {
   const reducedMotion = useReducedMotion()
+  const capa = useRef<HTMLDivElement>(null)
 
   return (
     <motion.div
+      ref={capa}
       data-lp-reveal=""
+      /* ═══ ESTADO DE ESPERA — F6·f1b ═══════════════════════════════════════
+         `data-lp-espera` significa "esta capa todavía no ha entrado en
+         pantalla", y `globals.css` la pone en `visibility: hidden` mientras no
+         lleve además `data-lp-visto`. Sin eso, sus controles son alcanzables
+         con Tab estando a `opacity: 0` — 21 de los 31 focusables de la página
+         lo estaban.
+
+         ⚠️ ES UN ATRIBUTO NUEVO Y NO SE REUTILIZA `data-lp-reveal`, que sería
+         lo cómodo. `data-lp-reveal` lo llevan también las 12 capas de carga
+         del hero, las de la receta y las de `Parallax`, que NO son
+         `whileInView`: nunca reciben un callback de viewport, así que con la
+         regla colgada de ese atributo se quedarían ocultas PARA SIEMPRE.
+         `data-lp-espera` lo ponen solo `Reveal` y `Stagger`, que son los que
+         sí tienen cómo levantarlo. */
+      data-lp-espera=""
+      /* El nodo se marca a sí mismo en cuanto entra: mismo instante en que
+         `motion` arranca la animación —los dos salen del mismo callback del
+         IntersectionObserver—, así que la capa se hace visible justo cuando
+         empieza a fundirse desde 0. No hay salto.
+         Se escribe el atributo a mano en vez de subirlo a estado: son 94
+         capas y ninguna necesita re-renderizar para esto. React no lo toca
+         porque nunca se lo pasamos como prop. */
+      onViewportEnter={() => capa.current?.setAttribute('data-lp-visto', '')}
       className={className}
       initial={{ opacity: 0, y: DIST.reveal }}
       whileInView={{ opacity: 1, y: 0 }}

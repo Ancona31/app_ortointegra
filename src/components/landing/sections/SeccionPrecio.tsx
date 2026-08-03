@@ -168,7 +168,10 @@ export default function SeccionPrecio() {
   const desdeClinica = PLANS.basica.precio_mensual
 
   return (
-    <section className="bg-[var(--lp-navy)]">
+    /* `[--lp-focus:…]` — sobre navy el anillo de foco pasa a blanco (11.64:1);
+       el acento por defecto mediría 1.81:1. Ojo: la tarjeta de Individual es
+       BLANCA y lo revierte a acento más abajo. */
+    <section className="bg-[var(--lp-navy)] [--lp-focus:var(--lp-ink-inverse)]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-16 sm:py-24 lg:py-32">
         <Reveal className="mx-auto max-w-2xl text-center">
           <p className="text-[12px] font-semibold uppercase tracking-[0.12em] leading-none text-[var(--lp-ink-inverse-70)]">
@@ -229,7 +232,10 @@ export default function SeccionPrecio() {
                   esconderlas abajo es exactamente la letra chiquita que la
                   página dice no tener. */}
               {FREE_NO_INCLUYE.map((f) => (
-                <li key={f} className="flex items-start gap-3 text-[15px] leading-[1.45] text-[var(--lp-ink-inverse-50)]">
+                /* -70 y no -50: sobre navy el 50% mide 4.20:1, bajo el 4.5 de
+                   AA para texto normal. Este renglón sigue siendo secundario
+                   —lo dice el icono de resta, no su opacidad—. */
+                <li key={f} className="flex items-start gap-3 text-[15px] leading-[1.45] text-[var(--lp-ink-inverse-70)]">
                   <Minus className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
                   <span>
                     {f} <span className="whitespace-nowrap">— no incluido</span>
@@ -318,7 +324,12 @@ export default function SeccionPrecio() {
                 el del marco menos su grosor (16 − 3), o si no se ve una luna
                 de color en las esquinas. Sin `shadow-*`: la sombra vive en el
                 contenedor, ver el aviso de arriba. */}
-            <div className="relative flex h-full flex-col rounded-[13px] bg-[var(--lp-surface)] p-8">
+            {/* ⚠️ REVIERTE EL ANILLO DE FOCO A ACENTO. La sección puso blanco
+                porque su fondo es navy, pero ESTA tarjeta es blanca: un anillo
+                blanco sobre ella sería invisible (1.00:1). Con acento, 6.45:1.
+                Cualquier tarjeta clara que se añada dentro de una franja
+                oscura necesita esta misma línea. */}
+            <div className="relative flex h-full flex-col rounded-[13px] bg-[var(--lp-surface)] p-8 [--lp-focus:var(--lp-accent)]">
             <p className="inline-flex w-fit items-center rounded-full bg-[var(--lp-accent-bg)] px-3 py-1 text-[12px] font-semibold uppercase tracking-[0.08em] leading-none text-[var(--lp-accent)]">
               Recomendado
             </p>
@@ -375,7 +386,10 @@ export default function SeccionPrecio() {
             </Link>
           </p>
           {/* Literal de `/pricing:217`. Si allá cambia, aquí también. */}
-          <p className="mt-3 text-[13px] leading-[1.45] text-[var(--lp-ink-inverse-50)]">
+          {/* -70 y no -50: 4.20:1 sobre navy incumple AA, y a 13px con más
+              razón. La letra pequeña legal es justo lo que no puede ser
+              ilegible. */}
+          <p className="mt-3 text-[13px] leading-[1.45] text-[var(--lp-ink-inverse-70)]">
             Todos los precios en MXN. IVA no incluido. Puedes cancelar en cualquier momento.
           </p>
         </Reveal>

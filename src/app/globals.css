@@ -224,12 +224,65 @@
   /* Inverso — texto y tintes sobre superficie oscura */
   --lp-ink-inverse:        #ffffff;
   --lp-ink-inverse-70:     rgb(255 255 255 / .70);
+  /*
+   * ⚠️ --lp-ink-inverse-50 NO SIRVE SOBRE NAVY. Mide 4.20:1 contra --lp-navy,
+   * por debajo del 4.5 de AA para texto normal, y en F6·f1 se retiraron de ahí
+   * sus tres usos (dos en §5.12, uno en §5.7) que pasaron a -70 (6.58:1).
+   * Su contrato queda ESTRECHADO a las cajas de gradiente slate, que son más
+   * oscuras: ahí mide 5.23:1 sobre slate-900 y 4.80:1 en el punto más claro
+   * del gradiente (slate-800), y pasa. Hoy tiene un único consumidor legítimo,
+   * el kicker de §5.4 (`SeccionIA.tsx:75`).
+   * Si vas a usarlo sobre cualquier otro fondo, MÍDELO ANTES.
+   */
   --lp-ink-inverse-50:     rgb(255 255 255 / .50);
   --lp-surface-inverse-5:  rgb(255 255 255 / .05);
   --lp-surface-inverse-10: rgb(255 255 255 / .10);
 
   /* Hover */
   --lp-hover-surface: #f1f5f9;
+
+  /*
+   * Color del anillo de foco. Lo consume la regla única de más abajo; las
+   * superficies oscuras lo redefinen a blanco sobre sí mismas.
+   * ⚠️ NO EXISTE UN SOLO COLOR QUE VALGA PARA LAS DOS SUPERFICIES, y está
+   * medido: para cumplir el 3:1 de WCAG 1.4.11 contra blanco Y contra navy a
+   * la vez, el anillo tendría que tener una luminancia relativa entre 0.221 y
+   * 0.300, y ningún token de la escala cae ahí (accent 0.113, ink-500 0.143,
+   * ink-700 0.066, border-strong 0.656). Por eso el color es una VARIABLE que
+   * hereda, y no una constante.
+   */
+  --lp-focus: var(--lp-accent);
+}
+
+/*
+ * ═══ ANILLO DE FOCO ÚNICO DE LA LANDING (F6·f1) ═══════════════════════════
+ * Antes cada control declaraba —o no— su propio anillo: 11 de 32 lo tenían, y
+ * los tres enlaces del nav no. El problema de fondo no era esos 21 controles,
+ * era que el patrón fuese opcional: el siguiente que alguien añada nace sin
+ * anillo. Con esta regla nace con él.
+ *
+ * `:where()` le da especificidad CERO a propósito. Los 11 controles que ya
+ * declaran su `focus-visible:outline-*` siguen ganando sin tocarlos, y
+ * cualquiera puede seguir personalizando el suyo. Esto es el suelo, no el techo.
+ *
+ * ⚠️ VA ACOTADA A `.font-lp`, o sea al envoltorio de la landing, y no es
+ * arbitrario: `globals.css` lo comparte el producto entero (login, agenda,
+ * expediente…). Una regla de foco global sería un cambio de alcance que esta
+ * tanda no audita. Se engancha a `.font-lp` porque es la clase que el layout
+ * ya pone en su `<div>` envolvente y así no hay que tocar ese archivo, que
+ * lleva un aviso expreso de mantenerse desnudo.
+ *
+ * Contraste del indicador (1.4.11 exige 3:1): sobre superficie clara el anillo
+ * es `--lp-accent`, 6.45:1 contra blanco. Sobre navy pasa a `--lp-ink-inverse`,
+ * 11.64:1. La redefinición la hace cada contenedor oscuro con la utilidad
+ * `[--lp-focus:var(--lp-ink-inverse)]`, y las tarjetas blancas DENTRO de una
+ * franja oscura la revierten a acento — si no, un anillo blanco sobre tarjeta
+ * blanca sería invisible.
+ */
+.font-lp :where(a, button, summary, [tabindex]:not([tabindex="-1"])):focus-visible,
+.font-lp :where(input, select, textarea):focus-visible {
+  outline: 2px solid var(--lp-focus);
+  outline-offset: 2px;
 }
 
 /* Par del fallback de --lp-wash. Va FUERA del bloque de arriba y DESPUÉS de
@@ -974,6 +1027,51 @@ html.dark .agenda-fc .fc-daygrid .fc-col-header-cell {
   animation: lp-giro-borde var(--lp-dur-glint) linear infinite;
 }
 
+/* ── Capas de tejido en espera (F6·f1b) ──────────────────────────────────
+   `data-lp-espera` lo ponen SOLO `Reveal` y `Stagger`; se levanta con
+   `data-lp-visto` en cuanto la capa entra en pantalla. Mientras no está visto,
+   el subárbol se saca del orden de tabulación: antes 21 de los 31 focusables
+   de la página eran alcanzables con Tab estando a `opacity: 0`.
+
+   ⚠️ `visibility` Y NO `inert`, y la razón es esta hoja. `inert` sería mejor
+   en casi todo —no toca el renderizado, así que no hay riesgo de romper
+   transiciones, y limpia también el árbol de accesibilidad— pero es un
+   ATRIBUTO HTML: no se puede revertir desde CSS, así que ni el bloque de
+   `prefers-reduced-motion` de abajo ni la escotilla de teclado podrían
+   levantarlo, y la única vía sería ramificar el render con `useReducedMotion`,
+   que es el bug que ya costó un ciclo. `visibility` se gobierna entero desde
+   aquí, que es donde tienen que vivir las dos reversiones.
+
+   ⚠️ Y NO CUELGA DE `data-lp-reveal`: ese atributo lo llevan también las capas
+   de carga del hero, las de la receta y las de `Parallax`, que no son
+   `whileInView` y nunca recibirían el `data-lp-visto`. Quedarían ocultas para
+   siempre. */
+[data-lp-espera]:not([data-lp-visto]) {
+  visibility: hidden;
+}
+
+/* ── Escotilla de teclado ──
+   `RevelarPorTeclado.tsx` pone `data-lp-teclado` en <html> a la primera señal
+   de navegación sin ratón. A partir de ahí el tejido se sirve en su estado
+   final: visible, alcanzable y sin animación pendiente.
+
+   Cubre el contenedor Y sus descendientes con `data-lp-reveal` porque en
+   `Stagger` la marca vive en el contenedor y son los HIJOS los que llevan el
+   `opacity: 0` inline: levantar solo el contenedor dejaría los ítems invisibles.
+
+   ⚠️ ACOTADO A LOS SUBÁRBOLES `data-lp-espera`, no a toda la página. Así el
+   tejido se aplana pero las dos escenas ligadas al scroll —el hero y el
+   ensamblaje de la receta— y los `Parallax` conservan su coreografía: no son
+   alcanzables por Tab de todas formas, así que aplanarlas no compraría nada y
+   costaría la mitad del diseño de la página. */
+html[data-lp-teclado] [data-lp-espera],
+html[data-lp-teclado] [data-lp-espera] [data-lp-reveal] {
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+}
+
 /* ── Reduced motion ──
    Neutraliza las animaciones de entrada/transición para quienes lo piden.
    `.animate-spin` (loaders) queda EXCLUIDO: congelarlo a media rotación deja
@@ -1006,6 +1104,17 @@ html.dark .agenda-fc .fc-daygrid .fc-col-header-cell {
     filter: none !important;
     transform: none !important;
     transition: none !important;
+  }
+
+  /*
+   * El estado de espera NO EXISTE bajo esta preferencia. La regla de arriba ya
+   * sirve las capas en su estado final visible, así que ocultarlas dejaría
+   * contenido que se ve pero no se puede tabular — el mismo defecto al revés.
+   * Se anula sobre `[data-lp-espera]` y no sobre `[data-lp-reveal]` porque en
+   * `Stagger` la marca vive en el contenedor, que no lleva `data-lp-reveal`.
+   */
+  [data-lp-espera] {
+    visibility: visible !important;
   }
 
   /*

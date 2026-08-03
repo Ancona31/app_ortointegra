@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { DIST, STAGGER } from './tokens'
 
@@ -87,9 +87,22 @@ export default function Stagger({
   gap = STAGGER.siblings,
 }: StaggerProps): React.JSX.Element {
   const reducedMotion = useReducedMotion()
+  const capa = useRef<HTMLDivElement>(null)
 
   return (
     <motion.div
+      ref={capa}
+      /* ═══ ESTADO DE ESPERA — F6·f1b ═══════════════════════════════════════
+         Mismo mecanismo que en `Reveal.tsx`, con una diferencia que importa:
+         aquí la marca va en el CONTENEDOR y no en los hijos. Los ítems los
+         escribe cada sección a mano —el componente no los envuelve, por la
+         lección de F2.a·a2— así que marcarlos uno a uno obligaría a tocar las
+         catorce secciones. Ocultar el contenedor oculta el subárbol entero y
+         levantarlo lo levanta entero: un atributo en vez de noventa.
+         Ver el aviso largo de `Reveal.tsx` sobre por qué esto NO se cuelga de
+         `data-lp-reveal`. */
+      data-lp-espera=""
+      onViewportEnter={() => capa.current?.setAttribute('data-lp-visto', '')}
       className={className}
       initial="oculto"
       whileInView="visible"

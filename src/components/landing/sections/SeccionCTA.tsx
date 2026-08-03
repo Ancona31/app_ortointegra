@@ -39,7 +39,11 @@ export default function SeccionCTA() {
         {/* §5.13 · F2.a·a1 — EL `<Reveal>` TOMA LAS CLASES DEL BLOQUE NAVY, no
             lo envuelve. Mismo criterio que `SeccionIA.tsx`, que es su gemelo
             de superficie. */}
-        <Reveal className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-[var(--lp-navy)] to-[var(--lp-accent)] p-8 sm:p-12 text-center shadow-[0_8px_32px_rgb(var(--lp-accent-rgb)/0.3)]">
+        {/* `[--lp-focus:…]`: los dos CTA de dentro viven sobre el degradado
+            navy→accent, así que su anillo de foco pasa a blanco (11.64:1 contra
+            el extremo navy). El acento por defecto se perdería sobre su propio
+            degradado. */}
+        <Reveal className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-[var(--lp-navy)] to-[var(--lp-accent)] p-8 sm:p-12 text-center shadow-[0_8px_32px_rgb(var(--lp-accent-rgb)/0.3)] [--lp-focus:var(--lp-ink-inverse)]">
           {/* Shine overlay */}
           <div className="absolute inset-0 bg-gradient-to-br from-[var(--lp-surface-inverse-10)] via-transparent to-transparent pointer-events-none" />
 

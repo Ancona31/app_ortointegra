@@ -186,7 +186,10 @@ export default function SeccionReceta() {
   }
 
   return (
-    <section className="bg-[var(--lp-navy)]">
+    /* `[--lp-focus:…]` — sobre navy el anillo de foco pasa a blanco (11.64:1).
+       Con el acento por defecto mediría 1.81:1 y no cumpliría 1.4.11. La regla
+       que lo consume está en globals.css; aquí solo se declara la variable. */
+    <section className="bg-[var(--lp-navy)] [--lp-focus:var(--lp-ink-inverse)]">
       {/* 260vh es el alto de §5.7 y va como clase, no como token: es geometría
           de maqueta, del mismo tipo que los `py-*` de §3.3, y `tokens.ts` es el
           espejo de los valores que consume `motion`. */}
@@ -276,7 +279,9 @@ export default function SeccionReceta() {
                     describía un canvas incrustado en la hoja que ya no existe:
                     era demasiado pequeño para trazar nada reconocible. Ahora se
                     dibuja en un lienzo grande y la hoja MUESTRA el resultado. */}
-                <p className="mt-2 text-[15px] leading-[1.5] text-[var(--lp-ink-inverse-50)]">
+                {/* -70 y no -50: sobre navy el 50% mide 4.20:1 y no llega al
+                    4.5 de AA para texto normal. */}
+                <p className="mt-2 text-[15px] leading-[1.5] text-[var(--lp-ink-inverse-70)]">
                   Dibújala en grande y aparece en la receta — o sube una foto de tu firma.
                 </p>
                 {/* ═══ LOS DOS CONTROLES REALES DEL TEASER, EN UNA SOLA FILA ═══

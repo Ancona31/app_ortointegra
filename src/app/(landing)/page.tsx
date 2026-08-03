@@ -1,5 +1,6 @@
 'use client'
 
+import RevelarPorTeclado from '@/components/landing/motion/RevelarPorTeclado'
 import SeccionNav from '@/components/landing/sections/SeccionNav'
 import SeccionHero from '@/components/landing/sections/SeccionHero'
 import SeccionProblema from '@/components/landing/sections/SeccionProblema'
@@ -25,6 +26,11 @@ import SeccionFooter from '@/components/landing/sections/SeccionFooter'
 export default function HomePage() {
   return (
     <main className="min-h-screen relative">
+      {/* No pinta nada. Es el único listener de la página para la escotilla de
+          teclado de los reveals: sin él, sacar los controles ocultos del orden
+          de tabulación dejaría media página inalcanzable. Ver el aviso largo
+          de `RevelarPorTeclado.tsx` antes de moverlo o quitarlo. */}
+      <RevelarPorTeclado />
       <SeccionNav />
       <SeccionHero />
       <SeccionProblema />
