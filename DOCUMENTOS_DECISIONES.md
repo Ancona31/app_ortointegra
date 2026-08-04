@@ -1,3 +1,13 @@
+> **AVISO — 2026-08-04.** Este documento es histórico. El §2 (tipografía y
+> uso de color) quedó superado por el brief v2 y por la sesión de rediseño.
+> La fuente de verdad vigente es `DOCUMENTOS_HANDOFF.md`. Donde ambos se
+> contradigan, manda el handoff.
+>
+> El "siguiente paso ejecutable" que menciona abajo ya se ejecutó: la auditoría
+> está en `DOCUMENTOS_AUDITORIA.md` y el rediseño de los 8 formatos cerró.
+> El siguiente paso real es el Paso 0 de `PLAN_FASE1_DOCUMENTOS.md`.
+
+
 # Proyecto: Sistema de documentos — Decisiones de planeación
 
 > Estado: planeación cerrada salvo 4 decisiones pendientes (ver final).
