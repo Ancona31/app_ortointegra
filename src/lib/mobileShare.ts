@@ -28,7 +28,29 @@ type DocType =
 /** Guard de concurrencia — evita ejecuciones paralelas por multi-clic */
 let isGenerating = false
 
-/** Importa dinámicamente el renderer correcto y genera el elemento react-pdf */
+/**
+ * Importa dinámicamente el renderer correcto y genera el elemento react-pdf.
+ *
+ * ── PUNTO ÚNICO DE RAMIFICACIÓN v1 / v2 ─────────────────────────────────────
+ * Este `switch` es el lugar donde, en un paso futuro, se decidirá entre el
+ * renderer v1 (`@/lib/pdf/…`) y el v2 (`@/lib/pdf/v2/…`) de cada formato.
+ * No hay otro punto en el que la app elija renderer: los 12 call sites de
+ * `generarPdf` pasan por aquí.
+ *
+ * HOY NO RAMIFICA, y eso es deliberado. Estado actual de la firma:
+ *  - `buildClientElement` no recibe ninguna noción de versión de formato.
+ *  - `generarPdf` (:153-161) tampoco: sus params son
+ *    `{ tipo, medico, data, logoUrl, filename, pacienteId, consultorio }`.
+ *    `medico` es `PdfMedicoData`, que son datos de impresión, NO identidad —
+ *    no hay ahí un id de médico con el que leer el feature flag
+ *    `profiles.usa_documentos_v2`.
+ *
+ * Es decir: para ramificar hace falta meter versión (o identidad del médico)
+ * en la firma de `generarPdf`, y eso toca los 12 call sites. Por eso no se
+ * hace en el Paso 0.a, cuyo contrato es que el andamiaje quede inerte y los
+ * 8 formatos generen exactamente el mismo PDF que hoy.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
 async function buildClientElement(
   tipo: string,
   medico: PdfMedicoData | null,

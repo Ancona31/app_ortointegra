@@ -204,6 +204,14 @@ export interface MedicoInfo {
   direccion_consultorio: string
   telefono_consultorio: string
   clinica_nombre?: string
+  /**
+   * Feature flag TEMPORAL del rollout de documentos v2 (columna en
+   * public.profiles, NOT NULL DEFAULT false). Se retira cuando v2 esté al 100 %.
+   * Opcional porque la migración `20260804_profiles_flag_documentos_v2.sql`
+   * todavía no está aplicada y `/api/medico` todavía no lo selecciona.
+   * NADIE LO LEE TODAVÍA — es andamiaje inerte del Paso 0.a.
+   */
+  usa_documentos_v2?: boolean
 }
 
 // ─── Documentos ───────────────────────────────────────────────────────────────
@@ -230,6 +238,15 @@ export interface Documento {
   tipo: TipoDocumento
   contenido: DocumentoContenido
   pdf_url?: string
+  /**
+   * Chasis de diseño con el que se emitió el documento (1 = v1, 2 = v2).
+   * Columna en DB: NOT NULL DEFAULT 1. Opcional aquí porque la migración
+   * `20260804_documentos_formato_version.sql` todavía no está aplicada, así que
+   * a runtime llega `undefined`. Es la señal que usa el guard de regeneración
+   * en ModalDocumentos.tsx: si no se puede establecer la versión, no se
+   * regenera.
+   */
+  formato_version?: 1 | 2
   // Metadata de uploads clínicos (sub-fase 6A). NULL en documentos generados por la app.
   storage_bucket?: string | null
   storage_path?: string | null
