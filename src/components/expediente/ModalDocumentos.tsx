@@ -55,6 +55,21 @@ function iconForTipo(tipo: string) {
   }
 }
 
+/**
+ * Versión de formato que produce el generador de PDFs HOY.
+ *
+ * ⚠️  ESPEJO MANUAL de `buildClientElement` en `src/lib/mobileShare.ts` — el
+ * punto único de ramificación v1/v2. Ese switch todavía NO ramifica (lo dice
+ * su propio comentario), así que hoy todos los formatos salen v1. El día que
+ * ramifique, ESTA constante se actualiza en el mismo commit; si se olvida, el
+ * guard de regeneración bloquea o deja pasar el conjunto equivocado.
+ *
+ * No se importa de mobileShare porque allí no existe tal constante: la versión
+ * está implícita en qué renderer elige el switch. Duplicar un número con esta
+ * nota es preferible a inventar una capa de versionado para un solo consumidor.
+ */
+const FORMATO_VERSION_GENERADOR = 1
+
 type ModalDocumentosProps = {
   open: boolean
   onClose: () => void
@@ -74,6 +89,7 @@ export default function ModalDocumentos({
 }: ModalDocumentosProps) {
   const [docAEliminar, setDocAEliminar] = useState<string | null>(null)
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null)
+  const [bloqueoRegeneracion, setBloqueoRegeneracion] = useState(false)
   const [eliminando, setEliminando] = useState(false)
   const { state: subState, openBloqueoModal } = useSubscriptionGate()
   const { medicoInfo } = useMedicoInfo()
@@ -96,8 +112,36 @@ export default function ModalDocumentos({
   }
 
   // Duplicado de TabDocumentos.tsx — Fase 7 eliminará TabDocumentos y esta queda como única fuente
+  /**
+   * Recupera el PDF de un documento que NO tiene archivo en Storage.
+   *
+   * No sobrescribe nada: el botón que llama aquí vive en la rama `else` del
+   * ternario `doc.pdf_url ? … : doc.contenido ? …` de más abajo, así que solo
+   * existe cuando `pdf_url` es null. El caso real son los documentos generados
+   * en otro dispositivo cuyo archivo nunca llegó a subir. No hay papel
+   * entregado que quede huérfano porque no hay papel.
+   *
+   * GUARD DE FORMATO — lo único que se bloquea es reproducir un documento con
+   * un chasis de diseño distinto al que se emitió. Si `formato_version` no
+   * coincide con lo que produce el generador de hoy, el PDF saldría con otra
+   * apariencia que el original y dejaría de ser el mismo documento.
+   *
+   * `?? FORMATO_VERSION_GENERADOR` no es un atajo: la migración
+   * `20260804_documentos_formato_version.sql` declara la columna
+   * `NOT NULL DEFAULT 1`, o sea "todo lo que ya existe es v1". Mientras esa
+   * migración no se aplique, `formato_version` llega `undefined` a runtime; sin
+   * esta normalización el guard bloquearía los 497 documentos que precisamente
+   * viene a recuperar. Con ella el componente se comporta igual antes y después
+   * de aplicarla.
+   */
   async function regenerarYSubirPdf(doc: Documento) {
     if (!doc.contenido || regeneratingId) return
+
+    if ((doc.formato_version ?? FORMATO_VERSION_GENERADOR) !== FORMATO_VERSION_GENERADOR) {
+      setBloqueoRegeneracion(true)
+      return
+    }
+
     setRegeneratingId(doc.id)
     try {
       const { generarPdf } = await import('@/lib/mobileShare')
@@ -279,6 +323,33 @@ export default function ModalDocumentos({
             >
               {eliminando && <Loader2 size={14} className="animate-spin" />}
               Eliminar
+            </button>
+          </div>
+        </div>
+      </ModalShell>
+
+      {/* Aviso del guard de formato — ver regenerarYSubirPdf */}
+      <ModalShell
+        open={bloqueoRegeneracion}
+        onClose={() => setBloqueoRegeneracion(false)}
+        title="Este documento usa un diseño anterior"
+        elevated
+        maxWidth="max-w-sm"
+      >
+        <div className="px-5 py-4">
+          <p className="text-sm text-slate-600 mb-5">
+            Este documento se emitió con un diseño de documento anterior al que
+            usa el sistema hoy. No puede reproducirse tal como se entregó: el PDF
+            saldría con otra apariencia. Si necesita una copia, emita un documento
+            nuevo con la fecha de hoy.
+          </p>
+          <div className="flex items-center justify-end">
+            <button
+              type="button"
+              onClick={() => setBloqueoRegeneracion(false)}
+              className="px-4 py-2 text-sm font-medium text-white bg-slate-700 hover:bg-slate-800 rounded-xl transition-colors"
+            >
+              Entendido
             </button>
           </div>
         </div>
