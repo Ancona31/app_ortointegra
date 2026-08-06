@@ -82,11 +82,9 @@ const GEOMETRIA = {
    * humanista aparece en un segundo componente, entonces sí es un rol y sube a
    * I.1.4 con nombre propio.
    *
-   * La ficha declara familia, cuerpo e interlineado, y no declara peso, tracking
-   * ni color. ASUMIENDO QUE se comportan como el resto de valores del riel: peso
-   * 400 —el único que usa cualquier rol de texto humanista del sistema—, tracking
-   * 0 —ningún rol humanista de I.1.4 lleva tracking— y `tinta.negra`, como todo
-   * valor de campo.
+   * Los seis valores —familia, cuerpo, interlineado, peso, tracking y color—
+   * están declarados en la ficha. Aquí no se supone ninguno: si falta uno,
+   * primero se declara en la ficha y después se transcribe (anexo A, P2-7).
    */
   diagnostico: {
     cuerpo: 11,
@@ -218,7 +216,8 @@ const estilos = StyleSheet.create({
    * renderer el flex-basis es de CAJA DE CONTENIDO, así que el padding de 20 pt y
    * la regla de 0.5 se suman por fuera del reparto y la primera celda sale de
    * 188.54 pt en vez de los 202.5 que declara la ficha. Con `width`, que sí es de
-   * caja de borde, los 202.5 salen exactos.
+   * caja de borde, los 202.5 salen exactos. Está declarado en I.3.8 con su
+   * síntoma, porque el riel de 2.F va a copiar esta composición.
    */
   celda: {
     paddingTop: GEOMETRIA.padding.superior,

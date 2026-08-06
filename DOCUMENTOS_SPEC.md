@@ -781,13 +781,24 @@ separados: paciente · edad · sexo · expediente · diagnóstico · fecha · ho
 | Edad | 2 | `dato` |
 | Sexo | 2 | `dato` |
 | Expediente | 3 | `dato` |
-| Diagnóstico | 5 | **IBM Plex Sans 11 / 16 pt** — única excepción de familia |
+| Diagnóstico | 5 | **IBM Plex Sans 11 / 16 pt, peso 400, tracking 0, `tinta.negra`** — única excepción de familia |
 | Fecha | 4 | `dato` |
 | Hora | 3 | `dato` |
 
 Padding de celda `8 10 10`, regla izquierda de `filete.regla` en
 `tinta.hairline` salvo en la primera de cada fila, regla superior en la segunda
 fila. El riel abre y cierra con `filete.fino` en `tinta.negra`.
+
+> **La celda de diagnóstico no es un rol de la escala.** No aparece en la tabla
+> de I.1.4 y no debe subir a ella: es geometría interna de este componente, que
+> es donde I.1.7 manda declararla. Una versión anterior de esta ficha solo
+> declaraba familia, cuerpo e interlineado y dejaba peso, tracking y color sin
+> decir, así que al construir 2.D hubo que suponerlos. **Quedan declarados
+> arriba** y el criterio de cada uno es el mismo: comportarse como cualquier otro
+> valor del riel. Peso 400 —el único que usa cualquier rol humanista de I.1.4—,
+> tracking 0 —ningún rol humanista lleva tracking— y `tinta.negra`, como todo
+> valor de campo. Si algún día 11 / 16 en humanista aparece en un segundo
+> componente, entonces sí es un rol y sube a I.1.4 con nombre propio.
 
 > `CONCILIA D6` — la versión anterior de este spec declaraba dos componentes,
 > `BloquePaciente` y un `RielDatos` con fecha y diagnóstico. El diseño tiene
@@ -830,16 +841,38 @@ un dato no viene.
 
 **Los tres estados**
 
-| Estado | Composición |
-|---|---|
-| `con valor` | Rótulo en versalita + valor |
-| `vacío requerido` | Rótulo en versalita + línea de `manuscrito.ancho` y `manuscrito.alto`, grosor `filete.fino`. Se llena a mano |
+| Estado | Composición | Alto del bloque |
+|---|---|---|
+| `con valor` | Rótulo en versalita + valor | `etiqueta` + `dato` = **27 pt** |
+| `vacío requerido` | Rótulo en versalita + línea de `manuscrito.ancho` y `manuscrito.alto`, grosor `filete.fino`. Se llena a mano | `etiqueta` + `manuscrito.alto` = **31 pt** |
+| `vacío opcional` | **Colapsa entero.** Ni rótulo, ni línea, ni hueco | **0 pt** |
 
-| `vacío opcional` | **Colapsa entero.** Ni rótulo, ni línea, ni hueco |
+**El estado no se pasa: se resuelve.** El componente recibe el rótulo, el valor
+—que puede no venir— y si el formato lo declara requerido, y de ahí sale el
+estado. Es lo que quiere decir «de una sola manera en todo el sistema»: si el
+estado entrara por prop, cada sitio de llamada podría equivocarse y volveríamos
+al defecto §8.8 por otra puerta.
 
-**Tokens que consume.** `manuscrito.ancho` · `manuscrito.alto` ·
-`filete.fino` · `etiqueta.cuerpo` · `etiqueta.tracking` · `dato.cuerpo` ·
-`tinta.negra`.
+> **Los dos estados con tinta NO miden lo mismo, y es a propósito.** Difieren en
+> `manuscrito.alto − dato.interlineado` = **4 pt**, que es lo que el espacio de
+> escritura mide de más que un renglón de texto. No se comprime el espacio de
+> escritura para igualarlos: `manuscrito.alto` es el único valor tipográfico del
+> sistema medido contra una referencia física —pautado de cuaderno profesional,
+> 7.1 mm (I.1.5)— e I.3.4 prohíbe cambiar una medida para cuadrar una caja. Lo
+> que sí es idéntico en los dos estados es la posición del rótulo: la diferencia
+> vive entera **debajo** de él. Una fila de campos mezclados alinea por arriba,
+> nunca por abajo.
+
+**Tokens que consume.** `etiqueta` · `dato` —los dos roles de I.1.4, que traen
+familia, cuerpo, interlineado, peso, tracking y color— · `manuscrito.ancho` ·
+`manuscrito.alto` · `manuscrito.grosor`, que es `filete.fino` por identidad ·
+`tinta.negra` para la línea.
+
+> **CORRIGE 2.E** — la lista anterior era de antes de la escala tipográfica y
+> pedía `etiqueta.cuerpo`, `etiqueta.tracking` y `dato.cuerpo` sueltos. Esos
+> fragmentos no existen como tokens: I.1.4 declara **roles completos**, y un rol
+> se consume entero o no se consume. Es la misma corrección que ya se aplicó a
+> 2.B (P2-2) y a 2.C (P2-6).
 
 **Reglas**
 
@@ -1585,6 +1618,25 @@ y nada debajo.
   borde inferior del nodo. Una regla del spec que pida alinear líneas base se
   implementa alineando bordes inferiores de cajas de línea, y el desplazamiento
   residual se declara en la ficha del componente (primer caso: 2.C).
+- **`flexBasis` es de caja de CONTENIDO; `width` es de caja de BORDE.** Es la
+  trampa de cualquier riel de celdas, y la forma «obvia» de repartir en
+  proporción —`flexBasis: 0` más `flexGrow: columnas`— cae justo en ella.
+
+  **Síntoma:** las celdas salen más estrechas de lo declarado y el error es mayor
+  cuantas más columnas tenga la celda. En 2.D, con padding `8 10 10` y regla de
+  0.5, la celda de paciente salió de **188.54 pt** en vez de los **202.5** que
+  son sus 5 columnas de `riel.celda`. El riel se ve bien —suma 486 y no deja
+  hueco—, así que el defecto **no se nota mirando**: solo aparece al medir contra
+  la retícula, o al poner dos rieles distintos uno debajo del otro y ver que sus
+  reglas verticales no coinciden.
+
+  **Causa:** el padding y la regla se suman **por fuera** del basis, así que el
+  reparto proporcional se hace sobre `486 − Σ(padding + regla)` y no sobre 486.
+
+  **Forma correcta:** `width: columnas × riel.celda` **más** `flexGrow: columnas`.
+  El `width` da el ancho declarado en el caso nominal —los anchos suman la caja y
+  no sobra espacio que repartir— y el `flexGrow` solo entra cuando una celda
+  colapsa, que es cuando sí hay que redistribuir. Los dos, y en ese orden.
 
 ### I.3.9 · Inmutabilidad
 
@@ -2348,6 +2400,10 @@ registran aquí para que nadie las lea como reinterpretaciones ni intente
 | P2-4 | **La hifenación queda desactivada en el registro de fuentes de v2.** No es preferencia tipográfica: es lo que impide que la denominación genérica de una receta salga partida con guion y falle el gate de I.3.1 | El taller imprimió `RECOMEN-DACIONES` en cuanto un título rompió a dos líneas. v1 ya lo desactivaba por otra causa —la corrupción de acentuados— y el spec no lo declaraba en ninguna parte | I.3.8 · `v2/fonts.ts` |
 | P2-5 | **El desplazamiento entre las líneas base de la fecha y del título es de 1.976 pt y se declara como geometría derivada de 2.C**, en forma de fórmula. No se corrige | La regla 3 pide alinear por línea base y react-pdf no expone ninguna: hay que alinear bordes inferiores de caja de línea, y eso deja un residuo que sin declarar se lee como defecto y alguien intenta parchearlo con un valor duro | 2.C · I.3.8 |
 | P2-6 | **El subtítulo se declara en la ficha de 2.C**, con separación `espacio.4` respecto del título. Corregida de paso la lista de tokens de 2.C, que anotaba `tinta.secundaria` «(fecha)»: la fecha va en `tinta.etiqueta` y la secundaria es del subtítulo | D2 lo inventarió para los ocho formatos pero ninguna ficha lo alojaba, así que al construir 2.C hubo que implementarlo sin separación declarada — es decir, a merced del interlineado de dos roles | 2.C · II preámbulo |
+| P2-7 | **La celda de diagnóstico de 2.D queda declarada entera**: IBM Plex Sans 11 / 16, peso 400, tracking 0, `tinta.negra`. Y queda dicho que NO sube a I.1.4: es geometría interna del componente | La ficha declaraba familia, cuerpo e interlineado y callaba los otros tres, así que al construir 2.D hubo que suponerlos. Una suposición que solo vive en un comentario del código es un hueco del spec que únicamente ve quien abre el archivo | 2.D |
+| P2-8 | **`flexBasis` es de caja de contenido y `width` de caja de borde.** Un riel de celdas se compone con `width` + `flexGrow`, nunca con `flexBasis: 0` + `flexGrow` | El reparto proporcional «obvio» dejó la celda de paciente de 2.D en 188.54 pt en vez de 202.5: el padding y la regla se suman por fuera del basis. El riel sigue sumando 486 y sin hueco, así que el defecto no se ve mirando — solo midiendo | I.3.8 · 2.D |
+| P2-9 | **La lista de tokens de 2.E pedía fragmentos de rol** —`etiqueta.cuerpo`, `etiqueta.tracking`, `dato.cuerpo`—, que no existen. Pasa a los roles completos `etiqueta` y `dato` | Tercera vez que aparece la misma lista pre-escala, tras 2.B (P2-2) y 2.C (P2-6). I.1.4 declara roles, no fragmentos: un rol se consume entero | 2.E |
+| P2-10 | **Los dos estados con tinta de 2.E no miden lo mismo: 27 y 31 pt.** La diferencia de 4 pt se declara, con su motivo, y se declara también que el ESTADO se resuelve dentro del componente en vez de entrar por prop | Al construir 2.E hubo que decidir si el espacio de escritura se comprimía a un renglón de texto para igualar alturas. No se comprime —I.1.5 e I.3.4—, pero sin declararlo el siguiente que componga una fila de campos mixtos va a leer los 4 pt como defecto de alineación | 2.E |
 
 Una cuarta, menor, sin fila propia: `caja.alto` queda marcado en I.1.1 como
 derivado que **se implementa como fórmula**. El Paso 0 lo había escrito como

@@ -33,6 +33,7 @@ import PanelCircular from '@/lib/pdf/v2/PanelCircular'
 import Membrete, { type MedicoMembrete } from '@/lib/pdf/v2/Membrete'
 import TituloDocumento from '@/lib/pdf/v2/TituloDocumento'
 import BloquePaciente from '@/lib/pdf/v2/BloquePaciente'
+import Campo from '@/lib/pdf/v2/Campo'
 import { registrarFuentesV2 } from '@/lib/pdf/v2/fonts'
 import {
   CAJA,
@@ -135,6 +136,16 @@ const estilos = StyleSheet.create({
     width: '100%',
     height: GUIA.grosor,
     backgroundColor: GUIA.caja,
+  },
+  /**
+   * Fila de campos de 2.E. La separación va en el CONTENEDOR y por `gap`, que es
+   * la regla 4 de la ficha: un margen en el propio campo sobreviviría al colapso
+   * y dejaría justo el hueco que el colapso existe para no dejar. Un campo que
+   * devuelve `null` no monta nodo, así que tampoco consume su `gap`.
+   */
+  filaCampos: {
+    flexDirection: 'row',
+    gap: ESPACIO[24],
   },
 })
 
@@ -401,6 +412,53 @@ function HojaTaller({
             vecinas llevan la misma palabra: la de diagnóstico va en IBM Plex Sans
             11 / 16, única excepción de familia del riel, y la de fecha en la
             neo-grotesca del rol «dato».
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <Rotulo>2.E campo · los tres estados, uno junto a otro</Rotulo>
+          <View style={[estilos.muestra, estilos.filaCampos]}>
+            <Campo etiqueta="Genérico" valor="Amoxicilina" requerido />
+            <Campo etiqueta="Nombre comercial" requerido />
+            {/* Este tercero no se ve: colapsa entero. Está aquí para que se
+                compruebe que entre el segundo y el borde no queda nada. */}
+            <Campo etiqueta="Proyecciones" requerido={false} />
+          </View>
+          <View style={estilos.marcaArranque} />
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.E campo · tres campos, el del medio opcional vacio</Rotulo>
+            <View style={[estilos.muestra, estilos.filaCampos]}>
+              <Campo etiqueta="Genérico" valor="Amoxicilina" requerido />
+              <Campo etiqueta="Presentación" requerido={false} />
+              <Campo etiqueta="Vía" valor="Oral" requerido />
+            </View>
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.E campo · la misma fila sin el campo del medio</Rotulo>
+            <View style={[estilos.muestra, estilos.filaCampos]}>
+              <Campo etiqueta="Genérico" valor="Amoxicilina" requerido />
+              <Campo etiqueta="Vía" valor="Oral" requerido />
+            </View>
+          </View>
+
+          <Text style={estilos.nota}>
+            2.E · Campo. Las dos filas de abajo tienen que ser IDÉNTICAS: la
+            primera lleva tres campos con el del medio en «vacío opcional» y la
+            segunda solo los dos que quedan. Si el colapso dejara aire, «Vía»
+            estaría más a la derecha en la primera. La separación entre campos es
+            del contenedor, no del campo: por eso un campo que colapsa tampoco se
+            lleva su separación. Arriba, los dos estados con tinta: la diferencia
+            entre «con valor» y «vacío requerido» vive entera bajo el rótulo, y el
+            segundo mide 4 pt más porque el espacio de escritura es más alto que un
+            renglón de texto. No lleva ninguna leyenda de error: el rótulo y la
+            línea ya dicen qué falta y dónde se escribe.
           </Text>
         </View>
       </Page>
