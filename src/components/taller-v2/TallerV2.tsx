@@ -60,6 +60,13 @@ const ACENTOS_DE_PRUEBA: ReadonlyArray<{ nombre: string; hex: string }> = [
   { nombre: 'Negro', hex: '#000000' },
 ]
 
+/**
+ * Especialidad larga para comprobar la regla 3 de 2.B: no se abrevia, rompe a
+ * dos líneas. Es una cadena real de las que se ven en cédulas de especialidad.
+ */
+const ESPECIALIDAD_LARGA =
+  'Ortopedia y Traumatología · Cirugía Articular y Reconstructiva de Cadera y Rodilla'
+
 /** Espera antes de regenerar, para no lanzar un PDF por cada tick del picker. */
 const ESPERA_MS = 220
 
@@ -77,6 +84,7 @@ export default function TallerV2(): ReactElement {
   const [acentoHex, setAcentoHex] = useState<string>(ACENTO_BASE_POR_DEFECTO)
   const [logo, setLogo] = useState<string>(MEDICO_FICTICIO.logo)
   const [nombreLogo, setNombreLogo] = useState<string>('icon-192.png · 1:1')
+  const [especialidadLarga, setEspecialidadLarga] = useState<boolean>(false)
   const [estado, setEstado] = useState<Estado>({ fase: 'generando' })
 
   const acento = resolverAcento(acentoHex)
@@ -107,7 +115,16 @@ export default function TallerV2(): ReactElement {
       void (async () => {
         try {
           const { generarPdfTaller } = await import('./HojaTaller')
-          const blob = await generarPdfTaller({ ...MEDICO_FICTICIO, logo }, acentoHex)
+          const blob = await generarPdfTaller(
+            {
+              ...MEDICO_FICTICIO,
+              logo,
+              especialidad: especialidadLarga
+                ? ESPECIALIDAD_LARGA
+                : MEDICO_FICTICIO.especialidad,
+            },
+            acentoHex,
+          )
           if (cancelado) return
           urlCreada = URL.createObjectURL(blob)
           setEstado({ fase: 'listo', url: urlCreada })
@@ -126,7 +143,7 @@ export default function TallerV2(): ReactElement {
       clearTimeout(temporizador)
       if (urlCreada !== null) URL.revokeObjectURL(urlCreada)
     }
-  }, [acentoHex, logo])
+  }, [acentoHex, logo, especialidadLarga])
 
   const derivados: ReadonlyArray<{
     token: string
@@ -235,6 +252,24 @@ export default function TallerV2(): ReactElement {
               llenar el círculo, ninguno debe salir estirado. Solo PNG o JPG
               (I.3.8). No se sube a ninguna parte: se queda en esta pestaña.
             </p>
+          </section>
+
+          <section className="mt-8">
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+              Especialidad
+            </h2>
+            <label className="mt-3 flex cursor-pointer items-start gap-2 text-xs text-slate-400">
+              <input
+                type="checkbox"
+                checked={especialidadLarga}
+                onChange={(e) => setEspecialidadLarga(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                Especialidad larga. Debe romper a dos líneas y no abreviarse ni
+                cortarse (regla 3 de 2.B).
+              </span>
+            </label>
           </section>
 
           <section className="mt-8">

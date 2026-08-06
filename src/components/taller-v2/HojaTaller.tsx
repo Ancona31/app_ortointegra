@@ -30,16 +30,16 @@ import {
 } from '@react-pdf/renderer'
 import type { ReactElement } from 'react'
 import PanelCircular from '@/lib/pdf/v2/PanelCircular'
+import Membrete, { type MedicoMembrete } from '@/lib/pdf/v2/Membrete'
 import { registrarFuentesV2 } from '@/lib/pdf/v2/fonts'
 import {
   CAJA,
   ESPACIO,
-  FUENTE,
   MARGEN,
   PAPEL,
   TINTA,
-  TIPOGRAFIA,
   ZONA_SEGURA,
+  estiloTipografico,
   resolverAcento,
   type AcentoResuelto,
 } from '@/lib/pdf/v2/tokens'
@@ -71,21 +71,6 @@ const GUIA = {
   /** Azul apenas visible: la caja de texto donde vive el contenido. */
   caja: '#C6D6E6',
 } as const
-
-/**
- * DOS CONVERSIONES DE UNIDAD que todo consumidor de la escala tipográfica
- * necesita, porque el spec y react-pdf no hablan en las mismas unidades:
- *
- * - `lineHeight` numérico en react-pdf es un MULTIPLICADOR del cuerpo, y el spec
- *   declara el interlineado en pt → `interlineado / cuerpo`, que es esta función.
- * - `letterSpacing` es en pt y el spec declara el tracking en em →
- *   `tracking × cuerpo`, que se hace en cada estilo.
- */
-function interlineadoRelativo(rol: { cuerpo: number; interlineado: number | null }): number {
-  return (rol.interlineado ?? rol.cuerpo) / rol.cuerpo
-}
-
-const ETIQUETA = TIPOGRAFIA.etiqueta
 
 const estilos = StyleSheet.create({
   pagina: {
@@ -123,20 +108,21 @@ const estilos = StyleSheet.create({
     marginRight: ESPACIO[24],
     alignItems: 'center',
   },
+  // El rol trae familia, cuerpo, interlineado, peso, tracking y color ya en las
+  // unidades de react-pdf. Aquí solo se añade lo que es del taller.
   rotulo: {
-    fontFamily: ETIQUETA.familia,
-    fontSize: ETIQUETA.cuerpo,
-    fontWeight: ETIQUETA.peso,
-    lineHeight: interlineadoRelativo(ETIQUETA),
-    letterSpacing: ETIQUETA.tracking * ETIQUETA.cuerpo,
-    color: TINTA.etiqueta,
+    ...estiloTipografico('etiqueta'),
     marginTop: ESPACIO[8],
   },
   nota: {
-    fontFamily: FUENTE.humanista,
-    fontSize: TIPOGRAFIA['titulo.subtitulo'].cuerpo,
-    lineHeight: interlineadoRelativo(TIPOGRAFIA['titulo.subtitulo']),
-    color: TINTA.secundaria,
+    ...estiloTipografico('titulo.subtitulo'),
+    marginTop: ESPACIO[32],
+  },
+  /** Separación entre muestras de componentes distintos. Es del taller. */
+  seccion: {
+    marginTop: ESPACIO[48],
+  },
+  muestra: {
     marginTop: ESPACIO[32],
   },
 })
@@ -147,6 +133,25 @@ const estilos = StyleSheet.create({
  */
 function Rotulo({ children }: { children: string }): ReactElement {
   return <Text style={estilos.rotulo}>{children.toUpperCase()}</Text>
+}
+
+/**
+ * Compone las líneas de cédula que el membrete imprime.
+ *
+ * La redacción es DEL TALLER, no del spec: 2.B declara «una línea por cédula»
+ * pero no cómo se rotula cada una, así que el componente no lo inventa y quien
+ * llama lo decide. Estas dos cadenas son las que usa hoy v1 en `PdfHeader.tsx`.
+ */
+function medicoMembrete(medico: MedicoFicticio): MedicoMembrete {
+  return {
+    nombre: medico.nombre,
+    especialidad: medico.especialidad,
+    universidad: medico.universidad,
+    cedulas: [
+      `Céd. Prof. ${medico.cedulaProfesional}`,
+      `Céd. Esp. ${medico.cedulaEspecialidad}`,
+    ],
+  }
 }
 
 function HojaTaller({
@@ -189,6 +194,41 @@ function HojaTaller({
             queda pegado al borde superior de la caja porque no hay panel encima
             que lo baje. El monograma es el único texto que cambia de tono con el
             acento, y lo hace en «acento.tinta» derivado, que I.1.8 admite.
+          </Text>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.B membrete · completo</Rotulo>
+            <View style={estilos.muestra}>
+              <Membrete
+                variante="completo"
+                acento={acento}
+                medico={medicoMembrete(medico)}
+                consultorio={{
+                  domicilio: medico.domicilio,
+                  telefono: medico.telefono,
+                }}
+                panel={{ variante: 'logo', acento, logo: medico.logo }}
+              />
+            </View>
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.B membrete · continuacion</Rotulo>
+            <View style={estilos.muestra}>
+              <Membrete
+                variante="continuacion"
+                acento={acento}
+                medico={medicoMembrete(medico)}
+              />
+            </View>
+          </View>
+
+          <Text style={estilos.nota}>
+            2.B · Membrete, cerrado por 2.O · FileteGruesoFino. El segmento grueso
+            del filete mide 96 pt y es el único sitio del sistema donde el acento
+            va como barra sólida; el resto de la línea es negro y no cambia con el
+            acento. La variante «continuacion» imprime nombre y cédula principal,
+            sin panel y sin riel de consultorio.
           </Text>
         </View>
       </Page>
