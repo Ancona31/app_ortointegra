@@ -587,6 +587,24 @@ está usando fuera de sus cuatro roles.
 **Contenido.** Nombre · especialidad · cédulas (una línea por cédula) ·
 **universidad emisora** · riel del consultorio activo (domicilio y teléfono).
 
+**Rol tipográfico de cada pieza**
+
+| Pieza | Rol |
+|---|---|
+| Nombre | `medico.nombre` |
+| Especialidad | `medico.especialidad` |
+| Cada línea de cédula | `medico.credencial` |
+| Domicilio y teléfono del consultorio | `medico.credencial` |
+| **Universidad emisora** | `medico.credencial` |
+
+La universidad va en `medico.credencial` porque es una credencial más, no un dato
+de contacto ni una etiqueta: comparte renglón, cuerpo y color con las cédulas.
+La ficha no le asignaba rol y hubo que decidirlo al implementar.
+
+La redacción de cada línea de cédula **no se declara aquí**: el componente recibe
+las líneas ya compuestas. «Una línea por cédula» es la regla; cómo se rotula cada
+una lo decide quien llama.
+
 **Variantes declaradas**
 
 | Variante | Cuándo |
@@ -594,14 +612,31 @@ está usando fuera de sus cuatro roles.
 | `completo` | Hoja 1 de todos los formatos |
 | `continuacion` | Hojas 2+. Nombre y cédula principal. Sin panel, sin riel de consultorio |
 
-**Tokens que consume.** `fuente.neogrotesca` · `tinta.negra` ·
-`tinta.secundaria` · `filete.fino` (cierre) · `etiqueta.cuerpo` ·
-`etiqueta.tracking` · `dato.cuerpo` · `caja.ancho` · `reticula.*`.
+**Tokens que consume.** `medico.nombre` · `medico.especialidad` ·
+`medico.credencial` · `caja.ancho` · `filete.regla` (regla vertical de cédulas) ·
+`tinta.hairline` (su color) · `transicion.membreteFilete` ·
+`transicion.membreteLineaFina` · `acento.base`, vía `FileteGruesoFino`.
+
+> **CORRIGE 2.B** — la lista anterior citaba `etiqueta.cuerpo`,
+> `etiqueta.tracking` y `dato.cuerpo`, y ninguno de los tres se usa aquí: **el
+> membrete no tiene etiquetas ni campos.** Tiene nombre, especialidad y
+> credenciales, que I.1.4 declara como roles `medico.*` con ese nombre exacto
+> —«Nombre del médico», «Especialidad», «Contacto y cédulas»—. Tampoco citaba
+> `filete.fino`, que sí se usa, pero dentro de `FileteGruesoFino`, no aquí.
+>
+> Esa lista es de la primera versión de la ficha, **anterior a que existiera la
+> escala tipográfica de I.1.4**, y sobrevivió a la conciliación porque nadie la
+> cruzó contra la escala. Se detectó al implementar 2.B: los roles que el
+> componente necesitaba no estaban en su propia lista, y los que estaban no
+> tenían contenido que los usara.
 
 **Reglas**
 
-1. **Es el único consumidor de `ConsultorioActivoContext` en todo el sistema**
-   (I.3.6). Ningún otro componente lo lee.
+1. **Es el único componente que imprime los datos del consultorio activo**, y los
+   recibe **por prop**: la lectura del contexto ocurre en el sitio que construye
+   el documento, una sola vez (I.3.6). Un `useContext` dentro de este componente
+   imprimiría el consultorio equivocado en silencio — ver la nota de I.3.6 antes
+   de tocarlo.
 2. **Nada aquí colapsa por ausencia.** Universidad, cédulas y domicilio son
    exigibles: si faltan, la emisión está bloqueada aguas arriba (I.3.7). El
    membrete nunca dibuja un membrete incompleto en silencio, que es
@@ -1429,11 +1464,34 @@ de 300 líneas es un chasis incompleto.
 
 ### I.3.6 · Consultorio activo
 
-El `ConsultorioActivoContext` se consume **una sola vez en todo el sistema, en
-`Membrete`**. Ningún otro componente lo lee. Los 8 formatos toman siempre los
-datos del consultorio activo: sin instantáneas, sin respaldo a los campos
-heredados del perfil (`direccion_consultorio`, `telefono_consultorio`), sin
-excepciones para documentos nuevos.
+**El invariante: el consultorio activo se lee UNA SOLA VEZ por documento.** Los 8
+formatos toman siempre los datos del consultorio activo: sin instantáneas, sin
+respaldo a los campos heredados del perfil (`direccion_consultorio`,
+`telefono_consultorio`), sin excepciones para documentos nuevos.
+
+**Dónde ocurre la lectura: en el sitio que CONSTRUYE el documento**, es decir el
+formulario o el call site que arma el árbol de react-pdf antes de renderizarlo.
+`Membrete` es el único componente que **imprime** esos datos, y los recibe **por
+prop**.
+
+> **CORRIGE I.3.6** — la versión anterior decía que `ConsultorioActivoContext` se
+> consumía «en `Membrete`», con un `useContext` dentro del componente. Al
+> implementar 2.B resultó que **eso no puede funcionar**: el PDF se renderiza con
+> `pdf()`, que monta su propio árbol **fuera del árbol de providers de la app**.
+> Un `useContext` ahí no falla ni avisa: devuelve el valor por defecto e imprime
+> el consultorio equivocado **en silencio**, que es exactamente el defecto que
+> esta regla existe para evitar.
+>
+> **No lo «arregles» metiendo el contexto dentro del componente.** Si ves
+> `Membrete` recibiendo `consultorio` por prop, está bien. Lo que hay que vigilar
+> es que **solo un sitio por documento lea el contexto**: si aparece un segundo
+> `useConsultorioActivo()` en la ruta de emisión de un formato, ese es el defecto
+> que describe la verificación visible de 2.B. El invariante es sobre el número de
+> lecturas, no sobre qué componente las hace.
+>
+> Los formularios de v1 ya lo hacen así —leen el contexto y pasan
+> `consultorioData` al PDF—, así que la corrección alinea el spec con lo que la
+> app hace y con lo único que el renderer permite.
 
 ### I.3.7 · La validación bloquea, no colapsa
 
@@ -2213,6 +2271,8 @@ registran aquí para que nadie las lea como reinterpretaciones ni intente
 | P1-2 | Las nueve separaciones entre bloques pasan de prosa sin nombre a tokens con nombre, grupo `transicion.*` | Sin nombre de token, el paso de componentes las habría escrito como literales, que es lo que I.1 prohíbe | I.1.7 · 2.C |
 | P1-3 | **`espacio.20` retirado.** Su único uso pasa a `transicion.tituloRiel` | Se instanciaba en dos sitios sin ser miembro de la escala de ocho: no había nada que importar | I.1.7 · 2.C · II.8 §5 |
 | P2-1 | **El logo llena el círculo interior y se recorta a él.** Retiradas la «caja útil del logo» de 33 × 19 pt y la regla de no recortar | Al construir 2.A se comparó contra v1: el spec describía un comportamiento que la app nunca tuvo y que deja el logo en un cuarto del panel | 2.A |
+| P2-2 | **La lista de tokens de 2.B era de antes de la escala tipográfica.** Fuera `etiqueta.*` y `dato.cuerpo`, que el membrete no usa; dentro los tres roles `medico.*`. Declarado el rol de la universidad, que faltaba | Al construir 2.B, los roles que el componente necesitaba no estaban en su propia lista y los que estaban no tenían contenido que los usara | 2.B |
+| P2-3 | **El consultorio activo se lee en el sitio que construye el documento, no dentro de `Membrete`.** El invariante sigue siendo una lectura por documento | `pdf()` monta su árbol fuera de los providers: un `useContext` en el componente devolvería el valor por defecto e imprimiría el consultorio equivocado en silencio | I.3.6 · 2.B regla 1 |
 
 Una cuarta, menor, sin fila propia: `caja.alto` queda marcado en I.1.1 como
 derivado que **se implementa como fórmula**. El Paso 0 lo había escrito como
