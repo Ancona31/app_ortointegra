@@ -25,8 +25,11 @@ const PWA_PUBLIC_ASSETS = new Set([
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
-  // Bypass inmediato para recursos críticos de la PWA
-  if (PWA_PUBLIC_ASSETS.has(pathname)) {
+  // Bypass inmediato para recursos críticos de la PWA.
+  // /fonts/ se comprueba con startsWith porque el Set son rutas exactas y no
+  // puede cubrir un directorio: react-pdf hace fetch de los .ttf sin cookie y
+  // fontkit revienta con "Unknown font format" si recibe el HTML del login.
+  if (PWA_PUBLIC_ASSETS.has(pathname) || pathname.startsWith('/fonts/')) {
     return NextResponse.next({ request })
   }
 
@@ -81,5 +84,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|logo.png|logo-spinus.png|landing/|audio/|sw\\.js|manifest\\.json|icon-192\\.png|icon-512\\.png|apple-touch-icon\\.png).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|logo.png|logo-spinus.png|landing/|audio/|fonts/|sw\\.js|manifest\\.json|icon-192\\.png|icon-512\\.png|apple-touch-icon\\.png).*)'],
 }
