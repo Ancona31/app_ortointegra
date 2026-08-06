@@ -138,7 +138,7 @@ interface Props {
 }
 
 export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, medicamentosIniciales, offlineMode, onOfflineSave }: Props) {
-  const { medicoInfo: onlineMedicoInfo } = useMedicoInfo()
+  const { medicoInfo: onlineMedicoInfo, isLoading: cargandoPerfil } = useMedicoInfo()
   const { consultorioActivo } = useConsultorioActivo()
 
   // In offline mode, read doctor profile from localStorage (pre-fetched with Base64 assets)
@@ -164,6 +164,11 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     firma_url: offlineProfile.firma_base64,
     clinica_nombre: offlineProfile.clinica_nombre,
   } : onlineMedicoInfo
+
+  // Imprimir antes de que resuelva el perfil produce un PDF con el encabezado
+  // vacío: sin nombre, sin cédulas, sin domicilio. Solo bloquea mientras carga;
+  // si resuelve sin datos el botón se habilita igual.
+  const perfilPendiente = cargandoPerfil && !medicoInfo
   const { isSuperAdmin } = useProfile()
   const toast = useToast()
   const [paciente, setPaciente] = useState(pacienteInicial)
@@ -556,7 +561,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 
       <button
         onClick={imprimir}
-        disabled={!paciente || imprimiendo}
+        disabled={!paciente || imprimiendo || perfilPendiente}
         className="doc-print-btn w-full flex items-center justify-center gap-2 py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-50"
       >
         {imprimiendo

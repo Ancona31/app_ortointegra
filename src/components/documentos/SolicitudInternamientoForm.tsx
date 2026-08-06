@@ -43,7 +43,7 @@ const REQUERIMIENTOS = [
 ]
 
 export default function SolicitudInternamientoForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, offlineMode, onOfflineSave }: Props) {
-  const { medicoInfo: onlineMedicoInfo } = useMedicoInfo()
+  const { medicoInfo: onlineMedicoInfo, isLoading: cargandoPerfil } = useMedicoInfo()
   const { consultorioActivo } = useConsultorioActivo()
 
   // In offline mode, read doctor profile from localStorage (pre-fetched with Base64 assets)
@@ -69,6 +69,11 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
     firma_url: offlineProfile.firma_base64,
     clinica_nombre: offlineProfile.clinica_nombre,
   } : onlineMedicoInfo
+
+  // Imprimir antes de que resuelva el perfil produce un PDF con el encabezado
+  // vacío: sin nombre, sin cédulas, sin domicilio. Solo bloquea mientras carga;
+  // si resuelve sin datos el botón se habilita igual.
+  const perfilPendiente = cargandoPerfil && !medicoInfo
   const toast = useToast()
   const [paciente, setPaciente] = useState(pacienteInicial)
   const [fecha, setFecha] = useState(hoyEnTZ())
@@ -402,7 +407,7 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
 
       <button
         onClick={imprimir}
-        disabled={!paciente || !diagnostico || !lugar || imprimiendo}
+        disabled={!paciente || !diagnostico || !lugar || imprimiendo || perfilPendiente}
         className="doc-print-btn w-full flex items-center justify-center gap-2 py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-50"
       >
         {imprimiendo

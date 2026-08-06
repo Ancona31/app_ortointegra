@@ -4,7 +4,7 @@ import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { useState } from 'react'
 
-import { Printer, Loader2 } from 'lucide-react'
+import { Printer, Loader2, Trash2 } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { generarPdf } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
@@ -27,7 +27,7 @@ interface Props {
 }
 
 export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, offlineMode, onOfflineSave }: Props) {
-  const { medicoInfo: onlineMedicoInfo } = useMedicoInfo()
+  const { medicoInfo: onlineMedicoInfo, isLoading: cargandoPerfil } = useMedicoInfo()
   const { consultorioActivo } = useConsultorioActivo()
 
   // In offline mode, read doctor profile from localStorage (pre-fetched with Base64 assets)
@@ -53,6 +53,11 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
     firma_url: offlineProfile.firma_base64,
     clinica_nombre: offlineProfile.clinica_nombre,
   } : onlineMedicoInfo
+
+  // Imprimir antes de que resuelva el perfil produce un PDF con el encabezado
+  // vacío: sin nombre, sin cédulas, sin domicilio. Solo bloquea mientras carga;
+  // si resuelve sin datos el botón se habilita igual.
+  const perfilPendiente = cargandoPerfil && !medicoInfo
   const toast = useToast()
   const [paciente, setPaciente] = useState(pacienteInicial)
   const [fecha, setFecha] = useState(hoyEnTZ())
@@ -64,6 +69,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
   const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean } | null>(null)
 
   function addEstudio() { setEstudios([...estudios, { tipo: '', region: '', proyecciones: '', indicacion: '' }]) }
+  function removeEstudio(i: number) { setEstudios(estudios.filter((_, idx) => idx !== i)) }
   function updateEstudio(i: number, field: keyof Estudio, val: string) {
     setEstudios(estudios.map((e, idx) => idx === i ? { ...e, [field]: val } : e))
   }
@@ -223,29 +229,39 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
         </div>
         <div className="divide-y divide-slate-100">
           {estudios.map((e, i) => (
-            <div key={i} className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="sm:col-span-2">
-                <label className="text-xs text-slate-500 block mb-1">Tipo de estudio</label>
-                <input list={`tipos-${i}`} value={e.tipo} onChange={ev => updateEstudio(i, 'tipo', ev.target.value)} placeholder="Seleccionar o escribir..."
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
-                <datalist id={`tipos-${i}`}>
-                  {TIPOS_ESTUDIO.map(t => <option key={t} value={t} />)}
-                </datalist>
+            <div key={i} className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-400">ESTUDIO {i + 1}</span>
+                {estudios.length > 1 && (
+                  <button onClick={() => removeEstudio(i)} className="text-red-400 hover:text-red-600">
+                    <Trash2 size={14} />
+                  </button>
+                )}
               </div>
-              <div className="sm:col-span-2">
-                <label className="text-xs text-slate-500 block mb-1">Región anatómica</label>
-                <input type="text" value={e.region} onChange={ev => updateEstudio(i, 'region', ev.target.value)} placeholder="Ej: Columna Lumbar, Rodilla Der."
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
-              </div>
-              <div>
-                <label className="text-xs text-slate-500 block mb-1">Proyecciones</label>
-                <input type="text" value={e.proyecciones || ''} onChange={ev => updateEstudio(i, 'proyecciones', ev.target.value)} placeholder="AP, Lateral, etc."
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
-              </div>
-              <div className="sm:col-span-3">
-                <label className="text-xs text-slate-500 block mb-1">Indicación clínica específica</label>
-                <input type="text" value={e.indicacion || ''} onChange={ev => updateEstudio(i, 'indicacion', ev.target.value)} placeholder="Ej: Descartar fractura vertebral"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="text-xs text-slate-500 block mb-1">Tipo de estudio</label>
+                  <input list={`tipos-${i}`} value={e.tipo} onChange={ev => updateEstudio(i, 'tipo', ev.target.value)} placeholder="Seleccionar o escribir..."
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                  <datalist id={`tipos-${i}`}>
+                    {TIPOS_ESTUDIO.map(t => <option key={t} value={t} />)}
+                  </datalist>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-xs text-slate-500 block mb-1">Región anatómica</label>
+                  <input type="text" value={e.region} onChange={ev => updateEstudio(i, 'region', ev.target.value)} placeholder="Ej: Columna Lumbar, Rodilla Der."
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 block mb-1">Proyecciones</label>
+                  <input type="text" value={e.proyecciones || ''} onChange={ev => updateEstudio(i, 'proyecciones', ev.target.value)} placeholder="AP, Lateral, etc."
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                </div>
+                <div className="sm:col-span-3">
+                  <label className="text-xs text-slate-500 block mb-1">Indicación clínica específica</label>
+                  <input type="text" value={e.indicacion || ''} onChange={ev => updateEstudio(i, 'indicacion', ev.target.value)} placeholder="Ej: Descartar fractura vertebral"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
+                </div>
               </div>
             </div>
           ))}
@@ -258,7 +274,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
         </div>
       )}
 
-      <button onClick={imprimir} disabled={!paciente || estudios.filter(e => e.tipo && e.region).length === 0 || imprimiendo}
+      <button onClick={imprimir} disabled={!paciente || estudios.filter(e => e.tipo && e.region).length === 0 || imprimiendo || perfilPendiente}
         className="doc-print-btn w-full flex items-center justify-center gap-2 py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-50">
         {imprimiendo ? <><Loader2 size={18} className="animate-spin" /> Generando PDF...</> : <><Printer size={18} /> Imprimir Solicitud</>}
       </button>

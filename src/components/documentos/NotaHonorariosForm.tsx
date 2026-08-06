@@ -65,7 +65,7 @@ function isFormEmpty(lineas: LineaConcepto[], paciente: string, notas: string, p
 }
 
 export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, offlineMode, onOfflineSave, userId, clinicaId }: Props) {
-  const { medicoInfo: onlineMedicoInfo } = useMedicoInfo()
+  const { medicoInfo: onlineMedicoInfo, isLoading: cargandoPerfil } = useMedicoInfo()
   const { consultorioActivo } = useConsultorioActivo()
 
   // In offline mode, read doctor profile from localStorage (pre-fetched with Base64 assets)
@@ -91,6 +91,11 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, o
     firma_url: offlineProfile.firma_base64,
     clinica_nombre: offlineProfile.clinica_nombre,
   } : onlineMedicoInfo
+
+  // Imprimir antes de que resuelva el perfil produce un PDF con el encabezado
+  // vacío: sin nombre, sin cédulas, sin domicilio. Solo bloquea mientras carga;
+  // si resuelve sin datos el botón se habilita igual.
+  const perfilPendiente = cargandoPerfil && !medicoInfo
 
   // Resolver userId/clinicaId: props > localStorage (funciona con y sin AuthProvider)
   const resolvedUserId = userId ?? (() => {
@@ -750,7 +755,7 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, o
       <div className="flex flex-col sm:flex-row gap-3">
         <button
           onClick={imprimir}
-          disabled={!puedeImprimir || imprimiendo}
+          disabled={!puedeImprimir || imprimiendo || perfilPendiente}
           className="doc-print-btn flex-1 flex items-center justify-center gap-2 py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-50"
         >
           {imprimiendo
