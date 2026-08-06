@@ -13,18 +13,19 @@
  * CONVENCIÓN DE NOMBRES (§0 del spec). Los tokens se nombran `grupo.token`. La
  * traducción a TypeScript es mecánica y la correspondencia es literal:
  *
- *   `papel.ancho`      → `PAPEL.ancho`
- *   `riel.celda`       → `RIEL_CELDA`        (grupo de un solo miembro)
- *   `espacio.16`       → `ESPACIO[16]`
- *   `filete.fino`      → `FILETE.fino`
- *   `tinta.negra`      → `TINTA.negra`
- *   `texto.corrido`    → `TIPOGRAFIA['texto.corrido']`  (clave literal del spec)
- *   `umbral.firma`     → `umbralFirma()`      (token derivado → función)
+ *   `papel.ancho`         → `PAPEL.ancho`
+ *   `riel.celda`          → `RIEL_CELDA`     (grupo de un solo miembro)
+ *   `espacio.16`          → `ESPACIO[16]`
+ *   `filete.fino`         → `FILETE.fino`
+ *   `tinta.negra`         → `TINTA.negra`
+ *   `transicion.tituloRiel` → `TRANSICION.tituloRiel`
+ *   `texto.corrido`       → `TIPOGRAFIA['texto.corrido']` (clave literal del spec)
+ *   `umbral.firma`        → `umbralFirma()`  (token derivado → función)
  *
  * TOKENS DERIVADOS. §0 exige que un token derivado se implemente como FÓRMULA y
- * no como su resultado. Los tres derivados de esta capa son funciones:
- * `darkenToContrast()`, `altoBloqueFirma()` y `umbralFirma()`. Si alguien los
- * congela en constantes, el token deja de estar implementado.
+ * no como su resultado. En esta capa son cuatro: `CAJA.alto` (expresión) y las
+ * funciones `darkenToContrast()`, `altoBloqueFirma()` y `umbralFirma()`. Si
+ * alguien los congela en literales, el token deja de estar implementado.
  *
  * Unidad: puntos PostScript (pt), la unidad nativa de @react-pdf/renderer.
  * El tracking va en em, tal como lo declara el spec.
@@ -36,25 +37,48 @@ export const PAPEL = {
   alto: 792,
 } as const
 
-/** Caja de contenido: el área viva dentro de los márgenes. */
-export const CAJA = {
-  ancho: 486,
-  alto: 670,
-} as const
-
 /**
- * Zona segura: banda perimetral que ninguna impresora de escritorio garantiza.
- * Nada imprimible debe entrar aquí.
+ * I.1.2 · Márgenes de la hoja. Asimétricos: el izquierdo es el mayor porque la
+ * hoja se perfora y se engrapa por ese borde.
+ *
+ * Declarado antes de `CAJA` —al revés que en el spec, donde I.1.2 va después de
+ * I.1.1— porque `caja.alto` se deriva de estos valores y TypeScript necesita
+ * tenerlos inicializados.
+ *
+ * DESGLOSE DEL MARGEN INFERIOR, que es la parte que hay que respetar al
+ * implementar: 36 pt de papel intocable + 16 pt de banda de pie + 16 pt de aire.
+ * La banda de pie es tinta, no sangre: vive DENTRO de la zona segura y FUERA de
+ * la caja de texto, así que el margen inferior no se mide hasta la banda.
  */
-export const ZONA_SEGURA = 36
-
-/** Márgenes de la hoja. Asimétricos: el izquierdo aloja el riel. */
 export const MARGEN = {
   superior: 54,
   izquierdo: 72,
   derecho: 54,
   inferior: 68,
 } as const
+
+/**
+ * Caja de contenido: el área viva dentro de los márgenes.
+ *
+ * `alto` es un token DERIVADO y va como fórmula, no como su resultado (§0). El
+ * valor de referencia es 670 pt; un 670 literal aquí significaría que el token
+ * no está implementado.
+ *
+ * `ancho` no es derivado: I.1.1 lo declara como valor propio, «token único de
+ * texto corrido en todo el sistema». El 453.75 pt que apareció en Plan de
+ * Suplementación queda eliminado — no existe un segundo ancho de caja.
+ */
+export const CAJA = {
+  ancho: 486,
+  alto: PAPEL.alto - MARGEN.superior - MARGEN.inferior,
+} as const
+
+/**
+ * Zona segura: banda perimetral que ninguna impresora de escritorio garantiza,
+ * por los cuatro lados. Cubre el área no imprimible de 4–5 mm de una impresora
+ * de consultorio. Ningún elemento con tinta la cruza.
+ */
+export const ZONA_SEGURA = 36
 
 /** Retícula de 12 columnas sobre la caja de contenido. */
 export const RETICULA = {
@@ -269,6 +293,52 @@ export const ESPACIO = {
   32: 32,
   48: 48,
   64: 64,
+} as const
+
+/**
+ * Las nueve transiciones entre bloques declaradas por el diseño (I.1.7).
+ *
+ * NO SE FUSIONAN CON `ESPACIO` aunque varias coincidan en valor.
+ * `seccionParrafo` mide lo mismo que `espacio.8`, `contenidoPie` que
+ * `espacio.16` y `entreSecciones` que `espacio.24`: son `COINCIDENCIA`, no
+ * identidad. La escala se usa donde la separación es genérica; estos tokens
+ * donde tiene dos extremos identificables y tiene que poder cambiar sola. Mover
+ * `ESPACIO[16]` para ajustar el aire sobre la banda de pie movería también toda
+ * sangría de bloque destacado del sistema.
+ *
+ * Las otras tres —14, 6 y 10 pt— no son miembros de la escala y nunca lo fueron.
+ * Esa es la razón por la que este grupo existe: sin nombre propio, los
+ * componentes las escribirían como literales, que es justo lo que I.1 prohíbe.
+ *
+ * No confundir con `FILETE.transicion`, que es un grosor de línea.
+ */
+export const TRANSICION = {
+  /** Fila superior del membrete → filete de cierre. */
+  membreteFilete: 14,
+  /** Filete de cierre del membrete → línea fina. */
+  membreteLineaFina: 6,
+  /** Bloque de título → su filete. */
+  tituloFilete: 10,
+  /**
+   * Filete del título → riel de identificación.
+   *
+   * También el arranque del cuerpo del Escrito Médico bajo el filete del
+   * membrete cuando el título colapsa (2.C variante `ausente`, II.8 §5): lo que
+   * va bajo el filete sin título ocupa el sitio del riel. Ese uso venía de un
+   * `espacio.20` que no era miembro de la escala de ocho y quedó retirado del
+   * spec; no lo repongas.
+   */
+  tituloRiel: 20,
+  /** Encabezado de sección → su párrafo. */
+  seccionParrafo: 8,
+  /** Cierre de una sección numerada → apertura de la siguiente. */
+  entreSecciones: 24,
+  /** Cabecera de tabla → filete de acento. */
+  tablaFilete: 6,
+  /** Cierre de tabla → fila de total. */
+  tablaTotal: 6,
+  /** Último bloque de contenido → banda de pie. */
+  contenidoPie: 16,
 } as const
 
 // ───────────────────────────────────────────────────────────────────────────────
@@ -508,15 +578,21 @@ function redondearPt(valor: number): number {
  *
  * El rol va ENCIMA de la línea, en versalita; el nombre y las credenciales van
  * debajo. Ese renglón del rol es lo que le faltaba a la composición de 119.8 pt
- * de una versión anterior del spec.
+ * de una generación anterior del spec.
  *
- * Valor de referencia del spec para `medicoTratante`: 131.8 pt.
- * ⚠️ Esta fórmula devuelve 130.8 pt. La diferencia de 1 pt está EN EL SPEC, que
- * en I.1.9 escribe su propia suma como `11 + 77 + 0.8 + 4 + 16 + 11 + 11 =
- * 130.8` y a continuación la declara «131.8 incluyendo el filete», contando el
- * filete dos veces. Los tres roles de la tabla salen 1 pt por debajo del valor
- * declarado, con el mismo desfase. Aquí manda la fórmula, que es lo que §0
- * exige implementar; el número declarado se corrige en el spec, no aquí.
+ * Valores de referencia del spec (I.1.9): `medicoTratante` **130.8 pt**, los
+ * otros dos roles **119.8 pt**.
+ *
+ * El 131.8 pt que declaraba una versión anterior del spec era doble conteo de
+ * `filete.fino` y quedó corregido (anexo A, P1-1). Se detectó justamente aquí:
+ * la fórmula daba los tres roles 1 pt por debajo, con desfase constante. La
+ * fórmula no cambió — es la tercera generación de valores que aguanta sin
+ * tocarla, y ese es el motivo de escribirla como fórmula.
+ *
+ * `COINCIDENCIA` — el 119.8 pt de anestesiólogo y firmante coincide en cifra con
+ * el 119.8 pt muerto del médico tratante. Distinto valor por distinta causa: uno
+ * era el médico sin el renglón del rol, otro es un firmante con un renglón de
+ * credencial menos. Ver un 119.8 aquí no significa que el valor muerto volvió.
  */
 export function altoBloqueFirma(rol: RolFirmante): number {
   const renglones = FIRMA_RENGLONES[rol].reduce(
@@ -546,8 +622,12 @@ export function altoBloqueFirma(rol: RolFirmante): number {
  * de generaciones muertas: el primero se calculó con renglón de 17 pt, el
  * segundo con una composición de firma sin el renglón del rol (`CONCILIA D43`).
  *
- * Valor de referencia del spec: 201.8 pt. Esta fórmula devuelve 200.8 pt, por
- * el mismo desfase de 1 pt de `altoBloqueFirma` documentado arriba.
+ * Valor de referencia del spec para `medicoTratante`: **200.8 pt**.
+ *
+ * `COINCIDENCIA` — evaluado para anestesiólogo o firmante da 189.8 pt, cifra
+ * idéntica al umbral muerto de una generación anterior. No es el mismo valor:
+ * aquel era el médico con una composición incompleta, este es otro rol con un
+ * renglón menos.
  */
 export function umbralFirma(rol: RolFirmante = 'medicoTratante'): number {
   return redondearPt(

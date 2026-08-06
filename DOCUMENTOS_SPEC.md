@@ -101,7 +101,7 @@ numérico de layout puede existir fuera de aquí.
 | `papel.ancho` | 612 pt | Carta, 216 mm |
 | `papel.alto` | 792 pt | Carta, 279 mm |
 | `caja.ancho` | 486 pt | Token único de texto corrido en todo el sistema |
-| `caja.alto` | 670 pt | `papel.alto − margen.superior − margen.inferior` |
+| `caja.alto` | `papel.alto − margen.superior − margen.inferior` (670 pt) | **Derivado: se implementa como fórmula.** Un 670 literal en el código significa que el token no está implementado (§0) |
 | `zona.segura` | 36 pt | Por los cuatro lados. **Ningún elemento con tinta la cruza** |
 
 La zona segura cubre el área no imprimible de 4–5 mm de una impresora de
@@ -285,19 +285,45 @@ manuscrita y cualquier espacio destinado a llenarse con pluma.
 > a la escala sería rediseñar hojas aprobadas para satisfacer una regla que el
 > propio diseño nunca siguió.
 
-**Separaciones entre bloques declaradas por el diseño**
+**Transiciones entre bloques declaradas por el diseño**
 
-| Transición | Medida |
-|---|---|
-| Membrete: fila superior → filete | 14 pt |
-| Membrete: filete → línea fina | 6 pt |
-| Título: bloque → filete | 10 pt |
-| Título: filete → riel de identificación | 20 pt |
-| Encabezado de sección: título → párrafo | 8 pt |
-| Entre secciones numeradas | 24 pt |
-| Tabla: cabecera → filete de acento | 6 pt |
-| Tabla: cierre → fila de total | 6 pt |
-| Contenido → banda de pie | 16 pt |
+Nueve separaciones con dos extremos identificables cada una. Son tokens con
+nombre propio, no miembros de la escala.
+
+| Token | Valor | Separa |
+|---|---|---|
+| `transicion.membreteFilete` | 14 pt | Fila superior del membrete → filete de cierre |
+| `transicion.membreteLineaFina` | 6 pt | Filete de cierre del membrete → línea fina |
+| `transicion.tituloFilete` | 10 pt | Bloque de título → su filete |
+| `transicion.tituloRiel` | 20 pt | Filete del título → riel de identificación |
+| `transicion.seccionParrafo` | 8 pt | Encabezado de sección → su párrafo |
+| `transicion.entreSecciones` | 24 pt | Cierre de una sección numerada → apertura de la siguiente |
+| `transicion.tablaFilete` | 6 pt | Cabecera de tabla → filete de acento |
+| `transicion.tablaTotal` | 6 pt | Cierre de tabla → fila de total |
+| `transicion.contenidoPie` | 16 pt | Último bloque de contenido → banda de pie |
+
+> **No se fusionan con la escala de espaciado, aunque varios coincidan en
+> valor.** `transicion.seccionParrafo` vale lo mismo que `espacio.8`,
+> `transicion.contenidoPie` que `espacio.16` y `transicion.entreSecciones` que
+> `espacio.24`; los tres son `COINCIDENCIA`, no identidad. El criterio de uso es
+> el que decide: la escala se usa donde la separación es genérica y el valor
+> podría ser cualquier miembro; estos tokens donde la separación tiene **dos
+> extremos identificables** y tiene que poder cambiar sola sin arrastrar a todo
+> lo demás que hoy mide igual. Mover `espacio.16` para ajustar el aire sobre la
+> banda de pie sería mover también toda sangría de bloque destacado del sistema.
+>
+> Los otros tres —14, 6 y 10 pt— no son miembros de la escala y nunca lo fueron:
+> esa es la razón por la que esta tabla existe.
+>
+> No confundir el grupo `transicion.*` con `filete.transicion` (I.1.6), que es
+> un grosor de línea.
+>
+> **`espacio.20` no existe.** Se instanciaba en 2.C y en II.8 §5 para el
+> arranque del cuerpo del Escrito Médico bajo el filete del membrete cuando el
+> título colapsa, y nunca fue miembro de la escala de ocho. Ese uso pasa a
+> `transicion.tituloRiel`, que vale lo mismo por la misma razón: lo que va bajo
+> el filete cuando el título está ausente ocupa el sitio del riel de
+> identificación.
 
 ### I.1.8 · Color
 
@@ -383,16 +409,48 @@ debajo.
 
 | Rol | Renglones de identificación | Alto |
 |---|---|---|
-| Médico tratante | Nombre + céd. profesional + céd. de especialidad | **131.8 pt** |
-| Anestesiólogo | Nombre + céd. profesional | 120.8 pt |
-| Paciente · familiar · representante · testigo | Nombre + rol o parentesco | 120.8 pt |
+| Médico tratante | Nombre + céd. profesional + céd. de especialidad | **130.8 pt** |
+| Anestesiólogo | Nombre + céd. profesional | 119.8 pt |
+| Paciente · familiar · representante · testigo | Nombre + rol o parentesco | 119.8 pt |
 
-`11 + 77 + 0.8 + 4 + 16 + 11 + 11 = 130.8` … con `firma.nombre` a 16 pt de
-interlineado y dos credenciales a 11: **131.8 pt** incluyendo el filete.
+Sumando del médico tratante, cada término por su token y su valor:
 
-> El valor anterior de este spec era 119.8 pt. Le faltaba el renglón del rol
-> sobre la línea, que el diseño sí tiene. El 120 pt del handoff y el 119.8 de
-> la versión anterior pertenecen a generaciones distintas y ninguno se usa.
+```
+firma.rol         11        (interlineado del rol en versalita, sobre la línea)
+firma.espacio     77        (espacio de escritura)
+filete.fino        0.8      (la línea)
+espacio.4          4        (margen superior del nombre)
+firma.nombre      16        (interlineado)
+firma.credencial  11        (céd. profesional)
+firma.credencial  11        (céd. de especialidad)
+                 ─────
+                 130.8 pt
+```
+
+Los otros dos roles son la misma suma con un renglón de `firma.credencial`
+menos: **119.8 pt**.
+
+> **CORRIGE 131.8** — este bloque medía 131.8 pt en la versión anterior de este
+> spec, y era un doble conteo: la suma ya incluía `filete.fino`, y la línea
+> siguiente volvía a sumarlo al declarar «131.8 pt incluyendo el filete». **No
+> falta ninguna ranura en la composición: sobraba la aritmética.** La suma de
+> arriba tiene los mismos siete términos que tenía.
+>
+> Se detectó al transcribir I.1 a la capa de tokens: implementada la fórmula, los
+> **tres** roles salían 1 pt por debajo de su valor declarado, con desfase
+> constante. Un renglón faltante habría desviado un rol, no los tres por igual.
+>
+> Es el tercer valor de este bloque en tres generaciones —120 pt en el handoff,
+> 119.8 pt en la versión anterior, 130.8 pt ahora— y las tres veces **la fórmula
+> aguantó**: lo que cambió fue qué ranuras la componen y cuánto mide cada una,
+> nunca su estructura. Ese es exactamente el motivo de escribirla como fórmula y
+> no como constante. El 120 y el 119.8 de médico tratante quedan muertos.
+>
+> `COINCIDENCIA` — el 119.8 pt de anestesiólogo y firmante coincide en cifra con
+> el 119.8 pt muerto del médico tratante. Son valores distintos por causas
+> distintas: aquel era el médico sin el renglón del rol, este es un firmante con
+> un renglón de credencial menos. No se fusionan y ver un 119.8 en el código no
+> significa que el valor muerto haya vuelto.
 
 #### Umbral de la regla 1
 
@@ -400,9 +458,12 @@ interlineado y dos credenciales a 11: **131.8 pt** incluyendo el filete.
 umbral.firma = firma.bloque.alto(médico)
              + espacio.16
              + 3 × texto.corrido.interlineado
-             = 131.8 + 16 + 54
-             = 201.8 pt
+             = 130.8 + 16 + 54
+             = 200.8 pt
 ```
+
+El 3 de la fórmula es `flujo.arrastre`: son las tres líneas que la regla 1 de
+2.N baja con la firma, no un tercer valor independiente.
 
 > `CONCILIA D43` — convivían dos umbrales: 185 pt en el diseño y 189.8 pt en la
 > versión anterior de este spec. **Los dos son de generaciones muertas.** Los
@@ -412,8 +473,15 @@ umbral.firma = firma.bloque.alto(médico)
 > 189.8 usaban una composición de firma sin el renglón del rol.
 >
 > **El renglón es 18 pt y no hay debate.** El umbral no se implementa como
-> constante sino como la fórmula, que es lo que hizo posible recalcularlo dos
-> veces sin discutirlo.
+> constante sino como la fórmula, que es lo que hizo posible recalcularlo tres
+> veces sin discutirlo: 185, 189.8, 201.8 y ahora 200.8, y en ninguna de las
+> tres el debate fue sobre el umbral.
+>
+> `COINCIDENCIA` — evaluado para anestesiólogo o firmante, cuyo bloque mide
+> 119.8 pt, el umbral da 189.8 pt, cifra idéntica al umbral muerto de la versión
+> anterior. Distinto valor por distinta causa: aquel era el médico con una
+> composición incompleta, este es otro rol con un renglón menos. 2.N lo invoca
+> como `umbral.firma(variante)` precisamente porque depende del rol.
 
 #### Umbrales de párrafo
 
@@ -564,7 +632,9 @@ farmacia, admisión, laboratorio.
 
 **Tokens que consume.** `titulo.documento.cuerpo` ·
 `titulo.documento.interlineado` · `fuente.neogrotesca` · `tinta.negra` ·
-`tinta.secundaria` (fecha) · `espacio.20` (arranque del cuerpo en `ausente`).
+`tinta.secundaria` (fecha) · `transicion.tituloFilete` ·
+`transicion.tituloRiel` (arranque del cuerpo en `ausente`: lo que va bajo el
+filete cuando el título colapsa ocupa el sitio del riel).
 
 **Reglas**
 
@@ -2022,7 +2092,8 @@ No usa `EntradaNumerada`. Las listas del cuerpo vienen del editor, no de
 - **La línea formal de lugar y fecha la escribe el médico dentro del cuerpo**,
   según lo que exija el trámite. El sistema no la impone.
 - Sin título, el filete del membrete hace doble trabajo: cierra el membrete y
-  abre el cuerpo, que arranca a `espacio.20` bajo él.
+  abre el cuerpo, que arranca a `transicion.tituloRiel` bajo él: sin título no
+  hay riel de identificación que separar, y el cuerpo ocupa ese sitio.
 - El cuerpo viene de un editor con soporte markdown. **Hay errores de detección
   de caracteres pendientes de revisar en código**, dentro del alcance de este
   formato.
@@ -2099,13 +2170,31 @@ Numeración de `SPEC_DISENO_PARTE_B.md`. Tres criterios de resolución:
 | D40 | Fecha sin rótulo también en hojas de continuación | CHASIS | II.8 §5 |
 | D41 | `tituloPie` es campo aparte. Cambio de formulario | DISEÑO | II.8 §5 · Paso 5 |
 | D42 | Variante `cita` con filete solo izquierdo | CHASIS | II.8 §5 |
-| D43 | `umbral.firma` = 201.8 pt, por fórmula. 185 y 189.8 quedan muertos | CHASIS | I.1.9 |
+| D43 | `umbral.firma` = 200.8 pt, por fórmula. 185 y 189.8 quedan muertos | CHASIS | I.1.9 |
 | D44 | Cuatro bloques indivisibles, no tres | CHASIS | 2.N |
 
 **Cuatro más que no venían numeradas y también se resolvieron:** las dos
 retículas conviviendo (I.1.3), la escala de nueve filetes (I.1.6), el alcance de
 la escala de espaciado (I.1.7) y el interlineado de la etiqueta de folio
 (I.1.4).
+
+## Correcciones posteriores a la conciliación
+
+Las tres salieron de **transcribir I.1 a la capa de tokens (Paso 1)**, con el
+anexo A ya cerrado. No son divergencias entre el diseño y este spec: son
+defectos del propio spec que solo se ven cuando el valor se ejecuta. Se
+registran aquí para que nadie las lea como reinterpretaciones ni intente
+«restaurar» lo anterior.
+
+| # | Corrección | Por qué apareció al implementar | Dónde queda |
+|---|---|---|---|
+| P1-1 | El bloque de firma mide **130.8 pt**, no 131.8, y el umbral **200.8**, no 201.8. Era doble conteo de `filete.fino` | La fórmula, implementada, daba los tres roles 1 pt por debajo de su valor declarado, con desfase constante | I.1.9 · A D43 |
+| P1-2 | Las nueve separaciones entre bloques pasan de prosa sin nombre a tokens con nombre, grupo `transicion.*` | Sin nombre de token, el paso de componentes las habría escrito como literales, que es lo que I.1 prohíbe | I.1.7 · 2.C |
+| P1-3 | **`espacio.20` retirado.** Su único uso pasa a `transicion.tituloRiel` | Se instanciaba en dos sitios sin ser miembro de la escala de ocho: no había nada que importar | I.1.7 · 2.C · II.8 §5 |
+
+Una cuarta, menor, sin fila propia: `caja.alto` queda marcado en I.1.1 como
+derivado que **se implementa como fórmula**. El Paso 0 lo había escrito como
+literal 670.
 
 ## Lo que queda abierto
 
