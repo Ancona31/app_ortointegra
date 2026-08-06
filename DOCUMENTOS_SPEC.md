@@ -678,6 +678,11 @@ consumidor del contexto y eso es un defecto.
 **Propósito.** Nombrar el documento. Es la primera lectura del receptor —
 farmacia, admisión, laboratorio.
 
+**Contenido.** Título · subtítulo · fecha del encabezado. El subtítulo lo exige
+el preámbulo de la Sección II para los ocho formatos (`CONCILIA D2`) y **no
+tiene otro sitio donde vivir**: es parte del bloque de título, y se declara aquí
+desde el cierre del componente (anexo A, P2-6).
+
 **Variantes declaradas**
 
 | Variante | Cuándo |
@@ -686,11 +691,19 @@ farmacia, admisión, laboratorio.
 | `variable` | Escrito Médico. Lo escribe el médico |
 | `ausente` | Escrito Médico sin título. El filete del membrete hace doble trabajo: cierra el membrete y abre el cuerpo |
 
-**Tokens que consume.** `titulo.documento.cuerpo` ·
-`titulo.documento.interlineado` · `fuente.neogrotesca` · `tinta.negra` ·
-`tinta.secundaria` (fecha) · `transicion.tituloFilete` ·
-`transicion.tituloRiel` (arranque del cuerpo en `ausente`: lo que va bajo el
-filete cuando el título colapsa ocupa el sitio del riel).
+**Tokens que consume.** `titulo.documento` · `titulo.subtitulo` ·
+`fecha.encabezado` —los tres roles de I.1.4 traen familia, cuerpo, interlineado,
+peso, tracking y color, así que no se listan por separado— · `espacio.4`
+(título → subtítulo, ver regla 5) · `reticula.medianil` (título ↔ fecha) ·
+`transicion.tituloFilete` · `transicion.tituloRiel` (arranque del cuerpo en
+`ausente`: lo que va bajo el filete cuando el título colapsa ocupa el sitio del
+riel). Cierra con `FileteGruesoFino` (2.O), del que hereda `filete.fino` y el
+segmento grueso en `acento.base`.
+
+> **CORRIGE 2.C** — la lista anterior era de antes de la escala tipográfica y
+> anotaba `tinta.secundaria` como «(fecha)». Es al revés: la **fecha** va en
+> `tinta.etiqueta` y quien va en `tinta.secundaria` es el **subtítulo**. Ninguna
+> de las dos tintas se instancia suelta: llegan dentro de su rol.
 
 **Reglas**
 
@@ -702,6 +715,49 @@ filete cuando el título colapsa ocupa el sitio del riel).
 3. Cuando hay fecha en el encabezado, se alinea por **línea base con la primera
    línea del título**, no con la última y no con el centro del bloque.
 4. La variante `ausente` **colapsa entera**: no deja hueco reservado.
+5. El **subtítulo** va bajo el título, separado por `espacio.4`, y colapsa si no
+   viene. El valor sale de la **escala** y no de la geometría interna del
+   componente porque aquí no hay nada que transcribir: el diseño nunca inventarió
+   el subtítulo, así que no existe una cifra medida que declarar. De la escala se
+   elige el mínimo por **jerarquía**: título y subtítulo son un solo bloque, y su
+   separación interna tiene que ser estrictamente menor que la que cierra el
+   bloque —`transicion.tituloFilete`, 10 pt— y que la que lo separa del riel
+   —`transicion.tituloRiel`, 20 pt—. Con 4 pt el orden queda 4 < 10 < 20 y el
+   subtítulo se lee pegado a su título; con `espacio.8`, que es el 80 % del que
+   cierra el bloque, empieza a flotar sobre el filete en vez de pertenecer al
+   título. **No se usa `transicion.seccionParrafo`** aunque la relación sea
+   análoga —encabezado y el texto que lo explica—: ese token tiene dos extremos
+   declarados y I.1.7 prohíbe leer la coincidencia de valor como identidad.
+
+**Geometría derivada — desplazamiento de la línea base de la fecha.**
+
+La regla 3 pide alinear la fecha por línea base con la primera línea del título.
+**react-pdf no puede hacerlo**: no le da a Yoga una función de línea base para
+los nodos de texto, así que `alignItems: 'baseline'` alinea por el borde inferior
+del nodo y, con un título de dos líneas, la fecha caería a la **segunda** — justo
+lo que la regla prohíbe.
+
+Lo implementado alinea los **bordes inferiores** de las dos cajas de línea: la
+caja de la fecha mide una línea de título de alto y su texto se apoya abajo. Eso
+garantiza lo que la regla existe para garantizar —la fecha en la primera línea,
+nunca en la segunda ni centrada entre ambas— y deja las dos líneas base
+desplazadas. El desplazamiento es **derivado y se declara como fórmula**, no como
+cifra (§0): la línea base se sitúa a `ascendente × cuerpo` del borde superior de
+la caja, y la caja mide el interlineado.
+
+```
+desplazamiento =   (titulo.documento.interlineado − fecha.encabezado.interlineado)
+                 − ascendente(Archivo) × (titulo.documento.cuerpo − fecha.encabezado.cuerpo)
+               =   (20 − 11) − 0.878 × (17 − 9)   =   1.976 pt
+```
+
+El ascendente de Archivo es 878/1000 em, leído del TTF del repo. La fecha queda
+1.976 pt **por debajo** de la línea base del título: **0.70 mm**, invisible en
+papel. Valor medido contra el flujo de contenido de un PDF real, no estimado.
+
+**No es un defecto y no se «arregla».** Un desplazamiento duro que lo compensara
+dependería del ascendente de la familia y de los dos cuerpos, y se rompería en
+silencio al cambiar cualquiera de los tres.
 
 **Verificación visible.** En Escrito Médico, escribir un título de ~60
 caracteres: rompe a dos líneas, **la fecha queda alineada con la primera
@@ -1514,6 +1570,21 @@ y nada debajo.
 - El vector va por primitivas `<Svg>` / `<Path>` / `<G>`.
 - Todo asset ráster se vigila por peso. El logo PNG del sistema viejo pesa
   195 KB y es el 80 % del peso de cada archivo generado.
+- **La hifenación va desactivada.** react-pdf parte palabras con guion por
+  defecto —en el taller salió `RECOMEN-DACIONES`— y su algoritmo además corrompe
+  caracteres acentuados, que es la razón por la que v1 ya lo desactiva. Se apaga
+  en el registro de fuentes con `Font.registerHyphenationCallback(p => [p])`, que
+  es **global al renderer, no por familia**: una sola llamada cubre las dos
+  familias y cualquiera que se registre después. El motivo que obliga no es
+  estético: sin desactivarla, la **denominación genérica** de una receta puede
+  salir partida con guion, y es el único campo obligatorio por normativa que
+  tiene que ser legible por máquina en el gate de I.3.1. `RECOMEN-DACIONES` es
+  feo; `AMOXICI-LINA` es un problema legal.
+- No existe alineación por **línea base** entre nodos de texto: no hay función de
+  línea base registrada en Yoga, así que `alignItems: 'baseline'` alinea por el
+  borde inferior del nodo. Una regla del spec que pida alinear líneas base se
+  implementa alineando bordes inferiores de cajas de línea, y el desplazamiento
+  residual se declara en la ficha del componente (primer caso: 2.C).
 
 ### I.3.9 · Inmutabilidad
 
@@ -2259,9 +2330,10 @@ la escala de espaciado (I.1.7) y el interlineado de la etiqueta de folio
 
 ## Correcciones posteriores a la conciliación
 
-Las tres salieron de **transcribir I.1 a la capa de tokens (Paso 1)**, con el
-anexo A ya cerrado. No son divergencias entre el diseño y este spec: son
-defectos del propio spec que solo se ven cuando el valor se ejecuta. Se
+Salieron todas de **ejecutar** el spec con el anexo A ya cerrado: las `P1-*` de
+transcribir I.1 a la capa de tokens (Paso 1), las `P2-*` de construir los
+componentes de I.2 (Paso 2). No son divergencias entre el diseño y este spec:
+son defectos del propio spec que solo se ven cuando el valor se ejecuta. Se
 registran aquí para que nadie las lea como reinterpretaciones ni intente
 «restaurar» lo anterior.
 
@@ -2273,6 +2345,9 @@ registran aquí para que nadie las lea como reinterpretaciones ni intente
 | P2-1 | **El logo llena el círculo interior y se recorta a él.** Retiradas la «caja útil del logo» de 33 × 19 pt y la regla de no recortar | Al construir 2.A se comparó contra v1: el spec describía un comportamiento que la app nunca tuvo y que deja el logo en un cuarto del panel | 2.A |
 | P2-2 | **La lista de tokens de 2.B era de antes de la escala tipográfica.** Fuera `etiqueta.*` y `dato.cuerpo`, que el membrete no usa; dentro los tres roles `medico.*`. Declarado el rol de la universidad, que faltaba | Al construir 2.B, los roles que el componente necesitaba no estaban en su propia lista y los que estaban no tenían contenido que los usara | 2.B |
 | P2-3 | **El consultorio activo se lee en el sitio que construye el documento, no dentro de `Membrete`.** El invariante sigue siendo una lectura por documento | `pdf()` monta su árbol fuera de los providers: un `useContext` en el componente devolvería el valor por defecto e imprimiría el consultorio equivocado en silencio | I.3.6 · 2.B regla 1 |
+| P2-4 | **La hifenación queda desactivada en el registro de fuentes de v2.** No es preferencia tipográfica: es lo que impide que la denominación genérica de una receta salga partida con guion y falle el gate de I.3.1 | El taller imprimió `RECOMEN-DACIONES` en cuanto un título rompió a dos líneas. v1 ya lo desactivaba por otra causa —la corrupción de acentuados— y el spec no lo declaraba en ninguna parte | I.3.8 · `v2/fonts.ts` |
+| P2-5 | **El desplazamiento entre las líneas base de la fecha y del título es de 1.976 pt y se declara como geometría derivada de 2.C**, en forma de fórmula. No se corrige | La regla 3 pide alinear por línea base y react-pdf no expone ninguna: hay que alinear bordes inferiores de caja de línea, y eso deja un residuo que sin declarar se lee como defecto y alguien intenta parchearlo con un valor duro | 2.C · I.3.8 |
+| P2-6 | **El subtítulo se declara en la ficha de 2.C**, con separación `espacio.4` respecto del título. Corregida de paso la lista de tokens de 2.C, que anotaba `tinta.secundaria` «(fecha)»: la fecha va en `tinta.etiqueta` y la secundaria es del subtítulo | D2 lo inventarió para los ocho formatos pero ninguna ficha lo alojaba, así que al construir 2.C hubo que implementarlo sin separación declarada — es decir, a merced del interlineado de dos roles | 2.C · II preámbulo |
 
 Una cuarta, menor, sin fila propia: `caja.alto` queda marcado en I.1.1 como
 derivado que **se implementa como fórmula**. El Paso 0 lo había escrito como

@@ -24,6 +24,8 @@
  *    sobrevive es la separación que existe siempre bajo el filete —
  *    `transicion.tituloRiel`—, porque cuando no hay título el filete del membrete
  *    hace doble trabajo: cierra el membrete y abre el cuerpo.
+ * 5. El SUBTÍTULO va bajo el título, separado por `espacio.4`, y colapsa si no
+ *    viene. Ver la nota en `subtitulo`.
  *
  * LAS DOS REGLAS DEL PREÁMBULO DE II
  *
@@ -31,9 +33,9 @@
  *    MAYÚSCULAS por transformación** (`CONCILIA D1`). Nunca se almacena en
  *    mayúsculas. La transformación ocurre aquí, en el render.
  * b. **Los ocho formatos admiten subtítulo**, en `titulo.subtitulo`, bajo el
- *    título, y COLAPSA si no viene (`CONCILIA D2`). La ficha de 2.C no lo
- *    menciona —su lista de tokens es anterior a esa conciliación— pero el
- *    subtítulo no tiene otro sitio donde vivir: es parte del bloque de título.
+ *    título, y COLAPSA si no viene (`CONCILIA D2`). El subtítulo no tiene otro
+ *    sitio donde vivir: es parte del bloque de título, y por eso la ficha de 2.C
+ *    lo declara desde el cierre del componente (anexo A, P2-6).
  *
  * Sin `'use client'`: módulo neutro, como el resto de v2.
  */
@@ -42,6 +44,7 @@ import { View, Text, StyleSheet } from '@react-pdf/renderer'
 import type { ReactElement } from 'react'
 import FileteGruesoFino from './FileteGruesoFino'
 import {
+  ESPACIO,
   RETICULA,
   TIPOGRAFIA,
   TRANSICION,
@@ -73,7 +76,28 @@ const estilos = StyleSheet.create({
     flex: 1,
   },
   titulo: { ...estiloTipografico('titulo.documento') },
-  subtitulo: { ...estiloTipografico('titulo.subtitulo') },
+  /**
+   * REGLA 5 — LA SEPARACIÓN DEL SUBTÍTULO.
+   *
+   * `espacio.4` sale de la ESCALA y no de la geometría interna del componente
+   * porque aquí no hay nada que transcribir: el diseño nunca inventarió el
+   * subtítulo (`CONCILIA D2`), así que no existe una cifra medida que declarar.
+   *
+   * De la escala se elige el mínimo por jerarquía: título y subtítulo son UN
+   * SOLO bloque, y su separación interna tiene que ser estrictamente menor que
+   * la que cierra el bloque —`transicion.tituloFilete`, 10 pt— y que la que lo
+   * separa del riel —`transicion.tituloRiel`, 20 pt—. Con 4 pt el orden queda
+   * 4 < 10 < 20 y el subtítulo se lee pegado a su título.
+   *
+   * NO se usa `transicion.seccionParrafo` aunque la relación sea análoga
+   * —encabezado y el texto que lo explica—: ese token tiene dos extremos
+   * declarados y I.1.7 prohíbe leer la coincidencia de valor como identidad.
+   * Moverlo para ajustar un encabezado de sección no debe arrastrar al subtítulo.
+   */
+  subtitulo: {
+    ...estiloTipografico('titulo.subtitulo'),
+    marginTop: ESPACIO[4],
+  },
   /**
    * REGLA 3, Y HASTA DÓNDE LLEGA EL RENDERER.
    *
@@ -87,8 +111,20 @@ const estilos = StyleSheet.create({
    * texto se apoya abajo. Así la fecha queda siempre en la primera línea, nunca
    * en la segunda ni centrada entre ambas. Lo que quedan alineados con exactitud
    * son los BORDES INFERIORES de las dos cajas de línea; las líneas base quedan
-   * a un par de puntos, porque igualarlas exigiría el ascendente de cada cuerpo y
-   * la ficha no declara ningún desplazamiento. Está medido y reportado.
+   * desplazadas 1.976 pt, con la fecha por debajo del título.
+   *
+   * Esa cifra NO es un residuo que haya que perseguir: es geometría derivada del
+   * componente, declarada en la ficha de 2.C con su fórmula. react-pdf sitúa la
+   * línea base a `ascendente × cuerpo` del borde superior de la caja de línea, y
+   * la caja mide el interlineado, así que el desplazamiento sale de los dos roles
+   * y del ascendente de Archivo (878/1000 em):
+   *
+   *     (20 − 11) − 0.878 × (17 − 9) = 1.976 pt = 0.70 mm
+   *
+   * Medido contra el flujo de contenido del PDF real, no estimado. No lo
+   * «corrijas» con un desplazamiento duro: dependería del ascendente de la
+   * familia y de los dos cuerpos, y se rompería en silencio al cambiar
+   * cualquiera de los tres.
    */
   cajaFecha: {
     height: ALTO_LINEA_TITULO,
