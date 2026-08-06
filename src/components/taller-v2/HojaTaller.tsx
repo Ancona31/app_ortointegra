@@ -32,6 +32,7 @@ import type { ReactElement } from 'react'
 import PanelCircular from '@/lib/pdf/v2/PanelCircular'
 import Membrete, { type MedicoMembrete } from '@/lib/pdf/v2/Membrete'
 import TituloDocumento from '@/lib/pdf/v2/TituloDocumento'
+import BloquePaciente from '@/lib/pdf/v2/BloquePaciente'
 import { registrarFuentesV2 } from '@/lib/pdf/v2/fonts'
 import {
   CAJA,
@@ -163,6 +164,27 @@ function medicoMembrete(medico: MedicoFicticio): MedicoMembrete {
     ],
   }
 }
+
+/**
+ * Paciente de prueba del taller. INVENTADO, como el médico. No sale de la base y
+ * no hay ninguna ruta desde este archivo hasta ella.
+ *
+ * Vive aquí y no en `TallerV2.tsx` porque no lleva ningún control en la barra
+ * lateral: las cuatro muestras de 2.D se distinguen por qué campos se le pasan al
+ * componente, no por lo que valgan.
+ */
+const PACIENTE_FICTICIO = {
+  paciente: 'María Fernanda Ruiz Ortega',
+  edad: '54 años',
+  sexo: 'Femenino',
+  expediente: 'EXP-004821',
+  diagnostico: 'Gonartrosis bilateral grado III',
+  fecha: '4 ago 2026',
+  hora: '11:40',
+} as const
+
+/** Cadena para comparar familias: la misma palabra en las dos celdas vecinas. */
+const CADENA_COMPARACION = 'Gonartrosis bilateral'
 
 function HojaTaller({
   medico,
@@ -318,6 +340,67 @@ function HojaTaller({
             la diferencia entre las dos es exactamente el bloque del título más su
             filete, sin banda vacía residual. En «ausente» el filete del membrete
             hace doble trabajo.
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <Rotulo>2.D paciente · completo, las siete celdas</Rotulo>
+          <View style={estilos.muestra}>
+            <BloquePaciente variante="completo" {...PACIENTE_FICTICIO} />
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.D paciente · como llega hoy, sin sexo ni expediente ni hora</Rotulo>
+            <View style={estilos.muestra}>
+              <BloquePaciente
+                variante="completo"
+                paciente={PACIENTE_FICTICIO.paciente}
+                edad={PACIENTE_FICTICIO.edad}
+                diagnostico={PACIENTE_FICTICIO.diagnostico}
+                fecha={PACIENTE_FICTICIO.fecha}
+              />
+            </View>
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.D paciente · reducido, hojas de continuacion</Rotulo>
+            <View style={estilos.muestra}>
+              <BloquePaciente
+                variante="reducido"
+                paciente={PACIENTE_FICTICIO.paciente}
+                expediente={PACIENTE_FICTICIO.expediente}
+              />
+            </View>
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.D paciente · comparacion de familia</Rotulo>
+            <View style={estilos.muestra}>
+              {/* La misma cadena en dos celdas vecinas de la fila inferior:
+                  diagnóstico en la humanista, fecha en la neo-grotesca. */}
+              <BloquePaciente
+                variante="completo"
+                paciente={PACIENTE_FICTICIO.paciente}
+                diagnostico={CADENA_COMPARACION}
+                fecha={CADENA_COMPARACION}
+              />
+            </View>
+          </View>
+
+          <Text style={estilos.nota}>
+            2.D · BloquePaciente. Es UN riel de siete celdas en dos filas, no dos
+            rieles: sus anchos salen de «riel.celda» (40.5 pt), que es la segunda
+            retícula de I.1.3, no de «reticula.columna». En la segunda muestra las
+            tres celdas ausentes desaparecen y las restantes se ensanchan hasta
+            ocupar el riel completo, sin dejar hueco. En la cuarta, las dos celdas
+            vecinas llevan la misma palabra: la de diagnóstico va en IBM Plex Sans
+            11 / 16, única excepción de familia del riel, y la de fecha en la
+            neo-grotesca del rol «dato».
           </Text>
         </View>
       </Page>
