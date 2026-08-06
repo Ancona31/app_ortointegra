@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import Link from 'next/link'
@@ -12,7 +12,11 @@ import type { Documento } from '@/types'
 import ModalShell from '@/components/ui/ModalShell'
 import { createClient } from '@/lib/supabase/client'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
+import { useToast } from '@/components/ui/Toast'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
+
+/** Vigencia de las URLs firmadas al abrir el modal. */
+const SIGNED_URL_TTL = 900 // 15 min
 
 // Duplicado de TabDocumentos.tsx — Fase 7 eliminará TabDocumentos y esta queda como única fuente
 const TIPO_DOC_LABEL: Record<string, string> = {
@@ -70,6 +74,20 @@ function iconForTipo(tipo: string) {
  */
 const FORMATO_VERSION_GENERADOR = 1
 
+/**
+ * Nombre con el que debe guardarse el PDF al descargarlo.
+ *
+ * `pdf_url` es la ruta dentro del bucket (`<pacienteId>/<archivo>.pdf`), así que
+ * su último segmento ya es el nombre que `generateDocFileName` produjo al emitir
+ * el documento. Se pasa a `createSignedUrl({ download })` para que Storage
+ * responda con `Content-Disposition: attachment; filename=…`; sin eso el archivo
+ * se guarda con el identificador que el navegador deduce de la URL firmada.
+ */
+function nombreArchivoDescarga(doc: Documento): string {
+  const base = doc.pdf_url?.split('/').pop()?.trim()
+  return base || `${doc.tipo}.pdf`
+}
+
 type ModalDocumentosProps = {
   open: boolean
   onClose: () => void
@@ -91,25 +109,85 @@ export default function ModalDocumentos({
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null)
   const [bloqueoRegeneracion, setBloqueoRegeneracion] = useState(false)
   const [eliminando, setEliminando] = useState(false)
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({})
+  const [firmandoUrls, setFirmandoUrls] = useState(false)
+  const [falloFirma, setFalloFirma] = useState(false)
   const { state: subState, openBloqueoModal } = useSubscriptionGate()
   const { medicoInfo } = useMedicoInfo()
 
-  // Duplicado de TabDocumentos.tsx — Fase 7 eliminará TabDocumentos y esta queda como única fuente
-  async function descargarPdf(pdfUrl: string) {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase.storage
+  // El objeto que devuelve useToast se recrea en cada render del provider. Si
+  // entrara como dependencia del efecto de firma, un toast de error volvería a
+  // disparar el efecto que lo emitió.
+  const toast = useToast()
+  const toastRef = useRef(toast)
+  useEffect(() => { toastRef.current = toast })
+
+  /**
+   * Firma las URLs de descarga POR ADELANTADO, al abrir el modal.
+   *
+   * Firmar es asíncrono. Cuando el `await` vivía dentro del onClick, para cuando
+   * la URL existía la activación transitoria del gesto ya se había consumido y
+   * Safari bloqueaba la apertura: en escritorio con aviso de "popup bloqueado",
+   * en iOS en silencio — el botón simplemente no hacía nada. Con la URL ya
+   * firmada el icono es un `<a href>` real y entre el toque y la navegación no
+   * queda ninguna asincronía.
+   *
+   * `firmaKey` incluye `pdf_url` a propósito: `regenerarYSubirPdf` muta ese
+   * campo in situ sin reemplazar el array (deuda técnica #1), así que la
+   * identidad de `documentos` no basta para detectar que hay un PDF nuevo que
+   * firmar.
+   */
+  const firmaKey = documentos.map(d => `${d.id}:${d.pdf_url ?? ''}`).join('|')
+
+  useEffect(() => {
+    if (!open) return
+    const conPdf = documentos.filter(d => d.pdf_url)
+    if (conPdf.length === 0) return
+
+    let cancelled = false
+    setFirmandoUrls(true)
+    setFalloFirma(false)
+
+    const supabase = createClient()
+    Promise.all(conPdf.map(doc =>
+      supabase.storage
         .from('documentos-pdf')
-        .createSignedUrl(pdfUrl, 900) // 15 min
-      if (error || !data?.signedUrl) {
-        console.error('[ModalDocumentos] signed URL error:', error?.message)
-        return
-      }
-      window.open(data.signedUrl, '_blank')
-    } catch (err) {
-      console.error('[ModalDocumentos] descargarPdf:', err)
-    }
-  }
+        .createSignedUrl(doc.pdf_url!, SIGNED_URL_TTL, { download: nombreArchivoDescarga(doc) })
+        // Anotación explícita como en ModalPreviewDocumento.tsx: los tipos de
+        // storage-js no llegan a inferirse a través del cliente.
+        .then(({ data, error }: { data: { signedUrl: string } | null; error: Error | null }) => {
+          if (error || !data?.signedUrl) {
+            console.error('[ModalDocumentos] signed URL error:', error?.message)
+            return null
+          }
+          return [doc.id, data.signedUrl] as const
+        })
+    ))
+      .then(resultados => {
+        if (cancelled) return
+        const firmadas = resultados.filter((r): r is readonly [string, string] => r !== null)
+        setSignedUrls(Object.fromEntries(firmadas))
+        setFirmandoUrls(false)
+        const fallos = resultados.length - firmadas.length
+        if (fallos > 0) {
+          setFalloFirma(true)
+          toastRef.current.error(
+            fallos === resultados.length
+              ? 'No se pudieron preparar las descargas de los documentos.'
+              : `No se pudo preparar la descarga de ${fallos} documento${fallos > 1 ? 's' : ''}.`
+          )
+        }
+      })
+      .catch(err => {
+        if (cancelled) return
+        console.error('[ModalDocumentos] firma de URLs:', err)
+        setFirmandoUrls(false)
+        setFalloFirma(true)
+        toastRef.current.error('No se pudieron preparar las descargas. Revisa tu conexión.')
+      })
+
+    return () => { cancelled = true }
+  }, [open, firmaKey, documentos])
 
   // Duplicado de TabDocumentos.tsx — Fase 7 eliminará TabDocumentos y esta queda como única fuente
   /**
@@ -256,13 +334,31 @@ export default function ModalDocumentos({
                 </div>
                 <div className="flex items-center gap-0.5 flex-shrink-0">
                   {doc.pdf_url ? (
-                    <button
-                      onClick={() => descargarPdf(doc.pdf_url!)}
-                      className="flex items-center text-xs text-emerald-600 hover:text-emerald-700 px-2 py-1.5 rounded-lg hover:bg-emerald-50 transition-colors"
-                      title="Descargar PDF"
-                    >
-                      <Download size={14} />
-                    </button>
+                    signedUrls[doc.id] ? (
+                      /* <a href> con la URL ya firmada: cero asincronía entre el
+                         toque y la navegación (ver el efecto de firma arriba).
+                         El atributo `download` lo ignora el navegador por ser
+                         cross-origin; el nombre real lo impone el
+                         Content-Disposition que trae la URL firmada. */
+                      <a
+                        href={signedUrls[doc.id]}
+                        download={nombreArchivoDescarga(doc)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center text-xs text-emerald-600 hover:text-emerald-700 px-2 py-1.5 rounded-lg hover:bg-emerald-50 transition-colors"
+                        title="Descargar PDF"
+                      >
+                        <Download size={14} />
+                      </a>
+                    ) : (
+                      <span
+                        aria-disabled="true"
+                        title={falloFirma ? 'No se pudo preparar la descarga' : 'Preparando descarga…'}
+                        className="flex items-center text-xs text-slate-300 px-2 py-1.5 rounded-lg cursor-default"
+                      >
+                        {firmandoUrls ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                      </span>
+                    )
                   ) : doc.contenido ? (
                     <button
                       onClick={() => regenerarYSubirPdf(doc)}
