@@ -2785,4 +2785,35 @@ control» de `globals.css`.
 
 ---
 
+## Documentos — modal posterior a la generación
+
+### DOC-DT-1 — `NotaHonorariosForm` mantiene un Portal propio para ganarle a un z-index que ya no existe
+- **Estado:** 🔴 abierta
+- **Detectada:** 2026-08-06, al investigar el `z-[9999]` del overlay de
+  documentos de `nueva-nota/page.tsx` antes del modal posterior a la generación.
+- **Archivo afectado:** `src/components/documentos/NotaHonorariosForm.tsx:783-786`
+  (el bloque `{modalConfirm && (<Portal>…)}`).
+- **Descripción:** el modal de confirmación de ese formulario no usa
+  `ModalShell`: monta su propio `<Portal>`, su propio backdrop
+  (`bg-black/40 backdrop-blur-sm`) y su propia animación, todo dentro de un
+  contenedor `fixed inset-0 z-[10000]`. El 10000 no es un valor de diseño: es
+  exactamente uno más que el `z-[9999]` que tenía el overlay de documentos de
+  `nueva-nota`, dentro del cual este formulario se monta. Era la única forma de
+  que la confirmación se viera por encima del formulario que la dispara.
+- **Qué cambió:** el 2026-08-06 ese overlay bajó a `z-50` (commit del arreglo de
+  z-index; ver el comentario largo en `nueva-nota/page.tsx:1852`). Con el overlay
+  en la capa base de `ModalShell`, **el `z-[10000]` dejó de tener razón de ser**:
+  `<ModalShell elevated>` (`z-[60]`) ya basta para apilarse sobre él.
+- **Fix pendiente:** migrar `modalConfirm` a `<ModalShell elevated>` y borrar el
+  Portal, el backdrop y el manejo de cierre propios. Deja de duplicar el
+  scroll-lock, el Escape y la geometría que `ModalShell` ya resuelve, y elimina
+  el último `z-[10000]` suelto del codebase fuera de `OnboardingGuide`.
+- **No se hizo en el momento de detectarlo** para no mezclar un refactor de ese
+  formulario con el arreglo de z-index ni con el modal posterior a la generación.
+  Ninguno de los dos lo necesita: `z-[10000]` sigue estando por encima de todo.
+- **Cuándo atacar:** sin urgencia (no hay defecto visible). Cuando se vuelva a
+  tocar `NotaHonorariosForm` por cualquier otro motivo.
+
+---
+
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)

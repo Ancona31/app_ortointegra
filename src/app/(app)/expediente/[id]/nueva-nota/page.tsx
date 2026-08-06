@@ -1390,7 +1390,7 @@ export default function NuevaNotaPage() {
       {/* ── Grid de dos columnas · una sola columna en Cierre ──
           Con la nota guardada (blueprint §5.3) la página deja de ser de captura:
           la rejilla colapsa y los documentos pasan a protagonista a ancho completo.
-          El overlay de documentos (createPortal, z-[9999]) es HERMANO de este
+          El overlay de documentos (createPortal, z-50) es HERMANO de este
           contenedor y monta en document.body: ninguna clase de aquí lo alcanza. */}
       <div className={notaSaved
         ? 'space-y-[var(--sp-gap-block)]'
@@ -1830,7 +1830,7 @@ export default function NuevaNotaPage() {
         {notaSaved && (
           /* Primario único de la pantalla, en flujo y no sticky: el Cierre es
              corto y una barra fija taparía la última fila de la rejilla —
-             además el overlay de documentos (z-[9999]) la cubriría al abrir un
+             además el overlay de documentos (z-50) la cubriría al abrir un
              formulario. <Link> y no router.push: .sp-btn ya se usa sobre Link en
              el Estado Éxito, y conserva prefetch y clic-central. Sin --reward:
              esa sombra es del CTA de receta del Estado 4. */
@@ -1849,7 +1849,23 @@ export default function NuevaNotaPage() {
         const CurrentIcon = currentDoc?.icon ?? FileText
 
         return (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-8">
+          /* z-50 — la capa base de ModalShell. Este overlay es conceptualmente
+             un modal más y no necesita nada por encima de ella: lo único con lo
+             que compite es el chasis (Sidebar z-40/z-50, SuscripcionBanner z-40)
+             y el ModalShell del funnel, que nunca coexiste con él (:1004 cierra
+             el funnel antes de abrir un documento; :724-726 hace lo inverso).
+
+             ⚠️ ESTUVO EN z-[9999] Y ERA ARBITRARIO — nació así en 996b62b sin
+             justificación y rompía tres elementos globales. Este overlay es el
+             ÚNICO de esa banda que va portalado a document.body; Toast (:54),
+             OfflineAlert (:47) y CommandPalette (:164) se renderizan EN LÍNEA
+             dentro del árbol de (app)/layout.tsx. Los nodos portalados se anexan
+             a body después del root, así que en empate de z-index gana el portal
+             por orden de DOM. Resultado: el overlay tapaba los toasts (z-[9999],
+             empate) y la alerta bloqueante de Sin conexión (z-[9999], empate), y
+             le ganaba a ⌘K (z-[9998]). Los tres son globales y van por encima de
+             un formulario de documento. NO SUBIR ESTE VALOR. */
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
             {/* Backdrop con blur — cubre toda la pantalla */}
             <div
               className="fixed inset-0 bg-black/40 backdrop-blur-sm animate-[fadeIn_0.15s_ease-out]"
