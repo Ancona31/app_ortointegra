@@ -156,8 +156,9 @@ servidor limita → autentica → resetea → audita → responde. R1 (producto)
 muere por construcción.
 
 **D2 · Entrega de sesión: tokens en el body + `setSession` en el
-cliente.** El servidor valida credenciales con supabase-js puro (anon key,
-sin adaptador de cookies) y devuelve `{ session }`; el cliente ejecuta
+cliente.** El servidor valida credenciales con supabase-js puro (secret
+API key, sin adaptador de cookies — ver §3.2 y el corolario de D7) y
+devuelve `{ session }`; el cliente ejecuta
 `supabase.auth.setSession(session)` y TODO lo demás queda idéntico:
 AuthContext, SessionGuard, blindaje offline, secureStorage cifrado con
 clave derivada de sesión, cookies de client.ts. Devolver tokens por HTTPS
@@ -221,11 +222,50 @@ El fallo de autenticación NO es fail-open: ese error sí se devuelve.
 
 **D7 · Perímetro honesto.** Nuestra API no puede impedir que un atacante
 hable directo con GoTrue: la anon key es pública por diseño de Supabase.
-El perímetro contra eso es de Supabase: límites nativos de /token
-(inventariar en A1) + CAPTCHA aplicado por GoTrue (Etapa C) + protección
-de contraseñas filtradas (toggle Pro). Nuestro módulo protege el flujo del
-producto y a los usuarios entre sí. Venderse otra cosa sería seguridad
-falsa.
+El perímetro contra eso es de Supabase: límites nativos de /token +
+CAPTCHA aplicado por GoTrue (Etapa C) + protección de contraseñas
+filtradas (toggle Pro, movida a Etapa B — ver A1). Nuestro módulo protege
+el flujo del producto y a los usuarios entre sí. Venderse otra cosa sería
+seguridad falsa.
+
+✅ **D7 CERRADO CON UN NÚMERO (A1, 2026-08-05).** El límite nativo de
+sign-ups y sign-ins es **30 requests / 5 min por IP = 360/hora**. Existe,
+luego D7 no es una excusa; pero **360 intentos/hora desde una IP no frenan
+un ataque paciente contra una cuenta concreta**. Esa es la magnitud real
+del perímetro que NO controlamos, y es la razón por la que el CAPTCHA de
+Etapa C no es opcional-decorativo. Inventario completo en la viñeta A1.
+
+> ### ⚠️ COROLARIO DE D7 (A1, 2026-08-05) · IP ADDRESS FORWARDING
+>
+> **Estado hoy: APAGADO.** Y hoy da igual: el navegador llama directo a
+> GoTrue, así que los límites nativos se aplican por IP del médico.
+>
+> **La Etapa A invierte eso.** Cuando el login se mueva al servidor,
+> TODOS los intentos llegarán a GoTrue desde infraestructura de Vercel:
+> GoTrue verá **una sola IP para todos los usuarios** y el límite de
+> 30/5min pasará a compartirse entre ellos. Varios médicos entrando a la
+> vez podrían agotarlo entre sí y recibir **429 de GoTrue sin haber hecho
+> nada malo**.
+>
+> **Encender el IP forwarding es REQUISITO DEL DEPLOY DE LA ETAPA A
+> (A3).** No es una decisión abierta ni un toggle suelto que se pueda
+> dejar para después.
+>
+> **Por qué ese momento exacto y no otro:**
+> - **Ni antes:** hoy no hace nada —no hay servidor que reenvíe IP— y
+>   dejaría un cabo suelto encendido sin función.
+> - **Ni después:** dejaría un hueco en producción durante el cual todos
+>   los usuarios comparten una única IP ante GoTrue.
+> - Además, encenderlo **obliga a que el endpoint llame a GoTrue con
+>   secret API keys**: el forwarding solo se acepta en llamadas
+>   autenticadas, porque si cualquiera pudiera declarar su propia IP el
+>   límite de GoTrue se evadiría trivialmente. Ese requisito nace en el
+>   mismo deploy en que el endpoint empieza a hablar con GoTrue.
+>
+> **Consecuencia de diseño:** el endpoint debe contemplar desde el inicio
+> la llamada a GoTrue con **secret API key + cabecera de IP real**. El
+> cliente supabase-js del servidor **ya no es "anon key a secas"** — ver
+> §3.2. Contingencia en §7·C10.
 
 **D8 · Estructura de módulo, no de parche.** La lógica vive en
 `src/lib/auth/` como funciones puras reutilizables; los endpoints son
@@ -344,6 +384,19 @@ funciones + `DROP INDEX idx_ip_rate_limits_ruta_fecha`.
 
 ### 3.2 Contrato del endpoint de login (Etapa A)
 
+> ⚠️ **ACTUALIZADO POR A1 (2026-08-05) — EL CLIENTE DEL SERVIDOR NO ES
+> "ANON KEY A SECAS".** Con el IP forwarding encendido en A3 (corolario de
+> D7), la llamada del paso 5 a GoTrue debe hacerse con **secret API key**
+> y **reenviando la IP real del médico** en la cabecera correspondiente.
+> Sin la key secreta GoTrue ignora el forwarding — solo lo acepta
+> autenticado, porque de otro modo cualquiera declararía su IP y evadiría
+> el límite. Sin el forwarding, los 30/5min de GoTrue se comparten entre
+> todos nuestros usuarios (fila 13 de §6-A lo prueba).
+>
+> Implicación operativa: la secret key es un secreto de servidor más,
+> nunca alcanzable desde el cliente. `credentials.ts` es su único
+> consumidor.
+
 ```
 POST /api/auth/login  { email, password }
  1. Validar body → normalizar email (credentials.ts)
@@ -353,8 +406,10 @@ POST /api/auth/login  { email, password }
  4. limiter: 'auth:login_v2:<email>:<ip>' (5/15min)
       bloqueado → audit acceso_denegado → 429 {kind:'limite-intentos'}
     [orden IP→email cierra R8]
- 5. credentials.verificar
+ 5. credentials.verificar   [secret API key + cabecera de IP real → GoTrue]
       error credenciales → audit login_fallido → 401 {kind:'credenciales'}
+      429 de GoTrue (over_request_rate_limit) → 502 {kind:'servicio-limite'}
+        [NO confundir con nuestro 429: son cubos distintos — §6-A fila 14]
       error otro → audit + 502 {kind:'servicio'}
  6. éxito → limiter.reset('auth:login_v2:<email>:<ip>')   [D5]
           → audit login_exitoso (user.id real)
@@ -422,8 +477,34 @@ la lista pública (una línea, inevitable).
   del error de GoTrue, (e) `/api/auth/login` no existe y (f) un único
   call-site de `signInWithPassword` (`login/page.tsx:211`): sin sorpresas.
 - **A1 · Inventario del perímetro Supabase (dashboard, sin código).**
-  Valores reales de los rate limits nativos de Auth; disponibilidad de
-  CAPTCHA y leaked-password-protection en el plan actual. Insumo de C.
+  ✅ **CERRADA — medida el 2026-08-05** (dashboard de producción, proyecto
+  ortointegra, plan **PRO**).
+
+  **Límites nativos de Auth** (Authentication → Rate Limits):
+
+  | Límite | Valor medido | Lectura |
+  |---|---|---|
+  | **Sign-ups y sign-ins** | **30 / 5 min por IP** (360/hora) | **El perímetro real contra fuerza bruta directa a GoTrue.** Cierra D7 con un número: existe, pero 360 intentos/hora desde una IP no frenan un ataque paciente contra una cuenta concreta |
+  | Token refreshes | 150 / 5 min por IP (1800/hora) | Holgado. Un consultorio con varios médicos tras la misma IP no choca |
+  | Token verifications | 30 / 5 min | — |
+  | Anonymous | 30 / hora | — |
+  | Emails | 2 / hora | — |
+  | SMS | 30 / hora | — |
+
+  **Attack Protection — las dos disponibles en PRO, las dos APAGADAS hoy:**
+  - **CAPTCHA: apagado.** Toggle disponible; el selector de proveedor
+    aparece al encenderlo. Sigue en **Etapa C**.
+  - **Prevent use of leaked passwords: DISABLED.** Toggle disponible.
+    ⚠️ **MOVIDA A ETAPA B.** Actúa solo en alta y cambio de contraseña,
+    **NO en login**: no protege a quien ya tiene una contraseña
+    comprometida, así que su sitio es el registro, no el perímetro de
+    acceso. Es **el cambio más barato del proyecto**: un toggle, cero
+    código, cero riesgo para usuarios actuales.
+
+  **IP Address Forwarding: APAGADO.** Deja de ser inocuo en cuanto la
+  Etapa A mueva el login al servidor → **requisito del deploy A3**, con su
+  razonamiento completo en el corolario de D7 (§2) y su consecuencia de
+  diseño en §3.2.
 - **A2 · SQL** (§3.1) por D-T6. Verificación manual: 3 llamadas con
   límite 2 → tercera bloqueada; reset limpia; REVOKE niega a anon;
   `EXPLAIN` del COUNT filtrando SOLO por `ruta` (el predicado real del
@@ -435,6 +516,14 @@ la lista pública (una línea, inevitable).
   el índice es al menos USABLE.
 - **A3 · Deploy 1.** Módulo lib/auth + endpoint + cirugía page.tsx +
   línea middleware. Matriz §6-A completa en PREVIEW antes de main.
+  ⚠️ **REQUISITO NO NEGOCIABLE (A1, 2026-08-05): encender el IP Address
+  Forwarding EN ESTE MISMO DEPLOY**, ni antes ni después (razonamiento en
+  el corolario de D7). Implica que el endpoint llame a GoTrue con **secret
+  API key + cabecera de IP real** desde su primera versión — no es un
+  añadido posterior, es parte del diseño de `credentials.ts` (§3.2). Sin
+  esto, GoTrue ve una sola IP para todos los médicos y el límite de
+  30/5min se comparte entre ellos. Lo prueban las filas **13 y 14** de
+  §6-A; el modo de fallo, §7·C10.
 - **A4 · Observación 24–48 h** en prod: logs [AUTH], audit_log, filas de
   login_v2 reseteándose. Criterio: cero 429 sobre legítimos, cero
   login_fallido inexplicado.
@@ -452,6 +541,13 @@ la lista pública (una línea, inevitable).
   queda SOLO para logout (hasta D).
 - `/api/health` entra aquí: es la misma lista pública del middleware que
   ya se está editando con pruebas. Una línea, matriz lo cubre.
+- **Leaked password protection (HaveIBeenPwned) — toggle del plan Pro.
+  MOVIDA DESDE ETAPA C por A1 (2026-08-05).** Razón del traslado: actúa
+  en alta y cambio de contraseña, **NO en login** — no protege a quien ya
+  tiene una contraseña comprometida, así que pertenece al registro y no
+  al perímetro de acceso. Es el cambio más barato del proyecto: un
+  toggle, cero código, cero riesgo para usuarios actuales. Decisión
+  explícita de Angel antes de activarlo.
 
 ### ETAPA C · Perímetro Supabase (cierra R1-GoTrue; casi todo es toggle)
 
@@ -459,8 +555,11 @@ la lista pública (una línea, inevitable).
   Supabase lo exige en /token; widget en las 4 pantallas; nuestros
   endpoints reenvían el captchaToken. Contingencia: es un toggle —
   desactivable en dashboard en segundos si algo falla.
-- Leaked password protection (HaveIBeenPwned): toggle del plan Pro.
-- Ajuste de límites nativos de Auth con el inventario de A1.
+- ~~Leaked password protection (HaveIBeenPwned)~~ → **MOVIDA A ETAPA B**
+  por A1 (2026-08-05): actúa en alta y cambio de contraseña, no en login.
+- Ajuste de límites nativos de Auth con el inventario de A1 — que ya está
+  medido: sign-ups/sign-ins **30/5min por IP**, el número que justifica
+  este CAPTCHA. Ver la viñeta A1 para la tabla completa.
 - Decisión explícita de Angel antes de activar cada uno.
 
 ### ETAPA D · Sesión e higiene NOM-024
@@ -532,9 +631,12 @@ por LFPDPPP.
 | 10 | forgot-password completo | Recovery intacto (endpoint viejo vivo) |
 | 11★ | Enter, foco, reduced-motion | Sin regresión del rediseño |
 | 12 | RPC caída simulada | Login procede + error [AUTH] en logs (fail-open verificado) |
+| 13 | Varios logins legítimos casi simultáneos contra el endpoint nuevo (≥6 en paralelo, cuentas DISTINTAS) | Todos pasan; **ninguno recibe 429 de GoTrue**. Verifica que el IP forwarding funciona |
+| 14 | El `{kind}` distingue el 429 de GoTrue (`over_request_rate_limit`) del 429 de nuestro limitador | Mensajes distintos. Hoy los dos se verían iguales para el usuario y el mensaje sería engañoso |
 
-La 6 prueba (B); la 5 prueba R2; la 2 prueba (A)+R4. Ninguna la ve el
-build. Método de sondeo sin service role: `remaining` del endpoint
+La 6 prueba (B); la 5 prueba R2; la 2 prueba (A)+R4; **la 13 prueba el IP
+forwarding de A3 y la 14 que no mintamos sobre de quién es el 429**.
+Ninguna la ve el build. Método de sondeo sin service role: `remaining` del endpoint
 (filas = límite − 1 − remaining sobre clave virgen).
 
 ### 6-B/C/D/E — se redactan al abrir cada etapa, con el mismo estándar:
@@ -576,6 +678,14 @@ nuestro endpoint deje pasar. D añade: el logout audita `logout` y solo
 - **C9 · MFA (E): pérdida de dispositivo.** Códigos de respaldo desde el
   día uno + runbook de des-enrolamiento por service role con verificación
   de identidad definida ANTES de activar MFA para nadie.
+- **C10 · El IP forwarding (A3) falla.** Es un toggle de dashboard: se
+  apaga en segundos. El efecto de apagarlo es que GoTrue vuelve a ver una
+  sola IP para todos los usuarios y el límite de 30/5min se comparte entre
+  ellos — **degradación, no caída**: los logins siguen funcionando y solo
+  se estrecha el margen bajo concurrencia alta. Señal de que está pasando:
+  429 de GoTrue sobre médicos legítimos (fila 13 de §6-A, y el
+  `{kind:'servicio-limite'}` de §3.2 lo hace distinguible en logs en vez
+  de confundirse con nuestro propio limitador).
 
 ---
 
