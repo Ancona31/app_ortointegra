@@ -221,7 +221,45 @@ la víctima: intercambio correcto.
 **D4 · Atomicidad en Postgres.** RPC SECURITY DEFINER con
 pg_advisory_xact_lock por clave: chequeo+inserción en una operación,
 reset por ruta exacta. Sin cambio de esquema (no arrastra
-verificar-receta). REVOKE a anon/authenticated: solo service role.
+verificar-receta). REVOKE a `PUBLIC` + anon/authenticated **y GRANT
+explícito a service_role** (ver el recuadro de privilegios de §3.1: revocar
+solo a anon/authenticated deja el RPC abierto vía PUBLIC).
+
+> ### ⚠️ D4 · DOS PRECISIONES DE LA AUDITORÍA DE A2 (2026-08-05). NO SON OPCIONALES.
+>
+> **1 · El RPC se consume con `.rpc(...).single()`. SIEMPRE.**
+> `rate_limit_intento` es `RETURNS TABLE`, es decir **set-returning**:
+> PostgREST la expone como recurso tipo tabla y devuelve **un array**, no un
+> objeto.
+>
+> ```ts
+> const { data } = await supabase.rpc('rate_limit_intento', {...})
+> // data === [{ bloqueado: false, restantes: 4 }]   ← ARRAY
+> // data.bloqueado === undefined → falsy → NUNCA bloquea a nadie
+> ```
+>
+> Sin `.single()`, `data.bloqueado` es `undefined`, el `if` no entra nunca,
+> **el limitador deja pasar el 100 % de los intentos y no lanza ningún
+> error**. No hay excepción, no hay log `[AUTH]`, D6 no se entera: es
+> fail-open silencioso y permanente, indistinguible de "nadie está
+> atacando". La función devuelve siempre exactamente 1 fila, así que
+> `.single()` no puede fallar por cardinalidad.
+> (`rate_limit_reset` sí es escalar — `RETURNS int` → `data` es un número.)
+>
+> **2 · Se ramifica por `bloqueado`, JAMÁS por `restantes`.**
+> `restantes = 0` con `bloqueado = false` es el **último intento
+> permitido**, no un bloqueo. Con límite 5 la secuencia es
+> `4, 3, 2, 1, 0` permitidos y el 6.º devuelve `(true, 0)`. Leer
+> `restantes === 0` como "bloqueado" adelanta el bloqueo un intento y
+> castiga al médico legítimo en su último tiro válido.
+> ✅ **VERIFICADO EN PRODUCCIÓN (2026-08-05).** El smoke test con límite 3
+> devolvió `(false,2) (false,1) (false,0)` y solo el 4.º dio `(true,0)`:
+> el `(false,0)` del tercero es exactamente el caso que un `if (!restantes)`
+> rompería.
+>
+> Ambas viven también como `COMMENT ON FUNCTION` en la base, para que
+> sobrevivan a este documento. La fila 15 de §6-A es la única prueba de la
+> matriz que detecta el fallo de `.single()`.
 
 **D5 · El reset toca ÚNICAMENTE la ruta de email+IP.** Jamás
 `auth:login_ip:*`, jamás rutas de recovery. R4 imposible por construcción:
@@ -344,55 +382,97 @@ supabase/migrations/
 
 ### 3.1 SQL de la Etapa A
 
-```sql
--- 20260803_auth_01_rate_limit_atomico.sql
-CREATE OR REPLACE FUNCTION public.rate_limit_intento(
-  p_clave text, p_ruta text, p_limite int, p_ventana_min int
-) RETURNS TABLE (bloqueado boolean, restantes int)
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE v_total int;
-BEGIN
-  PERFORM pg_advisory_xact_lock(hashtext(p_ruta));  -- serializa por clave
-  DELETE FROM ip_rate_limits
-   WHERE ruta = p_ruta
-     AND created_at < now() - make_interval(mins => p_ventana_min);
-  SELECT count(*) INTO v_total FROM ip_rate_limits
-   WHERE ruta = p_ruta
-     AND created_at >= now() - make_interval(mins => p_ventana_min);
-  IF v_total >= p_limite THEN
-    RETURN QUERY SELECT true, 0;
-  ELSE
-    INSERT INTO ip_rate_limits (ip, ruta) VALUES (p_clave, p_ruta);
-    RETURN QUERY SELECT false, p_limite - v_total - 1;
-  END IF;
-END $$;
+> ⚠️ **EL SQL YA NO VIVE EN ESTE DOCUMENTO (auditoría de A2, 2026-08-05).**
+> Fuente única y literal:
+> **`supabase/migrations/20260805_auth_01_rate_limit_atomico.sql`**
+> — el archivo ES el bloque que se ejecutó en producción, sin recortes, más
+> el smoke test verificado al final.
+> ✅ **APLICADO Y VERIFICADO EN PRODUCCIÓN EL 2026-08-05** (PostgreSQL 17.6;
+> resultados en la viñeta A2 de §4).
+> El borrador que ocupaba esta sección quedó **APLICABLE CON CORRECCIONES**;
+> duplicarlo aquí sería garantizar que las dos copias divergan. Lo que sigue
+> es el porqué de las correcciones, no el código.
 
-CREATE OR REPLACE FUNCTION public.rate_limit_reset(p_ruta text)
-RETURNS int LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
-  WITH borradas AS (
-    DELETE FROM ip_rate_limits WHERE ruta = p_ruta RETURNING 1
-  ) SELECT count(*)::int FROM borradas;
-$$;
+**Qué hace:** `rate_limit_intento(p_clave, p_ruta, p_limite, p_ventana_min)`
+(chequeo+inserción atómicos, D4) y `rate_limit_reset(p_ruta)` (vaciado del
+cubo, D5), más el índice `idx_ip_rate_limits_ruta_fecha (ruta, created_at)`
+para el predicado real del RPC.
 
-REVOKE EXECUTE ON FUNCTION public.rate_limit_intento(text,text,int,int)
-  FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION public.rate_limit_reset(text)
-  FROM anon, authenticated;
+**Por qué hace falta el índice.** El RPC filtra SOLO por `ruta`; el índice
+existente `idx_ip_rate_limits_ip_ruta_fecha` tiene `ip` como PRIMERA
+columna, así que NO sirve a un predicado sin `ip` → seq scan en las tres
+operaciones (DELETE de vencidas, COUNT de la ventana, chequeo previo al
+INSERT). ⚠️ **EL ÍNDICE VIEJO NO SE TOCA:** lo sigue usando `rateLimit.ts`,
+que sí filtra por `(ip, ruta)` — `checkAuthRateLimit` y `checkIpRateLimit`,
+esta última compartida con verificar-receta (no-tocar #4). El pre-flight y
+el post-flight de la migración lo verifican antes y después.
 
--- Índice para el patrón de acceso del RPC (A0, 2026-08-05).
--- El RPC filtra SOLO por ruta; el índice existente
--- idx_ip_rate_limits_ip_ruta_fecha tiene `ip` como PRIMERA columna, así
--- que NO es usable para un predicado que no incluye ip → seq scan en las
--- tres operaciones (DELETE de vencidas, COUNT de la ventana, y el
--- chequeo previo al INSERT).
--- ⚠️ EL ÍNDICE VIEJO NO SE TOCA. Lo sigue usando rateLimit.ts, que sí
--- filtra por (ip, ruta) — checkAuthRateLimit y checkIpRateLimit, esta
--- última compartida con verificar-receta (no-tocar #4).
-CREATE INDEX IF NOT EXISTS idx_ip_rate_limits_ruta_fecha
-  ON public.ip_rate_limits USING btree (ruta, created_at);
-```
-Aditiva pura: si nada la llama, nada cambia. Rollback = DROP ×2 de las
-funciones + `DROP INDEX idx_ip_rate_limits_ruta_fecha`.
+> #### 🔴 PRIVILEGIOS — el borrador de esta sección estaba MAL. No lo copies.
+>
+> El `REVOKE EXECUTE … FROM anon, authenticated` que aquí figuraba
+> **dejaba el RPC abierto**. Tres hechos que hay que tener juntos:
+>
+> 1. **Postgres concede `EXECUTE TO PUBLIC` por defecto** a toda función
+>    nueva. Revocar solo a `anon`/`authenticated` **no sirve de nada**:
+>    los dos siguen pudiendo ejecutar heredando de `PUBLIC`. **El REVOKE
+>    debe incluir `PUBLIC`.**
+> 2. **Falta el `GRANT EXECUTE … TO service_role`, y su ausencia es el
+>    peor fallo del módulo.** Supabase concede EXECUTE *directo* a
+>    `anon`/`authenticated`/`service_role` vía `ALTER DEFAULT PRIVILEGES`
+>    (documentado en `20260524_..._ts1a.sql:12-13`), pero eso es una
+>    **suposición sobre configuración externa, no una garantía**. Si no se
+>    cumple, tras el `REVOKE … FROM PUBLIC` el service role se queda **sin
+>    EXECUTE** → `42501 permission denied` → **D6 se lo traga** → el
+>    limitador queda en **fail-open PERMANENTE Y SILENCIOSO**. Ni un error
+>    visible, ni un 429 nunca más. Re-conceder explícitamente convierte una
+>    suposición en un hecho, por una línea.
+> 3. **`CREATE OR REPLACE` NO restablece privilegios** — preserva la ACL y
+>    el owner. Lo que sí los restablece a los defaults (incluido
+>    `EXECUTE TO PUBLIC`) es un **`DROP` + `CREATE`**. Contra ese escenario
+>    la defensa no es más REVOKE, es el **POST-FLIGHT** de la migración:
+>    aborta la transacción si `anon`/`authenticated` conservan EXECUTE o si
+>    `service_role` no lo tiene.
+>
+> El mismo bloque de la migración asserta además `owner = postgres`, sin el
+> cual `SECURITY DEFINER` **no** bypasea el RLS deny-all de
+> `ip_rate_limits` (mismo razonamiento que `20260522_etapa5c:6`).
+
+**Otras cinco correcciones que incorpora el archivo** (todas cerraban en
+fail-open mudo o en un hueco de privilegios):
+
+- `SET search_path = public, **pg_temp**` — con `pg_temp` sin listar,
+  Postgres lo busca PRIMERO y una tabla temporal puede secuestrar el nombre
+  `ip_rate_limits` dentro de un SECURITY DEFINER owned by `postgres`. Es
+  además la convención vigente del repo (5.C, ts1a); el borrador usaba la
+  forma vieja de `baseline/05_functions.sql`.
+- **Guardas de NULL/rango** en `rate_limit_intento`. Sin ellas
+  `make_interval(mins => NULL)` → NULL → `(0 >= NULL)` es NULL → el `IF` lo
+  trata como FALSE → **inserta y devuelve `restantes` NULL, sin error**. El
+  fail-open de D6 vive en el `try/catch` del servidor, no dentro del RPC.
+- **`pg_advisory_xact_lock(1789, hashtext(ruta))`** en vez de la forma de
+  un solo `bigint`: espacio de claves privado del módulo, aislado del
+  espacio global que comparten extensiones y procesos del sistema. (Una
+  colisión de `hashtext` entre dos rutas produce **solo contención, jamás
+  cuentas erróneas**: todos los predicados de fila filtran por
+  `ruta = p_ruta`, no por el hash.)
+- **`rate_limit_reset` rechaza por excepción toda ruta que no sea
+  `auth:login_v2:%`**, y toma el mismo lock. Así **D5 pasa a ser cierto por
+  construcción y no por convención**: tal como estaba, dependía de que
+  `limiter.ts` nunca se equivocara de cadena, y un typo habría vaciado en
+  silencio el cubo equivocado. ✅ **Verificado en producción contra su
+  vector real (2026-08-05):** `rate_limit_reset('auth:login_ip:1.2.3.4')`
+  → `EXCEPTION P0001`. R4 imposible desde la base.
+- **`NOTIFY pgrst, 'reload schema';`** — convención del repo en 8
+  migraciones, y aquí **funcionalmente obligatoria**: sin recarga del
+  esquema PostgREST devuelve `PGRST202`/404 al `.rpc()` → D6 lo atrapa →
+  fail-open silencioso otra vez.
+
+**Aditiva pura:** si nada la llama, nada cambia. **Rollback:** bloque DOWN
+comentado al final del propio archivo (`DROP` ×2 + `DROP INDEX` + `NOTIFY`).
+Ojo: los tres DROP bastan para el esquema, pero las filas escritas por el
+RPC quedan huérfanas — nada las lee y nada las purga. El DELETE opcional
+está comentado en el DOWN, sin ejecutar, porque CLAUDE.md prohíbe DELETE en
+producción sin decisión explícita.
 
 ### 3.2 Contrato del endpoint de login (Etapa A)
 
@@ -428,6 +508,58 @@ POST /api/auth/login  { email, password }
           → 200 { session }
  7. RPC en try/catch → fail-open D6 con log [AUTH]
 ```
+
+> ### ⚠️ PASOS 3, 4 y 6 — CÓMO SE LEE EL RPC (auditoría A2, 2026-08-05)
+>
+> Las tres llamadas al limitador usan **`.rpc(...).single()`** y ramifican
+> por **`bloqueado`**, nunca por `restantes`. El razonamiento completo y el
+> modo de fallo están en el recuadro de **D4**; aquí basta con que no se
+> escriba `data.bloqueado` sobre un array.
+>
+> **No metas los pasos 3 y 4 en una sola transacción de base de datos.** Tal
+> como está el contrato son dos `.rpc()` secuenciales = dos transacciones =
+> un advisory lock vivo a la vez, sin orden que respetar. Un RPC único que
+> tomara los dos locks (`login_ip` y `login_v2`) introduciría **riesgo real
+> de deadlock por orden de adquisición**. Está anotado también en el
+> `COMMENT ON FUNCTION`.
+
+> ### 🔶 PASO 3 — EL CUBO `auth:login_ip:<ip>` YA EXISTE. ES COMPARTIDO, A PROPÓSITO.
+>
+> `checkAuthRateLimit` construye `ruta = 'auth:' + action + ':' + identifier`
+> (`rateLimit.ts:73`). Con `action='login_ip'` (`rate-limit/route.ts:52`)
+> produce **`auth:login_ip:<ip>`, con límite 20/15min**: la **misma cadena y
+> los mismos límites** que el paso 3 de este contrato. El cubo de email sí se
+> aisló (`login_email` → `login_v2`); **el de IP no**. No es un descuido a
+> corregir: es la decisión.
+>
+> **DECISIÓN: NO renombrar.** Aislarlo a `login_ip_v2` daría al atacante
+> **20 (viejo) + 20 (nuevo) = 40 intentos por IP** durante las 24–48 h de
+> convivencia de D9 — debilitar R8 justo en la ventana de mayor exposición
+> es peor que la limitación que se acepta abajo. Compartir el cubo es además
+> lo semánticamente correcto: es el mismo límite conceptual.
+>
+> **Lo que se paga, escrito para que nadie lo descubra depurando
+> contadores:**
+>
+> 1. **Durante D9, la atomicidad de D4 es PARCIAL, no total.** Cubre el cubo
+>    `login_v2` (escritor único: el RPC). **NO cubre `login_ip`**, porque el
+>    camino viejo hace `count → insert` **sin tomar el advisory lock**: un
+>    intento por la vía vieja se cuela exactamente en la ventana que el lock
+>    pretende cerrar. Cualquier afirmación de atomicidad total sobre ese cubo
+>    es falsa hasta que A5 retire la acción `login_email` del endpoint viejo.
+> 2. **Doble conteo con bundles rancios.** Un cliente con JS cacheado que aún
+>    llame a `/api/auth/rate-limit` quema una fila de ese cubo; el endpoint
+>    nuevo quema otra. El médico agota los 20/15min antes de lo esperado.
+>    Tráfico residual, pero real durante la ventana.
+> 3. **El `DELETE` del RPC borra filas escritas por el código viejo** (filtra
+>    solo por `ruta`). Es inocuo — solo elimina vencidas de la misma ventana
+>    de 15 min — pero explica por qué las cuentas no cuadran si se comparan
+>    los dos caminos.
+>
+> Las demás rutas **no** colisionan: `auth:login_email:<email>`,
+> `auth:registro:<ip>`, `auth:recovery:<email>` y `verificar-receta` son
+> escritas solo por la vía vieja, y `auth:login_v2:<email>:<ip>` solo por la
+> nueva.
 
 ### 3.3 Cirugía en login/page.tsx (Etapa A)
 
@@ -517,15 +649,68 @@ la lista pública (una línea, inevitable).
   Etapa A mueva el login al servidor → **requisito del deploy A3**, con su
   razonamiento completo en el corolario de D7 (§2) y su consecuencia de
   diseño en §3.2.
-- **A2 · SQL** (§3.1) por D-T6. Verificación manual: 3 llamadas con
-  límite 2 → tercera bloqueada; reset limpia; REVOKE niega a anon;
-  `EXPLAIN` del COUNT filtrando SOLO por `ruta` (el predicado real del
-  RPC) debe mostrar **Index Scan sobre `idx_ip_rate_limits_ruta_fecha`,
-  no Seq Scan**. ⚠️ Si sale Seq Scan con la tabla casi vacía, NO es
-  concluyente: el planificador prefiere seq scan en tablas pequeñas y eso
-  no prueba que el índice esté mal. Repetir el `EXPLAIN` con datos
-  suficientes, o forzar con `SET enable_seqscan = off` para confirmar que
-  el índice es al menos USABLE.
+- **A2 · SQL** — archivo
+  `supabase/migrations/20260805_auth_01_rate_limit_atomico.sql` (§3.1).
+  Auditado el 2026-08-05: **APLICABLE CON CORRECCIONES**, correcciones
+  incorporadas al archivo. Dictamen aceptado por Angel.
+  ✅ **CERRADA — APLICADA Y VERIFICADA EN PRODUCCIÓN EL 2026-08-05.**
+  El post-flight pasó (2 funciones `SECURITY DEFINER`, `owner=postgres`,
+  `anon`/`authenticated` SIN execute, `service_role` CON execute, índice
+  nuevo creado e `idx_ip_rate_limits_ip_ruta_fecha` intacto — no-tocar #4).
+
+  **Smoke test en producción — resultado íntegro** (copia literal al final
+  del archivo de migración):
+
+  | Prueba | Resultado | Qué prueba |
+  |---|---|---|
+  | intentos 1/2/3 con límite 3 | `(false,2) (false,1) (false,0)` | Aritmética de la rama permitida. **`(false,0)` es el ÚLTIMO PERMITIDO, no un bloqueo** — confirma en producción la regla de D4 |
+  | intento 4 | `(true,0)` | El corte cae en el 4.º, ni antes ni después |
+  | `reset` → intento posterior | `3` → `(false,2)` | El cubo se vació de verdad; el reset no es cosmético (D5) |
+  | `rate_limit_reset('auth:login_ip:1.2.3.4')` | **`EXCEPTION P0001`** | **D5 probado contra su vector real**: el cubo por IP es exactamente lo que R4 querría vaciar, y la función lo rechaza. Prueba más fuerte que la de `verificar-receta` que preveía el plan |
+  | `EXPLAIN` del COUNT por `ruta` | **`Index Only Scan using idx_ip_rate_limits_ruta_fecha`** | Ni Seq Scan ni Index Scan: sirve el predicado sin tocar el heap. **Cierra la salvedad de abajo sobre el Seq Scan no concluyente** |
+  | residuo | `0 filas` | El smoke test no dejó basura en `ip_rate_limits` |
+  | versión | **PostgreSQL 17.6** | Cierra la única afirmación que la auditoría marcó como NO verificada contra esta instancia: `make_interval(mins => ...)` existe desde PG 9.4. Deja de ser un supuesto |
+
+  **Lo que A2 NO cierra y sigue vivo para A3:** el consumo correcto del RPC
+  (`.rpc(...).single()` y ramificar por `bloqueado` — D4) es **código, no
+  SQL**. La base está verificada; que `limiter.ts` la lea bien lo prueba la
+  **fila 15 de §6-A**, no este smoke test.
+
+  > ### 🔴 PROTOCOLO DE APLICACIÓN — NO FUE QUERY POR QUERY. Así se hizo y así se repite.
+  >
+  > **UNA sola corrida transaccional del archivo COMPLETO en el SQL Editor.**
+  > Nada de ejecutar las funciones en una pestaña y los `REVOKE` en otra.
+  > Así se aplicó el 2026-08-05 y así debe repetirse en cualquier reaplicación.
+  >
+  > **Por qué:** entre el `CREATE` de las funciones y el `REVOKE` existe una
+  > ventana en la que **`anon` tiene EXECUTE** sobre dos funciones
+  > `SECURITY DEFINER`, owned by `postgres`, **sin ninguna comprobación de
+  > identidad dentro**. La anon key es pública por diseño (D7). En esa
+  > ventana, cualquiera puede:
+  > - llamar `rate_limit_intento` 20 veces con
+  >   `ruta='auth:login_ip:<IP de la víctima>'` → **denegación de servicio
+  >   dirigida contra el login de un médico concreto**;
+  > - llamar `rate_limit_reset` para vaciar su propio cubo → el limitador
+  >   deja de existir para el atacante.
+  >
+  > Y si el `REVOKE` falla, se olvida, o el operador cierra la pestaña,
+  > **esa ventana no se cierra nunca**. Por eso el archivo va envuelto en
+  > `BEGIN; … COMMIT;` con pre-flight y post-flight: si el post-flight
+  > detecta que `anon` conserva EXECUTE, o que `service_role` no lo tiene,
+  > **la transacción hace ROLLBACK y no queda nada aplicado**. Todo o nada.
+
+  **El smoke test va en corrida APARTE**, después del `COMMIT` (resultados
+  arriba). ⚠️ Sobre el `EXPLAIN`: si en una reaplicación saliera **Seq
+  Scan** con la tabla casi vacía, **NO sería concluyente** — el planificador
+  prefiere seq scan en tablas pequeñas y eso no prueba que el índice esté
+  mal; habría que repetirlo con datos suficientes o forzar con
+  `SET enable_seqscan = off`. **No hizo falta el 2026-08-05: salió Index
+  Only Scan directo.**
+
+  **El REVOKE no se verifica a mano:** lo assertan las cuatro
+  comprobaciones de `has_function_privilege` del post-flight (anon y
+  authenticated SIN execute, service_role CON execute), más `owner=postgres`
+  y la supervivencia del índice viejo (no-tocar #4). Todas pasaron.
 - **A3 · Deploy 1.** Módulo lib/auth + endpoint + cirugía page.tsx +
   línea middleware. Matriz §6-A completa en PREVIEW antes de main.
 
@@ -637,6 +822,33 @@ la lista pública (una línea, inevitable).
 - R7: limpieza programada de ip_rate_limits (pg_cron o job) + evaluación
   de hashear la clave de email (PII) — aquí SÍ se contempla
   verificar-receta explícitamente (no-tocar #4).
+
+  > ### 📈 CRECIMIENTO NO ACOTADO — LA ETAPA A LO EMPEORA (auditoría A2, 2026-08-05)
+  >
+  > La limpieza de `ip_rate_limits` es **lazy y por clave**: `rate_limit_intento`
+  > solo purga vencidas **de la ruta que está atendiendo en ese momento**. Un
+  > cubo que no se vuelve a visitar **no se purga jamás**. Nada más borra esa
+  > tabla.
+  >
+  > **D3 multiplica la cardinalidad.** Antes la clave era `email`: el cubo de
+  > un médico se limpiaba solo, la siguiente vez que entraba. Ahora es
+  > `email+IP` (`auth:login_v2:<email>:<ip>`), así que **un mismo médico con
+  > WiFi de consultorio, datos móviles y red de casa deja tres cubos**, y cada
+  > uno solo se limpia si vuelve a entrar **desde esa misma IP**. Con IPs
+  > móviles rotativas (CGNAT) esa segunda visita no ocurre nunca: **filas
+  > huérfanas permanentes, una por intento**.
+  >
+  > No es un bloqueante de A2 y **no se arregla ahí**: un `DELETE` más amplio
+  > dentro del RPC arrastraría a `verificar-receta` (no-tocar #4). Es
+  > exactamente el trabajo de esta etapa. El índice
+  > `idx_ip_rate_limits_ruta_fecha (ruta, created_at)` que crea A2 **abarata
+  > la purga programada**, que puede barrer por ruta y fecha.
+  >
+  > Doble motivo para calendarizarla, no dejarla abierta: `ruta` guarda
+  > **correo + IP en claro** (y `ip` recibe `p_clave`), o sea dato personal
+  > con retención indefinida bajo la LFPDPPP vigente. Ya ocurre hoy
+  > (`checkAuthRateLimit` mete el email en la columna `ip`) — **no es una
+  > regresión de la Etapa A**, pero la Etapa A multiplica el volumen.
 - R5 completo: métrica de intentos/bloqueos, severidad real (hoy info),
   alerta activa. "Limitador muerto" debe sonar distinto de "nadie ataca".
 - R11: tests del limitador (la matriz §6 como suite repetible).
@@ -677,11 +889,23 @@ por LFPDPPP.
 | 12 | RPC caída simulada | Login procede + error [AUTH] en logs (fail-open verificado) |
 | 13 | Varios logins legítimos casi simultáneos contra el endpoint nuevo (≥6 en paralelo, cuentas DISTINTAS) | Todos pasan; **ninguno recibe 429 de GoTrue**. Verifica que el IP forwarding funciona |
 | 14 | El `{kind}` distingue el 429 de GoTrue (`over_request_rate_limit`) del 429 de nuestro limitador | Mensajes distintos. Hoy los dos se verían iguales para el usuario y el mensaje sería engañoso |
+| 15 | **El 6.º intento contra un par (email, IP) virgen recibe 429.** 5 fallidos + 1 más, secuenciales, misma cuenta y misma red | **429 en el 6.º, servido por nuestro endpoint.** Los 5 primeros: 401. La única prueba que detecta el fallo de `.single()` (D4) |
 
 La 6 prueba (B); la 5 prueba R2; la 2 prueba (A)+R4; **la 13 prueba el IP
 forwarding de A3 y la 14 que no mintamos sobre de quién es el 429**.
 Ninguna la ve el build. Método de sondeo sin service role: `remaining` del endpoint
 (filas = límite − 1 − remaining sobre clave virgen).
+
+> **Por qué la 15 no es redundante con la 3, la 4 ni la 6** (auditoría A2,
+> 2026-08-05). Sin ella, el modo de fallo de `.single()` —el RPC devuelve un
+> **array**, `data.bloqueado` queda `undefined`, el limitador **no bloquea
+> nunca y no lanza error** (ver D4)— **sería invisible para toda la matriz**:
+> la 3 y la 4 podían darse por buenas leyendo solo el 429 final sin
+> comprobar que llega en el 6.º y no antes; la 6 mide concurrencia, no el
+> corte; la 12 verifica el fail-open **deseado** (RPC caída), que es
+> exactamente el aspecto que tendría el fail-open **accidental**. La 15 es
+> secuencial y cuenta intentos a propósito: es la que distingue "el
+> limitador funciona" de "el limitador está muerto y nadie lo nota".
 
 ### 6-B/C/D/E — se redactan al abrir cada etapa, con el mismo estándar:
 ambos lados (el legítimo entra / el atacante no), evidencia numérica,
