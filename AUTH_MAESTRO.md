@@ -114,6 +114,38 @@ propio cubo (no gasta el de la cuenta real).
 - Un login llama /auth/v1/token de GoTrue directo desde el navegador (el
   flujo que este proyecto elimina).
 
+### 1.4 Hallazgos colaterales de A0 (2026-08-05) — DEUDA A REGISTRAR, NO ARREGLAR AQUÍ
+
+Encontrados de paso al verificar D2. **Ninguno bloquea la Etapa A y
+ninguno se toca en este proyecto** — quedan anotados para que existan por
+escrito y no se "descubran" otra vez.
+
+1. **`setAll` de `client.ts:51-57` descarta las `options` que le pasa el
+   SDK.** El adaptador de `@supabase/ssr` construye cada cookie con sus
+   opciones (`cookies.js:177-188`), incluido el **`maxAge: 0`** de las
+   cookies que pide BORRAR (chunks stale, `cookies.js:163-167`). Nuestro
+   `setAll` ignora ese tercer argumento y reescribe todo con la misma
+   cadena fija: **una cookie que el SDK quiso expirar se reescribe con
+   valor `""` en vez de morir.** El descarte de `maxAge`/`expires` es
+   deliberado y está comentado (cookies de sesión que mueren al cerrar la
+   pestaña); el efecto sobre el BORRADO no está declarado en ningún sitio.
+2. **`logAudit` acepta `userAgent` y lo tira.** Está en la interfaz
+   (`audit.ts:77`) pero el `insert` no lo mapea (`audit.ts:84-91`: solo
+   `user_id, accion, tabla, registro_id, ip, descripcion`). Los tres
+   call-sites de `audit-login/route.ts` (`:20, :23, :28`) lo pasan y se
+   pierde. **Relevante para el `audit.ts` del módulo (§3):** si se quiere
+   user-agent —y NOM-024 lo agradecería— no basta con pasarlo; falta la
+   columna o el mapeo.
+3. **`sessionStorage.spinus_active` es bandera muerta.** Se escribe
+   (`login/page.tsx:235`, `auth/callback/page.tsx:18`) y se borra
+   (`auth-context.tsx:181`, `super-admin/Sidebar.tsx:49`), pero **ninguna
+   línea del repo la LEE** (verificado por grep). El comentario de
+   `client.ts:32-34` afirma que `SessionGuard` la usa como detector de
+   "tab nuevo" para el auto-logout al cerrar el navegador: **es falso**,
+   `SessionGuard.tsx` no la menciona. O el auto-logout al cerrar navegador
+   no existe, o vive en otro sitio — sin determinar. No tocar sin decidir
+   cuál de las dos.
+
 ---
 
 ## 2 · DECISIONES DE ARQUITECTURA (aprobadas — no reabrir)
@@ -128,12 +160,41 @@ cliente.** El servidor valida credenciales con supabase-js puro (anon key,
 sin adaptador de cookies) y devuelve `{ session }`; el cliente ejecuta
 `supabase.auth.setSession(session)` y TODO lo demás queda idéntico:
 AuthContext, SessionGuard, blindaje offline, secureStorage cifrado con
-clave derivada de sesión, mirror engine, cookies de client.ts. Devolver
-tokens por HTTPS es lo que GoTrue hace hoy; no es regresión. El modelo
-full-SSR de cookies servidor es un refactor de sesión completo — otra
-época, no este proyecto.
-⚠️ Supuesto bloqueante a verificar en A0: que setSession dispare el mismo
-onAuthStateChange que el login directo. Si no, SE DETIENE Y SE REDISEÑA.
+clave derivada de sesión, cookies de client.ts. Devolver tokens por HTTPS
+es lo que GoTrue hace hoy; no es regresión. El modelo full-SSR de cookies
+servidor es un refactor de sesión completo — otra época, no este proyecto.
+
+✅ **VERIFICADO EN A0 (2026-08-05). Ya no es un supuesto bloqueante.** La
+versión anterior de este párrafo anclaba D2 en que `setSession` disparase
+el mismo `onAuthStateChange` que el login directo. **Esa razón era
+incorrecta** — y conviene dejar escrito por qué, para que nadie construya
+sobre la premisa equivocada:
+
+1. **La sesión persiste en COOKIES, no en localStorage.** `client.ts:35`
+   declara `auth.storage = window.localStorage`, pero `@supabase/ssr` 0.9
+   lo PISA: `createBrowserClient.js:42` escribe `storage` DESPUÉS de
+   `...options?.auth`, con el adaptador cookie-only de `cookies.js:120-213`
+   ("It only works on the cookies abstraction", comentario de la propia
+   librería). En `localStorage` solo vive `spinus_session_meta`, que
+   escribe a mano el AuthProvider (`auth-context.tsx:78-84`) — metadata
+   propia, no la sesión.
+2. **Solo hay UN suscriptor de `onAuthStateChange` en todo el repo**
+   (`src/app/auth/callback/page.tsx:33`, confirmación de cuenta por
+   enlace) y **no participa en el login**. `AuthContext` no se suscribe:
+   resuelve con `getSession()` al montar (`auth-context.tsx:197-208`).
+3. **D2 se sostiene por el reload, no por el evento.** El login termina en
+   `window.location.href` (`login/page.tsx:249`): recarga completa de
+   documento → el AuthProvider se destruye y se remonta leyendo
+   `getSession()`; `SessionGuard` consume `AuthContext`; `secureStorage`
+   deriva su clave de `document.cookie` (`secureStorage.ts:47-56`). **Todo
+   relee cookies tras el reload.** Y `setSession` escribe exactamente las
+   mismas cookies por el mismo `setAll` de `client.ts:51-57`, porque ambas
+   rutas terminan en `_saveSession` → `storage.setItem`
+   (`GoTrueClient.js:1575` vs `:650`), las dos con `await`.
+
+El evento `SIGNED_IN` se emite igual en ambas rutas
+(`GoTrueClient.js:1576` vs `:651`), pero es irrelevante aquí: nadie lo
+escucha en este camino.
 
 **D3 · Clave del cubo de login: `email+IP`** (`auth:login_v2:<email>:<ip>`).
 El atacante que quema 5 intentos con tu correo bloquea SU par, no a ti →
@@ -210,6 +271,25 @@ supabase/migrations/
   [Etapa F] retención/limpieza programada
 ```
 
+> ### 🚫 PROHIBIDO CREAR `src/lib/auth/index.ts` (A0, 2026-08-05)
+>
+> **Ya existe `src/lib/auth.ts`** — 56 líneas, `requireSuperAdmin` /
+> `requireAdmin`, con **14 importadores** que hacen
+> `import { requireSuperAdmin } from '@/lib/auth'` (todos bajo
+> `src/app/api/super-admin/`).
+>
+> Los imports profundos que plantea este documento
+> (`@/lib/auth/limiter`, `@/lib/auth/credentials`, …) **conviven sin
+> ambigüedad** con ese archivo: el fichero y el directorio pueden
+> coexistir. Lo que rompe la convivencia es un `index.ts` dentro del
+> directorio: entonces `@/lib/auth` pasa a tener dos candidatos
+> (`auth.ts` y `auth/index.ts`). La resolución probablemente seguiría
+> eligiendo el archivo, pero "probablemente" no es un criterio aceptable
+> en el módulo de autenticación.
+>
+> **Descartado renombrar `auth.ts` → `auth/guards.ts`:** toca 15 archivos
+> fuera del scope de esta etapa. No se hace aquí.
+
 ### 3.1 SQL de la Etapa A
 
 ```sql
@@ -246,8 +326,21 @@ REVOKE EXECUTE ON FUNCTION public.rate_limit_intento(text,text,int,int)
   FROM anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.rate_limit_reset(text)
   FROM anon, authenticated;
+
+-- Índice para el patrón de acceso del RPC (A0, 2026-08-05).
+-- El RPC filtra SOLO por ruta; el índice existente
+-- idx_ip_rate_limits_ip_ruta_fecha tiene `ip` como PRIMERA columna, así
+-- que NO es usable para un predicado que no incluye ip → seq scan en las
+-- tres operaciones (DELETE de vencidas, COUNT de la ventana, y el
+-- chequeo previo al INSERT).
+-- ⚠️ EL ÍNDICE VIEJO NO SE TOCA. Lo sigue usando rateLimit.ts, que sí
+-- filtra por (ip, ruta) — checkAuthRateLimit y checkIpRateLimit, esta
+-- última compartida con verificar-receta (no-tocar #4).
+CREATE INDEX IF NOT EXISTS idx_ip_rate_limits_ruta_fecha
+  ON public.ip_rate_limits USING btree (ruta, created_at);
 ```
-Aditiva pura: si nada la llama, nada cambia. Rollback = DROP ×2.
+Aditiva pura: si nada la llama, nada cambia. Rollback = DROP ×2 de las
+funciones + `DROP INDEX idx_ip_rate_limits_ruta_fecha`.
 
 ### 3.2 Contrato del endpoint de login (Etapa A)
 
@@ -276,12 +369,35 @@ escapes y el signInWithPassword directo; dentro un fetch a
 /api/auth/login con mapeo 429→'limite-intentos', 401→'credenciales',
 red→mensaje de sin conexión (deja de ser bypass: sin red no hay login,
 hoy tampoco — GoTrue necesita red). Éxito →
-`await supabase.auth.setSession(data.session)` → mismo onAuthStateChange
-de siempre → `window.location.href='/inicio'`. El signOut previo por
+`await supabase.auth.setSession(data.session)` → **comprobar su retorno
+(ver abajo)** → `window.location.href='/inicio'`. El signOut previo por
 sesión residual se conserva. El fetch a audit-login del éxito se elimina
 (el servidor ya auditó). submitLockRef, disabled, error persistente,
 useId, aria, autoComplete: INTACTOS. Middleware: /api/auth/login entra en
 la lista pública (una línea, inevitable).
+
+> ### ⚠️ REQUISITO NUEVO (A0, 2026-08-05) — HAY QUE COMPROBAR EL RETORNO DE `setSession` ANTES DE NAVEGAR
+>
+> **Esto no existe hoy y no es opcional.** `setSession` NO es equivalente
+> punto por punto a `signInWithPassword`: con el token vigente hace una
+> llamada de red EXTRA que el login directo no hace —
+> `await this._getUser(currentSession.access_token)` →
+> `GET /auth/v1/user` (`GoTrueClient.js:1563`) — y la hace ANTES de
+> persistir.
+>
+> Modo de fallo que esto introduce: nuestro endpoint responde 200 con la
+> sesión, la red cae en ese intervalo (o el `offlineAwareFetch` de
+> `client.ts:14-19` la rechaza de plano porque `navigator.onLine === false`),
+> el `_getUser` falla y `_setSession` retorna
+> `{ data: { session: null, user: null }, error }` (`GoTrueClient.js:1565`)
+> **sin guardar ni notificar nada**. Resultado: credenciales correctas,
+> sesión válida emitida, NADA persistido, y el usuario aterriza en /inicio
+> sin cookie → rebote del middleware, indistinguible de un fallo de login.
+>
+> Hoy nadie inspecciona ese retorno porque `signInWithPassword` no tiene
+> esta rama. **Regla: si `setSession` no devuelve sesión, mostrar error y
+> NO navegar.** El `submitLockRef` debe liberarse en esa salida (es un
+> fallo, no una navegación).
 
 ---
 
@@ -295,12 +411,28 @@ la lista pública (una línea, inevitable).
   de la lista pública del middleware; (d) firma real de logAudit y del
   error de GoTrue credenciales-vs-otros; (e) que no exista ya
   /api/auth/login; (f) inventario de TODOS los call-sites de
-  signInWithPassword del repo. Si (a) contradice D2 → STOP y rediseño.
+  signInWithPassword del repo.
+  ✅ **CERRADA — ejecutada el 2026-08-05.** No hubo STOP: **D2 quedó
+  VERIFICADO**, aunque por una razón distinta a la que se suponía (ver el
+  bloque de D2). Los seis puntos se resolvieron y sus hallazgos ya están
+  incorporados al documento: la mecánica real de sesión en **D2**; el
+  requisito nuevo de comprobar el retorno de `setSession` en **§3.3**; la
+  prohibición del `index.ts` en **§3**; y la deuda colateral en **§1.4**.
+  (b) SessionGuard, (c) `publicApiPaths`, (d) firma de logAudit y forma
+  del error de GoTrue, (e) `/api/auth/login` no existe y (f) un único
+  call-site de `signInWithPassword` (`login/page.tsx:211`): sin sorpresas.
 - **A1 · Inventario del perímetro Supabase (dashboard, sin código).**
   Valores reales de los rate limits nativos de Auth; disponibilidad de
   CAPTCHA y leaked-password-protection en el plan actual. Insumo de C.
 - **A2 · SQL** (§3.1) por D-T6. Verificación manual: 3 llamadas con
-  límite 2 → tercera bloqueada; reset limpia; REVOKE niega a anon.
+  límite 2 → tercera bloqueada; reset limpia; REVOKE niega a anon;
+  `EXPLAIN` del COUNT filtrando SOLO por `ruta` (el predicado real del
+  RPC) debe mostrar **Index Scan sobre `idx_ip_rate_limits_ruta_fecha`,
+  no Seq Scan**. ⚠️ Si sale Seq Scan con la tabla casi vacía, NO es
+  concluyente: el planificador prefiere seq scan en tablas pequeñas y eso
+  no prueba que el índice esté mal. Repetir el `EXPLAIN` con datos
+  suficientes, o forzar con `SET enable_seqscan = off` para confirmar que
+  el índice es al menos USABLE.
 - **A3 · Deploy 1.** Módulo lib/auth + endpoint + cirugía page.tsx +
   línea middleware. Matriz §6-A completa en PREVIEW antes de main.
 - **A4 · Observación 24–48 h** en prod: logs [AUTH], audit_log, filas de
@@ -333,8 +465,18 @@ la lista pública (una línea, inevitable).
 
 ### ETAPA D · Sesión e higiene NOM-024
 
-- **Fix del logout que audita `login_exitoso`** (vocabulario canónico de
-  audit.ts; corrige trazabilidad NOM-024). Prioridad alta dentro de D.
+- **Fix del logout que audita `login_exitoso`.** Prioridad alta dentro de
+  D. **Precisado en A0 (2026-08-05): NO es un problema de vocabulario.**
+  El literal `'logout'` ya existe en la unión `AuditAccion`
+  (`audit.ts:34`) y ya se emite correctamente. El defecto es una llamada
+  DE MÁS: la rama `action === 'logout'` de
+  `src/app/api/auth/audit-login/route.ts` invoca `logLogin({success:true})`
+  (`:28`) — que resuelve a `'login_exitoso'` por el ternario de
+  `audit.ts:132` — **ADEMÁS** del `logAudit({accion:'logout'})` correcto
+  (`:31`). Cada logout escribe DOS filas en `audit_log`, una de ellas
+  falsa. **El fix es retirar la llamada de más (`:28`), no añadir
+  vocabulario.** Verificar de paso que ningún consumidor de `audit_log`
+  dependa del par de filas.
 - Timeout de inactividad (15–20 min, estándar clínico; ya en la lista de
   la auditoría de abril).
 - "Cerrar sesión en todos los dispositivos" (signOut scope global de
