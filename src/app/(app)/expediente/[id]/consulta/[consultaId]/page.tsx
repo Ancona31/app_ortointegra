@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Paciente, Consulta, MedicoInfo } from '@/types'
 import { parseISO, format } from 'date-fns'
 import { generateDocFileName } from '@/lib/patientUtils'
 import { es } from 'date-fns/locale'
-import { ArrowLeft, Printer, Stethoscope, Plus, Loader2, FileText, Lock, PenLine, Sparkles } from 'lucide-react'
+import { ArrowLeft, Printer, Stethoscope, Plus, Loader2, FileText, Lock, PenLine, Sparkles, Eye } from 'lucide-react'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 import { useAuditAccess } from '@/hooks/useAudit'
@@ -71,6 +71,31 @@ export default function ConsultaDetallePage() {
   const [guardandoAddendum, setGuardandoAddendum] = useState(false)
   const [error, setError] = useState('')
   const [imprimiendo, setImprimiendo] = useState(false)
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null)
+
+  /**
+   * El botón no abre el PDF: se convierte en el enlace que lo abre.
+   *
+   * `generarPdf` lo abría él mismo al terminar, después del refresco del perfil
+   * médico, el fetch del logo, los imports dinámicos y el render. Para entonces
+   * la activación transitoria del gesto ya estaba consumida y Safari bloqueaba
+   * la apertura — en silencio en iOS y en la PWA. En una nota duele más que en
+   * un documento: la reimpresión no se persiste, así que si no se abre no queda
+   * en ninguna lista donde ir a buscarla.
+   *
+   * Con el href ya resuelto, entre el toque y la navegación no hay asincronía.
+   * Mismo criterio que ModalDocumentoGenerado, duplicado a propósito.
+   */
+  const pdfUrl = useMemo(() => (pdfBlob ? URL.createObjectURL(pdfBlob) : null), [pdfBlob])
+
+  useEffect(() => {
+    if (!pdfUrl) return
+    return () => {
+      // 60s de gracia: si el médico ya lo abrió, el visor tiene su copia
+      // interna y revocar es seguro.
+      setTimeout(() => URL.revokeObjectURL(pdfUrl), 60000)
+    }
+  }, [pdfUrl])
 
   useEffect(() => {
     // Perfil médico — best-effort
@@ -108,6 +133,9 @@ export default function ConsultaDetallePage() {
     setAddendums(prev => [...prev, data.addendum])
     setAddendumTexto('')
     setShowAddendum(false)
+    // El PDF ya generado no lleva este addendum: se descarta para que el botón
+    // vuelva a "Imprimir" en lugar de ofrecer un enlace a un documento viejo.
+    setPdfBlob(null)
   }
 
   async function imprimir() {
@@ -132,13 +160,16 @@ export default function ConsultaDetallePage() {
         addendums,
         medicoVivo,
       })
-      await generarPdf({
+      const { blob } = await generarPdf({
         tipo: 'nota_evolucion',
         medico: null,
         data: { ...notaRenderData },
         logoUrl: notaRenderData.medico.logoUrl,
         filename: generateDocFileName(notaRenderData.paciente.nombreCompleto, 'Nota-Evolucion'),
+        entregar: false,
       })
+
+      setPdfBlob(blob)
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('[ConsultaDetalle] imprimir falló:', err)
@@ -190,15 +221,29 @@ export default function ConsultaDetallePage() {
           <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-400 bg-slate-50 border border-slate-200 rounded-lg">
             <Lock size={12} /> Nota sellada
           </span>
-          <button
-            onClick={imprimir}
-            disabled={imprimiendo}
-            className="flex items-center gap-2 px-4 py-2 border-2 border-[#1a3a5c] text-[#1a3a5c] rounded-lg text-sm font-medium hover:bg-[#1a3a5c] hover:text-white transition-colors disabled:opacity-50"
-          >
-            {imprimiendo
-              ? <><Loader2 size={16} className="animate-spin" /> Generando...</>
-              : <><Printer size={16} /> Imprimir</>}
-          </button>
+          {/* El enlace se queda hasta que se agregue un addendum (que invalida
+              el PDF) o se recargue la página: si el médico cierra la pestaña
+              del visor por error, puede volver a abrirla sin regenerar. */}
+          {pdfUrl ? (
+            <a
+              href={pdfUrl}
+              target="_blank"
+              rel="noopener"
+              className="flex items-center gap-2 px-4 py-2 bg-[#1a3a5c] border-2 border-[#1a3a5c] text-white rounded-lg text-sm font-medium hover:bg-[#0f2540] transition-colors"
+            >
+              <Eye size={16} /> Abrir PDF
+            </a>
+          ) : (
+            <button
+              onClick={imprimir}
+              disabled={imprimiendo}
+              className="flex items-center gap-2 px-4 py-2 border-2 border-[#1a3a5c] text-[#1a3a5c] rounded-lg text-sm font-medium hover:bg-[#1a3a5c] hover:text-white transition-colors disabled:opacity-50"
+            >
+              {imprimiendo
+                ? <><Loader2 size={16} className="animate-spin" /> Generando...</>
+                : <><Printer size={16} /> Imprimir</>}
+            </button>
+          )}
         </div>
       </div>
 

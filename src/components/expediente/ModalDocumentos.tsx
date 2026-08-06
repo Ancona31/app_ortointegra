@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import type { Documento } from '@/types'
 import ModalShell from '@/components/ui/ModalShell'
+import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
 import { createClient } from '@/lib/supabase/client'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
 import { useToast } from '@/components/ui/Toast'
@@ -107,6 +108,7 @@ export default function ModalDocumentos({
 }: ModalDocumentosProps) {
   const [docAEliminar, setDocAEliminar] = useState<string | null>(null)
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null)
+  const [docRegenerado, setDocRegenerado] = useState<{ blob: Blob; titulo: string; guardado: boolean } | null>(null)
   const [bloqueoRegeneracion, setBloqueoRegeneracion] = useState(false)
   const [eliminando, setEliminando] = useState(false)
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({})
@@ -221,6 +223,12 @@ export default function ModalDocumentos({
     }
 
     setRegeneratingId(doc.id)
+    // El blob se lee en el finally para montar el modal de entrega. Antes,
+    // `generarPdf` abría la pestaña él mismo al terminar; con el gesto ya
+    // consumido por el trabajo asíncrono, Safari la bloqueaba y el médico se
+    // quedaba sin el PDF que acababa de recuperar. Ver ModalDocumentoGenerado.
+    let pdfBlob: Blob | null = null
+    let guardado = false
     try {
       const { generarPdf } = await import('@/lib/mobileShare')
       const { getDoctorProfile } = await import('@/lib/offline/doctorProfile')
@@ -248,14 +256,21 @@ export default function ModalDocumentos({
       const { generateDocFileName } = await import('@/lib/patientUtils')
       const tipoLabel = doc.tipo.replace(/_/g, '-')
 
-      const { storagePath } = await generarPdf({
+      const { blob, storagePath } = await generarPdf({
         tipo: doc.tipo,
         medico: medicoData,
         data: doc.contenido as Record<string, unknown>,
         logoUrl,
         filename: generateDocFileName(pacienteNombre, tipoLabel),
         pacienteId: doc.paciente_id ?? undefined,
+        entregar: false,
       })
+
+      pdfBlob = blob
+      // Derivado solo de storagePath: el error del .update() de abajo sigue sin
+      // comprobarse, igual que antes de este cambio. Sin storagePath es seguro
+      // que el documento NO quedó recuperable, que es lo que el modal advierte.
+      guardado = storagePath !== null
 
       if (storagePath) {
         const supabase = createClient()
@@ -266,6 +281,13 @@ export default function ModalDocumentos({
       console.error('[ModalDocumentos] regenerarPdf:', err)
     } finally {
       setRegeneratingId(null)
+      if (pdfBlob) {
+        setDocRegenerado({
+          blob: pdfBlob,
+          titulo: TIPO_DOC_LABEL[doc.tipo] || doc.tipo,
+          guardado,
+        })
+      }
     }
   }
 
@@ -450,6 +472,22 @@ export default function ModalDocumentos({
           </div>
         </div>
       </ModalShell>
+
+      {/* Entrega del PDF recuperado. Va apilado sobre la lista (elevated,
+          z-[60]) igual que los dos confirmatorios de arriba; nunca coinciden
+          con una regeneración en curso.
+          NO se aprovecha el <a> de descarga que la fila ya tiene: la deuda
+          técnica #1 (:263 muta doc.pdf_url por referencia, sin setState) impide
+          que la fila se re-renderice, así que ese botón no llega a aparecer.
+          Cerrarla exige que el padre reemplace la fila en su estado — otro
+          alcance, y esta vía sirve casi solo a documentos históricos. */}
+      <ModalDocumentoGenerado
+        open={docRegenerado !== null}
+        onClose={() => setDocRegenerado(null)}
+        blob={docRegenerado?.blob ?? null}
+        titulo={docRegenerado?.titulo ?? 'Documento'}
+        guardadoEnExpediente={docRegenerado?.guardado ?? false}
+      />
     </>
   )
 }

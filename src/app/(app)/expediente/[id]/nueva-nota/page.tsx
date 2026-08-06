@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import ModalShell from '@/components/ui/ModalShell'
 import { useParams } from 'next/navigation'
@@ -215,6 +215,7 @@ export default function NuevaNotaPage() {
   const [generando, setGenerando]       = useState(false)
   const [guardando, setGuardando]       = useState(false)
   const [imprimiendo, setImprimiendo]   = useState(false)
+  const [notaPdfBlob, setNotaPdfBlob]   = useState<Blob | null>(null)
   const [error, setError]               = useState('')
   const [notaSaved, setNotaSaved]       = useState(false)
   const [docInline, setDocInlineRaw]    = useState<string | null>(null)
@@ -732,6 +733,39 @@ export default function NuevaNotaPage() {
   }
 
   // ── Imprimir nota (pipeline react-pdf, patrón B′) ─────────────
+  /**
+   * El botón "Imprimir nota" del Estado Éxito no abre el PDF: se convierte en
+   * el enlace que lo abre.
+   *
+   * `generarPdf` lo abría él mismo al terminar, después del refresco del perfil
+   * médico, el fetch del logo, los imports dinámicos y el render. Para entonces
+   * la activación transitoria del gesto ya estaba consumida y Safari bloqueaba
+   * la apertura — en silencio en iOS y en la PWA. En una nota duele más que en
+   * un documento: la impresión no se persiste (el generarPdf de abajo va sin
+   * pacienteId a propósito), así que si no se abre no queda en ninguna lista
+   * donde ir a buscarla.
+   *
+   * Con el href ya resuelto, entre el toque y la navegación no hay asincronía.
+   * Mismo criterio que ModalDocumentoGenerado, duplicado a propósito.
+   *
+   * La nota queda sellada al llegar al Éxito (autosave cortado por notaSaved),
+   * así que el PDF no se invalida mientras el modal siga abierto y el enlace no
+   * necesita descartarse.
+   */
+  const notaPdfUrl = useMemo(
+    () => (notaPdfBlob ? URL.createObjectURL(notaPdfBlob) : null),
+    [notaPdfBlob],
+  )
+
+  useEffect(() => {
+    if (!notaPdfUrl) return
+    return () => {
+      // 60s de gracia: si el médico ya lo abrió, el visor tiene su copia
+      // interna y revocar es seguro.
+      setTimeout(() => URL.revokeObjectURL(notaPdfUrl), 60000)
+    }
+  }, [notaPdfUrl])
+
   // Lo consume el botón "Imprimir nota" del Estado Éxito. Conservar el handler
   // evita reponer las 8 fuentes de estado que lee (R11).
   async function imprimir() {
@@ -764,13 +798,16 @@ export default function NuevaNotaPage() {
       })
 
       // Sin pacienteId: imprimir NO persiste en Storage (solo entrega el PDF).
-      await generarPdf({
+      const { blob } = await generarPdf({
         tipo: 'nota_evolucion',
         medico: null,
         data: { ...notaRenderData },
         logoUrl: notaRenderData.medico.logoUrl,
         filename: generateDocFileName(notaRenderData.paciente.nombreCompleto, 'Nota-Evolucion'),
+        entregar: false,
       })
+
+      setNotaPdfBlob(blob)
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('[NuevaNota] imprimir falló:', err)
@@ -1018,10 +1055,17 @@ export default function NuevaNotaPage() {
                 className="sp-btn sp-btn--tertiary">
                 <FileText size={17} /> Otros documentos
               </button>
-              <button onClick={imprimir} disabled={imprimiendo}
-                className="sp-btn sp-btn--tertiary disabled:opacity-40">
-                {imprimiendo ? <><Loader2 size={17} className="animate-spin" /> Imprimiendo...</> : <><Printer size={17} /> Imprimir nota</>}
-              </button>
+              {notaPdfUrl ? (
+                <a href={notaPdfUrl} target="_blank" rel="noopener"
+                  className="sp-btn sp-btn--tertiary">
+                  <Eye size={17} /> Abrir PDF
+                </a>
+              ) : (
+                <button onClick={imprimir} disabled={imprimiendo}
+                  className="sp-btn sp-btn--tertiary disabled:opacity-40">
+                  {imprimiendo ? <><Loader2 size={17} className="animate-spin" /> Imprimiendo...</> : <><Printer size={17} /> Imprimir nota</>}
+                </button>
+              )}
               <Link href={`/expediente/${id}`} className="sp-btn sp-btn--tertiary">
                 <Eye size={17} /> Ver expediente
               </Link>
