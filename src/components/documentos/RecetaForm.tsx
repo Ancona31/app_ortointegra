@@ -17,6 +17,7 @@ import { hoyEnTZ } from '@/lib/dates'
 import AutocompleteMedicamento from '@/components/AutocompleteMedicamento'
 import { MedicamentoDB } from '@/data/medicamentos'
 import { useToast } from '@/components/ui/Toast'
+import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
 
 type MedicamentoConVia = Medicamento & { via_administracion?: string }
 
@@ -208,6 +209,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
   const [recomendaciones, setRecomendaciones] = useState('')
   const [errorGuardado, setErrorGuardado] = useState('')
   const [imprimiendo, setImprimiendo] = useState(false)
+  const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean } | null>(null)
 
   function addMed() {
     setMedicamentos([...medicamentos, { nombre_comercial: '', presentacion: '', dosis: '', principio_activo: '', indicacion: '', via_administracion: 'Oral' }])
@@ -263,6 +265,10 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
 
     // Flags de tracking para diferenciar errores de PDF vs persistencia
     let pdfGenerated = false
+    // El blob y el desenlace de la persistencia se leen en el finally para
+    // montar el modal posterior a la generación. Ver ModalDocumentoGenerado.
+    let pdfBlob: Blob | null = null
+    let guardado = false
 
     try {
       // 3. PDF PRIMERO — si falla, abortamos antes de escribir nada.
@@ -311,7 +317,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
         telefono: consultorioActivo.telefono,
       } : undefined
 
-      const { storagePath } = await generarPdf({
+      const { blob, storagePath } = await generarPdf({
         tipo: 'receta',
         pacienteId,
         medico: {
@@ -345,9 +351,13 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
         logoUrl,
         filename: generateDocFileName(paciente, 'Receta'),
         consultorio: consultorioData,
+        // El búnker offline queda intacto: sigue entregando el PDF él mismo y
+        // no monta el modal — onOfflineSave desmonta el formulario al guardar.
+        entregar: !!offlineMode,
       })
 
       pdfGenerated = true
+      pdfBlob = blob
 
       // 4. Persistencia
       if (offlineMode) {
@@ -381,6 +391,10 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
         const { error } = await supabase.from('documentos').insert(insertPayload)
         if (error) throw error
 
+        // Sin storagePath la fila se inserta igual pero sin PDF en Storage:
+        // mobileShare captura el error de subida y no lo relanza. El documento
+        // no queda recuperable desde la lista y el modal tiene que decirlo.
+        guardado = storagePath !== null
         toast.success('Receta guardada')
       }
     } catch (err) {
@@ -397,6 +411,9 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
       console.error('[RecetaForm] imprimir falló:', err)
     } finally {
       setImprimiendo(false)
+      // También cuando la persistencia falló: el PDF existe y con el paciente
+      // enfrente lo urgente es poder imprimirlo.
+      if (pdfBlob && !offlineMode) setDocGenerado({ blob: pdfBlob, guardado })
     }
   }
 
@@ -546,6 +563,14 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
           ? <><Loader2 size={18} className="animate-spin" /> Generando PDF...</>
           : <><Printer size={18} /> Imprimir Receta</>}
       </button>
+
+      <ModalDocumentoGenerado
+        open={docGenerado !== null}
+        onClose={() => setDocGenerado(null)}
+        blob={docGenerado?.blob ?? null}
+        titulo="Receta"
+        guardadoEnExpediente={docGenerado?.guardado ?? false}
+      />
     </div>
   )
 }

@@ -171,6 +171,15 @@ export interface GenerarPdfResult {
  * Si se pasa pacienteId, sube el PDF a Supabase Storage (documentos-pdf)
  * y retorna el storagePath. Si el upload falla, retorna storagePath=null
  * pero el PDF se entrega al usuario normalmente.
+ *
+ * `entregar: false` corta la Fase 6 y devuelve el blob sin abrir nada. Lo usan
+ * los 8 formularios de documentos: la entrega automática se hacía después de
+ * varios segundos de trabajo asíncrono (fetch del logo, imports dinámicos,
+ * render, subida a Storage), para cuando la activación transitoria del gesto ya
+ * se había consumido y Safari bloqueaba la apertura — en silencio en iOS. En su
+ * lugar el formulario muestra un modal con un botón "Visualizar" que el médico
+ * pulsa cuando el trabajo YA terminó, así el gesto está intacto. Ver
+ * ModalDocumentoGenerado.tsx.
  */
 export async function generarPdf(params: {
   tipo: string
@@ -180,6 +189,8 @@ export async function generarPdf(params: {
   filename?: string
   pacienteId?: string
   consultorio?: PdfConsultorioData
+  /** Default true — abrir/compartir el PDF al terminar (Fase 6). */
+  entregar?: boolean
 }): Promise<GenerarPdfResult> {
   // Guard de concurrencia: ignorar multi-clics
   if (isGenerating) {
@@ -188,7 +199,7 @@ export async function generarPdf(params: {
   }
 
   isGenerating = true
-  const { tipo, medico, data, logoUrl, filename, pacienteId, consultorio } = params
+  const { tipo, medico, data, logoUrl, filename, pacienteId, consultorio, entregar = true } = params
   const defaultFilename = `${tipo.replace(/_/g, '-')}.pdf`
 
   let phase = 'inicio'
@@ -269,19 +280,23 @@ export async function generarPdf(params: {
     }
 
     // ── Fase 6: disparar entrega al usuario ──
-    phase = 'disparando entrega'
-    const isMobile =
-      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-      window.innerWidth < 768
+    // Se salta con entregar:false — el llamador entrega el blob él mismo, desde
+    // un gesto del usuario. Ver la nota en la firma de generarPdf.
+    if (entregar) {
+      phase = 'disparando entrega'
+      const isMobile =
+        /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+        window.innerWidth < 768
 
-    const finalName = filename ?? defaultFilename
-    if (isMobile) {
-      await compartirODescargar(pdfBlob, finalName)
-    } else {
-      abrirBlobEnPestana(pdfBlob, finalName)
+      const finalName = filename ?? defaultFilename
+      if (isMobile) {
+        await compartirODescargar(pdfBlob, finalName)
+      } else {
+        abrirBlobEnPestana(pdfBlob, finalName)
+      }
     }
 
-    console.log('[generarPdf] 6/6 completado', storagePath ? '(con Storage)' : '(sin Storage)')
+    console.log('[generarPdf] 6/6 completado', storagePath ? '(con Storage)' : '(sin Storage)', entregar ? '' : '(sin entrega)')
 
     return { blob: pdfBlob, storagePath }
   } catch (err) {

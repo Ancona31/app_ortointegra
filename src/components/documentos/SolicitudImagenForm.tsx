@@ -8,6 +8,7 @@ import { Printer, Loader2 } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { generarPdf } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
+import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
@@ -60,6 +61,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
   const [urgente, setUrgente] = useState(false)
   const [errorGuardado, setErrorGuardado] = useState('')
   const [imprimiendo, setImprimiendo] = useState(false)
+  const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean } | null>(null)
 
   function addEstudio() { setEstudios([...estudios, { tipo: '', region: '', proyecciones: '', indicacion: '' }]) }
   function updateEstudio(i: number, field: keyof Estudio, val: string) {
@@ -85,6 +87,10 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
 
     // Flags de tracking para diferenciar errores
     let pdfGenerated = false
+    // El blob y el desenlace de la persistencia se leen en el finally para
+    // montar el modal posterior a la generación. Ver ModalDocumentoGenerado.
+    let pdfBlob: Blob | null = null
+    let guardado = false
 
     try {
       // 3. PDF PRIMERO — si falla, abortamos antes de persistir
@@ -114,7 +120,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
         telefono: consultorioActivo.telefono,
       } : undefined
 
-      const { storagePath } = await generarPdf({
+      const { blob, storagePath } = await generarPdf({
         tipo: 'solicitud_imagen',
         pacienteId,
         medico: medicoData,
@@ -128,9 +134,13 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
         logoUrl,
         filename: generateDocFileName(paciente, 'Solicitud_Imagen'),
         consultorio: consultorioData,
+        // El búnker offline queda intacto: sigue entregando el PDF él mismo y
+        // no monta el modal — onOfflineSave desmonta el formulario al guardar.
+        entregar: !!offlineMode,
       })
 
       pdfGenerated = true
+      pdfBlob = blob
 
       // 4. Persistencia
       if (offlineMode) {
@@ -164,6 +174,10 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
         const { error } = await supabase.from('documentos').insert(insertPayload)
         if (error) throw error
 
+        // Sin storagePath la fila se inserta igual pero sin PDF en Storage:
+        // mobileShare captura el error de subida y no lo relanza. El documento
+        // no queda recuperable desde la lista y el modal tiene que decirlo.
+        guardado = storagePath !== null
         toast.success('Solicitud guardada')
       }
     } catch (err) {
@@ -178,6 +192,9 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
       console.error('[SolicitudImagenForm] imprimir falló:', err)
     } finally {
       setImprimiendo(false)
+      // También cuando la persistencia falló: el PDF existe y con el paciente
+      // enfrente lo urgente es poder imprimirlo.
+      if (pdfBlob && !offlineMode) setDocGenerado({ blob: pdfBlob, guardado })
     }
   }
 
@@ -245,6 +262,14 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
         className="doc-print-btn w-full flex items-center justify-center gap-2 py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-50">
         {imprimiendo ? <><Loader2 size={18} className="animate-spin" /> Generando PDF...</> : <><Printer size={18} /> Imprimir Solicitud</>}
       </button>
+
+      <ModalDocumentoGenerado
+        open={docGenerado !== null}
+        onClose={() => setDocGenerado(null)}
+        blob={docGenerado?.blob ?? null}
+        titulo="Solicitud de imagen"
+        guardadoEnExpediente={docGenerado?.guardado ?? false}
+      />
     </div>
   )
 }

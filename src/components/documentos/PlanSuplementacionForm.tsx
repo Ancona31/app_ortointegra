@@ -9,6 +9,7 @@ import { Printer, Loader2, RefreshCw } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { generarPdf } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
+import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
 import QRCode from 'qrcode'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -209,6 +210,7 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
   const [seguimiento, setSeguimiento] = useState('')
   const [imprimiendo, setImprimiendo] = useState(false)
   const [errorGuardado, setErrorGuardado] = useState('')
+  const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean } | null>(null)
 
   function dosisParaForm(sup: Suplemento, peso: number): string {
     if (peso > 0) {
@@ -254,6 +256,10 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
 
     // Flags de tracking para diferenciar errores
     let pdfGenerated = false
+    // El blob y el desenlace de la persistencia se leen en el finally para
+    // montar el modal posterior a la generación. Ver ModalDocumentoGenerado.
+    let pdfBlob: Blob | null = null
+    let guardado = false
 
     try {
       // 3. PDF PRIMERO — si falla, abortamos antes de persistir
@@ -290,7 +296,7 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
         telefono: consultorioActivo.telefono,
       } : undefined
 
-      const { storagePath } = await generarPdf({
+      const { blob, storagePath } = await generarPdf({
         tipo: 'plan_suplementacion',
         pacienteId,
         medico: medicoData,
@@ -321,9 +327,13 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
         logoUrl,
         filename: generateDocFileName(paciente, 'Plan_Suplementacion'),
         consultorio: consultorioData,
+        // El búnker offline queda intacto: sigue entregando el PDF él mismo y
+        // no monta el modal — onOfflineSave desmonta el formulario al guardar.
+        entregar: !!offlineMode,
       })
 
       pdfGenerated = true
+      pdfBlob = blob
 
       // 4. Persistencia
       if (offlineMode) {
@@ -360,6 +370,12 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
           if (error) throw error
         }
 
+        // Sin pacienteId no hay fila que insertar ni subida que intentar, así
+        // que no hay nada que advertir. Con pacienteId, storagePath null
+        // significa que la subida falló: mobileShare captura ese error y no lo
+        // relanza, la fila queda sin PDF y el modal tiene que decirlo.
+        guardado = pacienteId ? storagePath !== null : true
+
         if (!pacienteId) {
           toast.success('Plan generado')
         } else {
@@ -378,6 +394,9 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
       console.error('[PlanSuplementacionForm] imprimir falló:', err)
     } finally {
       setImprimiendo(false)
+      // También cuando la persistencia falló: el PDF existe y con el paciente
+      // enfrente lo urgente es poder imprimirlo.
+      if (pdfBlob && !offlineMode) setDocGenerado({ blob: pdfBlob, guardado })
     }
   }
 
@@ -537,6 +556,14 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
           : <><Printer size={18} /> Imprimir Plan de Suplementación</>
         }
       </button>
+
+      <ModalDocumentoGenerado
+        open={docGenerado !== null}
+        onClose={() => setDocGenerado(null)}
+        blob={docGenerado?.blob ?? null}
+        titulo="Plan de suplementación"
+        guardadoEnExpediente={docGenerado?.guardado ?? false}
+      />
     </div>
   )
 }

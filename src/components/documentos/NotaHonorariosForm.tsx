@@ -8,6 +8,7 @@ import Portal from '@/components/ui/Portal'
 import { flushSync } from 'react-dom'
 import { generarPdf } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
+import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
@@ -117,6 +118,7 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, o
   const [folio, setFolio]                 = useState(() => generarFolio('honorarios'))
   const [imprimiendo, setImprimiendo]     = useState(false)
   const [errorGuardado, setErrorGuardado] = useState('')
+  const [docGenerado, setDocGenerado]     = useState<{ blob: Blob; guardado: boolean } | null>(null)
   const [lineas, setLineas]               = useState<LineaConcepto[]>([{ id: 1, concepto: '', precio: 0 }])
   const [nextId, setNextId]               = useState(2)
   const [divisa, setDivisa]               = useState<Divisa>('MXN')
@@ -348,6 +350,10 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, o
     }
 
     let pdfGenerated = false
+    // El blob y el desenlace de la persistencia se leen en el finally para
+    // montar el modal posterior a la generación. Ver ModalDocumentoGenerado.
+    let pdfBlob: Blob | null = null
+    let guardado = false
 
     try {
       const fechaFmt = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
@@ -375,7 +381,7 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, o
         telefono: consultorioActivo.telefono,
       } : undefined
 
-      const { storagePath } = await generarPdf({
+      const { blob, storagePath } = await generarPdf({
         tipo: 'nota_honorarios',
         pacienteId,
         medico: medicoData,
@@ -389,9 +395,13 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, o
         logoUrl,
         filename: generateDocFileName(paciente, tipoDoc === 'cotizacion' ? 'Cotizacion' : 'Nota_Honorarios'),
         consultorio: consultorioData,
+        // El búnker offline queda intacto: sigue entregando el PDF él mismo y
+        // no monta el modal — onOfflineSave desmonta el formulario al guardar.
+        entregar: !!offlineMode,
       })
 
       pdfGenerated = true
+      pdfBlob = blob
 
       if (offlineMode) {
         const { addDocument } = await import('@/lib/offline/db')
@@ -424,6 +434,11 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, o
         const { error } = await supabase.from('documentos').insert(insertPayload)
         if (error) throw error
 
+        // Sin storagePath la fila se inserta igual pero sin PDF en Storage:
+        // mobileShare captura el error de subida y no lo relanza. El documento
+        // no queda recuperable desde la lista y el modal tiene que decirlo.
+        guardado = storagePath !== null
+
         const docLabel = tipoDoc === 'cotizacion' ? 'Cotizacion' : 'Recibo'
         toast.success(docLabel + ' guardado')
       }
@@ -439,6 +454,9 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, o
       console.error('[NotaHonorariosForm] imprimir falló:', err)
     } finally {
       setImprimiendo(false)
+      // También cuando la persistencia falló: el PDF existe y con el paciente
+      // enfrente lo urgente es poder imprimirlo.
+      if (pdfBlob && !offlineMode) setDocGenerado({ blob: pdfBlob, guardado })
     }
   }
 
@@ -826,6 +844,14 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, o
           </div>
         </Portal>
       )}
+
+      <ModalDocumentoGenerado
+        open={docGenerado !== null}
+        onClose={() => setDocGenerado(null)}
+        blob={docGenerado?.blob ?? null}
+        titulo={tituloDoc}
+        guardadoEnExpediente={docGenerado?.guardado ?? false}
+      />
     </div>
   )
 }

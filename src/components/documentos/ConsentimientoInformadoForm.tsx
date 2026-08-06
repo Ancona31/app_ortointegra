@@ -6,6 +6,7 @@ import { Printer, Loader2, ChevronDown, ChevronUp, ShieldCheck } from 'lucide-re
 import { flushSync } from 'react-dom'
 import { generarPdf } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
+import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
@@ -140,6 +141,7 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
   const [imprimiendo, setImprimiendo] = useState(false)
   const [errorGuardado, setErrorGuardado] = useState('')
   const [imprimirDenegacion, setImprimirDenegacion] = useState(false)
+  const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean } | null>(null)
 
   function updateSeccion(key: SeccionKey, val: string) {
     setSecciones(s => ({ ...s, [key]: val }))
@@ -187,6 +189,10 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
 
     // Flags de tracking para diferenciar errores
     let pdfGenerated = false
+    // El blob y el desenlace de la persistencia se leen en el finally para
+    // montar el modal posterior a la generación. Ver ModalDocumentoGenerado.
+    let pdfBlob: Blob | null = null
+    let guardado = false
 
     try {
       // 4. PDF PRIMERO — si falla, abortamos antes de persistir.
@@ -216,7 +222,7 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
         telefono: consultorioActivo.telefono,
       } : undefined
 
-      const { storagePath } = await generarPdf({
+      const { blob, storagePath } = await generarPdf({
         tipo: 'consentimiento_informado',
         pacienteId,
         medico: medicoData,
@@ -230,9 +236,13 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
         logoUrl,
         filename: generateDocFileName(paciente, 'Consentimiento_Informado'),
         consultorio: consultorioData,
+        // El búnker offline queda intacto: sigue entregando el PDF él mismo y
+        // no monta el modal — onOfflineSave desmonta el formulario al guardar.
+        entregar: !!offlineMode,
       })
 
       pdfGenerated = true
+      pdfBlob = blob
 
       // 5. Persistencia
       if (offlineMode) {
@@ -266,6 +276,10 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
         const { error } = await supabase.from('documentos').insert(insertPayload)
         if (error) throw error
 
+        // Sin storagePath la fila se inserta igual pero sin PDF en Storage:
+        // mobileShare captura el error de subida y no lo relanza. El documento
+        // no queda recuperable desde la lista y el modal tiene que decirlo.
+        guardado = storagePath !== null
         toast.success('Consentimiento guardado')
       }
     } catch (err) {
@@ -280,6 +294,9 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
       console.error('[ConsentimientoInformadoForm] imprimir falló:', err)
     } finally {
       setImprimiendo(false)
+      // También cuando la persistencia falló: el PDF existe y con el paciente
+      // enfrente lo urgente es poder imprimirlo.
+      if (pdfBlob && !offlineMode) setDocGenerado({ blob: pdfBlob, guardado })
     }
   }
 
@@ -434,6 +451,14 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
           : <><Printer size={18} /> Generar Consentimiento Informado</>
         }
       </button>
+
+      <ModalDocumentoGenerado
+        open={docGenerado !== null}
+        onClose={() => setDocGenerado(null)}
+        blob={docGenerado?.blob ?? null}
+        titulo="Consentimiento informado"
+        guardadoEnExpediente={docGenerado?.guardado ?? false}
+      />
     </div>
   )
 }
