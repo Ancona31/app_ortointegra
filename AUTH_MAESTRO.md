@@ -145,6 +145,18 @@ escrito y no se "descubran" otra vez.
    `SessionGuard.tsx` no la menciona. O el auto-logout al cerrar navegador
    no existe, o vive en otro sitio — sin determinar. No tocar sin decidir
    cuál de las dos.
+4. **LATENCIA PERCIBIDA EN LOGIN Y LOGOUT — observación de Angel,
+   2026-08-05.** Textual: *el login y el logout se sienten lentos; a veces
+   hacen falta dos o tres clics para que respondan.* **Sin causa
+   confirmada.** No la explica ninguno de los defectos hallados en la
+   auditoría: el limitador no bloquea hasta el 6.º intento, y la fila
+   duplicada del logout no añade latencia perceptible. Hipótesis abiertas:
+   encadenamiento de peticiones, arranque en frío de las rutas de API en
+   Vercel, o algo no auditado en el flujo de logout.
+   **Se MIDE en A3** (línea base en producción, previa al deploy, repetida
+   en A4) **y se DIAGNOSTICA en Etapa D** (auditoría del flujo de logout).
+   Queda anotada aquí para que no se pierda si alguien lee solo esta
+   sección.
 
 ---
 
@@ -516,6 +528,27 @@ la lista pública (una línea, inevitable).
   el índice es al menos USABLE.
 - **A3 · Deploy 1.** Módulo lib/auth + endpoint + cirugía page.tsx +
   línea middleware. Matriz §6-A completa en PREVIEW antes de main.
+
+  📏 **PASO PREVIO AL DEPLOY — LÍNEA BASE DE LATENCIA (2026-08-05).**
+  Antes de desplegar el endpoint nuevo, medir en **PRODUCCIÓN** el login
+  actual: tiempo desde el clic en «Iniciar sesión» hasta la llegada a
+  `/inicio`, **y desglose por petición** — las cuatro que hay hoy: 2×
+  `/api/auth/rate-limit`, 1× GoTrue `/auth/v1/token`, 1×
+  `/api/auth/audit-login`. **Mínimo 3 mediciones**, anotando en cada una
+  si la ruta venía **fría o caliente**.
+
+  *Razón:* Angel reporta (2026-08-05) **latencia percibida en login y
+  logout — a veces necesita dos o tres clics para que responda**. **No hay
+  causa confirmada**, y ninguno de los defectos hallados en la auditoría
+  la explica: el limitador no bloquea hasta el 6.º intento, y la fila
+  duplicada del logout no añade latencia perceptible. Hipótesis abiertas:
+  encadenamiento de peticiones, arranque en frío de las rutas de API en
+  Vercel, o algo no auditado en el flujo de logout.
+
+  El endpoint nuevo **colapsa 4 peticiones del navegador a 1**, así que
+  PODRÍA mejorarlo — pero **sin línea base no habrá forma de saberlo, y
+  tampoco de detectar una regresión**. Repetir la misma medición en **A4**
+  y comparar.
   ⚠️ **REQUISITO NO NEGOCIABLE (A1, 2026-08-05): encender el IP Address
   Forwarding EN ESTE MISMO DEPLOY**, ni antes ni después (razonamiento en
   el corolario de D7). Implica que el endpoint llame a GoTrue con **secret
@@ -564,6 +597,17 @@ la lista pública (una línea, inevitable).
 
 ### ETAPA D · Sesión e higiene NOM-024
 
+- **AUDITORÍA DEL FLUJO DE LOGOUT — nunca se ha hecho.** Va PRIMERA
+  dentro de D, antes que cualquier corrección. El logout es parte del
+  módulo de auth y **jamás ha sido revisado**: lo único que se sabe de él
+  es que escribe dos filas en `audit_log` (el `logLogin` de más en
+  `audit-login/route.ts:28` además del `logAudit('logout')` correcto de
+  `:31`). **No se ha auditado** qué hace antes de redirigir, si espera a
+  que terminen sus peticiones, ni de dónde sale la latencia que Angel
+  reporta (§1.4·4).
+  **La auditoría PRECEDE al fix:** primero se entiende el flujo completo,
+  después se corrige. Incluye **medir la latencia real del logout** con el
+  mismo método de la línea base de A3.
 - **Fix del logout que audita `login_exitoso`.** Prioridad alta dentro de
   D. **Precisado en A0 (2026-08-05): NO es un problema de vocabulario.**
   El literal `'logout'` ya existe en la unión `AuditAccion`
