@@ -2,11 +2,17 @@
  * Genera PDFs 100% en el CLIENTE con @react-pdf/renderer.
  * Sin dependencia del servidor — funciona online y offline.
  *
- * Estrategia de entrega:
- *  - Desktop: abre el PDF en pestaña nueva con el visor nativo del browser
- *             (el usuario decide imprimir/descargar/cerrar sin guardar)
- *  - Mobile:  navigator.share con File (estándar iOS/Android)
- *  - Fallback móvil: abre en pestaña nueva
+ * Estrategia de entrega: una sola, en todas las plataformas — abrir el PDF en
+ * una pestaña nueva con el visor nativo del navegador, desde donde el usuario
+ * decide imprimir, descargar o cerrar sin guardar.
+ *
+ * Hubo una segunda rama, para móvil, que ofrecía la hoja de compartir del
+ * sistema vía navigator.share. Se eliminó: entraba por detección de user agent
+ * (que no reconocía al iPad desde iPadOS 13) y, sobre todo, navigator.share
+ * exige activación transitoria igual que la apertura de pestaña. Como la fase 6
+ * corre después de segundos de trabajo asíncrono, el gesto ya está gastado, el
+ * share lanza NotAllowedError y caía al mismo abrirBlobEnPestana. Aterrizaba
+ * donde aterriza esto, con un rodeo.
  *
  * generarPdf() — genera PDF vía react-pdf en todas las plataformas.
  */
@@ -109,11 +115,21 @@ async function buildClientElement(
 }
 
 /**
- * Abre el blob en una pestaña nueva con el visor PDF nativo del browser.
- * Usa <a target="_blank"> (no window.open) porque el click programático
- * en anchor sobrevive trabajo async sin ser bloqueado por popup blockers
- * en Mac Chrome/Safari. El usuario decide desde el visor si imprimir,
- * descargar o cerrar sin guardar.
+ * Abre el blob en una pestaña nueva con el visor PDF nativo del navegador.
+ * El usuario decide desde el visor si imprimir, descargar o cerrar sin guardar.
+ *
+ * Usa <a target="_blank"> y no window.open porque el clic programático en un
+ * anchor pasa el bloqueo de popups en más navegadores.
+ *
+ * ⚠️ NO SOBREVIVE AL TRABAJO ASÍNCRONO — esta función decía lo contrario y era
+ * falso. Sin activación transitoria viva, Safari bloquea la apertura igual: en
+ * escritorio con aviso de ventana bloqueada, en iOS y en la PWA en silencio. Es
+ * el bug que se corrigió en los 8 formularios de documentos moviendo la
+ * apertura a un botón que el médico pulsa cuando el trabajo ya terminó (ver
+ * ModalDocumentoGenerado.tsx).
+ *
+ * Es decir: llamar a esto DESPUÉS de un await equivale a no entregar el PDF en
+ * Safari. Todo llamador nuevo debe dispararlo desde el handler del gesto.
  */
 function abrirBlobEnPestana(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
@@ -133,32 +149,6 @@ function abrirBlobEnPestana(blob: Blob, filename: string) {
   // El nombre real ya quedó persistido en Storage; descargas desde el visor
   // recibirán nombre genérico, aceptable.
   void filename
-}
-
-/**
- * Compartir en móvil con navigator.share (iOS/Android).
- * Fallback a descarga directa si share no está disponible o falla.
- */
-async function compartirODescargar(blob: Blob, filename: string) {
-  const file = new File([blob], filename, { type: 'application/pdf' })
-
-  if (
-    typeof navigator.share === 'function' &&
-    typeof navigator.canShare === 'function' &&
-    navigator.canShare({ files: [file] })
-  ) {
-    try {
-      // eslint-disable-next-line no-console
-      console.log('[generarPdf] intentando navigator.share (iOS/Android)')
-      await navigator.share({ files: [file], title: filename.replace('.pdf', '') })
-      return
-    } catch (err) {
-      // NotAllowedError: user gesture perdido, o AbortError: usuario canceló
-      // eslint-disable-next-line no-console
-      console.warn('[generarPdf] navigator.share falló, fallback a descarga:', err)
-    }
-  }
-  abrirBlobEnPestana(blob, filename)
 }
 
 export interface GenerarPdfResult {
@@ -284,16 +274,7 @@ export async function generarPdf(params: {
     // un gesto del usuario. Ver la nota en la firma de generarPdf.
     if (entregar) {
       phase = 'disparando entrega'
-      const isMobile =
-        /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-        window.innerWidth < 768
-
-      const finalName = filename ?? defaultFilename
-      if (isMobile) {
-        await compartirODescargar(pdfBlob, finalName)
-      } else {
-        abrirBlobEnPestana(pdfBlob, finalName)
-      }
+      abrirBlobEnPestana(pdfBlob, filename ?? defaultFilename)
     }
 
     console.log('[generarPdf] 6/6 completado', storagePath ? '(con Storage)' : '(sin Storage)', entregar ? '' : '(sin entrega)')
