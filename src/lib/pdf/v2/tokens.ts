@@ -201,6 +201,83 @@ export const TIPOGRAFIA = {
 
 export type RolTipograficoNombre = keyof typeof TIPOGRAFIA
 
+/**
+ * Un rol de la escala, ya en las unidades de react-pdf y listo para pasarse a
+ * `style`. Lo devuelve `estiloTipografico()`.
+ */
+export interface EstiloTipografico {
+  readonly fontFamily: Familia
+  readonly fontSize: number
+  /**
+   * MULTIPLICADOR del cuerpo, que es lo que react-pdf entiende por `lineHeight`.
+   * Ausente cuando el rol no declara interlineado (`marca.estado`): así manda el
+   * valor por defecto del renderer en vez de uno inventado aquí.
+   */
+  readonly lineHeight?: number
+  readonly fontWeight: Peso
+  /** En pt, que es lo que react-pdf entiende por `letterSpacing`. */
+  readonly letterSpacing: number
+  /** Ausente cuando el rol no se rellena: `marca.estado` va de contorno. */
+  readonly color?: string
+}
+
+/**
+ * Resuelve el nombre de color de un rol a un hex.
+ *
+ * Un rol en `acento.tinta` al que no se le pasa acento cae a `tinta.negra`: es
+ * el mismo criterio que un hex inválido en `resolverAcento()` — negro legible,
+ * nunca un color roto.
+ */
+function colorDeRol(color: ColorDeTexto, acento?: AcentoResuelto): string | undefined {
+  switch (color) {
+    case 'tinta.negra':
+      return TINTA.negra
+    case 'tinta.secundaria':
+      return TINTA.secundaria
+    case 'tinta.etiqueta':
+      return TINTA.etiqueta
+    case 'tinta.papel':
+      return TINTA.papel
+    case 'acento.tinta':
+      return acento?.tinta ?? TINTA.negra
+    case 'contorno':
+      return undefined
+  }
+}
+
+/**
+ * LA ÚNICA PUERTA A LA ESCALA TIPOGRÁFICA. Un componente pide un rol y recibe el
+ * estilo listo; ningún componente vuelve a dividir ni multiplicar nada.
+ *
+ * Existe porque el spec y react-pdf no hablan en las mismas unidades y son DOS
+ * conversiones, no una:
+ *
+ *   `lineHeight`    react-pdf = multiplicador · spec = pt  → interlineado / cuerpo
+ *   `letterSpacing` react-pdf = pt            · spec = em  → tracking × cuerpo
+ *
+ * Con veinte componentes por delante, cada uno repitiendo esas dos operaciones,
+ * la regla de tres estaba garantizada. Si ves `/ cuerpo` o `* cuerpo` en un
+ * componente, sobra: es esta función.
+ *
+ * Pura y determinista. El `acento` solo hace falta para los roles cuyo color es
+ * `acento.tinta` — `seccion.numero`, `entrada.numero` y `folio`.
+ */
+export function estiloTipografico(
+  rol: RolTipograficoNombre,
+  acento?: AcentoResuelto,
+): EstiloTipografico {
+  const r = TIPOGRAFIA[rol]
+  const color = colorDeRol(r.color, acento)
+  return {
+    fontFamily: r.familia,
+    fontSize: r.cuerpo,
+    ...(r.interlineado === null ? {} : { lineHeight: r.interlineado / r.cuerpo }),
+    fontWeight: r.peso,
+    letterSpacing: r.tracking * r.cuerpo,
+    ...(color === undefined ? {} : { color }),
+  }
+}
+
 /** Roles que llevan cifras tabulares (I.1.4, párrafo bajo la escala). */
 export const CIFRAS_TABULARES = [
   'dato',
