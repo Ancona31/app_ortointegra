@@ -533,7 +533,7 @@ acento, y dentro el logo del médico o su monograma.
 | Relleno del disco | `acento.velo` |
 | Diámetro del círculo interior | 47 pt |
 | Anillo interior | 0.5 pt, `tinta.reglaSuave` |
-| Caja útil del logo | 33 × 19 pt, centrada |
+| Caja del logo | El círculo interior completo. **No hay caja aparte** |
 | Monograma | Archivo 19 pt, peso 600, interlineado 1, `acento.tinta` |
 
 Holgura entre anillos: 4.5 pt por lado. Los grosores de 1.5 y 0.5 pt son
@@ -541,8 +541,29 @@ geometría de este componente, **no miembros de `filete.*`** (I.1.6).
 
 **Reglas**
 
-1. El logo se escala **para caber sin recortar**. Nunca se recorta al círculo,
-   nunca se deforma. La caja interior es fija; el logo cede.
+1. **El logo llena el círculo interior y se recorta a él**, centrado y
+   conservando su proporción. Se escala por su lado menor hasta cubrir los 47 pt
+   y lo que sobra del lado mayor queda fuera del círculo. Nunca se deforma: el
+   recorte es la alternativa a estirar. El médico sube el logo que tenga —
+   cuadrado, apaisado o vertical— y el panel se adapta; no al revés.
+
+   > **CORRIGE 2.A** — la versión anterior de esta ficha declaraba una «caja útil
+   > del logo» de 33 × 19 pt con la regla «se escala para caber sin recortar,
+   > nunca se recorta al círculo». **Las dos cosas quedan retiradas.** Esa caja
+   > deja el logo en un cuarto de la superficie del panel: una miniatura en el
+   > centro de un círculo vacío.
+   >
+   > La corrección sale de comparar contra v1 al implementar el componente: el
+   > spec describía un comportamiento **que la app nunca tuvo** y que empeora el
+   > resultado. v1 recorta al círculo con `overflow: hidden` sobre el envoltorio
+   > redondo desde la primera versión.
+   >
+   > Nota de fidelidad: v1 no cubre el círculo entero — mete la imagen en una
+   > caja de 80 × 40 pt y la recorta después, así que un logo cuadrado le queda
+   > al 68 % del diámetro sin recortarse y solo lo más apaisado que ~1.5:1 pierde
+   > bordes. Esta ficha declara el comportamiento **completo** —cubrir y
+   > recortar, cualquier proporción—, que es el que v1 aproximaba con una caja
+   > intermedia y el que hace que el logo se vea del tamaño del panel.
 2. El ráster llega **normalizado desde el ingest del perfil**. El render no
    normaliza, no redimensiona y no convierte formatos: si el asset no sirve,
    la variante es `monograma`.
@@ -2191,6 +2212,7 @@ registran aquí para que nadie las lea como reinterpretaciones ni intente
 | P1-1 | El bloque de firma mide **130.8 pt**, no 131.8, y el umbral **200.8**, no 201.8. Era doble conteo de `filete.fino` | La fórmula, implementada, daba los tres roles 1 pt por debajo de su valor declarado, con desfase constante | I.1.9 · A D43 |
 | P1-2 | Las nueve separaciones entre bloques pasan de prosa sin nombre a tokens con nombre, grupo `transicion.*` | Sin nombre de token, el paso de componentes las habría escrito como literales, que es lo que I.1 prohíbe | I.1.7 · 2.C |
 | P1-3 | **`espacio.20` retirado.** Su único uso pasa a `transicion.tituloRiel` | Se instanciaba en dos sitios sin ser miembro de la escala de ocho: no había nada que importar | I.1.7 · 2.C · II.8 §5 |
+| P2-1 | **El logo llena el círculo interior y se recorta a él.** Retiradas la «caja útil del logo» de 33 × 19 pt y la regla de no recortar | Al construir 2.A se comparó contra v1: el spec describía un comportamiento que la app nunca tuvo y que deja el logo en un cuarto del panel | 2.A |
 
 Una cuarta, menor, sin fila propia: `caja.alto` queda marcado en I.1.1 como
 derivado que **se implementa como fórmula**. El Paso 0 lo había escrito como
