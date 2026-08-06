@@ -31,6 +31,7 @@ import {
 import type { ReactElement } from 'react'
 import PanelCircular from '@/lib/pdf/v2/PanelCircular'
 import Membrete, { type MedicoMembrete } from '@/lib/pdf/v2/Membrete'
+import TituloDocumento from '@/lib/pdf/v2/TituloDocumento'
 import { registrarFuentesV2 } from '@/lib/pdf/v2/fonts'
 import {
   CAJA,
@@ -124,6 +125,15 @@ const estilos = StyleSheet.create({
   },
   muestra: {
     marginTop: ESPACIO[32],
+  },
+  /**
+   * Marca de arranque: dónde empezaría el bloque siguiente. Sirve para medir el
+   * hueco que deja cada variante de 2.C. Andamiaje del taller, no chasis.
+   */
+  marcaArranque: {
+    width: '100%',
+    height: GUIA.grosor,
+    backgroundColor: GUIA.caja,
   },
 })
 
@@ -229,6 +239,85 @@ function HojaTaller({
             va como barra sólida; el resto de la línea es negro y no cambia con el
             acento. La variante «continuacion» imprime nombre y cédula principal,
             sin panel y sin riel de consultorio.
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <Rotulo>2.C titulo · fijo, con subtitulo</Rotulo>
+          <View style={estilos.muestra}>
+            <TituloDocumento
+              variante="fijo"
+              acento={acento}
+              titulo="Solicitud de laboratorio"
+              subtitulo="Estudios de laboratorio clínico"
+            />
+          </View>
+
+          <Rotulo>2.C titulo · variable largo, con fecha</Rotulo>
+          <View style={estilos.muestra}>
+            <TituloDocumento
+              variante="variable"
+              acento={acento}
+              titulo="Constancia de atención médica y recomendaciones laborales"
+              fecha="4 ago 2026"
+            />
+          </View>
+
+          <Text style={estilos.nota}>
+            2.C · TituloDocumento. El título se guarda en capitalización de oración
+            y se compone en mayúsculas aquí, no en la base (regla 1 del preámbulo de
+            II). El variable rompe a dos líneas y la fecha se queda en la PRIMERA,
+            nunca en la segunda ni centrada entre las dos.
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <View>
+            <Rotulo>fijo · membrete → titulo → arranque</Rotulo>
+            <View style={estilos.muestra}>
+              <Membrete
+                variante="continuacion"
+                acento={acento}
+                medico={medicoMembrete(medico)}
+              />
+              <TituloDocumento
+                variante="fijo"
+                acento={acento}
+                titulo="Solicitud de laboratorio"
+              />
+              <View style={estilos.marcaArranque} />
+            </View>
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>ausente · membrete → titulo → arranque</Rotulo>
+            <View style={estilos.muestra}>
+              <Membrete
+                variante="continuacion"
+                acento={acento}
+                medico={medicoMembrete(medico)}
+              />
+              <TituloDocumento variante="ausente" />
+              <View style={estilos.marcaArranque} />
+            </View>
+          </View>
+
+          <Text style={estilos.nota}>
+            Las dos muestras de arriba son el mismo membrete con las dos variantes
+            del título. La línea azul marca dónde arrancaría el bloque siguiente:
+            la diferencia entre las dos es exactamente el bloque del título más su
+            filete, sin banda vacía residual. En «ausente» el filete del membrete
+            hace doble trabajo.
           </Text>
         </View>
       </Page>
