@@ -34,6 +34,7 @@ import Membrete, { type MedicoMembrete } from '@/lib/pdf/v2/Membrete'
 import TituloDocumento from '@/lib/pdf/v2/TituloDocumento'
 import BloquePaciente from '@/lib/pdf/v2/BloquePaciente'
 import Campo from '@/lib/pdf/v2/Campo'
+import RielDatos from '@/lib/pdf/v2/RielDatos'
 import { registrarFuentesV2 } from '@/lib/pdf/v2/fonts'
 import {
   CAJA,
@@ -196,6 +197,22 @@ const PACIENTE_FICTICIO = {
 
 /** Cadena para comparar familias: la misma palabra en las dos celdas vecinas. */
 const CADENA_COMPARACION = 'Gonartrosis bilateral'
+
+/**
+ * Celdas sueltas para mirar 2.F sin pasar por 2.D. Los anchos son enteros de
+ * `riel.celda` y suman 12 por fila, que es la regla 1 de la ficha.
+ */
+const CELDAS_2F = {
+  fila1: [
+    { clave: 'servicio', etiqueta: 'Servicio', valor: 'Ortopedia', columnas: 5 },
+    { clave: 'turno', etiqueta: 'Turno', valor: 'Matutino', columnas: 4 },
+    { clave: 'cama', etiqueta: 'Cama', valor: '204-B', columnas: 3 },
+  ],
+  fila2: [
+    { clave: 'ayuno', etiqueta: 'Ayuno', valor: '8 horas', columnas: 6 },
+    { clave: 'traslado', etiqueta: 'Traslado', valor: 'Camilla', columnas: 6 },
+  ],
+} as const
 
 function HojaTaller({
   medico,
@@ -459,6 +476,63 @@ function HojaTaller({
             segundo mide 4 pt más porque el espacio de escritura es más alto que un
             renglón de texto. No lleva ninguna leyenda de error: el rótulo y la
             línea ya dicen qué falta y dónde se escribe.
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <Rotulo>2.F riel · variante celdas, dos filas</Rotulo>
+          <View style={estilos.muestra}>
+            <RielDatos
+              variante="celdas"
+              filas={[CELDAS_2F.fila1, CELDAS_2F.fila2]}
+            />
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.F riel · variante una linea</Rotulo>
+            <View style={estilos.muestra}>
+              <RielDatos variante="unaLinea" celdas={CELDAS_2F.fila1} />
+            </View>
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.F riel · celdas, con la del medio colapsada</Rotulo>
+            <View style={estilos.muestra}>
+              <RielDatos
+                variante="celdas"
+                filas={[
+                  [
+                    CELDAS_2F.fila1[0],
+                    { ...CELDAS_2F.fila1[1], valor: undefined },
+                    CELDAS_2F.fila1[2],
+                  ],
+                  CELDAS_2F.fila2,
+                ]}
+              />
+            </View>
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.D sobre 2.F · el riel del paciente, sin cambios</Rotulo>
+            <View style={estilos.muestra}>
+              <BloquePaciente variante="completo" {...PACIENTE_FICTICIO} />
+            </View>
+          </View>
+
+          <Text style={estilos.nota}>
+            2.F · RielDatos. Las dos primeras muestras son la misma fila con las
+            dos variantes de composición: arriba dentro de un riel de dos filas,
+            debajo como riel de una sola. En la tercera, «Turno» no trae dato:
+            desaparece y «Servicio» y «Cama» se ensanchan hasta llenar el riel, sin
+            dejar hueco ni regla suelta. La cuarta es 2.D compuesto ya sobre 2.F —
+            sus reglas verticales caen en 202.5, 283.5 y 364.5 pt, que son 5, 2, 2
+            y 3 columnas de «riel.celda», exactamente donde caían cuando 2.D
+            componía su propio riel.
           </Text>
         </View>
       </Page>

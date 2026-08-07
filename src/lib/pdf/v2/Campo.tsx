@@ -101,13 +101,32 @@ const estilos = StyleSheet.create({
   },
 })
 
+/**
+ * ¿El campo trae dato? Ausente y vacío son lo mismo.
+ *
+ * EXPORTADA A PROPÓSITO, y es lo único que se exporta además del componente.
+ * `RielDatos` (2.F) tiene que tomar esta misma decisión ANTES de montar la celda,
+ * porque colapsar dentro de un riel no es dejar de pintar un rótulo: es quitar la
+ * celda entera —su ancho, su padding y su regla— y repartir el sobrante entre las
+ * que quedan. Eso es geometría del riel y no puede vivir aquí.
+ *
+ * Lo que sí vive aquí, y una sola vez en todo el sistema, es la REGLA de qué
+ * cuenta como dato ausente. Si el riel se escribiera su propia versión, bastaría
+ * con que una de las dos dejara de recortar los espacios para que un campo con un
+ * espacio en blanco colapsara en un sitio y pintara un rótulo vacío en el otro —
+ * que es el defecto §8.8 apareciendo por la costura entre dos componentes.
+ */
+export function tieneValor(valor: string | undefined): valor is string {
+  return valor !== undefined && valor.trim() !== ''
+}
+
 /** 2.E · `Campo`. Devuelve `null` en el estado `vacío opcional` (regla 4). */
 export default function Campo({
   etiqueta,
   valor,
   requerido,
 }: CampoProps): ReactElement | null {
-  const hayValor = valor !== undefined && valor.trim() !== ''
+  const hayValor = tieneValor(valor)
 
   // Regla 1 y regla 4 en la misma línea: sin valor y sin exigencia, no queda ni
   // rótulo ni hueco. Antes de este `return` no se ha pintado nada.

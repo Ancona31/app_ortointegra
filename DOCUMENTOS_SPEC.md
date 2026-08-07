@@ -185,7 +185,7 @@ láminas de diseño.
 | Especialidad | `medico.especialidad` | Archivo | 7.5 / 12 pt | 500 | 0.34 em | `tinta.secundaria` |
 | Contacto y cédulas | `medico.credencial` | Archivo | 7.5 / 11 pt | 400 | 0.06 em | `tinta.secundaria` |
 | Título de documento | `titulo.documento` | Archivo | 17 / 20 pt | 600 | 0.02 em | `tinta.negra` |
-| Subtítulo de documento | `titulo.subtitulo` | IBM Plex Sans | 10.5 / 15 pt | 400 | 0 | `tinta.secundaria` |
+| Subtítulo de documento o de sección | `titulo.subtitulo` | IBM Plex Sans | 10.5 / 15 pt | 400 | 0 | `tinta.secundaria` |
 | Encabezado de sección | `titulo.seccion` | Archivo | 10 / 14 pt | 600 | 0.14 em | `tinta.negra` |
 | Número de sección | `seccion.numero` | Archivo | 15 / 15 pt | 600 | 0 | `acento.tinta` |
 | Etiqueta en versalita | `etiqueta` | Archivo | 7 / 11 pt | 600 | 0.22 em | `tinta.etiqueta` |
@@ -228,6 +228,96 @@ etiquetas. Ver I.3.1 para su efecto sobre la extracción de texto.
 
 **Medida.** 486 pt a 11.5 pt son ≈ 85 caracteres. El handoff decía ≈ 93; el
 diseño mide 85. Se registra el valor medido.
+
+#### Desviaciones declaradas de un rol
+
+Un componente puede necesitar un rol de la escala **con un cambio enumerado**.
+Eso no es un rol nuevo y no se le pone nombre de token: se cita el rol y se
+declara qué cambia y por qué, en la ficha del componente. El patrón lo fijó la
+zona 2 de 2.M, que pide `pie` y declara los dos valores que altera.
+
+**Una desviación no asciende a rol** hasta que un segundo componente necesite
+exactamente la misma, **color incluido**. Mientras la use uno solo, un nombre
+propio en I.1.4 sería un rol sin plural; y si dos la usan con distinta tinta, lo
+que comparten no es un rol, porque un rol lleva su color dentro.
+
+| Desviación | Base | Qué cambia | Quién la usa |
+|---|---|---|---|
+| `dato` en peso 500 | `dato` | peso 500 | 2.D, celda de paciente |
+| `etiqueta` sobre negativo | `etiqueta` | color → `tinta.papel` | 2.H |
+| **`pie` en versalita** | `pie` | peso 600 · tracking `0.22 em` | 2.K · 2.M zona 2 · 2.N |
+| **`seccion.numero` a 26 pt** | `seccion.numero` | cuerpo 26 pt | 2.Q |
+
+**`pie` en versalita** es la única con más de un consumidor, y aun así **no sube
+a rol**: los tres la usan con **color distinto**, que lo fija el sitio —
+`tinta.papel` sobre la banda de acento (2.M), `tinta.secundaria` en el área de
+contenido (2.K y 2.N)—. Un rol lleva su color dentro; esto no puede. Los dos
+valores que sí comparte son los de la versalita del sistema: peso 600 y tracking
+`0.22 em` son los de `etiqueta` y `firma.rol`.
+
+**`seccion.numero` a 26 pt** cambia solo el cuerpo. Familia, peso, tracking y
+`acento.tinta` los sigue poniendo el rol, y el interlineado sale de la razón 1
+que el rol declara (15 / 15), así que a 26 pt es 26.
+
+#### Las once piezas que no tenían rol, y cómo se cerraron
+
+Salieron del barrido de las veinte fichas de I.2 (anexo A, P2-11) y se cerraron
+**derivando del propio spec**, no eligiendo (anexo A, P2-14). Ninguna necesitó un
+token nuevo: los valores ya estaban en el diseño y lo que faltaba era el nombre.
+Cada fila dice qué la sostiene — una jerarquía ya declarada, un rol vecino que
+hace el mismo trabajo, o una regla del sistema.
+
+**Diez de once.** El que falta, H9, y el que apareció al cerrar H4 están abajo.
+
+| # | Pieza | Ficha | Cerrada como | De qué se deriva |
+|---|---|---|---|---|
+| H1 | Filete de `instrucciones` | 2.I | **`filete.acento`** (2 pt) | La jerarquía de 2.I es alarma > instrucciones > cita y su regla 1 dice que **la carga el grosor**. Entre `filete.alarma` (3) y `filete.cita` (1.6) la escala tiene un solo miembro |
+| H2 | Encabezado de bloque del parser | 2.J | **`etiqueta`** | Es la versalita con la que el sistema nombra lo que va debajo. Su gemelo `firma.rol` —mismos valores, otro nombre— ya hace ese trabajo fuera de un campo. No puede ser `titulo.seccion`: el bloque vive **dentro** de una sección ya abierta por 2.P y compartir rol aplanaría un nivel |
+| H3 | Sangría del ítem colgante | 2.J | **`reticula.riel` + `reticula.medianil`** | Un ítem con raya colgada es la anatomía de 2.G y 2.P: riel del número + medianil + caja de texto. I.1.3 declara que esa suma **es** `reticula.columna` |
+| H4 | Ancla → secundario, secundario → nota | 2.G | **`espacio.4`** y **`espacio.8`** | Mismo criterio que el subtítulo de 2.C. El secundario es la segunda línea del mismo dato y va al mínimo de la escala; la nota cambia de familia y de registro, así que sube un miembro. Dos niveles, los dos menores de la escala |
+| H5 | `pie` en versalita | 2.K · 2.M | **Desviación declarada**, tabla de arriba | El patrón de 2.M, aplicado a 2.K. Los dos valores que comparte son los de la versalita del sistema |
+| H6 | Número de apertura, 26 pt | 2.Q | **`seccion.numero` a 26 pt**, desviación declarada | Es el número de una sección, igual que el de 2.P. Suena más fuerte porque el propósito declarado de 2.Q es ser más fuerte que 2.P, y la ficha ya fija el cuerpo |
+| H7 | Rótulo de sección · subtítulo de lector | 2.Q | **`titulo.seccion`** · **`titulo.subtitulo`** | 2.Q es 2.P un nivel arriba y 2.P compone su título con `titulo.seccion`. El subtítulo es la única línea secundaria del sistema —humanista, `tinta.secundaria`, bajo un título— y su alcance se amplía a sección en la tabla de arriba |
+| H8 | Total del recibo, Archivo 22 / 600 | 2.T | **Geometría del componente**, declarada entera | Criterio de los anillos de 2.A: un valor que usa un solo componente en un solo sitio no es un rol. La regla 2 de 2.T lo dice ella misma — no hay segundo uso |
+| H9 | Ancho de la caja de importes | 2.T | **NO DEFINIDO** | Ver abajo |
+| H10 | Los tres avisos de pie | 2.N | **`pie` en versalita**, en `tinta.secundaria` | Misma posición que el contador de 2.K —al pie del área de contenido, no en la banda—, mismo registro y misma forma de cadena. Pueden salir en la misma hoja: si no comparten tratamiento, compiten |
+| H11 | Contorno «negro al 45 %» | 2.S | **Geometría derivada de 2.S**: `tinta.negra` al 45 % sobre blanco, por mezcla opaca | La misma derivación que `acento.velo`, que es `acento.base` al 6 % sobre blanco. Mezcla y no alfa, por el mismo motivo de I.1.8: un alfa depende del visor y del driver de impresión |
+
+**H9 queda NO DEFINIDO.** Los 246 pt de la caja de importes de 2.T citan
+`manuscrito.ancho`, que I.1.5 reserva a «espacios destinados a llenarse con
+pluma» — y una caja de importes impresos no lo es. Tampoco se puede derivar de
+la retícula: 246 no es un número entero de columnas de ninguna de las dos
+—`reticula.columna` daría 238.5 con 6 columnas o 279.75 con 7, y `riel.celda`
+daría 243 con 6—, así que I.1.3 no lo produce. **Lo que falta:** medir la caja de
+totales en el Recibo aprobado. Si mide 246, es geometría de 2.T con nombre propio
+y la coincidencia con `manuscrito.ancho` se registra como `COINCIDENCIA`; si mide
+otra cosa, el 246 era un token al que alguien echó mano y se sustituye. No se
+puede resolver sin el archivo de diseño.
+
+**Y uno nuevo, que apareció al cerrar H4: el aire entre entradas de 2.G también
+queda NO DEFINIDO.** Está acotado —tiene que ser mayor que `espacio.8`, o la nota
+de una entrada se pegaría a la regla tanto como al ancla de la que cuelga— pero
+nada del spec lo fija, y elegir `espacio.12` por ser el siguiente miembro sería
+apilar una decisión encima de un valor ya derivado. **Lo que falta:** medir la
+densidad de una lista de tres medicamentos en la Receta aprobada. Detalle en la
+ficha de 2.G.
+
+#### Tres tratamientos que son geometría de componente POR DECISIÓN
+
+El monograma de 2.A (Archivo 19 / 600), la celda de diagnóstico de 2.D (IBM Plex
+Sans 11 / 16) y la leyenda de 2.R (IBM Plex Sans 9 / 13) **no están en esta
+escala y no es un olvido.** Los tres están declarados enteros en su ficha
+—familia, cuerpo, interlineado, peso, tracking y color— y los tres los usa un
+solo componente en un solo sitio.
+
+Es la misma línea que I.1.7 traza para el espaciado: la escala gobierna lo que se
+comparte, y la geometría interna de un componente se declara en su ficha aunque
+no sea miembro de nada. **No los «corrijas» metiéndolos en I.1.4.** Un rol existe
+para tener plural; subir aquí un valor con un único consumidor no ordena el
+sistema, solo mueve el sitio donde hay que ir a leerlo.
+
+Se revisa si aparece un cuarto: tres excepciones son tres decisiones, cuatro
+empiezan a ser una escala incompleta.
 
 ### I.1.5 · Escritura manuscrita
 
@@ -662,6 +752,15 @@ La línea fina bajo el filete tiene dos columnas: a la izquierda domicilio y
 teléfono más universidad, a la derecha las cédulas alineadas a la derecha, con
 regla vertical de `filete.regla` en `tinta.hairline` a su izquierda.
 
+> **La línea fina NO es un `RielDatos`**, aunque el contenido de arriba la llame
+> «riel del consultorio» y la tabla de variantes de 2.F la reclamara como
+> consumidora de `una línea`. No tiene rótulos, sus anchos no salen de
+> `riel.celda` —la columna de contacto es flexible y la de cédulas se dimensiona
+> por su contenido—, su texto va en `medico.credencial` y una de sus dos columnas
+> apila tres renglones, que no es «un dato corto con su etiqueta». Su geometría es
+> la de la tabla de arriba y se compone aquí. Lo único que comparte con 2.F es la
+> regla vertical, que es un token y no un componente.
+
 > `CONCILIA D23` — Laboratorio y Recibo emiten hoy **sin línea de cédulas**.
 > No es una variante: es el defecto nivel 1 de I.3.7. Los ocho formatos llevan
 > membrete completo.
@@ -785,9 +884,10 @@ separados: paciente · edad · sexo · expediente · diagnóstico · fecha · ho
 | Fecha | 4 | `dato` |
 | Hora | 3 | `dato` |
 
-Padding de celda `8 10 10`, regla izquierda de `filete.regla` en
-`tinta.hairline` salvo en la primera de cada fila, regla superior en la segunda
-fila. El riel abre y cierra con `filete.fino` en `tinta.negra`.
+La composición del riel —padding de celda, reglas, filetes de apertura y cierre,
+y el reparto de anchos al colapsar— **la declara 2.F**, que es de quien 2.D toma
+el riel. Aquí solo viven las siete celdas de arriba y sus dos excepciones
+tipográficas.
 
 > **La celda de diagnóstico no es un rol de la escala.** No aparece en la tabla
 > de I.1.4 y no debe subir a ella: es geometría interna de este componente, que
@@ -811,8 +911,16 @@ fila. El riel abre y cierra con `filete.fino` en `tinta.negra`.
 | `completo` | Hoja 1 |
 | `reducido` | Hojas de continuación. Nombre y expediente en un riel de una línea |
 
-**Tokens que consume.** `RielDatos` (2.F) para su composición · `etiqueta.*` ·
-`dato.cuerpo` · `tinta.negra`.
+**Tokens que consume.** `RielDatos` (2.F) para su composición, y de él vienen las
+reglas, los filetes y el reparto de anchos. Propio de esta ficha: `riel.celda`
+—las columnas de la tabla de arriba—, los roles `etiqueta` y `dato`, y la
+excepción de familia del diagnóstico, declarada entera en la nota de arriba.
+
+> **CORRIGE 2.D** — la lista anterior pedía `etiqueta.*` —un comodín sobre un rol
+> que no tiene miembros que desplegar— y `dato.cuerpo`, un fragmento que no
+> existe. Es la **cuarta** de las cinco fichas ya implementadas con la misma lista
+> pre-escala, no la tercera: se descubrió al barrer de 2.F a 2.T y cruzar el
+> resultado contra las que ya estaban construidas (anexo A, P2-11).
 
 **Reglas**
 
@@ -904,25 +1012,83 @@ con su etiqueta.
 
 | Variante | Cuándo |
 |---|---|
-| `celdas` | Número de celdas por fila, declarado por el formato |
-| `una línea` | Riel comprimido de una sola fila (paciente reducido, consultorio en membrete) |
-| `sin contador` | El riel no participa del conteo de lista. Catálogo abierto — requerimientos especiales de Internamiento |
+| `celdas` | Varias filas. El número de celdas por fila lo declara el formato |
+| `una línea` | Riel comprimido de una sola fila. Hoy: `BloquePaciente` reducido |
 
-**Tokens que consume.** `filete.regla` · `tinta.hairline` · `etiqueta.cuerpo` ·
-`etiqueta.tracking` · `dato.cuerpo` · `reticula.columna` ·
-`reticula.medianil`.
+> **CORRIGE 2.F — las tres «variantes» no eran tres alternativas.** `celdas` y
+> `una línea` son formas de componer y se excluyen entre sí; `sin contador` **no
+> compone nada**: declara que el riel no participa del conteo de `ContadorLista`
+> (2.K regla 3), y un riel puede ser `celdas` **y** `sin contador` a la vez. No es
+> una tercera variante sino una propiedad ortogonal, y por eso baja a su propia
+> línea:
+>
+> **`sin contador`.** El riel no entra en el conteo de lista. Existe porque el
+> catálogo que presenta es abierto —el médico agrega y quita requerimientos
+> especiales de Internamiento— y «3 de 7» sería una cifra falsa. **No cambia nada
+> del render**, así que entra como prop cuando exista 2.K, que es quien la lee.
+> Implementarla antes sería una prop que nadie consulta.
+>
+> **Y `una línea` pierde un consumidor: la línea fina del membrete no es un
+> `RielDatos`.** No tiene rótulos, sus anchos no salen de `riel.celda` —la columna
+> de contacto es flexible y la de cédulas se dimensiona por contenido—, su texto
+> va en `medico.credencial` y una de sus dos celdas apila tres renglones, que no
+> es «un dato corto con su etiqueta». Meterla aquí obligaría a que las reglas 1 y
+> 2 de esta ficha llevaran excepciones, y un componente con excepciones en sus
+> reglas es el componente equivocado. Su geometría ya estaba declarada en 2.B —
+> medianil de 24 y sangría de regla de 12— y ahí se queda.
+
+**Tokens que consume.** `etiqueta` · `dato` —los dos roles de I.1.4, que traen
+familia, cuerpo, interlineado, peso, tracking y color— · `riel.celda` ·
+`filete.fino` y `tinta.negra` (apertura y cierre del riel) · `filete.regla` y
+`tinta.hairline` (reglas entre celdas y entre filas).
+
+> **CORRIGE 2.F** — la lista anterior tenía **dos** defectos. Pedía
+> `etiqueta.cuerpo`, `etiqueta.tracking` y `dato.cuerpo`, que son fragmentos de
+> rol y no existen. Y apoyaba el riel en `reticula.columna` y
+> `reticula.medianil`, que es **la retícula equivocada**: I.1.3 declara las dos
+> que conviven y dice cuál va aquí. Las celdas del riel se separan con una regla
+> vertical más padding, así que su partición es de doce partes iguales **sin
+> medianil**, `riel.celda` = 40.5 pt. Donde hay regla no hace falta medianil. La
+> regla 1 queda reescrita en consecuencia.
 
 **Reglas**
 
-1. Las celdas se apoyan en la retícula: su ancho es un número entero de
-   columnas más sus medianiles. Ningún ancho arbitrario.
+1. Las celdas se apoyan en `riel.celda`: su ancho es un número entero de
+   columnas de riel, **sin medianil que sumar**. Ningún ancho arbitrario.
 2. Las reglas entre celdas son `filete.regla` en `tinta.hairline`. **Nunca
    texto en `tinta.hairline`** (I.1.8).
 3. Si una celda colapsa por `Campo` vacío opcional, **las restantes
    redistribuyen** y el riel no deja hueco. Un riel con un agujero delata que
    faltaba un dato, que es justo lo que el colapso evita.
-4. La variante `sin contador` existe porque el catálogo que presenta es
-   abierto: el médico agrega y quita, y «3 de 7» sería una cifra falsa.
+4. **`Campo` (2.E) no compone las celdas de este riel, y no es un olvido.**
+   Colapsar dentro de un riel no es dejar de pintar un rótulo: es quitar la celda
+   entera —ancho, padding y regla— y repartir el sobrante, que es geometría de
+   aquí y no puede vivir en 2.E. Repartir la garantía §8.8 entre quien decide y
+   quien pinta sería peor que dejarla entera en cualquiera de los dos. Se suma
+   que de los consumidores de riel del sistema **solo el del paciente tiene
+   celdas con rótulo**, y que el estado `vacío requerido` de 2.E **no cabe aquí**:
+   su línea mide `manuscrito.ancho` = 246 pt y la celda más ancha del riel son 5
+   columnas = 202.5 pt.
+
+   Lo que sí se comparte, y una sola vez en el sistema, es **la regla de qué
+   cuenta como dato ausente**: la exporta 2.E y la importa este componente. Si
+   cada uno se escribiera la suya, bastaría con que una dejara de recortar los
+   espacios para que un valor en blanco colapsara en un sitio e imprimiera un
+   rótulo huérfano en el otro — el §8.8 apareciendo por la costura.
+
+**Geometría interna** — es la del riel, no la de sus consumidores. Padding de
+celda `8 10 10`; regla izquierda de `filete.regla` en `tinta.hairline` salvo en
+la primera celda de cada fila; regla superior en toda fila que no sea la primera
+**viva**; el riel abre y cierra con `filete.fino` en `tinta.negra`.
+
+> Esta declaración vivía en la ficha de 2.D, que fue quien la necesitó primero.
+> Baja aquí con el componente: dos fichas declarando el padding del mismo objeto
+> es la divergencia que I.3.5 persigue. 2.D conserva solo lo suyo — qué celdas
+> hay, cuántas columnas ocupa cada una y sus dos excepciones tipográficas.
+>
+> **«La primera fila viva», no «la primera fila».** Si la fila de arriba colapsa
+> entera, la que queda arriba del todo no lleva regla superior: quedaría una línea
+> horizontal flotando bajo el filete de apertura, sin nada encima.
 
 **Verificación visible.** En Suplementación, emitir con peso y sin peso: con
 peso, el riel de paciente muestra la celda `BASE DEL CÁLCULO`; sin peso, esa
@@ -940,18 +1106,57 @@ Suplementación e Imagenología.
 
 | Ranura | Contenido | Composición |
 |---|---|---|
-| Riel del número | `01`, `02`… | `reticula.riel`, `entrada.numero.cuerpo` |
-| `ancla` | Los dos datos de mayor peso, al mismo cuerpo | `entrada.ancla.cuerpo`, `fuente.neogrotesca` |
-| `secundario` | Dato de apoyo bajo el ancla | `entrada.secundario.cuerpo`, **`tinta.negra`, nunca un gris** |
+| Riel del número | `01`, `02`… | `reticula.riel`, rol `entrada.numero` |
+| `ancla` | Los dos datos de mayor peso, al mismo cuerpo | rol `entrada.ancla` |
+| `secundario` | Dato de apoyo bajo el ancla | rol `entrada.secundario`, que ya va en **`tinta.negra`, nunca un gris** |
 | `marca` | Bloque en negativo, si el formato lo usa | 2.H |
-| `nota` | Texto en humanista | `fuente.humanista`, `texto.corrido.*` |
+| `nota` | Texto en humanista | rol `texto.corrido` |
 
 Qué dato ocupa cada ranura lo declara el formato en la Sección II. El
 componente declara las ranuras, no su contenido.
 
-**Tokens que consume.** `reticula.riel` · `reticula.medianil` ·
-`filete.regla` · `tinta.hairline` · `tinta.negra` · `entrada.*` ·
-`espacio.*`.
+**Separaciones internas**
+
+| Separa | Valor |
+|---|---|
+| `ancla` → `secundario` | `espacio.4` |
+| `secundario` → `nota` | `espacio.8` |
+| Entre entradas, alrededor de la regla | **NO DEFINIDO** — ver abajo |
+
+> **CIERRA H4.** Mismo criterio que el subtítulo de 2.C: dentro de un bloque, la
+> separación es tanto menor cuanto más pegadas estén las dos piezas. El
+> `secundario` es «dato de apoyo **bajo el ancla**» —la segunda línea del mismo
+> dato, misma familia y mismo registro—, así que va al **mínimo de la escala**. La
+> `nota` cambia de familia y de registro —es humanista, texto corrido, otra voz—,
+> así que sube un miembro. Dos niveles de pertenencia, los dos miembros menores de
+> la escala, en orden: 4 < 8.
+>
+> Con `espacio.4` en las dos, la nota se leería como un tercer renglón del mismo
+> dato; con `espacio.12` en la segunda, empezaría a competir con la separación
+> entre entradas.
+>
+> **El aire alrededor de la regla entre entradas queda NO DEFINIDO.** Solo se
+> puede acotar: tiene que ser mayor que `espacio.8`, o la nota de una entrada se
+> pegaría a la regla tanto como al ancla de la que cuelga. El menor miembro que lo
+> cumple es `espacio.12`, pero **nada del spec lo fija**, y elegirlo por ser el
+> siguiente de la escala sería apilar una decisión sobre otra derivada. Falta
+> medir la densidad de una lista de tres medicamentos en la Receta aprobada.
+
+**Tokens que consume.** `entrada.numero` · `entrada.ancla` ·
+`entrada.secundario` · `texto.corrido` · `reticula.riel` ·
+`reticula.medianil` · `filete.regla` · `tinta.hairline` · `espacio.4` ·
+`espacio.8`.
+
+> **CORRIGE 2.G** — la anatomía pedía `entrada.numero.cuerpo`,
+> `entrada.ancla.cuerpo`, `entrada.secundario.cuerpo` y `texto.corrido.*`: cuatro
+> fragmentos de rol que no existen. Un rol de I.1.4 **se consume entero**, y con
+> él vienen la familia y el color, así que `fuente.neogrotesca`, `fuente.humanista`
+> y el `tinta.negra` del secundario sobraban de la lista — no porque no apliquen,
+> sino porque ya viajan dentro del rol. La lista tenía además dos comodines:
+> `entrada.*`, que se despliega a los tres roles, y `espacio.*`, que no se podía
+> desplegar porque no había nada declarado detrás. Las dos separaciones internas
+> quedan cerradas arriba (H4); la tercera, el aire entre entradas, sigue
+> **NO DEFINIDA** y también está arriba.
 
 **Reglas**
 
@@ -980,8 +1185,8 @@ gris y es un defecto.
 **Propósito.** Marcar un dato crítico de modo que sobreviva a la fotocopia, al
 fax y a la lectura de reojo en un mostrador.
 
-**Composición.** Fondo `tinta.negra`, texto `tinta.papel`, versalita con
-`etiqueta.tracking`. Ancho variable según la palabra.
+**Composición.** Fondo `tinta.negra`, rol `etiqueta` **con el color sustituido
+por `tinta.papel`**. Ancho variable según la palabra.
 
 **Variantes declaradas**
 
@@ -991,8 +1196,16 @@ fax y a la lectura de reojo en un mostrador.
 | `urgente` | Badge del documento, bajo el título |
 | `urgente reducido` | Repetición del badge en hojas de continuación |
 
-**Tokens que consume.** `tinta.negra` · `tinta.papel` · `etiqueta.cuerpo` ·
-`etiqueta.tracking` · `espacio.4` · `espacio.8`.
+**Tokens que consume.** `etiqueta` · `tinta.negra` · `tinta.papel` ·
+`espacio.4` · `espacio.8`.
+
+> **CORRIGE 2.H** — pedía `etiqueta.cuerpo` y `etiqueta.tracking`, fragmentos que
+> no existen. Va el rol `etiqueta` entero, **con una salvedad que hay que
+> implementar a mano**: el rol trae `tinta.etiqueta`, un gris de 7 : 1 pensado
+> para papel blanco. Aquí el texto va sobre fondo negro y el color se sustituye
+> por `tinta.papel`. Componer este bloque pidiendo el rol tal cual imprimiría gris
+> sobre negro y lo dejaría ilegible, que es lo contrario de lo que el componente
+> existe para conseguir.
 
 **Reglas**
 
@@ -1021,12 +1234,30 @@ en diagonal. Se distingue **por filete, nunca por fondo de color**.
 | Variante | Filete | Usada por |
 |---|---|---|
 | `alarma` | `filete.alarma`, superior e izquierdo | Receta |
-| `instrucciones` | `filete.instrucciones`, izquierdo | Internamiento |
+| `instrucciones` | `filete.acento`, izquierdo | Internamiento |
 | `cita` | `filete.cita`, izquierdo | Suplementación |
 
-**Tokens que consume.** `filete.alarma` · `filete.instrucciones` ·
-`filete.cita` · `espacio.16` (sangría) · `tinta.negra` ·
-`texto.corrido.*` · `fuente.humanista`.
+> **CIERRA H1** — la variante `instrucciones` citaba un `filete.instrucciones`
+> que no existe. El grosor **se deriva, no se elige**: la regla 1 de esta ficha
+> dice que la jerarquía la carga el grosor del filete, y la jerarquía de las tres
+> variantes es alarma > instrucciones > cita. Entre `filete.alarma` (3 pt) y
+> `filete.cita` (1.6 pt) la escala de I.1.6 tiene **un solo miembro**,
+> `filete.acento` (2 pt), así que no hay nada que decidir.
+>
+> Que `filete.acento` ya lo usen la cabecera de tabla y el marco del QR no
+> estorba: la columna «reservado a» de I.1.6 se retiró en la conciliación por ser
+> falsa. Un grosor es un grosor, y quién lo usa se declara en la Sección II.
+
+**Tokens que consume.** `alarma.cuerpo` (variante `alarma`) · `texto.corrido`
+(variantes `instrucciones` y `cita`) · `filete.alarma` · `filete.acento` ·
+`filete.cita` · `espacio.16` (sangría) · `tinta.negra`.
+
+> **CORRIGE 2.I** — dos defectos más. (1) `texto.corrido.*` es un fragmento de
+> rol, y `fuente.humanista` sobra porque el rol ya la trae. (2) Faltaba `alarma.cuerpo`,
+> que es el rol con el que se compone la variante `alarma` —IBM Plex Sans 12 / 18,
+> peso 500, por `CONCILIA D16`— y que **ninguna ficha citaba**, pese a existir en
+> I.1.4 desde la conciliación. Un rol sin consumidor declarado es un rol que el
+> primer implementador no encuentra.
 
 **Reglas**
 
@@ -1108,6 +1339,41 @@ Receta · notas adicionales de Suplementación · notas para el servicio de
 Imagenología · instrucciones al paciente de Internamiento · indicaciones de
 ingreso a piso.
 
+**Tokens que consume.** `etiqueta`, para el encabezado de bloque ·
+`texto.corrido`, para ítems y párrafos · `reticula.riel` y `reticula.medianil`,
+para la sangría del ítem colgante.
+
+> **CIERRA H2 — el encabezado de bloque va en `etiqueta`.** Se compone en
+> versalita, y de los 23 roles de I.1.4 la versalita del sistema es una sola
+> —peso 600, tracking `0.22 em`— con dos nombres: `etiqueta` y `firma.rol`. Que
+> existan los dos es la prueba de que ese tratamiento **no es exclusivo de un
+> campo**: `firma.rol` no rotula un dato, rotula lo que va debajo de él, que es
+> exactamente el trabajo del encabezado de bloque. De los dos nombres se toma el
+> genérico.
+>
+> **No es `titulo.seccion`**, aunque también sea un encabezado: el bloque del
+> parser vive **dentro** de una sección que ya abrió `EncabezadoSeccion` (2.P) con
+> ese rol. Darle el mismo aplanaría dos niveles en uno, y el nivel es justo lo que
+> el lookahead existe para distinguir.
+>
+> El gris `tinta.etiqueta` que trae el rol es correcto aquí y no contradice la
+> regla 5 de 2.G: aquello prohíbe componer en gris un **dato** —la denominación
+> genérica—, no el rótulo que lo agrupa.
+
+> **CIERRA H3 — la sangría del ítem es `reticula.riel` + `reticula.medianil`.**
+> Un ítem con la raya colgada es la misma anatomía que una entrada con su número
+> en el riel (2.G) y que una sección con el suyo (2.P): riel a la izquierda,
+> medianil, y la caja de texto. 2.P la escribe explícita —«dos columnas, medianil
+> `reticula.medianil`: riel del número (`reticula.riel`) y caja de texto»— y aquí
+> se instancia igual, con la raya en el sitio del número.
+>
+> La suma cierra sola: I.1.3 declara que `reticula.riel` + `reticula.medianil`
+> = 23.25 + 9 = 32.25 **es** `reticula.columna`. La sangría del ítem es una
+> columna exacta, así que un ítem que rompe a varias líneas sangra a retícula y no
+> a un valor suelto.
+
+> **CORRIGE 2.J** — era la única ficha sin lista de tokens.
+
 **Verificación visible.** Pegar en indicaciones de ingreso a piso un texto que
 empiece con dos renglones de prosa corrida y siga con un encabezado y sus
 viñetas. Los dos primeros renglones deben salir **en minúsculas, en humanista,
@@ -1124,8 +1390,20 @@ sin raya y sin número**. Si salen en versalita, no hay lookahead.
 | Intermedia | `<ÍTEMS> EN ESTA HOJA · NN DE MM` — NN es lo impreso en esa hoja |
 | Final | `TOTAL DE <ÍTEMS> · MM` |
 
-**Tokens que consume.** `pie.cuerpo` · `etiqueta.tracking` ·
-`tinta.secundaria`.
+**Tokens que consume.** **`pie` en versalita**, la desviación declarada en I.1.4,
+en color `tinta.secundaria`.
+
+> **CIERRA H5** — pedía `pie.cuerpo` y `etiqueta.tracking`, dos fragmentos de rol
+> que no existen, y describía sin nombrarlo el mismo tratamiento que la zona 2 de
+> 2.M. Los dos pasan a citar la desviación, que **se declara una sola vez** en
+> I.1.4 y no dos: rol `pie` con peso 600 y tracking `0.22 em`, que son los de la
+> versalita del sistema.
+>
+> **El color no viaja con la desviación y por eso no es un rol.** El rol `pie` va
+> en `tinta.papel` porque vive sobre la banda de acento; el contador NO vive ahí
+> —vive en el área de contenido—, así que pedirlo tal cual lo imprimiría blanco
+> sobre blanco. Aquí es `tinta.secundaria`. Es el mismo cuidado que 2.H, por la
+> razón inversa.
 
 **Reglas**
 
@@ -1179,8 +1457,14 @@ firma.
 | Anestesiólogo | Nombre · céd. profesional |
 | Paciente · familiar · representante · testigo | Nombre · rol o parentesco |
 
-**Tokens que consume.** `firma.espacio` · `firma.rol` · `firma.nombre` ·
-`firma.credencial` · `filete.fino` · `espacio.4` · `manuscrito.ancho`.
+**Tokens que consume.** `firma.rol` · `firma.nombre` · `firma.credencial` ·
+`firma.espacio` · `filete.fino` · `tinta.negra` (color de la línea) ·
+`espacio.4` · `manuscrito.ancho`.
+
+> **REVISADA 2.L** — es la única de las quince cuya lista ya nombraba roles
+> completos y tokens existentes. Solo se le añade `tinta.negra`: la ficha
+> declaraba el grosor de la línea de firma y no su color, y un grosor sin tinta
+> no se puede pintar.
 
 **Reglas**
 
@@ -1222,11 +1506,18 @@ Retícula `auto auto 1fr`, medianil 10 pt, padding lateral 8 pt.
 | Zona | Contenido | Token |
 |---|---|---|
 | 1 | `Folio <folio>` | `pie` |
-| 2 | `Página X de Y` en versalita | `pie`, peso 600, tracking 0.22 em |
+| 2 | `Página X de Y` en versalita | **`pie` en versalita**, en `tinta.papel` |
 | 3 | Leyenda, alineada a la derecha | `pie.leyenda` |
 
 **Tokens que consume.** `pie` · `pie.leyenda` · `acento.banda` · `tinta.papel` ·
 `zona.segura` · `margen.izquierdo` · `margen.derecho`.
+
+> **REVISADA 2.M** — lista correcta. Esta ficha es la que **fijó el patrón** de
+> desviación declarada: la zona 2 pedía el rol `pie` con peso y tracking
+> cambiados y escribía los dos valores exactos en su tabla, en vez de inventar un
+> nombre de token para la variación. De ahí salió la tabla de desviaciones de
+> I.1.4, y la zona 2 pasa ahora a citarla por su nombre (H5). El color sigue
+> siendo cosa del sitio: aquí `tinta.papel`, porque el texto va sobre la banda.
 
 **Reglas**
 
@@ -1295,6 +1586,25 @@ ahí sí aparece, y en las dos hojas es el mismo número.
 **Composición de la última hoja.** El bloque de firma se ancla al final del
 contenido. El aire sobrante queda debajo de la rúbrica, no encima.
 
+**Tokens que consume.** `umbral.firma` —derivado, se implementa como fórmula— ·
+`flujo.orphans` · `flujo.widows` · `flujo.arrastre` · **`pie` en versalita**, en
+`tinta.secundaria`, para los tres avisos y para la zona derecha.
+
+> **CORRIGE 2.N** — no tenía lista, aunque su propio cuerpo nombra los cuatro
+> primeros tokens. Las «últimas tres líneas» de la regla 1 son `flujo.arrastre`,
+> que ya existe y es el mismo 3 que entra en la fórmula de `umbral.firma`: no es
+> un literal.
+
+> **CIERRA H10 — los avisos van en `pie` en versalita, en `tinta.secundaria`: el
+> mismo tratamiento que el contador de 2.K.** Los tres se derivan de dónde viven y
+> de qué son. **No van en la banda de pie**: 2.M declara sus tres zonas —folio,
+> paginación y leyenda— y ninguna es esta, así que el aviso es un bloque al pie
+> del **área de contenido**, que es justo donde vive el contador de 2.K. Comparten
+> además la forma de cadena —una versalita con separador de punto medio que
+> informa de paginación— y pueden salir en la misma hoja: dos avisos de la misma
+> naturaleza, a un palmo uno de otro, compuestos distinto, compiten por la misma
+> mirada sin que la diferencia signifique nada.
+
 **Verificación visible.** Construir un caso donde el contenido termine a media
 hoja y la firma no quepa: la hoja debe cerrar con
 `RESERVADO PARA LA FIRMA · CONTINÚA EN LA HOJA 2`, y la hoja 2 debe traer
@@ -1318,7 +1628,17 @@ por hoja en los ocho formatos.
 | Grueso, a la izquierda | 96 × **2.5 pt** | `acento.base` |
 | Fino, hasta el borde derecho de la caja | 0.8 pt | `tinta.negra` |
 
-Los 2.5 pt son geometría de este componente, no un miembro de `filete.*`.
+Los 2.5 pt son geometría de este componente, no un miembro de `filete.*`. **Los
+0.8 pt del segmento fino sí lo son: son `filete.fino`**, no una cifra suelta.
+
+**Tokens que consume.** `filete.fino` · `tinta.negra` · `acento.base` ·
+`caja.ancho`.
+
+> **CORRIGE 2.O** — no tenía lista. Su tabla de composición escribía el grosor del
+> segmento fino como «0.8 pt», que es exactamente la forma en que un token se
+> convierte en literal al implementarlo: los 2.5 pt del segmento grueso llevan su
+> aviso de «geometría del componente» y el 0.8 no llevaba ninguno, así que se leía
+> como si fuera del mismo tipo. No lo es.
 
 **Reglas**
 
@@ -1341,12 +1661,24 @@ Consentimiento e Internamiento.
 **Composición**
 
 - Abre con regla de `filete.fino` a todo `caja.ancho`
-- Padding superior 8 pt
+- Padding superior 8 pt — geometría interna, entre el filete y la cabecera
 - Dos columnas, medianil `reticula.medianil`: riel del número
   (`reticula.riel`) y caja de texto
 - Número en `seccion.numero`; título en `titulo.seccion`
-- Aire título → párrafo: 8 pt
-- Aire entre secciones: `espacio.24`
+- Aire título → párrafo: `transicion.seccionParrafo`
+- Aire entre secciones: `transicion.entreSecciones`
+
+**Tokens que consume.** `seccion.numero` · `titulo.seccion` · `texto.corrido` ·
+`reticula.riel` · `reticula.medianil` · `caja.ancho` · `filete.fino` ·
+`tinta.negra` · `transicion.seccionParrafo` · `transicion.entreSecciones`.
+
+> **CORRIGE 2.P** — no tenía lista, y su composición escribía **como cifras
+> sueltas las dos separaciones que I.1.7 nombró expresamente para esta ficha**:
+> los 8 pt del aire título → párrafo son `transicion.seccionParrafo` y los 24 del
+> aire entre secciones son `transicion.entreSecciones`. El segundo estaba además
+> escrito como `espacio.24`, que es justo la confusión contra la que I.1.7 avisa:
+> valen lo mismo y **no son el mismo token**. Mover `espacio.24` para ajustar el
+> aire entre secciones movería con él todo lo demás del sistema que hoy mide 24.
 
 **Reglas**
 
@@ -1367,7 +1699,40 @@ palabras partidas con guion en alguna línea.
 fuerte que un `EncabezadoSeccion` porque cambia de lector, no de tema.
 
 **Composición.** `filete.transicion` a todo `caja.ancho` + número colgado en el
-riel a 26 pt + cabecera con el rótulo de sección y el subtítulo de lector.
+riel + cabecera con el rótulo de sección y el subtítulo de lector.
+
+| Elemento | Rol |
+|---|---|
+| Número colgado en el riel | **`seccion.numero` a 26 pt**, desviación declarada (I.1.4) |
+| Rótulo de sección | `titulo.seccion` |
+| Subtítulo de lector | `titulo.subtitulo` |
+
+**Tokens que consume.** `seccion.numero` · `titulo.seccion` ·
+`titulo.subtitulo` · `filete.transicion` · `caja.ancho` · `reticula.riel` ·
+`tinta.negra`.
+
+> **CIERRA H6 y H7.** No tenía lista y sus tres elementos con texto no tenían rol.
+> Los tres se derivan de 2.P, que hace **el trabajo análogo un nivel más abajo**:
+> abrir una sección con su número colgado en el riel y su título al lado.
+>
+> **El número.** 2.P compone el suyo con `seccion.numero`, y el de aquí es el
+> número de una sección igual que aquel — la cabecera dice `SECCIÓN 2 DE 2`. Del
+> rol vienen familia, peso, tracking y `acento.tinta`; lo único que cambia es el
+> cuerpo, que esta ficha ya fijaba en 26 pt y que **es coherente con el propósito
+> declarado del componente**: 2.Q es más fuerte que 2.P porque cambia de lector, y
+> ya lleva el filete más grueso del sistema. Un número que sonara igual que el de
+> 2.P contradiría eso. Queda como desviación declarada y no como rol nuevo: un
+> solo consumidor.
+>
+> **El rótulo de sección** hace lo mismo que el título de 2.P, así que va en el
+> mismo rol.
+>
+> **El subtítulo de lector** es la única línea secundaria que el sistema tiene
+> —humanista, `tinta.secundaria`, colgada de un título—, y 2.C ya la usa así bajo
+> el título del documento. Inventar una segunda para las secciones sería, en la
+> capa de tokens, lo que I.3.5 prohíbe en la de componentes. Lo que sí cambia es
+> el **alcance declarado del rol**, que en I.1.4 pasa de «subtítulo de documento»
+> a «de documento o de sección».
 
 **Reglas**
 
@@ -1399,6 +1764,17 @@ grueso que cualquier otro filete del documento**, incluido el del membrete.
 | Filete corto sobre el folio | 40 × `filete.cita`, `acento.base`, margen superior 10 pt |
 | Folio | `folio` |
 
+**Tokens que consume.** `etiqueta` · `folio` · `filete.acento` · `filete.cita` ·
+`acento.base` · `tinta.secundaria`.
+
+> **REVISADA 2.R** — no tenía lista; los tokens que su tabla ya citaba eran todos
+> reales y con nombre completo, incluido el rol `etiqueta`, que aquí sí está bien
+> escrito. Lo que queda señalado es la **leyenda**: IBM Plex Sans 9 / 13 pt no es
+> ningún rol de I.1.4. La ficha la declara entera —familia, cuerpo, interlineado y
+> color—, así que es geometría interna válida y no un hueco a medias, pero es el
+> **segundo** cuerpo humanista fuera de la escala tras el diagnóstico de 2.D
+> (11 / 16). Dos ya son un patrón que conviene mirar antes de que sean tres.
+
 **Reglas**
 
 1. **La zona de QR vive en el cuerpo de la última hoja, no en el pie.** El pie
@@ -1425,10 +1801,37 @@ de agua de logo, que queda prohibida (I.3.2).
 | Cuerpo | `marca.estado` |
 | Rotación | −9° |
 | Relleno | transparente — letra hueca |
-| Contorno | `filete.regla`, negro al 45 % |
+| Contorno | `filete.regla`, en el gris derivado de abajo |
 | Posición | anclada al pie del área de contenido |
 
+**Geometría derivada: el gris del contorno.** `tinta.negra` al **45 %** sobre
+blanco, **por mezcla opaca**, con la misma operación que I.1.8 usa para
+`acento.velo`.
+
+> **CIERRA H11.** El «negro al 45 %» era el único color del sistema que vivía
+> suelto en una ficha, sin token y sin fórmula. No necesita entrada propia en
+> I.1.8 —lo usa un solo componente en un solo sitio, que es el criterio de 2.A—
+> pero sí necesita **decir de dónde sale**, o el primero que lo implemente
+> escribirá un hexadecimal a mano.
+>
+> Sale de donde salen todos los tonos derivados del sistema: mezclando contra un
+> extremo, en proporción declarada, **con la mezcla opaca de I.1.8 y nunca con un
+> alfa**. El motivo es el mismo que allí: un alfa en PDF depende del visor y del
+> driver de impresión, y una mezcla opaca imprime igual en todas partes. La
+> proporción es la que la regla 2 de esta ficha exige — el contorno tiene que
+> quedar por debajo del texto que cruza, o el sello compite con lo que hay que
+> leer.
+
 **Estados:** `SIN FIRMAR` · `BORRADOR` · `COPIA` · `SIN VALIDEZ — VISTA PREVIA`.
+
+**Tokens que consume.** `marca.estado` · `filete.regla` · `tinta.negra`, del que
+se deriva el gris del contorno.
+
+> **REVISADA 2.S** — no tenía lista; los dos tokens que su tabla citaba son
+> reales. `marca.estado` es además el único rol de I.1.4 **sin interlineado y sin
+> relleno**: declara `contorno`, no un color de texto, y la capa de tokens lo
+> respeta devolviendo el estilo sin `color`. El gris del contorno queda cerrado
+> arriba como geometría derivada (H11).
 
 **Reglas**
 
@@ -1449,20 +1852,57 @@ sigue siendo legible.
 **Propósito.** El cierre económico del Recibo. Es el único bloque del sistema
 con jerarquía de cifra.
 
-**Composición.** Caja de `manuscrito.ancho` alineada a la derecha, retícula
-`1fr auto`. Filas: subtotales → total → anticipo → saldo.
+**Composición.** Caja de ancho **`NO DEFINIDO`** —ver H9 abajo— alineada a la
+derecha, retícula `1fr auto`. Filas: subtotales → total → anticipo → saldo.
 
 | Fila | Cuerpo |
 |---|---|
 | Subtotal, anticipo, saldo | `dato` |
-| Total | Archivo 22 pt, peso 600 |
+| Total | Geometría de este componente — ver abajo |
+
+**Geometría del componente: la cifra del total.** Archivo **22 / sin
+interlineado propio**, peso 600, tracking 0, `tinta.negra`, cifras tabulares.
+
+> **CIERRA H8 — el total es geometría de 2.T, no un rol.** Criterio de los
+> anillos del panel de 2.A: un valor que usa **un solo componente en un solo
+> sitio** se declara en su ficha y no en la escala. Aquí lo dice la propia regla 2
+> —no hay segundo uso del cuerpo de 22 pt en una cifra—, y un rol existe para
+> tener plural.
+>
+> Los tres valores que la ficha no declaraba se derivan del riel en el que vive.
+> **Tracking 0**, que es el de todos los roles con cifra de I.1.4 —`dato`,
+> `tabla.celda`, `entrada.numero`— salvo `folio`. **`tinta.negra`**, porque la
+> regla 1 exige que la columna «sume visualmente» y una columna que cambia de
+> tinta entre sus filas y su total deja de leerse como una columna. **Sin
+> interlineado propio**, como `marca.estado`, que es el otro 22 pt del sistema y
+> el único rol que I.1.4 deja sin interlineado: el total es una sola línea y la
+> altura de su fila es del riel, no de la cifra.
+>
+> El cuerpo coincide con `marca.estado` y **no se fusionan**: una es una cifra y
+> el otro un sello hueco y girado. La regla 2 queda corregida abajo, porque decía
+> que no había segundo uso de 22 pt y sí lo hay.
+
+**Tokens que consume.** `dato` · `tinta.negra`.
+
+> **H9 · EL ANCHO DE LA CAJA QUEDA `NO DEFINIDO`.** La composición cita
+> `manuscrito.ancho`, y I.1.5 reserva ese token a «espacios destinados a llenarse
+> con pluma»: una caja de importes impresos no lo es. Tampoco sale de la retícula
+> —246 no es entero de `reticula.columna`, que daría 238.5 con 6 columnas o 279.75
+> con 7, ni de `riel.celda`, que daría 243 con 6—, así que I.1.3 no lo produce y
+> no hay de dónde derivarlo.
+>
+> **Lo que falta para cerrarlo:** medir la caja de totales en el Recibo aprobado.
+> Si mide 246 pt, es geometría de 2.T con nombre propio y la coincidencia con
+> `manuscrito.ancho` se registra como `COINCIDENCIA`; si mide otra cosa, el 246
+> era un token al que alguien echó mano y se sustituye por el valor medido.
 
 **Reglas**
 
 1. **Cifras tabulares en todas las filas**, alineadas por la unidad. Es el único
    bloque donde una columna de números tiene que sumar visualmente.
-2. El total es la única cifra del sistema que sube de escala. No hay segundo
-   uso del cuerpo de 22 pt.
+2. El total es la única **cifra** del sistema que sube de escala. Comparte cuerpo
+   con `marca.estado`, que también es 22 pt: es `COINCIDENCIA` y no identidad — un
+   sello hueco y girado no es una cifra— y **no se fusionan**.
 3. Anticipo y saldo colapsan por separado.
 
 **Verificación visible.** Emitir con cuatro conceptos de importes de distinta
@@ -2404,6 +2844,10 @@ registran aquí para que nadie las lea como reinterpretaciones ni intente
 | P2-8 | **`flexBasis` es de caja de contenido y `width` de caja de borde.** Un riel de celdas se compone con `width` + `flexGrow`, nunca con `flexBasis: 0` + `flexGrow` | El reparto proporcional «obvio» dejó la celda de paciente de 2.D en 188.54 pt en vez de 202.5: el padding y la regla se suman por fuera del basis. El riel sigue sumando 486 y sin hueco, así que el defecto no se ve mirando — solo midiendo | I.3.8 · 2.D |
 | P2-9 | **La lista de tokens de 2.E pedía fragmentos de rol** —`etiqueta.cuerpo`, `etiqueta.tracking`, `dato.cuerpo`—, que no existen. Pasa a los roles completos `etiqueta` y `dato` | Tercera vez que aparece la misma lista pre-escala, tras 2.B (P2-2) y 2.C (P2-6). I.1.4 declara roles, no fragmentos: un rol se consume entero | 2.E |
 | P2-10 | **Los dos estados con tinta de 2.E no miden lo mismo: 27 y 31 pt.** La diferencia de 4 pt se declara, con su motivo, y se declara también que el ESTADO se resuelve dentro del componente en vez de entrar por prop | Al construir 2.E hubo que decidir si el espacio de escritura se comprimía a un renglón de texto para igualar alturas. No se comprime —I.1.5 e I.3.4—, pero sin declararlo el siguiente que componga una fila de campos mixtos va a leer los 4 pt como defecto de alineación | 2.E |
+| P2-11 | **Barrido de las listas de tokens de las quince fichas restantes (2.F a 2.T)**, cruzadas contra los nombres reales de I.1. Seis fichas citaban fragmentos de rol o comodines, seis no tenían lista, 2.F apoyaba el riel en la retícula equivocada, 2.I citaba un `filete.instrucciones` inexistente y 2.P escribía como cifras sueltas las dos transiciones que I.1.7 había nombrado para ella. **De paso apareció una cuarta ficha ya implementada con el mismo defecto, 2.D**, que el barrido no cubría. Las once piezas sin rol quedan listadas en I.1.4, señaladas y sin resolver — **se cierran en P2-14**, salvo una | Tres de las cinco fichas ya implementadas —2.B, 2.C y 2.E— traían la misma lista pre-escala, y al barrer resultaron ser cuatro. No es casualidad: son listas escritas antes de que I.1.4 existiera, que sobrevivieron a la conciliación porque nadie las cruzó contra ella. Barrerlas de golpe cuesta una sesión; tropezar quince veces cuesta quince | I.1.4 · 2.D · 2.F a 2.T |
+| P2-12 | **Las tres «variantes» de 2.F no eran tres alternativas.** `celdas` y `una línea` componen y se excluyen; `sin contador` es una propiedad ortogonal que no cambia el render y que lee 2.K. Y `una línea` **pierde un consumidor**: la línea fina del membrete no es un `RielDatos` | Al implementar 2.F hubo que elegir un tipo para sus props y las tres variantes no formaban una unión: un riel puede ser `celdas` y `sin contador` a la vez. Al buscar el segundo consumidor de `una línea` resultó que el del membrete no tiene rótulos, ni anchos de `riel.celda`, ni el rol `dato` | 2.F · 2.B |
+| P2-13 | **La composición del riel baja de la ficha de 2.D a la de 2.F**: padding `8 10 10`, reglas, filetes de apertura y cierre y reparto de anchos. 2.D conserva solo sus siete celdas y sus dos excepciones tipográficas. Y la regla superior va en toda fila que no sea **la primera viva**, no «la segunda» | 2.D declaró el riel porque lo necesitó antes de que 2.F existiera. Dejar la declaración en las dos fichas es la divergencia que I.3.5 persigue. El matiz de «la primera viva» aparece solo al implementar el colapso: con la fila de arriba colapsada, «la segunda fila» deja una regla flotando bajo el filete de apertura | 2.F · 2.D |
+| P2-14 | **Cerrados diez de los once huecos de rol de I.1.4, derivando del spec y sin inventar ninguno.** Ninguno necesitó un token nuevo: los valores ya estaban, sin nombre asignado. Salió de ahí un patrón que faltaba nombrar —la **desviación declarada de un rol**, tabla nueva en I.1.4— que ya practicaban 2.D, 2.H y 2.M sin llamarla así. **H9 queda `NO DEFINIDO`**, y con él el aire entre entradas de 2.G, que apareció al cerrar H4 | Diez huecos y cero tokens nuevos es la comprobación de que eran huecos de **nombre**, no de valor: el diseño ya los tenía resueltos y lo que faltaba era cruzarlos contra la escala. Los dos que no se cierran son los dos que exigen medir una hoja aprobada, que es información que este documento no contiene | I.1.4 · 2.G · 2.I · 2.J · 2.K · 2.M · 2.N · 2.Q · 2.S · 2.T |
 
 Una cuarta, menor, sin fila propia: `caja.alto` queda marcado en I.1.1 como
 derivado que **se implementa como fórmula**. El Paso 0 lo había escrito como
