@@ -12,10 +12,6 @@
  * la de firmas. Aquí se implementa con `fixed`, que hace que react-pdf repita el
  * nodo en cada hoja del documento. **No lo quites para «ahorrar» en la última.**
  *
- * La paginación se compone con la función `render` del renderer, que es lo único
- * que conoce la Y real: el total de hojas no se sabe hasta que el motor de flujo
- * ha terminado de repartir (regla 2).
- *
  * DÓNDE VIVE LA BANDA — LO QUE MÁS SE EQUIVOCA
  *
  * **Fuera de la caja de texto y dentro de la zona segura.** No se mide desde el
@@ -38,6 +34,31 @@
  * declarada, y lo es **por sus tres cotas**: 16 pt de alto, `acento.banda`
  * calculado a 7 : 1 sobre blanco, y no cruza la zona segura. Quitarle cualquiera
  * de las tres la convierte en lo que I.3.2 prohíbe.
+ *
+ * ⚠️ POR QUÉ EL `render` VA EN LA BANDA Y NO SOLO EN LA PAGINACIÓN
+ *
+ * Porque sin él la zona 2 sale VACÍA, sin error y sin aviso. Está medido
+ * descomprimiendo el flujo de contenido de un PDF real, no supuesto:
+ *
+ * 1. Un `lineHeight` numérico es un MULTIPLICADOR del cuerpo, y react-pdf lo
+ *    resuelve a puntos al montar la página: 11 / 7 → 11 pt.
+ * 2. Cada nodo con `render` obliga al renderer a **recomponer la página entera**
+ *    —una vez por corte de hoja y otra al saber el total—, y en cada pasada
+ *    vuelve a resolver estilos YA resueltos. El multiplicador se aplica otra vez:
+ *    11 → 77 → 539 pt.
+ * 3. Los demás nodos no lo notan porque conservan sus líneas ya maquetadas. El
+ *    nodo con `render` es el único al que se le tiran para recomponerlas, y a
+ *    539 pt de interlineado **su línea ya no cabe en una banda de 16**: el
+ *    maquetador devuelve cero líneas y la zona queda muda.
+ *
+ * Poniendo el `render` en la BANDA, sus tres zonas se vuelven a crear desde cero
+ * en cada pasada, con el estilo literal sin resolver: se resuelve una sola vez
+ * por pasada y el multiplicador nunca se acumula. La alternativa —quitarle el
+ * interlineado a la paginación— también imprime, pero la deja 1.65 pt más abajo
+ * que el folio, que está a su lado y en el mismo rol.
+ *
+ * **Vale para cualquier componente del chasis que use `render`.** 2.N lo va a
+ * necesitar para sus tres avisos de pie.
  *
  * Sin `'use client'`: módulo neutro, como el resto de v2.
  */
@@ -68,6 +89,16 @@ const GEOMETRIA = {
 } as const
 
 /**
+ * Zona 3, invariable en los ocho formatos (ficha de 2.M, tabla de cadenas).
+ *
+ * **No entra por prop.** Si la declarara cada formato, el sistema acabaría con
+ * ocho leyendas distintas — que es exactamente la deriva que 2.N concilia en los
+ * avisos de pie (`CONCILIA D5, D22`). Se guarda como se imprime.
+ */
+const LEYENDA =
+  'Documento generado por Spinus · Expediente clínico electrónico · spinus.com.mx'
+
+/**
  * La versalita del sistema, leída de `etiqueta` en vez de escrita como cifra. Es
  * la desviación declarada **`pie` en versalita** (I.1.4), la misma que consume
  * 2.K — con el color puesto por el sitio, que aquí es `tinta.papel` porque el
@@ -93,6 +124,11 @@ const estilos = StyleSheet.create({
   zonaAuto: {
     flexShrink: 0,
   },
+  /**
+   * El medianil lo lleva SIEMPRE la zona que va segunda, nunca la primera: en
+   * `sin folio` la paginación pasa a la zona 1 y ahí no tiene nada a la
+   * izquierda de lo que separarse.
+   */
   separacion: {
     marginLeft: GEOMETRIA.medianil,
   },
@@ -113,76 +149,104 @@ const estilos = StyleSheet.create({
 })
 
 interface Comun {
-  /** Cadena corta de cierre. La declara el formato. */
-  leyenda: string
   /** La banda va en `acento.banda`, derivado a 7 : 1 sobre blanco. */
   acento: AcentoResuelto
 }
 
 export type PieDocumentoProps =
-  /** Folio · paginación · leyenda. Siete de los ocho formatos. */
+  /**
+   * Folio · paginación · leyenda. **Tres formatos**: Receta (II.3), Recibo de
+   * Honorarios / Cotización (II.5) y Consentimiento (II.7) — los tres que
+   * circulan hacia un tercero que puede citar el número.
+   *
+   * El `folio` entra ya compuesto: **2.M no decide su forma** y no la valida.
+   */
   | ({ variante: 'completo'; folio: string } & Comun)
   /**
-   * Paginación · título del documento · leyenda. **Solo Escrito Médico**, que no
-   * es un documento seriado: sin folio no hay identificador humano que mostrar en
-   * la página de verificación, y por eso tampoco lleva QR.
+   * Paginación · título del documento · leyenda. **Cinco formatos**, que son
+   * mayoría: Laboratorio (II.1), Imagenología (II.2), Suplementación (II.4),
+   * Internamiento (II.6) y Escrito Médico (II.8).
    *
-   * Está declarada para que **nadie reponga el folio por consistencia mal
-   * entendida** (regla 4). Si ves un folio en un Escrito Médico, alguien inventó
-   * una serie que no existe.
+   * No es la excepción de un formato raro: es el caso corriente. Un folio solo
+   * sirve donde alguien de fuera lo cita, y estos cinco no salen a esa
+   * circulación (regla 4).
    */
   | ({ variante: 'sinFolio'; titulo: string } & Comun)
 
 /**
- * `PÁGINA X DE Y` (regla 2). La Y la pone el renderer, no quien llama: es el
- * único que sabe en cuántas hojas acabó repartido el contenido.
+ * `Página X de Y` (regla 2), compuesta en mayúsculas por la versalita del rol —
+ * la misma convención que 2.C, 2.H y 2.K: la cadena se guarda en capitalización
+ * de oración y la transformación ocurre aquí.
+ *
+ * **Las cifras las pone el renderer, no quien llama:** el total de hojas no
+ * existe hasta que el flujo ha terminado de repartir. Se leen de `subPage*`, que
+ * cuenta las hojas de ESTE documento; `pageNumber` cuenta las del PDF entero y
+ * solo coincide porque **un formato se compone con un único elemento `Page`**.
+ * Si algún día uno declara dos, esta cuenta es la correcta y la otra mentiría.
  */
 function paginacion({
-  pageNumber,
-  totalPages,
+  subPageNumber,
+  subPageTotalPages,
 }: {
-  pageNumber: number
-  totalPages: number
+  subPageNumber: number
+  subPageTotalPages: number
 }): string {
-  return `PÁGINA ${pageNumber} DE ${totalPages}`
+  return `Página ${subPageNumber} de ${subPageTotalPages}`.toUpperCase()
+}
+
+/**
+ * Las tres zonas en el orden que declara cada variante. Lo que cambia entre las
+ * dos es **qué ocupa cada zona**, no cómo se compone: la paginación conserva su
+ * versalita al pasar a la zona 1, y el título ocupa la zona que el folio deja
+ * libre con el rol que el folio usaba, `pie`.
+ */
+function zonas(props: PieDocumentoProps): ReactElement[] {
+  const leyenda = (
+    <Text key="leyenda" style={estilos.leyenda}>
+      {LEYENDA}
+    </Text>
+  )
+
+  if (props.variante === 'completo') {
+    return [
+      <Text
+        key="folio"
+        style={[estilos.folio, estilos.zonaAuto]}
+      >{`Folio ${props.folio}`}</Text>,
+      <Text
+        key="paginacion"
+        style={[estilos.paginacion, estilos.zonaAuto, estilos.separacion]}
+        render={paginacion}
+      />,
+      leyenda,
+    ]
+  }
+
+  return [
+    <Text
+      key="paginacion"
+      style={[estilos.paginacion, estilos.zonaAuto]}
+      render={paginacion}
+    />,
+    <Text key="titulo" style={[estilos.folio, estilos.zonaAuto, estilos.separacion]}>
+      {props.titulo}
+    </Text>,
+    leyenda,
+  ]
 }
 
 /** 2.M · `PieDocumento`. */
 export default function PieDocumento(props: PieDocumentoProps): ReactElement {
-  const zonaPaginacion = (
-    <Text
-      style={[estilos.paginacion, estilos.zonaAuto]}
-      render={paginacion}
-      fixed
-    />
-  )
-
   return (
     // `fixed`: regla 1. Sin él, el pie sale solo en la hoja donde se declaró.
-    // El relleno es `acento.banda`, derivado a 7 : 1 sobre blanco (I.1.8), y entra
-    // aquí y no en la hoja de estilos porque depende del acento del médico.
-    <View style={[estilos.banda, { backgroundColor: props.acento.banda }]} fixed>
-      {props.variante === 'completo' ? (
-        <>
-          <Text style={[estilos.folio, estilos.zonaAuto]}>{`Folio ${props.folio}`}</Text>
-          <View style={estilos.separacion}>{zonaPaginacion}</View>
-        </>
-      ) : (
-        <>
-          {zonaPaginacion}
-          {/*
-            El título ocupa la zona que en `completo` lleva el folio, y va en el
-            mismo rol `pie`: cada contenido conserva su tratamiento y lo que
-            cambia es qué zona ocupa. La paginación no pierde su versalita por
-            haberse movido a la zona 1.
-          */}
-          <Text style={[estilos.folio, estilos.zonaAuto, estilos.separacion]}>
-            {props.titulo}
-          </Text>
-        </>
-      )}
-
-      <Text style={estilos.leyenda}>{props.leyenda}</Text>
-    </View>
+    // `render`: ver la nota larga de la cabecera. No es un adorno — sin él la
+    // paginación no se imprime. El relleno es `acento.banda`, derivado a 7 : 1
+    // sobre blanco (I.1.8), y entra aquí y no en la hoja de estilos porque
+    // depende del acento del médico.
+    <View
+      style={[estilos.banda, { backgroundColor: props.acento.banda }]}
+      fixed
+      render={() => zonas(props)}
+    />
   )
 }

@@ -404,6 +404,13 @@ const SECCIONES_2P = [
   },
 ] as const
 
+/**
+ * Las mismas tres secciones repetidas, para que la muestra de 2.M desborde a dos
+ * hojas de verdad. Tres no bastan: caben en una y entonces la paginación diría
+ * siempre «1 de 1», que es la cifra que no demuestra nada.
+ */
+const SECCIONES_2M = [...SECCIONES_2P, ...SECCIONES_2P] as const
+
 /** Los firmantes de un Consentimiento, para 2.L. Inventados. */
 const FIRMAS_2L: readonly Firma[] = [
   {
@@ -1071,19 +1078,35 @@ function HojaTaller({
         </View>
       </Page>
 
+      {/*
+        2.M · variante `completo`, en un documento que DESBORDA A DOS HOJAS.
+
+        El desbordamiento no es decorativo: la paginación se compone con la
+        función de render del renderer y esa función **solo corre sobre hojas de
+        verdad**. Con una muestra de una hoja, la zona 2 diría siempre «1 de 1» y
+        el defecto que tuvo este componente —zona vacía, sin error— no se vería
+        aquí sino en el Paso 4, con un formato encima. Por eso esta página va en
+        FLUJO y con contenido de sobra: son las seis secciones, no las tres.
+
+        Las cifras salen de `subPage*`, que cuenta las hojas de ESTA página, no
+        las del taller entero: por eso dice «1 de 2» y «2 de 2» y no «18 de 19».
+      */}
       <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.paginaFlujo}>
         <View style={estilos.guiaZonaSegura} fixed />
         <View style={estilos.guiaCaja} fixed />
 
-        <Rotulo>2.L + 2.M · contenido corto</Rotulo>
+        <Rotulo>2.L + 2.M · pie completo, documento de dos hojas</Rotulo>
         <View style={estilos.muestra}>
-          <EncabezadoSeccion
-            numero={1}
-            titulo="Descripción del procedimiento"
-            texto={SECCIONES_2P[0].texto}
-            primera
-            acento={acento}
-          />
+          {SECCIONES_2M.map((seccion, indice) => (
+            <EncabezadoSeccion
+              key={`${seccion.titulo}-${indice}`}
+              numero={indice + 1}
+              titulo={seccion.titulo}
+              texto={seccion.texto}
+              primera={indice === 0}
+              acento={acento}
+            />
+          ))}
         </View>
 
         <View style={estilos.seccion}>
@@ -1102,19 +1125,14 @@ function HojaTaller({
           />
         </View>
 
-        <PieDocumento
-          variante="completo"
-          folio="RX-2026-0042"
-          leyenda="Documento emitido con Spinus"
-          acento={acento}
-        />
+        <PieDocumento variante="completo" folio="RX-2026-0042" acento={acento} />
       </Page>
 
       <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.paginaFlujo}>
         <View style={estilos.guiaZonaSegura} fixed />
         <View style={estilos.guiaCaja} fixed />
 
-        <Rotulo>2.L + 2.M · contenido largo, con la reticula de cuatro firmas</Rotulo>
+        <Rotulo>2.L + 2.M · pie sin folio, la variante de cinco formatos</Rotulo>
         <View style={estilos.muestra}>
           {SECCIONES_2P.map((seccion, indice) => (
             <EncabezadoSeccion
@@ -1134,8 +1152,7 @@ function HojaTaller({
 
         <PieDocumento
           variante="sinFolio"
-          titulo="Consentimiento informado"
-          leyenda="Documento emitido con Spinus"
+          titulo="Solicitud de laboratorio"
           acento={acento}
         />
       </Page>

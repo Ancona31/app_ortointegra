@@ -707,8 +707,8 @@ geometría de este componente, **no miembros de `filete.*`** (I.1.6).
    normaliza, no redimensiona y no convierte formatos: si el asset no sirve,
    la variante es `monograma`.
 3. **El panel aparece solo en la primera hoja.** En las hojas de continuación
-   lo que importa es folio, paginación y paciente, que viven en el pie y en el
-   riel. Repetirlo cuesta peso —la auditoría documenta el logo instanciado dos
+   lo que importa es paginación, paciente y —en los tres formatos que lo llevan—
+   folio, que viven en el pie y en el riel. Repetirlo cuesta peso —la auditoría documenta el logo instanciado dos
    veces por página desde el mismo PNG de 195 KB— sin agregar identificación.
 4. El panel no se escala por hoja ni por cantidad de contenido.
 
@@ -1806,10 +1806,21 @@ ninguna letra del nombre ni de las cédulas.
 
 **Variantes declaradas**
 
-| Variante | Zonas |
-|---|---|
-| `completo` | Folio · paginación · leyenda |
-| `sin folio` | Paginación · título del documento · leyenda. **Solo Escrito Médico** |
+| Variante | Zonas | Formatos |
+|---|---|---|
+| `completo` | Folio · paginación · leyenda | **Tres:** Receta (II.3), Recibo de Honorarios / Cotización (II.5), Consentimiento (II.7) |
+| `sin folio` | Paginación · título del documento · leyenda | **Cinco:** Laboratorio (II.1), Imagenología (II.2), Suplementación (II.4), Internamiento (II.6), Escrito Médico (II.8) |
+
+> **DECIDIDO — el folio va en tres formatos, no en ocho, y `sin folio` es el caso
+> MAYORITARIO.** El folio existe para que alguien pueda citarte un papel y tú
+> puedas encontrarlo. Solo esos tres circulan hacia un tercero que lo cita — la
+> farmacia, la aseguradora, un juzgado—. En los otros cinco **no era buscable
+> siquiera**: el número vive dentro del JSON del documento, sin columna propia y
+> sin índice, así que lo impreso era decorativo.
+>
+> La variante `sin folio` **deja de ser la excepción del Escrito Médico**. No es
+> el caso raro: es cinco de ocho. La ficha se lee ahora con ese reparto, y la
+> regla 4 dice qué la sostiene.
 
 **Geometría** — la banda vive **fuera de la caja de texto y dentro de la zona
 segura**: `left: margen.izquierdo`, `right: margen.derecho`,
@@ -1821,6 +1832,28 @@ Retícula `auto auto 1fr`, medianil 10 pt, padding lateral 8 pt.
 | 1 | `Folio <folio>` | `pie` |
 | 2 | `Página X de Y` en versalita | **`pie` en versalita**, en `tinta.papel` |
 | 3 | Leyenda, alineada a la derecha | `pie.leyenda` |
+
+**Las tres cadenas, escritas.** Ninguna de las tres estaba en este spec y las
+tres se imprimen: eso es un hueco, no una omisión menor — sin la cadena escrita,
+el que implementa la inventa, y así es como la leyenda acabó diciendo
+«Documento emitido con Spinus», que nadie declaró nunca.
+
+| Zona | Cadena |
+|---|---|
+| 1 | `Folio {folio}` |
+| 2 | `Página X de Y` |
+| 3 | `Documento generado por Spinus · Expediente clínico electrónico · spinus.com.mx` |
+
+Las tres se guardan **en capitalización de oración** y la zona 2 se compone en
+mayúsculas por su versalita, que es la regla 1 del preámbulo de II y lo mismo que
+hacen 2.C, 2.H y 2.K. La zona 3 **no entra por prop**: es invariable en los ocho
+y, si la declarara cada formato, acabaríamos con ocho leyendas —que es la deriva
+que 2.N concilia en los avisos (`CONCILIA D5, D22`).
+
+> **El formato del folio NO se decide aquí.** 2.M lo recibe ya compuesto, como
+> dato, y no lo valida ni lo abrevia. El generador único para los tres formatos
+> que lo llevan es un sub-paso aparte, y ahí van la serie, el ancho, el prefijo y
+> dónde se guarda para poder buscarlo.
 
 **Tokens que consume.** `pie` · `pie.leyenda` · `acento.banda` · `tinta.papel` ·
 `zona.segura` · `margen.izquierdo` · `margen.derecho`.
@@ -1842,10 +1875,15 @@ Retícula `auto auto 1fr`, medianil 10 pt, padding lateral 8 pt.
    excepción admitida a la prohibición de barra sólida (I.3.2): está acotada a
    16 pt de alto, va en `acento.banda` calculado a 7 : 1, y no cruza la zona
    segura.
-4. La variante `sin folio` existe porque el Escrito Médico **no es un documento
-   seriado**. Está declarada aquí para que nadie reponga el folio por
-   consistencia mal entendida.
+4. **La variante `sin folio` es para los cinco formatos que no circulan hacia un
+   tercero que cite el número.** Está declarada aquí para que nadie reponga el
+   folio por consistencia mal entendida — y ahora al revés que antes: lo que hay
+   que justificar es **ponerlo**, no quitarlo.
 5. El pie no invade el bloque de firmas ni al revés.
+6. **La paginación cuenta las hojas de ESTE documento.** Un formato se compone
+   con **un único elemento de página** del renderer, y la cuenta se lee de ahí.
+   Si algún día un formato declarara dos, esta cuenta sigue siendo la correcta y
+   la del PDF entero mentiría.
 
 > **CIERRA 2.M — cómo se implementa la regla 5, y las dos cosas que la sostienen.**
 >
@@ -1870,10 +1908,40 @@ Retícula `auto auto 1fr`, medianil 10 pt, padding lateral 8 pt.
 > ocupa la zona que el folio deja libre con el rol que el folio usaba, `pie`. Lo
 > que cambia entre variantes es qué ocupa cada zona, no cómo se compone.
 
-**Verificación visible.** Emitir un Escrito Médico de dos hojas: en el pie
-aparecen paginación, el título que escribió el médico y la leyenda — **y en
-ningún lugar de ninguna de las dos hojas aparece un folio**. Emitir una receta:
-ahí sí aparece, y en las dos hojas es el mismo número.
+> ### ⚠️ LA ZONA 2 SE CAE SOLA SI EL `render` NO ENVUELVE LA BANDA ENTERA
+>
+> **Medido descomprimiendo el flujo de contenido de un PDF real**, no supuesto.
+> La zona 2 salía VACÍA: banda, folio y leyenda impresos, y ni una letra de
+> paginación. Sin error, sin aviso y sin hueco que delate la falta.
+>
+> **La cadena de causas, en tres pasos:**
+>
+> 1. Un interlineado declarado como razón —que es como lo entrega la escala de
+>    I.1.4: 11 / 7— el renderer lo resuelve a puntos al montar la página.
+> 2. **Cada nodo con función de render obliga a recomponer la página entera**,
+>    una vez por corte de hoja y otra al saber el total. En cada pasada se
+>    resuelven estilos ya resueltos, así que la razón se aplica otra vez sobre un
+>    valor que ya era absoluto: 11 → 77 → 539 pt.
+> 3. Los demás nodos no lo notan porque conservan sus líneas ya maquetadas. El
+>    nodo con render es el único al que se le tiran para rehacerlas, y con 539 pt
+>    de interlineado **su línea ya no cabe en una banda de 16**: el maquetador
+>    devuelve cero líneas.
+>
+> **La regla que sale de aquí: el render va en la BANDA, no en la zona.** Así sus
+> tres zonas se vuelven a crear desde el estilo literal en cada pasada, se
+> resuelven una sola vez y la razón nunca se acumula. La alternativa —quitarle el
+> interlineado a la paginación— también imprime, pero la deja 1.65 pt más baja que
+> el folio, que va a su lado y en el mismo rol.
+>
+> **Vale para todo el chasis, no solo para 2.M.** 2.N va a necesitar exactamente
+> esto para sus tres avisos de pie (anexo A, P2-30).
+
+**Verificación visible.** Emitir una receta de dos hojas: la banda aparece en
+**las dos**, con `PÁGINA 1 DE 2` y `PÁGINA 2 DE 2`, y el folio es el mismo número
+en ambas. Emitir un Escrito Médico de dos hojas: en el pie aparecen paginación,
+el título y la leyenda — **y en ningún lugar de ninguna de las dos hojas aparece
+un folio**. Poner las dos hojas de la receta una junto a otra: si la zona 2 está
+en blanco en las dos, el render no envuelve la banda.
 
 ---
 
@@ -2094,7 +2162,7 @@ que es la misma relación un nivel más abajo.
 
 1. La cabecera dice `SECCIÓN 2 DE 2`. **Nunca «continuación».** Una hoja de
    indicaciones de enfermería no es la continuación de la hoja del paciente: es
-   otro documento dentro del mismo folio.
+   otro documento dentro de la misma solicitud.
 
    > **La cadena la compone el componente**, a partir de dos números que entrega
    > el formato — no entra como texto. Es el mismo cierre que la cadena `URGENTE`
@@ -2665,9 +2733,10 @@ falla algo, el defecto es del chasis, no del formato.
 | | |
 |---|---|
 | Título | `SOLICITUD DE LABORATORIO`, variante `fijo` |
-| Folio | Sí |
+| Folio | **No** |
 | QR | **No** |
 | Firmas | Una: médico tratante |
+| Pie | `PieDocumento` variante **`sin folio`**: paginación · título · leyenda |
 
 > **Decisión.** El título del sistema viejo era «Solicitud de Estudios de
 > Laboratorio». Se acorta. La regla 1 de `TituloDocumento` exige que un título
@@ -2680,6 +2749,11 @@ falla algo, el defecto es del chasis, no del formato.
 > **Sin QR, por arquetipo.** Una solicitud no autoriza nada: en México los
 > estudios se contratan sin solicitud médica. Un QR de verificación sugiere una
 > autorización que el papel no otorga.
+
+> **Sin folio, por el mismo motivo.** Nadie de fuera cita el número de una
+> solicitud: el laboratorio recibe el papel, hace los estudios y no vuelve a
+> referirse a él. Un número que nadie cita y que además no era buscable —vive
+> dentro del JSON, sin columna ni índice— es tinta decorativa (2.M).
 
 ### 2 · Campos
 
@@ -2695,7 +2769,7 @@ falla algo, el defecto es del chasis, no del formato.
 
 `Membrete` completo → `TituloDocumento` fijo → `BloquePaciente` completo →
 `RielDatos` una línea (fecha, diagnóstico) → lista de `EntradaNumerada` →
-`ParserBloques` (notas) → `BloqueFirmas` amplia → `PieDocumento` completo.
+`ParserBloques` (notas) → `BloqueFirmas` amplia → `PieDocumento` sin folio.
 
 `ContadorLista` con `<ÍTEMS>` = **ESTUDIOS**.
 
@@ -2739,10 +2813,11 @@ Arquetipo A. Gemelo de Laboratorio con entrada de cuatro datos y badge.
 | | |
 |---|---|
 | Título | `SOLICITUD DE IMAGENOLOGÍA`, variante `fijo` |
-| Folio | Sí |
+| Folio | **No** — mismo argumento que II.1 |
 | QR | **No** — mismo argumento que II.1 |
 | Firmas | Una: médico tratante |
 | Badge | `BloqueNegativo` variante `urgente`, bajo el título |
+| Pie | `PieDocumento` variante **`sin folio`** |
 
 El cambio de título aplica también a la app y al nombre del archivo descargado
 (Paso 5).
@@ -2765,7 +2840,7 @@ El cambio de título aplica también a la app y al nombre del archivo descargado
 `Membrete` completo → `TituloDocumento` fijo → `BloqueNegativo` urgente →
 `BloquePaciente` completo → `RielDatos` una línea (fecha, diagnóstico) → lista
 de `EntradaNumerada` → `ParserBloques` (notas al servicio) → `BloqueFirmas`
-amplia → `PieDocumento` completo.
+amplia → `PieDocumento` sin folio.
 
 `ContadorLista` con `<ÍTEMS>` = **ESTUDIOS**.
 
@@ -2810,10 +2885,15 @@ entrada, bloque negativo, alarma, reglas de flujo y campo vacío requerido.
 | | |
 |---|---|
 | Título | `RECETA MÉDICA`, variante `fijo` |
-| Folio | Sí |
+| Folio | **Sí** |
 | QR | **Uno solo**, de verificación. El QR del blog sale |
 | Firmas | Una: médico tratante |
 | Membrete | Con **universidad emisora obligatoria** |
+| Pie | `PieDocumento` variante **`completo`** |
+
+> **Uno de los tres formatos con folio y uno de los dos con QR.** La farmacia es
+> la ventanilla que verifica de forma rutinaria y que cita el número cuando algo
+> no cuadra: es el caso de uso que justifica los dos (2.M).
 
 ### 2 · Campos
 
@@ -2834,11 +2914,12 @@ entrada, bloque negativo, alarma, reglas de flujo y campo vacío requerido.
 
 `Membrete` completo → `TituloDocumento` fijo → `BloquePaciente` →
 lista de `EntradaNumerada` → `BloqueDestacado` alarma con `ParserBloques`
-dentro → `ZonaQR` → `BloqueFirmas` simple → `PieDocumento`.
+dentro → `ZonaQR` → `BloqueFirmas` simple → `PieDocumento` completo.
 
 > `CONCILIA D17` — la `ZonaQR` va en el cuerpo de la última hoja, no dentro del
 > pie. La versión anterior de este spec decía «`PieDocumento` completo con QR».
-> Aplica igual a II.4 y II.5.
+> Aplica igual a II.5, que es el otro formato con QR. **Ya no aplica a II.4**, que
+> lo perdió (anexo A, P2-30).
 
 `ContadorLista` con `<ÍTEMS>` = **MEDICAMENTOS**.
 
@@ -2895,9 +2976,16 @@ ranuras ocupadas funcione sin componente paralelo.**
 | | |
 |---|---|
 | Título | `PLAN DE SUPLEMENTACIÓN`, variante `fijo` |
-| Folio | Sí |
-| QR | Sí, de verificación |
+| Folio | **No** |
+| QR | **No** |
 | Firmas | Una: médico tratante |
+| Pie | `PieDocumento` variante **`sin folio`** |
+
+> **Pierde el QR y el folio, y por la misma razón.** El QR sirve donde un tercero
+> verifica de forma rutinaria — la farmacia con una receta, la aseguradora con un
+> recibo. Un plan de suplementación no pasa por ninguna ventanilla: se lo lleva el
+> paciente y lo sigue. Sin verificador rutinario, el QR es una promesa que nadie
+> usa, y el folio un número que nadie cita (2.M, anexo A, P2-30).
 
 ### 2 · Campos
 
@@ -2917,7 +3005,7 @@ ranuras ocupadas funcione sin componente paralelo.**
 
 `Membrete` completo → `TituloDocumento` fijo → `BloquePaciente` con celda de
 peso → lista de `EntradaNumerada` → `ParserBloques` (notas) → `BloqueDestacado`
-cita → `ZonaQR` → `BloqueFirmas` simple → `PieDocumento`.
+cita → `BloqueFirmas` simple → `PieDocumento` sin folio.
 
 `ContadorLista` con `<ÍTEMS>` = **SUPLEMENTOS**.
 
@@ -2965,9 +3053,13 @@ Arquetipo E. Único formato con lógica de cálculo.
 | | |
 |---|---|
 | Título | `RECIBO DE HONORARIOS` o `COTIZACIÓN`, variante `fijo` con dos valores |
-| Folio | Sí, autogenerado |
-| QR | Sí, de verificación |
+| Folio | **Sí**, autogenerado |
+| QR | **Sí**, de verificación |
 | Firmas | Una: médico tratante |
+| Pie | `PieDocumento` variante **`completo`** |
+
+> **El otro formato con folio y con QR.** La ventanilla aquí es la aseguradora,
+> que verifica y cita el número por oficio (2.M).
 
 > El título tiene dos valores porque el documento tiene dos usos, pero **no es
 > la variante `variable`**: el médico no lo escribe, lo selecciona. La variante
@@ -2997,7 +3089,7 @@ jerarquía visible, **no en gris pequeño al pie**.
 `Membrete` completo → `TituloDocumento` fijo → `BloquePaciente` →
 `RielDatos` de aseguradora → lista de `EntradaNumerada` → `RielImportes` →
 `ParserBloques` (notas) → leyenda de no fiscal → `ZonaQR` →
-`BloqueFirmas` simple → `PieDocumento`.
+`BloqueFirmas` simple → `PieDocumento` completo.
 
 `ContadorLista` con `<ÍTEMS>` = **CONCEPTOS**.
 
@@ -3047,10 +3139,19 @@ y la transición de sección.
 | | |
 |---|---|
 | Título | `SOLICITUD DE INTERNAMIENTO`, variante `fijo` |
-| Folio | Sí, **en todas las hojas** |
+| Folio | **No** |
 | QR | **No** |
 | Firmas | Sección 1: paciente y médico. Sección 2: solo médico |
 | Badge | `BloqueNegativo` variante `urgente` |
+| Pie | `PieDocumento` variante **`sin folio`**, en todas las hojas |
+
+> **Lo que ata la hoja suelta aquí es la paginación y el riel reducido del
+> paciente, no el folio.** Queda declarado para que nadie reponga el folio
+> apelando al hallazgo de la auditoría sobre hojas que se separan (§8.3, §5 de
+> abajo): ese hallazgo lo cubren las otras dos piezas, que son las que dicen de
+> quién es la hoja y si falta alguna. El internamiento es documento de apoyo
+> interno del hospital, sin valor legal propio y sin tercero que cite un número
+> (2.M, anexo A, P2-30).
 
 **Sección 1** la leen el paciente y Admisión. **Sección 2** la leen enfermería y
 el residente.
@@ -3089,7 +3190,7 @@ instrucciones con lista **numerada** → `BloqueFirmas` amplia con dos firmas.
 **Sección 2** — `BloquePaciente` reducido → `ParserBloques` (indicaciones de
 ingreso a piso) → `BloqueFirmas` amplia con una firma.
 
-`PieDocumento` completo en todas las hojas.
+`PieDocumento` **sin folio** en todas las hojas.
 
 ### 4 · Ancla de entrada
 
@@ -3097,10 +3198,12 @@ No usa `EntradaNumerada`. Sus listas salen de `ParserBloques` y de `RielDatos`.
 
 ### 5 · Excepciones
 
-- **Folio, paginación y `BloquePaciente` reducido en TODAS las hojas.** En el
+- **Paginación y `BloquePaciente` reducido en TODAS las hojas.** En el
   hospital las hojas se separan: una hoja de indicaciones sin nombre de
   paciente es un riesgo de seguridad, no un descuido de maquetación. El sistema
-  viejo emitía la página 2 casi vacía y sin nombre (auditoría §8.3).
+  viejo emitía la página 2 casi vacía y sin nombre (auditoría §8.3). **Sin
+  folio:** lo que identifica la hoja es el nombre del paciente, y lo que dice si
+  falta otra es la paginación.
 - **Requerimientos especiales sin contador:** el catálogo es abierto, el médico
   agrega y quita. Un total sería una cifra falsa.
 - **Instrucciones al paciente con lista numerada**, no con raya: primero
@@ -3118,7 +3221,8 @@ de un encabezado con sus viñetas. La sección 2 empieza con un **filete
 claramente más grueso que cualquier otro del documento**, su cabecera dice
 `SECCIÓN 2 DE 2`, lleva el nombre del paciente arriba, y **los dos primeros
 renglones salen en minúsculas y sin raya**. Separar la hoja 2 de la hoja 1: por
-sí sola identifica paciente, folio y página.
+sí sola identifica paciente y página — **y no lleva folio en ninguna de las
+dos**.
 
 ---
 
@@ -3132,10 +3236,18 @@ firmas y el ciclo de vida del documento.
 | | |
 |---|---|
 | Título | `CARTA DE CONSENTIMIENTO INFORMADO`, variante `fijo` |
-| Folio | Sí, en todas las hojas |
-| QR | **Sí**, `ZonaQR` en la última hoja |
+| Folio | **Sí**, en todas las hojas |
+| QR | **No** |
 | Firmas | Cinco firmantes → `BloqueFirmas` variante `retícula`, repartido en dos hojas |
 | Marca de estado | **Sí**, `MarcaEstado` (2.S) |
+
+> **Conserva el folio y pierde el QR.** No son la misma decisión. El folio se
+> queda porque la NOM-004 pide poder identificar una pieza del expediente y este
+> es la pieza que más se cita fuera. El QR sale porque **el consentimiento se
+> firma y se archiva en papel**: no hay ventanilla que lo verifique de forma
+> rutinaria, como sí la hay para una receta en la farmacia o un recibo en la
+> aseguradora. Un QR que casi nunca se escanea es una garantía nominal (anexo A,
+> P2-30, que revoca la mitad de D36).
 
 **Las cuatro decisiones de conciliación de este formato:**
 
@@ -3155,10 +3267,12 @@ firmas y el ciclo de vida del documento.
 > documento repagina entero y su número de hojas puede cambiar.** No es un
 > ajuste tipográfico.
 >
-> `CONCILIA D36` — lleva `ZonaQR` y `MarcaEstado`, aunque el diseño no los
-> instancie. Es el documento donde la verificación por un tercero —aseguradora,
-> CONAMED— tiene más valor, y los cuatro estados estaban comprometidos desde la
-> partición en dos entregas para no rediseñarlo dos veces.
+> `CONCILIA D36` — llevaba `ZonaQR` y `MarcaEstado`, aunque el diseño no los
+> instancie, porque es el documento donde la verificación por un tercero
+> —aseguradora, CONAMED— tiene más valor. **La mitad del QR queda revocada**
+> (anexo A, P2-30): ese valor es real pero no es rutinario, y el papel firmado se
+> archiva. `MarcaEstado` se queda entera: los cuatro estados estaban comprometidos
+> desde la partición en dos entregas para no rediseñarlo dos veces.
 
 ### 2 · Campos
 
@@ -3182,7 +3296,7 @@ firmas y el ciclo de vida del documento.
 
 `Membrete` completo → `TituloDocumento` fijo → `BloquePaciente` →
 siete `EncabezadoSeccion` con su texto corrido → autorizaciones →
-`BloqueFirmas` retícula, repartido en dos hojas → `ZonaQR` → `PieDocumento`.
+`BloqueFirmas` retícula, repartido en dos hojas → `PieDocumento` completo.
 Hoja de denegación o revocación al final, opcional. Hoja de anexo de
 identificaciones al final, segunda entrega.
 
@@ -3235,7 +3349,7 @@ escala del cuerpo viniendo del editor.
 | | |
 |---|---|
 | Título | Variante **`variable`**. Lo escribe el médico. Variante `ausente` si no lo pone |
-| Folio | **No. Único formato sin folio** |
+| Folio | **No** |
 | QR | **No** |
 | Firmas | Una: médico tratante |
 | Pie | `PieDocumento` variante **`sin folio`**: paginación · título · leyenda |
@@ -3246,6 +3360,9 @@ escala del cuerpo viniendo del editor.
 > que mostrar en la página de verificación, y por eso tampoco lleva QR. Si
 > alguien agrega folio «por consistencia», está inventando una serie que no
 > existe.
+>
+> **Ya no es el único sin folio: son cinco de ocho** (2.M, anexo A, P2-30). Este
+> formato fue el que hizo falta la variante, no el que la agota.
 
 ### 2 · Campos
 
@@ -3409,6 +3526,7 @@ registran aquí para que nadie las lea como reinterpretaciones ni intente
 | P2-27 | **La regla que impide el bug §8.1 no vive en 2.L ni en 2.M: vive en el `paddingBottom` de la página.** Queda declarado en las dos fichas, con el desglose `68 = 36 + 16 + 16`. Declarado también que la banda se repite por nodo fijo y que la paginación se compone con la función de render, que es lo único que conoce la Y real | Las dos fichas se prohíben mutuamente el solape y ninguna de las dos puede verlo: el bloque de firmas va en el flujo y la banda va anclada al papel. Al componer la primera hoja de prueba quedó claro que la garantía es de quien monta la página, y que sin declararlo el bug vuelve sin que ninguna de las dos fichas se haya incumplido | 2.L · 2.M · I.1.2 |
 | P2-28 | **Cuatro declaraciones menores de 2.P y 2.Q.** El número de sección va sin cero a la izquierda y el título de sección no se transforma a mayúsculas (2.P); el aire entre el filete de apertura y la cabecera de 2.Q son 8 pt, `COINCIDENCIA` con el de 2.P; y la cadena `SECCIÓN n DE m` la compone el componente a partir de dos números | Las cuatro son huecos de los que solo se ve que faltan cuando hay que escribir la línea. La de la cadena es la que importa: la regla 1 de 2.Q prohíbe la palabra «continuación», y componiendo la cadena dentro **no hay por dónde escribirla** — el mismo cierre que la cadena `URGENTE` de 2.H | 2.P · 2.Q · 2.H |
 | P2-29 | **2.S no se puede componer con texto en este renderer y queda sin construir.** react-pdf no emite nunca el operador `Tr` de modo de trazo, y el `<Text>` de SVG descarta `stroke`: la palabra sale **negra y rellena**, que es lo que la regla 2 prohíbe. Comprobado descomprimiendo el flujo de contenido de un PDF real. La ficha queda intacta salvo el aviso; las dos rutas —contorno vectorial por `<Path>`, o revisar la regla 2 contra la lámina— quedan escritas con su coste | Es el segundo límite del renderer que aparece contra una regla no negociable del spec, tras las versalitas de I.3.1, y el primero que **bloquea** un componente en vez de dejarlo componible con reservas. Se comprobó midiendo antes de escribir una línea del componente: la ficha promete letra hueca y hueca es lo único que no se puede | 2.S · I.3.8 |
+| P2-30 | **El folio baja de ocho formatos a tres y el QR de cuatro a dos; la variante `sin folio` de 2.M pasa a ser el caso mayoritario, cinco de ocho.** Llevan folio Receta, Recibo y Consentimiento; llevan QR Receta y Recibo. Quedan escritas en la ficha las **tres cadenas literales de la banda**, que no estaban en ninguna parte, y corregida la leyenda —decía «Documento emitido con Spinus», que nadie declaró—. Y queda declarada la regla de implementación que hacía falta para que la zona 2 se imprima: **la función de render envuelve la banda entera, no la zona**. Revoca la mitad de D36 —el QR del Consentimiento— y deja el **formato del folio fuera de 2.M**: es un sub-paso aparte | Tres hallazgos en el mismo sitio y ninguno se ve sin ejecutar. **El folio no era buscable**: vive dentro del JSON del documento, sin columna ni índice, así que el número impreso no lo podía encontrar nadie — un identificador que no identifica. **El QR no tenía verificador rutinario** en Suplementación ni en Consentimiento: el primero se lo lleva el paciente, el segundo se firma y se archiva en papel. Y **la paginación no se imprimía**: el interlineado de la escala es una razón, cada pasada de render la vuelve a aplicar sobre un valor ya absoluto —11 → 77 → 539 pt— y la línea deja de caber en la banda de 16, sin error y sin hueco que lo delate. Medido descomprimiendo el flujo de contenido de un PDF real | 2.M · 2.A · 2.Q · II.1 · II.2 · II.3 · II.4 · II.5 · II.6 · II.7 · II.8 · A D17 · A D36 |
 Una cuarta, menor, sin fila propia: `caja.alto` queda marcado en I.1.1 como
 derivado que **se implementa como fórmula**. El Paso 0 lo había escrito como
 literal 670.
@@ -3421,4 +3539,5 @@ literal 670.
 | Repaginación del Consentimiento | Consecuencia de D33. No se puede estimar sin generar el PDF |
 | La sangría de las tres cajas enmarcadas del Recibo | 2.U regla 4. El dispositivo no la impone —un riel enmarcado y una leyenda de dos líneas no la llevan igual— y el archivo solo trae medida la de 2.R (`12 14 14`). Se mide al construir II.5 |
 | **2.S · la letra hueca** | El renderer no puede trazar texto: no emite el operador `Tr` y el `<Text>` de SVG descarta `stroke` (comprobado, P2-29). Elegir entre convertir las cuatro cadenas a trazado vectorial —versionado o generado en emisión— o revisar la regla 2 contra la lámina. **Lo que no se hace es componerla rellena** |
+| **El generador de folio** | 2.M lo recibe como dato y no decide su forma. Serie, ancho, prefijo, reinicio anual y —lo que hoy falta de verdad— **dónde se guarda para poder buscarlo**: hoy vive dentro del JSON del documento, sin columna ni índice. Es un sub-paso aparte y **único para los tres formatos que llevan folio** (anexo A, P2-30) |
 | Gate de extracción de texto | I.3.1. No se resuelve en papel: se corre contra el primer PDF real de react-pdf. **Lo que sí quedó resuelto en papel es qué hacer si falla**: la escalera de remedios de I.3.1, con la vía de administración como primer sitio a mirar por ser el único elemento del gate que es clínico y traqueado a la vez |
