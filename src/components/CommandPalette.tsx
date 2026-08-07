@@ -3,9 +3,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Search, User, X, ArrowRight, Loader2, UserPlus, ChevronLeft } from 'lucide-react'
+import { Search, User, X, ArrowRight, Loader2, UserPlus, ChevronLeft, FileText } from 'lucide-react'
 import { calcularEdad } from '@/lib/patientUtils'
 import { useProfile } from '@/hooks/useProfile'
+import { normalizarFolio } from '@/lib/documentos/folio'
 import type { DuplicatePatientResponse } from '@/types'
 
 type Paciente = {
@@ -15,6 +16,37 @@ type Paciente = {
   fecha_nacimiento?: string | null
   numero_expediente?: string | null
   sexo?: string | null
+}
+
+/**
+ * El documento que devuelve una búsqueda por folio.
+ *
+ * `pacientes` admite objeto o arreglo porque PostgREST devuelve la relación
+ * embebida de una u otra forma según cómo infiera la cardinalidad, y este
+ * cliente no lleva tipos generados. Se resuelve abajo, en `nombreDePaciente()`.
+ */
+type DocumentoConFolio = {
+  id: string
+  folio: string
+  tipo: string
+  created_at: string
+  paciente_id: string
+  pacientes?: NombrePaciente | NombrePaciente[] | null
+}
+
+type NombrePaciente = { nombre: string; apellidos: string }
+
+/** Cómo se lee cada `documentos.tipo` de los tres formatos que llevan folio. */
+const ETIQUETA_TIPO: Record<string, string> = {
+  receta: 'Receta médica',
+  nota_honorarios: 'Honorarios / Cotización',
+  consentimiento_informado: 'Consentimiento informado',
+}
+
+function nombreDePaciente(p: DocumentoConFolio['pacientes']): string {
+  const uno = Array.isArray(p) ? p[0] : p
+  if (!uno) return 'Paciente sin nombre'
+  return `${uno.nombre} ${uno.apellidos}`.trim()
 }
 
 /* Descompone el query en nombre/apellidos si tiene espacio */
@@ -30,6 +62,7 @@ export default function CommandPalette() {
   const [open, setOpen]       = useState(false)
   const [query, setQuery]     = useState('')
   const [results, setResults] = useState<Paciente[]>([])
+  const [documento, setDocumento] = useState<DocumentoConFolio | null>(null)
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState(0)
 
@@ -63,7 +96,7 @@ export default function CommandPalette() {
   /* Reset al abrir */
   useEffect(() => {
     if (open) {
-      setQuery(''); setResults([]); setSelected(0)
+      setQuery(''); setResults([]); setDocumento(null); setSelected(0)
       setModoCrear(false)
       setFormNombre(''); setFormApellidos(''); setFormFechaNac('')
       setFormConsentimiento(false)
@@ -73,9 +106,40 @@ export default function CommandPalette() {
 
   /* Búsqueda con debounce */
   const buscar = useCallback(async (q: string) => {
-    if (!q.trim()) { setResults([]); return }
+    if (!q.trim()) { setResults([]); setDocumento(null); return }
     setLoading(true)
     const supabase = createClient()
+
+    /*
+      BÚSQUEDA POR FOLIO — el modo lo decide la FORMA de lo escrito, no un
+      conmutador. `RX-2026-0042` no se parece a ningún nombre de paciente, así
+      que `normalizarFolio()` devuelve `null` para todo lo demás y la búsqueda
+      sigue siendo la de siempre. Quien llama por teléfono dicta el número y el
+      médico lo teclea tal cual: sin ceros, en minúsculas o con espacios.
+
+      Es GLOBAL a propósito: quien tiene el papel en la mano no sabe de qué
+      paciente es, que es justo lo que hace inútil buscar dentro de un expediente.
+
+      El alcance lo pone la RLS, no esta consulta. `documentos_select` limita a
+      `subido_por = auth.uid()` dentro de la propia clínica, así que un folio de
+      otro médico no aparece aunque se teclee entero. No se toca esa frontera
+      desde aquí.
+    */
+    const folio = normalizarFolio(q)
+    if (folio !== null) {
+      const { data } = await supabase
+        .from('documentos')
+        .select('id, folio, tipo, created_at, paciente_id, pacientes(nombre, apellidos)')
+        .eq('folio', folio)
+        .maybeSingle()
+      setDocumento(data ?? null)
+      setResults([])
+      setLoading(false)
+      setSelected(0)
+      return
+    }
+
+    setDocumento(null)
     const qNorm = q.trim().replace(/\s+/g, ' ')
     const { data } = await supabase
       .from('pacientes')
@@ -95,8 +159,15 @@ export default function CommandPalette() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [query, buscar])
 
-  /* Total de opciones navegables: resultados + opción "Crear" si aplica */
-  const mostrarOpcionCrear = query.trim().length >= 2 && !loading && results.length < 8
+  /* Lo tecleado tiene forma de folio: el buscador está en modo documento. */
+  const esFolio = normalizarFolio(query) !== null
+
+  /*
+    Total de opciones navegables: resultados + opción "Crear" si aplica.
+    En modo folio no se ofrece crear: nadie quiere un paciente llamado
+    «RX-2026-0042».
+  */
+  const mostrarOpcionCrear = !esFolio && query.trim().length >= 2 && !loading && results.length < 8
   const totalOpciones = results.length + (mostrarOpcionCrear ? 1 : 0)
 
   function handleKey(e: React.KeyboardEvent) {
@@ -105,6 +176,7 @@ export default function CommandPalette() {
     if (e.key === 'ArrowUp')   { e.preventDefault(); setSelected(s => Math.max(s - 1, 0)) }
     if (e.key === 'Enter') {
       e.preventDefault()
+      if (documento) { abrirDocumento(documento); return }
       if (results[selected]) { navegar(results[selected].id); return }
       if (mostrarOpcionCrear && selected === results.length) abrirCrear()
     }
@@ -113,6 +185,17 @@ export default function CommandPalette() {
   function navegar(id: string) {
     setOpen(false)
     router.push(isSecretary ? '/expediente' : `/expediente/${id}`)
+  }
+
+  /*
+    Un folio lleva al expediente de SU paciente, a la pestaña de documentos:
+    quien busca por folio ya sabe qué documento quiere y lo que le falta es el
+    contexto. La secretaria va al listado, como en `navegar()`: la regla de a
+    dónde puede entrar cada rol no cambia por haber llegado desde un folio.
+  */
+  function abrirDocumento(doc: DocumentoConFolio) {
+    setOpen(false)
+    router.push(isSecretary ? '/expediente' : `/expediente/${doc.paciente_id}/documentos`)
   }
 
   function abrirCrear() {
@@ -187,13 +270,44 @@ export default function CommandPalette() {
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 onKeyDown={handleKey}
-                placeholder="Buscar paciente por nombre..."
+                placeholder="Buscar paciente por nombre o documento por folio..."
                 className="flex-1 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none bg-transparent"
               />
               <button onClick={() => setOpen(false)} className="text-slate-300 hover:text-slate-500 transition-colors">
                 <X size={16} />
               </button>
             </div>
+
+            {/* Resultado por folio — uno como mucho: el índice es único */}
+            {documento && (
+              <ul className="py-2">
+                <li>
+                  <button
+                    onClick={() => abrirDocumento(documento)}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left bg-slate-50 hover:bg-slate-100 transition-colors"
+                  >
+                    <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                      <FileText size={15} className="text-[#1e5fa8]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-slate-800 text-sm truncate">
+                        <span className="font-mono">{documento.folio}</span>
+                        {' · '}
+                        {ETIQUETA_TIPO[documento.tipo] ?? documento.tipo}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-0.5 truncate">
+                        {nombreDePaciente(documento.pacientes)}
+                        {' · '}
+                        {new Date(documento.created_at).toLocaleDateString('es-MX', {
+                          day: 'numeric', month: 'short', year: 'numeric',
+                        })}
+                      </p>
+                    </div>
+                    <ArrowRight size={14} className="text-slate-400 flex-shrink-0" />
+                  </button>
+                </li>
+              </ul>
+            )}
 
             {/* Resultados */}
             {(results.length > 0 || mostrarOpcionCrear) && (
@@ -255,16 +369,29 @@ export default function CommandPalette() {
             )}
 
             {/* Sin resultados (sin mostrar la opción de crear, que ya está arriba) */}
-            {query && !loading && results.length === 0 && !mostrarOpcionCrear && (
+            {query && !loading && results.length === 0 && !documento && !mostrarOpcionCrear && (
               <div className="flex flex-col items-center gap-2 py-10 text-slate-400">
-                <User size={32} className="opacity-30" />
-                <p className="text-sm">Sin resultados para "{query}"</p>
+                {esFolio ? <FileText size={32} className="opacity-30" /> : <User size={32} className="opacity-30" />}
+                <p className="text-sm">Sin resultados para &quot;{query}&quot;</p>
+                {/*
+                  En modo folio el vacío es ambiguo y hay que desambiguarlo: el
+                  folio puede no existir, o existir y ser de otro médico —la RLS
+                  lo oculta—, o ser de los 421 documentos anteriores a la
+                  columna, que llevan el folio dentro de `contenido` y no aquí.
+                  Sin esta línea, las tres se leen como «no existe».
+                */}
+                {esFolio && (
+                  <p className="text-xs text-center px-8 leading-relaxed">
+                    Ningún documento tuyo con ese folio. Los emitidos antes del
+                    folio correlativo no se encuentran por aquí.
+                  </p>
+                )}
               </div>
             )}
 
             {!query && (
               <div className="px-4 py-3 text-xs text-slate-400 flex items-center justify-between">
-                <span>Escribe el nombre del paciente</span>
+                <span>Nombre del paciente, o folio del documento</span>
                 <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">Esc</span>
               </div>
             )}
