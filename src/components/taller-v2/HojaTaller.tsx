@@ -40,6 +40,10 @@ import BloqueDestacado from '@/lib/pdf/v2/BloqueDestacado'
 import ContadorLista from '@/lib/pdf/v2/ContadorLista'
 import ParserBloques from '@/lib/pdf/v2/ParserBloques'
 import EntradaNumerada from '@/lib/pdf/v2/EntradaNumerada'
+import EncabezadoSeccion from '@/lib/pdf/v2/EncabezadoSeccion'
+import AperturaSeccion from '@/lib/pdf/v2/AperturaSeccion'
+import PieDocumento from '@/lib/pdf/v2/PieDocumento'
+import BloqueFirmas, { type Firma } from '@/lib/pdf/v2/BloqueFirmas'
 import { registrarFuentesV2 } from '@/lib/pdf/v2/fonts'
 import {
   CAJA,
@@ -84,6 +88,23 @@ const GUIA = {
 const estilos = StyleSheet.create({
   pagina: {
     backgroundColor: TINTA.papel,
+  },
+  /**
+   * Página en FLUJO, no en posición absoluta como el resto del taller. Hace falta
+   * para 2.L y 2.M: el bloque de firmas va detrás del contenido y la banda de pie
+   * se ancla al papel, así que la comprobación de que no se solapan solo tiene
+   * sentido con el contenido fluyendo de verdad.
+   *
+   * El `paddingBottom: margen.inferior` **es la garantía de la regla 4 de 2.L**:
+   * reserva los 36 + 16 + 16 pt donde vive la banda. Sin él, el contenido llegaría
+   * hasta el borde y el pie se le montaría encima — el bug §8.1.
+   */
+  paginaFlujo: {
+    backgroundColor: TINTA.papel,
+    paddingTop: MARGEN.superior,
+    paddingLeft: MARGEN.izquierdo,
+    paddingRight: MARGEN.derecho,
+    paddingBottom: MARGEN.inferior,
   },
   guiaZonaSegura: {
     position: 'absolute',
@@ -359,6 +380,47 @@ const ENTRADAS_2G = [
     nota: 'Una tableta en ayunas mientras dure el antiinflamatorio.',
   },
 ] as const
+
+/**
+ * Secciones de un Consentimiento, para 2.P. Texto INVENTADO con la longitud que
+ * tendría el real: un párrafo de dos líneas no demuestra nada sobre la bandera
+ * izquierda, que es lo que hay que mirar aquí.
+ */
+const SECCIONES_2P = [
+  {
+    titulo: 'Descripción del procedimiento',
+    texto:
+      'Se le practicará una artroscopia de rodilla derecha bajo anestesia regional. El procedimiento consiste en introducir una cámara y dos instrumentos a través de incisiones de menos de un centímetro para revisar la articulación por dentro, recortar la porción de menisco lesionada y lavar la cavidad. La intervención dura entre cuarenta y sesenta minutos y no requiere transfusión en condiciones normales. El ingreso es el mismo día y el alta se prevé a las pocas horas, salvo complicación.',
+  },
+  {
+    titulo: 'Riesgos específicos',
+    texto:
+      'Toda intervención tiene riesgos. Los más frecuentes en este procedimiento son la inflamación y el derrame articular durante las primeras semanas, la rigidez temporal y el dolor en las incisiones. Con menor frecuencia pueden presentarse infección de la articulación, trombosis venosa profunda de la pierna intervenida, lesión de un vaso o de un nervio de la zona, y persistencia de las molestias que motivaron la cirugía. En un porcentaje pequeño de casos puede ser necesaria una segunda intervención.',
+  },
+  {
+    titulo: 'Alternativas y consecuencias de no tratarse',
+    texto:
+      'La alternativa al procedimiento es el tratamiento conservador con rehabilitación, analgésicos e infiltraciones, que en algunos pacientes reduce las molestias sin necesidad de cirugía. De no tratarse, la lesión meniscal puede mantener el dolor y los bloqueos de la rodilla, limitar la marcha y acelerar el desgaste del cartílago vecino. Usted puede revocar este consentimiento en cualquier momento antes del procedimiento, sin que ello afecte a la atención que reciba.',
+  },
+] as const
+
+/** Los firmantes de un Consentimiento, para 2.L. Inventados. */
+const FIRMAS_2L: readonly Firma[] = [
+  {
+    rol: 'Paciente',
+    nombre: 'María Fernanda Ruiz Ortega',
+    credenciales: ['Paciente'],
+  },
+  {
+    rol: 'Familiar responsable',
+    nombre: 'Jorge Ruiz Medina',
+    credenciales: ['Hermano'],
+  },
+  // Los dos testigos van SIN nombre a propósito: por NOM-004 la firma permanece
+  // y su renglón queda para llenarse a mano. Es lo que hay que comprobar.
+  { rol: 'Testigo 1' },
+  { rol: 'Testigo 2' },
+]
 
 /** El texto de la verificación visible de 2.J, tal como lo pide la ficha. */
 const VERIFICACION_2J = [
@@ -931,6 +993,151 @@ function HojaTaller({
             abrir el segundo.
           </Text>
         </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <Rotulo>2.P seccion · tres secciones seguidas</Rotulo>
+          <View style={estilos.muestra}>
+            {SECCIONES_2P.map((seccion, indice) => (
+              <EncabezadoSeccion
+                key={seccion.titulo}
+                numero={indice + 1}
+                titulo={seccion.titulo}
+                texto={seccion.texto}
+                primera={indice === 0}
+                acento={acento}
+              />
+            ))}
+          </View>
+
+          <Text style={estilos.nota}>
+            2.P · EncabezadoSeccion. El borde DERECHO de los párrafos tiene que
+            quedar desigual: si está alineado, quedó justificado y hay palabras
+            partidas con guion — el espécimen lo tiene así y queda superado por
+            I.3.2. El número es de sección y va SIN cero a la izquierda: el 01 es
+            de 2.G y es de un ítem, no de una sección. Entre secciones hay
+            «transicion.entreSecciones», que mide lo mismo que «espacio.24» y no es
+            el mismo token.
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <Rotulo>2.Q apertura · comparada con el filete del membrete</Rotulo>
+          <View style={estilos.muestra}>
+            <Membrete
+              variante="continuacion"
+              acento={acento}
+              medico={medicoMembrete(medico)}
+            />
+          </View>
+
+          <View style={estilos.seccion}>
+            <AperturaSeccion
+              numero={2}
+              total={2}
+              lector="Enfermería y residente de piso"
+              acento={acento}
+            />
+          </View>
+
+          <View style={estilos.seccion}>
+            <EncabezadoSeccion
+              numero={1}
+              titulo="Indicaciones de ingreso a piso"
+              texto="Se anotan a continuación las indicaciones de ingreso. La sección la leen enfermería y el residente de guardia, no el paciente."
+              primera
+              acento={acento}
+            />
+          </View>
+
+          <Text style={estilos.nota}>
+            2.Q · AperturaSeccion. Los tres filetes de esta hoja, de arriba abajo:
+            el del membrete, el de apertura y el de una sección normal. El de
+            apertura tiene que verse claramente más grueso que cualquier otro,
+            INCLUIDO el del membrete: es el más grueso del sistema y su uso está
+            limitado a este componente. La cabecera dice SECCIÓN 2 DE 2 y la
+            compone el componente a partir de dos números — «continuación» no cabe
+            porque no hay por dónde escribirla.
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.paginaFlujo}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <Rotulo>2.L + 2.M · contenido corto</Rotulo>
+        <View style={estilos.muestra}>
+          <EncabezadoSeccion
+            numero={1}
+            titulo="Descripción del procedimiento"
+            texto={SECCIONES_2P[0].texto}
+            primera
+            acento={acento}
+          />
+        </View>
+
+        <View style={estilos.seccion}>
+          <BloqueFirmas
+            variante="simple"
+            firmas={[
+              {
+                rol: 'Firma y sello del médico',
+                nombre: medico.nombre,
+                credenciales: [
+                  `Céd. Prof. ${medico.cedulaProfesional}`,
+                  `Céd. Esp. ${medico.cedulaEspecialidad}`,
+                ],
+              },
+            ]}
+          />
+        </View>
+
+        <PieDocumento
+          variante="completo"
+          folio="RX-2026-0042"
+          leyenda="Documento emitido con Spinus"
+          acento={acento}
+        />
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.paginaFlujo}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <Rotulo>2.L + 2.M · contenido largo, con la reticula de cuatro firmas</Rotulo>
+        <View style={estilos.muestra}>
+          {SECCIONES_2P.map((seccion, indice) => (
+            <EncabezadoSeccion
+              key={seccion.titulo}
+              numero={indice + 1}
+              titulo={seccion.titulo}
+              texto={seccion.texto}
+              primera={indice === 0}
+              acento={acento}
+            />
+          ))}
+        </View>
+
+        <View style={estilos.seccion}>
+          <BloqueFirmas variante="reticula" firmas={FIRMAS_2L} />
+        </View>
+
+        <PieDocumento
+          variante="sinFolio"
+          titulo="Consentimiento informado"
+          leyenda="Documento emitido con Spinus"
+          acento={acento}
+        />
       </Page>
     </Document>
   )

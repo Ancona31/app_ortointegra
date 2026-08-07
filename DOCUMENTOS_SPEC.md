@@ -1706,7 +1706,7 @@ total, está contando el documento y no la hoja.
 
 | Variante | Cuándo |
 |---|---|
-| `simple` | Una firma. Caja de 222 pt |
+| `simple` | Una firma. Caja de `cierre.derecha` |
 | `pareja` | Dos firmas en la misma fila |
 | `retícula` | De 3 a 6 firmas. Dos columnas, medianil 24 pt, padding de celda `14 0 4` |
 
@@ -1734,12 +1734,38 @@ firma.
 
 **Tokens que consume.** `firma.rol` · `firma.nombre` · `firma.credencial` ·
 `firma.espacio` · `filete.fino` · `tinta.negra` (color de la línea) ·
-`espacio.4` · `manuscrito.ancho`.
+`espacio.4` · `cierre.derecha` (caja de la variante `simple`) · `caja.ancho`
+(las dos variantes en fila).
 
 > **REVISADA 2.L** — es la única de las quince cuya lista ya nombraba roles
 > completos y tokens existentes. Solo se le añade `tinta.negra`: la ficha
 > declaraba el grosor de la línea de firma y no su color, y un grosor sin tinta
 > no se puede pintar.
+
+> **CIERRA 2.L — la caja de `simple` es `cierre.derecha`, y `manuscrito.ancho`
+> sale de la lista.** Los 222 pt que declaraba la variante quedan muertos: la caja
+> de firma vive en la **columna derecha de la fila de cierre** (I.1.3), que es de
+> donde salió el 246 de 2.T al cerrarse H9. *ASUMIENDO* que el 222 venga de una
+> generación con otro reparto —222 + 24 de medianil da exactamente los 246 de la
+> columna—, pero eso es una hipótesis sobre su origen, no sobre su validez: el
+> valor medido es el de la columna.
+>
+> Y este componente **no consume ningún token del grupo `manuscrito`**, aunque
+> I.1.5 diga que su grupo aplica a «líneas de firma manuscrita»: el alto del
+> espacio de escritura es `firma.espacio` (77) y no `manuscrito.alto` (20), y el
+> grosor de la línea es `filete.fino` citado por su nombre. El ancho tampoco:
+> ninguna de las tres variantes mide 246 por ser una línea de pluma — la `simple`
+> lo mide por ser una columna. **Es la tercera vez que el 246 se lee como el token
+> equivocado** (anexo A, P2-26).
+
+**Geometría de las variantes en fila** — dos columnas iguales sobre `caja.ancho`,
+medianil 24 pt, y padding de celda `14 0 4` **solo en `retícula`**: es lo que
+separa una FILA de la siguiente, 14 pt sobre cada celda y 4 bajo ella. En
+`pareja` hay una sola fila y no hay nada que separar.
+
+> `COINCIDENCIA` — el medianil de 24 pt vale lo mismo que `cierre.medianil` y no
+> es el mismo valor: aquel separa las dos columnas desiguales de la fila de cierre
+> —216 y 246—, este separa dos celdas iguales de firma. No se fusionan.
 
 **Reglas**
 
@@ -1753,6 +1779,18 @@ firma.
    viejo, presente en las dos páginas de Internamiento y en Consentimiento.
 5. La rúbrica del médico es un trazo capturado; la de los demás firmantes es
    espacio en blanco sobre la línea, del alto de la variante.
+6. **El renglón del nombre se reserva aunque el nombre no venga.** No colapsa:
+   un testigo sin nombre deja su línea **y su renglón** para llenarse a mano
+   (II.7 §5, NOM-004). Colapsarlo dejaría dos firmas vecinas de alto distinto y,
+   peor, quitaría el sitio donde se escribe el nombre.
+
+> **CIERRA 2.L — quién garantiza la regla 4, que no es este componente.** El
+> bloque va en el FLUJO del contenido —regla 2, anclado al final— y la banda de
+> pie va anclada al papel, así que ninguno de los dos puede ver al otro. Lo que
+> impide el solape es que **la página declare `paddingBottom: margen.inferior`**,
+> que reserva los 36 + 16 + 16 pt donde vive la banda (I.1.2). Si una hoja del
+> sistema se compone sin ese padding, el bug §8.1 vuelve y **no habrá nada en 2.L
+> ni en 2.M que lo detenga**. Queda declarado también en 2.M (anexo A, P2-27).
 
 **Verificación visible.** Emitir un consentimiento y una receta uno junto al
 otro y medir con el borde de una hoja: **el espacio de escritura sobre la línea
@@ -1808,6 +1846,29 @@ Retícula `auto auto 1fr`, medianil 10 pt, padding lateral 8 pt.
    seriado**. Está declarada aquí para que nadie reponga el folio por
    consistencia mal entendida.
 5. El pie no invade el bloque de firmas ni al revés.
+
+> **CIERRA 2.M — cómo se implementa la regla 5, y las dos cosas que la sostienen.**
+>
+> **(1) El desglose del margen inferior.** `margen.inferior` = 68 = 36 de papel
+> intocable + 16 de banda + 16 de aire. La banda ocupa de 36 a 52 pt del borde y
+> el contenido se detiene en 68, así que entre los dos quedan 16 pt —
+> `transicion.contenidoPie`—. **La página tiene que declarar
+> `paddingBottom: margen.inferior`**: es ahí, y no en este componente ni en 2.L,
+> donde vive la garantía.
+>
+> **(2) La banda se repite sola.** La regla 1 —«en todas las hojas, sin
+> excepción»— se implementa marcando el nodo como fijo, no instanciándolo por
+> hoja: el que compone el documento lo declara una vez. Y la paginación se compone
+> con la función de render del renderer, que es lo único que conoce la Y real: el
+> total de hojas no existe hasta que el flujo ha terminado de repartir (anexo A,
+> P2-27).
+
+> **CIERRA 2.M — qué rol lleva el título en la variante `sin folio`.** La tabla de
+> zonas declara los roles para `completo` y la otra variante mueve los contenidos
+> de sitio sin declararlos otra vez. Cada contenido **conserva su tratamiento**:
+> la paginación sigue en `pie` en versalita aunque pase a la zona 1, y el título
+> ocupa la zona que el folio deja libre con el rol que el folio usaba, `pie`. Lo
+> que cambia entre variantes es qué ocupa cada zona, no cómo se compone.
 
 **Verificación visible.** Emitir un Escrito Médico de dos hojas: en el pie
 aparecen paginación, el título que escribió el médico y la leyenda — **y en
@@ -1961,6 +2022,17 @@ Consentimiento e Internamiento.
    es de sección y no de entrada, y no lleva ranuras de ancla ni de marca.
 2. El párrafo va en `texto.corrido`, **bandera izquierda**. El espécimen lo
    tiene justificado con partición; queda superado por I.3.2.
+3. **El número va sin cero a la izquierda.** El cero es de 2.G y es de un
+   identificador de ítem; este es un ordinal de sección. Tercera vez que el
+   sistema decide lo mismo, tras 2.K y 2.J.
+4. **El título no se transforma a mayúsculas.** Las dos versalitas de I.1.4 son
+   `etiqueta` y `firma.rol`, y la regla de componer en mayúsculas es del TÍTULO
+   DEL DOCUMENTO (preámbulo de II, `CONCILIA D1`). `titulo.seccion` no es
+   ninguna de las dos: su tracking de 0.14 em no es el 0.22 de la versalita del
+   sistema. La caja de la cadena la decide el formato.
+5. **El texto de sección no pasa por `ParserBloques`.** No está en la lista de
+   bloques con esa sintaxis de 2.J: es prosa larga prellenada por plantilla, no
+   una lista con encabezados.
 
 **Verificación visible.** En el Consentimiento, el borde derecho de los
 párrafos debe quedar **desigual**. Si está alineado, quedó justificado y hay
@@ -2009,11 +2081,25 @@ riel + cabecera con el rótulo de sección y el subtítulo de lector.
 > el **alcance declarado del rol**, que en I.1.4 pasa de «subtítulo de documento»
 > a «de documento o de sección».
 
+**Geometría interna.** Aire entre el filete que abre y la cabecera: **8 pt**.
+La ficha no lo declaraba; se toma el mismo tramo que 2.P declara para el suyo,
+que es la misma relación un nivel más abajo.
+
+> `COINCIDENCIA` — vale lo mismo que el de 2.P y que `espacio.8`, y **no se
+> fusionan**: son el aire de dos aperturas distintas y una puede querer moverse
+> sin arrastrar a la otra. Es la misma disciplina con la que I.1.7 separa
+> `transicion.seccionParrafo` de `espacio.8` (anexo A, P2-28).
+
 **Reglas**
 
 1. La cabecera dice `SECCIÓN 2 DE 2`. **Nunca «continuación».** Una hoja de
    indicaciones de enfermería no es la continuación de la hoja del paciente: es
    otro documento dentro del mismo folio.
+
+   > **La cadena la compone el componente**, a partir de dos números que entrega
+   > el formato — no entra como texto. Es el mismo cierre que la cadena `URGENTE`
+   > de 2.H, y por el mismo motivo: si el texto entrara por prop, la palabra
+   > prohibida podría entrar con él. Aquí no hay por dónde escribirla.
 2. Es el filete más grueso del sistema y su uso está limitado a este
    componente.
 
@@ -2117,6 +2203,45 @@ se deriva el gris del contorno.
 
 1. Es el **único uso permitido de la diagonal** en el sistema.
 2. Letra hueca siempre: rellena taparía el texto y desaparecería en fotocopia.
+
+> ### ⚠️ 2.S NO SE PUEDE COMPONER CON TEXTO EN ESTE RENDERER
+>
+> **La regla 2 no es implementable con `<Text>` ni con `<Text>` dentro de `<Svg>`,
+> y está medido, no supuesto.** react-pdf no emite en ningún momento el operador
+> PDF de modo de trazo de texto (`Tr`): su rutina de dibujo de glifos hace
+> `fillColor` y `TJ`, y nada más. El `<Text>` de SVG **acepta `stroke` y
+> `strokeWidth` en el tipo pero los descarta al maquetar**: la única propiedad de
+> pintura que sobrevive es `fill`, que además cae a negro cuando vale `none`.
+>
+> **Comprobación** — se renderizó una hoja con
+> `<Svg><Text fill="none" stroke="#8C8C8C" strokeWidth={0.5}>BORRADOR</Text></Svg>`
+> y se descomprimió el flujo de contenido del PDF resultante. Lo que sale es
+> `0 0 0 scn` seguido de `BT … TJ ET`: **la palabra se imprime en negro sólido y
+> relleno**, que es exactamente lo que la regla 2 prohíbe — taparía el texto
+> clínico que cruza.
+>
+> **Por eso este componente queda sin construir**, y no se compone «mientras
+> tanto» con letra rellena: una marca rellena sobre un consentimiento no es una
+> versión provisional del sello, es un documento con el texto tapado.
+>
+> **Las dos rutas reales, para decidir con coste delante:**
+>
+> 1. **Contorno vectorial.** Convertir las cuatro cadenas —son fijas— a trazado
+>    con las herramientas de fuente que el propio renderer ya trae, y dibujarlas
+>    con `<Path fill="none" stroke=…>`, que **sí** admite trazo (I.3.8 declara el
+>    vector por primitivas). Dos variantes: generar el trazado **una vez** y
+>    versionarlo —el componente queda síncrono, pero el dato queda atado al
+>    archivo de fuente— o generarlo **en tiempo de emisión** —sin dato versionado,
+>    pero obliga a un paso asíncrono en el sitio que construye el documento, como
+>    el consultorio activo de I.3.6—.
+> 2. **Revisar la regla 2** contra el archivo de diseño: si el sello admitiera un
+>    relleno muy claro sin contorno, sería componible hoy con `<Text>`. La ficha
+>    dice que no —«desaparecería en fotocopia»—, así que esta ruta **no se toma
+>    sin volver a la lámina**.
+>
+> Mientras tanto, todo lo demás de esta ficha —los cuatro estados, la rotación de
+> −9°, el gris del contorno y la posición— **queda válido y sin tocar**: lo que
+> falta es con qué se dibuja la letra, no qué dice ni dónde va (anexo A, P2-29).
 
 > `CONCILIA D18` — había dos rotaciones (−28° y −9°) y dos contornos (0.7 y
 > 0.5 pt). Gana el par que instancia un formato real sobre el de la lámina.
@@ -3280,6 +3405,10 @@ registran aquí para que nadie las lea como reinterpretaciones ni intente
 | P2-23 | **Los dos huecos que exigían mirar una lámina, cerrados midiendo.** El aire entre entradas de 2.G son **12.5 pt** con reparto propio —7 de padding inferior, `filete.regla`, 5 de padding superior— y la regla queda **descentrada a propósito**, 2 pt más cerca de la entrada que abre. El ancho de la caja de importes de 2.T es **`cierre.derecha`**, token nuevo de I.1.3, no `manuscrito.ancho` | Ninguno de los dos se podía derivar y los dos se habían dejado escritos como `NO DEFINIDO` con su cota. Las cotas aguantaron —12.5 > 8, como exigía 2.G— pero el valor real no es miembro de la escala ni está centrado: elegir `espacio.12` «porque es el siguiente» habría fijado una cifra parecida con el reparto equivocado. El archivo traía además **tres calibraciones** del mismo espacio (5/7, 8/10, 9/11), resueltas a una sola por el precedente de D4 | I.1.3 · I.1.4 · 2.G · 2.T |
 | P2-24 | **`MarcoParcial` (2.U): el chasis pasa de veinte a veintiún componentes.** El marco en acento no es una variante de `BloqueDestacado` sino un **dispositivo gráfico** que envuelve contenidos de anatomía distinta. Se retira la cuarta variante `acento` de 2.I, se corrige II.5 §5, que la citaba por nombre, y baja a 2.U la composición del marco que 2.R declaraba por su cuenta. **D26 y D34 quedan unificadas** | La ficha de 2.I dejó la duda planteada al construirla y la medición la resolvió por partida triple: los tres bloques enmarcados del Recibo no comparten anatomía entre sí —uno es un `RielDatos`, otro una declaración de dos líneas—, el marco va en acento y las tres variantes de 2.I en negro, y en la hoja espécimen el marco figura entre los **dispositivos gráficos**, no entre los componentes. D26 y D34 se habían reportado por separado, cada una desde su formato, sin ver que describían el mismo objeto | I.2 · 2.I · 2.R · 2.U · II.5 · II.7 |
 | P2-25 | **Dos ranuras de 2.G que la anatomía no situaba.** La `marca` va **en la fila del `ancla`, a la derecha** —lo dice la tabla de separaciones internas, que no declara ningún tramo que la toque— con `reticula.medianil` de separador. Y la `nota` se compone con **2.J**, que suma esta ranura a su lista de bloques con sintaxis de viñetas | Al montar las cinco ranuras hubo que decidir dónde caía la marca, y las dos lecturas —renglón propio o fuera del flujo— daban entradas de alto distinto para todo medicamento no oral. La tabla de separaciones desempata sin inventar nada: está completa si la marca no está en el flujo, y con hueco si lo está | 2.G · 2.J |
+| P2-26 | **La caja de la variante `simple` de 2.L es `cierre.derecha`, no «222 pt», y `manuscrito.ancho` sale de su lista de tokens.** 2.L no consume nada del grupo `manuscrito`: su espacio de escritura es `firma.espacio` (77) y no `manuscrito.alto` (20), y su línea es `filete.fino` | Al montar las tres variantes hubo que darle un ancho a la caja y la ficha traía dos cifras incompatibles: 222 pt en la tabla de variantes y `manuscrito.ancho` (246) en la lista de tokens. La columna de cierre, medida en la ronda anterior, las desempata. **Es la tercera vez que el 246 se lee como el token equivocado** —antes en 2.T (H9) y en I.1.5— y por eso la `COINCIDENCIA` está ahora declarada en los tres sitios | 2.L · I.1.3 · I.1.5 |
+| P2-27 | **La regla que impide el bug §8.1 no vive en 2.L ni en 2.M: vive en el `paddingBottom` de la página.** Queda declarado en las dos fichas, con el desglose `68 = 36 + 16 + 16`. Declarado también que la banda se repite por nodo fijo y que la paginación se compone con la función de render, que es lo único que conoce la Y real | Las dos fichas se prohíben mutuamente el solape y ninguna de las dos puede verlo: el bloque de firmas va en el flujo y la banda va anclada al papel. Al componer la primera hoja de prueba quedó claro que la garantía es de quien monta la página, y que sin declararlo el bug vuelve sin que ninguna de las dos fichas se haya incumplido | 2.L · 2.M · I.1.2 |
+| P2-28 | **Cuatro declaraciones menores de 2.P y 2.Q.** El número de sección va sin cero a la izquierda y el título de sección no se transforma a mayúsculas (2.P); el aire entre el filete de apertura y la cabecera de 2.Q son 8 pt, `COINCIDENCIA` con el de 2.P; y la cadena `SECCIÓN n DE m` la compone el componente a partir de dos números | Las cuatro son huecos de los que solo se ve que faltan cuando hay que escribir la línea. La de la cadena es la que importa: la regla 1 de 2.Q prohíbe la palabra «continuación», y componiendo la cadena dentro **no hay por dónde escribirla** — el mismo cierre que la cadena `URGENTE` de 2.H | 2.P · 2.Q · 2.H |
+| P2-29 | **2.S no se puede componer con texto en este renderer y queda sin construir.** react-pdf no emite nunca el operador `Tr` de modo de trazo, y el `<Text>` de SVG descarta `stroke`: la palabra sale **negra y rellena**, que es lo que la regla 2 prohíbe. Comprobado descomprimiendo el flujo de contenido de un PDF real. La ficha queda intacta salvo el aviso; las dos rutas —contorno vectorial por `<Path>`, o revisar la regla 2 contra la lámina— quedan escritas con su coste | Es el segundo límite del renderer que aparece contra una regla no negociable del spec, tras las versalitas de I.3.1, y el primero que **bloquea** un componente en vez de dejarlo componible con reservas. Se comprobó midiendo antes de escribir una línea del componente: la ficha promete letra hueca y hueca es lo único que no se puede | 2.S · I.3.8 |
 Una cuarta, menor, sin fila propia: `caja.alto` queda marcado en I.1.1 como
 derivado que **se implementa como fórmula**. El Paso 0 lo había escrito como
 literal 670.
@@ -3291,4 +3420,5 @@ literal 670.
 | El destaque de vía es binario: negativo solo en las no orales | Resuelto y aplicado en II.3, pero **revierte una línea del handoff** que decía «13 vías, todas en bloque negativo». Queda registrado como reversión consciente |
 | Repaginación del Consentimiento | Consecuencia de D33. No se puede estimar sin generar el PDF |
 | La sangría de las tres cajas enmarcadas del Recibo | 2.U regla 4. El dispositivo no la impone —un riel enmarcado y una leyenda de dos líneas no la llevan igual— y el archivo solo trae medida la de 2.R (`12 14 14`). Se mide al construir II.5 |
+| **2.S · la letra hueca** | El renderer no puede trazar texto: no emite el operador `Tr` y el `<Text>` de SVG descarta `stroke` (comprobado, P2-29). Elegir entre convertir las cuatro cadenas a trazado vectorial —versionado o generado en emisión— o revisar la regla 2 contra la lámina. **Lo que no se hace es componerla rellena** |
 | Gate de extracción de texto | I.3.1. No se resuelve en papel: se corre contra el primer PDF real de react-pdf. **Lo que sí quedó resuelto en papel es qué hacer si falla**: la escalera de remedios de I.3.1, con la vía de administración como primer sitio a mirar por ser el único elemento del gate que es clínico y traqueado a la vez |
