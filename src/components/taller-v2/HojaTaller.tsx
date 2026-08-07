@@ -35,6 +35,9 @@ import TituloDocumento from '@/lib/pdf/v2/TituloDocumento'
 import BloquePaciente from '@/lib/pdf/v2/BloquePaciente'
 import Campo from '@/lib/pdf/v2/Campo'
 import RielDatos from '@/lib/pdf/v2/RielDatos'
+import BloqueNegativo from '@/lib/pdf/v2/BloqueNegativo'
+import BloqueDestacado from '@/lib/pdf/v2/BloqueDestacado'
+import ContadorLista from '@/lib/pdf/v2/ContadorLista'
 import { registrarFuentesV2 } from '@/lib/pdf/v2/fonts'
 import {
   CAJA,
@@ -148,6 +151,20 @@ const estilos = StyleSheet.create({
     flexDirection: 'row',
     gap: ESPACIO[24],
   },
+  /**
+   * Fila para poner dos bloques de 2.H uno junto a otro. `alignItems` arriba para
+   * que la comparación sea de ANCHO y no de posición vertical, que es lo que la
+   * verificación visible de la ficha manda mirar.
+   */
+  filaBloques: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: ESPACIO[24],
+  },
+  /** Separación entre las muestras apiladas de 2.I. Es del taller. */
+  destacado: {
+    marginTop: ESPACIO[24],
+  },
 })
 
 /**
@@ -212,6 +229,22 @@ const CELDAS_2F = {
     { clave: 'ayuno', etiqueta: 'Ayuno', valor: '8 horas', columnas: 6 },
     { clave: 'traslado', etiqueta: 'Traslado', valor: 'Camilla', columnas: 6 },
   ],
+} as const
+
+/**
+ * Texto real para las tres variantes de 2.I. INVENTADO como el resto del taller,
+ * pero con la longitud y el registro que tendría el pasaje real de cada formato:
+ * un bloque destacado con dos palabras dentro no demuestra nada sobre la sangría.
+ */
+const TEXTO_2I = {
+  /** Recomendaciones de una Receta (II.3). */
+  alarma:
+    'Tome el medicamento con alimentos y complete la caja aunque los síntomas cedan antes. Si aparece erupción en la piel, hinchazón de labios o dificultad para respirar, suspenda y acuda a urgencias.',
+  /** Instrucciones al paciente de un Internamiento (II.6). Van NUMERADAS. */
+  instrucciones:
+    'Preséntese en admisión a las 06:00 h con identificación oficial. Ayuno absoluto de ocho horas antes del ingreso. Suspenda anticoagulantes 48 horas antes si su médico se lo indicó. Traiga los estudios de laboratorio y las radiografías recientes.',
+  /** Seguimiento de un Plan de Suplementación (II.4). */
+  cita: 'Reevaluación en ocho semanas con biometría hemática y perfil de hierro. Suspenda la suplementación y avise por el canal habitual si aparece intolerancia digestiva.',
 } as const
 
 function HojaTaller({
@@ -533,6 +566,121 @@ function HojaTaller({
             sus reglas verticales caen en 202.5, 283.5 y 364.5 pt, que son 5, 2, 2
             y 3 columnas de «riel.celda», exactamente donde caían cuando 2.D
             componía su propio riel.
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <Rotulo>2.H negativo · via corta y via larga, una junto a otra</Rotulo>
+          <View style={[estilos.muestra, estilos.filaBloques]}>
+            <BloqueNegativo variante="via" via="oral" />
+            <BloqueNegativo variante="via" via="intramuscular" />
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.H negativo · via acentuada, para el gate de I.3.1</Rotulo>
+            <View style={estilos.muestra}>
+              <BloqueNegativo variante="via" via="transdérmica" />
+            </View>
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.H negativo · badge urgente y su repeticion reducida</Rotulo>
+            <View style={[estilos.muestra, estilos.filaBloques]}>
+              <BloqueNegativo variante="urgente" />
+              <BloqueNegativo variante="urgenteReducido" />
+            </View>
+          </View>
+
+          <Text style={estilos.nota}>
+            2.H · BloqueNegativo. Los dos bloques de arriba tienen que medir
+            ANCHOS CLARAMENTE DISTINTOS y las dos palabras leerse enteras: el
+            ancho es la variable, el cuerpo no. Si midieran lo mismo, alguien puso
+            un ancho fijo y la palabra larga está comprimida o cortada. Ninguna se
+            abrevia y ninguna lleva elipsis. El badge reducido de la última
+            muestra imprime la misma palabra al mismo cuerpo: lo único que pierde
+            es aire lateral, de 8 pt a 4 pt por lado.
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <Rotulo>2.I destacado · alarma, filete superior e izquierdo</Rotulo>
+          <View style={estilos.muestra}>
+            <BloqueDestacado variante="alarma" texto={TEXTO_2I.alarma} />
+          </View>
+
+          <View style={estilos.destacado}>
+            <Rotulo>2.I destacado · instrucciones, solo izquierdo</Rotulo>
+            <View style={estilos.muestra}>
+              <BloqueDestacado
+                variante="instrucciones"
+                texto={TEXTO_2I.instrucciones}
+              />
+            </View>
+          </View>
+
+          <View style={estilos.destacado}>
+            <Rotulo>2.I destacado · cita, solo izquierdo</Rotulo>
+            <View style={estilos.muestra}>
+              <BloqueDestacado variante="cita" texto={TEXTO_2I.cita} />
+            </View>
+          </View>
+
+          <Text style={estilos.nota}>
+            2.I · BloqueDestacado. Ninguna de las tres lleva trama ni fondo detrás
+            del texto: solo filete. La jerarquía la carga el grosor —3, 2 y 1.6
+            pt—, que es lo único que sobrevive intacto a una fotocopia, y el de
+            alarma se ve claramente más grueso que el de cita. La alarma es la
+            única con filete superior, y su texto va en «alarma.cuerpo», un punto
+            por encima del texto corrido de las otras dos. La variante
+            «instrucciones» compondrá lista NUMERADA cuando exista 2.J: hoy imprime
+            la misma cadena en plano y la ranura del parser está marcada en el
+            componente, sin adelantarlo.
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <Rotulo>2.K contador · hoja intermedia</Rotulo>
+          <View style={estilos.muestra}>
+            <ContadorLista
+              forma="intermedia"
+              items="estudios"
+              enEstaHoja={5}
+              total={9}
+            />
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.K contador · hoja final</Rotulo>
+            <View style={estilos.muestra}>
+              <ContadorLista forma="final" items="estudios" total={9} />
+            </View>
+          </View>
+
+          <Text style={estilos.nota}>
+            2.K · ContadorLista. Las dos formas dicen cosas distintas y se
+            distinguen a simple vista: la intermedia cuenta lo que lleva ESA hoja y
+            de cuántas, la final da el total. Si la hoja 1 mostrara el total,
+            estaría contando el documento y no la hoja, y quien la recibe suelta no
+            podría saber que le falta la 2. El sustantivo —aquí ESTUDIOS, de la
+            Solicitud de Laboratorio— lo declara el formato en la Sección II; el
+            componente no lo conoce. Va en «pie» en versalita, pero en
+            «tinta.secundaria» y no en «tinta.papel»: vive en el área de contenido,
+            no sobre la banda de acento.
           </Text>
         </View>
       </Page>

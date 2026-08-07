@@ -1028,6 +1028,13 @@ con su etiqueta.
 > del render**, así que entra como prop cuando exista 2.K, que es quien la lee.
 > Implementarla antes sería una prop que nadie consulta.
 >
+> **La prop ya existe, y su lector no es 2.K.** Construido 2.K, resultó que ese
+> componente recibe cifras ya contadas y no ve los rieles de la hoja: quien lee la
+> prop es el sitio que compone el documento, que es el único que tiene delante el
+> riel y el contador a la vez. Detalle en 2.K regla 3 y en el anexo A (P2-18).
+> **Que ningún `if` de 2.F la consulte no es un olvido:** no cambia el render, y si
+> algún día aparece uno aquí, la propiedad dejó de ser ortogonal.
+>
 > **Y `una línea` pierde un consumidor: la línea fina del membrete no es un
 > `RielDatos`.** No tiene rótulos, sus anchos no salen de `riel.celda` —la columna
 > de contacto es flexible y la de cédulas se dimensiona por contenido—, su texto
@@ -1207,6 +1214,35 @@ por `tinta.papel`**. Ancho variable según la palabra.
 > sobre negro y lo dejaría ilegible, que es lo contrario de lo que el componente
 > existe para conseguir.
 
+**Geometría interna** — el padding es lo único que el componente tiene además del
+fondo y del texto, y es lo que separa a `urgente reducido` de las otras dos:
+
+| Variante | Padding |
+|---|---|
+| `via` · `urgente` | `espacio.4` vertical · `espacio.8` horizontal |
+| `urgente reducido` | `espacio.4` por los cuatro lados |
+
+> **CIERRA 2.H — qué reduce `urgente reducido`, y cuál de los dos espacios va
+> dónde.** La ficha citaba `espacio.4` y `espacio.8` sin decir cuál era cuál, y
+> declaraba la variante reducida sin decir qué reduce. Las dos se cierran con lo
+> único que las reglas dejan libre: **el cuerpo y el tracking están congelados por
+> la regla 2 y el texto entero por la 1**, así que la única dimensión que una
+> variante puede reducir es el aire alrededor de la palabra. El horizontal es el
+> mayor de los dos miembros citados, porque es el eje en que el bloque crece con
+> la palabra; el vertical es el menor y **no cambia entre variantes**, o el badge
+> reducido cambiaría de alto y dejaría de alinearse con lo que tiene al lado.
+> **No es una reducción del cuerpo:** la palabra se imprime al mismo tamaño en la
+> hoja de continuación que en la hoja 1 (anexo A, P2-15).
+
+**La cadena `URGENTE` es del componente, no del formato.** A diferencia del
+título de 2.C, que el formato entrega como cadena, aquí el formato entrega un
+booleano: II.2 §2 y II.6 §2 declaran el campo `urgente` como «no requerido · si
+viene vacío, sin badge», y ningún formato declara el texto del badge. Hacerlo
+entrar por prop abriría la puerta a que una hoja de continuación imprimiera
+`URG.`, que es exactamente lo que prohíbe la regla 1. La palabra de la variante
+`via` sí viene del formato: son las trece de II.3 §5, y el componente no las
+conoce.
+
 **Reglas**
 
 1. **Nunca se abrevia.** No hay `I.M.` ni `SUBCUT.`. El bloque crece hasta que
@@ -1265,15 +1301,55 @@ en diagonal. Se distingue **por filete, nunca por fondo de color**.
    jerarquía la carga el grosor del filete, que es lo único que sobrevive
    intacto a una fotocopia.
 2. La sangría del texto respecto del filete es `espacio.16` en las tres
-   variantes.
+   variantes. **En `alarma`, que tiene dos filetes, se aplica a los dos**: el
+   texto guarda `espacio.16` con el de la izquierda y otro tanto con el de
+   arriba.
 
    > `CORRIGE HANDOFF` — figuraba como 14 pt en el bloque de alarma, fuera de
    > la escala de espaciado. Se resuelve aquí, como quedó anotado en I.1.7. No
    > hay razón de alineación que exija 14: la sangría no se alinea con la
    > retícula, se alinea con el filete.
+   >
+   > **CIERRA 2.I — la regla decía «el filete», en singular, y `alarma` tiene
+   > dos.** Leerlo como «solo el izquierdo» dejaría el texto de la alarma pegado a
+   > un filete de 3 pt, el más grueso del sistema después del de transición y
+   > justamente el que más aire necesita. La sangría es del texto respecto de su
+   > filete: donde hay filete, hay sangría (anexo A, P2-16).
 3. `break-inside: avoid`. Un bloque destacado no se parte entre hojas.
 4. La variante `instrucciones` compone **lista numerada**, no con raya: la
    secuencia significa algo (primero presentarse, después el ayuno).
+
+   > **La numeración es de 2.J, y la ranura queda preparada.** Quien compone la
+   > lista es `ParserBloques`, que recibe **una sola cadena** (`CONCILIA D10`) —
+   > que es la forma en que el pasaje entra en este componente—. Mientras 2.J no
+   > exista, las tres variantes componen su cadena en plano con el rol que les
+   > toca; la ranura está en el sitio donde hoy va el texto y el cambio, cuando
+   > llegue, es **interno**: la entrada del componente no se mueve. No se adelanta
+   > el parser aquí.
+
+**El marco parcial en acento de II.5 queda `NO DEFINIDO`.** II.5 §5 lo cita por
+nombre —«la variante `acento` de `BloqueDestacado`» (`CONCILIA D26`)— y esta
+tabla declara tres variantes, no cuatro: es la tercera comprobación de cierre de
+§0 sin cumplir. **No se resuelve inventando la cuarta fila**, porque las dos
+lecturas posibles llevan a componentes distintos y el spec no contiene con qué
+elegir:
+
+- **Es una variante más de aquí.** Sería `filete.acento` en dos lados —superior e
+  izquierdo, que es el único marco parcial que el sistema declara, en 2.R— y en
+  acento en vez de `tinta.negra`. Encaja con I.3.5: un formato que necesita algo
+  no estrena componente, estrena variante.
+- **No es un `BloqueDestacado`.** Lo que II.5 enmarca no es un pasaje de prosa
+  sino **un riel de aseguradora, una leyenda y una declaración**: el propósito de
+  esta ficha —destacar un pasaje que se lee en diagonal— no es el suyo, su
+  jerarquía no la carga el grosor (regla 1) y no compone texto en un rol propio.
+  Es el mismo criterio con el que la línea fina del membrete salió de 2.F: un
+  componente que necesita excepciones en sus reglas es el componente equivocado.
+
+**Lo que falta:** mirar el Recibo aprobado y ver si el marco envuelve prosa o
+envuelve bloques. Si envuelve prosa, es la cuarta variante y se declara aquí con
+su grosor y su color; si envuelve bloques, D26 encaminó mal y el marco es
+geometría del formato o un componente propio. Hasta entonces, **ningún formato
+instancia una variante `acento` de este componente**, y esta ficha declara tres.
 
 **Verificación visible.** En Receta, emitir con y sin recomendaciones: con
 ellas aparece un filete grueso al costado y arriba del bloque, **sin ninguna
@@ -1390,6 +1466,12 @@ sin raya y sin número**. Si salen en versalita, no hay lookahead.
 | Intermedia | `<ÍTEMS> EN ESTA HOJA · NN DE MM` — NN es lo impreso en esa hoja |
 | Final | `TOTAL DE <ÍTEMS> · MM` |
 
+**Las cifras van sin cero a la izquierda.** `NN` y `MM` son marcadores de
+posición de un conteo, no un formato de dos dígitos. El cero a la izquierda es la
+regla 1 de 2.G y pertenece al número de **entrada**, que es un identificador: un
+`07 DE 13` aquí imitaría ese identificador y haría creer que el contador señala a
+un ítem concreto de la lista (anexo A, P2-17).
+
 **Tokens que consume.** **`pie` en versalita**, la desviación declarada en I.1.4,
 en color `tinta.secundaria`.
 
@@ -1412,6 +1494,20 @@ en color `tinta.secundaria`.
 2. Un documento de una sola hoja cuenta como **final**.
 3. **No aplica a listas no paginables** ni a `RielDatos` en variante
    `sin contador`: un catálogo abierto no tiene total verdadero.
+
+   > **CIERRA 2.K — quién lee la prop `sin contador`, ahora que este componente
+   > existe.** 2.F la declaró como propiedad ortogonal que «entra como prop cuando
+   > exista 2.K, que es quien la lee» (anexo A, P2-12). **No la lee 2.K:** este
+   > componente recibe cifras ya contadas y no ve los rieles de la hoja, así que
+   > no puede consultarla ni queriendo. La lee **el sitio que compone el
+   > documento**, que es quien tiene delante los dos —el riel y el contador— y el
+   > único que puede a la vez no sumar esos ítems al total y no instanciar el
+   > contador. Misma forma que tomó el consultorio activo en P2-3: la lectura vive
+   > en el sitio que construye el documento, no dentro del componente que imprime.
+   >
+   > **Tampoco hay aquí una prop para desactivarse.** Un contador que se pinta a
+   > sí mismo vacío seguiría ocupando sitio y afirmando algo. La regla se cumple
+   > **no instanciándolo** (anexo A, P2-18).
 
 > `CONCILIA D24` — el Recibo no instancia el contador ni en su hoja intermedia.
 > Lo instancia: `<ÍTEMS>` = CONCEPTOS.
@@ -2849,6 +2945,11 @@ registran aquí para que nadie las lea como reinterpretaciones ni intente
 | P2-13 | **La composición del riel baja de la ficha de 2.D a la de 2.F**: padding `8 10 10`, reglas, filetes de apertura y cierre y reparto de anchos. 2.D conserva solo sus siete celdas y sus dos excepciones tipográficas. Y la regla superior va en toda fila que no sea **la primera viva**, no «la segunda» | 2.D declaró el riel porque lo necesitó antes de que 2.F existiera. Dejar la declaración en las dos fichas es la divergencia que I.3.5 persigue. El matiz de «la primera viva» aparece solo al implementar el colapso: con la fila de arriba colapsada, «la segunda fila» deja una regla flotando bajo el filete de apertura | 2.F · 2.D |
 | P2-14 | **Cerrados diez de los once huecos de rol de I.1.4, derivando del spec y sin inventar ninguno.** Ninguno necesitó un token nuevo: los valores ya estaban, sin nombre asignado. Salió de ahí un patrón que faltaba nombrar —la **desviación declarada de un rol**, tabla nueva en I.1.4— que ya practicaban 2.D, 2.H y 2.M sin llamarla así. **H9 queda `NO DEFINIDO`**, y con él el aire entre entradas de 2.G, que apareció al cerrar H4 | Diez huecos y cero tokens nuevos es la comprobación de que eran huecos de **nombre**, no de valor: el diseño ya los tenía resueltos y lo que faltaba era cruzarlos contra la escala. Los dos que no se cierran son los dos que exigen medir una hoja aprobada, que es información que este documento no contiene | I.1.4 · 2.G · 2.I · 2.J · 2.K · 2.M · 2.N · 2.Q · 2.S · 2.T |
 
+| P2-15 | **2.H declaraba `espacio.4` y `espacio.8` sin decir cuál iba dónde, y una variante `urgente reducido` sin decir qué reduce.** Cierran las dos juntas: padding `4` vertical y `8` horizontal en `via` y `urgente`; `4` por los cuatro lados en la reducida. **Lo que se reduce es el aire, nunca el cuerpo** | Al implementar 2.H hubo que escribir un padding, y las tres variantes no se distinguían en nada: con el cuerpo y el tracking congelados por la regla 2 y el texto entero por la 1, el aire es lo único que una variante puede cambiar. Una variante que no cambia nada es una variante que el primer implementador borra | 2.H |
+| P2-16 | **La sangría de 2.I se aplica a los dos filetes de la variante `alarma`**, no solo al izquierdo. Y **la cadena `URGENTE` es del componente 2.H, no del formato**: II declara un booleano, no un texto | La regla 2 de 2.I dice «el filete» en singular y `alarma` tiene dos: sin cerrarlo, el texto queda pegado al filete de 3 pt. Lo de 2.H apareció al elegir el tipo de sus props: si el texto entrara por prop, una hoja de continuación podría imprimir `URG.`, que es lo que prohíbe su regla 1 | 2.H · 2.I |
+| P2-17 | **Las cifras de 2.K van sin cero a la izquierda.** `NN` y `MM` son marcadores de posición de un conteo, no un formato de dos dígitos | El cero a la izquierda existe en el sistema —regla 1 de 2.G— y al componer la cadena había que decidir si aplicaba. No aplica: es del número de **entrada**, que es un identificador, y un `07 DE 13` en el contador imitaría ese identificador | 2.K · 2.G |
+| P2-18 | **La prop `sin contador` de 2.F no la lee 2.K.** La lee el sitio que compone el documento: 2.K recibe cifras ya contadas y no ve los rieles de la hoja. Y 2.K **no tiene una prop para desactivarse**: la regla 3 se cumple no instanciándolo | P2-12 dejó escrito que la prop entraría «cuando exista 2.K, que es quien la lee». Existe 2.K y no puede leerla: es la misma corrección que P2-3 —la lectura vive en el sitio que construye el documento, no dentro del componente que imprime—, que aquí aparece por segunda vez y por la misma causa | 2.F · 2.K · I.3.6 |
+
 Una cuarta, menor, sin fila propia: `caja.alto` queda marcado en I.1.1 como
 derivado que **se implementa como fórmula**. El Paso 0 lo había escrito como
 literal 670.
@@ -2860,3 +2961,5 @@ literal 670.
 | El destaque de vía es binario: negativo solo en las no orales | Resuelto y aplicado en II.3, pero **revierte una línea del handoff** que decía «13 vías, todas en bloque negativo». Queda registrado como reversión consciente |
 | Repaginación del Consentimiento | Consecuencia de D33. No se puede estimar sin generar el PDF |
 | Gate de extracción de texto | I.3.1. No se resuelve en papel: se corre contra el primer PDF real de react-pdf |
+| La variante `acento` de `BloqueDestacado` | II.5 §5 la cita por nombre y 2.I declara tres variantes: la tercera comprobación de cierre de §0, sin cumplir. Las dos lecturas —cuarta variante de 2.I, o marco que no es un `BloqueDestacado`— llevan a componentes distintos y elegir exige **mirar el Recibo aprobado** y ver si el marco envuelve prosa o envuelve bloques. Detalle en la ficha de 2.I |
+| **Versalitas: I.1.4 e I.3.1 se contradicen** | I.1.4 declara que las versalitas del sistema son **mayúsculas con tracking** y avisa de que sustituirlas por versalitas reales «invalidaría todos los trackings» de la escala. I.3.1 **prohíbe exactamente eso** y exige versalitas reales de la fuente, con el motivo hasta el operador PDF: el `letterSpacing` parte el `TJ` en un segmento por glifo y el extractor devuelve `PAC IE NT E`. Los componentes construidos hasta hoy componen sus versalitas con tracking —2.D, 2.E, 2.F, 2.H y 2.K—, y el renderer no ofrece otra puerta —el `Style` de react-pdf no tiene `fontVariant` ni selección de *features* OpenType—, así que «versalitas reales» significaría registrar un TTF de versalitas como familia aparte. **Se decide contra el gate**, con el PDF delante, no aquí |

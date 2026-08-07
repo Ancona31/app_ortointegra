@@ -145,11 +145,34 @@ export interface CeldaRiel {
   readonly estiloValor?: EstiloValorCelda
 }
 
+/**
+ * `sin contador` — LA PROPIEDAD ORTOGONAL DE LA FICHA, QUE NO COMPONE NADA.
+ *
+ * No es una tercera variante: un riel puede ser `celdas` **y** `sin contador` a
+ * la vez. Declara que el riel no participa del conteo de `ContadorLista` (2.K
+ * regla 3), porque el catálogo que presenta es abierto —el médico agrega y quita
+ * requerimientos especiales de Internamiento— y «3 de 7» sería una cifra falsa.
+ *
+ * **No cambia nada del render**, y por eso no se leerá en este archivo: aquí no
+ * hay ningún `if` que la consulte y no debe haberlo.
+ *
+ * QUIÉN LA LEE, YA CON 2.K CONSTRUIDO. No 2.K: ese componente recibe cifras ya
+ * contadas —`enEstaHoja` y `total`— y no ve los rieles de la hoja, así que no
+ * puede consultar esta prop ni aunque quisiera. La lee **el sitio que compone el
+ * documento**, que es quien tiene delante los dos: el riel y el contador. Es la
+ * misma forma que tomó el consultorio activo en P2-3 —la lectura vive en el sitio
+ * que construye el documento, no dentro del componente que imprime—. Queda
+ * registrado en el anexo A (P2-18).
+ */
+interface SinContador {
+  readonly sinContador?: boolean
+}
+
 export type RielDatosProps =
   /** Varias filas de celdas. El número de celdas por fila lo declara el formato. */
-  | { variante: 'celdas'; filas: readonly (readonly CeldaRiel[])[] }
+  | ({ variante: 'celdas'; filas: readonly (readonly CeldaRiel[])[] } & SinContador)
   /** Riel comprimido de una sola fila. Hoy: `BloquePaciente` reducido. */
-  | { variante: 'unaLinea'; celdas: readonly CeldaRiel[] }
+  | ({ variante: 'unaLinea'; celdas: readonly CeldaRiel[] } & SinContador)
 
 /**
  * Una fila del riel, con sus celdas YA filtradas por el componente: aquí no llega
