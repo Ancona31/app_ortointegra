@@ -85,26 +85,41 @@ Componentes en orden de dependencia. Cada uno se valida antes del siguiente.
 
 ---
 
-## Paso 3 · Prueba de extracción de texto *(gate)*
+## Paso 3 · Prueba de extracción de texto — ~~*(gate)*~~ **CERRADO, YA NO BLOQUEA**
 
-**Se corre en cuanto exista el primer PDF real de react-pdf, antes de implementar el resto de formatos.**
+> **2026-08-07 — este paso dejó de ser un gate y el Paso 4 no espera a nada.**
+> Corrido, medido y aceptado. El detalle completo, con la tabla elemento por
+> elemento, está en `DOCUMENTOS_SPEC.md` I.3.1; el cierre, en su anexo A (P2-33).
 
-Generar el PDF de un formato y correr `pdftotext`. Deben aparecer como **texto real**:
+**Por qué dejó de bloquear.** La razón que lo sostenía era falsa y la había
+escrito el propio spec: «su legibilidad por máquina es materia de la certificación
+NOM-024». La NOM-024 regula el **intercambio entre sistemas** y ese intercambio va
+por **datos estructurados**; lo que se audita es el **expediente exportado**, no el
+papel. Copiar texto de un PDF nunca fue un requisito normativo.
 
-- [ ] Denominación genérica
-- [ ] Nombre comercial
-- [ ] Presentación y gramaje
-- [ ] Vía de administración
-- [ ] Indicación
-- [ ] Números de entrada (`01`, `02`…)
-- [ ] Folio
-- [ ] `PÁGINA X DE Y`
-- [ ] Etiquetas en versalita, **sin fragmentar** (`PACIENTE`, no `PAC IE NT E`)
-- [ ] Ligaduras (`superficie`, no `super�cie`)
+**Qué se midió** (Archivo e IBM Plex Sans reales, con `pdftotext` y con pdf.js):
 
-**Si falla:** el tracking está rompiendo la extracción. Usar versalitas reales de la fuente, no `letterSpacing` sobre mayúsculas. **No avanzar a otros formatos hasta que pase.**
+- ✅ **Salen limpios en los dos extractores** — denominación genérica, nombre
+  comercial, presentación y gramaje, indicación, ligaduras y números de entrada.
+  **Ahí están los cuatro campos clínicos**, que es lo que importaba.
+- ❌ **Salen fragmentados** — vía de administración (3 de 13 palabras con
+  `pdftotext`, 13 de 13 con pdf.js), etiquetas en versalita (3 de 24 y 24 de 24),
+  folio, contador de lista y paginación. Cuatro son metadatos; el único clínico es
+  la vía.
 
-Motivo: la denominación genérica es el único campo obligatorio por normativa, y su legibilidad por máquina es materia de la certificación NOM-024.
+**Por qué se acepta.** El PDF se ve, se imprime y se lee sin ningún problema. Lo
+único afectado es **copiar texto del archivo**, que no ocurre en ningún flujo real
+del sistema. Si algún día hace falta lectura automática por un tercero, el camino
+es el JSON del expediente, no el papel.
+
+**Qué NO se hace.** No se toca ningún tracking y la escala de I.1.4 se queda como
+está. Quitárselo a los cinco elementos que fallan estrecharía la caja de la vía
+entre un 15 % y un 20 % y las etiquetas hasta 37 pt: destruir la tipografía del
+sistema por una comodidad del archivo.
+
+**Lo que sí vale la pena, sin urgencia:** repetir la extracción sobre el primer
+formato completo del Paso 4 con datos reales — no para decidir nada, sino para que
+la tabla de I.3.1 hable de un documento entero y no de una hoja de taller.
 
 ---
 
@@ -129,7 +144,8 @@ El orden va de menor a mayor estrés sobre el chasis. Cada formato valida una ca
 
 ## Paso 5 · Cambios de formulario
 
-Independientes del render. Se pueden hacer en paralelo a partir del Paso 3.
+Independientes del render. Se pueden hacer en paralelo a partir del Paso 3, que
+ya no bloquea nada.
 
 | Prioridad | Cambio |
 |---|---|

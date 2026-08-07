@@ -252,10 +252,10 @@ tracking**. Archivo no se carga con `font-variant-caps` y ningún punto del
 sistema lo usa. En el motor de PDF se transforma la cadena a mayúsculas y se
 aplica el tracking de la tabla. **Sustituirlas por versalitas reales invalidaría
 todos los valores de tracking de este documento** y cambiaría la altura de las
-etiquetas. **Esta declaración manda sobre la composición**; I.3.1 no la
-contradice: cruza esta escala contra la lista del gate, dice cuáles de sus
-elementos llevan tracking y ordena la escalera de remedios por si la extracción
-falla.
+etiquetas. **Esta declaración manda sobre la composición y ya no tiene
+contrapeso**: I.3.1 dejó de ser un gate el 2026-08-07 y lo que queda ahí es el
+registro de qué se extrae limpio de un PDF y qué no, sin ninguna exigencia sobre
+el tracking (anexo A, P2-33).
 
 **Medida.** 486 pt a 11.5 pt son ≈ 85 caracteres. El handoff decía ≈ 93; el
 diseño mide 85. Se registra el valor medido.
@@ -2460,110 +2460,46 @@ viejo asomando.
 
 Lo que no es token ni componente: reglas que ningún formato puede desactivar.
 
-### I.3.1 · Gate de extracción de texto
+### I.3.1 · Extracción de texto del PDF
 
-**Es el Paso 3 del plan y es bloqueante.** Se corre en cuanto exista el primer
-PDF real de react-pdf, antes de implementar el resto de formatos.
+**NO es un gate y no bloquea nada.** Es una **propiedad medida y documentada** del
+sistema: se sabe qué se extrae limpio de un PDF emitido y qué no, está medido, y
+se acepta como está. Los formatos del Paso 4 no esperan a nada.
 
-**Procedimiento.** Generar el PDF de un formato con datos reales y correr
-`pdftotext` sobre él.
+Lo fue hasta el **2026-08-07**, cuando se corrió y se revisó por qué era
+bloqueante. Lo que sigue es esa revisión, la medición y la decisión.
 
-**Deben aparecer como texto real, no como trazo ni como carácter de reemplazo:**
+#### Por qué dejó de ser un gate: la razón que lo sostenía era falsa
 
-- [ ] Denominación genérica
-- [ ] Nombre comercial
-- [ ] Presentación y gramaje
-- [ ] Vía de administración
-- [ ] Indicación
-- [ ] Números de entrada (`01`, `02`…)
-- [ ] Folio
-- [ ] `PÁGINA X DE Y`
-- [ ] Etiquetas en versalita, **sin fragmentar**: `PACIENTE`, nunca `PAC IE NT E`
-- [ ] Ligaduras: `superficie`, nunca `super�cie`
+Esta sección declaraba la extracción como criterio bloqueante y lo justificaba
+así: «la denominación genérica es el único campo obligatorio por normativa, y su
+legibilidad por máquina es materia de la certificación NOM-024».
 
-**La lista no cambia.** Es la misma de siempre y sigue siendo la que decide si
-el gate pasa o falla.
+**La segunda mitad de esa frase no se sostiene, y la escribió este spec — no
+salió de la norma.** La NOM-024 regula el **intercambio de información entre
+sistemas**, y ese intercambio va por **datos estructurados**. Lo que se audita es
+el **expediente exportado**, no el papel. Que un PDF permita copiar y pegar su
+texto nunca fue un requisito normativo: es una comodidad del archivo.
 
-**El riesgo, cruzado contra la escala**
+Con esa frase retirada, el gate se queda sin lo que lo hacía bloqueante. No queda
+ninguna otra: **el resto de la lista son metadatos**, y ninguno de los diez
+elementos lo pedía nadie de fuera.
 
-El mecanismo está confirmado hasta el operador PDF en la auditoría §8.5:
-`letterSpacing` hace que el avance de cada glifo difiera de su anchura nominal,
-y react-pdf entonces **puede** partir el operador `TJ` en un segmento por glifo;
-si lo hace, el extractor devuelve la cadena letra por letra. Ese riesgo **no
-corre parejo por toda la lista**, y saber dónde corre es lo que dimensiona el
-problema. Cruzada contra I.1.4, la lista se parte en dos:
+> ⚠️ **Precedente, no anécdota.** Una afirmación normativa inventada aquí dentro
+> estuvo a punto de costar la tipografía del sistema: el remedio que este spec
+> ordenaba era quitarle el tracking a cinco elementos, y con él a toda la
+> versalita. **Ninguna afirmación sobre la NOM-004, la NOM-024 o la LFPDPPP entra
+> en este documento sin verificarse contra el texto vigente.** Si aparece una sin
+> respaldo, se retira antes de que alguien diseñe contra ella.
 
-| Elemento del gate | Quién lo compone | Rol | Tracking |
-|---|---|---|---|
-| Denominación genérica | 2.G, ranura `secundario` | `entrada.secundario` | **0** |
-| Nombre comercial | 2.G, ranura `ancla` | `entrada.ancla` | **0** |
-| Presentación y gramaje | 2.G, ranura `ancla` | `entrada.ancla` | **0** |
-| Indicación | 2.G, ranura `nota` | `texto.corrido` | **0** |
-| Ligaduras (`superficie`) | Todo texto corrido | `texto.corrido` | **0** |
-| Números de entrada (`01`) | 2.G, riel del número | `entrada.numero` | **0** |
-| Folio | 2.M zona 1 · 2.R | `folio` | 0.03 em |
-| `PÁGINA X DE Y` | 2.M zona 2 | `pie` en versalita | 0.22 em |
-| Etiquetas en versalita | 2.E · 2.F · 2.J | `etiqueta` | 0.22 em |
-| **Vía de administración** | **2.H** | **`etiqueta`** sobre negativo | **0.22 em** |
+#### Lo medido — 2026-08-07
 
-**Seis de los diez van con tracking 0** y no pueden fragmentarse por esta causa,
-incluidos los cuatro campos clínicos que sostienen el motivo de todo el gate: la
-genérica, el comercial, el gramaje y la indicación.
+Corrido en el Paso 2, con los componentes que ya existen y sin esperar al Paso 3.
+Hoja compuesta con 2.D, 2.E, 2.F, 2.G, 2.H, 2.J, 2.K y 2.M, en Archivo e IBM Plex
+Sans reales. Extraída con **`pdftotext` (poppler)** y con **pdf.js**, para no
+confundir una propiedad del documento con una del extractor.
 
-**De los cuatro que llevan tracking, tres son metadatos** —folio, paginación y
-etiquetas—: un folio fragmentado estorba a una búsqueda, no a una dispensación.
-
-**Y el cuarto no lo es: la vía de administración.** No va en `dato` ni en
-`texto.corrido`: 2.H la compone con el rol `etiqueta` sobre fondo negro, así que
-carga los mismos `0.22 em` que un rótulo. **Es el único elemento del gate que es
-a la vez clínico y traqueado**, y por eso es el primero que hay que mirar cuando
-el gate corra y el primero al que se le baja el tracking si falla. Que un
-`INTRAMUSCULAR` salga como `I N T R A M U S C U L A R` de un extractor no es un
-problema de búsqueda: es el dato que decide cómo se administra el fármaco.
-
-**Escalera de remedios, en este orden**
-
-1. **Correr el gate contra un PDF real de react-pdf.** ~~El primer remedio es
-   medir.~~ **HECHO, en parte — ver «Ejecución parcial» abajo. FALLA.**
-2. **Si falla: bajar o eliminar el tracking en los elementos del gate que lo
-   llevan**, y solo en ellos — los cuatro de la tabla, empezando por la vía.
-   Cuatro sitios acotados, con su rol y su componente ya identificados. El resto
-   del chasis no se toca: un rol traqueado que no está en la lista del gate no
-   tiene por qué cambiar.
-3. **Solo si eso no basta: revisar la escala.** Es el remedio caro —mueve
-   `etiqueta` y `firma.rol`, y con ellos toda versalita del sistema— y por eso va
-   el último, no el primero.
-
-**Las versalitas reales quedan descartadas, y no se vuelven a proponer.** Una
-versión anterior de esta sección las exigía; es un remedio que **no existe en
-este renderer**: el `Style` de react-pdf no tiene `fontVariant` ni selección de
-*features* OpenType, y Archivo no se carga con un corte de versalitas. La única
-forma sería registrar un TTF de versalitas como familia aparte, lo que
-invalidaría todos los trackings de I.1.4 y cambiaría la altura de las etiquetas
-—que es justo lo que I.1.4 advierte— para resolver un fallo que todavía no se ha
-medido. Si alguien vuelve a proponerlo, esto es lo que hay que contestar.
-
-**Quién manda sobre qué.** **I.1.4 gobierna la composición**: ahí se declara que
-las versalitas del sistema son mayúsculas con tracking, y esta sección no lo
-contradice ni lo prohíbe. **Esta sección gobierna qué hacer si el gate falla**:
-la escalera de arriba, en ese orden. Las dos secciones se contradecían mientras
-I.3.1 ordenaba un remedio inexistente; ya no (anexo A, P2-19).
-
-**Consecuencia declarada.** Si el gate falla, **no se avanza a otros formatos**
-hasta que pase. No se documenta como deuda, no se difiere, no se implementa
-«mientras tanto» un segundo formato. Lo que cambia con la escalera es **qué se
-arregla**, no la exigencia de arreglarlo antes de seguir.
-
-#### Ejecución parcial del gate — 2026-08-07
-
-Corrido en el Paso 2, con los componentes del chasis que ya existen y sin esperar
-al Paso 3. Hoja compuesta con 2.D, 2.E, 2.F, 2.G, 2.H, 2.J, 2.K y 2.M, en Archivo
-e IBM Plex Sans reales, y extraída con **`pdftotext` (poppler)** —el procedimiento
-que esta sección declara— y con **pdf.js** como segunda opinión.
-
-**EL GATE FALLA.** Elemento por elemento:
-
-| Elemento del gate | Tracking | `pdftotext` | pdf.js | |
+| Elemento | Tracking | `pdftotext` | pdf.js | |
 |---|---|---|---|---|
 | Denominación genérica | 0 | limpio | limpio | ✅ |
 | Nombre comercial | 0 | limpio | limpio | ✅ |
@@ -2571,56 +2507,105 @@ que esta sección declara— y con **pdf.js** como segunda opinión.
 | Indicación | 0 | limpio | limpio | ✅ |
 | Ligaduras (`superficie`, `eficaz`) | 0 | limpio | limpio | ✅ |
 | Números de entrada (`01`) | 0 | limpio | limpio | ✅ |
-| **Vía de administración** | 0.22 em | **3 de 13 rotas** | **13 de 13 rotas** | ❌ |
-| **Etiquetas en versalita** | 0.22 em | **3 de 24 rotas** | **24 de 24 rotas** | ❌ |
-| **Folio** (2.M zona 1, rol `pie`) | 0.10 em | **roto** | **roto** | ❌ |
-| `PÁGINA X DE Y` | 0.22 em | limpio | **roto** | ❌ |
-| Contador de lista (2.K) | 0.22 em | **roto** | **roto** | ❌ |
 | Leyenda del pie (`pie.leyenda`) | 0.05 em | limpio | limpio | ✅ |
+| **Vía de administración** | 0.22 em | 3 de 13 rotas | 13 de 13 rotas | ❌ |
+| **Etiquetas en versalita** | 0.22 em | 3 de 24 rotas | 24 de 24 rotas | ❌ |
+| **Folio** (2.M zona 1, rol `pie`) | 0.10 em | roto | roto | ❌ |
+| **Contador de lista** (2.K) | 0.22 em | roto | roto | ❌ |
+| **`PÁGINA X DE Y`** (2.M zona 2) | 0.22 em | limpio | roto | ❌ |
 
-**Las tres roturas de vía son `OFTÁLMICA`, `SUBCUTÁNEA` y `RECTAL`**; las tres de
-etiqueta, `PRESENTACIÓN`, `AYUNO` y `PACIENTE O REPRESENTANTE`. El gate pide
-literalmente «`PACIENTE`, nunca `PAC IE NT E`»: `PACIENTE` solo sale limpio y
-`PACIENTE O REPRESENTANTE` sale `PA C I E N T E O R E P R E S E N TA N T E`.
+**Los seis de tracking 0 salen limpios en los dos extractores, y ahí están los
+cuatro campos clínicos.** Es lo que importaba: la denominación genérica, el
+nombre comercial, el gramaje y la indicación se copian de un PDF emitido sin
+perder un carácter.
 
-**Los seis de tracking 0 pasan los dos extractores.** Es la parte que importaba
-más y confirma lo que esta sección ya predecía: los cuatro campos clínicos que
-sostienen el motivo del gate no pueden fragmentarse por esta causa.
+**Fallan cinco. Cuatro son metadatos** —folio, paginación, contador y
+etiquetas— **y uno es clínico**: la vía de administración, que 2.H compone con el
+rol `etiqueta` sobre negativo y por eso carga los `0.22 em` de un rótulo. Las tres
+vías que rompe `pdftotext` son `OFTÁLMICA`, `SUBCUTÁNEA` y `RECTAL`; las tres
+etiquetas, `PRESENTACIÓN`, `AYUNO` y `PACIENTE O REPRESENTANTE`.
 
-**El mecanismo de §8.5 queda confirmado, y es peor de lo que decía.** No es que
-react-pdf «pueda» partir el operador `TJ`: con cualquier tracking distinto de
-cero **lo parte siempre**, un segmento por glifo. Medido a 0.05, 0.10 y 0.22 em.
-Lo que varía no es el PDF sino si el extractor vuelve a juntar los trozos, y eso
-**el documento no lo controla**.
+> **La vía se comporta al revés de lo que se esperaba entre extractores.**
+> `pdftotext` recompone 10 de las 13 palabras; **pdf.js no recompone ninguna**.
+> Quien mire esto en el futuro tiene que mirar los dos: con uno solo, la vía
+> parece casi sana o parece perdida del todo, y no es ni lo uno ni lo otro.
 
-**La frontera, acotada.** Con sondas de la misma cadena a cuerpo 7 en Archivo,
-de 0 a 0.22 em: **limpio hasta 0.09 em inclusive, roto desde 0.10 em** en los dos
-extractores. Es decir, entre **0.63 y 0.70 pt** de `letterSpacing` absoluto. Dos
-avisos sobre esa cifra:
+#### Dos correcciones al mecanismo, que la medición desmintió
 
-- **No es un umbral seguro, es una cota inferior.** `pdftotext` no es monótono:
-  rompe la sonda a 0.10 em y la recompone a 0.12, 0.15, 0.18, 0.20 y 0.22. Lo que
-  decide en su caso no es el tracking sino **la cadena**: todas las que rompe
-  llevan un par con ajuste de kerning —`TA` en ofTÁlmica, subcuTÁnea, recTAl,
-  presenTAción; `AY` en AYuno; `PA` en PAciente—, que rompe la uniformidad de los
-  ajustes del `TJ`. Es correlación observada en las 37 cadenas medidas, no
-  mecanismo demostrado.
-- **Por cadena significa por dato nuevo.** Un medicamento o una etiqueta que hoy
-  no existe puede romperse mañana sin que nadie toque el chasis.
+**(1) No es que react-pdf «pueda» partir el operador de texto: lo parte
+SIEMPRE.** La auditoría §8.5 lo dejó como una posibilidad. Con cualquier tracking
+distinto de cero, react-pdf emite **un segmento por glifo**, sin excepción —
+medido a 0.05, 0.10 y 0.22 em leyendo el flujo de contenido. Lo que varía no es
+el PDF: es si el extractor vuelve a juntar los trozos, y **eso el documento no lo
+controla**.
 
-**Qué queda sin probar:** el rol `folio` a 0.03 em, porque su único consumidor es
-2.R y 2.R no está construido; 2.S, bloqueado (P2-29); y el gate sobre un formato
-completo con datos reales, que es el Paso 3 y sigue en pie.
+**(2) La frontera medida no es un umbral seguro: es una cota inferior.** Con
+sondas de la misma cadena a cuerpo 7 en Archivo, de 0 a 0.22 em, sale **limpio
+hasta 0.09 em inclusive y roto desde 0.10 em** en los dos extractores — entre
+0.63 y 0.70 pt de `letterSpacing` absoluto. Pero **`pdftotext` no es monótono**:
+rompe la sonda a 0.10 em y la recompone a 0.12, 0.15, 0.18, 0.20 y 0.22. Lo que
+decide en su caso no es el tracking sino **la cadena concreta**: las seis que
+rompe de las 37 medidas llevan un par con ajuste de kerning —`TA` en ofTÁlmica,
+subcuTÁnea, recTAl, presenTAción; `AY` en AYuno; `PA` en PAciente—, que rompe la
+uniformidad de los ajustes. Es correlación observada, no mecanismo demostrado.
 
-**No se cambió ningún tracking.** Esto es el peldaño 1 y solo eso: el peldaño 2
-se decide con estos números delante, y la tabla de arriba dice exactamente cuáles
-son los sitios acotados — la vía (2.H) y las versalitas del pie (2.K, 2.M), más
-el rol `pie` del folio, que es el único de la lista por debajo de la versalita y
-aun así roto en los dos extractores.
+**Por cadena significa por dato nuevo.** Un medicamento o una etiqueta que hoy no
+existe puede romperse mañana sin que nadie toque el chasis. Es la razón por la
+que bajar el tracking **no cerraría** el problema, solo lo haría menos frecuente:
+no hay valor distinto de cero que garantice nada.
 
-**Motivo.** La denominación genérica es el único campo obligatorio por
-normativa. Un expediente cuyo dato legalmente exigible no es legible por
-máquina es exactamente lo que se revisa en la certificación NOM-024.
+#### Por qué se acepta como está
+
+**El PDF se ve, se imprime y se lee sin ningún problema.** Nada de esto afecta a
+lo que el papel hace: la vía se lee `SUBCUTÁNEA` en pantalla y en papel, y el
+fragmentado solo existe dentro del archivo, en cómo está partido el operador.
+
+**Lo único afectado es copiar texto del archivo**, y eso no ocurre en ninguno de
+los flujos reales del sistema: el médico emite, imprime o comparte; el paciente
+lee o lleva el papel; la farmacia y el hospital leen con los ojos.
+
+**Y si algún día hace falta lectura automática por un tercero, el camino es el
+JSON del expediente, no el papel.** Un PDF es un documento de presentación; el
+dato estructurado ya existe y ya se exporta. Rediseñar la tipografía del sistema
+para que un extractor de PDF acierte es resolver el problema por el sitio
+equivocado.
+
+#### Lo que NO se hace, y por qué queda escrito
+
+**No se toca ningún tracking. La escala de I.1.4 se queda como está.** La opción
+que este spec ordenaba —quitarle el tracking a los cinco elementos que fallan—
+**queda descartada el 2026-08-07, con la prueba visual delante**: destruye la
+tipografía del sistema para resolver algo que no es un requisito. Lo que costaba,
+medido: la caja negra de la vía se estrecha entre un 15 % y un 20 %
+—`SUBCUTÁNEA` pasa de 79.7 a 64.3 pt—, `PACIENTE O REPRESENTANTE` pierde 37 pt y
+el contador de 2.K, 38.5.
+
+**Las versalitas reales siguen descartadas**, ahora por partida doble. Ya no
+existía el remedio —el `Style` de react-pdf no tiene `fontVariant` ni selección de
+*features* OpenType, y Archivo no trae corte de versalitas—, y además ya no hay
+nada que remediar. Si alguien vuelve a proponerlas, esto es lo que hay que
+contestar.
+
+**Y no hay escalera de remedios.** La que había —medir, bajar el tracking,
+revisar la escala— se retira entera: existía para pasar un gate que no tenía por
+qué existir.
+
+#### Quién manda sobre qué
+
+**I.1.4 gobierna la composición**, sin contrapeso: las versalitas del sistema son
+mayúsculas con tracking y esta sección ya no dice nada sobre eso. Lo que queda
+aquí es **el registro de una propiedad medida**, no una regla que nadie tenga que
+cumplir (anexo A, P2-19 abrió el conflicto; P2-33 lo cierra).
+
+#### Qué queda sin medir
+
+Sin urgencia: nada de esto bloquea nada.
+
+- El rol `folio` a 0.03 em — su único consumidor es 2.R, que no está construido.
+- 2.S, bloqueado por otra causa (anexo A, P2-29).
+- La extracción sobre un formato completo con datos reales. **Vale la pena
+  correrla cuando exista el primer formato del Paso 4**, no para decidir nada sino
+  para que esta tabla hable de un documento entero y no de una hoja de taller.
 
 ### I.3.2 · Prohibiciones de diseño
 
@@ -2720,9 +2705,10 @@ y nada debajo.
   es **global al renderer, no por familia**: una sola llamada cubre las dos
   familias y cualquiera que se registre después. El motivo que obliga no es
   estético: sin desactivarla, la **denominación genérica** de una receta puede
-  salir partida con guion, y es el único campo obligatorio por normativa que
-  tiene que ser legible por máquina en el gate de I.3.1. `RECOMEN-DACIONES` es
-  feo; `AMOXICI-LINA` es un problema legal.
+  salir partida con guion, y es el único campo obligatorio por normativa. Aquí no
+  se trata de extracción —I.3.1 dejó de exigir nada— sino de lo que **se lee en el
+  papel**: `RECOMEN-DACIONES` es feo, y `AMOXICI-LINA` en un renglón de receta es
+  un nombre de fármaco partido delante de quien lo dispensa.
 - No existe alineación por **línea base** entre nodos de texto: no hay función de
   línea base registrada en Yoga, así que `alignItems: 'baseline'` alinea por el
   borde inferior del nodo. Una regla del spec que pida alinear líneas base se
@@ -3629,6 +3615,7 @@ registran aquí para que nadie las lea como reinterpretaciones ni intente
 | P2-30 | **El folio baja de ocho formatos a tres y el QR de cuatro a dos; la variante `sin folio` de 2.M pasa a ser el caso mayoritario, cinco de ocho.** Llevan folio Receta, Recibo y Consentimiento; llevan QR Receta y Recibo. Quedan escritas en la ficha las **tres cadenas literales de la banda**, que no estaban en ninguna parte, y corregida la leyenda —decía «Documento emitido con Spinus», que nadie declaró—. Y queda declarada la regla de implementación que hacía falta para que la zona 2 se imprima: **la función de render envuelve la banda entera, no la zona**. Revoca la mitad de D36 —el QR del Consentimiento— y deja el **formato del folio fuera de 2.M**: es un sub-paso aparte | Tres hallazgos en el mismo sitio y ninguno se ve sin ejecutar. **El folio no era buscable**: vive dentro del JSON del documento, sin columna ni índice, así que el número impreso no lo podía encontrar nadie — un identificador que no identifica. **El QR no tenía verificador rutinario** en Suplementación ni en Consentimiento: el primero se lo lleva el paciente, el segundo se firma y se archiva en papel. Y **la paginación no se imprimía**: el interlineado de la escala es una razón, cada pasada de render la vuelve a aplicar sobre un valor ya absoluto —11 → 77 → 539 pt— y la línea deja de caber en la banda de 16, sin error y sin hueco que lo delate. Medido descomprimiendo el flujo de contenido de un PDF real | 2.M · 2.A · 2.Q · II.1 · II.2 · II.3 · II.4 · II.5 · II.6 · II.7 · II.8 · A D17 · A D36 |
 | P2-31 | **El defecto mudo de 2.M queda fijado con prueba, y aparece su gemelo.** La regla de implementación pasa a I.3.8 como «la trampa del nodo con `render`», con sus dos mitades: el interlineado se remultiplica en cada recomposición —la que ya se conocía— y **el contenido que solo existe dentro del `render` no está cuando se cargan las tipografías**, así que la banda salía en la fuente de reserva sin lanzar nada. Forma correcta: `render` en el contenedor **más** los mismos hijos declarados. `src/lib/tests/pieDocumento.test.ts` extrae el texto del PDF y comprueba la cadena de paginación en las dos hojas | La segunda mitad salió al medir el gate: el `/BaseFont` del PDF decía Helvetica donde tenía que decir Archivo. La había introducido el arreglo de P2-30 sin que se viera, porque en el taller todas las demás piezas piden Archivo y dejaban la familia ya cargada — el defecto solo asoma en un documento donde la banda sea la única que la pida. Dos defectos mudos seguidos en el mismo nodo son lo que justifica la prueba: 2.N tiene la misma anatomía | I.3.8 · 2.M · `pieDocumento.test.ts` |
 | P2-32 | **El gate de extracción de I.3.1, corrido en el Paso 2 y no en el 3: FALLA.** Los seis elementos de tracking 0 —los cuatro clínicos incluidos— pasan los dos extractores. Fallan la vía de administración (3 de 13 en `pdftotext`, 13 de 13 en pdf.js), las etiquetas en versalita (3 de 24 y 24 de 24), el folio, el contador de 2.K y la paginación. Frontera acotada con sondas: **limpio hasta 0.09 em, roto desde 0.10**. Registrado en I.3.1 como ejecución parcial, con lo que quedó sin probar. **Sin cambiar ningún tracking** | El peldaño 1 pedía medir y se podía medir ya: los componentes existen desde el Paso 2. Y medir cambió el enunciado — §8.5 decía que react-pdf «puede» partir el `TJ`; lo parte **siempre** que hay tracking, y lo que varía es si el extractor recompone, que el documento no controla. `pdftotext` además no es monótono: rompe a 0.10 em y recompone a 0.22, porque lo que decide es la cadena —las que rompe llevan un par con kerning— y no el tracking. Un umbral no basta: un medicamento nuevo puede romperse mañana | I.3.1 · 2.H · 2.K · 2.M · I.1.4 |
+| P2-33 | **El gate de extracción deja de serlo: I.3.1 pasa de criterio bloqueante a propiedad medida, y la opción de quitar el tracking queda DESCARTADA.** La razón que lo hacía bloqueante era falsa y la había escrito este spec — «la legibilidad por máquina de la denominación genérica es materia de la certificación NOM-024»—: la NOM-024 regula el intercambio entre sistemas y ese intercambio va por datos estructurados; lo que se audita es el expediente exportado, no el papel. Retirada la frase, se retira la escalera de remedios entera y el chasis se queda intacto. La medición se conserva con sus números. **Ningún tracking cambia.** El Paso 3 de `PLAN_FASE1_DOCUMENTOS.md` deja de bloquear el Paso 4 | Los cinco elementos que fallan afectan a **copiar texto del archivo**, que no ocurre en ningún flujo real: el médico emite e imprime, el paciente lleva el papel, la farmacia lee con los ojos. El PDF se ve, se imprime y se lee igual. Y si alguna vez hace falta lectura automática por un tercero, el camino es el JSON del expediente. El coste de lo contrario estaba medido con la prueba visual delante: la caja de la vía se estrechaba entre 15 % y 20 %, `PACIENTE O REPRESENTANTE` perdía 37 pt y el contador 38.5 — destruir la tipografía del sistema por una comodidad del archivo. **El precedente que queda es el otro**: una afirmación normativa inventada dentro del spec estuvo a punto de rediseñar la escala | I.3.1 · I.1.4 · I.3.8 · `PLAN_FASE1_DOCUMENTOS.md` · A P2-19 · A P2-32 |
 Una cuarta, menor, sin fila propia: `caja.alto` queda marcado en I.1.1 como
 derivado que **se implementa como fórmula**. El Paso 0 lo había escrito como
 literal 670.
@@ -3642,4 +3629,3 @@ literal 670.
 | La sangría de las tres cajas enmarcadas del Recibo | 2.U regla 4. El dispositivo no la impone —un riel enmarcado y una leyenda de dos líneas no la llevan igual— y el archivo solo trae medida la de 2.R (`12 14 14`). Se mide al construir II.5 |
 | **2.S · la letra hueca** | El renderer no puede trazar texto: no emite el operador `Tr` y el `<Text>` de SVG descarta `stroke` (comprobado, P2-29). Elegir entre convertir las cuatro cadenas a trazado vectorial —versionado o generado en emisión— o revisar la regla 2 contra la lámina. **Lo que no se hace es componerla rellena** |
 | **El generador de folio** | 2.M lo recibe como dato y no decide su forma. Serie, ancho, prefijo, reinicio anual y —lo que hoy falta de verdad— **dónde se guarda para poder buscarlo**: hoy vive dentro del JSON del documento, sin columna ni índice. Es un sub-paso aparte y **único para los tres formatos que llevan folio** (anexo A, P2-30) |
-| **Gate de extracción de texto — peldaño 2** | I.3.1. El peldaño 1 ya está corrido (2026-08-07, anexo A P2-32) y **falla**: pasan los seis elementos de tracking 0, fallan la vía, las versalitas, el folio y el contador. Lo que queda abierto es **decidir el peldaño 2 con esos números delante** — bajar el tracking de los cuatro sitios acotados, y cuánto. No se decide aquí porque no es una medición sino una elección tipográfica, y porque `pdftotext` rompe **por cadena y no por tracking**: bajar el valor reduce el riesgo pero no lo cierra. Sigue pendiente además correr el gate sobre un formato completo con datos reales (Paso 3) |
