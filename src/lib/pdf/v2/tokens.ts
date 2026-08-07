@@ -23,9 +23,10 @@
  *   `umbral.firma`        → `umbralFirma()`  (token derivado → función)
  *
  * TOKENS DERIVADOS. §0 exige que un token derivado se implemente como FÓRMULA y
- * no como su resultado. En esta capa son cuatro: `CAJA.alto` (expresión) y las
- * funciones `darkenToContrast()`, `altoBloqueFirma()` y `umbralFirma()`. Si
- * alguien los congela en literales, el token deja de estar implementado.
+ * no como su resultado. En esta capa son cinco: `CAJA.alto` y `CIERRE.izquierda`
+ * (expresiones) y las funciones `darkenToContrast()`, `altoBloqueFirma()` y
+ * `umbralFirma()`. Si alguien los congela en literales, el token deja de estar
+ * implementado.
  *
  * Unidad: puntos PostScript (pt), la unidad nativa de @react-pdf/renderer.
  * El tracking va en em, tal como lo declara el spec.
@@ -95,6 +96,37 @@ export const RETICULA = {
 
 /** Alto de una celda del riel. */
 export const RIEL_CELDA = 40.5
+
+/**
+ * I.1.3 · La fila de cierre: la última fila de la hoja, la que reparte el pie del
+ * contenido entre lo que se firma y lo que se cuenta. La misma en los ocho
+ * formatos — la caja de firma (2.L) vive en su columna derecha, y en el Recibo esa
+ * columna es la que ocupa `RielImportes` (2.T).
+ *
+ * Es la TERCERA partición de la caja de 486 pt, y convive con las otras dos por la
+ * misma razón que ellas conviven entre sí: cada una separa cosas distintas con
+ * separadores distintos. No sale de `reticula.columna` y no tiene por qué —esta
+ * fila es de dos columnas con medianil propio, medido en la hoja aprobada—, y ese
+ * fue justamente el motivo de que H9 quedara abierto toda la conciliación: se
+ * buscaba el 246 en la retícula de doce, que es la partición equivocada.
+ *
+ * `izquierda` es DERIVADO y va como fórmula (§0): un 216 literal significaría que
+ * el token no está implementado.
+ *
+ * `COINCIDENCIA` — `derecha` mide lo mismo que `MANUSCRITO.ancho` (246 pt) y NO
+ * son el mismo valor: uno es el ancho de una columna de maquetación, el otro el de
+ * una línea destinada a llenarse con pluma, medida contra la presentación más
+ * larga del catálogo. **No los fusiones.** Si cambia el ancho de la línea de
+ * escritura, esta columna no se mueve.
+ */
+const CIERRE_DERECHA = 246
+const CIERRE_MEDIANIL = 24
+
+export const CIERRE = {
+  derecha: CIERRE_DERECHA,
+  medianil: CIERRE_MEDIANIL,
+  izquierda: CAJA.ancho - CIERRE_DERECHA - CIERRE_MEDIANIL,
+} as const
 
 // ───────────────────────────────────────────────────────────────────────────────
 // I.1.4 · Tipografía

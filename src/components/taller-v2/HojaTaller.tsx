@@ -39,6 +39,7 @@ import BloqueNegativo from '@/lib/pdf/v2/BloqueNegativo'
 import BloqueDestacado from '@/lib/pdf/v2/BloqueDestacado'
 import ContadorLista from '@/lib/pdf/v2/ContadorLista'
 import ParserBloques from '@/lib/pdf/v2/ParserBloques'
+import EntradaNumerada from '@/lib/pdf/v2/EntradaNumerada'
 import { registrarFuentesV2 } from '@/lib/pdf/v2/fonts'
 import {
   CAJA,
@@ -331,6 +332,33 @@ const CASOS_2J: readonly { readonly rotulo: string; readonly texto: string; read
     marca: 'numero',
   },
 ]
+
+/**
+ * Tres medicamentos con las cinco ranuras ocupadas, como los compondría una
+ * Receta (II.3 §4): el ancla lleva comercial y presentación al mismo peso, el
+ * secundario la denominación genérica, la marca la vía y la nota la indicación.
+ * INVENTADOS, como todo lo del taller.
+ */
+const ENTRADAS_2G = [
+  {
+    ancla: 'Amoxil · Cápsulas 500 mg, caja con 12',
+    secundario: 'Amoxicilina',
+    marca: 'oral',
+    nota: 'Una cápsula cada ocho horas durante siete días, con alimentos.',
+  },
+  {
+    ancla: 'Ketorolaco Pisa · Solución inyectable 30 mg/ml',
+    secundario: 'Ketorolaco trometamina',
+    marca: 'intramuscular',
+    nota: 'Una ampolleta cada doce horas por razón necesaria, máximo dos días.',
+  },
+  {
+    ancla: 'Nexium · Tabletas 20 mg, caja con 14',
+    secundario: 'Esomeprazol',
+    marca: 'oral',
+    nota: 'Una tableta en ayunas mientras dure el antiinflamatorio.',
+  },
+] as const
 
 /** El texto de la verificación visible de 2.J, tal como lo pide la ficha. */
 const VERIFICACION_2J = [
@@ -799,6 +827,59 @@ function HojaTaller({
             renglón sí sale en versalita, y no por llevar dos puntos sino porque
             debajo tiene viñetas. La raya cuelga en el riel y el texto sangra una
             columna exacta: 23.25 + 9 = 32.25 pt.
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <Rotulo>2.G entrada · tres, con las cinco ranuras ocupadas</Rotulo>
+          <View style={estilos.muestra}>
+            {ENTRADAS_2G.map((entrada, indice) => (
+              <EntradaNumerada
+                key={entrada.secundario}
+                numero={indice + 1}
+                primera={indice === 0}
+                ancla={entrada.ancla}
+                secundario={entrada.secundario}
+                marca={entrada.marca}
+                nota={entrada.nota}
+                acento={acento}
+              />
+            ))}
+            {/* No debe haber regla entre esta línea y la última entrada. */}
+            <View style={estilos.marcaArranque} />
+          </View>
+
+          <View style={estilos.seccion}>
+            <Rotulo>2.G entrada · solo el ancla, las demas ranuras colapsan</Rotulo>
+            <View style={estilos.muestra}>
+              <EntradaNumerada
+                numero={1}
+                primera
+                ancla="Paracetamol · Tabletas 500 mg, caja con 10"
+                acento={acento}
+              />
+              <View style={estilos.marcaArranque} />
+            </View>
+          </View>
+
+          <Text style={estilos.nota}>
+            2.G · EntradaNumerada. Los números salen 01, 02 y 03 en el riel
+            izquierdo, alineados entre sí y en acento derivado. La denominación
+            genérica —el renglón bajo el ancla— se lee TAN NEGRA como el nombre
+            comercial: más chica, no más gris. Es el único campo obligatorio por
+            normativa y no puede componerse como dato de segunda. La regla entre
+            entradas NO está centrada: 5 pt por debajo de ella hasta la entrada
+            que abre y 7 pt por encima hasta la que cierra, así que se lee como
+            apertura de la siguiente. No hay regla antes de la primera ni después
+            de la última — la línea azul lo comprueba. En la muestra de abajo, una
+            entrada con solo el ancla: el número sigue siendo 01 aunque sea la
+            única, que es lo que la distingue de 2.J, donde un solo ítem no se
+            numera.
           </Text>
         </View>
       </Page>

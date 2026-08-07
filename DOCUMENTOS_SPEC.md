@@ -17,7 +17,7 @@
 | I.1 · Tokens | **cerrada.** Sin pendientes: los doce sitios tipográficos tienen valor |
 | I.3 · Invariantes del sistema | escrita |
 | Anexo A · Divergencias | **cerrado.** Las 44, resueltas |
-| I.2 · Componentes | **cerrada.** Veinte componentes |
+| I.2 · Componentes | **cerrada.** Veintiún componentes |
 | II · Por formato | **cerrada.** Los ocho |
 
 ---
@@ -150,6 +150,34 @@ equivale a una columna: `23.25 + 9 = 32.25`.
 | Texto | 1–8 | 321 pt |
 | Riel de datos | 9–12 | 156 pt |
 
+**La fila de cierre**
+
+Es la última fila de la hoja, la que reparte el pie del contenido entre lo que se
+firma y lo que se cuenta. La misma en los ocho formatos: la caja de firma vive en
+su columna derecha, y en el Recibo esa columna es la que ocupa `RielImportes`.
+
+| Token | Valor |
+|---|---|
+| `cierre.derecha` | 246 pt |
+| `cierre.medianil` | 24 pt |
+| `cierre.izquierda` | `caja.ancho − cierre.derecha − cierre.medianil` (216 pt) |
+
+`cierre.izquierda` es **derivado: se implementa como fórmula** (§0). Un 216
+literal en el código significa que el token no está implementado.
+
+> **No sale de `reticula.columna` y no tiene por qué.** Esta fila no es una
+> partición de doce: es un reparto de dos columnas con un medianil propio, medido
+> en la hoja aprobada. Es la tercera partición de la misma caja de 486 pt, y
+> convive con las otras dos por la misma razón que ellas conviven entre sí — cada
+> una separa cosas distintas con separadores distintos (`CONCILIA D-retícula`).
+>
+> `COINCIDENCIA` — `cierre.derecha` mide lo mismo que `manuscrito.ancho`
+> (246 pt). **Distinto valor por distinta causa** y no se fusionan: uno es el
+> ancho de una columna de maquetación y el otro el de una línea destinada a
+> llenarse con pluma, medida contra la presentación más larga del catálogo. Cuál
+> derivó de cuál no lo dice el archivo de diseño. Si algún día cambia el ancho de
+> la línea de escritura, la columna de cierre **no se mueve**.
+
 > `CONCILIA D-retícula` — el diseño tiene **dos retículas conviviendo**: la de
 > 32.25 + 9 para bloques de texto, y una de 12 partes iguales sin medianil para
 > el riel de identificación. **No es un defecto y no se unifica.** Son dos
@@ -266,11 +294,13 @@ que el rol declara (15 / 15), así que a 26 pt es 26.
 
 Salieron del barrido de las veinte fichas de I.2 (anexo A, P2-11) y se cerraron
 **derivando del propio spec**, no eligiendo (anexo A, P2-14). Ninguna necesitó un
-token nuevo: los valores ya estaban en el diseño y lo que faltaba era el nombre.
+rol nuevo: los valores ya estaban en el diseño y lo que faltaba era el nombre.
 Cada fila dice qué la sostiene — una jerarquía ya declarada, un rol vecino que
 hace el mismo trabajo, o una regla del sistema.
 
-**Diez de once.** El que falta, H9, y el que apareció al cerrar H4 están abajo.
+**Diez por derivación; H9, por medición** (anexo A, P2-23). Está abajo, con el
+aire entre entradas que apareció al cerrar H4: los dos únicos que no se podían
+resolver leyendo, solo mirando la lámina.
 
 | # | Pieza | Ficha | Cerrada como | De qué se deriva |
 |---|---|---|---|---|
@@ -282,28 +312,31 @@ hace el mismo trabajo, o una regla del sistema.
 | H6 | Número de apertura, 26 pt | 2.Q | **`seccion.numero` a 26 pt**, desviación declarada | Es el número de una sección, igual que el de 2.P. Suena más fuerte porque el propósito declarado de 2.Q es ser más fuerte que 2.P, y la ficha ya fija el cuerpo |
 | H7 | Rótulo de sección · subtítulo de lector | 2.Q | **`titulo.seccion`** · **`titulo.subtitulo`** | 2.Q es 2.P un nivel arriba y 2.P compone su título con `titulo.seccion`. El subtítulo es la única línea secundaria del sistema —humanista, `tinta.secundaria`, bajo un título— y su alcance se amplía a sección en la tabla de arriba |
 | H8 | Total del recibo, Archivo 22 / 600 | 2.T | **Geometría del componente**, declarada entera | Criterio de los anillos de 2.A: un valor que usa un solo componente en un solo sitio no es un rol. La regla 2 de 2.T lo dice ella misma — no hay segundo uso |
-| H9 | Ancho de la caja de importes | 2.T | **NO DEFINIDO** | Ver abajo |
+| H9 | Ancho de la caja de importes | 2.T | **`cierre.derecha`** (246 pt), token nuevo de I.1.3 | No se deriva: se **mide**. Es la columna derecha de la fila de cierre, la de la caja de firma, no `manuscrito.ancho`. Ver abajo |
 | H10 | Los tres avisos de pie | 2.N | **`pie` en versalita**, en `tinta.secundaria` | Misma posición que el contador de 2.K —al pie del área de contenido, no en la banda—, mismo registro y misma forma de cadena. Pueden salir en la misma hoja: si no comparten tratamiento, compiten |
 | H11 | Contorno «negro al 45 %» | 2.S | **Geometría derivada de 2.S**: `tinta.negra` al 45 % sobre blanco, por mezcla opaca | La misma derivación que `acento.velo`, que es `acento.base` al 6 % sobre blanco. Mezcla y no alfa, por el mismo motivo de I.1.8: un alfa depende del visor y del driver de impresión |
 
-**H9 queda NO DEFINIDO.** Los 246 pt de la caja de importes de 2.T citan
-`manuscrito.ancho`, que I.1.5 reserva a «espacios destinados a llenarse con
-pluma» — y una caja de importes impresos no lo es. Tampoco se puede derivar de
-la retícula: 246 no es un número entero de columnas de ninguna de las dos
-—`reticula.columna` daría 238.5 con 6 columnas o 279.75 con 7, y `riel.celda`
-daría 243 con 6—, así que I.1.3 no lo produce. **Lo que falta:** medir la caja de
-totales en el Recibo aprobado. Si mide 246, es geometría de 2.T con nombre propio
-y la coincidencia con `manuscrito.ancho` se registra como `COINCIDENCIA`; si mide
-otra cosa, el 246 era un token al que alguien echó mano y se sustituye. No se
-puede resolver sin el archivo de diseño.
+**H9 QUEDA CERRADO, y no era lo que parecía.** Los 246 pt de la caja de importes
+de 2.T no salieron de `manuscrito.ancho`: son el ancho de la **columna derecha de
+la fila de cierre**, la misma donde vive la caja de firma en los ocho formatos.
+Medido en el archivo aprobado: 486 − 246 − 24 de medianil = 216 pt para la
+columna izquierda. El token es `cierre.derecha` y vive en I.1.3, con
+`cierre.medianil` y `cierre.izquierda`; la coincidencia con `manuscrito.ancho`
+queda registrada como `COINCIDENCIA` en los dos sitios. Lo que hacía irresoluble
+este hueco era buscar el 246 en la retícula de doce, que es la partición
+equivocada: la fila de cierre es de dos columnas.
 
-**Y uno nuevo, que apareció al cerrar H4: el aire entre entradas de 2.G también
-queda NO DEFINIDO.** Está acotado —tiene que ser mayor que `espacio.8`, o la nota
-de una entrada se pegaría a la regla tanto como al ancla de la que cuelga— pero
-nada del spec lo fija, y elegir `espacio.12` por ser el siguiente miembro sería
-apilar una decisión encima de un valor ya derivado. **Lo que falta:** medir la
-densidad de una lista de tres medicamentos en la Receta aprobada. Detalle en la
+**Y el que apareció al cerrar H4 —el aire entre entradas de 2.G— también queda
+cerrado**, y tampoco por derivación: **medido**. Son 12.5 pt, y no son un miembro
+de la escala sino tres cifras con reparto propio —7 pt de padding inferior,
+`filete.regla`, 5 pt de padding superior—, con la regla deliberadamente
+descentrada. Es geometría interna del componente y está declarada entera en la
 ficha de 2.G.
+
+**Las once piezas quedan cerradas.** Nueve por derivación del propio spec, dos
+—las dos que exigían mirar una lámina— por medición. Ninguna necesitó un token
+tipográfico nuevo; la única que estrenó nombre estrenó **tres**, y son de
+retícula, no de escala.
 
 #### Tres tratamientos que son geometría de componente POR DECISIÓN
 
@@ -337,6 +370,13 @@ empiezan a ser una escala incompleta.
 
 Aplica a: líneas de campo vacío requerido, bloques rayados, líneas de firma
 manuscrita y cualquier espacio destinado a llenarse con pluma.
+
+> `COINCIDENCIA` — `manuscrito.ancho` mide lo mismo que `cierre.derecha` de
+> I.1.3, y **no son el mismo valor**: este se midió contra la presentación más
+> larga del catálogo, aquel es el ancho de la columna derecha de la fila de
+> cierre. Es el mismo cuidado que ya se tuvo con los dos 20 pt del alto: un token
+> de escritura a mano no presta su medida a la maquetación. **Ver 246 pt en dos
+> sitios no significa que sobre uno.**
 
 ### I.1.6 · Filetes
 
@@ -589,13 +629,19 @@ El 3 de la fórmula es `flujo.arrastre`: son las tres líneas que la regla 1 de
 ## I.2 · Componentes
 
 Orden de dependencia: cada componente solo cita tokens de I.1 y componentes
-anteriores. Ficha idéntica en los veinte.
+anteriores. Ficha idéntica en los veintiuno.
 
-> **Son veinte, no catorce.** La conciliación contra el diseño encontró seis
+> **Son veintiuno, no catorce.** La conciliación contra el diseño encontró seis
 > componentes reales que el plan de código no listaba: `FileteGruesoFino`,
 > `ZonaQR`, `MarcaEstado`, `EncabezadoSeccion`, `AperturaSeccion` y
 > `RielImportes`. Sin ellos, cada formato los recompone por su cuenta, que es
 > exactamente el origen de buena parte de las 44 divergencias del anexo A.
+>
+> **El veintiuno llegó midiendo, no conciliando.** `MarcoParcial` (2.U) sale de la
+> medición del Recibo: el marco en acento no era una variante de `BloqueDestacado`
+> sino un dispositivo gráfico que envuelve contenidos de anatomía distinta, y ya
+> estaba declarado dos veces —en 2.R y, por su nombre, en II.5— sin dueño (anexo
+> A, P2-24).
 >
 > Se evaluó y se descartó meter `EncabezadoSeccion` dentro de `EntradaNumerada`:
 > un encabezado de sección no es un ítem de lista, no participa del contador, y
@@ -1125,13 +1171,56 @@ Suplementación e Imagenología.
 Qué dato ocupa cada ranura lo declara el formato en la Sección II. El
 componente declara las ranuras, no su contenido.
 
+> **CIERRA 2.G — dónde va la `marca`, que la anatomía no situaba.** Va **en la
+> fila del `ancla`, a la derecha**, no en el flujo vertical. Lo dice la tabla de
+> separaciones internas de aquí abajo: declara `ancla` → `secundario` y
+> `secundario` → `nota` y **no declara ningún tramo que toque la marca**. Con la
+> marca en el flujo, esa tabla tendría un hueco; fuera de él, está completa. Y
+> encaja con lo que la marca es: califica el renglón del ancla —esta presentación,
+> por esta vía—, no es un renglón más. El medianil entre el ancla y la marca no lo
+> declara la ficha: se usa `reticula.medianil`, el separador de columnas del
+> sistema, en vez de inventar una cifra (mismo criterio que 2.C con la fecha).
+>
+> **La `nota` se compone con `ParserBloques` (2.J).** El rol es el mismo que la
+> ficha ya declaraba —`texto.corrido`, que es lo que 2.J usa por defecto— y la
+> lista de bloques con esa sintaxis de 2.J incorpora esta ranura. En la práctica
+> la indicación es prosa y de ahí sale prosa; si el médico escribe viñetas, salen
+> como lista en vez de como una tirada de guiones sueltos. Raya y no número: una
+> indicación enumera sin orden (anexo A, P2-25).
+
 **Separaciones internas**
 
 | Separa | Valor |
 |---|---|
 | `ancla` → `secundario` | `espacio.4` |
 | `secundario` → `nota` | `espacio.8` |
-| Entre entradas, alrededor de la regla | **NO DEFINIDO** — ver abajo |
+| Entre entradas, alrededor de la regla | **12.5 pt**, con reparto propio — ver abajo |
+
+**Geometría interna: el aire entre entradas.** Medido en la lámina aprobada. No
+es un miembro de la escala de espaciado y no debe forzarse a serlo (I.1.7): es
+geometría del componente, como los anillos de 2.A o el padding de celda de 2.F.
+
+| Tramo | Valor |
+|---|---|
+| Padding inferior de la entrada que **termina** | 7 pt |
+| Regla | `filete.regla` (0.5 pt) en `tinta.hairline` |
+| Padding superior de la entrada que **empieza** | 5 pt |
+| **Total** | **12.5 pt** |
+
+> **LA REGLA NO ESTÁ CENTRADA, Y ES DELIBERADO.** Queda 2 pt más cerca de la
+> entrada que abre que de la que cierra, así que se lee como **apertura de la
+> siguiente** y no como cierre de la anterior — que es lo que hace que una lista
+> larga se recorra hacia abajo en vez de leerse como bloques sueltos. **Conserva
+> el desfase.** Un 6/6 «para que quede centrado» es la corrección que hay que no
+> hacer: no es un descuido de medición.
+>
+> `CONCILIA D-entradas` — el archivo trae **tres calibraciones del mismo
+> espacio**: 5/7, 8/10 y 9/11, todas con la misma regla y **todas con el desfase
+> de 2 pt**. Gana la de 5/7, que es la de las láminas con varios medicamentos, es
+> decir el caso real; las otras dos son de láminas de un solo medicamento. El
+> precedente es D4: **un documento no cambia de métrica según cuántos ítems
+> tenga**, y una lista que se aprieta al crecer es exactamente lo que I.3.4
+> prohíbe. Una sola calibración.
 
 > **CIERRA H4.** Mismo criterio que el subtítulo de 2.C: dentro de un bloque, la
 > separación es tanto menor cuanto más pegadas estén las dos piezas. El
@@ -1145,17 +1234,16 @@ componente declara las ranuras, no su contenido.
 > dato; con `espacio.12` en la segunda, empezaría a competir con la separación
 > entre entradas.
 >
-> **El aire alrededor de la regla entre entradas queda NO DEFINIDO.** Solo se
-> puede acotar: tiene que ser mayor que `espacio.8`, o la nota de una entrada se
-> pegaría a la regla tanto como al ancla de la que cuelga. El menor miembro que lo
-> cumple es `espacio.12`, pero **nada del spec lo fija**, y elegirlo por ser el
-> siguiente de la escala sería apilar una decisión sobre otra derivada. Falta
-> medir la densidad de una lista de tres medicamentos en la Receta aprobada.
+> **El aire entre entradas ya no se deriva: está medido**, arriba. La cota que
+> esta nota dejaba escrita —mayor que `espacio.8`— la cumple: 12.5 > 8. Y confirma
+> por qué no se eligió `espacio.12` en su día: el valor real no es un miembro de
+> la escala ni está centrado, así que la elección «razonable» habría fijado una
+> cifra parecida con el reparto equivocado (anexo A, P2-23).
 
 **Tokens que consume.** `entrada.numero` · `entrada.ancla` ·
 `entrada.secundario` · `texto.corrido` · `reticula.riel` ·
 `reticula.medianil` · `filete.regla` · `tinta.hairline` · `espacio.4` ·
-`espacio.8`.
+`espacio.8`. **Componentes:** 2.H en la ranura `marca`, 2.J en la ranura `nota`.
 
 > **CORRIGE 2.G** — la anatomía pedía `entrada.numero.cuerpo`,
 > `entrada.ancla.cuerpo`, `entrada.secundario.cuerpo` y `texto.corrido.*`: cuatro
@@ -1335,29 +1423,24 @@ en diagonal. Se distingue **por filete, nunca por fondo de color**.
    > entra por la ranura de rol de 2.J. Una prosa sin viñetas sale de ahí como
    > prosa: es la degradación segura del parser, no una excepción de 2.I.
 
-**El marco parcial en acento de II.5 queda `NO DEFINIDO`.** II.5 §5 lo cita por
-nombre —«la variante `acento` de `BloqueDestacado`» (`CONCILIA D26`)— y esta
-tabla declara tres variantes, no cuatro: es la tercera comprobación de cierre de
-§0 sin cumplir. **No se resuelve inventando la cuarta fila**, porque las dos
-lecturas posibles llevan a componentes distintos y el spec no contiene con qué
-elegir:
+**NO HAY CUARTA VARIANTE. El marco parcial es 2.U, y este componente es uno de
+sus consumidores, no su dueño.** La medición del Recibo cerró la duda que esta
+ficha dejó abierta —si el marco envolvía prosa o envolvía bloques— y la respuesta
+es la segunda: de los tres bloques enmarcados, **la caja de aseguradora es un
+`RielDatos` enmarcado y la leyenda no fiscal es una declaración de dos líneas**;
+solo la declaración del Consentimiento comparte anatomía con este componente. Un
+dispositivo que envuelve cosas de anatomía distinta no es una variante de una de
+ellas.
 
-- **Es una variante más de aquí.** Sería `filete.acento` en dos lados —superior e
-  izquierdo, que es el único marco parcial que el sistema declara, en 2.R— y en
-  acento en vez de `tinta.negra`. Encaja con I.3.5: un formato que necesita algo
-  no estrena componente, estrena variante.
-- **No es un `BloqueDestacado`.** Lo que II.5 enmarca no es un pasaje de prosa
-  sino **un riel de aseguradora, una leyenda y una declaración**: el propósito de
-  esta ficha —destacar un pasaje que se lee en diagonal— no es el suyo, su
-  jerarquía no la carga el grosor (regla 1) y no compone texto en un rol propio.
-  Es el mismo criterio con el que la línea fina del membrete salió de 2.F: un
-  componente que necesita excepciones en sus reglas es el componente equivocado.
+El segundo argumento es de tinta y basta por sí solo: **las tres variantes de
+aquí van en `tinta.negra` y el marco va en acento.** En la hoja espécimen, además,
+el marco parcial figura en el bloque de **dispositivos gráficos**, no en el de
+componentes.
 
-**Lo que falta:** mirar el Recibo aprobado y ver si el marco envuelve prosa o
-envuelve bloques. Si envuelve prosa, es la cuarta variante y se declara aquí con
-su grosor y su color; si envuelve bloques, D26 encaminó mal y el marco es
-geometría del formato o un componente propio. Hasta entonces, **ningún formato
-instancia una variante `acento` de este componente**, y esta ficha declara tres.
+`CONCILIA D26, D34` — las dos divergencias se reportaron por separado —una en
+II.5, otra en II.7— sin ver que eran el mismo objeto. Quedan unificadas en 2.U.
+**Si alguien vuelve a proponer una variante `acento` de `BloqueDestacado`, esto es
+lo que hay que contestar.**
 
 **Verificación visible.** En Receta, emitir con y sin recomendaciones: con
 ellas aparece un filete grueso al costado y arriba del bloque, **sin ninguna
@@ -1481,7 +1564,14 @@ compone: es la mitad testable de un solo componente, no una capa nueva.
 **Bloques del sistema que usan esta sintaxis.** Recomendaciones generales de
 Receta · notas adicionales de Suplementación · notas para el servicio de
 Imagenología · instrucciones al paciente de Internamiento · indicaciones de
-ingreso a piso.
+ingreso a piso · **la ranura `nota` de `EntradaNumerada`** (2.G).
+
+> La última entró al construir 2.G. Es la única de la lista que **no** es un
+> bloque de texto libre sino un renglón de un ítem, y por eso faltaba: la
+> indicación de un medicamento es prosa y sale prosa. Pasa por el parser de todas
+> formas porque el dato viene de un textarea y nada impide que el médico escriba
+> viñetas ahí — y entonces salen como lista, no como una tirada de guiones dentro
+> de un párrafo.
 
 **Tokens que consume.** `etiqueta`, para el encabezado de bloque ·
 `texto.corrido`, para ítems y párrafos · `reticula.riel` y `reticula.medianil`,
@@ -1936,8 +2026,13 @@ grueso que cualquier otro filete del documento**, incluido el del membrete.
 
 **Propósito.** Verificación por terceros: farmacia, hospital, aseguradora.
 
-**Composición.** Marco parcial de dos lados —filete superior e izquierdo de
-`filete.acento`—, padding `12 14 14`.
+**Composición.** `MarcoParcial` (2.U) con padding `12 14 14`.
+
+> **CORRIGE 2.R** — esta ficha describía el marco entera —«dos lados, filete
+> superior e izquierdo de `filete.acento`»— y era **la segunda declaración del
+> mismo objeto** en el spec. El marco baja a 2.U, que es el dispositivo; aquí se
+> queda lo que sí es de 2.R: qué envuelve y con cuánta sangría. Es la misma
+> operación que llevó la composición del riel de 2.D a 2.F (anexo A, P2-13).
 
 | Elemento | Medida |
 |---|---|
@@ -2037,8 +2132,8 @@ sigue siendo legible.
 **Propósito.** El cierre económico del Recibo. Es el único bloque del sistema
 con jerarquía de cifra.
 
-**Composición.** Caja de ancho **`NO DEFINIDO`** —ver H9 abajo— alineada a la
-derecha, retícula `1fr auto`. Filas: subtotales → total → anticipo → saldo.
+**Composición.** Caja de ancho **`cierre.derecha`** alineada a la derecha,
+retícula `1fr auto`. Filas: subtotales → total → anticipo → saldo.
 
 | Fila | Cuerpo |
 |---|---|
@@ -2067,19 +2162,24 @@ interlineado propio**, peso 600, tracking 0, `tinta.negra`, cifras tabulares.
 > el otro un sello hueco y girado. La regla 2 queda corregida abajo, porque decía
 > que no había segundo uso de 22 pt y sí lo hay.
 
-**Tokens que consume.** `dato` · `tinta.negra`.
+**Tokens que consume.** `dato` · `tinta.negra` · `cierre.derecha`.
 
-> **H9 · EL ANCHO DE LA CAJA QUEDA `NO DEFINIDO`.** La composición cita
-> `manuscrito.ancho`, y I.1.5 reserva ese token a «espacios destinados a llenarse
-> con pluma»: una caja de importes impresos no lo es. Tampoco sale de la retícula
-> —246 no es entero de `reticula.columna`, que daría 238.5 con 6 columnas o 279.75
-> con 7, ni de `riel.celda`, que daría 243 con 6—, así que I.1.3 no lo produce y
-> no hay de dónde derivarlo.
+> **CIERRA H9 — la caja mide `cierre.derecha` (246 pt), y NO es `manuscrito.ancho`.**
+> Medido en el Recibo aprobado: el riel de importes no tiene ancho propio, ocupa
+> **la columna derecha de la fila de cierre**, la misma donde vive la caja de
+> firma en los ocho formatos. Por eso 246 no salía de la retícula de doce — la
+> fila de cierre es de dos columnas, con su medianil de 24 pt, y está declarada en
+> I.1.3.
 >
-> **Lo que falta para cerrarlo:** medir la caja de totales en el Recibo aprobado.
-> Si mide 246 pt, es geometría de 2.T con nombre propio y la coincidencia con
-> `manuscrito.ancho` se registra como `COINCIDENCIA`; si mide otra cosa, el 246
-> era un token al que alguien echó mano y se sustituye por el valor medido.
+> **Que coincida con `manuscrito.ancho` es real y es `COINCIDENCIA`**, no
+> identidad: cuál derivó de cuál no lo dice el archivo. Si algún día cambia el
+> ancho de la línea de escritura a mano, esta caja no se mueve. **No sustituyas
+> `cierre.derecha` por `manuscrito.ancho` porque «es el mismo número»:** es el
+> error que este componente ya cometió una vez, y es lo que dejó H9 abierto
+> durante toda la conciliación.
+>
+> Corolario para 2.L: la caja de firma vive en esta misma columna. Cuando se
+> construya, el token es este y no uno nuevo.
 
 **Reglas**
 
@@ -2093,6 +2193,73 @@ interlineado propio**, peso 600, tracking 0, `tinta.negra`, cifras tabulares.
 **Verificación visible.** Emitir con cuatro conceptos de importes de distinta
 longitud: los cuatro quedan alineados **por la unidad, no por la izquierda**, y
 el total se lee claramente mayor que ellos.
+
+---
+
+### 2.U · `MarcoParcial`
+
+**Propósito.** Enmarcar sin encerrar. Es el **dispositivo gráfico** con el que el
+sistema acota un contenido que hay que mirar aparte, sin barra, sin fondo y sin
+caja cerrada.
+
+**Composición.** Filete **superior e izquierdo** de `filete.acento`, en
+`acento.base`. Nada más: ni los otros dos lados, ni relleno, ni velo.
+
+**Sin variantes.** El marco es uno solo. Lo que cambia entre usos es **qué
+envuelve**, y eso no es una variante suya.
+
+**Tokens que consume.** `filete.acento` · `acento.base`.
+
+**Reglas**
+
+1. **Dos lados, siempre los mismos: superior e izquierdo.** Nunca los cuatro y
+   nunca con fondo (`CONCILIA D34`, I.3.2). Un marco de cuatro lados con trama es
+   lo que hace el sistema viejo y es lo que este dispositivo sustituye.
+2. **Va en acento**, y es uno de los usos que I.1.8 admite para el acento — como
+   filete, nunca como color de texto.
+3. **Envuelve; no compone.** No conoce el rol de lo que hay dentro, no impone
+   familia ni cuerpo, y por eso puede envolver cosas de anatomía distinta: un
+   `RielDatos`, una declaración de dos líneas o un pasaje de prosa. **Ahí está la
+   diferencia con `BloqueDestacado`** (2.I), que sí compone su contenido en un rol
+   propio y va en `tinta.negra`.
+4. **La sangría respecto del filete la declara el consumidor**, no este
+   dispositivo: un riel enmarcado y una leyenda de dos líneas no la llevan igual.
+   2.R ya declara la suya —padding `12 14 14`—. **`NO DEFINIDO`** la de las tres
+   cajas del Recibo: se mide al construir II.5, con la lámina delante.
+5. **En fotocopia sigue significando** (I.3.3): lo que informa es el marco, no su
+   tono. Que el acento salga gris no le quita nada — sigue siendo dos filetes de
+   2 pt donde no había ninguno.
+
+**Quién lo instancia**
+
+| Sitio | Qué envuelve |
+|---|---|
+| 2.R · `ZonaQR` | El QR, su leyenda y su folio. **Ya lo componía por su cuenta** |
+| II.5 · Recibo | Caja de aseguradora (un `RielDatos`), leyenda no fiscal y declaración |
+| II.7 · Consentimiento | El bloque de motivo (`CONCILIA D34`) |
+
+> **DE DÓNDE SALE ESTE COMPONENTE.** De medir el Recibo. La ficha de 2.I había
+> dejado abierto si el marco en acento era su cuarta variante o no lo era; la
+> medición dice que los tres bloques enmarcados **no comparten anatomía entre sí**
+> —uno es un riel, otro una declaración de dos líneas— y que solo uno se parece a
+> un bloque destacado. Un dispositivo que envuelve cosas distintas no pertenece a
+> ninguna de ellas. Se suma la tinta: las tres variantes de 2.I van en negro y
+> esto va en acento.
+>
+> **No contradice I.3.5.** Esa regla prohíbe el componente PARALELO —uno que hace
+> lo mismo que otro con otro nombre— y esto es lo contrario: retira de 2.I una
+> variante que no le pertenecía y le quita a 2.R una composición que ya estaba
+> duplicando en solitario. Donde había dos declaraciones del mismo marco y una
+> tercera reclamada por el componente equivocado, queda una.
+>
+> `CONCILIA D26, D34` — las dos divergencias eran el mismo objeto visto desde dos
+> formatos. Quedan unificadas aquí (anexo A, P2-24).
+
+**Verificación visible.** Poner juntas la `ZonaQR` de una receta y la caja de
+aseguradora de un recibo: **el marco es idéntico en las dos** —mismo grosor,
+mismos dos lados, mismo tono— aunque dentro haya un QR en una y un riel de celdas
+en la otra. Si un marco tiene los cuatro lados, o trama detrás, es el sistema
+viejo asomando.
 
 ---
 
@@ -2729,8 +2896,12 @@ formato donde una columna de números tiene que sumar visualmente.
   documento suele ser corto y el total cae cerca del final de la caja.
 - **Las notas van en bandera izquierda**, no justificadas con partición como
   hoy (`CONCILIA D28`).
-- El marco parcial en acento de las cajas de aseguradora, leyenda no fiscal y
-  declaración es la variante `acento` de `BloqueDestacado` (`CONCILIA D26`).
+- Las cajas de aseguradora, leyenda no fiscal y declaración van con
+  **`MarcoParcial`** (2.U), el dispositivo gráfico del chasis (`CONCILIA D26`).
+  **No son bloques destacados** y `BloqueDestacado` no tiene variante `acento`:
+  las tres envuelven anatomías distintas —la de aseguradora es un `RielDatos`, la
+  leyenda es una declaración de dos líneas— y el marco va en acento, no en
+  `tinta.negra`. La sangría de las tres queda por medir (2.U regla 4).
 
 ### 6 · Verificación visible
 
@@ -2903,9 +3074,10 @@ sistema: su carga cae sobre las reglas de viudas y huérfanas.
   familiar responsable, testigo 1, testigo 2 y médico tratante. Los dos testigos
   siguen siendo fijos por NOM-004: un testigo sin nombre deja su línea para
   firmar a mano (`CONCILIA D-anestesiólogo`).
-- **El bloque de motivo va con marco parcial**, no con borde en los cuatro
+- **El bloque de motivo va con `MarcoParcial`** (2.U), no con borde en los cuatro
   lados y fondo como hoy. El chasis solo declara marcos parciales
-  (`CONCILIA D34`).
+  (`CONCILIA D34`). Es el mismo dispositivo que enmarca las tres cajas del Recibo:
+  D26 y D34 eran el mismo objeto visto desde dos formatos.
 - La bandera `identificacion` por firmante es código muerto: el marcado ya no
   la lee. Se retira al implementar (`CONCILIA D38`).
 - **La marca de estado sustituye a la marca de agua de logo**, que queda
@@ -3044,7 +3216,7 @@ Numeración de `SPEC_DISENO_PARTE_B.md`. Tres criterios de resolución:
 | D23 | Los ocho formatos llevan membrete completo con cédulas | CHASIS | 2.B · I.3.7 |
 | D24 | El Recibo instancia `ContadorLista` con CONCEPTOS | CHASIS | 2.K · II.5 §3 |
 | D25 | `acento.velo` = 6 %. Máximo de fondo tenue 12 % | CHASIS | I.1.8 |
-| D26 | Variante `acento` de `BloqueDestacado`, declarada | DISEÑO | II.5 §5 |
+| D26 | El marco en acento del Recibo es `MarcoParcial` (2.U), **no una variante de `BloqueDestacado`** | DISEÑO | II.5 §5 · **2.U** |
 | D27 | `manuscrito.alto` = 20 pt. Eran tres valores | CHASIS | I.1.5 |
 | D28 | Notas del Recibo en bandera izquierda | CHASIS | II.5 §5 · I.3.2 |
 | D29 | `firma.nombre` = 11.5 / 16 pt | CHASIS | I.1.4 |
@@ -3052,7 +3224,7 @@ Numeración de `SPEC_DISENO_PARTE_B.md`. Tres criterios de resolución:
 | D31 | `AperturaSeccion` pasa a ser componente | DISEÑO | 2.Q |
 | D32 | `CARTA DE CONSENTIMIENTO INFORMADO`, término de la NOM-004 | **DECIDIDO** | II.7 §1 |
 | D33 | Consentimiento a 11.5 / 18, bandera izquierda, 486 pt. **Repagina** | **DECIDIDO** | II.7 §1 |
-| D34 | Marco parcial, no borde de cuatro lados con fondo | CHASIS | II.7 §5 |
+| D34 | Marco parcial, no borde de cuatro lados con fondo | CHASIS | II.7 §5 · **2.U** |
 | D35 | El médico **sí** imprime rúbrica. Se revoca la instrucción contraria | **DECIDIDO** | I.1.9 · II.7 §1 |
 | D36 | El Consentimiento lleva `ZonaQR` y `MarcaEstado` | **DECIDIDO** | II.7 §1 |
 | D37 | `firma.espacio` único de 77 pt. Se retira el tramo de 28 | **DECIDIDO** | I.1.9 |
@@ -3096,7 +3268,7 @@ registran aquí para que nadie las lea como reinterpretaciones ni intente
 | P2-11 | **Barrido de las listas de tokens de las quince fichas restantes (2.F a 2.T)**, cruzadas contra los nombres reales de I.1. Seis fichas citaban fragmentos de rol o comodines, seis no tenían lista, 2.F apoyaba el riel en la retícula equivocada, 2.I citaba un `filete.instrucciones` inexistente y 2.P escribía como cifras sueltas las dos transiciones que I.1.7 había nombrado para ella. **De paso apareció una cuarta ficha ya implementada con el mismo defecto, 2.D**, que el barrido no cubría. Las once piezas sin rol quedan listadas en I.1.4, señaladas y sin resolver — **se cierran en P2-14**, salvo una | Tres de las cinco fichas ya implementadas —2.B, 2.C y 2.E— traían la misma lista pre-escala, y al barrer resultaron ser cuatro. No es casualidad: son listas escritas antes de que I.1.4 existiera, que sobrevivieron a la conciliación porque nadie las cruzó contra ella. Barrerlas de golpe cuesta una sesión; tropezar quince veces cuesta quince | I.1.4 · 2.D · 2.F a 2.T |
 | P2-12 | **Las tres «variantes» de 2.F no eran tres alternativas.** `celdas` y `una línea` componen y se excluyen; `sin contador` es una propiedad ortogonal que no cambia el render y que lee 2.K. Y `una línea` **pierde un consumidor**: la línea fina del membrete no es un `RielDatos` | Al implementar 2.F hubo que elegir un tipo para sus props y las tres variantes no formaban una unión: un riel puede ser `celdas` y `sin contador` a la vez. Al buscar el segundo consumidor de `una línea` resultó que el del membrete no tiene rótulos, ni anchos de `riel.celda`, ni el rol `dato` | 2.F · 2.B |
 | P2-13 | **La composición del riel baja de la ficha de 2.D a la de 2.F**: padding `8 10 10`, reglas, filetes de apertura y cierre y reparto de anchos. 2.D conserva solo sus siete celdas y sus dos excepciones tipográficas. Y la regla superior va en toda fila que no sea **la primera viva**, no «la segunda» | 2.D declaró el riel porque lo necesitó antes de que 2.F existiera. Dejar la declaración en las dos fichas es la divergencia que I.3.5 persigue. El matiz de «la primera viva» aparece solo al implementar el colapso: con la fila de arriba colapsada, «la segunda fila» deja una regla flotando bajo el filete de apertura | 2.F · 2.D |
-| P2-14 | **Cerrados diez de los once huecos de rol de I.1.4, derivando del spec y sin inventar ninguno.** Ninguno necesitó un token nuevo: los valores ya estaban, sin nombre asignado. Salió de ahí un patrón que faltaba nombrar —la **desviación declarada de un rol**, tabla nueva en I.1.4— que ya practicaban 2.D, 2.H y 2.M sin llamarla así. **H9 queda `NO DEFINIDO`**, y con él el aire entre entradas de 2.G, que apareció al cerrar H4 | Diez huecos y cero tokens nuevos es la comprobación de que eran huecos de **nombre**, no de valor: el diseño ya los tenía resueltos y lo que faltaba era cruzarlos contra la escala. Los dos que no se cierran son los dos que exigen medir una hoja aprobada, que es información que este documento no contiene | I.1.4 · 2.G · 2.I · 2.J · 2.K · 2.M · 2.N · 2.Q · 2.S · 2.T |
+| P2-14 | **Cerrados diez de los once huecos de rol de I.1.4, derivando del spec y sin inventar ninguno.** Ninguno necesitó un token nuevo: los valores ya estaban, sin nombre asignado. Salió de ahí un patrón que faltaba nombrar —la **desviación declarada de un rol**, tabla nueva en I.1.4— que ya practicaban 2.D, 2.H y 2.M sin llamarla así. **H9 queda `NO DEFINIDO`**, y con él el aire entre entradas de 2.G, que apareció al cerrar H4 — **los dos se cierran midiendo en P2-23** | Diez huecos y cero tokens nuevos es la comprobación de que eran huecos de **nombre**, no de valor: el diseño ya los tenía resueltos y lo que faltaba era cruzarlos contra la escala. Los dos que no se cierran son los dos que exigen medir una hoja aprobada, que es información que este documento no contiene | I.1.4 · 2.G · 2.I · 2.J · 2.K · 2.M · 2.N · 2.Q · 2.S · 2.T |
 | P2-15 | **2.H declaraba `espacio.4` y `espacio.8` sin decir cuál iba dónde, y una variante `urgente reducido` sin decir qué reduce.** Cierran las dos juntas: padding `4` vertical y `8` horizontal en `via` y `urgente`; `4` por los cuatro lados en la reducida. **Lo que se reduce es el aire, nunca el cuerpo** | Al implementar 2.H hubo que escribir un padding, y las tres variantes no se distinguían en nada: con el cuerpo y el tracking congelados por la regla 2 y el texto entero por la 1, el aire es lo único que una variante puede cambiar. Una variante que no cambia nada es una variante que el primer implementador borra | 2.H |
 | P2-16 | **La sangría de 2.I se aplica a los dos filetes de la variante `alarma`**, no solo al izquierdo. Y **la cadena `URGENTE` es del componente 2.H, no del formato**: II declara un booleano, no un texto | La regla 2 de 2.I dice «el filete» en singular y `alarma` tiene dos: sin cerrarlo, el texto queda pegado al filete de 3 pt. Lo de 2.H apareció al elegir el tipo de sus props: si el texto entrara por prop, una hoja de continuación podría imprimir `URG.`, que es lo que prohíbe su regla 1 | 2.H · 2.I |
 | P2-17 | **Las cifras de 2.K van sin cero a la izquierda.** `NN` y `MM` son marcadores de posición de un conteo, no un formato de dos dígitos | El cero a la izquierda existe en el sistema —regla 1 de 2.G— y al componer la cadena había que decidir si aplicaba. No aplica: es del número de **entrada**, que es un identificador, y un `07 DE 13` en el contador imitaría ese identificador | 2.K · 2.G |
@@ -3105,7 +3277,9 @@ registran aquí para que nadie las lea como reinterpretaciones ni intente
 | P2-20 | **El aire entre nodos de 2.J**, que la ficha no declaraba: `espacio.4` dentro del bloque, `espacio.8` entre bloques. Cerrado con el criterio de H4, no elegido | Sin declararlo, el parser componía encabezado, ítems y párrafos pegados por el interlineado y el bloque dejaba de leerse como bloque. Es el tercer sitio donde sirve el mismo criterio —2.C, 2.G y ahora 2.J—, lo que empieza a ser un patrón y no una derivación suelta | 2.J · I.1.7 |
 | P2-21 | **Las dos lecturas del parser que la ficha dejaba abiertas.** (1) El lookahead mira la línea **siguiente**, no la siguiente no vacía: una línea vacía corta de verdad. (2) «Con un solo ítem no se numera» tiene alcance de **cadena entera**, no de bloque. Y queda declarado qué cuenta como viñeta —`- – — • *` y el prefijo numérico, que se descarta— y que la viñeta exige un espacio detrás | Las dos salieron de escribir la batería: cada una tenía dos comportamientos posibles y los dos eran defendibles leyendo la ficha. Se resolvieron por el mismo criterio que ordena todo este componente —cuál de las dos degrada mejor cuando se equivoca— y cada una tiene ya su prueba, así que la próxima vez no se vuelve a decidir | 2.J |
 | P2-22 | **2.J compone el cuerpo con `texto.corrido` salvo dentro de la alarma, que declara `alarma.cuerpo`** (II.3 §5): el rol entra por ranura, lo declara la ficha del consumidor y la ranura está cerrada a esos dos roles. Declarada también la **marca del ítem**: la raya (—) en `fuente.neogrotesca` (`CONCILIA D30`), y el ordinal como `1.` sin cero a la izquierda | Al conectar 2.J a 2.I chocaron dos listas de tokens: la de 2.J pedía `texto.corrido` para todo y la de 2.I declara `alarma.cuerpo` para la alarma, que compone con el parser dentro. Ninguna estaba mal; faltaba decir por dónde entra el rol. Lo de la marca es el hueco gemelo: la ficha decía «la raya del sistema» sin declarar qué signo ni en qué familia | 2.J · 2.I · II.3 |
-
+| P2-23 | **Los dos huecos que exigían mirar una lámina, cerrados midiendo.** El aire entre entradas de 2.G son **12.5 pt** con reparto propio —7 de padding inferior, `filete.regla`, 5 de padding superior— y la regla queda **descentrada a propósito**, 2 pt más cerca de la entrada que abre. El ancho de la caja de importes de 2.T es **`cierre.derecha`**, token nuevo de I.1.3, no `manuscrito.ancho` | Ninguno de los dos se podía derivar y los dos se habían dejado escritos como `NO DEFINIDO` con su cota. Las cotas aguantaron —12.5 > 8, como exigía 2.G— pero el valor real no es miembro de la escala ni está centrado: elegir `espacio.12` «porque es el siguiente» habría fijado una cifra parecida con el reparto equivocado. El archivo traía además **tres calibraciones** del mismo espacio (5/7, 8/10, 9/11), resueltas a una sola por el precedente de D4 | I.1.3 · I.1.4 · 2.G · 2.T |
+| P2-24 | **`MarcoParcial` (2.U): el chasis pasa de veinte a veintiún componentes.** El marco en acento no es una variante de `BloqueDestacado` sino un **dispositivo gráfico** que envuelve contenidos de anatomía distinta. Se retira la cuarta variante `acento` de 2.I, se corrige II.5 §5, que la citaba por nombre, y baja a 2.U la composición del marco que 2.R declaraba por su cuenta. **D26 y D34 quedan unificadas** | La ficha de 2.I dejó la duda planteada al construirla y la medición la resolvió por partida triple: los tres bloques enmarcados del Recibo no comparten anatomía entre sí —uno es un `RielDatos`, otro una declaración de dos líneas—, el marco va en acento y las tres variantes de 2.I en negro, y en la hoja espécimen el marco figura entre los **dispositivos gráficos**, no entre los componentes. D26 y D34 se habían reportado por separado, cada una desde su formato, sin ver que describían el mismo objeto | I.2 · 2.I · 2.R · 2.U · II.5 · II.7 |
+| P2-25 | **Dos ranuras de 2.G que la anatomía no situaba.** La `marca` va **en la fila del `ancla`, a la derecha** —lo dice la tabla de separaciones internas, que no declara ningún tramo que la toque— con `reticula.medianil` de separador. Y la `nota` se compone con **2.J**, que suma esta ranura a su lista de bloques con sintaxis de viñetas | Al montar las cinco ranuras hubo que decidir dónde caía la marca, y las dos lecturas —renglón propio o fuera del flujo— daban entradas de alto distinto para todo medicamento no oral. La tabla de separaciones desempata sin inventar nada: está completa si la marca no está en el flujo, y con hueco si lo está | 2.G · 2.J |
 Una cuarta, menor, sin fila propia: `caja.alto` queda marcado en I.1.1 como
 derivado que **se implementa como fórmula**. El Paso 0 lo había escrito como
 literal 670.
@@ -3116,5 +3290,5 @@ literal 670.
 |---|---|
 | El destaque de vía es binario: negativo solo en las no orales | Resuelto y aplicado en II.3, pero **revierte una línea del handoff** que decía «13 vías, todas en bloque negativo». Queda registrado como reversión consciente |
 | Repaginación del Consentimiento | Consecuencia de D33. No se puede estimar sin generar el PDF |
+| La sangría de las tres cajas enmarcadas del Recibo | 2.U regla 4. El dispositivo no la impone —un riel enmarcado y una leyenda de dos líneas no la llevan igual— y el archivo solo trae medida la de 2.R (`12 14 14`). Se mide al construir II.5 |
 | Gate de extracción de texto | I.3.1. No se resuelve en papel: se corre contra el primer PDF real de react-pdf. **Lo que sí quedó resuelto en papel es qué hacer si falla**: la escalera de remedios de I.3.1, con la vía de administración como primer sitio a mirar por ser el único elemento del gate que es clínico y traqueado a la vez |
-| La variante `acento` de `BloqueDestacado` | II.5 §5 la cita por nombre y 2.I declara tres variantes: la tercera comprobación de cierre de §0, sin cumplir. Las dos lecturas —cuarta variante de 2.I, o marco que no es un `BloqueDestacado`— llevan a componentes distintos y elegir exige **mirar el Recibo aprobado** y ver si el marco envuelve prosa o envuelve bloques. Detalle en la ficha de 2.I |
