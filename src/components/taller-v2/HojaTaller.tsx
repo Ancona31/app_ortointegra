@@ -44,6 +44,7 @@ import EncabezadoSeccion from '@/lib/pdf/v2/EncabezadoSeccion'
 import AperturaSeccion from '@/lib/pdf/v2/AperturaSeccion'
 import PieDocumento from '@/lib/pdf/v2/PieDocumento'
 import BloqueFirmas, { type Firma } from '@/lib/pdf/v2/BloqueFirmas'
+import MotorFlujo from '@/lib/pdf/v2/MotorFlujo'
 import { registrarFuentesV2 } from '@/lib/pdf/v2/fonts'
 import {
   CAJA,
@@ -410,6 +411,30 @@ const SECCIONES_2P = [
  * siempre «1 de 1», que es la cifra que no demuestra nada.
  */
 const SECCIONES_2M = [...SECCIONES_2P, ...SECCIONES_2P] as const
+
+/**
+ * CUATRO secciones, para la muestra de la regla 1 de 2.N. El número no es
+ * decorativo y no se toca sin volver a medir: con tres, el contenido y el cierre
+ * caben en una hoja y la regla no se ejercita; con cinco, el contenido desborda y
+ * la hoja 2 llega con texto encima de la firma, que tampoco es el caso. Con
+ * cuatro el contenido termina a media hoja y en lo que queda NO cabe el umbral,
+ * que es el único caso que no se fabrica por accidente.
+ */
+const SECCIONES_2N = [...SECCIONES_2P, SECCIONES_2P[0]] as const
+
+/** NUEVE secciones: tres hojas, que es lo mínimo para ver los dos avisos de lista. */
+const SECCIONES_2N_LISTA = [...SECCIONES_2M, ...SECCIONES_2P] as const
+
+/**
+ * Las tres últimas líneas del contenido para la muestra de 2.N: lo que baja con
+ * la firma cuando el umbral no cabe (regla 1). INVENTADO, como el resto del
+ * taller, y medido para ocupar tres líneas de texto corrido sobre la caja de 486
+ * pt — que es lo que hace que el cierre mida exactamente el umbral.
+ */
+const ARRASTRE_2N =
+  'Con lo anterior se cierra la valoración del episodio y se da por terminada la nota. ' +
+  'El paciente queda citado para revisión en ocho semanas y se le entregan por escrito los ' +
+  'datos de alarma por los que debe volver antes de esa fecha.'
 
 /** Los firmantes de un Consentimiento, para 2.L. Inventados. */
 const FIRMAS_2L: readonly Firma[] = [
@@ -1155,6 +1180,107 @@ function HojaTaller({
           titulo="Solicitud de laboratorio"
           acento={acento}
         />
+      </Page>
+
+      {/*
+        2.N · EL CASO DE LA REGLA 1, que es el único que no se fabrica por accidente.
+
+        Tres secciones dejan el contenido terminado A MEDIA HOJA, y en lo que
+        queda no cabe `umbral.firma`. Lo que hay que mirar, en este orden:
+
+        1. La hoja 1 cierra con RESERVADO PARA LA FIRMA · CONTINÚA EN LA HOJA 2 a
+           la izquierda y SIN FIRMA NO ES VÁLIDO a la derecha, y NO trae ni el
+           arrastre ni la firma.
+        2. La hoja 2 trae las TRES ÚLTIMAS LÍNEAS del contenido y debajo la firma.
+           La firma sola sería el defecto que esta regla existe para evitar.
+        3. Medir con una regla el cuerpo del texto en las dos hojas: es el mismo.
+           Si en la primera fuera más chico, el motor comprimió (I.3.4).
+        4. El aviso NO sale en la hoja 2. En la última no continúa nada.
+      */}
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.paginaFlujo}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <MotorFlujo
+          arrastre={ARRASTRE_2N}
+          avisos={[{ forma: 'reservaFirma' }]}
+          firmas={
+            <BloqueFirmas
+              variante="simple"
+              firmas={[
+                {
+                  rol: 'Firma y sello del médico',
+                  nombre: medico.nombre,
+                  credenciales: [
+                    `Céd. Prof. ${medico.cedulaProfesional}`,
+                    `Céd. Esp. ${medico.cedulaEspecialidad}`,
+                  ],
+                },
+              ]}
+            />
+          }
+        >
+          <Rotulo>2.N · contenido a media hoja, la firma no cabe</Rotulo>
+          <View style={estilos.muestra}>
+            {SECCIONES_2N.map((seccion, indice) => (
+              <EncabezadoSeccion
+                key={`${seccion.titulo}-${indice}`}
+                numero={indice + 1}
+                titulo={seccion.titulo}
+                texto={seccion.texto}
+                primera={indice === 0}
+                acento={acento}
+              />
+            ))}
+          </View>
+        </MotorFlujo>
+      </Page>
+
+      {/*
+        2.N · las otras dos formas del aviso, sobre un documento que desborda.
+
+        La hoja que no cierra la lista lleva la primera forma con su rango; la que
+        la cierra y sigue con texto corrido lleva la segunda. La palabra de <ÍTEMS>
+        —«estudios», «indicaciones»— la declara el FORMATO, igual que en 2.K: el
+        componente no la conoce. La última hoja no lleva ninguna.
+      */}
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.paginaFlujo}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <MotorFlujo
+          arrastre={ARRASTRE_2N}
+          avisos={[
+            { forma: 'listaContinua', items: 'estudios', desde: 1, hasta: 5 },
+            { forma: 'textoContinua', items: 'indicaciones' },
+          ]}
+          firmas={
+            <BloqueFirmas
+              variante="simple"
+              firmas={[
+                {
+                  rol: 'Firma y sello del médico',
+                  nombre: medico.nombre,
+                  credenciales: [`Céd. Prof. ${medico.cedulaProfesional}`],
+                },
+              ]}
+            />
+          }
+        >
+          <Rotulo>2.N · los dos avisos de lista, y ninguno en la última hoja</Rotulo>
+          <View style={estilos.muestra}>
+            {SECCIONES_2N_LISTA.map((seccion, indice) => (
+              <EncabezadoSeccion
+                key={`${seccion.titulo}-${indice}`}
+                numero={indice + 1}
+                titulo={seccion.titulo}
+                texto={seccion.texto}
+                primera={indice === 0}
+                acento={acento}
+              />
+            ))}
+          </View>
+        </MotorFlujo>
       </Page>
     </Document>
   )
