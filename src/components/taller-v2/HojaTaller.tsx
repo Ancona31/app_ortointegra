@@ -38,6 +38,7 @@ import RielDatos from '@/lib/pdf/v2/RielDatos'
 import BloqueNegativo from '@/lib/pdf/v2/BloqueNegativo'
 import BloqueDestacado from '@/lib/pdf/v2/BloqueDestacado'
 import ContadorLista from '@/lib/pdf/v2/ContadorLista'
+import ParserBloques from '@/lib/pdf/v2/ParserBloques'
 import { registrarFuentesV2 } from '@/lib/pdf/v2/fonts'
 import {
   CAJA,
@@ -182,6 +183,29 @@ function Rotulo({ children }: { children: string }): ReactElement {
  * pero no cómo se rotula cada una, así que el componente no lo inventa y quien
  * llama lo decide. Estas dos cadenas son las que usa hoy v1 en `PdfHeader.tsx`.
  */
+/** Una muestra de 2.J con su rótulo. Andamiaje del taller. */
+function MuestraParser({
+  rotulo,
+  texto,
+  marca,
+}: {
+  rotulo: string
+  texto: string
+  marca: 'raya' | 'numero'
+}): ReactElement {
+  return (
+    <View style={estilos.seccion}>
+      <Rotulo>{rotulo}</Rotulo>
+      <View style={estilos.muestra}>
+        <ParserBloques texto={texto} marca={marca} />
+        {/* Marca de arranque: con la cadena vacía tiene que quedar pegada al
+            rótulo, sin banda vacía entre los dos. */}
+        <View style={estilos.marcaArranque} />
+      </View>
+    </View>
+  )
+}
+
 function medicoMembrete(medico: MedicoFicticio): MedicoMembrete {
   return {
     nombre: medico.nombre,
@@ -240,12 +264,83 @@ const TEXTO_2I = {
   /** Recomendaciones de una Receta (II.3). */
   alarma:
     'Tome el medicamento con alimentos y complete la caja aunque los síntomas cedan antes. Si aparece erupción en la piel, hinchazón de labios o dificultad para respirar, suspenda y acuda a urgencias.',
-  /** Instrucciones al paciente de un Internamiento (II.6). Van NUMERADAS. */
-  instrucciones:
-    'Preséntese en admisión a las 06:00 h con identificación oficial. Ayuno absoluto de ocho horas antes del ingreso. Suspenda anticoagulantes 48 horas antes si su médico se lo indicó. Traiga los estudios de laboratorio y las radiografías recientes.',
+  /**
+   * Instrucciones al paciente de un Internamiento (II.6). Van NUMERADAS, y por
+   * eso este texto trae encabezado y viñetas: es lo que 2.J convierte en lista.
+   */
+  instrucciones: [
+    'El día del ingreso:',
+    '- Preséntese en admisión a las 06:00 h con identificación oficial.',
+    '- Ayuno absoluto de ocho horas antes del ingreso.',
+    '- Traiga los estudios de laboratorio y las radiografías recientes.',
+  ].join('\n'),
   /** Seguimiento de un Plan de Suplementación (II.4). */
   cita: 'Reevaluación en ocho semanas con biometría hemática y perfil de hierro. Suspenda la suplementación y avise por el canal habitual si aparece intolerancia digestiva.',
 } as const
+
+/**
+ * Los siete casos de la batería de 2.J, con el texto que los provoca. Son los
+ * mismos que prueba `src/lib/tests/parserBloques.test.ts`: aquí se ven, allí se
+ * comprueban. El caso 2 va primero, como en la ficha y como en el archivo de
+ * pruebas.
+ */
+const CASOS_2J: readonly { readonly rotulo: string; readonly texto: string; readonly marca: 'raya' | 'numero' }[] = [
+  {
+    rotulo: 'caso 2 · prosa sin viñetas y sin items debajo',
+    texto:
+      'El paciente ingresa por dolor lumbar de tres semanas.\nSe solicita valoración por rehabilitación.',
+    marca: 'raya',
+  },
+  {
+    rotulo: 'caso 1 · encabezado + dos items',
+    texto: 'Indicaciones generales:\n- Dieta blanda\n- Signos vitales cada ocho horas',
+    marca: 'raya',
+  },
+  {
+    rotulo: 'caso 3 · viñetas antes del primer encabezado',
+    texto:
+      '- Dieta blanda\n- Reposo relativo\nIndicaciones al egreso:\n- Deambulación asistida con andadera',
+    marca: 'raya',
+  },
+  {
+    rotulo: 'caso 4 · un solo item, que no se numera',
+    texto: '- Ayuno absoluto de ocho horas',
+    marca: 'numero',
+  },
+  {
+    rotulo: 'caso 5 · item con dos puntos en medio',
+    texto: '- Ayuno: ocho horas antes del ingreso\n- Traslado: en camilla desde urgencias',
+    marca: 'raya',
+  },
+  {
+    rotulo: 'caso 6 · cadena vacia, que colapsa entera',
+    texto: '',
+    marca: 'raya',
+  },
+  {
+    rotulo: 'caso 7 · dos bloques con contador corrido',
+    texto: [
+      'Antes del ingreso:',
+      '- Ayuno de ocho horas',
+      '- Traer estudios recientes',
+      '',
+      'El día del procedimiento:',
+      '- Presentarse a las 06:00 h',
+      '- Acudir acompañado',
+    ].join('\n'),
+    marca: 'numero',
+  },
+]
+
+/** El texto de la verificación visible de 2.J, tal como lo pide la ficha. */
+const VERIFICACION_2J = [
+  'El paciente ingresa por dolor lumbar de tres semanas de evolución.',
+  'Se solicita valoración por el servicio de rehabilitación en las primeras 24 horas.',
+  'Indicaciones de ingreso a piso:',
+  '- Dieta blanda, tolerando vía oral',
+  '- Signos vitales cada ocho horas',
+  '- Deambulación asistida a partir del segundo día',
+].join('\n')
 
 function HojaTaller({
   medico,
@@ -641,10 +736,11 @@ function HojaTaller({
             pt—, que es lo único que sobrevive intacto a una fotocopia, y el de
             alarma se ve claramente más grueso que el de cita. La alarma es la
             única con filete superior, y su texto va en «alarma.cuerpo», un punto
-            por encima del texto corrido de las otras dos. La variante
-            «instrucciones» compondrá lista NUMERADA cuando exista 2.J: hoy imprime
-            la misma cadena en plano y la ranura del parser está marcada en el
-            componente, sin adelantarlo.
+            por encima del texto corrido de las otras dos. Las tres componen ya a
+            través de 2.J: la de «instrucciones» sale NUMERADA porque ahí la
+            secuencia significa algo, y las otras dos entran como prosa y salen
+            como prosa — que es la degradación segura del parser, no una excepción
+            de este componente.
           </Text>
         </View>
       </Page>
@@ -681,6 +777,77 @@ function HojaTaller({
             componente no lo conoce. Va en «pie» en versalita, pero en
             «tinta.secundaria» y no en «tinta.papel»: vive en el área de contenido,
             no sobre la banda de acento.
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          <Rotulo>2.J parser · la verificacion visible de la ficha</Rotulo>
+          <View style={estilos.muestra}>
+            <ParserBloques texto={VERIFICACION_2J} marca="raya" />
+          </View>
+
+          <Text style={estilos.nota}>
+            2.J · ParserBloques. Los DOS PRIMEROS RENGLONES salen en minúsculas,
+            en humanista, sin raya y sin número: son prosa sin viñetas y sin ítems
+            debajo. Si salieran en versalita, no hay lookahead — y ese es el bug
+            que ya apareció una vez, en el mockup de Internamiento. El tercer
+            renglón sí sale en versalita, y no por llevar dos puntos sino porque
+            debajo tiene viñetas. La raya cuelga en el riel y el texto sangra una
+            columna exacta: 23.25 + 9 = 32.25 pt.
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          {CASOS_2J.slice(0, 4).map((caso) => (
+            <MuestraParser
+              key={caso.rotulo}
+              rotulo={caso.rotulo}
+              texto={caso.texto}
+              marca={caso.marca}
+            />
+          ))}
+
+          <Text style={estilos.nota}>
+            Los cuatro primeros casos de la batería, en el mismo orden en que se
+            prueban. El 2 va primero. En el 4, el ítem único se compone como
+            párrafo y NO lleva número, aunque la muestra pida numeración: una lista
+            de uno no es una lista. Distíngase de 2.G, donde una sola entrada sí
+            lleva su «01».
+          </Text>
+        </View>
+      </Page>
+
+      <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.pagina}>
+        <View style={estilos.guiaZonaSegura} fixed />
+        <View style={estilos.guiaCaja} fixed />
+
+        <View style={estilos.contenido}>
+          {CASOS_2J.slice(4).map((caso) => (
+            <MuestraParser
+              key={caso.rotulo}
+              rotulo={caso.rotulo}
+              texto={caso.texto}
+              marca={caso.marca}
+            />
+          ))}
+
+          <Text style={estilos.nota}>
+            Los tres restantes. En el 5, los dos puntos van dentro de un ítem y no
+            lo ascienden a encabezado: el tipo lo decide la viñeta y el lookahead,
+            nunca la puntuación. En el 6 la línea azul queda pegada al rótulo — la
+            cadena vacía no monta ningún nodo, así que no deja hueco. En el 7 la
+            numeración corre entre los dos bloques: 1, 2, 3, 4, sin repetir el 1 al
+            abrir el segundo.
           </Text>
         </View>
       </Page>

@@ -224,7 +224,10 @@ tracking**. Archivo no se carga con `font-variant-caps` y ningún punto del
 sistema lo usa. En el motor de PDF se transforma la cadena a mayúsculas y se
 aplica el tracking de la tabla. **Sustituirlas por versalitas reales invalidaría
 todos los valores de tracking de este documento** y cambiaría la altura de las
-etiquetas. Ver I.3.1 para su efecto sobre la extracción de texto.
+etiquetas. **Esta declaración manda sobre la composición**; I.3.1 no la
+contradice: cruza esta escala contra la lista del gate, dice cuáles de sus
+elementos llevan tracking y ordena la escalera de remedios por si la extracción
+falla.
 
 **Medida.** 486 pt a 11.5 pt son ≈ 85 caracteres. El handoff decía ≈ 93; el
 diseño mide 85. Se registra el valor medido.
@@ -1319,13 +1322,18 @@ en diagonal. Se distingue **por filete, nunca por fondo de color**.
 4. La variante `instrucciones` compone **lista numerada**, no con raya: la
    secuencia significa algo (primero presentarse, después el ayuno).
 
-   > **La numeración es de 2.J, y la ranura queda preparada.** Quien compone la
+   > **La numeración es de 2.J, y la ranura ya está ocupada.** Quien compone la
    > lista es `ParserBloques`, que recibe **una sola cadena** (`CONCILIA D10`) —
-   > que es la forma en que el pasaje entra en este componente—. Mientras 2.J no
-   > exista, las tres variantes componen su cadena en plano con el rol que les
-   > toca; la ranura está en el sitio donde hoy va el texto y el cambio, cuando
-   > llegue, es **interno**: la entrada del componente no se mueve. No se adelanta
-   > el parser aquí.
+   > que es la forma en que el pasaje entra en este componente—. El cambio fue
+   > interno y la entrada de 2.I no se movió, como quedó anunciado.
+   >
+   > **Las tres variantes componen a través de 2.J**, no solo `instrucciones`: el
+   > pasaje entra como cadena en las tres y la Receta compone su alarma «con
+   > `ParserBloques` dentro» (II.3 §3). Lo que cada variante declara es **la marca
+   > de lista** —número en `instrucciones`, raya en las otras dos— y **el rol del
+   > cuerpo** —`alarma.cuerpo` en la alarma, `texto.corrido` en las otras dos—, que
+   > entra por la ranura de rol de 2.J. Una prosa sin viñetas sale de ahí como
+   > prosa: es la degradación segura del parser, no una excepción de 2.I.
 
 **El marco parcial en acento de II.5 queda `NO DEFINIDO`.** II.5 §5 lo cita por
 nombre —«la variante `acento` de `BloqueDestacado`» (`CONCILIA D26`)— y esta
@@ -1379,11 +1387,41 @@ pruebas al lado, no después.
 siguiente. Sin él, la prosa sin viñetas se compone en versalita como si fuera
 título: fue el bug que apareció en el mockup de Internamiento.
 
+> **CIERRA 2.J — el lookahead mira la línea SIGUIENTE, no la siguiente no vacía.**
+> «Corte» significa corte: una línea vacía cierra el bloque, así que un encabezado
+> separado de sus viñetas por un renglón en blanco **no es encabezado**, es
+> párrafo. Es la lectura conservadora y es deliberada — si el lookahead saltara
+> los blancos, esto
+>
+>     El paciente ingresa hoy.
+>     ⏎
+>     - Dieta blanda
+>
+> ascendería la primera línea a versalita **por una lista que no es suya**, que es
+> el caso 2 entrando por la otra puerta. El precio del corte es un encabezado
+> compuesto como prosa, con su lista intacta debajo: exactamente lo que promete la
+> degradación segura (anexo A, P2-21).
+
+**Qué cuenta como viñeta.** Guion, raya, semirraya, punto y asterisco —
+`- – — • *` —, más el **prefijo numérico** que produce cualquier editor cuando
+alguien teclea una lista ordenada (`1.`, `2)`). El prefijo numérico se reconoce
+**como viñeta y se descarta** igual que los demás: si la lista va numerada, el
+número lo pone el sistema y corrido, o se imprimirían dos numeraciones — que es
+la regla 1 de composición.
+
+**La viñeta exige un espacio detrás.** Sin esa condición, una línea de prosa que
+empiece por raya —«—dijo el paciente»— se leería como ítem. Con ella, el error
+posible es el contrario: un ítem mal tecleado se compone como prosa, que es el
+lado seguro.
+
 **Composición**
 
 1. La viñeta del dato **se sustituye** por la raya del sistema. Nunca se
    imprimen las dos.
-2. Un ítem puede ocupar varias líneas: la raya cuelga y el texto sangra.
+2. Un ítem puede ocupar varias líneas: la raya cuelga y el texto sangra. Es
+   **geometría de render**: en el DATO, una línea sin viñeta no es continuación
+   del ítem de arriba sino un bloque nuevo, que es lo que hay que explicarle al
+   médico en el textarea (II.6 §5).
 3. **Degradación segura.** La viñeta vive en el dato, no en el render. Si el
    parser falla, el texto sigue siendo una lista legible, nunca un párrafo
    apelmazado. Es requisito, no efecto colateral.
@@ -1398,6 +1436,30 @@ título: fue el bug que apareció en el mockup de Internamiento.
 **Con un solo ítem no se numera:** se compone como párrafo. Distíngase de
 `EntradaNumerada` (2.G), donde una sola entrada **sí** lleva su número.
 
+> **CIERRA 2.J — el alcance de esa regla es la CADENA ENTERA, no el bloque.** Dos
+> razones. La ficha la contrasta con 2.G, y ahí «una sola entrada» es del
+> documento entero. Y por bloque, dos ítems separados por un renglón en blanco
+> serían dos listas de uno y perderían los dos su raya — el apelmazamiento que la
+> degradación segura prohíbe. Cuando el ítem único se degrada, **el encabezado que
+> tenga encima sigue siendo encabezado**: lo decidió el lookahead sobre el texto
+> de origen, donde sí había un ítem debajo (anexo A, P2-21).
+
+**Separación entre nodos**
+
+| Separa | Valor |
+|---|---|
+| Nodos del mismo bloque — encabezado → ítem, ítem → ítem, párrafo → párrafo | `espacio.4` |
+| Entre bloques | `espacio.8` |
+
+> **CIERRA 2.J — la ficha no declaraba el aire y se cierra con el criterio de
+> H4**, el mismo que ya cerró las separaciones internas de 2.G y el subtítulo de
+> 2.C: dentro de un bloque la separación es tanto menor cuanto más pegadas están
+> las piezas. Un encabezado y sus ítems son un solo bloque y van al mínimo de la
+> escala; el cambio de bloque sube un miembro. Dos niveles, los dos menores de la
+> escala, en orden: 4 < 8. Con `espacio.4` en las dos, los bloques dejarían de
+> leerse como bloques; con `espacio.12` en la segunda, el bloque competiría con la
+> separación entre bloques de primer nivel (anexo A, P2-20).
+
 **Batería mínima de pruebas.** El caso 2 se prueba **antes que ningún otro**.
 
 | # | Entrada | Salida esperada |
@@ -1410,6 +1472,12 @@ título: fue el bug que apareció en el mockup de Internamiento.
 | 6 | Cadena vacía | Colapsa entero |
 | 7 | Varios bloques con contador corrido | Sin números repetidos |
 
+Los siete viven en `src/lib/tests/parserBloques.test.ts`, en ese orden y con el 2
+abriendo el archivo, más las lecturas que cerró P2-21. Son pruebas del **análisis**
+—qué es cada línea y en qué orden queda—; lo que se ve se comprueba en el taller.
+Por eso el análisis vive en `parserBloques.ts`, separado del componente que
+compone: es la mitad testable de un solo componente, no una capa nueva.
+
 **Bloques del sistema que usan esta sintaxis.** Recomendaciones generales de
 Receta · notas adicionales de Suplementación · notas para el servicio de
 Imagenología · instrucciones al paciente de Internamiento · indicaciones de
@@ -1417,7 +1485,28 @@ ingreso a piso.
 
 **Tokens que consume.** `etiqueta`, para el encabezado de bloque ·
 `texto.corrido`, para ítems y párrafos · `reticula.riel` y `reticula.medianil`,
-para la sangría del ítem colgante.
+para la sangría del ítem colgante · `espacio.4` y `espacio.8`, para el aire entre
+nodos · `fuente.neogrotesca`, **solo para la marca** del ítem.
+
+> **CIERRA 2.J — la marca del ítem y el rol del cuerpo, que faltaban los dos.**
+>
+> **La marca.** El signo es la **raya** (—), no el guion ni la semirraya: es el
+> que abre elemento de lista en ortografía española. Se compone en
+> `fuente.neogrotesca` aunque el texto del ítem vaya en humanista (`CONCILIA
+> D30`), que es lo que sustituye a la IBM Plex Mono con que la compone hoy el
+> sistema viejo — la única aparición de la mono como contenido y no como notación,
+> y por eso su retirada pasa por aquí. Cuerpo e interlineado los hereda del cuerpo
+> del ítem; lo único que cambia es la familia. En la forma numerada, la marca es el
+> ordinal seguido de punto —`1.`— **sin cero a la izquierda**: el cero es de 2.G y
+> es de un identificador, no de un conteo, igual que en 2.K.
+>
+> **El rol del cuerpo entra por ranura.** `texto.corrido` es el caso normal, pero
+> la Receta compone su alarma «con `ParserBloques` dentro» (II.3 §3) y esa alarma
+> va en `alarma.cuerpo`, un punto por encima (II.3 §5). El rol lo declara la ficha
+> del CONSUMIDOR —2.I— y 2.J solo declara que existe la ranura, exactamente como
+> 2.F con la excepción tipográfica de celda. La ranura está cerrada a esos dos
+> roles: abierta a los 23 de I.1.4 sería una puerta para componer el cuerpo con
+> cualquier cosa (anexo A, P2-22).
 
 > **CIERRA H2 — el encabezado de bloque va en `etiqueta`.** Se compone en
 > versalita, y de los 23 roles de I.1.4 la versalita del sistema es una sola
@@ -2032,17 +2121,81 @@ PDF real de react-pdf, antes de implementar el resto de formatos.
 - [ ] Etiquetas en versalita, **sin fragmentar**: `PACIENTE`, nunca `PAC IE NT E`
 - [ ] Ligaduras: `superficie`, nunca `super�cie`
 
-**Prohibición.** No se simulan versalitas aplicando `letterSpacing` sobre
-mayúsculas. Se usan **versalitas reales de la fuente**. El motivo está
-confirmado hasta el operador PDF en la auditoría §8.5: `letterSpacing` hace que
-el avance de cada glifo difiera de su anchura nominal, y react-pdf entonces
-parte el operador `TJ` en un segmento por glifo. El extractor devuelve la
-cadena letra por letra. Aplica a **todas** las etiquetas del sistema, no a tres
-títulos: el diseño nuevo usa versalita en todo el chasis.
+**La lista no cambia.** Es la misma de siempre y sigue siendo la que decide si
+el gate pasa o falla.
+
+**El riesgo, cruzado contra la escala**
+
+El mecanismo está confirmado hasta el operador PDF en la auditoría §8.5:
+`letterSpacing` hace que el avance de cada glifo difiera de su anchura nominal,
+y react-pdf entonces **puede** partir el operador `TJ` en un segmento por glifo;
+si lo hace, el extractor devuelve la cadena letra por letra. Ese riesgo **no
+corre parejo por toda la lista**, y saber dónde corre es lo que dimensiona el
+problema. Cruzada contra I.1.4, la lista se parte en dos:
+
+| Elemento del gate | Quién lo compone | Rol | Tracking |
+|---|---|---|---|
+| Denominación genérica | 2.G, ranura `secundario` | `entrada.secundario` | **0** |
+| Nombre comercial | 2.G, ranura `ancla` | `entrada.ancla` | **0** |
+| Presentación y gramaje | 2.G, ranura `ancla` | `entrada.ancla` | **0** |
+| Indicación | 2.G, ranura `nota` | `texto.corrido` | **0** |
+| Ligaduras (`superficie`) | Todo texto corrido | `texto.corrido` | **0** |
+| Números de entrada (`01`) | 2.G, riel del número | `entrada.numero` | **0** |
+| Folio | 2.M zona 1 · 2.R | `folio` | 0.03 em |
+| `PÁGINA X DE Y` | 2.M zona 2 | `pie` en versalita | 0.22 em |
+| Etiquetas en versalita | 2.E · 2.F · 2.J | `etiqueta` | 0.22 em |
+| **Vía de administración** | **2.H** | **`etiqueta`** sobre negativo | **0.22 em** |
+
+**Seis de los diez van con tracking 0** y no pueden fragmentarse por esta causa,
+incluidos los cuatro campos clínicos que sostienen el motivo de todo el gate: la
+genérica, el comercial, el gramaje y la indicación.
+
+**De los cuatro que llevan tracking, tres son metadatos** —folio, paginación y
+etiquetas—: un folio fragmentado estorba a una búsqueda, no a una dispensación.
+
+**Y el cuarto no lo es: la vía de administración.** No va en `dato` ni en
+`texto.corrido`: 2.H la compone con el rol `etiqueta` sobre fondo negro, así que
+carga los mismos `0.22 em` que un rótulo. **Es el único elemento del gate que es
+a la vez clínico y traqueado**, y por eso es el primero que hay que mirar cuando
+el gate corra y el primero al que se le baja el tracking si falla. Que un
+`INTRAMUSCULAR` salga como `I N T R A M U S C U L A R` de un extractor no es un
+problema de búsqueda: es el dato que decide cómo se administra el fármaco.
+
+**Escalera de remedios, en este orden**
+
+1. **Correr el gate contra un PDF real de react-pdf.** El primer remedio es
+   medir: el mecanismo de §8.5 es real, pero que rompa la extracción en esta
+   versión del renderer, con estas fuentes y con este extractor, **está sin
+   comprobar**. No se rediseña la escala tipográfica contra un riesgo que nadie
+   ha visto fallar.
+2. **Si falla: bajar o eliminar el tracking en los elementos del gate que lo
+   llevan**, y solo en ellos — los cuatro de la tabla, empezando por la vía.
+   Cuatro sitios acotados, con su rol y su componente ya identificados. El resto
+   del chasis no se toca: un rol traqueado que no está en la lista del gate no
+   tiene por qué cambiar.
+3. **Solo si eso no basta: revisar la escala.** Es el remedio caro —mueve
+   `etiqueta` y `firma.rol`, y con ellos toda versalita del sistema— y por eso va
+   el último, no el primero.
+
+**Las versalitas reales quedan descartadas, y no se vuelven a proponer.** Una
+versión anterior de esta sección las exigía; es un remedio que **no existe en
+este renderer**: el `Style` de react-pdf no tiene `fontVariant` ni selección de
+*features* OpenType, y Archivo no se carga con un corte de versalitas. La única
+forma sería registrar un TTF de versalitas como familia aparte, lo que
+invalidaría todos los trackings de I.1.4 y cambiaría la altura de las etiquetas
+—que es justo lo que I.1.4 advierte— para resolver un fallo que todavía no se ha
+medido. Si alguien vuelve a proponerlo, esto es lo que hay que contestar.
+
+**Quién manda sobre qué.** **I.1.4 gobierna la composición**: ahí se declara que
+las versalitas del sistema son mayúsculas con tracking, y esta sección no lo
+contradice ni lo prohíbe. **Esta sección gobierna qué hacer si el gate falla**:
+la escalera de arriba, en ese orden. Las dos secciones se contradecían mientras
+I.3.1 ordenaba un remedio inexistente; ya no (anexo A, P2-19).
 
 **Consecuencia declarada.** Si el gate falla, **no se avanza a otros formatos**
 hasta que pase. No se documenta como deuda, no se difiere, no se implementa
-«mientras tanto» un segundo formato.
+«mientras tanto» un segundo formato. Lo que cambia con la escalera es **qué se
+arregla**, no la exigencia de arreglarlo antes de seguir.
 
 **Motivo.** La denominación genérica es el único campo obligatorio por
 normativa. Un expediente cuyo dato legalmente exigible no es legible por
@@ -2944,11 +3097,14 @@ registran aquí para que nadie las lea como reinterpretaciones ni intente
 | P2-12 | **Las tres «variantes» de 2.F no eran tres alternativas.** `celdas` y `una línea` componen y se excluyen; `sin contador` es una propiedad ortogonal que no cambia el render y que lee 2.K. Y `una línea` **pierde un consumidor**: la línea fina del membrete no es un `RielDatos` | Al implementar 2.F hubo que elegir un tipo para sus props y las tres variantes no formaban una unión: un riel puede ser `celdas` y `sin contador` a la vez. Al buscar el segundo consumidor de `una línea` resultó que el del membrete no tiene rótulos, ni anchos de `riel.celda`, ni el rol `dato` | 2.F · 2.B |
 | P2-13 | **La composición del riel baja de la ficha de 2.D a la de 2.F**: padding `8 10 10`, reglas, filetes de apertura y cierre y reparto de anchos. 2.D conserva solo sus siete celdas y sus dos excepciones tipográficas. Y la regla superior va en toda fila que no sea **la primera viva**, no «la segunda» | 2.D declaró el riel porque lo necesitó antes de que 2.F existiera. Dejar la declaración en las dos fichas es la divergencia que I.3.5 persigue. El matiz de «la primera viva» aparece solo al implementar el colapso: con la fila de arriba colapsada, «la segunda fila» deja una regla flotando bajo el filete de apertura | 2.F · 2.D |
 | P2-14 | **Cerrados diez de los once huecos de rol de I.1.4, derivando del spec y sin inventar ninguno.** Ninguno necesitó un token nuevo: los valores ya estaban, sin nombre asignado. Salió de ahí un patrón que faltaba nombrar —la **desviación declarada de un rol**, tabla nueva en I.1.4— que ya practicaban 2.D, 2.H y 2.M sin llamarla así. **H9 queda `NO DEFINIDO`**, y con él el aire entre entradas de 2.G, que apareció al cerrar H4 | Diez huecos y cero tokens nuevos es la comprobación de que eran huecos de **nombre**, no de valor: el diseño ya los tenía resueltos y lo que faltaba era cruzarlos contra la escala. Los dos que no se cierran son los dos que exigen medir una hoja aprobada, que es información que este documento no contiene | I.1.4 · 2.G · 2.I · 2.J · 2.K · 2.M · 2.N · 2.Q · 2.S · 2.T |
-
 | P2-15 | **2.H declaraba `espacio.4` y `espacio.8` sin decir cuál iba dónde, y una variante `urgente reducido` sin decir qué reduce.** Cierran las dos juntas: padding `4` vertical y `8` horizontal en `via` y `urgente`; `4` por los cuatro lados en la reducida. **Lo que se reduce es el aire, nunca el cuerpo** | Al implementar 2.H hubo que escribir un padding, y las tres variantes no se distinguían en nada: con el cuerpo y el tracking congelados por la regla 2 y el texto entero por la 1, el aire es lo único que una variante puede cambiar. Una variante que no cambia nada es una variante que el primer implementador borra | 2.H |
 | P2-16 | **La sangría de 2.I se aplica a los dos filetes de la variante `alarma`**, no solo al izquierdo. Y **la cadena `URGENTE` es del componente 2.H, no del formato**: II declara un booleano, no un texto | La regla 2 de 2.I dice «el filete» en singular y `alarma` tiene dos: sin cerrarlo, el texto queda pegado al filete de 3 pt. Lo de 2.H apareció al elegir el tipo de sus props: si el texto entrara por prop, una hoja de continuación podría imprimir `URG.`, que es lo que prohíbe su regla 1 | 2.H · 2.I |
 | P2-17 | **Las cifras de 2.K van sin cero a la izquierda.** `NN` y `MM` son marcadores de posición de un conteo, no un formato de dos dígitos | El cero a la izquierda existe en el sistema —regla 1 de 2.G— y al componer la cadena había que decidir si aplicaba. No aplica: es del número de **entrada**, que es un identificador, y un `07 DE 13` en el contador imitaría ese identificador | 2.K · 2.G |
 | P2-18 | **La prop `sin contador` de 2.F no la lee 2.K.** La lee el sitio que compone el documento: 2.K recibe cifras ya contadas y no ve los rieles de la hoja. Y 2.K **no tiene una prop para desactivarse**: la regla 3 se cumple no instanciándolo | P2-12 dejó escrito que la prop entraría «cuando exista 2.K, que es quien la lee». Existe 2.K y no puede leerla: es la misma corrección que P2-3 —la lectura vive en el sitio que construye el documento, no dentro del componente que imprime—, que aquí aparece por segunda vez y por la misma causa | 2.F · 2.K · I.3.6 |
+| P2-19 | **I.3.1 reescrita: I.1.4 e I.3.1 se contradecían de frente.** I.1.4 declara que las versalitas del sistema son mayúsculas con tracking; I.3.1 prohibía exactamente eso y exigía versalitas reales. **La lista de campos del gate no cambia y sigue siendo bloqueante**; lo que cambia es el remedio: se cruza la lista contra la escala —seis de diez elementos van con tracking 0— y la prohibición se sustituye por una escalera de tres peldaños, con las versalitas reales descartadas por escrito. Aparece de paso el hallazgo que dimensiona el riesgo: **la vía de administración es el único elemento del gate que es clínico y traqueado a la vez**, porque 2.H la compone con el rol `etiqueta` | La contradicción venía de la entrega del diseño: I.3.1 se escribió con el hallazgo de la auditoría §8.5 delante y **nunca se actualizó** cuando la conciliación fijó la escala de I.1.4 y declaró la versalita del sistema como mayúsculas con tracking. Quedó dormida porque ningún componente la ejecutaba; salió al construir 2.H y 2.K, que son versalita entera. El remedio que ordenaba tampoco existe: el `Style` de react-pdf no tiene `fontVariant` ni *features* OpenType, verificado en `@react-pdf/stylesheet` | I.3.1 · I.1.4 · 2.H · 2.K |
+| P2-20 | **El aire entre nodos de 2.J**, que la ficha no declaraba: `espacio.4` dentro del bloque, `espacio.8` entre bloques. Cerrado con el criterio de H4, no elegido | Sin declararlo, el parser componía encabezado, ítems y párrafos pegados por el interlineado y el bloque dejaba de leerse como bloque. Es el tercer sitio donde sirve el mismo criterio —2.C, 2.G y ahora 2.J—, lo que empieza a ser un patrón y no una derivación suelta | 2.J · I.1.7 |
+| P2-21 | **Las dos lecturas del parser que la ficha dejaba abiertas.** (1) El lookahead mira la línea **siguiente**, no la siguiente no vacía: una línea vacía corta de verdad. (2) «Con un solo ítem no se numera» tiene alcance de **cadena entera**, no de bloque. Y queda declarado qué cuenta como viñeta —`- – — • *` y el prefijo numérico, que se descarta— y que la viñeta exige un espacio detrás | Las dos salieron de escribir la batería: cada una tenía dos comportamientos posibles y los dos eran defendibles leyendo la ficha. Se resolvieron por el mismo criterio que ordena todo este componente —cuál de las dos degrada mejor cuando se equivoca— y cada una tiene ya su prueba, así que la próxima vez no se vuelve a decidir | 2.J |
+| P2-22 | **2.J compone el cuerpo con `texto.corrido` salvo dentro de la alarma, que declara `alarma.cuerpo`** (II.3 §5): el rol entra por ranura, lo declara la ficha del consumidor y la ranura está cerrada a esos dos roles. Declarada también la **marca del ítem**: la raya (—) en `fuente.neogrotesca` (`CONCILIA D30`), y el ordinal como `1.` sin cero a la izquierda | Al conectar 2.J a 2.I chocaron dos listas de tokens: la de 2.J pedía `texto.corrido` para todo y la de 2.I declara `alarma.cuerpo` para la alarma, que compone con el parser dentro. Ninguna estaba mal; faltaba decir por dónde entra el rol. Lo de la marca es el hueco gemelo: la ficha decía «la raya del sistema» sin declarar qué signo ni en qué familia | 2.J · 2.I · II.3 |
 
 Una cuarta, menor, sin fila propia: `caja.alto` queda marcado en I.1.1 como
 derivado que **se implementa como fórmula**. El Paso 0 lo había escrito como
@@ -2960,6 +3116,5 @@ literal 670.
 |---|---|
 | El destaque de vía es binario: negativo solo en las no orales | Resuelto y aplicado en II.3, pero **revierte una línea del handoff** que decía «13 vías, todas en bloque negativo». Queda registrado como reversión consciente |
 | Repaginación del Consentimiento | Consecuencia de D33. No se puede estimar sin generar el PDF |
-| Gate de extracción de texto | I.3.1. No se resuelve en papel: se corre contra el primer PDF real de react-pdf |
+| Gate de extracción de texto | I.3.1. No se resuelve en papel: se corre contra el primer PDF real de react-pdf. **Lo que sí quedó resuelto en papel es qué hacer si falla**: la escalera de remedios de I.3.1, con la vía de administración como primer sitio a mirar por ser el único elemento del gate que es clínico y traqueado a la vez |
 | La variante `acento` de `BloqueDestacado` | II.5 §5 la cita por nombre y 2.I declara tres variantes: la tercera comprobación de cierre de §0, sin cumplir. Las dos lecturas —cuarta variante de 2.I, o marco que no es un `BloqueDestacado`— llevan a componentes distintos y elegir exige **mirar el Recibo aprobado** y ver si el marco envuelve prosa o envuelve bloques. Detalle en la ficha de 2.I |
-| **Versalitas: I.1.4 e I.3.1 se contradicen** | I.1.4 declara que las versalitas del sistema son **mayúsculas con tracking** y avisa de que sustituirlas por versalitas reales «invalidaría todos los trackings» de la escala. I.3.1 **prohíbe exactamente eso** y exige versalitas reales de la fuente, con el motivo hasta el operador PDF: el `letterSpacing` parte el `TJ` en un segmento por glifo y el extractor devuelve `PAC IE NT E`. Los componentes construidos hasta hoy componen sus versalitas con tracking —2.D, 2.E, 2.F, 2.H y 2.K—, y el renderer no ofrece otra puerta —el `Style` de react-pdf no tiene `fontVariant` ni selección de *features* OpenType—, así que «versalitas reales» significaría registrar un TTF de versalitas como familia aparte. **Se decide contra el gate**, con el PDF delante, no aquí |
