@@ -2523,11 +2523,8 @@ problema de búsqueda: es el dato que decide cómo se administra el fármaco.
 
 **Escalera de remedios, en este orden**
 
-1. **Correr el gate contra un PDF real de react-pdf.** El primer remedio es
-   medir: el mecanismo de §8.5 es real, pero que rompa la extracción en esta
-   versión del renderer, con estas fuentes y con este extractor, **está sin
-   comprobar**. No se rediseña la escala tipográfica contra un riesgo que nadie
-   ha visto fallar.
+1. **Correr el gate contra un PDF real de react-pdf.** ~~El primer remedio es
+   medir.~~ **HECHO, en parte — ver «Ejecución parcial» abajo. FALLA.**
 2. **Si falla: bajar o eliminar el tracking en los elementos del gate que lo
    llevan**, y solo en ellos — los cuatro de la tabla, empezando por la vía.
    Cuatro sitios acotados, con su rol y su componente ya identificados. El resto
@@ -2556,6 +2553,70 @@ I.3.1 ordenaba un remedio inexistente; ya no (anexo A, P2-19).
 hasta que pase. No se documenta como deuda, no se difiere, no se implementa
 «mientras tanto» un segundo formato. Lo que cambia con la escalera es **qué se
 arregla**, no la exigencia de arreglarlo antes de seguir.
+
+#### Ejecución parcial del gate — 2026-08-07
+
+Corrido en el Paso 2, con los componentes del chasis que ya existen y sin esperar
+al Paso 3. Hoja compuesta con 2.D, 2.E, 2.F, 2.G, 2.H, 2.J, 2.K y 2.M, en Archivo
+e IBM Plex Sans reales, y extraída con **`pdftotext` (poppler)** —el procedimiento
+que esta sección declara— y con **pdf.js** como segunda opinión.
+
+**EL GATE FALLA.** Elemento por elemento:
+
+| Elemento del gate | Tracking | `pdftotext` | pdf.js | |
+|---|---|---|---|---|
+| Denominación genérica | 0 | limpio | limpio | ✅ |
+| Nombre comercial | 0 | limpio | limpio | ✅ |
+| Presentación y gramaje | 0 | limpio | limpio | ✅ |
+| Indicación | 0 | limpio | limpio | ✅ |
+| Ligaduras (`superficie`, `eficaz`) | 0 | limpio | limpio | ✅ |
+| Números de entrada (`01`) | 0 | limpio | limpio | ✅ |
+| **Vía de administración** | 0.22 em | **3 de 13 rotas** | **13 de 13 rotas** | ❌ |
+| **Etiquetas en versalita** | 0.22 em | **3 de 24 rotas** | **24 de 24 rotas** | ❌ |
+| **Folio** (2.M zona 1, rol `pie`) | 0.10 em | **roto** | **roto** | ❌ |
+| `PÁGINA X DE Y` | 0.22 em | limpio | **roto** | ❌ |
+| Contador de lista (2.K) | 0.22 em | **roto** | **roto** | ❌ |
+| Leyenda del pie (`pie.leyenda`) | 0.05 em | limpio | limpio | ✅ |
+
+**Las tres roturas de vía son `OFTÁLMICA`, `SUBCUTÁNEA` y `RECTAL`**; las tres de
+etiqueta, `PRESENTACIÓN`, `AYUNO` y `PACIENTE O REPRESENTANTE`. El gate pide
+literalmente «`PACIENTE`, nunca `PAC IE NT E`»: `PACIENTE` solo sale limpio y
+`PACIENTE O REPRESENTANTE` sale `PA C I E N T E O R E P R E S E N TA N T E`.
+
+**Los seis de tracking 0 pasan los dos extractores.** Es la parte que importaba
+más y confirma lo que esta sección ya predecía: los cuatro campos clínicos que
+sostienen el motivo del gate no pueden fragmentarse por esta causa.
+
+**El mecanismo de §8.5 queda confirmado, y es peor de lo que decía.** No es que
+react-pdf «pueda» partir el operador `TJ`: con cualquier tracking distinto de
+cero **lo parte siempre**, un segmento por glifo. Medido a 0.05, 0.10 y 0.22 em.
+Lo que varía no es el PDF sino si el extractor vuelve a juntar los trozos, y eso
+**el documento no lo controla**.
+
+**La frontera, acotada.** Con sondas de la misma cadena a cuerpo 7 en Archivo,
+de 0 a 0.22 em: **limpio hasta 0.09 em inclusive, roto desde 0.10 em** en los dos
+extractores. Es decir, entre **0.63 y 0.70 pt** de `letterSpacing` absoluto. Dos
+avisos sobre esa cifra:
+
+- **No es un umbral seguro, es una cota inferior.** `pdftotext` no es monótono:
+  rompe la sonda a 0.10 em y la recompone a 0.12, 0.15, 0.18, 0.20 y 0.22. Lo que
+  decide en su caso no es el tracking sino **la cadena**: todas las que rompe
+  llevan un par con ajuste de kerning —`TA` en ofTÁlmica, subcuTÁnea, recTAl,
+  presenTAción; `AY` en AYuno; `PA` en PAciente—, que rompe la uniformidad de los
+  ajustes del `TJ`. Es correlación observada en las 37 cadenas medidas, no
+  mecanismo demostrado.
+- **Por cadena significa por dato nuevo.** Un medicamento o una etiqueta que hoy
+  no existe puede romperse mañana sin que nadie toque el chasis.
+
+**Qué queda sin probar:** el rol `folio` a 0.03 em, porque su único consumidor es
+2.R y 2.R no está construido; 2.S, bloqueado (P2-29); y el gate sobre un formato
+completo con datos reales, que es el Paso 3 y sigue en pie.
+
+**No se cambió ningún tracking.** Esto es el peldaño 1 y solo eso: el peldaño 2
+se decide con estos números delante, y la tabla de arriba dice exactamente cuáles
+son los sitios acotados — la vía (2.H) y las versalitas del pie (2.K, 2.M), más
+el rol `pie` del folio, que es el único de la lista por debajo de la versalita y
+aun así roto en los dos extractores.
 
 **Motivo.** La denominación genérica es el único campo obligatorio por
 normativa. Un expediente cuyo dato legalmente exigible no es legible por
@@ -2686,6 +2747,45 @@ y nada debajo.
   El `width` da el ancho declarado en el caso nominal —los anchos suman la caja y
   no sobra espacio que repartir— y el `flexGrow` solo entra cuando una celda
   colapsa, que es cuando sí hay que redistribuir. Los dos, y en ese orden.
+
+- **La trampa del nodo con `render`.** Es la gemela de la anterior: dos defectos
+  distintos, los dos **mudos**, los dos de todo componente cuyo contenido dependa
+  de la hoja en que cae. Hoy es 2.M; **2.N entra de lleno** con sus tres avisos de
+  pie. Lo que sigue está medido —descomprimiendo el flujo de contenido y leyendo
+  el `/BaseFont` de un PDF real—, no deducido.
+
+  **Lo que hace un nodo con `render`:** obliga al renderer a **recomponer la
+  página entera**, una vez por corte de hoja y otra al conocer el total. No es un
+  detalle de implementación: es de donde salen los dos defectos.
+
+  **(1) El interlineado se multiplica en cada pasada.** I.1.4 declara el
+  interlineado como razón del cuerpo —`pie` es 11 / 7— y el renderer la resuelve
+  a puntos al montar la página. En la recomposición **vuelve a resolver estilos ya
+  resueltos**, así que aplica la razón otra vez sobre un valor que ya era
+  absoluto: `11 → 77 → 539 pt`. Los demás nodos no lo notan porque conservan sus
+  líneas ya maquetadas; al nodo con `render` se le tiran para rehacerlas, y con
+  539 pt de interlineado **su línea deja de caber** — el maquetador devuelve cero
+  líneas y la zona sale en blanco, sin error y sin hueco que lo delate.
+
+  **(2) Su contenido no existe cuando se cargan las tipografías.** La prebúsqueda
+  de fuentes recorre el árbol **declarado**, antes de que ningún `render` haya
+  corrido, y carga las familias que encuentra en los estilos. Lo que solo aparece
+  al recomponer no está ahí, así que su familia nunca se carga y el maquetador cae
+  a la tipografía por defecto del renderer: **otras anchuras, otro color de
+  página, y tampoco lanza nada**.
+
+  **Forma correcta: el `render` va en el CONTENEDOR, y sus hijos se declaran
+  además como hijos.** El `render` es lo que se imprime —y al recrear el subárbol
+  desde el estilo literal en cada pasada, la razón se resuelve una sola vez y
+  nunca se acumula—; los hijos declarados no se componen, pero son lo único que ve
+  la prebúsqueda. Hacen falta los dos. Poner el `render` en el nodo de texto en
+  vez de en el contenedor reproduce el defecto (1); omitir los hijos reproduce
+  el (2).
+
+  **Los dos están fijados con prueba** en `src/lib/tests/pieDocumento.test.ts`,
+  que extrae el texto del PDF y comprueba que la cadena de paginación aparece en
+  las dos hojas. Un defecto que no lanza y no se ve solo lo detecta una prueba: no
+  la borres al construir 2.N, cópiala.
 
 ### I.3.9 · Inmutabilidad
 
@@ -3527,6 +3627,8 @@ registran aquí para que nadie las lea como reinterpretaciones ni intente
 | P2-28 | **Cuatro declaraciones menores de 2.P y 2.Q.** El número de sección va sin cero a la izquierda y el título de sección no se transforma a mayúsculas (2.P); el aire entre el filete de apertura y la cabecera de 2.Q son 8 pt, `COINCIDENCIA` con el de 2.P; y la cadena `SECCIÓN n DE m` la compone el componente a partir de dos números | Las cuatro son huecos de los que solo se ve que faltan cuando hay que escribir la línea. La de la cadena es la que importa: la regla 1 de 2.Q prohíbe la palabra «continuación», y componiendo la cadena dentro **no hay por dónde escribirla** — el mismo cierre que la cadena `URGENTE` de 2.H | 2.P · 2.Q · 2.H |
 | P2-29 | **2.S no se puede componer con texto en este renderer y queda sin construir.** react-pdf no emite nunca el operador `Tr` de modo de trazo, y el `<Text>` de SVG descarta `stroke`: la palabra sale **negra y rellena**, que es lo que la regla 2 prohíbe. Comprobado descomprimiendo el flujo de contenido de un PDF real. La ficha queda intacta salvo el aviso; las dos rutas —contorno vectorial por `<Path>`, o revisar la regla 2 contra la lámina— quedan escritas con su coste | Es el segundo límite del renderer que aparece contra una regla no negociable del spec, tras las versalitas de I.3.1, y el primero que **bloquea** un componente en vez de dejarlo componible con reservas. Se comprobó midiendo antes de escribir una línea del componente: la ficha promete letra hueca y hueca es lo único que no se puede | 2.S · I.3.8 |
 | P2-30 | **El folio baja de ocho formatos a tres y el QR de cuatro a dos; la variante `sin folio` de 2.M pasa a ser el caso mayoritario, cinco de ocho.** Llevan folio Receta, Recibo y Consentimiento; llevan QR Receta y Recibo. Quedan escritas en la ficha las **tres cadenas literales de la banda**, que no estaban en ninguna parte, y corregida la leyenda —decía «Documento emitido con Spinus», que nadie declaró—. Y queda declarada la regla de implementación que hacía falta para que la zona 2 se imprima: **la función de render envuelve la banda entera, no la zona**. Revoca la mitad de D36 —el QR del Consentimiento— y deja el **formato del folio fuera de 2.M**: es un sub-paso aparte | Tres hallazgos en el mismo sitio y ninguno se ve sin ejecutar. **El folio no era buscable**: vive dentro del JSON del documento, sin columna ni índice, así que el número impreso no lo podía encontrar nadie — un identificador que no identifica. **El QR no tenía verificador rutinario** en Suplementación ni en Consentimiento: el primero se lo lleva el paciente, el segundo se firma y se archiva en papel. Y **la paginación no se imprimía**: el interlineado de la escala es una razón, cada pasada de render la vuelve a aplicar sobre un valor ya absoluto —11 → 77 → 539 pt— y la línea deja de caber en la banda de 16, sin error y sin hueco que lo delate. Medido descomprimiendo el flujo de contenido de un PDF real | 2.M · 2.A · 2.Q · II.1 · II.2 · II.3 · II.4 · II.5 · II.6 · II.7 · II.8 · A D17 · A D36 |
+| P2-31 | **El defecto mudo de 2.M queda fijado con prueba, y aparece su gemelo.** La regla de implementación pasa a I.3.8 como «la trampa del nodo con `render`», con sus dos mitades: el interlineado se remultiplica en cada recomposición —la que ya se conocía— y **el contenido que solo existe dentro del `render` no está cuando se cargan las tipografías**, así que la banda salía en la fuente de reserva sin lanzar nada. Forma correcta: `render` en el contenedor **más** los mismos hijos declarados. `src/lib/tests/pieDocumento.test.ts` extrae el texto del PDF y comprueba la cadena de paginación en las dos hojas | La segunda mitad salió al medir el gate: el `/BaseFont` del PDF decía Helvetica donde tenía que decir Archivo. La había introducido el arreglo de P2-30 sin que se viera, porque en el taller todas las demás piezas piden Archivo y dejaban la familia ya cargada — el defecto solo asoma en un documento donde la banda sea la única que la pida. Dos defectos mudos seguidos en el mismo nodo son lo que justifica la prueba: 2.N tiene la misma anatomía | I.3.8 · 2.M · `pieDocumento.test.ts` |
+| P2-32 | **El gate de extracción de I.3.1, corrido en el Paso 2 y no en el 3: FALLA.** Los seis elementos de tracking 0 —los cuatro clínicos incluidos— pasan los dos extractores. Fallan la vía de administración (3 de 13 en `pdftotext`, 13 de 13 en pdf.js), las etiquetas en versalita (3 de 24 y 24 de 24), el folio, el contador de 2.K y la paginación. Frontera acotada con sondas: **limpio hasta 0.09 em, roto desde 0.10**. Registrado en I.3.1 como ejecución parcial, con lo que quedó sin probar. **Sin cambiar ningún tracking** | El peldaño 1 pedía medir y se podía medir ya: los componentes existen desde el Paso 2. Y medir cambió el enunciado — §8.5 decía que react-pdf «puede» partir el `TJ`; lo parte **siempre** que hay tracking, y lo que varía es si el extractor recompone, que el documento no controla. `pdftotext` además no es monótono: rompe a 0.10 em y recompone a 0.22, porque lo que decide es la cadena —las que rompe llevan un par con kerning— y no el tracking. Un umbral no basta: un medicamento nuevo puede romperse mañana | I.3.1 · 2.H · 2.K · 2.M · I.1.4 |
 Una cuarta, menor, sin fila propia: `caja.alto` queda marcado en I.1.1 como
 derivado que **se implementa como fórmula**. El Paso 0 lo había escrito como
 literal 670.
@@ -3540,4 +3642,4 @@ literal 670.
 | La sangría de las tres cajas enmarcadas del Recibo | 2.U regla 4. El dispositivo no la impone —un riel enmarcado y una leyenda de dos líneas no la llevan igual— y el archivo solo trae medida la de 2.R (`12 14 14`). Se mide al construir II.5 |
 | **2.S · la letra hueca** | El renderer no puede trazar texto: no emite el operador `Tr` y el `<Text>` de SVG descarta `stroke` (comprobado, P2-29). Elegir entre convertir las cuatro cadenas a trazado vectorial —versionado o generado en emisión— o revisar la regla 2 contra la lámina. **Lo que no se hace es componerla rellena** |
 | **El generador de folio** | 2.M lo recibe como dato y no decide su forma. Serie, ancho, prefijo, reinicio anual y —lo que hoy falta de verdad— **dónde se guarda para poder buscarlo**: hoy vive dentro del JSON del documento, sin columna ni índice. Es un sub-paso aparte y **único para los tres formatos que llevan folio** (anexo A, P2-30) |
-| Gate de extracción de texto | I.3.1. No se resuelve en papel: se corre contra el primer PDF real de react-pdf. **Lo que sí quedó resuelto en papel es qué hacer si falla**: la escalera de remedios de I.3.1, con la vía de administración como primer sitio a mirar por ser el único elemento del gate que es clínico y traqueado a la vez |
+| **Gate de extracción de texto — peldaño 2** | I.3.1. El peldaño 1 ya está corrido (2026-08-07, anexo A P2-32) y **falla**: pasan los seis elementos de tracking 0, fallan la vía, las versalitas, el folio y el contador. Lo que queda abierto es **decidir el peldaño 2 con esos números delante** — bajar el tracking de los cuatro sitios acotados, y cuánto. No se decide aquí porque no es una medición sino una elección tipográfica, y porque `pdftotext` rompe **por cadena y no por tracking**: bajar el valor reduce el riesgo pero no lo cierra. Sigue pendiente además correr el gate sobre un formato completo con datos reales (Paso 3) |

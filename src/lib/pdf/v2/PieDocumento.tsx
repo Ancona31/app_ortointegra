@@ -239,14 +239,27 @@ function zonas(props: PieDocumentoProps): ReactElement[] {
 export default function PieDocumento(props: PieDocumentoProps): ReactElement {
   return (
     // `fixed`: regla 1. Sin él, el pie sale solo en la hoja donde se declaró.
-    // `render`: ver la nota larga de la cabecera. No es un adorno — sin él la
-    // paginación no se imprime. El relleno es `acento.banda`, derivado a 7 : 1
-    // sobre blanco (I.1.8), y entra aquí y no en la hoja de estilos porque
-    // depende del acento del médico.
+    //
+    // `render` MÁS los mismos hijos declarados, y las dos cosas hacen falta:
+    //
+    // - El `render` es lo que imprime. Ver la nota larga de la cabecera.
+    // - Los hijos NO se componen —el renderer los descarta y se queda con lo que
+    //   devuelve el `render`—, pero son lo único que ve el **prebúsqueda de
+    //   tipografías**, que recorre el árbol declarado ANTES de que ningún
+    //   `render` haya corrido y carga las familias que encuentra. Sin ellos, las
+    //   tres zonas piden una familia que nadie cargó y el maquetador cae a la
+    //   tipografía por defecto del renderer: la banda sale en Helvetica, con las
+    //   demás anchuras, y **sin lanzar nada**. Medido leyendo el `/BaseFont` del
+    //   PDF (I.3.8).
+    //
+    // El relleno es `acento.banda`, derivado a 7 : 1 sobre blanco (I.1.8), y
+    // entra aquí y no en la hoja de estilos porque depende del acento del médico.
     <View
       style={[estilos.banda, { backgroundColor: props.acento.banda }]}
       fixed
       render={() => zonas(props)}
-    />
+    >
+      {zonas(props)}
+    </View>
   )
 }
