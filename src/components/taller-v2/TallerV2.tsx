@@ -75,11 +75,12 @@ const ESPERA_MS = 220
  * distintos y no pueden convivir en el mismo: el chasis va con guías y en
  * posición absoluta, y un formato va sin guías y en flujo.
  */
-type Vista = 'chasis' | 'laboratorio'
+type Vista = 'chasis' | 'laboratorio' | 'imagenologia'
 
 const VISTAS: ReadonlyArray<{ vista: Vista; etiqueta: string }> = [
   { vista: 'chasis', etiqueta: 'Chasis · I.2' },
   { vista: 'laboratorio', etiqueta: '4.1 · Laboratorio' },
+  { vista: 'imagenologia', etiqueta: '4.2 · Imagenología' },
 ]
 
 type Estado =
@@ -140,7 +141,9 @@ export default function TallerV2(): ReactElement {
           const generar =
             vista === 'laboratorio'
               ? (await import('./HojaLaboratorio')).generarPdfLaboratorio
-              : (await import('./HojaTaller')).generarPdfTaller
+              : vista === 'imagenologia'
+                ? (await import('./HojaImagenologia')).generarPdfImagenologia
+                : (await import('./HojaTaller')).generarPdfTaller
           const blob = await generar(medico, acentoHex)
           if (cancelado) return
           urlCreada = URL.createObjectURL(blob)

@@ -51,7 +51,18 @@
 
 import { View, Text, Image, StyleSheet } from '@react-pdf/renderer'
 import type { ReactElement } from 'react'
-import { CAJA, CIERRE, ESPACIO, FILETE, FIRMA, TINTA, estiloTipografico } from './tokens'
+import {
+  CAJA,
+  CIERRE,
+  ESPACIO,
+  FILETE,
+  FIRMA,
+  FUENTE,
+  TINTA,
+  TIPOGRAFIA,
+  estiloTipografico,
+  type Lamina,
+} from './tokens'
 
 /**
  * Geometría interna de las variantes en fila, de la ficha de 2.L.
@@ -68,6 +79,41 @@ import { CAJA, CIERRE, ESPACIO, FILETE, FIRMA, TINTA, estiloTipografico } from '
 const GEOMETRIA = {
   medianil: 24,
   celda: { superior: 14, inferior: 4 },
+  /**
+   * LA MISMA FIRMA EN LA LÁMINA DE IMAGENOLOGÍA — 118.75 pt, no 120.8.
+   *
+   * Los dos pt de diferencia no son uno: son cuatro desviaciones medidas, y las
+   * cuatro se declaran aquí porque tienen un solo consumidor (I.1.7).
+   *
+   *     firma.rol         11      igual
+   *     firma.espacio     77      igual
+   *     línea              0.75   el chasis, `filete.fino` = 0.8
+   *     aire bajo la línea 4      el chasis, `espacio.5`
+   *     nombre            15      el chasis, `firma.nombre` = 11.5 / 16
+   *     cédulas           11      igual de alto, distinto de familia y color
+   *                       ─────
+   *                       118.75
+   *
+   * ⚠ **D9, CON LA CIFRA AL LADO.** Esta lámina compone las cédulas en **IBM Plex
+   * Sans, `tinta.etiqueta`**; Laboratorio en **Archivo, `tinta.secundaria`**. Las
+   * dos son láminas aprobadas y la divergencia sigue abierta: se compone la de cada
+   * formato y queda reportada, no se elige una.
+   *
+   * ⚠ La línea de 0.75 es el mismo píxel del riel (ver `TRAZO` en 2.F). Mismo aviso:
+   * si 0.75 fuera el valor real, `filete.fino` está mal en los ocho.
+   *
+   * **`altoBloqueFirma()` sigue devolviendo 120.8 y esto no lo mueve.** Esa fórmula
+   * es la que consume `umbralFirma()` y con él la regla 1 de 2.N en los ocho
+   * formatos; cambiarla por una lámina movería el umbral de todos. El bloque de
+   * este formato mide 2.05 pt MENOS que lo que el umbral reserva, que es holgura y
+   * no defecto. Reportado.
+   */
+  imagenologia: {
+    linea: 0.75,
+    aireNombre: ESPACIO[4],
+    interlineadoNombre: 15,
+    cuerpoNombre: 11,
+  },
 } as const
 
 /**
@@ -149,6 +195,27 @@ const estilos = StyleSheet.create({
     marginTop: ESPACIO[5],
   },
   credencial: { ...estiloTipografico('firma.credencial') },
+  /** Las cuatro desviaciones de la lámina de Imagenología. Ver `GEOMETRIA`. */
+  lineaImagenologia: {
+    borderBottomWidth: GEOMETRIA.imagenologia.linea,
+  },
+  nombreImagenologia: {
+    ...estiloTipografico('firma.nombre'),
+    fontSize: GEOMETRIA.imagenologia.cuerpoNombre,
+    lineHeight:
+      GEOMETRIA.imagenologia.interlineadoNombre / GEOMETRIA.imagenologia.cuerpoNombre,
+    // El tracking SÍ se recalcula, al revés que en las desviaciones de 2.F: el de
+    // `firma.nombre` no es 0, así que mover el cuerpo lo mueve. La conversión
+    // em → pt es la misma que hace `estiloTipografico()`.
+    letterSpacing:
+      TIPOGRAFIA['firma.nombre'].tracking * GEOMETRIA.imagenologia.cuerpoNombre,
+    marginTop: GEOMETRIA.imagenologia.aireNombre,
+  },
+  credencialImagenologia: {
+    ...estiloTipografico('firma.credencial'),
+    fontFamily: FUENTE.humanista,
+    color: TINTA.etiqueta,
+  },
 })
 
 export interface Firma {
@@ -173,16 +240,25 @@ export interface Firma {
   readonly rubrica?: string
 }
 
-export type BloqueFirmasProps =
-  /** Una firma, en la columna derecha de la fila de cierre. */
-  | { variante: 'simple'; firmas: readonly [Firma] }
-  /** Dos firmas en la misma fila. */
-  | { variante: 'pareja'; firmas: readonly [Firma, Firma] }
-  /** De 3 a 6 firmas, en dos columnas. */
-  | { variante: 'reticula'; firmas: readonly Firma[] }
+/** Qué lámina fija la línea, el aire y los dos renglones de abajo. */
+interface ConLamina {
+  lamina?: Lamina
+}
+
+export type BloqueFirmasProps = ConLamina &
+  (
+    /** Una firma, en la columna izquierda de la fila de cierre. */
+    | { variante: 'simple'; firmas: readonly [Firma] }
+    /** Dos firmas en la misma fila. */
+    | { variante: 'pareja'; firmas: readonly [Firma, Firma] }
+    /** De 3 a 6 firmas, en dos columnas. */
+    | { variante: 'reticula'; firmas: readonly Firma[] }
+  )
 
 /** Una firma: rol encima, espacio de escritura, línea, y la identificación. */
-function UnaFirma({ firma }: { firma: Firma }): ReactElement {
+function UnaFirma({ firma, lamina }: { firma: Firma; lamina: Lamina }): ReactElement {
+  const imagen = lamina === 'imagenologia'
+
   return (
     <View>
       <Text style={estilos.rol}>{firma.rol.toUpperCase()}</Text>
@@ -196,14 +272,16 @@ function UnaFirma({ firma }: { firma: Firma }): ReactElement {
         )}
       </View>
 
-      <View style={estilos.linea} />
+      <View style={[estilos.linea, imagen ? estilos.lineaImagenologia : {}]} />
 
       {/*
         El renglón del nombre se reserva SIEMPRE, con o sin nombre: es la ranura
         que la fórmula de I.1.9 cuenta y es donde se escribe a mano cuando el
         formato deja la firma en blanco.
       */}
-      <Text style={estilos.nombre}>{firma.nombre ?? ' '}</Text>
+      <Text style={imagen ? estilos.nombreImagenologia : estilos.nombre}>
+        {firma.nombre ?? ' '}
+      </Text>
 
       {/*
         UN SOLO RENGLÓN DE CREDENCIALES, SIEMPRE.
@@ -220,7 +298,7 @@ function UnaFirma({ firma }: { firma: Firma }): ReactElement {
         Unir con un solo elemento es idempotente, así que los roles que ya traían una
         credencial no cambian.
       */}
-      <Text style={estilos.credencial}>
+      <Text style={imagen ? estilos.credencialImagenologia : estilos.credencial}>
         {(firma.credenciales ?? []).join(SEPARADOR_CREDENCIALES) || ' '}
       </Text>
     </View>
@@ -239,12 +317,14 @@ function enParejas(firmas: readonly Firma[]): readonly (readonly Firma[])[] {
 
 /** 2.L · `BloqueFirmas`. */
 export default function BloqueFirmas(props: BloqueFirmasProps): ReactElement {
+  const lamina = props.lamina ?? 'chasis'
+
   // Regla 3: `break-inside: avoid`. Un bloque de firmas no se parte entre hojas;
   // es uno de los cuatro bloques indivisibles de 2.N (`CONCILIA D44`).
   if (props.variante === 'simple') {
     return (
       <View style={estilos.cajaSimple} wrap={false}>
-        <UnaFirma firma={props.firmas[0]} />
+        <UnaFirma firma={props.firmas[0]} lamina={lamina} />
       </View>
     )
   }
@@ -264,7 +344,7 @@ export default function BloqueFirmas(props: BloqueFirmasProps): ReactElement {
                 reticula ? estilos.celdaEnReticula : {},
               ]}
             >
-              <UnaFirma firma={firma} />
+              <UnaFirma firma={firma} lamina={lamina} />
             </View>
           ))}
         </View>

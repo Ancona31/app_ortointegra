@@ -50,7 +50,7 @@
  */
 
 import { View, Text, StyleSheet } from '@react-pdf/renderer'
-import type { ReactElement } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import FileteGruesoFino from './FileteGruesoFino'
 import {
   ESPACIO,
@@ -60,6 +60,7 @@ import {
   ZONA,
   estiloTipografico,
   type AcentoResuelto,
+  type Lamina,
 } from './tokens'
 
 /**
@@ -67,6 +68,33 @@ import {
  * sistema: no lo pases ya en mayúsculas.
  */
 const ETIQUETA_FOLIO = 'Folio'
+
+/** Rótulo de la segunda celda del riel derecho. Solo la lámina de Imagenología. */
+const ETIQUETA_EMISION = 'Emisión'
+
+/**
+ * GEOMETRÍA DEL BLOQUE EN LA LÁMINA DE IMAGENOLOGÍA.
+ *
+ * Las tres cifras son la misma decisión vista por sus tres lados: **el título de
+ * este formato tuvo que acortarse por romper a dos líneas** (regla 1), y la
+ * solución de la lámina fue darle caja de ancho FIJO en vez de `flex: 1`. Con 287
+ * de título, 9 de medianil y 190 de riel se cierran los 486 de la caja, así que el
+ * título no puede invadir el riel ni aunque crezca.
+ *
+ * El riel de 190 lleva DOS celdas —`Emisión` y `Folio`— con 16 pt entre ellas, y
+ * es él quien fija el alto del bloque en 25 pt: la caja del título mide 20.
+ *
+ * Los dos aires del bloque también son propios: 6 pt hasta su filete y 10 pt del
+ * filete al riel de identificación, donde el chasis pone 4 y 8
+ * (`transicion.tituloFilete` y `transicion.tituloRiel`, medidos en Laboratorio).
+ */
+const IMAGENOLOGIA = {
+  cajaTitulo: 287,
+  rielDerecho: 190,
+  medianilCeldas: 16,
+  tituloFilete: 6,
+  tituloRiel: 10,
+} as const
 
 /** Interlineado del título: el alto de UNA de sus líneas. Lo usa la fecha. */
 const ALTO_LINEA_TITULO = TIPOGRAFIA['titulo.documento'].interlineado ?? 0
@@ -84,12 +112,29 @@ const estilos = StyleSheet.create({
     width: '100%',
     marginBottom: TRANSICION.tituloRiel,
   },
+  bloqueImagenologia: {
+    marginBottom: IMAGENOLOGIA.tituloRiel,
+  },
   fila: {
     flexDirection: 'row',
   },
   columnaTitulo: {
     // Regla 2: el título toma el ancho restante y rompe solo. Sin truncado.
     flex: 1,
+  },
+  /**
+   * La caja fija de la lámina de Imagenología. No es `flex: 1` con un máximo: es
+   * ancho fijo, que es lo que garantiza que el título no colisione con el riel de
+   * 190 pase lo que pase con la cadena (ver `IMAGENOLOGIA`).
+   */
+  columnaTituloFija: {
+    width: IMAGENOLOGIA.cajaTitulo,
+    flexShrink: 0,
+  },
+  /** La ranura de lo que cuelga bajo el título, dentro del bloque. */
+  bajoTitulo: {
+    marginTop: ESPACIO[4],
+    flexDirection: 'row',
   },
   titulo: { ...estiloTipografico('titulo.documento') },
   /**
@@ -136,6 +181,23 @@ const estilos = StyleSheet.create({
     flexShrink: 0,
     alignItems: 'flex-end',
   },
+  /**
+   * El riel derecho de la lámina de Imagenología: 190 pt y DOS celdas alineadas a
+   * la derecha, con 16 pt entre ellas. Es él quien fija el alto del bloque.
+   */
+  rielDoble: {
+    width: IMAGENOLOGIA.rielDerecho,
+    marginLeft: RETICULA.medianil,
+    flexShrink: 0,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  celdaRiel: {
+    alignItems: 'flex-end',
+  },
+  celdaRielSiguiente: {
+    marginLeft: IMAGENOLOGIA.medianilCeldas,
+  },
   etiquetaFolio: { ...estiloTipografico('etiqueta') },
   /**
    * REGLA 3, Y HASTA DÓNDE LLEGA EL RENDERER.
@@ -178,6 +240,9 @@ const estilos = StyleSheet.create({
   hastaFilete: {
     marginTop: TRANSICION.tituloFilete,
   },
+  hastaFileteImagenologia: {
+    marginTop: IMAGENOLOGIA.tituloFilete,
+  },
 })
 
 interface ConTitulo {
@@ -203,7 +268,33 @@ interface ConTitulo {
    * su propia lámina, que compone el riel de 156 pt y emite con prefijo.
    */
   folio?: string
+  /**
+   * Fecha y hora de emisión, YA compuestas por quien llama —la lámina de
+   * Imagenología imprime `4 ago 2026 · 11:05`—. Ocupa la primera celda del riel
+   * derecho y colapsa si no viene, que es lo que hace en los otros siete formatos.
+   *
+   * No es la `fecha` de arriba y no se confunde con ella: aquella es la del
+   * Escrito Médico, va sin rótulo y se apoya en la línea base del título (regla 3).
+   * Esta es un par rótulo + valor dentro del riel, como el folio.
+   */
+  emision?: string
+  /**
+   * LO QUE CUELGA BAJO EL TÍTULO, DENTRO DEL BLOQUE, a `espacio.4`.
+   *
+   * Es una ranura y no una prop `urgente`: 2.C no tiene por qué conocer 2.H ni el
+   * booleano que lo enciende. Hoy la ocupa un solo formato —el badge `URGENTE` de
+   * Imagenología, que la lámina compone a 4 pt bajo el título y DENTRO del bloque,
+   * encima del filete— y por eso no se declara nada más.
+   *
+   * ⚠ Con la ranura ocupada el bloque deja de medir los 25 pt que fija el riel
+   * derecho: la columna del título pasa a 20 + 4 + 14.5 = 38.5 y el bloque entero
+   * crece 13.5 pt. Las coordenadas medidas de la lámina son las de la hoja SIN
+   * badge; con badge todo lo que va debajo baja esos 13.5.
+   */
+  bajoTitulo?: ReactNode
   acento: AcentoResuelto
+  /** Qué lámina fija la geometría del bloque. Sin ella, la del chasis. */
+  lamina?: Lamina
 }
 
 export type TituloDocumentoProps =
@@ -222,13 +313,30 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
     return <View style={estilos.bloque} />
   }
 
+  const imagen = (props.lamina ?? 'chasis') === 'imagenologia'
+
+  /**
+   * Una celda del riel derecho: rótulo en versalita y valor en `folio`. El rol va
+   * en `acento.tinta`, así que se resuelve en el render y se esparce en un
+   * literal: misma razón de tipos que en 2.B, 2.D, 2.F y 2.G.
+   */
+  const celda = (etiqueta: string, valor: string): ReactElement => (
+    <>
+      <Text style={estilos.etiquetaFolio}>{etiqueta.toUpperCase()}</Text>
+      <Text style={{ ...estiloTipografico('folio', props.acento) }}>{valor}</Text>
+    </>
+  )
+
   return (
-    <View style={estilos.bloque}>
+    <View style={[estilos.bloque, imagen ? estilos.bloqueImagenologia : {}]}>
       <View style={estilos.fila}>
-        <View style={estilos.columnaTitulo}>
+        <View style={imagen ? estilos.columnaTituloFija : estilos.columnaTitulo}>
           <Text style={estilos.titulo}>{props.titulo.toUpperCase()}</Text>
           {props.subtitulo === undefined ? null : (
             <Text style={estilos.subtitulo}>{props.subtitulo}</Text>
+          )}
+          {props.bajoTitulo === undefined ? null : (
+            <View style={estilos.bajoTitulo}>{props.bajoTitulo}</View>
           )}
         </View>
         {props.fecha === undefined ? null : (
@@ -237,22 +345,35 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
           </View>
         )}
 
-        {props.folio === undefined ? null : (
-          <View style={estilos.rielFolio}>
-            <Text style={estilos.etiquetaFolio}>{ETIQUETA_FOLIO.toUpperCase()}</Text>
-            {/*
-              El rol `folio` va en `acento.tinta`, así que se resuelve en el render
-              y se esparce en un literal: misma razón de tipos que en 2.B, 2.D, 2.F
-              y 2.G.
-            */}
-            <Text style={{ ...estiloTipografico('folio', props.acento) }}>
-              {props.folio}
-            </Text>
+        {imagen ? (
+          /*
+            EL RIEL DERECHO DE 190 pt, CON DOS CELDAS. Es lo que fija el alto del
+            bloque en 25 pt: 11 de rótulo más 14 de valor. Las dos celdas colapsan
+            por separado, como cualquier par rótulo + valor del sistema (2.E).
+          */
+          <View style={estilos.rielDoble}>
+            {props.emision === undefined ? null : (
+              <View style={estilos.celdaRiel}>
+                {celda(ETIQUETA_EMISION, props.emision)}
+              </View>
+            )}
+            {props.folio === undefined ? null : (
+              <View
+                style={[
+                  estilos.celdaRiel,
+                  props.emision === undefined ? {} : estilos.celdaRielSiguiente,
+                ]}
+              >
+                {celda(ETIQUETA_FOLIO, props.folio)}
+              </View>
+            )}
           </View>
+        ) : props.folio === undefined ? null : (
+          <View style={estilos.rielFolio}>{celda(ETIQUETA_FOLIO, props.folio)}</View>
         )}
       </View>
 
-      <View style={estilos.hastaFilete}>
+      <View style={imagen ? estilos.hastaFileteImagenologia : estilos.hastaFilete}>
         <FileteGruesoFino acento={props.acento} />
       </View>
     </View>

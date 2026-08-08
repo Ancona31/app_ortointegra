@@ -57,7 +57,7 @@
 
 import { Text, StyleSheet } from '@react-pdf/renderer'
 import type { ReactElement } from 'react'
-import { TINTA, TIPOGRAFIA, estiloTipografico } from './tokens'
+import { TINTA, TIPOGRAFIA, estiloTipografico, type Lamina } from './tokens'
 
 /**
  * La versalita del sistema, leída de `etiqueta` en vez de escrita como cifra.
@@ -95,6 +95,18 @@ const estilos = StyleSheet.create({
     letterSpacing: VERSALITA.tracking * TIPOGRAFIA.pie.cuerpo,
     color: TINTA.secundaria,
   },
+  /**
+   * El mismo contador en la lámina de Imagenología: **`tinta.etiqueta`**, un gris
+   * más claro que el `tinta.secundaria` del chasis. Cuerpo, interlineado, peso y
+   * tracking no se mueven —7 / 11 en 600—, así que el alto sigue siendo 11 pt.
+   *
+   * El color es del SITIO, que es lo que declara la cabecera: aquí el sitio no
+   * cambia —sigue al pie del área de contenido— pero la lámina lo compone un tono
+   * por encima. Reportado.
+   */
+  contadorImagenologia: {
+    color: TINTA.etiqueta,
+  },
 })
 
 interface Comun {
@@ -106,6 +118,8 @@ interface Comun {
   items: string
   /** Total de ítems del DOCUMENTO, el `MM` de las dos formas. */
   total: number
+  /** Qué lámina fija el color. Sin ella, la del chasis. */
+  lamina?: Lamina
 }
 
 export type ContadorListaProps =
@@ -132,5 +146,14 @@ function cadena(props: ContadorListaProps): string {
 
 /** 2.K · `ContadorLista`. */
 export default function ContadorLista(props: ContadorListaProps): ReactElement {
-  return <Text style={estilos.contador}>{cadena(props).toUpperCase()}</Text>
+  return (
+    <Text
+      style={[
+        estilos.contador,
+        props.lamina === 'imagenologia' ? estilos.contadorImagenologia : {},
+      ]}
+    >
+      {cadena(props).toUpperCase()}
+    </Text>
+  )
 }

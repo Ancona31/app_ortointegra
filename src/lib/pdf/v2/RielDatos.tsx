@@ -41,7 +41,15 @@
 import { View, Text, StyleSheet } from '@react-pdf/renderer'
 import type { ReactElement } from 'react'
 import { tieneValor } from './Campo'
-import { CAJA, FILETE, RIEL_CELDA, TINTA, TIPOGRAFIA, estiloTipografico } from './tokens'
+import {
+  CAJA,
+  FILETE,
+  RIEL_CELDA,
+  TINTA,
+  TIPOGRAFIA,
+  estiloTipografico,
+  type Lamina,
+} from './tokens'
 
 /**
  * Geometría interna del riel, de la ficha de 2.F. I.1.7 declara que la geometría
@@ -69,6 +77,24 @@ const GEOMETRIA = {
   /** Padding de celda `3 10 4`: superior 3, laterales 10, inferior 4. */
   padding: { superior: 3, lateral: 10, inferior: 4 },
 } as const
+
+/**
+ * LOS DOS TRAZOS DEL RIEL, uno por lámina. Ver `Lamina` en la capa de tokens.
+ *
+ * La lámina de Imagenología cierra su riel con **0.75 pt** y separa sus dos filas
+ * con **0.375**: son 1 px y 0.5 px, que es lo que dibuja un HTML a 96 dpi. Con
+ * ellos el riel entero mide 63.87 —0.75 + 30 + 32.375 + 0.75—, que es exactamente
+ * lo que la medición da entre 209 y 272.87.
+ *
+ * El chasis los declara en `filete.fino` y `filete.regla`, 0.8 y 0.5, leídos de
+ * A.7. **La diferencia se compone, no se unifica:** si el 0.75 fuera el valor real
+ * del sistema, `filete.fino` estaría mal en los ocho formatos y eso movería
+ * Laboratorio, que ya está conciliado. Reportado.
+ */
+const TRAZO = {
+  chasis: { filete: FILETE.fino, regla: FILETE.regla },
+  imagenologia: { filete: 0.75, regla: 0.375 },
+} as const satisfies Record<Lamina, { filete: number; regla: number }>
 
 /** Lo que una desviación puede mover de un rol: solo su cuerpo y su interlineado. */
 interface DesviacionRol {
@@ -115,9 +141,7 @@ const estilos = StyleSheet.create({
    */
   riel: {
     width: CAJA.ancho,
-    borderTopWidth: FILETE.fino,
     borderTopColor: TINTA.negra,
-    borderBottomWidth: FILETE.fino,
     borderBottomColor: TINTA.negra,
   },
   fila: {
@@ -128,7 +152,6 @@ const estilos = StyleSheet.create({
   },
   /** Regla superior de toda fila que no sea la primera VIVA. */
   filaSiguiente: {
-    borderTopWidth: FILETE.regla,
     borderTopColor: TINTA.hairline,
   },
   /**
@@ -157,7 +180,6 @@ const estilos = StyleSheet.create({
   },
   /** Regla izquierda salvo en la primera celda de cada fila. */
   celdaConRegla: {
-    borderLeftWidth: FILETE.regla,
     borderLeftColor: TINTA.hairline,
   },
   /**
@@ -254,11 +276,17 @@ interface SinContador {
   readonly sinContador?: boolean
 }
 
+/** Qué lámina fija los dos grosores del riel. Sin ella, la del chasis. */
+interface ConLamina {
+  readonly lamina?: Lamina
+}
+
 export type RielDatosProps =
   /** Varias filas de celdas. El número de celdas por fila lo declara el formato. */
-  | ({ variante: 'celdas'; filas: readonly (readonly CeldaRiel[])[] } & SinContador)
+  | ({ variante: 'celdas'; filas: readonly (readonly CeldaRiel[])[] } & SinContador &
+      ConLamina)
   /** Riel comprimido de una sola fila. Hoy: `BloquePaciente` reducido. */
-  | ({ variante: 'unaLinea'; celdas: readonly CeldaRiel[] } & SinContador)
+  | ({ variante: 'unaLinea'; celdas: readonly CeldaRiel[] } & SinContador & ConLamina)
 
 /**
  * Una fila del riel, con sus celdas YA filtradas por el componente: aquí no llega
@@ -267,19 +295,29 @@ export type RielDatosProps =
 function Fila({
   celdas,
   primera,
+  regla,
 }: {
   celdas: readonly CeldaRiel[]
   primera: boolean
+  /** Grosor de las reglas de esta lámina: la de arriba y las verticales. */
+  regla: number
 }): ReactElement {
   return (
-    <View style={[estilos.fila, primera ? {} : estilos.filaSiguiente]}>
+    <View
+      style={[
+        estilos.fila,
+        primera ? {} : { ...estilos.filaSiguiente, borderTopWidth: regla },
+      ]}
+    >
       {celdas.map((celda, indice) => (
         <View
           key={celda.clave}
           style={[
             estilos.celda,
             { width: celda.columnas * RIEL_CELDA, flexGrow: celda.columnas },
-            indice === 0 ? {} : estilos.celdaConRegla,
+            indice === 0
+              ? {}
+              : { ...estilos.celdaConRegla, borderLeftWidth: regla },
           ]}
         >
           <Text style={estilos.etiqueta}>{celda.etiqueta.toUpperCase()}</Text>
@@ -309,10 +347,22 @@ export default function RielDatos(props: RielDatosProps): ReactElement {
     .map((fila) => fila.filter((celda) => tieneValor(celda.valor)))
     .filter((fila) => fila.length > 0)
 
+  const trazo = TRAZO[props.lamina ?? 'chasis']
+
   return (
-    <View style={estilos.riel}>
+    <View
+      style={[
+        estilos.riel,
+        { borderTopWidth: trazo.filete, borderBottomWidth: trazo.filete },
+      ]}
+    >
       {vivas.map((celdas, indice) => (
-        <Fila key={celdas[0].clave} celdas={celdas} primera={indice === 0} />
+        <Fila
+          key={celdas[0].clave}
+          celdas={celdas}
+          primera={indice === 0}
+          regla={trazo.regla}
+        />
       ))}
     </View>
   )

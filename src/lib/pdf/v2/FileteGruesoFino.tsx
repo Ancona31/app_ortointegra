@@ -42,7 +42,29 @@ import { FILETE, TINTA, type AcentoResuelto } from './tokens'
 const GEOMETRIA = {
   anchoGrueso: 96,
   grosorGrueso: 2.5,
+  /**
+   * LA SEGUNDA MEDIDA DEL FILETE, Y POR QUÉ LA REGLA 1 NO SE ROMPE.
+   *
+   * La regla 1 dice que el grueso es de ancho FIJO y que no hay prop de ancho.
+   * Sigue sin haberla: lo que entra es una MEDIDA declarada —dos parejas cerradas,
+   * no un número libre—, y la elige el sitio que instancia el filete, no el
+   * contenido. Un `ancho={72}` sí rompería la regla; `medida="lista"` no.
+   *
+   * Existe porque la lámina de Imagenología abre su lista con **64 × 2 pt** de
+   * acento más el fino negro, y `SPEC_DISENO_PARTE_B.md` B.2 §5 la declara
+   * explícitamente por contraste con la principal: «más corto y fino que el filete
+   * principal (96 × 2.5)». Sin esta pareja, el encabezado de lista se compone con
+   * el filete del membrete y pesa lo mismo que él.
+   */
+  anchoGruesoLista: 64,
+  grosorGruesoLista: 2,
 } as const
+
+/**
+ * Las dos medidas declaradas. `principal` cierra membrete y título en los ocho
+ * formatos; `lista` abre la lista de Imagenología.
+ */
+export type MedidaFilete = 'principal' | 'lista'
 
 const estilos = StyleSheet.create({
   linea: {
@@ -53,9 +75,16 @@ const estilos = StyleSheet.create({
     width: '100%',
     height: GEOMETRIA.grosorGrueso,
   },
+  lineaLista: {
+    height: GEOMETRIA.grosorGruesoLista,
+  },
   grueso: {
     width: GEOMETRIA.anchoGrueso,
     height: GEOMETRIA.grosorGrueso,
+  },
+  gruesoLista: {
+    width: GEOMETRIA.anchoGruesoLista,
+    height: GEOMETRIA.grosorGruesoLista,
   },
   fino: {
     flex: 1,
@@ -67,13 +96,25 @@ const estilos = StyleSheet.create({
 export interface FileteGruesoFinoProps {
   /** El segmento grueso va en `acento.base`, en su forma pura (regla 3). */
   readonly acento: AcentoResuelto
+  /** Cuál de las dos medidas declaradas. Sin ella, la principal de los ocho. */
+  readonly medida?: MedidaFilete
 }
 
 /** 2.O · `FileteGruesoFino`. */
-export default function FileteGruesoFino({ acento }: FileteGruesoFinoProps): ReactElement {
+export default function FileteGruesoFino({
+  acento,
+  medida = 'principal',
+}: FileteGruesoFinoProps): ReactElement {
+  const lista = medida === 'lista'
+
   return (
-    <View style={estilos.linea}>
-      <View style={[estilos.grueso, { backgroundColor: acento.base }]} />
+    <View style={[estilos.linea, lista ? estilos.lineaLista : {}]}>
+      <View
+        style={[
+          lista ? estilos.gruesoLista : estilos.grueso,
+          { backgroundColor: acento.base },
+        ]}
+      />
       <View style={estilos.fino} />
     </View>
   )

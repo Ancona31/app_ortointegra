@@ -283,6 +283,30 @@ export const TIPOGRAFIA = {
   // §3. Su peso YA era el correcto: 400, el de `texto.corrido` y el único que la
   // humanista tiene cargado junto al 500. No se toca.
   'entradaCompacta.nota': { familia: FUENTE.humanista, cuerpo: 9, interlineado: 11.5, peso: 400, tracking: 0, color: 'tinta.secundaria' },
+  // ── Calibración `estudio` de la entrada (2.G). Medida en la lámina de
+  // Imagenología: es la lista APILADA de cuatro datos, no la tabla de columnas de
+  // Laboratorio. Cuatro roles y no dos porque la ranura `nota` de este formato
+  // lleva rótulo colgado propio —`Indicación`—, que la calibración `compacta` no
+  // tiene.
+  //
+  // ⚠ **LOS PESOS SON LOS DE LA LÁMINA Y NO LOS DEL ROL QUE HEREDARÍAN.** Es la
+  // trampa que ya se pagó una vez en `entradaCompacta.*`, donde el cuerpo salió de
+  // la lámina y el peso de `entrada.*`, y los estudios se compusieron en negrita.
+  // Aquí el ancla SÍ va en 600 y el secundario en **500**, que no es ni el 400 de
+  // `entrada.secundario` ni el 600 del ancla.
+  //
+  // La otra herencia que NO se toma: `entrada.secundario` va en `tinta.negra` por
+  // la regla 5 de 2.G —en la Receta ese renglón es la denominación genérica—. En
+  // esta lámina el secundario son las PROYECCIONES y va en `tinta.secundaria`. La
+  // regla 5 protege un dato normativo de la Receta, no este renglón.
+  //
+  // El número no sube aquí: la lámina lo compone a 13 / 17 en 600 y acento, que es
+  // exactamente `entrada.numero`. Un quinto rol idéntico a uno existente sería
+  // deuda.
+  'entradaEstudio.ancla': { familia: FUENTE.neogrotesca, cuerpo: 12.5, interlineado: 17, peso: 600, tracking: -0.005, color: 'tinta.negra' },
+  'entradaEstudio.secundario': { familia: FUENTE.neogrotesca, cuerpo: 10, interlineado: 13, peso: 500, tracking: 0, color: 'tinta.secundaria' },
+  'entradaEstudio.rotuloNota': { familia: FUENTE.neogrotesca, cuerpo: 6.5, interlineado: 16, peso: 600, tracking: 0.2, color: 'tinta.etiqueta' },
+  'entradaEstudio.nota': { familia: FUENTE.humanista, cuerpo: 10.5, interlineado: 16, peso: 400, tracking: 0, color: 'tinta.negra' },
   'firma.nombre': { familia: FUENTE.neogrotesca, cuerpo: 11.5, interlineado: 16, peso: 600, tracking: -0.012, color: 'tinta.negra' },
   'firma.rol': { familia: FUENTE.neogrotesca, cuerpo: 7, interlineado: 11, peso: 600, tracking: 0.22, color: 'tinta.etiqueta' },
   'firma.credencial': { familia: FUENTE.neogrotesca, cuerpo: 7.5, interlineado: 11, peso: 400, tracking: 0.06, color: 'tinta.secundaria' },
@@ -470,6 +494,17 @@ export const ESPACIO_BASE = 4
  * `COINCIDENCIA` — `espacio.20` mide lo mismo que el antiguo `transicion.tituloRiel`
  * y no es él. Aquel quedó en 8 pt por la misma lámina; que hayan coincidido en 20
  * durante una generación no los hace el mismo valor.
+ *
+ * **Y AHORA ES DE TRECE.** Se añaden `14` y `26`, medidos en la lámina de
+ * Imagenología por el mismo criterio con que entraron los tres anteriores — sin
+ * ellos el formato no se compone sin escribir literales:
+ *
+ *   `espacio.14`  riel de identificación → cabecera de la lista
+ *   `espacio.26`  aire antes de la firma
+ *
+ * `COINCIDENCIA` — `espacio.14` NO es el aire de continuación de esa misma lámina,
+ * que mide 16 y es `espacio.16`: son dos separaciones distintas que la hoja 1 y la
+ * hoja de continuación miden distinto a propósito.
  */
 export const ESPACIO = {
   2: 2,
@@ -477,13 +512,45 @@ export const ESPACIO = {
   5: 5,
   8: 8,
   12: 12,
+  14: 14,
   16: 16,
   20: 20,
   24: 24,
+  26: 26,
   32: 32,
   48: 48,
   64: 64,
 } as const
+
+/**
+ * QUÉ LÁMINA FIJA LA COMPOSICIÓN DE UN COMPONENTE. **La declara el formato.**
+ *
+ * No es una variante de diseño ni un tema: es la constatación de que dos hojas
+ * aprobadas componen la misma pieza con cifras distintas, y de que el chasis no
+ * puede tener las dos a la vez sin decir cuál está usando. El criterio es el mismo
+ * que ya rige `CalibracionEntrada` en 2.G — lo declara el formato, una vez, y
+ * nunca el contenido en tiempo de render (I.3.4).
+ *
+ * `chasis` es el valor por defecto en los seis componentes que la aceptan, así que
+ * **ningún formato ya construido cambia por esto**. Solo Imagenología la declara.
+ *
+ * Las seis desviaciones, con su sitio de definición, para que se puedan cruzar de
+ * una sola lectura:
+ *
+ *   2.B  banda de dirección de DOS renglones a 7.5 / 12   (el chasis compone uno)
+ *   2.C  caja de título 287 · riel derecho 190 · aires 6 y 10
+ *   2.F  filetes del riel 0.75 y regla interior 0.375     (el chasis, 0.8 y 0.5)
+ *   2.D  valor de diagnóstico a 11 / 15                   (el chasis, 11 / 13)
+ *   2.K  contador en `tinta.etiqueta`                     (el chasis, secundaria)
+ *   2.L  línea 0.75 · nombre 11 / 15 · aire 4 · cédulas en humanista
+ *
+ * ⚠ **LOS DOS GROSORES DE HAIRLINE SON UN PÍXEL Y MEDIO PÍXEL.** 0.75 pt = 1 px y
+ * 0.375 pt = 0.5 px a 96 dpi, que es lo que las láminas dibujan por ser HTML. El
+ * chasis los declara en 0.8 y 0.5 (`filete.fino`, `filete.regla`) porque así los
+ * leyó A.7. **No los unifiques por tu cuenta:** si el 0.75 es el valor real,
+ * `filete.fino` está mal en los ocho formatos y eso mueve Laboratorio. Reportado.
+ */
+export type Lamina = 'chasis' | 'imagenologia'
 
 /**
  * Las nueve transiciones entre bloques declaradas por el diseño (I.1.7).

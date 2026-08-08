@@ -53,9 +53,11 @@ import PanelCircular, { type PanelCircularProps } from './PanelCircular'
 import FileteGruesoFino from './FileteGruesoFino'
 import {
   CAJA,
+  TIPOGRAFIA,
   TRANSICION,
   estiloTipografico,
   type AcentoResuelto,
+  type Lamina,
 } from './tokens'
 
 /**
@@ -83,6 +85,43 @@ const GEOMETRIA = {
   medianilPanelNombre: 18,
   /** Nombre → especialidad. */
   nombreEspecialidad: 7,
+  /**
+   * EL ESPACIADOR QUE CIERRA EL MEMBRETE — 12 pt, sin contenido.
+   *
+   * ⚠ **NO ES UN RENGLÓN VACÍO NI UN DEFECTO.** Una lectura anterior de la lámina
+   * de Imagenología lo contó como un tercer renglón de la banda de dirección —«un
+   * contenedor vacío que solo ocupa altura»— y lo retiró; y la misma lectura, en la
+   * lámina de Laboratorio, lo tomó por un aire del formato. Es lo mismo en los dos
+   * sitios y es lo mismo en los ocho: **el elemento que separa el membrete del
+   * documento**.
+   *
+   * Su trabajo se ve al quitarlo: la banda va a 12 pt de interlineado y el título
+   * arranca pegado a ella, así que las cinco líneas —nombre, especialidad,
+   * dirección, cédulas, título— se leen como un bloque corrido de interlineado
+   * uniforme y el título deja de nombrar un documento para parecer la quinta línea
+   * del médico. Con él, membrete y documento se distinguen.
+   *
+   * A AMBOS LADOS EL AIRE ES CERO, y eso es parte de la medida: la banda cierra en
+   * 153.5, el espaciador ocupa de 153.5 a 165.5 y el bloque de título arranca
+   * exactamente donde termina. Un formato que además ponga su propio aire entre
+   * membrete y título estará contando dos veces la misma separación — es lo que
+   * hacía `SolicitudLaboratorio` con `espacio.12`.
+   *
+   * Vive AQUÍ y no en el formato porque cierra el membrete, así que viaja con él a
+   * los ocho: es la misma razón por la que el filete grueso-fino tampoco lo pone
+   * cada formato.
+   */
+  espaciadorCierre: 12,
+  /**
+   * INTERLINEADO DE LA BANDA EN LA LÁMINA DE IMAGENOLOGÍA — 12, no 11.
+   *
+   * Desviación declarada del rol `medico.credencial`, del mismo tipo que las dos
+   * de 2.F: se mueve el interlineado y nada más —familia, cuerpo, peso, tracking y
+   * color los sigue poniendo el rol—. No sube a I.1.4 mientras tenga un solo
+   * consumidor. Es lo que hace que los dos renglones midan los 24 pt que mide la
+   * banda de esa lámina.
+   */
+  interlineadoBandaImagenologia: 12,
 } as const
 
 /** Datos del médico que el membrete imprime. Ninguno es opcional (regla 2). */
@@ -114,6 +153,11 @@ export type MembreteProps =
       acento: AcentoResuelto
       /** El panel de 2.A, en la variante que corresponda a este médico. */
       panel: PanelCircularProps
+      /**
+       * Qué lámina fija la banda. Sin ella, la de Laboratorio: un solo renglón,
+       * sin cédulas ni universidad. Ver la nota junto al render.
+       */
+      lamina?: Lamina
     }
   | {
       variante: 'continuacion'
@@ -160,11 +204,45 @@ const estilos = StyleSheet.create({
     marginTop: TRANSICION.membreteLineaFina,
   },
   credencial: { ...estiloTipografico('medico.credencial') },
+  /**
+   * El renglón de la banda de Imagenología, con la desviación de interlineado
+   * encima del rol. El cuerpo no se desvía, así que el `letterSpacing` que trae
+   * `estiloTipografico()` sigue siendo el bueno y no hay que recalcularlo — mismo
+   * caso que el rótulo de celda en 2.F.
+   */
+  credencialAlta: {
+    ...estiloTipografico('medico.credencial'),
+    lineHeight:
+      GEOMETRIA.interlineadoBandaImagenologia / TIPOGRAFIA['medico.credencial'].cuerpo,
+  },
+  /**
+   * El segundo renglón NO lleva margen propio: la lámina lo compone pegado al
+   * primero, y esos 12 pt de altura son todo lo que aporta. Existe como estilo
+   * aparte para que quede escrito que el cero es medido y no un olvido.
+   */
+  segundoRenglon: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  /**
+   * El cierre del bloque. Caja sin contenido y sin margen a ningún lado: su alto
+   * ES la separación. Ver `GEOMETRIA.espaciadorCierre` antes de tocarlo.
+   */
+  espaciador: {
+    height: GEOMETRIA.espaciadorCierre,
+  },
 })
+
+/**
+ * La raya del sistema, la misma con la que 2.L une las credenciales bajo la
+ * firma. Aquí une las dos cédulas en el renglón que la lámina compone en uno.
+ */
+const SEPARADOR_CREDENCIALES = ' · '
 
 /** 2.B · `Membrete`. */
 export default function Membrete(props: MembreteProps): ReactElement {
   const { acento, medico } = props
+  const lamina: Lamina = props.variante === 'completo' ? (props.lamina ?? 'chasis') : 'chasis'
 
   return (
     <View style={estilos.membrete}>
@@ -205,9 +283,13 @@ export default function Membrete(props: MembreteProps): ReactElement {
               Calle 20 Núm. 110-J, entre 23 y 25, Centro, Umán, Yucatán 97390   Tel. 999 222 3173
 
           Ni la universidad ni las cédulas aparecen ahí: donde iría la columna de
-          cédulas la lámina deja un contenedor vacío que solo ocupa altura. Son
-          10 pt de encabezado, la segunda de las tres causas del exceso que impedía
-          que 18 estudios cupieran en una hoja.
+          cédulas la lámina no imprime nada. Son 10 pt de encabezado, la segunda de
+          las tres causas del exceso que impedía que 18 estudios cupieran en una
+          hoja.
+
+          Lo que aquella lectura llamó «un contenedor vacío que solo ocupa altura»
+          NO es la columna de cédulas ausente: es el espaciador de cierre, que ahora
+          se compone abajo y en los ocho. Ver `GEOMETRIA.espaciadorCierre`.
 
           ⚠ **CHOCA CON `CONCILIA D23` Y CON I.3.7**, que declaran cédulas y
           universidad obligatorias en el membrete de los ocho formatos —y con que
@@ -223,10 +305,49 @@ export default function Membrete(props: MembreteProps): ReactElement {
           misma razón (regla 2 de la ficha): la lámina imprime `Tel. 999 222 3173` y
           el prefijo es redacción, no dato. Este componente coloca, no rotula.
         */
-        <View style={estilos.bandaDireccion}>
-          <Text style={estilos.credencial}>{props.consultorio.domicilio}</Text>
-          <Text style={estilos.credencial}>{props.consultorio.telefono}</Text>
-        </View>
+        <>
+          {/*
+            LA BANDA DE IMAGENOLOGÍA SÍ LLEVA CÉDULAS Y UNIVERSIDAD, Y SON DOS
+            RENGLONES DE 12 pt.
+
+            Es la otra mitad de la contradicción de `CONCILIA D23` que la cabecera
+            reporta: Laboratorio compone un renglón sin credenciales y esta lámina
+            compone dos con ellas. **Las dos son láminas aprobadas**, así que el
+            chasis no elige: lo declara el formato.
+
+            SON DOS Y NO TRES. Los 12 pt que la extracción leyó como un tercer
+            renglón vacío eran el espaciador de cierre, que ahora se compone abajo
+            y para los ocho formatos. Ver `GEOMETRIA.espaciadorCierre`.
+
+            Los dos renglones llevan el MISMO tratamiento —Archivo 7.5 / 12, peso
+            400, `tinta.secundaria`—, así que ninguno de los dos destaca sobre el
+            otro; lo único propio del primero es el margen de 6 pt que lo despega
+            del filete, y ese es `transicion.membreteLineaFina`.
+
+            El reparto en dos zonas del segundo renglón —cédulas a la izquierda,
+            universidad a la derecha— es el que mide B.2 §4. La nota de medición lo
+            escribe como una sola cadena unida por la raya; imprime lo mismo con
+            otra alineación, y queda reportado como lo único de esta banda donde
+            las dos lecturas de la lámina no coinciden.
+          */}
+          <View style={estilos.bandaDireccion}>
+            <Text style={lamina === 'chasis' ? estilos.credencial : estilos.credencialAlta}>
+              {props.consultorio.domicilio}
+            </Text>
+            <Text style={lamina === 'chasis' ? estilos.credencial : estilos.credencialAlta}>
+              {props.consultorio.telefono}
+            </Text>
+          </View>
+
+          {lamina === 'chasis' ? null : (
+            <View style={estilos.segundoRenglon}>
+              <Text style={estilos.credencialAlta}>
+                {medico.cedulas.join(SEPARADOR_CREDENCIALES)}
+              </Text>
+              <Text style={estilos.credencialAlta}>{medico.universidad}</Text>
+            </View>
+          )}
+        </>
       ) : (
         // La ficha no declara dónde va la cédula principal en `continuacion`:
         // queda bajo el nombre, a la izquierda. Sin columna izquierda no hay
@@ -235,6 +356,15 @@ export default function Membrete(props: MembreteProps): ReactElement {
           <Text style={estilos.credencial}>{medico.cedulas[0]}</Text>
         </View>
       )}
+
+      {/*
+        EL CIERRE DEL BLOQUE. Va en las DOS variantes: lo que separa es el membrete
+        de lo que venga debajo, y en una hoja de continuación el membrete sigue
+        siendo un membrete. Ninguna lámina de continuación está medida todavía, así
+        que ese lado queda anotado — si al medirla resulta otra cifra, es una
+        variante del espaciador, no un aire del formato.
+      */}
+      <View style={estilos.espaciador} />
     </View>
   )
 }

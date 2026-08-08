@@ -45,7 +45,7 @@ import RielDatos, {
   type CeldaRiel,
   type EstiloValorCelda,
 } from './RielDatos'
-import { FUENTE, TINTA } from './tokens'
+import { FUENTE, TINTA, type Lamina } from './tokens'
 
 /**
  * Geometría interna de ESTE componente, de la ficha de 2.D. I.1.7 declara que la
@@ -94,6 +94,16 @@ const GEOMETRIA = {
     tracking: 0,
     color: TINTA.negra,
   },
+  /**
+   * EL MISMO VALOR EN LA LÁMINA DE IMAGENOLOGÍA — 11 / **15**.
+   *
+   * Allí el diagnóstico ocupa la fila entera a `span 12` y no comparte renglón con
+   * fecha ni hora, así que nada le obliga a caber en los 13 pt de las otras
+   * celdas: la fila inferior mide 32.375 —0.375 de regla + 3 + 10 + **15** + 4— y
+   * es la única del riel que no mide 30. Es el mismo caso que arriba visto por el
+   * otro lado: aquel 13 salía de que la celda compartía fila con dos celdas más.
+   */
+  interlineadoDiagnosticoImagenologia: 15,
 } as const
 
 /** Los siete datos del riel. */
@@ -133,10 +143,20 @@ const DIAGNOSTICO: DescriptorCelda = { campo: 'diagnostico', etiqueta: 'Diagnós
 const FECHA: DescriptorCelda = { campo: 'fecha', etiqueta: 'Fecha', columnas: 4, trazo: 'dato' }
 const HORA: DescriptorCelda = { campo: 'hora', etiqueta: 'Hora', columnas: 3, trazo: 'dato' }
 
+/**
+ * El diagnóstico de la lámina de Imagenología ocupa la fila ENTERA. Es la misma
+ * celda con otro ancho: allí la fecha no vive en este riel —va como `Emisión` en
+ * el riel derecho del bloque de título— y la hora tampoco, así que no hay con
+ * quién compartir el renglón.
+ */
+const DIAGNOSTICO_PLENO: DescriptorCelda = { ...DIAGNOSTICO, columnas: 12 }
+
 /** Fila superior: 5 + 2 + 2 + 3 = 12 columnas de `riel.celda`. */
 const FILA_SUPERIOR: readonly DescriptorCelda[] = [PACIENTE, EDAD, SEXO, EXPEDIENTE]
 /** Fila inferior: 5 + 4 + 3 = 12. */
 const FILA_INFERIOR: readonly DescriptorCelda[] = [DIAGNOSTICO, FECHA, HORA]
+/** Fila inferior de Imagenología: una sola celda de 12. */
+const FILA_INFERIOR_IMAGENOLOGIA: readonly DescriptorCelda[] = [DIAGNOSTICO_PLENO]
 /** Variante `reducido`: una sola línea con nombre y expediente, con sus anchos. */
 const FILA_REDUCIDA: readonly DescriptorCelda[] = [PACIENTE, EXPEDIENTE]
 
@@ -167,8 +187,11 @@ export interface ValoresPaciente {
 }
 
 export type BloquePacienteProps =
-  /** Hoja 1. */
-  | ({ variante: 'completo' } & ValoresPaciente)
+  /**
+   * Hoja 1. `lamina` decide dos cosas a la vez, y las dos son del mismo riel: el
+   * trazo de sus filetes (2.F) y si la fila inferior lleva tres celdas o una.
+   */
+  | ({ variante: 'completo'; lamina?: Lamina } & ValoresPaciente)
   /**
    * Hojas de continuación. Regla 2 de la ficha: NO ES OPCIONAL cuando el documento
    * tiene más de una hoja. Una hoja de indicaciones sin nombre de paciente es un
@@ -194,6 +217,15 @@ const estilos = StyleSheet.create({
     letterSpacing: GEOMETRIA.diagnostico.tracking,
     color: GEOMETRIA.diagnostico.color,
   },
+  valorDiagnosticoImagenologia: {
+    fontFamily: FUENTE.humanista,
+    fontSize: GEOMETRIA.diagnostico.cuerpo,
+    lineHeight:
+      GEOMETRIA.interlineadoDiagnosticoImagenologia / GEOMETRIA.diagnostico.cuerpo,
+    fontWeight: GEOMETRIA.diagnostico.peso,
+    letterSpacing: GEOMETRIA.diagnostico.tracking,
+    color: GEOMETRIA.diagnostico.color,
+  },
 })
 
 /**
@@ -201,9 +233,13 @@ const estilos = StyleSheet.create({
  * 2.F aplica por defecto, en vez de que 2.D lo repita por su cuenta. Solo se
  * entrega estilo cuando hay una excepción DECLARADA que entregar.
  */
-function estiloValor(trazo: TrazoValor): EstiloValorCelda | undefined {
+function estiloValor(trazo: TrazoValor, lamina: Lamina): EstiloValorCelda | undefined {
   if (trazo === 'datoAncla') return estilos.valorAncla
-  if (trazo === 'diagnostico') return estilos.valorDiagnostico
+  if (trazo === 'diagnostico') {
+    return lamina === 'imagenologia'
+      ? estilos.valorDiagnosticoImagenologia
+      : estilos.valorDiagnostico
+  }
   return undefined
 }
 
@@ -211,13 +247,14 @@ function estiloValor(trazo: TrazoValor): EstiloValorCelda | undefined {
 function celdas(
   descriptores: readonly DescriptorCelda[],
   valores: Partial<Record<CampoPaciente, string>>,
+  lamina: Lamina,
 ): readonly CeldaRiel[] {
   return descriptores.map((d) => ({
     clave: d.campo,
     etiqueta: d.etiqueta,
     valor: valores[d.campo],
     columnas: d.columnas,
-    estiloValor: estiloValor(d.trazo),
+    estiloValor: estiloValor(d.trazo, lamina),
   }))
 }
 
@@ -227,18 +264,24 @@ export default function BloquePaciente(props: BloquePacienteProps): ReactElement
     return (
       <RielDatos
         variante="unaLinea"
-        celdas={celdas(FILA_REDUCIDA, {
-          paciente: props.paciente,
-          expediente: props.expediente,
-        })}
+        celdas={celdas(
+          FILA_REDUCIDA,
+          { paciente: props.paciente, expediente: props.expediente },
+          'chasis',
+        )}
       />
     )
   }
 
+  const lamina = props.lamina ?? 'chasis'
+  const inferior =
+    lamina === 'imagenologia' ? FILA_INFERIOR_IMAGENOLOGIA : FILA_INFERIOR
+
   return (
     <RielDatos
       variante="celdas"
-      filas={[celdas(FILA_SUPERIOR, props), celdas(FILA_INFERIOR, props)]}
+      lamina={lamina}
+      filas={[celdas(FILA_SUPERIOR, props, lamina), celdas(inferior, props, lamina)]}
     />
   )
 }

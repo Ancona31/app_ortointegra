@@ -115,7 +115,6 @@ const ROTULO_FIRMA = 'Firma y sello del médico'
  * todas las parejas midan lo mismo, y `SPEC_DISENO_PARTE_B.md` B.1 §2, que mide el
  * orden de bloques de la hoja 1 sobre la lámina aprobada, las tiene distintas:
  *
- *   membrete → título     **12 pt**   B.1 §2 · aire 2                → `espacio.12`
  *   riel → cabecera       **12 pt**   B.1 §2 · aire 7 · 211.05→223.05 → `espacio.12`
  *   cierre → contador      **5 pt**   B.1 §2 · bloque 11             → `espacio.5`
  *   contador → notas      **20 pt**   B.1 §5 `separacion`            → `espacio.20`
@@ -129,19 +128,27 @@ const ROTULO_FIRMA = 'Firma y sello del médico'
  * firma—, no el de II.1 §3, que ponía el contador al final. Ver la nota junto al
  * contador en el render.
  *
- * **Título → riel es la única pareja que este archivo NO declara**, y es la única
- * que ya está declarada en el chasis: 2.C aporta `transicion.tituloRiel` por abajo,
- * en sus tres variantes. Sumarle aquí otra la contaría dos veces.
+ * **Ni membrete → título ni título → riel las declara este archivo**, y las dos
+ * faltan por la misma razón: ya están declaradas en el chasis, cada una por el
+ * componente que cierra. 2.C aporta `transicion.tituloRiel` por abajo, y 2.B
+ * aporta su espaciador de cierre — los 12 pt que esta lista tenía como
+ * `espacio.12`. Sumar aquí cualquiera de las dos la contaría dos veces.
  *
+ * > **ESA PAREJA VALÍA 12 pt Y SIGUE VALIENDO 12.** Lo que cambió es de quién es:
+ * > B.1 §2 la leyó como «Aire 12 pt» del formato y es el espaciador que cierra el
+ * > membrete, el mismo que la lámina de Imagenología compone y que su extracción
+ * > confundió con un tercer renglón de la banda de dirección. El impreso de este
+ * > formato no se mueve ni un punto; lo que se mueve es dónde está escrito.
+ * >
  * > La primera versión de este formato dejó **membrete → título sin separación**,
  * > leyendo II.8 §5 —«sin título el cuerpo arranca a `transicion.tituloRiel` bajo
  * > el filete del membrete»— como si dijera que el título nace pegado. No lo dice:
  * > ese pasaje describe la variante `ausente` de 2.C, donde no hay bloque de
  * > título. Impreso, el resultado era un título pegado al renglón de la
  * > universidad, leyéndose como una cuarta línea del membrete y no como el nombre
- * > del documento (anexo A, P4-5).
+ * > del documento (anexo A, P4-5). Con el espaciador dentro de 2.B ese defecto ya
+ * > no puede volver por omisión: el membrete cierra solo.
  */
-const SEPARACION_MEMBRETE_TITULO = ESPACIO[12]
 const SEPARACION_RIEL_LISTA = ESPACIO[12]
 const SEPARACION_LISTA_CONTADOR = ESPACIO[5]
 const SEPARACION_CONTADOR_NOTAS = ESPACIO[20]
@@ -205,9 +212,6 @@ const estilos = StyleSheet.create({
     paddingRight: MARGEN.derecho,
     paddingBottom: MARGEN.inferior,
   },
-  bloqueMembreteTitulo: {
-    marginTop: SEPARACION_MEMBRETE_TITULO,
-  },
   bloqueRielLista: {
     marginTop: SEPARACION_RIEL_LISTA,
   },
@@ -266,31 +270,28 @@ export default function SolicitudLaboratorio({
       />
 
       {/*
-        El título va envuelto solo para llevar su separación superior: 2.C aporta
-        la inferior —`transicion.tituloRiel`— pero ninguna de las nueve
-        transiciones de I.1.7 separa el membrete de lo que viene debajo.
+        SIN ENVOLTORIO Y SIN SEPARACIÓN SUPERIOR: la aporta el espaciador de cierre
+        de 2.B, que es de quien siempre fue. 2.C aporta la inferior
+        —`transicion.tituloRiel`—, así que este bloque no declara ninguna de las dos.
+
+        SIN SUBTÍTULO, Y NO ES UN OLVIDO. `CONCILIA D2` lo declaraba para los ocho
+        formatos deduciéndolo de la lámina —que sí lo compone en sus tres hojas—, y
+        la deducción queda REVERTIDA por decisión de producto: no sale de ninguna
+        necesidad, ningún formulario de la app tiene el campo, y añadirlo obligaría
+        a tocar los ocho para algo que quedaría vacío casi siempre.
+
+        La ranura de 2.C sigue construida y sin consumidores a propósito: la
+        necesita el título variable del Escrito Médico. No la borres para «limpiar».
+
+        Cuesta 16 pt de encabezado a favor: 14 del renglón del subtítulo más los 2
+        de `espacio.2` que lo separaban del título.
       */}
-      <View style={estilos.bloqueMembreteTitulo}>
-        {/*
-          SIN SUBTÍTULO, Y NO ES UN OLVIDO. `CONCILIA D2` lo declaraba para los ocho
-          formatos deduciéndolo de la lámina —que sí lo compone en sus tres hojas—, y
-          la deducción queda REVERTIDA por decisión de producto: no sale de ninguna
-          necesidad, ningún formulario de la app tiene el campo, y añadirlo obligaría
-          a tocar los ocho para algo que quedaría vacío casi siempre.
-
-          La ranura de 2.C sigue construida y sin consumidores a propósito: la
-          necesita el título variable del Escrito Médico. No la borres para «limpiar».
-
-          Cuesta 16 pt de encabezado a favor: 14 del renglón del subtítulo más los 2
-          de `espacio.2` que lo separaban del título.
-        */}
-        <TituloDocumento
-          variante="fijo"
-          acento={acento}
-          titulo={TITULO}
-          folio={folio}
-        />
-      </View>
+      <TituloDocumento
+        variante="fijo"
+        acento={acento}
+        titulo={TITULO}
+        folio={folio}
+      />
 
       {/*
         El riel de identificación. `fecha` y `diagnostico` son DOS DE SUS SIETE

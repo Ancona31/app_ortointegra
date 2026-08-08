@@ -49,6 +49,7 @@
 import { View, Text, StyleSheet } from '@react-pdf/renderer'
 import type { ReactElement } from 'react'
 import BloqueNegativo from './BloqueNegativo'
+import FileteGruesoFino from './FileteGruesoFino'
 import ParserBloques from './ParserBloques'
 import { tieneValor } from './Campo'
 import {
@@ -110,6 +111,28 @@ const GEOMETRIA = {
     regla: TINTA.reglaFila,
   },
   /**
+   * LA TERCERA CALIBRACIÓN — `estudio`, medida en la lámina de Imagenología.
+   *
+   * No es una tercera densidad de la misma fila: es **la lista apilada**, con los
+   * cuatro datos uno bajo otro, que es lo contrario de la tabla de columnas de
+   * Laboratorio. Por eso su ritmo se compone de otra manera y no como las otras
+   * dos —ver `entradaEstudio` en la hoja de estilos—: la regla va DEBAJO de cada
+   * entrada, incluida la última, y el padding es de todas, incluida la primera.
+   *
+   * `5 arriba + 6 abajo` es el `padding: 5pt 0 6pt` de la lámina. No es el desfase
+   * deliberado de `normal` —allí la regla queda más cerca de la entrada que abre—:
+   * aquí la regla cierra cada entrada y el aire mayor va bajo ella.
+   *
+   * El medianil de 6 pt separa el rótulo colgado `Indicación` de su texto, y es
+   * geometría de esta calibración: no sale de `reticula.medianil`, que vale 9.
+   */
+  estudio: {
+    aireSuperior: 5,
+    aireInferior: 6,
+    regla: TINTA.hairline,
+    medianilRotuloNota: 6,
+  },
+  /**
    * Ancho de la columna de la nota en la disposición `columna`. B.1 §3 declara la
    * retícula de la tabla como `23.25pt 1fr 132pt` con medianil de 9 pt: el riel y
    * el medianil son `reticula.riel` y `reticula.medianil`, y este 132 es la tercera
@@ -146,6 +169,26 @@ const estilos = StyleSheet.create({
     borderTopWidth: FILETE.regla,
     borderTopColor: GEOMETRIA.compacta.regla,
     paddingTop: GEOMETRIA.compacta.aireSuperior,
+  },
+  /**
+   * EL RITMO DE `estudio`, Y POR QUÉ NO SE ESCRIBE COMO LOS OTROS DOS.
+   *
+   * Las otras dos calibraciones ponen la regla ARRIBA de la entrada que empieza y
+   * se la ahorran a la primera, que es lo que evita una regla flotando sobre la
+   * lista. Esta lámina compone la regla ABAJO de cada entrada —«regla inferior 0.5
+   * pt `#D9D6D0`»— y el padding en las dos direcciones de todas ellas, incluida la
+   * primera. La diferencia se ve al empezar y al terminar la lista: aquí la
+   * primera entrada arranca a 5 pt de la cabecera y la última cierra con su propia
+   * regla, que es lo que hace de cierre de la lista.
+   *
+   * **Por eso este formato no monta `CierreEntradas`.** Un filete de cierre encima
+   * de la regla de la última entrada serían dos líneas donde la lámina tiene una.
+   */
+  entradaEstudio: {
+    paddingTop: GEOMETRIA.estudio.aireSuperior,
+    paddingBottom: GEOMETRIA.estudio.aireInferior,
+    borderBottomWidth: FILETE.regla,
+    borderBottomColor: GEOMETRIA.estudio.regla,
   },
   /**
    * El riel del número. Ancho fijo `reticula.riel` más `reticula.medianil`: la
@@ -193,6 +236,37 @@ const estilos = StyleSheet.create({
     flexShrink: 0,
   },
   notaCompacta: { ...estiloTipografico('entradaCompacta.nota') },
+  /** Las tres ranuras de la calibración `estudio`, apiladas. */
+  anclaEstudio: { ...estiloTipografico('entradaEstudio.ancla'), flex: 1 },
+  /**
+   * El secundario de esta lámina —las proyecciones— NO lleva aire sobre el ancla:
+   * la entrada completa mide 48 pt de contenido —17 + 13 + 2 + 16— y ese 2 es el
+   * único aire interno, el del bloque de la nota. Si aquí hubiera un margen, la
+   * fila dejaría de medir lo que mide la lámina.
+   */
+  secundarioEstudio: { ...estiloTipografico('entradaEstudio.secundario') },
+  /** El bloque de la nota: rótulo colgado a la izquierda y texto a la derecha. */
+  notaEstudio: {
+    flexDirection: 'row',
+    marginTop: ESPACIO[2],
+  },
+  rotuloNota: {
+    ...estiloTipografico('entradaEstudio.rotuloNota'),
+    flexShrink: 0,
+    marginRight: GEOMETRIA.estudio.medianilRotuloNota,
+  },
+  textoNota: { ...estiloTipografico('entradaEstudio.nota'), flex: 1 },
+  /**
+   * LA CABECERA DE LA LISTA APILADA. No es `CabeceraEntradas`: aquella rotula las
+   * tres columnas de una tabla y esta nombra la lista entera con una sola palabra.
+   *
+   * El aire de 5 pt va ENTRE el rótulo y su filete, y bajo el filete es CERO: la
+   * primera entrada arranca inmediatamente y su propio padding de 5 hace el resto.
+   */
+  cabeceraLista: {
+    marginTop: ESPACIO[5],
+  },
+  rotuloLista: { ...estiloTipografico('titulo.seccion') },
   /**
    * La celda de indicación con la calibración `normal`. Ninguna lámina compone
    * `normal` + `columna` —Laboratorio es `compacta`—, así que el rol es el que la
@@ -259,7 +333,7 @@ const estilos = StyleSheet.create({
  * Cuál de las dos calibraciones de fila usa la lista. **La declara el formato**,
  * nunca el número de ítems (ver la nota de `GEOMETRIA`).
  */
-export type CalibracionEntrada = 'normal' | 'compacta'
+export type CalibracionEntrada = 'normal' | 'compacta' | 'estudio'
 
 /**
  * Dónde va la ranura `nota` respecto del `ancla`.
@@ -297,6 +371,15 @@ export interface EntradaNumeradaProps {
   marca?: string
   /** Texto en humanista, compuesto por 2.J. Colapsa si no viene. */
   nota?: string
+  /**
+   * Rótulo colgado de la ranura `nota`. **Solo la calibración `estudio`**, que es
+   * la única lámina que lo compone: existe para distinguir la indicación DEL
+   * ESTUDIO del diagnóstico DEL DOCUMENTO, que va una sola vez en el riel.
+   *
+   * La cadena la declara el formato —`Indicación`—, como todas las del sistema.
+   * Colapsa con la nota: sin nota no hay nada que rotular.
+   */
+  rotuloNota?: string
   /** El número va en `acento.tinta`, que es el único color que necesita acento. */
   acento: AcentoResuelto
   /**
@@ -359,6 +442,41 @@ export function CierreEntradas(): ReactElement {
   return <View style={estilos.cierre} />
 }
 
+export interface CabeceraListaProps {
+  /**
+   * El sustantivo de la lista, en capitalización de oración: se compone en
+   * mayúsculas aquí. La lámina imprime `Estudios` y, en continuación,
+   * `Estudios · continuación`; la cadena entera la declara el formato.
+   */
+  readonly titulo: string
+  readonly acento: AcentoResuelto
+}
+
+/**
+ * LA CABECERA DE LA LISTA APILADA — rótulo y filete corto.
+ *
+ * La otra cabecera de este archivo, `CabeceraEntradas`, rotula las TRES COLUMNAS
+ * de la disposición `columna`. Esta no rotula columnas: la lista de Imagenología
+ * es apilada y no tiene ninguna, así que lo que la cabecera nombra es la lista
+ * entera. Son dos piezas distintas con el mismo sitio en la hoja, no dos nombres
+ * de la misma.
+ *
+ * El rótulo va en `titulo.seccion` —Archivo 10 / 14, 600, 0.14 em—, que es
+ * exactamente lo que mide la lámina, y **no en `etiqueta`**, la versalita de 7 / 11
+ * con la que se rotula un campo: 0.14 em no es el 0.22 de la versalita del sistema.
+ * Se compone en mayúsculas porque la lámina lo compone así.
+ */
+export function CabeceraLista({ titulo, acento }: CabeceraListaProps): ReactElement {
+  return (
+    <View>
+      <Text style={estilos.rotuloLista}>{titulo.toUpperCase()}</Text>
+      <View style={estilos.cabeceraLista}>
+        <FileteGruesoFino acento={acento} medida="lista" />
+      </View>
+    </View>
+  )
+}
+
 /** 2.G · `EntradaNumerada`. */
 export default function EntradaNumerada({
   numero,
@@ -367,23 +485,32 @@ export default function EntradaNumerada({
   secundario,
   marca,
   nota,
+  rotuloNota,
   acento,
   calibracion,
   disposicion,
 }: EntradaNumeradaProps): ReactElement {
   const compacta = calibracion === 'compacta'
+  const estudio = calibracion === 'estudio'
   const enColumna = disposicion === 'columna'
+
+  /**
+   * `estudio` lleva su ritmo en las DOS direcciones y en todas las entradas, así
+   * que no consulta `primera`. Las otras dos se lo ahorran a la primera, que es lo
+   * que evita la regla flotando sobre la lista. Ver `entradaEstudio`.
+   */
+  const ritmo = estudio
+    ? estilos.entradaEstudio
+    : primera
+      ? {}
+      : compacta
+        ? estilos.separacionCompacta
+        : estilos.separacion
 
   return (
     // Regla 4: `wrap={false}` es el `break-inside: avoid` de la ficha. Es uno de
     // los cuatro bloques indivisibles que declara 2.N (`CONCILIA D44`).
-    <View
-      style={[
-        estilos.entrada,
-        primera ? {} : compacta ? estilos.separacionCompacta : estilos.separacion,
-      ]}
-      wrap={false}
-    >
+    <View style={[estilos.entrada, ritmo]} wrap={false}>
       <View style={estilos.riel}>
         {/*
           El único estilo de v2 que no puede vivir en `StyleSheet.create`: el rol
@@ -408,7 +535,17 @@ export default function EntradaNumerada({
 
       <View style={estilos.contenido}>
         <View style={estilos.filaAncla}>
-          <Text style={compacta ? estilos.anclaCompacta : estilos.ancla}>{ancla}</Text>
+          <Text
+            style={
+              estudio
+                ? estilos.anclaEstudio
+                : compacta
+                  ? estilos.anclaCompacta
+                  : estilos.ancla
+            }
+          >
+            {ancla}
+          </Text>
           {tieneValor(marca) ? (
             <View style={estilos.cajaMarca}>
               <BloqueNegativo variante="via" via={marca} />
@@ -417,7 +554,26 @@ export default function EntradaNumerada({
         </View>
 
         {tieneValor(secundario) ? (
-          <Text style={estilos.secundario}>{secundario}</Text>
+          <Text style={estudio ? estilos.secundarioEstudio : estilos.secundario}>
+            {secundario}
+          </Text>
+        ) : null}
+
+        {/*
+          LA NOTA DE `estudio` NO PASA POR 2.J, y por la misma razón que no pasa la
+          de la disposición `columna`: es un dato con su propio rótulo, no prosa con
+          viñetas. Colapsa entera —rótulo incluido— cuando no viene, que es la mitad
+          de la verificación visible de II.2 §6; la otra mitad es que colapse
+          INDEPENDIENTEMENTE de las proyecciones, y eso sale de que sean dos
+          condiciones separadas y no una.
+        */}
+        {estudio && tieneValor(nota) ? (
+          <View style={estilos.notaEstudio}>
+            {tieneValor(rotuloNota) ? (
+              <Text style={estilos.rotuloNota}>{rotuloNota.toUpperCase()}</Text>
+            ) : null}
+            <Text style={estilos.textoNota}>{nota}</Text>
+          </View>
         ) : null}
 
         {/*
@@ -436,7 +592,7 @@ export default function EntradaNumerada({
           fila esté calibrada a 9 / 11.5. No se resuelve inventando: cuando exista
           una lámina que lo use, se mide y se abre la ranura en 2.J.
         */}
-        {!enColumna && tieneValor(nota) ? (
+        {!estudio && !enColumna && tieneValor(nota) ? (
           <View style={estilos.nota}>
             <ParserBloques texto={nota} marca="raya" />
           </View>
