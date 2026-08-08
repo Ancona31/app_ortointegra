@@ -224,6 +224,14 @@ para procedimiento de actualización.
 
 * Componentes React: functional components con hooks, nunca class components
 * Nombra archivos de componentes en PascalCase, utilidades en camelCase
+* **NUNCA dos archivos cuyos nombres solo se distingan por la mayúscula**, ni
+  siquiera con extensión distinta. `ParserBloques.tsx` + `parserBloques.ts` es
+  válido en Linux y **no compila en macOS ni en Windows**, donde el filesystem no
+  distingue mayúsculas: el bundler prueba `.ts` antes que `.tsx` y el componente
+  entra como `undefined`, sin error propio. Ojo con la regla de arriba: aplicar
+  PascalCase al componente y camelCase a su utilidad hermana produce exactamente
+  ese par. Dale al segundo un nombre distinto, no solo otra caja
+  (`analizadorBloques.ts`). Ocurrió el 2026-08-07 — `DEUDA_TECNICA.md` DEP-DT-2
 * Un componente por archivo
 * Extrae lógica compleja a custom hooks en `src/hooks/` **solo cuando se use en >1 lugar**
 * Extrae utilidades reutilizables a `src/lib/` **solo cuando se use en >1 lugar**

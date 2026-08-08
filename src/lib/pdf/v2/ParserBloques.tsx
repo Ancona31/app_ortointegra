@@ -9,11 +9,19 @@
  *
  * QUÉ DECIDE ESTE ARCHIVO Y QUÉ NO
  *
- * Nada. Lo que es cada línea lo decide `parserBloques.ts`, que se prueba entero
- * en `src/lib/tests/parserBloques.test.ts` — los siete casos de la ficha, con el
- * caso 2 primero. Aquí solo se compone lo que aquel devuelve. Si un texto sale
- * mal, el sitio donde mirar es el analizador, y hay una prueba que escribir antes
- * de tocarlo.
+ * Nada. Lo que es cada línea lo decide `analizadorBloques.ts`, que se prueba
+ * entero en `src/lib/tests/parserBloques.test.ts` — los siete casos de la ficha,
+ * con el caso 2 primero. Aquí solo se compone lo que aquel devuelve. Si un texto
+ * sale mal, el sitio donde mirar es el analizador, y hay una prueba que escribir
+ * antes de tocarlo.
+ *
+ * > **El analizador se llamaba `parserBloques.ts`**, a un carácter de distancia
+ * > del nombre de este archivo. Los dos convivían en Linux y **ninguno de los dos
+ * > resolvía en macOS**, donde el filesystem no distingue mayúsculas: webpack
+ * > probaba `.ts` antes que `.tsx` y este componente entraba como `undefined`.
+ * > Renombrado a lo que ya decía su propia cabecera —«el analizador de 2.J»—. La
+ * > regla que lo impide vive en `CLAUDE.md`; el incidente, en `DEUDA_TECNICA.md`
+ * > (DEP-DT-2).
  *
  * LAS TRES REGLAS DE COMPOSICIÓN
  *
@@ -42,7 +50,7 @@
 
 import { View, Text, StyleSheet } from '@react-pdf/renderer'
 import type { ReactElement } from 'react'
-import { analizar, type NodoParser } from './parserBloques'
+import { analizar, type NodoParser } from './analizadorBloques'
 import { ESPACIO, FUENTE, RETICULA, estiloTipografico } from './tokens'
 
 /**

@@ -2853,11 +2853,35 @@ falla algo, el defecto es del chasis, no del formato.
 
 ### 3 · Composición
 
-`Membrete` completo → `TituloDocumento` fijo → `BloquePaciente` completo →
-`RielDatos` una línea (fecha, diagnóstico) → lista de `EntradaNumerada` →
-`ParserBloques` (notas) → `BloqueFirmas` amplia → `PieDocumento` sin folio.
+`Membrete` completo → `TituloDocumento` fijo → `BloquePaciente` completo → lista
+de `EntradaNumerada` → `ParserBloques` (notas) → `ContadorLista` →
+`BloqueFirmas` simple → `PieDocumento` sin folio.
 
-`ContadorLista` con `<ÍTEMS>` = **ESTUDIOS**.
+`ContadorLista` con `<ÍTEMS>` = **ESTUDIOS**, en forma `final`: un documento de
+una sola hoja cuenta como final (2.K regla 2).
+
+> **CORRIGE II.1 §3 — fuera el `RielDatos` una línea con fecha y diagnóstico.**
+> Los dos son celdas de `BloquePaciente` completo, que es **un** riel de siete
+> celdas en dos filas: componer además un segundo riel con esos mismos dos datos
+> los imprimía por duplicado. Es la estructura de dos rieles que ya había resuelto
+> `CONCILIA D6` y que II.3 ya no tiene; esta línea sobrevivió sin cruzarse contra
+> ella (anexo A, P4-2).
+
+> **CORRIGE II.1 §3 — `BloqueFirmas` simple, no «amplia».** «Amplia» no es una
+> variante declarada en 2.L y rompía la tercera comprobación de cierre de §0.
+> Aquí hay una firma y su caja es `cierre.derecha`: eso es `simple` (anexo A,
+> P4-1).
+
+> **DÓNDE VA EL CONTADOR, y por qué aquí.** La cadena de composición no lo situaba
+> y H10 solo dice «al pie del área de contenido». Va al **final del contenido,
+> tras las notas y antes de la firma**: 2.K existe para que quien reciba una hoja
+> suelta sepa si le falta otra, así que se lee al terminar de leer la hoja.
+>
+> **La fila que comparte con los avisos de 2.N este formato NO la ejercita**, y
+> por eso el reparto de esa fila sigue abierto: el aviso de continuación solo sale
+> en una hoja donde la lista no cerró, y en esa hoja el contador va en forma
+> `intermedia`. En Laboratorio el contador es siempre `final` y el aviso, siempre
+> ausente. Lo cierra el primer formato que junte los dos (anexo A, P4-3).
 
 ### 4 · Ancla de entrada
 
@@ -2924,11 +2948,18 @@ El cambio de título aplica también a la app y al nombre del archivo descargado
 ### 3 · Composición
 
 `Membrete` completo → `TituloDocumento` fijo → `BloqueNegativo` urgente →
-`BloquePaciente` completo → `RielDatos` una línea (fecha, diagnóstico) → lista
-de `EntradaNumerada` → `ParserBloques` (notas al servicio) → `BloqueFirmas`
-amplia → `PieDocumento` sin folio.
+`BloquePaciente` completo → lista de `EntradaNumerada` → `ParserBloques` (notas
+al servicio) → `ContadorLista` → `BloqueFirmas` simple → `PieDocumento` sin
+folio.
 
 `ContadorLista` con `<ÍTEMS>` = **ESTUDIOS**.
+
+> **Las tres correcciones de II.1 §3 aplican igual aquí**, que es su gemelo: fuera
+> el `RielDatos` duplicado (`CONCILIA D6`), `simple` en vez de «amplia», y el
+> contador al final del contenido (anexo A, P4-1, P4-2). **Lo que aquí sí puede
+> ocurrir es la fila compartida** —Imagenología pagina en cuanto lleva varios
+> estudios con proyecciones e indicación—, así que P4-3 se cierra en 4.2 y no
+> vuelve a quedar abierto.
 
 ### 4 · Ancla de entrada
 
@@ -3268,13 +3299,14 @@ el residente.
 `BloqueNegativo` urgente → `BloquePaciente` completo → `RielDatos` de ingreso →
 diagnósticos y procedimiento → `RielDatos` de requerimientos, variante
 `sin contador` → `ParserBloques` (justificación) → `BloqueDestacado`
-instrucciones con lista **numerada** → `BloqueFirmas` amplia con dos firmas.
+instrucciones con lista **numerada** → `BloqueFirmas` **pareja** (paciente y
+médico, las dos en la misma fila).
 
 **Transición** — `AperturaSeccion` (2.Q). La cabecera dice `SECCIÓN 2 DE 2`,
 **nunca «continuación»**.
 
 **Sección 2** — `BloquePaciente` reducido → `ParserBloques` (indicaciones de
-ingreso a piso) → `BloqueFirmas` amplia con una firma.
+ingreso a piso) → `BloqueFirmas` **simple** (solo el médico).
 
 `PieDocumento` **sin folio** en todas las hojas.
 
@@ -3463,7 +3495,7 @@ escala del cuerpo viniendo del editor.
 
 `Membrete` completo con fecha en el encabezado → `TituloDocumento` variable →
 `BloquePaciente` completo, si hay paciente → cuerpo en texto corrido →
-`BloqueFirmas` amplia → `PieDocumento` sin folio.
+`BloqueFirmas` simple → `PieDocumento` sin folio.
 
 ### 4 · Ancla de entrada
 
@@ -3573,7 +3605,8 @@ la escala de espaciado (I.1.7) y el interlineado de la etiqueta de folio
 
 Salieron todas de **ejecutar** el spec con el anexo A ya cerrado: las `P1-*` de
 transcribir I.1 a la capa de tokens (Paso 1), las `P2-*` de construir los
-componentes de I.2 (Paso 2). No son divergencias entre el diseño y este spec:
+componentes de I.2 (Paso 2) y las `P4-*` de componer el primer formato de la
+Sección II (Paso 4). No son divergencias entre el diseño y este spec:
 son defectos del propio spec que solo se ven cuando el valor se ejecuta. Se
 registran aquí para que nadie las lea como reinterpretaciones ni intente
 «restaurar» lo anterior.
@@ -3620,6 +3653,22 @@ Una cuarta, menor, sin fila propia: `caja.alto` queda marcado en I.1.1 como
 derivado que **se implementa como fórmula**. El Paso 0 lo había escrito como
 literal 670.
 
+### Paso 4 — las que salieron de componer el primer formato
+
+Las cinco salieron de **II.1**, que es el formato más simple del sistema y el que
+se construyó primero justamente para esto: si algo falla en el chasis desnudo, el
+defecto es del chasis o del spec, nunca del formato. **Cuatro de las cinco son de
+la Sección II, no de la I:** el chasis aguantó; lo que no había aguantado era la
+ficha del formato, escrita antes que varias de las conciliaciones que la afectan.
+
+| # | Corrección | Por qué apareció al implementar | Dónde queda |
+|---|---|---|---|
+| P4-1 | **`BloqueFirmas` «amplia» no existe, y estaba en CINCO sitios.** Se barren las cinco: II.1, II.2 y II.8 pasan a `simple` —una firma—, II.6 sección 1 a `pareja` —paciente y médico— y II.6 sección 2 a `simple`. El mapeo no se elige: sale del inventario de firmantes de cada §1 | Al componer la firma de II.1 hubo que elegir variante y la que la ficha citaba no estaba en 2.L, que declara `simple`, `pareja` y `retícula`. Es la **tercera comprobación de cierre de §0 fallando** —«todo nombre de variante citado en II existe declarado en I.2»— y llevaba fallando cinco veces sin que nadie cruzara las dos listas. *ASUMIENDO* que «amplia» venga de la generación anterior a `D37`, cuando el espacio de escritura tenía dos tramos (77 y 28) y la variante se nombraba por su alto: es hipótesis sobre su origen, no sobre su validez — lo que la resuelve es el número de firmas, que sí está declarado | 2.L · II.1 §3 · II.2 §3 · II.6 §3 · II.8 §3 · A D37 |
+| P4-2 | **II.1 y II.2 componían un `RielDatos` una línea con fecha y diagnóstico, que los habría IMPRESO DOS VECES.** Sale de las dos cadenas: los dos datos son celdas de `BloquePaciente` completo | `CONCILIA D6` ya había resuelto que el diseño tiene **un** riel de siete celdas y no dos, y 2.D lo implementa así desde el Paso 2. Las cadenas de composición de las dos solicitudes no se cruzaron contra esa resolución y conservaron el segundo riel. II.3 sí está escrito sin él, que es lo que delata que la corrección era conocida y no llegó a estas dos fichas. Duplicar un dato clínico en la misma hoja no es cosmético: obliga a leer dos veces para comprobar que dicen lo mismo | II.1 §3 · II.2 §3 · 2.D · A D6 |
+| P4-3 | **El contador de 2.K no tenía posición declarada.** Queda **al final del contenido, tras las notas y antes de la firma**, derivado de su propósito: quien recibe una hoja suelta se entera al terminar de leerla. **Lo que sigue abierto es el reparto de la fila que comparte con los avisos de 2.N**, que Laboratorio no puede ejercitar | H10 y la ficha de 2.K sitúan los dos «al pie del área de contenido», «a un palmo uno de otro» y dicen que «pueden salir en la misma hoja», pero ninguna de las dos declara qué zona ocupa cada uno. Al componer II.1 hubo que poner el contador en algún sitio y la ambigüedad no se podía cerrar midiendo: la lámina no está en el repo. En este formato no colisionan nunca —el aviso solo sale donde la lista no cerró, y ahí el contador es `intermedia`, no `final`—, así que se cierra en 4.2 | 2.K · 2.N · II.1 §3 · I.1.4 H10 |
+| P4-4 | **II.1 §3 no declara qué pasa cuando el formato pagina, y pagina antes de lo que parece.** Medido: **con tres estudios de una línea de indicación más dos líneas de notas, el documento pasa a dos hojas y la hoja 2 llega con la firma SOLA** — sin membrete de continuación, sin `BloquePaciente` reducido y sin el aviso `RESERVADO PARA LA FIRMA`. Las tres piezas existen en el chasis y ninguna está en la cadena de composición. **Queda abierto**, no corregido | La cadena de II.1 describe una hoja, y con dos estudios cabe una hoja, así que el hueco no se ve leyendo. Se vio al render: el primer caso completo realista lo desbordó. `MotorFlujo` (2.N) es lo que lo cerraría y **la Sección II no lo nombra en ninguno de los ocho formatos**, además de que su prop `arrastre` pide las tres últimas líneas de PROSA y este formato termina en lista y contador. La regla 2 de 2.D es la que más pesa: el riel reducido «NO ES OPCIONAL cuando el documento tiene más de una hoja» — una hoja de estudios sin nombre de paciente es riesgo clínico, y hoy se emitiría | 2.N · 2.D regla 2 · II.1 §3 · `PLAN_FASE1_DOCUMENTOS.md` |
+| P4-5 | **La separación entre bloques de primer nivel la declara el FORMATO, eligiendo miembro de la escala**, y II.1 no lo hacía. Laboratorio declara `espacio.24`, uniforme en sus cinco parejas. La única que no lo lleva es título → riel, que ya la aporta 2.C por abajo | Ninguna de las nueve `transicion.*` de I.1.7 separa las parejas de este documento, y sin una elección declarada cada bloque habría nacido pegado al anterior. §0 ya decía quién elige —«el formato declara cuál miembro usa»—, pero ninguna ficha de la Sección II lo había ejercido. La primera versión dejó **membrete → título sin separación**, leyendo II.8 §5 como si dijera que el título nace pegado al filete: no lo dice, describe la variante `ausente`, donde no hay bloque de título. Impreso, el título se leía como una cuarta línea del membrete | I.1.7 · §0 · II.1 §3 · II.8 §5 |
+
 ## Lo que queda abierto
 
 | Qué | Por qué no se cierra aquí |
@@ -3628,4 +3677,6 @@ literal 670.
 | Repaginación del Consentimiento | Consecuencia de D33. No se puede estimar sin generar el PDF |
 | La sangría de las tres cajas enmarcadas del Recibo | 2.U regla 4. El dispositivo no la impone —un riel enmarcado y una leyenda de dos líneas no la llevan igual— y el archivo solo trae medida la de 2.R (`12 14 14`). Se mide al construir II.5 |
 | **2.S · la letra hueca** | El renderer no puede trazar texto: no emite el operador `Tr` y el `<Text>` de SVG descarta `stroke` (comprobado, P2-29). Elegir entre convertir las cuatro cadenas a trazado vectorial —versionado o generado en emisión— o revisar la regla 2 contra la lámina. **Lo que no se hace es componerla rellena** |
+| **La paginación de las solicitudes** | P4-4. Falta declarar en la cadena de II.1 y II.2 el membrete de continuación, el `BloquePaciente` reducido y el aviso de pie, y decidir cómo entra `MotorFlujo` en un formato que **no termina en prosa**: su prop `arrastre` pide las tres últimas líneas de texto corrido y aquí lo último son la lista y el contador. La regla 2 de 2.D lo hace urgente, no cosmético |
+| **El reparto de la fila de pie del contenido** | P4-3. El contador de 2.K y los avisos de 2.N viven en el mismo sitio y pueden salir en la misma hoja, y nadie declara qué zona ocupa cada uno. Laboratorio no lo ejercita —su contador es siempre `final` y su aviso siempre ausente—; Imagenología sí |
 | **El generador de folio** | 2.M lo recibe como dato y no decide su forma. Serie, ancho, prefijo, reinicio anual y —lo que hoy falta de verdad— **dónde se guarda para poder buscarlo**: hoy vive dentro del JSON del documento, sin columna ni índice. Es un sub-paso aparte y **único para los tres formatos que llevan folio** (anexo A, P2-30) |

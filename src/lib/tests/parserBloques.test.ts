@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { analizar, type NodoParser } from '@/lib/pdf/v2/parserBloques'
+import { analizar, type NodoParser } from '@/lib/pdf/v2/analizadorBloques'
 
 /** Atajos de lectura: las pruebas hablan de tipos y textos, no de objetos. */
 const tipos = (nodos: readonly NodoParser[]): readonly string[] => nodos.map((n) => n.tipo)

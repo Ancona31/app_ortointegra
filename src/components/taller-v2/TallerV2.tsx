@@ -70,6 +70,18 @@ const ESPECIALIDAD_LARGA =
 /** Espera antes de regenerar, para no lanzar un PDF por cada tick del picker. */
 const ESPERA_MS = 220
 
+/**
+ * Qué PDF se está mirando. La hoja de chasis y los formatos son documentos
+ * distintos y no pueden convivir en el mismo: el chasis va con guías y en
+ * posición absoluta, y un formato va sin guías y en flujo.
+ */
+type Vista = 'chasis' | 'laboratorio'
+
+const VISTAS: ReadonlyArray<{ vista: Vista; etiqueta: string }> = [
+  { vista: 'chasis', etiqueta: 'Chasis · I.2' },
+  { vista: 'laboratorio', etiqueta: '4.1 · Laboratorio' },
+]
+
 type Estado =
   | { fase: 'generando' }
   | { fase: 'listo'; url: string }
@@ -81,6 +93,7 @@ function contraste(hex: string): string {
 }
 
 export default function TallerV2(): ReactElement {
+  const [vista, setVista] = useState<Vista>('chasis')
   const [acentoHex, setAcentoHex] = useState<string>(ACENTO_BASE_POR_DEFECTO)
   const [logo, setLogo] = useState<string>(MEDICO_FICTICIO.logo)
   const [nombreLogo, setNombreLogo] = useState<string>('icon-192.png · 1:1')
@@ -114,17 +127,21 @@ export default function TallerV2(): ReactElement {
       setEstado({ fase: 'generando' })
       void (async () => {
         try {
-          const { generarPdfTaller } = await import('./HojaTaller')
-          const blob = await generarPdfTaller(
-            {
-              ...MEDICO_FICTICIO,
-              logo,
-              especialidad: especialidadLarga
-                ? ESPECIALIDAD_LARGA
-                : MEDICO_FICTICIO.especialidad,
-            },
-            acentoHex,
-          )
+          const medico = {
+            ...MEDICO_FICTICIO,
+            logo,
+            especialidad: especialidadLarga
+              ? ESPECIALIDAD_LARGA
+              : MEDICO_FICTICIO.especialidad,
+          }
+          // Los dos módulos se importan a demanda, como ya hacía el del chasis:
+          // arrastran @react-pdf/renderer entero y no tienen por qué entrar en el
+          // bundle de la barra lateral.
+          const generar =
+            vista === 'laboratorio'
+              ? (await import('./HojaLaboratorio')).generarPdfLaboratorio
+              : (await import('./HojaTaller')).generarPdfTaller
+          const blob = await generar(medico, acentoHex)
           if (cancelado) return
           urlCreada = URL.createObjectURL(blob)
           setEstado({ fase: 'listo', url: urlCreada })
@@ -143,7 +160,7 @@ export default function TallerV2(): ReactElement {
       clearTimeout(temporizador)
       if (urlCreada !== null) URL.revokeObjectURL(urlCreada)
     }
-  }, [acentoHex, logo, especialidadLarga])
+  }, [acentoHex, logo, especialidadLarga, vista])
 
   const derivados: ReadonlyArray<{
     token: string
@@ -169,6 +186,33 @@ export default function TallerV2(): ReactElement {
       <div className="flex min-h-0 flex-1">
         <aside className="w-80 shrink-0 overflow-y-auto border-r border-slate-800 p-6 text-sm">
           <section>
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+              Qué se está mirando
+            </h2>
+            <div className="mt-3 flex gap-2">
+              {VISTAS.map((v) => (
+                <button
+                  key={v.vista}
+                  type="button"
+                  onClick={() => setVista(v.vista)}
+                  className={`rounded border px-3 py-1.5 text-xs ${
+                    vista === v.vista
+                      ? 'border-slate-500 bg-slate-800 text-slate-100'
+                      : 'border-slate-700 text-slate-400'
+                  }`}
+                >
+                  {v.etiqueta}
+                </button>
+              ))}
+            </div>
+            <p className="mt-3 text-xs text-slate-500">
+              El formato va SIN guías: un documento tiene que verse como un
+              documento. Trae dos casos —uno completo y uno mínimo—, cada uno en su
+              propia hoja.
+            </p>
+          </section>
+
+          <section className="mt-8">
             <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-400">
               Acento del médico
             </h2>
@@ -315,7 +359,8 @@ export default function TallerV2(): ReactElement {
             <p className="mt-3 text-xs text-slate-500">
               Andamiaje del taller, no tokens del chasis. Sus posiciones sí salen de
               los tokens: son la comprobación de que los componentes se alinean donde
-              deben.
+              deben. <strong className="text-slate-400">Solo en la hoja de chasis:</strong>{' '}
+              un formato no lleva ninguna línea de encuadre.
             </p>
           </section>
         </aside>

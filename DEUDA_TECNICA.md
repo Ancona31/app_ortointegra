@@ -673,6 +673,22 @@ inherentemente best-effort.
 
 **Acción pendiente (proyecto aparte, NO bloquea billing):** correr `npm audit` (sin fix) para inventariar las 8 vulnerabilidades altas, determinar cuáles afectan runtime de producción vs. dev/build únicamente, y decidir mitigaciones caso por caso. Sesión dedicada, fuera del proyecto de cierre de fugas de billing Stripe.
 
+### DEP-DT-2 — Dos módulos que solo se distinguían por la mayúscula (RESUELTO)
+
+**Detectado:** 2026-08-07, al empezar el Paso 4.1 del sistema de documentos v2 desde un Mac. **Introducido:** Paso 2, al construir 2.J.
+
+**Síntoma:** `npm run build` y `tsc --noEmit` fallaban en HEAD limpio, sin ningún cambio local. El build además avisaba por su cuenta: *«There are multiple modules with names that only differ in casing.»* En tiempo de render, `ParserBloques` entraba como `undefined` y react-pdf lanzaba *«Element type is invalid»* señalando a `EntradaNumerada`, que es quien lo consume — el error apuntaba al consumidor, no a la causa.
+
+**Causa raíz:** `src/lib/pdf/v2/parserBloques.ts` (el analizador) y `src/lib/pdf/v2/ParserBloques.tsx` (el componente 2.J) solo se distinguían por la mayúscula inicial. En Linux son dos archivos y todo resuelve; en un filesystem case-insensitive —macOS, Windows— son el mismo nombre, y tanto webpack como vite prueban `.ts` antes que `.tsx`: `import ParserBloques from './ParserBloques'` traía el analizador, que no tiene default export.
+
+**Por qué no se vio antes:** el entorno oficial es WSL/Ubuntu y Vercel deploya en Linux, así que **compilaba en los dos sitios donde se miraba**. Es un defecto que solo aparece al cambiar de máquina.
+
+**Fix aplicado:** `parserBloques.ts` → `analizadorBloques.ts`, que es como su propia cabecera ya lo llamaba («el analizador de 2.J»). Dos imports actualizados: `ParserBloques.tsx` y `parserBloques.test.ts`. Ninguna línea de lógica cambió. Tras el renombrado: `tsc` 0 errores, build completo, 195/195 pruebas.
+
+**Regla permanente,** para que no vuelva: está en `CLAUDE.md` § *Estilo de código*, junto a la convención que lo produjo — PascalCase para el componente y camelCase para su utilidad hermana generan el par colisionante sin que nadie lo busque.
+
+**Pendiente menor, no bloqueante:** el archivo de pruebas sigue llamándose `parserBloques.test.ts` y prueba el analizador. No colisiona con nada, así que se deja; renómbrese a `analizadorBloques.test.ts` la próxima vez que se toque.
+
 ---
 
 ## Billing — Cierre de fugas Stripe
