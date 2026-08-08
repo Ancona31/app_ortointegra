@@ -41,17 +41,72 @@
 import { View, Text, StyleSheet } from '@react-pdf/renderer'
 import type { ReactElement } from 'react'
 import { tieneValor } from './Campo'
-import { CAJA, FILETE, RIEL_CELDA, TINTA, estiloTipografico } from './tokens'
+import { CAJA, FILETE, RIEL_CELDA, TINTA, TIPOGRAFIA, estiloTipografico } from './tokens'
 
 /**
  * Geometría interna del riel, de la ficha de 2.F. I.1.7 declara que la geometría
  * interna vive en la ficha del componente y no en la escala de espaciado, aunque
- * no sea múltiplo de 4 — y `8 10 10` no lo es.
+ * no sea múltiplo de 4 — y `3 10 4` no lo es.
+ *
+ * ⚠ **EL PADDING VERTICAL DE A.8 ERA 8 / 10 Y LA CELDA MEDÍA 45 pt. Son 30.**
+ *
+ * La lámina de Laboratorio compone la celda del riel de identificación en 30 pt
+ * exactos, y su desglose no deja margen de interpretación:
+ *
+ *     3  padding superior
+ *     10 interlineado del rótulo   `etiqueta`
+ *     13 interlineado del valor    `dato`
+ *     4  padding inferior
+ *     ── 30
+ *
+ * Las cuatro celdas de la fila 1 miden 30; las tres de la fila 2 miden 30.5, porque
+ * arrastran la regla de 0.5 pt que las separa de la fila de arriba. Con los dos
+ * filetes del riel, el bloque entero mide 62.1 pt donde antes medía 92.1.
+ *
+ * El padding lateral de 10 pt no cambia — la corrección es vertical.
  */
 const GEOMETRIA = {
-  /** Padding de celda `8 10 10`: superior 8, laterales 10, inferior 10. */
-  padding: { superior: 8, lateral: 10, inferior: 10 },
+  /** Padding de celda `3 10 4`: superior 3, laterales 10, inferior 4. */
+  padding: { superior: 3, lateral: 10, inferior: 4 },
 } as const
+
+/** Lo que una desviación puede mover de un rol: solo su cuerpo y su interlineado. */
+interface DesviacionRol {
+  /** En pt. Ausente cuando la desviación no mueve el cuerpo. */
+  readonly cuerpo?: number
+  /** En pt, como lo declara el diseño. La conversión a multiplicador va abajo. */
+  readonly interlineado: number
+}
+
+/**
+ * LAS DOS DESVIACIONES DE ROL DEL RIEL, Y POR QUÉ VIVEN AQUÍ Y NO EN LA ESCALA.
+ *
+ * El rótulo de celda va en `etiqueta` con interlineado **10** en vez de 11, y el
+ * valor en `dato` con cuerpo **11.5** e interlineado **13** en vez de 12 / 16. Es lo
+ * que hace que la celda mida los 30 pt de la lámina.
+ *
+ * Una generación anterior bajó los dos valores a I.1.4 y arrastró cinco elementos
+ * que la lámina mide en 7 / 11 —cabecera de tabla (2.G), etiqueta de folio (2.C),
+ * bloque en negativo (2.H), encabezado de 2.J y rótulo de campo (2.E)—, porque
+ * `etiqueta` es el rol de TODA versalita de rótulo del sistema. **La escala no se
+ * toca por un componente:** los 7 / 10 y los 11.5 / 13 son del riel.
+ *
+ * Es el mismo patrón de desviación declarada que 2.D ya usa para el valor de la
+ * celda de diagnóstico: se declara entera en la ficha del componente, con su motivo,
+ * y no sube a I.1.4 mientras tenga un solo consumidor. Si un segundo componente
+ * pidiera estos valores, entonces sí serían roles y subirían con nombre propio.
+ *
+ * Solo se declara lo que SE DESVÍA. Familia, peso, tracking y color siguen saliendo
+ * del rol por `estiloTipografico()`, que es la única puerta a la escala.
+ *
+ * `satisfies` y no `as const`: son MEDIDAS, no discriminantes. Congeladas al tipo
+ * literal, el estilo de la celda se lleva un `fontSize: 11.5` literal y `2.D` deja
+ * de poder construir encima su excepción de diagnóstico, que va a 11.
+ */
+const DESVIACION = {
+  rotulo: { interlineado: 10 },
+  valor: { cuerpo: 11.5, interlineado: 13 },
+} satisfies Record<'rotulo' | 'valor', DesviacionRol>
 
 const estilos = StyleSheet.create({
   /**
@@ -108,10 +163,30 @@ const estilos = StyleSheet.create({
   /**
    * Versalita: mayúsculas con tracking, no versalitas reales de la fuente
    * (I.1.4). La transformación a mayúsculas ocurre en el render.
+   *
+   * Con la desviación de interlineado del riel encima del rol. El cuerpo no se
+   * desvía, así que el `letterSpacing` que trae `estiloTipografico()` sigue siendo
+   * el bueno y NO hay que recalcularlo.
    */
-  etiqueta: { ...estiloTipografico('etiqueta') },
-  /** El valor por defecto de toda celda del sistema. */
-  valor: { ...estiloTipografico('dato') },
+  etiqueta: {
+    ...estiloTipografico('etiqueta'),
+    lineHeight: DESVIACION.rotulo.interlineado / TIPOGRAFIA.etiqueta.cuerpo,
+  },
+  /**
+   * El valor por defecto de toda celda del riel, con la desviación de cuerpo e
+   * interlineado encima del rol `dato`.
+   *
+   * Este es el segundo sitio de v2 donde se divide por el cuerpo a mano, y por el
+   * mismo motivo que el primero (la celda de diagnóstico de 2.D):
+   * `estiloTipografico()` es la puerta a la ESCALA, y una desviación declarada no
+   * está en la escala. El `letterSpacing` no se recalcula porque el tracking de
+   * `dato` es 0: cambiar el cuerpo no lo mueve.
+   */
+  valor: {
+    ...estiloTipografico('dato'),
+    fontSize: DESVIACION.valor.cuerpo,
+    lineHeight: DESVIACION.valor.interlineado / DESVIACION.valor.cuerpo,
+  },
 })
 
 /**
@@ -123,6 +198,17 @@ const estilos = StyleSheet.create({
  * 2.D.
  */
 export type EstiloValorCelda = typeof estilos.valor
+
+/**
+ * El valor de celda ya desviado, para que un consumidor pueda construir SU
+ * excepción encima en vez de partir del rol `dato` crudo.
+ *
+ * Existe por un defecto concreto: el nombre del paciente es «`dato`, peso 500»
+ * (2.D) y se componía esparciendo `estiloTipografico('dato')`, así que se quedaba
+ * en 12 / 16 y estiraba la fila del riel mientras las demás celdas iban a
+ * 11.5 / 13. Una desviación declarada solo sirve si TODO el riel parte de ella.
+ */
+export const VALOR_CELDA: EstiloValorCelda = estilos.valor
 
 export interface CeldaRiel {
   /** Identidad estable de la celda dentro del riel. */

@@ -35,9 +35,14 @@
  * 4. Cierra con `FileteGruesoFino` (2.O) a todo `caja.ancho`. Ese filete es
  *    estructural: `TituloDocumento` en su variante `ausente` se apoya en él.
  *
- * `CONCILIA D23` — Laboratorio y Recibo emiten hoy sin línea de cédulas. No es
- * una variante: es el defecto nivel 1 de I.3.7. Los ocho formatos llevan
- * membrete completo.
+ * ⚠ `CONCILIA D23` **QUEDA CONTRADICHO POR LA LÁMINA Y SIN RESOLVER.** D23 declara
+ * que Laboratorio y Recibo emitiendo sin línea de cédulas es el defecto nivel 1 de
+ * I.3.7, y que los ocho formatos llevan membrete completo. La lámina aprobada de
+ * Laboratorio compone su membrete **sin cédulas y sin universidad**, en un solo
+ * renglón de domicilio y teléfono. Este archivo compone lo que compone la lámina —
+ * ver la nota junto a la banda de dirección— y la contradicción queda REPORTADA
+ * para que la decida Angel. Mientras tanto los dos datos siguen siendo props
+ * exigibles: lo que cambió es qué se imprime, no qué se exige.
  *
  * Sin `'use client'`: módulo neutro, como el resto de v2.
  */
@@ -48,8 +53,6 @@ import PanelCircular, { type PanelCircularProps } from './PanelCircular'
 import FileteGruesoFino from './FileteGruesoFino'
 import {
   CAJA,
-  FILETE,
-  TINTA,
   TRANSICION,
   estiloTipografico,
   type AcentoResuelto,
@@ -63,22 +66,23 @@ import {
  * y `transicion.membreteLineaFina`, ya nombradas en I.1.7, y se consumen de ahí.
  * Un token tiene exactamente un sitio de definición (§0).
  *
- * `COINCIDENCIA` — 24 y 12 valen lo mismo que `espacio.24` y `espacio.12`, y no
- * son ellos: son geometría interna de componente, que I.1.7 declara en la ficha
- * y no en la escala. No los fusiones.
+ * `COINCIDENCIA` — 18 vale lo mismo que un miembro futuro de la escala y no es él:
+ * es geometría interna de componente, que I.1.7 declara en la ficha y no en la
+ * escala. No lo fusiones.
+ *
+ * LOS TRES MIEMBROS QUE SE RETIRAN, Y POR QUÉ. `medianilLineaFina` (24),
+ * `sangriaReglaCedulas` (12) y `separadorContacto` (` · `) componían la columna de
+ * cédulas y la segunda línea de contacto de A.7. La lámina de Laboratorio no compone
+ * ninguna de las dos —ver la nota junto a la banda de dirección en el render—, así
+ * que sus tres valores se quedaron sin consumidor. Un miembro de geometría sin
+ * consumidor es deuda, no ficha: si la variante con cédulas vuelve, vuelven con ella
+ * y salen de A.7 tal cual.
  */
 const GEOMETRIA = {
   /** Medianil panel → bloque de nombre. */
   medianilPanelNombre: 18,
   /** Nombre → especialidad. */
   nombreEspecialidad: 7,
-  /** Medianil de la línea fina: contacto ↔ cédulas. */
-  medianilLineaFina: 24,
-  /**
-   * Sangría de la regla vertical de cédulas. Se lee como el aire entre la regla
-   * y el texto de las cédulas, que es lo que la separa de la columna izquierda.
-   */
-  sangriaReglaCedulas: 12,
 } as const
 
 /** Datos del médico que el membrete imprime. Ninguno es opcional (regla 2). */
@@ -145,15 +149,15 @@ const estilos = StyleSheet.create({
     flexDirection: 'row',
     marginTop: TRANSICION.membreteLineaFina,
   },
-  columnaContacto: {
-    flex: 1,
-  },
-  columnaCedulas: {
-    marginLeft: GEOMETRIA.medianilLineaFina,
-    paddingLeft: GEOMETRIA.sangriaReglaCedulas,
-    borderLeftWidth: FILETE.regla,
-    borderLeftColor: TINTA.hairline,
-    alignItems: 'flex-end',
+  /**
+   * LA BANDA DE DIRECCIÓN ES UN SOLO RENGLÓN, CON `space-between`. Domicilio
+   * pegado al margen izquierdo, teléfono pegado al derecho, nada en medio. Ver la
+   * nota larga junto al render.
+   */
+  bandaDireccion: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: TRANSICION.membreteLineaFina,
   },
   credencial: { ...estiloTipografico('medico.credencial') },
 })
@@ -190,19 +194,38 @@ export default function Membrete(props: MembreteProps): ReactElement {
       </View>
 
       {props.variante === 'completo' ? (
-        <View style={estilos.lineaFina}>
-          <View style={estilos.columnaContacto}>
-            <Text style={estilos.credencial}>{props.consultorio.domicilio}</Text>
-            <Text style={estilos.credencial}>{props.consultorio.telefono}</Text>
-            <Text style={estilos.credencial}>{medico.universidad}</Text>
-          </View>
-          <View style={estilos.columnaCedulas}>
-            {medico.cedulas.map((cedula) => (
-              <Text key={cedula} style={estilos.credencial}>
-                {cedula}
-              </Text>
-            ))}
-          </View>
+        /*
+          UN SOLO RENGLÓN, Y NI CÉDULAS NI UNIVERSIDAD.
+
+          A.7 compone la línea fina en dos columnas —contacto a la izquierda en dos
+          renglones, cédulas a la derecha— y eso son 22 pt de banda. **La lámina de
+          Laboratorio compone un solo renglón**, con el domicilio a la izquierda, el
+          teléfono a la derecha y `space-between` entre los dos:
+
+              Calle 20 Núm. 110-J, entre 23 y 25, Centro, Umán, Yucatán 97390   Tel. 999 222 3173
+
+          Ni la universidad ni las cédulas aparecen ahí: donde iría la columna de
+          cédulas la lámina deja un contenedor vacío que solo ocupa altura. Son
+          10 pt de encabezado, la segunda de las tres causas del exceso que impedía
+          que 18 estudios cupieran en una hoja.
+
+          ⚠ **CHOCA CON `CONCILIA D23` Y CON I.3.7**, que declaran cédulas y
+          universidad obligatorias en el membrete de los ocho formatos —y con que
+          Imagenología, Receta y Suplementación sí las llevan—. Se compone como la
+          lámina porque la lámina manda en composición, y **queda reportado**: la
+          decisión de producto es de Angel, no de este archivo. Si los otros siete
+          formatos las conservan, lo que falta es una variante de 2.B, no revertir
+          esto. Por eso `MedicoMembrete.universidad` y `.cedulas` siguen siendo
+          props exigibles: el dato no deja de ser obligatorio porque esta lámina no
+          lo imprima, y `continuacion` sigue componiendo la cédula principal.
+
+          El teléfono llega YA REDACTADO por quien llama, como las cédulas y por la
+          misma razón (regla 2 de la ficha): la lámina imprime `Tel. 999 222 3173` y
+          el prefijo es redacción, no dato. Este componente coloca, no rotula.
+        */
+        <View style={estilos.bandaDireccion}>
+          <Text style={estilos.credencial}>{props.consultorio.domicilio}</Text>
+          <Text style={estilos.credencial}>{props.consultorio.telefono}</Text>
         </View>
       ) : (
         // La ficha no declara dónde va la cédula principal en `continuacion`:

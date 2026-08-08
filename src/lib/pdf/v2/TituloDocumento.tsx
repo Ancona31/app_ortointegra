@@ -24,18 +24,27 @@
  *    sobrevive es la separación que existe siempre bajo el filete —
  *    `transicion.tituloRiel`—, porque cuando no hay título el filete del membrete
  *    hace doble trabajo: cierra el membrete y abre el cuerpo.
- * 5. El SUBTÍTULO va bajo el título, separado por `espacio.4`, y colapsa si no
+ * 5. El SUBTÍTULO va bajo el título, separado por `espacio.2`, y colapsa si no
  *    viene. Ver la nota en `subtitulo`.
+ * 6. El RIEL DE FOLIO ocupa la zona derecha del bloque, 156 pt de ancho fijo, y
+ *    colapsa si no viene. Lo llevan siete de los ocho formatos; el Escrito Médico
+ *    es el único sin folio. Ver la nota en `rielFolio`.
  *
  * LAS DOS REGLAS DEL PREÁMBULO DE II
  *
  * a. **El título se almacena en capitalización de oración y se compone en
  *    MAYÚSCULAS por transformación** (`CONCILIA D1`). Nunca se almacena en
  *    mayúsculas. La transformación ocurre aquí, en el render.
- * b. **Los ocho formatos admiten subtítulo**, en `titulo.subtitulo`, bajo el
- *    título, y COLAPSA si no viene (`CONCILIA D2`). El subtítulo no tiene otro
- *    sitio donde vivir: es parte del bloque de título, y por eso la ficha de 2.C
- *    lo declara desde el cierre del componente (anexo A, P2-6).
+ * b. **La ranura de subtítulo se queda construida y HOY NO TIENE CONSUMIDORES.**
+ *    `CONCILIA D2` la declaraba para los ocho formatos, deducida de la lámina; la
+ *    deducción queda REVERTIDA por decisión de producto: ningún formulario de la
+ *    app tiene ese campo y añadirlo obligaría a tocar los ocho para algo que
+ *    quedaría vacío casi siempre. Solicitud de Laboratorio ya no lo pasa.
+ *
+ *    **NO BORRES LA RANURA.** La necesita el título variable del Escrito Médico, y
+ *    sigue siendo el único sitio donde un subtítulo puede vivir: es parte del bloque
+ *    de título (anexo A, P2-6). Colapsa si no viene, que es lo que hace ahora en el
+ *    único formato construido.
  *
  * Sin `'use client'`: módulo neutro, como el resto de v2.
  */
@@ -48,9 +57,16 @@ import {
   RETICULA,
   TIPOGRAFIA,
   TRANSICION,
+  ZONA,
   estiloTipografico,
   type AcentoResuelto,
 } from './tokens'
+
+/**
+ * Rótulo del riel de folio. Se compone en versalita aquí, como toda versalita del
+ * sistema: no lo pases ya en mayúsculas.
+ */
+const ETIQUETA_FOLIO = 'Folio'
 
 /** Interlineado del título: el alto de UNA de sus líneas. Lo usa la fecha. */
 const ALTO_LINEA_TITULO = TIPOGRAFIA['titulo.documento'].interlineado ?? 0
@@ -96,8 +112,31 @@ const estilos = StyleSheet.create({
    */
   subtitulo: {
     ...estiloTipografico('titulo.subtitulo'),
-    marginTop: ESPACIO[4],
+    // `espacio.2`, medido en B.1 §1 («margen superior 2 pt»). La versión anterior
+    // usaba `espacio.4`, elegido por jerarquía porque el diseño «nunca inventarió
+    // el subtítulo»; la lámina sí lo tiene y sí lo mide, así que el razonamiento
+    // sobra. El orden que aquel argumento buscaba se conserva: 2 < 4 < 8.
+    marginTop: ESPACIO[2],
   },
+  /**
+   * EL RIEL DE FOLIO. Zona derecha del bloque de título, de ancho FIJO: A.8 declara
+   * las dos zonas del bloque —texto 321 pt (columnas 1–8), riel 156 pt (9–12)— y
+   * B.1 §2 lo confirma sobre la lámina de Laboratorio, «riel de folio de 156 pt a
+   * la derecha».
+   *
+   * No comparte caja con la fecha y no puede: la fecha se apoya en la línea base
+   * del título (regla 3) y el folio es un par etiqueta + valor de dos renglones.
+   * Ningún formato lleva los dos —la fecha en el encabezado es solo del Escrito
+   * Médico (II.8 §5), que es el único sin folio—, así que no hay que decidir cómo
+   * conviven.
+   */
+  rielFolio: {
+    width: ZONA.riel,
+    marginLeft: RETICULA.medianil,
+    flexShrink: 0,
+    alignItems: 'flex-end',
+  },
+  etiquetaFolio: { ...estiloTipografico('etiqueta') },
   /**
    * REGLA 3, Y HASTA DÓNDE LLEGA EL RENDERER.
    *
@@ -154,6 +193,16 @@ interface ConTitulo {
    * corta y sin rótulo—. Colapsa si no viene: solo un formato la lleva aquí.
    */
   fecha?: string
+  /**
+   * Folio del documento, ya generado. Colapsa si no viene.
+   *
+   * **Siete de los ocho formatos lo llevan.** El único sin folio es el Escrito
+   * Médico, y las láminas lo dicen dos veces (B.8: «Folio — no existe en ninguna
+   * parte», «el único formato sin folio»). La decisión de que Laboratorio no lo
+   * llevara —II.1 §1, «nadie de fuera cita el número de una solicitud»— iba contra
+   * su propia lámina, que compone el riel de 156 pt y emite con prefijo.
+   */
+  folio?: string
   acento: AcentoResuelto
 }
 
@@ -185,6 +234,20 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
         {props.fecha === undefined ? null : (
           <View style={estilos.cajaFecha}>
             <Text style={estilos.fecha}>{props.fecha}</Text>
+          </View>
+        )}
+
+        {props.folio === undefined ? null : (
+          <View style={estilos.rielFolio}>
+            <Text style={estilos.etiquetaFolio}>{ETIQUETA_FOLIO.toUpperCase()}</Text>
+            {/*
+              El rol `folio` va en `acento.tinta`, así que se resuelve en el render
+              y se esparce en un literal: misma razón de tipos que en 2.B, 2.D, 2.F
+              y 2.G.
+            */}
+            <Text style={{ ...estiloTipografico('folio', props.acento) }}>
+              {props.folio}
+            </Text>
           </View>
         )}
       </View>

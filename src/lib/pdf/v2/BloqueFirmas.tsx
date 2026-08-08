@@ -16,15 +16,17 @@
  *
  * ANATOMÍA, Y POR QUÉ EL ROL VA ENCIMA DE LA LÍNEA
  *
- *     firma.rol         versalita, ENCIMA de la línea
- *     firma.espacio     77 pt de espacio de escritura
- *     filete.fino       la línea
- *     espacio.4         margen superior del nombre
- *     firma.nombre      bajo la línea
- *     firma.credencial  uno o dos renglones, según el rol
+ *     firma.rol         versalita, ENCIMA de la línea            11 pt
+ *     firma.espacio     77 pt de espacio de escritura            77
+ *     filete.fino       la línea                                  0.8
+ *     espacio.5         margen superior del nombre                5
+ *     firma.nombre      bajo la línea                            16
+ *     firma.credencial  UN renglón, unido con la raya            11
+ *                                                                ──── 120.8
  *
- * La suma es `firma.bloque.alto(rol)` de I.1.9 —130.8 pt el médico tratante,
- * 119.8 los demás— y está implementada como fórmula en `altoBloqueFirma()`. Este
+ * La suma es `firma.bloque.alto(rol)` de I.1.9 —**120.8 pt**— y está implementada
+ * como fórmula en `altoBloqueFirma()`. Los 130.8 pt del médico tratante que
+ * declaraba el spec contaban un renglón de cédula de más. Este
  * componente no la recalcula: **compone las mismas ranuras en el mismo orden**,
  * así que el alto sale solo. La línea se dibuja como borde de una caja sin alto
  * propio para que los 0.8 pt del filete se sumen a los 77 y no se coman de ellos.
@@ -68,18 +70,32 @@ const GEOMETRIA = {
   celda: { superior: 14, inferior: 4 },
 } as const
 
+/**
+ * La raya del sistema con sus dos espacios: la misma que separa las tres zonas de
+ * la banda de pie (2.M). Une las credenciales de un firmante en el renglón único
+ * que declara `FIRMA_RENGLONES`. Ver la nota junto al render.
+ */
+const SEPARADOR_CREDENCIALES = ' · '
+
 /** Dos columnas iguales sobre la caja, con su medianil. */
 const ANCHO_CELDA = (CAJA.ancho - GEOMETRIA.medianil) / 2
 
 const estilos = StyleSheet.create({
   /**
-   * La variante `simple` ocupa la columna derecha de la fila de cierre, que es
+   * La variante `simple` ocupa la columna IZQUIERDA de la fila de cierre, que es
    * donde vive la caja de firma en los ocho formatos (I.1.3). **No es
-   * `manuscrito.ancho`**, aunque mida lo mismo: ver la nota de `cierre.derecha`.
+   * `manuscrito.ancho`**, aunque mida lo mismo: ver la nota de `cierre.izquierda`.
+   *
+   * ⚠ **ESTABA A LA DERECHA Y ERA UN DEFECTO DE CHASIS.** I.1.3 declaraba «la caja
+   * de firma vive en su columna derecha» y aquí se cableaba con `flex-end`. Las
+   * láminas la ponen a la IZQUIERDA, con la cifra al lado —B.3 §2 y B.4: «firma a
+   * la izquierda (246 pt) · QR y folio de verificación a la derecha»—. Los dos
+   * nombres de `cierre.*` estaban cambiados y quedan corregidos en la capa de
+   * tokens; esto es la otra mitad del mismo defecto.
    */
   cajaSimple: {
-    width: CIERRE.derecha,
-    alignSelf: 'flex-end',
+    width: CIERRE.izquierda,
+    alignSelf: 'flex-start',
   },
   fila: {
     flexDirection: 'row',
@@ -112,17 +128,25 @@ const estilos = StyleSheet.create({
     objectPositionX: '0%',
   },
   /**
-   * La línea. Caja sin alto propio con borde inferior, para que el filete SUME
-   * sus 0.8 pt a los 77 del espacio en vez de comérselos por dentro — que es como
-   * está escrita la fórmula de I.1.9.
+   * La línea. Caja sin alto propio con borde inferior, para que el filete SUME sus
+   * 0.8 pt a los 77 del espacio en vez de comérselos por dentro — que es como está
+   * escrita la fórmula de I.1.9.
+   *
+   * `filete.fino`, que es lo que declaran A.12 y B.1 §5. Una generación anterior lo
+   * bajó a `filete.regla` para que el bloque cuadrara en los 119.45 pt medidos en la
+   * lámina: **manda el valor declarado, no el que cuadra la suma.**
    */
   linea: {
     borderBottomWidth: FILETE.fino,
     borderBottomColor: TINTA.negra,
   },
+  /**
+   * `espacio.5`, no `espacio.4`. Es el margen superior del nombre que mide la
+   * lámina, y el mismo sumando que usa `altoBloqueFirma()`.
+   */
   nombre: {
     ...estiloTipografico('firma.nombre'),
-    marginTop: ESPACIO[4],
+    marginTop: ESPACIO[5],
   },
   credencial: { ...estiloTipografico('firma.credencial') },
 })
@@ -181,11 +205,24 @@ function UnaFirma({ firma }: { firma: Firma }): ReactElement {
       */}
       <Text style={estilos.nombre}>{firma.nombre ?? ' '}</Text>
 
-      {(firma.credenciales ?? []).map((credencial) => (
-        <Text key={credencial} style={estilos.credencial}>
-          {credencial}
-        </Text>
-      ))}
+      {/*
+        UN SOLO RENGLÓN DE CREDENCIALES, SIEMPRE.
+
+        La lámina imprime `Céd. Prof. 9552456 · Céd. Esp. 12085805` en una línea
+        (B.1 §4), separadas por la raya del sistema. La versión anterior mapeaba el
+        arreglo a un `Text` por elemento y sacaba dos renglones donde la lámina tiene
+        uno: **11 pt de más en el bloque**, y una de las tres causas por las que 18
+        estudios no cabían en una hoja.
+
+        Se une AQUÍ y no en el formato porque `FIRMA_RENGLONES` declara un renglón de
+        credencial por rol y `altoBloqueFirma()` cuenta ese renglón: si el formato
+        pudiera pasar dos, la fórmula mentiría y el motor de flujo pagaría el error.
+        Unir con un solo elemento es idempotente, así que los roles que ya traían una
+        credencial no cambian.
+      */}
+      <Text style={estilos.credencial}>
+        {(firma.credenciales ?? []).join(SEPARADOR_CREDENCIALES) || ' '}
+      </Text>
     </View>
   )
 }

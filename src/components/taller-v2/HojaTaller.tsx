@@ -942,6 +942,11 @@ function HojaTaller({
                 marca={entrada.marca}
                 nota={entrada.nota}
                 acento={acento}
+                // La pareja de la Receta y la Suplementación: fila normal y nota
+                // apilada bajo el ancla. La otra —`compacta` + `columna`— es la
+                // tabla de Laboratorio y se ve en su propia hoja de taller.
+                calibracion="normal"
+                disposicion="apilada"
               />
             ))}
             {/* No debe haber regla entre esta línea y la última entrada. */}
@@ -956,6 +961,8 @@ function HojaTaller({
                 primera
                 ancla="Paracetamol · Tabletas 500 mg, caja con 10"
                 acento={acento}
+                calibracion="normal"
+                disposicion="apilada"
               />
               <View style={estilos.marcaArranque} />
             </View>

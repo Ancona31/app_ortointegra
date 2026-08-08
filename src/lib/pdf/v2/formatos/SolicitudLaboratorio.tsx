@@ -31,20 +31,26 @@
  *    dos líneas. Se guarda en capitalización de oración y 2.C lo compone en
  *    mayúsculas (`CONCILIA D1`). La misma cadena va al pie: el médico no debe leer
  *    un nombre en el encabezado y otro abajo.
- * 2. **Sin folio y sin QR.** Una solicitud no autoriza nada —en México los
- *    estudios se contratan sin solicitud médica— y nadie de fuera cita su número.
- *    De ahí la variante `sin folio` de 2.M, que es el caso mayoritario del sistema:
- *    cinco de ocho formatos (anexo A, P2-30).
+ * 2. **Sin QR.** Una solicitud no autoriza nada —en México los estudios se
+ *    contratan sin solicitud médica—, así que un QR de verificación sugeriría una
+ *    autorización que el papel no otorga. Esa parte de la decisión se mantiene.
  * 3. **La entrada mínima del sistema: dos ranuras ocupadas.** `secundario` y
  *    `marca` colapsan (II.1 §4). Que 2.G funcione así es lo que demuestra que no
  *    necesita todas sus ranuras — y por eso aquí no se le pasan, en vez de pasarle
  *    cadenas vacías.
  *
- * EXCEPCIÓN DE II.1 §5 — LA LISTA ES DE UNA SOLA COLUMNA
+ * LO QUE II.1 DECIDIÓ Y LA LÁMINA CONTRADICE — REVERTIDO
  *
- * El renderer viejo dibujaba el encabezado de una segunda columna sin filas debajo
- * (auditoría §8.2). No se repone: aquí no hay ninguna banda ni encabezado a la
- * derecha de los nombres, y la verificación visible de II.1 §6 manda comprobarlo.
+ * a. **SÍ lleva folio.** II.1 §1 decidió que no, razonando que «nadie de fuera cita
+ *    el número de una solicitud». Su lámina compone el riel de folio de 156 pt en
+ *    el bloque de título y emite con prefijo en los tres casos (B.1 §2 y §4). Siete
+ *    de los ocho formatos llevan folio; el único sin él es el Escrito Médico.
+ * b. **La lista NO es de una sola columna.** II.1 §5 lo declaraba como excepción,
+ *    leyendo la auditoría §8.2 —el renderer viejo dibujaba el encabezado de una
+ *    segunda columna sin filas debajo—. Ese defecto era una cabecera huérfana, no
+ *    la columna: B.1 §3 mide la tabla en tres columnas, con la indicación a la
+ *    derecha del nombre y en su mismo renglón. Lo que no se repone es la CABECERA,
+ *    que la lámina sí tiene y que aquí sigue sin componerse. **Reportado.**
  *
  * DOS COSAS QUE ESTE FORMATO NO MONTA, Y POR QUÉ
  *
@@ -70,7 +76,7 @@ import Membrete, {
 import type { PanelCircularProps } from '../PanelCircular'
 import TituloDocumento from '../TituloDocumento'
 import BloquePaciente, { type ValoresPaciente } from '../BloquePaciente'
-import EntradaNumerada from '../EntradaNumerada'
+import EntradaNumerada, { CabeceraEntradas, CierreEntradas } from '../EntradaNumerada'
 import ParserBloques from '../ParserBloques'
 import ContadorLista from '../ContadorLista'
 import BloqueFirmas, { type Firma } from '../BloqueFirmas'
@@ -86,27 +92,46 @@ import { ESPACIO, MARGEN, PAPEL, TINTA, type AcentoResuelto } from '../tokens'
 const TITULO = 'Solicitud de laboratorio'
 /** `<ÍTEMS>` de 2.K, regla 1: la palabra la declara el formato (II.1 §3). */
 const ITEMS = 'estudios'
+/**
+ * Los tres rótulos de la cabecera de tabla, textuales de A.11 y de B.1 §4. Se
+ * componen en versalita en 2.G, como toda versalita del sistema.
+ */
+const CABECERA = { numero: '#', ancla: 'Estudio solicitado', nota: 'Indicación' } as const
 /** `CONCILIA D14` — la misma cadena en Receta y en las dos solicitudes. */
 const ROTULO_FIRMA = 'Firma y sello del médico'
 
 /**
- * SEPARACIÓN ENTRE BLOQUES DE PRIMER NIVEL, y por qué la elige el formato.
+ * SEPARACIÓN ENTRE BLOQUES DE PRIMER NIVEL, medida en la lámina aprobada.
  *
  * I.1.7 declara nueve `transicion.*` con dos extremos identificables cada una, y
  * ninguna separa las parejas de este documento —membrete → título, riel → lista,
  * lista → notas, notas → contador, contador → firma—. Para esas, I.1.7 dice que
  * gobierna la ESCALA, y §0 dice que **el formato declara qué miembro usa**. Esto
- * es esa declaración, hecha una sola vez y no cinco.
+ * es esa declaración.
  *
- * Se elige `espacio.24` y no un miembro menor porque es la magnitud con la que el
- * diseño separa bloques de primer nivel entre sí —`transicion.entreSecciones` mide
- * lo mismo por la misma causa, y es `COINCIDENCIA`, no identidad: mover una no
- * debe mover la otra—. Uniforme en las cinco parejas, porque un documento no
- * cambia de métrica según lo que traiga (I.3.4).
+ * **NO ES UN VALOR UNIFORME, y la versión anterior de este archivo lo era.** Ponía
+ * `espacio.24` en las cinco parejas razonando desde I.3.4 —«un documento no cambia
+ * de métrica según lo que traiga»—. Esa regla habla del CONTENIDO: no obliga a que
+ * todas las parejas midan lo mismo, y `SPEC_DISENO_PARTE_B.md` B.1 §2, que mide el
+ * orden de bloques de la hoja 1 sobre la lámina aprobada, las tiene distintas:
  *
- * **Título → riel es la única que NO la lleva**, y es la única que ya está
- * declarada: 2.C aporta `transicion.tituloRiel` por abajo, en sus tres variantes.
- * Sumarle aquí otra la contaría dos veces.
+ *   membrete → título     **12 pt**   B.1 §2 · aire 2                → `espacio.12`
+ *   riel → cabecera       **12 pt**   B.1 §2 · aire 7 · 211.05→223.05 → `espacio.12`
+ *   cierre → contador      **5 pt**   B.1 §2 · bloque 11             → `espacio.5`
+ *   contador → notas      **20 pt**   B.1 §5 `separacion`            → `espacio.20`
+ *   notas → firma         **20 pt**   B.1 §5 `separacion`            → `espacio.20`
+ *
+ * Los cinco valores salen ya de la escala: `espacio.5` y `espacio.20` se añadieron
+ * a I.1.7 para poder escribirlos, porque la escala existe para expresar el diseño y
+ * no para restringirlo. Ninguno es literal.
+ *
+ * El ORDEN es el de B.1 §2 —filas → filete de cierre → contador → observaciones →
+ * firma—, no el de II.1 §3, que ponía el contador al final. Ver la nota junto al
+ * contador en el render.
+ *
+ * **Título → riel es la única pareja que este archivo NO declara**, y es la única
+ * que ya está declarada en el chasis: 2.C aporta `transicion.tituloRiel` por abajo,
+ * en sus tres variantes. Sumarle aquí otra la contaría dos veces.
  *
  * > La primera versión de este formato dejó **membrete → título sin separación**,
  * > leyendo II.8 §5 —«sin título el cuerpo arranca a `transicion.tituloRiel` bajo
@@ -116,7 +141,11 @@ const ROTULO_FIRMA = 'Firma y sello del médico'
  * > universidad, leyéndose como una cuarta línea del membrete y no como el nombre
  * > del documento (anexo A, P4-5).
  */
-const SEPARACION_BLOQUE = ESPACIO[24]
+const SEPARACION_MEMBRETE_TITULO = ESPACIO[12]
+const SEPARACION_RIEL_LISTA = ESPACIO[12]
+const SEPARACION_LISTA_CONTADOR = ESPACIO[5]
+const SEPARACION_CONTADOR_NOTAS = ESPACIO[20]
+const SEPARACION_NOTAS_FIRMA = ESPACIO[20]
 
 /**
  * Un estudio de la lista. Dos ranuras de 2.G, que son las dos que II.1 §4 ocupa:
@@ -147,6 +176,17 @@ export interface SolicitudLaboratorioProps {
   readonly estudios: readonly EstudioSolicitado[]
   /** Notas al laboratorio. Colapsan enteras si no vienen. */
   readonly notas?: string
+  /**
+   * Folio del documento, ya generado por `public.generar_folio()`. **NO es
+   * opcional**: la lámina lo compone en el riel de 156 pt del bloque de título y lo
+   * repite en la banda de pie, y 2.M variante `completo` lo exige.
+   *
+   * ⚠ La clase de folio de este formato **no existe todavía en producción**: el
+   * generador solo conoce `rx`, `noh`, `cot` y `ci`, y su CHECK las restringe. La
+   * migración está escrita y sin aplicar en
+   * `supabase/migrations/20260808_folio_02_clases_faltantes.sql`.
+   */
+  readonly folio: string
   /** Trazo capturado del médico (2.L regla 5). */
   readonly rubrica?: string
 }
@@ -165,8 +205,20 @@ const estilos = StyleSheet.create({
     paddingRight: MARGEN.derecho,
     paddingBottom: MARGEN.inferior,
   },
-  bloque: {
-    marginTop: SEPARACION_BLOQUE,
+  bloqueMembreteTitulo: {
+    marginTop: SEPARACION_MEMBRETE_TITULO,
+  },
+  bloqueRielLista: {
+    marginTop: SEPARACION_RIEL_LISTA,
+  },
+  bloqueListaContador: {
+    marginTop: SEPARACION_LISTA_CONTADOR,
+  },
+  bloqueContadorNotas: {
+    marginTop: SEPARACION_CONTADOR_NOTAS,
+  },
+  bloqueFirma: {
+    marginTop: SEPARACION_NOTAS_FIRMA,
   },
 })
 
@@ -196,6 +248,7 @@ export default function SolicitudLaboratorio({
   paciente,
   estudios,
   notas,
+  folio,
   rubrica,
 }: SolicitudLaboratorioProps): ReactElement {
   // Anotado y no aseverado: 2.L pide una tupla de una firma y la anotación se la
@@ -217,8 +270,26 @@ export default function SolicitudLaboratorio({
         la inferior —`transicion.tituloRiel`— pero ninguna de las nueve
         transiciones de I.1.7 separa el membrete de lo que viene debajo.
       */}
-      <View style={estilos.bloque}>
-        <TituloDocumento variante="fijo" acento={acento} titulo={TITULO} />
+      <View style={estilos.bloqueMembreteTitulo}>
+        {/*
+          SIN SUBTÍTULO, Y NO ES UN OLVIDO. `CONCILIA D2` lo declaraba para los ocho
+          formatos deduciéndolo de la lámina —que sí lo compone en sus tres hojas—, y
+          la deducción queda REVERTIDA por decisión de producto: no sale de ninguna
+          necesidad, ningún formulario de la app tiene el campo, y añadirlo obligaría
+          a tocar los ocho para algo que quedaría vacío casi siempre.
+
+          La ranura de 2.C sigue construida y sin consumidores a propósito: la
+          necesita el título variable del Escrito Médico. No la borres para «limpiar».
+
+          Cuesta 16 pt de encabezado a favor: 14 del renglón del subtítulo más los 2
+          de `espacio.2` que lo separaban del título.
+        */}
+        <TituloDocumento
+          variante="fijo"
+          acento={acento}
+          titulo={TITULO}
+          folio={folio}
+        />
       </View>
 
       {/*
@@ -229,7 +300,21 @@ export default function SolicitudLaboratorio({
       */}
       <BloquePaciente variante="completo" {...paciente} />
 
-      <View style={estilos.bloque}>
+      {/*
+        LA LISTA, EN LAS DOS VARIANTES QUE LA LÁMINA COMPONE.
+
+        `compacta` + `columna` son la tabla de B.1 §3: estudio a la izquierda,
+        indicación en la tercera columna de 132 pt, en el MISMO renglón, con la fila
+        calibrada a 9 / 11.5 pt. Es lo que revierte `D4` y `D3`, y lo que hace que
+        una lista larga quepa donde la lámina la mete.
+
+        **Las dos las declara este archivo, no el número de estudios.** Si algún día
+        aparece aquí un `estudios.length > N` eligiendo calibración, es D4 volviendo
+        por la puerta de atrás: lo que I.3.4 prohíbe es que el documento cambie de
+        métrica según lo que traiga, y eso sigue en pie.
+      */}
+      <View style={estilos.bloqueRielLista}>
+        <CabeceraEntradas {...CABECERA} acento={acento} />
         {estudios.map((estudio, indice) => (
           <EntradaNumerada
             // El índice ES la identidad: dos estudios pueden llamarse igual y lo
@@ -240,37 +325,52 @@ export default function SolicitudLaboratorio({
             ancla={estudio.nombre}
             nota={estudio.indicacion}
             acento={acento}
+            calibracion="compacta"
+            disposicion="columna"
           />
         ))}
+        <CierreEntradas />
+      </View>
+
+      {/*
+        EL CONTADOR VA PEGADO AL CIERRE DE LA TABLA, ANTES DE LAS OBSERVACIONES.
+
+        II.1 §3 lo había puesto al final del contenido, tras las notas, con este
+        argumento: «2.K existe para que quien reciba una hoja suelta sepa si le
+        falta otra, así que se lee al terminar de leer la hoja». B.1 §2 compone el
+        orden contrario —filas → filete de cierre → contador a 5 pt →
+        observaciones—, y la lámina manda. Leído sobre el papel el orden de la
+        lámina es además el que se sostiene: el contador cierra LA TABLA, no la
+        hoja, y a 5 pt del filete se lee como su fila de total, que es exactamente
+        lo que A.11 llama «fila de total».
+      */}
+      <View style={estilos.bloqueListaContador}>
+        <ContadorLista forma="final" items={ITEMS} total={estudios.length} />
       </View>
 
       {/*
         Las notas colapsan ENTERAS, con su separación incluida: sin el `null` el
-        contenedor seguiría aportando sus 24 pt y quedaría el hueco donde estarían
+        contenedor seguiría aportando sus 20 pt y quedaría el hueco donde estarían
         —justo lo que II.1 §6 manda comprobar—. Por eso la condición envuelve al
         `View` y no vive dentro de él.
       */}
       {tieneValor(notas) ? (
-        <View style={estilos.bloque}>
+        <View style={estilos.bloqueContadorNotas}>
           <ParserBloques texto={notas} marca="raya" />
         </View>
       ) : null}
 
-      {/*
-        2.K en forma `final`: un documento de una sola hoja cuenta como final
-        (regla 2). Va al FINAL DEL CONTENIDO porque el contador existe para que
-        quien reciba una hoja suelta sepa si le falta otra.
-      */}
-      <View style={estilos.bloque}>
-        <ContadorLista forma="final" items={ITEMS} total={estudios.length} />
-      </View>
-
-      <View style={estilos.bloque}>
+      <View style={estilos.bloqueFirma}>
         <BloqueFirmas variante="simple" firmas={firmas} />
       </View>
 
-      {/* Variante `sin folio`: paginación · título · leyenda. NINGÚN folio. */}
-      <PieDocumento variante="sinFolio" titulo={TITULO} acento={acento} />
+      {/*
+        Variante `completo`: folio · paginación · leyenda, que es exactamente lo que
+        B.1 §4 imprime en la banda («Folio L-7C15A0E4D2B9 · Página 1 de 2 ·
+        Documento generado por Spinus…»). Era `sinFolio`, por la decisión de II.1 §1
+        que la lámina contradice.
+      */}
+      <PieDocumento variante="completo" folio={folio} acento={acento} />
     </Page>
   )
 }

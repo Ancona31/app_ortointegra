@@ -40,8 +40,12 @@
 
 import type { ReactElement } from 'react'
 import { StyleSheet } from '@react-pdf/renderer'
-import RielDatos, { type CeldaRiel, type EstiloValorCelda } from './RielDatos'
-import { FUENTE, TINTA, estiloTipografico } from './tokens'
+import RielDatos, {
+  VALOR_CELDA,
+  type CeldaRiel,
+  type EstiloValorCelda,
+} from './RielDatos'
+import { FUENTE, TINTA } from './tokens'
 
 /**
  * Geometría interna de ESTE componente, de la ficha de 2.D. I.1.7 declara que la
@@ -59,8 +63,18 @@ const GEOMETRIA = {
    */
   pesoAncla: 500,
   /**
-   * VALOR DE LA CELDA DE DIAGNÓSTICO — IBM Plex Sans 11 / 16 pt, peso 400,
+   * VALOR DE LA CELDA DE DIAGNÓSTICO — IBM Plex Sans 11 / 13 pt, peso 400,
    * tracking 0, `tinta.negra`.
+   *
+   * ⚠ **INTERLINEADO 13, NO 16.** A.8 lo declara en 11 / 16, heredando el 16 del
+   * valor de riel que la lámina desmiente. Las tres celdas de la fila inferior del
+   * riel miden 30.5 pt en la lámina, exactamente igual que las cuatro de arriba más
+   * su regla, y con 16 esta celda sola estiraría la fila a 33.5: las reglas
+   * verticales del riel llegan de arriba abajo de la fila, así que la celda más alta
+   * manda sobre las otras dos. El 13 es el mismo interlineado que 2.F declara como
+   * desviación del valor de celda, no un valor nuevo — lo que sigue siendo excepción
+   * de ESTA celda es la FAMILIA y el cuerpo de 11 pt, que es lo que A.8 declara de
+   * propio.
    *
    * Es la ÚNICA excepción de familia del riel y la ficha de 2.D la declara
    * entera. No la «unifiques» con el resto del riel ni la subas a I.1.4: no es un
@@ -75,7 +89,7 @@ const GEOMETRIA = {
    */
   diagnostico: {
     cuerpo: 11,
-    interlineado: 16,
+    interlineado: 13,
     peso: 400,
     tracking: 0,
     color: TINTA.negra,
@@ -163,8 +177,15 @@ export type BloquePacienteProps =
   | { variante: 'reducido'; paciente: string; expediente?: string }
 
 const estilos = StyleSheet.create({
-  /** Único valor del riel en peso 500: el nombre, que es el ancla de la hoja. */
-  valorAncla: { ...estiloTipografico('dato'), fontWeight: GEOMETRIA.pesoAncla },
+  /**
+   * Único valor del riel en peso 500: el nombre, que es el ancla de la hoja.
+   *
+   * Parte de `VALOR_CELDA` —el valor de celda YA DESVIADO por 2.F— y no del rol
+   * `dato`: la ficha lo declara «`dato`, peso 500», es decir el mismo valor que las
+   * demás celdas un peso por encima. Partiendo del rol crudo se quedaría en 12 / 16
+   * y estiraría la fila entera, que es justo lo que la desviación del riel corrige.
+   */
+  valorAncla: { ...VALOR_CELDA, fontWeight: GEOMETRIA.pesoAncla },
   valorDiagnostico: {
     fontFamily: FUENTE.humanista,
     fontSize: GEOMETRIA.diagnostico.cuerpo,

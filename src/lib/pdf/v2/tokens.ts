@@ -100,8 +100,8 @@ export const RIEL_CELDA = 40.5
 /**
  * I.1.3 · La fila de cierre: la última fila de la hoja, la que reparte el pie del
  * contenido entre lo que se firma y lo que se cuenta. La misma en los ocho
- * formatos — la caja de firma (2.L) vive en su columna derecha, y en el Recibo esa
- * columna es la que ocupa `RielImportes` (2.T).
+ * formatos — la caja de firma (2.L) vive en su columna IZQUIERDA, y en el Recibo la
+ * derecha es la que ocupa `RielImportes` (2.T).
  *
  * Es la TERCERA partición de la caja de 486 pt, y convive con las otras dos por la
  * misma razón que ellas conviven entre sí: cada una separa cosas distintas con
@@ -110,22 +110,39 @@ export const RIEL_CELDA = 40.5
  * fue justamente el motivo de que H9 quedara abierto toda la conciliación: se
  * buscaba el 246 en la retícula de doce, que es la partición equivocada.
  *
- * `izquierda` es DERIVADO y va como fórmula (§0): un 216 literal significaría que
- * el token no está implementado.
+ * ⚠ **LOS DOS NOMBRES ESTABAN CAMBIADOS Y QUEDAN CORREGIDOS.** La versión anterior
+ * declaraba `cierre.derecha` = 246 y derivaba `cierre.izquierda` = 216, y I.1.3
+ * decía «la caja de firma vive en su columna derecha». Las láminas dicen lo
+ * contrario y lo dicen dos veces, con la cifra al lado: `SPEC_DISENO_PARTE_B.md`
+ * B.3 §2 y B.4 componen la fila de cierre como «**firma a la izquierda (246 pt)** ·
+ * QR y folio de verificación a la derecha». La columna ancha es la izquierda. El
+ * valor propio pasa a `izquierda` y el DERIVADO a `derecha`: un 216 literal en el
+ * código significa que el token no está implementado.
  *
- * `COINCIDENCIA` — `derecha` mide lo mismo que `MANUSCRITO.ancho` (246 pt) y NO
+ * `COINCIDENCIA` — `izquierda` mide lo mismo que `MANUSCRITO.ancho` (246 pt) y NO
  * son el mismo valor: uno es el ancho de una columna de maquetación, el otro el de
  * una línea destinada a llenarse con pluma, medida contra la presentación más
  * larga del catálogo. **No los fusiones.** Si cambia el ancho de la línea de
  * escritura, esta columna no se mueve.
  */
-const CIERRE_DERECHA = 246
+const CIERRE_IZQUIERDA = 246
 const CIERRE_MEDIANIL = 24
 
 export const CIERRE = {
-  derecha: CIERRE_DERECHA,
+  izquierda: CIERRE_IZQUIERDA,
   medianil: CIERRE_MEDIANIL,
-  izquierda: CAJA.ancho - CIERRE_DERECHA - CIERRE_MEDIANIL,
+  derecha: CAJA.ancho - CIERRE_IZQUIERDA - CIERRE_MEDIANIL,
+} as const
+
+/**
+ * I.1.3 · Las dos zonas del bloque de título, declaradas por el diseño (A.2 y A.8):
+ * el texto ocupa las columnas 1–8 y el riel de folio las 9–12.
+ *
+ * `321 + 9 + 156 = 486` = `caja.ancho`, con un medianil de retícula entre las dos.
+ */
+export const ZONA = {
+  texto: 321,
+  riel: 156,
 } as const
 
 // ───────────────────────────────────────────────────────────────────────────────
@@ -210,9 +227,22 @@ export const TIPOGRAFIA = {
   'medico.especialidad': { familia: FUENTE.neogrotesca, cuerpo: 7.5, interlineado: 12, peso: 500, tracking: 0.34, color: 'tinta.secundaria' },
   'medico.credencial': { familia: FUENTE.neogrotesca, cuerpo: 7.5, interlineado: 11, peso: 400, tracking: 0.06, color: 'tinta.secundaria' },
   'titulo.documento': { familia: FUENTE.neogrotesca, cuerpo: 17, interlineado: 20, peso: 600, tracking: 0.02, color: 'tinta.negra' },
-  'titulo.subtitulo': { familia: FUENTE.humanista, cuerpo: 10.5, interlineado: 15, peso: 400, tracking: 0, color: 'tinta.secundaria' },
+  // Interlineado 14, no 15: A.8 (espécimen) dice 15 y B.1 §1 mide 10.5 / 14 en la
+  // lámina del formato, que es la que manda.
+  'titulo.subtitulo': { familia: FUENTE.humanista, cuerpo: 10.5, interlineado: 14, peso: 400, tracking: 0, color: 'tinta.secundaria' },
   'titulo.seccion': { familia: FUENTE.neogrotesca, cuerpo: 10, interlineado: 14, peso: 600, tracking: 0.14, color: 'tinta.negra' },
   'seccion.numero': { familia: FUENTE.neogrotesca, cuerpo: 15, interlineado: 15, peso: 600, tracking: 0, color: 'acento.tinta' },
+  // ── LOS DOS ROLES QUE EL RIEL DESVÍA, Y QUE AQUÍ NO SE MUEVEN.
+  //
+  // La celda del riel de identificación mide 30 pt en la lámina —3 + 10 + 13 + 4— y
+  // eso pide rótulo 7 / 10 y valor 11.5 / 13. **Esos dos valores son del RIEL, no de
+  // la escala**, y viven declarados como desviación en la ficha de 2.F.
+  //
+  // Una generación anterior los bajó aquí y arrastró cinco elementos que la lámina
+  // mide en 7 / 11: cabecera de tabla (2.G), etiqueta de folio (2.C), bloque en
+  // negativo (2.H), encabezado de 2.J y rótulo de campo (2.E). **La escala no se
+  // toca por un componente**: si un segundo componente pidiera 7 / 10, entonces sí
+  // sería un rol y subiría aquí con nombre propio.
   etiqueta: { familia: FUENTE.neogrotesca, cuerpo: 7, interlineado: 11, peso: 600, tracking: 0.22, color: 'tinta.etiqueta' },
   dato: { familia: FUENTE.neogrotesca, cuerpo: 12, interlineado: 16, peso: 400, tracking: 0, color: 'tinta.negra' },
   'texto.corrido': { familia: FUENTE.humanista, cuerpo: 11.5, interlineado: 18, peso: 400, tracking: 0, color: 'tinta.negra' },
@@ -220,6 +250,39 @@ export const TIPOGRAFIA = {
   'entrada.ancla': { familia: FUENTE.neogrotesca, cuerpo: 11, interlineado: 15, peso: 600, tracking: 0, color: 'tinta.negra' },
   'entrada.secundario': { familia: FUENTE.neogrotesca, cuerpo: 9.5, interlineado: 14, peso: 400, tracking: 0, color: 'tinta.negra' },
   'entrada.numero': { familia: FUENTE.neogrotesca, cuerpo: 13, interlineado: 17, peso: 600, tracking: 0, color: 'acento.tinta' },
+  // ── Calibración COMPACTA de la entrada (2.G). Medida en la lámina de
+  // Laboratorio, B.1 §3, fila «lista larga (18 / 19 filas)». Es la calibración que
+  // hace que 18 estudios quepan en una hoja, y la que `D4` había eliminado. NO la
+  // elige el número de ítems en tiempo de render: la declara el formato.
+  //
+  // ⚠ **LOS TRES PESOS SON 400, Y DOS DE ELLOS ERAN 600 POR MEZCLA DE FUENTES.**
+  //
+  // La primera versión de estos roles tomó el CUERPO de B.1 §3 y el PESO de los
+  // roles `entrada.*` del chasis, que son 600. Es mezcla de dos fuentes, y produce
+  // una hoja que se parece a la lámina sin serlo: los estudios salían en negrita.
+  //
+  // La lista de Laboratorio **no es una `EntradaNumerada`**: B.1 §3 y §6 la declaran
+  // como la variante grid del componente `Tabla`, y sus celdas son el rol
+  // `tabla.celda`, que A.4 fija en **Archivo 9.5 / 14 pt, peso 400**. A.11 lo dice
+  // por contraste dentro de su propia ficha: declara «600» explícito para la
+  // cabecera y para la fila de total, y NO declara peso para los cuerpos de celda,
+  // que por tanto se quedan en el del rol. Los roles `entrada.ancla` y
+  // `entrada.numero` de los que salió el 600 son de la Receta —A.4 los marca
+  // `NO DEFINIDO en el chasis`, «nace en la Receta Médica»— y no gobiernan esta
+  // tabla.
+  //
+  // `DERIVADO, NO MEDIDO` — el archivo de la lámina no está en el repo, así que esto
+  // sale de A.4 + A.11 + B.1 §3, no de abrir el HTML. B.1 §3 no tiene columna de
+  // peso para ninguna de las dos calibraciones, así que su silencio no distingue.
+  // El número es el menos firme de los tres: es la única celda con color de acento,
+  // y en los otros tres formatos el número de entrada sí va en 600 —pero esos son
+  // entradas, no tablas.
+  'entradaCompacta.numero': { familia: FUENTE.neogrotesca, cuerpo: 9, interlineado: 11.5, peso: 400, tracking: 0, color: 'acento.tinta' },
+  'entradaCompacta.ancla': { familia: FUENTE.neogrotesca, cuerpo: 9.5, interlineado: 11.5, peso: 400, tracking: 0, color: 'tinta.negra' },
+  // La indicación va en humanista y en `tinta.secundaria` (#454545), textual de B.1
+  // §3. Su peso YA era el correcto: 400, el de `texto.corrido` y el único que la
+  // humanista tiene cargado junto al 500. No se toca.
+  'entradaCompacta.nota': { familia: FUENTE.humanista, cuerpo: 9, interlineado: 11.5, peso: 400, tracking: 0, color: 'tinta.secundaria' },
   'firma.nombre': { familia: FUENTE.neogrotesca, cuerpo: 11.5, interlineado: 16, peso: 600, tracking: -0.012, color: 'tinta.negra' },
   'firma.rol': { familia: FUENTE.neogrotesca, cuerpo: 7, interlineado: 11, peso: 600, tracking: 0.22, color: 'tinta.etiqueta' },
   'firma.credencial': { familia: FUENTE.neogrotesca, cuerpo: 7.5, interlineado: 11, peso: 400, tracking: 0.06, color: 'tinta.secundaria' },
@@ -315,6 +378,7 @@ export const CIFRAS_TABULARES = [
   'dato',
   'tabla.celda',
   'entrada.numero',
+  'entradaCompacta.numero',
   'folio',
   'medico.credencial',
   'firma.credencial',
@@ -384,7 +448,7 @@ export const MANUSCRITO = {
 export const ESPACIO_BASE = 4
 
 /**
- * La escala de 8 miembros. `espacio.16` → `ESPACIO[16]`.
+ * La escala. `espacio.16` → `ESPACIO[16]`.
  *
  * ALCANCE. La escala gobierna la separación vertical entre BLOQUES DE PRIMER
  * NIVEL. La geometría interna de un componente —aire entre panel y nombre,
@@ -392,12 +456,29 @@ export const ESPACIO_BASE = 4
  * del componente con el valor extraído del diseño, aunque no sea múltiplo de 4.
  * El espécimen aprobado usa 14, 18, 10, 7, 6, 5 y 3 pt dentro de sus
  * componentes: forzarlos a esta escala sería rediseñar hojas ya aprobadas.
+ *
+ * **ERA DE OCHO MIEMBROS Y AHORA ES DE ONCE.** Se añaden `2`, `5` y `20`, que no
+ * son múltiplos de `espacio.base` y no tienen por qué serlo: **la escala existe
+ * para expresar el diseño, no para restringirlo.** Los tres salen medidos de la
+ * lámina de Laboratorio y sin ellos el formato no se puede componer sin escribir
+ * literales, que es lo que I.1 prohíbe:
+ *
+ *   `espacio.2`   subtítulo bajo el título          B.1 §1
+ *   `espacio.5`   cierre de la lista → contador     B.1 §2 · bloque 11
+ *   `espacio.20`  aire antes de observaciones y antes de la firma   B.1 §5 `separacion`
+ *
+ * `COINCIDENCIA` — `espacio.20` mide lo mismo que el antiguo `transicion.tituloRiel`
+ * y no es él. Aquel quedó en 8 pt por la misma lámina; que hayan coincidido en 20
+ * durante una generación no los hace el mismo valor.
  */
 export const ESPACIO = {
+  2: 2,
   4: 4,
+  5: 5,
   8: 8,
   12: 12,
   16: 16,
+  20: 20,
   24: 24,
   32: 32,
   48: 48,
@@ -422,28 +503,53 @@ export const ESPACIO = {
  * No confundir con `FILETE.transicion`, que es un grosor de línea.
  */
 export const TRANSICION = {
-  /** Fila superior del membrete → filete de cierre. */
-  membreteFilete: 14,
+  /**
+   * Fila superior del membrete → filete de cierre.
+   *
+   * **8 pt, no 14.** Tercera transición que el espécimen declara de una forma y la
+   * lámina compone de otra, y la tercera que se resuelve igual: A.7 y A.15 dicen
+   * 14, y las coordenadas medidas de la lámina de Laboratorio dan el cierre de la
+   * fila superior en **58.7** y el filete en **66.7 → 69.2**. Ocho.
+   */
+  membreteFilete: 8,
   /** Filete de cierre del membrete → línea fina. */
   membreteLineaFina: 6,
-  /** Bloque de título → su filete. */
-  tituloFilete: 10,
+  /**
+   * Bloque de título → su filete.
+   *
+   * **4 pt, no 10.** A.15 —los espaciados del ESPÉCIMEN— declara 10 pt, y con 10
+   * el encabezado no cabe en el presupuesto de la lámina. `SPEC_DISENO_PARTE_B.md`
+   * B.1 §2 mide **4 pt** sobre la lámina aprobada de Laboratorio, y manda la lámina
+   * del formato, no el espécimen. Vale 6 pt de deriva de encabezado.
+   */
+  tituloFilete: 4,
   /**
    * Filete del título → riel de identificación.
    *
-   * También el arranque del cuerpo del Escrito Médico bajo el filete del
-   * membrete cuando el título colapsa (2.C variante `ausente`, II.8 §5): lo que
-   * va bajo el filete sin título ocupa el sitio del riel. Ese uso venía de un
-   * `espacio.20` que no era miembro de la escala de ocho y quedó retirado del
-   * spec; no lo repongas.
+   * **8 pt, no 20.** Misma causa que `tituloFilete`: A.15 declara 20 y B.1 §2 mide
+   * **8** en la lámina. Vale 12 pt de deriva de encabezado.
+   *
+   * ⚠ **También gobierna el Escrito Médico.** Es el arranque del cuerpo bajo el
+   * filete del membrete cuando el título colapsa (2.C variante `ausente`, II.8 §5):
+   * lo que va bajo el filete sin título ocupa el sitio del riel. Ese formato sube
+   * 12 pt de contenido por este cambio y **su lámina no se ha medido todavía**
+   * (B.8). Queda reportado.
    */
-  tituloRiel: 20,
+  tituloRiel: 8,
   /** Encabezado de sección → su párrafo. */
   seccionParrafo: 8,
   /** Cierre de una sección numerada → apertura de la siguiente. */
   entreSecciones: 24,
-  /** Cabecera de tabla → filete de acento. */
-  tablaFilete: 6,
+  /**
+   * Cabecera de tabla → filete de acento.
+   *
+   * **3 pt, no 6.** Cuarta transición que el espécimen declara de una forma y la
+   * lámina compone de otra, y la cuarta que se resuelve igual: A.15 dice 6, y la
+   * lámina de Laboratorio mide el bloque de cabecera —rótulo + aire + filete— en
+   * **16 pt**. Con el rótulo en `etiqueta` (11 pt) y el filete en `filete.acento`
+   * (2 pt), el aire que queda es 3. Manda la lámina del formato, no el espécimen.
+   */
+  tablaFilete: 3,
   /** Cierre de tabla → fila de total. */
   tablaTotal: 6,
   /** Último bloque de contenido → banda de pie. */
@@ -661,8 +767,25 @@ export type RolFirmante = 'medicoTratante' | 'anestesiologo' | 'firmante'
  * alto del renglón es su interlineado, no un valor aparte.
  */
 export const FIRMA_RENGLONES = {
-  /** Nombre + céd. profesional + céd. de especialidad. */
-  medicoTratante: ['firma.nombre', 'firma.credencial', 'firma.credencial'],
+  /**
+   * Nombre + **un solo renglón** de credenciales.
+   *
+   * ⚠ **ERAN DOS RENGLONES DE CÉDULA Y LA LÁMINA COMPONE UNO.** B.1 §4 imprime
+   * `Céd. Prof. 9552456 · Céd. Esp. 12085805` en una línea, separadas por la raya
+   * del sistema, no una debajo de otra. El chasis contaba un renglón de más y por
+   * eso daba 130.8 pt donde la lámina mide 119.5.
+   *
+   * **El alcance no es Laboratorio.** `altoBloqueFirma()` y `umbralFirma()` salen de
+   * esta tabla y gobiernan la regla 1 de 2.N en los ocho formatos: el umbral del
+   * médico tratante baja de 200.8 a 189.5 pt. Es la corrección de un cálculo que
+   * sobraba, no un ajuste para que quepa esta hoja.
+   *
+   * Que los tres roles tengan hoy el mismo inventario es CONSECUENCIA, no diseño:
+   * cada uno llegó a un renglón por su causa —el médico juntando dos cédulas, los
+   * otros dos porque siempre tuvieron una—. Si algún rol vuelve a necesitar dos, se
+   * declara aquí y la fórmula lo absorbe sin tocarse.
+   */
+  medicoTratante: ['firma.nombre', 'firma.credencial'],
   /** Nombre + céd. profesional. */
   anestesiologo: ['firma.nombre', 'firma.credencial'],
   /** Nombre + rol o parentesco. */
@@ -682,15 +805,27 @@ function redondearPt(valor: number): number {
 /**
  * `firma.bloque.alto(renglones)` de I.1.9, como fórmula:
  *
- *     firma.rol + firma.espacio + filete.fino + espacio.4
+ *     firma.rol + firma.espacio + filete.fino + espacio.5
  *               + Σ(renglones de identificación)
+ *
+ * **UN SOLO SUMANDO CAMBIÓ, Y ES EL AIRE BAJO LA LÍNEA:** `espacio.5`, no
+ * `espacio.4`. Lo declaran igual A.12 —«margen superior 5 pt» para el nombre del
+ * caso de 1 firma— y el desglose medido de la lámina, así que no hay divergencia
+ * que resolver: el 4 era del spec viejo. La línea sigue siendo `filete.fino`, como
+ * A.12 y B.1 §5.
+ *
+ *     11 rótulo + 77 rúbrica + 0.8 filete + 5 aire + 16 nombre + 11 cédulas = 120.8
+ *
+ * Lo que sí bajó el alto es el renglón de cédula que se fusionó en uno: 130.8 → 120.8.
  *
  * El rol va ENCIMA de la línea, en versalita; el nombre y las credenciales van
  * debajo. Ese renglón del rol es lo que le faltaba a la composición de 119.8 pt
  * de una generación anterior del spec.
  *
- * Valores de referencia del spec (I.1.9): `medicoTratante` **130.8 pt**, los
- * otros dos roles **119.8 pt**.
+ * Valor de referencia: **120.8 pt** para los tres roles. Los 130.8 pt del médico
+ * tratante y los 119.8 pt de los otros dos son de la generación anterior del spec,
+ * la que contaba dos renglones de cédula al médico y ponía `espacio.4` bajo la
+ * línea.
  *
  * El 131.8 pt que declaraba una versión anterior del spec era doble conteo de
  * `filete.fino` y quedó corregido (anexo A, P1-1). Se detectó justamente aquí:
@@ -698,10 +833,10 @@ function redondearPt(valor: number): number {
  * fórmula no cambió — es la tercera generación de valores que aguanta sin
  * tocarla, y ese es el motivo de escribirla como fórmula.
  *
- * `COINCIDENCIA` — el 119.8 pt de anestesiólogo y firmante coincide en cifra con
- * el 119.8 pt muerto del médico tratante. Distinto valor por distinta causa: uno
- * era el médico sin el renglón del rol, otro es un firmante con un renglón de
- * credencial menos. Ver un 119.8 aquí no significa que el valor muerto volvió.
+ * `COINCIDENCIA` — que los tres roles den hoy la misma cifra NO significa que el
+ * parámetro sobre: siguen siendo tres inventarios declarados por separado en
+ * `FIRMA_RENGLONES`, y coinciden porque los tres acabaron en un renglón de
+ * credencial. No colapses la función a una constante.
  */
 export function altoBloqueFirma(rol: RolFirmante): number {
   const renglones = FIRMA_RENGLONES[rol].reduce(
@@ -712,7 +847,7 @@ export function altoBloqueFirma(rol: RolFirmante): number {
     (TIPOGRAFIA['firma.rol'].interlineado ?? 0) +
       FIRMA.espacio +
       FILETE.fino +
-      ESPACIO[4] +
+      ESPACIO[5] +
       renglones,
   )
 }
@@ -731,12 +866,8 @@ export function altoBloqueFirma(rol: RolFirmante): number {
  * de generaciones muertas: el primero se calculó con renglón de 17 pt, el
  * segundo con una composición de firma sin el renglón del rol (`CONCILIA D43`).
  *
- * Valor de referencia del spec para `medicoTratante`: **200.8 pt**.
- *
- * `COINCIDENCIA` — evaluado para anestesiólogo o firmante da 189.8 pt, cifra
- * idéntica al umbral muerto de una generación anterior. No es el mismo valor:
- * aquel era el médico con una composición incompleta, este es otro rol con un
- * renglón menos.
+ * Valor de referencia: **190.8 pt** para los tres roles. Los 200.8 pt del spec son
+ * de la generación que contaba dos renglones de cédula al médico tratante.
  */
 export function umbralFirma(rol: RolFirmante = 'medicoTratante'): number {
   return redondearPt(

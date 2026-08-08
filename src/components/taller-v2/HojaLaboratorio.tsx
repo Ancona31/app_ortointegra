@@ -38,34 +38,51 @@ import { resolverAcento } from '@/lib/pdf/v2/tokens'
 import type { MedicoFicticio } from './HojaTaller'
 
 /**
- * Paciente del caso completo. INVENTADO. Sin `sexo`, `expediente` ni `hora`: los
- * tres no llegan hoy desde ningún formulario (2.D regla 3), así que pasarlos aquí
- * enseñaría un riel que la app todavía no puede producir.
+ * Paciente del caso completo. INVENTADO. **Las SIETE celdas del riel**, que es lo
+ * que la lámina aprobada compone: `SPEC_DISENO_PARTE_B.md` B.1 §2 declara el riel
+ * de identificación como «7 celdas en dos filas» y §4 lista las siete etiquetas.
+ *
+ * La versión anterior pasaba cuatro —sin `sexo`, `expediente` ni `hora`— razonando
+ * que los tres no llegan hoy desde ningún formulario (2.D regla 3). El razonamiento
+ * es cierto y es cableado del Paso 5, pero la consecuencia era enseñar medio riel:
+ * al colapsar tres celdas, 2.F redistribuye las cuatro vivas por `flexGrow` y la
+ * fila superior queda con dos celdas estiradas donde la lámina tiene cuatro. El
+ * taller existe para ver la composición del formato, no el estado del cableado.
+ *
+ * La fecha va en la forma larga —`7 de agosto de 2026`—, que es la de la hoja 1 en
+ * B.1 §2. El token corto `7 ago 2026` es el de las hojas de continuación.
  */
 const PACIENTE_COMPLETO: ValoresPaciente = {
   paciente: 'María Fernanda Ruiz Ortega',
   edad: '54 años',
+  sexo: 'Femenino',
+  expediente: 'EXP-004821',
   diagnostico: 'Gonartrosis bilateral grado III',
-  fecha: '7 ago 2026',
+  fecha: '7 de agosto de 2026',
+  hora: '10:45',
 }
 
 /** Paciente del caso mínimo: lo indispensable, para ver colapsar el diagnóstico. */
 const PACIENTE_MINIMO: ValoresPaciente = {
   paciente: 'Jorge Alberto Medina Salas',
   edad: '61 años',
-  fecha: '7 ago 2026',
+  fecha: '7 de agosto de 2026',
 }
 
 /**
  * Dos estudios con indicación, de un preoperatorio.
  *
- * **Son DOS y no tres, y la cifra está medida.** Con tres estudios de una línea
- * de indicación más estas notas, el documento pasa a DOS hojas y la hoja 2 llega
- * con la firma sola —sin membrete de continuación, sin `BloquePaciente` reducido
- * y sin el aviso `RESERVADO PARA LA FIRMA`—, porque este formato todavía no monta
- * `MotorFlujo` y II.1 §3 no declara ninguna de esas tres piezas. Queda registrado
- * en el spec (anexo A, P4-4). Con dos, el caso completo cabe en una hoja, que es
- * lo que estos dos casos existen para enseñar.
+ * **La cifra de tres que decía esta nota ya no aplica.** Se midió cuando la lista
+ * apilaba la indicación bajo el nombre, a 53.5 pt por entrada; con la tabla de
+ * B.1 §3 —fila `compacta`, indicación en `columna`— la entrada mide 15.5 pt y el
+ * techo de una hoja está hoy en **15 estudios**, medido. Los dos de aquí se
+ * conservan porque este caso existe para enseñar la composición, no el techo.
+ *
+ * Lo que sigue vivo de aquella nota es el defecto que describía: cuando la lista
+ * desborda, la hoja 2 llega con la firma sola —sin membrete de continuación, sin
+ * `BloquePaciente` reducido y sin el aviso `RESERVADO PARA LA FIRMA`—, porque este
+ * formato todavía no monta `MotorFlujo` y II.1 §3 no declara ninguna de esas tres
+ * piezas (anexo A, P4-4).
  */
 const ESTUDIOS_COMPLETO: readonly EstudioSolicitado[] = [
   {
@@ -95,6 +112,27 @@ const NOTAS_COMPLETO = [
   '- Reportar por teléfono cualquier valor crítico.',
 ].join('\n')
 
+/*
+ * Los dos subtítulos de los casos QUEDAN RETIRADOS. La lámina los tiene en sus tres
+ * hojas —B.1 §1 observa `Protocolo preoperatorio completo`, `Examen general de
+ * orina` y `Protocolo preoperatorio ampliado`— y el formato ya no compone la ranura:
+ * `CONCILIA D2` queda revertido por decisión de producto. Ver la nota junto al
+ * título en `SolicitudLaboratorio`.
+ */
+
+/**
+ * Folios INVENTADOS, con la forma que emitirá `public.generar_folio()` tras la
+ * migración `20260808_folio_02_clases_faltantes.sql` — `LAB-AAAA-NNNN`.
+ *
+ * **No son los de la lámina.** Aquella emite `L-7C15A0E4D2B9`: prefijo de una letra
+ * más 8 hex de UUID, que es la generación anterior y que el CHECK de
+ * `20260807_folio_01` excluye a propósito. La forma es decisión de producto y manda
+ * `DOCUMENTOS_SPEC.md`; la lámina manda en que el folio EXISTA y en dónde se
+ * compone, no en cómo se genera.
+ */
+const FOLIO_COMPLETO = 'LAB-2026-0148'
+const FOLIO_MINIMO = 'LAB-2026-0149'
+
 /** Las dos líneas de cédula, redactadas por quien llama (2.B no las inventa). */
 function medicoMembrete(medico: MedicoFicticio): MedicoMembrete {
   return {
@@ -118,7 +156,9 @@ function HojaLaboratorio({
   const acento = resolverAcento(acentoHex)
   const comun = {
     medico: medicoMembrete(medico),
-    consultorio: { domicilio: medico.domicilio, telefono: medico.telefono },
+    // El teléfono llega YA ROTULADO: A.7 compone `Tel. 999 222 3173 · Univ. …` en
+    // un solo renglón y 2.B une los dos datos, pero no inventa el rótulo.
+    consultorio: { domicilio: medico.domicilio, telefono: `Tel. ${medico.telefono}` },
     panel: { variante: 'logo', acento, logo: medico.logo } as const,
     acento,
   }
@@ -130,11 +170,13 @@ function HojaLaboratorio({
         paciente={PACIENTE_COMPLETO}
         estudios={ESTUDIOS_COMPLETO}
         notas={NOTAS_COMPLETO}
+        folio={FOLIO_COMPLETO}
       />
       <SolicitudLaboratorio
         {...comun}
         paciente={PACIENTE_MINIMO}
         estudios={ESTUDIOS_MINIMO}
+        folio={FOLIO_MINIMO}
       />
     </Document>
   )
