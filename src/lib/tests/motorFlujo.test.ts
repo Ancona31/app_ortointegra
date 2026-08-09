@@ -38,7 +38,7 @@ import path from 'node:path'
 import React from 'react'
 import { Document, Page, View, Text, Font, renderToBuffer } from '@react-pdf/renderer'
 import type { DocumentProps } from '@react-pdf/renderer'
-import MotorFlujo, { type AvisoPie } from '@/lib/pdf/v2/MotorFlujo'
+import MotorFlujo from '@/lib/pdf/v2/MotorFlujo'
 import BloqueFirmas from '@/lib/pdf/v2/BloqueFirmas'
 import {
   PAPEL,
@@ -46,6 +46,8 @@ import {
   FLUJO,
   TIPOGRAFIA,
   estiloTipografico,
+  resolverAcento,
+  ACENTO_BASE_POR_DEFECTO,
 } from '@/lib/pdf/v2/tokens'
 
 const h = React.createElement
@@ -198,6 +200,14 @@ const ARRASTRE =
 /** Nombre que solo puede salir del bloque de firmas. */
 const FIRMANTE = 'Angel Ancona'
 
+/**
+ * Nombre que solo puede salir del riel del paciente, en cualquiera de sus dos
+ * variantes. Sin la secuencia `fi`: react-pdf incrusta la LIGADURA como glifo propio
+ * y su `ToUnicode` no la descompone, así que un «Identificable» sale del flujo como
+ * «Identicable» y la prueba fallaría por el extractor, no por el componente.
+ */
+const PACIENTE = 'Paciente Reconocible'
+
 const FIRMAS = h(BloqueFirmas, {
   variante: 'simple',
   firmas: [{ rol: 'Firma y sello del médico', nombre: FIRMANTE, credenciales: ['Céd. Prof. 9552456'] }],
@@ -223,13 +233,37 @@ function relleno(n: number): React.ReactElement[] {
 }
 
 /**
+ * Los datos del encabezado. Van al mínimo a propósito: esta prueba fija el motor de
+ * flujo, no la composición del encabezado —eso es 2.V y lo miden las tres pruebas de
+ * formato—. Lo único que importa aquí es que exista, porque su alto entra en el
+ * reparto.
+ */
+const ENCABEZADO = {
+  medico: {
+    nombre: 'Dra. Elena Marín Solís',
+    especialidad: 'Ortopedia y Traumatología',
+    universidad: 'Universidad Nacional Autónoma de México',
+    cedulas: ['Céd. Prof. 7000001'],
+  },
+  consultorio: { domicilio: 'Av. Ficticia 100', telefono: 'Tel. 55 0000 0000' },
+  panel: { variante: 'oculto' } as const,
+  acento: resolverAcento(ACENTO_BASE_POR_DEFECTO),
+  titulo: 'Hoja de prueba',
+  paciente: { paciente: PACIENTE },
+}
+
+/**
  * Una hoja del sistema. Es el `paddingBottom: margen.inferior` lo que reserva el
  * hueco donde vive el aviso (I.1.2): sin él, el aviso se solaparía con la última
  * línea de contenido, que es el bug §8.1 en su versión de 2.N.
  */
 function documento(
   hijos: number,
-  props: { arrastre: string; firmas: React.ReactElement; avisos?: readonly (AvisoPie | null)[] },
+  props: {
+    arrastre?: string
+    firmas: React.ReactElement
+    contador?: { items: string; total: number }
+  },
 ): React.ReactElement<DocumentProps> {
   return h<DocumentProps>(
     Document,
@@ -245,7 +279,7 @@ function documento(
           paddingBottom: MARGEN.inferior,
         },
       },
-      h(MotorFlujo, { ...props, children: relleno(hijos) }),
+      h(MotorFlujo, { encabezado: ENCABEZADO, ...props, children: relleno(hijos) }),
     ),
   )
 }
@@ -265,7 +299,6 @@ describe('2.N · MotorFlujo', () => {
       documento(CONTENIDO_A_MEDIA_HOJA, {
         arrastre: ARRASTRE,
         firmas: FIRMAS,
-        avisos: [{ forma: 'reservaFirma' }],
       }),
     )
     const texto = textoPorHoja(pdf)
@@ -275,7 +308,10 @@ describe('2.N · MotorFlujo', () => {
     // La hoja 1 cierra con el aviso. Esto es lo que se compone dentro de un
     // `render` y lo que se cae en silencio: si falla, mira I.3.8 antes que el
     // componente.
-    expect(texto[0]).toContain('RESERVADO PARA LA FIRMA · CONTINÚA EN LA HOJA 2')
+    //
+    // UNA SOLA FORMA, y eran tres: el rango de la de lista pedía saber qué ítems
+    // cayeron en cada hoja, que el renderer no reporta. Ver `ZONA_IZQUIERDA` en 2.N.
+    expect(texto[0]).toContain('CONTINÚA EN LA HOJA 2')
     expect(texto[0]).toContain('SIN FIRMA NO ES VÁLIDO')
 
     // Y no se queda ni con el arrastre ni con la firma.
@@ -287,18 +323,20 @@ describe('2.N · MotorFlujo', () => {
     expect(texto[1]).toContain(FIRMANTE)
 
     // El aviso NO sale en la última hoja: en ella no continúa nada.
-    expect(texto[1]).not.toContain('RESERVADO PARA LA FIRMA')
+    expect(texto[1]).not.toContain('CONTINÚA EN LA HOJA')
     expect(texto[1]).not.toContain('SIN FIRMA NO ES VÁLIDO')
+
+    // REGLA 2 DE 2.D, QUE ES LO QUE 2.N AÑADIÓ AL CABLEARSE: la hoja de continuación
+    // identifica al paciente ella sola. Antes de esto llegaba sin membrete, sin folio
+    // y sin nombre — el hallazgo más grave de la auditoría del sistema viejo.
+    expect(texto[1]).toContain(PACIENTE)
+    expect(texto[1]).toContain('CONTINUACIÓN')
   }, 60_000)
 
   it('I.3.4: no comprime el cuerpo para cuadrar la hoja', async () => {
     const cuerpos = cuerposPorHoja(
       await renderToBuffer(
-        documento(CONTENIDO_A_MEDIA_HOJA, {
-          arrastre: ARRASTRE,
-          firmas: FIRMAS,
-          avisos: [{ forma: 'reservaFirma' }],
-        }),
+        documento(CONTENIDO_A_MEDIA_HOJA, { arrastre: ARRASTRE, firmas: FIRMAS }),
       ),
     )
 
@@ -314,29 +352,39 @@ describe('2.N · MotorFlujo', () => {
     expect(minimo).toBe(TIPOGRAFIA.pie.cuerpo)
   }, 60_000)
 
-  it('las tres formas del aviso, con la palabra que declara el formato', async () => {
-    // Tres hojas: 80 renglones son 1440 pt sobre una caja de 670, así que caben
-    // 37 en cada una de las dos primeras y el resto pasa a la tercera con el cierre.
+  it('el contador sale en todas las hojas, con su forma y sin cifra inventada', async () => {
+    // Tres hojas: 80 renglones son 1440 pt sobre una caja que el encabezado ya
+    // recorta, así que el contenido reparte y el cierre cae en la última.
     const texto = textoPorHoja(
       await renderToBuffer(
         documento(80, {
           arrastre: ARRASTRE,
           firmas: FIRMAS,
-          avisos: [
-            { forma: 'listaContinua', items: 'estudios', desde: 1, hasta: 5 },
-            { forma: 'textoContinua', items: 'indicaciones' },
-          ],
+          contador: { items: 'estudios', total: 9 },
         }),
       ),
     )
 
-    expect(texto).toHaveLength(3)
-    expect(texto[0]).toContain('CONTINÚA EN LA HOJA 2 · ESTUDIOS 1 A 5')
-    expect(texto[1]).toContain('LAS INDICACIONES CONTINÚAN EN LA HOJA 3')
-    // La zona derecha es la misma en las dos, e invariable (`CONCILIA D22`).
-    expect(texto[0]).toContain('SIN FIRMA NO ES VÁLIDO')
-    expect(texto[1]).toContain('SIN FIRMA NO ES VÁLIDO')
-    expect(texto[2]).not.toContain('SIN FIRMA NO ES VÁLIDO')
+    expect(texto.length).toBeGreaterThan(2)
+    const ultima = texto.length
+
+    /*
+      LA FORMA INTERMEDIA SITÚA LA HOJA, NO CUENTA SUS ÍTEMS. El `NN DE MM` de la
+      ficha —«cuántos van en ESTA hoja»— no lo reporta el renderer y no lo puede
+      calcular nadie sin paginar a mano. Decisión de Angel: cambiar la cadena. Ver 2.K.
+    */
+    for (let i = 0; i < ultima - 1; i += 1) {
+      expect(texto[i]).toContain(`ESTUDIOS · HOJA ${i + 1} DE ${ultima} · TOTAL 9`)
+      expect(texto[i]).toContain('SIN FIRMA NO ES VÁLIDO')
+    }
+
+    // La última lleva la forma final, y ninguna otra la lleva.
+    expect(texto[ultima - 1]).toContain('TOTAL DE ESTUDIOS · 9')
+    expect(texto[ultima - 1]).not.toContain('SIN FIRMA NO ES VÁLIDO')
+    expect(texto.slice(0, -1).every((t) => !t.includes('TOTAL DE ESTUDIOS'))).toBe(true)
+
+    // Y en ninguna aparece la cifra que no se puede saber.
+    expect(texto.some((t) => t.includes('EN ESTA HOJA'))).toBe(false)
   }, 60_000)
 
   it('compone el aviso con la tipografía del sistema, no con la de reserva', async () => {
@@ -346,13 +394,14 @@ describe('2.N · MotorFlujo', () => {
     // renderer — sin lanzar nada. Ver I.3.8.
     //
     // El bloque de firmas va aquí SIN Archivo a propósito: con el 2.L de verdad,
-    // el rol de firma cargaría la familia y el defecto quedaría tapado.
+    // el rol de firma cargaría la familia y el defecto quedaría tapado. El
+    // encabezado sí la carga —el nombre del médico va en Archivo—, así que lo que
+    // esta prueba fija hoy es que ninguna de las dos zonas cae a Helvetica.
     const pdf = (
       await renderToBuffer(
         documento(CONTENIDO_A_MEDIA_HOJA, {
           arrastre: ARRASTRE,
           firmas: FIRMAS_SIN_ARCHIVO,
-          avisos: [{ forma: 'reservaFirma' }],
         }),
       )
     ).toString('latin1')

@@ -113,6 +113,20 @@ const VISTAS: readonly EntradaSelector[] = [
   { vista: null, codigo: '4.8', nombre: 'Escrito médico' },
 ]
 
+/**
+ * LOS CASOS DE CADA FORMATO. Los tres formatos construidos declaran los mismos
+ * tres, y el `lleno` es el único que desborda: es el que enseña la hoja de
+ * continuación, que es lo que 2.N añadió al chasis.
+ *
+ * El chasis no tiene casos —es una hoja de muestras, no un documento—, así que su
+ * selector no aparece.
+ */
+const CASOS: ReadonlyArray<{ caso: string; etiqueta: string; nota: string }> = [
+  { caso: 'completo', etiqueta: 'Completo', nota: 'Todos los estados de la entrada' },
+  { caso: 'minimo', etiqueta: 'Mínimo', nota: 'Lo justo, sin bloques de cierre' },
+  { caso: 'lleno', etiqueta: 'Lleno', nota: 'Desborda: enseña la hoja 2' },
+]
+
 type Estado =
   | { fase: 'generando' }
   | { fase: 'listo'; url: string }
@@ -125,6 +139,7 @@ function contraste(hex: string): string {
 
 export default function TallerV2(): ReactElement {
   const [vista, setVista] = useState<Vista>('chasis')
+  const [caso, setCaso] = useState<string>('completo')
   const [acentoHex, setAcentoHex] = useState<string>(ACENTO_BASE_POR_DEFECTO)
   const [logo, setLogo] = useState<string>(MEDICO_FICTICIO.logo)
   const [nombreLogo, setNombreLogo] = useState<string>('icon-192.png · 1:1')
@@ -175,8 +190,10 @@ export default function TallerV2(): ReactElement {
                 ? (await import('./HojaImagenologia')).generarPdfImagenologia
                 : vista === 'receta'
                   ? (await import('./HojaReceta')).generarPdfReceta
-                  : (await import('./HojaTaller')).generarPdfTaller
-          const blob = await generar(medico, acentoHex)
+                  : // La hoja de chasis no tiene casos: se le pasa el argumento y lo
+                  // ignora, que es más barato que ramificar la llamada.
+                  (await import('./HojaTaller')).generarPdfTaller
+          const blob = await generar(medico, acentoHex, caso)
           if (cancelado) return
           urlCreada = URL.createObjectURL(blob)
           setEstado({ fase: 'listo', url: urlCreada })
@@ -195,7 +212,7 @@ export default function TallerV2(): ReactElement {
       clearTimeout(temporizador)
       if (urlCreada !== null) URL.revokeObjectURL(urlCreada)
     }
-  }, [acentoHex, logo, especialidadLarga, vista])
+  }, [acentoHex, logo, especialidadLarga, vista, caso])
 
   const derivados: ReadonlyArray<{
     token: string
@@ -263,8 +280,42 @@ export default function TallerV2(): ReactElement {
             <p className="mt-3 text-xs text-slate-500">
               Las entradas en gris son los formatos que faltan por construir. El
               formato va SIN guías: un documento tiene que verse como un documento.
-              Cada caso va en su propia hoja.
             </p>
+
+            {vista === 'chasis' ? null : (
+              <div className="mt-5">
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                  Caso
+                </h3>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {CASOS.map((c) => (
+                    <button
+                      key={c.caso}
+                      type="button"
+                      onClick={() => setCaso(c.caso)}
+                      title={c.nota}
+                      className={`rounded border px-2 py-1.5 text-xs ${
+                        caso === c.caso
+                          ? 'border-slate-500 bg-slate-800 text-slate-100'
+                          : 'border-slate-700 text-slate-400'
+                      }`}
+                    >
+                      {c.etiqueta}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-3 text-xs text-slate-500">
+                  <strong className="text-slate-400">
+                    Cada caso es un documento entero, no una hoja de un documento
+                    común.
+                  </strong>{' '}
+                  Es lo que ocurre en emisión real —un documento es un formato— y
+                  componer varios en uno produce un resultado que en producción no
+                  existe. El caso <em>lleno</em> desborda: es el que enseña la hoja de
+                  continuación con su membrete, su folio y el nombre del paciente.
+                </p>
+              </div>
+            )}
           </section>
 
           <section className="mt-8">

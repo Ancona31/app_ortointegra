@@ -141,12 +141,48 @@ function medicoMembrete(medico: MedicoFicticio): MedicoMembrete {
   }
 }
 
+/**
+ * ⚠️ **UN CASO POR PDF, Y ANTES ERAN LOS TRES EN UNO.**
+ *
+ * Cada caso es un **documento entero**, no una hoja de un documento común. No es una
+ * comodidad del taller: es lo que ocurre en emisión real —un documento es un formato,
+ * un `Document` con un `Page`— y componer tres `Page` en un `Document` **produce un
+ * resultado que no existe en producción**.
+ *
+ * Y no solo mentía: rompía. En la pasada de reparto el renderer entrega `pageNumber`
+ * ABSOLUTO del documento y no `subPageNumber`, así que la primera hoja del segundo
+ * caso se repartía como si fuera una continuación y luego se pintaba con el
+ * encabezado completo. Medido: 13 ítems donde caben 10, con el paso de fila
+ * comprimido de 50 a 40.99 pt — una violación de I.3.4 sin un solo aviso. Ver la
+ * cabecera de 2.N.
+ */
+export type CasoImagenologia = 'completo' | 'minimo' | 'lleno'
+
+const CASOS: Record<
+  CasoImagenologia,
+  {
+    estudios: readonly EstudioSolicitado[]
+    paciente: ValoresPaciente
+    folio: string
+    urgente: boolean
+    notas?: string
+  }
+> = {
+  completo: { estudios: ESTUDIOS_COMPLETO, paciente: PACIENTE_COMPLETO, folio: FOLIO_COMPLETO, urgente: true, notas: NOTAS_COMPLETO },
+  minimo: { estudios: ESTUDIOS_MINIMO, paciente: PACIENTE_MINIMO, folio: FOLIO_MINIMO, urgente: false },
+  // Urgente Y desbordado: es el caso que enseña el badge en las DOS hojas, reducido
+  // en la segunda, que es lo único que distingue a este formato en continuación.
+  lleno: { estudios: ESTUDIOS_LLENO, paciente: PACIENTE_COMPLETO, folio: FOLIO_LLENO, urgente: true, notas: NOTAS_COMPLETO },
+}
+
 function HojaImagenologia({
   medico,
   acentoHex,
+  caso,
 }: {
   medico: MedicoFicticio
   acentoHex: string
+  caso: CasoImagenologia
 }): ReactElement {
   const acento = resolverAcento(acentoHex)
   const comun = {
@@ -157,30 +193,18 @@ function HojaImagenologia({
     acento,
   }
 
+  const c = CASOS[caso]
+
   return (
-    <Document title="Solicitud de imagenología — taller">
+    <Document title={`Solicitud de imagenología — taller · ${caso}`}>
       <SolicitudImagenologia
         {...comun}
-        paciente={PACIENTE_COMPLETO}
-        estudios={ESTUDIOS_COMPLETO}
+        paciente={c.paciente}
+        estudios={c.estudios}
         emision={EMISION}
-        urgente
-        notas={NOTAS_COMPLETO}
-        folio={FOLIO_COMPLETO}
-      />
-      <SolicitudImagenologia
-        {...comun}
-        paciente={PACIENTE_MINIMO}
-        estudios={ESTUDIOS_MINIMO}
-        emision={EMISION}
-        folio={FOLIO_MINIMO}
-      />
-      <SolicitudImagenologia
-        {...comun}
-        paciente={PACIENTE_COMPLETO}
-        estudios={ESTUDIOS_LLENO}
-        emision={EMISION}
-        folio={FOLIO_LLENO}
+        urgente={c.urgente}
+        notas={c.notas}
+        folio={c.folio}
       />
     </Document>
   )
@@ -190,10 +214,15 @@ function HojaImagenologia({
 export async function generarPdfImagenologia(
   medico: MedicoFicticio,
   acentoHex: string,
+  caso: string,
 ): Promise<Blob> {
   registrarFuentesV2()
   const elemento: ReactElement<DocumentProps> = (
-    <HojaImagenologia medico={medico} acentoHex={acentoHex} />
+    <HojaImagenologia
+      medico={medico}
+      acentoHex={acentoHex}
+      caso={caso in CASOS ? (caso as CasoImagenologia) : 'completo'}
+    />
   )
   return pdf(elemento).toBlob()
 }

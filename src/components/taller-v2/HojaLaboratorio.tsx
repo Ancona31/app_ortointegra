@@ -146,12 +146,54 @@ function medicoMembrete(medico: MedicoFicticio): MedicoMembrete {
   }
 }
 
+/**
+ * ⚠️ **UN CASO POR PDF, Y ANTES ERAN VARIOS EN UNO.**
+ *
+ * Cada caso es un **documento entero**, no una hoja de un documento común. No es una
+ * comodidad del taller: es lo que ocurre en emisión real —un documento es un formato,
+ * un `Document` con un `Page`— y componer varios `Page` en un `Document` **produce un
+ * resultado que no existe en producción**.
+ *
+ * Y no solo mentía: rompía. En la pasada de reparto el renderer entrega `pageNumber`
+ * ABSOLUTO del documento y no `subPageNumber`, así que la primera hoja del segundo
+ * caso se repartía como si fuera una continuación y luego se pintaba con el
+ * encabezado completo. Medido: 13 ítems donde caben 10, con el paso de fila
+ * comprimido de 50 a 40.99 pt — una violación de I.3.4 sin un solo aviso. Ver la
+ * cabecera de 2.N.
+ */
+export type CasoLaboratorio = 'completo' | 'minimo' | 'lleno'
+
+/**
+ * El caso `lleno` son 25 estudios: por encima de los 18 que la lámina mete en una
+ * hoja, así que **corta**. Es el caso que enseña la hoja de continuación de este
+ * formato, y el que hay que mirar tapándose la hoja 1 con la mano: la 2 tiene que
+ * identificar al paciente ella sola (regla 2 de 2.D).
+ */
+const ESTUDIOS_LLENO: readonly EstudioSolicitado[] = Array.from(
+  { length: 25 },
+  (_, i) => ({
+    nombre: `Estudio de control ${i + 1}`,
+    indicacion: i % 3 === 0 ? 'Ayuno de 8 horas' : undefined,
+  }),
+)
+
+const CASOS: Record<
+  CasoLaboratorio,
+  { estudios: readonly EstudioSolicitado[]; paciente: ValoresPaciente; folio: string; notas?: string }
+> = {
+  completo: { estudios: ESTUDIOS_COMPLETO, paciente: PACIENTE_COMPLETO, folio: FOLIO_COMPLETO, notas: NOTAS_COMPLETO },
+  minimo: { estudios: ESTUDIOS_MINIMO, paciente: PACIENTE_MINIMO, folio: FOLIO_MINIMO },
+  lleno: { estudios: ESTUDIOS_LLENO, paciente: PACIENTE_COMPLETO, folio: FOLIO_COMPLETO, notas: NOTAS_COMPLETO },
+}
+
 function HojaLaboratorio({
   medico,
   acentoHex,
+  caso,
 }: {
   medico: MedicoFicticio
   acentoHex: string
+  caso: CasoLaboratorio
 }): ReactElement {
   const acento = resolverAcento(acentoHex)
   const comun = {
@@ -163,20 +205,16 @@ function HojaLaboratorio({
     acento,
   }
 
+  const c = CASOS[caso]
+
   return (
-    <Document title="Solicitud de laboratorio — taller">
+    <Document title={`Solicitud de laboratorio — taller · ${caso}`}>
       <SolicitudLaboratorio
         {...comun}
-        paciente={PACIENTE_COMPLETO}
-        estudios={ESTUDIOS_COMPLETO}
-        notas={NOTAS_COMPLETO}
-        folio={FOLIO_COMPLETO}
-      />
-      <SolicitudLaboratorio
-        {...comun}
-        paciente={PACIENTE_MINIMO}
-        estudios={ESTUDIOS_MINIMO}
-        folio={FOLIO_MINIMO}
+        paciente={c.paciente}
+        estudios={c.estudios}
+        notas={c.notas}
+        folio={c.folio}
       />
     </Document>
   )
@@ -186,10 +224,15 @@ function HojaLaboratorio({
 export async function generarPdfLaboratorio(
   medico: MedicoFicticio,
   acentoHex: string,
+  caso: string,
 ): Promise<Blob> {
   registrarFuentesV2()
   const elemento: ReactElement<DocumentProps> = (
-    <HojaLaboratorio medico={medico} acentoHex={acentoHex} />
+    <HojaLaboratorio
+      medico={medico}
+      acentoHex={acentoHex}
+      caso={caso in CASOS ? (caso as CasoLaboratorio) : 'completo'}
+    />
   )
   return pdf(elemento).toBlob()
 }

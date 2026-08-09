@@ -431,6 +431,22 @@ const SECCIONES_2N_LISTA = [...SECCIONES_2M, ...SECCIONES_2P] as const
  * taller, y medido para ocupar tres líneas de texto corrido sobre la caja de 486
  * pt — que es lo que hace que el cierre mida exactamente el umbral.
  */
+/**
+ * Los datos que 2.N pasa a 2.V para componer el encabezado de cada hoja. Es lo único
+ * que un formato declara del encabezado: **datos, nunca composición**.
+ */
+function encabezado2N(medico: MedicoFicticio, acento: AcentoResuelto) {
+  return {
+    medico: medicoMembrete(medico),
+    consultorio: { domicilio: medico.domicilio, telefono: `Tel. ${medico.telefono}` },
+    panel: { variante: 'logo', acento, logo: medico.logo } as const,
+    acento,
+    titulo: 'Hoja de taller',
+    paciente: { paciente: 'Paciente de prueba', expediente: 'EXP-000000' },
+    folio: 'TAL-2026-0001',
+  }
+}
+
 const ARRASTRE_2N =
   'Con lo anterior se cierra la valoración del episodio y se da por terminada la nota. ' +
   'El paciente queda citado para revisión en ocho semanas y se le entregan por escrito los ' +
@@ -874,12 +890,7 @@ function HojaTaller({
         <View style={estilos.contenido}>
           <Rotulo>2.K contador · hoja intermedia</Rotulo>
           <View style={estilos.muestra}>
-            <ContadorLista
-              forma="intermedia"
-              items="estudios"
-              enEstaHoja={5}
-              total={9}
-            />
+            <ContadorLista forma="intermedia" items="estudios" hoja={1} hojas={2} total={9} />
           </View>
 
           <View style={estilos.seccion}>
@@ -891,8 +902,8 @@ function HojaTaller({
 
           <Text style={estilos.nota}>
             2.K · ContadorLista. Las dos formas dicen cosas distintas y se
-            distinguen a simple vista: la intermedia cuenta lo que lleva ESA hoja y
-            de cuántas, la final da el total. Si la hoja 1 mostrara el total,
+            distinguen a simple vista: la intermedia sitúa la hoja dentro del
+            documento, la final da el total. Si la hoja 1 mostrara solo el total,
             estaría contando el documento y no la hoja, y quien la recibe suelta no
             podría saber que le falta la 2. El sustantivo —aquí ESTUDIOS, de la
             Solicitud de Laboratorio— lo declara el formato en la Sección II; el
@@ -1195,22 +1206,24 @@ function HojaTaller({
         Tres secciones dejan el contenido terminado A MEDIA HOJA, y en lo que
         queda no cabe `umbral.firma`. Lo que hay que mirar, en este orden:
 
-        1. La hoja 1 cierra con RESERVADO PARA LA FIRMA · CONTINÚA EN LA HOJA 2 a
-           la izquierda y SIN FIRMA NO ES VÁLIDO a la derecha, y NO trae ni el
-           arrastre ni la firma.
+        1. La hoja 1 cierra con CONTINÚA EN LA HOJA 2 a la izquierda y SIN FIRMA
+           NO ES VÁLIDO a la derecha, y NO trae ni el arrastre ni la firma.
         2. La hoja 2 trae las TRES ÚLTIMAS LÍNEAS del contenido y debajo la firma.
            La firma sola sería el defecto que esta regla existe para evitar.
         3. Medir con una regla el cuerpo del texto en las dos hojas: es el mismo.
            Si en la primera fuera más chico, el motor comprimió (I.3.4).
         4. El aviso NO sale en la hoja 2. En la última no continúa nada.
+        5. La hoja 2 abre con el encabezado de CONTINUACIÓN: membrete solo con el
+           nombre, título con su rótulo y el riel reducido con el paciente. Taparse
+           la hoja 1 con la mano: la 2 tiene que identificar al paciente sola.
       */}
       <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.paginaFlujo}>
         <View style={estilos.guiaZonaSegura} fixed />
         <View style={estilos.guiaCaja} fixed />
 
         <MotorFlujo
+          encabezado={encabezado2N(medico, acento)}
           arrastre={ARRASTRE_2N}
-          avisos={[{ forma: 'reservaFirma' }]}
           firmas={
             <BloqueFirmas
               variante="simple"
@@ -1244,23 +1257,23 @@ function HojaTaller({
       </Page>
 
       {/*
-        2.N · las otras dos formas del aviso, sobre un documento que desborda.
+        2.N · el contador por hoja, sobre un documento que desborda a tres.
 
-        La hoja que no cierra la lista lleva la primera forma con su rango; la que
-        la cierra y sigue con texto corrido lleva la segunda. La palabra de <ÍTEMS>
-        —«estudios», «indicaciones»— la declara el FORMATO, igual que en 2.K: el
-        componente no la conoce. La última hoja no lleva ninguna.
+        Cada hoja lleva SU contador, y cae solo en el sitio correcto: detrás del
+        contenido de esa hoja. Las hojas que no cierran lo llevan en forma
+        `intermedia` —ESTUDIOS · HOJA 1 DE 3 · TOTAL n— y la última en `final`.
+
+        La cifra de «cuántos ítems van en ESTA hoja» no aparece por ningún lado, y no
+        es un olvido: el renderer no reporta qué cayó en cada hoja. Ver 2.K.
       */}
       <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.paginaFlujo}>
         <View style={estilos.guiaZonaSegura} fixed />
         <View style={estilos.guiaCaja} fixed />
 
         <MotorFlujo
+          encabezado={encabezado2N(medico, acento)}
+          contador={{ items: 'estudios', total: SECCIONES_2N_LISTA.length }}
           arrastre={ARRASTRE_2N}
-          avisos={[
-            { forma: 'listaContinua', items: 'estudios', desde: 1, hasta: 5 },
-            { forma: 'textoContinua', items: 'indicaciones' },
-          ]}
           firmas={
             <BloqueFirmas
               variante="simple"

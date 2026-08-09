@@ -100,15 +100,11 @@
 
 import { Page, View, StyleSheet } from '@react-pdf/renderer'
 import type { ReactElement } from 'react'
-import Membrete, {
-  type ConsultorioMembrete,
-  type MedicoMembrete,
-} from '../Membrete'
+import type { ConsultorioMembrete, MedicoMembrete } from '../Membrete'
 import type { PanelCircularProps } from '../PanelCircular'
-import TituloDocumento from '../TituloDocumento'
-import BloquePaciente, { type ValoresPaciente } from '../BloquePaciente'
-import EntradaNumerada, { CabeceraLista, CierreEntradas } from '../EntradaNumerada'
-import ContadorLista from '../ContadorLista'
+import type { ValoresPaciente } from '../BloquePaciente'
+import EntradaNumerada, { CierreEntradas } from '../EntradaNumerada'
+import MotorFlujo from '../MotorFlujo'
 import BloqueDestacado from '../BloqueDestacado'
 import BloqueFirmas, { type Firma } from '../BloqueFirmas'
 import ZonaQR from '../ZonaQR'
@@ -178,7 +174,6 @@ const VIA_POR_DEFECTO = 'Oral'
  * la de siete, que es la que gobierna. Reportado.
  */
 const SEPARACION_RIEL_LISTA = ESPACIO[10]
-const SEPARACION_LISTA_CONTADOR = ESPACIO[5]
 const SEPARACION_CONTADOR_RECOMENDACIONES = ESPACIO[14]
 const SEPARACION_RECOMENDACIONES_ALARMA = ESPACIO[12]
 const SEPARACION_ALARMA_CIERRE = ESPACIO[26]
@@ -264,12 +259,6 @@ const estilos = StyleSheet.create({
     // él vuelve el bug §8.1 y no hay nada que lo detenga (anexo A, P2-27).
     paddingBottom: MARGEN.inferior,
   },
-  bloqueRielLista: {
-    marginTop: SEPARACION_RIEL_LISTA,
-  },
-  bloqueListaContador: {
-    marginTop: SEPARACION_LISTA_CONTADOR,
-  },
   bloqueRecomendaciones: {
     marginTop: SEPARACION_CONTADOR_RECOMENDACIONES,
   },
@@ -349,55 +338,86 @@ export default function RecetaMedica({
   return (
     <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.hoja}>
       {/*
-        Membrete con cédulas y universidad, en un segundo renglón pegado al de
-        dirección — la misma banda que compone Imagenología. Y con el espaciador de
-        cierre a 10 pt, que es lo único que esta lámina mide distinto del resto.
+        TODO EL ENCABEZADO ENTRA COMO DATOS, y este archivo no compone ni una sola
+        pieza de él: ni el membrete, ni el título, ni el riel, ni la cabecera de la
+        lista. Los monta 2.V desde 2.N, dos veces —hoja 1 y continuación— y decide
+        cuál sale en cada hoja.
+
+        Lo que este formato declara aquí es lo suyo: sus cadenas, su lámina, su
+        paciente y el aire de 10 pt entre el riel y la cabecera, que cada lámina mide
+        distinto.
       */}
-      <Membrete
-        variante="completo"
-        lamina="receta"
-        acento={acento}
-        medico={medico}
-        consultorio={consultorio}
-        panel={panel}
-      />
+      <MotorFlujo
+        encabezado={{
+          medico,
+          consultorio,
+          panel,
+          acento,
+          lamina: 'receta',
+          titulo: TITULO,
+          paciente,
+          emision,
+          folio,
+          lista: { titulo: CABECERA_LISTA },
+          aireLista: SEPARACION_RIEL_LISTA,
+        }}
+        contador={{ items: ITEMS, total: medicamentos.length, lamina: 'receta' }}
+        cierre={
+          <>
+            {/*
+              LOS DOS BLOQUES DE CIERRE, cada uno con su propio campo y su propio
+              colapso. El `null` envuelve al contenedor y no vive dentro de él: si no,
+              el aire seguiría aportándose y quedaría el hueco donde estarían.
+            */}
+            {tieneValor(recomendaciones) ? (
+              <View style={estilos.bloqueRecomendaciones}>
+                <BloqueDestacado
+                  variante="recomendaciones"
+                  encabezado={ENCABEZADO_RECOMENDACIONES}
+                  texto={recomendaciones}
+                />
+              </View>
+            ) : null}
 
-      {/*
-        SIN SEPARACIÓN SUPERIOR, Y NO ES UN OLVIDO: quien separa el membrete del
-        título es el espaciador de 2.B. Poner aquí `espacio.10` sería contar dos
-        veces la misma pieza.
+            {tieneValor(signosDeAlarma) ? (
+              <View style={estilos.bloqueAlarma}>
+                <BloqueDestacado
+                  variante="alarma"
+                  lamina="receta"
+                  encabezado={ENCABEZADO_ALARMA}
+                  texto={signosDeAlarma}
+                />
+              </View>
+            ) : null}
+          </>
+        }
+        firmas={
+          /*
+            LA FILA DE CIERRE. Los dos bloques que la componen son indivisibles por su
+            cuenta —2.L regla 3 y 2.R—, y además va entera dentro del bloque que 2.N
+            cierra con `wrap={false}`, así que no puede partirse entre hojas.
+          */
+          <View style={estilos.filaCierre}>
+            <BloqueFirmas variante="simple" lamina="receta" firmas={firmas} />
+            {tieneValor(qr) ? (
+              <ZonaQR
+                qr={qr}
+                rotulo={ROTULO_VERIFICACION}
+                folio={folio}
+                acento={acento}
+              />
+            ) : null}
+          </View>
+        }
+      >
+        {/*
+          LA LISTA DE MEDICAMENTOS. Cinco datos apilados por entrada: el número en su
+          riel y el ancla, el genérico, la vía y la indicación en la caja.
 
-        SIN SUBTÍTULO: B.3 §1 lo dice con todas las letras para esta lámina.
-
-        SIN BADGE: `bajoTitulo` se queda vacío. La ranura la ocupa hoy un solo
-        formato —el `URGENTE` de Imagenología— y esta lámina no cuelga nada del
-        título.
-      */}
-      <TituloDocumento
-        variante="fijo"
-        lamina="receta"
-        acento={acento}
-        titulo={TITULO}
-        emision={emision}
-        folio={folio}
-      />
-
-      {/*
-        Cinco celdas: paciente, edad, sexo y expediente arriba; el diagnóstico solo,
-        a fila entera, abajo. La fecha NO va aquí — sube al riel derecho del título.
-      */}
-      <BloquePaciente variante="completo" lamina="receta" {...paciente} />
-
-      {/*
-        LA LISTA DE MEDICAMENTOS. Cinco datos apilados por entrada: el número en su
-        riel y el ancla, el genérico, la vía y la indicación en la caja.
-
-        `disposicion="apilada"` es lo que el eje declara, aunque la calibración
-        `medicamento` no consulte la ranura de columna: los dos ejes siguen siendo
-        ortogonales y ninguno tiene valor por defecto (2.G).
-      */}
-      <View style={estilos.bloqueRielLista}>
-        <CabeceraLista titulo={CABECERA_LISTA} acento={acento} />
+          `disposicion="apilada"` es lo que el eje declara, aunque la calibración
+          `medicamento` no consulte la ranura de columna: los dos ejes siguen siendo
+          ortogonales y ninguno tiene valor por defecto (2.G).
+        */}
         {medicamentos.map((medicamento, indice) => (
           <EntradaNumerada
             // El índice ES la identidad: dos renglones pueden recetar el mismo
@@ -424,71 +444,14 @@ export default function RecetaMedica({
         {/*
           El filete que cierra la lista. Esta calibración pone la regla ARRIBA de
           cada entrada y se la ahorra a la primera (regla 3 de 2.G), así que la
-          última no arrastra ninguna debajo: aquí no hay línea doble que solapar y el
-          margen negativo de `CierreEntradas` se come medio punto del aire de la
-          entrada anterior. Es la misma pieza que cierra la tabla de Laboratorio.
+          última no arrastra ninguna debajo.
+
+          ⚠ Sale en TODAS las hojas, no solo en la última: es un nodo del flujo y cae
+          donde cae. En la lámina cierra la lista de cada hoja igual, justo encima del
+          contador, así que coincide — pero no es este archivo quien lo garantiza.
         */}
         <CierreEntradas />
-      </View>
-
-      {/*
-        El contador cierra LA LISTA, no la hoja: va a 5 pt del filete de cierre y
-        antes de los dos bloques de recomendaciones, que es el orden de la lámina.
-
-        Forma `final` siempre. Ver el punto (c) de la cabecera.
-      */}
-      <View style={estilos.bloqueListaContador}>
-        <ContadorLista
-          forma="final"
-          lamina="receta"
-          items={ITEMS}
-          total={medicamentos.length}
-        />
-      </View>
-
-      {/*
-        LOS DOS BLOQUES DE CIERRE, cada uno con su propio campo y su propio colapso.
-        El `null` envuelve al contenedor y no vive dentro de él: si no, el aire
-        seguiría aportándose y quedaría el hueco donde estarían.
-      */}
-      {tieneValor(recomendaciones) ? (
-        <View style={estilos.bloqueRecomendaciones}>
-          <BloqueDestacado
-            variante="recomendaciones"
-            encabezado={ENCABEZADO_RECOMENDACIONES}
-            texto={recomendaciones}
-          />
-        </View>
-      ) : null}
-
-      {tieneValor(signosDeAlarma) ? (
-        <View style={estilos.bloqueAlarma}>
-          <BloqueDestacado
-            variante="alarma"
-            lamina="receta"
-            encabezado={ENCABEZADO_ALARMA}
-            texto={signosDeAlarma}
-          />
-        </View>
-      ) : null}
-
-      {/*
-        LA FILA DE CIERRE. Los dos bloques que la componen son indivisibles por su
-        cuenta —2.L regla 3 y 2.R—, así que la fila no necesita su propio
-        `wrap={false}`: lo que no puede partirse ya se defiende solo, y forzarlo aquí
-        empujaría la firma a una hoja nueva por 56 pt de QR.
-      */}
-      <View style={estilos.filaCierre}>
-        <BloqueFirmas variante="simple" lamina="receta" firmas={firmas} />
-        {tieneValor(qr) ? (
-          <ZonaQR
-            qr={qr}
-            rotulo={ROTULO_VERIFICACION}
-            folio={folio}
-            acento={acento}
-          />
-        ) : null}
-      </View>
+      </MotorFlujo>
 
       {/*
         Variante `completo`: folio · paginación · leyenda. Es uno de los tres formatos

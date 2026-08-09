@@ -83,17 +83,12 @@
 
 import { Page, View, StyleSheet } from '@react-pdf/renderer'
 import type { ReactElement } from 'react'
-import Membrete, {
-  type ConsultorioMembrete,
-  type MedicoMembrete,
-} from '../Membrete'
+import type { ConsultorioMembrete, MedicoMembrete } from '../Membrete'
 import type { PanelCircularProps } from '../PanelCircular'
-import TituloDocumento from '../TituloDocumento'
-import BloqueNegativo from '../BloqueNegativo'
-import BloquePaciente, { type ValoresPaciente } from '../BloquePaciente'
-import EntradaNumerada, { CabeceraLista } from '../EntradaNumerada'
+import type { ValoresPaciente } from '../BloquePaciente'
+import EntradaNumerada from '../EntradaNumerada'
+import MotorFlujo from '../MotorFlujo'
 import ParserBloques from '../ParserBloques'
-import ContadorLista from '../ContadorLista'
 import BloqueFirmas, { type Firma } from '../BloqueFirmas'
 import PieDocumento from '../PieDocumento'
 import { tieneValor } from '../Campo'
@@ -132,7 +127,6 @@ const ROTULO_FIRMA = 'Firma y sello del médico'
  * para esta lámina. Sumar aquí cualquiera de las dos la contaría dos veces.
  */
 const SEPARACION_RIEL_LISTA = ESPACIO[14]
-const SEPARACION_LISTA_CONTADOR = ESPACIO[5]
 const SEPARACION_CONTADOR_NOTAS = ESPACIO[16]
 const SEPARACION_NOTAS_FIRMA = ESPACIO[26]
 
@@ -194,17 +188,8 @@ const estilos = StyleSheet.create({
     // él vuelve el bug §8.1 y no hay nada que lo detenga (anexo A, P2-27).
     paddingBottom: MARGEN.inferior,
   },
-  bloqueRielLista: {
-    marginTop: SEPARACION_RIEL_LISTA,
-  },
-  bloqueListaContador: {
-    marginTop: SEPARACION_LISTA_CONTADOR,
-  },
   bloqueContadorNotas: {
     marginTop: SEPARACION_CONTADOR_NOTAS,
-  },
-  bloqueFirma: {
-    marginTop: SEPARACION_NOTAS_FIRMA,
   },
 })
 
@@ -255,59 +240,48 @@ export default function SolicitudImagenologia({
   return (
     <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.hoja}>
       {/*
-        El membrete de ESTA lámina lleva cédulas y universidad, en un segundo
-        renglón pegado al de dirección. Es la contradicción de `CONCILIA D23` vista
-        desde el lado contrario al de Laboratorio: ver la nota en 2.B.
-      */}
-      <Membrete
-        variante="completo"
-        lamina="imagenologia"
-        acento={acento}
-        medico={medico}
-        consultorio={consultorio}
-        panel={panel}
-      />
+        EL ENCABEZADO ENTRA COMO DATOS y lo compone 2.V desde 2.N, en sus dos
+        variantes. Este archivo ya no monta membrete, título, riel ni cabecera: si
+        volviera a hacerlo, volvería la hoja 2 sin nombre de paciente.
 
-      {/*
-        SIN SEPARACIÓN SUPERIOR, Y NO ES UN OLVIDO: el título arranca exactamente
-        donde el membrete termina de cerrarse, porque quien separa los dos bloques
-        es el espaciador de 2.B. Poner aquí `espacio.12` sería contar dos veces la
-        misma pieza — es lo que hacía Laboratorio.
-
-        SIN SUBTÍTULO: esta lámina no lo tiene, a diferencia de la de Laboratorio,
-        donde además quedó revertido por decisión de producto (`CONCILIA D2`).
+        El badge tampoco: entra como el booleano que II.2 §2 declara y el chasis lo
+        reduce solo en las hojas de continuación (2.H `urgenteReducido`).
       */}
-      <TituloDocumento
-        variante="fijo"
-        lamina="imagenologia"
-        acento={acento}
-        titulo={TITULO}
-        emision={emision}
-        folio={folio}
-        bajoTitulo={
-          urgente === true ? (
-            <BloqueNegativo variante="urgente" lamina="imagenologia" />
+      <MotorFlujo
+        encabezado={{
+          medico,
+          consultorio,
+          panel,
+          acento,
+          lamina: 'imagenologia',
+          titulo: TITULO,
+          paciente,
+          emision,
+          folio,
+          urgente,
+          lista: { titulo: CABECERA_LISTA },
+          aireLista: SEPARACION_RIEL_LISTA,
+        }}
+        contador={{ items: ITEMS, total: estudios.length, lamina: 'imagenologia' }}
+        cierre={
+          /*
+            Las notas colapsan ENTERAS, con su separación incluida: sin el `null` el
+            contenedor seguiría aportando sus 16 pt y quedaría el hueco donde estarían.
+          */
+          tieneValor(notas) ? (
+            <View style={estilos.bloqueContadorNotas}>
+              <ParserBloques texto={notas} marca="raya" />
+            </View>
           ) : undefined
         }
-      />
-
-      {/*
-        Cinco celdas: paciente, edad, sexo y expediente arriba; el diagnóstico solo,
-        a fila entera, abajo. La fecha NO va aquí — sube al riel derecho del título.
-      */}
-      <BloquePaciente variante="completo" lamina="imagenologia" {...paciente} />
-
-      {/*
-        LA LISTA APILADA. Sin `CierreEntradas`: en esta calibración cada entrada
-        lleva su regla debajo, incluida la última, y esa regla ES el cierre de la
-        lista. Ver `entradaEstudio` en 2.G.
-
-        `disposicion="apilada"` es lo que el eje declara, aunque la calibración
-        `estudio` ya no consulte la ranura de columna: los dos ejes siguen siendo
-        ortogonales y ninguno tiene valor por defecto (2.G).
-      */}
-      <View style={estilos.bloqueRielLista}>
-        <CabeceraLista titulo={CABECERA_LISTA} acento={acento} />
+        aireFirma={SEPARACION_NOTAS_FIRMA}
+        firmas={<BloqueFirmas variante="simple" lamina="imagenologia" firmas={firmas} />}
+      >
+        {/*
+          LA LISTA APILADA. Sin `CierreEntradas`: en esta calibración cada entrada
+          lleva su regla debajo, incluida la última, y esa regla ES el cierre de la
+          lista. Ver `entradaEstudio` en 2.G.
+        */}
         {estudios.map((estudio, indice) => (
           <EntradaNumerada
             // El índice ES la identidad: dos estudios pueden pedir la misma región
@@ -324,39 +298,7 @@ export default function SolicitudImagenologia({
             disposicion="apilada"
           />
         ))}
-      </View>
-
-      {/*
-        El contador cierra LA LISTA, no la hoja: va a 5 pt de la regla de la última
-        entrada y antes de las notas, que es el orden de la lámina.
-
-        Forma `final` siempre, porque este formato no pagina todavía: sin 2.N no hay
-        quién sepa dónde corta la lista ni, por tanto, cuándo tocaría `intermedia`.
-        Ver el punto (a) de la cabecera.
-      */}
-      <View style={estilos.bloqueListaContador}>
-        <ContadorLista
-          forma="final"
-          lamina="imagenologia"
-          items={ITEMS}
-          total={estudios.length}
-        />
-      </View>
-
-      {/*
-        Las notas colapsan ENTERAS, con su separación incluida: sin el `null` el
-        contenedor seguiría aportando sus 16 pt y quedaría el hueco donde estarían.
-        Por eso la condición envuelve al `View` y no vive dentro de él.
-      */}
-      {tieneValor(notas) ? (
-        <View style={estilos.bloqueContadorNotas}>
-          <ParserBloques texto={notas} marca="raya" />
-        </View>
-      ) : null}
-
-      <View style={estilos.bloqueFirma}>
-        <BloqueFirmas variante="simple" lamina="imagenologia" firmas={firmas} />
-      </View>
+      </MotorFlujo>
 
       {/*
         Variante `completo`: folio · paginación · leyenda. La lámina compone las tres

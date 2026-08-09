@@ -7,11 +7,28 @@
  *
  * LAS DOS FORMAS
  *
- *   intermedia   `<ÍTEMS> EN ESTA HOJA · NN DE MM`   NN es lo impreso en ESA hoja
+ *   intermedia   `<ÍTEMS> · HOJA N DE M · TOTAL MM`
  *   final        `TOTAL DE <ÍTEMS> · MM`
  *
- * La diferencia no es cosmética: si la hoja 1 muestra el total, está contando el
- * documento y no la hoja, y quien la recibe no puede saber que le falta la 2.
+ * La diferencia no es cosmética: si la hoja 1 muestra solo el total, está contando
+ * el documento y no la hoja, y quien la recibe no puede saber que le falta la 2.
+ *
+ * ⚠ **LA FORMA INTERMEDIA DECÍA `<ÍTEMS> EN ESTA HOJA · NN DE MM` Y YA NO.**
+ *
+ * Ese `NN` —cuántos ítems se imprimieron en ESA hoja— **no lo reporta el renderer**.
+ * react-pdf parte el flujo pero no dice qué cayó en cada hoja, así que la cifra no la
+ * puede calcular ni este componente ni el formato ni 2.N: para saberla habría que
+ * reimplementar la maquetación y repartir la lista a mano, o componer el PDF dos
+ * veces. Medido y comprobado sobre el renderer, no supuesto.
+ *
+ * **Decisión de Angel: cambiar la cadena en vez de pagar cualquiera de las dos.** La
+ * forma nueva cumple la misma función —quien recibe una hoja suelta sabe que le falta
+ * otra, y cuántos ítems tiene el documento— con las tres cifras que el renderer SÍ
+ * reporta: el número de hoja, el total de hojas y el total de ítems, que lo declara
+ * quien llama.
+ *
+ * ⚠ **VA CONTRA LA LÁMINA**, que compone `MEDICAMENTOS EN ESTA HOJA · 04 DE 07`.
+ * Queda declarado aquí y reportado: no es una limitación escondida.
  *
  * `<ÍTEMS>` LO DECLARA EL FORMATO, NO ESTE COMPONENTE (regla 1)
  *
@@ -133,8 +150,11 @@ interface Comun {
 }
 
 export type ContadorListaProps =
-  /** Hoja intermedia: lo que lleva ESA hoja, y de cuántas. */
-  | ({ forma: 'intermedia'; enEstaHoja: number } & Comun)
+  /**
+   * Hoja que no es la última: en qué hoja va y de cuántas. Las dos cifras las pone
+   * el renderer —`subPageNumber` y `subPageTotalPages`—, que es lo único que sabe.
+   */
+  | ({ forma: 'intermedia'; hoja: number; hojas: number } & Comun)
   /** Hoja final. Un documento de una sola hoja usa esta forma (regla 2). */
   | ({ forma: 'final' } & Comun)
 
@@ -143,13 +163,13 @@ export type ContadorListaProps =
  *
  * **Las cifras van sin cero a la izquierda.** El cero a la izquierda es la regla
  * 1 de 2.G y es del número de ENTRADA, que es un identificador de dos dígitos;
- * aquí `NN` y `MM` son marcadores de posición de un conteo, no un formato fijo.
- * Un `07 DE 13` en el contador imitaría el número de entrada y haría creer que
- * señala a un ítem concreto de la lista. Queda registrado en el anexo A (P2-17).
+ * aquí son marcadores de posición de un conteo, no un formato fijo. Un `07 DE 13`
+ * en el contador imitaría el número de entrada y haría creer que señala a un ítem
+ * concreto de la lista. Queda registrado en el anexo A (P2-17).
  */
 function cadena(props: ContadorListaProps): string {
   if (props.forma === 'intermedia') {
-    return `${props.items} en esta hoja · ${props.enEstaHoja} de ${props.total}`
+    return `${props.items} · Hoja ${props.hoja} de ${props.hojas} · Total ${props.total}`
   }
   return `Total de ${props.items} · ${props.total}`
 }

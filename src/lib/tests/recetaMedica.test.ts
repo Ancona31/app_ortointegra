@@ -735,7 +735,15 @@ describe('II.3 · Receta Médica — medido sobre el PDF', () => {
     const anchoFolio = await anchoCompuesto(COMUN.folio, 'folio')
     const anchoRotulo = await anchoCompuesto('VERIFICACIÓN', 'etiqueta')
 
-    const folio = hoja.renglones.find((r) => r.texto === COMUN.folio)
+    /*
+      EL ÚLTIMO, NO EL PRIMERO. Desde que 2.N compone el encabezado en todas las
+      hojas, el folio sale DOS veces en la última: una en el riel del bloque de título
+      —alineado al borde de la caja, en 558— y otra en la zona de verificación. El
+      orden de dibujo sigue al del árbol, así que el de la zona es el segundo.
+    */
+    const folios = hoja.renglones.filter((r) => r.texto === COMUN.folio)
+    expect(folios.length).toBeGreaterThan(0)
+    const folio = folios[folios.length - 1]
     expect(folio).toBeDefined()
     expect((folio?.x ?? 0) + anchoFolio).toBeCloseTo(BORDE_TEXTO, 1)
     expect(renglon(hoja, 'VERIFICACIÓN').x + anchoRotulo).toBeCloseTo(BORDE_TEXTO, 1)
@@ -811,74 +819,61 @@ describe('II.3 · Receta Médica — medido sobre el PDF', () => {
     expect(renglon(hoja, 'Folio P-B8570E3FA164')).toBeDefined()
   }, 60_000)
 
-  it('cierra la hoja donde la medición dice, y no un medicamento más', async () => {
+  it('reparte la lista entre hojas en vez de apretarla en una', async () => {
     /*
-      LA CAPACIDAD, QUE LA LÁMINA NO DECLARA.
+      LA CAPACIDAD, DESPUÉS DE CABLEAR 2.N.
 
-      El archivo aprobado reparte 4 y 3 **por literal** —`slice(0, 4)` y `slice(4)`—
-      y no dice cuántos caben. Esto lo mide, y da una cifra bastante más baja que 4
-      por una razón estructural que conviene leer entera antes de tomarla por un
-      defecto:
+      Antes de esto el formato componía como hoja única: la firma y los dos bloques de
+      cierre competían con la lista en la misma hoja y cabían DOS medicamentos. Ahora
+      el documento pagina, así que lo que se mide es dónde CORTA.
 
-      **Sin 2.N, el documento es un solo flujo y el cierre viaja con la lista.** En la
-      lámina, la hoja 1 lleva encabezado + lista + contador + aviso, y NADA más: la
-      firma, el QR y los dos bloques de recomendaciones viven en la hoja 2. Aquí el
-      renderer reparte un único `Page`, así que la firma —118.75 pt— y los dos
-      bloques compiten con la lista en la misma hoja. Por eso caben 4 en la lámina y
-      2 aquí: **no es que la fila mida de más, es que la hoja lleva de más.**
+      El archivo aprobado reparte 4 y 3 por literal —`slice(0, 4)`— y no declara
+      capacidad. Medido con los dos bloques de cierre puestos:
 
-      El presupuesto, en pt sobre los 670 de caja: 220.88 de encabezado + 21 de
-      cabecera + N filas + 0.3 del filete de cierre + 5 + 11 del contador + los dos
-      bloques + 26 + 118.75 de firma.
+          fila cara, indicación de dos líneas      4 + 3   ← el reparto de la lámina
+          fila corta, indicación de una línea      5 + 2
 
-      Las cuatro cifras medidas, con la combinación más cara —ancla, genérico, vía e
-      indicación de una línea, 75 pt de fila— y con la más barata que la receta puede
-      emitir —ancla y genérico, sin indicación, 58 pt; la vía no entra en la cuenta
-      porque nunca colapsa:
-
-          fila         con los dos bloques    sin ellos
-          cara (75)            2                  3
-          barata (58)          2                  4
-
-      La columna de la derecha es la que hay que comparar con el 4 de la lámina.
-      **Solo lo alcanza con la fila barata**, y aun así incluyendo la firma, que en la
-      hoja 1 de la lámina no está. Es la medida de lo que cuesta no tener hoja de
-      continuación — más los 3.5 pt por entrada que cuesta componer también la vía
-      oral en negativo. Reportado.
+      La cifra de la lámina sale del estado caro, que es el que su hoja compone. La
+      hoja 1 sostiene esos 4 y no más porque su encabezado completo pesa 220.88 pt;
+      las de continuación caben más, que es justo lo que el encabezado reducido
+      compra.
     */
     const caro = (i: number): MedicamentoRecetado => ({
       comercial: `Fármaco ${i}`,
       presentacion: 'Tabletas 500 mg',
       generico: 'Denominación genérica',
       via: 'Subcutánea',
-      indicacion: UNA_LINEA,
+      indicacion: DOS_LINEAS,
     })
-    // Sin indicación. No se le quita el genérico: sería componer una receta peor
-    // para que quepa una más, y lo que se mide es la hoja real.
-    const barato = (i: number): MedicamentoRecetado => ({
-      comercial: `Fármaco ${i}`,
-      presentacion: 'Tabletas 500 mg',
-      generico: 'Denominación genérica',
-    })
+    const corto = (i: number): MedicamentoRecetado => ({ ...caro(i), indicacion: UNA_LINEA })
     const cierre = {
       recomendaciones: 'Mantenga reposo relativo durante las primeras 48 horas.',
       signosDeAlarma: 'Fiebre mayor de 38.5 °C que no cede con el antipirético.',
     }
-    const lista = (
-      n: number,
-      forma: (i: number) => MedicamentoRecetado,
-    ): readonly MedicamentoRecetado[] => Array.from({ length: n }, (_, i) => forma(i))
+    const lista = (n: number): readonly MedicamentoRecetado[] =>
+      Array.from({ length: n }, (_, i) => caro(i))
 
-    // El documento completo: dos medicamentos, sea cual sea su estado.
-    expect(await componer(lista(2, caro), cierre)).toHaveLength(1)
-    expect(await componer(lista(3, caro), cierre)).toHaveLength(2)
-    expect(await componer(lista(2, barato), cierre)).toHaveLength(1)
-    expect(await componer(lista(3, barato), cierre)).toHaveLength(2)
+    /** Cuántos medicamentos imprime cada hoja. */
+    const reparto = (hojas: readonly Hoja[]): number[] =>
+      hojas.map((hoja) => hoja.renglones.filter((r) => /^Fármaco \d/.test(r.texto)).length)
 
-    // Sin los dos bloques de cierre, que es lo que hace la mayoría de las recetas.
-    expect(await componer(lista(3, caro))).toHaveLength(1)
-    expect(await componer(lista(4, caro))).toHaveLength(2)
-    expect(await componer(lista(4, barato))).toHaveLength(1)
-    expect(await componer(lista(5, barato))).toHaveLength(2)
+    // Con siete, el reparto de la lámina. La hoja 1 cierra en 4 y no en 5.
+    expect(reparto(await componer(lista(7), cierre)).slice(0, 2)).toEqual([4, 3])
+
+    // Y la hoja 1 no lleva ninguno de los dos bloques de cierre, que es lo que el
+    // motor hace posible: antes competían con la lista.
+    const [primera] = await componer(lista(7), cierre)
+    expect(primera.renglones.some((r) => r.texto.startsWith('RECOMENDACIONES'))).toBe(
+      false,
+    )
+    expect(primera.renglones.some((r) => r.texto.startsWith('ACUDA'))).toBe(false)
+
+    // Sin los bloques de cierre la hoja 1 sigue cerrando en 4: los bloques no estaban
+    // ahí quitándole sitio, es su propio encabezado el que lo ocupa.
+    expect(reparto(await componer(lista(7)))[0]).toBe(4)
+
+    // Con la fila corta entra uno más, y es la lista la que se mueve, no la métrica.
+    const cortos = Array.from({ length: 7 }, (_, i) => corto(i))
+    expect(reparto(await componer(cortos, cierre)).slice(0, 2)).toEqual([5, 2])
   }, 300_000)
 })

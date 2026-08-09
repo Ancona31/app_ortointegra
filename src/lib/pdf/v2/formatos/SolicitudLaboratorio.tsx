@@ -69,16 +69,12 @@
 
 import { Page, View, StyleSheet } from '@react-pdf/renderer'
 import type { ReactElement } from 'react'
-import Membrete, {
-  type ConsultorioMembrete,
-  type MedicoMembrete,
-} from '../Membrete'
+import type { ConsultorioMembrete, MedicoMembrete } from '../Membrete'
 import type { PanelCircularProps } from '../PanelCircular'
-import TituloDocumento from '../TituloDocumento'
-import BloquePaciente, { type ValoresPaciente } from '../BloquePaciente'
-import EntradaNumerada, { CabeceraEntradas, CierreEntradas } from '../EntradaNumerada'
+import type { ValoresPaciente } from '../BloquePaciente'
+import EntradaNumerada, { CierreEntradas } from '../EntradaNumerada'
+import MotorFlujo from '../MotorFlujo'
 import ParserBloques from '../ParserBloques'
-import ContadorLista from '../ContadorLista'
 import BloqueFirmas, { type Firma } from '../BloqueFirmas'
 import PieDocumento from '../PieDocumento'
 import { tieneValor } from '../Campo'
@@ -150,7 +146,6 @@ const ROTULO_FIRMA = 'Firma y sello del médico'
  * > no puede volver por omisión: el membrete cierra solo.
  */
 const SEPARACION_RIEL_LISTA = ESPACIO[12]
-const SEPARACION_LISTA_CONTADOR = ESPACIO[5]
 const SEPARACION_CONTADOR_NOTAS = ESPACIO[20]
 const SEPARACION_NOTAS_FIRMA = ESPACIO[20]
 
@@ -212,17 +207,8 @@ const estilos = StyleSheet.create({
     paddingRight: MARGEN.derecho,
     paddingBottom: MARGEN.inferior,
   },
-  bloqueRielLista: {
-    marginTop: SEPARACION_RIEL_LISTA,
-  },
-  bloqueListaContador: {
-    marginTop: SEPARACION_LISTA_CONTADOR,
-  },
   bloqueContadorNotas: {
     marginTop: SEPARACION_CONTADOR_NOTAS,
-  },
-  bloqueFirma: {
-    marginTop: SEPARACION_NOTAS_FIRMA,
   },
 })
 
@@ -261,61 +247,54 @@ export default function SolicitudLaboratorio({
 
   return (
     <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.hoja}>
-      <Membrete
-        variante="completo"
-        acento={acento}
-        medico={medico}
-        consultorio={consultorio}
-        panel={panel}
-      />
-
       {/*
-        SIN ENVOLTORIO Y SIN SEPARACIÓN SUPERIOR: la aporta el espaciador de cierre
-        de 2.B, que es de quien siempre fue. 2.C aporta la inferior
-        —`transicion.tituloRiel`—, así que este bloque no declara ninguna de las dos.
+        EL ENCABEZADO ENTRA COMO DATOS y lo compone 2.V desde 2.N.
 
-        SIN SUBTÍTULO, Y NO ES UN OLVIDO. `CONCILIA D2` lo declaraba para los ocho
-        formatos deduciéndolo de la lámina —que sí lo compone en sus tres hojas—, y
-        la deducción queda REVERTIDA por decisión de producto: no sale de ninguna
-        necesidad, ningún formulario de la app tiene el campo, y añadirlo obligaría
-        a tocar los ocho para algo que quedaría vacío casi siempre.
+        Este formato es el que más gana con ello: es el de lista larga —18 estudios en
+        una hoja— y por tanto el que corta más a menudo. Antes de esto, la hoja 2 de
+        una solicitud de 25 estudios llegaba sin membrete, sin folio y **sin nombre de
+        paciente**, que es el hallazgo más grave de la auditoría del sistema viejo.
 
-        La ranura de 2.C sigue construida y sin consumidores a propósito: la
-        necesita el título variable del Escrito Médico. No la borres para «limpiar».
-
-        Cuesta 16 pt de encabezado a favor: 14 del renglón del subtítulo más los 2
-        de `espacio.2` que lo separaban del título.
+        `lista.columnas` es lo que hace que la cabecera de continuación sea la TABLA
+        de tres rótulos y no el rótulo único de las otras dos láminas: la anatomía la
+        declara el formato, la repetición la resuelve el chasis.
       */}
-      <TituloDocumento
-        variante="fijo"
-        acento={acento}
-        titulo={TITULO}
-        folio={folio}
-      />
+      <MotorFlujo
+        encabezado={{
+          medico,
+          consultorio,
+          panel,
+          acento,
+          titulo: TITULO,
+          paciente,
+          folio,
+          lista: { titulo: TITULO, columnas: CABECERA },
+          aireLista: SEPARACION_RIEL_LISTA,
+        }}
+        contador={{ items: ITEMS, total: estudios.length }}
+        cierre={
+          tieneValor(notas) ? (
+            <View style={estilos.bloqueContadorNotas}>
+              <ParserBloques texto={notas} marca="raya" />
+            </View>
+          ) : undefined
+        }
+        aireFirma={SEPARACION_NOTAS_FIRMA}
+        firmas={<BloqueFirmas variante="simple" firmas={firmas} />}
+      >
+        {/*
+          LA LISTA, EN LAS DOS VARIANTES QUE LA LÁMINA COMPONE.
 
-      {/*
-        El riel de identificación. `fecha` y `diagnostico` son DOS DE SUS SIETE
-        CELDAS, no un segundo riel: II.1 §3 declaraba además un `RielDatos` de una
-        línea con esos dos datos, que es la estructura de dos rieles que mató
-        `CONCILIA D6` y que los habría impreso por duplicado (anexo A, P4-2).
-      */}
-      <BloquePaciente variante="completo" {...paciente} />
+          `compacta` + `columna` son la tabla de B.1 §3: estudio a la izquierda,
+          indicación en la tercera columna de 132 pt, en el MISMO renglón, con la fila
+          calibrada a 9 / 11.5 pt. Es lo que revierte `D4` y `D3`, y lo que hace que
+          una lista larga quepa donde la lámina la mete.
 
-      {/*
-        LA LISTA, EN LAS DOS VARIANTES QUE LA LÁMINA COMPONE.
-
-        `compacta` + `columna` son la tabla de B.1 §3: estudio a la izquierda,
-        indicación en la tercera columna de 132 pt, en el MISMO renglón, con la fila
-        calibrada a 9 / 11.5 pt. Es lo que revierte `D4` y `D3`, y lo que hace que
-        una lista larga quepa donde la lámina la mete.
-
-        **Las dos las declara este archivo, no el número de estudios.** Si algún día
-        aparece aquí un `estudios.length > N` eligiendo calibración, es D4 volviendo
-        por la puerta de atrás: lo que I.3.4 prohíbe es que el documento cambie de
-        métrica según lo que traiga, y eso sigue en pie.
-      */}
-      <View style={estilos.bloqueRielLista}>
-        <CabeceraEntradas {...CABECERA} acento={acento} />
+          **Las dos las declara este archivo, no el número de estudios.** Si algún día
+          aparece aquí un `estudios.length > N` eligiendo calibración, es D4 volviendo
+          por la puerta de atrás: lo que I.3.4 prohíbe es que el documento cambie de
+          métrica según lo que traiga, y eso sigue en pie.
+        */}
         {estudios.map((estudio, indice) => (
           <EntradaNumerada
             // El índice ES la identidad: dos estudios pueden llamarse igual y lo
@@ -331,46 +310,8 @@ export default function SolicitudLaboratorio({
           />
         ))}
         <CierreEntradas />
-      </View>
+      </MotorFlujo>
 
-      {/*
-        EL CONTADOR VA PEGADO AL CIERRE DE LA TABLA, ANTES DE LAS OBSERVACIONES.
-
-        II.1 §3 lo había puesto al final del contenido, tras las notas, con este
-        argumento: «2.K existe para que quien reciba una hoja suelta sepa si le
-        falta otra, así que se lee al terminar de leer la hoja». B.1 §2 compone el
-        orden contrario —filas → filete de cierre → contador a 5 pt →
-        observaciones—, y la lámina manda. Leído sobre el papel el orden de la
-        lámina es además el que se sostiene: el contador cierra LA TABLA, no la
-        hoja, y a 5 pt del filete se lee como su fila de total, que es exactamente
-        lo que A.11 llama «fila de total».
-      */}
-      <View style={estilos.bloqueListaContador}>
-        <ContadorLista forma="final" items={ITEMS} total={estudios.length} />
-      </View>
-
-      {/*
-        Las notas colapsan ENTERAS, con su separación incluida: sin el `null` el
-        contenedor seguiría aportando sus 20 pt y quedaría el hueco donde estarían
-        —justo lo que II.1 §6 manda comprobar—. Por eso la condición envuelve al
-        `View` y no vive dentro de él.
-      */}
-      {tieneValor(notas) ? (
-        <View style={estilos.bloqueContadorNotas}>
-          <ParserBloques texto={notas} marca="raya" />
-        </View>
-      ) : null}
-
-      <View style={estilos.bloqueFirma}>
-        <BloqueFirmas variante="simple" firmas={firmas} />
-      </View>
-
-      {/*
-        Variante `completo`: folio · paginación · leyenda, que es exactamente lo que
-        B.1 §4 imprime en la banda («Folio L-7C15A0E4D2B9 · Página 1 de 2 ·
-        Documento generado por Spinus…»). Era `sinFolio`, por la decisión de II.1 §1
-        que la lámina contradice.
-      */}
       <PieDocumento variante="completo" folio={folio} acento={acento} />
     </Page>
   )

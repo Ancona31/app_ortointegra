@@ -181,14 +181,39 @@ function medicoMembrete(medico: MedicoFicticio): MedicoMembrete {
   }
 }
 
+/**
+ * ⚠️ **UN CASO POR PDF, Y ANTES ERAN LOS TRES EN UNO.**
+ *
+ * Cada caso es un **documento entero**, no una hoja de un documento común. No es una
+ * comodidad del taller: es lo que ocurre en emisión real —un documento es un formato,
+ * un `Document` con un `Page`— y componer tres `Page` en un `Document` **produce un
+ * resultado que no existe en producción**.
+ *
+ * Y no solo mentía: rompía. En la pasada de reparto el renderer entrega `pageNumber`
+ * ABSOLUTO del documento y no `subPageNumber`, así que la primera hoja del segundo
+ * caso se repartía como si fuera una continuación y luego se pintaba con el
+ * encabezado completo. Medido: 13 ítems donde caben 10, con el paso de fila
+ * comprimido de 50 a 40.99 pt — una violación de I.3.4 sin un solo aviso. Ver la
+ * cabecera de 2.N.
+ */
+export type CasoReceta = 'completo' | 'minimo' | 'lleno'
+
+const CASOS: Record<CasoReceta, { medicamentos: readonly MedicamentoRecetado[]; paciente: ValoresPaciente; folio: string; cierre: boolean }> = {
+  completo: { medicamentos: MEDICAMENTOS_COMPLETO, paciente: PACIENTE_COMPLETO, folio: FOLIO_COMPLETO, cierre: true },
+  minimo: { medicamentos: MEDICAMENTOS_MINIMO, paciente: PACIENTE_MINIMO, folio: FOLIO_MINIMO, cierre: false },
+  lleno: { medicamentos: MEDICAMENTOS_LLENO, paciente: PACIENTE_COMPLETO, folio: FOLIO_LLENO, cierre: true },
+}
+
 function HojaReceta({
   medico,
   acentoHex,
   qr,
+  caso,
 }: {
   medico: MedicoFicticio
   acentoHex: string
   qr: string
+  caso: CasoReceta
 }): ReactElement {
   const acento = resolverAcento(acentoHex)
   const comun = {
@@ -199,34 +224,18 @@ function HojaReceta({
     acento,
   }
 
+  const c = CASOS[caso]
+
   return (
-    <Document title="Receta médica — taller">
+    <Document title={`Receta médica — taller · ${caso}`}>
       <RecetaMedica
         {...comun}
-        paciente={PACIENTE_COMPLETO}
-        medicamentos={MEDICAMENTOS_COMPLETO}
+        paciente={c.paciente}
+        medicamentos={c.medicamentos}
         emision={EMISION}
-        recomendaciones={RECOMENDACIONES}
-        signosDeAlarma={SIGNOS_DE_ALARMA}
-        folio={FOLIO_COMPLETO}
-        qr={qr}
-      />
-      <RecetaMedica
-        {...comun}
-        paciente={PACIENTE_MINIMO}
-        medicamentos={MEDICAMENTOS_MINIMO}
-        emision={EMISION}
-        folio={FOLIO_MINIMO}
-        qr={qr}
-      />
-      <RecetaMedica
-        {...comun}
-        paciente={PACIENTE_COMPLETO}
-        medicamentos={MEDICAMENTOS_LLENO}
-        emision={EMISION}
-        recomendaciones={RECOMENDACIONES}
-        signosDeAlarma={SIGNOS_DE_ALARMA}
-        folio={FOLIO_LLENO}
+        recomendaciones={c.cierre ? RECOMENDACIONES : undefined}
+        signosDeAlarma={c.cierre ? SIGNOS_DE_ALARMA : undefined}
+        folio={c.folio}
         qr={qr}
       />
     </Document>
@@ -237,13 +246,19 @@ function HojaReceta({
 export async function generarPdfReceta(
   medico: MedicoFicticio,
   acentoHex: string,
+  caso: string,
 ): Promise<Blob> {
   registrarFuentesV2()
   // PNG y sin margen: `<Image>` de react-pdf solo acepta JPG, PNG o base64 (I.3.8),
   // y el aire alrededor del código lo pone la fila de cierre, no el ráster.
   const qr = await QRCode.toDataURL(TOKEN_VERIFICACION, { margin: 0, width: 224 })
   const elemento: ReactElement<DocumentProps> = (
-    <HojaReceta medico={medico} acentoHex={acentoHex} qr={qr} />
+    <HojaReceta
+      medico={medico}
+      acentoHex={acentoHex}
+      qr={qr}
+      caso={caso in CASOS ? (caso as CasoReceta) : 'completo'}
+    />
   )
   return pdf(elemento).toBlob()
 }

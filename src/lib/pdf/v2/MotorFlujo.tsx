@@ -81,6 +81,28 @@
  * la razón se resuelve una sola vez— **y las mismas zonas se declaran además como
  * hijos**, que es lo único que ve la prebúsqueda.
  *
+ * EL ENCABEZADO POR HOJA — LO QUE ESTE COMPONENTE AÑADIÓ AL CABLEARSE
+ *
+ * Un `View fixed` con `render` al principio del flujo: el renderer lo repite en todas
+ * las hojas y su contenido se decide por hoja, así que la 1 lleva el encabezado
+ * completo y las demás el de continuación. **Los altos pueden diferir y el corte lo
+ * respeta**, y eso no es una suposición: `splitPage` resuelve los nodos dinámicos y
+ * RE-MAQUETA la hoja antes de partirla, y repite el ciclo sobre el resto. Medido
+ * sobre el PDF, con una cabecera de 200 pt en la hoja 1 y de 40 en la 2.
+ *
+ * ⚠ **QUÉ HOJA ES, Y POR QUÉ SE LEEN DOS CIFRAS Y NO UNA.** En la pasada de REPARTO
+ * el renderer entrega solo `pageNumber`; `subPageNumber` no existe hasta la pasada
+ * final. Para un `Document` de un solo `Page` —que es toda emisión real: un documento
+ * es un formato— las dos coinciden, así que `subPageNumber ?? pageNumber` es exacto.
+ *
+ * **En un `Document` con VARIOS `Page` no lo es**, porque `pageNumber` es absoluto
+ * del documento: la primera hoja del segundo formato se reparte como si fuera una
+ * continuación y luego se pinta con el encabezado completo. El resultado está medido
+ * y es MUDO — el contenido se comprime, 13 ítems donde caben 10, con el paso de fila
+ * bajando de 50 a 40.99 pt. Es una violación de I.3.4 que nadie lanza. **No compongas
+ * dos formatos en un mismo `Document`**; el taller lo hacía y quedó corregido a un
+ * caso por PDF.
+ *
  * DÓNDE VIVE EL AVISO — AL PIE DEL ÁREA DE CONTENIDO, NO EN LA BANDA
  *
  * 2.M declara sus tres zonas —folio, paginación y leyenda— y ninguna es esta. El
@@ -96,6 +118,8 @@
 
 import { View, Text, StyleSheet } from '@react-pdf/renderer'
 import type { ReactElement, ReactNode } from 'react'
+import EncabezadoHoja, { type EncabezadoHojaProps } from './EncabezadoHoja'
+import ContadorLista from './ContadorLista'
 import {
   ESPACIO,
   FLUJO,
@@ -104,6 +128,7 @@ import {
   TIPOGRAFIA,
   estiloTipografico,
   umbralFirma,
+  type Lamina,
   type RolFirmante,
 } from './tokens'
 
@@ -135,11 +160,15 @@ const estilos = StyleSheet.create({
   /** El arrastre: texto corrido, sin nada propio. */
   arrastre: { ...estiloTipografico('texto.corrido') },
   /**
-   * El aire de la fórmula de `umbral.firma`, entre el arrastre y la firma. Es
-   * `espacio.16` y no `transicion.contenidoPie`, que mide lo mismo y separa otras
-   * dos cosas: el último bloque de contenido de la banda de pie.
+   * EL AIRE SOBRE EL CONTADOR — `espacio.5`, y las tres láminas medidas coinciden.
+   *
+   * Vive aquí y no en el formato porque el contador lo monta este componente: 2.K no
+   * lleva margen propio a propósito —«la separación respecto del contenido es del
+   * contenedor»— y el contenedor es este. Que las tres láminas midan lo mismo es lo
+   * que permite que no sea una prop; el día que una mida otra cosa, sube a prop como
+   * `aireFirma`.
    */
-  firmas: { marginTop: ESPACIO[16] },
+  contador: { marginTop: ESPACIO[5] },
   /**
    * El aviso cuelga del borde inferior de la caja de texto y ocupa el primer
    * renglón de los 16 pt de `transicion.contenidoPie`. Los 5 pt que sobran hasta
@@ -170,67 +199,61 @@ const estilos = StyleSheet.create({
 })
 
 /**
- * Las tres formas canónicas del aviso de pie (`CONCILIA D5`). No hay una cuarta:
- * el sistema viejo tenía cuatro construcciones distintas de la zona izquierda
- * —`La solicitud continúa…`, `El consentimiento continúa…`, `El escrito
- * continúa…`, `Continúa en la hoja 2 · instrucciones y firmas`— y ninguna era
- * ninguna de estas.
+ * LA ZONA IZQUIERDA DEL AVISO — UNA SOLA FORMA, Y ERAN TRES.
  *
- * `items` es la palabra que **declara el formato**, no el componente: estudios,
- * medicamentos, suplementos, conceptos. Entra en capitalización de oración y se
- * compone en versalita aquí, exactamente como en 2.K.
+ * `CONCILIA D5` había reducido de seis construcciones a tres: `listaContinua`
+ * —«continúa en la hoja 2 · medicamentos 05 a 07»—, `textoContinua` y `reservaFirma`.
+ * **Las tres quedan colapsadas en esta.**
+ *
+ * El motivo es el mismo que cambió la cadena del contador en 2.K: el rango `05 a 07`
+ * lo tiene que poner quien sabe qué ítems cayeron en cada hoja, y **eso no lo reporta
+ * el renderer**. Tampoco lo puede saber el formato sin paginar por su cuenta, que es
+ * justo lo que este componente existe para evitar. Sin el rango, `listaContinua` y
+ * `textoContinua` dicen exactamente lo mismo, y `reservaFirma` —«en la hoja de al
+ * lado solo falta la firma»— exige saber dónde cayó el corte, que es el mismo dato.
+ *
+ * Con una sola forma, el aviso deja de entrar por prop: lo pone el motor en toda hoja
+ * que no sea la última, que es la única condición que hace falta y la única que el
+ * renderer sí da. **Un aviso que nadie tiene que declarar es un aviso que ningún
+ * formato puede olvidar.**
+ *
+ * ⚠ **VA CONTRA LA LÁMINA**, que compone `CONTINÚA EN LA HOJA 2 · MEDICAMENTOS 05 A
+ * 07`. Decisión de Angel, declarada y reportada: no es una limitación escondida.
  */
-export type AvisoPie =
-  /** La lista no terminó en esta hoja. `desde` y `hasta` son los de ESTA hoja. */
-  | { forma: 'listaContinua'; items: string; desde: number; hasta: number }
-  /** La lista cerró y el texto corrido sigue. */
-  | { forma: 'textoContinua'; items: string }
-  /** Todo cerró y solo falta la firma: es la regla 1 vista desde la hoja anterior. */
-  | { forma: 'reservaFirma' }
+const ZONA_IZQUIERDA = 'Continúa en la hoja'
 
 /** Lo que el renderer entrega a cada nodo con `render`, de lo que aquí se usa. */
 interface Hoja {
-  subPageNumber: number
-  subPageTotalPages: number
+  /** Ausentes en la pasada de REPARTO. Ver la nota de la cabecera. */
+  subPageNumber?: number
+  subPageTotalPages?: number
+  pageNumber?: number
 }
 
 /**
- * La cadena de la zona izquierda, en capitalización de oración. La versalita la
- * pone la composición, como en 2.C, 2.H, 2.K y 2.M.
+ * En qué hoja del DOCUMENTO estamos, y cuántas hay.
  *
- * `siguiente` es siempre `subPageNumber + 1`: las tres formas apuntan a la hoja
- * de al lado, nunca a una hoja arbitraria.
+ * `subPageNumber` cuenta las hojas de este `Page`; `pageNumber` las del PDF entero y
+ * es lo único que llega en la pasada de reparto. Ver la nota larga de la cabecera
+ * antes de tocar esta línea: de ella depende que el encabezado de la hoja 1 no se
+ * componga como una continuación.
  */
-function cadena(aviso: AvisoPie, siguiente: number): string {
-  switch (aviso.forma) {
-    case 'listaContinua':
-      return `Continúa en la hoja ${siguiente} · ${aviso.items} ${aviso.desde} a ${aviso.hasta}`
-    case 'textoContinua':
-      return `Las ${aviso.items} continúan en la hoja ${siguiente}`
-    case 'reservaFirma':
-      return `Reservado para la firma · Continúa en la hoja ${siguiente}`
-  }
+export function numeroDeHoja(hoja: Hoja): number {
+  return hoja.subPageNumber ?? hoja.pageNumber ?? 1
 }
 
 /**
- * Qué aviso lleva la hoja que se está componiendo, o ninguno.
+ * ¿Esta hoja es la última del documento?
  *
- * **La última hoja no lleva aviso nunca**, diga lo que diga el formato: en ella no
- * continúa nada y las tres formas prometen una hoja siguiente que no existe. La
- * guarda va aquí y no en quien llama porque es la única forma de que no dependa
- * de que cada formato acierte con la longitud de su lista.
- *
- * En la pasada de reparto el renderer todavía no conoce las cifras de hoja y las
- * entrega sin definir; la aritmética cae entonces en `NaN`, el índice no
- * encuentra nada y el aviso no se compone. En la pasada final —la única que
- * imprime— ya están las cuatro.
+ * En la pasada de reparto el total no existe todavía, y entonces **se responde que
+ * NO**: es la respuesta conservadora para las dos cosas que dependen de ella. El
+ * aviso vive en posición absoluta, así que componerlo de más en esa pasada no mueve
+ * ni un punto del flujo; y el contador mide lo mismo en sus dos formas, un renglón de
+ * `pie`. En la pasada final —la única que imprime— las dos cifras ya están.
  */
-function avisoDeLaHoja(
-  avisos: readonly (AvisoPie | null)[],
-  { subPageNumber, subPageTotalPages }: Hoja,
-): AvisoPie | null {
-  if (subPageNumber >= subPageTotalPages) return null
-  return avisos[subPageNumber - 1] ?? null
+function esUltima({ subPageNumber, subPageTotalPages }: Hoja): boolean {
+  if (subPageNumber === undefined || subPageTotalPages === undefined) return false
+  return subPageNumber >= subPageTotalPages
 }
 
 /**
@@ -240,29 +263,63 @@ function avisoDeLaHoja(
  * declarados no se componen —el renderer los descarta—, así que basta con que
  * lleven el estilo: la familia y el peso que hay que cargar salen de ahí.
  */
-function zonas(avisos: readonly (AvisoPie | null)[]): ReactElement[] {
+function zonas(): ReactElement[] {
   return [
     <Text
       key="izquierda"
       style={[estilos.zona, estilos.izquierda]}
-      render={(hoja) => {
-        const aviso = avisoDeLaHoja(avisos, hoja)
-        return aviso === null ? null : cadena(aviso, hoja.subPageNumber + 1).toUpperCase()
-      }}
+      render={(hoja) =>
+        esUltima(hoja)
+          ? null
+          : `${ZONA_IZQUIERDA} ${numeroDeHoja(hoja) + 1}`.toUpperCase()
+      }
     />,
     <Text
       key="derecha"
       style={[estilos.zona, estilos.derecha]}
-      render={(hoja) =>
-        avisoDeLaHoja(avisos, hoja) === null ? null : ZONA_DERECHA.toUpperCase()
-      }
+      render={(hoja) => (esUltima(hoja) ? null : ZONA_DERECHA.toUpperCase())}
     />,
   ]
 }
 
 export interface MotorFlujoProps {
+  /**
+   * LOS DATOS DEL ENCABEZADO, no su composición. El motor los pasa a 2.V dos veces
+   * —una por variante— y decide cuál sale en cada hoja.
+   *
+   * **Es lo que impide que un formato componga su propia hoja de continuación.** Si
+   * esta prop fuera un `ReactNode`, cada uno de los ocho volvería a escribir el
+   * membrete reducido, el riel del paciente y el rótulo de continuación, y serían
+   * ocho sitios donde olvidarse del nombre del paciente.
+   */
+  encabezado: Omit<EncabezadoHojaProps, 'variante'>
   /** El contenido del documento, ya compuesto en bloques por el formato. */
   children: ReactNode
+  /**
+   * El contador de la lista (2.K), si el formato tiene lista. Sale **en todas las
+   * hojas**, con la forma que corresponda: `intermedia` mientras queden hojas,
+   * `final` en la última. El formato declara el sustantivo y el total; el número de
+   * hoja lo pone el renderer.
+   */
+  contador?: {
+    readonly items: string
+    readonly total: number
+    readonly lamina?: Lamina
+  }
+  /**
+   * Lo que va entre el contador y la firma: notas, recomendaciones, alarma. Va
+   * DESPUÉS del contador en el flujo, que es el orden de las tres láminas medidas.
+   */
+  cierre?: ReactNode
+  /**
+   * Aire entre lo último del contenido y el bloque de firma. Lo declara el FORMATO
+   * porque cada lámina lo mide distinto —20 pt en Laboratorio, 26 en Imagenología y
+   * en Receta—, igual que el aire hasta la cabecera de la lista.
+   *
+   * Sin él, `espacio.16`: el mismo sumando que la fórmula de `umbral.firma` pone
+   * entre el arrastre y la firma, que es la única separación que I.1.9 declara aquí.
+   */
+  aireFirma?: number
   /**
    * Las últimas `flujo.arrastre` líneas del contenido: el texto corrido que baja
    * con la firma cuando el umbral no cabe (regla 1).
@@ -270,43 +327,118 @@ export interface MotorFlujoProps {
    * **Lo declara el formato y no lo puede calcular el motor.** react-pdf no
    * expone la maquetación de líneas antes de componer la hoja, así que no hay
    * ningún momento en el que este componente pueda mirar el contenido y saber
-   * dónde caen sus tres últimas líneas. Es la misma delegación que hace 2.K con
-   * la forma de su contador, y por la misma razón.
+   * dónde caen sus tres últimas líneas.
+   *
+   * Opcional, y ninguno de los tres formatos construidos lo pasa: los tres terminan
+   * en lista o en bloque destacado, no en prosa. El `minHeight` de abajo sigue
+   * reservando el umbral entero, así que la regla 1 se cumple igual — lo que no hay
+   * es texto que arrastrar.
    */
-  arrastre: string
+  arrastre?: string
   /** El bloque de firmas (2.L), ya compuesto. Cierra el documento. */
   firmas: ReactElement
   /** Rol del firmante que cierra: es de donde sale el umbral. */
   rol?: RolFirmante
-  /**
-   * El aviso de pie de cada hoja: `avisos[0]` es la hoja 1. Una hoja sin entrada
-   * —o con `null`— no lleva aviso, y la última no lleva nunca.
-   */
-  avisos?: readonly (AvisoPie | null)[]
 }
 
 /** 2.N · `MotorFlujo`. */
 export default function MotorFlujo({
+  encabezado,
   children,
+  contador,
+  cierre,
+  aireFirma = ESPACIO[16],
   arrastre,
   firmas,
   rol = 'medicoTratante',
-  avisos = [],
 }: MotorFlujoProps): ReactElement {
+  /**
+   * Las dos variantes del encabezado, compuestas de antemano. Se montan las DOS
+   * aunque solo salga una: son lo único que ve la prebúsqueda de tipografías, que
+   * recorre el árbol declarado antes de que corra ningún `render` (I.3.8). Sin ellas
+   * el encabezado de continuación pediría familias que nadie cargó y saldría en la
+   * tipografía de reserva, sin lanzar nada.
+   */
+  const primera = <EncabezadoHoja variante="primera" {...encabezado} />
+  const continuacion = <EncabezadoHoja variante="continuacion" {...encabezado} />
+
+  /** El contador de esta hoja. Las dos formas miden lo mismo: un renglón de `pie`. */
+  const contadorDeHoja = (hoja: Hoja): ReactElement | null => {
+    if (contador === undefined) return null
+    return esUltima(hoja) ? (
+      <ContadorLista forma="final" {...contador} />
+    ) : (
+      <ContadorLista
+        forma="intermedia"
+        hoja={numeroDeHoja(hoja)}
+        hojas={hoja.subPageTotalPages ?? numeroDeHoja(hoja)}
+        {...contador}
+      />
+    )
+  }
+
   return (
     <>
+      {/*
+        EL ENCABEZADO DE CADA HOJA. `fixed` para que se repita y `render` para que
+        cambie: las dos mitades hacen falta y ninguna sirve sola. Los hijos declarados
+        no se componen —el renderer los descarta y se queda con lo que devuelve el
+        `render`— pero son lo único que ve la prebúsqueda de tipografías.
+      */}
+      <View fixed render={(hoja: Hoja) => (numeroDeHoja(hoja) === 1 ? primera : continuacion)}>
+        {primera}
+        {continuacion}
+      </View>
+
       {children}
+
+      {/*
+        EL CONTADOR, UNO POR HOJA Y EN SU SITIO DEL FLUJO.
+
+        Es `fixed`, así que el renderer lo copia a todas las hojas **conservando su
+        posición entre hermanos**: cae justo detrás de la última entrada de su hoja y,
+        en la última, delante de los bloques de cierre. Es el orden de las tres
+        láminas, y sale solo — no hay que saber dónde cortó la lista para colocarlo.
+      */}
+      {contador === undefined ? null : (
+        <View style={estilos.contador} fixed render={(hoja: Hoja) => contadorDeHoja(hoja)}>
+          <ContadorLista forma="final" {...contador} />
+        </View>
+      )}
+
+      {cierre}
 
       {/*
         El cierre. `wrap={false}` es lo que hace verdadera la regla 1: si no cabe,
         baja ENTERO, y el arrastre está dentro. El `minHeight` es `umbral.firma`
         como fórmula — nunca como cifra.
+
+        ⚠ **EL `minHeight` SOLO SE APLICA CUANDO HAY ARRASTRE, Y ANTES SE APLICABA
+        SIEMPRE.** `umbral.firma` es `firma.bloque.alto + espacio.16 + 3 renglones`, y
+        esos dos últimos sumandos SON el arrastre y su aire: existen para que un
+        arrastre que componga en menos de tres líneas no cuele el bloque en un hueco
+        donde el umbral no cabía. Sin arrastre no hay nada que reservar, y reservarlo
+        igual son 72 pt de aire muerto —190.8 contra los 118.75 que mide la firma—
+        que empujan el cierre a una hoja propia.
+
+        Medido en Receta con 7 medicamentos: con el `minHeight` puesto salían TRES
+        hojas, la última con la firma y los dos bloques de cierre y ni un medicamento.
+        **Es el defecto que la regla 1 existe para evitar, provocado por la propia
+        regla 1.** Sin él salen las dos hojas de la lámina, 4 y 3.
+
+        Lo que la regla 1 garantiza sigue en pie por otro lado: el bloque es
+        indivisible, así que la firma nunca se parte, y los bloques de cierre que la
+        preceden traen su propio `wrap={false}` (2.I regla 3).
       */}
-      <View wrap={false} style={{ minHeight: umbralFirma(rol) }}>
-        <Text style={estilos.arrastre} orphans={FLUJO.orphans} widows={FLUJO.widows}>
-          {arrastre}
-        </Text>
-        <View style={estilos.firmas}>{firmas}</View>
+      <View wrap={false} style={arrastre === undefined ? {} : { minHeight: umbralFirma(rol) }}>
+        {arrastre === undefined ? null : (
+          <Text style={estilos.arrastre} orphans={FLUJO.orphans} widows={FLUJO.widows}>
+            {arrastre}
+          </Text>
+        )}
+        <View style={{ marginTop: arrastre === undefined ? aireFirma : ESPACIO[16] }}>
+          {firmas}
+        </View>
       </View>
 
       {/*
@@ -314,8 +446,8 @@ export default function MotorFlujo({
         el CONTENEDOR y las mismas zonas declaradas como hijos: las dos mitades de
         I.3.8. Ver la nota larga de la cabecera antes de tocar cualquiera de las tres.
       */}
-      <View style={estilos.aviso} fixed render={() => zonas(avisos)}>
-        {zonas(avisos)}
+      <View style={estilos.aviso} fixed render={() => zonas()}>
+        {zonas()}
       </View>
     </>
   )
