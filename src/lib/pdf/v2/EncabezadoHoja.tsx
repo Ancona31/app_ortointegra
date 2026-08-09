@@ -88,7 +88,11 @@ import Membrete, {
   type MedicoMembrete,
 } from './Membrete'
 import type { PanelCircularProps } from './PanelCircular'
-import TituloDocumento, { CeldaFolio, ETIQUETA_FOLIO_RIEL } from './TituloDocumento'
+import TituloDocumento, {
+  CeldaFolio,
+  ETIQUETA_EMISION_RIEL,
+  ETIQUETA_FOLIO_RIEL,
+} from './TituloDocumento'
 import BloquePaciente, {
   type RielHonorarios,
   type ValoresPaciente,
@@ -173,11 +177,51 @@ export interface EncabezadoHojaProps {
   readonly subtitulo?: string
   readonly rotuloSubtitulo?: string
   /**
-   * El paciente. **Exigible**, y no solo en la hoja 1: la regla 2 de 2.D declara el
-   * riel reducido obligatorio en cuanto el documento tiene más de una hoja.
+   * El paciente. **Exigible en siete de los ocho formatos**, y no solo en la hoja 1: la
+   * regla 2 de 2.D declara el riel reducido obligatorio en cuanto el documento tiene más
+   * de una hoja.
+   *
+   * ⚠ **EL OCTAVO NO TIENE PACIENTE Y POR ESO ES OPCIONAL.** El Escrito Médico es una hoja
+   * membretada multiuso —un certificado, una carta a un colega, una constancia— y ninguna
+   * de sus ocho láminas instancia 2.D: no hay campo que colapsar, no hay dato que falte.
+   * Sin paciente, la hoja 1 no monta riel y la de continuación compone **las cédulas del
+   * médico** en la línea reducida.
+   *
+   * **La regla 2 no se relaja:** lo que exige es que una hoja suelta se pueda atribuir, y
+   * este formato lo resuelve con otros tres datos —título, fecha y médico con cédula—, que
+   * es lo que B.8 declara. Quien tenga paciente sigue obligado a pasarlo.
    */
-  readonly paciente: ValoresPaciente
+  readonly paciente?: ValoresPaciente
   readonly emision?: string
+  /**
+   * FECHA DEL ENCABEZADO, colgada del título y **sin rótulo** (2.C regla 3). No es `emision`
+   * y no se confunde con ella: aquella es un par rótulo + valor dentro de un riel.
+   *
+   * La lleva un formato, el único cuyo bloque de título no tiene riel de folio a la derecha:
+   * sin folio, el sitio de la derecha lo ocupa la fecha.
+   */
+  readonly fecha?: string
+  /**
+   * EL MÉDICO DEJÓ EL TÍTULO EN BLANCO. El bloque compone la variante `ausente` y el rótulo
+   * de continuación sigue usando `titulo`, que el formato rellena con su `tituloPie`.
+   *
+   * Entra como booleano y no como `titulo` vacío porque son dos preguntas distintas: qué se
+   * imprime arriba y con qué se nombra el documento en las hojas siguientes. Un formato sin
+   * título sigue teniendo nombre.
+   */
+  readonly tituloAusente?: boolean
+  /**
+   * CON QUÉ SE NOMBRA EL DOCUMENTO EN LAS HOJAS DE CONTINUACIÓN, cuando no es su título.
+   *
+   * Sin ella, el título — que es lo que componen siete de los ocho formatos, porque su
+   * título es fijo y es su nombre. El octavo los separa: el encabezado de un escrito puede
+   * llevar una constancia de tres renglones y las hojas siguientes rotularse con el nombre
+   * corto, que es un campo aparte y no un truncado (`CONCILIA D41`).
+   *
+   * **No es el rótulo entero**: la palabra «continuación» la sigue poniendo este componente,
+   * que es lo que impide que ocho formatos acaben con ocho redacciones de lo mismo.
+   */
+  readonly nombreDocumento?: string
   readonly folio?: string
   /** Badge del documento. El chasis lo reduce solo en las hojas de continuación. */
   readonly urgente?: boolean
@@ -375,11 +419,47 @@ function lineaDePaciente(
     .join(RAYA)
 }
 
+/**
+ * EL RIEL DERECHO DE LA CABECERA DE CONTINUACIÓN — folio en siete formatos, EMISIÓN en uno.
+ *
+ * ⚠ **EL ESCRITO MÉDICO NO TIENE FOLIO Y AUN ASÍ LLEVA RIEL.** Es el único: sin folio, lo
+ * que ata su hoja 2 a la 1 son el título, el médico con su cédula y **la fecha**, así que la
+ * fecha sube a la celda que en los otros siete ocupa el número. Y la compone distinto —
+ * rotulada `Emisión`, a 10 / 14 en peso 500 y en tinta plena— porque no es un identificador:
+ * el acento del sistema marca series, y aquí no hay serie.
+ *
+ * ⚠ **LA MISMA FECHA VA SIN RÓTULO Y A 9 pt EN LA HOJA 1**, colgada del título en
+ * `tinta.etiqueta`. Dos tratamientos del mismo dato dentro del mismo documento; II.8 §5 los
+ * unifica al de la hoja 1 (`CONCILIA D40`) y **el paso 4.8 manda componer los dos medidos**.
+ * Reportado.
+ */
+const EMISION_CONTINUACION = { cuerpo: 10, interlineado: 14, peso: 500 as const }
+
+function rielDeContinuacion(props: EncabezadoHojaProps): ReactElement | undefined {
+  if (props.lamina === 'escrito') {
+    return props.emision === undefined ? undefined : (
+      <CeldaFolio
+        etiqueta={ETIQUETA_EMISION_RIEL}
+        valor={props.emision}
+        acento={props.acento}
+        desviacion={{ ...EMISION_CONTINUACION, color: TINTA.negra }}
+      />
+    )
+  }
+  return props.folio === undefined ? undefined : (
+    <CeldaFolio
+      etiqueta={ETIQUETA_FOLIO_RIEL}
+      valor={props.folio}
+      acento={props.acento}
+    />
+  )
+}
+
 /** 2.V · `EncabezadoHoja`. */
 export default function EncabezadoHoja(props: EncabezadoHojaProps): ReactElement {
   const continuacion = props.variante === 'continuacion'
   const titulo = continuacion
-    ? (props.rotuloHoja ?? continua(props.titulo))
+    ? (props.rotuloHoja ?? continua(props.nombreDocumento ?? props.titulo))
     : props.titulo
   /**
    * ⚠ **EL BADGE NO SE REPITE EN LAS HOJAS DE CONTINUACIÓN DE INTERNAMIENTO.**
@@ -392,6 +472,7 @@ export default function EncabezadoHoja(props: EncabezadoHojaProps): ReactElement
    */
   const badgeEnContinuacion = props.lamina !== 'internamiento'
   const internamiento = props.lamina === 'internamiento'
+  const escrito = props.lamina === 'escrito'
 
   return (
     <View>
@@ -408,15 +489,7 @@ export default function EncabezadoHoja(props: EncabezadoHojaProps): ReactElement
           medico={props.medico}
           rotulo={titulo}
           espaciador={props.espaciadorHoja}
-          riel={
-            props.folio === undefined ? undefined : (
-              <CeldaFolio
-                etiqueta={ETIQUETA_FOLIO_RIEL}
-                valor={props.folio}
-                acento={props.acento}
-              />
-            )
-          }
+          riel={rielDeContinuacion(props)}
         />
       ) : (
         <Membrete
@@ -436,14 +509,26 @@ export default function EncabezadoHoja(props: EncabezadoHojaProps): ReactElement
         además de la banda de 2.M—, y la emisión solo en la 1: es un dato de cabecera,
         no de identificación.
       */}
-      {continuacion ? null : (
+      {continuacion ? null : props.tituloAusente === true ? (
+        /*
+          SIN TÍTULO. En la lámina que lo mide el bloque NO colapsa: deja 20 pt con la fecha
+          sola y conserva su filete. Ver la variante `ausente` de 2.C.
+        */
         <TituloDocumento
-          variante="fijo"
+          variante="ausente"
+          lamina={props.lamina}
+          acento={props.acento}
+          fecha={props.fecha}
+        />
+      ) : (
+        <TituloDocumento
+          variante={escrito ? 'variable' : 'fijo'}
           lamina={props.lamina}
           acento={props.acento}
           titulo={titulo}
           subtitulo={props.subtitulo}
           rotuloSubtitulo={props.rotuloSubtitulo}
+          fecha={props.fecha}
           emision={props.emision}
           folio={props.folio}
           bajoTitulo={
@@ -469,7 +554,19 @@ export default function EncabezadoHoja(props: EncabezadoHojaProps): ReactElement
         colgar, que es donde la hoja 1 lo pone. La lámina lo compone así: «a la derecha
         de la línea de paciente».
       */}
-      {continuacion ? (
+      {continuacion && props.paciente === undefined ? (
+        /*
+          ⚠ **SIN PACIENTE NO HAY LÍNEA REDUCIDA, Y LA HOJA SIGUE IDENTIFICADA.** El Escrito
+          Médico no tiene paciente, así que lo que ata su hoja 2 a la 1 son otras tres cosas
+          —el título en el rótulo, la fecha en el riel derecho y el médico con SUS DOS
+          CÉDULAS bajo el filete—, y las tres las compone 2.B. Componer además una línea aquí
+          repetiría las cédulas dos renglones más abajo.
+
+          La regla 2 de 2.D no se relaja: exige que una hoja suelta se pueda atribuir, y este
+          formato lo cumple por otra vía. Quien tenga paciente sigue montando su línea.
+        */
+        null
+      ) : continuacion ? (
         <View style={estilos.filaContinuacion}>
           <Text
             style={[
@@ -477,13 +574,17 @@ export default function EncabezadoHoja(props: EncabezadoHojaProps): ReactElement
               internamiento ? estilos.lineaPacienteInternamiento : {},
             ]}
           >
-            {lineaDePaciente(props.paciente, props.lamina ?? 'chasis', props.eco)}
+            {lineaDePaciente(
+              props.paciente ?? { paciente: '' },
+              props.lamina ?? 'chasis',
+              props.eco,
+            )}
           </Text>
           {props.urgente === true && badgeEnContinuacion ? (
             <BloqueNegativo variante="urgenteReducido" lamina={props.lamina} />
           ) : null}
         </View>
-      ) : (
+      ) : props.paciente === undefined ? null : (
         <BloquePaciente
           variante="completo"
           lamina={props.lamina}

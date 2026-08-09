@@ -167,6 +167,20 @@ const GEOMETRIA = {
    */
   instruccionesInternamiento: ALARMA_RECETA,
   /**
+   * LA CITA DEL ESCRITO MÉDICO — **solo filete izquierdo, y con sangría 12**.
+   *
+   * Es la variante `cita` tal como `CONCILIA D42` la unificó —sin filete superior, que es lo
+   * que la distingue de la alarma— con una sangría de 12 en vez de los `espacio.16` del
+   * chasis. Su cuerpo mide entonces **472.4** —486 − 1.6 − 12— contra los 472.57 que mide la
+   * lámina: 0.17 de residuo de caja de línea.
+   *
+   * ⚠ **DOS LÁMINAS COMPONEN ESTA VARIANTE Y NO COINCIDEN.** Suplementación le pone filete
+   * superior e izquierdo a 1.9 con sangría 12 y ancho 294; esta le pone solo el izquierdo a
+   * 1.6 con sangría 12 y el ancho de la caja. Lo único que comparten es la sangría. Se
+   * compone la de cada lámina y `D42` sigue **reportado**.
+   */
+  citaEscrito: { sangria: ESPACIO[12] },
+  /**
    * Las notas adicionales de esa misma lámina: la anatomía de `recomendaciones` con
    * **0.63 pt de filete en vez de 0.5**. Es el mismo hairline que su regla de entrada,
    * y por eso el valor sale de `FILETE_SUPLEMENTACION` y no se escribe aquí.
@@ -228,6 +242,12 @@ const estilos = StyleSheet.create({
     borderLeftWidth: FILETE.cita,
     borderLeftColor: TINTA.negra,
     paddingLeft: SANGRIA,
+  },
+  /** La misma cita con la sangría medida en la lámina de II.8. */
+  fileteCitaEscrito: {
+    borderLeftWidth: FILETE.cita,
+    borderLeftColor: TINTA.negra,
+    paddingLeft: GEOMETRIA.citaEscrito.sangria,
   },
   /** La cita de Suplementación: dos filetes, sangría de 12 y ancho propio. */
   fileteCitaSuplementacion: {
@@ -406,6 +426,7 @@ type EstiloFilete =
   | typeof estilos.fileteInstruccionesInternamiento
   | typeof estilos.fileteCita
   | typeof estilos.fileteCitaSuplementacion
+  | typeof estilos.fileteCitaEscrito
   | typeof estilos.fileteRecomendaciones
   | typeof estilos.fileteRecomendacionesSuplementacion
 
@@ -425,7 +446,8 @@ function estiloFilete(variante: VarianteDestacado, lamina: Lamina): EstiloFilete
       ? estilos.fileteRecomendacionesSuplementacion
       : estilos.fileteRecomendaciones
   }
-  return suplementacion ? estilos.fileteCitaSuplementacion : estilos.fileteCita
+  if (suplementacion) return estilos.fileteCitaSuplementacion
+  return lamina === 'escrito' ? estilos.fileteCitaEscrito : estilos.fileteCita
 }
 
 /** 2.I · `BloqueDestacado`. */

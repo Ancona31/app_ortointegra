@@ -71,6 +71,7 @@ import {
   ZONA_SEGURA,
   estiloTipografico,
   type AcentoResuelto,
+  type Lamina,
 } from './tokens'
 
 /**
@@ -146,6 +147,34 @@ const estilos = StyleSheet.create({
     textAlign: 'right',
     marginLeft: GEOMETRIA.medianil,
   },
+  /**
+   * LAS TRES ZONAS DE LA LÁMINA DE ESCRITO MÉDICO — `auto minmax(0, 1fr) auto`.
+   *
+   * Los otros siete formatos empaquetan sus dos primeras zonas a la izquierda y dejan que la
+   * leyenda se coma el resto; esta lámina pone **el título en el centro y la leyenda a la
+   * derecha midiendo lo que dice**. No es una preferencia: es que aquí la zona central lleva
+   * un dato VARIABLE —el título lo escribe el médico— y la única forma de que no empuje a la
+   * leyenda fuera de la banda es darle el hueco flexible y recortarla.
+   *
+   * ⚠ **ES LA ÚNICA ZONA DEL SISTEMA CON RECORTE POR ELIPSIS.** `maxLines: 1` y
+   * `textOverflow: 'ellipsis'` son las dos props con las que react-pdf trunca, y 2.H las
+   * prohíbe en su ficha por una razón que aquí no aplica: allí lo truncado sería una vía de
+   * administración, un dato clínico. Aquí es el nombre del documento, que ya va entero y a
+   * 17 pt en la cabecera. Reportado, y acotado a esta zona.
+   */
+  tituloCentral: {
+    ...estiloTipografico('pie'),
+    flex: 1,
+    minWidth: 0,
+    textAlign: 'center',
+    marginHorizontal: GEOMETRIA.medianil,
+    maxLines: 1,
+    textOverflow: 'ellipsis',
+  },
+  leyendaDerecha: {
+    ...estiloTipografico('pie.leyenda'),
+    flexShrink: 0,
+  },
 })
 
 interface Comun {
@@ -171,7 +200,7 @@ export type PieDocumentoProps =
    * sirve donde alguien de fuera lo cita, y estos cinco no salen a esa
    * circulación (regla 4).
    */
-  | ({ variante: 'sinFolio'; titulo: string } & Comun)
+  | ({ variante: 'sinFolio'; titulo: string; lamina?: Lamina } & Comun)
 
 /**
  * `Página X de Y` (regla 2), compuesta en mayúsculas por la versalita del rol —
@@ -219,6 +248,27 @@ function zonas(props: PieDocumentoProps): ReactElement[] {
         render={paginacion}
       />,
       leyenda,
+    ]
+  }
+
+  /*
+    DOS REPARTOS PARA LA MISMA VARIANTE. El de Internamiento empaqueta paginación y título a
+    la izquierda; el de Escrito Médico centra el título y deja la leyenda a la derecha. Ver
+    `tituloCentral`.
+  */
+  if (props.lamina === 'escrito') {
+    return [
+      <Text
+        key="paginacion"
+        style={[estilos.paginacion, estilos.zonaAuto]}
+        render={paginacion}
+      />,
+      <Text key="titulo" style={estilos.tituloCentral}>
+        {props.titulo}
+      </Text>,
+      <Text key="leyenda" style={estilos.leyendaDerecha}>
+        {LEYENDA}
+      </Text>,
     ]
   }
 

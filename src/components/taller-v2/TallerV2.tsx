@@ -84,6 +84,7 @@ type Vista =
   | 'honorarios'
   | 'internamiento'
   | 'consentimiento'
+  | 'escrito'
 
 /**
  * EL SELECTOR — EL CHASIS Y LOS OCHO FORMATOS DE LA SECCIÓN II.
@@ -98,9 +99,10 @@ type Vista =
  * de 320 pt y se corta — que es el defecto que esta tabla arregla.
  *
  * ⚠ **SON NUEVE Y NO DIEZ.** La Sección II declara ocho formatos —II.1 a II.8— y con
- * el chasis son nueve, así que faltan CUATRO por construir y no cinco. Si el décimo es
- * una vista que no está en la Sección II —una hoja de vista previa, o el chasis
- * partido en dos—, dime cuál y entra aquí sin tocar nada más: la retícula envuelve.
+ * el chasis son nueve. **Ya no falta ninguno**: las nueve entradas están construidas y
+ * ninguna se pinta en gris. Si el décimo es una vista que no está en la Sección II —una
+ * hoja de vista previa, o el chasis partido en dos—, dime cuál y entra aquí sin tocar
+ * nada más: la retícula envuelve.
  */
 interface EntradaSelector {
   /** `null` mientras el formato no exista: la entrada se pinta y no se pulsa. */
@@ -118,7 +120,7 @@ const VISTAS: readonly EntradaSelector[] = [
   { vista: 'honorarios', codigo: '4.5', nombre: 'Honorarios' },
   { vista: 'internamiento', codigo: '4.6', nombre: 'Internamiento' },
   { vista: 'consentimiento', codigo: '4.7', nombre: 'Consentimiento' },
-  { vista: null, codigo: '4.8', nombre: 'Escrito médico' },
+  { vista: 'escrito', codigo: '4.8', nombre: 'Escrito médico' },
 ]
 
 /**
@@ -185,11 +187,24 @@ const CASOS_CONSENTIMIENTO: readonly EntradaCaso[] = [
   { caso: 'sustitucion', etiqueta: 'Sustitución', nota: 'Sin nivel 2: Testigos pasa a 2' },
 ]
 
+/**
+ * LOS DE ESCRITO MÉDICO SON CUATRO Y NO TRES, y su eje no es el contenido sino el TÍTULO:
+ * es el único formato cuyo título lo escribe el médico, así que lo que hay que ver es qué
+ * pasa cuando crece —hasta tres renglones— y cuando no está.
+ */
+const CASOS_ESCRITO: readonly EntradaCaso[] = [
+  { caso: 'corto', etiqueta: 'Corto', nota: 'Un renglón: la fecha se alinea con él' },
+  { caso: 'medio', etiqueta: 'Medio', nota: 'Un renglón, cadena más larga' },
+  { caso: 'largo', etiqueta: 'Largo', nota: 'Tres renglones: la fecha va con la primera' },
+  { caso: 'sin', etiqueta: 'Sin título', nota: 'Hueco de 20 pt, no cero, y con filete' },
+]
+
 /** Qué casos ofrece cada vista. Las que no aparecen usan los tres de `CASOS`. */
 function casosDe(vista: Vista): readonly EntradaCaso[] {
   if (vista === 'honorarios') return CASOS_HONORARIOS
   if (vista === 'internamiento') return CASOS_INTERNAMIENTO
   if (vista === 'consentimiento') return CASOS_CONSENTIMIENTO
+  if (vista === 'escrito') return CASOS_ESCRITO
   return CASOS
 }
 

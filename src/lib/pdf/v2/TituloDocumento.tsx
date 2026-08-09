@@ -246,6 +246,39 @@ const INTERNAMIENTO = {
  */
 const CONSENTIMIENTO = { tituloRiel: 18 } as const
 
+/**
+ * GEOMETRÍA DEL BLOQUE EN LA LÁMINA DE ESCRITO MÉDICO — **el único con título VARIABLE**.
+ *
+ * No hay caja fija ni riel de folio: este es el único formato del sistema sin folio, así que
+ * el título toma todo lo que la fecha le deja. El reparto medido cierra la caja sin residuo:
+ *
+ *     425.61  el título, `flex: 1`
+ *      16     el medianil hasta la fecha   ← propio; el chasis pone `reticula.medianil` (9)
+ *      44.39  la fecha, que mide lo que dice
+ *     ───────
+ *     486
+ *
+ * El 425.61 **no se escribe**: sale de la resta, y escribirlo congelaría el bloque a una
+ * fecha de once caracteres.
+ *
+ * Sus dos aires son propios: **5 pt** hasta el filete —los mismos de Receta, así que se leen
+ * de allí— y **20 pt** del filete al cuerpo, donde el chasis pone 8. Ese 20 es el mayor del
+ * sistema junto con el 18 de Consentimiento, y por la misma razón: lo que va debajo no es un
+ * riel de identificación sino el cuerpo del documento.
+ *
+ * ⚠ **EL BLOQUE MIDE 22.37 CON UNA LÍNEA Y 60 CON TRES, Y LAS DOS CIFRAS NO SON LA MISMA
+ * CUENTA.** Tres renglones de 20 son 60 exactos; uno solo mide 22.37. Los 2.37 de sobra son
+ * el residuo de caja de línea del HTML —el *strut* que Yoga no añade—, y no se compone: se
+ * componen los 20 del renglón, que es lo que la propia lámina declara para el caso de tres.
+ * Reportado.
+ */
+const ESCRITO = {
+  medianilFecha: 16,
+  tituloRiel: 20,
+  /** Alto del bloque cuando no hay título: un renglón, con la fecha sola. */
+  altoSinTitulo: 20,
+} as const
+
 /** Interlineado del título: el alto de UNA de sus líneas. Lo usa la fecha. */
 const ALTO_LINEA_TITULO = TIPOGRAFIA['titulo.documento'].interlineado ?? 0
 
@@ -276,6 +309,26 @@ const estilos = StyleSheet.create({
   /** El aire mayor del sistema bajo el filete del título. Ver `CONSENTIMIENTO`. */
   bloqueConsentimiento: {
     marginBottom: CONSENTIMIENTO.tituloRiel,
+  },
+  /** El aire mayor del sistema bajo el filete del título, empatado con el de II.7. */
+  bloqueEscrito: {
+    marginBottom: ESCRITO.tituloRiel,
+  },
+  /**
+   * LA FILA DEL BLOQUE SIN TÍTULO — 20 pt con la fecha sola, alineada a la derecha.
+   *
+   * `justifyContent: 'flex-end'` empuja la caja de la fecha al borde derecho de la caja, que
+   * es donde estaría si hubiera título. El hueco de 20 pt es el renglón que el título habría
+   * ocupado: **la fecha sigue teniendo dónde apoyarse**.
+   */
+  filaSinTitulo: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    height: ESCRITO.altoSinTitulo,
+  },
+  /** El medianil propio de esta lámina entre el título y su fecha. */
+  cajaFechaEscrito: {
+    marginLeft: ESCRITO.medianilFecha,
   },
   fila: {
     flexDirection: 'row',
@@ -523,8 +576,24 @@ export type TituloDocumentoProps =
   | ({ variante: 'fijo' } & ConTitulo)
   /** Escrito Médico. Lo escribe el médico. */
   | ({ variante: 'variable' } & ConTitulo)
-  /** Escrito Médico sin título. No deja hueco reservado. */
-  | { variante: 'ausente' }
+  /**
+   * Escrito Médico sin título.
+   *
+   * ⚠ **NO COLAPSA ENTERA, Y LA REGLA 4 DE LA FICHA DICE QUE SÍ.** La lámina que la mide
+   * compone un bloque de **20 pt con la fecha sola alineada a la derecha**, y conserva su
+   * filete. Se compone lo medido, y encaja con lo que la variante es: sin título el
+   * documento sigue teniendo fecha, y esa fecha vive en este bloque —no en el pie, no en un
+   * riel—. Colapsar a cero la dejaría sin sitio.
+   *
+   * La regla 4 sigue siendo cierta para el chasis, que es lo que se compone sin `lamina`:
+   * ahí no queda ni el bloque ni su filete, solo `transicion.tituloRiel`. **Reportado.**
+   */
+  | ({ variante: 'ausente' } & {
+      /** Sin ella, el bloque colapsa entero como declara la regla 4. */
+      fecha?: string
+      acento?: AcentoResuelto
+      lamina?: Lamina
+    })
 
 /**
  * UNA CELDA DEL RIEL DE FOLIO: rótulo en versalita y valor en `folio`.
@@ -560,6 +629,12 @@ export function CeldaFolio({
     readonly cuerpo: number
     readonly interlineado: number
     readonly peso?: Peso
+    /**
+     * Tinta del valor, cuando la lámina no lo compone en el acento. Hoy una: la celda de
+     * `Emisión` de la cabecera de continuación de II.8 va en `tinta.negra` — no es un folio,
+     * es una fecha, y el acento del sistema marca identificadores.
+     */
+    readonly color?: string
   }
 }): ReactElement {
   return (
@@ -577,6 +652,7 @@ export function CeldaFolio({
                 // que mover el cuerpo lo mueve. Misma conversión que `estiloTipografico()`.
                 letterSpacing: TIPOGRAFIA.folio.tracking * desviacion.cuerpo,
                 ...(desviacion.peso === undefined ? {} : { fontWeight: desviacion.peso }),
+                ...(desviacion.color === undefined ? {} : { color: desviacion.color }),
               }),
         }}
       >
@@ -589,12 +665,37 @@ export function CeldaFolio({
 /** El rótulo del riel de folio, para quien componga la celda desde fuera. */
 export const ETIQUETA_FOLIO_RIEL = ETIQUETA_FOLIO
 
+/** El de la celda de emisión, que 2.V compone en la cabecera de continuación de II.8. */
+export const ETIQUETA_EMISION_RIEL = ETIQUETA_EMISION
+
 /** 2.C · `TituloDocumento`. */
 export default function TituloDocumento(props: TituloDocumentoProps): ReactElement {
   if (props.variante === 'ausente') {
-    // Regla 4: colapsa entero. Solo queda la separación bajo el filete del
-    // membrete, que aquí hace de filete de apertura del cuerpo.
-    return <View style={estilos.bloque} />
+    /*
+      SIN FECHA NI LÁMINA: regla 4, colapsa entero. Solo queda la separación bajo el filete
+      del membrete, que entonces hace de filete de apertura del cuerpo.
+    */
+    if (props.lamina !== 'escrito' || props.fecha === undefined || props.acento === undefined) {
+      return <View style={estilos.bloque} />
+    }
+
+    /*
+      LA LÁMINA DE ESCRITO MÉDICO: 20 pt con la fecha sola a la derecha, y su filete. La
+      caja de la fecha es la MISMA que con título —un renglón de título de alto, con el
+      texto apoyado abajo—, así que quitar el título no mueve la fecha ni un punto.
+    */
+    return (
+      <View style={[estilos.bloque, estilos.bloqueEscrito]}>
+        <View style={estilos.filaSinTitulo}>
+          <View style={estilos.cajaFecha}>
+            <Text style={estilos.fecha}>{props.fecha}</Text>
+          </View>
+        </View>
+        <View style={estilos.hastaFileteReceta}>
+          <FileteGruesoFino acento={props.acento} />
+        </View>
+      </View>
+    )
   }
 
   /**
@@ -621,6 +722,12 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
    * el contenedor. Por eso no entra en `doble` ni en ninguna otra rama.
    */
   const consentimiento = lamina === 'consentimiento'
+  /**
+   * Escrito Médico compone la caja del título con `flex: 1` —la del chasis— y solo desvía el
+   * medianil hasta la fecha y el aire de abajo. Por eso no entra en `doble` ni en ninguna
+   * rama de caja fija: sin riel de folio, el título no tiene con quién colisionar.
+   */
+  const escrito = lamina === 'escrito'
   const doble = imagen || receta || internamiento
 
   /**
@@ -658,7 +765,9 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
             ? estilos.bloqueSuplementacion
             : consentimiento
               ? estilos.bloqueConsentimiento
-              : {},
+              : escrito
+                ? estilos.bloqueEscrito
+                : {},
       ]}
     >
       <View style={estilos.fila}>
@@ -702,7 +811,7 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
           )}
         </View>
         {props.fecha === undefined ? null : (
-          <View style={estilos.cajaFecha}>
+          <View style={[estilos.cajaFecha, escrito ? estilos.cajaFechaEscrito : {}]}>
             <Text style={estilos.fecha}>{props.fecha}</Text>
           </View>
         )}
@@ -762,7 +871,7 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
         style={
           imagen
             ? estilos.hastaFileteImagenologia
-            : receta || internamiento
+            : receta || internamiento || escrito
               ? estilos.hastaFileteReceta
               : honorarios
                 ? estilos.hastaFileteHonorarios

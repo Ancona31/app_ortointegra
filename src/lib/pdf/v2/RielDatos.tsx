@@ -176,6 +176,16 @@ const TRAZO = {
    * láminas y es lo que fija el filete en 0.63 —con los 0.8 que lee B.7 §2 se pasa 0.345—.
    */
   consentimiento: { filete: FILETE_CONSENTIMIENTO.regla, regla: 0.375 },
+  /**
+   * **LA DE ESCRITO MÉDICO NO TIENE RIEL DE IDENTIFICACIÓN Y NO PUEDE MEDIRLO.** Ninguna de
+   * sus ocho láminas instancia 2.D: ese formato no tiene paciente. Lo único que compone con
+   * este componente es la celda de `Emisión` del riel derecho de su cabecera de
+   * continuación, que la monta 2.C y no pasa por aquí.
+   *
+   * Se declaran los valores del chasis para no dejar el miembro sin valor, **y no los lee
+   * nadie** — es el mismo caso que la regla interior de Honorarios, que tampoco existe.
+   */
+  escrito: { filete: FILETE.fino, regla: FILETE.regla },
 } as const satisfies Record<Lamina, { filete: number; regla: number }>
 
 /** Lo que una desviación puede mover de un rol: solo su cuerpo y su interlineado. */

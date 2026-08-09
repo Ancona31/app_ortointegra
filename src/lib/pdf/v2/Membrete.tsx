@@ -53,6 +53,7 @@ import PanelCircular, { type PanelCircularProps } from './PanelCircular'
 import FileteGruesoFino from './FileteGruesoFino'
 import {
   CAJA,
+  TINTA,
   TIPOGRAFIA,
   TRANSICION,
   estiloTipografico,
@@ -197,6 +198,37 @@ const GEOMETRIA = {
    * caso exacto. Reportado.
    */
   espaciadorCierreConsentimiento: 20,
+  /**
+   * EL ESPACIADOR DE CIERRE EN LA LÁMINA DE ESCRITO MÉDICO — **16 pt**, el cuarto valor.
+   *
+   * Su banda de dirección cierra en 153.35 y el bloque de título abre en 169.35. Dieciséis,
+   * entre los 12 del chasis y los 20 de Consentimiento. Cuatro cifras medidas para el mismo
+   * elemento —10, 12, 16 y 20— y ninguna se unifica: cada una la declara su lámina.
+   * Reportado.
+   */
+  espaciadorCierreEscrito: 16,
+  /**
+   * EL ESPACIADOR DE LA HOJA DE CONTINUACIÓN DE ESCRITO MÉDICO — **24 pt**.
+   *
+   * `COINCIDENCIA` con el de Honorarios, que vale lo mismo y no es él: dos láminas lo miden
+   * en 24 por su cuenta. Es el mayor de los cuatro —12, 14, 24 y 26— y aquí lo que separa
+   * es la identidad del médico del cuerpo del escrito, que es todo lo que esa hoja lleva.
+   */
+  espaciadorContinuacionEscrito: 24,
+  /**
+   * LA LÍNEA DE CÉDULAS DE LA CONTINUACIÓN — interlineado **12** y `tinta.etiqueta`.
+   *
+   * Es la misma línea que este componente ya compone bajo el filete en la variante
+   * `continuacion`, con dos sumandos movidos: sube de 11 a 12 —el mismo 12 de la banda de
+   * dos renglones— y baja de `tinta.secundaria` a `tinta.etiqueta`. Familia, cuerpo, peso y
+   * tracking los sigue poniendo el rol.
+   *
+   * ⚠ **Y LLEVA LAS DOS CÉDULAS, NO SOLO LA PRINCIPAL.** En las otras cinco láminas esta
+   * línea imprime `medico.cedulas[0]`; aquí imprime las dos unidas por la raya del sistema,
+   * porque en un documento SIN FOLIO son parte de lo que ata la hoja 2 a la 1 — junto con el
+   * título y la fecha, que es lo que B.8 declara.
+   */
+  cedulaContinuacionEscrito: { interlineado: 12 },
   /**
    * INTERLINEADO DE LA BANDA EN LA LÁMINA DE IMAGENOLOGÍA — 12, no 11.
    *
@@ -415,6 +447,35 @@ const estilos = StyleSheet.create({
   espaciadorConsentimiento: {
     height: GEOMETRIA.espaciadorCierreConsentimiento,
   },
+  /** Y el cuarto valor, el de Escrito Médico. */
+  espaciadorEscrito: {
+    height: GEOMETRIA.espaciadorCierreEscrito,
+  },
+  espaciadorContinuacionEscrito: {
+    height: GEOMETRIA.espaciadorContinuacionEscrito,
+  },
+  /** La línea de cédulas de esa hoja, con sus dos sumandos movidos. */
+  credencialEscrito: {
+    ...estiloTipografico('medico.credencial'),
+    lineHeight:
+      GEOMETRIA.cedulaContinuacionEscrito.interlineado /
+      TIPOGRAFIA['medico.credencial'].cuerpo,
+    color: TINTA.etiqueta,
+  },
+  /**
+   * EL RÓTULO DE CONTINUACIÓN EN LA LÁMINA DE ESCRITO MÉDICO — `firma.rol`, no
+   * `titulo.seccion`.
+   *
+   * Los cinco formatos con hoja de continuación lo componen a 10 / 14 en tinta plena; esta
+   * lámina lo compone a **7 / 11 en 0.22 em sobre `tinta.etiqueta`**, que es la versalita
+   * con la que el sistema rotula una firma. Con ella la cabecera mide **29** —11 del rótulo
+   * más 18 del nombre— contra los 32 de las otras cinco.
+   *
+   * Y encaja con lo que este formato es: sin folio, el rótulo no identifica el documento
+   * —eso lo hacen el nombre del médico, sus cédulas y la fecha—, solo dice qué se está
+   * leyendo. Un rótulo que no identifica no tiene por qué pesar como un título.
+   */
+  rotuloContinuacionEscrito: { ...estiloTipografico('firma.rol') },
 })
 
 /**
@@ -445,6 +506,7 @@ export default function Membrete(props: MembreteProps): ReactElement {
    */
   const internamiento = lamina === 'internamiento'
   const consentimiento = lamina === 'consentimiento'
+  const escrito = lamina === 'escrito'
   /**
    * LA BANDA DE CONSENTIMIENTO ES LA DE HONORARIOS: **un renglón alto y sin credenciales**.
    *
@@ -502,7 +564,13 @@ export default function Membrete(props: MembreteProps): ReactElement {
         <View style={estilos.cabeceraContinuacion}>
           <View>
             {props.rotulo === undefined ? null : (
-              <Text style={estilos.rotuloContinuacion}>{props.rotulo.toUpperCase()}</Text>
+              <Text
+                style={
+                  escrito ? estilos.rotuloContinuacionEscrito : estilos.rotuloContinuacion
+                }
+              >
+                {props.rotulo.toUpperCase()}
+              </Text>
             )}
             <Text style={estilos.nombreContinuacion}>{medico.nombre}</Text>
           </View>
@@ -604,7 +672,11 @@ export default function Membrete(props: MembreteProps): ReactElement {
         // queda bajo el nombre, a la izquierda. Sin columna izquierda no hay
         // nada que separar, así que tampoco lleva la regla vertical.
         <View style={estilos.lineaFina}>
-          <Text style={estilos.credencial}>{medico.cedulas[0]}</Text>
+          <Text style={escrito ? estilos.credencialEscrito : estilos.credencial}>
+            {escrito
+              ? medico.cedulas.join(SEPARADOR_CREDENCIALES)
+              : medico.cedulas[0]}
+          </Text>
         </View>
       )}
 
@@ -623,7 +695,9 @@ export default function Membrete(props: MembreteProps): ReactElement {
               ? estilos.espaciadorContinuacionHonorarios
               : internamiento
                 ? estilos.espaciadorContinuacionInternamiento
-                : estilos.espaciador
+                : escrito
+                  ? estilos.espaciadorContinuacionEscrito
+                  : estilos.espaciador
             : /*
                 DOS LÁMINAS COMPONEN 10, DOS COMPONEN 12 Y UNA COMPONE 20. Internamiento
                 mide el mismo 10 que Receta —su banda cierra en 153.35 y el bloque de
@@ -632,9 +706,11 @@ export default function Membrete(props: MembreteProps): ReactElement {
               */
               consentimiento
               ? estilos.espaciadorConsentimiento
-              : lamina === 'receta' || internamiento
-                ? estilos.espaciadorReceta
-                : estilos.espaciador,
+              : escrito
+                ? estilos.espaciadorEscrito
+                : lamina === 'receta' || internamiento
+                  ? estilos.espaciadorReceta
+                  : estilos.espaciador,
           // La hoja manda sobre la lámina, y solo un formato la usa. Ver `espaciador`.
           props.variante === 'continuacion' && props.espaciador !== undefined
             ? { height: props.espaciador }

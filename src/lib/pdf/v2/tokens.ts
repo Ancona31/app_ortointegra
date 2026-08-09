@@ -587,6 +587,33 @@ export const TIPOGRAFIA = {
   'casilla.texto': { familia: FUENTE.humanista, cuerpo: 8, interlineado: 11, peso: 400, tracking: 0, color: 'tinta.negra' },
   'anexo.nombre': { familia: FUENTE.neogrotesca, cuerpo: 11, interlineado: 15, peso: 500, tracking: -0.012, color: 'tinta.negra' },
   'anexo.pie': { familia: FUENTE.humanista, cuerpo: 7.5, interlineado: 11, peso: 400, tracking: 0, color: 'tinta.etiqueta' },
+  // ── LOS DOS ROLES DE LA LÁMINA DE ESCRITO MÉDICO (II.8).
+  //
+  // Son los DOS ÚNICOS que hacen falta para el formato de cuerpo más rico del sistema, y esa
+  // es la medida de lo desnudo que es su chasis: todo lo demás de su cuerpo ya existía.
+  //
+  //     párrafo, ítem de lista   `texto.corrido`       IBM Plex Sans 11.5 / 18, 400
+  //     negrita y cita           `instruccion.texto`   lo mismo en peso 500
+  //     marca de lista           `item.raya`           Archivo 9 / 18, 400, `tinta.etiqueta`
+  //     fecha del encabezado     `fecha.encabezado`    Archivo 9, 400, `tinta.etiqueta`
+  //
+  // ⚠ **`instruccion.texto` E `item.raya` LLEVAN EL NOMBRE DE OTRO FORMATO Y SE REUSAN
+  // IGUAL.** Un rol nuevo idéntico a uno existente sería deuda, y el nombre de un rol dice de
+  // dónde salió, no quién puede leerlo. Con tres consumidores cada uno, lo que hará falta es
+  // renombrarlos —a `texto.destacado` y `lista.marca`—, no duplicarlos. Reportado.
+  //
+  // Los dos que sí son nuevos se distinguen de lo que más se les parece por una sola cosa:
+  //
+  //     `cuerpo.encabezado1`   13 / 18   no hay ningún rol de 13 pt en la escala
+  //     `cuerpo.encabezado2`   10 / 14 en **`tinta.secundaria`**   `titulo.seccion` es igual
+  //                            en todo menos en la tinta, que allí es plena
+  //
+  // **El techo de 13 pt es deliberado y la lámina lo declara:** el encabezado mayor del
+  // cuerpo se queda muy por debajo de los 22 del nombre del médico, «para que nunca
+  // compitan». Es un cuerpo cuyo texto lo escribe el médico en un editor, así que el chasis
+  // tiene que garantizar que no pueda gritar más que el membrete.
+  'cuerpo.encabezado1': { familia: FUENTE.neogrotesca, cuerpo: 13, interlineado: 18, peso: 600, tracking: 0.08, color: 'tinta.negra' },
+  'cuerpo.encabezado2': { familia: FUENTE.neogrotesca, cuerpo: 10, interlineado: 14, peso: 600, tracking: 0.14, color: 'tinta.secundaria' },
   'recomendaciones.encabezado': { familia: FUENTE.neogrotesca, cuerpo: 9, interlineado: 13, peso: 600, tracking: 0.14, color: 'tinta.negra' },
   'alarma.encabezado': { familia: FUENTE.neogrotesca, cuerpo: 9.5, interlineado: 13, peso: 600, tracking: 0.22, color: 'tinta.negra' },
   'firma.nombre': { familia: FUENTE.neogrotesca, cuerpo: 11.5, interlineado: 16, peso: 600, tracking: -0.012, color: 'tinta.negra' },
@@ -1098,6 +1125,23 @@ export type Lamina =
   | 'honorarios'
   | 'internamiento'
   | 'consentimiento'
+  /**
+   * **Y AHORA SON OCHO. LA OCTAVA ES LA MENOR, Y ESO ES LO QUE VALIDA.**
+   *
+   * `escrito` mide el encabezado más pequeño del sistema —**165.22 pt**, un tercio del de
+   * Consentimiento— porque no lleva casi nada: sin folio, sin riel de identificación, sin
+   * bloque de paciente y con un título que escribe el médico. Es el chasis desnudo, y por eso
+   * es el que dice si el chasis se sostiene solo.
+   *
+   * Lo que declara de propio:
+   *
+   *   2.B  espaciador de cierre a 16 —cuarto valor— y rótulo de continuación en `firma.rol`
+   *   2.C  medianil de 16 a la fecha, aire de 20 bajo el filete y una variante `ausente`
+   *        **que no colapsa**: deja 20 pt con la fecha sola
+   *   2.M  las tres zonas de la banda en otro orden, y la única con recorte por elipsis
+   *   2.V  hoja de continuación **sin paciente**: su línea reducida lleva las cédulas
+   */
+  | 'escrito'
 
 /**
  * Las nueve transiciones entre bloques declaradas por el diseño (I.1.7).

@@ -78,11 +78,30 @@ export function registrarFuentesV2(): void {
     ],
   })
 
+  /**
+   * LA ITÁLICA ENTRA CON II.8 Y ES LA ÚNICA DEL SISTEMA.
+   *
+   * El cuerpo del Escrito Médico viene de un editor de texto rico y su marca de cursiva es
+   * IBM Plex Sans **400 itálica**; B.8 §4 lo dice con la cifra al lado —«es el único de los
+   * ocho que carga la itálica»—. Sin el archivo registrado, react-pdf no encuentra la cara
+   * y compone la redonda **sin lanzar nada**: la cursiva desaparecería en silencio, que es
+   * exactamente el defecto mudo que I.3.8 obliga a cerrar.
+   *
+   * `IBMPlexSans-Italic.ttf` se obtuvo por el procedimiento de la cabecera —pedir el CSS a
+   * la API de Google Fonts y leer la URL vigente de `fonts.gstatic.com`— y queda versionado
+   * en el repo como los otros cinco.
+   *
+   * ⚠ **NO HAY ITÁLICA DE PESO 500.** La negrita de este formato se compone en 500 y la
+   * cursiva en 400; una cursiva DENTRO de una negrita pediría 500 itálica, que no está
+   * registrada. Ver `TRAMO` en el formato: la combinación se resuelve allí y queda
+   * reportada.
+   */
   Font.register({
     family: 'IBM Plex Sans',
     fonts: [
       { src: '/fonts/IBMPlexSans-Regular.ttf', fontWeight: 400 },
       { src: '/fonts/IBMPlexSans-Medium.ttf', fontWeight: 500 },
+      { src: '/fonts/IBMPlexSans-Italic.ttf', fontWeight: 400, fontStyle: 'italic' },
     ],
   })
 }
