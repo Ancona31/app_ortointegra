@@ -58,13 +58,32 @@ const GEOMETRIA = {
    */
   anchoGruesoLista: 64,
   grosorGruesoLista: 2,
+  /**
+   * LA TERCERA MEDIDA, Y LA MÁS GRANDE DEL SISTEMA POR LOS DOS EJES.
+   *
+   * La lámina de Internamiento abre su sección 2 con **144 × 4 pt** de acento más el fino
+   * negro hasta el borde de la caja —los 342 que quedan de los 486—. El grosor es
+   * `filete.transicion`, que I.1.6 declara reservado a la apertura de sección y que hasta
+   * ahora no tenía consumidor; el ancho es propio, y es exactamente el doble más la mitad
+   * del segmento de la medida `lista`.
+   *
+   * La regla 1 sigue en pie: lo que entra es una MEDIDA declarada —tres parejas cerradas—,
+   * no un número libre. Un `ancho={144}` la rompería; `medida="transicion"` no.
+   *
+   * ⚠ **LA REGLA 3 DICE QUE EL ACENTO SÓLIDO ESTÁ ACOTADO A 96 pt Y ESTO SON 144.** Se
+   * compone lo medido y la razón de la regla se conserva entera: sigue sin cruzar la caja
+   * —144 de 486, menos de un tercio— y sigue siendo el único sitio donde el acento aparece
+   * como barra. Lo que cambia es la cifra del tope, no lo que la regla protege. Reportado.
+   */
+  anchoGruesoTransicion: 144,
 } as const
 
 /**
- * Las dos medidas declaradas. `principal` cierra membrete y título en los ocho
- * formatos; `lista` abre la lista de Imagenología.
+ * Las tres medidas declaradas. `principal` cierra membrete y título en los ocho
+ * formatos; `lista` abre la lista de Imagenología; `transicion` abre la sección 2 de
+ * Internamiento y no la usa nadie más (2.Q, regla 2).
  */
-export type MedidaFilete = 'principal' | 'lista'
+export type MedidaFilete = 'principal' | 'lista' | 'transicion'
 
 const estilos = StyleSheet.create({
   linea: {
@@ -78,6 +97,9 @@ const estilos = StyleSheet.create({
   lineaLista: {
     height: GEOMETRIA.grosorGruesoLista,
   },
+  lineaTransicion: {
+    height: FILETE.transicion,
+  },
   grueso: {
     width: GEOMETRIA.anchoGrueso,
     height: GEOMETRIA.grosorGrueso,
@@ -85,6 +107,10 @@ const estilos = StyleSheet.create({
   gruesoLista: {
     width: GEOMETRIA.anchoGruesoLista,
     height: GEOMETRIA.grosorGruesoLista,
+  },
+  gruesoTransicion: {
+    width: GEOMETRIA.anchoGruesoTransicion,
+    height: FILETE.transicion,
   },
   fino: {
     flex: 1,
@@ -106,12 +132,22 @@ export default function FileteGruesoFino({
   medida = 'principal',
 }: FileteGruesoFinoProps): ReactElement {
   const lista = medida === 'lista'
+  const transicion = medida === 'transicion'
 
   return (
-    <View style={[estilos.linea, lista ? estilos.lineaLista : {}]}>
+    <View
+      style={[
+        estilos.linea,
+        lista ? estilos.lineaLista : transicion ? estilos.lineaTransicion : {},
+      ]}
+    >
       <View
         style={[
-          lista ? estilos.gruesoLista : estilos.grueso,
+          lista
+            ? estilos.gruesoLista
+            : transicion
+              ? estilos.gruesoTransicion
+              : estilos.grueso,
           { backgroundColor: acento.base },
         ]}
       />

@@ -159,6 +159,32 @@ const GEOMETRIA = {
    */
   espaciadorContinuacionHonorarios: 24,
   /**
+   * EL MISMO ESPACIADOR EN LAS HOJAS DE CONTINUACIÓN DE INTERNAMIENTO — **14 pt**.
+   *
+   * Segunda lámina de continuación medida, y la segunda que no compone los 12 del chasis.
+   * Sus 69 pt cierran exactos con él y **sin el renglón de cédula**, igual que Honorarios:
+   *
+   *      32     cabecera: rótulo `titulo.seccion` (14) + nombre a 14 / 18
+   *       8     `transicion.membreteFilete`
+   *       2.5   el filete
+   *      14     este espaciador
+   *      12.5   la línea de paciente, que la monta 2.V
+   *      ─────
+   *      69
+   *
+   * ⚠ Esta lámina también enumera la cabecera en **29** y el chasis compone 32; con 29 el
+   * total no llega a 69 por ningún camino. Se compone lo que cuadra con la cota, que es la
+   * medida dura, y es la misma lectura que ya hizo Honorarios con su 78.5. **Dos láminas
+   * enumeran 29 y las dos cuadran con 32.** Reportado.
+   *
+   * ⚠ **EL RENGLÓN DE CÉDULA SÍ SE COMPONE Y LA LÁMINA NO LO TIENE**, así que la hoja real
+   * pesa 17 pt más que la cota: 86 contra 69. Es exactamente el mismo hueco que reporta
+   * Honorarios —la cédula (11) y su aire (6)— y no se toca por el mismo motivo: ese
+   * renglón lo componen hoy Laboratorio, Imagenología y Receta contra sus propias láminas,
+   * y ninguno tiene una hoja de continuación medida con la que contrastarlo. Reportado.
+   */
+  espaciadorContinuacionInternamiento: 14,
+  /**
    * INTERLINEADO DE LA BANDA EN LA LÁMINA DE IMAGENOLOGÍA — 12, no 11.
    *
    * Desviación declarada del rol `medico.credencial`, del mismo tipo que las dos
@@ -355,6 +381,10 @@ const estilos = StyleSheet.create({
   espaciadorContinuacionHonorarios: {
     height: GEOMETRIA.espaciadorContinuacionHonorarios,
   },
+  /** Y el de las hojas 2 y 3 de Internamiento, a medio camino de los otros dos. */
+  espaciadorContinuacionInternamiento: {
+    height: GEOMETRIA.espaciadorContinuacionInternamiento,
+  },
 })
 
 /**
@@ -378,6 +408,12 @@ export default function Membrete(props: MembreteProps): ReactElement {
    * renglón lo pierde ella sola.
    */
   const honorarios = lamina === 'honorarios'
+  /**
+   * La banda de Internamiento es la de Imagenología y Receta: **dos renglones de 12 con
+   * cédulas y universidad**, medidos entre 129.35 y 153.35. Cae en `conCedulas` sin
+   * condición propia; lo único suyo son los dos espaciadores de cierre.
+   */
+  const internamiento = lamina === 'internamiento'
   const conCedulas = lamina !== 'chasis' && !honorarios
 
   return (
@@ -523,8 +559,16 @@ export default function Membrete(props: MembreteProps): ReactElement {
           props.variante === 'continuacion'
             ? honorarios
               ? estilos.espaciadorContinuacionHonorarios
-              : estilos.espaciador
-            : lamina === 'receta'
+              : internamiento
+                ? estilos.espaciadorContinuacionInternamiento
+                : estilos.espaciador
+            : /*
+                DOS LÁMINAS COMPONEN 10 Y DOS COMPONEN 12. Internamiento mide el mismo 10
+                que Receta —su banda cierra en 153.35 y el bloque de título abre en
+                163.35—, así que se lee de donde ya está en vez de declarar un tercer
+                miembro que valdría lo mismo.
+              */
+              lamina === 'receta' || internamiento
               ? estilos.espaciadorReceta
               : estilos.espaciador
         }

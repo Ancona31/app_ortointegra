@@ -61,13 +61,17 @@
 
 import { View, Text, StyleSheet } from '@react-pdf/renderer'
 import type { ReactElement, ReactNode } from 'react'
-import ParserBloques, { type RolCuerpoParser } from './ParserBloques'
+import ParserBloques, {
+  type CalibracionParser,
+  type RolCuerpoParser,
+} from './ParserBloques'
 import {
   ESPACIO,
   FILETE,
   FILETE_SUPLEMENTACION,
   TINTA,
   estiloTipografico,
+  type AcentoResuelto,
   type Lamina,
   type RolTipograficoNombre,
 } from './tokens'
@@ -104,9 +108,16 @@ const SANGRIA = ESPACIO[16]
  * la lectura de la ficha —«la sangría se aplica a los dos filetes»— da 16 y 16. Son
  * dos composiciones distintas del mismo bloque, no un ajuste del mismo valor.
  */
+/**
+ * El padding de la alarma de Receta, extraído del bloque de abajo para que las
+ * instrucciones de Internamiento lo LEAN en vez de repetirlo. Son la misma composición
+ * con otro grosor de filete; escrito dos veces, serían dos sitios que desincronizar.
+ */
+const ALARMA_RECETA = { superior: 6, izquierda: ESPACIO[14], inferior: 8 } as const
+
 const GEOMETRIA = {
   /** Alarma en la lámina de Receta: `padding: 6pt 0 8pt 14pt`. */
-  alarmaReceta: { superior: 6, izquierda: ESPACIO[14], inferior: 8 },
+  alarmaReceta: ALARMA_RECETA,
   /**
    * Recomendaciones generales: filete SUPERIOR de `filete.regla` en
    * `tinta.reglaSuave` y 6 pt de aire bajo él. **Sin sangría izquierda**, que es lo
@@ -138,6 +149,23 @@ const GEOMETRIA = {
    * que es la lectura de la regla 2 que ya fijó el anexo A (P2-16) para la alarma.
    */
   citaSuplementacion: { sangria: ESPACIO[12], ancho: 294 },
+  /**
+   * LAS INSTRUCCIONES AL PACIENTE DE INTERNAMIENTO — **la alarma de Receta con dos
+   * puntos menos de filete**.
+   *
+   * `padding: 6 0 8 14`, que son exactamente los de `alarmaReceta`, y filete superior E
+   * izquierdo de `filete.acento` (2 pt) en vez de los 4 de `filete.alarma`. Los tres
+   * valores de padding se leen de `alarmaReceta` en vez de repetirse: son la misma
+   * composición dos escalones más abajo, y `D15` y `D21` ya lo dicen con la cifra al lado
+   * —«la sangría real del sistema es 14 pt en alarma e instrucciones».
+   *
+   * ⚠ **LLEVA FILETE SUPERIOR Y LA FICHA DECLARA SOLO EL IZQUIERDO PARA ESTA VARIANTE.**
+   * Es el mismo caso que la cita de Suplementación rompiendo `D42`: la lámina compone los
+   * dos. Se compone bajo `lamina` y el chasis no se mueve. Lo que sigue distinguiendo a
+   * las instrucciones de la alarma es el GROSOR —2 contra 4— y que su lista va numerada.
+   * Reportado.
+   */
+  instruccionesInternamiento: ALARMA_RECETA,
   /**
    * Las notas adicionales de esa misma lámina: la anatomía de `recomendaciones` con
    * **0.63 pt de filete en vez de 0.5**. Es el mismo hairline que su regla de entrada,
@@ -185,6 +213,16 @@ const estilos = StyleSheet.create({
     borderLeftWidth: FILETE.acento,
     borderLeftColor: TINTA.negra,
     paddingLeft: SANGRIA,
+  },
+  /** Las instrucciones de Internamiento: dos filetes y el padding de la alarma. */
+  fileteInstruccionesInternamiento: {
+    borderLeftWidth: FILETE.acento,
+    borderLeftColor: TINTA.negra,
+    borderTopWidth: FILETE.acento,
+    borderTopColor: TINTA.negra,
+    paddingTop: GEOMETRIA.instruccionesInternamiento.superior,
+    paddingLeft: GEOMETRIA.instruccionesInternamiento.izquierda,
+    paddingBottom: GEOMETRIA.instruccionesInternamiento.inferior,
   },
   fileteCita: {
     borderLeftWidth: FILETE.cita,
@@ -237,23 +275,59 @@ const estilos = StyleSheet.create({
  *   algo —primero presentarse, después el ayuno (regla 4)—; raya en las otras dos,
  *   que enumeran sin orden.
  */
+interface Composicion {
+  readonly rolCuerpo: RolCuerpoParser
+  readonly marca: 'raya' | 'numero'
+  readonly rolEncabezado: RolTipograficoNombre | null
+  readonly calibracion: CalibracionParser
+}
+
 const COMPOSICION = {
-  alarma: { rolCuerpo: 'alarma.cuerpo', marca: 'raya', rolEncabezado: 'alarma.encabezado' },
-  instrucciones: { rolCuerpo: 'texto.corrido', marca: 'numero', rolEncabezado: null },
-  cita: { rolCuerpo: 'texto.corrido', marca: 'raya', rolEncabezado: null },
+  alarma: {
+    rolCuerpo: 'alarma.cuerpo',
+    marca: 'raya',
+    rolEncabezado: 'alarma.encabezado',
+    calibracion: 'chasis',
+  },
+  instrucciones: {
+    rolCuerpo: 'texto.corrido',
+    marca: 'numero',
+    rolEncabezado: null,
+    calibracion: 'chasis',
+  },
+  cita: { rolCuerpo: 'texto.corrido', marca: 'raya', rolEncabezado: null, calibracion: 'chasis' },
   recomendaciones: {
     rolCuerpo: 'texto.corrido',
     marca: 'raya',
     rolEncabezado: 'recomendaciones.encabezado',
+    calibracion: 'chasis',
   },
-} as const satisfies Record<
-  VarianteDestacado,
-  {
-    rolCuerpo: RolCuerpoParser
-    marca: 'raya' | 'numero'
-    rolEncabezado: RolTipograficoNombre | null
-  }
->
+} as const satisfies Record<VarianteDestacado, Composicion>
+
+/**
+ * LAS INSTRUCCIONES DE INTERNAMIENTO CAMBIAN LAS TRES COSAS QUE LA VARIANTE DECLARA.
+ *
+ *   cuerpo       `instruccion.texto`, que es el texto corrido un peso por encima
+ *   encabezado   `alarma.encabezado` —9.5 / 13, 600, 0.22 em—, y el chasis no le pone
+ *                ninguno: hasta esta lámina, `instrucciones` era un bloque sin rótulo
+ *   calibración  `internamientoInstrucciones`: riel de 14 y ordinal `01`, no `1.`
+ *
+ * Vive aquí y no como una quinta variante porque **es la misma variante**: mismo filete de
+ * `filete.acento`, misma sangría de 14 y misma lista numerada. Lo que cambia lo declara la
+ * lámina, que es el mecanismo del sistema para exactamente este caso (I.3.5).
+ */
+const INSTRUCCIONES_INTERNAMIENTO: Composicion = {
+  rolCuerpo: 'instruccion.texto',
+  marca: 'numero',
+  rolEncabezado: 'alarma.encabezado',
+  calibracion: 'internamientoInstrucciones',
+}
+
+function composicionDe(variante: VarianteDestacado, lamina: Lamina): Composicion {
+  return variante === 'instrucciones' && lamina === 'internamiento'
+    ? INSTRUCCIONES_INTERNAMIENTO
+    : COMPOSICION[variante]
+}
 
 /**
  * Las CUATRO variantes. `recomendaciones` entra con la lámina de Receta y es la
@@ -311,6 +385,12 @@ export interface BloqueDestacadoProps {
   contenido?: ReactNode
   /** Qué lámina fija el padding de la alarma. Sin ella, la del chasis. */
   lamina?: Lamina
+  /**
+   * El acento, y solo para la marca de lista de las composiciones que la componen en
+   * `acento.tinta` —hoy una, el ordinal de las instrucciones de II.6—. Se pasa tal cual a
+   * 2.J; sin él, la marca cae a tinta negra y el bloque se imprime igual (I.3.7).
+   */
+  acento?: AcentoResuelto
 }
 
 /**
@@ -323,6 +403,7 @@ type EstiloFilete =
   | typeof estilos.fileteAlarma
   | typeof estilos.fileteAlarmaReceta
   | typeof estilos.fileteInstrucciones
+  | typeof estilos.fileteInstruccionesInternamiento
   | typeof estilos.fileteCita
   | typeof estilos.fileteCitaSuplementacion
   | typeof estilos.fileteRecomendaciones
@@ -334,7 +415,11 @@ function estiloFilete(variante: VarianteDestacado, lamina: Lamina): EstiloFilete
   if (variante === 'alarma') {
     return lamina === 'receta' ? estilos.fileteAlarmaReceta : estilos.fileteAlarma
   }
-  if (variante === 'instrucciones') return estilos.fileteInstrucciones
+  if (variante === 'instrucciones') {
+    return lamina === 'internamiento'
+      ? estilos.fileteInstruccionesInternamiento
+      : estilos.fileteInstrucciones
+  }
   if (variante === 'recomendaciones') {
     return suplementacion
       ? estilos.fileteRecomendacionesSuplementacion
@@ -350,9 +435,20 @@ export default function BloqueDestacado({
   texto,
   contenido,
   lamina = 'chasis',
+  acento,
 }: BloqueDestacadoProps): ReactElement {
-  const composicion = COMPOSICION[variante]
+  const composicion = composicionDe(variante, lamina)
   const hayEncabezado = encabezado !== undefined && encabezado.trim() !== ''
+  /**
+   * El rótulo se compone con el rol que declara la composición, no con el que deduce la
+   * variante. Es lo que permite que las instrucciones de II.6 lleven el suyo sin abrir una
+   * quinta variante: los dos roles que existen son de alarma y de recomendaciones, y este
+   * bloque toma el primero.
+   */
+  const estiloEncabezado =
+    composicion.rolEncabezado === 'alarma.encabezado'
+      ? estilos.encabezadoAlarma
+      : estilos.encabezadoRecomendaciones
 
   return (
     // `wrap={false}` es la regla 3: un bloque destacado no se parte entre hojas.
@@ -360,15 +456,7 @@ export default function BloqueDestacado({
     // indivisibles que declara 2.N (`CONCILIA D44`).
     <View style={[estilos.bloque, estiloFilete(variante, lamina)]} wrap={false}>
       {hayEncabezado && composicion.rolEncabezado !== null ? (
-        <Text
-          style={
-            variante === 'alarma'
-              ? estilos.encabezadoAlarma
-              : estilos.encabezadoRecomendaciones
-          }
-        >
-          {encabezado.toUpperCase()}
-        </Text>
+        <Text style={estiloEncabezado}>{encabezado.toUpperCase()}</Text>
       ) : null}
 
       {/*
@@ -388,7 +476,12 @@ export default function BloqueDestacado({
             ? {}
             : variante === 'alarma'
               ? estilos.cuerpoTrasEncabezadoAlarma
-              : estilos.cuerpoTrasEncabezadoRecomendaciones
+              : /*
+                  Las instrucciones de II.6 se quedan con el aire de recomendaciones —4 pt—
+                  y la lámina no lo mide: solo da el alto del bloque, que depende de
+                  cuántos ítems rompen a dos líneas. `DERIVADO, NO MEDIDO`.
+                */
+                estilos.cuerpoTrasEncabezadoRecomendaciones
         }
       >
         {contenido ??
@@ -397,6 +490,8 @@ export default function BloqueDestacado({
               texto={texto}
               marca={composicion.marca}
               rolCuerpo={composicion.rolCuerpo}
+              calibracion={composicion.calibracion}
+              acento={acento}
             />
           ))}
       </View>

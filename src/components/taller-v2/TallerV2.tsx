@@ -82,6 +82,7 @@ type Vista =
   | 'receta'
   | 'suplementacion'
   | 'honorarios'
+  | 'internamiento'
 
 /**
  * EL SELECTOR — EL CHASIS Y LOS OCHO FORMATOS DE LA SECCIÓN II.
@@ -114,7 +115,7 @@ const VISTAS: readonly EntradaSelector[] = [
   { vista: 'receta', codigo: '4.3', nombre: 'Receta' },
   { vista: 'suplementacion', codigo: '4.4', nombre: 'Suplementación' },
   { vista: 'honorarios', codigo: '4.5', nombre: 'Honorarios' },
-  { vista: null, codigo: '4.6', nombre: 'Internamiento' },
+  { vista: 'internamiento', codigo: '4.6', nombre: 'Internamiento' },
   { vista: null, codigo: '4.7', nombre: 'Consentimiento' },
   { vista: null, codigo: '4.8', nombre: 'Escrito médico' },
 ]
@@ -159,6 +160,26 @@ const CASOS_HONORARIOS: readonly EntradaCaso[] = [
   { caso: 'minimo', etiqueta: 'Mínimo', nota: 'Un concepto y el paciente vacío' },
 ]
 
+/**
+ * LOS DE INTERNAMIENTO TAMPOCO SON LOS TRES DE ARRIBA, y por una razón distinta: **su
+ * reparto en hojas es estructural, no por capacidad**. Un caso `lleno` no enseñaría nada —
+ * la sección 2 abre en su propia hoja con una indicación o con veinte—, así que el tercero
+ * es la verificación visible de II.6 §6: indicaciones con dos renglones de prosa delante,
+ * que tienen que salir en minúsculas y sin raya.
+ */
+const CASOS_INTERNAMIENTO: readonly EntradaCaso[] = [
+  { caso: 'completo', etiqueta: 'Completo', nota: 'Las tres hojas, con badge y sección 2' },
+  { caso: 'minimo', etiqueta: 'Mínimo', nota: 'Sin sección 2: colapsa la hoja 3' },
+  { caso: 'prosa', etiqueta: 'Prosa', nota: 'II.6 §6: prosa suelta antes de los bloques' },
+]
+
+/** Qué casos ofrece cada vista. Las que no aparecen usan los tres de `CASOS`. */
+function casosDe(vista: Vista): readonly EntradaCaso[] {
+  if (vista === 'honorarios') return CASOS_HONORARIOS
+  if (vista === 'internamiento') return CASOS_INTERNAMIENTO
+  return CASOS
+}
+
 type Estado =
   | { fase: 'generando' }
   | { fase: 'listo'; url: string }
@@ -179,8 +200,8 @@ export default function TallerV2(): ReactElement {
   const [estado, setEstado] = useState<Estado>({ fase: 'generando' })
 
   const acento = resolverAcento(acentoHex)
-  /** Qué casos ofrece la vista que se está mirando. Ver `CASOS_HONORARIOS`. */
-  const casos = vista === 'honorarios' ? CASOS_HONORARIOS : CASOS
+  /** Qué casos ofrece la vista que se está mirando. Ver `casosDe`. */
+  const casos = casosDe(vista)
 
   /**
    * Cambiar de vista **reinicia el caso al primero de la nueva**: los de Honorarios no
@@ -189,8 +210,7 @@ export default function TallerV2(): ReactElement {
    */
   function elegirVista(nueva: Vista): void {
     setVista(nueva)
-    const primero = nueva === 'honorarios' ? CASOS_HONORARIOS[0] : CASOS[0]
-    setCaso(primero.caso)
+    setCaso(casosDe(nueva)[0].caso)
   }
 
   /**
@@ -239,7 +259,9 @@ export default function TallerV2(): ReactElement {
                     ? (await import('./HojaSuplementacion')).generarPdfSuplementacion
                     : vista === 'honorarios'
                       ? (await import('./HojaHonorarios')).generarPdfHonorarios
-                      : // La hoja de chasis no tiene casos: se le pasa el argumento y lo
+                      : vista === 'internamiento'
+                        ? (await import('./HojaInternamiento')).generarPdfInternamiento
+                        : // La hoja de chasis no tiene casos: se le pasa el argumento y lo
                       // ignora, que es más barato que ramificar la llamada.
                       (await import('./HojaTaller')).generarPdfTaller
           const blob = await generar(medico, acentoHex, caso)

@@ -63,6 +63,7 @@ import {
   TIPOGRAFIA,
   estiloTipografico,
   type Lamina,
+  type Peso,
 } from './tokens'
 
 /**
@@ -79,6 +80,17 @@ import {
  */
 const GEOMETRIA = {
   medianil: 24,
+  /**
+   * EL MEDIANIL DE LA PAREJA EN LA LÁMINA DE INTERNAMIENTO — **30 pt**.
+   *
+   * ⚠ **LA LÁMINA DECLARA ADEMÁS DOS CAJAS DE 246 Y LAS DOS CIFRAS NO CABEN JUNTAS**:
+   * 246 + 30 + 246 = 522, treinta y seis por encima de `caja.ancho`. Se compone el
+   * MEDIANIL, que es la cifra que no depende de nadie, y las dos celdas se reparten lo que
+   * queda —(486 − 30) / 2 = **228**—, que es como reparte la variante en las otras
+   * láminas. Los 246 son `cierre.izquierda`, el ancho de la columna de firma cuando la
+   * firma va SOLA; en una pareja no puede valer para las dos. Reportado.
+   */
+  medianilInternamiento: 30,
   celda: { superior: 14, inferior: 4 },
   /**
    * LA MISMA FIRMA EN LAS LÁMINAS DE IMAGENOLOGÍA Y DE RECETA — 118.75 pt, no 120.8.
@@ -166,6 +178,8 @@ const SEPARADOR_CREDENCIALES = ' · '
 
 /** Dos columnas iguales sobre la caja, con su medianil. */
 const ANCHO_CELDA = (CAJA.ancho - GEOMETRIA.medianil) / 2
+/** Las mismas dos columnas con el medianil de Internamiento. Ver `GEOMETRIA`. */
+const ANCHO_CELDA_INTERNAMIENTO = (CAJA.ancho - GEOMETRIA.medianilInternamiento) / 2
 
 const estilos = StyleSheet.create({
   /**
@@ -190,8 +204,14 @@ const estilos = StyleSheet.create({
   celda: {
     width: ANCHO_CELDA,
   },
+  celdaInternamiento: {
+    width: ANCHO_CELDA_INTERNAMIENTO,
+  },
   celdaConMedianil: {
     marginLeft: GEOMETRIA.medianil,
+  },
+  celdaConMedianilInternamiento: {
+    marginLeft: GEOMETRIA.medianilInternamiento,
   },
   /** Solo en `retícula`: es lo que separa una fila de la siguiente. */
   celdaEnReticula: {
@@ -273,6 +293,34 @@ const estilos = StyleSheet.create({
   },
 })
 
+/**
+ * LAS TRES COMPOSICIONES DEL BLOQUE DE FIRMA, Y POR QUÉ ENTRAN POR PROP Y NO SOLO POR
+ * LÁMINA.
+ *
+ *   `chasis`     la fórmula de I.1.9 sin tocar: línea 0.8, aire 5, nombre 11.5 / 16
+ *   `estandar`   `GEOMETRIA.medida`, 118.75 pt — Imagenología, Receta, Suplementación
+ *   `compacta`   `GEOMETRIA.medidaHonorarios`, 117.47 pt — Honorarios y la hoja 2 de II.6
+ *
+ * Hasta II.6, cuál se componía lo decidía la lámina y con eso bastaba. **Esa lámina
+ * compone las DOS en el mismo documento**: la firma doble de la hoja 2 mide 117.47 —línea
+ * 0.47, nombre 10 / 14— y la firma sola de la hoja 3 mide 118.48, que es `estandar` con su
+ * residuo de 0.27 ya conocido. Con la lámina como único discriminante no hay forma de
+ * componer las dos, así que **lo declara el formato**, que es quien sabe en qué hoja está.
+ *
+ * ⚠ **DOS COMPOSICIONES DE NOMBRE EN EL MISMO ARCHIVO, Y SON EL CUARTO Y EL SEGUNDO VALOR
+ * DEL SISTEMA PARA ESE RENGLÓN.** Laboratorio lo compone a 11.5 / 16, Imagenología, Receta
+ * y Suplementación a 11 / 15, Honorarios a 10 / 14, y II.6 a las dos. Se compone lo medido
+ * y **queda reportado**: mientras las láminas estén aprobadas, ninguna gana sobre la otra.
+ *
+ * Sin la prop, la que fija la lámina, así que ningún formato ya construido cambia.
+ */
+export type CalibracionFirma = 'chasis' | 'estandar' | 'compacta'
+
+function calibracionDeLamina(lamina: Lamina): CalibracionFirma {
+  if (lamina === 'chasis') return 'chasis'
+  return lamina === 'honorarios' ? 'compacta' : 'estandar'
+}
+
 export interface Firma {
   /**
    * Qué firma esta persona: `Firma y sello del médico`, `Paciente`, `Testigo 1`.
@@ -286,6 +334,16 @@ export interface Firma {
    * quitaría el sitio donde se escribe el nombre.
    */
   readonly nombre?: string
+  /**
+   * PESO DEL NOMBRE, cuando la lámina lo compone por debajo del `firma.nombre` del rol.
+   *
+   * Lo declara una lámina y en una sola de sus dos firmas: la del paciente o familiar de
+   * II.6 va en **400** y la del médico, a su lado, en 600. **Hoy no se ve**, porque esa
+   * firma va con el renglón en blanco —quien firma escribe su nombre a mano— y un peso
+   * sobre una cadena vacía no imprime nada. Se compone igualmente: el día que ese renglón
+   * lleve un nombre saldría en 600 sin esto, que no es lo que mide la lámina. Anotado.
+   */
+  readonly pesoNombre?: Peso
   /** Cédulas o parentesco. El inventario por rol lo declara I.1.9. */
   readonly credenciales?: readonly string[]
   /**
@@ -298,6 +356,11 @@ export interface Firma {
 /** Qué lámina fija la línea, el aire y los dos renglones de abajo. */
 interface ConLamina {
   lamina?: Lamina
+  /**
+   * Cuál de las tres composiciones. Sin ella, la que fija la lámina — que es lo que
+   * componen los cinco formatos anteriores. Ver `CalibracionFirma`.
+   */
+  calibracion?: CalibracionFirma
 }
 
 export type BloqueFirmasProps = ConLamina &
@@ -324,16 +387,20 @@ export type BloqueFirmasProps = ConLamina &
   )
 
 /** Una firma: rol encima, espacio de escritura, línea, y la identificación. */
-function UnaFirma({ firma, lamina }: { firma: Firma; lamina: Lamina }): ReactElement {
+function UnaFirma({
+  firma,
+  calibracion,
+}: {
+  firma: Firma
+  calibracion: CalibracionFirma
+}): ReactElement {
   /**
-   * Cualquier lámina distinta del chasis compone las cuatro desviaciones de
-   * `GEOMETRIA.medida`: las dos que las miden dan las mismas cifras.
-   *
-   * **Salvo Honorarios**, que mide las cuatro por su cuenta y da otras dos cifras en
-   * dos de ellas. Ver `GEOMETRIA.medidaHonorarios`.
+   * `estandar` son las cuatro desviaciones de `GEOMETRIA.medida`, que dos láminas miden
+   * con las mismas cifras; `compacta` son las de `GEOMETRIA.medidaHonorarios`, que difieren
+   * en dos de las cuatro. Ver `CalibracionFirma`.
    */
-  const medida = lamina !== 'chasis'
-  const honorarios = lamina === 'honorarios'
+  const medida = calibracion !== 'chasis'
+  const honorarios = calibracion === 'compacta'
 
   return (
     <View>
@@ -365,13 +432,14 @@ function UnaFirma({ firma, lamina }: { firma: Firma; lamina: Lamina }): ReactEle
         formato deja la firma en blanco.
       */}
       <Text
-        style={
+        style={[
           honorarios
             ? estilos.nombreHonorarios
             : medida
               ? estilos.nombreMedido
-              : estilos.nombre
-        }
+              : estilos.nombre,
+          firma.pesoNombre === undefined ? {} : { fontWeight: firma.pesoNombre },
+        ]}
       >
         {firma.nombre ?? ' '}
       </Text>
@@ -411,6 +479,9 @@ function enParejas(firmas: readonly Firma[]): readonly (readonly Firma[])[] {
 /** 2.L · `BloqueFirmas`. */
 export default function BloqueFirmas(props: BloqueFirmasProps): ReactElement {
   const lamina = props.lamina ?? 'chasis'
+  const calibracion = props.calibracion ?? calibracionDeLamina(lamina)
+  /** El único reparto de fila propio de una lámina. Ver `GEOMETRIA.medianilInternamiento`. */
+  const internamiento = lamina === 'internamiento'
 
   // Regla 3: `break-inside: avoid`. Un bloque de firmas no se parte entre hojas;
   // es uno de los cuatro bloques indivisibles de 2.N (`CONCILIA D44`).
@@ -423,7 +494,7 @@ export default function BloqueFirmas(props: BloqueFirmasProps): ReactElement {
         ]}
         wrap={false}
       >
-        <UnaFirma firma={props.firmas[0]} lamina={lamina} />
+        <UnaFirma firma={props.firmas[0]} calibracion={calibracion} />
       </View>
     )
   }
@@ -438,12 +509,16 @@ export default function BloqueFirmas(props: BloqueFirmasProps): ReactElement {
             <View
               key={firma.rol}
               style={[
-                estilos.celda,
-                columna === 0 ? {} : estilos.celdaConMedianil,
+                internamiento ? estilos.celdaInternamiento : estilos.celda,
+                columna === 0
+                  ? {}
+                  : internamiento
+                    ? estilos.celdaConMedianilInternamiento
+                    : estilos.celdaConMedianil,
                 reticula ? estilos.celdaEnReticula : {},
               ]}
             >
-              <UnaFirma firma={firma} lamina={lamina} />
+              <UnaFirma firma={firma} calibracion={calibracion} />
             </View>
           ))}
         </View>

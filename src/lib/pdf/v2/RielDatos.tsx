@@ -45,6 +45,7 @@ import {
   CAJA,
   FILETE,
   FILETE_HONORARIOS,
+  FILETE_INTERNAMIENTO,
   RETICULA,
   RIEL_CELDA,
   TINTA,
@@ -79,6 +80,23 @@ import {
 const GEOMETRIA = {
   /** Padding de celda `3 10 4`: superior 3, laterales 10, inferior 4. */
   padding: { superior: 3, lateral: 10, inferior: 4 },
+  /**
+   * LA CELDA DEL CATÁLOGO — `padding: 4 10 5 10`, y **0 a la izquierda en la primera de
+   * cada fila**. Es la única celda del sistema con padding vertical propio: 4 y 5 donde el
+   * riel de identificación pone 3 y 4.
+   *
+   * El cero de la primera es el mismo criterio que el de la celda de peso en 2.D: el
+   * primer requerimiento de cada renglón arranca pegado al margen de la caja, no a 10 pt.
+   * Aquí además cierra la retícula — con 10 a la izquierda, las tres columnas de 162 no
+   * empezarían donde empieza la caja.
+   *
+   * ⚠ **LA CELDA MIDE 23 Y LA LÁMINA 23.48.** Con el cuerpo en `requerimiento.texto`
+   * —10.5 / 14— la suma es 4 + 14 + 5 = 23, y los **0.48 pt** que faltan son el residuo de
+   * caja de línea que esta lámina deja en todo lo demás: el HTML añade el *strut* de la
+   * fuente donde Yoga no. Es el mismo signo y el mismo orden que el 0.47 de las filas de
+   * Suplementación y el 0.56 de las de Receta. Reportado.
+   */
+  catalogo: { superior: 4, derecha: 10, inferior: 5, izquierda: 10 },
 } as const
 
 /**
@@ -113,6 +131,15 @@ const GEOMETRIA = {
  * puede estarlo**: el riel de este formato es de una sola fila, así que no hay ninguna
  * regla horizontal que dibujar. Se declara la de las tres láminas anteriores para no
  * dejar el miembro sin valor, y no la lee nadie.
+ *
+ * **Y LA DE INTERNAMIENTO ES LA QUINTA, Y NO DECLARA NINGUNA DE LAS DOS.** Esa lámina da
+ * las dos cotas de su riel —abre en 218.19 y cierra en 279.61— y sus dos filas de celda
+ * base son 30 y 30, así que lo que queda para los dos filetes y la regla interior son
+ * **1.42 pt**. Con los 0.475 de Honorarios y los 0.375 de las otras tres el riel compone
+ * **61.325** contra los 61.42 medidos: **0.095 pt de sobra**, el residuo más pequeño del
+ * sistema y de la misma clase que el 0.27 de la firma de Suplementación o el 0.365 de su
+ * encabezado. Se reutilizan los dos valores en vez de inventar una pareja que cuadre la
+ * resta: `DERIVADO, NO MEDIDO`. Reportado.
  */
 const TRAZO = {
   chasis: { filete: FILETE.fino, regla: FILETE.regla },
@@ -120,6 +147,7 @@ const TRAZO = {
   receta: { filete: 0.75, regla: 0.375 },
   suplementacion: { filete: 0.75, regla: 0.375 },
   honorarios: { filete: FILETE_HONORARIOS.riel, regla: 0.375 },
+  internamiento: { filete: FILETE_HONORARIOS.riel, regla: 0.375 },
 } as const satisfies Record<Lamina, { filete: number; regla: number }>
 
 /** Lo que una desviación puede mover de un rol: solo su cuerpo y su interlineado. */
@@ -302,6 +330,44 @@ const estilos = StyleSheet.create({
   escritura: {
     borderBottomColor: TINTA.negra,
   },
+  /**
+   * EL RIEL DEL CATÁLOGO. Abre y cierra con el hairline de su lámina en `tinta.negra`,
+   * como el de identificación, y no comparte con él ni el grosor ni el padding.
+   */
+  catalogo: {
+    width: CAJA.ancho,
+    borderTopColor: TINTA.negra,
+    borderBottomColor: TINTA.negra,
+    borderTopWidth: FILETE_INTERNAMIENTO.regla,
+    borderBottomWidth: FILETE_INTERNAMIENTO.regla,
+  },
+  /**
+   * LA REGLA ENTRE FILAS DEL CATÁLOGO — `filete.regla` en `tinta.reglaFila`, que es el
+   * tono con el que I.1.8 separa las filas de una tabla larga.
+   *
+   * ⚠ **EL PASO 4.6 NO LA ENUMERA Y B.6 §5 SÍ LA MIDE** —«Regla entre filas 0.5 pt
+   * `#EDEAE4`»—. Se compone la medida: un catálogo de tres columnas que envuelve a tres
+   * renglones sin ninguna separación horizontal se lee como una sola tirada. Reportado.
+   */
+  filaCatalogo: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  filaCatalogoSiguiente: {
+    borderTopWidth: FILETE.regla,
+    borderTopColor: TINTA.reglaFila,
+  },
+  celdaCatalogo: {
+    paddingTop: GEOMETRIA.catalogo.superior,
+    paddingBottom: GEOMETRIA.catalogo.inferior,
+    paddingRight: GEOMETRIA.catalogo.derecha,
+  },
+  /** La regla vertical del catálogo: su propio hairline, nunca el del riel. */
+  celdaCatalogoConRegla: {
+    borderLeftWidth: FILETE_INTERNAMIENTO.regla,
+    borderLeftColor: TINTA.hairline,
+  },
+  requerimiento: { ...estiloTipografico('requerimiento.texto') },
   /** El mismo valor un peso por encima. Ver `PESO_VALOR_RECETA`. */
   valorReceta: {
     ...estiloTipografico('dato'),
@@ -493,6 +559,29 @@ export type RielDatosProps =
       ConLamina)
   /** Riel comprimido de una sola fila. Hoy: `BloquePaciente` reducido. */
   | ({ variante: 'unaLinea'; celdas: readonly CeldaRiel[] } & SinContador & ConLamina)
+  /**
+   * CATÁLOGO ABIERTO: una retícula de celdas SIN RÓTULO, que envuelve a tantas filas como
+   * haga falta. Hoy la usa un formato y un bloque: los requerimientos especiales de II.6.
+   *
+   * **No es la variante `celdas` con la etiqueta vacía.** Aquella compone un par rótulo +
+   * valor por celda —es su anatomía entera, y de ahí salen sus 30 pt— y aquí no hay
+   * rótulos que poner: lo que se enumera es el catálogo mismo. Con una etiqueta en blanco
+   * la celda seguiría midiendo los 10 pt del renglón del rótulo y el riel saldría al doble
+   * de alto, con un hueco gris encima de cada requerimiento.
+   *
+   * **Y no participa del contador** (`sinContador`, 2.K regla 3): el médico agrega y quita
+   * requerimientos, así que «3 de 7» sería una cifra falsa. Ver `SinContador`.
+   */
+  | ({
+      variante: 'catalogo'
+      readonly items: readonly string[]
+      /**
+       * Columnas de la retícula. Divide a `reticula.columnas`, no es un ancho: con 3, cada
+       * celda mide 4 × `riel.celda` = 162 pt y las tres cierran la caja.
+       */
+      readonly columnas: number
+    } & SinContador &
+      ConLamina)
 
 /**
  * Una fila del riel, con sus celdas YA filtradas por el componente: aquí no llega
@@ -586,8 +675,78 @@ function Fila({
   )
 }
 
+/**
+ * Parte el catálogo en filas de `columnas`. Es la única variante que reparte por su
+ * cuenta: en las otras dos, cuántas celdas van en cada fila lo declara el consumidor.
+ */
+function enFilas(items: readonly string[], columnas: number): readonly (readonly string[])[] {
+  const filas: string[][] = []
+  items.forEach((item, indice) => {
+    if (indice % columnas === 0) filas.push([item])
+    else filas[filas.length - 1].push(item)
+  })
+  return filas
+}
+
+/**
+ * El riel del catálogo. Sin rótulos, sin colapso de celda y sin redistribución: **una
+ * celda vacía no existe** —el catálogo son los ítems que hay— y la última fila puede
+ * quedar corta, que es lo que hace una retícula que envuelve.
+ */
+function Catalogo({
+  items,
+  columnas,
+}: {
+  items: readonly string[]
+  columnas: number
+}): ReactElement {
+  /*
+    EL ANCHO SALE DE LA RETÍCULA DEL RIEL Y NO DE UNA DIVISIÓN DE LA CAJA. Con 3
+    columnas son 4 × `riel.celda` = 162 pt, que es lo que mide la lámina. Escribir
+    `CAJA.ancho / columnas` daría lo mismo hoy y dejaría de estar atado a la retícula el
+    día que alguien pida 4 o 6 columnas.
+  */
+  const ancho = (RETICULA.columnas / columnas) * RIEL_CELDA
+
+  return (
+    <View style={estilos.catalogo}>
+      {enFilas(items, columnas).map((fila, indiceFila) => (
+        <View
+          key={fila[0]}
+          style={[
+            estilos.filaCatalogo,
+            indiceFila === 0 ? {} : estilos.filaCatalogoSiguiente,
+          ]}
+        >
+          {fila.map((item, indice) => (
+            <View
+              key={item}
+              style={[
+                estilos.celdaCatalogo,
+                {
+                  width: ancho,
+                  // La primera de cada fila arranca pegada al margen; las demás sangran
+                  // los 10 pt que las separan de su regla. Ver `GEOMETRIA.catalogo`.
+                  paddingLeft: indice === 0 ? 0 : GEOMETRIA.catalogo.izquierda,
+                },
+                indice === 0 ? {} : estilos.celdaCatalogoConRegla,
+              ]}
+            >
+              <Text style={estilos.requerimiento}>{item}</Text>
+            </View>
+          ))}
+        </View>
+      ))}
+    </View>
+  )
+}
+
 /** 2.F · `RielDatos`. */
 export default function RielDatos(props: RielDatosProps): ReactElement {
+  if (props.variante === 'catalogo') {
+    return <Catalogo items={props.items} columnas={props.columnas} />
+  }
+
   const declaradas =
     props.variante === 'unaLinea' ? [props.celdas] : props.filas
 

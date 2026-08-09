@@ -194,6 +194,17 @@ export type CampoPaciente =
   | 'hora'
   /** La novena, y solo de la cotización de II.5. Ver `GEOMETRIA.honorarios`. */
   | 'vigencia'
+  /**
+   * LAS CUATRO DE LA FILA INFERIOR DE INTERNAMIENTO (II.6), y ninguna es clínica del
+   * paciente: son las condiciones del ingreso. Viven aquí porque viven en ESE riel —el de
+   * identificación—, que es lo que este componente compone; el día que otro formato pida
+   * un riel con datos que no son del paciente, lo que hará falta es partir 2.D, no
+   * añadirle celdas.
+   */
+  | 'hospital'
+  | 'tipoInternamiento'
+  | 'diasEstimados'
+  | 'asa'
 
 /** Cómo se compone el VALOR de una celda. La etiqueta es igual en las ocho. */
 type TrazoValor =
@@ -285,6 +296,38 @@ const EMISION_COTIZACION: DescriptorCelda = { campo: 'fecha', etiqueta: 'Fecha d
 const EMISION_RECIBO: DescriptorCelda = { ...EMISION_COTIZACION, columnas: 5 }
 const VIGENCIA: DescriptorCelda = { campo: 'vigencia', etiqueta: 'Vigencia', columnas: 3, trazo: 'vigencia' }
 
+/**
+ * LA FILA INFERIOR DE INTERNAMIENTO — CUATRO CELDAS, Y LA MÁS ESTRECHA DEL SISTEMA.
+ *
+ *     Hospital o lugar   span 5
+ *     Tipo de internamiento  span 4
+ *     Días est.          span 2
+ *     ASA                span **1**   →  40.5 pt de ancho, 20.5 netos tras el padding
+ *
+ * `ASA` a span 1 es la única celda de una columna de los seis formatos, y cabe porque su
+ * rótulo son tres letras y su valor un romano de uno o dos caracteres. Un valor más largo
+ * ahí rompería a dos renglones y estiraría la fila entera — las reglas verticales del riel
+ * llegan de arriba abajo, así que la celda más alta manda sobre las otras tres (ver la
+ * nota del diagnóstico en `GEOMETRIA`).
+ *
+ * **Las cuatro son `dato` sin excepción tipográfica**, que es lo que las distingue de la
+ * fila inferior de las otras láminas: no hay diagnóstico en este riel, así que no hay
+ * ninguna celda con familia propia. El diagnóstico de este formato es un bloque del
+ * cuerpo, no una celda.
+ */
+const HOSPITAL: DescriptorCelda = { campo: 'hospital', etiqueta: 'Hospital o lugar', columnas: 5, trazo: 'dato' }
+const TIPO_INTERNAMIENTO: DescriptorCelda = { campo: 'tipoInternamiento', etiqueta: 'Tipo de internamiento', columnas: 4, trazo: 'dato' }
+const DIAS_ESTIMADOS: DescriptorCelda = { campo: 'diasEstimados', etiqueta: 'Días est.', columnas: 2, trazo: 'dato' }
+const ASA: DescriptorCelda = { campo: 'asa', etiqueta: 'ASA', columnas: 1, trazo: 'dato' }
+
+/** Fila inferior de Internamiento: 5 + 4 + 2 + 1 = 12. */
+const FILA_INFERIOR_INTERNAMIENTO: readonly DescriptorCelda[] = [
+  HOSPITAL,
+  TIPO_INTERNAMIENTO,
+  DIAS_ESTIMADOS,
+  ASA,
+]
+
 /** Cotización: 5 + 4 + 3 = 12. */
 const FILA_COTIZACION: readonly DescriptorCelda[] = [
   PACIENTE_COTIZACION,
@@ -345,6 +388,20 @@ export interface ValoresPaciente {
    * recibo no caduca.
    */
   readonly vigencia?: string
+  /**
+   * Hospital o lugar del internamiento (II.6). **Bloquea emisión** en el formulario, como
+   * el paciente: una solicitud que no dice dónde se interna no se puede admitir.
+   *
+   * Sale además en la línea de paciente de las hojas de continuación, que es el único
+   * formato del sistema donde esa línea lleva una quinta pieza (2.V).
+   */
+  readonly hospital?: string
+  /** Tipo de internamiento, ya redactado: `Cirugía electiva`. Colapsa. */
+  readonly tipoInternamiento?: string
+  /** Días estimados, YA con su unidad —la lámina imprime `2 días`—. Colapsa. */
+  readonly diasEstimados?: string
+  /** Clasificación ASA, en romanos: `II`. Colapsa. */
+  readonly asa?: string
 }
 
 export type BloquePacienteProps =
@@ -592,16 +649,19 @@ export default function BloquePaciente(props: BloquePacienteProps): ReactElement
   }
 
   /**
-   * Las TRES anatomías de la fila inferior, una por lo que el formato mete en ella:
+   * Las CUATRO anatomías de la fila inferior, una por lo que el formato mete en ella:
    * tres celdas en el chasis —diagnóstico, fecha y hora—, una sola de doce donde la
-   * fecha sube al riel del título, y dos donde además hay peso que declarar.
+   * fecha sube al riel del título, dos donde además hay peso que declarar, y las cuatro
+   * del ingreso en Internamiento, que es la única sin diagnóstico.
    */
   const inferior =
     lamina === 'chasis'
       ? FILA_INFERIOR
       : lamina === 'suplementacion'
         ? FILA_INFERIOR_CON_PESO
-        : FILA_INFERIOR_PLENA
+        : lamina === 'internamiento'
+          ? FILA_INFERIOR_INTERNAMIENTO
+          : FILA_INFERIOR_PLENA
 
   return (
     <RielDatos

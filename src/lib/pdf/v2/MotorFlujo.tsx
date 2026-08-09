@@ -292,7 +292,24 @@ export interface MotorFlujoProps {
    * membrete reducido, el riel del paciente y el rótulo de continuación, y serían
    * ocho sitios donde olvidarse del nombre del paciente.
    */
-  encabezado: Omit<EncabezadoHojaProps, 'variante'>
+  encabezado: Omit<EncabezadoHojaProps, 'variante' | 'rotuloHoja'>
+  /**
+   * RÓTULO PROPIO DE UNA HOJA CONCRETA, indexado por NÚMERO DE HOJA. Las que no tengan
+   * entrada componen el del chasis, `titulo · continuación`.
+   *
+   * Va como mapa y no como lista para que un formato pueda rotular la hoja 3 **sin
+   * escribir la de la 2**: con una lista tendría que rellenar el hueco, y rellenarlo es
+   * escribir «continuación» en el formato, que es justo la palabra que `ROTULO_CONTINUACION`
+   * existe para que ningún formato teclee.
+   *
+   * **Lo lee este componente y no 2.V** porque es 2.N quien sabe en qué hoja está: aquel
+   * compone la hoja que le den. Es la misma división con la que ya decide entre las dos
+   * variantes de encabezado.
+   *
+   * Hoy lo declara un formato y en una sola hoja: la 3 de II.6 abre la sección 2, que **no
+   * es la continuación de la 1** sino otro documento dentro del mismo folio.
+   */
+  rotulosContinuacion?: Readonly<Record<number, string>>
   /** El contenido del documento, ya compuesto en bloques por el formato. */
   children: ReactNode
   /**
@@ -344,6 +361,7 @@ export interface MotorFlujoProps {
 /** 2.N · `MotorFlujo`. */
 export default function MotorFlujo({
   encabezado,
+  rotulosContinuacion = {},
   children,
   contador,
   cierre,
@@ -353,14 +371,32 @@ export default function MotorFlujo({
   rol = 'medicoTratante',
 }: MotorFlujoProps): ReactElement {
   /**
-   * Las dos variantes del encabezado, compuestas de antemano. Se montan las DOS
-   * aunque solo salga una: son lo único que ve la prebúsqueda de tipografías, que
-   * recorre el árbol declarado antes de que corra ningún `render` (I.3.8). Sin ellas
-   * el encabezado de continuación pediría familias que nadie cargó y saldría en la
-   * tipografía de reserva, sin lanzar nada.
+   * Las variantes del encabezado, compuestas de antemano. Se montan TODAS aunque solo
+   * salga una: son lo único que ve la prebúsqueda de tipografías, que recorre el árbol
+   * declarado antes de que corra ningún `render` (I.3.8). Sin ellas el encabezado de
+   * continuación pediría familias que nadie cargó y saldría en la tipografía de reserva,
+   * sin lanzar nada.
    */
   const primera = <EncabezadoHoja variante="primera" {...encabezado} />
   const continuacion = <EncabezadoHoja variante="continuacion" {...encabezado} />
+  const propios = new Map<number, ReactElement>(
+    Object.entries(rotulosContinuacion).map(([hoja, rotulo]) => [
+      Number(hoja),
+      <EncabezadoHoja
+        key={hoja}
+        variante="continuacion"
+        {...encabezado}
+        rotuloHoja={rotulo}
+      />,
+    ]),
+  )
+
+  /**
+   * Qué encabezado va en esta hoja. La 1 el completo; de la 2 en adelante, el rótulo
+   * propio si el formato declaró uno para ella y el del chasis si no.
+   */
+  const encabezadoDeHoja = (numero: number): ReactElement =>
+    numero === 1 ? primera : (propios.get(numero) ?? continuacion)
 
   /** El contador de esta hoja. Las dos formas miden lo mismo: un renglón de `pie`. */
   const contadorDeHoja = (hoja: Hoja): ReactElement | null => {
@@ -385,9 +421,10 @@ export default function MotorFlujo({
         no se componen —el renderer los descarta y se queda con lo que devuelve el
         `render`— pero son lo único que ve la prebúsqueda de tipografías.
       */}
-      <View fixed render={(hoja: Hoja) => (numeroDeHoja(hoja) === 1 ? primera : continuacion)}>
+      <View fixed render={(hoja: Hoja) => encabezadoDeHoja(numeroDeHoja(hoja))}>
         {primera}
         {continuacion}
+        {[...propios.values()]}
       </View>
 
       {children}

@@ -53,6 +53,7 @@ import { View, Text, StyleSheet } from '@react-pdf/renderer'
 import type { ReactElement, ReactNode } from 'react'
 import FileteGruesoFino from './FileteGruesoFino'
 import {
+  CAJA,
   ESPACIO,
   RETICULA,
   TINTA,
@@ -62,6 +63,7 @@ import {
   estiloTipografico,
   type AcentoResuelto,
   type Lamina,
+  type Peso,
 } from './tokens'
 
 /**
@@ -183,6 +185,45 @@ const HONORARIOS = {
   subtitulo: { cuerpo: 11, interlineado: 15 },
 } as const
 
+/**
+ * GEOMETRÍA DEL BLOQUE EN LA LÁMINA DE INTERNAMIENTO — **LA CAJA MÁS ANCHA DEL SISTEMA**.
+ *
+ * Mismo reparto que Imagenología y Receta —caja fija a la izquierda, riel de dos celdas a
+ * la derecha— con la caja del título en **297 pt**, diez más que la de Imagenología. Y el
+ * aire hasta su filete son los **5 pt** de Receta, así que se leen de allí.
+ *
+ * ⚠ **LAS DOS CIFRAS DE LA LÁMINA NO CIERRAN LA CAJA, Y SE COMPONE LA DEL TÍTULO.** Mide
+ * caja 297 y riel derecho 190; con el medianil de retícula eso son **496**, diez por
+ * encima de `caja.ancho`. Aquí el riel se DERIVA —486 − 9 − 297 = 180— y un 190 literal en
+ * este archivo significaría que el bloque desborda:
+ *
+ * - La caja es la pieza que la regla 1 de 2.C protege: `SOLICITUD DE INTERNAMIENTO` es el
+ *   título fijo más largo de los seis formatos y es justo por eso que esta lámina le da
+ *   diez puntos más que Imagenología. Recortarla a 287 devolvería el defecto que aquella
+ *   tuvo que resolver acortando su propio título.
+ * - El riel aguanta la resta sin apretarse porque **este formato no lleva folio** (ver la
+ *   cabecera de II.6): su riel derecho compone una sola celda, `Emisión`, y 180 pt le
+ *   sobran. Los 190 harían falta con las dos.
+ *
+ * Reportado.
+ *
+ * **LAS DOS CELDAS DEL RIEL SE DESVÍAN EN CUERPO Y UNA TAMBIÉN EN PESO.** El rol `folio`
+ * va a 11 / 14 en peso 500 y esta lámina compone las dos a **10 / 14**, con la emisión en
+ * **400** y el folio en 500. Es una desviación declarada del par, con el patrón de 2.F,
+ * 2.B y 2.L: el rol no se toca y no sube a I.1.4 mientras tenga un solo consumidor.
+ *
+ * ⚠ La lámina declara la tinta —`#1a3250`, que es `acento.tinta` con el acento por
+ * defecto— **solo para el folio**. La emisión conserva la del rol, que es la misma.
+ * `DERIVADO, NO MEDIDO`.
+ */
+const INTERNAMIENTO = {
+  cajaTitulo: 297,
+  /** DERIVADO: lo que queda de la caja tras el título y su medianil. Ver arriba. */
+  rielDerecho: CAJA.ancho - RETICULA.medianil - 297,
+  medianilCeldas: IMAGENOLOGIA.medianilCeldas,
+  celda: { cuerpo: 10, interlineado: 14, pesoEmision: 400 as Peso },
+} as const
+
 /** Interlineado del título: el alto de UNA de sus líneas. Lo usa la fecha. */
 const ALTO_LINEA_TITULO = TIPOGRAFIA['titulo.documento'].interlineado ?? 0
 
@@ -228,6 +269,10 @@ const estilos = StyleSheet.create({
   },
   columnaTituloFijaReceta: {
     width: RECETA.cajaTitulo,
+    flexShrink: 0,
+  },
+  columnaTituloFijaInternamiento: {
+    width: INTERNAMIENTO.cajaTitulo,
     flexShrink: 0,
   },
   /** La ranura de lo que cuelga bajo el título, dentro del bloque. */
@@ -293,6 +338,13 @@ const estilos = StyleSheet.create({
   },
   rielDobleReceta: {
     width: RECETA.rielDerecho,
+    marginLeft: RETICULA.medianil,
+    flexShrink: 0,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  rielDobleInternamiento: {
+    width: INTERNAMIENTO.rielDerecho,
     marginLeft: RETICULA.medianil,
     flexShrink: 0,
     flexDirection: 'row',
@@ -465,15 +517,45 @@ export function CeldaFolio({
   etiqueta,
   valor,
   acento,
+  desviacion,
 }: {
   readonly etiqueta: string
   readonly valor: string
   readonly acento: AcentoResuelto
+  /**
+   * Desviación declarada del rol `folio`, cuando la lámina compone el valor con otro
+   * cuerpo o con otro peso. Solo se escribe lo que se desvía: familia, tracking y color
+   * los sigue poniendo el rol, y por eso el estilo se arma AQUÍ y no en la hoja de
+   * estilos — el color depende del acento y se resuelve en el render.
+   *
+   * Hoy la declara una lámina, en sus dos celdas. Ver `INTERNAMIENTO`.
+   */
+  readonly desviacion?: {
+    readonly cuerpo: number
+    readonly interlineado: number
+    readonly peso?: Peso
+  }
 }): ReactElement {
   return (
     <>
       <Text style={estilos.etiquetaFolio}>{etiqueta.toUpperCase()}</Text>
-      <Text style={{ ...estiloTipografico('folio', acento) }}>{valor}</Text>
+      <Text
+        style={{
+          ...estiloTipografico('folio', acento),
+          ...(desviacion === undefined
+            ? {}
+            : {
+                fontSize: desviacion.cuerpo,
+                lineHeight: desviacion.interlineado / desviacion.cuerpo,
+                // El tracking SÍ se recalcula: el de `folio` no es 0 —vale 0.03 em—, así
+                // que mover el cuerpo lo mueve. Misma conversión que `estiloTipografico()`.
+                letterSpacing: TIPOGRAFIA.folio.tracking * desviacion.cuerpo,
+                ...(desviacion.peso === undefined ? {} : { fontWeight: desviacion.peso }),
+              }),
+        }}
+      >
+        {valor}
+      </Text>
     </>
   )
 }
@@ -506,15 +588,32 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
    * decide en el contenedor.
    */
   const receta = lamina === 'receta' || suplementacion
-  const doble = imagen || receta
+  const internamiento = lamina === 'internamiento'
+  const doble = imagen || receta || internamiento
 
   /**
    * Una celda del riel derecho: rótulo en versalita y valor en `folio`. El rol va
    * en `acento.tinta`, así que se resuelve en el render y se esparce en un
    * literal: misma razón de tipos que en 2.B, 2.D, 2.F y 2.G.
+   *
+   * `peso` es la única pieza que las dos celdas de Internamiento no comparten: la emisión
+   * baja a 400 y el folio se queda en el 500 del rol.
    */
-  const celda = (etiqueta: string, valor: string): ReactElement => (
-    <CeldaFolio etiqueta={etiqueta} valor={valor} acento={props.acento} />
+  const celda = (etiqueta: string, valor: string, peso?: Peso): ReactElement => (
+    <CeldaFolio
+      etiqueta={etiqueta}
+      valor={valor}
+      acento={props.acento}
+      desviacion={
+        internamiento
+          ? {
+              cuerpo: INTERNAMIENTO.celda.cuerpo,
+              interlineado: INTERNAMIENTO.celda.interlineado,
+              peso,
+            }
+          : undefined
+      }
+    />
   )
 
   return (
@@ -535,7 +634,9 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
               ? estilos.columnaTituloFija
               : receta
                 ? estilos.columnaTituloFijaReceta
-                : estilos.columnaTitulo
+                : internamiento
+                  ? estilos.columnaTituloFijaInternamiento
+                  : estilos.columnaTitulo
           }
         >
           <Text style={estilos.titulo}>{props.titulo.toUpperCase()}</Text>
@@ -579,10 +680,22 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
             valor, en las dos láminas. Las dos celdas colapsan por separado, como
             cualquier par rótulo + valor del sistema (2.E).
           */
-          <View style={imagen ? estilos.rielDoble : estilos.rielDobleReceta}>
+          <View
+            style={
+              imagen
+                ? estilos.rielDoble
+                : internamiento
+                  ? estilos.rielDobleInternamiento
+                  : estilos.rielDobleReceta
+            }
+          >
             {props.emision === undefined ? null : (
               <View style={estilos.celdaRiel}>
-                {celda(ETIQUETA_EMISION, props.emision)}
+                {celda(
+                  ETIQUETA_EMISION,
+                  props.emision,
+                  internamiento ? INTERNAMIENTO.celda.pesoEmision : undefined,
+                )}
               </View>
             )}
             {props.folio === undefined ? null : (
@@ -591,7 +704,7 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
                   estilos.celdaRiel,
                   props.emision === undefined
                     ? {}
-                    : imagen
+                    : imagen || internamiento
                       ? estilos.celdaRielSiguiente
                       : estilos.celdaRielSiguienteReceta,
                 ]}
@@ -605,11 +718,17 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
         )}
       </View>
 
+      {/*
+        DOS LÁMINAS MIDEN 5 pt HASTA EL FILETE. Internamiento cierra su bloque en 202.69 y
+        abre el filete en 207.69, que son los mismos 5 de Receta: se lee de allí en vez de
+        declarar un miembro que valdría lo mismo. El aire de ABAJO sí es el del chasis —
+        210.19 → 218.19 son los 8 de `transicion.tituloRiel`—, así que no declara ninguno.
+      */}
       <View
         style={
           imagen
             ? estilos.hastaFileteImagenologia
-            : receta
+            : receta || internamiento
               ? estilos.hastaFileteReceta
               : honorarios
                 ? estilos.hastaFileteHonorarios

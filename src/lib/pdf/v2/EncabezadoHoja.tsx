@@ -206,6 +206,23 @@ export interface EncabezadoHojaProps {
    * renglón de 7.5 / 12, y con dos serían 24. Se compone en uno y queda reportado.
    */
   readonly eco?: string
+  /**
+   * RÓTULO PROPIO DE ESTA HOJA DE CONTINUACIÓN, en vez del `titulo · continuación` que
+   * compone el chasis. Lo redacta el FORMATO y lo elige 2.N por número de hoja.
+   *
+   * Existe por un formato y por una razón que no es de estilo: la hoja 3 de II.6 **no es
+   * la continuación de la 2**. La sección 1 la leen el paciente y Admisión; la 2, la
+   * enfermería y el residente de piso. Son dos documentos dentro del mismo folio, así que
+   * su cabecera dice `Solicitud de internamiento · sección 2 de 2` y **nunca
+   * «continuación»** (II.6 §6, y la regla 1 de 2.Q).
+   *
+   * ⚠ **ABRE LA PUERTA QUE `ROTULO_CONTINUACION` CERRABA**, y por eso está acotada: quien
+   * pase una cadena aquí puede escribir la palabra prohibida. Lo que la protege es que
+   * ninguna hoja la recibe por defecto —sin ella, el rótulo lo sigue componiendo el
+   * chasis— y que la única cadena que la usa hoy vive en la ficha de su formato, donde se
+   * lee al lado de la regla que la prohíbe.
+   */
+  readonly rotuloHoja?: string
 }
 
 /**
@@ -229,6 +246,17 @@ export interface EncabezadoHojaProps {
 const LINEA_PACIENTE = { interlineado: 12 } as const
 
 /**
+ * LA MISMA LÍNEA EN LA LÁMINA DE INTERNAMIENTO — **12.5**, medio punto más alta.
+ *
+ * Es la única pieza de esa hoja de continuación que no coincide con lo que el chasis ya
+ * compone, y no es residuo: sus 69 pt solo cierran con 12.5 —32 + 8 + 2.5 + 14 + 12.5—.
+ * Medio punto es poco para abrir una desviación y aun así se compone, por lo mismo que se
+ * componen los hairlines de 0.475: **la cota es la medida dura** y taparla con «es
+ * residuo» es lo que hace que un presupuesto deje de cuadrar dos láminas más tarde.
+ */
+const LINEA_PACIENTE_INTERNAMIENTO = { interlineado: 12.5 } as const
+
+/**
  * Los dos rótulos de la línea, y la raya que une sus piezas.
  *
  * Los escribe el chasis y no el formato, por lo mismo que 2.K escribe «Total de» y
@@ -248,6 +276,18 @@ const ROTULO_EXPEDIENTE = 'Exp.'
  * pueden comprobar. Los otros tres no pasan `peso` y su línea no se mueve ni un punto.
  */
 const ROTULO_PESO = 'Peso'
+/**
+ * ⚠ **EL HOSPITAL VA SIN RÓTULO, Y SOLO LO LLEVA UN FORMATO.**
+ *
+ * La lámina de Internamiento compone `Paciente · Nombre · 25 años · Exp. 2026-0184 · Star
+ * Médica Mérida`: la quinta pieza es el sitio del ingreso y entra sin rotular, al revés
+ * que el expediente y el peso. Es lo que corresponde —un nombre propio de hospital no
+ * necesita que le digan que es un hospital— y es también el dato que hace que la hoja 2 de
+ * este formato se pueda devolver a su piso si se separa de la 1, que es para lo que la
+ * regla 2 de 2.D existe.
+ *
+ * Los otros cinco formatos no pasan `hospital` y su línea no se mueve ni un punto.
+ */
 const RAYA = ' · '
 
 const estilos = StyleSheet.create({
@@ -263,6 +303,12 @@ const estilos = StyleSheet.create({
     lineHeight: LINEA_PACIENTE.interlineado / TIPOGRAFIA['medico.credencial'].cuerpo,
     color: TINTA.etiqueta,
     flex: 1,
+  },
+  /** La misma línea medio punto más alta. Ver `LINEA_PACIENTE_INTERNAMIENTO`. */
+  lineaPacienteInternamiento: {
+    lineHeight:
+      LINEA_PACIENTE_INTERNAMIENTO.interlineado /
+      TIPOGRAFIA['medico.credencial'].cuerpo,
   },
   /** La línea y, a su derecha, el badge reducido de los formatos que lo llevan. */
   filaContinuacion: {
@@ -285,6 +331,8 @@ function lineaDePaciente(paciente: ValoresPaciente, eco?: string): string {
       ? `${ROTULO_EXPEDIENTE} ${paciente.expediente}`
       : undefined,
     tieneValor(paciente.peso) ? `${ROTULO_PESO} ${paciente.peso}` : undefined,
+    // Sin rótulo, a propósito. Ver la nota de arriba.
+    paciente.hospital,
     eco,
   ]
     .filter((pieza): pieza is string => tieneValor(pieza))
@@ -294,7 +342,20 @@ function lineaDePaciente(paciente: ValoresPaciente, eco?: string): string {
 /** 2.V · `EncabezadoHoja`. */
 export default function EncabezadoHoja(props: EncabezadoHojaProps): ReactElement {
   const continuacion = props.variante === 'continuacion'
-  const titulo = continuacion ? continua(props.titulo) : props.titulo
+  const titulo = continuacion
+    ? (props.rotuloHoja ?? continua(props.titulo))
+    : props.titulo
+  /**
+   * ⚠ **EL BADGE NO SE REPITE EN LAS HOJAS DE CONTINUACIÓN DE INTERNAMIENTO.**
+   *
+   * Las dos láminas que componen un bloque en negativo lo repiten reducido en su hoja 2, y
+   * esta **no lo compone en ninguna de las dos suyas**: el badge sale bajo el título de la
+   * hoja 1 y ahí se queda. No se compone lo que la lámina no tiene, aunque el chasis sepa
+   * componerlo. **Reportado**, porque va contra la regla 4 de 2.H leída de corrido —un
+   * badge marca el DOCUMENTO, no una hoja— y aquí el documento queda marcado en una sola.
+   */
+  const badgeEnContinuacion = props.lamina !== 'internamiento'
+  const internamiento = props.lamina === 'internamiento'
 
   return (
     <View>
@@ -367,10 +428,15 @@ export default function EncabezadoHoja(props: EncabezadoHojaProps): ReactElement
       */}
       {continuacion ? (
         <View style={estilos.filaContinuacion}>
-          <Text style={estilos.lineaPaciente}>
+          <Text
+            style={[
+              estilos.lineaPaciente,
+              internamiento ? estilos.lineaPacienteInternamiento : {},
+            ]}
+          >
             {lineaDePaciente(props.paciente, props.eco)}
           </Text>
-          {props.urgente === true ? (
+          {props.urgente === true && badgeEnContinuacion ? (
             <BloqueNegativo variante="urgenteReducido" lamina={props.lamina} />
           ) : null}
         </View>

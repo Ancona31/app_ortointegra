@@ -513,6 +513,42 @@ export const TIPOGRAFIA = {
   'noFiscal.cuerpo': { familia: FUENTE.humanista, cuerpo: 9.5, interlineado: 13.5, peso: 400, tracking: 0, color: 'tinta.negra' },
   'formaPago.rotulo': { familia: FUENTE.neogrotesca, cuerpo: 6.5, interlineado: 10, peso: 400, tracking: 0.1, color: 'tinta.etiqueta' },
   'formaPago.valor': { familia: FUENTE.neogrotesca, cuerpo: 9.5, interlineado: 13, peso: 400, tracking: 0, color: 'tinta.negra' },
+  // ── LOS SEIS ROLES DE LA LÁMINA DE INTERNAMIENTO (II.6).
+  //
+  // Suben aquí por el par de razones de siempre —no son desviaciones de ningún rol y los
+  // compone el FORMATO o un componente que no puede escribir tipografía— y ninguno
+  // coincide con uno existente. Los tres que más se acercan y **no son**:
+  //
+  //     `bloqueSimple.titulo`   9 / **12**   `recomendaciones.encabezado` va a 9 / 13
+  //     `requerimiento.texto`   10.5 / **14** en **500**   `concepto.texto`, 10.5 / 13 en 400
+  //     `instruccion.texto`     11.5 / 18 en **500**   `texto.corrido`, lo mismo en 400
+  //
+  // Los que SÍ coinciden no entran, que es la otra mitad del criterio: el número de la
+  // apertura y el de los bloques numerados son `seccion.numero` —15 / 15, 600, acento— y
+  // el título de bloque numerado es `titulo.seccion` —10 / 14, 600, 0.14 em—, hasta la
+  // centésima. Un rol nuevo idéntico a uno existente sería deuda (ver la nota de
+  // `entradaEstudio.numero`).
+  //
+  // Los tres trackings salen del píxel, con la conversión de siempre: 1.68 px a 9 pt
+  // —12 px— son **0.14 em**, y 2.347 px a 8 pt —10.667 px— son **0.22 em**, que es la
+  // versalita del sistema. `COINCIDENCIA` con el tracking de `etiqueta`, que vale lo
+  // mismo y no es este.
+  //
+  // ⚠ **`seccion.lector` LLEVA EL TRACKING DE LA VERSALITA Y LA LÁMINA ESCRIBE LA CADENA
+  // EN CAPITALIZACIÓN DE ORACIÓN** —`Para personal de enfermería y médico residente`—.
+  // Toda versalita del sistema se compone en mayúsculas; esta no, porque es lo que la
+  // lámina imprime. Se compone textual y queda **reportado**.
+  //
+  // ⚠ **`item.raya` VA EN LA NEO-GROTESCA Y LA LÁMINA COMPONE LA RAYA EN IBM PLEX MONO.**
+  // Octavo caso idéntico (`CONCILIA D13, D20, D30`), y este es el que la propia ficha de
+  // II.6 §5 manda sustituir con nombre. I.1.4 prohíbe la mono en documento impreso.
+  // Reportado.
+  'bloqueSimple.titulo': { familia: FUENTE.neogrotesca, cuerpo: 9, interlineado: 12, peso: 600, tracking: 0.14, color: 'tinta.negra' },
+  'seccion.lector': { familia: FUENTE.neogrotesca, cuerpo: 8, interlineado: 12, peso: 600, tracking: 0.22, color: 'tinta.secundaria' },
+  'item.raya': { familia: FUENTE.neogrotesca, cuerpo: 9, interlineado: 18, peso: 400, tracking: 0, color: 'tinta.etiqueta' },
+  'instruccion.numero': { familia: FUENTE.neogrotesca, cuerpo: 9, interlineado: 18, peso: 600, tracking: 0, color: 'acento.tinta' },
+  'instruccion.texto': { familia: FUENTE.humanista, cuerpo: 11.5, interlineado: 18, peso: 500, tracking: 0, color: 'tinta.negra' },
+  'requerimiento.texto': { familia: FUENTE.neogrotesca, cuerpo: 10.5, interlineado: 14, peso: 500, tracking: 0, color: 'tinta.negra' },
   'recomendaciones.encabezado': { familia: FUENTE.neogrotesca, cuerpo: 9, interlineado: 13, peso: 600, tracking: 0.14, color: 'tinta.negra' },
   'alarma.encabezado': { familia: FUENTE.neogrotesca, cuerpo: 9.5, interlineado: 13, peso: 600, tracking: 0.22, color: 'tinta.negra' },
   'firma.nombre': { familia: FUENTE.neogrotesca, cuerpo: 11.5, interlineado: 16, peso: 600, tracking: -0.012, color: 'tinta.negra' },
@@ -617,6 +653,9 @@ export const CIFRAS_TABULARES = [
   // de abajo (2.T regla 1); el concepto comparte rol y no lleva cifras.
   'concepto.numero',
   'concepto.texto',
+  // El ordinal de las instrucciones al paciente (II.6), por lo mismo que los cuatro de
+  // arriba: es un identificador de ítem que se lee en columna, `01` sobre `02`.
+  'instruccion.numero',
   // La póliza es alfanumérica y la lámina la compone tabular igual: es un
   // identificador que se coteja carácter a carácter contra el oficio de la
   // aseguradora, que es el mismo caso que el folio.
@@ -747,6 +786,34 @@ export const FILETE_HONORARIOS = {
   firma: 0.47,
   /** Los dos lados del marco parcial. El chasis pone `filete.acento`, 2. */
   acento: 2.53,
+} as const
+
+/**
+ * EL ÚNICO GROSOR PROPIO DE LA LÁMINA DE INTERNAMIENTO.
+ *
+ * Mismo criterio que `FILETE_SUPLEMENTACION` y `FILETE_HONORARIOS`, y por la misma razón
+ * de §0: tiene TRES consumidores, así que no puede vivir en la ficha de un componente.
+ *
+ *   filete superior del bloque simple (II.6, `tinta.reglaSuave`)
+ *   filetes de apertura y cierre del riel de requerimientos (2.F)
+ *   regla vertical entre celdas de ese riel (2.F, `tinta.hairline`)
+ *
+ * `COINCIDENCIA` — vale lo mismo que `FILETE_SUPLEMENTACION.regla` y que
+ * `FILETE_HONORARIOS.regla`, y **no es ninguno de los dos**: son tres láminas distintas
+ * que miden 0.63 por su cuenta. Es ya la tercera, lo que inclina el aviso de aquellas dos
+ * —«si 0.63 fuera el valor real, `filete.regla` está mal en los ocho»— del lado del 0.63.
+ * Sigue sin unificarse aquí: mover `filete.regla` mueve los cinco formatos conciliados.
+ * Reportado.
+ *
+ * ⚠ **B.6 §3 MIDE ESTE MISMO FILETE EN 0.5 pt Y EL PASO 4.6 MANDA 0.63.** Se compone el
+ * que manda el paso. Reportado.
+ *
+ * **Los filetes del riel de identificación NO están aquí**, y no por olvido: esa lámina
+ * no los declara y se derivan de su cota. Ver `TRAZO` en 2.F.
+ */
+export const FILETE_INTERNAMIENTO = {
+  /** Bloque simple, riel de requerimientos y su regla vertical. */
+  regla: 0.63,
 } as const
 
 // ───────────────────────────────────────────────────────────────────────────────
@@ -922,6 +989,26 @@ export const ESPACIO = {
  * aquellas láminas: lo que esta añade es que **el reparto 246 / 24 / 216 no siempre
  * cae del mismo lado**. No los vuelvas a cambiar por esto —moverías Imagenología,
  * Receta y Suplementación—; lo que hay que leer es el VALOR. Reportado.
+ *
+ * **Y AHORA SON SEIS. LA SEXTA ES LA MÁS ALTA Y LA ÚNICA CON DOS SECCIONES.**
+ *
+ * `internamiento` mide el encabezado más alto del sistema —**237.61 pt**, contra los
+ * 232.51 de Suplementación— y es la única lámina con tres hojas de reparto FIJO. Casi todo
+ * lo que desvía ya estaba medido en otra: el espaciador de cierre de 10 es el de Receta,
+ * los 5 pt hasta el filete del título también, los dos renglones de banda con cédulas son
+ * los de Imagenología y los hairlines de su riel son los de Honorarios. **Ninguna de esas
+ * cifras se vuelve a escribir**: se leen de donde ya están.
+ *
+ * Lo que declara de propio:
+ *
+ *   2.B  espaciador de la hoja de continuación a 14      (chasis 12, honorarios 24)
+ *   2.C  caja de título 297 —la más ancha— con el riel derecho DERIVADO
+ *   2.D  fila inferior de cuatro celdas: hospital, tipo, días y ASA (span 1)
+ *   2.F  variante `catalogo`, que nace con ella
+ *   2.I  instrucciones con filete superior, padding `6 0 8 14` y encabezado
+ *   2.J  las tres calibraciones de ítem, que nacen con ella
+ *   2.L  medianil de pareja a 30 y DOS composiciones de nombre en el mismo documento
+ *   2.Q  que se estrena aquí y no tiene otro consumidor
  */
 export type Lamina =
   | 'chasis'
@@ -929,6 +1016,7 @@ export type Lamina =
   | 'receta'
   | 'suplementacion'
   | 'honorarios'
+  | 'internamiento'
 
 /**
  * Las nueve transiciones entre bloques declaradas por el diseño (I.1.7).

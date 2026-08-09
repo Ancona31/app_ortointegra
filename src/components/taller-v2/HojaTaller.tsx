@@ -1091,10 +1091,15 @@ function HojaTaller({
           </View>
 
           <View style={estilos.seccion}>
+            {/*
+              El rótulo es el TÍTULO de la sección y no `SECCIÓN 2 DE 2`: es lo que compone
+              la lámina de II.6, y la cadena de la sección se mudó a la cabecera de esa
+              hoja. Ver el punto (a) de 2.Q.
+            */}
             <AperturaSeccion
               numero={2}
-              total={2}
-              lector="Enfermería y residente de piso"
+              rotulo="Indicaciones de ingreso a piso"
+              lector="Para personal de enfermería y médico residente"
               acento={acento}
             />
           </View>

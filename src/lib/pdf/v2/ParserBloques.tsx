@@ -51,7 +51,14 @@
 import { View, Text, StyleSheet } from '@react-pdf/renderer'
 import type { ReactElement } from 'react'
 import { analizar, type NodoParser } from './analizadorBloques'
-import { ESPACIO, FUENTE, RETICULA, estiloTipografico } from './tokens'
+import {
+  ESPACIO,
+  FUENTE,
+  RETICULA,
+  estiloTipografico,
+  type AcentoResuelto,
+  type RolTipograficoNombre,
+} from './tokens'
 
 /**
  * LA RAYA DEL SISTEMA. Raya, no guion ni semirraya: es el signo con el que la
@@ -88,6 +95,102 @@ export type RolCuerpoParser =
   | 'texto.corrido'
   | 'alarma.cuerpo'
   | 'texto.reducido'
+  /**
+   * **Y AHORA SON CUATRO.** `instruccion.texto` entra con las instrucciones al paciente de
+   * II.6: es el texto corrido del sistema **un peso por encima** —IBM Plex Sans 11.5 / 18
+   * en 500—, y lo que lo justifica es lo mismo que justifica el bloque entero: son las
+   * instrucciones que el paciente lee en su casa la noche antes de ingresar, y el bloque
+   * existe para que se lean aunque se lea en diagonal. Mismo cuerpo, más tinta.
+   */
+  | 'instruccion.texto'
+
+/**
+ * LAS CUATRO CALIBRACIONES DE ÍTEM. **Lo declara el consumidor, nunca el contenido**
+ * (I.3.4), igual que `CalibracionEntrada` en 2.G y `Lamina` en todo el chasis.
+ *
+ * La del chasis es la anatomía de siempre: riel de `reticula.riel` con el medianil de
+ * columna, y la marca heredando el cuerpo del texto con la familia cambiada. Las tres
+ * restantes son las tres anatomías de ítem que mide la lámina de II.6, y las tres son más
+ * estrechas: allí la raya no cuelga de una columna de retícula sino de un riel de 9 pt, y
+ * la caja de texto mide **469** —486 − 9 − 8—, que es la medida de línea que esa lámina
+ * declara para todos sus ítems.
+ *
+ * **Se distinguen entre sí por el margen y por la marca, no por el ancho:**
+ *
+ *     simple          raya   riel  9   margen 2   bloques de diagnóstico, procedimiento…
+ *     bloque          raya   riel  9   margen 3   los cuatro bloques numerados de la sec. 2
+ *     instrucciones   `01`   riel 14   margen 2   la lista numerada de la hoja 2
+ *
+ * El margen de 3 no es miembro de la escala de espaciado y no tiene por qué serlo: es
+ * geometría interna de este componente (I.1.7), como el 9 y el 8 de al lado.
+ *
+ * ⚠ **EL AIRE ENTRE BLOQUES NO ESTÁ MEDIDO EN ESA LÁMINA** y las tres se quedan con el
+ * `espacio.8` del chasis. No hay dónde medirlo: el formato instancia un parser por bloque
+ * —cada uno con su título y su filete puestos por fuera—, así que dentro de una llamada
+ * casi nunca hay dos bloques. `DERIVADO, NO MEDIDO`.
+ */
+export type CalibracionParser =
+  | 'chasis'
+  | 'internamientoSimple'
+  | 'internamientoBloque'
+  | 'internamientoInstrucciones'
+
+interface Calibracion {
+  /** Ancho fijo de la columna de la marca. */
+  readonly riel: number
+  /** Separación entre la marca y la caja de texto. */
+  readonly medianil: number
+  /**
+   * Rol con el que se compone la marca. `null` = hereda el cuerpo del texto y solo cambia
+   * de familia, que es lo que hace el chasis (`CONCILIA D30`).
+   */
+  readonly rolMarca: RolTipograficoNombre | null
+  /**
+   * `01` en vez de `1.`. Es el identificador de ítem de 2.G, no el ordinal de sección de
+   * 2.P: la lámina de II.6 numera sus instrucciones `01` a `06`, con cero a la izquierda y
+   * sin punto, que es como se numera una lista que alguien va a tachar una por una.
+   */
+  readonly ordinalConCero: boolean
+  /** Aire entre nodos del mismo bloque. */
+  readonly dentro: number
+  /** Aire entre bloques. */
+  readonly entre: number
+}
+
+const CALIBRACION = {
+  chasis: {
+    riel: RETICULA.riel,
+    medianil: RETICULA.medianil,
+    rolMarca: null,
+    ordinalConCero: false,
+    dentro: ESPACIO[4],
+    entre: ESPACIO[8],
+  },
+  internamientoSimple: {
+    riel: 9,
+    medianil: ESPACIO[8],
+    rolMarca: 'item.raya',
+    ordinalConCero: false,
+    dentro: ESPACIO[2],
+    entre: ESPACIO[8],
+  },
+  internamientoBloque: {
+    riel: 9,
+    medianil: ESPACIO[8],
+    rolMarca: 'item.raya',
+    ordinalConCero: false,
+    dentro: 3,
+    entre: ESPACIO[8],
+  },
+  internamientoInstrucciones: {
+    riel: 14,
+    medianil: ESPACIO[8],
+    rolMarca: 'instruccion.numero',
+    ordinalConCero: true,
+    dentro: ESPACIO[2],
+    entre: ESPACIO[8],
+  },
+} as const satisfies Record<CalibracionParser, Calibracion>
 
 const estilos = StyleSheet.create({
   /**
@@ -104,32 +207,42 @@ const estilos = StyleSheet.create({
   cuerpoCorrido: { ...estiloTipografico('texto.corrido') },
   cuerpoAlarma: { ...estiloTipografico('alarma.cuerpo') },
   cuerpoReducido: { ...estiloTipografico('texto.reducido') },
+  cuerpoInstruccion: { ...estiloTipografico('instruccion.texto') },
   /** La marca hereda cuerpo e interlineado del texto y cambia de familia (D30). */
   marcaCorrido: { ...estiloTipografico('texto.corrido'), fontFamily: FUENTE.neogrotesca },
   marcaAlarma: { ...estiloTipografico('alarma.cuerpo'), fontFamily: FUENTE.neogrotesca },
   marcaReducido: { ...estiloTipografico('texto.reducido'), fontFamily: FUENTE.neogrotesca },
+  marcaInstruccion: {
+    ...estiloTipografico('instruccion.texto'),
+    fontFamily: FUENTE.neogrotesca,
+  },
   /**
    * SANGRÍA DEL ÍTEM COLGANTE — `reticula.riel` + `reticula.medianil` (`CIERRA
    * H3`). Misma anatomía que la entrada de 2.G y la sección de 2.P: riel a la
    * izquierda, medianil, caja de texto. La suma cierra sola —23.25 + 9 = 32.25 es
    * `reticula.columna`—, así que un ítem que rompe a varias líneas sangra a
    * retícula y no a un valor suelto.
+   *
+   * **El ancho del riel y su medianil los declara la calibración**, no esta hoja: la
+   * lámina de II.6 cuelga sus rayas de 9 pt y no de una columna de retícula. Ver
+   * `CALIBRACION`.
    */
   item: { flexDirection: 'row' },
-  riel: { width: RETICULA.riel, marginRight: RETICULA.medianil, flexShrink: 0 },
+  riel: { flexShrink: 0 },
   /** La caja de texto se queda con el resto: es lo que hace colgar la raya. */
   cajaTexto: { flex: 1 },
-  /**
-   * AIRE ENTRE NODOS. La ficha no lo declaraba; se cierra con el criterio de H4,
-   * que es el que ya cerró las separaciones internas de 2.G y el subtítulo de
-   * 2.C: dentro de un bloque, la separación es tanto menor cuanto más pegadas
-   * están las piezas. Un encabezado y sus ítems son un solo bloque y van al
-   * mínimo de la escala; entre bloques sube un miembro. Dos niveles, los dos
-   * menores de la escala, en orden: 4 < 8 (anexo A, P2-20).
-   */
-  dentroDelBloque: { marginTop: ESPACIO[4] },
-  entreBloques: { marginTop: ESPACIO[8] },
 })
+
+/**
+ * AIRE ENTRE NODOS. La ficha no lo declaraba; se cierra con el criterio de H4, que es el
+ * que ya cerró las separaciones internas de 2.G y el subtítulo de 2.C: dentro de un
+ * bloque, la separación es tanto menor cuanto más pegadas están las piezas. Un encabezado
+ * y sus ítems son un solo bloque y van al mínimo de la escala; entre bloques sube un
+ * miembro. Dos niveles, los dos menores de la escala, en orden: 4 < 8 (anexo A, P2-20).
+ *
+ * Los dos viven ahora en `CALIBRACION` porque la lámina de II.6 mide otros dos, y viven
+ * como número y no como estilo porque el margen es lo único que cambia.
+ */
 
 export interface ParserBloquesProps {
   /** UNA SOLA CADENA. Nunca un array (`CONCILIA D10`). */
@@ -138,6 +251,30 @@ export interface ParserBloquesProps {
   marca: 'raya' | 'numero'
   /** Rol del cuerpo. Sin él, el texto corrido del sistema. */
   rolCuerpo?: RolCuerpoParser
+  /** Anatomía del ítem. Sin ella, la del chasis. Ver `CALIBRACION`. */
+  calibracion?: CalibracionParser
+  /**
+   * El acento, y solo para las calibraciones cuya marca va en `acento.tinta` —hoy una, la
+   * de instrucciones—. Sin él, la marca cae a tinta negra, que es la degradación de
+   * `estiloTipografico()` y no un color roto (I.3.7).
+   */
+  acento?: AcentoResuelto
+}
+
+/** El estilo del cuerpo de cada rol, para no ramificar dos veces en el render. */
+function estiloCuerpo(rol: RolCuerpoParser): typeof estilos.cuerpoCorrido {
+  if (rol === 'alarma.cuerpo') return estilos.cuerpoAlarma
+  if (rol === 'texto.reducido') return estilos.cuerpoReducido
+  if (rol === 'instruccion.texto') return estilos.cuerpoInstruccion
+  return estilos.cuerpoCorrido
+}
+
+/** La marca cuando la calibración no declara rol: el cuerpo con la familia cambiada. */
+function estiloMarcaHeredada(rol: RolCuerpoParser): typeof estilos.marcaCorrido {
+  if (rol === 'alarma.cuerpo') return estilos.marcaAlarma
+  if (rol === 'texto.reducido') return estilos.marcaReducido
+  if (rol === 'instruccion.texto') return estilos.marcaInstruccion
+  return estilos.marcaCorrido
 }
 
 /** Un nodo ya compuesto, con su separación respecto del anterior. */
@@ -147,30 +284,28 @@ function Nodo({
   bloqueAnterior,
   marca,
   rolCuerpo,
+  calibracion,
+  acento,
 }: {
   nodo: NodoParser
   primero: boolean
   bloqueAnterior: number
   marca: ParserBloquesProps['marca']
   rolCuerpo: RolCuerpoParser
+  calibracion: Calibracion
+  acento?: AcentoResuelto
 }): ReactElement {
   const separacion = primero
     ? {}
-    : nodo.bloque === bloqueAnterior
-      ? estilos.dentroDelBloque
-      : estilos.entreBloques
-  const cuerpo =
-    rolCuerpo === 'alarma.cuerpo'
-      ? estilos.cuerpoAlarma
-      : rolCuerpo === 'texto.reducido'
-        ? estilos.cuerpoReducido
-        : estilos.cuerpoCorrido
+    : {
+        marginTop:
+          nodo.bloque === bloqueAnterior ? calibracion.dentro : calibracion.entre,
+      }
+  const cuerpo = estiloCuerpo(rolCuerpo)
   const marcaEstilo =
-    rolCuerpo === 'alarma.cuerpo'
-      ? estilos.marcaAlarma
-      : rolCuerpo === 'texto.reducido'
-        ? estilos.marcaReducido
-        : estilos.marcaCorrido
+    calibracion.rolMarca === null
+      ? estiloMarcaHeredada(rolCuerpo)
+      : { ...estiloTipografico(calibracion.rolMarca, acento) }
 
   if (nodo.tipo === 'encabezado') {
     // Versalita: mayúsculas con tracking, como toda versalita del sistema (I.1.4).
@@ -183,9 +318,18 @@ function Nodo({
 
   return (
     <View style={[estilos.item, separacion]}>
-      <View style={estilos.riel}>
+      <View
+        style={[
+          estilos.riel,
+          { width: calibracion.riel, marginRight: calibracion.medianil },
+        ]}
+      >
         <Text style={marcaEstilo}>
-          {marca === 'numero' ? `${nodo.ordinal}.` : RAYA}
+          {marca === 'numero'
+            ? calibracion.ordinalConCero
+              ? String(nodo.ordinal).padStart(2, '0')
+              : `${nodo.ordinal}.`
+            : RAYA}
         </Text>
       </View>
       <Text style={[cuerpo, estilos.cajaTexto]}>{nodo.texto}</Text>
@@ -193,14 +337,39 @@ function Nodo({
   )
 }
 
-/** 2.J · `ParserBloques`. Devuelve `null` con la cadena vacía (caso 6). */
-export default function ParserBloques({
-  texto,
+/**
+ * LA MITAD QUE COMPONE, SIN ANALIZAR NADA — para quien ya tiene los nodos.
+ *
+ * ⚠ **EXISTE POR UN DEFECTO MEDIDO, NO POR COMODIDAD.** II.6 agrupa los nodos de una sola
+ * cadena en bloques —cada uno con su filete, su número y su título— y la primera versión lo
+ * resolvía reconstruyendo el cuerpo de cada bloque y volviéndolo a pasar por el analizador.
+ * Eso **cambia el resultado**: la degradación del ítem único de `analizar()` es GLOBAL a la
+ * cadena a propósito, así que al reanalizar bloque a bloque, uno con una sola viñeta pasaba
+ * a párrafo y perdía su raya. Medido sobre el PDF: tres de los cuatro bloques de
+ * indicaciones salían sin marca.
+ *
+ * Con esta puerta, el análisis ocurre **una sola vez sobre la cadena entera** —que es lo
+ * que la ficha declara— y lo único que se reparte es la composición.
+ *
+ * **No relaja `CONCILIA D10`.** El sistema sigue sin recibir arrays de datos: lo que entra
+ * aquí no es contenido tecleado por nadie sino la salida de `analizar()`, y quien la produce
+ * tuvo que partir de una cadena. La puerta de datos sigue siendo `ParserBloques`.
+ */
+export function ListaDeNodos({
+  nodos,
   marca,
   rolCuerpo = 'texto.corrido',
-}: ParserBloquesProps): ReactElement | null {
-  const nodos = analizar(texto)
+  calibracion = 'chasis',
+  acento,
+}: {
+  readonly nodos: readonly NodoParser[]
+  readonly marca: ParserBloquesProps['marca']
+  readonly rolCuerpo?: RolCuerpoParser
+  readonly calibracion?: CalibracionParser
+  readonly acento?: AcentoResuelto
+}): ReactElement | null {
   if (nodos.length === 0) return null
+  const medidas: Calibracion = CALIBRACION[calibracion]
 
   return (
     <View>
@@ -214,8 +383,29 @@ export default function ParserBloques({
           bloqueAnterior={i === 0 ? nodo.bloque : nodos[i - 1].bloque}
           marca={marca}
           rolCuerpo={rolCuerpo}
+          calibracion={medidas}
+          acento={acento}
         />
       ))}
     </View>
+  )
+}
+
+/** 2.J · `ParserBloques`. Devuelve `null` con la cadena vacía (caso 6). */
+export default function ParserBloques({
+  texto,
+  marca,
+  rolCuerpo = 'texto.corrido',
+  calibracion = 'chasis',
+  acento,
+}: ParserBloquesProps): ReactElement | null {
+  return (
+    <ListaDeNodos
+      nodos={analizar(texto)}
+      marca={marca}
+      rolCuerpo={rolCuerpo}
+      calibracion={calibracion}
+      acento={acento}
+    />
   )
 }
