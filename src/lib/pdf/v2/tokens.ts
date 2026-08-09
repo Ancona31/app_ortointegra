@@ -307,6 +307,61 @@ export const TIPOGRAFIA = {
   'entradaEstudio.secundario': { familia: FUENTE.neogrotesca, cuerpo: 10, interlineado: 13, peso: 500, tracking: 0, color: 'tinta.secundaria' },
   'entradaEstudio.rotuloNota': { familia: FUENTE.neogrotesca, cuerpo: 6.5, interlineado: 16, peso: 600, tracking: 0.2, color: 'tinta.etiqueta' },
   'entradaEstudio.nota': { familia: FUENTE.humanista, cuerpo: 10.5, interlineado: 16, peso: 400, tracking: 0, color: 'tinta.negra' },
+  // ── Calibración `medicamento` de la entrada (2.G). Medida en la lámina aprobada
+  // de Receta, hoja `B · 7 medicamentos`. Es la lista APILADA de CINCO datos —el
+  // número en el riel y cuatro en la caja—, y por eso son cinco roles y no cuatro:
+  // ninguna de las otras dos calibraciones tiene una ranura de vía.
+  //
+  // ⚠ **NINGUNO DE LOS CINCO ES EL ROL `entrada.*` QUE HEREDARÍAN**, y esta es la
+  // tercera vez que hay que decirlo en esta tabla. Aquí las diferencias son de un
+  // punto y por eso se cuelan con más facilidad que las de `entradaCompacta.*`:
+  //
+  //     número      13 / **16**   `entrada.numero` va a 13 / 17
+  //     ancla       **12** / 16   `entrada.ancla` va a 11 / 15 y sin tracking
+  //     genérico    10 / 13 · **500**   `entrada.secundario` va a 9.5 / 14 en 400
+  //
+  // **EL TRACKING DEL ANCLA SALE DE UN PÍXEL Y MEDIO.** La lámina es HTML a 96 dpi
+  // y mide `letter-spacing: -0.08px`; a cuerpo 12 pt —que son 16 px— eso es
+  // **−0.005 em**, que es lo que `SPEC_DISENO_PARTE_B.md` B.3 §3 anota por su
+  // cuenta. La conversión px → em es la misma que valida los trackings de la banda
+  // de pie contra esta lámina: 0.933 px a 7 pt es `pie` (0.1 em) y 0.4 px a 6 pt es
+  // `pie.leyenda` (0.05 em), los dos exactos.
+  //
+  // **EL GENÉRICO VA EN TINTA PLENA Y ESO NO ES UNA ELECCIÓN.** Es la regla 5 de
+  // 2.G: la denominación genérica es el único campo obligatorio por normativa. La
+  // lámina no declara `color` en ese renglón y por tanto hereda `#101010` del
+  // contenedor, que es lo mismo que declarar `tinta.negra`. Es la diferencia con
+  // `entradaEstudio.secundario`, que sí va en `tinta.secundaria` porque allí ese
+  // renglón son las proyecciones de un estudio, no un dato normativo.
+  'entradaMedicamento.numero': { familia: FUENTE.neogrotesca, cuerpo: 13, interlineado: 16, peso: 600, tracking: 0, color: 'acento.tinta' },
+  'entradaMedicamento.ancla': { familia: FUENTE.neogrotesca, cuerpo: 12, interlineado: 16, peso: 600, tracking: -0.005, color: 'tinta.negra' },
+  'entradaMedicamento.generico': { familia: FUENTE.neogrotesca, cuerpo: 10, interlineado: 13, peso: 500, tracking: 0, color: 'tinta.negra' },
+  // ⚠ **NO HAY ROL DE VÍA, Y LO HUBO.** La lámina compone la vía ORAL como texto
+  // plano —Archivo 7.5 / 13, 600, 0.2 em— y todas las demás como bloque en negativo,
+  // y eso llegó a estar aquí como `entradaMedicamento.viaOral`. **Angel decidió que
+  // las trece van en negativo**, contra lo medido, así que ese rol se queda sin
+  // consumidor y un miembro de escala sin consumidores es deuda, no escala.
+  //
+  // La vía ya no la compone ningún rol de I.1.4: la compone 2.H, con su calibración
+  // medida. Si la decisión se revierte, el rol vuelve tal cual —7.5 / 13, 600,
+  // 0.2 em, `tinta.negra`, con «Vía» en `tinta.etiqueta`— y no hay que medirlo otra
+  // vez.
+  'entradaMedicamento.indicacion': { familia: FUENTE.humanista, cuerpo: 10, interlineado: 14, peso: 400, tracking: 0, color: 'tinta.negra' },
+  // ── LOS DOS ENCABEZADOS DE BLOQUE DESTACADO (2.I), medidos en la misma lámina.
+  //
+  // Suben aquí y no a la ficha de 2.I porque **no son desviaciones de ningún rol**:
+  // 9 / 13 y 9.5 / 13 no salen de mover un sumando de `etiqueta` (7 / 11) ni de
+  // `titulo.seccion` (10 / 14), que son los dos rótulos con los que el sistema
+  // nombra lo que va debajo. Son escala nueva, y el criterio de I.1.7 para eso es
+  // el contrario: lo que no es geometría interna de un componente es un rol.
+  //
+  // Se distinguen entre sí por el TRACKING y no por el cuerpo: 0.14 em es el de un
+  // encabezado de sección y 0.22 el de la versalita del sistema. El de la alarma va
+  // en la versalita porque es lo que la lámina compone —y porque la alarma es el
+  // único bloque del sistema con ventaja declarada sobre el texto corrido, así que
+  // su rótulo tampoco puede ser el más discreto de los dos.
+  'recomendaciones.encabezado': { familia: FUENTE.neogrotesca, cuerpo: 9, interlineado: 13, peso: 600, tracking: 0.14, color: 'tinta.negra' },
+  'alarma.encabezado': { familia: FUENTE.neogrotesca, cuerpo: 9.5, interlineado: 13, peso: 600, tracking: 0.22, color: 'tinta.negra' },
   'firma.nombre': { familia: FUENTE.neogrotesca, cuerpo: 11.5, interlineado: 16, peso: 600, tracking: -0.012, color: 'tinta.negra' },
   'firma.rol': { familia: FUENTE.neogrotesca, cuerpo: 7, interlineado: 11, peso: 600, tracking: 0.22, color: 'tinta.etiqueta' },
   'firma.credencial': { familia: FUENTE.neogrotesca, cuerpo: 7.5, interlineado: 11, peso: 400, tracking: 0.06, color: 'tinta.secundaria' },
@@ -403,6 +458,7 @@ export const CIFRAS_TABULARES = [
   'tabla.celda',
   'entrada.numero',
   'entradaCompacta.numero',
+  'entradaMedicamento.numero',
   'folio',
   'medico.credencial',
   'firma.credencial',
@@ -431,8 +487,24 @@ export const CIFRAS_TABULARES = [
 export const FILETE = {
   /** Apertura de sección. */
   transicion: 4,
-  /** Bloque de alarma. */
-  alarma: 3,
+  /**
+   * Bloque de alarma.
+   *
+   * ⚠ **SON 4 pt Y EL CHASIS LOS TENÍA EN 3.** La lámina aprobada de Receta —el
+   * único formato del sistema que compone una alarma— mide su filete superior e
+   * izquierdo en **4 pt sólidos `tinta.negra`**, no en 3. El 3 venía de A.4 y no
+   * está medido sobre ninguna lámina.
+   *
+   * La jerarquía de grosores de 2.I aguanta el cambio sin tocarse: alarma (4) >
+   * instrucciones (2, `filete.acento`) > cita (1.6, `filete.cita`). Lo que sí deja
+   * de ser cierto es la coincidencia con `filete.transicion`, que vale 4 y **no es
+   * este valor**: aquel abre una sección numerada (2.Q) y este enmarca un pasaje.
+   * `COINCIDENCIA`, no identidad.
+   *
+   * Alcance: un solo consumidor —la variante `alarma` de 2.I— y un solo formato que
+   * la instancia. Reportado.
+   */
+  alarma: 4,
   /** Cabecera de tabla · marco parcial de dos lados · marco del QR. */
   acento: 2,
   /** Bloque de cita · filete corto sobre el folio. */
@@ -505,12 +577,23 @@ export const ESPACIO_BASE = 4
  * `COINCIDENCIA` — `espacio.14` NO es el aire de continuación de esa misma lámina,
  * que mide 16 y es `espacio.16`: son dos separaciones distintas que la hoja 1 y la
  * hoja de continuación miden distinto a propósito.
+ *
+ * **Y AHORA ES DE CATORCE.** Se añade `10`, medido en la lámina de Receta por el
+ * mismo criterio con que entraron los cinco anteriores — sin él el formato no se
+ * compone sin escribir un literal:
+ *
+ *   `espacio.10`  cierre del riel de identificación → cabecera de la lista
+ *
+ * `COINCIDENCIA` — esos 10 pt miden lo mismo que el espaciador que cierra el
+ * membrete en esa misma lámina (2.B) y que el aire `tituloRiel` de la de
+ * Imagenología (2.C). Los tres separan cosas distintas y ninguno es este.
  */
 export const ESPACIO = {
   2: 2,
   4: 4,
   5: 5,
   8: 8,
+  10: 10,
   12: 12,
   14: 14,
   16: 16,
@@ -549,8 +632,25 @@ export const ESPACIO = {
  * chasis los declara en 0.8 y 0.5 (`filete.fino`, `filete.regla`) porque así los
  * leyó A.7. **No los unifiques por tu cuenta:** si el 0.75 es el valor real,
  * `filete.fino` está mal en los ocho formatos y eso mueve Laboratorio. Reportado.
+ *
+ * **AHORA SON TRES LÁMINAS, Y LA TERCERA CONFIRMA A LA SEGUNDA MÁS DE LO QUE LA
+ * CONTRADICE.** `receta` coincide con `imagenologia` en cinco de las seis
+ * desviaciones de arriba —los dos hairlines del riel, el diagnóstico a fila entera,
+ * el contador en `tinta.etiqueta`, la banda de dirección de dos renglones y el
+ * bloque de firma de 118.75 pt— y solo diverge en la geometría del bloque de
+ * título, que cada formato mide con su propio reparto. Que dos de las tres láminas
+ * midan 0.75 donde el chasis pone 0.8 mueve el aviso de arriba de «reportado» a
+ * «pendiente de decisión»: son dos votos contra uno, y el uno es Laboratorio.
+ *
+ * Las cinco desviaciones PROPIAS de `receta`, con su sitio de definición:
+ *
+ *   2.B  espaciador de cierre del membrete a 10          (chasis e imagenología, 12)
+ *   2.C  caja de título 267 · riel derecho 210 · medianil de celdas 20 · aire 5
+ *   2.F  valor de celda en peso 500                      (el chasis, 400)
+ *   2.G  calibración `medicamento` y tratamiento binario de la vía
+ *   2.I  alarma con padding `6 0 8 14`                   (el chasis, `espacio.16`)
  */
-export type Lamina = 'chasis' | 'imagenologia'
+export type Lamina = 'chasis' | 'imagenologia' | 'receta'
 
 /**
  * Las nueve transiciones entre bloques declaradas por el diseño (I.1.7).

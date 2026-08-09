@@ -49,6 +49,7 @@ import {
   TIPOGRAFIA,
   estiloTipografico,
   type Lamina,
+  type Peso,
 } from './tokens'
 
 /**
@@ -90,10 +91,18 @@ const GEOMETRIA = {
  * A.7. **La diferencia se compone, no se unifica:** si el 0.75 fuera el valor real
  * del sistema, `filete.fino` estaría mal en los ocho formatos y eso movería
  * Laboratorio, que ya está conciliado. Reportado.
+ *
+ * **LA LÁMINA DE RECETA MIDE LO MISMO, Y ESO CAMBIA EL PESO DEL AVISO.** Su riel abre
+ * en 204 y cierra en 267.88: son los mismos 63.88 —0.75 + 30 + 32.38 + 0.75— hasta
+ * la centésima. Dos láminas de tres miden 0.75 y 0.375 donde el chasis pone 0.8 y
+ * 0.5, así que lo que arriba se declaraba «diferencia de una lámina» es ya la
+ * mayoría. Sigue sin unificarse aquí por la misma razón: unificar mueve Laboratorio,
+ * que está conciliado, y esa es una decisión de producto. Reportado.
  */
 const TRAZO = {
   chasis: { filete: FILETE.fino, regla: FILETE.regla },
   imagenologia: { filete: 0.75, regla: 0.375 },
+  receta: { filete: 0.75, regla: 0.375 },
 } as const satisfies Record<Lamina, { filete: number; regla: number }>
 
 /** Lo que una desviación puede mover de un rol: solo su cuerpo y su interlineado. */
@@ -133,6 +142,27 @@ const DESVIACION = {
   rotulo: { interlineado: 10 },
   valor: { cuerpo: 11.5, interlineado: 13 },
 } satisfies Record<'rotulo' | 'valor', DesviacionRol>
+
+/**
+ * EL PESO DEL VALOR DE CELDA EN LA LÁMINA DE RECETA — **500, no 400**.
+ *
+ * Esa lámina declara UN SOLO tratamiento para el valor de celda: Archivo 11.5 / 13
+ * en peso **500**, `tinta.negra`. El chasis compone 400 —el del rol `dato`— y sube
+ * a 500 una sola celda, el nombre del paciente, que 2.D declara como «el único
+ * destaque del riel» (`GEOMETRIA.pesoAncla`).
+ *
+ * ⚠ **CONSECUENCIA VISIBLE, Y QUEDA REPORTADA: en este formato el destaque de 2.D
+ * desaparece.** Con las siete celdas a 500, el nombre del paciente ya no pesa más
+ * que la edad ni que el expediente. No es que 2.D deje de aplicarse: es que su
+ * excepción y el valor por defecto de esta lámina coinciden, así que no hay nada
+ * que añadir encima. Si al mirar el impreso resulta que el nombre SÍ destacaba en
+ * la lámina, entonces lo medido es la celda del nombre y no la celda genérica, y la
+ * corrección es volver este 500 a 400 — no tocar 2.D.
+ *
+ * Vive aquí y no en 2.D por lo mismo que las dos desviaciones de arriba: es el valor
+ * por DEFECTO de toda celda de este riel, no la excepción de una celda concreta.
+ */
+const PESO_VALOR_RECETA: Peso = 500
 
 const estilos = StyleSheet.create({
   /**
@@ -209,6 +239,13 @@ const estilos = StyleSheet.create({
     fontSize: DESVIACION.valor.cuerpo,
     lineHeight: DESVIACION.valor.interlineado / DESVIACION.valor.cuerpo,
   },
+  /** El mismo valor un peso por encima. Ver `PESO_VALOR_RECETA`. */
+  valorReceta: {
+    ...estiloTipografico('dato'),
+    fontSize: DESVIACION.valor.cuerpo,
+    lineHeight: DESVIACION.valor.interlineado / DESVIACION.valor.cuerpo,
+    fontWeight: PESO_VALOR_RECETA,
+  },
 })
 
 /**
@@ -231,6 +268,14 @@ export type EstiloValorCelda = typeof estilos.valor
  * 11.5 / 13. Una desviación declarada solo sirve si TODO el riel parte de ella.
  */
 export const VALOR_CELDA: EstiloValorCelda = estilos.valor
+
+/**
+ * El valor por defecto de cada lámina. Lo consulta 2.D para saber si su excepción
+ * de peso —el nombre del paciente— añade algo o ya está puesta.
+ */
+export function valorDeCelda(lamina: Lamina): EstiloValorCelda {
+  return lamina === 'receta' ? estilos.valorReceta : estilos.valor
+}
 
 export interface CeldaRiel {
   /** Identidad estable de la celda dentro del riel. */
@@ -296,11 +341,14 @@ function Fila({
   celdas,
   primera,
   regla,
+  valor,
 }: {
   celdas: readonly CeldaRiel[]
   primera: boolean
   /** Grosor de las reglas de esta lámina: la de arriba y las verticales. */
   regla: number
+  /** Estilo del valor de celda de esta lámina, cuando la celda no trae excepción. */
+  valor: EstiloValorCelda
 }): ReactElement {
   return (
     <View
@@ -321,7 +369,7 @@ function Fila({
           ]}
         >
           <Text style={estilos.etiqueta}>{celda.etiqueta.toUpperCase()}</Text>
-          <Text style={celda.estiloValor ?? estilos.valor}>{celda.valor}</Text>
+          <Text style={celda.estiloValor ?? valor}>{celda.valor}</Text>
         </View>
       ))}
     </View>
@@ -347,7 +395,9 @@ export default function RielDatos(props: RielDatosProps): ReactElement {
     .map((fila) => fila.filter((celda) => tieneValor(celda.valor)))
     .filter((fila) => fila.length > 0)
 
-  const trazo = TRAZO[props.lamina ?? 'chasis']
+  const lamina = props.lamina ?? 'chasis'
+  const trazo = TRAZO[lamina]
+  const valor = valorDeCelda(lamina)
 
   return (
     <View
@@ -362,6 +412,7 @@ export default function RielDatos(props: RielDatosProps): ReactElement {
           celdas={celdas}
           primera={indice === 0}
           regla={trazo.regla}
+          valor={valor}
         />
       ))}
     </View>

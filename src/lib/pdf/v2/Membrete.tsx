@@ -113,6 +113,25 @@ const GEOMETRIA = {
    */
   espaciadorCierre: 12,
   /**
+   * EL MISMO ESPACIADOR EN LA LÁMINA DE RECETA — **10 pt, no 12**.
+   *
+   * Las coordenadas medidas no dejan margen: la banda de dirección cierra en 153.5
+   * y el bloque de título abre en 163.5. Diez.
+   *
+   * ⚠ **NO ES UN AIRE DEL FORMATO NI UNA VARIANTE DE DISEÑO**, y por eso vive aquí
+   * y no en `RecetaMedica.tsx`: es el mismo elemento que separa el membrete del
+   * documento en los ocho, medido en una lámina que lo compone dos puntos más
+   * bajo. Puesto en el formato volvería el defecto que ya se pagó una vez —contar
+   * dos veces la misma separación, una en 2.B y otra como `espacio.*` del formato—
+   * y además el día que otro formato mida 10 habría dos sitios que arreglar.
+   *
+   * Que dos láminas midan 12 y una 10 **queda reportado y no resuelto**: no hay
+   * forma de saber desde aquí si el 10 es un valor propio de este formato o una
+   * deriva de la ronda de diseño en que se dibujó. Mientras tanto lo declara el
+   * formato, que es el mecanismo del sistema para exactamente este caso (`Lamina`).
+   */
+  espaciadorCierreReceta: 10,
+  /**
    * INTERLINEADO DE LA BANDA EN LA LÁMINA DE IMAGENOLOGÍA — 12, no 11.
    *
    * Desviación declarada del rol `medico.credencial`, del mismo tipo que las dos
@@ -154,8 +173,9 @@ export type MembreteProps =
       /** El panel de 2.A, en la variante que corresponda a este médico. */
       panel: PanelCircularProps
       /**
-       * Qué lámina fija la banda. Sin ella, la de Laboratorio: un solo renglón,
-       * sin cédulas ni universidad. Ver la nota junto al render.
+       * Qué lámina fija la banda y el espaciador de cierre. Sin ella, la de
+       * Laboratorio: un solo renglón, sin cédulas ni universidad, y cierre de 12.
+       * Ver la nota junto al render.
        */
       lamina?: Lamina
     }
@@ -230,6 +250,10 @@ const estilos = StyleSheet.create({
    */
   espaciador: {
     height: GEOMETRIA.espaciadorCierre,
+  },
+  /** El mismo cierre, dos puntos más bajo. Ver `GEOMETRIA.espaciadorCierreReceta`. */
+  espaciadorReceta: {
+    height: GEOMETRIA.espaciadorCierreReceta,
   },
 })
 
@@ -307,8 +331,14 @@ export default function Membrete(props: MembreteProps): ReactElement {
         */
         <>
           {/*
-            LA BANDA DE IMAGENOLOGÍA SÍ LLEVA CÉDULAS Y UNIVERSIDAD, Y SON DOS
-            RENGLONES DE 12 pt.
+            LAS BANDAS DE IMAGENOLOGÍA Y DE RECETA SÍ LLEVAN CÉDULAS Y UNIVERSIDAD,
+            Y SON DOS RENGLONES DE 12 pt.
+
+            Las dos láminas coinciden hasta el punto: 129.5 → 141.5 y 141.5 → 153.5
+            en las coordenadas de Receta, que son los mismos 24 pt de banda con el
+            segundo renglón pegado al primero. Dos de las tres láminas medidas
+            componen así, y solo Laboratorio compone un renglón sin credenciales —lo
+            que inclina `CONCILIA D23`, sin cerrarlo, hacia el lado de I.3.7.
 
             Es la otra mitad de la contradicción de `CONCILIA D23` que la cabecera
             reporta: Laboratorio compone un renglón sin credenciales y esta lámina
@@ -363,8 +393,10 @@ export default function Membrete(props: MembreteProps): ReactElement {
         siendo un membrete. Ninguna lámina de continuación está medida todavía, así
         que ese lado queda anotado — si al medirla resulta otra cifra, es una
         variante del espaciador, no un aire del formato.
+
+        Dos láminas lo miden en 12 y una en 10. Ver `GEOMETRIA.espaciadorCierreReceta`.
       */}
-      <View style={estilos.espaciador} />
+      <View style={lamina === 'receta' ? estilos.espaciadorReceta : estilos.espaciador} />
     </View>
   )
 }

@@ -96,15 +96,25 @@ const estilos = StyleSheet.create({
     color: TINTA.secundaria,
   },
   /**
-   * El mismo contador en la lámina de Imagenología: **`tinta.etiqueta`**, un gris
-   * más claro que el `tinta.secundaria` del chasis. Cuerpo, interlineado, peso y
-   * tracking no se mueven —7 / 11 en 600—, así que el alto sigue siendo 11 pt.
+   * El mismo contador en las láminas de Imagenología y de Receta:
+   * **`tinta.etiqueta`**, un gris más claro que el `tinta.secundaria` del chasis.
+   * Cuerpo, interlineado, peso y tracking no se mueven —7 / 11 en 600—, así que el
+   * alto sigue siendo 11 pt.
    *
    * El color es del SITIO, que es lo que declara la cabecera: aquí el sitio no
-   * cambia —sigue al pie del área de contenido— pero la lámina lo compone un tono
-   * por encima. Reportado.
+   * cambia —sigue al pie del área de contenido— pero las dos láminas lo componen un
+   * tono por encima. Dos de tres. Reportado.
+   *
+   * ⚠ **LO QUE ESTE COMPONENTE NO COMPONE DE LA LÁMINA DE RECETA: SUS DOS ZONAS.**
+   * Esa lámina reparte el contador en un flex de dos zonas —el rótulo y la cifra—
+   * en vez de una sola cadena unida por la raya, y sus cifras llevan cero a la
+   * izquierda: `04 de 07`, `07`. Aquí no se compone ninguna de las dos cosas. El
+   * cero a la izquierda está decidido en contra por la ficha (anexo A, P2-17: es la
+   * regla 1 de 2.G y es del número de ENTRADA, no de un conteo), y el reparto en
+   * dos zonas no se puede escribir sin inventar el medianil, que la medición no da.
+   * Reportado, no compuesto.
    */
-  contadorImagenologia: {
+  contadorMedido: {
     color: TINTA.etiqueta,
   },
 })
@@ -150,7 +160,9 @@ export default function ContadorLista(props: ContadorListaProps): ReactElement {
     <Text
       style={[
         estilos.contador,
-        props.lamina === 'imagenologia' ? estilos.contadorImagenologia : {},
+        props.lamina !== undefined && props.lamina !== 'chasis'
+          ? estilos.contadorMedido
+          : {},
       ]}
     >
       {cadena(props).toUpperCase()}

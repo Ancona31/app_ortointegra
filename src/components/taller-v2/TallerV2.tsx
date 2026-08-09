@@ -75,12 +75,42 @@ const ESPERA_MS = 220
  * distintos y no pueden convivir en el mismo: el chasis va con guías y en
  * posición absoluta, y un formato va sin guías y en flujo.
  */
-type Vista = 'chasis' | 'laboratorio' | 'imagenologia'
+type Vista = 'chasis' | 'laboratorio' | 'imagenologia' | 'receta'
 
-const VISTAS: ReadonlyArray<{ vista: Vista; etiqueta: string }> = [
-  { vista: 'chasis', etiqueta: 'Chasis · I.2' },
-  { vista: 'laboratorio', etiqueta: '4.1 · Laboratorio' },
-  { vista: 'imagenologia', etiqueta: '4.2 · Imagenología' },
+/**
+ * EL SELECTOR — EL CHASIS Y LOS OCHO FORMATOS DE LA SECCIÓN II.
+ *
+ * Una entrada por vista, construida o no. **Las pendientes se listan igual**, en
+ * gris y sin poder pulsarse, y eso es deliberado: el selector es el índice del paso
+ * 4 y un índice que solo enseña lo hecho no dice cuánto falta. Cada una se enciende
+ * al construir su formato, y lo único que hay que tocar es su `vista`.
+ *
+ * El `codigo` y el `nombre` van separados porque el botón los compone en dos
+ * renglones. En uno solo, `4.7 · Consentimiento` no cabe en media columna del panel
+ * de 320 pt y se corta — que es el defecto que esta tabla arregla.
+ *
+ * ⚠ **SON NUEVE Y NO DIEZ.** La Sección II declara ocho formatos —II.1 a II.8— y con
+ * el chasis son nueve, así que faltan CINCO por construir y no seis. Si el décimo es
+ * una vista que no está en la Sección II —una hoja de vista previa, o el chasis
+ * partido en dos—, dime cuál y entra aquí sin tocar nada más: la retícula envuelve.
+ */
+interface EntradaSelector {
+  /** `null` mientras el formato no exista: la entrada se pinta y no se pulsa. */
+  readonly vista: Vista | null
+  readonly codigo: string
+  readonly nombre: string
+}
+
+const VISTAS: readonly EntradaSelector[] = [
+  { vista: 'chasis', codigo: 'I.2', nombre: 'Chasis' },
+  { vista: 'laboratorio', codigo: '4.1', nombre: 'Laboratorio' },
+  { vista: 'imagenologia', codigo: '4.2', nombre: 'Imagenología' },
+  { vista: 'receta', codigo: '4.3', nombre: 'Receta' },
+  { vista: null, codigo: '4.4', nombre: 'Suplementación' },
+  { vista: null, codigo: '4.5', nombre: 'Honorarios' },
+  { vista: null, codigo: '4.6', nombre: 'Internamiento' },
+  { vista: null, codigo: '4.7', nombre: 'Consentimiento' },
+  { vista: null, codigo: '4.8', nombre: 'Escrito médico' },
 ]
 
 type Estado =
@@ -135,15 +165,17 @@ export default function TallerV2(): ReactElement {
               ? ESPECIALIDAD_LARGA
               : MEDICO_FICTICIO.especialidad,
           }
-          // Los dos módulos se importan a demanda, como ya hacía el del chasis:
-          // arrastran @react-pdf/renderer entero y no tienen por qué entrar en el
-          // bundle de la barra lateral.
+          // Los módulos se importan a demanda, como ya hacía el del chasis:
+          // arrastran @react-pdf/renderer entero —y el de Receta además `qrcode`— y
+          // no tienen por qué entrar en el bundle de la barra lateral.
           const generar =
             vista === 'laboratorio'
               ? (await import('./HojaLaboratorio')).generarPdfLaboratorio
               : vista === 'imagenologia'
                 ? (await import('./HojaImagenologia')).generarPdfImagenologia
-                : (await import('./HojaTaller')).generarPdfTaller
+                : vista === 'receta'
+                  ? (await import('./HojaReceta')).generarPdfReceta
+                  : (await import('./HojaTaller')).generarPdfTaller
           const blob = await generar(medico, acentoHex)
           if (cancelado) return
           urlCreada = URL.createObjectURL(blob)
@@ -192,26 +224,46 @@ export default function TallerV2(): ReactElement {
             <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-400">
               Qué se está mirando
             </h2>
-            <div className="mt-3 flex gap-2">
-              {VISTAS.map((v) => (
-                <button
-                  key={v.vista}
-                  type="button"
-                  onClick={() => setVista(v.vista)}
-                  className={`rounded border px-3 py-1.5 text-xs ${
-                    vista === v.vista
-                      ? 'border-slate-500 bg-slate-800 text-slate-100'
-                      : 'border-slate-700 text-slate-400'
-                  }`}
-                >
-                  {v.etiqueta}
-                </button>
-              ))}
+            {/*
+              RETÍCULA DE DOS COLUMNAS QUE ENVUELVE, no una fila.
+
+              Con una fila el cuarto botón ya salía medio tapado y el quinto no
+              entraba; con `grid-cols-2` el selector crece hacia abajo y el panel, que
+              ya es `overflow-y-auto`, se encarga del resto. El código y el nombre van
+              en dos renglones para que ninguna etiqueta se corte: en una sola línea,
+              `4.7 · Consentimiento` no cabe en media columna de 320 pt.
+            */}
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {VISTAS.map((v) => {
+                const activa = v.vista !== null && vista === v.vista
+                const pendiente = v.vista === null
+                return (
+                  <button
+                    key={v.codigo}
+                    type="button"
+                    disabled={pendiente}
+                    onClick={() => v.vista !== null && setVista(v.vista)}
+                    title={pendiente ? 'Todavía no construido' : undefined}
+                    className={`rounded border px-2.5 py-1.5 text-left text-xs ${
+                      activa
+                        ? 'border-slate-500 bg-slate-800 text-slate-100'
+                        : pendiente
+                          ? 'cursor-not-allowed border-dashed border-slate-800 text-slate-600'
+                          : 'border-slate-700 text-slate-400'
+                    }`}
+                  >
+                    <span className="block font-mono text-[10px] leading-4 opacity-70">
+                      {v.codigo}
+                    </span>
+                    <span className="block leading-4">{v.nombre}</span>
+                  </button>
+                )
+              })}
             </div>
             <p className="mt-3 text-xs text-slate-500">
-              El formato va SIN guías: un documento tiene que verse como un
-              documento. Trae dos casos —uno completo y uno mínimo—, cada uno en su
-              propia hoja.
+              Las entradas en gris son los formatos que faltan por construir. El
+              formato va SIN guías: un documento tiene que verse como un documento.
+              Cada caso va en su propia hoja.
             </p>
           </section>
 

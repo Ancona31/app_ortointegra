@@ -80,7 +80,14 @@ const GEOMETRIA = {
   medianil: 24,
   celda: { superior: 14, inferior: 4 },
   /**
-   * LA MISMA FIRMA EN LA LÁMINA DE IMAGENOLOGÍA — 118.75 pt, no 120.8.
+   * LA MISMA FIRMA EN LAS LÁMINAS DE IMAGENOLOGÍA Y DE RECETA — 118.75 pt, no 120.8.
+   *
+   * ⚠ **SON DOS LÁMINAS Y NO UNA, Y COINCIDEN EN LAS SEIS CIFRAS.** Receta mide
+   * `rótulo 11 · rúbrica 77 · filete 0.75 · nombre 15 · cédulas 11` con el nombre
+   * en Archivo 11 / 15 y las cédulas en IBM Plex Sans 7.5 / 11 sobre
+   * `tinta.etiqueta`. Es exactamente lo de abajo. Eso mueve `D9` —el desacuerdo
+   * sobre la familia y el color de las cédulas— de «una contra una» a **dos contra
+   * una**, y el uno que queda es Laboratorio.
    *
    * Los dos pt de diferencia no son uno: son cuatro desviaciones medidas, y las
    * cuatro se declaran aquí porque tienen un solo consumidor (I.1.7).
@@ -94,10 +101,10 @@ const GEOMETRIA = {
    *                       ─────
    *                       118.75
    *
-   * ⚠ **D9, CON LA CIFRA AL LADO.** Esta lámina compone las cédulas en **IBM Plex
-   * Sans, `tinta.etiqueta`**; Laboratorio en **Archivo, `tinta.secundaria`**. Las
-   * dos son láminas aprobadas y la divergencia sigue abierta: se compone la de cada
-   * formato y queda reportada, no se elige una.
+   * ⚠ **D9, CON LA CIFRA AL LADO.** Estas dos láminas componen las cédulas en **IBM
+   * Plex Sans, `tinta.etiqueta`**; Laboratorio en **Archivo, `tinta.secundaria`**.
+   * Las tres son láminas aprobadas y la divergencia sigue abierta: se compone la de
+   * cada formato y queda reportada, no se elige una.
    *
    * ⚠ La línea de 0.75 es el mismo píxel del riel (ver `TRAZO` en 2.F). Mismo aviso:
    * si 0.75 fuera el valor real, `filete.fino` está mal en los ocho.
@@ -108,7 +115,7 @@ const GEOMETRIA = {
    * este formato mide 2.05 pt MENOS que lo que el umbral reserva, que es holgura y
    * no defecto. Reportado.
    */
-  imagenologia: {
+  medida: {
     linea: 0.75,
     aireNombre: ESPACIO[4],
     interlineadoNombre: 15,
@@ -195,23 +202,23 @@ const estilos = StyleSheet.create({
     marginTop: ESPACIO[5],
   },
   credencial: { ...estiloTipografico('firma.credencial') },
-  /** Las cuatro desviaciones de la lámina de Imagenología. Ver `GEOMETRIA`. */
-  lineaImagenologia: {
-    borderBottomWidth: GEOMETRIA.imagenologia.linea,
+  /** Las cuatro desviaciones que las dos láminas miden. Ver `GEOMETRIA.medida`. */
+  lineaMedida: {
+    borderBottomWidth: GEOMETRIA.medida.linea,
   },
-  nombreImagenologia: {
+  nombreMedido: {
     ...estiloTipografico('firma.nombre'),
-    fontSize: GEOMETRIA.imagenologia.cuerpoNombre,
+    fontSize: GEOMETRIA.medida.cuerpoNombre,
     lineHeight:
-      GEOMETRIA.imagenologia.interlineadoNombre / GEOMETRIA.imagenologia.cuerpoNombre,
+      GEOMETRIA.medida.interlineadoNombre / GEOMETRIA.medida.cuerpoNombre,
     // El tracking SÍ se recalcula, al revés que en las desviaciones de 2.F: el de
     // `firma.nombre` no es 0, así que mover el cuerpo lo mueve. La conversión
     // em → pt es la misma que hace `estiloTipografico()`.
     letterSpacing:
-      TIPOGRAFIA['firma.nombre'].tracking * GEOMETRIA.imagenologia.cuerpoNombre,
-    marginTop: GEOMETRIA.imagenologia.aireNombre,
+      TIPOGRAFIA['firma.nombre'].tracking * GEOMETRIA.medida.cuerpoNombre,
+    marginTop: GEOMETRIA.medida.aireNombre,
   },
-  credencialImagenologia: {
+  credencialMedida: {
     ...estiloTipografico('firma.credencial'),
     fontFamily: FUENTE.humanista,
     color: TINTA.etiqueta,
@@ -257,7 +264,11 @@ export type BloqueFirmasProps = ConLamina &
 
 /** Una firma: rol encima, espacio de escritura, línea, y la identificación. */
 function UnaFirma({ firma, lamina }: { firma: Firma; lamina: Lamina }): ReactElement {
-  const imagen = lamina === 'imagenologia'
+  /**
+   * Cualquier lámina distinta del chasis compone las cuatro desviaciones de
+   * `GEOMETRIA.medida`: las dos que las miden dan las mismas cifras.
+   */
+  const medida = lamina !== 'chasis'
 
   return (
     <View>
@@ -272,14 +283,14 @@ function UnaFirma({ firma, lamina }: { firma: Firma; lamina: Lamina }): ReactEle
         )}
       </View>
 
-      <View style={[estilos.linea, imagen ? estilos.lineaImagenologia : {}]} />
+      <View style={[estilos.linea, medida ? estilos.lineaMedida : {}]} />
 
       {/*
         El renglón del nombre se reserva SIEMPRE, con o sin nombre: es la ranura
         que la fórmula de I.1.9 cuenta y es donde se escribe a mano cuando el
         formato deja la firma en blanco.
       */}
-      <Text style={imagen ? estilos.nombreImagenologia : estilos.nombre}>
+      <Text style={medida ? estilos.nombreMedido : estilos.nombre}>
         {firma.nombre ?? ' '}
       </Text>
 
@@ -298,7 +309,7 @@ function UnaFirma({ firma, lamina }: { firma: Firma; lamina: Lamina }): ReactEle
         Unir con un solo elemento es idempotente, así que los roles que ya traían una
         credencial no cambian.
       */}
-      <Text style={imagen ? estilos.credencialImagenologia : estilos.credencial}>
+      <Text style={medida ? estilos.credencialMedida : estilos.credencial}>
         {(firma.credenciales ?? []).join(SEPARADOR_CREDENCIALES) || ' '}
       </Text>
     </View>

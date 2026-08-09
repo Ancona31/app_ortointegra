@@ -96,6 +96,39 @@ const IMAGENOLOGIA = {
   tituloRiel: 10,
 } as const
 
+/**
+ * GEOMETRÍA DEL BLOQUE EN LA LÁMINA DE RECETA.
+ *
+ * Mismo reparto que Imagenología —caja fija a la izquierda, riel de dos celdas a la
+ * derecha— con otras tres cifras: **267 + 9 + 210 = 486**, que vuelve a cerrar la
+ * caja. El riel es 20 pt más ancho porque su folio es más largo: `P-B8570E3FA164`
+ * contra `IMG-2026-0148`.
+ *
+ * ⚠ **`SPEC_DISENO_PARTE_B.md` B.3 §1 DICE QUE ESTA CAJA NO ES FIJA** —«sin caja de
+ * ancho fijo (`flex: 1; min-width: 0`)»— y las coordenadas medidas dicen 267. Con
+ * `flex: 1` la caja mediría exactamente lo mismo mientras el riel siga en 210, así
+ * que las dos lecturas imprimen igual **hoy** y solo divergen si el título creciera.
+ * Se compone FIJA por la razón de la regla 1 de la ficha: un título fijo que rompe a
+ * dos líneas es un error de redacción, y una caja fija lo hace visible en el taller
+ * en vez de dejar que el título coma riel en silencio. Reportado.
+ *
+ * El aire hasta su filete son **5 pt** —188.5 → 193.5—, que no es ni el 4 del chasis
+ * ni el 6 de Imagenología. El aire de abajo, en cambio, **sí es el del chasis**:
+ * 196 → 204 son los 8 pt de `transicion.tituloRiel`, así que este formato no
+ * declara nada por ese lado.
+ *
+ * El medianil entre las dos celdas del riel —20 pt— es el único valor de este
+ * bloque que **no sale de las coordenadas**: con `justify-content: flex-end` la
+ * separación entre celdas no se puede despejar de los bordes del riel. Sale de
+ * B.3 §2, que es la otra lectura del mismo archivo. Reportado como derivado.
+ */
+const RECETA = {
+  cajaTitulo: 267,
+  rielDerecho: 210,
+  medianilCeldas: 20,
+  tituloFilete: 5,
+} as const
+
 /** Interlineado del título: el alto de UNA de sus líneas. Lo usa la fecha. */
 const ALTO_LINEA_TITULO = TIPOGRAFIA['titulo.documento'].interlineado ?? 0
 
@@ -129,6 +162,10 @@ const estilos = StyleSheet.create({
    */
   columnaTituloFija: {
     width: IMAGENOLOGIA.cajaTitulo,
+    flexShrink: 0,
+  },
+  columnaTituloFijaReceta: {
+    width: RECETA.cajaTitulo,
     flexShrink: 0,
   },
   /** La ranura de lo que cuelga bajo el título, dentro del bloque. */
@@ -192,11 +229,21 @@ const estilos = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
   },
+  rielDobleReceta: {
+    width: RECETA.rielDerecho,
+    marginLeft: RETICULA.medianil,
+    flexShrink: 0,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
   celdaRiel: {
     alignItems: 'flex-end',
   },
   celdaRielSiguiente: {
     marginLeft: IMAGENOLOGIA.medianilCeldas,
+  },
+  celdaRielSiguienteReceta: {
+    marginLeft: RECETA.medianilCeldas,
   },
   etiquetaFolio: { ...estiloTipografico('etiqueta') },
   /**
@@ -242,6 +289,9 @@ const estilos = StyleSheet.create({
   },
   hastaFileteImagenologia: {
     marginTop: IMAGENOLOGIA.tituloFilete,
+  },
+  hastaFileteReceta: {
+    marginTop: RECETA.tituloFilete,
   },
 })
 
@@ -313,7 +363,17 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
     return <View style={estilos.bloque} />
   }
 
-  const imagen = (props.lamina ?? 'chasis') === 'imagenologia'
+  /**
+   * DOS LÁMINAS COMPONEN EL RIEL DERECHO CON DOS CELDAS Y UNA CON UNA. Lo que
+   * distingue a `chasis` de las otras dos es la ANATOMÍA del riel —`Folio` solo
+   * contra `Emisión` + `Folio`—; lo que distingue a las otras dos entre sí son solo
+   * cifras. Por eso el árbol se ramifica una vez, por `doble`, y las cifras entran
+   * como estilo.
+   */
+  const lamina = props.lamina ?? 'chasis'
+  const imagen = lamina === 'imagenologia'
+  const receta = lamina === 'receta'
+  const doble = imagen || receta
 
   /**
    * Una celda del riel derecho: rótulo en versalita y valor en `folio`. El rol va
@@ -330,7 +390,15 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
   return (
     <View style={[estilos.bloque, imagen ? estilos.bloqueImagenologia : {}]}>
       <View style={estilos.fila}>
-        <View style={imagen ? estilos.columnaTituloFija : estilos.columnaTitulo}>
+        <View
+          style={
+            imagen
+              ? estilos.columnaTituloFija
+              : receta
+                ? estilos.columnaTituloFijaReceta
+                : estilos.columnaTitulo
+          }
+        >
           <Text style={estilos.titulo}>{props.titulo.toUpperCase()}</Text>
           {props.subtitulo === undefined ? null : (
             <Text style={estilos.subtitulo}>{props.subtitulo}</Text>
@@ -345,13 +413,14 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
           </View>
         )}
 
-        {imagen ? (
+        {doble ? (
           /*
-            EL RIEL DERECHO DE 190 pt, CON DOS CELDAS. Es lo que fija el alto del
-            bloque en 25 pt: 11 de rótulo más 14 de valor. Las dos celdas colapsan
-            por separado, como cualquier par rótulo + valor del sistema (2.E).
+            EL RIEL DERECHO CON DOS CELDAS — 190 pt en Imagenología, 210 en Receta.
+            Es lo que fija el alto del bloque en 25 pt: 11 de rótulo más 14 de
+            valor, en las dos láminas. Las dos celdas colapsan por separado, como
+            cualquier par rótulo + valor del sistema (2.E).
           */
-          <View style={estilos.rielDoble}>
+          <View style={imagen ? estilos.rielDoble : estilos.rielDobleReceta}>
             {props.emision === undefined ? null : (
               <View style={estilos.celdaRiel}>
                 {celda(ETIQUETA_EMISION, props.emision)}
@@ -361,7 +430,11 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
               <View
                 style={[
                   estilos.celdaRiel,
-                  props.emision === undefined ? {} : estilos.celdaRielSiguiente,
+                  props.emision === undefined
+                    ? {}
+                    : imagen
+                      ? estilos.celdaRielSiguiente
+                      : estilos.celdaRielSiguienteReceta,
                 ]}
               >
                 {celda(ETIQUETA_FOLIO, props.folio)}
@@ -373,7 +446,15 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
         )}
       </View>
 
-      <View style={imagen ? estilos.hastaFileteImagenologia : estilos.hastaFilete}>
+      <View
+        style={
+          imagen
+            ? estilos.hastaFileteImagenologia
+            : receta
+              ? estilos.hastaFileteReceta
+              : estilos.hastaFilete
+        }
+      >
         <FileteGruesoFino acento={props.acento} />
       </View>
     </View>

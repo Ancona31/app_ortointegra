@@ -95,15 +95,16 @@ const GEOMETRIA = {
     color: TINTA.negra,
   },
   /**
-   * EL MISMO VALOR EN LA LÁMINA DE IMAGENOLOGÍA — 11 / **15**.
+   * EL MISMO VALOR CUANDO EL DIAGNÓSTICO OCUPA LA FILA ENTERA — 11 / **15**.
    *
-   * Allí el diagnóstico ocupa la fila entera a `span 12` y no comparte renglón con
-   * fecha ni hora, así que nada le obliga a caber en los 13 pt de las otras
-   * celdas: la fila inferior mide 32.375 —0.375 de regla + 3 + 10 + **15** + 4— y
-   * es la única del riel que no mide 30. Es el mismo caso que arriba visto por el
-   * otro lado: aquel 13 salía de que la celda compartía fila con dos celdas más.
+   * Medido en las láminas de Imagenología y de Receta, que coinciden hasta la
+   * centésima: en las dos el diagnóstico va a `span 12` y no comparte renglón con
+   * fecha ni hora, así que nada le obliga a caber en los 13 pt de las otras celdas.
+   * La fila inferior mide **32.375** —0.375 de regla + 3 + 10 + **15** + 4— y es la
+   * única del riel que no mide 30. Es el mismo caso que arriba visto por el otro
+   * lado: aquel 13 salía de que la celda compartía fila con dos celdas más.
    */
-  interlineadoDiagnosticoImagenologia: 15,
+  interlineadoDiagnosticoFilaPlena: 15,
 } as const
 
 /** Los siete datos del riel. */
@@ -144,10 +145,10 @@ const FECHA: DescriptorCelda = { campo: 'fecha', etiqueta: 'Fecha', columnas: 4,
 const HORA: DescriptorCelda = { campo: 'hora', etiqueta: 'Hora', columnas: 3, trazo: 'dato' }
 
 /**
- * El diagnóstico de la lámina de Imagenología ocupa la fila ENTERA. Es la misma
- * celda con otro ancho: allí la fecha no vive en este riel —va como `Emisión` en
- * el riel derecho del bloque de título— y la hora tampoco, así que no hay con
- * quién compartir el renglón.
+ * El diagnóstico de las láminas de Imagenología y de Receta ocupa la fila ENTERA.
+ * Es la misma celda con otro ancho: en las dos, la fecha no vive en este riel —va
+ * como `Emisión` en el riel derecho del bloque de título— y la hora tampoco, así
+ * que no hay con quién compartir el renglón.
  */
 const DIAGNOSTICO_PLENO: DescriptorCelda = { ...DIAGNOSTICO, columnas: 12 }
 
@@ -155,8 +156,8 @@ const DIAGNOSTICO_PLENO: DescriptorCelda = { ...DIAGNOSTICO, columnas: 12 }
 const FILA_SUPERIOR: readonly DescriptorCelda[] = [PACIENTE, EDAD, SEXO, EXPEDIENTE]
 /** Fila inferior: 5 + 4 + 3 = 12. */
 const FILA_INFERIOR: readonly DescriptorCelda[] = [DIAGNOSTICO, FECHA, HORA]
-/** Fila inferior de Imagenología: una sola celda de 12. */
-const FILA_INFERIOR_IMAGENOLOGIA: readonly DescriptorCelda[] = [DIAGNOSTICO_PLENO]
+/** Fila inferior de Imagenología y de Receta: una sola celda de 12. */
+const FILA_INFERIOR_PLENA: readonly DescriptorCelda[] = [DIAGNOSTICO_PLENO]
 /** Variante `reducido`: una sola línea con nombre y expediente, con sus anchos. */
 const FILA_REDUCIDA: readonly DescriptorCelda[] = [PACIENTE, EXPEDIENTE]
 
@@ -217,11 +218,11 @@ const estilos = StyleSheet.create({
     letterSpacing: GEOMETRIA.diagnostico.tracking,
     color: GEOMETRIA.diagnostico.color,
   },
-  valorDiagnosticoImagenologia: {
+  valorDiagnosticoPleno: {
     fontFamily: FUENTE.humanista,
     fontSize: GEOMETRIA.diagnostico.cuerpo,
     lineHeight:
-      GEOMETRIA.interlineadoDiagnosticoImagenologia / GEOMETRIA.diagnostico.cuerpo,
+      GEOMETRIA.interlineadoDiagnosticoFilaPlena / GEOMETRIA.diagnostico.cuerpo,
     fontWeight: GEOMETRIA.diagnostico.peso,
     letterSpacing: GEOMETRIA.diagnostico.tracking,
     color: GEOMETRIA.diagnostico.color,
@@ -234,11 +235,24 @@ const estilos = StyleSheet.create({
  * entrega estilo cuando hay una excepción DECLARADA que entregar.
  */
 function estiloValor(trazo: TrazoValor, lamina: Lamina): EstiloValorCelda | undefined {
-  if (trazo === 'datoAncla') return estilos.valorAncla
+  if (trazo === 'datoAncla') {
+    /*
+      EN LA LÁMINA DE RECETA EL DESTAQUE NO AÑADE NADA, y por eso aquí no se
+      compone: ese riel lleva TODAS sus celdas en peso 500 (ver `PESO_VALOR_RECETA`
+      en 2.F), así que la excepción del nombre y el valor por defecto coinciden.
+      Devolver `estilos.valorAncla` volvería a partir de `VALOR_CELDA`, que es el
+      valor del chasis, y bajaría el resto del renglón a 400 sin querer.
+
+      **Lo que NO cambia es la regla:** el nombre sigue siendo el ancla del riel. Si
+      esa lámina se corrige y su valor de celda vuelve a 400, este `if` sobra y el
+      destaque reaparece solo.
+    */
+    return lamina === 'receta' ? undefined : estilos.valorAncla
+  }
   if (trazo === 'diagnostico') {
-    return lamina === 'imagenologia'
-      ? estilos.valorDiagnosticoImagenologia
-      : estilos.valorDiagnostico
+    return lamina === 'chasis'
+      ? estilos.valorDiagnostico
+      : estilos.valorDiagnosticoPleno
   }
   return undefined
 }
@@ -274,8 +288,7 @@ export default function BloquePaciente(props: BloquePacienteProps): ReactElement
   }
 
   const lamina = props.lamina ?? 'chasis'
-  const inferior =
-    lamina === 'imagenologia' ? FILA_INFERIOR_IMAGENOLOGIA : FILA_INFERIOR
+  const inferior = lamina === 'chasis' ? FILA_INFERIOR : FILA_INFERIOR_PLENA
 
   return (
     <RielDatos

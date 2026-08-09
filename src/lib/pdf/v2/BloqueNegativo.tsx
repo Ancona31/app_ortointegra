@@ -75,27 +75,37 @@ const GEOMETRIA = {
   /** `urgente reducido`: los 4 pt de la escala por los cuatro lados. */
   paddingHorizontalReducido: ESPACIO[4],
   /**
-   * EL BADGE DE LA LÁMINA DE IMAGENOLOGÍA — 14.5 pt de alto, no 19.
+   * LA CALIBRACIÓN MEDIDA — 14.5 pt de alto, no 19.
    *
    * La ficha cerró su geometría por deducción, con lo único que las reglas 1 a 3
    * dejaban libre: el padding, tomado de `espacio.4` y `espacio.8` (anexo A,
-   * P2-15). La lámina de este formato lo mide, y mide otra cosa —también el
-   * cuerpo, que la deducción daba por congelado en el rol `etiqueta`:
+   * P2-15). Las láminas la miden, y miden otra cosa —también el cuerpo, que la
+   * deducción daba por congelado en el rol `etiqueta`:
    *
    *     hoja 1        8 / 10 pt, 0.18 em, padding `2 6 2.5`   → 14.5 de alto
    *     continuación  7 /  9 pt, 0.18 em, padding `1.5 5 2`   → 12.5 de alto
    *
+   * ⚠ **NO ES «LA CALIBRACIÓN DE IMAGENOLOGÍA», Y ASÍ SE LLAMABA.** Las dos láminas
+   * que componen un bloque en negativo lo componen con estas mismas seis cifras, y
+   * lo componen sobre objetos DISTINTOS: en Imagenología es el badge `URGENTE` que
+   * cuelga del título, y en Receta es la vía de administración dentro de la entrada.
+   * Que coincidan hasta la centésima es el argumento más fuerte que hay para pensar
+   * que **esta es la geometría real del componente y el 19 pt deducido es el que
+   * sobra**. No se sube a la ficha por decisión propia: eso movería el badge de los
+   * ocho formatos. Reportado, con una lámina más de respaldo que antes.
+   *
    * **La regla 2 no se rompe:** dice que no se escala el texto PARA QUE QUEPA, y
    * esto no es un ajuste al ancho disponible — el ancho lo sigue poniendo la
-   * palabra. Es que la lámina compone el badge un punto por debajo de la versalita
-   * de rótulo, y `urgente reducido` reduce además el cuerpo, no solo el aire.
+   * palabra. Es que las láminas componen el bloque un punto por debajo de la
+   * versalita de rótulo, y `urgente reducido` reduce además el cuerpo, no solo el
+   * aire.
    *
    * Que las dos variantes tengan altos distintos era justo lo que la deducción
    * quiso evitar —«o el badge reducido dejaría de alinearse con lo que tiene al
    * lado»—, y en la lámina no se alinean con nada: en continuación el badge va a la
    * derecha de la línea de paciente, que es otro bloque. Reportado.
    */
-  imagenologia: {
+  medida: {
     normal: { cuerpo: 8, interlineado: 10, vertical: 2, verticalInferior: 2.5, horizontal: 6 },
     reducido: { cuerpo: 7, interlineado: 9, vertical: 1.5, verticalInferior: 2, horizontal: 5 },
     /** En em, como lo declara el diseño. La conversión a pt va abajo. */
@@ -136,36 +146,36 @@ const estilos = StyleSheet.create({
   },
   /** La desviación declarada: el rol `etiqueta` con el color sustituido. */
   texto: { ...estiloTipografico('etiqueta'), color: TINTA.papel },
-  /** Las dos calibraciones de la lámina de Imagenología. Ver `GEOMETRIA`. */
-  bloqueImagenologia: {
-    paddingTop: GEOMETRIA.imagenologia.normal.vertical,
-    paddingBottom: GEOMETRIA.imagenologia.normal.verticalInferior,
-    paddingHorizontal: GEOMETRIA.imagenologia.normal.horizontal,
+  /** Las dos calibraciones que las láminas miden. Ver `GEOMETRIA.medida`. */
+  bloqueMedido: {
+    paddingTop: GEOMETRIA.medida.normal.vertical,
+    paddingBottom: GEOMETRIA.medida.normal.verticalInferior,
+    paddingHorizontal: GEOMETRIA.medida.normal.horizontal,
   },
-  bloqueImagenologiaReducido: {
-    paddingTop: GEOMETRIA.imagenologia.reducido.vertical,
-    paddingBottom: GEOMETRIA.imagenologia.reducido.verticalInferior,
-    paddingHorizontal: GEOMETRIA.imagenologia.reducido.horizontal,
+  bloqueMedidoReducido: {
+    paddingTop: GEOMETRIA.medida.reducido.vertical,
+    paddingBottom: GEOMETRIA.medida.reducido.verticalInferior,
+    paddingHorizontal: GEOMETRIA.medida.reducido.horizontal,
   },
-  textoImagenologia: {
+  textoMedido: {
     ...estiloTipografico('etiqueta'),
     color: TINTA.papel,
-    fontSize: GEOMETRIA.imagenologia.normal.cuerpo,
+    fontSize: GEOMETRIA.medida.normal.cuerpo,
     lineHeight:
-      GEOMETRIA.imagenologia.normal.interlineado / GEOMETRIA.imagenologia.normal.cuerpo,
+      GEOMETRIA.medida.normal.interlineado / GEOMETRIA.medida.normal.cuerpo,
     // El tracking se recalcula porque cambia el cuerpo Y cambia el em: la lámina
     // compone 0.18, no el 0.22 de la versalita del sistema.
-    letterSpacing: GEOMETRIA.imagenologia.tracking * GEOMETRIA.imagenologia.normal.cuerpo,
+    letterSpacing: GEOMETRIA.medida.tracking * GEOMETRIA.medida.normal.cuerpo,
   },
-  textoImagenologiaReducido: {
+  textoMedidoReducido: {
     ...estiloTipografico('etiqueta'),
     color: TINTA.papel,
-    fontSize: GEOMETRIA.imagenologia.reducido.cuerpo,
+    fontSize: GEOMETRIA.medida.reducido.cuerpo,
     lineHeight:
-      GEOMETRIA.imagenologia.reducido.interlineado /
-      GEOMETRIA.imagenologia.reducido.cuerpo,
+      GEOMETRIA.medida.reducido.interlineado /
+      GEOMETRIA.medida.reducido.cuerpo,
     letterSpacing:
-      GEOMETRIA.imagenologia.tracking * GEOMETRIA.imagenologia.reducido.cuerpo,
+      GEOMETRIA.medida.tracking * GEOMETRIA.medida.reducido.cuerpo,
   },
 })
 
@@ -173,8 +183,14 @@ export type BloqueNegativoProps =
   /**
    * Vía de administración dentro de una `EntradaNumerada` (2.G, ranura `marca`).
    * La palabra la declara el formato: son las trece vías de II.3 §5.
+   *
+   * ⚠ **SOLO LAS NO ORALES LLEGAN AQUÍ, Y LO DECIDE EL FORMATO.** La lámina de
+   * Receta compone la vía oral como texto plano y la sublingual como bloque, y el
+   * archivo lo resuelve con un `via === 'Oral'`. II.3 §5 declaraba las trece en
+   * negativo; manda la lámina. El catálogo no lo conoce este componente ni 2.G:
+   * ver `MarcaVia` en la ficha de 2.G.
    */
-  | { variante: 'via'; via: string }
+  | { variante: 'via'; via: string; lamina?: Lamina }
   /** Badge del documento, bajo el título. Uno por documento (regla 4). */
   | { variante: 'urgente'; lamina?: Lamina }
   /** Repetición del badge en hojas de continuación. Misma palabra, menos aire. */
@@ -184,20 +200,25 @@ export type BloqueNegativoProps =
 export default function BloqueNegativo(props: BloqueNegativoProps): ReactElement {
   const palabra = props.variante === 'via' ? props.via : CADENA_URGENTE
   const reducido = props.variante === 'urgenteReducido'
-  const imagen = props.variante !== 'via' && props.lamina === 'imagenologia'
+  /**
+   * Cualquier lámina distinta del chasis compone la calibración medida, y las tres
+   * variantes la aceptan: la miden dos láminas sobre dos objetos distintos y no hay
+   * motivo para que el badge la tenga y la vía no. Ver `GEOMETRIA.medida`.
+   */
+  const medido = (props.lamina ?? 'chasis') !== 'chasis'
 
-  const caja = imagen
+  const caja = medido
     ? reducido
-      ? estilos.bloqueImagenologiaReducido
-      : estilos.bloqueImagenologia
+      ? estilos.bloqueMedidoReducido
+      : estilos.bloqueMedido
     : reducido
       ? estilos.bloqueReducido
       : {}
 
-  const texto = imagen
+  const texto = medido
     ? reducido
-      ? estilos.textoImagenologiaReducido
-      : estilos.textoImagenologia
+      ? estilos.textoMedidoReducido
+      : estilos.textoMedido
     : estilos.texto
 
   return (

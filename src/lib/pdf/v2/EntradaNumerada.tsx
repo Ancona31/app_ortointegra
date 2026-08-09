@@ -133,6 +133,56 @@ const GEOMETRIA = {
     medianilRotuloNota: 6,
   },
   /**
+   * LA CUARTA CALIBRACIÓN — `medicamento`, medida en la lámina aprobada de Receta.
+   *
+   * **Su ritmo es el de `normal` y no una cuarta cifra.** 7 pt de padding inferior,
+   * la regla de 0.5 en `tinta.hairline` y 5 pt de padding superior: exactamente lo
+   * que ya declara `normal`, hasta el desfase deliberado de 2 pt que hace que la
+   * regla se lea como apertura de la entrada que empieza. Esta lámina es de donde
+   * salió aquel 5/7, así que confirmarlo aquí no es una coincidencia — es la fuente.
+   *
+   * Por eso esta entrada **no aparece en `separacion*`**: reutiliza el estilo de
+   * `normal` tal cual. Lo que sí es propio son las tres cifras de abajo.
+   *
+   * ⚠ **LA LÁMINA `B · 1 MEDICAMENTO` USA OTRO RITMO Y NO ES ESTE.** Aquella
+   * compone padding `8/10` y `9/11` en vez de `5/7`, junto con una calibración
+   * tipográfica entera un punto por encima —número 14 / 17, ancla 12.5 / 17,
+   * genérico 10.5 / 14, indicación 10.5 / 16—. Es la hoja de UN medicamento: la
+   * lista de siete es la que gobierna, por el mismo criterio con que `compacta` no
+   * se elige por el número de ítems (I.3.4). **Reportado y no compuesto:** si algún
+   * día se compone, es una quinta calibración declarada por el formato, nunca un
+   * `medicamentos.length === 1` en tiempo de render.
+   */
+  medicamento: {
+    /**
+     * Ancho de la indicación — **381 pt**, no el ancho de la caja de contenido.
+     *
+     * La caja mide 453.75 (486 − 23.25 de riel − 9 de medianil) y la indicación se
+     * queda 72.75 pt corta por la derecha. Es ancho FIJO y no un `flex: 1`
+     * recortado: la lámina lo declara como medida de línea, y una medida de línea
+     * es lo que hace legible un párrafo de 10 / 14 — el resto de la caja se queda
+     * en blanco a propósito.
+     */
+    anchoIndicacion: 381,
+    /**
+     * Aire sobre la indicación — 3 pt. Es el único aire interno de la entrada junto
+     * al de la vía; el ancla, el genérico y la vía oral van pegados uno bajo otro.
+     *
+     * `DERIVADO DE LA SEGUNDA LECTURA` — las coordenadas medidas dan los altos de
+     * fila (85.37 · 89.56 · 75.56) pero no el desglose, y sin este margen los tres
+     * salen 3 pt cortos. `SPEC_DISENO_PARTE_B.md` B.3 §3 lo declara —«margen 3
+     * pt»— sobre el mismo archivo. Con él, la fila de vía oral cuadra en 0.13 pt y
+     * las dos de vía en negativo en 0.56.
+     */
+    aireIndicacion: 3,
+    /**
+     * Aire sobre el CONTENEDOR del bloque en negativo — 2 pt. La vía ORAL no lo
+     * lleva: la lámina la compone «sin margen superior propio», y esa asimetría es
+     * lo que hace que las dos formas midan distinto (13 contra 16.5).
+     */
+    aireVia: ESPACIO[2],
+  },
+  /**
    * Ancho de la columna de la nota en la disposición `columna`. B.1 §3 declara la
    * retícula de la tabla como `23.25pt 1fr 132pt` con medianil de 9 pt: el riel y
    * el medianil son `reticula.riel` y `reticula.medianil`, y este 132 es la tercera
@@ -236,6 +286,36 @@ const estilos = StyleSheet.create({
     flexShrink: 0,
   },
   notaCompacta: { ...estiloTipografico('entradaCompacta.nota') },
+  /**
+   * LAS CUATRO RANURAS DE LA CALIBRACIÓN `medicamento`, APILADAS DENTRO DE LA CAJA.
+   *
+   * Ninguna lleva margen superior salvo las dos que la lámina declara —la vía en
+   * negativo y la indicación—, y ese cero es medido: los altos de fila solo cuadran
+   * si el genérico va pegado al ancla y la vía oral pegada al genérico.
+   */
+  anclaMedicamento: { ...estiloTipografico('entradaMedicamento.ancla'), flex: 1 },
+  /** REGLA 5: tinta plena. Es la denominación genérica. El rol ya la trae. */
+  genericoMedicamento: { ...estiloTipografico('entradaMedicamento.generico') },
+  /**
+   * El contenedor del bloque en negativo. Su margen es lo único propio.
+   *
+   * `alignItems: 'flex-start'` es lo que impide que el contenedor estire al bloque:
+   * 2.H ya se defiende con su `alignSelf`, pero eso solo funciona si nadie de fuera
+   * le impone un ancho, y un `View` en columna estira a sus hijos por defecto.
+   */
+  cajaVia: {
+    marginTop: GEOMETRIA.medicamento.aireVia,
+    alignItems: 'flex-start',
+  },
+  /**
+   * La indicación, de ancho FIJO. Ver `GEOMETRIA.medicamento.anchoIndicacion`: no
+   * es `flex: 1`, y por eso no se estira hasta el borde de la caja.
+   */
+  indicacionMedicamento: {
+    ...estiloTipografico('entradaMedicamento.indicacion'),
+    width: GEOMETRIA.medicamento.anchoIndicacion,
+    marginTop: GEOMETRIA.medicamento.aireIndicacion,
+  },
   /** Las tres ranuras de la calibración `estudio`, apiladas. */
   anclaEstudio: { ...estiloTipografico('entradaEstudio.ancla'), flex: 1 },
   /**
@@ -333,7 +413,7 @@ const estilos = StyleSheet.create({
  * Cuál de las dos calibraciones de fila usa la lista. **La declara el formato**,
  * nunca el número de ítems (ver la nota de `GEOMETRIA`).
  */
-export type CalibracionEntrada = 'normal' | 'compacta' | 'estudio'
+export type CalibracionEntrada = 'normal' | 'compacta' | 'estudio' | 'medicamento'
 
 /**
  * Dónde va la ranura `nota` respecto del `ancla`.
@@ -492,12 +572,14 @@ export default function EntradaNumerada({
 }: EntradaNumeradaProps): ReactElement {
   const compacta = calibracion === 'compacta'
   const estudio = calibracion === 'estudio'
+  const medicamento = calibracion === 'medicamento'
   const enColumna = disposicion === 'columna'
 
   /**
    * `estudio` lleva su ritmo en las DOS direcciones y en todas las entradas, así
-   * que no consulta `primera`. Las otras dos se lo ahorran a la primera, que es lo
-   * que evita la regla flotando sobre la lista. Ver `entradaEstudio`.
+   * que no consulta `primera`. Las otras tres se lo ahorran a la primera, que es lo
+   * que evita la regla flotando sobre la lista — y `medicamento` reutiliza el de
+   * `normal` sin más, porque es el mismo (ver `GEOMETRIA.medicamento`).
    */
   const ritmo = estudio
     ? estilos.entradaEstudio
@@ -524,7 +606,11 @@ export default function EntradaNumerada({
         <Text
           style={{
             ...estiloTipografico(
-              compacta ? 'entradaCompacta.numero' : 'entrada.numero',
+              compacta
+                ? 'entradaCompacta.numero'
+                : medicamento
+                  ? 'entradaMedicamento.numero'
+                  : 'entrada.numero',
               acento,
             ),
           }}
@@ -539,24 +625,76 @@ export default function EntradaNumerada({
             style={
               estudio
                 ? estilos.anclaEstudio
-                : compacta
-                  ? estilos.anclaCompacta
-                  : estilos.ancla
+                : medicamento
+                  ? estilos.anclaMedicamento
+                  : compacta
+                    ? estilos.anclaCompacta
+                    : estilos.ancla
             }
           >
             {ancla}
           </Text>
-          {tieneValor(marca) ? (
+          {/*
+            LA MARCA VA EN LA FILA DEL ANCLA EN TODAS LAS CALIBRACIONES MENOS EN
+            `medicamento`, donde la lámina le da renglón propio —el tercero de la
+            caja, entre el genérico y la indicación—. Ver el bloque de la vía abajo.
+          */}
+          {!medicamento && tieneValor(marca) ? (
             <View style={estilos.cajaMarca}>
               <BloqueNegativo variante="via" via={marca} />
             </View>
           ) : null}
         </View>
 
+        {/*
+          EL `secundario` COLAPSA COMO CUALQUIER RANURA DE 2.G: sin dato, no queda
+          rótulo ni hueco.
+
+          ⚠ **AQUÍ HUBO UN CAMPO VACÍO REQUERIDO (2.E) Y SE RETIRÓ.** II.3 §2 declara
+          el genérico y la presentación como «vacío requerido: rótulo y línea», y así
+          se compuso: sin genérico salía `GENÉRICO` sobre una línea de
+          `manuscrito.ancho`. **Angel decidió que colapse entero.** El motivo no es
+          de redacción: esa línea mide 246 pt y vive dentro de la caja de contenido de
+          la entrada, así que en cuanto la entrada llevaba vía y el bloque en negativo
+          quedaba debajo, las dos zonas se pisaban. Un hueco donde escribir a pluma
+          que se solapa con la vía de administración es peor que no tenerlo.
+
+          Si vuelve, vuelve con una línea que no sea `manuscrito.ancho` — medida
+          contra la caja de la entrada, no contra la presentación más larga del
+          catálogo, que es de donde salen los 246.
+        */}
         {tieneValor(secundario) ? (
-          <Text style={estudio ? estilos.secundarioEstudio : estilos.secundario}>
+          <Text
+            style={
+              estudio
+                ? estilos.secundarioEstudio
+                : medicamento
+                  ? estilos.genericoMedicamento
+                  : estilos.secundario
+            }
+          >
             {secundario}
           </Text>
+        ) : null}
+
+        {/*
+          LA VÍA, EN SU PROPIO RENGLÓN. Entra por 2.H con la calibración medida.
+
+          ⚠ **LA LÁMINA COMPONE LA ORAL COMO TEXTO PLANO Y AQUÍ VAN LAS TRECE EN
+          NEGATIVO.** Es decisión de Angel contra lo medido, y devuelve a II.3 §5 lo
+          que la lámina le había quitado. Cuesta 3.5 pt por entrada oral —el bloque
+          mide 2 + 14.5 donde el renglón plano medía 13—, así que las filas de vía
+          oral dejan de medir los 85.37 pt de la lámina y miden los 89 de las demás.
+        */}
+        {medicamento && tieneValor(marca) ? (
+          <View style={estilos.cajaVia}>
+            <BloqueNegativo variante="via" via={marca} lamina="receta" />
+          </View>
+        ) : null}
+
+        {/* La indicación, de medida fija. No pasa por 2.J: es un dato, no prosa. */}
+        {medicamento && tieneValor(nota) ? (
+          <Text style={estilos.indicacionMedicamento}>{nota}</Text>
         ) : null}
 
         {/*
@@ -592,7 +730,7 @@ export default function EntradaNumerada({
           fila esté calibrada a 9 / 11.5. No se resuelve inventando: cuando exista
           una lámina que lo use, se mide y se abre la ranura en 2.J.
         */}
-        {!estudio && !enColumna && tieneValor(nota) ? (
+        {!estudio && !medicamento && !enColumna && tieneValor(nota) ? (
           <View style={estilos.nota}>
             <ParserBloques texto={nota} marca="raya" />
           </View>
