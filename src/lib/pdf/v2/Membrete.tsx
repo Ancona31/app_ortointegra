@@ -132,6 +132,33 @@ const GEOMETRIA = {
    */
   espaciadorCierreReceta: 10,
   /**
+   * EL MISMO ESPACIADOR EN LA HOJA DE CONTINUACIÓN DE HONORARIOS — **24 pt**.
+   *
+   * Es el primer valor que este componente declara para la variante `continuacion`, y
+   * hasta ahora no había ninguno porque **ninguna lámina de continuación estaba
+   * medida**: la nota de abajo lo dejaba anotado —«si al medirla resulta otra cifra, es
+   * una variante del espaciador, no un aire del formato»— y esta es esa medición.
+   *
+   * Los 78.5 pt que mide esa hoja cierran exactos con él y sin el renglón de cédula:
+   *
+   *     32     cabecera: rótulo `titulo.seccion` (14) + nombre a 14 / 18
+   *      8     `transicion.membreteFilete`
+   *      2.5   el filete
+   *     24     este espaciador
+   *     12     la línea de paciente, que la monta 2.V
+   *     ─────
+   *     78.5
+   *
+   * ⚠ La lámina enumera la cabecera en **29** y el chasis compone 32; con 29 el total
+   * no llega a 78.5 por ningún camino. Se compone lo que cuadra con la cota, que es la
+   * medida dura. Reportado.
+   *
+   * **No lo hereda ninguna otra lámina**: las otras cuatro siguen en 12, que es lo que
+   * este componente compone desde el principio para las dos variantes. Cambiarlo para
+   * todas movería la hoja 2 de Receta, que está fijada en 93.5 pt por una prueba.
+   */
+  espaciadorContinuacionHonorarios: 24,
+  /**
    * INTERLINEADO DE LA BANDA EN LA LÁMINA DE IMAGENOLOGÍA — 12, no 11.
    *
    * Desviación declarada del rol `medico.credencial`, del mismo tipo que las dos
@@ -218,6 +245,16 @@ export type MembreteProps =
       rotulo?: string
       /** La celda de folio de 2.C, a la derecha de la cabecera. Colapsa si no viene. */
       riel?: ReactNode
+      /**
+       * Qué lámina fija el espaciador de cierre de ESTA hoja. Sin ella, los 12 pt del
+       * chasis, que son los que componen las cuatro láminas anteriores.
+       *
+       * ⚠ **NO TOCA NADA MÁS DE LA VARIANTE**, y eso es deliberado: la cabecera, el
+       * nombre a 14 / 18 y la cédula bajo el filete siguen siendo los mismos en las
+       * cinco. Si esta prop empezara a ramificar más piezas, lo que haría falta es una
+       * variante y no un discriminante.
+       */
+      lamina?: Lamina
     }
 
 const estilos = StyleSheet.create({
@@ -314,6 +351,10 @@ const estilos = StyleSheet.create({
   espaciadorReceta: {
     height: GEOMETRIA.espaciadorCierreReceta,
   },
+  /** El mismo cierre en la hoja 2 de Honorarios, el doble de alto. */
+  espaciadorContinuacionHonorarios: {
+    height: GEOMETRIA.espaciadorContinuacionHonorarios,
+  },
 })
 
 /**
@@ -325,7 +366,19 @@ const SEPARADOR_CREDENCIALES = ' · '
 /** 2.B · `Membrete`. */
 export default function Membrete(props: MembreteProps): ReactElement {
   const { acento, medico } = props
-  const lamina: Lamina = props.variante === 'completo' ? (props.lamina ?? 'chasis') : 'chasis'
+  const lamina: Lamina = props.lamina ?? 'chasis'
+  /**
+   * LA BANDA DE HONORARIOS ES LA DE LABORATORIO CON OTRO INTERLINEADO.
+   *
+   * Un solo renglón, sin cédulas y sin universidad —`D23` otra vez, y ahora son dos
+   * láminas contra tres—, pero a **12 pt de interlineado** en vez de a 11: es el mismo
+   * 12 con el que Imagenología, Receta y Suplementación componen sus DOS renglones. Por
+   * eso esta lámina no cae ni en el `chasis` ni en el resto, y hacen falta las dos
+   * condiciones: el renglón alto lo tiene todo lo que no es chasis, y el segundo
+   * renglón lo pierde ella sola.
+   */
+  const honorarios = lamina === 'honorarios'
+  const conCedulas = lamina !== 'chasis' && !honorarios
 
   return (
     <View style={estilos.membrete}>
@@ -438,7 +491,7 @@ export default function Membrete(props: MembreteProps): ReactElement {
             </Text>
           </View>
 
-          {lamina === 'chasis' ? null : (
+          {!conCedulas ? null : (
             <View style={estilos.segundoRenglon}>
               <Text style={estilos.credencialAlta}>
                 {medico.cedulas.join(SEPARADOR_CREDENCIALES)}
@@ -465,7 +518,17 @@ export default function Membrete(props: MembreteProps): ReactElement {
 
         Dos láminas lo miden en 12 y una en 10. Ver `GEOMETRIA.espaciadorCierreReceta`.
       */}
-      <View style={lamina === 'receta' ? estilos.espaciadorReceta : estilos.espaciador} />
+      <View
+        style={
+          props.variante === 'continuacion'
+            ? honorarios
+              ? estilos.espaciadorContinuacionHonorarios
+              : estilos.espaciador
+            : lamina === 'receta'
+              ? estilos.espaciadorReceta
+              : estilos.espaciador
+        }
+      />
     </View>
   )
 }

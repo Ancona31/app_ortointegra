@@ -41,14 +41,17 @@
 import type { ReactElement } from 'react'
 import { StyleSheet } from '@react-pdf/renderer'
 import RielDatos, {
+  ETIQUETA_CELDA,
   VALOR_CELDA,
   type CeldaRiel,
   type EstiloValorCelda,
 } from './RielDatos'
 import {
+  FILETE_HONORARIOS,
   FILETE_SUPLEMENTACION,
   FUENTE,
   TINTA,
+  veloDeAcento,
   type AcentoResuelto,
   type Lamina,
 } from './tokens'
@@ -145,6 +148,31 @@ const GEOMETRIA = {
     /** El `0` del `padding: 3 10 4 0`. Ver arriba: es de la lámina. */
     paddingIzquierdo: 0,
   },
+  /**
+   * LAS DOS CELDAS PROPIAS DE LA LÁMINA DE HONORARIOS.
+   *
+   * `escritura` — la celda de paciente de este formato **no colapsa cuando falta el
+   * dato**: conserva su rótulo y deja una línea para llenar a pluma. Es el estado
+   * «vacío requerido» de 2.E y **el único sitio del sistema que lo usa**, porque este
+   * es el único formato donde el paciente no es obligatorio (II.5 §2) y a la vez el
+   * único donde alguien puede escribirlo a mano en el mostrador. Con la línea, la celda
+   * pasa de 30 a **33.47** pt: 3 + 10 + 16.47 + 4.
+   *
+   * ⚠ **II.5 §5 DICE QUE COLAPSA Y LA LÁMINA DIBUJA LA LÍNEA.** La ficha razona que
+   * «no imprime un guion ni una línea, porque nadie va a llenarlo a mano»; la lámina
+   * del recibo mínimo la compone. Manda la lámina. Reportado.
+   *
+   * `vigencia` — la única celda con FONDO de los cinco formatos extraídos: el acento al
+   * **8 %**, que es un velo nuevo —el chasis declara el 6 %— dentro del máximo del 12 %
+   * que I.1.8 admite. Su rótulo va en `tinta.secundaria` y su cifra en peso 600, y esas
+   * dos desviaciones **no son cosméticas**: son las que hacen que la celda siga
+   * distinguiéndose en fotocopia, donde el velo desaparece (I.3.3). Reportado como
+   * `D25`.
+   */
+  honorarios: {
+    escritura: { alto: 16.47, grosor: FILETE_HONORARIOS.regla },
+    vigencia: { velo: 0.08, peso: 600 },
+  },
 } as const
 
 /**
@@ -164,6 +192,8 @@ export type CampoPaciente =
   | 'diagnostico'
   | 'fecha'
   | 'hora'
+  /** La novena, y solo de la cotización de II.5. Ver `GEOMETRIA.honorarios`. */
+  | 'vigencia'
 
 /** Cómo se compone el VALOR de una celda. La etiqueta es igual en las ocho. */
 type TrazoValor =
@@ -175,6 +205,8 @@ type TrazoValor =
   | 'diagnostico'
   /** La cifra a 14 / 16. Solo peso. Ver `GEOMETRIA.peso`. */
   | 'peso'
+  /** El valor de celda en peso 600. Solo vigencia. Ver `GEOMETRIA.honorarios`. */
+  | 'vigencia'
 
 interface DescriptorCelda {
   readonly campo: CampoPaciente
@@ -231,6 +263,45 @@ const FILA_INFERIOR_CON_PESO: readonly DescriptorCelda[] = [PESO, DIAGNOSTICO_CO
 const FILA_REDUCIDA: readonly DescriptorCelda[] = [PACIENTE, EXPEDIENTE]
 
 /**
+ * LAS DOS FILAS DE LA LÁMINA DE HONORARIOS, Y SON UNA FILA CADA UNA.
+ *
+ * Es el único riel del sistema de una sola fila: no hay diagnóstico —el documento no lo
+ * lleva—, ni edad, ni sexo, ni expediente. Lo que hay es quién paga, cuándo se emite y
+ * —solo en la cotización— hasta cuándo vale.
+ *
+ * **Las dos reparten las mismas doce columnas de otra manera**, y ese reparto no se
+ * puede derivar del colapso: sin vigencia, el reparto proporcional daría 6.67 y 5.33
+ * columnas donde la lámina mide 7 y 5. Por eso son dos filas declaradas y por eso la
+ * elige el FORMATO con `rielHonorarios`, nunca la presencia del dato en tiempo de
+ * render (I.3.4).
+ *
+ * `Fecha de emisión` es su propio descriptor y no `FECHA`: la etiqueta es otra. En los
+ * cuatro formatos anteriores la fecha se rotula `Fecha` —o sube al riel del título como
+ * `Emisión`— y aquí la lámina la escribe entera.
+ */
+const PACIENTE_COTIZACION: DescriptorCelda = { ...PACIENTE, columnas: 5 }
+const PACIENTE_RECIBO: DescriptorCelda = { ...PACIENTE, columnas: 7 }
+const EMISION_COTIZACION: DescriptorCelda = { campo: 'fecha', etiqueta: 'Fecha de emisión', columnas: 4, trazo: 'dato' }
+const EMISION_RECIBO: DescriptorCelda = { ...EMISION_COTIZACION, columnas: 5 }
+const VIGENCIA: DescriptorCelda = { campo: 'vigencia', etiqueta: 'Vigencia', columnas: 3, trazo: 'vigencia' }
+
+/** Cotización: 5 + 4 + 3 = 12. */
+const FILA_COTIZACION: readonly DescriptorCelda[] = [
+  PACIENTE_COTIZACION,
+  EMISION_COTIZACION,
+  VIGENCIA,
+]
+/** Recibo: 7 + 5 = 12. */
+const FILA_RECIBO: readonly DescriptorCelda[] = [PACIENTE_RECIBO, EMISION_RECIBO]
+
+/**
+ * Cuál de las dos filas de Honorarios se compone. **Lo declara el formato**, que es
+ * quien sabe si está emitiendo una cotización o un recibo — el mismo criterio con el
+ * que `CalibracionEntrada` la declara en 2.G y `Lamina` en todo el chasis.
+ */
+export type RielHonorarios = 'cotizacion' | 'recibo'
+
+/**
  * Valores del riel. Solo `paciente` es obligatorio.
  *
  * Regla 1 de la ficha: el nombre nunca está ausente —los 8 formularios lo
@@ -265,6 +336,15 @@ export interface ValoresPaciente {
   readonly diagnostico?: string
   readonly fecha?: string
   readonly hora?: string
+  /**
+   * Vigencia de la cotización, YA redactada por quien llama —la lámina imprime
+   * `30 días naturales`—. Mismo criterio que el peso y la emisión: este componente
+   * coloca, no rotula ni calcula.
+   *
+   * La lleva un solo formato y solo uno de sus dos casos. En el recibo no existe: un
+   * recibo no caduca.
+   */
+  readonly vigencia?: string
 }
 
 export type BloquePacienteProps =
@@ -288,8 +368,18 @@ export type BloquePacienteProps =
        * Es la misma degradación que I.3.7 declara para el render —nunca colapsa, cae
        * a lo neutro—, y es lo que permite que la hoja de chasis del taller siga
        * montando este componente sin pasarlo.
+       *
+       * **En la lámina de Honorarios hace falta además para el fondo de la celda de
+       * vigencia**, y ahí la degradación es la misma: sin acento, la celda va sin velo
+       * y se sigue distinguiendo por el peso de su cifra y por la tinta de su rótulo,
+       * que es lo que I.3.3 exige de todas formas.
        */
       acento?: AcentoResuelto
+      /**
+       * Cuál de las dos filas de Honorarios. **Solo se lee con `lamina="honorarios"`**;
+       * en las otras cuatro láminas no hay dos anatomías entre las que elegir.
+       */
+      rielHonorarios?: RielHonorarios
     } & ValoresPaciente)
   /**
    * Hojas de continuación. Regla 2 de la ficha: NO ES OPCIONAL cuando el documento
@@ -350,6 +440,17 @@ const estilos = StyleSheet.create({
     fontWeight: GEOMETRIA.peso.base.peso,
     letterSpacing: GEOMETRIA.peso.base.tracking * GEOMETRIA.peso.base.cuerpo,
   },
+  /**
+   * LAS DOS DESVIACIONES DE LA CELDA DE VIGENCIA. Parten de los valores YA DESVIADOS
+   * del riel —`VALOR_CELDA` y `ETIQUETA_CELDA`— y no de los roles crudos: lo único que
+   * esta celda cambia es el peso de la cifra y la tinta del rótulo, y partir de
+   * `dato` o de `etiqueta` le devolvería el 12 / 16 y el interlineado 11 que la
+   * desviación del riel corrige.
+   *
+   * Las dos existen para que el fondo no sea el único portador de significado (I.3.3).
+   */
+  valorVigencia: { ...VALOR_CELDA, fontWeight: GEOMETRIA.honorarios.vigencia.peso },
+  etiquetaVigencia: { ...ETIQUETA_CELDA, color: TINTA.secundaria },
 })
 
 /**
@@ -373,6 +474,7 @@ function estiloValor(trazo: TrazoValor, lamina: Lamina): EstiloValorCelda | unde
     return lamina === 'receta' ? undefined : estilos.valorAncla
   }
   if (trazo === 'peso') return estilos.valorPeso
+  if (trazo === 'vigencia') return estilos.valorVigencia
   if (trazo === 'diagnostico') {
     /*
       La excepción de fila plena vale igual con `span 8`: lo que le da los 15 pt de
@@ -427,6 +529,31 @@ function celdas(
           },
         }
       : {}),
+    /*
+      LAS DOS COSAS QUE SOLO TIENE LA LÁMINA DE HONORARIOS, y las dos entran por las
+      ranuras que 2.F declara: el riel no sabe qué es una vigencia ni por qué el
+      paciente de un recibo se puede llenar a mano.
+
+      El velo se deriva aquí y no en la capa de tokens porque el 8 % es de ESTA celda:
+      `resolverAcento()` deriva el 6 % del chasis, que es el de todos los demás fondos
+      tenues del sistema.
+    */
+    ...(d.campo === 'paciente' && lamina === 'honorarios'
+      ? { escritura: GEOMETRIA.honorarios.escritura }
+      : {}),
+    ...(d.campo === 'vigencia'
+      ? {
+          estiloEtiqueta: estilos.etiquetaVigencia,
+          ...(acento === undefined
+            ? {}
+            : {
+                fondo: veloDeAcento(
+                  acento.base,
+                  GEOMETRIA.honorarios.vigencia.velo,
+                ),
+              }),
+        }
+      : {}),
   }))
 }
 
@@ -446,6 +573,24 @@ export default function BloquePaciente(props: BloquePacienteProps): ReactElement
   }
 
   const lamina = props.lamina ?? 'chasis'
+
+  /**
+   * EL ÚNICO RIEL DE UNA SOLA FILA DEL SISTEMA. No es una fila superior sin inferior:
+   * es otra anatomía, con otras etiquetas y otro reparto de las doce columnas. Ver
+   * `FILA_COTIZACION` y `FILA_RECIBO`.
+   */
+  if (lamina === 'honorarios') {
+    const fila =
+      props.rielHonorarios === 'recibo' ? FILA_RECIBO : FILA_COTIZACION
+    return (
+      <RielDatos
+        variante="celdas"
+        lamina={lamina}
+        filas={[celdas(fila, props, lamina, props.acento)]}
+      />
+    )
+  }
+
   /**
    * Las TRES anatomías de la fila inferior, una por lo que el formato mete en ella:
    * tres celdas en el chasis —diagnóstico, fecha y hora—, una sola de doce donde la

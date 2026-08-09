@@ -412,6 +412,107 @@ export const TIPOGRAFIA = {
   'cita.fecha': { familia: FUENTE.neogrotesca, cuerpo: 14, interlineado: 18, peso: 600, tracking: 0, color: 'tinta.negra' },
   'cita.plazo': { familia: FUENTE.neogrotesca, cuerpo: 8, interlineado: 11, peso: 400, tracking: 0, color: 'tinta.secundaria' },
   'cita.nota': { familia: FUENTE.humanista, cuerpo: 9.5, interlineado: 13, peso: 400, tracking: 0, color: 'tinta.secundaria' },
+  // ── LOS CUATRO ROLES DE LA TABLA DE CONCEPTOS (II.5), medidos en la lámina de
+  // Recibo y Cotización.
+  //
+  // Suben aquí y no a la ficha de un componente por la misma razón que los cuatro
+  // `cita.*`: **los compone el FORMATO**. La lista de II.5 no es una
+  // `EntradaNumerada` —su propia ficha lo dice, «no usa `EntradaNumerada`, usa
+  // `Tabla` en modo grid»— y el chasis no tiene un componente `Tabla`, así que la
+  // retícula de cuatro columnas la monta el formato. Sin estos roles, II.5 tendría
+  // cinco cuerpos y tres colores escritos dentro, que es justo lo que la cabecera de
+  // esta tabla promete que no ocurre.
+  //
+  // Ninguno sale de mover un sumando de un rol existente: `tabla.celda` va a 9.5 / 14
+  // y `entradaCompacta.*` a 9 / 11.5, y esta lámina mide 9 / 13 y 10.5 / 13.
+  //
+  // **El precio no tiene rol propio: es `concepto.texto` alineado a la derecha.** La
+  // alineación no es tipografía —no está en la tabla de I.1.4 para ningún rol— y un
+  // quinto rol idéntico al segundo sería deuda, que es lo que ya dicen las notas de
+  // `entradaEstudio.numero` y de la calibración `suplemento`.
+  //
+  // ⚠ **SON LOS CUERPOS DE LA CALIBRACIÓN DE COTIZACIÓN Y LA FILA COMPUESTA ES LA DEL
+  // RECIBO DE 14.** `SPEC_DISENO_PARTE_B.md` B.5 §3 mide tres calibraciones de fila
+  // —21.42, 17.21 y 22.47 pt— y las dos primeras difieren también en cuerpo: la de
+  // volumen va a 9 / 12.5 y 10 / 12.5. El paso 4.5 entrega estos cuerpos y manda
+  // componer la fila de 17.21; con estos interlineados la fila da 17.63. Los 0.42
+  // quedan **reportados**, y las otras dos calibraciones no se componen: es lo que D4
+  // prohíbe —un documento no cambia de métrica según cuántos ítems traiga— y aquí se
+  // resuelve como en 2.G, declarando UNA y solo una.
+  //
+  // El tracking de las dos marcas de origen sale del píxel, como el del ancla de
+  // Receta y el del calificador de la celda de peso: 1.68 px a 7 pt —9.333 px— son
+  // **0.18 em**. `COINCIDENCIA` con el 0.18 de `GEOMETRIA.peso.base` en 2.D, que vale
+  // lo mismo y no es este.
+  //
+  // Las dos se distinguen por PESO Y TINTA y no por caja, y eso es I.3.3 aplicado: la
+  // lámina lo razona por su cuenta —en fotocopia la diferencia entre 600 negro y 400
+  // gris se conserva; la de un cuadro relleno frente a uno hueco, no—.
+  'concepto.numero': { familia: FUENTE.neogrotesca, cuerpo: 9, interlineado: 13, peso: 400, tracking: 0, color: 'acento.tinta' },
+  'concepto.texto': { familia: FUENTE.neogrotesca, cuerpo: 10.5, interlineado: 13, peso: 400, tracking: 0, color: 'tinta.negra' },
+  'concepto.origenPropio': { familia: FUENTE.neogrotesca, cuerpo: 7, interlineado: 13, peso: 600, tracking: 0.18, color: 'tinta.negra' },
+  'concepto.origenTercero': { familia: FUENTE.neogrotesca, cuerpo: 7, interlineado: 13, peso: 400, tracking: 0.18, color: 'tinta.etiqueta' },
+  // ── EL TEXTO CORRIDO DE LA COLUMNA DE 246 pt (II.5), medido en la misma lámina.
+  //
+  // ⚠ **ES `texto.corrido` REDUCIDO Y ENTRA COMO ROL PORQUE LO COMPONE 2.J.** La lista
+  // de roles de cuerpo del parser está cerrada a dos a propósito —«una prop abierta a
+  // los 23 roles sería una puerta para componer el cuerpo con cualquier cosa»—, así que
+  // un tercero tiene que existir aquí con nombre propio o no existe.
+  //
+  // Lo que lo justifica es la MEDIDA DE LÍNEA: las notas de este formato no viven en la
+  // caja de 486 pt sino en la columna derecha de la fila de cierre, que mide 246. El
+  // texto corrido del sistema a 11.5 / 18 en esa columna compone ocho renglones donde la
+  // lámina mide cinco, y con ellos la cotización deja de caber en su hoja única.
+  //
+  // ⚠ **`D28` QUEDA COMPUESTO A MEDIAS Y ES DELIBERADO.** Esa divergencia tiene dos
+  // ejes: el cuerpo —9.5 / 14 contra 11.5 / 18— y la justificación con partición. **El
+  // cuerpo se compone y la justificación NO**: I.3.2 la prohíbe sin excepción y II.5 §5
+  // lo repite con nombre —«las notas van en bandera izquierda»—. Reportado.
+  'texto.reducido': { familia: FUENTE.humanista, cuerpo: 9.5, interlineado: 14, peso: 400, tracking: 0, color: 'tinta.negra' },
+  // ── LOS SIETE ROLES DE LOS TRES BLOQUES ENMARCADOS Y DE LA FORMA DE PAGO (II.5).
+  //
+  // Suben aquí por el mismo par de razones que los cuatro `cita.*` y los cuatro
+  // `concepto.*`: **no son desviaciones de ningún rol** —6.5 / 10 en 600 no sale de
+  // mover un sumando de `etiqueta`, ni 9.5 / 13.5 de mover uno de `tabla.celda`— y **los
+  // compone el FORMATO**, porque lo que los envuelve es 2.U, que enmarca sin componer
+  // (regla 3 de su ficha). Sin ellos, II.5 tendría siete cuerpos y tres colores escritos
+  // dentro, que es lo que la cabecera de la Sección II promete que no ocurre.
+  //
+  // ⚠ **DOCE ROLES NUEVOS EN UN SOLO FORMATO ES MUCHO Y QUEDA REPORTADO.** La escala
+  // pasa de 23 a 35 miembros, y la causa está medida: esta lámina no reutiliza casi nada
+  // —«el más divergente de los cinco»—. Ninguno coincide con uno existente; los tres que
+  // más se acercan son `entrada.ancla` (11 / 15 en **600**, no 500), `entradaEstudio.
+  // secundario` (10 / 13 en **500** y `tinta.secundaria`) y `entradaEstudio.rotuloNota`
+  // (6.5 / **16** en 0.2 em). Si al construir II.6 o II.7 alguno reaparece, deja de ser
+  // de este formato y se le quita el prefijo.
+  //
+  // Los dos trackings salen del píxel, con la conversión de siempre: 1.907 px a 6.5 pt
+  // —8.667 px— son **0.22 em**, que es la versalita del sistema, y el 0.02 em del título
+  // de la leyenda es el mismo de `titulo.documento`. Ninguno es una cifra nueva.
+  //
+  // `aseguradora.rotulo` y `formaPago.rotulo` comparten cuerpo e interlineado y **no se
+  // fusionan**: el primero va en 600 y el segundo en 400 con otro tracking, que es
+  // exactamente la diferencia entre rotular una celda y rotular un dato suelto.
+  //
+  // ⚠ **`formaPago.rotulo` VA EN LA NEO-GROTESCA Y LA LÁMINA LO COMPONE EN IBM PLEX
+  // MONO.** Séptimo caso idéntico (`CONCILIA D13, D20, D30`). I.1.4 prohíbe la mono en
+  // documento impreso. Reportado.
+  //
+  // El interlineado de los dos rótulos —10— **no está medido**: lo fija la fila en la
+  // que viven, que mide 13 en las dos y la gobierna el valor. Con cualquier cifra mayor,
+  // el rótulo estiraría la fila. `DERIVADO, NO MEDIDO`.
+  'aseguradora.nombre': { familia: FUENTE.neogrotesca, cuerpo: 11, interlineado: 15, peso: 500, tracking: 0, color: 'tinta.negra' },
+  'aseguradora.rotulo': { familia: FUENTE.neogrotesca, cuerpo: 6.5, interlineado: 10, peso: 600, tracking: 0.22, color: 'tinta.etiqueta' },
+  'aseguradora.valor': { familia: FUENTE.neogrotesca, cuerpo: 10, interlineado: 13, peso: 400, tracking: 0, color: 'tinta.negra' },
+  // Los dos de la leyenda no fiscal. **La jerarquía va por PESO Y POR FAMILIA, no por
+  // cuerpo ni por color**: los dos miden 9.5 / 13.5 y los dos van en tinta plena, y lo
+  // que distingue al título es el 600 de la neo-grotesca. Es lo que hace que la leyenda
+  // sobreviva a la fotocopia sin depender del marco (I.3.3), y es también por qué II.5
+  // §1 exige que vaya «en jerarquía visible, no en gris pequeño al pie».
+  'noFiscal.titulo': { familia: FUENTE.neogrotesca, cuerpo: 9.5, interlineado: 13.5, peso: 600, tracking: 0.02, color: 'tinta.negra' },
+  'noFiscal.cuerpo': { familia: FUENTE.humanista, cuerpo: 9.5, interlineado: 13.5, peso: 400, tracking: 0, color: 'tinta.negra' },
+  'formaPago.rotulo': { familia: FUENTE.neogrotesca, cuerpo: 6.5, interlineado: 10, peso: 400, tracking: 0.1, color: 'tinta.etiqueta' },
+  'formaPago.valor': { familia: FUENTE.neogrotesca, cuerpo: 9.5, interlineado: 13, peso: 400, tracking: 0, color: 'tinta.negra' },
   'recomendaciones.encabezado': { familia: FUENTE.neogrotesca, cuerpo: 9, interlineado: 13, peso: 600, tracking: 0.14, color: 'tinta.negra' },
   'alarma.encabezado': { familia: FUENTE.neogrotesca, cuerpo: 9.5, interlineado: 13, peso: 600, tracking: 0.22, color: 'tinta.negra' },
   'firma.nombre': { familia: FUENTE.neogrotesca, cuerpo: 11.5, interlineado: 16, peso: 600, tracking: -0.012, color: 'tinta.negra' },
@@ -511,6 +612,15 @@ export const CIFRAS_TABULARES = [
   'entrada.numero',
   'entradaCompacta.numero',
   'entradaMedicamento.numero',
+  // Los dos de la tabla de II.5. `concepto.texto` entra por el PRECIO, que es la
+  // única columna del sistema donde una cifra tiene que sumar visualmente con la
+  // de abajo (2.T regla 1); el concepto comparte rol y no lleva cifras.
+  'concepto.numero',
+  'concepto.texto',
+  // La póliza es alfanumérica y la lámina la compone tabular igual: es un
+  // identificador que se coteja carácter a carácter contra el oficio de la
+  // aseguradora, que es el mismo caso que el folio.
+  'aseguradora.valor',
   'folio',
   'medico.credencial',
   'firma.credencial',
@@ -597,6 +707,46 @@ export const FILETE_SUPLEMENTACION = {
   acento: 1.9,
   /** Regla entre entradas y filete de notas. El chasis pone `filete.regla`, 0.5. */
   regla: 0.63,
+} as const
+
+/**
+ * LOS CUATRO GROSORES QUE MIDE LA LÁMINA DE RECIBO Y COTIZACIÓN.
+ *
+ * Mismo criterio que `FILETE_SUPLEMENTACION`, y por la misma razón de §0: cada uno
+ * tiene más de un consumidor, así que no puede vivir en la ficha de un componente.
+ *
+ *   `regla`   regla de fila de la tabla (II.5) · línea de escritura de la celda de
+ *             paciente (2.F) · filete del riel de importes (2.T)
+ *   `riel`    los dos filetes del riel de identificación (2.F)
+ *   `firma`   la línea sobre la que se firma (2.L)
+ *   `acento`  el marco parcial de dos lados (2.U)
+ *
+ * ⚠ **ESTA LÁMINA DIBUJA SUS HAIRLINES MEDIO PUNTO POR DEBAJO DEL CHASIS Y LOS TRES
+ * PRIMEROS VALORES SON DISTINTOS ENTRE SÍ.** No se unifican, por lo mismo que no se
+ * unificaron los 0.75 del riel de las otras tres láminas: mover `filete.fino` o
+ * `filete.regla` mueve los cuatro formatos ya conciliados. Reportado.
+ *
+ * `COINCIDENCIA` — `regla` vale lo mismo que `FILETE_SUPLEMENTACION.regla` y **no es
+ * él**: son dos láminas distintas que miden 0.63 por su cuenta. Fusionarlos ataría la
+ * regla de esta tabla a la de las entradas de aquel formato.
+ *
+ * `DERIVADO, NO MEDIDO` — `riel`. La lámina da las dos cotas del riel de
+ * identificación —abre en 219.85, cierra en 250.8— y la celda base mide 30 como en
+ * todo el sistema: los 0.95 pt que sobran son sus dos filetes, 0.475 cada uno. Es del
+ * mismo orden que el 0.47 de la línea de firma, que esta misma lámina sí declara.
+ *
+ * `regla` interior del riel: **NO EXISTE EN ESTA LÁMINA**. Su riel es de una sola
+ * fila, así que no hay ninguna regla horizontal que dibujar. Ver `TRAZO` en 2.F.
+ */
+export const FILETE_HONORARIOS = {
+  /** Regla de fila, línea de escritura y filete del riel de importes. */
+  regla: 0.63,
+  /** Filetes de apertura y cierre del riel de identificación. */
+  riel: 0.475,
+  /** La línea de firma. El chasis pone `filete.fino`, 0.8; las otras láminas, 0.75. */
+  firma: 0.47,
+  /** Los dos lados del marco parcial. El chasis pone `filete.acento`, 2. */
+  acento: 2.53,
 } as const
 
 // ───────────────────────────────────────────────────────────────────────────────
@@ -749,8 +899,36 @@ export const ESPACIO = {
  *   2.I  cita con filete superior e izquierdo, y ranura de composición propia
  *
  * Las dos primeras son el valor del chasis o el de otra lámina, no cifras nuevas.
+ *
+ * **Y AHORA SON CINCO. LA QUINTA NO HEREDA DE NINGUNA Y ESO ES LO QUE LA DEFINE.**
+ *
+ * `honorarios` es la lámina de Recibo y Cotización, y es la más divergente de las
+ * cinco: su membrete vuelve al renglón único de Laboratorio —sin cédulas ni
+ * universidad, `D23`—, su bloque de título es el más alto del sistema (50 pt) y el
+ * único con rótulo de subtítulo, su riel es de una sola fila, y su fila de cierre
+ * invierte las dos columnas de I.1.3. Lo que declara de propio:
+ *
+ *   2.B  banda de UN renglón a 7.5 / 12         (Laboratorio compone uno a 7.5 / 11)
+ *   2.B  espaciador de continuación a 24        (los cuatro anteriores, 12)
+ *   2.C  caja 321 + riel 156 —los del chasis— con rótulo de subtítulo y aire de 6
+ *   2.F  filetes del riel 0.475, celda con fondo y celda con línea de escritura
+ *   2.L  línea 0.47 · nombre 10 / 14 · ancho declarado por el formato
+ *   2.T  y 2.U, que nacen con ella
+ *
+ * ⚠ **LA FILA DE CIERRE VA AL REVÉS QUE EN LOS OTROS CUATRO.** `cierre.izquierda`
+ * (246) es aquí la columna DERECHA —la del riel de importes, que la lámina sitúa en
+ * `x = 312`— y `cierre.derecha` (216) la IZQUIERDA, la de la firma en `x = 72`. Los
+ * dos nombres se corrigieron una vez contra B.3 y B.4 y siguen siendo correctos para
+ * aquellas láminas: lo que esta añade es que **el reparto 246 / 24 / 216 no siempre
+ * cae del mismo lado**. No los vuelvas a cambiar por esto —moverías Imagenología,
+ * Receta y Suplementación—; lo que hay que leer es el VALOR. Reportado.
  */
-export type Lamina = 'chasis' | 'imagenologia' | 'receta' | 'suplementacion'
+export type Lamina =
+  | 'chasis'
+  | 'imagenologia'
+  | 'receta'
+  | 'suplementacion'
+  | 'honorarios'
 
 /**
  * Las nueve transiciones entre bloques declaradas por el diseño (I.1.7).
@@ -972,6 +1150,31 @@ export interface AcentoResuelto {
 }
 
 /**
+ * `acento.base` mezclado con blanco a la proporción pedida, por mezcla OPACA.
+ *
+ * Existe porque **el velo dejó de tener un solo valor** y I.1.8 ya lo preveía: declara
+ * `acento.velo` al 6 % y, en la misma línea, un **máximo admitido del 12 %** para
+ * cualquier fondo tenue. Un máximo sin más valores que él es un máximo sin uso; la
+ * celda de vigencia de II.5 es el primero que lo estrena, al 8 %.
+ *
+ * ⚠ **EL 8 % ES UN VALOR NUEVO Y QUEDA REPORTADO.** Es el único fondo de celda de los
+ * cinco formatos extraídos, y la razón por la que se compone es que no es el único
+ * portador de significado (I.3.3): la vigencia se distingue **además** por el peso de
+ * su cifra y por la tinta de su rótulo, así que sobrevive a la fotocopia. Quien quite
+ * cualquiera de esos dos deja el color solo y rompe la regla.
+ *
+ * La proporción se recorta al máximo de I.1.8 en vez de confiarse: un velo por encima
+ * del 12 % deja de ser tenue y pasa a ser la barra sólida que I.3.2 prohíbe.
+ */
+export function veloDeAcento(base: string, proporcion: number): string {
+  const leido = leerHex(base)
+  if (leido === null) return escribirHex(BLANCO)
+  return escribirHex(
+    mezclar(leido, BLANCO, Math.min(proporcion, ACENTO_DERIVACION.velo.maximo)),
+  )
+}
+
+/**
  * Deriva los tres tonos del acento a partir del hex configurado por el médico.
  *
  * REGLA DURA de I.1.8: el acento nunca es color de texto en su forma pura. Solo
@@ -990,7 +1193,9 @@ export function resolverAcento(hex: string = ACENTO_BASE_POR_DEFECTO): AcentoRes
     valido,
     tinta: darkenToContrast(base, ACENTO_DERIVACION.tinta.objetivo, ACENTO_DERIVACION.tinta.tMax),
     banda: darkenToContrast(base, ACENTO_DERIVACION.banda.objetivo, ACENTO_DERIVACION.banda.tMax),
-    velo: escribirHex(mezclar(leerHex(base)!, BLANCO, ACENTO_DERIVACION.velo.proporcion)),
+    // Por la misma puerta que el velo de la celda de vigencia: un solo sitio donde
+    // se mezcla contra blanco, y el 6 % es una proporción más, no un caso aparte.
+    velo: veloDeAcento(base, ACENTO_DERIVACION.velo.proporcion),
   }
 }
 

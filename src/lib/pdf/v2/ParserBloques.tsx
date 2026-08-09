@@ -65,7 +65,7 @@ import { ESPACIO, FUENTE, RETICULA, estiloTipografico } from './tokens'
 const RAYA = '—'
 
 /**
- * Los dos roles con los que un consumidor puede pedir el cuerpo.
+ * Los TRES roles con los que un consumidor puede pedir el cuerpo.
  *
  * `texto.corrido` es el caso normal y el que declara la lista de tokens de la
  * ficha. `alarma.cuerpo` existe porque el bloque de alarma de la Receta lleva
@@ -74,10 +74,20 @@ const RAYA = '—'
  * componente solo declara que hay una ranura para él. Es la misma forma que toma
  * la excepción tipográfica de celda en 2.F.
  *
- * La lista está cerrada a esos dos a propósito: una prop abierta a los 23 roles
- * de I.1.4 sería una puerta para componer el cuerpo con cualquier cosa.
+ * **Y AHORA SON TRES.** `texto.reducido` entra con las notas de II.5, y lo que lo
+ * justifica no es el gusto sino la MEDIDA DE LÍNEA: ese texto no vive en la caja
+ * de 486 pt sino en la columna derecha de la fila de cierre, que mide 246. El
+ * texto corrido del sistema en esa columna compone ocho renglones donde la lámina
+ * mide cinco.
+ *
+ * **La lista sigue CERRADA y eso no es una formalidad**: una prop abierta a los 35
+ * roles de I.1.4 sería una puerta para componer el cuerpo con cualquier cosa. Cada
+ * miembro nuevo cuesta una lámina que lo mida y un motivo que no sea estético.
  */
-export type RolCuerpoParser = 'texto.corrido' | 'alarma.cuerpo'
+export type RolCuerpoParser =
+  | 'texto.corrido'
+  | 'alarma.cuerpo'
+  | 'texto.reducido'
 
 const estilos = StyleSheet.create({
   /**
@@ -93,9 +103,11 @@ const estilos = StyleSheet.create({
   encabezado: { ...estiloTipografico('etiqueta') },
   cuerpoCorrido: { ...estiloTipografico('texto.corrido') },
   cuerpoAlarma: { ...estiloTipografico('alarma.cuerpo') },
+  cuerpoReducido: { ...estiloTipografico('texto.reducido') },
   /** La marca hereda cuerpo e interlineado del texto y cambia de familia (D30). */
   marcaCorrido: { ...estiloTipografico('texto.corrido'), fontFamily: FUENTE.neogrotesca },
   marcaAlarma: { ...estiloTipografico('alarma.cuerpo'), fontFamily: FUENTE.neogrotesca },
+  marcaReducido: { ...estiloTipografico('texto.reducido'), fontFamily: FUENTE.neogrotesca },
   /**
    * SANGRÍA DEL ÍTEM COLGANTE — `reticula.riel` + `reticula.medianil` (`CIERRA
    * H3`). Misma anatomía que la entrada de 2.G y la sección de 2.P: riel a la
@@ -134,20 +146,31 @@ function Nodo({
   primero,
   bloqueAnterior,
   marca,
-  alarma,
+  rolCuerpo,
 }: {
   nodo: NodoParser
   primero: boolean
   bloqueAnterior: number
   marca: ParserBloquesProps['marca']
-  alarma: boolean
+  rolCuerpo: RolCuerpoParser
 }): ReactElement {
   const separacion = primero
     ? {}
     : nodo.bloque === bloqueAnterior
       ? estilos.dentroDelBloque
       : estilos.entreBloques
-  const cuerpo = alarma ? estilos.cuerpoAlarma : estilos.cuerpoCorrido
+  const cuerpo =
+    rolCuerpo === 'alarma.cuerpo'
+      ? estilos.cuerpoAlarma
+      : rolCuerpo === 'texto.reducido'
+        ? estilos.cuerpoReducido
+        : estilos.cuerpoCorrido
+  const marcaEstilo =
+    rolCuerpo === 'alarma.cuerpo'
+      ? estilos.marcaAlarma
+      : rolCuerpo === 'texto.reducido'
+        ? estilos.marcaReducido
+        : estilos.marcaCorrido
 
   if (nodo.tipo === 'encabezado') {
     // Versalita: mayúsculas con tracking, como toda versalita del sistema (I.1.4).
@@ -161,7 +184,7 @@ function Nodo({
   return (
     <View style={[estilos.item, separacion]}>
       <View style={estilos.riel}>
-        <Text style={alarma ? estilos.marcaAlarma : estilos.marcaCorrido}>
+        <Text style={marcaEstilo}>
           {marca === 'numero' ? `${nodo.ordinal}.` : RAYA}
         </Text>
       </View>
@@ -179,8 +202,6 @@ export default function ParserBloques({
   const nodos = analizar(texto)
   if (nodos.length === 0) return null
 
-  const alarma = rolCuerpo === 'alarma.cuerpo'
-
   return (
     <View>
       {nodos.map((nodo, i) => (
@@ -192,7 +213,7 @@ export default function ParserBloques({
           primero={i === 0}
           bloqueAnterior={i === 0 ? nodo.bloque : nodos[i - 1].bloque}
           marca={marca}
-          alarma={alarma}
+          rolCuerpo={rolCuerpo}
         />
       ))}
     </View>

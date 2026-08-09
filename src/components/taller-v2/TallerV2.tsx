@@ -81,6 +81,7 @@ type Vista =
   | 'imagenologia'
   | 'receta'
   | 'suplementacion'
+  | 'honorarios'
 
 /**
  * EL SELECTOR — EL CHASIS Y LOS OCHO FORMATOS DE LA SECCIÓN II.
@@ -112,7 +113,7 @@ const VISTAS: readonly EntradaSelector[] = [
   { vista: 'imagenologia', codigo: '4.2', nombre: 'Imagenología' },
   { vista: 'receta', codigo: '4.3', nombre: 'Receta' },
   { vista: 'suplementacion', codigo: '4.4', nombre: 'Suplementación' },
-  { vista: null, codigo: '4.5', nombre: 'Honorarios' },
+  { vista: 'honorarios', codigo: '4.5', nombre: 'Honorarios' },
   { vista: null, codigo: '4.6', nombre: 'Internamiento' },
   { vista: null, codigo: '4.7', nombre: 'Consentimiento' },
   { vista: null, codigo: '4.8', nombre: 'Escrito médico' },
@@ -130,10 +131,32 @@ const VISTAS: readonly EntradaSelector[] = [
  * El chasis no tiene casos —es una hoja de muestras, no un documento—, así que su
  * selector no aparece.
  */
-const CASOS: ReadonlyArray<{ caso: string; etiqueta: string; nota: string }> = [
+interface EntradaCaso {
+  readonly caso: string
+  readonly etiqueta: string
+  readonly nota: string
+}
+
+const CASOS: readonly EntradaCaso[] = [
   { caso: 'completo', etiqueta: 'Completo', nota: 'Todos los estados de la entrada' },
   { caso: 'minimo', etiqueta: 'Mínimo', nota: 'Lo justo, sin bloques de cierre' },
   { caso: 'lleno', etiqueta: 'Lleno', nota: 'Desborda: enseña la hoja 2' },
+]
+
+/**
+ * LOS CASOS DE HONORARIOS NO SON LOS TRES DE ARRIBA, y no es una comodidad del taller:
+ * ese formato tiene DOS documentos —cotización y recibo— con trece diferencias medidas
+ * entre ellos, así que su eje no es cuánto contenido trae sino cuál de los dos se emite.
+ * El tercero es un recibo de un concepto **sin paciente**, que es lo único que enseña la
+ * línea de escritura del riel.
+ *
+ * El `lleno` de los otros cuatro lo hace aquí el recibo, que con sus 14 conceptos
+ * desborda y enseña la hoja de continuación con el eco del total.
+ */
+const CASOS_HONORARIOS: readonly EntradaCaso[] = [
+  { caso: 'cotizacion', etiqueta: 'Cotización', nota: 'Aseguradora, origen, subtotales y QR' },
+  { caso: 'recibo', etiqueta: 'Recibo', nota: '14 conceptos: desborda y enseña la hoja 2' },
+  { caso: 'minimo', etiqueta: 'Mínimo', nota: 'Un concepto y el paciente vacío' },
 ]
 
 type Estado =
@@ -156,6 +179,19 @@ export default function TallerV2(): ReactElement {
   const [estado, setEstado] = useState<Estado>({ fase: 'generando' })
 
   const acento = resolverAcento(acentoHex)
+  /** Qué casos ofrece la vista que se está mirando. Ver `CASOS_HONORARIOS`. */
+  const casos = vista === 'honorarios' ? CASOS_HONORARIOS : CASOS
+
+  /**
+   * Cambiar de vista **reinicia el caso al primero de la nueva**: los de Honorarios no
+   * son los de los otros cuatro, así que un `completo` heredado dejaría el selector
+   * marcando un botón que no existe y el PDF cayendo al caso por defecto sin decirlo.
+   */
+  function elegirVista(nueva: Vista): void {
+    setVista(nueva)
+    const primero = nueva === 'honorarios' ? CASOS_HONORARIOS[0] : CASOS[0]
+    setCaso(primero.caso)
+  }
 
   /**
    * Carga un logo del disco como data URL. No sube nada a ninguna parte: se
@@ -201,9 +237,11 @@ export default function TallerV2(): ReactElement {
                   ? (await import('./HojaReceta')).generarPdfReceta
                   : vista === 'suplementacion'
                     ? (await import('./HojaSuplementacion')).generarPdfSuplementacion
-                    : // La hoja de chasis no tiene casos: se le pasa el argumento y lo
-                    // ignora, que es más barato que ramificar la llamada.
-                    (await import('./HojaTaller')).generarPdfTaller
+                    : vista === 'honorarios'
+                      ? (await import('./HojaHonorarios')).generarPdfHonorarios
+                      : // La hoja de chasis no tiene casos: se le pasa el argumento y lo
+                      // ignora, que es más barato que ramificar la llamada.
+                      (await import('./HojaTaller')).generarPdfTaller
           const blob = await generar(medico, acentoHex, caso)
           if (cancelado) return
           urlCreada = URL.createObjectURL(blob)
@@ -270,7 +308,7 @@ export default function TallerV2(): ReactElement {
                     key={v.codigo}
                     type="button"
                     disabled={pendiente}
-                    onClick={() => v.vista !== null && setVista(v.vista)}
+                    onClick={() => v.vista !== null && elegirVista(v.vista)}
                     title={pendiente ? 'Todavía no construido' : undefined}
                     className={`rounded border px-2.5 py-1.5 text-left text-xs ${
                       activa
@@ -299,7 +337,7 @@ export default function TallerV2(): ReactElement {
                   Caso
                 </h3>
                 <div className="mt-3 grid grid-cols-3 gap-2">
-                  {CASOS.map((c) => (
+                  {casos.map((c) => (
                     <button
                       key={c.caso}
                       type="button"

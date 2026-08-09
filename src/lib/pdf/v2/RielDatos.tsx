@@ -44,6 +44,7 @@ import { tieneValor } from './Campo'
 import {
   CAJA,
   FILETE,
+  FILETE_HONORARIOS,
   RETICULA,
   RIEL_CELDA,
   TINTA,
@@ -104,12 +105,21 @@ const GEOMETRIA = {
  * los mismos 0.75 y 0.375, así que el aviso pasa de dos contra uno a **tres contra
  * uno**: solo Laboratorio compone 0.8 y 0.5. Sigue sin unificarse aquí, y ya no por
  * falta de votos sino porque es una decisión de producto. Reportado.
+ *
+ * **Y LA DE HONORARIOS ES LA CUARTA, CON UNA CIFRA PROPIA Y UNA QUE NO EXISTE.** Su
+ * riel abre en 219.85 y cierra en 250.8: con la celda base en 30, los 0.95 pt que
+ * sobran son sus dos filetes a **0.475**, que es del mismo orden que el 0.47 con el que
+ * esa misma lámina dibuja la línea de firma. Su regla interior **no está medida y no
+ * puede estarlo**: el riel de este formato es de una sola fila, así que no hay ninguna
+ * regla horizontal que dibujar. Se declara la de las tres láminas anteriores para no
+ * dejar el miembro sin valor, y no la lee nadie.
  */
 const TRAZO = {
   chasis: { filete: FILETE.fino, regla: FILETE.regla },
   imagenologia: { filete: 0.75, regla: 0.375 },
   receta: { filete: 0.75, regla: 0.375 },
   suplementacion: { filete: 0.75, regla: 0.375 },
+  honorarios: { filete: FILETE_HONORARIOS.riel, regla: 0.375 },
 } as const satisfies Record<Lamina, { filete: number; regla: number }>
 
 /** Lo que una desviación puede mover de un rol: solo su cuerpo y su interlineado. */
@@ -268,6 +278,30 @@ const estilos = StyleSheet.create({
     fontSize: DESVIACION.valor.cuerpo,
     lineHeight: DESVIACION.valor.interlineado / DESVIACION.valor.cuerpo,
   },
+  /**
+   * LA LÍNEA DE ESCRITURA DE UNA CELDA — el estado «vacío requerido» de 2.E, dentro
+   * del riel.
+   *
+   * ⚠ **NO LA COMPONE 2.E Y NO PUEDE COMPONERLA**, aunque sea su estado y aunque su
+   * regla 1 sea la que manda aquí —rótulo y línea, sin leyenda de error—. Aquel
+   * componente monta su propio rótulo en `etiqueta` sin la desviación del riel y su
+   * línea mide `manuscrito.ancho` × `manuscrito.alto` (246 × 20), que es más ancha que
+   * varias celdas y más alta que la celda entera. Lo que se comparte con 2.E es lo que
+   * ya se compartía: la REGLA de qué cuenta como dato ausente (`tieneValor`), y ahora
+   * también la de qué se imprime cuando falta.
+   *
+   * El alto y el grosor los declara el CONSUMIDOR, como la excepción de valor: 2.F no
+   * sabe qué celda de qué formato se llena a pluma. Hoy solo una — la del paciente en
+   * el recibo mínimo, 16.47 × 0.63 —, y con ella la celda pasa de 30 a **33.47** pt.
+   *
+   * ⚠ **`D27` SE COMPONE Y NO SE RESUELVE.** `manuscrito.alto` son 20 pt medidos
+   * contra el pautado de un cuaderno (I.1.5) y esta lámina dibuja 16.47; ya había un
+   * tercer valor de 16 en el espécimen y uno de 11 en Receta. Se compone el de la
+   * lámina y queda reportado.
+   */
+  escritura: {
+    borderBottomColor: TINTA.negra,
+  },
   /** El mismo valor un peso por encima. Ver `PESO_VALOR_RECETA`. */
   valorReceta: {
     ...estiloTipografico('dato'),
@@ -297,6 +331,17 @@ export type EstiloValorCelda = typeof estilos.valor
  * 11.5 / 13. Una desviación declarada solo sirve si TODO el riel parte de ella.
  */
 export const VALOR_CELDA: EstiloValorCelda = estilos.valor
+
+/** Estilo del rótulo de una celda. Mismo motivo de tipos que `EstiloValorCelda`. */
+export type EstiloEtiquetaCelda = typeof estilos.etiqueta
+
+/**
+ * El rótulo de celda YA DESVIADO —`etiqueta` a interlineado 10—, para que un consumidor
+ * construya SU excepción encima en vez de partir del rol crudo. Es la misma puerta que
+ * `VALOR_CELDA` y existe por el mismo defecto: partiendo del rol, el rótulo volvería a
+ * los 11 pt de interlineado y estiraría la celda.
+ */
+export const ETIQUETA_CELDA: EstiloEtiquetaCelda = estilos.etiqueta
 
 /**
  * El valor por defecto de cada lámina. Lo consulta 2.D para saber si su excepción
@@ -365,6 +410,43 @@ export interface CeldaRiel {
    * compone tal cual.
    */
   readonly paddingIzquierdo?: number
+  /**
+   * FONDO DE LA CELDA. Hoy uno solo en todo el sistema: la celda de vigencia de II.5,
+   * que la lámina rellena con el acento al 8 % (`veloDeAcento` en la capa de tokens).
+   *
+   * ⚠ **ES EL ÚNICO FONDO DE CELDA DE LOS CINCO FORMATOS EXTRAÍDOS Y QUEDA REPORTADO**
+   * (`D25`). Se compone porque el color **no es el único portador de significado**
+   * (I.3.3): esa celda se distingue además por el peso de su cifra y por la tinta de su
+   * rótulo, así que sobrevive a la fotocopia. Quien quite cualquiera de los dos deja el
+   * color solo y rompe la regla.
+   *
+   * Entra como hex ya resuelto y no como proporción: 2.F no deriva colores.
+   */
+  readonly fondo?: string
+  /**
+   * Excepción tipográfica del RÓTULO, con la misma forma que la del valor. Hoy una
+   * sola: el rótulo `Vigencia`, que la lámina compone en `tinta.secundaria` y no en el
+   * `tinta.etiqueta` de todas las demás etiquetas del sistema.
+   *
+   * Es media distinción de las dos que salvan el fondo de la regla 3 de I.3.3, así que
+   * **no es cosmética**: quitarla deja la vigencia distinguida solo por color.
+   */
+  readonly estiloEtiqueta?: EstiloEtiquetaCelda
+  /**
+   * LÍNEA DE ESCRITURA cuando la celda no trae valor: el estado «vacío requerido» de
+   * 2.E. **Con ella la celda NO colapsa** — conserva su rótulo y deja el hueco donde se
+   * escribe a pluma.
+   *
+   * Sin ella, una celda sin dato desaparece y las demás redistribuyen, que es lo que
+   * hacen las siete celdas de los cuatro formatos anteriores. Ver `escritura` en la
+   * hoja de estilos.
+   */
+  readonly escritura?: {
+    /** Alto del espacio de escritura, en pt. La lámina de II.5 mide 16.47. */
+    readonly alto: number
+    /** Grosor de la línea. La lámina de II.5 mide 0.63. */
+    readonly grosor: number
+  }
   /**
    * Excepción tipográfica del valor, cuando el consumidor declara una en su
    * propia ficha. Sin ella, el valor va en el rol `dato`, que es el caso normal.
@@ -446,6 +528,7 @@ function Fila({
               flexGrow: celda.columnas,
               paddingLeft: celda.paddingIzquierdo ?? GEOMETRIA.padding.lateral,
             },
+            celda.fondo === undefined ? {} : { backgroundColor: celda.fondo },
             /*
               LA REGLA VERTICAL, Y NUNCA EN LA PRIMERA CELDA VIVA. Las celdas llegan
               aquí ya filtradas, así que `indice === 0` es la primera que SOBREVIVE al
@@ -464,10 +547,14 @@ function Fila({
           ]}
         >
           {celda.etiquetaSecundaria === undefined ? (
-            <Text style={estilos.etiqueta}>{celda.etiqueta.toUpperCase()}</Text>
+            <Text style={[estilos.etiqueta, celda.estiloEtiqueta ?? {}]}>
+              {celda.etiqueta.toUpperCase()}
+            </Text>
           ) : (
             <View style={estilos.filaRotulos}>
-              <Text style={estilos.etiqueta}>{celda.etiqueta.toUpperCase()}</Text>
+              <Text style={[estilos.etiqueta, celda.estiloEtiqueta ?? {}]}>
+                {celda.etiqueta.toUpperCase()}
+              </Text>
               <Text
                 style={[celda.etiquetaSecundaria.estilo, estilos.rotuloSecundario]}
               >
@@ -475,7 +562,24 @@ function Fila({
               </Text>
             </View>
           )}
-          <Text style={celda.estiloValor ?? valor}>{celda.valor}</Text>
+          {/*
+            LOS DOS ESTADOS CON TINTA DE 2.E, DENTRO DE LA CELDA. Con dato, el valor;
+            sin dato y con espacio de escritura declarado, la línea. El tercer estado
+            —vacío opcional— no llega hasta aquí: la celda se filtró antes de montarse.
+          */}
+          {tieneValor(celda.valor) || celda.escritura === undefined ? (
+            <Text style={celda.estiloValor ?? valor}>{celda.valor}</Text>
+          ) : (
+            <View
+              style={[
+                estilos.escritura,
+                {
+                  height: celda.escritura.alto,
+                  borderBottomWidth: celda.escritura.grosor,
+                },
+              ]}
+            />
+          )}
         </View>
       ))}
     </View>
@@ -498,7 +602,14 @@ export default function RielDatos(props: RielDatosProps): ReactElement {
    * superior en la fila de arriba del todo en cuanto colapsara la fila 1.
    */
   const vivas = declaradas
-    .map((fila) => fila.filter((celda) => tieneValor(celda.valor)))
+    .map((fila) =>
+      fila.filter(
+        // Una celda con espacio de escritura declarado SOBREVIVE sin dato: es el
+        // estado «vacío requerido» de 2.E, y colapsarla sería el defecto §8.8 al
+        // revés — quitar el hueco donde hay que escribir.
+        (celda) => tieneValor(celda.valor) || celda.escritura !== undefined,
+      ),
+    )
     .filter((fila) => fila.length > 0)
 
   const lamina = props.lamina ?? 'chasis'

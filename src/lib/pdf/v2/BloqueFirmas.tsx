@@ -56,6 +56,7 @@ import {
   CIERRE,
   ESPACIO,
   FILETE,
+  FILETE_HONORARIOS,
   FIRMA,
   FUENTE,
   TINTA,
@@ -120,6 +121,39 @@ const GEOMETRIA = {
     aireNombre: ESPACIO[4],
     interlineadoNombre: 15,
     cuerpoNombre: 11,
+  },
+  /**
+   * LA MISMA FIRMA EN LA LÁMINA DE HONORARIOS — **117.47 pt**, y cierra sin residuo.
+   *
+   *     firma.rol         11
+   *     firma.espacio     77
+   *     línea              0.47   las otras dos láminas, 0.75; el chasis, 0.8
+   *     aire bajo la línea 4      igual que las otras dos; el chasis, `espacio.5`
+   *     nombre            14      Archivo **10 / 14**
+   *     cédulas           11      igual
+   *                       ───────
+   *                       117.47
+   *
+   * ⚠ **EL NOMBRE VA A 10 / 14 Y ES EL CUARTO VALOR DEL SISTEMA PARA EL MISMO
+   * RENGLÓN.** Laboratorio lo compone a 11.5 / 16 —el rol `firma.nombre`—, Imagenología
+   * y Receta a 11 / 15, Suplementación hereda esos, y esta lámina baja a 10 / 14. Se
+   * compone el de cada lámina y **queda reportado**: no hay ninguna que gane sobre las
+   * otras tres mientras las cuatro estén aprobadas.
+   *
+   * La línea de 0.47 es el mismo hairline con el que esta lámina dibuja los filetes de
+   * su riel (0.475) y su regla de fila (0.63): ver `FILETE_HONORARIOS`. Mismo aviso que
+   * en las otras dos medidas — si alguno de estos fuera el valor real del sistema,
+   * `filete.fino` está mal en los ocho formatos.
+   *
+   * Las cédulas conservan el tratamiento de las otras dos láminas —IBM Plex Sans sobre
+   * `tinta.etiqueta`, `D9`— porque esta no declara nada de ellas más que su alto, que
+   * es el mismo. `DERIVADO POR MAYORÍA`, no medido.
+   */
+  medidaHonorarios: {
+    linea: FILETE_HONORARIOS.firma,
+    aireNombre: ESPACIO[4],
+    interlineadoNombre: 14,
+    cuerpoNombre: 10,
   },
 } as const
 
@@ -223,6 +257,20 @@ const estilos = StyleSheet.create({
     fontFamily: FUENTE.humanista,
     color: TINTA.etiqueta,
   },
+  /** Las mismas cuatro desviaciones con las cifras de Honorarios. */
+  lineaHonorarios: {
+    borderBottomWidth: GEOMETRIA.medidaHonorarios.linea,
+  },
+  nombreHonorarios: {
+    ...estiloTipografico('firma.nombre'),
+    fontSize: GEOMETRIA.medidaHonorarios.cuerpoNombre,
+    lineHeight:
+      GEOMETRIA.medidaHonorarios.interlineadoNombre /
+      GEOMETRIA.medidaHonorarios.cuerpoNombre,
+    letterSpacing:
+      TIPOGRAFIA['firma.nombre'].tracking * GEOMETRIA.medidaHonorarios.cuerpoNombre,
+    marginTop: GEOMETRIA.medidaHonorarios.aireNombre,
+  },
 })
 
 export interface Firma {
@@ -254,8 +302,21 @@ interface ConLamina {
 
 export type BloqueFirmasProps = ConLamina &
   (
-    /** Una firma, en la columna izquierda de la fila de cierre. */
-    | { variante: 'simple'; firmas: readonly [Firma] }
+    /**
+     * Una firma, en la columna izquierda de la fila de cierre.
+     *
+     * `ancho` lo declara el formato cuando su fila de cierre no reparte las dos
+     * columnas como las demás. Sin él, `cierre.izquierda` (246), que es lo que componen
+     * los cuatro formatos anteriores.
+     *
+     * ⚠ **HONORARIOS LA COMPONE EN LA COLUMNA ESTRECHA, Y SIGUE SIENDO LA IZQUIERDA.**
+     * Esa lámina pone el riel de importes (246) a la derecha y la firma (216) a la
+     * izquierda: el reparto de I.1.3 es el mismo —246 / 24 / 216— pero cae del otro
+     * lado. Por eso lo que entra es el ANCHO y no un lado: la regla de 2.L —«la caja de
+     * firma vive en la columna izquierda»— no cambia, y los dos nombres de `cierre.*`
+     * tampoco. Ver la nota de `Lamina` en la capa de tokens.
+     */
+    | { variante: 'simple'; firmas: readonly [Firma]; ancho?: number }
     /** Dos firmas en la misma fila. */
     | { variante: 'pareja'; firmas: readonly [Firma, Firma] }
     /** De 3 a 6 firmas, en dos columnas. */
@@ -267,8 +328,12 @@ function UnaFirma({ firma, lamina }: { firma: Firma; lamina: Lamina }): ReactEle
   /**
    * Cualquier lámina distinta del chasis compone las cuatro desviaciones de
    * `GEOMETRIA.medida`: las dos que las miden dan las mismas cifras.
+   *
+   * **Salvo Honorarios**, que mide las cuatro por su cuenta y da otras dos cifras en
+   * dos de ellas. Ver `GEOMETRIA.medidaHonorarios`.
    */
   const medida = lamina !== 'chasis'
+  const honorarios = lamina === 'honorarios'
 
   return (
     <View>
@@ -283,14 +348,31 @@ function UnaFirma({ firma, lamina }: { firma: Firma; lamina: Lamina }): ReactEle
         )}
       </View>
 
-      <View style={[estilos.linea, medida ? estilos.lineaMedida : {}]} />
+      <View
+        style={[
+          estilos.linea,
+          honorarios
+            ? estilos.lineaHonorarios
+            : medida
+              ? estilos.lineaMedida
+              : {},
+        ]}
+      />
 
       {/*
         El renglón del nombre se reserva SIEMPRE, con o sin nombre: es la ranura
         que la fórmula de I.1.9 cuenta y es donde se escribe a mano cuando el
         formato deja la firma en blanco.
       */}
-      <Text style={medida ? estilos.nombreMedido : estilos.nombre}>
+      <Text
+        style={
+          honorarios
+            ? estilos.nombreHonorarios
+            : medida
+              ? estilos.nombreMedido
+              : estilos.nombre
+        }
+      >
         {firma.nombre ?? ' '}
       </Text>
 
@@ -334,7 +416,13 @@ export default function BloqueFirmas(props: BloqueFirmasProps): ReactElement {
   // es uno de los cuatro bloques indivisibles de 2.N (`CONCILIA D44`).
   if (props.variante === 'simple') {
     return (
-      <View style={estilos.cajaSimple} wrap={false}>
+      <View
+        style={[
+          estilos.cajaSimple,
+          props.ancho === undefined ? {} : { width: props.ancho },
+        ]}
+        wrap={false}
+      >
         <UnaFirma firma={props.firmas[0]} lamina={lamina} />
       </View>
     )

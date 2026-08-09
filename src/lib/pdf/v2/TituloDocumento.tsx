@@ -55,6 +55,7 @@ import FileteGruesoFino from './FileteGruesoFino'
 import {
   ESPACIO,
   RETICULA,
+  TINTA,
   TIPOGRAFIA,
   TRANSICION,
   ZONA,
@@ -144,6 +145,43 @@ const RECETA = {
  * dos aires no son la misma pareja.
  */
 const SUPLEMENTACION = { ...RECETA, tituloRiel: 10 } as const
+
+/**
+ * GEOMETRÍA DEL BLOQUE EN LA LÁMINA DE HONORARIOS — **LA DEL CHASIS, Y ES LA MÁS ALTA**.
+ *
+ * Su reparto horizontal no es propio: caja de 321 y riel de 156, que son `zona.texto` y
+ * `zona.riel` de A.8 sin tocar, y por eso aquí no se escribe ninguno de los dos. El
+ * riel lleva UNA celda —solo `Folio`—, como el chasis: la emisión de este formato no
+ * sube aquí, se queda en el riel de identificación con su rótulo entero
+ * (`Fecha de emisión`).
+ *
+ * Lo propio son dos cosas, y las dos son de la columna del título:
+ *
+ * a. **El aire hasta el filete son 6 pt**, donde el chasis pone 4.
+ *    `COINCIDENCIA` — vale lo mismo que el de Imagenología y no es él: aquella mide 10
+ *    del filete al riel y esta 8, que es el del chasis. No son la misma pareja.
+ * b. **El bloque mide 50 pt, el más alto del sistema**, y es el único que rotula su
+ *    subtítulo. Las tres piezas cierran la cifra sin residuo:
+ *
+ *        título       20      `titulo.documento`, 17 / 20
+ *        rótulo       15      4 de margen + 11 de `etiqueta`
+ *        subtítulo    15      11 / 15, que NO es el rol
+ *        ────────────────
+ *                     50
+ *
+ * ⚠ **EL SUBTÍTULO SE DESVÍA EN CUERPO, INTERLINEADO Y TINTA.** `titulo.subtitulo` va a
+ * 10.5 / 14 en `tinta.secundaria` y esta lámina lo compone a **11 / 15 en tinta plena**.
+ * Es una desviación declarada de variante, con el patrón de 2.F, 2.B y 2.L: el rol no se
+ * toca —lo sigue usando quien lo instancie— y no sube a I.1.4 mientras tenga un solo
+ * consumidor. La tinta plena es lo que lo separa de un subtítulo cualquiera: aquí el
+ * subtítulo es el PROCEDIMIENTO, que es lo que la aseguradora busca al leer la hoja.
+ */
+const HONORARIOS = {
+  tituloFilete: 6,
+  /** Aire entre el título y el rótulo del subtítulo. */
+  aireRotulo: ESPACIO[4],
+  subtitulo: { cuerpo: 11, interlineado: 15 },
+} as const
 
 /** Interlineado del título: el alto de UNA de sus líneas. Lo usa la fecha. */
 const ALTO_LINEA_TITULO = TIPOGRAFIA['titulo.documento'].interlineado ?? 0
@@ -308,6 +346,25 @@ const estilos = StyleSheet.create({
     flexShrink: 0,
   },
   fecha: { ...estiloTipografico('fecha.encabezado') },
+  /**
+   * EL RÓTULO DEL SUBTÍTULO — la versalita del sistema, con su aire de 4 pt. Es la
+   * única pieza de este bloque que no existía: hasta esta lámina, un subtítulo era un
+   * renglón suelto bajo el título y nadie decía qué era. Ver `HONORARIOS`.
+   */
+  rotuloSubtitulo: {
+    ...estiloTipografico('etiqueta'),
+    marginTop: HONORARIOS.aireRotulo,
+  },
+  /** El subtítulo con la desviación de la lámina encima del rol. Ver `HONORARIOS`. */
+  subtituloHonorarios: {
+    ...estiloTipografico('titulo.subtitulo'),
+    fontSize: HONORARIOS.subtitulo.cuerpo,
+    lineHeight: HONORARIOS.subtitulo.interlineado / HONORARIOS.subtitulo.cuerpo,
+    color: TINTA.negra,
+    // El mismo aire que el subtítulo del chasis cuando NO hay rótulo del que colgar.
+    // Con rótulo lo anula el render: el rótulo ya trae el suyo.
+    marginTop: ESPACIO[2],
+  },
   hastaFilete: {
     marginTop: TRANSICION.tituloFilete,
   },
@@ -316,6 +373,9 @@ const estilos = StyleSheet.create({
   },
   hastaFileteReceta: {
     marginTop: RECETA.tituloFilete,
+  },
+  hastaFileteHonorarios: {
+    marginTop: HONORARIOS.tituloFilete,
   },
 })
 
@@ -327,6 +387,15 @@ interface ConTitulo {
   titulo: string
   /** Colapsa si no viene (regla b del preámbulo de II). */
   subtitulo?: string
+  /**
+   * RÓTULO DEL SUBTÍTULO, en capitalización de oración: la versalita la pone el render.
+   *
+   * Lo lleva un solo formato —II.5 rotula el suyo `Procedimiento o motivo`— y es lo que
+   * convierte un renglón suelto en un dato con nombre. Colapsa con el subtítulo: sin
+   * subtítulo no hay nada que rotular, que es la misma condición con la que colapsa el
+   * rótulo de la nota en 2.G.
+   */
+  rotuloSubtitulo?: string
   /**
    * Fecha del encabezado, ya formateada por quien llama —II.8 la imprime en forma
    * corta y sin rótulo—. Colapsa si no viene: solo un formato la lleva aquí.
@@ -430,6 +499,7 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
   const lamina = props.lamina ?? 'chasis'
   const imagen = lamina === 'imagenologia'
   const suplementacion = lamina === 'suplementacion'
+  const honorarios = lamina === 'honorarios'
   /**
    * Suplementación compone el bloque **con las cifras de Receta** (ver `SUPLEMENTACION`),
    * así que aquí van juntas: lo único que las separa es el aire de abajo, y ese se
@@ -469,8 +539,28 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
           }
         >
           <Text style={estilos.titulo}>{props.titulo.toUpperCase()}</Text>
+          {/*
+            EL RÓTULO VA ENTRE EL TÍTULO Y EL SUBTÍTULO, y él lleva el aire de los dos:
+            con rótulo, el subtítulo va pegado a su rótulo —los 15 pt del bloque son 4 +
+            11 y 15 limpios—; sin él, conserva el `espacio.2` de la lámina de
+            Laboratorio. Son dos composiciones del mismo par, no un margen que se suma.
+          */}
           {props.subtitulo === undefined ? null : (
-            <Text style={estilos.subtitulo}>{props.subtitulo}</Text>
+            <>
+              {props.rotuloSubtitulo === undefined ? null : (
+                <Text style={estilos.rotuloSubtitulo}>
+                  {props.rotuloSubtitulo.toUpperCase()}
+                </Text>
+              )}
+              <Text
+                style={[
+                  honorarios ? estilos.subtituloHonorarios : estilos.subtitulo,
+                  props.rotuloSubtitulo === undefined ? {} : { marginTop: 0 },
+                ]}
+              >
+                {props.subtitulo}
+              </Text>
+            </>
           )}
           {props.bajoTitulo === undefined ? null : (
             <View style={estilos.bajoTitulo}>{props.bajoTitulo}</View>
@@ -521,7 +611,9 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
             ? estilos.hastaFileteImagenologia
             : receta
               ? estilos.hastaFileteReceta
-              : estilos.hastaFilete
+              : honorarios
+                ? estilos.hastaFileteHonorarios
+                : estilos.hastaFilete
         }
       >
         <FileteGruesoFino acento={props.acento} />

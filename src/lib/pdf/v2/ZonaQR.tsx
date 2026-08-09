@@ -79,7 +79,7 @@
 
 import { View, Text, Image, StyleSheet } from '@react-pdf/renderer'
 import type { ReactElement } from 'react'
-import { estiloTipografico, type AcentoResuelto } from './tokens'
+import { estiloTipografico, type AcentoResuelto, type Lamina } from './tokens'
 
 /**
  * Geometría de ESTE componente, medida en la lámina. I.1.7: la geometría interna
@@ -95,6 +95,24 @@ const GEOMETRIA = {
   qr: 56,
   /** Caja de texto → QR. La ficha declara 14. */
   medianil: 12,
+  /**
+   * LA DISPOSICIÓN DE LA LÁMINA DE HONORARIOS — **AL REVÉS, Y CON ANCHO**.
+   *
+   * Allí el QR va a la IZQUIERDA y el texto a su derecha, en una caja de 146 pt. Las
+   * tres cifras cierran la columna estrecha de su fila de cierre sin declararla:
+   * 56 + 14 + 146 = **216** = `cierre.derecha`, que es donde vive la firma de ese
+   * formato y bajo la que se apoya esta zona.
+   *
+   * **No es una variante de diseño: es que en esa hoja la zona no cuelga del borde
+   * derecho de la caja.** En Receta el grupo se ancla a la derecha del papel y por eso
+   * el texto crece hacia la izquierda sin ancho declarado; aquí abre una columna, así
+   * que lo que se ancla es el borde IZQUIERDO y el texto necesita medida propia o se
+   * comería el hueco de la firma.
+   *
+   * ⚠ El medianil son 14 y no los 12 de Receta. Es lo que mide B.5 §5 —y, otra vez, lo
+   * que la ficha de 2.R declaraba antes de que Receta lo desmintiera—. Reportado.
+   */
+  honorarios: { medianil: 14, texto: 146 },
 } as const
 
 const estilos = StyleSheet.create({
@@ -158,13 +176,26 @@ const estilos = StyleSheet.create({
     flexShrink: 0,
     alignItems: 'flex-end',
   },
+  /**
+   * La caja de texto de Honorarios: ancho declarado, a la derecha del QR y alineada
+   * por la izquierda. Es la imagen especular de la de arriba, y por eso sus dos
+   * declaraciones también lo son. Ver `GEOMETRIA.honorarios`.
+   */
+  textoHonorarios: {
+    width: GEOMETRIA.honorarios.texto,
+    marginLeft: GEOMETRIA.honorarios.medianil,
+    flexShrink: 0,
+    alignItems: 'flex-start',
+  },
   rotulo: { ...estiloTipografico('etiqueta'), textAlign: 'right' },
+  rotuloHonorarios: { textAlign: 'left' },
   /**
    * El folio va PEGADO a su rótulo, sin margen. Los 11.6 pt que había entre los dos
    * —10 de margen más 1.6 de filete— eran del filete y se fueron con él; ver la
    * cabecera. Si alguien vuelve a poner un margen aquí, que sea porque midió algo.
    */
   folio: { textAlign: 'right' },
+  folioHonorarios: { textAlign: 'left' },
   /**
    * El ráster, sin marco y sin fondo. `objectFit: 'contain'` conserva la proporción
    * del código: un QR estirado deja de leerse, que es lo único que este bloque tiene
@@ -191,30 +222,69 @@ export interface ZonaQRProps {
   readonly folio: string
   /** El filete corto y el folio van en acento. */
   readonly acento: AcentoResuelto
+  /** Qué lámina fija la disposición. Sin ella, la de Receta: texto a la izquierda. */
+  readonly lamina?: Lamina
 }
 
 /** 2.R · `ZonaQR`. */
-export default function ZonaQR({ qr, rotulo, folio, acento }: ZonaQRProps): ReactElement {
+export default function ZonaQR({
+  qr,
+  rotulo,
+  folio,
+  acento,
+  lamina = 'chasis',
+}: ZonaQRProps): ReactElement {
+  const honorarios = lamina === 'honorarios'
+
+  /* `Image` de react-pdf: no admite `alt` y su salida es un PDF, no un DOM. */
+  /* eslint-disable-next-line jsx-a11y/alt-text */
+  const codigo = <Image src={qr} style={estilos.qr} />
+
+  const texto = (
+    <View style={honorarios ? estilos.textoHonorarios : estilos.texto}>
+      <Text style={[estilos.rotulo, honorarios ? estilos.rotuloHonorarios : {}]}>
+        {rotulo.toUpperCase()}
+      </Text>
+      {/*
+        AQUÍ IBA EL FILETE CORTO. Ver `FILETE_RETIRADO` antes de reponerlo: la ficha
+        de 2.R lo declara, la lámina de Honorarios lo compone —40 × 1.6 en acento— y
+        la de Receta no lo lleva. **Se mantiene retirado en las dos**: es decisión de
+        Angel sobre el bloque, no sobre un formato. Reportado.
+      */}
+      {/*
+        El folio va en el rol `folio`, que es `acento.tinta`: se resuelve en el
+        render y se esparce en un literal, por la misma razón de tipos que en 2.B,
+        2.C, 2.D, 2.F y 2.G.
+
+        ⚠ La lámina de Honorarios lo compone a **10 / 14** y el rol va a 11 / 14. Se
+        compone el rol —es el mismo folio que imprime la banda de pie y el riel del
+        título de esa misma hoja— y queda reportado.
+      */}
+      <Text
+        style={{
+          ...estiloTipografico('folio', acento),
+          ...(honorarios ? estilos.folioHonorarios : estilos.folio),
+        }}
+      >
+        {folio}
+      </Text>
+    </View>
+  )
+
   return (
     <View style={estilos.zona} wrap={false}>
-      <View style={estilos.texto}>
-        <Text style={estilos.rotulo}>{rotulo.toUpperCase()}</Text>
-        {/*
-          AQUÍ IBA EL FILETE CORTO. Ver `FILETE_RETIRADO` antes de reponerlo: la ficha
-          de 2.R lo declara y la lámina de Angel no lo lleva.
-        */}
-        {/*
-          El folio va en el rol `folio`, que es `acento.tinta`: se resuelve en el
-          render y se esparce en un literal, por la misma razón de tipos que en 2.B,
-          2.C, 2.D, 2.F y 2.G.
-        */}
-        <Text style={{ ...estiloTipografico('folio', acento), ...estilos.folio }}>
-          {folio}
-        </Text>
-      </View>
-      {/* `Image` de react-pdf: no admite `alt` y su salida es un PDF, no un DOM. */}
-      {/* eslint-disable-next-line jsx-a11y/alt-text */}
-      <Image src={qr} style={estilos.qr} />
+      {/* Las dos disposiciones son el mismo par en el orden inverso. */}
+      {honorarios ? (
+        <>
+          {codigo}
+          {texto}
+        </>
+      ) : (
+        <>
+          {texto}
+          {codigo}
+        </>
+      )}
     </View>
   )
 }

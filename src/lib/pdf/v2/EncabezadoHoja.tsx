@@ -89,7 +89,10 @@ import Membrete, {
 } from './Membrete'
 import type { PanelCircularProps } from './PanelCircular'
 import TituloDocumento, { CeldaFolio, ETIQUETA_FOLIO_RIEL } from './TituloDocumento'
-import BloquePaciente, { type ValoresPaciente } from './BloquePaciente'
+import BloquePaciente, {
+  type RielHonorarios,
+  type ValoresPaciente,
+} from './BloquePaciente'
 import BloqueNegativo from './BloqueNegativo'
 import { CabeceraEntradas, CabeceraLista } from './EntradaNumerada'
 import { tieneValor } from './Campo'
@@ -160,6 +163,16 @@ export interface EncabezadoHojaProps {
   /** En capitalización de oración. La versalita y el rótulo los pone el chasis. */
   readonly titulo: string
   /**
+   * Subtítulo del bloque de título y su rótulo (2.C, reglas 5 y 6). Los dos colapsan y
+   * **solo salen en la hoja 1**: en las de continuación el título va plegado en la
+   * cabecera del membrete y no hay bloque del que colgarlos.
+   *
+   * Hoy los lleva un formato —II.5 rotula el suyo `Procedimiento o motivo`— y los dos
+   * son cadenas del FORMATO, así que entran por prop y no las escribe este componente.
+   */
+  readonly subtitulo?: string
+  readonly rotuloSubtitulo?: string
+  /**
    * El paciente. **Exigible**, y no solo en la hoja 1: la regla 2 de 2.D declara el
    * riel reducido obligatorio en cuanto el documento tiene más de una hoja.
    */
@@ -172,6 +185,27 @@ export interface EncabezadoHojaProps {
   readonly lista?: ListaEncabezado
   /** Separación entre el riel de identificación y la cabecera de la lista. */
   readonly aireLista?: number
+  /**
+   * Cuál de las dos filas del riel de Honorarios (2.D). Se pasa tal cual y solo lo lee
+   * esa lámina.
+   */
+  readonly rielHonorarios?: RielHonorarios
+  /**
+   * ECO DE LA HOJA ANTERIOR, al final de la línea de paciente y **solo en las hojas de
+   * continuación**.
+   *
+   * Lo lleva un formato y ninguno más: la hoja 2 de un recibo cierra con la firma y sin
+   * un solo importe, así que sin el eco sería una hoja firmada que no dice cuánto se
+   * está cobrando. La lámina compone `14 conceptos · total $18,400.00 USD en la hoja 1`.
+   *
+   * La cadena entera la redacta el FORMATO —lleva su sustantivo, su cifra y su divisa—,
+   * como todas las del sistema. Este componente la coloca y la une con la raya.
+   *
+   * ⚠ **VA EN EL MISMO RENGLÓN QUE EL PACIENTE Y LA LÁMINA LO ESCRIBE EN DOS.** Su
+   * propia cota lo desmiente: esa hoja mide 12 pt de línea de paciente, que es UN
+   * renglón de 7.5 / 12, y con dos serían 24. Se compone en uno y queda reportado.
+   */
+  readonly eco?: string
 }
 
 /**
@@ -242,7 +276,7 @@ const estilos = StyleSheet.create({
  * La línea de identificación: rótulo, nombre, edad y expediente, unidos por la raya
  * del sistema. Las piezas que no vienen no dejan raya suelta.
  */
-function lineaDePaciente(paciente: ValoresPaciente): string {
+function lineaDePaciente(paciente: ValoresPaciente, eco?: string): string {
   return [
     ROTULO_PACIENTE,
     paciente.paciente,
@@ -251,6 +285,7 @@ function lineaDePaciente(paciente: ValoresPaciente): string {
       ? `${ROTULO_EXPEDIENTE} ${paciente.expediente}`
       : undefined,
     tieneValor(paciente.peso) ? `${ROTULO_PESO} ${paciente.peso}` : undefined,
+    eco,
   ]
     .filter((pieza): pieza is string => tieneValor(pieza))
     .join(RAYA)
@@ -271,6 +306,7 @@ export default function EncabezadoHoja(props: EncabezadoHojaProps): ReactElement
         */
         <Membrete
           variante="continuacion"
+          lamina={props.lamina}
           acento={props.acento}
           medico={props.medico}
           rotulo={titulo}
@@ -308,6 +344,8 @@ export default function EncabezadoHoja(props: EncabezadoHojaProps): ReactElement
           lamina={props.lamina}
           acento={props.acento}
           titulo={titulo}
+          subtitulo={props.subtitulo}
+          rotuloSubtitulo={props.rotuloSubtitulo}
           emision={props.emision}
           folio={props.folio}
           bajoTitulo={
@@ -329,7 +367,9 @@ export default function EncabezadoHoja(props: EncabezadoHojaProps): ReactElement
       */}
       {continuacion ? (
         <View style={estilos.filaContinuacion}>
-          <Text style={estilos.lineaPaciente}>{lineaDePaciente(props.paciente)}</Text>
+          <Text style={estilos.lineaPaciente}>
+            {lineaDePaciente(props.paciente, props.eco)}
+          </Text>
           {props.urgente === true ? (
             <BloqueNegativo variante="urgenteReducido" lamina={props.lamina} />
           ) : null}
@@ -339,6 +379,7 @@ export default function EncabezadoHoja(props: EncabezadoHojaProps): ReactElement
           variante="completo"
           lamina={props.lamina}
           acento={props.acento}
+          rielHonorarios={props.rielHonorarios}
           {...props.paciente}
         />
       )}
