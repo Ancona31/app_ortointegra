@@ -44,6 +44,7 @@ import { tieneValor } from './Campo'
 import {
   CAJA,
   FILETE,
+  FILETE_CONSENTIMIENTO,
   FILETE_HONORARIOS,
   FILETE_INTERNAMIENTO,
   RETICULA,
@@ -97,6 +98,18 @@ const GEOMETRIA = {
    * Suplementación y el 0.56 de las de Receta. Reportado.
    */
   catalogo: { superior: 4, derecha: 10, inferior: 5, izquierda: 10 },
+  /**
+   * LA CELDA DEL RIEL EN LA LÁMINA DE CONSENTIMIENTO — `padding: 4 10 5`, no `3 10 4`.
+   *
+   * Con el valor a interlineado 14 —ver `DESVIACION_CONSENTIMIENTO`— la celda base mide
+   * **33 pt** y no los 30 de los seis formatos anteriores: 4 + 10 + 14 + 5. Es el único
+   * riel del sistema con otra altura de celda, y el motivo es su contenido — ninguna otra
+   * lámina mete un diagnóstico, un hospital y un domicilio en el mismo riel.
+   *
+   * `COINCIDENCIA` — el 4 y el 5 valen lo mismo que el padding del catálogo de II.6 y no
+   * son él: son dos rieles distintos de dos láminas distintas.
+   */
+  paddingConsentimiento: { superior: 4, lateral: 10, inferior: 5 },
 } as const
 
 /**
@@ -148,6 +161,21 @@ const TRAZO = {
   suplementacion: { filete: 0.75, regla: 0.375 },
   honorarios: { filete: FILETE_HONORARIOS.riel, regla: 0.375 },
   internamiento: { filete: FILETE_HONORARIOS.riel, regla: 0.375 },
+  /**
+   * **Y LA DE CONSENTIMIENTO ES LA SEXTA, Y SU COTA CIERRA SIN RESIDUO.** El riel abre en
+   * 398.75 y cierra en 537.6, y sus cuatro filas no miden lo mismo:
+   *
+   *     33      paciente · edad · expediente · fecha
+   *     35.47   familiar o responsable, con su línea de escritura de 16.47
+   *     33      diagnóstico
+   *     35      hospital o clínica · lugar, los dos a interlineado 16
+   *     ──────
+   *     136.47  + 2 × 0.63 de filete + 3 × 0.375 de regla = **138.855**
+   *
+   * contra los **138.85** medidos: cinco milésimas. Es el ajuste más fino de las seis
+   * láminas y es lo que fija el filete en 0.63 —con los 0.8 que lee B.7 §2 se pasa 0.345—.
+   */
+  consentimiento: { filete: FILETE_CONSENTIMIENTO.regla, regla: 0.375 },
 } as const satisfies Record<Lamina, { filete: number; regla: number }>
 
 /** Lo que una desviación puede mover de un rol: solo su cuerpo y su interlineado. */
@@ -209,6 +237,24 @@ const DESVIACION = {
  */
 const PESO_VALOR_RECETA: Peso = 500
 
+/**
+ * EL VALOR DE CELDA EN LA LÁMINA DE CONSENTIMIENTO — 11.5 / **14**, no 11.5 / 13.
+ *
+ * Un solo punto de interlineado, y es lo que sube la celda base de 30 a 33 junto con el
+ * padding de `4 10 5`. El cuerpo no se mueve: sigue siendo el 11.5 del riel.
+ *
+ * ⚠ **LA LÁMINA NO DECLARA EL CUERPO DE ESTA CELDA**, solo su interlineado —el 14 de la
+ * suma `4 + 10 + 14 + 5 = 33`—. Se conserva el 11.5 del riel en vez de inventar uno:
+ * `DERIVADO, NO MEDIDO`. Las tres celdas que SÍ declaran cuerpo propio —diagnóstico,
+ * hospital y lugar— entran por la ranura de excepción de 2.D.
+ */
+const DESVIACION_CONSENTIMIENTO = {
+  cuerpo: 11.5,
+  interlineado: 14,
+  // `satisfies` y no anotación, por lo mismo que en `DESVIACION`: son MEDIDAS, no
+  // discriminantes, y con la anotación el cuerpo se ensancha a `number | undefined`.
+} satisfies DesviacionRol
+
 const estilos = StyleSheet.create({
   /**
    * El riel abre y cierra con `filete.fino` en `tinta.negra`. Los dos filetes son
@@ -247,12 +293,12 @@ const estilos = StyleSheet.create({
    * reparto y las celdas salen más estrechas de lo declarado. Está en I.3.8 con
    * su síntoma y su medida.
    */
-  celda: {
-    paddingTop: GEOMETRIA.padding.superior,
-    paddingBottom: GEOMETRIA.padding.inferior,
-    paddingLeft: GEOMETRIA.padding.lateral,
-    paddingRight: GEOMETRIA.padding.lateral,
-  },
+  /**
+   * El padding NO vive aquí: lo declara la lámina y entra por `Fila`. Ver
+   * `paddingDeCelda`. Este estilo se queda con lo que no cambia, que hoy es nada — existe
+   * para que la celda siga teniendo un sitio donde crecer sin volver a repartir estilos.
+   */
+  celda: {},
   /** Regla izquierda salvo en la primera celda de cada fila. */
   celdaConRegla: {
     borderLeftColor: TINTA.hairline,
@@ -375,6 +421,13 @@ const estilos = StyleSheet.create({
     lineHeight: DESVIACION.valor.interlineado / DESVIACION.valor.cuerpo,
     fontWeight: PESO_VALOR_RECETA,
   },
+  /** El mismo valor un punto más alto. Ver `DESVIACION_CONSENTIMIENTO`. */
+  valorConsentimiento: {
+    ...estiloTipografico('dato'),
+    fontSize: DESVIACION_CONSENTIMIENTO.cuerpo,
+    lineHeight:
+      DESVIACION_CONSENTIMIENTO.interlineado / DESVIACION_CONSENTIMIENTO.cuerpo,
+  },
 })
 
 /**
@@ -414,7 +467,23 @@ export const ETIQUETA_CELDA: EstiloEtiquetaCelda = estilos.etiqueta
  * de peso —el nombre del paciente— añade algo o ya está puesta.
  */
 export function valorDeCelda(lamina: Lamina): EstiloValorCelda {
-  return lamina === 'receta' ? estilos.valorReceta : estilos.valor
+  if (lamina === 'receta') return estilos.valorReceta
+  if (lamina === 'consentimiento') return estilos.valorConsentimiento
+  return estilos.valor
+}
+
+/**
+ * El padding de celda de cada lámina. Cinco componen el `3 10 4` del chasis y una el
+ * `4 10 5` que sube su celda base a 33. Ver `GEOMETRIA.paddingConsentimiento`.
+ */
+function paddingDeCelda(lamina: Lamina): {
+  superior: number
+  lateral: number
+  inferior: number
+} {
+  return lamina === 'consentimiento'
+    ? GEOMETRIA.paddingConsentimiento
+    : GEOMETRIA.padding
 }
 
 export interface CeldaRiel {
@@ -592,6 +661,7 @@ function Fila({
   primera,
   regla,
   valor,
+  padding,
 }: {
   celdas: readonly CeldaRiel[]
   primera: boolean
@@ -599,6 +669,8 @@ function Fila({
   regla: number
   /** Estilo del valor de celda de esta lámina, cuando la celda no trae excepción. */
   valor: EstiloValorCelda
+  /** Padding de celda de esta lámina. Ver `paddingDeCelda`. */
+  padding: { superior: number; lateral: number; inferior: number }
 }): ReactElement {
   return (
     <View
@@ -615,7 +687,10 @@ function Fila({
             {
               width: celda.columnas * RIEL_CELDA,
               flexGrow: celda.columnas,
-              paddingLeft: celda.paddingIzquierdo ?? GEOMETRIA.padding.lateral,
+              paddingTop: padding.superior,
+              paddingBottom: padding.inferior,
+              paddingRight: padding.lateral,
+              paddingLeft: celda.paddingIzquierdo ?? padding.lateral,
             },
             celda.fondo === undefined ? {} : { backgroundColor: celda.fondo },
             /*
@@ -789,6 +864,7 @@ export default function RielDatos(props: RielDatosProps): ReactElement {
           primera={indice === 0}
           regla={trazo.regla}
           valor={valor}
+          padding={paddingDeCelda(lamina)}
         />
       ))}
     </View>

@@ -83,6 +83,7 @@ type Vista =
   | 'suplementacion'
   | 'honorarios'
   | 'internamiento'
+  | 'consentimiento'
 
 /**
  * EL SELECTOR — EL CHASIS Y LOS OCHO FORMATOS DE LA SECCIÓN II.
@@ -116,7 +117,7 @@ const VISTAS: readonly EntradaSelector[] = [
   { vista: 'suplementacion', codigo: '4.4', nombre: 'Suplementación' },
   { vista: 'honorarios', codigo: '4.5', nombre: 'Honorarios' },
   { vista: 'internamiento', codigo: '4.6', nombre: 'Internamiento' },
-  { vista: null, codigo: '4.7', nombre: 'Consentimiento' },
+  { vista: 'consentimiento', codigo: '4.7', nombre: 'Consentimiento' },
   { vista: null, codigo: '4.8', nombre: 'Escrito médico' },
 ]
 
@@ -173,10 +174,22 @@ const CASOS_INTERNAMIENTO: readonly EntradaCaso[] = [
   { caso: 'prosa', etiqueta: 'Prosa', nota: 'II.6 §6: prosa suelta antes de los bloques' },
 ]
 
+/**
+ * LOS DE CONSENTIMIENTO tampoco son los tres de arriba, y por una tercera razón: sus ramas
+ * no son de cantidad sino de CASO CLÍNICO. Lo que cambia entre ellos es si hay fotografías
+ * —de eso depende que exista la hoja de anexo— y si el paciente puede firmar por sí mismo.
+ */
+const CASOS_CONSENTIMIENTO: readonly EntradaCaso[] = [
+  { caso: 'completo', etiqueta: 'Completo', nota: 'Cinco firmantes, tres niveles y anexo' },
+  { caso: 'sinFotos', etiqueta: 'Sin fotos', nota: 'La hoja de anexo NO aparece' },
+  { caso: 'sustitucion', etiqueta: 'Sustitución', nota: 'Sin nivel 2: Testigos pasa a 2' },
+]
+
 /** Qué casos ofrece cada vista. Las que no aparecen usan los tres de `CASOS`. */
 function casosDe(vista: Vista): readonly EntradaCaso[] {
   if (vista === 'honorarios') return CASOS_HONORARIOS
   if (vista === 'internamiento') return CASOS_INTERNAMIENTO
+  if (vista === 'consentimiento') return CASOS_CONSENTIMIENTO
   return CASOS
 }
 
@@ -261,6 +274,8 @@ export default function TallerV2(): ReactElement {
                       ? (await import('./HojaHonorarios')).generarPdfHonorarios
                       : vista === 'internamiento'
                         ? (await import('./HojaInternamiento')).generarPdfInternamiento
+                        : vista === 'consentimiento'
+                        ? (await import('./HojaConsentimiento')).generarPdfConsentimiento
                         : // La hoja de chasis no tiene casos: se le pasa el argumento y lo
                       // ignora, que es más barato que ramificar la llamada.
                       (await import('./HojaTaller')).generarPdfTaller

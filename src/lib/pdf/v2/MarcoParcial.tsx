@@ -88,31 +88,54 @@ export const MARCO = {
     padding: { superior: 6, lateral: 10, inferior: 8 },
   },
   /**
-   * Bloque de motivo del Consentimiento (II.7). **Sin consumidor todavía**: se declara
-   * medido para que 4.7 no vuelva a medirlo. Si al construir aquel formato la cifra no
-   * cuadra, la que manda es su lámina y esta entrada se corrige.
+   * Declaración de consentimiento (II.7). La cifra se declaró medida al construir II.5,
+   * **sin consumidor todavía**, para que 4.7 no volviera a medirla. Cuadra: la lámina de
+   * Consentimiento compone su declaración con este ancho y este padding exactos.
    */
   declaracion: {
     ancho: 426,
     padding: { superior: 9, lateral: 12, inferior: 11 },
   },
+  /**
+   * Fundamento legal (II.7), el bloque que cita la NOM-004 bajo el título. **Es el único
+   * marco del sistema cuyo ancho no es 426 ni 246**: mide los mismos 381 pt que la caja de
+   * texto de las siete secciones clínicas, así que su medida de línea es la del cuerpo del
+   * documento y no la de un apartado.
+   */
+  fundamento: {
+    ancho: 381,
+    padding: { superior: 8, lateral: 12, inferior: 10 },
+  },
 } as const satisfies Record<string, { ancho: number; padding: PaddingMarco }>
 
 const estilos = StyleSheet.create({
   /**
-   * Los dos lados, y nada más. El grosor va aquí y el color en el render, porque
-   * depende del acento del médico — misma razón de tipos que en 2.B, 2.C y 2.G.
+   * Los dos lados, y nada más. El grosor y el color van en el render, porque el primero
+   * lo declara la lámina y el segundo depende del acento del médico — misma razón de
+   * tipos que en 2.B, 2.C y 2.G.
    *
    * `flexShrink: 0` para que el marco conserve su ancho declarado dentro de una fila:
    * sin él, la caja de aseguradora se encogería al repartirse el ancho de su fila y
    * dejaría de medir los 426 que mide en la lámina.
    */
   marco: {
-    borderTopWidth: FILETE_HONORARIOS.acento,
-    borderLeftWidth: FILETE_HONORARIOS.acento,
     flexShrink: 0,
   },
 })
+
+/**
+ * EL GROSOR POR DEFECTO — el de la lámina que estrenó este dispositivo.
+ *
+ * La cabecera anunciaba que «el día que aparezca una segunda lámina con marco parcial, el
+ * grosor sube a prop declarada». **Ese día llegó**: la de Consentimiento compone sus dos
+ * marcos —fundamento legal y declaración— con `filete.acento`, los 2 pt limpios de la
+ * escala de I.1.6, contra los 2.53 de Honorarios. Dos láminas y dos cifras, así que el
+ * grosor deja de leerse de una y pasa a declararlo el consumidor, como el ancho y el
+ * padding (regla 4).
+ *
+ * Sin la prop, el 2.53 de Honorarios: los tres marcos de aquel formato no se mueven.
+ */
+const GROSOR_POR_DEFECTO = FILETE_HONORARIOS.acento
 
 export interface MarcoParcialProps {
   /** Ancho del marco, declarado por el consumidor (regla 4). */
@@ -121,6 +144,8 @@ export interface MarcoParcialProps {
   readonly padding: PaddingMarco
   /** El acento del médico. Los dos filetes van en `acento.base` (regla 2). */
   readonly acento: AcentoResuelto
+  /** Grosor de los dos filetes. Sin él, el de Honorarios. Ver `GROSOR_POR_DEFECTO`. */
+  readonly grosor?: number
   /** Lo que se enmarca. Este dispositivo no lo compone (regla 3). */
   readonly children: ReactNode
 }
@@ -130,6 +155,7 @@ export default function MarcoParcial({
   ancho,
   padding,
   acento,
+  grosor = GROSOR_POR_DEFECTO,
   children,
 }: MarcoParcialProps): ReactElement {
   return (
@@ -138,6 +164,8 @@ export default function MarcoParcial({
         estilos.marco,
         {
           width: ancho,
+          borderTopWidth: grosor,
+          borderLeftWidth: grosor,
           paddingTop: padding.superior,
           paddingLeft: padding.lateral,
           paddingRight: padding.lateral,

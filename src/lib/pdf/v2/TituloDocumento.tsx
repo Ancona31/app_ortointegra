@@ -224,6 +224,28 @@ const INTERNAMIENTO = {
   celda: { cuerpo: 10, interlineado: 14, pesoEmision: 400 as Peso },
 } as const
 
+/**
+ * GEOMETRÍA DEL BLOQUE EN LA LÁMINA DE CONSENTIMIENTO — **LA DEL CHASIS, MENOS UN AIRE**.
+ *
+ * Su reparto horizontal no es propio: caja de 321 y riel de 156, que son `zona.texto` y
+ * `zona.riel` de A.8 sin tocar, con UNA sola celda —`Folio`—. Y su aire hasta el filete son
+ * los 4 pt de `transicion.tituloFilete`, también del chasis. Por eso aquí no se escribe
+ * ninguna de las tres cifras.
+ *
+ * Lo propio es el aire de ABAJO: **18 pt del filete al cuerpo**, donde el chasis pone 8 y
+ * las láminas de Imagenología y Suplementación ponen 10. Es el mayor del sistema, y lo que
+ * hay debajo también lo es — un bloque de fundamento legal, no un riel.
+ *
+ * **EL BLOQUE MIDE 56 pt Y ES EL SEGUNDO MÁS ALTO, y son 56 porque el título rompe a dos
+ * líneas.** `CONSENTIMIENTO MÉDICO INFORMADO` en versalitas a 17 pt no cabe en los 321 de
+ * `zona.texto`, así que compone 20 + 20, y con el subtítulo a 2 + 14 salen los 56 medidos.
+ *
+ * ⚠ **ESO ES LA REGLA 1 DE 2.C OCURRIENDO**, que declara que un título fijo que rompe a dos
+ * líneas es un error de redacción del título. Aquí la lámina lo compone así a propósito y su
+ * cota lo confirma. No se toca ni el título ni la caja: se compone lo medido. Reportado.
+ */
+const CONSENTIMIENTO = { tituloRiel: 18 } as const
+
 /** Interlineado del título: el alto de UNA de sus líneas. Lo usa la fecha. */
 const ALTO_LINEA_TITULO = TIPOGRAFIA['titulo.documento'].interlineado ?? 0
 
@@ -250,6 +272,10 @@ const estilos = StyleSheet.create({
    */
   bloqueSuplementacion: {
     marginBottom: SUPLEMENTACION.tituloRiel,
+  },
+  /** El aire mayor del sistema bajo el filete del título. Ver `CONSENTIMIENTO`. */
+  bloqueConsentimiento: {
+    marginBottom: CONSENTIMIENTO.tituloRiel,
   },
   fila: {
     flexDirection: 'row',
@@ -589,6 +615,12 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
    */
   const receta = lamina === 'receta' || suplementacion
   const internamiento = lamina === 'internamiento'
+  /**
+   * Consentimiento compone el bloque con la geometría del chasis —caja 321, riel 156 con
+   * UNA celda y 4 pt hasta el filete— y solo desvía el aire de abajo, que se resuelve en
+   * el contenedor. Por eso no entra en `doble` ni en ninguna otra rama.
+   */
+  const consentimiento = lamina === 'consentimiento'
   const doble = imagen || receta || internamiento
 
   /**
@@ -624,7 +656,9 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
           ? estilos.bloqueImagenologia
           : suplementacion
             ? estilos.bloqueSuplementacion
-            : {},
+            : consentimiento
+              ? estilos.bloqueConsentimiento
+              : {},
       ]}
     >
       <View style={estilos.fila}>

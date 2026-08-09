@@ -549,6 +549,44 @@ export const TIPOGRAFIA = {
   'instruccion.numero': { familia: FUENTE.neogrotesca, cuerpo: 9, interlineado: 18, peso: 600, tracking: 0, color: 'acento.tinta' },
   'instruccion.texto': { familia: FUENTE.humanista, cuerpo: 11.5, interlineado: 18, peso: 500, tracking: 0, color: 'tinta.negra' },
   'requerimiento.texto': { familia: FUENTE.neogrotesca, cuerpo: 10.5, interlineado: 14, peso: 500, tracking: 0, color: 'tinta.negra' },
+  // ── LOS OCHO ROLES DE LA LÁMINA DE CONSENTIMIENTO (II.7).
+  //
+  // Es el formato de texto corrido más extenso del sistema y **el más alejado del token**:
+  // su prosa va a 10.5 / 16 donde `texto.corrido` pone 11.5 / 18, y su medida de línea es
+  // 381 pt donde el sistema pone 486. Los dos ejes están reportados como `D33` desde la
+  // conciliación; lo que 4.7 compone es el cuerpo medido y **no** el justificado.
+  //
+  // Ninguno coincide con uno existente. Los que SÍ coinciden no entran, que es la otra
+  // mitad del criterio, y en esta lámina son seis:
+  //
+  //     número de sección y del anexo   `seccion.numero`      15 / 15, 600, acento
+  //     título de sección               `titulo.seccion`      10 / 14, 600, 0.14 em
+  //     subtítulo del documento         `titulo.subtitulo`    10.5 / 14, 400, secundaria
+  //     rótulo de nivel y de firmante   `firma.rol`           7 / 11, 600, 0.22 em
+  //     rótulo de parentesco            `aseguradora.rotulo`  6.5 / 10, 600, 0.22 em
+  //     entradilla del anexo            `cita.nota`           9.5 / 13, 400, secundaria
+  //
+  // ⚠ **LOS DOS ÚLTIMOS LLEVAN EL NOMBRE DE OTRO FORMATO Y SE REUSAN IGUAL.** Un rol nuevo
+  // idéntico a uno existente sería deuda —lo dicen ya las notas de `entradaEstudio.numero`
+  // y de la calibración `suplemento`—, y el nombre de un rol describe de dónde salió, no
+  // quién puede leerlo. Si el sistema acaba con tres consumidores de cada uno, lo que hará
+  // falta es renombrarlos, no duplicarlos.
+  //
+  // **EL TRACKING DE `rotulo.bloque` SALE DE LOS MISMOS 2.4 px QUE EL DE `rotulo.riel`.**
+  // La lámina compone los dos rótulos con el mismo `letter-spacing` absoluto, y a 9 pt eso
+  // son 0.2 em exactos mientras que a 11 pt son **0.164**. No es una cifra elegida: es la
+  // misma línea de CSS leída a dos cuerpos. `COINCIDENCIA` con el 0.2 de la versalita del
+  // sistema, que vale lo mismo solo en el rótulo pequeño.
+  'seccion.parrafo': { familia: FUENTE.humanista, cuerpo: 10.5, interlineado: 16, peso: 400, tracking: 0, color: 'tinta.negra' },
+  'seccion.entradilla': { familia: FUENTE.humanista, cuerpo: 10.5, interlineado: 16, peso: 400, tracking: 0, color: 'tinta.secundaria' },
+  // El cuerpo de prosa más pequeño del sistema, y va en el bloque que cita la norma.
+  'fundamento.cuerpo': { familia: FUENTE.humanista, cuerpo: 9, interlineado: 13.5, peso: 400, tracking: 0, color: 'tinta.negra' },
+  'rotulo.riel': { familia: FUENTE.neogrotesca, cuerpo: 9, interlineado: 13, peso: 600, tracking: 0.2, color: 'tinta.negra' },
+  'rotulo.bloque': { familia: FUENTE.neogrotesca, cuerpo: 11, interlineado: 15, peso: 600, tracking: 0.1636, color: 'tinta.negra' },
+  'nivel.numero': { familia: FUENTE.neogrotesca, cuerpo: 11, interlineado: 13, peso: 600, tracking: 0, color: 'acento.tinta' },
+  'casilla.texto': { familia: FUENTE.humanista, cuerpo: 8, interlineado: 11, peso: 400, tracking: 0, color: 'tinta.negra' },
+  'anexo.nombre': { familia: FUENTE.neogrotesca, cuerpo: 11, interlineado: 15, peso: 500, tracking: -0.012, color: 'tinta.negra' },
+  'anexo.pie': { familia: FUENTE.humanista, cuerpo: 7.5, interlineado: 11, peso: 400, tracking: 0, color: 'tinta.etiqueta' },
   'recomendaciones.encabezado': { familia: FUENTE.neogrotesca, cuerpo: 9, interlineado: 13, peso: 600, tracking: 0.14, color: 'tinta.negra' },
   'alarma.encabezado': { familia: FUENTE.neogrotesca, cuerpo: 9.5, interlineado: 13, peso: 600, tracking: 0.22, color: 'tinta.negra' },
   'firma.nombre': { familia: FUENTE.neogrotesca, cuerpo: 11.5, interlineado: 16, peso: 600, tracking: -0.012, color: 'tinta.negra' },
@@ -816,6 +854,31 @@ export const FILETE_INTERNAMIENTO = {
   regla: 0.63,
 } as const
 
+/**
+ * EL ÚNICO GROSOR PROPIO DE LA LÁMINA DE CONSENTIMIENTO.
+ *
+ * Mismo criterio que las tres tablas de arriba, y por la misma razón de §0: tiene TRES
+ * consumidores, así que no puede vivir en la ficha de un componente.
+ *
+ *   filete superior de las siete secciones clínicas (II.7)
+ *   filetes de apertura y cierre del riel de identificación (2.F)
+ *   línea de escritura de la celda `Familiar o responsable` (2.F)
+ *
+ * `COINCIDENCIA` — es el cuarto 0.63 del sistema, tras Suplementación, Honorarios e
+ * Internamiento, y **no es ninguno de los tres**: cuatro láminas lo miden por su cuenta.
+ * Con cuatro votos contra el 0.5 de `filete.regla`, el aviso de las otras tres deja de ser
+ * una diferencia y pasa a ser la regla; unificar sigue siendo una decisión de producto
+ * porque movería los seis formatos conciliados. Reportado.
+ *
+ * ⚠ **B.7 §2 Y §3 MIDEN ESTOS DOS FILETES EN 0.8 pt Y EL PASO 4.7 MANDA 0.63.** Se compone
+ * el que manda el paso, y además es el que cuadra el riel: con 0.8, sus cuatro filas dan
+ * 139.195 contra los 138.85 medidos; con 0.63, dan **138.855**. Reportado.
+ */
+export const FILETE_CONSENTIMIENTO = {
+  /** Filete de sección, filetes del riel y línea de escritura del familiar. */
+  regla: 0.63,
+} as const
+
 // ───────────────────────────────────────────────────────────────────────────────
 // I.1.5 · Escritura manuscrita
 // ───────────────────────────────────────────────────────────────────────────────
@@ -1009,6 +1072,23 @@ export const ESPACIO = {
  *   2.J  las tres calibraciones de ítem, que nacen con ella
  *   2.L  medianil de pareja a 30 y DOS composiciones de nombre en el mismo documento
  *   2.Q  que se estrena aquí y no tiene otro consumidor
+ *
+ * **Y AHORA SON SIETE. LA SÉPTIMA ES LA MAYOR DE TODAS.**
+ *
+ * `consentimiento` mide el encabezado más alto del sistema —**511.6 pt**, más del doble que
+ * los 237.61 de Internamiento— porque entre el título y el riel mete un bloque entero de
+ * fundamento legal. Es también el formato de texto corrido más extenso, el único con firmas
+ * en tres niveles de jerarquía repartidos en dos hojas, y el único con hoja condicional.
+ *
+ * Lo que declara de propio:
+ *
+ *   2.B  espaciador de cierre a 20 —valor único— y banda de UN renglón alto sin cédulas
+ *   2.B  espaciador de continuación **por hoja**: 26, 12 y 20 en el mismo documento
+ *   2.C  aire del filete del título al cuerpo a 18            (el chasis, 8)
+ *   2.D  riel de OCHO celdas en cuatro filas, sin sexo, con celda base de 33
+ *   2.F  padding de celda `4 10 5` y valor a 11.5 / 14        (el chasis, `3 10 4` y 11.5 / 13)
+ *   2.L  medianil de pareja a 30 y una ranura para lo que cuelga bajo la nota
+ *   2.U  grosor de marco a `filete.acento`                    (Honorarios, 2.53)
  */
 export type Lamina =
   | 'chasis'
@@ -1017,6 +1097,7 @@ export type Lamina =
   | 'suplementacion'
   | 'honorarios'
   | 'internamiento'
+  | 'consentimiento'
 
 /**
  * Las nueve transiciones entre bloques declaradas por el diseño (I.1.7).
@@ -1115,6 +1196,19 @@ export const TINTA = {
   reglaSuave: '#C9C5BD',
   /** Texto sobre banda de pie y sobre bloque en negativo. */
   papel: '#FFFFFF',
+  /**
+   * ⚠ **EL OCTAVO NEUTRO, Y I.1.8 DECLARA SIETE.**
+   *
+   * Fondo de la caja de fotografía del anexo de II.7 —y del bloque de motivo de su variante
+   * por sustitución, que no se compone—. Es un blanco cálido, no un gris de la escala: no
+   * sale de mezclar ninguno de los siete ni del acento, así que no se puede derivar.
+   *
+   * **Se compone porque no es el único portador de significado** (I.3.3): la caja de foto
+   * se distingue además por su borde de 0.5 y por el filete de acento que la abre, así que
+   * en fotocopia sigue siendo una caja. Quien quite cualquiera de los dos deja el color
+   * solo y rompe la regla. Reportado.
+   */
+  papelTenue: '#FAF9F7',
 } as const
 
 /** `acento.base` por defecto. Configurable por médico. */

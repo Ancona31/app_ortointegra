@@ -82,7 +82,7 @@
  */
 
 import { View, Text, StyleSheet } from '@react-pdf/renderer'
-import type { ReactElement } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import Membrete, {
   type ConsultorioMembrete,
   type MedicoMembrete,
@@ -223,6 +223,31 @@ export interface EncabezadoHojaProps {
    * lee al lado de la regla que la prohíbe.
    */
   readonly rotuloHoja?: string
+  /**
+   * ALTO DEL ESPACIADOR QUE CIERRA LA CABECERA DE ESTA HOJA. Sin él, el que fija la lámina.
+   *
+   * Lo lleva un formato: II.7 mide 26 en sus hojas 2 y 3, 12 en las 4 y 5 y 20 en la del
+   * anexo. Ver `espaciador` en 2.B.
+   */
+  readonly espaciadorHoja?: number
+  /**
+   * LO QUE VA ENTRE EL BLOQUE DE TÍTULO Y EL RIEL DE IDENTIFICACIÓN, **y solo en la hoja 1**.
+   *
+   * ⚠ **NO ES UNA PUERTA PARA QUE UN FORMATO SE COMPONGA EL ENCABEZADO.** Lo que entra aquí
+   * no puede repetirse por hoja —la variante de continuación ni lo mira— y no toca ninguna
+   * de las piezas que este componente coloca. Si algún día lleva un membrete, un título o
+   * una línea de paciente, la ranura se cerró mal.
+   *
+   * Existe por un formato y por una razón de ORDEN, no de estilo: II.7 mete un bloque de
+   * fundamento legal y el rótulo `Datos de identificación` **entre el título y el riel**, y
+   * el riel lo monta este componente. Sin la ranura, el formato solo puede poner esos dos
+   * bloques DETRÁS del riel, y entonces el rótulo que nombra el riel se imprime debajo de
+   * él, que es exactamente lo que la regla 1 de 2.E prohíbe por el otro lado: una caja con
+   * su etiqueta en el sitio equivocado.
+   *
+   * Los seis formatos anteriores no la pasan y su encabezado no cambia ni un punto.
+   */
+  readonly antesDelRiel?: ReactNode
 }
 
 /**
@@ -286,7 +311,14 @@ const ROTULO_PESO = 'Peso'
  * este formato se pueda devolver a su piso si se separa de la 1, que es para lo que la
  * regla 2 de 2.D existe.
  *
- * Los otros cinco formatos no pasan `hospital` y su línea no se mueve ni un punto.
+ * ⚠ **VA POR LÁMINA Y NO POR PRESENCIA DEL DATO**, que es lo contrario de lo que hacen el
+ * expediente y el peso. Consentimiento también rotula un `Hospital o clínica` en su riel y
+ * su línea de continuación **no lo lleva**: compone `Paciente · Nombre | Expediente
+ * 2026-0184 · 22 jun 2026`, en dos zonas, con el rótulo entero y con la fecha en vez de la
+ * edad. Es la TERCERA construcción de esta línea y **no se compone**, por lo mismo que no se
+ * compuso la emisión que Suplementación pone al final de la suya: esta línea es una sola
+ * forma para los siete formatos, y abrirla por prop es la deriva que `CONCILIA D5` ya tuvo
+ * que conciliar en los avisos de pie. Reportado.
  */
 const RAYA = ' · '
 
@@ -322,7 +354,11 @@ const estilos = StyleSheet.create({
  * La línea de identificación: rótulo, nombre, edad y expediente, unidos por la raya
  * del sistema. Las piezas que no vienen no dejan raya suelta.
  */
-function lineaDePaciente(paciente: ValoresPaciente, eco?: string): string {
+function lineaDePaciente(
+  paciente: ValoresPaciente,
+  lamina: Lamina,
+  eco?: string,
+): string {
   return [
     ROTULO_PACIENTE,
     paciente.paciente,
@@ -331,8 +367,8 @@ function lineaDePaciente(paciente: ValoresPaciente, eco?: string): string {
       ? `${ROTULO_EXPEDIENTE} ${paciente.expediente}`
       : undefined,
     tieneValor(paciente.peso) ? `${ROTULO_PESO} ${paciente.peso}` : undefined,
-    // Sin rótulo, a propósito. Ver la nota de arriba.
-    paciente.hospital,
+    // Sin rótulo, y SOLO en la lámina que lo mide. Ver la nota de arriba.
+    lamina === 'internamiento' ? paciente.hospital : undefined,
     eco,
   ]
     .filter((pieza): pieza is string => tieneValor(pieza))
@@ -371,6 +407,7 @@ export default function EncabezadoHoja(props: EncabezadoHojaProps): ReactElement
           acento={props.acento}
           medico={props.medico}
           rotulo={titulo}
+          espaciador={props.espaciadorHoja}
           riel={
             props.folio === undefined ? undefined : (
               <CeldaFolio
@@ -418,6 +455,12 @@ export default function EncabezadoHoja(props: EncabezadoHojaProps): ReactElement
       )}
 
       {/*
+        LO QUE EL FORMATO METE ENTRE EL TÍTULO Y EL RIEL, solo en la hoja 1. Ver
+        `antesDelRiel`.
+      */}
+      {continuacion || props.antesDelRiel === undefined ? null : props.antesDelRiel}
+
+      {/*
         LA IDENTIFICACIÓN DEL PACIENTE, que en continuación NO ES OPCIONAL (regla 2 de
         2.D). Riel completo en la hoja 1, línea gris en las demás: el dato es el mismo,
         la caja no. Ver `LINEA_PACIENTE`.
@@ -434,7 +477,7 @@ export default function EncabezadoHoja(props: EncabezadoHojaProps): ReactElement
               internamiento ? estilos.lineaPacienteInternamiento : {},
             ]}
           >
-            {lineaDePaciente(props.paciente, props.eco)}
+            {lineaDePaciente(props.paciente, props.lamina ?? 'chasis', props.eco)}
           </Text>
           {props.urgente === true && badgeEnContinuacion ? (
             <BloqueNegativo variante="urgenteReducido" lamina={props.lamina} />

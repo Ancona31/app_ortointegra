@@ -282,6 +282,14 @@ function zonas(): ReactElement[] {
   ]
 }
 
+/** Lo que una hoja de continuación puede componer distinto. Ver `hojasPropias`. */
+export interface HojaPropia {
+  /** Rótulo de la cabecera, ya redactado. Sin él, `titulo · continuación`. */
+  readonly rotulo?: string
+  /** Alto del espaciador que cierra la cabecera. Sin él, el de la lámina. */
+  readonly espaciador?: number
+}
+
 export interface MotorFlujoProps {
   /**
    * LOS DATOS DEL ENCABEZADO, no su composición. El motor los pasa a 2.V dos veces
@@ -292,12 +300,12 @@ export interface MotorFlujoProps {
    * membrete reducido, el riel del paciente y el rótulo de continuación, y serían
    * ocho sitios donde olvidarse del nombre del paciente.
    */
-  encabezado: Omit<EncabezadoHojaProps, 'variante' | 'rotuloHoja'>
+  encabezado: Omit<EncabezadoHojaProps, 'variante' | 'rotuloHoja' | 'espaciadorHoja'>
   /**
-   * RÓTULO PROPIO DE UNA HOJA CONCRETA, indexado por NÚMERO DE HOJA. Las que no tengan
-   * entrada componen el del chasis, `titulo · continuación`.
+   * LO QUE UNA HOJA CONCRETA COMPONE DISTINTO, indexado por NÚMERO DE HOJA. Las que no
+   * tengan entrada componen lo del chasis y lo de su lámina.
    *
-   * Va como mapa y no como lista para que un formato pueda rotular la hoja 3 **sin
+   * Va como mapa y no como lista para que un formato pueda declarar la hoja 3 **sin
    * escribir la de la 2**: con una lista tendría que rellenar el hueco, y rellenarlo es
    * escribir «continuación» en el formato, que es justo la palabra que `ROTULO_CONTINUACION`
    * existe para que ningún formato teclee.
@@ -306,10 +314,14 @@ export interface MotorFlujoProps {
    * compone la hoja que le den. Es la misma división con la que ya decide entre las dos
    * variantes de encabezado.
    *
-   * Hoy lo declara un formato y en una sola hoja: la 3 de II.6 abre la sección 2, que **no
-   * es la continuación de la 1** sino otro documento dentro del mismo folio.
+   * Lo declaran dos formatos, cada uno por un motivo:
+   *
+   *   II.6  la hoja 3 abre la sección 2, que **no es la continuación de la 1** sino otro
+   *         documento dentro del mismo folio, así que lleva `rotulo` propio
+   *   II.7  su cabecera pesa distinto en cada tramo —26, 12 y 20—, así que lleva
+   *         `espaciador` propio en cinco hojas
    */
-  rotulosContinuacion?: Readonly<Record<number, string>>
+  hojasPropias?: Readonly<Record<number, HojaPropia>>
   /** El contenido del documento, ya compuesto en bloques por el formato. */
   children: ReactNode
   /**
@@ -352,8 +364,25 @@ export interface MotorFlujoProps {
    * es texto que arrastrar.
    */
   arrastre?: string
-  /** El bloque de firmas (2.L), ya compuesto. Cierra el documento. */
-  firmas: ReactElement
+  /**
+   * El bloque de firmas (2.L), ya compuesto. Cierra el documento.
+   *
+   * ⚠ **OPCIONAL, Y SOLO PARA UN CASO: EL FORMATO QUE REPARTE SUS FIRMAS POR ESTRUCTURA.**
+   *
+   * II.7 tiene cinco firmantes en TRES niveles de jerarquía repartidos en dos hojas, y
+   * detrás de ellos puede ir todavía una hoja de anexo. No hay un «bloque que cierra el
+   * documento» que entregar: las firmas son bloques del flujo como cualquier otro, y su
+   * sitio lo fija un salto de hoja declarado, no el hueco que quede.
+   *
+   * **Lo que la regla 1 garantiza sigue en pie por otro lado.** Cada celda de 2.L trae su
+   * propio `wrap={false}` (regla 3), así que ninguna firma se parte; y un nivel que abre
+   * hoja no puede quedarse huérfano de su contenido, que es lo que el umbral evita. Sin
+   * `firmas` este componente no monta el bloque de cierre y no reserva ningún umbral — que
+   * es lo correcto: reservarlo empujaría la primera firma a una hoja propia.
+   *
+   * Los seis formatos anteriores lo pasan y su composición no cambia.
+   */
+  firmas?: ReactElement
   /** Rol del firmante que cierra: es de donde sale el umbral. */
   rol?: RolFirmante
 }
@@ -361,7 +390,7 @@ export interface MotorFlujoProps {
 /** 2.N · `MotorFlujo`. */
 export default function MotorFlujo({
   encabezado,
-  rotulosContinuacion = {},
+  hojasPropias = {},
   children,
   contador,
   cierre,
@@ -380,13 +409,14 @@ export default function MotorFlujo({
   const primera = <EncabezadoHoja variante="primera" {...encabezado} />
   const continuacion = <EncabezadoHoja variante="continuacion" {...encabezado} />
   const propios = new Map<number, ReactElement>(
-    Object.entries(rotulosContinuacion).map(([hoja, rotulo]) => [
+    Object.entries(hojasPropias).map(([hoja, propia]) => [
       Number(hoja),
       <EncabezadoHoja
         key={hoja}
         variante="continuacion"
         {...encabezado}
-        rotuloHoja={rotulo}
+        rotuloHoja={propia.rotulo}
+        espaciadorHoja={propia.espaciador}
       />,
     ]),
   )
@@ -467,16 +497,21 @@ export default function MotorFlujo({
         indivisible, así que la firma nunca se parte, y los bloques de cierre que la
         preceden traen su propio `wrap={false}` (2.I regla 3).
       */}
-      <View wrap={false} style={arrastre === undefined ? {} : { minHeight: umbralFirma(rol) }}>
-        {arrastre === undefined ? null : (
-          <Text style={estilos.arrastre} orphans={FLUJO.orphans} widows={FLUJO.widows}>
-            {arrastre}
-          </Text>
-        )}
-        <View style={{ marginTop: arrastre === undefined ? aireFirma : ESPACIO[16] }}>
-          {firmas}
+      {firmas === undefined ? null : (
+        <View
+          wrap={false}
+          style={arrastre === undefined ? {} : { minHeight: umbralFirma(rol) }}
+        >
+          {arrastre === undefined ? null : (
+            <Text style={estilos.arrastre} orphans={FLUJO.orphans} widows={FLUJO.widows}>
+              {arrastre}
+            </Text>
+          )}
+          <View style={{ marginTop: arrastre === undefined ? aireFirma : ESPACIO[16] }}>
+            {firmas}
+          </View>
         </View>
-      </View>
+      )}
 
       {/*
         El aviso de pie. `fixed` para que se evalúe en todas las hojas, `render` en

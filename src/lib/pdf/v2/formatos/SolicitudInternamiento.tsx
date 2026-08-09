@@ -530,7 +530,7 @@ export default function SolicitudInternamiento({
           urgente,
         }}
         // Solo la hoja 3. La 2 se queda con el rótulo del chasis. Ver `ROTULO_HOJA_SECCION_2`.
-        rotulosContinuacion={{ 3: ROTULO_HOJA_SECCION_2 }}
+        hojasPropias={{ 3: { rotulo: ROTULO_HOJA_SECCION_2 } }}
         aireFirma={SEPARACION_ULTIMO_FIRMA}
         firmas={
           /*

@@ -185,6 +185,19 @@ const GEOMETRIA = {
    */
   espaciadorContinuacionInternamiento: 14,
   /**
+   * EL ESPACIADOR DE CIERRE EN LA LÁMINA DE CONSENTIMIENTO — **20 pt, y es valor único**.
+   *
+   * Su banda de dirección cierra en 141.35 y el bloque de título abre en 161.35. Veinte, el
+   * doble del de Receta y ocho más que el del chasis. Es coherente con lo que este formato
+   * es: el único cuyo encabezado mete un bloque entero entre el título y el riel, así que su
+   * membrete necesita despegarse más de lo que sigue o las cinco piezas se leen corridas.
+   *
+   * Cuatro cifras para el mismo elemento —10, 12, 20 y 24— y las cuatro medidas. **Ninguna
+   * se unifica**: cada una la declara su lámina, que es el mecanismo del sistema para este
+   * caso exacto. Reportado.
+   */
+  espaciadorCierreConsentimiento: 20,
+  /**
    * INTERLINEADO DE LA BANDA EN LA LÁMINA DE IMAGENOLOGÍA — 12, no 11.
    *
    * Desviación declarada del rol `medico.credencial`, del mismo tipo que las dos
@@ -271,6 +284,19 @@ export type MembreteProps =
       rotulo?: string
       /** La celda de folio de 2.C, a la derecha de la cabecera. Colapsa si no viene. */
       riel?: ReactNode
+      /**
+       * ALTO DEL ESPACIADOR DE CIERRE DE ESTA HOJA, cuando la lámina no lo mide igual en
+       * todas. Sin él, el que fija la lámina.
+       *
+       * ⚠ **ENTRA POR PROP Y NO POR LÁMINA PORQUE HAY UNA QUE MIDE TRES.** Las hojas 2 y 3
+       * de II.7 cierran su cabecera con **26**, las 4 y 5 con **12** y la del anexo con
+       * **20** — es el único formato del sistema cuyo encabezado de continuación no pesa lo
+       * mismo en todas sus hojas, y la causa está a la vista: las dos primeras siguen texto
+       * corrido y las otras tres abren un bloque con rótulo propio. Reportado.
+       *
+       * Quien lo elige es 2.N, que es quien sabe en qué hoja está.
+       */
+      espaciador?: number
       /**
        * Qué lámina fija el espaciador de cierre de ESTA hoja. Sin ella, los 12 pt del
        * chasis, que son los que componen las cuatro láminas anteriores.
@@ -385,6 +411,10 @@ const estilos = StyleSheet.create({
   espaciadorContinuacionInternamiento: {
     height: GEOMETRIA.espaciadorContinuacionInternamiento,
   },
+  /** El cierre más alto de la variante completa. Ver `espaciadorCierreConsentimiento`. */
+  espaciadorConsentimiento: {
+    height: GEOMETRIA.espaciadorCierreConsentimiento,
+  },
 })
 
 /**
@@ -414,7 +444,40 @@ export default function Membrete(props: MembreteProps): ReactElement {
    * condición propia; lo único suyo son los dos espaciadores de cierre.
    */
   const internamiento = lamina === 'internamiento'
-  const conCedulas = lamina !== 'chasis' && !honorarios
+  const consentimiento = lamina === 'consentimiento'
+  /**
+   * LA BANDA DE CONSENTIMIENTO ES LA DE HONORARIOS: **un renglón alto y sin credenciales**.
+   *
+   * Su dirección abre en 129.35 y cierra en 141.35 —doce, un solo renglón— y ni las cédulas
+   * ni la universidad aparecen. `D23` pasa así de dos láminas contra tres a **tres contra
+   * tres**: Laboratorio, Honorarios y Consentimiento componen el membrete sin credenciales,
+   * e Imagenología, Receta y Suplementación con ellas. Empate, y sigue sin resolverse desde
+   * aquí: se compone lo que compone cada lámina. Reportado.
+   *
+   * Lo que separa a esta de la de Laboratorio es el interlineado —12 contra 11—, que es lo
+   * mismo que ya separaba a la de Honorarios.
+   */
+  const bandaUnRenglon = honorarios || consentimiento
+  const conCedulas = lamina !== 'chasis' && !bandaUnRenglon
+  /**
+   * ⚠ **EL RENGLÓN DE CÉDULA DE LA HOJA DE CONTINUACIÓN, Y AHORA SÍ SE RETIRA.**
+   *
+   * Este componente lo componía en las seis láminas, y las TRES que miden su hoja de
+   * continuación pieza por pieza —Honorarios 78.5, Internamiento 69 y Consentimiento 80.5—
+   * cierran sus cotas **sin él**: los 17 pt que sobraban eran la cédula (11) y su aire (6).
+   * Estaba reportado dos veces y no se tocaba «porque moverlo movería a Laboratorio,
+   * Imagenología y Receta a ciegas».
+   *
+   * **Ya no las mueve.** Se retira SOLO en las tres láminas que lo miden ausente; las otras
+   * tres —que no tienen ninguna hoja de continuación medida— lo siguen componiendo, y su
+   * encabezado no cambia ni un punto. Con esto los tres presupuestos cuadran exactos y el
+   * aviso deja de estar abierto.
+   *
+   * El día que se mida una cuarta lámina, entra en la lista o se queda fuera; el día que se
+   * midan las tres que faltan y coincidan, esto pasa a ser el comportamiento del chasis y la
+   * lista sobra.
+   */
+  const cedulaEnContinuacion = !(honorarios || internamiento || consentimiento)
 
   return (
     <View style={estilos.membrete}>
@@ -536,7 +599,7 @@ export default function Membrete(props: MembreteProps): ReactElement {
             </View>
           )}
         </>
-      ) : (
+      ) : !cedulaEnContinuacion ? null : (
         // La ficha no declara dónde va la cédula principal en `continuacion`:
         // queda bajo el nombre, a la izquierda. Sin columna izquierda no hay
         // nada que separar, así que tampoco lleva la regla vertical.
@@ -548,14 +611,13 @@ export default function Membrete(props: MembreteProps): ReactElement {
       {/*
         EL CIERRE DEL BLOQUE. Va en las DOS variantes: lo que separa es el membrete
         de lo que venga debajo, y en una hoja de continuación el membrete sigue
-        siendo un membrete. Ninguna lámina de continuación está medida todavía, así
-        que ese lado queda anotado — si al medirla resulta otra cifra, es una
-        variante del espaciador, no un aire del formato.
+        siendo un membrete.
 
-        Dos láminas lo miden en 12 y una en 10. Ver `GEOMETRIA.espaciadorCierreReceta`.
+        Cuatro cifras en la variante completa —10, 12 y 20— y tres en la de continuación
+        —12, 14, 24 y 26—, todas medidas. Ver `GEOMETRIA`.
       */}
       <View
-        style={
+        style={[
           props.variante === 'continuacion'
             ? honorarios
               ? estilos.espaciadorContinuacionHonorarios
@@ -563,15 +625,21 @@ export default function Membrete(props: MembreteProps): ReactElement {
                 ? estilos.espaciadorContinuacionInternamiento
                 : estilos.espaciador
             : /*
-                DOS LÁMINAS COMPONEN 10 Y DOS COMPONEN 12. Internamiento mide el mismo 10
-                que Receta —su banda cierra en 153.35 y el bloque de título abre en
-                163.35—, así que se lee de donde ya está en vez de declarar un tercer
-                miembro que valdría lo mismo.
+                DOS LÁMINAS COMPONEN 10, DOS COMPONEN 12 Y UNA COMPONE 20. Internamiento
+                mide el mismo 10 que Receta —su banda cierra en 153.35 y el bloque de
+                título abre en 163.35—, así que se lee de donde ya está en vez de declarar
+                un miembro que valdría lo mismo.
               */
-              lamina === 'receta' || internamiento
-              ? estilos.espaciadorReceta
-              : estilos.espaciador
-        }
+              consentimiento
+              ? estilos.espaciadorConsentimiento
+              : lamina === 'receta' || internamiento
+                ? estilos.espaciadorReceta
+                : estilos.espaciador,
+          // La hoja manda sobre la lámina, y solo un formato la usa. Ver `espaciador`.
+          props.variante === 'continuacion' && props.espaciador !== undefined
+            ? { height: props.espaciador }
+            : {},
+        ]}
       />
     </View>
   )

@@ -50,7 +50,7 @@
  */
 
 import { View, Text, Image, StyleSheet } from '@react-pdf/renderer'
-import type { ReactElement } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import {
   CAJA,
   CIERRE,
@@ -91,6 +91,22 @@ const GEOMETRIA = {
    * firma va SOLA; en una pareja no puede valer para las dos. Reportado.
    */
   medianilInternamiento: 30,
+  /**
+   * EL BLOQUE DE PARENTESCO — **23.48 pt**, y lo lleva UNA celda de UN formato.
+   *
+   * La celda del familiar de II.7 mide 146.95 contra los 117.47 de las otras cuatro, y la
+   * diferencia son estos 23.48 más su margen de 6. Dentro van un rótulo de 6.5 / 10 y una
+   * línea de 13 pt: **23 exactos**, y los 0.48 que faltan son el residuo de caja de línea
+   * del HTML, el mismo que esa lámina deja en su celda de riel. Reportado.
+   *
+   * ⚠ **LA LÍNEA MIDE 13 pt Y `manuscrito.alto` SON 20.** Es el cuarto valor del sistema
+   * para el mismo token —20 del chasis, 16.47 de los dos campos de riel, 11 de Receta y 13
+   * aquí—, y `D27` lo lleva reportado desde la conciliación. Se compone el medido.
+   *
+   * **Este componente no sabe qué es un parentesco** y no lo compone: lo que declara es la
+   * ranura y su aire. Ver `anadido` en `Firma`.
+   */
+  anadido: { margen: 6 },
   celda: { superior: 14, inferior: 4 },
   /**
    * LA MISMA FIRMA EN LAS LÁMINAS DE IMAGENOLOGÍA Y DE RECETA — 118.75 pt, no 120.8.
@@ -178,7 +194,14 @@ const SEPARADOR_CREDENCIALES = ' · '
 
 /** Dos columnas iguales sobre la caja, con su medianil. */
 const ANCHO_CELDA = (CAJA.ancho - GEOMETRIA.medianil) / 2
-/** Las mismas dos columnas con el medianil de Internamiento. Ver `GEOMETRIA`. */
+/**
+ * Las mismas dos columnas con el medianil de 30. Ver `GEOMETRIA.medianilInternamiento`.
+ *
+ * **Lo componen DOS láminas**: la pareja de firmas de II.6 y la retícula de tres niveles de
+ * II.7, las dos con `gap: 0 30pt` y celdas de 228. Consentimiento además lo declara sin
+ * contradicción —no repite el 246 que en Internamiento no cabía—, así que esa lámina
+ * confirma por su cuenta que el reparto bueno es 228 + 30 + 228.
+ */
 const ANCHO_CELDA_INTERNAMIENTO = (CAJA.ancho - GEOMETRIA.medianilInternamiento) / 2
 
 const estilos = StyleSheet.create({
@@ -213,6 +236,8 @@ const estilos = StyleSheet.create({
   celdaConMedianilInternamiento: {
     marginLeft: GEOMETRIA.medianilInternamiento,
   },
+  /** El aire sobre lo que el formato cuelga bajo la nota. Ver `GEOMETRIA.anadido`. */
+  anadido: { marginTop: GEOMETRIA.anadido.margen },
   /** Solo en `retícula`: es lo que separa una fila de la siguiente. */
   celdaEnReticula: {
     paddingTop: GEOMETRIA.celda.superior,
@@ -351,6 +376,23 @@ export interface Firma {
    * (I.3.8). Los demás firmantes firman a mano sobre la línea (regla 5).
    */
   readonly rubrica?: string
+  /**
+   * LO QUE CUELGA BAJO LA NOTA, compuesto por el FORMATO.
+   *
+   * ⚠ **NO ES UN ATAJO PARA METER MÁS RENGLONES DE IDENTIFICACIÓN.** Los renglones bajo la
+   * línea los declara `FIRMA_RENGLONES` en I.1.9 y `altoBloqueFirma()` los cuenta: quien
+   * añada uno por aquí hará que la fórmula mienta y que el umbral de 2.N pague el error.
+   *
+   * Existe por un caso y hoy tiene uno: la celda del familiar de II.7 lleva debajo un campo
+   * `Parentesco con el paciente` —rótulo y línea de escritura— que **no es una credencial**
+   * sino un dato que se llena a pluma después de firmar. Por eso el alto de esa celda
+   * (146.95) no sale de la fórmula de I.1.9 y no debe salir: es la celda estándar más un
+   * bloque que el formato cuelga.
+   *
+   * Este componente pone el aire —6 pt— y nada más. La tipografía y la línea las compone
+   * quien lo declara, que es el mismo reparto que la ranura `contenido` de 2.I.
+   */
+  readonly anadido?: ReactNode
 }
 
 /** Qué lámina fija la línea, el aire y los dos renglones de abajo. */
@@ -462,6 +504,11 @@ function UnaFirma({
       <Text style={medida ? estilos.credencialMedida : estilos.credencial}>
         {(firma.credenciales ?? []).join(SEPARADOR_CREDENCIALES) || ' '}
       </Text>
+
+      {/* La ranura del formato, con su aire. Ver `anadido` en `Firma`. */}
+      {firma.anadido === undefined ? null : (
+        <View style={estilos.anadido}>{firma.anadido}</View>
+      )}
     </View>
   )
 }
@@ -480,8 +527,8 @@ function enParejas(firmas: readonly Firma[]): readonly (readonly Firma[])[] {
 export default function BloqueFirmas(props: BloqueFirmasProps): ReactElement {
   const lamina = props.lamina ?? 'chasis'
   const calibracion = props.calibracion ?? calibracionDeLamina(lamina)
-  /** El único reparto de fila propio de una lámina. Ver `GEOMETRIA.medianilInternamiento`. */
-  const internamiento = lamina === 'internamiento'
+  /** El reparto de fila de 228 + 30 + 228, que componen dos láminas. */
+  const internamiento = lamina === 'internamiento' || lamina === 'consentimiento'
 
   // Regla 3: `break-inside: avoid`. Un bloque de firmas no se parte entre hojas;
   // es uno de los cuatro bloques indivisibles de 2.N (`CONCILIA D44`).

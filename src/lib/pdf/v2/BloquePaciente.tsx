@@ -54,6 +54,7 @@ import {
   veloDeAcento,
   type AcentoResuelto,
   type Lamina,
+  type Peso,
 } from './tokens'
 
 /**
@@ -173,6 +174,34 @@ const GEOMETRIA = {
     escritura: { alto: 16.47, grosor: FILETE_HONORARIOS.regla },
     vigencia: { velo: 0.08, peso: 600 },
   },
+  /**
+   * LAS TRES CELDAS PROPIAS DE LA LÁMINA DE CONSENTIMIENTO.
+   *
+   * `hospital` — **el valor más destacado del riel de los siete formatos**: Archivo
+   * 12.5 / 16 en peso 500 con tracking −0.01 em, contra los 11.5 / 14 del resto de sus
+   * celdas. No es un capricho: en una hoja que se archiva en un expediente hospitalario, el
+   * dato que dice DÓNDE se firmó pesa tanto como el nombre. Es la única celda del sistema
+   * cuyo valor sube de cuerpo respecto del riel.
+   *
+   * `lugar` — 11 / 16. Comparte fila con la de hospital, así que su interlineado tiene que
+   * ser el mismo o la fila la estiraría la más alta (ver la nota del diagnóstico arriba).
+   * El cuerpo sí baja: es el domicilio, no el sitio.
+   *
+   * `diagnostico` — IBM Plex Sans **10.5 / 14**, media décima por debajo del 11 / 13 y del
+   * 11 / 15 con que las otras láminas componen esta misma celda. Es el tercer valor del
+   * sistema para el mismo sitio y sale de que aquí la celda ocupa la fila entera y no
+   * comparte renglón con nadie.
+   *
+   * `escritura` — la línea del familiar. **Son las mismas dos cifras que la celda de
+   * paciente del recibo mínimo**, así que se leen de `honorarios` en vez de repetirse:
+   * 16.47 de alto y 0.63 de grosor. Es el segundo consumidor del estado «vacío requerido»
+   * de 2.E dentro de un riel.
+   */
+  consentimiento: {
+    hospital: { cuerpo: 12.5, interlineado: 16, peso: 500 as Peso, tracking: -0.01 },
+    lugar: { cuerpo: 11, interlineado: 16 },
+    diagnostico: { cuerpo: 10.5, interlineado: 14 },
+  },
 } as const
 
 /**
@@ -205,6 +234,14 @@ export type CampoPaciente =
   | 'tipoInternamiento'
   | 'diasEstimados'
   | 'asa'
+  /**
+   * LAS DOS DE LA LÁMINA DE CONSENTIMIENTO. `familiar` es el **único campo vacío requerido
+   * de un riel que no es el paciente**: si no viene, la celda conserva su rótulo y deja una
+   * línea para llenar a pluma, porque quien acompaña al paciente se identifica en el
+   * mostrador. `lugar` es el domicilio donde se firma, que la NOM-004 pide asentar.
+   */
+  | 'familiar'
+  | 'lugar'
 
 /** Cómo se compone el VALOR de una celda. La etiqueta es igual en las ocho. */
 type TrazoValor =
@@ -218,6 +255,10 @@ type TrazoValor =
   | 'peso'
   /** El valor de celda en peso 600. Solo vigencia. Ver `GEOMETRIA.honorarios`. */
   | 'vigencia'
+  /** El valor más destacado del riel. Solo hospital de II.7. */
+  | 'hospital'
+  /** 11 / 16, para no estirar la fila que comparte con hospital. Solo lugar. */
+  | 'lugar'
 
 interface DescriptorCelda {
   readonly campo: CampoPaciente
@@ -328,6 +369,37 @@ const FILA_INFERIOR_INTERNAMIENTO: readonly DescriptorCelda[] = [
   ASA,
 ]
 
+/**
+ * LAS CUATRO FILAS DE CONSENTIMIENTO — ocho celdas, y **sin sexo**.
+ *
+ * Es el único riel del sistema de cuatro filas, y el único donde el paciente no comparte
+ * renglón con su sexo: este formato no lo pide. Lo que sí mete, y ningún otro, es a quién
+ * acompaña al paciente y dónde se firma.
+ *
+ *     paciente 5 · edad 2 · expediente 2 · fecha 3    = 12
+ *     familiar o responsable 12                        campo vacío requerido
+ *     diagnóstico 12
+ *     hospital o clínica 8 · lugar 4                   = 12
+ *
+ * `EXPEDIENTE_CORTO` y `FECHA_CONSENTIMIENTO` son descriptores propios y no `EXPEDIENTE` y
+ * `FECHA`: el reparto de la fila superior es otro —2 y 3 contra 3 y 4— y ese reparto no se
+ * puede derivar del colapso, que es lo mismo que ya obligó a declarar dos filas en
+ * Honorarios.
+ */
+const EXPEDIENTE_CORTO: DescriptorCelda = { ...EXPEDIENTE, columnas: 2 }
+const FECHA_CONSENTIMIENTO: DescriptorCelda = { ...FECHA, columnas: 3 }
+const FAMILIAR: DescriptorCelda = { campo: 'familiar', etiqueta: 'Familiar o responsable', columnas: 12, trazo: 'dato' }
+const DIAGNOSTICO_CONSENTIMIENTO: DescriptorCelda = { ...DIAGNOSTICO, columnas: 12 }
+const HOSPITAL_CLINICA: DescriptorCelda = { campo: 'hospital', etiqueta: 'Hospital o clínica', columnas: 8, trazo: 'hospital' }
+const LUGAR: DescriptorCelda = { campo: 'lugar', etiqueta: 'Lugar', columnas: 4, trazo: 'lugar' }
+
+const FILAS_CONSENTIMIENTO: readonly (readonly DescriptorCelda[])[] = [
+  [PACIENTE, EDAD, EXPEDIENTE_CORTO, FECHA_CONSENTIMIENTO],
+  [FAMILIAR],
+  [DIAGNOSTICO_CONSENTIMIENTO],
+  [HOSPITAL_CLINICA, LUGAR],
+]
+
 /** Cotización: 5 + 4 + 3 = 12. */
 const FILA_COTIZACION: readonly DescriptorCelda[] = [
   PACIENTE_COTIZACION,
@@ -402,6 +474,14 @@ export interface ValoresPaciente {
   readonly diasEstimados?: string
   /** Clasificación ASA, en romanos: `II`. Colapsa. */
   readonly asa?: string
+  /**
+   * Familiar o responsable del paciente (II.7). **Campo vacío requerido**: si no viene, la
+   * celda NO colapsa — conserva su rótulo y deja la línea de escritura. Es el único campo
+   * del sistema, junto al paciente del recibo mínimo, que se comporta así dentro de un riel.
+   */
+  readonly familiar?: string
+  /** Lugar donde se firma el consentimiento. Colapsa. */
+  readonly lugar?: string
 }
 
 export type BloquePacienteProps =
@@ -508,6 +588,43 @@ const estilos = StyleSheet.create({
    */
   valorVigencia: { ...VALOR_CELDA, fontWeight: GEOMETRIA.honorarios.vigencia.peso },
   etiquetaVigencia: { ...ETIQUETA_CELDA, color: TINTA.secundaria },
+  /**
+   * LAS TRES EXCEPCIONES DE LA LÁMINA DE CONSENTIMIENTO. Parten del valor de celda YA
+   * DESVIADO por 2.F —igual que `valorAncla` y `valorPeso`— y no del rol crudo: lo único que
+   * estas celdas cambian es el cuerpo, el interlineado, el peso y el tracking, y partir de
+   * `dato` les devolvería el 12 / 16 que la desviación del riel corrige.
+   *
+   * El tracking del hospital SÍ se recalcula —la conversión em → pt es la misma que hace
+   * `estiloTipografico()`—; el de las otras dos es 0 y no hay nada que mover.
+   */
+  valorHospital: {
+    ...VALOR_CELDA,
+    fontSize: GEOMETRIA.consentimiento.hospital.cuerpo,
+    lineHeight:
+      GEOMETRIA.consentimiento.hospital.interlineado /
+      GEOMETRIA.consentimiento.hospital.cuerpo,
+    fontWeight: GEOMETRIA.consentimiento.hospital.peso,
+    letterSpacing:
+      GEOMETRIA.consentimiento.hospital.tracking *
+      GEOMETRIA.consentimiento.hospital.cuerpo,
+  },
+  valorLugar: {
+    ...VALOR_CELDA,
+    fontSize: GEOMETRIA.consentimiento.lugar.cuerpo,
+    lineHeight:
+      GEOMETRIA.consentimiento.lugar.interlineado / GEOMETRIA.consentimiento.lugar.cuerpo,
+  },
+  /** El diagnóstico de esta lámina: la excepción de FAMILIA con su tercer cuerpo. */
+  valorDiagnosticoConsentimiento: {
+    fontFamily: FUENTE.humanista,
+    fontSize: GEOMETRIA.consentimiento.diagnostico.cuerpo,
+    lineHeight:
+      GEOMETRIA.consentimiento.diagnostico.interlineado /
+      GEOMETRIA.consentimiento.diagnostico.cuerpo,
+    fontWeight: GEOMETRIA.diagnostico.peso,
+    letterSpacing: GEOMETRIA.diagnostico.tracking,
+    color: GEOMETRIA.diagnostico.color,
+  },
 })
 
 /**
@@ -532,12 +649,18 @@ function estiloValor(trazo: TrazoValor, lamina: Lamina): EstiloValorCelda | unde
   }
   if (trazo === 'peso') return estilos.valorPeso
   if (trazo === 'vigencia') return estilos.valorVigencia
+  if (trazo === 'hospital') return estilos.valorHospital
+  if (trazo === 'lugar') return estilos.valorLugar
   if (trazo === 'diagnostico') {
     /*
       La excepción de fila plena vale igual con `span 8`: lo que le da los 15 pt de
       interlineado es no compartir renglón con `Fecha` y `Hora`, no ocupar las doce
       columnas. Ver `FILA_INFERIOR_CON_PESO`.
+
+      Consentimiento tiene su propio cuerpo para esta celda —10.5 / 14—, que es el tercer
+      valor del sistema para el mismo sitio. Ver `GEOMETRIA.consentimiento`.
     */
+    if (lamina === 'consentimiento') return estilos.valorDiagnosticoConsentimiento
     return lamina === 'chasis'
       ? estilos.valorDiagnostico
       : estilos.valorDiagnosticoPleno
@@ -595,7 +718,13 @@ function celdas(
       `resolverAcento()` deriva el 6 % del chasis, que es el de todos los demás fondos
       tenues del sistema.
     */
-    ...(d.campo === 'paciente' && lamina === 'honorarios'
+    /*
+      LOS DOS CAMPOS VACÍOS REQUERIDOS DEL SISTEMA, y los dos dentro de un riel: el paciente
+      del recibo mínimo y el familiar del consentimiento. **Las dos líneas miden lo mismo**
+      —16.47 × 0.63—, así que la segunda lee las cifras de la primera en vez de repetirlas.
+      Con ella la celda pasa de 33 a 35.47 pt, que es lo que hace cuadrar el riel de II.7.
+    */
+    ...((d.campo === 'paciente' && lamina === 'honorarios') || d.campo === 'familiar'
       ? { escritura: GEOMETRIA.honorarios.escritura }
       : {}),
     ...(d.campo === 'vigencia'
@@ -644,6 +773,23 @@ export default function BloquePaciente(props: BloquePacienteProps): ReactElement
         variante="celdas"
         lamina={lamina}
         filas={[celdas(fila, props, lamina, props.acento)]}
+      />
+    )
+  }
+
+  /**
+   * EL ÚNICO RIEL DE CUATRO FILAS. No es el de dos con dos más: es otra anatomía —ocho
+   * celdas, sin sexo, con un campo vacío requerido en medio— y por eso se declara entera.
+   * Ver `FILAS_CONSENTIMIENTO`.
+   */
+  if (lamina === 'consentimiento') {
+    return (
+      <RielDatos
+        variante="celdas"
+        lamina={lamina}
+        filas={FILAS_CONSENTIMIENTO.map((fila) =>
+          celdas(fila, props, lamina, props.acento),
+        )}
       />
     )
   }
