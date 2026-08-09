@@ -35,6 +35,36 @@
  * este componente, que montaba las piezas de la hoja 1 encogidas —membrete con el
  * nombre a tamaño de portada, bloque de título entero y el riel con sus filetes—.
  *
+ * ⚠ **LA CUARTA LÁMINA PESA 70.5 pt DE CONTINUACIÓN Y ESTE COMPONENTE COMPONE 83.5.**
+ *
+ * La de Suplementación es la primera que mide su hoja 2 pieza por pieza, y no cuadra
+ * con lo que el chasis monta. La diferencia son **13 pt** y se cierra exacta con dos
+ * sumandos, así que no hay nada que buscar:
+ *
+ *     −17   el renglón de cédula y su aire de 6, que esta lámina NO compone
+ *     + 4   su espaciador de cierre, 16 en vez de los 12 de 2.B
+ *     ────
+ *     −13   83.5 → 70.5
+ *
+ * (Sobre esos 83.5 va además el aire hasta la cabecera de la lista, que declara el
+ * formato: con los 10 de Receta salen los **93.50** que fija la prueba de 2.N, y con
+ * los 14 de Suplementación, 97.5. Por eso las dos cifras que se comparan son 83.5 y
+ * 70.5, no 93.5 y 70.5: aquella lleva dentro un aire de otro formato.)
+ *
+ * **No se ajusta ninguno de los dos**, y el motivo es el mismo en los dos casos: la
+ * cédula bajo el nombre y el espaciador de 12 los componen hoy Laboratorio,
+ * Imagenología y Receta, los tres conciliados contra su propia lámina, y ninguno de
+ * los tres tiene una lámina de continuación medida con la que contrastarlos. Mover
+ * cualquiera de los dos aquí los movería a los tres a ciegas. Lo que sí se compone es
+ * lo que no arrastra a nadie: el peso en la línea de paciente, que solo sale donde hay
+ * peso. **Reportado.**
+ *
+ * ⚠ Esa misma lámina cierra su línea con la emisión —`… · Peso 72.5 kg | 4 ago 2026 ·
+ * 10:15`— y aquí sigue sin componerse: la emisión es dato de cabecera y este
+ * componente la deja en la hoja 1 a propósito (ver el comentario del título). Ponerla
+ * ahora la haría aparecer en la hoja 2 de los tres formatos anteriores, que es
+ * exactamente el cambio a ciegas de arriba. **Reportado.**
+ *
  * **La identificación del paciente NO ES OPCIONAL** (regla 2 de 2.D). Una hoja de
  * estudios o de indicaciones sin nombre es un riesgo clínico, no un detalle de
  * maquetación: en el hospital las hojas se separan. Lo que la lámina retira es la
@@ -102,6 +132,15 @@ function continua(cadena: string): string {
 export interface ListaEncabezado {
   /** El sustantivo de la lista, en capitalización de oración. */
   readonly titulo: string
+  /**
+   * Rótulo a la derecha del sustantivo (2.G `CabeceraLista`). Colapsa si no viene.
+   *
+   * Sale en TODAS las hojas, igual que el sustantivo: es lo que califica la lista, y
+   * una hoja de continuación de suplementos sin `Dosis calculada para 72.5 kg` diría
+   * dosis sin decir contra qué se calcularon. `DERIVADO` — la lámina de continuación
+   * no lo mide, y por eso queda anotado en vez de dado por medido.
+   */
+  readonly rotulo?: string
   /** Los tres rótulos, si la lista se compone en columnas. */
   readonly columnas?: {
     readonly numero: string
@@ -165,6 +204,16 @@ const LINEA_PACIENTE = { interlineado: 12 } as const
  */
 const ROTULO_PACIENTE = 'Paciente'
 const ROTULO_EXPEDIENTE = 'Exp.'
+/**
+ * ⚠ **EL PESO SOLO APARECE DONDE HAY PESO, Y HOY ESO ES UN SOLO FORMATO.**
+ *
+ * La lámina de Suplementación compone su línea de continuación como
+ * `Paciente · Nombre · 25 años · Exp. 2026-0184 · Peso 72.5 kg`, y es la única que
+ * lleva la última pieza: en ese formato el peso no es un dato clínico más sino la base
+ * de todo lo que la hoja calcula, así que una hoja 2 sin él tiene dosis que no se
+ * pueden comprobar. Los otros tres no pasan `peso` y su línea no se mueve ni un punto.
+ */
+const ROTULO_PESO = 'Peso'
 const RAYA = ' · '
 
 const estilos = StyleSheet.create({
@@ -201,6 +250,7 @@ function lineaDePaciente(paciente: ValoresPaciente): string {
     tieneValor(paciente.expediente)
       ? `${ROTULO_EXPEDIENTE} ${paciente.expediente}`
       : undefined,
+    tieneValor(paciente.peso) ? `${ROTULO_PESO} ${paciente.peso}` : undefined,
   ]
     .filter((pieza): pieza is string => tieneValor(pieza))
     .join(RAYA)
@@ -285,7 +335,12 @@ export default function EncabezadoHoja(props: EncabezadoHojaProps): ReactElement
           ) : null}
         </View>
       ) : (
-        <BloquePaciente variante="completo" lamina={props.lamina} {...props.paciente} />
+        <BloquePaciente
+          variante="completo"
+          lamina={props.lamina}
+          acento={props.acento}
+          {...props.paciente}
+        />
       )}
 
       {props.lista === undefined ? null : (
@@ -293,6 +348,7 @@ export default function EncabezadoHoja(props: EncabezadoHojaProps): ReactElement
           {props.lista.columnas === undefined ? (
             <CabeceraLista
               titulo={continuacion ? continua(props.lista.titulo) : props.lista.titulo}
+              rotulo={props.lista.rotulo}
               acento={props.acento}
             />
           ) : (

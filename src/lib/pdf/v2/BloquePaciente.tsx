@@ -45,7 +45,13 @@ import RielDatos, {
   type CeldaRiel,
   type EstiloValorCelda,
 } from './RielDatos'
-import { FUENTE, TINTA, type Lamina } from './tokens'
+import {
+  FILETE_SUPLEMENTACION,
+  FUENTE,
+  TINTA,
+  type AcentoResuelto,
+  type Lamina,
+} from './tokens'
 
 /**
  * Geometría interna de ESTE componente, de la ficha de 2.D. I.1.7 declara que la
@@ -105,19 +111,61 @@ const GEOMETRIA = {
    * lado: aquel 13 salía de que la celda compartía fila con dos celdas más.
    */
   interlineadoDiagnosticoFilaPlena: 15,
+  /**
+   * LA CELDA DE PESO, de la lámina de Suplementación. Es la octava celda del
+   * inventario de 2.D y la única que el chasis no tenía.
+   *
+   * `padding: 3 10 4 0` — el lateral IZQUIERDO a cero, contra los 10 de todas las
+   * demás. Se compone tal cual: el rótulo y la cifra de esta celda arrancan pegados al
+   * margen de la caja y no alineados con `PACIENTE`, que está justo encima a 10 pt.
+   * **Es lo que mide la lámina** y encaja con lo que la celda es —la base del cálculo
+   * de todas las dosis de la hoja, y la única cifra del riel a cuerpo 14—, así que se
+   * imprime así y queda anotado por si al mirar el papel resulta un descuido del
+   * archivo y no una decisión.
+   *
+   * Sus dos tipografías viven aquí y no en I.1.4 por lo mismo que la del diagnóstico:
+   * son de ESTA celda, con un solo consumidor, y I.1.7 manda declararlas en la ficha
+   * del componente. Solo se escribe lo que se desvía —el rótulo `PESO` es el
+   * `etiqueta` del riel sin tocar, y por eso no aparece.
+   *
+   *   `base`   el calificador `BASE DEL CÁLCULO`: 6.5 / 10, 600, 0.18 em, tinta plena
+   *   `valor`  la cifra: 14 / 16, 600, tinta plena
+   *
+   * ⚠ **EL CALIFICADOR VA EN TINTA PLENA Y ES UN RÓTULO**, que es lo contrario de lo
+   * que hace el resto del riel —toda etiqueta del sistema va en `tinta.etiqueta`—. Es
+   * de la lámina y no un descuido de transcripción: el rótulo dice qué es la celda y
+   * el calificador dice qué se hace con ella, y el segundo pesa más.
+   *
+   * El tracking sale del píxel, como el del ancla de Receta: 1.56 px a 6.5 pt —8.667
+   * px— son 0.18 em.
+   */
+  peso: {
+    base: { cuerpo: 6.5, interlineado: 10, peso: 600, tracking: 0.18 },
+    valor: { cuerpo: 14, interlineado: 16, peso: 600 },
+    /** El `0` del `padding: 3 10 4 0`. Ver arriba: es de la lámina. */
+    paddingIzquierdo: 0,
+  },
 } as const
 
-/** Los siete datos del riel. */
+/**
+ * Los datos del riel. **Eran siete y son ocho**: `peso` entra con la lámina de
+ * Suplementación, que es el único formato del sistema donde el peso no es un dato
+ * clínico más sino la base de todo lo que la hoja calcula (II.4 §5).
+ *
+ * No lo lleva ningún otro formato y no colapsa nada de los tres ya construidos: quien
+ * no lo pasa no monta la celda, que es como se comporta cualquier campo de este riel.
+ */
 export type CampoPaciente =
   | 'paciente'
   | 'edad'
   | 'sexo'
   | 'expediente'
+  | 'peso'
   | 'diagnostico'
   | 'fecha'
   | 'hora'
 
-/** Cómo se compone el VALOR de una celda. La etiqueta es igual en las siete. */
+/** Cómo se compone el VALOR de una celda. La etiqueta es igual en las ocho. */
 type TrazoValor =
   /** Rol `dato` tal cual: edad, sexo, expediente, fecha y hora. Es el de 2.F. */
   | 'dato'
@@ -125,6 +173,8 @@ type TrazoValor =
   | 'datoAncla'
   /** La excepción de familia. Solo diagnóstico. */
   | 'diagnostico'
+  /** La cifra a 14 / 16. Solo peso. Ver `GEOMETRIA.peso`. */
+  | 'peso'
 
 interface DescriptorCelda {
   readonly campo: CampoPaciente
@@ -152,12 +202,31 @@ const HORA: DescriptorCelda = { campo: 'hora', etiqueta: 'Hora', columnas: 3, tr
  */
 const DIAGNOSTICO_PLENO: DescriptorCelda = { ...DIAGNOSTICO, columnas: 12 }
 
+/**
+ * LA FILA INFERIOR DE SUPLEMENTACIÓN: peso (4) + diagnóstico (8) = 12.
+ *
+ * El diagnóstico no ocupa la fila entera como en las otras dos láminas de riel doble
+ * —cede cuatro columnas—, y por eso es su propio descriptor y no `DIAGNOSTICO_PLENO`.
+ * Lo que NO cambia es su composición: sigue siendo la excepción de familia a 11 / 15,
+ * porque lo que fijaba aquel 15 no era el `span 12` sino que la celda no comparte
+ * renglón con `Fecha` y `Hora`, que son las que lo apretaban a 13 en el chasis.
+ *
+ * `BASE DEL CÁLCULO` no es una celda: es el segundo rótulo de la de peso (2.F).
+ */
+const PESO: DescriptorCelda = { campo: 'peso', etiqueta: 'Peso', columnas: 4, trazo: 'peso' }
+const DIAGNOSTICO_CON_PESO: DescriptorCelda = { ...DIAGNOSTICO, columnas: 8 }
+
+/** El calificador del rótulo de la celda de peso. Lo declara 2.D, no el formato. */
+const ROTULO_BASE_CALCULO = 'Base del cálculo'
+
 /** Fila superior: 5 + 2 + 2 + 3 = 12 columnas de `riel.celda`. */
 const FILA_SUPERIOR: readonly DescriptorCelda[] = [PACIENTE, EDAD, SEXO, EXPEDIENTE]
 /** Fila inferior: 5 + 4 + 3 = 12. */
 const FILA_INFERIOR: readonly DescriptorCelda[] = [DIAGNOSTICO, FECHA, HORA]
 /** Fila inferior de Imagenología y de Receta: una sola celda de 12. */
 const FILA_INFERIOR_PLENA: readonly DescriptorCelda[] = [DIAGNOSTICO_PLENO]
+/** Fila inferior de Suplementación: 4 + 8 = 12. */
+const FILA_INFERIOR_CON_PESO: readonly DescriptorCelda[] = [PESO, DIAGNOSTICO_CON_PESO]
 /** Variante `reducido`: una sola línea con nombre y expediente, con sus anchos. */
 const FILA_REDUCIDA: readonly DescriptorCelda[] = [PACIENTE, EXPEDIENTE]
 
@@ -182,6 +251,17 @@ export interface ValoresPaciente {
   readonly edad?: string
   readonly sexo?: string
   readonly expediente?: string
+  /**
+   * Peso, **ya con su unidad**, compuesto por quien llama —la lámina imprime
+   * `72.5 kg`—. Mismo criterio que la emisión y las cédulas: este componente coloca,
+   * no rotula ni convierte.
+   *
+   * Lo lleva un solo formato, y en él su ausencia colapsa dos cosas a la vez: la
+   * celda del riel y el rótulo `Dosis calculada para NN kg` de la cabecera de la
+   * lista (II.4 §6). La segunda no es de aquí — la resuelve el formato, que es quien
+   * tiene delante los dos.
+   */
+  readonly peso?: string
   readonly diagnostico?: string
   readonly fecha?: string
   readonly hora?: string
@@ -192,7 +272,25 @@ export type BloquePacienteProps =
    * Hoja 1. `lamina` decide dos cosas a la vez, y las dos son del mismo riel: el
    * trazo de sus filetes (2.F) y si la fila inferior lleva tres celdas o una.
    */
-  | ({ variante: 'completo'; lamina?: Lamina } & ValoresPaciente)
+  | ({
+      variante: 'completo'
+      lamina?: Lamina
+      /**
+       * EL ACENTO, Y SOLO PARA UNA REGLA DEL RIEL.
+       *
+       * Es lo único de este bloque que no es neutro: la lámina de Suplementación
+       * separa la celda de peso de la de diagnóstico con un filete de 1.9 pt en
+       * `acento.base` en vez de con el hairline de las demás. Ninguna otra celda de
+       * ninguna otra lámina lo usa.
+       *
+       * Opcional a propósito, y sin fallback inventado: sin acento esa regla se
+       * compone como el hairline del riel, que es lo que hace el resto del bloque.
+       * Es la misma degradación que I.3.7 declara para el render —nunca colapsa, cae
+       * a lo neutro—, y es lo que permite que la hoja de chasis del taller siga
+       * montando este componente sin pasarlo.
+       */
+      acento?: AcentoResuelto
+    } & ValoresPaciente)
   /**
    * Hojas de continuación. Regla 2 de la ficha: NO ES OPCIONAL cuando el documento
    * tiene más de una hoja. Una hoja de indicaciones sin nombre de paciente es un
@@ -227,6 +325,31 @@ const estilos = StyleSheet.create({
     letterSpacing: GEOMETRIA.diagnostico.tracking,
     color: GEOMETRIA.diagnostico.color,
   },
+  /**
+   * LAS DOS COMPOSICIONES DE LA CELDA DE PESO. Parten del valor de celda YA DESVIADO
+   * por 2.F —igual que `valorAncla`— y no del rol crudo: lo único que esta celda
+   * cambia del riel es el cuerpo, el interlineado y el peso, y partir de `dato` le
+   * devolvería el 12 / 16 que la desviación del riel corrige.
+   */
+  valorPeso: {
+    ...VALOR_CELDA,
+    fontSize: GEOMETRIA.peso.valor.cuerpo,
+    lineHeight: GEOMETRIA.peso.valor.interlineado / GEOMETRIA.peso.valor.cuerpo,
+    fontWeight: GEOMETRIA.peso.valor.peso,
+  },
+  /**
+   * El calificador `BASE DEL CÁLCULO`. El tracking se declara en em, como todo el
+   * spec, y se convierte a pt aquí con la misma multiplicación que hace
+   * `estiloTipografico()` — que no sirve para esto porque una desviación declarada no
+   * está en la escala.
+   */
+  rotuloBase: {
+    ...VALOR_CELDA,
+    fontSize: GEOMETRIA.peso.base.cuerpo,
+    lineHeight: GEOMETRIA.peso.base.interlineado / GEOMETRIA.peso.base.cuerpo,
+    fontWeight: GEOMETRIA.peso.base.peso,
+    letterSpacing: GEOMETRIA.peso.base.tracking * GEOMETRIA.peso.base.cuerpo,
+  },
 })
 
 /**
@@ -249,7 +372,13 @@ function estiloValor(trazo: TrazoValor, lamina: Lamina): EstiloValorCelda | unde
     */
     return lamina === 'receta' ? undefined : estilos.valorAncla
   }
+  if (trazo === 'peso') return estilos.valorPeso
   if (trazo === 'diagnostico') {
+    /*
+      La excepción de fila plena vale igual con `span 8`: lo que le da los 15 pt de
+      interlineado es no compartir renglón con `Fecha` y `Hora`, no ocupar las doce
+      columnas. Ver `FILA_INFERIOR_CON_PESO`.
+    */
     return lamina === 'chasis'
       ? estilos.valorDiagnostico
       : estilos.valorDiagnosticoPleno
@@ -262,6 +391,7 @@ function celdas(
   descriptores: readonly DescriptorCelda[],
   valores: Partial<Record<CampoPaciente, string>>,
   lamina: Lamina,
+  acento?: AcentoResuelto,
 ): readonly CeldaRiel[] {
   return descriptores.map((d) => ({
     clave: d.campo,
@@ -269,6 +399,34 @@ function celdas(
     valor: valores[d.campo],
     columnas: d.columnas,
     estiloValor: estiloValor(d.trazo, lamina),
+    /*
+      LAS TRES COSAS QUE SOLO TIENE LA CELDA DE PESO, y las tres entran por las ranuras
+      que 2.F declara en vez de por una variante suya: el riel no sabe qué es una base
+      de cálculo.
+
+      La regla de acento va en la celda de la DERECHA porque el riel compone todas sus
+      reglas como borde izquierdo (ver `reglaIzquierda` en 2.F). Aquí eso se lee al
+      revés de lo que dice la lámina y dibuja la misma línea.
+    */
+    ...(d.campo === 'peso'
+      ? {
+          etiquetaSecundaria: {
+            texto: ROTULO_BASE_CALCULO,
+            estilo: estilos.rotuloBase,
+          },
+          paddingIzquierdo: GEOMETRIA.peso.paddingIzquierdo,
+        }
+      : {}),
+    ...(d.campo === 'diagnostico' &&
+    lamina === 'suplementacion' &&
+    acento !== undefined
+      ? {
+          reglaIzquierda: {
+            grosor: FILETE_SUPLEMENTACION.acento,
+            color: acento.base,
+          },
+        }
+      : {}),
   }))
 }
 
@@ -288,13 +446,26 @@ export default function BloquePaciente(props: BloquePacienteProps): ReactElement
   }
 
   const lamina = props.lamina ?? 'chasis'
-  const inferior = lamina === 'chasis' ? FILA_INFERIOR : FILA_INFERIOR_PLENA
+  /**
+   * Las TRES anatomías de la fila inferior, una por lo que el formato mete en ella:
+   * tres celdas en el chasis —diagnóstico, fecha y hora—, una sola de doce donde la
+   * fecha sube al riel del título, y dos donde además hay peso que declarar.
+   */
+  const inferior =
+    lamina === 'chasis'
+      ? FILA_INFERIOR
+      : lamina === 'suplementacion'
+        ? FILA_INFERIOR_CON_PESO
+        : FILA_INFERIOR_PLENA
 
   return (
     <RielDatos
       variante="celdas"
       lamina={lamina}
-      filas={[celdas(FILA_SUPERIOR, props, lamina), celdas(inferior, props, lamina)]}
+      filas={[
+        celdas(FILA_SUPERIOR, props, lamina, props.acento),
+        celdas(inferior, props, lamina, props.acento),
+      ]}
     />
   )
 }

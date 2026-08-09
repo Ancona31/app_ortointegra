@@ -1,11 +1,11 @@
 /**
- * LA HOJA DE CONTINUACIÓN, MEDIDA EN LOS TRES FORMATOS CONSTRUIDOS.
+ * LA HOJA DE CONTINUACIÓN, MEDIDA EN LOS CUATRO FORMATOS CONSTRUIDOS.
  *
- * POR QUÉ ESTA PRUEBA ES DE LOS TRES Y NO DE CADA UNO
+ * POR QUÉ ESTA PRUEBA ES DE LOS CUATRO Y NO DE CADA UNO
  *
  * Porque lo que fija es que la continuación **se resuelve una sola vez, en el
  * chasis**. Si algún día un formato compone la suya por su cuenta, esta prueba
- * seguirá pasando para él y fallará para los otros dos — y ese es exactamente el
+ * seguirá pasando para él y fallará para los otros tres — y ese es exactamente el
  * síntoma que hay que ver. Las cotas de cada lámina se miden en la prueba del
  * formato; aquí solo se mide lo que 2.N y 2.V garantizan para los ocho.
  *
@@ -42,6 +42,7 @@ import type { DocumentProps } from '@react-pdf/renderer'
 import SolicitudLaboratorio from '@/lib/pdf/v2/formatos/SolicitudLaboratorio'
 import SolicitudImagenologia from '@/lib/pdf/v2/formatos/SolicitudImagenologia'
 import RecetaMedica from '@/lib/pdf/v2/formatos/RecetaMedica'
+import PlanSuplementacion from '@/lib/pdf/v2/formatos/PlanSuplementacion'
 import {
   TIPOGRAFIA,
   resolverAcento,
@@ -286,9 +287,30 @@ const RECETA = h(RecetaMedica, {
 })
 
 /**
+ * Los nueve suplementos del reparto de la lámina, del estado más caro. Es el único
+ * formato del sistema cuya línea de paciente de continuación lleva un dato más que la
+ * de los otros tres: el peso, sin el cual la hoja 2 tendría dosis calculadas sin decir
+ * contra qué (ver `ROTULO_PESO` en 2.V).
+ */
+const SUPLEMENTACION = h(PlanSuplementacion, {
+  ...COMUN,
+  paciente: { ...COMUN.paciente, peso: '72.5 kg' },
+  suplementos: Array.from({ length: 9 }, (_, i) => ({
+    nombre: `Suplemento de control ${i + 1}`,
+    dosis: '500 mg cada 12 horas',
+    justificacion:
+      'Aporte insuficiente documentado en la valoración nutricional, con reevaluación programada al terminar el esquema de tres meses.',
+  })),
+  emision: '4 ago 2026 · 10:15',
+  notas: 'Tome los suplementos con alimentos.',
+  cita: { fecha: '4 de noviembre de 2026', plazo: 'a 3 meses' },
+  folio: 'S-C9174B2E60A5',
+})
+
+/**
  * `ancla` localiza el primer renglón de cada entrada y `cuerpoAncla` es el cuerpo con
  * el que se compone, que sale de la calibración que el formato declara en 2.G:
- * `compacta` 9.5, `estudio` 12.5, `medicamento` 12.
+ * `compacta` 9.5, `estudio` 12.5, `medicamento` 12, `suplemento` 12.5.
  */
 const FORMATOS = [
   {
@@ -311,6 +333,15 @@ const FORMATOS = [
     titulo: 'RECETA MÉDICA',
     ancla: /^Fármaco \d+ · Tabletas 500 mg$/,
     cuerpoAncla: TIPOGRAFIA['entradaMedicamento.ancla'].cuerpo,
+  },
+  {
+    nombre: 'Suplementación',
+    elemento: SUPLEMENTACION,
+    titulo: 'PLAN DE SUPLEMENTACIÓN',
+    ancla: /^Suplemento de control \d+ · 500 mg cada 12 horas$/,
+    // La calibración `suplemento` compone su ancla con el rol de `estudio`: los dos
+    // están medidos idénticos y un rol duplicado sería deuda (I.1.4).
+    cuerpoAncla: TIPOGRAFIA['entradaEstudio.ancla'].cuerpo,
   },
 ] as const
 

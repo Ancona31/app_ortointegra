@@ -60,11 +60,12 @@
  */
 
 import { View, Text, StyleSheet } from '@react-pdf/renderer'
-import type { ReactElement } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import ParserBloques, { type RolCuerpoParser } from './ParserBloques'
 import {
   ESPACIO,
   FILETE,
+  FILETE_SUPLEMENTACION,
   TINTA,
   estiloTipografico,
   type Lamina,
@@ -118,6 +119,37 @@ const GEOMETRIA = {
    * escala: la alarma aprieta más porque su cuerpo pesa más (12 / 18 en 500).
    */
   aireCuerpo: { alarma: 3, recomendaciones: ESPACIO[4] },
+  /**
+   * LA CITA DE CONTROL DE SUPLEMENTACIÓN, Y ROMPE LO QUE `CONCILIA D42` HABÍA UNIDO.
+   *
+   * ⚠ **LLEVA FILETE SUPERIOR E IZQUIERDO**, y `D42` unificó la variante `cita` a
+   * «solo izquierdo» precisamente porque una cita con filete superior aparecía en
+   * Suplementación: era lo que la distinguía de la alarma. **La lámina la compone con
+   * los dos**, así que la unificación no describe el archivo aprobado. Se compone bajo
+   * `lamina` y el chasis no se mueve — con lo que la distinción respecto de la alarma
+   * se queda en lo que siempre fue de verdad: el grosor (1.9 contra 4) y el color del
+   * cuerpo. **Reportado, no resuelto.**
+   *
+   * El grosor es `FILETE_SUPLEMENTACION.acento`, 1.9 pt, y no `filete.cita`, que vale
+   * 1.6. Es el mismo trazo con el que esa lámina separa la celda de peso en el riel.
+   *
+   * `ancho` es del BLOQUE, no de su medida de línea: es el único destacado del sistema
+   * que no ocupa la caja entera. Y la sangría son 12 pt aplicados a los dos filetes,
+   * que es la lectura de la regla 2 que ya fijó el anexo A (P2-16) para la alarma.
+   */
+  citaSuplementacion: { sangria: ESPACIO[12], ancho: 294 },
+  /**
+   * Las notas adicionales de esa misma lámina: la anatomía de `recomendaciones` con
+   * **0.63 pt de filete en vez de 0.5**. Es el mismo hairline que su regla de entrada,
+   * y por eso el valor sale de `FILETE_SUPLEMENTACION` y no se escribe aquí.
+   *
+   * ⚠ **LO QUE NO SE COMPONE DE ESE BLOQUE SON LOS MÁRGENES DE SUS PÁRRAFOS**: la
+   * lámina mide **5 pt en cada uno** y 2.J compone 4 dentro de un bloque y 8 entre
+   * bloques (`dentroDelBloque` / `entreBloques`, anexo A, P2-20). Esa escala es del
+   * parser y la comparten los cuatro destacados y las notas de los otros formatos;
+   * moverla por esta lámina, o abrirle una ranura de márgenes a 2.J, es propagar una
+   * decisión de este bloque a un componente que no la toma. **Reportado, no compuesto.**
+   */
 } as const
 
 const estilos = StyleSheet.create({
@@ -159,6 +191,16 @@ const estilos = StyleSheet.create({
     borderLeftColor: TINTA.negra,
     paddingLeft: SANGRIA,
   },
+  /** La cita de Suplementación: dos filetes, sangría de 12 y ancho propio. */
+  fileteCitaSuplementacion: {
+    borderLeftWidth: FILETE_SUPLEMENTACION.acento,
+    borderLeftColor: TINTA.negra,
+    borderTopWidth: FILETE_SUPLEMENTACION.acento,
+    borderTopColor: TINTA.negra,
+    paddingTop: GEOMETRIA.citaSuplementacion.sangria,
+    paddingLeft: GEOMETRIA.citaSuplementacion.sangria,
+    width: GEOMETRIA.citaSuplementacion.ancho,
+  },
   /**
    * El único filete SUPERIOR del componente, y el único que no va en `tinta.negra`.
    * Es también el más fino de los cuatro, y eso es la jerarquía funcionando: unas
@@ -166,6 +208,12 @@ const estilos = StyleSheet.create({
    */
   fileteRecomendaciones: {
     borderTopWidth: FILETE.regla,
+    borderTopColor: TINTA.reglaSuave,
+    paddingTop: GEOMETRIA.recomendaciones.superior,
+  },
+  /** El mismo, 0.13 pt más grueso. Ver `GEOMETRIA` antes de fusionarlos. */
+  fileteRecomendacionesSuplementacion: {
+    borderTopWidth: FILETE_SUPLEMENTACION.regla,
     borderTopColor: TINTA.reglaSuave,
     paddingTop: GEOMETRIA.recomendaciones.superior,
   },
@@ -240,8 +288,27 @@ export interface BloqueDestacadoProps {
    * El pasaje, como UNA cadena. Es la misma forma que espera `ParserBloques`
    * (`CONCILIA D10`), así que cuando 2.J llegue no hay que cambiar la prop: el
    * texto entra igual y lo que cambia es quién lo compone dentro.
+   *
+   * Uno de los dos, `texto` o `contenido`. Si vienen los dos, manda `contenido`.
    */
-  texto: string
+  texto?: string
+  /**
+   * COMPOSICIÓN PROPIA DEL FORMATO, EN VEZ DEL PASAJE.
+   *
+   * ⚠ **NO ES UN ATAJO PARA METER PROSA POR OTRA PUERTA.** El pasaje entra por `texto`
+   * y lo compone 2.J, y eso no cambia: si lo que tienes es un párrafo, usa `texto`.
+   *
+   * Existe por un caso y hoy tiene uno: el bloque de cita de Suplementación son
+   * **cuatro datos con cuatro roles distintos** —rótulo, fecha, plazo y nota— y ninguno
+   * es prosa. Meterlos por `texto` obligaría a que 2.J supiera distinguirlos, que es
+   * pedirle a un analizador de viñetas que analice una ficha.
+   *
+   * Lo que este bloque sigue aportando es lo suyo y es todo lo que aporta: el filete,
+   * la sangría, el ancho y el `wrap={false}`. **La tipografía del contenido NO la pone
+   * el formato**: los cuatro roles `cita.*` viven en I.1.4, que es donde un formato
+   * puede leerlos sin escribir ni un cuerpo.
+   */
+  contenido?: ReactNode
   /** Qué lámina fija el padding de la alarma. Sin ella, la del chasis. */
   lamina?: Lamina
 }
@@ -257,16 +324,23 @@ type EstiloFilete =
   | typeof estilos.fileteAlarmaReceta
   | typeof estilos.fileteInstrucciones
   | typeof estilos.fileteCita
+  | typeof estilos.fileteCitaSuplementacion
   | typeof estilos.fileteRecomendaciones
+  | typeof estilos.fileteRecomendacionesSuplementacion
 
 /** Filete y sangría de cada variante, con la lámina que la fija. */
 function estiloFilete(variante: VarianteDestacado, lamina: Lamina): EstiloFilete {
+  const suplementacion = lamina === 'suplementacion'
   if (variante === 'alarma') {
     return lamina === 'receta' ? estilos.fileteAlarmaReceta : estilos.fileteAlarma
   }
   if (variante === 'instrucciones') return estilos.fileteInstrucciones
-  if (variante === 'recomendaciones') return estilos.fileteRecomendaciones
-  return estilos.fileteCita
+  if (variante === 'recomendaciones') {
+    return suplementacion
+      ? estilos.fileteRecomendacionesSuplementacion
+      : estilos.fileteRecomendaciones
+  }
+  return suplementacion ? estilos.fileteCitaSuplementacion : estilos.fileteCita
 }
 
 /** 2.I · `BloqueDestacado`. */
@@ -274,6 +348,7 @@ export default function BloqueDestacado({
   variante,
   encabezado,
   texto,
+  contenido,
   lamina = 'chasis',
 }: BloqueDestacadoProps): ReactElement {
   const composicion = COMPOSICION[variante]
@@ -316,11 +391,14 @@ export default function BloqueDestacado({
               : estilos.cuerpoTrasEncabezadoRecomendaciones
         }
       >
-        <ParserBloques
-          texto={texto}
-          marca={composicion.marca}
-          rolCuerpo={composicion.rolCuerpo}
-        />
+        {contenido ??
+          (texto === undefined ? null : (
+            <ParserBloques
+              texto={texto}
+              marca={composicion.marca}
+              rolCuerpo={composicion.rolCuerpo}
+            />
+          ))}
       </View>
     </View>
   )

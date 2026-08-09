@@ -55,6 +55,7 @@ import { tieneValor } from './Campo'
 import {
   ESPACIO,
   FILETE,
+  FILETE_SUPLEMENTACION,
   RETICULA,
   TINTA,
   TRANSICION,
@@ -183,6 +184,38 @@ const GEOMETRIA = {
     aireVia: ESPACIO[2],
   },
   /**
+   * LA QUINTA CALIBRACIÓN — `suplemento`, medida en la lámina de Suplementación.
+   *
+   * **ES LA MISMA ENTRADA DE RECETA CON DOS RANURAS VACÍAS, Y ESE ES SU VALOR.** II.4
+   * §4 lo dice sin rodeos: «sin vía, sin presentación, sin genérico… si alguien crea
+   * un componente aparte para esto, el chasis está mal». Así que aquí no hay ninguna
+   * rama nueva de contenido —solo ancla y nota—, y las tres tipografías son roles que
+   * ya existían (ver la nota de I.1.4). Lo propio es el RITMO, y son tres cifras:
+   *
+   *     padding      5 arriba / 6 abajo   (Receta: 5 / 7, y como margen, no padding)
+   *     regla        0.63                 (Receta: `filete.regla`, 0.5)
+   *     aire de nota 2                    (Receta: 3 sobre la indicación)
+   *
+   * **El padding va en las DOS direcciones de todas las entradas, como en `estudio` y
+   * al revés que en `normal`.** Es lo que hacen cuadrar los tres altos que la lámina
+   * mide para la fila: **28.47 · 48.47 · 66.47**, según traiga la justificación cero,
+   * una o dos líneas. Compuestos dan 28 —5 + 17 + 6—, 48 y 66; el residuo constante de
+   * **0.47** es de la lámina y tiene la misma causa que el 0.56 de Receta: la caja de
+   * línea del HTML añade el *strut* de la fuente y Yoga no. Aparece en los tres altos
+   * y con el mismo valor, que es lo que predice esa causa.
+   *
+   * La regla, en cambio, va ARRIBA y se le ahorra a la primera, como en `normal`: esta
+   * lista sí cierra con el filete de `CierreEntradas`, y con la regla abajo serían dos
+   * líneas donde la lámina tiene una — que es justo el motivo por el que `estudio` no
+   * monta ese cierre.
+   */
+  suplemento: {
+    aireSuperior: 5,
+    aireInferior: 6,
+    /** Aire sobre la justificación. Receta pone 3 sobre su indicación. */
+    aireJustificacion: ESPACIO[2],
+  },
+  /**
    * Ancho de la columna de la nota en la disposición `columna`. B.1 §3 declara la
    * retícula de la tabla como `23.25pt 1fr 132pt` con medianil de 9 pt: el riel y
    * el medianil son `reticula.riel` y `reticula.medianil`, y este 132 es la tercera
@@ -239,6 +272,21 @@ const estilos = StyleSheet.create({
     paddingBottom: GEOMETRIA.estudio.aireInferior,
     borderBottomWidth: FILETE.regla,
     borderBottomColor: GEOMETRIA.estudio.regla,
+  },
+  /**
+   * EL RITMO DE `suplemento`, en sus dos formas. Padding en las dos direcciones —lo
+   * que hace que la fila mida 28, 48 o 66 pt— y la regla arriba, que la primera no
+   * lleva. Ver `GEOMETRIA.suplemento`.
+   */
+  entradaSuplemento: {
+    paddingTop: GEOMETRIA.suplemento.aireSuperior,
+    paddingBottom: GEOMETRIA.suplemento.aireInferior,
+  },
+  entradaSuplementoConRegla: {
+    paddingTop: GEOMETRIA.suplemento.aireSuperior,
+    paddingBottom: GEOMETRIA.suplemento.aireInferior,
+    borderTopWidth: FILETE_SUPLEMENTACION.regla,
+    borderTopColor: GEOMETRIA.normal.regla,
   },
   /**
    * El riel del número. Ancho fijo `reticula.riel` más `reticula.medianil`: la
@@ -316,6 +364,23 @@ const estilos = StyleSheet.create({
     width: GEOMETRIA.medicamento.anchoIndicacion,
     marginTop: GEOMETRIA.medicamento.aireIndicacion,
   },
+  /**
+   * LA JUSTIFICACIÓN DE `suplemento`, Y **NO LLEVA ANCHO DECLARADO**.
+   *
+   * ⚠ La lámina la compone a **486 pt** dentro de una caja de entrada que mide
+   * **453.75** —486 − 23.25 de riel − 9 de medianil—: en el archivo desborda la columna
+   * por 32.25 pt, que es una columna exacta de la retícula de doce. Sin `width`, este
+   * texto mide su contenedor y sale en los 453.75 que le corresponden. **Componer el
+   * 486 sería reproducir el defecto**, y encima el mismo que ya se pagó una vez en
+   * Receta con la línea de escritura de `manuscrito.ancho`. Reportado.
+   *
+   * Es la diferencia con la indicación de Receta, que sí lleva ancho fijo —381 pt— y
+   * ahí no es un defecto sino una medida de línea declarada por la lámina.
+   */
+  justificacionSuplemento: {
+    ...estiloTipografico('texto.corrido'),
+    marginTop: GEOMETRIA.suplemento.aireJustificacion,
+  },
   /** Las tres ranuras de la calibración `estudio`, apiladas. */
   anclaEstudio: { ...estiloTipografico('entradaEstudio.ancla'), flex: 1 },
   /**
@@ -347,6 +412,26 @@ const estilos = StyleSheet.create({
     marginTop: ESPACIO[5],
   },
   rotuloLista: { ...estiloTipografico('titulo.seccion') },
+  /**
+   * EL RENGLÓN DE LA CABECERA CUANDO LLEVA RÓTULO A LA DERECHA.
+   *
+   * `alignItems: 'flex-end'` apoya las dos cajas de línea por su borde inferior, que
+   * es lo único alineable aquí (ver `cajaFecha` en 2.C). Los dos van a interlineado
+   * 14 —el del sustantivo por rol, el del rótulo por declaración—, así que la cabecera
+   * sigue midiendo los 14 pt que mide en las tres láminas con lista apilada.
+   *
+   * El medianil es el separador de columnas del sistema: la lámina sitúa el rótulo «a
+   * la derecha de Suplementos» y no da la cifra. Mismo criterio que 2.C con la fecha
+   * y 2.G con la marca. `DERIVADO, NO MEDIDO`.
+   */
+  filaCabecera: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  rotuloCabecera: {
+    ...estiloTipografico('lista.rotulo'),
+    marginLeft: RETICULA.medianil,
+  },
   /**
    * La celda de indicación con la calibración `normal`. Ninguna lámina compone
    * `normal` + `columna` —Laboratorio es `compacta`—, así que el rol es el que la
@@ -413,7 +498,13 @@ const estilos = StyleSheet.create({
  * Cuál de las dos calibraciones de fila usa la lista. **La declara el formato**,
  * nunca el número de ítems (ver la nota de `GEOMETRIA`).
  */
-export type CalibracionEntrada = 'normal' | 'compacta' | 'estudio' | 'medicamento'
+export type CalibracionEntrada =
+  | 'normal'
+  | 'compacta'
+  | 'estudio'
+  | 'medicamento'
+  /** Dos ranuras: ancla y justificación. Ver `GEOMETRIA.suplemento`. */
+  | 'suplemento'
 
 /**
  * Dónde va la ranura `nota` respecto del `ancla`.
@@ -529,6 +620,18 @@ export interface CabeceraListaProps {
    * `Estudios · continuación`; la cadena entera la declara el formato.
    */
   readonly titulo: string
+  /**
+   * RÓTULO A LA DERECHA DEL SUSTANTIVO, en el mismo renglón. Colapsa si no viene, que
+   * es lo que hace en los otros dos formatos con lista apilada.
+   *
+   * Lo estrena Suplementación con `Dosis calculada para NN kg`, que **colapsa con el
+   * peso**: sin peso no hay base de cálculo que anunciar (II.4 §6). Esa condición no
+   * es de aquí — la resuelve el formato, que es quien tiene el peso delante.
+   *
+   * La cadena entera la redacta el formato, como todas las del sistema: este
+   * componente coloca y compone en su rol, no rotula.
+   */
+  readonly rotulo?: string
   readonly acento: AcentoResuelto
 }
 
@@ -546,10 +649,27 @@ export interface CabeceraListaProps {
  * con la que se rotula un campo: 0.14 em no es el 0.22 de la versalita del sistema.
  * Se compone en mayúsculas porque la lámina lo compone así.
  */
-export function CabeceraLista({ titulo, acento }: CabeceraListaProps): ReactElement {
+export function CabeceraLista({
+  titulo,
+  rotulo,
+  acento,
+}: CabeceraListaProps): ReactElement {
   return (
     <View>
-      <Text style={estilos.rotuloLista}>{titulo.toUpperCase()}</Text>
+      {/*
+        Con rótulo, el sustantivo comparte renglón con él; sin rótulo va suelto y no
+        se monta la fila. Un contenedor de más por hoja no arruina nada, pero tampoco
+        hace falta: la cabecera sin rótulo es la de los otros dos formatos y tiene que
+        seguir componiéndose exactamente igual.
+      */}
+      {rotulo === undefined ? (
+        <Text style={estilos.rotuloLista}>{titulo.toUpperCase()}</Text>
+      ) : (
+        <View style={estilos.filaCabecera}>
+          <Text style={estilos.rotuloLista}>{titulo.toUpperCase()}</Text>
+          <Text style={estilos.rotuloCabecera}>{rotulo}</Text>
+        </View>
+      )}
       <View style={estilos.cabeceraLista}>
         <FileteGruesoFino acento={acento} medida="lista" />
       </View>
@@ -573,21 +693,30 @@ export default function EntradaNumerada({
   const compacta = calibracion === 'compacta'
   const estudio = calibracion === 'estudio'
   const medicamento = calibracion === 'medicamento'
+  const suplemento = calibracion === 'suplemento'
   const enColumna = disposicion === 'columna'
 
   /**
    * `estudio` lleva su ritmo en las DOS direcciones y en todas las entradas, así
-   * que no consulta `primera`. Las otras tres se lo ahorran a la primera, que es lo
+   * que no consulta `primera`. Las otras cuatro se lo ahorran a la primera, que es lo
    * que evita la regla flotando sobre la lista — y `medicamento` reutiliza el de
    * `normal` sin más, porque es el mismo (ver `GEOMETRIA.medicamento`).
+   *
+   * `suplemento` es el caso mixto y no cabía en ninguno de los dos: lleva padding en
+   * las dos direcciones como `estudio` y la regla arriba como `normal`, así que sus
+   * dos formas se declaran enteras y se elige por `primera`.
    */
   const ritmo = estudio
     ? estilos.entradaEstudio
-    : primera
-      ? {}
-      : compacta
-        ? estilos.separacionCompacta
-        : estilos.separacion
+    : suplemento
+      ? primera
+        ? estilos.entradaSuplemento
+        : estilos.entradaSuplementoConRegla
+      : primera
+        ? {}
+        : compacta
+          ? estilos.separacionCompacta
+          : estilos.separacion
 
   return (
     // Regla 4: `wrap={false}` es el `break-inside: avoid` de la ficha. Es uno de
@@ -623,7 +752,13 @@ export default function EntradaNumerada({
         <View style={estilos.filaAncla}>
           <Text
             style={
-              estudio
+              /*
+                `suplemento` compone su ancla con el rol de `estudio` —12.5 / 17, 600,
+                −0.005 em— porque las dos láminas lo miden igual, hasta el píxel del
+                tracking. No es que una herede de la otra: es que un rol idéntico no se
+                duplica (ver la nota de I.1.4).
+              */
+              estudio || suplemento
                 ? estilos.anclaEstudio
                 : medicamento
                   ? estilos.anclaMedicamento
@@ -698,6 +833,17 @@ export default function EntradaNumerada({
         ) : null}
 
         {/*
+          LA JUSTIFICACIÓN. Tampoco pasa por 2.J y por lo mismo: es el dato que el
+          médico escribe en el campo `justificacion`, no un pasaje con viñetas. Colapsa
+          entera cuando no viene y la fila baja de 48 a 28 pt — que es la mitad de la
+          verificación visible de este formato: **las dos ranuras vacías no dejan nada,
+          y la entrada sigue siendo la misma `EntradaNumerada` de Receta** (II.4 §4).
+        */}
+        {suplemento && tieneValor(nota) ? (
+          <Text style={estilos.justificacionSuplemento}>{nota}</Text>
+        ) : null}
+
+        {/*
           LA NOTA DE `estudio` NO PASA POR 2.J, y por la misma razón que no pasa la
           de la disposición `columna`: es un dato con su propio rótulo, no prosa con
           viñetas. Colapsa entera —rótulo incluido— cuando no viene, que es la mitad
@@ -730,7 +876,7 @@ export default function EntradaNumerada({
           fila esté calibrada a 9 / 11.5. No se resuelve inventando: cuando exista
           una lámina que lo use, se mide y se abre la ranura en 2.J.
         */}
-        {!estudio && !medicamento && !enColumna && tieneValor(nota) ? (
+        {!estudio && !medicamento && !suplemento && !enColumna && tieneValor(nota) ? (
           <View style={estilos.nota}>
             <ParserBloques texto={nota} marca="raya" />
           </View>

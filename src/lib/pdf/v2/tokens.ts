@@ -360,6 +360,58 @@ export const TIPOGRAFIA = {
   // en la versalita porque es lo que la lámina compone —y porque la alarma es el
   // único bloque del sistema con ventaja declarada sobre el texto corrido, así que
   // su rótulo tampoco puede ser el más discreto de los dos.
+  // ── LA CALIBRACIÓN `suplemento` DE LA ENTRADA (2.G) NO APARECE EN ESTA TABLA, Y
+  // ESO ES EL RESULTADO DEL PASO 4.4.
+  //
+  // Sus tres ranuras se componen con roles que YA existen, hasta la centésima:
+  //
+  //     número          `entrada.numero`         13 / 17, 600, acento
+  //     ancla           `entradaEstudio.ancla`   12.5 / 17, 600, −0.005 em
+  //     justificación   `texto.corrido`          IBM Plex Sans 11.5 / 18, 400
+  //
+  // El tracking del ancla sale del mismo píxel que el de Receta: la lámina mide
+  // `letter-spacing: -0.083px` y a cuerpo 12.5 pt —16.667 px— eso es −0.005 em, que es
+  // exactamente lo que `entradaEstudio.ancla` ya declara. **Un cuarto rol idéntico a
+  // uno existente sería deuda**, que es lo mismo que dice la nota del número en
+  // `entradaEstudio`. Si algún día ves aquí `entradaSuplemento.*`, mídelo antes: casi
+  // seguro es un rol duplicado.
+  //
+  // ── EL RÓTULO DE LA CABECERA DE LISTA (2.G `CabeceraLista`).
+  //
+  // ⚠ **LA LÁMINA LO COMPONE EN IBM PLEX MONO Y AQUÍ VA EN LA NEO-GROTESCA.** I.1.4
+  // prohíbe la mono en documento impreso —solo existe en el marco de documentación de
+  // las láminas— y este es el cuarto caso idéntico: `CONCILIA D13, D20, D30`. La
+  // sustitución es la que esos tres ya fijaron y queda **reportada**.
+  //
+  // El tracking sí es el medido: 1 px a 7.5 pt —10 px— son 0.1 em, la misma conversión
+  // con la que se validaron los dos trackings de la banda de pie contra la lámina de
+  // Receta. `COINCIDENCIA` con el tracking de `pie`, que vale lo mismo y no es este.
+  //
+  // El interlineado de 14 NO está medido: lo fija la cabecera, que mide 14 pt en las
+  // tres láminas con lista apilada y donde este rótulo comparte renglón con el
+  // `titulo.seccion` del sustantivo. Con cualquier cifra mayor, el rótulo estiraría la
+  // cabecera y dejaría de medir 14. `DERIVADO, NO MEDIDO`.
+  'lista.rotulo': { familia: FUENTE.neogrotesca, cuerpo: 7.5, interlineado: 14, peso: 400, tracking: 0.1, color: 'tinta.etiqueta' },
+  // ── LOS CUATRO TEXTOS DEL BLOQUE DE CITA DE CONTROL (2.I, variante `cita`).
+  //
+  // Suben aquí por el mismo criterio que los dos encabezados de bloque destacado de
+  // abajo: no son desviaciones de ningún rol —7.5 / 11 en 600 no sale de mover un
+  // sumando de `etiqueta`, ni 14 / 18 de mover uno de `dato`— y lo que no es geometría
+  // interna de un componente es un rol (I.1.7).
+  //
+  // Y hay una segunda razón, que es de reparto de responsabilidades: estos cuatro los
+  // compone el FORMATO, por la ranura `contenido` de 2.I, y un formato no escribe
+  // tipografía. Sin estos roles, II.4 tendría cuatro cuerpos y cuatro colores dentro,
+  // que es justo lo que la cabecera de II.3 promete que no ocurre.
+  //
+  // ⚠ **`cita.plazo` VA EN LA NEO-GROTESCA Y LA LÁMINA LO COMPONE EN MONO**, igual que
+  // `lista.rotulo` de arriba y por lo mismo. Su interlineado tampoco está medido: se
+  // toma el 11 de los otros dos roles de este cuerpo —`etiqueta` y `medico.credencial`,
+  // los dos a 11— en vez de inventar una cifra. `DERIVADO, NO MEDIDO`.
+  'cita.encabezado': { familia: FUENTE.neogrotesca, cuerpo: 7.5, interlineado: 11, peso: 600, tracking: 0, color: 'tinta.secundaria' },
+  'cita.fecha': { familia: FUENTE.neogrotesca, cuerpo: 14, interlineado: 18, peso: 600, tracking: 0, color: 'tinta.negra' },
+  'cita.plazo': { familia: FUENTE.neogrotesca, cuerpo: 8, interlineado: 11, peso: 400, tracking: 0, color: 'tinta.secundaria' },
+  'cita.nota': { familia: FUENTE.humanista, cuerpo: 9.5, interlineado: 13, peso: 400, tracking: 0, color: 'tinta.secundaria' },
   'recomendaciones.encabezado': { familia: FUENTE.neogrotesca, cuerpo: 9, interlineado: 13, peso: 600, tracking: 0.14, color: 'tinta.negra' },
   'alarma.encabezado': { familia: FUENTE.neogrotesca, cuerpo: 9.5, interlineado: 13, peso: 600, tracking: 0.22, color: 'tinta.negra' },
   'firma.nombre': { familia: FUENTE.neogrotesca, cuerpo: 11.5, interlineado: 16, peso: 600, tracking: -0.012, color: 'tinta.negra' },
@@ -515,6 +567,38 @@ export const FILETE = {
   regla: 0.5,
 } as const
 
+/**
+ * LOS DOS GROSORES QUE MIDE LA LÁMINA DE SUPLEMENTACIÓN, Y POR QUÉ NO ENTRAN EN
+ * `FILETE`.
+ *
+ * Esa escala es de seis grosores del SISTEMA y ninguno de estos dos lo es: son las
+ * cifras con que una lámina concreta dibuja dos trazos que el chasis ya tiene. Meterlos
+ * ahí como séptimo y octavo miembro los ofrecería a los ocho formatos, que es lo
+ * contrario de lo que son.
+ *
+ * Viven aquí y **no en la ficha de un componente** —que es donde I.1.7 manda poner la
+ * geometría interna— porque los dos tienen DOS consumidores cada uno, y §0 exige un
+ * solo sitio de definición por token:
+ *
+ *   `acento`  borde de la celda de peso (2.D) · filetes del bloque de cita (2.I)
+ *   `regla`   regla entre entradas (2.G) · filete de las notas (2.I)
+ *
+ * Con un solo consumidor cada uno, lo correcto sería la ficha del componente, igual
+ * que las desviaciones de 2.F o el padding de alarma de 2.I.
+ *
+ * ⚠ **LOS DOS SE APARTAN DEL CHASIS POR MENOS DE UN TERCIO DE PUNTO**, y eso es lo que
+ * hay que saber antes de tocarlos: 1.9 contra los 1.6 de `filete.cita` y 0.63 contra
+ * los 0.5 de `filete.regla`. No se unifican por la misma razón que los hairlines de
+ * 0.75 del riel siguen sin unificarse (ver `TRAZO` en 2.F): mover `filete.cita` o
+ * `filete.regla` mueve los formatos ya conciliados. Reportado.
+ */
+export const FILETE_SUPLEMENTACION = {
+  /** Celda de peso y bloque de cita. El chasis pone `filete.cita`, 1.6. */
+  acento: 1.9,
+  /** Regla entre entradas y filete de notas. El chasis pone `filete.regla`, 0.5. */
+  regla: 0.63,
+} as const
+
 // ───────────────────────────────────────────────────────────────────────────────
 // I.1.5 · Escritura manuscrita
 // ───────────────────────────────────────────────────────────────────────────────
@@ -649,8 +733,24 @@ export const ESPACIO = {
  *   2.F  valor de celda en peso 500                      (el chasis, 400)
  *   2.G  calibración `medicamento` y tratamiento binario de la vía
  *   2.I  alarma con padding `6 0 8 14`                   (el chasis, `espacio.16`)
+ *
+ * **Y AHORA SON CUATRO. LA CUARTA ES LA QUE MENOS DECLARA, Y ESO ES EL HALLAZGO.**
+ *
+ * `suplementacion` hereda de `receta` casi todo lo que aquella desvió —los dos
+ * hairlines del riel, el reparto 267 + 9 + 210 del bloque de título con su medianil de
+ * 20 y su aire de 5, la banda de dirección de dos renglones, el bloque de firma de
+ * 118.75, el contador en `tinta.etiqueta`— y **ninguna de esas cifras se vuelve a
+ * escribir**: se leen de donde ya están. Lo que declara de propio es esto, y solo esto:
+ *
+ *   2.B  espaciador de cierre del membrete a 12          (receta, 10)
+ *   2.C  aire del filete de título al riel a 10          (el chasis, 8)
+ *   2.D  fila inferior del riel: peso (4) + diagnóstico (8), con la celda de peso
+ *   2.G  calibración `suplemento` —dos ranuras— y cabecera de lista con rótulo
+ *   2.I  cita con filete superior e izquierdo, y ranura de composición propia
+ *
+ * Las dos primeras son el valor del chasis o el de otra lámina, no cifras nuevas.
  */
-export type Lamina = 'chasis' | 'imagenologia' | 'receta'
+export type Lamina = 'chasis' | 'imagenologia' | 'receta' | 'suplementacion'
 
 /**
  * Las nueve transiciones entre bloques declaradas por el diseño (I.1.7).

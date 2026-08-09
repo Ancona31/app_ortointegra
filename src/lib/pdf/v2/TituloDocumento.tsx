@@ -129,6 +129,22 @@ const RECETA = {
   tituloFilete: 5,
 } as const
 
+/**
+ * GEOMETRÍA DEL BLOQUE EN LA LÁMINA DE SUPLEMENTACIÓN — **LAS DE RECETA, MENOS UNA**.
+ *
+ * Las cuatro cifras del reparto son idénticas a las de arriba y por eso se leen de
+ * `RECETA` en vez de volver a escribirse: caja 267, riel 210, medianil de celdas 20 y
+ * 5 pt hasta el filete. Copiarlas aquí crearía dos sitios de definición para el mismo
+ * bloque medido dos veces igual, que es cómo se desincronizan.
+ *
+ * Lo único propio es el aire de ABAJO: **10 pt del filete al riel de identificación**,
+ * donde Receta no declara nada y se queda con los 8 del chasis
+ * (`transicion.tituloRiel`). `COINCIDENCIA` — vale lo mismo que el de Imagenología y
+ * no es él: aquella lámina también mide 6 hasta su filete y esta mide 5, así que sus
+ * dos aires no son la misma pareja.
+ */
+const SUPLEMENTACION = { ...RECETA, tituloRiel: 10 } as const
+
 /** Interlineado del título: el alto de UNA de sus líneas. Lo usa la fecha. */
 const ALTO_LINEA_TITULO = TIPOGRAFIA['titulo.documento'].interlineado ?? 0
 
@@ -147,6 +163,14 @@ const estilos = StyleSheet.create({
   },
   bloqueImagenologia: {
     marginBottom: IMAGENOLOGIA.tituloRiel,
+  },
+  /**
+   * `COINCIDENCIA` con el de arriba, y por eso es un estilo aparte y no el mismo: las
+   * dos láminas miden 10 pt en este aire por su cuenta. Fusionarlos ataría el bloque
+   * de un formato al del otro.
+   */
+  bloqueSuplementacion: {
+    marginBottom: SUPLEMENTACION.tituloRiel,
   },
   fila: {
     flexDirection: 'row',
@@ -405,7 +429,13 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
    */
   const lamina = props.lamina ?? 'chasis'
   const imagen = lamina === 'imagenologia'
-  const receta = lamina === 'receta'
+  const suplementacion = lamina === 'suplementacion'
+  /**
+   * Suplementación compone el bloque **con las cifras de Receta** (ver `SUPLEMENTACION`),
+   * así que aquí van juntas: lo único que las separa es el aire de abajo, y ese se
+   * decide en el contenedor.
+   */
+  const receta = lamina === 'receta' || suplementacion
   const doble = imagen || receta
 
   /**
@@ -418,7 +448,16 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
   )
 
   return (
-    <View style={[estilos.bloque, imagen ? estilos.bloqueImagenologia : {}]}>
+    <View
+      style={[
+        estilos.bloque,
+        imagen
+          ? estilos.bloqueImagenologia
+          : suplementacion
+            ? estilos.bloqueSuplementacion
+            : {},
+      ]}
+    >
       <View style={estilos.fila}>
         <View
           style={

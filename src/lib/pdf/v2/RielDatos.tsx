@@ -44,6 +44,7 @@ import { tieneValor } from './Campo'
 import {
   CAJA,
   FILETE,
+  RETICULA,
   RIEL_CELDA,
   TINTA,
   TIPOGRAFIA,
@@ -98,11 +99,17 @@ const GEOMETRIA = {
  * 0.5, así que lo que arriba se declaraba «diferencia de una lámina» es ya la
  * mayoría. Sigue sin unificarse aquí por la misma razón: unificar mueve Laboratorio,
  * que está conciliado, y esa es una decisión de producto. Reportado.
+ *
+ * **Y LA DE SUPLEMENTACIÓN ES LA TERCERA, CON LAS MISMAS DOS CIFRAS.** Su riel mide
+ * los mismos 0.75 y 0.375, así que el aviso pasa de dos contra uno a **tres contra
+ * uno**: solo Laboratorio compone 0.8 y 0.5. Sigue sin unificarse aquí, y ya no por
+ * falta de votos sino porque es una decisión de producto. Reportado.
  */
 const TRAZO = {
   chasis: { filete: FILETE.fino, regla: FILETE.regla },
   imagenologia: { filete: 0.75, regla: 0.375 },
   receta: { filete: 0.75, regla: 0.375 },
+  suplementacion: { filete: 0.75, regla: 0.375 },
 } as const satisfies Record<Lamina, { filete: number; regla: number }>
 
 /** Lo que una desviación puede mover de un rol: solo su cuerpo y su interlineado. */
@@ -213,6 +220,28 @@ const estilos = StyleSheet.create({
     borderLeftColor: TINTA.hairline,
   },
   /**
+   * EL RENGLÓN DE RÓTULOS, cuando la celda lleva dos. Con uno solo el `Text` va suelto
+   * y esta fila no se monta: un contenedor de más por celda, en un riel de siete, es
+   * árbol que nadie necesita.
+   *
+   * `alignItems: 'flex-end'` apoya las dos cajas de línea por su borde INFERIOR, que
+   * es lo único que se puede alinear aquí: react-pdf no le da a Yoga una función de
+   * línea base (ver la nota larga de `cajaFecha` en 2.C). Con los dos rótulos al mismo
+   * interlineado —10 pt en la celda de peso— el borde inferior y la base coinciden y
+   * la distinción no llega a existir.
+   *
+   * El medianil es `reticula.medianil`, que es el separador de columnas del sistema:
+   * la lámina no lo mide, y es el mismo criterio con que 2.C separa el título de la
+   * fecha y 2.G la marca del ancla en vez de inventar una cifra.
+   */
+  filaRotulos: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  rotuloSecundario: {
+    marginLeft: RETICULA.medianil,
+  },
+  /**
    * Versalita: mayúsculas con tracking, no versalitas reales de la fuente
    * (I.1.4). La transformación a mayúsculas ocurre en el render.
    *
@@ -286,6 +315,56 @@ export interface CeldaRiel {
   readonly valor?: string
   /** Columnas de `riel.celda`. Entero, nunca un ancho arbitrario (regla 1). */
   readonly columnas: number
+  /**
+   * SEGUNDO RÓTULO, EN EL MISMO RENGLÓN QUE EL PRIMERO Y A SU DERECHA.
+   *
+   * Una sola celda del sistema lo lleva hoy: la de peso de 2.D, que rotula `PESO` y
+   * califica `BASE DEL CÁLCULO`. Colapsa con la celda, como todo lo suyo.
+   *
+   * ⚠ **VA EN EL RENGLÓN DEL RÓTULO Y NO EN UNO PROPIO, Y ESO ES UNA LECTURA DE LA
+   * LÁMINA, NO UN CAPRICHO DE MAQUETACIÓN.** El archivo enumera *tres* textos en esa
+   * celda y a la vez la mide en **33.71 pt**, y las dos cosas no caben juntas: apilados
+   * son 3 + 10 + 10 + 16 + 4 = 43. Con los dos rótulos compartiendo renglón son
+   * **33** —3 + 10 + 16 + 4— y el residuo de 0.71 es el de la caja de línea del HTML,
+   * el mismo que en Receta valía 0.56. La otra medida de la lámina lo confirma por su
+   * cuenta: **su encabezado de 232.51 pt solo cuadra con 33**, y con 43 se pasa diez.
+   * Dos cotas medidas contra una frase. Reportado.
+   *
+   * El estilo lo entrega el CONSUMIDOR, como la excepción de valor: 2.F no sabe qué
+   * es una base de cálculo ni con qué se compone.
+   */
+  readonly etiquetaSecundaria?: {
+    readonly texto: string
+    readonly estilo: EstiloValorCelda
+  }
+  /**
+   * REGLA IZQUIERDA PROPIA, cuando la celda no se separa de su vecina con el hairline
+   * del riel. Hoy solo el borde de acento de 1.9 pt que la lámina de Suplementación
+   * dibuja entre la celda de peso y la de diagnóstico.
+   *
+   * ⚠ **LA LÁMINA LO DECLARA COMO BORDE *DERECHO* DE LA CELDA DE PESO Y AQUÍ ES EL
+   * *IZQUIERDO* DE LA SIGUIENTE.** Es la misma línea en el mismo sitio —una celda
+   * acaba donde empieza la otra— y el riel compone TODAS sus reglas verticales como
+   * borde izquierdo de la celda que sigue (ver `celdaConRegla`). Ponerlo del otro lado
+   * dibujaría dos: la de acento y el hairline que la vecina trae por defecto.
+   *
+   * Sin ella, el hairline del riel. Y en la primera celda viva de la fila no se dibuja
+   * ninguna de las dos, que es lo que hace que el colapso de la celda de peso no deje
+   * un filete de acento colgando en el margen.
+   */
+  readonly reglaIzquierda?: {
+    readonly grosor: number
+    readonly color: string
+  }
+  /**
+   * Padding izquierdo propio, en pt. Sin él, los 10 de `GEOMETRIA.padding.lateral`.
+   *
+   * Existe por un solo dato medido: la celda de peso compone `padding: 3 10 4 0`, con
+   * el lado izquierdo a CERO, así que su rótulo y su cifra arrancan pegados al margen
+   * de la caja en vez de a 10 pt como las de la fila de arriba. Es de la lámina y se
+   * compone tal cual.
+   */
+  readonly paddingIzquierdo?: number
   /**
    * Excepción tipográfica del valor, cuando el consumidor declara una en su
    * propia ficha. Sin ella, el valor va en el rol `dato`, que es el caso normal.
@@ -362,13 +441,40 @@ function Fila({
           key={celda.clave}
           style={[
             estilos.celda,
-            { width: celda.columnas * RIEL_CELDA, flexGrow: celda.columnas },
+            {
+              width: celda.columnas * RIEL_CELDA,
+              flexGrow: celda.columnas,
+              paddingLeft: celda.paddingIzquierdo ?? GEOMETRIA.padding.lateral,
+            },
+            /*
+              LA REGLA VERTICAL, Y NUNCA EN LA PRIMERA CELDA VIVA. Las celdas llegan
+              aquí ya filtradas, así que `indice === 0` es la primera que SOBREVIVE al
+              colapso: cuando la celda de peso se va, la de diagnóstico pasa a ser la
+              primera y su regla de acento se va con ella, en vez de quedar dibujada
+              contra el margen.
+            */
             indice === 0
               ? {}
-              : { ...estilos.celdaConRegla, borderLeftWidth: regla },
+              : celda.reglaIzquierda === undefined
+                ? { ...estilos.celdaConRegla, borderLeftWidth: regla }
+                : {
+                    borderLeftWidth: celda.reglaIzquierda.grosor,
+                    borderLeftColor: celda.reglaIzquierda.color,
+                  },
           ]}
         >
-          <Text style={estilos.etiqueta}>{celda.etiqueta.toUpperCase()}</Text>
+          {celda.etiquetaSecundaria === undefined ? (
+            <Text style={estilos.etiqueta}>{celda.etiqueta.toUpperCase()}</Text>
+          ) : (
+            <View style={estilos.filaRotulos}>
+              <Text style={estilos.etiqueta}>{celda.etiqueta.toUpperCase()}</Text>
+              <Text
+                style={[celda.etiquetaSecundaria.estilo, estilos.rotuloSecundario]}
+              >
+                {celda.etiquetaSecundaria.texto.toUpperCase()}
+              </Text>
+            </View>
+          )}
           <Text style={celda.estiloValor ?? valor}>{celda.valor}</Text>
         </View>
       ))}

@@ -75,7 +75,12 @@ const ESPERA_MS = 220
  * distintos y no pueden convivir en el mismo: el chasis va con guías y en
  * posición absoluta, y un formato va sin guías y en flujo.
  */
-type Vista = 'chasis' | 'laboratorio' | 'imagenologia' | 'receta'
+type Vista =
+  | 'chasis'
+  | 'laboratorio'
+  | 'imagenologia'
+  | 'receta'
+  | 'suplementacion'
 
 /**
  * EL SELECTOR — EL CHASIS Y LOS OCHO FORMATOS DE LA SECCIÓN II.
@@ -90,7 +95,7 @@ type Vista = 'chasis' | 'laboratorio' | 'imagenologia' | 'receta'
  * de 320 pt y se corta — que es el defecto que esta tabla arregla.
  *
  * ⚠ **SON NUEVE Y NO DIEZ.** La Sección II declara ocho formatos —II.1 a II.8— y con
- * el chasis son nueve, así que faltan CINCO por construir y no seis. Si el décimo es
+ * el chasis son nueve, así que faltan CUATRO por construir y no cinco. Si el décimo es
  * una vista que no está en la Sección II —una hoja de vista previa, o el chasis
  * partido en dos—, dime cuál y entra aquí sin tocar nada más: la retícula envuelve.
  */
@@ -106,7 +111,7 @@ const VISTAS: readonly EntradaSelector[] = [
   { vista: 'laboratorio', codigo: '4.1', nombre: 'Laboratorio' },
   { vista: 'imagenologia', codigo: '4.2', nombre: 'Imagenología' },
   { vista: 'receta', codigo: '4.3', nombre: 'Receta' },
-  { vista: null, codigo: '4.4', nombre: 'Suplementación' },
+  { vista: 'suplementacion', codigo: '4.4', nombre: 'Suplementación' },
   { vista: null, codigo: '4.5', nombre: 'Honorarios' },
   { vista: null, codigo: '4.6', nombre: 'Internamiento' },
   { vista: null, codigo: '4.7', nombre: 'Consentimiento' },
@@ -114,9 +119,13 @@ const VISTAS: readonly EntradaSelector[] = [
 ]
 
 /**
- * LOS CASOS DE CADA FORMATO. Los tres formatos construidos declaran los mismos
+ * LOS CASOS DE CADA FORMATO. Los cuatro formatos construidos declaran los mismos
  * tres, y el `lleno` es el único que desborda: es el que enseña la hoja de
  * continuación, que es lo que 2.N añadió al chasis.
+ *
+ * En Suplementación el `mínimo` hace además de segunda mitad de su verificación
+ * visible: va SIN PESO, y con él desaparecen la celda `BASE DEL CÁLCULO` del riel y el
+ * rótulo `Dosis calculada para NN kg` de la cabecera (II.4 §6).
  *
  * El chasis no tiene casos —es una hoja de muestras, no un documento—, así que su
  * selector no aparece.
@@ -190,9 +199,11 @@ export default function TallerV2(): ReactElement {
                 ? (await import('./HojaImagenologia')).generarPdfImagenologia
                 : vista === 'receta'
                   ? (await import('./HojaReceta')).generarPdfReceta
-                  : // La hoja de chasis no tiene casos: se le pasa el argumento y lo
-                  // ignora, que es más barato que ramificar la llamada.
-                  (await import('./HojaTaller')).generarPdfTaller
+                  : vista === 'suplementacion'
+                    ? (await import('./HojaSuplementacion')).generarPdfSuplementacion
+                    : // La hoja de chasis no tiene casos: se le pasa el argumento y lo
+                    // ignora, que es más barato que ramificar la llamada.
+                    (await import('./HojaTaller')).generarPdfTaller
           const blob = await generar(medico, acentoHex, caso)
           if (cancelado) return
           urlCreada = URL.createObjectURL(blob)
