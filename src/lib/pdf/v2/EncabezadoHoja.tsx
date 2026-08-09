@@ -22,17 +22,25 @@
  *
  * QUÉ CAMBIA ENTRE LAS DOS VARIANTES
  *
- *   membrete    `completo` con panel y especialidad  →  `continuacion`, solo el nombre
- *   título      el del formato                       →  con el rótulo de continuación
- *   riel        `completo`, hasta siete celdas       →  `reducido`, nombre y expediente
- *   badge       `urgente`                            →  `urgenteReducido`
+ *   membrete    `completo` con panel y especialidad  →  `continuacion`, nombre a 14/18
+ *   título      bloque propio con su filete          →  PLEGADO dentro de la cabecera
+ *   paciente    riel `completo`, hasta siete celdas  →  una línea gris de 7.5 / 12
+ *   badge       colgado del título                   →  a la derecha de la línea
  *   cabecera    el sustantivo de la lista            →  con el rótulo de continuación
  *
- * **El riel reducido NO ES OPCIONAL** (regla 2 de 2.D). Una hoja de estudios o de
- * indicaciones sin nombre de paciente es un riesgo clínico, no un detalle de
- * maquetación: en el hospital las hojas se separan. Por eso `paciente` es una prop
- * exigible y no hay ninguna rama de este archivo que componga una continuación sin
- * ella.
+ * **LO QUE PESA CADA UNA, Y POR QUÉ IMPORTA.** El encabezado completo mide 220.88 pt
+ * y el de continuación tiene que ser mucho más ligero o no compensa: si pesara lo
+ * mismo, cortar una lista costaría una hoja entera de identidad repetida. Las tres
+ * cifras de arriba salen de la lámina y valen 59 pt frente a la primera versión de
+ * este componente, que montaba las piezas de la hoja 1 encogidas —membrete con el
+ * nombre a tamaño de portada, bloque de título entero y el riel con sus filetes—.
+ *
+ * **La identificación del paciente NO ES OPCIONAL** (regla 2 de 2.D). Una hoja de
+ * estudios o de indicaciones sin nombre es un riesgo clínico, no un detalle de
+ * maquetación: en el hospital las hojas se separan. Lo que la lámina retira es la
+ * CAJA —el riel con sus filetes— y no el dato: el nombre y el expediente siguen ahí,
+ * en una línea. Por eso `paciente` es una prop exigible y no hay ninguna rama de este
+ * archivo que componga una continuación sin ella.
  *
  * QUIÉN LO INSTANCIA
  *
@@ -43,18 +51,26 @@
  * Sin `'use client'`: módulo neutro, como el resto de v2.
  */
 
-import { View, StyleSheet } from '@react-pdf/renderer'
+import { View, Text, StyleSheet } from '@react-pdf/renderer'
 import type { ReactElement } from 'react'
 import Membrete, {
   type ConsultorioMembrete,
   type MedicoMembrete,
 } from './Membrete'
 import type { PanelCircularProps } from './PanelCircular'
-import TituloDocumento from './TituloDocumento'
+import TituloDocumento, { CeldaFolio, ETIQUETA_FOLIO_RIEL } from './TituloDocumento'
 import BloquePaciente, { type ValoresPaciente } from './BloquePaciente'
 import BloqueNegativo from './BloqueNegativo'
 import { CabeceraEntradas, CabeceraLista } from './EntradaNumerada'
-import { ESPACIO, type AcentoResuelto, type Lamina } from './tokens'
+import { tieneValor } from './Campo'
+import {
+  ESPACIO,
+  TINTA,
+  TIPOGRAFIA,
+  estiloTipografico,
+  type AcentoResuelto,
+  type Lamina,
+} from './tokens'
 
 /**
  * EL RÓTULO DE CONTINUACIÓN, UNA SOLA VEZ EN EL SISTEMA.
@@ -119,6 +135,38 @@ export interface EncabezadoHojaProps {
   readonly aireLista?: number
 }
 
+/**
+ * GEOMETRÍA DE LA LÍNEA DE PACIENTE — 7.5 / 12, `tinta.etiqueta`.
+ *
+ * ⚠ **AQUÍ IBA UN `RielDatos` REDUCIDO Y LA LÁMINA COMPONE UNA LÍNEA.** La variante
+ * `reducido` de 2.D monta el riel entero con sus dos filetes de cierre: 31.5 pt para
+ * decir un nombre y un expediente. La lámina compone un solo renglón gris —B.3 §2,
+ * hoja 2, bloque 3: «línea de paciente y fecha de emisión, 7.5 / 12 pt, #737373»—, que
+ * son 12. Son 19 pt de encabezado, el tercero de los tres tramos.
+ *
+ * **Lo que NO cambia es la regla 2 de 2.D:** el nombre y el expediente siguen en la
+ * hoja, que es lo único que esa regla exige —que una hoja suelta se pueda atribuir a
+ * un paciente—. Lo que se retira es la caja, no el dato.
+ *
+ * Es una desviación de `medico.credencial` en dos sumandos, con el patrón de siempre:
+ * el interlineado sube de 11 a 12 —el mismo 12 que 2.B ya usa en su banda de dos
+ * renglones— y el color pasa de `tinta.secundaria` a `tinta.etiqueta`. Familia,
+ * cuerpo, peso y tracking los sigue poniendo el rol.
+ */
+const LINEA_PACIENTE = { interlineado: 12 } as const
+
+/**
+ * Los dos rótulos de la línea, y la raya que une sus piezas.
+ *
+ * Los escribe el chasis y no el formato, por lo mismo que 2.K escribe «Total de» y
+ * 2.M su leyenda: si los declarara cada uno de los ocho, el sistema acabaría con ocho
+ * redacciones de la misma línea. La lámina compone
+ * `Paciente · Nombre · 25 años · Exp. 2026-0184`.
+ */
+const ROTULO_PACIENTE = 'Paciente'
+const ROTULO_EXPEDIENTE = 'Exp.'
+const RAYA = ' · '
+
 const estilos = StyleSheet.create({
   /**
    * El aire entre el riel y la cabecera de la lista. Lo declara el FORMATO —cada
@@ -127,7 +175,36 @@ const estilos = StyleSheet.create({
    * lista sin cabecera no tiene de qué separarse.
    */
   hastaLista: { width: '100%' },
+  lineaPaciente: {
+    ...estiloTipografico('medico.credencial'),
+    lineHeight: LINEA_PACIENTE.interlineado / TIPOGRAFIA['medico.credencial'].cuerpo,
+    color: TINTA.etiqueta,
+    flex: 1,
+  },
+  /** La línea y, a su derecha, el badge reducido de los formatos que lo llevan. */
+  filaContinuacion: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
 })
+
+/**
+ * La línea de identificación: rótulo, nombre, edad y expediente, unidos por la raya
+ * del sistema. Las piezas que no vienen no dejan raya suelta.
+ */
+function lineaDePaciente(paciente: ValoresPaciente): string {
+  return [
+    ROTULO_PACIENTE,
+    paciente.paciente,
+    paciente.edad,
+    tieneValor(paciente.expediente)
+      ? `${ROTULO_EXPEDIENTE} ${paciente.expediente}`
+      : undefined,
+  ]
+    .filter((pieza): pieza is string => tieneValor(pieza))
+    .join(RAYA)
+}
 
 /** 2.V · `EncabezadoHoja`. */
 export default function EncabezadoHoja(props: EncabezadoHojaProps): ReactElement {
@@ -137,7 +214,26 @@ export default function EncabezadoHoja(props: EncabezadoHojaProps): ReactElement
   return (
     <View>
       {continuacion ? (
-        <Membrete variante="continuacion" acento={props.acento} medico={props.medico} />
+        /*
+          LA CABECERA DE CONTINUACIÓN, CON EL TÍTULO PLEGADO DENTRO. No monta un
+          bloque de título aparte: el rótulo y el nombre comparten la cabecera y el
+          filete que 2.B ya cierra, que es como lo compone la lámina.
+        */
+        <Membrete
+          variante="continuacion"
+          acento={props.acento}
+          medico={props.medico}
+          rotulo={titulo}
+          riel={
+            props.folio === undefined ? undefined : (
+              <CeldaFolio
+                etiqueta={ETIQUETA_FOLIO_RIEL}
+                valor={props.folio}
+                acento={props.acento}
+              />
+            )
+          }
+        />
       ) : (
         <Membrete
           variante="completo"
@@ -150,39 +246,44 @@ export default function EncabezadoHoja(props: EncabezadoHojaProps): ReactElement
       )}
 
       {/*
-        EL TÍTULO VA EN LAS DOS HOJAS, con su rótulo de continuación en la segunda.
-        El folio también: es lo que ata la hoja al documento dentro del cuerpo, además
-        de la banda de 2.M. La emisión NO se repite — es un dato de cabecera, no de
-        identificación, y la hoja de continuación ya queda atada por el folio.
+        EL TÍTULO, SOLO EN LA HOJA 1. En las de continuación va plegado arriba, dentro
+        de la cabecera: ver el `rotulo` que se le pasa al membrete. El folio se
+        compone en las dos —es lo que ata la hoja al documento dentro del cuerpo,
+        además de la banda de 2.M—, y la emisión solo en la 1: es un dato de cabecera,
+        no de identificación.
       */}
-      <TituloDocumento
-        variante="fijo"
-        lamina={props.lamina}
-        acento={props.acento}
-        titulo={titulo}
-        emision={continuacion ? undefined : props.emision}
-        folio={props.folio}
-        bajoTitulo={
-          props.urgente === true ? (
-            <BloqueNegativo
-              variante={continuacion ? 'urgenteReducido' : 'urgente'}
-              lamina={props.lamina}
-            />
-          ) : undefined
-        }
-      />
+      {continuacion ? null : (
+        <TituloDocumento
+          variante="fijo"
+          lamina={props.lamina}
+          acento={props.acento}
+          titulo={titulo}
+          emision={props.emision}
+          folio={props.folio}
+          bajoTitulo={
+            props.urgente === true ? (
+              <BloqueNegativo variante="urgente" lamina={props.lamina} />
+            ) : undefined
+          }
+        />
+      )}
 
       {/*
-        EL RIEL. Regla 2 de 2.D: en continuación NO es opcional. La variante
-        `reducido` compone nombre y expediente en una sola línea, que es lo mínimo con
-        lo que una hoja suelta se puede atribuir a un paciente.
+        LA IDENTIFICACIÓN DEL PACIENTE, que en continuación NO ES OPCIONAL (regla 2 de
+        2.D). Riel completo en la hoja 1, línea gris en las demás: el dato es el mismo,
+        la caja no. Ver `LINEA_PACIENTE`.
+
+        El badge viaja con la línea porque en continuación no hay título del que
+        colgar, que es donde la hoja 1 lo pone. La lámina lo compone así: «a la derecha
+        de la línea de paciente».
       */}
       {continuacion ? (
-        <BloquePaciente
-          variante="reducido"
-          paciente={props.paciente.paciente}
-          expediente={props.paciente.expediente}
-        />
+        <View style={estilos.filaContinuacion}>
+          <Text style={estilos.lineaPaciente}>{lineaDePaciente(props.paciente)}</Text>
+          {props.urgente === true ? (
+            <BloqueNegativo variante="urgenteReducido" lamina={props.lamina} />
+          ) : null}
+        </View>
       ) : (
         <BloquePaciente variante="completo" lamina={props.lamina} {...props.paciente} />
       )}

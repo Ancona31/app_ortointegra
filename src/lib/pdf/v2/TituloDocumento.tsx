@@ -355,6 +355,39 @@ export type TituloDocumentoProps =
   /** Escrito Médico sin título. No deja hueco reservado. */
   | { variante: 'ausente' }
 
+/**
+ * UNA CELDA DEL RIEL DE FOLIO: rótulo en versalita y valor en `folio`.
+ *
+ * Exportada porque el membrete de continuación compone la misma pareja a la derecha
+ * de su cabecera (2.B, ranura `riel`), y **la pareja tiene que tener un solo sitio de
+ * definición**: son dos roles y una transformación a versalita, y con dos copias
+ * bastaría con tocar una para que el folio de la hoja 1 y el de la 2 dejaran de
+ * parecerse. Es el mismo criterio con que 2.F se quedó la composición del riel que
+ * 2.D había escrito por su cuenta (I.3.5).
+ *
+ * El rol `folio` va en `acento.tinta`, así que se resuelve en el render y se esparce
+ * en un literal: misma razón de tipos que en 2.B, 2.D, 2.F y 2.G.
+ */
+export function CeldaFolio({
+  etiqueta,
+  valor,
+  acento,
+}: {
+  readonly etiqueta: string
+  readonly valor: string
+  readonly acento: AcentoResuelto
+}): ReactElement {
+  return (
+    <>
+      <Text style={estilos.etiquetaFolio}>{etiqueta.toUpperCase()}</Text>
+      <Text style={{ ...estiloTipografico('folio', acento) }}>{valor}</Text>
+    </>
+  )
+}
+
+/** El rótulo del riel de folio, para quien componga la celda desde fuera. */
+export const ETIQUETA_FOLIO_RIEL = ETIQUETA_FOLIO
+
 /** 2.C · `TituloDocumento`. */
 export default function TituloDocumento(props: TituloDocumentoProps): ReactElement {
   if (props.variante === 'ausente') {
@@ -381,10 +414,7 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
    * literal: misma razón de tipos que en 2.B, 2.D, 2.F y 2.G.
    */
   const celda = (etiqueta: string, valor: string): ReactElement => (
-    <>
-      <Text style={estilos.etiquetaFolio}>{etiqueta.toUpperCase()}</Text>
-      <Text style={{ ...estiloTipografico('folio', props.acento) }}>{valor}</Text>
-    </>
+    <CeldaFolio etiqueta={etiqueta} valor={valor} acento={props.acento} />
   )
 
   return (

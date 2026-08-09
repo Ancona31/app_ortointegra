@@ -423,8 +423,16 @@ describe('2.N · la hoja de continuación, en los tres formatos', () => {
     }
   }, 120_000)
 
-  it('Receta: reparte 4 y 3 como la lámina, y los bloques de cierre no van en la 1', async () => {
+  it('Receta: reparte 4 y 3 como la lámina, en DOS hojas', async () => {
     const hojas = await componer(RECETA)
+
+    /*
+      DOS HOJAS, QUE ES LO QUE LA LÁMINA COMPONE. Con el encabezado de continuación
+      pesando lo que pesaba antes de plegarlo —166 pt contra los 93.5 de ahora— la
+      firma no cabía en la hoja 2 y caía sola en una tercera, que es el defecto que la
+      regla 1 de 2.N existe para evitar.
+    */
+    expect(hojas).toHaveLength(2)
 
     // El reparto de la lámina para el caso de 7 (B.3 §5). Allí está fijado por
     // literal —`slice(0,4)`— y aquí sale de medir: es el mismo.
@@ -439,5 +447,53 @@ describe('2.N · la hoja de continuación, en los tres formatos', () => {
     expect(hojas[0].texto).not.toContain('ACUDA DE INMEDIATO')
     expect(hojas[1].texto).toContain('RECOMENDACIONES GENERALES')
     expect(hojas[1].texto).toContain('ACUDA DE INMEDIATO')
+    // Y la firma y el QR cierran ahí mismo, no en una hoja aparte.
+    expect(hojas[1].texto).toContain('FIRMA DEL MÉDICO')
+  }, 120_000)
+
+  it('el encabezado de continuación pesa la mitad que el completo', async () => {
+    /*
+      LO QUE PLEGAR LA CABECERA COMPRÓ, MEDIDO.
+
+      Se mide desde el margen hasta el ancla de la PRIMERA entrada de cada hoja, que
+      es todo lo que el encabezado ocupa más la cabecera de la lista. La cifra sale
+      de la misma cota con la que la prueba de II.3 fija el encabezado de la hoja 1.
+
+      El encabezado propio —hasta donde ABRE la cabecera de la lista— mide **220.88 pt**
+      en la hoja 1 y **93.50** en las de continuación. La lámina compone ~95. Aquí se
+      miden sus dos consecuencias, que llevan encima la cabecera de la lista (21 pt),
+      el ritmo de entrada de la hoja 2 (12.5, que la primera no tiene por ser
+      `primera`) y el descenso de la línea base dentro de su caja:
+
+          hoja 1          252.41 pt
+          continuación    137.54 pt      ← 114.87 menos
+
+      Los 166 pt que pesaba la primera versión salían de montar las piezas de la hoja
+      1 encogidas: membrete con el nombre a tamaño de portada, bloque de título entero
+      con su filete y el riel del paciente con los suyos. Los tres tramos que los
+      separan están declarados donde se ejecutan — el nombre a 14 / 18 en 2.B, el
+      título plegado y la línea de paciente en 2.V.
+    */
+    const hojas = await componer(RECETA)
+    expect(hojas).toHaveLength(2)
+
+    /** Del margen superior al ancla de la primera entrada de la hoja. */
+    const hastaLaLista = (hoja: Hoja): number => {
+      const anclas = hoja.renglones
+        .filter((r) => /^Fármaco \d/.test(r.texto))
+        .map((r) => 792 - r.y)
+      expect(anclas.length).toBeGreaterThan(0)
+      return Math.min(...anclas) - 54
+    }
+
+    const completo = hastaLaLista(hojas[0])
+    const continuacion = hastaLaLista(hojas[1])
+
+    // Lo que los tres tramos compraron, en una resta. Con la versión que montaba las
+    // piezas de la hoja 1 encogidas la diferencia era de 55 pt y la firma no cabía.
+    expect(completo - continuacion).toBeGreaterThan(100)
+    // Y las dos cifras, ancladas: si alguna se mueve, algo del encabezado cambió.
+    expect(completo).toBeCloseTo(252.41, 1)
+    expect(continuacion).toBeCloseTo(137.54, 1)
   }, 120_000)
 })

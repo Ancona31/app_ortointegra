@@ -278,7 +278,10 @@ const estilos = StyleSheet.create({
    * y el QR el que sube a su base.
    */
   filaCierre: {
-    marginTop: SEPARACION_ALARMA_CIERRE,
+    // SIN `marginTop`: el aire hasta la firma lo aporta 2.N por `aireFirma`, que es
+    // quien monta el bloque indivisible del cierre. Declararlo aquí también lo
+    // contaba DOS veces —26 del formato más los 16 por defecto del motor— y esos 16
+    // pt de más eran justo lo que empujaba la firma a una tercera hoja.
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
@@ -391,6 +394,7 @@ export default function RecetaMedica({
             ) : null}
           </>
         }
+        aireFirma={SEPARACION_ALARMA_CIERRE}
         firmas={
           /*
             LA FILA DE CIERRE. Los dos bloques que la componen son indivisibles por su

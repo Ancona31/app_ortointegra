@@ -48,7 +48,7 @@
  */
 
 import { View, Text, StyleSheet } from '@react-pdf/renderer'
-import type { ReactElement } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import PanelCircular, { type PanelCircularProps } from './PanelCircular'
 import FileteGruesoFino from './FileteGruesoFino'
 import {
@@ -141,6 +141,28 @@ const GEOMETRIA = {
    * banda de esa lámina.
    */
   interlineadoBandaImagenologia: 12,
+  /**
+   * EL NOMBRE EN LA VARIANTE `continuacion` — **14 / 18, no 26 / 28**.
+   *
+   * ⚠ Esta variante componía el nombre con el rol `medico.nombre` tal cual, es decir
+   * **a tamaño de portada en una hoja de continuación**. Las TRES láminas medidas lo
+   * componen a 14 / 18 y coinciden entre sí: `SPEC_DISENO_PARTE_B.md` B.3, pregunta
+   * transversal B, lo dice con la cifra al lado —«14 / 18 pt continuación, idéntico a
+   * Laboratorio e Imagenología»—. No es una divergencia de un formato: es un defecto
+   * del chasis con tres láminas de respaldo.
+   *
+   * Es una DESVIACIÓN DECLARADA de variante, con el patrón que ya usan 2.F, 2.D y
+   * 2.L: **el rol no se toca** —`medico.nombre` sigue en 26 / 28 y lo sigue usando la
+   * hoja 1— y lo que se mueve es el cuerpo y el interlineado de esta variante. No
+   * sube a I.1.4 mientras tenga un solo consumidor.
+   *
+   * El tracking SÍ se recalcula, al revés que en las desviaciones de 2.F: el de
+   * `medico.nombre` no es 0 —vale −0.012 em—, así que mover el cuerpo lo mueve.
+   *
+   * Vale 10 pt de encabezado de continuación, y es el primero de los tres tramos que
+   * separaban los 166 pt que pesaba esta hoja de los 95 que mide la lámina.
+   */
+  continuacion: { cuerpoNombre: 14, interlineadoNombre: 18 },
 } as const
 
 /** Datos del médico que el membrete imprime. Ninguno es opcional (regla 2). */
@@ -183,6 +205,19 @@ export type MembreteProps =
       variante: 'continuacion'
       medico: MedicoMembrete
       acento: AcentoResuelto
+      /**
+       * EL RÓTULO DEL DOCUMENTO, PLEGADO DENTRO DE LA CABECERA.
+       *
+       * En capitalización de oración y **ya con su rótulo de continuación**: quien lo
+       * arma es 2.V, que es donde vive esa cadena para los ocho formatos. Aquí solo
+       * se coloca y se compone en mayúsculas.
+       *
+       * Colapsa si no viene, y entonces la cabecera es solo el nombre — que es lo que
+       * componía esta variante antes de plegar el título.
+       */
+      rotulo?: string
+      /** La celda de folio de 2.C, a la derecha de la cabecera. Colapsa si no viene. */
+      riel?: ReactNode
     }
 
 const estilos = StyleSheet.create({
@@ -202,6 +237,30 @@ const estilos = StyleSheet.create({
   // sin índice de media queries, así que un rol se esparce, nunca se asigna
   // directo. Vale para los 18 componentes que faltan.
   nombre: { ...estiloTipografico('medico.nombre') },
+  /** El mismo nombre, a la mitad. Ver `GEOMETRIA.continuacion`. */
+  nombreContinuacion: {
+    ...estiloTipografico('medico.nombre'),
+    fontSize: GEOMETRIA.continuacion.cuerpoNombre,
+    lineHeight:
+      GEOMETRIA.continuacion.interlineadoNombre / GEOMETRIA.continuacion.cuerpoNombre,
+    letterSpacing:
+      TIPOGRAFIA['medico.nombre'].tracking * GEOMETRIA.continuacion.cuerpoNombre,
+  },
+  /**
+   * LA CABECERA DE CONTINUACIÓN — rótulo y nombre a la izquierda, folio a la derecha.
+   *
+   * La lámina **pliega el rótulo del documento aquí dentro** en vez de montar un
+   * bloque de título entero con su propio filete debajo: los dos comparten el filete
+   * que este componente ya cierra (regla 4). Son 30 pt de encabezado, el segundo de
+   * los tres tramos.
+   */
+  cabeceraContinuacion: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  rotuloContinuacion: { ...estiloTipografico('titulo.seccion') },
+  rielContinuacion: { alignItems: 'flex-end', flexShrink: 0 },
   especialidad: {
     ...estiloTipografico('medico.especialidad'),
     marginTop: GEOMETRIA.nombreEspecialidad,
@@ -288,7 +347,17 @@ export default function Membrete(props: MembreteProps): ReactElement {
           </View>
         </View>
       ) : (
-        <Text style={estilos.nombre}>{medico.nombre}</Text>
+        <View style={estilos.cabeceraContinuacion}>
+          <View>
+            {props.rotulo === undefined ? null : (
+              <Text style={estilos.rotuloContinuacion}>{props.rotulo.toUpperCase()}</Text>
+            )}
+            <Text style={estilos.nombreContinuacion}>{medico.nombre}</Text>
+          </View>
+          {props.riel === undefined ? null : (
+            <View style={estilos.rielContinuacion}>{props.riel}</View>
+          )}
+        </View>
       )}
 
       <View style={estilos.hastaFilete}>
