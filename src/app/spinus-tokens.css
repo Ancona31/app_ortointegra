@@ -1531,6 +1531,202 @@ a:hover { color: var(--sp-primary-active); }
 }
 
 
+/* --- 21. HONORARIOS / COTIZACIÓN (GUIA_FORM_HONORARIOS §2, §4) ---------- */
+
+/* Los dos documentos son UN formulario con variantes declaradas, así que aquí
+   no hay dos juegos de clases: hay un juego con `data-tipo` en el contenedor.
+   Un segundo juego sería la copia del archivo en dos que I.3.5 prohíbe, hecha
+   en CSS. */
+
+/* Cabecera de «Datos del documento»: además del rótulo lleva el segmentado de
+   tipo (§2). Envuelve porque desde 600px el segmentado mide 264 fijos y por
+   debajo baja a una SEGUNDA LÍNEA DE LA MISMA CABECERA, no a una card propia:
+   la card «Tipo de documento» se retira. */
+.sp-doc-honohead { flex-wrap: wrap; row-gap: var(--sp-2); padding-top: 9px; padding-bottom: 9px; }
+
+.sp-doc-segmented {
+  display: flex; gap: 4px;
+  padding: 4px; border-radius: 12px;
+  background: var(--sp-surface-sunken);
+}
+.sp-doc-segmented--tipo { flex: 1 0 100%; }
+@container docform (min-width: 600px) {
+  .sp-doc-segmented--tipo { flex: 0 0 264px; margin-left: auto; }
+}
+.sp-doc-segmented__opt {
+  flex: 1; min-height: 38px; padding: 0 10px;
+  border: none; background: none; cursor: pointer;
+  border-radius: var(--sp-r-btn-sm);          /* 8 = 12 del riel − 4 de padding */
+  font-family: inherit; font-size: var(--sp-fs-body-sm); font-weight: var(--sp-fw-semi);
+  color: var(--sp-ink-500);
+  transition: background var(--sp-dur-micro) var(--sp-ease-out),
+              color var(--sp-dur-micro) var(--sp-ease-out);
+}
+.sp-doc-segmented__opt:hover { color: var(--sp-ink-800); }
+.sp-doc-segmented__opt[aria-pressed="true"] { background: var(--sp-primary); color: #fff; }
+/* Como CAMPO (divisa) el control entero mide 44 y no 46: la altura de control
+   del sistema manda sobre los 38 px que el segmentado usa dentro de una
+   cabecera de 56. */
+.sp-doc-segmented--field .sp-doc-segmented__opt { min-height: 36px; }
+
+/* Datos de la cotización: son CUATRO campos. A 788 de contenedor, cuatro
+   columnas dejarían el folio en 165px, así que el tramo MD va a dos y la cuarta
+   abre a 840 (§0). No es `data-cols="4"`: esa primitiva abre a tres en 600. */
+.sp-doc-honodatos { display: grid; gap: var(--sp-4); grid-template-columns: 1fr; }
+@container docform (min-width: 380px) {
+  .sp-doc-honodatos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container docform (min-width: 840px) {
+  .sp-doc-honodatos { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* Folio: lo asigna la base al insertar (§4.1), así que en pantalla no puede
+   mostrar número antes de emitir. Se lee como lo que es —un hueco reservado—,
+   no como un campo que el médico se dejó vacío. */
+.sp-doc-folio { background: var(--sp-surface-muted); color: var(--sp-ink-350); cursor: not-allowed; }
+
+/* Conmutador del seguro (§4.5). El RIEL mide 44×26 con perilla de 20, pero el
+   botón es 44×44: el piso táctil del sistema no admite excepciones (spec 01
+   §1) y un riel de 26 px de alto no es un objetivo de dedo. */
+.sp-doc-switch {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 var(--sp-tap); width: var(--sp-tap); height: var(--sp-tap);
+  margin-left: auto; padding: 0; border: none; background: none; cursor: pointer;
+}
+.sp-doc-switch__track {
+  position: relative; width: 44px; height: 26px;
+  border-radius: var(--sp-r-pill); background: var(--sp-line-strong);
+  transition: background var(--sp-dur-micro) var(--sp-ease-out);
+}
+.sp-doc-switch[aria-checked="true"] .sp-doc-switch__track { background: var(--sp-primary); }
+.sp-doc-switch__knob {
+  position: absolute; top: 3px; left: 3px; width: 20px; height: 20px;
+  border-radius: var(--sp-r-pill); background: var(--sp-surface);
+  box-shadow: 0 1px 2px rgba(16, 42, 73, .28);
+  transition: transform var(--sp-dur-micro) var(--sp-ease-out);
+}
+.sp-doc-switch[aria-checked="true"] .sp-doc-switch__knob { transform: translateX(18px); }
+
+/* ── Rejilla de conceptos — tres trazados (§4.2) ─────────────────────────
+   El umbral es de CONTENEDOR y no de viewport: el mismo formulario vive en
+   tres montajes. El trazado de partida es el APILADO, que es el peor caso
+   (390 de viewport) y el que cierra H-02: `grid-cols-[1fr_140px_36px]` fijo
+   dejaba el concepto en 94 px ahí.
+   Apilada, cada fila es una minitarjeta y cada celda lleva su etiqueta; en una
+   línea, la cabecera de columnas se renderiza una vez y las etiquetas de celda
+   desaparecen. Las dos cosas viven en el DOM siempre y las conmuta el CSS: el
+   umbral es de contenedor y ningún cálculo en JS lo acertaría. */
+.sp-doc-honofilas { display: flex; flex-direction: column; gap: var(--sp-2-5); }
+.sp-doc-honofila {
+  display: grid; gap: var(--sp-2-5);
+  grid-template-columns: minmax(0, 1fr) 40px;
+  grid-template-areas: "c d" "o o" "p p";
+  padding: 12px;
+  border: var(--sp-bw-hair) solid var(--sp-line-card);
+  border-radius: var(--sp-r-card-inner);      /* 13 */
+  background: var(--sp-surface);
+}
+.sp-doc-honofilas[data-tipo="honorarios"] .sp-doc-honofila { grid-template-areas: "c d" "p p"; }
+.sp-doc-honofila > [data-cell="c"] { grid-area: c; min-width: 0; }
+.sp-doc-honofila > [data-cell="o"] { grid-area: o; min-width: 0; }
+.sp-doc-honofila > [data-cell="p"] { grid-area: p; min-width: 0; }
+/* Apilada, la papelera comparte fila con el rótulo del concepto y su campo:
+   se alinea con el CAMPO, que es sobre lo que actúa. */
+.sp-doc-honofila > [data-cell="d"] { grid-area: d; align-self: end; }
+/* Etiqueta por celda. En los trazados de una línea se esconde A LA VISTA pero
+   NO se retira del árbol —`display:none` la quitaría de los dos—: la cabecera
+   de columnas es `aria-hidden`, así que sin esto el campo se quedaría sin
+   nombre justo en el trazado donde su rótulo está lejos. */
+.sp-doc-honocell-label { display: block; margin-bottom: var(--sp-gap-label); }
+/* La cabecera de columnas solo existe en los trazados de una línea. */
+.sp-doc-honocols { display: none; }
+.sp-doc-honocols > [data-cell="p"] { text-align: right; }
+
+@container docform (min-width: 520px) {
+  /* Recibo: concepto + precio + papelera, en una línea. */
+  .sp-doc-honofilas[data-tipo="honorarios"] { gap: var(--sp-3); }
+  .sp-doc-honofilas[data-tipo="honorarios"] .sp-doc-honofila {
+    grid-template-columns: minmax(0, 1fr) 150px 40px;
+    grid-template-areas: "c p d";
+    align-items: center;
+    padding: 0; border: none; background: none;
+  }
+  .sp-doc-honofilas[data-tipo="honorarios"] .sp-doc-honofila > [data-cell="d"] { align-self: center; }
+  .sp-doc-honofilas[data-tipo="honorarios"] .sp-doc-honocols { display: grid; }
+  .sp-doc-honofilas[data-tipo="honorarios"] .sp-doc-honocell-label {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+  }
+
+  /* Cotización: el origen todavía no cabe en la línea y baja entero. */
+  .sp-doc-honofilas[data-tipo="cotizacion"] .sp-doc-honofila {
+    grid-template-columns: minmax(0, 1fr) 150px 40px;
+    grid-template-areas: "c p d" "o o o";
+  }
+}
+@container docform (min-width: 760px) {
+  .sp-doc-honofilas[data-tipo="cotizacion"] { gap: var(--sp-3); }
+  .sp-doc-honofilas[data-tipo="cotizacion"] .sp-doc-honofila {
+    grid-template-columns: minmax(0, 1fr) 168px 150px 40px;
+    grid-template-areas: "c o p d";
+    align-items: center;
+    padding: 0; border: none; background: none;
+  }
+  .sp-doc-honofilas[data-tipo="cotizacion"] .sp-doc-honofila > [data-cell="d"] { align-self: center; }
+  .sp-doc-honofilas[data-tipo="cotizacion"] .sp-doc-honocols { display: grid; }
+  .sp-doc-honofilas[data-tipo="cotizacion"] .sp-doc-honocell-label {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+  }
+}
+
+/* La papelera de la fila mide 40 de ancho y 44 de alto: los 44 son el piso
+   táctil y los 40 son la columna que la rejilla le reserva. */
+.sp-doc-honofila .sp-doc-iconbtn { flex: 0 0 40px; width: 40px; }
+
+/* Precio: el prefijo SIGUE A LA DIVISA. Cifra a la derecha y tabular para que
+   las columnas de importes se lean como una columna. */
+.sp-doc-precio { position: relative; }
+.sp-doc-precio > .sp-input {
+  padding-left: 28px; text-align: right; font-variant-numeric: tabular-nums;
+}
+/* «US$» no cabe en los 28 px que le bastan a «$». */
+.sp-doc-precio[data-divisa="USD"] > .sp-input { padding-left: 38px; }
+.sp-doc-precio__sim {
+  position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+  font-size: var(--sp-fs-body-sm); color: var(--sp-ink-350); pointer-events: none;
+}
+
+/* ── Bloque de cierre (§4.4) ─────────────────────────────────────────────
+   SIEMPRE visible, también con total en cero: renderizarlo solo con `total > 0`
+   es lo que hoy lo hace aparecer y desaparecer mientras se teclea. */
+.sp-doc-cierre {
+  margin-top: var(--sp-4);
+  border-top: var(--sp-bw-hair) solid var(--sp-line-divider);
+}
+.sp-doc-cierrefila {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--sp-3); min-height: var(--sp-tap);
+}
+.sp-doc-cierrelabel {
+  min-width: 0; font-size: var(--sp-fs-body-sm); font-weight: var(--sp-fw-semi);
+  color: var(--sp-ink-500);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sp-doc-cierrecifra {
+  font-size: var(--sp-fs-body); font-weight: var(--sp-fw-bold);
+  color: var(--sp-ink-800); font-variant-numeric: tabular-nums;
+}
+/* La fila que cierra el documento: la que el paciente lee primero. */
+.sp-doc-cierrefila--final { border-top: var(--sp-bw-hair) solid var(--sp-line-divider); }
+.sp-doc-cierrefila--final .sp-doc-cierrelabel { font-size: var(--sp-fs-body); color: var(--sp-ink-700); }
+.sp-doc-cierrefila--final .sp-doc-cierrecifra {
+  font-size: 20px; font-weight: var(--sp-fw-black); color: var(--sp-primary-hover);
+}
+/* El único número editable del bloque. */
+.sp-doc-anticipo { flex: 0 0 170px; width: 170px; }
+
+
 /* ============================================================================
    ANIMACIONES
    ========================================================================== */
@@ -1554,5 +1750,95 @@ a:hover { color: var(--sp-primary-active); }
   .sp-spinner, .sp-dots span { animation-duration: var(--sp-dur-spin) !important; animation-iteration-count: infinite !important; }
 }
 */
+
+
+/* --- 22. SECCIÓN PLEGABLE E INDICACIONES DE PISO ------------------------- */
+/* (GUIA_FORM_INTERNAMIENTO §3 y §4 · mecánica de la propuesta §3.A.3)
+
+   Va DENTRO de @layer components, delante del cierre, y no detrás del archivo:
+   fuera de la capa estas reglas ganarían a las utilidades de Tailwind, que es
+   justo el reparto que la spec 01 §1 fija al revés.
+
+   Sección propia y no un apartado de la 18: la 18 es el vocabulario común de
+   los ocho formularios y esto lo estrena uno. Se numera 22 y no 21 porque
+   Honorarios ocupó la 21 mientras esto se escribía, en paralelo y en el mismo
+   archivo. `.sp-section` nace ya con dos
+   consumidores —GUIA_FORM_CONSENTIMIENTO §3 la nombra para sus siete
+   secciones—; el control de dos niveles es de internamiento y de nadie más. */
+
+/* ── Card plegable ─────────────────────────────────────────────────────────
+   El <h2> NO puede vivir dentro del <button> —contenido de flujo dentro de
+   contenido de frase—, así que lo envuelve: el encabezado da la semántica y el
+   botón es lo pulsable, que es lo que `aria-expanded` necesita debajo. */
+.sp-section__title { margin: 0; font: inherit; }
+.sp-section__head {
+  width: 100%; text-align: left; cursor: pointer;
+  background: none; color: inherit;
+  border: 0; border-bottom: var(--sp-bw-hair) solid var(--sp-line-divider);
+}
+/* Plegada mide 58px: 56 de cabecera + 2 de bordes de la card. El filete
+   inferior se va porque ya no separa de nada. */
+.sp-section__head[aria-expanded="false"] { border-bottom: 0; }
+.sp-section__head:focus-visible { outline: none; box-shadow: var(--sp-focus-ring); }
+.sp-section__chev {
+  margin-left: auto; flex: 0 0 auto;
+  width: 18px; height: 18px; color: var(--sp-ink-icon);
+  transition: transform var(--sp-dur-micro) var(--sp-ease-out);
+}
+.sp-section__head[aria-expanded="true"] .sp-section__chev { transform: rotate(180deg); }
+/* El bloque global de `globals.css` solo neutraliza las clases `animate-*`. */
+@media (prefers-reduced-motion: reduce) { .sp-section__chev { transition: none; } }
+/* En XS el título se lleva la primera línea y el resumen cae debajo con el
+   chevron: los tres en fila dejan el título en cuatro renglones —«Indicaciones
+   de ingreso a piso» mide 255 de los 276 útiles y el badge otros 154—. Las dos
+   líneas suman 46 y caben en los 56 de la cabecera, así que plegada sigue
+   midiendo 58. */
+@container docform (max-width: 379px) { .sp-section__head { flex-wrap: wrap; } }
+
+/* ── Control de dos niveles: grupos y renglones (§3) ──────────────────────── */
+.sp-doc-piso { display: flex; flex-direction: column; gap: var(--sp-3-5); }
+
+/* Chip que abre la fila de grupo propio. Es una ACCIÓN, no un grupo: nunca
+   lleva `aria-pressed`, así que nunca se enciende. */
+.sp-doc-chipadd svg { width: 16px; height: 16px; }
+
+.sp-doc-grupos { display: flex; flex-direction: column; gap: var(--sp-3); }
+.sp-doc-grupo {
+  border: var(--sp-bw-hair) solid var(--sp-line-card);
+  border-radius: var(--sp-r-field-sm);
+  padding: 14px;
+}
+.sp-doc-grupohead { display: flex; align-items: center; gap: var(--sp-2); min-height: var(--sp-tap); }
+/* Los dos con `flex: 0 0 auto`: el que cede ancho a 316 es el nombre, que
+   admite dos líneas — la papelera encogida deja de ser un objetivo de 44. */
+.sp-doc-grupohead > .sp-doc-iconbtn { margin-left: auto; flex: 0 0 auto; }
+/* El recuento es lo que hace que plegar resuma en vez de esconder (§3.4). */
+.sp-doc-grupocount {
+  flex: 0 0 auto;
+  font-size: var(--sp-fs-hint); color: var(--sp-ink-350); white-space: nowrap;
+}
+/* La cabecera ya trae sus 44px de alto; el primer renglón solo necesita aire. */
+.sp-doc-grupohead + .sp-doc-listrow { margin-top: var(--sp-2); }
+.sp-doc-grupofoot { margin-top: 14px; }
+
+/* Zona de arranque: 96px punteados que dicen qué hacer y quién pone los
+   guiones. Sin ella, cuatro chips apagados no explican nada. */
+.sp-doc-dashzone {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 96px; padding: var(--sp-3) var(--sp-4);
+  border: var(--sp-bw-hair) dashed var(--sp-line-dash);
+  border-radius: var(--sp-r-field-sm);
+  text-align: center;
+}
+
+/* Fila de grupo propio: campo + ✕ + Añadir. En XS el campo se lleva la primera
+   línea entera y los dos botones caen debajo. */
+.sp-doc-nuevogrupo { display: flex; align-items: center; gap: var(--sp-2); }
+.sp-doc-nuevogrupo > .sp-input { flex: 1; min-width: 0; }
+.sp-doc-nuevogrupo > .sp-btn { flex: 0 0 auto; min-height: var(--sp-tap); white-space: nowrap; }
+@container docform (max-width: 379px) {
+  .sp-doc-nuevogrupo { flex-wrap: wrap; }
+  .sp-doc-nuevogrupo > .sp-input { flex: 1 0 100%; }
+}
 
 } /* fin @layer components */

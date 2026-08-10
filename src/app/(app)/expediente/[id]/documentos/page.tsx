@@ -35,9 +35,9 @@ function DocumentosPacienteContent() {
   // Arranca en null y no en 'receta': sin tipo elegido se ven las ocho
   // tarjetas. Quien llegue con ?tipo= sigue aterrizando en su formulario.
   const [tab, setTab] = useState<TipoDocumento | null>(null)
-  // Reportan los seis con predicado: los cinco del sistema de plantillas
-  // —Receta, Laboratorio, Imagen, Suplementación, Escrito— más Honorarios.
-  // Consentimiento e Internamiento aún no, y quedan en `true`: no avisan.
+  // Reportan los siete con predicado: los seis del sistema de plantillas
+  // —Receta, Laboratorio, Imagen, Suplementación, Escrito, Internamiento— más
+  // Honorarios. Consentimiento aún no, y queda en `true`: no avisa.
   const [formVacio, setFormVacio] = useState(true)
   // El panel de plantillas sustituye al formulario y oculta el selector de tipo.
   const [panelPlantillas, setPanelPlantillas] = useState(false)
@@ -86,10 +86,10 @@ function DocumentosPacienteContent() {
           {tab === 'lab' && <SolicitudLabForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
           {tab === 'imagen' && <SolicitudImagenForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
           {tab === 'suplementacion' && <PlanSuplementacionForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
-          {tab === 'internamiento' && <SolicitudInternamientoForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} />}
+          {tab === 'internamiento' && <SolicitudInternamientoForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
           {tab === 'escrito' && <EscritoMedicoForm pacienteInicial={nombreCompleto} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
           {tab === 'consentimiento' && <ConsentimientoInformadoForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} />}
-          {tab === 'honorarios' && <NotaHonorariosForm pacienteInicial={nombreCompleto} pacienteId={id} onVacioChange={setFormVacio} />}
+          {tab === 'honorarios' && <NotaHonorariosForm pacienteInicial={nombreCompleto} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
         </SelectorTipoDocumento>
       </div>
     </div>

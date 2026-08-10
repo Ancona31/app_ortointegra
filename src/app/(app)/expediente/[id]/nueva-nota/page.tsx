@@ -212,9 +212,9 @@ export default function NuevaNotaPage() {
   // horizontal del overlay, que se retira en este paso.
   const [docInline, setDocInline]       = useState<TipoDocumento | null>(null)
   // Paso 5.1: el formulario montado reporta si tiene algo escrito. Lo emiten
-  // los seis con predicado —los cinco del sistema de plantillas (Receta,
-  // Laboratorio, Imagen, Suplementación, Escrito) más Honorarios—.
-  // Consentimiento e Internamiento aún no, y quedan en `true`: no avisan.
+  // los siete con predicado —los seis del sistema de plantillas (Receta,
+  // Laboratorio, Imagen, Suplementación, Escrito, Internamiento) más
+  // Honorarios—. Consentimiento aún no, y queda en `true`: no avisa.
   const [formVacio, setFormVacio]       = useState(true)
   // El panel de plantillas sustituye al formulario y oculta el selector de tipo.
   const [panelPlantillas, setPanelPlantillas] = useState(false)
@@ -1866,7 +1866,7 @@ export default function NuevaNotaPage() {
                   <PlanSupFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />
                 )}
                 {docInline === 'internamiento' && (
-                  <InternamientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} />
+                  <InternamientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />
                 )}
                 {docInline === 'escrito' && (
                   <EscritoFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />
@@ -1875,7 +1875,7 @@ export default function NuevaNotaPage() {
                   <ConsentimientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} />
                 )}
                 {docInline === 'honorarios' && (
-                  <HonorariosFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} onVacioChange={setFormVacio} />
+                  <HonorariosFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />
                 )}
               </SelectorTipoDocumento>
             </div>

@@ -50,9 +50,9 @@ function DocumentosContent() {
   const [resultados, setResultados] = useState<Paciente[]>([])
   const [buscando, setBuscando] = useState(false)
   const [showQuickPatient, setShowQuickPatient] = useState(false)
-  // Reportan los seis con predicado: los cinco del sistema de plantillas
-  // —Receta, Laboratorio, Imagen, Suplementación, Escrito— más Honorarios.
-  // Consentimiento e Internamiento aún no, y quedan en `true`: no avisan.
+  // Reportan los siete con predicado: los seis del sistema de plantillas
+  // —Receta, Laboratorio, Imagen, Suplementación, Escrito, Internamiento— más
+  // Honorarios. Consentimiento aún no, y queda en `true`: no avisa.
   const [formVacio, setFormVacio] = useState(true)
   // El panel de plantillas sustituye al formulario y oculta el selector de tipo.
   const [panelPlantillas, setPanelPlantillas] = useState(false)
@@ -224,6 +224,8 @@ function DocumentosContent() {
                 <SolicitudInternamientoForm
                   pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}
                   pacienteId={pacienteSeleccionado.id}
+                  onVacioChange={setFormVacio}
+                  onPanelPlantillasChange={setPanelPlantillas}
                 />
               )}
               {tipo === 'escrito' && (
@@ -245,6 +247,7 @@ function DocumentosContent() {
                   pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}
                   pacienteId={pacienteSeleccionado.id}
                   onVacioChange={setFormVacio}
+                  onPanelPlantillasChange={setPanelPlantillas}
                 />
               )}
             </SelectorTipoDocumento>
