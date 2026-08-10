@@ -743,13 +743,12 @@ body {
 }
 
 /* Glow de confirmación tras drop exitoso */
-/* Botón de imprimir sticky dentro del modal de documentos */
-.doc-modal-scroll .doc-print-btn {
-  position: sticky;
-  bottom: 0;
-  z-index: 10;
-  box-shadow: 0 -12px 24px rgba(255,255,255,0.95);
-}
+/* G-06 — retirada la regla `.doc-modal-scroll .doc-print-btn`. Scopaba el
+   botón de imprimir al scroller del overlay de documentos, que murió en el
+   paso 5.1: desde entonces no casaba con nada. Laboratorio e Imagenología
+   pasan a `.sp-doc-actions`, que es sticky en los dos montajes. Los otros seis
+   formularios conservan la clase `doc-print-btn` en el marcado, ya sin efecto,
+   hasta que migren. */
 
 /* ── Launcher animations ── */
 @keyframes launcherFadeIn {

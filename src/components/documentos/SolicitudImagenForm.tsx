@@ -2,21 +2,70 @@
 import { generateDocFileName } from '@/lib/patientUtils'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-import { Printer, Loader2, Trash2 } from 'lucide-react'
+import { Printer, Trash2, Plus, Check, AlertTriangle, ScanLine } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { generarPdf } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
 import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import Link from 'next/link'
+import ComboEscribible from '@/components/documentos/ComboEscribible'
 import { createClient } from '@/lib/supabase/client'
-import { hoyEnTZ } from '@/lib/dates'
+import { hoyEnTZ, desplazarFecha } from '@/lib/dates'
+import { enfocarYAcercar } from '@/lib/scrollDoc'
 
-const TIPOS_ESTUDIO = ['Radiografía', 'Resonancia Magnética (RMN)', 'Tomografía (TAC)', 'Ultrasonido', 'Densitometría Ósea', 'Gammagrafía', 'Mielograma', 'Electromiografía (EMG)']
+const TIPOS_ESTUDIO = [
+  'Radiografía',
+  // Las dos variantes de RMN por separado: es lo que cambia la preparación del
+  // paciente y el coste del estudio, así que el radiólogo necesita saber cuál
+  // desde la solicitud. Quien tenga otro caso lo escribe — el campo es libre y
+  // esto es solo la lista de sugerencias.
+  'Resonancia magnética simple',
+  'Resonancia magnética contrastada',
+  'Tomografía (TAC)',
+  'Ultrasonido',
+  'Densitometría ósea',
+  'Gammagrafía',
+  'Electromiografía (EMG)',
+  'Mielograma',
+] as const
+
+const FECHA_MIN = '1900-01-01'
 
 type Estudio = { tipo: string; region: string; proyecciones?: string; indicacion?: string }
+
+const ESTUDIO_VACIO: Estudio = { tipo: '', region: '', proyecciones: '', indicacion: '' }
+
+/**
+ * El par tipo + región se exige JUNTO, no campo a campo.
+ * Un estudio a medias no es una petición — y hasta ahora se caía del PDF sin
+ * decirlo, porque el payload filtraba por `e.tipo && e.region`.
+ */
+type EstadoEstudio = 'vacio' | 'completo' | 'faltaRegion' | 'faltaTipo'
+
+function estadoDe(e: Estudio): EstadoEstudio {
+  const tipo = e.tipo.trim()
+  const region = e.region.trim()
+  if (!tipo && !region) return 'vacio'      // se ignora: ni molesta ni bloquea
+  if (tipo && region) return 'completo'
+  return tipo ? 'faltaRegion' : 'faltaTipo'
+}
+
+/** Predicado único de «formulario vacío». Mismo criterio que Honorarios. */
+function isFormEmpty(
+  estudios: Estudio[], urgente: boolean,
+  paciente: string, pacienteInicial: string,
+  diagnostico: string, diagnosticoInicial: string,
+): boolean {
+  const pacienteIntacto = paciente.trim() === '' || paciente.trim() === pacienteInicial.trim()
+  const dxIntacto = diagnostico.trim() === '' || diagnostico.trim() === diagnosticoInicial.trim()
+  const sinEstudios = estudios.every(e =>
+    !e.tipo.trim() && !e.region.trim() && !e.proyecciones?.trim() && !e.indicacion?.trim())
+  return pacienteIntacto && dxIntacto && !urgente && sinEstudios
+}
 
 interface Props {
   pacienteInicial?: string
@@ -24,9 +73,11 @@ interface Props {
   pacienteId?: string
   offlineMode?: boolean
   onOfflineSave?: () => void
+  /** Reporta al host si el formulario sigue vacío (guía 04 §6.1 y §6.2). */
+  onVacioChange?: (vacio: boolean) => void
 }
 
-export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, offlineMode, onOfflineSave }: Props) {
+export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, offlineMode, onOfflineSave, onVacioChange }: Props) {
   const { medicoInfo: onlineMedicoInfo, isLoading: cargandoPerfil } = useMedicoInfo()
   const { consultorioActivo } = useConsultorioActivo()
 
@@ -62,19 +113,67 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
   const [paciente, setPaciente] = useState(pacienteInicial)
   const [fecha, setFecha] = useState(hoyEnTZ())
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
-  const [estudios, setEstudios] = useState<Estudio[]>([{ tipo: '', region: '', proyecciones: '', indicacion: '' }])
+  const [estudios, setEstudios] = useState<Estudio[]>([{ ...ESTUDIO_VACIO }])
   const [urgente, setUrgente] = useState(false)
   const [errorGuardado, setErrorGuardado] = useState('')
   const [imprimiendo, setImprimiendo] = useState(false)
   const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean } | null>(null)
+  // Nada acusa antes del primer intento de imprimir; después todo se actualiza
+  // en vivo. Gobierna el banner (§3.8) Y el teñido del bloque a medias (§2.4):
+  // sin esto, el bloque se pone rojo mientras se teclea el tipo y antes de que
+  // dé tiempo a llegar a la región.
+  const [intentado, setIntentado] = useState(false)
 
-  function addEstudio() { setEstudios([...estudios, { tipo: '', region: '', proyecciones: '', indicacion: '' }]) }
+  const formRef = useRef<HTMLDivElement>(null)
+  const pacienteRef = useRef<HTMLInputElement>(null)
+
+  const vacio = isFormEmpty(estudios, urgente, paciente, pacienteInicial, diagnostico, diagnosticoInicial)
+  useEffect(() => { onVacioChange?.(vacio) }, [vacio, onVacioChange])
+
+  // G-10: foco al primer campo editable vacío al montar. preventScroll para no
+  // arrastrar la página hasta él. En móvil esto abre el teclado en cada montaje.
+  useEffect(() => {
+    const primero = formRef.current?.querySelector<HTMLElement>('input:not([type="date"]):not([type="checkbox"])')
+    if (primero instanceof HTMLInputElement && !primero.value) primero.focus({ preventScroll: true })
+  }, [])
+
+  function addEstudio() { setEstudios([...estudios, { ...ESTUDIO_VACIO }]) }
   function removeEstudio(i: number) { setEstudios(estudios.filter((_, idx) => idx !== i)) }
-  function updateEstudio(i: number, field: keyof Estudio, val: string) {
-    setEstudios(estudios.map((e, idx) => idx === i ? { ...e, [field]: val } : e))
+  function updateEstudio(i: number, campo: keyof Estudio, val: string) {
+    setEstudios(estudios.map((e, idx) => idx === i ? { ...e, [campo]: val } : e))
+  }
+
+  // ── Validación ──────────────────────────────────────────────────
+  const estados = estudios.map(estadoDe)
+  const primerIncompleto = estados.findIndex(s => s === 'faltaRegion' || s === 'faltaTipo')
+  const completos = estudios.filter((_, i) => estados[i] === 'completo')
+
+  const faltantes: { clave: string; nombre: string }[] = []
+  if (!paciente.trim()) faltantes.push({ clave: 'paciente', nombre: 'Paciente' })
+  if (completos.length === 0) faltantes.push({ clave: 'estudios', nombre: 'un estudio con tipo y región' })
+
+  function irA(clave: string) {
+    if (clave === 'paciente') { enfocarYAcercar(pacienteRef.current); return }
+    enfocarYAcercar(formRef.current?.querySelector<HTMLElement>('#imagen-tipo-0') ?? null)
   }
 
   async function imprimir() {
+    // Dos puertas. La del par va primero: es la que evita que un estudio a
+    // medias desaparezca del PDF sin avisar.
+    if (primerIncompleto >= 0) {
+      setIntentado(true)
+      enfocarYAcercar(formRef.current?.querySelector<HTMLElement>(
+        estados[primerIncompleto] === 'faltaRegion'
+          ? `#imagen-region-${primerIncompleto}`
+          : `#imagen-tipo-${primerIncompleto}`,
+      ) ?? null)
+      return
+    }
+    if (faltantes.length > 0) {
+      setIntentado(true)
+      irA(faltantes[0].clave)
+      return
+    }
     flushSync(() => { setErrorGuardado(''); setImprimiendo(true) })
 
     // 1. Feedback instantáneo
@@ -83,10 +182,13 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
     // 2. Identidad — UUID v4 puro (las solicitudes de imagen no tienen
     //    verificación pública ni folio visible)
     const clientId = crypto.randomUUID()
+    // El filtro sobrevive, pero ya no descarta nada en silencio: emitir con un
+    // estudio a medias es imposible, y los del todo vacíos se ignoran a
+    // propósito (§2.4).
     const contenido = {
       paciente,
       diagnostico,
-      estudios: estudios.filter(e => e.tipo && e.region),
+      estudios: completos,
       urgente,
       fecha,
     }
@@ -134,7 +236,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
           paciente,
           fecha: fechaFormat,
           diagnostico,
-          estudios: estudios.filter(e => e.tipo && e.region),
+          estudios: completos,
           urgente,
         },
         logoUrl,
@@ -184,7 +286,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
         // mobileShare captura el error de subida y no lo relanza. El documento
         // no queda recuperable desde la lista y el modal tiene que decirlo.
         guardado = storagePath !== null
-        toast.success('Solicitud guardada')
+        toast.success('Solicitud de imagen guardada')
       }
     } catch (err) {
       if (!pdfGenerated) {
@@ -204,86 +306,211 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
     }
   }
 
+  const senalar = (clave: string) => intentado && faltantes.some(f => f.clave === clave)
+
   return (
-    <div className="space-y-5">
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-        <h2 className="font-semibold text-slate-700 text-sm mb-4">Datos del paciente</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div><label className="text-xs font-medium text-slate-500 block mb-1">Fecha</label>
-            <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" /></div>
-          <div><label className="text-xs font-medium text-slate-500 block mb-1">Paciente <span className="text-red-400">*</span></label>
-            <input type="text" value={paciente} onChange={e => setPaciente(e.target.value)} placeholder="Nombre completo" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" /></div>
-          <div><label className="text-xs font-medium text-slate-500 block mb-1">Diagnóstico</label>
-            <input type="text" value={diagnostico} onChange={e => setDiagnostico(e.target.value)} placeholder="Dx de envío" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" /></div>
-        </div>
-        <label className="flex items-center gap-2 mt-4 text-sm text-red-600 cursor-pointer font-medium">
-          <input type="checkbox" checked={urgente} onChange={e => setUrgente(e.target.checked)} className="w-4 h-4 accent-red-600" />
-          Marcar como URGENTE
-        </label>
-      </div>
+    <div ref={formRef} className="sp-doc-form">
+      {/* Card Plantilla (spec 02 §1) y «Guardar como plantilla» en la barra:
+          sus DOS posiciones quedan fijadas —selector arriba, guardar abajo—
+          pero el sistema es del paso siguiente. No se montan controles muertos. */}
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-          <h2 className="font-semibold text-slate-700 text-sm">Estudios de imagen</h2>
-          <button onClick={addEstudio} className="text-xs text-[#1e5fa8] hover:text-[#1a3a5c] font-medium">+ Agregar</button>
+      <section className="sp-card sp-doc-card">
+        <div className="sp-doc-cardhead">
+          <h2 className="sp-label">Datos del paciente</h2>
         </div>
-        <div className="divide-y divide-slate-100">
-          {estudios.map((e, i) => (
-            <div key={i} className="p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-400">ESTUDIO {i + 1}</span>
-                {estudios.length > 1 && (
-                  <button onClick={() => removeEstudio(i)} className="text-red-400 hover:text-red-600">
-                    <Trash2 size={14} />
-                  </button>
-                )}
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="sm:col-span-2">
-                  <label className="text-xs text-slate-500 block mb-1">Tipo de estudio</label>
-                  <input list={`tipos-${i}`} value={e.tipo} onChange={ev => updateEstudio(i, 'tipo', ev.target.value)} placeholder="Seleccionar o escribir..."
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
-                  <datalist id={`tipos-${i}`}>
-                    {TIPOS_ESTUDIO.map(t => <option key={t} value={t} />)}
-                  </datalist>
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="text-xs text-slate-500 block mb-1">Región anatómica</label>
-                  <input type="text" value={e.region} onChange={ev => updateEstudio(i, 'region', ev.target.value)} placeholder="Ej: Columna Lumbar, Rodilla Der."
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-500 block mb-1">Proyecciones</label>
-                  <input type="text" value={e.proyecciones || ''} onChange={ev => updateEstudio(i, 'proyecciones', ev.target.value)} placeholder="AP, Lateral, etc."
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
-                </div>
-                <div className="sm:col-span-3">
-                  <label className="text-xs text-slate-500 block mb-1">Indicación clínica específica</label>
-                  <input type="text" value={e.indicacion || ''} onChange={ev => updateEstudio(i, 'indicacion', ev.target.value)} placeholder="Ej: Descartar fractura vertebral"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
-                </div>
-              </div>
+        <div className="sp-doc-cardbody">
+          <div className="sp-doc-grid" data-cols="3">
+            <div className="sp-doc-field">
+              <label htmlFor="imagen-fecha" className="sp-label-field">Fecha</label>
+              <input id="imagen-fecha" type="date" value={fecha}
+                min={FECHA_MIN} max={desplazarFecha(hoyEnTZ(), { anios: 1 })}
+                onChange={e => setFecha(e.target.value)} className="sp-input" />
             </div>
-          ))}
-        </div>
-      </div>
+            <div className="sp-doc-field">
+              <label htmlFor="imagen-paciente" className="sp-label-field">
+                Paciente <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
+                <span className="sr-only">obligatorio</span>
+              </label>
+              <input ref={pacienteRef} id="imagen-paciente" type="text" value={paciente}
+                onChange={e => setPaciente(e.target.value)} placeholder="Nombre completo"
+                aria-invalid={senalar('paciente') || undefined}
+                className={`sp-input ${senalar('paciente') ? 'sp-doc-invalid' : ''}`} />
+            </div>
+            <div className="sp-doc-field">
+              <label htmlFor="imagen-diagnostico" className="sp-label-field">Diagnóstico</label>
+              <input id="imagen-diagnostico" type="text" value={diagnostico}
+                onChange={e => setDiagnostico(e.target.value)} placeholder="Dx de envío" className="sp-input" />
+            </div>
 
-      {errorGuardado && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-          {errorGuardado}
+            {/* El rojo se reserva al badge, que además es el que sale en el PDF:
+                la etiqueta entera en rojo competía con los errores de campo. */}
+            <div className="sp-doc-span-all">
+              <label className="sp-check">
+                <input type="checkbox" checked={urgente}
+                  onChange={e => setUrgente(e.target.checked)} className="sr-only" />
+                <span className="sp-check__box"><Check aria-hidden="true" /></span>
+                <span className="sp-check__label">Marcar como urgente</span>
+                {urgente && <span className="sp-badge sp-badge--danger">URGENTE</span>}
+              </label>
+            </div>
+          </div>
         </div>
+      </section>
+
+      <section className="sp-card sp-doc-card">
+        <div className="sp-doc-cardhead">
+          <div className="sp-icobox sp-icobox--sm"><ScanLine /></div>
+          <h2 className="sp-label">Estudios de imagen</h2>
+          <button type="button" onClick={addEstudio} aria-label="Agregar estudio"
+            className="sp-btn sp-btn--compact sp-doc-add">
+            <Plus size={17} /><span className="sp-doc-long">Agregar estudio</span>
+          </button>
+        </div>
+        <div className="sp-doc-cardbody">
+          {estudios.map((e, i) => {
+            const estado = estados[i]
+            const roto = intentado && (estado === 'faltaRegion' || estado === 'faltaTipo')
+            return (
+              <div key={i} className={`sp-doc-studyblock ${roto ? 'sp-doc-studyblock--invalid' : ''}`}>
+                <div className="sp-doc-studyhead">
+                  <span className="sp-label" style={{ fontSize: '11.5px', fontWeight: 'var(--sp-fw-black)' }}>
+                    Estudio {i + 1}
+                  </span>
+                  {e.region.trim() && (
+                    <span className="sp-chip sp-chip--meta sp-doc-studychip">{e.region.trim()}</span>
+                  )}
+                  <button type="button" onClick={() => removeEstudio(i)} disabled={estudios.length === 1}
+                    aria-label={`Eliminar estudio ${i + 1}`}
+                    className="sp-doc-iconbtn" style={{ marginLeft: 'auto' }}>
+                    <Trash2 />
+                  </button>
+                </div>
+
+                <div className="sp-doc-studygrid">
+                  <div className="sp-doc-field" data-span="2">
+                    <label htmlFor={`imagen-tipo-${i}`} className="sp-label-field">
+                      Tipo de estudio <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
+                      <span className="sr-only">obligatorio</span>
+                    </label>
+                    <ComboEscribible
+                      id={`imagen-tipo-${i}`}
+                      value={e.tipo}
+                      onChange={val => updateEstudio(i, 'tipo', val)}
+                      sugerencias={TIPOS_ESTUDIO}
+                      placeholder="Seleccionar o escribir…"
+                      pie="Ninguno encaja: escribe el tipo y se usa tal cual."
+                      invalido={roto && estado === 'faltaTipo'}
+                      claseExtra={roto && estado === 'faltaTipo' ? 'sp-doc-invalid--pair' : ''}
+                    />
+                    {roto && estado === 'faltaTipo' && (
+                      <p className="sp-hint" style={{ color: 'var(--sp-danger)' }}>
+                        Falta el tipo. Complétalo o borra el estudio.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="sp-doc-field" data-span="2">
+                    <label htmlFor={`imagen-region-${i}`} className="sp-label-field">
+                      Región anatómica <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
+                      <span className="sr-only">obligatorio</span>
+                    </label>
+                    {/* Campo libre y sin sugerencias: lado, nivel y segmento son
+                        lo que más varía y una lista estorbaría más que ayudaría. */}
+                    <input id={`imagen-region-${i}`} type="text" value={e.region}
+                      onChange={ev => updateEstudio(i, 'region', ev.target.value)}
+                      placeholder="Ej: Columna lumbar, rodilla der."
+                      aria-invalid={(roto && estado === 'faltaRegion') || undefined}
+                      className={`sp-input ${roto && estado === 'faltaRegion' ? 'sp-doc-invalid--pair' : ''}`} />
+                    {roto && estado === 'faltaRegion' && (
+                      <p className="sp-hint" style={{ color: 'var(--sp-danger)' }}>
+                        Falta la región. Complétala o borra el estudio.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Siempre visibles: son una línea cada una y son lo que evita
+                      la llamada del radiólogo. Plegarlas cuesta un toque por
+                      estudio y ahorra 74px. */}
+                  <div className="sp-doc-field" data-span="1">
+                    <label htmlFor={`imagen-proyecciones-${i}`} className="sp-label-field">Proyecciones</label>
+                    <input id={`imagen-proyecciones-${i}`} type="text" value={e.proyecciones ?? ''}
+                      onChange={ev => updateEstudio(i, 'proyecciones', ev.target.value)}
+                      placeholder="AP, lateral…" className="sp-input" />
+                  </div>
+
+                  <div className="sp-doc-field" data-span="3">
+                    <label htmlFor={`imagen-indicacion-${i}`} className="sp-label-field">Indicación clínica específica</label>
+                    <input id={`imagen-indicacion-${i}`} type="text" value={e.indicacion ?? ''}
+                      onChange={ev => updateEstudio(i, 'indicacion', ev.target.value)}
+                      placeholder="Ej: Descartar fractura vertebral" className="sp-input" />
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
+      {errorGuardado && <p className="sp-banner sp-banner--danger">{errorGuardado}</p>}
+
+      {!cargandoPerfil && !medicoInfo && (
+        <p className="sp-banner sp-banner--warn">
+          <AlertTriangle size={17} />
+          <span style={{ flex: 1 }}>Completa tu perfil para que el documento salga con tu encabezado.</span>
+          <Link href="/perfil" className="sp-link-alt">Ir a mi perfil</Link>
+        </p>
       )}
 
-      <button onClick={imprimir} disabled={!paciente || estudios.filter(e => e.tipo && e.region).length === 0 || imprimiendo || perfilPendiente}
-        className="doc-print-btn w-full flex items-center justify-center gap-2 py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-50">
-        {imprimiendo ? <><Loader2 size={18} className="animate-spin" /> Generando PDF...</> : <><Printer size={18} /> Imprimir Solicitud</>}
-      </button>
+      {/* Nombra el ESTUDIO, no el campo: con dos o tres bloques en pantalla,
+          «falta la región» no localiza nada. */}
+      {intentado && primerIncompleto >= 0 && (
+        <p className="sp-banner sp-banner--warn" aria-live="polite">
+          <AlertTriangle size={17} />
+          <span>
+            El estudio {primerIncompleto + 1} tiene{' '}
+            {estados[primerIncompleto] === 'faltaRegion' ? 'tipo sin región' : 'región sin tipo'}:
+            {' '}complétalo o bórralo.
+          </span>
+        </p>
+      )}
+
+      {intentado && primerIncompleto < 0 && faltantes.length > 0 && (
+        <p className="sp-banner sp-banner--warn" aria-live="polite">
+          <AlertTriangle size={17} />
+          <span>
+            {faltantes.length === 1 ? 'Falta 1 campo' : `Faltan ${faltantes.length} campos`}:{' '}
+            {faltantes.slice(0, 3).map((f, i) => (
+              <span key={f.clave}>
+                {i > 0 && ' · '}
+                <button type="button" onClick={() => irA(f.clave)}
+                  className="sp-link-alt" style={{ color: 'var(--sp-warn-strong)' }}>
+                  {f.nombre}
+                </button>
+              </span>
+            ))}
+            {faltantes.length > 3 && ` y ${faltantes.length - 3} más`}
+          </span>
+        </p>
+      )}
+
+      <div className="sp-doc-actions">
+        <button type="button" onClick={imprimir} disabled={imprimiendo || perfilPendiente}
+          className="sp-btn sp-btn--primary">
+          {imprimiendo ? <><span className="sp-spinner" /> Generando PDF…</>
+            : perfilPendiente ? <><span className="sp-spinner" /> Cargando tu perfil…</>
+            : <>
+                <Printer size={17} />
+                <span className="sp-doc-long">Imprimir solicitud de imagen</span>
+                <span className="sp-doc-short">Imprimir</span>
+              </>}
+        </button>
+      </div>
 
       <ModalDocumentoGenerado
         open={docGenerado !== null}
         onClose={() => setDocGenerado(null)}
         blob={docGenerado?.blob ?? null}
-        titulo="Solicitud de imagen"
+        titulo="Solicitud de imagen generada"
         guardadoEnExpediente={docGenerado?.guardado ?? false}
       />
     </div>

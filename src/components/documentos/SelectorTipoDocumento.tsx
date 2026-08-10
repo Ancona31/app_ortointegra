@@ -6,6 +6,9 @@ import {
   BedDouble, PenLine, ShieldCheck, Receipt, ChevronDown,
 } from 'lucide-react'
 import ModalShell from '@/components/ui/ModalShell'
+// Misma búsqueda de scroller que usan los formularios: el scroller de esta app
+// no es la ventana. Una sola definición para que no diverjan.
+import { scrollerDe } from '@/lib/scrollDoc'
 
 /**
  * Selector de tipo de documento — GUIA_FORMULARIOS_04_TARJETAS_TIPO.md.
@@ -71,24 +74,6 @@ type EstiloDoc = React.CSSProperties & { '--doc-color': string }
 
 function estiloDe(t: Tipo): EstiloDoc {
   return { '--doc-color': `var(--sp-doc-${t.token})` }
-}
-
-/**
- * Ancestro que hace scroll. En esta app NO es la ventana: `(app)/layout.tsx:48`
- * es `<main class="overflow-y-auto">` dentro de un `h-screen overflow-hidden`,
- * así que `window.scrollBy` no movería nada y la compensación del §5 sería un
- * no-op silencioso. Se busca el ancestro real y se cae a scrollingElement.
- */
-function scrollerDe(el: HTMLElement): HTMLElement {
-  let n: HTMLElement | null = el.parentElement
-  while (n) {
-    const { overflowY } = getComputedStyle(n)
-    // Desbordado de verdad: un contenedor `auto` que no scrollea aceptaría el
-    // scrollTop y lo descartaría, y la compensación fallaría en silencio.
-    if ((overflowY === 'auto' || overflowY === 'scroll') && n.scrollHeight > n.clientHeight) return n
-    n = n.parentElement
-  }
-  return (document.scrollingElement as HTMLElement | null) ?? document.documentElement
 }
 
 /** Columnas vigentes de la rejilla. Se leen del CSS resuelto porque el umbral

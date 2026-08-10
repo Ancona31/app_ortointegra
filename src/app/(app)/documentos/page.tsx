@@ -210,8 +210,8 @@ function DocumentosContent() {
                   pacienteId={pacienteSeleccionado.id}
                 />
               )}
-              {tipo === 'lab' && <SolicitudLabForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} />}
-              {tipo === 'imagen' && <SolicitudImagenForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} />}
+              {tipo === 'lab' && <SolicitudLabForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} onVacioChange={setFormVacio} />}
+              {tipo === 'imagen' && <SolicitudImagenForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} onVacioChange={setFormVacio} />}
               {tipo === 'suplementacion' && <PlanSuplementacionForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} />}
               {tipo === 'internamiento' && (
                 <SolicitudInternamientoForm

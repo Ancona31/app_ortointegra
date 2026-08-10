@@ -797,10 +797,16 @@ a:hover { color: var(--sp-primary-active); }
 /* --- 16. CHECKBOX ------------------------------------------------------ */
 .sp-check { display: flex; align-items: center; gap: 11px; cursor: pointer; min-height: var(--sp-tap); }
 .sp-check__box {
+  display: flex; align-items: center; justify-content: center;
   width: 22px; height: 22px; flex: 0 0 22px; border-radius: var(--sp-r-checkbox);
   border: var(--sp-bw-accent) solid var(--sp-line-strong); background: var(--sp-surface);
 }
 .sp-check input:checked + .sp-check__box { background: var(--sp-primary); border-color: var(--sp-primary); }
+/* La palomita se monta siempre y se revela al marcar: aparecer y desaparecer
+   del DOM haría saltar la caja de 22px durante el reflow. */
+.sp-check__box svg { width: 14px; height: 14px; color: #fff; opacity: 0; }
+.sp-check input:checked + .sp-check__box svg { opacity: 1; }
+.sp-check input:focus-visible + .sp-check__box { box-shadow: var(--sp-focus-ring); }
 .sp-check__label { font-size: var(--sp-fs-body); color: var(--sp-ink-700); }
 
 
@@ -935,6 +941,203 @@ a:hover { color: var(--sp-primary-active); }
 /* Sin soporte de consultas de contenedor (iPadOS ≤15): quedan las 2 columnas
    de la regla base. Correcto siempre, subóptimo en pantallas grandes — el
    fallback seguro, igual que en guía 03 §3.C.4. */
+
+
+/* --- 18. FORMULARIOS DE DOCUMENTO (GUIA_FORMULARIOS_01 §1 y §3) --------- */
+
+/* Envoltorio de cada formulario. Vuelve a declarar `docform` porque el
+   contenedor que importa es el del FORMULARIO, no el de la página: anidado
+   dentro de .sp-doc-host gana el más cercano, que es este. Así los tres
+   montajes lo obtienen gratis. */
+.sp-doc-form {
+  container-type: inline-size;
+  container-name: docform;
+  display: flex; flex-direction: column;
+  gap: var(--sp-gap-block);            /* 18px */
+}
+
+/* Primitivas de rejilla. data-cols = el MÁXIMO al que puede llegar; los
+   escalones intermedios los pone la consulta de contenedor.
+   minmax(0,1fr) y nunca 1fr: es lo que impide que el ancho mínimo intrínseco
+   de un <input> (≈175px) infle la pista y desborde la fila. */
+.sp-doc-grid { display: grid; gap: var(--sp-4); grid-template-columns: 1fr; }
+@container docform (min-width: 380px) {
+  .sp-doc-grid[data-cols="2"],
+  .sp-doc-grid[data-cols="3"],
+  .sp-doc-grid[data-cols="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container docform (min-width: 600px) {
+  .sp-doc-grid[data-cols="3"],
+  .sp-doc-grid[data-cols="4"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@container docform (min-width: 840px) {
+  .sp-doc-grid[data-cols="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.sp-doc-span-2   { grid-column: span 2; }
+.sp-doc-span-all { grid-column: 1 / -1; }
+@container docform (max-width: 379px) { .sp-doc-span-2 { grid-column: auto; } }
+
+/* Campo: etiqueta sobre control, 6px. min-width:0 para que el campo pueda
+   encogerse dentro de su pista de rejilla. */
+.sp-doc-field { display: flex; flex-direction: column; gap: var(--sp-gap-label); min-width: 0; }
+
+/* Card con cabecera a sangre: el padding se lo queda el cuerpo. Un solo
+   lenguaje de cabecera (auditoría §4.3: eran cuatro) y SIN franja gris. */
+.sp-doc-card { padding: 0; }
+.sp-doc-cardhead {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: 0 20px; min-height: 56px;
+  border-bottom: var(--sp-bw-hair) solid var(--sp-line-divider);
+}
+.sp-doc-cardbody { padding: var(--sp-pad-card); }   /* 18px 20px */
+.sp-doc-chips { display: flex; flex-wrap: wrap; gap: var(--sp-gap-item); }
+
+/* Acción de cabecera. En XS pierde el texto y queda como 44×44: el aria-label
+   viaja siempre, así que no se pierde el nombre. */
+.sp-doc-add { margin-left: auto; }
+@container docform (max-width: 379px) {
+  .sp-doc-add { width: var(--sp-tap); height: var(--sp-tap); min-height: var(--sp-tap); padding: 0; }
+  .sp-doc-add .sp-doc-long { display: none; }
+}
+
+/* Etiqueta larga del primario, que en XS no cabe */
+.sp-doc-short { display: none; }
+@container docform (max-width: 379px) {
+  .sp-doc-long  { display: none; }
+  .sp-doc-short { display: inline; }
+}
+
+/* Fila de lista. Con ≥4 filas gana un filete: por debajo, 12px de aire basta. */
+.sp-doc-listrow { display: flex; align-items: center; gap: var(--sp-2-5); }
+.sp-doc-listrow + .sp-doc-listrow { margin-top: var(--sp-3); }
+.sp-doc-list--long .sp-doc-listrow + .sp-doc-listrow {
+  border-top: var(--sp-bw-hair) solid var(--sp-line-divider);
+  padding-top: var(--sp-3);
+}
+.sp-doc-listnum { flex: 0 0 20px; }
+
+/* Ícono-botón: 44×44 SIEMPRE, con el glifo a 18. El área táctil no se negocia
+   ni siquiera cuando el icono es pequeño (L-02 / I-01). Visible y disabled con
+   un solo ítem: ocultarlo mueve la interfaz entera al añadir el segundo. */
+.sp-doc-iconbtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 var(--sp-tap); width: var(--sp-tap); height: var(--sp-tap);
+  border: none; background: none; cursor: pointer;
+  border-radius: var(--sp-r-btn-sm);   /* 8 */
+  color: var(--sp-ink-icon);
+  transition: background var(--sp-dur-micro) var(--sp-ease-out),
+              color var(--sp-dur-micro) var(--sp-ease-out);
+}
+.sp-doc-iconbtn:hover:not(:disabled) { color: var(--sp-danger); background: var(--sp-danger-bg); }
+.sp-doc-iconbtn:disabled { opacity: .4; cursor: not-allowed; }
+.sp-doc-iconbtn svg { width: 18px; height: 18px; }
+
+.sp-doc-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--sp-2); min-height: 96px; text-align: center;
+}
+.sp-doc-empty .sp-icobox { background: var(--sp-surface-empty); color: var(--sp-ink-150); }
+
+/* Campo señalado. Dos colores porque son dos cosas distintas: falta un
+   obligatorio (warn, §3.8) o el par tipo+región está a medias (danger, §2.4).
+   :focus gana por especificidad, que es lo que se quiere: al entrar a
+   corregirlo, el campo se lee como activo y no como roto. */
+.sp-doc-invalid       { border-color: var(--sp-warn);   border-width: var(--sp-bw-accent); }
+.sp-doc-invalid--pair { border-color: var(--sp-danger); border-width: var(--sp-bw-accent); }
+
+/* Barra de acciones. SIN los márgenes negativos de la spec: ahí son los del
+   padding de .sp-card, y esta barra es hermana de las cards, no hija — los
+   negativos la sacarían 20px del contenedor por cada lado.
+   La sombra no tiene token; es el único literal de la hoja. */
+.sp-doc-actions {
+  position: sticky; bottom: 0; z-index: 1;
+  padding: 14px 0 calc(14px + env(safe-area-inset-bottom));
+  background: var(--sp-surface);
+  border-top: var(--sp-bw-hair) solid var(--sp-line-divider);
+  box-shadow: 0 -8px 20px rgba(16, 42, 73, .05);
+  display: flex; align-items: center; gap: var(--sp-gap-item);
+}
+.sp-doc-actions > .sp-btn--primary { flex: 1; min-height: var(--sp-ctrl-h-desktop); }
+@container docform (max-width: 379px) {
+  .sp-doc-actions { flex-direction: column-reverse; }
+  .sp-doc-actions > * { width: 100%; }
+}
+
+/* Bloque de estudio (imagenología). Contenedor PROPIO: la rejilla interior se
+   mide contra el interior del bloque, no contra el formulario. */
+.sp-doc-studyblock {
+  container-type: inline-size;
+  container-name: docstudy;
+  border: var(--sp-bw-hair) solid var(--sp-line-card);
+  border-radius: var(--sp-r-card-inner);   /* 13 */
+  background: var(--sp-surface);
+  padding: 14px;
+}
+.sp-doc-studyblock + .sp-doc-studyblock { margin-top: var(--sp-3); }
+.sp-doc-studyblock--invalid { border-color: var(--sp-danger-border); background: var(--sp-danger-bg); }
+.sp-doc-studyhead { display: flex; align-items: center; gap: var(--sp-2); min-height: var(--sp-tap); }
+.sp-doc-studychip { display: none; }
+
+/* Tres trazados, ninguno reparte medias columnas (I-02 · I-03). */
+.sp-doc-studygrid { display: grid; gap: 14px; grid-template-columns: 1fr; }
+@container docstudy (min-width: 520px) {
+  .sp-doc-studygrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sp-doc-studychip {
+    display: inline-block; max-width: 220px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+}
+@container docstudy (min-width: 760px) {
+  .sp-doc-studygrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .sp-doc-studygrid > [data-span="2"] { grid-column: span 2; }
+  .sp-doc-studygrid > [data-span="3"] { grid-column: span 3; }
+}
+
+/* Desplegable escribible — patrón de referencia del sistema (imagen §2.2).
+   Portal a body y position:fixed: dentro del flujo, el menú quedaba recortado
+   por el scroller de la card (L-03). */
+.sp-doc-combo { position: relative; min-width: 0; }
+.sp-doc-combo > .sp-input { padding-right: 32px; }
+.sp-doc-combo > svg {
+  position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
+  width: 15px; height: 15px; color: var(--sp-ink-icon); pointer-events: none;
+}
+.sp-doc-menu {
+  position: fixed; z-index: 55;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--sp-surface);
+  border: var(--sp-bw-hair) solid var(--sp-line-card);
+  border-radius: 12px;                  /* --sp-r-field + 2 */
+  box-shadow: 0 12px 28px rgba(16, 42, 73, .14);
+}
+/* 4 filas de 44px. Ocho sugerencias abiertas de golpe tapan el formulario. */
+.sp-doc-menu__list { max-height: 176px; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+/* nowrap + elipsis: sin esto una sugerencia larga («Test de Supresión con
+   Dexametasona (2 mg × 2 días)», 50 caracteres) envuelve a dos líneas, la fila
+   deja de medir 44px y el tope de «4 filas = 176px» pasa a mostrar 3 y pico.
+   El nombre completo queda en el `title` del elemento. */
+.sp-doc-menu__item {
+  display: flex; align-items: center; min-height: var(--sp-tap);
+  padding: 0 14px; cursor: pointer;
+  font-size: var(--sp-fs-body-sm); color: var(--sp-ink-700);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sp-doc-menu__item[aria-selected="true"] {
+  background: var(--sp-primary-bg-faint); color: var(--sp-ink-900); font-weight: var(--sp-fw-semi);
+}
+.sp-doc-menu__foot {
+  padding: 9px 14px;
+  font-size: var(--sp-fs-hint); color: var(--sp-ink-350);
+  background: var(--sp-surface-sunken);
+  border-top: var(--sp-bw-hair) solid var(--sp-line-divider);
+}
+
+/* Badge de urgente: el rojo se reserva a ESTO. Hoy la etiqueta entera de la
+   casilla iba en rojo y competía con los errores del formulario. */
+.sp-badge--danger {
+  background: var(--sp-danger-bg); color: var(--sp-danger);
+  font-size: 11.5px; font-weight: var(--sp-fw-black);
+}
 
 
 /* ============================================================================

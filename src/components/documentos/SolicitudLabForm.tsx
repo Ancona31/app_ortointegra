@@ -6,16 +6,25 @@ import { generarPdf } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
 import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-import { Plus, Trash2, Printer, Loader2 } from 'lucide-react'
+import { Plus, Trash2, Printer, AlertTriangle, FlaskConical } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import AutocompleteEstudio from '@/components/AutocompleteEstudio'
+import Link from 'next/link'
+import ComboEscribible from '@/components/documentos/ComboEscribible'
+import { ESTUDIOS_LAB } from '@/lib/estudiosLab'
 import { createClient } from '@/lib/supabase/client'
-import { hoyEnTZ } from '@/lib/dates'
+import { hoyEnTZ, desplazarFecha } from '@/lib/dates'
+import { enfocarYAcercar } from '@/lib/scrollDoc'
 
+/**
+ * Diez cadenas fijas, sin identificador ni versión: la comparación con la lista
+ * es de texto exacto. Si una cambia, las plantillas guardadas dejan de encender
+ * ese chip pero el estudio sigue en la lista — ni el panel ni el formulario
+ * pueden asumir que un estudio guardado tiene chip. Consecuencia declarada.
+ */
 const ESTUDIOS_PRESET = [
   'Biometría Hemática',
   'Glucosa',
@@ -27,7 +36,24 @@ const ESTUDIOS_PRESET = [
   'Perfil Tiroideo Completo',
   'Urocultivo',
   'Cultivo de Secreción',
-]
+] as const
+
+const FECHA_MIN = '1900-01-01'
+
+/**
+ * Predicado único de «formulario vacío». Mismo criterio que Honorarios: los
+ * campos que llegan prellenados de la ficha NO cuentan como escritos hasta que
+ * se editan, porque llegaron solos.
+ */
+function isFormEmpty(
+  estudios: string[], notas: string,
+  paciente: string, pacienteInicial: string,
+  diagnostico: string, diagnosticoInicial: string,
+): boolean {
+  const pacienteIntacto = paciente.trim() === '' || paciente.trim() === pacienteInicial.trim()
+  const dxIntacto = diagnostico.trim() === '' || diagnostico.trim() === diagnosticoInicial.trim()
+  return pacienteIntacto && dxIntacto && notas.trim() === '' && estudios.every(e => e.trim() === '')
+}
 
 interface Props {
   pacienteInicial?: string
@@ -35,9 +61,11 @@ interface Props {
   pacienteId?: string
   offlineMode?: boolean
   onOfflineSave?: () => void
+  /** Reporta al host si el formulario sigue vacío (guía 04 §6.1 y §6.2). */
+  onVacioChange?: (vacio: boolean) => void
 }
 
-export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, offlineMode, onOfflineSave }: Props) {
+export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, offlineMode, onOfflineSave, onVacioChange }: Props) {
   const { medicoInfo: onlineMedicoInfo, isLoading: cargandoPerfil } = useMedicoInfo()
   const { consultorioActivo } = useConsultorioActivo()
 
@@ -78,16 +106,61 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
   const [errorGuardado, setErrorGuardado] = useState('')
   const [imprimiendo, setImprimiendo] = useState(false)
   const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean } | null>(null)
+  // El banner de faltantes NO existe hasta el primer intento de imprimir: un
+  // formulario recién abierto no acusa de nada. Después permanece y se
+  // actualiza en vivo.
+  const [intentado, setIntentado] = useState(false)
+
+  const formRef = useRef<HTMLDivElement>(null)
+  const pacienteRef = useRef<HTMLInputElement>(null)
+
+  const vacio = isFormEmpty(estudios, notas, paciente, pacienteInicial, diagnostico, diagnosticoInicial)
+  useEffect(() => { onVacioChange?.(vacio) }, [vacio, onVacioChange])
+
+  // G-10: foco al primer campo editable vacío al montar. preventScroll para no
+  // arrastrar la página hasta él. En móvil esto abre el teclado en cada montaje.
+  useEffect(() => {
+    const primero = formRef.current?.querySelector<HTMLElement>('input:not([type="date"]), textarea')
+    if (primero instanceof HTMLInputElement && !primero.value) primero.focus({ preventScroll: true })
+  }, [])
 
   function addEstudio() { setEstudios([...estudios, '']) }
   function removeEstudio(i: number) { setEstudios(estudios.filter((_, idx) => idx !== i)) }
   function updateEstudio(i: number, val: string) { setEstudios(estudios.map((e, idx) => idx === i ? val : e)) }
-  function togglePreset(e: string) {
-    if (estudios.includes(e)) setEstudios(estudios.filter(s => s !== e))
-    else setEstudios([...estudios.filter(s => s !== ''), e])
+
+  // L-01: una sola fuente de verdad. El chip no guarda estado — lo inserta o lo
+  // retira de `estudios`, y su encendido se deriva de ahí. Dos arrays divergen
+  // siempre.
+  function togglePreset(preset: string) {
+    if (estudios.includes(preset)) setEstudios(estudios.filter(e => e !== preset))
+    else setEstudios([...estudios.filter(e => e.trim() !== ''), preset])
+  }
+
+  // ── Validación (§3.8) ───────────────────────────────────────────
+  const faltantes: { clave: string; nombre: string }[] = []
+  if (!paciente.trim()) faltantes.push({ clave: 'paciente', nombre: 'Paciente' })
+  if (estudios.every(e => e.trim() === '')) faltantes.push({ clave: 'estudios', nombre: 'Estudios' })
+
+  function textoFaltantes(): string {
+    const n = faltantes.length
+    const cabeza = faltantes.slice(0, 3).map(f => f.nombre).join(' · ')
+    const resto = n > 3 ? ` y ${n - 3} más` : ''
+    return `${n === 1 ? 'Falta 1 campo' : `Faltan ${n} campos`}: ${cabeza}${resto}`
+  }
+
+  function irA(clave: string) {
+    if (clave === 'paciente') { enfocarYAcercar(pacienteRef.current); return }
+    enfocarYAcercar(formRef.current?.querySelector<HTMLElement>('#laboratorio-estudio-0') ?? null)
   }
 
   async function imprimir() {
+    // El primario nunca está gris por faltantes: un botón apagado no enseña qué
+    // falta, el banner sí. Al pulsar con faltantes no emite y lleva al primero.
+    if (faltantes.length > 0) {
+      setIntentado(true)
+      irA(faltantes[0].clave)
+      return
+    }
     flushSync(() => { setErrorGuardado(''); setImprimiendo(true) })
 
     // 1. Feedback instantáneo
@@ -198,7 +271,7 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
         // mobileShare captura el error de subida y no lo relanza. El documento
         // no queda recuperable desde la lista y el modal tiene que decirlo.
         guardado = storagePath !== null
-        toast.success('Solicitud guardada')
+        toast.success('Solicitud de laboratorio guardada')
       }
     } catch (err) {
       if (!pdfGenerated) {
@@ -218,76 +291,165 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
     }
   }
 
+  const senalar = (clave: string) => intentado && faltantes.some(f => f.clave === clave)
+  const conNumeral = estudios.length >= 2
+
   return (
-    <div className="space-y-5">
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-        <h2 className="font-semibold text-slate-700 text-sm mb-4">Datos del paciente</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div><label className="text-xs font-medium text-slate-500 block mb-1">Fecha</label>
-            <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" /></div>
-          <div><label className="text-xs font-medium text-slate-500 block mb-1">Paciente <span className="text-red-400">*</span></label>
-            <input type="text" value={paciente} onChange={e => setPaciente(e.target.value)} placeholder="Nombre completo" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" /></div>
-          <div><label className="text-xs font-medium text-slate-500 block mb-1">Diagnóstico</label>
-            <input type="text" value={diagnostico} onChange={e => setDiagnostico(e.target.value)} placeholder="Dx de envío" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" /></div>
-        </div>
-      </div>
+    <div ref={formRef} className="sp-doc-form">
+      {/* Card Plantilla (spec 02 §1) y «Guardar como plantilla» en la barra:
+          sus DOS posiciones quedan fijadas —selector arriba, guardar abajo—
+          pero el sistema es del paso siguiente. No se montan controles muertos. */}
 
-      {/* Preset rápido */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-        <h2 className="font-semibold text-slate-700 text-sm mb-3">Estudios frecuentes</h2>
-        <div className="flex flex-wrap gap-2">
-          {ESTUDIOS_PRESET.map(e => (
-            <button key={e} onClick={() => togglePreset(e)}
-              className={`text-xs px-3 py-1.5 rounded-full border transition-all ${estudios.includes(e) ? 'bg-[#1e5fa8] text-white border-[#1e5fa8]' : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-[#1e5fa8]'}`}>
-              {e}
-            </button>
-          ))}
+      <section className="sp-card sp-doc-card">
+        <div className="sp-doc-cardhead">
+          <h2 className="sp-label">Datos del paciente</h2>
         </div>
-      </div>
-
-      {/* Lista manual */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 rounded-t-xl flex items-center justify-between">
-          <h2 className="font-semibold text-slate-700 text-sm">Estudios solicitados</h2>
-          <button onClick={addEstudio} className="flex items-center gap-1 text-xs text-[#1e5fa8] hover:text-[#1a3a5c] font-medium"><Plus size={14} /> Agregar</button>
-        </div>
-        <div className="p-4 space-y-2">
-          {estudios.map((e, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <span className="text-slate-400 text-sm w-5">{i + 1}.</span>
-              <AutocompleteEstudio
-                value={e}
-                onChange={val => updateEstudio(i, val)}
-                index={i}
-              />
-              {estudios.length > 1 && <button onClick={() => removeEstudio(i)} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button>}
+        <div className="sp-doc-cardbody">
+          <div className="sp-doc-grid" data-cols="3">
+            <div className="sp-doc-field">
+              <label htmlFor="laboratorio-fecha" className="sp-label-field">Fecha</label>
+              <input id="laboratorio-fecha" type="date" value={fecha}
+                min={FECHA_MIN} max={desplazarFecha(hoyEnTZ(), { anios: 1 })}
+                onChange={e => setFecha(e.target.value)} className="sp-input" />
             </div>
-          ))}
+            <div className="sp-doc-field">
+              <label htmlFor="laboratorio-paciente" className="sp-label-field">
+                Paciente <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
+                <span className="sr-only">obligatorio</span>
+              </label>
+              <input ref={pacienteRef} id="laboratorio-paciente" type="text" value={paciente}
+                onChange={e => setPaciente(e.target.value)} placeholder="Nombre completo"
+                aria-invalid={senalar('paciente') || undefined}
+                className={`sp-input ${senalar('paciente') ? 'sp-doc-invalid' : ''}`} />
+            </div>
+            <div className="sp-doc-field">
+              <label htmlFor="laboratorio-diagnostico" className="sp-label-field">Diagnóstico</label>
+              <input id="laboratorio-diagnostico" type="text" value={diagnostico}
+                onChange={e => setDiagnostico(e.target.value)} placeholder="Dx de envío" className="sp-input" />
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-        <label className="text-sm font-semibold text-slate-700 block mb-2">Indicaciones / Notas</label>
-        <textarea value={notas} onChange={e => setNotas(e.target.value)} placeholder="Indicaciones especiales, ayuno requerido..." rows={2}
-          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30" />
-      </div>
-
-      {errorGuardado && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-          {errorGuardado}
+      <section className="sp-card sp-doc-card">
+        <div className="sp-doc-cardhead">
+          <h2 className="sp-label">Estudios frecuentes</h2>
         </div>
+        <div className="sp-doc-cardbody">
+          <div className="sp-doc-chips">
+            {ESTUDIOS_PRESET.map(preset => (
+              <button key={preset} type="button" onClick={() => togglePreset(preset)}
+                aria-pressed={estudios.includes(preset)} className="sp-chip">
+                {preset}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="sp-card sp-doc-card">
+        <div className="sp-doc-cardhead">
+          <div className="sp-icobox sp-icobox--sm"><FlaskConical /></div>
+          <h2 className="sp-label">Estudios solicitados</h2>
+          <button type="button" onClick={addEstudio} aria-label="Agregar"
+            className="sp-btn sp-btn--compact sp-doc-add">
+            <Plus size={17} /><span className="sp-doc-long">Agregar</span>
+          </button>
+        </div>
+        <div className="sp-doc-cardbody">
+          {estudios.length === 0 ? (
+            <div className="sp-doc-empty">
+              <div className="sp-icobox sp-icobox--sm"><FlaskConical /></div>
+              <p className="sp-hint">Sin estudios. Usa «Agregar».</p>
+            </div>
+          ) : (
+            <div className={estudios.length >= 4 ? 'sp-doc-list--long' : undefined}>
+              {estudios.map((estudio, i) => (
+                <div key={i} className="sp-doc-listrow">
+                  {conNumeral && <span className="sp-label sp-doc-listnum">{i + 1}.</span>}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <ComboEscribible
+                      id={`laboratorio-estudio-${i}`}
+                      value={estudio}
+                      onChange={val => updateEstudio(i, val)}
+                      sugerencias={ESTUDIOS_LAB}
+                      minCaracteres={2}
+                      placeholder="Nombre del estudio"
+                      pie="Ninguno encaja: escribe el nombre y se usa tal cual."
+                      invalido={senalar('estudios')}
+                      claseExtra={senalar('estudios') ? 'sp-doc-invalid' : ''}
+                    />
+                  </div>
+                  <button type="button" onClick={() => removeEstudio(i)} disabled={estudios.length === 1}
+                    aria-label={estudio.trim() ? `Eliminar ${estudio.trim()}` : `Eliminar estudio ${i + 1}`}
+                    className="sp-doc-iconbtn">
+                    <Trash2 />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="sp-card sp-doc-card">
+        <div className="sp-doc-cardhead">
+          <h2 className="sp-label">Indicaciones / Notas</h2>
+        </div>
+        <div className="sp-doc-cardbody">
+          <label htmlFor="laboratorio-notas" className="sr-only">Indicaciones / Notas</label>
+          <textarea id="laboratorio-notas" value={notas} onChange={e => setNotas(e.target.value)}
+            placeholder="Indicaciones especiales, ayuno requerido…" className="sp-textarea" />
+        </div>
+      </section>
+
+      {errorGuardado && <p className="sp-banner sp-banner--danger">{errorGuardado}</p>}
+
+      {!cargandoPerfil && !medicoInfo && (
+        <p className="sp-banner sp-banner--warn">
+          <AlertTriangle size={17} />
+          <span style={{ flex: 1 }}>Completa tu perfil para que el documento salga con tu encabezado.</span>
+          <Link href="/perfil" className="sp-link-alt">Ir a mi perfil</Link>
+        </p>
       )}
 
-      <button onClick={imprimir} disabled={!paciente || estudios.filter(Boolean).length === 0 || imprimiendo || perfilPendiente}
-        className="doc-print-btn w-full flex items-center justify-center gap-2 py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-50">
-        {imprimiendo ? <><Loader2 size={18} className="animate-spin" /> Generando PDF...</> : <><Printer size={18} /> Imprimir Solicitud</>}
-      </button>
+      {intentado && faltantes.length > 0 && (
+        <p className="sp-banner sp-banner--warn" aria-live="polite">
+          <AlertTriangle size={17} />
+          <span>
+            {textoFaltantes().split(':')[0]}:{' '}
+            {faltantes.slice(0, 3).map((f, i) => (
+              <span key={f.clave}>
+                {i > 0 && ' · '}
+                <button type="button" onClick={() => irA(f.clave)}
+                  className="sp-link-alt" style={{ color: 'var(--sp-warn-strong)' }}>
+                  {f.nombre}
+                </button>
+              </span>
+            ))}
+            {faltantes.length > 3 && ` y ${faltantes.length - 3} más`}
+          </span>
+        </p>
+      )}
+
+      <div className="sp-doc-actions">
+        <button type="button" onClick={imprimir} disabled={imprimiendo || perfilPendiente}
+          className="sp-btn sp-btn--primary">
+          {imprimiendo ? <><span className="sp-spinner" /> Generando PDF…</>
+            : perfilPendiente ? <><span className="sp-spinner" /> Cargando tu perfil…</>
+            : <>
+                <Printer size={17} />
+                <span className="sp-doc-long">Imprimir solicitud de laboratorio</span>
+                <span className="sp-doc-short">Imprimir</span>
+              </>}
+        </button>
+      </div>
 
       <ModalDocumentoGenerado
         open={docGenerado !== null}
         onClose={() => setDocGenerado(null)}
         blob={docGenerado?.blob ?? null}
-        titulo="Solicitud de laboratorio"
+        titulo="Solicitud de laboratorio generada"
         guardadoEnExpediente={docGenerado?.guardado ?? false}
       />
     </div>
