@@ -107,6 +107,18 @@ const GEOMETRIA = {
    * ranura y su aire. Ver `anadido` en `Firma`.
    */
   anadido: { margen: 6 },
+  /**
+   * EL PIE DE SELLO — **2 pt bajo la calidad del firmante**, y cuesta 11 en total.
+   *
+   * Es la segunda ranura que este componente abre bajo la nota, y es distinta de `anadido`
+   * en las dos cosas que importan: va ANTES —pegada a la identificación, que es lo que
+   * acredita— y su aire es 2 en vez de 6. Con el renglón de `sello.pie` a 9, la celda sube
+   * los 11 pt que la trazabilidad de II.7 declara.
+   *
+   * **Este componente no sabe qué es un sello** y no lo compone: lo que declara es la ranura
+   * y su aire, igual que con el parentesco.
+   */
+  sello: { margen: 2 },
   celda: { superior: 14, inferior: 4 },
   /**
    * LA MISMA FIRMA EN LAS LÁMINAS DE IMAGENOLOGÍA Y DE RECETA — 118.75 pt, no 120.8.
@@ -238,6 +250,8 @@ const estilos = StyleSheet.create({
   },
   /** El aire sobre lo que el formato cuelga bajo la nota. Ver `GEOMETRIA.anadido`. */
   anadido: { marginTop: GEOMETRIA.anadido.margen },
+  /** El aire sobre el pie de sello, pegado a la calidad del firmante. */
+  sello: { marginTop: GEOMETRIA.sello.margen },
   /** Solo en `retícula`: es lo que separa una fila de la siguiente. */
   celdaEnReticula: {
     paddingTop: GEOMETRIA.celda.superior,
@@ -393,6 +407,22 @@ export interface Firma {
    * quien lo declara, que es el mismo reparto que la ranura `contenido` de 2.I.
    */
   readonly anadido?: ReactNode
+  /**
+   * EL PIE DE SELLO DE TRAZABILIDAD, compuesto por el FORMATO.
+   *
+   * ⚠ **NO ES UN RENGLÓN DE IDENTIFICACIÓN Y NO PUEDE SERLO.** Vale aquí el mismo aviso que
+   * en `anadido`: `FIRMA_RENGLONES` declara los renglones que van bajo la línea y
+   * `altoBloqueFirma()` los cuenta, así que lo que entre por esta ranura **no lo ve la
+   * fórmula** y el umbral de la regla 1 de 2.N se queda corto.
+   *
+   * Hoy lo usa un formato y no le afecta: II.7 reparte sus firmas por estructura —con saltos
+   * de hoja declarados— y no entrega `firmas` a 2.N, así que ahí no hay umbral que mentir.
+   * **Un formato que sí cierre con 2.N no debe usar esta ranura** sin corregir I.1.9 antes.
+   *
+   * Va DESPUÉS de la nota y ANTES de `anadido`: el sello acredita la identificación que
+   * tiene encima, y lo que cuelga después —un parentesco que se llena a pluma— es otra cosa.
+   */
+  readonly sello?: ReactNode
 }
 
 /** Qué lámina fija la línea, el aire y los dos renglones de abajo. */
@@ -504,6 +534,11 @@ function UnaFirma({
       <Text style={medida ? estilos.credencialMedida : estilos.credencial}>
         {(firma.credenciales ?? []).join(SEPARADOR_CREDENCIALES) || ' '}
       </Text>
+
+      {/* El pie de sello, pegado a la nota. Ver `sello` en `Firma`. */}
+      {firma.sello === undefined ? null : (
+        <View style={estilos.sello}>{firma.sello}</View>
+      )}
 
       {/* La ranura del formato, con su aire. Ver `anadido` en `Firma`. */}
       {firma.anadido === undefined ? null : (

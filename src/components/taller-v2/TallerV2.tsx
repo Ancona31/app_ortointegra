@@ -185,6 +185,7 @@ const CASOS_CONSENTIMIENTO: readonly EntradaCaso[] = [
   { caso: 'completo', etiqueta: 'Completo', nota: 'Cinco firmantes, tres niveles y anexo' },
   { caso: 'sinFotos', etiqueta: 'Sin fotos', nota: 'La hoja de anexo NO aparece' },
   { caso: 'sustitucion', etiqueta: 'Sustitución', nota: 'Sin nivel 2: Testigos pasa a 2' },
+  { caso: 'sinSellar', etiqueta: 'Sin sellar', nota: 'Sin sellos: nada que sellar' },
 ]
 
 /**
@@ -388,7 +389,7 @@ export default function TallerV2(): ReactElement {
                 <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400">
                   Caso
                 </h3>
-                <div className="mt-3 grid grid-cols-3 gap-2">
+                <div className="mt-3 grid grid-cols-2 gap-2">
                   {casos.map((c) => (
                     <button
                       key={c.caso}

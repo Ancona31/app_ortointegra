@@ -125,6 +125,40 @@
  *    ninguna de las diez láminas del formato y las dos versiones que existen en otros
  *    archivos difieren entre sí. II.7 §1 la declara (`D36`). Se decide con su lámina.
  *
+ * LOS SELLOS DE TRAZABILIDAD — POR QUÉ VAN IMPRESOS Y NO SOLO EN EL REGISTRO
+ *
+ * La NOM-004 exige que la firma electrónica lleve **sello de tiempo** que documente la fecha
+ * y la hora exactas de CADA firma, y que el documento acredite que no se alteró después. **El
+ * papel es lo que se presenta en sede legal**, así que los sellos se imprimen: un registro de
+ * base de datos no viaja con la hoja.
+ *
+ * Se componen en dos sitios y **ninguno existe en la lámina** —son posteriores a ella—, así
+ * que toda su geometría es DERIVADA y está declarada como tal:
+ *
+ *     pie de celda      una línea de `sello.pie` bajo la calidad del firmante, a 2 pt
+ *     cierre            dos líneas sobre filete gris, en la ÚLTIMA hoja del documento
+ *
+ * **LA HORA VA CON SEGUNDOS Y NO ES UN CAPRICHO.** Las firmas ocurren en momentos distintos
+ * —el paciente firma, el testigo lee y firma después— y esa diferencia es parte de la
+ * evidencia: un consentimiento cuyas cinco firmas comparten minuto exacto es sospechoso. En
+ * papel esa hora se COTEJA contra el expediente, no se lee de corrido, y por eso el rol va en
+ * cifras tabulares.
+ *
+ * ⚠ **DÓNDE VA EL BLOQUE DE CIERRE: EN LA ÚLTIMA HOJA DEL DOCUMENTO, NO EN LA DE FIRMAS.**
+ * Con anexo el documento no termina en las firmas, así que el bloque iría en medio y habría
+ * páginas selladas después del sello. Se resuelve colocándolo **al final del flujo, detrás
+ * del anexo condicional**: cae en la hoja 6 cuando hay fotografías y en la 5 cuando no, sin
+ * que este archivo tenga que saber cuál es.
+ *
+ * ⚠ **LOS SELLOS SOLO EXISTEN EN UN DOCUMENTO SELLADO.** Un consentimiento impreso para
+ * firmarse a mano no lleva ninguno: no hay nada que sellar. Un solo interruptor —`sellado`—
+ * gobierna los dos sitios, así que no puede haber pies de celda sin bloque de cierre ni al
+ * revés.
+ *
+ * ⚠ **EL REGISTRO DE ACCESOS NO SE IMPRIME EN NINGUNA FORMA.** Quién abrió el documento y
+ * cuándo es dato de base, no del papel: en la hoja no aporta nada y en cambio expone el
+ * movimiento interno de la clínica a cualquiera que la reciba.
+ *
  * LAS CINCO DECISIONES DE PRODUCTO, YA TOMADAS
  *
  * 1. **Cinco firmantes**: médico, paciente, familiar o responsable y dos testigos. El
@@ -222,6 +256,41 @@ const ENTRADILLA_ANEXO =
   'Reproducción de la identificación oficial del paciente y de las personas que firman el consentimiento.'
 const SIN_FOTOGRAFIA =
   'No se capturó fotografía de la identificación de este firmante.'
+
+/**
+ * LAS CADENAS DE LOS SELLOS. Se redactan aquí, como todas las del sistema, y llevan dentro
+ * cifras que el formato cuenta: por eso son funciones y no constantes.
+ *
+ * ⚠ **LA CONCORDANCIA DE NÚMERO SE COMPONE**, al revés que en el aviso de pie de 2.N, donde
+ * `CONCILIA D22` fijó una sola forma. Allí el sustantivo elidido es siempre el mismo —un
+ * documento— y no hay nada que concordar; aquí `1 firmaron` y `1 omitidos` se leen mal en un
+ * papel que va a sede legal, y el caso ocurre en cuanto tres de los cuatro firman.
+ *
+ * `firmantes previstos` se queda en plural sin condición: este formato compone **cuatro
+ * celdas como mínimo** —médico, paciente o familiar, y los dos testigos, que son fijos por
+ * NOM-004—, así que el singular no puede darse.
+ */
+const SELLO_FIRMADO = 'Firmado'
+const SELLO_CON_ANEXO = 'con identificación anexa'
+const SELLO_HUELLA = 'Huella SHA-256'
+const SELLO_VERIFICABLE = 'verificable en el expediente electrónico'
+
+function recuento(previstos: number, firmaron: number): string {
+  const omitidos = previstos - firmaron
+  return [
+    `${previstos} firmantes previstos`,
+    `${firmaron} ${firmaron === 1 ? 'firmó' : 'firmaron'}`,
+    `${omitidos} ${omitidos === 1 ? 'omitido' : 'omitidos'}`,
+  ].join(', ')
+}
+
+function lineaSellado(fecha: string, previstos: number, firmaron: number): string {
+  return `Documento sellado el ${fecha} · ${recuento(previstos, firmaron)}`
+}
+
+function lineaHuella(huella: string): string {
+  return `${SELLO_HUELLA} · ${huella} · ${SELLO_VERIFICABLE}`
+}
 
 /**
  * LOS TRES PÁRRAFOS DE LA DECLARACIÓN, que el formato REDACTA porque llevan datos dentro.
@@ -324,6 +393,26 @@ const NIVEL = {
   parentesco: 13,
 } as const
 
+/**
+ * EL BLOQUE DE VERIFICACIÓN DEL CIERRE. **Ninguna cifra sale de la lámina**: ese bloque no
+ * existe en ella, así que las cuatro son `DERIVADO` y se eligen de la escala, no se inventan.
+ *
+ *     aire        `espacio.24`, el mismo con el que I.1.7 separa dos secciones. Es lo que
+ *                 separa el cierre de lo último del documento, que es la misma relación
+ *     filete      `filete.regla` en `tinta.reglaSuave`: el trazo más discreto que el sistema
+ *                 dibuja, por debajo del de la cita y del principal. Un sello acredita, no
+ *                 destaca
+ *     aire tras   `espacio.4`, el mínimo de la escala: el filete y las dos líneas son un
+ *                 solo bloque
+ *     ancho       `caja.ancho`, como todo lo que cierra una hoja
+ */
+const VERIFICACION = {
+  aire: ESPACIO[24],
+  grosor: FILETE.regla,
+  color: TINTA.reglaSuave,
+  aireTrasFilete: ESPACIO[4],
+} as const
+
 /** Geometría del anexo. */
 const ANEXO = {
   /** Celda de la retícula: `(486 − 30) / 2`. La misma que la de firmas. */
@@ -355,6 +444,17 @@ export interface FirmanteConsentimiento {
   readonly nombre?: string
   /** Trazo capturado, ya normalizado a PNG o JPG por quien llama (I.3.8). */
   readonly rubrica?: string
+  /**
+   * FECHA Y HORA DE LA FIRMA, **ya compuesta por quien llama** en formato corto
+   * `dd/mm/aaaa hh:mm:ss`. Este componente coloca, no rotula ni convierte — el mismo criterio
+   * que la emisión, el peso y las cédulas.
+   *
+   * ⚠ **SU PRESENCIA ES LO QUE DICE QUE ESTA PERSONA FIRMÓ**, y no la rúbrica: la del médico
+   * se renderiza siempre (decisión de producto 2), así que el trazo no distingue. Un firmante
+   * OMITIDO no trae sello y **no lleva pie**: no firmó, no hay nada que sellar. Y es lo que
+   * cuenta el recuento del bloque de cierre.
+   */
+  readonly sello?: string
 }
 
 /** Una identificación del anexo. Su fotografía es lo único opcional. */
@@ -427,6 +527,25 @@ export interface ConsentimientoInformadoProps {
    * fotografía** (decisión de producto 5); sin ninguna, el documento cierra en las firmas.
    */
   readonly identificaciones?: readonly IdentificacionAnexo[]
+  /**
+   * EL SELLO DEL DOCUMENTO. **Su presencia es el interruptor de toda la trazabilidad**: sin
+   * él no se compone el bloque de cierre y tampoco ningún pie de celda, aunque los firmantes
+   * traigan hora. Un consentimiento impreso para firmarse a mano no lleva sellos.
+   *
+   * Un solo interruptor para los dos sitios, a propósito: dos harían posible un documento con
+   * pies de firma y sin bloque de cierre, que es un papel que dice cuándo firmó cada uno y no
+   * dice si se alteró después.
+   */
+  readonly sellado?: {
+    /** Fecha y hora del sellado, YA compuesta: `09/08/2026 12:47:19`. */
+    readonly fecha: string
+    /**
+     * Huella SHA-256 **abreviada**, ya recortada por quien llama: `3f9a…8c41`. En papel no se
+     * teclea, se compara con la del expediente, así que la abreviada basta y la completa solo
+     * ocuparía dos renglones de cifras que nadie va a leer.
+     */
+    readonly huella: string
+  }
   /** Folio del documento, ya generado. Prefijo `C-` en la lámina. */
   readonly folio: string
 }
@@ -571,6 +690,18 @@ const estilos = StyleSheet.create({
   },
   bloqueNivel: { marginTop: SEPARACION_CASILLA_NIVEL },
   bloqueNivelSiguiente: { marginTop: SEPARACION_CELDAS_NIVEL },
+  /** El pie de sello de una celda de firma. El aire de 2 pt lo pone 2.L. */
+  sello: { ...estiloTipografico('sello.pie') },
+
+  /** El bloque de verificación, en la última hoja del documento. */
+  verificacion: {
+    width: CAJA.ancho,
+    marginTop: VERIFICACION.aire,
+    borderTopWidth: VERIFICACION.grosor,
+    borderTopColor: VERIFICACION.color,
+    paddingTop: VERIFICACION.aireTrasFilete,
+  },
+
   /** Rótulo y línea del parentesco, lo único que cuelga bajo una nota de firma. */
   rotuloParentesco: { ...estiloTipografico('aseguradora.rotulo') },
   lineaParentesco: {
@@ -776,6 +907,30 @@ function Parentesco(): ReactElement {
   )
 }
 
+/**
+ * EL PIE DE SELLO DE UNA CELDA. Se compone aquí y no en 2.L porque aquel componente no sabe
+ * qué es un sello de tiempo: lo que declara es la ranura y su aire de 2 pt.
+ *
+ * `con identificación anexa` sale **solo si esa persona tiene fotografía en el anexo**, y es
+ * lo que remite de una hoja a la otra: sin esa coletilla, quien lea la hoja de firmas no sabe
+ * que hay una hoja más con su credencial reproducida.
+ */
+function PieDeSello({
+  sello,
+  conAnexo,
+}: {
+  sello: string
+  conAnexo: boolean
+}): ReactElement {
+  return (
+    <Text style={estilos.sello}>
+      {[`${SELLO_FIRMADO} ${sello}`, conAnexo ? SELLO_CON_ANEXO : undefined]
+        .filter((pieza): pieza is string => pieza !== undefined)
+        .join(' · ')}
+    </Text>
+  )
+}
+
 /** Una celda vacía de la retícula: el nivel 2 tiene una firma y dos columnas. */
 const CELDA_VACIA: Firma = { rol: ' ' }
 
@@ -875,30 +1030,57 @@ export default function ConsentimientoInformado({
   firmantes,
   sustitucion,
   identificaciones,
+  sellado,
   folio,
 }: ConsentimientoInformadoProps): ReactElement {
+  /** La hoja de anexo solo existe si al menos una identificación trae fotografía. */
+  const identificados = identificaciones ?? []
+  const hayAnexo = identificados.some((i) => tieneValor(i.foto))
+
+  /**
+   * ¿ESTE FIRMANTE TIENE FOTOGRAFÍA EN EL ANEXO? Se cruza por el ROL, que es la misma cadena
+   * en las dos listas —`Paciente`, `Testigo 1`— y el único dato que las une. El médico nunca
+   * la tiene: el anexo reproduce la identificación de quien CONSIENTE, no la de quien informa.
+   */
+  const conAnexo = (rol: string): boolean =>
+    identificados.some((i) => i.rol === rol && tieneValor(i.foto))
+
   /**
    * LOS CINCO FIRMANTES. El médico imprime su rúbrica siempre; los otros cuatro solo si
    * firmaron. Los renglones bajo la línea salen de I.1.9 y el del médico son sus cédulas,
    * que se toman de `MedicoMembrete` en vez de pedirlas otra vez.
+   *
+   * **El pie de sello lo gobierna `sellado`**: sin documento sellado no hay pie en ninguna
+   * celda, aunque el firmante traiga hora. Ver esa prop.
    */
+  const pieDe = (
+    firmante: FirmanteConsentimiento,
+    rol: string,
+  ): ReactElement | undefined =>
+    sellado === undefined || !tieneValor(firmante.sello) ? undefined : (
+      <PieDeSello sello={firmante.sello} conAnexo={conAnexo(rol)} />
+    )
+
   const firmaMedico: Firma = {
     rol: ROL_MEDICO,
     nombre: firmantes.medico.nombre ?? medico.nombre,
     credenciales: medico.cedulas,
     rubrica: firmantes.medico.rubrica,
+    sello: pieDe(firmantes.medico, ROL_MEDICO),
   }
   const firmaPaciente: Firma = {
     rol: ROL_PACIENTE,
     nombre: firmantes.paciente.nombre,
     credenciales: [NOTA_PACIENTE],
     rubrica: firmantes.paciente.rubrica,
+    sello: pieDe(firmantes.paciente, ROL_PACIENTE),
   }
   const firmaFamiliar: Firma = {
     rol: ROL_FAMILIAR,
     nombre: firmantes.familiar.nombre,
     credenciales: [NOTA_FAMILIAR],
     rubrica: firmantes.familiar.rubrica,
+    sello: pieDe(firmantes.familiar, ROL_FAMILIAR),
     anadido: <Parentesco />,
   }
   const firmaTestigo1: Firma = {
@@ -906,12 +1088,14 @@ export default function ConsentimientoInformado({
     nombre: firmantes.testigo1.nombre,
     credenciales: [NOTA_TESTIGO],
     rubrica: firmantes.testigo1.rubrica,
+    sello: pieDe(firmantes.testigo1, ROL_TESTIGO_1),
   }
   const firmaTestigo2: Firma = {
     rol: ROL_TESTIGO_2,
     nombre: firmantes.testigo2.nombre,
     credenciales: [NOTA_TESTIGO],
     rubrica: firmantes.testigo2.rubrica,
+    sello: pieDe(firmantes.testigo2, ROL_TESTIGO_2),
   }
 
   /**
@@ -926,9 +1110,25 @@ export default function ConsentimientoInformado({
   const nivel3: readonly [Firma, Firma] = [firmaTestigo1, firmaTestigo2]
   const numeroTestigos = sustitucion ? 2 : 3
 
-  /** La hoja de anexo solo existe si al menos una identificación trae fotografía. */
-  const identificados = identificaciones ?? []
-  const hayAnexo = identificados.some((i) => tieneValor(i.foto))
+  /**
+   * EL RECUENTO DEL BLOQUE DE CIERRE — sobre las CELDAS QUE SE COMPONEN, no sobre los cinco
+   * firmantes que la prop declara.
+   *
+   * En la variante por sustitución el paciente no firma y su celda no existe, así que serían
+   * cuatro previstos y no cinco: contar los cinco declararía omitido a alguien a quien el
+   * documento no le pidió firmar, que es exactamente la pregunta que este recuento existe
+   * para evitar. La celda vacía del nivel 2 tampoco cuenta — es relleno de retícula.
+   */
+  const celdas: readonly FirmanteConsentimiento[] = sustitucion === true
+    ? [firmantes.medico, firmantes.familiar, firmantes.testigo1, firmantes.testigo2]
+    : [
+        firmantes.medico,
+        firmantes.paciente,
+        firmantes.familiar,
+        firmantes.testigo1,
+        firmantes.testigo2,
+      ]
+  const firmaron = celdas.filter((f) => tieneValor(f.sello)).length
 
   return (
     <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.hoja}>
@@ -1111,6 +1311,26 @@ export default function ConsentimientoInformado({
             ))}
           </View>
         ) : null}
+
+        {/*
+          ═══ EL BLOQUE DE VERIFICACIÓN ═══
+
+          ⚠ **VA AL FINAL DEL FLUJO, DETRÁS DEL ANEXO CONDICIONAL, Y ESA ES LA SOLUCIÓN AL
+          «DÓNDE».** El documento no siempre termina en las firmas: con fotografías termina en
+          el anexo. Puesto aquí cae en la última hoja sea cual sea —la 6 con anexo, la 5 sin
+          él— y este archivo no tiene que saber en cuál está. Un bloque que dice que el
+          documento no se alteró no puede tener páginas detrás.
+
+          `wrap={false}`: las dos líneas y su filete son una sola cosa.
+        */}
+        {sellado === undefined ? null : (
+          <View style={estilos.verificacion} wrap={false}>
+            <Text style={estilos.sello}>
+              {lineaSellado(sellado.fecha, celdas.length, firmaron)}
+            </Text>
+            <Text style={estilos.sello}>{lineaHuella(sellado.huella)}</Text>
+          </View>
+        )}
       </MotorFlujo>
 
       {/*

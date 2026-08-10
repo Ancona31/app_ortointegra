@@ -217,6 +217,11 @@ const TITULO = 'CARTA DE CONSENTIMIENTO INFORMADO'
 const HOSPITAL = 'Hospital Ficticio del Centro'
 
 /** Un PNG de 1 × 1. Hace de fotografía y de rúbrica: lo que se mide es la caja, no la foto. */
+const SELLO_MEDICO = '09/08/2026 12:41:52'
+const SELLO_PACIENTE = '09/08/2026 12:43:07'
+const SELLO_DOCUMENTO = '09/08/2026 12:47:19'
+const HUELLA = '3f9a…8c41'
+
 const RASTER =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
 
@@ -275,17 +280,24 @@ const COMPLETO: ConsentimientoInformadoProps = {
   },
   procedimiento: PROCEDIMIENTO,
   secciones: SECCIONES,
-  // Rúbricas MEZCLADAS: el médico y el paciente firman, los otros tres van en blanco.
+  /*
+    RÚBRICAS Y SELLOS MEZCLADOS: el médico y el paciente firman —con horas DISTINTAS, que es
+    parte de la evidencia—, los otros tres no. Un firmante sin sello no llevará pie.
+  */
   firmantes: {
-    medico: { rubrica: RASTER },
-    paciente: { nombre: PACIENTE, rubrica: RASTER },
+    medico: { rubrica: RASTER, sello: SELLO_MEDICO },
+    paciente: { nombre: PACIENTE, rubrica: RASTER, sello: SELLO_PACIENTE },
     familiar: { nombre: FAMILIAR },
     testigo1: { nombre: 'Juan Canul Uc' },
     testigo2: { nombre: 'Rosa Pech Ek' },
   },
   identificaciones: IDENTIFICACIONES,
+  sellado: { fecha: SELLO_DOCUMENTO, huella: HUELLA },
   folio: 'C-7F41A9C0D3E2',
 }
+
+/** El mismo documento SIN sellar: no hay nada que sellar, así que no hay sellos. */
+const SIN_SELLAR: ConsentimientoInformadoProps = { ...COMPLETO, sellado: undefined }
 
 /** El mismo documento con el familiar VACÍO: su celda no colapsa, deja la línea. */
 const FAMILIAR_VACIO: ConsentimientoInformadoProps = {
@@ -321,6 +333,21 @@ function renglon(hoja: Hoja, texto: string): Renglon {
   const encontrado = hoja.renglones.find((r) => r.texto === texto)
   expect(encontrado, `no se encontró el renglón «${texto}»`).toBeDefined()
   return encontrado as Renglon
+}
+
+/**
+ * LA LIGADURA `fi`, QUITADA DE LA CADENA ESPERADA EN VEZ DE EVITADA EN EL DATO.
+ *
+ * react-pdf incrusta `fi` como un glifo propio y su `ToUnicode` no lo descompone, así que el
+ * extractor lee `rmante` donde el PDF imprime `firmante`. En los siete formatos anteriores
+ * bastó con no anclar en cadenas que la llevaran; aquí no se puede — las cadenas del sello
+ * dicen `firmantes`, `firmaron` y `verificable`, y son justo las que hay que comprobar.
+ *
+ * Se aplica la MISMA transformación a lo esperado. Es una limitación del lector, no del
+ * documento: en el PDF la palabra está entera y se copia entera.
+ */
+function sinLigadura(texto: string): string {
+  return texto.replace(/fi/g, '')
 }
 
 /** ¿Hay un renglón que empiece por este texto? Para las líneas que el ancho parte. */
@@ -390,6 +417,118 @@ describe('II.7 · Consentimiento Informado', () => {
     expect(contiene(hojas[4], 'TESTIGOS')).toBe(true)
     expect(contiene(hojas[5], 'ANEXO · IDENTIFICACIÓN DE FIRMANTES')).toBe(true)
     expect(hojas[5].texto).toContain('PÁGINA 6 DE 6')
+  }, 200_000)
+
+  it('el pie de sello sale solo en quien firmó, y remite al anexo', async () => {
+    const hojas = await componer(COMPLETO)
+
+    /*
+      DOS FIRMARON Y TRES NO. Los dos que firmaron llevan su hora; los tres omitidos no llevan
+      pie —no firmaron, no hay nada que sellar—. Las dos horas son distintas entre sí, que es
+      lo que la evidencia necesita: cinco firmas en el mismo segundo son sospechosas.
+    */
+    expect(hojas[3].texto).toContain(`Firmado ${SELLO_MEDICO}`)
+    expect(hojas[3].texto).toContain(`Firmado ${SELLO_PACIENTE}`)
+    expect(hojas[4].texto).not.toContain('Firmado ')
+
+    /*
+      Y EL PACIENTE REMITE AL ANEXO PORQUE TIENE FOTOGRAFÍA ALLÍ; el médico no, porque el
+      anexo reproduce la identificación de quien CONSIENTE, no la de quien informa.
+    */
+    const pie = (hoja: Hoja, sello: string): string => {
+      const encontrado = hoja.renglones.find((r) => r.texto.startsWith(`Firmado ${sello}`))
+      expect(encontrado, `no se encontró el pie de «${sello}»`).toBeDefined()
+      return (encontrado as Renglon).texto
+    }
+    expect(pie(hojas[3], SELLO_PACIENTE)).toContain(
+      sinLigadura('con identificación anexa'),
+    )
+    expect(pie(hojas[3], SELLO_MEDICO)).not.toContain('anexa')
+
+    /*
+      EL PIE CUESTA 11 pt POR CELDA, y se mide por dónde cae su línea base respecto de la
+      calidad del firmante que tiene encima:
+
+          11        la caja de línea de la nota, IBM Plex Sans 7.5 / 11
+           2        el aire que declara la ranura de 2.L
+        −  7.688    el ascendente de la humanista a 7.5 pt
+        +  6.146    el de la neo-grotesca a 7
+          ────────
+          11.458
+
+      Los 11 del coste son los 2 de aire más los 9 del renglón de `sello.pie`. Con dos celdas
+      selladas, la hoja 4 crece 22 y **no repagina**: el documento sigue en seis hojas, que es
+      lo que fija la prueba del bloque de verificación.
+    */
+    const nota = hojas[3].renglones.find((r) => r.texto === 'Nombre y rma')
+    expect(nota).toBeDefined()
+    const sello = hojas[3].renglones.find((r) =>
+      r.texto.startsWith(`Firmado ${SELLO_PACIENTE}`),
+    )
+    expect(sello).toBeDefined()
+    expect((sello as Renglon).arriba - (nota as Renglon).arriba).toBeCloseTo(11.46, 1)
+  }, 200_000)
+
+  it('el bloque de verificación va en la ÚLTIMA hoja, con y sin anexo', async () => {
+    const conAnexo = await componer(COMPLETO)
+    const sinAnexo = await componer(SIN_ANEXO)
+
+    /*
+      ⚠ **NO ES LA HOJA DE FIRMAS: ES LA ÚLTIMA DEL DOCUMENTO.** Con fotografías el documento
+      termina en el anexo, así que el bloque baja con él. Un sello que dice que el documento no
+      se alteró no puede tener páginas detrás.
+    */
+    expect(conAnexo).toHaveLength(6)
+    expect(sinAnexo).toHaveLength(5)
+    expect(conAnexo[5].texto).toContain(`Documento sellado el ${SELLO_DOCUMENTO}`)
+    expect(sinAnexo[4].texto).toContain(`Documento sellado el ${SELLO_DOCUMENTO}`)
+    // Y en ninguna otra: es un cierre, no una marca de página.
+    for (const hoja of conAnexo.slice(0, 5)) {
+      expect(hoja.texto).not.toContain('Documento sellado')
+    }
+
+    /*
+      EL RECUENTO SE HACE SOBRE LAS CELDAS COMPUESTAS. Cinco firmantes, dos con hora: la
+      diferencia es lo que responde a la pregunta de por qué hay celdas en blanco.
+    */
+    expect(conAnexo[5].texto).toContain(
+      sinLigadura('5 firmantes previstos, 2 firmaron, 3 omitidos'),
+    )
+    expect(conAnexo[5].texto).toContain(`Huella SHA-256 · ${HUELLA}`)
+    expect(conAnexo[5].texto).toContain(
+      sinLigadura('verificable en el expediente electrónico'),
+    )
+  }, 200_000)
+
+  it('por sustitución el recuento cuenta CUATRO, no cinco', async () => {
+    const hojas = await componer({ ...COMPLETO, sustitucion: true })
+
+    /*
+      El paciente no firma y su celda no existe, así que contarlo lo declararía omitido a
+      pesar de que el documento no le pidió firmar — que es justo la pregunta que este
+      recuento existe para cerrar.
+    */
+    expect(hojas[hojas.length - 1].texto).toContain(
+      sinLigadura('4 firmantes previstos, 1 firmó, 3 omitidos'),
+    )
+  }, 200_000)
+
+  it('sin sellar no hay un solo sello, aunque los firmantes traigan hora', async () => {
+    const hojas = await componer(SIN_SELLAR)
+
+    /*
+      Un consentimiento impreso para firmarse a mano no lleva trazabilidad: **no hay nada que
+      sellar**. Un solo interruptor gobierna los dos sitios, así que no puede quedar un pie de
+      celda suelto sin bloque de cierre.
+    */
+    for (const hoja of hojas) {
+      expect(hoja.texto).not.toContain('Firmado ')
+      expect(hoja.texto).not.toContain('Documento sellado')
+      expect(hoja.texto).not.toContain('Huella SHA-256')
+      expect(hoja.texto).not.toContain(sinLigadura('firmantes previstos'))
+    }
+    // Y el documento sigue midiendo lo mismo: los sellos no cambian el reparto.
+    expect(hojas).toHaveLength(6)
   }, 200_000)
 
   it('el riel son ocho celdas en cuatro filas, sin sexo y con celda base de 33', async () => {

@@ -587,6 +587,26 @@ export const TIPOGRAFIA = {
   'casilla.texto': { familia: FUENTE.humanista, cuerpo: 8, interlineado: 11, peso: 400, tracking: 0, color: 'tinta.negra' },
   'anexo.nombre': { familia: FUENTE.neogrotesca, cuerpo: 11, interlineado: 15, peso: 500, tracking: -0.012, color: 'tinta.negra' },
   'anexo.pie': { familia: FUENTE.humanista, cuerpo: 7.5, interlineado: 11, peso: 400, tracking: 0, color: 'tinta.etiqueta' },
+  /**
+   * EL SELLO DE TRAZABILIDAD DE II.7 — Archivo 7 / 9, 400, `tinta.secundaria`.
+   *
+   * Lo componen los dos sitios donde el documento acredita QUÉ pasó y CUÁNDO: el pie de cada
+   * celda de firma y el bloque de verificación del cierre. Es el cuerpo más pequeño del
+   * sistema junto con `pie.leyenda`, y eso es lo correcto — el sello no se lee, se coteja.
+   *
+   * ⚠ **VA EN LA NEO-GROTESCA Y CON CIFRAS TABULARES, Y NO ES ESTÉTICA.** Lo que se hace con
+   * una hora impresa en papel es compararla con otra: la de la celda de al lado, la del
+   * expediente, la de la nota de evolución. Con cifras proporcionales, `12:43:07` y
+   * `12:47:19` no alinean sus columnas y la comparación deja de ser visual. Por eso entra en
+   * `CIFRAS_TABULARES` — es el mismo motivo por el que están el folio y la póliza.
+   *
+   * `tinta.secundaria` y no `tinta.etiqueta`: es texto que se lee, no un rótulo que nombra
+   * otra cosa. El gris del cuerpo, un escalón por encima del de las versalitas.
+   *
+   * **El interlineado de 9 sale de la cota, no del gusto:** el pie de celda cuesta 11 pt y su
+   * margen respecto de la calidad del firmante son 2, así que el renglón mide 9.
+   */
+  'sello.pie': { familia: FUENTE.neogrotesca, cuerpo: 7, interlineado: 9, peso: 400, tracking: 0, color: 'tinta.secundaria' },
   // ── LOS DOS ROLES DE LA LÁMINA DE ESCRITO MÉDICO (II.8).
   //
   // Son los DOS ÚNICOS que hacen falta para el formato de cuerpo más rico del sistema, y esa
@@ -721,6 +741,8 @@ export const CIFRAS_TABULARES = [
   // El ordinal de las instrucciones al paciente (II.6), por lo mismo que los cuatro de
   // arriba: es un identificador de ítem que se lee en columna, `01` sobre `02`.
   'instruccion.numero',
+  // El sello de II.7: una hora impresa se compara, no se lee. Ver su ficha.
+  'sello.pie',
   // La póliza es alfanumérica y la lámina la compone tabular igual: es un
   // identificador que se coteja carácter a carácter contra el oficio de la
   // aseguradora, que es el mismo caso que el folio.

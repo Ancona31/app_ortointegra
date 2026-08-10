@@ -5,11 +5,22 @@
  * lee la base ni Storage, no toca v1, no toca los formularios ni el flujo del médico: el
  * médico, el paciente, los testigos y las identificaciones son inventados y viven aquí.
  *
- * TRES CASOS, Y CADA UNO ENSEÑA UNA RAMA DISTINTA
+ * CUATRO CASOS, Y CADA UNO ENSEÑA UNA RAMA DISTINTA
  *
  *   completo      los cinco firmantes, tres niveles y la hoja de anexo con fotografías
  *   sin fotos     **la hoja de anexo NO aparece**: es la verificación de la decisión 5
  *   sustitución   el nivel 2 desaparece, Testigos se renumera a 2 y la casilla sale marcada
+ *   sin sellar    **sin trazabilidad**: ni pies de celda ni bloque de cierre
+ *
+ * LOS SELLOS SON LA VERIFICACIÓN DEL `completo` Y DEL `sin sellar`
+ *
+ * En el sellado, **dos firmantes llevan pie con su hora y dos no**: el médico y el paciente
+ * firmaron, el familiar y los dos testigos no. Las horas son distintas entre sí a propósito —
+ * esa diferencia es parte de la evidencia—, y el bloque de cierre de la última hoja cuenta
+ * cinco previstos, dos firmados y tres omitidos.
+ *
+ * En el `sin sellar` no hay un solo sello en ninguna parte, aunque los firmantes traigan hora:
+ * un consentimiento impreso para firmarse a mano no tiene nada que sellar.
  *
  * LAS RÚBRICAS MEZCLADAS SON LO QUE HAY QUE MIRAR EN EL `completo`
  *
@@ -134,18 +145,27 @@ const IDENTIFICACIONES_SIN_FOTO: readonly IdentificacionAnexo[] =
  * siempre, el paciente porque firmó en pantalla, y los otros tres en blanco.
  */
 const FIRMANTES = {
-  medico: { rubrica: RASTER },
-  paciente: { nombre: 'Renata Bustamante Oceguera', rubrica: RASTER },
+  medico: { rubrica: RASTER, sello: '09/08/2026 12:41:52' },
+  paciente: {
+    nombre: 'Renata Bustamante Oceguera',
+    rubrica: RASTER,
+    sello: '09/08/2026 12:43:07',
+  },
+  // Los tres sin sello: no firmaron, así que su celda no lleva pie.
   familiar: { nombre: 'María Bustamante Canul' },
   testigo1: { nombre: 'Juan Canul Uc' },
   testigo2: { nombre: 'Rosa Pech Ek' },
 } as const
+
+/** El sello del documento. Fecha y huella INVENTADAS. */
+const SELLADO = { fecha: '09/08/2026 12:47:19', huella: '3f9a…8c41' } as const
 
 /** Folios INVENTADOS, con el prefijo `C-` que la lámina compone. */
 const FOLIOS = {
   completo: 'C-7F41A9C0D3E2',
   sinFotos: 'C-2B60E4F19A7C',
   sustitucion: 'C-9D08C5A2B461',
+  sinSellar: 'C-5E13B7A6C209',
 } as const
 
 /** Las dos líneas de cédula, redactadas por quien llama (2.B no las inventa). */
@@ -162,23 +182,39 @@ function medicoMembrete(medico: MedicoFicticio): MedicoMembrete {
 }
 
 /** Un caso es un documento entero, no una hoja de un documento común (ver 2.N). */
-export type CasoConsentimiento = 'completo' | 'sinFotos' | 'sustitucion'
+export type CasoConsentimiento =
+  | 'completo'
+  | 'sinFotos'
+  | 'sustitucion'
+  | 'sinSellar'
 
 const CASOS: Record<
   CasoConsentimiento,
   {
     readonly identificaciones: readonly IdentificacionAnexo[]
     readonly sustitucion?: boolean
+    readonly sellado?: typeof SELLADO
     readonly folio: string
   }
 > = {
-  completo: { identificaciones: IDENTIFICACIONES, folio: FOLIOS.completo },
-  sinFotos: { identificaciones: IDENTIFICACIONES_SIN_FOTO, folio: FOLIOS.sinFotos },
+  completo: {
+    identificaciones: IDENTIFICACIONES,
+    sellado: SELLADO,
+    folio: FOLIOS.completo,
+  },
+  sinFotos: {
+    identificaciones: IDENTIFICACIONES_SIN_FOTO,
+    sellado: SELLADO,
+    folio: FOLIOS.sinFotos,
+  },
   sustitucion: {
     identificaciones: IDENTIFICACIONES,
     sustitucion: true,
+    sellado: SELLADO,
     folio: FOLIOS.sustitucion,
   },
+  // Sin `sellado`: ni pies de celda ni bloque de cierre.
+  sinSellar: { identificaciones: IDENTIFICACIONES, folio: FOLIOS.sinSellar },
 }
 
 function HojaConsentimiento({
@@ -207,6 +243,7 @@ function HojaConsentimiento({
         firmantes={FIRMANTES}
         sustitucion={c.sustitucion}
         identificaciones={c.identificaciones}
+        sellado={c.sellado}
         folio={c.folio}
       />
     </Document>
