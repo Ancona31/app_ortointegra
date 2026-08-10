@@ -95,6 +95,62 @@ function objetos(pdf: string): Map<number, string> {
   return mapa
 }
 
+/**
+ * LAS LÍNEAS BASE DE UNA HOJA, en orden de aparición y medidas desde el borde superior.
+ *
+ * ⚠ **NO BASTA CON LEER LOS `Tm`.** react-pdf los escribe casi siempre como
+ * `1 0 0 1 0 792 Tm` y coloca el texto con la pila de `cm`, así que un lector que solo mire
+ * el `Tm` obtiene 792 para todos los renglones — que es exactamente el fallo con el que esta
+ * prueba se escribió la primera vez. Hay que componer la matriz, como hacen los lectores de
+ * las pruebas de formato.
+ */
+type Matriz = readonly [number, number, number, number, number, number]
+const IDENTIDAD: Matriz = [1, 0, 0, 1, 0, 0]
+
+/** `cm` premultiplica: la nueva matriz se aplica ANTES que la que ya estaba. */
+function concatenar(n: Matriz, p: Matriz): Matriz {
+  return [
+    n[0] * p[0] + n[1] * p[2],
+    n[0] * p[1] + n[1] * p[3],
+    n[2] * p[0] + n[3] * p[2],
+    n[2] * p[1] + n[3] * p[3],
+    n[4] * p[0] + n[5] * p[2] + p[4],
+    n[4] * p[1] + n[5] * p[3] + p[5],
+  ]
+}
+
+function basesPorHoja(pdf: Buffer): number[][] {
+  return hojas(pdf).map(({ contenido }) => {
+    const bases: number[] = []
+    const pila: Matriz[] = []
+    let ctm: Matriz = IDENTIDAD
+    for (const t of contenido.matchAll(
+      /(q)\n|(Q)\n|(-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) cm|(-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) Tm/g,
+    )) {
+      if (t[1] !== undefined) pila.push(ctm)
+      else if (t[2] !== undefined) ctm = pila.pop() ?? IDENTIDAD
+      else if (t[3] !== undefined) {
+        ctm = concatenar([+t[3], +t[4], +t[5], +t[6], +t[7], +t[8]] as const, ctm)
+      } else {
+        bases.push(792 - (ctm[1] * +t[13] + ctm[3] * +t[14] + ctm[5]))
+      }
+    }
+    return bases
+  })
+}
+
+/**
+ * EL PASO ENTRE DOS RENGLONES CONSECUTIVOS DE UNA HOJA, sin repetir el que ya se midió.
+ *
+ * Devuelve los pasos distintos que aparecen, redondeados a centésimas: en una hoja sin
+ * comprimir hay UNO —el interlineado del rol— más los saltos entre bloques, que son mayores.
+ * Lo que delata la compresión es que el paso del cuerpo deje de ser exacto.
+ */
+function pasos(bases: number[]): number[] {
+  const saltos = bases.slice(1).map((y, i) => Math.round((y - bases[i]) * 100) / 100)
+  return [...new Set(saltos)].sort((a, b) => a - b)
+}
+
 /** Datos del `stream` de un objeto, descomprimidos. */
 function flujo(cuerpo: string): string {
   const inicio = cuerpo.indexOf('stream\n') + 'stream\n'.length
@@ -167,19 +223,17 @@ function textoPorHoja(pdf: Buffer): string[] {
   })
 }
 
-/**
- * Los cuerpos de letra que dibuja cada hoja, en puntos. Es la regla con la que se
- * mide la verificación visible de la ficha: «medir que el cuerpo del texto es
- * idéntico en las dos hojas; si en la primera es más chico, el motor comprimió y
- * eso es un defecto» (I.3.4).
- */
-function cuerposPorHoja(pdf: Buffer): Set<number>[] {
-  return hojas(pdf).map(({ contenido }) => {
-    const cuerpos = new Set<number>()
-    for (const t of contenido.matchAll(/\/\w+ ([\d.]+) Tf/g)) cuerpos.add(Number(t[1]))
-    return cuerpos
-  })
-}
+/*
+  ⚠ **AQUÍ VIVÍA `cuerposPorHoja`, Y MEDÍA LA SEÑAL EQUIVOCADA.**
+
+  Comparaba los cuerpos de letra de una hoja con los de la otra para detectar la compresión
+  de I.3.4. No podía cazar nada: **react-pdf no toca `fontSize` jamás**. Cuando la hoja no
+  cuadra, quien encoge es Yoga, y encoge CAJAS — las letras salen del mismo tamaño dentro de
+  cajas más juntas. Una prueba que no puede fallar es peor que ninguna: se lee como garantía.
+
+  La sustituye la sonda de más abajo, que mide distancias entre puntos conocidos del flujo
+  contra su suma de tokens, y en TODAS las hojas.
+*/
 
 // ─── El documento del taller, en miniatura ───────────────────────────────────
 
@@ -333,23 +387,51 @@ describe('2.N · MotorFlujo', () => {
     expect(texto[1]).toContain('CONTINUACIÓN')
   }, 60_000)
 
-  it('I.3.4: no comprime el cuerpo para cuadrar la hoja', async () => {
-    const cuerpos = cuerposPorHoja(
+  it('I.3.4: no comprime el cuerpo para cuadrar la hoja, en NINGUNA hoja', async () => {
+    /*
+      ⚠ **ESTA PRUEBA MEDÍA LOS CUERPOS DE LETRA Y ESA ES LA SEÑAL EQUIVOCADA.**
+
+      Comparaba los operadores `Tf` de las dos hojas —«si en la primera fuera más chico, el
+      motor habría comprimido»—. **react-pdf nunca toca `fontSize`**: cuando la hoja que
+      cierra no cuadra, lo que encoge son las CAJAS. Medido sobre un documento comprimido: los
+      conjuntos de cuerpos salen byte a byte idénticos a los del mismo documento sin comprimir,
+      así que la prueba pasaba con el defecto delante.
+
+      Y tampoco habría cazado el defecto que la cabecera de 2.N documenta —«el paso de fila
+      bajando de 50 a 40.99 pt»—, por lo mismo: ahí lo que baja es el paso, no el cuerpo.
+
+      **Lo que se mide ahora es la distancia entre dos puntos conocidos del flujo contra su
+      suma de tokens**: dos renglones consecutivos de `texto.corrido` tienen que estar
+      separados por su interlineado EXACTO. Y se mide en todas las hojas, no solo en la
+      primera — la compresión ocurre en la hoja que CIERRA, que puede ser cualquiera.
+
+      DE DÓNDE SALE LA COMPRESIÓN, para quien venga a tocar esto:
+
+      `splitPage` re-maqueta la hoja que cierra con altura DEFINIDA —`{ ...page.box, height }`—
+      y la siguiente con altura auto. Con altura definida, cualquier exceso residual es
+      espacio libre negativo de un contenedor flex en columna, y Yoga lo reparte encogiendo a
+      todos los hijos en proporción. Puede encogerlos a todos porque `setFlexShrink` compone
+      `value || 1`: **ningún nodo puede declararse rígido con `flexShrink: 0`**.
+    */
+    const bases = basesPorHoja(
       await renderToBuffer(
         documento(CONTENIDO_A_MEDIA_HOJA, { arrastre: ARRASTRE, firmas: FIRMAS }),
       ),
     )
 
-    expect(cuerpos).toHaveLength(2)
-    // El mismo cuerpo de texto corrido en las dos hojas. Si en la primera fuera
-    // más chico, el motor habría comprimido para que cupiera algo más.
-    for (const hoja of cuerpos) {
-      expect(hoja).toContain(TIPOGRAFIA['texto.corrido'].cuerpo)
+    expect(bases).toHaveLength(2)
+
+    const interlineado = TIPOGRAFIA['texto.corrido'].interlineado ?? 0
+    for (const [indice, hoja] of bases.entries()) {
+      const cuerpo = pasos(hoja).filter((p) => p > 0 && p < interlineado * 1.5)
+      /*
+        El paso del cuerpo es UNO y es el interlineado del rol. Si la hoja se hubiera
+        comprimido, aquí saldría 17.97 en vez de 18 — y con dos decimales eso no pasa
+        desapercibido. Se filtran los saltos mayores porque son los aires entre bloques, que
+        esta prueba no fija: los fijan las de cada formato.
+      */
+      expect(cuerpo, `hoja ${indice + 1}`).toContain(interlineado)
     }
-    // Y nada por debajo del cuerpo más pequeño de la escala que este documento
-    // usa, que es el del aviso.
-    const minimo = Math.min(...cuerpos.flatMap((hoja) => [...hoja]))
-    expect(minimo).toBe(TIPOGRAFIA.pie.cuerpo)
   }, 60_000)
 
   it('el contador sale en todas las hojas, con su forma y sin cifra inventada', async () => {

@@ -114,13 +114,16 @@ const estilos = StyleSheet.create({
    * lo declara la lámina y el segundo depende del acento del médico — misma razón de
    * tipos que en 2.B, 2.C y 2.G.
    *
-   * `flexShrink: 0` para que el marco conserve su ancho declarado dentro de una fila:
-   * sin él, la caja de aseguradora se encogería al repartirse el ancho de su fila y
-   * dejaría de medir los 426 que mide en la lámina.
+   * ⚠ **EL ANCHO LO GUARDA `minWidth`, NO `flexShrink: 0`.** Este archivo declaraba lo
+   * segundo y **no hacía nada**: `@react-pdf/layout` compone `setFlexShrink` como
+   * `setYogaValue('flexShrink')(value || 1)`, así que el 0 se convierte en 1 y el marco
+   * encogía al repartirse el ancho de su fila como cualquier otro nodo. Medido.
+   *
+   * `minWidth` sí lo respeta Yoga, y va en el render junto al `width` porque los dos salen de
+   * la misma prop: la regla 4 dice que el ancho lo declara el consumidor, y ahora esa
+   * declaración es una garantía y no una intención.
    */
-  marco: {
-    flexShrink: 0,
-  },
+  marco: {},
 })
 
 /**
@@ -164,6 +167,8 @@ export default function MarcoParcial({
         estilos.marco,
         {
           width: ancho,
+          // Ver la nota de `marco`: es esto lo que impide que la fila lo encoja.
+          minWidth: ancho,
           borderTopWidth: grosor,
           borderLeftWidth: grosor,
           paddingTop: padding.superior,

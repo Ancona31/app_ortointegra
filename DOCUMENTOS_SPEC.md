@@ -2773,6 +2773,51 @@ y nada debajo.
   las dos hojas. Un defecto que no lanza y no se ve solo lo detecta una prueba: no
   la borres al construir 2.N, cópiala.
 
+  **(3) Deja un residuo que el cortador no cuenta.** El primer nodo del flujo de
+  una hoja con contador `fixed` arranca en `1 0 0 1 0 −0.115236 cm`: por encima
+  del origen. Sin el contador, ese nodo no existe. Medido barriendo el mismo
+  documento con y sin él, con la lista entre 34 y 38 entradas. Es una fracción de
+  punto y no se ve; se anota porque es el suelo de cualquier medición contra la
+  retícula y porque sale del mismo sitio que (1) y (2): la recomposición.
+
+- **La hoja se COMPRIME en vez de paginar, y nadie se entera.** Es la tercera
+  trampa del renderer y la única que contradice una regla del spec —I.3.4, «los
+  bloques se mueven, no se comprimen»—. Lo que sigue está medido sobre II.2.
+
+  **Lo que hace el renderer:** monta la página con su altura FIJA antes de
+  paginar. Si el flujo se pasa, Yoga reparte el sobrante encogiendo a todos los
+  hijos en proporción, y **solo después** `splitNodes` mira las cajas para decidir
+  el corte: para entonces ya caben todas, así que no corta nada.
+
+  **Por qué no se puede declarar rígido un nodo:** `@react-pdf/layout` compone
+  `setFlexShrink` como `setYogaValue('flexShrink')(value || 1)`. El `0` es
+  falsy, se convierte en `1`, y **`flexShrink: 0` no hace absolutamente nada**.
+  Una declaración inerte es peor que ninguna: se lee como garantía. `minWidth` y
+  `minHeight` van por `setYogaValue` a secas y **sí se respetan** — son la única
+  forma de fijar una cota, y por eso 2.C, 2.L y 2.U declaran `minHeight`/`minWidth`
+  donde su ficha promete que algo no se comprime.
+
+  **Cuánto:** el sobrante que quepa dentro de la holgura de encogido. En II.2, con
+  siete estudios en su estado más caro, la hoja entera sale **1.97 % más pequeña**
+  —el paso de entrada baja de 59.5 a 58.3269, el membrete de 89.182 a 88.481— y no
+  hay hoja 2 de lista. Con el estado mínimo el sobrante de una entrada es de 28.5
+  pt, más de lo que la holgura da de sí, y entonces pagina limpio. **El chasis se
+  traga los desbordes pequeños y solo pagina los grandes.**
+
+  **Cómo se detecta:** midiendo la distancia entre dos puntos conocidos del flujo
+  contra su suma de tokens, **en todas las hojas**. Ni los cuerpos de letra ni el
+  paso entre renglones de un párrafo sirven: react-pdf no toca `fontSize` nunca, y
+  las líneas de un `Text` las coloca el motor de texto, no Yoga. La sonda está en
+  los cuatro formatos de lista larga —`recetaMedica`, `solicitudImagenologia`,
+  `planSuplementacion`, `reciboHonorarios`— y en `motorFlujo`, y el caso vivo de
+  II.2 queda fijado con su cifra en `solicitudImagenologia.test.ts`.
+
+  **Sin arreglo todavía.** La única palanca medida —`flexShrink` a un positivo
+  diminuto, que sí pasa el `value || 1`— rigidiza el nodo donde se ponga y muda
+  los mismos puntos a los demás: cambia una deformación repartida por una
+  concentrada. Arreglarlo de verdad es rigidizar el chasis entero para que el
+  desborde exista y la paginación lo vea.
+
 ### I.3.9 · Inmutabilidad
 
 Los documentos ya emitidos **no se regeneran**. Un documento con

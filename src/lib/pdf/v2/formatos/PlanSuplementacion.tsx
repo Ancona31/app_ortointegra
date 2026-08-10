@@ -40,6 +40,29 @@
  *    exacta. Se compone la caja y queda reportado en 2.G.
  * d. **La cita lleva filete superior E izquierdo**, y `CONCILIA D42` había unificado la
  *    variante a solo izquierdo citando este mismo formato. Reportado en 2.I.
+ * f. ⚠ **LA MARCA COMERCIAL ENTRA EN UNA RANURA QUE LA LÁMINA DA POR NO APLICABLE, Y NO
+ *    DESPLAZA A NADIE.** B.4 §3 tabula `marca` como «no aplica en este formato» y II.4 §4 lo
+ *    repite —«sin vía, sin presentación, sin genérico»—, así que este campo es posterior a la
+ *    lámina y **el formato deja de tener dos ranuras ocupadas para tener tres**.
+ *
+ *    **La justificación NO ocupa esa ranura**: vive en `nota`, que es otra, y las dos se
+ *    componen a la vez sin estorbarse. El orden impreso queda ancla → marca → justificación,
+ *    que es lo que el dato pide: primero qué es y cuánto, después cuál comprar, después por
+ *    qué. Retirar la justificación no es una consecuencia de añadir la marca; sería una
+ *    decisión de producto aparte y **cuesta las tres o cuatro líneas de texto que el
+ *    paciente lee**. No se retira aquí.
+ * g. ⚠ **LA MARCA VA EN NEGATIVO Y ESO LE PONE UN TECHO DE ANCHO.** 2.H no abrevia, no
+ *    escala el texto, no reduce el tracking y no trunca: el ancho es la variable. La columna
+ *    de contenido de la entrada mide **453.75 pt** y a 8 pt con 0.18 em de tracking ahí caben
+ *    unos **70 caracteres** en versalita —medido: `Ultimate Omega · Nordic Naturals`, 32
+ *    caracteres, compone un bloque de 211 pt—. Por encima, el bloque **rompe a DOS renglones
+ *    dentro del negativo**: no se sale de la columna, no se recorta y no encoge. Medido con
+ *    una marca de 73 caracteres: el bloque mide 432.9 × 24.5 y la entrada crece 10 pt más.
+ *
+ *    Es el comportamiento correcto según las reglas 1 y 3, pero **un negativo de dos
+ *    renglones deja de leerse como una etiqueta y empieza a leerse como un párrafo con
+ *    fondo**. Si eso pasa a menudo, la decisión no es de render: es partir el dato en dos
+ *    campos —producto y fabricante— y componer solo el primero en negativo. Reportado.
  * e. **`Sin firma no es válido`, en masculino.** Es la cadena de la lámina y es también
  *    la que `CONCILIA D22` fijó para los ocho, así que aquí no hay nada que conciliar:
  *    la lámina y el chasis dicen lo mismo. La que se aparta es la de Receta, que compone
@@ -168,16 +191,47 @@ const SEPARACION_CITA_CIERRE = ESPACIO[26]
  * razones que allí: el separador es redacción del formato, y cada mitad colapsa
  * distinto —sin dosis, el ancla se queda con el nombre y no cuelga la raya—.
  *
- * Lo que NO hay aquí es tan importante como lo que hay: **no existe `via`, ni
- * `presentacion`, ni `generico`**. Esas tres ranuras de la entrada de Receta se quedan
- * vacías y no dejan nada — ni rótulo, ni línea, ni hueco (II.4 §4).
+ * **Y AHORA SON TRES**, con la marca comercial. Lo que sigue sin existir es `via`: esa
+ * ranura de la entrada de Receta se queda vacía y no deja nada — ni rótulo, ni línea, ni
+ * hueco (II.4 §4).
  */
 export interface SuplementoIndicado {
   /** Nombre del suplemento. Sin él colapsa la primera mitad del ancla. */
   readonly nombre?: string
   /** Dosis y pauta. Sin ella, el ancla se queda con el nombre (II.4 §2). */
   readonly dosis?: string
-  /** Justificación clínica. Colapsa sola: la fila baja de 48 pt a 28. */
+  /**
+   * MARCA COMERCIAL, en la ranura `marca` de la entrada — **en BLOQUE EN NEGATIVO** (2.H).
+   *
+   * **No todas las marcas de suplemento tienen la misma pureza**, así que el médico tiene
+   * que poder decir cuál comprar, y eso es un dato que el paciente lee en el mostrador de la
+   * farmacia con la caja en la mano: fondo negro, versalita, ancho variable. Es el mismo
+   * papel que la vía de administración de Receta, que ocupa esa misma ranura.
+   *
+   * Llega **ya redactada** por quien llama —`Ultimate Omega · Nordic Naturals`, con la raya
+   * del sistema entre el producto y el fabricante—, como las cédulas, el peso y la emisión:
+   * este formato coloca, no rotula ni concatena lo que no es suyo.
+   *
+   * Colapsa sola y no deja nada, que es lo que hacen las ranuras vacías de 2.G.
+   *
+   * ⚠ **VA EN SU PROPIA LÍNEA, ENTRE EL DATO SECUNDARIO Y LA NOTA**, que es donde 2.G coloca
+   * esta ranura. Como este formato deja `secundario` vacío, el bloque queda pegado al ancla
+   * — un renglón por debajo del nombre y la dosis.
+   *
+   * ⚠ **LAS CUATRO REGLAS DE 2.H VALEN AQUÍ, Y LA PRIMERA ES LA QUE MUERDE.** El bloque
+   * nunca abrevia y nunca trunca: el ancho es la variable. Con una marca larga el texto
+   * ROMPE A DOS RENGLONES dentro del negativo en vez de salirse de la columna — ver el punto
+   * (g) de la cabecera.
+   */
+  readonly marca?: string
+  /**
+   * Justificación clínica, en la ranura `nota`. Colapsa sola: la fila baja de 48 pt a 28.
+   *
+   * ⚠ **NO ES LA RANURA DE LA MARCA Y NO SE ESTORBAN.** La justificación vive en `nota`, dos
+   * renglones más abajo y en `texto.corrido`; la marca vive en `secundario`, pegada al ancla
+   * y en la neo-grotesca. Las dos se componen a la vez sin desplazarse. Ver el punto (f) de
+   * la cabecera.
+   */
   readonly justificacion?: string
 }
 
@@ -459,8 +513,9 @@ export default function PlanSuplementacion({
           LA LISTA DE SUPLEMENTOS. **Dos datos por entrada** —el número en su riel, el
           ancla y la justificación en la caja—, contra los cinco de Receta.
 
-          Las tres ranuras que no se pasan no se declaran de ninguna manera: no hay un
-          `via={undefined}` ni un `secundario=""`. Una ranura que el formato no ocupa
+          **Y AHORA SON TRES DATOS**: la marca entra por `secundario`, la ranura que II.4 §4
+          daba por vacía. Sigue sin haber `via`, y esa ausencia no se declara de ninguna
+          manera —no hay un `via={undefined}`—: una ranura que el formato no ocupa
           simplemente no existe en la llamada, que es lo que hace que la comprobación de
           II.4 §4 se lea de un vistazo.
         */}
@@ -472,6 +527,7 @@ export default function PlanSuplementacion({
             numero={indice + 1}
             primera={indice === 0}
             ancla={anclaDe(suplemento)}
+            marca={suplemento.marca}
             nota={suplemento.justificacion}
             acento={acento}
             calibracion="suplemento"

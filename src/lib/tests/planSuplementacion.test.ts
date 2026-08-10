@@ -767,6 +767,62 @@ describe('II.4 · Plan de Suplementación — medido sobre el PDF', () => {
     expect(renglon(hoja, `Folio ${COMUN.folio}`)).toBeDefined()
   }, 60_000)
 
+  it('I.3.4: el paso de entrada es el mismo en TODAS las hojas', async () => {
+    /*
+      ⚠ **LA SONDA DE I.3.4, Y MIDE LO QUE SÍ SE MUEVE.**
+
+      Cuando la hoja que cierra no cuadra, `splitPage` la re-maqueta con altura DEFINIDA y
+      Yoga reparte el exceso encogiendo a TODOS los hijos en proporción — puede hacerlo
+      porque el renderer compone `setFlexShrink` como `value || 1` y ningún nodo se puede
+      declarar rígido. El resultado es una hoja un tanto por mil más pequeña, sin aviso.
+
+      **Lo que NO delata el defecto:** ni los cuerpos de letra —react-pdf nunca toca
+      `fontSize`— ni el paso entre renglones DENTRO de un párrafo, porque las líneas de un
+      `Text` las coloca el motor de texto y no Yoga. Medido: en un documento comprimido los
+      dos salen idénticos.
+
+      **Lo que sí:** el paso de una ENTRADA a la siguiente, que es distancia entre cajas.
+      Medido sobre este mismo formato al ras: **101.13 pt limpio contra 100.968 comprimido**.
+
+      Se mide en TODAS las hojas porque la que se comprime es la que CIERRA, y esa puede ser
+      cualquiera — la primera versión de esta sonda solo miraba la hoja 1.
+    */
+    /*
+      NUEVE ENTRADAS DEL ESTADO MÁS CARO, que es el reparto de 6 y 3 que fija la prueba de
+      abajo: hacen falta DOS hojas con varias entradas en cada una, o no hay paso que medir
+      en la segunda.
+    */
+    const lista = Array.from({ length: 9 }, (_, i) => ({
+      nombre: `Suplemento ${i}`,
+      dosis: '500 mg cada 12 horas',
+      justificacion: DOS_LINEAS,
+    }))
+    const hojas = await componer(lista, {
+      notas: 'Tome los suplementos con alimentos y separados de cualquier antibiótico.',
+      cita: { fecha: '4 de noviembre de 2026', plazo: 'a 3 meses' },
+    })
+    expect(hojas.length).toBeGreaterThan(1)
+
+    /*
+      EL PASO, SUMADO DE SUS PARTES y no copiado de una medición: padding de la fila, ancla,
+      aire de la justificación, sus dos renglones, padding inferior y la regla que separa de
+      la siguiente. Es la misma cuenta que fija la prueba de los tres altos, más la regla.
+    */
+    const esperado =
+      5 + 17 + 2 + 2 * (TIPOGRAFIA['texto.corrido'].interlineado ?? 0) + 6 +
+      FILETE_SUPLEMENTACION.regla
+
+    for (const [indice, hoja] of hojas.entries()) {
+      const anclas = hoja.renglones
+        .filter((r) => /^Suplemento \d/.test(r.texto))
+        .map((r) => r.arriba)
+      if (anclas.length < 2) continue
+      for (const [i, altura] of anclas.slice(1).entries()) {
+        expect(altura - anclas[i], `hoja ${indice + 1}`).toBeCloseTo(esperado, 1)
+      }
+    }
+  }, 200_000)
+
   it('reparte nueve suplementos en 6 y 3, con todo el cierre en la hoja 2', async () => {
     /*
       EL REPARTO DE LA LÁMINA. Nueve suplementos del estado más caro —ancla y

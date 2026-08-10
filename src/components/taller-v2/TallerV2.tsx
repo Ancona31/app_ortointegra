@@ -164,6 +164,17 @@ const CASOS_HONORARIOS: readonly EntradaCaso[] = [
 ]
 
 /**
+ * LOS DE SUPLEMENTACIÓN SON LOS TRES DE ARRIBA MÁS UNO: el catálogo real del formato v1,
+ * con los cuatro suplementos y sus textos, para poner los dos PDF lado a lado. No es una
+ * demostración de estados —para eso está el `completo`—: es la comparación.
+ */
+const CASOS_SUPLEMENTACION: readonly EntradaCaso[] = [
+  ...CASOS,
+  { caso: 'catalogo', etiqueta: 'Catálogo v1', nota: 'Los cuatro reales, con sus textos' },
+  { caso: 'marcaLarga', etiqueta: 'Marca larga', nota: 'El techo del bloque en negativo' },
+]
+
+/**
  * LOS DE INTERNAMIENTO TAMPOCO SON LOS TRES DE ARRIBA, y por una razón distinta: **su
  * reparto en hojas es estructural, no por capacidad**. Un caso `lleno` no enseñaría nada —
  * la sección 2 abre en su propia hoja con una indicación o con veinte—, así que el tercero
@@ -202,6 +213,7 @@ const CASOS_ESCRITO: readonly EntradaCaso[] = [
 
 /** Qué casos ofrece cada vista. Las que no aparecen usan los tres de `CASOS`. */
 function casosDe(vista: Vista): readonly EntradaCaso[] {
+  if (vista === 'suplementacion') return CASOS_SUPLEMENTACION
   if (vista === 'honorarios') return CASOS_HONORARIOS
   if (vista === 'internamiento') return CASOS_INTERNAMIENTO
   if (vista === 'consentimiento') return CASOS_CONSENTIMIENTO

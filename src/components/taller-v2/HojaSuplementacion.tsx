@@ -5,11 +5,36 @@
  * lee la base ni Storage, no toca v1, no toca los formularios ni el flujo del médico:
  * el médico y el paciente son inventados y viven aquí abajo.
  *
- * TRES CASOS, Y LOS TRES HACEN FALTA
+ * CINCO CASOS
  *
  *   completo   las dos combinaciones de la entrada y **con peso**
  *   mínimo     un suplemento con lo justo y **SIN PESO**: es la mitad que falta
  *   lleno      la hoja al tope, para ver el corte y la hoja de continuación
+ *   catálogo   **los cuatro suplementos reales del formato v1**, con sus textos
+ *   marca larga  el mismo, con una marca que no cabe en la columna
+ *
+ * EL CASO `catálogo` NO ES UNA DEMOSTRACIÓN: ES LA COMPARACIÓN CON v1
+ *
+ * Los cuatro suplementos y sus textos salen del catálogo del formato vivo, para poner los
+ * dos PDF lado a lado y ver qué cambia. Lo que hay que mirar es que **la justificación de
+ * v2 ocupa el sitio de la «indicación» de v1** —el beneficio del catálogo, escrito en
+ * lenguaje para el paciente— y que ahí el texto real es MUCHO más largo que el de los
+ * otros tres casos: cuatro renglones por entrada donde el `completo` compone dos.
+ *
+ * **Y ES DONDE SE VE LA MARCA COMERCIAL, EN BLOQUE EN NEGATIVO.** Solo el Omega-3 la lleva
+ * —`Ultimate Omega · Nordic Naturals`—, así que los otros tres enseñan lo contrario: la
+ * ranura `marca` colapsa sin dejar hueco, igual que la vía de Receta cuando no viene.
+ *
+ * EL QUINTO CASO ES EL LÍMITE DEL NEGATIVO
+ *
+ * `marca larga` compone la misma lista con una marca de 78 caracteres, que **no cabe en la
+ * columna de 453.75 pt**. Lo que hay que mirar es que el bloque NO se sale de la columna ni
+ * se recorta: rompe a dos renglones dentro del negro, que es lo que las reglas 1 y 3 de 2.H
+ * obligan. Y que a dos renglones **deja de leerse como una etiqueta**.
+ *
+ * ⚠ **v1 IMPRIME UNA COLUMNA MÁS: LA PRESENTACIÓN** —`100 mcg/cápsula`, `640
+ * mg/cápsula`—. Este caso NO la compone, porque el formato de v2 no tiene ranura para
+ * ella. Ver el reporte del paso: el hueco está en el FORMATO, no en el chasis.
  *
  * EL MÍNIMO ES LA VERIFICACIÓN VISIBLE DE II.4 §6, Y POR ESO VA SIN PESO
  *
@@ -137,10 +162,67 @@ const CITA: CitaDeControl = {
   nota: 'Traer control de 25-OH vitamina D y calcio sérico tomados la semana previa.',
 }
 
+/**
+ * LOS CUATRO SUPLEMENTOS DEL CATÁLOGO DE v1, con sus textos REALES.
+ *
+ * No son datos inventados como los de los otros tres casos: son las cadenas del formato
+ * vivo, y por eso este caso sirve de comparación. **La «indicación» de v1 entra por la
+ * ranura de justificación de v2**, que es la que ocupa su sitio.
+ *
+ * ⚠ **FALTA LA PRESENTACIÓN.** v1 imprime una cuarta columna —`100 mcg/cápsula`, `640
+ * mg/cápsula`, derivada del catálogo— que aquí no aparece: `SuplementoIndicado` no tiene
+ * ese campo. No se añade por su cuenta; queda reportado.
+ */
+const SUPLEMENTOS_CATALOGO: readonly SuplementoIndicado[] = [
+  {
+    nombre: 'Vitamina D3',
+    dosis: '5,000 UI/día',
+    justificacion:
+      'Ayuda a que tus huesos absorban el calcio correctamente y se mantengan fuertes. Es especialmente importante después de una cirugía de columna o articulaciones para que la recuperación sea más rápida y sólida.',
+  },
+  {
+    nombre: 'Vitamina K2 (MK-7)',
+    dosis: '100 mcg/día',
+    justificacion:
+      'Trabaja en equipo con la Vitamina D3 para que el calcio llegue exactamente a donde debe estar: tus huesos. Evita que ese calcio se acumule en lugares donde puede hacer daño, como las arterias o los ligamentos.',
+  },
+  {
+    nombre: 'Colágeno Hidrolizado + Vitamina C',
+    dosis: '10–15 g + 500 mg en ayunas',
+    justificacion:
+      'El colágeno es el material de construcción natural de tus tendones, ligamentos y los discos que amortiguan tu columna. Tomarlo en ayunas con vitamina C ayuda a reparar y fortalecer esos tejidos desde adentro.',
+  },
+  {
+    nombre: 'Omega-3 (EPA/DHA)',
+    dosis: '2–3 g/día con alimentos',
+    // El único con marca: los otros tres colapsan la ranura sin dejar hueco.
+    marca: 'Ultimate Omega · Nordic Naturals',
+    justificacion:
+      'Reduce la inflamación de forma natural en articulaciones, nervios y discos de la columna. A dosis terapéuticas ayuda a controlar el dolor crónico sin irritar el estómago como lo hacen algunos antiinflamatorios convencionales.',
+  },
+]
+
+/**
+ * LA MISMA LISTA CON UNA MARCA QUE NO CABE. 78 caracteres contra los ~60 que entran en la
+ * columna: es el caso que enseña el techo del bloque en negativo. INVENTADA.
+ */
+const SUPLEMENTOS_MARCA_LARGA: readonly SuplementoIndicado[] = SUPLEMENTOS_CATALOGO.map(
+  (suplemento, i) =>
+    i === 3
+      ? {
+          ...suplemento,
+          marca:
+            'Ultimate Omega Professional Formula · Nordic Naturals Laboratories Norway',
+        }
+      : suplemento,
+)
+
 /** Folios INVENTADOS, con el prefijo `S-` que la lámina compone. */
 const FOLIO_COMPLETO = 'S-C9174B2E60A5'
 const FOLIO_MINIMO = 'S-3A80F5C1D742'
 const FOLIO_LLENO = 'S-71E6D4A08B39'
+const FOLIO_CATALOGO = 'S-4D82F0B93E17'
+const FOLIO_MARCA_LARGA = 'S-6C09A1E45D82'
 
 /** Emisión ya compuesta: token corto de fecha + hora, con la raya del sistema. */
 const EMISION = '4 ago 2026 · 10:15'
@@ -167,7 +249,12 @@ function medicoMembrete(medico: MedicoFicticio): MedicoMembrete {
 }
 
 /** Un caso es un documento entero, no una hoja de un documento común (ver 2.N). */
-export type CasoSuplementacion = 'completo' | 'minimo' | 'lleno'
+export type CasoSuplementacion =
+  | 'completo'
+  | 'minimo'
+  | 'lleno'
+  | 'catalogo'
+  | 'marcaLarga'
 
 const CASOS: Record<
   CasoSuplementacion,
@@ -181,6 +268,8 @@ const CASOS: Record<
   completo: { suplementos: SUPLEMENTOS_COMPLETO, paciente: PACIENTE_COMPLETO, folio: FOLIO_COMPLETO, cierre: true },
   minimo: { suplementos: SUPLEMENTOS_MINIMO, paciente: PACIENTE_SIN_PESO, folio: FOLIO_MINIMO, cierre: false },
   lleno: { suplementos: SUPLEMENTOS_LLENO, paciente: PACIENTE_COMPLETO, folio: FOLIO_LLENO, cierre: true },
+  catalogo: { suplementos: SUPLEMENTOS_CATALOGO, paciente: PACIENTE_COMPLETO, folio: FOLIO_CATALOGO, cierre: true },
+  marcaLarga: { suplementos: SUPLEMENTOS_MARCA_LARGA, paciente: PACIENTE_COMPLETO, folio: FOLIO_MARCA_LARGA, cierre: true },
 }
 
 function HojaSuplementacion({

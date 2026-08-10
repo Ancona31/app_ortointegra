@@ -469,6 +469,13 @@ const estilos = StyleSheet.create({
    */
   cajaFecha: {
     height: ALTO_LINEA_TITULO,
+    /**
+     * ⚠ **`minHeight`, PORQUE `flexShrink: 0` NO PROTEGE NADA.** El renderer convierte todo
+     * `flexShrink` declarado en 0 a 1 (`value || 1`), así que esta caja encogía con la hoja
+     * como cualquier otra y la fecha dejaba de apoyarse en la línea del título. Con
+     * `minHeight` el alto de una línea de título es un suelo de verdad.
+     */
+    minHeight: ALTO_LINEA_TITULO,
     justifyContent: 'flex-end',
     // La ficha no declara el medianil entre título y fecha. Se usa el separador
     // de columnas del sistema en vez de inventar una cifra.

@@ -265,6 +265,23 @@ const estilos = StyleSheet.create({
    */
   espacio: {
     height: FIRMA.espacio,
+    /**
+     * ⚠ **`minHeight` Y NO `flexShrink: 0`: LA REGLA 1 NECESITA UNA GARANTÍA QUE EXISTA.**
+     *
+     * `@react-pdf/layout` compone `setFlexShrink` como `setYogaValue('flexShrink')(value || 1)`,
+     * así que **un `flexShrink: 0` declarado se convierte en 1** y el nodo encoge igual que
+     * cualquier otro. Medido: dos cajas de 80 en una fila de 100, una con `flexShrink: 0`,
+     * salen las dos a 50.
+     *
+     * `minHeight` sí lo respeta Yoga —medido con el mismo caso: la caja protegida se queda en
+     * 80 y su hermana absorbe todo el encogimiento—, y por eso la regla 1 se declara así. Sin
+     * él, una hoja que cierra al ras encoge el espacio de escritura unas décimas **en
+     * silencio**, que es exactamente lo que I.3.4 prohíbe.
+     *
+     * Los 77 pt no dependen de la hoja ni del hueco sobrante. Si no caben, se reparten en dos
+     * hojas; nunca se comprimen.
+     */
+    minHeight: FIRMA.espacio,
     justifyContent: 'flex-end',
   },
   /** La rúbrica no se estira: se apoya en la línea y conserva su proporción. */

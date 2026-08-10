@@ -819,6 +819,54 @@ describe('II.3 · Receta Médica — medido sobre el PDF', () => {
     expect(renglon(hoja, 'Folio P-B8570E3FA164')).toBeDefined()
   }, 60_000)
 
+  it('I.3.4: el paso de entrada es el mismo en TODAS las hojas', async () => {
+    /*
+      ⚠ **LA SONDA DE I.3.4, Y MIDE LO QUE SÍ SE MUEVE.**
+
+      Cuando la hoja que cierra no cuadra, `splitPage` la re-maqueta con altura DEFINIDA y
+      Yoga reparte el exceso encogiendo a TODOS los hijos en proporción — puede hacerlo porque
+      el renderer compone `setFlexShrink` como `value || 1` y ningún nodo se puede declarar
+      rígido. La hoja sale un tanto por mil más pequeña, sin aviso.
+
+      **Ni los cuerpos de letra ni el paso entre renglones de un párrafo lo delatan**: react-pdf
+      nunca toca `fontSize`, y las líneas de un `Text` las coloca el motor de texto, no Yoga.
+      Lo que sí lo delata es el paso de una ENTRADA a la siguiente, que es distancia entre
+      cajas. Medido en II.4 al ras: 101.13 limpio contra 100.968 comprimido.
+
+      Se mide en TODAS las hojas: la que se comprime es la que CIERRA, y puede ser cualquiera.
+    */
+    const caro = (i: number): MedicamentoRecetado => ({
+      comercial: `Fármaco ${i}`,
+      presentacion: 'Tabletas 500 mg',
+      generico: 'Denominación genérica',
+      via: 'Subcutánea',
+      indicacion: UNA_LINEA,
+    })
+    const hojas = await componer(Array.from({ length: 12 }, (_, i) => caro(i)))
+    expect(hojas.length).toBeGreaterThan(1)
+
+    /*
+      EL PASO ESPERADO ES EL DE LA ENTRADA COMPLETA, el mismo 75 que mide la prueba de las
+      cuatro combinaciones tres casos más arriba —con su regla dentro, porque es paso entre
+      anclas y no alto de caja.
+    */
+    const esperado = 75
+
+    let hojasMedidas = 0
+    for (const [indice, hoja] of hojas.entries()) {
+      const anclas = hoja.renglones
+        .filter((r) => /^Fármaco \d/.test(r.texto))
+        .map((r) => r.arriba)
+      if (anclas.length < 2) continue
+      hojasMedidas += 1
+      for (const [i, altura] of anclas.slice(1).entries()) {
+        expect(altura - anclas[i], `hoja ${indice + 1}`).toBeCloseTo(esperado, 1)
+      }
+    }
+    // Si la lista dejara de partirse, la sonda quedaría midiendo una sola hoja en silencio.
+    expect(hojasMedidas).toBeGreaterThan(1)
+  }, 200_000)
+
   it('reparte la lista entre hojas en vez de apretarla en una', async () => {
     /*
       LA CAPACIDAD, DESPUÉS DE CABLEAR 2.N.

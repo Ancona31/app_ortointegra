@@ -445,6 +445,100 @@ describe('II.2 · Solicitud de Imagenología — medido sobre el PDF', () => {
     expect(conBadge.renglones.filter((r) => r.texto === 'URGENTE')).toHaveLength(1)
   }, 60_000)
 
+  it('I.3.4: el paso de entrada es el mismo en TODAS las hojas', async () => {
+    /*
+      ⚠ **LA SONDA DE I.3.4, Y MIDE LO QUE SÍ SE MUEVE.**
+
+      Cuando la hoja no cuadra, Yoga reparte el exceso encogiendo a TODOS los hijos en
+      proporción — puede hacerlo porque `@react-pdf/layout` compone `setFlexShrink` como
+      `setYogaValue('flexShrink')(value || 1)`, así que el 0 se vuelve 1 y ningún nodo se
+      declara rígido. La hoja sale un tanto por mil —o un dos por ciento— más pequeña, sin
+      aviso ninguno, y **la paginación no llega a enterarse**: para cuando `splitNodes`
+      mira las cajas, ya caben todas.
+
+      **Ni el cuerpo de letra ni el paso entre renglones de un párrafo lo delatan**:
+      react-pdf nunca toca `fontSize`, y las líneas de un `Text` las coloca el motor de
+      texto, no Yoga. Lo que sí lo delata es el paso de una ENTRADA a la siguiente, que es
+      distancia entre cajas y no puede salir de otro sitio que de la suma de sus tokens.
+
+      Se mide en TODAS las hojas y en TODAS las parejas: la que se comprime es la que
+      cierra, y puede ser cualquiera.
+    */
+    const minimo = (i: number): EstudioSolicitado => ({
+      tipo: 'Radiografía',
+      region: `Segmento ${i}`,
+    })
+    const hojas = await componer(Array.from({ length: 16 }, (_, i) => minimo(i)))
+    expect(hojas.length).toBeGreaterThan(1)
+
+    // El estado mínimo mide 28.5 por entrada, de la prueba de los cuatro estados.
+    const esperado = 28.5
+
+    let hojasMedidas = 0
+    for (const [indice, hoja] of hojas.entries()) {
+      const anclas = hoja.renglones
+        .filter((r) => /^Radiografía · Segmento \d/.test(r.texto))
+        .map((r) => r.arriba)
+      if (anclas.length < 2) continue
+      hojasMedidas += 1
+      for (const [i, altura] of anclas.slice(1).entries()) {
+        expect(altura - anclas[i], `hoja ${indice + 1}`).toBeCloseTo(esperado, 1)
+      }
+    }
+    // Si la lista dejara de partirse, la sonda quedaría midiendo una sola hoja en silencio.
+    expect(hojasMedidas).toBeGreaterThan(1)
+  }, 200_000)
+
+  it('DEFECTO DEL CHASIS: con siete estudios caros la hoja se comprime un 2 %', async () => {
+    /*
+      ⚠⚠ **ESTA PRUEBA FIJA UN DEFECTO VIVO, NO UNA GARANTÍA. El día que se arregle, FALLA
+      — y eso es lo que se quiere: que nadie lo arregle sin venir aquí a borrarla.**
+
+      La sonda de arriba encontró el caso real: con SIETE estudios en su estado más caro,
+      la hoja 1 no cabe por unos 8 pt y el chasis, en vez de mandar el séptimo a la hoja 2,
+      **encoge la hoja entera un 1.97 %**. Medido, con `caro(i)`:
+
+          entradas 2 a 6   paso 59.5000   (la suma de tokens, limpia)
+          entradas 7 a ∞   paso 58.3269   (−1.1731 por entrada)
+
+      Y no es solo la lista: el membrete baja de 89.182 a 88.481, el título de 177.426 a
+      175.060. Se comprime TODO el flujo, en proporción.
+
+      POR QUÉ NO SE ARREGLA AQUÍ. El sobrante de 8 pt cabe dentro de la holgura que Yoga
+      tiene para encoger, así que lo absorbe antes de que la paginación mire. Con el estado
+      MÍNIMO el sobrante de una entrada es de 28.5 pt, más de lo que la holgura da de sí, y
+      entonces sí pagina limpio (la sonda de arriba lo comprueba con dieciséis). O sea que
+      el chasis se traga en silencio los desbordes pequeños y solo pagina los grandes.
+
+      El único palanca medida es poner `flexShrink` a un valor positivo diminuto —el 0 es
+      inerte, el 0.0001 no— en la raíz de la entrada de 2.G: probado, deja el paso en
+      59.4997. **No se aplicó**, porque no arregla nada: los mismos 8 pt se mudan enteros
+      al membrete y a la cabecera, que es donde menos se ven y más duelen. Rigidizar SOLO
+      la lista cambia una deformación repartida por una concentrada.
+
+      Arreglarlo de verdad es hacer rígido el chasis entero para que el desborde exista y
+      la paginación lo vea. Eso mueve muchos componentes y no cabe en este paso.
+    */
+    const caro = (i: number): EstudioSolicitado => ({
+      tipo: 'Radiografía',
+      region: `Segmento ${i}`,
+      proyecciones: 'AP y lateral',
+      indicacion: 'Control evolutivo del material de osteosíntesis.',
+    })
+    const paso = async (n: number): Promise<number> => {
+      const [hoja] = await componer(Array.from({ length: n }, (_, i) => caro(i)))
+      const anclas = hoja.renglones
+        .filter((r) => /^Radiografía · Segmento \d/.test(r.texto))
+        .map((r) => r.arriba)
+      return anclas[1] - anclas[0]
+    }
+
+    // Seis caben: el paso es la suma de tokens.
+    expect(await paso(6)).toBeCloseTo(59.5, 2)
+    // El séptimo no cabe, y en vez de irse a la hoja 2 encoge la hoja.
+    expect(await paso(7)).toBeCloseTo(58.3269, 2)
+  }, 200_000)
+
   it('cierra la hoja donde la medición dice, y no una entrada más', async () => {
     // Con el estado más caro caben CUATRO. El presupuesto, en pt sobre los 670 de
     // caja: 217.88 de encabezado + 21 de cabecera + N × 59.5 + 5 + 11 de contador

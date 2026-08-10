@@ -16,11 +16,40 @@
  *    administración.
  * 4. **`urgente` marca el documento, no un ítem de la lista.**
  *
- * Las tres se implementan aquí en tres líneas de estilo y una ausencia:
- * `alignSelf: 'flex-start'` hace que el ancho lo ponga la palabra y no el padre;
- * `flexShrink: 0` impide que un contenedor estrecho comprima la caja; y en este
- * archivo **no aparecen `maxLines` ni `textOverflow`**, que son las dos props con
- * las que react-pdf trunca. Si alguna vez aparecen, la regla 3 se rompió.
+ * ⚠ **LO QUE GARANTIZA CADA REGLA, Y LO QUE NO PUEDE GARANTIZAR NINGUNA DECLARACIÓN**
+ *
+ * Las reglas 2 y 3 se cumplen por AUSENCIA, y eso sí es firme: en este archivo no hay
+ * ninguna escritura de `fontSize` ni de `letterSpacing` fuera del rol, y **no aparecen
+ * `maxLines` ni `textOverflow`**, que son las dos props con las que react-pdf trunca. El
+ * renderer nunca escala tipografía por su cuenta. Si alguna de esas cuatro cosas aparece
+ * aquí, la regla correspondiente se rompió.
+ *
+ * La regla 1 se apoya en `alignSelf: 'flex-start'`: el ancho lo pone la palabra y no el
+ * padre.
+ *
+ * ⚠ **AQUÍ HABÍA UN `flexShrink: 0` Y NO HACÍA NADA. QUEDA RETIRADO.**
+ *
+ * Decía impedir «que un contenedor estrecho comprima la caja», y `@react-pdf/layout` compone
+ * `setFlexShrink` como `setYogaValue('flexShrink')(value || 1)`: **el 0 declarado se
+ * convierte en 1**. Medido con dos cajas de 80 en una fila de 100, una de ellas con
+ * `flexShrink: 0`: salen las dos a 50. Una declaración que se lee como garantía y no lo es
+ * es peor que no tenerla.
+ *
+ * **Lo que de verdad protege a este bloque es su CONTENIDO.** Yoga no encoge una caja de
+ * texto por debajo de su *min-content*, así que en un contenedor estrecho el bloque **rompe
+ * a más renglones** en vez de apretar la palabra. Medido en II.4 con una marca comercial de
+ * 73 caracteres: en la columna de 453.75 pt el negativo compone 432.9 × 24.5 —dos renglones—
+ * y no se sale ni recorta.
+ *
+ * **Y eso es correcto según las reglas 2 y 3, pero tiene una consecuencia que hay que
+ * mirar:** un negativo de dos renglones deja de leerse como etiqueta y empieza a leerse como
+ * un párrafo con fondo. No se resuelve en este archivo —el dispositivo hace lo que debe—,
+ * sino partiendo el dato en el formato que lo entrega.
+ *
+ * `minWidth` **no sirve aquí**, aunque Yoga sí lo respete: el ancho de este bloque lo pone
+ * la palabra y no hay ninguna cifra estática que declarar. Donde sí la hay —los 77 pt del
+ * espacio de firma en 2.L, el ancho declarado del marco en 2.U, la caja de la fecha en
+ * 2.C— la protección se ha convertido en un `minHeight` o un `minWidth` de verdad.
  *
  * EL COLOR DEL TEXTO SE SUSTITUYE A MANO, Y ES LO ÚNICO QUE SE TOCA DEL ROL
  *
@@ -127,8 +156,8 @@ const estilos = StyleSheet.create({
    * la verificación visible saldrían idénticos —que es justo el síntoma que la
    * ficha manda buscar—. Con él, el ancho lo pone la palabra.
    *
-   * `flexShrink: 0` cubre el otro lado: dentro de una fila estrecha, Yoga
-   * comprimiría la caja y partiría la palabra. Reglas 2 y 3.
+   * **Aquí NO hay `flexShrink: 0`**, y su ausencia es deliberada: el renderer lo convertía
+   * en 1 y no protegía nada. Ver la nota larga de la cabecera antes de reponerlo.
    *
    * Sin `borderRadius`: I.3.2 prohíbe las esquinas muy redondeadas y la ficha no
    * declara ninguna, así que el bloque es rectangular.
@@ -136,7 +165,6 @@ const estilos = StyleSheet.create({
   bloque: {
     backgroundColor: TINTA.negra,
     alignSelf: 'flex-start',
-    flexShrink: 0,
     paddingVertical: GEOMETRIA.padding.vertical,
     paddingHorizontal: GEOMETRIA.padding.horizontal,
   },

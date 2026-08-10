@@ -443,6 +443,45 @@ describe('II.5 · Recibo de Honorarios / Cotización', () => {
     expect(paso(recibo)).toBeCloseTo(esperado, 1)
   }, 120_000)
 
+  it('I.3.4: el paso de fila es el mismo en TODAS las hojas', async () => {
+    /*
+      ⚠ **LA SONDA DE I.3.4, Y MIDE LO QUE SÍ SE MUEVE.**
+
+      La prueba de arriba compara dos documentos, pero solo en su hoja 1 y solo entre sus dos
+      primeras filas. **El riesgo no está ahí**: cuando la hoja que CIERRA no cuadra,
+      `splitPage` la re-maqueta con altura DEFINIDA y Yoga reparte el exceso encogiendo a
+      todos los hijos en proporción — puede hacerlo porque `@react-pdf/layout` compone
+      `setFlexShrink` como `value || 1`, así que ningún nodo se declara rígido. La hoja sale
+      un tanto por mil más pequeña, sin aviso ninguno.
+
+      **Ni el cuerpo de letra ni el paso entre renglones de un párrafo lo delatan**: react-pdf
+      nunca toca `fontSize`, y las líneas de un `Text` las coloca el motor de texto, no Yoga.
+      Lo que sí lo delata es el paso de una FILA a la siguiente, que es distancia entre cajas.
+      Medido al ras en II.4: 101.13 limpio contra 100.968 comprimido.
+
+      Por eso este recibo lleva **treinta** conceptos y no catorce: con catorce la tabla cabe
+      entera en la hoja 1 y la hoja que se comprime —la que cierra— no tiene una sola fila que
+      medir. Se recorren TODAS las hojas y TODAS las parejas consecutivas.
+    */
+    const hojas = await componer({ ...RECIBO, conceptos: conceptos(30) })
+    expect(hojas.length).toBeGreaterThan(1)
+
+    const esperado =
+      2 * 2 + (TIPOGRAFIA['concepto.texto'].interlineado ?? 0) + FILETE_HONORARIOS.regla
+
+    let hojasMedidas = 0
+    for (const [indice, hoja] of hojas.entries()) {
+      const ys = hoja.renglones.filter((r) => CONCEPTO.test(r.texto)).map((r) => r.arriba)
+      if (ys.length < 2) continue
+      hojasMedidas += 1
+      for (const [i, y] of ys.slice(1).entries()) {
+        expect(y - ys[i], `hoja ${indice + 1}`).toBeCloseTo(esperado, 1)
+      }
+    }
+    // Si la tabla dejara de partirse, la sonda quedaría midiendo una sola hoja en silencio.
+    expect(hojasMedidas).toBeGreaterThan(1)
+  }, 120_000)
+
   it('las trece diferencias salen del mismo componente', async () => {
     const cotizacion = await componer(COTIZACION)
     const recibo = await componer(RECIBO)

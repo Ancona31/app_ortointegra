@@ -184,6 +184,16 @@ const GEOMETRIA = {
     aireVia: ESPACIO[2],
   },
   /**
+   * ⚠ **EL AIRE SOBRE LA MARCA DE `suplemento` NO ESTÁ MEDIDO.** La marca comercial es un
+   * campo posterior a la lámina —B.4 §3 tabula la ranura `marca` como «no aplica en este
+   * formato»—, así que no hay ninguna cota que transcribir. Se toma el mismo `espacio.2` con
+   * el que Receta separa su vía, que es la misma relación entre las mismas dos piezas: el
+   * bloque en negativo y el dato que tiene encima. `DERIVADO POR PRECEDENTE`.
+   *
+   * No se declara aparte porque valdría lo mismo y en el mismo sitio: se lee de
+   * `medicamento.aireVia`. Si algún día se mide y difiere, entra aquí con nombre propio.
+   */
+  /**
    * LA QUINTA CALIBRACIÓN — `suplemento`, medida en la lámina de Suplementación.
    *
    * **ES LA MISMA ENTRADA DE RECETA CON DOS RANURAS VACÍAS, Y ESE ES SU VALOR.** II.4
@@ -536,8 +546,13 @@ export interface EntradaNumeradaProps {
   /** Dato de apoyo bajo el ancla. Colapsa si no viene. */
   secundario?: string
   /**
-   * La palabra del bloque en negativo (2.H), si el formato usa esta ranura. En
-   * Receta es la vía de administración; el componente no lo sabe ni tiene por qué.
+   * La palabra del bloque en negativo (2.H), si el formato usa esta ranura.
+   *
+   * **La componen DOS calibraciones y ninguna sabe qué es la otra.** En Receta es la vía de
+   * administración; en Suplementación, la marca comercial del producto. Este componente no
+   * lo sabe ni tiene por qué: lo que declara es que hay una ranura para un dato que va en
+   * negativo, y las cuatro reglas de 2.H valen igual en las dos —nunca abrevia, no escala el
+   * texto ni reduce el tracking para que quepa, no trunca, y el ancho es la variable.
    */
   marca?: string
   /** Texto en humanista, compuesto por 2.J. Colapsa si no viene. */
@@ -770,11 +785,18 @@ export default function EntradaNumerada({
             {ancla}
           </Text>
           {/*
-            LA MARCA VA EN LA FILA DEL ANCLA EN TODAS LAS CALIBRACIONES MENOS EN
-            `medicamento`, donde la lámina le da renglón propio —el tercero de la
-            caja, entre el genérico y la indicación—. Ver el bloque de la vía abajo.
+            LA MARCA VA EN LA FILA DEL ANCLA EN LAS CALIBRACIONES QUE NO LE DAN RENGLÓN
+            PROPIO, y **dos se lo dan**: `medicamento` —la lámina de Receta pone la vía
+            en el tercer renglón de la caja, entre el genérico y la indicación— y
+            `suplemento`, que hace lo mismo con la marca comercial. Las dos se componen
+            en el bloque de abajo.
+
+            ⚠ **LAS DOS RAMAS SON EXCLUYENTES Y HAY QUE MANTENERLAS ASÍ.** Sin la
+            exclusión de `suplemento`, el bloque en negativo se compone DOS VECES —una
+            aquí, con la calibración del chasis a 19 pt de alto, y otra abajo con la
+            medida a 14.5—, y el defecto es visible pero no lanza nada. Medido.
           */}
-          {!medicamento && tieneValor(marca) ? (
+          {!medicamento && !suplemento && tieneValor(marca) ? (
             <View style={estilos.cajaMarca}>
               <BloqueNegativo variante="via" via={marca} />
             </View>
@@ -821,9 +843,20 @@ export default function EntradaNumerada({
           mide 2 + 14.5 donde el renglón plano medía 13—, así que las filas de vía
           oral dejan de medir los 85.37 pt de la lámina y miden los 89 de las demás.
         */}
-        {medicamento && tieneValor(marca) ? (
+        {(medicamento || suplemento) && tieneValor(marca) ? (
           <View style={estilos.cajaVia}>
-            <BloqueNegativo variante="via" via={marca} lamina="receta" />
+            {/*
+              ⚠ **LA LÁMINA QUE SE PASA NO ES LA DEL FORMATO, Y DA IGUAL POR AHORA.** 2.H
+              compone su calibración medida —8 / 10, padding `2 6 2.5`, alto 14.5— para
+              CUALQUIER lámina distinta del chasis, así que `receta` y `suplementacion`
+              producen el mismo bloque. Se pasa la de cada formato para que el día que 2.H
+              distinga entre láminas esto no se quede componiendo la equivocada.
+            */}
+            <BloqueNegativo
+              variante="via"
+              via={marca}
+              lamina={medicamento ? 'receta' : 'suplementacion'}
+            />
           </View>
         ) : null}
 
