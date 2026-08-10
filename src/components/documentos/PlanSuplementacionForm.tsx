@@ -4,17 +4,20 @@ import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { useProfile } from '@/hooks/useProfile'
 
-import { useState, useCallback } from 'react'
-import { Printer, Loader2, RefreshCw } from 'lucide-react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { AlertTriangle, Check, ClipboardList, Printer } from 'lucide-react'
 import { flushSync } from 'react-dom'
+import Link from 'next/link'
 import { generarPdf } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
 import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
+import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
 import QRCode from 'qrcode'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
-import { hoyEnTZ } from '@/lib/dates'
+import { hoyEnTZ, desplazarFecha } from '@/lib/dates'
+import { enfocarYAcercar } from '@/lib/scrollDoc'
 
 type Presentacion = {
   tipo: string      // 'cápsula' | 'tableta' | 'cucharada' | 'scoop'
@@ -33,6 +36,8 @@ type Suplemento = {
   beneficio_clinico: string          // texto médico — visible en tarjetas de selección (médico)
   beneficio_paciente: string         // lenguaje amigable — aparece en el PDF (paciente)
 }
+
+const FECHA_MIN = '1900-01-01'
 
 const SUPLEMENTOS: Suplemento[] = [
   {
@@ -162,7 +167,75 @@ function dosisEnCapsulas(sup: Suplemento, pesoKg: number): string | null {
   return sup.presentacion.nota ? `${base} — ${sup.presentacion.nota}` : base
 }
 
-type SupSelec = { nombre: string; dosis: string; justificacion: string }
+/**
+ * Dosis propuesta para el campo editable de la tarjeta.
+ *
+ * Sin peso NO se calcula nada (§2.3): la tarjeta se abre con la dosis vacía y
+ * se rellena sola en cuanto el peso llega. Los suplementos que no dosifican por
+ * kilo —Ashwagandha— llevan siempre su dosis fija, con peso o sin él.
+ */
+function dosisParaForm(sup: Suplemento, peso: number): string {
+  if (!sup.min_kg) return sup.dosis_default
+  if (!(peso > 0)) return ''
+  return dosisEnCapsulas(sup, peso) ?? calcularDosis(sup, peso)
+}
+
+/**
+ * `editada` no viaja al PDF ni al expediente: es la memoria de quién escribió la
+ * dosis, y es lo único que permite recalcular al corregir el peso sin pisar lo
+ * que el médico puso a mano (S-04).
+ */
+type SupSelec = { nombre: string; dosis: string; marca: string; justificacion: string; editada: boolean }
+
+/** Aviso de recálculo (§3). Se redacta con los dos números y nada más. */
+function textoRecalculo(recalculadas: number, conservadas: number): string {
+  const r = recalculadas === 1 ? 'Se recalculó 1 dosis' : `Se recalcularon ${recalculadas} dosis`
+  if (conservadas === 0) return `${r}.`
+  if (recalculadas === 0) {
+    return conservadas === 1
+      ? 'No se recalculó ninguna dosis: la editaste a mano.'
+      : `No se recalculó ninguna dosis: editaste las ${conservadas}.`
+  }
+  return conservadas === 1
+    ? `${r}; 1 se conservó porque la editaste`
+    : `${r}; ${conservadas} se conservaron porque las editaste`
+}
+
+/** Lee un suplemento guardado en jsonb. Solo sobreviven los del catálogo de hoy. */
+function leerSuplemento(bruto: unknown): SupSelec | null {
+  if (typeof bruto !== 'object' || bruto === null) return null
+  const fila = bruto as Record<string, unknown>
+  const texto = (v: unknown): string => (typeof v === 'string' ? v : '')
+  const nombre = texto(fila.nombre)
+  if (!SUPLEMENTOS.some(s => s.nombre === nombre)) return null
+  return {
+    nombre,
+    dosis: texto(fila.dosis),
+    marca: texto(fila.marca),
+    justificacion: texto(fila.justificacion),
+    // Una dosis que llega de una plantilla se respeta igual que una escrita a
+    // mano: la eligió el médico al guardarla.
+    editada: texto(fila.dosis).trim() !== '',
+  }
+}
+
+/**
+ * Predicado único de «formulario vacío». Mismo criterio que Laboratorio: los
+ * campos prellenados de la ficha no cuentan hasta que se editan. El peso queda
+ * fuera por la misma razón que la fecha y el diagnóstico —la guía lo declara
+ * dato de paciente (§1)— y por eso tampoco entra en la plantilla: si contara,
+ * teclear solo el peso habilitaría guardar una plantilla sin nada dentro.
+ */
+function isFormEmpty(
+  seleccionados: SupSelec[], notas: string, seguimiento: string,
+  paciente: string, pacienteInicial: string,
+  diagnostico: string, diagnosticoInicial: string,
+): boolean {
+  const pacienteIntacto = paciente.trim() === '' || paciente.trim() === pacienteInicial.trim()
+  const dxIntacto = diagnostico.trim() === '' || diagnostico.trim() === diagnosticoInicial.trim()
+  return pacienteIntacto && dxIntacto && seleccionados.length === 0
+    && notas.trim() === '' && seguimiento.trim() === ''
+}
 
 interface Props {
   pacienteInicial?: string
@@ -170,9 +243,18 @@ interface Props {
   pacienteId?: string
   offlineMode?: boolean
   onOfflineSave?: () => void
+  /** Reporta al host si el formulario sigue vacío (guía 04 §6.1 y §6.2). */
+  onVacioChange?: (vacio: boolean) => void
+  /**
+   * El panel de plantillas sustituye al formulario en su mismo espacio, y
+   * mientras está abierto el selector de tipo del host se oculta (spec 02 §3.1):
+   * elegir otro tipo desde ahí tiraría el formulario sobre el que el panel
+   * opera.
+   */
+  onPanelPlantillasChange?: (abierto: boolean) => void
 }
 
-export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, offlineMode, onOfflineSave }: Props) {
+export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, offlineMode, onOfflineSave, onVacioChange, onPanelPlantillasChange }: Props) {
   const { medicoInfo: onlineMedicoInfo, isLoading: cargandoPerfil } = useMedicoInfo()
   const { consultorioActivo } = useConsultorioActivo()
 
@@ -216,40 +298,103 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
   const [imprimiendo, setImprimiendo] = useState(false)
   const [errorGuardado, setErrorGuardado] = useState('')
   const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean } | null>(null)
+  // Aviso de recálculo por cambio de peso (S-04). Nace al corregir el peso con
+  // suplementos ya elegidos y desaparece en el siguiente cambio de peso.
+  const [recalculo, setRecalculo] = useState<{ recalculadas: number; conservadas: number } | null>(null)
+  // Nada acusa antes del primer intento de imprimir; después se actualiza en vivo.
+  const [intentado, setIntentado] = useState(false)
 
-  function dosisParaForm(sup: Suplemento, peso: number): string {
-    if (peso > 0) {
-      const caps = dosisEnCapsulas(sup, peso)
-      if (caps) return caps
-      if (sup.min_kg) return calcularDosis(sup, peso)
-    }
-    return sup.dosis_default
-  }
+  const formRef = useRef<HTMLDivElement>(null)
+  const pacienteRef = useRef<HTMLInputElement>(null)
+
+  const vacio = isFormEmpty(seleccionados, notas, seguimiento, paciente, pacienteInicial, diagnostico, diagnosticoInicial)
+  useEffect(() => { onVacioChange?.(vacio) }, [vacio, onVacioChange])
+
+  // ── Plantillas (spec 02) ────────────────────────────────────────
+  // Se guarda TODO menos los datos del paciente: fuera paciente, diagnóstico,
+  // fecha y peso. El peso es del paciente que está delante, no del plan.
+  const plantillas = usePlantillasDocumento({
+    tipo: 'plan_suplementacion',
+    vacio,
+    // El búnker no tiene red ni sesión de Supabase: el sistema no se monta.
+    desactivado: !!offlineMode,
+    onPanelChange: onPanelPlantillasChange,
+    leer: () => ({ _v: 1, seleccionados, notas, seguimiento }),
+    aplicar: (c: ContenidoPlantilla) => {
+      // Solo las claves que existen HOY, campo a campo. Los valores de repuesto
+      // NO son defensa de sobra: «Vaciar formulario» aplica un contenido sin
+      // ninguna clave, así que es justo lo que repone el estado inicial.
+      setSeleccionados(Array.isArray(c.seleccionados)
+        ? c.seleccionados.map(leerSuplemento).filter((s): s is SupSelec => s !== null)
+        : [])
+      setNotas(typeof c.notas === 'string' ? c.notas : '')
+      setSeguimiento(typeof c.seguimiento === 'string' ? c.seguimiento : '')
+      setRecalculo(null)
+    },
+  })
+
+  // G-10: foco al primer campo editable vacío al montar. preventScroll para no
+  // arrastrar la página hasta él. En móvil esto abre el teclado en cada montaje.
+  useEffect(() => {
+    const primero = formRef.current?.querySelector<HTMLElement>('input:not([type="date"]):not([type="checkbox"])')
+    if (primero instanceof HTMLInputElement && !primero.value) primero.focus({ preventScroll: true })
+  }, [])
 
   const toggleSup = useCallback((sup: Suplemento) => {
-    if (seleccionados.find(s => s.nombre === sup.nombre)) {
-      setSeleccionados(prev => prev.filter(s => s.nombre !== sup.nombre))
-    } else {
-      const peso = parseFloat(pesoKg)
-      setSeleccionados(prev => [...prev, { nombre: sup.nombre, dosis: dosisParaForm(sup, peso), justificacion: '' }])
-    }
-  }, [seleccionados, pesoKg])
-
-  function updateSup(nombre: string, field: keyof SupSelec, val: string) {
-    setSeleccionados(prev => prev.map(s => s.nombre === nombre ? { ...s, [field]: val } : s))
-  }
-
-  const recalcularTodas = useCallback(() => {
-    const peso = parseFloat(pesoKg)
-    if (!peso) return
-    setSeleccionados(prev => prev.map(s => {
-      const sup = SUPLEMENTOS.find(x => x.nombre === s.nombre)
-      if (!sup) return s
-      return { ...s, dosis: dosisParaForm(sup, peso) }
-    }))
+    setSeleccionados(prev => prev.some(s => s.nombre === sup.nombre)
+      ? prev.filter(s => s.nombre !== sup.nombre)
+      : [...prev, {
+          nombre: sup.nombre,
+          dosis: dosisParaForm(sup, parseFloat(pesoKg)),
+          marca: '', justificacion: '', editada: false,
+        }])
   }, [pesoKg])
 
+  const updateSup = useCallback((nombre: string, campo: 'dosis' | 'marca' | 'justificacion', val: string) => {
+    setSeleccionados(prev => prev.map(s => s.nombre === nombre
+      ? { ...s, [campo]: val, editada: campo === 'dosis' ? true : s.editada }
+      : s))
+  }, [])
+
+  /**
+   * S-04 — corregir el peso recalcula SOLO las dosis que nadie ha tocado, y
+   * dice cuántas se conservaron. Recalcular todas borraría el trabajo manual;
+   * no recalcular ninguna dejaría la hoja mintiendo sobre el peso impreso.
+   */
+  function cambiarPeso(val: string) {
+    setPesoKg(val)
+    if (seleccionados.length === 0) { setRecalculo(null); return }
+    const peso = parseFloat(val)
+    const conservadas = seleccionados.filter(s => s.editada).length
+    setSeleccionados(seleccionados.map(s => {
+      if (s.editada) return s
+      const sup = SUPLEMENTOS.find(x => x.nombre === s.nombre)
+      return sup ? { ...s, dosis: dosisParaForm(sup, peso) } : s
+    }))
+    setRecalculo(peso > 0
+      ? { recalculadas: seleccionados.length - conservadas, conservadas }
+      : null)
+  }
+
+  // ── Validación (§3.8) ───────────────────────────────────────────
+  const faltantes: { clave: string; nombre: string }[] = []
+  if (!paciente.trim()) faltantes.push({ clave: 'suplementacion-paciente', nombre: 'Paciente' })
+  if (!(parseFloat(pesoKg) > 0)) faltantes.push({ clave: 'suplementacion-peso', nombre: 'Peso' })
+  if (seleccionados.length === 0) faltantes.push({ clave: 'suplementacion-sup-0', nombre: 'Suplementos' })
+
+  function irA(clave: string) {
+    if (clave === 'suplementacion-paciente') { enfocarYAcercar(pacienteRef.current); return }
+    enfocarYAcercar(formRef.current?.querySelector<HTMLElement>(`#${clave}`) ?? null)
+  }
+
   async function imprimir() {
+    // El primario nunca está gris por faltantes: un botón apagado no enseña qué
+    // falta, el banner sí. Al pulsar con faltantes no emite y lleva al primero.
+    if (faltantes.length > 0) {
+      setIntentado(true)
+      irA(faltantes[0].clave)
+      return
+    }
     flushSync(() => { setErrorGuardado(''); setImprimiendo(true) })
 
     // 1. Feedback instantáneo
@@ -257,7 +402,11 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
 
     // 2. Identidad — UUID v4 puro como clientId
     const clientId = crypto.randomUUID()
-    const contenido = { paciente, diagnostico, pesoKg, seleccionados, notas, seguimiento, fecha }
+    // `editada` es memoria de la pantalla y no sale de ella.
+    const elegidos = seleccionados.map(s => ({
+      nombre: s.nombre, dosis: s.dosis, marca: s.marca, justificacion: s.justificacion,
+    }))
+    const contenido = { paciente, diagnostico, pesoKg, seleccionados: elegidos, notas, seguimiento, fecha }
 
     // Flags de tracking para diferenciar errores
     let pdfGenerated = false
@@ -307,11 +456,8 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
         medico: medicoData,
         data: {
           paciente, fecha: fechaFormat, diagnostico, peso,
-          suplementos: seleccionados.map(s => {
+          suplementos: elegidos.map(s => {
             const sup = SUPLEMENTOS.find(x => x.nombre === s.nombre)
-            const dosisPersonalizada = (sup && peso > 0)
-              ? (dosisEnCapsulas(sup, peso) ?? s.dosis)
-              : s.dosis
             // Convertir presentacion (objeto) a string para el PDF
             const pres = sup?.presentacion
             const presTexto = pres
@@ -319,7 +465,11 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
               : null
 
             return {
-              nombre: s.nombre, dosis: dosisPersonalizada, presentacion: presTexto,
+              // La dosis que sale impresa es la del formulario, sin recalcular:
+              // lo que el médico dejó escrito manda sobre lo que la fórmula
+              // volvería a proponer (§2.3).
+              nombre: s.nombre, dosis: s.dosis, presentacion: presTexto,
+              marca: s.marca || undefined,
               beneficio_clinico: sup?.beneficio_clinico ?? '',
               beneficio_paciente: sup?.beneficio_paciente ?? '',
               justificacion: s.justificacion,
@@ -384,7 +534,7 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
         if (!pacienteId) {
           toast.success('Plan generado')
         } else {
-          toast.success('Plan guardado')
+          toast.success('Plan de suplementación guardado')
         }
       }
     } catch (err) {
@@ -405,170 +555,279 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
     }
   }
 
-  const inputCls = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]'
+  const senalar = (clave: string) => intentado && faltantes.some(f => f.clave === clave)
+  const conPeso = parseFloat(pesoKg) > 0
 
   return (
-    <div className="space-y-5">
+    <div ref={formRef} className="sp-doc-form">
+      {/* El árbol del formulario NO se desmonta cuando el panel de plantillas
+          está abierto: se apaga con display:none y el panel se monta como
+          hermano, en el mismo contenedor de scroll (spec 02 §3.1). */}
+      <div className="sp-doc-formbody" style={plantillas.panelAbierto ? { display: 'none' } : undefined}>
 
-      {/* Datos del paciente */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-        <h2 className="font-semibold text-slate-700 text-sm mb-4">Datos del paciente</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Fecha</label>
-            <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Paciente <span className="text-red-400">*</span></label>
-            <input type="text" value={paciente} onChange={e => setPaciente(e.target.value)} placeholder="Nombre completo" className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Diagnóstico</label>
-            <input type="text" value={diagnostico} onChange={e => setDiagnostico(e.target.value)} placeholder="Diagnóstico principal" className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">
-              Peso (kg) <span className="text-slate-400 font-normal">— calcula dosis por peso</span>
-            </label>
-            <input
-              type="number"
-              value={pesoKg}
-              onChange={e => setPesoKg(e.target.value)}
-              placeholder="Ej: 75"
-              min="20" max="300" step="0.5"
-              className={inputCls}
-            />
-          </div>
+      {plantillas.selector}
+
+      {/* El peso vive aquí y no en la card de suplementos: es dato del paciente,
+          no del suplemento (§1). La cuarta columna abre a 840px de CONTENEDOR y
+          nunca por viewport — S-01. */}
+      <section className="sp-card sp-doc-card">
+        <div className="sp-doc-cardhead">
+          <h2 className="sp-label">Datos del paciente</h2>
         </div>
-      </div>
+        <div className="sp-doc-cardbody">
+          <div className="sp-doc-grid" data-cols="4">
+            <div className="sp-doc-field">
+              <label htmlFor="suplementacion-fecha" className="sp-label-field">Fecha</label>
+              <input id="suplementacion-fecha" type="date" value={fecha}
+                min={FECHA_MIN} max={desplazarFecha(hoyEnTZ(), { anios: 1 })}
+                onChange={e => setFecha(e.target.value)} className="sp-input" />
+            </div>
+            <div className="sp-doc-field">
+              <label htmlFor="suplementacion-paciente" className="sp-label-field">
+                Paciente <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
+                <span className="sr-only">obligatorio</span>
+              </label>
+              <input ref={pacienteRef} id="suplementacion-paciente" type="text" value={paciente}
+                onChange={e => setPaciente(e.target.value)} placeholder="Nombre completo"
+                aria-invalid={senalar('suplementacion-paciente') || undefined}
+                className={`sp-input ${senalar('suplementacion-paciente') ? 'sp-doc-invalid' : ''}`} />
+              {pacienteInicial && <p className="sp-hint">De la ficha · editable</p>}
+            </div>
+            <div className="sp-doc-field">
+              <label htmlFor="suplementacion-diagnostico" className="sp-label-field">Diagnóstico</label>
+              <input id="suplementacion-diagnostico" type="text" value={diagnostico}
+                onChange={e => setDiagnostico(e.target.value)} placeholder="Diagnóstico principal"
+                className="sp-input" />
+              {diagnosticoInicial && <p className="sp-hint">Del diagnóstico de la consulta</p>}
+            </div>
+            <div className="sp-doc-field">
+              <label htmlFor="suplementacion-peso" className="sp-label-field">
+                Peso (kg) <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
+                <span className="sr-only">obligatorio</span>
+              </label>
+              <input id="suplementacion-peso" type="number" value={pesoKg}
+                onChange={e => cambiarPeso(e.target.value)} placeholder="Ej: 75"
+                min="20" max="300" step="0.5"
+                aria-invalid={senalar('suplementacion-peso') || undefined}
+                className={`sp-input ${senalar('suplementacion-peso') ? 'sp-doc-invalid' : ''}`} />
+              <p className="sp-hint">Calcula las dosis por peso</p>
+            </div>
+          </div>
 
-      {/* Selección de suplementos */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-slate-700 text-sm">Seleccionar suplementos</h2>
-          {pesoKg && seleccionados.length > 0 && (
-            <button
-              onClick={recalcularTodas}
-              className="flex items-center gap-1.5 text-xs text-[#1e5fa8] hover:text-[#1a3a5c] font-medium px-3 py-1.5 bg-blue-50 rounded-lg transition-colors"
-            >
-              <RefreshCw size={12} /> Recalcular dosis ({pesoKg} kg)
-            </button>
+          {recalculo && (
+            <p className="sp-banner sp-banner--info" style={{ marginTop: 'var(--sp-3)' }} aria-live="polite">
+              {textoRecalculo(recalculo.recalculadas, recalculo.conservadas)}
+            </p>
           )}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {SUPLEMENTOS.map(s => {
-            const sel = seleccionados.find(x => x.nombre === s.nombre)
-            return (
-              <button
-                key={s.nombre}
-                onClick={() => toggleSup(s)}
-                className={`text-left px-4 py-3 rounded-lg border-2 text-sm transition-all ${
-                  sel
-                    ? 'border-[#1e5fa8] bg-blue-50 text-[#1a3a5c]'
-                    : 'border-slate-200 hover:border-slate-300 text-slate-600'
-                }`}
-              >
-                <span className="font-medium">{sel ? '✓ ' : ''}{s.nombre}</span>
-                <span className="block text-xs text-slate-400 mt-0.5">
-                  {s.dosis_por_kg ?? s.dosis_default}
-                </span>
-                <span className="block text-xs mt-1.5 leading-relaxed" style={{ color: sel ? '#1e5fa8cc' : '#94a3b8' }}>
-                  {s.beneficio_clinico}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
+      </section>
 
-      {/* Personalizar dosis */}
-      {seleccionados.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
-            <h2 className="font-semibold text-slate-700 text-sm">Personalizar dosis y justificación</h2>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {seleccionados.map(s => {
-              const sup = SUPLEMENTOS.find(x => x.nombre === s.nombre)
-              return (
-                <div key={s.nombre} className="p-4 space-y-2">
-                  <p className="font-medium text-slate-700 text-sm">{s.nombre}</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-xs text-slate-400">Dosis</label>
-                      <input
-                        type="text"
-                        value={s.dosis}
-                        onChange={e => updateSup(s.nombre, 'dosis', e.target.value)}
-                        className="w-full mt-1 px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-slate-400">Nota / Justificación (opcional)</label>
-                      <input
-                        type="text"
-                        value={s.justificacion}
-                        onChange={e => updateSup(s.nombre, 'justificacion', e.target.value)}
-                        placeholder="Ej: Vitamina D 18 ng/mL en laboratorio"
-                        className="w-full mt-1 px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
+      <section className="sp-card sp-doc-card">
+        <div className="sp-doc-cardhead">
+          <div className="sp-icobox sp-icobox--sm"><ClipboardList /></div>
+          <h2 className="sp-label">Suplementos</h2>
+          <span className="sp-badge" style={{ marginLeft: 'auto' }}>
+            {seleccionados.length} de {SUPLEMENTOS.length}
+          </span>
+        </div>
+        <div className="sp-doc-cardbody">
+          {/* Columna única en los cuatro anchos (§2.2): con alturas desiguales,
+              dos columnas obligan a leer en zigzag. */}
+          <div className="sp-doc-supgrid">
+            {SUPLEMENTOS.map((sup, i) => (
+              <TarjetaSuplemento
+                key={sup.nombre}
+                sup={sup}
+                indice={i}
+                sel={seleccionados.find(s => s.nombre === sup.nombre)}
+                senalado={i === 0 && senalar('suplementacion-sup-0')}
+                conPeso={conPeso}
+                onToggle={() => toggleSup(sup)}
+                onCampo={(campo, val) => updateSup(sup.nombre, campo, val)}
+              />
+            ))}
           </div>
         </div>
+      </section>
+
+      <section className="sp-card sp-doc-card">
+        <div className="sp-doc-cardhead">
+          <h2 className="sp-label">Notas y control</h2>
+        </div>
+        <div className="sp-doc-cardbody">
+          <div className="sp-doc-supnotas">
+            <div className="sp-doc-field">
+              <label htmlFor="suplementacion-notas" className="sp-label-field">Notas adicionales</label>
+              <textarea id="suplementacion-notas" value={notas} onChange={e => setNotas(e.target.value)}
+                placeholder="Indicaciones generales…" className="sp-textarea" />
+            </div>
+            <div className="sp-doc-field">
+              <label htmlFor="suplementacion-control" className="sp-label-field">Cita de control</label>
+              <input id="suplementacion-control" type="text" value={seguimiento}
+                onChange={e => setSeguimiento(e.target.value)}
+                placeholder="Ej: En 3 meses con nuevos laboratorios" className="sp-input" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {errorGuardado && <p className="sp-banner sp-banner--danger">{errorGuardado}</p>}
+
+      {!cargandoPerfil && !medicoInfo && (
+        <p className="sp-banner sp-banner--warn">
+          <AlertTriangle size={17} />
+          <span style={{ flex: 1 }}>Completa tu perfil para que el documento salga con tu encabezado.</span>
+          <Link href="/perfil" className="sp-link-alt">Ir a mi perfil</Link>
+        </p>
       )}
 
-      {/* Notas y control */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="text-sm font-semibold text-slate-700 block mb-2">Notas adicionales</label>
-          <textarea
-            value={notas}
-            onChange={e => setNotas(e.target.value)}
-            placeholder="Indicaciones generales..."
-            rows={3}
-            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30"
-          />
-        </div>
-        <div>
-          <label className="text-sm font-semibold text-slate-700 block mb-2">Cita de control</label>
-          <input
-            type="text"
-            value={seguimiento}
-            onChange={e => setSeguimiento(e.target.value)}
-            placeholder="Ej: En 3 meses con nuevos laboratorios"
-            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30"
-          />
-        </div>
+      {intentado && faltantes.length > 0 && (
+        <p className="sp-banner sp-banner--warn" aria-live="polite">
+          <AlertTriangle size={17} />
+          <span>
+            {faltantes.length === 1 ? 'Falta 1 campo' : `Faltan ${faltantes.length} campos`}:{' '}
+            {faltantes.slice(0, 3).map((f, i) => (
+              <span key={f.clave}>
+                {i > 0 && ' · '}
+                <button type="button" onClick={() => irA(f.clave)}
+                  className="sp-link-alt" style={{ color: 'var(--sp-warn-strong)' }}>
+                  {f.nombre}
+                </button>
+              </span>
+            ))}
+            {faltantes.length > 3 && ` y ${faltantes.length - 3} más`}
+          </span>
+        </p>
+      )}
+
+      {/* «Guardar como plantilla» va aquí y no arriba: se guarda cuando el
+          formulario YA está lleno, así que su sitio es junto al de imprimir. */}
+      <div className="sp-doc-actions">
+        {plantillas.botonGuardar}
+        <button type="button" onClick={imprimir} disabled={imprimiendo || perfilPendiente}
+          className="sp-btn sp-btn--primary">
+          {imprimiendo ? <><span className="sp-spinner" /> Generando PDF…</>
+            : perfilPendiente ? <><span className="sp-spinner" /> Cargando tu perfil…</>
+            : <>
+                <Printer size={17} />
+                <span className="sp-doc-long">Imprimir plan de suplementación</span>
+                <span className="sp-doc-short">Imprimir</span>
+              </>}
+        </button>
       </div>
 
-      {errorGuardado && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-          {errorGuardado}
-        </div>
-      )}
+      </div>
 
-      <button
-        onClick={imprimir}
-        disabled={!paciente || seleccionados.length === 0 || imprimiendo || perfilPendiente}
-        className="doc-print-btn w-full flex items-center justify-center gap-2 py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-50"
-      >
-        {imprimiendo
-          ? <><Loader2 size={18} className="animate-spin" /> Generando PDF...</>
-          : <><Printer size={18} /> Imprimir Plan de Suplementación</>
-        }
-      </button>
+      {plantillas.panel}
+      {plantillas.dialogos}
 
       <ModalDocumentoGenerado
         open={docGenerado !== null}
         onClose={() => setDocGenerado(null)}
         blob={docGenerado?.blob ?? null}
-        titulo="Plan de suplementación"
+        titulo="Plan de suplementación generado"
         guardadoEnExpediente={docGenerado?.guardado ?? false}
       />
+    </div>
+  )
+}
+
+// ── Tarjeta de suplemento (§2.1) ─────────────────────────────────────────────
+
+interface PropsTarjeta {
+  sup: Suplemento
+  indice: number
+  sel: SupSelec | undefined
+  /** Solo la primera: es la que el banner de faltantes señala y enfoca. */
+  senalado: boolean
+  conPeso: boolean
+  onToggle: () => void
+  onCampo: (campo: 'dosis' | 'marca' | 'justificacion', val: string) => void
+}
+
+function TarjetaSuplemento({ sup, indice, sel, senalado, conPeso, onToggle, onCampo }: PropsTarjeta) {
+  const [expandido, setExpandido] = useState(false)
+  const [recortado, setRecortado] = useState(false)
+  const textoRef = useRef<HTMLParagraphElement>(null)
+
+  /**
+   * «Ver completo» solo se dibuja si el beneficio NO cabe en tres líneas (§2.1),
+   * y eso depende del ancho: a 818 px de tarjeta los nueve caben y el enlace no
+   * aparece en ninguna. Se mide, no se adivina.
+   *
+   * Con la tarjeta expandida el efecto sale antes de medir: sin recorte,
+   * `scrollHeight` y `clientHeight` coinciden y el enlace se borraría a sí mismo
+   * dejando el texto largo sin forma de volver a plegarse.
+   */
+  useLayoutEffect(() => {
+    const el = textoRef.current
+    if (!el || expandido) return
+    const medir = () => setRecortado(el.scrollHeight - el.clientHeight > 1)
+    medir()
+    const ro = new ResizeObserver(medir)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [expandido])
+
+  return (
+    <div
+      className={`sp-doc-supcard ${sel ? 'sp-doc-supcard--on' : ''} ${senalado ? 'sp-doc-supcard--invalid' : ''}`}
+      onClick={e => {
+        // La tarjeta entera alterna la selección: la casilla es la señal, no el
+        // objetivo (§2.1). Lo que nace en un control se lo queda el control —la
+        // etiqueta ya alterna por su cuenta y duplicaría el gesto.
+        if ((e.target as HTMLElement).closest('label, button, input, textarea')) return
+        onToggle()
+      }}
+    >
+      <label className="sp-check sp-doc-suphead">
+        <input id={`suplementacion-sup-${indice}`} type="checkbox" className="sr-only"
+          checked={!!sel} onChange={onToggle} />
+        <span className="sp-check__box"><Check aria-hidden="true" /></span>
+        <span style={{ minWidth: 0 }}>
+          <span className="sp-doc-supname">{sup.nombre}</span>
+          {/* La referencia por kilo queda a la vista: sin ella no hay forma de
+              comprobar la dosis calculada. */}
+          <span className="sp-doc-supref">{sup.dosis_por_kg ?? sup.dosis_default}</span>
+        </span>
+      </label>
+
+      <p ref={textoRef}
+        className={`sp-doc-supbenefit ${expandido ? '' : 'sp-doc-supbenefit--clamp'}`}>
+        {sup.beneficio_clinico}
+      </p>
+      {recortado && (
+        <button type="button" onClick={() => setExpandido(v => !v)}
+          className="sp-link-alt sp-doc-supmore">
+          {expandido ? 'Ver menos' : 'Ver completo'}
+        </button>
+      )}
+
+      {sel && (
+        <div className="sp-doc-supfields" onClick={e => e.stopPropagation()}>
+          <div className="sp-doc-field">
+            <label htmlFor={`suplementacion-dosis-${indice}`} className="sp-label-field">Dosis</label>
+            <input id={`suplementacion-dosis-${indice}`} type="text" value={sel.dosis}
+              onChange={e => onCampo('dosis', e.target.value)}
+              placeholder={conPeso ? '' : 'Escribe el peso y se calcula'}
+              className="sp-input" />
+          </div>
+          <div className="sp-doc-field">
+            <label htmlFor={`suplementacion-marca-${indice}`} className="sp-label-field">Marca comercial</label>
+            <input id={`suplementacion-marca-${indice}`} type="text" value={sel.marca}
+              onChange={e => onCampo('marca', e.target.value)}
+              placeholder="Ej: Nordic Naturals" className="sp-input" />
+          </div>
+          <div className="sp-doc-field" data-span="2">
+            <label htmlFor={`suplementacion-justificacion-${indice}`} className="sp-label-field">
+              Nota / justificación
+            </label>
+            <input id={`suplementacion-justificacion-${indice}`} type="text" value={sel.justificacion}
+              onChange={e => onCampo('justificacion', e.target.value)}
+              placeholder="Ej: Vitamina D 18 ng/mL en laboratorio" className="sp-input" />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

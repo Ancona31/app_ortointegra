@@ -50,7 +50,9 @@ function DocumentosContent() {
   const [resultados, setResultados] = useState<Paciente[]>([])
   const [buscando, setBuscando] = useState(false)
   const [showQuickPatient, setShowQuickPatient] = useState(false)
-  // Solo Honorarios reporta hoy; el resto se da por vacío (paso 5.1).
+  // Reportan los seis con predicado: los cinco del sistema de plantillas
+  // —Receta, Laboratorio, Imagen, Suplementación, Escrito— más Honorarios.
+  // Consentimiento e Internamiento aún no, y quedan en `true`: no avisan.
   const [formVacio, setFormVacio] = useState(true)
   // El panel de plantillas sustituye al formulario y oculta el selector de tipo.
   const [panelPlantillas, setPanelPlantillas] = useState(false)
@@ -211,11 +213,13 @@ function DocumentosContent() {
                 <RecetaForm
                   pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}
                   pacienteId={pacienteSeleccionado.id}
+                  onVacioChange={setFormVacio}
+                  onPanelPlantillasChange={setPanelPlantillas}
                 />
               )}
               {tipo === 'lab' && <SolicitudLabForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
               {tipo === 'imagen' && <SolicitudImagenForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
-              {tipo === 'suplementacion' && <PlanSuplementacionForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} />}
+              {tipo === 'suplementacion' && <PlanSuplementacionForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
               {tipo === 'internamiento' && (
                 <SolicitudInternamientoForm
                   pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}
@@ -226,6 +230,8 @@ function DocumentosContent() {
                 <EscritoMedicoForm
                   pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}
                   pacienteId={pacienteSeleccionado.id}
+                  onVacioChange={setFormVacio}
+                  onPanelPlantillasChange={setPanelPlantillas}
                 />
               )}
               {tipo === 'consentimiento' && (

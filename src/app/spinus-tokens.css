@@ -1140,6 +1140,93 @@ a:hover { color: var(--sp-primary-active); }
    siendo el del formulario. */
 .sp-doc-formbody { display: flex; flex-direction: column; gap: var(--sp-gap-block); }
 
+/* ── Receta · bloque de medicamento (GUIA_FORM_RECETA §2) ────────────────
+   Como el bloque de estudio pero con radio de control (9) y SIN contenedor
+   propio: la rejilla interior es la primitiva `.sp-doc-grid[data-cols="3"]`,
+   que mide `docform`. Receta no tiene trazado de 4 —cinco campos en tres
+   columnas dan tres filas exactas—, así que un segundo contexto de medida no
+   distinguiría ningún caso. */
+.sp-doc-medblock {
+  border: var(--sp-bw-hair) solid var(--sp-line-card);
+  border-radius: var(--sp-r-field-sm);   /* 9 */
+  background: var(--sp-surface);
+  padding: 14px;
+}
+.sp-doc-medblock + .sp-doc-medblock { margin-top: var(--sp-3); }
+.sp-doc-medhead { display: flex; align-items: center; gap: var(--sp-2); min-height: var(--sp-tap); }
+.sp-doc-medhead > .sp-label { font-size: 11.5px; }
+.sp-doc-medhead > .sp-doc-iconbtn { margin-left: auto; }
+
+/* «Agregar medicamento» al pie de CADA bloque y no al final de la lista: con
+   tres o cuatro fármacos, un botón único obliga a bajar hasta abajo y volver a
+   subir (§2.2). */
+.sp-doc-medfoot { margin-top: 14px; }
+@container docform (max-width: 379px) {
+  .sp-doc-medfoot > .sp-btn { width: 100%; }
+}
+
+/* ── Suplementación · tarjetas (GUIA_FORM_SUPLEMENTACION §2) ─────────────
+   Columna única en los CUATRO anchos: cada tarjeta tiene alto distinto según su
+   beneficio, y en dos columnas la vecina nunca empieza donde la vista la busca
+   (§2.2). `align-items:start` para que abrir una no estire a ninguna otra. */
+.sp-doc-supgrid {
+  display: grid; grid-template-columns: 1fr;
+  gap: var(--sp-2-5); align-items: start;
+}
+.sp-doc-supcard {
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  /* `relative` no es decorativo: la casilla es `sr-only`, o sea `absolute`, y
+     es el destino al que el banner de faltantes desplaza. Sin bloque contenedor
+     aquí, su rectángulo lo fija un ancestro cualquiera y el desplazamiento
+     aterriza en otro sitio. */
+  position: relative;
+  padding: 14px; cursor: pointer;
+  background: var(--sp-surface);
+  border: var(--sp-bw-hair) solid var(--sp-line-soft);
+  border-radius: var(--sp-r-card-inner);   /* 13 = --sp-r-field-sm + 4 */
+  transition: background var(--sp-dur-micro) var(--sp-ease-out),
+              border-color var(--sp-dur-micro) var(--sp-ease-out);
+}
+.sp-doc-supcard--on {
+  background: var(--sp-primary-bg-faint);
+  border-color: var(--sp-primary); border-width: var(--sp-bw-accent);
+}
+/* Solo la primera, y solo tras el primer intento: es la que el banner nombra. */
+.sp-doc-supcard--invalid { border-color: var(--sp-warn); border-width: var(--sp-bw-accent); }
+
+/* Cabecera: casilla + nombre + dosis de referencia. Es una etiqueta real, así
+   que el teclado la alcanza sin ARIA inventada; el resto de la tarjeta añade
+   superficie al mismo gesto. `flex-start` porque el nombre puede envolver. */
+.sp-doc-suphead { align-items: flex-start; }
+.sp-doc-suphead > .sp-check__box { margin-top: 1px; }
+.sp-doc-supname { font-size: var(--sp-fs-body); font-weight: var(--sp-fw-bold); color: var(--sp-ink-900); }
+.sp-doc-supref  { display: block; margin-top: 2px; font-size: 12.5px; color: var(--sp-ink-350); }
+
+/* El beneficio clínico es la referencia con la que el médico elige: se acota a
+   tres líneas, no se esconde (S-02). */
+.sp-doc-supbenefit { font-size: 13px; line-height: var(--sp-lh-body); color: var(--sp-ink-500); }
+.sp-doc-supbenefit--clamp {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
+}
+/* Sin resetear el borde: `.sp-link-alt` vive de su subrayado punteado, que es
+   un `border-bottom`, y el preflight ya deja el botón sin borde ni fondo. */
+.sp-doc-supmore { align-self: flex-start; min-height: 32px; padding: 0; }
+
+/* Campos que aparecen al seleccionar. Dosis y marca a la par; la nota debajo. */
+.sp-doc-supfields { display: grid; grid-template-columns: 1fr; gap: var(--sp-3); }
+@container docform (min-width: 600px) {
+  .sp-doc-supfields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sp-doc-supfields > [data-span="2"] { grid-column: span 2; }
+}
+
+/* Notas y control: dos columnas SOLO desde 600px de contenedor (§4). El trazado
+   de `data-cols="2"` abre a 380, y ahí un textarea junto a un input miden 182px
+   cada uno. */
+.sp-doc-supnotas { display: grid; grid-template-columns: 1fr; gap: var(--sp-4); }
+@container docform (min-width: 600px) {
+  .sp-doc-supnotas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 
 /* --- 19. PLANTILLAS DE DOCUMENTO (GUIA_FORMULARIOS_02) ------------------ */
 
@@ -1259,6 +1346,188 @@ a:hover { color: var(--sp-primary-active); }
 .sp-badge--danger {
   background: var(--sp-danger-bg); color: var(--sp-danger);
   font-size: 11.5px; font-weight: var(--sp-fw-black);
+}
+
+
+/* --- 20. EDITOR DEL ESCRITO MÉDICO (GUIA_FORM_ESCRITO_MEDICO §2.2 y §3) -- */
+
+/* Sección propia y no un apartado de la 18: el editor es de UN formulario de
+   los ocho. Los demás no tienen cuerpo de texto enriquecido y no heredan nada
+   de aquí. */
+
+/* Fila del título del pie: campo + enlace de reenganche (§2.2). El enlace es
+   `flex: 0 0 auto` y el campo se queda con todo lo que sobre. */
+.sp-ed-pie { display: flex; align-items: center; gap: var(--sp-2-5); }
+.sp-ed-pie > .sp-input     { flex: 1; min-width: 0; }
+.sp-ed-pie > .sp-link-alt  { flex: 0 0 auto; }
+
+/* ── Barra de herramientas (§3.3 y §3.4) ────────────────────────────────── */
+/* `position: relative` porque es el ancla de los tres menús, que cuelgan de su
+   borde inferior. Van DENTRO de la barra y no de la card: colgados de la card
+   aparecerían al pie del área de escritura.
+   `flex-wrap: nowrap` es la regla entera: la barra nunca pasa de una fila, y
+   lo que no cabe baja al menú. El reparto lo decide el CONTENEDOR y no el
+   viewport, así que sale igual en el iPad vertical que en una ventana
+   estrecha de escritorio.
+   La card NO lleva `overflow: hidden` — recortaría los menús. */
+.sp-ed-bar {
+  position: relative;
+  display: flex; align-items: center; flex-wrap: nowrap;
+  gap: var(--sp-1-5);                        /* 6 — niveles 1 y 2 */
+  padding: 8px 12px;
+  background: var(--sp-surface-sunken);
+  border-bottom: var(--sp-bw-hair) solid var(--sp-line-divider);
+}
+@container docform (min-width: 760px) {
+  .sp-ed-bar { gap: var(--sp-2); }           /* 8 — nivel 3, las nueve caben */
+}
+
+/* Objetivo de 44×44 con glifo de 18. Hoy eran 26 px reales, trece veces
+   (E-02). El área táctil no se negocia. */
+.sp-ed-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 var(--sp-tap); width: var(--sp-tap); height: var(--sp-tap);
+  border: none; background: none; cursor: pointer;
+  border-radius: var(--sp-r-btn-sm);         /* 8 */
+  color: var(--sp-ink-700);
+  transition: background var(--sp-dur-micro) var(--sp-ease-out),
+              color var(--sp-dur-micro) var(--sp-ease-out);
+}
+.sp-ed-btn:hover { background: var(--sp-surface-muted); }
+.sp-ed-btn svg { width: 18px; height: 18px; }
+/* Estado por FONDO y no solo por color de glifo: a 18 px la diferencia de
+   tinta sola no se lee. `aria-expanded` entra aquí para que el control que
+   tiene su menú abierto se vea encendido mientras dura. */
+.sp-ed-btn[aria-pressed="true"],
+.sp-ed-btn[aria-expanded="true"] {
+  background: var(--sp-primary-bg-faint); color: var(--sp-ink-900);
+}
+
+/* Control de bloque, nivel 1: 52×44 con el glifo del bloque actual + chevron.
+   Sustituye al `<select>` porque a 332 px de barra útil no hay sitio para los
+   128 px del desplegable. */
+.sp-ed-block { flex: 0 0 52px; width: 52px; gap: 1px; }
+.sp-ed-block > svg:last-child { width: 13px; height: 13px; color: var(--sp-ink-icon); }
+
+/* Control de bloque, niveles 2 y 3: `<select>` nativo — en el iPad abre la
+   rueda del sistema. Sube a 44 px de alto vía `.sp-input`: era el control más
+   pequeño de los ocho formularios (E-05). */
+.sp-ed-select { display: none; flex: 0 0 128px; width: 128px; }
+@container docform (min-width: 520px) {
+  .sp-ed-block  { display: none; }
+  .sp-ed-select { display: block; }
+}
+@container docform (min-width: 760px) {
+  .sp-ed-select { flex-basis: 150px; width: 150px; }
+}
+
+/* Botón del menú. Separado del grupo de formato con `margin-left: auto` para
+   no pulsarlo al ir a por las listas, y con borde para leerse como otra cosa.
+   En nivel 3 no se renderiza: las nueve están en la barra. */
+.sp-ed-more { margin-left: auto; border: var(--sp-bw-hair) solid var(--sp-line-input); }
+@container docform (min-width: 760px) { .sp-ed-more { display: none; } }
+
+/* El reparto de §3.3, en dos pares de clases:
+     .sp-ed-n2 / .sp-ed-n3 — el control EN LA BARRA desde 520 / desde 760
+     .sp-ed-m2 / .sp-ed-m3 — la fila EN EL MENÚ, hasta 520 / hasta 760
+   Cada control se escribe dos veces en el árbol y el contenedor apaga una. Es
+   la única forma de repartir por consulta de contenedor sin medir con JS, que
+   es justo lo que el sistema evita en todas las demás rejillas. `display:none`
+   los saca también del orden de tabulación: no hay objetivos fantasma. */
+.sp-ed-n2, .sp-ed-n3 { display: none; }
+@container docform (min-width: 520px) {
+  .sp-ed-n2 { display: inline-flex; }
+  .sp-ed-m2 { display: none; }
+}
+@container docform (min-width: 760px) {
+  .sp-ed-n3 { display: inline-flex; }
+  .sp-ed-m3 { display: none; }
+}
+
+/* ── Menús de la barra (§3.4) ───────────────────────────────────────────── */
+.sp-ed-menu {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 5;
+  min-width: 212px; padding: var(--sp-1);
+  background: var(--sp-surface);
+  border: var(--sp-bw-hair) solid var(--sp-line-card);
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgba(16, 42, 73, .14);
+}
+/* El de bloque cuelga del extremo izquierdo: su control es el primero. */
+.sp-ed-menu--left { right: auto; left: 0; }
+
+/* Fila de 44 px con icono de 20 y NOMBRE ESCRITO: en un menú no hay que
+   adivinar qué hace un glifo. */
+.sp-ed-row {
+  display: flex; align-items: center; gap: var(--sp-2-5);
+  width: 100%; min-height: var(--sp-tap);
+  padding: 0 12px; border: none; background: none; cursor: pointer;
+  border-radius: var(--sp-r-btn-sm);
+  font-family: inherit; font-size: var(--sp-fs-body-sm);
+  color: var(--sp-ink-700); text-align: left;
+}
+.sp-ed-row:hover { background: var(--sp-surface-muted); }
+.sp-ed-row > svg { flex: 0 0 20px; width: 20px; height: 20px; }
+.sp-ed-row[aria-checked="true"] {
+  background: var(--sp-primary-bg-faint); color: var(--sp-ink-900);
+  font-weight: var(--sp-fw-semi);
+}
+/* Marca de la derecha: chevron de «abre otra hoja» o palomita de «es esta». */
+.sp-ed-row__cue { margin-left: auto; flex: 0 0 auto; color: var(--sp-ink-icon); display: flex; }
+.sp-ed-row__cue svg { width: 16px; height: 16px; }
+/* Cabecera de la segunda hoja del menú (alineación), con su flecha de vuelta. */
+.sp-ed-menuhead {
+  display: flex; align-items: center; gap: var(--sp-2);
+  min-height: var(--sp-tap); padding: 0 12px 0 4px;
+  border-bottom: var(--sp-bw-hair) solid var(--sp-line-divider);
+  margin-bottom: var(--sp-1);
+}
+
+/* ── Área de escritura (§3.5) ───────────────────────────────────────────── */
+/* 240 px hasta 760 de contenedor y 320 desde ahí, en vez del `min-h-[380px]`
+   fijo de antes: 380 ahogaba el editor justo donde menos alto útil hay.
+   Crece con el contenido y NO abre scroll propio — el scroll es el del
+   formulario. */
+.sp-ed-prose {
+  padding: 18px 20px;
+  /* 15/1.7 son de la guía §3.5. `--sp-lh-body` (1.55) es interlínea de texto
+     denso; esto es prosa de lectura sostenida y necesita el aire. */
+  font-size: 15px; line-height: 1.7;
+  color: var(--sp-ink-700);
+  min-height: 240px; outline: none;
+}
+@container docform (min-width: 760px) { .sp-ed-prose { min-height: 320px; } }
+
+/* Estilos del contenido. Antes los inyectaba un `<style>` en cada montaje
+   (E-04): dos escritos abiertos se pisaban las reglas entre sí. Aquí viven
+   una sola vez y el preflight de Tailwind 4 —que resetea ul/ol/h1-h6— queda
+   respondido en el mismo sitio. */
+.sp-ed-prose p          { margin: 8px 0; }
+.sp-ed-prose h1,
+.sp-ed-prose h2         { font-size: 19px; margin: 18px 0 6px; }
+.sp-ed-prose h3         { font-size: 17px; margin: 14px 0 5px; }
+.sp-ed-prose h1,
+.sp-ed-prose h2,
+.sp-ed-prose h3         { font-weight: var(--sp-fw-black); line-height: var(--sp-lh-title);
+                          color: var(--sp-ink-900); }
+.sp-ed-prose ul         { list-style: disc;    padding-left: 24px; margin: 8px 0; }
+.sp-ed-prose ol         { list-style: decimal; padding-left: 24px; margin: 8px 0; }
+.sp-ed-prose li         { margin: 2px 0; }
+.sp-ed-prose li > p     { margin: 0; }
+.sp-ed-prose blockquote {
+  border-left: 3px solid var(--sp-line-input); padding-left: 16px; margin: 10px 0;
+  font-style: italic; color: var(--sp-ink-500);
+}
+.sp-ed-prose hr         { border: 0; border-top: var(--sp-bw-hair) solid var(--sp-line-card);
+                          margin: 14px 0; }
+.sp-ed-prose > :first-child { margin-top: 0; }
+.sp-ed-prose > :last-child  { margin-bottom: 0; }
+
+/* Marcador de posición del párrafo vacío (extensión Placeholder de TipTap). */
+.sp-ed-prose p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left; height: 0; pointer-events: none;
+  color: var(--sp-ink-200);
 }
 
 

@@ -211,9 +211,10 @@ export default function NuevaNotaPage() {
   // de setDocInline: slideDir/slideKey/prevDocRef solo alimentaban la animación
   // horizontal del overlay, que se retira en este paso.
   const [docInline, setDocInline]       = useState<TipoDocumento | null>(null)
-  // Paso 5.1: el formulario montado reporta si tiene algo escrito. Hoy solo lo
-  // emite Honorarios (es el único con predicado); los otros siete quedan en
-  // `true` hasta que el paso del acabado los cablee, así que no avisan.
+  // Paso 5.1: el formulario montado reporta si tiene algo escrito. Lo emiten
+  // los seis con predicado —los cinco del sistema de plantillas (Receta,
+  // Laboratorio, Imagen, Suplementación, Escrito) más Honorarios—.
+  // Consentimiento e Internamiento aún no, y quedan en `true`: no avisan.
   const [formVacio, setFormVacio]       = useState(true)
   // El panel de plantillas sustituye al formulario y oculta el selector de tipo.
   const [panelPlantillas, setPanelPlantillas] = useState(false)
@@ -1853,7 +1854,7 @@ export default function NuevaNotaPage() {
                 oculto={panelPlantillas}
               >
                 {docInline === 'receta' && (
-                  <RecetaFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} medicamentosIniciales={medicamentosParaReceta} />
+                  <RecetaFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} medicamentosIniciales={medicamentosParaReceta} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />
                 )}
                 {docInline === 'lab' && (
                   <SolicitudLabFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />
@@ -1862,13 +1863,13 @@ export default function NuevaNotaPage() {
                   <SolicitudImagenFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />
                 )}
                 {docInline === 'suplementacion' && (
-                  <PlanSupFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} />
+                  <PlanSupFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />
                 )}
                 {docInline === 'internamiento' && (
                   <InternamientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} />
                 )}
                 {docInline === 'escrito' && (
-                  <EscritoFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} />
+                  <EscritoFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />
                 )}
                 {docInline === 'consentimiento' && (
                   <ConsentimientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} />
