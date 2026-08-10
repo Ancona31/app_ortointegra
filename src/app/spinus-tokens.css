@@ -70,6 +70,29 @@
   --sp-danger-border:      #f3c9c9;
 
   /* ---------------------------------------------------------------------
+     2.b COLOR — TIPO DE DOCUMENTO (GUIA_FORMULARIOS_04 §3)
+     ---------------------------------------------------------------------
+     Identidad permanente de cada uno de los 8 formatos. Se usan SOLO en el
+     selector de tipo (tarjeta y línea plegada). Nunca en el PDF, ni en un
+     botón, ni en un borde de card, ni en el foco: eso es del acento del
+     médico (--sp-primary), que es un selector libre y PUEDE coincidir con
+     cualquiera de estos hex sin que se confundan — la distinción la dan el
+     icono y la etiqueta, no el color.
+     Los cuatro valores que NO son la elección obvia lo son por separación
+     en deuteranopia y en L*: escrito es cyan-800 y no teal-700 (con emerald
+     era el mismo tile dos veces), imagen violet-600 e indigo-800 en
+     consentimiento (violeta e índigo colapsan a azul), y suplementación
+     amber-800 porque amber-700 ES exactamente --sp-warn. */
+  --sp-doc-receta:         #1d4ed8;  /* blue-700    */
+  --sp-doc-laboratorio:    #047857;  /* emerald-700 */
+  --sp-doc-imagen:         #7c3aed;  /* violet-600  */
+  --sp-doc-suplementacion: #92400e;  /* amber-800   */
+  --sp-doc-internamiento:  #be123c;  /* rose-700    */
+  --sp-doc-escrito:        #155e75;  /* cyan-800    */
+  --sp-doc-consentimiento: #3730a3;  /* indigo-800  */
+  --sp-doc-honorarios:     #c2410c;  /* orange-700  */
+
+  /* ---------------------------------------------------------------------
      3. COLOR — NEUTRALES (escala única, rol fijo por token)
      --------------------------------------------------------------------- */
   --sp-ink-900:            #14345c;  /* títulos de nivel documento (H1 de lienzo) */
@@ -345,6 +368,20 @@ html.dark {
   --sp-danger-ink:       #fca5a5;                   /* TP:218 */
   --sp-danger-bg:        rgba(239,68,68,.14);       /* TP:194 */
   --sp-danger-border:    rgba(239,68,68,.25);       /* TP:210 */
+
+  /* — TIPO DE DOCUMENTO — el mismo 45 % contra blanco que usa
+       --sp-primary-text. Literales y no color-mix sobre el token claro:
+       redeclarar --sp-doc-X en función de var(--sp-doc-X) es una referencia
+       cíclica y la propiedad quedaría inválida (guaranteed-invalid), no
+       heredada. Los valores son los de GUIA_FORMULARIOS_04 §3. */
+  --sp-doc-receta:         #99afed;
+  --sp-doc-laboratorio:    #8ec2b3;
+  --sp-doc-imagen:         #c4a6f7;
+  --sp-doc-suplementacion: #cea993;
+  --sp-doc-internamiento:  #e294a7;
+  --sp-doc-escrito:        #96b7c1;
+  --sp-doc-consentimiento: #a5a2d6;
+  --sp-doc-honorarios:     #e4aa92;
 
   /* — SEMÁFORO DE VITALES — espejo oscuro. Aquí sí converge con la semántica
        genérica: los hexes de la card solo divergen en la paleta clara. */
@@ -758,6 +795,139 @@ a:hover { color: var(--sp-primary-active); }
 }
 .sp-check input:checked + .sp-check__box { background: var(--sp-primary); border-color: var(--sp-primary); }
 .sp-check__label { font-size: var(--sp-fs-body); color: var(--sp-ink-700); }
+
+
+/* --- 17. SELECTOR DE TIPO DE DOCUMENTO (GUIA_FORMULARIOS_04) ------------ */
+
+/* Envoltorio de selector + formulario. Establece el contexto de consulta de
+   contenedor: TODA la disposición de aquí abajo mide el CONTENEDOR, no el
+   viewport. Es la causa raíz de §0.3 de la auditoría — los breakpoints de
+   Tailwind se disparaban por viewport dentro de un panel que no había
+   crecido, y por eso los campos se reordenaban al girar el iPad.
+   `docform` es el mismo nombre que usará el envoltorio de cada formulario
+   (guía 03 §3.C.2); anidados, gana el más cercano, que es lo correcto. */
+.sp-doc-host {
+  container-type: inline-size;
+  container-name: docform;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-gap-block);            /* 18px */
+}
+
+/* Un solo umbral: 4 columnas desde 600px de contenedor, 2 por debajo. Ocho se
+   divide en 4 y en 2, así que ninguna fila queda coja en ningún ancho. */
+.sp-doc-typecards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-2-5);                  /* 10px */
+}
+
+/* minmax(0,1fr) y no 1fr: impide que el ancho mínimo intrínseco de la
+   etiqueta infle la pista y desborde la fila. */
+.sp-doc-typecard {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--sp-2-5);
+  min-height: 92px;                    /* 104px en 4 columnas */
+  padding: 14px 10px;
+  border-radius: var(--sp-r-card);     /* 16px */
+  background: var(--sp-surface);
+  border: var(--sp-bw-hair) solid var(--sp-line-card);
+  box-shadow: var(--sp-shadow-flat);
+  color: var(--sp-ink-700);
+  font-size: 13px;                     /* 14px en 4 columnas */
+  font-weight: var(--sp-fw-semi);
+  line-height: 1.25;
+  text-align: center;
+  transition: background var(--sp-dur-micro) var(--sp-ease-out),
+              border-color var(--sp-dur-micro) var(--sp-ease-out);
+}
+
+/* El icono lleva el color del tipo AL 100 % EN LOS CUATRO ESTADOS. La
+   selección se comunica con peso, fondo y filete — nunca con la aparición
+   del color: si solo apareciera al seleccionar, cuando lo ves ya llegaste. */
+.sp-doc-typecard > svg { width: 22px; height: 22px; flex-shrink: 0; color: var(--doc-color); }
+
+/* Máximo 2 líneas: la tarjeta las admite, así que «Honorarios / Cotización»
+   NO se acorta en móvil. */
+.sp-doc-typecard__label {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+/* @media (hover: hover): en táctil el hover se queda pegado tras el toque y
+   una tarjeta no seleccionada se leería como si lo estuviera. */
+@media (hover: hover) {
+  .sp-doc-typecard:hover {
+    background: color-mix(in srgb, var(--doc-color) 6%, var(--sp-surface));
+    border-color: color-mix(in srgb, var(--doc-color) 30%, var(--sp-surface));
+    color: var(--sp-ink-800);
+  }
+}
+
+/* Ninguna superficie del tipo es relleno sólido: máximo un lavado al 12 %
+   con filete de 1.5px. El acento del médico sí se pinta en sólido. Es lo que
+   impide confundir una tarjeta con un control de la app aunque los dos hex
+   coincidan.
+   Se mezcla contra --sp-surface y no contra #fff (spec §9): en claro es el
+   mismo #ffffff y en oscuro mezcla contra la superficie, que es lo que la
+   spec dejaba como NO DEFINIDO. */
+.sp-doc-typecard[aria-selected="true"] {
+  background: color-mix(in srgb, var(--doc-color) 12%, var(--sp-surface));
+  border: var(--sp-bw-accent) solid var(--doc-color);
+  color: color-mix(in srgb, var(--doc-color) 40%, var(--sp-ink-700));
+  font-weight: var(--sp-fw-bold);
+}
+
+.sp-doc-typecard:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--doc-color) 18%, transparent);
+}
+
+/* Línea plegada: 52px en vez de 398 en móvil (346 devueltos) y de 220 en el
+   resto. Toma el vestido del estado seleccionado. */
+.sp-doc-typecollapsed {
+  display: flex; align-items: center; gap: var(--sp-3);
+  width: 100%;
+  min-height: 52px;
+  padding: 0 14px;
+  border-radius: var(--sp-r-card);
+  background: color-mix(in srgb, var(--doc-color) 12%, var(--sp-surface));
+  border: var(--sp-bw-accent) solid var(--doc-color);
+  color: color-mix(in srgb, var(--doc-color) 40%, var(--sp-ink-700));
+  text-align: left;
+}
+.sp-doc-typecollapsed > svg { width: 22px; height: 22px; flex-shrink: 0; color: var(--doc-color); }
+.sp-doc-typecollapsed:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--doc-color) 18%, transparent);
+}
+.sp-doc-typecollapsed__eyebrow {
+  display: block;
+  font-size: var(--sp-fs-legal); font-weight: var(--sp-fw-bold);
+  letter-spacing: var(--sp-ls-label-w); text-transform: uppercase;
+  color: var(--sp-ink-350);
+}
+.sp-doc-typecollapsed__name {
+  display: block;
+  font-size: var(--sp-fs-body); font-weight: var(--sp-fw-bold);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sp-doc-typecollapsed__cta {
+  margin-left: auto; display: flex; align-items: center; gap: var(--sp-1-5);
+  font-size: var(--sp-fs-meta); font-weight: var(--sp-fw-semi);
+  color: var(--sp-ink-500); flex-shrink: 0;
+}
+.sp-doc-typecollapsed__cta > svg { width: 18px; height: 18px; color: var(--sp-ink-icon); }
+
+@container docform (min-width: 600px) {
+  .sp-doc-typecards { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-gap-tiles); }
+  .sp-doc-typecard  { min-height: 104px; padding: 18px 12px; font-size: var(--sp-fs-body-sm); }
+  .sp-doc-typecard > svg { width: 24px; height: 24px; }
+}
+
+/* Sin soporte de consultas de contenedor (iPadOS ≤15): quedan las 2 columnas
+   de la regla base. Correcto siempre, subóptimo en pantallas grandes — el
+   fallback seguro, igual que en guía 03 §3.C.4. */
 
 
 /* ============================================================================

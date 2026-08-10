@@ -1,9 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { createPortal } from 'react-dom'
 import ModalShell from '@/components/ui/ModalShell'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Paciente, Diagnostico, MedicamentoConsulta, SignosVitales, MedicoInfo } from '@/types'
 import type { MedicamentoIA, BloqueIA, NotaIAResponse } from '@/lib/notaIA/schema'
@@ -11,8 +10,7 @@ import { calcularEdad, generateDocFileName } from '@/lib/patientUtils'
 import { buildNotaRenderData } from '@/lib/notaRenderData'
 import {
   ArrowLeft, Save, Loader2, RotateCcw, Printer, Eye, Pencil,
-  Pill, FlaskConical, ScanLine, ClipboardList, CheckCircle2, Check,
-  BedDouble, PenLine, ShieldCheck, Receipt, X, FileText,
+  Pill, CheckCircle2, Check, PenLine, X, FileText,
   Mic, Sparkles, AlertTriangle,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -26,6 +24,7 @@ import dynamic from 'next/dynamic'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import SignosVitalesCard, { type SignosVitalesForm } from '@/components/expediente/SignosVitalesCard'
 import { fueraDeLimitesDuros, type SignoVitalKey } from '@/lib/signosVitalesRangos'
+import SelectorTipoDocumento, { tipoDocumento, type TipoDocumento } from '@/components/documentos/SelectorTipoDocumento'
 
 function FormCargando() {
   return (
@@ -67,17 +66,6 @@ type MedicamentoConVia = {
   nombre_comercial: string; presentacion: string; dosis: string
   principio_activo: string; indicacion: string; via_administracion: string
 }
-
-const DOCS = [
-  { key: 'receta',         label: 'Receta médica',            icon: Pill,          color: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' },
-  { key: 'lab',            label: 'Solicitud de laboratorio', icon: FlaskConical,  color: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' },
-  { key: 'imagen',         label: 'Solicitud de imagen',      icon: ScanLine,      color: 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100' },
-  { key: 'suplementacion', label: 'Plan de suplementación',   icon: ClipboardList, color: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100' },
-  { key: 'internamiento',  label: 'Internamiento',            icon: BedDouble,     color: 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100' },
-  { key: 'escrito',        label: 'Escrito médico',           icon: PenLine,       color: 'border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100' },
-  { key: 'consentimiento', label: 'Consentimiento',           icon: ShieldCheck,   color: 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100' },
-  { key: 'honorarios',     label: 'Honorarios / Cotización',   icon: Receipt,       color: 'border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100' },
-]
 
 const MED_VACIA: MedicamentoConsulta = { nombre: '', dosis: '', frecuencia: '', duracion: '' }
 
@@ -184,6 +172,7 @@ function construirSignosVitalesPayload(sv: SignosVitalesForm): SignosVitales | u
 
 export default function NuevaNotaPage() {
   const { id } = useParams<{ id: string }>()
+  const router = useRouter()
   const { consultorioActivo } = useConsultorioActivo()
   useAuditAccess('consultas', id) // NOM-024: registrar acceso a nota médica
   const [medicoInfo, setMedicoInfo] = useState<MedicoInfo | null>(null)
@@ -218,22 +207,16 @@ export default function NuevaNotaPage() {
   const [notaPdfBlob, setNotaPdfBlob]   = useState<Blob | null>(null)
   const [error, setError]               = useState('')
   const [notaSaved, setNotaSaved]       = useState(false)
-  const [docInline, setDocInlineRaw]    = useState<string | null>(null)
-  const [slideDir, setSlideDir]         = useState<'left' | 'right'>('right')
-  const [slideKey, setSlideKey]         = useState(0)
-  const prevDocRef                      = useRef<string | null>(null)
-
-  const setDocInline = (key: string | null) => {
-    if (key && prevDocRef.current && key !== prevDocRef.current) {
-      const docs = medicamentosParaReceta.length > 0 ? DOCS : DOCS.filter(d => d.key !== 'receta')
-      const prevIdx = docs.findIndex(d => d.key === prevDocRef.current)
-      const nextIdx = docs.findIndex(d => d.key === key)
-      setSlideDir(nextIdx > prevIdx ? 'right' : 'left')
-      setSlideKey(k => k + 1)
-    }
-    prevDocRef.current = key
-    setDocInlineRaw(key)
-  }
+  // Tipo de documento desplegado bajo «Concluir consulta». Muere el envoltorio
+  // de setDocInline: slideDir/slideKey/prevDocRef solo alimentaban la animación
+  // horizontal del overlay, que se retira en este paso.
+  const [docInline, setDocInline]       = useState<TipoDocumento | null>(null)
+  // Paso 5.1: el formulario montado reporta si tiene algo escrito. Hoy solo lo
+  // emite Honorarios (es el único con predicado); los otros siete quedan en
+  // `true` hasta que el paso del acabado los cablee, así que no avisan.
+  const [formVacio, setFormVacio]       = useState(true)
+  // Aviso de §6.2: se avisa, NO se bloquea.
+  const [confirmarConcluir, setConfirmarConcluir] = useState(false)
   const [ultimoGuardado, setUltimoGuardado] = useState<Date | null>(null)
   const [borradorRestaurado, setBorradorRestaurado] = useState(false)
   const [ultimaConsulta, setUltimaConsulta] = useState<{ diagnosticos: string; medicamentos: MedicamentoConsulta[] | null } | null>(null)
@@ -1434,8 +1417,9 @@ export default function NuevaNotaPage() {
       {/* ── Grid de dos columnas · una sola columna en Cierre ──
           Con la nota guardada (blueprint §5.3) la página deja de ser de captura:
           la rejilla colapsa y los documentos pasan a protagonista a ancho completo.
-          El overlay de documentos (createPortal, z-50) es HERMANO de este
-          contenedor y monta en document.body: ninguna clase de aquí lo alcanza. */}
+          Ese ancho completo es ahora el del selector y el del formulario, que
+          viven DENTRO de este contenedor: el overlay portalado murió en 5.1 y
+          con él el panel de 720px que estrechaba los formularios en iPad. */}
       <div className={notaSaved
         ? 'space-y-[var(--sp-gap-block)]'
         : 'lg:grid lg:grid-cols-5 lg:gap-6 lg:items-start space-y-5 lg:space-y-0'}>
@@ -1765,12 +1749,21 @@ export default function NuevaNotaPage() {
           )}
 
           {/* ── Panel de documentos ──
-              En Cierre es el protagonista: chrome del sistema y rejilla a 4.
+              En Cierre queda como encabezado: las tarjetas de tipo bajaron al
+              otro lado de «Concluir consulta» (montaje 1 de la guía 04, cuyo
+              cromo encima del selector es «Card de nota guardada + botón
+              Concluir consulta»).
               En Captura conserva su chrome actual intacto — migrarlo cambiaría
               el estado de captura, que no es objetivo de C5. */}
-          <div className={notaSaved
-            ? 'sp-card'
-            : 'bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden'}>
+          <div
+            /* data-onboard="panel-documentos" SE CONSERVA y sube desde la
+               rejilla retirada a esta card: es el único ancla con consumidor
+               vivo — el querySelector de «Otros documentos» del Estado Éxito
+               depende de él, y el selector queda justo debajo. */
+            data-onboard={notaSaved ? 'panel-documentos' : undefined}
+            className={notaSaved
+              ? 'sp-card'
+              : 'bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden'}>
 
             {notaSaved ? (
               /* Encabezado del Cierre: ABSORBE el banner verde en vez de
@@ -1813,54 +1806,7 @@ export default function NuevaNotaPage() {
                   </button>
                 )}
               </div>
-            ) : (
-              /* Estado: nota guardada — panel activo.
-                 data-onboard="panel-documentos" SE CONSERVA: es el único ancla
-                 con consumidor vivo — el querySelector de "Otros documentos"
-                 del Estado Éxito depende de él. */
-              <div className="space-y-3" data-onboard="panel-documentos">
-
-                {/* Rejilla única: la receta destacada entra como celda de ancho
-                    completo en vez de vivir fuera. Sin medicamentos son 8
-                    formatos → 4×2 exacto; con receta promovida quedan 7 → 4+3,
-                    equilibrado por la banda de arriba. El sistema no expone
-                    rejilla de 4: la composición es layout, va con utilidades
-                    (regla de C1–C4). Sin ternario de notaSaved: esta rama del
-                    panel SOLO se monta con la nota guardada. */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-
-                  {medicamentosParaReceta.length > 0 && (
-                    <button onClick={() => setDocInline(docInline === 'receta' ? null : 'receta')}
-                      className={`col-span-full flex items-center gap-2 py-2.5 px-3 rounded-xl border-2 text-sm font-semibold transition-all ${docInline === 'receta' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100'}`}>
-                      <Pill size={15} />
-                      <span className="text-left leading-tight">
-                        {docInline === 'receta' ? 'Cerrar receta' : `Receta médica`}
-                      </span>
-                      <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-normal ${docInline === 'receta' ? 'bg-white/20' : 'bg-blue-100 text-blue-600'}`}>
-                        {medicamentosParaReceta.length} med.
-                      </span>
-                    </button>
-                  )}
-
-                  {DOCS.filter(d => !(d.key === 'receta' && medicamentosParaReceta.length > 0)).map(({ key, label, icon: Icon, color }) => (
-                    <button key={key}
-                      onClick={() => setDocInline(docInline === key ? null : key)}
-                      className={`flex flex-col items-center gap-1.5 p-4 rounded-xl border-2 transition-all text-center text-xs font-medium leading-tight ${docInline === key ? color + ' border-current' : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'}`}>
-                      <Icon size={17} />
-                      {label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Indicador de documento abierto */}
-                {docInline && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-[#1e5fa8]/5 border border-[#1e5fa8]/20 rounded-xl text-xs text-[#1e5fa8] font-medium">
-                    <FileText size={13} />
-                    Editando: {DOCS.find(d => d.key === docInline)?.label}
-                  </div>
-                )}
-              </div>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -1872,133 +1818,96 @@ export default function NuevaNotaPage() {
             Cierre tiene un solo propósito: documentar y concluir.
         ════════════════════════════════ */}
         {notaSaved && (
-          /* Primario único de la pantalla, en flujo y no sticky: el Cierre es
-             corto y una barra fija taparía la última fila de la rejilla —
-             además el overlay de documentos (z-50) la cubriría al abrir un
-             formulario. <Link> y no router.push: .sp-btn ya se usa sobre Link en
-             el Estado Éxito, y conserva prefetch y clic-central. Sin --reward:
-             esa sombra es del CTA de receta del Estado 4. */
-          <Link href={`/expediente/${id}`}
-            className="sp-btn sp-btn--primary sp-btn--primary-block">
-            <Check size={18} />
-            Concluir consulta
-          </Link>
+          <>
+            {/* Primario único de la pantalla, en flujo y no sticky: el Cierre es
+                corto y una barra fija taparía el selector de tipo. <Link> y no
+                router.push: .sp-btn ya se usa sobre Link en el Estado Éxito, y
+                conserva prefetch y clic-central. Sin --reward: esa sombra es
+                del CTA de receta del Estado 4.
+                El onClick solo INTERCEPTA (§6.2: se avisa, no se bloquea); con
+                el formulario vacío deja pasar la navegación del Link intacta.
+                El clic central dispara auxclick, no click, así que abre en
+                pestaña nueva sin pasar por el aviso: es un gesto explícito de
+                "no me lleves de aquí" y no hay nada que advertir. */}
+            <Link href={`/expediente/${id}`}
+              onClick={e => {
+                if (formVacio || !docInline) return
+                e.preventDefault()
+                setConfirmarConcluir(true)
+              }}
+              className="sp-btn sp-btn--primary sp-btn--primary-block">
+              <Check size={18} />
+              Concluir consulta
+            </Link>
+
+            {/* Selector de tipo + formulario, en la misma pantalla y a anchura
+                completa. Murió el modal flotante: con el contexto del paciente
+                y de la consulta ya en pantalla no había nada que pasarle. */}
+            <div className="sp-doc-host">
+              <SelectorTipoDocumento
+                value={docInline}
+                onChange={t => { setFormVacio(true); setDocInline(t) }}
+                conDatos={!formVacio}
+              >
+                {docInline === 'receta' && (
+                  <RecetaFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} medicamentosIniciales={medicamentosParaReceta} />
+                )}
+                {docInline === 'lab' && (
+                  <SolicitudLabFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} />
+                )}
+                {docInline === 'imagen' && (
+                  <SolicitudImagenFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} />
+                )}
+                {docInline === 'suplementacion' && (
+                  <PlanSupFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} />
+                )}
+                {docInline === 'internamiento' && (
+                  <InternamientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} />
+                )}
+                {docInline === 'escrito' && (
+                  <EscritoFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} />
+                )}
+                {docInline === 'consentimiento' && (
+                  <ConsentimientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} />
+                )}
+                {docInline === 'honorarios' && (
+                  <HonorariosFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} onVacioChange={setFormVacio} />
+                )}
+              </SelectorTipoDocumento>
+            </div>
+          </>
         )}
 
       </div>
 
-      {/* ── Modal flotante de documentos (portal a body) ── */}
-      {docInline && createPortal((() => {
-        const currentDoc = DOCS.find(d => d.key === docInline)
-        const CurrentIcon = currentDoc?.icon ?? FileText
-
-        return (
-          /* z-50 — la capa base de ModalShell. Este overlay es conceptualmente
-             un modal más y no necesita nada por encima de ella: lo único con lo
-             que compite es el chasis (Sidebar z-40/z-50, SuscripcionBanner z-40)
-             y el ModalShell del funnel, que nunca coexiste con él (:1004 cierra
-             el funnel antes de abrir un documento; :724-726 hace lo inverso).
-
-             ⚠️ ESTUVO EN z-[9999] Y ERA ARBITRARIO — nació así en 996b62b sin
-             justificación y rompía tres elementos globales. Este overlay es el
-             ÚNICO de esa banda que va portalado a document.body; Toast (:54),
-             OfflineAlert (:47) y CommandPalette (:164) se renderizan EN LÍNEA
-             dentro del árbol de (app)/layout.tsx. Los nodos portalados se anexan
-             a body después del root, así que en empate de z-index gana el portal
-             por orden de DOM. Resultado: el overlay tapaba los toasts (z-[9999],
-             empate) y la alerta bloqueante de Sin conexión (z-[9999], empate), y
-             le ganaba a ⌘K (z-[9998]). Los tres son globales y van por encima de
-             un formulario de documento. NO SUBIR ESTE VALOR. */
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
-            {/* Backdrop con blur — cubre toda la pantalla */}
-            <div
-              className="fixed inset-0 bg-black/40 backdrop-blur-sm animate-[fadeIn_0.15s_ease-out]"
-              onClick={() => setDocInline(null)}
-            />
-
-            {/* Ventana flotante centrada — tamaño fijo */}
-            <div className="relative bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.2)] border border-slate-200/60 w-full max-w-3xl flex flex-col animate-[modalEnter_0.22s_cubic-bezier(0.32,0.72,0,1)]" style={{ height: '85vh' }}>
-              {/* Header */}
-              <div className="border-b border-slate-200/60 flex-shrink-0">
-                {/* Row 1: Title + close */}
-                <div className="flex items-center justify-between px-4 sm:px-5 pt-3 pb-2 sm:pb-3">
-                  <div key={`header-${slideKey}`} className="flex items-center gap-2 sm:gap-2.5 min-w-0" style={slideKey > 0 ? { animation: 'docTitleIn 0.35s cubic-bezier(0.32, 0.72, 0, 1)' } : undefined}>
-                    <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${currentDoc?.color.split(' ').slice(1, 3).join(' ') ?? 'bg-slate-50'}`}>
-                      <CurrentIcon size={15} />
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="text-xs sm:text-sm font-semibold text-slate-800 truncate">{currentDoc?.label}</h3>
-                      <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">{nombrePaciente}</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setDocInline(null)}
-                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 active:scale-95 transition-all flex-shrink-0 ml-2"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-
-                {/* Row 2: Document type icons */}
-                <div className="px-4 sm:px-5 pb-2.5 -mt-0.5">
-                  <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
-                    {DOCS.map(({ key, label, icon: Icon, color }) => {
-                      const isActive = key === docInline
-                      const colorClasses = color.split(' ')
-                      const bgClass = isActive ? colorClasses.slice(1, 3).join(' ') : 'bg-transparent'
-                      const textClass = isActive ? colorClasses[3] ?? 'text-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
-                      return (
-                        <button
-                          key={key}
-                          onClick={() => setDocInline(key)}
-                          title={label}
-                          className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center active:scale-90 transition-all duration-150 flex-shrink-0 ${bgClass} ${textClass} ${isActive ? 'ring-1 ring-current/20 shadow-sm' : ''}`}
-                        >
-                          <Icon size={14} />
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* Contenido scrolleable — height fijo, slide animation */}
-              <div className="doc-modal-scroll flex-1 overflow-y-auto overflow-x-hidden relative">
-                <div
-                  key={slideKey}
-                  className="p-4 sm:p-6 min-h-full"
-                  style={slideKey > 0 ? { animation: `${slideDir === 'right' ? 'slideFromRight' : 'slideFromLeft'} 0.3s cubic-bezier(0.32, 0.72, 0, 1)` } : undefined}
-                >
-                  {docInline === 'receta' && (
-                    <RecetaFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} medicamentosIniciales={medicamentosParaReceta} />
-                  )}
-                  {docInline === 'lab' && (
-                    <SolicitudLabFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} />
-                  )}
-                  {docInline === 'imagen' && (
-                    <SolicitudImagenFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} />
-                  )}
-                  {docInline === 'suplementacion' && (
-                    <PlanSupFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} />
-                  )}
-                  {docInline === 'internamiento' && (
-                    <InternamientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} />
-                  )}
-                  {docInline === 'escrito' && (
-                    <EscritoFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} />
-                  )}
-                  {docInline === 'consentimiento' && (
-                    <ConsentimientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} />
-                  )}
-                  {docInline === 'honorarios' && (
-                    <HonorariosFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} />
-                  )}
-                </div>
-              </div>
-            </div>
+      {/* Aviso al concluir con un formulario a medio llenar (§6.2). Nombra el
+          documento pendiente, nunca «tienes cambios sin guardar». */}
+      <ModalShell
+        open={confirmarConcluir}
+        onClose={() => setConfirmarConcluir(false)}
+        spinusGeometry="decide"
+        title="¿Concluir la consulta?"
+        footer={
+          <div className="flex items-center gap-2 p-4 md:px-6">
+            <button onClick={() => setConfirmarConcluir(false)} className="sp-btn sp-btn--ghost">
+              Seguir llenando
+            </button>
+            <div className="flex-1" />
+            <button onClick={() => router.push(`/expediente/${id}`)} className="sp-btn sp-btn--primary">
+              Concluir de todos modos
+            </button>
           </div>
-        )
-      })(), document.body)}
+        }
+      >
+        <div className="p-4 md:p-6">
+          <p className="sp-body">
+            Tienes {tipoDocumento(docInline)?.pendiente ?? 'un documento empezado'} y sin imprimir.
+            Si concluyes ahora, no se emite. Puedes concluir de todos modos: no todo lo que
+            se empieza se entrega.
+          </p>
+        </div>
+      </ModalShell>
+
     </div>
   )
 }

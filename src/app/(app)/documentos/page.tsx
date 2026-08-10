@@ -2,10 +2,11 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { FileText, Pill, FlaskConical, ScanLine, ClipboardList, Search, User, X, BedDouble, PenLine, Loader2, ChevronRight, UserPlus, ShieldCheck, Receipt } from 'lucide-react'
+import { Search, User, X, Loader2, ChevronRight, UserPlus } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import QuickPatientModal from '@/components/ui/QuickPatientModal'
+import SelectorTipoDocumento, { TIPOS_DOCUMENTO, type TipoDocumento } from '@/components/documentos/SelectorTipoDocumento'
 
 const FormLoader = () => (
   <div className="flex items-center justify-center py-16 text-[#86868b]">
@@ -39,32 +40,22 @@ const EscritoMedicoForm       = safeDynamic(() => import('@/components/documento
 const ConsentimientoForm      = safeDynamic(() => import('@/components/documentos/ConsentimientoInformadoForm'))
 const NotaHonorariosForm      = safeDynamic(() => import('@/components/documentos/NotaHonorariosForm'))
 
-const TIPOS = [
-  { key: 'receta',        label: 'Receta Médica',       sublabel: 'Prescripción farmacológica', icon: Pill,           bg: 'bg-blue-50',    icon_color: 'text-[#1e5fa8]' },
-  { key: 'lab',          label: 'Laboratorio',           sublabel: 'Solicitud de estudios',      icon: FlaskConical,   bg: 'bg-emerald-50', icon_color: 'text-emerald-600' },
-  { key: 'imagen',       label: 'Imagen',                sublabel: 'Rx, RM, TAC, US',            icon: ScanLine,       bg: 'bg-violet-50',  icon_color: 'text-violet-600' },
-  { key: 'suplementacion',label: 'Suplementación',       sublabel: 'Plan nutricional',           icon: ClipboardList,  bg: 'bg-amber-50',   icon_color: 'text-amber-600' },
-  { key: 'internamiento',label: 'Internamiento',         sublabel: 'Solicitud hospitalaria',     icon: BedDouble,      bg: 'bg-rose-50',    icon_color: 'text-rose-600' },
-  { key: 'escrito',      label: 'Escrito Médico',        sublabel: 'Carta o informe libre',      icon: PenLine,        bg: 'bg-teal-50',    icon_color: 'text-teal-600' },
-  { key: 'consentimiento', label: 'Consentimiento',     sublabel: 'Consentimiento informado',   icon: ShieldCheck,    bg: 'bg-indigo-50',  icon_color: 'text-indigo-600' },
-  { key: 'honorarios',  label: 'Honorarios',            sublabel: 'Cotización o nota de cobro',  icon: Receipt,        bg: 'bg-slate-50',   icon_color: 'text-slate-600' },
-] as const
-
-type TipoDoc = typeof TIPOS[number]['key']
 type Paciente = { id: string; nombre: string; apellidos: string }
 
 function DocumentosContent() {
   const searchParams = useSearchParams()
-  const [tipo, setTipo] = useState<TipoDoc | null>(null)
+  const [tipo, setTipo] = useState<TipoDocumento | null>(null)
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState<Paciente | null>(null)
   const [busqueda, setBusqueda] = useState('')
   const [resultados, setResultados] = useState<Paciente[]>([])
   const [buscando, setBuscando] = useState(false)
   const [showQuickPatient, setShowQuickPatient] = useState(false)
+  // Solo Honorarios reporta hoy; el resto se da por vacío (paso 5.1).
+  const [formVacio, setFormVacio] = useState(true)
 
   useEffect(() => {
-    const t = searchParams.get('tipo') as TipoDoc | null
-    if (t && TIPOS.some(x => x.key === t)) setTipo(t)
+    const t = searchParams.get('tipo') as TipoDocumento | null
+    if (t && TIPOS_DOCUMENTO.some(x => x.key === t)) setTipo(t)
   }, [searchParams])
 
   useEffect(() => {
@@ -200,76 +191,55 @@ function DocumentosContent() {
             </button>
           </div>
 
-          {/* Paso 2 — Selector de tipo */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100">
-              <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest mb-0.5">Paso 2</p>
-              <h2 className="text-sm font-semibold text-[#1d1d1f]">Tipo de documento</h2>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y divide-slate-100">
-              {TIPOS.map(({ key, label, sublabel, icon: Icon, bg, icon_color }) => (
-                <button
-                  key={key}
-                  onClick={() => setTipo(key)}
-                  className={`flex items-center gap-3 px-4 py-4 text-left hover:bg-slate-50/80 transition-colors ${tipo === key ? 'bg-slate-50' : ''}`}
-                >
-                  <div className={`w-9 h-9 rounded-xl ${bg} flex items-center justify-center flex-shrink-0`}>
-                    <Icon size={17} className={icon_color} strokeWidth={1.8} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className={`text-xs font-semibold leading-tight ${tipo === key ? 'text-[#1e5fa8]' : 'text-[#1d1d1f]'}`}>{label}</p>
-                    <p className="text-[10px] text-[#86868b] mt-0.5 leading-tight">{sublabel}</p>
-                  </div>
-                  {tipo === key && (
-                    <div className="ml-auto w-2 h-2 rounded-full bg-[#1e5fa8] flex-shrink-0" />
-                  )}
-                </button>
-              ))}
-            </div>
+          {/* Paso 2 — Selector de tipo + formulario.
+              Las tarjetas del sistema sustituyen a la rejilla con sublabels:
+              los sublabels se caen porque la etiqueta completa ya nombra el
+              documento, y con ellos se caen los cuatro colores que divergían
+              de los ocho tokens (teal en escrito, amber-600 en suplementación,
+              slate en honorarios). */}
+          <div className="sp-doc-host">
+            <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest">Paso 2 · Tipo de documento</p>
+            <SelectorTipoDocumento
+              value={tipo}
+              onChange={t => { setFormVacio(true); setTipo(t) }}
+              conDatos={!formVacio}
+            >
+              {tipo === 'receta' && (
+                <RecetaForm
+                  pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}
+                  pacienteId={pacienteSeleccionado.id}
+                />
+              )}
+              {tipo === 'lab' && <SolicitudLabForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} />}
+              {tipo === 'imagen' && <SolicitudImagenForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} />}
+              {tipo === 'suplementacion' && <PlanSuplementacionForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} />}
+              {tipo === 'internamiento' && (
+                <SolicitudInternamientoForm
+                  pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}
+                  pacienteId={pacienteSeleccionado.id}
+                />
+              )}
+              {tipo === 'escrito' && (
+                <EscritoMedicoForm
+                  pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}
+                  pacienteId={pacienteSeleccionado.id}
+                />
+              )}
+              {tipo === 'consentimiento' && (
+                <ConsentimientoForm
+                  pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}
+                  pacienteId={pacienteSeleccionado.id}
+                />
+              )}
+              {tipo === 'honorarios' && (
+                <NotaHonorariosForm
+                  pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}
+                  pacienteId={pacienteSeleccionado.id}
+                  onVacioChange={setFormVacio}
+                />
+              )}
+            </SelectorTipoDocumento>
           </div>
-
-          {/* Formulario */}
-          {tipo === 'receta' && (
-            <RecetaForm
-              pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}
-              pacienteId={pacienteSeleccionado.id}
-            />
-          )}
-          {tipo === 'lab' && <SolicitudLabForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} />}
-          {tipo === 'imagen' && <SolicitudImagenForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} />}
-          {tipo === 'suplementacion' && <PlanSuplementacionForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} />}
-          {tipo === 'internamiento' && (
-            <SolicitudInternamientoForm
-              pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}
-              pacienteId={pacienteSeleccionado.id}
-            />
-          )}
-          {tipo === 'escrito' && (
-            <EscritoMedicoForm
-              pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}
-              pacienteId={pacienteSeleccionado.id}
-            />
-          )}
-          {tipo === 'consentimiento' && (
-            <ConsentimientoForm
-              pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}
-              pacienteId={pacienteSeleccionado.id}
-            />
-          )}
-          {tipo === 'honorarios' && (
-            <NotaHonorariosForm
-              pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}
-              pacienteId={pacienteSeleccionado.id}
-            />
-          )}
-          {!tipo && (
-            <div className="py-12 text-center text-[#86868b]">
-              <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
-                <FileText size={20} className="text-slate-300" />
-              </div>
-              <p className="text-sm">Selecciona el tipo de documento</p>
-            </div>
-          )}
         </>
       )}
 

@@ -24,6 +24,19 @@ interface Props {
   userId?: string | null
   /** clinicaId — necesario para guardar plantillas */
   clinicaId?: string | null
+  /**
+   * Reporta al host si el formulario sigue vacío. Lo consume el selector de
+   * tipo de documento para la confirmación previa al cambiar de tipo y el
+   * aviso al concluir la consulta (GUIA_FORMULARIOS_04 §6.1 y §6.2).
+   *
+   * Emite `isFormEmpty` — el predicado que este formulario YA usaba para
+   * decidir si aplicar una plantilla pisa datos. No hay un segundo criterio:
+   * si hubiera dos, dos partes del sistema discreparían sobre si hay algo
+   * escrito. Los otros siete formularios todavía no lo emiten y el host los
+   * da por vacíos; se cablean en el paso del acabado, donde de todos modos
+   * se toca cada uno.
+   */
+  onVacioChange?: (vacio: boolean) => void
 }
 
 interface LineaConcepto {
@@ -64,7 +77,7 @@ function isFormEmpty(lineas: LineaConcepto[], paciente: string, notas: string, p
   )
 }
 
-export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, offlineMode, onOfflineSave, userId, clinicaId }: Props) {
+export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, offlineMode, onOfflineSave, userId, clinicaId, onVacioChange }: Props) {
   const { medicoInfo: onlineMedicoInfo, isLoading: cargandoPerfil } = useMedicoInfo()
   const { consultorioActivo } = useConsultorioActivo()
 
@@ -152,6 +165,11 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, o
 
   const hayLineaInvalida  = lineas.some(l => l.concepto.trim() !== '' && l.precio <= 0)
   const puedeImprimir     = lineas.some(l => l.concepto.trim() !== '' && l.precio > 0) && !hayLineaInvalida
+
+  // Misma llamada que gobierna «Sobreescribir formulario» al aplicar plantilla:
+  // un solo predicado, dos consumidores.
+  const vacio = isFormEmpty(lineas, paciente, notas, pacienteInicial)
+  useEffect(() => { onVacioChange?.(vacio) }, [vacio, onVacioChange])
 
   // ─── Load templates ────────────────────────────────────────────────────────
   const fetchTemplates = useCallback(async () => {
