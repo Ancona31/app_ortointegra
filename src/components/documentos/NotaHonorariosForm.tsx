@@ -2,9 +2,8 @@
 import { generateDocFileName } from '@/lib/patientUtils'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
-import { useCallback, useEffect, useState } from 'react'
-import { Printer, Loader2, Plus, Trash2, Save, FileText, AlertTriangle } from 'lucide-react'
-import Portal from '@/components/ui/Portal'
+import { useEffect, useState } from 'react'
+import { Printer, Loader2, Plus, Trash2 } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { generarPdf } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
@@ -13,17 +12,13 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 import { hoyEnTZ, desplazarFecha } from '@/lib/dates'
-import type { AseguradoraInfo, HonorariosTemplate } from '@/types'
+import type { AseguradoraInfo } from '@/types'
 
 interface Props {
   pacienteInicial?: string
   pacienteId?: string
   offlineMode?: boolean
   onOfflineSave?: () => void
-  /** userId del médico — si no se pasa, las plantillas se deshabilitan */
-  userId?: string | null
-  /** clinicaId — necesario para guardar plantillas */
-  clinicaId?: string | null
   /**
    * Reporta al host si el formulario sigue vacío. Lo consume el selector de
    * tipo de documento para la confirmación previa al cambiar de tipo y el
@@ -77,7 +72,7 @@ function isFormEmpty(lineas: LineaConcepto[], paciente: string, notas: string, p
   )
 }
 
-export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, offlineMode, onOfflineSave, userId, clinicaId, onVacioChange }: Props) {
+export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, offlineMode, onOfflineSave, onVacioChange }: Props) {
   const { medicoInfo: onlineMedicoInfo, isLoading: cargandoPerfil } = useMedicoInfo()
   const { consultorioActivo } = useConsultorioActivo()
 
@@ -110,22 +105,6 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, o
   // si resuelve sin datos el botón se habilita igual.
   const perfilPendiente = cargandoPerfil && !medicoInfo
 
-  // Resolver userId/clinicaId: props > localStorage (funciona con y sin AuthProvider)
-  const resolvedUserId = userId ?? (() => {
-    try {
-      const raw = localStorage.getItem('spinus_session_meta')
-      return raw ? (JSON.parse(raw) as { userId?: string }).userId ?? null : null
-    } catch { return null }
-  })()
-  const resolvedClinicaId = clinicaId ?? (() => {
-    try {
-      const raw = localStorage.getItem('spinus_sec_cache_user_profile')
-      if (!raw) return null
-      // secureStorage cifra — no podemos leer directo. Fallback: null
-      return null
-    } catch { return null }
-  })()
-
   const toast = useToast()
 
   // ─── Form state ────────────────────────────────────────────────────────────
@@ -133,7 +112,9 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, o
   const [paciente, setPaciente]           = useState(pacienteInicial)
   const [fecha, setFecha]                 = useState(hoyEnTZ)
   const [formaPago, setFormaPago]         = useState('Efectivo')
-  const [folio, setFolio]                 = useState(() => generarFolio('honorarios'))
+  // Sin setter: lo movía el sistema viejo de plantillas al aplicar una. El folio
+  // se calcula al montar y el display lo deriva del tipo de documento.
+  const [folio]                           = useState(() => generarFolio('honorarios'))
   const [imprimiendo, setImprimiendo]     = useState(false)
   const [errorGuardado, setErrorGuardado] = useState('')
   const [docGenerado, setDocGenerado]     = useState<{ blob: Blob; guardado: boolean } | null>(null)
@@ -143,20 +124,11 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, o
   const [notas, setNotas]                 = useState('')
   const [aseguradora, setAseguradora]     = useState<AseguradoraInfo | null>(null)
 
-  // ─── Template state ────────────────────────────────────────────────────────
-  const [templates, setTemplates]                   = useState<HonorariosTemplate[]>([])
-  const [selectedTemplateId, setSelectedTemplateId] = useState('')
-  const [loadingTemplates, setLoadingTemplates]     = useState(false)
-  const [showSaveTemplate, setShowSaveTemplate]     = useState(false)
-  const [templateName, setTemplateName]             = useState('')
-  const [savingTemplate, setSavingTemplate]         = useState(false)
-  const [modalConfirm, setModalConfirm]             = useState<{
-    titulo: string
-    mensaje: string
-    labelConfirm: string
-    destructivo: boolean
-    onConfirm: () => void
-  } | null>(null)
+  // El sistema VIEJO de plantillas vivía aquí: leía `plantillas_honorarios` con
+  // un `clinica_id` que siempre resolvía a null, así que guardar llevaba roto
+  // desde abril de 2026. Se retira entero en el paso 5.3.b. El sistema nuevo
+  // —`plantillas_documento`, común a los ocho— entra en Honorarios cuando le
+  // toque su paso; la tabla vieja se retira aparte, no aquí.
 
   // ─── Derived ───────────────────────────────────────────────────────────────
   const folioDisplay = tipoDoc === 'cotizacion' ? folio.replace('NOH-', 'COT-') : folio
@@ -170,162 +142,6 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, o
   // un solo predicado, dos consumidores.
   const vacio = isFormEmpty(lineas, paciente, notas, pacienteInicial)
   useEffect(() => { onVacioChange?.(vacio) }, [vacio, onVacioChange])
-
-  // ─── Load templates ────────────────────────────────────────────────────────
-  const fetchTemplates = useCallback(async () => {
-    setLoadingTemplates(true)
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from('plantillas_honorarios')
-        .select('id, nombre, contenido')
-        .order('nombre')
-      if (error) throw error
-      setTemplates((data ?? []) as HonorariosTemplate[])
-    } catch {
-      // Silently ignore — templates are an enhancement, not critical
-    } finally {
-      setLoadingTemplates(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchTemplates()
-  }, [fetchTemplates])
-
-  // ─── Apply template ────────────────────────────────────────────────────────
-  function doApplyTemplate(tpl: HonorariosTemplate): void {
-    const c = tpl.contenido
-    setTipoDoc(c.tipoDoc)
-    setDivisa(c.divisa)
-    setFormaPago(c.formaPago)
-    setNotas(c.notas ?? '')
-    setAseguradora(c.aseguradora ?? null)
-    const newLineas = c.lineas.map((l, i) => ({ id: i + 1, concepto: l.concepto, precio: l.precio }))
-    setLineas(newLineas.length > 0 ? newLineas : [{ id: 1, concepto: '', precio: 0 }])
-    setNextId((newLineas.length > 0 ? newLineas.length : 1) + 1)
-    setFolio(generarFolio(c.tipoDoc))
-    setFecha(hoyEnTZ())
-  }
-
-  function applyTemplate(templateId: string): void {
-    const tpl = templates.find(t => t.id === templateId)
-    if (!tpl) return
-
-    if (!isFormEmpty(lineas, paciente, notas, pacienteInicial)) {
-      setModalConfirm({
-        titulo: 'Sobreescribir formulario',
-        mensaje: 'El formulario tiene datos. ¿Deseas reemplazarlos con la plantilla seleccionada?',
-        labelConfirm: 'Sobreescribir',
-        destructivo: false,
-        onConfirm: () => doApplyTemplate(tpl),
-      })
-      return
-    }
-
-    doApplyTemplate(tpl)
-  }
-
-  // ─── Save template (core) ───────────────────────────────────────────────────
-  function buildContenido() {
-    return {
-      tipoDoc,
-      lineas: lineas.filter(l => l.concepto.trim() !== '').map(l => ({ concepto: l.concepto, precio: l.precio })),
-      divisa,
-      formaPago,
-      notas,
-      aseguradora,
-    }
-  }
-
-  async function doSaveTemplate(name: string, existingId?: string): Promise<void> {
-    if (!resolvedUserId || !resolvedClinicaId) {
-      toast.error('No se pudo determinar tu usuario o clínica')
-      return
-    }
-    setSavingTemplate(true)
-    try {
-      const supabase = createClient()
-      const contenido = buildContenido()
-
-      if (existingId) {
-        const { error } = await supabase
-          .from('plantillas_honorarios')
-          .update({ contenido })
-          .eq('id', existingId)
-        if (error) throw error
-      } else {
-        const { error } = await supabase
-          .from('plantillas_honorarios')
-          .insert({ user_id: resolvedUserId, clinica_id: resolvedClinicaId, nombre: name, contenido })
-        if (error) throw error
-      }
-
-      toast.success('Plantilla guardada')
-      setShowSaveTemplate(false)
-      setTemplateName('')
-      fetchTemplates()
-    } catch (err) {
-      toast.error('Error al guardar plantilla')
-      console.error('[NotaHonorariosForm] saveTemplate:', err)
-    } finally {
-      setSavingTemplate(false)
-    }
-  }
-
-  async function saveTemplate(): Promise<void> {
-    const name = templateName.trim()
-    if (!name) { toast.error('Ingresa un nombre para la plantilla'); return }
-
-    const supabase = createClient()
-    const { data: existing, error: findErr } = await supabase
-      .from('plantillas_honorarios')
-      .select('id')
-      .eq('nombre', name)
-
-    if (findErr) { toast.error('Error al verificar plantilla'); return }
-
-    if (existing && existing.length > 0) {
-      setModalConfirm({
-        titulo: 'Plantilla existente',
-        mensaje: `Ya existe una plantilla "${name}". ¿Deseas sobreescribir su contenido?`,
-        labelConfirm: 'Sobreescribir',
-        destructivo: false,
-        onConfirm: () => doSaveTemplate(name, existing[0].id),
-      })
-      return
-    }
-
-    doSaveTemplate(name)
-  }
-
-  // ─── Delete template ──────────────────────────────────────────────────────
-  function requestDeleteTemplate(): void {
-    const tpl = templates.find(t => t.id === selectedTemplateId)
-    if (!tpl) return
-
-    setModalConfirm({
-      titulo: 'Eliminar plantilla',
-      mensaje: `¿Estás seguro de que deseas eliminar "${tpl.nombre}" de forma permanente?`,
-      labelConfirm: 'Eliminar',
-      destructivo: true,
-      onConfirm: async () => {
-        try {
-          const supabase = createClient()
-          const { error } = await supabase
-            .from('plantillas_honorarios')
-            .delete()
-            .eq('id', selectedTemplateId)
-          if (error) throw error
-          toast.success('Plantilla eliminada')
-          setSelectedTemplateId('')
-          fetchTemplates()
-        } catch {
-          toast.error('Error al eliminar plantilla')
-        }
-      },
-    })
-  }
 
   // ─── Line operations ───────────────────────────────────────────────────────
   function agregarLinea(): void {
@@ -488,41 +304,6 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, o
 
   return (
     <div className="space-y-5">
-
-      {/* ── Template selector ─────────────────────────────────────────────── */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-        <p className="text-xs font-medium text-slate-500 mb-2 flex items-center gap-1.5">
-          <FileText size={13} /> Plantilla
-        </p>
-        <div className="flex items-center gap-2">
-          <select
-            value={selectedTemplateId}
-            onChange={e => {
-              setSelectedTemplateId(e.target.value)
-              if (e.target.value) applyTemplate(e.target.value)
-            }}
-            disabled={loadingTemplates}
-            className={inputCls + ' flex-1'}
-          >
-            <option value="">
-              {loadingTemplates ? 'Cargando plantillas...' : '— Seleccionar plantilla —'}
-            </option>
-            {templates.map(t => (
-              <option key={t.id} value={t.id}>{t.nombre}</option>
-            ))}
-          </select>
-          {selectedTemplateId && (
-            <button
-              type="button"
-              onClick={requestDeleteTemplate}
-              title="Eliminar plantilla"
-              className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
-            >
-              <Trash2 size={16} />
-            </button>
-          )}
-        </div>
-      </div>
 
       {/* ── Selector de tipo ──────────────────────────────────────────────── */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
@@ -781,92 +562,7 @@ export default function NotaHonorariosForm({ pacienteInicial = '', pacienteId, o
             : <><Printer size={18} /> Imprimir {tituloDoc}</>
           }
         </button>
-
-        {!showSaveTemplate ? (
-          <button
-            type="button"
-            onClick={() => setShowSaveTemplate(true)}
-            className="flex items-center justify-center gap-2 py-3 px-5 border-2 border-[#1e5fa8] text-[#1e5fa8] rounded-xl font-medium hover:bg-[#1e5fa8]/5 transition-colors"
-          >
-            <Save size={18} /> Guardar como plantilla
-          </button>
-        ) : (
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={templateName}
-              onChange={e => setTemplateName(e.target.value)}
-              placeholder="Nombre de la plantilla"
-              className={inputCls + ' flex-1'}
-              autoFocus
-              onKeyDown={e => { if (e.key === 'Enter') saveTemplate(); if (e.key === 'Escape') setShowSaveTemplate(false) }}
-            />
-            <button
-              type="button"
-              onClick={saveTemplate}
-              disabled={savingTemplate || !templateName.trim()}
-              className="py-2 px-4 bg-[#1e5fa8] text-white rounded-lg text-sm font-medium hover:bg-[#1a3a5c] transition-colors disabled:opacity-50"
-            >
-              {savingTemplate ? <Loader2 size={16} className="animate-spin" /> : 'Guardar'}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setShowSaveTemplate(false); setTemplateName('') }}
-              className="py-2 px-3 text-slate-400 hover:text-slate-600 text-sm"
-            >
-              Cancelar
-            </button>
-          </div>
-        )}
       </div>
-
-      {/* ── Modal de confirmación — patrón Spinus (blur + slide) ──────────── */}
-      {modalConfirm && (
-        <Portal>
-          <div className="fixed inset-0 z-[10000] flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden animate-slide-up" onClick={e => e.stopPropagation()}>
-              <div className="px-6 pt-6 pb-4 text-center">
-                <div
-                  className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center"
-                  style={{ backgroundColor: modalConfirm.destructivo ? '#FEF2F2' : '#EFF6FF' }}
-                >
-                  <AlertTriangle
-                    size={22}
-                    style={{ color: modalConfirm.destructivo ? '#EF5350' : '#1e5fa8' }}
-                  />
-                </div>
-                <h2 className="text-base font-semibold text-[#1d1d1f]">{modalConfirm.titulo}</h2>
-                <p className="text-[13px] text-[#3d3d3f] mt-3 leading-relaxed">
-                  {modalConfirm.mensaje}
-                </p>
-              </div>
-              <div className="border-t border-slate-100 grid grid-cols-2">
-                <button
-                  onClick={() => {
-                    setModalConfirm(null)
-                    if (selectedTemplateId && !templates.find(t => t.id === selectedTemplateId)) {
-                      setSelectedTemplateId('')
-                    }
-                  }}
-                  className="px-4 py-3.5 text-sm font-medium text-[#1e5fa8] hover:bg-slate-50 transition-colors border-r border-slate-100"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={() => {
-                    modalConfirm.onConfirm()
-                    setModalConfirm(null)
-                  }}
-                  className="px-4 py-3.5 text-sm font-semibold hover:bg-red-50 transition-colors"
-                  style={{ color: modalConfirm.destructivo ? '#EF5350' : '#1e5fa8' }}
-                >
-                  {modalConfirm.labelConfirm}
-                </button>
-              </div>
-            </div>
-          </div>
-        </Portal>
-      )}
 
       <ModalDocumentoGenerado
         open={docGenerado !== null}

@@ -52,6 +52,8 @@ function DocumentosContent() {
   const [showQuickPatient, setShowQuickPatient] = useState(false)
   // Solo Honorarios reporta hoy; el resto se da por vacío (paso 5.1).
   const [formVacio, setFormVacio] = useState(true)
+  // El panel de plantillas sustituye al formulario y oculta el selector de tipo.
+  const [panelPlantillas, setPanelPlantillas] = useState(false)
 
   useEffect(() => {
     const t = searchParams.get('tipo') as TipoDocumento | null
@@ -201,8 +203,9 @@ function DocumentosContent() {
             <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest">Paso 2 · Tipo de documento</p>
             <SelectorTipoDocumento
               value={tipo}
-              onChange={t => { setFormVacio(true); setTipo(t) }}
+              onChange={t => { setFormVacio(true); setPanelPlantillas(false); setTipo(t) }}
               conDatos={!formVacio}
+              oculto={panelPlantillas}
             >
               {tipo === 'receta' && (
                 <RecetaForm
@@ -210,8 +213,8 @@ function DocumentosContent() {
                   pacienteId={pacienteSeleccionado.id}
                 />
               )}
-              {tipo === 'lab' && <SolicitudLabForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} onVacioChange={setFormVacio} />}
-              {tipo === 'imagen' && <SolicitudImagenForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} onVacioChange={setFormVacio} />}
+              {tipo === 'lab' && <SolicitudLabForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
+              {tipo === 'imagen' && <SolicitudImagenForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
               {tipo === 'suplementacion' && <PlanSuplementacionForm pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`} pacienteId={pacienteSeleccionado.id} />}
               {tipo === 'internamiento' && (
                 <SolicitudInternamientoForm

@@ -13,6 +13,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import Link from 'next/link'
 import ComboEscribible from '@/components/documentos/ComboEscribible'
+import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
 import { createClient } from '@/lib/supabase/client'
 import { hoyEnTZ, desplazarFecha } from '@/lib/dates'
 import { enfocarYAcercar } from '@/lib/scrollDoc'
@@ -54,6 +55,28 @@ function estadoDe(e: Estudio): EstadoEstudio {
   return tipo ? 'faltaRegion' : 'faltaTipo'
 }
 
+/** Alguno de los cuatro campos tiene texto. Gobierna qué filas van a plantilla. */
+function conTexto(e: Estudio): boolean {
+  return !!(e.tipo.trim() || e.region.trim() || e.proyecciones?.trim() || e.indicacion?.trim())
+}
+
+/**
+ * Lee una fila guardada en jsonb, campo a campo y desconfiando de todo: el
+ * contenido pudo escribirse con otra versión del formulario.
+ */
+function leerEstudio(bruto: unknown): Estudio | null {
+  if (typeof bruto !== 'object' || bruto === null) return null
+  const fila = bruto as Record<string, unknown>
+  const texto = (v: unknown): string => (typeof v === 'string' ? v : '')
+  const e: Estudio = {
+    tipo: texto(fila.tipo),
+    region: texto(fila.region),
+    proyecciones: texto(fila.proyecciones),
+    indicacion: texto(fila.indicacion),
+  }
+  return conTexto(e) ? e : null
+}
+
 /** Predicado único de «formulario vacío». Mismo criterio que Honorarios. */
 function isFormEmpty(
   estudios: Estudio[], urgente: boolean,
@@ -75,9 +98,16 @@ interface Props {
   onOfflineSave?: () => void
   /** Reporta al host si el formulario sigue vacío (guía 04 §6.1 y §6.2). */
   onVacioChange?: (vacio: boolean) => void
+  /**
+   * El panel de plantillas sustituye al formulario en su mismo espacio, y
+   * mientras está abierto el selector de tipo del host se oculta (spec 02 §3.1):
+   * elegir otro tipo desde ahí tiraría el formulario sobre el que el panel
+   * opera.
+   */
+  onPanelPlantillasChange?: (abierto: boolean) => void
 }
 
-export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, offlineMode, onOfflineSave, onVacioChange }: Props) {
+export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, offlineMode, onOfflineSave, onVacioChange, onPanelPlantillasChange }: Props) {
   const { medicoInfo: onlineMedicoInfo, isLoading: cargandoPerfil } = useMedicoInfo()
   const { consultorioActivo } = useConsultorioActivo()
 
@@ -129,6 +159,32 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
 
   const vacio = isFormEmpty(estudios, urgente, paciente, pacienteInicial, diagnostico, diagnosticoInicial)
   useEffect(() => { onVacioChange?.(vacio) }, [vacio, onVacioChange])
+
+  // ── Plantillas (spec 02) ────────────────────────────────────────
+  // Se guarda TODO menos los datos del paciente: fuera paciente, diagnóstico y
+  // fecha. Los estudios se guardan aunque estén a medias —una plantilla es un
+  // punto de partida, no un documento— y el filtro del par tipo+región sigue
+  // gobernando la emisión, no el guardado.
+  const plantillas = usePlantillasDocumento({
+    tipo: 'solicitud_imagen',
+    vacio,
+    // El búnker no tiene red ni sesión de Supabase: el sistema no se monta.
+    desactivado: !!offlineMode,
+    onPanelChange: onPanelPlantillasChange,
+    leer: () => ({ _v: 1, estudios: estudios.filter(conTexto), urgente }),
+    aplicar: (c: ContenidoPlantilla) => {
+      // Solo las claves que existen HOY en el formulario, campo a campo.
+      // Los dos valores de repuesto NO son defensa de sobra: «Vaciar
+      // formulario» aplica un contenido sin ninguna clave, así que es justo lo
+      // que repone el estado inicial. El paciente y el diagnóstico no se tocan
+      // aquí, y por eso sobreviven al vaciado.
+      const guardados = Array.isArray(c.estudios)
+        ? c.estudios.map(leerEstudio).filter((e): e is Estudio => e !== null)
+        : []
+      setEstudios(guardados.length > 0 ? guardados : [{ ...ESTUDIO_VACIO }])
+      setUrgente(c.urgente === true)
+    },
+  })
 
   // G-10: foco al primer campo editable vacío al montar. preventScroll para no
   // arrastrar la página hasta él. En móvil esto abre el teclado en cada montaje.
@@ -310,9 +366,12 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
 
   return (
     <div ref={formRef} className="sp-doc-form">
-      {/* Card Plantilla (spec 02 §1) y «Guardar como plantilla» en la barra:
-          sus DOS posiciones quedan fijadas —selector arriba, guardar abajo—
-          pero el sistema es del paso siguiente. No se montan controles muertos. */}
+      {/* El árbol del formulario NO se desmonta cuando el panel de plantillas
+          está abierto: se apaga con display:none y el panel se monta como
+          hermano, en el mismo contenedor de scroll (spec 02 §3.1). */}
+      <div className="sp-doc-formbody" style={plantillas.panelAbierto ? { display: 'none' } : undefined}>
+
+      {plantillas.selector}
 
       <section className="sp-card sp-doc-card">
         <div className="sp-doc-cardhead">
@@ -493,7 +552,10 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
         </p>
       )}
 
+      {/* «Guardar como plantilla» va aquí y no arriba: se guarda cuando el
+          formulario YA está lleno, así que su sitio es junto al de imprimir. */}
       <div className="sp-doc-actions">
+        {plantillas.botonGuardar}
         <button type="button" onClick={imprimir} disabled={imprimiendo || perfilPendiente}
           className="sp-btn sp-btn--primary">
           {imprimiendo ? <><span className="sp-spinner" /> Generando PDF…</>
@@ -505,6 +567,11 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
               </>}
         </button>
       </div>
+
+      </div>
+
+      {plantillas.panel}
+      {plantillas.dialogos}
 
       <ModalDocumentoGenerado
         open={docGenerado !== null}

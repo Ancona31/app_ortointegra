@@ -14,6 +14,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import Link from 'next/link'
 import ComboEscribible from '@/components/documentos/ComboEscribible'
+import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
 import { ESTUDIOS_LAB } from '@/lib/estudiosLab'
 import { createClient } from '@/lib/supabase/client'
 import { hoyEnTZ, desplazarFecha } from '@/lib/dates'
@@ -63,9 +64,16 @@ interface Props {
   onOfflineSave?: () => void
   /** Reporta al host si el formulario sigue vacío (guía 04 §6.1 y §6.2). */
   onVacioChange?: (vacio: boolean) => void
+  /**
+   * El panel de plantillas sustituye al formulario en su mismo espacio, y
+   * mientras está abierto el selector de tipo del host se oculta (spec 02 §3.1):
+   * elegir otro tipo desde ahí tiraría el formulario sobre el que el panel
+   * opera.
+   */
+  onPanelPlantillasChange?: (abierto: boolean) => void
 }
 
-export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, offlineMode, onOfflineSave, onVacioChange }: Props) {
+export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInicial = '', pacienteId, offlineMode, onOfflineSave, onVacioChange, onPanelPlantillasChange }: Props) {
   const { medicoInfo: onlineMedicoInfo, isLoading: cargandoPerfil } = useMedicoInfo()
   const { consultorioActivo } = useConsultorioActivo()
 
@@ -116,6 +124,32 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
 
   const vacio = isFormEmpty(estudios, notas, paciente, pacienteInicial, diagnostico, diagnosticoInicial)
   useEffect(() => { onVacioChange?.(vacio) }, [vacio, onVacioChange])
+
+  // ── Plantillas (spec 02) ────────────────────────────────────────
+  // Se guarda TODO menos los datos del paciente. Aquí eso deja fuera paciente,
+  // diagnóstico y fecha: los tres son suyos aunque los teclee el médico, y una
+  // plantilla con la fecha congelada es un defecto.
+  const plantillas = usePlantillasDocumento({
+    tipo: 'solicitud_lab',
+    vacio,
+    // El búnker no tiene red ni sesión de Supabase: el sistema no se monta.
+    desactivado: !!offlineMode,
+    onPanelChange: onPanelPlantillasChange,
+    leer: () => ({ _v: 1, estudios: estudios.filter(e => e.trim() !== ''), notas }),
+    aplicar: (c: ContenidoPlantilla) => {
+      // Solo las claves que existen HOY en el formulario, y comprobando el tipo
+      // de cada una: el jsonb pudo guardarse con otra versión del formulario.
+      // Los dos `else` NO son defensa de sobra: «Vaciar formulario» aplica un
+      // contenido sin ninguna clave, así que es justo lo que repone el estado
+      // inicial. El paciente y el diagnóstico no se tocan aquí, y por eso
+      // sobreviven al vaciado.
+      const guardados = Array.isArray(c.estudios)
+        ? c.estudios.filter((e): e is string => typeof e === 'string' && e.trim() !== '')
+        : []
+      setEstudios(guardados.length > 0 ? guardados : [''])
+      setNotas(typeof c.notas === 'string' ? c.notas : '')
+    },
+  })
 
   // G-10: foco al primer campo editable vacío al montar. preventScroll para no
   // arrastrar la página hasta él. En móvil esto abre el teclado en cada montaje.
@@ -296,9 +330,12 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
 
   return (
     <div ref={formRef} className="sp-doc-form">
-      {/* Card Plantilla (spec 02 §1) y «Guardar como plantilla» en la barra:
-          sus DOS posiciones quedan fijadas —selector arriba, guardar abajo—
-          pero el sistema es del paso siguiente. No se montan controles muertos. */}
+      {/* El árbol del formulario NO se desmonta cuando el panel de plantillas
+          está abierto: se apaga con display:none y el panel se monta como
+          hermano, en el mismo contenedor de scroll (spec 02 §3.1). */}
+      <div className="sp-doc-formbody" style={plantillas.panelAbierto ? { display: 'none' } : undefined}>
+
+      {plantillas.selector}
 
       <section className="sp-card sp-doc-card">
         <div className="sp-doc-cardhead">
@@ -432,7 +469,10 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
         </p>
       )}
 
+      {/* «Guardar como plantilla» va aquí y no arriba: se guarda cuando el
+          formulario YA está lleno, así que su sitio es junto al de imprimir. */}
       <div className="sp-doc-actions">
+        {plantillas.botonGuardar}
         <button type="button" onClick={imprimir} disabled={imprimiendo || perfilPendiente}
           className="sp-btn sp-btn--primary">
           {imprimiendo ? <><span className="sp-spinner" /> Generando PDF…</>
@@ -444,6 +484,11 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
               </>}
         </button>
       </div>
+
+      </div>
+
+      {plantillas.panel}
+      {plantillas.dialogos}
 
       <ModalDocumentoGenerado
         open={docGenerado !== null}

@@ -93,10 +93,17 @@ interface Props {
    * único de «formulario vacío», negado.
    */
   conDatos?: boolean
+  /**
+   * El formulario montado abrió su panel de plantillas (spec 02 §3.1). El
+   * selector se apaga —no se desmonta: el pliegue mide su ranura— porque el
+   * panel opera sobre el formulario que sigue vivo debajo, y elegir otro tipo
+   * desde aquí lo tiraría.
+   */
+  oculto?: boolean
   children: ReactNode
 }
 
-export default function SelectorTipoDocumento({ value, onChange, conDatos = false, children }: Props) {
+export default function SelectorTipoDocumento({ value, onChange, conDatos = false, oculto = false, children }: Props) {
   const idBase = useId()
   const idPanel = `${idBase}-panel`
 
@@ -237,7 +244,7 @@ export default function SelectorTipoDocumento({ value, onChange, conDatos = fals
     <>
       {/* La ranura: tarjetas o línea, nunca las dos. Es lo que se mide para
           compensar el scroll, así que el ref va aquí y no en cada hijo. */}
-      <div ref={slotRef}>
+      <div ref={slotRef} style={oculto ? { display: 'none' } : undefined}>
         {abierto || !activo ? (
           <div
             ref={gridRef}

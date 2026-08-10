@@ -215,6 +215,8 @@ export default function NuevaNotaPage() {
   // emite Honorarios (es el único con predicado); los otros siete quedan en
   // `true` hasta que el paso del acabado los cablee, así que no avisan.
   const [formVacio, setFormVacio]       = useState(true)
+  // El panel de plantillas sustituye al formulario y oculta el selector de tipo.
+  const [panelPlantillas, setPanelPlantillas] = useState(false)
   // Aviso de §6.2: se avisa, NO se bloquea.
   const [confirmarConcluir, setConfirmarConcluir] = useState(false)
   const [ultimoGuardado, setUltimoGuardado] = useState<Date | null>(null)
@@ -1846,17 +1848,18 @@ export default function NuevaNotaPage() {
             <div className="sp-doc-host">
               <SelectorTipoDocumento
                 value={docInline}
-                onChange={t => { setFormVacio(true); setDocInline(t) }}
+                onChange={t => { setFormVacio(true); setPanelPlantillas(false); setDocInline(t) }}
                 conDatos={!formVacio}
+                oculto={panelPlantillas}
               >
                 {docInline === 'receta' && (
                   <RecetaFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} medicamentosIniciales={medicamentosParaReceta} />
                 )}
                 {docInline === 'lab' && (
-                  <SolicitudLabFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} onVacioChange={setFormVacio} />
+                  <SolicitudLabFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />
                 )}
                 {docInline === 'imagen' && (
-                  <SolicitudImagenFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} onVacioChange={setFormVacio} />
+                  <SolicitudImagenFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />
                 )}
                 {docInline === 'suplementacion' && (
                   <PlanSupFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} />

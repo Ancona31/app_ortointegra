@@ -1132,6 +1132,128 @@ a:hover { color: var(--sp-primary-active); }
   border-top: var(--sp-bw-hair) solid var(--sp-line-divider);
 }
 
+/* Cuerpo del formulario: los bloques que el panel de plantillas sustituye. Es
+   un envoltorio y no el propio .sp-doc-form porque el panel es HERMANO suyo
+   —el árbol del formulario no se desmonta, se apaga con display:none (spec 02
+   §3.1)—, y sin repetir aquí la columna las cards perderían sus 18px de aire.
+   NO vuelve a declarar `container`: el contenedor que miden las cards sigue
+   siendo el del formulario. */
+.sp-doc-formbody { display: flex; flex-direction: column; gap: var(--sp-gap-block); }
+
+
+/* --- 19. PLANTILLAS DE DOCUMENTO (GUIA_FORMULARIOS_02) ------------------ */
+
+/* Fila de control del selector: select + «Gestionar». En XS el botón pasa
+   debajo a ancho completo (corrige H-03). */
+.sp-tpl-row { display: grid; grid-template-columns: 1fr auto; gap: var(--sp-gap-item); }
+@container docform (max-width: 379px) {
+  .sp-tpl-row { grid-template-columns: 1fr; gap: var(--sp-2); }
+  .sp-tpl-row > .sp-btn { width: 100%; }
+}
+/* El compacto sube a 44px: es un control de fila, no una acción inline. */
+.sp-tpl-manage { min-height: var(--sp-tap); white-space: nowrap; }
+.sp-tpl-manage svg { width: 17px; height: 17px; }
+
+/* Bloque de 44px mientras carga. Sin shimmer: por debajo de 200ms un skeleton
+   parpadea más de lo que informa. */
+.sp-tpl-skeleton {
+  min-height: var(--sp-tap); border-radius: var(--sp-r-field);
+  background: var(--sp-surface-muted);
+}
+
+/* Estado vacío: la card no se oculta, cambia de contenido. */
+.sp-tpl-empty { display: flex; align-items: flex-start; gap: var(--sp-3); }
+
+/* Aviso de plantilla aplicada. No se autodescarta: si desapareciera solo, quien
+   miró a otro lado pierde el único acuse de que se le reemplazó el formulario. */
+.sp-tpl-aviso { margin-top: 10px; }
+.sp-tpl-aviso > span { flex: 1; }
+.sp-tpl-deshacer {
+  min-height: 0; padding: 0; flex: 0 0 auto;
+  color: var(--sp-primary); font-size: var(--sp-fs-meta);
+}
+.sp-tpl-deshacer:hover { color: var(--sp-primary-hover); }
+
+/* ── Panel de gestión ──────────────────────────────────────────────────── */
+/* Sin `position: sticky` en la cabecera: con scroll de página sube con el
+   contenido. La tenía porque el overlay que desapareció solo daba 605px. */
+.sp-tpl-panelhead {
+  display: flex; align-items: center; gap: var(--sp-3);
+  min-height: 56px;
+  border-bottom: var(--sp-bw-hair) solid var(--sp-line-divider);
+  margin-bottom: var(--sp-gap-section);
+}
+.sp-tpl-back {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 var(--sp-tap); width: var(--sp-tap); height: var(--sp-tap);
+  border: none; background: none; cursor: pointer;
+  border-radius: var(--sp-r-btn-sm); color: var(--sp-ink-500);
+  transition: background var(--sp-dur-micro) var(--sp-ease-out);
+}
+.sp-tpl-back:hover { background: var(--sp-surface-muted); }
+.sp-tpl-back svg { width: 20px; height: 20px; }
+.sp-tpl-panelhead > .sp-badge { margin-left: auto; }
+@container docform (max-width: 379px) {
+  .sp-tpl-panelhead > .sp-title-card { font-size: var(--sp-fs-vitals); }
+}
+
+.sp-tpl-list { display: flex; flex-direction: column; gap: var(--sp-2-5); }
+.sp-tpl-item { min-height: 68px; gap: var(--sp-3); }
+.sp-tpl-nombre { min-width: 0; flex: 1; }
+.sp-tpl-nombre > .sp-title-sec {
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sp-tpl-nombre > .sp-hint { margin-top: 2px; }
+.sp-tpl-acciones { display: flex; gap: var(--sp-1); flex: 0 0 auto; }
+.sp-tpl-accion {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: var(--sp-1-5);
+  flex: 0 0 var(--sp-tap); width: var(--sp-tap); height: var(--sp-tap);
+  border: none; background: none; cursor: pointer;
+  border-radius: var(--sp-r-btn-sm);
+  /* Los TRES grises en reposo: el rojo permanente en una lista de 3–4 filas es
+     ruido. El color llega en el hover. */
+  color: var(--sp-ink-icon);
+  transition: background var(--sp-dur-micro) var(--sp-ease-out),
+              color var(--sp-dur-micro) var(--sp-ease-out);
+}
+.sp-tpl-accion svg { width: 18px; height: 18px; }
+.sp-tpl-accion__label { display: none; font-size: 12px; color: var(--sp-ink-500); }
+.sp-tpl-accion:hover:not(:disabled) { color: var(--sp-primary); background: var(--sp-primary-bg); }
+.sp-tpl-accion--danger:hover:not(:disabled) { color: var(--sp-danger); background: var(--sp-danger-bg); }
+.sp-tpl-accion:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Fila en operación: se apaga entera y el icono pulsado pasa a spinner. */
+.sp-tpl-item--ocupada { opacity: .55; pointer-events: none; }
+
+/* Renombrar EN SITIO: la fila se convierte en input + ✕ + Guardar. La fila pasa
+   a columna porque el aviso de duplicado va DEBAJO del campo, no a su lado. */
+.sp-tpl-item--editando { flex-direction: column; align-items: stretch; gap: var(--sp-1-5); }
+.sp-tpl-rename { display: flex; align-items: center; gap: var(--sp-2); width: 100%; }
+.sp-tpl-rename > .sp-input { flex: 1; min-width: 0; }
+.sp-tpl-rename > .sp-btn { min-height: var(--sp-tap); flex: 0 0 auto; }
+
+/* Filas fantasma mientras carga. Sin animación, igual que el selector. */
+.sp-tpl-ghost { height: 68px; border-radius: var(--sp-r-field-sm); background: var(--sp-surface-muted); }
+
+/* Estado vacío del panel. */
+.sp-tpl-panelempty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--sp-3); min-height: 240px; text-align: center;
+}
+.sp-tpl-panelempty .sp-icobox { background: var(--sp-surface-empty); color: var(--sp-ink-150); }
+.sp-tpl-panelempty .sp-hint { max-width: 320px; }
+
+/* Dos plantas por debajo de 380px: nombre y fecha arriba, las tres acciones
+   abajo repartidas. A 318px de contenido cada celda queda en ≈98px, así que la
+   etiqueta cabe junto al icono. */
+@container docform (max-width: 379px) {
+  .sp-tpl-item { flex-direction: column; align-items: stretch; min-height: 104px; gap: var(--sp-2); }
+  .sp-tpl-acciones { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-2); }
+  .sp-tpl-accion { width: auto; flex: 1 1 auto; }
+  .sp-tpl-accion__label { display: inline; }
+}
+
 /* Badge de urgente: el rojo se reserva a ESTO. Hoy la etiqueta entera de la
    casilla iba en rojo y competía con los errores del formulario. */
 .sp-badge--danger {

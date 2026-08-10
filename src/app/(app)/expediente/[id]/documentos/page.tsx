@@ -37,6 +37,8 @@ function DocumentosPacienteContent() {
   const [tab, setTab] = useState<TipoDocumento | null>(null)
   // Solo Honorarios reporta hoy; el resto se da por vacío (paso 5.1).
   const [formVacio, setFormVacio] = useState(true)
+  // El panel de plantillas sustituye al formulario y oculta el selector de tipo.
+  const [panelPlantillas, setPanelPlantillas] = useState(false)
 
   useEffect(() => {
     const t = searchParams.get('tipo') as TipoDocumento | null
@@ -74,12 +76,13 @@ function DocumentosPacienteContent() {
       <div className="sp-doc-host">
         <SelectorTipoDocumento
           value={tab}
-          onChange={t => { setFormVacio(true); setTab(t) }}
+          onChange={t => { setFormVacio(true); setPanelPlantillas(false); setTab(t) }}
           conDatos={!formVacio}
+          oculto={panelPlantillas}
         >
           {tab === 'receta' && <RecetaForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} />}
-          {tab === 'lab' && <SolicitudLabForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} />}
-          {tab === 'imagen' && <SolicitudImagenForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} />}
+          {tab === 'lab' && <SolicitudLabForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
+          {tab === 'imagen' && <SolicitudImagenForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
           {tab === 'suplementacion' && <PlanSuplementacionForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} />}
           {tab === 'internamiento' && <SolicitudInternamientoForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} />}
           {tab === 'escrito' && <EscritoMedicoForm pacienteInicial={nombreCompleto} pacienteId={id} />}
