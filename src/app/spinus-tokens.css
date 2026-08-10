@@ -132,22 +132,29 @@
 
   /* ---------------------------------------------------------------------
      4. RADIOS — dos familias: CONTENEDOR y CONTROL
-     --------------------------------------------------------------------- */
-  --sp-r-modal:            20px;  /* modal, frame de viewport */
-  --sp-r-card:             16px;  /* card contenedora (vitales, captura, contexto) */
-  --sp-r-icon-lg:          15px;  /* contenedor de ícono 56px (confirmación) */
-  --sp-r-input:            14px;  /* textarea grande de captura */
-  --sp-r-cta:              14px;  /* botón primario full-width en móvil */
-  --sp-r-card-inner:       13px;  /* card interna (bloque de nota, filas de acción) */
-  --sp-r-btn:              12px;  /* botón (desktop), tile de vital, badge grande */
-  --sp-r-field:            12px;  /* input/textarea estándar, banner */
-  --sp-r-icon-md:          11px;  /* contenedor de ícono 38–44px */
-  --sp-r-field-sm:         11px;  /* fila de diagnóstico, input compacto */
-  --sp-r-btn-sm:           10px;  /* botón compacto, ícono-botón 34px */
-  --sp-r-btn-xs:            9px;  /* botón inline dentro de card interna */
-  --sp-r-note:              8px;  /* bloque de texto embebido */
+     ---------------------------------------------------------------------
+     Cambio de sistema 2026-08-09 (Anexo de radios, común a las guías 01 y 04):
+     LOS CONTENEDORES NO BAJAN; los CONTROLES bajan un escalón cada uno. La
+     jerarquía de la escala no se altera — lo que cambia es la diferencia entre
+     la curva del contenedor y la del control, que pasa de 4 px a 6 px, y es lo
+     que se lee como más limpio.
+     Suelo de la familia de control: 8 px. Por debajo entra en el terreno de
+     --sp-r-note, que es para texto embebido, no para controles. */
+  --sp-r-modal:            20px;  /* modal, frame de viewport                    · sin cambio */
+  --sp-r-card:             16px;  /* card contenedora (vitales, captura, tipo)   · sin cambio */
+  --sp-r-icon-lg:          15px;  /* contenedor de ícono 56px (confirmación)     · sin cambio */
+  --sp-r-card-inner:       13px;  /* card interna (bloque de nota, acciones)     · sin cambio */
+  --sp-r-input:            12px;  /* textarea grande de captura                  · 14 → 12 */
+  --sp-r-cta:              12px;  /* primario a ancho completo                   · 14 → 12 */
+  --sp-r-icon-md:          11px;  /* contenedor de ícono 38–44px                 · sin cambio */
+  --sp-r-btn:              10px;  /* botón, tile de vital, badge grande          · 12 → 10 */
+  --sp-r-field:            10px;  /* input, select, textarea, banner             · 12 → 10 */
+  --sp-r-field-sm:          9px;  /* fila e input compactos                      · 11 →  9 */
+  --sp-r-btn-xs:            9px;  /* botón inline dentro de card interna         · sin cambio */
+  --sp-r-btn-sm:            8px;  /* botón compacto e ícono-botón                ·  10 →  8 */
+  --sp-r-note:              8px;  /* bloque de texto embebido                    · sin cambio */
   --sp-r-checkbox:          6px;
-  --sp-r-pill:            999px;  /* chip, badge, pill, punto */
+  --sp-r-pill:            999px;  /* chip, badge, pill, punto — es una FORMA, no un radio */
 
   /* ---------------------------------------------------------------------
      5. ESPACIADO — base 4px (múltiplos exactos usados)
