@@ -346,8 +346,16 @@ export default function ModalDocumentos({
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
-            {documentos.map(doc => (
-              <div key={doc.id} className="flex items-center gap-3 px-4 py-3">
+            {documentos.map(doc => {
+              // Un borrador es trabajo en curso, no un documento emitido: no
+              // tiene folio, no tiene PDF y solo lo ve su autor. Se distingue
+              // con TRES señales —borde punteado, distintivo ámbar y «sin
+              // firmar» en la línea de estado— porque una sola se pasa por alto,
+              // y de él solo cuelgan dos acciones: retomarlo o cancelarlo.
+              const esBorrador = doc.estado === 'borrador'
+              return (
+              <div key={doc.id}
+                className={`flex items-center gap-3 px-4 py-3${esBorrador ? ' border border-dashed border-amber-300 bg-amber-50/40 rounded-xl my-1' : ''}`}>
                 <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
                   {iconForTipo(doc.tipo)}
                 </div>
@@ -355,13 +363,42 @@ export default function ModalDocumentos({
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${TIPO_DOC_COLOR[doc.tipo] || 'bg-slate-100 text-slate-600'}`}>
                     {TIPO_DOC_LABEL[doc.tipo] || doc.tipo}
                   </span>
+                  {esBorrador && (
+                    <span className="text-xs px-2 py-0.5 ml-1.5 rounded-full font-medium bg-amber-100 text-amber-700">
+                      Borrador
+                    </span>
+                  )}
                   <p className="text-xs text-slate-400 mt-0.5 truncate">
+                    {esBorrador && 'Tu borrador · guardado el '}
                     {doc.created_at ? format(parseISO(doc.created_at), "d 'de' MMMM yyyy, HH:mm", { locale: es }) : ''}
-                    {doc.contenido?.diagnostico ? ` · ${doc.contenido.diagnostico}` : ''}
+                    {esBorrador
+                      ? ', sin firmar'
+                      : doc.contenido?.diagnostico ? ` · ${doc.contenido.diagnostico}` : ''}
                   </p>
                 </div>
                 <div className="flex items-center gap-0.5 flex-shrink-0">
-                  {doc.pdf_url ? (
+                  {esBorrador ? (
+                    /* Sin descarga y sin «Ver»: no hay PDF que enseñar. Y sin
+                       regenerar, que subiría a Storage el papel de un documento
+                       que todavía no se ha emitido. */
+                    <Link
+                      href={`/expediente/${pacienteId}/documentos?tipo=consentimiento&borrador=${doc.id}`}
+                      onClick={(e) => {
+                        // Mismo intercept que «+ Nuevo documento»: es otra
+                        // entrada a la misma pantalla de escritura.
+                        if (subState.isBlocked) {
+                          e.preventDefault()
+                          openBloqueoModal()
+                          return
+                        }
+                        onClose()
+                      }}
+                      className="flex items-center gap-1 text-xs text-amber-700 hover:text-amber-800 font-medium px-2.5 py-1.5 rounded-lg hover:bg-amber-100 transition-colors"
+                      title="Seguir editándolo"
+                    >
+                      <PenLine size={14} /> Retomar
+                    </Link>
+                  ) : doc.pdf_url ? (
                     signedUrls[doc.id] ? (
                       /* <a href> con la URL ya firmada: cero asincronía entre el
                          toque y la navegación (ver el efecto de firma arriba).
@@ -397,23 +434,26 @@ export default function ModalDocumentos({
                       {regeneratingId === doc.id ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
                     </button>
                   ) : null}
-                  <button
-                    onClick={() => onVerDocumento(doc)}
-                    className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-900 font-medium px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
-                    title="Ver documento"
-                  >
-                    <Eye size={14} /> Ver
-                  </button>
+                  {!esBorrador && (
+                    <button
+                      onClick={() => onVerDocumento(doc)}
+                      className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-900 font-medium px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                      title="Ver documento"
+                    >
+                      <Eye size={14} /> Ver
+                    </button>
+                  )}
                   <button
                     onClick={() => setDocAEliminar(doc.id)}
                     className="flex items-center text-xs text-red-400 hover:text-red-600 px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
-                    title="Eliminar documento"
+                    title={esBorrador ? 'Cancelar borrador' : 'Eliminar documento'}
                   >
                     <Trash2 size={14} />
                   </button>
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </ModalShell>

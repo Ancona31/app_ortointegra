@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useRef, useState, type RefObject } from 'react'
-import { AlertTriangle, Check, EyeOff, Printer, ShieldCheck, ShieldOff } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { AlertTriangle, Check, EyeOff, FileClock, PenLine, Printer, ShieldCheck, ShieldOff } from 'lucide-react'
 import { flushSync } from 'react-dom'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import Link from 'next/link'
 import { generateDocFileName } from '@/lib/patientUtils'
@@ -11,6 +11,7 @@ import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { generarPdf } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
+import ModalShell from '@/components/ui/ModalShell'
 import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
 import SeccionPlegable from '@/components/documentos/SeccionPlegable'
 import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
@@ -37,14 +38,30 @@ import { enfocarYAcercar } from '@/lib/scrollDoc'
  * quien buscara «¿este paciente autorizó?» veía un consentimiento donde hubo
  * un rechazo.
  *
+ * ── EL BORRADOR, Y POR QUÉ LA FILA VA ANTES QUE EL PDF ──────────────────────
+ * GUIA_FORMULARIOS_05 §0 y §9. El consentimiento es el único de los ocho que
+ * cambia de estado en el tiempo: `borrador` → `emitido_firma_manual` (imprimir
+ * sin firma) o → `firmado` (sellar con firmas, paso siguiente). Los dos
+ * finales son TERMINALES; de ellos no se vuelve.
+ *
+ * El folio lo asigna la base al SALIR de borrador, así que **la fila se escribe
+ * antes de renderizar el PDF, en las dos ramas** —la del borrador emitido y la
+ * del consentimiento que se imprime de una—. Antes era al revés y el papel
+ * salía sin folio: un número que no está impreso no sirve para que nadie te
+ * cite el documento por teléfono.
+ *
+ * Precio de la inversión, aceptado: si el render falla, la fila ya existe y el
+ * folio ya se consumió. No queda huérfana —aparece en la lista con su botón de
+ * regenerar— y el mensaje de error lo dice con el folio delante.
+ *
+ * ⚠ Los otros SIETE formatos siguen generando el PDF antes de escribir la fila,
+ * así que su papel sale sin folio. Se corrige en el cableado de v2, cuando se
+ * toquen todos a la vez; aquí solo se arreglan los dos de este archivo.
+ *
  * ── LO QUE ESTE PASE **NO** HACE ────────────────────────────────────────────
- * El flujo de firmado electrónico (GUIA_FORMULARIOS_05) es su propio paso: los
- * tres botones de la barra, el borrador, la captura de firmas y las fotos de
- * identificación. Aquí la barra sigue teniendo los dos de siempre —«Guardar
- * como plantilla» + imprimir—, así que «Guardar como plantilla» se queda en la
- * barra y NO sube a la card de plantilla: la excepción de §1.2 existe para no
- * dejar cuatro botones en una barra que hoy tiene dos. Sube cuando suba el
- * tercero.
+ * La captura de firmas y las fotos de identificación son el paso siguiente. El
+ * primario «Iniciar firmado electrónico» está a la vista y DESHABILITADO, con
+ * el motivo escrito encima: un botón que no existe no anuncia nada.
  */
 
 interface Props {
@@ -57,6 +74,12 @@ interface Props {
    * aquí es más rápido que ir a la ficha y volver.
    */
   edadInicial?: string
+  /**
+   * Borrador que se retoma, desde `?borrador=` de la lista de documentos (§9).
+   * Se carga en el MISMO formulario, editable: editar y firmar son la misma
+   * tarea sin terminar, no dos pantallas.
+   */
+  borradorId?: string
   offlineMode?: boolean
   onOfflineSave?: () => void
   /** Reporta al host si el formulario sigue vacío (guía 04 §6.1 y §6.2). */
@@ -72,6 +95,18 @@ const FECHA_MIN = '1900-01-01'
 
 /** Cuál de los dos documentos excluyentes se está emitiendo. */
 type TipoDoc = 'consentimiento' | 'denegacion'
+
+/** La fila de `documentos` en estado `borrador`, con lo justo para retomarla. */
+interface FilaBorrador {
+  id: string
+  contenido: Record<string, unknown> | null
+  created_at: string
+}
+
+/** Lee una clave de texto del jsonb: pudo guardarse con otra versión del formulario. */
+function texto(v: unknown): string {
+  return typeof v === 'string' ? v : ''
+}
 
 const SECCIONES_DEFAULT = {
   preoperatorio: `Después de haberle realizado historia clínica y estudios diagnósticos pertinentes (análisis de laboratorio, estudios de imagen u otros según el caso), se ha establecido el diagnóstico descrito y, habiendo agotado otras alternativas de tratamiento, se le recomienda someterse al procedimiento indicado. Se le indicará el tiempo necesario de ayuno previo y las indicaciones preoperatorias correspondientes.`,
@@ -152,7 +187,8 @@ function isFormEmpty(e: EstadoVacio): boolean {
 
 export default function ConsentimientoInformadoForm({
   pacienteInicial = '', pacienteId, diagnosticoInicial = '', edadInicial = '',
-  offlineMode, onOfflineSave, onVacioChange, onPanelPlantillasChange,
+  borradorId: borradorIdInicial, offlineMode, onOfflineSave, onVacioChange,
+  onPanelPlantillasChange,
 }: Props) {
   const { medicoInfo: onlineMedicoInfo, isLoading: cargandoPerfil } = useMedicoInfo()
   const { consultorioActivo } = useConsultorioActivo()
@@ -211,6 +247,18 @@ export default function ConsentimientoInformadoForm({
   // formulario recién abierto no acusa de nada. Después permanece y se
   // actualiza en vivo.
   const [intentado, setIntentado] = useState(false)
+
+  // ── Borrador (§9) ───────────────────────────────────────────────
+  // `borradorId` es la fila viva que se está editando; null mientras el
+  // consentimiento no se haya guardado nunca. `borradorPrevio` es el borrador
+  // propio que YA existía al abrir el formulario y todavía no se ha resuelto:
+  // sobrevive a cerrar el diálogo para que guardar no cree un segundo.
+  const [borradorId, setBorradorId] = useState<string | null>(null)
+  const [borradorFecha, setBorradorFecha] = useState<string | null>(null)
+  const [guardandoBorrador, setGuardandoBorrador] = useState(false)
+  const [borradorPrevio, setBorradorPrevio] = useState<FilaBorrador | null>(null)
+  const [dialogoPrevio, setDialogoPrevio] = useState(false)
+  const [reemplazando, setReemplazando] = useState(false)
 
   const formRef = useRef<HTMLDivElement>(null)
   const fechaRef = useRef<HTMLInputElement>(null)
@@ -287,6 +335,77 @@ export default function ConsentimientoInformadoForm({
     setSecciones(s => ({ ...s, [key]: val }))
   }
 
+  // ── Borrador · carga (§9.2) ─────────────────────────────────────
+  /**
+   * Vuelca la fila en el formulario. Cada clave se comprueba por separado, como
+   * en las plantillas: el jsonb pudo escribirse con otra versión del formulario
+   * y lo que falte vuelve a su valor inicial, no a `undefined`.
+   */
+  const aplicarBorrador = useCallback((fila: FilaBorrador): void => {
+    const c = fila.contenido ?? {}
+    setFecha(texto(c.fecha) || hoyEnTZ())
+    setLugar(texto(c.lugar))
+    setPaciente(texto(c.paciente))
+    setEdad(texto(c.edad))
+    setDiagnostico(texto(c.diagnostico))
+    setProcedimiento(texto(c.procedimiento))
+    setFamiliar(texto(c.familiar))
+    setTestigo1(texto(c.testigo1))
+    setTestigo2(texto(c.testigo2))
+    setAutorizaTransfusion(c.autorizaTransfusion === 'si' || c.autorizaTransfusion === 'no'
+      ? c.autorizaTransfusion : null)
+    setAutorizaFotos(c.autorizaFotos === true)
+    setSecciones(leerSecciones(c.secciones))
+    setBorradorId(fila.id)
+    setBorradorFecha(fila.created_at)
+    setBorradorPrevio(null)
+    setDialogoPrevio(false)
+  }, [])
+
+  /**
+   * Al montar: o se retoma el borrador que pide la URL, o se comprueba si el
+   * médico ya tiene uno propio de este paciente (§9.3).
+   *
+   * `subido_por = auth.uid()` es redundante con la policy de SELECT, que ya
+   * esconde los ajenos, y va explícito de todos modos: el criterio de producto
+   * —un borrador por paciente Y por médico— no debe depender de leerse en otro
+   * archivo para entenderse aquí.
+   *
+   * El búnker offline no entra: no tiene sesión ni red.
+   */
+  useEffect(() => {
+    if (offlineMode || !pacienteId) return
+    let cancelado = false
+
+    void (async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || cancelado) return
+
+      let q = supabase
+        .from('documentos')
+        .select('id, contenido, created_at')
+        .eq('paciente_id', pacienteId)
+        .eq('tipo', 'consentimiento_informado')
+        .eq('estado', 'borrador')
+        .eq('subido_por', user.id)
+      if (borradorIdInicial) q = q.eq('id', borradorIdInicial)
+
+      const { data } = await q.order('created_at', { ascending: false }).limit(1)
+      const fila = (data?.[0] ?? null) as FilaBorrador | null
+      if (cancelado || !fila) return
+
+      if (borradorIdInicial) {
+        aplicarBorrador(fila)
+      } else {
+        setBorradorPrevio(fila)
+        setDialogoPrevio(true)
+      }
+    })()
+
+    return () => { cancelado = true }
+  }, [offlineMode, pacienteId, borradorIdInicial, aplicarBorrador])
+
   // ── Validación (§3.8) ───────────────────────────────────────────
   // Los NUEVE obligatorios auditados del formato, en el orden de lectura del
   // formulario. Ninguno de los cinco campos retirados en este pase era uno de
@@ -356,6 +475,103 @@ export default function ConsentimientoInformadoForm({
     enfocarYAcercar(destinos[clave]?.current ?? null)
   }
 
+  /**
+   * El contenido persistido del CONSENTIMIENTO — el mismo para el borrador y
+   * para el emitido, porque son la misma fila en dos momentos. La denegación
+   * arma el suyo en `imprimir`: lleva seis campos y ninguna sección.
+   *
+   * El FOLIO no está aquí: es columna propia y lo escribe la base.
+   */
+  function contenidoConsentimiento(): Record<string, unknown> {
+    return {
+      paciente, lugar, fecha, edad, procedimiento, diagnostico,
+      familiar, testigo1, testigo2, autorizaTransfusion, autorizaFotos,
+      secciones, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    }
+  }
+
+  // ── Borrador · guardar (§9) ─────────────────────────────────────
+  /**
+   * Guarda SIN emitir. La fila nace en `borrador` y por tanto SIN folio: lo
+   * asigna la base al salir de ese estado, así que un borrador que nunca se
+   * imprime no deja un hueco en la serie.
+   *
+   * Sin validación de faltantes a propósito: un borrador incompleto es
+   * exactamente lo que este botón existe para permitir.
+   */
+  async function guardarBorrador(): Promise<void> {
+    if (guardandoBorrador || imprimiendo) return
+    // Guardar sin resolver el que ya había crearía el segundo borrador que la
+    // regla prohíbe. Cerrar el diálogo no es responderlo.
+    if (!borradorId && borradorPrevio) { setDialogoPrevio(true); return }
+
+    setErrorGuardado('')
+    setGuardandoBorrador(true)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('No autenticado')
+
+      if (borradorId) {
+        // `.eq('estado','borrador')` + recuento de filas: la policy de UPDATE
+        // exige `subido_por = auth.uid()`, así que tocar el borrador de otro
+        // médico devuelve CERO filas y NINGÚN error.
+        const { data, error } = await supabase
+          .from('documentos')
+          .update({ contenido: contenidoConsentimiento() })
+          .eq('id', borradorId)
+          .eq('estado', 'borrador')
+          .select('id')
+        if (error) throw error
+        if (!data || data.length === 0) throw new Error('SIN_FILAS')
+      } else {
+        const { data, error } = await supabase
+          .from('documentos')
+          .insert({
+            tipo: 'consentimiento_informado',
+            estado: 'borrador',
+            contenido: contenidoConsentimiento(),
+            client_id: crypto.randomUUID(),
+            paciente_id: pacienteId,
+            subido_por: user.id,
+          })
+          .select('id, created_at')
+          .single()
+        if (error) throw error
+        setBorradorId(data.id)
+        setBorradorFecha(data.created_at)
+      }
+      toast.success('Borrador guardado. No se ha emitido nada todavía.')
+    } catch (err) {
+      const msg = err instanceof Error && err.message === 'SIN_FILAS'
+        ? 'No se pudo guardar el borrador: no es tuyo o ya se emitió.'
+        : 'No se pudo guardar el borrador. Revisa tu conexión e intenta de nuevo.'
+      toast.error(msg)
+      setErrorGuardado(msg)
+      console.error('[ConsentimientoInformadoForm] guardarBorrador falló:', err)
+    } finally {
+      setGuardandoBorrador(false)
+    }
+  }
+
+  /** Reemplaza el borrador previo por uno nuevo: se borra y el formulario sigue en blanco. */
+  async function reemplazarBorrador(): Promise<void> {
+    if (!borradorPrevio || reemplazando) return
+    setReemplazando(true)
+    try {
+      const res = await fetch(`/api/documentos/${borradorPrevio.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(`DELETE ${res.status}`)
+      setBorradorPrevio(null)
+      setDialogoPrevio(false)
+      toast.success('Borrador anterior eliminado')
+    } catch (err) {
+      toast.error('No se pudo eliminar el borrador anterior. Intenta de nuevo.')
+      console.error('[ConsentimientoInformadoForm] reemplazarBorrador falló:', err)
+    } finally {
+      setReemplazando(false)
+    }
+  }
+
   async function imprimir(): Promise<void> {
     // El primario nunca está gris por faltantes: un botón apagado no enseña qué
     // falta, el banner sí. Al pulsar con faltantes no emite y lleva al primero.
@@ -377,30 +593,83 @@ export default function ConsentimientoInformadoForm({
     //    formulario. Lo que la denegación no lleva se conserva en pantalla y se
     //    declara en la franja, pero no viaja a la fila: allí significaría que
     //    este papel lo lleva, y no lo lleva.
-    //    El FOLIO no está aquí: lo asigna la base en el trigger BEFORE INSERT,
-    //    con prefijo CI o DEN según este mismo `tipo` de la tabla.
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
     const contenido: Record<string, unknown> = esDenegacion
       // El diagnóstico entra: no está en el riel, pero SÍ en la declaración
       // (§5), así que es parte del documento emitido y se guarda como tal.
       ? { paciente, lugar, fecha, edad, procedimiento, diagnostico, familiar, timezone }
-      : {
-        paciente, lugar, fecha, edad, procedimiento, diagnostico,
-        familiar, testigo1, testigo2, autorizaTransfusion, autorizaFotos,
-        secciones, timezone,
-      }
+      : contenidoConsentimiento()
 
-    // Flags de tracking para diferenciar errores
-    let pdfGenerated = false
+    // El borrador cargado se emite solo si lo que se imprime es un
+    // CONSENTIMIENTO. La denegación no tiene borrador —se emite en el momento,
+    // no se prepara con calma—, así que conmutar a denegación con un borrador
+    // abierto emite una fila nueva y deja el borrador donde estaba.
+    const idBorrador = esDenegacion ? null : borradorId
+
     // El blob y el desenlace de la persistencia se leen en el finally para
     // montar el modal posterior a la generación. Ver ModalDocumentoGenerado.
     let pdfBlob: Blob | null = null
     let guardado = false
+    let filaId: string | null = null
+    let folio: string | null = null
 
     try {
-      // 4. PDF PRIMERO — si falla, abortamos antes de persistir.
-      //    CRÍTICO en consentimiento: evita registros legales huérfanos
-      //    en DB sin documento físico entregable al paciente.
+      // ── 4 · LA FILA PRIMERO, porque de ella sale el folio ─────────────
+      //    Invierte el orden que tenían los ocho formatos —PDF, subida, fila—.
+      //    El trigger asigna el folio al INSERT si el documento nace emitido, y
+      //    al salir de `borrador` si venía de uno; en los dos casos el número
+      //    solo existe DESPUÉS de escribir, así que renderizar antes imprimía
+      //    un papel sin él.
+      //
+      //    Va con el cliente de SESIÓN del médico, nunca con privilegios de
+      //    servicio: el trigger exenta por completo a quien no trae JWT, y el
+      //    documento quedaría emitido con folio nulo PARA SIEMPRE —un segundo
+      //    intento no lo arregla, porque la asignación exige venir de borrador—.
+      const supabase = offlineMode ? null : createClient()
+      if (supabase) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('No autenticado')
+
+        if (idBorrador) {
+          const { data, error } = await supabase
+            .from('documentos')
+            .update({ contenido, estado: 'emitido_firma_manual' })
+            .eq('id', idBorrador)
+            .eq('estado', 'borrador')
+            .select('id, folio')
+          if (error) throw error
+          // Cero filas SIN error: la policy exige que el documento sea propio.
+          // Sin esta comprobación la interfaz creería que emitió.
+          if (!data || data.length === 0) throw new Error('EMISION_SIN_FILAS')
+          filaId = data[0].id
+          folio = data[0].folio
+        } else {
+          const insertPayload: Record<string, unknown> = {
+            tipo: tipoTabla,
+            // Explícito aunque sea el DEFAULT de la columna: aquí se lee que el
+            // documento nace emitido, que es lo que le gana el folio en el INSERT.
+            estado: 'emitido_firma_manual',
+            contenido,
+            client_id: clientId,
+            subido_por: user.id,
+          }
+          if (pacienteId) insertPayload.paciente_id = pacienteId
+
+          const { data, error } = await supabase
+            .from('documentos')
+            .insert(insertPayload)
+            .select('id, folio')
+            .single()
+          if (error) throw error
+          filaId = data.id
+          folio = data.folio
+        }
+        // La fila está en el expediente. Aunque el PDF fallara después, el
+        // documento es recuperable desde la lista con su botón de regenerar.
+        guardado = true
+      }
+
+      // ── 5 · El PDF, ya con el número que la base acaba de asignar ─────
       const medicoData = medicoInfo ? {
         nombre: medicoInfo.nombre,
         titulo: medicoInfo.titulo ?? null,
@@ -429,13 +698,17 @@ export default function ConsentimientoInformadoForm({
         tipo: tipoTabla,
         pacienteId,
         medico: medicoData,
+        // `folio` va en las dos ramas: es lo único que la inversión de orden
+        // existe para conseguir. En el búnker offline no hay fila ni base, así
+        // que llega undefined y el papel sale sin número, igual que hoy.
         data: esDenegacion
-          ? { paciente, lugar, fecha: fechaFmt, edad, procedimiento, diagnostico, familiar }
+          ? { paciente, lugar, fecha: fechaFmt, edad, procedimiento, diagnostico, familiar,
+              folio: folio ?? undefined }
           : {
             paciente, lugar, fecha: fechaFmt, edad,
             procedimiento, diagnostico, familiar,
             testigo1, testigo2, autorizaTransfusion, autorizaFotos,
-            secciones,
+            secciones, folio: folio ?? undefined,
           },
         logoUrl,
         filename: generateDocFileName(paciente, esDenegacion ? 'Denegacion_Consentimiento' : 'Consentimiento_Informado'),
@@ -445,10 +718,9 @@ export default function ConsentimientoInformadoForm({
         entregar: !!offlineMode,
       })
 
-      pdfGenerated = true
       pdfBlob = blob
 
-      // 5. Persistencia
+      // ── 6 · La ruta del archivo, sobre la fila que ya existe ──────────
       if (offlineMode) {
         const { addDocument } = await import('@/lib/offline/db')
         const { getOfflineIdentity } = await import('@/lib/offline/identity')
@@ -466,44 +738,51 @@ export default function ConsentimientoInformadoForm({
           : 'Consentimiento informado guardado en bunker offline')
         onOfflineSave?.()
       } else {
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('No autenticado')
-
-        const insertPayload: Record<string, unknown> = {
-          tipo: tipoTabla,
-          contenido,
-          client_id: clientId,
-          pdf_url: storagePath,
-          subido_por: user.id,
+        if (storagePath && filaId && supabase) {
+          // Este UPDATE no toca ni el estado ni el folio, así que el trigger lo
+          // deja pasar: solo rechaza salir de un estado terminal o mover el folio.
+          const { error } = await supabase
+            .from('documentos')
+            .update({ pdf_url: storagePath })
+            .eq('id', filaId)
+          if (error) {
+            // No es fatal: la fila está y el PDF se entrega igual. Lo que se
+            // pierde es la descarga desde la lista, que el botón de regenerar
+            // repone.
+            console.error('[ConsentimientoInformadoForm] update pdf_url:', error.message)
+          }
         }
-        if (pacienteId) insertPayload.paciente_id = pacienteId
-
-        const { error } = await supabase.from('documentos').insert(insertPayload)
-        if (error) throw error
-
-        // Sin storagePath la fila se inserta igual pero sin PDF en Storage:
-        // mobileShare captura el error de subida y no lo relanza. El documento
-        // no queda recuperable desde la lista y el modal tiene que decirlo.
-        guardado = storagePath !== null
-        toast.success(esDenegacion ? 'Denegación guardada' : 'Consentimiento guardado')
+        // Emitido: el borrador dejó de serlo y la barra vuelve a su forma.
+        if (idBorrador) {
+          setBorradorId(null)
+          setBorradorFecha(null)
+        }
+        const nombreDoc = esDenegacion ? 'Denegación guardada' : 'Consentimiento guardado'
+        toast.success(folio ? `${nombreDoc} · ${folio}` : nombreDoc)
       }
     } catch (err) {
-      if (!pdfGenerated) {
-        toast.error('No se pudo generar el PDF. Intenta de nuevo.')
-        setErrorGuardado('No se pudo generar el PDF. Intenta de nuevo.')
+      // Tres desenlaces distintos, y el del medio es nuevo: con la fila escrita
+      // antes que el PDF, un fallo de render deja un documento emitido y un
+      // folio consumido. Decirlo con el número delante es lo que permite
+      // encontrarlo en la lista y recuperar el PDF desde ahí.
+      const emisionSinFilas = err instanceof Error && err.message === 'EMISION_SIN_FILAS'
+      let msg: string
+      if (emisionSinFilas) {
+        msg = 'No se pudo emitir el borrador: no es tuyo o ya se había emitido.'
+      } else if (offlineMode) {
+        // En el búnker no hay fila ni folio que perder: el único fallo posible
+        // es el render.
+        msg = 'No se pudo generar el PDF. Intenta de nuevo.'
+      } else if (filaId === null) {
+        msg = esDenegacion
+          ? 'No se pudo guardar la denegación, así que no se generó el PDF. Intenta de nuevo.'
+          : 'No se pudo guardar el consentimiento, así que no se generó el PDF. Intenta de nuevo.'
       } else {
-        // Enteras y no compuestas por piezas: el género del artículo no se
-        // resuelve concatenando `nombreCorto`, que es masculino en uno de los
-        // dos. Mismo criterio que la franja de Honorarios.
-        toast.error(esDenegacion
-          ? 'La denegación se generó pero no se pudo guardar. Revisa errores de sincronización.'
-          : 'El consentimiento se generó pero no se pudo guardar. Revisa errores de sincronización.')
-        setErrorGuardado(esDenegacion
-          ? 'Error al guardar la denegación.'
-          : 'Error al guardar el consentimiento.')
+        msg = `El documento quedó registrado${folio ? ` con folio ${folio}` : ''}, pero no se pudo generar el PDF. `
+          + 'Búscalo en la lista de documentos del paciente y recupéralo desde ahí.'
       }
-      // eslint-disable-next-line no-console
+      toast.error(msg)
+      setErrorGuardado(msg)
       console.error('[ConsentimientoInformadoForm] imprimir falló:', err)
     } finally {
       setImprimiendo(false)
@@ -523,7 +802,29 @@ export default function ConsentimientoInformadoForm({
           hermano, en el mismo contenedor de scroll (spec 02 §3.1). */}
       <div className="sp-doc-formbody" style={plantillas.panelAbierto ? { display: 'none' } : undefined}>
 
+      {/* Banner del borrador retomado (§9.2). Arriba del todo: lo primero que
+          hay que saber al abrir esta pantalla es que nada se ha emitido. */}
+      {borradorId && !esDenegacion && (
+        <p className="sp-banner sp-banner--warn">
+          <FileClock size={17} />
+          <span>
+            {borradorFecha
+              ? `Borrador guardado el ${format(parseISO(borradorFecha), "d 'de' MMMM 'de' yyyy, HH:mm", { locale: es })}. `
+              : 'Borrador guardado. '}
+            Sigue editándolo o continúa con el firmado; nada se ha emitido todavía.
+          </span>
+        </p>
+      )}
+
       {plantillas.selector}
+
+      {/* «Guardar como plantilla» sube aquí, junto al selector (spec 05 §1):
+          abajo hay ya tres botones y un cuarto en la misma fila es un tablero. */}
+      {plantillas.botonGuardar && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          {plantillas.botonGuardar}
+        </div>
+      )}
 
       <section className="sp-card sp-doc-card">
         {/* El segmentado vive en la cabecera de la primera card, como en
@@ -754,26 +1055,112 @@ export default function ConsentimientoInformadoForm({
         </p>
       )}
 
-      {/* «Guardar como plantilla» va aquí y no arriba: se guarda cuando el
-          formulario YA está lleno, así que su sitio es junto al de imprimir. */}
+      {/* El motivo del primario apagado, a la vista. Un botón deshabilitado sin
+          explicación se lee como una avería. */}
+      {!esDenegacion && (
+        <p className="sp-hint">
+          El firmado electrónico se habilita en la siguiente versión. Por ahora
+          imprime sin firma —la firma va en el papel— o guarda el borrador.
+        </p>
+      )}
+
+      {/* Orden del DOM = orden en fila desde 380px (§1). En XS `.sp-doc-actions`
+          es `column-reverse`, así que el primario queda arriba sin más. */}
       <div className="sp-doc-actions">
-        {plantillas.botonGuardar}
-        <button type="button" onClick={imprimir} disabled={imprimiendo || perfilPendiente}
-          className="sp-btn sp-btn--primary">
-          {imprimiendo ? <><span className="sp-spinner" /> Generando PDF…</>
-            : perfilPendiente ? <><span className="sp-spinner" /> Cargando tu perfil…</>
-            : <>
-                <Printer size={17} />
-                <span className="sp-doc-long">Imprimir {nombreCorto}</span>
-                <span className="sp-doc-short">Imprimir</span>
-              </>}
-        </button>
+        {esDenegacion ? (
+          /* La denegación no tiene borrador ni firmado: se emite en el momento.
+             Su barra es la de siempre. */
+          <button type="button" onClick={imprimir} disabled={imprimiendo || perfilPendiente}
+            className="sp-btn sp-btn--primary">
+            {imprimiendo ? <><span className="sp-spinner" /> Generando PDF…</>
+              : perfilPendiente ? <><span className="sp-spinner" /> Cargando tu perfil…</>
+              : <>
+                  <Printer size={17} />
+                  <span className="sp-doc-long">Imprimir {nombreCorto}</span>
+                  <span className="sp-doc-short">Imprimir</span>
+                </>}
+          </button>
+        ) : (
+          <>
+            <button type="button" onClick={guardarBorrador}
+              disabled={guardandoBorrador || imprimiendo || vacio}
+              title={vacio ? 'Escribe algo antes de guardarlo como borrador.' : undefined}
+              className="sp-btn sp-btn--ghost" style={{ flex: '0 0 auto' }}>
+              {guardandoBorrador ? <><span className="sp-spinner" /> Guardando…</> : 'Guardar borrador'}
+            </button>
+            <button type="button" onClick={imprimir}
+              disabled={imprimiendo || guardandoBorrador || perfilPendiente}
+              className="sp-btn sp-btn--secondary"
+              style={{ flex: '0 0 auto', whiteSpace: 'nowrap' }}>
+              {imprimiendo ? <><span className="sp-spinner" /> Generando PDF…</>
+                : perfilPendiente ? <><span className="sp-spinner" /> Cargando tu perfil…</>
+                : <><Printer size={17} /> Imprimir sin firma</>}
+            </button>
+            {/* Visible y apagado: el paso siguiente lo enciende. */}
+            <button type="button" disabled className="sp-btn sp-btn--primary"
+              title="Disponible en la siguiente versión">
+              <PenLine size={18} />
+              {borradorId ? 'Continuar firmado' : 'Iniciar firmado electrónico'}
+            </button>
+          </>
+        )}
       </div>
 
       </div>
 
       {plantillas.panel}
       {plantillas.dialogos}
+
+      {/* §9.3 · ya hay un borrador PROPIO de este paciente. Retomar es el
+          primario: casi siempre es el mismo procedimiento y lo que el médico
+          quiere es seguir. */}
+      <ModalShell
+        open={dialogoPrevio && borradorPrevio !== null}
+        onClose={() => !reemplazando && setDialogoPrevio(false)}
+        spinusGeometry="decide"
+        title={`${pacienteInicial.trim() || 'Este paciente'} ya tiene un consentimiento a medias`}
+        footer={
+          <div className="flex items-center gap-2 p-4 md:px-6">
+            <button type="button" onClick={reemplazarBorrador} disabled={reemplazando}
+              className="sp-btn sp-btn--ghost">
+              {reemplazando ? <><span className="sp-spinner" /> Eliminando…</> : 'Reemplazarlo'}
+            </button>
+            <div className="flex-1" />
+            <button type="button" disabled={reemplazando}
+              onClick={() => borradorPrevio && aplicarBorrador(borradorPrevio)}
+              className="sp-btn sp-btn--primary">
+              Retomar el borrador
+            </button>
+          </div>
+        }
+      >
+        <div className="p-4 md:p-6">
+          <p className="sp-body">
+            Solo puedes tener un borrador de consentimiento por paciente. Este es tuyo:
+          </p>
+          {/* Nombra el PROCEDIMIENTO y no solo la fecha: los borradores no
+              caducan, así que este diálogo puede salir meses después. */}
+          <div style={{
+            marginTop: 'var(--sp-gap-item)',
+            border: '1px dashed var(--sp-line-dash)',
+            borderRadius: 'var(--sp-r-field-sm)',
+            background: 'var(--sp-surface-sunken)',
+            padding: '12px 14px',
+          }}>
+            <p className="sp-body" style={{ fontWeight: 'var(--sp-fw-bold)' }}>
+              {texto(borradorPrevio?.contenido?.procedimiento) || 'Sin procedimiento anotado'}
+            </p>
+            <p className="sp-hint" style={{ marginTop: 2 }}>
+              {borradorPrevio
+                ? `Guardado el ${format(parseISO(borradorPrevio.created_at), "d 'de' MMMM 'de' yyyy, HH:mm", { locale: es })} · sin firmar`
+                : ''}
+            </p>
+          </div>
+          <p className="sp-hint" style={{ marginTop: 'var(--sp-gap-item)' }}>
+            Si lo reemplazas, se pierde lo que tenía escrito. No se puede deshacer.
+          </p>
+        </div>
+      </ModalShell>
 
       <ModalDocumentoGenerado
         open={docGenerado !== null}

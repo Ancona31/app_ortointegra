@@ -253,6 +253,17 @@ export interface Documento {
    * regenera.
    */
   formato_version?: 1 | 2
+  /**
+   * Estado del documento — hoy solo lo mueve el consentimiento informado
+   * (`20260812_documentos_estado.sql`). `borrador` es trabajo sin terminar: no
+   * tiene folio, no tiene PDF y solo lo ve su autor. Los otros dos son
+   * TERMINALES: de ellos no se vuelve, ni se pasa de uno al otro.
+   *
+   * Opcional aquí, como `formato_version`: la columna es `NOT NULL DEFAULT
+   * 'emitido_firma_manual'`, así que quien no la pida en el `select` la recibe
+   * `undefined` y debe tratarse como emitida.
+   */
+  estado?: 'borrador' | 'emitido_firma_manual' | 'firmado'
   // Metadata de uploads clínicos (sub-fase 6A). NULL en documentos generados por la app.
   storage_bucket?: string | null
   storage_path?: string | null

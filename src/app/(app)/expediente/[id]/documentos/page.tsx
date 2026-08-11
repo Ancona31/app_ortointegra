@@ -54,6 +54,9 @@ function DocumentosPacienteContent() {
 
   const nombreCompleto = paciente ? `${paciente.nombre} ${paciente.apellidos}` : ''
   const diagnosticoInicial = searchParams.get('dx') || ''
+  // Borrador que se retoma desde la lista de documentos. Solo lo consume el
+  // consentimiento: es el único formato con estado (guía 05 §9).
+  const borradorId = searchParams.get('borrador') || undefined
   // Ya redactada («45 años»), que es como la escribe el médico en el
   // consentimiento. La ficha ya se consulta con `fecha_nacimiento`.
   const edadInicial = paciente?.fecha_nacimiento
@@ -93,7 +96,7 @@ function DocumentosPacienteContent() {
           {tab === 'suplementacion' && <PlanSuplementacionForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
           {tab === 'internamiento' && <SolicitudInternamientoForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
           {tab === 'escrito' && <EscritoMedicoForm pacienteInicial={nombreCompleto} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
-          {tab === 'consentimiento' && <ConsentimientoInformadoForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} edadInicial={edadInicial} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
+          {tab === 'consentimiento' && <ConsentimientoInformadoForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} edadInicial={edadInicial} pacienteId={id} borradorId={borradorId} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
           {tab === 'honorarios' && <NotaHonorariosForm pacienteInicial={nombreCompleto} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />}
         </SelectorTipoDocumento>
       </div>

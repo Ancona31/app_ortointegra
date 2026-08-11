@@ -65,11 +65,21 @@ export async function POST(req: NextRequest) {
   // ── Obtener documento (RLS filtra por clínica) ──
   const { data: doc } = await supabase
     .from('documentos')
-    .select('id, tipo, contenido, created_at, paciente_id')
+    .select('id, tipo, contenido, created_at, paciente_id, estado')
     .eq('id', documentoId)
     .single()
 
   if (!doc) return NextResponse.json({ error: 'Documento no encontrado' }, { status: 404 })
+
+  // Un borrador no se manda a nadie: no está emitido, no tiene folio y sigue
+  // siendo editable. Enviarlo pondría en manos del paciente un documento que
+  // todavía puede cambiar.
+  if (doc.estado === 'borrador') {
+    return NextResponse.json(
+      { error: 'Este consentimiento es un borrador. Emítelo antes de enviarlo.' },
+      { status: 400 }
+    )
+  }
 
   // ── Validar email contra el registrado del paciente ──
   if (doc.paciente_id) {
