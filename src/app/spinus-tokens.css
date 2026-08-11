@@ -1902,4 +1902,125 @@ a:hover { color: var(--sp-primary-active); }
    propia. El icono y el rótulo se quedan arriba, juntos. */
 .sp-doc-consent-head { flex-wrap: wrap; row-gap: var(--sp-2); padding-top: 9px; padding-bottom: 9px; }
 
+
+/* --- 25. FIRMADO ELECTRÓNICO (GUIA_FORMULARIOS_05 §3 y §5) --------------- */
+/* Va al final y DENTRO de @layer components, por lo mismo que la 22, 23 y 24.
+
+   No usa @container: el modo vive en `position: fixed`, fuera del contenedor
+   `docform` del formulario, así que sus dos anchos se resuelven con @media. */
+
+/* El modo tapa la pantalla ENTERA, y eso es una función (§2): es el único
+   momento del sistema en que el dispositivo cambia de manos, y el paciente no
+   debe poder llegar al expediente ni al listado.
+
+   z-index 55 y no 40: el botón de menú del Sidebar en móvil es `z-50` y
+   quedaría ENCIMA del modo, que es exactamente la puerta al expediente que
+   este modo existe para cerrar. Los dos ModalShell de dentro pasan `elevated`
+   y suben a 60, así que siguen apilándose sobre él. */
+.sp-firma-modo {
+  position: fixed; inset: 0; z-index: 55;
+  display: flex; flex-direction: column;
+  background: var(--sp-surface);
+}
+
+/* §3.1 · cabecera de 56 px */
+.sp-firma-head {
+  flex: 0 0 auto; display: flex; align-items: center; gap: var(--sp-2);
+  height: 56px; padding: 0 var(--sp-3);
+  border-bottom: var(--sp-bw-hair) solid var(--sp-line-divider);
+}
+.sp-firma-salir {
+  display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: var(--sp-tap); height: var(--sp-tap);
+  border-radius: var(--sp-r-btn-sm); color: var(--sp-ink-500);
+}
+.sp-firma-salir:disabled { opacity: .4; cursor: not-allowed; }
+/* El título se trunca antes que el badge: con el contador largo a 358 px no
+   caben los dos, y el que informa de dónde estamos es el contador. */
+.sp-firma-titulo { flex: 1; min-width: 0; font-size: 18px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-firma-long  { display: none; }
+.sp-firma-short { display: inline; }
+@media (min-width: 380px) {
+  .sp-firma-titulo { font-size: var(--sp-fs-card); }
+  .sp-firma-long  { display: inline; }
+  .sp-firma-short { display: none; }
+}
+
+.sp-firma-progress { flex: 0 0 auto; padding: var(--sp-3); }
+
+.sp-firma-cuerpo {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: var(--sp-4);
+  padding: 0 var(--sp-3) var(--sp-4);
+}
+
+/* El rol y el nombre de quien firma, a la vista: el paciente coge el
+   dispositivo sin ningún contexto de lo que está pasando. */
+.sp-firma-quien { display: flex; flex-direction: column; gap: 2px; }
+.sp-firma-nombre {
+  font-size: var(--sp-fs-card); font-weight: var(--sp-fw-black);
+  line-height: var(--sp-lh-title); color: var(--sp-ink-800);
+}
+
+.sp-firma-lienzo-wrap { display: flex; flex-direction: column; gap: var(--sp-gap-label); }
+.sp-firma-girar { color: var(--sp-ink-350); }
+
+/* §5.1 · el lienzo.
+
+   El FONDO es literal y no `--sp-surface-sunken`, por lo mismo que la tinta es
+   literal en el componente: este mapa de bits ES el que se imprime, así que lo
+   que se ve al firmar tiene que ser lo que sale en el papel, en los dos temas.
+   Con el token, en modo oscuro se firmaría claro sobre oscuro y se imprimiría
+   claro sobre blanco. */
+.sp-firma-lienzo {
+  position: relative; height: 240px;
+  background: #fbfcfe;
+  border: var(--sp-bw-hair) solid var(--sp-line-input);
+  border-radius: var(--sp-r-input);
+  overflow: hidden;
+}
+@media (min-width: 380px) { .sp-firma-lienzo { height: 280px; } }
+
+/* `touch-action: none` es lo que impide que el gesto de firmar haga scroll de
+   la página en lugar de dibujar. */
+.sp-firma-canvas {
+  display: block; width: 100%; height: 100%;
+  touch-action: none; cursor: crosshair;
+}
+.sp-firma-placeholder {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  pointer-events: none; user-select: none;
+  font-size: var(--sp-fs-body); color: var(--sp-ink-200);
+}
+.sp-firma-linea {
+  position: absolute; left: 20px; right: 20px; bottom: 34px;
+  border-top: var(--sp-bw-hair) dashed var(--sp-line-dash);
+}
+.sp-firma-rol {
+  position: absolute; left: 0; right: 0; bottom: 12px; text-align: center;
+  pointer-events: none; user-select: none;
+  font-size: var(--sp-fs-legal); font-weight: var(--sp-fw-bold);
+  letter-spacing: var(--sp-ls-label-w); color: var(--sp-ink-300);
+  text-transform: uppercase;
+}
+
+/* §5.2 · en XS los dos a ancho completo y el primario arriba */
+.sp-firma-acciones { display: flex; align-items: center; gap: var(--sp-2-5); }
+.sp-firma-acciones > .sp-btn { min-height: var(--sp-ctrl-h-desktop); }
+@media (max-width: 379px) {
+  .sp-firma-acciones { flex-direction: column-reverse; }
+  .sp-firma-acciones > * { width: 100%; }
+}
+
+/* §7.1 · una fila por firmante */
+.sp-firma-resumen { display: flex; flex-direction: column; gap: var(--sp-2-5); }
+.sp-firma-fila { gap: var(--sp-3); justify-content: flex-start; }
+.sp-firma-fila-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.sp-firma-fila-nombre {
+  font-size: var(--sp-fs-body); font-weight: var(--sp-fw-bold); color: var(--sp-ink-800);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sp-firma-ico-vacio { background: var(--sp-surface-muted); color: var(--sp-ink-icon); }
+
 } /* fin @layer components */

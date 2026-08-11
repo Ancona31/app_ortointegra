@@ -14,6 +14,8 @@ import { useToast } from '@/components/ui/Toast'
 import ModalShell from '@/components/ui/ModalShell'
 import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
 import SeccionPlegable from '@/components/documentos/SeccionPlegable'
+import FirmadoConsentimiento, { type FirmaCapturada } from '@/components/documentos/FirmadoConsentimiento'
+import { huellaDocumento } from '@/lib/documentos/firmaTrazo'
 import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
 import { createClient } from '@/lib/supabase/client'
 import { hoyEnTZ, desplazarFecha } from '@/lib/dates'
@@ -58,10 +60,27 @@ import { enfocarYAcercar } from '@/lib/scrollDoc'
  * así que su papel sale sin folio. Se corrige en el cableado de v2, cuando se
  * toquen todos a la vez; aquí solo se arreglan los dos de este archivo.
  *
+ * ── EL FIRMADO ELECTRÓNICO, Y EL ORDEN DE LAS TRES OPERACIONES ──────────────
+ * GUIA_FORMULARIOS_05 §4 a §7. El primario abre `FirmadoConsentimiento`, que
+ * reúne los cuatro desenlaces y devuelve las firmas capturadas. Sellar son tres
+ * operaciones en un orden que NO es el intuitivo y que ninguna regla admite
+ * cambiar (cabecera de `20260813_firmas_documento.sql`):
+ *
+ *   1. insertar las firmas
+ *   2. UPDATE del documento a `firmado`, devolviendo el folio
+ *   3. renderizar el PDF
+ *
+ * Las firmas van ANTES del sellado porque el guardián de la base solo admite
+ * firmar un BORRADOR: si se sella primero, la firma que llegue después ve el
+ * estado ya cambiado y se rechaza. Y el sellado va antes de renderizar porque
+ * el folio lo asigna ese UPDATE.
+ *
+ * Las tres van con el cliente de SESIÓN del médico, nunca con privilegios de
+ * servicio: el guardián exenta del gate de clínica a quien no trae JWT.
+ *
  * ── LO QUE ESTE PASE **NO** HACE ────────────────────────────────────────────
- * La captura de firmas y las fotos de identificación son el paso siguiente. El
- * primario «Iniciar firmado electrónico» está a la vista y DESHABILITADO, con
- * el motivo escrito encima: un botón que no existe no anuncia nada.
+ * Las fotos de identificación (spec 05 §6) son el paso siguiente. Por eso el
+ * resumen del firmado dice `Firmó` a secas y no `Firmó · sin foto`.
  */
 
 interface Props {
@@ -101,6 +120,27 @@ interface FilaBorrador {
   id: string
   contenido: Record<string, unknown> | null
   created_at: string
+}
+
+/**
+ * Una fila de `public.firmas_documento`, tal como se inserta.
+ *
+ * `trazo` admite null SOLO en el médico —lo impone `firmas_documento_trazo_check`—
+ * y por eso el tipo lo declara así: sin la unión, TypeScript infiere `string` del
+ * primer elemento y la fila del médico no compilaría.
+ *
+ * `firmado_en_servidor` no está aquí a propósito: lo impone el trigger de la
+ * base pase lo que pase, y mandarlo desde el cliente solo daría la ilusión de
+ * que la hora del servidor la decide el cliente.
+ */
+interface FilaFirma {
+  documento_id: string
+  rol: 'medico' | 'paciente' | 'familiar' | 'testigo_1' | 'testigo_2'
+  trazo: string | null
+  firmado_en: string
+  huella: string
+  dispositivo: string
+  creado_por: string
 }
 
 /** Lee una clave de texto del jsonb: pudo guardarse con otra versión del formulario. */
@@ -259,6 +299,18 @@ export default function ConsentimientoInformadoForm({
   const [borradorPrevio, setBorradorPrevio] = useState<FilaBorrador | null>(null)
   const [dialogoPrevio, setDialogoPrevio] = useState(false)
   const [reemplazando, setReemplazando] = useState(false)
+
+  // ── Firmado electrónico (spec 05) ───────────────────────────────
+  // Mientras `firmando` no es null, el modo a pantalla completa está montado y
+  // el formulario sigue vivo detrás con display:none. Lleva CONGELADO el
+  // contenido que se acaba de escribir y su huella: a partir de ahí el
+  // contenido no se vuelve a tocar —el sellado solo mueve `estado`—, que es lo
+  // que sostiene que lo firmado sea lo guardado.
+  const [firmando, setFirmando] = useState<
+    { documentoId: string; huella: string; contenido: Record<string, unknown> } | null
+  >(null)
+  const [sellando, setSellando] = useState(false)
+  const [errorSellado, setErrorSellado] = useState('')
 
   const formRef = useRef<HTMLDivElement>(null)
   const fechaRef = useRef<HTMLInputElement>(null)
@@ -499,6 +551,52 @@ export default function ConsentimientoInformadoForm({
    * Sin validación de faltantes a propósito: un borrador incompleto es
    * exactamente lo que este botón existe para permitir.
    */
+  /**
+   * Escribe el contenido en la fila del borrador —creándola si no existe— y
+   * devuelve su id. Lanza si falla; el mensaje lo compone quien la llama.
+   *
+   * Recibe el contenido en vez de leerlo: el firmado necesita que lo que se
+   * guarda y lo que se resume en la huella sean el MISMO objeto, no dos
+   * lecturas del estado separadas por un `await`.
+   */
+  async function persistirBorrador(contenido: Record<string, unknown>): Promise<string> {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('No autenticado')
+
+    if (borradorId) {
+      // `.eq('estado','borrador')` + recuento de filas: la policy de UPDATE
+      // exige `subido_por = auth.uid()`, así que tocar el borrador de otro
+      // médico devuelve CERO filas y NINGÚN error.
+      const { data, error } = await supabase
+        .from('documentos')
+        .update({ contenido })
+        .eq('id', borradorId)
+        .eq('estado', 'borrador')
+        .select('id')
+      if (error) throw error
+      if (!data || data.length === 0) throw new Error('SIN_FILAS')
+      return borradorId
+    }
+
+    const { data, error } = await supabase
+      .from('documentos')
+      .insert({
+        tipo: 'consentimiento_informado',
+        estado: 'borrador',
+        contenido,
+        client_id: crypto.randomUUID(),
+        paciente_id: pacienteId,
+        subido_por: user.id,
+      })
+      .select('id, created_at')
+      .single()
+    if (error) throw error
+    setBorradorId(data.id)
+    setBorradorFecha(data.created_at)
+    return data.id
+  }
+
   async function guardarBorrador(): Promise<void> {
     if (guardandoBorrador || imprimiendo) return
     // Guardar sin resolver el que ya había crearía el segundo borrador que la
@@ -508,39 +606,7 @@ export default function ConsentimientoInformadoForm({
     setErrorGuardado('')
     setGuardandoBorrador(true)
     try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('No autenticado')
-
-      if (borradorId) {
-        // `.eq('estado','borrador')` + recuento de filas: la policy de UPDATE
-        // exige `subido_por = auth.uid()`, así que tocar el borrador de otro
-        // médico devuelve CERO filas y NINGÚN error.
-        const { data, error } = await supabase
-          .from('documentos')
-          .update({ contenido: contenidoConsentimiento() })
-          .eq('id', borradorId)
-          .eq('estado', 'borrador')
-          .select('id')
-        if (error) throw error
-        if (!data || data.length === 0) throw new Error('SIN_FILAS')
-      } else {
-        const { data, error } = await supabase
-          .from('documentos')
-          .insert({
-            tipo: 'consentimiento_informado',
-            estado: 'borrador',
-            contenido: contenidoConsentimiento(),
-            client_id: crypto.randomUUID(),
-            paciente_id: pacienteId,
-            subido_por: user.id,
-          })
-          .select('id, created_at')
-          .single()
-        if (error) throw error
-        setBorradorId(data.id)
-        setBorradorFecha(data.created_at)
-      }
+      await persistirBorrador(contenidoConsentimiento())
       toast.success('Borrador guardado. No se ha emitido nada todavía.')
     } catch (err) {
       const msg = err instanceof Error && err.message === 'SIN_FILAS'
@@ -549,6 +615,49 @@ export default function ConsentimientoInformadoForm({
       toast.error(msg)
       setErrorGuardado(msg)
       console.error('[ConsentimientoInformadoForm] guardarBorrador falló:', err)
+    } finally {
+      setGuardandoBorrador(false)
+    }
+  }
+
+  /**
+   * Abre el modo de firmado (spec 05 §2). Antes GUARDA, y no por comodidad: las
+   * firmas cuelgan de un `documento_id` que tiene que existir y estar en
+   * `borrador`, y la huella se calcula sobre el contenido que se acaba de
+   * escribir. Sin ese guardado, la huella acreditaría un texto que no está en
+   * ninguna parte.
+   *
+   * Exige el formulario completo, al contrario que «Guardar borrador»: firmar
+   * es el paso previo a emitir, y no se le pide a un paciente que firme un
+   * documento al que le faltan campos.
+   */
+  async function iniciarFirmado(): Promise<void> {
+    if (guardandoBorrador || imprimiendo || firmando) return
+    if (faltantes.length > 0) {
+      setIntentado(true)
+      irA(faltantes[0].clave)
+      return
+    }
+    if (!borradorId && borradorPrevio) { setDialogoPrevio(true); return }
+
+    setErrorGuardado('')
+    setErrorSellado('')
+    setGuardandoBorrador(true)
+    try {
+      const contenido = contenidoConsentimiento()
+      const documentoId = await persistirBorrador(contenido)
+      setFirmando({ documentoId, huella: await huellaDocumento(contenido), contenido })
+    } catch (err) {
+      const causa = err instanceof Error ? err.message : ''
+      const msg = causa === 'SIN_FILAS'
+        ? 'No se pudo abrir el firmado: el borrador no es tuyo o ya se emitió.'
+        : causa === 'SIN_CRYPTO_SUBTLE'
+        ? 'Este navegador no puede calcular la huella del documento porque la página no se '
+          + 'abrió por HTTPS. Ábrela por HTTPS o desde localhost para firmar.'
+        : 'No se pudo abrir el firmado. Revisa tu conexión e intenta de nuevo.'
+      toast.error(msg)
+      setErrorGuardado(msg)
+      console.error('[ConsentimientoInformadoForm] iniciarFirmado falló:', err)
     } finally {
       setGuardandoBorrador(false)
     }
@@ -569,6 +678,189 @@ export default function ConsentimientoInformadoForm({
       console.error('[ConsentimientoInformadoForm] reemplazarBorrador falló:', err)
     } finally {
       setReemplazando(false)
+    }
+  }
+
+  /**
+   * Los datos de impresión que comparten el consentimiento sellado y el que se
+   * imprime sin firma. Se lee dos veces en este archivo y en ningún otro sitio.
+   */
+  function datosDePapel() {
+    const medicoData = medicoInfo ? {
+      nombre: medicoInfo.nombre,
+      titulo: medicoInfo.titulo ?? null,
+      nombres: medicoInfo.nombres ?? null,
+      apellido_paterno: medicoInfo.apellido_paterno ?? null,
+      apellido_materno: medicoInfo.apellido_materno ?? null,
+      especialidad: medicoInfo.especialidad,
+      cedula_profesional: medicoInfo.cedula_profesional,
+      cedula_especialidad: medicoInfo.cedula_especialidad,
+      color_primario: medicoInfo.color_primario,
+      color_secundario: medicoInfo.color_secundario,
+      direccion_consultorio: medicoInfo.direccion_consultorio,
+      telefono_consultorio: medicoInfo.telefono_consultorio,
+      firma_url: medicoInfo.firma_url ?? null,
+    } : null
+    return {
+      medicoData,
+      logoUrl: medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined,
+      consultorio: consultorioActivo ? {
+        nombre: consultorioActivo.nombre,
+        direccion: consultorioActivo.direccion,
+        telefono: consultorioActivo.telefono,
+      } : undefined,
+      fechaFmt: format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es }),
+    }
+  }
+
+  /**
+   * Las TRES OPERACIONES DEL SELLADO, en el único orden que las reglas admiten.
+   * Ver la cabecera del archivo: firmas → sellado → PDF, y ninguna de las dos
+   * precedencias es de estilo.
+   */
+  async function sellar(firmas: FirmaCapturada[]): Promise<void> {
+    if (!firmando || sellando) return
+    setSellando(true)
+    setErrorSellado('')
+
+    let pdfBlob: Blob | null = null
+    let folio: string | null = null
+    let selladoOk = false
+
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('No autenticado')
+
+      const selladoEn = new Date().toISOString()
+      const dispositivo = navigator.userAgent.slice(0, 500)
+
+      // ── 1 · LAS FIRMAS, ANTES DEL SELLADO ────────────────────────────
+      //    El guardián de la base solo admite firmar un BORRADOR: si el
+      //    documento se sellara primero, estas filas verían el estado ya
+      //    cambiado y se rechazarían.
+      //
+      //    Un solo INSERT con todas: PostgREST lo manda como una sentencia, así
+      //    que o entran las cinco o no entra ninguna. Cinco llamadas dejarían
+      //    documentos con la mitad de sus firmas y sin forma de completarlas,
+      //    porque una firma no se edita.
+      const filas: FilaFirma[] = firmas.map(f => ({
+        documento_id: firmando.documentoId,
+        rol: f.rol,
+        trazo: f.trazo,
+        firmado_en: f.firmadoEn,
+        huella: firmando.huella,
+        dispositivo,
+        creado_por: user.id,
+      }))
+      // El médico no firma en el flujo —su rúbrica sale del perfil— pero SÍ se
+      // registra, con la hora del sellado, que es el acto que reúne las demás.
+      filas.push({
+        documento_id: firmando.documentoId,
+        rol: 'medico',
+        trazo: null,
+        firmado_en: selladoEn,
+        huella: firmando.huella,
+        dispositivo,
+        creado_por: user.id,
+      })
+      const { error: errFirmas } = await supabase.from('firmas_documento').insert(filas)
+      if (errFirmas) throw errFirmas
+
+      // ── 2 · EL SELLADO, que es lo que asigna el folio ────────────────
+      //    Solo `estado`. El contenido NO se toca: la huella de las firmas se
+      //    calculó sobre lo que hay guardado, y reescribirlo aquí la invalidaría
+      //    en el mismo acto que la registra.
+      const { data, error } = await supabase
+        .from('documentos')
+        .update({ estado: 'firmado' })
+        .eq('id', firmando.documentoId)
+        .eq('estado', 'borrador')
+        .select('id, folio')
+      if (error) throw error
+      if (!data || data.length === 0) throw new Error('SELLADO_SIN_FILAS')
+      folio = data[0].folio
+      selladoOk = true
+
+      // ── 3 · EL PDF, ya con el folio, las rúbricas y los sellos ───────
+      const papel = datosDePapel()
+      const { blob, storagePath } = await generarPdf({
+        tipo: 'consentimiento_informado',
+        pacienteId,
+        medico: papel.medicoData,
+        // El contenido CONGELADO, no una lectura nueva del estado: lo que se
+        // imprime tiene que ser lo mismo que se guardó y lo mismo que resume la
+        // huella. Solo la fecha se recompone, porque el papel la lleva
+        // redactada y la fila la guarda en ISO.
+        data: {
+          ...firmando.contenido,
+          fecha: papel.fechaFmt,
+          folio: folio ?? undefined,
+          firmas: [
+            ...firmas.map(f => ({ rol: f.rol, trazo: f.trazo, firmadoEn: f.firmadoEn })),
+            { rol: 'medico', trazo: null, firmadoEn: selladoEn },
+          ],
+          selladoEn,
+          huella: firmando.huella,
+        },
+        logoUrl: papel.logoUrl,
+        filename: generateDocFileName(paciente, 'Consentimiento_Informado'),
+        consultorio: papel.consultorio,
+        entregar: false,
+      })
+      pdfBlob = blob
+
+      if (storagePath) {
+        // No toca ni el estado ni el folio, así que el trigger lo deja pasar.
+        const { error: errPdf } = await supabase
+          .from('documentos')
+          .update({ pdf_url: storagePath })
+          .eq('id', firmando.documentoId)
+        if (errPdf) console.error('[ConsentimientoInformadoForm] update pdf_url:', errPdf.message)
+      }
+
+      setFirmando(null)
+      setBorradorId(null)
+      setBorradorFecha(null)
+      toast.success(folio ? `Consentimiento sellado · ${folio}` : 'Consentimiento sellado')
+    } catch (err) {
+      const sinFilas = err instanceof Error && err.message === 'SELLADO_SIN_FILAS'
+      // 23514 es `check_violation`. En esta tabla el único CHECK que puede
+      // fallar con datos bien formados es el del reloj: el techo de
+      // `firmado_en` es `firmado_en_servidor + 1 día`, así que un dispositivo
+      // con la fecha adelantada tumba el INSERT entero. Decirlo con esas
+      // palabras ahorra buscarlo en el lado equivocado.
+      const relojAdelantado = !selladoOk
+        && typeof err === 'object' && err !== null && 'code' in err
+        && (err as { code?: unknown }).code === '23514'
+      let msg: string
+      if (sinFilas) {
+        msg = 'No se pudo sellar: el borrador no es tuyo o ya se había emitido.'
+      } else if (relojAdelantado) {
+        msg = 'La base rechazó las firmas: la fecha y hora de este dispositivo están adelantadas. '
+          + 'Corrígelas y vuelve a firmar.'
+      } else if (!selladoOk) {
+        msg = 'No se pudieron guardar las firmas, así que el documento no se selló. Intenta de nuevo.'
+      } else {
+        // El caso incómodo: el documento ya es terminal y el folio ya se
+        // consumió. Cerrar el modo es lo correcto —no hay nada más que firmar—
+        // y el mensaje lleva el número delante para poder encontrarlo.
+        msg = `El consentimiento quedó sellado${folio ? ` con folio ${folio}` : ''}, pero no se pudo `
+          + 'generar el PDF. Búscalo en la lista de documentos del paciente y recupéralo desde ahí.'
+      }
+      toast.error(msg)
+      if (selladoOk) {
+        setErrorGuardado(msg)
+        setFirmando(null)
+        setBorradorId(null)
+        setBorradorFecha(null)
+      } else {
+        setErrorSellado(msg)
+      }
+      console.error('[ConsentimientoInformadoForm] sellar falló:', err)
+    } finally {
+      setSellando(false)
+      if (pdfBlob) setDocGenerado({ blob: pdfBlob, guardado: true })
     }
   }
 
@@ -800,7 +1092,11 @@ export default function ConsentimientoInformadoForm({
       {/* El árbol del formulario NO se desmonta cuando el panel de plantillas
           está abierto: se apaga con display:none y el panel se monta como
           hermano, en el mismo contenedor de scroll (spec 02 §3.1). */}
-      <div className="sp-doc-formbody" style={plantillas.panelAbierto ? { display: 'none' } : undefined}>
+      {/* Con el firmado abierto el formulario sigue MONTADO y apagado, no
+          desmontado (§2): al salir del modo el médico vuelve a lo que estaba
+          escribiendo, sin haberlo traspasado a ninguna parte. */}
+      <div className="sp-doc-formbody"
+        style={plantillas.panelAbierto || firmando ? { display: 'none' } : undefined}>
 
       {/* Banner del borrador retomado (§9.2). Arriba del todo: lo primero que
           hay que saber al abrir esta pantalla es que nada se ha emitido. */}
@@ -1055,15 +1351,6 @@ export default function ConsentimientoInformadoForm({
         </p>
       )}
 
-      {/* El motivo del primario apagado, a la vista. Un botón deshabilitado sin
-          explicación se lee como una avería. */}
-      {!esDenegacion && (
-        <p className="sp-hint">
-          El firmado electrónico se habilita en la siguiente versión. Por ahora
-          imprime sin firma —la firma va en el papel— o guarda el borrador.
-        </p>
-      )}
-
       {/* Orden del DOM = orden en fila desde 380px (§1). En XS `.sp-doc-actions`
           es `column-reverse`, así que el primario queda arriba sin más. */}
       <div className="sp-doc-actions">
@@ -1096,9 +1383,12 @@ export default function ConsentimientoInformadoForm({
                 : perfilPendiente ? <><span className="sp-spinner" /> Cargando tu perfil…</>
                 : <><Printer size={17} /> Imprimir sin firma</>}
             </button>
-            {/* Visible y apagado: el paso siguiente lo enciende. */}
-            <button type="button" disabled className="sp-btn sp-btn--primary"
-              title="Disponible en la siguiente versión">
+            {/* No se apaga por faltantes, igual que el de imprimir: un botón
+                gris no enseña qué falta, el banner sí. Al pulsar con faltantes
+                no abre el firmado y lleva al primero. */}
+            <button type="button" onClick={iniciarFirmado}
+              disabled={imprimiendo || guardandoBorrador || perfilPendiente}
+              className="sp-btn sp-btn--primary">
               <PenLine size={18} />
               {borradorId ? 'Continuar firmado' : 'Iniciar firmado electrónico'}
             </button>
@@ -1110,6 +1400,18 @@ export default function ConsentimientoInformadoForm({
 
       {plantillas.panel}
       {plantillas.dialogos}
+
+      {/* El modo de firmado, a pantalla completa (spec 05 §2). Salir sin sellar
+          no deshace nada: el borrador ya está escrito con este contenido. */}
+      {firmando && (
+        <FirmadoConsentimiento
+          nombres={{ paciente, familiar, testigo_1: testigo1, testigo_2: testigo2 }}
+          onSalir={() => { if (!sellando) { setFirmando(null); setErrorSellado('') } }}
+          onSellar={sellar}
+          sellando={sellando}
+          errorSellado={errorSellado}
+        />
+      )}
 
       {/* §9.3 · ya hay un borrador PROPIO de este paciente. Retomar es el
           primario: casi siempre es el mismo procedimiento y lo que el médico

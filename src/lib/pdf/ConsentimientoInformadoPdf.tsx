@@ -12,6 +12,23 @@ import type { PdfMedicoData, PdfColors, PdfConsultorioData } from './PdfStyles'
 /*  Tipos                                                              */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Una firma electrónica ya capturada, tal como se imprime.
+ * `GUIA_FORMULARIOS_05` §8.2. La compone el formulario a partir de las filas
+ * que acaba de escribir en `public.firmas_documento`.
+ */
+export interface FirmaImpresa {
+  /** `paciente` · `familiar` · `testigo_1` · `testigo_2` · `medico`. */
+  rol: string
+  /**
+   * Data-URL PNG del trazo, ya recortado a la caja de la tinta.
+   * NULL en el médico: su rúbrica sale del perfil, no se captura en el momento.
+   */
+  trazo: string | null
+  /** ISO del sello del dispositivo — el momento real del trazo. */
+  firmadoEn: string
+}
+
 export interface ConsentimientoData {
   paciente: string
   lugar: string
@@ -58,6 +75,17 @@ export interface ConsentimientoData {
    */
   soloDenegacion?: boolean
   folio?: string
+  /**
+   * Las firmas electrónicas del documento sellado. Ausente o vacío en un
+   * consentimiento que se imprime para firmarse a mano, que es como salen los
+   * `emitido_firma_manual`: entonces las celdas quedan en blanco, igual que
+   * antes de que existiera el firmado.
+   */
+  firmas?: FirmaImpresa[]
+  /** ISO del acto de sellar, que es el que reúne todas las firmas. */
+  selladoEn?: string
+  /** SHA-256 hexadecimal del contenido en el momento de firmar. */
+  huella?: string
 }
 
 /**
@@ -114,6 +142,19 @@ function nl2p(text: string, style: Style): ReactElement[] {
     ))
 }
 
+/**
+ * `dd/mm/aaaa hh:mm:ss` — el formato de los sellos impresos (§8.2).
+ * Local a este archivo y sin date-fns: los renderers de PDF no importan nada
+ * del árbol de la aplicación más allá de sus propios estilos.
+ */
+function selloLegible(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`
+    + ` ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
+
 interface FirmaBoxProps {
   label: string
   nombre?: string
@@ -121,9 +162,17 @@ interface FirmaBoxProps {
   idLabel?: string
   idVal?: string
   colors: PdfColors
+  /**
+   * La rúbrica, en los 48 pt libres sobre la línea. `objectFit: contain` y no
+   * un ancho fijo: el trazo llega ya recortado a su tinta, así que ocupa lo que
+   * ocupa —como en papel— y solo se le impide desbordar la celda.
+   */
+  trazo?: string | null
+  /** El pie de sello, bajo la calidad del firmante y a 2 pt de ella. */
+  sello?: string
 }
 
-function FirmaBox({ label, nombre, sublabel, idLabel, idVal, colors }: FirmaBoxProps) {
+function FirmaBox({ label, nombre, sublabel, idLabel, idVal, colors, trazo, sello }: FirmaBoxProps) {
   const fb = StyleSheet.create({
     wrap: {
       width: '48%',
@@ -131,6 +180,17 @@ function FirmaBox({ label, nombre, sublabel, idLabel, idVal, colors }: FirmaBoxP
     },
     space: {
       height: 48,
+      justifyContent: 'flex-end',
+    },
+    trazo: {
+      width: '100%',
+      height: 48,
+      objectFit: 'contain',
+    },
+    sello: {
+      fontSize: 7,
+      color: '#666',
+      marginTop: 2,
     },
     line: {
       borderTopWidth: 1,
@@ -164,7 +224,11 @@ function FirmaBox({ label, nombre, sublabel, idLabel, idVal, colors }: FirmaBoxP
 
   return (
     <View style={fb.wrap}>
-      <View style={fb.space} />
+      <View style={fb.space}>
+        {/* eslint-disable-next-line jsx-a11y/alt-text -- el <Image> de
+            @react-pdf/renderer no acepta alt: no es una imagen del DOM. */}
+        {trazo ? <Image style={fb.trazo} src={trazo} /> : null}
+      </View>
       <View style={fb.line}>
         <Text style={fb.label}>{label}</Text>
         {nombre ? <Text style={fb.nombre}>{nombre}</Text> : null}
@@ -174,6 +238,7 @@ function FirmaBox({ label, nombre, sublabel, idLabel, idVal, colors }: FirmaBoxP
             {idLabel}: {idVal}
           </Text>
         ) : null}
+        {sello ? <Text style={fb.sello}>{sello}</Text> : null}
       </View>
     </View>
   )
@@ -526,6 +591,17 @@ export default function ConsentimientoInformadoPdf({
       justifyContent: 'space-between',
       marginTop: 10,
     },
+    /* Cierre de la hoja firmada (§8.2), sobre filete gris */
+    cierreBox: {
+      borderTopWidth: 1,
+      borderTopColor: '#d1d5db',
+      paddingTop: 5,
+    },
+    cierreText: {
+      fontSize: 7,
+      color: '#666',
+      lineHeight: 1.5,
+    },
     /* Denegacion */
     denegBox: {
       borderWidth: 1,
@@ -575,6 +651,19 @@ export default function ConsentimientoInformadoPdf({
     )
   }
 
+  /* ---------- Firmas electrónicas, si el documento está sellado ---------- */
+  // Índice por rol. Vacío en un documento que se imprime para firmarse a mano,
+  // y entonces todo lo de abajo se resuelve a null: la lámina sale como antes.
+  const porRol = new Map((data.firmas ?? []).map(f => [f.rol, f]))
+  const sellado = data.selladoEn !== undefined && porRol.size > 0
+
+  function pieDe(rol: string): string | undefined {
+    const f = porRol.get(rol)
+    if (!f) return undefined
+    const cuando = selloLegible(f.firmadoEn)
+    return cuando === '' ? undefined : `Firmado ${cuando}`
+  }
+
   /* ---------- Signatures grid ---------- */
   function FirmasBlock() {
     return (
@@ -585,6 +674,8 @@ export default function ConsentimientoInformadoPdf({
           idLabel="Identificación"
           idVal={data?.idPaciente}
           colors={colors}
+          trazo={porRol.get('paciente')?.trazo}
+          sello={pieDe('paciente')}
         />
         <FirmaBox
           label="Médico Tratante"
@@ -593,6 +684,11 @@ export default function ConsentimientoInformadoPdf({
           idLabel="Céd. Prof."
           idVal={cedProf}
           colors={colors}
+          // El médico no firma en el flujo: su rúbrica sale del perfil, y solo
+          // se estampa cuando el documento se selló —en uno impreso para
+          // firmarse a mano, la celda se queda para la pluma—.
+          trazo={sellado ? medico?.firma_url ?? null : null}
+          sello={pieDe('medico')}
         />
         <FirmaBox
           label={data?.representante ? 'Representante Legal' : 'Familiar / Responsable'}
@@ -600,7 +696,11 @@ export default function ConsentimientoInformadoPdf({
           idLabel="Identificación"
           idVal={data?.idRepresentante ?? data?.idFamiliar}
           colors={colors}
+          trazo={porRol.get('familiar')?.trazo}
+          sello={pieDe('familiar')}
         />
+        {/* El anestesiólogo no entra en el flujo de firmado: su celda se queda
+            siempre para la pluma. */}
         <FirmaBox
           label="Anestesiólogo"
           nombre={data?.anestesiologo}
@@ -610,15 +710,46 @@ export default function ConsentimientoInformadoPdf({
           label="Testigo 1"
           nombre={data?.testigo1}
           colors={colors}
+          trazo={porRol.get('testigo_1')?.trazo}
+          sello={pieDe('testigo_1')}
         />
         <FirmaBox
           label="Testigo 2"
           nombre={data?.testigo2}
           colors={colors}
+          trazo={porRol.get('testigo_2')?.trazo}
+          sello={pieDe('testigo_2')}
         />
       </View>
     )
   }
+
+  /* ---------- Cierre de la hoja firmada (§8.2) ---------- */
+  // Los CUATRO previstos son los del flujo; el médico no se cuenta ahí porque
+  // no se le pregunta: su rúbrica se estampa siempre.
+  const PREVISTOS = ['paciente', 'familiar', 'testigo_1', 'testigo_2']
+  const firmaron = PREVISTOS.filter(r => porRol.has(r)).length
+
+  // Un elemento y NO un componente declarado dentro del render: los dos de este
+  // archivo que sí lo son ya arrastran ese aviso del linter y no se le suma un
+  // tercero.
+  const huellaCompleta = data.huella ?? ''
+  const cierreSellado = !sellado ? null : (
+    <View style={s.cierreBox}>
+      <Text style={s.cierreText}>
+        Documento sellado el {selloLegible(data.selladoEn ?? '')} · {PREVISTOS.length} firmantes
+        previstos, {firmaron} firmaron, {PREVISTOS.length - firmaron} no firmaron
+      </Text>
+      {huellaCompleta ? (
+        <Text style={s.cierreText}>
+          {/* Abreviada como en la lámina: los cuatro primeros y los cuatro últimos. */}
+          Huella SHA-256 · {huellaCompleta.length > 8
+            ? `${huellaCompleta.slice(0, 4)}…${huellaCompleta.slice(-4)}`
+            : huellaCompleta} · verificable en el expediente electrónico
+        </Text>
+      ) : null}
+    </View>
+  )
 
   /* ---------- Cédulas string ---------- */
   const credsStr = [
@@ -848,6 +979,7 @@ export default function ConsentimientoInformadoPdf({
 
           {/* Firmas */}
           <FirmasBlock />
+          {cierreSellado}
       </Page>
       </>)}
 
