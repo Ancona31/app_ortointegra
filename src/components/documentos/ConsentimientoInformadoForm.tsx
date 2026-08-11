@@ -149,7 +149,7 @@ function texto(v: unknown): string {
 }
 
 const SECCIONES_DEFAULT = {
-  preoperatorio: `Después de haberle realizado historia clínica y estudios diagnósticos pertinentes (análisis de laboratorio, estudios de imagen u otros según el caso), se ha establecido el diagnóstico descrito y, habiendo agotado otras alternativas de tratamiento, se le recomienda someterse al procedimiento indicado. Se le indicará el tiempo necesario de ayuno previo y las indicaciones preoperatorias correspondientes.`,
+  preoperatorio: `Después de haberle realizado historia clínica y estudios diagnósticos pertinentes (análisis de laboratorio, estudios de imagen u otros según el caso), se ha establecido el diagnóstico descrito y, habiendo agotado otras alternativas de tratamiento, se le recomienda someterse al procedimiento indicado. Se le indicará el tiempo necesario de ayuno previo y las indicaciones previas correspondientes.`,
 
   beneficios: `El fin primordial del procedimiento es corregir la condición diagnosticada, proteger las estructuras anatómicas involucradas, mantener o restaurar la función y evitar la progresión de la enfermedad, la cual podría producir lesiones más serias o dolor incapacitante. Los resultados esperados incluyen mejoría del dolor, recuperación funcional y mejora en la calidad de vida, aunque estos no pueden garantizarse en su totalidad, ya que dependen de múltiples factores individuales.`,
 
@@ -178,7 +178,12 @@ const SECCIONES_ORDEN = Object.keys(SECCIONES_DEFAULT) as SeccionKey[]
 const SECCIONES_OBLIGATORIAS: readonly SeccionKey[] = ['descripcion', 'riesgosEspecificos']
 
 const LABELS: Record<SeccionKey, { titulo: string; hint: string }> = {
-  preoperatorio:      { titulo: '1 · Preoperatorio',                hint: 'Describe los estudios realizados, el diagnóstico y el procedimiento recomendado.' },
+  // ⚠ LA CLAVE SIGUE SIENDO `preoperatorio` Y NO SE TOCA. Es la clave del jsonb
+  // en `documentos.contenido.secciones` de todos los consentimientos ya
+  // emitidos: renombrarla dejaría su sección 1 vacía al regenerar el PDF y
+  // borraría el texto de los borradores al retomarlos. Lo que cambia es el
+  // rótulo, que es lo único que se lee.
+  preoperatorio:      { titulo: '1 · Evaluación y decisión terapéutica', hint: 'Describe los estudios realizados, el diagnóstico y el procedimiento recomendado.' },
   beneficios:         { titulo: '2 · Beneficios esperados',          hint: 'Explica los objetivos y resultados esperados del procedimiento.' },
   anestesia:          { titulo: '3 · Anestesia',                     hint: 'Indica el tipo de anestesia prevista y quién informará al paciente.' },
   descripcion:        { titulo: '4 · Descripción del procedimiento', hint: 'Detalla la técnica quirúrgica, vía de abordaje e implantes a utilizar.' },

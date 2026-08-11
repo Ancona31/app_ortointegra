@@ -786,7 +786,9 @@ interface SeccionClinica {
  * los 28 pt que declara `SEPARACION_RIEL_SECCION`.
  */
 const SECCIONES: readonly SeccionClinica[] = [
-  { numero: 1, titulo: 'Preoperatorio', clave: 'preoperatorio', separacion: 0 },
+  // `clave` es la del jsonb guardado y NO se renombra; el rótulo sí, porque
+  // «Preoperatorio» presuponía quirófano.
+  { numero: 1, titulo: 'Evaluación y decisión terapéutica', clave: 'preoperatorio', separacion: 0 },
   { numero: 2, titulo: 'Beneficios esperados', clave: 'beneficios', separacion: SEPARACION_SECCIONES_HOJA_2 },
   { numero: 3, titulo: 'Anestesia', clave: 'anestesia', separacion: SEPARACION_SECCIONES_HOJA_2 },
   {

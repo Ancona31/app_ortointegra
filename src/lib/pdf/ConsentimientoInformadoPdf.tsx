@@ -125,7 +125,12 @@ export interface ConsentimientoProps {
 }
 
 const SECCION_LABELS: Array<{ key: string; num: string; titulo: string }> = [
-  { key: 'preoperatorio', num: '1', titulo: 'Preoperatorio' },
+  // ⚠ `key` es la clave del jsonb guardado y NO se renombra: de ella sale el
+  // texto de los documentos ya emitidos (`data.secciones[sec.key]`). Cambiarla
+  // imprimiría la sección 1 en blanco al regenerar un consentimiento viejo.
+  // El rótulo dejó de decir «Preoperatorio» porque presuponía quirófano, y el
+  // consentimiento cubre también procedimientos invasivos que no son cirugía.
+  { key: 'preoperatorio', num: '1', titulo: 'Evaluación y decisión terapéutica' },
   { key: 'beneficios', num: '2', titulo: 'Beneficios esperados' },
   { key: 'anestesia', num: '3', titulo: 'Anestesia' },
   { key: 'descripcion', num: '4', titulo: 'Descripción del procedimiento' },

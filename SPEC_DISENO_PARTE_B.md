@@ -1664,7 +1664,7 @@ Riel derecho de **156 pt**. Con subtítulo sin rótulo:
 
 | Hoja | Contenido |
 |---|---|
-| 1 | Membrete completo **sin cédulas** → título → **fundamento legal** → `Datos de identificación` → §1 Preoperatorio → aviso |
+| 1 | Membrete completo **sin cédulas** → título → **fundamento legal** → `Datos de identificación` → §1 Evaluación y decisión terapéutica → aviso |
 | 2 | Cabecera reducida → §2 Beneficios → §3 Anestesia → §4 Descripción (zona de escritura) |
 | 3 | Cabecera → §5 Riesgos comunes (2 párrafos) → §6 Riesgos específicos (zona de escritura) → §7 Alternativas |
 | 4 | Cabecera → **Declaración de consentimiento** → casilla de sustitución → **nivel 1 · Otorgamiento** |
@@ -1725,7 +1725,7 @@ Cuerpo del párrafo: IBM Plex Sans **9 / 13.5 pt** — el cuerpo de prosa más p
 
 **Los siete títulos de sección**, orden literal:
 ```
-1  Preoperatorio
+1  Evaluación y decisión terapéutica
 2  Beneficios esperados
 3  Anestesia
 4  Descripción del procedimiento

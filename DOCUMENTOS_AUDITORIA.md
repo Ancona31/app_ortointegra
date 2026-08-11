@@ -2078,7 +2078,7 @@ muestra "Plan generado" en vez de "Plan guardado").
 
 | Campo | Etiqueta | Default | Oblig. UI | Bloquea PDF |
 |---|---|---|:-:|:-:|
-| `secciones.preoperatorio` | 1 · Preoperatorio | Texto largo | No | No |
+| `secciones.preoperatorio` | 1 · Evaluación y decisión terapéutica | Texto largo | No | No |
 | `secciones.beneficios` | 2 · Beneficios esperados | Texto largo | No | No |
 | `secciones.anestesia` | 3 · Anestesia | Texto largo | No | No |
 | `secciones.descripcion` | 4 · Descripción del procedimiento * | **Vacío** (`:31`) | **Sí** | **Sí** (`:162`) |

@@ -410,7 +410,7 @@ describe('II.7 · Consentimiento Informado', () => {
 
     expect(contiene(hojas[0], 'FUNDAMENTO LEGAL')).toBe(true)
     expect(contiene(hojas[0], 'DATOS DE IDENTIFICACIÓN')).toBe(true)
-    expect(contiene(hojas[0], 'PREOPERATORIO')).toBe(true)
+    expect(contiene(hojas[0], 'EVALUACIÓN Y DECISIÓN TERAPÉUTICA')).toBe(true)
     expect(contiene(hojas[3], 'DECLARACIÓN DE CONSENTIMIENTO')).toBe(true)
     expect(contiene(hojas[3], 'OTORGAMIENTO')).toBe(true)
     expect(contiene(hojas[4], 'REPRESENTACIÓN')).toBe(true)
