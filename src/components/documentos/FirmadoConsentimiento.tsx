@@ -45,10 +45,12 @@ export interface FirmaCapturada {
   firmadoEn: string
 }
 
-/** Cómo se resolvió un paso. Omitir resuelve un paso, no lo elimina. */
+/**
+ * Cómo se resolvió un paso. Solo hay dos desenlaces, y el segundo es del
+ * paciente y de nadie más: quien no iba a firmar no llegó a entrar al flujo.
+ */
 type Desenlace =
   | { tipo: 'firmo'; trazo: string; firmadoEn: string }
-  | { tipo: 'omitido' }
   | { tipo: 'no_pudo' }
 
 interface Paso {
@@ -58,6 +60,7 @@ interface Paso {
   titulo: string
 }
 
+/** El catálogo de los cuatro posibles. Cuáles entran de verdad lo decide `firmantesDe`. */
 const PASOS: readonly Paso[] = [
   { rol: 'paciente', etiqueta: 'PACIENTE', titulo: 'Paciente' },
   { rol: 'familiar', etiqueta: 'FAMILIAR RESPONSABLE', titulo: 'Familiar o responsable' },
@@ -65,36 +68,90 @@ const PASOS: readonly Paso[] = [
   { rol: 'testigo_2', etiqueta: 'TESTIGO 2', titulo: 'Testigo 2' },
 ]
 
-/** Índice de la pantalla de revisión: va DESPUÉS de los cuatro firmantes. */
-const RESUMEN = PASOS.length
+/**
+ * Quiénes firman de verdad: SOLO los que tienen nombre escrito.
+ *
+ * Una firma sin nombre no acredita a nadie, y el papel acabaría con un trazo que
+ * no se puede atribuir. Por eso no llenar el nombre ES la forma de omitir a un
+ * testigo, y por eso este componente ya no tiene botón de omitir: dos maneras de
+ * decir lo mismo es una de más.
+ *
+ * ⚠ EL PACIENTE ENTRA SIEMPRE, tenga nombre o no. Su ausencia del papel no es
+ * «no está» sino «no pudo firmar», que es un hecho distinto y se registra con su
+ * casilla. En la práctica su nombre nunca está vacío —es campo obligatorio del
+ * formulario y sin él no se abre el firmado— pero la regla se declara aquí en
+ * vez de descansar en una validación que vive en otro archivo.
+ *
+ * ⚠ Y EL FAMILIAR TAMPOCO PUEDE FALTAR HOY, aunque este filtro no lo diga: su
+ * nombre es obligatorio en el formulario —`faltantes` lo exige sin condición— y
+ * `iniciarFirmado` no abre el modo con faltantes. Consecuencia directa: **su
+ * firma es obligatoria en todo consentimiento**. Si algún día se quiere poder
+ * emitir sin firma del familiar, lo que hay que soltar es esa obligatoriedad del
+ * NOMBRE en el formulario; en cuanto el nombre pueda ir vacío, el familiar
+ * desaparece del flujo solo, igual que un testigo, y aquí no hay que tocar nada.
+ */
+function firmantesDe(nombres: Record<RolFirmante, string>): Paso[] {
+  return PASOS.filter(p => p.rol === 'paciente' || nombres[p.rol].trim() !== '')
+}
 
 /**
- * La tinta, como literal y NO como token.
+ * La tinta: NEGRO, y como literal.
  *
- * `--sp-ink-900` vale #14345c en claro y `rgba(255,255,255,.87)` en oscuro, y
- * este mapa de bits ES el que se imprime: leer el token dejaría al médico en
- * modo oscuro con una firma blanca sobre papel blanco. Por lo mismo el lienzo
- * lleva fondo claro literal en el CSS: lo que se ve al firmar es lo que sale en
- * el papel, en los dos temas.
+ * ── POR QUÉ NEGRO Y NO EL AZUL DE ACENTO ────────────────────────────────────
+ * Una firma no es parte del formato: es lo único del papel que escribió una
+ * persona. Con el azul de la marca salía del mismo color que los filetes y las
+ * cabeceras, así que se leía como impresión y no como rúbrica.
+ *
+ * Y sobre todo: **la rúbrica del médico ya es negra**. Es un archivo del bucket
+ * `firmas-medicos`, y `FirmaCaptura.tsx` la umbraliza a negro puro y opaco
+ * —`d[i] = 0` en los tres canales— antes de subirla. Con la captura en azul, la
+ * hoja de firmas del mismo consentimiento acababa con la del paciente de un
+ * color y la del médico de otro. `#000000` no es un negro aproximado: es
+ * exactamente el mismo valor que ya lleva el archivo del médico.
+ *
+ * ── ⚠ Y POR QUÉ LITERAL Y NO TOKEN ──────────────────────────────────────────
+ * `--sp-ink-900` vale `rgba(255,255,255,.87)` en modo oscuro, y este mapa de
+ * bits ES el que se imprime: leerlo de un token daría una firma capturada de
+ * noche BLANCA SOBRE PAPEL BLANCO. Nada de `getComputedStyle` ni de `var(--sp-*)`
+ * en la ruta de captura. Por lo mismo el lienzo lleva fondo claro literal en el
+ * CSS: lo que se ve al firmar es lo que sale en el papel, en los dos temas.
  */
-const TINTA = '#14345c'
+const TINTA = '#000000'
 
 interface Props {
-  /** Los nombres escritos en el formulario, para encabezar cada paso. */
+  /**
+   * Los nombres escritos en el formulario. Deciden QUIÉNES firman, no solo cómo
+   * se encabeza cada paso: ver `firmantesDe`.
+   *
+   * No cambian mientras el modo está abierto —el formulario queda congelado
+   * detrás con `display:none`—, así que la lista de firmantes se calcula en cada
+   * render sin riesgo de que el flujo cambie de longitud a media firma.
+   */
   nombres: Record<RolFirmante, string>
+  /**
+   * Se DECLARA en el formulario, no aquí (ver la casilla allí). Llega como dato
+   * y este componente no vuelve a preguntarlo: marcarla hace obligatorio el
+   * nombre del familiar, y ese nombre hay que reclamarlo antes de entrar, no
+   * con el paciente y el dispositivo delante.
+   */
+  pacienteNoPuedeFirmar: boolean
   onSalir: () => void
-  onSellar: (firmas: FirmaCapturada[]) => void
+  /**
+   * `previstos` es cuántos firmantes pidió el flujo, no cuántos firmaron: es lo
+   * que el papel imprime en su línea de cierre, y no se puede deducir de las
+   * firmas capturadas.
+   */
+  onSellar: (firmas: FirmaCapturada[], previstos: number) => void
   sellando: boolean
   /** Mensaje del formulario cuando alguna de las tres operaciones falló. */
   errorSellado: string
 }
 
 export default function FirmadoConsentimiento({
-  nombres, onSalir, onSellar, sellando, errorSellado,
+  nombres, pacienteNoPuedeFirmar, onSalir, onSellar, sellando, errorSellado,
 }: Props) {
   const [paso, setPaso] = useState(0)
   const [desenlaces, setDesenlaces] = useState<Partial<Record<RolFirmante, Desenlace>>>({})
-  const [noPuedeFirmar, setNoPuedeFirmar] = useState(false)
   const [tieneTrazo, setTieneTrazo] = useState(false)
   const [limpiarSenal, setLimpiarSenal] = useState(0)
   const [errorTrazo, setErrorTrazo] = useState('')
@@ -103,16 +160,14 @@ export default function FirmadoConsentimiento({
 
   const lienzoRef = useRef<HTMLCanvasElement>(null)
 
-  const enResumen = paso === RESUMEN
-  const actual = enResumen ? null : PASOS[paso]
-  const hayFirmas = Object.values(desenlaces).some(d => d.tipo === 'firmo')
+  /** Los que de verdad firman este documento, y por tanto los pasos del flujo. */
+  const firmantes = firmantesDe(nombres)
 
-  // El familiar deja de ser opcional cuando el paciente no pudo firmar: sin
-  // firma del paciente, la del familiar es la que sostiene el documento.
-  const familiarObligatorio = desenlaces.paciente?.tipo === 'no_pudo'
-  const puedeOmitir = actual !== null
-    && actual.rol !== 'paciente'
-    && !(actual.rol === 'familiar' && familiarObligatorio)
+  const enResumen = paso >= firmantes.length
+  const actual = enResumen ? null : firmantes[paso]
+  const hayFirmas = Object.values(desenlaces).some(d => d.tipo === 'firmo')
+  /** El lienzo se APAGA —no se borra— cuando este paso es el de un paciente que no puede firmar. */
+  const apagado = actual?.rol === 'paciente' && pacienteNoPuedeFirmar
 
   /** La X y `Escape` son lo mismo: salir con firmas capturadas pide confirmación. */
   const intentarSalir = useCallback((): void => {
@@ -139,13 +194,13 @@ export default function FirmadoConsentimiento({
     setDesenlaces(siguientes)
     setErrorTrazo('')
     setTieneTrazo(false)
-    const pendiente = PASOS.findIndex(p => siguientes[p.rol] === undefined)
-    setPaso(pendiente === -1 ? RESUMEN : pendiente)
+    const pendiente = firmantes.findIndex(p => siguientes[p.rol] === undefined)
+    setPaso(pendiente === -1 ? firmantes.length : pendiente)
   }
 
   function confirmarFirma(): void {
     if (!actual) return
-    if (noPuedeFirmar) { resolver(actual.rol, { tipo: 'no_pudo' }); return }
+    if (apagado) { resolver(actual.rol, { tipo: 'no_pudo' }); return }
     const lienzo = lienzoRef.current
     if (!lienzo) return
     const res = exportarTrazo(lienzo)
@@ -163,23 +218,22 @@ export default function FirmadoConsentimiento({
     const { [rol]: _quitado, ...resto } = desenlaces
     void _quitado
     setDesenlaces(resto)
-    if (rol === 'paciente') setNoPuedeFirmar(false)
     setTieneTrazo(false)
     setErrorTrazo('')
-    setPaso(PASOS.findIndex(p => p.rol === rol))
+    setPaso(firmantes.findIndex(p => p.rol === rol))
   }
 
   function sellar(): void {
     setConfirmarSellado(false)
     const firmas: FirmaCapturada[] = []
-    for (const p of PASOS) {
+    for (const p of firmantes) {
       const d = desenlaces[p.rol]
       if (d?.tipo === 'firmo') firmas.push({ rol: p.rol, trazo: d.trazo, firmadoEn: d.firmadoEn })
     }
-    onSellar(firmas)
+    onSellar(firmas, firmantes.length)
   }
 
-  const resueltos = PASOS.filter(p => desenlaces[p.rol] !== undefined).length
+  const resueltos = firmantes.filter(p => desenlaces[p.rol] !== undefined).length
 
   return (
     /**
@@ -225,22 +279,28 @@ export default function FirmadoConsentimiento({
           </h2>
           <span className="sp-badge">
             <span className="sp-firma-long">
-              {enResumen ? `${resueltos} de ${PASOS.length} resueltos` : `Firmante ${paso + 1} de ${PASOS.length}`}
+              {enResumen
+                ? `${resueltos} de ${firmantes.length} resueltos`
+                : `Firmante ${paso + 1} de ${firmantes.length}`}
             </span>
             <span className="sp-firma-short">
-              {enResumen ? `${resueltos}/${PASOS.length}` : `${paso + 1}/${PASOS.length}`}
+              {enResumen ? `${resueltos}/${firmantes.length}` : `${paso + 1}/${firmantes.length}`}
             </span>
           </span>
         </header>
 
         {/* ── Progreso (§3.2) ───────────────────────────────────────────
-            CUATRO SEGMENTOS SIEMPRE, aunque se omitan firmantes: omitir resuelve
-            un paso, no lo elimina. Un progreso que encoge miente sobre cuánto
-            queda. */}
+            UN SEGMENTO POR FIRMANTE REAL, no cuatro fijos: los cuatro fijos
+            existían cuando se podía omitir dentro del flujo —omitir resolvía un
+            paso sin eliminarlo, y un progreso que encogía a media firma habría
+            mentido sobre cuánto quedaba—. Ahora quiénes firman se decide ANTES
+            de entrar, con los nombres, así que la cuenta ya no puede cambiar a
+            mitad de camino: enseñar cuatro cuando solo se piden dos sería la
+            mentira contraria. */}
         <div className="sp-progress sp-firma-progress">
           <span className="sp-progress__label">FIRMANTES</span>
           <div className="sp-progress__track">
-            {PASOS.map((p, i) => (
+            {firmantes.map((p, i) => (
               <span key={p.rol}
                 className={`sp-progress__seg ${i <= paso ? 'sp-progress__seg--done' : ''}`} />
             ))}
@@ -262,31 +322,25 @@ export default function FirmadoConsentimiento({
                 key={actual.rol}
                 lienzoRef={lienzoRef}
                 etiqueta={actual.etiqueta}
-                apagado={noPuedeFirmar}
+                apagado={apagado}
                 hayTinta={tieneTrazo}
                 limpiarSenal={limpiarSenal}
                 onTinta={() => { setTieneTrazo(true); setErrorTrazo('') }}
               />
 
-              {/* §5.3 · solo existe en el paso del paciente */}
-              {actual.rol === 'paciente' && (
-                <>
-                  <label className="sp-check">
-                    <input type="checkbox" className="sr-only" checked={noPuedeFirmar}
-                      onChange={e => setNoPuedeFirmar(e.target.checked)} />
-                    <span className="sp-check__box"><Check aria-hidden="true" /></span>
-                    <span className="sp-check__label">El paciente no puede firmar</span>
-                  </label>
-                  {noPuedeFirmar && (
-                    <p className="sp-banner sp-banner--warn">
-                      <AlertTriangle size={17} />
-                      <span>
-                        Se pasa al familiar responsable, y ahí la firma deja de ser opcional:
-                        sin firma del paciente, la del familiar es obligatoria.
-                      </span>
-                    </p>
-                  )}
-                </>
+              {/* §5.3 · El lienzo se apaga en vez de ocultarse: se ve que dejó de
+                  aplicar. Aquí estuvo la casilla que lo apagaba; ahora se declara
+                  en el formulario, que es donde puede exigir a tiempo el nombre
+                  del familiar. Este paso solo lo hace constar. */}
+              {apagado && (
+                <p className="sp-banner sp-banner--warn">
+                  <AlertTriangle size={17} />
+                  <span>
+                    Declaraste que el paciente no puede firmar. Firma en su lugar el familiar
+                    responsable, que es quien consiente. Si el paciente sí puede firmar, sal y
+                    desmarca la casilla en el formulario.
+                  </span>
+                </p>
               )}
 
               {errorTrazo && <p className="sp-banner sp-banner--danger">{errorTrazo}</p>}
@@ -294,34 +348,30 @@ export default function FirmadoConsentimiento({
               {/* §5.2 · borrar limpia el lienzo entero: no hay deshacer parcial de
                   trazos, que en una firma no significa nada. */}
               <div className="sp-firma-acciones">
-                <button type="button" disabled={!tieneTrazo || noPuedeFirmar}
+                <button type="button" disabled={!tieneTrazo || apagado}
                   onClick={() => { setLimpiarSenal(n => n + 1); setTieneTrazo(false); setErrorTrazo('') }}
                   className="sp-btn sp-btn--secondary"
                   style={{ flex: '0 0 auto', whiteSpace: 'nowrap' }}>
                   Borrar y repetir
                 </button>
-                <button type="button" disabled={!tieneTrazo && !noPuedeFirmar}
+                <button type="button" disabled={!tieneTrazo && !apagado}
                   onClick={confirmarFirma} className="sp-btn sp-btn--primary" style={{ flex: 1 }}>
-                  {noPuedeFirmar ? 'Continuar sin firma del paciente' : 'Confirmar firma'}
+                  {apagado ? 'Continuar sin firma del paciente' : 'Confirmar firma'}
                 </button>
               </div>
 
-              {/* §5.4 · nunca a la altura del primario: es una salida legítima,
-                  pero no es lo que se espera. */}
-              {puedeOmitir && (
-                <button type="button" onClick={() => resolver(actual.rol, { tipo: 'omitido' })}
-                  className="sp-btn sp-btn--ghost"
-                  style={{ alignSelf: 'flex-start', whiteSpace: 'nowrap' }}>
-                  Omitir este firmante
-                </button>
-              )}
+              {/* Aquí vivía «Omitir este firmante» (§5.4). Se retiró: quien no
+                  tiene nombre no entra al flujo, así que dejar el nombre vacío ya
+                  es la forma de omitir a un testigo, y dos maneras de decir lo
+                  mismo es una de más. El paciente nunca lo tuvo: su ausencia se
+                  declara con la casilla, que dice algo distinto. */}
             </>
           ) : (
             <>
               <p className="sp-hint">Revisa antes de imprimir. Puedes rehacer cualquier firma.</p>
 
               <div className="sp-firma-resumen">
-                {PASOS.map(p => (
+                {firmantes.map(p => (
                   <FilaResumen key={p.rol} titulo={p.titulo} nombre={nombres[p.rol]}
                     desenlace={desenlaces[p.rol]} deshabilitado={sellando}
                     onRehacer={() => rehacer(p.rol)} />
@@ -649,11 +699,12 @@ interface FilaProps {
 }
 
 function FilaResumen({ titulo, nombre, desenlace, deshabilitado, onRehacer }: FilaProps) {
+  // Sin `Omitido`: ya no es un desenlace posible. Quien se omite no aparece en
+  // esta lista porque nunca entró al flujo.
   const firmo = desenlace?.tipo === 'firmo'
   const estado = desenlace === undefined ? 'Pendiente'
     : desenlace.tipo === 'firmo' ? 'Firmó'
-    : desenlace.tipo === 'no_pudo' ? 'No pudo firmar'
-    : 'Omitido'
+    : 'No pudo firmar'
 
   return (
     <div className="sp-row sp-firma-fila">

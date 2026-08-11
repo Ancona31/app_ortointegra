@@ -1883,6 +1883,12 @@ a:hover { color: var(--sp-primary-active); }
    entero. El contenedor conserva sus 44px de alto mínimo. */
 .sp-doc-consent-fotos { align-items: flex-start; }
 
+/* «El paciente no puede firmar», bajo el campo del familiar. Vive ahí y no con
+   las autorizaciones porque marcarla cambia la regla del control que tiene
+   encima: vuelve obligatorio el nombre del familiar, que pasa a ser quien
+   consiente. Un poco de aire para que no se pegue al input. */
+.sp-doc-consent-nofirma { margin-top: var(--sp-1-5); }
+
 
 /* --- 24. DENEGACIÓN O REVOCACIÓN (GUIA_FORM_DENEGACION §1) --------------- */
 /* Va al final y DENTRO de @layer components, por lo mismo que la 22 y la 23.

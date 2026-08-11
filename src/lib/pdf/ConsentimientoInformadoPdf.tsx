@@ -86,6 +86,13 @@ export interface ConsentimientoData {
   selladoEn?: string
   /** SHA-256 hexadecimal del contenido en el momento de firmar. */
   huella?: string
+  /**
+   * Cuántos firmantes pidió el flujo. NO son cuatro fijos: solo se pide firma a
+   * quien tiene nombre escrito, así que un consentimiento sin testigos prevé
+   * dos. Sin este dato la línea de cierre diría «4 previstos» donde solo se
+   * pidieron dos, e inventaría dos ausencias que nunca existieron.
+   */
+  previstos?: number
 }
 
 /**
@@ -725,10 +732,13 @@ export default function ConsentimientoInformadoPdf({
   }
 
   /* ---------- Cierre de la hoja firmada (§8.2) ---------- */
-  // Los CUATRO previstos son los del flujo; el médico no se cuenta ahí porque
-  // no se le pregunta: su rúbrica se estampa siempre.
-  const PREVISTOS = ['paciente', 'familiar', 'testigo_1', 'testigo_2']
-  const firmaron = PREVISTOS.filter(r => porRol.has(r)).length
+  // Los del flujo; el médico no se cuenta ahí porque no se le pregunta: su
+  // rúbrica se estampa siempre.
+  const DEL_FLUJO = ['paciente', 'familiar', 'testigo_1', 'testigo_2']
+  const firmaron = DEL_FLUJO.filter(r => porRol.has(r)).length
+  // Sin el dato, el suelo honesto es «tantos previstos como firmaron»: nunca
+  // inventa una ausencia.
+  const previstos = data.previstos ?? firmaron
 
   // Un elemento y NO un componente declarado dentro del render: los dos de este
   // archivo que sí lo son ya arrastran ese aviso del linter y no se le suma un
@@ -736,9 +746,14 @@ export default function ConsentimientoInformadoPdf({
   const huellaCompleta = data.huella ?? ''
   const cierreSellado = !sellado ? null : (
     <View style={s.cierreBox}>
+      {/* El singular importa: el mínimo real es UN firmante —un consentimiento
+          que firma solo el paciente, sin familiar ni testigos, es válido— y
+          «1 firmantes previstos» en un documento legal se lee como un descuido. */}
       <Text style={s.cierreText}>
-        Documento sellado el {selloLegible(data.selladoEn ?? '')} · {PREVISTOS.length} firmantes
-        previstos, {firmaron} firmaron, {PREVISTOS.length - firmaron} no firmaron
+        Documento sellado el {selloLegible(data.selladoEn ?? '')} · {previstos}{' '}
+        {previstos === 1 ? 'firmante previsto' : 'firmantes previstos'}, {firmaron}{' '}
+        {firmaron === 1 ? 'firmó' : 'firmaron'}, {previstos - firmaron}{' '}
+        {previstos - firmaron === 1 ? 'no firmó' : 'no firmaron'}
       </Text>
       {huellaCompleta ? (
         <Text style={s.cierreText}>

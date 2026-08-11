@@ -201,6 +201,7 @@ interface EstadoVacio {
   testigo2: string
   autorizaTransfusion: 'si' | 'no' | null
   autorizaFotos: boolean
+  pacienteNoPuedeFirmar: boolean
   secciones: Secciones
 }
 
@@ -222,7 +223,7 @@ function isFormEmpty(e: EstadoVacio): boolean {
   return pacienteIntacto && edadIntacta && dxIntacto && seccionesIntactas
     && e.lugar.trim() === '' && e.procedimiento.trim() === ''
     && e.familiar.trim() === '' && e.testigo1.trim() === '' && e.testigo2.trim() === ''
-    && e.autorizaTransfusion === null && !e.autorizaFotos
+    && e.autorizaTransfusion === null && !e.autorizaFotos && !e.pacienteNoPuedeFirmar
 }
 
 export default function ConsentimientoInformadoForm({
@@ -276,6 +277,23 @@ export default function ConsentimientoInformadoForm({
   const [testigo2, setTestigo2]           = useState('')
   const [autorizaTransfusion, setAutorizaTransfusion] = useState<'si' | 'no' | null>(null)
   const [autorizaFotos, setAutorizaFotos] = useState(false)
+  /**
+   * ⚠ VIVE EN EL FORMULARIO Y NO EN LA CAPTURA, Y ESO ES LO QUE LA HACE ÚTIL.
+   *
+   * Marcarla convierte al familiar en quien consiente, así que su NOMBRE pasa a
+   * ser exigible y su firma también. Reclamar ese nombre solo tiene sentido
+   * ANTES de iniciar el firmado: descubrirlo en mitad del flujo dejaría al
+   * médico rellenando la ficha con el paciente y el dispositivo delante, o
+   * peor, con una firma ya capturada que habría que tirar al salir.
+   *
+   * Además es un hecho clínico que el médico conoce antes de entregar el
+   * dispositivo —inconsciencia, minoría de edad, imposibilidad física—, no algo
+   * que se averigüe al ver el lienzo.
+   *
+   * El modo de firmado la recibe como dato y no la vuelve a preguntar: dos
+   * sitios donde declarar lo mismo es uno de más.
+   */
+  const [pacienteNoPuedeFirmar, setPacienteNoPuedeFirmar] = useState(false)
 
   const [secciones, setSecciones] = useState<Secciones>({ ...SECCIONES_DEFAULT })
 
@@ -329,7 +347,7 @@ export default function ConsentimientoInformadoForm({
   const vacio = isFormEmpty({
     paciente, pacienteInicial, edad, edadInicial, diagnostico, diagnosticoInicial,
     lugar, procedimiento, familiar, testigo1, testigo2,
-    autorizaTransfusion, autorizaFotos, secciones,
+    autorizaTransfusion, autorizaFotos, pacienteNoPuedeFirmar, secciones,
   })
   useEffect(() => { onVacioChange?.(vacio) }, [vacio, onVacioChange])
 
@@ -407,6 +425,7 @@ export default function ConsentimientoInformadoForm({
     setAutorizaTransfusion(c.autorizaTransfusion === 'si' || c.autorizaTransfusion === 'no'
       ? c.autorizaTransfusion : null)
     setAutorizaFotos(c.autorizaFotos === true)
+    setPacienteNoPuedeFirmar(c.pacienteNoPuedeFirmar === true)
     setSecciones(leerSecciones(c.secciones))
     setBorradorId(fila.id)
     setBorradorFecha(fila.created_at)
@@ -478,7 +497,21 @@ export default function ConsentimientoInformadoForm({
   if (!edad.trim()) faltantes.push({ clave: 'edad', nombre: 'Edad del paciente' })
   if (!esDenegacion && !diagnostico.trim()) faltantes.push({ clave: 'diagnostico', nombre: 'Diagnóstico' })
   if (!procedimiento.trim()) faltantes.push({ clave: 'procedimiento', nombre: 'Procedimiento' })
-  if (!familiar.trim()) {
+  // El familiar ya NO es obligatorio siempre: su nombre vacío es la forma de
+  // decir que no hay familiar que firme, y entonces sale del flujo de firmado
+  // igual que un testigo sin nombre. Una firma sin nombre no acredita a nadie.
+  //
+  // ⚠ SALVO SI EL PACIENTE NO PUEDE FIRMAR, que es la excepción que da sentido
+  // a todo el flujo: ahí el familiar es QUIEN CONSIENTE, no un acompañante, así
+  // que su nombre vuelve a ser exigible —y su firma también, porque sin nombre
+  // no entra al flujo y sin él en el flujo el documento no lo consiente nadie—.
+  //
+  // En DENEGACIÓN se queda como estaba, exigido siempre: aquella hoja no pasa
+  // por el flujo de firmado —se emite en el momento y se firma a mano—, así que
+  // nada de lo de arriba le aplica, y su obligatoriedad era una decisión
+  // auditada del formato (§8 de su guía). Aflojarla de rebote sería cambiar un
+  // documento que nadie pidió tocar.
+  if (!familiar.trim() && (esDenegacion || pacienteNoPuedeFirmar)) {
     faltantes.push({ clave: 'familiar', nombre: 'Familiar responsable o representante legal' })
   }
   if (!esDenegacion) {
@@ -538,6 +571,10 @@ export default function ConsentimientoInformadoForm({
     return {
       paciente, lugar, fecha, edad, procedimiento, diagnostico,
       familiar, testigo1, testigo2, autorizaTransfusion, autorizaFotos,
+      // Entra en el contenido, y por tanto en la HUELLA: es lo que explica que
+      // el papel no lleve firma del paciente, así que forma parte de lo que se
+      // firmó y no puede quedar fuera de lo que la huella acredita.
+      pacienteNoPuedeFirmar,
       secciones, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     }
   }
@@ -718,7 +755,7 @@ export default function ConsentimientoInformadoForm({
    * Ver la cabecera del archivo: firmas → sellado → PDF, y ninguna de las dos
    * precedencias es de estilo.
    */
-  async function sellar(firmas: FirmaCapturada[]): Promise<void> {
+  async function sellar(firmas: FirmaCapturada[], previstos: number): Promise<void> {
     if (!firmando || sellando) return
     setSellando(true)
     setErrorSellado('')
@@ -802,6 +839,10 @@ export default function ConsentimientoInformadoForm({
           ],
           selladoEn,
           huella: firmando.huella,
+          // Cuántos firmantes PIDIÓ el flujo, que ya no son cuatro fijos: solo
+          // entran los que tenían nombre. No se puede deducir de las firmas
+          // capturadas, así que viaja desde el modo hasta el papel.
+          previstos,
         },
         logoUrl: papel.logoUrl,
         filename: generateDocFileName(paciente, 'Consentimiento_Informado'),
@@ -1225,15 +1266,39 @@ export default function ConsentimientoInformadoForm({
 
             {/* Fila 3 — el campo fusionado · Testigo 1 · Testigo 2 */}
             <div className="sp-doc-field">
+              {/* El asterisco sigue a la validación, como en Diagnóstico: en
+                  consentimiento el familiar solo es obligatorio si el paciente
+                  no puede firmar. Un campo marcado como obligatorio que no
+                  bloquea nada enseña una regla falsa. */}
               <label htmlFor="consentimiento-familiar" className="sp-label-field">
-                Familiar responsable o representante legal{' '}
-                <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
-                <span className="sr-only">obligatorio</span>
+                Familiar responsable o representante legal
+                {(esDenegacion || pacienteNoPuedeFirmar) && <>
+                  {' '}<span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
+                  <span className="sr-only">obligatorio</span>
+                </>}
               </label>
               <input ref={familiarRef} id="consentimiento-familiar" type="text" value={familiar}
                 onChange={e => setFamiliar(e.target.value)} placeholder="Nombre completo"
                 aria-invalid={senalar('familiar') || undefined}
                 className={`sp-input ${senalar('familiar') ? 'sp-doc-invalid' : ''}`} />
+              {/* La casilla va PEGADA al campo que vuelve obligatorio, no con las
+                  autorizaciones: marcarla cambia la regla del control de arriba,
+                  y esa relación tiene que verse de un vistazo. En denegación no
+                  se muestra — esa hoja no tiene flujo de firmado. */}
+              {!esDenegacion && (
+                <label className="sp-check sp-doc-consent-nofirma">
+                  <input id="consentimiento-nofirma" type="checkbox" className="sr-only"
+                    checked={pacienteNoPuedeFirmar}
+                    onChange={e => setPacienteNoPuedeFirmar(e.target.checked)} />
+                  <span className="sp-check__box"><Check aria-hidden="true" /></span>
+                  <span className="sp-check__label">El paciente no puede firmar</span>
+                </label>
+              )}
+              {pacienteNoPuedeFirmar && (
+                <p className="sp-hint">
+                  El familiar responsable firma en su lugar: su nombre pasa a ser obligatorio.
+                </p>
+              )}
             </div>
             <div className="sp-doc-field">
               <label htmlFor="consentimiento-testigo1" className="sp-label-field">Testigo 1</label>
@@ -1406,6 +1471,7 @@ export default function ConsentimientoInformadoForm({
       {firmando && (
         <FirmadoConsentimiento
           nombres={{ paciente, familiar, testigo_1: testigo1, testigo_2: testigo2 }}
+          pacienteNoPuedeFirmar={pacienteNoPuedeFirmar}
           onSalir={() => { if (!sellando) { setFirmando(null); setErrorSellado('') } }}
           onSellar={sellar}
           sellando={sellando}
