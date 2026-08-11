@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Check, Minus, X } from 'lucide-react'
 import ModalShell from '@/components/ui/ModalShell'
+import Portal from '@/components/ui/Portal'
 import {
   ANCHO_BITMAP,
   GROSOR_TRAZO,
@@ -181,185 +182,215 @@ export default function FirmadoConsentimiento({
   const resueltos = PASOS.filter(p => desenlaces[p.rol] !== undefined).length
 
   return (
-    <div className="sp-firma-modo sp-push-forward" role="dialog" aria-modal="true"
-      aria-label="Firmado electrónico">
+    /**
+     * ⚠ EL PORTAL NO SOBRA. NO LO QUITES.
+     *
+     * El formulario vive dentro de `.sp-doc-form`, que lleva
+     * `container-type: inline-size` para sus consultas de contenedor. Eso
+     * arrastra CONTENCIÓN DE DISPOSICIÓN, y un elemento con contención de
+     * disposición se convierte en MARCO DE REFERENCIA de sus descendientes
+     * `position: fixed`: el `inset: 0` de `.sp-firma-modo` deja de medirse
+     * contra el viewport y pasa a medirse contra la caja del formulario.
+     *
+     * Sin el portal ocurrían las dos cosas a la vez, y son la misma:
+     *
+     *  · El modo NO tapaba la barra lateral. No por apilamiento —el z-index
+     *    nunca llegó a competir con nada— sino porque el modo quedaba
+     *    confinado a la columna del formulario, que empieza a la derecha de la
+     *    barra, así que geométricamente no la alcanzaba.
+     *  · El área de captura no se veía. Con el cuerpo del formulario en
+     *    `display:none`, a `.sp-doc-form` no le quedaba NINGÚN hijo en flujo
+     *    —el panel de plantillas es null cerrado y los modales salen por este
+     *    mismo portal—, así que su altura de contenido era 0. Contra una caja
+     *    de 0, `top:0; bottom:0` da un modo de 0 de alto, y `.sp-firma-cuerpo`
+     *    —`flex: 1 1 0%` con `overflow-y: auto`— se quedaba en 0 y recortaba el
+     *    lienzo entero. La cabecera y el progreso son `flex: 0 0 auto` y por eso
+     *    seguían viéndose, desbordando.
+     *
+     * Colgando del `<body>`, `fixed` vuelve a resolverse contra el viewport.
+     * Los tokens `--sp-*` viven en `:root`, así que no se pierde ninguno.
+     */
+    <Portal>
+      <div className="sp-firma-modo sp-push-forward" role="dialog" aria-modal="true"
+        aria-label="Firmado electrónico">
 
-      {/* ── Cabecera (§3.1) ───────────────────────────────────────── */}
-      <header className="sp-firma-head">
-        <button type="button" onClick={intentarSalir} disabled={sellando}
-          className="sp-firma-salir" aria-label="Salir del firmado">
-          <X size={20} />
-        </button>
-        <h2 className="sp-title-card sp-firma-titulo">
-          {enResumen ? 'Revisión antes de sellar' : 'Firmado electrónico'}
-        </h2>
-        <span className="sp-badge">
-          <span className="sp-firma-long">
-            {enResumen ? `${resueltos} de ${PASOS.length} resueltos` : `Firmante ${paso + 1} de ${PASOS.length}`}
-          </span>
-          <span className="sp-firma-short">
-            {enResumen ? `${resueltos}/${PASOS.length}` : `${paso + 1}/${PASOS.length}`}
-          </span>
-        </span>
-      </header>
-
-      {/* ── Progreso (§3.2) ───────────────────────────────────────────
-          CUATRO SEGMENTOS SIEMPRE, aunque se omitan firmantes: omitir resuelve
-          un paso, no lo elimina. Un progreso que encoge miente sobre cuánto
-          queda. */}
-      <div className="sp-progress sp-firma-progress">
-        <span className="sp-progress__label">FIRMANTES</span>
-        <div className="sp-progress__track">
-          {PASOS.map((p, i) => (
-            <span key={p.rol}
-              className={`sp-progress__seg ${i <= paso ? 'sp-progress__seg--done' : ''}`} />
-          ))}
-        </div>
-      </div>
-
-      <div className="sp-firma-cuerpo">
-        {actual !== null ? (
-          <>
-            {/* El rol y el nombre, a la vista: el paciente coge el dispositivo
-                sin ningún contexto de lo que está pasando. */}
-            <div className="sp-firma-quien">
-              <p className="sp-label">Firma de</p>
-              <p className="sp-firma-nombre">{nombres[actual.rol].trim() || actual.titulo}</p>
-              <p className="sp-hint">{actual.titulo}</p>
-            </div>
-
-            <LienzoFirma
-              key={actual.rol}
-              lienzoRef={lienzoRef}
-              etiqueta={actual.etiqueta}
-              apagado={noPuedeFirmar}
-              hayTinta={tieneTrazo}
-              limpiarSenal={limpiarSenal}
-              onTinta={() => { setTieneTrazo(true); setErrorTrazo('') }}
-            />
-
-            {/* §5.3 · solo existe en el paso del paciente */}
-            {actual.rol === 'paciente' && (
-              <>
-                <label className="sp-check">
-                  <input type="checkbox" className="sr-only" checked={noPuedeFirmar}
-                    onChange={e => setNoPuedeFirmar(e.target.checked)} />
-                  <span className="sp-check__box"><Check aria-hidden="true" /></span>
-                  <span className="sp-check__label">El paciente no puede firmar</span>
-                </label>
-                {noPuedeFirmar && (
-                  <p className="sp-banner sp-banner--warn">
-                    <AlertTriangle size={17} />
-                    <span>
-                      Se pasa al familiar responsable, y ahí la firma deja de ser opcional:
-                      sin firma del paciente, la del familiar es obligatoria.
-                    </span>
-                  </p>
-                )}
-              </>
-            )}
-
-            {errorTrazo && <p className="sp-banner sp-banner--danger">{errorTrazo}</p>}
-
-            {/* §5.2 · borrar limpia el lienzo entero: no hay deshacer parcial de
-                trazos, que en una firma no significa nada. */}
-            <div className="sp-firma-acciones">
-              <button type="button" disabled={!tieneTrazo || noPuedeFirmar}
-                onClick={() => { setLimpiarSenal(n => n + 1); setTieneTrazo(false); setErrorTrazo('') }}
-                className="sp-btn sp-btn--secondary"
-                style={{ flex: '0 0 auto', whiteSpace: 'nowrap' }}>
-                Borrar y repetir
-              </button>
-              <button type="button" disabled={!tieneTrazo && !noPuedeFirmar}
-                onClick={confirmarFirma} className="sp-btn sp-btn--primary" style={{ flex: 1 }}>
-                {noPuedeFirmar ? 'Continuar sin firma del paciente' : 'Confirmar firma'}
-              </button>
-            </div>
-
-            {/* §5.4 · nunca a la altura del primario: es una salida legítima,
-                pero no es lo que se espera. */}
-            {puedeOmitir && (
-              <button type="button" onClick={() => resolver(actual.rol, { tipo: 'omitido' })}
-                className="sp-btn sp-btn--ghost"
-                style={{ alignSelf: 'flex-start', whiteSpace: 'nowrap' }}>
-                Omitir este firmante
-              </button>
-            )}
-          </>
-        ) : (
-          <>
-            <p className="sp-hint">Revisa antes de imprimir. Puedes rehacer cualquier firma.</p>
-
-            <div className="sp-firma-resumen">
-              {PASOS.map(p => (
-                <FilaResumen key={p.rol} titulo={p.titulo} nombre={nombres[p.rol]}
-                  desenlace={desenlaces[p.rol]} deshabilitado={sellando}
-                  onRehacer={() => rehacer(p.rol)} />
-              ))}
-            </div>
-
-            {errorSellado && <p className="sp-banner sp-banner--danger">{errorSellado}</p>}
-
-            <button type="button" onClick={() => setConfirmarSellado(true)} disabled={sellando}
-              className="sp-btn sp-btn--primary sp-btn--primary-block">
-              {sellando
-                ? <><span className="sp-spinner" /> Sellando…</>
-                : 'Imprimir consentimiento'}
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* §7.2 · el punto de no retorno */}
-      {/* `elevated` sube el modal a z-60: el modo entero vive en z-55 para
-          taparle el paso al botón de menú del Sidebar, que es z-50. */}
-      <ModalShell open={confirmarSellado} onClose={() => setConfirmarSellado(false)} elevated
-        spinusGeometry="decide" title="¿Sellar y firmar el consentimiento?"
-        footer={
-          <div className="flex items-center gap-2 p-4 md:px-6">
-            <button type="button" onClick={() => setConfirmarSellado(false)}
-              className="sp-btn sp-btn--ghost">Revisar otra vez</button>
-            <div className="flex-1" />
-            {/* El primario dice SELLAR, que es el acto; imprimir es lo que
-                ocurre después. Un botón que dijera imprimir no comunicaría un
-                punto de no retorno. */}
-            <button type="button" onClick={sellar} className="sp-btn sp-btn--primary">
-              Sellar e imprimir
-            </button>
-          </div>
-        }>
-        <div className="p-4 md:p-6">
-          <p className="sp-banner sp-banner--danger">
-            <AlertTriangle size={17} />
-            <span>
-              Al sellar, el documento queda firmado, se guarda en el expediente y se registra
-              su huella. Después ya no se puede editar: ni el texto, ni las firmas, ni las
-              fotos. Si algo está mal, corrígelo ahora.
+        {/* ── Cabecera (§3.1) ───────────────────────────────────────── */}
+        <header className="sp-firma-head">
+          <button type="button" onClick={intentarSalir} disabled={sellando}
+            className="sp-firma-salir" aria-label="Salir del firmado">
+            <X size={20} />
+          </button>
+          <h2 className="sp-title-card sp-firma-titulo">
+            {enResumen ? 'Revisión antes de sellar' : 'Firmado electrónico'}
+          </h2>
+          <span className="sp-badge">
+            <span className="sp-firma-long">
+              {enResumen ? `${resueltos} de ${PASOS.length} resueltos` : `Firmante ${paso + 1} de ${PASOS.length}`}
             </span>
-          </p>
-        </div>
-      </ModalShell>
+            <span className="sp-firma-short">
+              {enResumen ? `${resueltos}/${PASOS.length}` : `${paso + 1}/${PASOS.length}`}
+            </span>
+          </span>
+        </header>
 
-      <ModalShell open={confirmarSalida} onClose={() => setConfirmarSalida(false)} elevated
-        spinusGeometry="decide" title="¿Salir del firmado?"
-        footer={
-          <div className="flex items-center gap-2 p-4 md:px-6">
-            <button type="button" onClick={onSalir} className="sp-btn sp-btn--ghost">
-              Salir y perder las firmas
-            </button>
-            <div className="flex-1" />
-            <button type="button" onClick={() => setConfirmarSalida(false)}
-              className="sp-btn sp-btn--primary">Seguir firmando</button>
+        {/* ── Progreso (§3.2) ───────────────────────────────────────────
+            CUATRO SEGMENTOS SIEMPRE, aunque se omitan firmantes: omitir resuelve
+            un paso, no lo elimina. Un progreso que encoge miente sobre cuánto
+            queda. */}
+        <div className="sp-progress sp-firma-progress">
+          <span className="sp-progress__label">FIRMANTES</span>
+          <div className="sp-progress__track">
+            {PASOS.map((p, i) => (
+              <span key={p.rol}
+                className={`sp-progress__seg ${i <= paso ? 'sp-progress__seg--done' : ''}`} />
+            ))}
           </div>
-        }>
-        <div className="p-4 md:p-6">
-          <p className="sp-body">
-            Ya hay firmas capturadas y todavía no se han guardado. Si sales ahora se pierden
-            y habrá que volver a pedirlas.
-          </p>
         </div>
-      </ModalShell>
-    </div>
+
+        <div className="sp-firma-cuerpo">
+          {actual !== null ? (
+            <>
+              {/* El rol y el nombre, a la vista: el paciente coge el dispositivo
+                  sin ningún contexto de lo que está pasando. */}
+              <div className="sp-firma-quien">
+                <p className="sp-label">Firma de</p>
+                <p className="sp-firma-nombre">{nombres[actual.rol].trim() || actual.titulo}</p>
+                <p className="sp-hint">{actual.titulo}</p>
+              </div>
+
+              <LienzoFirma
+                key={actual.rol}
+                lienzoRef={lienzoRef}
+                etiqueta={actual.etiqueta}
+                apagado={noPuedeFirmar}
+                hayTinta={tieneTrazo}
+                limpiarSenal={limpiarSenal}
+                onTinta={() => { setTieneTrazo(true); setErrorTrazo('') }}
+              />
+
+              {/* §5.3 · solo existe en el paso del paciente */}
+              {actual.rol === 'paciente' && (
+                <>
+                  <label className="sp-check">
+                    <input type="checkbox" className="sr-only" checked={noPuedeFirmar}
+                      onChange={e => setNoPuedeFirmar(e.target.checked)} />
+                    <span className="sp-check__box"><Check aria-hidden="true" /></span>
+                    <span className="sp-check__label">El paciente no puede firmar</span>
+                  </label>
+                  {noPuedeFirmar && (
+                    <p className="sp-banner sp-banner--warn">
+                      <AlertTriangle size={17} />
+                      <span>
+                        Se pasa al familiar responsable, y ahí la firma deja de ser opcional:
+                        sin firma del paciente, la del familiar es obligatoria.
+                      </span>
+                    </p>
+                  )}
+                </>
+              )}
+
+              {errorTrazo && <p className="sp-banner sp-banner--danger">{errorTrazo}</p>}
+
+              {/* §5.2 · borrar limpia el lienzo entero: no hay deshacer parcial de
+                  trazos, que en una firma no significa nada. */}
+              <div className="sp-firma-acciones">
+                <button type="button" disabled={!tieneTrazo || noPuedeFirmar}
+                  onClick={() => { setLimpiarSenal(n => n + 1); setTieneTrazo(false); setErrorTrazo('') }}
+                  className="sp-btn sp-btn--secondary"
+                  style={{ flex: '0 0 auto', whiteSpace: 'nowrap' }}>
+                  Borrar y repetir
+                </button>
+                <button type="button" disabled={!tieneTrazo && !noPuedeFirmar}
+                  onClick={confirmarFirma} className="sp-btn sp-btn--primary" style={{ flex: 1 }}>
+                  {noPuedeFirmar ? 'Continuar sin firma del paciente' : 'Confirmar firma'}
+                </button>
+              </div>
+
+              {/* §5.4 · nunca a la altura del primario: es una salida legítima,
+                  pero no es lo que se espera. */}
+              {puedeOmitir && (
+                <button type="button" onClick={() => resolver(actual.rol, { tipo: 'omitido' })}
+                  className="sp-btn sp-btn--ghost"
+                  style={{ alignSelf: 'flex-start', whiteSpace: 'nowrap' }}>
+                  Omitir este firmante
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="sp-hint">Revisa antes de imprimir. Puedes rehacer cualquier firma.</p>
+
+              <div className="sp-firma-resumen">
+                {PASOS.map(p => (
+                  <FilaResumen key={p.rol} titulo={p.titulo} nombre={nombres[p.rol]}
+                    desenlace={desenlaces[p.rol]} deshabilitado={sellando}
+                    onRehacer={() => rehacer(p.rol)} />
+                ))}
+              </div>
+
+              {errorSellado && <p className="sp-banner sp-banner--danger">{errorSellado}</p>}
+
+              <button type="button" onClick={() => setConfirmarSellado(true)} disabled={sellando}
+                className="sp-btn sp-btn--primary sp-btn--primary-block">
+                {sellando
+                  ? <><span className="sp-spinner" /> Sellando…</>
+                  : 'Imprimir consentimiento'}
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* §7.2 · el punto de no retorno */}
+        {/* `elevated` sube el modal a z-60: el modo entero vive en z-55 para
+            taparle el paso al botón de menú del Sidebar, que es z-50. */}
+        <ModalShell open={confirmarSellado} onClose={() => setConfirmarSellado(false)} elevated
+          spinusGeometry="decide" title="¿Sellar y firmar el consentimiento?"
+          footer={
+            <div className="flex items-center gap-2 p-4 md:px-6">
+              <button type="button" onClick={() => setConfirmarSellado(false)}
+                className="sp-btn sp-btn--ghost">Revisar otra vez</button>
+              <div className="flex-1" />
+              {/* El primario dice SELLAR, que es el acto; imprimir es lo que
+                  ocurre después. Un botón que dijera imprimir no comunicaría un
+                  punto de no retorno. */}
+              <button type="button" onClick={sellar} className="sp-btn sp-btn--primary">
+                Sellar e imprimir
+              </button>
+            </div>
+          }>
+          <div className="p-4 md:p-6">
+            <p className="sp-banner sp-banner--danger">
+              <AlertTriangle size={17} />
+              <span>
+                Al sellar, el documento queda firmado, se guarda en el expediente y se registra
+                su huella. Después ya no se puede editar: ni el texto, ni las firmas, ni las
+                fotos. Si algo está mal, corrígelo ahora.
+              </span>
+            </p>
+          </div>
+        </ModalShell>
+
+        <ModalShell open={confirmarSalida} onClose={() => setConfirmarSalida(false)} elevated
+          spinusGeometry="decide" title="¿Salir del firmado?"
+          footer={
+            <div className="flex items-center gap-2 p-4 md:px-6">
+              <button type="button" onClick={onSalir} className="sp-btn sp-btn--ghost">
+                Salir y perder las firmas
+              </button>
+              <div className="flex-1" />
+              <button type="button" onClick={() => setConfirmarSalida(false)}
+                className="sp-btn sp-btn--primary">Seguir firmando</button>
+            </div>
+          }>
+          <div className="p-4 md:p-6">
+            <p className="sp-body">
+              Ya hay firmas capturadas y todavía no se han guardado. Si sales ahora se pierden
+              y habrá que volver a pedirlas.
+            </p>
+          </div>
+        </ModalShell>
+      </div>
+    </Portal>
   )
 }
 

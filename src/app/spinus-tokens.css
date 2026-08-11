@@ -1906,17 +1906,31 @@ a:hover { color: var(--sp-primary-active); }
 /* --- 25. FIRMADO ELECTRÓNICO (GUIA_FORMULARIOS_05 §3 y §5) --------------- */
 /* Va al final y DENTRO de @layer components, por lo mismo que la 22, 23 y 24.
 
-   No usa @container: el modo vive en `position: fixed`, fuera del contenedor
-   `docform` del formulario, así que sus dos anchos se resuelven con @media. */
+   No usa @container, y ahora es verdad: el modo se monta por `Portal` y cuelga
+   del <body>, así que no hay ningún contenedor `docform` sobre él y sus dos
+   anchos se resuelven con @media, contra el viewport. */
 
 /* El modo tapa la pantalla ENTERA, y eso es una función (§2): es el único
    momento del sistema en que el dispositivo cambia de manos, y el paciente no
    debe poder llegar al expediente ni al listado.
 
+   ⚠ ESTO SOLO FUNCIONA PORQUE EL COMPONENTE SE MONTA POR `Portal`, colgando del
+   <body>. `.sp-doc-form`, donde vive el formulario, lleva
+   `container-type: inline-size` para sus consultas de contenedor; eso arrastra
+   contención de disposición, y un elemento con contención de disposición se
+   convierte en MARCO DE REFERENCIA de sus descendientes `position: fixed`. Sin
+   el portal, este `inset: 0` no se mide contra el viewport sino contra la caja
+   del formulario, y el modo se queda dentro de su columna —y con altura 0, que
+   es lo que recortaba el lienzo entero—. La explicación larga está en el
+   componente, junto al `<Portal>`.
+
    z-index 55 y no 40: el botón de menú del Sidebar en móvil es `z-50` y
-   quedaría ENCIMA del modo, que es exactamente la puerta al expediente que
-   este modo existe para cerrar. Los dos ModalShell de dentro pasan `elevated`
-   y suben a 60, así que siguen apilándose sobre él. */
+   quedaría ENCIMA del modo, que es exactamente la puerta al expediente que este
+   modo existe para cerrar. Ojo con leer este número como la causa de nada:
+   mientras el modo estuvo dentro del formulario NUNCA llegó a competir con la
+   barra —no es que se pintara por debajo, es que no la alcanzaba—. El nivel solo
+   significa algo desde que el modo cuelga del <body>. Los dos ModalShell de
+   dentro pasan `elevated` y suben a 60, así que siguen apilándose sobre él. */
 .sp-firma-modo {
   position: fixed; inset: 0; z-index: 55;
   display: flex; flex-direction: column;
