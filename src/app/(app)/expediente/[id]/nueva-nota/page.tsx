@@ -212,9 +212,8 @@ export default function NuevaNotaPage() {
   // horizontal del overlay, que se retira en este paso.
   const [docInline, setDocInline]       = useState<TipoDocumento | null>(null)
   // Paso 5.1: el formulario montado reporta si tiene algo escrito. Lo emiten
-  // los siete con predicado —los seis del sistema de plantillas (Receta,
-  // Laboratorio, Imagen, Suplementación, Escrito, Internamiento) más
-  // Honorarios—. Consentimiento aún no, y queda en `true`: no avisa.
+  // los ocho —los siete del sistema de plantillas (Receta, Laboratorio, Imagen,
+  // Suplementación, Escrito, Internamiento, Consentimiento) más Honorarios—.
   const [formVacio, setFormVacio]       = useState(true)
   // El panel de plantillas sustituye al formulario y oculta el selector de tipo.
   const [panelPlantillas, setPanelPlantillas] = useState(false)
@@ -818,6 +817,11 @@ export default function NuevaNotaPage() {
     }))
 
   const nombrePaciente = paciente ? `${paciente.nombre} ${paciente.apellidos}` : ''
+  // Ya redactada («45 años»), que es como la escribe el médico en el
+  // consentimiento. `construirPaciente` usa la misma fuente en años enteros.
+  const edadInicial = paciente?.fecha_nacimiento
+    ? calcularEdad(paciente.fecha_nacimiento).textoElegante
+    : ''
 
   // Entrevista: bloque en curso + validación de completitud (navegación del modal).
   const bloqueEnCurso = bloquesEntrevista[bloqueActual]
@@ -1872,7 +1876,7 @@ export default function NuevaNotaPage() {
                   <EscritoFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />
                 )}
                 {docInline === 'consentimiento' && (
-                  <ConsentimientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} pacienteId={id} />
+                  <ConsentimientoFormDynamic pacienteInicial={nombrePaciente} diagnosticoInicial={formatDiagnosticosInline(form.diagnosticos)} edadInicial={edadInicial} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />
                 )}
                 {docInline === 'honorarios' && (
                   <HonorariosFormDynamic pacienteInicial={nombrePaciente} pacienteId={id} onVacioChange={setFormVacio} onPanelPlantillasChange={setPanelPlantillas} />

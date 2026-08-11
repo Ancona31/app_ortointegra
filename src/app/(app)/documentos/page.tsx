@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { Search, User, X, Loader2, ChevronRight, UserPlus } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
+import { calcularEdad } from '@/lib/patientUtils'
 import QuickPatientModal from '@/components/ui/QuickPatientModal'
 import SelectorTipoDocumento, { TIPOS_DOCUMENTO, type TipoDocumento } from '@/components/documentos/SelectorTipoDocumento'
 
@@ -40,7 +41,9 @@ const EscritoMedicoForm       = safeDynamic(() => import('@/components/documento
 const ConsentimientoForm      = safeDynamic(() => import('@/components/documentos/ConsentimientoInformadoForm'))
 const NotaHonorariosForm      = safeDynamic(() => import('@/components/documentos/NotaHonorariosForm'))
 
-type Paciente = { id: string; nombre: string; apellidos: string }
+// `fecha_nacimiento` es opcional porque el alta rápida devuelve un paciente sin
+// ella: quien no la tenga entra al consentimiento con la edad en blanco.
+type Paciente = { id: string; nombre: string; apellidos: string; fecha_nacimiento?: string | null }
 
 function DocumentosContent() {
   const searchParams = useSearchParams()
@@ -50,9 +53,9 @@ function DocumentosContent() {
   const [resultados, setResultados] = useState<Paciente[]>([])
   const [buscando, setBuscando] = useState(false)
   const [showQuickPatient, setShowQuickPatient] = useState(false)
-  // Reportan los siete con predicado: los seis del sistema de plantillas
-  // —Receta, Laboratorio, Imagen, Suplementación, Escrito, Internamiento— más
-  // Honorarios. Consentimiento aún no, y queda en `true`: no avisa.
+  // Los ocho reportan predicado: los siete del sistema de plantillas
+  // —Receta, Laboratorio, Imagen, Suplementación, Escrito, Internamiento,
+  // Consentimiento— más Honorarios.
   const [formVacio, setFormVacio] = useState(true)
   // El panel de plantillas sustituye al formulario y oculta el selector de tipo.
   const [panelPlantillas, setPanelPlantillas] = useState(false)
@@ -71,7 +74,9 @@ function DocumentosContent() {
       const busquedaNorm = busqueda.trim().replace(/\s+/g, ' ')
       const { data, error } = await supabase
         .from('pacientes')
-        .select('id, nombre, apellidos')
+        // `fecha_nacimiento` no la pinta el buscador: la necesita el
+        // consentimiento, que prellena la edad de la ficha (§5 de su guía).
+        .select('id, nombre, apellidos, fecha_nacimiento')
         .neq('activo', false)
         .or(`nombre.ilike.%${busquedaNorm}%,apellidos.ilike.%${busquedaNorm}%`)
         .limit(8)
@@ -239,7 +244,12 @@ function DocumentosContent() {
               {tipo === 'consentimiento' && (
                 <ConsentimientoForm
                   pacienteInicial={`${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellidos}`}
+                  edadInicial={pacienteSeleccionado.fecha_nacimiento
+                    ? calcularEdad(pacienteSeleccionado.fecha_nacimiento).textoElegante
+                    : ''}
                   pacienteId={pacienteSeleccionado.id}
+                  onVacioChange={setFormVacio}
+                  onPanelPlantillasChange={setPanelPlantillas}
                 />
               )}
               {tipo === 'honorarios' && (

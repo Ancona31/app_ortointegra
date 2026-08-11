@@ -1,26 +1,58 @@
 'use client'
 
-import { generateDocFileName } from '@/lib/patientUtils'
-import { useState } from 'react'
-import { Printer, Loader2, ChevronDown, ChevronUp, ShieldCheck } from 'lucide-react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
+import { AlertTriangle, Check, Printer, ShieldCheck } from 'lucide-react'
 import { flushSync } from 'react-dom'
+import { format } from 'date-fns'
+import { es } from 'date-fns/locale'
+import Link from 'next/link'
+import { generateDocFileName } from '@/lib/patientUtils'
+import { useMedicoInfo } from '@/hooks/useMedicoInfo'
+import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { generarPdf } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
 import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
-import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
+import SeccionPlegable from '@/components/documentos/SeccionPlegable'
+import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
 import { createClient } from '@/lib/supabase/client'
-import { hoyEnTZ } from '@/lib/dates'
-import { useMedicoInfo } from '@/hooks/useMedicoInfo'
-import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
+import { hoyEnTZ, desplazarFecha } from '@/lib/dates'
+import { enfocarYAcercar } from '@/lib/scrollDoc'
+
+/**
+ * Consentimiento informado — GUIA_FORM_CONSENTIMIENTO.md.
+ *
+ * ── LO QUE ESTE PASE **NO** HACE ────────────────────────────────────────────
+ * El flujo de firmado electrónico (GUIA_FORMULARIOS_05) es su propio paso: los
+ * tres botones de la barra, el borrador, la captura de firmas y las fotos de
+ * identificación. Aquí la barra sigue teniendo los dos de siempre —«Guardar
+ * como plantilla» + imprimir—, así que «Guardar como plantilla» se queda en la
+ * barra y NO sube a la card de plantilla: la excepción de §1.2 existe para no
+ * dejar cuatro botones en una barra que hoy tiene dos. Sube cuando suba el
+ * tercero.
+ */
 
 interface Props {
   pacienteInicial?: string
   pacienteId?: string
   diagnosticoInicial?: string
+  /**
+   * Edad de la ficha, ya redactada («45 años»). Se prellena y queda EDITABLE
+   * (§5): si el paciente cumplió años entre la ficha y la consulta, corregirlo
+   * aquí es más rápido que ir a la ficha y volver.
+   */
+  edadInicial?: string
   offlineMode?: boolean
   onOfflineSave?: () => void
+  /** Reporta al host si el formulario sigue vacío (guía 04 §6.1 y §6.2). */
+  onVacioChange?: (vacio: boolean) => void
+  /**
+   * El panel de plantillas sustituye al formulario en su mismo espacio, y
+   * mientras está abierto el selector de tipo del host se oculta (spec 02 §3.1).
+   */
+  onPanelPlantillasChange?: (abierto: boolean) => void
 }
+
+const FECHA_MIN = '1900-01-01'
 
 const SECCIONES_DEFAULT = {
   preoperatorio: `Después de haberle realizado historia clínica y estudios diagnósticos pertinentes (análisis de laboratorio, estudios de imagen u otros según el caso), se ha establecido el diagnóstico descrito y, habiendo agotado otras alternativas de tratamiento, se le recomienda someterse al procedimiento indicado. Se le indicará el tiempo necesario de ayuno previo y las indicaciones preoperatorias correspondientes.`,
@@ -39,55 +71,67 @@ const SECCIONES_DEFAULT = {
 }
 
 type SeccionKey = keyof typeof SECCIONES_DEFAULT
+type Secciones = Record<SeccionKey, string>
 
-const LABELS: Record<SeccionKey, { num: string; titulo: string; hint: string }> = {
-  preoperatorio:      { num: '1', titulo: 'Preoperatorio',                hint: 'Describe los estudios realizados, el diagnóstico y el procedimiento recomendado.' },
-  beneficios:         { num: '2', titulo: 'Beneficios esperados',          hint: 'Explica los objetivos y resultados esperados del procedimiento.' },
-  anestesia:          { num: '3', titulo: 'Anestesia',                     hint: 'Indica el tipo de anestesia prevista y quién informará al paciente.' },
-  descripcion:        { num: '4', titulo: 'Descripción del procedimiento', hint: 'Detalla la técnica quirúrgica, vía de abordaje e implantes a utilizar.' },
-  riesgosComunes:     { num: '5', titulo: 'Riesgos comunes',               hint: 'Riesgos inherentes a cualquier procedimiento quirúrgico.' },
-  riesgosEspecificos: { num: '6', titulo: 'Riesgos específicos',           hint: 'Riesgos propios de esta cirugía en particular.' },
-  alternativas:       { num: '7', titulo: 'Alternativas de tratamiento',   hint: 'Opciones disponibles en lugar del procedimiento propuesto.' },
+const SECCIONES_ORDEN = Object.keys(SECCIONES_DEFAULT) as SeccionKey[]
+
+/**
+ * Las dos que nacen vacías y bloquean la emisión. No es una decisión de este
+ * pase: son la validación legal auditada del formato (NOM-004-SSA3-2012) y se
+ * conserva entera. Lo que cambia es cómo se enseña —badge en la cabecera y
+ * banner de faltantes, en vez de un toast al pulsar imprimir—.
+ */
+const SECCIONES_OBLIGATORIAS: readonly SeccionKey[] = ['descripcion', 'riesgosEspecificos']
+
+const LABELS: Record<SeccionKey, { titulo: string; hint: string }> = {
+  preoperatorio:      { titulo: '1 · Preoperatorio',                hint: 'Describe los estudios realizados, el diagnóstico y el procedimiento recomendado.' },
+  beneficios:         { titulo: '2 · Beneficios esperados',          hint: 'Explica los objetivos y resultados esperados del procedimiento.' },
+  anestesia:          { titulo: '3 · Anestesia',                     hint: 'Indica el tipo de anestesia prevista y quién informará al paciente.' },
+  descripcion:        { titulo: '4 · Descripción del procedimiento', hint: 'Detalla la técnica quirúrgica, vía de abordaje e implantes a utilizar.' },
+  riesgosComunes:     { titulo: '5 · Riesgos comunes',               hint: 'Riesgos inherentes a cualquier procedimiento quirúrgico.' },
+  riesgosEspecificos: { titulo: '6 · Riesgos específicos',           hint: 'Riesgos propios de esta cirugía en particular.' },
+  alternativas:       { titulo: '7 · Alternativas de tratamiento',   hint: 'Opciones disponibles en lugar del procedimiento propuesto.' },
 }
 
-function SeccionCard({
-  seccionKey, value, onChange, requerido,
-}: { seccionKey: SeccionKey; value: string; onChange: (v: string) => void; requerido?: boolean }) {
-  const [abierta, setAbierta] = useState(true)
-  const { num, titulo, hint } = LABELS[seccionKey]
-
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setAbierta(o => !o)}
-        className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-slate-50 transition-colors"
-      >
-        <span className="w-6 h-6 rounded-full bg-[#1e5fa8] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
-          {num}
-        </span>
-        <span className="font-semibold text-slate-700 text-sm flex-1">
-          {titulo}{requerido && <span className="text-red-400 ml-1">*</span>}
-        </span>
-        {abierta ? <ChevronUp size={15} className="text-slate-400" /> : <ChevronDown size={15} className="text-slate-400" />}
-      </button>
-
-      {abierta && (
-        <div className="px-5 pb-4">
-          <p className="text-xs text-slate-400 mb-2">{hint}</p>
-          <textarea
-            value={value}
-            onChange={e => onChange(e.target.value)}
-            rows={5}
-            className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8] resize-y"
-          />
-        </div>
-      )}
-    </div>
-  )
+interface EstadoVacio {
+  paciente: string
+  pacienteInicial: string
+  edad: string
+  edadInicial: string
+  diagnostico: string
+  diagnosticoInicial: string
+  lugar: string
+  procedimiento: string
+  familiar: string
+  testigo1: string
+  testigo2: string
+  autorizaTransfusion: 'si' | 'no' | null
+  autorizaFotos: boolean
+  imprimirDenegacion: boolean
+  secciones: Secciones
 }
 
-export default function ConsentimientoInformadoForm({ pacienteInicial = '', pacienteId, diagnosticoInicial = '', offlineMode, onOfflineSave }: Props) {
+/**
+ * Predicado único de «formulario vacío». Mismo criterio que los demás: lo que
+ * llega solo no cuenta como escrito hasta que se edita. Aquí eso son cuatro
+ * cosas —paciente, edad y diagnóstico de la ficha, y las cinco secciones que
+ * nacen con texto por defecto—, y la fecha de hoy no entra por lo mismo.
+ */
+function isFormEmpty(e: EstadoVacio): boolean {
+  const pacienteIntacto = e.paciente.trim() === '' || e.paciente.trim() === e.pacienteInicial.trim()
+  const edadIntacta = e.edad.trim() === '' || e.edad.trim() === e.edadInicial.trim()
+  const dxIntacto = e.diagnostico.trim() === '' || e.diagnostico.trim() === e.diagnosticoInicial.trim()
+  const seccionesIntactas = SECCIONES_ORDEN.every(k => e.secciones[k] === SECCIONES_DEFAULT[k])
+  return pacienteIntacto && edadIntacta && dxIntacto && seccionesIntactas
+    && e.lugar.trim() === '' && e.procedimiento.trim() === ''
+    && e.familiar.trim() === '' && e.testigo1.trim() === '' && e.testigo2.trim() === ''
+    && e.autorizaTransfusion === null && !e.autorizaFotos && !e.imprimirDenegacion
+}
+
+export default function ConsentimientoInformadoForm({
+  pacienteInicial = '', pacienteId, diagnosticoInicial = '', edadInicial = '',
+  offlineMode, onOfflineSave, onVacioChange, onPanelPlantillasChange,
+}: Props) {
   const { medicoInfo: onlineMedicoInfo, isLoading: cargandoPerfil } = useMedicoInfo()
   const { consultorioActivo } = useConsultorioActivo()
 
@@ -121,56 +165,138 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
   const perfilPendiente = cargandoPerfil && !medicoInfo
   const toast = useToast()
 
-  // Campos de identificación
-  const [paciente, setPaciente]               = useState(pacienteInicial)
-  const [lugar, setLugar]                     = useState('')
-  const [fecha, setFecha]                     = useState(hoyEnTZ())
-  const [expediente, setExpediente]           = useState('')
-  const [edad, setEdad]                       = useState('')
-  const [idPaciente, setIdPaciente]           = useState('')
-  const [procedimiento, setProcedimiento]     = useState('')
-  const [diagnostico, setDiagnostico]         = useState(diagnosticoInicial)
-  const [familiar, setFamiliar]               = useState('')
-  const [idFamiliar, setIdFamiliar]           = useState('')
-  const [representante, setRepresentante]     = useState('')
-  const [idRepresentante, setIdRepresentante] = useState('')
-  const [anestesiologo, setAnestesiologo]     = useState('')
-  const [testigo1, setTestigo1]               = useState('')
-  const [testigo2, setTestigo2]               = useState('')
+  // ── Identificación: once controles en cuatro filas (§2) ─────────────
+  const [fecha, setFecha]                 = useState(hoyEnTZ())
+  const [lugar, setLugar]                 = useState('')
+  const [paciente, setPaciente]           = useState(pacienteInicial)
+  const [edad, setEdad]                   = useState(edadInicial)
+  const [diagnostico, setDiagnostico]     = useState(diagnosticoInicial)
+  const [procedimiento, setProcedimiento] = useState('')
+  // Campo FUSIONADO (§5): firma uno de los dos, nunca los dos.
+  const [familiar, setFamiliar]           = useState('')
+  const [testigo1, setTestigo1]           = useState('')
+  const [testigo2, setTestigo2]           = useState('')
   const [autorizaTransfusion, setAutorizaTransfusion] = useState<'si' | 'no' | null>(null)
-  const [autorizaFotos, setAutorizaFotos]     = useState(false)
+  const [autorizaFotos, setAutorizaFotos] = useState(false)
 
-  // Secciones editables
-  const [secciones, setSecciones] = useState({ ...SECCIONES_DEFAULT })
+  const [secciones, setSecciones] = useState<Secciones>({ ...SECCIONES_DEFAULT })
 
+  const [imprimirDenegacion, setImprimirDenegacion] = useState(false)
   const [imprimiendo, setImprimiendo] = useState(false)
   const [errorGuardado, setErrorGuardado] = useState('')
-  const [imprimirDenegacion, setImprimirDenegacion] = useState(false)
   const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean } | null>(null)
+  // El banner de faltantes NO existe hasta el primer intento de imprimir: un
+  // formulario recién abierto no acusa de nada. Después permanece y se
+  // actualiza en vivo.
+  const [intentado, setIntentado] = useState(false)
 
-  function updateSeccion(key: SeccionKey, val: string) {
+  const formRef = useRef<HTMLDivElement>(null)
+  const fechaRef = useRef<HTMLInputElement>(null)
+  const lugarRef = useRef<HTMLInputElement>(null)
+  const pacienteRef = useRef<HTMLInputElement>(null)
+  const edadRef = useRef<HTMLInputElement>(null)
+  const diagnosticoRef = useRef<HTMLInputElement>(null)
+  const procedimientoRef = useRef<HTMLInputElement>(null)
+  const familiarRef = useRef<HTMLInputElement>(null)
+
+  const vacio = isFormEmpty({
+    paciente, pacienteInicial, edad, edadInicial, diagnostico, diagnosticoInicial,
+    lugar, procedimiento, familiar, testigo1, testigo2,
+    autorizaTransfusion, autorizaFotos, imprimirDenegacion, secciones,
+  })
+  useEffect(() => { onVacioChange?.(vacio) }, [vacio, onVacioChange])
+
+  // ── Plantillas (spec 02) ────────────────────────────────────────
+  // Se guarda TODO menos los datos del paciente, y aquí eso deja fuera más de lo
+  // habitual: además de paciente, edad, diagnóstico y fecha, quedan fuera el
+  // familiar, los dos testigos y LAS DOS AUTORIZACIONES. Las autorizaciones no
+  // se omiten por descuido ni por simetría: son decisiones del paciente (§2), y
+  // una plantilla que llegue con «Sí autoriza transfusión» marcado afirmaría en
+  // un documento legal algo que el paciente no dijo.
+  //
+  // Consecuencia buscada: ni aplicar una plantilla ni «Vaciar formulario» tocan
+  // ninguno de esos siete. Es exactamente lo que promete el aviso del selector
+  // —«los datos del paciente no cambiaron»—, y hace que Deshacer los devuelva
+  // intactos porque nunca se movieron.
+  const plantillas = usePlantillasDocumento({
+    tipo: 'consentimiento_informado',
+    vacio,
+    // El búnker no tiene red ni sesión de Supabase: el sistema no se monta.
+    desactivado: !!offlineMode,
+    onPanelChange: onPanelPlantillasChange,
+    leer: () => ({
+      _v: 1, lugar, procedimiento, imprimirDenegacion,
+      secciones: { ...secciones },
+    }),
+    aplicar: (c: ContenidoPlantilla) => {
+      // Solo las claves que existen HOY en el formulario, y comprobando el tipo
+      // de cada una: el jsonb pudo guardarse con otra versión del formulario.
+      // Los `else` NO son defensa de sobra: «Vaciar formulario» aplica un
+      // contenido sin ninguna clave, así que es justo lo que repone el estado
+      // inicial.
+      setLugar(typeof c.lugar === 'string' ? c.lugar : '')
+      setProcedimiento(typeof c.procedimiento === 'string' ? c.procedimiento : '')
+      setImprimirDenegacion(c.imprimirDenegacion === true)
+      setSecciones(leerSecciones(c.secciones))
+    },
+  })
+
+  // G-10: foco al primer campo editable vacío al montar. preventScroll para no
+  // arrastrar la página hasta él. En móvil esto abre el teclado en cada montaje.
+  useEffect(() => {
+    const primero = formRef.current?.querySelector<HTMLElement>('input:not([type="date"]), textarea')
+    if (primero instanceof HTMLInputElement && !primero.value) primero.focus({ preventScroll: true })
+  }, [])
+
+  function updateSeccion(key: SeccionKey, val: string): void {
     setSecciones(s => ({ ...s, [key]: val }))
   }
 
-  async function imprimir() {
-    // ══════════════════════════════════════════════════════════════════
-    // VALIDACIÓN LEGAL — 9 campos obligatorios (NOM-004-SSA3-2012)
-    // Se preserva exactamente como estaba. Ejecuta ANTES de flushSync
-    // para que el botón no entre en estado "Generando..." si falta algo.
-    // ══════════════════════════════════════════════════════════════════
-    const faltantes = [
-      { val: paciente,                    label: 'Nombre del paciente' },
-      { val: lugar,                       label: 'Lugar' },
-      { val: fecha,                       label: 'Fecha' },
-      { val: edad,                        label: 'Edad' },
-      { val: procedimiento,               label: 'Procedimiento' },
-      { val: diagnostico,                 label: 'Diagnóstico' },
-      { val: familiar,                    label: 'Familiar responsable' },
-      { val: secciones.descripcion,       label: 'Descripción del procedimiento' },
-      { val: secciones.riesgosEspecificos, label: 'Riesgos específicos' },
-    ].filter(c => !c.val.trim()).map(c => c.label)
+  // ── Validación (§3.8) ───────────────────────────────────────────
+  // Los NUEVE obligatorios auditados del formato, en el orden de lectura del
+  // formulario. Ninguno de los cinco campos retirados en este pase era uno de
+  // ellos, así que la validación legal sale intacta: lo único que cambia es el
+  // nombre del fusionado en el banner (§4 y §8).
+  const faltantes: { clave: string; nombre: string }[] = []
+  if (!fecha) faltantes.push({ clave: 'fecha', nombre: 'Fecha' })
+  if (!lugar.trim()) faltantes.push({ clave: 'lugar', nombre: 'Lugar' })
+  if (!paciente.trim()) faltantes.push({ clave: 'paciente', nombre: 'Paciente' })
+  if (!edad.trim()) faltantes.push({ clave: 'edad', nombre: 'Edad del paciente' })
+  if (!diagnostico.trim()) faltantes.push({ clave: 'diagnostico', nombre: 'Diagnóstico' })
+  if (!procedimiento.trim()) faltantes.push({ clave: 'procedimiento', nombre: 'Procedimiento' })
+  if (!familiar.trim()) {
+    faltantes.push({ clave: 'familiar', nombre: 'Familiar responsable o representante legal' })
+  }
+  for (const k of SECCIONES_OBLIGATORIAS) {
+    if (!secciones[k].trim()) faltantes.push({ clave: `seccion-${k}`, nombre: LABELS[k].titulo.slice(4) })
+  }
+
+  function textoFaltantes(): string {
+    const n = faltantes.length
+    return n === 1 ? 'Falta 1 campo' : `Faltan ${n} campos`
+  }
+
+  function irA(clave: string): void {
+    // Una sección obligatoria puede estar plegada, y entonces su textarea no
+    // está en el árbol: el destino es su cabecera, que sí lo está siempre y es
+    // pulsable. `SeccionPlegable` publica ese id como parte de su contrato.
+    if (clave.startsWith('seccion-')) {
+      enfocarYAcercar(document.getElementById(`consentimiento-${clave.slice(8)}-cabecera`))
+      return
+    }
+    const destinos: Record<string, RefObject<HTMLInputElement | null>> = {
+      fecha: fechaRef, lugar: lugarRef, paciente: pacienteRef, edad: edadRef,
+      diagnostico: diagnosticoRef, procedimiento: procedimientoRef, familiar: familiarRef,
+    }
+    enfocarYAcercar(destinos[clave]?.current ?? null)
+  }
+
+  async function imprimir(): Promise<void> {
+    // El primario nunca está gris por faltantes: un botón apagado no enseña qué
+    // falta, el banner sí. Al pulsar con faltantes no emite y lleva al primero.
     if (faltantes.length > 0) {
-      toast.error(`Campos obligatorios faltantes: ${faltantes.join(', ')}`)
+      setIntentado(true)
+      irA(faltantes[0].clave)
       return
     }
 
@@ -185,9 +311,8 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
     // 3. Contenido persistido — NO incluye imprimirDenegacion (es una
     //    opción de impresión, no parte del consentimiento legal)
     const contenido = {
-      paciente, lugar, fecha, expediente, edad, idPaciente, procedimiento, diagnostico,
-      familiar, idFamiliar, representante, idRepresentante, anestesiologo,
-      testigo1, testigo2, autorizaTransfusion, autorizaFotos,
+      paciente, lugar, fecha, edad, procedimiento, diagnostico,
+      familiar, testigo1, testigo2, autorizaTransfusion, autorizaFotos,
       secciones,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     }
@@ -232,9 +357,8 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
         pacienteId,
         medico: medicoData,
         data: {
-          paciente, lugar, fecha: fechaFmt, expediente, edad, idPaciente,
-          procedimiento, diagnostico, familiar, idFamiliar,
-          representante, idRepresentante, anestesiologo,
+          paciente, lugar, fecha: fechaFmt, edad,
+          procedimiento, diagnostico, familiar,
           testigo1, testigo2, autorizaTransfusion, autorizaFotos,
           secciones, imprimirDenegacion,
         },
@@ -305,165 +429,278 @@ export default function ConsentimientoInformadoForm({ pacienteInicial = '', paci
     }
   }
 
-  const inputCls = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8]'
+  const senalar = (clave: string) => intentado && faltantes.some(f => f.clave === clave)
+  const maxFecha = desplazarFecha(hoyEnTZ(), { anios: 1 })
 
   return (
-    <div className="space-y-4">
+    <div ref={formRef} className="sp-doc-form">
+      {/* El árbol del formulario NO se desmonta cuando el panel de plantillas
+          está abierto: se apaga con display:none y el panel se monta como
+          hermano, en el mismo contenedor de scroll (spec 02 §3.1). */}
+      <div className="sp-doc-formbody" style={plantillas.panelAbierto ? { display: 'none' } : undefined}>
 
-      {/* Datos de identificación */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <ShieldCheck size={15} className="text-[#1e5fa8]" />
-          <h2 className="font-semibold text-slate-700 text-sm">Datos de identificación</h2>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Lugar <span className="text-red-400">*</span></label>
-            <input type="text" value={lugar} onChange={e => setLugar(e.target.value)} placeholder="Ej: Monterrey, N.L." className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Fecha <span className="text-red-400">*</span></label>
-            <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Paciente <span className="text-red-400">*</span></label>
-            <input type="text" value={paciente} onChange={e => setPaciente(e.target.value)} placeholder="Nombre completo" className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Edad del paciente <span className="text-red-400">*</span></label>
-            <input type="text" value={edad} onChange={e => setEdad(e.target.value)} placeholder="Ej: 45 años" className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">No. Expediente</label>
-            <input type="text" value={expediente} onChange={e => setExpediente(e.target.value)} placeholder="Ej: 2024-001" className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Identificado con</label>
-            <input type="text" value={idPaciente} onChange={e => setIdPaciente(e.target.value)} placeholder="Ej: INE 123456789" className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Procedimiento <span className="text-red-400">*</span></label>
-            <input type="text" value={procedimiento} onChange={e => setProcedimiento(e.target.value)} placeholder="Ej: Artrodesis cervical anterior" className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Diagnóstico <span className="text-red-400">*</span></label>
-            <input type="text" value={diagnostico} onChange={e => setDiagnostico(e.target.value)} placeholder="Diagnóstico principal" className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Familiar responsable <span className="text-red-400">*</span></label>
-            <input type="text" value={familiar} onChange={e => setFamiliar(e.target.value)} placeholder="Nombre completo" className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Identificación del familiar</label>
-            <input type="text" value={idFamiliar} onChange={e => setIdFamiliar(e.target.value)} placeholder="Ej: INE 987654321" className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Representante legal <span className="text-slate-300">(si aplica)</span></label>
-            <input type="text" value={representante} onChange={e => setRepresentante(e.target.value)} placeholder="Nombre completo" className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Identificación del representante</label>
-            <input type="text" value={idRepresentante} onChange={e => setIdRepresentante(e.target.value)} placeholder="Tipo y número de ID" className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Médico anestesiólogo <span className="text-slate-300">(si aplica)</span></label>
-            <input type="text" value={anestesiologo} onChange={e => setAnestesiologo(e.target.value)} placeholder="Nombre del anestesiólogo" className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Testigo 1</label>
-            <input type="text" value={testigo1} onChange={e => setTestigo1(e.target.value)} placeholder="Nombre del testigo" className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Testigo 2</label>
-            <input type="text" value={testigo2} onChange={e => setTestigo2(e.target.value)} placeholder="Nombre del testigo" className={inputCls} />
-          </div>
-        </div>
+      {plantillas.selector}
 
-        {/* Autorizaciones */}
-        <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-2">Autoriza transfusión de sangre</label>
-            <div className="flex gap-3">
-              {(['si', 'no'] as const).map(v => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => setAutorizaTransfusion(v)}
-                  className={`px-4 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                    autorizaTransfusion === v
-                      ? v === 'si' ? 'bg-green-100 border-green-400 text-green-700' : 'bg-red-100 border-red-400 text-red-700'
-                      : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-                  }`}
-                >
-                  {v === 'si' ? 'Sí' : 'No'}
-                </button>
-              ))}
+      <section className="sp-card sp-doc-card">
+        <div className="sp-doc-cardhead">
+          <div className="sp-icobox sp-icobox--sm"><ShieldCheck /></div>
+          <h2 className="sp-label">Datos de identificación</h2>
+        </div>
+        <div className="sp-doc-cardbody">
+          <div className="sp-doc-grid sp-doc-consent-id" data-cols="3">
+
+            {/* Fila 1 — Fecha · Lugar · Paciente */}
+            <div className="sp-doc-field">
+              <label htmlFor="consentimiento-fecha" className="sp-label-field">
+                Fecha <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
+                <span className="sr-only">obligatorio</span>
+              </label>
+              <input ref={fechaRef} id="consentimiento-fecha" type="date" value={fecha}
+                min={FECHA_MIN} max={maxFecha}
+                onChange={e => setFecha(e.target.value)}
+                aria-invalid={senalar('fecha') || undefined}
+                className={`sp-input ${senalar('fecha') ? 'sp-doc-invalid' : ''}`} />
             </div>
-          </div>
-          <div className="flex items-start gap-3 pt-1">
-            <input
-              type="checkbox"
-              id="autorizaFotos"
-              checked={autorizaFotos}
-              onChange={e => setAutorizaFotos(e.target.checked)}
-              className="mt-0.5 w-4 h-4 accent-[#1e5fa8]"
-            />
-            <label htmlFor="autorizaFotos" className="text-xs text-slate-600 leading-relaxed cursor-pointer">
-              Autoriza uso de fotografías para fines educativos y publicación académica
-            </label>
+            {/* Sin cambio (§5): lo escribe el médico cada vez, no viene del
+                consultorio. Lo que sí hace es entrar en la plantilla. */}
+            <div className="sp-doc-field">
+              <label htmlFor="consentimiento-lugar" className="sp-label-field">
+                Lugar <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
+                <span className="sr-only">obligatorio</span>
+              </label>
+              <input ref={lugarRef} id="consentimiento-lugar" type="text" value={lugar}
+                onChange={e => setLugar(e.target.value)} placeholder="Ej: Monterrey, N.L."
+                aria-invalid={senalar('lugar') || undefined}
+                className={`sp-input ${senalar('lugar') ? 'sp-doc-invalid' : ''}`} />
+            </div>
+            <div className="sp-doc-field">
+              <label htmlFor="consentimiento-paciente" className="sp-label-field">
+                Paciente <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
+                <span className="sr-only">obligatorio</span>
+              </label>
+              <input ref={pacienteRef} id="consentimiento-paciente" type="text" value={paciente}
+                onChange={e => setPaciente(e.target.value)} placeholder="Nombre completo"
+                aria-invalid={senalar('paciente') || undefined}
+                className={`sp-input ${senalar('paciente') ? 'sp-doc-invalid' : ''}`} />
+              {pacienteInicial && <p className="sp-hint">De la ficha · editable</p>}
+            </div>
+
+            {/* Fila 2 — Edad · Diagnóstico · Procedimiento */}
+            <div className="sp-doc-field">
+              <label htmlFor="consentimiento-edad" className="sp-label-field">
+                Edad del paciente <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
+                <span className="sr-only">obligatorio</span>
+              </label>
+              <input ref={edadRef} id="consentimiento-edad" type="text" value={edad}
+                onChange={e => setEdad(e.target.value)} placeholder="Ej: 45 años"
+                aria-invalid={senalar('edad') || undefined}
+                className={`sp-input ${senalar('edad') ? 'sp-doc-invalid' : ''}`} />
+              {edadInicial && <p className="sp-hint">De la ficha · editable</p>}
+            </div>
+            <div className="sp-doc-field">
+              <label htmlFor="consentimiento-diagnostico" className="sp-label-field">
+                Diagnóstico <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
+                <span className="sr-only">obligatorio</span>
+              </label>
+              <input ref={diagnosticoRef} id="consentimiento-diagnostico" type="text" value={diagnostico}
+                onChange={e => setDiagnostico(e.target.value)} placeholder="Diagnóstico principal"
+                aria-invalid={senalar('diagnostico') || undefined}
+                className={`sp-input ${senalar('diagnostico') ? 'sp-doc-invalid' : ''}`} />
+              {diagnosticoInicial && <p className="sp-hint">Del diagnóstico de la consulta</p>}
+            </div>
+            <div className="sp-doc-field">
+              <label htmlFor="consentimiento-procedimiento" className="sp-label-field">
+                Procedimiento <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
+                <span className="sr-only">obligatorio</span>
+              </label>
+              <input ref={procedimientoRef} id="consentimiento-procedimiento" type="text" value={procedimiento}
+                onChange={e => setProcedimiento(e.target.value)}
+                placeholder="Ej: Artrodesis cervical anterior"
+                aria-invalid={senalar('procedimiento') || undefined}
+                className={`sp-input ${senalar('procedimiento') ? 'sp-doc-invalid' : ''}`} />
+            </div>
+
+            {/* Fila 3 — el campo fusionado · Testigo 1 · Testigo 2 */}
+            <div className="sp-doc-field">
+              <label htmlFor="consentimiento-familiar" className="sp-label-field">
+                Familiar responsable o representante legal{' '}
+                <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
+                <span className="sr-only">obligatorio</span>
+              </label>
+              <input ref={familiarRef} id="consentimiento-familiar" type="text" value={familiar}
+                onChange={e => setFamiliar(e.target.value)} placeholder="Nombre completo"
+                aria-invalid={senalar('familiar') || undefined}
+                className={`sp-input ${senalar('familiar') ? 'sp-doc-invalid' : ''}`} />
+            </div>
+            <div className="sp-doc-field">
+              <label htmlFor="consentimiento-testigo1" className="sp-label-field">Testigo 1</label>
+              <input id="consentimiento-testigo1" type="text" value={testigo1}
+                onChange={e => setTestigo1(e.target.value)} placeholder="Nombre del testigo"
+                className="sp-input" />
+            </div>
+            <div className="sp-doc-field">
+              <label htmlFor="consentimiento-testigo2" className="sp-label-field">Testigo 2</label>
+              <input id="consentimiento-testigo2" type="text" value={testigo2}
+                onChange={e => setTestigo2(e.target.value)} placeholder="Nombre del testigo"
+                className="sp-input" />
+            </div>
+
+            {/* Fila 4 — bajo divisor: no son datos de identificación, son
+                decisiones del paciente (§2). */}
+            <div className="sp-doc-consent-auth">
+              <div className="sp-doc-field">
+                <span className="sp-label-field" id="consentimiento-transfusion">
+                  Autoriza transfusión de sangre
+                </span>
+                <div className="sp-doc-segmented sp-doc-segmented--field" role="group"
+                  aria-labelledby="consentimiento-transfusion">
+                  {(['si', 'no'] as const).map(v => (
+                    <button key={v} type="button" aria-pressed={autorizaTransfusion === v}
+                      onClick={() => setAutorizaTransfusion(v)} className="sp-doc-segmented__opt">
+                      {v === 'si' ? 'Sí' : 'No'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="sp-doc-field">
+                <span className="sp-label-field">Uso de fotografías</span>
+                {/* El `<label>` envuelve al control, así que el nombre accesible
+                    de la casilla es su propio texto: el rótulo de arriba agrupa
+                    la celda, no nombra la casilla. */}
+                <label className="sp-check sp-doc-consent-fotos">
+                  <input id="consentimiento-fotos" type="checkbox" className="sr-only"
+                    checked={autorizaFotos} onChange={e => setAutorizaFotos(e.target.checked)} />
+                  <span className="sp-check__box"><Check aria-hidden="true" /></span>
+                  <span className="sp-check__label">
+                    Autoriza su uso con fines educativos y de publicación académica
+                  </span>
+                </label>
+              </div>
+            </div>
+
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Secciones clínicas */}
-      {(Object.keys(secciones) as SeccionKey[]).map(key => (
-        <SeccionCard
+      {/* Las siete nacen PLEGADAS (§3): abiertas, el formulario mide ≈2.400px
+          antes de escribir nada. El badge de la cabecera es lo que hace que
+          plegar resuma en vez de esconder. */}
+      {SECCIONES_ORDEN.map(key => (
+        <SeccionPlegable
           key={key}
-          seccionKey={key}
-          value={secciones[key]}
-          onChange={v => updateSeccion(key, v)}
-          requerido={key === 'descripcion' || key === 'riesgosEspecificos'}
-        />
+          id={`consentimiento-${key}`}
+          titulo={LABELS[key].titulo}
+          resumen={resumenSeccion(key, secciones[key])}
+        >
+          <p className="sp-hint" style={{ marginBottom: 'var(--sp-gap-label)' }}>{LABELS[key].hint}</p>
+          <label htmlFor={`consentimiento-${key}-texto`} className="sr-only">{LABELS[key].titulo}</label>
+          <textarea id={`consentimiento-${key}-texto`} value={secciones[key]}
+            onChange={e => updateSeccion(key, e.target.value)}
+            rows={6} className="sp-textarea" />
+        </SeccionPlegable>
       ))}
 
-      {/* Opción: incluir hoja de denegación */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-3.5 flex items-center gap-3">
-        <input
-          type="checkbox"
-          id="imprimirDenegacion"
-          checked={imprimirDenegacion}
-          onChange={e => setImprimirDenegacion(e.target.checked)}
-          className="w-4 h-4 accent-[#1e5fa8] flex-shrink-0"
-        />
-        <label htmlFor="imprimirDenegacion" className="text-sm text-slate-600 cursor-pointer leading-snug">
-          Incluir hoja de <strong>Denegación o Revocación</strong> del consentimiento (hoja 4 opcional)
-        </label>
-      </div>
-
-      {errorGuardado && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-          {errorGuardado}
+      {/* Hoja 4 opcional. Es una opción de IMPRESIÓN, no parte del
+          consentimiento legal: por eso no entra en `contenido`. */}
+      <section className="sp-card sp-doc-card">
+        <div className="sp-doc-cardbody">
+          <label className="sp-check">
+            <input id="consentimiento-denegacion" type="checkbox" className="sr-only"
+              checked={imprimirDenegacion} onChange={e => setImprimirDenegacion(e.target.checked)} />
+            <span className="sp-check__box"><Check aria-hidden="true" /></span>
+            <span className="sp-check__label">
+              Incluir hoja de Denegación o Revocación del consentimiento
+            </span>
+          </label>
         </div>
+      </section>
+
+      {errorGuardado && <p className="sp-banner sp-banner--danger">{errorGuardado}</p>}
+
+      {!cargandoPerfil && !medicoInfo && (
+        <p className="sp-banner sp-banner--warn">
+          <AlertTriangle size={17} />
+          <span style={{ flex: 1 }}>Completa tu perfil para que el documento salga con tu encabezado.</span>
+          <Link href="/perfil" className="sp-link-alt">Ir a mi perfil</Link>
+        </p>
       )}
 
-      <button
-        onClick={imprimir}
-        disabled={imprimiendo || perfilPendiente}
-        className="doc-print-btn w-full flex items-center justify-center gap-2 py-3 bg-[#1a3a5c] text-white rounded-xl font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-50"
-      >
-        {imprimiendo
-          ? <><Loader2 size={18} className="animate-spin" /> Generando PDF...</>
-          : <><Printer size={18} /> Generar Consentimiento Informado</>
-        }
-      </button>
+      {intentado && faltantes.length > 0 && (
+        <p className="sp-banner sp-banner--warn" aria-live="polite">
+          <AlertTriangle size={17} />
+          <span>
+            {textoFaltantes()}:{' '}
+            {faltantes.slice(0, 3).map((f, i) => (
+              <span key={f.clave}>
+                {i > 0 && ' · '}
+                <button type="button" onClick={() => irA(f.clave)}
+                  className="sp-link-alt" style={{ color: 'var(--sp-warn-strong)' }}>
+                  {f.nombre}
+                </button>
+              </span>
+            ))}
+            {faltantes.length > 3 && ` y ${faltantes.length - 3} más`}
+          </span>
+        </p>
+      )}
+
+      {/* «Guardar como plantilla» va aquí y no arriba: se guarda cuando el
+          formulario YA está lleno, así que su sitio es junto al de imprimir. */}
+      <div className="sp-doc-actions">
+        {plantillas.botonGuardar}
+        <button type="button" onClick={imprimir} disabled={imprimiendo || perfilPendiente}
+          className="sp-btn sp-btn--primary">
+          {imprimiendo ? <><span className="sp-spinner" /> Generando PDF…</>
+            : perfilPendiente ? <><span className="sp-spinner" /> Cargando tu perfil…</>
+            : <>
+                <Printer size={17} />
+                <span className="sp-doc-long">Imprimir consentimiento</span>
+                <span className="sp-doc-short">Imprimir</span>
+              </>}
+        </button>
+      </div>
+
+      </div>
+
+      {plantillas.panel}
+      {plantillas.dialogos}
 
       <ModalDocumentoGenerado
         open={docGenerado !== null}
         onClose={() => setDocGenerado(null)}
         blob={docGenerado?.blob ?? null}
-        titulo="Consentimiento informado"
+        titulo="Consentimiento generado"
         guardadoEnExpediente={docGenerado?.guardado ?? false}
       />
     </div>
   )
+}
+
+/**
+ * Badge de la cabecera plegada (§3). `Editada` cuando el texto difiere del
+ * defecto y nada cuando está intacto —eso es la spec—, con una salvedad: las
+ * dos que nacen vacías Y bloquean la emisión dicen `Obligatoria` mientras lo
+ * estén. Sin ella, el único aviso de un campo obligatorio viviría dentro de una
+ * card plegada, que es donde no se ve.
+ */
+function resumenSeccion(key: SeccionKey, valor: string): string | undefined {
+  if (valor === SECCIONES_DEFAULT[key]) {
+    return SECCIONES_OBLIGATORIAS.includes(key) ? 'Obligatoria' : undefined
+  }
+  return valor.trim() === '' && SECCIONES_OBLIGATORIAS.includes(key) ? 'Obligatoria' : 'Editada'
+}
+
+/**
+ * Lee las siete secciones de una plantilla comprobando cada clave: el jsonb pudo
+ * guardarse con otra versión del formulario. Lo que falte vuelve a su texto por
+ * defecto, que es de lo que depende «Vaciar formulario».
+ */
+function leerSecciones(bruto: unknown): Secciones {
+  const src = (bruto && typeof bruto === 'object') ? bruto as Record<string, unknown> : {}
+  const out = { ...SECCIONES_DEFAULT }
+  for (const k of SECCIONES_ORDEN) {
+    const v = src[k]
+    if (typeof v === 'string') out[k] = v
+  }
+  return out
 }

@@ -1841,4 +1841,46 @@ a:hover { color: var(--sp-primary-active); }
   .sp-doc-nuevogrupo > .sp-input { flex: 1 0 100%; }
 }
 
+
+/* --- 23. CONSENTIMIENTO INFORMADO (GUIA_FORM_CONSENTIMIENTO §2) ---------- */
+/* Va al final y DENTRO de @layer components, por lo mismo que la 22: fuera de
+   la capa estas reglas ganarían a las utilidades de Tailwind.
+
+   Sección corta a propósito. Las siete secciones de texto son `.sp-section` de
+   la 22, las once celdas de identificación son `.sp-doc-grid[data-cols="3"]` de
+   la 18, el segmentado de transfusión es `.sp-doc-segmented--field` de la 21 y
+   la casilla de fotografías es `.sp-check` de la 16 —22×22, radio 6, borde de
+   1.5 y contenedor de 44, que es exactamente lo que pide §2—. Aquí solo queda
+   lo que ningún otro formato necesitaba. */
+
+/* Reserva de dos renglones en la etiqueta, y SOLO en multicolumna (§7).
+   «Familiar responsable o representante legal» ocupa dos líneas a 238px de
+   campo, y sin la reserva las otras dos columnas de su fila arrancan 17px más
+   arriba. En una sola columna no hay con qué desalinearse y la reserva sería
+   aire de más, así que el umbral es el mismo al que la rejilla abre a dos. */
+@container docform (min-width: 380px) {
+  .sp-doc-consent-id .sp-label-field { min-height: 34px; }
+}
+
+/* Fila 4: el divisor y las dos autorizaciones. Van bajo filete porque NO son
+   datos de identificación sino decisiones del paciente (§2).
+   Reparte por su cuenta y no con las columnas de la rejilla: en el tramo de dos
+   columnas el segmentado caería en una pista de 166px y sus dos botones en 77
+   cada uno, por debajo de lo cómodo. Abre a dos en el mismo umbral en que la
+   rejilla abre a tres, donde la pista ya mide 272. */
+.sp-doc-consent-auth {
+  grid-column: 1 / -1;
+  display: grid; grid-template-columns: 1fr; gap: var(--sp-4);
+  margin-top: var(--sp-4); padding-top: var(--sp-4);
+  border-top: var(--sp-bw-hair) solid var(--sp-line-divider);
+}
+@container docform (min-width: 600px) {
+  .sp-doc-consent-auth { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* El texto de la casilla envuelve a dos y tres renglones según el ancho, así
+   que la caja se ancla a la primera línea en vez de centrarse contra el bloque
+   entero. El contenedor conserva sus 44px de alto mínimo. */
+.sp-doc-consent-fotos { align-items: flex-start; }
+
 } /* fin @layer components */
