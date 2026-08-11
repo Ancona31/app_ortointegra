@@ -6,6 +6,12 @@
  *
  * Propósito: el espacio donde se firma. De 1 a 6 firmas por hoja.
  *
+ * ⚠ **LA RETÍCULA YA NO ES SIEMPRE DE DOS COLUMNAS.** La ficha la declaraba así y el 2 estaba
+ * cableado; II.9 —la denegación— compone tres firmantes en **tres** columnas de 142 pt, una
+ * sola fila, porque en dos desbordaba 62 pt de una hoja que tiene que ser una. Entra como
+ * PARÁMETRO `columnas` del formato, con 2 por defecto: la celda y su fórmula de alto no
+ * cambian. Ver `columnas` en `BloqueFirmasProps`, que es donde queda declarado.
+ *
  * REGLA 1 — EL ALTO DE LA FIRMA NO DEPENDE DE LA HOJA
  *
  * `firma.espacio` son 77 pt **en las tres variantes**. Lo que cambia entre ellas
@@ -204,17 +210,24 @@ const GEOMETRIA = {
  */
 const SEPARADOR_CREDENCIALES = ' · '
 
-/** Dos columnas iguales sobre la caja, con su medianil. */
-const ANCHO_CELDA = (CAJA.ancho - GEOMETRIA.medianil) / 2
 /**
- * Las mismas dos columnas con el medianil de 30. Ver `GEOMETRIA.medianilInternamiento`.
+ * N COLUMNAS IGUALES SOBRE LA CAJA, CON SU MEDIANIL. **El reparto es fórmula, nunca cifra.**
  *
- * **Lo componen DOS láminas**: la pareja de firmas de II.6 y la retícula de tres niveles de
- * II.7, las dos con `gap: 0 30pt` y celdas de 228. Consentimiento además lo declara sin
- * contradicción —no repite el 246 que en Internamiento no cabía—, así que esa lámina
- * confirma por su cuenta que el reparto bueno es 228 + 30 + 228.
+ * Con dos columnas y el medianil de 24 da los 231 del chasis; con el de 30 da los **228** que
+ * componen tres láminas —la pareja de firmas de II.6, la retícula de tres niveles de II.7 y la
+ * variante por sustitución de II.9—, y ese es el reparto que explica
+ * `GEOMETRIA.medianilInternamiento`: aquella lámina declara además dos cajas de 246 que no
+ * caben juntas, así que se compone el MEDIANIL y las celdas se reparten lo que queda.
+ * Consentimiento lo confirma por su cuenta, sin repetir el 246.
+ *
+ * ⚠ **Y CON TRES COLUMNAS DA 142**, que es la cifra que la guía de II.9 mide para su variante
+ * de tres firmantes: (486 − 60) / 3 = 142 exactos. No hay que escribirla en ninguna parte —
+ * sale de la misma resta— y por eso el parámetro nuevo es un NÚMERO DE COLUMNAS y no un
+ * ancho. Ver `columnas` en `BloqueFirmasProps`.
  */
-const ANCHO_CELDA_INTERNAMIENTO = (CAJA.ancho - GEOMETRIA.medianilInternamiento) / 2
+function anchoDeCelda(medianil: number, columnas: number): number {
+  return (CAJA.ancho - medianil * (columnas - 1)) / columnas
+}
 
 const estilos = StyleSheet.create({
   /**
@@ -236,23 +249,24 @@ const estilos = StyleSheet.create({
   fila: {
     flexDirection: 'row',
   },
-  celda: {
-    width: ANCHO_CELDA,
-  },
-  celdaInternamiento: {
-    width: ANCHO_CELDA_INTERNAMIENTO,
-  },
-  celdaConMedianil: {
-    marginLeft: GEOMETRIA.medianil,
-  },
-  celdaConMedianilInternamiento: {
-    marginLeft: GEOMETRIA.medianilInternamiento,
-  },
   /** El aire sobre lo que el formato cuelga bajo la nota. Ver `GEOMETRIA.anadido`. */
   anadido: { marginTop: GEOMETRIA.anadido.margen },
   /** El aire sobre el pie de sello, pegado a la calidad del firmante. */
   sello: { marginTop: GEOMETRIA.sello.margen },
-  /** Solo en `retícula`: es lo que separa una fila de la siguiente. */
+  /**
+   * Solo en `retícula` **CON MÁS DE UNA FILA**: es lo que separa una fila de la siguiente.
+   *
+   * ⚠ **LA CONDICIÓN DE «MÁS DE UNA FILA» ES NUEVA Y NO CAMBIA NADA YA COMPUESTO.** La ficha
+   * declara este padding solo para `retícula` y la razón que da es explícita —«es lo que
+   * separa las FILAS de una retícula»—, que es la misma por la que `pareja` nunca lo lleva:
+   * con una sola fila no hay nada que separar. Mientras `retícula` significó «de 3 a 6 firmas
+   * en dos columnas» las dos lecturas coincidían, porque tres firmas ya son dos filas; con
+   * `columnas` una retícula puede tener una sola fila, y entonces los 18 pt se sumarían al
+   * alto de la celda sin separar nada. Ver `columnas` en `BloqueFirmasProps`.
+   *
+   * El único consumidor anterior de `retícula` compone cuatro firmas en dos filas y no se
+   * mueve ni un punto.
+   */
   celdaEnReticula: {
     paddingTop: GEOMETRIA.celda.superior,
     paddingBottom: GEOMETRIA.celda.inferior,
@@ -452,6 +466,37 @@ interface ConLamina {
   calibracion?: CalibracionFirma
 }
 
+/**
+ * EL PARÁMETRO NUEVO DE 2.L — **CUÁNTAS COLUMNAS TIENE LA RETÍCULA**, y por defecto dos.
+ *
+ * La ficha declaraba la retícula como «de 3 a 6 firmas **en dos columnas**», y ese 2 estaba
+ * cableado: `enParejas()` partía la lista en filas de dos y las celdas medían 228 o 231. Con
+ * tres firmantes eso da **dos filas y media fila vacía**, y en la lámina que lo destapó —II.9,
+ * la denegación— desbordaba 62 pt de una hoja que tiene que ser una.
+ *
+ * **La regla de esa lámina es «tantas columnas como firmantes, una sola fila siempre»**, y con
+ * ella sus tres firmas caben en 142 pt de celda cada una, verificado a que el rol, el nombre y
+ * la nota entran en un renglón cada uno.
+ *
+ * ⚠ **ES UN PARÁMETRO, NO UN COMPONENTE NUEVO NI UNA VARIANTE NUEVA.** Lo único que cambia es
+ * en cuántas columnas se reparte la misma caja de 486; la celda, su calibración, su
+ * `wrap={false}` y las cinco ranuras de `Firma` son las de siempre. Añadir una cuarta variante
+ * habría duplicado `UnaFirma` y su fórmula de alto para no cambiar ni un punto de la celda.
+ *
+ * **Sin él, dos** — que es lo que compone el único consumidor anterior de `retícula` y lo que
+ * la ficha declaraba. Ningún formato ya construido cambia.
+ *
+ * ⚠ **NO ES UN ANCHO DE CELDA Y NO DEBE SERLO.** El ancho sale de `anchoDeCelda()` a partir del
+ * medianil de la lámina, así que quien pase 3 no puede equivocarse en la resta. Un formato que
+ * quisiera columnas desiguales no cabe aquí y **tampoco debería**: la retícula de firmas del
+ * sistema reparte la caja en partes iguales, y un firmante con más sitio que otro es jerarquía
+ * de otorgamiento, que es lo que II.7 compone con rótulos de nivel y no con anchos.
+ *
+ * ⚠ **EL FORMATO ES QUIEN LO SABE, Y TIENE QUE PASARLO.** Este componente **no** lo deduce de
+ * `firmas.length`: hacerlo sería métrica decidida por el contenido en tiempo de render, que es
+ * lo que I.3.4 prohíbe, y dejaría a II.7 —cuatro firmas que la lámina quiere en dos columnas—
+ * componiendo cuatro columnas de 106 pt sin que nadie lo hubiera pedido.
+ */
 export type BloqueFirmasProps = ConLamina &
   (
     /**
@@ -471,8 +516,8 @@ export type BloqueFirmasProps = ConLamina &
     | { variante: 'simple'; firmas: readonly [Firma]; ancho?: number }
     /** Dos firmas en la misma fila. */
     | { variante: 'pareja'; firmas: readonly [Firma, Firma] }
-    /** De 3 a 6 firmas, en dos columnas. */
-    | { variante: 'reticula'; firmas: readonly Firma[] }
+    /** De 3 a 6 firmas, en dos columnas —o en las que declare `columnas`—. */
+    | { variante: 'reticula'; firmas: readonly Firma[]; columnas?: number }
   )
 
 /** Una firma: rol encima, espacio de escritura, línea, y la identificación. */
@@ -565,11 +610,17 @@ function UnaFirma({
   )
 }
 
-/** Parte las firmas en filas de dos, que es la retícula declarada. */
-function enParejas(firmas: readonly Firma[]): readonly (readonly Firma[])[] {
+/**
+ * Parte las firmas en filas de `columnas`. Con dos es la retícula que la ficha declaraba y el
+ * reparto no cambia; con tres cabe una sola fila. Ver `columnas` en `BloqueFirmasProps`.
+ */
+function enFilas(
+  firmas: readonly Firma[],
+  columnas: number,
+): readonly (readonly Firma[])[] {
   const filas: Firma[][] = []
   firmas.forEach((firma, indice) => {
-    if (indice % 2 === 0) filas.push([firma])
+    if (indice % columnas === 0) filas.push([firma])
     else filas[filas.length - 1].push(firma)
   })
   return filas
@@ -579,8 +630,19 @@ function enParejas(firmas: readonly Firma[]): readonly (readonly Firma[])[] {
 export default function BloqueFirmas(props: BloqueFirmasProps): ReactElement {
   const lamina = props.lamina ?? 'chasis'
   const calibracion = props.calibracion ?? calibracionDeLamina(lamina)
-  /** El reparto de fila de 228 + 30 + 228, que componen dos láminas. */
-  const internamiento = lamina === 'internamiento' || lamina === 'consentimiento'
+  /**
+   * EL MEDIANIL DE 30, que componen TRES láminas: la pareja de II.6, la retícula de II.7 y las
+   * dos variantes de II.9. Las demás componen el de 24. Ver `GEOMETRIA.medianilInternamiento`.
+   *
+   * Es lo único que la lámina decide de este reparto; **cuántas columnas hay lo decide el
+   * formato**, y de las dos cosas juntas sale el ancho de celda.
+   */
+  const medianil =
+    lamina === 'internamiento' ||
+    lamina === 'consentimiento' ||
+    lamina === 'denegacion'
+      ? GEOMETRIA.medianilInternamiento
+      : GEOMETRIA.medianil
 
   // Regla 3: `break-inside: avoid`. Un bloque de firmas no se parte entre hojas;
   // es uno de los cuatro bloques indivisibles de 2.N (`CONCILIA D44`).
@@ -599,22 +661,27 @@ export default function BloqueFirmas(props: BloqueFirmasProps): ReactElement {
   }
 
   const reticula = props.variante === 'reticula'
+  /** Sin `columnas`, dos: la pareja siempre y la retícula que la ficha declaraba. */
+  const columnas = reticula ? (props.columnas ?? 2) : 2
+  const ancho = anchoDeCelda(medianil, columnas)
+  const filas = enFilas(props.firmas, columnas)
+  /**
+   * El padding que separa una fila de la siguiente, **solo si hay una siguiente**. Ver
+   * `celdaEnReticula`.
+   */
+  const conPaddingDeFila = reticula && filas.length > 1
 
   return (
     <View wrap={false}>
-      {enParejas(props.firmas).map((fila) => (
+      {filas.map((fila) => (
         <View key={fila[0].rol} style={estilos.fila}>
           {fila.map((firma, columna) => (
             <View
               key={firma.rol}
               style={[
-                internamiento ? estilos.celdaInternamiento : estilos.celda,
-                columna === 0
-                  ? {}
-                  : internamiento
-                    ? estilos.celdaConMedianilInternamiento
-                    : estilos.celdaConMedianil,
-                reticula ? estilos.celdaEnReticula : {},
+                { width: ancho },
+                columna === 0 ? {} : { marginLeft: medianil },
+                conPaddingDeFila ? estilos.celdaEnReticula : {},
               ]}
             >
               <UnaFirma firma={firma} calibracion={calibracion} />

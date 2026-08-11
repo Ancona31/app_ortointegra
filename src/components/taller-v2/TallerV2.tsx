@@ -85,6 +85,7 @@ type Vista =
   | 'internamiento'
   | 'consentimiento'
   | 'escrito'
+  | 'denegacion'
 
 /**
  * EL SELECTOR — EL CHASIS Y LOS OCHO FORMATOS DE LA SECCIÓN II.
@@ -98,11 +99,10 @@ type Vista =
  * renglones. En uno solo, `4.7 · Consentimiento` no cabe en media columna del panel
  * de 320 pt y se corta — que es el defecto que esta tabla arregla.
  *
- * ⚠ **SON NUEVE Y NO DIEZ.** La Sección II declara ocho formatos —II.1 a II.8— y con
- * el chasis son nueve. **Ya no falta ninguno**: las nueve entradas están construidas y
- * ninguna se pinta en gris. Si el décimo es una vista que no está en la Sección II —una
- * hoja de vista previa, o el chasis partido en dos—, dime cuál y entra aquí sin tocar
- * nada más: la retícula envuelve.
+ * ⚠ **SON DIEZ.** La Sección II declaraba ocho formatos —II.1 a II.8— y con el chasis eran
+ * nueve; **II.9, la denegación, es el noveno formato** y entra con esta lista. No es una hoja
+ * del consentimiento: es un documento independiente que se emite EN SU LUGAR, con su propio
+ * `documentos.tipo` y su propia serie de folio. Ninguna entrada se pinta en gris.
  */
 interface EntradaSelector {
   /** `null` mientras el formato no exista: la entrada se pinta y no se pulsa. */
@@ -121,6 +121,7 @@ const VISTAS: readonly EntradaSelector[] = [
   { vista: 'internamiento', codigo: '4.6', nombre: 'Internamiento' },
   { vista: 'consentimiento', codigo: '4.7', nombre: 'Consentimiento' },
   { vista: 'escrito', codigo: '4.8', nombre: 'Escrito médico' },
+  { vista: 'denegacion', codigo: '4.9', nombre: 'Denegación' },
 ]
 
 /**
@@ -211,6 +212,20 @@ const CASOS_ESCRITO: readonly EntradaCaso[] = [
   { caso: 'sin', etiqueta: 'Sin título', nota: 'Hueco de 20 pt, no cero, y con filete' },
 ]
 
+/**
+ * LOS DE LA DENEGACIÓN son cinco y su eje es **quién firma**, que es lo único que cambia entre
+ * sus dos variantes. Los otros tres son lo que hay que vigilar en un documento cuya condición
+ * dura es caber en una hoja: la declaración sin el inciso del diagnóstico, el campo vacío
+ * requerido del riel y el nombre de procedimiento largo, que es el riesgo que la guía declara.
+ */
+const CASOS_DENEGACION: readonly EntradaCaso[] = [
+  { caso: 'paciente', etiqueta: 'Firma el paciente', nota: 'Tres firmantes en tres columnas' },
+  { caso: 'sustitucion', etiqueta: 'Sustitución', nota: 'Dos columnas y constancia del motivo' },
+  { caso: 'sinDiagnostico', etiqueta: 'Sin diagnóstico', nota: 'La frase, sin el inciso' },
+  { caso: 'familiarVacio', etiqueta: 'Familiar vacío', nota: 'El riel conserva rótulo y línea' },
+  { caso: 'largo', etiqueta: 'Procedimiento largo', nota: 'Subtítulo recortado, sigue en 1 hoja' },
+]
+
 /** Qué casos ofrece cada vista. Las que no aparecen usan los tres de `CASOS`. */
 function casosDe(vista: Vista): readonly EntradaCaso[] {
   if (vista === 'suplementacion') return CASOS_SUPLEMENTACION
@@ -218,6 +233,7 @@ function casosDe(vista: Vista): readonly EntradaCaso[] {
   if (vista === 'internamiento') return CASOS_INTERNAMIENTO
   if (vista === 'consentimiento') return CASOS_CONSENTIMIENTO
   if (vista === 'escrito') return CASOS_ESCRITO
+  if (vista === 'denegacion') return CASOS_DENEGACION
   return CASOS
 }
 
@@ -304,6 +320,8 @@ export default function TallerV2(): ReactElement {
                         ? (await import('./HojaInternamiento')).generarPdfInternamiento
                         : vista === 'consentimiento'
                         ? (await import('./HojaConsentimiento')).generarPdfConsentimiento
+                        : vista === 'denegacion'
+                        ? (await import('./HojaDenegacion')).generarPdfDenegacion
                         : // La hoja de chasis no tiene casos: se le pasa el argumento y lo
                       // ignora, que es más barato que ramificar la llamada.
                       (await import('./HojaTaller')).generarPdfTaller

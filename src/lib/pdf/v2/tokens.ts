@@ -1164,6 +1164,42 @@ export type Lamina =
    *   2.V  hoja de continuación **sin paciente**: su línea reducida lleva las cédulas
    */
   | 'escrito'
+  /**
+   * **Y AHORA SON NUEVE. LA NOVENA ES LA QUE MENOS DECLARA DE PROPIO, Y NO POR SER SENCILLA.**
+   *
+   * `denegacion` es la lámina de la Denegación o revocación del consentimiento: un documento
+   * INDEPENDIENTE de una hoja que se emite **en lugar** del consentimiento cuando el paciente
+   * rechaza el procedimiento o revoca una autorización previa. No es una hoja de II.7.
+   *
+   * ⚠ **NO ES `consentimiento` CON MENOS COSAS, Y ES EL ERROR FÁCIL DE COMETER.** Comparte con
+   * aquella la banda de un renglón sin cédulas, la anatomía de celda del riel y el marco de su
+   * declaración —de ahí que casi todo lo suyo se LEA de allí en vez de volver a declararse—,
+   * pero sus dos aires de encabezado son los del CHASIS y no los de II.7:
+   *
+   *     espaciador de cierre del membrete   **12**, el del chasis   (consentimiento, 20)
+   *     aire bajo el filete del título      ** 8**, el del chasis   (consentimiento, 18)
+   *
+   * Son 18 pt de encabezado, y por eso esta lámina no puede componerse pasando
+   * `lamina: 'consentimiento'`: con los dos aires de aquella el documento mide 258.59 pt de
+   * encabezado en vez de 240.59, y esos 18 pt salen de la holgura de la variante por
+   * sustitución, que solo tiene 26.04.
+   *
+   * Que los dos sean los del chasis es también lo que hace que **2.C no la nombre**: sin
+   * ninguna rama suya, el bloque de título compone la caja de 321, el riel de folio de 156 y
+   * los dos aires del chasis, que es exactamente lo que la guía mide.
+   *
+   * Lo que declara de propio:
+   *
+   *   2.B  banda de UN renglón alto sin cédulas —la de Honorarios y Consentimiento—, con el
+   *        espaciador de cierre del chasis
+   *   2.D  riel de SEIS celdas en dos filas, sin diagnóstico y sin expediente, con el familiar
+   *        como campo vacío requerido
+   *   2.F  la anatomía de celda de Consentimiento —padding `4 10 5`, valor a 11.5 / 14— con
+   *        los filetes del CHASIS: 0.8 y 0.5. Es la segunda lámina que los compone
+   *   2.L  retícula de tantas COLUMNAS como firmantes, en una sola fila
+   *   2.M  banda `completo` **sin QR**: el documento no autoriza nada
+   */
+  | 'denegacion'
 
 /**
  * Las nueve transiciones entre bloques declaradas por el diseño (I.1.7).

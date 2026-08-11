@@ -387,6 +387,35 @@ const estilos = StyleSheet.create({
     marginTop: ESPACIO[2],
   },
   /**
+   * EL SUBTÍTULO RECORTADO A UN RENGLÓN — **una lámina, y es lo que le garantiza la hoja única**.
+   *
+   * II.9 —la denegación— mide su bloque de título en 55.99 pt con el subtítulo en UN renglón, y
+   * su subtítulo es el nombre del procedimiento, que lo escribe el médico. Si rompe a dos, el
+   * encabezado sube 14 pt; su variante por sustitución tiene 26.04 de holgura y una revocación
+   * en dos hojas **no es aceptable** —decisión de Angel—, así que esos 14 pt son la diferencia
+   * entre un documento y dos.
+   *
+   * ⚠ **ESTO NO RELAJA LA REGLA 2, QUE ES DEL TÍTULO Y SIGUE EN PIE.** «El título variable SÍ
+   * puede romper a dos líneas […] sin `maxLines`, sin truncado, sin elipsis» habla del TÍTULO, y
+   * el del Escrito Médico sigue rompiendo a tres renglones sin que nadie lo toque. Lo que se
+   * recorta aquí es el subtítulo, que es otra ranura.
+   *
+   * ⚠ **Y NO SE PIERDE NADA.** El nombre completo del procedimiento se imprime entero dentro de
+   * la declaración de ese formato, que es donde tiene valor legal; aquí es un rótulo de
+   * cabecera. Es exactamente la razón con la que 2.M acota su única zona con elipsis —«es el
+   * nombre del documento, que ya va entero y a 17 pt en la cabecera»—, y este es el **segundo**
+   * sitio del sistema con recorte. Reportado, y acotado a esta lámina.
+   *
+   * ⚠ **POR MAQUETACIÓN Y NO POR CARACTERES.** Un tope de caracteres depende del juego de anchos
+   * de la cadena —medido: 69 caracteres de un nombre quirúrgico caben y 70 no, y con glifos más
+   * anchos el corte cae antes—, así que garantizaría el renglón único solo de media. `maxLines`
+   * lo garantiza siempre, y `textOverflow` es lo que hace que el lector vea que falta texto.
+   */
+  subtituloRecortado: {
+    maxLines: 1,
+    textOverflow: 'ellipsis',
+  },
+  /**
    * EL RIEL DE FOLIO. Zona derecha del bloque de título, de ancho FIJO: A.8 declara
    * las dos zonas del bloque —texto 321 pt (columnas 1–8), riel 156 pt (9–12)— y
    * B.1 §2 lo confirma sobre la lámina de Laboratorio, «riel de folio de 156 pt a
@@ -807,6 +836,8 @@ export default function TituloDocumento(props: TituloDocumentoProps): ReactEleme
                 style={[
                   honorarios ? estilos.subtituloHonorarios : estilos.subtitulo,
                   props.rotuloSubtitulo === undefined ? {} : { marginTop: 0 },
+                  // Una lámina, y por una razón que no es de estilo. Ver `subtituloRecortado`.
+                  lamina === 'denegacion' ? estilos.subtituloRecortado : {},
                 ]}
               >
                 {props.subtitulo}

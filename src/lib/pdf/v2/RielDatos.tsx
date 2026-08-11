@@ -186,6 +186,32 @@ const TRAZO = {
    * nadie** — es el mismo caso que la regla interior de Honorarios, que tampoco existe.
    */
   escrito: { filete: FILETE.fino, regla: FILETE.regla },
+  /**
+   * **Y LA DE DENEGACIÓN ES LA SÉPTIMA, Y ES LA SEGUNDA QUE COMPONE EL TRAZO DEL CHASIS.**
+   *
+   * Su guía lo escribe con todas las letras —«0.5 pt `#D9D6D0` entre celdas; 0.8 pt `#101010`
+   * arriba y abajo del riel»—, que son `filete.fino` y `filete.regla` sin desviar, y su cota
+   * lo confirma por su cuenta. El riel abre en 223.97 y cierra en 294.59, y sus dos filas no
+   * miden lo mismo:
+   *
+   *     33      paciente · edad · fecha
+   *     35.47   familiar o responsable —con su línea de escritura de 16.47—, hospital y lugar
+   *     ──────
+   *     68.47   + 2 × 0.8 de filete + 1 × 0.5 de regla = **70.57**
+   *
+   * contra los **70.62** medidos: **0.05 pt**, el residuo más pequeño del sistema junto al de
+   * Internamiento. Con el 0.63 y el 0.375 de Consentimiento saldrían 70.105 —medio punto por
+   * debajo—, así que **no se hereda el trazo de aquella lámina aunque se herede su celda**.
+   *
+   * Eso mueve el aviso que las seis anteriores dejaban abierto: ya no es «solo Laboratorio
+   * compone 0.8 y 0.5» sino **dos contra cuatro**. Sigue sin unificarse aquí, y por la misma
+   * razón de siempre: es una decisión de producto, no de este archivo. Reportado.
+   *
+   * ⚠ La tabla de encabezado de esa misma guía escribe **0.75** para el filete de cierre, que
+   * no coincide con el 0.8 de su §4. Se compone el 0.8, que es el que da el residuo de 0.05 y
+   * el que el chasis ya declara; el 0.75 es el redondeo de la tabla. Reportado.
+   */
+  denegacion: { filete: FILETE.fino, regla: FILETE.regla },
 } as const satisfies Record<Lamina, { filete: number; regla: number }>
 
 /** Lo que una desviación puede mover de un rol: solo su cuerpo y su interlineado. */
@@ -478,12 +504,28 @@ export const ETIQUETA_CELDA: EstiloEtiquetaCelda = estilos.etiqueta
  */
 export function valorDeCelda(lamina: Lamina): EstiloValorCelda {
   if (lamina === 'receta') return estilos.valorReceta
-  if (lamina === 'consentimiento') return estilos.valorConsentimiento
+  // Las dos láminas que componen la celda de 33: ver `celdaDeConsentimiento`.
+  if (celdaDeConsentimiento(lamina)) return estilos.valorConsentimiento
   return estilos.valor
 }
 
 /**
- * El padding de celda de cada lámina. Cinco componen el `3 10 4` del chasis y una el
+ * LAS DOS LÁMINAS QUE COMPONEN LA CELDA ALTA — `padding: 4 10 5` y valor a 11.5 / 14.
+ *
+ * Denegación hereda de Consentimiento la ANATOMÍA de la celda y nada más: su guía mide la
+ * celda base en **32.99** —«padding 4 + rótulo 10 + valor 14 + padding 5»—, que es la misma
+ * suma, y en cambio compone los filetes del chasis (ver `TRAZO.denegacion`). Se leen de donde
+ * ya están en vez de declarar una pareja que valdría lo mismo.
+ *
+ * **Que sean dos y no una es lo que justifica la función.** Con una sola lámina bastaba un
+ * `===`; con dos, el día que entre una tercera hay un solo sitio que tocar.
+ */
+function celdaDeConsentimiento(lamina: Lamina): boolean {
+  return lamina === 'consentimiento' || lamina === 'denegacion'
+}
+
+/**
+ * El padding de celda de cada lámina. Cinco componen el `3 10 4` del chasis y DOS el
  * `4 10 5` que sube su celda base a 33. Ver `GEOMETRIA.paddingConsentimiento`.
  */
 function paddingDeCelda(lamina: Lamina): {
@@ -491,7 +533,7 @@ function paddingDeCelda(lamina: Lamina): {
   lateral: number
   inferior: number
 } {
-  return lamina === 'consentimiento'
+  return celdaDeConsentimiento(lamina)
     ? GEOMETRIA.paddingConsentimiento
     : GEOMETRIA.padding
 }

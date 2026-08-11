@@ -519,7 +519,20 @@ export default function Membrete(props: MembreteProps): ReactElement {
    * Lo que separa a esta de la de Laboratorio es el interlineado —12 contra 11—, que es lo
    * mismo que ya separaba a la de Honorarios.
    */
-  const bandaUnRenglon = honorarios || consentimiento
+  /**
+   * LA BANDA DE DENEGACIÓN ES LA DE CONSENTIMIENTO, Y SU ESPACIADOR NO.
+   *
+   * Su guía compone la dirección en 129.49 → 141.49 —doce, un solo renglón a 7.5 / 12— sin
+   * cédulas ni universidad, que es exactamente la banda de II.7; `D23` pasa así de tres contra
+   * tres a **cuatro contra tres**, y sigue sin resolverse desde aquí.
+   *
+   * ⚠ **PERO SU ESPACIADOR DE CIERRE SON LOS 12 DEL CHASIS, NO LOS 20 DE II.7** —141.49 →
+   * 153.49—, y por eso esta lámina entra en `bandaUnRenglon` y **no** en la rama de
+   * `consentimiento` de abajo. Las dos cosas se leen a dos líneas de distancia a propósito:
+   * son la mitad de los 18 pt que separan los dos encabezados. Ver `Lamina` en tokens.
+   */
+  const denegacion = lamina === 'denegacion'
+  const bandaUnRenglon = honorarios || consentimiento || denegacion
   const conCedulas = lamina !== 'chasis' && !bandaUnRenglon
   /**
    * ⚠ **EL RENGLÓN DE CÉDULA DE LA HOJA DE CONTINUACIÓN, Y AHORA SÍ SE RETIRA.**

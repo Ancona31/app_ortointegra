@@ -400,6 +400,35 @@ const FILAS_CONSENTIMIENTO: readonly (readonly DescriptorCelda[])[] = [
   [HOSPITAL_CLINICA, LUGAR],
 ]
 
+/**
+ * LAS DOS FILAS DE DENEGACIÓN — seis celdas, y **sin diagnóstico y sin expediente**.
+ *
+ * No es el riel de Consentimiento con dos filas menos: es otro reparto de las doce columnas
+ * en las dos que quedan, y ese reparto no se puede derivar del colapso —es lo mismo que ya
+ * obligó a declarar dos filas en Honorarios y cuatro en Consentimiento—.
+ *
+ *     paciente 5 · edad 2 · fecha 5              = 12
+ *     familiar 4 · hospital o clínica 5 · lugar 3 = 12    el familiar, campo vacío requerido
+ *
+ * **Qué se va y por qué.** El expediente y el diagnóstico no están: este documento no asienta
+ * un padecimiento, asienta que no se autorizó un procedimiento, y el procedimiento va en el
+ * subtítulo del bloque de título. El familiar SE QUEDA en el riel —igual que en II.7— y sigue
+ * siendo campo vacío requerido: quien acompaña al paciente se identifica en el mostrador, y en
+ * la variante por sustitución es quien firma.
+ *
+ * Los cinco descriptores propios lo son solo por su `span`; su etiqueta y su trazo son los de
+ * las celdas de II.7, así que se derivan de ellas en vez de repetirse.
+ */
+const FECHA_DENEGACION: DescriptorCelda = { ...FECHA, columnas: 5 }
+const FAMILIAR_DENEGACION: DescriptorCelda = { ...FAMILIAR, columnas: 4 }
+const HOSPITAL_DENEGACION: DescriptorCelda = { ...HOSPITAL_CLINICA, columnas: 5 }
+const LUGAR_DENEGACION: DescriptorCelda = { ...LUGAR, columnas: 3 }
+
+const FILAS_DENEGACION: readonly (readonly DescriptorCelda[])[] = [
+  [PACIENTE, EDAD, FECHA_DENEGACION],
+  [FAMILIAR_DENEGACION, HOSPITAL_DENEGACION, LUGAR_DENEGACION],
+]
+
 /** Cotización: 5 + 4 + 3 = 12. */
 const FILA_COTIZACION: readonly DescriptorCelda[] = [
   PACIENTE_COTIZACION,
@@ -788,6 +817,22 @@ export default function BloquePaciente(props: BloquePacienteProps): ReactElement
         variante="celdas"
         lamina={lamina}
         filas={FILAS_CONSENTIMIENTO.map((fila) =>
+          celdas(fila, props, lamina, props.acento),
+        )}
+      />
+    )
+  }
+
+  /**
+   * EL RIEL DE LA DENEGACIÓN. Dos filas, seis celdas y un reparto propio de las doce
+   * columnas: se declara entero por lo mismo que el de Consentimiento. Ver `FILAS_DENEGACION`.
+   */
+  if (lamina === 'denegacion') {
+    return (
+      <RielDatos
+        variante="celdas"
+        lamina={lamina}
+        filas={FILAS_DENEGACION.map((fila) =>
           celdas(fila, props, lamina, props.acento),
         )}
       />
