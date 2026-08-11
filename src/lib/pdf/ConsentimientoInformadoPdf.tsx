@@ -39,8 +39,47 @@ export interface ConsentimientoData {
     riesgosEspecificos: string
     alternativas: string
   }
-  imprimirDenegacion?: boolean
+  /**
+   * Emite SOLO la hoja de denegación, sin las tres del consentimiento.
+   *
+   * ⚠ PUENTE, NO SOLUCIÓN DEFINITIVA. La denegación es un formato v2
+   * (`GUIA_FORM_DENEGACION.md`), pero v2 entero sigue detrás de un interruptor
+   * apagado: ningún formato v2 se usa en producción y cablearlo exige meter
+   * versión en la firma de `generarPdf`, que toca sus 12 call sites (ver la
+   * nota larga de `buildClientElement` en `src/lib/mobileShare.ts`). Sin este
+   * atajo la denegación no se podría imprimir hasta ese paso posterior.
+   * Cuando v2 se cablee, la denegación entra por la misma puerta que los otros
+   * ocho y esta bandera se retira con su hoja.
+   *
+   * Sustituyó a `imprimirDenegacion`, que ANEXABA la denegación al
+   * consentimiento. Es una bandera y no dos a propósito: los dos documentos son
+   * excluyentes, no acumulables. Si el paciente deniega, no se imprimen las
+   * siete hojas que explican y otorgan lo que acaba de rechazar.
+   */
+  soloDenegacion?: boolean
   folio?: string
+}
+
+/**
+ * Lo que la denegación necesita, y nada más. Sin las secciones clínicas, que no
+ * aparecen en el documento.
+ *
+ * El diagnóstico SÍ está, y no en el riel —que no lo lleva (§4)— sino dentro de
+ * la declaración: una revocación puede acabar en sede legal, y ahí importa no
+ * solo qué procedimiento se rechazó sino de qué se estaba tratando al paciente.
+ * Es opcional porque en denegación no es campo obligatorio; ver cómo se compone
+ * la frase sin él más abajo.
+ */
+export type DenegacionData = Pick<
+  ConsentimientoData,
+  'paciente' | 'lugar' | 'fecha' | 'edad' | 'procedimiento' | 'familiar' | 'folio'
+> & { diagnostico?: string }
+
+export interface DenegacionProps {
+  medico: PdfMedicoData | null
+  data: DenegacionData
+  logoUrl?: string
+  consultorio?: PdfConsultorioData
 }
 
 export interface ConsentimientoProps {
@@ -237,6 +276,32 @@ function CompactHeader({ medico, colors, logoUrl, paciente, procedimiento }: Com
 
 export function renderConsentimiento(props: ConsentimientoProps) {
   return <ConsentimientoInformadoPdf {...props} />
+}
+
+/** Las siete secciones que la denegación no lleva. Ver `soloDenegacion`. */
+const SIN_SECCIONES: ConsentimientoData['secciones'] = {
+  preoperatorio: '', beneficios: '', anestesia: '', descripcion: '',
+  riesgosComunes: '', riesgosEspecificos: '', alternativas: '',
+}
+
+/**
+ * La denegación como documento de una hoja. Ver la nota de `soloDenegacion`:
+ * es el puente hasta que se cablee v2.
+ */
+export function renderDenegacion(props: DenegacionProps) {
+  return (
+    <ConsentimientoInformadoPdf
+      medico={props.medico}
+      logoUrl={props.logoUrl}
+      consultorio={props.consultorio}
+      data={{
+        ...props.data,
+        diagnostico: props.data.diagnostico ?? '',
+        secciones: SIN_SECCIONES,
+        soloDenegacion: true,
+      }}
+    />
+  )
 }
 
 export default function ConsentimientoInformadoPdf({
@@ -571,6 +636,12 @@ export default function ConsentimientoInformadoPdf({
         : 'NO autorizo la transfusión de sangre o hemoderivados, asumiendo los riesgos que esto implica.'
       : null
 
+  /* ---------- Diagnóstico de la declaración de denegación ---------- */
+  // No es obligatorio en denegación —exigirlo bloquearía un rechazo por no
+  // haber redactado antes lo que el paciente acaba de rechazar—, así que la
+  // frase se compone SIN el inciso cuando falta, y no con un hueco ni un guion.
+  const dxDenegacion = data.diagnostico?.trim() ?? ''
+
   const fotosLine = data.autorizaFotos
     ? 'Autorizo la toma de fotografías clínicas con fines de documentación médica y seguimiento del tratamiento.'
     : null
@@ -581,6 +652,9 @@ export default function ConsentimientoInformadoPdf({
 
   return (
     <Document>
+      {/* Las tres hojas del consentimiento NO se emiten cuando el documento es
+          la denegación: es un documento que SUSTITUYE, no que se anexa. */}
+      {!data.soloDenegacion && (<>
       {/* =================== PAGE 1 =================== */}
       <Page size="LETTER" style={s.page}>
         {/* Header fixed */}
@@ -775,9 +849,10 @@ export default function ConsentimientoInformadoPdf({
           {/* Firmas */}
           <FirmasBlock />
       </Page>
+      </>)}
 
-      {/* =================== PAGE 4 (optional) =================== */}
-      {data.imprimirDenegacion ? (
+      {/* ============ DENEGACIÓN — hoja única y excluyente ============ */}
+      {data.soloDenegacion ? (
         <Page size="LETTER" style={s.page}>
           <View fixed style={s.headerFixed}>
             <BarraTop colors={colors} />
@@ -808,16 +883,26 @@ export default function ConsentimientoInformadoPdf({
                 </Text>
               </View>
               <View style={s.denegBody}>
+                {/* La cadena literal de GUIA_FORM_DENEGACION §5, con el inciso
+                    del diagnóstico. Los cuatro datos destacados llevan el mismo
+                    tratamiento —`declBold`—: el diagnóstico con otro peso se
+                    leería como un dato de otra clase dentro de la misma frase. */}
                 <Text style={s.denegText}>
-                  Yo, <Text style={s.declBold}>{data?.paciente ?? 'Pte. no identificado'}</Text>, declaro que he sido
-                  informado(a) de manera clara y completa sobre el procedimiento:{' '}
-                  <Text style={s.declBold}>{data?.procedimiento ?? ''}</Text>, sus riesgos, beneficios
-                  y alternativas por el/la Dr(a).{' '}
+                  Yo, <Text style={s.declBold}>{data?.paciente ?? 'Pte. no identificado'}</Text>
+                  {dxDenegacion !== '' ? (
+                    <>, con diagnóstico de <Text style={s.declBold}>{dxDenegacion}</Text></>
+                  ) : null}
+                  , declaro que he sido informado de manera clara y completa sobre el
+                  procedimiento <Text style={s.declBold}>{data?.procedimiento ?? ''}</Text>,
+                  sus riesgos, beneficios y alternativas, por el{' '}
                   <Text style={s.declBold}>{nombre}</Text>.
                 </Text>
+                {/* Sin versalitas ni barra: las versalitas dentro del texto
+                    corrido no existen en el sistema y la barra no es un recurso
+                    declarado. El énfasis lo lleva el título del documento. */}
                 <Text style={s.denegText}>
                   No obstante, en pleno uso de mis facultades y de forma libre y voluntaria,
-                  manifiesto mi decisión de NO autorizar / REVOCAR la autorización
+                  manifiesto mi decisión de no autorizar o revocar la autorización
                   previamente otorgada para la realización del procedimiento descrito,
                   asumiendo las consecuencias que de ello puedan derivarse, las cuales me han
                   sido explicadas.

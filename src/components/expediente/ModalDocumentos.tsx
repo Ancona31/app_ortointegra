@@ -6,7 +6,7 @@ import { es } from 'date-fns/locale'
 import Link from 'next/link'
 import {
   Banknote, BedDouble, ClipboardList, Download, Eye, File, FileText,
-  FlaskConical, Loader2, PenLine, Pill, RefreshCw, ScanLine, ShieldCheck, Trash2,
+  FlaskConical, Loader2, PenLine, Pill, RefreshCw, ScanLine, ShieldCheck, ShieldOff, Trash2,
 } from 'lucide-react'
 import type { Documento } from '@/types'
 import ModalShell from '@/components/ui/ModalShell'
@@ -29,6 +29,10 @@ const TIPO_DOC_LABEL: Record<string, string> = {
   escrito_medico: 'Escrito Médico',
   solicitud_internamiento: 'Solicitud de Internamiento',
   consentimiento_informado: 'Consentimiento Informado',
+  // El acto contrario, y con etiqueta propia por eso mismo: sin ella la lista
+  // mostraría `denegacion_consentimiento` en crudo, y quien busque «¿este
+  // paciente autorizó?» tendría que abrir el documento para saber que no.
+  denegacion_consentimiento: 'Denegación o Revocación',
   nota_honorarios: 'Honorarios / Cotización',
 }
 
@@ -42,6 +46,7 @@ const TIPO_DOC_COLOR: Record<string, string> = {
   escrito_medico: 'bg-teal-100 text-teal-700',
   solicitud_internamiento: 'bg-rose-100 text-rose-700',
   consentimiento_informado: 'bg-indigo-100 text-indigo-700',
+  denegacion_consentimiento: 'bg-red-100 text-red-700',
   nota_honorarios: 'bg-orange-100 text-orange-700',
 }
 
@@ -54,6 +59,7 @@ function iconForTipo(tipo: string) {
     case 'solicitud_internamiento':  return <BedDouble size={16} className="text-rose-600" />
     case 'escrito_medico':           return <PenLine size={16} className="text-teal-600" />
     case 'consentimiento_informado': return <ShieldCheck size={16} className="text-indigo-600" />
+    case 'denegacion_consentimiento': return <ShieldOff size={16} className="text-red-600" />
     case 'nota_honorarios':          return <Banknote size={16} className="text-orange-600" />
     case 'informe_clinico':          return <FileText size={16} className="text-slate-600" />
     default:                          return <File size={16} className="text-slate-400" />

@@ -1883,4 +1883,23 @@ a:hover { color: var(--sp-primary-active); }
    entero. El contenedor conserva sus 44px de alto mínimo. */
 .sp-doc-consent-fotos { align-items: flex-start; }
 
+
+/* --- 24. DENEGACIÓN O REVOCACIÓN (GUIA_FORM_DENEGACION §1) --------------- */
+/* Va al final y DENTRO de @layer components, por lo mismo que la 22 y la 23.
+
+   Sección de una regla, y es lo que debe ser: la denegación comparte
+   formulario con el consentimiento, así que hereda su CSS entero. Lo único
+   propio es dónde vive el conmutador, y el conmutador mismo es el
+   `.sp-doc-segmented--tipo` de la 21 sin un solo cambio — el mismo control que
+   elige entre recibo y cotización, que es exactamente lo que promete la guía.
+   Nada que plegar necesita CSS: las siete secciones y las autorizaciones
+   dejan de montarse, no se ocultan. */
+
+/* La cabecera de «Datos de identificación» lleva icono + rótulo + segmentado.
+   Envuelve por la misma razón que `.sp-doc-honohead`, y no reusa esa clase
+   porque su nombre dice honorarios: por debajo de 600 el segmentado mide el
+   ancho entero y baja a una SEGUNDA LÍNEA DE LA MISMA CABECERA, no a una card
+   propia. El icono y el rótulo se quedan arriba, juntos. */
+.sp-doc-consent-head { flex-wrap: wrap; row-gap: var(--sp-2); padding-top: 9px; padding-bottom: 9px; }
+
 } /* fin @layer components */

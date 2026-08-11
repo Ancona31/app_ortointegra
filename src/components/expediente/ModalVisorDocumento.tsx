@@ -16,6 +16,8 @@ const TIPO_DOC_LABEL: Record<string, string> = {
   escrito_medico: 'Escrito Médico',
   solicitud_internamiento: 'Solicitud de Internamiento',
   consentimiento_informado: 'Consentimiento Informado',
+  // Sin esta línea el visor titula con `denegacion_consentimiento` en crudo.
+  denegacion_consentimiento: 'Denegación o Revocación',
   nota_honorarios: 'Nota de Honorarios',
 }
 const TIPO_DOC_COLOR: Record<string, string> = {
@@ -27,6 +29,7 @@ const TIPO_DOC_COLOR: Record<string, string> = {
   escrito_medico: 'bg-teal-100 text-teal-700',
   solicitud_internamiento: 'bg-rose-100 text-rose-700',
   consentimiento_informado: 'bg-indigo-100 text-indigo-700',
+  denegacion_consentimiento: 'bg-red-100 text-red-700',
   nota_honorarios: 'bg-orange-100 text-orange-700',
 }
 
@@ -321,8 +324,9 @@ export default function ModalVisorDocumento({ doc, onClose, pacienteEmail }: Pro
           </div>
         )}
 
-        {/* CONSENTIMIENTO INFORMADO */}
-        {doc.tipo === 'consentimiento_informado' && (
+        {/* CONSENTIMIENTO INFORMADO · DENEGACIÓN — mismos campos de
+            identificación; la denegación guarda dos de los tres. */}
+        {(doc.tipo === 'consentimiento_informado' || doc.tipo === 'denegacion_consentimiento') && (
           <div className="space-y-3">
             {doc.contenido?.procedimiento && (
               <div className="flex gap-2">

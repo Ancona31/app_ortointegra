@@ -36,11 +36,15 @@ type DocumentoConFolio = {
 
 type NombrePaciente = { nombre: string; apellidos: string }
 
-/** Cómo se lee cada `documentos.tipo` de los tres formatos que llevan folio. */
+/** Cómo se lee cada `documentos.tipo` de los formatos que llevan folio. */
 const ETIQUETA_TIPO: Record<string, string> = {
   receta: 'Receta médica',
   nota_honorarios: 'Honorarios / Cotización',
   consentimiento_informado: 'Consentimiento informado',
+  // Buscar `DEN-2026-0001` sin esta línea encuentra el documento y lo lee
+  // `denegacion_consentimiento`, que es el único sitio donde el buscador de
+  // folios enseña el valor de la columna en crudo.
+  denegacion_consentimiento: 'Denegación o revocación',
 }
 
 function nombreDePaciente(p: DocumentoConFolio['pacientes']): string {

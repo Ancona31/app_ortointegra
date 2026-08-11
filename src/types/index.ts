@@ -225,6 +225,12 @@ export type TipoDocumento =
   | 'escrito_medico'
   | 'nota_honorarios'
   | 'consentimiento_informado'
+  // Documento INDEPENDIENTE que se emite EN LUGAR del consentimiento, no como
+  // hoja suya: si el paciente deniega, no se imprimen las siete hojas que
+  // explican y otorgan lo que acaba de rechazar. Tipo propio y no
+  // discriminador dentro de `contenido` —al revés que Honorarios/Cotización—
+  // porque los dos actos son opuestos y confundirlos en una lista sí hace daño.
+  | 'denegacion_consentimiento'
   | 'resultado_laboratorio'
   | 'estudio_imagen'
   // Legacy (documentos existentes en DB antes del rename)

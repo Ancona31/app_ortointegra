@@ -28,6 +28,7 @@ type DocType =
   | 'solicitud_internamiento'
   | 'escrito_medico'
   | 'consentimiento_informado'
+  | 'denegacion_consentimiento'
   | 'nota_evolucion'
   | 'expediente_completo'
 
@@ -98,6 +99,17 @@ async function buildClientElement(
     case 'consentimiento_informado': {
       const { renderConsentimiento } = await import('@/lib/pdf/ConsentimientoInformadoPdf')
       return renderConsentimiento({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl, consultorio: props.consultorio })
+    }
+    case 'denegacion_consentimiento': {
+      // ⚠ PUENTE DECLARADO. La denegación es un formato v2, pero v2 entero
+      // sigue apagado —ninguno de sus formatos se usa en producción— y
+      // cablearlo es el paso posterior que describe la nota de arriba. Hasta
+      // entonces se emite con la hoja del renderer v1, que ya la tenía medida:
+      // era su hoja 4 opcional. Cuando v2 se cablee, este caso cambia de
+      // destino como los otros ocho, no antes. Ver `soloDenegacion` en
+      // ConsentimientoInformadoPdf.tsx.
+      const { renderDenegacion } = await import('@/lib/pdf/ConsentimientoInformadoPdf')
+      return renderDenegacion({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl, consultorio: props.consultorio })
     }
     case 'nota_evolucion': {
       const { renderNotaEvolucion } = await import('@/lib/pdf/NotaEvolucionPdf')

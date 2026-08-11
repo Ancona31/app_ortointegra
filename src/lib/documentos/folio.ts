@@ -6,8 +6,9 @@
  * No es una abstracción: es el sitio donde queda escrito que **el cliente y la
  * base tienen que estar de acuerdo sobre la forma del folio**. `FOLIO_CANONICO`
  * es, carácter por carácter, el mismo patrón que el CHECK
- * `documentos_folio_formato_check` de `20260807_folio_01_esquema_y_generador.sql`,
- * y los cuatro prefijos son los mismos cuatro del `CASE` de
+ * `documentos_folio_formato_check` de `20260811_folio_03_denegacion.sql` —que
+ * sustituye a folio_01 en los tres CHECK, ver su cabecera—, y los nueve
+ * prefijos son los mismos nueve del `CASE` de
  * `public.generar_folio()`. Si los dos se separan, el buscador deja de encontrar
  * folios que la base sí emite — y lo hace en silencio, porque una búsqueda que
  * no encuentra nada se parece mucho a un folio que no existe. La prueba de
@@ -20,17 +21,28 @@
  */
 
 /**
- * Los cuatro prefijos, por clase de folio.
+ * Los nueve prefijos, por clase de folio, en el orden del `CASE` del generador.
  *
- * La clave es la clase, no `documentos.tipo`: Honorarios y Cotización comparten
- * el mismo `tipo` en la tabla —`nota_honorarios`— y no comparten serie. Es la
- * misma distinción que hace el `CASE` del generador.
+ * La clave es la clase, no `documentos.tipo`, y los dos extremos de esa
+ * distinción están aquí:
+ *
+ *   · Honorarios y Cotización comparten el mismo `tipo` en la tabla
+ *     —`nota_honorarios`— y NO comparten serie: se separan por
+ *     `contenido->>'tipo_doc'`.
+ *   · La denegación va al revés: tipo propio —`denegacion_consentimiento`— y
+ *     serie propia, sin discriminador. Un consentimiento y una denegación son
+ *     actos opuestos, así que confundirlos en una lista sí hace daño.
  */
 export const PREFIJO_POR_CLASE = {
   rx: 'RX',
   noh: 'NOH',
   cot: 'COT',
   ci: 'CI',
+  lab: 'LAB',
+  img: 'IMG',
+  sup: 'SUP',
+  int: 'INT',
+  den: 'DEN',
 } as const
 
 export type ClaseFolio = keyof typeof PREFIJO_POR_CLASE
@@ -41,7 +53,7 @@ export type ClaseFolio = keyof typeof PREFIJO_POR_CLASE
  *
  * Gemelo exacto del CHECK de la columna. No lo cambies aquí sin cambiarlo allá.
  */
-export const FOLIO_CANONICO = /^(?:RX|NOH|COT|CI)-\d{4}-\d{4,}$/
+export const FOLIO_CANONICO = /^(?:RX|NOH|COT|CI|LAB|IMG|SUP|INT|DEN)-\d{4}-\d{4,}$/
 
 /**
  * Lo que se acepta de quien lo teclea desde un papel: la clase en cualquier
@@ -52,7 +64,7 @@ export const FOLIO_CANONICO = /^(?:RX|NOH|COT|CI)-\d{4}-\d{4,}$/
  * a propósito: por teléfono salen guiones largos, puntos y barras, y ninguno
  * significa nada distinto.
  */
-const DICTADO = /^(RX|NOH|COT|CI)[^0-9A-Z]*(\d{4})[^0-9A-Z]*(\d+)$/
+const DICTADO = /^(RX|NOH|COT|CI|LAB|IMG|SUP|INT|DEN)[^0-9A-Z]*(\d{4})[^0-9A-Z]*(\d+)$/
 
 /**
  * Devuelve el folio canónico, o `null` si lo que entra no es un folio.

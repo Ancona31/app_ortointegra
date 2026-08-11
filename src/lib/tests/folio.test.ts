@@ -18,7 +18,11 @@ import { normalizarFolio, FOLIO_CANONICO, PREFIJO_POR_CLASE } from '@/lib/docume
 
 describe('normalizarFolio', () => {
   it('deja intacto lo que ya está en forma canónica', () => {
-    for (const folio of ['RX-2026-0042', 'NOH-2026-0013', 'COT-2026-0005', 'CI-2026-0007']) {
+    for (const folio of [
+      'RX-2026-0042', 'NOH-2026-0013', 'COT-2026-0005', 'CI-2026-0007',
+      'LAB-2026-0001', 'IMG-2026-0002', 'SUP-2026-0003', 'INT-2026-0004',
+      'DEN-2026-0006',
+    ]) {
       expect(normalizarFolio(folio)).toBe(folio)
     }
   })
@@ -33,6 +37,8 @@ describe('normalizarFolio', () => {
     expect(normalizarFolio('ci.2026.7')).toBe('CI-2026-0007')
     expect(normalizarFolio('cot/2026/5')).toBe('COT-2026-0005')
     expect(normalizarFolio('RX20260042')).toBe('RX-2026-0042')
+    expect(normalizarFolio('den 2026 6')).toBe('DEN-2026-0006')
+    expect(normalizarFolio('  lab—2026—1 ')).toBe('LAB-2026-0001')
   })
 
   it('los ceros de relleno son indiferentes, y la serie 10 000 no se trunca', () => {
@@ -76,10 +82,13 @@ describe('normalizarFolio', () => {
     }
   })
 
-  it('los cuatro prefijos son los cuatro del generador, y solo esos', () => {
-    // Si aquí aparece un quinto, el `CASE` de `public.generar_folio()` y el
+  it('los nueve prefijos son los nueve del generador, y solo esos', () => {
+    // Si aquí aparece un décimo, el `CASE` de `public.generar_folio()` y el
     // CHECK de la columna tienen que crecer con él. Los tres a la vez o ninguno.
-    expect(Object.values(PREFIJO_POR_CLASE)).toEqual(['RX', 'NOH', 'COT', 'CI'])
+    // El orden es el del `CASE` de `20260811_folio_03_denegacion.sql`.
+    expect(Object.values(PREFIJO_POR_CLASE)).toEqual(
+      ['RX', 'NOH', 'COT', 'CI', 'LAB', 'IMG', 'SUP', 'INT', 'DEN'],
+    )
     for (const prefijo of Object.values(PREFIJO_POR_CLASE)) {
       expect(normalizarFolio(`${prefijo}-2026-1`)).toBe(`${prefijo}-2026-0001`)
     }

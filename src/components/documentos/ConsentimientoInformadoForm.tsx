@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type RefObject } from 'react'
-import { AlertTriangle, Check, Printer, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, Check, EyeOff, Printer, ShieldCheck, ShieldOff } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -19,7 +19,23 @@ import { hoyEnTZ, desplazarFecha } from '@/lib/dates'
 import { enfocarYAcercar } from '@/lib/scrollDoc'
 
 /**
- * Consentimiento informado — GUIA_FORM_CONSENTIMIENTO.md.
+ * Consentimiento informado — GUIA_FORM_CONSENTIMIENTO.md — y su contrario, la
+ * denegación o revocación — GUIA_FORM_DENEGACION.md —.
+ *
+ * ── DOS DOCUMENTOS EXCLUYENTES EN UN FORMULARIO ─────────────────────────────
+ * El conmutador de la cabecera elige cuál se emite, como el de recibo y
+ * cotización en Honorarios. Comparten los datos de identificación; al elegir
+ * denegación se pliegan las siete secciones clínicas y las dos autorizaciones,
+ * que no aplican, y lo escrito en ellas se conserva y se declara al pie.
+ *
+ * La denegación SUSTITUYE al consentimiento, no se le anexa: si el paciente
+ * deniega, no se imprimen las siete hojas que explican y otorgan lo que acaba
+ * de rechazar. Por eso son dos `documentos.tipo` distintos y dos series de
+ * folio —`CI-` y `DEN-`—, y por eso se retiró la casilla «Incluir hoja de
+ * Denegación» que las imprimía juntas: además de duplicar la vía de denegar,
+ * guardaba el rechazo como `consentimiento_informado` con folio `CI-`, así que
+ * quien buscara «¿este paciente autorizó?» veía un consentimiento donde hubo
+ * un rechazo.
  *
  * ── LO QUE ESTE PASE **NO** HACE ────────────────────────────────────────────
  * El flujo de firmado electrónico (GUIA_FORMULARIOS_05) es su propio paso: los
@@ -53,6 +69,9 @@ interface Props {
 }
 
 const FECHA_MIN = '1900-01-01'
+
+/** Cuál de los dos documentos excluyentes se está emitiendo. */
+type TipoDoc = 'consentimiento' | 'denegacion'
 
 const SECCIONES_DEFAULT = {
   preoperatorio: `Después de haberle realizado historia clínica y estudios diagnósticos pertinentes (análisis de laboratorio, estudios de imagen u otros según el caso), se ha establecido el diagnóstico descrito y, habiendo agotado otras alternativas de tratamiento, se le recomienda someterse al procedimiento indicado. Se le indicará el tiempo necesario de ayuno previo y las indicaciones preoperatorias correspondientes.`,
@@ -107,7 +126,6 @@ interface EstadoVacio {
   testigo2: string
   autorizaTransfusion: 'si' | 'no' | null
   autorizaFotos: boolean
-  imprimirDenegacion: boolean
   secciones: Secciones
 }
 
@@ -116,6 +134,10 @@ interface EstadoVacio {
  * llega solo no cuenta como escrito hasta que se edita. Aquí eso son cuatro
  * cosas —paciente, edad y diagnóstico de la ficha, y las cinco secciones que
  * nacen con texto por defecto—, y la fecha de hoy no entra por lo mismo.
+ *
+ * El tipo elegido tampoco entra, igual que en Honorarios: conmutar no es
+ * escribir, y si contara, cambiar a denegación encendería el aviso de «se
+ * perderá lo escrito» del selector de tipo del host con el formulario vacío.
  */
 function isFormEmpty(e: EstadoVacio): boolean {
   const pacienteIntacto = e.paciente.trim() === '' || e.paciente.trim() === e.pacienteInicial.trim()
@@ -125,7 +147,7 @@ function isFormEmpty(e: EstadoVacio): boolean {
   return pacienteIntacto && edadIntacta && dxIntacto && seccionesIntactas
     && e.lugar.trim() === '' && e.procedimiento.trim() === ''
     && e.familiar.trim() === '' && e.testigo1.trim() === '' && e.testigo2.trim() === ''
-    && e.autorizaTransfusion === null && !e.autorizaFotos && !e.imprimirDenegacion
+    && e.autorizaTransfusion === null && !e.autorizaFotos
 }
 
 export default function ConsentimientoInformadoForm({
@@ -181,7 +203,7 @@ export default function ConsentimientoInformadoForm({
 
   const [secciones, setSecciones] = useState<Secciones>({ ...SECCIONES_DEFAULT })
 
-  const [imprimirDenegacion, setImprimirDenegacion] = useState(false)
+  const [tipoDoc, setTipoDoc] = useState<TipoDoc>('consentimiento')
   const [imprimiendo, setImprimiendo] = useState(false)
   const [errorGuardado, setErrorGuardado] = useState('')
   const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean } | null>(null)
@@ -199,10 +221,15 @@ export default function ConsentimientoInformadoForm({
   const procedimientoRef = useRef<HTMLInputElement>(null)
   const familiarRef = useRef<HTMLInputElement>(null)
 
+  const esDenegacion = tipoDoc === 'denegacion'
+  /** El `documentos.tipo` emitido. De él sale el prefijo del folio: CI o DEN. */
+  const tipoTabla = esDenegacion ? 'denegacion_consentimiento' : 'consentimiento_informado'
+  const nombreCorto = esDenegacion ? 'denegación' : 'consentimiento'
+
   const vacio = isFormEmpty({
     paciente, pacienteInicial, edad, edadInicial, diagnostico, diagnosticoInicial,
     lugar, procedimiento, familiar, testigo1, testigo2,
-    autorizaTransfusion, autorizaFotos, imprimirDenegacion, secciones,
+    autorizaTransfusion, autorizaFotos, secciones,
   })
   useEffect(() => { onVacioChange?.(vacio) }, [vacio, onVacioChange])
 
@@ -224,8 +251,14 @@ export default function ConsentimientoInformadoForm({
     // El búnker no tiene red ni sesión de Supabase: el sistema no se monta.
     desactivado: !!offlineMode,
     onPanelChange: onPanelPlantillasChange,
+    // El tipo elegido NO viaja en la plantilla, al revés que en Honorarios: allí
+    // una plantilla de cotización lo es entera —vigencia y orígenes incluidos—,
+    // y aquí las dos comparten lo único plantillable, que son lugar,
+    // procedimiento y las secciones. Una «plantilla de denegación» sería la
+    // misma plantilla con las secciones sin usar, así que el tipo se queda como
+    // lo que es: la decisión de qué documento estoy emitiendo ahora.
     leer: () => ({
-      _v: 1, lugar, procedimiento, imprimirDenegacion,
+      _v: 1, lugar, procedimiento,
       secciones: { ...secciones },
     }),
     aplicar: (c: ContenidoPlantilla) => {
@@ -236,7 +269,9 @@ export default function ConsentimientoInformadoForm({
       // inicial.
       setLugar(typeof c.lugar === 'string' ? c.lugar : '')
       setProcedimiento(typeof c.procedimiento === 'string' ? c.procedimiento : '')
-      setImprimirDenegacion(c.imprimirDenegacion === true)
+      // Las plantillas guardadas antes de este pase traen `imprimirDenegacion`.
+      // La clave se ignora y no rompe nada: la casilla que la escribía ya no
+      // existe, y la denegación es ahora un documento propio.
       setSecciones(leerSecciones(c.secciones))
     },
   })
@@ -257,18 +292,48 @@ export default function ConsentimientoInformadoForm({
   // formulario. Ninguno de los cinco campos retirados en este pase era uno de
   // ellos, así que la validación legal sale intacta: lo único que cambia es el
   // nombre del fusionado en el banner (§4 y §8).
+  //
+  // La denegación exige SEIS de los nueve. Suelta las dos secciones clínicas
+  // obligatorias, que ni se muestran, y el diagnóstico. Ninguno de los tres se
+  // suelta por no salir impreso —el diagnóstico SÍ sale, dentro de la
+  // declaración (GUIA_FORM_DENEGACION §5)— sino porque exigirlos bloquearía la
+  // emisión de un rechazo por no haber redactado antes lo que el paciente
+  // acaba de rechazar. Cuando falta, la declaración se compone sin su inciso.
+  // El familiar SÍ sigue exigido: firma el documento en las dos variantes (§8).
   const faltantes: { clave: string; nombre: string }[] = []
   if (!fecha) faltantes.push({ clave: 'fecha', nombre: 'Fecha' })
   if (!lugar.trim()) faltantes.push({ clave: 'lugar', nombre: 'Lugar' })
   if (!paciente.trim()) faltantes.push({ clave: 'paciente', nombre: 'Paciente' })
   if (!edad.trim()) faltantes.push({ clave: 'edad', nombre: 'Edad del paciente' })
-  if (!diagnostico.trim()) faltantes.push({ clave: 'diagnostico', nombre: 'Diagnóstico' })
+  if (!esDenegacion && !diagnostico.trim()) faltantes.push({ clave: 'diagnostico', nombre: 'Diagnóstico' })
   if (!procedimiento.trim()) faltantes.push({ clave: 'procedimiento', nombre: 'Procedimiento' })
   if (!familiar.trim()) {
     faltantes.push({ clave: 'familiar', nombre: 'Familiar responsable o representante legal' })
   }
-  for (const k of SECCIONES_OBLIGATORIAS) {
-    if (!secciones[k].trim()) faltantes.push({ clave: `seccion-${k}`, nombre: LABELS[k].titulo.slice(4) })
+  if (!esDenegacion) {
+    for (const k of SECCIONES_OBLIGATORIAS) {
+      if (!secciones[k].trim()) faltantes.push({ clave: `seccion-${k}`, nombre: LABELS[k].titulo.slice(4) })
+    }
+  }
+
+  // ── Franja de lo conservado ─────────────────────────────────────
+  // Conmutar no borra nada: lo que la denegación no lleva deja de mostrarse y
+  // de imprimirse, pero sigue escrito y se declara aquí con su valor. Solo
+  // entran valores ESCRITOS —un prellenado no es algo que el médico
+  // escribiera—, y por eso las secciones cuentan las EDITADAS y no las siete.
+  const conservado: string[] = []
+  if (esDenegacion) {
+    const editadas = SECCIONES_ORDEN.filter(k => secciones[k] !== SECCIONES_DEFAULT[k]).length
+    if (editadas > 0) {
+      conservado.push(editadas === 1 ? '1 sección clínica editada' : `${editadas} secciones clínicas editadas`)
+    }
+    if (autorizaTransfusion !== null) {
+      conservado.push(`transfusión (${autorizaTransfusion === 'si' ? 'Sí' : 'No'})`)
+    }
+    if (autorizaFotos) conservado.push('uso de fotografías (autorizado)')
+    const testigos = [testigo1.trim(), testigo2.trim()].filter(t => t !== '')
+    if (testigos.length > 0) conservado.push(`testigos (${testigos.join(', ')})`)
+    // El diagnóstico NO entra aquí: sale impreso, dentro de la declaración.
   }
 
   function textoFaltantes(): string {
@@ -303,19 +368,27 @@ export default function ConsentimientoInformadoForm({
     flushSync(() => { setErrorGuardado(''); setImprimiendo(true) })
 
     // 1. Feedback instantáneo
-    toast.info('Generando consentimiento informado...')
+    toast.info(esDenegacion ? 'Generando denegación…' : 'Generando consentimiento informado...')
 
     // 2. Identidad — UUID v4 puro como clientId
     const clientId = crypto.randomUUID()
 
-    // 3. Contenido persistido — NO incluye imprimirDenegacion (es una
-    //    opción de impresión, no parte del consentimiento legal)
-    const contenido = {
-      paciente, lugar, fecha, edad, procedimiento, diagnostico,
-      familiar, testigo1, testigo2, autorizaTransfusion, autorizaFotos,
-      secciones,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    }
+    // 3. Contenido persistido — el documento EMITIDO, no el estado del
+    //    formulario. Lo que la denegación no lleva se conserva en pantalla y se
+    //    declara en la franja, pero no viaja a la fila: allí significaría que
+    //    este papel lo lleva, y no lo lleva.
+    //    El FOLIO no está aquí: lo asigna la base en el trigger BEFORE INSERT,
+    //    con prefijo CI o DEN según este mismo `tipo` de la tabla.
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const contenido: Record<string, unknown> = esDenegacion
+      // El diagnóstico entra: no está en el riel, pero SÍ en la declaración
+      // (§5), así que es parte del documento emitido y se guarda como tal.
+      ? { paciente, lugar, fecha, edad, procedimiento, diagnostico, familiar, timezone }
+      : {
+        paciente, lugar, fecha, edad, procedimiento, diagnostico,
+        familiar, testigo1, testigo2, autorizaTransfusion, autorizaFotos,
+        secciones, timezone,
+      }
 
     // Flags de tracking para diferenciar errores
     let pdfGenerated = false
@@ -353,17 +426,19 @@ export default function ConsentimientoInformadoForm({
       } : undefined
 
       const { blob, storagePath } = await generarPdf({
-        tipo: 'consentimiento_informado',
+        tipo: tipoTabla,
         pacienteId,
         medico: medicoData,
-        data: {
-          paciente, lugar, fecha: fechaFmt, edad,
-          procedimiento, diagnostico, familiar,
-          testigo1, testigo2, autorizaTransfusion, autorizaFotos,
-          secciones, imprimirDenegacion,
-        },
+        data: esDenegacion
+          ? { paciente, lugar, fecha: fechaFmt, edad, procedimiento, diagnostico, familiar }
+          : {
+            paciente, lugar, fecha: fechaFmt, edad,
+            procedimiento, diagnostico, familiar,
+            testigo1, testigo2, autorizaTransfusion, autorizaFotos,
+            secciones,
+          },
         logoUrl,
-        filename: generateDocFileName(paciente, 'Consentimiento_Informado'),
+        filename: generateDocFileName(paciente, esDenegacion ? 'Denegacion_Consentimiento' : 'Consentimiento_Informado'),
         consultorio: consultorioData,
         // El búnker offline queda intacto: sigue entregando el PDF él mismo y
         // no monta el modal — onOfflineSave desmonta el formulario al guardar.
@@ -380,13 +455,15 @@ export default function ConsentimientoInformadoForm({
         await addDocument({
           id: crypto.randomUUID(),
           temp_patient_id: pacienteId ?? 'unknown',
-          tipo: 'consentimiento_informado',
+          tipo: tipoTabla,
           contenido,
           created_at: new Date().toISOString(),
           medico_id: getOfflineIdentity()?.userId ?? 'anonymous',
           _syncStatus: 'pending',
         })
-        toast.success('Consentimiento informado guardado en bunker offline')
+        toast.success(esDenegacion
+          ? 'Denegación guardada en bunker offline'
+          : 'Consentimiento informado guardado en bunker offline')
         onOfflineSave?.()
       } else {
         const supabase = createClient()
@@ -394,7 +471,7 @@ export default function ConsentimientoInformadoForm({
         if (!user) throw new Error('No autenticado')
 
         const insertPayload: Record<string, unknown> = {
-          tipo: 'consentimiento_informado',
+          tipo: tipoTabla,
           contenido,
           client_id: clientId,
           pdf_url: storagePath,
@@ -409,15 +486,22 @@ export default function ConsentimientoInformadoForm({
         // mobileShare captura el error de subida y no lo relanza. El documento
         // no queda recuperable desde la lista y el modal tiene que decirlo.
         guardado = storagePath !== null
-        toast.success('Consentimiento guardado')
+        toast.success(esDenegacion ? 'Denegación guardada' : 'Consentimiento guardado')
       }
     } catch (err) {
       if (!pdfGenerated) {
         toast.error('No se pudo generar el PDF. Intenta de nuevo.')
         setErrorGuardado('No se pudo generar el PDF. Intenta de nuevo.')
       } else {
-        toast.error('Consentimiento generado pero no se pudo guardar. Revisa errores de sincronización.')
-        setErrorGuardado('Error al guardar el consentimiento.')
+        // Enteras y no compuestas por piezas: el género del artículo no se
+        // resuelve concatenando `nombreCorto`, que es masculino en uno de los
+        // dos. Mismo criterio que la franja de Honorarios.
+        toast.error(esDenegacion
+          ? 'La denegación se generó pero no se pudo guardar. Revisa errores de sincronización.'
+          : 'El consentimiento se generó pero no se pudo guardar. Revisa errores de sincronización.')
+        setErrorGuardado(esDenegacion
+          ? 'Error al guardar la denegación.'
+          : 'Error al guardar el consentimiento.')
       }
       // eslint-disable-next-line no-console
       console.error('[ConsentimientoInformadoForm] imprimir falló:', err)
@@ -442,9 +526,25 @@ export default function ConsentimientoInformadoForm({
       {plantillas.selector}
 
       <section className="sp-card sp-doc-card">
-        <div className="sp-doc-cardhead">
-          <div className="sp-icobox sp-icobox--sm"><ShieldCheck /></div>
+        {/* El segmentado vive en la cabecera de la primera card, como en
+            Honorarios: una card entera para dos botones sería una card de más,
+            y el orden de las cards no cambia al conmutar. */}
+        <div className="sp-doc-cardhead sp-doc-consent-head">
+          {/* El escudo sigue al tipo: un escudo con paloma junto al rótulo
+              «Denegación» afirmaría lo contrario del documento. */}
+          <div className="sp-icobox sp-icobox--sm">{esDenegacion ? <ShieldOff /> : <ShieldCheck />}</div>
           <h2 className="sp-label">Datos de identificación</h2>
+          <div className="sp-doc-segmented sp-doc-segmented--tipo" role="group" aria-label="Tipo de documento">
+            {([
+              { key: 'consentimiento', label: 'Consentimiento' },
+              { key: 'denegacion', label: 'Denegación' },
+            ] as { key: TipoDoc; label: string }[]).map(({ key, label }) => (
+              <button key={key} type="button" aria-pressed={tipoDoc === key}
+                onClick={() => setTipoDoc(key)} className="sp-doc-segmented__opt">
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="sp-doc-cardbody">
           <div className="sp-doc-grid sp-doc-consent-id" data-cols="3">
@@ -498,9 +598,15 @@ export default function ConsentimientoInformadoForm({
               {edadInicial && <p className="sp-hint">De la ficha · editable</p>}
             </div>
             <div className="sp-doc-field">
+              {/* El asterisco sigue a la validación: la denegación no exige
+                  diagnóstico porque su hoja no lo lleva. Un campo marcado como
+                  obligatorio que no bloquea nada enseña una regla falsa. */}
               <label htmlFor="consentimiento-diagnostico" className="sp-label-field">
-                Diagnóstico <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
-                <span className="sr-only">obligatorio</span>
+                Diagnóstico
+                {!esDenegacion && <>
+                  {' '}<span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
+                  <span className="sr-only">obligatorio</span>
+                </>}
               </label>
               <input ref={diagnosticoRef} id="consentimiento-diagnostico" type="text" value={diagnostico}
                 onChange={e => setDiagnostico(e.target.value)} placeholder="Diagnóstico principal"
@@ -546,7 +652,9 @@ export default function ConsentimientoInformadoForm({
             </div>
 
             {/* Fila 4 — bajo divisor: no son datos de identificación, son
-                decisiones del paciente (§2). */}
+                decisiones del paciente (§2). La denegación no las lleva: quien
+                rechaza el procedimiento no autoriza nada dentro de él. */}
+            {!esDenegacion && (
             <div className="sp-doc-consent-auth">
               <div className="sp-doc-field">
                 <span className="sp-label-field" id="consentimiento-transfusion">
@@ -577,6 +685,7 @@ export default function ConsentimientoInformadoForm({
                 </label>
               </div>
             </div>
+            )}
 
           </div>
         </div>
@@ -584,8 +693,11 @@ export default function ConsentimientoInformadoForm({
 
       {/* Las siete nacen PLEGADAS (§3): abiertas, el formulario mide ≈2.400px
           antes de escribir nada. El badge de la cabecera es lo que hace que
-          plegar resuma en vez de esconder. */}
-      {SECCIONES_ORDEN.map(key => (
+          plegar resuma en vez de esconder.
+          En denegación no se muestran: son las hojas que explican y otorgan
+          justo lo que el paciente rechaza. Lo escrito en ellas sigue en el
+          estado —conmutar no borra— y se declara en la franja de abajo. */}
+      {!esDenegacion && SECCIONES_ORDEN.map(key => (
         <SeccionPlegable
           key={key}
           id={`consentimiento-${key}`}
@@ -600,20 +712,18 @@ export default function ConsentimientoInformadoForm({
         </SeccionPlegable>
       ))}
 
-      {/* Hoja 4 opcional. Es una opción de IMPRESIÓN, no parte del
-          consentimiento legal: por eso no entra en `contenido`. */}
-      <section className="sp-card sp-doc-card">
-        <div className="sp-doc-cardbody">
-          <label className="sp-check">
-            <input id="consentimiento-denegacion" type="checkbox" className="sr-only"
-              checked={imprimirDenegacion} onChange={e => setImprimirDenegacion(e.target.checked)} />
-            <span className="sp-check__box"><Check aria-hidden="true" /></span>
-            <span className="sp-check__label">
-              Incluir hoja de Denegación o Revocación del consentimiento
-            </span>
-          </label>
-        </div>
-      </section>
+      {/* Franja de lo conservado. Conmutar no borra nada: lo que la denegación
+          no lleva deja de verse y de imprimirse, pero sigue escrito y se
+          declara aquí con su valor, para que volver al consentimiento no sea
+          un acto de fe. */}
+      {conservado.length > 0 && (
+        <p className="sp-banner sp-banner--info">
+          <EyeOff size={17} />
+          <span>
+            Se conserva escrito, pero no sale en la denegación: {conservado.join(' · ')}.
+          </span>
+        </p>
+      )}
 
       {errorGuardado && <p className="sp-banner sp-banner--danger">{errorGuardado}</p>}
 
@@ -654,7 +764,7 @@ export default function ConsentimientoInformadoForm({
             : perfilPendiente ? <><span className="sp-spinner" /> Cargando tu perfil…</>
             : <>
                 <Printer size={17} />
-                <span className="sp-doc-long">Imprimir consentimiento</span>
+                <span className="sp-doc-long">Imprimir {nombreCorto}</span>
                 <span className="sp-doc-short">Imprimir</span>
               </>}
         </button>
@@ -669,7 +779,7 @@ export default function ConsentimientoInformadoForm({
         open={docGenerado !== null}
         onClose={() => setDocGenerado(null)}
         blob={docGenerado?.blob ?? null}
-        titulo="Consentimiento generado"
+        titulo={esDenegacion ? 'Denegación generada' : 'Consentimiento generado'}
         guardadoEnExpediente={docGenerado?.guardado ?? false}
       />
     </div>
