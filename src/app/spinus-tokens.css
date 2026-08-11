@@ -1987,8 +1987,12 @@ a:hover { color: var(--sp-primary-active); }
    que se ve al firmar tiene que ser lo que sale en el papel, en los dos temas.
    Con el token, en modo oscuro se firmaría claro sobre oscuro y se imprimiría
    claro sobre blanco. */
+/* `flex: 0 0 auto` y no el encogimiento por defecto: el lienzo es un elemento
+   flexible dentro de una columna flexible, así que en una pantalla baja
+   —teléfono en horizontal— se comprimiría por debajo de sus 240 px antes de que
+   el cuerpo decidiera desplazarse. El área de firma no encoge: se desplaza. */
 .sp-firma-lienzo {
-  position: relative; height: 240px;
+  position: relative; flex: 0 0 auto; height: 240px;
   background: #fbfcfe;
   border: var(--sp-bw-hair) solid var(--sp-line-input);
   border-radius: var(--sp-r-input);
@@ -1996,11 +2000,15 @@ a:hover { color: var(--sp-primary-active); }
 }
 @media (min-width: 380px) { .sp-firma-lienzo { height: 280px; } }
 
-/* `touch-action: none` es lo que impide que el gesto de firmar haga scroll de
-   la página en lugar de dibujar. */
+/* ⚠ AQUÍ NO HAY `touch-action`, Y ES A PROPÓSITO. Es lo que impide que el gesto
+   de firmar se lo lleve el desplazamiento de la página, así que tiene que
+   ganar SIEMPRE — y desde aquí no puede: `globals.css` declara
+   `* { touch-action: manipulation }` fuera de toda `@layer`, y lo no encapado
+   gana a todo lo que viva dentro de `@layer components`, sin que la
+   especificidad cuente. Vive en línea, sobre el propio <canvas>. */
 .sp-firma-canvas {
   display: block; width: 100%; height: 100%;
-  touch-action: none; cursor: crosshair;
+  cursor: crosshair;
 }
 .sp-firma-placeholder {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;

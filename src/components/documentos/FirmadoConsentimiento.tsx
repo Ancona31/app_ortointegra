@@ -398,6 +398,24 @@ export default function FirmadoConsentimiento({
 /*  El lienzo                                                          */
 /* ------------------------------------------------------------------ */
 
+/** Un punto YA en coordenadas del mapa de bits, nunca de pantalla. */
+interface Punto { x: number; y: number }
+
+/**
+ * De coordenadas de ventana a coordenadas del mapa de bits: las del puntero
+ * multiplicadas por `1024 ÷ ancho_css` (§5.5.2).
+ *
+ * Recibe el rectángulo en vez de leerlo: quien la llama procesa varias muestras
+ * de un mismo evento y `getBoundingClientRect` fuerza recálculo de disposición
+ * en cada llamada.
+ */
+function aBitmap(c: HTMLCanvasElement, caja: DOMRect, clientX: number, clientY: number): Punto {
+  return {
+    x: (clientX - caja.left) * (c.width / caja.width),
+    y: (clientY - caja.top) * (c.height / caja.height),
+  }
+}
+
 interface LienzoProps {
   lienzoRef: React.RefObject<HTMLCanvasElement | null>
   etiqueta: string
@@ -417,7 +435,16 @@ interface LienzoProps {
 function LienzoFirma({ lienzoRef, etiqueta, apagado, hayTinta, limpiarSenal, onTinta }: LienzoProps) {
   const [avisoGirar, setAvisoGirar] = useState(false)
   const dibujando = useRef(false)
-  const ultimo = useRef<{ x: number; y: number } | null>(null)
+  /**
+   * Los DOS puntos que sostienen la continuidad del trazo: el último del
+   * puntero y el último punto MEDIO. Ver `trazar`.
+   */
+  const ultimo = useRef<Punto | null>(null)
+  const medio = useRef<Punto | null>(null)
+  const observador = useRef<ResizeObserver | null>(null)
+  /** Espejo de `hayTinta`: el observador no ve el estado de React. */
+  const hayTintaRef = useRef(hayTinta)
+  useEffect(() => { hayTintaRef.current = hayTinta }, [hayTinta])
 
   /**
    * Fija el mapa de bits a 1024 px de ancho y reajusta el contexto, que se
@@ -439,7 +466,38 @@ function LienzoFirma({ lienzoRef, etiqueta, apagado, hayTinta, limpiarSenal, onT
     ctx.strokeStyle = TINTA
   }, [lienzoRef])
 
-  useEffect(() => { preparar() }, [preparar])
+  /**
+   * ⚠ EL DIMENSIONADO VA EN UN `ref` DE FUNCIÓN Y EN UN `ResizeObserver`, NO EN
+   * UN EFECTO DE MONTAJE. NO LO DEVUELVAS A UN `useEffect`.
+   *
+   * Un `<canvas>` sin atributos `width`/`height` nace con un mapa de bits de
+   * 300×150 mientras el CSS lo estira a su caja. Si el dimensionado no llega a
+   * ejecutarse —o se ejecuta cuando el elemento todavía no tiene caja, y
+   * entonces no vuelve a intentarlo nunca—, el factor de escala queda en
+   * 300 ÷ ancho_css y **la tinta aterriza a un tercio de donde está el dedo**.
+   * Es un fallo silencioso: no hay error, solo un trazo que no sigue al cursor.
+   *
+   * El observador cierra esa clase entera de fallos: se dispara al empezar a
+   * observar —así que prepara en cuanto el nodo TIENE caja, no cuando React
+   * cree que la tiene— y otra vez cada vez que la caja cambia. De paso sustituye
+   * a los oyentes de `resize` y `orientationchange`, que solo cubrían el cambio
+   * de tamaño del viewport y no el del propio elemento.
+   *
+   * `preparar` es estable —depende solo de un objeto ref—, y eso importa: si
+   * este callback cambiara en cada render, React lo llamaría con `null` y con el
+   * nodo continuamente, y cada vuelta borraría el lienzo A MEDIA FIRMA.
+   */
+  const montarLienzo = useCallback((nodo: HTMLCanvasElement | null): void => {
+    lienzoRef.current = nodo
+    observador.current?.disconnect()
+    observador.current = null
+    if (nodo === null) return
+    // Asignar `width` no cambia la caja CSS del elemento, así que preparar
+    // dentro del observador no puede realimentarlo.
+    const ro = new ResizeObserver(() => { if (!hayTintaRef.current) preparar() })
+    ro.observe(nodo)
+    observador.current = ro
+  }, [lienzoRef, preparar])
 
   // Al limpiar: `width` se reasigna, que es la forma de vaciar un canvas sin
   // dejar rastro en el alfa —y `clearRect` bastaría, pero `preparar` ya deja el
@@ -463,42 +521,45 @@ function LienzoFirma({ lienzoRef, etiqueta, apagado, hayTinta, limpiarSenal, onT
   }, [])
 
   /**
-   * ⚠ El área SOLO se rehace mientras esté VACÍA. Con tinta dentro, girar no
-   * rehace nada: se conserva el mapa de bits y su proporción. Es consecuencia
-   * directa de guardar imagen y no puntos —sin los puntos no hay nada que
-   * volver a dibujar en una caja de otra proporción—, así que rehacer con tinta
-   * dentro solo podría deformar la firma o perderla.
+   * Un segmento, y SOLO ese segmento.
+   *
+   * ⚠ EL `beginPath()` NO SOBRA. Sin él, cada `stroke()` vuelve a rasterizar
+   * TODO lo acumulado desde que empezó el gesto, así que el trabajo crece con el
+   * cuadrado del número de puntos y la firma se frena dentro del propio trazo.
+   * Lo sufre más el ratón que el dedo, porque muestrea mucho más.
+   *
+   * ── POR QUÉ NO SE VEN LAS UNIONES ──────────────────────────────────────────
+   * Cada segmento va del punto MEDIO anterior al medio nuevo, con el punto real
+   * como control de la cuadrática. Eso hace la tangente continua en las uniones:
+   * al llegar al medio de `anterior`→`p` la tangente lleva la dirección
+   * `anterior`→`p`, y el segmento siguiente arranca en ese mismo medio con
+   * `p` de control, o sea con esa misma dirección. Sin los medios —uniendo punto
+   * con punto— la tangente daría un salto en cada muestra y se verían los
+   * vértices.
    */
-  useEffect(() => {
-    if (hayTinta) return
-    const alRedimensionar = () => preparar()
-    window.addEventListener('resize', alRedimensionar)
-    window.addEventListener('orientationchange', alRedimensionar)
-    return () => {
-      window.removeEventListener('resize', alRedimensionar)
-      window.removeEventListener('orientationchange', alRedimensionar)
-    }
-  }, [hayTinta, preparar])
-
-  /** Coordenadas del puntero multiplicadas por `1024 ÷ ancho_css` (§5.5.2). */
-  function posicion(e: React.PointerEvent<HTMLCanvasElement>): { x: number; y: number } {
-    const c = lienzoRef.current
-    if (!c) return { x: 0, y: 0 }
-    const caja = c.getBoundingClientRect()
-    return {
-      x: (e.clientX - caja.left) * (c.width / caja.width),
-      y: (e.clientY - caja.top) * (c.height / caja.height),
-    }
+  function trazar(ctx: CanvasRenderingContext2D, p: Punto): void {
+    const anterior = ultimo.current
+    const medioAnterior = medio.current
+    if (!anterior || !medioAnterior) return
+    const nuevoMedio = { x: (anterior.x + p.x) / 2, y: (anterior.y + p.y) / 2 }
+    ctx.beginPath()
+    ctx.moveTo(medioAnterior.x, medioAnterior.y)
+    ctx.quadraticCurveTo(anterior.x, anterior.y, nuevoMedio.x, nuevoMedio.y)
+    ctx.stroke()
+    ultimo.current = p
+    medio.current = nuevoMedio
   }
 
   function iniciar(e: React.PointerEvent<HTMLCanvasElement>): void {
     if (apagado) return
-    const ctx = lienzoRef.current?.getContext('2d')
-    if (!ctx) return
+    const c = lienzoRef.current
+    const ctx = c?.getContext('2d')
+    if (!c || !ctx) return
     e.currentTarget.setPointerCapture(e.pointerId)
-    const p = posicion(e)
+    const p = aBitmap(c, c.getBoundingClientRect(), e.clientX, e.clientY)
     dibujando.current = true
     ultimo.current = p
+    medio.current = p
     // Un toque sin arrastre también deja tinta: sin esto, un punto sobre la i
     // no se dibujaría.
     ctx.beginPath()
@@ -509,19 +570,41 @@ function LienzoFirma({ lienzoRef, etiqueta, apagado, hayTinta, limpiarSenal, onT
   }
 
   function seguir(e: React.PointerEvent<HTMLCanvasElement>): void {
-    if (!dibujando.current || !ultimo.current) return
-    const ctx = lienzoRef.current?.getContext('2d')
-    if (!ctx) return
-    const p = posicion(e)
-    const medio = { x: (ultimo.current.x + p.x) / 2, y: (ultimo.current.y + p.y) / 2 }
-    ctx.quadraticCurveTo(ultimo.current.x, ultimo.current.y, medio.x, medio.y)
-    ctx.stroke()
-    ultimo.current = p
+    if (!dibujando.current) return
+    const c = lienzoRef.current
+    const ctx = c?.getContext('2d')
+    if (!c || !ctx) return
+    // UNA sola lectura del rectángulo por evento, no una por muestra:
+    // `getBoundingClientRect` fuerza recálculo de disposición, y abajo pueden
+    // salir decenas de puntos de un mismo evento.
+    const caja = c.getBoundingClientRect()
+    // ⚠ LOS EVENTOS FUSIONADOS SON LA FIRMA DE VERDAD. El navegador entrega un
+    // `pointermove` por cuadro, pero el digitalizador muestrea mucho más rápido
+    // y guarda dentro las muestras intermedias. Leer solo el evento es tirarlas:
+    // quedan rectas entre cuadro y cuadro en vez de una curva.
+    const nativo = e.nativeEvent
+    const fusionados = typeof nativo.getCoalescedEvents === 'function'
+      ? nativo.getCoalescedEvents()
+      : []
+    const muestras = fusionados.length > 0 ? fusionados : [nativo]
+    for (const m of muestras) trazar(ctx, aBitmap(c, caja, m.clientX, m.clientY))
   }
 
   function terminar(): void {
+    if (dibujando.current) {
+      // La cola: del último medio al último punto real. Sin esto la firma
+      // termina media muestra antes de donde se levantó el dedo.
+      const ctx = lienzoRef.current?.getContext('2d')
+      if (ctx && ultimo.current && medio.current) {
+        ctx.beginPath()
+        ctx.moveTo(medio.current.x, medio.current.y)
+        ctx.lineTo(ultimo.current.x, ultimo.current.y)
+        ctx.stroke()
+      }
+    }
     dibujando.current = false
     ultimo.current = null
+    medio.current = null
   }
 
   return (
@@ -532,7 +615,15 @@ function LienzoFirma({ lienzoRef, etiqueta, apagado, hayTinta, limpiarSenal, onT
         </p>
       )}
       <div className="sp-firma-lienzo" style={apagado ? { opacity: 0.45 } : undefined}>
-        <canvas ref={lienzoRef} className="sp-firma-canvas"
+        {/* ⚠ `touchAction` VA EN LÍNEA Y NO EN EL CSS, Y NO ES DESCUIDO.
+            `globals.css` declara `* { touch-action: manipulation }` FUERA de
+            toda `@layer`, y lo no encapado gana a cualquier regla dentro de
+            `@layer components` por mucha especificidad que tenga. Ahí vivía
+            `.sp-firma-canvas { touch-action: none }`, que por eso no hacía
+            nada: en móvil el arrastre se lo llevaba el desplazamiento de la
+            página y la firma se cortaba a la mitad. En línea gana siempre. */}
+        <canvas ref={montarLienzo} className="sp-firma-canvas"
+          style={{ touchAction: 'none' }}
           onPointerDown={iniciar} onPointerMove={seguir}
           onPointerUp={terminar} onPointerCancel={terminar} />
         {!hayTinta && !apagado && (
