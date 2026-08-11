@@ -105,7 +105,7 @@ firmó, así que no hay identificación que capturar.
 | Línea de firma | 1 px dashed `--sp-line-dash`, a 34 px del borde inferior, con 20 px de margen lateral | — |
 | Rol bajo la línea | `--sp-fs-legal` 11 / `--sp-fw-bold` / `--sp-ls-label-w` / `--sp-ink-300`, mayúsculas | — |
 | Placeholder | `--sp-fs-body` 14.5 `--sp-ink-200`, centrado | — |
-| Trazo | `--sp-ink-900`, 3 px, `stroke-linecap: round` | — |
+| Trazo | `--sp-ink-900`, `stroke-linecap: round`. **El grosor se declara en píxeles del mapa de bits, no de pantalla: §5.5** | — |
 
 El lienzo ocupa el ancho completo del contenedor en los cuatro anchos: cuanto más ancho,
 más cómodo firmar.
@@ -144,6 +144,130 @@ Presente en familiar, testigo 1 y testigo 2. Ausente en el paciente, y ausente e
 familiar cuando el paciente marcó «no puede firmar».
 
 Nunca a la altura del primario: es una salida legítima, pero no es lo que se espera.
+
+### 5.5 · Cómo se captura y qué se guarda
+
+**El trazo se guarda como IMAGEN, no como lista de puntos.** La migración
+`20260813_firmas_documento.sql` ya lo impone:
+`trazo ~ '^data:image/(png|jpeg);base64,' AND length(trazo) BETWEEN 100 AND 300000`.
+
+Dos razones, y ninguna es de comodidad:
+
+- **La firma del médico ya es una imagen** —un archivo del bucket `firmas-medicos`— y es la
+  que lleva peso legal en todo lo que se emite hoy. Con puntos, el mismo papel llevaría dos
+  tipos de firma con dos tratamientos distintos, sin ganar nada.
+- **Lo que se coteja es la FORMA del trazo** contra la de la identificación anexa, y una
+  imagen a resolución suficiente la muestra igual de bien. Los puntos solo aportarían la
+  dinámica —velocidad, presión, orden—, y eso es firma biométrica: otra liga.
+
+#### 5.5.1 · La celda impresa, de donde salen todos los números
+
+De `ConsentimientoInformadoPdf.tsx`: página LETTER (612 pt) con `paddingHorizontal: 50`
+→ 512 pt de contenido; `FirmaBox` al **48 %** → **245,76 pt**, con **48 pt** de alto libre
+sobre la línea de firma.
+
+| Magnitud | Valor |
+|---|---|
+| Celda impresa | 245,76 × 48 pt = **86,7 × 16,9 mm** |
+| Proporción de la celda | **5,12 : 1** |
+| Milímetro por punto | 0,352778 |
+
+**Si `FirmaBox` cambia de ancho, esta sección entera hay que rehacerla.** Los 1024 px y los
+0,6 mm de abajo se derivan de esos 245,76 pt y de nada más.
+
+#### 5.5.2 · Resolución interna: 1024 px de ancho, FIJA
+
+`245,76 pt ÷ 72 × 300 dpi = 1024,0 px` — exacto. Un mapa de bits de 1024 px de ancho es
+justo 300 dpi a lo ancho de la celda impresa.
+
+| Regla | Valor |
+|---|---|
+| Ancho del mapa de bits | **1024 px, siempre** |
+| Alto | `round(1024 × alto_css ÷ ancho_css)` — ≈ 1024 × 772 en XS, ≈ 1024 × 379 a 788 |
+| Escala de dibujo | las coordenadas del puntero se multiplican por `1024 ÷ ancho_css` |
+| Formato | **PNG con alfa.** No JPEG: la firma se apoya sobre la línea impresa |
+
+**Fija, y explícitamente NO `devicePixelRatio`.** Ahí está lo que hace que la firma sea la
+misma desde el móvil y desde el iPad: el teléfono suele traer dpr 3 y el iPad dpr 2, así
+que atar el mapa de bits al dispositivo es justo lo que produce dos archivos distintos, con
+distinto detalle y distinto peso, del mismo gesto.
+
+El lienzo se estira por CSS a su caja —240 px de alto en XS, 280 desde 380, ancho completo
+del contenedor (§5.1)—; el mapa de bits no se entera. Se ve del mismo tamaño para el
+paciente y guarda varias veces más detalle.
+
+#### 5.5.3 · Grosor: 7 px de mapa de bits = 0,6 mm impresos
+
+1024 px ↔ 86,7 mm, luego **1 px = 0,0847 mm**. `0,6 ÷ 0,0847 = 7,08` → **7 px**.
+
+Se declara en píxeles del mapa de bits, **no de pantalla**: es la única forma de que el
+milímetro impreso sea constante. Consecuencia aceptada: en pantalla el trazo mide 2,2 px
+CSS en XS y 5,2 px a 788. **Varía en pantalla para no variar en el papel**, que es donde se
+coteja.
+
+Lo que **no** se puede igualar es el tamaño de la firma: el mismo gesto ocupa el 60 % de un
+lienzo de teléfono y el 30 % de uno de iPad. En papel una firma también varía de tamaño.
+El grosor sí se iguala, y es lo que decide si el trazo se lee al imprimirlo.
+
+#### 5.5.4 · El recorte a la tinta, y por qué sin él los milímetros son falsos
+
+El lienzo en pantalla va de **1,33 : 1** (XS) a **2,7 : 1** (788). La celda impresa es
+**5,12 : 1**. Si la imagen entera se metiera en la celda respetando su proporción, mandaría
+el alto: aterrizaría a 48 pt de alto y entre 64 y 130 pt de ancho —el 26–53 % de la celda—,
+y todos los milímetros de §5.5.3 encogerían en la misma proporción.
+
+**Así que la exportación recorta a la caja envolvente de la tinta, más un margen**, antes de
+ir al PDF. Además es lo natural: en papel una firma ocupa lo que ocupa, no lo que medía el
+lienzo donde se trazó.
+
+| Parte | Valor |
+|---|---|
+| Recorte | caja envolvente de todos los trazos |
+| Margen | 2 % del lado mayor de esa caja, para que el trazo no toque el borde |
+| Lienzo sin tinta | no se exporta: sin trazo no hay firma, y quien no firmó no tiene fila |
+
+#### 5.5.5 · El presupuesto son 300 000 CARACTERES, no 300 KB
+
+`length()` mide caracteres del data-URL, no bytes de imagen. Base64 son 4 caracteres por
+cada 3 bytes, y el prefijo `data:image/png;base64,` son 22 caracteres:
+
+`(300 000 − 22) × ¾ = 224 983 bytes ≈ **219 KiB** de PNG como máximo.`
+
+Un PNG de 1024 px de ancho con trazos dispersos sobre alfa queda muy por debajo. La regla
+no es confiar en eso, sino **medir la longitud del data-URL antes del INSERT**: si se
+pasara, se reexporta a **768 px** de ancho —que siguen siendo 225 dpi a lo ancho de la
+celda— en vez de fallar. Una firma capturada no se pierde por un presupuesto.
+
+#### 5.5.6 · Y lo que la base ya impone
+
+`length(trazo) BETWEEN 100 AND 300000` también tiene suelo: **100 caracteres**. Un data-URL
+de menos de 100 no es un trazo, es un lienzo en blanco exportado por error. Y `webp` o `svg`
+NO entran en el patrón: entrarían en la fila y el documento fallaría al renderizar.
+
+### 5.6 · Orientación, y por qué el trazo no se gira
+
+**El área de captura va a pantalla completa en móvil.** Es el mismo criterio del modo
+entero (§2) y por la misma razón: es el único momento en que el dispositivo cambia de
+manos, así que tapar el resto de la aplicación es una función, no un efecto colateral —el
+paciente no debe poder llegar al expediente.
+
+| Regla | Valor |
+|---|---|
+| Aviso de girar | En vertical, y **NO BLOQUEA**: el área está activa detrás y se puede firmar igual |
+| Al girar | El área se rehace y el aviso desaparece solo |
+| En tablet | **No aparece nunca** |
+| Forzar la rotación | **No se intenta.** `screen.orientation.lock()` exige pantalla completa real y en iOS no está disponible |
+
+**El trazo NO se gira para aprovechar la pantalla vertical.** Una firma es memoria muscular:
+firmar de lado obliga a girar la muñeca y produce un trazo que no se parece al de la
+identificación anexa, que es contra lo que hay que poder cotejarla. Se pierde ancho útil;
+se conserva lo único que hace que la firma sirva.
+
+> ⚠ **El área solo se rehace mientras esté VACÍA.** Con tinta dentro, girar no rehace nada:
+> se conserva el mapa de bits y su proporción. Es consecuencia directa de guardar imagen y
+> no puntos —sin los puntos no hay nada que volver a dibujar en una caja de otra
+> proporción—, así que rehacer con tinta dentro solo podría deformar la firma o perderla.
+> Rehacer estando vacía es gratis; con tinta dentro, nunca.
 
 ---
 
@@ -330,6 +454,12 @@ El móvil es el caso principal: es donde se firma con el dedo.
 - **Modo a pantalla completa y no ruta ni modal** — hay que llevarse un formulario sin guardar, y un modal se cierra tocando fuera.
 - **Cuatro segmentos de progreso siempre** — omitir resuelve un paso, no lo elimina.
 - **La foto después de la firma** — preguntar por la identificación de quien aún no firmó es preguntar dos veces.
+- **El trazo se guarda como imagen y no como puntos** — la firma del médico ya es una imagen, y lo que se coteja es la forma; los puntos solo aportarían dinámica, que es firma biométrica.
+- **1024 px de ancho fijos, y no `devicePixelRatio`** — atar el mapa de bits al dispositivo es lo que hace que el móvil y el iPad guarden firmas distintas del mismo gesto.
+- **El grosor se declara en píxeles del mapa de bits, no de pantalla** — varía en pantalla para no variar en el papel, que es donde se coteja.
+- **La exportación recorta a la tinta** — sin recorte la imagen entra por el alto de la celda y todos los milímetros encogen; y en papel una firma ocupa lo que ocupa.
+- **El aviso de girar no bloquea** — el área está activa detrás; un aviso que impide firmar convierte una molestia en una firma perdida.
+- **El trazo no se gira** — firmar de lado obliga a girar la muñeca y el trazo deja de parecerse al de la identificación anexa.
 - **«No puede firmar» apaga el lienzo en vez de ocultarlo** — se ve que dejó de aplicar.
 - **El aviso de que el familiar pasa a obligatorio sale al marcar la casilla** — es la única casilla que altera los pasos siguientes.
 - **Marco con la proporción del anexo** — lo encuadrado es lo impreso, sin recortes posteriores.
@@ -344,6 +474,7 @@ El móvil es el caso principal: es donde se firma con el dedo.
 
 | Ref | Qué falta |
 |---|---|
+| §5.5 · §5.6 | **La guía visual de la captura**, pedida en paralelo y todavía no escrita. Lo de §5.5 y §5.6 son las reglas que ya están decididas —qué se guarda, a qué resolución, con qué grosor y qué pasa al girar—; el cromo del lienzo sigue siendo el de §5.1 hasta que llegue. |
 | §8.2 | **Visto bueno a la ubicación y el formato de los sellos impresos**, antes de tocar la lámina. Y si la huella abreviada de 8 caracteres basta en papel o hay que imprimirla entera. |
 | Legal | **Si el consentimiento anterior se marca como anulado.** Rehacer tras sellar no existe: se emite uno nuevo (regla de inmutabilidad de los ocho). Falta decidir si el primero se marca y el nuevo lo referencia, o si conviven sin marca y manda la fecha. Es decisión clínico-legal. Consecuencia: la lista necesitaría un tercer estado además de `Sellado` y `Borrador`. |
 
