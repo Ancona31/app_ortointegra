@@ -770,8 +770,19 @@ export default function ConsentimientoInformadoPdf({
     },
     anexoConFoto: { backgroundColor: '#f8fafc' },
     anexoSinFoto: { paddingHorizontal: 24 },
-    /* La foto no se estira: conserva su proporción dentro de la caja. */
-    anexoFoto: { width: '100%', height: '100%', objectFit: 'contain' },
+    /* La foto no se estira: conserva su proporción dentro de la caja —el
+       recortador ya la entrega en la proporción exacta, así que la llena—.
+
+       ⚠ LAS ESQUINAS REDONDEADAS VAN AQUÍ, EN LA COMPOSICIÓN, Y NO EN LA
+       IMAGEN. La foto se guarda en JPEG, que no tiene transparencia: redondear
+       el archivo obligaría a PNG, y medido sobre contenido fotográfico a
+       1400 px el PNG pesa de 23 a 43 veces más (5,8–6,7 MB contra 135–287 KB) —
+       con alfa llega a 7,5 MB, que ni siquiera entra en el tope de 5 MB del
+       bucket—. El render de @react-pdf recorta la propia Image por su
+       borderRadius, así que el redondeo cuesta cero bytes. Detrás asoma el
+       fondo de la caja, como una credencial real sobre su lámina. El recortador
+       enseña el mismo radio en pantalla (`MARCO_ESTILO`). */
+    anexoFoto: { width: '100%', height: '100%', objectFit: 'contain', borderRadius: 6 },
     anexoLeyenda: {
       fontSize: 7.5,
       color: '#999',

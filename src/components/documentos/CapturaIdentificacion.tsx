@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Cropper, { type Area, type Point } from 'react-easy-crop'
-import { Camera, Images } from 'lucide-react'
+import { Camera, Images, RotateCw } from 'lucide-react'
 import {
   ANCHO_MINIMO_NITIDO,
   PROPORCION,
@@ -59,6 +59,31 @@ import {
 
 type Fase = 'pregunta' | 'recortar' | 'subiendo'
 
+/**
+ * El marco del recortador, EN LÍNEA y no en la hoja de estilos, porque no puede
+ * ser de otra forma: react-easy-crop inyecta su hoja SIN capa en `<head>`, y lo
+ * no encapado gana a cualquier regla de `@layer components` sin que la
+ * especificidad cuente —la misma lección que `touch-action`, documentada en
+ * `spinus-tokens.css`—. El estilo en línea gana siempre.
+ *
+ * ── EL CONTRASTE ES DOBLE LÍNEA, Y LAS DOS HACEN FALTA ──────────────────────
+ * Una línea blanca desaparece sobre una credencial clara y una oscura sobre una
+ * mesa oscura. Blanco por dentro (border) + azul marino por fuera (outline):
+ * una de las dos contrasta siempre, sea lo que sea lo que haya debajo.
+ *
+ * `color` no es texto: es el color del velo exterior — la librería lo dibuja
+ * con `box-shadow: 0 0 0 9999em currentColor`.
+ *
+ * El radio anticipa las esquinas redondeadas con que la foto se imprime en el
+ * anexo (v1 del PDF): lo que el médico ve al ajustar es la forma final.
+ */
+const MARCO_ESTILO: React.CSSProperties = {
+  border: '2px solid rgba(255, 255, 255, 0.95)',
+  outline: '2px solid rgba(26, 58, 92, 0.9)',
+  borderRadius: 10,
+  color: 'rgba(15, 30, 48, 0.55)',
+}
+
 interface Props {
   /** El borrador al que cuelga la foto. La ruta sale `{documentoId}/{rol}.jpg`. */
   documentoId: string
@@ -82,6 +107,13 @@ export default function CapturaIdentificacion({ documentoId, rol, onListo }: Pro
   // `Recorte` que `prepararFoto` acepta, con otros nombres de campo.
   const [crop, setCrop] = useState<Point>({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
+  /**
+   * Rotación en pasos de 90°, solo desde el botón. `onRotationChange` NO se
+   * pasa a propósito: con él la librería habilita el giro por gesto de dos
+   * dedos, que produce ángulos libres — y `matrizDeRecorte` solo garantiza los
+   * múltiplos de 90, que además son lo que una credencial torcida necesita.
+   */
+  const [rotacion, setRotacion] = useState(0)
   const [areaPixels, setAreaPixels] = useState<Area | null>(null)
 
   const inputCamaraRef = useRef<HTMLInputElement>(null)
@@ -123,6 +155,7 @@ export default function CapturaIdentificacion({ documentoId, rol, onListo }: Pro
       setFuente({ url, img })
       setCrop({ x: 0, y: 0 })
       setZoom(1)
+      setRotacion(0)
       setFase('recortar')
     } catch {
       setAviso('No se pudo leer esa imagen. Elige otro archivo o sigue sin foto.')
@@ -134,12 +167,15 @@ export default function CapturaIdentificacion({ documentoId, rol, onListo }: Pro
     if (!fuente || !areaPixels) return
     setFase('subiendo')
     try {
+      // La rotación viaja hasta el recorte final: `croppedAreaPixels` viene en
+      // el espacio girado y la matriz de `prepararFoto` lo deshace. Sin ese
+      // tercer argumento, el médico ajustaría una cosa y se imprimiría otra.
       const blob = await prepararFoto(fuente.img, {
         x: areaPixels.x,
         y: areaPixels.y,
         ancho: areaPixels.width,
         alto: areaPixels.height,
-      })
+      }, rotacion)
       if (!blob) throw new Error('SIN_BLOB')
 
       const cuerpo = new FormData()
@@ -209,13 +245,23 @@ export default function CapturaIdentificacion({ documentoId, rol, onListo }: Pro
         <>
           {/* El recortador. La proporción es la de la caja del anexo y es FIJA:
               lo que encierra el rectángulo es lo que se imprime, sin más
-              recortes después. Arrastrar mueve, pellizco o rueda acercan. */}
+              recortes después. Arrastrar mueve, pellizco o rueda acercan, Girar
+              endereza en pasos de 90°.
+
+              El contenedor lleva LA MISMA proporción que el rectángulo (CSS de
+              `.sp-idfoto-cropper`), así que el marco lo llena entero: es lo que
+              decide el encuadre y domina la pantalla. `cover` garantiza que la
+              imagen siempre cubra el rectángulo — sin bandas vacías que
+              acabarían impresas como bordes negros. */}
           <div className="sp-idfoto-cropper">
             <Cropper
               image={fuente.url}
               crop={crop}
               zoom={zoom}
+              rotation={rotacion}
               aspect={PROPORCION}
+              objectFit="cover"
+              style={{ cropAreaStyle: MARCO_ESTILO }}
               onCropChange={setCrop}
               onZoomChange={setZoom}
               onCropComplete={(_area, pixeles) => setAreaPixels(pixeles)}
@@ -237,6 +283,14 @@ export default function CapturaIdentificacion({ documentoId, rol, onListo }: Pro
               disabled={fase === 'subiendo'}
               onClick={() => { soltarFuente(); setAviso(''); setFase('pregunta') }}>
               Volver
+            </button>
+            {/* Foto en vertical con la credencial apaisada: sin esto, la única
+                salida era repetir la foto. Siempre horario: al cuarto toque se
+                da la vuelta completa, y para deshacer un toque bastan tres. */}
+            <button type="button" className="sp-btn sp-btn--secondary"
+              disabled={fase === 'subiendo'}
+              onClick={() => setRotacion(r => (r + 90) % 360)}>
+              <RotateCw size={17} aria-hidden="true" /> Girar
             </button>
             <button type="button" className="sp-btn sp-btn--primary" style={{ flex: 1 }}
               disabled={fase === 'subiendo' || areaPixels === null}

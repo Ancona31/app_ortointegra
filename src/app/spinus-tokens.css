@@ -2071,12 +2071,26 @@ a:hover { color: var(--sp-primary-active); }
 /* El recortador (react-easy-crop llena esta caja con `position: absolute`, así
    que necesita un contenedor posicionado y con tamaño propio). El fondo oscuro
    no es estética: deja de competir con la credencial, que es lo único que hay
-   que ver. El rectángulo de recorte lo dibuja la librería con la proporción de
-   la caja del anexo —228 × 144—, que le llega por la prop `aspect` desde
-   `PROPORCION`: la proporción vive en `identificacionFoto.ts`, no aquí. */
+   que ver.
+
+   ⚠ EL CONTENEDOR LLEVA LA MISMA PROPORCIÓN QUE EL RECTÁNGULO DE RECORTE
+   —228 × 144, la de la caja del anexo—, Y NO ES CASUAL: la librería calcula su
+   rectángulo como el mayor que cabe con esa proporción, así que con el
+   contenedor igual de proporcionado el marco LO LLENA ENTERO. El marco es lo
+   que decide el encuadre y tiene que dominar la pantalla; con un contenedor de
+   otra proporción —hubo uno de 4:3— el marco flotaba más pequeño dentro, con
+   bandas muertas de bisel alrededor.
+
+   El ancho toma todo lo que quepa dejando sitio a los controles: 100 % del
+   cuerpo, o lo que 60vh de alto permitan con esta proporción, lo que sea menor.
+   La prop `aspect` del componente lleva el mismo número desde `PROPORCION`
+   (`identificacionFoto.ts`): si la caja del anexo cambia, cambian los dos. */
 .sp-idfoto-cropper {
-  position: relative; width: 100%; aspect-ratio: 4 / 3; max-height: 55vh;
-  background: var(--sp-bezel); border-radius: var(--sp-r-card); overflow: hidden;
+  position: relative;
+  aspect-ratio: 228 / 144;
+  width: min(100%, calc(60vh * 1.5833));
+  margin-inline: auto;
+  background: var(--sp-bezel); border-radius: 10px; overflow: hidden;
 }
 
 .sp-idfoto-pie { text-align: center; color: var(--sp-ink-350); }
@@ -2087,3 +2101,16 @@ a:hover { color: var(--sp-primary-active); }
 }
 
 } /* fin @layer components */
+
+/* ⚠ FUERA DE @layer A PROPÓSITO — NO LO METAS DENTRO. La hoja de react-easy-crop
+   se inyecta sin capa en <head>, y lo no encapado gana a cualquier regla de
+   @layer components sin que la especificidad cuente (la misma lección que
+   touch-action, documentada arriba). Aquí las dos hojas quedan en la misma
+   condición de origen y decide la especificidad: dos clases contra una, gana
+   esto. El marco del rectángulo va aparte, en línea (`MARCO_ESTILO` del
+   componente); esto solo sube el contraste de la retícula de tercios, cuyas
+   líneas son pseudo-elementos y no admiten estilo en línea. */
+.sp-idfoto-cropper .reactEasyCrop_CropAreaGrid::before,
+.sp-idfoto-cropper .reactEasyCrop_CropAreaGrid::after {
+  border-color: rgba(255, 255, 255, 0.75);
+}
