@@ -308,6 +308,35 @@ se conserva lo único que hace que la firma sirva.
 
 ## 6 · Foto de identificación
 
+> ### ⚠ Actualización 2026-08-12 — captura NATIVA. §6.2 y §6.3 describen un sistema retirado
+>
+> La captura con `getUserMedia` —el visor de §6.2, el marco en vivo, el selector
+> de cámaras y la rama de permiso denegado de §6.3— **se retiró**: en iPad y
+> Android `getUserMedia` rechazaba con `NotAllowedError` sin llegar a enseñar el
+> diálogo de permiso, a través de cinco intentos de corrección de la política de
+> permisos. La sustituye, auditada y verificada en dispositivo:
+>
+> - **Campo de archivo nativo con dos entradas**: `Tomar foto` (con
+>   `capture="environment"`, abre la cámara del sistema) y `Elegir archivo`
+>   (sin él, abre el selector). Dos porque `capture` fuerza la cámara y suprime
+>   la galería, y la galería es aceptable (§6.3). No pasa por `getUserMedia` ni
+>   por `Permissions-Policy`, y verificado: no deja copia en la galería del
+>   dispositivo.
+> - **Recorte posterior** (react-easy-crop) con la proporción fija de la caja
+>   del anexo —228 × 144—, arrastrando y con zoom sobre la imagen quieta. Lo que
+>   encierra el rectángulo es lo que se sube: la mesa y los dedos no salen del
+>   dispositivo. Con aviso en pantalla si el recorte queda por debajo de los
+>   950 px que la caja impresa necesita a 300 dpi.
+>
+> **Desviación declarada y aceptada:** la cámara EN VIVO de escritorio se
+> pierde — `capture` se ignora ahí y los dos botones abren el selector de
+> archivo. Una cámara web apuntando a la mesa nunca fue buen instrumento para
+> una credencial; el caso principal es el móvil, como declara §10.
+>
+> Siguen vigentes de esta sección: la pregunta de §6.1 tras confirmar cada
+> firma, que `Sin foto` es una respuesta y no una cancelación, y que **la foto
+> no bloquea en ninguna de sus ramas**.
+
 ### 6.1 · La pregunta
 
 Llega **después** de confirmar la firma, nunca antes.

@@ -2051,10 +2051,13 @@ a:hover { color: var(--sp-primary-active); }
 }
 .sp-firma-ico-vacio { background: var(--sp-surface-muted); color: var(--sp-ink-icon); }
 
-/* ═══ §6 · la foto de identificación ═══════════════════════════════════════
+/* ═══ §6 · la foto de identificación — captura nativa y recorte ═══════════
    Vive dentro del cuerpo del modo de firmado y sustituye al lienzo mientras
-   dura. Todo lo de aquí es cromo: la foto NO BLOQUEA en ninguna rama, así que
-   ninguna de estas cajas puede quedarse sin salida. */
+   dura. La captura la hace la aplicación de cámara del SISTEMA (campo de
+   archivo con `capture`), así que aquí no hay visor ni marco en vivo: el cromo
+   es la pregunta, el recortador y sus controles. Todo esto es cromo: la foto NO
+   BLOQUEA en ninguna rama, así que ninguna de estas cajas puede quedarse sin
+   salida. */
 .sp-idfoto { display: flex; flex-direction: column; gap: var(--sp-3); }
 
 /* §6.1 · la pregunta. `Sin foto` es una respuesta, no una cancelación, y por eso
@@ -2065,86 +2068,22 @@ a:hover { color: var(--sp-primary-active); }
 .sp-idfoto-controles { display: flex; align-items: center; gap: var(--sp-2-5); flex-wrap: wrap; }
 .sp-idfoto-controles > .sp-btn { min-height: var(--sp-ctrl-h-desktop); }
 
-/* §6.2 · el visor, en 3:4 y sobre el bisel. El fondo oscuro no es estética: es
-   lo que deja de competir con la credencial, que es lo único que hay que ver. */
-.sp-idfoto-visor {
-  position: relative; width: 100%; aspect-ratio: 3 / 4; max-height: 60vh;
+/* El recortador (react-easy-crop llena esta caja con `position: absolute`, así
+   que necesita un contenedor posicionado y con tamaño propio). El fondo oscuro
+   no es estética: deja de competir con la credencial, que es lo único que hay
+   que ver. El rectángulo de recorte lo dibuja la librería con la proporción de
+   la caja del anexo —228 × 144—, que le llega por la prop `aspect` desde
+   `PROPORCION`: la proporción vive en `identificacionFoto.ts`, no aquí. */
+.sp-idfoto-cropper {
+  position: relative; width: 100%; aspect-ratio: 4 / 3; max-height: 55vh;
   background: var(--sp-bezel); border-radius: var(--sp-r-card); overflow: hidden;
 }
-.sp-idfoto-video { width: 100%; height: 100%; object-fit: cover; display: block; }
-
-/* ⚠ EL MARCO LLEVA LA PROPORCIÓN DE LA CAJA DEL ANEXO —228 × 144— Y NO OTRA.
-   Lo encuadrado es lo impreso: con cualquier otra proporción, lo capturado no
-   entra en la caja del PDF sin recortarse otra vez, y ese segundo recorte lo
-   decidiría el código y no quien encuadró. Si la caja del anexo cambia, cambian
-   estos dos números y los de `identificacionFoto.ts` a la vez. */
-.sp-idfoto-marco {
-  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  box-sizing: border-box;
-  width: min(100% - 80px, 320px);
-  aspect-ratio: 228 / 144;
-  border: 2px solid rgba(255,255,255,.5); border-radius: 10px;
-  pointer-events: none;
-}
-/* Las cuatro esquinas, de 26 px y trazo de 3: son lo que se busca con el pulso,
-   más que el borde tenue. */
-.sp-idfoto-marco i {
-  position: absolute; width: 26px; height: 26px; border: 0 solid #fff;
-}
-.sp-idfoto-marco i:nth-child(1) { top: -2px; left: -2px; border-top-width: 3px; border-left-width: 3px; border-radius: 10px 0 0 0; }
-.sp-idfoto-marco i:nth-child(2) { top: -2px; right: -2px; border-top-width: 3px; border-right-width: 3px; border-radius: 0 10px 0 0; }
-.sp-idfoto-marco i:nth-child(3) { bottom: -2px; left: -2px; border-bottom-width: 3px; border-left-width: 3px; border-radius: 0 0 0 10px; }
-.sp-idfoto-marco i:nth-child(4) { bottom: -2px; right: -2px; border-bottom-width: 3px; border-right-width: 3px; border-radius: 0 0 10px 0; }
 
 .sp-idfoto-pie { text-align: center; color: var(--sp-ink-350); }
-
-.sp-idfoto-disparador {
-  flex: 0 0 auto; width: 72px; height: 72px; border-radius: var(--sp-r-pill);
-  background: var(--sp-primary); box-shadow: 0 0 0 4px var(--sp-line-input);
-}
-.sp-idfoto-disparador:disabled { opacity: .5; cursor: not-allowed; }
-/* El disparador manda en la fila y los dos laterales la reparten: en XS los tres
-   caben porque los laterales son texto corto. */
-.sp-idfoto-controles:has(.sp-idfoto-disparador) { justify-content: space-between; }
-
-/* §6.3 · escritorio y permiso denegado: el mismo marco, dibujado a tamaño real. */
-.sp-idfoto-zona {
-  display: flex; flex-direction: column; align-items: center; gap: var(--sp-3);
-  padding: 28px; text-align: center;
-  border: var(--sp-bw-hair) dashed var(--sp-line-dash); border-radius: var(--sp-r-card);
-}
-.sp-idfoto-recorte {
-  width: 228px; max-width: 100%; aspect-ratio: 228 / 144;
-  border: var(--sp-bw-hair) dashed var(--sp-line-dash); border-radius: 10px;
-  background: var(--sp-surface);
-}
-
-.sp-idfoto-previa {
-  width: 100%; aspect-ratio: 228 / 144;
-  border: var(--sp-bw-hair) solid var(--sp-line-input); border-radius: var(--sp-r-card);
-  background: var(--sp-surface-sunken); overflow: hidden;
-}
-.sp-idfoto-previa img { width: 100%; height: 100%; object-fit: contain; display: block; }
-
-/* ⚠ ANDAMIO DE DEPURACIÓN — se borra junto con el `<details>` de
-   CapturaIdentificacion.tsx cuando la cámara móvil funcione. No es cromo del
-   producto: es lo único que deja leer el fallo en un iPad, que no tiene consola.
-   `pre` con ajuste de línea porque el agente de usuario es una línea larguísima
-   y sin `wrap` se sale de la pantalla en vez de partirse. */
-.sp-idfoto-diag {
-  border: var(--sp-bw-hair) dashed var(--sp-line-dash); border-radius: var(--sp-r-field-sm);
-  padding: var(--sp-2-5); color: var(--sp-ink-350);
-}
-.sp-idfoto-diag summary { font-size: var(--sp-fs-legal); cursor: pointer; }
-.sp-idfoto-diag pre {
-  margin: var(--sp-2) 0; font-size: 11px; line-height: 1.5;
-  white-space: pre-wrap; overflow-wrap: anywhere; user-select: text;
-}
 
 @media (max-width: 379px) {
   .sp-idfoto-card { flex-direction: column; }
   .sp-idfoto-controles > .sp-btn { width: 100%; }
-  .sp-idfoto-controles:has(.sp-idfoto-disparador) > .sp-btn { width: auto; }
 }
 
 } /* fin @layer components */
