@@ -124,7 +124,7 @@ Tras cada firma capturada: **pregunta de foto**. Solo a quien firmó.
 | Línea de firma | 1 px dashed `--sp-line-dash`, a 34 px del borde inferior, con 20 px de margen lateral | — |
 | Rol bajo la línea | `--sp-fs-legal` 11 / `--sp-fw-bold` / `--sp-ls-label-w` / `--sp-ink-300`, mayúsculas | — |
 | Placeholder | `--sp-fs-body` 14.5 `--sp-ink-200`, centrado | — |
-| Trazo | `--sp-ink-900`, `stroke-linecap: round`. **El grosor se declara en píxeles del mapa de bits, no de pantalla: §5.5** | — |
+| Trazo | Negro literal, `stroke-linecap: round`. **Este grosor es solo el de la pantalla; el impreso se declara aparte: §5.5.3** | — |
 
 El lienzo ocupa el ancho completo del contenedor en los cuatro anchos: cuanto más ancho,
 más cómodo firmar.
@@ -207,59 +207,126 @@ sobre la línea de firma.
 | Proporción de la celda | **5,12 : 1** |
 | Milímetro por punto | 0,352778 |
 
-**Si `FirmaBox` cambia de ancho, esta sección entera hay que rehacerla.** Los 1024 px y los
-0,6 mm de abajo se derivan de esos 245,76 pt y de nada más.
+**Si `FirmaBox` cambia de tamaño, esta sección entera hay que rehacerla** — y los DOS ejes
+cuentan: de los 245,76 pt salen los 1024 px canónicos y de los 48 pt salen los 200, que son
+los que de verdad gobiernan el grosor impreso (§5.5.4).
 
-#### 5.5.2 · Resolución interna: 1024 px de ancho, FIJA
+#### 5.5.2 · Los DOS espacios, y cuál de ellos se imprime
 
-`245,76 pt ÷ 72 × 300 dpi = 1024,0 px` — exacto. Un mapa de bits de 1024 px de ancho es
-justo 300 dpi a lo ancho de la celda impresa.
+> ⚠ **Reescrita el 2026-08-12.** La versión anterior de §5.5.2 y §5.5.3 declaraba el grosor
+> en píxeles del mapa de bits de captura y afirmaba que así el milímetro impreso quedaba
+> constante. **Era falso**, y la medición sobre PDF reales lo destapó: el mismo código daba
+> 1,264 mm en un iPad y 0,262 mm en un Samsung, y ni siquiera el mismo valor para dos
+> personas firmando en el mismo aparato. La causa está en §5.5.4.
 
-| Regla | Valor |
-|---|---|
-| Ancho del mapa de bits | **1024 px, siempre** |
-| Alto | `round(1024 × alto_css ÷ ancho_css)` — ≈ 1024 × 772 en XS, ≈ 1024 × 379 a 788 |
-| Escala de dibujo | las coordenadas del puntero se multiplican por `1024 ÷ ancho_css` |
-| Formato | **PNG con alfa.** No JPEG: la firma se apoya sobre la línea impresa |
+Hay **dos espacios con dos grosores**, y confundirlos fue el defecto:
 
-**Fija, y explícitamente NO `devicePixelRatio`.** Ahí está lo que hace que la firma sea la
-misma desde el móvil y desde el iPad: el teléfono suele traer dpr 3 y el iPad dpr 2, así
-que atar el mapa de bits al dispositivo es justo lo que produce dos archivos distintos, con
-distinto detalle y distinto peso, del mismo gesto.
+| | Tamaño | Trazo | Para qué |
+|---|---|---|---|
+| **Captura** | 1024 px de ancho × `round(1024 × alto_css ÷ ancho_css)` | **7 px** | Lo que el paciente ve mientras firma. **No se imprime** |
+| **Canónico** | **1024 × 200 px** | **6 px** | La celda impresa a 300 dpi. **Es lo único que sale en el papel** |
 
-El lienzo se estira por CSS a su caja —240 px de alto en XS, 280 desde 380, ancho completo
-del contenedor (§5.1)—; el mapa de bits no se entera. Se ve del mismo tamaño para el
-paciente y guarda varias veces más detalle.
+**La captura sigue siendo 1024 px de ancho, fija y explícitamente NO `devicePixelRatio`**:
+el teléfono suele traer dpr 3 y el iPad dpr 2, así que atar el mapa de bits al dispositivo
+produciría dos archivos distintos, con distinto detalle y distinto peso, del mismo gesto.
+Las coordenadas del puntero se multiplican por `1024 ÷ ancho_css`. Formato **PNG con alfa**:
+no JPEG, porque la firma se apoya sobre la línea impresa.
 
-#### 5.5.3 · Grosor: 7 px de mapa de bits = 0,6 mm impresos
+**El canónico sale de la celda a 300 dpi, y por sus DOS ejes:**
 
-1024 px ↔ 86,7 mm, luego **1 px = 0,0847 mm**. `0,6 ÷ 0,0847 = 7,08` → **7 px**.
+```
+ancho   245,76 pt ÷ 72 × 300 dpi = 1024 px
+alto     48,00 pt ÷ 72 × 300 dpi =  200 px
+```
 
-Se declara en píxeles del mapa de bits, **no de pantalla**: es la única forma de que el
-milímetro impreso sea constante. Consecuencia aceptada: en pantalla el trazo mide 2,2 px
-CSS en XS y 5,2 px a 788. **Varía en pantalla para no variar en el papel**, que es donde se
-coteja.
+El alto es el que manda, por lo que explica §5.5.4. Y no es un número nuevo en el proyecto:
+**`FirmaCaptura.tsx` normaliza la rúbrica del médico a ese mismo alto de 200 px desde
+siempre**, y por eso su rúbrica es lo único del documento que imprime igual en todas partes.
+Esto le da a la firma capturada la normalización que la del médico ya tenía.
 
-Lo que **no** se puede igualar es el tamaño de la firma: el mismo gesto ocupa el 60 % de un
-lienzo de teléfono y el 30 % de uno de iPad. En papel una firma también varía de tamaño.
-El grosor sí se iguala, y es lo que decide si el trazo se lee al imprimirlo.
+#### 5.5.3 · Grosor: 6 px canónicos = 0,508 mm impresos
 
-#### 5.5.4 · El recorte a la tinta, y por qué sin él los milímetros son falsos
+`6 ÷ 300 dpi × 25,4 = **0,508 mm**`, y no depende de nada más.
+
+**De dónde sale el 6.** De medir la rúbrica del médico, que es el patrón que el lector tiene
+al lado en la misma hoja: **6,08 px** en su espacio de 200 px de alto, o sea 0,515 mm
+impresos. La diferencia con estos 6 px es del 1,4 %, invisible.
+
+**No sale de los «0,6 mm» que declaraba la versión anterior.** Aquel número se calculó
+suponiendo que la firma cruzaba los 86,7 mm de la celda —«1024 px ↔ 86,7 mm, luego 1 px =
+0,0847 mm»— y el recorte de §5.5.4 garantiza que no los cruce nunca: las firmas reales
+imprimen entre 13 y 54 mm de ancho. Sobre una firma de 29 mm, 0,66 mm de trazo se leen como
+un rotulador.
+
+**Y la frase «varía en pantalla para no variar en el papel» decía exactamente lo contrario
+de la verdad.** Con el recorte más `contain`, la relación grosor/firma del papel **es
+idéntica** a la de la pantalla: el papel reproduce fielmente lo que se ve. Por eso el
+grosor de captura de §5.5.2 ya solo gobierna la pantalla.
+
+Consecuencia aceptada: el trazo en pantalla no pesa exactamente lo que pesará en el papel,
+y la diferencia cambia con el aparato. Es preferible a la alternativa —adaptar el grosor en
+vivo al alto que lleve la firma—, que haría que el trazo cambiara de grueso mientras el
+paciente lo está dibujando.
+
+#### 5.5.4 · El recorte a la tinta, y por qué obliga a un espacio canónico
 
 El lienzo en pantalla va de **1,33 : 1** (XS) a **2,7 : 1** (788). La celda impresa es
 **5,12 : 1**. Si la imagen entera se metiera en la celda respetando su proporción, mandaría
-el alto: aterrizaría a 48 pt de alto y entre 64 y 130 pt de ancho —el 26–53 % de la celda—,
-y todos los milímetros de §5.5.3 encogerían en la misma proporción.
+el alto: aterrizaría a 48 pt de alto y entre 64 y 130 pt de ancho —el 26–53 % de la celda—.
 
-**Así que la exportación recorta a la caja envolvente de la tinta, más un margen**, antes de
-ir al PDF. Además es lo natural: en papel una firma ocupa lo que ocupa, no lo que medía el
-lienzo donde se trazó.
+**Así que la exportación recorta a la caja envolvente de la tinta**, y además es lo natural:
+en papel una firma ocupa lo que ocupa, no lo que medía el lienzo donde se trazó.
+
+> ⚠ **Y eso deja la colocación LIMITADA POR EL ALTO, que es de donde salía el defecto.**
+> Toda firma recortada tiene proporción menor que 5,12, así que `objectFit: contain` la
+> ajusta por el alto y de ahí sale, exacta:
+>
+> ```
+> dpi impresos = 1,5 × (alto de la tinta en píxeles)
+> grosor       = trazo_px ÷ dpi
+> ```
+>
+> Con el trazo declarado en el espacio de captura, el grosor impreso pasaba a depender de
+> cuántos píxeles de alto ocupara cada firma — que cambia con la proporción del lienzo de
+> cada aparato y con cómo firme cada persona. Verificado contra los cuatro casos medidos:
+> tinta de 180 px → 270 dpi; de 178 → 267; de 411 → 617; de 623 → 934.
+
+**La salida es redibujar, no reescalar.** Reescalar el recorte a un alto fijo no arregla
+nada: mueve el trazo y la firma en la misma proporción, así que el alto se cancela y el
+grosor relativo queda igual. Y además interpolar no crea detalle.
+
+**La exportación conserva las muestras del puntero y las REDIBUJA en el canónico**, con un
+`contain` de la tinta en 1024 × 200. La imagen sale **o exactamente 1024 de ancho o
+exactamente 200 de alto**, así que `FirmaBox` la coloca siempre a 300 dpi:
+
+| Caso | Manda | Resultado | dpi |
+|---|---|---|---|
+| Firma normal (proporción < 5,12) | el alto | alto = 200 | `200 ÷ (48÷72)` = **300** |
+| Firma muy plana (proporción > 5,12) | el ancho | ancho = 1024 | `1024 ÷ (245,76÷72)` = **300** |
+
+Un solo `min` cubre los dos extremos, sin ramas. Redibujar además **esquiva la
+interpolación**: la firma se rasteriza de nuevo a 300 dpi desde las muestras, con su
+precisión subpíxel intacta.
 
 | Parte | Valor |
 |---|---|
-| Recorte | caja envolvente de todos los trazos |
-| Margen | 2 % del lado mayor de esa caja, para que el trazo no toque el borde |
+| Recorte | caja envolvente del recorrido del puntero |
+| Margen | `GROSOR_CANONICO / 2 + 2 px`, para que el remate redondo no salga cortado |
+| Muestras | filtradas a **0,6 px canónicos** de distancia mínima — ver abajo |
 | Lienzo sin tinta | no se exporta: sin trazo no hay firma, y quien no firmó no tiene fila |
+
+**El umbral de distancia mínima.** El lápiz del iPad muestrea unas 240 veces por segundo y
+el navegador entrega todas esas muestras en `getCoalescedEvents`. Firmando despacio, dos
+muestras caen a menos de un píxel y cada una dibuja un segmento con sus remates redondos
+sobre el anterior. La tinta es opaca, así que el interior no engorda —pero el borde
+suavizado sí, hasta saturar—. Medido componiendo trazos uno a uno: 7,64 px con muestras a
+6,5 px de paso, 8,00 px a 0,25 px. Un **+4,7 %** que aparece solo en el aparato que más
+muestrea. 0,6 px es la décima parte del trazo; la curva más fina de una firma mide unos
+4 px canónicos, muy por encima.
+
+> ⚠ **Las muestras son TRANSITORIAS y no contradicen §5.5.** Lo que se GUARDA sigue siendo
+> una imagen: viven en memoria mientras dura la captura y mueren con el paso. La decisión de
+> §5.5 es sobre qué se almacena y con qué se coteja, no sobre cómo se rasteriza.
 
 #### 5.5.5 · El presupuesto son 300 000 CARACTERES, no 300 KB
 
@@ -268,10 +335,15 @@ cada 3 bytes, y el prefijo `data:image/png;base64,` son 22 caracteres:
 
 `(300 000 − 22) × ¾ = 224 983 bytes ≈ **219 KiB** de PNG como máximo.`
 
-Un PNG de 1024 px de ancho con trazos dispersos sobre alfa queda muy por debajo. La regla
-no es confiar en eso, sino **medir la longitud del data-URL antes del INSERT**: si se
-pasara, se reexporta a **768 px** de ancho —que siguen siendo 225 dpi a lo ancho de la
-celda— en vez de fallar. Una firma capturada no se pierde por un presupuesto.
+**Con el canónico acotado en 1024 × 200, es inalcanzable.** Medido sobre PNG con trazo real:
+una firma normal ocupa unos **7 100 caracteres** y una densísima **16 600** — el 2 % y el
+6 % del tope.
+
+**El respaldo de reexportar a 768 px se RETIRÓ.** Antes, pasarse del presupuesto disparaba
+una segunda exportación más pequeña; con el canónico eso no puede ocurrir, y un camino
+muerto que nadie recorre solo sugiere un riesgo que ya no existe. La comprobación de
+longitud se conserva como **guardia de fallo ruidoso**: si alguna vez se rebasara, algo
+estaría muy mal y degradar la firma en silencio no lo arreglaría.
 
 #### 5.5.6 · Y lo que la base ya impone
 
@@ -538,8 +610,9 @@ El móvil es el caso principal: es donde se firma con el dedo.
 - **La foto después de la firma** — preguntar por la identificación de quien aún no firmó es preguntar dos veces.
 - **El trazo se guarda como imagen y no como puntos** — la firma del médico ya es una imagen, y lo que se coteja es la forma; los puntos solo aportarían dinámica, que es firma biométrica.
 - **1024 px de ancho fijos, y no `devicePixelRatio`** — atar el mapa de bits al dispositivo es lo que hace que el móvil y el iPad guarden firmas distintas del mismo gesto.
-- **El grosor se declara en píxeles del mapa de bits, no de pantalla** — varía en pantalla para no variar en el papel, que es donde se coteja.
-- **La exportación recorta a la tinta** — sin recorte la imagen entra por el alto de la celda y todos los milímetros encogen; y en papel una firma ocupa lo que ocupa.
+- **El grosor impreso se declara en el espacio canónico, no en el de captura** — el recorte deja la colocación limitada por el alto, así que un grosor declarado en píxeles de captura acaba dependiendo de cuánto ocupara cada firma: 4,8× de dispersión medida entre dos aparatos, y ni siquiera constante entre dos personas del mismo.
+- **La exportación redibuja, no reescala** — reescalar mueve el trazo y la firma en la misma proporción, así que el alto se cancela y el grosor relativo queda igual; redibujar desde las muestras además no interpola.
+- **La exportación recorta a la tinta** — sin recorte la imagen entra por el alto de la celda y la firma aterriza en el 26–53 % de ella; y en papel una firma ocupa lo que ocupa.
 - **El aviso de girar no bloquea** — el área está activa detrás; un aviso que impide firmar convierte una molestia en una firma perdida.
 - **El trazo no se gira** — firmar de lado obliga a girar la muñeca y el trazo deja de parecerse al de la identificación anexa.
 - **«No puede firmar» apaga el lienzo en vez de ocultarlo** — se ve que dejó de aplicar.

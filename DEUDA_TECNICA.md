@@ -2832,4 +2832,52 @@ control» de `globals.css`.
 
 ---
 
+## Firmado del consentimiento — geometría del trazo
+
+### FIR-DT-1 — La rúbrica del médico topa el ancho en 400 px: el mismo defecto de grosor, esperando
+- **Estado:** 🔴 abierta (latente: hoy no se manifiesta)
+- **Detectada:** 2026-08-12, al normalizar el trazo de la firma capturada. La
+  rúbrica del médico se usó como patrón de referencia para fijar el grosor
+  impreso, y al mirar cómo se produce apareció esto.
+- **Archivo afectado:** `src/components/perfil/FirmaCaptura.tsx:66`
+  (`const scale = Math.min(400 / cropW, 200 / cropH, 1)`).
+- **Descripción:** `FirmaBox` coloca las firmas con `objectFit: contain` en una
+  celda de 245,76 × 48 pt, y el recorte a la tinta deja esa colocación
+  **limitada por el alto**. De ahí sale, exacta:
+
+  ```
+  dpi impresos = 1,5 × (alto de la imagen en píxeles)
+  grosor       = trazo_px ÷ dpi
+  ```
+
+  Para que el grosor impreso no dependa de cada firma, la imagen tiene que
+  llegar al PDF con **200 px de alto** — que es la celda a 300 dpi. La rúbrica
+  del médico se normaliza con un `contain` en **400 × 200**, y ese 400 es el
+  problema: **una rúbrica más ancha que 2 : 1 la limita el ANCHO**, sale con
+  menos de 200 px de alto y se imprime a menos de 300 dpi, con el trazo
+  proporcionalmente más grueso.
+
+  Ejemplo: una rúbrica de proporción 3,2 : 1 saldría 400 × 125 → 187 dpi → el
+  trazo imprime un 60 % más grueso que el de una rúbrica cuadrada.
+- **Por qué hoy no se ve:** la rúbrica actual mide **349 × 200** — proporción
+  1,745, por debajo del 2 : 1, así que el tope del ancho no llega a morder y sale
+  a 200 px de alto exactos. Es la única razón por la que ha funcionado, y por la
+  que sirvió de patrón fiable para calibrar el resto.
+- **Fix pendiente:** subir el tope del ancho de 400 a **1024** — la celda
+  completa a 300 dpi—, de modo que el `contain` quede en `1024 × 200` y el alto
+  mande salvo en rúbricas de más de 5,12 : 1, donde el ancho también da 300 dpi.
+  Es el mismo espacio canónico que ya usa `firmaTrazo.ts`. Una línea.
+- **Ojo con el efecto colateral:** la rúbrica se usa en los NUEVE formatos, no
+  solo en el consentimiento. Subir el tope hace que rúbricas anchas se guarden
+  con más píxeles, lo que cambia su tamaño impreso en cualquier formato cuya
+  celda tenga otra geometría. Hay que revisar los demás antes de tocarlo.
+- **Cuándo atacar:** sin urgencia mientras ninguna cuenta suba una rúbrica de más
+  de 2 : 1. En cuanto alguna lo haga, se manifiesta sin aviso. Buen momento: la
+  próxima vez que se toque `FirmaCaptura.tsx` o la geometría de firmas de v2.
+- **Contexto largo:** `GUIA_FORMULARIOS_05_FIRMADO_CONSENTIMIENTO.md` §5.5.2 a
+  §5.5.5, reescritas el 2026-08-12 con la medición que destapó el defecto
+  equivalente en la firma capturada.
+
+---
+
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)

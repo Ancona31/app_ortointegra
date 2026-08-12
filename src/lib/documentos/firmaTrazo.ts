@@ -1,116 +1,225 @@
 /**
  * Geometría del trazo de firma — GUIA_FORMULARIOS_05 §5.5.
  *
- * Módulo NEUTRO: sin `'use client'` y sin ningún import. Todo lo de aquí son
- * números derivados de la celda impresa y dos funciones que solo tocan un
- * canvas que le entregan. Vive fuera del componente porque los números tienen
- * una procedencia que hay que poder leer sin abrir 600 líneas de interfaz.
+ * Módulo NEUTRO: sin `'use client'` y sin ningún import. Vive fuera del
+ * componente porque los números tienen una procedencia que hay que poder leer
+ * sin abrir 700 líneas de interfaz.
+ *
+ * ══ HAY DOS ESPACIOS Y DOS GROSORES. NO LOS CONFUNDAS ══════════════════════
+ *
+ * Es la distinción que ordena este archivo entero, y confundirlos fue el
+ * defecto que corrige esta versión:
+ *
+ *   CAPTURA    `ANCHO_BITMAP` 1024 px de ancho, alto según la caja CSS, trazo
+ *              `GROSOR_TRAZO` 7 px. Es lo que el paciente ve mientras firma, y
+ *              NO ES LO QUE SE IMPRIME. Solo gobierna la pantalla.
+ *
+ *   CANÓNICO   `CANONICO_ANCHO` × `CANONICO_ALTO` = 1024 × 200 px, trazo
+ *              `GROSOR_CANONICO` 6 px. Es la celda impresa a 300 dpi, y es lo
+ *              único que sale en el papel: la exportación REDIBUJA ahí las
+ *              muestras del puntero.
+ *
+ * ── POR QUÉ EL CANÓNICO EXISTE ──────────────────────────────────────────────
+ * `FirmaBox` coloca la firma con `objectFit: contain` en una celda de
+ * 245,76 × 48 pt, y el recorte a la tinta (§5.5.4) hace que esa colocación esté
+ * LIMITADA POR EL ALTO. De ahí sale, exacta:
+ *
+ *     dpi impresos = 1,5 × (alto de la tinta en píxeles)
+ *     grosor       = trazo_px ÷ dpi
+ *
+ * Con el trazo declarado en el espacio de captura, el grosor impreso pasaba a
+ * depender de cuántos píxeles de alto ocupara cada firma. Medido sobre PDF
+ * reales: 1,264 mm en un iPad y 0,262 mm en un Samsung —4,8× de dispersión— y
+ * ni siquiera constante entre dos personas firmando en el mismo aparato.
+ *
+ * Redibujar en el canónico fija el alto en 200 px y con él los 300 dpi, así que
+ * el grosor deja de depender de nada: 6 ÷ 300 × 25,4 = **0,508 mm, siempre**.
  *
  * ── DE DÓNDE SALEN LOS NÚMEROS ──────────────────────────────────────────────
- * De `ConsentimientoInformadoPdf.tsx`: página LETTER (612 pt) con
- * `paddingHorizontal: 50` → 512 pt de contenido, y `FirmaBox` al 48 % →
- * 245,76 pt de ancho con 48 pt de alto libre sobre la línea de firma.
+ *   Celda impresa   245,76 × 48 pt   (LETTER 612 − 100 de margen, `FirmaBox` al 48 %)
+ *   Alto canónico   48 ÷ 72 × 300 dpi = 200 px
+ *   Ancho canónico  245,76 ÷ 72 × 300 dpi = 1024 px
+ *   Grosor          6 px, medidos sobre la rúbrica del médico (ver `GROSOR_CANONICO`)
  *
- *   Celda impresa      245,76 × 48 pt = 86,7 × 16,9 mm
- *   Ancho del bitmap   245,76 pt ÷ 72 × 300 dpi = 1024,0 px — exacto
- *   Milímetro por px   86,7 ÷ 1024 = 0,0847 mm
- *   Grosor             0,6 mm ÷ 0,0847 = 7,08 → 7 px de bitmap
- *
- * ⚠ SI `FirmaBox` CAMBIA DE ANCHO, ESTE ARCHIVO ENTERO HAY QUE REHACERLO. Los
- * 1024 y el 7 se derivan de esos 245,76 pt y de nada más.
+ * ⚠ SI `FirmaBox` CAMBIA DE TAMAÑO, ESTE ARCHIVO ENTERO HAY QUE REHACERLO.
  */
 
+/* ── El espacio de CAPTURA: lo que el paciente ve ──────────────────────────── */
+
 /**
- * Ancho del mapa de bits, FIJO y explícitamente NO `devicePixelRatio`.
+ * Ancho del mapa de bits de captura, FIJO y explícitamente NO `devicePixelRatio`.
  *
- * Ahí está lo que hace que la firma sea la misma desde el móvil y desde el
- * iPad: el teléfono suele traer dpr 3 y el iPad dpr 2, así que atar el mapa de
- * bits al dispositivo es justo lo que produce dos archivos distintos, con
- * distinto detalle y distinto peso, del mismo gesto.
+ * El teléfono suele traer dpr 3 y el iPad dpr 2, así que atar el mapa de bits al
+ * dispositivo produciría dos archivos distintos, con distinto detalle y distinto
+ * peso, del mismo gesto.
  */
 export const ANCHO_BITMAP = 1024
 
 /**
- * El ancho al que se REEXPORTA si el data-URL se pasa del presupuesto. Siguen
- * siendo 225 dpi a lo ancho de la celda impresa: una firma capturada no se
- * pierde por un presupuesto.
- */
-export const ANCHO_REDUCIDO = 768
-
-/**
- * Grosor en píxeles DEL MAPA DE BITS, no de pantalla. Es la única forma de que
- * el milímetro impreso sea constante. Consecuencia aceptada: en pantalla el
- * trazo mide 2,2 px CSS en XS y 5,2 px a 788. Varía en pantalla para no variar
- * en el papel, que es donde se coteja.
+ * Grosor del trazo EN PANTALLA, en píxeles del mapa de bits de captura.
+ *
+ * ⚠ NO ES EL GROSOR IMPRESO. Lo fue, y ahí estaba el defecto: en el papel se
+ * traducía a un grosor que dependía del alto de cada firma. El impreso es
+ * `GROSOR_CANONICO`, y esta constante ya solo decide cómo se ve el trazo
+ * mientras se firma.
+ *
+ * Consecuencia aceptada: el trazo en pantalla no pesa exactamente lo que pesará
+ * en el papel, y la diferencia cambia con el aparato. Es preferible a la
+ * alternativa —adaptar el grosor en vivo al alto que lleve la firma—, que haría
+ * que el trazo cambiara de grueso mientras el paciente lo está dibujando.
  */
 export const GROSOR_TRAZO = 7
 
+/** Alto del mapa de bits de captura que corresponde a una caja CSS de `ancho × alto`. */
+export function altoBitmap(anchoCss: number, altoCss: number): number {
+  if (anchoCss <= 0 || altoCss <= 0) return ANCHO_BITMAP
+  return Math.round((ANCHO_BITMAP * altoCss) / anchoCss)
+}
+
+/* ── El espacio CANÓNICO: lo que se imprime ────────────────────────────────── */
+
+/** `245,76 pt ÷ 72 × 300 dpi = 1024 px` — la celda impresa a lo ancho. */
+export const CANONICO_ANCHO = 1024
+
+/**
+ * `48 pt ÷ 72 × 300 dpi = 200 px` — el alto libre de la celda a 300 dpi.
+ *
+ * Es el eje que manda, porque el recorte deja la colocación limitada por el
+ * alto. Y no es un número nuevo en el proyecto: `FirmaCaptura.tsx` normaliza la
+ * rúbrica del médico a este mismo alto desde siempre, y por eso su rúbrica es lo
+ * único que imprime igual en todos los documentos. Esto le da a la firma
+ * capturada la normalización que la del médico ya tenía.
+ */
+export const CANONICO_ALTO = 200
+
+/**
+ * Grosor impreso: **6 px canónicos = 6 ÷ 300 × 25,4 = 0,508 mm**.
+ *
+ * Sale de medir la rúbrica del médico, que es el patrón que el lector tiene al
+ * lado en la misma hoja: 6,08 px en su espacio de 200 px de alto, o sea
+ * 0,515 mm impresos. La diferencia con estos 6 px es del 1,4 %, invisible.
+ *
+ * No sale de los «0,6 mm» que declaraba la versión anterior de §5.5.3: aquel
+ * número se calculó suponiendo que la firma cruzaba los 86,7 mm de la celda, y
+ * el recorte garantiza que no los cruce nunca —las firmas reales imprimen entre
+ * 13 y 54 mm de ancho—.
+ */
+export const GROSOR_CANONICO = 6
+
+/**
+ * Aire entre la tinta y el borde de la imagen exportada, en píxeles canónicos.
+ *
+ * Los remates redondos ya asoman `GROSOR_CANONICO / 2` más allá del recorrido
+ * del puntero; estos 2 px son para que el borde suavizado del trazo no quede
+ * cortado contra el filo de la imagen.
+ */
+export const MARGEN_CANONICO = 2
+
+/**
+ * Distancia mínima entre muestras consecutivas, en píxeles canónicos.
+ *
+ * ── QUÉ ARREGLA ─────────────────────────────────────────────────────────────
+ * El lápiz del iPad muestrea unas 240 veces por segundo y el navegador entrega
+ * todas esas muestras en `getCoalescedEvents`. Firmando despacio, dos muestras
+ * consecutivas caen a menos de un píxel, y cada una dibuja un segmento con sus
+ * remates redondos sobre el anterior. La tinta es opaca, así que el interior no
+ * engorda —pero el BORDE SUAVIZADO sí: se compone contra sí mismo hasta
+ * saturar—. Medido componiendo trazos uno a uno: 7,64 px con muestras a 6,5 px
+ * de paso, 8,00 px con muestras a 0,25 px. Un +4,7 % que aparece solo en el
+ * aparato que más muestrea, y que se lleva por delante el borde limpio.
+ *
+ * 0,6 px es la décima parte del trazo: por debajo, una muestra no aporta forma,
+ * solo tinta superpuesta. La curva más fina de una firma mide en torno al 2 %
+ * del alto —4 px canónicos—, muy por encima de este umbral.
+ */
+export const UMBRAL_MUESTRA = 0.6
+
+/**
+ * La tinta: NEGRO, y como literal.
+ *
+ * ── POR QUÉ NEGRO Y NO EL AZUL DE ACENTO ────────────────────────────────────
+ * Una firma no es parte del formato: es lo único del papel que escribió una
+ * persona. Con el azul de la marca salía del mismo color que los filetes y las
+ * cabeceras, así que se leía como impresión y no como rúbrica.
+ *
+ * Y sobre todo: **la rúbrica del médico ya es negra**. Es un archivo del bucket
+ * `firmas-medicos`, y `FirmaCaptura.tsx` la umbraliza a negro puro y opaco
+ * —`d[i] = 0` en los tres canales— antes de subirla. Con la captura en azul, la
+ * hoja de firmas del mismo consentimiento acababa con la del paciente de un
+ * color y la del médico de otro. `#000000` no es un negro aproximado: es
+ * exactamente el mismo valor que ya lleva el archivo del médico.
+ *
+ * ── ⚠ Y POR QUÉ LITERAL Y NO TOKEN ──────────────────────────────────────────
+ * `--sp-ink-900` vale `rgba(255,255,255,.87)` en modo oscuro, y este mapa de
+ * bits ES el que se imprime: leerlo de un token daría una firma capturada de
+ * noche BLANCA SOBRE PAPEL BLANCO. Nada de `getComputedStyle` ni de `var(--sp-*)`
+ * en la ruta de captura ni en la de exportación. Por lo mismo el lienzo lleva
+ * fondo claro literal en el CSS: lo que se ve al firmar es lo que sale en el
+ * papel, en los dos temas.
+ */
+export const TINTA_FIRMA = '#000000'
+
+/* ── El presupuesto que impone la base ─────────────────────────────────────── */
+
 /**
  * Tope del data-URL, en CARACTERES —que es lo que mide `length()` en Postgres,
- * no bytes de imagen—. `(300 000 − 22) × ¾ = 224 983 bytes ≈ 219 KiB` de PNG.
- * Lo impone `firmas_documento_trazo_check`.
+ * no bytes de imagen—. Lo impone `firmas_documento_trazo_check`.
+ *
+ * Con el canónico acotado en 1024 × 200 es **inalcanzable**: medido sobre PNG
+ * con trazo real, una firma normal ocupa unos 7 100 caracteres y una densísima
+ * 16 600 — el 2 % y el 6 % de este tope—. Se conserva como guardia de fallo
+ * ruidoso, no como camino: si alguna vez se rebasara, algo estaría muy mal y
+ * degradar la firma en silencio no lo arreglaría.
+ *
+ * Aquí vivía `ANCHO_REDUCIDO` (768 px), que reexportaba más pequeño al pasarse
+ * del presupuesto. Se retiró: con el canónico no puede dispararse, y un camino
+ * muerto que nadie recorre solo sugiere un riesgo que ya no existe.
  */
 export const LIMITE_DATAURL = 300000
 
 /** Suelo del mismo CHECK: menos de 100 caracteres no es un trazo, es un lienzo en blanco. */
 export const MINIMO_DATAURL = 100
 
-/** Margen del recorte: 2 % del lado mayor de la caja de tinta. */
-const MARGEN_RECORTE = 0.02
+/* ── El trazo ──────────────────────────────────────────────────────────────── */
 
-/** Alto del mapa de bits que corresponde a una caja CSS de `anchoCss × altoCss`. */
-export function altoBitmap(anchoCss: number, altoCss: number): number {
-  if (anchoCss <= 0 || altoCss <= 0) return ANCHO_BITMAP
-  return Math.round((ANCHO_BITMAP * altoCss) / anchoCss)
-}
+/** Un punto YA en coordenadas del mapa de bits de captura, nunca de pantalla. */
+export interface Punto { x: number; y: number }
 
-/** La caja envolvente de todos los trazos. `null` si el lienzo está vacío. */
-function cajaDeTinta(
+/** Un trazo: las muestras de un gesto, del contacto al levantamiento. */
+export type Trazo = readonly Punto[]
+
+/**
+ * Un segmento, y SOLO ese segmento. Devuelve el nuevo punto medio.
+ *
+ * ⚠ EL `beginPath()` NO SOBRA. Sin él, cada `stroke()` vuelve a rasterizar TODO
+ * lo acumulado desde que empezó el gesto, así que el trabajo crece con el
+ * cuadrado del número de puntos y la firma se frena dentro del propio trazo.
+ *
+ * ── POR QUÉ NO SE VEN LAS UNIONES ───────────────────────────────────────────
+ * Cada segmento va del punto MEDIO anterior al medio nuevo, con el punto real
+ * como control de la cuadrática. Eso hace la tangente continua en las uniones:
+ * al llegar al medio de `anterior`→`p` la tangente lleva la dirección
+ * `anterior`→`p`, y el segmento siguiente arranca en ese mismo medio con `p` de
+ * control, o sea con esa misma dirección. Sin los medios —uniendo punto con
+ * punto— la tangente daría un salto en cada muestra y se verían los vértices.
+ *
+ * ⚠ VIVE AQUÍ PORQUE TIENE DOS LLAMADORES Y NO PUEDEN DIVERGIR: el lienzo en
+ * vivo la llama muestra a muestra mientras el paciente firma, y `exportarFirma`
+ * la llama en lote al redibujar en el canónico. Si cada uno tuviera su copia,
+ * lo que el paciente ve y lo que se imprime podrían dejar de ser la misma curva.
+ */
+export function segmentoSuavizado(
   ctx: CanvasRenderingContext2D,
-  ancho: number,
-  alto: number,
-): { x: number; y: number; ancho: number; alto: number } | null {
-  const px = ctx.getImageData(0, 0, ancho, alto).data
-  let minX = ancho
-  let minY = alto
-  let maxX = -1
-  let maxY = -1
-
-  for (let y = 0; y < alto; y++) {
-    for (let x = 0; x < ancho; x++) {
-      // El lienzo es transparente y el trazo opaco: el canal alfa es el único
-      // que hace falta mirar.
-      if (px[(y * ancho + x) * 4 + 3] === 0) continue
-      if (x < minX) minX = x
-      if (x > maxX) maxX = x
-      if (y < minY) minY = y
-      if (y > maxY) maxY = y
-    }
-  }
-
-  if (maxX < 0) return null
-  return { x: minX, y: minY, ancho: maxX - minX + 1, alto: maxY - minY + 1 }
-}
-
-/** Recorta un trozo del lienzo a un PNG con alfa, opcionalmente reescalado. */
-function recortar(
-  origen: HTMLCanvasElement,
-  x: number,
-  y: number,
-  ancho: number,
-  alto: number,
-  escala: number,
-): string {
-  const destino = document.createElement('canvas')
-  destino.width = Math.max(1, Math.round(ancho * escala))
-  destino.height = Math.max(1, Math.round(alto * escala))
-  const ctx = destino.getContext('2d')
-  if (!ctx) return ''
-  ctx.drawImage(origen, x, y, ancho, alto, 0, 0, destino.width, destino.height)
-  // PNG con alfa y NO jpeg: la firma se apoya sobre la línea impresa. Y ni
-  // webp ni svg entran en el patrón del CHECK: entrarían en la fila y el
-  // documento fallaría al renderizar.
-  return destino.toDataURL('image/png')
+  anterior: Punto,
+  medioAnterior: Punto,
+  p: Punto,
+): Punto {
+  const nuevoMedio = { x: (anterior.x + p.x) / 2, y: (anterior.y + p.y) / 2 }
+  ctx.beginPath()
+  ctx.moveTo(medioAnterior.x, medioAnterior.y)
+  ctx.quadraticCurveTo(anterior.x, anterior.y, nuevoMedio.x, nuevoMedio.y)
+  ctx.stroke()
+  return nuevoMedio
 }
 
 /** Por qué no se pudo exportar. `vacio` es el caso normal —nadie firmó todavía—. */
@@ -120,41 +229,154 @@ export type ResultadoTrazo =
   | { ok: true; trazo: string }
   | { ok: false; motivo: FalloTrazo }
 
+/** La caja envolvente del RECORRIDO del puntero. `null` si no hay ninguna muestra. */
+function cajaDeTrazos(trazos: readonly Trazo[]): {
+  x: number; y: number; ancho: number; alto: number
+} | null {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const trazo of trazos) {
+    for (const p of trazo) {
+      if (p.x < minX) minX = p.x
+      if (p.x > maxX) maxX = p.x
+      if (p.y < minY) minY = p.y
+      if (p.y > maxY) maxY = p.y
+    }
+  }
+  if (!Number.isFinite(minX)) return null
+  return { x: minX, y: minY, ancho: maxX - minX, alto: maxY - minY }
+}
+
 /**
- * Exporta el trazo RECORTADO a la caja de la tinta más un margen.
+ * Las muestras que aportan forma, ya en canónico. Ver `UMBRAL_MUESTRA`.
  *
- * Sin el recorte los milímetros de arriba serían falsos: el lienzo en pantalla
- * va de 1,33:1 a 2,7:1 y la celda impresa es 5,12:1, así que la imagen entera
- * aterrizaría por el alto —48 pt— y ocuparía entre el 26 y el 53 % del ancho de
- * la celda, encogiendo el grosor en la misma proporción. Además es lo natural:
- * en papel una firma ocupa lo que ocupa, no lo que medía el lienzo.
+ * La última entra SIEMPRE aunque caiga por debajo del umbral: es donde se
+ * levantó el lápiz, y descartarla acortaría el trazo.
  */
-export function exportarTrazo(lienzo: HTMLCanvasElement): ResultadoTrazo {
+function muestrasUtiles(trazo: Trazo, aCanonico: (p: Punto) => Punto): Punto[] {
+  const salida: Punto[] = []
+  for (const p of trazo) {
+    const c = aCanonico(p)
+    const previo = salida[salida.length - 1]
+    if (previo === undefined) { salida.push(c); continue }
+    const dx = c.x - previo.x
+    const dy = c.y - previo.y
+    if (dx * dx + dy * dy >= UMBRAL_MUESTRA * UMBRAL_MUESTRA) salida.push(c)
+  }
+  const fin = trazo[trazo.length - 1]
+  if (fin !== undefined && salida.length > 1) {
+    const c = aCanonico(fin)
+    const ultimo = salida[salida.length - 1]
+    if (c.x !== ultimo.x || c.y !== ultimo.y) salida.push(c)
+  }
+  return salida
+}
+
+/**
+ * Un trazo entero. Reproduce exactamente lo que el lienzo en vivo dibuja:
+ * el punto de contacto, los segmentos suavizados y la cola hasta el último
+ * punto real.
+ */
+function dibujarTrazo(ctx: CanvasRenderingContext2D, puntos: readonly Punto[]): void {
+  const primero = puntos[0]
+  if (primero === undefined) return
+  // Un toque sin arrastre también deja tinta: sin esto, un punto sobre la i no
+  // se dibujaría.
+  ctx.beginPath()
+  ctx.moveTo(primero.x, primero.y)
+  ctx.lineTo(primero.x, primero.y)
+  ctx.stroke()
+
+  let ultimo = primero
+  let medio = primero
+  for (let i = 1; i < puntos.length; i++) {
+    medio = segmentoSuavizado(ctx, ultimo, medio, puntos[i])
+    ultimo = puntos[i]
+  }
+  // La cola: del último medio al último punto real. Sin esto la firma termina
+  // media muestra antes de donde se levantó el dedo.
+  if (ultimo !== medio) {
+    ctx.beginPath()
+    ctx.moveTo(medio.x, medio.y)
+    ctx.lineTo(ultimo.x, ultimo.y)
+    ctx.stroke()
+  }
+}
+
+/**
+ * La geometría del canónico: a qué escala entra la tinta y qué tamaño tiene la
+ * imagen resultante.
+ *
+ * ⚠ ES EL INVARIANTE DEL QUE DEPENDE TODO. La imagen sale **o exactamente 1024
+ * de ancho o exactamente 200 de alto**, y en los dos casos `FirmaBox` la coloca
+ * a 300 dpi: limitada por el alto, `200 px ÷ (48 pt ÷ 72) = 300`; limitada por
+ * el ancho, `1024 px ÷ (245,76 pt ÷ 72) = 300`. Con el grosor fijo en 6 px, eso
+ * da 0,508 mm impresos sin depender de nada.
+ *
+ * Pura y exportada para poder comprobarlo sin un canvas: ver `firmaTrazo.test.ts`.
+ */
+export function geometriaCanonica(
+  anchoTinta: number,
+  altoTinta: number,
+): { escala: number; ancho: number; alto: number; borde: number } {
+  const borde = GROSOR_CANONICO / 2 + MARGEN_CANONICO
+  const escalas: number[] = []
+  if (anchoTinta > 0) escalas.push((CANONICO_ANCHO - 2 * borde) / anchoTinta)
+  if (altoTinta > 0) escalas.push((CANONICO_ALTO - 2 * borde) / altoTinta)
+  // Un punto suelto no tiene extensión en ningún eje: no hay nada que escalar.
+  const escala = escalas.length > 0 ? Math.min(...escalas) : 1
+  return {
+    escala,
+    ancho: Math.max(1, Math.round(anchoTinta * escala + 2 * borde)),
+    alto: Math.max(1, Math.round(altoTinta * escala + 2 * borde)),
+    borde,
+  }
+}
+
+/**
+ * Exporta la firma REDIBUJÁNDOLA en el espacio canónico.
+ *
+ * ⚠ REDIBUJA, NO REESCALA, Y ESA ES LA DIFERENCIA QUE HACE QUE ESTO FUNCIONE.
+ * Reescalar el mapa de bits de captura no arreglaría nada: mueve el trazo y la
+ * firma en la misma proporción, así que el grosor relativo —lo único que
+ * falla— queda igual, y además interpolar no crea detalle. Redibujando desde
+ * las muestras, el trazo se rasteriza de nuevo a 300 dpi con un grosor fijo:
+ * ni se interpola ni el grosor depende de cuánto ocupara la firma.
+ *
+ * La escala es un `contain` de la tinta en 1024 × 200, que cubre los dos
+ * extremos sin ramas: una firma muy plana la limita el ancho —1024 px sobre
+ * 86,7 mm siguen siendo 300 dpi— y una muy alta, el alto. En los dos casos el
+ * grosor impreso sale el mismo.
+ */
+export function exportarFirma(trazos: readonly Trazo[]): ResultadoTrazo {
+  const caja = cajaDeTrazos(trazos)
+  // Sin trazo no hay firma, y quien no firmó no tiene fila.
+  if (caja === null) return { ok: false, motivo: 'vacio' }
+
+  const { escala, ancho, alto, borde } = geometriaCanonica(caja.ancho, caja.alto)
+  const lienzo = document.createElement('canvas')
+  lienzo.width = ancho
+  lienzo.height = alto
   const ctx = lienzo.getContext('2d')
-  if (!ctx) return { ok: false, motivo: 'contexto' }
+  if (ctx === null) return { ok: false, motivo: 'contexto' }
 
-  const caja = cajaDeTinta(ctx, lienzo.width, lienzo.height)
-  // Un lienzo sin tinta no se exporta: sin trazo no hay firma, y quien no firmó
-  // no tiene fila.
-  if (!caja) return { ok: false, motivo: 'vacio' }
+  ctx.lineWidth = GROSOR_CANONICO
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.strokeStyle = TINTA_FIRMA
 
-  const margen = Math.round(Math.max(caja.ancho, caja.alto) * MARGEN_RECORTE)
-  const x = Math.max(0, caja.x - margen)
-  const y = Math.max(0, caja.y - margen)
-  const ancho = Math.min(lienzo.width, caja.x + caja.ancho + margen) - x
-  const alto = Math.min(lienzo.height, caja.y + caja.alto + margen) - y
+  const aCanonico = (p: Punto): Punto => ({
+    x: (p.x - caja.x) * escala + borde,
+    y: (p.y - caja.y) * escala + borde,
+  })
+  for (const trazo of trazos) dibujarTrazo(ctx, muestrasUtiles(trazo, aCanonico))
 
-  const entero = recortar(lienzo, x, y, ancho, alto, 1)
-  if (entero.length >= MINIMO_DATAURL && entero.length <= LIMITE_DATAURL) {
-    return { ok: true, trazo: entero }
-  }
-  if (entero.length < MINIMO_DATAURL) return { ok: false, motivo: 'vacio' }
-
-  const reducido = recortar(lienzo, x, y, ancho, alto, ANCHO_REDUCIDO / ANCHO_BITMAP)
-  if (reducido.length >= MINIMO_DATAURL && reducido.length <= LIMITE_DATAURL) {
-    return { ok: true, trazo: reducido }
-  }
-  return { ok: false, motivo: 'presupuesto' }
+  // PNG con alfa y NO jpeg: la firma se apoya sobre la línea impresa. Y ni webp
+  // ni svg entran en el patrón del CHECK: entrarían en la fila y el documento
+  // fallaría al renderizar.
+  const trazo = lienzo.toDataURL('image/png')
+  if (trazo.length < MINIMO_DATAURL) return { ok: false, motivo: 'vacio' }
+  if (trazo.length > LIMITE_DATAURL) return { ok: false, motivo: 'presupuesto' }
+  return { ok: true, trazo }
 }
 
 /**
@@ -167,7 +389,7 @@ export function exportarTrazo(lienzo: HTMLCanvasElement): ResultadoTrazo {
  */
 export async function huellaDocumento(contenido: unknown): Promise<string> {
   // ⚠ `crypto.subtle` SOLO EXISTE EN CONTEXTO SEGURO. En https y en localhost
-  // está; abriendo el servidor de desarrollo por IP de red local —que es como
+  // está, abriendo el servidor de desarrollo por IP de red local —que es como
   // se prueba en el iPad— NO, y el fallo llegaría como un `undefined` sin
   // relación aparente con la firma. Se nombra aquí para que el formulario pueda
   // decir qué pasa en vez de culpar a la conexión.

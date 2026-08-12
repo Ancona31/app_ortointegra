@@ -8,8 +8,11 @@ import CapturaIdentificacion from '@/components/documentos/CapturaIdentificacion
 import {
   ANCHO_BITMAP,
   GROSOR_TRAZO,
+  TINTA_FIRMA,
   altoBitmap,
-  exportarTrazo,
+  exportarFirma,
+  segmentoSuavizado,
+  type Punto,
 } from '@/lib/documentos/firmaTrazo'
 
 /**
@@ -109,30 +112,6 @@ function firmantesDe(nombres: Record<RolFirmante, string>): Paso[] {
   return PASOS.filter(p => p.rol === 'paciente' || nombres[p.rol].trim() !== '')
 }
 
-/**
- * La tinta: NEGRO, y como literal.
- *
- * ── POR QUÉ NEGRO Y NO EL AZUL DE ACENTO ────────────────────────────────────
- * Una firma no es parte del formato: es lo único del papel que escribió una
- * persona. Con el azul de la marca salía del mismo color que los filetes y las
- * cabeceras, así que se leía como impresión y no como rúbrica.
- *
- * Y sobre todo: **la rúbrica del médico ya es negra**. Es un archivo del bucket
- * `firmas-medicos`, y `FirmaCaptura.tsx` la umbraliza a negro puro y opaco
- * —`d[i] = 0` en los tres canales— antes de subirla. Con la captura en azul, la
- * hoja de firmas del mismo consentimiento acababa con la del paciente de un
- * color y la del médico de otro. `#000000` no es un negro aproximado: es
- * exactamente el mismo valor que ya lleva el archivo del médico.
- *
- * ── ⚠ Y POR QUÉ LITERAL Y NO TOKEN ──────────────────────────────────────────
- * `--sp-ink-900` vale `rgba(255,255,255,.87)` en modo oscuro, y este mapa de
- * bits ES el que se imprime: leerlo de un token daría una firma capturada de
- * noche BLANCA SOBRE PAPEL BLANCO. Nada de `getComputedStyle` ni de `var(--sp-*)`
- * en la ruta de captura. Por lo mismo el lienzo lleva fondo claro literal en el
- * CSS: lo que se ve al firmar es lo que sale en el papel, en los dos temas.
- */
-const TINTA = '#000000'
-
 interface Props {
   /**
    * Los nombres escritos en el formulario. Deciden QUIÉNES firman, no solo cómo
@@ -188,6 +167,22 @@ export default function FirmadoConsentimiento({
     useState<{ rol: RolFirmante; trazo: string; firmadoEn: string } | null>(null)
 
   const lienzoRef = useRef<HTMLCanvasElement>(null)
+  /**
+   * LAS MUESTRAS DEL PUNTERO, un array por gesto. De aquí sale lo que se
+   * imprime: `exportarFirma` las REDIBUJA en el espacio canónico en vez de
+   * reescalar el mapa de bits, que es lo que hace que el grosor impreso deje de
+   * depender del aparato (ver la cabecera de `firmaTrazo.ts`).
+   *
+   * ⚠ SON TRANSITORIAS Y NO CONTRADICEN §5.5. Lo que se GUARDA sigue siendo una
+   * imagen: estos puntos viven en memoria mientras dura la captura y mueren con
+   * el paso. La decisión de §5.5 es sobre qué se almacena y con qué se coteja,
+   * no sobre cómo se rasteriza.
+   *
+   * Vive en el padre y no en `LienzoFirma` porque es `confirmarFirma` quien las
+   * necesita. Se vacían en los tres sitios donde el lienzo se vacía: al
+   * resolver un paso, al rehacer una firma y al pulsar «Borrar y repetir».
+   */
+  const trazosRef = useRef<Punto[][]>([])
 
   /** Los que de verdad firman este documento, y por tanto los pasos del flujo. */
   const firmantes = firmantesDe(nombres)
@@ -227,6 +222,7 @@ export default function FirmadoConsentimiento({
     setErrorTrazo('')
     setTieneTrazo(false)
     setPendienteFoto(null)
+    trazosRef.current = []
     const pendiente = firmantes.findIndex(p => siguientes[p.rol] === undefined)
     setPaso(pendiente === -1 ? firmantes.length : pendiente)
   }
@@ -242,9 +238,9 @@ export default function FirmadoConsentimiento({
   function confirmarFirma(): void {
     if (!actual) return
     if (apagado) { resolver(actual.rol, { tipo: 'no_pudo' }); return }
-    const lienzo = lienzoRef.current
-    if (!lienzo) return
-    const res = exportarTrazo(lienzo)
+    // Desde las MUESTRAS, no desde el lienzo: lo que se imprime se redibuja en
+    // el espacio canónico. El lienzo solo fue lo que el paciente vio.
+    const res = exportarFirma(trazosRef.current)
     if (!res.ok) {
       setErrorTrazo(res.motivo === 'presupuesto'
         ? 'La firma pesa demasiado para guardarse. Bórrala y hazla con menos trazos.'
@@ -263,6 +259,7 @@ export default function FirmadoConsentimiento({
     setTieneTrazo(false)
     setErrorTrazo('')
     setPendienteFoto(null)
+    trazosRef.current = []
     setPaso(firmantes.findIndex(p => p.rol === rol))
   }
 
@@ -386,6 +383,7 @@ export default function FirmadoConsentimiento({
                 <LienzoFirma
                   key={actual.rol}
                   lienzoRef={lienzoRef}
+                  trazosRef={trazosRef}
                   etiqueta={actual.etiqueta}
                   apagado={apagado}
                   hayTinta={tieneTrazo}
@@ -414,7 +412,12 @@ export default function FirmadoConsentimiento({
                     trazos, que en una firma no significa nada. */}
                 <div className="sp-firma-acciones">
                   <button type="button" disabled={!tieneTrazo || apagado}
-                    onClick={() => { setLimpiarSenal(n => n + 1); setTieneTrazo(false); setErrorTrazo('') }}
+                    onClick={() => {
+                      setLimpiarSenal(n => n + 1)
+                      setTieneTrazo(false)
+                      setErrorTrazo('')
+                      trazosRef.current = []
+                    }}
                     className="sp-btn sp-btn--secondary"
                     style={{ flex: '0 0 auto', whiteSpace: 'nowrap' }}>
                     Borrar y repetir
@@ -515,11 +518,10 @@ export default function FirmadoConsentimiento({
 /* ------------------------------------------------------------------ */
 
 /** Un punto YA en coordenadas del mapa de bits, nunca de pantalla. */
-interface Punto { x: number; y: number }
-
 /**
- * De coordenadas de ventana a coordenadas del mapa de bits: las del puntero
- * multiplicadas por `1024 ÷ ancho_css` (§5.5.2).
+ * De coordenadas de ventana a coordenadas del mapa de bits de CAPTURA: las del
+ * puntero multiplicadas por `1024 ÷ ancho_css` (§5.5.2). El espacio canónico de
+ * impresión es otro y lo resuelve `exportarFirma`.
  *
  * Recibe el rectángulo en vez de leerlo: quien la llama procesa varias muestras
  * de un mismo evento y `getBoundingClientRect` fuerza recálculo de disposición
@@ -534,6 +536,8 @@ function aBitmap(c: HTMLCanvasElement, caja: DOMRect, clientX: number, clientY: 
 
 interface LienzoProps {
   lienzoRef: React.RefObject<HTMLCanvasElement | null>
+  /** Donde se acumulan las muestras. Ver su declaración en el padre. */
+  trazosRef: React.RefObject<Punto[][]>
   etiqueta: string
   /** «No puede firmar»: el lienzo se APAGA, no se borra — se ve que dejó de aplicar. */
   apagado: boolean
@@ -548,7 +552,9 @@ interface LienzoProps {
   onTinta: () => void
 }
 
-function LienzoFirma({ lienzoRef, etiqueta, apagado, hayTinta, limpiarSenal, onTinta }: LienzoProps) {
+function LienzoFirma({
+  lienzoRef, trazosRef, etiqueta, apagado, hayTinta, limpiarSenal, onTinta,
+}: LienzoProps) {
   const [avisoGirar, setAvisoGirar] = useState(false)
   const dibujando = useRef(false)
   /**
@@ -557,6 +563,8 @@ function LienzoFirma({ lienzoRef, etiqueta, apagado, hayTinta, limpiarSenal, onT
    */
   const ultimo = useRef<Punto | null>(null)
   const medio = useRef<Punto | null>(null)
+  /** El gesto en curso. Al levantar el lápiz se archiva en `trazosRef`. */
+  const gesto = useRef<Punto[]>([])
   const observador = useRef<ResizeObserver | null>(null)
   /** Espejo de `hayTinta`: el observador no ve el estado de React. */
   const hayTintaRef = useRef(hayTinta)
@@ -576,10 +584,12 @@ function LienzoFirma({ lienzoRef, etiqueta, apagado, hayTinta, limpiarSenal, onT
     c.height = altoBitmap(caja.width, caja.height)
     const ctx = c.getContext('2d')
     if (!ctx) return
+    // `GROSOR_TRAZO` gobierna SOLO lo que se ve en pantalla. El grosor impreso
+    // es `GROSOR_CANONICO` y lo aplica `exportarFirma` al redibujar.
     ctx.lineWidth = GROSOR_TRAZO
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
-    ctx.strokeStyle = TINTA
+    ctx.strokeStyle = TINTA_FIRMA
   }, [lienzoRef])
 
   /**
@@ -637,33 +647,20 @@ function LienzoFirma({ lienzoRef, etiqueta, apagado, hayTinta, limpiarSenal, onT
   }, [])
 
   /**
-   * Un segmento, y SOLO ese segmento.
+   * Un segmento en el lienzo EN VIVO, y de paso la muestra al gesto.
    *
-   * ⚠ EL `beginPath()` NO SOBRA. Sin él, cada `stroke()` vuelve a rasterizar
-   * TODO lo acumulado desde que empezó el gesto, así que el trabajo crece con el
-   * cuadrado del número de puntos y la firma se frena dentro del propio trazo.
-   * Lo sufre más el ratón que el dedo, porque muestrea mucho más.
-   *
-   * ── POR QUÉ NO SE VEN LAS UNIONES ──────────────────────────────────────────
-   * Cada segmento va del punto MEDIO anterior al medio nuevo, con el punto real
-   * como control de la cuadrática. Eso hace la tangente continua en las uniones:
-   * al llegar al medio de `anterior`→`p` la tangente lleva la dirección
-   * `anterior`→`p`, y el segmento siguiente arranca en ese mismo medio con
-   * `p` de control, o sea con esa misma dirección. Sin los medios —uniendo punto
-   * con punto— la tangente daría un salto en cada muestra y se verían los
-   * vértices.
+   * La curva la dibuja `segmentoSuavizado`, que vive en `firmaTrazo.ts` porque
+   * `exportarFirma` usa exactamente la misma al redibujar en el canónico: si
+   * cada uno tuviera su copia, lo que el paciente ve y lo que se imprime
+   * podrían dejar de ser la misma curva.
    */
   function trazar(ctx: CanvasRenderingContext2D, p: Punto): void {
     const anterior = ultimo.current
     const medioAnterior = medio.current
     if (!anterior || !medioAnterior) return
-    const nuevoMedio = { x: (anterior.x + p.x) / 2, y: (anterior.y + p.y) / 2 }
-    ctx.beginPath()
-    ctx.moveTo(medioAnterior.x, medioAnterior.y)
-    ctx.quadraticCurveTo(anterior.x, anterior.y, nuevoMedio.x, nuevoMedio.y)
-    ctx.stroke()
+    medio.current = segmentoSuavizado(ctx, anterior, medioAnterior, p)
     ultimo.current = p
-    medio.current = nuevoMedio
+    gesto.current.push(p)
   }
 
   function iniciar(e: React.PointerEvent<HTMLCanvasElement>): void {
@@ -676,6 +673,7 @@ function LienzoFirma({ lienzoRef, etiqueta, apagado, hayTinta, limpiarSenal, onT
     dibujando.current = true
     ultimo.current = p
     medio.current = p
+    gesto.current = [p]
     // Un toque sin arrastre también deja tinta: sin esto, un punto sobre la i
     // no se dibujaría.
     ctx.beginPath()
@@ -717,7 +715,11 @@ function LienzoFirma({ lienzoRef, etiqueta, apagado, hayTinta, limpiarSenal, onT
         ctx.lineTo(ultimo.current.x, ultimo.current.y)
         ctx.stroke()
       }
+      // El gesto se archiva al levantar el lápiz, no antes: es la unidad que
+      // `exportarFirma` redibuja, y partirlo dejaría uniones donde no las hay.
+      if (gesto.current.length > 0) trazosRef.current.push(gesto.current)
     }
+    gesto.current = []
     dibujando.current = false
     ultimo.current = null
     medio.current = null
