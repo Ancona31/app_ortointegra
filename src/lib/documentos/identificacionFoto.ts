@@ -102,6 +102,29 @@ export function medidasRotadas(
   return rotacion % 180 === 0 ? { ancho, alto } : { ancho: alto, alto: ancho }
 }
 
+/**
+ * El zoom por debajo del cual ya no se puede alejar más: aquel en que la imagen
+ * ENTERA cabe dentro del rectángulo de recorte.
+ *
+ * En la escala de react-easy-crop con `objectFit: cover` y el contenedor con la
+ * proporción del rectángulo: zoom 1 = la imagen CUBRE el rectángulo (no se ve
+ * nada fuera de ella), y este valor (≤ 1) = la imagen entera DENTRO. Es el tope
+ * que pide el defecto de la credencial cortada: permite alejar hasta meterla
+ * completa —la credencial está dentro de la imagen, así que con la imagen entera
+ * cabe seguro— y ni un paso más allá, donde ya solo se añade vacío.
+ *
+ * Entre este zoom y 1 la imagen cubre un eje del rectángulo y el otro no: las
+ * bandas del eje descubierto son inevitables en cuanto las proporciones
+ * difieren, y las rellena de blanco `prepararFoto`. Depende de la rotación
+ * porque a 90° la imagen intercambia sus lados.
+ */
+export function zoomMinimoEntera(ancho: number, alto: number, rotacion: number): number {
+  const r = medidasRotadas(ancho, alto, rotacion)
+  if (r.ancho <= 0 || r.alto <= 0) return 1
+  const proporcionImagen = r.ancho / r.alto
+  return Math.min(proporcionImagen, PROPORCION) / Math.max(proporcionImagen, PROPORCION)
+}
+
 /** Coseno y seno EXACTOS por paso de 90°: `Math.cos(3π/2)` devuelve −1.8e−16, no 0. */
 const GIROS: Record<number, readonly [number, number]> = {
   0: [1, 0], 90: [0, 1], 180: [-1, 0], 270: [0, -1],
@@ -191,6 +214,15 @@ export async function prepararFoto(
   lienzo.height = Math.round(lienzo.width / PROPORCION)
   const ctx = lienzo.getContext('2d')
   if (!ctx) return null
+
+  // ⚠ EL FONDO BLANCO NO SOBRA. Desde que el zoom mínimo permite alejar hasta
+  // meter la imagen entera, el rectángulo puede cubrir bandas donde no hay
+  // imagen — y esto se codifica a JPEG, que no tiene alfa: un píxel sin pintar
+  // sale NEGRO, no transparente. Dos franjas negras impresas en el anexo
+  // parecerían un defecto; en blanco, sobre una credencial en su lámina clara,
+  // no se notan.
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, lienzo.width, lienzo.height)
 
   // La rotación se aplica AL RECORTE FINAL, no solo a la vista previa: la
   // matriz gira la imagen original al espacio en que el médico ajustó su

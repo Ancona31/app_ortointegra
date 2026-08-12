@@ -16,8 +16,10 @@
 
 import { describe, expect, it } from 'vitest'
 import {
+  PROPORCION,
   matrizDeRecorte,
   medidasRotadas,
+  zoomMinimoEntera,
   type Recorte,
 } from '@/lib/documentos/identificacionFoto'
 
@@ -113,6 +115,31 @@ describe('matrizDeRecorte · el rectángulo del recorte llena la salida', () => 
     const opuesta = aplicar(m, 800, 479)
     expect(opuesta.x).toBeCloseTo(300, 10)
     expect(opuesta.y).toBeCloseTo(190, 10)
+  })
+})
+
+describe('zoomMinimoEntera · hasta dónde se puede alejar', () => {
+  it('una imagen con la proporción exacta del rectángulo no necesita alejarse: mínimo 1', () => {
+    expect(zoomMinimoEntera(2280, 1440, 0)).toBeCloseTo(1, 10)
+  })
+
+  it('una foto 16:9 apaisada —el caso de la credencial cortada— baja a caber entera', () => {
+    // Proporción 1,778 contra 1,583: el mínimo es 1,583/1,778.
+    expect(zoomMinimoEntera(1920, 1080, 0)).toBeCloseTo(PROPORCION / (1920 / 1080), 10)
+    expect(zoomMinimoEntera(1920, 1080, 0)).toBeLessThan(1)
+  })
+
+  it('una foto en vertical baja mucho más, y girarla 90° lo recalcula', () => {
+    // 9:16 = 0,5625 → mínimo 0,5625/1,5833 ≈ 0,355.
+    expect(zoomMinimoEntera(1080, 1920, 0)).toBeCloseTo((1080 / 1920) / PROPORCION, 10)
+    // Girada 90° vuelve a ser 16:9: el mismo mínimo que la apaisada.
+    expect(zoomMinimoEntera(1080, 1920, 90)).toBeCloseTo(zoomMinimoEntera(1920, 1080, 0), 10)
+  })
+
+  it('nunca pasa de 1: alejar jamás exige acercar', () => {
+    expect(zoomMinimoEntera(5712, 4284, 0)).toBeLessThanOrEqual(1)
+    expect(zoomMinimoEntera(100, 3000, 0)).toBeLessThanOrEqual(1)
+    expect(zoomMinimoEntera(0, 100, 0)).toBe(1)
   })
 })
 

@@ -1,13 +1,15 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Cropper, { type Area, type Point } from 'react-easy-crop'
+import Cropper, { type Area, type MediaSize, type Point, type Size } from 'react-easy-crop'
 import { Camera, Images, RotateCw } from 'lucide-react'
 import {
   ANCHO_MINIMO_NITIDO,
   PROPORCION,
   cargarImagen,
+  medidasRotadas,
   prepararFoto,
+  zoomMinimoEntera,
 } from '@/lib/documentos/identificacionFoto'
 
 /**
@@ -116,6 +118,14 @@ export default function CapturaIdentificacion({ documentoId, rol, onListo }: Pro
   const [rotacion, setRotacion] = useState(0)
   const [areaPixels, setAreaPixels] = useState<Area | null>(null)
 
+  /**
+   * Las medidas que la librería reporta de sí misma: la imagen como se pinta y
+   * el rectángulo de recorte. Viven en refs —no se renderiza nada con ellas—
+   * y las consume `limitarPosicion`.
+   */
+  const mediaRef = useRef<MediaSize | null>(null)
+  const cropSizeRef = useRef<Size | null>(null)
+
   const inputCamaraRef = useRef<HTMLInputElement>(null)
   const inputArchivoRef = useRef<HTMLInputElement>(null)
   /**
@@ -198,8 +208,57 @@ export default function CapturaIdentificacion({ documentoId, rol, onListo }: Pro
    * papel. `prepararFoto` no escala hacia arriba —correcto: inventar píxeles no
    * mejora una credencial— así que un recorte por debajo del mínimo sale tal
    * cual y se imprime menos nítido. Es aviso y no bloqueo, como todo aquí.
+   *
+   * Sigue midiendo con el zoom mínimo desbloqueado: al alejar, `areaPixels`
+   * crece —cubre más fuente— así que el aviso se dispara al acercar y, sobre
+   * todo, con una fuente pequeña: una foto de galería de pocos píxeles avisa
+   * incluso alejada del todo, que es justo cuando más hace falta.
    */
   const corto = areaPixels !== null && areaPixels.width < ANCHO_MINIMO_NITIDO
+
+  /**
+   * Hasta dónde se puede ALEJAR: el zoom en que la imagen entera cabe en el
+   * rectángulo, y ni un paso más. Es la salida elegida al defecto de la
+   * credencial cortada — `objectFit: cover` con el mínimo de 1 impedía bajar de
+   * «imagen cubriendo el rectángulo», así que una credencial mayor que el marco
+   * no entraba completa. Por debajo de 1 aparecen bandas sin imagen en un eje:
+   * el tope evita las evitables y `prepararFoto` pinta de blanco las demás.
+   */
+  const zoomMinimo = fuente
+    ? zoomMinimoEntera(fuente.img.naturalWidth, fuente.img.naturalHeight, rotacion)
+    : 1
+
+  /**
+   * ⚠ EL CLAMP DE POSICIÓN ES NUESTRO PORQUE `restrictPosition` MIENTE AQUÍ.
+   * Con la prop activada, cuando la imagen no cubre el rectángulo la librería
+   * RECORTA `croppedAreaPixels` a los límites de la imagen y reconstruye el
+   * rectángulo desde el eje amputado — devuelve una región que no es la que el
+   * médico ve, que es exactamente el defecto que ya tuvo esta pantalla con el
+   * marco de adorno. Desactivada, los píxeles salen fieles (con las bandas
+   * incluidas), pero la imagen queda libre para sacarse del marco de un
+   * arrastre. Esto repone solo la parte buena: la misma fórmula de la librería
+   * (`restrictPositionCoord`, con su valor absoluto), que deja deslizar una
+   * imagen menor que el rectángulo dentro de él sin poder escapársele.
+   */
+  const limitarPosicion = useCallback((p: Point, zoomActual: number): Point => {
+    const media = mediaRef.current
+    const cropSize = cropSizeRef.current
+    if (!media || !cropSize) return p
+    const girada = medidasRotadas(media.width, media.height, rotacion)
+    const topeX = Math.abs((girada.ancho * zoomActual) / 2 - cropSize.width / 2)
+    const topeY = Math.abs((girada.alto * zoomActual) / 2 - cropSize.height / 2)
+    return {
+      x: Math.min(Math.max(p.x, -topeX), topeX),
+      y: Math.min(Math.max(p.y, -topeY), topeY),
+    }
+  }, [rotacion])
+
+  // Durante el pellizco, la librería avisa de la posición ANTES que del zoom,
+  // así que el clamp de `onCropChange` corre con el zoom del render anterior.
+  // Este efecto reajusta la posición cuando el zoom (o el giro) se asienta.
+  useEffect(() => {
+    setCrop(c => limitarPosicion(c, zoom))
+  }, [zoom, limitarPosicion])
 
   return (
     <div className="sp-idfoto">
@@ -261,8 +320,16 @@ export default function CapturaIdentificacion({ documentoId, rol, onListo }: Pro
               rotation={rotacion}
               aspect={PROPORCION}
               objectFit="cover"
+              minZoom={zoomMinimo}
+              // Apagada a propósito y sustituida por `limitarPosicion`: con la
+              // imagen sin cubrir el rectángulo, la prop devuelve unos
+              // `croppedAreaPixels` recortados a la imagen — otra región que la
+              // que se ve. La explicación entera, sobre el callback.
+              restrictPosition={false}
               style={{ cropAreaStyle: MARCO_ESTILO }}
-              onCropChange={setCrop}
+              setMediaSize={m => { mediaRef.current = m }}
+              setCropSize={s => { cropSizeRef.current = s }}
+              onCropChange={p => setCrop(limitarPosicion(p, zoom))}
               onZoomChange={setZoom}
               onCropComplete={(_area, pixeles) => setAreaPixels(pixeles)}
             />
@@ -286,10 +353,19 @@ export default function CapturaIdentificacion({ documentoId, rol, onListo }: Pro
             </button>
             {/* Foto en vertical con la credencial apaisada: sin esto, la única
                 salida era repetir la foto. Siempre horario: al cuarto toque se
-                da la vuelta completa, y para deshacer un toque bastan tres. */}
+                da la vuelta completa, y para deshacer un toque bastan tres.
+                Girar recentra y reajusta el zoom al mínimo del nuevo giro: el
+                mínimo depende de qué lado queda a lo ancho, así que el zoom
+                vigente puede quedar por debajo del tope recién calculado. */}
             <button type="button" className="sp-btn sp-btn--secondary"
               disabled={fase === 'subiendo'}
-              onClick={() => setRotacion(r => (r + 90) % 360)}>
+              onClick={() => {
+                const nueva = (rotacion + 90) % 360
+                setRotacion(nueva)
+                setCrop({ x: 0, y: 0 })
+                setZoom(z => Math.max(z,
+                  zoomMinimoEntera(fuente.img.naturalWidth, fuente.img.naturalHeight, nueva)))
+              }}>
               <RotateCw size={17} aria-hidden="true" /> Girar
             </button>
             <button type="button" className="sp-btn sp-btn--primary" style={{ flex: 1 }}
