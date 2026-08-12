@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Check, Minus, X } from 'lucide-react'
 import ModalShell from '@/components/ui/ModalShell'
 import Portal from '@/components/ui/Portal'
+import CapturaIdentificacion from '@/components/documentos/CapturaIdentificacion'
 import {
   ANCHO_BITMAP,
   GROSOR_TRAZO,
@@ -25,13 +26,20 @@ import {
  * paciente no debe poder llegar al expediente ni al listado.
  *
  * ── LO QUE ESTE COMPONENTE NO HACE ──────────────────────────────────────────
- * No escribe en la base. Reúne los cuatro desenlaces y entrega las firmas
- * capturadas a `onSellar`; el orden de las tres operaciones —firmas, sellado,
- * PDF— lo impone el formulario, que es quien conoce la fila.
+ * No escribe en la BASE. Reúne los desenlaces y entrega las firmas capturadas a
+ * `onSellar`; el orden de las tres operaciones —firmas, sellado, PDF— lo impone
+ * el formulario, que es quien conoce la fila.
  *
- * Las fotos de identificación (§6) son el paso siguiente y no existen aquí. Por
- * eso el resumen dice `Firmó` a secas y no `Firmó · sin foto`: anunciar la
- * ausencia de algo que nunca se ofreció se lee como un fallo.
+ * ── LO QUE SÍ ESCRIBE, Y POR QUÉ AQUÍ ───────────────────────────────────────
+ * La foto de identificación (§6) SÍ se sube desde aquí, dentro de
+ * `CapturaIdentificacion`, y eso es deliberado: la fila de la firma es inmutable
+ * y lleva la ruta dentro, así que la foto tiene que existir ANTES de que la fila
+ * se inserte. Insertar primero y fallar la subida dejaría una ruta muerta que ya
+ * no se puede corregir. Lo impone `20260813_firmas_documento.sql`, junto a
+ * `firmas_documento_identificacion_check`.
+ *
+ * La pregunta llega DESPUÉS de confirmar la firma y solo a quien firmó: quien no
+ * firmó no está, así que no hay identificación que capturar.
  */
 
 /** Los cuatro del flujo. El médico no entra: su rúbrica sale del perfil (§4). */
@@ -43,6 +51,13 @@ export interface FirmaCapturada {
   trazo: string
   /** ISO del sello del DISPOSITIVO: el momento real del trazo. */
   firmadoEn: string
+  /**
+   * Ruta de la foto dentro del bucket cerrado `identificaciones`, o `null` si se
+   * siguió sin foto. Va tal cual a `firmas_documento.identificacion_path`, que
+   * admite NULL: la foto nunca bloquea, así que su ausencia es un desenlace
+   * normal y no un fallo.
+   */
+  identificacionPath: string | null
 }
 
 /**
@@ -50,7 +65,7 @@ export interface FirmaCapturada {
  * paciente y de nadie más: quien no iba a firmar no llegó a entrar al flujo.
  */
 type Desenlace =
-  | { tipo: 'firmo'; trazo: string; firmadoEn: string }
+  | { tipo: 'firmo'; trazo: string; firmadoEn: string; identificacionPath: string | null }
   | { tipo: 'no_pudo' }
 
 interface Paso {
@@ -129,6 +144,12 @@ interface Props {
    */
   nombres: Record<RolFirmante, string>
   /**
+   * El borrador que se está firmando. Solo lo usa la captura de la foto: es el
+   * documento al que cuelga en el bucket, y el que la ruta de servidor comprueba
+   * que sea del médico y siga en `borrador`.
+   */
+  documentoId: string
+  /**
    * Se DECLARA en el formulario, no aquí (ver la casilla allí). Llega como dato
    * y este componente no vuelve a preguntarlo: marcarla hace obligatorio el
    * nombre del familiar, y ese nombre hay que reclamarlo antes de entrar, no
@@ -148,7 +169,7 @@ interface Props {
 }
 
 export default function FirmadoConsentimiento({
-  nombres, pacienteNoPuedeFirmar, onSalir, onSellar, sellando, errorSellado,
+  nombres, documentoId, pacienteNoPuedeFirmar, onSalir, onSellar, sellando, errorSellado,
 }: Props) {
   const [paso, setPaso] = useState(0)
   const [desenlaces, setDesenlaces] = useState<Partial<Record<RolFirmante, Desenlace>>>({})
@@ -157,6 +178,14 @@ export default function FirmadoConsentimiento({
   const [errorTrazo, setErrorTrazo] = useState('')
   const [confirmarSellado, setConfirmarSellado] = useState(false)
   const [confirmarSalida, setConfirmarSalida] = useState(false)
+  /**
+   * La firma que ya se confirmó y está esperando la respuesta sobre su foto
+   * (§6.1). Mientras vive, el lienzo deja el sitio a la captura: el trazo ya no
+   * se toca y volver a enseñarlo invitaría a rehacerlo cuando el paso siguiente
+   * es otro. Se resuelve —con foto o sin ella— en `resolver`.
+   */
+  const [pendienteFoto, setPendienteFoto] =
+    useState<{ rol: RolFirmante; trazo: string; firmadoEn: string } | null>(null)
 
   const lienzoRef = useRef<HTMLCanvasElement>(null)
 
@@ -165,7 +194,10 @@ export default function FirmadoConsentimiento({
 
   const enResumen = paso >= firmantes.length
   const actual = enResumen ? null : firmantes[paso]
-  const hayFirmas = Object.values(desenlaces).some(d => d.tipo === 'firmo')
+  // La pendiente de foto cuenta: es un trazo ya capturado que se perdería al
+  // salir, aunque su paso todavía no esté resuelto.
+  const hayFirmas = pendienteFoto !== null
+    || Object.values(desenlaces).some(d => d.tipo === 'firmo')
   /** El lienzo se APAGA —no se borra— cuando este paso es el de un paciente que no puede firmar. */
   const apagado = actual?.rol === 'paciente' && pacienteNoPuedeFirmar
 
@@ -194,10 +226,19 @@ export default function FirmadoConsentimiento({
     setDesenlaces(siguientes)
     setErrorTrazo('')
     setTieneTrazo(false)
+    setPendienteFoto(null)
     const pendiente = firmantes.findIndex(p => siguientes[p.rol] === undefined)
     setPaso(pendiente === -1 ? firmantes.length : pendiente)
   }
 
+  /**
+   * Confirmar NO resuelve el paso todavía: deja la firma en `pendienteFoto` y
+   * abre la pregunta de §6.1. El paso se resuelve cuando la captura responde,
+   * con ruta o con `null` —«sin foto» es una respuesta, no una cancelación—.
+   *
+   * El paciente que no puede firmar es la excepción: no hay firma, así que no
+   * hay a quién preguntarle por su identificación.
+   */
   function confirmarFirma(): void {
     if (!actual) return
     if (apagado) { resolver(actual.rol, { tipo: 'no_pudo' }); return }
@@ -210,7 +251,8 @@ export default function FirmadoConsentimiento({
         : 'El lienzo está vacío: no hay ningún trazo que guardar.')
       return
     }
-    resolver(actual.rol, { tipo: 'firmo', trazo: res.trazo, firmadoEn: new Date().toISOString() })
+    setErrorTrazo('')
+    setPendienteFoto({ rol: actual.rol, trazo: res.trazo, firmadoEn: new Date().toISOString() })
   }
 
   /** Vuelve a ese firmante SIN deshacer los demás (§7.1). */
@@ -220,6 +262,7 @@ export default function FirmadoConsentimiento({
     setDesenlaces(resto)
     setTieneTrazo(false)
     setErrorTrazo('')
+    setPendienteFoto(null)
     setPaso(firmantes.findIndex(p => p.rol === rol))
   }
 
@@ -228,7 +271,12 @@ export default function FirmadoConsentimiento({
     const firmas: FirmaCapturada[] = []
     for (const p of firmantes) {
       const d = desenlaces[p.rol]
-      if (d?.tipo === 'firmo') firmas.push({ rol: p.rol, trazo: d.trazo, firmadoEn: d.firmadoEn })
+      if (d?.tipo === 'firmo') {
+        firmas.push({
+          rol: p.rol, trazo: d.trazo, firmadoEn: d.firmadoEn,
+          identificacionPath: d.identificacionPath,
+        })
+      }
     }
     onSellar(firmas, firmantes.length)
   }
@@ -318,53 +366,71 @@ export default function FirmadoConsentimiento({
                 <p className="sp-hint">{actual.titulo}</p>
               </div>
 
-              <LienzoFirma
-                key={actual.rol}
-                lienzoRef={lienzoRef}
-                etiqueta={actual.etiqueta}
-                apagado={apagado}
-                hayTinta={tieneTrazo}
-                limpiarSenal={limpiarSenal}
-                onTinta={() => { setTieneTrazo(true); setErrorTrazo('') }}
-              />
+              {/* §6 · Con la firma ya confirmada, el lienzo deja el sitio a la
+                  pregunta de la foto. El trazo no se vuelve a enseñar: ya no se
+                  toca, y verlo invitaría a rehacerlo cuando lo que toca es
+                  responder si se anexa la identificación. */}
+              {pendienteFoto !== null ? (
+                <CapturaIdentificacion
+                  key={pendienteFoto.rol}
+                  documentoId={documentoId}
+                  rol={pendienteFoto.rol}
+                  onListo={path => resolver(pendienteFoto.rol, {
+                    tipo: 'firmo',
+                    trazo: pendienteFoto.trazo,
+                    firmadoEn: pendienteFoto.firmadoEn,
+                    identificacionPath: path,
+                  })}
+                />
+              ) : (<>
+                <LienzoFirma
+                  key={actual.rol}
+                  lienzoRef={lienzoRef}
+                  etiqueta={actual.etiqueta}
+                  apagado={apagado}
+                  hayTinta={tieneTrazo}
+                  limpiarSenal={limpiarSenal}
+                  onTinta={() => { setTieneTrazo(true); setErrorTrazo('') }}
+                />
 
-              {/* §5.3 · El lienzo se apaga en vez de ocultarse: se ve que dejó de
-                  aplicar. Aquí estuvo la casilla que lo apagaba; ahora se declara
-                  en el formulario, que es donde puede exigir a tiempo el nombre
-                  del familiar. Este paso solo lo hace constar. */}
-              {apagado && (
-                <p className="sp-banner sp-banner--warn">
-                  <AlertTriangle size={17} />
-                  <span>
-                    Declaraste que el paciente no puede firmar. Firma en su lugar el familiar
-                    responsable, que es quien consiente. Si el paciente sí puede firmar, sal y
-                    desmarca la casilla en el formulario.
-                  </span>
-                </p>
-              )}
+                {/* §5.3 · El lienzo se apaga en vez de ocultarse: se ve que dejó de
+                    aplicar. Aquí estuvo la casilla que lo apagaba; ahora se declara
+                    en el formulario, que es donde puede exigir a tiempo el nombre
+                    del familiar. Este paso solo lo hace constar. */}
+                {apagado && (
+                  <p className="sp-banner sp-banner--warn">
+                    <AlertTriangle size={17} />
+                    <span>
+                      Declaraste que el paciente no puede firmar. Firma en su lugar el familiar
+                      responsable, que es quien consiente. Si el paciente sí puede firmar, sal y
+                      desmarca la casilla en el formulario.
+                    </span>
+                  </p>
+                )}
 
-              {errorTrazo && <p className="sp-banner sp-banner--danger">{errorTrazo}</p>}
+                {errorTrazo && <p className="sp-banner sp-banner--danger">{errorTrazo}</p>}
 
-              {/* §5.2 · borrar limpia el lienzo entero: no hay deshacer parcial de
-                  trazos, que en una firma no significa nada. */}
-              <div className="sp-firma-acciones">
-                <button type="button" disabled={!tieneTrazo || apagado}
-                  onClick={() => { setLimpiarSenal(n => n + 1); setTieneTrazo(false); setErrorTrazo('') }}
-                  className="sp-btn sp-btn--secondary"
-                  style={{ flex: '0 0 auto', whiteSpace: 'nowrap' }}>
-                  Borrar y repetir
-                </button>
-                <button type="button" disabled={!tieneTrazo && !apagado}
-                  onClick={confirmarFirma} className="sp-btn sp-btn--primary" style={{ flex: 1 }}>
-                  {apagado ? 'Continuar sin firma del paciente' : 'Confirmar firma'}
-                </button>
-              </div>
+                {/* §5.2 · borrar limpia el lienzo entero: no hay deshacer parcial de
+                    trazos, que en una firma no significa nada. */}
+                <div className="sp-firma-acciones">
+                  <button type="button" disabled={!tieneTrazo || apagado}
+                    onClick={() => { setLimpiarSenal(n => n + 1); setTieneTrazo(false); setErrorTrazo('') }}
+                    className="sp-btn sp-btn--secondary"
+                    style={{ flex: '0 0 auto', whiteSpace: 'nowrap' }}>
+                    Borrar y repetir
+                  </button>
+                  <button type="button" disabled={!tieneTrazo && !apagado}
+                    onClick={confirmarFirma} className="sp-btn sp-btn--primary" style={{ flex: 1 }}>
+                    {apagado ? 'Continuar sin firma del paciente' : 'Confirmar firma'}
+                  </button>
+                </div>
 
-              {/* Aquí vivía «Omitir este firmante» (§5.4). Se retiró: quien no
-                  tiene nombre no entra al flujo, así que dejar el nombre vacío ya
-                  es la forma de omitir a un testigo, y dos maneras de decir lo
-                  mismo es una de más. El paciente nunca lo tuvo: su ausencia se
-                  declara con la casilla, que dice algo distinto. */}
+                {/* Aquí vivía «Omitir este firmante» (§5.4). Se retiró: quien no
+                    tiene nombre no entra al flujo, así que dejar el nombre vacío ya
+                    es la forma de omitir a un testigo, y dos maneras de decir lo
+                    mismo es una de más. El paciente nunca lo tuvo: su ausencia se
+                    declara con la casilla, que dice algo distinto. */}
+              </>)}
             </>
           ) : (
             <>
@@ -702,8 +768,13 @@ function FilaResumen({ titulo, nombre, desenlace, deshabilitado, onRehacer }: Fi
   // Sin `Omitido`: ya no es un desenlace posible. Quien se omite no aparece en
   // esta lista porque nunca entró al flujo.
   const firmo = desenlace?.tipo === 'firmo'
+  // Los tres estados de §7.1. `sin foto` no es un reproche: la foto es cotejo y
+  // se ofreció, así que su ausencia es un dato del expediente y se enseña.
   const estado = desenlace === undefined ? 'Pendiente'
-    : desenlace.tipo === 'firmo' ? 'Firmó'
+    : desenlace.tipo === 'firmo'
+      ? desenlace.identificacionPath !== null
+        ? 'Firmó · con foto de identificación'
+        : 'Firmó · sin foto'
     : 'No pudo firmar'
 
   return (

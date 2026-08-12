@@ -15,6 +15,7 @@ import ModalShell from '@/components/ui/ModalShell'
 import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
 import SeccionPlegable from '@/components/documentos/SeccionPlegable'
 import FirmadoConsentimiento, { type FirmaCapturada } from '@/components/documentos/FirmadoConsentimiento'
+import type { IdentificacionImpresa } from '@/lib/pdf/ConsentimientoInformadoPdf'
 import { huellaDocumento } from '@/lib/documentos/firmaTrazo'
 import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
 import { createClient } from '@/lib/supabase/client'
@@ -140,12 +141,55 @@ interface FilaFirma {
   firmado_en: string
   huella: string
   dispositivo: string
+  /**
+   * La ruta de la foto de identificación dentro del bucket cerrado, o `null` si
+   * se siguió sin foto. La foto YA está subida cuando esta fila se escribe: la
+   * fila es inmutable, así que insertarla primero y fallar la subida dejaría una
+   * ruta muerta imposible de corregir. Lo dice la migración junto a
+   * `firmas_documento_identificacion_check`.
+   */
+  identificacion_path: string | null
   creado_por: string
 }
 
 /** Lee una clave de texto del jsonb: pudo guardarse con otra versión del formulario. */
 function texto(v: unknown): string {
   return typeof v === 'string' ? v : ''
+}
+
+/** El rol de la firma, ya redactado como lo imprime la hoja de anexo. */
+const TITULO_ROL: Record<FirmaCapturada['rol'], string> = {
+  paciente: 'Paciente',
+  familiar: 'Familiar o responsable',
+  testigo_1: 'Testigo 1',
+  testigo_2: 'Testigo 2',
+}
+
+/**
+ * Trae una foto de identificación del bucket CERRADO para incrustarla en el PDF.
+ *
+ * El bucket deniega a todos los usuarios —también al médico que la subió—, así
+ * que la única puerta es la ruta de servidor, que comprueba la propiedad del
+ * documento y la saca con privilegios de servicio.
+ *
+ * ⚠ FALLA EN SILENCIO, A PROPÓSITO. Aquí el documento ya está SELLADO: el folio
+ * está consumido y la fila es inmutable. Tumbar la generación del PDF porque una
+ * foto no se pudo traer dejaría al médico sin papel por lo accesorio, cuando el
+ * recuadro sabe componerse sin ella —lleva su leyenda de que no se capturó—.
+ */
+async function traerFoto(documentoId: string, ruta: string | null): Promise<string | undefined> {
+  if (ruta === null) return undefined
+  try {
+    const res = await fetch(
+      `/api/documentos/${documentoId}/identificacion?path=${encodeURIComponent(ruta)}`,
+    )
+    if (!res.ok) throw new Error(`GET ${res.status}`)
+    const { dataUrl } = (await res.json()) as { dataUrl?: string }
+    return dataUrl
+  } catch (err) {
+    console.error('[ConsentimientoInformadoForm] traerFoto falló:', err)
+    return undefined
+  }
 }
 
 const SECCIONES_DEFAULT = {
@@ -793,6 +837,7 @@ export default function ConsentimientoInformadoForm({
         firmado_en: f.firmadoEn,
         huella: firmando.huella,
         dispositivo,
+        identificacion_path: f.identificacionPath,
         creado_por: user.id,
       }))
       // El médico no firma en el flujo —su rúbrica sale del perfil— pero SÍ se
@@ -804,6 +849,9 @@ export default function ConsentimientoInformadoForm({
         firmado_en: selladoEn,
         huella: firmando.huella,
         dispositivo,
+        // El anexo reproduce la identificación de quien CONSIENTE, no la de
+        // quien informa: al médico no se le pregunta y no tiene ruta.
+        identificacion_path: null,
         creado_por: user.id,
       })
       const { error: errFirmas } = await supabase.from('firmas_documento').insert(filas)
@@ -825,6 +873,21 @@ export default function ConsentimientoInformadoForm({
       selladoOk = true
 
       // ── 3 · EL PDF, ya con el folio, las rúbricas y los sellos ───────
+      //    Antes, las fotos: el PDF se compone en el NAVEGADOR y las lleva
+      //    DENTRO, incrustadas, así que reimprimir dentro de un año no depende
+      //    de que la foto siga existiendo. Una fila por firmante que firmó,
+      //    tenga foto o no: el recuadro sin ella lleva su leyenda.
+      const nombresPorRol: Record<FirmaCapturada['rol'], string> = {
+        paciente, familiar, testigo_1: testigo1, testigo_2: testigo2,
+      }
+      const identificaciones: IdentificacionImpresa[] = await Promise.all(
+        firmas.map(async f => ({
+          rol: TITULO_ROL[f.rol],
+          nombre: nombresPorRol[f.rol].trim() || TITULO_ROL[f.rol],
+          foto: await traerFoto(firmando.documentoId, f.identificacionPath),
+        })),
+      )
+
       const papel = datosDePapel()
       const { blob, storagePath } = await generarPdf({
         tipo: 'consentimiento_informado',
@@ -848,6 +911,8 @@ export default function ConsentimientoInformadoForm({
           // entran los que tenían nombre. No se puede deducir de las firmas
           // capturadas, así que viaja desde el modo hasta el papel.
           previstos,
+          // La hoja de anexo solo se imprime si al menos una trae fotografía.
+          identificaciones,
         },
         logoUrl: papel.logoUrl,
         filename: generateDocFileName(paciente, 'Consentimiento_Informado'),
@@ -1476,6 +1541,7 @@ export default function ConsentimientoInformadoForm({
       {firmando && (
         <FirmadoConsentimiento
           nombres={{ paciente, familiar, testigo_1: testigo1, testigo_2: testigo2 }}
+          documentoId={firmando.documentoId}
           pacienteNoPuedeFirmar={pacienteNoPuedeFirmar}
           onSalir={() => { if (!sellando) { setFirmando(null); setErrorSellado('') } }}
           onSellar={sellar}

@@ -29,6 +29,27 @@ export interface FirmaImpresa {
   firmadoEn: string
 }
 
+/**
+ * Una identificación de la hoja de anexo — GUIA_FORMULARIOS_05 §6.
+ *
+ * Una por firmante QUE FIRMÓ, tenga foto o no: quien firmó sin ella lleva su
+ * recuadro con la leyenda de que no se capturó, que es un dato del expediente y
+ * no un hueco. El médico no entra: el anexo reproduce la identificación de quien
+ * consiente, no la de quien informa.
+ */
+export interface IdentificacionImpresa {
+  /** El rol, ya redactado: `Paciente`, `Testigo 1`. */
+  rol: string
+  nombre: string
+  /**
+   * Data-URL de la foto, ya traída del bucket cerrado por quien llama. Ausente
+   * cuando se siguió sin foto —o cuando traerla falló, que tampoco bloquea—.
+   */
+  foto?: string
+  /** El campo «Identificación» del formulario, si lo lleva. */
+  identificacion?: string
+}
+
 export interface ConsentimientoData {
   paciente: string
   lugar: string
@@ -93,6 +114,12 @@ export interface ConsentimientoData {
    * pidieron dos, e inventaría dos ausencias que nunca existieron.
    */
   previstos?: number
+  /**
+   * Las identificaciones de la hoja de anexo. **La hoja solo se imprime si al
+   * menos una trae fotografía**: sin ninguna, el documento cierra en las firmas
+   * y no se añade una hoja entera de recuadros vacíos.
+   */
+  identificaciones?: IdentificacionImpresa[]
 }
 
 /**
@@ -122,6 +149,55 @@ export interface ConsentimientoProps {
   data: ConsentimientoData
   logoUrl?: string
   consultorio?: PdfConsultorioData
+}
+
+/* ------------------------------------------------------------------ */
+/*  Anexo · identificación de firmantes                                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * ⚠ TRABAJO CON FECHA DE CADUCIDAD CONOCIDA, Y ESTÁ DECIDIDO ASÍ.
+ *
+ * La hoja de anexo ya existe, mejor medida y con su propio sistema tipográfico,
+ * en el formato v2: `src/lib/pdf/v2/formatos/ConsentimientoInformado.tsx`
+ * (`IdentificacionAnexo`, `RecuadroAnexo`, la constante `ANEXO`). Lo que sigue
+ * es una RÉPLICA de su geometría en este renderer, no un diseño nuevo.
+ *
+ * Se replicó porque v1 es el que emite hoy: `mobileShare.ts` manda
+ * `consentimiento_informado` aquí, y v2 entero sigue detrás del interruptor
+ * apagado que describe la nota de `soloDenegacion` —ninguno de sus formatos se
+ * usa en producción—. Sin esta hoja, la captura de fotos del Paso 5.8 subiría
+ * identificaciones que no salen en ningún papel.
+ *
+ * **Cuando v2 se cablee, esta sección se va con el resto del archivo**, igual
+ * que la hoja de denegación y por el mismo motivo. No la mejores: mejora la del
+ * v2, que es la que sobrevive.
+ */
+const ANEXO = {
+  /** La caja de fotografía, en puntos. Proporción 1,583 — la de una credencial. */
+  ancho: 228,
+  alto: 144,
+  /** Medianil entre las dos columnas. 228 + 30 + 228 = 486 de los 512 de contenido. */
+  medianil: 30,
+  /** Aire entre filas de la retícula. */
+  aireFilas: 20,
+} as const
+
+const ANEXO_ROTULO = 'Anexo · Identificación de firmantes'
+const ANEXO_ENTRADILLA =
+  'Reproducción de la identificación oficial del paciente y de las personas que firman el consentimiento.'
+/** La leyenda de quien firmó y no anexó identificación. Textual del v2. */
+const ANEXO_SIN_FOTO =
+  'No se capturó fotografía de la identificación de este firmante.'
+
+/** Parte las identificaciones en filas de dos, que es la retícula. */
+function enParejas(items: IdentificacionImpresa[]): IdentificacionImpresa[][] {
+  const filas: IdentificacionImpresa[][] = []
+  items.forEach((item, i) => {
+    if (i % 2 === 0) filas.push([item])
+    else filas[filas.length - 1].push(item)
+  })
+  return filas
 }
 
 const SECCION_LABELS: Array<{ key: string; num: string; titulo: string }> = [
@@ -645,6 +721,68 @@ export default function ConsentimientoInformadoPdf({
       lineHeight: 1.7,
       marginBottom: 6,
     },
+    /* Anexo · identificación de firmantes. Réplica del v2: ver la nota de ANEXO. */
+    anexoEntradilla: {
+      fontSize: 8,
+      color: '#666',
+      lineHeight: 1.5,
+      marginBottom: 4,
+    },
+    anexoFila: {
+      flexDirection: 'row',
+      marginTop: ANEXO.aireFilas,
+    },
+    anexoCelda: { width: ANEXO.ancho },
+    anexoCeldaSiguiente: { marginLeft: ANEXO.medianil },
+    anexoNumero: {
+      fontSize: 8,
+      fontWeight: 700,
+      color: colors.cs,
+      marginRight: 6,
+    },
+    anexoRol: {
+      fontSize: 8,
+      fontWeight: 700,
+      color: colors.cp,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    anexoNombre: {
+      fontSize: 9,
+      color: '#1a1a1a',
+      marginTop: 1,
+    },
+    /* El filete de acento que abre la caja. Es su borde superior: dibujar los
+       dos daría una línea doble donde el v2 tiene una. */
+    anexoFilete: {
+      height: 2,
+      backgroundColor: colors.cp,
+      marginTop: 5,
+    },
+    anexoCaja: {
+      height: ANEXO.alto,
+      borderLeftWidth: 1,
+      borderRightWidth: 1,
+      borderBottomWidth: 1,
+      borderColor: '#d1d5db',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    anexoConFoto: { backgroundColor: '#f8fafc' },
+    anexoSinFoto: { paddingHorizontal: 24 },
+    /* La foto no se estira: conserva su proporción dentro de la caja. */
+    anexoFoto: { width: '100%', height: '100%', objectFit: 'contain' },
+    anexoLeyenda: {
+      fontSize: 7.5,
+      color: '#999',
+      textAlign: 'center',
+      lineHeight: 1.5,
+    },
+    anexoPie: {
+      fontSize: 7.5,
+      color: '#666',
+      marginTop: 4,
+    },
   })
 
   /* ---------- Render section block ---------- */
@@ -732,6 +870,48 @@ export default function ConsentimientoInformadoPdf({
           trazo={porRol.get('testigo_2')?.trazo}
           sello={pieDe('testigo_2')}
         />
+      </View>
+    )
+  }
+
+  /* ---------- Anexo · identificación de firmantes (§6) ---------- */
+  // La hoja SOLO existe si al menos una identificación trae fotografía: sin
+  // ninguna, el documento cierra en las firmas y no se añade una hoja entera de
+  // recuadros vacíos. Réplica de la decisión de producto 5 del formato v2.
+  const identificaciones = data.identificaciones ?? []
+  const hayAnexo = identificaciones.some(i => (i.foto ?? '') !== '')
+
+  /**
+   * Un recuadro. Con foto o sin ella, el rol y el nombre se imprimen igual.
+   *
+   * Una función que devuelve un ELEMENTO, no un componente declarado dentro del
+   * render: los dos que sí lo son en este archivo —`SeccionBlock` y
+   * `FirmasBlock`— ya arrastran el aviso del linter, y no se le suma un tercero.
+   */
+  function recuadroAnexo(id: IdentificacionImpresa, numero: number): ReactElement {
+    const foto = id.foto ?? ''
+    return (
+      <View wrap={false}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+          <Text style={s.anexoNumero}>{String(numero).padStart(2, '0')}</Text>
+          <View>
+            <Text style={s.anexoRol}>{id.rol.toUpperCase()}</Text>
+            <Text style={s.anexoNombre}>{id.nombre}</Text>
+          </View>
+        </View>
+        <View style={s.anexoFilete} />
+        <View style={[s.anexoCaja, foto ? s.anexoConFoto : s.anexoSinFoto]}>
+          {foto ? (
+            /* eslint-disable-next-line jsx-a11y/alt-text -- el <Image> de
+               @react-pdf/renderer no acepta alt: no es una imagen del DOM. */
+            <Image style={s.anexoFoto} src={foto} />
+          ) : (
+            <Text style={s.anexoLeyenda}>{ANEXO_SIN_FOTO}</Text>
+          )}
+        </View>
+        {id.identificacion ? (
+          <Text style={s.anexoPie}>{id.identificacion}</Text>
+        ) : null}
       </View>
     )
   }
@@ -1001,6 +1181,47 @@ export default function ConsentimientoInformadoPdf({
           <FirmasBlock />
           {cierreSellado}
       </Page>
+
+      {/* ============ ANEXO — hoja condicional (§6) ============
+          Solo si al menos una identificación trae fotografía. Un consentimiento
+          en el que nadie anexó identificación cierra en las firmas. */}
+      {hayAnexo ? (
+        <Page size="LETTER" style={s.page}>
+          <View fixed style={s.headerFixed}>
+            <BarraTop colors={colors} />
+            <View style={s.headerInner}>
+              <PdfHeader
+                medico={medico}
+                colors={colors}
+                logoUrl={logoUrl}
+                folio={data.folio}
+                fecha={data.fecha}
+                compact
+                consultorio={consultorio}
+              />
+            </View>
+          </View>
+          <View fixed style={s.footerFixed}>
+            <BarraBottom colors={colors} medico={medico} consultorio={consultorio} />
+          </View>
+
+          <PdfWatermark logoUrl={logoUrl} />
+
+            <Text style={s.contLabel}>{ANEXO_ROTULO}</Text>
+            <Text style={s.anexoEntradilla}>{ANEXO_ENTRADILLA}</Text>
+
+            {enParejas(identificaciones).map((fila, indiceFila) => (
+              <View key={fila[0].rol} style={s.anexoFila}>
+                {fila.map((id, columna) => (
+                  <View key={id.rol}
+                    style={columna === 0 ? s.anexoCelda : [s.anexoCelda, s.anexoCeldaSiguiente]}>
+                    {recuadroAnexo(id, indiceFila * 2 + columna + 1)}
+                  </View>
+                ))}
+              </View>
+            ))}
+        </Page>
+      ) : null}
       </>)}
 
       {/* ============ DENEGACIÓN — hoja única y excluyente ============ */}
