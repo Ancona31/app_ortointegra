@@ -32,6 +32,49 @@ import { cargarImagen, prepararFoto } from '@/lib/documentos/identificacionFoto'
 /** Dónde se eligió la foto, para que «Repetir» vuelva al mismo sitio. */
 type Origen = 'camara' | 'archivo'
 
+/**
+ * Qué decirle al médico cuando la cámara no arranca.
+ *
+ * ── ⚠ POR QUÉ `NotAllowedError` NO SE PUEDE PARTIR EN DOS ───────────────────
+ * Ese nombre cubre DOS cosas muy distintas, y la excepción no las distingue:
+ *
+ *   · El usuario rechazó el permiso — se le preguntó y dijo que no. Se arregla
+ *     volviéndolo a conceder desde los ajustes del navegador.
+ *   · La POLÍTICA DE PERMISOS del documento no incluye la cámara — el navegador
+ *     deniega SIN PREGUNTAR. No hay ningún permiso que conceder: se arregla en
+ *     la cabecera `Permissions-Policy` de `next.config.ts`, y hasta que alguien
+ *     la toque, el médico puede intentarlo mil veces sin que cambie nada.
+ *
+ * Blink mete «permissions policy» en el texto del mensaje y WebKit devuelve una
+ * frase genérica, así que mirar la cadena solo funcionaría en la mitad de los
+ * dispositivos —y esta pantalla se usa sobre todo en iPad—. No se adivina: se
+ * nombran los dos casos y se da al médico el ÚNICO dato que sí los separa desde
+ * fuera, que es si llegó a salir el diálogo de permiso.
+ *
+ * El nombre exacto va a la consola, no aquí: aquí estorba.
+ */
+function mensajeDeCamara(err: Error): string {
+  switch (err.name) {
+    case 'NotFoundError':
+    case 'DevicesNotFoundError':
+      return 'Este dispositivo no tiene cámara. Elige la foto desde un archivo o sigue sin ella.'
+    case 'NotReadableError':
+    case 'TrackStartError':
+      return 'La cámara está ocupada por otra aplicación. Ciérrala e inténtalo, '
+        + 'o elige la foto desde un archivo.'
+    case 'OverconstrainedError':
+      return 'Esa cámara ya no está disponible. Elige otra, usa un archivo o sigue sin foto.'
+    case 'NotAllowedError':
+    case 'SecurityError':
+      return 'El navegador no autorizó la cámara. Si NO te pidió permiso, no hay nada que '
+        + 'conceder: la aplicación no la tiene habilitada en esta pantalla y hay que avisar a '
+        + 'soporte. Si sí te lo pidió y lo rechazaste, concédelo en los ajustes del navegador. '
+        + 'Mientras tanto, elige la foto desde un archivo o sigue sin ella.'
+    default:
+      return 'No se pudo abrir la cámara. Elige la foto desde un archivo o sigue sin ella.'
+  }
+}
+
 type Fase = 'pregunta' | 'camara' | 'revisar' | 'archivo' | 'subiendo'
 
 interface Props {
@@ -125,32 +168,58 @@ export default function CapturaIdentificacion({ documentoId, rol, onListo }: Pro
    */
   async function abrirCamara(id?: string): Promise<void> {
     setAviso('')
+    apagar()
+    let flujo: MediaStream
     try {
-      apagar()
+      // ⚠ SOLO LO NEGOCIABLE. `facingMode` e `ideal` los ajusta el dispositivo si
+      // no puede darlos; lo único exacto es el `deviceId`, y solo cuando el
+      // médico ha elegido una cámara concreta de la lista. Pedir una resolución
+      // o una cámara EXACTAS hace que la petición se rechace entera en vez de
+      // negociar, y entonces la cámara no arranca en el dispositivo que no las
+      // tenga.
       const video: MediaTrackConstraints = id
         ? { deviceId: { exact: id } }
         // `environment` y no `user`: se fotografía un documento sobre la mesa,
         // no una cara. En un portátil con una sola cámara se ignora solo.
         : { facingMode: 'environment' }
       video.width = { ideal: 1920 }
-      const flujo = await navigator.mediaDevices.getUserMedia({ video })
-      flujoRef.current = flujo
-      // Cambiar de cámara no cambia de fase, así que el efecto de arriba no se
-      // vuelve a disparar: aquí el `<video>` ya está montado y se engancha solo.
-      if (videoRef.current) videoRef.current.srcObject = flujo
-      setFase('camara')
-      setOrigen('camara')
-      // Las etiquetas de los dispositivos solo llegan con el permiso ya
-      // concedido, así que enumerar antes daría una lista de cadenas vacías.
-      const todos = await navigator.mediaDevices.enumerateDevices()
-      setCamaras(todos.filter(d => d.kind === 'videoinput'))
-      setCamaraId(id ?? '')
-    } catch {
-      // Ni «permiso denegado» ni «no hay cámara» por separado: desde aquí las
-      // dos se ven igual, y las dos tienen la misma salida.
-      setAviso('No se pudo abrir la cámara. Elige la foto desde un archivo o sigue sin ella.')
+      flujo = await navigator.mediaDevices.getUserMedia({ video })
+    } catch (err) {
+      // ⚠ LA EXCEPCIÓN SE LIGA Y SE REGISTRA. NO LA VUELVAS A DESCARTAR.
+      // Este `catch` estuvo sin ligar, y por eso la denegación por política de
+      // permisos —que fallaba idéntico en iPad y en Android— no dejaba ni un
+      // rastro con el que diagnosticarla: solo se veía el texto de la interfaz,
+      // que además mandaba a conceder un permiso que nadie iba a pedir. El
+      // nombre es el dato fiable; el mensaje cambia según la máquina.
+      const fallo = err instanceof Error ? err : new Error(String(err))
+      console.error('[CapturaIdentificacion] getUserMedia falló:', fallo.name, '·', fallo.message)
+      setAviso(mensajeDeCamara(fallo))
       setFase('archivo')
       setOrigen('archivo')
+      return
+    }
+
+    flujoRef.current = flujo
+    // Cambiar de cámara no cambia de fase, así que el efecto de arriba no se
+    // vuelve a disparar: aquí el `<video>` ya está montado y se engancha solo.
+    if (videoRef.current) videoRef.current.srcObject = flujo
+    setFase('camara')
+    setOrigen('camara')
+    setCamaraId(id ?? '')
+
+    // ⚠ FUERA DEL `try` DE ARRIBA, Y A PROPÓSITO. La lista de cámaras es un lujo
+    // —sirve para elegir entre la del portátil y una de documentos—, no una
+    // condición para firmar. Compartiendo el `catch` con `getUserMedia`, un
+    // fallo aquí apagaba una cámara YA ABIERTA y enseñaba el mensaje de error.
+    //
+    // Y va DESPUÉS de `getUserMedia` porque enumerar antes del permiso devuelve
+    // una lista sin etiquetas ni identificadores útiles —en iOS, sobre todo—, y
+    // un selector construido con eso no sirve para elegir nada.
+    try {
+      const todos = await navigator.mediaDevices.enumerateDevices()
+      setCamaras(todos.filter(d => d.kind === 'videoinput'))
+    } catch (err) {
+      console.error('[CapturaIdentificacion] enumerateDevices falló:', err)
     }
   }
 
