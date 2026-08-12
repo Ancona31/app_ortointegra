@@ -2126,6 +2126,21 @@ a:hover { color: var(--sp-primary-active); }
 }
 .sp-idfoto-previa img { width: 100%; height: 100%; object-fit: contain; display: block; }
 
+/* ⚠ ANDAMIO DE DEPURACIÓN — se borra junto con el `<details>` de
+   CapturaIdentificacion.tsx cuando la cámara móvil funcione. No es cromo del
+   producto: es lo único que deja leer el fallo en un iPad, que no tiene consola.
+   `pre` con ajuste de línea porque el agente de usuario es una línea larguísima
+   y sin `wrap` se sale de la pantalla en vez de partirse. */
+.sp-idfoto-diag {
+  border: var(--sp-bw-hair) dashed var(--sp-line-dash); border-radius: var(--sp-r-field-sm);
+  padding: var(--sp-2-5); color: var(--sp-ink-350);
+}
+.sp-idfoto-diag summary { font-size: var(--sp-fs-legal); cursor: pointer; }
+.sp-idfoto-diag pre {
+  margin: var(--sp-2) 0; font-size: 11px; line-height: 1.5;
+  white-space: pre-wrap; overflow-wrap: anywhere; user-select: text;
+}
+
 @media (max-width: 379px) {
   .sp-idfoto-card { flex-direction: column; }
   .sp-idfoto-controles > .sp-btn { width: 100%; }

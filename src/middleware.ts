@@ -20,6 +20,10 @@ const PWA_PUBLIC_ASSETS = new Set([
   '/icon-512.png',
   '/apple-touch-icon.png',
   '/offline',  // fallback del SW — debe ser accesible sin sesión
+  // ⚠ ANDAMIO — paso 0 de la captura nativa (prueba de `capture` en iPad y
+  // Android, sin exigir sesión en el dispositivo). Se borra esta línea junto
+  // con public/prueba-captura.html cuando la prueba termine.
+  '/prueba-captura.html',
 ])
 
 export async function middleware(request: NextRequest) {

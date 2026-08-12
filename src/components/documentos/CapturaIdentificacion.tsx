@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Camera, Images, Upload } from 'lucide-react'
-import { cargarImagen, prepararFoto } from '@/lib/documentos/identificacionFoto'
+import { cargarImagen, prepararFoto, recorteDelMarco } from '@/lib/documentos/identificacionFoto'
 
 /**
  * Foto de identificación de un firmante — GUIA_FORMULARIOS_05 §6.
@@ -31,6 +31,65 @@ import { cargarImagen, prepararFoto } from '@/lib/documentos/identificacionFoto'
 
 /** Dónde se eligió la foto, para que «Repetir» vuelva al mismo sitio. */
 type Origen = 'camara' | 'archivo'
+
+/* ============================================================================
+ * ⚠ ANDAMIO DE DEPURACIÓN — SE QUITA ENTERO CUANDO LA CÁMARA MÓVIL FUNCIONE
+ * ============================================================================
+ *
+ * Esto NO es una función del producto: es un panel que enseña en la propia
+ * pantalla lo que en un iPad no hay forma de leer de otra manera. iPadOS no
+ * tiene consola en el dispositivo —el Web Inspector de Safari exige un Mac, y el
+ * emparejamiento inicial va por cable—, y en Android `chrome://inspect` también
+ * sale de un ordenador. Sin esto, un `console.error` en el dispositivo donde
+ * ocurre el fallo es un mensaje que nadie puede leer.
+ *
+ * Se quita en un solo tirón: esta constante, `recogerDiagnostico`, los dos
+ * estados `diagnostico`/`copiado`, sus tres asignaciones y el `<details>` del
+ * final del render. Nada más depende de ello.
+ *
+ * ── LO QUE RECOGE, Y POR QUÉ CADA COSA ──────────────────────────────────────
+ * · `excepcion` — el nombre es el dato que decide. `NotAllowedError` y
+ *   `SecurityError` se ven igual desde la interfaz y tienen causas distintas.
+ * · `Permissions-Policy` — LA CABECERA TAL COMO LLEGA A ESTE DISPOSITIVO Y EN
+ *   ESTA URL, pedida con un HEAD a la propia página. Es lo único que zanja si lo
+ *   que se sirve en el despliegue es lo mismo que se sirve en local: si el móvil
+ *   entra por otra dirección, o si algo por delante añade su propia política,
+ *   aquí se ve. Medirlo en local no lo demuestra.
+ * · `origen` y `ruta` — para ver si el móvil está entrando por una dirección que
+ *   la regla de `next.config.ts` no cubre.
+ * · `seguro` — `getUserMedia` no existe fuera de contexto seguro.
+ * · el estado del vídeo — solo sirve si la cámara llegó a abrirse.
+ * ========================================================================== */
+
+/** Una línea del panel. Se compone a mano para que se lea en una pantalla de móvil. */
+function linea(clave: string, valor: string): string {
+  return `${clave.padEnd(14)}${valor}`
+}
+
+async function recogerDiagnostico(err: Error | null, video: HTMLVideoElement | null): Promise<string> {
+  const lineas: string[] = []
+  if (err) lineas.push(linea('excepcion', `${err.name}: ${err.message}`))
+  lineas.push(linea('origen', window.location.origin))
+  lineas.push(linea('ruta', window.location.pathname))
+  lineas.push(linea('seguro', String(window.isSecureContext)))
+  lineas.push(linea('mediaDevices', navigator.mediaDevices === undefined ? 'no' : 'sí'))
+
+  // El HEAD va a la propia página, no a una ruta cualquiera: lo que interesa es
+  // la política que rige ESTE documento.
+  try {
+    const res = await fetch(window.location.href, { method: 'HEAD', cache: 'no-store' })
+    lineas.push(linea('policy', res.headers.get('permissions-policy') ?? '(ninguna)'))
+  } catch (e) {
+    lineas.push(linea('policy', `(no se pudo leer: ${e instanceof Error ? e.message : String(e)})`))
+  }
+
+  if (video) {
+    lineas.push(linea('video', `readyState=${video.readyState} paused=${video.paused} `
+      + `${video.videoWidth}x${video.videoHeight} playsinline=${video.hasAttribute('playsinline')}`))
+  }
+  lineas.push(linea('ua', navigator.userAgent))
+  return lineas.join('\n')
+}
 
 /**
  * Qué decirle al médico cuando la cámara no arranca.
@@ -96,10 +155,16 @@ export default function CapturaIdentificacion({ documentoId, rol, onListo }: Pro
   const [camaras, setCamaras] = useState<MediaDeviceInfo[]>([])
   const [camaraId, setCamaraId] = useState<string>('')
   const [aviso, setAviso] = useState('')
+  /** Ver `ANDAMIO DE DEPURACIÓN`. Vacío mientras no falle nada. */
+  const [diagnostico, setDiagnostico] = useState('')
+  const [copiado, setCopiado] = useState(false)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const flujoRef = useRef<MediaStream | null>(null)
   const archivoRef = useRef<HTMLInputElement>(null)
+  /** El visor y el marco: de sus rectángulos REALES sale el recorte. Ver `disparar`. */
+  const visorRef = useRef<HTMLDivElement>(null)
+  const marcoRef = useRef<HTMLSpanElement>(null)
   /**
    * Espejo del object-URL de la previa. Vive en un ref y no solo en el estado
    * porque quien lo revoca al desmontar es una limpieza que corre UNA vez: con
@@ -158,7 +223,19 @@ export default function CapturaIdentificacion({ documentoId, rol, onListo }: Pro
    */
   useEffect(() => {
     if (fase !== 'camara') return
-    if (videoRef.current && flujoRef.current) videoRef.current.srcObject = flujoRef.current
+    const video = videoRef.current
+    if (!video || !flujoRef.current) return
+    video.srcObject = flujoRef.current
+    // ⚠ `autoPlay` NO BASTA, Y `play()` NO SOBRA. Asignar `srcObject` DESPUÉS del
+    // montaje no siempre vuelve a evaluar el arranque automático: en escritorio
+    // suele arrancar igual, y en iOS y Android el elemento se queda pausado, con
+    // el visor negro y `videoWidth` en 0. Es un fallo sin excepción, así que sin
+    // esta llamada —y sin su registro— no deja ningún rastro.
+    void video.play().catch((err: unknown) => {
+      const fallo = err instanceof Error ? err : new Error(String(err))
+      console.error('[CapturaIdentificacion] play() falló:', fallo.name, '·', fallo.message)
+      void recogerDiagnostico(fallo, video).then(setDiagnostico)
+    })
   }, [fase])
 
   /**
@@ -193,6 +270,8 @@ export default function CapturaIdentificacion({ documentoId, rol, onListo }: Pro
       // nombre es el dato fiable; el mensaje cambia según la máquina.
       const fallo = err instanceof Error ? err : new Error(String(err))
       console.error('[CapturaIdentificacion] getUserMedia falló:', fallo.name, '·', fallo.message)
+      // Andamio: en el iPad la consola de arriba no la lee nadie.
+      void recogerDiagnostico(fallo, null).then(setDiagnostico)
       setAviso(mensajeDeCamara(fallo))
       setFase('archivo')
       setOrigen('archivo')
@@ -223,12 +302,31 @@ export default function CapturaIdentificacion({ documentoId, rol, onListo }: Pro
     }
   }
 
-  /** El disparador: recorta a la proporción del anexo y pasa a confirmar o repetir. */
+  /**
+   * El disparador: guarda LO QUE EL MARCO ENCIERRA, no el fotograma entero.
+   *
+   * Los dos rectángulos se miden aquí, en el momento del disparo, y no se
+   * deducen del CSS: el visor cambia de proporción con el alto de la ventana
+   * —`max-height: 60vh` gana a su `aspect-ratio`— y el marco depende del ancho
+   * del contenedor. Medirlos al disparar es lo que hace que girar el dispositivo
+   * entre abrir la cámara y apretar el botón no descuadre nada.
+   */
   async function disparar(): Promise<void> {
     const video = videoRef.current
     if (!video) return
-    const blob = await prepararFoto(video)
-    if (!blob) { setAviso('La cámara todavía no entrega imagen. Inténtalo otra vez.'); return }
+    const caja = visorRef.current?.getBoundingClientRect()
+    const marco = marcoRef.current?.getBoundingClientRect()
+    const recorte = caja && marco
+      ? recorteDelMarco(video.videoWidth, video.videoHeight, caja, marco)
+      : undefined
+    const blob = await prepararFoto(video, recorte)
+    if (!blob) {
+      setAviso('La cámara todavía no entrega imagen. Inténtalo otra vez.')
+      // Sin excepción no hay más rastro que este: es la forma de fallo que no
+      // deja error, solo un visor negro.
+      void recogerDiagnostico(null, video).then(setDiagnostico)
+      return
+    }
     apagar()
     ponerPrevia(blob)
     setFase('revisar')
@@ -286,11 +384,13 @@ export default function CapturaIdentificacion({ documentoId, rol, onListo }: Pro
 
       {fase === 'camara' && (
         <>
-          <div className="sp-idfoto-visor">
+          <div ref={visorRef} className="sp-idfoto-visor">
             <video ref={videoRef} autoPlay playsInline muted className="sp-idfoto-video" />
-            {/* El marco lleva la proporción de la caja del anexo: lo encuadrado
-                es lo impreso, sin recortes posteriores. */}
-            <span className="sp-idfoto-marco" aria-hidden="true">
+            {/* ⚠ ESTE MARCO GOBIERNA EL RECORTE, no es un adorno: su rectángulo
+                real se mide al disparar y de ahí sale lo que se guarda. Lo fue
+                —solo dibujo— y la foto salía con el fotograma entero. Si le
+                cambias el tamaño o la posición, cambia lo capturado. */}
+            <span ref={marcoRef} className="sp-idfoto-marco" aria-hidden="true">
               <i /><i /><i /><i />
             </span>
           </div>
@@ -375,6 +475,24 @@ export default function CapturaIdentificacion({ documentoId, rol, onListo }: Pro
             </button>
           </div>
         </>
+      )}
+
+      {/* ⚠ ANDAMIO DE DEPURACIÓN — se quita entero, ver la nota de arriba.
+          Plegado por defecto: el paciente puede tener el dispositivo delante y
+          esto no es para él. Solo aparece cuando algo ha fallado. */}
+      {diagnostico !== '' && (
+        <details className="sp-idfoto-diag">
+          <summary>Detalle técnico del fallo</summary>
+          <pre>{diagnostico}</pre>
+          <button type="button" className="sp-btn sp-btn--compact"
+            onClick={() => {
+              void navigator.clipboard?.writeText(diagnostico)
+                .then(() => setCopiado(true))
+                .catch(() => setCopiado(false))
+            }}>
+            {copiado ? 'Copiado' : 'Copiar'}
+          </button>
+        </details>
       )}
     </div>
   )
