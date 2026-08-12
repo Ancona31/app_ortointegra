@@ -32,20 +32,28 @@ import { withSentryConfig } from "@sentry/nextjs";
  *
  * ── ⚠ Y POR QUÉ LOS ORÍGENES SE EXCLUYEN ENTRE SÍ ───────────────────────────
  * Next aplica TODAS las reglas cuyo `source` coincida, así que si las dos
- * cubrieran la ruta de documentos el navegador recibiría dos `Permissions-Policy`
+ * cubrieran una ruta de firmado el navegador recibiría dos `Permissions-Policy`
  * y mandaría la primera aparición de `camera` —el orden decidiría el permiso, en
- * silencio y sin error—. Por eso la regla general excluye esa ruta con un
- * lookahead en vez de confiar en el orden.
+ * silencio y sin error—. Por eso la regla general las excluye con un lookahead
+ * en vez de confiar en el orden.
  *
- * ⚠ Y ESO OBLIGA A ESCRIBIR LA RUTA DOS VECES, en dos sintaxis distintas: la
- * regla concreta usa el `:id` de path-to-regexp y el lookahead usa `[^/]+`,
- * porque dentro de un grupo de exclusión el parámetro con nombre no vale. **Si
- * cambias una, cambia la otra**, o las dos reglas volverán a solaparse.
- * Comprobación, con el servidor levantado:
+ * ── ⚠ LAS RUTAS SE ESCRIBEN UNA SOLA VEZ. NO LAS DUPLIQUES A MANO ───────────
+ * La exclusión necesita la misma lista en OTRA sintaxis —`[^/]+` en vez del
+ * `:id` de path-to-regexp, porque dentro de un grupo de exclusión el parámetro
+ * con nombre no vale—, así que la tentación es escribirlas dos veces. Con tres
+ * rutas eso son seis sitios que tienen que coincidir, y la primera vez que
+ * alguien añada una cuarta y actualice solo una mitad, las dos reglas volverán a
+ * solaparse y el permiso lo volverá a decidir el orden, sin error y sin aviso.
  *
- *   curl -sI http://localhost:3000/expediente/abc/documentos | grep -ci permissions-policy   → 1
- *   curl -sI http://localhost:3000/expediente/abc/documentos | grep -i  permissions-policy   → camera=(self)
- *   curl -sI http://localhost:3000/inicio                    | grep -i  permissions-policy   → camera=()
+ * Por eso `EXCLUSION` se DERIVA de `RUTAS_CON_CAMARA` con una traducción de una
+ * línea. **Para añadir o quitar una ruta se toca la lista y nada más.**
+ *
+ * Comprobación, con el servidor levantado —una cabecera por ruta, y la correcta—:
+ *
+ *   for r in /expediente/abc/documentos /expediente/abc/nueva-nota /documentos \
+ *            /inicio /offline-mode; do
+ *     printf '%-32s ' "$r"; curl -sI "http://localhost:3000$r" | grep -i permissions-policy
+ *   done
  * ========================================================================== */
 
 const cabecerasComunes = [
@@ -55,16 +63,39 @@ const cabecerasComunes = [
   { key: 'Referrer-Policy',         value: 'strict-origin-when-cross-origin' },
 ]
 
-/** Ni el propio origen. Es el valor de todo el sitio menos una ruta. */
+/** Ni el propio origen. Es el valor de todo el sitio menos las rutas de abajo. */
 const SIN_CAMARA = 'camera=(), microphone=(), geolocation=()'
 /** Solo el propio origen, y solo donde se firma el consentimiento. */
 const CON_CAMARA = 'camera=(self), microphone=(), geolocation=()'
 
 /**
- * La pantalla del firmado, que es la única excepción. Su gemelo es el lookahead
- * de la regla general, más abajo: las dos tienen que decir la misma ruta.
+ * LAS TRES RUTAS QUE MONTAN EL FORMULARIO DE CONSENTIMIENTO, que son las tres
+ * desde las que se puede abrir el firmado y, por tanto, pedir la cámara.
+ *
+ * No es una lista de pantallas parecidas: es la lista de sitios donde
+ * `ConsentimientoInformadoForm` se renderiza. Si mañana se monta desde una
+ * cuarta, va aquí, o la cámara volverá a quedarse bloqueada solo en esa.
+ *
+ * ⚠ HAY UNA CUARTA QUE NO ESTÁ, Y ES DELIBERADO: `/offline-mode` también monta
+ * el formulario, pero su firmado es inalcanzable —`iniciarFirmado` guarda el
+ * borrador contra Supabase antes de abrir el modo, y sin red eso falla y el modo
+ * no llega a montarse—. Abrirle la cámara sería abrirla en una pantalla que no
+ * puede usarla. Si el búnker gana firmado algún día, entonces sí entra aquí.
  */
-const RUTA_DOCUMENTOS = '/expediente/:id/documentos'
+const RUTAS_CON_CAMARA = [
+  '/expediente/:id/documentos',
+  '/expediente/:id/nueva-nota',
+  '/documentos',
+] as const
+
+/**
+ * La misma lista, en la sintaxis que el lookahead entiende: sin la barra inicial
+ * —que ya la pone el `source`— y con los parámetros con nombre convertidos en
+ * `[^/]+`. Derivada, nunca escrita a mano: ver la advertencia de arriba.
+ */
+const EXCLUSION = RUTAS_CON_CAMARA
+  .map(ruta => ruta.slice(1).replace(/:[^/]+/g, '[^/]+'))
+  .join('|')
 
 const nextConfig: NextConfig = {
   // Build ID único por deploy — usado por el Service Worker para nombrar
@@ -84,14 +115,15 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
-      {
-        source: RUTA_DOCUMENTOS,
+      // Una regla por ruta de firmado, todas con el mismo valor.
+      ...RUTAS_CON_CAMARA.map(source => ({
+        source,
         headers: [...cabecerasComunes, { key: 'Permissions-Policy', value: CON_CAMARA }],
-      },
+      })),
       {
-        // Todo menos la ruta de arriba. El lookahead es lo que impide que las dos
-        // reglas coincidan a la vez y lleguen dos `Permissions-Policy`.
-        source: '/((?!expediente/[^/]+/documentos$).*)',
+        // Todo lo demás. El lookahead es lo que impide que esta regla coincida a
+        // la vez que una de arriba y lleguen dos `Permissions-Policy`.
+        source: `/((?!(?:${EXCLUSION})$).*)`,
         headers: [...cabecerasComunes, { key: 'Permissions-Policy', value: SIN_CAMARA }],
       },
     ]
