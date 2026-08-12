@@ -647,6 +647,35 @@ a:hover { color: var(--sp-primary-active); }
   font-size: 15px; line-height: 1.6;
 }
 
+/* Campo de fecha nativo, y SOLO él. En Safari iOS/iPadOS el widget nativo
+   impone su propio ancho y el `width: 100%` de arriba no lo baja de ahí. La
+   pista de `.sp-doc-grid` es `minmax(0, 1fr)` y NO crece, así que el input
+   desborda su propia celda y se pinta ENCIMA de la de al lado — en el
+   consentimiento, encima de «Lugar».
+
+   El defecto está en los OCHO formularios de documento, porque los ocho visten
+   su fecha con esta clase; solo se ve donde la celda es más estrecha:
+   Suplementación y Honorarios/cotización a 187-201px de pista, los seis de tres
+   columnas a 210-262px en iPad, y Escrito médico a 365px, que es el único que
+   se salva. En escritorio no se ve porque ahí sí se respeta el `width`. Era la
+   V-02 de DOCUMENTOS_AUDITORIA_FORMULARIOS.md, predicha y nunca corregida: el
+   refactor a consultas de contenedor arregló el disparo por viewport, no el
+   ancho del control.
+
+   ⚠ EL SELECTOR NO PUEDE SER `.sp-input` A SECAS. Esa misma clase viste los
+   `<select>` de los formularios (SolicitudInternamientoForm.tsx:474) y quitarles
+   la apariencia nativa les BORRA LA FLECHA del desplegable, sin sustituto: no
+   hay `background-image` de reemplazo en esta hoja. Acotado a type="date".
+
+   `min-width: 0` acompaña al reset y no sobra: es el otro suelo del mismo
+   problema —el mínimo intrínseco del control— y sin él el reset se queda a
+   medias en los motores que sí acotan por ahí. */
+input[type="date"].sp-input {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+}
+
 
 /* --- 9. BADGES --------------------------------------------------------- */
 .sp-badge {
