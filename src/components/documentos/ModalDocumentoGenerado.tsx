@@ -78,8 +78,11 @@ interface Props {
  * al servidor con el id del documento, así que ningún formulario tiene que
  * conocer la ficha del paciente para que esto funcione.
  *
- *   consultando → el GET que dice qué hay en la ficha
- *   listo       → hay correo en la ficha y se ve cuál; se puede mandar
+ *   listo       → el estado de partida y también el de después de resolver: si
+ *                 hay correo en la ficha se ve cuál y el botón manda; si aún no
+ *                 se ha preguntado (`resuelto` en falso) el botón pregunta
+ *   consultando → el GET que dice qué hay en la ficha, disparado por el BOTÓN y
+ *                 nunca por abrirse el modal
  *   pidiendo    → no hay correo, o el médico eligió otro: se teclea aquí mismo
  *   confirmando → la dirección tecleada, grande, para leerla letra por letra
  *   enviando / enviado / error
@@ -94,7 +97,14 @@ export default function ModalDocumentoGenerado({
   guardadoEnExpediente,
   documentoId = null,
 }: Props) {
-  const [paso, setPaso] = useState<Paso>('consultando')
+  const [paso, setPaso] = useState<Paso>('listo')
+  /**
+   * Si ya se preguntó al servidor. Hace falta además de `correoFicha` porque
+   * `null` es ambiguo: puede ser «todavía no lo he preguntado» o «lo pregunté y
+   * la ficha no tiene». Sin esta bandera, el botón no sabría si le toca
+   * resolver o abrir la captura.
+   */
+  const [resuelto, setResuelto] = useState(false)
   const [correoFicha, setCorreoFicha] = useState<string | null>(null)
   const [pacienteId, setPacienteId] = useState<string | null>(null)
   const [escrito, setEscrito] = useState('')
@@ -116,7 +126,8 @@ export default function ModalDocumentoGenerado({
   const [aperturaVista, setAperturaVista] = useState(open)
   if (open !== aperturaVista) {
     setAperturaVista(open)
-    setPaso(documentoId === null ? 'listo' : 'consultando')
+    setPaso('listo')
+    setResuelto(false)
     setCorreoFicha(null)
     setPacienteId(null)
     setEscrito('')
@@ -126,37 +137,57 @@ export default function ModalDocumentoGenerado({
     setAvisoGuardado('')
   }
 
-  /* Qué dirección propone el envío. Se pregunta al servidor con el id del
-     documento y NO se recibe por props: así ningún formulario tiene que conocer
-     la ficha del paciente, y los nueve puntos de montaje siguen pasando un dato
-     y no dos. El setState va dentro del callback del fetch —no en el cuerpo del
-     efecto—, que es lo que el lint permite. */
-  useEffect(() => {
-    if (!open || documentoId === null) return
-    let vivo = true
-    fetch(`/api/email/enviar-documento?documentoId=${encodeURIComponent(documentoId)}`)
-      .then(async res => ({ ok: res.ok, datos: await res.json() as Record<string, unknown> }))
-      .then(({ ok, datos }) => {
-        if (!vivo) return
-        if (!ok) {
-          setErrorEnvio(typeof datos.error === 'string' ? datos.error : 'No se pudo comprobar el correo del paciente.')
-          setPaso('error')
-          return
-        }
-        const ficha = typeof datos.correoFicha === 'string' ? datos.correoFicha : null
-        setCorreoFicha(ficha)
-        setPacienteId(typeof datos.pacienteId === 'string' ? datos.pacienteId : null)
-        /* Sin correo en la ficha se entra DIRECTO a pedirlo: es el caso común y
-           un paso intermedio que solo dice «no hay correo» sobra. */
-        setPaso(ficha === null ? 'pidiendo' : 'listo')
-      })
-      .catch(() => {
-        if (!vivo) return
-        setErrorEnvio('No se pudo comprobar el correo del paciente. Revisa tu conexión.')
+  /**
+   * Qué dirección propone el envío. Se pregunta al servidor con el id del
+   * documento y NO se recibe por props: así ningún formulario tiene que conocer
+   * la ficha del paciente, y los nueve puntos de montaje siguen pasando un dato
+   * y no dos.
+   *
+   * ⚠️⚠️ SE LLAMA AL PULSAR «ENVIAR POR CORREO», NUNCA AL ABRIRSE EL MODAL.
+   *
+   * Estuvo en un efecto atado a `open` y fue un error en dos frentes. El visible:
+   * el modal se abre al terminar de imprimir CUALQUIER documento, así que
+   * desplegaba el campo del correo en la cara de quien solo quería mirar el PDF y
+   * cerrar. El invisible, y peor: una petición por cada documento emitido, se
+   * fuera a enviar o no. El correo se manda en pocos casos, así que la inmensa
+   * mayoría de esas peticiones no servían para nada — y cada una lee la ficha del
+   * paciente, que es dato personal, sin que nadie lo haya pedido.
+   *
+   * Si alguien vuelve a moverla a un efecto, vuelven las dos cosas.
+   */
+  async function resolverDestinatario(): Promise<void> {
+    /* Reentrada cerrada: el botón ya se deshabilita mientras consulta, pero un
+       doble toque rápido puede colarse entre el clic y el repintado. */
+    if (documentoId === null || paso === 'consultando') return
+    setPaso('consultando')
+    setErrorEnvio('')
+    try {
+      const res = await fetch(
+        `/api/email/enviar-documento?documentoId=${encodeURIComponent(documentoId)}`,
+      )
+      const datos = await res.json() as Record<string, unknown>
+      if (!res.ok) {
+        setErrorEnvio(typeof datos.error === 'string'
+          ? datos.error
+          : 'No se pudo comprobar el correo del paciente.')
+        /* `resuelto` se queda en falso: el botón vuelve a intentarlo. */
         setPaso('error')
-      })
-    return () => { vivo = false }
-  }, [open, documentoId])
+        return
+      }
+      const ficha = typeof datos.correoFicha === 'string' ? datos.correoFicha : null
+      setCorreoFicha(ficha)
+      setPacienteId(typeof datos.pacienteId === 'string' ? datos.pacienteId : null)
+      setResuelto(true)
+      /* Sin correo en la ficha se entra DIRECTO a pedirlo: es el caso común
+         —la mayoría de las fichas no lo tienen— y un paso intermedio que solo
+         diga «no hay correo» sobra. Con correo, se enseña cuál antes de mandar
+         nada; el envío es el segundo toque. */
+      setPaso(ficha === null ? 'pidiendo' : 'listo')
+    } catch {
+      setErrorEnvio('No se pudo comprobar el correo del paciente. Revisa tu conexión.')
+      setPaso('error')
+    }
+  }
 
   /**
    * ⚠️ AL SERVIDOR SOLO VIAJA EL ID. Ni el blob que este modal tiene en memoria,
@@ -321,14 +352,9 @@ export default function ModalDocumentoGenerado({
   function panelDestinatario(): ReactNode {
     if (sinDocumento) return null
 
-    if (paso === 'consultando') {
-      return (
-        <p className="sp-hint text-center" style={{ paddingTop: '4px' }}>
-          <Loader2 size={13} className="animate-spin inline mr-1.5" />
-          Comprobando el correo del paciente…
-        </p>
-      )
-    }
+    /* La espera se cuenta en el propio botón, no aquí: repetirla en dos sitios
+       parte la atención justo en el segundo en que no hay nada que decidir. */
+    if (paso === 'consultando') return null
 
     if (paso === 'pidiendo') {
       return (
@@ -517,20 +543,33 @@ export default function ModalDocumentoGenerado({
           <div className="sp-grid-actions">
             <button
               type="button"
+              /* El primer toque RESUELVE el destinatario; a partir de ahí manda
+                 o abre la captura. Es lo que mantiene la consulta fuera de la
+                 apertura del modal: ver `resolverDestinatario`. */
               onClick={() => {
-                if (correoFicha !== null) void enviarPorCorreo(null)
+                if (!resuelto) void resolverDestinatario()
+                else if (correoFicha !== null) void enviarPorCorreo(null)
                 else { setEscrito(''); setErrorEnvio(''); setPaso('pidiendo') }
               }}
               disabled={sinDocumento || paso === 'consultando' || paso === 'enviando' || paso === 'enviado'}
               aria-disabled={sinDocumento || undefined}
+              aria-busy={paso === 'consultando' || paso === 'enviando'}
               className={`sp-btn sp-btn--tertiary${sinDocumento ? ' cursor-not-allowed' : ''}`}
               style={{ flexDirection: 'column', gap: '7px' }}
             >
+              {/* La espera se cuenta EN EL BOTÓN, que es donde está mirando quien
+                  acaba de pulsarlo, y con el control ya deshabilitado: entre el
+                  toque y saber si hay correo hay un viaje al servidor, y sin
+                  esto el modal parece no haberse enterado. */}
               <span className="inline-flex items-center gap-2">
-                {paso === 'enviando'
+                {paso === 'consultando' || paso === 'enviando'
                   ? <Loader2 size={17} className="animate-spin" />
                   : paso === 'enviado' ? <Check size={17} /> : <Mail size={17} />}
-                {paso === 'enviando' ? 'Enviando…' : paso === 'enviado' ? 'Enviado' : 'Enviar por correo'}
+                {paso === 'consultando'
+                  ? 'Comprobando…'
+                  : paso === 'enviando'
+                    ? 'Enviando…'
+                    : paso === 'enviado' ? 'Enviado' : 'Enviar por correo'}
               </span>
               {/* El motivo, siempre a la vista: un botón apagado sin explicación
                   deja al médico buscando qué le falta. */}
