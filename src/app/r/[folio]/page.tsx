@@ -1,13 +1,15 @@
 import type { Metadata } from 'next'
 import type { ReactElement } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { CheckCircle, ExternalLink, ShieldAlert, ShieldCheck } from 'lucide-react'
+import { Check, ExternalLink, Lock, ShieldAlert } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import { PREFIJO_POR_CLASE, normalizarFolio, type ClaseFolio } from '@/lib/documentos/folio'
-import BotonCopiarCedula from './BotonCopiarCedula'
+import Cedulas from './Cedulas'
+import './verificacion.css'
 
 /* ═══ /r/[folio] — VERIFICACIÓN PÚBLICA DE AUTENTICIDAD ═══
    Esta página existe para UNA cosa: que quien tiene el papel delante —una
@@ -116,8 +118,13 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 }
 
-const NAVY_POR_DEFECTO = '#1a3a5c'
-const AZUL_POR_DEFECTO = '#1e5fa8'
+/* ⚠️ EL ACENTO DEL CONSULTORIO NO SE APLICA AQUÍ, Y ES DELIBERADO.
+   `contenido` trae `color_primario` y `color_secundario` —el papel se imprime
+   con ellos— y esta página los ignora: el cromo es de Spinus. Un acento libre
+   podría caer cerca del verde de «verificado» o del rojo de «el papel fue
+   alterado», que en esta página son SEMÁNTICOS y no decorativos, y teñir la
+   declaración con el color que eligió el propio emisor debilita justo lo que la
+   declaración afirma. Todo el color vive en `verificacion.css`. */
 
 /**
  * El buscador de cédulas de la SEP. Dirección confirmada contra el portal.
@@ -177,8 +184,6 @@ interface Verificacion {
   readonly medicoEspecialidad?: string
   readonly cedulaProfesional?: string
   readonly cedulaEspecialidad?: string
-  readonly navy: string
-  readonly azul: string
 }
 
 interface FilaDocumento {
@@ -316,80 +321,145 @@ async function leerDocumento(folioPedido: string): Promise<Verificacion | null> 
     medicoEspecialidad,
     cedulaProfesional,
     cedulaEspecialidad,
-    navy: texto(contenido, 'color_primario') ?? NAVY_POR_DEFECTO,
-    azul: texto(contenido, 'color_secundario') ?? AZUL_POR_DEFECTO,
   }
 }
 
-/** Marco común: mismo fondo y misma columna en los dos desenlaces. */
+/**
+ * El símbolo y el nombre. El símbolo YA TRAE SU PROPIO DISCO dibujado, así que
+ * no se recorta en círculo ni se le añade sombra: hacerlo le comería el anillo.
+ * Va con `alt=""` porque «Spinus» está a su lado como texto — anunciarlo dos
+ * veces es ruido para quien escucha la página.
+ */
+function BarraDeMarca(): ReactElement {
+  return (
+    <header className="vf-marca">
+      <div className="vf-marca__in">
+        <Image
+          src="/logo-spinus.png"
+          alt=""
+          width={800}
+          height={777}
+          sizes="26px"
+          loading="eager"
+          className="vf-marca__simbolo"
+        />
+        <span className="vf-marca__nombre">Spinus</span>
+        <span className="vf-marca__rol">
+          <span className="vf-marca__rol--corto">Verificación</span>
+          <span className="vf-marca__rol--ancho">Verificación pública de documentos</span>
+        </span>
+      </div>
+    </header>
+  )
+}
+
+/** Marco común: misma barra, misma columna y mismo pie en los dos desenlaces. */
 function Hoja({ children }: { children: React.ReactNode }): ReactElement {
   return (
-    <div className="min-h-screen bg-slate-50 py-10 px-4">
-      <div className="max-w-2xl mx-auto space-y-5">
+    <div className="vf-root">
+      <BarraDeMarca />
+      <div className="vf-col">
         {children}
-        <div className="text-center pb-4 space-y-2">
-          <Link
-            href="/"
-            className="text-sm font-semibold text-slate-500 hover:text-slate-700 underline underline-offset-4"
-          >
-            Conoce Spinus
-          </Link>
-          <p className="text-xs text-slate-300">
-            Spinus · Sistema de Gestión Clínica · spinus.com.mx
+        <footer className="vf-pie">
+          <p className="vf-pie__texto">
+            Esta página es el respaldo del médico: muestra exactamente lo que se emitió, para
+            cotejarlo contra el papel. No hace referencia al paciente — quien escanea ya tiene el
+            documento delante.
           </p>
-        </div>
+          <Link href="/" className="vf-pie__enlace">Conoce Spinus</Link>
+          <p className="vf-pie__marca">Spinus · Sistema de Gestión Clínica · spinus.com.mx</p>
+        </footer>
       </div>
     </div>
   )
 }
 
 /**
- * Un renglón de la lista. El contador va DENTRO del renglón —«2 de 3»— y no en
- * una cabecera con el total: pegado a cada fármaco es lo que permite recorrer el
- * papel de arriba abajo y descubrir dónde se metió el que sobra.
+ * El desenlace negativo. Responde 200 y no `notFound()`: «este folio no
+ * verifica» es una respuesta con significado para quien escanea, no una página
+ * que falta, y así conserva la estética en vez de caer al 404 pelado de Next.
  *
- * Las indicaciones van en bloque propio, a ancho completo y con
- * `whitespace-pre-line`, porque son texto que escribió el médico: se imprimen
- * como las escribió, con sus saltos, sin recorte y sin analizarlas.
+ * Reusa la caja de la declaración sin su verde —`--nulo`— para que los dos
+ * desenlaces pesen lo mismo. Y NO lleva medicamentos: ver la cabecera.
  */
-function Renglon(
-  { med, indice, total, azul }: {
-    med: MedicamentoPublicado; indice: number; total: number; azul: string
-  },
-): ReactElement {
+function NoVerificado(): ReactElement {
   return (
-    <li className="px-5 py-4">
-      <div className="flex items-baseline gap-3">
-        <span className="flex-shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px]
-                         font-bold tabular-nums text-slate-500">
-          {indice} de {total}
-        </span>
-        <p className="font-bold text-slate-800 text-base leading-tight">{med.nombreComercial}</p>
+    <Hoja>
+      <section className="vf-decl vf-decl--nulo">
+        <ShieldAlert className="vf-decl__icono" strokeWidth={2.5} aria-hidden="true" />
+        <div className="vf-decl__col">
+          <p className="vf-decl__ante">Sin verificar</p>
+          <h1 className="vf-decl__frase">No pudimos verificar este documento</h1>
+          <p className="vf-decl__cuerpo">
+            El folio no corresponde a ningún documento verificable.
+          </p>
+        </div>
+      </section>
+
+      <section className="vf-caja">
+        <p>
+          Compruebe que el folio esté completo y bien escrito. Los folios verificables tienen la
+          forma <b>RX-2026-0001</b>: tres o cuatro letras, el año y el número.
+        </p>
+        <p>
+          Los documentos emitidos antes de que existiera esta serie ya no se verifican en línea. Si
+          necesita confirmar uno de ellos, contacte directamente al consultorio que lo emitió.
+        </p>
+        {/* Sin fila no hay nada que respaldar, y por eso este desenlace no
+            compone lista: ver la cabecera. */}
+        <p className="vf-caja__menor">
+          Sin un documento que la respalde no hay lista de medicamentos que mostrar.
+        </p>
+      </section>
+    </Hoja>
+  )
+}
+
+/**
+ * Un renglón de la lista, con los cinco campos y su ordinal.
+ *
+ * El ordinal va `aria-hidden`: la lista es un `<ol>` y quien la escucha ya
+ * recibe el número por la semántica; pintarlo además en el distintivo es para
+ * el ojo que recorre el papel de arriba abajo buscando el renglón que sobra.
+ *
+ * Las indicaciones van en bloque propio, a ancho completo, respetando los saltos
+ * que escribió el médico y sin recorte: ver la cabecera.
+ */
+function Renglon({ med, indice }: { med: MedicamentoPublicado; indice: number }): ReactElement {
+  return (
+    <li className="vf-med">
+      <span className="vf-med__ord" aria-hidden="true">{indice}</span>
+
+      <div className="vf-med__id">
+        <p className="vf-med__nombre">{med.nombreComercial}</p>
+        {med.principioActivo !== undefined && (
+          <p className="vf-med__activo">
+            Principio activo: <b>{med.principioActivo}</b>
+          </p>
+        )}
       </div>
 
-      {med.principioActivo !== undefined && (
-        <p className="text-sm mt-1" style={{ color: azul }}>{med.principioActivo}</p>
-      )}
-
       {(med.presentacion !== undefined || med.via !== undefined) && (
-        <div className="flex flex-wrap gap-x-6 gap-y-1 mt-2 text-xs text-slate-500">
+        <div className="vf-med__pares">
           {med.presentacion !== undefined && (
-            <span><span className="font-semibold text-slate-600">Presentación:</span> {med.presentacion}</span>
+            <div className="vf-med__campo">
+              <span className="vf-med__et">Presentación</span>
+              <span className="vf-med__valor">{med.presentacion}</span>
+            </div>
           )}
           {med.via !== undefined && (
-            <span><span className="font-semibold text-slate-600">Vía:</span> {med.via}</span>
+            <div className="vf-med__campo">
+              <span className="vf-med__et">Vía</span>
+              <span className="vf-med__valor vf-med__valor--via">{med.via}</span>
+            </div>
           )}
         </div>
       )}
 
       {med.indicaciones !== undefined && (
-        <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-            Indicaciones
-          </span>
-          <p className="text-sm text-slate-700 mt-0.5 leading-relaxed whitespace-pre-line">
-            {med.indicaciones}
-          </p>
+        <div className="vf-med__ind">
+          <span className="vf-med__et">Indicaciones</span>
+          <p>{med.indicaciones}</p>
         </div>
       )}
     </li>
@@ -399,83 +469,41 @@ function Renglon(
 /**
  * La lista entera. Es el producto de esta página: ver la cabecera.
  *
- * ⚠️ NO SE PLIEGA, NO PAGINA Y NO LLEVA DESPLAZAMIENTO INTERNO. Una lista
- * recortada a las tres primeras deja de servir para lo único que sirve —contar
- * los renglones del papel— y volvería mentiroso el contador de cada renglón.
+ * ⚠️ EL CONTADOR DE LA CABECERA DICE «{n} de {n}» CON EL MISMO NÚMERO DOS VECES,
+ * y no es una errata: afirma que se están mostrando los n renglones de los n que
+ * se emitieron, o sea que la lista NO se plegó, NO paginó y NO se recortó. Es la
+ * mitad de arriba del sistema; la otra es el ordinal de cada renglón. Recortar
+ * la lista volvería mentiroso el contador.
  */
 function Medicamentos(
-  { medicamentos, azul }: { medicamentos: readonly MedicamentoPublicado[]; azul: string },
+  { medicamentos }: { medicamentos: readonly MedicamentoPublicado[] },
 ): ReactElement {
+  const total = medicamentos.length
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      <div className="px-5 pt-4 pb-3">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-          Medicamentos emitidos
-        </h2>
-        <p className="text-sm text-slate-600 leading-relaxed mt-2">
+    <section className="vf-meds">
+      <div className="vf-meds__cab">
+        <div className="vf-meds__fila">
+          <h2 className="vf-meds__et">Medicamentos emitidos</h2>
+          <span className="vf-meds__contador">{total} de {total}</span>
+        </div>
+        <p className="vf-meds__aviso">
           Esto es exactamente lo que se emitió. Si el papel dice otra presentación, otras
           indicaciones o tiene un renglón de más,{' '}
-          <span className="font-bold text-slate-900">el papel fue alterado</span>.
+          <span className="vf-meds__alerta">el papel fue alterado</span>.
         </p>
       </div>
 
-      <ol className="border-t border-slate-100 divide-y divide-slate-100">
+      <ol className="vf-meds__lista">
         {medicamentos.map((med, i) => (
-          <Renglon
-            key={`${i}-${med.nombreComercial}`}
-            med={med}
-            indice={i + 1}
-            total={medicamentos.length}
-            azul={azul}
-          />
+          <Renglon key={`${i}-${med.nombreComercial}`} med={med} indice={i + 1} />
         ))}
       </ol>
 
-      <p className="px-5 py-3 border-t border-slate-100 text-xs text-slate-400 leading-relaxed">
+      <p className="vf-meds__nota">
         Las indicaciones son el texto que escribió el médico al emitir la receta. Esta página no
         registra si ya se surtió.
       </p>
-    </div>
-  )
-}
-
-/**
- * El desenlace negativo. Responde 200 y no `notFound()`: «este folio no
- * verifica» es una respuesta con significado para quien escanea, no una página
- * que falta, y así conserva la estética en vez de caer al 404 pelado de Next.
- */
-function NoVerificado(): ReactElement {
-  return (
-    <Hoja>
-      <div className="rounded-2xl p-5 flex items-center gap-4 bg-white border border-slate-200 shadow-sm">
-        <ShieldAlert size={40} className="flex-shrink-0 text-slate-400" />
-        <div>
-          <p className="font-bold text-lg leading-tight text-slate-800">
-            No pudimos verificar este documento
-          </p>
-          <p className="text-sm text-slate-500 mt-0.5">
-            El folio no corresponde a ningún documento verificable.
-          </p>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-4 space-y-3">
-        <p className="text-sm text-slate-600 leading-relaxed">
-          Comprueba que el folio esté completo y bien escrito. Los folios verificables tienen la
-          forma <span className="font-semibold text-slate-800">RX-2026-0001</span>: tres o cuatro
-          letras, el año y el número.
-        </p>
-        <p className="text-sm text-slate-600 leading-relaxed">
-          Los documentos emitidos antes de que existiera esta serie ya no se verifican en línea. Si
-          necesitas confirmar uno de ellos, contacta directamente al consultorio que lo emitió.
-        </p>
-        {/* Sin fila no hay nada que respaldar, y por eso este desenlace no
-            compone lista: ver la cabecera. */}
-        <p className="text-xs text-slate-400 leading-relaxed">
-          Sin un documento que la respalde no hay lista de medicamentos que mostrar.
-        </p>
-      </div>
-    </Hoja>
+    </section>
   )
 }
 
@@ -487,115 +515,97 @@ export default async function VerificacionPage(
 
   if (doc === null) return <NoVerificado />
 
+  const hayCedulas = doc.cedulaProfesional !== undefined || doc.cedulaEspecialidad !== undefined
+
   return (
     <Hoja>
-      {/* Sello de verificación */}
-      <div
-        className="rounded-2xl p-5 flex items-center gap-4 text-white shadow-lg"
-        style={{ background: `linear-gradient(135deg, ${doc.navy}, ${doc.azul})` }}
-      >
-        <ShieldCheck size={40} className="flex-shrink-0 opacity-90" />
-        <div>
-          <p className="font-bold text-lg leading-tight">Documento verificado</p>
-          <p className="text-sm opacity-80 mt-0.5">
-            {doc.etiqueta} · Folio {doc.folio}
+      {/* La declaración: es el producto de esta página, y por eso abre. */}
+      <section className="vf-decl">
+        <Check className="vf-decl__icono" strokeWidth={3} aria-hidden="true" />
+        <div className="vf-decl__col">
+          <p className="vf-decl__ante">Documento verificado</p>
+          <h1 className="vf-decl__frase">Este documento es auténtico</h1>
+          <p className="vf-decl__cuerpo">
+            Existe en el registro de Spinus y fue emitido por el médico que aparece abajo. Coteje
+            estos datos con el papel que tiene delante.
           </p>
         </div>
-        <CheckCircle size={28} className="ml-auto flex-shrink-0 opacity-80" />
-      </div>
+      </section>
 
-      {/* Quién lo firma: es justo lo que hay que poder comprobar, así que va completo. */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div
-          className="px-5 py-3 border-b border-slate-100"
-          style={{ borderLeftWidth: 4, borderLeftColor: doc.navy }}
-        >
-          <p className="font-bold text-slate-800 text-base">{doc.medicoNombre}</p>
-          {doc.medicoEspecialidad !== undefined && (
-            <p className="text-sm italic mt-0.5" style={{ color: doc.azul }}>
-              {doc.medicoEspecialidad}
-            </p>
-          )}
-        </div>
-        <div className="px-5 py-3 space-y-3">
-          <div className="flex flex-wrap gap-4 text-xs text-slate-500">
-            {doc.cedulaProfesional !== undefined && (
-              <span>
-                <span className="font-semibold text-slate-600">Cédula Prof.:</span>{' '}
-                {doc.cedulaProfesional}
-                <BotonCopiarCedula valor={doc.cedulaProfesional} que="Cédula profesional" />
-              </span>
-            )}
-            {doc.cedulaEspecialidad !== undefined && (
-              <span>
-                <span className="font-semibold text-slate-600">Cédula Esp.:</span>{' '}
-                {doc.cedulaEspecialidad}
-                <BotonCopiarCedula valor={doc.cedulaEspecialidad} que="Cédula de especialidad" />
-              </span>
-            )}
-          </div>
-
-          {/* UN SOLO ENLACE PARA LAS CÉDULAS, y va aquí —pegado a los números—
-              porque es una acción sobre ese dato, no un pie de página. El
-              destino es el mismo para las dos; lo que cambia es qué se pega, y
-              de eso se encarga el botón de cada una.
-
-              El dominio se compone VISIBLE y partido para que `gob.mx` se lea
-              como lo que es: ver la nota de cabecera sobre los sitios que imitan
-              al registro. Sin ninguna cédula el bloque no se compone — no habría
-              nada que comprobar allá. */}
-          {(doc.cedulaProfesional !== undefined || doc.cedulaEspecialidad !== undefined) && (
-            <div className="space-y-1.5">
-              <a
-                href={BUSCADOR_CEDULAS}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group inline-flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5
-                           text-xs text-slate-500 hover:text-slate-700"
-              >
-                <ExternalLink size={13} className="flex-shrink-0 self-center" aria-hidden="true" />
-                <span className="font-semibold text-slate-600 group-hover:text-slate-800">
-                  Comprueba estas cédulas en el registro oficial
-                </span>
-                <span className="font-mono text-slate-400 group-hover:text-slate-600">
-                  cedulaprofesional.sep.<span className="font-bold text-slate-600">gob.mx</span>
-                </span>
-              </a>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                El registro no recibe el número por enlace: cópialo con su botón y pégalo en el
-                buscador.
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Cuándo se emitió. Aquí vivía también la card del paciente por
+      {/* SEGUNDO, y antes del médico: folio y fecha son los dos datos con los
+          que se coteja de un vistazo. Aquí vivía además la card del paciente por
           iniciales; se retiró entera —ver la cabecera— y no vuelve. */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-4">
-        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Fecha de emisión
-        </span>
-        <p className="font-medium text-slate-800 mt-0.5">{doc.fecha}</p>
-      </div>
+      <section className="vf-datos">
+        <div className="vf-dato">
+          <span className="vf-dato__et">Folio</span>
+          <p className="vf-dato__folio">{doc.folio}</p>
+          <p className="vf-dato__pista">{doc.etiqueta} · Debe coincidir con el folio impreso.</p>
+        </div>
+        <div className="vf-dato">
+          <span className="vf-dato__et">Fecha de emisión</span>
+          <p className="vf-dato__fecha">{doc.fecha}</p>
+        </div>
+      </section>
+
+      {/* Quién lo firma: es justo lo que hay que poder comprobar, así que va
+          completo y es la única tarjeta con acento. */}
+      <section className="vf-medico">
+        <div className="vf-medico__id">
+          <p className="vf-medico__ante">Emitido por</p>
+          <p className="vf-medico__nombre">{doc.medicoNombre}</p>
+          {doc.medicoEspecialidad !== undefined && (
+            <p className="vf-medico__esp">{doc.medicoEspecialidad}</p>
+          )}
+        </div>
+
+        {/* Sin ninguna cédula no se compone ni la caja ni el enlace: no habría
+            nada que comprobar allá. */}
+        {hayCedulas && (
+          <>
+            <Cedulas
+              cedulaProfesional={doc.cedulaProfesional}
+              cedulaEspecialidad={doc.cedulaEspecialidad}
+            />
+
+            <div className="vf-registro">
+              <div className="vf-registro__texto">
+                <p className="vf-registro__lead">
+                  Compruébelo usted mismo en el registro del gobierno: busque por número de cédula.
+                </p>
+                <p className="vf-registro__nota">
+                  Registro Nacional de Profesionistas (SEP). Único dominio oficial: termina en
+                  gob.mx. Pegue el número de cédula en el buscador.
+                </p>
+              </div>
+
+              <div className="vf-registro__accion">
+                <a
+                  href={BUSCADOR_CEDULAS}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="vf-registro__boton"
+                >
+                  <ExternalLink className="vf-registro__icono" aria-hidden="true" />
+                  <span className="vf-registro__rotulo--largo">Abrir el registro de la SEP</span>
+                  <span className="vf-registro__rotulo--corto">Abrir el registro</span>
+                </a>
+                {/* El host IMPRESO, nunca como título emergente: ver la nota de
+                    `verificacion.css`. El orden visual lo pone el CSS. */}
+                <span className="vf-registro__host">
+                  <Lock className="vf-registro__candado" aria-hidden="true" />
+                  <span>
+                    cedulaprofesional.sep.<span className="vf-registro__gob">gob.mx</span>
+                  </span>
+                </span>
+              </div>
+            </div>
+          </>
+        )}
+      </section>
 
       {/* Sin renglones el bloque no se compone: son los ocho formatos que no son
           Receta, que no guardan la clave. */}
-      {doc.medicamentos.length > 0 && (
-        <Medicamentos medicamentos={doc.medicamentos} azul={doc.azul} />
-      )}
-
-      {/* La declaración: es el producto de esta página. */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-4">
-        <p className="text-sm text-slate-600 leading-relaxed">
-          <span className="font-semibold text-slate-800">
-            Este documento fue emitido con Spinus y es auténtico.
-          </span>{' '}
-          Esta página es el respaldo del médico: muestra exactamente lo que se emitió, para
-          cotejarlo contra el papel. No hace referencia al paciente — quien escanea ya tiene el
-          documento delante.
-        </p>
-      </div>
+      {doc.medicamentos.length > 0 && <Medicamentos medicamentos={doc.medicamentos} />}
     </Hoja>
   )
 }
