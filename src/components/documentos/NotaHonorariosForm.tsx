@@ -1043,14 +1043,14 @@ export default function NotaHonorariosForm({
       {plantillas.panel}
       {plantillas.dialogos}
 
-      {/* El componente compone «{titulo} generado», así que aquí va el
-          sustantivo. Ver el informe: la concordancia de «Cotización generada»
-          necesita el cambio de contrato del spec 03, que no es de este paso. */}
+      {/* La frase entera, y aquí especialmente: los dos papeles de este
+          formulario no comparten género —«Cotización generada» contra «Recibo
+          generado»—, así que ningún participio fijo sirve para ambos. */}
       <ModalDocumentoGenerado
         open={docGenerado !== null}
         onClose={() => setDocGenerado(null)}
         blob={docGenerado?.blob ?? null}
-        titulo={esCotizacion ? 'Cotización' : 'Recibo'}
+        titulo={esCotizacion ? 'Cotización generada' : 'Recibo generado'}
         guardadoEnExpediente={docGenerado?.guardado ?? false}
       />
     </div>

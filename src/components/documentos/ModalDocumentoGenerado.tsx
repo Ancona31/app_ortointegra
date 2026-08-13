@@ -41,7 +41,16 @@ interface Props {
   onClose: () => void
   /** PDF ya generado, en memoria. */
   blob: Blob | null
-  /** "Receta", "Solicitud de laboratorio"… — encabeza el modal como "<X> generada". */
+  /**
+   * La frase ENTERA del encabezado, participio incluido: "Receta generada",
+   * "Recibo generado". No es el sustantivo suelto.
+   *
+   * El modal no añade nada, y no es por gusto: los nueve documentos no comparten
+   * género —receta, solicitud, carta y denegación son femeninos; consentimiento,
+   * escrito, plan y recibo, masculinos— así que cualquier participio compuesto
+   * aquí saldría mal concordado en la mitad de ellos. Quien emite decide su
+   * propia frase; este componente solo la imprime.
+   */
   titulo: string
   /**
    * Falso cuando el documento NO quedó en el expediente: falló la subida a
@@ -104,7 +113,8 @@ export default function ModalDocumentoGenerado({
         </div>
       )}
 
-      <h3 className="sp-title-state">{titulo} generado</h3>
+      {/* Verbatim: el participio viene ya en `titulo`. Ver su prop. */}
+      <h3 className="sp-title-state">{titulo}</h3>
 
       {/* La confirmación NO afirma "quedó en el expediente": PlanSuplementacion
           no inserta fila cuando no hay pacienteId, y ahí la frase sería falsa.

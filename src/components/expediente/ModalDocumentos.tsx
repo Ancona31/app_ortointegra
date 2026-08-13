@@ -38,6 +38,48 @@ const TIPO_DOC_LABEL: Record<string, string> = {
   nota_honorarios: 'Honorarios / Cotización',
 }
 
+/**
+ * La frase que encabeza el modal de entrega tras REGENERAR — la décima puerta
+ * por la que sale un PDF, junto a los ocho formularios.
+ *
+ * No se compone a partir de `TIPO_DOC_LABEL`: el participio concuerda con el
+ * sustantivo y estos no comparten género (receta, solicitud, carta y denegación
+ * son femeninos; consentimiento, escrito, plan y recibo, masculinos), así que
+ * pegarle un « generado» a la etiqueta escribía «Receta generado». Cada frase se
+ * escribe entera, como hace cada formulario con la suya.
+ *
+ * En minúscula tras la primera palabra, igual que los formularios, para que el
+ * encabezado se lea igual venga de donde venga.
+ */
+const TIPO_DOC_TITULO_REGENERADO: Record<string, string> = {
+  receta: 'Receta generada',
+  solicitud_lab: 'Solicitud de laboratorio generada',
+  solicitud_imagen: 'Solicitud de imagenología generada',
+  plan_suplementacion: 'Plan de suplementación generado',
+  informe_clinico: 'Informe clínico generado',
+  escrito_medico: 'Escrito médico generado',
+  solicitud_internamiento: 'Solicitud de internamiento generada',
+  consentimiento_informado: 'Consentimiento generado',
+  denegacion_consentimiento: 'Denegación generada',
+  // `nota_honorarios` NO está aquí: su fila emite dos papeles de género distinto
+  // y el tipo no basta para saber cuál. Lo resuelve `tituloRegenerado`.
+}
+
+/**
+ * Frase de encabezado para el documento que acaba de regenerarse.
+ *
+ * Honorarios y cotización comparten `tipo`, así que la distinción sale de lo
+ * PERSISTIDO: `contenido.tipo_doc`, el mismo campo con el que el trigger elige
+ * la serie del folio (NOH o COT). Cualquier valor que no sea `cotizacion` es un
+ * recibo, igual que en el adaptador de v2.
+ */
+function tituloRegenerado(doc: Documento): string {
+  if (doc.tipo === 'nota_honorarios') {
+    return doc.contenido.tipo_doc === 'cotizacion' ? 'Cotización generada' : 'Recibo generado'
+  }
+  return TIPO_DOC_TITULO_REGENERADO[doc.tipo] ?? 'Documento generado'
+}
+
 // Duplicado de TabDocumentos.tsx — Fase 7 eliminará TabDocumentos y esta queda como única fuente
 const TIPO_DOC_COLOR: Record<string, string> = {
   receta: 'bg-blue-100 text-blue-700',
@@ -303,7 +345,7 @@ export default function ModalDocumentos({
       if (pdfBlob) {
         setDocRegenerado({
           blob: pdfBlob,
-          titulo: TIPO_DOC_LABEL[doc.tipo] || doc.tipo,
+          titulo: tituloRegenerado(doc),
           guardado,
         })
       }
@@ -549,7 +591,7 @@ export default function ModalDocumentos({
         open={docRegenerado !== null}
         onClose={() => setDocRegenerado(null)}
         blob={docRegenerado?.blob ?? null}
-        titulo={docRegenerado?.titulo ?? 'Documento'}
+        titulo={docRegenerado?.titulo ?? 'Documento generado'}
         guardadoEnExpediente={docRegenerado?.guardado ?? false}
       />
     </>
