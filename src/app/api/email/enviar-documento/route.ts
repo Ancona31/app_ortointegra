@@ -112,6 +112,91 @@ interface FilaPerfil {
   readonly cedula_especialidad: string | null
 }
 
+/**
+ * Los mismos filtros que exige enviar, para poder preguntar antes de hacerlo.
+ * Devuelve el documento y el correo de la ficha, o una respuesta de error ya
+ * compuesta. Sale de `POST` para que `GET` no pueda contestar con criterios más
+ * flojos: si mañana se endurece el envío, la consulta se endurece con él.
+ */
+async function documentoDelMedico(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  documentoId: string,
+  userId: string,
+): Promise<{ doc: FilaDocumento } | { fallo: NextResponse }> {
+  const { data: doc } = await supabase
+    .from('documentos')
+    .select('id, tipo, folio, pdf_url, paciente_id, consulta_id, estado, subido_por')
+    .eq('id', documentoId)
+    .single<FilaDocumento>()
+
+  if (!doc) {
+    return { fallo: NextResponse.json({ error: 'Documento no encontrado' }, { status: 404 }) }
+  }
+  if (doc.estado === 'borrador') {
+    return {
+      fallo: NextResponse.json(
+        { error: 'Este documento es un borrador. Emítelo antes de enviarlo.' },
+        { status: 400 },
+      ),
+    }
+  }
+  if (doc.subido_por !== null && doc.subido_por !== userId) {
+    return {
+      fallo: NextResponse.json(
+        { error: 'Solo el médico que emitió el documento puede enviarlo.' },
+        { status: 403 },
+      ),
+    }
+  }
+  return { doc }
+}
+
+/** El correo de la ficha del paciente, o cadena vacía. Siempre en minúsculas. */
+async function correoDeLaFicha(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  pacienteId: string | null,
+): Promise<string> {
+  if (pacienteId === null) return ''
+  const { data } = await supabase
+    .from('pacientes')
+    .select('email')
+    .eq('id', pacienteId)
+    .single<{ email: string | null }>()
+  return data?.email?.trim().toLowerCase() ?? ''
+}
+
+/**
+ * `GET ?documentoId=…` — qué dirección propondrá el envío.
+ *
+ * Existe para que el modal pueda ENSEÑAR el destinatario antes de mandar nada,
+ * y para saber si hay que pedirlo. Sin esto, el médico pulsaba a ciegas y se
+ * enteraba del destino por el acuse, cuando ya no había vuelta atrás.
+ *
+ * Devuelve el correo del paciente, que es dato personal, así que pasa por los
+ * MISMOS filtros que enviar: solo lo ve el médico que emitió el documento, que
+ * es quien ya lo tiene delante en la ficha.
+ */
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+  const documentoId = req.nextUrl.searchParams.get('documentoId')?.trim() ?? ''
+  if (documentoId === '') {
+    return NextResponse.json({ error: 'Faltan datos' }, { status: 400 })
+  }
+
+  const resultado = await documentoDelMedico(supabase, documentoId, user.id)
+  if ('fallo' in resultado) return resultado.fallo
+
+  const correoFicha = await correoDeLaFicha(supabase, resultado.doc.paciente_id)
+
+  return NextResponse.json({
+    correoFicha: correoFicha === '' ? null : correoFicha,
+    pacienteId: resultado.doc.paciente_id,
+  })
+}
+
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -153,51 +238,26 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     )
   }
 
-  // ── El documento (la RLS ya filtra por clínica) ───────────────────────────
-  const { data: doc } = await supabase
-    .from('documentos')
-    .select('id, tipo, folio, pdf_url, paciente_id, consulta_id, estado, subido_por')
-    .eq('id', documentoId)
-    .single<FilaDocumento>()
-
-  if (!doc) return NextResponse.json({ error: 'Documento no encontrado' }, { status: 404 })
-
-  /* Un borrador no se manda a nadie: no está emitido, no tiene folio y sigue
-     siendo editable. Enviarlo pondría en manos del paciente un documento que
-     todavía puede cambiar. */
-  if (doc.estado === 'borrador') {
-    return NextResponse.json(
-      { error: 'Este documento es un borrador. Emítelo antes de enviarlo.' },
-      { status: 400 },
-    )
+  /* Documento, borrador y autoría: los mismos filtros que usa `GET`. Un intento
+     de envío por quien no lo emitió sí deja rastro; la consulta previa no. */
+  const resultado = await documentoDelMedico(supabase, documentoId, user.id)
+  if ('fallo' in resultado) {
+    if (resultado.fallo.status === 403) {
+      logAudit({
+        userId: user.id,
+        accion: 'enviar_documento_denegado',
+        tabla: 'documentos',
+        registroId: documentoId,
+        ip,
+        descripcion: 'Intento de envío por un usuario que no emitió el documento.',
+      })
+    }
+    return resultado.fallo
   }
-
-  /* Solo el médico que lo emitió. Ver la cabecera. */
-  if (doc.subido_por !== null && doc.subido_por !== user.id) {
-    logAudit({
-      userId: user.id,
-      accion: 'enviar_documento_denegado',
-      tabla: 'documentos',
-      registroId: documentoId,
-      ip,
-      descripcion: 'Intento de envío por un usuario que no emitió el documento.',
-    })
-    return NextResponse.json(
-      { error: 'Solo el médico que emitió el documento puede enviarlo.' },
-      { status: 403 },
-    )
-  }
+  const doc = resultado.doc
 
   // ── El destinatario ───────────────────────────────────────────────────────
-  let emailRegistrado = ''
-  if (doc.paciente_id !== null) {
-    const { data: paciente } = await supabase
-      .from('pacientes')
-      .select('email')
-      .eq('id', doc.paciente_id)
-      .single<{ email: string | null }>()
-    emailRegistrado = paciente?.email?.trim().toLowerCase() ?? ''
-  }
+  const emailRegistrado = await correoDeLaFicha(supabase, doc.paciente_id)
 
   /* Sin dirección pedida manda la de la ficha. Es la vía del modal posterior a
      la emisión, que solo conoce el id del documento. */

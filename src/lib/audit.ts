@@ -28,6 +28,12 @@ export type AuditAccion =
   | 'exportar_expediente'
   | 'enviar_documento'
   | 'enviar_documento_denegado'
+  /* Escritura del correo en la ficha desde el modal de envío, y solo cuando la
+     ficha NO tenía ninguno — sustituir uno existente está prohibido en
+     `/api/pacientes/[id]/correo`. Acción propia y no un `editar_paciente`
+     genérico: es un dato de contacto que se guarda a raíz de un envío, y quien
+     audite una dirección equivocada quiere poder aislar justo esos. */
+  | 'actualizar_paciente_correo'
   // Autenticación
   | 'login_exitoso'
   | 'login_fallido'

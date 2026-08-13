@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { AlertTriangle, Check, Eye, Loader2, Mail, MessageCircle } from 'lucide-react'
 import ModalShell from '@/components/ui/ModalShell'
 
@@ -70,17 +71,20 @@ interface Props {
    * motivo a la vista, porque no hay nada que enviar.
    */
   documentoId?: string | null
-  /**
-   * Falso cuando el paciente no tiene correo en su ficha. El botón se apaga y lo
-   * dice: apagarlo sin explicación deja al médico buscando qué le falta.
-   *
-   * Opcional porque hay puntos de montaje que no conocen la ficha; sin él se
-   * intenta el envío y es el servidor quien responde que no hay correo.
-   */
-  pacienteTieneCorreo?: boolean
 }
 
-type EstadoEnvio = 'listo' | 'enviando' | 'enviado' | 'error'
+/**
+ * Los pasos del envío. El destinatario NO llega por props: lo pregunta el modal
+ * al servidor con el id del documento, así que ningún formulario tiene que
+ * conocer la ficha del paciente para que esto funcione.
+ *
+ *   consultando → el GET que dice qué hay en la ficha
+ *   listo       → hay correo en la ficha y se ve cuál; se puede mandar
+ *   pidiendo    → no hay correo, o el médico eligió otro: se teclea aquí mismo
+ *   confirmando → la dirección tecleada, grande, para leerla letra por letra
+ *   enviando / enviado / error
+ */
+type Paso = 'consultando' | 'listo' | 'pidiendo' | 'confirmando' | 'enviando' | 'enviado' | 'error'
 
 export default function ModalDocumentoGenerado({
   open,
@@ -89,11 +93,17 @@ export default function ModalDocumentoGenerado({
   titulo,
   guardadoEnExpediente,
   documentoId = null,
-  pacienteTieneCorreo,
 }: Props) {
-  const [envio, setEnvio] = useState<EstadoEnvio>('listo')
+  const [paso, setPaso] = useState<Paso>('consultando')
+  const [correoFicha, setCorreoFicha] = useState<string | null>(null)
+  const [pacienteId, setPacienteId] = useState<string | null>(null)
+  const [escrito, setEscrito] = useState('')
   const [errorEnvio, setErrorEnvio] = useState('')
   const [enviadoA, setEnviadoA] = useState('')
+  /* Solo se ofrece guardar cuando la ficha estaba VACÍA. Ver `guardarEnFicha`. */
+  const [ofrecerGuardar, setOfrecerGuardar] = useState(false)
+  const [guardando, setGuardando] = useState(false)
+  const [avisoGuardado, setAvisoGuardado] = useState('')
 
   /* Cada apertura empieza limpia: el modal se reutiliza entre documentos y un
      «Enviado» heredado del anterior haría creer que este ya salió.
@@ -106,10 +116,47 @@ export default function ModalDocumentoGenerado({
   const [aperturaVista, setAperturaVista] = useState(open)
   if (open !== aperturaVista) {
     setAperturaVista(open)
-    setEnvio('listo')
+    setPaso(documentoId === null ? 'listo' : 'consultando')
+    setCorreoFicha(null)
+    setPacienteId(null)
+    setEscrito('')
     setErrorEnvio('')
     setEnviadoA('')
+    setOfrecerGuardar(false)
+    setAvisoGuardado('')
   }
+
+  /* Qué dirección propone el envío. Se pregunta al servidor con el id del
+     documento y NO se recibe por props: así ningún formulario tiene que conocer
+     la ficha del paciente, y los nueve puntos de montaje siguen pasando un dato
+     y no dos. El setState va dentro del callback del fetch —no en el cuerpo del
+     efecto—, que es lo que el lint permite. */
+  useEffect(() => {
+    if (!open || documentoId === null) return
+    let vivo = true
+    fetch(`/api/email/enviar-documento?documentoId=${encodeURIComponent(documentoId)}`)
+      .then(async res => ({ ok: res.ok, datos: await res.json() as Record<string, unknown> }))
+      .then(({ ok, datos }) => {
+        if (!vivo) return
+        if (!ok) {
+          setErrorEnvio(typeof datos.error === 'string' ? datos.error : 'No se pudo comprobar el correo del paciente.')
+          setPaso('error')
+          return
+        }
+        const ficha = typeof datos.correoFicha === 'string' ? datos.correoFicha : null
+        setCorreoFicha(ficha)
+        setPacienteId(typeof datos.pacienteId === 'string' ? datos.pacienteId : null)
+        /* Sin correo en la ficha se entra DIRECTO a pedirlo: es el caso común y
+           un paso intermedio que solo dice «no hay correo» sobra. */
+        setPaso(ficha === null ? 'pidiendo' : 'listo')
+      })
+      .catch(() => {
+        if (!vivo) return
+        setErrorEnvio('No se pudo comprobar el correo del paciente. Revisa tu conexión.')
+        setPaso('error')
+      })
+    return () => { vivo = false }
+  }, [open, documentoId])
 
   /**
    * ⚠️ AL SERVIDOR SOLO VIAJA EL ID. Ni el blob que este modal tiene en memoria,
@@ -119,29 +166,70 @@ export default function ModalDocumentoGenerado({
    * parecería un atajo y abriría la puerta a que se mande un archivo distinto
    * del emitido.
    */
-  async function enviarPorCorreo(): Promise<void> {
-    if (documentoId === null || envio === 'enviando' || envio === 'enviado') return
-    setEnvio('enviando')
+  async function enviarPorCorreo(destino: string | null): Promise<void> {
+    if (documentoId === null || paso === 'enviando') return
+    setPaso('enviando')
     setErrorEnvio('')
+    /* `confirmarEmailAlterno` solo cuando la dirección se tecleó aquí. Con la de
+       la ficha no hay nada que confirmar: no es una dirección nueva. */
+    const aMano = destino !== null
     try {
       const res = await fetch('/api/email/enviar-documento', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ documentoId }),
+        body: JSON.stringify(
+          aMano
+            ? { documentoId, pacienteEmail: destino, confirmarEmailAlterno: true }
+            : { documentoId },
+        ),
       })
       const data: { error?: string; enviadoA?: string } = await res.json()
       if (!res.ok) {
         setErrorEnvio(data.error ?? 'No se pudo enviar el documento.')
-        setEnvio('error')
+        setPaso('error')
         return
       }
-      setEnviadoA(data.enviadoA ?? '')
-      setEnvio('enviado')
+      setEnviadoA(data.enviadoA ?? destino ?? correoFicha ?? '')
+      /* ⚠️ SOLO SE PREGUNTA SI GUARDAR CUANDO LA FICHA ESTABA VACÍA.
+         Si ya había correo y este envío fue a otra dirección —el familiar, el
+         que dictó ese día—, ofrecer guardarla invitaría a sustituir en silencio
+         una dirección buena por una puntual, y nadie lo notaría hasta que un
+         envío futuro fuera a parar a quien no debe. Esa alterna es «solo para
+         este envío» y así se queda. El servidor lo impide además por su cuenta. */
+      setOfrecerGuardar(aMano && correoFicha === null && pacienteId !== null)
+      setPaso('enviado')
     } catch {
       setErrorEnvio('No se pudo conectar. Revisa tu conexión e intenta de nuevo.')
-      setEnvio('error')
+      setPaso('error')
     }
   }
+
+  /**
+   * Guarda en la ficha el correo que se acaba de usar. El envío YA ocurrió: esto
+   * es solo para la próxima vez, así que un fallo aquí se cuenta y no se
+   * dramatiza — el documento salió igual.
+   */
+  async function guardarEnFicha(): Promise<void> {
+    if (pacienteId === null || enviadoA === '' || guardando) return
+    setGuardando(true)
+    try {
+      const res = await fetch(`/api/pacientes/${pacienteId}/correo`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ correo: enviadoA }),
+      })
+      const data: { error?: string } = await res.json()
+      setAvisoGuardado(res.ok ? 'Guardado en la ficha del paciente.' : (data.error ?? 'No se pudo guardar en la ficha.'))
+    } catch {
+      setAvisoGuardado('No se pudo guardar en la ficha.')
+    } finally {
+      setGuardando(false)
+      setOfrecerGuardar(false)
+    }
+  }
+
+  /** Suficiente para atajar el dedo torcido; la validación de verdad es el servidor. */
+  const escritoValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(escrito.trim())
   /**
    * useMemo y NO un efecto que haga setState: así el href existe ya en el
    * PRIMER render del modal. Con setState habría un frame con el botón inerte
@@ -212,13 +300,180 @@ export default function ModalDocumentoGenerado({
     </div>
   )
 
-  /* Las dos razones por las que el correo no puede salir, en el orden en que
-     importan: sin fila no hay nada que enviar; con fila pero sin correo en la
-     ficha, hay documento y no hay a quién. */
-  const motivoSinCorreo = documentoId === null
-    ? 'No quedó en el expediente'
-    : pacienteTieneCorreo === false ? 'Sin correo en la ficha' : null
-  const puedeEnviarCorreo = motivoSinCorreo === null
+  /* Sin fila no hay nada que enviar: el PDF existe en memoria pero no en
+     Storage, y lo que se adjunta es el de Storage. */
+  const sinDocumento = documentoId === null
+
+  /**
+     El bloque del destinatario. Va como función y no como componente para que
+     no se recree en cada render (`react-hooks/static-components`).
+
+     ⚠️ LA CONFIRMACIÓN DOBLE NO ES UN «¿ESTÁS SEGURO?». Enseña la dirección
+     TECLEADA, grande y sola, y dice qué sale por ella. Un correo mal escrito
+     manda un documento con datos clínicos a un desconocido y eso no se deshace
+     —no hay «cancelar envío»—, así que el paso existe para que se lea letra por
+     letra, no para añadir un clic.
+
+     Y se exige EN LOS DOS CASOS que la dirección venga del teclado: tanto la
+     alterna como la primera de un paciente sin correo en la ficha. La API solo
+     la reclama para la alterna, porque sin correo registrado no hay discrepancia
+     que detectar — pero el riesgo es el mismo dedo sobre el mismo teclado. */
+  function panelDestinatario(): ReactNode {
+    if (sinDocumento) return null
+
+    if (paso === 'consultando') {
+      return (
+        <p className="sp-hint text-center" style={{ paddingTop: '4px' }}>
+          <Loader2 size={13} className="animate-spin inline mr-1.5" />
+          Comprobando el correo del paciente…
+        </p>
+      )
+    }
+
+    if (paso === 'pidiendo') {
+      return (
+        <div className="sp-banner w-full text-left" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '8px' }}>
+          <label htmlFor="mdg-correo" className="sp-label-field">
+            {correoFicha === null
+              ? 'Este paciente no tiene correo en su ficha. Escríbelo aquí:'
+              : 'Correo solo para este envío (la ficha no se toca):'}
+          </label>
+          <input
+            id="mdg-correo"
+            type="email"
+            inputMode="email"
+            autoComplete="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            value={escrito}
+            onChange={e => setEscrito(e.target.value)}
+            placeholder="nombre@correo.com"
+            className="sp-input"
+          />
+          <div className="sp-grid-actions">
+            <button
+              type="button"
+              onClick={() => setPaso('confirmando')}
+              disabled={!escritoValido}
+              className="sp-btn sp-btn--primary"
+            >
+              Continuar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEscrito('')
+                setErrorEnvio('')
+                /* Siempre a `listo`, haya correo en la ficha o no. Sin él, ese
+                   estado no pinta línea de destinatario y el botón de correo
+                   vuelve a abrir esta captura: cancelar devuelve al punto de
+                   partida, no a un estado de fallo. */
+                setPaso('listo')
+              }}
+              className="sp-btn sp-btn--ghost"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )
+    }
+
+    if (paso === 'confirmando') {
+      return (
+        <div className="sp-banner sp-banner--warn w-full text-left" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '10px' }}>
+          <span className="sp-label-field">Va a enviar el documento a esta dirección escrita a mano:</span>
+          <span
+            style={{
+              fontSize: '17px', fontWeight: 700, color: 'var(--sp-text-strong)',
+              wordBreak: 'break-all', userSelect: 'all', lineHeight: 1.3,
+            }}
+          >
+            {escrito.trim()}
+          </span>
+          <span style={{ fontSize: '12px', lineHeight: 1.5 }}>
+            Compruébala letra por letra. El archivo lleva datos clínicos dentro y un correo
+            enviado no se puede recuperar.
+          </span>
+          <div className="sp-grid-actions">
+            <button
+              type="button"
+              onClick={() => void enviarPorCorreo(escrito.trim())}
+              className="sp-btn sp-btn--primary"
+            >
+              Sí, enviar ahí
+            </button>
+            <button type="button" onClick={() => setPaso('pidiendo')} className="sp-btn sp-btn--ghost">
+              Corregir
+            </button>
+          </div>
+        </div>
+      )
+    }
+
+    if (paso === 'enviado') {
+      return (
+        <div className="w-full space-y-2">
+          <p className="sp-body text-center" style={{ fontSize: '12px' }} aria-live="polite">
+            Enviado{enviadoA !== '' ? ` a ${enviadoA}` : ''} con el PDF adjunto. Si no aparece,
+            pídele que revise su carpeta de <strong>spam o correo no deseado</strong>.
+          </p>
+
+          {/* El envío YA ocurrió; esto es solo para la próxima vez. Por eso se
+              pregunta DESPUÉS y no antes: nada de lo que se conteste aquí
+              cambia lo que acaba de salir. */}
+          {ofrecerGuardar && (
+            <div className="sp-banner w-full text-left" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '8px' }}>
+              <span style={{ fontSize: '13px' }}>
+                ¿Guardas <strong>{enviadoA}</strong> en la ficha del paciente para la próxima vez?
+              </span>
+              <div className="sp-grid-actions">
+                <button
+                  type="button"
+                  onClick={() => void guardarEnFicha()}
+                  disabled={guardando}
+                  className="sp-btn sp-btn--primary"
+                >
+                  {guardando ? <><Loader2 size={15} className="animate-spin" /> Guardando…</> : 'Guardar en la ficha'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOfrecerGuardar(false)}
+                  className="sp-btn sp-btn--ghost"
+                >
+                  No, gracias
+                </button>
+              </div>
+            </div>
+          )}
+
+          {avisoGuardado !== '' && (
+            <p className="sp-hint text-center" aria-live="polite">{avisoGuardado}</p>
+          )}
+        </div>
+      )
+    }
+
+    /* `listo`, `enviando` y `error`: la línea que dice a dónde va, con la
+       escotilla para usar otra dirección sin tocar la ficha. */
+    if (correoFicha === null) return null
+    return (
+      <div className="w-full text-left" style={{ fontSize: '12px', lineHeight: 1.5 }}>
+        <span style={{ color: 'var(--sp-text-muted)' }}>Se enviará a </span>
+        <strong style={{ color: 'var(--sp-text-strong)', wordBreak: 'break-all' }}>{correoFicha}</strong>
+        <button
+          type="button"
+          onClick={() => { setEscrito(''); setErrorEnvio(''); setPaso('pidiendo') }}
+          className="sp-link-alt"
+          style={{ display: 'block', marginTop: '2px' }}
+        >
+          Usar otro correo solo para este envío
+        </button>
+      </div>
+    )
+  }
+
+  const enFlujoDeCaptura = paso === 'pidiendo' || paso === 'confirmando'
 
   const pie = (
     <div className="p-4 md:px-6 space-y-2.5">
@@ -241,66 +496,71 @@ export default function ModalDocumentoGenerado({
         </button>
       )}
 
-      {/* WhatsApp sigue diferido; el correo ya envía. Ambos mandan el ARCHIVO —
-          por eso el mensaje y el adjunto viven en `lib/documentos/`, fuera de la
-          ruta de correo: cuando WhatsApp entre, reusa los dos y no los copia.
+      <div className="mt-2 pt-3 border-t border-[var(--sp-line-divider)] space-y-2.5">
+        {panelDestinatario()}
 
-          A OPACIDAD PLENA, igual que el botón de Google en /login: lo
-          deshabilitado se comunica con el estado del control, el relleno y el
-          cursor — nunca apagando el texto, porque entonces el médico no puede
-          leer QUÉ es lo que todavía no puede usar.
-          justifyContent en línea y no `justify-between`: globals.css importa
-          tailwindcss ANTES que spinus-tokens.css, así que el
-          `justify-content:center` de .sp-btn le gana a la utilidad. */}
-      <div className="sp-grid-actions mt-2 pt-3 border-t border-[var(--sp-line-divider)]">
-        <button
-          type="button"
-          onClick={() => void enviarPorCorreo()}
-          disabled={!puedeEnviarCorreo || envio === 'enviando' || envio === 'enviado'}
-          aria-disabled={!puedeEnviarCorreo || undefined}
-          className={`sp-btn sp-btn--tertiary${puedeEnviarCorreo ? '' : ' cursor-not-allowed'}`}
-          style={{ flexDirection: 'column', gap: '7px' }}
-        >
-          <span className="inline-flex items-center gap-2">
-            {envio === 'enviando'
-              ? <Loader2 size={17} className="animate-spin" />
-              : envio === 'enviado' ? <Check size={17} /> : <Mail size={17} />}
-            {envio === 'enviando' ? 'Enviando…' : envio === 'enviado' ? 'Enviado' : 'Enviar por correo'}
-          </span>
-          {/* El motivo, siempre a la vista: un botón apagado sin explicación deja
-              al médico buscando qué le falta. */}
-          {motivoSinCorreo !== null && (
-            <span className="sp-badge sp-badge--deferred">{motivoSinCorreo}</span>
-          )}
-        </button>
+        {/* Durante la captura y la confirmación la rejilla se retira: el panel
+            trae sus propios botones y un segundo «Enviar por correo» al lado
+            haría dudar de cuál manda. */}
+        {!enFlujoDeCaptura && (
+          /* WhatsApp sigue diferido; el correo ya envía. Ambos mandan el ARCHIVO
+             — por eso el mensaje y el adjunto viven en `lib/documentos/`, fuera
+             de la ruta de correo: cuando WhatsApp entre, reusa los dos.
 
-        <button
-          type="button"
-          disabled
-          aria-disabled="true"
-          className="sp-btn sp-btn--tertiary cursor-not-allowed"
-          style={{ flexDirection: 'column', gap: '7px' }}
-        >
-          <span className="inline-flex items-center gap-2">
-            <MessageCircle size={17} /> WhatsApp
-          </span>
-          <span className="sp-badge sp-badge--deferred">Próximamente</span>
-        </button>
+             A OPACIDAD PLENA, igual que el botón de Google en /login: lo
+             deshabilitado se comunica con el estado del control, el relleno y el
+             cursor — nunca apagando el texto, porque entonces el médico no puede
+             leer QUÉ es lo que todavía no puede usar.
+             justifyContent en línea y no `justify-between`: globals.css importa
+             tailwindcss ANTES que spinus-tokens.css, así que el
+             `justify-content:center` de .sp-btn le gana a la utilidad. */
+          <div className="sp-grid-actions">
+            <button
+              type="button"
+              onClick={() => {
+                if (correoFicha !== null) void enviarPorCorreo(null)
+                else { setEscrito(''); setErrorEnvio(''); setPaso('pidiendo') }
+              }}
+              disabled={sinDocumento || paso === 'consultando' || paso === 'enviando' || paso === 'enviado'}
+              aria-disabled={sinDocumento || undefined}
+              className={`sp-btn sp-btn--tertiary${sinDocumento ? ' cursor-not-allowed' : ''}`}
+              style={{ flexDirection: 'column', gap: '7px' }}
+            >
+              <span className="inline-flex items-center gap-2">
+                {paso === 'enviando'
+                  ? <Loader2 size={17} className="animate-spin" />
+                  : paso === 'enviado' ? <Check size={17} /> : <Mail size={17} />}
+                {paso === 'enviando' ? 'Enviando…' : paso === 'enviado' ? 'Enviado' : 'Enviar por correo'}
+              </span>
+              {/* El motivo, siempre a la vista: un botón apagado sin explicación
+                  deja al médico buscando qué le falta. */}
+              {sinDocumento && (
+                <span className="sp-badge sp-badge--deferred">No quedó en el expediente</span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              disabled
+              aria-disabled="true"
+              className="sp-btn sp-btn--tertiary cursor-not-allowed"
+              style={{ flexDirection: 'column', gap: '7px' }}
+            >
+              <span className="inline-flex items-center gap-2">
+                <MessageCircle size={17} /> WhatsApp
+              </span>
+              <span className="sp-badge sp-badge--deferred">Próximamente</span>
+            </button>
+          </div>
+        )}
+
+        {errorEnvio !== '' && (
+          <p className="sp-banner sp-banner--danger" role="alert">
+            <AlertTriangle size={17} />
+            <span>{errorEnvio}</span>
+          </p>
+        )}
       </div>
-
-      {errorEnvio !== '' && (
-        <p className="sp-banner sp-banner--danger" role="alert">
-          <AlertTriangle size={17} />
-          <span>{errorEnvio}</span>
-        </p>
-      )}
-
-      {envio === 'enviado' && (
-        <p className="sp-body text-center" style={{ fontSize: '12px' }} aria-live="polite">
-          Enviado{enviadoA !== '' ? ` a ${enviadoA}` : ''} con el PDF adjunto. Si no aparece, pídele
-          que revise su carpeta de <strong>spam o correo no deseado</strong>.
-        </p>
-      )}
 
       <button
         type="button"
