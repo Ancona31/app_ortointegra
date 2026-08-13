@@ -21,13 +21,18 @@
  * nombre vacío no tiene celda, y es lo que implementa «solo firma quien tiene
  * nombre».
  *
- * ── UNA DIFERENCIA DELIBERADA CON v1, Y HAY QUE MIRARLA ─────────────────────
+ * ── LA RÚBRICA DEL MÉDICO VA SOLO SI EL DOCUMENTO SE SELLÓ ──────────────────
  *
- * v1 estampaba la rúbrica del médico **solo si el documento se había sellado**; en
- * uno impreso para firma manual dejaba su celda en blanco. v2 la imprime siempre,
- * como los otros ocho formatos: es lo que declara el formato —«el médico es el
- * único cuya rúbrica se imprime siempre»— y lo que hace el sistema entero. El
- * médico ya firmó lo que emite; quien tiene que firmar delante es el paciente.
+ * **Y esto no es una preferencia de composición: es lo que el papel acredita.**
+ * Un consentimiento se imprime PARA QUE LO FIRMEN; si sale con la rúbrica del
+ * médico ya estampada, lleva su firma puesta antes de que el paciente consintiera
+ * nada, que es lo contrario de lo que el documento hace constar.
+ *
+ * Sellado, sí va: ahí el acto ya ocurrió y las cinco rúbricas constan juntas.
+ *
+ * Es la regla de v1 —`trazo={sellado ? medico.firma_url : null}`—, y es distinta
+ * de la de los otros siete formatos, donde la rúbrica del médico se imprime
+ * siempre porque el documento lo firma él y a nadie más se le pide firma.
  */
 
 import type { ReactElement } from 'react'
@@ -109,6 +114,14 @@ export function propsConsentimientoInformado(
     ? (data.secciones as Record<string, unknown>)
     : {}
 
+  /*
+   * El documento está sellado cuando hay firmas Y hay sello. Es el mismo
+   * predicado que v1 —`data.selladoEn !== undefined && porRol.size > 0`—, y
+   * gobierna dos cosas: los pies de hora de cada celda y, sobre todo, si la
+   * rúbrica del médico se estampa. Ver la cabecera.
+   */
+  const estaSellado = selladoEn !== undefined && porRol.size > 0
+
   return {
     ...comunes(entrada),
     paciente: {
@@ -132,7 +145,12 @@ export function propsConsentimientoInformado(
     firmantes: {
       // Sin nombre: el formato cae al del membrete, que es de donde tiene que
       // salir para que no haya dos juegos de datos del mismo médico en la hoja.
-      medico: { rubrica: rubricaDe(entrada.medico), sello: selloLegible(porRol.get('medico')?.firmadoEn) },
+      // Y sin rúbrica mientras el documento no esté sellado: su celda queda para
+      // la pluma, como las de los demás firmantes.
+      medico: {
+        rubrica: estaSellado ? rubricaDe(entrada.medico) : undefined,
+        sello: selloLegible(porRol.get('medico')?.firmadoEn),
+      },
       paciente: firmanteDe('paciente', textoOpcional(data.paciente), porRol),
       familiar: firmanteDe('familiar', textoOpcional(data.familiar), porRol),
       testigo1: firmanteDe('testigo_1', textoOpcional(data.testigo1), porRol),

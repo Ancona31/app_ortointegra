@@ -446,8 +446,12 @@ describe('II.7 · Consentimiento Informado', () => {
     expect(p.firmantes.paciente).toEqual({ nombre: 'Renata Bustamante', rubrica: undefined, sello: undefined })
     // Quien no tiene nombre no tiene celda: lo decide el formato con esto.
     expect(p.firmantes.testigo2.nombre).toBeUndefined()
-    // La rúbrica del médico sale del perfil SIEMPRE, que es lo que v2 declara.
-    expect(p.firmantes.medico.rubrica).toBe('data:image/png;base64,RUBRICA')
+    /*
+      ⚠ **NI SIQUIERA LA DEL MÉDICO.** Este papel se imprime para que lo firmen: sacarlo con
+      su rúbrica ya estampada lo dejaría firmado antes de que el paciente consintiera nada.
+      La celda queda para la pluma, como las otras cuatro.
+    */
+    expect(p.firmantes.medico.rubrica).toBeUndefined()
     expect(p.autorizaTransfusion).toBe('si')
     expect(p.autorizaFotos).toBe(true)
     expect(p.secciones.anestesia).toBeUndefined()
@@ -466,6 +470,8 @@ describe('II.7 · Consentimiento Informado', () => {
       identificaciones: [{ rol: 'Paciente', nombre: 'Renata Bustamante', foto: 'data:image/jpeg;base64,FOTO' }],
     }))
     expect(p.firmantes.paciente.rubrica).toBe('data:image/png;base64,TRAZO')
+    // Y sellado SÍ va la del médico: ahí el acto ya ocurrió.
+    expect(p.firmantes.medico.rubrica).toBe('data:image/png;base64,RUBRICA')
     expect(p.firmantes.paciente.sello).toMatch(/^13\/08\/2026 \d{2}:\d{2}:\d{2}$/)
     expect(p.sellado?.huella).toBe('3f9a8c41')
     expect(p.identificaciones?.[0]).toEqual({
@@ -498,7 +504,9 @@ describe('II.9 · Denegación de Consentimiento', () => {
     const p = propsDenegacionConsentimiento(entrada({ ...contenido, folio: 'DEN-2026-0003' }))
     expect(p.sustitucion).toBe(true)
     expect(p.firmantes.familiar.nombre).toBe('María Bustamante')
-    expect(p.firmantes.medico.rubrica).toBe('data:image/png;base64,RUBRICA')
+    // Las tres celdas para la pluma, la del médico incluida: una denegación se
+    // firma a mano y no se sella nunca.
+    expect(p.firmantes.medico.rubrica).toBeUndefined()
     expect(p.paciente.diagnostico).toBe('Espondilolistesis degenerativa')
   })
 

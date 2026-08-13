@@ -411,6 +411,43 @@ export interface BloqueDestacadoProps {
    * 2.J; sin él, la marca cae a tinta negra y el bloque se imprime igual (I.3.7).
    */
   acento?: AcentoResuelto
+  /**
+   * ⚠ **LEVANTA LA REGLA 3 — que este bloque no se parta entre hojas— Y TIENE UN SOLO
+   * CONSUMIDOR: las instrucciones al paciente de II.6.**
+   *
+   * ── POR QUÉ LA REGLA ES BUENA Y AQUÍ NO ─────────────────────────────────────
+   *
+   * La regla existe para pasajes ACOTADOS: una alarma de tres renglones o una cita de
+   * cuatro datos partidas por la mitad se leen mal, y cabe siempre en cualquier hueco
+   * razonable, así que no partirlas no cuesta nada.
+   *
+   * Las instrucciones de ingreso son de otra especie: **las escribe el médico y no tienen
+   * techo**. Con la regla puesta, un bloque que no cupiera en el hueco que queda bajaba
+   * ENTERO, dejaba media hoja en blanco detrás y —si algún día superara el alto de una
+   * hoja— no habría hoja donde ponerlo. Aplicar a un bloque sin techo una regla escrita
+   * para bloques cortos es lo que producía el defecto.
+   *
+   * ── QUÉ PASA CON EL MARCO AL PARTIRSE, MEDIDO SOBRE EL PDF ──────────────────
+   *
+   * **El fragmento de la hoja siguiente llega SIN MARCO: ni filete superior, ni filete
+   * izquierdo, ni la sangría de 14.** No es una decisión de diseño, es lo que hace el
+   * renderer: al partir un nodo pone a cero el borde y el padding del lado del corte, y en
+   * esta composición el resto tampoco sobrevive. Comprobado renderizando el documento con
+   * doce instrucciones y mirando la hoja 2.
+   *
+   * Lo que SÍ ata la continuación con lo anterior es el ordinal: la lista sigue en `07`,
+   * `08`… con la numeración corrida de 2.J. El encabezado no se repite —es un hijo, no un
+   * borde—, así que el bloque se nombra una vez, donde empieza.
+   *
+   * ⚠ **Si algún día hace falta que el marco continúe**, no se consigue desde aquí: habría
+   * que mover el filete del bloque a cada fila de la lista —y entonces el aire de 8 pt
+   * entre ítems lo cortaría, dejando una regla a trazos— o renunciar al marco y componer
+   * estas instrucciones como los demás bloques del formato, con filete de título. Las dos
+   * son decisiones de diseño, no de implementación.
+   *
+   * No lo pongas en `alarma` ni en `cita` sin volver a hacer este razonamiento.
+   */
+  divisible?: boolean
 }
 
 /**
@@ -458,6 +495,7 @@ export default function BloqueDestacado({
   contenido,
   lamina = 'chasis',
   acento,
+  divisible = false,
 }: BloqueDestacadoProps): ReactElement {
   const composicion = composicionDe(variante, lamina)
   const hayEncabezado = encabezado !== undefined && encabezado.trim() !== ''
@@ -475,8 +513,9 @@ export default function BloqueDestacado({
   return (
     // `wrap={false}` es la regla 3: un bloque destacado no se parte entre hojas.
     // Es el `break-inside: avoid` de la ficha y uno de los cuatro bloques
-    // indivisibles que declara 2.N (`CONCILIA D44`).
-    <View style={[estilos.bloque, estiloFilete(variante, lamina)]} wrap={false}>
+    // indivisibles que declara 2.N (`CONCILIA D44`). `divisible` la levanta, y
+    // solo un consumidor la levanta: ver esa prop.
+    <View style={[estilos.bloque, estiloFilete(variante, lamina)]} wrap={divisible}>
       {hayEncabezado && composicion.rolEncabezado !== null ? (
         <Text style={estiloEncabezado}>{encabezado.toUpperCase()}</Text>
       ) : null}

@@ -55,6 +55,7 @@ import {
   CAJA,
   ESPACIO,
   RETICULA,
+  TINTA,
   TIPOGRAFIA,
   estiloTipografico,
   type AcentoResuelto,
@@ -117,6 +118,17 @@ const estilos = StyleSheet.create({
    * preámbulo de II es del TÍTULO DEL DOCUMENTO (`CONCILIA D1`) y la lámina escribe esta
    * cadena en capitalización de oración, igual que 2.P escribe la suya. Se compone textual.
    */
+  /**
+   * EL ANTETÍTULO — `SECCIÓN 2 DE 2`, en el rol de sección, sobre el rótulo.
+   *
+   * Compuesto con la versalita del sistema y en `tinta.secundaria`: identifica la hoja
+   * sin competir con el rótulo, que es lo que se lee.
+   */
+  antetitulo: {
+    ...estiloTipografico('titulo.seccion'),
+    color: TINTA.secundaria,
+    marginBottom: ESPACIO[2],
+  },
   rotulo: { ...estiloTipografico('titulo.documento') },
   /**
    * El subtítulo de lector: `seccion.lector`, 8 / 12 en 600 con la versalita del sistema y
@@ -138,6 +150,26 @@ export interface AperturaSeccionProps {
    * componente no lo transforma. Ver la nota de `rotulo`.
    */
   rotulo: string
+  /**
+   * CUÁNTAS SECCIONES TIENE EL DOCUMENTO. Con `numero` compone el antetítulo
+   * `SECCIÓN 2 DE 2`, y por eso son dos números y no una cadena: **la palabra
+   * «continuación» no puede entrar por prop**, que es la regla 1 de la ficha de 2.Q.
+   *
+   * ── POR QUÉ VUELVE AQUÍ, SI LA LÁMINA LA HABÍA MUDADO A LA CABECERA ─────────
+   *
+   * El punto (a) de arriba la mudó al `rotuloHoja` de la hoja de continuación, y eso
+   * funcionaba mientras la sección 2 empezara en una hoja de número conocido: 2.V declara
+   * los rótulos propios POR NÚMERO DE HOJA. Desde que el cierre de la sección 1 se parte
+   * según lo que traiga, la sección 2 empieza en la hoja que toque —la 2 o la 3—, y un
+   * rótulo por número acabaría rotulando la hoja equivocada: diría `SECCIÓN 2 DE 2` sobre
+   * las instrucciones al paciente.
+   *
+   * Aquí no puede pasar: **este componente viaja en el flujo**, así que la cadena sale
+   * donde la sección empieza, sea cual sea la hoja. Lo que la cabecera de esa hoja dice
+   * —`· continuación`— es cierto: es la misma solicitud, y quien la separe la identifica
+   * por lo que tiene DEBAJO del filete más grueso del documento.
+   */
+  de: number
   /** Quién lee esta sección: «Para personal de enfermería y médico residente». */
   lector: string
   /** El número y el segmento grueso del filete van en el acento. */
@@ -147,6 +179,7 @@ export interface AperturaSeccionProps {
 /** 2.Q · `AperturaSeccion`. */
 export default function AperturaSeccion({
   numero,
+  de,
   rotulo,
   lector,
   acento,
@@ -176,6 +209,11 @@ export default function AperturaSeccion({
         </View>
 
         <View style={estilos.texto}>
+          {/*
+            LA CADENA QUE IDENTIFICA LA HOJA, compuesta de dos números y no recibida: ver
+            la prop `de`. En mayúsculas aquí, como toda versalita del sistema.
+          */}
+          <Text style={estilos.antetitulo}>{`Sección ${numero} de ${de}`.toUpperCase()}</Text>
           <Text style={estilos.rotulo}>{rotulo}</Text>
           <Text style={estilos.lector}>{lector}</Text>
         </View>

@@ -166,9 +166,11 @@
  *
  * 1. **Cinco firmantes**: médico, paciente, familiar o responsable y dos testigos. El
  *    anestesiólogo entrega su propio consentimiento y no aparece (`D-anestesiólogo`).
- * 2. **La rúbrica del médico se renderiza SIEMPRE**; las otras cuatro, solo si esa persona
- *    firmó en pantalla. El mismo documento puede mezclar las dos cosas, y por eso la
- *    rúbrica entra por firmante y no por documento.
+ * 2. **Ninguna rúbrica se estampa en un documento sin sellar, la del médico incluida.**
+ *    Este papel se imprime PARA QUE LO FIRMEN: sacarlo con la firma del médico ya puesta
+ *    lo dejaría firmado antes de que el paciente consintiera nada. Sellado, van las cinco.
+ *    Lo decide quien llama —la rúbrica entra por firmante y no por documento—; ver el
+ *    adaptador de este formato.
  * 3. **Sin firmar se imprime en blanco.** No hay leyenda de «pendiente» en el papel: el
  *    aviso vive en pantalla. Es la regla 2 de 2.E aplicada a la firma.
  * 4. **Ni la firma ni la fotografía bloquean la emisión.**
@@ -476,24 +478,24 @@ const SECCION = {
   aireParrafo: 7,
   /** Caja de texto de las cinco secciones de solo prosa. */
   caja: 381,
-  /** Caja de las dos que llevan zona de escritura: la fila entera menos el riel. */
+  /** Caja de las dos que llevan entradilla: la fila entera menos el riel. */
   cajaAncha: CAJA.ancho - RETICULA.riel - RETICULA.medianil,
-  /** Aire entre la entradilla de la zona y el primer renglón. */
-  aireZona: ESPACIO[8],
 } as const
 
-/**
- * EL RENGLÓN DE ESCRITURA — **15.5 pt**, con regla de `filete.regla` en `tinta.hairline`.
+/*
+ * ⚠ **AQUÍ VIVÍA LA ZONA DE ESCRITURA — renglones pautados de 15.5 pt bajo la
+ * descripción del procedimiento y bajo los riesgos específicos— Y SE RETIRÓ.**
  *
- * ⚠ **`manuscrito.alto` SON 20 Y B.7 §3 LEE 16.** Es el quinto valor del sistema para el
- * mismo token y se compone el que manda el paso 4.7. Ver el punto (c) de la cabecera.
+ * La lámina los compone porque nació como papel para rellenar a mano. En el
+ * sistema esas dos secciones **las escribe el médico en el formulario**, así que
+ * el papel salía con su texto y, debajo, seis renglones vacíos que nadie iba a
+ * llenar: 96 pt en una y 64 en la otra, empujando el resto del documento hacia
+ * abajo y sin decir nada.
  *
- * **Los mínimos se llenan con renglones enteros y el resto queda en blanco**, que es lo que
- * hace el `repeating-linear-gradient` de la lámina: en una caja de 96 con renglón de 15.5
- * caben seis reglas y sobran 3 pt. Redondear hacia arriba estiraría la zona por encima de
- * su mínimo, que es lo contrario de lo que un `min-height` declara.
+ * No es un mínimo que reservar: ese espacio es para el texto. Si alguna vez hace
+ * falta un consentimiento en blanco para llenar con pluma, es otro documento y no
+ * una zona muerta dentro de este.
  */
-const RENGLON = { alto: 15.5, grosor: FILETE.regla } as const
 
 /** Geometría de la retícula de firmas y de sus rótulos de nivel. */
 const NIVEL = {
@@ -546,8 +548,8 @@ const ANEXO = {
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 /**
- * Un firmante. **La rúbrica es por persona**, no por documento: el médico la lleva siempre
- * y los otros cuatro solo si firmaron en pantalla (decisión de producto 2).
+ * Un firmante. **La rúbrica es por persona**, no por documento: cada uno lleva la suya si
+ * firmó, y en un documento sin sellar no la lleva ninguno (decisión de producto 2).
  */
 export interface FirmanteConsentimiento {
   /** Nombre de quien firma. Sin él, el renglón se reserva para llenarlo a mano. */
@@ -638,7 +640,7 @@ export interface ConsentimientoInformadoProps {
   /** El procedimiento, que va como subtítulo del documento. Bloquea emisión (II.7 §2). */
   readonly procedimiento: string
   readonly secciones: SeccionesConsentimiento
-  /** Los cinco firmantes. El médico es el único cuya rúbrica se imprime siempre. */
+  /** Los cinco firmantes. Sin sellar, ninguno trae rúbrica: ver decisión 2. */
   readonly firmantes: {
     readonly medico: FirmanteConsentimiento
     readonly paciente: FirmanteConsentimiento
@@ -815,12 +817,6 @@ const estilos = StyleSheet.create({
     marginTop: SECCION.aireParrafo,
     ...JUSTIFICADO,
   },
-  zonaEscritura: { marginTop: SECCION.aireZona },
-  renglon: {
-    height: RENGLON.alto,
-    borderBottomWidth: RENGLON.grosor,
-    borderBottomColor: TINTA.hairline,
-  },
 
   // ── Declaración y la pila de decisiones del paciente
   declaracion: { marginTop: SEPARACION_ROTULO_DECLARACION },
@@ -968,8 +964,13 @@ interface SeccionClinica {
   readonly clave: keyof SeccionesConsentimiento
   /** Separación respecto de la sección anterior. Ver el punto (d) de la cabecera. */
   readonly separacion: number
-  /** Las dos que llevan zona de escritura, con su entradilla y su mínimo. */
-  readonly zona?: { readonly entradilla: string; readonly minimo: number }
+  /**
+   * Las dos secciones largas, con la entradilla que las precede.
+   *
+   * Su presencia sigue decidiendo dos cosas además del texto: la caja ancha y que la
+   * sección PUEDA partirse entre hojas. Ver `wrap` en `Seccion`.
+   */
+  readonly entradilla?: string
 }
 
 /**
@@ -990,7 +991,7 @@ const SECCIONES: readonly SeccionClinica[] = [
     titulo: 'Descripción del procedimiento',
     clave: 'descripcion',
     separacion: SEPARACION_SECCIONES_HOJA_2,
-    zona: { entradilla: ENTRADILLA_DESCRIPCION, minimo: 96 },
+    entradilla: ENTRADILLA_DESCRIPCION,
   },
   { numero: 5, titulo: 'Riesgos comunes', clave: 'riesgosComunes', separacion: SEPARACION_SECCIONES_HOJA_3 },
   {
@@ -998,29 +999,10 @@ const SECCIONES: readonly SeccionClinica[] = [
     titulo: 'Riesgos específicos',
     clave: 'riesgosEspecificos',
     separacion: SEPARACION_SECCIONES_HOJA_3,
-    zona: { entradilla: ENTRADILLA_RIESGOS, minimo: 64 },
+    entradilla: ENTRADILLA_RIESGOS,
   },
   { numero: 7, titulo: 'Alternativas de tratamiento', clave: 'alternativas', separacion: SEPARACION_SECCIONES_HOJA_3 },
 ]
-
-/**
- * LA ZONA DE ESCRITURA — renglones enteros dentro del mínimo declarado.
- *
- * Los saltos de línea del texto se respetan tal cual: la prosa de estas dos secciones la
- * escribe el médico y no pasa por ningún analizador. Ver `RENGLON`.
- */
-function ZonaEscritura({ minimo }: { minimo: number }): ReactElement {
-  const renglones = Math.floor(minimo / RENGLON.alto)
-  return (
-    <View style={[estilos.zonaEscritura, { height: minimo }]}>
-      {Array.from({ length: renglones }, (_, i) => (
-        // El índice ES la identidad: son renglones vacíos y su orden es lo único que los
-        // distingue.
-        <View key={i} style={estilos.renglon} />
-      ))}
-    </View>
-  )
-}
 
 /**
  * UNA SECCIÓN CLÍNICA: filete, número colgado del riel, título al lado y su prosa debajo.
@@ -1039,27 +1021,26 @@ function Seccion({
   texto: string
   primera: boolean
 }): ReactElement {
-  const conZona = seccion.zona !== undefined
+  const conEntradilla = seccion.entradilla !== undefined
   return (
     <View
       style={[
         estilos.seccion,
         { marginTop: primera ? SEPARACION_RIEL_SECCION : seccion.separacion },
       ]}
-      wrap={conZona}
+      wrap={conEntradilla}
     >
       <View style={estilos.rielSeccion}>
         <Text style={estilos.numeroSeccion}>{seccion.numero}</Text>
       </View>
-      <View style={conZona ? estilos.cajaSeccionAncha : estilos.cajaSeccion}>
+      <View style={conEntradilla ? estilos.cajaSeccionAncha : estilos.cajaSeccion}>
         <Text style={estilos.tituloSeccion}>{seccion.titulo.toUpperCase()}</Text>
-        {conZona ? (
+        {conEntradilla ? (
           <>
-            <Text style={estilos.entradillaZona}>{seccion.zona?.entradilla}</Text>
+            <Text style={estilos.entradillaZona}>{seccion.entradilla}</Text>
             {tieneValor(texto) ? (
               <Text style={[estilos.parrafoSeccion, estilos.cajaSeccion]}>{texto}</Text>
             ) : null}
-            <ZonaEscritura minimo={seccion.zona?.minimo ?? 0} />
           </>
         ) : (
           <Text style={estilos.parrafoSeccion}>{texto}</Text>
@@ -1214,13 +1195,19 @@ function enParejas<T>(items: readonly T[]): readonly (readonly T[])[] {
  * el reparto de la lámina y no el de esta composición. Es la misma decisión que el punto (d)
  * de la cabecera y por el mismo motivo: hacerlas depender de lo que caiga en cada hoja sería
  * métrica decidida por el contenido (I.3.4). Reportado.
+ *
+ * ⚠⚠ **Y YA SE COBRÓ UNA VEZ: LA TABLA HAY QUE MOVERLA CUANDO EL DOCUMENTO REPAGINA.** Al
+ * retirar las dos zonas de escritura, el documento pasó de seis hojas a cinco y esta tabla
+ * se quedó describiendo el reparto viejo: la del anexo perdió su rótulo —la clave 6 ya no
+ * existía— y dos cabeceras cogieron el espaciador de la hoja de al lado. Nada falla ni
+ * avisa; el papel sale con la cabecera equivocada. **Si vuelves a mover cuánto ocupa el
+ * cuerpo, vuelve aquí.**
  */
 const HOJAS_PROPIAS: Readonly<Record<number, HojaPropia>> = {
   2: { espaciador: ESPACIO[26] },
-  3: { espaciador: ESPACIO[26] },
+  3: { espaciador: ESPACIO[12] },
   4: { espaciador: ESPACIO[12] },
-  5: { espaciador: ESPACIO[12] },
-  6: { espaciador: ESPACIO[20], rotulo: ROTULO_ANEXO },
+  5: { espaciador: ESPACIO[20], rotulo: ROTULO_ANEXO },
 }
 
 // ─── El formato ──────────────────────────────────────────────────────────────
@@ -1276,9 +1263,9 @@ export default function ConsentimientoInformado({
     identificados.some((i) => i.rol === rol && tieneValor(i.foto))
 
   /**
-   * LOS CINCO FIRMANTES. El médico imprime su rúbrica siempre; los otros cuatro solo si
-   * firmaron. Los renglones bajo la línea salen de I.1.9 y el del médico son sus cédulas,
-   * que se toman de `MedicoMembrete` en vez de pedirlas otra vez.
+   * LOS CINCO FIRMANTES. Cada uno imprime su rúbrica si la trae, y en un documento sin
+   * sellar no la trae ninguno. Los renglones bajo la línea salen de I.1.9 y el del médico
+   * son sus cédulas, que se toman de `MedicoMembrete` en vez de pedirlas otra vez.
    *
    * **El pie de sello lo gobierna `sellado`**: sin documento sellado no hay pie en ninguna
    * celda, aunque el firmante traiga hora. Ver esa prop.
@@ -1471,8 +1458,13 @@ export default function ConsentimientoInformado({
           Cada una colapsa entera si su texto no viene (II.7 §2). `primera` es la primera que
           SOBREVIVE al colapso, no la §1: si el preoperatorio no viene, quien cuelga del riel
           es la siguiente y es ella la que lleva los 28 pt.
+
+          ⚠ **LAS DOS DE ENTRADILLA YA NO SE SALVAN DEL COLAPSO.** Sobrevivían sin texto
+          porque llevaban debajo los renglones para escribirlas a mano; retirados esos
+          renglones, una sección sin texto compondría su título y una entradilla que anuncia
+          algo que no está. II.7 §2 se aplica a las siete por igual.
         */}
-        {SECCIONES.filter((s) => tieneValor(secciones[s.clave]) || s.zona !== undefined).map(
+        {SECCIONES.filter((s) => tieneValor(secciones[s.clave])).map(
           (seccion, indice) => (
             <Seccion
               key={seccion.numero}

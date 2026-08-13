@@ -380,7 +380,40 @@ const estilos = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
   },
-  rotuloContinuacion: { ...estiloTipografico('titulo.seccion') },
+  /**
+   * LA COLUMNA IZQUIERDA DE LA CABECERA — rótulo y nombre del médico.
+   *
+   * `flex: 1` con `minWidth: 0` es lo que permite que el rótulo se recorte en vez de
+   * empujar: sin ellos, un rótulo largo ensancha la columna, desplaza el riel del folio
+   * fuera de la caja y rompe el encabezado de la hoja. Ver `rotuloContinuacion`.
+   */
+  columnaContinuacion: { flex: 1, minWidth: 0 },
+  /**
+   * EL RÓTULO DEL DOCUMENTO EN LA HOJA DE CONTINUACIÓN, **recortado a un renglón**.
+   *
+   * ── POR QUÉ SE RECORTA Y NO SE RETIRA ───────────────────────────────────────
+   *
+   * Esta cabecera existe para una sola cosa: que una hoja suelta diga de qué documento
+   * es (regla 2 de 2.D). Quitar el rótulo la dejaría sin su razón de ser. Pero el
+   * Escrito Médico lo escribe el médico, así que puede ser cualquier cosa de cualquier
+   * largo, y a dos renglones desplaza el nombre y el filete y descuadra el tramo de
+   * 30 pt que la lámina mide.
+   *
+   * Recortar conserva lo que hace falta —una hoja suelta se sigue atribuyendo por las
+   * primeras palabras del nombre del documento— y acota el daño de un título largo.
+   *
+   * ⚠ **ES EL ÚNICO RECORTE POR ELIPSIS DEL SISTEMA.** `maxLines` y `textOverflow` son
+   * las dos props con las que react-pdf trunca, y 2.H las prohíbe en su ficha por una
+   * razón que aquí no aplica: allí lo truncado sería un dato clínico —una vía de
+   * administración—. Aquí es el nombre del documento, que va entero y a 17 pt en la
+   * hoja 1. Estaba en la banda de pie y se movió aquí con ella: el pie ya no compone
+   * el título.
+   */
+  rotuloContinuacion: {
+    ...estiloTipografico('titulo.seccion'),
+    maxLines: 1,
+    textOverflow: 'ellipsis',
+  },
   rielContinuacion: { alignItems: 'flex-end', flexShrink: 0 },
   especialidad: {
     ...estiloTipografico('medico.especialidad'),
@@ -475,7 +508,11 @@ const estilos = StyleSheet.create({
    * —eso lo hacen el nombre del médico, sus cédulas y la fecha—, solo dice qué se está
    * leyendo. Un rótulo que no identifica no tiene por qué pesar como un título.
    */
-  rotuloContinuacionEscrito: { ...estiloTipografico('firma.rol') },
+  rotuloContinuacionEscrito: {
+    ...estiloTipografico('firma.rol'),
+    maxLines: 1,
+    textOverflow: 'ellipsis',
+  },
 })
 
 /**
@@ -575,7 +612,7 @@ export default function Membrete(props: MembreteProps): ReactElement {
         </View>
       ) : (
         <View style={estilos.cabeceraContinuacion}>
-          <View>
+          <View style={estilos.columnaContinuacion}>
             {props.rotulo === undefined ? null : (
               <Text
                 style={

@@ -19,11 +19,17 @@
  * dos columnas. Es dato del documento y no del flujo —sin él en la fila, un papel
  * reimpreso diría que el paciente denegó por sí mismo—, y por eso se guarda.
  *
- * ── ESTE DOCUMENTO NO SE FIRMA DIGITALMENTE ─────────────────────────────────
+ * ── ESTE DOCUMENTO NO SE FIRMA DIGITALMENTE, Y POR ESO NO LLEVA NINGUNA RÚBRICA
  *
  * No tiene borrador ni sellado: se emite en el momento, con el paciente delante, y
- * las tres celdas salen para la pluma. La única rúbrica impresa es la del médico,
- * que sale de su perfil como en los otros ocho formatos.
+ * **las tres celdas salen para la pluma, la del médico incluida**. Estampar ahí la
+ * rúbrica del perfil pondría la firma del médico en un papel que se imprime
+ * justamente para que lo firmen delante, y antes de que nadie lo haya hecho.
+ *
+ * Es la regla de v1, que compone esta hoja con el mismo bloque de firmas del
+ * consentimiento y solo estampa al médico en los sellados —y una denegación no se
+ * sella nunca—. Distinto de los otros siete formatos, donde firma el médico y
+ * nadie más.
  */
 
 import type { ReactElement } from 'react'
@@ -32,7 +38,7 @@ import DenegacionConsentimiento, {
   type DenegacionConsentimientoProps,
 } from '../formatos/DenegacionConsentimiento'
 import {
-  bandera, comunes, envolver, fechaCorta, rubricaDe, texto, textoOpcional,
+  bandera, comunes, envolver, fechaCorta, texto, textoOpcional,
   type EntradaAdaptador,
 } from './comun'
 
@@ -54,8 +60,9 @@ export function propsDenegacionConsentimiento(
     },
     procedimiento: texto(data.procedimiento),
     firmantes: {
-      // Sin nombre: el formato cae al del membrete.
-      medico: { rubrica: rubricaDe(entrada.medico) },
+      // Sin nombre —el formato cae al del membrete— y sin rúbrica. Ver la
+      // cabecera: las tres celdas de este documento son para la pluma.
+      medico: {},
       paciente: { nombre: textoOpcional(data.paciente) },
       familiar: { nombre: textoOpcional(data.familiar) },
     },

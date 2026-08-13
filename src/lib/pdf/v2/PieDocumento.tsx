@@ -71,7 +71,6 @@ import {
   ZONA_SEGURA,
   estiloTipografico,
   type AcentoResuelto,
-  type Lamina,
 } from './tokens'
 
 /**
@@ -147,34 +146,6 @@ const estilos = StyleSheet.create({
     textAlign: 'right',
     marginLeft: GEOMETRIA.medianil,
   },
-  /**
-   * LAS TRES ZONAS DE LA LÁMINA DE ESCRITO MÉDICO — `auto minmax(0, 1fr) auto`.
-   *
-   * Los otros siete formatos empaquetan sus dos primeras zonas a la izquierda y dejan que la
-   * leyenda se coma el resto; esta lámina pone **el título en el centro y la leyenda a la
-   * derecha midiendo lo que dice**. No es una preferencia: es que aquí la zona central lleva
-   * un dato VARIABLE —el título lo escribe el médico— y la única forma de que no empuje a la
-   * leyenda fuera de la banda es darle el hueco flexible y recortarla.
-   *
-   * ⚠ **ES LA ÚNICA ZONA DEL SISTEMA CON RECORTE POR ELIPSIS.** `maxLines: 1` y
-   * `textOverflow: 'ellipsis'` son las dos props con las que react-pdf trunca, y 2.H las
-   * prohíbe en su ficha por una razón que aquí no aplica: allí lo truncado sería una vía de
-   * administración, un dato clínico. Aquí es el nombre del documento, que ya va entero y a
-   * 17 pt en la cabecera. Reportado, y acotado a esta zona.
-   */
-  tituloCentral: {
-    ...estiloTipografico('pie'),
-    flex: 1,
-    minWidth: 0,
-    textAlign: 'center',
-    marginHorizontal: GEOMETRIA.medianil,
-    maxLines: 1,
-    textOverflow: 'ellipsis',
-  },
-  leyendaDerecha: {
-    ...estiloTipografico('pie.leyenda'),
-    flexShrink: 0,
-  },
 })
 
 interface Comun {
@@ -192,15 +163,23 @@ export type PieDocumentoProps =
    */
   | ({ variante: 'completo'; folio: string } & Comun)
   /**
-   * Paginación · título del documento · leyenda. **Cinco formatos**, que son
-   * mayoría: Laboratorio (II.1), Imagenología (II.2), Suplementación (II.4),
-   * Internamiento (II.6) y Escrito Médico (II.8).
+   * Paginación · leyenda. **Cinco formatos**, que son mayoría: Laboratorio (II.1),
+   * Imagenología (II.2), Suplementación (II.4), Internamiento (II.6) y Escrito
+   * Médico (II.8).
    *
    * No es la excepción de un formato raro: es el caso corriente. Un folio solo
    * sirve donde alguien de fuera lo cita, y estos cinco no salen a esa
    * circulación (regla 4).
+   *
+   * ⚠ **LLEVÓ EL TÍTULO DEL DOCUMENTO EN LA ZONA QUE EL FOLIO DEJA LIBRE, Y SE
+   * RETIRÓ.** No añadía nada: el título ya está compuesto arriba, a 17 pt, en la
+   * hoja 1 y en el rótulo de cada continuación —que es donde una hoja suelta se
+   * atribuye—. Y costaba: en el Escrito Médico el título lo escribe el médico, y
+   * uno largo empujaba la leyenda fuera de la banda de 16 pt. La zona queda libre
+   * y la leyenda se la come, que es lo que ya hacía en las hojas donde el título
+   * era corto.
    */
-  | ({ variante: 'sinFolio'; titulo: string; lamina?: Lamina } & Comun)
+  | ({ variante: 'sinFolio' } & Comun)
 
 /**
  * `Página X de Y` (regla 2), compuesta en mayúsculas por la versalita del rol —
@@ -224,10 +203,10 @@ function paginacion({
 }
 
 /**
- * Las tres zonas en el orden que declara cada variante. Lo que cambia entre las
- * dos es **qué ocupa cada zona**, no cómo se compone: la paginación conserva su
- * versalita al pasar a la zona 1, y el título ocupa la zona que el folio deja
- * libre con el rol que el folio usaba, `pie`.
+ * Las zonas en el orden que declara cada variante: tres con folio y **dos sin
+ * él**. Lo que cambia no es cómo se compone cada una sino cuáles hay: la
+ * paginación conserva su versalita al pasar a la zona 1, y la zona que el folio
+ * deja libre no la ocupa nadie —la leyenda, que ya era flexible, la absorbe—.
  */
 function zonas(props: PieDocumentoProps): ReactElement[] {
   const leyenda = (
@@ -251,36 +230,12 @@ function zonas(props: PieDocumentoProps): ReactElement[] {
     ]
   }
 
-  /*
-    DOS REPARTOS PARA LA MISMA VARIANTE. El de Internamiento empaqueta paginación y título a
-    la izquierda; el de Escrito Médico centra el título y deja la leyenda a la derecha. Ver
-    `tituloCentral`.
-  */
-  if (props.lamina === 'escrito') {
-    return [
-      <Text
-        key="paginacion"
-        style={[estilos.paginacion, estilos.zonaAuto]}
-        render={paginacion}
-      />,
-      <Text key="titulo" style={estilos.tituloCentral}>
-        {props.titulo}
-      </Text>,
-      <Text key="leyenda" style={estilos.leyendaDerecha}>
-        {LEYENDA}
-      </Text>,
-    ]
-  }
-
   return [
     <Text
       key="paginacion"
       style={[estilos.paginacion, estilos.zonaAuto]}
       render={paginacion}
     />,
-    <Text key="titulo" style={[estilos.folio, estilos.zonaAuto, estilos.separacion]}>
-      {props.titulo}
-    </Text>,
     leyenda,
   ]
 }

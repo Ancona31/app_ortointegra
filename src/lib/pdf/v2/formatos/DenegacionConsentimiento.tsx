@@ -319,9 +319,10 @@ const CONSTANCIA = {
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 /**
- * Un firmante. **La rúbrica es por persona**, no por documento: el médico la lleva siempre y
- * los otros dos solo si firmaron en pantalla. Quien no firmó sale con el espacio en blanco de
- * 77 pt, sin leyenda de «pendiente»: ese aviso vive en pantalla, no en el papel.
+ * Un firmante. **La rúbrica es por persona**, no por documento. En este documento no la
+ * trae ninguno: se emite para firmarse a mano y no se sella nunca, así que las tres celdas
+ * salen con su espacio en blanco de 77 pt, sin leyenda de «pendiente» —ese aviso vive en
+ * pantalla, no en el papel—. La ranura sigue aquí porque el firmante es el mismo tipo.
  */
 export interface FirmanteDenegacion {
   /** Nombre de quien firma. Sin él, el renglón se reserva para llenarlo a mano. */
@@ -358,7 +359,7 @@ export interface DenegacionConsentimientoProps {
    * dentro del primer párrafo de la declaración.
    */
   readonly procedimiento: string
-  /** Los tres firmantes. El médico es el único cuya rúbrica se imprime siempre. */
+  /** Los tres firmantes, y ninguno trae rúbrica: este documento se firma a mano. */
   readonly firmantes: {
     readonly medico: FirmanteDenegacion
     readonly paciente: FirmanteDenegacion
@@ -504,7 +505,7 @@ export default function DenegacionConsentimiento({
   const porSustitucion = sustitucion === true
 
   /**
-   * LOS TRES FIRMANTES. El médico imprime su rúbrica siempre; los otros dos, solo si firmaron.
+   * LOS TRES FIRMANTES. Cada uno imprime su rúbrica si la trae; aquí no la trae ninguno.
    * Los renglones bajo la línea salen de I.1.9 y el del médico son sus cédulas, que se toman de
    * `MedicoMembrete` en vez de pedirlas otra vez.
    */

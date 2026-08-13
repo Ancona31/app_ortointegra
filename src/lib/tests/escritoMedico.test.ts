@@ -442,26 +442,36 @@ describe('II.8 · Escrito Médico', () => {
     const hojas = await componer(CON_TITULO_LARGO)
 
     /*
-      `CONCILIA D41`. El encabezado imprime la constancia entera y la banda de pie imprime el
-      nombre corto **en todas las hojas**. Si fuera un truncado automático, la banda diría
+      `CONCILIA D41`. El encabezado imprime la constancia entera y el rótulo de continuación
+      imprime el nombre corto. Si fuera un truncado automático, el rótulo diría
       `Constancia de atención médica y valo…`.
+
+      ⚠ **LA BANDA DE PIE YA NO LO IMPRIME.** Repetía el nombre del documento en todas las
+      hojas y con uno largo empujaba la leyenda fuera de la banda de 16 pt. El nombre vive
+      donde sirve: entero en la hoja 1 y en el rótulo de cada continuación, que es lo que
+      permite atribuir una hoja suelta.
     */
     expect(hojas[0].texto).toContain('SECRETARÍA DE EDUCACIÓN')
-    for (const hoja of hojas) {
-      expect(hoja.texto).toContain(TITULO_PIE)
-    }
-    // Y el rótulo de continuación usa el NOMBRE, no el título de tres renglones.
+    // El rótulo de continuación usa el NOMBRE, no el título de tres renglones.
     expect(hojas[1].texto).toContain(`${TITULO_PIE.toUpperCase()} · CONTINUACIÓN`)
+    // Y la banda no lo lleva en ninguna hoja: dos zonas, paginación y leyenda.
+    for (const hoja of hojas) {
+      expect(hoja.texto).toContain('Documento generado por Spinus')
+    }
   }, 200_000)
 
-  it('sin título y sin nombre, la banda cae al genérico', async () => {
-    const [hoja1] = await componer(SIN_TITULO)
+  it('sin título y sin nombre, el rótulo de continuación cae al genérico', async () => {
+    const [, hoja2] = await componer(SIN_TITULO)
 
-    // La cascada: `tituloPie`, el título del encabezado, y `Escrito médico`.
-    expect(hoja1.texto).toContain('Escrito médico')
+    /*
+      La cascada: `tituloPie`, el título del encabezado, y `Escrito médico`. Se comprueba en
+      la hoja 2 y no en la 1 porque el nombre solo se compone donde hace falta —el rótulo de
+      continuación—, desde que la banda de pie dejó de repetirlo.
+    */
+    expect(hoja2.texto).toContain('ESCRITO MÉDICO · CONTINUACIÓN')
   }, 200_000)
 
-  it('ningún folio en ninguna hoja, y el pie con sus tres zonas', async () => {
+  it('ningún folio en ninguna hoja, y el pie con sus dos zonas', async () => {
     const hojas = await componer(BASE)
 
     /*
@@ -476,18 +486,19 @@ describe('II.8 · Escrito Médico', () => {
     }
 
     /*
-      LAS TRES ZONAS EN SU ORDEN: paginación a la izquierda, nombre del documento al centro y
-      leyenda a la derecha. Se comprueba por sus abscisas, que es lo único que distingue un
-      reparto de otro.
+      LAS DOS ZONAS EN SU ORDEN: paginación a la izquierda y leyenda a la derecha.
+
+      ⚠ **ERAN TRES Y EL NOMBRE DEL DOCUMENTO IBA EN MEDIO.** Se retiró: repetía lo que la
+      cabecera ya dice y, siendo un dato que escribe el médico, uno largo empujaba la leyenda
+      fuera de la banda. La zona central queda libre y la leyenda —que ya era la flexible— se
+      la come, así que lo que hay que comprobar es que no queda nada del nombre entre las dos.
     */
     const pagina = renglon(hojas[0], 'PÁGINA 1 DE 2')
-    // El nombre del documento en la banda; el extractor lo puede partir por `Tm`.
-    const titulo = empiezaPor(hojas[0], 'Certi')
     const leyenda = empiezaPor(hojas[0], 'Documento generado por Spinus')
-    expect(pagina.x).toBeLessThan(titulo.x)
-    expect(titulo.x).toBeLessThan(leyenda.x)
-    // El nombre va CENTRADO en su zona, no pegado a la paginación como en la otra lámina.
-    expect(titulo.x).toBeGreaterThan(pagina.x + 100)
+    expect(pagina.x).toBeLessThan(leyenda.x)
+    for (const hoja of hojas) {
+      expect(hoja.renglones.some((r) => r.texto.startsWith('Certi'))).toBe(false)
+    }
   }, 200_000)
 
   it('la hoja de continuación se identifica con tres datos y sin paciente', async () => {

@@ -373,18 +373,28 @@ describe('II.6 · Solicitud de Internamiento', () => {
     expect(encabezado(hoja1)).toBeCloseTo(233.83, 1)
   }, 120_000)
 
-  it('tres hojas, con el reparto estructural de la lámina', async () => {
+  it('la sección 1 llena su hoja y el cierre baja detrás, sin saltos declarados', async () => {
     const hojas = await componer(COMPLETO)
+
+    /*
+      ⚠ **AQUÍ HABÍA DOS `break` Y AHORA QUEDA UNO.** El de la sección 2 se queda —otro
+      lector, hoja que en el hospital se separa—; el que abría hoja para las instrucciones y
+      las firmas se retiró: dejaba la hoja 1 cerrada a un tercio.
+
+      Ahora las instrucciones **empiezan en la hoja 1** y se parten si hace falta, así que lo
+      que decide el reparto es lo que trae el documento y no una constante. Con este caso
+      —siete requerimientos, dos diagnósticos y siete instrucciones— salen tres hojas y el
+      corte cae dentro de la lista.
+    */
     expect(hojas).toHaveLength(3)
 
-    // Hoja 1 · sección 1: diagnósticos, procedimiento, requerimientos y justificación.
+    // Hoja 1 · el bloque clínico Y el principio de las instrucciones.
     expect(hojas[0].texto).toContain('Diagnósticos')
     expect(hojas[0].texto).toContain('Procedimiento o cirugía')
     expect(hojas[0].texto).toContain('Requerimientos especiales')
-    expect(hojas[0].texto).toContain('Sangre y hemoderivados')
+    expect(hojas[0].texto).toContain('INSTRUCCIONES PARA EL PACIENTE')
 
-    // Hoja 2 · cierre de la sección 1: instrucciones y las DOS firmas.
-    expect(hojas[1].texto).toContain('INSTRUCCIONES PARA EL PACIENTE')
+    // Hoja 2 · la cola de las instrucciones y las dos firmas, que no se parten.
     expect(hojas[1].texto).toContain('FIRMA DEL PACIENTE O FAMILIAR')
     expect(hojas[1].texto).toContain('FIRMA Y SELLO DEL MÉDICO')
     expect(hojas[1].texto).not.toContain('Requerimientos especiales')
@@ -395,21 +405,77 @@ describe('II.6 · Solicitud de Internamiento', () => {
     expect(hojas[2].texto).toContain('Cuidados generales')
     expect(hojas[2].texto).not.toContain('FIRMA DEL PACIENTE O FAMILIAR')
 
-    // Y la paginación de 2.M cuenta las tres.
     expect(hojas[2].texto).toContain('PÁGINA 3 DE 3')
   }, 120_000)
 
-  it('la hoja 3 dice «sección 2 de 2» y NUNCA «continuación»', async () => {
-    const hojas = await componer(COMPLETO)
+  it('la sección 2 se identifica DONDE EMPIEZA, no por el número de hoja', async () => {
+    const largo = await componer(COMPLETO)
+    const corto = await componer({ ...COMPLETO, instruccionesPaciente: undefined })
 
     /*
-      LA REGLA 1 DE 2.Q, MEDIDA. La hoja 2 sí es continuación de la 1 —cierra la sección 1
-      con las instrucciones y las firmas— y compone el rótulo del chasis. La 3 abre otro
-      documento dentro del mismo folio y compone el suyo.
+      LA REGLA 1 DE 2.Q, MEDIDA — y por otro camino que antes.
+
+      La cadena `SECCIÓN 2 DE 2` vivía en el rótulo de cabecera de la hoja 3, declarado en
+      `hojasPropias` POR NÚMERO. Con las instrucciones partiéndose, la sección 2 empieza en la
+      hoja que toque, así que la cadena se mudó al antetítulo de 2.Q, que viaja en el flujo:
+      sale donde la sección empieza, sea cual sea la hoja.
+
+      **Estas dos composiciones son la prueba**: el mismo documento con y sin instrucciones
+      abre su sección 2 en hojas distintas, y las dos la rotulan.
     */
-    expect(hojas[1].texto).toContain('SOLICITUD DE INTERNAMIENTO · CONTINUACIÓN')
-    expect(hojas[2].texto).toContain('SOLICITUD DE INTERNAMIENTO · SECCIÓN 2 DE 2')
-    expect(hojas[2].texto).not.toContain('CONTINUACIÓN')
+    const hojaDeLaSeccion = (hojas: Hoja[]): number =>
+      hojas.findIndex((hoja) => hoja.texto.includes('SECCIÓN 2 DE 2'))
+
+    expect(hojaDeLaSeccion(largo)).toBe(2)
+    expect(hojaDeLaSeccion(corto)).toBe(1)
+
+    // Y en la hoja de la sección, el rótulo va PEGADO a su apertura, no en la cabecera.
+    for (const [hojas, indice] of [[largo, 2], [corto, 1]] as const) {
+      expect(hojas[indice].texto).toContain('Indicaciones de ingreso a piso')
+      expect(hojas[indice].texto).toContain('Para personal de enfermería y médico residente')
+    }
+  }, 120_000)
+
+  it('las instrucciones empiezan en la hoja 1 y se parten, con las firmas detrás', async () => {
+    const doce = Array.from({ length: 12 }, (_, i) =>
+      `• Indicación ${i + 1}: el paciente y su familiar responsable deben atender esta instrucción antes del ingreso.`,
+    ).join('\n')
+    const hojas = await componer({
+      ...COMPLETO,
+      indicacionesPiso: undefined,
+      instruccionesPaciente: doce,
+    })
+
+    /*
+      ⚠ **ESTA ES LA PRUEBA DEL CAMBIO, Y LO QUE MIDE ES QUE NO SE DESPERDICIE HOJA.**
+
+      El bloque de instrucciones es el único `divisible` del sistema (2.I): empieza donde
+      acabe lo anterior y se parte. Antes era indivisible y abría hoja propia, así que doce
+      instrucciones dejaban la hoja 1 cerrada a un tercio.
+
+      Lo que se comprueba es el reparto: encabezado y primeras instrucciones en la hoja 1,
+      resto en la 2, y las firmas detrás de la cola —nunca antes—.
+    */
+    expect(hojas).toHaveLength(2)
+    expect(hojas[0].texto).toContain('INSTRUCCIONES PARA EL PACIENTE')
+    expect(hojas[0].texto).toContain('Indicación 1:')
+    // Cuántas caben depende de lo que traiga el bloque clínico —con este caso, cuatro—, y
+    // esa cifra NO se fija aquí: lo que se fija es que el bloque empiece en la hoja 1 y no
+    // termine en ella, que es la partición.
+    expect(hojas[0].texto).not.toContain('Indicación 12:')
+    // La cola, en la hoja siguiente y con su numeración corrida: es lo que ata las dos
+    // mitades, porque el marco NO se repite. Ver `divisible` en 2.I.
+    expect(hojas[1].texto).toContain('Indicación 12:')
+    expect(hojas[1].texto).not.toContain('Indicación 1:')
+    expect(hojas[1].texto).toContain('FIRMA DEL PACIENTE O FAMILIAR')
+
+    // Y la hoja 1 se llena de verdad: su último renglón cae en los 40 pt finales de la caja.
+    const ultimo = Math.max(
+      ...hojas[0].renglones
+        .filter((r) => !['PÁGINA', 'spinus', 'CONTINÚA', 'SIN FIRMA'].some((f) => r.texto.includes(f)))
+        .map((r) => r.arriba),
+    )
+    expect(ultimo).toBeGreaterThan(792 - 68 - 40)
   }, 120_000)
 
   it('el filete de la sección 2 es el más grueso del documento', async () => {
@@ -475,16 +541,22 @@ describe('II.6 · Solicitud de Internamiento', () => {
       legal propio y sin tercero que cite un número. Lo que ata las hojas es la paginación
       y la línea de paciente.
 
-      La banda de pie compone el TÍTULO en la zona donde iría el número, que es lo que hace
-      la variante `sin folio` de 2.M.
+      ⚠ **Y LA ZONA DONDE IRÍA EL NÚMERO NO LA OCUPA NADIE.** La banda componía ahí el título
+      del documento y se retiró: repetía lo que la cabecera de cada hoja ya dice —el rótulo de
+      continuación— y en el Escrito Médico, donde el título lo escribe el médico, uno largo
+      empujaba la leyenda fuera de la banda. La variante `sin folio` de 2.M son dos zonas.
     */
     for (const hoja of hojas) {
       expect(hoja.texto).not.toContain('FOLIO')
       expect(hoja.texto).not.toContain('H-')
       // 2.K no se instancia: el catálogo de requerimientos es abierto (regla 3).
       expect(hoja.texto).not.toContain('TOTAL DE ')
-      expect(hoja.texto).toContain('Solicitud de internamiento')
+      // El título en la banda, no; en la cabecera de la hoja, sí.
+      expect(hoja.texto).not.toContain('Solicitud de internamiento')
+      // La banda sigue ahí, con sus dos zonas: paginación y leyenda.
+      expect(hoja.texto).toContain('spinus.com.mx')
     }
+    expect(hojas[1].texto).toContain('SOLICITUD DE INTERNAMIENTO · CONTINUACIÓN')
   }, 120_000)
 
   it('el badge sale solo en la hoja 1, y el hospital en las otras dos', async () => {
@@ -608,23 +680,54 @@ describe('II.6 · Solicitud de Internamiento', () => {
     expect(salto(hojas[2])).toBeCloseTo(11 + 77 + 0.75 + 4 + ASCENDENTE_ARCHIVO * 11 - rol, 1)
   }, 120_000)
 
-  it('sin indicaciones de piso, la sección 2 colapsa entera', async () => {
+  it('sin indicaciones de piso: UNA hoja, y una sola firma del médico', async () => {
     const hojas = await componer(MINIMO)
 
     /*
       II.6 §2: `indicacionesPiso` ausente **colapsa la sección 2 entera** — su apertura, sus
-      bloques y su hoja. La firma del médico no desaparece: baja a cerrar la hoja 2, detrás
-      de la pareja, porque la monta 2.N como cierre del documento.
+      bloques y su hoja.
+
+      ⚠ **Y ERAN DOS HOJAS.** El cierre de la sección 1 abría hoja propia siempre, así que
+      una solicitud sin indicaciones de piso se llevaba una hoja entera para las
+      instrucciones y las firmas, con la primera cerrada a un tercio. Sin sección 2 no hay
+      rótulo que sostener por número de hoja, así que el bloque fluye y el documento cierra
+      donde termina.
     */
-    expect(hojas).toHaveLength(2)
-    expect(hojas[1].texto).not.toContain('Indicaciones de ingreso a piso')
-    expect(hojas[1].texto).toContain('FIRMA DEL PACIENTE O FAMILIAR')
-    expect(hojas[1].texto).toContain('PÁGINA 2 DE 2')
+    expect(hojas).toHaveLength(1)
+    expect(hojas[0].texto).not.toContain('Indicaciones de ingreso a piso')
+    expect(hojas[0].texto).toContain('FIRMA DEL PACIENTE O FAMILIAR')
+    expect(hojas[0].texto).toContain('PÁGINA 1 DE 1')
+
+    /*
+      LA FIRMA DEL MÉDICO, UNA SOLA VEZ. La del cierre de 2.N es la de la sección 2 y aquí
+      no hay sección 2: montándola igual, este documento componía la rúbrica del médico dos
+      veces —emparejada con la del paciente y otra vez suelta debajo, sin pareja—.
+    */
+    expect(hojas[0].renglones.filter((r) => r.texto === 'FIRMA Y SELLO DEL MÉDICO'))
+      .toHaveLength(1)
 
     // Y los tres bloques opcionales de la hoja 1 colapsan sin dejar rótulo ni hueco.
     expect(hojas[0].texto).not.toContain('Procedimiento o cirugía')
     expect(hojas[0].texto).not.toContain('Requerimientos especiales')
     expect(hojas[0].texto).not.toContain('URGENTE')
+  }, 120_000)
+
+  it('con sección 2 y SIN instrucciones, la sección 1 cierra en su hoja', async () => {
+    const hojas = await componer({ ...COMPLETO, instruccionesPaciente: undefined })
+
+    /*
+      EL CASO CONTRARIO DEL DEFECTO DE LA FIRMA DUPLICADA. Sin instrucciones, la pareja cierra
+      la sección 1 en la misma hoja del bloque clínico y la sección 2 abre la siguiente: dos
+      hojas donde antes eran tres, y ni una firma de más.
+    */
+    expect(hojas).toHaveLength(2)
+    expect(hojas[0].texto).not.toContain('INSTRUCCIONES PARA EL PACIENTE')
+    expect(hojas[0].texto).toContain('FIRMA DEL PACIENTE O FAMILIAR')
+    expect(hojas[0].renglones.filter((r) => r.texto === 'FIRMA Y SELLO DEL MÉDICO'))
+      .toHaveLength(1)
+    // Y la de la sección 2 en la suya: una firma por sección, que es el documento.
+    expect(hojas[1].renglones.filter((r) => r.texto === 'FIRMA Y SELLO DEL MÉDICO'))
+      .toHaveLength(1)
   }, 120_000)
 
   it('el aviso de pie es el del chasis, y la lámina compone otro', async () => {

@@ -629,8 +629,6 @@ export default function EscritoMedico({
       */}
       <PieDocumento
         variante="sinFolio"
-        lamina={LAMINA}
-        titulo={nombre}
         acento={acento}
       />
     </Page>

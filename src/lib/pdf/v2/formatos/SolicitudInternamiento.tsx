@@ -155,20 +155,29 @@ const TITULO_INSTRUCCIONES = 'Instrucciones para el paciente'
  */
 const SECCION_2 = {
   numero: 2,
+  /** Cuántas secciones tiene el documento. Con `numero` compone `SECCIÓN 2 DE 2`. */
+  de: 2,
   rotulo: 'Indicaciones de ingreso a piso',
   lector: 'Para personal de enfermería y médico residente',
 } as const
 
-/**
- * EL RÓTULO DE LA HOJA 3, Y ES LA RAZÓN DE QUE `rotulosContinuacion` EXISTA.
+/*
+ * ⚠ **AQUÍ VIVÍA `ROTULO_HOJA_SECCION_2` Y SE RETIRÓ. No lo repongas.**
  *
- * ⚠ **NUNCA «continuación» PARA LA SECCIÓN 2.** Una hoja de indicaciones de enfermería no
- * es la continuación de la hoja del paciente: es otro documento dentro del mismo folio,
- * con otro lector. La hoja 2 sí es continuación de la 1 —cierra la sección 1 con las
- * instrucciones y las firmas— y por eso **no se declara aquí**: se queda con el rótulo del
- * chasis, que es el único sitio del sistema donde esa palabra está escrita.
+ * Era el rótulo de cabecera de la hoja de la sección 2, declarado en `hojasPropias` de
+ * 2.N **por NÚMERO de hoja**. Funcionaba mientras el cierre de la sección 1 abría hoja
+ * propia siempre: la sección 2 caía en la 3, fija. Desde que las instrucciones al paciente
+ * se parten como cualquier contenido largo, la sección 2 empieza donde toque —hoja 2 con
+ * texto corto, 3 con texto largo— y un rótulo por número rotularía la hoja equivocada:
+ * diría `SECCIÓN 2 DE 2` sobre las instrucciones al paciente.
+ *
+ * La cadena no desapareció: **se mudó al sitio que viaja con la sección**, el antetítulo de
+ * 2.Q, que se compone donde la sección empieza sea cual sea la hoja. Ver la prop `de`.
+ *
+ * La cabecera de esa hoja dice ahora `· continuación`, y es cierto: es la misma solicitud.
+ * Quien separe la hoja la identifica por lo que hay bajo el filete más grueso del
+ * documento — `SECCIÓN 2 DE 2`, el título de la sección y su lector.
  */
-const ROTULO_HOJA_SECCION_2 = `${TITULO} · sección 2 de 2`
 
 /** Los dos rótulos de firma de la lámina, y la nota del primero. */
 const FIRMA_PACIENTE = 'Firma del paciente o familiar'
@@ -589,6 +598,7 @@ export default function SolicitudInternamiento({
   ]
   const firmaHoja3: readonly [Firma] = [firmaDelMedico(medico, rubrica)]
 
+
   return (
     <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.hoja}>
       <MotorFlujo
@@ -603,21 +613,22 @@ export default function SolicitudInternamiento({
           emision,
           urgente,
         }}
-        // Solo la hoja 3. La 2 se queda con el rótulo del chasis. Ver `ROTULO_HOJA_SECCION_2`.
-        hojasPropias={{ 3: { rotulo: ROTULO_HOJA_SECCION_2 } }}
         aireFirma={SEPARACION_ULTIMO_FIRMA}
-        firmas={
-          /*
-            LA FIRMA DE LA HOJA 3 — sola, en la columna izquierda de la fila de cierre, y
-            con la composición `estandar`: nombre a 11 / 15, contra el 10 / 14 de la pareja
-            de la hoja 2. Ver el punto (b) de la cabecera.
+        /*
+          EL CIERRE DE 2.N ES LA FIRMA DE LA SECCIÓN 2, **Y SOLO EXISTE SI HAY SECCIÓN 2**.
 
-            Cuando no hay sección 2 esta firma **cierra la hoja 2**, detrás de la pareja.
-            No es un caso raro: es lo que ocurre con una solicitud sin indicaciones de
-            piso, y es también la razón de que el cierre de 2.N no se pueda dejar vacío —
-            ese bloque es el que garantiza que la firma nunca se parta.
-          */
-          <BloqueFirmas variante="simple" lamina={LAMINA} firmas={firmaHoja3} />
+          ⚠ Aquí estaba el defecto de la firma duplicada: esta firma se montaba siempre, así
+          que una solicitud sin indicaciones de piso componía la rúbrica del médico DOS
+          VECES —una emparejada con la del paciente y otra suelta debajo, sin pareja—. Es la
+          firma de la sección 2: sin sección 2 no tiene nada que cerrar.
+
+          Sin ella, 2.N no monta bloque de cierre ni reserva umbral, y la garantía de que la
+          firma no se parte ni queda sola la da el grupo indivisible de más abajo.
+        */
+        firmas={
+          haySeccion2 ? (
+            <BloqueFirmas variante="simple" lamina={LAMINA} firmas={firmaHoja3} />
+          ) : undefined
         }
       >
         {/*
@@ -667,38 +678,45 @@ export default function SolicitudInternamiento({
         ) : null}
 
         {/*
-          ═══ HOJA 2 · CIERRE DE LA SECCIÓN 1 ═══
+          ═══ EL CIERRE DE LA SECCIÓN 1 — instrucciones al paciente y las dos firmas ═══
 
-          `break` abre hoja. El encabezado de continuación lo repite 2.N por su cuenta —es
-          `fixed`— así que aquí no hay nada que componer arriba, y por eso el aire entre el
-          encabezado y las instrucciones es cero: la caja empieza donde empieza la hoja.
+          ⚠ **AQUÍ HUBO UN `break` INCONDICIONAL Y ESE ERA EL DEFECTO DE LA MEDIA HOJA.**
+          Abría hoja siempre, así que las instrucciones y las firmas empezaban una hoja
+          propia aunque la anterior cerrara a un tercio. Ese corte no separaba a nadie:
+          misma sección, mismo lector, una sola firma al final.
+
+          Ahora el bloque **empieza donde acabe la justificación y se parte si hace falta**,
+          como cualquier contenido largo: lo que quepa va en esta hoja y el resto continúa en
+          la siguiente. Es `divisible` de 2.I, y ahí están las dos cosas que hay que saber:
+          por qué la regla 3 —un bloque destacado no se parte— vale para una alarma de tres
+          renglones y no para un texto sin techo, y **qué pasa con el marco al partirse**, que
+          está medido y no es lo que uno esperaría: la continuación llega sin filete, y lo que
+          la ata a la hoja anterior es el ordinal corrido de la lista.
+
+          Las firmas van detrás, **fuera del bloque y con su propio `wrap={false}`** (2.L):
+          se parten nunca, y si no caben bajan enteras a la hoja siguiente detrás de la cola
+          del bloque. La pareja va en una fila y con la composición `compacta`: nombre a
+          10 / 14, línea de 0.47. La del paciente va en blanco: la escribe él en Admisión.
         */}
-        <View break>
-          {instruccionesPaciente === undefined ? null : (
+        {instruccionesPaciente === undefined ? null : (
+          <View style={estilos.siguienteHoja1}>
             <BloqueDestacado
               variante="instrucciones"
               lamina={LAMINA}
               acento={acento}
               encabezado={TITULO_INSTRUCCIONES}
               texto={instruccionesPaciente}
-            />
-          )}
-
-          {/*
-            LAS DOS FIRMAS DE LA SECCIÓN 1, en la misma fila y con la composición
-            `compacta`: nombre a 10 / 14, línea de 0.47. La del paciente va en blanco.
-
-            2.L las cierra con `wrap={false}`, así que la pareja no se parte entre hojas
-            aunque las instrucciones crezcan.
-          */}
-          <View style={estilos.firmasHoja2}>
-            <BloqueFirmas
-              variante="pareja"
-              lamina={LAMINA}
-              calibracion="compacta"
-              firmas={firmasHoja2}
+              divisible
             />
           </View>
+        )}
+        <View style={estilos.firmasHoja2}>
+          <BloqueFirmas
+            variante="pareja"
+            lamina={LAMINA}
+            calibracion="compacta"
+            firmas={firmasHoja2}
+          />
         </View>
 
         {/*
@@ -712,6 +730,7 @@ export default function SolicitudInternamiento({
           <View break>
             <AperturaSeccion
               numero={SECCION_2.numero}
+              de={SECCION_2.de}
               rotulo={SECCION_2.rotulo}
               lector={SECCION_2.lector}
               acento={acento}
@@ -766,7 +785,7 @@ export default function SolicitudInternamiento({
         cuyo folio no se compone, y la decisión está razonada en el punto ⚠ de la cabecera.
         El título ocupa la zona donde iría el número, que es lo que esta variante hace.
       */}
-      <PieDocumento variante="sinFolio" titulo={TITULO} acento={acento} />
+      <PieDocumento variante="sinFolio" acento={acento} />
     </Page>
   )
 }

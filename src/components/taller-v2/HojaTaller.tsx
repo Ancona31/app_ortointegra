@@ -1092,12 +1092,14 @@ function HojaTaller({
 
           <View style={estilos.seccion}>
             {/*
-              El rótulo es el TÍTULO de la sección y no `SECCIÓN 2 DE 2`: es lo que compone
-              la lámina de II.6, y la cadena de la sección se mudó a la cabecera de esa
-              hoja. Ver el punto (a) de 2.Q.
+              El rótulo es el TÍTULO de la sección; `SECCIÓN 2 DE 2` va encima, como
+              antetítulo, compuesto de los dos números. Volvió aquí desde la cabecera de la
+              hoja cuando la sección dejó de empezar en una hoja de número fijo. Ver la prop
+              `de` de 2.Q.
             */}
             <AperturaSeccion
               numero={2}
+              de={2}
               rotulo="Indicaciones de ingreso a piso"
               lector="Para personal de enfermería y médico residente"
               acento={acento}
@@ -1200,7 +1202,6 @@ function HojaTaller({
 
         <PieDocumento
           variante="sinFolio"
-          titulo="Solicitud de laboratorio"
           acento={acento}
         />
       </Page>

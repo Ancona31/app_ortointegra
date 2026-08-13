@@ -215,11 +215,7 @@ describe('2.M · PieDocumento', () => {
     const hojas = textoPorHoja(
       await renderToBuffer(
         documento(
-          h(PieDocumento, {
-            variante: 'sinFolio',
-            titulo: 'Solicitud de laboratorio',
-            acento,
-          }),
+          h(PieDocumento, { variante: 'sinFolio', acento }),
         ),
       ),
     )
@@ -228,9 +224,11 @@ describe('2.M · PieDocumento', () => {
     expect(hojas[0]).toContain('PÁGINA 1 DE 2')
     expect(hojas[1]).toContain('PÁGINA 2 DE 2')
     for (const hoja of hojas) {
-      expect(hoja).toContain('Solicitud de laboratorio')
       // Regla 4: en esta variante no hay folio en ninguna hoja.
       expect(hoja).not.toContain('Folio')
+      // Y desde que el título salió de la banda, tampoco el nombre del
+      // documento: la zona que el folio deja libre no la ocupa nadie.
+      expect(hoja).toContain('spinus.com.mx')
     }
   }, 60_000)
 

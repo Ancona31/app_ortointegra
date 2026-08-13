@@ -181,6 +181,7 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
   const pacienteRef = useRef<HTMLInputElement>(null)
   const lugarRef = useRef<HTMLInputElement>(null)
   const diagnosticoRef = useRef<HTMLInputElement>(null)
+  const ingresoRef = useRef<HTMLInputElement>(null)
 
   const vacio = isFormEmpty({
     paciente, pacienteInicial, diagnostico, diagnosticoInicial,
@@ -260,6 +261,13 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
   if (!paciente.trim()) faltantes.push({ clave: 'paciente', nombre: 'Paciente' })
   if (!lugar.trim()) faltantes.push({ clave: 'lugar', nombre: 'Hospital' })
   if (!diagnostico.trim()) faltantes.push({ clave: 'diagnostico', nombre: 'Diagnóstico principal' })
+  /*
+    LA FECHA DE INGRESO BLOQUEA, como el hospital. Es lo que Admisión necesita para
+    agendar la cama: una solicitud que no dice qué día entra el paciente no se puede
+    programar, y hasta ahora se podía emitir sin ella —el papel salía con la celda
+    colapsada y el hospital tenía que llamar a preguntar—.
+  */
+  if (!fechaIngreso.trim()) faltantes.push({ clave: 'fechaIngreso', nombre: 'Fecha de ingreso' })
 
   function textoFaltantes(): string {
     const n = faltantes.length
@@ -271,6 +279,7 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
   function irA(clave: string) {
     if (clave === 'paciente') { enfocarYAcercar(pacienteRef.current); return }
     if (clave === 'lugar') { enfocarYAcercar(lugarRef.current); return }
+    if (clave === 'fechaIngreso') { enfocarYAcercar(ingresoRef.current); return }
     enfocarYAcercar(diagnosticoRef.current)
   }
 
@@ -519,10 +528,15 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
               </select>
             </div>
             <div className="sp-doc-field">
-              <label htmlFor="internamiento-ingreso" className="sp-label-field">Fecha propuesta de ingreso</label>
-              <input id="internamiento-ingreso" type="date" value={fechaIngreso}
+              <label htmlFor="internamiento-ingreso" className="sp-label-field">
+                Fecha propuesta de ingreso <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
+                <span className="sr-only">obligatorio</span>
+              </label>
+              <input ref={ingresoRef} id="internamiento-ingreso" type="date" value={fechaIngreso}
                 min={FECHA_MIN} max={maxFecha}
-                onChange={e => setFechaIngreso(e.target.value)} className="sp-input" />
+                onChange={e => setFechaIngreso(e.target.value)}
+                aria-invalid={senalar('fechaIngreso') || undefined}
+                className={`sp-input ${senalar('fechaIngreso') ? 'sp-doc-invalid' : ''}`} />
             </div>
             {/* Texto libre y no numérico: `3-5 días` es la respuesta habitual. */}
             <div className="sp-doc-field">

@@ -388,7 +388,7 @@ describe('II.7 · Consentimiento Informado', () => {
     expect(encabezado(hoja1)).toBeCloseTo(507.385, 1)
   }, 200_000)
 
-  it('con el texto en bandera izquierda salen SEIS hojas, las de la lámina', async () => {
+  it('con el texto en bandera izquierda salen CINCO hojas', async () => {
     const hojas = await componer(COMPLETO)
 
     /*
@@ -398,11 +398,15 @@ describe('II.7 · Consentimiento Informado', () => {
       alineaciones antes de decidir, las dos daban seis hojas y el mismo reparto.
 
       **Si esta prueba falla al tocar un texto, la respuesta NO es apretar el interlineado**
-      (I.3.4): es actualizar la cifra y decirlo.
+      (I.3.4): es actualizar la cifra y decirlo. Esto es decirlo: **eran SEIS, las de la
+      lámina, y son cinco desde que se retiraron las dos zonas de escritura** —96 pt bajo la
+      descripción del procedimiento y 64 bajo los riesgos específicos, renglones pautados que
+      el médico no llenaba porque esas secciones las escribe en el formulario—. Los 160 pt
+      recuperados son la hoja que sobraba.
 
-      Y el reparto es el de la lámina hasta en qué abre cada hoja:
+      Y el reparto sigue el de la lámina en qué abre cada hoja:
     */
-    expect(hojas).toHaveLength(6)
+    expect(hojas).toHaveLength(5)
 
     // El título es el de II.7 —el término de la NOM-004—, no el de la lámina.
     expect(contiene(hojas[0], TITULO)).toBe(true)
@@ -411,12 +415,12 @@ describe('II.7 · Consentimiento Informado', () => {
     expect(contiene(hojas[0], 'FUNDAMENTO LEGAL')).toBe(true)
     expect(contiene(hojas[0], 'DATOS DE IDENTIFICACIÓN')).toBe(true)
     expect(contiene(hojas[0], 'EVALUACIÓN Y DECISIÓN TERAPÉUTICA')).toBe(true)
-    expect(contiene(hojas[3], 'DECLARACIÓN DE CONSENTIMIENTO')).toBe(true)
-    expect(contiene(hojas[3], 'OTORGAMIENTO')).toBe(true)
-    expect(contiene(hojas[4], 'REPRESENTACIÓN')).toBe(true)
-    expect(contiene(hojas[4], 'TESTIGOS')).toBe(true)
-    expect(contiene(hojas[5], 'ANEXO · IDENTIFICACIÓN DE FIRMANTES')).toBe(true)
-    expect(hojas[5].texto).toContain('PÁGINA 6 DE 6')
+    expect(contiene(hojas[2], 'DECLARACIÓN DE CONSENTIMIENTO')).toBe(true)
+    expect(contiene(hojas[2], 'OTORGAMIENTO')).toBe(true)
+    expect(contiene(hojas[3], 'REPRESENTACIÓN')).toBe(true)
+    expect(contiene(hojas[3], 'TESTIGOS')).toBe(true)
+    expect(contiene(hojas[4], 'ANEXO · IDENTIFICACIÓN DE FIRMANTES')).toBe(true)
+    expect(hojas[4].texto).toContain('PÁGINA 5 DE 5')
   }, 200_000)
 
   it('el pie de sello sale solo en quien firmó, y remite al anexo', async () => {
@@ -427,9 +431,9 @@ describe('II.7 · Consentimiento Informado', () => {
       pie —no firmaron, no hay nada que sellar—. Las dos horas son distintas entre sí, que es
       lo que la evidencia necesita: cinco firmas en el mismo segundo son sospechosas.
     */
-    expect(hojas[3].texto).toContain(`Firmado ${SELLO_MEDICO}`)
-    expect(hojas[3].texto).toContain(`Firmado ${SELLO_PACIENTE}`)
-    expect(hojas[4].texto).not.toContain('Firmado ')
+    expect(hojas[2].texto).toContain(`Firmado ${SELLO_MEDICO}`)
+    expect(hojas[2].texto).toContain(`Firmado ${SELLO_PACIENTE}`)
+    expect(hojas[3].texto).not.toContain('Firmado ')
 
     /*
       Y EL PACIENTE REMITE AL ANEXO PORQUE TIENE FOTOGRAFÍA ALLÍ; el médico no, porque el
@@ -440,10 +444,10 @@ describe('II.7 · Consentimiento Informado', () => {
       expect(encontrado, `no se encontró el pie de «${sello}»`).toBeDefined()
       return (encontrado as Renglon).texto
     }
-    expect(pie(hojas[3], SELLO_PACIENTE)).toContain(
+    expect(pie(hojas[2], SELLO_PACIENTE)).toContain(
       sinLigadura('con identificación anexa'),
     )
-    expect(pie(hojas[3], SELLO_MEDICO)).not.toContain('anexa')
+    expect(pie(hojas[2], SELLO_MEDICO)).not.toContain('anexa')
 
     /*
       EL PIE CUESTA 11 pt POR CELDA, y se mide por dónde cae su línea base respecto de la
@@ -460,9 +464,9 @@ describe('II.7 · Consentimiento Informado', () => {
       selladas, la hoja 4 crece 22 y **no repagina**: el documento sigue en seis hojas, que es
       lo que fija la prueba del bloque de verificación.
     */
-    const nota = hojas[3].renglones.find((r) => r.texto === 'Nombre y rma')
+    const nota = hojas[2].renglones.find((r) => r.texto === 'Nombre y rma')
     expect(nota).toBeDefined()
-    const sello = hojas[3].renglones.find((r) =>
+    const sello = hojas[2].renglones.find((r) =>
       r.texto.startsWith(`Firmado ${SELLO_PACIENTE}`),
     )
     expect(sello).toBeDefined()
@@ -478,12 +482,12 @@ describe('II.7 · Consentimiento Informado', () => {
       termina en el anexo, así que el bloque baja con él. Un sello que dice que el documento no
       se alteró no puede tener páginas detrás.
     */
-    expect(conAnexo).toHaveLength(6)
-    expect(sinAnexo).toHaveLength(5)
-    expect(conAnexo[5].texto).toContain(`Documento sellado el ${SELLO_DOCUMENTO}`)
-    expect(sinAnexo[4].texto).toContain(`Documento sellado el ${SELLO_DOCUMENTO}`)
+    expect(conAnexo).toHaveLength(5)
+    expect(sinAnexo).toHaveLength(4)
+    expect(conAnexo[4].texto).toContain(`Documento sellado el ${SELLO_DOCUMENTO}`)
+    expect(sinAnexo[3].texto).toContain(`Documento sellado el ${SELLO_DOCUMENTO}`)
     // Y en ninguna otra: es un cierre, no una marca de página.
-    for (const hoja of conAnexo.slice(0, 5)) {
+    for (const hoja of conAnexo.slice(0, 4)) {
       expect(hoja.texto).not.toContain('Documento sellado')
     }
 
@@ -491,11 +495,11 @@ describe('II.7 · Consentimiento Informado', () => {
       EL RECUENTO SE HACE SOBRE LAS CELDAS COMPUESTAS. Cinco firmantes, dos con hora: la
       diferencia es lo que responde a la pregunta de por qué hay celdas en blanco.
     */
-    expect(conAnexo[5].texto).toContain(
+    expect(conAnexo[4].texto).toContain(
       sinLigadura('5 firmantes previstos, 2 firmaron, 3 omitidos'),
     )
-    expect(conAnexo[5].texto).toContain(`Huella SHA-256 · ${HUELLA}`)
-    expect(conAnexo[5].texto).toContain(
+    expect(conAnexo[4].texto).toContain(`Huella SHA-256 · ${HUELLA}`)
+    expect(conAnexo[4].texto).toContain(
       sinLigadura('verificable en el expediente electrónico'),
     )
   }, 200_000)
@@ -568,7 +572,7 @@ describe('II.7 · Consentimiento Informado', () => {
       representar ni testigos que firmen, esa quinta no tiene nada que componer y el `break`
       la habría abierto igualmente, numerada y con folio.
     */
-    expect(sinNadie).toHaveLength(4)
+    expect(sinNadie).toHaveLength(3)
 
     const todo = sinNadie.map((hoja) => hoja.texto).join('')
     // Ni los rótulos de nivel…
@@ -581,9 +585,9 @@ describe('II.7 · Consentimiento Informado', () => {
     expect(todo).not.toContain('PARENTESCO CON EL PACIENTE')
 
     // Y el nivel 1 sigue entero: el otorgamiento es lo que este documento es.
-    expect(contiene(sinNadie[3], 'OTORGAMIENTO')).toBe(true)
-    expect(contiene(sinNadie[3], 'MÉDICO TRATANTE')).toBe(true)
-    expect(contiene(sinNadie[3], 'PACIENTE')).toBe(true)
+    expect(contiene(sinNadie[2], 'OTORGAMIENTO')).toBe(true)
+    expect(contiene(sinNadie[2], 'MÉDICO TRATANTE')).toBe(true)
+    expect(contiene(sinNadie[2], 'PACIENTE')).toBe(true)
   }, 200_000)
 
   it('con un solo testigo se compone su celda y no la del otro', async () => {
@@ -649,7 +653,7 @@ describe('II.7 · Consentimiento Informado', () => {
       expect(hoja.texto).not.toContain(sinLigadura('firmantes previstos'))
     }
     // Y el documento sigue midiendo lo mismo: los sellos no cambian el reparto.
-    expect(hojas).toHaveLength(6)
+    expect(hojas).toHaveLength(5)
   }, 200_000)
 
   it('el riel son ocho celdas en cuatro filas, sin sexo y con celda base de 33', async () => {
@@ -713,24 +717,24 @@ describe('II.7 · Consentimiento Informado', () => {
     const hojas = await componer(COMPLETO)
 
     // Nivel 1 en la hoja 4: médico y paciente.
-    expect(contiene(hojas[3], 'MÉDICO TRATANTE')).toBe(true)
-    expect(contiene(hojas[3], 'Ced. Prof. 7000001 · Ced. Esp. 8000002')).toBe(true)
-    expect(hojas[3].texto).not.toContain('TESTIGO 1')
+    expect(contiene(hojas[2], 'MÉDICO TRATANTE')).toBe(true)
+    expect(contiene(hojas[2], 'Ced. Prof. 7000001 · Ced. Esp. 8000002')).toBe(true)
+    expect(hojas[2].texto).not.toContain('TESTIGO 1')
 
     // Niveles 2 y 3 en la hoja 5, con el parentesco colgando solo del familiar.
-    expect(contiene(hojas[4], 'FAMILIAR O RESPONSABLE')).toBe(true)
-    expect(contiene(hojas[4], 'PARENTESCO CON EL PACIENTE')).toBe(true)
-    expect(contiene(hojas[4], 'TESTIGO 1')).toBe(true)
-    expect(contiene(hojas[4], 'TESTIGO 2')).toBe(true)
+    expect(contiene(hojas[3], 'FAMILIAR O RESPONSABLE')).toBe(true)
+    expect(contiene(hojas[3], 'PARENTESCO CON EL PACIENTE')).toBe(true)
+    expect(contiene(hojas[3], 'TESTIGO 1')).toBe(true)
+    expect(contiene(hojas[3], 'TESTIGO 2')).toBe(true)
 
     /*
       LOS TRES NIVELES VAN NUMERADOS 1, 2 Y 3, y el 3 solo aparece en la hoja 5. Es lo que
       distingue esta retícula de una de seis firmas seguidas: la jerarquía es del documento,
       no del hueco que quede.
     */
-    expect(contiene(hojas[3], 'OTORGAMIENTO')).toBe(true)
-    expect(contiene(hojas[4], 'REPRESENTACIÓN')).toBe(true)
-    expect(contiene(hojas[4], 'TESTIGOS')).toBe(true)
+    expect(contiene(hojas[2], 'OTORGAMIENTO')).toBe(true)
+    expect(contiene(hojas[3], 'REPRESENTACIÓN')).toBe(true)
+    expect(contiene(hojas[3], 'TESTIGOS')).toBe(true)
   }, 200_000)
 
   it('por sustitución desaparece el nivel 2 y Testigos se renumera a 2', async () => {
@@ -740,17 +744,17 @@ describe('II.7 · Consentimiento Informado', () => {
       SUSTITUCIÓN Y NO ADICIÓN: el familiar firma en el nivel 1, en la celda del paciente, y
       el nivel de Representación deja de existir. El de Testigos pasa de 3 a 2.
     */
-    expect(hojas[4].texto).not.toContain('REPRESENTACIÓN')
-    expect(contiene(hojas[4], 'TESTIGOS')).toBe(true)
-    expect(contiene(hojas[3], 'OTORGAMIENTO')).toBe(true)
+    expect(hojas[3].texto).not.toContain('REPRESENTACIÓN')
+    expect(contiene(hojas[3], 'TESTIGOS')).toBe(true)
+    expect(contiene(hojas[2], 'OTORGAMIENTO')).toBe(true)
 
     // El familiar sube al nivel 1, con su parentesco, y ya no está en la hoja 5.
-    expect(contiene(hojas[3], 'FAMILIAR O RESPONSABLE')).toBe(true)
-    expect(contiene(hojas[3], 'PARENTESCO CON EL PACIENTE')).toBe(true)
-    expect(hojas[4].texto).not.toContain('PARENTESCO CON EL PACIENTE')
+    expect(contiene(hojas[2], 'FAMILIAR O RESPONSABLE')).toBe(true)
+    expect(contiene(hojas[2], 'PARENTESCO CON EL PACIENTE')).toBe(true)
+    expect(hojas[3].texto).not.toContain('PARENTESCO CON EL PACIENTE')
 
     // El número del nivel de testigos es el 2, y en la hoja 5 no hay ningún 3.
-    const numeros = hojas[4].renglones.filter((r) => r.texto === '3')
+    const numeros = hojas[3].renglones.filter((r) => r.texto === '3')
     expect(numeros).toHaveLength(0)
   }, 200_000)
 
@@ -762,16 +766,16 @@ describe('II.7 · Consentimiento Informado', () => {
       LA DECISIÓN DE PRODUCTO 5, MEDIDA POR LO QUE QUITA: una hoja entera. Es la única rama
       del sistema donde un dato hace aparecer o desaparecer una hoja.
     */
-    expect(conFotos).toHaveLength(6)
-    expect(sinFotos).toHaveLength(5)
+    expect(conFotos).toHaveLength(5)
+    expect(sinFotos).toHaveLength(4)
     for (const hoja of sinFotos) {
       expect(hoja.texto).not.toContain('ANEXO · IDENTIFICACIÓN DE FIRMANTES')
     }
-    expect(sinFotos[4].texto).toContain('PÁGINA 5 DE 5')
+    expect(sinFotos[3].texto).toContain('PÁGINA 4 DE 4')
   }, 200_000)
 
   it('el anexo imprime el tipo y el número haya foto o no', async () => {
-    const [, , , , , anexo] = await componer(COMPLETO)
+    const [, , , , anexo] = await componer(COMPLETO)
 
     // Los cuatro recuadros, numerados con cero a la izquierda.
     for (const numero of ['01', '02', '03', '04']) {
@@ -795,13 +799,18 @@ describe('II.7 · Consentimiento Informado', () => {
       LOS TRES ESPACIADORES DEL MISMO DOCUMENTO, medidos por dónde cae la línea de paciente:
       26 en las hojas que siguen texto corrido, 12 en las de firmas y 20 en la del anexo. Las
       diferencias son exactas porque todo lo demás de esa cabecera es idéntico.
+
+      ⚠ La tercera comprobación cambió de pareja al retirarse las zonas de escritura: **ya no
+      hay dos hojas de texto corrido**, las siete secciones caben en dos y solo la segunda es
+      de continuación. Lo que se comparan ahora son las DOS hojas de firmas, que son las que
+      quedaron repetidas.
     */
     const linea = (hoja: Hoja): number =>
       hoja.renglones.filter((r) => r.texto.startsWith('Paciente · '))[0].arriba
 
-    expect(linea(hojas[2]) - linea(hojas[3])).toBeCloseTo(26 - 12, 1)
-    expect(linea(hojas[5]) - linea(hojas[3])).toBeCloseTo(20 - 12, 1)
-    expect(linea(hojas[1])).toBeCloseTo(linea(hojas[2]), 1)
+    expect(linea(hojas[1]) - linea(hojas[2])).toBeCloseTo(26 - 12, 1)
+    expect(linea(hojas[4]) - linea(hojas[2])).toBeCloseTo(20 - 12, 1)
+    expect(linea(hojas[2])).toBeCloseTo(linea(hojas[3]), 1)
   }, 200_000)
 
   it('la línea de continuación no lleva el hospital, aunque el riel lo tenga', async () => {
@@ -849,12 +858,12 @@ describe('II.7 · Consentimiento Informado', () => {
       los dos rectángulos puede quedar en la hoja, en ningún caso.
     */
     const casilla = (hojas: Hoja[]): boolean =>
-      hojas[3].rectangulos.some(
+      hojas[2].rectangulos.some(
         (r) => (r.ancho === 5 && r.alto === 5) || (r.ancho === 9 && r.alto === 9),
       )
 
-    expect(contiene(sustituido[3], 'El paciente no puede')).toBe(true)
-    expect(normal[3].texto).not.toContain('El paciente no puede')
+    expect(contiene(sustituido[2], 'El paciente no puede')).toBe(true)
+    expect(normal[2].texto).not.toContain('El paciente no puede')
     expect(casilla(normal)).toBe(false)
     expect(casilla(sustituido)).toBe(false)
   }, 200_000)
@@ -867,11 +876,11 @@ describe('II.7 · Consentimiento Informado', () => {
       autorizaFotos: true,
     })
 
-    expect(contiene(hojas[3], 'El paciente no puede')).toBe(true)
-    expect(contiene(hojas[3], sinLigadura('NO autorizo la transfusión'))).toBe(true)
-    expect(contiene(hojas[3], sinLigadura('Autorizo la toma de fotografías'))).toBe(true)
+    expect(contiene(hojas[2], 'El paciente no puede')).toBe(true)
+    expect(contiene(hojas[2], sinLigadura('NO autorizo la transfusión'))).toBe(true)
+    expect(contiene(hojas[2], sinLigadura('Autorizo la toma de fotografías'))).toBe(true)
     expect(
-      hojas[3].rectangulos.some(
+      hojas[2].rectangulos.some(
         (r) => (r.ancho === 5 && r.alto === 5) || (r.ancho === 9 && r.alto === 9),
       ),
     ).toBe(false)
@@ -890,7 +899,7 @@ describe('II.7 · Consentimiento Informado', () => {
         ...COMPLETO,
         autorizaTransfusion: 'si',
       })
-      expect(contiene(hojas[3], sinLigadura('Autorizo la transfusión de sangre'))).toBe(true)
+      expect(contiene(hojas[2], sinLigadura('Autorizo la transfusión de sangre'))).toBe(true)
     }, 200_000)
 
     /**
@@ -903,8 +912,8 @@ describe('II.7 · Consentimiento Informado', () => {
         ...COMPLETO,
         autorizaTransfusion: 'no',
       })
-      expect(contiene(hojas[3], sinLigadura('NO autorizo la transfusión'))).toBe(true)
-      expect(contiene(hojas[3], 'asumiendo los riesgos')).toBe(true)
+      expect(contiene(hojas[2], sinLigadura('NO autorizo la transfusión'))).toBe(true)
+      expect(contiene(hojas[2], 'asumiendo los riesgos')).toBe(true)
     }, 200_000)
 
     /**
@@ -931,7 +940,7 @@ describe('II.7 · Consentimiento Informado', () => {
       const con = await componer({ ...COMPLETO, autorizaFotos: true })
       const sin = await componer({ ...COMPLETO, autorizaFotos: false })
 
-      expect(contiene(con[3], sinLigadura('Autorizo la toma de fotografías'))).toBe(true)
+      expect(contiene(con[2], sinLigadura('Autorizo la toma de fotografías'))).toBe(true)
       for (const hoja of sin) {
         expect(hoja.texto).not.toContain(sinLigadura('fotografías clínicas'))
       }
@@ -943,8 +952,8 @@ describe('II.7 · Consentimiento Informado', () => {
         autorizaTransfusion: 'si',
         autorizaFotos: false,
       })
-      expect(contiene(hojas[3], sinLigadura('Autorizo la transfusión de sangre'))).toBe(true)
-      expect(hojas[3].texto).not.toContain(sinLigadura('fotografías clínicas'))
+      expect(contiene(hojas[2], sinLigadura('Autorizo la transfusión de sangre'))).toBe(true)
+      expect(hojas[2].texto).not.toContain(sinLigadura('fotografías clínicas'))
     }, 200_000)
   })
 
@@ -963,8 +972,8 @@ describe('II.7 · Consentimiento Informado', () => {
    */
   it('la celda del acompañante lleva SIEMPRE el mismo rótulo', async () => {
     const hojas = await componer(COMPLETO)
-    expect(contiene(hojas[4], 'FAMILIAR O RESPONSABLE')).toBe(true)
-    expect(hojas[4].texto).not.toContain('REPRESENTANTE LEGAL')
+    expect(contiene(hojas[3], 'FAMILIAR O RESPONSABLE')).toBe(true)
+    expect(hojas[3].texto).not.toContain('REPRESENTANTE LEGAL')
   }, 200_000)
 
   /**
