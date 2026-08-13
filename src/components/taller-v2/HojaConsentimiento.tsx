@@ -163,11 +163,18 @@ const SELLADO = { fecha: '09/08/2026 12:47:19', huella: '3f9a…8c41' } as const
 /**
  * LOS FIRMANTES DEL CASO DE CONSULTA — sin testigos y sin familiar.
  *
- * Es el caso NORMAL en consulta y el que destapa el defecto del recuento: sus celdas de
- * testigo se componen igual —son fijas por NOM-004 y su línea se firma a mano— pero a esas
- * dos personas nadie les pidió nada, así que el bloque de cierre **no puede declararlas
- * omitidas**. Miradas la una junto a la otra, `completo` y `sinTestigos` enseñan las dos
- * formas de la línea de sellado.
+ * Es el caso NORMAL en consulta y el que destapó los DOS defectos del mismo hecho, que se
+ * corrigieron en dos pases:
+ *
+ *   1. El bloque de cierre declaraba «5 firmantes previstos, 2 firmaron, 3 omitidos» sobre
+ *      tres personas a las que nadie pidió nada.
+ *   2. **Y las celdas se componían igual, vacías** — rol, 77 pt de espacio, línea y nota—,
+ *      que es lo mismo dicho sin palabras y en el sitio donde más se mira.
+ *
+ * Ahora no se compone la celda de quien no iba a firmar, y con ninguno de los dos niveles
+ * la hoja entera desaparece: este caso sale en CUATRO hojas y `completo` en seis. Miradas
+ * la una junto a la otra, enseñan las dos formas del bloque de firmas y de la línea de
+ * sellado.
  */
 const FIRMANTES_SIN_TESTIGOS = {
   medico: FIRMANTES.medico,
@@ -229,10 +236,11 @@ const CASOS: Record<
   CasoConsentimiento,
   {
     readonly identificaciones: readonly IdentificacionAnexo[]
-    readonly sustitucion?: boolean
+    readonly pacienteNoPuedeFirmar?: boolean
     readonly sellado?: typeof SELLADO
     readonly folio: string
-    readonly autorizaciones?: { transfusion?: 'si' | 'no'; fotografias?: boolean }
+    readonly autorizaTransfusion?: 'si' | 'no'
+    readonly autorizaFotos?: boolean
     readonly representanteLegal?: boolean
     readonly firmantes?: typeof FIRMANTES | typeof FIRMANTES_SIN_TESTIGOS
   }
@@ -249,7 +257,7 @@ const CASOS: Record<
   },
   sustitucion: {
     identificaciones: IDENTIFICACIONES,
-    sustitucion: true,
+    pacienteNoPuedeFirmar: true,
     sellado: SELLADO,
     folio: FOLIOS.sustitucion,
   },
@@ -265,7 +273,8 @@ const CASOS: Record<
     identificaciones: IDENTIFICACIONES,
     sellado: SELLADO,
     folio: FOLIOS.autorizaciones,
-    autorizaciones: { transfusion: 'no', fotografias: true },
+    autorizaTransfusion: 'no',
+    autorizaFotos: true,
   },
   sinTestigos: {
     identificaciones: [],
@@ -310,8 +319,9 @@ function HojaConsentimiento({
         procedimiento={PROCEDIMIENTO}
         secciones={SECCIONES}
         firmantes={c.firmantes ?? FIRMANTES}
-        sustitucion={c.sustitucion}
-        autorizaciones={c.autorizaciones}
+        pacienteNoPuedeFirmar={c.pacienteNoPuedeFirmar}
+        autorizaTransfusion={c.autorizaTransfusion}
+        autorizaFotos={c.autorizaFotos}
         representanteLegal={c.representanteLegal}
         identificaciones={c.identificaciones}
         sellado={c.sellado}

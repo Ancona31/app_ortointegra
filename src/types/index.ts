@@ -264,6 +264,21 @@ export interface Documento {
    * `undefined` y debe tratarse como emitida.
    */
   estado?: 'borrador' | 'emitido_firma_manual' | 'firmado'
+  /**
+   * FOLIO DE LA SERIE, columna propia y escrita por la base
+   * (`20260807_folio_01_esquema_y_generador.sql`). El cliente no lo propone: el
+   * trigger lo rechaza.
+   *
+   * `null` en tres casos legítimos y en ninguno más: un borrador —lo recibe al
+   * salir de ese estado—, un formato sin clase de folio —`escrito_medico`— y
+   * las filas anteriores al generador.
+   *
+   * ⚠ **NO ES EL FOLIO QUE IMPRIME LA RECETA.** Aquella lleva el suyo dentro de
+   * `contenido.folio` —el `R-…` del QR de verificación— y esta columna trae
+   * además su `RX-…`. Quién imprime cuál lo decide `folioImpreso()` en
+   * `src/lib/documentos/folio.ts`, que es el único sitio donde está escrito.
+   */
+  folio?: string | null
   // Metadata de uploads clínicos (sub-fase 6A). NULL en documentos generados por la app.
   storage_bucket?: string | null
   storage_path?: string | null

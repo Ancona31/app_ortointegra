@@ -14,6 +14,7 @@ import { es } from 'date-fns/locale'
 import Link from 'next/link'
 import ComboEscribible from '@/components/documentos/ComboEscribible'
 import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
+import { folioImpreso } from '@/lib/documentos/folio'
 import { createClient } from '@/lib/supabase/client'
 import { hoyEnTZ, desplazarFecha } from '@/lib/dates'
 import { enfocarYAcercar } from '@/lib/scrollDoc'
@@ -233,7 +234,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
     flushSync(() => { setErrorGuardado(''); setImprimiendo(true) })
 
     // 1. Feedback instantáneo
-    toast.info('Generando solicitud de imagen...')
+    toast.info('Generando solicitud de imagenología...')
 
     // 2. Identidad — UUID v4 puro (las solicitudes de imagen no tienen
     //    verificación pública ni folio visible)
@@ -249,15 +250,51 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
       fecha,
     }
 
-    // Flags de tracking para diferenciar errores
-    let pdfGenerated = false
     // El blob y el desenlace de la persistencia se leen en el finally para
     // montar el modal posterior a la generación. Ver ModalDocumentoGenerado.
     let pdfBlob: Blob | null = null
     let guardado = false
+    let filaId: string | null = null
+    let folio: string | null = null
 
     try {
-      // 3. PDF PRIMERO — si falla, abortamos antes de persistir
+      // ── 3 · LA FILA PRIMERO, porque de ella sale el folio ─────────────
+      //    Invierte el orden que este formulario tenía —PDF, subida, fila—. El
+      //    trigger asigna el folio en el INSERT, así que el número solo existe
+      //    DESPUÉS de escribir y renderizar antes imprimía un papel sin él. Es
+      //    el orden que ya seguían el consentimiento y la denegación
+      //    (`20260812_documentos_estado.sql`, trampa 2).
+      //
+      //    Va con el cliente de SESIÓN del médico, nunca con privilegios de
+      //    servicio: el trigger exenta por completo a quien no trae JWT y la
+      //    fila quedaría emitida con folio nulo para siempre.
+      const supabase = offlineMode ? null : createClient()
+      if (supabase) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('No autenticado')
+
+        const insertPayload: Record<string, unknown> = {
+          tipo: 'solicitud_imagen',
+          contenido,
+          client_id: clientId,
+          subido_por: user.id,
+        }
+        if (pacienteId) insertPayload.paciente_id = pacienteId
+
+        const { data, error } = await supabase
+          .from('documentos')
+          .insert(insertPayload)
+          .select('id, folio')
+          .single()
+        if (error) throw error
+        filaId = data.id
+        folio = data.folio
+        // La fila está en el expediente. Aunque el PDF falle después, el
+        // documento es recuperable desde la lista con su botón de regenerar.
+        guardado = true
+      }
+
+      // ── 4 · El PDF, ya con el número que la base acaba de asignar ─────
       const fechaFormat = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
 
       const medicoData = medicoInfo ? {
@@ -294,19 +331,26 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
           diagnostico,
           estudios: completos,
           urgente,
+          // En el búnker offline no hay fila ni base, así que llega undefined y
+          // el papel sale sin número, igual que hasta ahora.
+          folio: folioImpreso('solicitud_imagen', folio),
         },
         logoUrl,
-        filename: generateDocFileName(paciente, 'Solicitud_Imagen'),
+        // IMAGENOLOGÍA Y NO IMAGEN, también en el nombre del archivo: el título
+        // del documento cambió en las tres capas a la vez —el PDF, la pantalla y
+        // el archivo que se descarga— para que quien busque el papel en su
+        // carpeta lo encuentre por el mismo nombre con que lo pidió. Ver
+        // `DOCUMENTOS_HANDOFF.md` §8, cambio 4.
+        filename: generateDocFileName(paciente, 'Solicitud_Imagenologia'),
         consultorio: consultorioData,
         // El búnker offline queda intacto: sigue entregando el PDF él mismo y
         // no monta el modal — onOfflineSave desmonta el formulario al guardar.
         entregar: !!offlineMode,
       })
 
-      pdfGenerated = true
       pdfBlob = blob
 
-      // 4. Persistencia
+      // ── 5 · La ruta del archivo, sobre la fila que ya existe ──────────
       if (offlineMode) {
         const { addDocument } = await import('@/lib/offline/db')
         const { getOfflineIdentity } = await import('@/lib/offline/identity')
@@ -319,39 +363,40 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
           medico_id: getOfflineIdentity()?.userId ?? 'anonymous',
           _syncStatus: 'pending',
         })
-        toast.success('Solicitud de imagen guardada en bunker offline')
+        toast.success('Solicitud de imagenología guardada en bunker offline')
         onOfflineSave?.()
       } else {
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('No autenticado')
-
-        const insertPayload: Record<string, unknown> = {
-          tipo: 'solicitud_imagen',
-          contenido,
-          client_id: clientId,
-          pdf_url: storagePath,
-          subido_por: user.id,
+        if (storagePath && filaId && supabase) {
+          // Este UPDATE no toca ni el estado ni el folio, así que el trigger lo
+          // deja pasar. No es fatal si falla: la fila está y el PDF se entrega
+          // igual; lo que se pierde es la descarga desde la lista, que el botón
+          // de regenerar repone.
+          const { error } = await supabase
+            .from('documentos')
+            .update({ pdf_url: storagePath })
+            .eq('id', filaId)
+          if (error) console.error('[SolicitudImagenForm] update pdf_url:', error.message)
         }
-        if (pacienteId) insertPayload.paciente_id = pacienteId
-
-        const { error } = await supabase.from('documentos').insert(insertPayload)
-        if (error) throw error
-
-        // Sin storagePath la fila se inserta igual pero sin PDF en Storage:
-        // mobileShare captura el error de subida y no lo relanza. El documento
-        // no queda recuperable desde la lista y el modal tiene que decirlo.
-        guardado = storagePath !== null
-        toast.success('Solicitud de imagen guardada')
+        toast.success(folio
+          ? `Solicitud de imagenología guardada · ${folio}`
+          : 'Solicitud de imagenología guardada')
       }
     } catch (err) {
-      if (!pdfGenerated) {
-        toast.error('No se pudo generar el PDF. Intenta de nuevo.')
-        setErrorGuardado('No se pudo generar el PDF. Intenta de nuevo.')
+      // Tres desenlaces, y el del medio es nuevo: con la fila escrita antes que
+      // el PDF, un fallo de render deja un documento emitido y un folio
+      // consumido. Decirlo con el número delante es lo que permite encontrarlo
+      // en la lista y recuperar el PDF desde ahí.
+      let msg: string
+      if (offlineMode) {
+        msg = 'No se pudo generar el PDF. Intenta de nuevo.'
+      } else if (filaId === null) {
+        msg = 'No se pudo guardar la solicitud, así que no se generó el PDF. Intenta de nuevo.'
       } else {
-        toast.error('Solicitud generada pero no se pudo guardar. Revisa errores de sincronización.')
-        setErrorGuardado('Error al guardar la solicitud.')
+        msg = `La solicitud quedó registrada${folio ? ` con folio ${folio}` : ''}, pero no se pudo `
+          + 'generar el PDF. Búscala en la lista de documentos del paciente y recupérala desde ahí.'
       }
+      toast.error(msg)
+      setErrorGuardado(msg)
       // eslint-disable-next-line no-console
       console.error('[SolicitudImagenForm] imprimir falló:', err)
     } finally {
@@ -562,7 +607,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
             : perfilPendiente ? <><span className="sp-spinner" /> Cargando tu perfil…</>
             : <>
                 <Printer size={17} />
-                <span className="sp-doc-long">Imprimir solicitud de imagen</span>
+                <span className="sp-doc-long">Imprimir solicitud de imagenología</span>
                 <span className="sp-doc-short">Imprimir</span>
               </>}
         </button>
@@ -577,7 +622,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
         open={docGenerado !== null}
         onClose={() => setDocGenerado(null)}
         blob={docGenerado?.blob ?? null}
-        titulo="Solicitud de imagen generada"
+        titulo="Solicitud de imagenología generada"
         guardadoEnExpediente={docGenerado?.guardado ?? false}
       />
     </div>

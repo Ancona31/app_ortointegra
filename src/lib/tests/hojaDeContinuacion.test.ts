@@ -273,10 +273,10 @@ const IMAGENOLOGIA = h(SolicitudImagenologia, {
 const RECETA = h(RecetaMedica, {
   ...COMUN,
   medicamentos: Array.from({ length: 7 }, (_, i) => ({
-    comercial: `Fármaco ${i + 1}`,
+    nombre_comercial: `Fármaco ${i + 1}`,
     presentacion: 'Tabletas 500 mg',
-    generico: 'Denominación genérica',
-    via: 'Subcutánea',
+    principio_activo: 'Denominación genérica',
+    via_administracion: 'Subcutánea',
     indicacion:
       'Una tableta cada 24 horas después del desayuno durante siete días, y suspender si aparece dolor epigástrico.',
   })),
@@ -295,7 +295,7 @@ const RECETA = h(RecetaMedica, {
 const SUPLEMENTACION = h(PlanSuplementacion, {
   ...COMUN,
   paciente: { ...COMUN.paciente, peso: '72.5 kg' },
-  suplementos: Array.from({ length: 9 }, (_, i) => ({
+  seleccionados: Array.from({ length: 9 }, (_, i) => ({
     nombre: `Suplemento de control ${i + 1}`,
     dosis: '500 mg cada 12 horas',
     justificacion:

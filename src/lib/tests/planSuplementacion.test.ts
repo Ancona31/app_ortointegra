@@ -413,7 +413,7 @@ const COMUN = {
   emision: '4 ago 2026 · 10:15',
   folio: 'S-C9174B2E60A5',
   qr: QR_MINIMO,
-} satisfies Omit<PlanSuplementacionProps, 'suplementos'>
+} satisfies Omit<PlanSuplementacionProps, 'seleccionados'>
 
 /** Una justificación que cabe holgada en un renglón de 453.75 pt a 11.5 / 18. */
 const UNA_LINEA = 'Aporte insuficiente en la dieta habitual.'
@@ -450,7 +450,7 @@ const CUATRO_FILAS: readonly SuplementoIndicado[] = [
 const ANCLAS = ['Colecalciferol', 'Magnesio', 'Zinc', 'Colágeno'] as const
 
 async function componer(
-  suplementos: readonly SuplementoIndicado[],
+  seleccionados: readonly SuplementoIndicado[],
   extra: Partial<PlanSuplementacionProps> = {},
 ): Promise<Hoja[]> {
   return hojas(
@@ -458,7 +458,7 @@ async function componer(
       h<DocumentProps>(
         Document,
         {},
-        h(PlanSuplementacion, { ...COMUN, suplementos, ...extra }),
+        h(PlanSuplementacion, { ...COMUN, seleccionados, ...extra }),
       ),
     ),
   )

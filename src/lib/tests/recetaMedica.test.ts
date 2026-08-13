@@ -415,30 +415,30 @@ const DOS_LINEAS =
 const CUATRO_FILAS: readonly MedicamentoRecetado[] = [
   // 1 · completa — ancla, genérico, vía e indicación de una línea
   {
-    comercial: 'Meloxicam',
+    nombre_comercial: 'Meloxicam',
     presentacion: 'Tabletas 15 mg',
-    generico: 'Meloxicam sódico',
-    via: 'Oral',
+    principio_activo: 'Meloxicam sódico',
+    via_administracion: 'Oral',
     indicacion: UNA_LINEA,
   },
   // 2 · sin genérico — la ranura colapsa entera, sin rótulo y sin línea
   {
-    comercial: 'Diclofenaco',
+    nombre_comercial: 'Diclofenaco',
     presentacion: 'Ampolleta 75 mg',
-    via: 'Intramuscular',
+    via_administracion: 'Intramuscular',
     indicacion: UNA_LINEA,
   },
   // 3 · sin indicación
   {
-    comercial: 'Fentanilo',
+    nombre_comercial: 'Fentanilo',
     presentacion: 'Parche 5 mg',
-    generico: 'Fentanilo',
-    via: 'Transdérmica',
+    principio_activo: 'Fentanilo',
+    via_administracion: 'Transdérmica',
   },
   // 4 · solo el ancla — con la vía, que nunca colapsa: sin dato es `Oral` (II.3 §2)
-  { comercial: 'Ketorolaco', presentacion: 'Tabletas 10 mg' },
+  { nombre_comercial: 'Ketorolaco', presentacion: 'Tabletas 10 mg' },
   // 5 · cierre de la medición
-  { comercial: 'Paracetamol', presentacion: 'Tabletas 500 mg', generico: 'Paracetamol' },
+  { nombre_comercial: 'Paracetamol', presentacion: 'Tabletas 500 mg', principio_activo: 'Paracetamol' },
 ]
 
 const ANCLAS = [
@@ -579,11 +579,11 @@ describe('II.3 · Receta Médica — medido sobre el PDF', () => {
   it('colapsa el genérico y la presentación sin dejar rótulo ni hueco', async () => {
     const [hoja] = await componer([
       // 01 · sin genérico
-      { comercial: 'Meloxicam', presentacion: 'Tabletas 15 mg', via: 'Intramuscular' },
+      { nombre_comercial: 'Meloxicam', presentacion: 'Tabletas 15 mg', via_administracion: 'Intramuscular' },
       // 02 · sin presentación: el ancla se reduce al comercial
-      { comercial: 'Diclofenaco', generico: 'Diclofenaco sódico' },
+      { nombre_comercial: 'Diclofenaco', principio_activo: 'Diclofenaco sódico' },
       // 03 · completa, para cerrar la medición del paso de la 02
-      { comercial: 'Paracetamol', presentacion: 'Tabletas 500 mg', generico: 'Paracetamol' },
+      { nombre_comercial: 'Paracetamol', presentacion: 'Tabletas 500 mg', principio_activo: 'Paracetamol' },
     ])
 
     /*
@@ -775,7 +775,7 @@ describe('II.3 · Receta Médica — medido sobre el PDF', () => {
     // mirar juntos. Con la lista llena el cierre se va a la hoja 2 — ver la prueba
     // de capacidad.
     const uno: readonly MedicamentoRecetado[] = [
-      { comercial: 'Meloxicam', presentacion: 'Tabletas 15 mg', generico: 'Meloxicam' },
+      { nombre_comercial: 'Meloxicam', presentacion: 'Tabletas 15 mg', principio_activo: 'Meloxicam' },
     ]
     const RECOMENDACIONES = 'Mantenga reposo relativo durante las primeras 48 horas.'
     const ALARMA = 'Fiebre mayor de 38.5 °C que no cede con el antipirético.'
@@ -836,10 +836,10 @@ describe('II.3 · Receta Médica — medido sobre el PDF', () => {
       Se mide en TODAS las hojas: la que se comprime es la que CIERRA, y puede ser cualquiera.
     */
     const caro = (i: number): MedicamentoRecetado => ({
-      comercial: `Fármaco ${i}`,
+      nombre_comercial: `Fármaco ${i}`,
       presentacion: 'Tabletas 500 mg',
-      generico: 'Denominación genérica',
-      via: 'Subcutánea',
+      principio_activo: 'Denominación genérica',
+      via_administracion: 'Subcutánea',
       indicacion: UNA_LINEA,
     })
     const hojas = await componer(Array.from({ length: 12 }, (_, i) => caro(i)))
@@ -887,10 +887,10 @@ describe('II.3 · Receta Médica — medido sobre el PDF', () => {
       compra.
     */
     const caro = (i: number): MedicamentoRecetado => ({
-      comercial: `Fármaco ${i}`,
+      nombre_comercial: `Fármaco ${i}`,
       presentacion: 'Tabletas 500 mg',
-      generico: 'Denominación genérica',
-      via: 'Subcutánea',
+      principio_activo: 'Denominación genérica',
+      via_administracion: 'Subcutánea',
       indicacion: DOS_LINEAS,
     })
     const corto = (i: number): MedicamentoRecetado => ({ ...caro(i), indicacion: UNA_LINEA })

@@ -316,7 +316,7 @@ const BASE: EscritoMedicoProps = {
   },
   panel: { variante: 'monograma', acento, iniciales: 'EM' },
   acento,
-  titulo: CORTO,
+  asunto: CORTO,
   fecha: FECHA,
   cuerpo: CUERPO,
 }
@@ -324,12 +324,12 @@ const BASE: EscritoMedicoProps = {
 /** Tres renglones de título, y un nombre corto propio para la banda de pie. */
 const CON_TITULO_LARGO: EscritoMedicoProps = {
   ...BASE,
-  titulo: LARGO,
+  asunto: LARGO,
   tituloPie: TITULO_PIE,
 }
 
 /** Sin título: el bloque deja 20 pt con la fecha sola y conserva su filete. */
-const SIN_TITULO: EscritoMedicoProps = { ...BASE, titulo: undefined }
+const SIN_TITULO: EscritoMedicoProps = { ...BASE, asunto: undefined }
 
 /** Un `Document` con un solo `Page`, que es lo que ocurre en emisión real. */
 async function componer(props: EscritoMedicoProps): Promise<Hoja[]> {

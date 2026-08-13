@@ -161,8 +161,9 @@ const CABECERA = {
   origen: 'Origen',
   precio: 'Precio',
 } as const
-/** Los dos valores de la marca de origen. */
-const ORIGEN = { propio: 'Propio', tercero: 'Tercero' } as const
+// La redacción de las dos marcas de origen —`Propio` y `Tercero`— vivía aquí y se
+// ha ido con la unión: el origen es texto libre del formulario y se imprime como
+// llega, así que no hay nada que redactar. Ver `ConceptoCobrado.origen`.
 /** Los tres rótulos del riel de aseguradora. */
 const ASEGURADORA = {
   bloque: 'Aseguradora',
@@ -444,8 +445,18 @@ export interface ConceptoCobrado {
    * De quién es el honorario. Colapsa: en un recibo la columna no existe, y en una
    * cotización un concepto sin origen deja su celda vacía sin cerrar la columna — que
    * es lo mismo que hace la celda de indicación de 2.G.
+   *
+   * ⚠ **TEXTO LIBRE, Y NO LA UNIÓN `'propio' | 'tercero'` QUE ESTE CAMPO DECLARABA.**
+   * `NotaHonorariosForm` ofrece cuatro sugerencias —`Honorarios médicos`, `Hospital`,
+   * `Anestesiólogo`, `Material e implantes`— y **acepta escribir encima**, porque
+   * ninguna lista cerrada aguanta la facturación real (§4.3). Los subtotales agrupan
+   * por la cadena tal cual, así que un origen tecleado a mano genera su propio
+   * subtotal. La unión era falsa: ninguno de los dos valores se ha guardado nunca.
+   *
+   * Se imprime tal cual llega, en versalita. **Ver `estilos.origenTercero`**: la
+   * distinción de dos pesos que había aquí se quedó sin criterio al caer la unión.
    */
-  readonly origen?: 'propio' | 'tercero'
+  readonly origen?: string
 }
 
 /** La aseguradora. Colapsa ENTERA, no por celdas (B.5 §5). */
@@ -488,9 +499,9 @@ interface Comun {
   /** El procedimiento o motivo, bajo el título y con su rótulo. Colapsa. */
   readonly procedimiento?: string
   /** `lineas[]` bloquea emisión en el formulario: al menos una (II.5 §2). */
-  readonly conceptos: readonly ConceptoCobrado[]
+  readonly lineas: readonly ConceptoCobrado[]
   /** La cifra del total, YA compuesta. Este formato no suma: recibe sumado. */
-  readonly total: string
+  readonly monto: string
   /** Por defecto MXN en el formulario, no aquí: si no viene, no se imprime. */
   readonly divisa?: Divisa
   /** Cuerpo del bloque de notas. Colapsa entero con su encabezado. */
@@ -511,7 +522,7 @@ interface Comun {
 export type ReciboHonorariosProps = Comun &
   (
     | {
-        readonly tipo: 'cotizacion'
+        readonly tipo_doc: 'cotizacion'
         /** Las dos filas de subtotal. Vacías, colapsan con su filete (2.T regla 3). */
         readonly subtotales?: readonly FilaImporte[]
         /** Colapsa el riel entero, con su marco y su aire. */
@@ -524,11 +535,18 @@ export type ReciboHonorariosProps = Comun &
         readonly qr?: string
       }
     | {
-        readonly tipo: 'recibo'
+        /**
+         * `honorarios` y no `recibo`, que es como se llama el documento en todas partes
+         * menos aquí: es el valor que `NotaHonorariosForm` escribe en
+         * `contenido.tipo_doc` y el que el trigger de la base lee para decidir la serie
+         * del folio —NOH o COT—. El discriminante es un nombre más, y mandan los del
+         * formulario.
+         */
+        readonly tipo_doc: 'honorarios'
         /** Anticipo, su fecha y el saldo. Colapsan las tres filas (2.T regla 3). */
         readonly anticipo?: AnticipoRecibido
         /** Método de pago, ya redactado. Colapsa el bloque entero. */
-        readonly formaPago?: string
+        readonly forma_pago?: string
       }
   )
 
@@ -576,15 +594,12 @@ function FilaConcepto({
         {linea.concepto}
       </Text>
       {!conOrigen ? null : (
-        <Text
-          style={[
-            linea.origen === 'tercero' ? estilos.origenTercero : estilos.origenPropio,
-            estilos.columnaOrigen,
-          ]}
-        >
-          {linea.origen === undefined
-            ? ''
-            : (linea.origen === 'tercero' ? ORIGEN.tercero : ORIGEN.propio).toUpperCase()}
+        // El origen se imprime como llega. Un peso solo, y es el que este render ya
+        // aplicaba de hecho: la rama `tercero` exigía esa cadena exacta y el
+        // formulario nunca la ha guardado, así que todo lo emitido hasta hoy salió
+        // por `origenPropio`. Fijarlo aquí no mueve ni un punto del papel ya impreso.
+        <Text style={[estilos.origenPropio, estilos.columnaOrigen]}>
+          {(linea.origen ?? '').toUpperCase()}
         </Text>
       )}
       <Text style={[estilos.precio, estilos.columnaPrecio]}>{linea.precio}</Text>
@@ -594,7 +609,7 @@ function FilaConcepto({
 
 /** II.5 · Recibo de Honorarios / Cotización. */
 export default function ReciboHonorarios(props: ReciboHonorariosProps): ReactElement {
-  const cotizacion = props.tipo === 'cotizacion'
+  const cotizacion = props.tipo_doc === 'cotizacion'
   // Anotado y no aseverado: 2.L pide una tupla de una firma y la anotación se la da
   // sin `as`, que este proyecto prohíbe para acallar un tipo.
   const firmas: readonly [Firma] = [firmaDelMedico(props.medico, props.rubrica)]
@@ -621,7 +636,7 @@ export default function ReciboHonorarios(props: ReciboHonorariosProps): ReactEle
             paciente de las hojas de continuación —2.V decide en cuáles—, así que aquí
             se declara y no se coloca.
           */
-          eco: `${props.conceptos.length} ${ITEMS}${RAYA}${ECO_TOTAL} ${props.total}${
+          eco: `${props.lineas.length} ${ITEMS}${RAYA}${ECO_TOTAL} ${props.monto}${
             props.divisa === undefined ? '' : ` ${props.divisa.codigo}`
           } ${ECO_CIERRE}`,
         }}
@@ -656,7 +671,7 @@ export default function ReciboHonorarios(props: ReciboHonorariosProps): ReactEle
               ) : null}
 
               {/* LA FORMA DE PAGO. Solo el recibo: una cotización no se cobra. */}
-              {!cotizacion && tieneValor(props.formaPago) ? (
+              {!cotizacion && tieneValor(props.forma_pago) ? (
                 <View>
                   <Text style={estilos.encabezadoFormaPago}>
                     {ENCABEZADO_FORMA_PAGO.toUpperCase()}
@@ -665,7 +680,7 @@ export default function ReciboHonorarios(props: ReciboHonorariosProps): ReactEle
                     <Text style={estilos.rotuloMetodo}>
                       {ROTULO_METODO.toUpperCase()}
                     </Text>
-                    <Text style={estilos.valorMetodo}>{props.formaPago}</Text>
+                    <Text style={estilos.valorMetodo}>{props.forma_pago}</Text>
                   </View>
                 </View>
               ) : null}
@@ -692,7 +707,7 @@ export default function ReciboHonorarios(props: ReciboHonorariosProps): ReactEle
                   subtotales={props.subtotales ?? []}
                   rotuloTotal={ROTULO_TOTAL_COTIZACION}
                   divisa={divisa}
-                  total={props.total}
+                  total={props.monto}
                 />
               ) : (
                 <RielImportes
@@ -700,7 +715,7 @@ export default function ReciboHonorarios(props: ReciboHonorariosProps): ReactEle
                   anticipo={props.anticipo}
                   rotuloTotal={ROTULO_TOTAL_RECIBO}
                   divisa={divisa}
-                  total={props.total}
+                  total={props.monto}
                 />
               )}
 
@@ -814,7 +829,7 @@ export default function ReciboHonorarios(props: ReciboHonorariosProps): ReactEle
           </Text>
         </View>
 
-        {props.conceptos.map((linea, indice) => (
+        {props.lineas.map((linea, indice) => (
           <FilaConcepto
             // El índice ES la identidad: dos renglones pueden cobrar el mismo concepto
             // a distinto precio y lo único que los distingue es su orden.

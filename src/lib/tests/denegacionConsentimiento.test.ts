@@ -498,6 +498,28 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
     ])
   }, 200_000)
 
+  /**
+   * El mismo criterio que II.7, comprobado aquí porque la retícula es la misma y el defecto
+   * era del componente compartido: una celda sin nombre componía rol, espacio de escritura,
+   * línea y nota, o sea una raya de firma en blanco. Aquí el caso es remoto —el formulario
+   * exige el familiar SIEMPRE en la denegación— y por eso se prueba: lo que imprime el papel
+   * no puede depender de una validación que vive en otro archivo.
+   */
+  it('un firmante sin nombre no compone celda: la retícula baja de columnas', async () => {
+    const [hoja] = await componer({
+      ...BASE,
+      firmantes: { medico: { rubrica: RASTER }, paciente: { nombre: PACIENTE }, familiar: {} },
+    })
+
+    expect(rolesDeFirma(hoja).map((r) => r.texto)).toEqual(['MÉDICO TRATANTE', 'PACIENTE'])
+    // Dos celdas de 228, el reparto de la variante por sustitución: no son tres de 142 con
+    // la tercera en blanco.
+    expect(rolesDeFirma(hoja).map((r) => r.x)).toEqual([
+      MARGEN.izquierdo,
+      MARGEN.izquierdo + CELDA_DOS + MEDIANIL_FIRMAS,
+    ])
+  }, 200_000)
+
   it('el diagnóstico entra en la declaración y NO en el riel', async () => {
     const [con] = await componer(CON_DIAGNOSTICO)
     const [sin] = await componer(BASE)

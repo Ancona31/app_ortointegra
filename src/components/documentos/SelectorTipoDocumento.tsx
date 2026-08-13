@@ -48,7 +48,10 @@ type Tipo = {
 export const TIPOS_DOCUMENTO: readonly Tipo[] = [
   { key: 'receta',         label: 'Receta',                  icon: Pill,          token: 'receta',         def: 'la receta',                     pendiente: 'una receta empezada' },
   { key: 'lab',            label: 'Laboratorio',             icon: FlaskConical,  token: 'laboratorio',    def: 'la solicitud de laboratorio',   pendiente: 'una solicitud de laboratorio empezada' },
-  { key: 'imagen',         label: 'Imagen',                  icon: ScanLine,      token: 'imagen',         def: 'la solicitud de imagen',        pendiente: 'una solicitud de imagen empezada' },
+  // `key` y `token` siguen diciendo `imagen` y no son un descuido: el primero
+  // viaja en la URL (`?tipo=imagen`) y el segundo nombra una variable de CSS.
+  // Lo que cambia es lo que LEE el médico. Ver el cambio 4 de `DOCUMENTOS_HANDOFF.md` §8.
+  { key: 'imagen',         label: 'Imagenología',            icon: ScanLine,      token: 'imagen',         def: 'la solicitud de imagenología',  pendiente: 'una solicitud de imagenología empezada' },
   { key: 'suplementacion', label: 'Suplementación',          icon: ClipboardList, token: 'suplementacion', def: 'el plan de suplementación',     pendiente: 'un plan de suplementación empezado' },
   { key: 'internamiento',  label: 'Internamiento',           icon: BedDouble,     token: 'internamiento',  def: 'la solicitud de internamiento', pendiente: 'una solicitud de internamiento empezada' },
   { key: 'escrito',        label: 'Escrito médico',          icon: PenLine,       token: 'escrito',        def: 'el escrito médico',             pendiente: 'un escrito médico empezado' },

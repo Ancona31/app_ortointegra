@@ -87,36 +87,36 @@ const PACIENTE_MINIMO: ValoresPaciente = {
 const MEDICAMENTOS_COMPLETO: readonly MedicamentoRecetado[] = [
   // 01 · completa — 75 pt
   {
-    comercial: 'Meloxicam Zydus',
+    nombre_comercial: 'Meloxicam Zydus',
     presentacion: 'Tabletas 15 mg, caja con 10',
-    generico: 'Meloxicam',
-    via: 'Oral',
+    principio_activo: 'Meloxicam',
+    via_administracion: 'Oral',
     indicacion: 'Una tableta cada 24 horas, después del desayuno, por 7 días.',
   },
   // 02 · sin genérico — 62 pt. La ranura colapsa entera: sin rótulo y sin línea.
   {
-    comercial: 'Diclofenaco Sódico Pisa',
+    nombre_comercial: 'Diclofenaco Sódico Pisa',
     presentacion: 'Solución inyectable 75 mg / 3 mL',
-    via: 'Intramuscular',
+    via_administracion: 'Intramuscular',
     indicacion: 'Una ampolleta cada 12 horas por 3 días, por personal de salud.',
   },
   // 03 · sin indicación — 58 pt
   {
-    comercial: 'Voltaren Emulgel',
+    nombre_comercial: 'Voltaren Emulgel',
     presentacion: 'Gel 1 %, tubo con 60 g',
-    generico: 'Diclofenaco dietilamonio',
-    via: 'Tópica',
+    principio_activo: 'Diclofenaco dietilamonio',
+    via_administracion: 'Tópica',
   },
   // 04 · solo el ancla — 45 pt. Sin vía declarada: sale oral por defecto (II.3 §2).
-  { comercial: 'Tempra', presentacion: 'Tabletas 500 mg, caja con 20' },
+  { nombre_comercial: 'Tempra', presentacion: 'Tabletas 500 mg, caja con 20' },
 ]
 
 /** Un solo medicamento con lo justo: la entrada mínima del formato. */
 const MEDICAMENTOS_MINIMO: readonly MedicamentoRecetado[] = [
   {
-    comercial: 'Naproxeno Sódico Ultra',
+    nombre_comercial: 'Naproxeno Sódico Ultra',
     presentacion: 'Tabletas 550 mg, caja con 10',
-    generico: 'Naproxeno sódico',
+    principio_activo: 'Naproxeno sódico',
   },
 ]
 
@@ -129,10 +129,10 @@ const MEDICAMENTOS_MINIMO: readonly MedicamentoRecetado[] = [
 const MEDICAMENTOS_LLENO: readonly MedicamentoRecetado[] = Array.from(
   { length: 12 },
   (_, i) => ({
-    comercial: `Fármaco de control ${i + 1}`,
+    nombre_comercial: `Fármaco de control ${i + 1}`,
     presentacion: 'Tabletas 500 mg, caja con 20',
-    generico: 'Denominación genérica de control',
-    via: 'Subcutánea',
+    principio_activo: 'Denominación genérica de control',
+    via_administracion: 'Subcutánea',
     indicacion:
       'Una tableta cada 8 horas durante diez días, con alimentos, sin suspender antes de terminar el esquema.',
   }),

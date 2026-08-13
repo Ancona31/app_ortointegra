@@ -270,13 +270,46 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     }
 
-    let pdfGenerated = false
     // El blob y el desenlace de la persistencia se leen en el finally para
     // montar el modal posterior a la generación. Ver ModalDocumentoGenerado.
     let pdfBlob: Blob | null = null
     let guardado = false
+    let filaId: string | null = null
 
     try {
+      // ── LA FILA PRIMERO ───────────────────────────────────────────────
+      //    Invierte el orden que este formulario tenía —PDF, subida, fila—,
+      //    como los otros seis. **Aquí no hay folio que ganar y se invierte
+      //    igual**: el escrito médico es el único formato sin clase de folio —el
+      //    generador no lo contempla y su columna queda NULL, porque no son
+      //    documentos seriados—. Lo que se gana es un solo orden en los siete
+      //    formularios: quien lea el siguiente no tiene que averiguar cuál de
+      //    los dos sigue este.
+      const supabase = offlineMode ? null : createClient()
+      if (supabase) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('No autenticado')
+
+        const insertPayload: Record<string, unknown> = {
+          tipo: 'escrito_medico',
+          contenido: docContenido,
+          client_id: clientId,
+          subido_por: user.id,
+        }
+        if (pacienteId) insertPayload.paciente_id = pacienteId
+
+        const { data, error } = await supabase
+          .from('documentos')
+          .insert(insertPayload)
+          .select('id')
+          .single()
+        if (error) throw error
+        filaId = data.id
+        // La fila está en el expediente. Aunque el PDF falle después, el
+        // documento es recuperable desde la lista con su botón de regenerar.
+        guardado = true
+      }
+
       const medicoData = medicoInfo ? {
         nombre: medicoInfo.nombre,
         titulo: medicoInfo.titulo ?? null,
@@ -317,9 +350,9 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
         entregar: !!offlineMode,
       })
 
-      pdfGenerated = true
       pdfBlob = blob
 
+      // La ruta del archivo, sobre la fila que ya existe.
       if (offlineMode) {
         const { addDocument } = await import('@/lib/offline/db')
         const { getOfflineIdentity } = await import('@/lib/offline/identity')
@@ -335,36 +368,33 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
         toast.success('Escrito medico guardado en bunker offline')
         onOfflineSave?.()
       } else {
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('No autenticado')
-
-        const insertPayload: Record<string, unknown> = {
-          tipo: 'escrito_medico',
-          contenido: docContenido,
-          client_id: clientId,
-          pdf_url: storagePath,
-          subido_por: user.id,
+        if (storagePath && filaId && supabase) {
+          // Este UPDATE no toca ni el estado ni el folio, así que el trigger lo
+          // deja pasar. No es fatal si falla: la fila está y el PDF se entrega
+          // igual; lo que se pierde es la descarga desde la lista, que el botón
+          // de regenerar repone.
+          const { error } = await supabase
+            .from('documentos')
+            .update({ pdf_url: storagePath })
+            .eq('id', filaId)
+          if (error) console.error('[EscritoMedicoForm] update pdf_url:', error.message)
         }
-        if (pacienteId) insertPayload.paciente_id = pacienteId
-
-        const { error } = await supabase.from('documentos').insert(insertPayload)
-        if (error) throw error
-
-        // Sin storagePath la fila se inserta igual pero sin PDF en Storage:
-        // mobileShare captura el error de subida y no lo relanza. El documento
-        // no queda recuperable desde la lista y el modal tiene que decirlo.
-        guardado = storagePath !== null
         toast.success('Escrito guardado')
       }
     } catch (err) {
-      if (!pdfGenerated) {
-        toast.error('No se pudo generar el PDF. Intenta de nuevo.')
-        setErrorGuardado('No se pudo generar el PDF. Intenta de nuevo.')
+      // Tres desenlaces, como en los otros seis, y sin folio que citar en el del
+      // medio: este formato no lo tiene.
+      let msg: string
+      if (offlineMode) {
+        msg = 'No se pudo generar el PDF. Intenta de nuevo.'
+      } else if (filaId === null) {
+        msg = 'No se pudo guardar el escrito, así que no se generó el PDF. Intenta de nuevo.'
       } else {
-        toast.error('Escrito generado pero no se pudo guardar. Revisa errores de sincronización.')
-        setErrorGuardado('Error al guardar el escrito.')
+        msg = 'El escrito quedó registrado, pero no se pudo generar el PDF. Búscalo en la lista de '
+          + 'documentos del paciente y recupéralo desde ahí.'
       }
+      toast.error(msg)
+      setErrorGuardado(msg)
       console.error('[EscritoMedicoForm] imprimir falló:', err)
     } finally {
       setImprimiendo(false)

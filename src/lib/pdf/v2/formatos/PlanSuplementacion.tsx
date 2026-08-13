@@ -271,7 +271,7 @@ export interface PlanSuplementacionProps {
    */
   readonly paciente: ValoresPaciente
   /** `seleccionados[]` bloquea emisión en el formulario: al menos uno (II.4 §2). */
-  readonly suplementos: readonly SuplementoIndicado[]
+  readonly seleccionados: readonly SuplementoIndicado[]
   /** Fecha y hora de emisión, YA compuestas por quien llama. Colapsa si no viene. */
   readonly emision?: string
   /** Cuerpo del bloque de notas adicionales. Colapsa entero si no viene. */
@@ -402,7 +402,7 @@ export default function PlanSuplementacion({
   panel,
   acento,
   paciente,
-  suplementos,
+  seleccionados,
   emision,
   notas,
   cita,
@@ -449,7 +449,7 @@ export default function PlanSuplementacion({
         }}
         contador={{
           items: ITEMS,
-          total: suplementos.length,
+          total: seleccionados.length,
           lamina: 'suplementacion',
         }}
         cierre={
@@ -532,7 +532,7 @@ export default function PlanSuplementacion({
           simplemente no existe en la llamada, que es lo que hace que la comprobación de
           II.4 §4 se lea de un vistazo.
         */}
-        {suplementos.map((suplemento, indice) => (
+        {seleccionados.map((suplemento, indice) => (
           <EntradaNumerada
             // El índice ES la identidad: dos renglones pueden indicar el mismo producto
             // a distinta pauta y lo único que los distingue es su orden.

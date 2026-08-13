@@ -259,17 +259,17 @@ export type CasoSuplementacion =
 const CASOS: Record<
   CasoSuplementacion,
   {
-    suplementos: readonly SuplementoIndicado[]
+    seleccionados: readonly SuplementoIndicado[]
     paciente: ValoresPaciente
     folio: string
     cierre: boolean
   }
 > = {
-  completo: { suplementos: SUPLEMENTOS_COMPLETO, paciente: PACIENTE_COMPLETO, folio: FOLIO_COMPLETO, cierre: true },
-  minimo: { suplementos: SUPLEMENTOS_MINIMO, paciente: PACIENTE_SIN_PESO, folio: FOLIO_MINIMO, cierre: false },
-  lleno: { suplementos: SUPLEMENTOS_LLENO, paciente: PACIENTE_COMPLETO, folio: FOLIO_LLENO, cierre: true },
-  catalogo: { suplementos: SUPLEMENTOS_CATALOGO, paciente: PACIENTE_COMPLETO, folio: FOLIO_CATALOGO, cierre: true },
-  marcaLarga: { suplementos: SUPLEMENTOS_MARCA_LARGA, paciente: PACIENTE_COMPLETO, folio: FOLIO_MARCA_LARGA, cierre: true },
+  completo: { seleccionados: SUPLEMENTOS_COMPLETO, paciente: PACIENTE_COMPLETO, folio: FOLIO_COMPLETO, cierre: true },
+  minimo: { seleccionados: SUPLEMENTOS_MINIMO, paciente: PACIENTE_SIN_PESO, folio: FOLIO_MINIMO, cierre: false },
+  lleno: { seleccionados: SUPLEMENTOS_LLENO, paciente: PACIENTE_COMPLETO, folio: FOLIO_LLENO, cierre: true },
+  catalogo: { seleccionados: SUPLEMENTOS_CATALOGO, paciente: PACIENTE_COMPLETO, folio: FOLIO_CATALOGO, cierre: true },
+  marcaLarga: { seleccionados: SUPLEMENTOS_MARCA_LARGA, paciente: PACIENTE_COMPLETO, folio: FOLIO_MARCA_LARGA, cierre: true },
 }
 
 function HojaSuplementacion({
@@ -295,7 +295,7 @@ function HojaSuplementacion({
         panel={{ variante: 'logo', acento, logo: medico.logo }}
         acento={acento}
         paciente={c.paciente}
-        suplementos={c.suplementos}
+        seleccionados={c.seleccionados}
         emision={EMISION}
         notas={c.cierre ? NOTAS : undefined}
         cita={c.cierre ? CITA : undefined}

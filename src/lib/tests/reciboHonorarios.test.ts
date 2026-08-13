@@ -225,7 +225,17 @@ function conceptos(cuantos: number, origen = false): readonly ConceptoCobrado[] 
   return Array.from({ length: cuantos }, (_, i) => ({
     concepto: `Concepto de control ${i + 1}`,
     precio: '$1,314.29',
-    ...(origen ? { origen: i % 2 === 0 ? ('propio' as const) : ('tercero' as const) } : {}),
+    // Texto libre, que es lo que el formulario guarda: dos de los cuatro orígenes
+    // que sugiere, alternados. No `propio`/`tercero`, que era la unión que este
+    // campo declaraba y que nadie ha guardado nunca.
+    //
+    // ⚠ LOS DOS CORTOS, Y NO POR COMODIDAD: la columna de origen mide 66 pt y a
+    // 7 pt en versalita le caben unos 17 caracteres, así que `Honorarios médicos`
+    // y `Material e implantes` —dos de las cuatro sugerencias del formulario—
+    // ENVUELVEN, y la fila pasa de 17.63 pt a 30.63. La medición de más abajo
+    // supone la fila de un renglón, que es la que 2.G declara. Que los otros dos
+    // no quepan es un desajuste de ANCHO, no de nombre: no se resuelve aquí.
+    ...(origen ? { origen: i % 2 === 0 ? 'Anestesiólogo' : 'Hospital' } : {}),
   }))
 }
 
@@ -240,10 +250,10 @@ const QR =
 
 const COTIZACION: ReciboHonorariosProps = {
   ...CHASIS,
-  tipo: 'cotizacion',
+  tipo_doc: 'cotizacion',
   paciente: { paciente: PACIENTE, fecha: '8 ago 2026', vigencia: '30 días naturales' },
   procedimiento: PROCEDIMIENTO,
-  conceptos: conceptos(4, true),
+  lineas: conceptos(4, true),
   aseguradora: {
     nombre: 'Grupo Nacional Provincial',
     poliza: 'GNP-4471-882301',
@@ -253,7 +263,7 @@ const COTIZACION: ReciboHonorariosProps = {
     { etiqueta: 'Honorarios del médico', importe: '$45,000.00' },
     { etiqueta: 'Estimado de terceros', importe: '$145,000.00' },
   ],
-  total: '$190,000.00',
+  monto: '$190,000.00',
   divisa: { codigo: 'MXN', nombre: 'Pesos mexicanos' },
   notas: 'Los importes marcados como estimado de terceros son referencia de costos.',
   folio: 'Q-4F17A20C93B6',
@@ -268,11 +278,11 @@ const COTIZACION_SIN_ASEGURADORA: ReciboHonorariosProps = {
 
 const RECIBO: ReciboHonorariosProps = {
   ...CHASIS,
-  tipo: 'recibo',
+  tipo_doc: 'honorarios',
   paciente: { paciente: PACIENTE, fecha: '8 ago 2026' },
   procedimiento: PROCEDIMIENTO,
-  conceptos: conceptos(14),
-  total: '$18,400.00',
+  lineas: conceptos(14),
+  monto: '$18,400.00',
   divisa: { codigo: 'USD', nombre: 'Dólares estadounidenses' },
   anticipo: {
     etiqueta: 'Anticipo recibido',
@@ -280,7 +290,7 @@ const RECIBO: ReciboHonorariosProps = {
     fecha: '12 jul 2026',
     saldo: { etiqueta: 'Saldo pendiente', importe: '$12,400.00' },
   },
-  formaPago: 'Transferencia electrónica',
+  forma_pago: 'Transferencia electrónica',
   notas: 'Todos los conceptos corresponden a honorarios del médico que suscribe.',
   folio: 'R-B8570E3FA164',
 }
@@ -293,9 +303,9 @@ const RECIBO: ReciboHonorariosProps = {
 const MINIMO: ReciboHonorariosProps = {
   ...RECIBO,
   paciente: { paciente: '', fecha: '8 ago 2026' },
-  conceptos: conceptos(1),
+  lineas: conceptos(1),
   anticipo: undefined,
-  formaPago: 'Efectivo',
+  forma_pago: 'Efectivo',
 }
 
 /** Un `Document` con un solo `Page`, que es lo que ocurre en emisión real. */
@@ -463,7 +473,7 @@ describe('II.5 · Recibo de Honorarios / Cotización', () => {
       entera en la hoja 1 y la hoja que se comprime —la que cierra— no tiene una sola fila que
       medir. Se recorren TODAS las hojas y TODAS las parejas consecutivas.
     */
-    const hojas = await componer({ ...RECIBO, conceptos: conceptos(30) })
+    const hojas = await componer({ ...RECIBO, lineas: conceptos(30) })
     expect(hojas.length).toBeGreaterThan(1)
 
     const esperado =
@@ -499,11 +509,11 @@ describe('II.5 · Recibo de Honorarios / Cotización', () => {
     expect(enCotizacion).toContain('ASEGURADORA')
     expect(enCotizacion).toContain('GNP-4471-882301')
     expect(enRecibo).not.toContain('ASEGURADORA')
-    // 4 · la columna de origen y sus dos marcas
+    // 4 · la columna de origen, con el texto libre tal como llega y en versalita
     expect(enCotizacion).toContain('ORIGEN')
-    expect(enCotizacion).toContain('PROPIO')
-    expect(enCotizacion).toContain('TERCERO')
-    expect(enRecibo).not.toContain('PROPIO')
+    expect(enCotizacion).toContain('ANESTESIÓLOGO')
+    expect(enCotizacion).toContain('HOSPITAL')
+    expect(enRecibo).not.toContain('ANESTESIÓLOGO')
     // 5 · los subtotales
     expect(enCotizacion).toContain('Estimado de terceros')
     expect(enRecibo).not.toContain('Estimado de terceros')

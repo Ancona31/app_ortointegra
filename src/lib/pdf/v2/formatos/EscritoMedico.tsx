@@ -301,7 +301,7 @@ export interface EscritoMedicoProps {
    * 20 pt con la fecha sola y su filete. Envuelve a los renglones que haga falta y nunca se
    * recorta.
    */
-  readonly titulo?: string
+  readonly asunto?: string
   /**
    * EL NOMBRE DEL DOCUMENTO EN LA BANDA DE PIE. **Es un campo aparte, no un truncado del
    * título** (`CONCILIA D41`): el encabezado puede llevar una constancia de tres renglones y
@@ -546,13 +546,13 @@ export default function EscritoMedico({
   consultorio,
   panel,
   acento,
-  titulo,
+  asunto,
   tituloPie,
   fecha,
   cuerpo,
   rubrica,
 }: EscritoMedicoProps): ReactElement {
-  const hayTitulo = tieneValor(titulo)
+  const hayTitulo = tieneValor(asunto)
   /**
    * EL NOMBRE DEL DOCUMENTO, en cascada: el campo propio, el título del encabezado y el
    * genérico. Lo usan la banda de pie y el rótulo de las hojas de continuación, que son los
@@ -561,7 +561,7 @@ export default function EscritoMedico({
   const nombre = tieneValor(tituloPie)
     ? tituloPie
     : hayTitulo
-      ? titulo
+      ? asunto
       : TITULO_PIE_POR_DEFECTO
 
   /**
@@ -591,7 +591,7 @@ export default function EscritoMedico({
             siempre. Por eso `tituloAusente` es un booleano y no un título vacío: sin título
             el documento sigue teniendo nombre. Ver esas dos props en 2.V.
           */
-          titulo: hayTitulo ? titulo : nombre,
+          titulo: hayTitulo ? asunto : nombre,
           nombreDocumento: nombre,
           tituloAusente: !hayTitulo,
           fecha,

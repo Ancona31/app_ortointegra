@@ -16,7 +16,7 @@
  *
  * En la **cotización**, las trece diferencias por el lado que las lleva: tres celdas en
  * el riel con la de vigencia sobre fondo, la caja de aseguradora enmarcada, la columna
- * de origen con sus dos marcas distinguidas por peso y tinta, los dos subtotales sobre
+ * de origen con el texto libre del formulario en versalita, los dos subtotales sobre
  * el filete, el rótulo `Total estimado`, el QR encima de la firma y el folio con `Q-`.
  *
  * En el **recibo**, las mismas trece por el lado contrario: dos celdas, sin aseguradora,
@@ -68,16 +68,26 @@ const PACIENTE_VACIO = { paciente: '', fecha: '8 ago 2026' }
 /** El procedimiento, bajo el título y con su rótulo. */
 const PROCEDIMIENTO = 'Artrodesis lumbar instrumentada L4-L5'
 
-/** Los cuatro conceptos de la cotización, con mezcla de origen. */
+/**
+ * Los cuatro conceptos de la cotización, con mezcla de origen.
+ *
+ * Los orígenes son los que el formulario sugiere y guarda —texto libre, no las marcas
+ * `propio` y `tercero` que este campo declaraba—, así que la hoja mide lo que se
+ * imprime de verdad: cadenas de ancho desigual en una columna de 66 pt.
+ */
 const CONCEPTOS_COTIZACION: readonly ConceptoCobrado[] = [
   {
     concepto: 'Honorarios del cirujano · artrodesis L4-L5',
-    origen: 'propio',
+    origen: 'Honorarios médicos',
     precio: '$45,000.00',
   },
-  { concepto: 'Honorarios del anestesiólogo', origen: 'tercero', precio: '$18,000.00' },
-  { concepto: 'Estancia hospitalaria · dos noches', origen: 'tercero', precio: '$62,000.00' },
-  { concepto: 'Material de osteosíntesis e implantes', origen: 'tercero', precio: '$65,000.00' },
+  { concepto: 'Honorarios del anestesiólogo', origen: 'Anestesiólogo', precio: '$18,000.00' },
+  { concepto: 'Estancia hospitalaria · dos noches', origen: 'Hospital', precio: '$62,000.00' },
+  {
+    concepto: 'Material de osteosíntesis e implantes',
+    origen: 'Material e implantes',
+    precio: '$65,000.00',
+  },
 ]
 
 /** Los catorce del recibo. Sin origen: en este caso la columna no existe. */
@@ -152,10 +162,10 @@ type DatosCaso = SinChasis<ReciboHonorariosProps>
 function datosDelCaso(caso: CasoHonorarios, qr: string): DatosCaso {
   if (caso === 'cotizacion') {
     return {
-      tipo: 'cotizacion',
+      tipo_doc: 'cotizacion',
       paciente: PACIENTE,
       procedimiento: PROCEDIMIENTO,
-      conceptos: CONCEPTOS_COTIZACION,
+      lineas: CONCEPTOS_COTIZACION,
       aseguradora: {
         nombre: 'Grupo Nacional Provincial',
         poliza: 'GNP-4471-882301',
@@ -165,7 +175,7 @@ function datosDelCaso(caso: CasoHonorarios, qr: string): DatosCaso {
         { etiqueta: 'Honorarios del médico', importe: '$45,000.00' },
         { etiqueta: 'Estimado de terceros', importe: '$145,000.00' },
       ],
-      total: '$190,000.00',
+      monto: '$190,000.00',
       divisa: { codigo: 'MXN', nombre: 'Pesos mexicanos' },
       notas: NOTAS_COTIZACION,
       folio: FOLIO_COTIZACION,
@@ -175,11 +185,11 @@ function datosDelCaso(caso: CasoHonorarios, qr: string): DatosCaso {
 
   if (caso === 'recibo') {
     return {
-      tipo: 'recibo',
+      tipo_doc: 'honorarios',
       paciente: PACIENTE,
       procedimiento: 'Programa de rehabilitación de rodilla derecha',
-      conceptos: CONCEPTOS_RECIBO,
-      total: '$18,400.00',
+      lineas: CONCEPTOS_RECIBO,
+      monto: '$18,400.00',
       divisa: { codigo: 'USD', nombre: 'Dólares estadounidenses' },
       anticipo: {
         etiqueta: 'Anticipo recibido',
@@ -187,19 +197,19 @@ function datosDelCaso(caso: CasoHonorarios, qr: string): DatosCaso {
         fecha: '12 jul 2026',
         saldo: { etiqueta: 'Saldo pendiente', importe: '$12,400.00' },
       },
-      formaPago: 'Transferencia electrónica',
+      forma_pago: 'Transferencia electrónica',
       notas: NOTAS_RECIBO,
       folio: FOLIO_RECIBO,
     }
   }
 
   return {
-    tipo: 'recibo',
+    tipo_doc: 'honorarios',
     paciente: PACIENTE_VACIO,
-    conceptos: CONCEPTOS_MINIMO,
-    total: '$1,200.00',
+    lineas: CONCEPTOS_MINIMO,
+    monto: '$1,200.00',
     divisa: { codigo: 'MXN', nombre: 'Pesos mexicanos' },
-    formaPago: 'Efectivo',
+    forma_pago: 'Efectivo',
     notas: NOTAS_MINIMO,
     folio: FOLIO_MINIMO,
   }

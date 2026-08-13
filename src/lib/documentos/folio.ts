@@ -48,6 +48,66 @@ export const PREFIJO_POR_CLASE = {
 export type ClaseFolio = keyof typeof PREFIJO_POR_CLASE
 
 /**
+ * QUÉ FORMATOS LLEVAN EL FOLIO DE LA SERIE IMPRESO EN EL PAPEL — y los tres que
+ * no, cada uno por su motivo.
+ *
+ * ── POR QUÉ ESTO EXISTE, Y POR QUÉ AQUÍ ─────────────────────────────────────
+ *
+ * Tiene DOS consumidores que están obligados a coincidir: el formulario que
+ * emite el documento y el botón que lo REGENERA meses después. Si el segundo
+ * imprimiera el folio donde el primero no lo imprimió, el papel recuperado no
+ * sería el papel entregado — que es justo lo que el guard de `formato_version`
+ * existe para impedir por la otra vía, la del chasis.
+ *
+ * Escrito en dos sitios sería el «espejo manual» que ya lastra
+ * `FORMATO_VERSION_GENERADOR`: dos listas que nadie recuerda mover a la vez.
+ *
+ * ── LOS TRES QUE NO ─────────────────────────────────────────────────────────
+ *
+ *   `receta`                  Lleva folio, pero **el suyo**: el `R-…` que el
+ *                             formulario genera, que va dentro de `contenido` y
+ *                             que resuelve el QR de verificación pública
+ *                             (`/r/[folio]`). La serie `RX-…` de la columna
+ *                             existe y no se imprime: dos números en la misma
+ *                             ranura obligarían a decidir cuál se cita, y el que
+ *                             está impreso hoy es el que verifica.
+ *   `solicitud_internamiento` La fila lleva `INT-…` y el papel no lo dice, y las
+ *                             dos cosas son ciertas a la vez: el expediente
+ *                             numera todo lo que emite porque una serie con
+ *                             huecos no se audita; nadie va a citar ese número
+ *                             desde el hospital. Decisión reconfirmada — ver
+ *                             `DOCUMENTOS_RANURAS_MUERTAS.md` §4.
+ *   `escrito_medico`          **No tiene clase de folio.** El generador no lo
+ *                             contempla y su columna queda NULL: no son
+ *                             documentos seriados.
+ */
+const IMPRIME_FOLIO_DE_SERIE: ReadonlySet<string> = new Set([
+  'solicitud_lab',
+  'solicitud_imagen',
+  'plan_suplementacion',
+  'nota_honorarios',
+  'consentimiento_informado',
+  'denegacion_consentimiento',
+])
+
+/**
+ * El folio que va al PDF, o `undefined` si ese formato no lo imprime.
+ *
+ * Lo llaman los formularios al emitir y el botón de regenerar al reproducir, y
+ * por eso no admite un `tipo` tipado: el segundo lee `documentos.tipo` de una
+ * fila, que es `string` y puede traer tipos que ningún formulario emite —subidas
+ * clínicas, informes—. Los que no están en la lista no imprimen folio, que es la
+ * respuesta correcta para todos ellos.
+ */
+export function folioImpreso(
+  tipo: string,
+  folioDeFila: string | null | undefined,
+): string | undefined {
+  if (folioDeFila === null || folioDeFila === undefined || folioDeFila === '') return undefined
+  return IMPRIME_FOLIO_DE_SERIE.has(tipo) ? folioDeFila : undefined
+}
+
+/**
  * La forma canónica: `RX-2026-0042`. Cuatro dígitos de año, cuatro de
  * correlativo — o más, porque la serie 10 000 se ensancha, no se trunca.
  *

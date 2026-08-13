@@ -12,6 +12,10 @@
  * PARÁMETRO `columnas` del formato, con 2 por defecto: la celda y su fórmula de alto no
  * cambian. Ver `columnas` en `BloqueFirmasProps`, que es donde queda declarado.
  *
+ * ⚠ **Y UNA CELDA PUEDE SER UN HUECO.** `pareja` y `retícula` admiten `null` en cualquier
+ * posición: reserva la columna y no compone firma. Existe porque una raya de firma vacía
+ * afirma que ahí faltó alguien. Ver `CeldaFirma`.
+ *
  * REGLA 1 — EL ALTO DE LA FIRMA NO DEPENDE DE LA HOJA
  *
  * `firma.espacio` son 77 pt **en las tres variantes**. Lo que cambia entre ellas
@@ -450,10 +454,17 @@ export interface Firma {
    */
   readonly rol: string
   /**
-   * Nombre de quien firma. **Puede faltar y su renglón NO colapsa**: un testigo
-   * sin nombre deja su línea —y el renglón de abajo— para llenarse a mano
-   * (II.7 §5, NOM-004). Colapsarlo dejaría dos firmas vecinas de alto distinto y
-   * quitaría el sitio donde se escribe el nombre.
+   * Nombre de quien firma. **Puede faltar y su renglón NO colapsa**: la firma del
+   * paciente de II.6 se compone sin nombre a propósito —la escribe él en Admisión—
+   * y colapsar el renglón dejaría dos firmas vecinas de alto distinto y quitaría el
+   * sitio donde se escribe.
+   *
+   * ⚠ **QUE EL RENGLÓN NO COLAPSE NO SIGNIFICA QUE LA CELDA SE COMPONGA SIEMPRE.**
+   * Son dos decisiones distintas y viven en dos sitios: aquí se decide qué pasa
+   * DENTRO de una celda que ya existe; **si esa celda existe lo decide el formato**,
+   * que es el único que sabe a quién se le pidió firmar. Un formato con firmantes
+   * opcionales —II.7 y II.9— pasa `null` en el hueco de quien no lo es. Ver
+   * `CeldaFirma`.
    */
   readonly nombre?: string
   /**
@@ -507,6 +518,34 @@ export interface Firma {
    */
   readonly sello?: ReactNode
 }
+
+/**
+ * EL HUECO DE RETÍCULA — **una celda que reserva su columna y no compone ninguna firma**.
+ *
+ * ══ QUÉ DEFECTO CIERRA ═════════════════════════════════════════════════════
+ *
+ * Antes el hueco se rellenaba con una `Firma` de rol en blanco —`CELDA_VACIA` en II.7— y
+ * eso **componía una rúbrica entera vacía**: rol, 77 pt de espacio de escritura, la línea
+ * de 0.47 y sus dos renglones. En el papel eso es una raya de firma, y una raya de firma
+ * vacía dice que ahí faltó alguien.
+ *
+ * Es el mismo defecto que el recuento del cierre de II.7 tenía por otra vía —«5 firmantes
+ * previstos, 2 firmaron, 3 omitidos» sobre personas a las que nadie pidió nada— y se cierra
+ * con el mismo criterio: **el documento hace constar quién firmó; solo declara ausencias
+ * cuando las hubo**. Cuatro rayas en blanco son cuatro ausencias declaradas sin palabras.
+ *
+ * ══ POR QUÉ UN HUECO Y NO UNA COLUMNA MENOS ════════════════════════════════
+ *
+ * Porque la caja de firma del sistema mide lo que mide. Colapsar la retícula a una columna
+ * daría una celda de 486 pt y una línea de firma del doble de larga que las demás del mismo
+ * documento; el hueco conserva los 228 y con ellos el peso de la firma. Es la razón que ya
+ * declaraba II.7 en su nivel 2 y sigue siendo la misma.
+ *
+ * ⚠ **NO ES «UNA FIRMA SIN DATOS».** Una `Firma` sin nombre SÍ se compone —ver `nombre`—;
+ * `null` es que ahí no hay firmante. Quien pase uno donde quería el otro cambia lo que el
+ * papel afirma, no cómo se ve.
+ */
+export type CeldaFirma = Firma | null
 
 /** Qué lámina fija la línea, el aire y los dos renglones de abajo. */
 interface ConLamina {
@@ -566,10 +605,13 @@ export type BloqueFirmasProps = ConLamina &
      * tampoco. Ver la nota de `Lamina` en la capa de tokens.
      */
     | { variante: 'simple'; firmas: readonly [Firma]; ancho?: number }
-    /** Dos firmas en la misma fila. */
-    | { variante: 'pareja'; firmas: readonly [Firma, Firma] }
-    /** De 3 a 6 firmas, en dos columnas —o en las que declare `columnas`—. */
-    | { variante: 'reticula'; firmas: readonly Firma[]; columnas?: number }
+    /**
+     * Dos celdas en la misma fila. Cualquiera de las dos puede ser un HUECO —`null`—,
+     * que reserva su columna sin componer firma. Ver `CeldaFirma`.
+     */
+    | { variante: 'pareja'; firmas: readonly [CeldaFirma, CeldaFirma] }
+    /** De 3 a 6 celdas, en dos columnas —o en las que declare `columnas`—. */
+    | { variante: 'reticula'; firmas: readonly CeldaFirma[]; columnas?: number }
   )
 
 /** Una firma: rol encima, espacio de escritura, línea, y la identificación. */
@@ -663,14 +705,16 @@ function UnaFirma({
 }
 
 /**
- * Parte las firmas en filas de `columnas`. Con dos es la retícula que la ficha declaraba y el
+ * Parte las celdas en filas de `columnas`. Con dos es la retícula que la ficha declaraba y el
  * reparto no cambia; con tres cabe una sola fila. Ver `columnas` en `BloqueFirmasProps`.
+ *
+ * Los huecos ocupan sitio en el reparto como cualquier celda: de eso se trata.
  */
 function enFilas(
-  firmas: readonly Firma[],
+  firmas: readonly CeldaFirma[],
   columnas: number,
-): readonly (readonly Firma[])[] {
-  const filas: Firma[][] = []
+): readonly (readonly CeldaFirma[])[] {
+  const filas: CeldaFirma[][] = []
   firmas.forEach((firma, indice) => {
     if (indice % columnas === 0) filas.push([firma])
     else filas[filas.length - 1].push(firma)
@@ -725,18 +769,27 @@ export default function BloqueFirmas(props: BloqueFirmasProps): ReactElement {
 
   return (
     <View wrap={false}>
-      {filas.map((fila) => (
-        <View key={fila[0].rol} style={estilos.fila}>
+      {/*
+        LA IDENTIDAD DE UNA CELDA ES SU POSICIÓN, y por eso las claves son índices y ya no
+        el rol: un hueco no tiene rol, y dos huecos de la misma fila tendrían el mismo. En
+        una retícula que se compone de una vez y no se reordena, la posición ES la
+        identidad — el mismo criterio que los renglones de la zona de escritura de II.7.
+      */}
+      {filas.map((fila, indiceFila) => (
+        <View key={indiceFila} style={estilos.fila}>
           {fila.map((firma, columna) => (
             <View
-              key={firma.rol}
+              key={columna}
               style={[
                 { width: ancho },
                 columna === 0 ? {} : { marginLeft: medianil },
                 conPaddingDeFila ? estilos.celdaEnReticula : {},
               ]}
             >
-              <UnaFirma firma={firma} calibracion={calibracion} />
+              {/* El hueco reserva su columna y no compone nada. Ver `CeldaFirma`. */}
+              {firma === null ? null : (
+                <UnaFirma firma={firma} calibracion={calibracion} />
+              )}
             </View>
           ))}
         </View>

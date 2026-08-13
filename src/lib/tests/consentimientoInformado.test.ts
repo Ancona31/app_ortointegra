@@ -312,7 +312,7 @@ const SIN_ANEXO: ConsentimientoInformadoProps = {
 }
 
 /** Por sustitución: el familiar firma en el nivel 1 y el nivel 2 desaparece. */
-const SUSTITUCION: ConsentimientoInformadoProps = { ...COMPLETO, sustitucion: true }
+const SUSTITUCION: ConsentimientoInformadoProps = { ...COMPLETO, pacienteNoPuedeFirmar: true }
 
 
 /** Un `Document` con un solo `Page`, que es lo que ocurre en emisión real. */
@@ -501,7 +501,7 @@ describe('II.7 · Consentimiento Informado', () => {
   }, 200_000)
 
   it('por sustitución el recuento cuenta CUATRO, no cinco', async () => {
-    const hojas = await componer({ ...COMPLETO, sustitucion: true })
+    const hojas = await componer({ ...COMPLETO, pacienteNoPuedeFirmar: true })
 
     /*
       El paciente no firma y su celda no existe, así que contarlo lo declararía omitido a
@@ -540,6 +540,79 @@ describe('II.7 · Consentimiento Informado', () => {
     // Lo que NO puede decir: que faltara nadie.
     expect(cierre).not.toContain('omitido')
     expect(cierre).not.toContain(sinLigadura('firmantes previstos'))
+  }, 200_000)
+
+  /**
+   * ⚠ EL SEGUNDO DEFECTO DEL MISMO CASO, Y EL QUE QUEDABA VIVO. El recuento dejó de
+   * declarar ausencias inventadas, pero **las celdas se seguían componiendo vacías**: rol,
+   * 77 pt de espacio de escritura, línea y nota. Cuatro rayas de firma en blanco dicen que
+   * faltaron cuatro personas, que es lo mismo que el «3 omitidos» retirado, dicho sin
+   * palabras y en el sitio donde más se mira.
+   */
+  it('sin familiar ni testigos NO se compone ninguna celda suya, ni su hoja', async () => {
+    const sinNadie = await componer({
+      ...COMPLETO,
+      firmantes: {
+        medico: { rubrica: RASTER, sello: SELLO_MEDICO },
+        paciente: { nombre: PACIENTE, rubrica: RASTER, sello: SELLO_PACIENTE },
+        familiar: {},
+        testigo1: {},
+        testigo2: {},
+      },
+      identificaciones: undefined,
+    })
+
+    /*
+      LA HOJA ENTERA DESAPARECE. Con los cinco firmantes y sin anexo son cinco hojas —tres de
+      secciones, otorgamiento y la de representación y testigos—; sin nadie a quien
+      representar ni testigos que firmen, esa quinta no tiene nada que componer y el `break`
+      la habría abierto igualmente, numerada y con folio.
+    */
+    expect(sinNadie).toHaveLength(4)
+
+    const todo = sinNadie.map((hoja) => hoja.texto).join('')
+    // Ni los rótulos de nivel…
+    expect(todo).not.toContain('REPRESENTACIÓN')
+    expect(todo).not.toContain('TESTIGOS')
+    // …ni las celdas: el rol y la nota se componían aunque el nombre faltara.
+    expect(todo).not.toContain('TESTIGO 1')
+    expect(todo).not.toContain('TESTIGO 2')
+    expect(todo).not.toContain('Mayor de edad')
+    expect(todo).not.toContain('PARENTESCO CON EL PACIENTE')
+
+    // Y el nivel 1 sigue entero: el otorgamiento es lo que este documento es.
+    expect(contiene(sinNadie[3], 'OTORGAMIENTO')).toBe(true)
+    expect(contiene(sinNadie[3], 'MÉDICO TRATANTE')).toBe(true)
+    expect(contiene(sinNadie[3], 'PACIENTE')).toBe(true)
+  }, 200_000)
+
+  it('con un solo testigo se compone su celda y no la del otro', async () => {
+    const hojas = await componer({
+      ...COMPLETO,
+      firmantes: {
+        medico: { rubrica: RASTER, sello: SELLO_MEDICO },
+        paciente: { nombre: PACIENTE, rubrica: RASTER, sello: SELLO_PACIENTE },
+        familiar: {},
+        testigo1: { nombre: 'Juan Canul Uc' },
+        testigo2: {},
+      },
+      identificaciones: undefined,
+    })
+    const firmas = hojas[hojas.length - 1]
+
+    expect(contiene(firmas, 'TESTIGO 1')).toBe(true)
+    expect(firmas.texto).not.toContain('TESTIGO 2')
+    // La nota de testigo se compone UNA vez: es lo que delata la celda del que no hay.
+    expect(firmas.renglones.filter((r) => r.texto === 'Mayor de edad')).toHaveLength(1)
+
+    /*
+      SIN FAMILIAR NO HAY NIVEL DE REPRESENTACIÓN, y entonces Testigos es el 2 — como en la
+      variante por sustitución, y por la misma razón: el número dice cuántos niveles hay
+      encima, no de qué variante se trata.
+    */
+    expect(firmas.texto).not.toContain('REPRESENTACIÓN')
+    expect(contiene(firmas, 'TESTIGOS')).toBe(true)
+    expect(firmas.renglones.filter((r) => r.texto === '3')).toHaveLength(0)
   }, 200_000)
 
   it('un testigo CON nombre que no firmó sí consta como omitido', async () => {
@@ -793,7 +866,7 @@ describe('II.7 · Consentimiento Informado', () => {
     it('la transfusión AUTORIZADA se compone con la redacción de v1', async () => {
       const hojas = await componer({
         ...COMPLETO,
-        autorizaciones: { transfusion: 'si' },
+        autorizaTransfusion: 'si',
       })
       expect(contiene(hojas[3], sinLigadura('Autorizo la transfusión de sangre'))).toBe(true)
     }, 200_000)
@@ -806,7 +879,7 @@ describe('II.7 · Consentimiento Informado', () => {
     it('la transfusión RECHAZADA se compone, y dice que se rechazó', async () => {
       const hojas = await componer({
         ...COMPLETO,
-        autorizaciones: { transfusion: 'no' },
+        autorizaTransfusion: 'no',
       })
       expect(contiene(hojas[3], sinLigadura('NO autorizo la transfusión'))).toBe(true)
       expect(contiene(hojas[3], 'asumiendo los riesgos')).toBe(true)
@@ -821,8 +894,8 @@ describe('II.7 · Consentimiento Informado', () => {
     }, 200_000)
 
     it('las fotografías solo se componen si se autorizaron', async () => {
-      const con = await componer({ ...COMPLETO, autorizaciones: { fotografias: true } })
-      const sin = await componer({ ...COMPLETO, autorizaciones: { fotografias: false } })
+      const con = await componer({ ...COMPLETO, autorizaFotos: true })
+      const sin = await componer({ ...COMPLETO, autorizaFotos: false })
 
       expect(contiene(con[3], sinLigadura('Autorizo la toma de fotografías'))).toBe(true)
       for (const hoja of sin) {
@@ -833,7 +906,8 @@ describe('II.7 · Consentimiento Informado', () => {
     it('las dos autorizaciones colapsan por separado', async () => {
       const hojas = await componer({
         ...COMPLETO,
-        autorizaciones: { transfusion: 'si', fotografias: false },
+        autorizaTransfusion: 'si',
+        autorizaFotos: false,
       })
       expect(contiene(hojas[3], sinLigadura('Autorizo la transfusión de sangre'))).toBe(true)
       expect(hojas[3].texto).not.toContain(sinLigadura('fotografías clínicas'))

@@ -11,6 +11,8 @@ import {
 import type { Documento } from '@/types'
 import ModalShell from '@/components/ui/ModalShell'
 import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
+import { FORMATO_VERSION_POR_DEFECTO, puedeComponer } from '@/lib/mobileShare'
+import { folioImpreso } from '@/lib/documentos/folio'
 import { createClient } from '@/lib/supabase/client'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
 import { useToast } from '@/components/ui/Toast'
@@ -23,7 +25,7 @@ const SIGNED_URL_TTL = 900 // 15 min
 const TIPO_DOC_LABEL: Record<string, string> = {
   receta: 'Receta',
   solicitud_lab: 'Solicitud de Laboratorio',
-  solicitud_imagen: 'Solicitud de Imagen',
+  solicitud_imagen: 'Solicitud de Imagenología',
   plan_suplementacion: 'Plan de Suplementación',
   informe_clinico: 'Informe Clínico',
   escrito_medico: 'Escrito Médico',
@@ -65,21 +67,6 @@ function iconForTipo(tipo: string) {
     default:                          return <File size={16} className="text-slate-400" />
   }
 }
-
-/**
- * Versión de formato que produce el generador de PDFs HOY.
- *
- * ⚠️  ESPEJO MANUAL de `buildClientElement` en `src/lib/mobileShare.ts` — el
- * punto único de ramificación v1/v2. Ese switch todavía NO ramifica (lo dice
- * su propio comentario), así que hoy todos los formatos salen v1. El día que
- * ramifique, ESTA constante se actualiza en el mismo commit; si se olvida, el
- * guard de regeneración bloquea o deja pasar el conjunto equivocado.
- *
- * No se importa de mobileShare porque allí no existe tal constante: la versión
- * está implícita en qué renderer elige el switch. Duplicar un número con esta
- * nota es preferible a inventar una capa de versionado para un solo consumidor.
- */
-const FORMATO_VERSION_GENERADOR = 1
 
 /**
  * Nombre con el que debe guardarse el PDF al descargarlo.
@@ -207,23 +194,41 @@ export default function ModalDocumentos({
    * en otro dispositivo cuyo archivo nunca llegó a subir. No hay papel
    * entregado que quede huérfano porque no hay papel.
    *
-   * GUARD DE FORMATO — lo único que se bloquea es reproducir un documento con
-   * un chasis de diseño distinto al que se emitió. Si `formato_version` no
-   * coincide con lo que produce el generador de hoy, el PDF saldría con otra
-   * apariencia que el original y dejaría de ser el mismo documento.
+   * ── SE REGENERA CON EL CHASIS CON QUE SE EMITIÓ, NO CON EL DE HOY ─────────
    *
-   * `?? FORMATO_VERSION_GENERADOR` no es un atajo: la migración
+   * `formato_version` de la fila viaja hasta `generarPdf`, que elige el
+   * renderer: v1 para las filas viejas y v2 para las nuevas. Antes esto era un
+   * guard de igualdad contra una constante local —«si no eres la versión que
+   * genero hoy, no te regenero»—, y el día que v2 se encienda eso habría dejado
+   * sin botón a los mil y pico documentos v1, que es justo lo contrario de lo
+   * que este botón existe para hacer.
+   *
+   * Lo que sí sigue bloqueándose es lo que este build NO sabe componer: un
+   * documento emitido con un chasis que esta versión de la app no lleva. Quien
+   * responde es `puedeComponer()`, en el mismo archivo que elige el renderer —
+   * ver su nota: la constante espejo que había aquí era una promesa de
+   * acordarse, no una garantía.
+   *
+   * `?? FORMATO_VERSION_POR_DEFECTO` no es un atajo: la migración
    * `20260804_documentos_formato_version.sql` declara la columna
-   * `NOT NULL DEFAULT 1`, o sea "todo lo que ya existe es v1". Mientras esa
-   * migración no se aplique, `formato_version` llega `undefined` a runtime; sin
-   * esta normalización el guard bloquearía los 497 documentos que precisamente
-   * viene a recuperar. Con ella el componente se comporta igual antes y después
-   * de aplicarla.
+   * `NOT NULL DEFAULT 1`, o sea «todo lo que ya existe es v1». Mientras no se
+   * aplique, `formato_version` llega `undefined` a runtime y sin esta
+   * normalización el guard bloquearía los documentos que viene a recuperar.
+   *
+   * ── Y CON EL FOLIO CON QUE SE EMITIÓ ─────────────────────────────────────
+   *
+   * `contenido.folio` primero: es el que el papel llevaba impreso —la receta
+   * guarda ahí el suyo, el del QR de verificación—. Si no hay, el de la columna,
+   * y solo para los formatos que lo imprimen: `folioImpreso()` es quien lo sabe,
+   * y es la misma función que usan los siete formularios al emitir. Sin ella,
+   * regenerar imprimiría el `INT-…` que la solicitud de internamiento
+   * deliberadamente no lleva.
    */
   async function regenerarYSubirPdf(doc: Documento) {
     if (!doc.contenido || regeneratingId) return
 
-    if ((doc.formato_version ?? FORMATO_VERSION_GENERADOR) !== FORMATO_VERSION_GENERADOR) {
+    const formatoVersion = doc.formato_version ?? FORMATO_VERSION_POR_DEFECTO
+    if (!puedeComponer(doc.tipo, formatoVersion)) {
       setBloqueoRegeneracion(true)
       return
     }
@@ -265,11 +270,15 @@ export default function ModalDocumentos({
       const { blob, storagePath } = await generarPdf({
         tipo: doc.tipo,
         medico: medicoData,
-        data: doc.contenido as Record<string, unknown>,
+        data: {
+          ...(doc.contenido as Record<string, unknown>),
+          folio: doc.contenido.folio ?? folioImpreso(doc.tipo, doc.folio),
+        },
         logoUrl,
         filename: generateDocFileName(pacienteNombre, tipoLabel),
         pacienteId: doc.paciente_id ?? undefined,
         entregar: false,
+        formatoVersion,
       })
 
       pdfBlob = blob
@@ -496,16 +505,21 @@ export default function ModalDocumentos({
       <ModalShell
         open={bloqueoRegeneracion}
         onClose={() => setBloqueoRegeneracion(false)}
-        title="Este documento usa un diseño anterior"
+        title="Este documento usa otro diseño"
         elevated
         maxWidth="max-w-sm"
       >
         <div className="px-5 py-4">
+          {/* «Otro» y no «anterior»: desde que la regeneración elige el chasis de
+              la fila, lo que este aviso significa es que esta versión de la app
+              no lleva ese diseño — y puede ser uno más nuevo, si el documento se
+              emitió desde un dispositivo ya actualizado. */}
           <p className="text-sm text-slate-600 mb-5">
-            Este documento se emitió con un diseño de documento anterior al que
-            usa el sistema hoy. No puede reproducirse tal como se entregó: el PDF
-            saldría con otra apariencia. Si necesita una copia, emita un documento
-            nuevo con la fecha de hoy.
+            Este documento se emitió con un diseño que esta versión de la
+            aplicación no puede componer. No puede reproducirse tal como se
+            entregó: el PDF saldría con otra apariencia. Actualiza la aplicación
+            o, si necesitas una copia ahora, emite un documento nuevo con la
+            fecha de hoy.
           </p>
           <div className="flex items-center justify-end">
             <button

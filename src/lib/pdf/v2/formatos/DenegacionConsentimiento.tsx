@@ -518,10 +518,25 @@ export default function DenegacionConsentimiento({
    * columnas quiere su lámina, y deducirlo en 2.L sería métrica decidida por el contenido en
    * tiempo de render (I.3.4). Aquí las dos cifras salen del mismo sitio —la variante— y por eso
    * se leen juntas. Ver `columnas` en la ficha de 2.L.
+   *
+   * ⚠ **Y UNA CELDA SIN NOMBRE NO SE COMPONE**, el mismo criterio que II.7. Aquí el caso es
+   * remoto —el formulario exige el familiar SIEMPRE en la denegación, y el paciente es campo
+   * obligatorio de los dos documentos— y se compone igual, porque lo que decide qué imprime el
+   * papel no puede ser una validación que vive en otro archivo. Una raya de firma en blanco
+   * afirma que ahí faltó alguien.
+   *
+   * **El médico no entra en la regla:** es el emisor y su nombre lo aporta el membrete.
+   *
+   * El mínimo de dos columnas es el ancho de celda del sistema: con una sola, la retícula
+   * repartiría los 486 pt enteros y la línea del médico mediría el doble que en cualquier otro
+   * documento.
    */
-  const firmas: readonly Firma[] = porSustitucion
-    ? [firmaMedico, firmaFamiliar]
-    : [firmaMedico, firmaPaciente, firmaFamiliar]
+  const firmas: readonly Firma[] = [
+    firmaMedico,
+    porSustitucion || !tieneValor(firmantes.paciente.nombre) ? null : firmaPaciente,
+    tieneValor(firmantes.familiar.nombre) ? firmaFamiliar : null,
+  ].filter((firma): firma is Firma => firma !== null)
+  const columnasDeFirma = Math.max(firmas.length, 2)
 
   return (
     <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.hoja}>
@@ -554,7 +569,7 @@ export default function DenegacionConsentimiento({
             variante="reticula"
             lamina={LAMINA}
             calibracion="compacta"
-            columnas={firmas.length}
+            columnas={columnasDeFirma}
             firmas={firmas}
           />
         }

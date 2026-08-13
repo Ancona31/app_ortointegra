@@ -14,6 +14,7 @@ import { useToast } from '@/components/ui/Toast'
 import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
 import ComboEscribible from '@/components/documentos/ComboEscribible'
 import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
+import { folioImpreso } from '@/lib/documentos/folio'
 import { createClient } from '@/lib/supabase/client'
 import { hoyEnTZ, desplazarFecha } from '@/lib/dates'
 import { enfocarYAcercar } from '@/lib/scrollDoc'
@@ -467,13 +468,50 @@ export default function NotaHonorariosForm({
         }),
     }
 
-    let pdfGenerated = false
     // El blob y el desenlace de la persistencia se leen en el finally para
     // montar el modal posterior a la generación. Ver ModalDocumentoGenerado.
     let pdfBlob: Blob | null = null
     let guardado = false
+    let filaId: string | null = null
+    let folio: string | null = null
 
     try {
+      // ── LA FILA PRIMERO, porque de ella sale el folio ─────────────────
+      //    Invierte el orden que este formulario tenía —PDF, subida, fila—. El
+      //    trigger asigna el folio en el INSERT, y aquí decide además la SERIE
+      //    leyendo `contenido->>tipo_doc`: NOH o COT (§4.1). El número solo
+      //    existe DESPUÉS de escribir, así que renderizar antes imprimía un
+      //    papel sin él — y este formulario ya enseñaba «Se asigna al emitir» en
+      //    su campo de folio, prometiendo un número que el papel no llevaba.
+      //
+      //    Va con el cliente de SESIÓN del médico, nunca con privilegios de
+      //    servicio: el trigger exenta por completo a quien no trae JWT.
+      const supabase = offlineMode ? null : createClient()
+      if (supabase) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('No autenticado')
+
+        const insertPayload: Record<string, unknown> = {
+          tipo: 'nota_honorarios',
+          contenido,
+          client_id: clientId,
+          subido_por: user.id,
+        }
+        if (pacienteId) insertPayload.paciente_id = pacienteId
+
+        const { data, error } = await supabase
+          .from('documentos')
+          .insert(insertPayload)
+          .select('id, folio')
+          .single()
+        if (error) throw error
+        filaId = data.id
+        folio = data.folio
+        // La fila está en el expediente. Aunque el PDF falle después, el
+        // documento es recuperable desde la lista con su botón de regenerar.
+        guardado = true
+      }
+
       const medicoData = medicoInfo ? {
         nombre: medicoInfo.nombre,
         titulo: medicoInfo.titulo ?? null,
@@ -511,6 +549,9 @@ export default function NotaHonorariosForm({
           total,
           divisa,
           notas: notas || undefined,
+          // En el búnker offline no hay fila ni base, así que llega undefined y
+          // el papel sale sin número, igual que hasta ahora.
+          folio: folioImpreso('nota_honorarios', folio),
           // Las seis diferencias nuevas viajan; el renderizador v1 imprime hoy
           // las que ya conocía. Se resuelven al cablear v2, igual que la cita
           // del escrito médico.
@@ -534,9 +575,9 @@ export default function NotaHonorariosForm({
         entregar: !!offlineMode,
       })
 
-      pdfGenerated = true
       pdfBlob = blob
 
+      // La ruta del archivo, sobre la fila que ya existe.
       if (offlineMode) {
         const { addDocument } = await import('@/lib/offline/db')
         const { getOfflineIdentity } = await import('@/lib/offline/identity')
@@ -554,36 +595,36 @@ export default function NotaHonorariosForm({
           : 'Recibo guardado en bunker offline')
         onOfflineSave?.()
       } else {
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('No autenticado')
-
-        const insertPayload: Record<string, unknown> = {
-          tipo: 'nota_honorarios',
-          contenido,
-          client_id: clientId,
-          pdf_url: storagePath,
-          subido_por: user.id,
+        if (storagePath && filaId && supabase) {
+          // Este UPDATE no toca ni el estado ni el folio, así que el trigger lo
+          // deja pasar. No es fatal si falla: la fila está y el PDF se entrega
+          // igual; lo que se pierde es la descarga desde la lista, que el botón
+          // de regenerar repone.
+          const { error } = await supabase
+            .from('documentos')
+            .update({ pdf_url: storagePath })
+            .eq('id', filaId)
+          if (error) console.error('[NotaHonorariosForm] update pdf_url:', error.message)
         }
-        if (pacienteId) insertPayload.paciente_id = pacienteId
-
-        const { error } = await supabase.from('documentos').insert(insertPayload)
-        if (error) throw error
-
-        // Sin storagePath la fila se inserta igual pero sin PDF en Storage:
-        // mobileShare captura el error de subida y no lo relanza. El documento
-        // no queda recuperable desde la lista y el modal tiene que decirlo.
-        guardado = storagePath !== null
-        toast.success(esCotizacion ? 'Cotización guardada' : 'Recibo guardado')
+        const nombreDoc = esCotizacion ? 'Cotización guardada' : 'Recibo guardado'
+        toast.success(folio ? `${nombreDoc} · ${folio}` : nombreDoc)
       }
     } catch (err) {
-      if (!pdfGenerated) {
-        toast.error('No se pudo generar el PDF. Intenta de nuevo.')
-        setErrorGuardado('No se pudo generar el PDF. Intenta de nuevo.')
+      // Tres desenlaces, y el del medio es nuevo: con la fila escrita antes que
+      // el PDF, un fallo de render deja un documento emitido y un folio
+      // consumido. Decirlo con el número delante es lo que permite encontrarlo
+      // en la lista y recuperar el PDF desde ahí.
+      let msg: string
+      if (offlineMode) {
+        msg = 'No se pudo generar el PDF. Intenta de nuevo.'
+      } else if (filaId === null) {
+        msg = 'No se pudo guardar el documento, así que no se generó el PDF. Intenta de nuevo.'
       } else {
-        toast.error('Documento generado pero no se pudo guardar. Revisa errores de sincronización.')
-        setErrorGuardado('Error al guardar el documento.')
+        msg = `El documento quedó registrado${folio ? ` con folio ${folio}` : ''}, pero no se pudo `
+          + 'generar el PDF. Búscalo en la lista de documentos del paciente y recupéralo desde ahí.'
       }
+      toast.error(msg)
+      setErrorGuardado(msg)
       // eslint-disable-next-line no-console
       console.error('[NotaHonorariosForm] imprimir falló:', err)
     } finally {

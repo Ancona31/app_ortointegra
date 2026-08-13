@@ -10,7 +10,7 @@ import TipTapViewer from '@/components/documentos/TipTapViewer'
 const TIPO_DOC_LABEL: Record<string, string> = {
   receta: 'Receta',
   solicitud_lab: 'Solicitud de Laboratorio',
-  solicitud_imagen: 'Solicitud de Imagen',
+  solicitud_imagen: 'Solicitud de Imagenología',
   plan_suplementacion: 'Plan de Suplementación',
   informe_clinico: 'Informe Clínico',
   escrito_medico: 'Escrito Médico',

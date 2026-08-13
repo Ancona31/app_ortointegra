@@ -12,7 +12,7 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 const TIPO_LABEL: Record<string, string> = {
   receta: 'Receta médica',
   solicitud_lab: 'Solicitud de laboratorio',
-  solicitud_imagen: 'Solicitud de imagen',
+  solicitud_imagen: 'Solicitud de imagenología',
   plan_suplementacion: 'Plan de suplementación',
   informe_clinico: 'Informe clínico',
   escrito_medico: 'Escrito médico',

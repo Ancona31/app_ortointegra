@@ -15,6 +15,7 @@ import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/do
 import QRCode from 'qrcode'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { folioImpreso } from '@/lib/documentos/folio'
 import { createClient } from '@/lib/supabase/client'
 import { hoyEnTZ, desplazarFecha } from '@/lib/dates'
 import { enfocarYAcercar } from '@/lib/scrollDoc'
@@ -408,15 +409,51 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
     }))
     const contenido = { paciente, diagnostico, pesoKg, seleccionados: elegidos, notas, seguimiento, fecha }
 
-    // Flags de tracking para diferenciar errores
-    let pdfGenerated = false
     // El blob y el desenlace de la persistencia se leen en el finally para
     // montar el modal posterior a la generación. Ver ModalDocumentoGenerado.
     let pdfBlob: Blob | null = null
     let guardado = false
+    let filaId: string | null = null
+    let folio: string | null = null
 
     try {
-      // 3. PDF PRIMERO — si falla, abortamos antes de persistir
+      // ── 3 · LA FILA PRIMERO, porque de ella sale el folio ─────────────
+      //    Invierte el orden que este formulario tenía —PDF, subida, fila—. El
+      //    trigger asigna el folio en el INSERT, así que el número solo existe
+      //    DESPUÉS de escribir y renderizar antes imprimía un papel sin él. Es
+      //    el orden que ya seguían el consentimiento y la denegación
+      //    (`20260812_documentos_estado.sql`, trampa 2).
+      //
+      //    ⚠ **SIGUE SIENDO CONDICIONAL A `pacienteId`**, que es lo que este
+      //    formulario tiene de propio: un plan generado sin paciente no se
+      //    guarda en ningún expediente, así que no hay fila ni folio, y el papel
+      //    sale sin número. Ese caso no cambia.
+      const supabase = offlineMode || !pacienteId ? null : createClient()
+      if (supabase) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('No autenticado')
+
+        const { data, error } = await supabase
+          .from('documentos')
+          .insert({
+            tipo: 'plan_suplementacion',
+            contenido,
+            client_id: clientId,
+            paciente_id: pacienteId,
+            subido_por: user.id,
+          })
+          .select('id, folio')
+          .single()
+        if (error) throw error
+        filaId = data.id
+        folio = data.folio
+      }
+      // La fila está en el expediente —o no había expediente donde ponerla, y
+      // entonces no hay nada que advertir—. Aunque el PDF falle después, el
+      // documento es recuperable desde la lista con su botón de regenerar.
+      guardado = true
+
+      // ── 4 · El PDF, ya con el número que la base acaba de asignar ─────
       const cp = medicoInfo?.color_primario || '#1a3a5c'
       const blogQrDataUrl = isSuperAdmin
         ? await QRCode.toDataURL(
@@ -478,6 +515,9 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
           notas: notas || undefined,
           citaControl: seguimiento || undefined,
           blogQrDataUrl: blogQrDataUrl || undefined,
+          // Sin fila —búnker offline o plan sin paciente— llega undefined y el
+          // papel sale sin número, igual que hasta ahora.
+          folio: folioImpreso('plan_suplementacion', folio),
         },
         logoUrl,
         filename: generateDocFileName(paciente, 'Plan_Suplementacion'),
@@ -487,10 +527,9 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
         entregar: !!offlineMode,
       })
 
-      pdfGenerated = true
       pdfBlob = blob
 
-      // 4. Persistencia
+      // ── 5 · La ruta del archivo, sobre la fila que ya existe ──────────
       if (offlineMode) {
         const { addDocument } = await import('@/lib/offline/db')
         const { getOfflineIdentity } = await import('@/lib/offline/identity')
@@ -506,45 +545,39 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
         toast.success('Plan de suplementacion guardado en bunker offline')
         onOfflineSave?.()
       } else {
-        // Persistencia — CONDICIONAL a pacienteId
-        if (pacienteId) {
-          const supabase = createClient()
-          const { data: { user } } = await supabase.auth.getUser()
-          if (!user) throw new Error('No autenticado')
-
-          const insertPayload: Record<string, unknown> = {
-            tipo: 'plan_suplementacion',
-            contenido,
-            client_id: clientId,
-            paciente_id: pacienteId,
-            pdf_url: storagePath,
-            subido_por: user.id,
-          }
-
-          const { error } = await supabase.from('documentos').insert(insertPayload)
-          if (error) throw error
+        if (storagePath && filaId && supabase) {
+          // Este UPDATE no toca ni el estado ni el folio, así que el trigger lo
+          // deja pasar. No es fatal si falla: la fila está y el PDF se entrega
+          // igual; lo que se pierde es la descarga desde la lista, que el botón
+          // de regenerar repone.
+          const { error } = await supabase
+            .from('documentos')
+            .update({ pdf_url: storagePath })
+            .eq('id', filaId)
+          if (error) console.error('[PlanSuplementacionForm] update pdf_url:', error.message)
         }
-
-        // Sin pacienteId no hay fila que insertar ni subida que intentar, así
-        // que no hay nada que advertir. Con pacienteId, storagePath null
-        // significa que la subida falló: mobileShare captura ese error y no lo
-        // relanza, la fila queda sin PDF y el modal tiene que decirlo.
-        guardado = pacienteId ? storagePath !== null : true
-
         if (!pacienteId) {
           toast.success('Plan generado')
         } else {
-          toast.success('Plan de suplementación guardado')
+          toast.success(folio ? `Plan de suplementación guardado · ${folio}` : 'Plan de suplementación guardado')
         }
       }
     } catch (err) {
-      if (!pdfGenerated) {
-        toast.error('No se pudo generar el PDF. Intenta de nuevo.')
-        setErrorGuardado('No se pudo generar el PDF. Intenta de nuevo.')
+      // Tres desenlaces, y el del medio es nuevo: con la fila escrita antes que
+      // el PDF, un fallo de render deja un documento emitido y un folio
+      // consumido. Decirlo con el número delante es lo que permite encontrarlo
+      // en la lista y recuperar el PDF desde ahí.
+      let msg: string
+      if (offlineMode || !pacienteId) {
+        msg = 'No se pudo generar el PDF. Intenta de nuevo.'
+      } else if (filaId === null) {
+        msg = 'No se pudo guardar el plan, así que no se generó el PDF. Intenta de nuevo.'
       } else {
-        toast.error('Plan generado pero no se pudo guardar. Revisa errores de sincronización.')
-        setErrorGuardado('Error al guardar el plan.')
+        msg = `El plan quedó registrado${folio ? ` con folio ${folio}` : ''}, pero no se pudo generar `
+          + 'el PDF. Búscalo en la lista de documentos del paciente y recupéralo desde ahí.'
       }
+      toast.error(msg)
+      setErrorGuardado(msg)
       // eslint-disable-next-line no-console
       console.error('[PlanSuplementacionForm] imprimir falló:', err)
     } finally {

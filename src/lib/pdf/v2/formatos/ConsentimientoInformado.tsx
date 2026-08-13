@@ -10,7 +10,10 @@
  *                 fundamento legal entre el título y el riel
  *   riel          ocho celdas en CUATRO filas, sin sexo y con un campo vacío requerido
  *   cuerpo        siete secciones de texto corrido, dos de ellas con zona de escritura
- *   firmas        cinco firmantes en TRES niveles de jerarquía, repartidos en dos hojas
+ *   firmas        hasta cinco firmantes en TRES niveles de jerarquía, repartidos en dos
+ *                 hojas — **y solo se compone la celda de quien iba a firmar**: sin
+ *                 familiar no hay nivel 2, sin testigos no hay nivel 3, y sin ninguno de
+ *                 los dos no hay segunda hoja de firmas. Ver `pidioFirma`
  *   anexo         una hoja más, y **solo si hay al menos una fotografía**
  *
  * ⚠⚠ **EXCEPCIÓN DECLARADA A I.3.2 — ESTE FORMATO COMPONE SU TEXTO CORRIDO JUSTIFICADO.**
@@ -180,7 +183,7 @@ import type { ReactElement } from 'react'
 import type { ConsultorioMembrete, MedicoMembrete } from '../Membrete'
 import type { PanelCircularProps } from '../PanelCircular'
 import type { ValoresPaciente } from '../BloquePaciente'
-import BloqueFirmas, { type Firma } from '../BloqueFirmas'
+import BloqueFirmas, { type CeldaFirma, type Firma } from '../BloqueFirmas'
 import MarcoParcial, { MARCO } from '../MarcoParcial'
 import MotorFlujo, { type HojaPropia } from '../MotorFlujo'
 import PieDocumento from '../PieDocumento'
@@ -344,23 +347,36 @@ function recuento(previstos: number, firmaron: number): string {
 }
 
 /**
+ * ¿SE LE PIDIÓ FIRMA A ESTA PERSONA? **La pregunta que gobierna las celdas y el recuento**,
+ * en una sola función porque las dos respuestas tienen que ser la misma.
+ *
+ * El criterio es el del formulario: **se le pidió firma a quien tiene nombre escrito**. Un
+ * testigo sin nombre no es un testigo que faltó: es un testigo que nunca hubo.
+ *
+ * `sello` también cuenta: si alguien firmó, estaba previsto por definición, venga o no su
+ * nombre en los datos.
+ *
+ * ⚠ **ESTA FUNCIÓN DECIDE ADEMÁS SI LA CELDA EXISTE, Y ANTES NO DECIDÍA NADA DE ESO.** Las
+ * celdas de testigo se componían siempre —fijas por NOM-004, con su línea para firmarse a
+ * mano— y en el caso normal de consulta, sin testigos, el papel salía con cuatro rayas de
+ * firma en blanco. Una raya en blanco afirma que ahí faltó alguien, que es exactamente lo
+ * que el recuento dejó de decir al arreglarse: se estaba diciendo dos veces por dos vías y
+ * solo se corrigió una. Ver `CeldaFirma` en 2.L.
+ */
+function pidioFirma(firmante: FirmanteConsentimiento): boolean {
+  return tieneValor(firmante.nombre) || tieneValor(firmante.sello)
+}
+
+/**
  * A CUÁNTOS SE LES PIDIÓ FIRMA — se DERIVA de las celdas, no llega como prop.
  *
  * Se deriva a propósito. El formato tiene delante a los cinco firmantes; un `previstos`
  * pasado desde fuera podría no coincidir con ellos, y entonces habría dos versiones de
  * la misma verdad en el mismo papel —el recuento diciendo una cifra y las celdas
  * enseñando otra— sin nada que las obligue a estar de acuerdo.
- *
- * El criterio es el del formulario: **se le pidió firma a quien tiene nombre escrito**.
- * Los dos testigos son celdas fijas por NOM-004 y su línea se compone siempre, con
- * nombre o sin él, para poder firmarse a mano; pero un testigo sin nombre no entró en
- * ningún recuento, porque no se le pidió nada.
- *
- * `sello` también cuenta: si alguien firmó, estaba previsto por definición, venga o no
- * su nombre en los datos.
  */
 function previstosDe(celdas: readonly FirmanteConsentimiento[]): number {
-  return celdas.filter((f) => tieneValor(f.nombre) || tieneValor(f.sello)).length
+  return celdas.filter(pidioFirma).length
 }
 
 function lineaSellado(fecha: string, previstos: number, firmaron: number): string {
@@ -625,7 +641,7 @@ export interface ConsentimientoInformadoProps {
    * se renumera a 2. Es una variante por sustitución, no por adición: no hay nada que
    * añadir, hay un nivel que se va.
    */
-  readonly sustitucion?: boolean
+  readonly pacienteNoPuedeFirmar?: boolean
   /**
    * LAS DOS AUTORIZACIONES DEL PACIENTE (`DOCUMENTOS_SPEC.md` II.7 §2 y §3).
    *
@@ -633,19 +649,29 @@ export interface ConsentimientoInformadoProps {
    * consentimiento donde no se preguntó por la transfusión no debe imprimir una línea que
    * insinúe que sí se preguntó.
    *
-   * `transfusion` es TRI-ESTADO y no un booleano, y la distinción es la que importa:
-   * `undefined` es «no se preguntó» y `'no'` es «el paciente lo rechazó expresamente». Con
-   * un booleano los dos casos se compondrían igual —sin línea— y se perdería una negativa
-   * explícita, que es justo el dato con más valor legal de los dos.
+   * ⚠ **ENTRAN SUELTAS Y NO DENTRO DE UN OBJETO `autorizaciones`.** Ese objeto no existe
+   * en ningún formulario: `ConsentimientoInformadoForm` guarda las dos claves en la raíz
+   * de `contenido`, con estos nombres. Agruparlas aquí obligaba a que alguien las
+   * envolviera por el camino, y envolver es traducir. La regla de colapso conjunto —sin
+   * ninguna de las dos, el bloque entero desaparece— no necesitaba el objeto: se lee
+   * igual de bien de dos campos que de uno.
    *
-   * `fotografias` sí es booleano porque su ausencia y su negativa son lo mismo: no hay
-   * autorización, y sin autorización no se fotografía. Solo se compone cuando es `true`,
-   * que es lo que hace v1.
+   * `autorizaTransfusion` es TRI-ESTADO y no un booleano, y la distinción es la que
+   * importa: ausente es «no se preguntó» y `'no'` es «el paciente lo rechazó
+   * expresamente». Con un booleano los dos casos se compondrían igual —sin línea— y se
+   * perdería una negativa explícita, que es justo el dato con más valor legal de los dos.
+   *
+   * ⚠ El formulario guarda el tercer estado como `null` y aquí es la ausencia de la
+   * propiedad. Es lo único que queda entre los dos extremos en este campo, y es cambio de
+   * forma, no de nombre: no entra en este paso.
    */
-  readonly autorizaciones?: {
-    readonly transfusion?: 'si' | 'no'
-    readonly fotografias?: boolean
-  }
+  readonly autorizaTransfusion?: 'si' | 'no'
+  /**
+   * Autorización de uso de fotografías. Booleano porque su ausencia y su negativa son lo
+   * mismo: no hay autorización, y sin autorización no se fotografía. Solo se compone
+   * cuando es `true`, que es lo que hace v1.
+   */
+  readonly autorizaFotos?: boolean
   /**
    * Quien acompaña es un REPRESENTANTE LEGAL acreditado y no un familiar. Solo cambia el
    * rótulo de su celda —ver `ROL_REPRESENTANTE`—; ni la retícula ni el recuento se mueven,
@@ -1080,9 +1106,6 @@ function PieDeSello({
   )
 }
 
-/** Una celda vacía de la retícula: el nivel 2 tiene una firma y dos columnas. */
-const CELDA_VACIA: Firma = { rol: ' ' }
-
 /** Un recuadro del anexo. Con foto o sin ella, el tipo y el número se imprimen igual. */
 function RecuadroAnexo({
   identificacion,
@@ -1191,8 +1214,9 @@ export default function ConsentimientoInformado({
   procedimiento,
   secciones,
   firmantes,
-  sustitucion,
-  autorizaciones,
+  pacienteNoPuedeFirmar,
+  autorizaTransfusion,
+  autorizaFotos,
   representanteLegal,
   identificaciones,
   sellado,
@@ -1271,16 +1295,55 @@ export default function ConsentimientoInformado({
   }
 
   /**
+   * ═══ QUÉ CELDAS EXISTEN ═══
+   *
+   * **Solo las de quien firmó o iba a firmar** (ver `pidioFirma`). El médico es la
+   * excepción y no lo es por casualidad: su celda es la del emisor del documento, existe
+   * antes que cualquier firmante, y su nombre lo aporta el membrete cuando el firmante no
+   * lo trae.
+   *
    * LA VARIANTE POR SUSTITUCIÓN, EN TRES LÍNEAS. El familiar sube al nivel 1, el nivel 2
    * desaparece y Testigos se renumera. Es sustitución y no adición: el familiar firma UNA
    * vez, aquí o allí, nunca en los dos sitios.
    */
-  const nivel1: readonly [Firma, Firma] = sustitucion
-    ? [firmaMedico, firmaFamiliar]
-    : [firmaMedico, firmaPaciente]
-  const nivel2: readonly [Firma, Firma] = [firmaFamiliar, CELDA_VACIA]
-  const nivel3: readonly [Firma, Firma] = [firmaTestigo1, firmaTestigo2]
-  const numeroTestigos = sustitucion ? 2 : 3
+  const hayPaciente = pidioFirma(firmantes.paciente)
+  const hayFamiliar = pidioFirma(firmantes.familiar)
+
+  const nivel1: readonly [CeldaFirma, CeldaFirma] = pacienteNoPuedeFirmar
+    ? [firmaMedico, hayFamiliar ? firmaFamiliar : null]
+    : [firmaMedico, hayPaciente ? firmaPaciente : null]
+
+  /**
+   * EL NIVEL 2 EXISTE SI HAY A QUIEN REPRESENTE. Sin familiar no hay representación que
+   * rotular: el rótulo de un nivel sin celdas es un epígrafe sobre nada.
+   *
+   * Su segunda columna es un HUECO y no una celda vacía: la retícula no se colapsa a una
+   * columna, o la línea de firma del familiar mediría 486 —el doble que las otras cuatro
+   * del documento— en vez de los 228 del sistema.
+   */
+  const hayRepresentacion = pacienteNoPuedeFirmar !== true && hayFamiliar
+  const nivel2: readonly [CeldaFirma, CeldaFirma] = [firmaFamiliar, null]
+
+  /**
+   * LOS TESTIGOS SE COMPACTAN A LA IZQUIERDA. Con uno solo, su celda ocupa la primera
+   * columna y la segunda queda en hueco: el rótulo de la celda dice cuál de los dos es, así
+   * que no hace falta que la posición lo repita, y una celda suelta a la derecha se lee como
+   * si la de al lado se hubiera perdido.
+   */
+  const testigos = [
+    pidioFirma(firmantes.testigo1) ? firmaTestigo1 : null,
+    pidioFirma(firmantes.testigo2) ? firmaTestigo2 : null,
+  ].filter((firma): firma is Firma => firma !== null)
+  const hayTestigos = testigos.length > 0
+  const nivel3: readonly [CeldaFirma, CeldaFirma] = [testigos[0] ?? null, testigos[1] ?? null]
+
+  /**
+   * EL NÚMERO DEL NIVEL DE TESTIGOS SALE DE CUÁNTOS NIVELES HAY ENCIMA, no de si hay
+   * sustitución. Eran lo mismo mientras el nivel 2 solo desaparecía por sustitución; ahora
+   * también desaparece cuando no hay familiar, y cablear el 3 dejaría una hoja con los
+   * niveles 1 y 3.
+   */
+  const numeroTestigos = hayRepresentacion ? 3 : 2
 
   /**
    * EL RECUENTO DEL BLOQUE DE CIERRE — sobre las CELDAS QUE SE COMPONEN, no sobre los cinco
@@ -1289,9 +1352,13 @@ export default function ConsentimientoInformado({
    * En la variante por sustitución el paciente no firma y su celda no existe, así que serían
    * cuatro previstos y no cinco: contar los cinco declararía omitido a alguien a quien el
    * documento no le pidió firmar, que es exactamente la pregunta que este recuento existe
-   * para evitar. La celda vacía del nivel 2 tampoco cuenta — es relleno de retícula.
+   * para evitar. El hueco del nivel 2 no cuenta — no es un firmante, es una columna.
+   *
+   * `previstosDe` filtra con `pidioFirma`, la misma función que decide qué celdas se
+   * componen, así que el recuento y el papel no pueden discrepar aunque esta lista traiga
+   * de más.
    */
-  const celdas: readonly FirmanteConsentimiento[] = sustitucion === true
+  const celdas: readonly FirmanteConsentimiento[] = pacienteNoPuedeFirmar === true
     ? [firmantes.medico, firmantes.familiar, firmantes.testigo1, firmantes.testigo2]
     : [
         firmantes.medico,
@@ -1399,7 +1466,7 @@ export default function ConsentimientoInformado({
           */}
           <View style={estilos.filaCasilla}>
             <View style={estilos.casilla}>
-              {sustitucion === true ? <View style={estilos.marcaCasilla} /> : null}
+              {pacienteNoPuedeFirmar === true ? <View style={estilos.marcaCasilla} /> : null}
             </View>
             <Text style={estilos.textoCasilla}>{TEXTO_SUSTITUCION}</Text>
           </View>
@@ -1419,22 +1486,22 @@ export default function ConsentimientoInformado({
             rechazó la transfusión o si nadie contestó nada.
 
             Lo que distingue «no se preguntó» de «rechazó» es que la fila EXISTA. Ver
-            `autorizaciones`.
+            `autorizaTransfusion`.
           */}
-          {autorizaciones?.transfusion === undefined ? null : (
+          {autorizaTransfusion === undefined ? null : (
             <View style={estilos.filaAutorizacion}>
               <View style={estilos.casilla}>
                 <View style={estilos.marcaCasilla} />
               </View>
               <Text style={estilos.textoCasilla}>
-                {autorizaciones.transfusion === 'si'
+                {autorizaTransfusion === 'si'
                   ? AUTORIZA_TRANSFUSION_SI
                   : AUTORIZA_TRANSFUSION_NO}
               </Text>
             </View>
           )}
 
-          {autorizaciones?.fotografias === true ? (
+          {autorizaFotos === true ? (
             <View style={estilos.filaAutorizacion}>
               <View style={estilos.casilla}>
                 <View style={estilos.marcaCasilla} />
@@ -1460,38 +1527,44 @@ export default function ConsentimientoInformado({
           Los dos niveles que quedan, en su propia hoja. El 2 desaparece entero en la
           variante por sustitución y el 3 se renumera a 2.
         */}
-        <View break>
-          {sustitucion === true ? null : (
-            <View>
-              <RotuloNivel numero={2} rotulo={NIVEL_REPRESENTACION} acento={acento} />
-              {/*
-                UNA CELDA LLENA Y LA SEGUNDA VACÍA. La retícula no se colapsa a una columna:
-                si lo hiciera, la caja del familiar mediría 486 y su línea de firma sería el
-                doble de larga que las otras cuatro del documento.
-              */}
-              <BloqueFirmas
-                variante="pareja"
-                lamina={LAMINA}
-                calibracion="compacta"
-                firmas={nivel2}
-              />
-            </View>
-          )}
+        {/*
+          ⚠ **Y LA HOJA ENTERA DESAPARECE SI NO QUEDA NINGUNO DE LOS DOS NIVELES**, que es el
+          caso normal de consulta: sin familiar y sin testigos. Sin esta condición el `break`
+          abriría una hoja con su cabecera de continuación, su folio, su paginación y nada
+          más — una hoja en blanco numerada dentro de un documento legal.
+        */}
+        {hayRepresentacion || hayTestigos ? (
+          <View break>
+            {hayRepresentacion ? (
+              <View>
+                <RotuloNivel numero={2} rotulo={NIVEL_REPRESENTACION} acento={acento} />
+                {/* Una celda llena y la segunda en hueco. Ver `nivel2`. */}
+                <BloqueFirmas
+                  variante="pareja"
+                  lamina={LAMINA}
+                  calibracion="compacta"
+                  firmas={nivel2}
+                />
+              </View>
+            ) : null}
 
-          <View style={sustitucion === true ? {} : estilos.bloqueNivelSiguiente}>
-            <RotuloNivel
-              numero={numeroTestigos}
-              rotulo={NIVEL_TESTIGOS}
-              acento={acento}
-            />
-            <BloqueFirmas
-              variante="pareja"
-              lamina={LAMINA}
-              calibracion="compacta"
-              firmas={nivel3}
-            />
+            {hayTestigos ? (
+              <View style={hayRepresentacion ? estilos.bloqueNivelSiguiente : {}}>
+                <RotuloNivel
+                  numero={numeroTestigos}
+                  rotulo={NIVEL_TESTIGOS}
+                  acento={acento}
+                />
+                <BloqueFirmas
+                  variante="pareja"
+                  lamina={LAMINA}
+                  calibracion="compacta"
+                  firmas={nivel3}
+                />
+              </View>
+            ) : null}
           </View>
-        </View>
+        ) : null}
 
         {/*
           ═══ HOJA DE ANEXO — CONDICIONAL ═══

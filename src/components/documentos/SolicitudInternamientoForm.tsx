@@ -18,6 +18,7 @@ import IndicacionesPiso, {
   type GrupoIndicaciones,
 } from '@/components/documentos/IndicacionesPiso'
 import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
+import { folioImpreso } from '@/lib/documentos/folio'
 import { createClient } from '@/lib/supabase/client'
 import { hoyEnTZ, desplazarFecha } from '@/lib/dates'
 import { enfocarYAcercar } from '@/lib/scrollDoc'
@@ -309,15 +310,52 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     }
 
-    // Flags de tracking para diferenciar errores
-    let pdfGenerated = false
     // El blob y el desenlace de la persistencia se leen en el finally para
     // montar el modal posterior a la generación. Ver ModalDocumentoGenerado.
     let pdfBlob: Blob | null = null
     let guardado = false
+    let filaId: string | null = null
+    let folio: string | null = null
 
     try {
-      // 4. PDF PRIMERO — si falla, abortamos antes de persistir
+      // ── 4 · LA FILA PRIMERO ───────────────────────────────────────────
+      //    Invierte el orden que este formulario tenía —PDF, subida, fila—,
+      //    como los otros seis, para que la fila exista antes de renderizar.
+      //
+      //    ⚠ **Y AQUÍ EL PAPEL SIGUE SIN LLEVAR EL FOLIO, A PROPÓSITO.** La base
+      //    asigna `INT-…` y la fila lo lleva —el expediente numera todo lo que
+      //    emite, porque una serie con huecos no se audita—, pero nadie va a
+      //    citar ese número desde el hospital y el formato no compone su ranura.
+      //    Decisión reconfirmada: ver `DOCUMENTOS_RANURAS_MUERTAS.md` §4 y
+      //    `folioImpreso()`, que es donde está escrito y donde el botón de
+      //    regenerar lee lo mismo.
+      const supabase = offlineMode ? null : createClient()
+      if (supabase) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('No autenticado')
+
+        const insertPayload: Record<string, unknown> = {
+          tipo: 'solicitud_internamiento',
+          contenido,
+          client_id: clientId,
+          subido_por: user.id,
+        }
+        if (pacienteId) insertPayload.paciente_id = pacienteId
+
+        const { data, error } = await supabase
+          .from('documentos')
+          .insert(insertPayload)
+          .select('id, folio')
+          .single()
+        if (error) throw error
+        filaId = data.id
+        folio = data.folio
+        // La fila está en el expediente. Aunque el PDF falle después, el
+        // documento es recuperable desde la lista con su botón de regenerar.
+        guardado = true
+      }
+
+      // ── 5 · El PDF ────────────────────────────────────────────────────
       const medicoData = medicoInfo ? {
         nombre: medicoInfo.nombre,
         titulo: medicoInfo.titulo ?? null,
@@ -353,6 +391,9 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
           tipoInternamiento, procedimiento, diasEstimados, asa, urgente,
           requerimientos: [...requerimientos, ...(requerimientosExtra ? [requerimientosExtra] : [])].filter(Boolean),
           justificacion, instruccionesPaciente, indicacionesPiso,
+          // Devuelve undefined SIEMPRE para este formato: la fila lleva el folio
+          // y el papel no lo dice. Ver arriba.
+          folio: folioImpreso('solicitud_internamiento', folio),
         },
         logoUrl,
         filename: generateDocFileName(paciente, 'Solicitud_Internamiento'),
@@ -362,10 +403,9 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
         entregar: !!offlineMode,
       })
 
-      pdfGenerated = true
       pdfBlob = blob
 
-      // 5. Persistencia
+      // ── 6 · La ruta del archivo, sobre la fila que ya existe ──────────
       if (offlineMode) {
         const { addDocument } = await import('@/lib/offline/db')
         const { getOfflineIdentity } = await import('@/lib/offline/identity')
@@ -381,36 +421,39 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
         toast.success('Solicitud de internamiento guardada en bunker offline')
         onOfflineSave?.()
       } else {
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('No autenticado')
-
-        const insertPayload: Record<string, unknown> = {
-          tipo: 'solicitud_internamiento',
-          contenido,
-          client_id: clientId,
-          pdf_url: storagePath,
-          subido_por: user.id,
+        if (storagePath && filaId && supabase) {
+          // Este UPDATE no toca ni el estado ni el folio, así que el trigger lo
+          // deja pasar. No es fatal si falla: la fila está y el PDF se entrega
+          // igual; lo que se pierde es la descarga desde la lista, que el botón
+          // de regenerar repone.
+          const { error } = await supabase
+            .from('documentos')
+            .update({ pdf_url: storagePath })
+            .eq('id', filaId)
+          if (error) console.error('[SolicitudInternamientoForm] update pdf_url:', error.message)
         }
-        if (pacienteId) insertPayload.paciente_id = pacienteId
-
-        const { error } = await supabase.from('documentos').insert(insertPayload)
-        if (error) throw error
-
-        // Sin storagePath la fila se inserta igual pero sin PDF en Storage:
-        // mobileShare captura el error de subida y no lo relanza. El documento
-        // no queda recuperable desde la lista y el modal tiene que decirlo.
-        guardado = storagePath !== null
-        toast.success('Solicitud de internamiento guardada')
+        // El folio SÍ va en el toast aunque no vaya en el papel: en pantalla es
+        // donde el médico puede leerlo y anotarlo si lo necesita.
+        toast.success(folio
+          ? `Solicitud de internamiento guardada · ${folio}`
+          : 'Solicitud de internamiento guardada')
       }
     } catch (err) {
-      if (!pdfGenerated) {
-        toast.error('No se pudo generar el PDF. Intenta de nuevo.')
-        setErrorGuardado('No se pudo generar el PDF. Intenta de nuevo.')
+      // Tres desenlaces, y el del medio es nuevo: con la fila escrita antes que
+      // el PDF, un fallo de render deja un documento emitido y un folio
+      // consumido. Decirlo con el número delante es lo que permite encontrarlo
+      // en la lista y recuperar el PDF desde ahí.
+      let msg: string
+      if (offlineMode) {
+        msg = 'No se pudo generar el PDF. Intenta de nuevo.'
+      } else if (filaId === null) {
+        msg = 'No se pudo guardar la solicitud, así que no se generó el PDF. Intenta de nuevo.'
       } else {
-        toast.error('Solicitud generada pero no se pudo guardar. Revisa errores de sincronización.')
-        setErrorGuardado('Error al guardar la solicitud.')
+        msg = `La solicitud quedó registrada${folio ? ` con folio ${folio}` : ''}, pero no se pudo `
+          + 'generar el PDF. Búscala en la lista de documentos del paciente y recupérala desde ahí.'
       }
+      toast.error(msg)
+      setErrorGuardado(msg)
       // eslint-disable-next-line no-console
       console.error('[SolicitudInternamientoForm] imprimir falló:', err)
     } finally {

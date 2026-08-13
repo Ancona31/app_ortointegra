@@ -236,18 +236,18 @@ export type CasoEscrito = 'corto' | 'medio' | 'largo' | 'sin' | 'editor'
 const CASOS: Record<
   CasoEscrito,
   {
-    readonly titulo?: string
+    readonly asunto?: string
     readonly tituloPie?: string
     /** Solo `editor`: el cuerpo sale del conversor y no de `CUERPO`. */
     readonly desdeEditor?: boolean
   }
 > = {
-  corto: { titulo: TITULOS.corto },
-  medio: { titulo: TITULOS.medio },
-  largo: { titulo: TITULOS.largo, tituloPie: TITULO_PIE_LARGO },
+  corto: { asunto: TITULOS.corto },
+  medio: { asunto: TITULOS.medio },
+  largo: { asunto: TITULOS.largo, tituloPie: TITULO_PIE_LARGO },
   // Sin título y sin `tituloPie`: la banda cae al genérico `Escrito médico`.
   sin: {},
-  editor: { titulo: TITULOS.corto, desdeEditor: true },
+  editor: { asunto: TITULOS.corto, desdeEditor: true },
 }
 
 function HojaEscrito({
@@ -270,7 +270,7 @@ function HojaEscrito({
         consultorio={{ domicilio: medico.domicilio, telefono: `Tel. ${medico.telefono}` }}
         panel={{ variante: 'logo', acento, logo: medico.logo }}
         acento={acento}
-        titulo={c.titulo}
+        asunto={c.asunto}
         tituloPie={c.tituloPie}
         fecha={FECHA}
         cuerpo={c.desdeEditor === true ? cuerpoEscritoDesde({ doc: DOC_EDITOR }).cuerpo : CUERPO}

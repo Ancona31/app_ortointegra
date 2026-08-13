@@ -190,8 +190,8 @@ const SEPARACION_ALARMA_CIERRE = ESPACIO[26]
  */
 export interface MedicamentoRecetado {
   /** Nombre comercial. Sin él colapsa la primera mitad del ancla (II.3 §2). */
-  readonly comercial?: string
-  /** Presentación y gramaje. Sin ella, el ancla se queda con el comercial. */
+  readonly nombre_comercial?: string
+  /** Presentación y gramaje. Sin ella, el ancla se queda con el nombre comercial. */
   readonly presentacion?: string
   /**
    * Denominación genérica. Va en TINTA PLENA (regla 5 de 2.G): es el único campo
@@ -200,14 +200,31 @@ export interface MedicamentoRecetado {
    * **Colapsa entero si no viene** — decisión de Angel, ver el punto 2 de la
    * cabecera. II.3 §2 lo declara vacío requerido, con rótulo y línea.
    */
-  readonly generico?: string
+  readonly principio_activo?: string
   /**
    * Vía de administración. Una de las trece de II.3 §5. Sin ella, `Oral`. Va SIEMPRE
    * en bloque negativo — ver el punto 1 de la cabecera.
    */
-  readonly via?: string
+  readonly via_administracion?: string
   /** Indicación. Colapsa sola si no viene. */
   readonly indicacion?: string
+  /*
+    ── AQUÍ NO HAY `dosis`, Y NO ES UN OLVIDO ────────────────────────────────
+
+    `RecetaForm` NO CAPTURA la dosis. La clave existe en el tipo `Medicamento` y en
+    su objeto vacío (`RecetaForm.tsx:32`), y se relee al cargar una fila
+    (`:83`), pero **ningún campo del formulario la escribe**: lo único que se le
+    parece es la «Sugerencia del catálogo» de `:666`, que es un texto de ayuda bajo
+    el input y nunca entra en el estado. Así que `contenido.medicamentos[].dosis`
+    viaja vacío en todas las recetas emitidas. `RecetaPdf.tsx` —v1— tampoco la lee.
+
+    Los miligramos van en `presentacion`, que es donde el médico los escribe de
+    verdad: `Tabletas 15 mg, caja con 10`. Y la pauta —cuántas y cada cuánto— va en
+    `indicacion`. Entre las dos no queda nada que una ranura de dosis pudiera decir.
+
+    Comprobado por Angel sobre el formulario. No añadir la ranura: compondría un
+    rótulo con una línea vacía en todas las recetas.
+  */
 }
 
 export interface RecetaMedicaProps {
@@ -327,7 +344,7 @@ const estilos = StyleSheet.create({
  * suelta, que es el defecto que una plantilla sí dejaría.
  */
 function anclaDe(medicamento: MedicamentoRecetado): string {
-  return [medicamento.comercial, medicamento.presentacion]
+  return [medicamento.nombre_comercial, medicamento.presentacion]
     .filter((mitad): mitad is string => tieneValor(mitad))
     .join(SEPARADOR_ANCLA)
 }
@@ -459,14 +476,14 @@ export default function RecetaMedica({
             numero={indice + 1}
             primera={indice === 0}
             ancla={anclaDe(medicamento)}
-            secundario={medicamento.generico}
+            secundario={medicamento.principio_activo}
             /*
               LA VÍA, SIEMPRE EN NEGATIVO. La palabra «Vía» va DENTRO de la cadena,
               como declara B.3 §3, y la redacta este archivo: 2.H coloca, no rotula.
               La ranura nunca colapsa — sin dato, la vía es oral (II.3 §2).
             */
             marca={`${ROTULO_VIA} ${
-              tieneValor(medicamento.via) ? medicamento.via : VIA_POR_DEFECTO
+              tieneValor(medicamento.via_administracion) ? medicamento.via_administracion : VIA_POR_DEFECTO
             }`}
             nota={medicamento.indicacion}
             acento={acento}

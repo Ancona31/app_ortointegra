@@ -350,17 +350,56 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
       color_secundario: medicoInfo?.color_secundario || '#1e5fa8',
     }
 
-    // Flags de tracking para diferenciar errores de PDF vs persistencia
-    let pdfGenerated = false
     // El blob y el desenlace de la persistencia se leen en el finally para
     // montar el modal posterior a la generación. Ver ModalDocumentoGenerado.
     let pdfBlob: Blob | null = null
     let guardado = false
+    let filaId: string | null = null
+    let folioSerie: string | null = null
 
     try {
-      // 3. PDF PRIMERO — si falla, abortamos antes de escribir nada.
-      //    Evita orphan records donde el outbox tiene una receta que el
-      //    médico nunca vio porque el PDF nunca se generó.
+      // ── 3 · LA FILA PRIMERO ───────────────────────────────────────────
+      //    Invierte el orden que este formulario tenía —PDF, subida, fila—,
+      //    como los otros seis, para que la fila exista antes de renderizar.
+      //
+      //    ⚠ **AQUÍ EL FOLIO IMPRESO NO CAMBIA, Y ES EL ÚNICO DE LOS SIETE.**
+      //    La receta ya llevaba folio en el papel: el `R-…` de arriba, que es lo
+      //    que resuelve el QR de verificación pública (`/r/[folio]`) y lo que
+      //    esa página muestra. La base asigna ADEMÁS su `RX-…` de serie, y
+      //    imprimir los dos obligaría a decidir cuál se cita. Se imprime el que
+      //    verifica; `folioImpreso()` lo declara en un solo sitio y por eso este
+      //    formulario no lo pasa al PDF aunque lo tenga aquí.
+      //
+      //    Va con el cliente de SESIÓN del médico, nunca con privilegios de
+      //    servicio: el trigger exenta por completo a quien no trae JWT.
+      const supabase = offlineMode ? null : createClient()
+      if (supabase) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('No autenticado')
+
+        const insertPayload: Record<string, unknown> = {
+          tipo: 'receta',
+          contenido,
+          client_id: folio,
+          subido_por: user.id,
+        }
+        if (pacienteId) insertPayload.paciente_id = pacienteId
+
+        const { data, error } = await supabase
+          .from('documentos')
+          .insert(insertPayload)
+          .select('id, folio')
+          .single()
+        if (error) throw error
+        filaId = data.id
+        folioSerie = data.folio
+        // La fila está en el expediente. Aunque el PDF falle después, la receta
+        // es recuperable desde la lista con su botón de regenerar — y el QR ya
+        // resuelve, porque lo que busca esa página es la fila, no el PDF.
+        guardado = true
+      }
+
+      // ── 4 · El PDF ────────────────────────────────────────────────────
       const verificacionUrl = `${window.location.origin}/r/${folio}`
       const [qrDataUrl, blogQrDataUrl] = await Promise.all([
         QRCode.toDataURL(verificacionUrl, {
@@ -442,10 +481,9 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
         entregar: !!offlineMode,
       })
 
-      pdfGenerated = true
       pdfBlob = blob
 
-      // 4. Persistencia
+      // ── 5 · La ruta del archivo, sobre la fila que ya existe ──────────
       if (offlineMode) {
         const { addDocument } = await import('@/lib/offline/db')
         const { getOfflineIdentity } = await import('@/lib/offline/identity')
@@ -461,38 +499,35 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
         toast.success('Receta guardada en bunker offline')
         onOfflineSave?.()
       } else {
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('No autenticado')
-
-        const insertPayload: Record<string, unknown> = {
-          tipo: 'receta',
-          contenido,
-          client_id: folio,
-          pdf_url: storagePath,
-          subido_por: user.id,
+        if (storagePath && filaId && supabase) {
+          // Este UPDATE no toca ni el estado ni el folio, así que el trigger lo
+          // deja pasar. No es fatal si falla: la fila está y el PDF se entrega
+          // igual; lo que se pierde es la descarga desde la lista, que el botón
+          // de regenerar repone.
+          const { error } = await supabase
+            .from('documentos')
+            .update({ pdf_url: storagePath })
+            .eq('id', filaId)
+          if (error) console.error('[RecetaForm] update pdf_url:', error.message)
         }
-        if (pacienteId) insertPayload.paciente_id = pacienteId
-
-        const { error } = await supabase.from('documentos').insert(insertPayload)
-        if (error) throw error
-
-        // Sin storagePath la fila se inserta igual pero sin PDF en Storage:
-        // mobileShare captura el error de subida y no lo relanza. El documento
-        // no queda recuperable desde la lista y el modal tiene que decirlo.
-        guardado = storagePath !== null
-        toast.success('Receta guardada')
+        // El folio del toast es el de SERIE, no el impreso: es el que se cita
+        // dentro de la clínica y el único que el buscador de folios encuentra.
+        toast.success(folioSerie ? `Receta guardada · ${folioSerie}` : 'Receta guardada')
       }
     } catch (err) {
-      if (!pdfGenerated) {
-        // El error ocurrió antes/durante el PDF → ningún orphan record
-        toast.error('No se pudo generar el PDF. Intenta de nuevo.')
-        setErrorGuardado('No se pudo generar el PDF. Intenta de nuevo.')
+      // Tres desenlaces, y el del medio es nuevo: con la fila escrita antes que
+      // el PDF, un fallo de render deja una receta emitida y un folio consumido.
+      let msg: string
+      if (offlineMode) {
+        msg = 'No se pudo generar el PDF. Intenta de nuevo.'
+      } else if (filaId === null) {
+        msg = 'No se pudo guardar la receta, así que no se generó el PDF. Intenta de nuevo.'
       } else {
-        // PDF OK pero persistencia fallida
-        toast.error('Receta generada pero no se pudo guardar. Revisa errores de sincronización.')
-        setErrorGuardado('Error al guardar la receta.')
+        msg = `La receta quedó registrada${folioSerie ? ` con folio ${folioSerie}` : ''}, pero no se `
+          + 'pudo generar el PDF. Búscala en la lista de documentos del paciente y recupérala desde ahí.'
       }
+      toast.error(msg)
+      setErrorGuardado(msg)
       // eslint-disable-next-line no-console
       console.error('[RecetaForm] imprimir falló:', err)
     } finally {
