@@ -430,7 +430,11 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
     const holgura = FONDO_DE_CAJA - finDelContenido(a)
 
     /*
-      **68.43 pt**, contra los 75.79 de la guía, y la resta cierra EXACTA con cinco sumandos:
+      **102.43 pt**, contra los 75.79 de la guía. La cifra se lee en dos pasos y el segundo es
+      nuevo:
+
+      1 · La composición daba **68.43**, y esa resta contra la guía cerraba EXACTA con cinco
+          sumandos:
 
           +2.85   el panel, que las nueve láminas miden en 58.85 y el chasis compone en 56
           +0.47   la línea del familiar: la guía mide con la celda VACÍA y este caso trae dato
@@ -440,10 +444,18 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
           ──────
           −7.36   75.79 → 68.43
 
-      ⚠ **LOS CUATRO PRIMEROS SON RESIDUOS Y EL QUINTO NO.** Es una divergencia con la guía, va
-      reportada, y el documento sigue cabiendo en su hoja con 68 pt de sobra.
+          ⚠ Los cuatro primeros son residuos y el quinto no. Es una divergencia con la guía y
+          va reportada.
+
+      2 · **+34.00 al retirar la declaración de sustitución de esta variante**, que son sus dos
+          piezas y nada más: **12** de separación y **22** de texto —dos renglones de 11 a
+          `casilla.texto`, 8 / 11—. Aquí ya no se compone: esta es la variante en que el
+          paciente firma por sí mismo.
+
+      Este documento no era el que apretaba, y ahora aprieta todavía menos: 102 pt de sobra son
+      seis renglones largos del párrafo de la declaración.
     */
-    expect(holgura).toBeCloseTo(68.43, 1)
+    expect(holgura).toBeCloseTo(102.43, 1)
   }, 200_000)
 
   it('la holgura de la variante por sustitución, contra los 26.04 de la guía', async () => {
@@ -455,6 +467,15 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
       **29.43 pt**, contra los 26.04 de la guía: los mismos 3.64 de arriba menos los **0.25**
       que la constancia compone de más —38 contra 37.75—. Es la variante más ajustada del
       sistema y la que hay que mirar cuando algo de este documento crezca.
+
+      ⚠ **NO SE MOVIÓ AL QUITAR LA CASILLA, Y ES LO QUE HABÍA QUE COMPROBAR.** Aquí la
+      declaración de sustitución SÍ se compone —es su variante—, así que lo único que se retiró
+      fue el cuadro de 9 × 9 y su medianil de 7: 16 pt de ANCHO, que el texto recupera al pasar
+      de 410 a los 426 del marco. No es alto, y el texto sigue ocupando dos renglones a los dos
+      anchos, así que la cota más ajustada del sistema se queda exactamente donde estaba.
+
+      La otra variante ganó 34 pt; esta, cero. Quien mida este documento tiene que seguir
+      mirando ESTA.
     */
     expect(holgura).toBeCloseTo(29.43, 1)
     expect(holgura).toBeGreaterThan(0)
@@ -563,7 +584,10 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
 
       ⚠ **NO QUEDA MARGEN PARA UN SEGUNDO RENGLÓN**, y ahí está el techo: con esta cadena y este
       procedimiento, **84 caracteres de diagnóstico caben y 85 no**. La variante en que firma el
-      paciente no lo sufre —le sobran 68 pt— y aguanta el diagnóstico entero.
+      paciente no lo sufre —le sobran 102 pt— y aguanta el diagnóstico entero.
+
+      ⚠ **EL TECHO DE LA AJUSTADA NO SUBIÓ AL QUITAR LA CASILLA.** Retirarla le devolvió 16 pt
+      de ancho al texto y ni un punto de alto, así que los 84 caracteres siguen siendo los 84.
 
       ⚠ **LOS 84 NO SON UNA REGLA, SON UNA COTA DE ESTA CADENA.** El diagnóstico y el
       procedimiento viven en el MISMO párrafo y compiten por los mismos renglones: alargar uno
@@ -571,8 +595,8 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
       sostiene y que hay que releer si esto falla es **el párrafo aguanta un renglón de más y no
       dos**.
     */
-    // La variante que firma el paciente: de 68.43 a 52.43. Le sobra de largo.
-    expect(await holguraDe(CON_DIAGNOSTICO)).toBeCloseTo(52.43, 1)
+    // La variante que firma el paciente: de 102.43 a 86.43. Le sobra de largo.
+    expect(await holguraDe(CON_DIAGNOSTICO)).toBeCloseTo(86.43, 1)
     // La ajustada: de 29.43 a 13.43. Sigue en una hoja, y sin sitio para otro renglón.
     expect(await holguraDe({ ...CON_DIAGNOSTICO, sustitucion: true })).toBeCloseTo(13.43, 1)
 
@@ -660,23 +684,33 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
     expect(contiene(b, 'Imposibilidad física para rmar')).toBe(true)
   }, 200_000)
 
-  it('la casilla se imprime en las dos variantes y solo se marca en una', async () => {
+  it('la sustitución se compone SOLO si se ejerció, y sin casilla', async () => {
     const [a] = await componer(BASE)
     const [b] = await componer(SUSTITUCION)
 
-    // La casilla sale siempre: lo que informa es que existe la posibilidad y si se ejerció.
-    expect(contiene(a, 'El paciente no puede rmar por sí mismo')).toBe(true)
+    /*
+      EN UN DOCUMENTO LEGAL NO HAY CASILLAS: se imprime la frase o no se imprime nada. Un
+      cuadrito vacío no distingue una negativa de un olvido, y aquí además salía vacío en
+      TODAS las denegaciones emitidas —el formulario ocultaba su control en esta rama y no
+      persistía el campo—, así que el papel dibujaba una posibilidad inejercitable.
+
+      El caso en que firma el paciente ya lo dice su propia firma en la retícula de tres
+      columnas; no necesita una frase que lo niegue.
+    */
     expect(contiene(b, 'El paciente no puede rmar por sí mismo')).toBe(true)
+    expect(a.texto).not.toContain('El paciente no puede')
 
     /*
-      LA MARCA ES UN RECTÁNGULO DE 5 × 5 y no un glifo de palomita: una tipografía de check
-      dependería de la fuente y no está en ninguna de las dos familias del sistema. Por eso se
-      mide como rectángulo del flujo.
+      NI EL CUADRO NI SU MARCA. La casilla era 9 × 9 con un rectángulo sólido de 5 × 5 dentro
+      —no un glifo de palomita: una tipografía de check dependería de una fuente que el sistema
+      no carga—, así que los dos se miden como rectángulos del flujo. Ninguno puede quedar.
     */
-    const marca = (hoja: Hoja): number =>
-      hoja.rectangulos.filter((r) => r.ancho === 5 && r.alto === 5).length
-    expect(marca(a)).toBe(0)
-    expect(marca(b)).toBe(1)
+    const casilla = (hoja: Hoja): number =>
+      hoja.rectangulos.filter(
+        (r) => (r.ancho === 5 && r.alto === 5) || (r.ancho === 9 && r.alto === 9),
+      ).length
+    expect(casilla(a)).toBe(0)
+    expect(casilla(b)).toBe(0)
   }, 200_000)
 
   it('el motivo entra por prop y no rompe la hoja única', async () => {

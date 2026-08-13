@@ -9,7 +9,7 @@
  *
  *   completo      los cinco firmantes, tres niveles y la hoja de anexo con fotografías
  *   sin fotos     **la hoja de anexo NO aparece**: es la verificación de la decisión 5
- *   sustitución   el nivel 2 desaparece, Testigos se renumera a 2 y la casilla sale marcada
+ *   sustitución   el nivel 2 desaparece, Testigos se renumera a 2 y se compone su declaración
  *   sin sellar    **sin trazabilidad**: ni pies de celda ni bloque de cierre
  *
  * LOS SELLOS SON LA VERIFICACIÓN DEL `completo` Y DEL `sin sellar`
@@ -245,10 +245,17 @@ const CASOS: Record<
     readonly firmantes?: typeof FIRMANTES | typeof FIRMANTES_SIN_TESTIGOS
   }
 > = {
+  /*
+    LLEVA LA TRANSFUSIÓN AUTORIZADA porque un documento completo hoy no puede no
+    llevarla: el formulario exige la respuesta para emitir. Sin ella, este caso estaría
+    midiendo un papel que ya no se puede emitir —solo reimprimir, si se firmó antes de
+    la regla—, y el caso de referencia del taller tiene que ser uno real.
+  */
   completo: {
     identificaciones: IDENTIFICACIONES,
     sellado: SELLADO,
     folio: FOLIOS.completo,
+    autorizaTransfusion: 'si',
   },
   sinFotos: {
     identificaciones: IDENTIFICACIONES_SIN_FOTO,
@@ -265,9 +272,12 @@ const CASOS: Record<
   sinSellar: { identificaciones: IDENTIFICACIONES, folio: FOLIOS.sinSellar },
   /*
     LA TRANSFUSIÓN VA EN `no` A PROPÓSITO. El `sí` es el caso amable y el que cualquiera
-    probaría; la negativa expresa es el dato con más valor legal de los dos y el que un
-    booleano habría confundido con «no se preguntó». Junto a `completo` —que no trae
-    ninguna— se ve que lo que distingue los dos casos es que la fila EXISTA.
+    probaría; la negativa expresa es el dato con más valor legal de los dos, y el papel la
+    compone entera —«NO autorizo…, asumiendo los riesgos»— en vez de callarla. Junto a
+    `completo`, que lleva el `sí`, se ven las dos redacciones una al lado de otra.
+
+    Y con las fotografías encima: es la pila de DOS declaraciones, para ver el aire de 8 pt
+    que las separa frente a los 12 con que la primera cuelga del marco.
   */
   autorizaciones: {
     identificaciones: IDENTIFICACIONES,

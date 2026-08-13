@@ -835,24 +835,46 @@ describe('II.7 · Consentimiento Informado', () => {
     }
   }, 200_000)
 
-  it('la casilla de sustitución se imprime siempre, marcada o no', async () => {
+  it('la sustitución se compone SOLO si se ejerció, y sin casilla', async () => {
     const normal = await componer(COMPLETO)
     const sustituido = await componer(SUSTITUCION)
 
     /*
-      LO QUE INFORMA ES QUE LA POSIBILIDAD EXISTE Y SI SE EJERCIÓ. Una casilla que solo
-      apareciera al marcarse no diría nada del caso normal, que es el 99 % de los documentos.
-      La marca es un cuadro sólido de 5 × 5, no un glifo: una palomita dependería de una
-      fuente que el sistema no carga.
-    */
-    const marca = (hojas: Hoja[]): boolean =>
-      hojas[3].rectangulos.some((r) => r.ancho === 5 && r.alto === 5)
+      EN UN DOCUMENTO LEGAL NO HAY CASILLAS. Se imprime la frase o no se imprime nada: una
+      casilla sin marcar dice «esto se podía marcar y no se marcó», y de ahí no se puede
+      distinguir una negativa de un olvido. El caso normal —el paciente firma por sí
+      mismo— ya lo dice su propia firma en el nivel 1; no necesita un cuadrito vacío.
 
-    for (const hojas of [normal, sustituido]) {
-      expect(contiene(hojas[3], 'El paciente no puede')).toBe(true)
-    }
-    expect(marca(normal)).toBe(false)
-    expect(marca(sustituido)).toBe(true)
+      La casilla era un cuadro de 9 × 9 con una marca sólida de 5 × 5 dentro. Ninguno de
+      los dos rectángulos puede quedar en la hoja, en ningún caso.
+    */
+    const casilla = (hojas: Hoja[]): boolean =>
+      hojas[3].rectangulos.some(
+        (r) => (r.ancho === 5 && r.alto === 5) || (r.ancho === 9 && r.alto === 9),
+      )
+
+    expect(contiene(sustituido[3], 'El paciente no puede')).toBe(true)
+    expect(normal[3].texto).not.toContain('El paciente no puede')
+    expect(casilla(normal)).toBe(false)
+    expect(casilla(sustituido)).toBe(false)
+  }, 200_000)
+
+  it('las autorizaciones tampoco llevan casilla: la frase o nada', async () => {
+    // El caso más cargado de los tres: la pila entera, con sus tres declaraciones.
+    const hojas = await componer({
+      ...SUSTITUCION,
+      autorizaTransfusion: 'no',
+      autorizaFotos: true,
+    })
+
+    expect(contiene(hojas[3], 'El paciente no puede')).toBe(true)
+    expect(contiene(hojas[3], sinLigadura('NO autorizo la transfusión'))).toBe(true)
+    expect(contiene(hojas[3], sinLigadura('Autorizo la toma de fotografías'))).toBe(true)
+    expect(
+      hojas[3].rectangulos.some(
+        (r) => (r.ancho === 5 && r.alto === 5) || (r.ancho === 9 && r.alto === 9),
+      ),
+    ).toBe(false)
   }, 200_000)
 
   /**
@@ -885,7 +907,19 @@ describe('II.7 · Consentimiento Informado', () => {
       expect(contiene(hojas[3], 'asumiendo los riesgos')).toBe(true)
     }, 200_000)
 
-    it('sin preguntar no se compone nada: no se insinúa que se preguntara', async () => {
+    /**
+     * ⚠ ESTE CASO YA NO SE PUEDE EMITIR, Y LA PRUEBA SIGUE AQUÍ POR ESO.
+     *
+     * La transfusión es obligatoria en el formulario: sin respuesta no se emite. Lo que
+     * este caso cubre es la REIMPRESIÓN de un consentimiento anterior a esa regla, que
+     * tiene `autorizaTransfusion: null` en la fila y es inmutable — no se corrige ni se
+     * migra, así que el formato tiene que saber componerlo mientras exista uno.
+     *
+     * Y lo que compone es NADA. Inventar una respuesta que nadie dio es falsear una
+     * declaración firmada; escribir «no se preguntó» sería meter un rótulo administrativo
+     * dentro de la declaración del paciente. El papel calla lo que la fila no sabe.
+     */
+    it('un consentimiento heredado sin respuesta se reimprime sin la frase', async () => {
       const hojas = await componer(COMPLETO)
       for (const hoja of hojas) {
         expect(hoja.texto).not.toContain(sinLigadura('transfusión'))

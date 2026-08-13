@@ -18,11 +18,21 @@
  *
  * LAS DOS VARIANTES, Y LAS DOS EN UNA HOJA
  *
- *     firma el paciente   3 firmantes   holgura **75.79 pt**
- *     por sustitución     2 firmantes   holgura **26.04 pt** — la más ajustada del documento
+ *     firma el paciente   3 firmantes   holgura **75.79 pt** de guía · **102.43** compuesta
+ *     por sustitución     2 firmantes   holgura **26.04 pt** de guía · **29.43** compuesta
+ *                                       — la más ajustada del documento y del sistema
  *
- * Lo que separa a la segunda es la constancia del motivo (37.75) más su espaciador (12). Ver
- * `EL RIESGO DECLARADO` abajo.
+ * Lo que separa a la segunda son tres bloques que la primera no tiene: la declaración de
+ * sustitución (22) con su espaciador (12) y la constancia del motivo (37.75) con el suyo (12).
+ * Ver `EL RIESGO DECLARADO` abajo.
+ *
+ * ⚠ **LAS DOS CIFRAS COMPUESTAS SE SEPARARON AL RETIRAR LA CASILLA**, y conviene saber por qué
+ * no se movieron a la vez. La declaración de sustitución dejó de componerse en la variante en
+ * que firma el paciente —antes salía en las dos, con el cuadro vacío—, así que aquella ganó sus
+ * 34 pt enteros. La de sustitución sigue componiéndola: allí lo único que se fue fue el cuadro
+ * de 9 × 9 y su medianil de 7, que son 16 pt de ANCHO y ninguno de alto. **La cota ajustada se
+ * quedó donde estaba**, y sigue siendo la que hay que mirar cuando algo de este documento
+ * crezca. Las dos, fijadas en `denegacionConsentimiento.test.ts`.
  *
  * EL PRESUPUESTO DEL ENCABEZADO, SUMADO Y NO DECLARADO
  *
@@ -141,9 +151,9 @@
  * **Se compone así y queda reportado**, porque las tres salidas están prohibidas o son peores:
  * bajar el cuerpo o el tracking es comprimir para cuadrar una hoja (I.3.4); recortar la cédula
  * con elipsis es esconder un dato de identificación profesional, que es lo que 2.H prohíbe; y
- * ensanchar la columna rompe el reparto de la guía. **La holgura lo absorbe**: la variante que lo
- * sufre es la de tres firmantes, que es la que tiene 75.79 pt de sobra, y queda en 68.43.
- * Fijado en `denegacionConsentimiento.test.ts`.
+ * ensanchar la columna rompe el reparto de la guía. **La holgura lo absorbe de sobra**: la
+ * variante que lo sufre es la de tres firmantes, la de 75.79 pt de guía, y aun con los 11 pt
+ * queda en 102.43. Fijado en `denegacionConsentimiento.test.ts`.
  *
  *   **El bloque con borde completo y fondo** (la constancia). Ya existía sin declarar en la
  *   hoja 4 de II.7, que no lo compuso: el punto (g) de su cabecera lo deja reportado como lo
@@ -216,10 +226,18 @@ const DECLARACION_3 =
   'Se me ha informado que puedo cambiar de opinión y otorgar mi consentimiento en cualquier momento.'
 
 /**
- * La casilla de sustitución, textual. **Es la misma cadena que compone II.7**, y se escribe
+ * LA DECLARACIÓN DE SUSTITUCIÓN, textual. **Es la misma cadena que compone II.7**, y se escribe
  * entera en vez de importarse de aquel formato: los dos son documentos distintos y una cadena
  * compartida ataría la redacción de uno a la del otro. Es el criterio del sistema con todas sus
  * cadenas (I.1.7).
+ *
+ * ⚠ **NO LLEVA CASILLA, Y SOLO SE COMPONE SI SE EJERCIÓ** — el mismo principio que II.7. En un
+ * documento legal se imprime la frase o no se imprime nada: una casilla sin marcar dice «esto se
+ * podía marcar y no se marcó», y de ahí no se distingue una negativa de un olvido.
+ *
+ * Aquí ese cuadrito llevaba además un defecto propio: **salía vacío en TODAS las denegaciones
+ * emitidas**, porque el formulario ocultaba su control en esta rama y nunca persistía el campo.
+ * El papel dibujaba una posibilidad que nadie podía ejercer. Ya lo guarda.
  */
 const TEXTO_SUSTITUCION =
   'El paciente no puede firmar por sí mismo; firma en su lugar el familiar o responsable, cuyos datos se asientan en el recuadro de la derecha.'
@@ -250,15 +268,20 @@ const NOTA_FAMILIAR_SUSTITUCION = 'Firma en representación del paciente'
 /**
  * SEPARACIÓN ENTRE BLOQUES DE PRIMER NIVEL — **12 pt, y son las cuatro iguales**.
  *
- *     riel → declaración          12
- *     declaración → casilla       12
- *     casilla → constancia        12   solo en la variante por sustitución
- *     casilla o constancia → firmas 12
+ *     riel → declaración                    12
+ *     declaración → sustitución             12   solo en la variante por sustitución
+ *     sustitución → constancia              12   solo en la variante por sustitución
+ *     declaración o constancia → firmas     12
  *
  * Es el único formato del sistema donde todas las separaciones de primer nivel valen lo mismo,
- * y no es casualidad: el documento tiene cuatro bloques y ninguna jerarquía entre ellos —la
- * declaración, la casilla que la califica, la constancia que explica quién firma y las firmas—.
- * Una sola constante, `espacio.12`, y ningún miembro nuevo de la escala.
+ * y no es casualidad: el documento tiene hasta cuatro bloques y ninguna jerarquía entre ellos
+ * —la declaración, la de sustitución que la califica, la constancia que explica quién firma y
+ * las firmas—. Una sola constante, `espacio.12`, y ningún miembro nuevo de la escala.
+ *
+ * ⚠ **LA CADENA TIENE DOS FORMAS Y NO UNA**, desde que la sustitución dejó de componerse
+ * siempre. En la variante en que firma el paciente son tres bloques, no cuatro: la declaración
+ * enlaza con las firmas y los dos intermedios no existen. Que las cuatro separaciones valgan lo
+ * mismo es lo que permite que la cadena se acorte sin recalcular nada.
  *
  * Faltan las tres del encabezado y las tres faltan porque ya están en el chasis: el espaciador
  * de cierre de 2.B, `transicion.tituloFilete` y `transicion.tituloRiel`. Sumar cualquiera aquí
@@ -289,13 +312,9 @@ const CONSTANCIA = {
   alto: 37.75,
 } as const
 
-/**
- * LA CASILLA DE SUSTITUCIÓN — 9 × 9 con marca sólida de 5 × 5, la misma que compone II.7.
- *
- * **No es una tipografía de check**: un glifo de palomita dependería de la fuente y no está en
- * ninguna de las dos familias del sistema.
- */
-const CASILLA = { lado: 9, marca: 5, medianil: 7 } as const
+// La casilla de sustitución —9 × 9 con marca sólida de 5 × 5— se fue con el principio de
+// arriba. Con ella se fueron sus tres cifras y el medianil de 7 que la separaba del texto:
+// la declaración ocupa ahora el ancho entero del marco. Ver `TEXTO_SUSTITUCION`.
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -348,10 +367,20 @@ export interface DenegacionConsentimientoProps {
   /**
    * VARIANTE POR SUSTITUCIÓN: el paciente no puede firmar y firma el familiar en su lugar.
    *
-   * Cambia cuatro cosas a la vez: la casilla sale marcada, **aparece la constancia del
-   * motivo**, la celda del paciente desaparece —la retícula pasa de tres columnas a dos— y la
-   * nota del familiar cambia a `Firma en representación del paciente`. Es sustitución y no
-   * adición: el familiar firma UNA vez.
+   * Y tiene sentido en una revocación tanto como en un otorgamiento: **un paciente que no
+   * puede firmar tampoco puede rechazar por escrito**, así que ahí el familiar decide por él.
+   * Es el mismo supuesto, del otro lado de la decisión.
+   *
+   * Cambia cuatro cosas a la vez: **se compone la declaración de sustitución**, aparece la
+   * constancia del motivo, la celda del paciente desaparece —la retícula pasa de tres columnas
+   * a dos— y la nota del familiar cambia a `Firma en representación del paciente`. Es
+   * sustitución y no adición: el familiar firma UNA vez.
+   *
+   * ⚠ **TUVO PRODUCTOR TARDE, Y ESTO ES LO QUE HAY QUE SABER AL LEER UNA FILA VIEJA.**
+   * `ConsentimientoInformadoForm` ocultaba su control en la rama de denegación y no persistía
+   * el campo, así que **ninguna denegación emitida hasta ahora puede traerlo**: todas se
+   * reimprimen en la variante en que firma el paciente, que es lo que su papel decía. Ya se
+   * captura y ya se guarda; las anteriores son inmutables y se quedan como están.
    */
   readonly sustitucion?: boolean
   /**
@@ -419,29 +448,20 @@ const estilos = StyleSheet.create({
   /** Las menciones destacadas van en peso 500, no 600. Ver `DECLARACION_2`. */
   destacado: { fontWeight: 500 },
 
-  // ── La casilla de sustitución
-  filaCasilla: {
+  // ── La declaración de sustitución
+  /**
+   * El ancho es el del marco de la declaración y no el de la caja: cuelga de ese bloque y se
+   * lee con él. Sin la casilla ni su medianil, el texto gana los 16 pt que ocupaban.
+   *
+   * ⚠ El token sigue llamándose `casilla.texto` y vive en `tokens.ts`, que es chasis. Ya no
+   * queda ninguna casilla en el sistema que lo justifique —II.7 la retiró antes que este
+   * formato—, así que el nombre es un fósil. Renombrarlo es trabajo de chasis y no de aquí.
+   */
+  declaracionSustitucion: {
+    ...estiloTipografico('casilla.texto'),
     width: MARCO.declaracion.ancho,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
     marginTop: SEPARACION,
   },
-  casilla: {
-    width: CASILLA.lado,
-    height: CASILLA.lado,
-    borderWidth: FILETE.fino,
-    borderColor: TINTA.negra,
-    marginRight: CASILLA.medianil,
-    flexShrink: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  marcaCasilla: {
-    width: CASILLA.marca,
-    height: CASILLA.marca,
-    backgroundColor: TINTA.negra,
-  },
-  textoCasilla: { ...estiloTipografico('casilla.texto'), flex: 1 },
 
   // ── La constancia del motivo
   /** El bloque cerrado con fondo. Ver `CONSTANCIA` antes de tocar cualquiera de sus cifras. */
@@ -619,18 +639,18 @@ export default function DenegacionConsentimiento({
         </View>
 
         {/*
-          ═══ LA CASILLA DE SUSTITUCIÓN ═══
+          ═══ LA DECLARACIÓN DE SUSTITUCIÓN — SOLO SI SE EJERCIÓ ═══
 
-          Va debajo de la declaración, **fuera del marco**, y en las DOS variantes: lo que
-          informa es que existe la posibilidad y si se ejerció. Una casilla que solo apareciera
-          al marcarse no diría nada del caso normal. Es la regla que ya sigue II.7.
+          Va debajo de la declaración, **fuera del marco**, y **solo en la variante por
+          sustitución**: se compone la frase o no se compone nada. Es la regla que ya sigue
+          II.7, y el porqué está en `TEXTO_SUSTITUCION`.
+
+          En la variante en que firma el paciente no queda hueco: la declaración enlaza
+          directamente con las firmas, con la misma separación de 12.
         */}
-        <View style={estilos.filaCasilla}>
-          <View style={estilos.casilla}>
-            {porSustitucion ? <View style={estilos.marcaCasilla} /> : null}
-          </View>
-          <Text style={estilos.textoCasilla}>{TEXTO_SUSTITUCION}</Text>
-        </View>
+        {porSustitucion ? (
+          <Text style={estilos.declaracionSustitucion}>{TEXTO_SUSTITUCION}</Text>
+        ) : null}
 
         {/*
           ═══ LA CONSTANCIA DEL MOTIVO — SOLO POR SUSTITUCIÓN ═══

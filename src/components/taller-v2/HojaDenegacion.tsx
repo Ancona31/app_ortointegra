@@ -7,9 +7,11 @@
  *
  * CINCO CASOS, Y CADA UNO ENSEÑA UNA COSA QUE NO SE VE EN LOS OTROS
  *
- *   firma el paciente   tres firmantes en TRES columnas de 142, sin constancia
- *   por sustitución     dos en dos de 228, con la constancia del motivo — **la variante más
- *                       ajustada del sistema: le quedan 13.43 pt con el diagnóstico dentro**
+ *   firma el paciente   tres firmantes en TRES columnas de 142, **sin la declaración de
+ *                       sustitución y sin constancia**: la declaración enlaza con las firmas
+ *   por sustitución     dos en dos de 228, con su declaración y la constancia del motivo — **la
+ *                       variante más ajustada del sistema: le quedan 13.43 pt con el
+ *                       diagnóstico dentro**
  *   sin diagnóstico     la declaración **sin el inciso**: sin hueco, sin guion, sin coma doble
  *   familiar vacío      el campo vacío requerido del riel: conserva su rótulo y deja la línea
  *   procedimiento largo el riesgo que la guía deja declarado, con la cadena que lo destapa
@@ -23,6 +25,12 @@
  * **La retícula de firmas.** En `firma el paciente` son tres columnas iguales en una sola fila,
  * sin media fila vacía; en `por sustitución` son dos y **la celda del paciente no está**, no
  * está vacía. Es el parámetro que este formato estrenó en 2.L.
+ *
+ * **Que en `firma el paciente` no haya ni rastro de la sustitución.** Ahí había una casilla
+ * vacía con su frase, en las dos variantes, y ahora se compone la frase o no se compone nada:
+ * un cuadrito sin marcar no distingue una negativa de un olvido, y en este documento salía
+ * vacío SIEMPRE —el formulario no persistía el campo—. Poniendo las dos al lado se ve que la
+ * variante normal cierra la declaración contra las firmas, con 34 pt más de aire.
  *
  * **Los 77 pt de espacio de firma, iguales en las dos.** No se comprimen para que quepa nada:
  * es la regla 1 de 2.L y es lo que hay que comprobar de un vistazo poniendo las dos al lado.

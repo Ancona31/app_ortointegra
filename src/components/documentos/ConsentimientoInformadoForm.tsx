@@ -563,6 +563,20 @@ export default function ConsentimientoInformadoForm({
   if (!familiar.trim() && (esDenegacion || pacienteNoPuedeFirmar)) {
     faltantes.push({ clave: 'familiar', nombre: 'Familiar responsable o representante legal' })
   }
+  // LA TRANSFUSIÓN ES OBLIGATORIA, y es la única de las tres decisiones que lo
+  // es. El papel compone sus DOS respuestas —«Autorizo» y «NO autorizo, asumiendo
+  // los riesgos»— porque las dos son decisiones del paciente que tienen que
+  // constar, así que no contestar no es un tercer estado que el documento pueda
+  // expresar: sería un consentimiento firmado del que no consta si se preguntó.
+  //
+  // Sin respuesta no se emite. Sí se puede GUARDAR COMO BORRADOR sin ella: el
+  // borrador existe justo para poder estar incompleto, y no valida faltantes.
+  //
+  // La denegación no la lleva: quien rechaza el procedimiento no autoriza nada
+  // dentro de él, y su fila 4 no se compone (§2).
+  if (!esDenegacion && autorizaTransfusion === null) {
+    faltantes.push({ clave: 'transfusion', nombre: 'Autorización de transfusión' })
+  }
   if (!esDenegacion) {
     for (const k of SECCIONES_OBLIGATORIAS) {
       if (!secciones[k].trim()) faltantes.push({ clave: `seccion-${k}`, nombre: LABELS[k].titulo.slice(4) })
@@ -600,6 +614,16 @@ export default function ConsentimientoInformadoForm({
     // pulsable. `SeccionPlegable` publica ese id como parte de su contrato.
     if (clave.startsWith('seccion-')) {
       enfocarYAcercar(document.getElementById(`consentimiento-${clave.slice(8)}-cabecera`))
+      return
+    }
+    // La transfusión no es un input con ref: es un grupo de dos botones. El
+    // destino es el primero, que sí es enfocable y desde el que la flecha
+    // alcanza el otro.
+    if (clave === 'transfusion') {
+      enfocarYAcercar(
+        formRef.current?.querySelector<HTMLElement>('#consentimiento-transfusion-grupo button')
+          ?? null,
+      )
       return
     }
     const destinos: Record<string, RefObject<HTMLInputElement | null>> = {
@@ -1000,7 +1024,17 @@ export default function ConsentimientoInformadoForm({
     const contenido: Record<string, unknown> = esDenegacion
       // El diagnóstico entra: no está en el riel, pero SÍ en la declaración
       // (§5), así que es parte del documento emitido y se guarda como tal.
-      ? { paciente, lugar, fecha, edad, procedimiento, diagnostico, familiar, timezone }
+      //
+      // Y `pacienteNoPuedeFirmar` entra TAMBIÉN, que es lo que faltaba: el
+      // formato lo compone —la declaración de sustitución, la constancia del
+      // motivo, la retícula de dos columnas y la nota del familiar— y la fila
+      // no lo llevaba, así que ninguna denegación emitida podía ejercer la
+      // variante. Es dato del documento, no del flujo: sin él en la fila, un
+      // papel reimpreso saldría diciendo que el paciente firmó por sí mismo.
+      ? {
+        paciente, lugar, fecha, edad, procedimiento, diagnostico, familiar,
+        pacienteNoPuedeFirmar, timezone,
+      }
       : contenidoConsentimiento()
 
     // El borrador cargado se emite solo si lo que se imprime es un
@@ -1353,20 +1387,34 @@ export default function ConsentimientoInformadoForm({
                 className={`sp-input ${senalar('familiar') ? 'sp-doc-invalid' : ''}`} />
               {/* La casilla va PEGADA al campo que vuelve obligatorio, no con las
                   autorizaciones: marcarla cambia la regla del control de arriba,
-                  y esa relación tiene que verse de un vistazo. En denegación no
-                  se muestra — esa hoja no tiene flujo de firmado. */}
-              {!esDenegacion && (
-                <label className="sp-check sp-doc-consent-nofirma">
-                  <input id="consentimiento-nofirma" type="checkbox" className="sr-only"
-                    checked={pacienteNoPuedeFirmar}
-                    onChange={e => setPacienteNoPuedeFirmar(e.target.checked)} />
-                  <span className="sp-check__box"><Check aria-hidden="true" /></span>
-                  <span className="sp-check__label">El paciente no puede firmar</span>
-                </label>
-              )}
+                  y esa relación tiene que verse de un vistazo.
+
+                  ⚠ SE MUESTRA TAMBIÉN EN DENEGACIÓN. Estuvo oculta ahí porque
+                  aquella hoja no tiene flujo de firmado —se firma a mano—, y eso
+                  es cierto pero no era la razón entera: la casilla gobierna DOS
+                  cosas, y solo una es el flujo. La otra es el PAPEL, y en la
+                  denegación cambia cuatro cosas —la declaración de sustitución,
+                  la constancia del motivo, la celda del paciente que desaparece y
+                  la nota del familiar—. Oculta, esas cuatro no se podían ejercer:
+                  el formato las dibujaba y nadie las encendía nunca.
+
+                  Y la variante tiene sentido aquí: un paciente que no puede firmar
+                  tampoco puede rechazar por escrito, así que el familiar decide
+                  por él. Es el mismo supuesto, del otro lado de la decisión. */}
+              <label className="sp-check sp-doc-consent-nofirma">
+                <input id="consentimiento-nofirma" type="checkbox" className="sr-only"
+                  checked={pacienteNoPuedeFirmar}
+                  onChange={e => setPacienteNoPuedeFirmar(e.target.checked)} />
+                <span className="sp-check__box"><Check aria-hidden="true" /></span>
+                <span className="sp-check__label">El paciente no puede firmar</span>
+              </label>
               {pacienteNoPuedeFirmar && (
                 <p className="sp-hint">
-                  El familiar responsable firma en su lugar: su nombre pasa a ser obligatorio.
+                  {/* En denegación el familiar YA era obligatorio siempre, así que
+                      prometer que «pasa a serlo» sería enseñar una regla falsa. */}
+                  {esDenegacion
+                    ? 'El familiar responsable firma en su lugar, y así lo dirá el documento.'
+                    : 'El familiar responsable firma en su lugar: su nombre pasa a ser obligatorio.'}
                 </p>
               )}
             </div>
@@ -1392,8 +1440,18 @@ export default function ConsentimientoInformadoForm({
                 <span className="sp-label-field" id="consentimiento-transfusion">
                   Autoriza transfusión de sangre
                 </span>
-                <div className="sp-doc-segmented sp-doc-segmented--field" role="group"
-                  aria-labelledby="consentimiento-transfusion">
+                {/* Obligatoria: el papel compone las DOS respuestas, así que no
+                    contestar no es un estado que el documento pueda expresar.
+                    Se señala en rojo como los demás campos.
+
+                    SIN `aria-invalid`, y no por descuido: ni `role="group"` ni
+                    `button` lo admiten —lo dice ARIA y lo comprueba jsx-a11y—.
+                    Lo que anuncia el faltante es el banner, que lo nombra, y el
+                    foco que este formulario lleva hasta el primer botón. Es la
+                    misma estrategia que el resto del formulario, no una excepción. */}
+                <div id="consentimiento-transfusion-grupo"
+                  className={`sp-doc-segmented sp-doc-segmented--field ${senalar('transfusion') ? 'sp-doc-invalid' : ''}`}
+                  role="group" aria-labelledby="consentimiento-transfusion">
                   {(['si', 'no'] as const).map(v => (
                     <button key={v} type="button" aria-pressed={autorizaTransfusion === v}
                       onClick={() => setAutorizaTransfusion(v)} className="sp-doc-segmented__opt">

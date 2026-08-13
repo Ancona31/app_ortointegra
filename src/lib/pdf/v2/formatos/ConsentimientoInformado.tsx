@@ -232,7 +232,22 @@ const ENTRADILLA_DESCRIPCION =
 const ENTRADILLA_RIESGOS =
   'Derivados de la localización anatómica y de las condiciones particulares del paciente. Se le han explicado de forma verbal y se detallan a continuación.'
 
-/** La casilla de sustitución, textual. */
+/**
+ * ═══ LAS TRES DECLARACIONES DEL PACIENTE ═══
+ *
+ * ⚠ **NO LLEVAN CASILLA, Y ESE ES EL PRINCIPIO DEL BLOQUE.** En un documento legal se
+ * imprime la frase o no se imprime nada. Una casilla sin marcar dice «esto se podía
+ * marcar y no se marcó», que es una ambigüedad que un papel firmado no debe tener: el
+ * lector no sabe si el paciente contestó que no, si nadie preguntó, o si se olvidó la
+ * marca. Las tres lecturas caben en el mismo cuadrito vacío y una de ellas es falsa.
+ *
+ * Compuesto como frase, el papel solo puede decir lo que pasó. Lo que no pasó no ocupa
+ * sitio — que es exactamente lo que hace el resto del sistema con las ranuras vacías.
+ *
+ * Sustituyó a un render de tres filas con casilla de 9 × 9: la de sustitución se
+ * imprimía SIEMPRE, marcada o no, y las dos autorizaciones llevaban una casilla siempre
+ * marcada que no podía significar más que «esta declaración está aquí».
+ */
 const TEXTO_SUSTITUCION =
   'El paciente no puede firmar por sí mismo; firma en su lugar el familiar o responsable, cuyos datos se asientan en el recuadro de la derecha.'
 
@@ -415,8 +430,9 @@ const DECLARACION_3 =
  *   riel → §1                         **28**
  *   entre secciones                   ** 8** y **20**   ver el punto (d) de la cabecera
  *   rótulo → declaración              ** 8**
- *   declaración → casilla             **12**
- *   casilla → nivel                   **12**
+ *   declaración → declaraciones       **12**
+ *   entre declaraciones               ** 8**
+ *   declaraciones → nivel             **12**
  *   nivel → celdas                    ** 6**
  *   celdas → nivel                    **12**
  *   espaciador del anexo              **20**   lo aporta 2.B, por hoja
@@ -436,10 +452,11 @@ const SEPARACION_RIEL_SECCION = ESPACIO[26] + ESPACIO[2]
 const SEPARACION_SECCIONES_HOJA_2 = ESPACIO[8]
 const SEPARACION_SECCIONES_HOJA_3 = ESPACIO[20]
 const SEPARACION_ROTULO_DECLARACION = ESPACIO[8]
-const SEPARACION_DECLARACION_CASILLA = ESPACIO[12]
-/** Entre casillas de la misma pila de declaraciones. Ver `filaAutorizacion`. */
-const SEPARACION_CASILLA_AUTORIZACION = ESPACIO[8]
-const SEPARACION_CASILLA_NIVEL = ESPACIO[12]
+/** Del marco de la declaración a la PRIMERA que se componga, sea cual sea de las tres. */
+const SEPARACION_DECLARACION_PACIENTE = ESPACIO[12]
+/** Entre declaraciones de la misma pila. Ver `declaracionPacienteSiguiente`. */
+const SEPARACION_ENTRE_DECLARACIONES = ESPACIO[8]
+const SEPARACION_DECLARACIONES_NIVEL = ESPACIO[12]
 const SEPARACION_NIVEL_CELDAS = ESPACIO[5] + 1
 const SEPARACION_CELDAS_NIVEL = ESPACIO[12]
 
@@ -636,40 +653,49 @@ export interface ConsentimientoInformadoProps {
   /**
    * VARIANTE POR SUSTITUCIÓN: el paciente no puede firmar y firma el familiar en su lugar.
    *
-   * Cambia tres cosas a la vez: la casilla sale marcada, el familiar ocupa la segunda celda
-   * del nivel 1, y **el nivel 2 desaparece entero** — ya firmó arriba—, con lo que Testigos
-   * se renumera a 2. Es una variante por sustitución, no por adición: no hay nada que
-   * añadir, hay un nivel que se va.
+   * Cambia tres cosas a la vez: **se compone la declaración de sustitución**, el familiar
+   * ocupa la segunda celda del nivel 1, y **el nivel 2 desaparece entero** —ya firmó
+   * arriba—, con lo que Testigos se renumera a 2. Es una variante por sustitución, no por
+   * adición: no hay nada que añadir, hay un nivel que se va.
+   *
+   * Sin ella no se compone nada, y no una casilla vacía: el caso normal —el paciente firma
+   * por sí mismo— ya lo dice su propia firma en el nivel 1.
    */
   readonly pacienteNoPuedeFirmar?: boolean
   /**
    * LAS DOS AUTORIZACIONES DEL PACIENTE (`DOCUMENTOS_SPEC.md` II.7 §2 y §3).
    *
-   * Las dos COLAPSAN por separado, y el bloque entero desaparece si no viene ninguna: un
-   * consentimiento donde no se preguntó por la transfusión no debe imprimir una línea que
-   * insinúe que sí se preguntó.
-   *
    * ⚠ **ENTRAN SUELTAS Y NO DENTRO DE UN OBJETO `autorizaciones`.** Ese objeto no existe
    * en ningún formulario: `ConsentimientoInformadoForm` guarda las dos claves en la raíz
    * de `contenido`, con estos nombres. Agruparlas aquí obligaba a que alguien las
-   * envolviera por el camino, y envolver es traducir. La regla de colapso conjunto —sin
-   * ninguna de las dos, el bloque entero desaparece— no necesitaba el objeto: se lee
-   * igual de bien de dos campos que de uno.
+   * envolviera por el camino, y envolver es traducir.
    *
-   * `autorizaTransfusion` es TRI-ESTADO y no un booleano, y la distinción es la que
-   * importa: ausente es «no se preguntó» y `'no'` es «el paciente lo rechazó
-   * expresamente». Con un booleano los dos casos se compondrían igual —sin línea— y se
-   * perdería una negativa explícita, que es justo el dato con más valor legal de los dos.
+   * ── LA TRANSFUSIÓN SE COMPONE EN SUS DOS RESPUESTAS ───────────────────────
    *
-   * ⚠ El formulario guarda el tercer estado como `null` y aquí es la ausencia de la
-   * propiedad. Es lo único que queda entre los dos extremos en este campo, y es cambio de
-   * forma, no de nombre: no entra en este paso.
+   * `'si'` y `'no'` imprimen cada una su frase. Las dos, porque las dos son decisiones del
+   * paciente y las dos tienen que constar: una negativa expresa a una transfusión es el
+   * dato con más valor legal del bloque, y callarla porque «no autorizó» sería componer un
+   * papel que no dice lo que el paciente decidió.
+   *
+   * **No hay tercer caso.** Si el consentimiento se firma, esa pregunta se hizo:
+   * `ConsentimientoInformadoForm` la exige entre los faltantes y sin respuesta no emite.
+   *
+   * ⚠ **POR ESO ES OPCIONAL, Y SOLO POR ESO.** El tipo admite la ausencia para los
+   * consentimientos EMITIDOS ANTES de esa regla, que tienen `autorizaTransfusion: null` en
+   * la fila y son inmutables. Al reimprimir uno de ellos la pila se compone sin esta
+   * frase: el papel calla lo que la fila no sabe, que es lo único honesto que puede hacer.
+   * Componer una respuesta que nadie dio sería inventarla; componer «no se preguntó» sería
+   * un rótulo administrativo dentro de una declaración firmada. Un documento nuevo no
+   * puede llegar aquí sin respuesta.
    */
   readonly autorizaTransfusion?: 'si' | 'no'
   /**
    * Autorización de uso de fotografías. Booleano porque su ausencia y su negativa son lo
-   * mismo: no hay autorización, y sin autorización no se fotografía. Solo se compone
-   * cuando es `true`, que es lo que hace v1.
+   * mismo: no hay autorización, y sin autorización no se fotografía.
+   *
+   * Solo se compone cuando es `true` —que es lo que hace v1—, y sin casilla: un «no
+   * autorizo fotografías» no es una decisión que el papel necesite acreditar, a diferencia
+   * de la transfusión. Lo que gobierna es que sin autorización no se fotografía.
    */
   readonly autorizaFotos?: boolean
   /**
@@ -794,7 +820,7 @@ const estilos = StyleSheet.create({
     borderBottomColor: TINTA.hairline,
   },
 
-  // ── Declaración y casilla
+  // ── Declaración y la pila de decisiones del paciente
   declaracion: { marginTop: SEPARACION_ROTULO_DECLARACION },
   parrafoDeclaracion: { ...estiloTipografico('seccion.parrafo'), ...JUSTIFICADO },
   parrafoDeclaracionSiguiente: {
@@ -804,41 +830,34 @@ const estilos = StyleSheet.create({
   },
   /** Las dos menciones destacadas van en peso 500, no 600. Ver `DECLARACION_2`. */
   destacado: { fontWeight: 500 },
-  filaCasilla: {
+  /**
+   * LA PRIMERA DECLARACIÓN DE LA PILA, la que se componga de las tres. Los 12 pt van
+   * aquí y no en un contenedor porque **cuál es la primera depende del caso**: si el
+   * paciente firma por sí mismo, la de sustitución no existe y quien abre la pila es la
+   * transfusión.
+   *
+   * El ancho es el del marco de la declaración, no el de la caja: la pila cuelga de ese
+   * bloque y se lee con él, no con la hoja.
+   *
+   * ⚠ El token sigue llamándose `casilla.texto` y vive en `tokens.ts`, que es chasis: la
+   * casilla se fue de este formato y de la denegación no, así que el token conserva su
+   * nombre y su único consumidor restante le da sentido.
+   */
+  declaracionPaciente: {
+    ...estiloTipografico('casilla.texto'),
     width: MARCO.declaracion.ancho,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginTop: SEPARACION_DECLARACION_CASILLA,
+    marginTop: SEPARACION_DECLARACION_PACIENTE,
   },
   /**
-   * La casilla: 9 × 9 con borde de `filete.fino` y una marca sólida de 5 × 5 dentro. **No
-   * es una tipografía de check**: un glifo de palomita dependería de la fuente y no está en
-   * ninguna de las dos familias del sistema.
+   * Las siguientes, con **menos aire**: del marco de la declaración a la pila hay 12 pt
+   * porque son dos bloques distintos; entre declaraciones hay 8 porque son la misma pila
+   * de decisiones del paciente, una debajo de otra. Es el mismo criterio con el que 2.G
+   * separa las entradas de una lista del bloque que las abre.
    */
-  casilla: {
-    width: 9,
-    height: 9,
-    borderWidth: FILETE.fino,
-    borderColor: TINTA.negra,
-    marginRight: 7,
-    flexShrink: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  marcaCasilla: { width: 5, height: 5, backgroundColor: TINTA.negra },
-  textoCasilla: { ...estiloTipografico('casilla.texto'), flex: 1 },
-  /**
-   * Las filas de autorización. Misma anatomía que `filaCasilla` y **menos aire**: entre la
-   * declaración y su casilla hay 12 pt porque son dos bloques distintos; entre la casilla
-   * de sustitución y las autorizaciones hay 8 porque son la misma pila de declaraciones
-   * del paciente, una debajo de otra. Es el mismo criterio con el que 2.G separa las
-   * entradas de una lista del bloque que las abre.
-   */
-  filaAutorizacion: {
+  declaracionPacienteSiguiente: {
+    ...estiloTipografico('casilla.texto'),
     width: MARCO.declaracion.ancho,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginTop: SEPARACION_CASILLA_AUTORIZACION,
+    marginTop: SEPARACION_ENTRE_DECLARACIONES,
   },
 
   // ── Rótulos de nivel y retícula de firmas
@@ -861,7 +880,7 @@ const estilos = StyleSheet.create({
     height: FILETE.regla,
     backgroundColor: TINTA.hairline,
   },
-  bloqueNivel: { marginTop: SEPARACION_CASILLA_NIVEL },
+  bloqueNivel: { marginTop: SEPARACION_DECLARACIONES_NIVEL },
   bloqueNivelSiguiente: { marginTop: SEPARACION_CELDAS_NIVEL },
   /** El pie de sello de una celda de firma. El aire de 2 pt lo pone 2.L. */
   sello: { ...estiloTipografico('sello.pie') },
@@ -1227,6 +1246,27 @@ export default function ConsentimientoInformado({
   const hayAnexo = identificados.some((i) => tieneValor(i.foto))
 
   /**
+   * LAS DECLARACIONES QUE ESTE DOCUMENTO COMPONE, en su orden fijo.
+   *
+   * Se arma la lista antes de componer y no se decide fila a fila porque **el aire
+   * depende de cuál sea la primera, no de cuál sea**: la de arriba cuelga del marco a
+   * 12 pt y las demás se apilan a 8. Con tres condicionales sueltas, quitar la de
+   * sustitución dejaba a la transfusión abriendo la pila con el aire de una continuación.
+   *
+   * ⚠ **LA TRANSFUSIÓN SE COMPONE EN SUS DOS RESPUESTAS Y NO TIENE TERCER CASO.** Si el
+   * consentimiento se firma, esa pregunta se hizo: el formulario la exige para emitir.
+   * Que falte solo puede pasar al REIMPRIMIR un consentimiento anterior a esa regla, y
+   * entonces no se compone nada — ver la prop, donde está lo que eso significa.
+   */
+  const declaracionesDelPaciente: readonly string[] = [
+    ...(pacienteNoPuedeFirmar === true ? [TEXTO_SUSTITUCION] : []),
+    ...(autorizaTransfusion === undefined
+      ? []
+      : [autorizaTransfusion === 'si' ? AUTORIZA_TRANSFUSION_SI : AUTORIZA_TRANSFUSION_NO]),
+    ...(autorizaFotos === true ? [AUTORIZA_FOTOS] : []),
+  ]
+
+  /**
    * ¿ESTE FIRMANTE TIENE FOTOGRAFÍA EN EL ANEXO? Se cruza por el ROL, que es la misma cadena
    * en las dos listas —`Paciente`, `Testigo 1`— y el único dato que las une. El médico nunca
    * la tiene: el anexo reproduce la identificación de quien CONSIENTE, no la de quien informa.
@@ -1460,55 +1500,31 @@ export default function ConsentimientoInformado({
           </View>
 
           {/*
-            LA CASILLA DE SUSTITUCIÓN. Se imprime SIEMPRE —marcada o sin marcar—, porque lo
-            que informa es que existe la posibilidad y si se ejerció: una casilla que solo
-            apareciera al marcarse no diría nada del caso normal.
-          */}
-          <View style={estilos.filaCasilla}>
-            <View style={estilos.casilla}>
-              {pacienteNoPuedeFirmar === true ? <View style={estilos.marcaCasilla} /> : null}
-            </View>
-            <Text style={estilos.textoCasilla}>{TEXTO_SUSTITUCION}</Text>
-          </View>
-
-          {/*
-            ═══ LAS AUTORIZACIONES ═══
+            ═══ LAS DECLARACIONES DEL PACIENTE ═══
 
             Van AQUÍ —entre la declaración y las firmas— porque es donde II.7 §3 las pone y
-            porque es lo que son: declaraciones del paciente, en la misma hoja donde firma.
+            porque es lo que son: decisiones del paciente, en la misma hoja donde firma.
             Debajo del cuerpo clínico no serían lo mismo; ahí serían información.
 
-            La casilla va SIEMPRE MARCADA, al revés que la de sustitución. No es un
-            descuido: en la de sustitución la marca dice si se ejerció, y aquí lo que se
-            ejerció ya lo dice el texto —`Autorizo` o `NO autorizo`—, así que la marca solo
-            puede significar «esta declaración forma parte de este documento». Una casilla
-            sin marcar junto a `NO autorizo` sería ilegible: no se sabría si el paciente
-            rechazó la transfusión o si nadie contestó nada.
+            SE COMPONE LA FRASE O NO SE COMPONE NADA. Ninguna lleva casilla — ver la
+            cabecera de `TEXTO_SUSTITUCION`, donde está el porqué.
 
-            Lo que distingue «no se preguntó» de «rechazó» es que la fila EXISTA. Ver
-            `autorizaTransfusion`.
+            El orden es fijo y no depende de cuáles existan: sustitución, transfusión,
+            fotografías. Va de lo que afecta a la firma misma a lo que afecta al
+            tratamiento y de ahí a lo accesorio, que es como se leen las tres.
           */}
-          {autorizaTransfusion === undefined ? null : (
-            <View style={estilos.filaAutorizacion}>
-              <View style={estilos.casilla}>
-                <View style={estilos.marcaCasilla} />
-              </View>
-              <Text style={estilos.textoCasilla}>
-                {autorizaTransfusion === 'si'
-                  ? AUTORIZA_TRANSFUSION_SI
-                  : AUTORIZA_TRANSFUSION_NO}
-              </Text>
-            </View>
-          )}
-
-          {autorizaFotos === true ? (
-            <View style={estilos.filaAutorizacion}>
-              <View style={estilos.casilla}>
-                <View style={estilos.marcaCasilla} />
-              </View>
-              <Text style={estilos.textoCasilla}>{AUTORIZA_FOTOS}</Text>
-            </View>
-          ) : null}
+          {declaracionesDelPaciente.map((texto, indice) => (
+            <Text
+              key={texto}
+              style={
+                indice === 0
+                  ? estilos.declaracionPaciente
+                  : estilos.declaracionPacienteSiguiente
+              }
+            >
+              {texto}
+            </Text>
+          ))}
 
           <View style={estilos.bloqueNivel}>
             <RotuloNivel numero={1} rotulo={NIVEL_OTORGAMIENTO} acento={acento} />
