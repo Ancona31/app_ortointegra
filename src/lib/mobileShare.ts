@@ -55,31 +55,91 @@ let isGenerating = false
  * pregunta se responde donde vive la respuesta, y `puedeComponer()` es lo único
  * que el modal necesita saber.
  *
- * ── ESTADO HOY: SOLO v1, EN LOS ONCE ────────────────────────────────────────
+ * ── ESTADO HOY: LOS NUEVE FORMATOS EN LAS DOS, LOS DOS RESTANTES EN v1 ──────
  *
- * Ningún formato tiene todavía adaptador v2 —los nueve componentes de
- * `src/lib/pdf/v2/formatos/` reciben props tipadas y nadie construye esas props
- * desde el `contenido` que guardan los formularios—, y **ninguna fila puede
- * traer 2**: la columna `formato_version` no está aplicada y nada la escribe.
- * Así que este mapa describe la realidad y no la anticipa. Cada formato entra
- * en la lista de v2 en el mismo commit que su adaptador, ni antes ni después.
+ * Los nueve documentos del sistema tienen adaptador —`src/lib/pdf/v2/adaptadores/`,
+ * que construye las props tipadas del formato desde el `contenido` que guardan los
+ * formularios—, así que esta compilación sabe componerlos en las dos versiones: v1
+ * para las mil y pico filas ya emitidas, v2 para las nuevas.
+ *
+ * `nota_evolucion` y `expediente_completo` **no son documentos de este sistema**:
+ * no se emiten desde los formularios, no llevan folio y no tienen formato v2. Se
+ * quedan en v1 y por eso `generarPdf` no puede tener a v2 como valor por defecto.
  */
 const VERSIONES_POR_TIPO: Readonly<Record<string, readonly number[]>> = {
-  receta: [1],
-  solicitud_lab: [1],
-  solicitud_imagen: [1],
-  plan_suplementacion: [1],
-  nota_honorarios: [1],
-  solicitud_internamiento: [1],
-  escrito_medico: [1],
-  consentimiento_informado: [1],
-  denegacion_consentimiento: [1],
+  receta: [1, 2],
+  solicitud_lab: [1, 2],
+  solicitud_imagen: [1, 2],
+  plan_suplementacion: [1, 2],
+  nota_honorarios: [1, 2],
+  solicitud_internamiento: [1, 2],
+  escrito_medico: [1, 2],
+  consentimiento_informado: [1, 2],
+  denegacion_consentimiento: [1, 2],
   nota_evolucion: [1],
   expediente_completo: [1],
 }
 
-/** Chasis con el que se emite un documento nuevo mientras v2 esté apagado. */
+/**
+ * Con qué chasis se compone un documento cuya fila no dice cuál.
+ *
+ * **Es la respuesta para lo VIEJO, no el interruptor de lo nuevo.** La columna
+ * `formato_version` nació `NOT NULL DEFAULT 1` —«todo lo que ya existe es v1»—, y
+ * este valor es lo que la repone cuando llega `undefined` a runtime. No lo subas a
+ * 2: haría que las filas de antes de la columna se reimprimieran con un chasis que
+ * no es el suyo, que es exactamente lo que la versión de formato existe para
+ * impedir.
+ */
 export const FORMATO_VERSION_POR_DEFECTO = 1
+
+/**
+ * EL INTERRUPTOR DE v2, Y ES ESTA CONSTANTE. No hay ninguna otra.
+ *
+ * Con qué chasis se emite un documento NUEVO. Los nueve formularios la pasan a
+ * `generarPdf` y escriben ESTE MISMO valor en `documentos.formato_version`, en el
+ * mismo acto: la fila tiene que decir con qué se compuso el papel o la reimpresión
+ * dejará de coincidir con lo que el paciente firmó.
+ *
+ * ── POR QUÉ NO SE LEE NINGÚN INDICADOR POR MÉDICO ───────────────────────────
+ *
+ * `profiles.usa_documentos_v2` existe como migración y **se queda sin aplicar y
+ * sin usar**: el encendido es para todos a la vez, decidido tras probar los nueve
+ * documentos en la rama. Un despliegue por médico obligaría a que el formulario
+ * esperase al perfil antes de saber qué compone, y a que dos médicos de la misma
+ * clínica emitieran papeles distintos del mismo acto.
+ *
+ * ── VOLVER ATRÁS ────────────────────────────────────────────────────────────
+ *
+ * Poner 1 aquí devuelve la emisión entera a v1 sin tocar nada más, y lo ya emitido
+ * en v2 se sigue reimprimiendo en v2 porque su fila lo dice. Es la única palanca
+ * que hace falta.
+ */
+export const VERSION_DE_EMISION = 2
+
+/**
+ * Con qué chasis emite ESTE formulario, que no es lo mismo en la app y en el
+ * búnker.
+ *
+ * ── EL BÚNKER SE QUEDA EN v1, Y ESTO NO ES UNA INCONSISTENCIA ───────────────
+ *
+ * **Las tipografías de v2 se cargan por URL desde `/fonts/`** (ver la
+ * restricción (a) de `v2/fonts.ts`: nada de Base64, que es lo que infla el
+ * bundle de v1). El búnker se usa sin red, y si esas cinco TTF no están
+ * guardadas en su caché el PDF no se compone **en el único sitio donde no hay a
+ * quién pedir ayuda**. v1 no tiene ese riesgo: arrastra sus fuentes embebidas.
+ *
+ * ⚠ **LA CONDICIÓN QUE BORRA ESTA RAMA, escrita para que no se «arregle» por
+ * parecer una inconsistencia:** el día que el service worker del búnker
+ * precachee `/fonts/Archivo-*.ttf` e `/fonts/IBMPlexSans-*.ttf`, esta función
+ * sobra y los nueve formularios pasan a `VERSION_DE_EMISION` a secas. Hasta
+ * entonces, quitarla convierte un fallo de red en un documento que no sale.
+ *
+ * El búnker no escribe en `public.documentos` —guarda en IndexedDB y sincroniza
+ * después—, así que aquí no hay fila que pueda discrepar del papel.
+ */
+export function versionQueEmite(offlineMode?: boolean): number {
+  return offlineMode === true ? FORMATO_VERSION_POR_DEFECTO : VERSION_DE_EMISION
+}
 
 /**
  * ¿Puede esta compilación reproducir este documento con SU chasis?
@@ -108,9 +168,12 @@ export function puedeComponer(tipo: string, formatoVersion: number): boolean {
  * documento se compusiera distinto según cuándo se pida, que es exactamente lo
  * que la inmutabilidad prohíbe.
  *
- * HOY SIEMPRE CAE EN v1 porque ningún formato tiene adaptador v2 todavía; ver
- * `VERSIONES_POR_TIPO`. La guarda de arriba es lo que impide que un documento
- * v2 se cuele por la rama de v1 el día que existan filas con 2.
+ * LOS NUEVE FORMATOS DEL SISTEMA RAMIFICAN AQUÍ y los dos que no son documentos
+ * —nota de evolución y expediente completo— no aparecen en la rama de v2: no
+ * tienen formato, y `puedeComponer` los para antes de llegar.
+ *
+ * Cada rama de v2 importa **su** adaptador, no un módulo con los nueve: así el
+ * médico que imprime una receta no descarga el consentimiento entero.
  */
 async function buildClientElement(
   tipo: string,
@@ -126,6 +189,52 @@ async function buildClientElement(
   // bien»: no se compone. `generarPdf` lo convierte en el mismo error que un
   // tipo desconocido, que es lo que es.
   if (!puedeComponer(tipo, formatoVersion)) return null
+
+  if (formatoVersion === 2) {
+    switch (tipo as DocType) {
+      case 'receta': {
+        const { renderRecetaMedicaV2 } = await import('@/lib/pdf/v2/adaptadores/RecetaMedica')
+        return renderRecetaMedicaV2(props)
+      }
+      case 'solicitud_lab': {
+        const { renderSolicitudLaboratorioV2 } = await import('@/lib/pdf/v2/adaptadores/SolicitudLaboratorio')
+        return renderSolicitudLaboratorioV2(props)
+      }
+      case 'solicitud_imagen': {
+        const { renderSolicitudImagenologiaV2 } = await import('@/lib/pdf/v2/adaptadores/SolicitudImagenologia')
+        return renderSolicitudImagenologiaV2(props)
+      }
+      case 'plan_suplementacion': {
+        const { renderPlanSuplementacionV2 } = await import('@/lib/pdf/v2/adaptadores/PlanSuplementacion')
+        return renderPlanSuplementacionV2(props)
+      }
+      case 'nota_honorarios': {
+        const { renderReciboHonorariosV2 } = await import('@/lib/pdf/v2/adaptadores/ReciboHonorarios')
+        return renderReciboHonorariosV2(props)
+      }
+      case 'solicitud_internamiento': {
+        const { renderSolicitudInternamientoV2 } = await import('@/lib/pdf/v2/adaptadores/SolicitudInternamiento')
+        return renderSolicitudInternamientoV2(props)
+      }
+      case 'escrito_medico': {
+        const { renderEscritoMedicoV2 } = await import('@/lib/pdf/v2/adaptadores/EscritoMedico')
+        return renderEscritoMedicoV2(props)
+      }
+      case 'consentimiento_informado': {
+        const { renderConsentimientoInformadoV2 } = await import('@/lib/pdf/v2/adaptadores/ConsentimientoInformado')
+        return renderConsentimientoInformadoV2(props)
+      }
+      case 'denegacion_consentimiento': {
+        // El puente a v1 que este caso tenía queda LEVANTADO: la denegación se
+        // componía con la hoja 4 del renderizador viejo mientras v2 estaba
+        // apagado. Ahora es un formato propio, como los otros ocho.
+        const { renderDenegacionConsentimientoV2 } = await import('@/lib/pdf/v2/adaptadores/DenegacionConsentimiento')
+        return renderDenegacionConsentimientoV2(props)
+      }
+      default:
+        return null
+    }
+  }
 
   switch (tipo as DocType) {
     case 'receta': {
@@ -161,13 +270,10 @@ async function buildClientElement(
       return renderConsentimiento({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl, consultorio: props.consultorio })
     }
     case 'denegacion_consentimiento': {
-      // ⚠ PUENTE DECLARADO. La denegación es un formato v2, pero v2 entero
-      // sigue apagado —ninguno de sus formatos se usa en producción— y
-      // cablearlo es el paso posterior que describe la nota de arriba. Hasta
-      // entonces se emite con la hoja del renderer v1, que ya la tenía medida:
-      // era su hoja 4 opcional. Cuando v2 se cablee, este caso cambia de
-      // destino como los otros ocho, no antes. Ver `soloDenegacion` en
-      // ConsentimientoInformadoPdf.tsx.
+      // La hoja 4 del renderizador viejo, que es con lo que se emitieron las
+      // denegaciones anteriores al encendido de v2. Sigue viva por ellas: es su
+      // chasis y con él se reimprimen. Lo nuevo va por la rama de arriba. Ver
+      // `soloDenegacion` en ConsentimientoInformadoPdf.tsx.
       const { renderDenegacion } = await import('@/lib/pdf/ConsentimientoInformadoPdf')
       return renderDenegacion({ medico: props.medico, data: props.data as never, logoUrl: props.logoUrl, consultorio: props.consultorio })
     }
@@ -256,11 +362,16 @@ export async function generarPdf(params: {
   /**
    * CHASIS CON EL QUE SE COMPONE. Sin él, v1.
    *
-   * Lo pasa quien REGENERA, leyéndolo de `documentos.formato_version`: un
-   * documento se reimprime con el chasis con que se emitió o deja de ser el
-   * mismo documento. Los formularios no lo pasan todavía —todos emiten v1—;
-   * cuando el flag `usa_documentos_v2` se encienda, lo pasarán junto con el
-   * valor que escriban en la fila, que tienen que ser el mismo.
+   * Lo pasan los dos extremos y por motivos distintos:
+   *
+   *   · Quien EMITE manda `VERSION_DE_EMISION`, el mismo valor que escribe en
+   *     `documentos.formato_version`. Los dos tienen que ser el mismo número o
+   *     la fila mentiría sobre el papel que salió.
+   *   · Quien REGENERA lo lee de la fila: un documento se reimprime con el
+   *     chasis con que se emitió o deja de ser el mismo documento.
+   *
+   * El defecto de v1 es para los llamadores que no son documentos del sistema
+   * —la nota de evolución y el expediente completo—, que no tienen formato v2.
    */
   formatoVersion?: number
 }): Promise<GenerarPdfResult> {

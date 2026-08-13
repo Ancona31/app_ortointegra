@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { generateDocFileName } from '@/lib/patientUtils'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
-import { generarPdf } from '@/lib/mobileShare'
+import { generarPdf, VERSION_DE_EMISION, versionQueEmite } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
 import ModalShell from '@/components/ui/ModalShell'
 import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
@@ -805,6 +805,9 @@ export default function ConsentimientoInformadoForm({
       especialidad: medicoInfo.especialidad,
       cedula_profesional: medicoInfo.cedula_profesional,
       cedula_especialidad: medicoInfo.cedula_especialidad,
+      // El membrete de v2 la exige por normativa (I.3.7) y sin ella el
+      // renglón sale sin universidad, en silencio.
+      universidad: medicoInfo.universidad ?? null,
       color_primario: medicoInfo.color_primario,
       color_secundario: medicoInfo.color_secundario,
       direccion_consultorio: medicoInfo.direccion_consultorio,
@@ -887,7 +890,12 @@ export default function ConsentimientoInformadoForm({
       //    en el mismo acto que la registra.
       const { data, error } = await supabase
         .from('documentos')
-        .update({ estado: 'firmado' })
+        // Con la versión de formato, que es lo otro que se fija al salir de
+        // borrador. El contenido NO se toca: la huella de las firmas se calculó
+        // sobre lo guardado y reescribirlo la invalidaría en el mismo acto que
+        // la registra. La versión no entra en la huella —no es contenido del
+        // documento sino con qué se compuso— así que no la mueve.
+        .update({ estado: 'firmado', formato_version: VERSION_DE_EMISION })
         .eq('id', firmando.documentoId)
         .eq('estado', 'borrador')
         .select('id, folio')
@@ -941,6 +949,10 @@ export default function ConsentimientoInformadoForm({
         logoUrl: papel.logoUrl,
         filename: generateDocFileName(paciente, 'Consentimiento_Informado'),
         consultorio: papel.consultorio,
+        // El mismo número que el UPDATE del sellado acaba de escribir. Sin la
+        // rama del búnker: firmar exige red —sube las fotos e inserta las firmas
+        // antes de llegar aquí—, así que este camino nunca corre offline.
+        formatoVersion: VERSION_DE_EMISION,
         entregar: false,
       })
       pdfBlob = blob
@@ -1070,7 +1082,12 @@ export default function ConsentimientoInformadoForm({
         if (idBorrador) {
           const { data, error } = await supabase
             .from('documentos')
-            .update({ contenido, estado: 'emitido_firma_manual' })
+            // `formato_version` viaja AQUÍ y no en `persistirBorrador`: esta es
+            // la única ventana en que el trigger admite fijarla —la salida de
+            // borrador, que es el acto que compone el papel—. Un borrador que se
+            // reguardara cambiando de versión caería en la guarda de
+            // inmutabilidad y fallaría con un mensaje que en un borrador miente.
+            .update({ contenido, estado: 'emitido_firma_manual', formato_version: VERSION_DE_EMISION })
             .eq('id', idBorrador)
             .eq('estado', 'borrador')
             .select('id, folio')
@@ -1089,6 +1106,9 @@ export default function ConsentimientoInformadoForm({
             contenido,
             client_id: clientId,
             subido_por: user.id,
+            // Nace emitida: la versión se fija en el INSERT y desde ahí es
+            // inmutable (`20260813_formato_version_inmutable.sql`).
+            formato_version: VERSION_DE_EMISION,
           }
           if (pacienteId) insertPayload.paciente_id = pacienteId
 
@@ -1116,6 +1136,9 @@ export default function ConsentimientoInformadoForm({
         especialidad: medicoInfo.especialidad,
         cedula_profesional: medicoInfo.cedula_profesional,
         cedula_especialidad: medicoInfo.cedula_especialidad,
+        // El membrete de v2 la exige por normativa (I.3.7) y sin ella el
+        // renglón sale sin universidad, en silencio.
+        universidad: medicoInfo.universidad ?? null,
         color_primario: medicoInfo.color_primario,
         color_secundario: medicoInfo.color_secundario,
         direccion_consultorio: medicoInfo.direccion_consultorio,
@@ -1135,21 +1158,25 @@ export default function ConsentimientoInformadoForm({
         tipo: tipoTabla,
         pacienteId,
         medico: medicoData,
-        // `folio` va en las dos ramas: es lo único que la inversión de orden
-        // existe para conseguir. En el búnker offline no hay fila ni base, así
-        // que llega undefined y el papel sale sin número, igual que hoy.
-        data: esDenegacion
-          ? { paciente, lugar, fecha: fechaFmt, edad, procedimiento, diagnostico, familiar,
-              folio: folio ?? undefined }
-          : {
-            paciente, lugar, fecha: fechaFmt, edad,
-            procedimiento, diagnostico, familiar,
-            testigo1, testigo2, autorizaTransfusion, autorizaFotos,
-            secciones, folio: folio ?? undefined,
-          },
+        /*
+         * EL CONTENIDO QUE ACABA DE ESCRIBIRSE, no una segunda lista de campos.
+         * Es el mismo criterio que el sellado usa dos pantallas más arriba, y lo
+         * que garantiza que el papel emitido y el reimpreso digan lo mismo: al
+         * regenerar, lo único que hay es esta fila.
+         *
+         * Las dos ramas del ternario que había aquí volvían a enumerar los campos
+         * y **se dejaban `pacienteNoPuedeFirmar` fuera de las dos**, que es el
+         * dato que enciende la declaración de sustitución. Solo la fecha se
+         * recompone, porque el papel la lleva redactada y la fila la guarda en
+         * ISO, y el folio se añade porque es columna y no contenido.
+         */
+        data: { ...contenido, fecha: fechaFmt, folio: folio ?? undefined },
         logoUrl,
         filename: generateDocFileName(paciente, esDenegacion ? 'Denegacion_Consentimiento' : 'Consentimiento_Informado'),
         consultorio: consultorioData,
+        // El mismo número que la fila acaba de recibir, venga del INSERT o del
+        // UPDATE que saca el borrador. Ver `versionQueEmite`.
+        formatoVersion: versionQueEmite(offlineMode),
         // El búnker offline queda intacto: sigue entregando el PDF él mismo y
         // no monta el modal — onOfflineSave desmonta el formulario al guardar.
         entregar: !!offlineMode,

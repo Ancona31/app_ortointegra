@@ -13,7 +13,7 @@ import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { useProfile } from '@/hooks/useProfile'
 import { createClient } from '@/lib/supabase/client'
-import { generarPdf } from '@/lib/mobileShare'
+import { generarPdf, VERSION_DE_EMISION, versionQueEmite } from '@/lib/mobileShare'
 import { hoyEnTZ, desplazarFecha } from '@/lib/dates'
 import { enfocarYAcercar } from '@/lib/scrollDoc'
 import { MEDICAMENTOS, type MedicamentoDB } from '@/data/medicamentos'
@@ -382,6 +382,11 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
           contenido,
           client_id: folio,
           subido_por: user.id,
+          // CON QUÉ CHASIS SALE EL PAPEL. La fila nace emitida, así que la
+          // versión se fija aquí y a partir de este INSERT es inmutable
+          // (`20260813_formato_version_inmutable.sql`). Tiene que ser el mismo
+          // número que recibe `generarPdf` más abajo.
+          formato_version: VERSION_DE_EMISION,
         }
         if (pacienteId) insertPayload.paciente_id = pacienteId
 
@@ -454,6 +459,10 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
           especialidad: doctorEspecialidad,
           cedula_profesional: cedProf,
           cedula_especialidad: cedEsp,
+          // También aquí, y no solo dentro de `data`: el membrete de v2 la lee
+          // del médico, como las cédulas, y `data.universidad` es la ranura que
+          // v1 usa para el mismo dato. Las dos apuntan al mismo perfil.
+          universidad: medicoInfo?.universidad ?? null,
           color_primario: cp,
           color_secundario: cs,
           direccion_consultorio: direccion,
@@ -476,6 +485,8 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
         logoUrl,
         filename: generateDocFileName(paciente, 'Receta'),
         consultorio: consultorioData,
+        // El mismo número que acaba de escribirse en la fila. Ver `versionQueEmite`.
+        formatoVersion: versionQueEmite(offlineMode),
         // El búnker offline queda intacto: sigue entregando el PDF él mismo y
         // no monta el modal — onOfflineSave desmonta el formulario al guardar.
         entregar: !!offlineMode,

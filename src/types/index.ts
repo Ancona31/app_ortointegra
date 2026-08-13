@@ -205,11 +205,17 @@ export interface MedicoInfo {
   telefono_consultorio: string
   clinica_nombre?: string
   /**
-   * Feature flag TEMPORAL del rollout de documentos v2 (columna en
-   * public.profiles, NOT NULL DEFAULT false). Se retira cuando v2 esté al 100 %.
-   * Opcional porque la migración `20260804_profiles_flag_documentos_v2.sql`
-   * todavía no está aplicada y `/api/medico` todavía no lo selecciona.
-   * NADIE LO LEE TODAVÍA — es andamiaje inerte del Paso 0.a.
+   * ⚠ **NUNCA SE USÓ, Y YA NO VA A USARSE.** Nació como interruptor por médico
+   * del despliegue de documentos v2; el encendido acabó siendo para todos a la
+   * vez, tras probar los nueve documentos en la rama.
+   *
+   * Su migración —`20260804_profiles_flag_documentos_v2.sql`— **se queda sin
+   * aplicar**, así que la columna no existe en producción y `/api/medico` no la
+   * selecciona. El interruptor de verdad es `VERSION_DE_EMISION`, en
+   * `src/lib/mobileShare.ts`, y es una constante: ver su nota para el porqué.
+   *
+   * No lo leas desde ningún sitio. Está aquí para que quien lo encuentre en la
+   * migración sepa que no es un cable suelto.
    */
   usa_documentos_v2?: boolean
 }

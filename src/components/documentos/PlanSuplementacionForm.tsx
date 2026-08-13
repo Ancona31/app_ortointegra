@@ -8,7 +8,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { AlertTriangle, Check, ClipboardList, Printer } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import Link from 'next/link'
-import { generarPdf } from '@/lib/mobileShare'
+import { generarPdf, VERSION_DE_EMISION, versionQueEmite } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
 import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
 import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
@@ -441,6 +441,11 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
             client_id: clientId,
             paciente_id: pacienteId,
             subido_por: user.id,
+            // CON QUÉ CHASIS SALE EL PAPEL. La fila nace emitida, así que la
+            // versión se fija aquí y a partir de este INSERT es inmutable
+            // (`20260813_formato_version_inmutable.sql`). Tiene que ser el mismo
+            // número que recibe `generarPdf` más abajo.
+            formato_version: VERSION_DE_EMISION,
           })
           .select('id, folio')
           .single()
@@ -473,6 +478,9 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
         especialidad: medicoInfo.especialidad,
         cedula_profesional: medicoInfo.cedula_profesional,
         cedula_especialidad: medicoInfo.cedula_especialidad,
+        // El membrete de v2 la exige por normativa (I.3.7) y sin ella el
+        // renglón sale sin universidad, en silencio.
+        universidad: medicoInfo.universidad ?? null,
         color_primario: medicoInfo.color_primario,
         color_secundario: medicoInfo.color_secundario,
         direccion_consultorio: medicoInfo.direccion_consultorio,
@@ -518,10 +526,24 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
           // Sin fila —búnker offline o plan sin paciente— llega undefined y el
           // papel sale sin número, igual que hasta ahora.
           folio: folioImpreso('plan_suplementacion', folio),
+          /*
+           * LO QUE ESTE FORMULARIO PERSISTE, JUNTO A LO QUE v1 IMPRIME.
+           *
+           * `suplementos` de arriba es una lista enriquecida con el catálogo
+           * —presentación y beneficios— que NO se guarda en la fila; lo que se
+           * guarda es `seleccionados`, con lo que el médico eligió y escribió.
+           * v2 lee de eso, que es lo único que existirá al regenerar. Igual el
+           * peso: `peso` es la cifra que v1 rotula, `pesoKg` la que va a la fila.
+           */
+          seleccionados: elegidos,
+          pesoKg,
+          seguimiento: seguimiento || undefined,
         },
         logoUrl,
         filename: generateDocFileName(paciente, 'Plan_Suplementacion'),
         consultorio: consultorioData,
+        // El mismo número que acaba de escribirse en la fila. Ver `versionQueEmite`.
+        formatoVersion: versionQueEmite(offlineMode),
         // El búnker offline queda intacto: sigue entregando el PDF él mismo y
         // no monta el modal — onOfflineSave desmonta el formulario al guardar.
         entregar: !!offlineMode,

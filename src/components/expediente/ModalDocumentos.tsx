@@ -254,6 +254,10 @@ export default function ModalDocumentos({
         especialidad: profile.especialidad,
         cedula_profesional: profile.cedula_profesional,
         cedula_especialidad: profile.cedula_especialidad,
+        // El membrete de v2 la exige (I.3.7), así que sin ella un documento
+        // regenerado saldría sin universidad donde el original la llevaba. El
+        // perfil espejo la guarda; `medicoInfo` es el respaldo si llega vacía.
+        universidad: profile.universidad || medicoInfo?.universidad || null,
         color_primario: profile.color_primario,
         color_secundario: profile.color_secundario,
         direccion_consultorio: profile.direccion_consultorio,

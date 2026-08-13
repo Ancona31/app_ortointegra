@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { generateDocFileName } from '@/lib/patientUtils'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
-import { generarPdf } from '@/lib/mobileShare'
+import { generarPdf, VERSION_DE_EMISION, versionQueEmite } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
 import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
 import ComboEscribible from '@/components/documentos/ComboEscribible'
@@ -496,6 +496,11 @@ export default function NotaHonorariosForm({
           contenido,
           client_id: clientId,
           subido_por: user.id,
+          // CON QUÉ CHASIS SALE EL PAPEL. La fila nace emitida, así que la
+          // versión se fija aquí y a partir de este INSERT es inmutable
+          // (`20260813_formato_version_inmutable.sql`). Tiene que ser el mismo
+          // número que recibe `generarPdf` más abajo.
+          formato_version: VERSION_DE_EMISION,
         }
         if (pacienteId) insertPayload.paciente_id = pacienteId
 
@@ -521,6 +526,9 @@ export default function NotaHonorariosForm({
         especialidad: medicoInfo.especialidad,
         cedula_profesional: medicoInfo.cedula_profesional,
         cedula_especialidad: medicoInfo.cedula_especialidad,
+        // El membrete de v2 la exige por normativa (I.3.7) y sin ella el
+        // renglón sale sin universidad, en silencio.
+        universidad: medicoInfo.universidad ?? null,
         color_primario: medicoInfo.color_primario,
         color_secundario: medicoInfo.color_secundario,
         direccion_consultorio: medicoInfo.direccion_consultorio,
@@ -552,17 +560,31 @@ export default function NotaHonorariosForm({
           // En el búnker offline no hay fila ni base, así que llega undefined y
           // el papel sale sin número, igual que hasta ahora.
           folio: folioImpreso('nota_honorarios', folio),
+          /*
+           * LOS DOS NOMBRES DE LO MISMO, Y VIAJAN LOS DOS.
+           *
+           * `tipoDoc` y `total` son los que lee el renderizador v1; `tipo_doc` y
+           * `monto` son los que este formulario PERSISTE, y por tanto los únicos
+           * que existen al regenerar. El adaptador de v2 lee de los segundos —ver
+           * su cabecera—, así que aquí se añaden en vez de sustituirse: el búnker
+           * sigue emitiendo con v1 y necesita los primeros.
+           */
+          tipo_doc: tipoDoc,
+          monto: total,
           // Las seis diferencias nuevas viajan; el renderizador v1 imprime hoy
-          // las que ya conocía. Se resuelven al cablear v2, igual que la cita
-          // del escrito médico.
+          // las que ya conocía. v2 las compone todas: la vigencia la redacta su
+          // adaptador desde estas dos claves, no desde la cadena de v1.
           ...(esCotizacion
             ? {
               vigencia: `${vigenciaDias} días · hasta ${fechaLarga(vigenciaHasta)}`,
+              vigencia_dias: vigenciaDias,
+              vigencia_hasta: vigenciaHasta,
               subtotales,
               aseguradora,
             }
             : {
               formaPago,
+              forma_pago: formaPago,
               anticipo,
               saldo,
             }),
@@ -570,6 +592,8 @@ export default function NotaHonorariosForm({
         logoUrl,
         filename: generateDocFileName(paciente, esCotizacion ? 'Cotizacion' : 'Nota_Honorarios'),
         consultorio: consultorioData,
+        // El mismo número que acaba de escribirse en la fila. Ver `versionQueEmite`.
+        formatoVersion: versionQueEmite(offlineMode),
         // El búnker offline queda intacto: sigue entregando el PDF él mismo y
         // no monta el modal — onOfflineSave desmonta el formulario al guardar.
         entregar: !!offlineMode,

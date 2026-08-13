@@ -6,7 +6,7 @@ import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Printer } from 'lucide-react'
 import { flushSync } from 'react-dom'
-import { generarPdf } from '@/lib/mobileShare'
+import { generarPdf, VERSION_DE_EMISION, versionQueEmite } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
 import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
 import EditorEscrito from '@/components/documentos/EditorEscrito'
@@ -295,6 +295,11 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
           contenido: docContenido,
           client_id: clientId,
           subido_por: user.id,
+          // CON QUÉ CHASIS SALE EL PAPEL. La fila nace emitida, así que la
+          // versión se fija aquí y a partir de este INSERT es inmutable
+          // (`20260813_formato_version_inmutable.sql`). Tiene que ser el mismo
+          // número que recibe `generarPdf` más abajo.
+          formato_version: VERSION_DE_EMISION,
         }
         if (pacienteId) insertPayload.paciente_id = pacienteId
 
@@ -319,6 +324,9 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
         especialidad: medicoInfo.especialidad,
         cedula_profesional: medicoInfo.cedula_profesional,
         cedula_especialidad: medicoInfo.cedula_especialidad,
+        // El membrete de v2 la exige por normativa (I.3.7) y sin ella el
+        // renglón sale sin universidad, en silencio.
+        universidad: medicoInfo.universidad ?? null,
         color_primario: medicoInfo.color_primario,
         color_secundario: medicoInfo.color_secundario,
         direccion_consultorio: medicoInfo.direccion_consultorio,
@@ -345,6 +353,8 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
         logoUrl,
         filename: generateDocFileName(paciente, 'Escrito_Medico'),
         consultorio: consultorioData,
+        // El mismo número que acaba de escribirse en la fila. Ver `versionQueEmite`.
+        formatoVersion: versionQueEmite(offlineMode),
         // El búnker offline queda intacto: sigue entregando el PDF él mismo y
         // no monta el modal — onOfflineSave desmonta el formulario al guardar.
         entregar: !!offlineMode,
