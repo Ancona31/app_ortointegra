@@ -3,10 +3,11 @@ import type { ReactElement } from 'react'
 import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { CheckCircle, ShieldAlert, ShieldCheck } from 'lucide-react'
+import { CheckCircle, ExternalLink, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import { PREFIJO_POR_CLASE, normalizarFolio, type ClaseFolio } from '@/lib/documentos/folio'
+import BotonCopiarCedula from './BotonCopiarCedula'
 
 /* ═══ /r/[folio] — VERIFICACIÓN PÚBLICA DE AUTENTICIDAD ═══
    Esta página existe para UNA cosa: que quien tiene el papel delante —una
@@ -43,13 +44,44 @@ import { PREFIJO_POR_CLASE, normalizarFolio, type ClaseFolio } from '@/lib/docum
    `COT-AAAAMMDD-SSSSS`). Que las viejas dejen de resolver es DELIBERADO: cada
    QR ya impreso es hoy una fuga, y dejar de servirlo es el arreglo.
 
-   ⚠️ CONSECUENCIA QUE HAY QUE CONOCER: hoy el ÚNICO QR de verificación que se
-   imprime es el de Receta, y `RecetaForm.tsx` lo compone sobre el `R-…` de
-   `contenido`, no sobre la serie `RX-…` de la columna. Mientras eso siga así,
-   ningún QR impreso resuelve —tampoco los que se impriman mañana—. Para que la
-   verificación vuelva a servir hay que decidir qué folio va impreso en el papel
-   y codificar ESE en el QR; ver la nota de `folio.ts` sobre por qué la receta
-   imprime hoy el suyo y no el de serie.
+   ⚠️ QUÉ QR LLEGA HASTA AQUÍ, Y CUÁL NO LLEGARÁ NUNCA
+
+   El ÚNICO formato que imprime QR de verificación es **Receta**, y desde agosto
+   de 2026 lo compone sobre el `RX-…` de la columna: es ese cambio el que hace
+   que esta página vuelva a servir. Antes lo componía sobre el `R-a3f9…` de
+   `contenido` y ninguno resolvía.
+
+   Los otros OCHO no llevan QR, y no es un cableado a medias: Suplementación y
+   Honorarios instancian el componente `ZonaQR` (2.R) y nadie les pasa código. Se
+   quedan así. **No lo «completes»** — encender un QR es decidir que ese formato
+   se verifica en público, y eso se decide por formato, no por tener el hueco.
+
+   ⚠️ LAS RECETAS ANTERIORES A ESE CAMBIO NO VERIFICAN Y ASÍ SE QUEDA. Llevan
+   impreso un `R-…` que `normalizarFolio()` rechaza. Es el arreglo, no el daño:
+   cada uno de esos QR servía el contenido clínico entero a quien lo escaneara.
+
+   ── LO QUE SE DECIDIÓ QUE ESTA PÁGINA **NO** HACE ──────────────────────────
+
+   · **No hay estado «anulado».** Un documento emitido es inmutable, así que no
+     hay nada que anular ni ningún estado que consultar aquí.
+   · **El enlace no caduca.** Está impreso en un papel que puede consultarse años
+     después. La vigencia de una receta la juzga quien la recibe, con la fecha de
+     emisión —que esta página muestra— y el plazo reglamentario que le aplique.
+     Eso no es trabajo de esta página.
+   · **El paciente sale por iniciales, y así se queda.** Ver `iniciales()`.
+
+   ── LAS CÉDULAS: ENLACE AL REGISTRO OFICIAL, Y POR QUÉ NO VA PRELLENADO ────
+
+   Afirmar que el médico existe no es verificarlo: hay que poder comprobarlo en
+   la fuente. Por eso las cédulas llevan al buscador de la SEP. **No admite
+   prellenado por URL** —comprobado en el portal—, así que el número se copia con
+   su botón y se pega allá; un enlace por cédula no serviría de nada, porque el
+   destino es el mismo para las dos y lo que cambia es lo que se pega.
+
+   ⚠️ EL DOMINIO VA A LA VISTA ANTES DE PULSAR, con `gob.mx` destacado, y eso es
+   contenido de seguridad y no adorno: existen sitios que imitan al registro
+   oficial. Mandar a ciegas a quien está verificando algo sería lo contrario de
+   lo que esta página hace.
 
    SIN `®`: la marca está en trámite ante el IMPI (exp. 3594483) y §7·Global lo
    prohíbe en texto nuevo. */
@@ -65,6 +97,15 @@ export const metadata: Metadata = {
 
 const NAVY_POR_DEFECTO = '#1a3a5c'
 const AZUL_POR_DEFECTO = '#1e5fa8'
+
+/**
+ * El buscador de cédulas de la SEP. Dirección confirmada contra el portal.
+ *
+ * Va sin parámetros y no admite ninguno: ver la nota de cabecera. Si algún día
+ * se le añade uno, se comprueba en el portal antes —no se deduce— y se cambia
+ * también el renglón que explica por qué hay que copiar y pegar.
+ */
+const BUSCADOR_CEDULAS = 'https://cedulaprofesional.sep.gob.mx/cedula'
 
 /**
  * Qué documento es, dicho desde el PREFIJO del folio y no desde `documentos.tipo`.
@@ -328,18 +369,55 @@ export default async function VerificacionPage(
             </p>
           )}
         </div>
-        <div className="px-5 py-3 flex flex-wrap gap-4 text-xs text-slate-500">
-          {doc.cedulaProfesional !== undefined && (
-            <span>
-              <span className="font-semibold text-slate-600">Cédula Prof.:</span>{' '}
-              {doc.cedulaProfesional}
-            </span>
-          )}
-          {doc.cedulaEspecialidad !== undefined && (
-            <span>
-              <span className="font-semibold text-slate-600">Cédula Esp.:</span>{' '}
-              {doc.cedulaEspecialidad}
-            </span>
+        <div className="px-5 py-3 space-y-3">
+          <div className="flex flex-wrap gap-4 text-xs text-slate-500">
+            {doc.cedulaProfesional !== undefined && (
+              <span>
+                <span className="font-semibold text-slate-600">Cédula Prof.:</span>{' '}
+                {doc.cedulaProfesional}
+                <BotonCopiarCedula valor={doc.cedulaProfesional} que="Cédula profesional" />
+              </span>
+            )}
+            {doc.cedulaEspecialidad !== undefined && (
+              <span>
+                <span className="font-semibold text-slate-600">Cédula Esp.:</span>{' '}
+                {doc.cedulaEspecialidad}
+                <BotonCopiarCedula valor={doc.cedulaEspecialidad} que="Cédula de especialidad" />
+              </span>
+            )}
+          </div>
+
+          {/* UN SOLO ENLACE PARA LAS CÉDULAS, y va aquí —pegado a los números—
+              porque es una acción sobre ese dato, no un pie de página. El
+              destino es el mismo para las dos; lo que cambia es qué se pega, y
+              de eso se encarga el botón de cada una.
+
+              El dominio se compone VISIBLE y partido para que `gob.mx` se lea
+              como lo que es: ver la nota de cabecera sobre los sitios que imitan
+              al registro. Sin ninguna cédula el bloque no se compone — no habría
+              nada que comprobar allá. */}
+          {(doc.cedulaProfesional !== undefined || doc.cedulaEspecialidad !== undefined) && (
+            <div className="space-y-1.5">
+              <a
+                href={BUSCADOR_CEDULAS}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group inline-flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5
+                           text-xs text-slate-500 hover:text-slate-700"
+              >
+                <ExternalLink size={13} className="flex-shrink-0 self-center" aria-hidden="true" />
+                <span className="font-semibold text-slate-600 group-hover:text-slate-800">
+                  Comprueba estas cédulas en el registro oficial
+                </span>
+                <span className="font-mono text-slate-400 group-hover:text-slate-600">
+                  cedulaprofesional.sep.<span className="font-bold text-slate-600">gob.mx</span>
+                </span>
+              </a>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                El registro no recibe el número por enlace: cópialo con su botón y pégalo en el
+                buscador.
+              </p>
+            </div>
           )}
         </div>
       </div>

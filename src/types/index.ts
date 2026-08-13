@@ -279,9 +279,13 @@ export interface Documento {
    * salir de ese estado—, un formato sin clase de folio —`escrito_medico`— y
    * las filas anteriores al generador.
    *
-   * ⚠ **NO ES EL FOLIO QUE IMPRIME LA RECETA.** Aquella lleva el suyo dentro de
-   * `contenido.folio` —el `R-…` del QR de verificación— y esta columna trae
-   * además su `RX-…`. Quién imprime cuál lo decide `folioImpreso()` en
+   * **ES TAMBIÉN EL FOLIO QUE IMPRIME LA RECETA, y el que codifica su QR de
+   * verificación.** Lo fue desde agosto de 2026: antes imprimía un `R-…` propio
+   * que el navegador generaba y que guardaba en `contenido.folio`, y que
+   * `/r/[folio]` no resuelve. Las recetas de entonces conservan esa clave y se
+   * regeneran con ella.
+   *
+   * Qué formatos imprimen esta columna lo decide `folioImpreso()` en
    * `src/lib/documentos/folio.ts`, que es el único sitio donde está escrito.
    */
   folio?: string | null

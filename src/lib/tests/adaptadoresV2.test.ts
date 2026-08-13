@@ -212,7 +212,6 @@ describe('II.3 · Receta Médica', () => {
    * papel sale sin código, que es lo que hace hoy v1 por ese mismo camino.
    */
   const contenido = {
-    folio: 'R-a3f9b2c1d4e5',
     paciente: 'María Fernanda Ruiz Ortega',
     diagnostico: 'Lumbalgia mecánica',
     medicamentos: [{
@@ -227,11 +226,15 @@ describe('II.3 · Receta Médica', () => {
     fecha: '2026-08-13',
   }
 
-  it('lee el folio propio de la receta y el QR que solo existe al emitir', () => {
+  it('lee el folio de la serie y el QR que solo existe al emitir', () => {
+    // El folio llega ya filtrado por `folioImpreso()` y es el de la columna: el
+    // mismo que el QR codifica. Que sean el mismo número es la condición para
+    // que `/r/[folio]` resuelva — ver `folio.test.ts`.
     const p = propsRecetaMedica(entrada({
-      ...contenido, edad: '54 años', sexo: 'Femenino', qrDataUrl: 'data:image/png;base64,QR',
+      ...contenido, folio: 'RX-2026-0001',
+      edad: '54 años', sexo: 'Femenino', qrDataUrl: 'data:image/png;base64,QR',
     }))
-    expect(p.folio).toBe('R-a3f9b2c1d4e5')
+    expect(p.folio).toBe('RX-2026-0001')
     expect(p.qr).toBe('data:image/png;base64,QR')
     expect(p.paciente.edad).toBe('54 años')
     expect(p.medicamentos[0].principio_activo).toBe('Dexketoprofeno')
@@ -239,7 +242,10 @@ describe('II.3 · Receta Médica', () => {
   })
 
   it('al regenerar colapsan las dos celdas y el QR, sin romper la entrada', () => {
-    const p = propsRecetaMedica(entrada(contenido))
+    // El folio SÍ sobrevive a la regeneración —es columna, no ranura efímera—,
+    // y por eso entra aquí: lo que colapsa es lo que el formulario no persiste.
+    const p = propsRecetaMedica(entrada({ ...contenido, folio: 'RX-2026-0001' }))
+    expect(p.folio).toBe('RX-2026-0001')
     expect(p.qr).toBeUndefined()
     expect(p.paciente.edad).toBeUndefined()
     expect(p.paciente.sexo).toBeUndefined()
@@ -599,7 +605,7 @@ describe('los nueve componen un PDF con el caso mínimo', () => {
       entrada({ paciente: 'Jorge Medina', estudios: [{ tipo: 'Radiografía', region: 'Rodilla' }], fecha: '2026-08-13', folio: 'IMG-2026-0001' }),
     ))],
     ['receta', () => React.createElement(RecetaMedica, propsRecetaMedica(
-      entrada({ paciente: 'Jorge Medina', fecha: '2026-08-13', folio: 'R-a3f9', medicamentos: [{ nombre_comercial: 'Keral', principio_activo: 'Dexketoprofeno', indicacion: 'Cada 8 horas' }] }),
+      entrada({ paciente: 'Jorge Medina', fecha: '2026-08-13', folio: 'RX-2026-0001', medicamentos: [{ nombre_comercial: 'Keral', principio_activo: 'Dexketoprofeno', indicacion: 'Cada 8 horas' }] }),
     ))],
     ['plan_suplementacion', () => React.createElement(PlanSuplementacion, propsPlanSuplementacion(
       entrada({ paciente: 'Jorge Medina', fecha: '2026-08-13', folio: 'SUP-2026-0001', seleccionados: [{ nombre: 'Vitamina D3', dosis: '4000 UI' }] }),

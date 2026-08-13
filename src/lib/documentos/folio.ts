@@ -62,15 +62,29 @@ export type ClaseFolio = keyof typeof PREFIJO_POR_CLASE
  * Escrito en dos sitios sería el «espejo manual» que ya lastra
  * `FORMATO_VERSION_GENERADOR`: dos listas que nadie recuerda mover a la vez.
  *
- * ── LOS TRES QUE NO ─────────────────────────────────────────────────────────
+ * ── LA RECETA ENTRÓ EN LA LISTA, Y CON ELLA VOLVIÓ A SERVIR EL QR ───────────
  *
- *   `receta`                  Lleva folio, pero **el suyo**: el `R-…` que el
- *                             formulario genera, que va dentro de `contenido` y
- *                             que resuelve el QR de verificación pública
- *                             (`/r/[folio]`). La serie `RX-…` de la columna
- *                             existe y no se imprime: dos números en la misma
- *                             ranura obligarían a decidir cuál se cita, y el que
- *                             está impreso hoy es el que verifica.
+ * Hasta agosto de 2026 la receta imprimía **el suyo**: un `R-` + 12 hex que el
+ * navegador generaba, que viajaba dentro de `contenido` y que era lo que el QR
+ * de verificación codificaba. Eran dos números para el mismo papel —ese y el
+ * `RX-…` de la columna— y se resolvió a favor del de la serie, porque es el que
+ * la base garantiza único, el único que el buscador de folios encuentra y el
+ * único que se puede dictar por teléfono.
+ *
+ * ⚠ **Y era la mitad de un QR roto.** `/r/[folio]` solo resuelve folios de la
+ * serie —`normalizarFolio()` rechaza el `R-…` a propósito, ver su nota—, así que
+ * mientras el QR codificara el del navegador, ningún papel verificaba. Esta
+ * línea de la lista es la otra mitad del arreglo.
+ *
+ * Consecuencia que hay que conocer al leer una fila vieja: las recetas emitidas
+ * ANTES de este cambio conservan su `R-…` dentro de `contenido`, y regenerarlas
+ * lo vuelve a imprimir. Es correcto —el papel recuperado tiene que ser el papel
+ * entregado—; quien lo decide es el `??` de `ModalDocumentos.tsx`, que lee
+ * `contenido.folio` primero y solo cae aquí cuando no hay. Las nuevas ya no
+ * escriben esa clave, y por eso caen.
+ *
+ * ── LOS DOS QUE NO ──────────────────────────────────────────────────────────
+ *
  *   `solicitud_internamiento` La fila lleva `INT-…` y el papel no lo dice, y las
  *                             dos cosas son ciertas a la vez: el expediente
  *                             numera todo lo que emite porque una serie con
@@ -82,6 +96,7 @@ export type ClaseFolio = keyof typeof PREFIJO_POR_CLASE
  *                             documentos seriados.
  */
 const IMPRIME_FOLIO_DE_SERIE: ReadonlySet<string> = new Set([
+  'receta',
   'solicitud_lab',
   'solicitud_imagen',
   'plan_suplementacion',

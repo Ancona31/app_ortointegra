@@ -14,7 +14,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { normalizarFolio, FOLIO_CANONICO, PREFIJO_POR_CLASE } from '@/lib/documentos/folio'
+import { folioImpreso, normalizarFolio, FOLIO_CANONICO, PREFIJO_POR_CLASE } from '@/lib/documentos/folio'
 
 describe('normalizarFolio', () => {
   it('deja intacto lo que ya está en forma canónica', () => {
@@ -92,5 +92,52 @@ describe('normalizarFolio', () => {
     for (const prefijo of Object.values(PREFIJO_POR_CLASE)) {
       expect(normalizarFolio(`${prefijo}-2026-1`)).toBe(`${prefijo}-2026-0001`)
     }
+  })
+})
+
+/**
+ * Qué formato imprime el folio de la columna. Lo leen dos consumidores que están
+ * obligados a coincidir —el formulario que emite y el botón que regenera meses
+ * después—, y por eso se prueba aquí y no en ninguno de los dos.
+ */
+describe('folioImpreso', () => {
+  it('la receta imprime el folio de la serie, y es el que codifica su QR', () => {
+    // Es la mitad del arreglo de la verificación pública: `/r/[folio]` SOLO
+    // resuelve folios de esta forma. Si esta línea se cae, el QR de toda receta
+    // nueva vuelve a llevar a «No pudimos verificar este documento», y lo hace
+    // sin romper ninguna otra prueba.
+    expect(folioImpreso('receta', 'RX-2026-0001')).toBe('RX-2026-0001')
+  })
+
+  it('los seis restantes que lo imprimen', () => {
+    for (const [tipo, folio] of [
+      ['solicitud_lab', 'LAB-2026-0148'],
+      ['solicitud_imagen', 'IMG-2026-0007'],
+      ['plan_suplementacion', 'SUP-2026-0031'],
+      ['nota_honorarios', 'NOH-2026-0044'],
+      ['consentimiento_informado', 'CI-2026-0091'],
+      ['denegacion_consentimiento', 'DEN-2026-0003'],
+    ] as const) {
+      expect(folioImpreso(tipo, folio)).toBe(folio)
+    }
+  })
+
+  it('el internamiento numera la fila y no el papel', () => {
+    // La serie no tiene huecos —el expediente numera todo lo que emite— pero
+    // nadie va a citar ese número desde el hospital. Ver DOCUMENTOS_RANURAS_MUERTAS §2.
+    expect(folioImpreso('solicitud_internamiento', 'INT-2026-0004')).toBeUndefined()
+  })
+
+  it('lo que no tiene folio, y lo que la función nunca emitió', () => {
+    // El escrito médico no es documento seriado: su columna es NULL.
+    expect(folioImpreso('escrito_medico', null)).toBeUndefined()
+    // Un borrador todavía sin emitir, y una fila anterior al generador.
+    expect(folioImpreso('receta', null)).toBeUndefined()
+    expect(folioImpreso('receta', undefined)).toBeUndefined()
+    expect(folioImpreso('receta', '')).toBeUndefined()
+    // El búnker offline: no hay fila, así que no hay folio ni QR en el papel.
+    expect(folioImpreso('solicitud_lab', null)).toBeUndefined()
+    // Tipos que ningún formulario emite —subidas clínicas—: `tipo` es `string`.
+    expect(folioImpreso('estudio_laboratorio', 'RX-2026-0001')).toBeUndefined()
   })
 })

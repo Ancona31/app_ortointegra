@@ -510,6 +510,34 @@ Hardening conocido pero no aplicado todavía. Cada ítem tiene fix planeado y mo
 
 ---
 
+### QR-01 — Borrar `/api/r/[folio]`, el gemelo JSON de la verificación pública
+
+**Archivo afectado:** `src/app/api/r/[folio]/route.ts` (24 líneas, se elimina entero).
+
+**Problema:** devuelve `contenido` COMPLETO de la receta —nombre del paciente, diagnóstico y los medicamentos con su posología— en JSON, sin ninguna comprobación de clínica ni de rol. Usa `createAdminClient()`, así que la RLS no aplica. Lo único que hay delante es el middleware, que exige sesión: **cualquier médico autenticado, de cualquier clínica, lee la receta de cualquier otro** con `curl` y el folio. El rate limit de 30/h por IP acota el barrido, no el acceso.
+
+Busca por `contenido->>folio`, o sea por el `R-…` viejo: alcanza a las ~357 recetas anteriores a agosto de 2026 y a ninguna nueva. **No es un dato tranquilizador** — son justo las recetas cuyo folio va impreso en papeles que circulan por ahí.
+
+Nadie lo llama: `grep -rn "api/r/" src` fuera de la propia ruta da cero. Es el resto de cuando `/r/[folio]` era un visor de la receta; la página ya no publica contenido clínico (commit `fc651a1`) y este endpoint sí. Por eso el fix es borrarlo, no restringirlo.
+
+**Cuándo atacar:** después de fusionar `feature/documentos-v2`. Deliberadamente fuera del alcance de esa rama.
+
+---
+
+### QR-02 — `/demo/receta` enseña medicamentos que la página real ya no enseña
+
+**Archivo afectado:** `src/app/demo/receta/page.tsx`.
+
+**Problema:** la demo se escribió como la referencia de política —fue la primera en aplicar la minimización— y hoy va por detrás: compone la lista de medicamentos prescritos, que `/r/[folio]` retiró. Su cabecera todavía dice que la minimización sigue abierta «PARA LA PÁGINA REAL», y es al revés.
+
+Los datos son ficticios, así que **no hay fuga**: es una promesa de producto que ya no corresponde a lo que el producto hace. Quien escanee el QR de una receta de verdad verá menos que en la demostración.
+
+Al arreglarlo, la demo hereda además lo que la real estrenó y ella no tiene: el enlace al registro de cédulas con sus botones de copiar.
+
+**Cuándo atacar:** después de fusionar `feature/documentos-v2`.
+
+---
+
 ## Mejoras post-rediseño de labs (retomar en sesión nueva)
 
 Identificadas durante QA de sub-fase 9. Son mejoras UX, no bugs

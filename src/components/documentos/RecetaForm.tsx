@@ -13,6 +13,7 @@ import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { useProfile } from '@/hooks/useProfile'
 import { createClient } from '@/lib/supabase/client'
+import { folioImpreso } from '@/lib/documentos/folio'
 import { generarPdf, VERSION_DE_EMISION, versionQueEmite } from '@/lib/mobileShare'
 import { hoyEnTZ, desplazarFecha } from '@/lib/dates'
 import { enfocarYAcercar } from '@/lib/scrollDoc'
@@ -325,16 +326,27 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     // 1. Feedback instantáneo — el usuario ve progreso en <50ms
     toast.info('Generando receta...')
 
-    // 2. Construcción de identidad — el folio sirve DOBLE propósito:
-    //    - Identificador público del documento (QR de verificación)
-    //    - clientId para idempotencia (idempotencia garantizada por el
-    //      índice único parcial en la tabla documentos)
-    const folio = `R-${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`
+    // 2 · Identidad — UUID puro, y SOLO para la idempotencia del índice único
+    //     parcial de `documentos`.
+    //
+    //     ⚠ **AQUÍ VIVÍA EL `R-a3f9…` QUE LA RECETA IMPRIMÍA**, y con él la
+    //     mitad del QR roto: se generaba en el navegador, se guardaba en
+    //     `contenido.folio` y era lo que el código codificaba — pero `/r/[folio]`
+    //     solo resuelve folios de la serie, así que ningún papel verificaba. El
+    //     número que va al papel y al QR es ahora el `RX-…` que la base asigna
+    //     al insertar; ver `folioImpreso()`.
+    //
+    //     Que la clave `folio` desaparezca de `contenido` NO es cosmético: es lo
+    //     que permite que el botón de regenerar distinga una receta vieja —que
+    //     la conserva y tiene que volver a imprimirla— de una nueva, que cae a
+    //     la columna. Ver el `??` de `ModalDocumentos.tsx`. Si alguien la
+    //     repone, las recetas nuevas empiezan a regenerarse con un número que su
+    //     papel no lleva.
+    const clientId = crypto.randomUUID()
     // Un bloque a medias no llega ni al PDF ni al expediente, y ya no puede
     // desaparecer en silencio: imprimir con uno incompleto es imposible.
     const medsData = medicamentos.filter(estaCompleto)
     const contenido = {
-      folio,
       paciente,
       diagnostico,
       medicamentos: medsData,
@@ -362,13 +374,11 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
       //    Invierte el orden que este formulario tenía —PDF, subida, fila—,
       //    como los otros seis, para que la fila exista antes de renderizar.
       //
-      //    ⚠ **AQUÍ EL FOLIO IMPRESO NO CAMBIA, Y ES EL ÚNICO DE LOS SIETE.**
-      //    La receta ya llevaba folio en el papel: el `R-…` de arriba, que es lo
-      //    que resuelve el QR de verificación pública (`/r/[folio]`) y lo que
-      //    esa página muestra. La base asigna ADEMÁS su `RX-…` de serie, y
-      //    imprimir los dos obligaría a decidir cuál se cita. Se imprime el que
-      //    verifica; `folioImpreso()` lo declara en un solo sitio y por eso este
-      //    formulario no lo pasa al PDF aunque lo tenga aquí.
+      //    ⚠ **ESTE ORDEN ES AHORA UNA DEPENDENCIA DURA Y NO UNA MEJORA.** El
+      //    folio de serie no existe hasta que la fila entra: lo pone un trigger
+      //    BEFORE INSERT. Renderizar antes imprimiría el papel sin número y —lo
+      //    que importa— el QR sin nada que codificar. Si alguien vuelve a poner
+      //    el PDF por delante, la verificación se apaga en silencio.
       //
       //    Va con el cliente de SESIÓN del médico, nunca con privilegios de
       //    servicio: el trigger exenta por completo a quien no trae JWT.
@@ -380,7 +390,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
         const insertPayload: Record<string, unknown> = {
           tipo: 'receta',
           contenido,
-          client_id: folio,
+          client_id: clientId,
           subido_por: user.id,
           // CON QUÉ CHASIS SALE EL PAPEL. La fila nace emitida, así que la
           // versión se fija aquí y a partir de este INSERT es inmutable
@@ -404,14 +414,31 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
         guardado = true
       }
 
-      // ── 4 · El PDF ────────────────────────────────────────────────────
-      const verificacionUrl = `${window.location.origin}/r/${folio}`
+      // ── 4 · El PDF, ya con el número que la base acaba de asignar ─────
+      //
+      //    EL QR SE COMPONE SOBRE `folioPapel`, QUE ES EL FOLIO DEVUELTO POR EL
+      //    INSERT — nunca sobre uno anterior, porque antes del INSERT no hay
+      //    ninguno. Los dos salen del mismo sitio a propósito: el código y el
+      //    renglón impreso tienen que ser el mismo número o el papel vuelve a
+      //    tener dos.
+      //
+      //    En el búnker offline no hay fila, así que no hay folio: el papel sale
+      //    sin número Y SIN QR, igual que los otros seis salen sin número. Un QR
+      //    sin folio que codificar solo puede llevar a «No pudimos verificar
+      //    este documento», y un código muerto impreso en un papel es peor que
+      //    ningún código.
+      const folioPapel = folioImpreso('receta', folioSerie)
+      const verificacionUrl = folioPapel !== undefined
+        ? `${window.location.origin}/r/${folioPapel}`
+        : null
       const [qrDataUrl, blogQrDataUrl] = await Promise.all([
-        QRCode.toDataURL(verificacionUrl, {
-          width: 96,
-          margin: 1,
-          color: { dark: '#1a3a5c', light: '#ffffff' },
-        }),
+        verificacionUrl !== null
+          ? QRCode.toDataURL(verificacionUrl, {
+              width: 96,
+              margin: 1,
+              color: { dark: '#1a3a5c', light: '#ffffff' },
+            })
+          : Promise.resolve(''),
         isSuperAdmin
           ? QRCode.toDataURL('https://dranconacolumna.com/articulos.html', {
               width: 64,
@@ -475,10 +502,10 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
           diagnostico,
           edad: edadPaciente != null ? `${edadPaciente} años` : undefined,
           sexo: sexoPaciente || undefined,
-          folio,
+          folio: folioPapel,
           medicamentos: medsData,
           recomendaciones: recomendaciones || undefined,
-          qrDataUrl,
+          qrDataUrl: qrDataUrl || undefined,
           blogQrDataUrl: blogQrDataUrl || undefined,
           universidad: medicoInfo?.universidad || undefined,
         },
@@ -521,8 +548,8 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
             .eq('id', filaId)
           if (error) console.error('[RecetaForm] update pdf_url:', error.message)
         }
-        // El folio del toast es el de SERIE, no el impreso: es el que se cita
-        // dentro de la clínica y el único que el buscador de folios encuentra.
+        // El folio del toast es el mismo que el del papel y el del QR: desde
+        // este cambio la receta tiene UN número, y es el de la serie.
         toast.success(folioSerie ? `Receta guardada · ${folioSerie}` : 'Receta guardada')
       }
     } catch (err) {

@@ -259,12 +259,18 @@ export default function ModalDocumentos({
    *
    * ── Y CON EL FOLIO CON QUE SE EMITIÓ ─────────────────────────────────────
    *
-   * `contenido.folio` primero: es el que el papel llevaba impreso —la receta
-   * guarda ahí el suyo, el del QR de verificación—. Si no hay, el de la columna,
-   * y solo para los formatos que lo imprimen: `folioImpreso()` es quien lo sabe,
-   * y es la misma función que usan los siete formularios al emitir. Sin ella,
-   * regenerar imprimiría el `INT-…` que la solicitud de internamiento
+   * `contenido.folio` primero: es el que el papel llevaba impreso. Si no hay, el
+   * de la columna, y solo para los formatos que lo imprimen: `folioImpreso()` es
+   * quien lo sabe, y es la misma función que usan los formularios al emitir. Sin
+   * ella, regenerar imprimiría el `INT-…` que la solicitud de internamiento
    * deliberadamente no lleva.
+   *
+   * ⚠ **ESTE `??` ES LO QUE PARTE EN DOS A LAS RECETAS, Y EL ORDEN IMPORTA.**
+   * Las anteriores a agosto de 2026 guardaron en `contenido.folio` el `R-a3f9…`
+   * que salió impreso en su papel, y lo recuperan por la izquierda. Las nuevas ya
+   * no escriben esa clave —ver `RecetaForm.tsx`— y caen a la derecha, que es
+   * donde está el `RX-…` de la serie que sí llevan impreso. Invertir el orden
+   * haría que las viejas se regeneraran con un número que su papel no dice.
    */
   async function regenerarYSubirPdf(doc: Documento) {
     if (!doc.contenido || regeneratingId) return

@@ -7,12 +7,17 @@
  *   medicamentos: { nombre_comercial, presentacion?, principio_activo?,
  *                   via_administracion?, indicacion }[]
  *
- * ── EL FOLIO DE ESTE FORMATO ES EL SUYO ─────────────────────────────────────
+ * ── EL FOLIO DE ESTE FORMATO ES EL DE LA SERIE ──────────────────────────────
  *
- * `R-a3f9…`, el que el formulario genera y el que resuelve el QR de verificación
- * pública. Vive DENTRO de `contenido` y no en la columna: la serie `RX-…` existe y
- * no se imprime, porque dos números en la misma ranura obligarían a decidir cuál
- * se cita. Por eso aquí se lee `data.folio` y no hace falta `folioImpreso()`.
+ * `RX-2026-0001`, el de la columna, y es el mismo que codifica el QR de
+ * verificación pública. Aquí eso no se decide ni se comprueba: `data.folio` llega
+ * ya filtrado por `folioImpreso()` —desde el formulario al emitir y desde
+ * `ModalDocumentos` al regenerar—, que es donde está escrito qué formatos lo
+ * imprimen.
+ *
+ * ⚠ Una receta ANTERIOR a agosto de 2026 llega por aquí con el `R-a3f9…` que
+ * guardó en `contenido`, porque ese es el que lleva su papel. No lo «corrijas» a
+ * la serie: el documento regenerado dejaría de ser el entregado.
  *
  * ── LO QUE NO ESTÁ EN `contenido` Y AUN ASÍ SE LEE ──────────────────────────
  *
