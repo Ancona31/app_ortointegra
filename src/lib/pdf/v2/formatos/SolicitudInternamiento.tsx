@@ -37,6 +37,25 @@
  * folio con la desviación medida de esta lámina (2.C), y nadie la alimenta. El día que la
  * decisión se revierta, entra el folio con su `H-` y no hay que medir nada otra vez.
  *
+ * ── ⚠ Y LA BASE SÍ LE ASIGNA UNO. NO ES UNA INCONSISTENCIA POR CORREGIR ─────
+ *
+ * `20260811_folio_03_denegacion.sql:273` mete `solicitud_internamiento` en el `CASE` del
+ * generador, así que **la fila va a tener folio `INT-AAAA-NNNN` y el papel no lo va a
+ * decir**. Reconfirmado por Angel al reconciliar v1 con v2, con el desacuerdo delante.
+ *
+ * Las dos cosas son ciertas a la vez y ninguna sobra:
+ *
+ *   · La FILA lo lleva porque el expediente electrónico numera todo lo que emite, y una
+ *     serie con huecos no se puede auditar.
+ *   · El PAPEL no lo lleva porque nadie lo va a citar: no hay ventanilla, ni aseguradora,
+ *     ni paciente que lea ese número en voz alta.
+ *
+ * **Quien encuentre este desacuerdo NO tiene que «arreglarlo».** Ni añadiendo la ranura al
+ * papel —la lámina no la mide y meterla mueve el encabezado más alto del sistema— ni
+ * sacando `int` del generador, que dejaría la serie con huecos. Si alguna vez se revierte,
+ * se revierte por decisión de producto y por escrito, no porque las dos mitades «no
+ * cuadren» al leerlas juntas.
+ *
  * EL PRESUPUESTO DEL ENCABEZADO, SUMADO Y NO DECLARADO
  *
  * La lámina mide **237.61 pt** desde el margen de 54, el más alto del sistema. Como en los

@@ -14,34 +14,39 @@
  *              `GROSOR_TRAZO` 7 px. Es lo que el paciente ve mientras firma, y
  *              NO ES LO QUE SE IMPRIME. Solo gobierna la pantalla.
  *
- *   CANÓNICO   `CANONICO_ANCHO` × `CANONICO_ALTO` = 1024 × 200 px, trazo
- *              `GROSOR_CANONICO` 6 px. Es la celda impresa a 300 dpi, y es lo
- *              único que sale en el papel: la exportación REDIBUJA ahí las
- *              muestras del puntero.
+ *   CANÓNICO   `CANONICO_ANCHO` × `CANONICO_ALTO` = 592 × 321 px, trazo
+ *              `GROSOR_CANONICO` 6 px. Es la caja de rúbrica impresa a 300 dpi,
+ *              y es lo único que sale en el papel: la exportación REDIBUJA ahí
+ *              las muestras del puntero.
  *
  * ── POR QUÉ EL CANÓNICO EXISTE ──────────────────────────────────────────────
- * `FirmaBox` coloca la firma con `objectFit: contain` en una celda de
- * 245,76 × 48 pt, y el recorte a la tinta (§5.5.4) hace que esa colocación esté
- * LIMITADA POR EL ALTO. De ahí sale, exacta:
- *
- *     dpi impresos = 1,5 × (alto de la tinta en píxeles)
- *     grosor       = trazo_px ÷ dpi
- *
- * Con el trazo declarado en el espacio de captura, el grosor impreso pasaba a
- * depender de cuántos píxeles de alto ocupara cada firma. Medido sobre PDF
+ * La caja de rúbrica coloca la firma con `objectFit: contain`, y el recorte a la
+ * tinta (§5.5.4) hace que la colocación la limite un eje o el otro según la forma
+ * del trazo. Con el grosor declarado en el espacio de CAPTURA, el grosor impreso
+ * pasaba a depender de cuántos píxeles ocupara cada firma. Medido sobre PDF
  * reales: 1,264 mm en un iPad y 0,262 mm en un Samsung —4,8× de dispersión— y
  * ni siquiera constante entre dos personas firmando en el mismo aparato.
  *
- * Redibujar en el canónico fija el alto en 200 px y con él los 300 dpi, así que
- * el grosor deja de depender de nada: 6 ÷ 300 × 25,4 = **0,508 mm, siempre**.
+ * Redibujar en el canónico fija las dos dimensiones, y como el canónico tiene
+ * **exactamente la proporción de la caja impresa**, `contain` no deja holgura en
+ * ningún eje: los dpi salen 300 lo limite el ancho o lo limite el alto, y el
+ * grosor deja de depender de nada: 6 ÷ 300 × 25,4 = **0,508 mm, siempre**.
  *
  * ── DE DÓNDE SALEN LOS NÚMEROS ──────────────────────────────────────────────
- *   Celda impresa   245,76 × 48 pt   (LETTER 612 − 100 de margen, `FirmaBox` al 48 %)
- *   Alto canónico   48 ÷ 72 × 300 dpi = 200 px
- *   Ancho canónico  245,76 ÷ 72 × 300 dpi = 1024 px
+ *   Caja impresa    142 × 77 pt      (`GEOMETRIA.rubrica` de `v2/BloqueFirmas.tsx`)
+ *   Ancho canónico  142 ÷ 72 × 300 dpi = 591,67 → 592 px
+ *   Alto canónico    77 ÷ 72 × 300 dpi = 320,83 → 321 px
+ *   Proporción      592 / 321 = 1,8442  ·  142 / 77 = 1,8442   ← el invariante
  *   Grosor          6 px, medidos sobre la rúbrica del médico (ver `GROSOR_CANONICO`)
  *
- * ⚠ SI `FirmaBox` CAMBIA DE TAMAÑO, ESTE ARCHIVO ENTERO HAY QUE REHACERLO.
+ * ⚠ **ESTE ARCHIVO ESTUVO CALIBRADO CONTRA `FirmaBox`, QUE ES v1** (245,76 × 48 pt,
+ * proporción 5,12). Al encender v2 la firma pasa a componerla `BloqueFirmas`, cuya
+ * celda mide 231, 228 o 142 pt según el formato: sin recalibrar, los mismos 6 px
+ * imprimían entre 0,293 y 0,815 mm según el formato y la forma de la firma. La
+ * recalibración es a la CAJA de v2, no a su celda, justamente para que el ancho de
+ * celda deje de entrar en la cuenta.
+ *
+ * ⚠ SI `GEOMETRIA.rubrica` CAMBIA DE TAMAÑO, ESTE ARCHIVO ENTERO HAY QUE REHACERLO.
  */
 
 /* ── El espacio de CAPTURA: lo que el paciente ve ──────────────────────────── */
@@ -78,19 +83,27 @@ export function altoBitmap(anchoCss: number, altoCss: number): number {
 
 /* ── El espacio CANÓNICO: lo que se imprime ────────────────────────────────── */
 
-/** `245,76 pt ÷ 72 × 300 dpi = 1024 px` — la celda impresa a lo ancho. */
-export const CANONICO_ANCHO = 1024
+/** `142 pt ÷ 72 × 300 dpi = 591,67 → 592 px` — la caja de rúbrica a lo ancho. */
+export const CANONICO_ANCHO = 592
 
 /**
- * `48 pt ÷ 72 × 300 dpi = 200 px` — el alto libre de la celda a 300 dpi.
+ * `77 pt ÷ 72 × 300 dpi = 320,83 → 321 px` — el alto de la caja de rúbrica a 300 dpi.
  *
- * Es el eje que manda, porque el recorte deja la colocación limitada por el
- * alto. Y no es un número nuevo en el proyecto: `FirmaCaptura.tsx` normaliza la
- * rúbrica del médico a este mismo alto desde siempre, y por eso su rúbrica es lo
- * único que imprime igual en todos los documentos. Esto le da a la firma
- * capturada la normalización que la del médico ya tenía.
+ * **Ningún eje manda sobre el otro, y ESA es la propiedad que se busca**: como los
+ * dos salen de la misma caja a los mismos dpi, la proporción canónica y la de la
+ * caja impresa coinciden —1,8442 las dos— y `contain` acaba dando 300 dpi lo limite
+ * el ancho o lo limite el alto. La versión anterior lo conseguía por otro camino
+ * —dos cifras que casualmente daban 300 en los dos ejes contra la celda de v1— y
+ * ese camino se rompía en cuanto la celda cambiaba de proporción.
+ *
+ * ⚠ **EL REDONDEO ES A ENTERO Y NO ES GRATIS.** 591,67 → 592 y 320,83 → 321
+ * desplazan los dpi efectivos a 300,17 y 300,16: 0,06 % de error, o sea 0,0003 mm
+ * sobre los 0,508. Invisible, y el redondeo es obligatorio porque un canvas no
+ * admite dimensiones fraccionarias. Lo que importa es que los dos se redondeen
+ * HACIA ARRIBA, para que las dos derivas vayan en el mismo sentido y la proporción
+ * no se separe.
  */
-export const CANONICO_ALTO = 200
+export const CANONICO_ALTO = 321
 
 /**
  * Grosor impreso: **6 px canónicos = 6 ÷ 300 × 25,4 = 0,508 mm**.
@@ -103,6 +116,12 @@ export const CANONICO_ALTO = 200
  * número se calculó suponiendo que la firma cruzaba los 86,7 mm de la celda, y
  * el recorte garantiza que no los cruce nunca —las firmas reales imprimen entre
  * 13 y 54 mm de ancho—.
+ *
+ * ⚠ **LA CIFRA NO CAMBIA AL PASAR A LA CAJA DE v2, Y ESO NO ES CASUALIDAD.** El
+ * grosor impreso es `px ÷ dpi`, y la recalibración se hizo eligiendo el canónico
+ * para que los dpi sigan siendo 300. Es decir: lo que se recalibró fue el TAMAÑO
+ * del espacio canónico, no este número. Si algún día se elige un canónico con
+ * otros dpi, es este 6 el que hay que mover, y en la misma proporción.
  */
 export const GROSOR_CANONICO = 6
 
@@ -165,9 +184,11 @@ export const TINTA_FIRMA = '#000000'
  * Tope del data-URL, en CARACTERES —que es lo que mide `length()` en Postgres,
  * no bytes de imagen—. Lo impone `firmas_documento_trazo_check`.
  *
- * Con el canónico acotado en 1024 × 200 es **inalcanzable**: medido sobre PNG
- * con trazo real, una firma normal ocupa unos 7 100 caracteres y una densísima
- * 16 600 — el 2 % y el 6 % de este tope—. Se conserva como guardia de fallo
+ * Con el canónico acotado en 592 × 321 es **inalcanzable**: medido sobre PNG con
+ * trazo real, una firma normal ocupa unos 7 100 caracteres y una densísima
+ * 16 600 — el 2 % y el 6 % de este tope—. El canónico nuevo tiene además MENOS
+ * área que el anterior (190 032 px contra 204 800), así que el margen se ensancha,
+ * no se estrecha. Se conserva como guardia de fallo
  * ruidoso, no como camino: si alguna vez se rebasara, algo estaría muy mal y
  * degradar la firma en silencio no lo arreglaría.
  *
@@ -306,11 +327,11 @@ function dibujarTrazo(ctx: CanvasRenderingContext2D, puntos: readonly Punto[]): 
  * La geometría del canónico: a qué escala entra la tinta y qué tamaño tiene la
  * imagen resultante.
  *
- * ⚠ ES EL INVARIANTE DEL QUE DEPENDE TODO. La imagen sale **o exactamente 1024
- * de ancho o exactamente 200 de alto**, y en los dos casos `FirmaBox` la coloca
- * a 300 dpi: limitada por el alto, `200 px ÷ (48 pt ÷ 72) = 300`; limitada por
- * el ancho, `1024 px ÷ (245,76 pt ÷ 72) = 300`. Con el grosor fijo en 6 px, eso
- * da 0,508 mm impresos sin depender de nada.
+ * ⚠ ES EL INVARIANTE DEL QUE DEPENDE TODO. La imagen sale **o exactamente 592
+ * de ancho o exactamente 321 de alto**, y en los dos casos la caja de rúbrica la
+ * coloca a 300 dpi: limitada por el alto, `321 px ÷ (77 pt ÷ 72) = 300,2`;
+ * limitada por el ancho, `592 px ÷ (142 pt ÷ 72) = 300,2`. Con el grosor fijo en
+ * 6 px, eso da 0,508 mm impresos sin depender de nada.
  *
  * Pura y exportada para poder comprobarlo sin un canvas: ver `firmaTrazo.test.ts`.
  */
@@ -342,10 +363,10 @@ export function geometriaCanonica(
  * las muestras, el trazo se rasteriza de nuevo a 300 dpi con un grosor fijo:
  * ni se interpola ni el grosor depende de cuánto ocupara la firma.
  *
- * La escala es un `contain` de la tinta en 1024 × 200, que cubre los dos
- * extremos sin ramas: una firma muy plana la limita el ancho —1024 px sobre
- * 86,7 mm siguen siendo 300 dpi— y una muy alta, el alto. En los dos casos el
- * grosor impreso sale el mismo.
+ * La escala es un `contain` de la tinta en 592 × 321, que cubre los dos extremos
+ * sin ramas: una firma muy plana la limita el ancho —592 px sobre 50,1 mm siguen
+ * siendo 300 dpi— y una muy alta, el alto. En los dos casos el grosor impreso
+ * sale el mismo.
  */
 export function exportarFirma(trazos: readonly Trazo[]): ResultadoTrazo {
   const caja = cajaDeTrazos(trazos)

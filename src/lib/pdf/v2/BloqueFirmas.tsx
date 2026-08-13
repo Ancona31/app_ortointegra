@@ -127,6 +127,50 @@ const GEOMETRIA = {
   sello: { margen: 2 },
   celda: { superior: 14, inferior: 4 },
   /**
+   * LA CAJA DE RÚBRICA — **142 × 77 pt, LA MISMA EN LOS NUEVE FORMATOS**, y es lo que
+   * hace que una firma pese lo mismo en todos ellos.
+   *
+   * ══ QUÉ PROBLEMA RESUELVE ══════════════════════════════════════════════════
+   *
+   * `firmaTrazo.ts` redibuja cada firma capturada en un espacio CANÓNICO para que su
+   * grosor impreso no dependa de cuánto ocupara el trazo. Ese mecanismo solo funciona
+   * si la celda impresa tiene **la misma proporción que el espacio canónico**: entonces
+   * `objectFit: contain` no deja holgura en ningún eje y los dpi salen fijos, la limite
+   * el ancho o la limite el alto.
+   *
+   * La calibración anterior estaba hecha contra `FirmaBox` de v1 —245.76 × 48 pt,
+   * proporción 5.12— y aquí la celda no mide eso ni mide siempre lo mismo:
+   *
+   *     2 columnas, medianil 24   →  231 pt   proporción 3.00
+   *     2 columnas, medianil 30   →  228 pt   proporción 2.96
+   *     3 columnas (II.9)         →  142 pt   proporción 1.84
+   *
+   * Sin caja propia, la rúbrica se contendría en la celda y los dpi cambiarían con el
+   * formato Y con la forma de cada firma: medido, entre 187 y 519 dpi, o sea entre
+   * 0.293 y 0.815 mm de grosor para el mismo trazo. Es la dispersión que el espacio
+   * canónico existe para eliminar, volviendo por la puerta de atrás.
+   *
+   * ══ POR QUÉ 142 Y NO MÁS ═══════════════════════════════════════════════════
+   *
+   * Porque la caja tiene que caber en la celda MÁS ESTRECHA del sistema, y esa es la de
+   * la denegación con sus tres columnas. Una caja más ancha se contendría dentro de esa
+   * celda —y solo dentro de esa— y ahí se rompería otra vez el invariante.
+   *
+   * El alto son los 77 de `FIRMA.espacio` enteros: no hay razón para dejar aire, y el
+   * espacio de escritura no cambia (regla 1).
+   *
+   * ⚠ **EL COSTE, DECLARADO:** en los formatos de dos columnas la rúbrica ocupa 142 de
+   * los 228–231 pt disponibles. **La restricción muerde en el ANCHO, no en el alto**, al
+   * revés de lo que parece al leer «no usa toda la celda». Consecuencia medida: una
+   * firma de proporción normal (2–3) imprime MÁS GRANDE que en v1 —142 × 57.6 contra
+   * 120 × 48—, y solo una muy plana (proporción > 5) imprime menor. Se acepta.
+   *
+   * ⚠ **SI ESTA CAJA CAMBIA, `firmaTrazo.ts` HAY QUE REHACERLO ENTERO.** Su espacio
+   * canónico —592 × 321 px— es esta caja a 300 dpi, y su grosor está calibrado contra
+   * esos dpi. Los dos números son el mismo número visto en dos unidades.
+   */
+  rubrica: { ancho: 142 },
+  /**
    * LA MISMA FIRMA EN LAS LÁMINAS DE IMAGENOLOGÍA Y DE RECETA — 118.75 pt, no 120.8.
    *
    * ⚠ **SON DOS LÁMINAS Y NO UNA, Y COINCIDEN EN LAS SEIS CIFRAS.** Receta mide
@@ -298,8 +342,16 @@ const estilos = StyleSheet.create({
     minHeight: FIRMA.espacio,
     justifyContent: 'flex-end',
   },
-  /** La rúbrica no se estira: se apoya en la línea y conserva su proporción. */
+  /**
+   * La rúbrica no se estira: se apoya en la línea y conserva su proporción.
+   *
+   * ⚠ **`width` FIJO Y NO `100%`.** Es la caja de proporción fija de `GEOMETRIA.rubrica`,
+   * y es lo que da a la firma el mismo peso en los nueve formatos: con el ancho heredado
+   * de la celda, los dpi de colocación cambiaban con el formato —231, 228 o 142 pt— y con
+   * la forma de cada trazo. Ver la nota larga de `GEOMETRIA.rubrica`.
+   */
   rubrica: {
+    width: GEOMETRIA.rubrica.ancho,
     height: FIRMA.espacio,
     objectFit: 'contain',
     objectPositionX: '0%',

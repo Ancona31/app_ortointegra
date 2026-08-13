@@ -170,7 +170,19 @@ export interface SolicitudImagenologiaProps {
   readonly emision?: string
   /** Badge del documento, no del estudio (II.2 §5). Sin él, sin badge. */
   readonly urgente?: boolean
-  /** Notas al servicio de imagen. Colapsan enteras si no vienen. */
+  /**
+   * Notas al servicio de imagen. Colapsan enteras si no vienen.
+   *
+   * ⚠ **RANURA SIN PRODUCTOR — no la des por viva al cablear.** `SolicitudImagenForm` **no
+   * tiene campo de notas**: su `contenido` es `{ paciente, diagnostico, estudios, urgente,
+   * fecha }` y nada más (`:244`). Así que este bloque —que `DOCUMENTOS_HANDOFF.md` §4 lista
+   * entre los que usan la sintaxis de viñetas de 2.J— **no se compone en ninguna solicitud
+   * emitida**.
+   *
+   * No está roto: está construido, medido y en reposo. Lo que lo encendería es un campo de
+   * notas en el formulario, que es trabajo de formulario. Está anotado con las otras cuatro
+   * en `DOCUMENTOS_RANURAS_MUERTAS.md`.
+   */
   readonly notas?: string
   /** Folio del documento, ya generado. Prefijo `I-` en la lámina. */
   readonly folio: string

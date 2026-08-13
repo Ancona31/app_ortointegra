@@ -276,7 +276,20 @@ export interface PlanSuplementacionProps {
   readonly emision?: string
   /** Cuerpo del bloque de notas adicionales. Colapsa entero si no viene. */
   readonly notas?: string
-  /** La cita de control. Colapsa entera si no viene. */
+  /**
+   * La cita de control. Colapsa entera si no viene.
+   *
+   * ⚠ **LA FORMA NO COINCIDE CON LA DEL FORMULARIO, Y POR ESO HOY NO SE COMPONE.**
+   * `CitaDeControl` pide `fecha` —requerida— más `plazo` y `nota` por separado;
+   * `PlanSuplementacionForm` guarda **`seguimiento`, una sola cadena libre** de un
+   * `<input type="text">` (`:297`, y así entra en `contenido` en `:409`). Una cadena libre
+   * no se parte en tres campos sin adivinar, y adivinar la fecha de una cita es
+   * exactamente lo que no se puede hacer en un documento clínico.
+   *
+   * No está roto: está construido, medido y en reposo. Las dos salidas son de formulario
+   * —partir el campo en tres, o aceptar texto libre aquí— y ninguna se decide en este
+   * archivo. Está anotado con las otras cuatro en `DOCUMENTOS_RANURAS_MUERTAS.md`.
+   */
   readonly cita?: CitaDeControl
   /** Folio del documento, ya generado. Prefijo `S-` en la lámina. */
   readonly folio: string

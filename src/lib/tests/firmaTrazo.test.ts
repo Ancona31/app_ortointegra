@@ -3,16 +3,24 @@
  *
  * POR QUÉ EXISTE. El grosor impreso de la firma dependía del aparato: 1,264 mm
  * en un iPad y 0,262 mm en un Samsung sobre PDF reales, y ni siquiera constante
- * entre dos personas firmando en el mismo. La causa era que `FirmaBox` coloca
- * con `contain` y el recorte a la tinta deja esa colocación limitada por el
- * alto, así que `dpi = 1,5 × alto_de_la_tinta`. Redibujar en un espacio
+ * entre dos personas firmando en el mismo. La causa era que la caja de rúbrica
+ * coloca con `contain` y el recorte a la tinta deja esa colocación limitada por
+ * un eje o por el otro según la forma del trazo. Redibujar en un espacio
  * canónico de tamaño fijo lo elimina.
  *
  * QUÉ VIGILA. El invariante del que depende todo el arreglo: la imagen
- * exportada sale **o exactamente 1024 de ancho o exactamente 200 de alto**, así
- * que `FirmaBox` la coloca siempre a 300 dpi y el trazo de 6 px imprime siempre
- * 0,508 mm. Un canvas no se puede probar aquí; esta geometría sí, y es la que
- * decide el resultado.
+ * exportada sale **o exactamente `CANONICO_ANCHO` de ancho o exactamente
+ * `CANONICO_ALTO` de alto**, y como el canónico tiene la proporción exacta de la
+ * caja impresa, esta la coloca siempre a 300 dpi y el trazo de 6 px imprime
+ * siempre 0,508 mm. Un canvas no se puede probar aquí; esta geometría sí, y es
+ * la que decide el resultado.
+ *
+ * ⚠ **LA CAJA DE ABAJO ES LA DE v2 Y ANTES ERA LA DE v1.** Este archivo medía
+ * contra `FirmaBox` —245,76 × 48 pt—, que es el renderizador viejo. Al encender
+ * v2 la firma la compone `GEOMETRIA.rubrica` de `v2/BloqueFirmas.tsx`. Si las
+ * dos cifras de aquí y las de allí se separan, el invariante se rompe **en
+ * silencio**: el PDF sigue saliendo, con otro grosor. Es lo que estas pruebas
+ * existen para impedir.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -23,14 +31,21 @@ import {
   geometriaCanonica,
 } from '@/lib/documentos/firmaTrazo'
 
-/** La celda impresa de `FirmaBox`, en puntos. De aquí salen los 300 dpi. */
-const CELDA_ANCHO_PT = 245.76
-const CELDA_ALTO_PT = 48
+/**
+ * LA CAJA DE RÚBRICA IMPRESA, en puntos — `GEOMETRIA.rubrica` de `v2/BloqueFirmas.tsx`
+ * más `FIRMA.espacio`. De aquí salen los 300 dpi.
+ *
+ * Se copian y no se importan a propósito: importarlas haría que un cambio allá
+ * arrastrara a la prueba y las dos siguieran «de acuerdo» mientras el papel cambia.
+ * Copiadas, un cambio de caja rompe estas pruebas, que es el aviso que se busca.
+ */
+const CAJA_ANCHO_PT = 142
+const CAJA_ALTO_PT = 77
 
-/** Los dpi con que `FirmaBox` acaba colocando una imagen de este tamaño. */
+/** Los dpi con que la caja de rúbrica acaba colocando una imagen de este tamaño. */
 function dpiImpresos(ancho: number, alto: number): number {
   // `objectFit: contain` — manda el eje que primero se queda sin sitio.
-  const escala = Math.min(CELDA_ANCHO_PT / ancho, CELDA_ALTO_PT / alto)
+  const escala = Math.min(CAJA_ANCHO_PT / ancho, CAJA_ALTO_PT / alto)
   return 72 / escala
 }
 
@@ -79,6 +94,30 @@ describe('geometriaCanonica · el invariante', () => {
     const max = Math.max(...grosores)
     // Antes del arreglo la dispersión medida era de 4,8×.
     expect(max / min).toBeLessThan(1.02)
+  })
+})
+
+describe('el canónico y la caja impresa son el mismo rectángulo', () => {
+  /**
+   * ESTA ES LA PRUEBA QUE HABRÍA CAZADO EL DEFECTO ANTES DE ENCENDER v2.
+   *
+   * El invariante no es «1024 × 200» ni «592 × 321»: es que la proporción del espacio
+   * canónico y la de la caja impresa coincidan. Mientras coincidan, `contain` no deja
+   * holgura y los dpi salen fijos lo limite el eje que lo limite. En cuanto se separan
+   * —que es lo que pasó al pasar de la celda de v1 a la de v2— el grosor vuelve a
+   * depender de la forma de cada firma, y nada avisa.
+   */
+  it('la proporción canónica es la de la caja, salvo el redondeo a píxel entero', () => {
+    const proporcionCanonica = CANONICO_ANCHO / CANONICO_ALTO
+    const proporcionCaja = CAJA_ANCHO_PT / CAJA_ALTO_PT
+    expect(proporcionCanonica).toBeCloseTo(proporcionCaja, 3)
+  })
+
+  it('los dos ejes del canónico dan los mismos dpi contra la caja', () => {
+    const dpiPorAncho = CANONICO_ANCHO / (CAJA_ANCHO_PT / 72)
+    const dpiPorAlto = CANONICO_ALTO / (CAJA_ALTO_PT / 72)
+    expect(dpiPorAncho).toBeCloseTo(dpiPorAlto, 0)
+    expect(dpiPorAncho).toBeCloseTo(300, 0)
   })
 })
 

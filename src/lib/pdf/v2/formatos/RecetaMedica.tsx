@@ -228,13 +228,42 @@ export interface RecetaMedicaProps {
    * Fecha y hora de emisión, YA compuestas por quien llama. Colapsa si no viene.
    */
   readonly emision?: string
-  /** Cuerpo del bloque de recomendaciones generales. Colapsa entero si no viene. */
+  /**
+   * Cuerpo del bloque de recomendaciones generales. Colapsa entero si no viene.
+   *
+   * **AQUÍ VA EL CAMPO `recomendaciones` DEL FORMULARIO**, que es donde el médico escribe
+   * «reposo relativo», «tomar con alimentos» o «acudir a control en 15 días». No va al
+   * bloque de alarma — ver `signosDeAlarma`, donde está razonado por qué no.
+   */
   readonly recomendaciones?: string
   /**
    * Cuerpo del bloque de alarma. Colapsa entero si no viene.
    *
    * Es un campo APARTE de `recomendaciones` y no una variante suya: ver el punto (e)
    * de la cabecera. II.3 §2 los trataba como uno solo.
+   *
+   * ══ ⚠ HOY NADIE LO ALIMENTA, Y ESTÁ DECIDIDO QUE SIGA ASÍ ══════════════════
+   *
+   * `RecetaForm` no tiene campo de signos de alarma: su único campo de cierre se llama
+   * **Recomendaciones generales** y va a la prop de arriba. Así que este bloque **no se
+   * compone en ninguna receta emitida** hasta que exista un campo propio.
+   *
+   * Se evaluó conectarle el texto de recomendaciones —era la propuesta inicial al
+   * reconciliar v1 con v2— y **se descartó con el papel delante**, por dos razones:
+   *
+   * 1. **El filete de 4 pt es el recurso más fuerte de la receta.** Es el grosor más alto
+   *    de este formato en la jerarquía de I.1.6. Gastarlo en «tomar con alimentos» es
+   *    ponerle el énfasis máximo del documento a lo que menos lo necesita.
+   * 2. **Un bloque de alarma que siempre dice cosas rutinarias deja de leerse como
+   *    alarma.** El día que haya un signo de verdad —«fiebre de más de 38.5 °C que no cede
+   *    con el antipirético»— ya no destacará, porque el lector habrá aprendido que ahí
+   *    nunca hay nada urgente. La alarma se gasta por uso, no por diseño.
+   *
+   * Y dejaría vacío el bloque que sí le corresponde a ese texto.
+   *
+   * **Lo que lo encendería** es un campo propio en `RecetaForm`, separado de
+   * recomendaciones. Es trabajo de formulario, no de este archivo. Hasta entonces la
+   * ranura está construida, medida y en reposo — que es distinto de estar rota.
    */
   readonly signosDeAlarma?: string
   /** Folio del documento, ya generado. Prefijo `P-` en la lámina. */

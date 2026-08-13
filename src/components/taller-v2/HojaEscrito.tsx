@@ -40,6 +40,7 @@ import EscritoMedico, {
   type NodoEscrito,
 } from '@/lib/pdf/v2/formatos/EscritoMedico'
 import type { MedicoMembrete } from '@/lib/pdf/v2/Membrete'
+import { cuerpoEscritoDesde } from '@/lib/pdf/v2/cuerpoEscrito'
 import { registrarFuentesV2 } from '@/lib/pdf/v2/fonts'
 import { resolverAcento } from '@/lib/pdf/v2/tokens'
 import type { MedicoFicticio } from './HojaTaller'
@@ -145,18 +146,108 @@ function medicoMembrete(medico: MedicoFicticio): MedicoMembrete {
   }
 }
 
+/**
+ * EL CASO `editor` — y es el único que NO escribe sus nodos a mano.
+ *
+ * ⚠ **ESTE CASO EXISTE PORQUE EL DE ARRIBA NO PRUEBA LO QUE PARECE.** `CUERPO` está
+ * redactado directamente en `NodoEscrito[]`, o sea en la forma que el formato quiere, y por
+ * eso siempre se vio bien: lo que nunca se comprobó es que el editor del médico SEPA
+ * producir eso. No sabía —faltaban el subrayado y las alineaciones— y la traducción no
+ * existía.
+ *
+ * Aquí el cuerpo entra como el JSON de ProseMirror que TipTap guarda en
+ * `documentos.contenido` y pasa por `cuerpoEscritoDesde`, que es el camino real. Si algún
+ * día el conversor se rompe, este caso sale vacío o a medias y se ve en el papel.
+ *
+ * Ejercita lo que la barra ofrece y `CUERPO` no toca: las cuatro alineaciones, el
+ * subrayado, la lista numerada y el salto de línea de Shift+Enter.
+ */
+const DOC_EDITOR = {
+  schema: 'tiptap-doc-v1',
+  content: {
+    type: 'doc',
+    content: [
+      {
+        type: 'heading',
+        attrs: { level: 2, textAlign: 'center' },
+        content: [{ type: 'text', text: 'Constancia médica' }],
+      },
+      {
+        type: 'paragraph',
+        attrs: { textAlign: 'justify' },
+        content: [
+          { type: 'text', text: 'A quien corresponda: hago constar que ' },
+          { type: 'text', text: 'Renata Bustamante Oceguera', marks: [{ type: 'bold' }] },
+          {
+            type: 'text',
+            text: ' acudió a valoración por dolor lumbar de tres semanas de evolución, sin datos de alarma neurológica ni indicación quirúrgica en este momento.',
+          },
+        ],
+      },
+      {
+        type: 'paragraph',
+        content: [
+          { type: 'text', text: 'Diagnóstico: ' },
+          { type: 'text', text: 'lumbalgia mecánica', marks: [{ type: 'underline' }] },
+          { type: 'text', text: '. Se indica:' },
+        ],
+      },
+      {
+        type: 'orderedList',
+        content: [
+          {
+            type: 'listItem',
+            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Reposo relativo por siete días.' }] }],
+          },
+          {
+            type: 'listItem',
+            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Rehabilitación física, dos sesiones por semana.' }] }],
+          },
+        ],
+      },
+      {
+        type: 'blockquote',
+        content: [{
+          type: 'paragraph',
+          content: [{
+            type: 'text',
+            text: 'La presente no certifica incapacidad laboral ni valoración de aptitud.',
+            marks: [{ type: 'italic' }],
+          }],
+        }],
+      },
+      { type: 'horizontalRule' },
+      {
+        type: 'paragraph',
+        attrs: { textAlign: 'right' },
+        content: [
+          { type: 'text', text: 'Mérida, Yucatán' },
+          { type: 'hardBreak' },
+          { type: 'text', text: 'a 4 de agosto de 2026' },
+        ],
+      },
+    ],
+  },
+}
+
 /** Un caso es un documento entero, no una hoja de un documento común (ver 2.N). */
-export type CasoEscrito = 'corto' | 'medio' | 'largo' | 'sin'
+export type CasoEscrito = 'corto' | 'medio' | 'largo' | 'sin' | 'editor'
 
 const CASOS: Record<
   CasoEscrito,
-  { readonly titulo?: string; readonly tituloPie?: string }
+  {
+    readonly titulo?: string
+    readonly tituloPie?: string
+    /** Solo `editor`: el cuerpo sale del conversor y no de `CUERPO`. */
+    readonly desdeEditor?: boolean
+  }
 > = {
   corto: { titulo: TITULOS.corto },
   medio: { titulo: TITULOS.medio },
   largo: { titulo: TITULOS.largo, tituloPie: TITULO_PIE_LARGO },
   // Sin título y sin `tituloPie`: la banda cae al genérico `Escrito médico`.
   sin: {},
+  editor: { titulo: TITULOS.corto, desdeEditor: true },
 }
 
 function HojaEscrito({
@@ -182,7 +273,7 @@ function HojaEscrito({
         titulo={c.titulo}
         tituloPie={c.tituloPie}
         fecha={FECHA}
-        cuerpo={CUERPO}
+        cuerpo={c.desdeEditor === true ? cuerpoEscritoDesde({ doc: DOC_EDITOR }).cuerpo : CUERPO}
       />
     </Document>
   )

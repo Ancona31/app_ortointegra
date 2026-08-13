@@ -44,19 +44,31 @@ import { resolverAcento } from '@/lib/pdf/v2/tokens'
 import type { MedicoFicticio } from './HojaTaller'
 
 /**
- * Paciente del caso completo. INVENTADO, hospital incluido. **Las ocho celdas del riel**,
+ * Paciente del caso completo. INVENTADO, hospital incluido. **Las SIETE celdas del riel**,
  * que son las que esta lámina compone: `fecha` y `hora` no se pasan porque en este formato
  * no viven en el riel —suben a la celda `Emisión` del bloque de título—, y `diagnostico`
  * tampoco: aquí es un bloque del cuerpo.
  *
- * Los días estimados y el peso llegan con su unidad ya redactada: 2.D coloca, no rotula ni
- * convierte.
+ * ⚠ **`sexo` YA NO SE PASA Y `edad` SÍ, Y LA DIFERENCIA IMPORTA.** La fila superior de este
+ * formato es propia desde la reconciliación de v1: cambia las celdas de edad y sexo por la
+ * FECHA DE INGRESO, que el formulario sí captura, que v1 imprime y que v2 no tenía dónde
+ * poner. Ver `FILA_SUPERIOR_INTERNAMIENTO` en 2.D, donde está medido por qué no cabía abajo.
+ *
+ * **Pero `edad` tiene un segundo consumidor y por eso sigue aquí:** `EncabezadoHoja.tsx:409`
+ * la compone en la línea de paciente de las hojas de CONTINUACIÓN —`Paciente · Nombre ·
+ * 25 años · Exp. … · Hospital`—, que en este formato van en todas las hojas. Quitarla la
+ * borraría de ahí sin que nadie lo pidiera. `sexo` no tiene ese segundo consumidor: sale del
+ * riel y sale del formato.
+ *
+ * Los días estimados y la fecha de ingreso llegan con su forma ya redactada: 2.D coloca, no
+ * rotula ni convierte.
  */
 const PACIENTE_COMPLETO: ValoresPaciente = {
   paciente: 'Renata Bustamante Oceguera',
+  // No sale en el riel de esta lámina; sí en la línea de continuación. Ver arriba.
   edad: '25 años',
-  sexo: 'Femenino',
   expediente: '2026-0184',
+  fechaIngreso: '12 de agosto de 2026',
   hospital: 'Hospital Ficticio del Centro',
   tipoInternamiento: 'Cirugía electiva',
   diasEstimados: '2 días',
@@ -64,8 +76,8 @@ const PACIENTE_COMPLETO: ValoresPaciente = {
 }
 
 /**
- * Paciente del caso mínimo: solo lo que bloquea emisión más la edad. Sin sexo, sin
- * expediente, sin tipo, sin días y sin ASA — las cinco celdas colapsan y las tres que
+ * Paciente del caso mínimo: solo lo que bloquea emisión más la edad. Sin expediente, sin
+ * fecha de ingreso, sin tipo, sin días y sin ASA — las cinco celdas colapsan y las que
  * quedan se reparten el riel.
  */
 const PACIENTE_MINIMO: ValoresPaciente = {

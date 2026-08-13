@@ -233,10 +233,47 @@ const ENTRADILLA_RIESGOS =
 const TEXTO_SUSTITUCION =
   'El paciente no puede firmar por sí mismo; firma en su lugar el familiar o responsable, cuyos datos se asientan en el recuadro de la derecha.'
 
+/**
+ * LAS DOS AUTORIZACIONES, textuales — y **la redacción es la de v1, literal**.
+ *
+ * ⚠ NO SE REESCRIBIÓ NI UNA COMA, Y ESO ES DELIBERADO. Son las tres cadenas que
+ * `ConsentimientoInformadoPdf.tsx:977-988` lleva imprimiendo en papel firmado, y un
+ * consentimiento firmado es prueba: cambiar cómo está redactada una autorización de
+ * transfusión sanguínea para que «suene mejor» crea dos versiones del mismo acto en el
+ * expediente de una misma clínica. Si alguna vez hay que cambiarlas, se cambian con
+ * criterio legal y en los dos renderizadores a la vez, no aquí solo.
+ *
+ * ── POR QUÉ ESTE BLOQUE NO EXISTÍA ─────────────────────────────────────────
+ *
+ * `DOCUMENTOS_SPEC.md` II.7 §2 declara los dos campos y §3 los pone en la composición
+ * —«siete `EncabezadoSeccion` → **autorizaciones** → `BloqueFirmas`»—, pero el formato v2
+ * se construyó sin ellos. El formulario SÍ los captura y SÍ los persiste
+ * (`ConsentimientoInformadoForm.tsx:327-328`, y entran en `contenidoConsentimiento()`, o
+ * sea **dentro de la huella SHA-256**). Es decir: el dato estaba firmado y no se imprimía.
+ *
+ * Encender v2 sin esto habría borrado del papel si el paciente autoriza transfusión
+ * sanguínea, que es dato clínico y legal, sin que nadie se enterara hasta echarlo en falta.
+ */
+const AUTORIZA_TRANSFUSION_SI =
+  'Autorizo la transfusión de sangre o hemoderivados si el médico lo considera necesario durante el procedimiento.'
+const AUTORIZA_TRANSFUSION_NO =
+  'NO autorizo la transfusión de sangre o hemoderivados, asumiendo los riesgos que esto implica.'
+const AUTORIZA_FOTOS =
+  'Autorizo la toma de fotografías clínicas con fines de documentación médica y seguimiento del tratamiento.'
+
 /** Los cinco roles de firmante y las tres notas, textuales. */
 const ROL_MEDICO = 'Médico tratante'
 const ROL_PACIENTE = 'Paciente'
 const ROL_FAMILIAR = 'Familiar o responsable'
+/**
+ * La misma celda cuando quien acompaña es un REPRESENTANTE LEGAL acreditado.
+ *
+ * No son sinónimos y por eso la etiqueta cambia: un familiar acompaña, un representante
+ * legal **sustituye la voluntad del paciente**, y quien lea la hoja después tiene que
+ * poder distinguir cuál de las dos cosas ocurrió sin abrir el expediente. v1 ya lo
+ * distinguía (`ConsentimientoInformadoPdf.tsx:855`) y v2 lo había perdido.
+ */
+const ROL_REPRESENTANTE = 'Representante legal'
 const ROL_TESTIGO_1 = 'Testigo 1'
 const ROL_TESTIGO_2 = 'Testigo 2'
 const NOTA_PACIENTE = 'Nombre y firma'
@@ -266,22 +303,64 @@ const SIN_FOTOGRAFIA =
  * documento— y no hay nada que concordar; aquí `1 firmaron` y `1 omitidos` se leen mal en un
  * papel que va a sede legal, y el caso ocurre en cuanto tres de los cuatro firman.
  *
- * `firmantes previstos` se queda en plural sin condición: este formato compone **cuatro
- * celdas como mínimo** —médico, paciente o familiar, y los dos testigos, que son fijos por
- * NOM-004—, así que el singular no puede darse.
+ * ⚠ **`firmantes previstos` YA NO SE QUEDA EN PLURAL SIN CONDICIÓN.** Esta nota decía que
+ * el singular «no puede darse» porque el formato compone cuatro celdas como mínimo. Era
+ * cierto de las CELDAS y falso de los PREVISTOS, que es lo que la línea cuenta: las celdas
+ * de testigo se componen siempre —son fijas por NOM-004 y su línea se firma a mano— pero a
+ * un testigo sin nombre nadie le pidió firmar. Con `previstosDe` la cifra puede ser 1, así
+ * que la concordancia se compone también aquí.
  */
 const SELLO_FIRMADO = 'Firmado'
 const SELLO_CON_ANEXO = 'con identificación anexa'
 const SELLO_HUELLA = 'Huella SHA-256'
 const SELLO_VERIFICABLE = 'verificable en el expediente electrónico'
 
+/**
+ * EL RECUENTO — y **cuando no falta nadie, no se enumeran ausencias**.
+ *
+ * ⚠ ESTA FUNCIÓN TENÍA UN DEFECTO Y ES EL MOTIVO DE QUE TENGA ESTA NOTA. Componía
+ * siempre las tres cifras contra un número de previstos que el formato cableaba en
+ * cuatro o cinco, así que un consentimiento SIN TESTIGOS —el caso normal en consulta—
+ * imprimía «5 firmantes previstos, 3 firmaron, 2 omitidos» e **inventaba dos ausencias
+ * que nunca existieron**: a esos dos testigos nadie les pidió firmar, porque nadie
+ * escribió su nombre.
+ *
+ * En un papel que puede acabar en sede legal, «2 omitidos» no es un matiz de
+ * redacción: es una afirmación sobre personas, y era falsa.
+ *
+ * Ahora `previstos` sale de a quién se le PIDIÓ firma (ver `previstosDe`) y, si
+ * coinciden con quienes firmaron, la línea dice solo eso. La regla es: **el documento
+ * hace constar quién firmó; solo declara omisiones cuando las hubo de verdad.**
+ */
 function recuento(previstos: number, firmaron: number): string {
   const omitidos = previstos - firmaron
+  const firmo = `${firmaron} ${firmaron === 1 ? 'firmó' : 'firmaron'}`
+  if (omitidos <= 0) return firmo
   return [
-    `${previstos} firmantes previstos`,
-    `${firmaron} ${firmaron === 1 ? 'firmó' : 'firmaron'}`,
+    `${previstos} ${previstos === 1 ? 'firmante previsto' : 'firmantes previstos'}`,
+    firmo,
     `${omitidos} ${omitidos === 1 ? 'omitido' : 'omitidos'}`,
   ].join(', ')
+}
+
+/**
+ * A CUÁNTOS SE LES PIDIÓ FIRMA — se DERIVA de las celdas, no llega como prop.
+ *
+ * Se deriva a propósito. El formato tiene delante a los cinco firmantes; un `previstos`
+ * pasado desde fuera podría no coincidir con ellos, y entonces habría dos versiones de
+ * la misma verdad en el mismo papel —el recuento diciendo una cifra y las celdas
+ * enseñando otra— sin nada que las obligue a estar de acuerdo.
+ *
+ * El criterio es el del formulario: **se le pidió firma a quien tiene nombre escrito**.
+ * Los dos testigos son celdas fijas por NOM-004 y su línea se compone siempre, con
+ * nombre o sin él, para poder firmarse a mano; pero un testigo sin nombre no entró en
+ * ningún recuento, porque no se le pidió nada.
+ *
+ * `sello` también cuenta: si alguien firmó, estaba previsto por definición, venga o no
+ * su nombre en los datos.
+ */
+function previstosDe(celdas: readonly FirmanteConsentimiento[]): number {
+  return celdas.filter((f) => tieneValor(f.nombre) || tieneValor(f.sello)).length
 }
 
 function lineaSellado(fecha: string, previstos: number, firmaron: number): string {
@@ -342,6 +421,8 @@ const SEPARACION_SECCIONES_HOJA_2 = ESPACIO[8]
 const SEPARACION_SECCIONES_HOJA_3 = ESPACIO[20]
 const SEPARACION_ROTULO_DECLARACION = ESPACIO[8]
 const SEPARACION_DECLARACION_CASILLA = ESPACIO[12]
+/** Entre casillas de la misma pila de declaraciones. Ver `filaAutorizacion`. */
+const SEPARACION_CASILLA_AUTORIZACION = ESPACIO[8]
 const SEPARACION_CASILLA_NIVEL = ESPACIO[12]
 const SEPARACION_NIVEL_CELDAS = ESPACIO[5] + 1
 const SEPARACION_CELDAS_NIVEL = ESPACIO[12]
@@ -462,10 +543,33 @@ export interface IdentificacionAnexo {
   /** Rol de la persona, con la misma cadena que su celda de firma. */
   readonly rol: string
   readonly nombre: string
-  /** Tipo de identificación: `Credencial para votar`. */
-  readonly tipo: string
-  /** Número o clave del documento. */
-  readonly numero: string
+  /**
+   * Tipo de identificación: `Credencial para votar`. **Opcional, y su ausencia es el caso
+   * normal** — ver la nota de `numero`.
+   */
+  readonly tipo?: string
+  /**
+   * Número o clave del documento. **Opcional, y su ausencia es el caso normal.**
+   *
+   * ⚠ LOS DOS ERAN OBLIGATORIOS Y NADIE LOS ALIMENTABA. `FirmadoConsentimiento` captura la
+   * FOTOGRAFÍA de la identificación y nada más: el formulario no tiene campos de tipo ni
+   * de número, y v1 tampoco los llenaba nunca —su `IdentificacionImpresa.identificacion`
+   * existe en el tipo y se pasa siempre vacío—. Requeridos, este anexo componía dos huecos
+   * donde la lámina pone un dato.
+   *
+   * ── POR QUÉ COLAPSAN EN VEZ DE PARTIRSE EN DOS CAMPOS DEL FORMULARIO ──────
+   *
+   * 1. **El dato ya está en la hoja, y mejor.** El anexo existe para reproducir la
+   *    fotografía de la credencial, y la hoja solo se imprime si hay al menos una. El tipo
+   *    y el número están ahí, legibles, en la credencial misma.
+   * 2. **Teclearlos introduce divergencia en un documento legal.** Un número tecleado que
+   *    no coincida con el fotografiado obliga a decidir cuál manda. La foto no se equivoca.
+   * 3. **Cuestan dos campos por firmante** en un flujo que ocurre con el paciente delante.
+   *
+   * Si algún día se capturan, entran por aquí sin tocar la composición: el pie ya sabe
+   * componerse con uno, con los dos o con ninguno.
+   */
+  readonly numero?: string
   /**
    * Ráster de la identificación, ya normalizado a PNG o JPG. **Sin ella el recuadro se
    * compone igual**, con su leyenda y con el tipo y el número: lo que desaparece es la
@@ -522,6 +626,36 @@ export interface ConsentimientoInformadoProps {
    * añadir, hay un nivel que se va.
    */
   readonly sustitucion?: boolean
+  /**
+   * LAS DOS AUTORIZACIONES DEL PACIENTE (`DOCUMENTOS_SPEC.md` II.7 §2 y §3).
+   *
+   * Las dos COLAPSAN por separado, y el bloque entero desaparece si no viene ninguna: un
+   * consentimiento donde no se preguntó por la transfusión no debe imprimir una línea que
+   * insinúe que sí se preguntó.
+   *
+   * `transfusion` es TRI-ESTADO y no un booleano, y la distinción es la que importa:
+   * `undefined` es «no se preguntó» y `'no'` es «el paciente lo rechazó expresamente». Con
+   * un booleano los dos casos se compondrían igual —sin línea— y se perdería una negativa
+   * explícita, que es justo el dato con más valor legal de los dos.
+   *
+   * `fotografias` sí es booleano porque su ausencia y su negativa son lo mismo: no hay
+   * autorización, y sin autorización no se fotografía. Solo se compone cuando es `true`,
+   * que es lo que hace v1.
+   */
+  readonly autorizaciones?: {
+    readonly transfusion?: 'si' | 'no'
+    readonly fotografias?: boolean
+  }
+  /**
+   * Quien acompaña es un REPRESENTANTE LEGAL acreditado y no un familiar. Solo cambia el
+   * rótulo de su celda —ver `ROL_REPRESENTANTE`—; ni la retícula ni el recuento se mueven,
+   * porque es la misma persona en el mismo sitio con otra calidad jurídica.
+   *
+   * Es independiente de `sustitucion`: se puede tener un representante legal que firma
+   * ADEMÁS del paciente (nivel 2) o EN SU LUGAR (sustitución). Las dos combinaciones son
+   * reales y ninguna implica la otra.
+   */
+  readonly representanteLegal?: boolean
   /**
    * Las identificaciones del anexo. **La hoja solo se imprime si al menos una trae
    * fotografía** (decisión de producto 5); sin ninguna, el documento cierra en las firmas.
@@ -667,6 +801,19 @@ const estilos = StyleSheet.create({
   },
   marcaCasilla: { width: 5, height: 5, backgroundColor: TINTA.negra },
   textoCasilla: { ...estiloTipografico('casilla.texto'), flex: 1 },
+  /**
+   * Las filas de autorización. Misma anatomía que `filaCasilla` y **menos aire**: entre la
+   * declaración y su casilla hay 12 pt porque son dos bloques distintos; entre la casilla
+   * de sustitución y las autorizaciones hay 8 porque son la misma pila de declaraciones
+   * del paciente, una debajo de otra. Es el mismo criterio con el que 2.G separa las
+   * entradas de una lista del bloque que las abre.
+   */
+  filaAutorizacion: {
+    width: MARCO.declaracion.ancho,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: SEPARACION_CASILLA_AUTORIZACION,
+  },
 
   // ── Rótulos de nivel y retícula de firmas
   nivel: {
@@ -979,10 +1126,24 @@ function RecuadroAnexo({
         )}
       </View>
 
-      <View style={estilos.pieAnexo}>
-        <Text style={estilos.textoPie}>{identificacion.tipo}</Text>
-        <Text style={estilos.textoPie}>{identificacion.numero}</Text>
-      </View>
+      {/*
+        EL PIE DE DOS ZONAS, Y CADA ZONA COLAPSA POR SU CUENTA.
+
+        Hoy no llega ninguna de las dos —ver `IdentificacionAnexo.numero`— así que lo
+        normal es que el pie entero no se componga y el recuadro cierre en la fotografía,
+        que es donde está el dato. Con una sola, esa se compone sola: no se reserva el
+        hueco de la otra ni se rellena con una raya.
+      */}
+      {tieneValor(identificacion.tipo) || tieneValor(identificacion.numero) ? (
+        <View style={estilos.pieAnexo}>
+          {tieneValor(identificacion.tipo) ? (
+            <Text style={estilos.textoPie}>{identificacion.tipo}</Text>
+          ) : null}
+          {tieneValor(identificacion.numero) ? (
+            <Text style={estilos.textoPie}>{identificacion.numero}</Text>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   )
 }
@@ -1031,6 +1192,8 @@ export default function ConsentimientoInformado({
   secciones,
   firmantes,
   sustitucion,
+  autorizaciones,
+  representanteLegal,
   identificaciones,
   sellado,
   folio,
@@ -1077,12 +1240,19 @@ export default function ConsentimientoInformado({
     rubrica: firmantes.paciente.rubrica,
     sello: pieDe(firmantes.paciente, ROL_PACIENTE),
   }
+  /*
+   * El rol de esta celda es el ÚNICO que no es una constante fija, y su cadena viaja a dos
+   * sitios: al rótulo de la celda y al cruce con el anexo, que empareja por rol. Se calcula
+   * una vez para que los dos usen la misma — con dos literales sueltos, un representante
+   * legal se quedaría sin su fotografía en el anexo sin que nada avisara.
+   */
+  const rolFamiliar = representanteLegal === true ? ROL_REPRESENTANTE : ROL_FAMILIAR
   const firmaFamiliar: Firma = {
-    rol: ROL_FAMILIAR,
+    rol: rolFamiliar,
     nombre: firmantes.familiar.nombre,
     credenciales: [NOTA_FAMILIAR],
     rubrica: firmantes.familiar.rubrica,
-    sello: pieDe(firmantes.familiar, ROL_FAMILIAR),
+    sello: pieDe(firmantes.familiar, rolFamiliar),
     anadido: <Parentesco />,
   }
   const firmaTestigo1: Firma = {
@@ -1131,6 +1301,7 @@ export default function ConsentimientoInformado({
         firmantes.testigo2,
       ]
   const firmaron = celdas.filter((f) => tieneValor(f.sello)).length
+  const previstos = previstosDe(celdas)
 
   return (
     <Page size={[PAPEL.ancho, PAPEL.alto]} style={estilos.hoja}>
@@ -1233,6 +1404,45 @@ export default function ConsentimientoInformado({
             <Text style={estilos.textoCasilla}>{TEXTO_SUSTITUCION}</Text>
           </View>
 
+          {/*
+            ═══ LAS AUTORIZACIONES ═══
+
+            Van AQUÍ —entre la declaración y las firmas— porque es donde II.7 §3 las pone y
+            porque es lo que son: declaraciones del paciente, en la misma hoja donde firma.
+            Debajo del cuerpo clínico no serían lo mismo; ahí serían información.
+
+            La casilla va SIEMPRE MARCADA, al revés que la de sustitución. No es un
+            descuido: en la de sustitución la marca dice si se ejerció, y aquí lo que se
+            ejerció ya lo dice el texto —`Autorizo` o `NO autorizo`—, así que la marca solo
+            puede significar «esta declaración forma parte de este documento». Una casilla
+            sin marcar junto a `NO autorizo` sería ilegible: no se sabría si el paciente
+            rechazó la transfusión o si nadie contestó nada.
+
+            Lo que distingue «no se preguntó» de «rechazó» es que la fila EXISTA. Ver
+            `autorizaciones`.
+          */}
+          {autorizaciones?.transfusion === undefined ? null : (
+            <View style={estilos.filaAutorizacion}>
+              <View style={estilos.casilla}>
+                <View style={estilos.marcaCasilla} />
+              </View>
+              <Text style={estilos.textoCasilla}>
+                {autorizaciones.transfusion === 'si'
+                  ? AUTORIZA_TRANSFUSION_SI
+                  : AUTORIZA_TRANSFUSION_NO}
+              </Text>
+            </View>
+          )}
+
+          {autorizaciones?.fotografias === true ? (
+            <View style={estilos.filaAutorizacion}>
+              <View style={estilos.casilla}>
+                <View style={estilos.marcaCasilla} />
+              </View>
+              <Text style={estilos.textoCasilla}>{AUTORIZA_FOTOS}</Text>
+            </View>
+          ) : null}
+
           <View style={estilos.bloqueNivel}>
             <RotuloNivel numero={1} rotulo={NIVEL_OTORGAMIENTO} acento={acento} />
             <BloqueFirmas
@@ -1328,7 +1538,7 @@ export default function ConsentimientoInformado({
         {sellado === undefined ? null : (
           <View style={estilos.verificacion} wrap={false}>
             <Text style={estilos.sello}>
-              {lineaSellado(sellado.fecha, celdas.length, firmaron)}
+              {lineaSellado(sellado.fecha, previstos, firmaron)}
             </Text>
             <Text style={estilos.sello}>{lineaHuella(sellado.huella)}</Text>
           </View>

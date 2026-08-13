@@ -128,6 +128,15 @@ interface Hoja {
   readonly cuerpos: ReadonlySet<number>
   readonly renglones: readonly Renglon[]
   readonly rectangulos: readonly Rectangulo[]
+  /**
+   * Cuántos TRAZOS cierra la hoja — operadores `S` del flujo.
+   *
+   * Existe por el subrayado, y por una razón que costó descubrir: react-pdf **no compone
+   * `textDecoration` como un rectángulo relleno** sino como una trayectoria trazada
+   * (`m … l … S`), así que contando `rectangulos` un párrafo subrayado y otro sin subrayar
+   * salen idénticos. Medido sobre el flujo de los dos.
+   */
+  readonly trazos: number
 }
 
 function leer(pdf: Buffer): Hoja[] {
@@ -201,7 +210,9 @@ function leer(pdf: Buffer): Hoja[] {
       }
     }
     cerrar()
-    return { texto, cuerpos, renglones, rectangulos }
+    // `S` como palabra suelta: el operador de trazado. Ver `Hoja.trazos`.
+    const trazos = (contenido.match(/(?:^|\s)S(?=\s|$)/g) ?? []).length
+    return { texto, cuerpos, renglones, rectangulos, trazos }
   })
 }
 
@@ -572,4 +583,121 @@ describe('II.8 · Escrito Médico', () => {
     const rol = ASCENDENTE_ARCHIVO * TIPOGRAFIA['firma.rol'].cuerpo
     expect(salto).toBeCloseTo(11 + 77 + 0.75 + 4 + ASCENDENTE_ARCHIVO * 11 - rol, 1)
   }, 200_000)
+
+  /**
+   * LO QUE EL EDITOR PRODUCE Y EL FORMATO NO SABÍA COMPONER.
+   *
+   * El chasis se midió contra las láminas y nadie comprobó el otro extremo: que el formato
+   * pudiera componer lo que el editor del médico genera. Faltaban dos cosas de su barra
+   * —el subrayado y las cuatro alineaciones— y sin ellas se habrían perdido en silencio al
+   * encender v2. La traducción vive en `v2/cuerpoEscrito.ts` y se prueba aparte; esto mide
+   * que lleguen **al papel**.
+   */
+  describe('el marcado de la barra del editor llega al papel', () => {
+    /** Un texto sin `fi`: la ligadura rompe el anclaje del lector. Ver `sinLigadura`. */
+    const SUBRAYADO = 'texto subrayado del editor'
+
+    it('el subrayado dibuja su línea, y no es solo un cambio de peso', async () => {
+      const marcado = await componer({
+        ...BASE,
+        cuerpo: [{ tipo: 'parrafo', tramos: [{ texto: SUBRAYADO, subrayado: true }] }],
+      })
+      const plano = await componer({
+        ...BASE,
+        cuerpo: [{ tipo: 'parrafo', tramos: [{ texto: SUBRAYADO }] }],
+      })
+
+      expect(marcado[0].texto).toContain(SUBRAYADO)
+
+      /*
+        ⚠ SE MIDEN TRAZOS Y NO RECTÁNGULOS. react-pdf compone `textDecoration` como una
+        trayectoria TRAZADA —`m … l … S`— y no como un rectángulo relleno, así que contando
+        `rectangulos` los dos párrafos salen idénticos y la prueba pasaría sin subrayado
+        alguno. Verificado sobre el flujo de los dos PDF.
+
+        Se compara contra el plano y no contra una cifra absoluta: así los filetes del
+        chasis, que están en las dos hojas, quedan fuera de la cuenta.
+      */
+      expect(marcado[0].trazos).toBe(plano[0].trazos + 1)
+    }, 200_000)
+
+    it('el subrayado se acumula con negrita y cursiva sin pedir una cara nueva', async () => {
+      const hojas = await componer({
+        ...BASE,
+        cuerpo: [{
+          tipo: 'parrafo',
+          tramos: [{ texto: SUBRAYADO, negrita: true, cursiva: true, subrayado: true }],
+        }],
+      })
+      const plano = await componer({
+        ...BASE,
+        cuerpo: [{ tipo: 'parrafo', tramos: [{ texto: SUBRAYADO, negrita: true, cursiva: true }] }],
+      })
+
+      // El texto sale entero y la línea se dibuja igual: la decoración no compite con la
+      // familia, que es lo que sí ocurre entre negrita y cursiva.
+      expect(hojas[0].texto).toContain(SUBRAYADO)
+      expect(hojas[0].trazos).toBe(plano[0].trazos + 1)
+    }, 200_000)
+
+    /**
+     * La alineación se mide por dónde EMPIEZA el renglón. El margen izquierdo de la caja
+     * son 72 pt —el mismo que ancla la firma en la prueba de arriba—, así que un párrafo en
+     * bandera arranca ahí y uno centrado o a la derecha arranca más adentro.
+     */
+    it('centrado y derecha desplazan el arranque del renglón', async () => {
+      const corto = 'Constancia'
+      const medir = async (alineacion?: 'center' | 'right'): Promise<number> => {
+        const hojas = await componer({
+          ...BASE,
+          cuerpo: [{ tipo: 'parrafo', tramos: [{ texto: corto }], alineacion }],
+        })
+        return renglon(hojas[0], corto).x
+      }
+
+      const izquierda = await medir(undefined)
+      const centro = await medir('center')
+      const derecha = await medir('right')
+
+      expect(izquierda).toBeCloseTo(72, 1)
+      expect(centro).toBeGreaterThan(izquierda)
+      expect(derecha).toBeGreaterThan(centro)
+    }, 200_000)
+
+    /**
+     * ⚠ EL JUSTIFICADO ES LA SEGUNDA EXCEPCIÓN DECLARADA A I.3.2 del sistema, y la primera
+     * es el cuerpo del consentimiento. Se admite aquí porque esta es la hoja membretada del
+     * médico y el trámite manda; si algún día aparece una tercera sin nota, la regla habrá
+     * dejado de ser una regla. Ver `AlineacionEscrito`.
+     */
+    it('el justificado se compone: no se descarta por I.3.2', async () => {
+      const largo =
+        'Se extiende la presente constancia a petición de la persona interesada para los usos legales y administrativos que estime convenientes ante la autoridad que corresponda.'
+      const bandera = await componer({
+        ...BASE,
+        cuerpo: [{ tipo: 'parrafo', tramos: [{ texto: largo }] }],
+      })
+      const justificado = await componer({
+        ...BASE,
+        cuerpo: [{ tipo: 'parrafo', tramos: [{ texto: largo }], alineacion: 'justify' }],
+      })
+
+      /*
+        El justificado no mueve dónde corta cada renglón: reparte el sobrante DENTRO del
+        renglón. Así que lo que cambia no es el número de renglones sino su contenido — en
+        bandera, el primero acaba donde acaba; justificado, el renglón se estira hasta el
+        borde y react-pdf lo compone con otros desplazamientos.
+      */
+      expect(justificado[0].texto).toContain('Se extiende la presente constancia')
+      expect(justificado[0].renglones.length).toBe(bandera[0].renglones.length)
+    }, 200_000)
+
+    it('los encabezados también admiten alineación', async () => {
+      const hojas = await componer({
+        ...BASE,
+        cuerpo: [{ tipo: 'encabezado1', texto: 'Constancia', alineacion: 'center' }],
+      })
+      expect(renglon(hojas[0], 'CONSTANCIA').x).toBeGreaterThan(72)
+    }, 200_000)
+  })
 })

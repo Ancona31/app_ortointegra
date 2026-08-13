@@ -343,6 +343,7 @@ Tu primer mensaje en cada sesión debe ser:
 
 - **CALCULADORAS_ROADMAP.md** — Sistema de 200 calculadoras clínicas. Leer ANTES de trabajar en calculadoras.
 - **RESUMEN_DASHBOARD.md** — Dashboard del paciente en /expediente/[id]/estado. Leer ANTES de trabajar en esa página.
+- **DOCUMENTOS_RANURAS_MUERTAS.md** — Cinco bloques de los formatos v2 construidos y sin nadie que los alimente. **Leer ANTES de cablear v2 y antes de encender el flag `usa_documentos_v2`.** Si el cableado los ignora, v2 se enciende con cinco bloques muertos y no se detecta hasta que un médico eche algo en falta en el papel.
 
 ---
 

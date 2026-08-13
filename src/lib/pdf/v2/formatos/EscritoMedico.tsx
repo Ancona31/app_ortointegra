@@ -226,22 +226,66 @@ export interface TramoTexto {
   readonly negrita?: boolean
   /** `<em>` del editor. 400 itálica. */
   readonly cursiva?: boolean
+  /**
+   * `<u>` del editor — la marca de nivel 2 de su barra (`EditorEscrito.tsx:125`).
+   *
+   * Se compone con `textDecoration: 'underline'`, que es una propiedad de decoración y
+   * NO de familia, así que **se acumula con las otras dos sin pedir una cara nueva**: a
+   * diferencia de negrita+cursiva, subrayado+cursiva o subrayado+negrita se componen
+   * enteros. Es la marca menos costosa de las tres.
+   */
+  readonly subrayado?: boolean
 }
+
+/**
+ * LA ALINEACIÓN DEL PÁRRAFO — y **es la segunda excepción declarada a I.3.2** del sistema.
+ *
+ * ⚠ I.3.2 PROHÍBE EL TEXTO JUSTIFICADO EN TODO v2, y hasta ahora la única excepción vivía
+ * en `formatos/ConsentimientoInformado.tsx`, escrita en un solo sitio para que
+ * `grep -rn "'justify'" src/lib/pdf/v2` devolviera UNA línea. Ahora devuelve dos, y la
+ * segunda es esta. Que sean dos y no una es lo que hay que vigilar: si algún día aparece
+ * una tercera sin nota, la regla habrá dejado de ser una regla.
+ *
+ * **Por qué se admite aquí.** Este formato no es una hoja del sistema: es la hoja
+ * membretada del médico, donde escribe certificados, constancias y cartas cuyo trámite
+ * manda sobre la composición. La barra del editor ofrece las cuatro alineaciones
+ * (`EditorEscrito.tsx:236`), el médico las usa, y **perderlas por el camino sería peor que
+ * la excepción**: un centrado que desaparece cambia lo que el papel dice de sí mismo.
+ *
+ * `undefined` es bandera izquierda, que es lo que compone el resto del sistema. No se
+ * escribe `'left'` por defecto: así el caso normal no lleva la propiedad y sigue siendo el
+ * del chasis, no una alineación elegida que casualmente coincide.
+ */
+export type AlineacionEscrito = 'left' | 'center' | 'right' | 'justify'
 
 /**
  * UN NODO DEL CUERPO. Son los siete constructores que la lámina declara, menos uno: `p` con
  * aire propio no es un nodo distinto sino el mismo párrafo — el aire lo pone el tipo.
  */
 export type NodoEscrito =
-  | { readonly tipo: 'parrafo'; readonly tramos: readonly TramoTexto[] }
-  | { readonly tipo: 'encabezado1'; readonly texto: string }
-  | { readonly tipo: 'encabezado2'; readonly texto: string }
+  | {
+      readonly tipo: 'parrafo'
+      readonly tramos: readonly TramoTexto[]
+      readonly alineacion?: AlineacionEscrito
+    }
+  | { readonly tipo: 'encabezado1'; readonly texto: string; readonly alineacion?: AlineacionEscrito }
+  | { readonly tipo: 'encabezado2'; readonly texto: string; readonly alineacion?: AlineacionEscrito }
   | {
       readonly tipo: 'lista'
       readonly marca: 'vineta' | 'numero'
       readonly items: readonly (readonly TramoTexto[])[]
     }
-  | { readonly tipo: 'cita'; readonly tramos: readonly TramoTexto[] }
+  /**
+   * La cita lleva alineación porque el editor la deja poner: `TextAlign` está configurado
+   * para `['heading', 'paragraph']` (`editorExtensions.ts:15`) y una cita del editor es un
+   * `blockquote` que CONTIENE párrafos, así que la marca vive en el párrafo de dentro. El
+   * conversor la sube aquí.
+   */
+  | {
+      readonly tipo: 'cita'
+      readonly tramos: readonly TramoTexto[]
+      readonly alineacion?: AlineacionEscrito
+    }
   | { readonly tipo: 'separador' }
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -302,6 +346,12 @@ const estilos = StyleSheet.create({
   parrafo: { ...estiloTipografico('texto.corrido'), width: CAJA.ancho },
   negrita: { fontWeight: TIPOGRAFIA['instruccion.texto'].peso },
   cursiva: { fontStyle: 'italic' },
+  /**
+   * El subrayado. `textDecoration` es de las pocas propiedades de decoración que
+   * @react-pdf/renderer implementa sobre `Text`, y no toca la familia: por eso esta marca
+   * se acumula con la negrita y con la cursiva y aquellas dos no se acumulan entre sí.
+   */
+  subrayado: { textDecoration: 'underline' },
 
   encabezado1: { ...estiloTipografico('cuerpo.encabezado1'), width: CAJA.ancho },
   encabezado2: { ...estiloTipografico('cuerpo.encabezado2'), width: CAJA.ancho },
@@ -344,7 +394,7 @@ function Tramos({ tramos }: { tramos: readonly TramoTexto[] }): ReactElement {
   return (
     <>
       {tramos.map((tramo, i) =>
-        tramo.negrita !== true && tramo.cursiva !== true ? (
+        tramo.negrita !== true && tramo.cursiva !== true && tramo.subrayado !== true ? (
           // El índice ES la identidad: los tramos salen de un editor y su orden es lo único
           // que los distingue —dos pueden decir lo mismo—.
           <Text key={i}>{tramo.texto}</Text>
@@ -356,6 +406,9 @@ function Tramos({ tramos }: { tramos: readonly TramoTexto[] }): ReactElement {
               // `TramoTexto`.
               tramo.negrita === true && tramo.cursiva !== true ? estilos.negrita : {},
               tramo.cursiva === true ? estilos.cursiva : {},
+              // El subrayado NO compite con las otras dos: es decoración, no familia, así
+              // que se acumula con cualquiera de ellas sin pedir una cara registrada.
+              tramo.subrayado === true ? estilos.subrayado : {},
             ]}
           >
             {tramo.texto}
@@ -413,6 +466,16 @@ function Nodo({
 }): ReactElement {
   const separacion = primero ? {} : { marginTop: aireDe(nodo) }
 
+  /**
+   * La alineación, o nada. `undefined` deja la bandera izquierda del chasis en vez de
+   * escribir `'left'`: así el caso normal no lleva la propiedad. Ver `AlineacionEscrito`,
+   * donde está declarada la excepción a I.3.2 que esto abre.
+   */
+  const alineacion =
+    nodo.tipo === 'separador' || nodo.tipo === 'lista' || nodo.alineacion === undefined
+      ? {}
+      : { textAlign: nodo.alineacion }
+
   if (nodo.tipo === 'separador') {
     return <View style={[estilos.separador, separacion]} />
   }
@@ -429,6 +492,7 @@ function Nodo({
         style={[
           nodo.tipo === 'encabezado1' ? estilos.encabezado1 : estilos.encabezado2,
           separacion,
+          alineacion,
         ]}
         wrap={false}
       >
@@ -444,7 +508,7 @@ function Nodo({
           variante="cita"
           lamina={LAMINA}
           contenido={
-            <Text style={estilos.cita}>
+            <Text style={[estilos.cita, alineacion]}>
               <Tramos tramos={nodo.tramos} />
             </Text>
           }
@@ -468,7 +532,7 @@ function Nodo({
   }
 
   return (
-    <Text style={[estilos.parrafo, separacion]} orphans={2} widows={2}>
+    <Text style={[estilos.parrafo, separacion, alineacion]} orphans={2} widows={2}>
       <Tramos tramos={nodo.tramos} />
     </Text>
   )

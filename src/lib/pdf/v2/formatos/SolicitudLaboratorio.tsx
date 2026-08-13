@@ -157,7 +157,17 @@ const SEPARACION_NOTAS_FIRMA = ESPACIO[20]
 export interface EstudioSolicitado {
   /** Ranura `ancla`: el nombre del estudio. */
   readonly nombre: string
-  /** Ranura `nota`: la indicación del estudio. Colapsa si no viene. */
+  /**
+   * Ranura `nota`: la indicación del estudio. Colapsa si no viene.
+   *
+   * ⚠ **RANURA SIN PRODUCTOR — no la des por viva al cablear.** `SolicitudLabForm` guarda
+   * `estudios` como `string[]` —cadenas sueltas, `:112`—, así que no hay de dónde sacar una
+   * indicación por estudio y esta columna **no se compone en ninguna solicitud emitida**.
+   *
+   * No está rota: está construida, medida y en reposo. Lo que la encendería es que el
+   * formulario guarde `{ nombre, indicacion }` en vez de una cadena, y eso es trabajo de
+   * formulario. Está anotada con las otras cuatro en `DOCUMENTOS_RANURAS_MUERTAS.md`.
+   */
   readonly indicacion?: string
 }
 

@@ -265,9 +265,15 @@ const COMPLETO: SolicitudInternamientoProps = {
   ...CHASIS,
   paciente: {
     paciente: PACIENTE,
+    /*
+      ⚠ NO SALE EN EL RIEL DE ESTA LÁMINA Y AQUÍ NO SOBRA. La fila superior de Internamiento
+      cambió edad y sexo por la fecha de ingreso, pero `EncabezadoHoja` sigue componiendo la
+      edad en la línea de paciente de las hojas de continuación — que es lo que afirma la
+      prueba de la regla 2 de 2.D, más abajo. `sexo` sí se retiró: no tiene segundo consumidor.
+    */
     edad: '25 años',
-    sexo: 'Femenino',
     expediente: '2026-0184',
+    fechaIngreso: '12 de agosto de 2026',
     ...RIEL_INGRESO,
   },
   emision: '8 ago 2026 · 09:40',
@@ -521,6 +527,28 @@ describe('II.6 · Solicitud de Internamiento', () => {
 
     // Y la de ASA es la última: lo que queda hasta el borde de la caja es UNA columna.
     expect(x('ASA') + RIEL_CELDA).toBeGreaterThan(72 + 486 - RIEL_CELDA)
+  }, 120_000)
+
+  /**
+   * ⚠ LA FECHA DE INGRESO ES LO QUE EL HOSPITAL NECESITA PARA AGENDAR LA CAMA, y v2 no tenía
+   * dónde ponerla: `ValoresPaciente` no la declaraba y la fila inferior está llena —una de
+   * sus celdas ya está en el mínimo del sistema—. v1 sí la imprime
+   * (`SolicitudInternamientoPdf.tsx:316`), así que encender v2 la habría borrado del papel.
+   *
+   * La fila superior de este formato es propia: `Paciente 5 · Ingreso 4 · Expediente 3`.
+   * Edad y sexo ceden sus cuatro columnas y ninguna de las otras dos cambia de ancho.
+   */
+  it('la fila superior es propia: paciente 5, ingreso 4, expediente 3', async () => {
+    const [hoja1] = await componer(COMPLETO)
+    const x = (etiqueta: string): number => renglon(hoja1, etiqueta).x
+
+    expect(hoja1.texto).toContain('12 de agosto de 2026')
+    expect(x('INGRESO') - x('PACIENTE')).toBeCloseTo(5 * RIEL_CELDA, 0)
+    expect(x('EXPEDIENTE') - x('INGRESO')).toBeCloseTo(4 * RIEL_CELDA, 0)
+
+    // Y las dos celdas que este riel NO lleva, contra las del chasis.
+    expect(hoja1.texto).not.toContain('SEXO')
+    expect(hoja1.texto).not.toContain('EDAD')
   }, 120_000)
 
   it('el catálogo de requerimientos son tres columnas de 162 que envuelven', async () => {

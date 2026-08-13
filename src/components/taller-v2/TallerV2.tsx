@@ -198,6 +198,11 @@ const CASOS_CONSENTIMIENTO: readonly EntradaCaso[] = [
   { caso: 'sinFotos', etiqueta: 'Sin fotos', nota: 'La hoja de anexo NO aparece' },
   { caso: 'sustitucion', etiqueta: 'Sustitución', nota: 'Sin nivel 2: Testigos pasa a 2' },
   { caso: 'sinSellar', etiqueta: 'Sin sellar', nota: 'Sin sellos: nada que sellar' },
+  // Los cuatro de la reconciliación con v1. Cada uno enseña algo que v2 no componía.
+  { caso: 'autorizaciones', etiqueta: 'Autorizaciones', nota: 'Transfusión RECHAZADA y fotos' },
+  { caso: 'sinTestigos', etiqueta: 'Sin testigos', nota: 'El cierre NO declara ausencias' },
+  { caso: 'representante', etiqueta: 'Representante', nota: 'La celda cambia de rótulo' },
+  { caso: 'anexoSinDatos', etiqueta: 'Anexo sin datos', nota: 'El pie colapsa: solo la foto' },
 ]
 
 /**
@@ -210,6 +215,13 @@ const CASOS_ESCRITO: readonly EntradaCaso[] = [
   { caso: 'medio', etiqueta: 'Medio', nota: 'Un renglón, cadena más larga' },
   { caso: 'largo', etiqueta: 'Largo', nota: 'Tres renglones: la fecha va con la primera' },
   { caso: 'sin', etiqueta: 'Sin título', nota: 'Hueco de 20 pt, no cero, y con filete' },
+  /*
+    El quinto NO es un caso de título: es el único cuyo cuerpo NO está escrito a mano en
+    `NodoEscrito[]` sino que sale del JSON del editor pasando por `cuerpoEscritoDesde`. Los
+    otros cuatro comparten un cuerpo redactado ya en la forma que el formato quiere, así que
+    nunca probaron si el editor sabe producirla. No sabía.
+  */
+  { caso: 'editor', etiqueta: 'Del editor', nota: 'JSON real: subrayado y alineaciones' },
 ]
 
 /**

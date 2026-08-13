@@ -224,16 +224,20 @@ export type CampoPaciente =
   /** La novena, y solo de la cotización de II.5. Ver `GEOMETRIA.honorarios`. */
   | 'vigencia'
   /**
-   * LAS CUATRO DE LA FILA INFERIOR DE INTERNAMIENTO (II.6), y ninguna es clínica del
+   * LAS CINCO DE INTERNAMIENTO (II.6), y ninguna es clínica del
    * paciente: son las condiciones del ingreso. Viven aquí porque viven en ESE riel —el de
    * identificación—, que es lo que este componente compone; el día que otro formato pida
    * un riel con datos que no son del paciente, lo que hará falta es partir 2.D, no
    * añadirle celdas.
+   *
+   * Cuatro van en la fila inferior; `fechaIngreso` va en la SUPERIOR — ver
+   * `FILA_SUPERIOR_INTERNAMIENTO`, donde está escrito por qué.
    */
   | 'hospital'
   | 'tipoInternamiento'
   | 'diasEstimados'
   | 'asa'
+  | 'fechaIngreso'
   /**
    * LAS DOS DE LA LÁMINA DE CONSENTIMIENTO. `familiar` es el **único campo vacío requerido
    * de un riel que no es el paciente**: si no viene, la celda conserva su rótulo y deja una
@@ -370,6 +374,59 @@ const FILA_INFERIOR_INTERNAMIENTO: readonly DescriptorCelda[] = [
 ]
 
 /**
+ * LA FILA SUPERIOR DE INTERNAMIENTO — y por qué la fecha de ingreso está AQUÍ y no abajo.
+ *
+ *     Paciente   span 5     sin cambio
+ *     Ingreso    span 4     ocupa las cuatro columnas que dejan edad y sexo
+ *     Expediente span 3     sin cambio
+ *
+ * ⚠ **NO SE INTENTÓ METERLA EN LA FILA INFERIOR. SE MIDIÓ, Y NO CABE.** Queda escrito para
+ * que nadie lo vuelva a intentar creyendo que fue pereza: aquella fila está llena y una de
+ * sus celdas ya está en el mínimo del sistema. Con el rótulo en `etiqueta` —Archivo 7 pt,
+ * peso 600, tracking 0.22 em ≈ 5.9 pt por carácter— y 20 pt de padding lateral por celda:
+ *
+ *     `TIPO DE INTERNAMIENTO`  rótulo ~118 pt  →  span 4 da 142 netos ✔ · span 3 da 101.5 ✗
+ *     `DÍAS EST.`              rótulo  ~50 pt  →  span 2 da  61 netos ✔ · span 1 da  20.5 ✗
+ *     `Hospital Ángeles del Pedregal`  valor ~167 pt  →  span 5 da 182.5 ✔ · span 4 da 142 ✗
+ *     `ASA`                    ya está en span 1, el mínimo de los seis formatos
+ *
+ * Cualquier reparto de cinco celdas en esas doce columnas parte un rótulo en dos renglones
+ * o parte el nombre del hospital. Y las reglas verticales del riel llegan de arriba abajo,
+ * así que **la celda más alta estira la fila entera** — en el único formato del sistema que
+ * repite el riel completo en TODAS sus hojas, así que el coste se multiplica por hoja.
+ *
+ * ── POR QUÉ SALEN EDAD Y SEXO, Y NO OTRA COSA ───────────────────────────────
+ *
+ * Decisión de producto, tomada con el dato delante: `SolicitudInternamientoForm` **no
+ * captura ninguna de las tres celdas de esta fila salvo el paciente** —su `contenido` no
+ * lleva `edad`, ni `sexo`, ni `expediente`—, así que las tres colapsan hoy en emisión real.
+ * Es decir: esta fila se compone con una sola celda viva, y lo que entra en su sitio es un
+ * dato que el formulario **sí** captura y que hoy sale en el papel de v1.
+ *
+ * ⚠ **`edad` SALE DE ESTA FILA PERO NO DEL FORMATO, Y NO SE LIMPIE COMO SI SOBRARA.**
+ * `EncabezadoHoja.tsx:409` la compone en la línea de paciente de las hojas de CONTINUACIÓN,
+ * que en Internamiento van en todas las hojas: `Paciente · Nombre · 25 años · Exp. … ·
+ * Hospital`. Quien vea que `edad` ya no aparece en este riel y decida dejar de pasarla, la
+ * borra de esa línea sin enterarse. `sexo` sí sale del formato entero: no tiene segundo
+ * consumidor.
+ *
+ * El expediente se queda porque es la pieza que también compone la línea de paciente de las
+ * hojas de continuación (`FILA_REDUCIDA`), y quitarlo de aquí dejaría el riel completo y el
+ * reducido diciendo cosas distintas.
+ *
+ * La alternativa descartada fue una TERCERA fila: no estrecha nada y conserva el sexo, pero
+ * suma ~30 pt al riel **en cada hoja** y deja nueve columnas vacías. Se descartó por eso.
+ */
+const INGRESO: DescriptorCelda = { campo: 'fechaIngreso', etiqueta: 'Ingreso', columnas: 4, trazo: 'dato' }
+
+/** Fila superior de Internamiento: 5 + 4 + 3 = 12. */
+const FILA_SUPERIOR_INTERNAMIENTO: readonly DescriptorCelda[] = [
+  PACIENTE,
+  INGRESO,
+  EXPEDIENTE,
+]
+
+/**
  * LAS CUATRO FILAS DE CONSENTIMIENTO — ocho celdas, y **sin sexo**.
  *
  * Es el único riel del sistema de cuatro filas, y el único donde el paciente no comparte
@@ -503,6 +560,19 @@ export interface ValoresPaciente {
   readonly diasEstimados?: string
   /** Clasificación ASA, en romanos: `II`. Colapsa. */
   readonly asa?: string
+  /**
+   * FECHA DE INGRESO (II.6), **ya compuesta por quien llama** — mismo criterio que la
+   * emisión, el peso y los días estimados: este componente coloca, no rotula ni convierte.
+   *
+   * Es lo que el hospital necesita para agendar la cama, y por eso no es un dato accesorio
+   * del que se pueda prescindir: `SolicitudInternamientoPdf.tsx:316` —el renderizador v1—
+   * ya lo imprime, así que una hoja de v2 sin él sería una regresión del papel, no una
+   * simplificación del riel.
+   *
+   * Su celda mide **span 4 = 162 pt, 142 netos**, que admite la forma larga
+   * `12 de agosto de 2026` (~115 pt). No hace falta la numérica corta.
+   */
+  readonly fechaIngreso?: string
   /**
    * Familiar o responsable del paciente (II.7). **Campo vacío requerido**: si no viene, la
    * celda NO colapsa — conserva su rótulo y deja la línea de escritura. Es el único campo
@@ -854,12 +924,20 @@ export default function BloquePaciente(props: BloquePacienteProps): ReactElement
           ? FILA_INFERIOR_INTERNAMIENTO
           : FILA_INFERIOR_PLENA
 
+  /**
+   * Y la fila SUPERIOR tiene dos anatomías, no una: Internamiento cambia edad y sexo por la
+   * fecha de ingreso. Ver `FILA_SUPERIOR_INTERNAMIENTO`, donde está medido por qué ese dato
+   * no cabe en la fila de abajo.
+   */
+  const superior =
+    lamina === 'internamiento' ? FILA_SUPERIOR_INTERNAMIENTO : FILA_SUPERIOR
+
   return (
     <RielDatos
       variante="celdas"
       lamina={lamina}
       filas={[
-        celdas(FILA_SUPERIOR, props, lamina, props.acento),
+        celdas(superior, props, lamina, props.acento),
         celdas(inferior, props, lamina, props.acento),
       ]}
     />

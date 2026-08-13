@@ -513,6 +513,54 @@ describe('II.7 · Consentimiento Informado', () => {
     )
   }, 200_000)
 
+  /**
+   * ⚠ EL DEFECTO QUE ESTA PRUEBA CIERRA. `previstos` estaba cableado al número de celdas
+   * compuestas —cuatro o cinco— y las celdas de testigo se componen SIEMPRE, tengan nombre
+   * o no, porque su línea se firma a mano (NOM-004). Consecuencia: un consentimiento de
+   * consulta sin testigos imprimía «2 omitidos» sobre dos personas a las que nadie pidió
+   * nada. En una hoja que puede acabar en sede legal eso no es una imprecisión de
+   * redacción: es una afirmación falsa sobre personas.
+   */
+  it('sin testigos NO se declaran ausencias: solo consta quién firmó', async () => {
+    const hojas = await componer({
+      ...COMPLETO,
+      firmantes: {
+        medico: { rubrica: RASTER, sello: SELLO_MEDICO },
+        paciente: { nombre: PACIENTE, rubrica: RASTER, sello: SELLO_PACIENTE },
+        // Al familiar tampoco se le pidió: sin nombre no entró en ningún recuento.
+        familiar: {},
+        testigo1: {},
+        testigo2: {},
+      },
+      identificaciones: undefined,
+    })
+    const cierre = hojas[hojas.length - 1].texto
+
+    expect(cierre).toContain(sinLigadura('2 firmaron'))
+    // Lo que NO puede decir: que faltara nadie.
+    expect(cierre).not.toContain('omitido')
+    expect(cierre).not.toContain(sinLigadura('firmantes previstos'))
+  }, 200_000)
+
+  it('un testigo CON nombre que no firmó sí consta como omitido', async () => {
+    const hojas = await componer({
+      ...COMPLETO,
+      firmantes: {
+        medico: { rubrica: RASTER, sello: SELLO_MEDICO },
+        paciente: { nombre: PACIENTE, rubrica: RASTER, sello: SELLO_PACIENTE },
+        familiar: {},
+        testigo1: { nombre: 'Juan Canul Uc' },
+        testigo2: {},
+      },
+      identificaciones: undefined,
+    })
+
+    // A este SÍ se le pidió firma —tiene nombre— y no firmó. Eso es una omisión real.
+    expect(hojas[hojas.length - 1].texto).toContain(
+      sinLigadura('3 firmantes previstos, 2 firmaron, 1 omitido'),
+    )
+  }, 200_000)
+
   it('sin sellar no hay un solo sello, aunque los firmantes traigan hora', async () => {
     const hojas = await componer(SIN_SELLAR)
 
@@ -732,5 +780,112 @@ describe('II.7 · Consentimiento Informado', () => {
     }
     expect(marca(normal)).toBe(false)
     expect(marca(sustituido)).toBe(true)
+  }, 200_000)
+
+  /**
+   * ⚠ ESTE BLOQUE NO EXISTÍA EN v2 Y EL FORMULARIO SÍ CAPTURA SUS DOS DATOS.
+   * `DOCUMENTOS_SPEC.md` II.7 §2 los declara y §3 los pone en la composición; el formato se
+   * construyó sin ellos. Peor: entran en `contenidoConsentimiento()`, o sea DENTRO de la
+   * huella SHA-256, así que el dato estaba firmado y no se imprimía. Encender v2 sin esto
+   * habría borrado del papel si el paciente autoriza transfusión sanguínea.
+   */
+  describe('las autorizaciones del paciente', () => {
+    it('la transfusión AUTORIZADA se compone con la redacción de v1', async () => {
+      const hojas = await componer({
+        ...COMPLETO,
+        autorizaciones: { transfusion: 'si' },
+      })
+      expect(contiene(hojas[3], sinLigadura('Autorizo la transfusión de sangre'))).toBe(true)
+    }, 200_000)
+
+    /**
+     * La negativa EXPRESA es el dato con más valor legal de los dos, y es justo el que un
+     * booleano habría perdido: con `boolean`, «no se preguntó» y «el paciente lo rechazó»
+     * se compondrían igual, sin línea. Por eso el campo es tri-estado.
+     */
+    it('la transfusión RECHAZADA se compone, y dice que se rechazó', async () => {
+      const hojas = await componer({
+        ...COMPLETO,
+        autorizaciones: { transfusion: 'no' },
+      })
+      expect(contiene(hojas[3], sinLigadura('NO autorizo la transfusión'))).toBe(true)
+      expect(contiene(hojas[3], 'asumiendo los riesgos')).toBe(true)
+    }, 200_000)
+
+    it('sin preguntar no se compone nada: no se insinúa que se preguntara', async () => {
+      const hojas = await componer(COMPLETO)
+      for (const hoja of hojas) {
+        expect(hoja.texto).not.toContain(sinLigadura('transfusión'))
+        expect(hoja.texto).not.toContain(sinLigadura('fotografías clínicas'))
+      }
+    }, 200_000)
+
+    it('las fotografías solo se componen si se autorizaron', async () => {
+      const con = await componer({ ...COMPLETO, autorizaciones: { fotografias: true } })
+      const sin = await componer({ ...COMPLETO, autorizaciones: { fotografias: false } })
+
+      expect(contiene(con[3], sinLigadura('Autorizo la toma de fotografías'))).toBe(true)
+      for (const hoja of sin) {
+        expect(hoja.texto).not.toContain(sinLigadura('fotografías clínicas'))
+      }
+    }, 200_000)
+
+    it('las dos autorizaciones colapsan por separado', async () => {
+      const hojas = await componer({
+        ...COMPLETO,
+        autorizaciones: { transfusion: 'si', fotografias: false },
+      })
+      expect(contiene(hojas[3], sinLigadura('Autorizo la transfusión de sangre'))).toBe(true)
+      expect(hojas[3].texto).not.toContain(sinLigadura('fotografías clínicas'))
+    }, 200_000)
+  })
+
+  /**
+   * Un familiar acompaña; un representante legal SUSTITUYE la voluntad del paciente. Quien
+   * lea la hoja después tiene que poder distinguirlo sin abrir el expediente. v1 ya lo
+   * distinguía (`ConsentimientoInformadoPdf.tsx:855`) y v2 lo había perdido.
+   */
+  it('el rótulo de la celda cambia cuando quien acompaña es representante legal', async () => {
+    const familiar = await componer(COMPLETO)
+    const representante = await componer({ ...COMPLETO, representanteLegal: true })
+
+    expect(contiene(familiar[4], 'FAMILIAR O RESPONSABLE')).toBe(true)
+    expect(contiene(representante[4], 'REPRESENTANTE LEGAL')).toBe(true)
+    expect(representante[4].texto).not.toContain('FAMILIAR O RESPONSABLE')
+  }, 200_000)
+
+  /**
+   * Los dos campos eran obligatorios y **nadie los alimentaba**: el formulario captura la
+   * fotografía de la credencial y nada más. Requeridos, el anexo componía dos huecos donde
+   * la lámina pone un dato.
+   */
+  it('el pie del anexo colapsa entero cuando no hay tipo ni número', async () => {
+    const hojas = await componer({
+      ...COMPLETO,
+      identificaciones: [
+        { rol: 'Paciente', nombre: PACIENTE, foto: RASTER },
+        { rol: 'Familiar o responsable', nombre: FAMILIAR, foto: RASTER },
+      ],
+    })
+    const anexo = hojas[hojas.length - 1]
+
+    // La hoja existe —hay fotografías— y el recuadro compone su rol y su nombre.
+    expect(contiene(anexo, 'ANEXO')).toBe(true)
+    expect(contiene(anexo, PACIENTE)).toBe(true)
+    // Lo que no aparece es el pie: ni el tipo de ninguna, ni un hueco donde iría.
+    expect(anexo.texto).not.toContain('Credencial para votar')
+  }, 200_000)
+
+  it('con UNO de los dos, ese se compone solo y sin reservar el hueco del otro', async () => {
+    const hojas = await componer({
+      ...COMPLETO,
+      identificaciones: [
+        { rol: 'Paciente', nombre: PACIENTE, tipo: 'Credencial para votar', foto: RASTER },
+      ],
+    })
+    const anexo = hojas[hojas.length - 1]
+
+    expect(contiene(anexo, 'Credencial para votar')).toBe(true)
+    expect(anexo.texto).not.toContain('BUOR010412MYN04')
   }, 200_000)
 })

@@ -160,12 +160,41 @@ const FIRMANTES = {
 /** El sello del documento. Fecha y huella INVENTADAS. */
 const SELLADO = { fecha: '09/08/2026 12:47:19', huella: '3f9a…8c41' } as const
 
+/**
+ * LOS FIRMANTES DEL CASO DE CONSULTA — sin testigos y sin familiar.
+ *
+ * Es el caso NORMAL en consulta y el que destapa el defecto del recuento: sus celdas de
+ * testigo se componen igual —son fijas por NOM-004 y su línea se firma a mano— pero a esas
+ * dos personas nadie les pidió nada, así que el bloque de cierre **no puede declararlas
+ * omitidas**. Miradas la una junto a la otra, `completo` y `sinTestigos` enseñan las dos
+ * formas de la línea de sellado.
+ */
+const FIRMANTES_SIN_TESTIGOS = {
+  medico: FIRMANTES.medico,
+  paciente: FIRMANTES.paciente,
+  familiar: {},
+  testigo1: {},
+  testigo2: {},
+} as const
+
+/**
+ * Las identificaciones SIN tipo ni número, que es como llegan hoy: el formulario captura la
+ * fotografía de la credencial y nada más. El pie del recuadro colapsa entero.
+ */
+const IDENTIFICACIONES_SIN_DATOS: readonly IdentificacionAnexo[] = IDENTIFICACIONES.map(
+  ({ rol, nombre, foto }) => ({ rol, nombre, foto }),
+)
+
 /** Folios INVENTADOS, con el prefijo `C-` que la lámina compone. */
 const FOLIOS = {
   completo: 'C-7F41A9C0D3E2',
   sinFotos: 'C-2B60E4F19A7C',
   sustitucion: 'C-9D08C5A2B461',
   sinSellar: 'C-5E13B7A6C209',
+  autorizaciones: 'C-84A2F70B1D5E',
+  sinTestigos: 'C-1C79E5D24B60',
+  representante: 'C-6A38B0F91E47',
+  anexoSinDatos: 'C-D250A8C63F1B',
 } as const
 
 /** Las dos líneas de cédula, redactadas por quien llama (2.B no las inventa). */
@@ -187,6 +216,14 @@ export type CasoConsentimiento =
   | 'sinFotos'
   | 'sustitucion'
   | 'sinSellar'
+  /** Las dos autorizaciones, con la transfusión RECHAZADA. Ver `autorizaciones` en II.7. */
+  | 'autorizaciones'
+  /** El caso de consulta: el papel no declara ausencias de quien no fue convocado. */
+  | 'sinTestigos'
+  /** El acompañante es representante legal: cambia el rótulo de su celda. */
+  | 'representante'
+  /** El anexo como llega hoy: fotografía sin tipo ni número. El pie colapsa. */
+  | 'anexoSinDatos'
 
 const CASOS: Record<
   CasoConsentimiento,
@@ -195,6 +232,9 @@ const CASOS: Record<
     readonly sustitucion?: boolean
     readonly sellado?: typeof SELLADO
     readonly folio: string
+    readonly autorizaciones?: { transfusion?: 'si' | 'no'; fotografias?: boolean }
+    readonly representanteLegal?: boolean
+    readonly firmantes?: typeof FIRMANTES | typeof FIRMANTES_SIN_TESTIGOS
   }
 > = {
   completo: {
@@ -215,6 +255,35 @@ const CASOS: Record<
   },
   // Sin `sellado`: ni pies de celda ni bloque de cierre.
   sinSellar: { identificaciones: IDENTIFICACIONES, folio: FOLIOS.sinSellar },
+  /*
+    LA TRANSFUSIÓN VA EN `no` A PROPÓSITO. El `sí` es el caso amable y el que cualquiera
+    probaría; la negativa expresa es el dato con más valor legal de los dos y el que un
+    booleano habría confundido con «no se preguntó». Junto a `completo` —que no trae
+    ninguna— se ve que lo que distingue los dos casos es que la fila EXISTA.
+  */
+  autorizaciones: {
+    identificaciones: IDENTIFICACIONES,
+    sellado: SELLADO,
+    folio: FOLIOS.autorizaciones,
+    autorizaciones: { transfusion: 'no', fotografias: true },
+  },
+  sinTestigos: {
+    identificaciones: [],
+    sellado: SELLADO,
+    folio: FOLIOS.sinTestigos,
+    firmantes: FIRMANTES_SIN_TESTIGOS,
+  },
+  representante: {
+    identificaciones: IDENTIFICACIONES,
+    sellado: SELLADO,
+    folio: FOLIOS.representante,
+    representanteLegal: true,
+  },
+  anexoSinDatos: {
+    identificaciones: IDENTIFICACIONES_SIN_DATOS,
+    sellado: SELLADO,
+    folio: FOLIOS.anexoSinDatos,
+  },
 }
 
 function HojaConsentimiento({
@@ -240,8 +309,10 @@ function HojaConsentimiento({
         paciente={PACIENTE}
         procedimiento={PROCEDIMIENTO}
         secciones={SECCIONES}
-        firmantes={FIRMANTES}
+        firmantes={c.firmantes ?? FIRMANTES}
         sustitucion={c.sustitucion}
+        autorizaciones={c.autorizaciones}
+        representanteLegal={c.representanteLegal}
         identificaciones={c.identificaciones}
         sellado={c.sellado}
         folio={c.folio}

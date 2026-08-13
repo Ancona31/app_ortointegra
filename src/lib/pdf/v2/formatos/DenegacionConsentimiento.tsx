@@ -361,6 +361,16 @@ export interface DenegacionConsentimientoProps {
    * Sin él, la fórmula de la hoja 4 de II.7, que ya está resuelta y medida allí. Entra por prop
    * porque el médico puede asentar otro —la caja crece con su contenido—, y no se inventa texto
    * nuevo cuando no lo hace.
+   *
+   * ⚠ **SIN PRODUCTOR HOY, Y ES EL CASO MENOS GRAVE DE LOS CINCO.** `ConsentimientoInformadoForm`
+   * captura `pacienteNoPuedeFirmar` —que es lo que enciende `sustitucion`— pero **no un texto
+   * de motivo**: el `contenido` de la denegación son seis campos y ninguno lo es (`:1006`).
+   *
+   * A diferencia de las otras cuatro ranuras anotadas en `DOCUMENTOS_RANURAS_MUERTAS.md`,
+   * **aquí el papel no se queda mudo**: sin motivo se compone la fórmula por defecto, que
+   * dice lo que hay que decir. Lo que falta no es el bloque, es la posibilidad de que el
+   * médico asiente un motivo distinto del genérico. Se anota igual para que quien cablee no
+   * lo cuente como cableado.
    */
   readonly motivo?: string
   /**
