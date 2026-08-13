@@ -770,44 +770,35 @@ describe('II.3 · Receta Médica — medido sobre el PDF', () => {
     // Lo que se mide es dónde queda su hueco, que es lo que fija el filete de arriba.
   }, 60_000)
 
-  it('compone los DOS bloques de cierre, y cada uno colapsa por su cuenta', async () => {
-    // Un solo medicamento, para que la hoja entera quepa y los dos bloques se puedan
-    // mirar juntos. Con la lista llena el cierre se va a la hoja 2 — ver la prueba
-    // de capacidad.
+  it('compone UN bloque de cierre, y colapsa entero con su aire', async () => {
+    // Un solo medicamento, para que la hoja entera quepa. Con la lista llena el
+    // cierre se va a la hoja 2 — ver la prueba de capacidad.
     const uno: readonly MedicamentoRecetado[] = [
       { nombre_comercial: 'Meloxicam', presentacion: 'Tabletas 15 mg', principio_activo: 'Meloxicam' },
     ]
     const RECOMENDACIONES = 'Mantenga reposo relativo durante las primeras 48 horas.'
-    const ALARMA = 'Fiebre mayor de 38.5 °C que no cede con el antipirético.'
 
-    const [conLosDos] = await componer(uno, {
-      recomendaciones: RECOMENDACIONES,
-      signosDeAlarma: ALARMA,
-    })
-    expect(renglon(conLosDos, 'RECOMENDACIONES GENERALES')).toBeDefined()
-    expect(renglon(conLosDos, 'ACUDA DE INMEDIATO')).toBeDefined()
+    /*
+      ERAN DOS Y ES UNO. La receta llevó un bloque de alarma aparte —`ACUDA DE INMEDIATO
+      A URGENCIAS SI PRESENTA`, con el filete de 4 pt— y no se compuso en ninguna receta
+      emitida: `RecetaForm` no tiene ese campo. Se retiró en vez de dotarlo, porque no
+      son dos cosas: una alarma, si la hay, es una recomendación al paciente y se escribe
+      donde el médico escribe las demás. II.3 §2 los inventariaba como uno solo.
+    */
+    const [conRecomendaciones] = await componer(uno, { recomendaciones: RECOMENDACIONES })
+    expect(renglon(conRecomendaciones, 'RECOMENDACIONES GENERALES')).toBeDefined()
+    expect(conRecomendaciones.renglones.some((r) => r.texto.startsWith('ACUDA'))).toBe(false)
 
-    // II.3 §2 los inventaría como UN solo campo cuyo vacío «colapsa el bloque de
-    // alarma entero». Son dos bloques y cada uno colapsa el suyo.
-    const [soloAlarma] = await componer(uno, { signosDeAlarma: ALARMA })
-    expect(soloAlarma.renglones.some((r) => r.texto.startsWith('RECOMENDACIONES'))).toBe(
-      false,
+    /*
+      Y EL COLAPSO ES TOTAL: sin el bloque no queda su aire. Sin recomendaciones, la
+      firma sube exactamente lo que medía el bloque más sus 14 pt de separación — no
+      queda un hueco donde estaba, que es la condición de toda ranura que colapsa.
+    */
+    const [sinNada] = await componer(uno)
+    expect(sinNada.renglones.some((r) => r.texto.startsWith('RECOMENDACIONES'))).toBe(false)
+    expect(renglon(conRecomendaciones, 'FIRMA DEL MÉDICO').arriba).toBeGreaterThan(
+      renglon(sinNada, 'FIRMA DEL MÉDICO').arriba,
     )
-    expect(renglon(soloAlarma, 'ACUDA DE INMEDIATO')).toBeDefined()
-
-    const [soloRecomendaciones] = await componer(uno, {
-      recomendaciones: RECOMENDACIONES,
-    })
-    expect(renglon(soloRecomendaciones, 'RECOMENDACIONES GENERALES')).toBeDefined()
-    expect(soloRecomendaciones.renglones.some((r) => r.texto.startsWith('ACUDA'))).toBe(
-      false,
-    )
-
-    // Y el colapso es TOTAL: sin el bloque no queda su aire. La firma sube
-    // exactamente lo que medía el bloque más su separación.
-    const conAmbos = renglon(conLosDos, 'FIRMA DEL MÉDICO').arriba
-    const sinRecomendaciones = renglon(soloAlarma, 'FIRMA DEL MÉDICO').arriba
-    expect(conAmbos).toBeGreaterThan(sinRecomendaciones)
   }, 180_000)
 
   it('ancla la banda de pie en y = 740 y con folio', async () => {
@@ -896,7 +887,6 @@ describe('II.3 · Receta Médica — medido sobre el PDF', () => {
     const corto = (i: number): MedicamentoRecetado => ({ ...caro(i), indicacion: UNA_LINEA })
     const cierre = {
       recomendaciones: 'Mantenga reposo relativo durante las primeras 48 horas.',
-      signosDeAlarma: 'Fiebre mayor de 38.5 °C que no cede con el antipirético.',
     }
     const lista = (n: number): readonly MedicamentoRecetado[] =>
       Array.from({ length: n }, (_, i) => caro(i))

@@ -45,12 +45,16 @@
  *    el número de una solicitud». Su lámina compone el riel de folio de 156 pt en
  *    el bloque de título y emite con prefijo en los tres casos (B.1 §2 y §4). Siete
  *    de los ocho formatos llevan folio; el único sin él es el Escrito Médico.
- * b. **La lista NO es de una sola columna.** II.1 §5 lo declaraba como excepción,
- *    leyendo la auditoría §8.2 —el renderer viejo dibujaba el encabezado de una
- *    segunda columna sin filas debajo—. Ese defecto era una cabecera huérfana, no
- *    la columna: B.1 §3 mide la tabla en tres columnas, con la indicación a la
- *    derecha del nombre y en su mismo renglón. Lo que no se repone es la CABECERA,
- *    que la lámina sí tiene y que aquí sigue sin componerse. **Reportado.**
+ * b. **La lista ES de una sola columna, y II.1 §5 tenía razón por el motivo
+ *    equivocado.** Aquel párrafo lo declaraba como excepción leyendo la auditoría
+ *    §8.2 —el renderer viejo dibujaba el encabezado de una segunda columna sin filas
+ *    debajo—, y se rebatió: ese defecto era una cabecera huérfana y no la columna,
+ *    así que B.1 §3 se compuso en tres columnas con la indicación a la derecha del
+ *    nombre. **El rebatimiento era correcto y la premisa no.** La indicación por
+ *    estudio no la captura nadie y se retiró, así que la tercera columna se quedaba
+ *    vacía en las 486 pt de todas las solicitudes: exactamente la cabecera huérfana
+ *    de §8.2, reconstruida desde el otro lado. Una sola columna, `apilada`, sin
+ *    cabecera de tabla. Ver `EstudioSolicitado`.
  *
  * DOS COSAS QUE ESTE FORMATO NO MONTA, Y POR QUÉ
  *
@@ -92,7 +96,10 @@ const ITEMS = 'estudios'
  * Los tres rótulos de la cabecera de tabla, textuales de A.11 y de B.1 §4. Se
  * componen en versalita en 2.G, como toda versalita del sistema.
  */
-const CABECERA = { numero: '#', ancla: 'Estudio solicitado', nota: 'Indicación' } as const
+// La cabecera de tabla —`#` · `Estudio solicitado` · `Indicación`— se fue con la columna
+// de indicación: sin una segunda columna de datos, tres rótulos son la cabecera huérfana
+// de §8.2. La cabecera de continuación compone ahora la variante de rótulo único, que es
+// la que ya usan las otras dos solicitudes.
 /** `CONCILIA D14` — la misma cadena en Receta y en las dos solicitudes. */
 const ROTULO_FIRMA = 'Firma y sello del médico'
 
@@ -150,25 +157,24 @@ const SEPARACION_CONTADOR_NOTAS = ESPACIO[20]
 const SEPARACION_NOTAS_FIRMA = ESPACIO[20]
 
 /**
- * Un estudio de la lista. Dos ranuras de 2.G, que son las dos que II.1 §4 ocupa:
- * `ancla` y `nota`. `secundario` y `marca` no existen en este formato — no entran
- * como opcionales vacíos, directamente no están.
+ * Un estudio de la lista. **UNA sola ranura de 2.G**, `ancla`, y el nombre del estudio en
+ * ella. `secundario`, `marca` y `nota` no existen en este formato — no entran como
+ * opcionales vacíos, directamente no están.
+ *
+ * ⚠ **LLEVÓ UNA SEGUNDA COLUMNA DE `indicacion` Y SE RETIRÓ.** Nadie la alimentaba:
+ * `SolicitudLabForm` guarda `estudios` como `string[]`, cadenas sueltas, y un estudio se
+ * pide por su nombre. Lo que hiciera falta añadir va en las notas generales al laboratorio,
+ * que sí existen y sí se guardan.
+ *
+ * Retirarla se llevó la tabla entera con ella, y eso es lo correcto: con la columna vacía,
+ * `disposicion="columna"` reservaba 132 pt más el medianil a la derecha de cada renglón y la
+ * cabecera rotulaba `Indicación` sobre nada — la cabecera huérfana que §8.2 ya había
+ * señalado en el renderizador viejo. Ahora la lista es `apilada` y el nombre del estudio
+ * ocupa el ancho vivo entero.
  */
 export interface EstudioSolicitado {
   /** Ranura `ancla`: el nombre del estudio. */
   readonly nombre: string
-  /**
-   * Ranura `nota`: la indicación del estudio. Colapsa si no viene.
-   *
-   * ⚠ **RANURA SIN PRODUCTOR — no la des por viva al cablear.** `SolicitudLabForm` guarda
-   * `estudios` como `string[]` —cadenas sueltas, `:112`—, así que no hay de dónde sacar una
-   * indicación por estudio y esta columna **no se compone en ninguna solicitud emitida**.
-   *
-   * No está rota: está construida, medida y en reposo. Lo que la encendería es que el
-   * formulario guarde `{ nombre, indicacion }` en vez de una cadena, y eso es trabajo de
-   * formulario. Está anotada con las otras cuatro en `DOCUMENTOS_RANURAS_MUERTAS.md`.
-   */
-  readonly indicacion?: string
 }
 
 export interface SolicitudLaboratorioProps {
@@ -278,7 +284,7 @@ export default function SolicitudLaboratorio({
           titulo: TITULO,
           paciente,
           folio,
-          lista: { titulo: TITULO, columnas: CABECERA },
+          lista: { titulo: TITULO },
           aireLista: SEPARACION_RIEL_LISTA,
         }}
         contador={{ items: ITEMS, total: estudios.length }}
@@ -293,15 +299,22 @@ export default function SolicitudLaboratorio({
         firmas={<BloqueFirmas variante="simple" firmas={firmas} />}
       >
         {/*
-          LA LISTA, EN LAS DOS VARIANTES QUE LA LÁMINA COMPONE.
+          LA LISTA, DE UNA SOLA COLUMNA.
 
-          `compacta` + `columna` son la tabla de B.1 §3: estudio a la izquierda,
-          indicación en la tercera columna de 132 pt, en el MISMO renglón, con la fila
-          calibrada a 9 / 11.5 pt. Es lo que revierte `D4` y `D3`, y lo que hace que
-          una lista larga quepa donde la lámina la mete.
+          `compacta` mantiene la fila calibrada a 9 / 11.5 pt, que es lo que revierte
+          `D4` y `D3` y lo que hace que una lista larga quepa donde la lámina la mete.
+          `apilada` sustituye a `columna` desde que se retiró la indicación por estudio:
+          en `columna`, el bloque de la nota reserva 132 pt más el medianil AUNQUE no
+          haya nota, así que el nombre del estudio se quedaba en 340 y sobraba un tercio
+          de renglón vacío en cada uno de los dieciocho. Ahora el ancla es `flex: 1` y
+          ocupa el ancho vivo entero.
 
-          **Las dos las declara este archivo, no el número de estudios.** Si algún día
-          aparece aquí un `estudios.length > N` eligiendo calibración, es D4 volviendo
+          ⚠ `compacta` + `apilada` es la pareja que 2.J declara NO DEFINIDA, y no se
+          compone aquí: esa indefinición es sobre el CUERPO de una nota apilada, y este
+          formato ya no tiene notas por entrada. Sin nota, la rama no se ejecuta.
+
+          **La calibración la declara este archivo, no el número de estudios.** Si algún
+          día aparece aquí un `estudios.length > N` eligiendo calibración, es D4 volviendo
           por la puerta de atrás: lo que I.3.4 prohíbe es que el documento cambie de
           métrica según lo que traiga, y eso sigue en pie.
         */}
@@ -313,10 +326,9 @@ export default function SolicitudLaboratorio({
             numero={indice + 1}
             primera={indice === 0}
             ancla={estudio.nombre}
-            nota={estudio.indicacion}
             acento={acento}
             calibracion="compacta"
-            disposicion="columna"
+            disposicion="apilada"
           />
         ))}
         <CierreEntradas />

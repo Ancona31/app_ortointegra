@@ -85,14 +85,8 @@ const PACIENTE_MINIMO: ValoresPaciente = {
  * piezas (anexo A, P4-4).
  */
 const ESTUDIOS_COMPLETO: readonly EstudioSolicitado[] = [
-  {
-    nombre: 'Biometría hemática completa',
-    indicacion: 'Preoperatorio de artroplastia total de rodilla derecha.',
-  },
-  {
-    nombre: 'Química sanguínea de seis elementos',
-    indicacion: 'Ayuno de ocho horas. Valorar función renal previa a AINE.',
-  },
+  { nombre: 'Biometría hemática completa' },
+  { nombre: 'Química sanguínea de seis elementos' },
 ]
 
 /** Un solo estudio y sin indicación: la entrada mínima del sistema (II.1 §4). */
@@ -173,7 +167,6 @@ const ESTUDIOS_LLENO: readonly EstudioSolicitado[] = Array.from(
   { length: 25 },
   (_, i) => ({
     nombre: `Estudio de control ${i + 1}`,
-    indicacion: i % 3 === 0 ? 'Ayuno de 8 horas' : undefined,
   }),
 )
 

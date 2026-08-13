@@ -76,7 +76,7 @@ export type ClaseFolio = keyof typeof PREFIJO_POR_CLASE
  *                             numera todo lo que emite porque una serie con
  *                             huecos no se audita; nadie va a citar ese número
  *                             desde el hospital. Decisión reconfirmada — ver
- *                             `DOCUMENTOS_RANURAS_MUERTAS.md` §4.
+ *                             `DOCUMENTOS_RANURAS_MUERTAS.md` §2.
  *   `escrito_medico`          **No tiene clase de folio.** El generador no lo
  *                             contempla y su columna queda NULL: no son
  *                             documentos seriados.

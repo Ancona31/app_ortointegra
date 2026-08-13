@@ -7,8 +7,8 @@
  *
  * TRES CASOS, Y LOS TRES HACEN FALTA
  *
- *   completo   los CUATRO estados de entrada, con diagnóstico, urgente y notas
- *   mínimo     un estudio de dos datos, sin diagnóstico, sin urgente y sin notas
+ *   completo   los CUATRO estados de entrada, con diagnóstico y urgente
+ *   mínimo     un estudio de dos datos, sin diagnóstico y sin urgente
  *   lleno      la hoja al tope, para ver dónde queda el techo de la lista
  *
  * El completo es el único que instancia los cuatro estados de la entrada a la vez,
@@ -18,8 +18,7 @@
  * si no hay con qué comparar.
  *
  * El mínimo enseña el colapso del resto: sin diagnóstico el riel se queda en una
- * fila, sin urgente el bloque de título vuelve a sus 25 pt y sin notas la firma
- * sube.
+ * fila y sin urgente el bloque de título vuelve a sus 25 pt.
  *
  * SIN GUÍAS, como el de Laboratorio: las líneas de zona segura son andamiaje del
  * taller de chasis y un documento tiene que verse como un documento.
@@ -107,19 +106,6 @@ const ESTUDIOS_LLENO: readonly EstudioSolicitado[] = Array.from(
   }),
 )
 
-/**
- * Notas al servicio del caso completo. Entran como UNA CADENA y las compone 2.J.
- *
- * El rótulo `Notas para el servicio de imagen` viaja DENTRO del texto, como primer
- * renglón, y por eso sale en `etiqueta` y no en los 9 / 13 de la lámina: ver el
- * punto (c) de la cabecera del formato.
- */
-const NOTAS_COMPLETO = [
-  'Notas para el servicio de imagen:',
-  '- Enviar el estudio en disco y por enlace al consultorio.',
-  '- Avisar por teléfono si el paciente no puede mantener la bipedestación.',
-].join('\n')
-
 /** Folios INVENTADOS, con la forma de `public.generar_folio()` para esta clase. */
 const FOLIO_COMPLETO = 'IMG-2026-0148'
 const FOLIO_MINIMO = 'IMG-2026-0149'
@@ -165,14 +151,13 @@ const CASOS: Record<
     paciente: ValoresPaciente
     folio: string
     urgente: boolean
-    notas?: string
   }
 > = {
-  completo: { estudios: ESTUDIOS_COMPLETO, paciente: PACIENTE_COMPLETO, folio: FOLIO_COMPLETO, urgente: true, notas: NOTAS_COMPLETO },
+  completo: { estudios: ESTUDIOS_COMPLETO, paciente: PACIENTE_COMPLETO, folio: FOLIO_COMPLETO, urgente: true },
   minimo: { estudios: ESTUDIOS_MINIMO, paciente: PACIENTE_MINIMO, folio: FOLIO_MINIMO, urgente: false },
   // Urgente Y desbordado: es el caso que enseña el badge en las DOS hojas, reducido
   // en la segunda, que es lo único que distingue a este formato en continuación.
-  lleno: { estudios: ESTUDIOS_LLENO, paciente: PACIENTE_COMPLETO, folio: FOLIO_LLENO, urgente: true, notas: NOTAS_COMPLETO },
+  lleno: { estudios: ESTUDIOS_LLENO, paciente: PACIENTE_COMPLETO, folio: FOLIO_LLENO, urgente: true },
 }
 
 function HojaImagenologia({
@@ -203,7 +188,6 @@ function HojaImagenologia({
         estudios={c.estudios}
         emision={EMISION}
         urgente={c.urgente}
-        notas={c.notas}
         folio={c.folio}
       />
     </Document>

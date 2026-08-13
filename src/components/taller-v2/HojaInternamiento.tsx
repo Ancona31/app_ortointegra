@@ -86,12 +86,15 @@ const PACIENTE_MINIMO: ValoresPaciente = {
   hospital: 'Hospital Ficticio del Centro',
 }
 
-/** Diagnósticos: el principal y dos secundarios, con la sintaxis de viñetas de 2.J. */
-const DIAGNOSTICOS = [
-  '— Gonartrosis tricompartimental derecha, grado IV de Kellgren-Lawrence',
-  '— Hipertensión arterial sistémica en control con IECA',
-  '— Obesidad grado I',
-].join('\n')
+/**
+ * Diagnósticos: el principal y dos secundarios, **como los guarda el formulario**. La
+ * sintaxis de viñetas de 2.J la compone el formato; aquí entran los campos crudos.
+ */
+const DIAGNOSTICO = 'Gonartrosis tricompartimental derecha, grado IV de Kellgren-Lawrence'
+const DIAGNOSTICOS_SECUNDARIOS = [
+  'Hipertensión arterial sistémica en control con IECA',
+  'Obesidad grado I',
+]
 
 const PROCEDIMIENTO =
   'Artroplastia total de rodilla derecha, cementada, con abordaje parapatelar medial.'
@@ -249,7 +252,8 @@ function HojaInternamiento({
         paciente={c.paciente}
         emision={EMISION}
         urgente={c.urgente}
-        diagnosticos={DIAGNOSTICOS}
+        diagnostico={DIAGNOSTICO}
+        diagnosticosSecundarios={DIAGNOSTICOS_SECUNDARIOS}
         procedimiento={c.procedimiento}
         requerimientos={c.requerimientos}
         justificacion={c.justificacion}

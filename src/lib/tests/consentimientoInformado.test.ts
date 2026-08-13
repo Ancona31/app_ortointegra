@@ -949,17 +949,22 @@ describe('II.7 · Consentimiento Informado', () => {
   })
 
   /**
-   * Un familiar acompaña; un representante legal SUSTITUYE la voluntad del paciente. Quien
-   * lea la hoja después tiene que poder distinguirlo sin abrir el expediente. v1 ya lo
-   * distinguía (`ConsentimientoInformadoPdf.tsx:855`) y v2 lo había perdido.
+   * ⚠ LA ALTERNANCIA DE RÓTULO SE RETIRÓ, Y ESTA PRUEBA FIJA QUE NO VUELVA SOLA.
+   *
+   * `representanteLegal` alternaba la celda entre `Familiar o responsable` y `Representante
+   * legal`, y nadie la alimentaba: el formulario tiene UN campo, rotulado `Familiar
+   * responsable o representante legal`, que cubre las dos calidades sin distinguirlas.
+   *
+   * Se justificó en su día diciendo que «v1 ya lo distinguía y v2 lo había perdido».
+   * **v1 tiene la rama y tampoco la ejerce**: la enciende `data.representante`
+   * (`ConsentimientoInformadoPdf.tsx:855`), que es el NOMBRE del representante —no un
+   * booleano— y el formulario no lo pasa nunca. Los dos renderizadores imprimen siempre lo
+   * mismo, así que retirarlo no cambia ni un papel.
    */
-  it('el rótulo de la celda cambia cuando quien acompaña es representante legal', async () => {
-    const familiar = await componer(COMPLETO)
-    const representante = await componer({ ...COMPLETO, representanteLegal: true })
-
-    expect(contiene(familiar[4], 'FAMILIAR O RESPONSABLE')).toBe(true)
-    expect(contiene(representante[4], 'REPRESENTANTE LEGAL')).toBe(true)
-    expect(representante[4].texto).not.toContain('FAMILIAR O RESPONSABLE')
+  it('la celda del acompañante lleva SIEMPRE el mismo rótulo', async () => {
+    const hojas = await componer(COMPLETO)
+    expect(contiene(hojas[4], 'FAMILIAR O RESPONSABLE')).toBe(true)
+    expect(hojas[4].texto).not.toContain('REPRESENTANTE LEGAL')
   }, 200_000)
 
   /**

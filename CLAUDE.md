@@ -343,7 +343,7 @@ Tu primer mensaje en cada sesión debe ser:
 
 - **CALCULADORAS_ROADMAP.md** — Sistema de 200 calculadoras clínicas. Leer ANTES de trabajar en calculadoras.
 - **RESUMEN_DASHBOARD.md** — Dashboard del paciente en /expediente/[id]/estado. Leer ANTES de trabajar en esa página.
-- **DOCUMENTOS_RANURAS_MUERTAS.md** — Cinco bloques de los formatos v2 construidos y sin nadie que los alimente. **Leer ANTES de cablear v2 y antes de encender el flag `usa_documentos_v2`.** Si el cableado los ignora, v2 se enciende con cinco bloques muertos y no se detecta hasta que un médico eche algo en falta en el papel.
+- **DOCUMENTOS_RANURAS_MUERTAS.md** — ✅ **Cerrado.** Las siete ranuras de v2 sin productor se retiraron de los formatos, así que ya no hay nada que vigilar al cablear ni al encender `usa_documentos_v2`. Lo que queda vivo dentro es su **§2**: tres decisiones que parecen huecos y no lo son —el folio de Internamiento, el tipo y número del anexo, y las tres celdas de riel pendientes de cable—. Leerlo solo si algo de eso parece un defecto que arreglar. También registra un defecto de chasis abierto (§3): react-pdf comprime las filas de una hoja que se pasa por poco.
 
 ---
 

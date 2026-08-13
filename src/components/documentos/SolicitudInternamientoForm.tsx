@@ -326,7 +326,7 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
       //    asigna `INT-…` y la fila lo lleva —el expediente numera todo lo que
       //    emite, porque una serie con huecos no se audita—, pero nadie va a
       //    citar ese número desde el hospital y el formato no compone su ranura.
-      //    Decisión reconfirmada: ver `DOCUMENTOS_RANURAS_MUERTAS.md` §4 y
+      //    Decisión reconfirmada: ver `DOCUMENTOS_RANURAS_MUERTAS.md` §2 y
       //    `folioImpreso()`, que es donde está escrito y donde el botón de
       //    regenerar lee lo mismo.
       const supabase = offlineMode ? null : createClient()

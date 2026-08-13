@@ -65,9 +65,6 @@ const PACIENTE = {
  */
 const PACIENTE_VACIO = { paciente: '', fecha: '8 ago 2026' }
 
-/** El procedimiento, bajo el título y con su rótulo. */
-const PROCEDIMIENTO = 'Artrodesis lumbar instrumentada L4-L5'
-
 /**
  * Los cuatro conceptos de la cotización, con mezcla de origen.
  *
@@ -164,19 +161,22 @@ function datosDelCaso(caso: CasoHonorarios, qr: string): DatosCaso {
     return {
       tipo_doc: 'cotizacion',
       paciente: PACIENTE,
-      procedimiento: PROCEDIMIENTO,
       lineas: CONCEPTOS_COTIZACION,
       aseguradora: {
         nombre: 'Grupo Nacional Provincial',
         poliza: 'GNP-4471-882301',
         cobertura: 'Gastos mayores',
       },
+      // Los subtotales agrupan por el TEXTO del origen, que es lo que hace
+      // `subtotalesDe()` en el formulario: una fila por origen distinto.
       subtotales: [
-        { etiqueta: 'Honorarios del médico', importe: '$45,000.00' },
-        { etiqueta: 'Estimado de terceros', importe: '$145,000.00' },
+        { origen: 'Honorarios médicos', total: '$45,000.00' },
+        { origen: 'Anestesiólogo', total: '$18,000.00' },
+        { origen: 'Hospital', total: '$62,000.00' },
+        { origen: 'Material e implantes', total: '$65,000.00' },
       ],
       monto: '$190,000.00',
-      divisa: { codigo: 'MXN', nombre: 'Pesos mexicanos' },
+      divisa: 'MXN',
       notas: NOTAS_COTIZACION,
       folio: FOLIO_COTIZACION,
       qr,
@@ -187,16 +187,11 @@ function datosDelCaso(caso: CasoHonorarios, qr: string): DatosCaso {
     return {
       tipo_doc: 'honorarios',
       paciente: PACIENTE,
-      procedimiento: 'Programa de rehabilitación de rodilla derecha',
       lineas: CONCEPTOS_RECIBO,
       monto: '$18,400.00',
-      divisa: { codigo: 'USD', nombre: 'Dólares estadounidenses' },
-      anticipo: {
-        etiqueta: 'Anticipo recibido',
-        importe: '−$6,000.00',
-        fecha: '12 jul 2026',
-        saldo: { etiqueta: 'Saldo pendiente', importe: '$12,400.00' },
-      },
+      divisa: 'USD',
+      anticipo: '−$6,000.00',
+      saldo: '$12,400.00',
       forma_pago: 'Transferencia electrónica',
       notas: NOTAS_RECIBO,
       folio: FOLIO_RECIBO,
@@ -208,7 +203,7 @@ function datosDelCaso(caso: CasoHonorarios, qr: string): DatosCaso {
     paciente: PACIENTE_VACIO,
     lineas: CONCEPTOS_MINIMO,
     monto: '$1,200.00',
-    divisa: { codigo: 'MXN', nombre: 'Pesos mexicanos' },
+    divisa: 'MXN',
     forma_pago: 'Efectivo',
     notas: NOTAS_MINIMO,
     folio: FOLIO_MINIMO,

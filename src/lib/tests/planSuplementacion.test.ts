@@ -668,23 +668,24 @@ describe('II.4 · Plan de Suplementación — medido sobre el PDF', () => {
     )
   }, 120_000)
 
-  it('compone el bloque de cita con sus dos filetes y sus cuatro textos', async () => {
-    const CITA = {
-      fecha: '4 de noviembre de 2026',
-      plazo: 'a 3 meses',
-      nota: 'Traer control de vitamina D.',
-    }
+  it('compone el bloque de cita con sus dos filetes y su texto libre', async () => {
+    /*
+      ERAN CUATRO TEXTOS Y SON DOS: el encabezado y el seguimiento. La cita entraba como
+      objeto de tres campos —`fecha` requerida, `plazo` y `nota`— y ningún formulario los
+      captura: lo que se guarda es `seguimiento`, una cadena libre, y es lo que v1 imprime
+      en su badge. Se compone como lo que es.
+    */
+    const CITA = 'Control a 3 meses, el 4 de noviembre de 2026. Traer vitamina D.'
     const uno: readonly SuplementoIndicado[] = [
       { nombre: 'Colecalciferol', dosis: '2 000 UI cada 24 horas' },
     ]
 
-    const [conCita] = await componer(uno, { cita: CITA, notas: 'Tome con alimentos.' })
+    const [conCita] = await componer(uno, { seguimiento: CITA, notas: 'Tome con alimentos.' })
 
     expect(renglon(conCita, 'CITA DE CONTROL')).toBeDefined()
-    // La fecha, por `textoDe`: abre con cifra y el renderer la parte en dos.
-    expect(textoDe(conCita)).toContain(CITA.fecha)
-    expect(renglon(conCita, CITA.plazo)).toBeDefined()
-    expect(renglon(conCita, CITA.nota)).toBeDefined()
+    // Por `textoDe`: la cadena es larga y el renderer la parte en varios renglones.
+    expect(textoDe(conCita)).toContain('Control a 3 meses')
+    expect(textoDe(conCita)).toContain('Traer vitamina D.')
 
     /*
       LOS DOS FILETES, Y `CONCILIA D42` DECÍA QUE ERA UNO. El superior mide 294 pt —el
@@ -799,7 +800,7 @@ describe('II.4 · Plan de Suplementación — medido sobre el PDF', () => {
     }))
     const hojas = await componer(lista, {
       notas: 'Tome los suplementos con alimentos y separados de cualquier antibiótico.',
-      cita: { fecha: '4 de noviembre de 2026', plazo: 'a 3 meses' },
+      seguimiento: 'Control a 3 meses, el 4 de noviembre de 2026.',
     })
     expect(hojas.length).toBeGreaterThan(1)
 
@@ -840,7 +841,7 @@ describe('II.4 · Plan de Suplementación — medido sobre el PDF', () => {
     })
     const cierre = {
       notas: 'Tome los suplementos con alimentos y separados de cualquier antibiótico.',
-      cita: { fecha: '4 de noviembre de 2026', plazo: 'a 3 meses' },
+      seguimiento: 'Control a 3 meses, el 4 de noviembre de 2026.',
     }
     const lista = Array.from({ length: 9 }, (_, i) => caro(i))
 

@@ -200,7 +200,6 @@ const FOLIOS = {
   sinSellar: 'C-5E13B7A6C209',
   autorizaciones: 'C-84A2F70B1D5E',
   sinTestigos: 'C-1C79E5D24B60',
-  representante: 'C-6A38B0F91E47',
   anexoSinDatos: 'C-D250A8C63F1B',
 } as const
 
@@ -227,8 +226,6 @@ export type CasoConsentimiento =
   | 'autorizaciones'
   /** El caso de consulta: el papel no declara ausencias de quien no fue convocado. */
   | 'sinTestigos'
-  /** El acompañante es representante legal: cambia el rótulo de su celda. */
-  | 'representante'
   /** El anexo como llega hoy: fotografía sin tipo ni número. El pie colapsa. */
   | 'anexoSinDatos'
 
@@ -241,7 +238,6 @@ const CASOS: Record<
     readonly folio: string
     readonly autorizaTransfusion?: 'si' | 'no'
     readonly autorizaFotos?: boolean
-    readonly representanteLegal?: boolean
     readonly firmantes?: typeof FIRMANTES | typeof FIRMANTES_SIN_TESTIGOS
   }
 > = {
@@ -292,12 +288,6 @@ const CASOS: Record<
     folio: FOLIOS.sinTestigos,
     firmantes: FIRMANTES_SIN_TESTIGOS,
   },
-  representante: {
-    identificaciones: IDENTIFICACIONES,
-    sellado: SELLADO,
-    folio: FOLIOS.representante,
-    representanteLegal: true,
-  },
   anexoSinDatos: {
     identificaciones: IDENTIFICACIONES_SIN_DATOS,
     sellado: SELLADO,
@@ -332,7 +322,6 @@ function HojaConsentimiento({
         pacienteNoPuedeFirmar={c.pacienteNoPuedeFirmar}
         autorizaTransfusion={c.autorizaTransfusion}
         autorizaFotos={c.autorizaFotos}
-        representanteLegal={c.representanteLegal}
         identificaciones={c.identificaciones}
         sellado={c.sellado}
         folio={c.folio}

@@ -257,7 +257,15 @@ export interface FilaImporte {
  */
 export interface AnticipoRecibido extends FilaImporte {
   /** Fecha del anticipo, YA compuesta. Colapsa sola. */
-  readonly fecha?: string
+  /*
+    ── AQUÍ NO HAY `fecha`, Y NO ES UN OLVIDO ────────────────────────────────
+
+    La fecha del anticipo se componía bajo su cifra, montada dentro del interlineado. Su
+    único consumidor era II.5 y **nadie la alimentaba**: `NotaHonorariosForm` guarda
+    `anticipo` como un número y no tiene campo de fecha detrás. Retirada con las siete
+    ranuras sin productor. Sus estilos —`estilos.fecha` y `GEOMETRIA.fecha`— se quedan:
+    los usa la credencial del médico, que es de donde salen sus cifras.
+  */
   /** El saldo que queda. Colapsa solo. */
   readonly saldo?: FilaImporte
 }
@@ -350,9 +358,6 @@ export default function RielImportes(props: RielImportesProps): ReactElement {
             <>
               <View style={estilos.filete} />
               <Fila fila={anticipo} />
-              {tieneValor(anticipo.fecha) ? (
-                <Text style={estilos.fecha}>{anticipo.fecha}</Text>
-              ) : null}
               {anticipo.saldo === undefined ? null : (
                 <Fila fila={anticipo.saldo} destacada />
               )}

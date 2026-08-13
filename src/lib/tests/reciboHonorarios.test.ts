@@ -202,7 +202,6 @@ const acento = resolverAcento(ACENTO_BASE_POR_DEFECTO)
  * LIGADURA como un glifo propio y su `ToUnicode` no la descompone.
  */
 const PACIENTE = 'Renata Bustamante Oceguera'
-const PROCEDIMIENTO = 'Artrodesis lumbar instrumentada L4-L5'
 /** El ancla con la que se localiza cada fila de la tabla. */
 const CONCEPTO = /^Concepto de control \d+$/
 
@@ -252,19 +251,19 @@ const COTIZACION: ReciboHonorariosProps = {
   ...CHASIS,
   tipo_doc: 'cotizacion',
   paciente: { paciente: PACIENTE, fecha: '8 ago 2026', vigencia: '30 días naturales' },
-  procedimiento: PROCEDIMIENTO,
   lineas: conceptos(4, true),
   aseguradora: {
     nombre: 'Grupo Nacional Provincial',
     poliza: 'GNP-4471-882301',
     cobertura: 'Gastos mayores',
   },
+  // Agrupados por el TEXTO del origen, que es lo que hace `subtotalesDe()`.
   subtotales: [
-    { etiqueta: 'Honorarios del médico', importe: '$45,000.00' },
-    { etiqueta: 'Estimado de terceros', importe: '$145,000.00' },
+    { origen: 'Anestesiólogo', total: '$45,000.00' },
+    { origen: 'Hospital', total: '$145,000.00' },
   ],
   monto: '$190,000.00',
-  divisa: { codigo: 'MXN', nombre: 'Pesos mexicanos' },
+  divisa: 'MXN',
   notas: 'Los importes marcados como estimado de terceros son referencia de costos.',
   folio: 'Q-4F17A20C93B6',
   qr: QR,
@@ -280,25 +279,33 @@ const RECIBO: ReciboHonorariosProps = {
   ...CHASIS,
   tipo_doc: 'honorarios',
   paciente: { paciente: PACIENTE, fecha: '8 ago 2026' },
-  procedimiento: PROCEDIMIENTO,
   lineas: conceptos(14),
   monto: '$18,400.00',
-  divisa: { codigo: 'USD', nombre: 'Dólares estadounidenses' },
-  anticipo: {
-    etiqueta: 'Anticipo recibido',
-    importe: '−$6,000.00',
-    fecha: '12 jul 2026',
-    saldo: { etiqueta: 'Saldo pendiente', importe: '$12,400.00' },
-  },
+  divisa: 'USD',
+  anticipo: '−$6,000.00',
+  saldo: '$12,400.00',
   forma_pago: 'Transferencia electrónica',
   notas: 'Todos los conceptos corresponden a honorarios del médico que suscribe.',
   folio: 'R-B8570E3FA164',
 }
 
 /**
- * El mismo recibo con el paciente VACÍO y una sola fila. Conserva el procedimiento a
- * propósito: así lo único que cambia respecto de `RECIBO` es la celda del paciente, y la
- * diferencia de encabezado es exactamente lo que mide la línea de escritura.
+ * EL RECIBO QUE DESBORDA, y hace falta uno aparte desde que se retiró el subtítulo.
+ *
+ * `RECIBO` tiene 14 conceptos y partía en dos hojas. Al irse la prop `procedimiento` el
+ * encabezado adelgazó **25 pt** y esas 14 filas pasaron a caber en una sola, así que ya no
+ * ejercita la hoja de continuación. Con **17** vuelve a partir: 16 caben y 17 no.
+ *
+ * Es dato del caso y no un número mágico: si el encabezado vuelve a moverse, esta cifra se
+ * remide. Lo que la prueba fija es la CONDUCTA —que exista hoja 2 y que lleve su eco—, no
+ * el número de filas que hace falta para provocarla.
+ */
+const RECIBO_LARGO: ReciboHonorariosProps = { ...RECIBO, lineas: conceptos(17) }
+
+/**
+ * El mismo recibo con el paciente VACÍO y una sola fila. Es lo único que cambia respecto
+ * de `RECIBO`, así que la diferencia de encabezado es exactamente lo que mide la línea de
+ * escritura.
  */
 const MINIMO: ReciboHonorariosProps = {
   ...RECIBO,
@@ -375,9 +382,16 @@ describe('II.5 · Recibo de Honorarios / Cotización', () => {
       **Se mide aquí en vez de taparse.** Si algún día 2.A pasa a 59, fallan esta prueba,
       la de Imagenología, la de Receta y la de Suplementación a la vez, que es la señal
       correcta.
+
+      ⚠ **Y AHORA SON 25 pt MENOS EN LOS DOS LADOS: 180.95 y 243.48.** Los aporta el
+      subtítulo `Procedimiento o motivo`, que se retiró porque nadie lo alimentaba. La
+      distancia a la cota de la lámina crece a 27.85 y 27.22, y sigue siendo por debajo:
+      **la lámina mide un bloque que este documento ya no compone**. Los residuos de 2.85
+      y 2.22 se conservan intactos dentro de la diferencia, que es lo que permite seguir
+      leyendo la cuenta de arriba sin rehacerla.
     */
-    expect(encabezado(sinSeguro)).toBeCloseTo(205.95, 1)
-    expect(encabezado(conSeguro)).toBeCloseTo(268.48, 1)
+    expect(encabezado(sinSeguro)).toBeCloseTo(180.95, 1)
+    expect(encabezado(conSeguro)).toBeCloseTo(243.48, 1)
   }, 120_000)
 
   it('el encabezado: la aseguradora pesa 62.53 y la lámina mide 61.9', async () => {
@@ -514,16 +528,25 @@ describe('II.5 · Recibo de Honorarios / Cotización', () => {
     expect(enCotizacion).toContain('ANESTESIÓLOGO')
     expect(enCotizacion).toContain('HOSPITAL')
     expect(enRecibo).not.toContain('ANESTESIÓLOGO')
-    // 5 · los subtotales
-    expect(enCotizacion).toContain('Estimado de terceros')
-    expect(enRecibo).not.toContain('Estimado de terceros')
+    /*
+      5 · los subtotales. La etiqueta de cada fila **es el texto del origen**: el
+      formulario agrupa por lo que el médico escribió, así que aquí no hay rótulo
+      redactado que buscar sino el origen tal cual. Antes decía `Estimado de terceros`,
+      que era una redacción inventada para la lámina.
+    */
+    expect(enCotizacion).toContain('Hospital')
+    expect(enRecibo).not.toContain('Hospital')
     // 6 · el rótulo del total
     expect(enCotizacion).toContain('TOTAL ESTIMADO')
     expect(enRecibo).toContain('TOTAL')
     expect(enRecibo).not.toContain('TOTAL ESTIMADO')
-    // 7 y 8 · anticipo, su fecha y el saldo
+    /*
+      7 y 8 · el anticipo y el saldo, **sin fecha**. `AnticipoRecibido.fecha` existía en
+      2.T y no la guardaba nadie: el formulario tiene un `anticipo` que es un número y
+      ningún campo de fecha detrás. Se fue con las siete ranuras sin productor.
+    */
     expect(enRecibo).toContain('Anticipo recibido')
-    expect(enRecibo).toContain('12 jul 2026')
+    expect(enRecibo).toContain('−$6,000.00')
     expect(enRecibo).toContain('Saldo pendiente')
     expect(enCotizacion).not.toContain('Anticipo recibido')
     // 9 · la forma de pago
@@ -557,31 +580,43 @@ describe('II.5 · Recibo de Honorarios / Cotización', () => {
     expect([...hoja.cuerpos]).toContain(TIPOGRAFIA['medico.nombre'].cuerpo)
   }, 120_000)
 
-  it('la cotización cabe en una hoja y el recibo de 14 parte en dos', async () => {
+  it('el recibo de 14 cabe ahora en una hoja, y el de 17 parte en dos', async () => {
     const cotizacion = await componer(COTIZACION)
     const recibo = await componer(RECIBO)
     const minimo = await componer(MINIMO)
+    const largo = await componer(RECIBO_LARGO)
 
     expect(cotizacion).toHaveLength(1)
     expect(minimo).toHaveLength(1)
-    expect(recibo).toHaveLength(2)
 
     /*
-      LAS 14 FILAS CABEN EN LA HOJA 1 Y LO QUE BAJA ES LA FILA DE CIERRE ENTERA.
+      ⚠ **ESTE RECIBO PARTÍA EN DOS Y YA NO.** Al retirarse el subtítulo `Procedimiento o
+      motivo` —que no alimentaba nadie— el encabezado adelgazó 25 pt, y con ellos entran
+      dos filas más de tabla: las 14 caben con su fila de cierre en la misma hoja.
+
+      Es holgura ganada, no una ranura tapada: el documento no queda con un hueco donde
+      estaba el subtítulo, sino con dos filas más de sitio antes de necesitar una hoja 2.
+    */
+    expect(recibo).toHaveLength(1)
+    expect(recibo[0].texto).toContain('FIRMA DEL MÉDICO')
+
+    /*
+      LAS FILAS CABEN EN LA HOJA 1 Y LO QUE BAJA ES LA FILA DE CIERRE ENTERA.
 
       ⚠ La lámina deja el riel de importes en la hoja 1 y baja solo la forma de pago y
       la firma. Aquí la fila de cierre es indivisible —2.N la cierra con `wrap={false}`—
       y viaja entera. Ver la cabecera del formato: elegir entre las dos disposiciones
       exige saber si el documento cabe, que es contenido en tiempo de render (I.3.4).
     */
-    expect((recibo[0].texto.match(/Concepto de control/g) ?? []).length).toBe(14)
-    expect(recibo[1].texto).not.toContain('Concepto de control')
-    expect(recibo[1].texto).toContain('FIRMA DEL MÉDICO')
-    expect(recibo[1].texto).toContain('Saldo pendiente')
+    expect(largo).toHaveLength(2)
+    expect((largo[0].texto.match(/Concepto de control/g) ?? []).length).toBe(17)
+    expect(largo[1].texto).not.toContain('Concepto de control')
+    expect(largo[1].texto).toContain('FIRMA DEL MÉDICO')
+    expect(largo[1].texto).toContain('Saldo pendiente')
   }, 120_000)
 
   it('la hoja 2 lleva el eco del total, que ningún otro formato tiene', async () => {
-    const hojas = await componer(RECIBO)
+    const hojas = await componer(RECIBO_LARGO)
     expect(hojas).toHaveLength(2)
 
     /*
@@ -590,14 +625,15 @@ describe('II.5 · Recibo de Honorarios / Cotización', () => {
       diría cuánto se cobra.
     */
     expect(hojas[1].texto).toContain(PACIENTE)
-    expect(hojas[1].texto).toContain('14 conceptos · total $18,400.00 USD en la hoja 1')
+    expect(hojas[1].texto).toContain('17 conceptos · total $18,400.00 USD en la hoja 1')
     expect(hojas[1].texto).toContain('RECIBO DE HONORARIOS · CONTINUACIÓN')
     // Y el eco NO está en la hoja 1: allí la cifra la da el riel de importes.
     expect(hojas[0].texto).not.toContain('en la hoja 1')
   }, 120_000)
 
   it('sin contador en ninguna hoja, y con el aviso canónico del chasis', async () => {
-    const hojas = await componer(RECIBO)
+    // El de 17, que es el que parte: el aviso de continuación solo existe si hay hoja 2.
+    const hojas = await componer(RECIBO_LARGO)
 
     /*
       `D24` — II.5 §3 declara `ContadorLista` con `<ÍTEMS>` = CONCEPTOS y el diseño no

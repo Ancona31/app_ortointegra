@@ -383,25 +383,23 @@ export interface DenegacionConsentimientoProps {
    * captura y ya se guarda; las anteriores son inmutables y se quedan como están.
    */
   readonly sustitucion?: boolean
-  /**
-   * MOTIVO POR EL QUE EL PACIENTE NO FIRMA. **Solo se compone en la variante por sustitución**,
-   * que es la única donde la pregunta existe.
-   *
-   * Sin él, la fórmula de la hoja 4 de II.7, que ya está resuelta y medida allí. Entra por prop
-   * porque el médico puede asentar otro —la caja crece con su contenido—, y no se inventa texto
-   * nuevo cuando no lo hace.
-   *
-   * ⚠ **SIN PRODUCTOR HOY, Y ES EL CASO MENOS GRAVE DE LOS CINCO.** `ConsentimientoInformadoForm`
-   * captura `pacienteNoPuedeFirmar` —que es lo que enciende `sustitucion`— pero **no un texto
-   * de motivo**: el `contenido` de la denegación son seis campos y ninguno lo es (`:1006`).
-   *
-   * A diferencia de las otras cuatro ranuras anotadas en `DOCUMENTOS_RANURAS_MUERTAS.md`,
-   * **aquí el papel no se queda mudo**: sin motivo se compone la fórmula por defecto, que
-   * dice lo que hay que decir. Lo que falta no es el bloque, es la posibilidad de que el
-   * médico asiente un motivo distinto del genérico. Se anota igual para que quien cablee no
-   * lo cuente como cableado.
-   */
-  readonly motivo?: string
+  /*
+    ── AQUÍ NO HAY `motivo`, Y NO ES UN OLVIDO ───────────────────────────────
+
+    La constancia compone SIEMPRE la fórmula por defecto, `MOTIVO_POR_DEFECTO`, y no hay
+    manera de asentar otra. Llevó una prop para que el médico pudiera escribir el suyo y
+    **nadie la alimentaba**: `ConsentimientoInformadoForm` captura `pacienteNoPuedeFirmar`
+    —que es lo que enciende la variante— pero no un texto de motivo.
+
+    Se retiró en vez de dotarla porque el papel no se queda mudo sin ella: la fórmula dice
+    lo que hay que decir —imposibilidad física, valorada y asentada por el médico
+    tratante— y es la que la hoja 4 de II.7 ya tenía resuelta y medida. Lo que se pierde
+    es la posibilidad de matizarla, y esa posibilidad costaba un campo de texto en un
+    flujo que ocurre con el paciente delante y con la hoja ya impresa a medias.
+
+    La caja sigue siendo `minHeight` y sigue creciendo con su contenido: si algún día
+    hace falta el campo, entra por aquí sin tocar la composición.
+  */
   /**
    * Folio del documento, YA generado por la base. **Prefijo `DEN`**, no `D-`: la guía de
    * composición proponía una sola letra siguiendo las láminas viejas, y la convención de las
@@ -501,7 +499,6 @@ export default function DenegacionConsentimiento({
   procedimiento,
   firmantes,
   sustitucion,
-  motivo,
   folio,
 }: DenegacionConsentimientoProps): ReactElement {
   const porSustitucion = sustitucion === true
@@ -664,9 +661,7 @@ export default function DenegacionConsentimiento({
         {porSustitucion ? (
           <View style={estilos.constancia} wrap={false}>
             <Text style={estilos.rotuloMotivo}>{ROTULO_MOTIVO.toUpperCase()}</Text>
-            <Text style={estilos.textoMotivo}>
-              {tieneValor(motivo) ? motivo : MOTIVO_POR_DEFECTO}
-            </Text>
+            <Text style={estilos.textoMotivo}>{MOTIVO_POR_DEFECTO}</Text>
           </View>
         ) : null}
       </MotorFlujo>

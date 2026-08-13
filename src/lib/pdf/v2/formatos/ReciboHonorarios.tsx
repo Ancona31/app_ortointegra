@@ -152,8 +152,9 @@ import {
 /** Los dos valores del título fijo. Se componen en mayúsculas en 2.C. */
 const TITULO_COTIZACION = 'Cotización'
 const TITULO_RECIBO = 'Recibo de honorarios'
-/** El único rótulo de subtítulo del sistema (2.C regla 6). */
-const ROTULO_SUBTITULO = 'Procedimiento o motivo'
+// El rótulo de subtítulo —`Procedimiento o motivo`, el único del sistema por 2.C regla 6—
+// se fue con la prop `procedimiento`. La regla sigue en 2.C por si algún formato la
+// estrena; hoy ninguno la compone.
 /** Los cuatro rótulos de la tabla. `#` es el mismo del espécimen y de 2.G. */
 const CABECERA = {
   numero: '#',
@@ -176,6 +177,9 @@ const ASEGURADORA = {
  */
 const ROTULO_TOTAL_COTIZACION = 'Total estimado'
 const ROTULO_TOTAL_RECIBO = 'Total'
+/** Las dos filas que cuelgan del total en el recibo. Ver `anticipoDelRecibo`. */
+const ROTULO_ANTICIPO = 'Anticipo recibido'
+const ROTULO_SALDO = 'Saldo pendiente'
 /** Las dos líneas de la leyenda no fiscal. Van en jerarquía visible (II.5 §1). */
 const NO_FISCAL_TITULO = 'Documento informativo'
 const NO_FISCAL_CUERPO =
@@ -249,11 +253,40 @@ const SEPARACION_TABLA_CIERRE = ESPACIO[10]
  *
  * Las dos retículas cierran la caja exacta, con el medianil del sistema entre columnas:
  *
- *     con origen   23.25 + 9 + 273.75 + 9 + 66 + 9 + 96 = 486
- *     sin origen   23.25 + 9 + 348.75 + 9 + 96          = 486
+ *     con origen   23.25 + 9 + 231.75 + 9 + 108 + 9 + 96 = 486
+ *     sin origen   23.25 + 9 + 348.75 + 9 + 96           = 486
  *
  * El `1fr` del concepto **no se declara**: sale solo de restar las demás, que es lo mismo
  * que hace la tercera columna de 2.G.
+ *
+ * ══ ⚠ EL ORIGEN MIDE 108 Y MEDÍA 66. AQUÍ ESTÁN LOS NÚMEROS ═══════════════
+ *
+ * Los 66 se midieron para `PROPIO` y `TERCERO`, siete caracteres, que era la unión que
+ * este campo declaraba. **Esa unión era falsa**: el formulario guarda texto libre y sugiere
+ * cuatro orígenes reales, de los que **dos no caben en 66** y rompían a dos renglones,
+ * subiendo la fila de 17.63 a 30.63 pt —13 exactos, un renglón de `concepto.origen`—.
+ * Afectaba a toda cotización con mezcla de orígenes, que es el caso normal.
+ *
+ * Medido por bisección sobre las cuatro sugerencias del formulario:
+ *
+ *     66     `HONORARIOS MÉDICOS` y `MATERIAL E IMPLANTES` parten     ← lo que había
+ *     104    los dos siguen partiendo
+ *     108    **los cuatro entran en un renglón**                      ← lo que se compone
+ *
+ * Los 42 pt salen del concepto, que pasa de 273.75 a 231.75, **y no le cuestan nada**:
+ * los cuatro conceptos de la lámina —el más largo, `Honorarios del cirujano · artrodesis
+ * L4-L5`, de 42 caracteres— siguen entrando en un renglón. Medido también por bisección:
+ * el concepto no rompe hasta **bajar de ~190 pt**, así que quedan 42 de margen por debajo.
+ *
+ * **Se ensancha en vez de admitir dos renglones** porque admitir dos renglones cuesta 13
+ * pt por fila afectada y deja la tabla desigual, y ensanchar no cuesta nada medible. Lo
+ * que NO se hace es truncar: un origen es de quien cobra, y recortarlo con elipsis
+ * escondería a quién va el dinero.
+ *
+ * ⚠ **UN ORIGEN MÁS LARGO QUE LAS CUATRO SUGERENCIAS SIGUE PARTIENDO A DOS RENGLONES**, y
+ * está bien que lo haga: el campo es abierto —ninguna lista cerrada aguanta la facturación
+ * real— y la degradación correcta de un texto que no cabe es envolver, no encogerse ni
+ * recortarse. Los 108 cubren lo que el formulario ofrece, no todo lo que se puede teclear.
  *
  * ⚠ **LA COLUMNA DE ORIGEN LA DECIDE EL TIPO DE DOCUMENTO, NO EL CONTENIDO.** B.5 §3 la
  * declara «según haya mezcla de origen», que sería métrica decidida en tiempo de render
@@ -261,7 +294,7 @@ const SEPARACION_TABLA_CIERRE = ESPACIO[10]
  * que se compone. Reportado.
  */
 const TABLA = {
-  origen: 66,
+  origen: 108,
   precio: 96,
   /** Padding vertical de la fila. Ver la nota de las tres calibraciones. */
   padding: 2,
@@ -469,17 +502,19 @@ export interface AseguradoraCotizacion {
 }
 
 /**
- * La divisa, en sus dos piezas. Entra partida y no ya redactada porque el documento la
- * imprime de dos maneras: entera bajo el total —`USD · Dólares estadounidenses`— y solo
- * el código en el eco de la hoja 2 —`total $18,400.00 USD`—. Unirlas es redacción de
- * este formato, como el ancla de Receta.
+ * LA DIVISA, con el mismo valor que guarda el formulario: **el código y nada más**.
+ *
+ * ⚠ Entraba como objeto `{ codigo, nombre }` y el formulario guarda `divisa: 'MXN' | 'USD'`,
+ * una cadena. El objeto obligaba a que alguien buscara el nombre por el camino, y buscar el
+ * nombre de una divisa **no es componer un documento: es un catálogo de dos entradas**, y
+ * los catálogos de este sistema viven en el formato que los imprime, como `TITULO_RECIBO` o
+ * `ROTULO_FIRMA`. Ver `NOMBRE_DIVISA`.
+ *
+ * El documento la imprime de dos maneras —entera bajo el total, `USD · Dólares
+ * estadounidenses`, y solo el código en el eco de la hoja 2, `total $18,400.00 USD`— y las
+ * dos se redactan aquí, que es donde ya se redactaba la unión.
  */
-export interface Divisa {
-  /** `MXN`, `USD`. */
-  readonly codigo: string
-  /** `Pesos mexicanos`. Colapsa: bajo el total queda el código solo. */
-  readonly nombre?: string
-}
+export type Divisa = 'MXN' | 'USD'
 
 interface Comun {
   readonly medico: MedicoMembrete
@@ -494,10 +529,35 @@ interface Comun {
    *
    * **`paciente` puede venir vacío y es el único formato donde puede** (II.5 §2). Cuando
    * falta, la celda no colapsa: conserva su rótulo y deja la línea para llenarla a mano.
+   *
+   * ── `vigencia` LLEGA COMPUESTA, Y ES EL ÚNICO DE ESTE FORMATO QUE NO SE ADAPTÓ ──
+   *
+   * El formulario guarda `vigencia_dias` (número) y `vigencia_hasta` (ISO); la celda quiere
+   * `30 días · hasta el 7 de septiembre de 2026`. **La compone quien cablea, y no este
+   * archivo, por tres razones y ninguna es de estilo:**
+   *
+   * 1. **`vigencia` vive en `ValoresPaciente`**, el tipo del riel de 2.D que comparten los
+   *    nueve formatos. Partirla en dos celdas metería una preocupación exclusiva de
+   *    honorarios dentro del riel de todos.
+   * 2. **Redactar la fecha larga en español es formatear, no colocar** — `fechaLarga()`—, y
+   *    es justo lo que el contrato del riel excluye: peso, emisión, días estimados y
+   *    cédulas entran ya redactados por el mismo motivo.
+   * 3. **La redacción ya existe y está probada en producción**: `NotaHonorariosForm` la
+   *    compone hoy para v1, con esa misma plantilla. El cable la mueve, no la inventa.
    */
   readonly paciente: ValoresPaciente
-  /** El procedimiento o motivo, bajo el título y con su rótulo. Colapsa. */
-  readonly procedimiento?: string
+  /*
+    ── AQUÍ NO HAY `procedimiento`, Y NO ES UN OLVIDO ────────────────────────
+
+    Llevó un subtítulo bajo el título, con su rótulo, y **nadie lo alimentaba**:
+    `NotaHonorariosForm` no tiene ese campo y su `contenido` no lo guarda. `NotaHonorariosPdf`
+    —v1— tampoco lo imprime, así que retirarlo no quita nada de ningún papel emitido.
+
+    Y no hace falta: **lo que se cobra ya lo dice la relación de conceptos**, línea por línea
+    y con su importe al lado —`Honorarios del cirujano · artrodesis L4-L5`—. Un subtítulo que
+    lo repitiera en singular obligaría a decidir cuál manda cuando la cotización cubre varios,
+    que es el caso normal de este documento.
+  */
   /** `lineas[]` bloquea emisión en el formulario: al menos una (II.5 §2). */
   readonly lineas: readonly ConceptoCobrado[]
   /** La cifra del total, YA compuesta. Este formato no suma: recibe sumado. */
@@ -523,8 +583,21 @@ export type ReciboHonorariosProps = Comun &
   (
     | {
         readonly tipo_doc: 'cotizacion'
-        /** Las dos filas de subtotal. Vacías, colapsan con su filete (2.T regla 3). */
-        readonly subtotales?: readonly FilaImporte[]
+        /**
+         * Las filas de subtotal, agrupadas por origen. Vacías, colapsan con su filete
+         * (2.T regla 3).
+         *
+         * ⚠ **CON LAS CLAVES DEL FORMULARIO, `origen` y `total`, y no las de 2.T.** El riel
+         * de importes las llama `etiqueta` e `importe`, que es su vocabulario y está bien
+         * para un riel genérico; este formato las recibe como las guarda
+         * `NotaHonorariosForm` —`subtotalesDe()` agrupa por el texto del origen y suma— y
+         * las traduce al pasarlas. La traducción es de una línea y vive en la frontera, que
+         * es donde tiene que estar.
+         *
+         * `total` llega YA COMPUESTO, como `precio` y como `monto`: en la fila es un
+         * número. Ver la nota de `ConceptoCobrado.precio`.
+         */
+        readonly subtotales?: readonly { readonly origen: string; readonly total: string }[]
         /** Colapsa el riel entero, con su marco y su aire. */
         readonly aseguradora?: AseguradoraCotizacion
         /**
@@ -543,8 +616,23 @@ export type ReciboHonorariosProps = Comun &
          * formulario.
          */
         readonly tipo_doc: 'honorarios'
-        /** Anticipo, su fecha y el saldo. Colapsan las tres filas (2.T regla 3). */
-        readonly anticipo?: AnticipoRecibido
+        /**
+         * Anticipo recibido, YA COMPUESTO con su signo y su separador de miles. Colapsa
+         * su fila (2.T regla 3).
+         *
+         * ⚠ **DOS CAMPOS SUELTOS Y NO UN OBJETO `AnticipoRecibido`.** El formulario guarda
+         * `anticipo` y `saldo` como dos números en la raíz de `contenido`, así que el
+         * objeto obligaba a que alguien los envolviera por el camino. De sus cuatro piezas,
+         * dos eran RÓTULOS de este documento —`Anticipo recibido` y `Saldo pendiente`— y
+         * están ahora donde están los demás, en `ROTULO_ANTICIPO` y `ROTULO_SALDO`; la
+         * cuarta, `fecha`, **no la guardaba nadie** y se fue con las siete ranuras.
+         */
+        readonly anticipo?: string
+        /**
+         * El saldo que queda, YA COMPUESTO. Colapsa solo: un recibo puede llevar anticipo
+         * sin declarar saldo pendiente.
+         */
+        readonly saldo?: string
         /** Método de pago, ya redactado. Colapsa el bloque entero. */
         readonly forma_pago?: string
       }
@@ -560,12 +648,38 @@ function firmaDelMedico(medico: MedicoMembrete, rubrica?: string): Firma {
   }
 }
 
-/** `USD · Dólares estadounidenses`, con la raya del sistema. Sin nombre, el código. */
+/**
+ * EL NOMBRE DE CADA DIVISA. Es un catálogo de dos entradas y vive aquí por lo mismo que
+ * `TITULO_RECIBO` o `ROTULO_FIRMA`: son cadenas que este documento imprime, y el sistema
+ * las declara en el formato que las compone. El formulario guarda el código y nada más.
+ */
+const NOMBRE_DIVISA: Record<Divisa, string> = {
+  MXN: 'Pesos mexicanos',
+  USD: 'Dólares estadounidenses',
+}
+
+/** `USD · Dólares estadounidenses`, con la raya del sistema. */
 function divisaCompleta(divisa: Divisa | undefined): string | undefined {
-  if (divisa === undefined) return undefined
-  return tieneValor(divisa.nombre)
-    ? `${divisa.codigo}${RAYA}${divisa.nombre}`
-    : divisa.codigo
+  return divisa === undefined ? undefined : `${divisa}${RAYA}${NOMBRE_DIVISA[divisa]}`
+}
+
+/**
+ * Las dos cifras del recibo en la forma que 2.T compone. El anticipo manda: **sin él no
+ * hay bloque**, y el saldo cuelga dentro —un recibo puede llevar anticipo sin declarar
+ * saldo pendiente (2.T regla 3)—.
+ *
+ * Los rótulos los pone este formato y no llegan por prop, como el resto de sus cadenas.
+ */
+function anticipoDelRecibo(
+  anticipo: string | undefined,
+  saldo: string | undefined,
+): AnticipoRecibido | undefined {
+  if (!tieneValor(anticipo)) return undefined
+  return {
+    etiqueta: ROTULO_ANTICIPO,
+    importe: anticipo,
+    saldo: tieneValor(saldo) ? { etiqueta: ROTULO_SALDO, importe: saldo } : undefined,
+  }
 }
 
 /** Regla 1 de 2.G, que aquí también aplica: dos dígitos hasta 99. */
@@ -626,8 +740,6 @@ export default function ReciboHonorarios(props: ReciboHonorariosProps): ReactEle
           acento: props.acento,
           lamina: 'honorarios',
           titulo: cotizacion ? TITULO_COTIZACION : TITULO_RECIBO,
-          subtitulo: props.procedimiento,
-          rotuloSubtitulo: ROTULO_SUBTITULO,
           paciente: props.paciente,
           rielHonorarios: cotizacion ? 'cotizacion' : 'recibo',
           folio: props.folio,
@@ -637,7 +749,7 @@ export default function ReciboHonorarios(props: ReciboHonorariosProps): ReactEle
             se declara y no se coloca.
           */
           eco: `${props.lineas.length} ${ITEMS}${RAYA}${ECO_TOTAL} ${props.monto}${
-            props.divisa === undefined ? '' : ` ${props.divisa.codigo}`
+            props.divisa === undefined ? '' : ` ${props.divisa}`
           } ${ECO_CIERRE}`,
         }}
         /*
@@ -701,10 +813,19 @@ export default function ReciboHonorarios(props: ReciboHonorariosProps): ReactEle
                 en la cotización los subtotales abren y el total cierra; en el recibo el
                 total abre y el anticipo cuelga debajo.
               */}
+              {/*
+                LA TRADUCCIÓN AL VOCABULARIO DE 2.T VIVE AQUÍ, EN LA FRONTERA, y son dos
+                líneas. El riel llama a sus piezas `etiqueta` e `importe` —que es el nombre
+                correcto para un riel genérico de importes— y este formato las recibe con
+                los nombres del formulario. Los rótulos son cadenas de ESTE documento y por
+                eso no llegan por prop: los pone el formato, como todas las demás.
+              */}
               {cotizacion ? (
                 <RielImportes
                   disposicion="subtotales"
-                  subtotales={props.subtotales ?? []}
+                  subtotales={(props.subtotales ?? []).map(
+                    (s): FilaImporte => ({ etiqueta: s.origen, importe: s.total }),
+                  )}
                   rotuloTotal={ROTULO_TOTAL_COTIZACION}
                   divisa={divisa}
                   total={props.monto}
@@ -712,7 +833,7 @@ export default function ReciboHonorarios(props: ReciboHonorariosProps): ReactEle
               ) : (
                 <RielImportes
                   disposicion="anticipo"
-                  anticipo={props.anticipo}
+                  anticipo={anticipoDelRecibo(props.anticipo, props.saldo)}
                   rotuloTotal={ROTULO_TOTAL_RECIBO}
                   divisa={divisa}
                   total={props.monto}

@@ -235,25 +235,6 @@ export interface SuplementoIndicado {
   readonly justificacion?: string
 }
 
-/**
- * La cita de control. Colapsa ENTERA si no viene, con su bloque y su aire (II.4 §2,
- * campo `seguimiento`).
- *
- * `fecha` no es opcional dentro del objeto y eso es deliberado: una cita de control sin
- * fecha es un bloque que dice que hay que volver sin decir cuándo. Quien no tenga fecha
- * no pasa el objeto y el bloque no se compone, que es el mismo criterio con el que 2.D
- * resuelve el paciente ausente —no hay variante sin nombre: quien no tiene paciente no
- * monta el componente—.
- */
-export interface CitaDeControl {
-  /** Fecha de la cita, YA compuesta por quien llama. */
-  readonly fecha: string
-  /** El plazo, tal como lo redacta el formulario: `a 3 meses`. Colapsa. */
-  readonly plazo?: string
-  /** Indicación de la cita. Colapsa. */
-  readonly nota?: string
-}
-
 export interface PlanSuplementacionProps {
   readonly medico: MedicoMembrete
   /** Consultorio activo, leído por quien construye el documento (I.3.6, P2-3). */
@@ -277,20 +258,20 @@ export interface PlanSuplementacionProps {
   /** Cuerpo del bloque de notas adicionales. Colapsa entero si no viene. */
   readonly notas?: string
   /**
-   * La cita de control. Colapsa entera si no viene.
+   * LA CITA DE CONTROL, como TEXTO LIBRE. Colapsa entera si no viene, con su bloque y su
+   * aire (II.4 §2).
    *
-   * ⚠ **LA FORMA NO COINCIDE CON LA DEL FORMULARIO, Y POR ESO HOY NO SE COMPONE.**
-   * `CitaDeControl` pide `fecha` —requerida— más `plazo` y `nota` por separado;
-   * `PlanSuplementacionForm` guarda **`seguimiento`, una sola cadena libre** de un
-   * `<input type="text">` (`:297`, y así entra en `contenido` en `:409`). Una cadena libre
-   * no se parte en tres campos sin adivinar, y adivinar la fecha de una cita es
-   * exactamente lo que no se puede hacer en un documento clínico.
+   * Es el campo `seguimiento` del formulario, tal cual: un `<input type="text">` donde el
+   * médico escribe «Control en 3 meses con biometría» o lo que el caso pida.
    *
-   * No está roto: está construido, medido y en reposo. Las dos salidas son de formulario
-   * —partir el campo en tres, o aceptar texto libre aquí— y ninguna se decide en este
-   * archivo. Está anotado con las otras cuatro en `DOCUMENTOS_RANURAS_MUERTAS.md`.
+   * ⚠ **ERA UN OBJETO DE TRES CAMPOS Y NO LO ALIMENTABA NADIE.** `CitaDeControl` pedía
+   * `fecha` —requerida— más `plazo` y `nota` por separado, y una cadena libre no se parte
+   * en tres sin adivinar; adivinar la fecha de una cita es exactamente lo que no se puede
+   * hacer en un documento clínico. De las dos salidas —partir el campo en el formulario o
+   * aceptar texto libre aquí— se tomó la segunda, que además es la que v1 lleva imprimiendo
+   * desde siempre en su badge `Cita de control:` (`PlanSuplementacionPdf.tsx:366`).
    */
-  readonly cita?: CitaDeControl
+  readonly seguimiento?: string
   /** Folio del documento, ya generado. Prefijo `S-` en la lámina. */
   readonly folio: string
   /**
@@ -405,7 +386,7 @@ export default function PlanSuplementacion({
   seleccionados,
   emision,
   notas,
-  cita,
+  seguimiento,
   folio,
   qr,
   rubrica,
@@ -473,12 +454,16 @@ export default function PlanSuplementacion({
             ) : null}
 
             {/*
-              LA CITA DE CONTROL, por la ranura `contenido` de 2.I: sus cuatro piezas son
-              datos con cuatro roles distintos, no un pasaje. El bloque sigue poniendo lo
-              suyo —los dos filetes de 1.9, la sangría de 12, el ancho de 294 y el
-              `wrap={false}`— y este archivo solo coloca los cuatro textos.
+              LA CITA DE CONTROL, por la ranura `contenido` de 2.I. El bloque sigue
+              poniendo lo suyo —los dos filetes de 1.9, la sangría de 12, el ancho de 294
+              y el `wrap={false}`— y este archivo solo coloca el encabezado y el texto.
+
+              ERAN CUATRO PIEZAS Y SON DOS. `fecha`, `plazo` y `nota` pedían una cita
+              partida en tres campos que ningún formulario captura: lo que se guarda es
+              `seguimiento`, una cadena libre, y es lo que v1 lleva imprimiendo en su
+              badge `Cita de control:`. Se compone como lo que es.
             */}
-            {cita === undefined ? null : (
+            {tieneValor(seguimiento) ? (
               <View style={hayNotas ? estilos.bloqueCita : estilos.bloqueCitaSinNotas}>
                 <BloqueDestacado
                   variante="cita"
@@ -488,18 +473,12 @@ export default function PlanSuplementacion({
                       <Text style={estilos.citaEncabezado}>
                         {ENCABEZADO_CITA.toUpperCase()}
                       </Text>
-                      <Text style={estilos.citaFecha}>{cita.fecha}</Text>
-                      {tieneValor(cita.plazo) ? (
-                        <Text style={estilos.citaPlazo}>{cita.plazo}</Text>
-                      ) : null}
-                      {tieneValor(cita.nota) ? (
-                        <Text style={estilos.citaNota}>{cita.nota}</Text>
-                      ) : null}
+                      <Text style={estilos.citaFecha}>{seguimiento}</Text>
                     </>
                   }
                 />
               </View>
-            )}
+            ) : null}
           </>
         }
         aireFirma={SEPARACION_CITA_CIERRE}

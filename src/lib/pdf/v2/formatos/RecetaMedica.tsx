@@ -124,9 +124,8 @@ const CABECERA_LISTA = 'Medicamentos'
  */
 const ROTULO_FIRMA = 'Firma del médico'
 const ROTULO_VERIFICACION = 'Verificación'
-/** Encabezados de los dos bloques de cierre. Los declara el formato, no 2.I. */
+/** Encabezado del bloque de cierre. Lo declara el formato, no 2.I. */
 const ENCABEZADO_RECOMENDACIONES = 'Recomendaciones generales'
-const ENCABEZADO_ALARMA = 'Acuda de inmediato a urgencias si presenta'
 /** Rótulo de la vía. La palabra viaja DENTRO del bloque, con el dato (B.3 §3). */
 const ROTULO_VIA = 'Vía'
 /**
@@ -157,10 +156,14 @@ const VIA_POR_DEFECTO = 'Oral'
  *   riel → cabecera            **10 pt**   267.88 → 277.88   → `espacio.10`
  *   cierre de lista → contador  **5 pt**                     → `espacio.5`
  *   contador → recomendaciones **14 pt**                     → `espacio.14`
- *   recomendaciones → alarma   **12 pt**                     → `espacio.12`
- *   alarma → fila de cierre    **26 pt**                     → `espacio.26`
+ *   recomendaciones → cierre   **26 pt**                     → `espacio.26`
  *
  * `espacio.10` se añadió a I.1.7 para poder escribir la primera.
+ *
+ * ⚠ **ERAN CINCO Y SON CUATRO.** `recomendaciones → alarma` (12) se fue con el bloque de
+ * signos de alarma, y los 26 que separaban la alarma de la fila de cierre pasan a colgar
+ * de recomendaciones. No queda hueco: son los mismos 26 que la lámina ya componía cuando
+ * la alarma no venía, que era SIEMPRE. Ver `ENCABEZADO_RECOMENDACIONES`.
  *
  * **Faltan dos parejas y las dos faltan porque ya están declaradas en el chasis**,
  * cada una en el componente que cierra: membrete → título es el espaciador de 2.B —
@@ -175,8 +178,7 @@ const VIA_POR_DEFECTO = 'Oral'
  */
 const SEPARACION_RIEL_LISTA = ESPACIO[10]
 const SEPARACION_CONTADOR_RECOMENDACIONES = ESPACIO[14]
-const SEPARACION_RECOMENDACIONES_ALARMA = ESPACIO[12]
-const SEPARACION_ALARMA_CIERRE = ESPACIO[26]
+const SEPARACION_RECOMENDACIONES_CIERRE = ESPACIO[26]
 
 /**
  * Un medicamento de la receta. Las CUATRO ranuras de 2.G, con el ancla partida en
@@ -248,41 +250,31 @@ export interface RecetaMedicaProps {
   /**
    * Cuerpo del bloque de recomendaciones generales. Colapsa entero si no viene.
    *
-   * **AQUÍ VA EL CAMPO `recomendaciones` DEL FORMULARIO**, que es donde el médico escribe
-   * «reposo relativo», «tomar con alimentos» o «acudir a control en 15 días». No va al
-   * bloque de alarma — ver `signosDeAlarma`, donde está razonado por qué no.
+   * **AQUÍ VA EL CAMPO `recomendaciones` DEL FORMULARIO**, y es el ÚNICO bloque de cierre
+   * que la receta compone: es donde el médico escribe «reposo relativo», «tomar con
+   * alimentos», «acudir a control en 15 días» — y también un signo de alarma, si lo hay.
    */
   readonly recomendaciones?: string
-  /**
-   * Cuerpo del bloque de alarma. Colapsa entero si no viene.
-   *
-   * Es un campo APARTE de `recomendaciones` y no una variante suya: ver el punto (e)
-   * de la cabecera. II.3 §2 los trataba como uno solo.
-   *
-   * ══ ⚠ HOY NADIE LO ALIMENTA, Y ESTÁ DECIDIDO QUE SIGA ASÍ ══════════════════
-   *
-   * `RecetaForm` no tiene campo de signos de alarma: su único campo de cierre se llama
-   * **Recomendaciones generales** y va a la prop de arriba. Así que este bloque **no se
-   * compone en ninguna receta emitida** hasta que exista un campo propio.
-   *
-   * Se evaluó conectarle el texto de recomendaciones —era la propuesta inicial al
-   * reconciliar v1 con v2— y **se descartó con el papel delante**, por dos razones:
-   *
-   * 1. **El filete de 4 pt es el recurso más fuerte de la receta.** Es el grosor más alto
-   *    de este formato en la jerarquía de I.1.6. Gastarlo en «tomar con alimentos» es
-   *    ponerle el énfasis máximo del documento a lo que menos lo necesita.
-   * 2. **Un bloque de alarma que siempre dice cosas rutinarias deja de leerse como
-   *    alarma.** El día que haya un signo de verdad —«fiebre de más de 38.5 °C que no cede
-   *    con el antipirético»— ya no destacará, porque el lector habrá aprendido que ahí
-   *    nunca hay nada urgente. La alarma se gasta por uso, no por diseño.
-   *
-   * Y dejaría vacío el bloque que sí le corresponde a ese texto.
-   *
-   * **Lo que lo encendería** es un campo propio en `RecetaForm`, separado de
-   * recomendaciones. Es trabajo de formulario, no de este archivo. Hasta entonces la
-   * ranura está construida, medida y en reposo — que es distinto de estar rota.
-   */
-  readonly signosDeAlarma?: string
+  /*
+    ── AQUÍ NO HAY `signosDeAlarma`, Y NO ES UN OLVIDO ───────────────────────
+
+    Este formato llevó un bloque de alarma aparte, con su encabezado y su filete de 4 pt,
+    y **no se compuso en ninguna receta emitida**: `RecetaForm` no tiene ese campo. Su
+    único campo de cierre se llama Recomendaciones generales y va a la prop de arriba.
+
+    Se retiró en vez de dotarlo. **No son dos cosas**: recomendaciones es el campo donde
+    el médico escribe lo que quiera para el paciente, y una alarma —si la hay— es
+    exactamente eso. Separarlos fue una lectura del diseño de la lámina, no una necesidad
+    del documento; II.3 §2 los trataba como uno solo y tenía razón.
+
+    ⚠ **SE LLEVÓ EL FILETE DE 4 pt CON ÉL, Y ESO DEJA UN GROSOR SIN USO EN LA RECETA.**
+    `filete.alarma` era el más alto de la jerarquía de I.1.6 en este formato y su único
+    consumidor era este bloque. La receta compone ahora hasta `filete.acento`. El token
+    sigue en `tokens.ts` y la variante `alarma` sigue en 2.G —los usa la hoja de chasis
+    del taller—, pero **ningún formato de los nueve lo compone ya**. Está reportado y NO
+    se reasigna: el grosor máximo de un documento se gasta una vez, y a qué se le da es
+    una decisión de diseño, no un hueco que rellenar porque quedó libre.
+  */
   /** Folio del documento, ya generado. Prefijo `P-` en la lámina. */
   readonly folio: string
   /**
@@ -307,9 +299,6 @@ const estilos = StyleSheet.create({
   },
   bloqueRecomendaciones: {
     marginTop: SEPARACION_CONTADOR_RECOMENDACIONES,
-  },
-  bloqueAlarma: {
-    marginTop: SEPARACION_RECOMENDACIONES_ALARMA,
   },
   /**
    * LA FILA DE CIERRE — firma a la izquierda, verificación a la derecha.
@@ -375,7 +364,6 @@ export default function RecetaMedica({
   medicamentos,
   emision,
   recomendaciones,
-  signosDeAlarma,
   folio,
   qr,
   rubrica,
@@ -428,19 +416,9 @@ export default function RecetaMedica({
               </View>
             ) : null}
 
-            {tieneValor(signosDeAlarma) ? (
-              <View style={estilos.bloqueAlarma}>
-                <BloqueDestacado
-                  variante="alarma"
-                  lamina="receta"
-                  encabezado={ENCABEZADO_ALARMA}
-                  texto={signosDeAlarma}
-                />
-              </View>
-            ) : null}
           </>
         }
-        aireFirma={SEPARACION_ALARMA_CIERRE}
+        aireFirma={SEPARACION_RECOMENDACIONES_CIERRE}
         firmas={
           /*
             LA FILA DE CIERRE. Los dos bloques que la componen son indivisibles por su

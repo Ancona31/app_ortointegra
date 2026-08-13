@@ -278,10 +278,10 @@ const COMPLETO: SolicitudInternamientoProps = {
   },
   emision: '8 ago 2026 · 09:40',
   urgente: true,
-  diagnosticos: [
-    '— Gonartrosis tricompartimental derecha, grado IV',
-    '— Hipertensión arterial sistémica en control',
-  ].join('\n'),
+  // El principal y un secundario, como los guarda el formulario: la sintaxis de
+  // viñetas de 2.J la compone el formato, no quien lo llama.
+  diagnostico: 'Gonartrosis tricompartimental derecha, grado IV',
+  diagnosticosSecundarios: ['Hipertensión arterial sistémica en control'],
   procedimiento: 'Artroplastia total de rodilla derecha, cementada.',
   /** El catálogo en el orden literal de la lámina: tres columnas y tres filas. */
   requerimientos: [

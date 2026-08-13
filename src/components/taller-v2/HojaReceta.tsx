@@ -142,16 +142,6 @@ const MEDICAMENTOS_LLENO: readonly MedicamentoRecetado[] = Array.from(
 const RECOMENDACIONES =
   'Mantenga reposo relativo durante las primeras 48 horas y aplique frío local tres veces al día por 15 minutos. No suspenda el tratamiento antes de terminarlo aunque el dolor ceda, y acuda a su cita de control con los estudios solicitados.'
 
-/**
- * Cuerpo del bloque de alarma. Entra por 2.J, que lo compone con la raya del
- * sistema: son signos que se enumeran sin orden, no una secuencia.
- */
-const SIGNOS_DE_ALARMA = [
-  '- Fiebre mayor de 38.5 °C que no cede con el antipirético.',
-  '- Aumento súbito del dolor, del enrojecimiento o de la temperatura de la articulación.',
-  '- Pérdida de fuerza, hormigueo persistente o incapacidad para apoyar la extremidad.',
-].join('\n')
-
 /** Folios INVENTADOS, con el prefijo `P-` que la lámina compone. */
 const FOLIO_COMPLETO = 'P-B8570E3FA164'
 const FOLIO_MINIMO = 'P-6C41A9D2E870'
@@ -234,7 +224,6 @@ function HojaReceta({
         medicamentos={c.medicamentos}
         emision={EMISION}
         recomendaciones={c.cierre ? RECOMENDACIONES : undefined}
-        signosDeAlarma={c.cierre ? SIGNOS_DE_ALARMA : undefined}
         folio={c.folio}
         qr={qr}
       />

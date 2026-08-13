@@ -243,19 +243,40 @@ export interface SolicitudInternamientoProps {
   /** Badge `URGENTE` bajo el título, y solo en la hoja 1 (2.H regla 4, y ver (c)). */
   readonly urgente?: boolean
   /**
-   * Diagnósticos, como UNA cadena con la sintaxis de bloques (`CONCILIA D10`). El
-   * principal y los secundarios entran como viñetas; sin ninguna, sale prosa.
-   * **Bloquea emisión.**
+   * EL DIAGNÓSTICO PRINCIPAL. **Bloquea emisión.**
+   *
+   * ⚠ Entraba junto con los secundarios en UNA cadena con la sintaxis de bloques
+   * (`CONCILIA D10`), y el formulario guarda dos cosas: `diagnostico` y
+   * `diagnosticosSecundarios`. **La cadena la armaba nadie**, porque armarla era el
+   * trabajo que este paso venía a quitar. Entran los dos campos como se guardan y la
+   * sintaxis de 2.J la compone `textoDiagnosticos()`, aquí abajo: **es redacción de este
+   * formato** —qué lleva raya y qué sale como prosa—, no traducción de un dato.
    */
-  readonly diagnosticos: string
+  readonly diagnostico: string
+  /**
+   * Diagnósticos secundarios, uno por elemento. Colapsan: sin ninguno, el principal sale
+   * como prosa y no como viñeta única. Ver `textoDiagnosticos()`.
+   */
+  readonly diagnosticosSecundarios?: readonly string[]
   /** Procedimiento o cirugía. Colapsa el bloque entero si no viene. */
   readonly procedimiento?: string
   /**
-   * Catálogo ABIERTO de requerimientos especiales. Colapsa el riel entero si viene vacío,
-   * y **no lleva contador**: el médico agrega y quita, así que «3 de 7» sería una cifra
-   * falsa (2.K regla 3).
+   * Catálogo ABIERTO de requerimientos especiales, los del catálogo cerrado del
+   * formulario. Colapsa el riel entero si viene vacío junto con el extra, y **no lleva
+   * contador**: el médico agrega y quita, así que «3 de 7» sería una cifra falsa
+   * (2.K regla 3).
    */
   readonly requerimientos?: readonly string[]
+  /**
+   * EL REQUERIMIENTO ESCRITO A MANO — «El que no esté en la lista», un solo campo de texto
+   * libre. Entra por separado porque así se guarda, y se compone como un ítem más del
+   * riel: para el papel es un requerimiento igual que los del catálogo.
+   *
+   * Que el formulario lo capture aparte es cosa suya —la lista es de casillas y esto es un
+   * input—, y unirlos es lo que ya hace al pasar los datos a v1 (`:392`). Aquí lo hace el
+   * formato, que es quien compone el riel.
+   */
+  readonly requerimientosExtra?: string
   /** Justificación clínica. Colapsa el bloque entero si no viene. */
   readonly justificacion?: string
   /**
@@ -421,6 +442,27 @@ function BloqueNumerado({
  * Un bloque de las indicaciones de piso, ya agrupado: con título es numerado, sin él es
  * prosa suelta.
  */
+/**
+ * EL PRINCIPAL Y SUS SECUNDARIOS, EN LA SINTAXIS DE BLOQUES QUE 2.J ANALIZA.
+ *
+ * Sin secundarios sale **prosa** —un solo diagnóstico no es una lista— y con ellos salen
+ * todos con raya, el principal el primero. Es la regla que `CONCILIA D10` fija y la que
+ * este bloque ya componía; lo que cambia es de dónde viene: antes llegaba la cadena hecha
+ * y ahora llegan los dos campos como el formulario los guarda.
+ *
+ * **Componer esto es redacción de este formato y por eso vive aquí**, no en el cable: qué
+ * lleva raya y qué sale como prosa es una decisión del papel, no una forma del dato. Es lo
+ * mismo que hace `bloquesDeIndicaciones()` un poco más abajo con los nodos de 2.J.
+ */
+function textoDiagnosticos(
+  principal: string,
+  secundarios: readonly string[] | undefined,
+): string {
+  const otros = (secundarios ?? []).filter(tieneValor)
+  if (otros.length === 0) return principal
+  return [principal, ...otros].map((d) => `- ${d}`).join('\n')
+}
+
 interface BloqueIndicacion {
   /** El encabezado del bloque. Ausente en la prosa suelta. */
   readonly titulo?: string
@@ -514,15 +556,28 @@ export default function SolicitudInternamiento({
   paciente,
   emision,
   urgente,
-  diagnosticos,
+  diagnostico,
+  diagnosticosSecundarios,
   procedimiento,
   requerimientos,
+  requerimientosExtra,
   justificacion,
   instruccionesPaciente,
   indicacionesPiso,
   rubrica,
 }: SolicitudInternamientoProps): ReactElement {
-  const hayRequerimientos = requerimientos !== undefined && requerimientos.length > 0
+  const diagnosticos = textoDiagnosticos(diagnostico, diagnosticosSecundarios)
+  /*
+    LOS DEL CATÁLOGO Y EL ESCRITO A MANO, EN UN SOLO RIEL. Para el papel son la misma
+    cosa —un requerimiento especial— y el formulario los captura por separado solo porque
+    unos son casillas y el otro un campo de texto. Es la misma unión que ya compone al
+    pasar los datos a v1.
+  */
+  const requerimientosDelRiel: readonly string[] = [
+    ...(requerimientos ?? []),
+    ...(tieneValor(requerimientosExtra) ? [requerimientosExtra] : []),
+  ].filter(tieneValor)
+  const hayRequerimientos = requerimientosDelRiel.length > 0
   const haySeccion2 = tieneValor(indicacionesPiso)
   const indicaciones = haySeccion2 ? bloquesDeIndicaciones(indicacionesPiso) : []
 
@@ -596,7 +651,7 @@ export default function SolicitudInternamiento({
                 variante="catalogo"
                 lamina={LAMINA}
                 sinContador
-                items={requerimientos}
+                items={requerimientosDelRiel}
                 columnas={COLUMNAS_REQUERIMIENTOS}
               />
             </View>

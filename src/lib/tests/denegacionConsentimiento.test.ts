@@ -713,14 +713,16 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
     expect(casilla(b)).toBe(0)
   }, 200_000)
 
-  it('el motivo entra por prop y no rompe la hoja única', async () => {
-    const hojas = await componer({
-      ...SUSTITUCION,
-      motivo: 'El paciente se encuentra bajo sedación y no puede otorgar firma autógrafa.',
-    })
-    expect(hojas).toHaveLength(1)
-    expect(contiene(hojas[0], 'bajo sedación')).toBe(true)
-    expect(contiene(hojas[0], 'Imposibilidad física')).toBe(false)
+  it('la constancia compone SIEMPRE la fórmula por defecto', async () => {
+    /*
+      LA PROP `motivo` SE RETIRÓ. Existía para que el médico asentara un motivo distinto
+      del genérico y no la alimentaba nadie: el formulario captura `pacienteNoPuedeFirmar`
+      y ningún campo de texto detrás. Sin ella el papel no se queda mudo —la fórmula dice
+      lo que hay que decir— y esa es la diferencia con las otras seis ranuras retiradas.
+    */
+    const [hoja] = await componer(SUSTITUCION)
+    // Sin la ligadura `fi`, que el lector no descompone.
+    expect(contiene(hoja, 'Imposibilidad física para rmar')).toBe(true)
   }, 200_000)
 
   it('EL RIESGO DECLARADO: el recorte del subtítulo es lo que mantiene la hoja única', async () => {

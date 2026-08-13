@@ -283,15 +283,11 @@ const AUTORIZA_FOTOS =
 const ROL_MEDICO = 'Médico tratante'
 const ROL_PACIENTE = 'Paciente'
 const ROL_FAMILIAR = 'Familiar o responsable'
-/**
- * La misma celda cuando quien acompaña es un REPRESENTANTE LEGAL acreditado.
- *
- * No son sinónimos y por eso la etiqueta cambia: un familiar acompaña, un representante
- * legal **sustituye la voluntad del paciente**, y quien lea la hoja después tiene que
- * poder distinguir cuál de las dos cosas ocurrió sin abrir el expediente. v1 ya lo
- * distinguía (`ConsentimientoInformadoPdf.tsx:855`) y v2 lo había perdido.
- */
-const ROL_REPRESENTANTE = 'Representante legal'
+// `Representante legal` era la misma celda con la otra calidad jurídica, y se fue con la
+// prop `representanteLegal` que la elegía. Se justificó diciendo que v1 lo distinguía y v2
+// lo había perdido; v1 tiene la rama —`ConsentimientoInformadoPdf.tsx:855`— y tampoco la
+// ejerce: la enciende `data.representante`, el NOMBRE del representante, que el formulario
+// no pasa nunca. Ver la nota junto a `rolFamiliar`.
 const ROL_TESTIGO_1 = 'Testigo 1'
 const ROL_TESTIGO_2 = 'Testigo 2'
 const NOTA_PACIENTE = 'Nombre y firma'
@@ -698,16 +694,22 @@ export interface ConsentimientoInformadoProps {
    * de la transfusión. Lo que gobierna es que sin autorización no se fotografía.
    */
   readonly autorizaFotos?: boolean
-  /**
-   * Quien acompaña es un REPRESENTANTE LEGAL acreditado y no un familiar. Solo cambia el
-   * rótulo de su celda —ver `ROL_REPRESENTANTE`—; ni la retícula ni el recuento se mueven,
-   * porque es la misma persona en el mismo sitio con otra calidad jurídica.
-   *
-   * Es independiente de `sustitucion`: se puede tener un representante legal que firma
-   * ADEMÁS del paciente (nivel 2) o EN SU LUGAR (sustitución). Las dos combinaciones son
-   * reales y ninguna implica la otra.
-   */
-  readonly representanteLegal?: boolean
+  /*
+    ── AQUÍ NO HAY `representanteLegal`, Y NO ES UN OLVIDO ───────────────────
+
+    Alternaba el rótulo de la celda del familiar entre `Familiar o responsable` y
+    `Representante legal`. **Solo eso**: ni la retícula ni el recuento se movían, porque es
+    la misma persona en el mismo sitio con otra calidad jurídica.
+
+    Y no lo alimentaba nadie. El formulario tiene UN campo para esa persona, rotulado
+    `Familiar responsable o representante legal`, que cubre las dos calidades sin
+    distinguirlas — así que el rótulo del papel lo decidía una prop que nadie pasaba, y
+    todo lo emitido salió con `Familiar o responsable`.
+
+    Se retiró en vez de dotarlo: distinguir la calidad jurídica costaba un control más en
+    un flujo que ocurre con el paciente delante, y el papel no lo echa en falta —el nombre
+    de quien firma está debajo de la línea y su identificación, en el anexo—.
+  */
   /**
    * Las identificaciones del anexo. **La hoja solo se imprime si al menos una trae
    * fotografía** (decisión de producto 5); sin ninguna, el documento cierra en las firmas.
@@ -1236,7 +1238,6 @@ export default function ConsentimientoInformado({
   pacienteNoPuedeFirmar,
   autorizaTransfusion,
   autorizaFotos,
-  representanteLegal,
   identificaciones,
   sellado,
   folio,
@@ -1305,12 +1306,24 @@ export default function ConsentimientoInformado({
     sello: pieDe(firmantes.paciente, ROL_PACIENTE),
   }
   /*
-   * El rol de esta celda es el ÚNICO que no es una constante fija, y su cadena viaja a dos
-   * sitios: al rótulo de la celda y al cruce con el anexo, que empareja por rol. Se calcula
-   * una vez para que los dos usen la misma — con dos literales sueltos, un representante
-   * legal se quedaría sin su fotografía en el anexo sin que nada avisara.
+   * ESTE ROL FUE VARIABLE Y YA NO LO ES.
+   *
+   * `representanteLegal` alternaba la cadena entre `Familiar o responsable` y
+   * `Representante legal`, y **nadie lo alimentaba**: el formulario tiene UN campo, rotulado
+   * `Familiar responsable o representante legal`, que cubre las dos calidades sin
+   * distinguirlas. Así que la alternancia no se ejerció nunca y todo lo emitido salió con
+   * `Familiar o responsable`, que es lo que sigue saliendo.
+   *
+   * Se retiró la prop en vez de dotarla: el papel no lo echa en falta —el nombre de quien
+   * firma está debajo y su identificación en el anexo— y distinguir la calidad jurídica
+   * costaba un control más en un flujo que ocurre con el paciente delante.
+   *
+   * **La constante local se queda igual**, y no se sustituye por el literal: su cadena viaja
+   * a dos sitios —el rótulo de la celda y el cruce con el anexo, que empareja por rol— y con
+   * dos literales sueltos un cambio en uno dejaría a esa persona sin su fotografía en el
+   * anexo sin que nada avisara.
    */
-  const rolFamiliar = representanteLegal === true ? ROL_REPRESENTANTE : ROL_FAMILIAR
+  const rolFamiliar = ROL_FAMILIAR
   const firmaFamiliar: Firma = {
     rol: rolFamiliar,
     nombre: firmantes.familiar.nombre,

@@ -65,7 +65,6 @@ import { Document, pdf, type DocumentProps } from '@react-pdf/renderer'
 import QRCode from 'qrcode'
 import type { ReactElement } from 'react'
 import PlanSuplementacion, {
-  type CitaDeControl,
   type SuplementoIndicado,
 } from '@/lib/pdf/v2/formatos/PlanSuplementacion'
 import type { MedicoMembrete } from '@/lib/pdf/v2/Membrete'
@@ -155,12 +154,14 @@ const NOTAS = [
   'No duplique la dosis si olvida una toma. Suspenda y avise al consultorio si aparece náusea persistente, estreñimiento marcado o sed excesiva.',
 ].join('\n\n')
 
-/** La cita de control. Colapsa entera en el caso mínimo. */
-const CITA: CitaDeControl = {
-  fecha: '4 de noviembre de 2026',
-  plazo: 'a 3 meses',
-  nota: 'Traer control de 25-OH vitamina D y calcio sérico tomados la semana previa.',
-}
+/**
+ * La cita de control. Colapsa entera en el caso mínimo.
+ *
+ * TEXTO LIBRE, que es lo que el formulario guarda en `seguimiento` y lo que v1 imprime.
+ * Se redacta largo a propósito: es el caso que enseña que la caja crece con su contenido.
+ */
+const CITA =
+  'Control a 3 meses, el 4 de noviembre de 2026. Traer 25-OH vitamina D y calcio sérico tomados la semana previa.'
 
 /**
  * LOS CUATRO SUPLEMENTOS DEL CATÁLOGO DE v1, con sus textos REALES.
@@ -298,7 +299,7 @@ function HojaSuplementacion({
         seleccionados={c.seleccionados}
         emision={EMISION}
         notas={c.cierre ? NOTAS : undefined}
-        cita={c.cierre ? CITA : undefined}
+        seguimiento={c.cierre ? CITA : undefined}
         folio={c.folio}
         qr={qr}
       />

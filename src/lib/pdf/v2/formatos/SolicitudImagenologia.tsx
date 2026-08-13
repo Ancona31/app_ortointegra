@@ -81,17 +81,15 @@
  * Sin `'use client'`: módulo neutro, como el resto de v2.
  */
 
-import { Page, View, StyleSheet } from '@react-pdf/renderer'
+import { Page, StyleSheet } from '@react-pdf/renderer'
 import type { ReactElement } from 'react'
 import type { ConsultorioMembrete, MedicoMembrete } from '../Membrete'
 import type { PanelCircularProps } from '../PanelCircular'
 import type { ValoresPaciente } from '../BloquePaciente'
 import EntradaNumerada from '../EntradaNumerada'
 import MotorFlujo from '../MotorFlujo'
-import ParserBloques from '../ParserBloques'
 import BloqueFirmas, { type Firma } from '../BloqueFirmas'
 import PieDocumento from '../PieDocumento'
-import { tieneValor } from '../Campo'
 import { ESPACIO, MARGEN, PAPEL, TINTA, type AcentoResuelto } from '../tokens'
 
 /** Las cuatro cadenas que este formato declara, textuales de la lámina. */
@@ -116,8 +114,13 @@ const ROTULO_FIRMA = 'Firma y sello del médico'
  *
  *   riel → cabecera       **14 pt**   → `espacio.14`
  *   cierre → contador      **5 pt**   → `espacio.5`
- *   contador → notas      **16 pt**   → `espacio.16`
- *   notas → firma         **26 pt**   → `espacio.26`
+ *   contador → firma      **26 pt**   → `espacio.26`
+ *
+ * ⚠ **ERAN CUATRO Y SON TRES.** `contador → notas` (16) desapareció con el bloque de
+ * notas al servicio de imagen: nadie lo alimentaba —el `contenido` del formulario no
+ * tiene esa clave— y el documento no lo echaba en falta. La cadena no deja hueco donde
+ * estaba: el contador enlaza con la firma con los mismos 26 pt que ya componía cuando
+ * las notas no venían, que era SIEMPRE.
  *
  * `espacio.14` y `espacio.26` se añadieron a I.1.7 para poder escribirlas.
  *
@@ -127,8 +130,7 @@ const ROTULO_FIRMA = 'Firma y sello del médico'
  * para esta lámina. Sumar aquí cualquiera de las dos la contaría dos veces.
  */
 const SEPARACION_RIEL_LISTA = ESPACIO[14]
-const SEPARACION_CONTADOR_NOTAS = ESPACIO[16]
-const SEPARACION_NOTAS_FIRMA = ESPACIO[26]
+const SEPARACION_CONTADOR_FIRMA = ESPACIO[26]
 
 /**
  * Un estudio de la lista. Las TRES ranuras que II.2 §4 ocupa —`ancla`,
@@ -170,20 +172,21 @@ export interface SolicitudImagenologiaProps {
   readonly emision?: string
   /** Badge del documento, no del estudio (II.2 §5). Sin él, sin badge. */
   readonly urgente?: boolean
-  /**
-   * Notas al servicio de imagen. Colapsan enteras si no vienen.
-   *
-   * ⚠ **RANURA SIN PRODUCTOR — no la des por viva al cablear.** `SolicitudImagenForm` **no
-   * tiene campo de notas**: su `contenido` es `{ paciente, diagnostico, estudios, urgente,
-   * fecha }` y nada más (`:244`). Así que este bloque —que `DOCUMENTOS_HANDOFF.md` §4 lista
-   * entre los que usan la sintaxis de viñetas de 2.J— **no se compone en ninguna solicitud
-   * emitida**.
-   *
-   * No está roto: está construido, medido y en reposo. Lo que lo encendería es un campo de
-   * notas en el formulario, que es trabajo de formulario. Está anotado con las otras cuatro
-   * en `DOCUMENTOS_RANURAS_MUERTAS.md`.
-   */
-  readonly notas?: string
+  /*
+    ── AQUÍ NO HAY `notas`, Y NO ES UN OLVIDO ────────────────────────────────
+
+    Este formato llevó un bloque de notas al servicio de imagen, con la sintaxis de
+    viñetas de 2.J, y **no se compuso en ninguna solicitud emitida**: `SolicitudImagenForm`
+    no tiene ese campo y su `contenido` son cinco claves —paciente, diagnóstico, estudios,
+    urgente y fecha— sin ninguna que lo alimente.
+
+    No hacía falta. Lo que el servicio de imagen necesita saber de cada estudio va en la
+    ranura `nota` de su entrada —`indicacion`, que SÍ se captura y sí se guarda—, y ahí es
+    donde se lee: junto al estudio al que se refiere, no en un bloque al pie que obliga a
+    volver arriba para saber de cuál habla.
+
+    Retirado con las otras seis ranuras sin productor. No lo repongas sin un campo detrás.
+  */
   /** Folio del documento, ya generado. Prefijo `I-` en la lámina. */
   readonly folio: string
   /** Trazo capturado del médico (2.L regla 5). */
@@ -199,9 +202,6 @@ const estilos = StyleSheet.create({
     // Regla 4 de 2.L: reserva los 36 + 16 + 16 pt donde vive la banda de 2.M. Sin
     // él vuelve el bug §8.1 y no hay nada que lo detenga (anexo A, P2-27).
     paddingBottom: MARGEN.inferior,
-  },
-  bloqueContadorNotas: {
-    marginTop: SEPARACION_CONTADOR_NOTAS,
   },
 })
 
@@ -241,7 +241,6 @@ export default function SolicitudImagenologia({
   estudios,
   emision,
   urgente,
-  notas,
   folio,
   rubrica,
 }: SolicitudImagenologiaProps): ReactElement {
@@ -275,18 +274,7 @@ export default function SolicitudImagenologia({
           aireLista: SEPARACION_RIEL_LISTA,
         }}
         contador={{ items: ITEMS, total: estudios.length, lamina: 'imagenologia' }}
-        cierre={
-          /*
-            Las notas colapsan ENTERAS, con su separación incluida: sin el `null` el
-            contenedor seguiría aportando sus 16 pt y quedaría el hueco donde estarían.
-          */
-          tieneValor(notas) ? (
-            <View style={estilos.bloqueContadorNotas}>
-              <ParserBloques texto={notas} marca="raya" />
-            </View>
-          ) : undefined
-        }
-        aireFirma={SEPARACION_NOTAS_FIRMA}
+        aireFirma={SEPARACION_CONTADOR_FIRMA}
         firmas={<BloqueFirmas variante="simple" lamina="imagenologia" firmas={firmas} />}
       >
         {/*
