@@ -11,32 +11,49 @@ import BotonCopiarCedula from './BotonCopiarCedula'
 
 /* ═══ /r/[folio] — VERIFICACIÓN PÚBLICA DE AUTENTICIDAD ═══
    Esta página existe para UNA cosa: que quien tiene el papel delante —una
-   farmacia, un hospital, una aseguradora— pueda comprobar que el documento lo
-   emitió Spinus y quién lo firmó. **No es un visor del documento.** Lo que dice
-   el papel ya lo tiene quien escanea; lo que no puede saber es si es auténtico.
+   farmacia, un hospital, una aseguradora— pueda cotejarlo renglón por renglón
+   contra lo que se emitió de verdad.
 
-   ⚠️⚠️ LO QUE ESTA PÁGINA NO PUBLICA, Y NO ES NEGOCIABLE
-   Ni diagnóstico, ni medicamentos, ni estudios, ni procedimiento, ni el nombre
-   completo del paciente. Solo lo que permite COTEJAR contra el papel: folio,
-   fecha, médico con sus cédulas, e iniciales del paciente.
+   ⚠️⚠️ NO ES UN SERVICIO AL PACIENTE: ES EL RESPALDO DEL MÉDICO
 
-   La razón es que la URL es adivinable —el folio va impreso dentro del QR y la
-   serie es correlativa: quien tenga uno puede caminar los demás—. Un
-   diagnóstico es dato personal SENSIBLE bajo la LFPDPPP vigente, y las multas
-   se duplican tratándose de ellos. La versión anterior de este archivo servía
-   el `contenido` entero —paciente, diagnóstico y medicamentos— a quien
-   escribiera el folio, sin caducidad y sin límite. Eso es lo que se corrige
-   aquí.
+   Un PDF se edita en cinco minutos. Alguien cambia una dosis o añade un
+   renglón, y la firma del médico sigue ahí. Si esa receta acaba en un problema,
+   lo único que el médico tiene para demostrar qué recetó de verdad es esta
+   página. Por eso la lista de medicamentos se publica ENTERA.
 
-   ⚠️ POR ESO `contenido` NO SE ATA A NINGUNA VARIABLE DE COMPONENTE. Se lee
-   dentro de `leerDocumento()` y de ahí solo sale el puñado de campos de
-   `Verificacion`. Si algún día ves `contenido` cruzando hacia el JSX, la fuga
-   volvió.
+   Y por eso mismo el paciente sale por completo —ni nombre, ni iniciales, ni
+   referencia alguna—: sin él, lo publicado es una lista de fármacos que no se
+   puede atribuir a nadie. La URL es adivinable —el folio va impreso dentro del
+   QR y la serie es correlativa—, así que quien camine la serie recoge recetas
+   anónimas y no expedientes. **No son dos decisiones sino una:** es esa
+   sustracción la que hace publicable la lista. Reponer al paciente sin retirar
+   los medicamentos rehace la fuga que este archivo corrigió.
 
-   ⚠️ LA REFERENCIA DE ESTÉTICA Y DE POLÍTICA ES `/demo/receta`, que estrenó la
-   minimización antes que esta página. Ojo: aquella todavía compone los
-   medicamentos —son ficticios y es una demo de producto—, y esta ya no. No
-   "alinees" esta con aquella copiándole la lista.
+   ⚠️ LO QUE SIGUE SIN PUBLICARSE: el diagnóstico y las recomendaciones. Un
+   diagnóstico es dato personal SENSIBLE bajo la LFPDPPP vigente y las multas se
+   duplican tratándose de ellos; además, unido a los fármacos volvería
+   identificable lo que ahora no lo es.
+
+   ⚠️ POR ESO `contenido` SIGUE SIN ATARSE A NINGUNA VARIABLE DE COMPONENTE. Se
+   lee dentro de `leerDocumento()` y de ahí solo salen los campos de
+   `Verificacion` —el puñado del encabezado, más los cinco de cada medicamento—.
+   Si algún día ves `contenido` cruzando hacia el JSX, la fuga volvió.
+
+   ⚠️ CINCO CAMPOS, LOS DEL FORMULARIO Y NINGUNO MÁS: nombre comercial,
+   principio activo, presentación, vía de administración e indicaciones.
+   Frecuencia, duración y cantidad NO son campos del formato: viven dentro de
+   las indicaciones, en el texto libre que escribe el médico, y por eso se
+   imprimen LITERALES —con sus saltos de línea y sin recortar—. Fabricar
+   columnas analizando ese texto sería inventar dato.
+
+   ⚠️ EL CONTADOR «{n} de {n}» DE CADA RENGLÓN NO ES DECORATIVO: es lo que
+   delata un renglón añadido al papel. Por eso la lista no se pliega, no pagina
+   y no lleva desplazamiento interno, tenga uno o tenga ocho.
+
+   ⚠️ LA DEMO `/demo/receta` YA NO ES LA REFERENCIA DE POLÍTICA. Estrenó la
+   minimización antes que esta página, y desde este pase va por detrás en las
+   dos direcciones: enseña al paciente y le falta el enlace al registro de
+   cédulas. Está anotada como QR-02 en `CLAUDE.md`. Manda esta página.
 
    SOLO LA FORMA NUEVA DEL FOLIO RESUELVE. `normalizarFolio()` acepta las nueve
    series de la columna —`RX-2026-0001`— y rechaza las tres formas viejas que
@@ -68,7 +85,11 @@ import BotonCopiarCedula from './BotonCopiarCedula'
      después. La vigencia de una receta la juzga quien la recibe, con la fecha de
      emisión —que esta página muestra— y el plazo reglamentario que le aplique.
      Eso no es trabajo de esta página.
-   · **El paciente sale por iniciales, y así se queda.** Ver `iniciales()`.
+   · **No registra el surtido.** Que una receta se haya despachado o no vive
+     fuera de Spinus, y esta página no lo afirma ni lo niega: lo dice su pie.
+   · **El desenlace negativo no lleva medicamentos.** Sin documento no hay nada
+     que mostrar, y una lista compuesta dentro de un error sería contenido sin
+     respaldo. Ver `NoVerificado()`.
 
    ── LAS CÉDULAS: ENLACE AL REGISTRO OFICIAL, Y POR QUÉ NO VA PRELLENADO ────
 
@@ -134,12 +155,24 @@ const ETIQUETA_POR_PREFIJO = new Map<string, string>(
   ),
 )
 
+/**
+ * Un renglón de la receta, con los CINCO campos del formulario y ninguno más.
+ * Ver la cabecera antes de añadir un sexto.
+ */
+interface MedicamentoPublicado {
+  readonly nombreComercial: string
+  readonly principioActivo?: string
+  readonly presentacion?: string
+  readonly via?: string
+  readonly indicaciones?: string
+}
+
 /** Lo único que sale de la base hacia el render. Ver la cabecera. */
 interface Verificacion {
   readonly folio: string
   readonly etiqueta: string
   readonly fecha: string
-  readonly pacienteIniciales: string
+  readonly medicamentos: readonly MedicamentoPublicado[]
   readonly medicoNombre: string
   readonly medicoEspecialidad?: string
   readonly cedulaProfesional?: string
@@ -174,16 +207,33 @@ function texto(fuente: Record<string, unknown> | null, clave: string): string | 
 }
 
 /**
- * `Ana Gabriela Solís` → `A. G. S.`
+ * Los medicamentos guardados en `contenido`, campo a campo y desconfiando de
+ * todo: el jsonb pudo escribirse con otra versión del formulario.
  *
- * Una inicial por palabra, sin filtrar partículas: `de la` sale como `D. L.` y
- * eso es feo pero inofensivo —el objetivo es cotejar, no componer un nombre—.
- * Filtrarlas costaría una lista de partículas que ningún dato justifica todavía.
+ * Solo la Receta guarda esta clave —los otros ocho formatos no la escriben—, así
+ * que para ellos sale el arreglo vacío y el bloque entero no se compone.
+ *
+ * Un renglón sin nombre comercial se descarta porque no habría qué cotejar, y
+ * eso NO descuadra el contador: `RecetaForm` filtra por `estaCompleto()` antes
+ * de guardar, así que todo lo que llega aquí trae comercial y principio activo.
  */
-function iniciales(nombre: string | undefined): string {
-  const partes = (nombre ?? '').trim().split(/\s+/).filter(parte => parte !== '')
-  if (partes.length === 0) return '—'
-  return partes.map(parte => `${parte.charAt(0).toUpperCase()}.`).join(' ')
+function leerMedicamentos(contenido: Record<string, unknown> | null): MedicamentoPublicado[] {
+  const bruto = contenido?.medicamentos
+  if (!Array.isArray(bruto)) return []
+
+  return bruto.flatMap((fila): MedicamentoPublicado[] => {
+    if (typeof fila !== 'object' || fila === null) return []
+    const campos = fila as Record<string, unknown>
+    const nombreComercial = texto(campos, 'nombre_comercial')
+    if (nombreComercial === undefined) return []
+    return [{
+      nombreComercial,
+      principioActivo: texto(campos, 'principio_activo'),
+      presentacion: texto(campos, 'presentacion'),
+      via: texto(campos, 'via_administracion'),
+      indicaciones: texto(campos, 'indicacion'),
+    }]
+  })
 }
 
 /**
@@ -261,7 +311,7 @@ async function leerDocumento(folioPedido: string): Promise<Verificacion | null> 
     folio: data.folio,
     etiqueta: ETIQUETA_POR_PREFIJO.get(prefijo) ?? 'Documento clínico',
     fecha: fechaDeEmision(texto(contenido, 'fecha'), data.created_at),
-    pacienteIniciales: iniciales(texto(contenido, 'paciente')),
+    medicamentos: leerMedicamentos(contenido),
     medicoNombre: medicoNombre ?? 'Médico no identificado',
     medicoEspecialidad,
     cedulaProfesional,
@@ -289,6 +339,102 @@ function Hoja({ children }: { children: React.ReactNode }): ReactElement {
           </p>
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Un renglón de la lista. El contador va DENTRO del renglón —«2 de 3»— y no en
+ * una cabecera con el total: pegado a cada fármaco es lo que permite recorrer el
+ * papel de arriba abajo y descubrir dónde se metió el que sobra.
+ *
+ * Las indicaciones van en bloque propio, a ancho completo y con
+ * `whitespace-pre-line`, porque son texto que escribió el médico: se imprimen
+ * como las escribió, con sus saltos, sin recorte y sin analizarlas.
+ */
+function Renglon(
+  { med, indice, total, azul }: {
+    med: MedicamentoPublicado; indice: number; total: number; azul: string
+  },
+): ReactElement {
+  return (
+    <li className="px-5 py-4">
+      <div className="flex items-baseline gap-3">
+        <span className="flex-shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px]
+                         font-bold tabular-nums text-slate-500">
+          {indice} de {total}
+        </span>
+        <p className="font-bold text-slate-800 text-base leading-tight">{med.nombreComercial}</p>
+      </div>
+
+      {med.principioActivo !== undefined && (
+        <p className="text-sm mt-1" style={{ color: azul }}>{med.principioActivo}</p>
+      )}
+
+      {(med.presentacion !== undefined || med.via !== undefined) && (
+        <div className="flex flex-wrap gap-x-6 gap-y-1 mt-2 text-xs text-slate-500">
+          {med.presentacion !== undefined && (
+            <span><span className="font-semibold text-slate-600">Presentación:</span> {med.presentacion}</span>
+          )}
+          {med.via !== undefined && (
+            <span><span className="font-semibold text-slate-600">Vía:</span> {med.via}</span>
+          )}
+        </div>
+      )}
+
+      {med.indicaciones !== undefined && (
+        <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            Indicaciones
+          </span>
+          <p className="text-sm text-slate-700 mt-0.5 leading-relaxed whitespace-pre-line">
+            {med.indicaciones}
+          </p>
+        </div>
+      )}
+    </li>
+  )
+}
+
+/**
+ * La lista entera. Es el producto de esta página: ver la cabecera.
+ *
+ * ⚠️ NO SE PLIEGA, NO PAGINA Y NO LLEVA DESPLAZAMIENTO INTERNO. Una lista
+ * recortada a las tres primeras deja de servir para lo único que sirve —contar
+ * los renglones del papel— y volvería mentiroso el contador de cada renglón.
+ */
+function Medicamentos(
+  { medicamentos, azul }: { medicamentos: readonly MedicamentoPublicado[]; azul: string },
+): ReactElement {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="px-5 pt-4 pb-3">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          Medicamentos emitidos
+        </h2>
+        <p className="text-sm text-slate-600 leading-relaxed mt-2">
+          Esto es exactamente lo que se emitió. Si el papel dice otra presentación, otras
+          indicaciones o tiene un renglón de más,{' '}
+          <span className="font-bold text-slate-900">el papel fue alterado</span>.
+        </p>
+      </div>
+
+      <ol className="border-t border-slate-100 divide-y divide-slate-100">
+        {medicamentos.map((med, i) => (
+          <Renglon
+            key={`${i}-${med.nombreComercial}`}
+            med={med}
+            indice={i + 1}
+            total={medicamentos.length}
+            azul={azul}
+          />
+        ))}
+      </ol>
+
+      <p className="px-5 py-3 border-t border-slate-100 text-xs text-slate-400 leading-relaxed">
+        Las indicaciones son el texto que escribió el médico al emitir la receta. Esta página no
+        registra si ya se surtió.
+      </p>
     </div>
   )
 }
@@ -323,8 +469,10 @@ function NoVerificado(): ReactElement {
           Los documentos emitidos antes de que existiera esta serie ya no se verifican en línea. Si
           necesitas confirmar uno de ellos, contacta directamente al consultorio que lo emitió.
         </p>
+        {/* Sin fila no hay nada que respaldar, y por eso este desenlace no
+            compone lista: ver la cabecera. */}
         <p className="text-xs text-slate-400 leading-relaxed">
-          Esta página nunca publica el contenido clínico de un documento, exista o no.
+          Sin un documento que la respalde no hay lista de medicamentos que mostrar.
         </p>
       </div>
     </Hoja>
@@ -422,28 +570,20 @@ export default async function VerificacionPage(
         </div>
       </div>
 
-      {/* Lo que permite cotejar contra el papel. Iniciales, nunca el nombre. */}
+      {/* Cuándo se emitió. Aquí vivía también la card del paciente por
+          iniciales; se retiró entera —ver la cabecera— y no vuelve. */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-4">
-        <div className="flex flex-wrap gap-6 text-sm">
-          <div>
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-              Paciente
-            </span>
-            <p className="font-medium text-slate-800 mt-0.5">{doc.pacienteIniciales}</p>
-          </div>
-          <div>
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-              Fecha de emisión
-            </span>
-            <p className="font-medium text-slate-800 mt-0.5">{doc.fecha}</p>
-          </div>
-        </div>
-        <p className="text-xs text-slate-400 mt-3 leading-relaxed">
-          Se muestran solo las iniciales del paciente, y el contenido clínico no se publica. Quien
-          verifica un documento necesita saber que es auténtico y quién lo firmó, no la condición
-          clínica de la persona.
-        </p>
+        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+          Fecha de emisión
+        </span>
+        <p className="font-medium text-slate-800 mt-0.5">{doc.fecha}</p>
       </div>
+
+      {/* Sin renglones el bloque no se compone: son los ocho formatos que no son
+          Receta, que no guardan la clave. */}
+      {doc.medicamentos.length > 0 && (
+        <Medicamentos medicamentos={doc.medicamentos} azul={doc.azul} />
+      )}
 
       {/* La declaración: es el producto de esta página. */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-4">
@@ -451,9 +591,9 @@ export default async function VerificacionPage(
           <span className="font-semibold text-slate-800">
             Este documento fue emitido con Spinus y es auténtico.
           </span>{' '}
-          El folio, la fecha, el médico y sus cédulas mostrados arriba corresponden al registro
-          original guardado en el expediente clínico electrónico. Si coinciden con el papel que
-          tienes delante, el documento es el que se emitió.
+          Esta página es el respaldo del médico: muestra exactamente lo que se emitió, para
+          cotejarlo contra el papel. No hace referencia al paciente — quien escanea ya tiene el
+          documento delante.
         </p>
       </div>
     </Hoja>
