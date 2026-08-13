@@ -162,7 +162,7 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
   const [pieEnganchado, setPieEnganchado] = useState(true)
   const [imprimiendo, setImprimiendo] = useState(false)
   const [errorGuardado, setErrorGuardado] = useState('')
-  const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean } | null>(null)
+  const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean; documentoId: string | null } | null>(null)
   // El banner de faltantes NO existe hasta el primer intento de imprimir: un
   // formulario recién abierto no acusa de nada. Después permanece y se
   // actualiza en vivo.
@@ -410,7 +410,7 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
       setImprimiendo(false)
       // También cuando la persistencia falló: el PDF existe y con el paciente
       // enfrente lo urgente es poder imprimirlo.
-      if (pdfBlob && !offlineMode) setDocGenerado({ blob: pdfBlob, guardado })
+      if (pdfBlob && !offlineMode) setDocGenerado({ blob: pdfBlob, guardado, documentoId: filaId })
     }
   }
 
@@ -546,6 +546,7 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
         blob={docGenerado?.blob ?? null}
         titulo="Escrito médico generado"
         guardadoEnExpediente={docGenerado?.guardado ?? false}
+        documentoId={docGenerado?.documentoId ?? null}
       />
     </div>
   )

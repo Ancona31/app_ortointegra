@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
-import { AlertTriangle, Check, Eye, Mail, MessageCircle } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { AlertTriangle, Check, Eye, Loader2, Mail, MessageCircle } from 'lucide-react'
 import ModalShell from '@/components/ui/ModalShell'
 
 /**
@@ -59,7 +59,28 @@ interface Props {
    * modal tiene que decirlo.
    */
   guardadoEnExpediente: boolean
+  /**
+   * La fila del documento recién emitido. Sin ella no se puede enviar: es lo
+   * único que la ruta de correo necesita —resuelve destinatario, adjunto y texto
+   * a partir del id— y es también lo que garantiza que se manda el PDF GUARDADO
+   * y no el blob que este modal tiene en memoria.
+   *
+   * Llega `null` cuando la fila no se escribió (fallo de persistencia) o cuando
+   * el formato no inserta ninguna. Entonces el botón se queda apagado con su
+   * motivo a la vista, porque no hay nada que enviar.
+   */
+  documentoId?: string | null
+  /**
+   * Falso cuando el paciente no tiene correo en su ficha. El botón se apaga y lo
+   * dice: apagarlo sin explicación deja al médico buscando qué le falta.
+   *
+   * Opcional porque hay puntos de montaje que no conocen la ficha; sin él se
+   * intenta el envío y es el servidor quien responde que no hay correo.
+   */
+  pacienteTieneCorreo?: boolean
 }
+
+type EstadoEnvio = 'listo' | 'enviando' | 'enviado' | 'error'
 
 export default function ModalDocumentoGenerado({
   open,
@@ -67,7 +88,60 @@ export default function ModalDocumentoGenerado({
   blob,
   titulo,
   guardadoEnExpediente,
+  documentoId = null,
+  pacienteTieneCorreo,
 }: Props) {
+  const [envio, setEnvio] = useState<EstadoEnvio>('listo')
+  const [errorEnvio, setErrorEnvio] = useState('')
+  const [enviadoA, setEnviadoA] = useState('')
+
+  /* Cada apertura empieza limpia: el modal se reutiliza entre documentos y un
+     «Enviado» heredado del anterior haría creer que este ya salió.
+
+     El reajuste va EN EL RENDER y no en un efecto —patrón «adjusting state when
+     props change» de React—: un efecto que llame a setState dispara un render en
+     cascada, y el lint del proyecto lo rechaza. Así el primer render tras abrir
+     ya sale con el estado limpio, sin un frame intermedio que enseñe el acuse
+     del documento anterior. */
+  const [aperturaVista, setAperturaVista] = useState(open)
+  if (open !== aperturaVista) {
+    setAperturaVista(open)
+    setEnvio('listo')
+    setErrorEnvio('')
+    setEnviadoA('')
+  }
+
+  /**
+   * ⚠️ AL SERVIDOR SOLO VIAJA EL ID. Ni el blob que este modal tiene en memoria,
+   * ni el correo del paciente. El PDF que se adjunta es el que quedó GUARDADO al
+   * emitir —el mismo que el paciente tiene en papel y que `/r/[folio]`
+   * respalda— y el destinatario sale de la ficha. Subir el blob desde aquí
+   * parecería un atajo y abriría la puerta a que se mande un archivo distinto
+   * del emitido.
+   */
+  async function enviarPorCorreo(): Promise<void> {
+    if (documentoId === null || envio === 'enviando' || envio === 'enviado') return
+    setEnvio('enviando')
+    setErrorEnvio('')
+    try {
+      const res = await fetch('/api/email/enviar-documento', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documentoId }),
+      })
+      const data: { error?: string; enviadoA?: string } = await res.json()
+      if (!res.ok) {
+        setErrorEnvio(data.error ?? 'No se pudo enviar el documento.')
+        setEnvio('error')
+        return
+      }
+      setEnviadoA(data.enviadoA ?? '')
+      setEnvio('enviado')
+    } catch {
+      setErrorEnvio('No se pudo conectar. Revisa tu conexión e intenta de nuevo.')
+      setEnvio('error')
+    }
+  }
   /**
    * useMemo y NO un efecto que haga setState: así el href existe ya en el
    * PRIMER render del modal. Con setState habría un frame con el botón inerte
@@ -138,6 +212,14 @@ export default function ModalDocumentoGenerado({
     </div>
   )
 
+  /* Las dos razones por las que el correo no puede salir, en el orden en que
+     importan: sin fila no hay nada que enviar; con fila pero sin correo en la
+     ficha, hay documento y no hay a quién. */
+  const motivoSinCorreo = documentoId === null
+    ? 'No quedó en el expediente'
+    : pacienteTieneCorreo === false ? 'Sin correo en la ficha' : null
+  const puedeEnviarCorreo = motivoSinCorreo === null
+
   const pie = (
     <div className="p-4 md:px-6 space-y-2.5">
       {pdfUrl ? (
@@ -159,7 +241,10 @@ export default function ModalDocumentoGenerado({
         </button>
       )}
 
-      {/* Correo y WhatsApp se cablean en un cambio posterior.
+      {/* WhatsApp sigue diferido; el correo ya envía. Ambos mandan el ARCHIVO —
+          por eso el mensaje y el adjunto viven en `lib/documentos/`, fuera de la
+          ruta de correo: cuando WhatsApp entre, reusa los dos y no los copia.
+
           A OPACIDAD PLENA, igual que el botón de Google en /login: lo
           deshabilitado se comunica con el estado del control, el relleno y el
           cursor — nunca apagando el texto, porque entonces el médico no puede
@@ -168,23 +253,54 @@ export default function ModalDocumentoGenerado({
           tailwindcss ANTES que spinus-tokens.css, así que el
           `justify-content:center` de .sp-btn le gana a la utilidad. */}
       <div className="sp-grid-actions mt-2 pt-3 border-t border-[var(--sp-line-divider)]">
-        {([
-          { icono: <Mail size={17} />, etiqueta: 'Enviar por correo' },
-          { icono: <MessageCircle size={17} />, etiqueta: 'WhatsApp' },
-        ]).map(({ icono, etiqueta }) => (
-          <button
-            key={etiqueta}
-            type="button"
-            disabled
-            aria-disabled="true"
-            className="sp-btn sp-btn--tertiary cursor-not-allowed"
-            style={{ flexDirection: 'column', gap: '7px' }}
-          >
-            <span className="inline-flex items-center gap-2">{icono} {etiqueta}</span>
-            <span className="sp-badge sp-badge--deferred">Próximamente</span>
-          </button>
-        ))}
+        <button
+          type="button"
+          onClick={() => void enviarPorCorreo()}
+          disabled={!puedeEnviarCorreo || envio === 'enviando' || envio === 'enviado'}
+          aria-disabled={!puedeEnviarCorreo || undefined}
+          className={`sp-btn sp-btn--tertiary${puedeEnviarCorreo ? '' : ' cursor-not-allowed'}`}
+          style={{ flexDirection: 'column', gap: '7px' }}
+        >
+          <span className="inline-flex items-center gap-2">
+            {envio === 'enviando'
+              ? <Loader2 size={17} className="animate-spin" />
+              : envio === 'enviado' ? <Check size={17} /> : <Mail size={17} />}
+            {envio === 'enviando' ? 'Enviando…' : envio === 'enviado' ? 'Enviado' : 'Enviar por correo'}
+          </span>
+          {/* El motivo, siempre a la vista: un botón apagado sin explicación deja
+              al médico buscando qué le falta. */}
+          {motivoSinCorreo !== null && (
+            <span className="sp-badge sp-badge--deferred">{motivoSinCorreo}</span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          disabled
+          aria-disabled="true"
+          className="sp-btn sp-btn--tertiary cursor-not-allowed"
+          style={{ flexDirection: 'column', gap: '7px' }}
+        >
+          <span className="inline-flex items-center gap-2">
+            <MessageCircle size={17} /> WhatsApp
+          </span>
+          <span className="sp-badge sp-badge--deferred">Próximamente</span>
+        </button>
       </div>
+
+      {errorEnvio !== '' && (
+        <p className="sp-banner sp-banner--danger" role="alert">
+          <AlertTriangle size={17} />
+          <span>{errorEnvio}</span>
+        </p>
+      )}
+
+      {envio === 'enviado' && (
+        <p className="sp-body text-center" style={{ fontSize: '12px' }} aria-live="polite">
+          Enviado{enviadoA !== '' ? ` a ${enviadoA}` : ''} con el PDF adjunto. Si no aparece, pídele
+          que revise su carpeta de <strong>spam o correo no deseado</strong>.
+        </p>
+      )}
 
       <button
         type="button"

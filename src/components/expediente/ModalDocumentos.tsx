@@ -143,7 +143,7 @@ export default function ModalDocumentos({
 }: ModalDocumentosProps) {
   const [docAEliminar, setDocAEliminar] = useState<string | null>(null)
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null)
-  const [docRegenerado, setDocRegenerado] = useState<{ blob: Blob; titulo: string; guardado: boolean } | null>(null)
+  const [docRegenerado, setDocRegenerado] = useState<{ blob: Blob; titulo: string; guardado: boolean; documentoId: string | null } | null>(null)
   const [bloqueoRegeneracion, setBloqueoRegeneracion] = useState(false)
   const [eliminando, setEliminando] = useState(false)
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({})
@@ -353,6 +353,10 @@ export default function ModalDocumentos({
           blob: pdfBlob,
           titulo: tituloRegenerado(doc),
           guardado,
+          /* Solo cuando la subida cuajó: el envío adjunta el PDF DE STORAGE, y
+             si `pdf_url` no se escribió no hay nada que adjuntar. Ofrecer el
+             botón aquí mandaría al médico a un error evitable. */
+          documentoId: guardado ? doc.id : null,
         })
       }
     }
@@ -599,6 +603,7 @@ export default function ModalDocumentos({
         blob={docRegenerado?.blob ?? null}
         titulo={docRegenerado?.titulo ?? 'Documento generado'}
         guardadoEnExpediente={docRegenerado?.guardado ?? false}
+        documentoId={docRegenerado?.documentoId ?? null}
       />
     </>
   )

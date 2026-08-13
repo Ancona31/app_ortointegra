@@ -148,7 +148,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
   const [urgente, setUrgente] = useState(false)
   const [errorGuardado, setErrorGuardado] = useState('')
   const [imprimiendo, setImprimiendo] = useState(false)
-  const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean } | null>(null)
+  const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean; documentoId: string | null } | null>(null)
   // Nada acusa antes del primer intento de imprimir; después todo se actualiza
   // en vivo. Gobierna el banner (§3.8) Y el teñido del bloque a medias (§2.4):
   // sin esto, el bloque se pone rojo mientras se teclea el tipo y antes de que
@@ -413,7 +413,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
       setImprimiendo(false)
       // También cuando la persistencia falló: el PDF existe y con el paciente
       // enfrente lo urgente es poder imprimirlo.
-      if (pdfBlob && !offlineMode) setDocGenerado({ blob: pdfBlob, guardado })
+      if (pdfBlob && !offlineMode) setDocGenerado({ blob: pdfBlob, guardado, documentoId: filaId })
     }
   }
 
@@ -634,6 +634,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
         blob={docGenerado?.blob ?? null}
         titulo="Solicitud de imagenología generada"
         guardadoEnExpediente={docGenerado?.guardado ?? false}
+        documentoId={docGenerado?.documentoId ?? null}
       />
     </div>
   )

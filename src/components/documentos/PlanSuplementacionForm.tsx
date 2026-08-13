@@ -298,7 +298,7 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
   const [seguimiento, setSeguimiento] = useState('')
   const [imprimiendo, setImprimiendo] = useState(false)
   const [errorGuardado, setErrorGuardado] = useState('')
-  const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean } | null>(null)
+  const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean; documentoId: string | null } | null>(null)
   // Aviso de recálculo por cambio de peso (S-04). Nace al corregir el peso con
   // suplementos ya elegidos y desaparece en el siguiente cambio de peso.
   const [recalculo, setRecalculo] = useState<{ recalculadas: number; conservadas: number } | null>(null)
@@ -606,7 +606,7 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
       setImprimiendo(false)
       // También cuando la persistencia falló: el PDF existe y con el paciente
       // enfrente lo urgente es poder imprimirlo.
-      if (pdfBlob && !offlineMode) setDocGenerado({ blob: pdfBlob, guardado })
+      if (pdfBlob && !offlineMode) setDocGenerado({ blob: pdfBlob, guardado, documentoId: filaId })
     }
   }
 
@@ -782,6 +782,7 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
         blob={docGenerado?.blob ?? null}
         titulo="Plan de suplementación generado"
         guardadoEnExpediente={docGenerado?.guardado ?? false}
+        documentoId={docGenerado?.documentoId ?? null}
       />
     </div>
   )
