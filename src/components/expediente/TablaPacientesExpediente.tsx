@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react'
 import { calcularEdad } from '@/lib/patientUtils'
 import { renderEnTZ } from '@/lib/dates'
@@ -20,6 +21,13 @@ interface Props {
   orden: OrdenColumna
   direccion: OrdenDireccion
   onOrden: (col: OrdenColumna) => void
+  /**
+   * Falso para la secretaria (y mientras el profile carga). Gobierna el kebab
+   * Y el enlace de la fila al expediente, porque son el mismo permiso: el
+   * layout de /expediente/[id] expulsa al rol 'secretaria' de todo el subárbol,
+   * así que una fila-enlace la llevaría a un redirect. Si algún día dejan de
+   * coincidir, sepáralos en dos props en vez de reutilizar éste.
+   */
   mostrarAcciones: boolean
 }
 
@@ -85,16 +93,30 @@ export function TablaPacientesExpediente({ pacientes, orden, direccion, onOrden,
             const avatarColor = AVATAR_COLORS[i % AVATAR_COLORS.length]
             const sexoLabel = p.sexo === 'M' ? 'Masculino' : p.sexo === 'F' ? 'Femenino' : 'Otro'
             return (
-              <tr key={p.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/80 transition-colors">
+              <tr key={p.id} className="relative border-b border-slate-100 last:border-0 hover:bg-slate-50/80 transition-colors">
                 <td className="px-4 py-3.5">
                   <div className="flex items-center gap-3.5 min-w-0">
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarColor}`}>
                       {p.nombre.charAt(0)}{p.apellidos.charAt(0)}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-[#1d1d1f] truncate">
-                        {p.nombre} {p.apellidos}
-                      </p>
+                      {/* Enlace-que-cubre-la-fila: el ::after se estira sobre el
+                          <tr> (de ahí su `relative`), así toda la fila navega y
+                          Next puede precargar el expediente al verlo en pantalla.
+                          Un onClick con router.push no serviría: Next solo
+                          precarga <Link>. */}
+                      {mostrarAcciones ? (
+                        <Link
+                          href={`/expediente/${p.id}`}
+                          className="block text-sm font-semibold text-[#1d1d1f] truncate rounded after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                        >
+                          {p.nombre} {p.apellidos}
+                        </Link>
+                      ) : (
+                        <p className="text-sm font-semibold text-[#1d1d1f] truncate">
+                          {p.nombre} {p.apellidos}
+                        </p>
+                      )}
                       <p className="text-[11px] text-[#86868b] mt-0.5">{sexoLabel}</p>
                     </div>
                   </div>
@@ -112,7 +134,9 @@ export function TablaPacientesExpediente({ pacientes, orden, direccion, onOrden,
                   <ListaChipsMedicos medicos={p.medicos} />
                 </td>
                 {mostrarAcciones && (
-                  <td className="px-4 py-3.5">
+                  /* `relative z-10` levanta esta celda sobre la capa del enlace:
+                     sin esto el clic en el kebab navegaría al expediente. */
+                  <td className="relative z-10 px-4 py-3.5">
                     <KebabAccionesPaciente pacienteId={p.id} />
                   </td>
                 )}

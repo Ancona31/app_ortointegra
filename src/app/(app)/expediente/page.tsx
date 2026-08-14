@@ -381,23 +381,36 @@ export default function ExpedientePage() {
               const avatarColor = AVATAR_COLORS[i % AVATAR_COLORS.length]
               const sexoLabel = p.sexo === 'M' ? 'Masculino' : p.sexo === 'F' ? 'Femenino' : 'Otro'
               return (
-                <div key={p.id} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm px-5 py-4">
+                <div key={p.id} className="relative bg-white rounded-2xl border border-slate-200/80 shadow-sm px-5 py-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3.5 min-w-0 flex-1">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarColor}`}>
                         {p.nombre.charAt(0)}{p.apellidos.charAt(0)}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-[#1d1d1f] truncate">
-                          {p.nombre} {p.apellidos}
-                        </p>
+                        {/* Mismo enlace-que-cubre-la-tarjeta que en la tabla:
+                            el ::after se estira sobre la card (de ahí su
+                            `relative`) para que Next precargue el expediente. */}
+                        {mostrarAcciones ? (
+                          <Link
+                            href={`/expediente/${p.id}`}
+                            className="block text-sm font-semibold text-[#1d1d1f] truncate rounded after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                          >
+                            {p.nombre} {p.apellidos}
+                          </Link>
+                        ) : (
+                          <p className="text-sm font-semibold text-[#1d1d1f] truncate">
+                            {p.nombre} {p.apellidos}
+                          </p>
+                        )}
                         <p className="text-[11px] text-[#86868b] mt-0.5">
                           {edad !== null ? `${edad.textoElegante} · ` : ''}{sexoLabel}
                         </p>
                       </div>
                     </div>
                     {mostrarAcciones && (
-                      <div className="flex-shrink-0">
+                      /* Sobre la capa del enlace: el kebab no debe navegar. */
+                      <div className="relative z-10 flex-shrink-0">
                         <KebabAccionesPaciente pacienteId={p.id} />
                       </div>
                     )}
