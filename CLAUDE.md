@@ -240,6 +240,18 @@ para procedimiento de actualización.
 * Usa el logger de `src/lib/logger.ts` en lugar de `console.log`
 * Imports absolutos con `@/` en lugar de rutas relativas largas
 
+### Nombres de rama
+
+Toda rama nueva lleva el prefijo `feature/` seguido de un nombre descriptivo
+en kebab-case, sin excepción por tipo de trabajo: también las de arreglo,
+refactor o documentación. Ejemplos vigentes: `feature/fase1-navegacion`,
+`feature/documentos-v2`, `feature/rediseno-landing`.
+
+Quedan en el repo unas pocas ramas anteriores a esta regla que no la siguen
+(`fix/perfil-telefono-huerfano`, `respaldo-main-mac`, y en remoto
+`dicom-viewer` y `multiconsultorio`). Son historia, no precedente: no se
+renombran, pero tampoco se imitan.
+
 ---
 
 ## 🖥️ Landing pública — reglas permanentes
