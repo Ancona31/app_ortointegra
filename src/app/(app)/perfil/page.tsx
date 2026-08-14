@@ -7,7 +7,7 @@ import { Loader2, Save, Palette, Upload, X, CalendarDays, CheckCircle2, LogIn, L
 import { PerfilSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import EspecialidadSelector from '@/components/ui/EspecialidadSelector'
-import { validarTelefono, validarCedula } from '@/lib/validaciones'
+import { validarCedula } from '@/lib/validaciones'
 import FirmaCaptura from '@/components/perfil/FirmaCaptura'
 import { compressLogoImage } from '@/lib/compressImage'
 import { syncDoctorProfile } from '@/lib/offline/doctorProfile'
@@ -29,8 +29,6 @@ type FormData = {
   cedula_profesional: string
   cedula_especialidad: string
   universidad: string
-  direccion_consultorio: string
-  telefono_consultorio: string
 }
 
 type Apariencia = {
@@ -63,7 +61,7 @@ export default function PerfilPage() {
   const [form, setForm] = useState<FormData>({
     titulo: '', nombres: '', apellido_paterno: '', apellido_materno: '',
     especialidad: '', cedula_profesional: '',
-    cedula_especialidad: '', universidad: '', direccion_consultorio: '', telefono_consultorio: '',
+    cedula_especialidad: '', universidad: '',
   })
   const [especialidades, setEspecialidades] = useState<string[]>([''])
   const [apariencia, setApariencia] = useState<Apariencia>({
@@ -214,8 +212,6 @@ export default function PerfilPage() {
           cedula_profesional: perfilData.medico.cedula_profesional || '',
           cedula_especialidad: perfilData.medico.cedula_especialidad || '',
           universidad: perfilData.medico.universidad || '',
-          direccion_consultorio: perfilData.medico.direccion_consultorio || '',
-          telefono_consultorio: perfilData.medico.telefono_consultorio || '',
         })
         setFirmaUrl(perfilData.medico.firma_url ?? null)
       }
@@ -250,11 +246,10 @@ export default function PerfilPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const errTel = validarTelefono(form.telefono_consultorio)
     const errCed = validarCedula(form.cedula_profesional)
     const errCedEsp = validarCedula(form.cedula_especialidad)
-    if (errTel || errCed || errCedEsp) {
-      toast.error(errTel || errCed || errCedEsp || 'Revisa los campos')
+    if (errCed || errCedEsp) {
+      toast.error(errCed || errCedEsp || 'Revisa los campos')
       return
     }
     if (!form.nombres.trim() || !form.apellido_paterno.trim()) {
@@ -263,6 +258,11 @@ export default function PerfilPage() {
     }
     setGuardando(true)
 
+    // `direccion_consultorio` y `telefono_consultorio` NO viajan en este payload: F3-5b movió
+    // esos datos a `consultorios` y quitó sus inputs de esta pantalla. El PUT itera `key in body`
+    // (api/me/perfil-medico/route.ts), así que omitirlos conserva intacto el valor histórico de
+    // profiles — del que aún dependen los PDFs como fallback (PdfHeader.tsx, PdfBarras.tsx,
+    // pdf/v2/adaptadores/comun.tsx). No los reintroduzcas aquí.
     const r1 = await fetch('/api/me/perfil-medico', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
