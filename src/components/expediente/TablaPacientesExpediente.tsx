@@ -108,7 +108,7 @@ export function TablaPacientesExpediente({ pacientes, orden, direccion, onOrden,
                       {mostrarAcciones ? (
                         <Link
                           href={`/expediente/${p.id}`}
-                          className="block text-sm font-semibold text-[#1d1d1f] truncate rounded after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                          className="block text-sm font-semibold text-[#1d1d1f] truncate rounded after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1e5fa8]"
                         >
                           {p.nombre} {p.apellidos}
                         </Link>
