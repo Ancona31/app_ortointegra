@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react'
 import { CheckCircle2, ChevronRight, Loader2, X } from 'lucide-react'
 import EspecialidadSelector from '@/components/ui/EspecialidadSelector'
 import FirmaCaptura from '@/components/perfil/FirmaCaptura'
-import { validarCedula } from '@/lib/validaciones'
+import { validarCedula, validarTelefono, formatearTelefono } from '@/lib/validaciones'
 import { useToast } from '@/components/ui/Toast'
 import { mutate } from 'swr'
 import { canManageClinica } from '@/lib/permissions'
@@ -51,6 +51,7 @@ export default function OnboardingModal({ onComplete, role, esAdminDeClinica }: 
   // Paso 3: Consultorio
   const [direccion, setDireccion] = useState('')
   const [telefono, setTelefono] = useState('')
+  const [errorTelefono, setErrorTelefono] = useState('')
 
   // Paso 4: Logo (solo admin)
   const [logoFile, setLogoFile] = useState<File | null>(null)
@@ -128,6 +129,17 @@ export default function OnboardingModal({ onComplete, role, esAdminDeClinica }: 
   // ── Guardar paso 3 ──────────────────────────────────────────
   async function guardarPaso3(): Promise<boolean> {
     if (!direccion.trim() && !telefono.trim()) return true // totalmente opcional
+
+    // El teléfono sigue siendo opcional (validarTelefono trata '' como válido), pero si viene
+    // debe salir de aquí ya normalizado: esta es la única escritura de telefono_consultorio y
+    // Mi Perfil ya no tiene campo donde corregir lo que se guarde mal.
+    const errTel = validarTelefono(telefono)
+    if (errTel) {
+      setErrorTelefono(errTel)
+      return false
+    }
+    setErrorTelefono('')
+
     setGuardando(true)
     try {
       const res = await fetch('/api/me/perfil-medico', {
@@ -368,10 +380,13 @@ export default function OnboardingModal({ onComplete, role, esAdminDeClinica }: 
                 <input
                   type="tel"
                   value={telefono}
-                  onChange={e => setTelefono(e.target.value)}
+                  onChange={e => { setTelefono(formatearTelefono(e.target.value)); setErrorTelefono('') }}
                   placeholder="Ej: 55 1234 5678"
                   className={inputCls}
                 />
+                {errorTelefono && (
+                  <p className="text-xs text-red-500 mt-1">{errorTelefono}</p>
+                )}
               </div>
             </div>
           )}
