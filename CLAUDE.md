@@ -510,17 +510,13 @@ Hardening conocido pero no aplicado todavía. Cada ítem tiene fix planeado y mo
 
 ---
 
-### QR-01 — Borrar `/api/r/[folio]`, el gemelo JSON de la verificación pública
+### QR-01 — ✅ Cerrado: `/api/r/[folio]` eliminado
 
-**Archivo afectado:** `src/app/api/r/[folio]/route.ts` (24 líneas, se elimina entero).
+`src/app/api/r/[folio]/route.ts` se borró entero. Devolvía el `contenido` COMPLETO de la receta —nombre del paciente, diagnóstico y medicamentos con su posología— en JSON, con `createAdminClient()`, así que la RLS no aplicaba: cualquier médico autenticado, de cualquier clínica, leía la receta de cualquier otro con `curl` y el folio. No lo llamaba nadie; era el resto de cuando `/r/[folio]` era un visor de la receta.
 
-**Problema:** devuelve `contenido` COMPLETO de la receta —nombre del paciente, diagnóstico y los medicamentos con su posología— en JSON, sin ninguna comprobación de clínica ni de rol. Usa `createAdminClient()`, así que la RLS no aplica. Lo único que hay delante es el middleware, que exige sesión: **cualquier médico autenticado, de cualquier clínica, lee la receta de cualquier otro** con `curl` y el folio. El rate limit de 30/h por IP acota el barrido, no el acceso.
+**⚠️ NO CONFUNDIR CON `pathname.startsWith('/r/')` DE `src/middleware.ts:61`, QUE SE QUEDA.** Esa línea mantiene pública la **página** `/r/[folio]`, que es el destino del QR impreso; no cubría a la ruta API, porque `/api/r/…` no empieza por `/r/`. Retirarla creyéndola resto de esto rompería la verificación entera.
 
-Busca por `contenido->>folio`, o sea por el `R-…` viejo: alcanza a las ~357 recetas anteriores a agosto de 2026 y a ninguna nueva. **No es un dato tranquilizador** — son justo las recetas cuyo folio va impreso en papeles que circulan por ahí.
-
-Nadie lo llama: `grep -rn "api/r/" src` fuera de la propia ruta da cero. Es el resto de cuando `/r/[folio]` era un visor de la receta; la página ya no publica contenido clínico (commit `fc651a1`) y este endpoint sí. Por eso el fix es borrarlo, no restringirlo.
-
-**Cuándo atacar:** después de fusionar `feature/documentos-v2`. Deliberadamente fuera del alcance de esa rama.
+Comprobado al borrar: cero consumidores en el código (el QR de la receta apunta a `/r/{folio}`, la página, en `RecetaForm.tsx:432`), y ninguna otra ruta sirve contenido de documentos con cliente de servicio — las cuatro que leen `documentos` (`/api/documentos/[id]`, `/api/me/estadisticas`, `/api/me/stats`, `/api/paciente/[id]/exportar`) usan el cliente de sesión, así que la RLS filtra. `/api/documentos/[id]/identificacion` sí usa cliente de servicio, pero comprueba `subido_por = user.id` antes y valida el prefijo de la ruta.
 
 ---
 
