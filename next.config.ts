@@ -32,6 +32,13 @@ const nextConfig: NextConfig = {
   generateBuildId: async () => {
     return process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) || 'dev-local'
   },
+  // Router Cache (Client Cache) del App Router. Por defecto en Next 15+ las
+  // rutas dinámicas tienen stale time 0 — se refetchean en cada navegación.
+  // Todas las rutas de (app) son dinámicas porque sus layouts leen cookies vía
+  // getUser(), así que sin esto el prefetch se descarta al instante.
+  experimental: {
+    staleTimes: { dynamic: 30, static: 180 },
+  },
   turbopack: {
     resolveAlias: {
       fs: { browser: './src/lib/stubs/empty.js' },
