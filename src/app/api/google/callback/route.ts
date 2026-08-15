@@ -3,12 +3,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { encrypt } from '@/lib/encrypt'
 
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI
-)
-
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get('code')
   const state = req.nextUrl.searchParams.get('state')
@@ -23,6 +17,14 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Una instancia por petición: compartirla entre peticiones concurrentes
+    // deja que un usuario sobrescriba las credenciales de otro.
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI
+    )
+
     const { tokens } = await oauth2Client.getToken(code)
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()

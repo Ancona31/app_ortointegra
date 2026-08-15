@@ -4,12 +4,6 @@ import { createClient } from '@/lib/supabase/server'
 import { decrypt, encrypt } from '@/lib/encrypt'
 import { anonimizarTexto } from '@/lib/anonimizar'
 
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI
-)
-
 export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient()
@@ -23,6 +17,14 @@ export async function GET(req: NextRequest) {
       .single()
 
     if (!tokenData) return NextResponse.json({ connected: false })
+
+    // Una instancia por petición: compartirla entre peticiones concurrentes
+    // deja que un usuario sobrescriba las credenciales de otro.
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI
+    )
 
     oauth2Client.setCredentials({
       access_token: decrypt(tokenData.access_token),
@@ -79,6 +81,14 @@ export async function DELETE(req: NextRequest) {
 
     if (!tokenData) return NextResponse.json({ error: 'Calendar no conectado' }, { status: 400 })
 
+    // Una instancia por petición: compartirla entre peticiones concurrentes
+    // deja que un usuario sobrescriba las credenciales de otro.
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI
+    )
+
     oauth2Client.setCredentials({
       access_token: decrypt(tokenData.access_token),
       refresh_token: decrypt(tokenData.refresh_token),
@@ -110,6 +120,14 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (!tokenData) return NextResponse.json({ error: 'Calendar no conectado' }, { status: 400 })
+
+    // Una instancia por petición: compartirla entre peticiones concurrentes
+    // deja que un usuario sobrescriba las credenciales de otro.
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI
+    )
 
     oauth2Client.setCredentials({
       access_token: decrypt(tokenData.access_token),

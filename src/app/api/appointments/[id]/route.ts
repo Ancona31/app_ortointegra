@@ -15,12 +15,6 @@ function gcalSummary(title: string): string {
   return 'Cita médica'
 }
 
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI
-)
-
 async function getGCalClient(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
   const { data: tokenData } = await supabase
     .from('google_tokens')
@@ -28,6 +22,14 @@ async function getGCalClient(supabase: Awaited<ReturnType<typeof createClient>>,
     .eq('user_id', userId)
     .single()
   if (!tokenData) return null
+
+  // Una instancia por petición: compartirla entre peticiones concurrentes
+  // deja que un usuario sobrescriba las credenciales de otro.
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI
+  )
 
   oauth2Client.setCredentials({
     access_token:  decrypt(tokenData.access_token),
