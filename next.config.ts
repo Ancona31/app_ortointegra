@@ -108,4 +108,30 @@ export default withSentryConfig(nextConfig, {
   silent: true,
   widenClientFileUpload: true,
   disableLogger: true,
+
+  /* ⚠ APAGADAS A PROPÓSITO — Y HAY QUE REVISARLO SI APARECE `instrumentation.ts`.
+   *
+   * Encendidas (su valor por defecto), estas dos opciones hacen que el plugin
+   * inyecte un `sentry-wrapper-module` en el bundle de servidor de CADA ruta,
+   * que llama a `wrapServerComponentWithSentry`. Eso arrastra `@sentry/node`
+   * con ~20 paquetes `@opentelemetry/instrumentation-*` detrás al grafo de
+   * servidor de todas las rutas, y se paga en cada arranque en frío.
+   *
+   * Hoy eso es costo puro: los wrappers instrumentan contra un SDK que NUNCA
+   * se inicializa, porque `Sentry.init()` de servidor solo corre desde el
+   * `register()` de un `instrumentation.ts` en la raíz y ese archivo no existe
+   * (el propio build lo avisa: "Could not find a Next.js instrumentation
+   * file"). Ver la cabecera de `sentry.server.config.ts`.
+   *
+   * SI ALGÚN DÍA SE CREA `instrumentation.ts`, esta decisión deja de ser
+   * gratis: con el SDK de servidor ya inicializado, los wrappers sí reportan
+   * errores y trazas de Server Components y rutas de API. Vuelve a evaluarla
+   * entonces, midiendo — no la des por buena por herencia.
+   *
+   * El Sentry de NAVEGADOR no se toca aquí: sigue vivo desde
+   * `instrumentation-client.ts`, que no depende de estas opciones. */
+  webpack: {
+    autoInstrumentServerFunctions: false,
+    autoInstrumentAppDirectory: false,
+  },
 });
