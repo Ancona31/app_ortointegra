@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Loader2 } from 'lucide-react'
 
@@ -163,10 +163,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const status = validateToken(meta)
   const isAuthenticated = status === 'AUTHENTICATED'
 
+  /* `meta` viaja por ref, no por dependencia. Con `[meta]`, refreshMeta cambiaba
+     de identidad en cada setMeta y remontaba el efecto de listeners de abajo;
+     como esos listeners son `online` y `visibilitychange`, volver a la pestaña
+     re-renderizaba la aplicacion entera. El ref se actualiza en commit y
+     refreshMeta solo se invoca desde manejadores de evento, que corren despues
+     del commit, asi que nunca lee un valor viejo. */
+  const metaRef = useRef(meta)
+  useEffect(() => { metaRef.current = meta }, [meta])
+
   const refreshMeta = useCallback(async (): Promise<void> => {
-    const newMeta = await syncFromSdkSession(meta)
+    const newMeta = await syncFromSdkSession(metaRef.current)
     setMeta(newMeta)
-  }, [meta])
+  }, [])
 
   const signOut = useCallback(async (): Promise<void> => {
     try {
@@ -222,15 +231,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [initialized, refreshMeta])
 
-  const value: AuthContextValue = {
-    userId: meta.userId,
-    email: meta.email,
-    status,
-    isAuthenticated,
-    initialized,
-    signOut,
-    refreshMeta,
-  }
+  const value: AuthContextValue = useMemo(
+    () => ({
+      userId: meta.userId,
+      email: meta.email,
+      status,
+      isAuthenticated,
+      initialized,
+      signOut,
+      refreshMeta,
+    }),
+    [meta.userId, meta.email, status, isAuthenticated, initialized, signOut, refreshMeta],
+  )
 
   // Loading gate: NO renderizar children hasta que la sesión se resuelva
   if (!initialized) {

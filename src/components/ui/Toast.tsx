@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useCallback, useRef } from 'react'
+import { createContext, useContext, useState, useCallback, useMemo, useRef } from 'react'
 import { CheckCircle, XCircle, Info, AlertTriangle, X } from 'lucide-react'
 
 type ToastType = 'success' | 'error' | 'info' | 'warning'
@@ -28,12 +28,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const dismiss = (id: number) => setToasts(prev => prev.filter(t => t.id !== id))
 
-  const toast: ToastFn = {
-    success: (msg) => add(msg, 'success'),
-    error:   (msg) => add(msg, 'error'),
-    info:    (msg) => add(msg, 'info'),
-    warning: (msg) => add(msg, 'warning'),
-  }
+  // Memoizado: sin esto el objeto cambia de identidad en cada toast que entra
+  // o sale, y re-renderiza todo el arbol bajo el provider.
+  const toast: ToastFn = useMemo(() => ({
+    success: (msg: string) => add(msg, 'success'),
+    error:   (msg: string) => add(msg, 'error'),
+    info:    (msg: string) => add(msg, 'info'),
+    warning: (msg: string) => add(msg, 'warning'),
+  }), [add])
 
   const styles: Record<ToastType, string> = {
     success: 'bg-emerald-50 border-emerald-200 text-emerald-800',

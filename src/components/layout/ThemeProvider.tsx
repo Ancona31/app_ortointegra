@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useClinica } from '@/hooks/useClinica'
 
 type ThemeCtx = { dark: boolean; toggle: () => void }
@@ -18,7 +18,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, [])
 
-  function toggle() {
+  const toggle = useCallback(() => {
     setDark(prev => {
       const next = !prev
       try {
@@ -27,7 +27,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       } catch {}
       return next
     })
-  }
+  }, [])
 
   const css = `
     :root {
@@ -229,8 +229,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     /* Los gradientes azules del header de TarjetaPaciente se ven bien en dark */
   `
 
+  // Memoizado: este provider re-renderiza cada vez que useClinica revalida,
+  // y con el objeto literal arrastraba a todo (app) detras.
+  const value = useMemo(() => ({ dark, toggle }), [dark, toggle])
+
   return (
-    <Ctx.Provider value={{ dark, toggle }}>
+    <Ctx.Provider value={value}>
       <style dangerouslySetInnerHTML={{ __html: css }} />
       {children}
     </Ctx.Provider>

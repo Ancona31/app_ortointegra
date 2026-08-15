@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useMemo,
   useState,
   type MouseEvent,
   type ReactNode,
@@ -43,12 +44,15 @@ export function SubscriptionGateProvider({
   const openBloqueoModal = useCallback(() => setIsOpen(true), [])
   const closeModal = useCallback(() => setIsOpen(false), [])
 
-  const value: SubscriptionGateContextValue = {
-    state: initialState,
-    openBloqueoModal,
-    closeModal,
-    isOpen,
-  }
+  const value: SubscriptionGateContextValue = useMemo(
+    () => ({
+      state: initialState,
+      openBloqueoModal,
+      closeModal,
+      isOpen,
+    }),
+    [initialState, openBloqueoModal, closeModal, isOpen],
+  )
 
   return (
     <SubscriptionGateContext.Provider value={value}>
