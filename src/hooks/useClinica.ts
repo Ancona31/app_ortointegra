@@ -26,7 +26,7 @@ export function useClinica() {
     '/api/me/clinica',
     fetcher,
     {
-      revalidateOnFocus: true,
+      // revalidateOnFocus se hereda del <SWRConfig> de (app), ya con throttle.
       dedupingInterval: 60_000,
       onSuccess: (d) => {
         if (d.clinica) secureStorage.set(CACHE_KEY, d.clinica)

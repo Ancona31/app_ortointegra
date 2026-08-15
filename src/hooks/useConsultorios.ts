@@ -32,7 +32,7 @@ export function useConsultorios() {
     '/api/consultorios',
     fetcher,
     {
-      revalidateOnFocus: true,
+      // revalidateOnFocus se hereda del <SWRConfig> de (app), ya con throttle.
       dedupingInterval: 60_000,
       onSuccess: (d) => {
         if (d.consultorios) secureStorage.set(CACHE_KEY, d.consultorios)
