@@ -544,6 +544,9 @@ function AppointmentModal({
       notes:       notes.trim() || null,
       status,
       paciente_id: paciente.id,
+      // El bloque optimista de handleSave pinta la tarjeta antes de que
+      // responda el servidor; sin esto escribiria el paciente anterior.
+      pacientes:   paciente ?? null,
       medico_id:   medicoId || null,
       ...(consultorioChanged ? { consultorio_id: consultorioId } : {}),
       updated_at:  apt?.updated_at,
@@ -1475,6 +1478,11 @@ export default function AgendaPage() {
 
     toast.success('Cita reagendada')
 
+    // Sin esto, extendedProps.updated_at se queda con el valor de la carga
+    // inicial y la siguiente edicion por formulario falla con 409.
+    const json = await res.json().catch(() => null)
+    if (json?.appointment) aplicarAppointmentAlEvento(json.appointment)
+
     // Glow verde de confirmación
     const el = arg.el as HTMLElement | null
     if (el) {
@@ -1516,7 +1524,7 @@ export default function AgendaPage() {
           existing.setExtendedProp('status', data.status ?? existing.extendedProps.status)
           existing.setExtendedProp('colorStyle', ev.extendedProps?.colorStyle)
           existing.setExtendedProp('notes', data.notes ?? existing.extendedProps.notes)
-          existing.setExtendedProp('pacientes', data.paciente_id ? existing.extendedProps.pacientes : null)
+          existing.setExtendedProp('pacientes', data.pacientes ?? null)
           // F3-6 fix Bug 1: actualizar también médico y consultorio_id (optimistic).
           existing.setExtendedProp('doctorInitial', ev.extendedProps?.doctorInitial)
           existing.setExtendedProp('medico_id', data.medico_id ?? null)
@@ -1545,19 +1553,8 @@ export default function AgendaPage() {
 
     const json = await res.json()
 
-    // F3-6 fix Bug 1: en edición, sincronizar snapshots completos desde el server
-    // (los 6 consultorio_* que el backend recalcula al cambiar consultorio_id,
-    // y mantiene coherencia para re-edición y badge de timezone).
     if (isEdit && json.appointment) {
-      const existing = api?.getEventById(data.id!)
-      if (existing) {
-        existing.setExtendedProp('consultorio_id', json.appointment.consultorio_id)
-        existing.setExtendedProp('consultorio_nombre', json.appointment.consultorio_nombre)
-        existing.setExtendedProp('consultorio_nombre_corto', json.appointment.consultorio_nombre_corto)
-        existing.setExtendedProp('consultorio_direccion', json.appointment.consultorio_direccion)
-        existing.setExtendedProp('consultorio_telefono', json.appointment.consultorio_telefono)
-        existing.setExtendedProp('consultorio_timezone', json.appointment.consultorio_timezone)
-      }
+      aplicarAppointmentAlEvento(json.appointment)
     }
 
     if (!isEdit && optimisticEvent && json.appointment?.id) {
