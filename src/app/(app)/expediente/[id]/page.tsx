@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, Suspense } from 'react'
+import dynamic from 'next/dynamic'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
@@ -9,12 +10,21 @@ import { Paciente, Consulta, Documento } from '@/types'
 import Portal from '@/components/ui/Portal'
 import { Trash2, AlertTriangle, Loader2 } from 'lucide-react'
 
-import ModalVisorDocumento from '@/components/expediente/ModalVisorDocumento'
 import HeroExpediente from '@/components/expediente/HeroExpediente'
 import ExpedienteCardsGrid, { type ProximaCita } from '@/components/expediente/ExpedienteCardsGrid'
 import AccesosRapidos from '@/components/expediente/AccesosRapidos'
 import ModalConsultas from '@/components/expediente/ModalConsultas'
 import ModalDocumentos from '@/components/expediente/ModalDocumentos'
+
+// Diferido A PROPÓSITO. NO lo vuelvas a importar estáticamente: arrastra TipTap,
+// ProseMirror y DOMPurify a la carga inicial del expediente, para un modal que
+// arranca cerrado (`docSeleccionado` empieza en `null`) y que solo se abre al
+// hacer clic en un documento. `ssr: false` es válido aquí porque esta página es
+// un Client Component.
+const ModalVisorDocumento = dynamic(
+  () => import('@/components/expediente/ModalVisorDocumento'),
+  { ssr: false }
+)
 
 /** Límite de registros por query */
 const QUERY_LIMIT = 50
