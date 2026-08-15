@@ -1379,6 +1379,29 @@ export default function AgendaPage() {
     }
   }
 
+  /**
+   * Re-hidrata un evento del calendario con la fila canonica que devolvio el
+   * servidor. Sustituye extendedProps en bloque en vez de campo por campo:
+   * ese era el bug — se sincronizaban 6 campos a mano y `updated_at` no
+   * estaba entre ellos, asi que el segundo guardado de una misma cita
+   * mandaba un valor viejo y el servidor respondia 409.
+   */
+  function aplicarAppointmentAlEvento(appointment: Partial<Appointment> & { id?: string }) {
+    if (!appointment?.id) return
+    const existing = calendarRef.current?.getApi()?.getEventById(appointment.id)
+    if (!existing) return
+
+    const input = buildEventInput(appointment)
+    if (appointment.start_time) existing.setStart(appointment.start_time)
+    if (appointment.end_time)   existing.setEnd(appointment.end_time)
+    existing.setProp('title', appointment.title ?? '')
+    if (input.textColor) existing.setProp('textColor', input.textColor as string)
+
+    for (const [clave, valor] of Object.entries(input.extendedProps ?? {})) {
+      existing.setExtendedProp(clave, valor)
+    }
+  }
+
   /* ── Handlers ────────────────────────────────────────── */
   function handleDateClick(arg: DateClickArg) {
     // Fase 8.2: bloqueo creación de citas si suscripción cancelada con >5 pacientes
