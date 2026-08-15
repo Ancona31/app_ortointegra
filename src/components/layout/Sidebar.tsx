@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
   Home, Stethoscope, Pill, FileText, FlaskConical, ScanLine,
@@ -223,10 +224,15 @@ export default function Sidebar() {
         {/* Logo + nombre */}
         <div className="flex flex-col items-center gap-2.5 px-5 py-5 border-b border-white/10">
           <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center overflow-hidden shadow-lg flex-shrink-0">
+            {/* 112 = 2× los 56 px del círculo, para pantallas de alta densidad.
+                Las dos ramas pasan por next/image: el host de Supabase Storage
+                está declarado en `remotePatterns` de next.config.ts. */}
             {logoUrl?.startsWith('https://') ? (
-              <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+              <Image src={logoUrl} alt="Logo" width={112} height={112}
+                className="w-full h-full object-contain" />
             ) : (
-              <img src="/logo.png" alt="Logo" className="w-full h-full object-contain"
+              <Image src="/logo.png" alt="Logo" width={112} height={112} priority
+                className="w-full h-full object-contain"
                 onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
             )}
           </div>
