@@ -1,6 +1,5 @@
 'use client'
 
-import * as Sentry from '@sentry/nextjs'
 import { useEffect } from 'react'
 
 export default function GlobalError({
@@ -11,7 +10,22 @@ export default function GlobalError({
   reset: () => void
 }) {
   useEffect(() => {
-    Sentry.captureException(error)
+    // El SDK se carga dinámicamente A PROPÓSITO. NO lo vuelvas a importar
+    // estáticamente: este archivo pertenece al segmento raíz, así que un
+    // `import` estático mete `@sentry/nextjs` —que en servidor resuelve a
+    // `@sentry/node` con todo OpenTelemetry detrás— en el grafo de servidor de
+    // TODAS las rutas, y se paga en cada arranque en frío. Medido: ~2.4 MB de
+    // chunks de servidor por ruta. El reporte del error no cambia.
+    async function reportar(): Promise<void> {
+      try {
+        const Sentry = await import('@sentry/nextjs')
+        Sentry.captureException(error)
+      } catch {
+        // Si el SDK no carga (chunk perdido, sin red) no hay nada que hacer:
+        // ya estamos en la pantalla de error global, el peor caso posible.
+      }
+    }
+    void reportar()
   }, [error])
 
   return (
