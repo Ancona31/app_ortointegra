@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { google } from 'googleapis'
 import { decrypt, encrypt } from '@/lib/encrypt'
+import { APPOINTMENT_SELECT } from '@/lib/appointments'
 
 // PRIVACIDAD — LFPDPPP Art. 9: los datos de salud son sensibles.
 // Google Calendar es un servicio externo — NUNCA enviar nombres de
@@ -43,7 +44,7 @@ export async function GET(req: NextRequest) {
     // RLS filtra por clinica_id
     let query = supabase
       .from('appointments')
-      .select('*, pacientes(id, nombre, apellidos, telefono), medico:profiles!appointments_medico_id_fkey(id, titulo, nombres, apellido_paterno, apellido_materno)')
+      .select(APPOINTMENT_SELECT)
       .eq('clinica_id', profile.clinica_id)
       .order('start_time', { ascending: true })
 
@@ -206,7 +207,7 @@ export async function POST(req: NextRequest) {
         consultorio_telefono:      consultorio.telefono,
         consultorio_timezone:      consultorio.timezone,
       })
-      .select()
+      .select(APPOINTMENT_SELECT)
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })

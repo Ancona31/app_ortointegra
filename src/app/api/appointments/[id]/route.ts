@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { google } from 'googleapis'
 import { decrypt, encrypt } from '@/lib/encrypt'
+import { APPOINTMENT_SELECT } from '@/lib/appointments'
 
 // PRIVACIDAD — LFPDPPP Art. 9: NUNCA enviar nombres de pacientes
 // ni datos clínicos a Google Calendar.
@@ -222,7 +223,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       .from('appointments')
       .update(updates)
       .eq('id', id)
-      .select()
+      .select(APPOINTMENT_SELECT)
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
