@@ -158,18 +158,29 @@ function ExpedientePacienteContent() {
         pacienteId={id}
       />
 
-      {/* ── Modal lista de documentos ── */}
-      <ModalDocumentos
-        open={mostrarModalDocumentos}
-        onClose={() => setMostrarModalDocumentos(false)}
-        documentos={documentos}
-        pacienteId={id}
-        onVerDocumento={(doc) => {
-          setMostrarModalDocumentos(false)
-          setDocSeleccionado(doc)
-        }}
-        onEliminarDocumento={eliminarDocumento}
-      />
+      {/* ── Modal lista de documentos ──
+          Montado SOLO cuando está abierto. Cerrado no pintaba nada, pero sus
+          hooks sí corrían: useMedicoInfo dispara /api/me/perfil-medico y, en
+          su onSuccess, un PBKDF2 de secureStorage más syncDoctorProfile con
+          dos descargas de imágenes y una escritura síncrona a localStorage.
+          Todo eso para un modal que la mayoría de las visitas no abre.
+          La apertura se ve igual: ModalShell ya devolvía null cerrado y sus
+          animaciones (animate-fade-in / animate-modal-enter) arrancan con el
+          montaje, que ahora ocurre en el mismo render en que open pasa a true.
+          No hay animación de salida que se pierda al desmontar. */}
+      {mostrarModalDocumentos && (
+        <ModalDocumentos
+          open
+          onClose={() => setMostrarModalDocumentos(false)}
+          documentos={documentos}
+          pacienteId={id}
+          onVerDocumento={(doc) => {
+            setMostrarModalDocumentos(false)
+            setDocSeleccionado(doc)
+          }}
+          onEliminarDocumento={eliminarDocumento}
+        />
+      )}
 
       {/* ── Modal eliminar paciente — macOS alert dialog ── */}
       {mostrarEliminarPaciente && (
