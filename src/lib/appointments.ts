@@ -6,3 +6,20 @@
  */
 export const APPOINTMENT_SELECT =
   '*, pacientes(id, nombre, apellidos, telefono), medico:profiles!appointments_medico_id_fkey(id, titulo, nombres, apellido_paterno, apellido_materno)'
+
+/** El paciente tal como llega dentro de una cita de `APPOINTMENT_SELECT`. */
+export type PacienteEnCita = { nombre: string; apellidos: string } | null
+
+/**
+ * Titulo del evento en el calendario propio de Spinus.
+ *
+ * PRIVACIDAD — el calendario es de la app, no el `primary` del medico, y el
+ * aviso de privacidad declara que Google recibe nombre del paciente y horario.
+ * Lo que NO sale: diagnostico, motivo de consulta, notas ni nada clinico.
+ */
+export function tituloParaGoogle(
+  p: { nombre: string; apellidos: string } | null,
+  fallback: string,
+): string {
+  return p ? `${p.nombre} ${p.apellidos}` : fallback
+}

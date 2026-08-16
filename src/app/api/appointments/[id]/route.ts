@@ -1,19 +1,8 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getGCalClient } from '@/lib/gcal'
-import { APPOINTMENT_SELECT } from '@/lib/appointments'
-
-// PRIVACIDAD — LFPDPPP Art. 9: NUNCA enviar nombres de pacientes
-// ni datos clínicos a Google Calendar.
-function gcalSummary(title: string): string {
-  const words = title.trim().split(/\s+/)
-  if (words.length >= 2 && words.every(w => /^[A-ZÁÉÍÓÚÑ]/.test(w))) {
-    const iniciales = words.map(w => w[0]).join('').toUpperCase()
-    return `Cita médica (${iniciales})`
-  }
-  return 'Cita médica'
-}
+import { conCalendarioSpinus, GCAL_TIMEZONE } from '@/lib/gcal'
+import { APPOINTMENT_SELECT, tituloParaGoogle, type PacienteEnCita } from '@/lib/appointments'
 
 /* ── PUT /api/appointments/[id] ─────────────────────────── */
 export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments/[id]'>) {
@@ -201,6 +190,9 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       const gcalEventId = existing.google_event_id
       const userId = user.id
       const admin = createAdminClient()
+      // El titulo del evento sale del paciente ligado; si la cita no tiene
+      // paciente, del titulo libre de la cita.
+      const pacienteCita: PacienteEnCita = apt.pacientes ?? null
       after(async () => {
         const STATUS_COLOR: Record<string, string | undefined> = {
           confirmed: '2',
@@ -210,23 +202,21 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
         }
         let gcal_sync_status: 'synced' | 'pending' | 'failed' = 'pending'
         try {
-          const calendar = await getGCalClient(supabase, userId)
-          if (calendar) {
-            await calendar.events.patch({
-              calendarId: 'primary',
+          await conCalendarioSpinus(supabase, userId, (calendar, calendarId) =>
+            calendar.events.patch({
+              calendarId,
               eventId:    gcalEventId,
               requestBody: {
-                ...(title      !== undefined ? { summary: gcalSummary(title) }                                      : {}),
+                ...(title      !== undefined ? { summary: tituloParaGoogle(pacienteCita, title) }         : {}),
                 // NO enviar notes/descripción a Google — puede contener datos clínicos
-                ...(start_time !== undefined ? { start: { dateTime: start_time, timeZone: 'America/Mexico_City' } } : {}),
-                ...(end_time   !== undefined ? { end:   { dateTime: end_time,   timeZone: 'America/Mexico_City' } } : {}),
-                ...(status     !== undefined && STATUS_COLOR[status] ? { colorId: STATUS_COLOR[status] }            : {}),
+                ...(start_time !== undefined ? { start: { dateTime: start_time, timeZone: GCAL_TIMEZONE } } : {}),
+                ...(end_time   !== undefined ? { end:   { dateTime: end_time,   timeZone: GCAL_TIMEZONE } } : {}),
+                ...(status     !== undefined && STATUS_COLOR[status] ? { colorId: STATUS_COLOR[status] }    : {}),
               },
             })
-            gcal_sync_status = 'synced'
-          } else {
-            gcal_sync_status = 'synced'
-          }
+          )
+          // null → el médico no tiene Google conectado: nada que sincronizar.
+          gcal_sync_status = 'synced'
         } catch (gcalErr) {
           console.error('[GCal] Error de sincronización en background')
           gcal_sync_status = 'failed'
@@ -270,10 +260,9 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext<'/api/appointm
       const userId = user.id
       after(async () => {
         try {
-          const calendar = await getGCalClient(supabase, userId)
-          if (calendar) {
-            await calendar.events.delete({ calendarId: 'primary', eventId: gcalEventId })
-          }
+          await conCalendarioSpinus(supabase, userId, (calendar, calendarId) =>
+            calendar.events.delete({ calendarId, eventId: gcalEventId })
+          )
         } catch { /* GCal delete es best-effort */ }
       })
     }

@@ -1,22 +1,8 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { google } from 'googleapis'
-import { decrypt, encrypt } from '@/lib/encrypt'
-import { APPOINTMENT_SELECT } from '@/lib/appointments'
-
-// PRIVACIDAD — LFPDPPP Art. 9: los datos de salud son sensibles.
-// Google Calendar es un servicio externo — NUNCA enviar nombres de
-// pacientes ni datos clínicos. Solo "Cita médica" + iniciales como máximo.
-function gcalSummary(title: string): string {
-  // Extraer iniciales si el título parece un nombre (2+ palabras capitalizadas)
-  const words = title.trim().split(/\s+/)
-  if (words.length >= 2 && words.every(w => /^[A-ZÁÉÍÓÚÑ]/.test(w))) {
-    const iniciales = words.map(w => w[0]).join('').toUpperCase()
-    return `Cita médica (${iniciales})`
-  }
-  return 'Cita médica'
-}
+import { conCalendarioSpinus, GCAL_TIMEZONE } from '@/lib/gcal'
+import { APPOINTMENT_SELECT, tituloParaGoogle, type PacienteEnCita } from '@/lib/appointments'
 
 async function getProfile(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -214,52 +200,28 @@ export async function POST(req: NextRequest) {
 
     // Google Calendar sync en background — necesita admin porque after() no tiene contexto de cookies
     const admin = createAdminClient()
+    // El titulo del evento sale del paciente ligado; si la cita no tiene
+    // paciente, del titulo libre de la cita.
+    const pacienteCita: PacienteEnCita = apt.pacientes ?? null
     after(async () => {
       let gcal_sync_status: 'synced' | 'pending' | 'failed' = 'pending'
       let google_event_id: string | null = null
 
       try {
-        const { data: tokenData } = await admin
-          .from('google_tokens')
-          .select('*')
-          .eq('user_id', profile.userId)
-          .single()
-
-        if (tokenData) {
-          const bgOauth = new google.auth.OAuth2(
-            process.env.GOOGLE_CLIENT_ID,
-            process.env.GOOGLE_CLIENT_SECRET,
-            process.env.GOOGLE_REDIRECT_URI
-          )
-          bgOauth.setCredentials({
-            access_token:  decrypt(tokenData.access_token),
-            refresh_token: decrypt(tokenData.refresh_token),
-            expiry_date:   tokenData.expires_at,
-          })
-          if (tokenData.expires_at && Date.now() > tokenData.expires_at) {
-            const { credentials } = await bgOauth.refreshAccessToken()
-            await admin.from('google_tokens').update({
-              access_token: credentials.access_token ? encrypt(credentials.access_token) : null,
-              expires_at:   credentials.expiry_date ?? null,
-            }).eq('user_id', profile.userId)
-            bgOauth.setCredentials(credentials)
-          }
-
-          const calendar = google.calendar({ version: 'v3', auth: bgOauth })
-          const { data: gEvent } = await calendar.events.insert({
-            calendarId:  'primary',
+        const creado = await conCalendarioSpinus(admin, profile.userId, (calendar, calendarId) =>
+          calendar.events.insert({
+            calendarId,
             requestBody: {
-              summary: gcalSummary(title),
+              summary: tituloParaGoogle(pacienteCita, title),
               // NO enviar notes/descripción a Google — puede contener datos clínicos
-              start: { dateTime: start_time, timeZone: 'America/Mexico_City' },
-              end:   { dateTime: end_time,   timeZone: 'America/Mexico_City' },
+              start: { dateTime: start_time, timeZone: GCAL_TIMEZONE },
+              end:   { dateTime: end_time,   timeZone: GCAL_TIMEZONE },
             },
           })
-          google_event_id  = gEvent.id ?? null
-          gcal_sync_status = 'synced'
-        } else {
-          gcal_sync_status = 'synced'
-        }
+        )
+        // creado === null → el médico no tiene Google conectado: nada que sincronizar.
+        google_event_id  = creado?.data.id ?? null
+        gcal_sync_status = 'synced'
       } catch (gcalErr) {
         console.error('[GCal] Error de sincronización en background')
         gcal_sync_status = 'failed'
