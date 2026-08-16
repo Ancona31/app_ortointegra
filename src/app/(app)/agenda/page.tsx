@@ -1093,7 +1093,7 @@ const GoogleEventCard = memo(function GoogleEventCard({
    fila: marcador (punto por estado o "G" de Google) + hora (700) + nombre
    (ellipsis). Sin border/sombra/fondo de tarjeta. */
 const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg }) {
-  const ext = arg.event.extendedProps as (Appointment & { doctorInitial?: string }) & { isGcalBlock?: boolean; isGcalBusy?: boolean }
+  const ext = arg.event.extendedProps as Appointment & { isGcalBlock?: boolean; isGcalBusy?: boolean }
   const isGcal = !!ext?.isGcalBlock
   // Evento del calendario de Spinus sin cita ligada: ni cita normal ni bloque
   // anónimo. Mismo criterio que GoogleEventCard en Semana/Día.
@@ -1136,10 +1136,13 @@ const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg }) {
   )
 })
 
-function renderEventContent(arg: EventContentArg, navegadorTZ: string) {
+/** Resuelve las iniciales del chip de médico de una cita ya pintada. */
+type InicialesDeCita = (ext: Appointment) => string | undefined
+
+function renderEventContent(arg: EventContentArg, navegadorTZ: string, inicialesDeCita: InicialesDeCita) {
   // Vista Mes: chip plano dedicado. El camino de Semana/Día (abajo) queda intacto.
   if (arg.view.type === 'dayGridMonth') return <MonthChip arg={arg} />
-  const ext = arg.event.extendedProps as (Appointment & { doctorInitial?: string }) & { isGcalBlock?: boolean; isGcalBusy?: boolean }
+  const ext = arg.event.extendedProps as Appointment & { isGcalBlock?: boolean; isGcalBusy?: boolean }
   if (ext?.isGcalBlock) {
     return <GoogleEventCard timeText={arg.timeText} title={arg.event.title} busy={!!ext.isGcalBusy} />
   }
@@ -1171,7 +1174,7 @@ function renderEventContent(arg: EventContentArg, navegadorTZ: string) {
       title={ext.title}
       pacNombre={pac ? `${pac.nombre} ${pac.apellidos}` : null}
       status={ext.status}
-      doctorInitial={ext.doctorInitial}
+      doctorInitial={inicialesDeCita(ext)}
       tzDiff={tzDiff}
     />
   )
@@ -1223,9 +1226,24 @@ export default function AgendaPage() {
     []
   )
 
+  /* Iniciales del chip de médico. Se calculan AL PINTAR, no al traer las citas.
+     Al montar, `medicos` viene vacío, así que `isSingleDoctor` vale true y el
+     event source no tenía con qué calcularlas; eso se corregía con un
+     `refetchEvents()` en cuanto llegaban los médicos — una segunda vuelta
+     entera a /api/appointments y /api/google/events por dos letras. Calculado
+     aquí, el chip aparece solo en el siguiente render y la red no se toca. */
+  const inicialesDeCita = useCallback<InicialesDeCita>((ext) => {
+    if (isSingleDoctor || !ext.medico_id) return undefined
+    // La lista manda sobre el join de la cita: al reasignar médico, el
+    // `medico` de extendedProps sigue siendo el anterior hasta que responde
+    // el servidor. La cita optimista tampoco trae join, solo `medico_id`.
+    const m = medicos.find(x => x.id === ext.medico_id) ?? ext.medico
+    return m ? componerInicialesMedico(m) : undefined
+  }, [isSingleDoctor, medicos])
+
   const renderEC = useCallback(
-    (arg: EventContentArg) => renderEventContent(arg, navegadorTZ),
-    [navegadorTZ]
+    (arg: EventContentArg) => renderEventContent(arg, navegadorTZ, inicialesDeCita),
+    [navegadorTZ, inicialesDeCita]
   )
 
   useEffect(() => {
@@ -1276,17 +1294,6 @@ export default function AgendaPage() {
     refetch()
   }, [filtroMedico])
 
-  // F3-6 fix: refetch al cargar médicos para que el chip se calcule con
-  // isSingleDoctor correcto. En el primer render medicos=[] → isSingleDoctor=true,
-  // el closure de appointmentSource captura ese valor y no calcula doctorInitial.
-  // Cuando médicos cargan, este efecto fuerza un refetch que reevalúa con el
-  // closure nuevo (isSingleDoctor=false en clínicas multi-médico).
-  const firstRenderMedicosRef = useRef(true)
-  useEffect(() => {
-    if (firstRenderMedicosRef.current) { firstRenderMedicosRef.current = false; return }
-    refetch()
-  }, [isSingleDoctor])
-
   /* ── Supabase Realtime — debounced (max 1 refetch/sec) ── */
   const realtimeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
@@ -1322,13 +1329,9 @@ export default function AgendaPage() {
       const apts: Appointment[] = data.appointments ?? []
 
       success(apts.map(apt => {
-        // Color = ESTADO (siempre). El médico solo se identifica por el chip.
+        // Color = ESTADO (siempre). El médico solo se identifica por el chip,
+        // que se calcula al pintar (ver `inicialesDeCita`), no aquí.
         const colorStyle = STATUS_STYLE[apt.status] ?? STATUS_STYLE.scheduled
-        let doctorInitial: string | undefined
-        if (!isSingleDoctor && apt.medico_id) {
-          const m = apt.medico
-          if (m) doctorInitial = componerInicialesMedico(m)
-        }
 
         return {
           id:              apt.id,
@@ -1338,13 +1341,13 @@ export default function AgendaPage() {
           backgroundColor: 'transparent',
           borderColor:     'transparent',
           textColor:       colorStyle.text,
-          extendedProps:   { ...apt, colorStyle, doctorInitial },
+          extendedProps:   { ...apt, colorStyle },
         }
       }))
     } catch (err: unknown) {
       failure(err instanceof Error ? err : new Error('Error cargando citas'))
     }
-  }, [isSingleDoctor, filtroMedico])
+  }, [filtroMedico])
 
   /* ── Event source: Google Calendar ─────────────────────
    * Dos cosas distintas en una sola petición:
@@ -1439,13 +1442,9 @@ export default function AgendaPage() {
   /* ── Helper: construir EventInput desde datos de cita ── */
   function buildEventInput(data: Partial<Appointment> & { id?: string }): EventInput {
     const status = data.status ?? 'scheduled'
-    // Color = ESTADO (siempre). El médico solo se identifica por el chip.
+    // Color = ESTADO (siempre). El médico solo se identifica por el chip,
+    // que se calcula al pintar (ver `inicialesDeCita`), no aquí.
     const colorStyle: EventColor = STATUS_STYLE[status] ?? STATUS_STYLE.scheduled
-    let doctorInitial: string | undefined
-    if (!isSingleDoctor && data.medico_id) {
-      const m = medicos.find(m => m.id === data.medico_id)
-      if (m) doctorInitial = componerInicialesMedico(m)
-    }
 
     return {
       id:              data.id ?? `${PREFIJO_OPTIMISTA}${Date.now()}`,
@@ -1455,7 +1454,7 @@ export default function AgendaPage() {
       backgroundColor: 'transparent',
       borderColor:     'transparent',
       textColor:       colorStyle.text,
-      extendedProps:   { ...data, colorStyle, doctorInitial },
+      extendedProps:   { ...data, colorStyle },
     }
   }
 
@@ -1608,7 +1607,7 @@ export default function AgendaPage() {
           existing.setExtendedProp('notes', data.notes ?? existing.extendedProps.notes)
           existing.setExtendedProp('pacientes', data.pacientes ?? null)
           // F3-6 fix Bug 1: actualizar también médico y consultorio_id (optimistic).
-          existing.setExtendedProp('doctorInitial', ev.extendedProps?.doctorInitial)
+          // El chip de iniciales sale de `medico_id` al pintar, así que basta con esto.
           existing.setExtendedProp('medico_id', data.medico_id ?? null)
           existing.setExtendedProp('consultorio_id', data.consultorio_id ?? existing.extendedProps.consultorio_id)
         }
