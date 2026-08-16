@@ -252,6 +252,13 @@ Quedan en el repo unas pocas ramas anteriores a esta regla que no la siguen
 `dicom-viewer` y `multiconsultorio`). Son historia, no precedente: no se
 renombran, pero tampoco se imitan.
 
+### Integración de ramas — no se usan pull requests
+
+Las ramas se integran con `git merge` sobre `main` desde local (fast-forward)
+y se empujan con `git push`. **Nada de `gh pr create` ni de flujos de PR:** no
+propongas abrir un PR, no lo ofrezcas como paso siguiente y no lo ejecutes.
+Cuando una rama esté lista, lo que sigue es el merge local.
+
 ---
 
 ## 🖥️ Landing pública — reglas permanentes
