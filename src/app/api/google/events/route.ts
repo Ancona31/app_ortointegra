@@ -117,9 +117,26 @@ export async function GET(req: NextRequest) {
     // Dos fuentes, en paralelo dentro de la misma sesión de Google:
     //   1. El calendario propio de Spinus, con detalle completo.
     //   2. La disponibilidad del calendario personal, sin detalle alguno.
-    const respuesta = await conCalendarioSpinus(supabase, user.id, async (calendar, calendarId) => {
+    //
+    // La segunda va MEMOIZADA y fuera del cuerpo que se reintenta. Si el
+    // calendario de Spinus da 404, `conCalendarioSpinus` lo recrea y vuelve a
+    // correr la operación entera; pero `freebusy` consulta `primary`, que no
+    // tiene nada que ver con el calendario caído y que ya respondió bien.
+    // Guardando la promesa, el reintento repite sólo `events.list`, que es lo
+    // único que depende del calendario recreado.
+    //
+    // Se guarda la promesa y no su resultado a propósito: así las dos siguen
+    // saliendo en paralelo en la primera pasada. `consultarOcupado` nunca
+    // rechaza —tiene su propio catch y degrada a lista vacía—, así que dejarla
+    // sin await en el camino de error no deja ningún rechazo suelto.
+    let ocupadoPromesa: Promise<BloqueOcupado[]> | null = null
+
+    const eventos = await conCalendarioSpinus(supabase, user.id, async (calendar, calendarId) => {
       calendarIdUsado = calendarId
-      const [lista, ocupado] = await Promise.all([
+      // El reintento trae el mismo cliente de Google (misma sesión), así que
+      // la promesa de la primera pasada sigue valiendo tal cual.
+      ocupadoPromesa ??= consultarOcupado(calendar, timeMin, timeMax, user.id)
+      const [lista] = await Promise.all([
         calendar.events.list({
           calendarId,
           timeMin,
@@ -128,13 +145,14 @@ export async function GET(req: NextRequest) {
           orderBy: 'startTime',
           maxResults: 100,
         }),
-        consultarOcupado(calendar, timeMin, timeMax, user.id),
+        ocupadoPromesa,
       ])
-      return { eventos: lista.data.items ?? [], ocupado }
+      return lista.data.items ?? []
     })
     // null = no hay sesión de Google (sin token) o no se pudo resolver el
     // calendario (Google falló al crearlo). Sólo lo segundo es un fallo.
-    if (!respuesta) {
+    // Comparación explícita: una lista vacía de eventos SÍ es una respuesta.
+    if (eventos === null) {
       return NextResponse.json({ estado: await estadoDeFallo(supabase, userId) })
     }
 
@@ -153,8 +171,10 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       estado:  'conectado' satisfies EstadoGoogle,
-      events:  respuesta.eventos.filter((e) => !e.id || !yaSonCitas.has(e.id)),
-      ocupado: respuesta.ocupado,
+      events:  eventos.filter((e) => !e.id || !yaSonCitas.has(e.id)),
+      // No nula por construcción —el cuerpo de arriba corrió—, pero el
+      // fallback evita depender de eso para el compilador.
+      ocupado: ocupadoPromesa ? await ocupadoPromesa : [],
     })
   } catch (err) {
     registrarFalloGCal(
