@@ -282,6 +282,10 @@ const FUENTE_APPOINTMENTS = 'appointments'
 /** Prefijo del id temporal que lleva una cita aun no confirmada por el servidor. */
 const PREFIJO_OPTIMISTA = 'optimistic-'
 
+/* Antigüedad a partir de la cual volver a la pestaña sí pide datos otra vez.
+   Ver el efecto de `visibilitychange`, que es quien lo justifica. */
+const UMBRAL_REFETCH_FOCO_MS = 120_000
+
 function calcDuration(startIso: string, endIso: string) {
   return Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 60000)
 }
@@ -1309,6 +1313,20 @@ export default function AgendaPage() {
     calendarRef.current?.getApi().refetchEvents()
   }
 
+  /* Cuándo se pidieron las citas al servidor por última vez. La estampa
+     `appointmentSource`, que es por donde pasan TODAS las traídas: el montaje,
+     el cambio de semana, el cambio de filtro, el refetch de reconexión y el de
+     foco. Una sola marca para todos los caminos, que es lo que evita tener dos
+     guardas de tiempo que se contradigan: la reconexión no consulta el umbral
+     —una caída del socket es prueba de que hubo hueco y ahí siempre se trae—
+     pero sí actualiza la marca, así que volver a la pestaña justo después de
+     reconectar ya no vuelve a pedir nada.
+
+     Se estampa al SALIR la petición, no al volver: dos señales seguidas
+     (`visibilitychange` y `focus` llegan juntas al restaurar una ventana
+     minimizada) dispararían si no dos peticiones idénticas. */
+  const ultimaTraidaRef = useRef(0)
+
   /* ── Refetch al cambiar el filtro de médico ─────────────
      Se dispara DESPUÉS del commit del estado (no en el onChange síncrono),
      cuando appointmentSourceRef.current ya apunta al appointmentSource
@@ -1328,6 +1346,7 @@ export default function AgendaPage() {
     failure: (err: Error) => void
   ) => {
     try {
+      ultimaTraidaRef.current = Date.now()
       let url = `/api/appointments?from=${info.startStr}&to=${info.endStr}`
       if (filtroMedico) url += `&medico_id=${filtroMedico}`
       const res = await fetch(url)
@@ -1693,6 +1712,55 @@ export default function AgendaPage() {
       })
 
     return () => { supabase.removeChannel(channel) }
+  }, [])
+
+  /* ── Refetch al recuperar el foco la pestaña ────────────
+   *
+   * Cierra el hueco que el canal NO puede cubrir, el que está descrito arriba
+   * como "límite conocido": cuando a un médico invitado le reasignan una cita
+   * a otro médico, `appointments_select` deja de dejarle leer esa fila, y la
+   * comprobación de Realtime corre sobre la fila YA reasignada, así que da
+   * false y el UPDATE no se le entrega. No es un evento perdido, es un
+   * no-evento: no hay nada que escuchar. Su tarjeta se queda pintada como si
+   * la cita siguiera siendo suya, y nada en el canal lo va a desmentir nunca.
+   *
+   * ACOTADO A PROPÓSITO — volver de otra ventana NO es motivo para pedir
+   * datos. Con la pestaña en segundo plano el websocket sigue abierto y los
+   * eventos siguen llegando y aplicándose, así que una ausencia corta no
+   * pierde nada. Y si el socket sí se cayó, el latido lo detecta en cosa de un
+   * minuto (30 s de intervalo, y la conexión se descarta cuando el siguiente
+   * sale sin respuesta del anterior) y el refetch de reconexión de arriba ya
+   * trae el rango entero.
+   *
+   * De ahí el umbral de 2 minutos: el doble de esa ventana de detección. Por
+   * debajo, o no se perdió nada, o lo cubre la reconexión, y disparar aquí
+   * sería repetir trabajo que otro camino ya hizo — que es justo lo que la
+   * agenda viene evitando. Por encima, lo único que queda por recuperar es el
+   * no-evento de arriba, que lleva obsoleto un rato indeterminado y no tiene
+   * ninguna prisa de segundos.
+   *
+   * Los dos escuchas son dos señales del sistema operativo para lo mismo, no
+   * dos mecanismos: `visibilitychange` cubre el cambio de pestaña y minimizar;
+   * `focus` cubre irse a otra aplicación con la ventana a la vista, donde la
+   * pestaña nunca deja de estar "visible". Pasan por la misma guarda y por el
+   * mismo `refetch`, y la marca se estampa al salir la petición, así que
+   * cuando llegan juntos sólo uno pide.
+   *
+   * El efecto no lleva dependencias: `refetch` y la guarda sólo leen refs, así
+   * que la clausura no se queda vieja. Mismo criterio que el efecto del canal.
+   */
+  useEffect(() => {
+    function alVolverAlFrente() {
+      if (document.visibilityState !== 'visible') return
+      if (Date.now() - ultimaTraidaRef.current < UMBRAL_REFETCH_FOCO_MS) return
+      refetch()
+    }
+    document.addEventListener('visibilitychange', alVolverAlFrente)
+    window.addEventListener('focus', alVolverAlFrente)
+    return () => {
+      document.removeEventListener('visibilitychange', alVolverAlFrente)
+      window.removeEventListener('focus', alVolverAlFrente)
+    }
   }, [])
 
   /* ── Handlers ────────────────────────────────────────── */
