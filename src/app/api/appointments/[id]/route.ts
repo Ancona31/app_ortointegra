@@ -2,7 +2,7 @@ import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { conCalendarioSpinus, GCAL_TIMEZONE } from '@/lib/gcal'
-import { APPOINTMENT_SELECT, tituloParaGoogle, type PacienteEnCita } from '@/lib/appointments'
+import { APPOINTMENT_SELECT, eventoParaGoogle, type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
 
 /* ── PUT /api/appointments/[id] ─────────────────────────── */
 export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments/[id]'>) {
@@ -185,7 +185,10 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     // Google Calendar sync en background — necesita admin porque after() no tiene contexto de cookies
-    const gcalFieldChanged = title !== undefined || start_time !== undefined || end_time !== undefined || notes !== undefined || status !== undefined
+    // `paciente_id` entra en la lista porque el título del evento se deriva del
+    // paciente: ligar o desligar uno cambia lo que Google debe mostrar aunque
+    // no se toque ningún otro campo.
+    const gcalFieldChanged = title !== undefined || start_time !== undefined || end_time !== undefined || notes !== undefined || status !== undefined || paciente_id !== undefined
     if (existing.google_event_id && gcalFieldChanged) {
       const gcalEventId = existing.google_event_id
       const userId = user.id
@@ -193,6 +196,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       // El titulo del evento sale del paciente ligado; si la cita no tiene
       // paciente, del titulo libre de la cita.
       const pacienteCita: PacienteEnCita = apt.pacientes ?? null
+      const clinicaCita:  ClinicaEnCita  = apt.clinicas  ?? null
       after(async () => {
         const STATUS_COLOR: Record<string, string | undefined> = {
           confirmed: '2',
@@ -201,14 +205,24 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
           completed: '8',
         }
         let gcal_sync_status: 'synced' | 'pending' | 'failed' = 'pending'
+        // Título y descripción se recalculan y se reenvían SIEMPRE que la
+        // operación toque Google, no sólo cuando venga `title` en el cuerpo:
+        // ambos se derivan del paciente, así que ligar uno a una cita ya
+        // existente dejaría el evento con el nombre viejo. El fallback sale de
+        // `apt.title` (la fila ya actualizada), no del `title` del cuerpo, que
+        // puede no venir.
+        // La descripción lleva un formato fijo (clínica y paciente) y NADA
+        // clínico: ni notes, ni motivo de consulta, ni diagnóstico.
+        // `reminders` NO se manda aquí a propósito: es del insert.
+        const { summary, description } = eventoParaGoogle(pacienteCita, clinicaCita, apt.title)
         try {
           await conCalendarioSpinus(supabase, userId, (calendar, calendarId) =>
             calendar.events.patch({
               calendarId,
               eventId:    gcalEventId,
               requestBody: {
-                ...(title      !== undefined ? { summary: tituloParaGoogle(pacienteCita, title) }         : {}),
-                // NO enviar notes/descripción a Google — puede contener datos clínicos
+                summary,
+                description,
                 ...(start_time !== undefined ? { start: { dateTime: start_time, timeZone: GCAL_TIMEZONE } } : {}),
                 ...(end_time   !== undefined ? { end:   { dateTime: end_time,   timeZone: GCAL_TIMEZONE } } : {}),
                 ...(status     !== undefined && STATUS_COLOR[status] ? { colorId: STATUS_COLOR[status] }    : {}),

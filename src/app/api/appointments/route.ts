@@ -2,7 +2,7 @@ import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { conCalendarioSpinus, GCAL_TIMEZONE } from '@/lib/gcal'
-import { APPOINTMENT_SELECT, tituloParaGoogle, type PacienteEnCita } from '@/lib/appointments'
+import { APPOINTMENT_SELECT, eventoParaGoogle, type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
 
 async function getProfile(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -203,17 +203,24 @@ export async function POST(req: NextRequest) {
     // El titulo del evento sale del paciente ligado; si la cita no tiene
     // paciente, del titulo libre de la cita.
     const pacienteCita: PacienteEnCita = apt.pacientes ?? null
+    const clinicaCita:  ClinicaEnCita  = apt.clinicas  ?? null
     after(async () => {
       let gcal_sync_status: 'synced' | 'pending' | 'failed' = 'pending'
       let google_event_id: string | null = null
 
       try {
+        // La descripción lleva un formato fijo (clínica y paciente) y NADA
+        // clínico: ni notes, ni motivo de consulta, ni diagnóstico.
+        const { summary, description, reminders } = eventoParaGoogle(pacienteCita, clinicaCita, title)
         const creado = await conCalendarioSpinus(admin, profile.userId, (calendar, calendarId) =>
           calendar.events.insert({
             calendarId,
             requestBody: {
-              summary: tituloParaGoogle(pacienteCita, title),
-              // NO enviar notes/descripción a Google — puede contener datos clínicos
+              summary,
+              description,
+              // Sólo al crear: si el médico le cambia el recordatorio a mano en
+              // Google, ninguna edición posterior desde Spinus se lo reimpone.
+              reminders,
               start: { dateTime: start_time, timeZone: GCAL_TIMEZONE },
               end:   { dateTime: end_time,   timeZone: GCAL_TIMEZONE },
             },

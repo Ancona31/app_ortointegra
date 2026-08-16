@@ -3,23 +3,85 @@
  * GET, POST y PUT deben devolver exactamente esta forma: el cliente
  * re-hidrata su estado desde la respuesta, asi que cualquier campo que
  * falte aqui se queda obsoleto en la UI hasta que el usuario recargue.
+ *
+ * `clinicas` viaja aqui para que las rutas puedan armar la descripcion del
+ * evento de Google sin un round trip extra.
  */
 export const APPOINTMENT_SELECT =
-  '*, pacientes(id, nombre, apellidos, telefono), medico:profiles!appointments_medico_id_fkey(id, titulo, nombres, apellido_paterno, apellido_materno)'
+  '*, pacientes(id, nombre, apellidos, telefono), clinicas(nombre, nombre_display), medico:profiles!appointments_medico_id_fkey(id, titulo, nombres, apellido_paterno, apellido_materno)'
 
 /** El paciente tal como llega dentro de una cita de `APPOINTMENT_SELECT`. */
 export type PacienteEnCita = { nombre: string; apellidos: string } | null
 
+/** La clinica tal como llega dentro de una cita de `APPOINTMENT_SELECT`. */
+export type ClinicaEnCita = { nombre: string; nombre_display: string | null } | null
+
+/**
+ * Minutos antes de la cita en que Google avisa al medico.
+ *
+ * Constante y no numero suelto porque tarde o temprano sera configurable por
+ * clinica. Solo se aplica al crear el evento: si el medico cambia o quita el
+ * recordatorio a mano en Google, ninguna edicion posterior desde Spinus se lo
+ * vuelve a imponer.
+ */
+export const GCAL_RECORDATORIO_MINUTOS = 60
+
 /**
  * Titulo del evento en el calendario propio de Spinus.
  *
- * PRIVACIDAD — el calendario es de la app, no el `primary` del medico, y el
- * aviso de privacidad declara que Google recibe nombre del paciente y horario.
- * Lo que NO sale: diagnostico, motivo de consulta, notas ni nada clinico.
+ * El prefijo "Cita medica:" NO es decorativo. Google agrega por su cuenta una
+ * ilustracion de cabecera al evento cuando reconoce ciertas palabras clave en
+ * el titulo, y esa es la que la dispara: no hay campo en la API para pedir la
+ * imagen, el recurso Events no tiene portada. El texto es la unica palanca.
+ * No cambiar sin avisar.
+ *
+ * Una sola linea: Google trunca el `summary` en la cuadricula del calendario.
+ *
+ * Sin paciente ligado el titulo cae al texto libre de la cita, tal cual y sin
+ * prefijo — ahi no hay nada que anunciar como cita medica.
  */
-export function tituloParaGoogle(
-  p: { nombre: string; apellidos: string } | null,
-  fallback: string,
-): string {
-  return p ? `${p.nombre} ${p.apellidos}` : fallback
+function tituloParaGoogle(paciente: PacienteEnCita, fallback: string): string {
+  return paciente ? `Cita médica: ${paciente.nombre} ${paciente.apellidos}` : fallback
+}
+
+/** Nombre de la clinica de cara a Google. `nombre_display` es nullable; `nombre` no. */
+function nombreClinica(clinica: ClinicaEnCita): string {
+  return clinica ? (clinica.nombre_display?.trim() || clinica.nombre) : ''
+}
+
+/**
+ * Lo que Spinus escribe en el evento de Google. Punto unico: si el formato se
+ * duplicara entre el POST y el PUT, el evento cambiaria de forma segun por
+ * donde pasara la ultima edicion.
+ *
+ * PRIVACIDAD — la descripcion tiene formato fijo y solo lleva nombre de
+ * clinica y nombre de paciente. NADA clinico: ni `notes`, ni motivo de
+ * consulta, ni diagnostico, ni el estado de la cita. El aviso de privacidad
+ * declara exactamente esto.
+ *
+ * `reminders` se devuelve siempre pero solo el `events.insert` debe mandarlo
+ * (ver GCAL_RECORDATORIO_MINUTOS).
+ */
+export function eventoParaGoogle(
+  paciente: PacienteEnCita,
+  clinica: ClinicaEnCita,
+  fallbackTitulo: string,
+): {
+  summary: string
+  description: string
+  reminders: { useDefault: false; overrides: Array<{ method: 'popup'; minutes: number }> }
+} {
+  const clinicaNombre = nombreClinica(clinica)
+  const renglones = paciente
+    ? [clinicaNombre, 'Consulta:', `${paciente.nombre} ${paciente.apellidos}`]
+    : [clinicaNombre]
+
+  return {
+    summary:     tituloParaGoogle(paciente, fallbackTitulo),
+    description: renglones.filter(Boolean).join('\n'),
+    reminders: {
+      useDefault: false,
+      overrides:  [{ method: 'popup', minutes: GCAL_RECORDATORIO_MINUTOS }],
+    },
+  }
 }
