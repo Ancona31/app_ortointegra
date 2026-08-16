@@ -250,6 +250,9 @@ const DEFAULT_DURATION = 60
 /** Id de la eventSource de citas; ver `eventSourcesStable`. */
 const FUENTE_APPOINTMENTS = 'appointments'
 
+/** Prefijo del id temporal que lleva una cita aun no confirmada por el servidor. */
+const PREFIJO_OPTIMISTA = 'optimistic-'
+
 function calcDuration(startIso: string, endIso: string) {
   return Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 60000)
 }
@@ -1384,7 +1387,7 @@ export default function AgendaPage() {
     }
 
     return {
-      id:              data.id ?? `optimistic-${Date.now()}`,
+      id:              data.id ?? `${PREFIJO_OPTIMISTA}${Date.now()}`,
       title:           data.title ?? '',
       start:           data.start_time,
       end:             data.end_time,
@@ -1476,6 +1479,11 @@ export default function AgendaPage() {
   }
 
   async function ejecutarDrop(id: string, start_time: string, end_time: string | undefined, arg: EventDropArg | EventResizeDoneArg) {
+    // Guarda: un id temporal no existe en la base, el PUT devolveria un error
+    // sin sentido. El evento optimista ya nace con `editable: false`, asi que
+    // esto solo cubre cualquier camino futuro que se nos escape.
+    if (id.startsWith(PREFIJO_OPTIMISTA)) { arg.revert(); return }
+
     const res = await fetch(`/api/appointments/${id}`, {
       method:  'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -1544,8 +1552,10 @@ export default function AgendaPage() {
           existing.setExtendedProp('consultorio_id', data.consultorio_id ?? existing.extendedProps.consultorio_id)
         }
       } else {
-        // Crear evento optimista temporal
-        optimisticEvent = api.addEvent(buildEventInput(data), FUENTE_APPOINTMENTS)
+        // Crear evento optimista temporal. `editable: false` cubre arrastre y
+        // redimension a la vez: una cita que todavia no existe en la base no
+        // tiene id que mandarle al servidor, solo el temporal.
+        optimisticEvent = api.addEvent({ ...buildEventInput(data), editable: false }, FUENTE_APPOINTMENTS)
       }
     }
 
@@ -1571,9 +1581,16 @@ export default function AgendaPage() {
     }
 
     if (!isEdit && optimisticEvent && json.appointment?.id) {
-      // Reemplazar evento optimista con el real (que tiene ID de DB)
+      // Reemplazar evento optimista con el real (que tiene ID de DB). Si un
+      // refetch corrio durante el POST, la cita ya llego del servidor: hay que
+      // re-hidratarla, no agregarla de nuevo — serian dos con el mismo id.
       optimisticEvent.remove()
-      api?.addEvent(buildEventInput({ ...data, ...json.appointment }), FUENTE_APPOINTMENTS)
+      const yaPresente = api?.getEventById(json.appointment.id)
+      if (yaPresente) {
+        aplicarAppointmentAlEvento(json.appointment)
+      } else {
+        api?.addEvent(buildEventInput({ ...data, ...json.appointment }), FUENTE_APPOINTMENTS)
+      }
     }
 
     if (!isEdit && json.gcalSynced === false) {
