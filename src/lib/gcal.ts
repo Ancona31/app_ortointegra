@@ -14,6 +14,7 @@
 import { google, type calendar_v3 } from 'googleapis'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { decrypt, encrypt } from '@/lib/encrypt'
+import { logger } from '@/lib/logger'
 import { componerNombreMedicoCompleto, type CamposNombre } from '@/lib/nombreMedico'
 
 export const GCAL_TIMEZONE = 'America/Mexico_City'
@@ -180,11 +181,25 @@ export async function getGCalClient(
  * Crea el calendario de Spinus del médico y persiste su id en `google_tokens`.
  * Se llama desde el callback de OAuth y, si allí falló, desde el helper en la
  * primera operación. Devuelve null si Google no devolvió id.
+ *
+ * `esperado` es el valor que `calendar_id` debe tener AHORA para aceptar el
+ * cambio, y no es opcional de verdad: pasar el que no toca cuesta un
+ * calendario huérfano o uno muerto adoptado como bueno.
+ *
+ *   null            se está creando el primero, la columna está vacía.
+ *   <id existente>  se está reemplazando ese id concreto porque Google
+ *                   contestó 404 sobre él. Con `null` aquí, el
+ *                   comparar-y-cambiar no prendería, se tiraría el calendario
+ *                   nuevo y se devolvería el id MUERTO como si valiera.
+ *
+ * Si el cambio no prende porque otra petición ganó la carrera, devuelve el
+ * calendario de esa otra petición: sirve igual y evita duplicados.
  */
 export async function crearCalendarioSpinus(
   supabase: SupabaseClient,
   userId: string,
   calendar: GCalCliente,
+  esperado: string | null = null,
 ): Promise<string | null> {
   const { data: perfil } = await supabase
     .from('profiles')
@@ -212,39 +227,71 @@ export async function crearCalendarioSpinus(
   const calendarId = cal?.id ?? null
   if (!calendarId) return null
 
-  // `.select()` para distinguir "se guardó" de "no se tocó ningún renglón":
-  // un UPDATE que la RLS filtra, o sobre un user_id que ya no tiene fila,
-  // responde sin error y con cero renglones. Sin esto, el fallo es mudo.
-  const { data: guardado, error } = await supabase
+  // COMPARAR-Y-CAMBIAR. El UPDATE sólo prende si `calendar_id` sigue valiendo
+  // lo que valía cuando se decidió crear. Dos peticiones en paralelo —la
+  // agenda dispara dos— llegan aquí con el mismo `esperado` y cada una crea su
+  // calendario, pero sólo una lo persiste; la otra se entera por los cero
+  // renglones, borra el suyo y adopta el del ganador. Sin esto ganaba la
+  // última en escribir y las demás quedaban de basura invisible en la cuenta
+  // del médico.
+  //
+  // `.select()` es lo que permite enterarse: sin él PostgREST responde éxito
+  // sin decir cuántos renglones tocó. Cubre además el UPDATE que la RLS filtra
+  // o sobre un user_id que ya no tiene fila.
+  const cambio = supabase
     .from('google_tokens')
     .update({ calendar_id: calendarId })
     .eq('user_id', userId)
-    .select('user_id')
-    .maybeSingle()
+  const { data: guardado, error } = await (
+    esperado === null
+      ? cambio.is('calendar_id', null)
+      : cambio.eq('calendar_id', esperado)
+  ).select('calendar_id').maybeSingle()
 
-  if (error || !guardado) {
-    // Un calendario creado que nadie registró es basura invisible: el médico
-    // no tiene por dónde enterarse de que existe y cada intento fallido deja
-    // otro. Se borra aquí mismo — `calendar.app.created` autoriza borrar los
-    // calendarios que la propia app creó.
+  if (!error && guardado) return calendarId
+
+  // No prendió. Sea cual sea el motivo, el calendario recién creado sobra: un
+  // calendario que nadie registró es basura invisible —el médico no tiene por
+  // dónde enterarse de que existe— y cada intento fallido deja otro. Se borra
+  // aquí mismo; `calendar.app.created` autoriza borrar lo que la app creó.
+  try {
+    await calendar.calendars.delete({ calendarId })
+  } catch (errBorrado) {
+    // Se queda huérfano de verdad. Al menos ahora hay una línea con el id
+    // exacto para poder borrarlo a mano.
     registrarFalloGCal(
-      { operacion: 'google_tokens.update(calendar_id)', userId, calendarId },
-      error ?? new Error('UPDATE sin renglones afectados'),
+      { operacion: 'calendars.delete (limpieza de huérfano)', userId, calendarId },
+      errBorrado,
     )
-    try {
-      await calendar.calendars.delete({ calendarId })
-    } catch (errBorrado) {
-      // Se queda huérfano de verdad. Al menos ahora hay una línea con el id
-      // exacto para poder borrarlo a mano.
-      registrarFalloGCal(
-        { operacion: 'calendars.delete (limpieza de huérfano)', userId, calendarId },
-        errBorrado,
-      )
-    }
-    return null
   }
 
-  return calendarId
+  // ¿Se perdió una carrera o falló el guardado de verdad? Lo dice el valor que
+  // haya ahora: si ya no es el esperado, otra petición ganó y su calendario
+  // sirve exactamente igual que el que acabamos de tirar.
+  const { data: fila } = await supabase
+    .from('google_tokens')
+    .select('calendar_id')
+    .eq('user_id', userId)
+    .maybeSingle<{ calendar_id: string | null }>()
+  const actual = fila?.calendar_id ?? null
+
+  if (actual !== null && actual !== esperado) {
+    // No es un fallo: es el mecanismo funcionando. Va como warn para que se
+    // vea en producción sin ensuciar el conteo de errores.
+    logger.warn('GCal', 'carrera de creación resuelta ' + JSON.stringify({
+      operacion:  'google_tokens.update(calendar_id) — comparar-y-cambiar no prendió',
+      userId,
+      descartado: calendarId,
+      adoptado:   actual,
+    }))
+    return actual
+  }
+
+  registrarFalloGCal(
+    { operacion: 'google_tokens.update(calendar_id)', userId, calendarId },
+    error ?? new Error('UPDATE sin renglones afectados y calendar_id sin cambiar'),
+  )
+  return null
 }
 
 /**
@@ -351,7 +398,10 @@ export async function conCalendarioSpinus<T>(
     if (await calendarioVive(calendar, calendarId, userId)) throw err
 
     await desvincularCitas(supabase, userId)
-    const recreado = await crearCalendarioSpinus(supabase, userId, calendar)
+    // `calendarId` es el que acaba de dar 404: se reemplaza ESE. Pasar null
+    // haría que el comparar-y-cambiar no prendiera y que se devolviera el id
+    // muerto, dejando el reintento condenado a fallar otra vez.
+    const recreado = await crearCalendarioSpinus(supabase, userId, calendar, calendarId)
     if (!recreado) throw err
     return await operacion(calendar, recreado)
   }

@@ -103,8 +103,12 @@ export async function GET(req: NextRequest) {
         .maybeSingle<{ calendar_id: string | null }>()
       const yaRegistrado = fila?.calendar_id ?? null
 
+      // `yaRegistrado` como valor esperado, no null: si llegamos aquí con un
+      // id no nulo es porque ese calendario ya no existe y hay que reemplazar
+      // ESE. Con null, el comparar-y-cambiar no prendería y se adoptaría el id
+      // muerto como bueno.
       if (!yaRegistrado || !(await calendarioVive(gcal, yaRegistrado, user.id))) {
-        await crearCalendarioSpinus(supabase, user.id, gcal)
+        await crearCalendarioSpinus(supabase, user.id, gcal, yaRegistrado)
       }
     } catch (err) {
       registrarFalloGCal({ operacion: 'calendars.insert (callback)', userId: user.id }, err)

@@ -164,8 +164,11 @@ export async function POST() {
       }
     }
 
-    // 4. Mismo criterio de nombre y descripción que el callback.
-    const nuevo = await crearCalendarioSpinus(supabase, user.id, calendar)
+    // 4. Mismo criterio de nombre y descripción que el callback. El valor
+    //    esperado es null porque el paso 2 acaba de dejar la columna en null;
+    //    si otra petición se coló y ya escribió un id, el comparar-y-cambiar
+    //    no prende y se adopta el suyo en vez de duplicar.
+    const nuevo = await crearCalendarioSpinus(supabase, user.id, calendar, null)
     if (!nuevo) {
       return NextResponse.json(
         { error: 'creacion_fallida', message: 'Se soltó el calendario anterior pero no se pudo crear el nuevo. Recarga la agenda y se creará solo.' },
