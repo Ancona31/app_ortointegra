@@ -253,9 +253,24 @@ export async function POST(req: NextRequest) {
       }
     })
 
+    // La escritura a Google corre en el after() de arriba, o sea DESPUÉS de
+    // responder: aquí nunca se puede decir "sincronizado". Lo que sí se puede
+    // decir es si hay con qué sincronizar, y son dos cosas muy distintas de
+    // cara al médico: 'pending' es el caso normal y no pide nada de él;
+    // 'disconnected' sí, tiene que ir a conectar Google.
+    //
+    // El `calendar_id` no entra en la cuenta a propósito: si falta,
+    // `conCalendarioSpinus` lo crea dentro del mismo after(). Sin fila en
+    // `google_tokens` no hay nada que pueda crearlo.
+    const { data: tokenGoogle } = await supabase
+      .from('google_tokens')
+      .select('user_id')
+      .eq('user_id', profile.userId)
+      .maybeSingle()
+
     return NextResponse.json({
       appointment: apt,
-      gcalSynced:  false,
+      gcalSync:    tokenGoogle ? 'pending' : 'disconnected',
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Error interno'

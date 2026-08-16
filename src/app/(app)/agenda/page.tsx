@@ -1654,8 +1654,18 @@ export default function AgendaPage() {
       }
     }
 
-    if (!isEdit && json.gcalSynced === false) {
+    // 'pending' es el caso normal —Google conectado, la escritura corre en el
+    // after() de la ruta— y no debe sonar a problema. 'disconnected' sí lo es y
+    // es lo único accionable: el médico tiene que ir a conectar Google.
+    // 'skipped' (sólo al editar) es que no había nada que sincronizar.
+    //
+    // PENDIENTE: que la sincronización falle DESPUÉS de decir "sincronizando"
+    // sigue sin verse. Para eso la agenda tendría que releer `gcal_sync_status`
+    // cuando el trabajo de fondo termina; es otra rama.
+    if (json.gcalSync === 'disconnected') {
       toast.info('Sin conexión con Google Calendar — se sincronizará pronto.')
+    } else if (json.gcalSync === 'pending') {
+      toast.info('Sincronizando con Google…')
     }
   }
 

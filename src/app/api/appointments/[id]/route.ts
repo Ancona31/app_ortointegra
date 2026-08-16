@@ -252,7 +252,22 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       })
     }
 
-    return NextResponse.json({ appointment: apt })
+    // Mismo criterio que el alta (POST /api/appointments): el after() de arriba
+    // corre después de responder, así que 'pending' es una promesa y no un
+    // hecho. 'skipped' es que no había nada que mandar —la cita nunca tuvo
+    // evento en Google, o no cambió ningún campo que Google vea—, y entonces la
+    // agenda no dice nada.
+    let gcalSync: 'pending' | 'disconnected' | 'skipped' = 'skipped'
+    if (existing.google_event_id && gcalFieldChanged) {
+      const { data: tokenGoogle } = await supabase
+        .from('google_tokens')
+        .select('user_id')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      gcalSync = tokenGoogle ? 'pending' : 'disconnected'
+    }
+
+    return NextResponse.json({ appointment: apt, gcalSync })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Error interno'
     return NextResponse.json({ error: message }, { status: 500 })
