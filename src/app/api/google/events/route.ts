@@ -4,11 +4,9 @@ import {
   conCalendarioSpinus,
   registrarFalloGCal,
   esCredencialInvalida,
-  GCAL_TIMEZONE,
   type GCalCliente,
   type EstadoGoogle,
 } from '@/lib/gcal'
-import { anonimizarTexto } from '@/lib/anonimizar'
 
 /** Un hueco ocupado del calendario personal del médico. Sin título ni detalle. */
 type BloqueOcupado = { start: string; end: string }
@@ -187,80 +185,5 @@ export async function GET(req: NextRequest) {
       estado: await estadoDeFallo(supabase, userId, err),
       error:  'Error al obtener eventos',
     })
-  }
-}
-
-export async function DELETE(req: NextRequest) {
-  let userId = 'sin-sesion'
-  let calendarIdUsado: string | null = null
-  let eventIdUsado: string | null = null
-
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    userId = user.id
-
-    const { eventId } = await req.json()
-    if (!eventId) return NextResponse.json({ error: 'eventId requerido' }, { status: 400 })
-    eventIdUsado = eventId
-
-    const borrado = await conCalendarioSpinus(supabase, user.id, (calendar, calendarId) => {
-      calendarIdUsado = calendarId
-      return calendar.events.delete({ calendarId, eventId })
-    })
-    if (borrado === null) return NextResponse.json({ error: 'Calendar no conectado' }, { status: 400 })
-
-    return NextResponse.json({ ok: true })
-  } catch (err) {
-    registrarFalloGCal(
-      { operacion: 'events.delete', userId, calendarId: calendarIdUsado, eventId: eventIdUsado },
-      err,
-    )
-    return NextResponse.json({ error: 'Error al eliminar evento' }, { status: 500 })
-  }
-}
-
-export async function POST(req: NextRequest) {
-  let userId = 'sin-sesion'
-  let calendarIdUsado: string | null = null
-
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    userId = user.id
-
-    const { titulo, descripcion, todoDia, fecha, inicio, fin, zona, emailMedico } = await req.json()
-    if (!titulo) return NextResponse.json({ error: 'Título requerido' }, { status: 400 })
-
-    const timeZone = zona ?? GCAL_TIMEZONE
-
-    const creado = await conCalendarioSpinus(supabase, user.id, (calendar, calendarId) => {
-      calendarIdUsado = calendarId
-      return calendar.events.insert({
-        calendarId,
-        sendUpdates: 'all',
-        // PRIVACIDAD — LFPDPPP: anonimizar título y descripción antes de enviar a Google.
-        // Este camino es texto libre que el médico escribe en CalendarWidget, no
-        // una cita con paciente ligado: aquí la anonimización se queda.
-        requestBody: {
-          summary: anonimizarTexto(titulo),
-          description: descripcion ? anonimizarTexto(descripcion) : undefined,
-          start: todoDia ? { date: fecha } : { dateTime: inicio, timeZone },
-          end:   todoDia ? { date: fecha } : { dateTime: fin,   timeZone },
-          ...(emailMedico ? { attendees: [{ email: emailMedico }] } : {}),
-        },
-      })
-    })
-    if (!creado) return NextResponse.json({ error: 'Calendar no conectado' }, { status: 400 })
-
-    return NextResponse.json({ ok: true, evento: creado.data })
-  } catch (err) {
-    registrarFalloGCal(
-      { operacion: 'events.insert (evento suelto)', userId, calendarId: calendarIdUsado },
-      err,
-    )
-    return NextResponse.json({ error: 'Error al crear evento' }, { status: 500 })
   }
 }

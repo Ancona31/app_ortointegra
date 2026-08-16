@@ -572,9 +572,11 @@ body {
 }
 
 /* ── Refinamientos de toolbar SOLO para la agenda (`.agenda-fc`) ──
-   Namespaced para NO afectar el CalendarWidget del dashboard, que es un
-   `.fc` sin este wrapper. Las reglas globales `.fc` de arriba quedan
-   intactas; estas son más específicas y solo aplican en la agenda. */
+   Namespaced a propósito: las reglas globales `.fc` de arriba quedan
+   intactas y estas, más específicas, solo aplican dentro del wrapper.
+   La separación nació por el calendario del dashboard, que ya no existe;
+   se queda igual porque es lo que permite montar otro `.fc` sin heredar
+   este toolbar. */
 .agenda-fc .fc-toolbar {
   padding: 14px 18px;
 }
@@ -995,8 +997,8 @@ html.dark {
 /* ── PARTE B — FullCalendar: vars nativas --fc-* en dark. Se definen en el
    ROOT .fc (no en el wrapper .agenda-fc): el bloque .fc{} (líneas ~212-216)
    re-declara estas vars en el propio root, así que ponerlas en el wrapper
-   queda SOMBREADO. Sigue NAMESPACED (.agenda-fc .fc) → no toca el
-   CalendarWidget del dashboard (.fc sin wrapper .agenda-fc). */
+   queda SOMBREADO. Sigue NAMESPACED (.agenda-fc .fc) → sólo aplica dentro
+   de la agenda, nunca a un `.fc` suelto. */
 html.dark .agenda-fc .fc {
   --fc-border-color: rgba(255, 255, 255, .07);
   --fc-today-bg-color: rgba(47, 111, 237, .10);

@@ -7,9 +7,13 @@
  * — si se reparte por las rutas, el día que un médico borre el calendario
  * desde Google cada ruta se romperá a su manera.
  *
- * PRIVACIDAD — nada clínico sale hacia Google. A este módulo sólo llegan
- * títulos y horarios; notas, motivo de consulta y diagnóstico se quedan en
- * Spinus (ver el comentario "NO enviar notes/descripción" en las rutas).
+ * PRIVACIDAD — nada clínico sale hacia Google, y desde que murió el POST de
+ * texto libre de `/api/google/events` ya no queda por dónde: lo único que se
+ * escribe son las citas, y su título y descripción los compone
+ * `eventoParaGoogle` (src/lib/appointments.ts) con un formato fijo de nombre
+ * de clínica y nombre de paciente. Ni `notes`, ni motivo de consulta, ni
+ * diagnóstico. Si alguna vez vuelve a haber un camino de texto libre, vuelve
+ * a hacer falta anonimizarlo antes de mandarlo.
  */
 import { google, type calendar_v3 } from 'googleapis'
 import type { SupabaseClient } from '@supabase/supabase-js'
