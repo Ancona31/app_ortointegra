@@ -11,7 +11,7 @@ import {
   TrendingUp, UserPlus,
   Calculator,
 } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useProfile, clearProfileCache } from '@/hooks/useProfile'
 import ConsultorioActivoSelector from '@/components/sidebar/ConsultorioActivoSelector'
@@ -176,6 +176,34 @@ export default function Sidebar() {
     })
   }
 
+  /* ⚠ LA CACHÉ DE CONFIGURACIÓN SE VACÍA AL DESMONTARSE ESTE SIDEBAR, NO DENTRO
+     DE `handleLogout`, Y NO ES UN CAPRICHO DE ESTILO.
+
+     `CLAVE_CONFIG` no es solo la clave de `useClinica`: desde que los cuatro
+     endpoints se consolidaron en /api/me/config es TAMBIÉN la de
+     `useConsultorios`. Vaciarla dentro del handler la vaciaba mientras el árbol
+     de (app) seguía montado —`router.push` no desmonta nada de forma síncrona—,
+     y `PrimerConsultorioModal` cuelga de `ConsultorioActivoProvider`
+     ((app)/layout.tsx:54), o sea que estaba en pantalla justo en ese instante.
+     `internalMutate` de SWR fija `data` y limpia `error`, pero NUNCA toca
+     `isLoading`: el hook quedaba en `consultorios: []` con `isLoading: false`
+     —un «no tienes ninguno» falso y estable, no un destello— y el modal de
+     configuración salía en CADA cierre de sesión, sin salida por Escape.
+
+     El desmontaje ES la señal de que la navegación ya sacó al usuario del árbol:
+     cuando esta limpieza corre, el modal ya no existe. El ref evita que un
+     desmontaje ajeno al logout (StrictMode en desarrollo, por ejemplo) borre la
+     caché de una sesión viva. */
+  const cerrandoSesionRef = useRef(false)
+
+  useEffect(() => {
+    return () => {
+      if (cerrandoSesionRef.current) {
+        mutate(CLAVE_CONFIG, null, { revalidate: false })
+      }
+    }
+  }, [])
+
   async function handleLogout() {
     // NOM-024: registrar logout antes de cerrar sesión
     fetch('/api/auth/audit-login', {
@@ -187,9 +215,10 @@ export default function Sidebar() {
     // stopMirrorEngine → clearMirror → cookies sb-* → sessionStorage → SDK signOut
     await signOut()
     clearProfileCache()
-    // La clave de useClinica es ya el agregado de configuración; limpiarla
-    // borra de paso consultorios, horario y médicos de la sesión que cierra.
-    await mutate(CLAVE_CONFIG, null, { revalidate: false })
+    // Marca para el cleanup de arriba; la caché del agregado —clínica,
+    // consultorios, horario y médicos de la sesión que cierra— se vacía cuando
+    // este componente se desmonte, no ahora.
+    cerrandoSesionRef.current = true
     router.push('/login')
     router.refresh()
   }
