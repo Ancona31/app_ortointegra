@@ -28,6 +28,22 @@ interface FilaTokens {
   calendar_id:   string | null
 }
 
+/**
+ * Estado de la conexión con Google, tal como lo consumen la agenda y el perfil.
+ * Sustituye al viejo `connected: boolean`, que mentía: cualquier fallo de
+ * Google se veía en la interfaz igual que "nunca conectaste".
+ *
+ *   'conectado'    hay token, hay calendario y Google respondió.
+ *   'sin_token'    el médico nunca conectó, desconectó, o revocó el acceso
+ *                  desde su cuenta de Google. ACCIONABLE: enseñar "Conectar".
+ *   'error_google' hay token bueno y Google falló. NO accionable: ofrecer
+ *                  "Conectar" aquí empuja a una reconexión que no hace falta.
+ *
+ * Esta unión se repite a mano en los componentes cliente que la consumen
+ * (`/perfil`): importarla de aquí arrastraría `googleapis` al bundle.
+ */
+export type EstadoGoogle = 'conectado' | 'sin_token' | 'error_google'
+
 /** ¿El error de la API de Google es un 404? Distingue "no existe" de "falló". */
 export function esNotFound(err: unknown): boolean {
   if (typeof err !== 'object' || err === null) return false
@@ -36,6 +52,31 @@ export function esNotFound(err: unknown): boolean {
   if ('response' in err && typeof err.response === 'object' && err.response !== null
       && 'status' in err.response && err.response.status === 404) return true
   return false
+}
+
+/**
+ * ¿El error dice que las credenciales ya no sirven? Google contesta
+ * `invalid_grant` al refrescar cuando el médico revocó el acceso desde su
+ * cuenta o cuando el refresh token caducó.
+ *
+ * Importa separarlo de un fallo cualquiera: hay fila en `google_tokens`, pero
+ * está muerta. Cuenta como 'sin_token' y no como 'error_google', porque esto SÍ
+ * se arregla volviendo a conectar y tratarlo como fallo pasajero deja al médico
+ * esperando para siempre a que Google "se recupere".
+ */
+export function esCredencialInvalida(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null) return false
+  const e = err as Record<string, unknown>
+  const respuesta = (typeof e.response === 'object' && e.response !== null)
+    ? e.response as Record<string, unknown>
+    : null
+  const datos = (typeof respuesta?.data === 'object' && respuesta.data !== null)
+    ? respuesta.data as Record<string, unknown>
+    : null
+  if (datos?.error === 'invalid_grant') return true
+  // googleapis no siempre trae `response.data`: si reventó antes de tener
+  // respuesta, el motivo viaja sólo en el mensaje.
+  return err instanceof Error && err.message.includes('invalid_grant')
 }
 
 /** Datos mínimos para que una línea de log sirva para diagnosticar. */

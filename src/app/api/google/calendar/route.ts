@@ -17,7 +17,9 @@ import {
   desvincularCitas,
   registrarFalloGCal,
   esNotFound,
+  esCredencialInvalida,
   type GCalCliente,
+  type EstadoGoogle,
 } from '@/lib/gcal'
 
 /** El calendario registrado en `google_tokens`, sin crear nada si no hay. */
@@ -54,7 +56,11 @@ async function nombreEnGoogle(
 
 /* ── GET /api/google/calendar ───────────────────────────────
  * A qué calendario se está sincronizando. Sólo lee: a diferencia de
- * `conCalendarioSpinus`, NO crea uno si `calendar_id` viene en null. */
+ * `conCalendarioSpinus`, NO crea uno si `calendar_id` viene en null.
+ *
+ * Tenía el mismo defecto que el GET de /api/google/events: contestaba
+ * `connected: false` tanto sin token como con Google caído, y el perfil le
+ * pintaba "Conectar" a un médico que ya lo estaba. Ahora contesta `estado`. */
 export async function GET() {
   let userId = 'sin-sesion'
 
@@ -64,20 +70,27 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     userId = user.id
 
+    // null = no hay fila en `google_tokens`. Es el único camino de "sin token"
+    // que llega hasta aquí sin lanzar.
     const calendar = await getGCalClient(supabase, user.id)
-    if (!calendar) return NextResponse.json({ connected: false })
+    if (!calendar) return NextResponse.json({ estado: 'sin_token' satisfies EstadoGoogle })
 
     const calendarId = await calendarioRegistrado(supabase, user.id)
     return NextResponse.json({
-      connected:    true,
+      estado:       'conectado' satisfies EstadoGoogle,
       calendarId,
       calendarName: calendarId ? await nombreEnGoogle(calendar, calendarId, user.id) : null,
     })
   } catch (err) {
     // Aquí cae sobre todo el refresco de token de un médico que revocó el
-    // acceso desde su cuenta de Google.
+    // acceso desde su cuenta de Google: hay fila, pero está muerta y esto sí se
+    // arregla reconectando, así que va como 'sin_token'. Cualquier otro fallo
+    // (incluido no llegar a mirar el token) es 'error_google': no accionable,
+    // y ofrecer "Conectar" ahí sería el mismo engaño de antes.
     registrarFalloGCal({ operacion: 'calendars.get (estado para el perfil)', userId }, err)
-    return NextResponse.json({ connected: false })
+    return NextResponse.json({
+      estado: (esCredencialInvalida(err) ? 'sin_token' : 'error_google') satisfies EstadoGoogle,
+    })
   }
 }
 

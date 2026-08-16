@@ -55,7 +55,7 @@ export default function CalendarWidget({ conectado, setConectado }: {
     try {
       const res = await fetch(`/api/google/events?from=${fetchInfo.startStr}&to=${fetchInfo.endStr}`)
       const data = await res.json()
-      if (!data.connected) return []
+      if (data.estado !== 'conectado') return []
       return (data.events as GCalEvent[] || []).map(e => ({
         id: e.id ?? undefined,
         title: e.summary ?? 'Sin título',

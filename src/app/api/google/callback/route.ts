@@ -90,9 +90,11 @@ export async function GET(req: NextRequest) {
       // registro en ninguna parte — el mismo estropicio que este archivo
       // acaba de dejar de causar, entrando por otra puerta.
       //
-      // Y hay un camino real hasta aquí: el GET de /api/google/events responde
-      // `connected: false` cuando Google falla de forma pasajera, así que el
-      // perfil le pinta "Conectar" a un médico que ya lo está.
+      // El camino que llevaba aquí —los GET de Google respondían
+      // `connected: false` ante un fallo pasajero y el perfil le pintaba
+      // "Conectar" a un médico que ya lo estaba— quedó cerrado: ahora
+      // contestan 'error_google' y el perfil no ofrece reconectar. La guarda
+      // se queda igual: sigue habiendo reconexiones legítimas.
       //
       // `calendarioVive` contesta "vive" ante cualquier error que no sea 404,
       // que es justo lo que conviene: si no se puede comprobar, no se crea.

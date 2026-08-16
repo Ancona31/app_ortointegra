@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useProfile } from '@/hooks/useProfile'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, Save, Palette, Upload, X, CalendarDays, CheckCircle2, LogIn, LogOut, PenLine, Plus, Pencil, Trash2, Star, MapPin, RefreshCw, AlertTriangle } from 'lucide-react'
@@ -37,6 +37,16 @@ type Apariencia = {
   color_secundario: string
   logo_url: string | null
 }
+
+/**
+ * Espejo de `EstadoGoogle` en `src/lib/gcal.ts`. Se repite en vez de
+ * importarse porque ese módulo arrastra `googleapis` y esta página es cliente.
+ *
+ *   'sin_token'    accionable: enseñar "Conectar".
+ *   'error_google' NO accionable: hay token y Google falló. Enseñar "Conectar"
+ *                  aquí manda al médico a reconectar algo que no está roto.
+ */
+type EstadoGcal = 'conectado' | 'sin_token' | 'error_google'
 
 const PALETAS = [
   { nombre: 'Spinus® (defecto)', primario: '#1a3a5c', secundario: '#1e5fa8' },
@@ -78,7 +88,8 @@ export default function PerfilPage() {
   const [guardando, setGuardando] = useState(false)
   const [subiendoLogo, setSubiendoLogo] = useState(false)
   const [firmaUrl, setFirmaUrl] = useState<string | null>(null)
-  const [gcalConectado, setGcalConectado] = useState<boolean | null>(null)
+  // null = todavía verificando.
+  const [gcalEstado, setGcalEstado] = useState<EstadoGcal | null>(null)
   const [desconectandoGcal, setDesconectandoGcal] = useState(false)
   // A qué calendario de Google se está sincronizando. null = conectado pero
   // todavía sin calendario, o el médico lo borró desde Google.
@@ -200,16 +211,26 @@ export default function PerfilPage() {
     }
   }, [profile, loadingProfile, router])
 
-  useEffect(() => {
-    // `/api/google/calendar` en vez de `/api/google/events`: responde lo mismo
-    // sobre la conexión, trae además el nombre del calendario, y no arrastra
-    // el listado de eventos del mes ni la consulta de disponibilidad.
+  // `/api/google/calendar` en vez de `/api/google/events`: responde lo mismo
+  // sobre la conexión, trae además el nombre del calendario, y no arrastra
+  // el listado de eventos del mes ni la consulta de disponibilidad.
+  // No pone `gcalEstado` en null al entrar: al montar ya vale null, y hacerlo
+  // aquí sería un setState síncrono dentro del efecto. El botón de reintentar
+  // se encarga de volver al spinner por su cuenta.
+  const cargarEstadoGcal = useCallback(() => {
     fetch('/api/google/calendar').then(r => r.json())
       .then(d => {
-        setGcalConectado(d.connected ?? false)
+        // Sin `estado` reconocible, tratarlo como fallo y NO como "conecta":
+        // equivocarse hacia "conecta" es lo que se está arreglando.
+        setGcalEstado(d.estado ?? 'error_google')
         setGcalNombre(d.calendarName ?? null)
       })
-      .catch(() => setGcalConectado(false))
+      // La red del navegador tampoco es accionable por el médico.
+      .catch(() => setGcalEstado('error_google'))
+  }, [])
+
+  useEffect(() => {
+    cargarEstadoGcal()
 
     Promise.all([
       fetch('/api/me/perfil-medico').then(r => r.json()),
@@ -240,7 +261,7 @@ export default function PerfilPage() {
       }
       setLoading(false)
     })
-  }, [])
+  }, [cargarEstadoGcal])
 
   async function onSelectLogo(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -329,7 +350,7 @@ export default function PerfilPage() {
   async function desconectarGcal() {
     setDesconectandoGcal(true)
     await fetch('/api/google/disconnect', { method: 'DELETE' })
-    setGcalConectado(false)
+    setGcalEstado('sin_token')
     setGcalNombre(null)
     setDesconectandoGcal(false)
   }
@@ -654,18 +675,33 @@ export default function PerfilPage() {
                 <div>
                   <p className="text-sm font-medium text-[#1d1d1f]">Google Calendar</p>
                   <p className="text-[11px] text-[#86868b]">
-                    {gcalConectado === null
+                    {gcalEstado === null
                       ? 'Verificando...'
-                      : gcalConectado
+                      : gcalEstado === 'conectado'
                         ? 'Sincronización activa — las citas se crean automáticamente'
-                        : 'Conecta para sincronizar citas con tu calendario personal'}
+                        : gcalEstado === 'error_google'
+                          // Ojo: NO decir "no conectado". Aquí hay token; lo que
+                          // no hubo es respuesta de Google.
+                          ? 'Google no respondió. Tu conexión sigue guardada; no hace falta que la rehagas.'
+                          : 'Conecta para sincronizar citas con tu calendario personal'}
                   </p>
                 </div>
               </div>
               <div className="flex-shrink-0 ml-4">
-                {gcalConectado === null ? (
+                {gcalEstado === null ? (
                   <Loader2 size={14} className="animate-spin text-[#86868b]" />
-                ) : gcalConectado ? (
+                ) : gcalEstado === 'error_google' ? (
+                  // Sin "Conectar" ni "Desconectar": no se sabe en qué estado
+                  // quedó nada del lado de Google, y reconectar no arregla un
+                  // fallo suyo. Lo único accionable es volver a preguntar.
+                  <button
+                    type="button"
+                    onClick={() => { setGcalEstado(null); cargarEstadoGcal() }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 rounded-xl transition-colors"
+                  >
+                    <RefreshCw size={12} /> Reintentar
+                  </button>
+                ) : gcalEstado === 'conectado' ? (
                   <div className="flex items-center gap-3">
                     <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-600">
                       <CheckCircle2 size={13} /> Conectado
@@ -704,7 +740,7 @@ export default function PerfilPage() {
             {/* A qué calendario se sincroniza. Quitarlo de la lista de Google
                 es indetectable desde aquí (`calendarList.get` pide un permiso
                 sensible que no pedimos), así que el aviso es la prevención. */}
-            {gcalConectado && (
+            {gcalEstado === 'conectado' && (
               <p className="mt-3 text-[11px] leading-relaxed text-[#86868b] bg-slate-50 border border-slate-100 rounded-xl px-3 py-2">
                 {gcalNombre ? (
                   <>

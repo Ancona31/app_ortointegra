@@ -1,10 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { conCalendarioSpinus, registrarFalloGCal, GCAL_TIMEZONE, type GCalCliente } from '@/lib/gcal'
+import {
+  conCalendarioSpinus,
+  registrarFalloGCal,
+  esCredencialInvalida,
+  GCAL_TIMEZONE,
+  type GCalCliente,
+  type EstadoGoogle,
+} from '@/lib/gcal'
 import { anonimizarTexto } from '@/lib/anonimizar'
 
 /** Un hueco ocupado del calendario personal del médico. Sin título ni detalle. */
 type BloqueOcupado = { start: string; end: string }
+
+/**
+ * Qué contestar cuando no hay eventos que devolver. Son dos situaciones que
+ * hasta ahora se veían iguales (`connected: false`) y no lo son: sin token el
+ * médico debe conectar, con token y Google caído no hay nada que pueda hacer.
+ *
+ * Ante la duda, 'sin_token': es el estado accionable y el que la interfaz
+ * llevaba mostrando, así que equivocarse hacia ahí no estrena ningún camino.
+ */
+async function estadoDeFallo(
+  supabase: Awaited<ReturnType<typeof createClient>> | null,
+  userId: string,
+  err?: unknown,
+): Promise<EstadoGoogle> {
+  if (err !== undefined && esCredencialInvalida(err)) return 'sin_token'
+  if (!supabase) return 'sin_token'
+  try {
+    // La RLS de `google_tokens` acota por `user_id = auth.uid()`; aquí seguimos
+    // dentro de la petición, así que el médico lee su propia fila y nada más.
+    const { data } = await supabase
+      .from('google_tokens')
+      .select('user_id')
+      .eq('user_id', userId)
+      .maybeSingle()
+    return data ? 'error_google' : 'sin_token'
+  } catch {
+    return 'sin_token'
+  }
+}
 
 /**
  * Disponibilidad del calendario personal (`primary`) del médico, vía
@@ -13,9 +49,9 @@ type BloqueOcupado = { start: string; end: string }
  *
  * Va en su propio try/catch a propósito. Un fallo aquí (el médico desmarcó la
  * casilla del permiso, o Google rechaza el alias) NO puede tumbar la respuesta
- * entera: el catch de afuera devolvería `connected: false` y la agenda y el
- * perfil se verían desconectados de Google teniendo el calendario sano.
- * Degradar a "sin bloques" es lo correcto.
+ * entera: el catch de afuera contestaría 'error_google' y la agenda se quedaría
+ * sin eventos teniendo el calendario de Spinus sano. Degradar a "sin bloques"
+ * es lo correcto.
  */
 async function consultarOcupado(
   calendar: GCalCliente,
@@ -60,13 +96,14 @@ async function consultarOcupado(
 }
 
 export async function GET(req: NextRequest) {
-  // Los necesita el catch de afuera, donde `user` y el calendario resuelto ya
-  // no están a la vista.
+  // Los necesita el catch de afuera, donde `user`, el cliente y el calendario
+  // resuelto ya no están a la vista.
   let userId = 'sin-sesion'
   let calendarIdUsado: string | null = null
+  let supabase: Awaited<ReturnType<typeof createClient>> | null = null
 
   try {
-    const supabase = await createClient()
+    supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     userId = user.id
@@ -95,7 +132,11 @@ export async function GET(req: NextRequest) {
       ])
       return { eventos: lista.data.items ?? [], ocupado }
     })
-    if (!respuesta) return NextResponse.json({ connected: false })
+    // null = no hay sesión de Google (sin token) o no se pudo resolver el
+    // calendario (Google falló al crearlo). Sólo lo segundo es un fallo.
+    if (!respuesta) {
+      return NextResponse.json({ estado: await estadoDeFallo(supabase, userId) })
+    }
 
     // Deduplicación del lado del servidor: los eventos que ya son una cita de
     // Spinus se quitan aquí. La agenda pinta esas citas por su cuenta desde
@@ -111,20 +152,21 @@ export async function GET(req: NextRequest) {
     const yaSonCitas = new Set((citas ?? []).map((c) => c.google_event_id))
 
     return NextResponse.json({
-      connected: true,
-      events:    respuesta.eventos.filter((e) => !e.id || !yaSonCitas.has(e.id)),
-      ocupado:   respuesta.ocupado,
+      estado:  'conectado' satisfies EstadoGoogle,
+      events:  respuesta.eventos.filter((e) => !e.id || !yaSonCitas.has(e.id)),
+      ocupado: respuesta.ocupado,
     })
   } catch (err) {
-    // OJO: la respuesta dice `connected: false`, así que un fallo pasajero de
-    // Google se ve en la interfaz como "no conectado". Se deja como está
-    // —cambiarlo es tocar el contrato con la agenda y el perfil— pero el log
-    // ya permite distinguir "sin conectar" de "conectado y reventó".
     registrarFalloGCal(
       { operacion: 'events.list (agenda)', userId, calendarId: calendarIdUsado },
       err,
     )
-    return NextResponse.json({ connected: false, error: 'Error al obtener eventos' })
+    // `err` entra en la cuenta para poder pescar el `invalid_grant`: ahí hay
+    // fila en `google_tokens`, pero está muerta y toca reconectar.
+    return NextResponse.json({
+      estado: await estadoDeFallo(supabase, userId, err),
+      error:  'Error al obtener eventos',
+    })
   }
 }
 

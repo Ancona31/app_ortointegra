@@ -1377,7 +1377,10 @@ export default function AgendaPage() {
     try {
       const res = await fetch(`/api/google/events?from=${info.startStr}&to=${info.endStr}`)
       const data = await res.json()
-      if (!data.connected) { success([]); return }
+      // 'sin_token' y 'error_google' se pintan igual aquí —sin eventos de
+      // Google— porque la agenda no tiene botón de conectar: quien distingue
+      // los dos casos de cara al médico es /perfil.
+      if (data.estado !== 'conectado') { success([]); return }
 
       type GCalEvent = { id?: string; summary?: string; start?: { dateTime?: string; date?: string }; end?: { dateTime?: string; date?: string } }
       type BloqueOcupado = { start: string; end: string }
