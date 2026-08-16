@@ -2880,4 +2880,47 @@ control» de `globals.css`.
 
 ---
 
+## Aislamiento entre clínicas — auditoría pendiente
+
+### ISO-DT-1 — Auditoría de aislamiento entre clínicas: `createAdminClient()`, índices únicos y buckets
+- **Estado:** 🔴 abierta (PRIORIDAD ALTA)
+- **Detectada:** 2026-08-16, al cerrar los defectos de la agenda y la
+  integración con Google Calendar. No es un hallazgo teórico: los tres casos de
+  abajo aparecieron uno tras otro en el mismo trabajo.
+- **Archivos afectados:** todos los que llaman a `createAdminClient()` (por
+  enumerar en el paso 1), más las restricciones e índices únicos del esquema y
+  las policies de los buckets de Storage.
+- **Riesgo:** fuga de datos entre clínicas por código que esquiva la RLS.
+
+  La RLS protege las tablas, pero `createAdminClient()` la desactiva por
+  completo. Cada sitio que lo usa es una zona sin frontera donde un filtro por
+  `clinica_id` olvidado se convierte en una fuga entre inquilinos. La superficie
+  crece con cada trabajo en segundo plano que agregamos.
+- **Casos ya encontrados y corregidos**, que muestran que no es teórico:
+  - `desvincularCitas` en `src/lib/gcal.ts` — sin `clinica_id` en el filtro, la
+    rama de `medico_id IS NULL` habría desvinculado citas huérfanas de **todas**
+    las clínicas, porque esa función corre con cliente admin.
+  - El índice único sobre `google_event_id` nació global. Un evento de Google
+    compartido entre dos clínicas habría hecho fallar la inserción de una por
+    culpa de la otra. Corregido a `(clinica_id, google_event_id)`.
+  - El `mutate('/api/me/clinica', null)` del cierre de sesión apuntaba a una
+    clave que dejó de existir: la marca de la clínica anterior sobrevivía al
+    cambio de cuenta en la misma máquina.
+- **Segunda familia del mismo riesgo:** cualquier restricción o índice único que
+  no lleve `clinica_id` acopla inquilinos entre sí. Hay que revisarlos todos.
+- **La auditoría pendiente:**
+  1. Enumerar todos los sitios que llaman a `createAdminClient()` y verificar
+     que cada consulta filtra por `clinica_id`.
+  2. Revisar todas las restricciones e índices únicos y confirmar que los que
+     deberían ser por clínica lo sean.
+  3. Revisar las policies de los buckets de Storage, que son superficie aparte
+     de la RLS de las tablas.
+- **Por qué es prioridad alta:** es la única familia de fallo que expone datos
+  de una clínica a otra. Todo lo demás en este archivo degrada la experiencia;
+  esto rompe la confianza del producto.
+- **Cuándo atacar:** sesión dedicada, propia. No se resuelve de paso dentro de
+  otro trabajo.
+
+---
+
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)

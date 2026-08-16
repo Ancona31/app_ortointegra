@@ -6,6 +6,18 @@
 
 ---
 
+## 📌 PENDIENTES PRIORITARIOS
+
+> **Pendiente prioritario:** auditoría de aislamiento entre clínicas. Cada
+> `createAdminClient()` esquiva la RLS; toda consulta ahí debe filtrar por
+> `clinica_id`. Detalles y casos ya encontrados en `DEUDA_TECNICA.md`.
+
+Mientras esa línea siga aquí, cualquier código nuevo que use
+`createAdminClient()` tiene que filtrar por `clinica_id` explícitamente, aunque
+parezca que no hace falta.
+
+---
+
 ## 🔴 PROTOCOLOS DE INTERACCIÓN — LEER PRIMERO, NO NEGOCIABLES
 
 Estos protocolos existen porque el proyecto ha sufrido regresiones severas por código inyectado fuera de scope, eliminaciones sin verificar dependencias, y "soluciones mágicas" complejas que aumentaron la fragilidad. Su violación causa retrabajo de días.
