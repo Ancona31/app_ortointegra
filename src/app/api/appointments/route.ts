@@ -250,10 +250,14 @@ export async function POST(req: NextRequest) {
         gcal_sync_status = 'failed'
       }
 
+      // `clinica_id` no es decorativo aunque `id` sea la clave primaria: con el
+      // cliente admin la RLS no acota nada. Mismo criterio que el `after()` del
+      // PUT en appointments/[id]/route.ts.
       const { error: errEstado } = await admin
         .from('appointments')
         .update({ google_event_id, gcal_sync_status })
         .eq('id', apt.id)
+        .eq('clinica_id', profile.clinica_id)
       if (errEstado) {
         registrarFalloGCal(
           { operacion: 'appointments.update(gcal_sync_status)', userId: profile.userId, calendarId: calendarIdUsado },
