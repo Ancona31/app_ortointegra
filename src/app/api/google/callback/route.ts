@@ -2,7 +2,7 @@ import { google } from 'googleapis'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { encrypt } from '@/lib/encrypt'
-import { crearCalendarioSpinus, registrarFalloGCal } from '@/lib/gcal'
+import { crearCalendarioSpinus, calendarioVive, registrarFalloGCal } from '@/lib/gcal'
 
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get('code')
@@ -82,11 +82,30 @@ export async function GET(req: NextRequest) {
     // `calendar_id` en null: `conCalendarioSpinus` lo crea en la primera
     // operación. No vale la pena tumbar la conexión entera por esto.
     try {
-      await crearCalendarioSpinus(
-        supabase,
-        user.id,
-        google.calendar({ version: 'v3', auth: oauth2Client }),
-      )
+      const gcal = google.calendar({ version: 'v3', auth: oauth2Client })
+
+      // RECONECTAR NO DEBE CREAR UN SEGUNDO CALENDARIO. El `upsert` de arriba
+      // no toca `calendar_id`, así que el de antes sigue ahí; crear otro lo
+      // pisaría y dejaría el anterior huérfano en la cuenta del médico, sin
+      // registro en ninguna parte — el mismo estropicio que este archivo
+      // acaba de dejar de causar, entrando por otra puerta.
+      //
+      // Y hay un camino real hasta aquí: el GET de /api/google/events responde
+      // `connected: false` cuando Google falla de forma pasajera, así que el
+      // perfil le pinta "Conectar" a un médico que ya lo está.
+      //
+      // `calendarioVive` contesta "vive" ante cualquier error que no sea 404,
+      // que es justo lo que conviene: si no se puede comprobar, no se crea.
+      const { data: fila } = await supabase
+        .from('google_tokens')
+        .select('calendar_id')
+        .eq('user_id', user.id)
+        .maybeSingle<{ calendar_id: string | null }>()
+      const yaRegistrado = fila?.calendar_id ?? null
+
+      if (!yaRegistrado || !(await calendarioVive(gcal, yaRegistrado, user.id))) {
+        await crearCalendarioSpinus(supabase, user.id, gcal)
+      }
     } catch (err) {
       registrarFalloGCal({ operacion: 'calendars.insert (callback)', userId: user.id }, err)
     }

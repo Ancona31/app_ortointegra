@@ -247,8 +247,13 @@ export async function crearCalendarioSpinus(
   return calendarId
 }
 
-/** ¿Sigue existiendo el calendario? Un error que no sea 404 se lee como "sí". */
-async function calendarioVive(calendar: GCalCliente, calendarId: string, userId: string): Promise<boolean> {
+/**
+ * ¿Sigue existiendo el calendario? Un error que no sea 404 se lee como "sí".
+ *
+ * Ese sesgo es deliberado y los dos llamadores dependen de él: ante la duda,
+ * ninguno destruye ni duplica nada.
+ */
+export async function calendarioVive(calendar: GCalCliente, calendarId: string, userId: string): Promise<boolean> {
   try {
     await calendar.calendars.get({ calendarId })
     return true
