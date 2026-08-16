@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { title, start_time, end_time, paciente_id, notes, medico_id, consultorio_id } = body
+    const { title, start_time, end_time, paciente_id, notes, medico_id, consultorio_id, client_id } = body
 
     if (!title || !start_time || !end_time) {
       return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
@@ -100,6 +100,24 @@ export async function POST(req: NextRequest) {
         { error: 'consultorio_invalido', message: 'consultorio_id no tiene formato UUID válido.' },
         { status: 400 }
       )
+    }
+
+    // `client_id` — clave de idempotencia del alta, una por escritura (la
+    // genera el cliente). Hace dos cosas a la vez:
+    //   · el índice único `idx_appointments_client_id` convierte un doble
+    //     clic, un reintento del navegador o una reconexión a media petición
+    //     en la MISMA cita, no en dos (ver el manejo del 23505 más abajo);
+    //   · viaja en el payload de Realtime, así que la pestaña que escribió
+    //     reconoce su propio eco y no lo vuelve a aplicar.
+    // Opcional a propósito: las citas que entran por otros caminos (o por un
+    // cliente viejo) siguen funcionando sin ella.
+    if (client_id !== undefined && client_id !== null) {
+      if (typeof client_id !== 'string' || !UUID_REGEX.test(client_id)) {
+        return NextResponse.json(
+          { error: 'client_id_invalido', message: 'client_id no tiene formato UUID válido.' },
+          { status: 400 }
+        )
+      }
     }
 
     // 5.H Paso 1: Determinar medico_id según rol (D-5.H-3).
@@ -185,6 +203,7 @@ export async function POST(req: NextRequest) {
         status:          'scheduled',
         medico_id:        finalMedicoId,
         gcal_sync_status: 'pending',
+        client_id:        client_id ?? null,
         // Snapshot inmutable del consultorio (Fase 2.6).
         consultorio_id:            consultorio.id,
         consultorio_nombre:        consultorio.nombre,
@@ -196,7 +215,35 @@ export async function POST(req: NextRequest) {
       .select(APPOINTMENT_SELECT)
       .single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      // 23505 = unique_violation. Con `client_id` en juego, casi siempre es el
+      // índice único `idx_appointments_client_id`: alguien reintentó un alta
+      // que YA ENTRÓ. La respuesta correcta no es un error —la cita existe y
+      // el cliente sólo quiere saber cuál es—, sino devolverla con la misma
+      // forma que si acabara de crearse. Sin esto, la idempotencia cambiaría
+      // un duplicado por un 500, que no es mejor.
+      //
+      // No se decide leyendo el mensaje del índice, sino releyendo por
+      // `client_id`: si aparece una cita, el choque fue ése; si no aparece
+      // (otro índice, o la fila es de otra clínica y la RLS no la deja ver),
+      // el error se propaga tal cual.
+      //
+      // Y se devuelve ANTES del after() de Google a propósito: el alta
+      // original ya creó su evento. Reintentar aquí crearía el duplicado en
+      // el calendario del médico que este bloque existe para evitar.
+      if (error.code === '23505' && client_id) {
+        const { data: yaExiste } = await supabase
+          .from('appointments')
+          .select(APPOINTMENT_SELECT)
+          .eq('client_id', client_id)
+          .eq('clinica_id', profile.clinica_id)
+          .maybeSingle()
+        if (yaExiste) {
+          return NextResponse.json({ appointment: yaExiste, gcalSync: 'skipped' })
+        }
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
 
     // Google Calendar sync en background con el cliente admin.
     //

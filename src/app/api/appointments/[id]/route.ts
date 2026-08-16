@@ -4,6 +4,52 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { conCalendarioSpinus, registrarFalloGCal, GCAL_TIMEZONE } from '@/lib/gcal'
 import { APPOINTMENT_SELECT, eventoParaGoogle, type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
 
+/* Formato UUID. A nivel de módulo porque lo usan el PUT (consultorio y
+   client_id) y el GET; antes vivía dentro del bloque de consultorio del PUT. */
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/* ── GET /api/appointments/[id] ─────────────────────────────
+ * Una cita, con la MISMA forma que devuelven el GET del rango, el POST y el
+ * PUT (`APPOINTMENT_SELECT`). Esa forma única es el punto: la agenda arma sus
+ * tarjetas a partir de ella, y un segundo camino para leer una cita acabaría
+ * produciendo tarjetas sutilmente distintas según por dónde llegó el dato.
+ *
+ * Quien la consume es el canal de Realtime: el payload de `postgres_changes`
+ * trae sólo columnas de `appointments`, sin el join del paciente que la
+ * tarjeta necesita para el nombre. Una cita, no un rango.
+ *
+ * Sin filtro explícito de clínica: la RLS de `appointments_select` ya acota
+ * por `clinica_id` (y por médico, para el invitado). Si la cita no es visible
+ * para quien pregunta, no llega fila y esto responde 404 — que es justo lo que
+ * debe ver.
+ */
+export async function GET(_req: NextRequest, ctx: RouteContext<'/api/appointments/[id]'>) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+    const { id } = await ctx.params
+    if (!UUID_REGEX.test(id)) {
+      return NextResponse.json({ error: 'id_invalido' }, { status: 400 })
+    }
+
+    const { data: appointment, error } = await supabase
+      .from('appointments')
+      .select(APPOINTMENT_SELECT)
+      .eq('id', id)
+      .maybeSingle()
+
+    if (error)       return NextResponse.json({ error: error.message },   { status: 500 })
+    if (!appointment) return NextResponse.json({ error: 'Cita no encontrada' }, { status: 404 })
+
+    return NextResponse.json({ appointment })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Error interno'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
+
 /* ── PUT /api/appointments/[id] ─────────────────────────── */
 export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments/[id]'>) {
   try {
@@ -16,7 +62,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
 
     const { id } = await ctx.params
     const body = await req.json()
-    const { title, start_time, end_time, paciente_id, notes, status, medico_id, consultorio_id, updated_at: clientUpdatedAt } = body
+    const { title, start_time, end_time, paciente_id, notes, status, medico_id, consultorio_id, updated_at: clientUpdatedAt, client_id } = body
 
     // RLS filtra por clinica_id
     const { data: existing } = await supabase
@@ -41,6 +87,32 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
     if (paciente_id !== undefined) updates.paciente_id = paciente_id || null
     if (notes       !== undefined) updates.notes       = notes || null
     if (status      !== undefined) updates.status      = status
+
+    // `client_id` en la EDICIÓN no es lo mismo que en el alta, aunque sea la
+    // misma columna. Aquí no hay idempotencia que ganar: el PUT ya es
+    // idempotente por naturaleza (escribe campos, no crea entidades) y además
+    // trae su propio control de concurrencia con `updated_at`. Reenviar el
+    // mismo PUT dos veces deja la fila igual; no hay duplicado posible.
+    //
+    // Lo que sí hace falta es FIRMAR la escritura, para que la pestaña que
+    // editó reconozca su eco en Realtime y no lo vuelva a aplicar. Por eso el
+    // cliente manda un UUID nuevo en cada edición y aquí se sobrescribe.
+    //
+    // CONSECUENCIA ACEPTADA: al sobrescribirlo se pierde la clave de
+    // idempotencia con que nació la cita. Sólo importaría si un reintento
+    // rezagado del POST original llegara DESPUÉS de que alguien ya editó esa
+    // misma cita —segundos, y con una edición humana en medio—; en ese hueco
+    // el alta duplicada volvería a ser posible. Se prefiere eso a dejar las
+    // ediciones sin firma, que es un eco mal aplicado en cada movimiento.
+    if (client_id !== undefined && client_id !== null) {
+      if (typeof client_id !== 'string' || !UUID_REGEX.test(client_id)) {
+        return NextResponse.json(
+          { error: 'client_id_invalido', message: 'client_id no tiene formato UUID válido.' },
+          { status: 400 }
+        )
+      }
+      updates.client_id = client_id
+    }
     // 5.H Paso 1: Validar cambio de medico_id según rol (D-5.H-3).
     // Médico invitado NO puede transferir su cita a otro médico (defense in depth
     // con la policy de Paso 3; mensaje claro al usuario en lugar de RLS 42501).
@@ -117,8 +189,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
         )
       }
 
-      // Validar formato UUID.
-      const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      // Validar formato UUID (la constante vive a nivel de módulo).
       if (!UUID_REGEX.test(consultorio_id)) {
         return NextResponse.json(
           { error: 'consultorio_invalido', message: 'consultorio_id no tiene formato UUID válido.' },
