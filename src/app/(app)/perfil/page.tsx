@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useProfile } from '@/hooks/useProfile'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Loader2, Save, Palette, Upload, X, CalendarDays, CheckCircle2, LogIn, LogOut, PenLine, Plus, Pencil, Trash2, Star, MapPin, RefreshCw } from 'lucide-react'
+import { Loader2, Save, Palette, Upload, X, CalendarDays, CheckCircle2, LogIn, LogOut, PenLine, Plus, Pencil, Trash2, Star, MapPin, RefreshCw, AlertTriangle } from 'lucide-react'
 import { PerfilSkeleton } from '@/components/ui/Skeleton'
+import ModalShell from '@/components/ui/ModalShell'
 import { useToast } from '@/components/ui/Toast'
 import EspecialidadSelector from '@/components/ui/EspecialidadSelector'
 import { validarCedula } from '@/lib/validaciones'
@@ -83,6 +84,7 @@ export default function PerfilPage() {
   // todavía sin calendario, o el médico lo borró desde Google.
   const [gcalNombre, setGcalNombre] = useState<string | null>(null)
   const [recreandoGcal, setRecreandoGcal] = useState(false)
+  const [confirmarRecrearGcal, setConfirmarRecrearGcal] = useState(false)
 
   // F3-5b: Mis consultorios
   const { consultorios, mutate: mutateConsultorios, isLoading: loadingConsultorios } = useConsultorios()
@@ -333,19 +335,7 @@ export default function PerfilPage() {
   }
 
   async function recrearCalendarioGcal() {
-    // La advertencia dice "se borran los eventos" y no "se borra el espejo"
-    // a propósito: hoy los eventos del calendario de Spinus son sólo reflejo
-    // de las citas, pero eso deja de ser cierto en cuanto se pueda agendar
-    // desde Google, y para entonces el aviso ya tiene que estar puesto.
-    const ok = confirm(
-      'Se creará un calendario de Spinus nuevo en tu cuenta de Google.\n\n' +
-      'SE BORRA EL CALENDARIO ACTUAL Y TODOS LOS EVENTOS QUE CONTENGA. ' +
-      'Tus citas de Spinus NO se borran, pero las que ya existían dejarán de ' +
-      'aparecer en Google: sólo se sincronizarán de aquí en adelante.\n\n' +
-      '¿Continuar?'
-    )
-    if (!ok) return
-
+    setConfirmarRecrearGcal(false)
     setRecreandoGcal(true)
     try {
       const res = await fetch('/api/google/calendar', { method: 'POST' })
@@ -683,7 +673,7 @@ export default function PerfilPage() {
                     {isAdmin && (
                       <button
                         type="button"
-                        onClick={recrearCalendarioGcal}
+                        onClick={() => setConfirmarRecrearGcal(true)}
                         disabled={recreandoGcal || desconectandoGcal}
                         className="flex items-center gap-1 text-[11px] text-[#86868b] hover:text-[#1e5fa8] transition-colors disabled:opacity-40"
                       >
@@ -774,6 +764,50 @@ export default function PerfilPage() {
           onConfirmDelete={handleConfirmDelete}
         />
       )}
+
+      {/* La advertencia dice "se borran los eventos" y no "se borra el espejo"
+          a propósito: hoy los eventos del calendario de Spinus son sólo reflejo
+          de las citas, pero eso deja de ser cierto en cuanto se pueda agendar
+          desde Google, y para entonces el aviso ya tiene que estar puesto. */}
+      <ModalShell
+        open={confirmarRecrearGcal}
+        onClose={() => setConfirmarRecrearGcal(false)}
+        title="Recrear calendario"
+        subtitle="Google Calendar"
+        icon={<AlertTriangle size={18} className="text-red-600" />}
+        iconBg="bg-red-50"
+        maxWidth="max-w-md"
+        footer={
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 px-5 py-3.5">
+            <button
+              type="button"
+              onClick={() => setConfirmarRecrearGcal(false)}
+              className="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={recrearCalendarioGcal}
+              className="px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors"
+            >
+              Sí, recrear
+            </button>
+          </div>
+        }
+      >
+        <div className="px-5 py-5 space-y-3">
+          <p className="text-sm text-slate-700">
+            Se creará un calendario de Spinus nuevo en tu cuenta de Google.
+          </p>
+          <p className="text-sm text-red-800 bg-red-50 border border-red-100 rounded-xl px-4 py-3 leading-relaxed">
+            SE BORRA EL CALENDARIO ACTUAL Y TODOS LOS EVENTOS QUE CONTENGA.
+            Tus citas de Spinus NO se borran, pero las que ya existían dejarán de
+            aparecer en Google: sólo se sincronizarán de aquí en adelante.
+          </p>
+          <p className="text-sm text-slate-700">¿Continuar?</p>
+        </div>
+      </ModalShell>
     </div>
   )
 }
