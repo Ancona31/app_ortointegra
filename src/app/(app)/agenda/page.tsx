@@ -247,6 +247,9 @@ const DURATIONS = [
 
 const DEFAULT_DURATION = 60
 
+/** Id de la eventSource de citas; ver `eventSourcesStable`. */
+const FUENTE_APPOINTMENTS = 'appointments'
+
 function calcDuration(startIso: string, endIso: string) {
   return Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 60000)
 }
@@ -1357,7 +1360,17 @@ export default function AgendaPage() {
       gcalSourceRef.current(info, success, failure),
     []
   )
-  const eventSourcesStable = useMemo(() => [stableAppointmentSource, stableGcalSource], [stableAppointmentSource, stableGcalSource])
+  /**
+   * Las fuentes llevan `id` explicito porque `api.addEvent(input, sourceId)`
+   * resuelve la fuente por ese id (si no la encuentra devuelve null y avisa
+   * por consola). Un evento añadido sin sourceId no pertenece a ninguna
+   * fuente y `refetchEvents()` no lo purga: sobrevive junto al evento
+   * recargado del servidor y quedan dos con el mismo ID (E5-DT-8).
+   */
+  const eventSourcesStable = useMemo(() => [
+    { id: FUENTE_APPOINTMENTS, events: stableAppointmentSource },
+    { id: 'gcal',              events: stableGcalSource },
+  ], [stableAppointmentSource, stableGcalSource])
 
   /* ── Helper: construir EventInput desde datos de cita ── */
   function buildEventInput(data: Partial<Appointment> & { id?: string }): EventInput {
@@ -1532,7 +1545,7 @@ export default function AgendaPage() {
         }
       } else {
         // Crear evento optimista temporal
-        optimisticEvent = api.addEvent(buildEventInput(data))
+        optimisticEvent = api.addEvent(buildEventInput(data), FUENTE_APPOINTMENTS)
       }
     }
 
@@ -1560,7 +1573,7 @@ export default function AgendaPage() {
     if (!isEdit && optimisticEvent && json.appointment?.id) {
       // Reemplazar evento optimista con el real (que tiene ID de DB)
       optimisticEvent.remove()
-      api?.addEvent(buildEventInput({ ...data, ...json.appointment }))
+      api?.addEvent(buildEventInput({ ...data, ...json.appointment }), FUENTE_APPOINTMENTS)
     }
 
     if (!isEdit && json.gcalSynced === false) {
