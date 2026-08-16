@@ -36,7 +36,7 @@ type Appointment = {
   paciente_id: string | null
   medico_id: string | null
   google_event_id: string | null
-  gcal_sync_status: 'synced' | 'pending' | 'failed'
+  gcal_sync_status: 'synced' | 'pending' | 'failed' | 'unbound'
   updated_at: string
   // F3-6: snapshots de consultorio (persistidos en POST/PUT, devueltos en GET).
   consultorio_id: string | null

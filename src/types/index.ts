@@ -122,7 +122,9 @@ export interface Appointment {
   google_event_id: string | null
   whatsapp_sent_at?: string | null
   whatsapp_reminder_sent_at?: string | null
-  gcal_sync_status: 'synced' | 'pending' | 'failed'
+  // 'unbound': la cita tuvo evento en Google y el vínculo se perdió sin vuelta
+  // atrás (el médico borró el calendario). La cita se conserva; el evento no.
+  gcal_sync_status: 'synced' | 'pending' | 'failed' | 'unbound'
   medico_id: string | null
   // Identificador de idempotencia del outbox-engine offline. La feature
   // del outbox fue eliminada en abril 2026 (ver CLAUDE.md), pero la columna

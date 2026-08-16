@@ -141,12 +141,37 @@ async function calendarioVive(calendar: GCalCliente, calendarId: string): Promis
 /**
  * El médico borró el calendario desde Google: los eventos murieron con él.
  * Se sueltan los vínculos, NUNCA la cita.
+ *
+ * ÁMBITO — dentro de la clínica, las citas de este médico MÁS las que no
+ * tienen médico asignado. `medico_id` a secas dejaba a estas últimas con un
+ * `google_event_id` muerto para siempre (la columna es nullable). `clinica_id`
+ * es imprescindible y no decorativo: sin él, el tramo `medico_id IS NULL`
+ * barrería las citas huérfanas de TODAS las clínicas — esta función corre a
+ * veces con el cliente admin, donde la RLS no acota nada.
+ *
+ * No se amplía a la clínica entera a propósito: en una clínica con varios
+ * médicos, las citas de otro pueden tener su evento en un calendario que sigue
+ * vivo, y desvincularlas rompería un enlace bueno.
+ *
+ * Hueco conocido que esto NO cierra: el evento se crea en el calendario de
+ * quien guarda la cita, no en el del médico de la cita. Si una secretaria
+ * agenda para el Dr. B y luego borra su propio calendario, esa cita no se
+ * desvincula. Cerrarlo pide una columna que registre de quién es el evento;
+ * queda fuera de esta rama.
  */
 async function desvincularCitas(supabase: SupabaseClient, userId: string): Promise<void> {
+  const { data: perfil } = await supabase
+    .from('profiles')
+    .select('clinica_id')
+    .eq('id', userId)
+    .maybeSingle<{ clinica_id: string | null }>()
+  if (!perfil?.clinica_id) return
+
   await supabase
     .from('appointments')
     .update({ google_event_id: null, gcal_sync_status: 'unbound' })
-    .eq('medico_id', userId)
+    .eq('clinica_id', perfil.clinica_id)
+    .or(`medico_id.eq.${userId},medico_id.is.null`)
     .not('google_event_id', 'is', null)
 }
 

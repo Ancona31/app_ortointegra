@@ -353,7 +353,6 @@ CREATE TABLE IF NOT EXISTS public.pacientes (
   fecha_consentimiento      timestamptz   DEFAULT now(),
   version_aviso_privacidad  text          DEFAULT 'v1.0-2026-04-08'::text,
   client_id                 text,
-  alta_rapida               boolean       NOT NULL DEFAULT false,
   CONSTRAINT pacientes_pkey PRIMARY KEY (id),
   CONSTRAINT pacientes_sexo_check CHECK (
     sexo = ANY (ARRAY['M'::text, 'F'::text, 'Otro'::text])
