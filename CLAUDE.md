@@ -16,6 +16,9 @@ Mientras esa línea siga aquí, cualquier código nuevo que use
 `createAdminClient()` tiene que filtrar por `clinica_id` explícitamente, aunque
 parezca que no hace falta.
 
+> **Ninguna migración se aplica sin pasar antes por
+> `supabase/AUDITORIA-MIGRACIONES.md`.**
+
 ---
 
 ## 🔴 PROTOCOLOS DE INTERACCIÓN — LEER PRIMERO, NO NEGOCIABLES
