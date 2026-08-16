@@ -75,6 +75,12 @@ export const CONFIG_VACIA: ConfigApp = {
 }
 
 /**
+ * Error del agregado con el código HTTP a cuestas. El código es lo que separa
+ * «el servidor no me contestó» de «el servidor me contestó que no».
+ */
+export type ErrorConfig = Error & { status?: number }
+
+/**
  * Fetcher único de la clave. La persistencia en `secureStorage` va aquí y no
  * en un `onSuccess` por hook a propósito: con varios hooks sobre la misma
  * clave, SWR solo ejecuta el fetcher —y el `onSuccess`— del que dispara la
@@ -82,9 +88,32 @@ export const CONFIG_VACIA: ConfigApp = {
  */
 export async function fetcherConfig(url: string): Promise<ConfigApp> {
   const r = await fetch(url)
-  if (!r.ok) throw new Error('Error al cargar la configuración')
+  if (!r.ok) {
+    const error: ErrorConfig = new Error('Error al cargar la configuración')
+    error.status = r.status
+    throw error
+  }
   const data = (await r.json()) as ConfigApp
   if (data.clinica) secureStorage.set(CACHE_CLINICA, data.clinica).catch(() => {})
   if (data.consultorios) secureStorage.set(CACHE_CONSULTORIOS, data.consultorios).catch(() => {})
   return data
+}
+
+/**
+ * ⚠ EL CACHE CIFRADO NO ES UN SUSTITUTO DE UNA SESIÓN CERRADA.
+ *
+ * `useClinica` y `useConsultorios` caen a `secureStorage` cuando el agregado
+ * falla, y eso es correcto para trabajar sin red estando dentro. NO lo es ante
+ * un 401 (no hay sesión) ni un 403 (no hay clínica): ahí el servidor sí sabe la
+ * respuesta y la respuesta es que no hay nada que enseñar.
+ *
+ * El caso concreto que esto cierra: `signOut()` (auth-context.tsx:180) borra
+ * cookies y `sessionStorage`, pero NO `secureStorage` — `cache_clinica` y
+ * `cache_consultorios` sobreviven al cierre de sesión. Sin este predicado, un
+ * médico que se loguea en una máquina que usó otro y recibe un 401 mientras su
+ * sesión se asienta vería pintada la clínica del anterior. Fuga entre cuentas.
+ */
+export function esErrorDeSesion(error: unknown): boolean {
+  const status = (error as ErrorConfig | undefined)?.status
+  return status === 401 || status === 403
 }

@@ -8,6 +8,7 @@ import {
   CACHE_CONSULTORIOS,
   CLAVE_CONFIG,
   CONFIG_DEDUPE_MS,
+  esErrorDeSesion,
   fetcherConfig,
   type ConfigApp,
 } from '@/lib/configApp'
@@ -47,8 +48,11 @@ export function useConsultorios() {
     },
   )
 
+  // Fallback offline. NO se activa ante 401/403: ver `esErrorDeSesion` en
+  // src/lib/configApp.ts — el cache cifrado respalda una red caída, nunca una
+  // sesión cerrada.
   const { data: fallback } = useSWR<Consultorio[]>(
-    !data && error ? `${CACHE_KEY}_fallback` : null,
+    !data && error && !esErrorDeSesion(error) ? `${CACHE_KEY}_fallback` : null,
     async () => {
       const cached = await secureStorage.get<Consultorio[]>(CACHE_KEY)
       if (!cached) throw new Error('Sin cache offline')

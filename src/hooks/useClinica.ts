@@ -6,6 +6,7 @@ import {
   CACHE_CLINICA,
   CLAVE_CONFIG,
   CONFIG_DEDUPE_MS,
+  esErrorDeSesion,
   fetcherConfig,
   type ClinicaConfig,
   type ConfigApp,
@@ -29,9 +30,11 @@ export function useClinica() {
     },
   )
 
-  // Fallback offline
+  // Fallback offline. NO se activa ante 401/403: ver `esErrorDeSesion` en
+  // src/lib/configApp.ts — el cache cifrado respalda una red caída, nunca una
+  // sesión cerrada.
   const { data: fallback } = useSWR<ClinicaConfig>(
-    !data && error ? `${CACHE_KEY}_fallback` : null,
+    !data && error && !esErrorDeSesion(error) ? `${CACHE_KEY}_fallback` : null,
     async () => {
       const cached = await secureStorage.get<ClinicaConfig>(CACHE_KEY)
       if (!cached) throw new Error('Sin cache offline')
