@@ -28,7 +28,7 @@ interface FilaTokens {
 }
 
 /** ¿El error de la API de Google es un 404? Distingue "no existe" de "falló". */
-function esNotFound(err: unknown): boolean {
+export function esNotFound(err: unknown): boolean {
   if (typeof err !== 'object' || err === null) return false
   if ('code'   in err && err.code   === 404) return true
   if ('status' in err && err.status === 404) return true
@@ -199,7 +199,13 @@ export async function crearCalendarioSpinus(
     requestBody: {
       summary:     nombre ? `Spinus - ${nombre}` : 'Spinus',
       timeZone:    GCAL_TIMEZONE,
-      description: 'Citas sincronizadas desde Spinus. No borres este calendario.',
+      // Quitarlo de la lista es tan destructivo como borrarlo y además es
+      // indetectable desde Spinus (`calendarList.get` pide un permiso sensible
+      // que no tenemos), así que se avisa de las dos cosas.
+      description:
+        'Citas sincronizadas desde Spinus. No borres este calendario '
+        + 'ni lo quites de tu lista de calendarios en Google: si desaparece de '
+        + 'tu lista, Spinus sigue escribiendo aquí y tú dejas de verlo.',
     },
   })
 
@@ -279,13 +285,14 @@ async function calendarioVive(calendar: GCalCliente, calendarId: string, userId:
  * desvincula. Cerrarlo pide una columna que registre de quién es el evento;
  * queda fuera de esta rama.
  */
-async function desvincularCitas(supabase: SupabaseClient, userId: string): Promise<void> {
+export async function desvincularCitas(supabase: SupabaseClient, userId: string): Promise<boolean> {
   const { data: perfil } = await supabase
     .from('profiles')
     .select('clinica_id')
     .eq('id', userId)
     .maybeSingle<{ clinica_id: string | null }>()
-  if (!perfil?.clinica_id) return
+  // Sin clínica no hay citas que soltar: el trabajo está hecho, no fallido.
+  if (!perfil?.clinica_id) return true
 
   const { error } = await supabase
     .from('appointments')
@@ -295,8 +302,14 @@ async function desvincularCitas(supabase: SupabaseClient, userId: string): Promi
     .not('google_event_id', 'is', null)
 
   // Si esto falla, las citas quedan apuntando a eventos de un calendario
-  // muerto y nada más vuelve a intentarlo.
-  if (error) registrarFalloGCal({ operacion: 'appointments.update(unbound)', userId }, error)
+  // muerto y nada más vuelve a intentarlo. `conCalendarioSpinus` no puede hacer
+  // nada al respecto e ignora el resultado; el botón de recrear del perfil sí
+  // lo mira, y aborta antes de destruir nada.
+  if (error) {
+    registrarFalloGCal({ operacion: 'appointments.update(unbound)', userId }, error)
+    return false
+  }
+  return true
 }
 
 /**

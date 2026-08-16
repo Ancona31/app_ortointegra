@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useProfile } from '@/hooks/useProfile'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Loader2, Save, Palette, Upload, X, CalendarDays, CheckCircle2, LogIn, LogOut, PenLine, Plus, Pencil, Trash2, Star, MapPin } from 'lucide-react'
+import { Loader2, Save, Palette, Upload, X, CalendarDays, CheckCircle2, LogIn, LogOut, PenLine, Plus, Pencil, Trash2, Star, MapPin, RefreshCw } from 'lucide-react'
 import { PerfilSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import EspecialidadSelector from '@/components/ui/EspecialidadSelector'
@@ -79,6 +79,10 @@ export default function PerfilPage() {
   const [firmaUrl, setFirmaUrl] = useState<string | null>(null)
   const [gcalConectado, setGcalConectado] = useState<boolean | null>(null)
   const [desconectandoGcal, setDesconectandoGcal] = useState(false)
+  // A qué calendario de Google se está sincronizando. null = conectado pero
+  // todavía sin calendario, o el médico lo borró desde Google.
+  const [gcalNombre, setGcalNombre] = useState<string | null>(null)
+  const [recreandoGcal, setRecreandoGcal] = useState(false)
 
   // F3-5b: Mis consultorios
   const { consultorios, mutate: mutateConsultorios, isLoading: loadingConsultorios } = useConsultorios()
@@ -195,8 +199,14 @@ export default function PerfilPage() {
   }, [profile, loadingProfile, router])
 
   useEffect(() => {
-    fetch('/api/google/events').then(r => r.json())
-      .then(d => setGcalConectado(d.connected ?? false))
+    // `/api/google/calendar` en vez de `/api/google/events`: responde lo mismo
+    // sobre la conexión, trae además el nombre del calendario, y no arrastra
+    // el listado de eventos del mes ni la consulta de disponibilidad.
+    fetch('/api/google/calendar').then(r => r.json())
+      .then(d => {
+        setGcalConectado(d.connected ?? false)
+        setGcalNombre(d.calendarName ?? null)
+      })
       .catch(() => setGcalConectado(false))
 
     Promise.all([
@@ -318,7 +328,38 @@ export default function PerfilPage() {
     setDesconectandoGcal(true)
     await fetch('/api/google/disconnect', { method: 'DELETE' })
     setGcalConectado(false)
+    setGcalNombre(null)
     setDesconectandoGcal(false)
+  }
+
+  async function recrearCalendarioGcal() {
+    // La advertencia dice "se borran los eventos" y no "se borra el espejo"
+    // a propósito: hoy los eventos del calendario de Spinus son sólo reflejo
+    // de las citas, pero eso deja de ser cierto en cuanto se pueda agendar
+    // desde Google, y para entonces el aviso ya tiene que estar puesto.
+    const ok = confirm(
+      'Se creará un calendario de Spinus nuevo en tu cuenta de Google.\n\n' +
+      'SE BORRA EL CALENDARIO ACTUAL Y TODOS LOS EVENTOS QUE CONTENGA. ' +
+      'Tus citas de Spinus NO se borran, pero las que ya existían dejarán de ' +
+      'aparecer en Google: sólo se sincronizarán de aquí en adelante.\n\n' +
+      '¿Continuar?'
+    )
+    if (!ok) return
+
+    setRecreandoGcal(true)
+    try {
+      const res = await fetch('/api/google/calendar', { method: 'POST' })
+      const d = await res.json()
+      if (!res.ok) {
+        toast.error(d.message || 'No se pudo recrear el calendario')
+      } else {
+        setGcalNombre(d.calendarName ?? null)
+        toast.success('Calendario recreado en tu cuenta de Google')
+      }
+    } catch {
+      toast.error('No se pudo recrear el calendario')
+    }
+    setRecreandoGcal(false)
   }
 
   if (loading || loadingProfile) return <PerfilSkeleton />
@@ -639,10 +680,21 @@ export default function PerfilPage() {
                     <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-600">
                       <CheckCircle2 size={13} /> Conectado
                     </span>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={recrearCalendarioGcal}
+                        disabled={recreandoGcal || desconectandoGcal}
+                        className="flex items-center gap-1 text-[11px] text-[#86868b] hover:text-[#1e5fa8] transition-colors disabled:opacity-40"
+                      >
+                        {recreandoGcal ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                        Recrear calendario
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={desconectarGcal}
-                      disabled={desconectandoGcal}
+                      disabled={desconectandoGcal || recreandoGcal}
                       className="flex items-center gap-1 text-[11px] text-[#86868b] hover:text-red-500 transition-colors disabled:opacity-40"
                     >
                       {desconectandoGcal ? <Loader2 size={12} className="animate-spin" /> : <LogOut size={12} />}
@@ -659,6 +711,24 @@ export default function PerfilPage() {
                 )}
               </div>
             </div>
+            {/* A qué calendario se sincroniza. Quitarlo de la lista de Google
+                es indetectable desde aquí (`calendarList.get` pide un permiso
+                sensible que no pedimos), así que el aviso es la prevención. */}
+            {gcalConectado && (
+              <p className="mt-3 text-[11px] leading-relaxed text-[#86868b] bg-slate-50 border border-slate-100 rounded-xl px-3 py-2">
+                {gcalNombre ? (
+                  <>
+                    Tus citas se sincronizan al calendario <strong className="text-[#1d1d1f]">{gcalNombre}</strong> de
+                    tu cuenta de Google. No lo borres <strong>ni lo quites de tu lista de calendarios</strong>: si
+                    desaparece de tu lista, Spinus sigue escribiendo en él y tú dejas de verlo. Si ya te pasó, usa
+                    &quot;Recrear calendario&quot;.
+                  </>
+                ) : (
+                  <>Todavía no hay un calendario de Spinus en tu cuenta de Google. Se creará solo la próxima vez que abras la agenda.</>
+                )}
+              </p>
+            )}
+
             {gcalPermisoFaltante && (
               <p className="mt-3 text-[11px] leading-relaxed text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
                 No se pudo conectar: en la pantalla de Google quedó sin marcar el permiso
