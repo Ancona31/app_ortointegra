@@ -65,6 +65,23 @@ export function useConsultorios() {
 
   const consultorioDefault = consultorios.find(c => c.es_default) ?? null
 
+  /* ⚠ LECTURA AFIRMATIVA — LEER ANTES DE TOCAR LA LÍNEA DE ARRIBA.
+     `data?.consultorios ?? fallback ?? []` es el punto exacto donde se destruye
+     la diferencia entre «el servidor me dijo que no tienes ninguno» y «todavía
+     no sé» / «no pude averiguarlo» / «alguien me vació la caché». A partir de
+     ahí `consultorios: []` significa las cuatro cosas a la vez, y quien lo lea
+     no puede reconstruir cuál era.
+     Esta bandera conserva el dato: es `true` solo si el agregado respondió con
+     una lista. Existe porque `PrimerConsultorioModal` ESCRIBE, y un modal que
+     escribe no debe dispararse por ausencia de evidencia.
+     Subsume a `isLoading`: mientras carga, `data` es `undefined`. Y cubre lo
+     que `isLoading` no veía —`internalMutate` de SWR fija `data` y limpia
+     `error` pero nunca toca `isLoading`, así que un `mutate(CLAVE_CONFIG, null)`
+     dejaba `isLoading: false` con la caché vacía—.
+     El fallback offline NO cuenta como lectura afirmativa: es una lista rancia
+     de cuando sí hubo red, y su vacío no es una respuesta del servidor. */
+  const lecturaConfirmada = Array.isArray(data?.consultorios)
+
   /** Traduce entre el contrato de fuera (`{ consultorios }`) y el agregado. */
   const mutate = useCallback(
     async (actualizador?: ActualizadorConsultorios, opciones?: { revalidate?: boolean }) => {
@@ -86,6 +103,7 @@ export function useConsultorios() {
     consultorios,
     consultorioDefault,
     isLoading,
+    lecturaConfirmada,
     mutate,
     isOfflineData: !data?.consultorios && !!fallback,
   }
