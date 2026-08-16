@@ -15,7 +15,14 @@ export async function GET() {
 
   const url = oauth2Client.generateAuthUrl({
     access_type: 'offline',
-    scope: ['https://www.googleapis.com/auth/calendar.events'],
+    // Ambos scopes son NO sensibles: sin verificación, sin tope de 100
+    // usuarios y sin pantalla de advertencia.
+    //   calendar.app.created      → CRUD sólo en calendarios que creó la app.
+    //   calendar.events.freebusy  → disponibilidad de `primary`, sin títulos.
+    scope: [
+      'https://www.googleapis.com/auth/calendar.app.created',
+      'https://www.googleapis.com/auth/calendar.events.freebusy',
+    ],
     prompt: 'consent',
     state,
   })

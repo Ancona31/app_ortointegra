@@ -2,6 +2,7 @@ import { google } from 'googleapis'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { encrypt } from '@/lib/encrypt'
+import { crearCalendarioSpinus } from '@/lib/gcal'
 
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get('code')
@@ -39,6 +40,19 @@ export async function GET(req: NextRequest) {
       refresh_token: tokens.refresh_token ? encrypt(tokens.refresh_token) : null,
       expires_at: tokens.expiry_date ?? null,
     })
+
+    // El calendario propio de Spinus. Si falla, los tokens quedan guardados y
+    // `calendar_id` en null: `conCalendarioSpinus` lo crea en la primera
+    // operación. No vale la pena tumbar la conexión entera por esto.
+    try {
+      await crearCalendarioSpinus(
+        supabase,
+        user.id,
+        google.calendar({ version: 'v3', auth: oauth2Client }),
+      )
+    } catch {
+      console.error('[GCal] No se pudo crear el calendario de Spinus en el callback')
+    }
 
     const response = NextResponse.redirect(new URL('/dashboard?calendar=connected', req.url))
     response.cookies.delete('oauth_state')

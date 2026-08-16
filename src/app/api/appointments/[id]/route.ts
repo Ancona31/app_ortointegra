@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { google } from 'googleapis'
-import { decrypt, encrypt } from '@/lib/encrypt'
+import { getGCalClient } from '@/lib/gcal'
 import { APPOINTMENT_SELECT } from '@/lib/appointments'
 
 // PRIVACIDAD — LFPDPPP Art. 9: NUNCA enviar nombres de pacientes
@@ -14,38 +13,6 @@ function gcalSummary(title: string): string {
     return `Cita médica (${iniciales})`
   }
   return 'Cita médica'
-}
-
-async function getGCalClient(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
-  const { data: tokenData } = await supabase
-    .from('google_tokens')
-    .select('*')
-    .eq('user_id', userId)
-    .single()
-  if (!tokenData) return null
-
-  // Una instancia por petición: compartirla entre peticiones concurrentes
-  // deja que un usuario sobrescriba las credenciales de otro.
-  const oauth2Client = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI
-  )
-
-  oauth2Client.setCredentials({
-    access_token:  decrypt(tokenData.access_token),
-    refresh_token: decrypt(tokenData.refresh_token),
-    expiry_date:   tokenData.expires_at,
-  })
-  if (tokenData.expires_at && Date.now() > tokenData.expires_at) {
-    const { credentials } = await oauth2Client.refreshAccessToken()
-    await supabase.from('google_tokens').update({
-      access_token: credentials.access_token ? encrypt(credentials.access_token) : null,
-      expires_at:   credentials.expiry_date ?? null,
-    }).eq('user_id', userId)
-    oauth2Client.setCredentials(credentials)
-  }
-  return google.calendar({ version: 'v3', auth: oauth2Client })
 }
 
 /* ── PUT /api/appointments/[id] ─────────────────────────── */
