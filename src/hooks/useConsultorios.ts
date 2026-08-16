@@ -1,23 +1,33 @@
 'use client'
 
+import { useCallback } from 'react'
 import useSWR from 'swr'
 import { secureStorage } from '@/lib/secureStorage'
 import { Consultorio } from '@/types'
+import {
+  CACHE_CONSULTORIOS,
+  CLAVE_CONFIG,
+  CONFIG_DEDUPE_MS,
+  fetcherConfig,
+  type ConfigApp,
+} from '@/lib/configApp'
 
-const CACHE_KEY = 'cache_consultorios'
+const CACHE_KEY = CACHE_CONSULTORIOS
 
-const fetcher = (url: string) =>
-  fetch(url).then(r => {
-    if (!r.ok) throw new Error('Error al cargar consultorios')
-    return r.json()
-  })
+/** Lo que veía y devolvía el actualizador de `mutate` cuando la clave de este
+ *  hook era `/api/consultorios`. Se conserva tal cual. */
+type DatosConsultorios = { consultorios: Consultorio[] }
+type ActualizadorConsultorios = (actual: DatosConsultorios | undefined) => DatosConsultorios
 
 /**
  * Hook que devuelve la lista de consultorios activos del usuario autenticado.
  *
- * Patrón replicado de useClinica: SWR primario contra /api/consultorios +
- * SWR de fallback que lee de secureStorage cuando el endpoint falla y no
- * hay data en memoria.
+ * La clave ya no es `/api/consultorios` sino el agregado de configuración
+ * (ver src/lib/configApp.ts): la misma petición trae clínica, consultorios,
+ * horario y médicos, así que abrir cualquier página de (app) deja de disparar
+ * cuatro llamadas paralelas. Lo que el hook devuelve NO cambia, `mutate`
+ * incluido: sigue recibiendo y devolviendo `{ consultorios }`, aunque por
+ * dentro escriba su rebanada del agregado.
  *
  * El endpoint solo devuelve consultorios activos (filtrado por backend);
  * los archivados no se exponen al usuario por diseño (R1).
@@ -28,15 +38,12 @@ const fetcher = (url: string) =>
  * modal de onboarding (Bloque F3-4) los bloqueará hasta crear el primero.
  */
 export function useConsultorios() {
-  const { data, error, isLoading, mutate } = useSWR<{ consultorios: Consultorio[] }>(
-    '/api/consultorios',
-    fetcher,
+  const { data, error, isLoading, mutate: mutarConfig } = useSWR<ConfigApp>(
+    CLAVE_CONFIG,
+    fetcherConfig,
     {
       // revalidateOnFocus se hereda del <SWRConfig> de (app), ya con throttle.
-      dedupingInterval: 60_000,
-      onSuccess: (d) => {
-        if (d.consultorios) secureStorage.set(CACHE_KEY, d.consultorios)
-      },
+      dedupingInterval: CONFIG_DEDUPE_MS,
     },
   )
 
@@ -53,6 +60,23 @@ export function useConsultorios() {
   const consultorios = data?.consultorios ?? fallback ?? []
 
   const consultorioDefault = consultorios.find(c => c.es_default) ?? null
+
+  /** Traduce entre el contrato de fuera (`{ consultorios }`) y el agregado. */
+  const mutate = useCallback(
+    async (actualizador?: ActualizadorConsultorios, opciones?: { revalidate?: boolean }) => {
+      if (!actualizador) {
+        await mutarConfig()
+        return
+      }
+      await mutarConfig(
+        (config) => config
+          ? { ...config, ...actualizador({ consultorios: config.consultorios }) }
+          : config,
+        opciones,
+      )
+    },
+    [mutarConfig],
+  )
 
   return {
     consultorios,

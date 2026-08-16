@@ -2,35 +2,30 @@
 
 import useSWR from 'swr'
 import { secureStorage } from '@/lib/secureStorage'
+import {
+  CACHE_CLINICA,
+  CLAVE_CONFIG,
+  CONFIG_DEDUPE_MS,
+  fetcherConfig,
+  type ClinicaConfig,
+  type ConfigApp,
+} from '@/lib/configApp'
 
-export type ClinicaConfig = {
-  id: string
-  nombre: string
-  nombre_display: string | null
-  subtitulo: string | null
-  color_primario: string | null
-  color_secundario: string | null
-  logo_url: string | null
-}
+/** Re-exportado desde su nuevo sitio: el tipo se movió, el import no cambia. */
+export type { ClinicaConfig }
 
-const CACHE_KEY = 'cache_clinica'
-
-const fetcher = (url: string) =>
-  fetch(url).then(r => {
-    if (!r.ok) throw new Error('Error al cargar clínica')
-    return r.json()
-  })
+const CACHE_KEY = CACHE_CLINICA
 
 export function useClinica() {
-  const { data, error } = useSWR<{ clinica: ClinicaConfig | null }>(
-    '/api/me/clinica',
-    fetcher,
+  // La clave ya no es `/api/me/clinica` sino el agregado de configuración,
+  // que trae la clínica junto con consultorios, horario y médicos en una
+  // sola petición. Lo que este hook devuelve no cambia (ver src/lib/configApp.ts).
+  const { data, error } = useSWR<ConfigApp>(
+    CLAVE_CONFIG,
+    fetcherConfig,
     {
       // revalidateOnFocus se hereda del <SWRConfig> de (app), ya con throttle.
-      dedupingInterval: 60_000,
-      onSuccess: (d) => {
-        if (d.clinica) secureStorage.set(CACHE_KEY, d.clinica)
-      },
+      dedupingInterval: CONFIG_DEDUPE_MS,
     },
   )
 

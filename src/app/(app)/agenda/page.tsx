@@ -21,6 +21,16 @@ import { useConsultoriosDeMedico } from '@/hooks/useConsultoriosDeMedico'
 import { componerNombreMedicoCompleto, componerInicialesMedico } from '@/lib/nombreMedico'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { ZONAS_MEXICO } from '@/lib/consultorios/zonas-mexico'
+import useSWR from 'swr'
+import {
+  CLAVE_CONFIG,
+  CONFIG_DEDUPE_MS,
+  fetcherConfig,
+  type ConfigApp,
+  type DiaSemana,
+  type Horario,
+  type MedicoConfig,
+} from '@/lib/configApp'
 
 /* ─── Tipos ────────────────────────────────────────────── */
 
@@ -53,6 +63,11 @@ type PacienteBusqueda = { id: string; nombre: string; apellidos: string; telefon
 
 type Medico = { id: string; titulo: string | null; nombres: string | null; apellido_paterno: string | null; apellido_materno: string | null; especialidad?: string | null }
 
+/* Constante de módulo, no `[]` en línea: un array nuevo por render cambiaría
+   la identidad de `inicialesDeCita` y con ella la de `eventContent`, que
+   FullCalendar usa para decidir si repintar las tarjetas. */
+const SIN_MEDICOS: MedicoConfig[] = []
+
 type ModalState =
   | { mode: 'closed' }
   | { mode: 'create'; start: string; end: string }
@@ -77,9 +92,8 @@ const STATUS_STYLE: Record<Status, { bg: string; text: string; border: string }>
 
 /* ─── Horario de consulta ──────────────────────────────── */
 
-type DiaSemana = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo'
-type HorarioDia = { activo: boolean; inicio: string; fin: string }
-type Horario = Record<DiaSemana, HorarioDia>
+/* `DiaSemana`, `HorarioDia` y `Horario` viven en src/lib/configApp.ts: es el
+   tipo de `clinicas.horario_consulta` tal como lo devuelve el agregado. */
 
 const DIAS: { key: DiaSemana; label: string; fc: number }[] = [
   { key: 'lunes',     label: 'Lunes',     fc: 1 },
@@ -1195,12 +1209,22 @@ export default function AgendaPage() {
   const [modal,        setModal]        = useState<ModalState>({ mode: 'closed' })
   const [isMobile,     setIsMobile]     = useState(false)
   const [currentView,  setCurrentView]  = useState<string>('timeGridWeek')
-  const [horario,      setHorario]      = useState<Horario>(HORARIO_DEFAULT)
   const [horarioOpen,  setHorarioOpen]  = useState(false)
   const [confirm,      setConfirm]      = useState<{ message: string; onConfirm: () => void; onCancel: () => void } | null>(null)
   const [citaCreada,   setCitaCreada]   = useState(false)
-  const [medicos,      setMedicos]      = useState<Medico[]>([])
   const [filtroMedico, setFiltroMedico] = useState<string>('')
+
+  /* Horario y médicos salen del agregado de configuración, no de dos fetch
+     propios: la misma clave la piden ya el Sidebar y el provider de
+     consultorios del layout, así que SWR la deduplica y abrir la agenda no
+     añade ninguna petición por estos dos datos. */
+  const { data: config, mutate: mutarConfig } = useSWR<ConfigApp>(
+    CLAVE_CONFIG,
+    fetcherConfig,
+    { dedupingInterval: CONFIG_DEDUPE_MS },
+  )
+  const horario = config?.horario ?? HORARIO_DEFAULT
+  const medicos = config?.medicos ?? SIN_MEDICOS
   const { profile, isDoctor } = useProfile()
   const toast = useToast()
   const { state: subState, openBloqueoModal } = useSubscriptionGate()
@@ -1245,18 +1269,6 @@ export default function AgendaPage() {
     (arg: EventContentArg) => renderEventContent(arg, navegadorTZ, inicialesDeCita),
     [navegadorTZ, inicialesDeCita]
   )
-
-  useEffect(() => {
-    fetch('/api/me/horario')
-      .then(r => r.json())
-      .then(d => { if (d.horario) setHorario(d.horario) })
-  }, [])
-
-  useEffect(() => {
-    fetch('/api/clinica/medicos')
-      .then(r => r.json())
-      .then(d => setMedicos(d.medicos ?? []))
-  }, [])
 
   /* ── Detectar mobile y actualizar vista del calendario ── */
   useEffect(() => {
@@ -1892,7 +1904,9 @@ export default function AgendaPage() {
               body:    JSON.stringify({ horario: h }),
             })
             if (res.ok) {
-              setHorario(h)
+              // El horario vive ya en el agregado: se escribe su rebanada en
+              // el cache en vez de en un estado local paralelo.
+              mutarConfig(c => c ? { ...c, horario: h } : c, { revalidate: false })
               setHorarioOpen(false)
               toast.success('Horario actualizado')
             } else {

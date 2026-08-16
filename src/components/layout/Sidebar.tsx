@@ -18,6 +18,7 @@ import ConsultorioActivoSelector from '@/components/sidebar/ConsultorioActivoSel
 import { canManageClinica } from '@/lib/permissions'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import { useClinica } from '@/hooks/useClinica'
+import { CLAVE_CONFIG } from '@/lib/configApp'
 import { useTheme } from '@/components/layout/ThemeProvider'
 import { useAuth } from '@/lib/auth-context'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
@@ -186,7 +187,9 @@ export default function Sidebar() {
     // stopMirrorEngine → clearMirror → cookies sb-* → sessionStorage → SDK signOut
     await signOut()
     clearProfileCache()
-    await mutate('/api/me/clinica', null, { revalidate: false })
+    // La clave de useClinica es ya el agregado de configuración; limpiarla
+    // borra de paso consultorios, horario y médicos de la sesión que cierra.
+    await mutate(CLAVE_CONFIG, null, { revalidate: false })
     router.push('/login')
     router.refresh()
   }
