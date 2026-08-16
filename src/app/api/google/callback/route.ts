@@ -34,6 +34,22 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(new URL('/login', req.url))
     }
 
+    // CONSENTIMIENTO GRANULAR — Google presenta los permisos con casillas
+    // individuales. Un médico puede desmarcar la de crear calendarios y darle
+    // Continuar: quedaría conectado pero sin poder crear nada, y fallaría más
+    // tarde con un error opaco. La respuesta del token trae los permisos
+    // realmente concedidos; si falta el imprescindible, no se guarda nada.
+    //
+    // `calendar.events.freebusy` NO se exige: sin él sólo se pierden los
+    // bloques de "Ocupado" del calendario personal, y la sincronización de
+    // citas —que es el punto— sigue funcionando entera.
+    const CALENDARIO_PROPIO = 'https://www.googleapis.com/auth/calendar.app.created'
+    if (!(tokens.scope ?? '').split(' ').includes(CALENDARIO_PROPIO)) {
+      const denegado = NextResponse.redirect(new URL('/perfil?gcal_error=permiso_calendario', req.url))
+      denegado.cookies.delete('oauth_state')
+      return denegado
+    }
+
     await supabase.from('google_tokens').upsert({
       user_id: user.id,
       access_token: tokens.access_token ? encrypt(tokens.access_token) : null,

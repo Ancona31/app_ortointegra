@@ -1305,7 +1305,14 @@ export default function AgendaPage() {
     }
   }, [isSingleDoctor, filtroMedico])
 
-  /* ── Event source: eventos personales de Google Calendar ── */
+  /* ── Event source: Google Calendar ─────────────────────
+   * Dos cosas distintas en una sola petición:
+   *   `events`  — eventos del calendario propio de Spinus, con detalle. El
+   *               servidor ya quitó los que son citas de la app, así que aquí
+   *               NO hace falta pedir /api/appointments para deduplicar.
+   *   `ocupado` — huecos del calendario personal del médico vía freebusy. Sin
+   *               título ni detalle: es todo lo que el permiso concede.
+   */
   const gcalSource = useCallback(async (
     info: { startStr: string; endStr: string },
     success: (events: EventInput[]) => void,
@@ -1314,19 +1321,13 @@ export default function AgendaPage() {
     try {
       const res = await fetch(`/api/google/events?from=${info.startStr}&to=${info.endStr}`)
       const data = await res.json()
-      if (!data.connected || !data.events) { success([]); return }
-
-      // IDs de eventos que ya son citas de la app — para no duplicar
-      const appGcalIds = new Set<string>()
-      const aptsRes = await fetch(`/api/appointments?from=${info.startStr}&to=${info.endStr}`)
-      const aptsData = await aptsRes.json()
-      for (const apt of aptsData.appointments ?? []) {
-        if (apt.google_event_id) appGcalIds.add(apt.google_event_id)
-      }
+      if (!data.connected) { success([]); return }
 
       type GCalEvent = { id?: string; summary?: string; start?: { dateTime?: string; date?: string }; end?: { dateTime?: string; date?: string } }
-      const eventos = (data.events as GCalEvent[])
-        .filter((e) => e.id && !appGcalIds.has(e.id))
+      type BloqueOcupado = { start: string; end: string }
+
+      const eventos = ((data.events ?? []) as GCalEvent[])
+        .filter((e) => e.id)
         .map((e) => ({
           id:              `gcal-${e.id}`,
           title:           `🔒 ${e.summary || 'Ocupado'}`,
@@ -1341,7 +1342,23 @@ export default function AgendaPage() {
           extendedProps:   { isGcalBlock: true },
         }))
 
-      success(eventos)
+      // Bloques anónimos. `isGcalBusy` los distingue de los de arriba: no
+      // tienen id de Google, ni título real, ni nada que abrir.
+      const bloques = ((data.ocupado ?? []) as BloqueOcupado[])
+        .map((b, i) => ({
+          id:              `gcal-busy-${i}-${b.start}`,
+          title:           '🔒 Ocupado',
+          start:           b.start,
+          end:             b.end,
+          allDay:          false,
+          backgroundColor: 'transparent',
+          borderColor:     'transparent',
+          textColor:       '#6d4ec0',
+          editable:        false,
+          extendedProps:   { isGcalBlock: true, isGcalBusy: true },
+        }))
+
+      success([...eventos, ...bloques])
     } catch (err: unknown) {
       failure(err instanceof Error ? err : new Error('Error cargando eventos'))
     }

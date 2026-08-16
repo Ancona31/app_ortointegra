@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useProfile } from '@/hooks/useProfile'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, Save, Palette, Upload, X, CalendarDays, CheckCircle2, LogIn, LogOut, PenLine, Plus, Pencil, Trash2, Star, MapPin } from 'lucide-react'
 import { PerfilSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
@@ -55,6 +55,10 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
 export default function PerfilPage() {
   const { profile, loading: loadingProfile } = useProfile()
   const router = useRouter()
+  // El callback de Google redirige aquí con ?gcal_error=permiso_calendario
+  // cuando el médico desmarcó la casilla de crear calendarios y aun así
+  // continuó: quedaría "conectado" sin poder crear el calendario de Spinus.
+  const gcalPermisoFaltante = useSearchParams().get('gcal_error') === 'permiso_calendario'
   const toast = useToast()
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -655,6 +659,14 @@ export default function PerfilPage() {
                 )}
               </div>
             </div>
+            {gcalPermisoFaltante && (
+              <p className="mt-3 text-[11px] leading-relaxed text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+                No se pudo conectar: en la pantalla de Google quedó sin marcar el permiso
+                para <strong>crear y administrar su propio calendario</strong>. Spinus guarda
+                tus citas en un calendario aparte que él mismo crea, así que sin ese permiso
+                no puede sincronizar nada. Vuelve a intentarlo y deja la casilla marcada.
+              </p>
+            )}
           </div>
         </div>
 

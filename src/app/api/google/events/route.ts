@@ -1,7 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { conCalendarioSpinus, GCAL_TIMEZONE } from '@/lib/gcal'
+import { conCalendarioSpinus, GCAL_TIMEZONE, type GCalCliente } from '@/lib/gcal'
 import { anonimizarTexto } from '@/lib/anonimizar'
+
+/** Un hueco ocupado del calendario personal del médico. Sin título ni detalle. */
+type BloqueOcupado = { start: string; end: string }
+
+/**
+ * Disponibilidad del calendario personal (`primary`) del médico, vía
+ * `freebusy.query`: horarios ocupados, sin títulos ni asistentes ni nada más.
+ * Es todo lo que autoriza el scope no sensible `calendar.events.freebusy`.
+ *
+ * Va en su propio try/catch a propósito. Un fallo aquí (el médico desmarcó la
+ * casilla del permiso, o Google rechaza el alias) NO puede tumbar la respuesta
+ * entera: el catch de afuera devolvería `connected: false` y la agenda y el
+ * perfil se verían desconectados de Google teniendo el calendario sano.
+ * Degradar a "sin bloques" es lo correcto.
+ */
+async function consultarOcupado(
+  calendar: GCalCliente,
+  timeMin: string,
+  timeMax: string,
+): Promise<BloqueOcupado[]> {
+  try {
+    const { data } = await calendar.freebusy.query({
+      requestBody: { timeMin, timeMax, items: [{ id: 'primary' }] },
+    })
+    const calendarios = data.calendars ?? {}
+    // El alias `primary` no está documentado para freebusy: si Google devuelve
+    // el calendario bajo otra llave (el correo de la cuenta), la tomamos igual
+    // y dejamos rastro en el log para saberlo.
+    let entrada = calendarios.primary
+    if (!entrada) {
+      const llaves = Object.keys(calendarios)
+      if (llaves.length > 0) {
+        console.error('[GCal] freebusy no devolvió la llave "primary"; llegó:', llaves.join(', '))
+        entrada = calendarios[llaves[0]]
+      }
+    }
+    if (entrada?.errors?.length) {
+      console.error('[GCal] freebusy devolvió errores en el calendario personal')
+      return []
+    }
+    return (entrada?.busy ?? []).flatMap((hueco) =>
+      hueco.start && hueco.end ? [{ start: hueco.start, end: hueco.end }] : []
+    )
+  } catch {
+    console.error('[GCal] freebusy.query falló sobre el calendario personal')
+    return []
+  }
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -15,19 +63,43 @@ export async function GET(req: NextRequest) {
     const timeMin = fromParam ?? new Date(ahora.getFullYear(), ahora.getMonth(), 1).toISOString()
     const timeMax = toParam ?? new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59).toISOString()
 
-    const respuesta = await conCalendarioSpinus(supabase, user.id, (calendar, calendarId) =>
-      calendar.events.list({
-        calendarId,
-        timeMin,
-        timeMax,
-        singleEvents: true,
-        orderBy: 'startTime',
-        maxResults: 100,
-      })
-    )
+    // Dos fuentes, en paralelo dentro de la misma sesión de Google:
+    //   1. El calendario propio de Spinus, con detalle completo.
+    //   2. La disponibilidad del calendario personal, sin detalle alguno.
+    const respuesta = await conCalendarioSpinus(supabase, user.id, async (calendar, calendarId) => {
+      const [lista, ocupado] = await Promise.all([
+        calendar.events.list({
+          calendarId,
+          timeMin,
+          timeMax,
+          singleEvents: true,
+          orderBy: 'startTime',
+          maxResults: 100,
+        }),
+        consultarOcupado(calendar, timeMin, timeMax),
+      ])
+      return { eventos: lista.data.items ?? [], ocupado }
+    })
     if (!respuesta) return NextResponse.json({ connected: false })
 
-    return NextResponse.json({ connected: true, events: respuesta.data.items || [] })
+    // Deduplicación del lado del servidor: los eventos que ya son una cita de
+    // Spinus se quitan aquí. La agenda pinta esas citas por su cuenta desde
+    // /api/appointments, así que devolverlas otra vez las duplicaría — y el
+    // cliente ya no necesita una segunda petición para averiguarlo.
+    // La RLS acota `appointments` a la clínica del médico.
+    const { data: citas } = await supabase
+      .from('appointments')
+      .select('google_event_id')
+      .gte('start_time', timeMin)
+      .lte('start_time', timeMax)
+      .not('google_event_id', 'is', null)
+    const yaSonCitas = new Set((citas ?? []).map((c) => c.google_event_id))
+
+    return NextResponse.json({
+      connected: true,
+      events:    respuesta.eventos.filter((e) => !e.id || !yaSonCitas.has(e.id)),
+      ocupado:   respuesta.ocupado,
+    })
   } catch {
     return NextResponse.json({ connected: false, error: 'Error al obtener eventos' })
   }
