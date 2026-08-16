@@ -1468,11 +1468,26 @@ export default function AgendaPage() {
   }
 
   /**
-   * Re-hidrata un evento del calendario con la fila canonica que devolvio el
-   * servidor. Sustituye extendedProps en bloque en vez de campo por campo:
-   * ese era el bug — se sincronizaban 6 campos a mano y `updated_at` no
-   * estaba entre ellos, asi que el segundo guardado de una misma cita
-   * mandaba un valor viejo y el servidor respondia 409.
+   * Re-hidrata un evento del calendario con la fila canónica que devolvió el
+   * servidor. Recorre `extendedProps` y FUSIONA clave por clave: no sustituye
+   * el objeto en bloque. Antes se sincronizaban 6 campos a mano y `updated_at`
+   * no estaba entre ellos, así que el segundo guardado de una misma cita
+   * mandaba un valor viejo y el servidor respondía 409; de ahí que hoy se
+   * recorra todo lo que llega en vez de una lista escrita a mano.
+   *
+   * QUE FUSIONE NO ES UN DESCUIDO: una clave AUSENTE conserva a propósito el
+   * valor ya pintado, y de eso depende algo concreto. `appointments` se
+   * publica en Realtime con `REPLICA IDENTITY` en default, y con esa identidad
+   * walrus no puede reconstruir las columnas TOAST que el UPDATE no tocó: una
+   * `notes` larga que nadie editó NO viaja en el payload. Al fusionar, esa
+   * clave ausente deja en pie la nota que ya estaba, que es la correcta.
+   *
+   * Cambiarlo a un reemplazo en bloque la borraría de la tarjeta sin que nada
+   * falle, y el siguiente guardado desde el modal escribiría ese vacío en la
+   * base. Rompe igual a cualquier llamador que pase un `Partial<Appointment>`
+   * incompleto. Ver la nota de
+   * `supabase/migrations/20260816_agenda_realtime_appointments.sql`, que
+   * apunta a esta función por su nombre.
    */
   function aplicarAppointmentAlEvento(appointment: Partial<Appointment> & { id?: string }) {
     if (!appointment?.id) return
