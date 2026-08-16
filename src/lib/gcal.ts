@@ -122,9 +122,42 @@ export async function crearCalendarioSpinus(
   })
 
   const calendarId = cal?.id ?? null
-  if (calendarId) {
-    await supabase.from('google_tokens').update({ calendar_id: calendarId }).eq('user_id', userId)
+  if (!calendarId) return null
+
+  // `.select()` para distinguir "se guardó" de "no se tocó ningún renglón":
+  // un UPDATE que la RLS filtra, o sobre un user_id que ya no tiene fila,
+  // responde sin error y con cero renglones. Sin esto, el fallo es mudo.
+  const { data: guardado, error } = await supabase
+    .from('google_tokens')
+    .update({ calendar_id: calendarId })
+    .eq('user_id', userId)
+    .select('user_id')
+    .maybeSingle()
+
+  if (error || !guardado) {
+    // Un calendario creado que nadie registró es basura invisible: el médico
+    // no tiene por dónde enterarse de que existe y cada intento fallido deja
+    // otro. Se borra aquí mismo — `calendar.app.created` autoriza borrar los
+    // calendarios que la propia app creó.
+    console.error('[GCal] calendars.insert OK pero no se pudo guardar calendar_id', {
+      operacion: 'google_tokens.update(calendar_id)',
+      userId,
+      calendarId,
+      error: error?.message ?? 'update sin renglones afectados',
+    })
+    try {
+      await calendar.calendars.delete({ calendarId })
+    } catch (errBorrado) {
+      console.error('[GCal] tampoco se pudo borrar el calendario huérfano', {
+        operacion: 'calendars.delete',
+        userId,
+        calendarId,
+        error: errBorrado instanceof Error ? errBorrado.message : String(errBorrado),
+      })
+    }
+    return null
   }
+
   return calendarId
 }
 

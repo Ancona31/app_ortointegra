@@ -27,6 +27,14 @@ export async function GET(req: NextRequest) {
     )
 
     const { tokens } = await oauth2Client.getToken(code)
+    // `getToken` NO deja las credenciales puestas en el cliente: devuelve los
+    // tokens y nada más. Sin este `setCredentials`, el cliente de Calendar que
+    // se construye abajo sale sin autenticar y `calendars.insert` revienta
+    // antes de salir a la red ("No access, refresh token, API key or refresh
+    // handler callback is set") — que es exactamente cómo `calendar_id` se
+    // quedaba en null sin que nadie se enterara.
+    oauth2Client.setCredentials(tokens)
+
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
