@@ -198,7 +198,16 @@ export async function POST(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    // Google Calendar sync en background — necesita admin porque after() no tiene contexto de cookies
+    // Google Calendar sync en background con el cliente admin.
+    //
+    // Este comentario decía "porque after() no tiene contexto de cookies" y era
+    // FALSO: `after()` conserva el contexto de la petición y la RLS funciona
+    // ahí con normalidad (comprobado en producción el 2026-08-16). El motivo
+    // real es a quién se le lee el token: `conCalendarioSpinus` recibe el id de
+    // quien ejecuta la acción y la RLS de `google_tokens` sólo deja leer
+    // `user_id = auth.uid()`, así que el cliente admin es el prerrequisito para
+    // leerle el token a otro usuario. Ver el comentario largo del PUT en
+    // appointments/[id]/route.ts.
     const admin = createAdminClient()
     // El titulo del evento sale del paciente ligado; si la cita no tiene
     // paciente, del titulo libre de la cita.

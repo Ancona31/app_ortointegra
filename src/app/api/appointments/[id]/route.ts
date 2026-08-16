@@ -184,12 +184,22 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    // Google Calendar sync en background — necesita admin porque after() corre
-    // DESPUÉS de responder, ya sin contexto de cookies: ahí `auth.uid()` es
-    // null y la RLS de `google_tokens` (user_id = auth.uid()) no deja leer ni
-    // el token del propio usuario. El resultado era que nada se sincronizaba y
-    // el catch de abajo se lo tragaba. El POST de /api/appointments ya lo hacía
-    // así; esto lo espeja.
+    // Google Calendar sync en background con el cliente admin, espejando al
+    // POST de /api/appointments.
+    //
+    // NO es por las cookies. `after()` SÍ conserva el contexto de la petición
+    // y la RLS funciona ahí con normalidad — comprobado en producción el
+    // 2026-08-16 creando y arrastrando una cita: Google se actualizó en ambos
+    // casos. Si alguien apunta lo contrario en algún comentario, está mal.
+    //
+    // El motivo real es a QUIÉN se le lee el token. `conCalendarioSpinus`
+    // recibe el `user.id` de quien ejecuta la acción, y la RLS de
+    // `google_tokens` sólo deja leer `user_id = auth.uid()`. Funciona para el
+    // dueño del token; una secretaria que mueve la cita de un médico busca el
+    // suyo, no lo tiene, y no sincroniza nada. El cliente admin es el
+    // PRERREQUISITO para poder leerle el token a otro usuario, no el arreglo:
+    // decidir a quién leérselo es del modelo de cuenta administradora, que va
+    // en otra rama. Hasta entonces ese caso sigue sin sincronizar.
     //
     // ÁMBITO CON CLIENTE ADMIN — sin RLS, cada consulta acota a mano:
     //   · el token va por `user_id` (es del usuario, no de la clínica);
@@ -320,9 +330,10 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext<'/api/appointm
     if (existing.google_event_id) {
       const gcalEventId = existing.google_event_id
       const userId = user.id
-      // Mismo motivo que en el PUT: dentro de after() ya no hay cookies, así
-      // que `auth.uid()` es null y la RLS de `google_tokens` no deja leer el
-      // token. Con el cliente admin la única consulta propia de esta baja es
+      // Mismo motivo que en el PUT (ver el comentario largo de arriba): el
+      // cliente admin es lo que permitirá leerle el token a alguien que no sea
+      // quien ejecuta la baja. No tiene nada que ver con `after()` ni con las
+      // cookies. Con el cliente admin, la única consulta propia de esta baja es
       // el borrado del evento en Google, que no toca la base; lo que
       // `conCalendarioSpinus` consulta por dentro ya va acotado por `userId`
       // y, en `desvincularCitas`, por la `clinica_id` de ese perfil.
