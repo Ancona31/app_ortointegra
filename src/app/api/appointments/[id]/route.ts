@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { conCalendarioSpinus, GCAL_TIMEZONE } from '@/lib/gcal'
+import { conCalendarioSpinus, registrarFalloGCal, GCAL_TIMEZONE } from '@/lib/gcal'
 import { APPOINTMENT_SELECT, eventoParaGoogle, type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
 
 /* ── PUT /api/appointments/[id] ─────────────────────────── */
@@ -205,6 +205,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
           completed: '8',
         }
         let gcal_sync_status: 'synced' | 'pending' | 'failed' = 'pending'
+        let calendarIdUsado: string | null = null
         // Título y descripción se recalculan y se reenvían SIEMPRE que la
         // operación toque Google, no sólo cuando venga `title` en el cuerpo:
         // ambos se derivan del paciente, así que ligar uno a una cita ya
@@ -216,8 +217,9 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
         // `reminders` NO se manda aquí a propósito: es del insert.
         const { summary, description } = eventoParaGoogle(pacienteCita, clinicaCita, apt.title)
         try {
-          await conCalendarioSpinus(supabase, userId, (calendar, calendarId) =>
-            calendar.events.patch({
+          await conCalendarioSpinus(supabase, userId, (calendar, calendarId) => {
+            calendarIdUsado = calendarId
+            return calendar.events.patch({
               calendarId,
               eventId:    gcalEventId,
               requestBody: {
@@ -228,14 +230,25 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
                 ...(status     !== undefined && STATUS_COLOR[status] ? { colorId: STATUS_COLOR[status] }    : {}),
               },
             })
-          )
+          })
           // null → el médico no tiene Google conectado: nada que sincronizar.
           gcal_sync_status = 'synced'
         } catch (gcalErr) {
-          console.error('[GCal] Error de sincronización en background')
+          // Corre dentro de after(): nadie ve el fallo del lado del cliente y la
+          // cita se queda en 'failed' sin más pista que esta línea.
+          registrarFalloGCal(
+            { operacion: 'events.patch (edición de cita)', userId, calendarId: calendarIdUsado, eventId: gcalEventId },
+            gcalErr,
+          )
           gcal_sync_status = 'failed'
         }
-        await admin.from('appointments').update({ gcal_sync_status }).eq('id', id)
+        const { error: errEstado } = await admin.from('appointments').update({ gcal_sync_status }).eq('id', id)
+        if (errEstado) {
+          registrarFalloGCal(
+            { operacion: 'appointments.update(gcal_sync_status)', userId, calendarId: calendarIdUsado },
+            errEstado,
+          )
+        }
       })
     }
 
@@ -273,11 +286,21 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext<'/api/appointm
       const gcalEventId = existing.google_event_id
       const userId = user.id
       after(async () => {
+        let calendarIdUsado: string | null = null
         try {
-          await conCalendarioSpinus(supabase, userId, (calendar, calendarId) =>
-            calendar.events.delete({ calendarId, eventId: gcalEventId })
+          await conCalendarioSpinus(supabase, userId, (calendar, calendarId) => {
+            calendarIdUsado = calendarId
+            return calendar.events.delete({ calendarId, eventId: gcalEventId })
+          })
+        } catch (gcalErr) {
+          // Sigue siendo best-effort —la cita ya se borró de Spinus y no hay
+          // nada que reintentar—, pero el evento queda vivo en el calendario
+          // del médico y hasta hoy no había forma de enterarse.
+          registrarFalloGCal(
+            { operacion: 'events.delete (baja de cita)', userId, calendarId: calendarIdUsado, eventId: gcalEventId },
+            gcalErr,
           )
-        } catch { /* GCal delete es best-effort */ }
+        }
       })
     }
 

@@ -2,7 +2,7 @@ import { google } from 'googleapis'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { encrypt } from '@/lib/encrypt'
-import { crearCalendarioSpinus } from '@/lib/gcal'
+import { crearCalendarioSpinus, registrarFalloGCal } from '@/lib/gcal'
 
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get('code')
@@ -16,6 +16,10 @@ export async function GET(req: NextRequest) {
   if (!state || !savedState || state !== savedState) {
     return NextResponse.redirect(new URL('/dashboard?error=invalid_state', req.url))
   }
+
+  // Se resuelve dentro del try, pero el catch de afuera lo necesita: si lo que
+  // revienta es `getToken`, todavía no hay sesión que consultar.
+  let userId = 'sin-sesion'
 
   try {
     // Una instancia por petición: compartirla entre peticiones concurrentes
@@ -41,6 +45,7 @@ export async function GET(req: NextRequest) {
     if (!user) {
       return NextResponse.redirect(new URL('/login', req.url))
     }
+    userId = user.id
 
     // CONSENTIMIENTO GRANULAR — Google presenta los permisos con casillas
     // individuales. Un médico puede desmarcar la de crear calendarios y darle
@@ -58,12 +63,20 @@ export async function GET(req: NextRequest) {
       return denegado
     }
 
-    await supabase.from('google_tokens').upsert({
+    const { error: errTokens } = await supabase.from('google_tokens').upsert({
       user_id: user.id,
       access_token: tokens.access_token ? encrypt(tokens.access_token) : null,
       refresh_token: tokens.refresh_token ? encrypt(tokens.refresh_token) : null,
       expires_at: tokens.expiry_date ?? null,
     })
+    // Sin fila de tokens no hay conexión ni dónde guardar el calendario: no
+    // vale la pena crear uno para tener que borrarlo un renglón más abajo.
+    if (errTokens) {
+      registrarFalloGCal({ operacion: 'google_tokens.upsert', userId: user.id }, errTokens)
+      const fallo = NextResponse.redirect(new URL('/dashboard?error=oauth_failed', req.url))
+      fallo.cookies.delete('oauth_state')
+      return fallo
+    }
 
     // El calendario propio de Spinus. Si falla, los tokens quedan guardados y
     // `calendar_id` en null: `conCalendarioSpinus` lo crea en la primera
@@ -74,14 +87,18 @@ export async function GET(req: NextRequest) {
         user.id,
         google.calendar({ version: 'v3', auth: oauth2Client }),
       )
-    } catch {
-      console.error('[GCal] No se pudo crear el calendario de Spinus en el callback')
+    } catch (err) {
+      registrarFalloGCal({ operacion: 'calendars.insert (callback)', userId: user.id }, err)
     }
 
     const response = NextResponse.redirect(new URL('/dashboard?calendar=connected', req.url))
     response.cookies.delete('oauth_state')
     return response
-  } catch {
+  } catch (err) {
+    // Aquí caen `getToken` (código caducado, redirect_uri que no cuadra,
+    // cliente OAuth revocado) y cualquier otro fallo del intercambio. Hasta
+    // hoy se iba entero al redirect sin dejar una línea.
+    registrarFalloGCal({ operacion: 'oauth2.getToken (callback)', userId }, err)
     return NextResponse.redirect(new URL('/dashboard?error=oauth_failed', req.url))
   }
 }

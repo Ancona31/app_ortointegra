@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { conCalendarioSpinus, GCAL_TIMEZONE, type GCalCliente } from '@/lib/gcal'
+import { conCalendarioSpinus, registrarFalloGCal, GCAL_TIMEZONE, type GCalCliente } from '@/lib/gcal'
 import { anonimizarTexto } from '@/lib/anonimizar'
 
 /** Un hueco ocupado del calendario personal del médico. Sin título ni detalle. */
@@ -21,6 +21,7 @@ async function consultarOcupado(
   calendar: GCalCliente,
   timeMin: string,
   timeMax: string,
+  userId: string,
 ): Promise<BloqueOcupado[]> {
   try {
     const { data } = await calendar.freebusy.query({
@@ -34,28 +35,41 @@ async function consultarOcupado(
     if (!entrada) {
       const llaves = Object.keys(calendarios)
       if (llaves.length > 0) {
-        console.error('[GCal] freebusy no devolvió la llave "primary"; llegó:', llaves.join(', '))
+        // Las llaves son ids de calendario del médico, no datos de paciente.
+        registrarFalloGCal(
+          { operacion: 'freebusy.query (sin llave "primary")', userId },
+          new Error(`llaves devueltas: ${llaves.join(', ')}`),
+        )
         entrada = calendarios[llaves[0]]
       }
     }
     if (entrada?.errors?.length) {
-      console.error('[GCal] freebusy devolvió errores en el calendario personal')
+      registrarFalloGCal(
+        { operacion: 'freebusy.query (errores en el calendario personal)', userId },
+        new Error(entrada.errors.map((e) => e.reason ?? 'sin reason').join(', ')),
+      )
       return []
     }
     return (entrada?.busy ?? []).flatMap((hueco) =>
       hueco.start && hueco.end ? [{ start: hueco.start, end: hueco.end }] : []
     )
-  } catch {
-    console.error('[GCal] freebusy.query falló sobre el calendario personal')
+  } catch (err) {
+    registrarFalloGCal({ operacion: 'freebusy.query', userId }, err)
     return []
   }
 }
 
 export async function GET(req: NextRequest) {
+  // Los necesita el catch de afuera, donde `user` y el calendario resuelto ya
+  // no están a la vista.
+  let userId = 'sin-sesion'
+  let calendarIdUsado: string | null = null
+
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    userId = user.id
 
     const ahora = new Date()
     const fromParam = req.nextUrl.searchParams.get('from')
@@ -67,6 +81,7 @@ export async function GET(req: NextRequest) {
     //   1. El calendario propio de Spinus, con detalle completo.
     //   2. La disponibilidad del calendario personal, sin detalle alguno.
     const respuesta = await conCalendarioSpinus(supabase, user.id, async (calendar, calendarId) => {
+      calendarIdUsado = calendarId
       const [lista, ocupado] = await Promise.all([
         calendar.events.list({
           calendarId,
@@ -76,7 +91,7 @@ export async function GET(req: NextRequest) {
           orderBy: 'startTime',
           maxResults: 100,
         }),
-        consultarOcupado(calendar, timeMin, timeMax),
+        consultarOcupado(calendar, timeMin, timeMax, user.id),
       ])
       return { eventos: lista.data.items ?? [], ocupado }
     })
@@ -100,44 +115,68 @@ export async function GET(req: NextRequest) {
       events:    respuesta.eventos.filter((e) => !e.id || !yaSonCitas.has(e.id)),
       ocupado:   respuesta.ocupado,
     })
-  } catch {
+  } catch (err) {
+    // OJO: la respuesta dice `connected: false`, así que un fallo pasajero de
+    // Google se ve en la interfaz como "no conectado". Se deja como está
+    // —cambiarlo es tocar el contrato con la agenda y el perfil— pero el log
+    // ya permite distinguir "sin conectar" de "conectado y reventó".
+    registrarFalloGCal(
+      { operacion: 'events.list (agenda)', userId, calendarId: calendarIdUsado },
+      err,
+    )
     return NextResponse.json({ connected: false, error: 'Error al obtener eventos' })
   }
 }
 
 export async function DELETE(req: NextRequest) {
+  let userId = 'sin-sesion'
+  let calendarIdUsado: string | null = null
+  let eventIdUsado: string | null = null
+
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    userId = user.id
 
     const { eventId } = await req.json()
     if (!eventId) return NextResponse.json({ error: 'eventId requerido' }, { status: 400 })
+    eventIdUsado = eventId
 
-    const borrado = await conCalendarioSpinus(supabase, user.id, (calendar, calendarId) =>
-      calendar.events.delete({ calendarId, eventId })
-    )
+    const borrado = await conCalendarioSpinus(supabase, user.id, (calendar, calendarId) => {
+      calendarIdUsado = calendarId
+      return calendar.events.delete({ calendarId, eventId })
+    })
     if (borrado === null) return NextResponse.json({ error: 'Calendar no conectado' }, { status: 400 })
 
     return NextResponse.json({ ok: true })
-  } catch {
+  } catch (err) {
+    registrarFalloGCal(
+      { operacion: 'events.delete', userId, calendarId: calendarIdUsado, eventId: eventIdUsado },
+      err,
+    )
     return NextResponse.json({ error: 'Error al eliminar evento' }, { status: 500 })
   }
 }
 
 export async function POST(req: NextRequest) {
+  let userId = 'sin-sesion'
+  let calendarIdUsado: string | null = null
+
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    userId = user.id
 
     const { titulo, descripcion, todoDia, fecha, inicio, fin, zona, emailMedico } = await req.json()
     if (!titulo) return NextResponse.json({ error: 'Título requerido' }, { status: 400 })
 
     const timeZone = zona ?? GCAL_TIMEZONE
 
-    const creado = await conCalendarioSpinus(supabase, user.id, (calendar, calendarId) =>
-      calendar.events.insert({
+    const creado = await conCalendarioSpinus(supabase, user.id, (calendar, calendarId) => {
+      calendarIdUsado = calendarId
+      return calendar.events.insert({
         calendarId,
         sendUpdates: 'all',
         // PRIVACIDAD — LFPDPPP: anonimizar título y descripción antes de enviar a Google.
@@ -151,11 +190,15 @@ export async function POST(req: NextRequest) {
           ...(emailMedico ? { attendees: [{ email: emailMedico }] } : {}),
         },
       })
-    )
+    })
     if (!creado) return NextResponse.json({ error: 'Calendar no conectado' }, { status: 400 })
 
     return NextResponse.json({ ok: true, evento: creado.data })
-  } catch {
+  } catch (err) {
+    registrarFalloGCal(
+      { operacion: 'events.insert (evento suelto)', userId, calendarId: calendarIdUsado },
+      err,
+    )
     return NextResponse.json({ error: 'Error al crear evento' }, { status: 500 })
   }
 }

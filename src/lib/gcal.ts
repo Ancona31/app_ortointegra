@@ -37,6 +37,68 @@ function esNotFound(err: unknown): boolean {
   return false
 }
 
+/** Datos mínimos para que una línea de log sirva para diagnosticar. */
+export interface ContextoGCal {
+  /** Qué se intentaba: 'calendars.insert', 'events.patch', 'freebusy.query'… */
+  operacion:   string
+  userId:      string
+  calendarId?: string | null
+  eventId?:    string | null
+}
+
+/**
+ * Saca de un error de la API de Google lo publicable: mensaje, código HTTP y
+ * código simbólico. Los errores de googleapis vienen en varias formas según
+ * dónde revienten (antes de salir a la red, en el transporte, o con respuesta
+ * de Google), así que se buscan las tres.
+ */
+function detalleError(err: unknown): { mensaje: string; status: number | null; codigo: string | null } {
+  if (typeof err !== 'object' || err === null) {
+    return { mensaje: String(err), status: null, codigo: null }
+  }
+  const e = err as Record<string, unknown>
+  const respuesta = (typeof e.response === 'object' && e.response !== null)
+    ? e.response as Record<string, unknown>
+    : null
+
+  const status =
+    typeof e.status            === 'number' ? e.status
+    : typeof e.code            === 'number' ? e.code
+    : typeof respuesta?.status === 'number' ? respuesta.status
+    : null
+
+  const codigo = typeof e.code === 'string' ? e.code : null
+
+  // Se registra `message` y NADA más de la respuesta. El cuerpo entero del
+  // error de Google puede traer de vuelta lo que se le mandó —y el título de
+  // un evento lleva el nombre del paciente—. Los mensajes de Calendar son del
+  // tipo "Not Found" / "Insufficient Permission" y no lo incluyen; el corte a
+  // 300 caracteres acota el daño si algún día uno lo hiciera.
+  const mensaje = (err instanceof Error ? err.message : String(err)).slice(0, 300)
+
+  return { mensaje, status, codigo }
+}
+
+/**
+ * Registra un fallo de Google con lo que hace falta para diagnosticarlo:
+ * operación, médico, calendario y el error real.
+ *
+ * PRIVACIDAD — aquí NO entra ningún token (ni cifrado ni descifrado) ni ningún
+ * nombre de paciente. Si añades un campo, que siga siendo así.
+ */
+export function registrarFalloGCal(ctx: ContextoGCal, err: unknown): void {
+  const { mensaje, status, codigo } = detalleError(err)
+  console.error('[GCal] fallo ' + JSON.stringify({
+    operacion:  ctx.operacion,
+    userId:     ctx.userId,
+    calendarId: ctx.calendarId ?? null,
+    ...(ctx.eventId ? { eventId: ctx.eventId } : {}),
+    status,
+    codigo,
+    mensaje,
+  }))
+}
+
 /**
  * Abre sesión con Google para un médico: refresca el token si expiró y
  * devuelve el cliente de Calendar junto al calendario que tenga registrado
@@ -68,11 +130,31 @@ async function abrirSesionGoogle(
   })
 
   if (tokenData.expires_at && Date.now() > tokenData.expires_at) {
-    const { credentials } = await oauth2Client.refreshAccessToken()
-    await supabase.from('google_tokens').update({
+    // Si el médico revocó el acceso desde su cuenta de Google, esto revienta
+    // con `invalid_grant` y hasta hoy subía sin dejar rastro hasta el catch
+    // mudo de la ruta de turno.
+    let credentials
+    try {
+      ({ credentials } = await oauth2Client.refreshAccessToken())
+    } catch (err) {
+      registrarFalloGCal(
+        { operacion: 'oauth2.refreshAccessToken', userId, calendarId: tokenData.calendar_id },
+        err,
+      )
+      throw err
+    }
+    const { error } = await supabase.from('google_tokens').update({
       access_token: credentials.access_token ? encrypt(credentials.access_token) : null,
       expires_at:   credentials.expiry_date ?? null,
     }).eq('user_id', userId)
+    // No se aborta: la sesión en memoria sirve para esta petición. Pero si no
+    // se guardó, la siguiente vuelve a refrescar y conviene saberlo.
+    if (error) {
+      registrarFalloGCal(
+        { operacion: 'google_tokens.update(access_token)', userId, calendarId: tokenData.calendar_id },
+        error,
+      )
+    }
     oauth2Client.setCredentials(credentials)
   }
 
@@ -139,21 +221,19 @@ export async function crearCalendarioSpinus(
     // no tiene por dónde enterarse de que existe y cada intento fallido deja
     // otro. Se borra aquí mismo — `calendar.app.created` autoriza borrar los
     // calendarios que la propia app creó.
-    console.error('[GCal] calendars.insert OK pero no se pudo guardar calendar_id', {
-      operacion: 'google_tokens.update(calendar_id)',
-      userId,
-      calendarId,
-      error: error?.message ?? 'update sin renglones afectados',
-    })
+    registrarFalloGCal(
+      { operacion: 'google_tokens.update(calendar_id)', userId, calendarId },
+      error ?? new Error('UPDATE sin renglones afectados'),
+    )
     try {
       await calendar.calendars.delete({ calendarId })
     } catch (errBorrado) {
-      console.error('[GCal] tampoco se pudo borrar el calendario huérfano', {
-        operacion: 'calendars.delete',
-        userId,
-        calendarId,
-        error: errBorrado instanceof Error ? errBorrado.message : String(errBorrado),
-      })
+      // Se queda huérfano de verdad. Al menos ahora hay una línea con el id
+      // exacto para poder borrarlo a mano.
+      registrarFalloGCal(
+        { operacion: 'calendars.delete (limpieza de huérfano)', userId, calendarId },
+        errBorrado,
+      )
     }
     return null
   }
@@ -162,12 +242,19 @@ export async function crearCalendarioSpinus(
 }
 
 /** ¿Sigue existiendo el calendario? Un error que no sea 404 se lee como "sí". */
-async function calendarioVive(calendar: GCalCliente, calendarId: string): Promise<boolean> {
+async function calendarioVive(calendar: GCalCliente, calendarId: string, userId: string): Promise<boolean> {
   try {
     await calendar.calendars.get({ calendarId })
     return true
   } catch (err) {
-    return !esNotFound(err)
+    // Un error que no sea 404 hace que esta comprobación conteste "vive" y el
+    // 404 original suba sin recrear nada. Es lo correcto, pero deja de serlo en
+    // silencio si lo que falla de verdad es el permiso o la cuota.
+    if (!esNotFound(err)) {
+      registrarFalloGCal({ operacion: 'calendars.get (comprobar si vive)', userId, calendarId }, err)
+      return true
+    }
+    return false
   }
 }
 
@@ -200,12 +287,16 @@ async function desvincularCitas(supabase: SupabaseClient, userId: string): Promi
     .maybeSingle<{ clinica_id: string | null }>()
   if (!perfil?.clinica_id) return
 
-  await supabase
+  const { error } = await supabase
     .from('appointments')
     .update({ google_event_id: null, gcal_sync_status: 'unbound' })
     .eq('clinica_id', perfil.clinica_id)
     .or(`medico_id.eq.${userId},medico_id.is.null`)
     .not('google_event_id', 'is', null)
+
+  // Si esto falla, las citas quedan apuntando a eventos de un calendario
+  // muerto y nada más vuelve a intentarlo.
+  if (error) registrarFalloGCal({ operacion: 'appointments.update(unbound)', userId }, error)
 }
 
 /**
@@ -239,7 +330,7 @@ export async function conCalendarioSpinus<T>(
     return await operacion(calendar, calendarId)
   } catch (err) {
     if (!esNotFound(err)) throw err
-    if (await calendarioVive(calendar, calendarId)) throw err
+    if (await calendarioVive(calendar, calendarId, userId)) throw err
 
     await desvincularCitas(supabase, userId)
     const recreado = await crearCalendarioSpinus(supabase, userId, calendar)

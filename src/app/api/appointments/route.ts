@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { conCalendarioSpinus, GCAL_TIMEZONE } from '@/lib/gcal'
+import { conCalendarioSpinus, registrarFalloGCal, GCAL_TIMEZONE } from '@/lib/gcal'
 import { APPOINTMENT_SELECT, eventoParaGoogle, type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
 
 async function getProfile(supabase: Awaited<ReturnType<typeof createClient>>) {
@@ -207,13 +207,15 @@ export async function POST(req: NextRequest) {
     after(async () => {
       let gcal_sync_status: 'synced' | 'pending' | 'failed' = 'pending'
       let google_event_id: string | null = null
+      let calendarIdUsado: string | null = null
 
       try {
         // La descripción lleva un formato fijo (clínica y paciente) y NADA
         // clínico: ni notes, ni motivo de consulta, ni diagnóstico.
         const { summary, description, reminders } = eventoParaGoogle(pacienteCita, clinicaCita, title)
-        const creado = await conCalendarioSpinus(admin, profile.userId, (calendar, calendarId) =>
-          calendar.events.insert({
+        const creado = await conCalendarioSpinus(admin, profile.userId, (calendar, calendarId) => {
+          calendarIdUsado = calendarId
+          return calendar.events.insert({
             calendarId,
             requestBody: {
               summary,
@@ -225,19 +227,30 @@ export async function POST(req: NextRequest) {
               end:   { dateTime: end_time,   timeZone: GCAL_TIMEZONE },
             },
           })
-        )
+        })
         // creado === null → el médico no tiene Google conectado: nada que sincronizar.
         google_event_id  = creado?.data.id ?? null
         gcal_sync_status = 'synced'
       } catch (gcalErr) {
-        console.error('[GCal] Error de sincronización en background')
+        // Corre dentro de after(): nadie ve el fallo del lado del cliente y la
+        // cita se queda en 'failed' sin más pista que esta línea.
+        registrarFalloGCal(
+          { operacion: 'events.insert (alta de cita)', userId: profile.userId, calendarId: calendarIdUsado },
+          gcalErr,
+        )
         gcal_sync_status = 'failed'
       }
 
-      await admin
+      const { error: errEstado } = await admin
         .from('appointments')
         .update({ google_event_id, gcal_sync_status })
         .eq('id', apt.id)
+      if (errEstado) {
+        registrarFalloGCal(
+          { operacion: 'appointments.update(gcal_sync_status)', userId: profile.userId, calendarId: calendarIdUsado },
+          errEstado,
+        )
+      }
     })
 
     return NextResponse.json({

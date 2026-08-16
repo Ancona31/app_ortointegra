@@ -5,6 +5,19 @@ import { randomBytes } from 'crypto'
 export async function GET() {
   const state = randomBytes(16).toString('hex')
 
+  // Esta ruta no tiene ningún catch que tape nada —no llama a Google, sólo
+  // arma la URL—, pero sí un modo de fallar callado: sin estas variables la
+  // URL sale con `client_id=undefined` y el médico ve un error de Google sin
+  // que quede una sola línea del lado de Spinus.
+  const faltantes = (['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_URI'] as const)
+    .filter((v) => !process.env[v])
+  if (faltantes.length > 0) {
+    console.error('[GCal] fallo ' + JSON.stringify({
+      operacion: 'oauth2.generateAuthUrl (connect)',
+      mensaje:   `faltan variables de entorno: ${faltantes.join(', ')}`,
+    }))
+  }
+
   // Una instancia por petición: compartirla entre peticiones concurrentes
   // deja que un usuario sobrescriba las credenciales de otro.
   const oauth2Client = new google.auth.OAuth2(
