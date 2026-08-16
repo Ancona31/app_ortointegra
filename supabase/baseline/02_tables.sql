@@ -76,12 +76,17 @@ CREATE TABLE IF NOT EXISTS public.appointments (
   gcal_sync_status           text        NOT NULL DEFAULT 'synced'::text,
   medico_id                  uuid,
   client_id                  text,
+  origen                     text        NOT NULL DEFAULT 'spinus'::text,
+  gcal_etag                  text,
   CONSTRAINT appointments_pkey PRIMARY KEY (id),
   CONSTRAINT appointments_status_check CHECK (
     status = ANY (ARRAY['scheduled'::text, 'confirmed'::text, 'cancelled'::text, 'no_show'::text])
   ),
   CONSTRAINT appointments_gcal_sync_status_check CHECK (
-    gcal_sync_status = ANY (ARRAY['synced'::text, 'pending'::text, 'failed'::text])
+    gcal_sync_status = ANY (ARRAY['synced'::text, 'pending'::text, 'failed'::text, 'unbound'::text])
+  ),
+  CONSTRAINT appointments_origen_check CHECK (
+    origen = ANY (ARRAY['spinus'::text, 'google'::text])
   )
 );
 
@@ -242,6 +247,7 @@ CREATE TABLE IF NOT EXISTS public.google_tokens (
   access_token  text   NOT NULL,
   refresh_token text,
   expires_at    bigint,
+  calendar_id   text,
   CONSTRAINT google_tokens_pkey PRIMARY KEY (user_id)
 );
 
@@ -347,6 +353,7 @@ CREATE TABLE IF NOT EXISTS public.pacientes (
   fecha_consentimiento      timestamptz   DEFAULT now(),
   version_aviso_privacidad  text          DEFAULT 'v1.0-2026-04-08'::text,
   client_id                 text,
+  alta_rapida               boolean       NOT NULL DEFAULT false,
   CONSTRAINT pacientes_pkey PRIMARY KEY (id),
   CONSTRAINT pacientes_sexo_check CHECK (
     sexo = ANY (ARRAY['M'::text, 'F'::text, 'Otro'::text])
