@@ -10,6 +10,7 @@ import esLocale from '@fullcalendar/core/locales/es'
 import { X, Calendar, User, Plus, Trash2, Settings, Lock, LayoutGrid, Columns3, Square, ChevronDown, FileText, Stethoscope, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { useToast } from '@/components/ui/Toast'
 import { useProfile } from '@/hooks/useProfile'
 import { canManageClinica } from '@/lib/permissions'
@@ -57,6 +58,20 @@ type Appointment = {
   consultorio_timezone: string | null
   pacientes?: { id: string; nombre: string; apellidos: string; telefono: string | null } | null
   medico?: { id: string; titulo: string | null; nombres: string | null; apellido_paterno: string | null; apellido_materno: string | null } | null
+}
+
+/**
+ * Una fila de `appointments` tal como llega por Realtime: columnas de la
+ * tabla y nada más. Los joins de `Appointment` (`pacientes`, `medico`) NO
+ * viajan en el payload de `postgres_changes` — por eso están fuera del tipo,
+ * para que el compilador impida leerlos de ahí.
+ *
+ * `client_id` es la firma de la escritura que la produjo (ver
+ * `firmarEscritura`).
+ */
+type FilaRealtime = Omit<Appointment, 'pacientes' | 'medico'> & {
+  clinica_id: string
+  client_id: string | null
 }
 
 type PacienteBusqueda = { id: string; nombre: string; apellidos: string; telefono: string | null }
@@ -1306,27 +1321,6 @@ export default function AgendaPage() {
     refetch()
   }, [filtroMedico])
 
-  /* ── Supabase Realtime — debounced (max 1 refetch/sec) ── */
-  const realtimeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(() => {
-    const supabase = createClient()
-    const channel = supabase
-      .channel('appointments-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => {
-        if (realtimeTimer.current) return // ya hay un refetch pendiente
-        realtimeTimer.current = setTimeout(() => {
-          realtimeTimer.current = null
-          refetch()
-        }, 1000)
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-      if (realtimeTimer.current) clearTimeout(realtimeTimer.current)
-    }
-  }, [])
-
   /* ── Event source: nuestras citas ───────────────────── */
   const appointmentSource = useCallback(async (
     info: { startStr: string; endStr: string },
@@ -1496,6 +1490,196 @@ export default function AgendaPage() {
     }
   }
 
+  /* ── Supabase Realtime — la agenda compartida ───────────
+   *
+   * La secretaria agenda desde su computadora y al médico le aparece en la
+   * suya. Cada cambio se aplica al evento que le toca: NUNCA un refetch del
+   * rango por un cambio individual (la única excepción es la reconexión, más
+   * abajo). Dos peticiones completas por cada cita que agenda la secretaria
+   * es justo lo que esto viene a evitar.
+   *
+   * AISLAMIENTO ENTRE CLÍNICAS — no lo hace este código, lo hace la RLS.
+   * Realtime evalúa `appointments_select` fila por fila y suscriptor por
+   * suscriptor (`realtime.apply_rls` relee la fila por su llave primaria con
+   * el rol y los claims JWT de cada quien), así que los INSERT y UPDATE de
+   * otra clínica no llegan aquí siquiera. Por eso el canal no lleva `filter`
+   * de `clinica_id`: no añadiría seguridad y en los DELETE ni se aplica.
+   *
+   * LOS BORRADOS SON DISTINTOS. La RLS no puede evaluarse sobre una fila que
+   * ya no existe, así que Supabase manda TODOS los DELETE a TODOS los
+   * suscriptos de la tabla — y precisamente por eso poda el payload a la
+   * llave primaria cuando la tabla tiene RLS. Llega un uuid y nada más: sin
+   * título, sin paciente, sin clínica. No hay fuga y no hay nada que filtrar;
+   * si ese uuid no está pintado aquí (porque era de otra clínica), quitarlo
+   * es una operación vacía. Cambiar `REPLICA IDENTITY` a `full` no traería
+   * más datos —la poda es por RLS, no por identidad de réplica—, sólo WAL.
+   *
+   * LÍMITE CONOCIDO, ACEPTADO, NO TAPAR CON UN REFETCH: a un médico invitado
+   * (no admin) que pierde una cita porque se la reasignaron a otro médico no
+   * le llega ningún evento. `appointments_select` sólo le deja ver
+   * `medico_id = auth.uid()`, y la comprobación de Realtime corre sobre la
+   * fila YA reasignada: da false y el UPDATE no se entrega. Es un no-evento,
+   * no hay nada que escuchar. Su tarjeta se queda obsoleta hasta la siguiente
+   * recarga o reconexión. Sondear la agenda para cubrir este caso costaría
+   * más que el caso mismo.
+   */
+
+  /* UUID de cada escritura que sale de ESTA pestaña. El servidor lo guarda en
+     `appointments.client_id` y Realtime lo devuelve dentro del payload: así el
+     eco de lo que yo mismo escribí se reconoce y se descarta —mi actualización
+     optimista ya lo pintó— sin depender de ningún temporizador. En el alta es
+     además la clave de idempotencia del POST. */
+  const escriturasPropias = useRef<Set<string>>(new Set())
+
+  function firmarEscritura(): string {
+    const firma = crypto.randomUUID()
+    escriturasPropias.current.add(firma)
+    // Cota de seguridad: con el canal vivo cada firma se borra al llegar su
+    // eco, pero si el socket se cae justo después de escribir, ese eco no
+    // llega nunca y la firma se quedaría aquí para siempre.
+    if (escriturasPropias.current.size > 50) {
+      const masVieja = escriturasPropias.current.values().next().value
+      if (masVieja) escriturasPropias.current.delete(masVieja)
+    }
+    return firma
+  }
+
+  /** Una cita con su forma canónica (con paciente y médico), o null. */
+  async function traerCita(id: string): Promise<Appointment | null> {
+    try {
+      const res = await fetch(`/api/appointments/${id}`)
+      if (!res.ok) return null
+      const json = await res.json()
+      return (json?.appointment as Appointment) ?? null
+    } catch {
+      return null
+    }
+  }
+
+  /** Aplica UN cambio llegado por el canal al evento que le corresponde. */
+  async function aplicarCambioRealtime(payload: RealtimePostgresChangesPayload<FilaRealtime>) {
+    const api = calendarRef.current?.getApi()
+    if (!api) return
+
+    // Un borrado trae sólo `{ id }` (ver el comentario de arriba). No hace
+    // falta saber de quién era: si no está pintado, esto no hace nada. Los
+    // borrados propios tampoco necesitan firma — la baja optimista ya quitó
+    // el evento, así que su eco tampoco encuentra nada que quitar.
+    if (payload.eventType === 'DELETE') {
+      const id = payload.old?.id
+      if (id) api.getEventById(id)?.remove()
+      return
+    }
+    if (payload.eventType !== 'INSERT' && payload.eventType !== 'UPDATE') return
+
+    const fila = payload.new
+    if (!fila?.id || !fila.start_time) return
+
+    // ¿Es mía? La actualización optimista ya la reflejó. La firma se CONSUME
+    // al usarse, no se guarda: si se quedara, cualquier cambio posterior de
+    // otra persona sobre esa misma cita se descartaría para siempre —el
+    // `client_id` de la fila no cambia hasta que alguien vuelve a escribirla—.
+    //
+    // Efecto de consumirla: el UPDATE de fondo que deja `gcal_sync_status`
+    // (el `after()` de la ruta) llega con la firma ya gastada y sí se aplica.
+    // No hay problema en ello y no se le pone lógica de orden encima: lo que
+    // trae es el estado canónico de la fila, así que aplicarlo nunca deja la
+    // tarjeta peor de como estaba.
+    if (fila.client_id && escriturasPropias.current.delete(fila.client_id)) return
+
+    // Lo que no se está viendo no se toca. `activeStart`/`activeEnd` son el
+    // rango que el calendario tiene pintado, el mismo con que pide las citas.
+    const { activeStart, activeEnd } = api.view
+    const inicio = new Date(fila.start_time)
+    const enRango = inicio >= activeStart && inicio < activeEnd
+    const pasaFiltroMedico = !filtroMedico || fila.medico_id === filtroMedico
+
+    if (!enRango || !pasaFiltroMedico) {
+      // Si estaba pintada y dejó de pertenecer a esta vista —la movieron a
+      // otra semana, o se la reasignaron a un médico distinto del filtrado—,
+      // se quita. Un evento que nunca estuvo aquí no genera nada.
+      api.getEventById(fila.id)?.remove()
+      return
+    }
+
+    // El payload no trae el paciente y la tarjeta lo necesita para el nombre.
+    // Se pide esa cita concreta —una, no el rango— y sólo cuando el paciente
+    // no se puede deducir de lo que ya está pintado: mover una cita de hora no
+    // gasta ninguna petición. Si la petición falla, se aplica el resto del
+    // cambio igual y la tarjeta cae a su título hasta la próxima recarga.
+    const existente = api.getEventById(fila.id)
+    const pacienteEnPantalla = existente?.extendedProps.pacientes as Appointment['pacientes'] | undefined
+    const mismoPaciente = existente?.extendedProps.paciente_id === fila.paciente_id
+
+    let cita: Partial<Appointment> & { id: string } = { ...fila }
+    if (!fila.paciente_id) {
+      cita.pacientes = null // desligaron al paciente (o nunca tuvo)
+    } else if (mismoPaciente && pacienteEnPantalla) {
+      cita.pacientes = pacienteEnPantalla
+    } else {
+      const hidratada = await traerCita(fila.id)
+      // Si la petición falla, el resto del cambio se aplica igual pero con el
+      // paciente en blanco (la tarjeta cae a su título). Conservar el nombre
+      // anterior sobre una cita que YA es de otro paciente sería peor que no
+      // enseñar ninguno.
+      cita = hidratada ?? { ...cita, pacientes: null }
+    }
+
+    // Comprobar la existencia ANTES de agregar, y comprobarla de nuevo aquí:
+    // entre el evento y la respuesta de `traerCita` pudo llegar el POST propio
+    // o un refetch de reconexión, y dos eventos con el mismo id es el bug que
+    // costó una rama entera cerrar.
+    if (api.getEventById(fila.id)) {
+      aplicarAppointmentAlEvento(cita)
+    } else {
+      api.addEvent(buildEventInput(cita), FUENTE_APPOINTMENTS)
+    }
+  }
+
+  /* El handler se recrea en cada render (lee `filtroMedico`), pero el canal se
+     suscribe UNA vez: la ref es lo que los une sin re-suscribir. Mismo patrón
+     que `appointmentSourceRef`. */
+  const aplicarCambioRef = useRef(aplicarCambioRealtime)
+  aplicarCambioRef.current = aplicarCambioRealtime
+
+  useEffect(() => {
+    const supabase = createClient()
+
+    /* Ciclo de vida de la conexión. Un websocket se cae al dormir el equipo o
+       al perder la red, y mientras estuvo caído los cambios no llegaron a
+       ninguna parte: no hay eventos que aplicar, hay un hueco. Ése es el
+       ÚNICO lugar donde un refetch del rango está justificado.
+       El callback de `subscribe` vuelve a dispararse con SUBSCRIBED en cada
+       reenganche automático (`rejoin()` reenvía el joinPush y sus hooks
+       sobreviven al reset), así que sirve de aviso de "ya volví". La caída se
+       detecta cuando falla el latido del socket, no al instante: tras
+       despertar el equipo la puesta al día puede tardar unos segundos. */
+    let huboCaida = false
+
+    const channel = supabase
+      .channel('appointments-realtime')
+      // El tipo va en el parámetro y no como argumento de tipo de `.on()`:
+      // `createClient()` no lleva el genérico `Database`, así que el cliente
+      // llega sin tipar y `.on<T>()` no acepta argumentos de tipo.
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'appointments' },
+        (payload: RealtimePostgresChangesPayload<FilaRealtime>) => {
+          void aplicarCambioRef.current(payload)
+        },
+      )
+      .subscribe((estado: string) => {
+        if (estado === 'SUBSCRIBED') {
+          if (huboCaida) { huboCaida = false; refetch() }
+          return
+        }
+        // CHANNEL_ERROR / TIMED_OUT / CLOSED: se perdió el hilo de los cambios.
+        huboCaida = true
+      })
+
+    return () => { supabase.removeChannel(channel) }
+  }, [])
+
   /* ── Handlers ────────────────────────────────────────── */
   function handleDateClick(arg: DateClickArg) {
     // Fase 8.2: bloqueo creación de citas si suscripción cancelada con >5 pacientes
@@ -1562,7 +1746,9 @@ export default function AgendaPage() {
     const res = await fetch(`/api/appointments/${id}`, {
       method:  'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ start_time, end_time }),
+      // `client_id` firma la escritura para que el eco de Realtime se
+      // reconozca como propio (ver `firmarEscritura`).
+      body:    JSON.stringify({ start_time, end_time, client_id: firmarEscritura() }),
     })
 
     if (!res.ok) {
@@ -1635,9 +1821,17 @@ export default function AgendaPage() {
     }
 
     // ── Llamada real al API ──
+    // La firma hace dos cosas según el verbo: en el PUT identifica el eco de
+    // Realtime como propio; en el POST es además la clave de idempotencia, y
+    // un doble clic o un reintento devuelven la MISMA cita en vez de crear
+    // otra (ver `firmarEscritura` y el manejo del 23505 en la ruta).
     const res = await fetch(
       isEdit ? `/api/appointments/${data.id}` : '/api/appointments',
-      { method: isEdit ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }
+      {
+        method:  isEdit ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ ...data, client_id: firmarEscritura() }),
+      }
     )
 
     if (!res.ok) {
@@ -1687,7 +1881,11 @@ export default function AgendaPage() {
     closeModal()
     toast.success('Cita eliminada')
 
-    // Optimistic: remover evento del calendario al instante
+    // Optimistic: remover evento del calendario al instante.
+    // Sin firma de escritura, y no hace falta: el eco de un DELETE llega
+    // podado a `{ id }` —la RLS no puede evaluarse sobre una fila que ya no
+    // existe—, así que ni siquiera traería el `client_id`. Como esta baja ya
+    // quitó el evento, su propio eco no encuentra nada que quitar.
     const api = calendarRef.current?.getApi()
     const existing = api?.getEventById(id)
     existing?.remove()
