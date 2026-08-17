@@ -2923,4 +2923,65 @@ control» de `globals.css`.
 
 ---
 
+## Migraciones — reconciliación de cabeceras
+
+### MIG-DT-1 — Nueve de doce cabeceras dicen «PENDIENTE DE APLICAR» estando aplicadas
+- **Estado:** 🟠 abierta. Registrada el 2026-08-17; **no se corrige en el commit
+  que la registra**, y la razón está en «Cómo se corrige».
+- **Archivos afectados:** los doce que hoy devuelve
+  `grep -l "PENDIENTE DE APLICAR" supabase/migrations/*.sql`.
+- **Qué pasa:** el rótulo está en la **primera línea del archivo**, es lo primero
+  que ve cualquiera que lo abra, y en la mayoría de los casos es falso. Quien lo
+  lee en frío concluye que el cambio no está en producción cuando lleva días
+  vigente, y decide sobre esa base: reaplicarlo, o construir encima de un
+  esquema que cree que no existe.
+- **Causa, que no es descuido:** cambió el flujo de trabajo y nadie lo declaró.
+  Hasta julio el archivo se commiteaba **después** de aplicar —por eso los de la
+  etapa 5 llevan `-- Aplicado a producción: 2026-05-30` y era cierto al
+  escribirse; por eso también sólo dos archivos de todo el repo se han
+  modificado tras su primer commit—. Desde agosto, con el flujo de planear
+  primero, el archivo se commitea **antes** de aplicar: el rótulo nace cierto y
+  **no hay ningún paso posterior que vuelva a mirarlo**.
+- **Ya se intentó arreglar desde el archivo siguiente y no funcionó:**
+  `20260813_formato_version_inmutable.sql:13-15` deja escrito que la cabecera de
+  `20260804_documentos_formato_version.sql` «sigue diciendo PENDIENTE DE APLICAR
+  y es falsa. Igual que ocurrió con las de folio». Eso se escribió el 13 de
+  agosto; el 17 el rótulo sigue ahí y se le han sumado tres archivos más. Quien
+  abre el archivo viejo no está leyendo el nuevo.
+- **Prevención, ya aplicada:** `supabase/AUDITORIA-MIGRACIONES.md` §7 convierte
+  actualizar la línea `-- ESTADO:` en el último paso de aplicar una migración, y
+  fija la frontera de qué se puede editar en un archivo ya aplicado. Eso detiene
+  la hemorragia; no repara lo ya escrito.
+- **Cómo se corrige, y por qué no ahora:** deduciendo cuáles están aplicadas se
+  cambia una mentira por otra. La reconciliación se hace **comprobando contra la
+  base qué objetos de cada migración existen** —tablas, columnas, índices,
+  policies, funciones— y escribiendo la fecha real, o `pendiente` si de verdad
+  lo está. Es un trabajo de una sesión propia, con la base delante.
+- **Punto de partida para esa sesión** — lo que hoy consta y lo que no:
+
+  | Archivo | Qué consta |
+  |---|---|
+  | `20260804_documentos_formato_version.sql` | aplicada (`20260813_formato_version_inmutable.sql:13`) |
+  | `20260807_folio_01_esquema_y_generador.sql` | aplicada («las de folio», misma cita) |
+  | `20260811_folio_03_denegacion.sql` | aplicada (misma cita) |
+  | `20260812_documentos_estado.sql` | aplicada (`20260813_firmas_documento.sql:81`) |
+  | `20260815_gcal_calendario_propio_a_esquema.sql` | aplicada el 2026-08-15 |
+  | `20260815_gcal_calendario_propio_b_datos.sql` | aplicada el 2026-08-15 |
+  | `20260817_gcal_conexion_clinica_a_esquema.sql` | aplicada el 2026-08-17 — **ya corregida**, ver su cabecera |
+  | `20260804_profiles_flag_documentos_v2.sql` | sin verificar |
+  | `20260810_plantillas_documento.sql` | sin verificar |
+  | `20260813_firmas_documento.sql` | sin verificar |
+  | `20260813_formato_version_inmutable.sql` | sin verificar |
+  | `20260817_gcal_conexion_clinica_b_retiro.sql` | **pendiente de verdad**: se aplica después del deploy y de un periodo de reposo |
+
+  Siete con evidencia documental, cuatro sin verificar y uno correcto. La cuenta
+  de nueve falsas es la estimación de trabajo, no un hecho comprobado: cuál de
+  los cuatro está aplicado es justo lo que hay que ir a mirar.
+- **Riesgo si se deja:** bajo por sí solo, alto como multiplicador. Ninguna de
+  estas líneas rompe nada al ejecutarse —no se ejecutan—, pero son la primera
+  fuente de contexto de cualquiera que trabaje sobre el esquema, y hoy esa
+  fuente miente más veces de las que acierta.
+
+---
+
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)
