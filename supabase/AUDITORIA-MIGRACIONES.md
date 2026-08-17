@@ -216,3 +216,49 @@ de la sección 4, **agrégala al final de esa lista, en este mismo archivo**, an
 de terminar, con una frase que explique **qué buscar** y **por qué**.
 
 La lista tiene que mejorar con cada auditoría.
+
+---
+
+## 7. Después de aplicar
+
+El último paso de aplicar una migración es **actualizar su línea `-- ESTADO:` con
+la fecha real, y commitearla**. Un archivo cuya cabecera diga «PENDIENTE DE
+APLICAR» estando aplicado es una trampa para el siguiente lector, y ya ha
+mordido: ver `20260813_formato_version_inmutable.sql:13-15`, que documenta el
+caso y no lo arregló, porque quien abre el archivo viejo no está leyendo el
+nuevo.
+
+La razón de que el rótulo envejezca no es descuido, es un cambio de flujo:
+hasta julio el archivo se commiteaba **después** de aplicar y el rótulo nacía
+cierto; desde agosto se commitea **antes**, y nada vuelve a mirarlo. Por eso el
+remedio tiene que ser un paso del ritual y no una buena intención.
+
+**La región editable de una migración ya aplicada es el bloque de comentarios
+anterior a la primera sentencia ejecutable, y sólo para anotar.** De la primera
+sentencia hacia abajo no se cambia nada nunca, ni siquiera un comentario suelto
+entre sentencias. Es comprobable de un vistazo: el diff de una migración
+aplicada no puede tocar ninguna línea igual o posterior a su primera línea
+no-comentario.
+
+Dos consecuencias que conviene tener presentes:
+
+- **Se anota, no se enmienda.** Si lo que hay que corregir es una afirmación
+  falsa, el texto falso se queda donde está y encima se añade una línea que dice
+  que es falso y a dónde ir. Reescribirlo para que diga la verdad borra la
+  evidencia de qué se creía cuando aquello corrió, que suele ser la causa raíz.
+- **Un `COMMENT ON` no es un comentario.** Es una sentencia, y su literal es
+  parte de lo que se ejecutó: se corrige con una migración posterior que lo
+  reescriba en la base, nunca editando el archivo aplicado.
+
+Esto no contradice el forward-only de `CLAUDE.md`: esa regla dice que los
+archivos originales **se conservan** y que los reverts son migraciones con
+timestamp posterior. Habla de cómo se deshace un cambio de esquema, no de los
+bytes del archivo. Anotar conserva; reescribir, no.
+
+**Excepción, y una sola:** blindar un archivo aplicado para el replay (añadirle
+`IF NOT EXISTS` y demás) sí toca sentencias, y a veces hace falta porque el
+archivo tiene dos deberes que chocan —ser lo que corrió y poder volver a correr
+sobre una base recién creada desde `baseline/`—. Precedente: commit `d257ec8`
+sobre `20260720_apnp_ant_no_patologicos.sql`. Cuando ocurra, va en **su propio
+commit**, con el motivo escrito en la cabecera, y **nunca mezclado con una
+anotación**: mezclarlos es exactamente cómo se borra la frontera de arriba.
