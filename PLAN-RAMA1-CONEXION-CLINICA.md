@@ -26,6 +26,10 @@
 > Las seis preguntas del final dejaron de ser preguntas: **§11 son decisiones
 > tomadas.**
 >
+> **PLAN CERRADO el 2026-08-17.** Cero preguntas abiertas, catorce hallazgos
+> absorbidos o resueltos (§10). Lo que sigue es escribir el código en el orden
+> de §6.
+>
 > **Donde este plan y `BRIEF-MIGRACION-PUENTE-SECRETOS.md` discrepen, manda el
 > brief:** es la especificación del puente y está auditada.
 
@@ -399,7 +403,9 @@ Estado tras la absorción del 2026-08-17. Se anota aquí porque el reporte no se
 | H8 | El contrato de `resolverConexionPropia` devolviendo null no estaba escrito | §1 (contrato explícito) y §0.3 (el matiz del `ocupado`) |
 | H9 | §2.4 contradecía el código en el camino del refresh | §2.4, con la excepción escrita |
 | H10 | Divergencias que el archivo B no atrapa | §2.6, nueva |
-| H11, H12, H13 | — | Se resolvieron por el camino durante el trabajo del puente |
+| H11 | El cerrojo de §2.2 apuntaba a un literal que iba a dejar de existir: con el puente, `google_conexiones_secretos` no vuelve a aparecer en `src/` —el código llama a un RPC—, así que media prueba quedaba vacía dando una cobertura que no tenía, y cualquiera podía llamar a `leer_conexion_google_con_secretos` desde cualquier archivo | **§2.2**, que vigila los tres nombres de función además de los de las tablas |
+| H12 | La cita del precedente no decía lo que se le atribuía: `20260813_firmas_documento.sql:235` es un `REVOKE` sobre una **tabla**, sin `GRANT` posterior, no el patrón de funciones. Los precedentes reales son `20260807_folio_01:612-613` y `20260615_consultorios_05:110-116`, y el segundo anota lo que importa: en Supabase `anon`/`authenticated` reciben EXECUTE por configuración del proyecto, al margen del `REVOKE FROM PUBLIC`. El patrón era correcto; la cita, no | Especificación del puente, que ya cita los precedentes reales |
+| H13 | `authenticated` conservaba `MAINTAIN` sobre `clinica_conexiones_google`: la lista enumerada de verbos de `20260817_...:343-344` no lo incluye porque Postgres lo añadió en la 17, después de escribirse la lista. Impacto casi nulo —habilita VACUUM/ANALYZE/REINDEX y PostgREST no emite esas sentencias—; el defecto es el método, porque enumerar verbos deja huecos que aparecen solos al cambiar de versión mayor | `20260818_gcal_puente_secretos.sql` §5 (`REVOKE ALL` + `GRANT SELECT`) y su afirmación C7, que comprueba el conjunto completo |
 | H14 | El secreto sigue legible por su dueño mientras viva el espejo | §2.7, nueva |
 
 ---
@@ -415,9 +421,14 @@ Esta sección era «Lo que necesito de ti antes de escribir una línea» y eran 
 5. **Desconectar gateado a `canManageClinica` — SÍ** (§0.6, F5). Y con él viene F12: el botón de `/perfil` tiene que gatearse igual, o la interfaz miente (H5).
 6. **Scopes `openid` y `email` — SÍ, en esta rama**, como **commit propio después del commit 3** (§6, commit 4), para poder revertirlos solos si la pantalla de consentimiento se comporta raro.
 
-## Lo que la absorción destapó y sí necesita tu visto bueno
+## Lo que la absorción destapó — **aprobado también**
 
-Ninguna de las dos es una pregunta de gusto: las dos cambian la forma de la rama.
+Las dos cambian la forma de la rama, y las dos están aceptadas:
 
-- **El modo estricto de §3.3 (H2).** `conCalendarioSpinus` gana un cuarto argumento obligatorio y quien no administra la clínica deja de poder crear, desvincular y recrear. **Tiene un coste de UX real y conviene que lo aceptes con los ojos abiertos:** una secretaria que agenda la primera cita de una clínica cuyo calendario aún no existe ya no lo crea; la cita queda `pending` hasta que entre quien administra. La alternativa es dejar que cualquier miembro dispare un UPDATE masivo sobre citas que no puede leer y una escritura en la cuenta de Google de otra persona.
-- **El commit 3 pasa a tocar ocho archivos (H3).** Es la salida elegida de las dos posibles, y está razonada en §6. La otra dejaba un intermedio que sólo es correcto mientras la clínica tenga un solo médico.
+- **El modo estricto de §3.3 (H2), con default restrictivo.** `conCalendarioSpinus` gana `puedeReparar` como cuarto argumento **obligatorio**, y quien no administra la clínica deja de poder crear, desvincular y recrear. El coste de UX se acepta con los ojos abiertos: una secretaria que agenda la primera cita de una clínica cuyo calendario aún no existe ya no lo crea, y la cita queda `pending` hasta que entre quien administra. La alternativa era dejar que cualquier miembro disparase un UPDATE masivo sobre citas que no puede leer y una escritura en la cuenta de Google de otra persona.
+- **El gate va en la capacidad, no en la ruta.** Es la corrección que más importa de todo H2 y conviene que quede escrita para que nadie la «simplifique» a un gate de ruta: **gatear `/api/google/events` no cierra nada**, porque el `after()` del alta de citas llama exactamente a lo mismo y lo dispara cualquiera con permiso para agendar. El modo vive en la función; cada ruta calcula `puedeReparar` con `canManageClinica` antes de responder.
+- **El commit 3 toca ocho archivos (H3).** Aceptado. Es la salida elegida de las dos posibles, razonada en §6; la otra dejaba un intermedio que sólo es correcto mientras la clínica tenga un solo médico.
+
+---
+
+**Con esto el plan queda cerrado.** No hay ninguna pregunta abierta: las seis de arriba y las tres de aquí están decididas, y los catorce hallazgos de §10 están absorbidos o resueltos. Lo siguiente es el código, en el orden de §6.
