@@ -2984,4 +2984,100 @@ control» de `globals.css`.
 
 ---
 
+## Permisos — superficie de ejecución de las funciones de `public`
+
+### ACL-DT-1 — Funciones de `public` ejecutables por `anon` sin quererlo: un caso confirmado y un alcance sin medir
+- **Estado:** 🟠 abierta. Registrada el 2026-08-17 al auditar el puente de secretos de Google (hallazgo H12 de esa auditoría).
+- **Archivo con el caso confirmado:** `supabase/migrations/20260615_consultorios_05_marcar_default_rpc.sql:115`.
+- **Alcance real:** sin medir. Ver «La consulta que falta».
+
+- **El caso.** Esa migración hace
+  `REVOKE EXECUTE ON FUNCTION public.marcar_consultorio_default(uuid) FROM PUBLIC;`
+  y después `GRANT EXECUTE … TO authenticated`. No revoca de `anon` ni de
+  `authenticated`, así que **`marcar_consultorio_default` es hoy ejecutable por
+  `anon`**. Lo llamativo es que la propia migración lo sabía: su comentario de
+  `:112-114` dice que «en Supabase, anon/authenticated/service_role mantienen
+  EXECUTE por configuración del proyecto independiente del REVOKE FROM PUBLIC»,
+  y aun así se quedó con el patrón que no lo quita.
+
+- **No es una fuga, y conviene decirlo con precisión para no inflar la
+  prioridad.** La función está protegida por dentro: resuelve el médico con
+  `auth.uid()`, que sin sesión es NULL, y entonces no encuentra fila y no hace
+  nada. Lo que hay es **superficie que no debería existir**: un endpoint RPC
+  alcanzable sin sesión cuya única defensa es su propio cuerpo. El día que
+  alguien edite ese cuerpo y quite el filtro, no hay una segunda barrera.
+
+- **Y esto es un patrón, no un caso.** Verificado contra producción: el
+  `pg_default_acl` de `public` para objetos de tipo `f` es
+  `{postgres=X, anon=X, authenticated=X, service_role=X}`. Es decir, **toda
+  función creada en `public` nace ejecutable por `anon` y por `authenticated`**,
+  por concesión directa a esos roles y no vía `PUBLIC` — por eso
+  `REVOKE … FROM PUBLIC` no la quita. Cualquier migración que haya creado una
+  función en `public` y sólo haya revocado de `PUBLIC` tiene el mismo agujero.
+
+- **El patrón correcto**, y ya hay precedente en el repo:
+
+  ```sql
+  REVOKE ALL ON FUNCTION public.<nombre>(<tipos>) FROM PUBLIC, anon, authenticated;
+  GRANT EXECUTE ON FUNCTION public.<nombre>(<tipos>) TO <el rol que la necesite>;
+  ```
+
+  Las dos sentencias van siempre juntas y en ese orden. Aplicado así en
+  `20260818_gcal_puente_secretos.sql` §4 para las tres funciones del puente, y
+  en `20260807_folio_01_esquema_y_generador.sql:612-613` para `generar_folio`.
+
+- **La consulta que falta, y es de sólo lectura.** Contesta cuántas funciones de
+  `public` están hoy ejecutables por `anon` o `authenticated`. Correr en el SQL
+  Editor; no cambia nada:
+
+  ```sql
+  SELECT n.nspname || '.' || p.proname
+           || '(' || pg_get_function_identity_arguments(p.oid) || ')'   AS funcion,
+         p.prosecdef                                                    AS security_definer,
+         pg_get_userbyid(p.proowner)                                    AS dueno,
+         has_function_privilege('anon',          p.oid, 'EXECUTE')      AS anon,
+         has_function_privilege('authenticated', p.oid, 'EXECUTE')      AS authenticated
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public'
+     AND p.prokind = 'f'
+     -- Las funciones de trigger no son invocables ni por SQL normal ni por
+     -- PostgREST: cuentan como ruido y taparían lo que importa.
+     AND p.prorettype <> 'trigger'::regtype
+     AND (has_function_privilege('anon',          p.oid, 'EXECUTE')
+       OR has_function_privilege('authenticated', p.oid, 'EXECUTE'))
+   ORDER BY has_function_privilege('anon', p.oid, 'EXECUTE') DESC,
+            p.prosecdef DESC,
+            p.proname;
+  ```
+
+- **Cómo se lee el resultado, porque contar no basta.** Tener `EXECUTE` no es
+  un defecto por sí solo: hay funciones que `authenticated` **debe** poder
+  ejecutar —los RPC de la aplicación— y helpers que las policies invocan. El
+  triaje es por columnas:
+  - **`anon = true`: debería salir vacío o casi.** Cada fila es un endpoint
+    alcanzable sin sesión. Empezar por aquí.
+  - **`anon = true` y `security_definer = true` a la vez: es el extremo
+    afilado.** La función corre con los privilegios de su dueño y la puede
+    llamar cualquiera sin autenticarse.
+  - **`authenticated = true`:** revisar una por una contra la lista de RPC que
+    la aplicación llama de verdad. Lo que no esté en esa lista sobra.
+
+- **Por qué no se resuelve aquí ni en la rama de Google Calendar.** El arreglo
+  es una migración de `REVOKE`/`GRANT` sobre N funciones, y no se puede escribir
+  hasta saber cuáles y cuáles de ellas alguien llama legítimamente. Revocar a
+  ciegas rompe RPC en producción. Primero la consulta, después la lista, después
+  la migración — con su veredicto afirmando el resultado en las dos direcciones,
+  como pide la dimensión 15 de `supabase/AUDITORIA-MIGRACIONES.md`.
+
+- **Familia.** Es la misma que **MIG-DT-1** (reconciliación de cabeceras de
+  migración) y que **ISO-DT-1** (auditoría de aislamiento entre clínicas):
+  cosas que se dieron por ciertas sin comprobar nunca la dirección permisiva. En
+  las tres se comprobó que lo cerrado estaba cerrado y no que lo abierto
+  estuviera abierto —o al revés—, y en las tres el remedio empieza por una
+  consulta de sólo lectura contra producción antes de escribir una línea de SQL.
+  Si algún día se agrupan en una sola sesión de saneamiento, van juntas.
+
+---
+
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)
