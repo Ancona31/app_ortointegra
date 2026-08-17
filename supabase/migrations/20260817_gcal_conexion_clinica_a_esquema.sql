@@ -1,5 +1,17 @@
 -- ============================================================================
--- PENDIENTE DE APLICAR — parte A de 2. La ejecuta Angel a mano.
+-- ESTADO: APLICADA EN PRODUCCIÓN 2026-08-17 — parte A de 2. La ejecutó Angel a mano.
+-- ============================================================================
+-- ⚠ CORRECCIÓN POSTERIOR — 2026-08-18, supabase/migrations/20260818_gcal_puente_secretos.sql
+--   Lo que este archivo dice más abajo sobre el alcance de `private` es FALSO,
+--   y se conserva tal cual porque es lo que se ejecutó:
+--     · la descripción de :50-51,
+--     · el COMMENT ON SCHEMA private de :367 («Sólo service_role…»),
+--     · el COMMENT ON TABLE de :392 («no alcanzable por PostgREST»).
+--   `service_role` NO alcanza private.google_conexiones_secretos: un esquema
+--   nuevo no hereda nada de pg_default_acl, y BYPASSRLS actúa sobre el filtro
+--   de filas, DESPUÉS del chequeo de privilegios de esquema y de tabla.
+--   Los COMMENT de la base los corrige el archivo del 18; aquí no se toca ni
+--   una sentencia.
 -- ============================================================================
 -- Conexión de Google POR CLÍNICA (Alternativa B, dos tablas) — ESQUEMA + DATOS
 --
