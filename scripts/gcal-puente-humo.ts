@@ -132,6 +132,17 @@ async function main(): Promise<void> {
     }
   }
 
+  // CONTRA QUÉ PROYECTO SE ESTÁ HABLANDO. Esto es lo que autoriza un deploy: con
+  // un .env.local apuntando a otro proyecto, las cinco sondas salen en verde
+  // sobre la base equivocada y el script dice «se puede desplegar». El ref sale
+  // del host de la URL —`https://<ref>.supabase.co`—, que es público y aparece
+  // en cada petición del navegador. LA CLAVE NO SE IMPRIME NUNCA, ni su
+  // longitud: es el secreto que permite saltarse la RLS entera.
+  const url = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!)
+  const ref = url.hostname.split('.')[0]
+  console.log(`Proyecto: ${ref}  (${url.hostname})`)
+  console.log('Compruébalo antes de leer nada más. Si no es el de producción, lo demás no significa nada.')
+
   const admin = createAdminClient()
 
   // ── P1 · ¿hay sujeto? ─────────────────────────────────────────────────────

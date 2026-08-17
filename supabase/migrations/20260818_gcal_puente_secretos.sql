@@ -81,6 +81,29 @@ BEGIN
   END IF;
 END $do$;
 
+-- ── DOS DEPENDENCIAS QUE ESTE PRE-VUELO NO COMPRUEBA, y por qué ─────────────
+--
+-- 1. `public.appointments` y su columna `gcal_calendar_id`, que usa C10. No se
+--    comprueban aquí porque C10 emplea `::regclass` y `has_column_privilege`,
+--    que LEVANTAN error de Postgres —no devuelven NULL ni escriben 'FALLO'— si
+--    el objeto falta. El resultado sigue siendo un aborto, pero con un mensaje
+--    crudo («column "gcal_calendar_id" ... does not exist») en vez del ABORTADO
+--    con instrucciones que sí dan las cuatro guardas de arriba. Queda anotado
+--    como inconsistencia de trato, no como riesgo: la columna la crea el mismo
+--    archivo del 17 que crea el esquema `private`, así que las dos faltan o
+--    ninguna, y el esquema sí está comprobado.
+--
+-- 2. Que existan los roles `anon`, `authenticated` y `service_role`. C4, C6,
+--    C7, C8 y C9 los nombran como literales en `has_*_privilege`, y R1-R9 hacen
+--    `SET LOCAL ROLE` sobre ellos: si no existen, el error es «role "anon" does
+--    not exist» y la migración aborta. `supabase/baseline/` NO los crea (no hay
+--    un solo `CREATE ROLE` ahí), así que un replay contra un Postgres pelado
+--    montado sólo desde el baseline no pasa de aquí. Es coherente con el
+--    contexto fijo de AUDITORIA-MIGRACIONES.md §2 —«Postgres gestionado por
+--    Supabase»— y la migración del 17 ya tiene la misma dependencia en su
+--    contador de grants. Se documenta para que no se descubra a mitad de un
+--    replay, no para resolverse aquí.
+
 -- La tabla temporal existe para reconciliar una tensión que no tiene otra
 -- salida: la prueba de escritura quiere estar DENTRO de la transacción (para
 -- poder deshacerse) y el veredicto quiere ser la ÚLTIMA sentencia del archivo
@@ -227,7 +250,28 @@ BEGIN
       USING DETAIL = 'Esa clínica ya tiene otra cuenta de Google como conexión de clínica. El relevo es un flujo consciente.';
   END IF;
 
-  -- 4. La columna es NOT NULL; sin esta guarda el fallo sería un 23502 opaco
+  -- 4. El `ON CONFLICT … DO UPDATE` de abajo NO toca `rol`, a propósito:
+  --    reconectar no promueve ni degrada. Pero entonces pedir un `rol` distinto
+  --    del que la fila ya tiene es un NO-OP, y callado es peligroso.
+  --
+  --    EL CASO ES EL RELEVO DE ADMINISTRADOR, y termina con la clínica muda:
+  --    B tiene una conexión 'personal'; se retira la de A; B reconecta pidiendo
+  --    'clinica'; la guarda 3 pasa porque ya no hay otra 'clinica'; el upsert
+  --    reactiva su fila y la deja en 'personal'. La clínica se queda con CERO
+  --    conexiones de clínica, `resolverConexionClinica` devuelve null, las citas
+  --    dejan de llegar a Google, y el único aviso sería un «desconectado» que el
+  --    médico acaba de contradecir conectando.
+  --
+  --    Se cubre en las dos direcciones: promover y degradar son igual de no-op.
+  IF EXISTS (
+    SELECT 1 FROM public.clinica_conexiones_google c
+     WHERE c.user_id = p_user_id AND c.rol <> p_rol
+  ) THEN
+    RAISE EXCEPTION 'rol_no_promovido'
+      USING DETAIL = 'Esa conexión ya existe con otro rol, y reconectar no lo cambia. Cambiar el rol es una operación aparte y explícita, no un efecto colateral del botón de conectar.';
+  END IF;
+
+  -- 5. La columna es NOT NULL; sin esta guarda el fallo sería un 23502 opaco
   --    llegando desde dentro de after(), donde el error se traga.
   IF p_access IS NULL THEN
     RAISE EXCEPTION 'access_token_nulo'
@@ -281,7 +325,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.alta_conexion_google(uuid, uuid, text, text, text, text, text, bigint) IS
-  'Alta o reconexión de una conexión de Google: metadata y secretos en UNA transacción, para que no pueda nacer una conexión sin tokens. Junto con guardar_secretos_conexion y leer_conexion_google_con_secretos, es el ÚNICO camino de la aplicación a private.google_conexiones_secretos: service_role no alcanza ese esquema por ningún otro. Sólo service_role puede ejecutarla. 20260818_gcal_puente_secretos.sql.';
+  'Alta o reconexión de una conexión de Google: metadata y secretos en UNA transacción, para que no pueda nacer una conexión sin tokens. Junto con guardar_secretos_conexion y leer_conexion_google_con_secretos, es el ÚNICO camino de la aplicación a private.google_conexiones_secretos: service_role no alcanza ese esquema por ningún otro. Sólo service_role puede ejecutarla. RECONECTAR NO CAMBIA EL ROL: si la conexión ya existe con un rol distinto del pedido, lanza rol_no_promovido en vez de dejarlo como estaba en silencio — callar ahí deja a la clínica sin conexión de clínica tras un relevo de administrador. Los otros errores con nombre son perfil_ajeno_a_clinica, conexion_de_otra_clinica, clinica_ya_conectada y access_token_nulo. 20260818_gcal_puente_secretos.sql.';
 
 -- ── 3.2 guardar_secretos_conexion ───────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.guardar_secretos_conexion(
@@ -451,6 +495,19 @@ GRANT EXECUTE ON FUNCTION public.leer_conexion_google_con_secretos(uuid, uuid)
 -- huecos que aparecen solos al cambiar de versión mayor.
 --
 -- Patrón del propio repo: 20260813_firmas_documento.sql:235-236.
+--
+-- ⚠️ VENTANA DE BLOQUEO, anotada y aceptada. El lock que toman estas dos
+--    sentencias sobre `clinica_conexiones_google` NO se suelta al acabar la
+--    sentencia: la transacción lo retiene hasta el COMMIT, y de aquí al COMMIT
+--    quedan los nueve bloques del veredicto, dos de los cuales (R4 y R5)
+--    escriben en esta misma tabla. `lock_timeout` acota la ADQUISICIÓN y
+--    `statement_timeout` cada sentencia; ninguno acota la retención total.
+--    Hoy el radio de daño es cero: ningún código lee todavía esta tabla. Deja
+--    de ser cero el día que este archivo se reaplique con el código de la Rama
+--    1 desplegado, y entonces las lecturas de la agenda encolarían detrás.
+--    No se reordena porque C7, C8, C9, C12 y C13 tienen que afirmar SOBRE el
+--    estado que dejan estas dos líneas; si algún día molesta, lo que se saca es
+--    esta sección entera a su propio archivo, no el veredicto.
 REVOKE ALL ON public.clinica_conexiones_google FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.clinica_conexiones_google TO authenticated;
 
@@ -466,7 +523,7 @@ COMMENT ON SCHEMA private IS
   'Datos que ninguna sesión de la aplicación alcanza directamente. El esquema NO tiene grants para NINGÚN rol de la aplicación, tampoco service_role: BYPASSRLS actúa sobre el filtro de filas, DESPUÉS del chequeo de privilegios de esquema y tabla, y no lo suple. Tampoco está expuesto por PostgREST. El único camino desde la aplicación son las tres funciones SECURITY DEFINER de public: alta_conexion_google, guardar_secretos_conexion y leer_conexion_google_con_secretos (20260818_gcal_puente_secretos.sql). Conceder USAGE aquí a service_role no arregla un olvido: deshace una decisión, y R6 de esa migración la afirma a propósito.';
 
 COMMENT ON TABLE private.google_conexiones_secretos IS
-  'access_token / refresh_token cifrados (AES-256-GCM, src/lib/encrypt.ts) de cada conexión de Google. Sin grants para ningún rol de la aplicación: ni anon, ni authenticated, ni service_role. Se llega sólo por public.leer_conexion_google_con_secretos, public.guardar_secretos_conexion y public.alta_conexion_google. El borrado se hereda del ON DELETE CASCADE desde public.clinica_conexiones_google, que corre como acción de integridad referencial. CORRIGE al COMMENT anterior (20260817_gcal_conexion_clinica_a_esquema.sql), que decía que service_role llegaba y era falso: ése fue el bug.';
+  'access_token / refresh_token cifrados (AES-256-GCM, src/lib/encrypt.ts) de cada conexión de Google. Sin grants para ningún rol de la aplicación: ni anon, ni authenticated, ni service_role. Se llega sólo por public.leer_conexion_google_con_secretos, public.guardar_secretos_conexion y public.alta_conexion_google. El borrado se hereda del ON DELETE CASCADE desde public.clinica_conexiones_google, que corre como acción de integridad referencial. Escrito por 20260818_gcal_puente_secretos.sql, que CORRIGE al COMMENT anterior (20260817_gcal_conexion_clinica_a_esquema.sql): decía que service_role llegaba, y era falso. Ése fue el bug.';
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- 7. LA CACHÉ DE POSTGREST
@@ -484,7 +541,7 @@ NOTIFY pgrst, 'reload schema';
 -- ════════════════════════════════════════════════════════════════════════════
 -- 8. VEREDICTO DENTRO DE LA BASE
 -- ════════════════════════════════════════════════════════════════════════════
--- Veinte afirmaciones (C1-C11 de catálogo, R1-R9 con rol real), frente a las
+-- Veintidós afirmaciones (C1-C13 de catálogo, R1-R9 con rol real), frente a las
 -- trece de la propuesta original. NINGUNA decide el deploy: eso es el script de
 -- humo (§7 del brief). Lo que hacen es abortar la migración si algo dentro de
 -- la base está mal — y como esto va antes del COMMIT, abortar significa que no
@@ -526,7 +583,7 @@ NOTIFY pgrst, 'reload schema';
 --     un falso verde: la migración aborta entera, pero por un motivo que no
 --     tiene nada que ver con lo que la afirmación estaba probando.
 
--- ── C1-C11 · Catálogo ───────────────────────────────────────────────────────
+-- ── C1-C13 · Catálogo ───────────────────────────────────────────────────────
 
 -- C1 · Existen las tres, con la firma exacta, y no hay sobrecargas.
 INSERT INTO pg_temp.veredicto_puente
@@ -545,16 +602,37 @@ SELECT 101, 'C1 · las 3 funciones existen con la firma exacta y sin sobrecargas
 
 -- C2 · SECURITY DEFINER + search_path fijado, en las tres.
 INSERT INTO pg_temp.veredicto_puente
-SELECT 102, 'C2 · prosecdef y proconfig con search_path=, en las 3',
+SELECT 102, 'C2 · las 3 son SECURITY DEFINER y su search_path está vacío',
   CASE WHEN (SELECT count(*) FROM pg_proc p
               JOIN pg_namespace n ON n.oid = p.pronamespace
              WHERE n.nspname = 'public'
                AND p.proname IN ('alta_conexion_google','guardar_secretos_conexion','leer_conexion_google_con_secretos')
                AND p.prosecdef
-               AND EXISTS (SELECT 1 FROM unnest(p.proconfig) e WHERE e LIKE 'search_path=%')
+               -- `LIKE 'search_path=%'` NO sirve: casa también con
+               -- `search_path=public, pg_temp`, que es justo lo que la §3.1
+               -- prohíbe. Se compara contra el valor VACÍO y nada más.
+               --
+               -- LA FORMA REAL LLEVA COMILLAS. Verificado por ejecución contra
+               -- Postgres 16:
+               --
+               --   SET search_path = ''               → {"search_path=\"\""}
+               --   SET search_path TO ''              → idéntico
+               --   SET search_path = public, pg_temp  → {"search_path=public, pg_temp"}
+               --
+               --   'search_path='   = ANY(proconfig)  → false
+               --   'search_path=""' = ANY(proconfig)  → true
+               --
+               -- `search_path` es un GUC de lista con comillas, y al aplanar el
+               -- elemento vacío lo cita. Así que comparar sólo contra
+               -- `'search_path='` —la corrección que parecía obvia— habría sido
+               -- un ROJO FALSO que abortaba la migración entera: el mismo error
+               -- que aceptar cualquier valor, en espejo. La variante sin
+               -- comillas se deja admitida por si una versión futura aplana
+               -- distinto; hoy la que casa es la citada.
+               AND (p.proconfig && ARRAY['search_path=""', 'search_path='])
             ) = 3
        THEN 'OK'
-       ELSE 'FALLO: alguna no es SECURITY DEFINER o no lleva search_path fijado'
+       ELSE 'FALLO: alguna no es SECURITY DEFINER, o su search_path no está vacío'
   END;
 
 -- C3 · service_role puede ejecutarlas.
@@ -600,6 +678,11 @@ SELECT 105, 'C5 · el dueño de las 3 funciones alcanza private.google_conexione
   END;
 
 -- C6 · El contador de grants indebidos que ya venía en la migración del 17.
+--      LIMITACIÓN CONOCIDA Y ACEPTADA, heredada de allí: sólo mira USAGE sobre
+--      el esquema y SELECT sobre la tabla. Un GRANT de INSERT, UPDATE o DELETE
+--      a anon o authenticated sin SELECT daría 0 y pasaría. Se deja tal cual
+--      para que el contador siga siendo comparable con el del 17; lo que cubre
+--      el caso realista es R6 y R7, que preguntan por alcance real.
 INSERT INTO pg_temp.veredicto_puente
 SELECT 106, 'C6 · grants_indebidos sobre private para anon/authenticated = 0',
   CASE WHEN (SELECT count(*) FROM (VALUES ('anon'),('authenticated')) AS r(rol)
@@ -669,7 +752,35 @@ SELECT 111, 'C11 · los COMMENT de private ya no documentan la avería como dise
         AND coalesce(obj_description('private'::regnamespace, 'pg_namespace'), '') LIKE '%20260818_gcal_puente_secretos%'
         AND coalesce(obj_description('private.google_conexiones_secretos'::regclass, 'pg_class'), '') LIKE '%20260818_gcal_puente_secretos%'
        THEN 'OK'
-       ELSE 'FALLO: los COMMENT no se actualizaron'
+       ELSE 'FALLO: los COMMENT de private no se actualizaron, o no citan a este archivo'
+  END;
+
+-- C12 · La RLS de clinica_conexiones_google sigue encendida.
+--       La migración del 17 lo afirmaba y esta lo había perdido. Importa aquí y
+--       no allí: la §5 de ESTE archivo hace REVOKE ALL sobre esa misma tabla, y
+--       R8 depende de que la RLS esté puesta para probar lo que dice probar.
+INSERT INTO pg_temp.veredicto_puente
+SELECT 112, 'C12 · RLS activa en public.clinica_conexiones_google',
+  CASE WHEN (SELECT c.relrowsecurity FROM pg_class c
+              WHERE c.oid = 'public.clinica_conexiones_google'::regclass) IS TRUE
+       THEN 'OK'
+       ELSE 'FALLO: la RLS está desactivada; cualquier authenticated vería las conexiones de todas las clínicas'
+  END;
+
+-- C13 · Exactamente una policy, y es PERMISSIVE de SELECT.
+--       Un SELECT bajo RLS es la UNIÓN de las policies permisivas que apliquen:
+--       una segunda no restringe, ENSANCHA, y lo hace en silencio. Lo dejó
+--       escrito la migración del 17 al crear la única que hay
+--       (20260817_...:326-342) y aquí se convierte en afirmación.
+INSERT INTO pg_temp.veredicto_puente
+SELECT 113, 'C13 · exactamente 1 policy sobre clinica_conexiones_google, PERMISSIVE y de SELECT',
+  CASE WHEN (SELECT count(*) FROM pg_policies p
+              WHERE p.schemaname = 'public' AND p.tablename = 'clinica_conexiones_google') = 1
+        AND (SELECT count(*) FROM pg_policies p
+              WHERE p.schemaname = 'public' AND p.tablename = 'clinica_conexiones_google'
+                AND p.cmd = 'SELECT' AND p.permissive = 'PERMISSIVE') = 1
+       THEN 'OK'
+       ELSE 'FALLO: hay 0, 2 o más policies, o la que hay no es una PERMISSIVE de SELECT'
   END;
 
 -- ── R1 · service_role lee la conexión con sus secretos ──────────────────────
@@ -934,13 +1045,62 @@ BEGIN
 END $do$;
 
 -- ── R8 · la policy de SELECT enseña lo propio y sólo lo propio ──────────────
+--
+-- ⚠️ LEE ESTO ANTES DE SIMPLIFICAR ESTE BLOQUE. Tiene dos piezas que parecen
+--    de más y son las dos que hacen que la afirmación pruebe algo.
+--
+-- PIEZA 1 — se compara contra las filas de SU clínica, no contra el literal 1.
+--   El brief §6.3 pedía «ve exactamente 1 fila». No sirve: el índice único de
+--   la clínica es PARCIAL sobre rol='clinica'
+--   (clinica_conexiones_google_una_por_clinica), así que una clínica puede
+--   tener a propósito varias conexiones —una 'clinica' y N 'personal', que es
+--   como se hace el relevo de administrador—. Con el literal, esta afirmación
+--   se pondría roja sola el día del primer relevo, y un rojo que no significa
+--   nada acaba desactivando la afirmación entera.
+--
+-- PIEZA 2 — hace falta una fila AJENA, y por eso se fabrica una.
+--   Sin ella esto es una TAUTOLOGÍA sobre los datos de hoy: hay una clínica y
+--   una conexión, así que «las filas de su clínica» y «todas las filas de la
+--   tabla» son el mismo número, y la comparación se cumple igual con la policy
+--   filtrando, con la policy rota devolviendo todo, y con la RLS apagada del
+--   todo. Una afirmación que no puede fallar es peor que no tenerla: ocupa el
+--   sitio de la que sí probaría.
+--   Por eso el bloque crea una clínica y una conexión ajenas DENTRO de su
+--   subtransacción —mismo patrón de R3, R4 y R5, sin mecánica nueva— y exige
+--   que la tabla tenga más filas que la clínica del sujeto mientras se mide.
+--   Todo se deshace con el centinela.
+--
+-- El fixture es barato y no toca el esquema `auth`: public.clinicas sólo exige
+-- `nombre` (todo lo demás tiene DEFAULT), y user_id apunta a auth.users(id),
+-- que es exactamente el dominio de public.profiles.id
+-- (profiles_id_fkey, baseline/04_foreign_keys.sql:148-151). Así que se reutiliza
+-- un perfil que todavía no tenga conexión, en vez de inventar un usuario.
 DO $do$
-DECLARE v_perfil uuid; v_clinica uuid; v_visibles int; v_esperadas int; v_res text;
+DECLARE
+  v_perfil uuid; v_clinica uuid; v_user_libre uuid; v_clinica_ajena uuid;
+  v_visibles int; v_esperadas int; v_total int; v_res text;
 BEGIN
   SELECT s.perfil_id, s.clinica_id INTO v_perfil, v_clinica FROM pg_temp.sujeto_puente s;
   IF v_perfil IS NULL THEN
-    INSERT INTO pg_temp.veredicto_puente VALUES (208, 'R8 · authenticated ve bajo su policy las conexiones de su clínica y ninguna más',
+    INSERT INTO pg_temp.veredicto_puente VALUES (208, 'R8 · authenticated ve las conexiones de su clínica y ninguna ajena',
       'NO PROBADO — no hay perfil con clínica y conexión en esta base');
+    RETURN;
+  END IF;
+
+  -- El dueño de la conexión ajena: cualquier perfil que no tenga ya una (el
+  -- índice clinica_conexiones_google_user_id_uniq no es parcial).
+  SELECT p.id INTO v_user_libre
+    FROM public.profiles p
+   WHERE NOT EXISTS (SELECT 1 FROM public.clinica_conexiones_google c WHERE c.user_id = p.id)
+   ORDER BY p.id
+   LIMIT 1;
+
+  IF v_user_libre IS NULL THEN
+    -- Sin fila ajena la afirmación sería una tautología, y una tautología en
+    -- verde es exactamente lo que este archivo existe para no repetir. Se dice
+    -- que no se probó.
+    INSERT INTO pg_temp.veredicto_puente VALUES (208, 'R8 · authenticated ve las conexiones de su clínica y ninguna ajena',
+      'NO PROBADO — no hay ningún perfil sin conexión con el que fabricar la fila ajena; sin ella la comparación no puede fallar');
     RETURN;
   END IF;
 
@@ -948,6 +1108,17 @@ BEGIN
     FROM public.clinica_conexiones_google c WHERE c.clinica_id = v_clinica;
 
   BEGIN
+    -- ── Fixture: una clínica y una conexión que NO son las del sujeto ───────
+    INSERT INTO public.clinicas (nombre)
+    VALUES ('SONDA R8 — se deshace con el centinela ZX001')
+    RETURNING id INTO v_clinica_ajena;
+
+    INSERT INTO public.clinica_conexiones_google (clinica_id, user_id, rol, estado)
+    VALUES (v_clinica_ajena, v_user_libre, 'clinica', 'activa');
+
+    SELECT count(*) INTO v_total FROM public.clinica_conexiones_google;
+
+    -- ── Medición bajo la piel de un miembro de la clínica del sujeto ────────
     -- La simulación satisface a public.get_clinica_id(): es SECURITY DEFINER,
     -- LANGUAGE sql, y su cuerpo es `SELECT clinica_id FROM profiles WHERE
     -- id = auth.uid()`; auth.uid() lee request.jwt.claims.
@@ -959,27 +1130,30 @@ BEGIN
 
     SELECT count(*) INTO v_visibles FROM public.clinica_conexiones_google;
 
-    -- DIVERGENCIA CON LA ESPECIFICACIÓN (brief §6.3, R8): el brief pide «ve
-    -- exactamente 1 fila». Se compara contra las filas de SU clínica en vez de
-    -- contra el literal 1, porque el esquema permite a propósito varias
-    -- conexiones por clínica (una 'clinica' y N 'personal', para el relevo de
-    -- administrador), y con el literal esta afirmación se pondría roja sola el
-    -- día del primer relevo. Lo que se prueba —ve las suyas y ninguna ajena— es
-    -- lo mismo, y así no caduca.
+    RESET ROLE;
+    PERFORM set_config('request.jwt.claims', '', true);
+
     v_res := CASE
-      WHEN v_visibles = v_esperadas AND v_visibles >= 1 THEN 'OK'
-      WHEN v_visibles > v_esperadas THEN format('FALLO: ve %s filas y su clínica sólo tiene %s — la policy filtra de menos', v_visibles, v_esperadas)
-      ELSE format('FALLO: ve %s filas de las %s de su clínica', v_visibles, v_esperadas)
+      -- La guarda de la tautología, primero: si la tabla no tiene más filas que
+      -- la clínica del sujeto, el fixture no entró y la medición no vale.
+      WHEN v_total <= v_esperadas
+        THEN format('FALLO: la fila ajena no llegó a existir (total=%s, de su clínica=%s); la medición habría sido una tautología', v_total, v_esperadas)
+      WHEN v_visibles > v_esperadas
+        THEN format('FALLO: ve %s filas de %s en la tabla, y su clínica sólo tiene %s — la policy filtra de menos, o la RLS está apagada', v_visibles, v_total, v_esperadas)
+      WHEN v_visibles < v_esperadas
+        THEN format('FALLO: ve %s filas de las %s de su clínica', v_visibles, v_esperadas)
+      ELSE format('OK — ve las %s de su clínica y ninguna de las %s ajenas', v_esperadas, v_total - v_esperadas)
     END;
 
     RAISE EXCEPTION 'centinela' USING ERRCODE = 'ZX001';
   EXCEPTION WHEN sqlstate 'ZX001' THEN
-    -- El claim es transaccional: si no se limpia, los bloques siguientes lo
-    -- verían. La subtransacción ya lo deshace; esto es el cinturón.
+    -- El rollback de la subtransacción se lleva el fixture, el rol y el claim.
+    -- El RESET y el set_config de aquí son el cinturón: el claim es
+    -- transaccional y los bloques siguientes lo verían.
     RESET ROLE;
     PERFORM set_config('request.jwt.claims', '', true);
     INSERT INTO pg_temp.veredicto_puente VALUES (208,
-      'R8 · authenticated ve bajo su policy las conexiones de su clínica y ninguna más', v_res);
+      'R8 · authenticated ve las conexiones de su clínica y ninguna ajena', v_res);
   END;
 END $do$;
 
@@ -1033,7 +1207,7 @@ BEGIN
   INSERT INTO pg_temp.veredicto_puente VALUES (900, 'VEREDICTO',
     CASE WHEN v_reservas > 0
       THEN format('OK CON RESERVAS — %s afirmaciones sin sujeto en esta base. FALTA LO QUE DECIDE: npx tsx scripts/gcal-puente-humo.ts', v_reservas)
-      ELSE 'OK — las 20 en verde. FALTA LO QUE DECIDE: npx tsx scripts/gcal-puente-humo.ts, y sólo entonces el deploy.'
+      ELSE 'OK — las 22 en verde. FALTA LO QUE DECIDE: npx tsx scripts/gcal-puente-humo.ts, y sólo entonces el deploy.'
     END);
 END $do$;
 
