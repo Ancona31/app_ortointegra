@@ -68,13 +68,29 @@ export const PAPEL = {
  * de 2.N, anclado a `bottom: margen.inferior − pie.interlineado`, que también lo es.
  * Con el margen en 36 la caja pasaría por encima de las dos. Su suelo real son 63.
  *
- * POR QUÉ SE REVIRTIÓ — **compra CERO medicamentos**
+ * POR QUÉ SE REVIRTIÓ — **compra CERO medicamentos, RE-MEDIDO TRAS EL CAMBIO DE LA VÍA**
  *
- * El objetivo era densidad en la Receta. Medido sobre el PDF, la receta completa —con
- * recomendaciones, firma y código— pasa de 3 a 4 medicamentos, y **la reducción del
- * hueco de rúbrica de 2.L ya la lleva de 3 a 4 ella sola**. Los dos cambios suman
- * 38.4 pt de los ~75 que cuesta el quinto, así que ninguno de los dos alcanza y juntos
- * tampoco: el margen no aporta ni un medicamento sobre lo que ya había.
+ * ⚠ **LA PRIMERA MEDICIÓN ERA ANTERIOR A QUE LA VÍA SUBIERA AL RENGLÓN DEL ANCLA**, así
+ * que contaba una entrada de ~75 pt que ya no existe: hoy mide 58.5. Se volvió a medir
+ * componiendo el PDF con la rama al día, y **el resultado no cambia**:
+ *
+ *     capacidad en UNA hoja, con recomendaciones, firma y código
+ *
+ *                              márgenes actuales   igualados 36/36/36/63
+ *     entrada de 58.5 pt              4                    4
+ *     entrada de 72.5 pt              3                    3
+ *
+ * El quinto medicamento cuesta **54 pt** de alto —umbral medido barriendo el margen
+ * vertical hasta que entra— y los cuatro márgenes igualados dan **23** (18 arriba + 5
+ * abajo). Faltan 31. Los 54 pt de ganancia HORIZONTAL no cuentan para esto: ensanchan
+ * la caja, no añaden renglones.
+ *
+ * ⚠ **Y EL CUELLO DE BOTELLA NO ES LA LISTA.** La lista sola aguanta 5, 6 y 7 en la hoja
+ * 1 (ver `recetaMedica.test.ts`); lo que no cabe detrás de ella es la fila de cierre. Por
+ * eso el margen no es la palanca, y por eso tampoco lo es reducir la tipografía de la
+ * entrada: se midió a −10 %, −15 % y −30 % proporcional sobre los cuatro roles de
+ * `entradaMedicamento.*`, y **−10 y −15 compran CERO**; solo −30 compra uno, dejando la
+ * indicación en 7 pt y más pequeña que las recomendaciones generales. No se aplicó.
  *
  * LO QUE COSTABA, MEDIDO SOBRE LAS 455 PRUEBAS
  *
