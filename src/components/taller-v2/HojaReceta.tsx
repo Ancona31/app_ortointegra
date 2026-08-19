@@ -276,13 +276,63 @@ function medicoMembrete(medico: MedicoFicticio): MedicoMembrete {
  * comprimido de 50 a 40.99 pt — una violación de I.3.4 sin un solo aviso. Ver la
  * cabecera de 2.N.
  */
-export type CasoReceta = 'completo' | 'minimo' | 'siete' | 'lleno'
+export type CasoReceta =
+  | 'completo'
+  | 'minimo'
+  | 'siete'
+  | 'lleno'
+  | 'nombre26'
+  | 'nombre22'
+  | 'nombre19'
+  | 'nombre17'
 
-const CASOS: Record<CasoReceta, { medicamentos: readonly MedicamentoRecetado[]; paciente: ValoresPaciente; folio: string; cierre: boolean }> = {
+/**
+ * LOS CUATRO CASOS DE NOMBRE — para mirar el cuerpo ajustado de 2.B, no el contenido.
+ *
+ * El nombre del membrete se componía a 26 pt fijos en una caja de 412, así que uno
+ * largo partía en dos renglones y empujaba 19 pt hacia abajo TODO el documento, en los
+ * nueve formatos. Ahora el cuerpo se deriva del ancho compuesto. Estos cuatro casos
+ * recorren la escala entera para poder verla de un vistazo:
+ *
+ *     nombre26   16 car   201.8 pt a 26   →  26.00 pt   sale IGUAL que siempre
+ *     nombre22   38 car   489.0 pt a 26   →  21.90 pt   el caso reportado
+ *     nombre19   43 car   555.1 pt a 26   →  19.29 pt   cerca del piso
+ *     nombre17   74 car   893.8 pt a 26   →  17.00 pt   PISO: aquí sí parte en dos
+ *
+ * ⚠ **`nombre17` PARTE A PROPÓSITO Y NO ES UN DEFECTO.** El piso es el cuerpo del
+ * rótulo del documento: por debajo, el nombre del médico se leería más pequeño que la
+ * palabra RECETA MÉDICA y la jerarquía del membrete quedaría del revés. Antes de bajar
+ * de ahí se prefiere el renglón partido. Hacen falta ~70 caracteres para llegar, que
+ * en la práctica no ocurre.
+ *
+ * Los cuatro llevan el contenido de `completo` a propósito: lo que se compara es el
+ * membrete, así que todo lo demás tiene que ser idéntico entre ellos.
+ */
+const NOMBRES_DE_PRUEBA = {
+  nombre26: 'Dr. Ángel Ancona',
+  nombre22: 'Dra. Mónica Alexandra Arámbula Sánchez',
+  nombre19: 'Dr. Diego Demetrio Tadeo Zambrano Hernández',
+  nombre17: 'Dra. María Guadalupe Echeverría Zambrano de la Torre Villaseñor Buenrostro',
+} as const
+
+interface CasoConfig {
+  medicamentos: readonly MedicamentoRecetado[]
+  paciente: ValoresPaciente
+  folio: string
+  cierre: boolean
+  /** Sustituye el nombre del médico ficticio. Solo lo usan los cuatro casos de 2.B. */
+  nombreMedico?: string
+}
+
+const CASOS: Record<CasoReceta, CasoConfig> = {
   completo: { medicamentos: MEDICAMENTOS_COMPLETO, paciente: PACIENTE_COMPLETO, folio: FOLIO_COMPLETO, cierre: true },
   minimo: { medicamentos: MEDICAMENTOS_MINIMO, paciente: PACIENTE_MINIMO, folio: FOLIO_MINIMO, cierre: false },
   siete: { medicamentos: MEDICAMENTOS_SIETE, paciente: PACIENTE_COMPLETO, folio: FOLIO_SIETE, cierre: true },
   lleno: { medicamentos: MEDICAMENTOS_LLENO, paciente: PACIENTE_COMPLETO, folio: FOLIO_LLENO, cierre: true },
+  nombre26: { medicamentos: MEDICAMENTOS_COMPLETO, paciente: PACIENTE_COMPLETO, folio: FOLIO_COMPLETO, cierre: true, nombreMedico: NOMBRES_DE_PRUEBA.nombre26 },
+  nombre22: { medicamentos: MEDICAMENTOS_COMPLETO, paciente: PACIENTE_COMPLETO, folio: FOLIO_COMPLETO, cierre: true, nombreMedico: NOMBRES_DE_PRUEBA.nombre22 },
+  nombre19: { medicamentos: MEDICAMENTOS_COMPLETO, paciente: PACIENTE_COMPLETO, folio: FOLIO_COMPLETO, cierre: true, nombreMedico: NOMBRES_DE_PRUEBA.nombre19 },
+  nombre17: { medicamentos: MEDICAMENTOS_COMPLETO, paciente: PACIENTE_COMPLETO, folio: FOLIO_COMPLETO, cierre: true, nombreMedico: NOMBRES_DE_PRUEBA.nombre17 },
 }
 
 function HojaReceta({
@@ -297,15 +347,17 @@ function HojaReceta({
   caso: CasoReceta
 }): ReactElement {
   const acento = resolverAcento(acentoHex)
+  const c = CASOS[caso]
+  const base = medicoMembrete(medico)
   const comun = {
-    medico: medicoMembrete(medico),
+    // Los cuatro casos de 2.B sustituyen SOLO el nombre: el resto del membrete se
+    // queda igual para que lo único que cambie entre ellos sea lo que se compara.
+    medico: c.nombreMedico === undefined ? base : { ...base, nombre: c.nombreMedico },
     // El teléfono llega YA ROTULADO: 2.B coloca, no rotula.
     consultorio: { domicilio: medico.domicilio, telefono: `Tel. ${medico.telefono}` },
     panel: { variante: 'logo', acento, logo: medico.logo } as const,
     acento,
   }
-
-  const c = CASOS[caso]
 
   return (
     <Document title={`Receta médica — taller · ${caso}`}>

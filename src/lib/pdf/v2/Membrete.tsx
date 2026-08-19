@@ -49,10 +49,15 @@
 
 import { View, Text, StyleSheet } from '@react-pdf/renderer'
 import type { ReactElement, ReactNode } from 'react'
-import PanelCircular, { type PanelCircularProps } from './PanelCircular'
+import PanelCircular, {
+  PANEL_DIAMETRO,
+  type PanelCircularProps,
+} from './PanelCircular'
 import FileteGruesoFino from './FileteGruesoFino'
+import { avanceRelativo } from './metricasNombre'
 import {
   CAJA,
+  NOMBRE_MEMBRETE,
   TINTA,
   TIPOGRAFIA,
   TRANSICION,
@@ -341,6 +346,80 @@ export type MembreteProps =
       lamina?: Lamina
     }
 
+/**
+ * EL ANCHO QUE LE QUEDA AL NOMBRE, y con quién lo comparte.
+ *
+ * La fila superior tiene DOS hijos y nada más: el panel y el bloque del nombre con
+ * `flex: 1`. No hay riel ni columna a la derecha, así que el nombre se queda con
+ * todo el sobrante. La especialidad no le disputa ancho —vive DEBAJO, dentro del
+ * mismo bloque—, y por eso no entra en esta resta.
+ *
+ * Con el panel `oculto` no se compone panel NI se reserva su medianil (regla 4 de
+ * 2.A), así que el disponible sube a la caja entera. Ese caso es real y hay que
+ * respetarlo: si se restara siempre, un membrete sin panel encogería el nombre sin
+ * necesidad.
+ */
+function anchoParaNombre(panelOculto: boolean): number {
+  return panelOculto
+    ? CAJA.ancho
+    : CAJA.ancho - PANEL_DIAMETRO - GEOMETRIA.medianilPanelNombre
+}
+
+/**
+ * EL CUERPO CON EL QUE SE COMPONE EL NOMBRE DEL MÉDICO (2.B).
+ *
+ * Ver la ficha de `NOMBRE_MEMBRETE` en la capa de tokens para el porqué. Aquí va el
+ * cómo, que tiene una sola sutileza:
+ *
+ * **EL ANCHO COMPUESTO ES LINEAL EN EL CUERPO**, así que no hace falta buscar por
+ * tanteo ni bajar de punto en punto. Los dos sumandos escalan con él —el avance de
+ * la fuente va en em, y el tracking react-pdf lo aplica en PUNTOS por carácter, que
+ * también salen del cuerpo—, de modo que el ancho por punto de cuerpo es constante y
+ * el cuerpo que cabe sale de una división.
+ *
+ * ⚠ **NO CUENTA CARACTERES.** El avance sale del binario real de la fuente, kerning
+ * incluido (`metricasNombre.ts`). Contar caracteres deja una zona gris de tres
+ * caracteres —el ritmo va de 11.6 a 12.9 pt por carácter según las letras— en la que
+ * no se sabe si cabe.
+ *
+ * ASUME NORMALIZACIÓN NFC, que es como llegan los nombres de `profiles`: el tracking
+ * se cuenta por punto de código, y una vocal acentuada descompuesta contaría dos.
+ */
+export function cuerpoDelNombre(nombre: string, disponible: number): number {
+  const rol = TIPOGRAFIA['medico.nombre']
+  const anchoPorPunto = avanceRelativo(nombre) / 1000 + rol.tracking * [...nombre].length
+  if (anchoPorPunto <= 0) return NOMBRE_MEMBRETE.techo
+  /*
+    Se trunca hacia abajo a centésimas: redondear hacia arriba devuelve un cuerpo
+    cuyo ancho compuesto supera la caja por una milésima, y entonces vuelve a partir
+    —que es justo el defecto que esto cierra—.
+  */
+  const cabe = Math.floor((disponible / anchoPorPunto) * 100) / 100
+  return Math.min(NOMBRE_MEMBRETE.techo, Math.max(NOMBRE_MEMBRETE.piso, cabe))
+}
+
+/**
+ * La desviación de estilo del nombre, o nada si compone a su cuerpo declarado.
+ *
+ * Devolver `undefined` en el caso normal no es una optimización: es la garantía de
+ * que **un nombre que hoy cabe sale byte a byte como hoy**. Solo se desvía el que lo
+ * necesita.
+ *
+ * `lineHeight` NO se toca, y es deliberado: `estiloTipografico()` lo compone como
+ * RATIO (`interlineado / cuerpo`), así que el interlineado ya escala solo con el
+ * cuerpo. `letterSpacing` sí se recalcula, porque ese va en PUNTOS absolutos y se
+ * quedó cuajado al cuerpo de 26. Es el mismo par de decisiones que ya toma
+ * `nombreContinuacion` aquí al lado.
+ */
+function ajusteDelNombre(
+  nombre: string,
+  panelOculto: boolean,
+): { fontSize: number; letterSpacing: number } | undefined {
+  const cuerpo = cuerpoDelNombre(nombre, anchoParaNombre(panelOculto))
+  if (cuerpo >= NOMBRE_MEMBRETE.techo) return undefined
+  return { fontSize: cuerpo, letterSpacing: TIPOGRAFIA['medico.nombre'].tracking * cuerpo }
+}
+
 const estilos = StyleSheet.create({
   membrete: {
     width: CAJA.ancho,
@@ -606,7 +685,17 @@ export default function Membrete(props: MembreteProps): ReactElement {
                 : { marginLeft: GEOMETRIA.medianilPanelNombre },
             ]}
           >
-            <Text style={estilos.nombre}>{medico.nombre}</Text>
+            <Text
+              style={[
+                estilos.nombre,
+                // 2.B: el cuerpo se ajusta al ancho para que el nombre no parta y
+                // no empuje 19 pt de contenido en los nueve formatos. Ver
+                // `ajusteDelNombre()`. Sin desviación cuando cabe a 26.
+                ajusteDelNombre(medico.nombre, props.panel.variante === 'oculto') ?? {},
+              ]}
+            >
+              {medico.nombre}
+            </Text>
             <Text style={estilos.especialidad}>{medico.especialidad}</Text>
           </View>
         </View>

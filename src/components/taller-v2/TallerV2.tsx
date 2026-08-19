@@ -162,6 +162,17 @@ const CASOS_RECETA: readonly EntradaCaso[] = [
   ...CASOS.slice(0, 2),
   { caso: 'siete', etiqueta: 'Siete', nota: 'La cota de v1: 7 con recomendaciones' },
   CASOS[2],
+  /*
+    LOS CUATRO DEL NOMBRE DEL MEMBRETE (2.B). No son variantes de contenido: los cuatro
+    llevan el mismo, y lo único que cambia es el nombre del médico. Están para mirar el
+    cuerpo ajustado —el nombre dejó de componerse a 26 pt fijos— y recorren la escala
+    entera, del techo al piso. La nota lleva el cuerpo resultante para poder compararlos
+    sin medir nada. Ver `NOMBRES_DE_PRUEBA` en `HojaReceta.tsx`.
+  */
+  { caso: 'nombre26', etiqueta: 'Nombre · 26 pt', nota: 'Corto: sale igual que siempre' },
+  { caso: 'nombre22', etiqueta: 'Nombre · 21.9 pt', nota: 'El caso reportado, 38 caracteres' },
+  { caso: 'nombre19', etiqueta: 'Nombre · 19.3 pt', nota: 'Cerca del piso, 43 caracteres' },
+  { caso: 'nombre17', etiqueta: 'Nombre · 17 pt', nota: 'Piso: por debajo se prefiere partir' },
 ]
 
 /**

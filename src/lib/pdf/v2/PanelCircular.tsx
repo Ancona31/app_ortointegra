@@ -52,8 +52,18 @@ import { FUENTE, TINTA, type AcentoResuelto } from './tokens'
  * I.1.4, por la misma razón. Su `interlineado: 1` viene así de la ficha: es un
  * multiplicador, que es justo lo que react-pdf entiende por `lineHeight`.
  */
+/**
+ * Diámetro exterior del panel, en border-box.
+ *
+ * Se exporta porque 2.B lo RESTA para saber cuánto ancho le queda al nombre del
+ * médico (ver `cuerpoDelNombre()` en `Membrete.tsx`). Escribir un 56 allí sería la
+ * misma cifra en dos sitios, y el día que el panel cambie de tamaño el nombre se
+ * seguiría midiendo contra el viejo.
+ */
+export const PANEL_DIAMETRO = 56
+
 const GEOMETRIA = {
-  diametroExterior: 56,
+  diametroExterior: PANEL_DIAMETRO,
   anilloExterior: 1.5,
   diametroInterior: 47,
   anilloInterior: 0.5,

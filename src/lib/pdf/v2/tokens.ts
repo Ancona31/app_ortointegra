@@ -819,6 +819,47 @@ export function estiloTipografico(
   }
 }
 
+/**
+ * I.1.4 · Los dos extremos del cuerpo del NOMBRE DEL MÉDICO EN EL MEMBRETE (2.B).
+ *
+ * ⚠ **EL CUERPO DE ESTE ROL DEJÓ DE SER FIJO, Y NO ES UN DESCUIDO.** `medico.nombre`
+ * declara 26 pt y ese sigue siendo su valor; lo que cambia es que 2.B lo trata como
+ * TECHO y no como cifra única. Si alguien lo devuelve a un 26 fijo, vuelve el defecto
+ * que esto cierra.
+ *
+ * LO QUE OBLIGÓ, MEDIDO. El nombre dispone de 412 pt —`CAJA.ancho` menos el panel de
+ * 56 y su medianil de 18—. «Dra. Mónica Alexandra Arámbula Sánchez» compone **489 pt**
+ * a 26: se pasa un 19 %, parte en dos renglones y la fila del membrete crece de 56 a
+ * 75 pt. Esos **19 pt de empuje bajan a TODO el contenido de los nueve formatos**,
+ * porque `Membrete` es chasis compartido. No es un problema del nombre largo: es que
+ * un cuerpo fijo en una caja fija solo tiene una salida, y es partir.
+ *
+ * POR QUÉ NO SE ARREGLÓ ACORTANDO LA CADENA. El apellido materno forma parte del
+ * nombre con el que el médico está registrado en su cédula; recortarlo en el papel es
+ * peor que componerlo un punto más pequeño. La cadena se queda entera.
+ *
+ * ⚠ **DE DÓNDE SALE EL PISO, Y POR QUÉ ES DERIVADO.** Es el cuerpo de
+ * `titulo.documento` —el rótulo `RECETA MÉDICA`—. Por debajo de ahí el nombre del
+ * médico se compondría **más pequeño que el nombre del documento** y la jerarquía del
+ * membrete quedaría invertida: la hoja diría antes qué es que de quién es. Va como
+ * fórmula y no como un 17 literal (§0): si ese rótulo cambia de cuerpo, este piso lo
+ * sigue solo.
+ *
+ * CONSECUENCIA ACEPTADA: dos médicos con nombres de largo distinto ven su nombre en
+ * cuerpos distintos. Es correcto —cada médico ve TODOS sus documentos consistentes
+ * entre sí— y un nombre algo más pequeño en una línea se lee mejor que uno grande
+ * partido en dos. Decisión de Angel.
+ *
+ * Quien compone es `cuerpoDelNombre()` en `Membrete.tsx`, con el avance real de la
+ * fuente (`metricasNombre.ts`), no con una cuenta de caracteres.
+ */
+export const NOMBRE_MEMBRETE = {
+  /** Techo: el cuerpo declarado del rol. Un nombre que cabe hoy no se mueve. */
+  techo: TIPOGRAFIA['medico.nombre'].cuerpo,
+  /** Piso DERIVADO: el cuerpo del rótulo del documento. Un 17 literal aquí es un bug. */
+  piso: TIPOGRAFIA['titulo.documento'].cuerpo,
+} as const
+
 /** Roles que llevan cifras tabulares (I.1.4, párrafo bajo la escala). */
 export const CIFRAS_TABULARES = [
   'dato',
