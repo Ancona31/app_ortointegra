@@ -37,6 +37,7 @@ import {
   CAJA,
   ESPACIO,
   FILETE,
+  FIRMA,
   MARGEN,
   PAPEL,
   TIPOGRAFIA,
@@ -452,10 +453,15 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
           `casilla.texto`, 8 / 11—. Aquí ya no se compone: esta es la variante en que el
           paciente firma por sí mismo.
 
-      Este documento no era el que apretaba, y ahora aprieta todavía menos: 102 pt de sobra son
-      seis renglones largos del párrafo de la declaración.
+      Este documento no era el que apretaba, y ahora aprieta todavía menos: 117 pt de sobra son
+      siete renglones largos del párrafo de la declaración.
+
+      ⚠ **+15.4 pt DESDE QUE LA RÚBRICA ENCOGIÓ.** `FIRMA.espacio` bajó un 20 % —de 77 a
+      61.6— porque ese hueco no es papel en blanco: es donde 2.L imprime la rúbrica
+      capturada del médico. La holgura se escribe contra el token y no como cifra suelta,
+      así que la cota sigue midiendo el documento y no el tamaño de la firma.
     */
-    expect(holgura).toBeCloseTo(102.43, 1)
+    expect(holgura).toBeCloseTo(102.43 + (77 - FIRMA.espacio), 1)
   }, 200_000)
 
   it('la holgura de la variante por sustitución, contra los 26.04 de la guía', async () => {
@@ -475,9 +481,14 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
       anchos, así que la cota más ajustada del sistema se queda exactamente donde estaba.
 
       La otra variante ganó 34 pt; esta, cero. Quien mida este documento tiene que seguir
-      mirando ESTA.
+      mirando ESTA — aunque desde que la rúbrica encogió respira 15.4 pt más.
+
+      ⚠ **+15.4 pt DESDE QUE LA RÚBRICA ENCOGIÓ.** `FIRMA.espacio` bajó un 20 % —de 77 a
+      61.6— porque ese hueco no es papel en blanco: es donde 2.L imprime la rúbrica
+      capturada del médico. La holgura se escribe contra el token y no como cifra suelta,
+      así que la cota sigue midiendo el documento y no el tamaño de la firma.
     */
-    expect(holgura).toBeCloseTo(29.43, 1)
+    expect(holgura).toBeCloseTo(29.43 + (77 - FIRMA.espacio), 1)
     expect(holgura).toBeGreaterThan(0)
   }, 200_000)
 
@@ -595,10 +606,21 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
       sostiene y que hay que releer si esto falla es **el párrafo aguanta un renglón de más y no
       dos**.
     */
-    // La variante que firma el paciente: de 102.43 a 86.43. Le sobra de largo.
-    expect(await holguraDe(CON_DIAGNOSTICO)).toBeCloseTo(86.43, 1)
-    // La ajustada: de 29.43 a 13.43. Sigue en una hoja, y sin sitio para otro renglón.
-    expect(await holguraDe({ ...CON_DIAGNOSTICO, sustitucion: true })).toBeCloseTo(13.43, 1)
+    // La variante que firma el paciente: de 102.43 a 86.43 con el hueco de rúbrica de 77,
+    // y 15.4 pt más desde que encogió. Le sobra de largo.
+    expect(await holguraDe(CON_DIAGNOSTICO)).toBeCloseTo(86.43 + (77 - FIRMA.espacio), 1)
+    /*
+      La ajustada: de 29.43 a 13.43 con el hueco de rúbrica de 77. Sigue en una hoja.
+
+      ⚠ **Y ES LA COTA QUE MÁS SE BENEFICIÓ DE QUE LA RÚBRICA ENCOGIERA.** Con 13.43 pt de
+      holgura esta variante era la más ajustada del sistema y no aguantaba un renglón más;
+      con los 15.4 que devuelve `FIRMA.espacio` pasa a 28.83 y respira. Sigue siendo la que
+      hay que mirar cuando algo de este documento crezca, pero ya no está al borde.
+    */
+    expect(await holguraDe({ ...CON_DIAGNOSTICO, sustitucion: true })).toBeCloseTo(
+      13.43 + (77 - FIRMA.espacio),
+      1,
+    )
 
     const conDiagnosticoDe = async (n: number): Promise<number> =>
       (
@@ -608,24 +630,31 @@ describe('II.9 · Denegación o revocación del consentimiento', () => {
         })
       ).length
 
-    expect(await conDiagnosticoDe(84)).toBe(1)
+    expect(await conDiagnosticoDe(168)).toBe(1)
 
     /*
-      ⚠⚠ **A PARTIR DE 85 LA VARIANTE POR SUSTITUCIÓN SE VA A DOS HOJAS, Y ESO NO ES ACEPTABLE.**
-      No se tapa con un recorte: lo único que queda por recortar es la declaración, que es la
-      frase que el paciente firma y donde el diagnóstico acaba de entrar por su valor legal —
-      recortarla escondería el dato que el cambio existe para asentar—. El subtítulo ya va a un
-      renglón desde 2.C, así que esa palanca está gastada.
+      ⚠⚠ **EL TECHO ERA 84 CARACTERES Y AHORA SON 168: EXACTAMENTE EL DOBLE.**
 
-      **Queda como decisión de Angel**, con la cifra medida al lado. La palanca que sobra es
-      retirar el subtítulo entero del bloque de título —16 pt, un renglón más de declaración—,
-      y no se ha compuesto porque hacer aparecer y desaparecer un bloque según lo que mida el
-      párrafo de abajo es métrica decidida por el contenido, que es lo que I.3.4 prohíbe.
+      Esta aserción se escribió para fijar un defecto abierto —«a partir de 85 la variante por
+      sustitución se va a dos hojas, y eso no es aceptable»— con el encargo explícito de que si
+      alguien lo resolvía, fallara y hubiera que venir a leer esto. **Falló, y esto es lo que
+      hay que leer.**
 
-      Esta aserción fija el defecto en vez de esconderlo: si alguien lo resuelve, falla y hay
-      que venir a leer esto.
+      Lo resolvió reducir `FIRMA.espacio` un 20 %. El hueco de la rúbrica se creía papel en
+      blanco para firmar a mano y resultó ser donde 2.L imprime la rúbrica capturada, así que
+      encogerlo no le quita sitio a nadie: la firma se compone proporcionalmente más pequeña.
+      Los 15.4 pt que devuelve caen enteros en la variante más ajustada del sistema y le
+      compran un renglón largo de declaración.
+
+      **El defecto no está cerrado, está acotado.** A partir de 169 sigue yéndose a dos hojas,
+      y las palancas que quedan son las mismas de antes —retirar el subtítulo del bloque de
+      título, 16 pt— con la misma objeción: hacer aparecer y desaparecer un bloque según lo que
+      mida el párrafo de abajo es métrica decidida por el contenido, y eso lo prohíbe I.3.4.
+      Lo que cambia es la urgencia: 84 caracteres no daban para un diagnóstico real y 168 sí.
+
+      Las dos cifras se dejan escritas. Si alguien vuelve a moverlo, falla otra vez.
     */
-    expect(await conDiagnosticoDe(85)).toBe(2)
+    expect(await conDiagnosticoDe(169)).toBe(2)
 
     // La otra variante aguanta el diagnóstico entero: no es ella la que desborda.
     expect(

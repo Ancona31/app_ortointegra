@@ -38,8 +38,11 @@ import SolicitudInternamiento, {
   type SolicitudInternamientoProps,
 } from '@/lib/pdf/v2/formatos/SolicitudInternamiento'
 import {
+  CAJA,
   FILETE,
+  FIRMA,
   FILETE_INTERNAMIENTO,
+  MARGEN,
   RIEL_CELDA,
   TIPOGRAFIA,
   resolverAcento,
@@ -520,8 +523,8 @@ describe('II.6 · Solicitud de Internamiento', () => {
     // Los dos renglones salen enteros, en su caja y sin marca delante.
     const prosa1 = renglon(hoja3, PROSA_1)
     const prosa2 = renglon(hoja3, PROSA_2)
-    expect(prosa1.x).toBeCloseTo(72, 1)
-    expect(prosa2.x).toBeCloseTo(72, 1)
+    expect(prosa1.x).toBeCloseTo(MARGEN.izquierdo, 1)
+    expect(prosa2.x).toBeCloseTo(MARGEN.izquierdo, 1)
 
     /*
       Y EL PRIMER BLOQUE NUMERADO SIGUE LLEVANDO EL 1: la prosa no consume número, que es
@@ -598,7 +601,7 @@ describe('II.6 · Solicitud de Internamiento', () => {
     expect(x('ASA') - x('DÍAS EST.')).toBeCloseTo(2 * RIEL_CELDA, 1)
 
     // Y la de ASA es la última: lo que queda hasta el borde de la caja es UNA columna.
-    expect(x('ASA') + RIEL_CELDA).toBeGreaterThan(72 + 486 - RIEL_CELDA)
+    expect(x('ASA') + RIEL_CELDA).toBeGreaterThan(MARGEN.izquierdo + CAJA.ancho - RIEL_CELDA)
   }, 120_000)
 
   /**
@@ -656,11 +659,15 @@ describe('II.6 · Solicitud de Internamiento', () => {
       LA HOJA 2 COMPONE EL NOMBRE A 10 / 14 Y LA HOJA 3 A 11 / 15, y las dos cifras salen
       de la distancia entre el rótulo de la firma y el nombre de abajo:
 
-          hoja 2   11 + 77 + 0.47 + 4 + 0.878 × 10 − 0.878 × 7 = 95.104
-          hoja 3   11 + 77 + 0.75 + 4 + 0.878 × 11 − 0.878 × 7 = 96.262
+          hoja 2   11 + 61.6 + 0.47 + 4 + 0.878 × 10 − 0.878 × 7 = 79.704
+          hoja 3   11 + 61.6 + 0.75 + 4 + 0.878 × 11 − 0.878 × 7 = 80.862
 
       Son 1.158 pt de diferencia dentro del mismo archivo. **Queda reportado**: es el
       cuarto y el segundo valor del sistema para el mismo renglón.
+
+      ⚠ **EL 61.6 ERA 77 Y DABA 95.104 / 96.262.** Es `FIRMA.espacio`, el hueco donde se
+      imprime la rúbrica capturada, que bajó un 20 %. Se lee del token y no se escribe:
+      el día que vuelva a moverse, esta cuenta lo sigue sola.
     */
     /*
       El nombre del médico sale DOS veces en las hojas de continuación —arriba en la
@@ -676,8 +683,9 @@ describe('II.6 · Solicitud de Internamiento', () => {
     }
 
     const rol = ASCENDENTE_ARCHIVO * (TIPOGRAFIA['firma.rol'].cuerpo ?? 0)
-    expect(salto(hojas[1])).toBeCloseTo(11 + 77 + 0.47 + 4 + ASCENDENTE_ARCHIVO * 10 - rol, 1)
-    expect(salto(hojas[2])).toBeCloseTo(11 + 77 + 0.75 + 4 + ASCENDENTE_ARCHIVO * 11 - rol, 1)
+    const hueco = FIRMA.espacio
+    expect(salto(hojas[1])).toBeCloseTo(11 + hueco + 0.47 + 4 + ASCENDENTE_ARCHIVO * 10 - rol, 1)
+    expect(salto(hojas[2])).toBeCloseTo(11 + hueco + 0.75 + 4 + ASCENDENTE_ARCHIVO * 11 - rol, 1)
   }, 120_000)
 
   it('sin indicaciones de piso: UNA hoja, y una sola firma del médico', async () => {

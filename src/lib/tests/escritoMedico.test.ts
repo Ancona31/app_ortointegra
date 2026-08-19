@@ -34,6 +34,8 @@ import EscritoMedico, {
 import {
   CAJA,
   FILETE,
+  FIRMA,
+  MARGEN,
   TIPOGRAFIA,
   resolverAcento,
   ACENTO_BASE_POR_DEFECTO,
@@ -380,7 +382,13 @@ describe('II.8 · Escrito Médico', () => {
       22.37 con un renglón y en 60 con tres, y 3 × 20 = 60 exactos: el renglón mide 20 y los
       2.37 son el *strut* del HTML. Reportado.
     */
-    expect(encabezado(hoja1)).toBeCloseTo(160, 1)
+    /*
+      `encabezado()` mide desde el borde del papel, así que se lleva dentro el margen
+      superior. Se escribe como resta contra el token y no como cifra suelta: el día que
+      los márgenes se muevan —se midió y se dejó para después, ver `MARGEN`— esta cota
+      sigue midiendo el encabezado y no el margen.
+    */
+    expect(encabezado(hoja1)).toBeCloseTo(160 - (54 - MARGEN.superior), 1)
   }, 200_000)
 
   it('el título envuelve: cada renglón extra cuesta 20 pt y nada se recorta', async () => {
@@ -532,7 +540,8 @@ describe('II.8 · Escrito Médico', () => {
       renglon(hoja2, CEDULAS).arriba -
       ASCENDENTE_ARCHIVO * TIPOGRAFIA['medico.credencial'].cuerpo +
       12
-    expect(finDeLaCabecera - 54).toBeCloseTo(57.5, 1)
+    // El margen se lee del token: escrito a mano dejó de valer al igualar los cuatro.
+    expect(finDeLaCabecera - MARGEN.superior).toBeCloseTo(57.5, 1)
   }, 200_000)
 
   it('el cuerpo compone sus seis nodos, con las marcas de lista en su eje', async () => {
@@ -575,12 +584,18 @@ describe('II.8 · Escrito Médico', () => {
     const ultima = hojas[hojas.length - 1]
 
     expect(ultima.texto).toContain('FIRMA Y SELLO DEL MÉDICO')
-    expect(renglon(ultima, 'FIRMA Y SELLO DEL MÉDICO').x).toBeCloseTo(72, 1)
+    expect(renglon(ultima, 'FIRMA Y SELLO DEL MÉDICO').x).toBeCloseTo(MARGEN.izquierdo, 1)
 
     /*
       LA COMPOSICIÓN `estandar` DE 2.L: nombre a 11 / 15 y línea de 0.75. La lámina mide el
       bloque en 118.48 y aquí compone 118.75 — los 0.27 de siempre, que ya reportan
       Suplementación y las otras dos láminas que la miden.
+
+      ⚠ **HOY COMPONE 103.35, Y LOS 15.4 QUE FALTAN SON LA RÚBRICA.** `FIRMA.espacio` bajó
+      un 20 % —de 77 a 61.6— porque ese hueco no es papel en blanco: es donde se imprime la
+      rúbrica capturada del médico, y ahora se compone proporcionalmente más pequeña. La
+      cota de la lámina es la del hueco de 77 y no se puede comparar contra esta sin
+      sumárselos. El salto se calcula desde el token, no desde la cifra.
     */
     /*
       El nombre del médico sale DOS veces en una hoja de continuación —arriba en la cabecera
@@ -592,7 +607,7 @@ describe('II.8 · Escrito Médico', () => {
     const salto =
       Math.max(...nombres) - renglon(ultima, 'FIRMA Y SELLO DEL MÉDICO').arriba
     const rol = ASCENDENTE_ARCHIVO * TIPOGRAFIA['firma.rol'].cuerpo
-    expect(salto).toBeCloseTo(11 + 77 + 0.75 + 4 + ASCENDENTE_ARCHIVO * 11 - rol, 1)
+    expect(salto).toBeCloseTo(11 + FIRMA.espacio + 0.75 + 4 + ASCENDENTE_ARCHIVO * 11 - rol, 1)
   }, 200_000)
 
   /**
@@ -670,7 +685,7 @@ describe('II.8 · Escrito Médico', () => {
       const centro = await medir('center')
       const derecha = await medir('right')
 
-      expect(izquierda).toBeCloseTo(72, 1)
+      expect(izquierda).toBeCloseTo(MARGEN.izquierdo, 1)
       expect(centro).toBeGreaterThan(izquierda)
       expect(derecha).toBeGreaterThan(centro)
     }, 200_000)

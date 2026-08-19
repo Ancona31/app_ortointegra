@@ -352,7 +352,21 @@ const estilos = StyleSheet.create({
    * si el genérico va pegado al ancla y la vía oral pegada al genérico.
    */
   anclaMedicamento: { ...estiloTipografico('entradaMedicamento.ancla'), flex: 1 },
-  /** REGLA 5: tinta plena. Es la denominación genérica. El rol ya la trae. */
+  /**
+   * REGLA 5: tinta plena. Es la denominación genérica. El rol ya la trae.
+   *
+   * ⚠ **SE PROBÓ A METERLO EN EL RENGLÓN DEL ANCLA Y SE RETIRÓ. NO LO REPONGAS.**
+   * Como run dentro del ancla ahorraba 13 pt por entrada, que con siete
+   * medicamentos son 91, y esa era la vía obvia para recuperar la densidad de v1.
+   * **No se lee.** Medido sobre el taller con nombres comerciales reales: el ancla
+   * envuelve en 3 de 7 casos, y al envolver el genérico cae al principio del
+   * segundo renglón, pegado a la indicación que viene debajo — así que se lee como
+   * si fuera parte de la pauta y no el nombre del fármaco.
+   *
+   * Un genérico que se confunde con la posología es un riesgo de dispensación, no
+   * un defecto estético. **En una receta la claridad manda sobre la densidad**, y
+   * esos 91 pt se pagan a propósito. Angel, sobre el taller.
+   */
   genericoMedicamento: { ...estiloTipografico('entradaMedicamento.generico') },
   /**
    * El contenedor del bloque en negativo. Su margen es lo único propio.
@@ -796,9 +810,13 @@ export default function EntradaNumerada({
             aquí, con la calibración del chasis a 19 pt de alto, y otra abajo con la
             medida a 14.5—, y el defecto es visible pero no lanza nada. Medido.
           */}
-          {!medicamento && !suplemento && tieneValor(marca) ? (
+          {!suplemento && tieneValor(marca) ? (
             <View style={estilos.cajaMarca}>
-              <BloqueNegativo variante="via" via={marca} />
+              <BloqueNegativo
+                variante="via"
+                via={marca}
+                lamina={medicamento ? 'receta' : undefined}
+              />
             </View>
           ) : null}
         </View>
@@ -843,7 +861,7 @@ export default function EntradaNumerada({
           mide 2 + 14.5 donde el renglón plano medía 13—, así que las filas de vía
           oral dejan de medir los 85.37 pt de la lámina y miden los 89 de las demás.
         */}
-        {(medicamento || suplemento) && tieneValor(marca) ? (
+        {suplemento && tieneValor(marca) ? (
           <View style={estilos.cajaVia}>
             {/*
               ⚠ **LA LÁMINA QUE SE PASA NO ES LA DEL FORMATO, Y DA IGUAL POR AHORA.** 2.H

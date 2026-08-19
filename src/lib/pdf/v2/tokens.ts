@@ -39,17 +39,60 @@ export const PAPEL = {
 } as const
 
 /**
- * I.1.2 · Márgenes de la hoja. Asimétricos: el izquierdo es el mayor porque la
- * hoja se perfora y se engrapa por ese borde.
+ * I.1.2 · Márgenes de la hoja. Asimétricos.
  *
- * Declarado antes de `CAJA` —al revés que en el spec, donde I.1.2 va después de
- * I.1.1— porque `caja.alto` se deriva de estos valores y TypeScript necesita
- * tenerlos inicializados.
+ * DESGLOSE DEL MARGEN INFERIOR, que es la parte que hay que respetar al implementar:
+ * 36 pt de papel intocable + 16 pt de banda de pie + 16 pt de aire. La banda de pie es
+ * tinta, no sangre: vive DENTRO de la zona segura y FUERA de la caja de texto, así que
+ * el margen inferior no se mide hasta la banda.
  *
- * DESGLOSE DEL MARGEN INFERIOR, que es la parte que hay que respetar al
- * implementar: 36 pt de papel intocable + 16 pt de banda de pie + 16 pt de aire.
- * La banda de pie es tinta, no sangre: vive DENTRO de la zona segura y FUERA de
- * la caja de texto, así que el margen inferior no se mide hasta la banda.
+ * ═══ SE AUTORIZÓ IGUALAR LOS CUATRO. SE MIDIÓ ENTERO Y NO SE APLICÓ ═══
+ *
+ * Angel autorizó bajar los cuatro al mismo valor, retirando la razón del izquierdo
+ * ampliado —«no se perfora nada»— y respetando solo `ZONA_SEGURA`. **Se compuso, se
+ * midió el sistema entero y se revirtió.** Queda escrito con las cifras para que
+ * retomarlo sea una decisión y no una nueva investigación.
+ *
+ * A QUÉ VALORES LLEGAN, Y CUÁNTO GANA LA CAJA
+ *
+ *     superior    54 → 36     el suelo es `ZONA_SEGURA`
+ *     izquierdo   72 → 36     sin la razón del perforado, iguala
+ *     derecho     54 → 36
+ *     inferior    68 → 63     ⚠ el único que NO llega a 36
+ *
+ *     caja        486 × 670  →  540 × 693      +54 de ancho, +23 de alto
+ *
+ * ⚠ **EL INFERIOR NO PUEDE BAJAR A 36 Y NO ES PRUDENCIA: ES QUE NO ESTÁ VACÍO.**
+ * Contando desde el borde inferior, 0→36 es la zona segura; 36→52 la banda de pie de
+ * 2.M, anclada a `bottom: ZONA_SEGURA`, que es TINTA; y 52→63 el aviso de continuación
+ * de 2.N, anclado a `bottom: margen.inferior − pie.interlineado`, que también lo es.
+ * Con el margen en 36 la caja pasaría por encima de las dos. Su suelo real son 63.
+ *
+ * POR QUÉ SE REVIRTIÓ — **compra CERO medicamentos**
+ *
+ * El objetivo era densidad en la Receta. Medido sobre el PDF, la receta completa —con
+ * recomendaciones, firma y código— pasa de 3 a 4 medicamentos, y **la reducción del
+ * hueco de rúbrica de 2.L ya la lleva de 3 a 4 ella sola**. Los dos cambios suman
+ * 38.4 pt de los ~75 que cuesta el quinto, así que ninguno de los dos alcanza y juntos
+ * tampoco: el margen no aporta ni un medicamento sobre lo que ya había.
+ *
+ * LO QUE COSTABA, MEDIDO SOBRE LAS 455 PRUEBAS
+ *
+ * Veinte cotas en ocho formatos. La mayoría son desplazamientos mecánicos, pero **no
+ * todas**: al ensanchar la caja 54 pt el texto re-envuelve y hay cambios de forma —el
+ * encabezado del Consentimiento encoge 20 pt de más, el catálogo de Internamiento deja
+ * de repartir en tres columnas de 162, la credencial de la Denegación deja de romper a
+ * dos renglones—. Esas cotas son la conciliación contra las láminas aprobadas, y **las
+ * láminas `.dc.html` no están en el repo**: reescribirlas convierte ocho suites de
+ * conciliación en fotos de lo que el código hace hoy, sin vuelta atrás.
+ *
+ * Además el defecto de compresión del chasis se reubica: sale de Imagenología con siete
+ * estudios y entra en Laboratorio, al 1.6 %.
+ *
+ * **Lo que se conserva del intento:** `CAJA.ancho`, `RETICULA.columna`, `RIEL_CELDA` y
+ * `ZONA.texto` pasaron a DERIVARSE de los márgenes en vez de llevar su cifra escrita.
+ * Con los márgenes actuales dan exactamente lo de antes —486, 32.25, 40.5 y 321— y el
+ * día que se muevan, se mueven solos. Ese trabajo ya está hecho.
  */
 export const MARGEN = {
   superior: 54,
@@ -65,12 +108,18 @@ export const MARGEN = {
  * valor de referencia es 670 pt; un 670 literal aquí significaría que el token
  * no está implementado.
  *
- * `ancho` no es derivado: I.1.1 lo declara como valor propio, «token único de
- * texto corrido en todo el sistema». El 453.75 pt que apareció en Plan de
- * Suplementación queda eliminado — no existe un segundo ancho de caja.
+ * ⚠ **`ancho` PASA A SER DERIVADO, Y ERA UN VALOR PROPIO DE 486.** I.1.1 lo declaraba
+ * «token único de texto corrido en todo el sistema» con cifra propia, y funcionaba
+ * porque 612 − 72 − 54 daba exactamente 486. Al igualar los márgenes esa coincidencia
+ * se rompe, y de las dos formas de arreglarla —mover la cifra a mano o derivarla— solo
+ * una no se puede desincronizar. Un 486 literal en el código significa ahora que el
+ * token no está implementado. Hoy vale **540**.
+ *
+ * El 453.75 pt que apareció en Plan de Suplementación queda eliminado — no existe un
+ * segundo ancho de caja.
  */
 export const CAJA = {
-  ancho: 486,
+  ancho: PAPEL.ancho - MARGEN.izquierdo - MARGEN.derecho,
   alto: PAPEL.alto - MARGEN.superior - MARGEN.inferior,
 } as const
 
@@ -81,21 +130,43 @@ export const CAJA = {
  */
 export const ZONA_SEGURA = 36
 
-/** Retícula de 12 columnas sobre la caja de contenido. */
+const RETICULA_COLUMNAS = 12
+const RETICULA_MEDIANIL = 9
+
+/**
+ * Retícula de 12 columnas sobre la caja de contenido.
+ *
+ * ⚠ **`columna` PASA A DERIVADO, Y ERA 32.25.** Como `CAJA.ancho`, su cifra propia
+ * cuadraba con la caja de 486 por construcción —12 × 32.25 + 11 × 9 = 486— y al
+ * ensanchar la caja deja de cuadrar. Derivada vale **36.75**. Un 32.25 literal
+ * significa que el token no está implementado.
+ *
+ * `riel` NO se deriva y sigue en 23.25: es el ancho de la columna de etiquetas, y lo
+ * fija el número de dos dígitos que vive dentro, no el ancho de la hoja. Que antes
+ * midiera `columna − medianil` era coincidencia de la caja de 486.
+ */
 export const RETICULA = {
-  columnas: 12,
-  /** Ancho de una columna. */
-  columna: 32.25,
+  columnas: RETICULA_COLUMNAS,
+  /** Ancho de una columna. DERIVADO de la caja. */
+  columna:
+    (CAJA.ancho - RETICULA_MEDIANIL * (RETICULA_COLUMNAS - 1)) / RETICULA_COLUMNAS,
   /** Separación entre columnas. */
-  medianil: 9,
+  medianil: RETICULA_MEDIANIL,
   /** Ancho del riel (columna de etiquetas a la izquierda del contenido). */
   riel: 23.25,
   /** Interlínea base: toda altura vertical es múltiplo de este valor. */
   lineaBase: 16,
 } as const
 
-/** Alto de una celda del riel. */
-export const RIEL_CELDA = 40.5
+/**
+ * Alto de una celda del riel. **DERIVADO, y era 40.5.**
+ *
+ * Los 40.5 eran `CAJA.ancho / 12` con la caja de 486, y 2.D lo usa como unidad de
+ * ANCHO para repartir el catálogo en columnas (`RielDatos`, `anchoCatalogo`): doce
+ * celdas tienen que sumar la caja o el riel deja de llegar al borde. Con la caja en
+ * 540 vale **45**.
+ */
+export const RIEL_CELDA = CAJA.ancho / RETICULA_COLUMNAS
 
 /**
  * I.1.3 · La fila de cierre: la última fila de la hoja, la que reparte el pie del
@@ -138,11 +209,17 @@ export const CIERRE = {
  * I.1.3 · Las dos zonas del bloque de título, declaradas por el diseño (A.2 y A.8):
  * el texto ocupa las columnas 1–8 y el riel de folio las 9–12.
  *
- * `321 + 9 + 156 = 486` = `caja.ancho`, con un medianil de retícula entre las dos.
+ * ⚠ **`texto` PASA A DERIVADO, Y ERA 321.** La partición cuadraba con la caja de 486
+ * —321 + 9 + 156— y al ensancharla hay que decidir quién absorbe los 54 pt nuevos. Se
+ * los queda el TEXTO: el riel de la derecha imprime el folio y la emisión, dos cadenas
+ * de longitud fija que no ganan nada con más sitio, y el título sí. `texto` vale
+ * ahora **375**.
  */
+const ZONA_RIEL = 156
+
 export const ZONA = {
-  texto: 321,
-  riel: 156,
+  texto: CAJA.ancho - RETICULA_MEDIANIL - ZONA_RIEL,
+  riel: ZONA_RIEL,
 } as const
 
 // ───────────────────────────────────────────────────────────────────────────────
@@ -1497,7 +1574,35 @@ export function resolverAcento(hex: string = ACENTO_BASE_POR_DEFECTO): AcentoRes
  * una hoja se reparten en dos, nunca se comprimen.
  */
 export const FIRMA = {
-  espacio: 77,
+  /**
+   * **61.6 pt, y eran 77 — un 20 % menos.**
+   *
+   * ⚠ **NO ES PAPEL EN BLANCO PARA FIRMAR A MANO, Y ESA ERA LA PREMISA EQUIVOCADA.**
+   * Este hueco es donde 2.L imprime la rúbrica capturada del médico: la caja de
+   * `GEOMETRIA.rubrica` mide exactamente `142 × espacio`. Reducirlo no le quita sitio
+   * a nadie — compone la misma rúbrica proporcionalmente más pequeña. Angel, con una
+   * receta real delante.
+   *
+   * ⚠ **Y `GEOMETRIA.rubrica.ancho` BAJA EL MISMO 20 %, DE 142 A 113.6. LOS DOS O
+   * NINGUNO.** La proporción de esa caja —1.8442— es el invariante sobre el que está
+   * construido `firmaTrazo.ts`: su espacio canónico de 592 × 321 px es esta caja a 300
+   * dpi, y coincide en proporción para que `contain` dé los mismos dpi lo limite el
+   * ancho o lo limite el alto. Bajar solo el alto rompe la coincidencia y los dpi
+   * pasan a depender de la FORMA de cada firma — que es exactamente la dispersión que
+   * el espacio canónico existe para eliminar. Bajando los dos, el invariante se
+   * conserva y el trazo sigue siendo el mismo para todos.
+   *
+   * EL TRAZO, MEDIDO: la rúbrica imprime un 20 % más pequeña y su grosor baja en la
+   * misma proporción, de **0.508 mm a 0.406 mm** —375 dpi contra 300—, igual para
+   * todas las firmas y para las ya capturadas. Es un escalado uniforme: nada se
+   * deforma, y 0.406 mm sigue siendo el grosor de una pluma fina.
+   *
+   * `GROSOR_CANONICO` NO se toca, y es deliberado: vale 6 px en el bitmap y las
+   * rúbricas ya guardadas se generaron con ese 6. Subirlo para compensar los dpi solo
+   * afectaría a las capturas NUEVAS y dejaría dos poblaciones de médicos imprimiendo
+   * con grosores distintos, que es peor que el punto de milímetro que se pierde.
+   */
+  espacio: 61.6,
 } as const
 
 /** Umbrales de párrafo (I.1.9). */

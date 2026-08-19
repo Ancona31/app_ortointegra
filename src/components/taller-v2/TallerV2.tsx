@@ -149,6 +149,22 @@ const CASOS: readonly EntradaCaso[] = [
 ]
 
 /**
+ * LOS CASOS DE RECETA SON LOS TRES DE ARRIBA MÁS UNO, y el cuarto no es una variante
+ * de contenido: es **la cota de la regresión que reportaron los betatesters**.
+ *
+ * La receta de v1 componía siete medicamentos con sus recomendaciones, la firma y el
+ * código de verificación en UNA hoja. La de v2 no llegaba, y ese es el caso que hay
+ * que poder mirar sin teclear siete medicamentos cada vez. No lo cubre ninguno de los
+ * otros tres: el `completo` lleva cuatro —una por combinación de ranuras— y el `lleno`
+ * lleva doce del estado más caro, que desborda por diseño.
+ */
+const CASOS_RECETA: readonly EntradaCaso[] = [
+  ...CASOS.slice(0, 2),
+  { caso: 'siete', etiqueta: 'Siete', nota: 'La cota de v1: 7 con recomendaciones' },
+  CASOS[2],
+]
+
+/**
  * LOS CASOS DE HONORARIOS NO SON LOS TRES DE ARRIBA, y no es una comodidad del taller:
  * ese formato tiene DOS documentos —cotización y recibo— con trece diferencias medidas
  * entre ellos, así que su eje no es cuánto contenido trae sino cuál de los dos se emite.
@@ -240,6 +256,7 @@ const CASOS_DENEGACION: readonly EntradaCaso[] = [
 
 /** Qué casos ofrece cada vista. Las que no aparecen usan los tres de `CASOS`. */
 function casosDe(vista: Vista): readonly EntradaCaso[] {
+  if (vista === 'receta') return CASOS_RECETA
   if (vista === 'suplementacion') return CASOS_SUPLEMENTACION
   if (vista === 'honorarios') return CASOS_HONORARIOS
   if (vista === 'internamiento') return CASOS_INTERNAMIENTO

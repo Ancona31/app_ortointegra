@@ -5,10 +5,11 @@
  * la base ni Storage, no toca v1, no toca los formularios ni el flujo del médico: el
  * médico y el paciente son inventados y viven aquí abajo.
  *
- * TRES CASOS, Y LOS TRES HACEN FALTA
+ * CUATRO CASOS, Y LOS CUATRO HACEN FALTA
  *
  *   completo   LAS CUATRO COMBINACIONES de la entrada, una debajo de otra
  *   mínimo     un medicamento con lo justo, sin recomendaciones y sin alarma
+ *   siete      LA COTA DE LA REGRESIÓN: los siete de v1 con recomendaciones
  *   lleno      la hoja al tope, para ver dónde queda el techo de la lista
  *
  * EL CASO COMPLETO SON LAS CUATRO COMBINACIONES, EN ORDEN Y CON SU ALTO MEDIDO
@@ -17,24 +18,37 @@
  * lleve su renglón y NADA MÁS —ni un hueco, ni un rótulo huérfano, ni una línea
  * cruzada—, y eso solo se ve comparando una fila con la de al lado.
  *
- *     01  completa            ancla · genérico · vía · indicación    **75 pt**
- *     02  sin genérico        ancla · vía · indicación               **62 pt**
- *     03  sin indicación      ancla · genérico · vía                 **58 pt**
- *     04  solo el ancla       ancla · vía                            **45 pt**
+ *     01  completa            ancla · genérico · vía · indicación    **58.5 pt**
+ *     02  sin genérico        ancla · vía · indicación               **45.5 pt**
+ *     03  sin indicación      ancla · genérico · vía                 **41.5 pt**
+ *     04  solo el ancla       ancla · vía                            **28.5 pt**
  *
- * Las cuatro cifras están fijadas en `src/lib/tests/recetaMedica.test.ts`, medidas
- * sobre el PDF: 75 − 13 = 62, 75 − 17 = 58, 75 − 30 = 45. Los 13 son el
- * interlineado del genérico y los 17 el de la indicación más su aire de 3.
+ * Eran 75 · 62 · 58 · 45. Los 16.5 pt que bajan las cuatro son la vía, que dejó de
+ * ocupar renglón propio y va a la derecha del ancla. Las cifras están fijadas en
+ * `src/lib/tests/recetaMedica.test.ts`, medidas sobre el PDF: 58.5 − 13 = 45.5,
+ * 58.5 − 17 = 41.5, 58.5 − 30 = 28.5. Los 13 son el interlineado del genérico y los
+ * 17 el de la indicación más su aire de 3.
+ *
+ * ⚠ **EL GENÉRICO SE PROBÓ EN LA LÍNEA DEL ANCLA Y SE BAJÓ. NO ES UN OLVIDO.**
+ * Ahorraba otros 13 pt por entrada, pero con nombres comerciales reales el ancla
+ * envuelve y el genérico caía pegado a la indicación, leyéndose como parte de la
+ * pauta. La decisión está en `genericoMedicamento` de 2.G, y **este caso de taller es
+ * donde se vio**: mira la `02` del caso de siete.
  *
  * **La vía no es una de las combinaciones y por eso no aparece en la tabla:** nunca
- * colapsa —sin dato es oral (II.3 §2)— y desde la decisión de Angel las trece van en
- * bloque negativo, así que aporta sus 16.5 pt a las cuatro filas por igual. Lo que sí
- * se ve entre ellas es la regla 1 de 2.H: `VÍA INTRAMUSCULAR` sale visiblemente más
- * ancha que `VÍA ORAL` y ninguna se abrevia.
+ * colapsa —sin dato es oral (II.3 §2)— y las trece van en bloque negativo. Lo que sí
+ * se ve entre las filas es la regla 1 de 2.H: `VÍA INTRAMUSCULAR` sale visiblemente
+ * más ancha que `VÍA ORAL`, ninguna se abrevia, y **las cuatro cierran a la derecha
+ * en el mismo punto** — creciendo hacia la izquierda, no hacia fuera de la caja.
+ *
+ * ⚠ **Y SU CUERPO BAJÓ DE 8 A 6.5 pt.** Compartiendo renglón con el ancla, el bloque
+ * en negativo le disputaba la jerarquía al nombre comercial: la versalita sobre negro
+ * suma fondo, tracking y caja al cuerpo. Es una calibración propia de la lámina en
+ * 2.H — el badge `URGENTE` de Imagenología comparte componente y no se movió.
  *
  * El mínimo enseña el colapso del resto: sin diagnóstico el riel se queda en una
- * fila, sin indicación la entrada baja a tres renglones y sin los dos bloques de
- * cierre la fila de firma sube hasta el contador.
+ * fila, sin indicación la entrada baja a dos renglones y sin bloque de cierre la
+ * fila de firma sube hasta el contador.
  *
  * SIN GUÍAS, como los otros dos formatos: un documento tiene que verse como un
  * documento.
@@ -138,6 +152,81 @@ const MEDICAMENTOS_LLENO: readonly MedicamentoRecetado[] = Array.from(
   }),
 )
 
+/**
+ * EL CASO DE LA REGRESIÓN — **siete medicamentos con recomendaciones, en una hoja.**
+ *
+ * No es un cuarto caso de demostración: es la COTA que los betatesters reportaron.
+ * La receta de v1 metía estos siete con sus recomendaciones, la firma y el código de
+ * verificación en una sola hoja, y la de v2 no llegaba. Este caso existe para poder
+ * mirar si llega, sin teclear siete medicamentos a mano cada vez.
+ *
+ * Son siete entradas del estado NORMAL —los cinco datos con indicación de una línea—,
+ * no del estado caro que compone el `lleno`: lo que se mide aquí es la receta que se
+ * emite todos los días, no el techo del formato. Con la indicación a dos líneas cada
+ * entrada sube un interlineado y entran seis.
+ *
+ * **QUÉ SE VE HOY, MEDIDO:** los siete caben en la hoja 1. Lo que se va a la hoja 2 es
+ * el cierre —recomendaciones, firma y código—, y eso **ya no se persigue**: cerrarlo
+ * pedía recortar el hueco de la rúbrica, y Angel decidió que ese hueco no se toca.
+ *
+ * Los fármacos son los de un esquema postoperatorio de ortopedia, con las vías
+ * variadas a propósito: la regla 1 de 2.H dice que el bloque en negativo crece con la
+ * palabra y no se abrevia, así que `VÍA INTRAMUSCULAR` tiene que salir visiblemente
+ * más ancha que `VÍA ORAL` — y desde la densificación las dos comparten renglón con
+ * el ancla, que es justo donde eso se puede ver de un vistazo.
+ */
+const MEDICAMENTOS_SIETE: readonly MedicamentoRecetado[] = [
+  {
+    nombre_comercial: 'Meloxicam Zydus',
+    presentacion: 'Tabletas 15 mg, caja con 10',
+    principio_activo: 'Meloxicam',
+    via_administracion: 'Oral',
+    indicacion: 'Una tableta cada 24 horas por 7 días.',
+  },
+  {
+    nombre_comercial: 'Omeprazol Ultra',
+    presentacion: 'Cápsulas 20 mg, caja con 14',
+    principio_activo: 'Omeprazol',
+    via_administracion: 'Oral',
+    indicacion: 'Una cápsula en ayunas por 14 días.',
+  },
+  {
+    nombre_comercial: 'Tempra Forte',
+    presentacion: 'Tabletas 500 mg, caja con 20',
+    principio_activo: 'Paracetamol',
+    via_administracion: 'Oral',
+    indicacion: 'Una tableta cada 8 horas si hay dolor.',
+  },
+  {
+    nombre_comercial: 'Dolac Sublingual',
+    presentacion: 'Tabletas 30 mg, caja con 10',
+    principio_activo: 'Ketorolaco trometamina',
+    via_administracion: 'Sublingual',
+    indicacion: 'Una tableta cada 8 horas por 3 días.',
+  },
+  {
+    nombre_comercial: 'Bedoyecta Tri',
+    presentacion: 'Solución inyectable, caja con 3 ampolletas',
+    principio_activo: 'Tiamina, piridoxina y cianocobalamina',
+    via_administracion: 'Intramuscular',
+    indicacion: 'Una ampolleta cada 24 horas por 3 días.',
+  },
+  {
+    nombre_comercial: 'Caltrate 600 + D',
+    presentacion: 'Tabletas 600 mg, frasco con 60',
+    principio_activo: 'Carbonato de calcio y colecalciferol',
+    via_administracion: 'Oral',
+    indicacion: 'Una tableta cada 12 horas con alimentos.',
+  },
+  {
+    nombre_comercial: 'Voltaren Emulgel',
+    presentacion: 'Gel 1 %, tubo con 60 g',
+    principio_activo: 'Diclofenaco dietilamonio',
+    via_administracion: 'Tópica',
+    indicacion: 'Aplicar en la zona cada 8 horas por 10 días.',
+  },
+]
+
 /** Cuerpo del bloque de recomendaciones generales. Un solo párrafo, sin viñetas. */
 const RECOMENDACIONES =
   'Mantenga reposo relativo durante las primeras 48 horas y aplique frío local tres veces al día por 15 minutos. No suspenda el tratamiento antes de terminarlo aunque el dolor ceda, y acuda a su cita de control con los estudios solicitados.'
@@ -146,6 +235,7 @@ const RECOMENDACIONES =
 const FOLIO_COMPLETO = 'P-B8570E3FA164'
 const FOLIO_MINIMO = 'P-6C41A9D2E870'
 const FOLIO_LLENO = 'P-4F1D0A9C7B23'
+const FOLIO_SIETE = 'P-2E7B5C0F91A4'
 
 /** Emisión ya compuesta: token corto de fecha + hora, con la raya del sistema. */
 const EMISION = '7 ago 2026 · 10:45'
@@ -186,11 +276,12 @@ function medicoMembrete(medico: MedicoFicticio): MedicoMembrete {
  * comprimido de 50 a 40.99 pt — una violación de I.3.4 sin un solo aviso. Ver la
  * cabecera de 2.N.
  */
-export type CasoReceta = 'completo' | 'minimo' | 'lleno'
+export type CasoReceta = 'completo' | 'minimo' | 'siete' | 'lleno'
 
 const CASOS: Record<CasoReceta, { medicamentos: readonly MedicamentoRecetado[]; paciente: ValoresPaciente; folio: string; cierre: boolean }> = {
   completo: { medicamentos: MEDICAMENTOS_COMPLETO, paciente: PACIENTE_COMPLETO, folio: FOLIO_COMPLETO, cierre: true },
   minimo: { medicamentos: MEDICAMENTOS_MINIMO, paciente: PACIENTE_MINIMO, folio: FOLIO_MINIMO, cierre: false },
+  siete: { medicamentos: MEDICAMENTOS_SIETE, paciente: PACIENTE_COMPLETO, folio: FOLIO_SIETE, cierre: true },
   lleno: { medicamentos: MEDICAMENTOS_LLENO, paciente: PACIENTE_COMPLETO, folio: FOLIO_LLENO, cierre: true },
 }
 

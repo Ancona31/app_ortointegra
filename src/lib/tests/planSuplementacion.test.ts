@@ -762,7 +762,7 @@ describe('II.4 · Plan de Suplementación — medido sobre el PDF', () => {
   it('ancla la banda de pie en y = 740 y con folio S-', async () => {
     const [hoja] = await componer(CUATRO_FILAS)
 
-    const banda = hoja.rectangulos.find((r) => r.ancho === 486 && r.alto === 16)
+    const banda = hoja.rectangulos.find((r) => r.ancho === CAJA.ancho && r.alto === 16)
     expect(banda?.arriba).toBe(740)
     // Variante `completo`. II.4 §1 declara `sin folio`; manda la lámina.
     expect(renglon(hoja, `Folio ${COMUN.folio}`)).toBeDefined()

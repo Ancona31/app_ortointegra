@@ -271,16 +271,39 @@ const IMAGENOLOGIA = h(SolicitudImagenologia, {
   folio: 'IMG-2026-0148',
 })
 
-/** Los 7 medicamentos del caso de la lámina, con la fila cara. */
+/**
+ * DOCE medicamentos del estado más caro, y **eran los 7 de la lámina**.
+ *
+ * ⚠ **NO SE CAMBIÓ PARA QUE LA PRUEBA PASARA: SE CAMBIÓ PORQUE DEJÓ DE PARTIR.** La
+ * entrada de Receta se densificó —la vía y el genérico subieron al renglón del ancla,
+ * de 75 pt a 45.5— y con siete la lista entra entera en la hoja 1. Lo que estas
+ * pruebas miden es **2.N, la hoja de continuación**, no la capacidad de la receta: sin
+ * una hoja 2 con entradas dentro no hay encabezado reducido que pesar ni segundo paso
+ * que comparar contra el primero.
+ *
+ * La capacidad de la receta se mide donde toca, en `recetaMedica.test.ts`, y ahí está
+ * fijado que los siete caben. Doce es el primer múltiplo cómodo que vuelve a partir:
+ * medido, reparte 7 y 5.
+ *
+ * ⚠ **Y LA INDICACIÓN BAJÓ A UNA LÍNEA, QUE ES EL SEGUNDO CAMBIO DE ESTE FIXTURE.**
+ * Con la de dos líneas la entrada mide 72.5 pt, y seis de ellas dejan la hoja 1
+ * pasada por poco: react-pdf la re-maqueta y **encoge sus filas un 1.46 %**, que es el
+ * defecto de chasis que `solicitudImagenologia.test.ts` documenta y que sigue sin
+ * arreglar. Con la fila de una línea —58.5 pt— el reparto es exacto y la deriva cero
+ * en todos los tamaños medidos, del 9 al 16.
+ *
+ * Esto NO tapa el defecto: lo esquiva a propósito, porque lo que estas pruebas miden
+ * es 2.N y no la compresión. El defecto está anotado con su cifra en la prueba de
+ * reparto de `recetaMedica.test.ts`, que es donde se ve.
+ */
 const RECETA = h(RecetaMedica, {
   ...COMUN,
-  medicamentos: Array.from({ length: 7 }, (_, i) => ({
+  medicamentos: Array.from({ length: 12 }, (_, i) => ({
     nombre_comercial: `Fármaco ${i + 1}`,
     presentacion: 'Tabletas 500 mg',
     principio_activo: 'Denominación genérica',
     via_administracion: 'Subcutánea',
-    indicacion:
-      'Una tableta cada 24 horas después del desayuno durante siete días, y suspender si aparece dolor epigástrico.',
+    indicacion: 'Una tableta cada 24 horas después del desayuno.',
   })),
   emision: '7 ago 2026 · 10:45',
   recomendaciones: 'Mantenga reposo relativo durante las primeras 48 horas.',
@@ -492,23 +515,28 @@ describe('2.N · la hoja de continuación, en los tres formatos', () => {
     }
   }, 120_000)
 
-  it('Receta: reparte 4 y 3 como la lámina, en DOS hojas', async () => {
+  it('Receta: reparte 7 y 5 con doce, en DOS hojas', async () => {
     const hojas = await componer(RECETA)
 
     /*
-      DOS HOJAS, QUE ES LO QUE LA LÁMINA COMPONE. Con el encabezado de continuación
-      pesando lo que pesaba antes de plegarlo —166 pt contra los 93.5 de ahora— la
-      firma no cabía en la hoja 2 y caía sola en una tercera, que es el defecto que la
-      regla 1 de 2.N existe para evitar.
+      DOS HOJAS. Con el encabezado de continuación pesando lo que pesaba antes de
+      plegarlo —166 pt contra los 93.5 de ahora— la firma no cabía en la hoja 2 y caía
+      sola en una tercera, que es el defecto que la regla 1 de 2.N existe para evitar.
     */
     expect(hojas).toHaveLength(2)
 
-    // El reparto de la lámina para el caso de 7 (B.3 §5). Allí está fijado por
-    // literal —`slice(0,4)`— y aquí sale de medir: es el mismo.
+    /*
+      EL REPARTO, MEDIDO. **Eran 4 y 3 con los siete de la lámina** —allí fijado por
+      literal, `slice(0,4)`— y con la entrada densificada la hoja 1 sostiene siete, así
+      que con siete ya no parte. Con doce reparte 7 y 5: la hoja 1 cabe menos que las
+      de continuación pese a tener el mismo alto útil, porque su encabezado completo
+      pesa 220.88 pt contra los 93.5 del reducido, y la de continuación carga además
+      con la fila de cierre.
+    */
     const enHoja = (i: number): number =>
       (hojas[i].texto.match(/Fármaco \d/g) ?? []).length
-    expect(enHoja(0)).toBe(4)
-    expect(enHoja(1)).toBe(3)
+    expect(enHoja(0)).toBe(7)
+    expect(enHoja(1)).toBe(5)
 
     // La hoja 1 no lleva el bloque de cierre. Es lo que el motor hace posible:
     // antes competía con la lista en la misma hoja.

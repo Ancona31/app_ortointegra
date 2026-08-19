@@ -37,6 +37,24 @@
  *   Ancho canónico  142 ÷ 72 × 300 dpi = 591,67 → 592 px
  *   Alto canónico    77 ÷ 72 × 300 dpi = 320,83 → 321 px
  *   Proporción      592 / 321 = 1,8442  ·  142 / 77 = 1,8442   ← el invariante
+ *
+ * ⚠ **LA CAJA IMPRESA ENCOGIÓ UN 20 % Y EL INVARIANTE SIGUE EN PIE.** Hoy mide
+ * **113,6 × 61,6 pt** —Angel: ese hueco no es papel en blanco, es donde se imprime esta
+ * rúbrica, así que se compone más pequeña—. Los DOS ejes bajaron el mismo 20 %, que es
+ * lo único que importa aquí: 113,6 / 61,6 = **1,8442**, la misma proporción, así que
+ * `contain` sigue dando los mismos dpi lo limite el ancho o lo limite el alto y el
+ * grosor sigue sin depender de la forma de cada firma.
+ *
+ * Lo que sí cambia es la CIFRA: los dpi pasan de 300 a **375** —592 ÷ (113,6 ÷ 72)— y
+ * con ellos el grosor impreso, de 0,508 a **0,406 mm**. Sigue siendo el mismo para
+ * todas las firmas y para las ya capturadas, que es la garantía que este archivo
+ * existe para dar. Donde abajo se lea «300 dpi» y «0,508 mm», léase 375 y 0,406.
+ *
+ * ⚠ **`GROSOR_CANONICO` NO SE SUBIÓ PARA COMPENSAR, Y ES DELIBERADO.** Subirlo de 6 a
+ * 7,5 px devolvería el grosor impreso a 0,508 mm exactos, pero solo para las capturas
+ * NUEVAS: las rúbricas ya guardadas se generaron con el 6 y no se regeneran. Habría dos
+ * poblaciones de médicos imprimiendo con grosores distintos, que es peor que el décimo
+ * de milímetro que se pierde — y 0,406 mm sigue siendo el grosor de una pluma fina.
  *   Grosor          6 px, medidos sobre la rúbrica del médico (ver `GROSOR_CANONICO`)
  *
  * ⚠ **ESTE ARCHIVO ESTUVO CALIBRADO CONTRA `FirmaBox`, QUE ES v1** (245,76 × 48 pt,

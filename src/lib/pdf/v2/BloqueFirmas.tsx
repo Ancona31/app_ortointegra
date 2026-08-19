@@ -172,8 +172,28 @@ const GEOMETRIA = {
    * ⚠ **SI ESTA CAJA CAMBIA, `firmaTrazo.ts` HAY QUE REHACERLO ENTERO.** Su espacio
    * canónico —592 × 321 px— es esta caja a 300 dpi, y su grosor está calibrado contra
    * esos dpi. Los dos números son el mismo número visto en dos unidades.
+   *
+   * ⚠ **YA CAMBIÓ UNA VEZ Y NO HUBO QUE REHACERLO, PORQUE CAMBIÓ EN PROPORCIÓN.** Los
+   * dos ejes bajaron el mismo 20 % —142 × 77 → 113.6 × 61.6— y la proporción se
+   * conserva en 1.8442, que es la condición que el canónico necesita. Lo que se movió
+   * fue la escala, no la forma: dpi 300 → 375 y grosor 0.508 → 0.406 mm, igual para
+   * todas las firmas. **Un cambio en UN SOLO eje sí obligaría a rehacerlo**, y es
+   * exactamente lo que esta nota está para impedir.
    */
-  rubrica: { ancho: 142 },
+  rubrica: {
+    /**
+     * **113.6 pt, y eran 142 — el mismo 20 % que bajó `FIRMA.espacio`.**
+     *
+     * ⚠ **LOS DOS SE MUEVEN JUNTOS O EL INVARIANTE SE ROMPE.** Ver la nota larga de
+     * `FIRMA.espacio`: 113.6 / 61.6 = 1.8442, la misma proporción que 142 / 77, que es
+     * la del espacio canónico de `firmaTrazo.ts`. Mientras coincidan, `contain` da los
+     * mismos dpi para toda firma y el grosor impreso no depende de su forma.
+     *
+     * Sigue cabiendo en la celda más estrecha del sistema —la de la denegación a tres
+     * columnas—, que es de donde salía el 142 y ahora sobra más.
+     */
+    ancho: 113.6,
+  },
   /**
    * LA MISMA FIRMA EN LAS LÁMINAS DE IMAGENOLOGÍA Y DE RECETA — 118.75 pt, no 120.8.
    *

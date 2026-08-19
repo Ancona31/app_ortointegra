@@ -56,6 +56,7 @@ import SolicitudImagenologia, {
   type SolicitudImagenologiaProps,
 } from '@/lib/pdf/v2/formatos/SolicitudImagenologia'
 import {
+  CAJA,
   MARGEN,
   PAPEL,
   TIPOGRAFIA,
@@ -564,7 +565,7 @@ describe('II.2 · Solicitud de Imagenología — medido sobre el PDF', () => {
   it('ancla la banda de pie en y = 740 y con folio', async () => {
     const [hoja] = await componer(CUATRO_ESTADOS)
 
-    const banda = hoja.rectangulos.find((r) => r.ancho === 486 && r.alto === 16)
+    const banda = hoja.rectangulos.find((r) => r.ancho === CAJA.ancho && r.alto === 16)
     expect(banda?.arriba).toBe(740)
     // Variante `completo`: la lámina compone folio, y II.2 §1 decía `sin folio`.
     expect(renglon(hoja, 'Folio IMG-2026-0148')).toBeDefined()

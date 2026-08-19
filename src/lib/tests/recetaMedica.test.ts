@@ -24,22 +24,32 @@
  * mide en 59**. Por eso se miden aquí en vez de taparse: si algún día el panel pasa
  * a 59, esta prueba falla y la de Imagenología también, que es la señal correcta.
  *
- * LOS ALTOS DE FILA, Y POR QUÉ YA NO SE COMPARAN TODOS CONTRA LA LÁMINA
+ * LOS ALTOS DE FILA, Y POR QUÉ YA NO SE COMPARAN CONTRA LA LÁMINA
  *
  * La lámina mide tres filas: **85.37** con vía oral, **89.56** con vía en negativo y
- * **75.56** con negativo e indicación de una línea.
+ * **75.56** con negativo e indicación de una línea. **Ninguna de las tres se compone
+ * ya**, y no por deriva: la entrada se densificó a propósito.
  *
- * ⚠ **LA PRIMERA YA NO EXISTE.** Angel decidió que las trece vías van en negativo,
- * incluida la oral, así que no hay fila de vía plana que medir: una entrada oral pesa
- * ahora lo mismo que una intramuscular. Es una divergencia deliberada de 3.5 pt por
- * entrada oral y no un defecto que perseguir.
+ * LA REGRESIÓN QUE LO OBLIGÓ. Los betatesters reportaron que la receta de v1 metía
+ * siete medicamentos con recomendaciones, firma y código en UNA hoja y la de v2 no.
+ * Medido: v1 aguanta once, v2 aguantaba dos. De los 489 pt de diferencia, **274 eran
+ * la entrada** —75 pt contra los 35.86 de v1—, y la causa era estructural: v1 compone
+ * vía e indicación en COLUMNAS a la derecha del nombre y v2 las APILABA debajo.
  *
- * Las otras dos se componen en **89** y **75** contra los 89.56 y 75.56 medidos. El
- * residuo de 0.56 es de la lámina y tiene causa conocida: en HTML un `inline-block`
- * dentro de un contenedor de bloque crea una caja de línea cuyo alto incluye el
- * *strut* de la fuente, medio punto que Yoga no añade porque el bloque en negativo es
- * un `View` y no un nodo de texto. Aparecía en las DOS filas con negativo y en
- * ninguna sin él, que es exactamente lo que predice esa causa.
+ * **SUBIÓ UNA COSA Y SE INTENTARON DOS.** La vía va a la derecha del ancla, en su
+ * bloque en negativo: **−16.5 pt por entrada**, y la fila completa pasa de 75 a 58.5.
+ *
+ * ⚠ **EL GENÉRICO TAMBIÉN SUBIÓ Y SE BAJÓ OTRA VEZ. NO LO VUELVAS A SUBIR.** Ahorraba
+ * otros 13 pt por entrada, pero al envolver el ancla —3 de cada 7 con nombres
+ * comerciales reales— caía pegado a la indicación y se leía como parte de la pauta.
+ * Un genérico que se confunde con la posología es un riesgo de dispensación. La
+ * decisión está escrita donde se ejecuta, en `genericoMedicamento` de 2.G.
+ *
+ * ⚠ **LAS TRECE VÍAS SIGUEN EN NEGATIVO, INCLUIDA LA ORAL** —decisión de Angel contra
+ * lo medido, ver la cabecera del formato—. Lo que cambia es dónde va el bloque y
+ * cuánto pesa: **el cuerpo baja de 8 a 6.5 pt** con una calibración propia de la
+ * lámina en 2.H, porque compartiendo renglón con el ancla le disputaba la jerarquía
+ * al nombre comercial. El bloque mide 11 pt de alto y ya no 14.5.
  *
  * CÓMO LEE LAS COORDENADAS
  *
@@ -387,6 +397,16 @@ const COMUN = {
   qr: QR_MINIMO,
 } satisfies Omit<RecetaMedicaProps, 'medicamentos'>
 
+/**
+ * EL ALTO DEL BLOQUE DE LA VÍA — **11 pt, y eran 14.5.**
+ *
+ * `1.25 + 8 + 1.75`, la calibración `receta` que 2.H estrenó al distinguir por primera
+ * vez entre láminas. Los 14.5 de antes son los de `normal`, que sigue componiendo el
+ * badge `URGENTE` de Imagenología: si esta cifra vuelve a 14.5, la vía ha dejado de
+ * usar su calibración y está compitiendo otra vez con el nombre comercial.
+ */
+const ALTO_VIA = 11
+
 /** Una indicación que cabe holgada en un renglón de 381 pt a 10 / 14. */
 const UNA_LINEA = 'Una tableta cada 24 horas.'
 /**
@@ -504,34 +524,46 @@ describe('II.3 · Receta Médica — medido sobre el PDF', () => {
     expect(abreLaLista(hoja) - ESPACIO[10] - abreRiel).toBeCloseTo(63.88, 1)
   }, 60_000)
 
-  it('mide las cuatro combinaciones de la entrada: 75 · 62 · 58 · 45', async () => {
+  it('mide las cuatro combinaciones de la entrada: 58.5 · 45.5 · 41.5 · 28.5', async () => {
     const [hoja] = await componer(CUATRO_FILAS)
     const [completa, sinGenerico, sinIndicacion, soloAncla] = pasos(hoja, ANCLAS)
 
-    // 1 · completa   16 ancla + 13 genérico + (2 + 14.5) vía + 3 + 14 indicación
-    //                + 7 + 0.5 + 5 de ritmo
-    // La lámina mide 75.56 con esta misma anatomía; el residuo de 0.56 es suyo.
-    expect(completa).toBeCloseTo(75, 2)
+    /*
+      1 · completa. El renglón del ancla se lleva DENTRO la vía, que es lo que la
+      densificación movió; el genérico y la indicación conservan el suyo:
+
+          16     el renglón del ancla — 12 / 16, y el bloque de la vía mide 11, que
+                 cabe dentro sin levantarlo
+          13     el genérico, a 10 / 13
+           3     `medicamento.aireIndicacion`
+          14     la indicación, a 10 / 14 y en una línea
+          12.5   el ritmo de `normal`: 7 abajo + 0.5 de regla + 5 arriba
+          ─────
+          58.5
+    */
+    expect(completa).toBeCloseTo(58.5, 2)
 
     // 2 · sin genérico: se va SU RENGLÓN Y NADA MÁS. Trece puntos, que es su
     // interlineado — no los 31 que ocupaba el campo vacío requerido que se retiró.
     expect(sinGenerico).toBeCloseTo(completa - 13, 2)
-    expect(sinGenerico).toBeCloseTo(62, 2)
+    expect(sinGenerico).toBeCloseTo(45.5, 2)
 
     // 3 · sin indicación: se va el renglón Y su aire de 3 pt.
     expect(sinIndicacion).toBeCloseTo(completa - 14 - 3, 2)
-    expect(sinIndicacion).toBeCloseTo(58, 2)
-
-    // 4 · solo el ancla: se van las dos anteriores a la vez. La vía NO se va —sin
-    // dato es oral— y por eso esta fila no baja de 45.
-    expect(soloAncla).toBeCloseTo(completa - 13 - 14 - 3, 2)
-    expect(soloAncla).toBeCloseTo(45, 2)
+    expect(sinIndicacion).toBeCloseTo(41.5, 2)
 
     /*
-      LA FILA QUE LA LÁMINA MIDE EN 89.56: la misma completa con la indicación a dos
-      líneas. Es la única de las tres suyas que esta implementación puede seguir
-      comparando —la de 85.37 se fue con la vía oral en negativo— y sale en 89, con
-      el residuo de 0.56 explicado en la cabecera.
+      4 · solo el ancla: se van las dos anteriores a la vez. La vía NO se va —sin dato
+      es oral— pero tampoco cuesta ya un renglón, así que esta fila es exactamente el
+      renglón del ancla más el ritmo: 28.5. Antes eran 45.
+    */
+    expect(soloAncla).toBeCloseTo(completa - 13 - 14 - 3, 2)
+    expect(soloAncla).toBeCloseTo(28.5, 2)
+
+    /*
+      LA MISMA COMPLETA CON LA INDICACIÓN A DOS LÍNEAS: 59.5. Ya no se compara contra
+      ninguna cifra de la lámina —las tres suyas se fueron con la densificación— sino
+      contra la fila de una línea más un interlineado, que es lo que tiene que crecer.
 
       Lo que NO comprueba es la medida de 381 pt: un texto que quepa en 381 y no en
       los 453.75 de la caja depende de la anchura media de la fuente, y una prueba
@@ -556,7 +588,7 @@ describe('II.3 · Receta Médica — medido sobre el PDF', () => {
       otro por defecto— y los dos llevan caja: es la decisión de Angel contra lo
       medido. Si alguien repone la rama de texto plano, aquí salen tres.
     */
-    const bloques = hoja.rectangulos.filter((r) => r.alto === 14.5)
+    const bloques = hoja.rectangulos.filter((r) => r.alto === ALTO_VIA)
     expect(bloques).toHaveLength(5)
 
     // La cadena incluye la palabra en todos los casos, y el bloque no se abrevia.
@@ -608,14 +640,20 @@ describe('II.3 · Receta Médica — medido sobre el PDF', () => {
 
     /*
       EL COLAPSO ES TOTAL, Y ESO SE MIDE EN EL PASO. Con el campo vacío requerido la
-      01 medía 16 + 31 + 16.5 + 12.5 = 76; sin él mide 16 + 16.5 + 12.5 = 45. Los 31
-      que se van son `etiqueta` (11) + `manuscrito.alto` (20).
+      01 medía 16 + 31 + 16.5 + 12.5 = 76; los 31 que se fueron eran `etiqueta` (11)
+      + `manuscrito.alto` (20).
+
+      Ahora miden 28.5 y 41.5: la vía dejó de costar renglón —va en el del ancla— y el
+      genérico volvió al suyo, así que lo que separa a las dos filas son exactamente
+      sus 13 pt.
     */
     const [paso01, paso02] = pasos(hoja, ['Meloxicam', 'Diclofenaco', 'Paracetamol'])
-    // 01 · ancla 16 + bloque de vía (2 + 14.5) + ritmo 12.5
-    expect(paso01).toBeCloseTo(16 + 2 + 14.5 + 12.5, 2)
-    // 02 · ancla 16 + genérico 13 + bloque de vía (2 + 14.5) + ritmo 12.5
-    expect(paso02).toBeCloseTo(16 + 13 + 2 + 14.5 + 12.5, 2)
+    // 01 · ancla 16 —con la vía dentro— + ritmo 12.5
+    expect(paso01).toBeCloseTo(16 + 12.5, 2)
+    // 02 · ancla 16 + genérico 13 + ritmo 12.5. La diferencia entre las dos ES el
+    // renglón del genérico, que es lo que esta prueba mide desde que volvió a tenerlo.
+    expect(paso02).toBeCloseTo(16 + 13 + 12.5, 2)
+    expect(paso02 - paso01).toBeCloseTo(13, 2)
   }, 60_000)
 
   it('no deja que ninguna zona de la entrada desborde su columna', async () => {
@@ -649,13 +687,22 @@ describe('II.3 · Receta Médica — medido sobre el PDF', () => {
       expect(r.x + r.ancho).toBeLessThanOrEqual(DERECHA + EPSILON)
     }
 
-    // Los bloques de vía, que son lo que la línea de escritura pisaba, viven enteros
-    // dentro de la columna de contenido de la entrada.
-    const vias = hoja.rectangulos.filter((r) => r.alto === 14.5)
+    /*
+      LOS BLOQUES DE VÍA, QUE AHORA COMPARTEN RENGLÓN CON EL ANCLA Y CIERRAN A LA
+      DERECHA. Antes abrían en la columna de contenido —eran el primer elemento de su
+      propio renglón—; desde la densificación son el último elemento de la fila del
+      ancla, así que lo que se fija es dónde ACABAN: en el borde de la caja, los cinco.
+
+      Que cierren todos en el mismo punto ES la alineación a la derecha, y es también
+      lo que comprueba que ninguno se sale: el más ancho del catálogo —`VÍA
+      INTRAMUSCULAR`— cierra en 558 igual que `VÍA ORAL`, creciendo hacia la izquierda.
+    */
+    const vias = hoja.rectangulos.filter((r) => r.alto === ALTO_VIA)
     expect(vias).toHaveLength(5)
     for (const v of vias) {
-      expect(v.x).toBeCloseTo(COLUMNA_CONTENIDO, 2)
-      expect(v.x + v.ancho).toBeLessThanOrEqual(DERECHA + EPSILON)
+      expect(v.x + v.ancho).toBeCloseTo(DERECHA, 2)
+      // Y creciendo hacia la izquierda no invade el riel del número.
+      expect(v.x).toBeGreaterThanOrEqual(COLUMNA_CONTENIDO - EPSILON)
     }
 
     // Y ningún renglón arranca fuera de la caja. Los de la entrada arrancan en el
@@ -804,7 +851,7 @@ describe('II.3 · Receta Médica — medido sobre el PDF', () => {
   it('ancla la banda de pie en y = 740 y con folio', async () => {
     const [hoja] = await componer(CUATRO_FILAS)
 
-    const banda = hoja.rectangulos.find((r) => r.ancho === 486 && r.alto === 16)
+    const banda = hoja.rectangulos.find((r) => r.ancho === CAJA.ancho && r.alto === 16)
     expect(banda?.arriba).toBe(740)
     // Variante `completo`: uno de los tres formatos que llevan folio en el pie.
     expect(renglon(hoja, 'Folio P-B8570E3FA164')).toBeDefined()
@@ -837,11 +884,12 @@ describe('II.3 · Receta Médica — medido sobre el PDF', () => {
     expect(hojas.length).toBeGreaterThan(1)
 
     /*
-      EL PASO ESPERADO ES EL DE LA ENTRADA COMPLETA, el mismo 75 que mide la prueba de las
-      cuatro combinaciones tres casos más arriba —con su regla dentro, porque es paso entre
-      anclas y no alto de caja.
+      EL PASO ESPERADO ES EL DE LA ENTRADA COMPLETA, el mismo 45.5 que mide la prueba de las
+      cuatro combinaciones —el `caro` de aquí lleva la indicación de UNA línea, al revés que
+      el de la prueba de reparto—, con su regla dentro, porque es paso entre anclas y no
+      alto de caja.
     */
-    const esperado = 75
+    const esperado = 58.5
 
     let hojasMedidas = 0
     for (const [indice, hoja] of hojas.entries()) {
@@ -860,22 +908,27 @@ describe('II.3 · Receta Médica — medido sobre el PDF', () => {
 
   it('reparte la lista entre hojas en vez de apretarla en una', async () => {
     /*
-      LA CAPACIDAD, DESPUÉS DE CABLEAR 2.N.
-
-      Antes de esto el formato componía como hoja única: la firma y los dos bloques de
-      cierre competían con la lista en la misma hoja y cabían DOS medicamentos. Ahora
-      el documento pagina, así que lo que se mide es dónde CORTA.
+      LA CAPACIDAD, DESPUÉS DE LA DENSIFICACIÓN DE LA ENTRADA.
 
       El archivo aprobado reparte 4 y 3 por literal —`slice(0, 4)`— y no declara
-      capacidad. Medido con los dos bloques de cierre puestos:
+      capacidad, y con la entrada apilada esta prueba medía justamente eso: 4 + 3 con
+      la fila cara y 5 + 2 con la corta.
 
-          fila cara, indicación de dos líneas      4 + 3   ← el reparto de la lámina
-          fila corta, indicación de una línea      5 + 2
+      **CON LA FILA CORTA YA NO CORTA CON SIETE**, que es la cota que los betatesters
+      reportaron: los siete caben en la hoja 1. Con la fila CARA —indicación de dos
+      líneas, 72.5 pt— entran seis.
 
-      La cifra de la lámina sale del estado caro, que es el que su hoja compone. La
-      hoja 1 sostiene esos 4 y no más porque su encabezado completo pesa 220.88 pt;
-      las de continuación caben más, que es justo lo que el encabezado reducido
-      compra.
+      ⚠ **LA HOJA 1 SOSTIENE LOS SIETE PERO EL DOCUMENTO SIGUE SALIENDO EN DOS**, y no
+      es esta prueba quien lo tapa: la fila de cierre no cabe detrás de ellos y se va a
+      la hoja 2. Angel aceptó que los siete CON firma y código en una hoja no son
+      alcanzables en esta versión y **dejó de ser el objetivo**: lo que faltaba salía
+      del hueco de la rúbrica, del contador o del riel, y ninguno de los tres se toca.
+
+      ⚠ **Y LA FILA CARA CAE EN LA ZONA DE COMPRESIÓN DEL CHASIS.** Con seis entradas
+      de 72.5 la hoja 1 se pasa por poco y react-pdf encoge sus filas un **1.46 %** —el
+      defecto que `solicitudImagenologia.test.ts` documenta y que sigue sin arreglar—.
+      Con la fila corta el reparto es exacto y la deriva es cero, así que la sonda de
+      I.3.4 de más arriba mide con ella. Aquí queda anotado, no tapado.
     */
     const caro = (i: number): MedicamentoRecetado => ({
       nombre_comercial: `Fármaco ${i}`,
@@ -895,23 +948,23 @@ describe('II.3 · Receta Médica — medido sobre el PDF', () => {
     const reparto = (hojas: readonly Hoja[]): number[] =>
       hojas.map((hoja) => hoja.renglones.filter((r) => /^Fármaco \d/.test(r.texto)).length)
 
-    // Con siete, el reparto de la lámina. La hoja 1 cierra en 4 y no en 5.
-    expect(reparto(await componer(lista(7), cierre)).slice(0, 2)).toEqual([4, 3])
-
-    // Y la hoja 1 no lleva ninguno de los dos bloques de cierre, que es lo que el
-    // motor hace posible: antes competían con la lista.
-    const [primera] = await componer(lista(7), cierre)
-    expect(primera.renglones.some((r) => r.texto.startsWith('RECOMENDACIONES'))).toBe(
-      false,
-    )
-    expect(primera.renglones.some((r) => r.texto.startsWith('ACUDA'))).toBe(false)
-
-    // Sin los bloques de cierre la hoja 1 sigue cerrando en 4: los bloques no estaban
-    // ahí quitándole sitio, es su propio encabezado el que lo ocupa.
-    expect(reparto(await componer(lista(7)))[0]).toBe(4)
-
-    // Con la fila corta entra uno más, y es la lista la que se mueve, no la métrica.
+    // LA COTA DE LA REGRESIÓN: con la fila corta, los siete caben en la hoja 1.
     const cortos = Array.from({ length: 7 }, (_, i) => corto(i))
-    expect(reparto(await componer(cortos, cierre)).slice(0, 2)).toEqual([5, 2])
+    expect(reparto(await componer(cortos, cierre))[0]).toBe(7)
+
+    // Con la fila cara entran seis, y era CUATRO antes de la densificación.
+    expect(reparto(await componer(lista(7), cierre)).slice(0, 2)).toEqual([6, 1])
+
+    // Sin el bloque de cierre, los mismos seis: no era él quien le quitaba sitio a la
+    // lista, es el encabezado completo de 220.88 pt.
+    expect(reparto(await componer(lista(7)))[0]).toBe(6)
+
+    /*
+      DÓNDE CORTA CON DOCE. Con la fila corta, 7 + 5 en dos hojas y sin deriva: la hoja
+      1 sostiene siete y las de continuación más, que es lo que compra su encabezado
+      reducido. Es la cifra medida, no una capacidad declarada.
+    */
+    const doceCortos = Array.from({ length: 12 }, (_, i) => corto(i))
+    expect(reparto(await componer(doceCortos, cierre))).toEqual([7, 5])
   }, 300_000)
 })

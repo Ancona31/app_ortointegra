@@ -137,6 +137,34 @@ const GEOMETRIA = {
   medida: {
     normal: { cuerpo: 8, interlineado: 10, vertical: 2, verticalInferior: 2.5, horizontal: 6 },
     reducido: { cuerpo: 7, interlineado: 9, vertical: 1.5, verticalInferior: 2, horizontal: 5 },
+    /**
+     * LA TERCERA CALIBRACIÓN — `receta`, Y ES LA ÚNICA QUE NO SALE DE UNA LÁMINA.
+     *
+     * ⚠ **ES UNA DECISIÓN DE DISEÑO DE ANGEL, NO UNA MEDICIÓN.** Las dos de arriba
+     * se leen de las láminas aprobadas; esta se declara. Va marcada para que nadie
+     * la «concilie» contra un archivo de diseño que no la contiene.
+     *
+     * LA CAUSA. Desde la densificación de la receta la vía comparte renglón con el
+     * ancla, y ahí las dos piezas se comparan de un vistazo. Con la calibración
+     * `normal` —8 pt en versalita, sobre negro y a 0.18 em— el bloque pesa casi
+     * tanto como el nombre comercial que califica: la versalita en negativo suma
+     * fondo, tracking y caja al cuerpo, así que 8 pt contra los 12 del ancla no se
+     * leen como cuatro puntos de diferencia. **El nombre comercial tiene que ganar
+     * de un vistazo, y no ganaba.**
+     *
+     * LA CIFRA. Cuerpo 6.5 sobre los 12 del ancla: poco más de la mitad, que es la
+     * proporción a la que el bloque deja de disputarle la jerarquía y pasa a leerse
+     * como lo que es —una marca, no un título—. El aire acompaña al cuerpo con las
+     * mismas proporciones que separan `normal` de `reducido`, así que el bloque
+     * mide **11 pt de alto** y sigue cabiendo holgado en el renglón de 16 del ancla.
+     *
+     * ⚠ **NO LA HEREDA NADIE MÁS, Y ESO ES EL PUNTO.** El badge `URGENTE` de
+     * Imagenología comparte componente y seguiría en `normal`: cuelga de un título
+     * de 17 pt y no compite con nada. Por eso esta calibración entra por lámina y
+     * no sustituye a `normal` — hacerlo movería el badge de los ocho formatos, que
+     * es justo lo que la cabecera de `medida` advierte de no hacer.
+     */
+    receta: { cuerpo: 6.5, interlineado: 8, vertical: 1.25, verticalInferior: 1.75, horizontal: 4.5 },
     /** En em, como lo declara el diseño. La conversión a pt va abajo. */
     tracking: 0.18,
   },
@@ -185,6 +213,12 @@ const estilos = StyleSheet.create({
     paddingBottom: GEOMETRIA.medida.reducido.verticalInferior,
     paddingHorizontal: GEOMETRIA.medida.reducido.horizontal,
   },
+  /** La de Receta. Ver `GEOMETRIA.medida.receta`. */
+  bloqueMedidoReceta: {
+    paddingTop: GEOMETRIA.medida.receta.vertical,
+    paddingBottom: GEOMETRIA.medida.receta.verticalInferior,
+    paddingHorizontal: GEOMETRIA.medida.receta.horizontal,
+  },
   textoMedido: {
     ...estiloTipografico('etiqueta'),
     color: TINTA.papel,
@@ -204,6 +238,14 @@ const estilos = StyleSheet.create({
       GEOMETRIA.medida.reducido.cuerpo,
     letterSpacing:
       GEOMETRIA.medida.tracking * GEOMETRIA.medida.reducido.cuerpo,
+  },
+  textoMedidoReceta: {
+    ...estiloTipografico('etiqueta'),
+    color: TINTA.papel,
+    fontSize: GEOMETRIA.medida.receta.cuerpo,
+    lineHeight:
+      GEOMETRIA.medida.receta.interlineado / GEOMETRIA.medida.receta.cuerpo,
+    letterSpacing: GEOMETRIA.medida.tracking * GEOMETRIA.medida.receta.cuerpo,
   },
 })
 
@@ -234,20 +276,34 @@ export default function BloqueNegativo(props: BloqueNegativoProps): ReactElement
    * motivo para que el badge la tenga y la vía no. Ver `GEOMETRIA.medida`.
    */
   const medido = (props.lamina ?? 'chasis') !== 'chasis'
+  /**
+   * ⚠ **LA PRIMERA VEZ QUE ESTE COMPONENTE DISTINGUE ENTRE LÁMINAS**, y la ficha lo
+   * anticipaba: 2.G ya venía pasando la lámina de cada formato «para que el día que
+   * 2.H distinga entre láminas esto no se quede componiendo la equivocada». Es ese
+   * día. Ver `GEOMETRIA.medida.receta`.
+   *
+   * Solo la vía de Receta: el badge `URGENTE` de Imagenología comparte componente y
+   * se queda en `normal`.
+   */
+  const receta = medido && props.lamina === 'receta' && props.variante === 'via'
 
-  const caja = medido
-    ? reducido
-      ? estilos.bloqueMedidoReducido
-      : estilos.bloqueMedido
-    : reducido
-      ? estilos.bloqueReducido
-      : {}
+  const caja = receta
+    ? estilos.bloqueMedidoReceta
+    : medido
+      ? reducido
+        ? estilos.bloqueMedidoReducido
+        : estilos.bloqueMedido
+      : reducido
+        ? estilos.bloqueReducido
+        : {}
 
-  const texto = medido
-    ? reducido
-      ? estilos.textoMedidoReducido
-      : estilos.textoMedido
-    : estilos.texto
+  const texto = receta
+    ? estilos.textoMedidoReceta
+    : medido
+      ? reducido
+        ? estilos.textoMedidoReducido
+        : estilos.textoMedido
+      : estilos.texto
 
   return (
     <View style={[estilos.bloque, caja]}>
