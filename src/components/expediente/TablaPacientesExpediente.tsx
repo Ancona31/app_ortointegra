@@ -76,18 +76,9 @@ function Th({ children }: { children: React.ReactNode }) {
 export function TablaPacientesExpediente({ pacientes, orden, direccion, onOrden, mostrarAcciones }: Props) {
   return (
     <div className="overflow-x-auto">
-      {/* `border-separate` NO es cosmético: es lo que hace que el `relative` del
-          <tr> de abajo cree bloque contenedor. Blink/WebKit ignoran el posicionado
-          relativo de una fila cuando la tabla colapsa bordes, y entonces el ::after
-          del enlace-que-cubre-la-fila se ancla al primer ancestro posicionado que
-          encuentre — `div.max-w-6xl` de /expediente, o sea la pantalla entera: cada
-          fila tapaba el buscador, los filtros y estos mismos encabezados, y todo
-          clic navegaba al último paciente. Si vuelves a `border-collapse`, reaparece.
-          Por eso los separadores viven en las celdas: en modo separate los bordes
-          declarados sobre <tr> no se pintan. */}
-      <table className="w-full border-separate border-spacing-0">
+      <table className="w-full border-collapse">
         <thead>
-          <tr className="[&>th]:border-b [&>th]:border-slate-100">
+          <tr className="border-b border-slate-100">
             <ThOrdenable col="apellidos" orden={orden} direccion={direccion} onOrden={onOrden}>Paciente</ThOrdenable>
             <ThOrdenable col="fecha_nacimiento" orden={orden} direccion={direccion} onOrden={onOrden}>Edad</ThOrdenable>
             <ThOrdenable col="numero_expediente" orden={orden} direccion={direccion} onOrden={onOrden}>Expediente</ThOrdenable>
@@ -102,22 +93,33 @@ export function TablaPacientesExpediente({ pacientes, orden, direccion, onOrden,
             const avatarColor = AVATAR_COLORS[i % AVATAR_COLORS.length]
             const sexoLabel = p.sexo === 'M' ? 'Masculino' : p.sexo === 'F' ? 'Femenino' : 'Otro'
             return (
-              <tr key={p.id} className="relative [&>td]:border-b [&>td]:border-slate-100 last:[&>td]:border-b-0 hover:bg-slate-50/80 transition-colors">
+              <tr key={p.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/80 transition-colors">
                 <td className="px-4 py-3.5">
                   <div className="flex items-center gap-3.5 min-w-0">
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarColor}`}>
                       {p.nombre.charAt(0)}{p.apellidos.charAt(0)}
                     </div>
                     <div className="min-w-0">
-                      {/* Enlace-que-cubre-la-fila: el ::after se estira sobre el
-                          <tr> (de ahí su `relative`), así toda la fila navega y
-                          Next puede precargar el expediente al verlo en pantalla.
-                          Un onClick con router.push no serviría: Next solo
-                          precarga <Link>. */}
+                      {/* Este enlace cubre SOLO el nombre, y no debe volver a
+                          estirarse sobre la fila. Se intentó con un ::after
+                          `absolute inset-0` anclado al <tr>, y no funciona en ningún
+                          motor: ni Blink ni WebKit crean bloque contenedor para una
+                          fila de tabla (WebKit tampoco con `border-collapse:
+                          separate`, que en Blink sí bastaba). Sin ese anclaje el
+                          overlay sube hasta `div.max-w-6xl` de /expediente y se
+                          estira sobre la pantalla entera: el buscador, los filtros y
+                          los encabezados de orden dejan de responder, y cualquier
+                          clic navega al último paciente de la lista, porque los N
+                          overlays se apilan y gana el último del DOM. Reintroducirlo
+                          reabre ese bug. Lo que se buscaba —que Next precargue el
+                          expediente— lo da el <Link> por sí solo; lo único que se
+                          pierde es el clic en toda la fila. La tarjeta de la vista
+                          móvil sí puede estirar el suyo: allí el ancla es un
+                          <div class="relative"> normal, que es CSS estándar. */}
                       {mostrarAcciones ? (
                         <Link
                           href={`/expediente/${p.id}`}
-                          className="block text-sm font-semibold text-[#1d1d1f] truncate rounded after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1e5fa8]"
+                          className="block text-sm font-semibold text-[#1d1d1f] truncate rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1e5fa8]"
                         >
                           {p.nombre} {p.apellidos}
                         </Link>
