@@ -1,30 +1,37 @@
 /**
- * §12.12.3 — ¿el token de la APP puede invitar asistentes y disparar el correo?
+ * §12.12.3 — la invitación por correo del médico invitado, verificada contra
+ * producción. SEGUNDA PASADA: ahora con DOS asistentes.
  *
- *   npx tsx scripts/gcal-attendees-humo.ts correo-del-invitado@ejemplo.com
+ *   npx tsx scripts/gcal-attendees-humo.ts medico@ejemplo.com paciente@ejemplo.com
  *
  * SCRIPT DE UNA SOLA EJECUCIÓN. No es código de producción y no lo importa
  * nadie. Si sigue aquí dentro de un mes, sobra.
  *
- * ── QUÉ DECIDE ──────────────────────────────────────────────────────────────
+ * ── QUÉ SE COMPROBÓ EN LA PRIMERA PASADA, Y QUÉ SE QUEDÓ SIN COMPROBAR ──────
  *
  * §12.4 del plan resuelve que a los médicos invitados NO se les pide conectar
  * su cuenta de Google: se les manda una invitación por correo desde el evento
- * de la clínica (`attendees` + `sendUpdates`). Toda esa decisión descansa en un
- * supuesto que nadie ha comprobado: que el scope NO sensible
- * `calendar.app.created` autorice a invitar asistentes externos.
+ * de la clínica (`attendees` + `sendUpdates`). La primera ejecución de este
+ * script confirmó lo que sostenía esa decisión —el scope NO sensible
+ * `calendar.app.created` SÍ autoriza a invitar asistentes externos, el correo
+ * llega, y los tres interruptores se aplican— y §12.4 dejó de colgar de un
+ * supuesto.
  *
- * Angel ya lo probó a mano desde la interfaz de Google Calendar y funciona.
- * Eso NO responde la pregunta: allí actuaba el dueño de la cuenta, con permisos
- * completos. Aquí actúa el token de la app, limitado a un solo scope. Son dos
- * actores distintos y pueden dar respuestas distintas.
+ * PERO SE HIZO CON UN SOLO INVITADO, Y AHÍ `guestsCanSeeOtherGuests` NO TIENE
+ * NADA QUE OCULTAR. Que un campo se guarde en `false` no demuestra que haga su
+ * trabajo cuando por fin hay algo que esconder. En la cita real hay DOS
+ * asistentes —el médico invitado y el paciente— y el interruptor es lo único
+ * que impide que se vean el correo personal el uno al otro.
  *
- * SEGUNDO OBJETIVO — el Meet. En la prueba manual, Google añadió solo un enlace
- * de videollamada. Falta saber si eso pasa también cuando el evento nace por la
- * API o si fue una preferencia de la interfaz. Si pasa siempre, cada médico
- * invitado recibiría un enlace de videollamada para una consulta PRESENCIAL, y
- * habría que apagarlo a propósito. Este script NO pide conferencia (no manda
- * `conferenceDataVersion` ni `conferenceData`): si aparece, la puso Google.
+ * OBJETIVO DE ESTA PASADA: invitar a los dos a la vez y comprobar que el
+ * interruptor sigue en pie con la lista llena.
+ *
+ * SEGUNDO OBJETIVO, HEREDADO — el Meet. En la prueba manual desde la interfaz,
+ * Google añadió solo un enlace de videollamada; por la API no apareció. Se
+ * vuelve a mirar porque no cuesta nada y porque un Meet en una consulta
+ * PRESENCIAL habría que apagarlo a propósito. Este script NO pide conferencia
+ * (no manda `conferenceDataVersion` ni `conferenceData`): si aparece, la puso
+ * Google.
  *
  * ── QUÉ ESCRIBE ─────────────────────────────────────────────────────────────
  *
@@ -36,8 +43,8 @@
  *
  * NO IMPRIME NINGÚN TOKEN, ni truncado.
  *
- * El correo del invitado NO va escrito en este archivo: se pasa por argumento
- * o por `GCAL_PRUEBA_INVITADO`.
+ * Los correos NO van escritos en este archivo: se pasan por argumento o por
+ * `GCAL_PRUEBA_INVITADO` y `GCAL_PRUEBA_PACIENTE`.
  */
 
 import { config } from 'dotenv'
@@ -101,18 +108,36 @@ function imprimeError(etiqueta: string, err: unknown): void {
   }
 }
 
-/** El correo del invitado. Argumento primero, variable de entorno después. */
-function correoDelInvitado(): string {
-  const valor = (process.argv[2] ?? process.env.GCAL_PRUEBA_INVITADO ?? '').trim()
-  if (!valor) {
+const USO =
+  '  npx tsx scripts/gcal-attendees-humo.ts medico@ejemplo.com paciente@ejemplo.com\n' +
+  '  (o exporta GCAL_PRUEBA_INVITADO y GCAL_PRUEBA_PACIENTE)'
+
+/**
+ * Los DOS correos. Argumento primero, variable de entorno después, igual que
+ * antes — sólo que ahora son dos.
+ *
+ * SE EXIGEN DISTINTOS, y no es quisquillosidad: con el mismo correo dos veces
+ * Google deduplica y la respuesta trae UN asistente, o sea la prueba de la
+ * primera pasada otra vez. `guestsCanSeeOtherGuests` volvería a no tener nada
+ * que ocultar y el veredicto saldría verde sin haber probado nada.
+ */
+function correosDeLosInvitados(): { medico: string; paciente: string } {
+  const medico   = (process.argv[2] ?? process.env.GCAL_PRUEBA_INVITADO ?? '').trim()
+  const paciente = (process.argv[3] ?? process.env.GCAL_PRUEBA_PACIENTE ?? '').trim()
+
+  if (!medico || !paciente) {
+    aborta(`Faltan los dos correos (el del médico invitado y el del paciente).\n${USO}`)
+  }
+  for (const valor of [medico, paciente]) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor)) aborta(`«${valor}» no parece un correo.`)
+  }
+  if (medico.toLowerCase() === paciente.toLowerCase()) {
     aborta(
-      'Falta el correo del invitado.\n' +
-      '  npx tsx scripts/gcal-attendees-humo.ts alguien@ejemplo.com\n' +
-      '  (o exporta GCAL_PRUEBA_INVITADO)'
+      'Los dos correos son el mismo. Google deduplica y quedaría UN asistente:\n' +
+      '  eso es la prueba de la primera pasada, no ésta. Usa dos buzones distintos.'
     )
   }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor)) aborta(`«${valor}» no parece un correo.`)
-  return valor
+  return { medico, paciente }
 }
 
 /**
@@ -218,6 +243,11 @@ function ventanaDePrueba(): { inicio: string; fin: string } {
  * Por eso se imprime el valor crudo al lado del efectivo: si Google cambiara un
  * default, la columna cruda seguiría diciendo la verdad.
  */
+/** El valor que RIGE: el crudo si vino, y si no el default de ese campo. */
+function efectivo(crudo: boolean | null | undefined, pordefecto: boolean): boolean {
+  return crudo === null || crudo === undefined ? pordefecto : crudo
+}
+
 function informeInterruptores(ev: calendar_v3.Schema$Event): void {
   const casos: { campo: string; crudo: boolean | null | undefined; pordefecto: boolean }[] = [
     { campo: 'guestsCanModify',         crudo: ev.guestsCanModify,         pordefecto: false },
@@ -226,25 +256,128 @@ function informeInterruptores(ev: calendar_v3.Schema$Event): void {
   ]
   console.log('Los tres interruptores de §12.4 (se pidieron los tres en false):')
   for (const c of casos) {
-    const efectivo = c.crudo === null || c.crudo === undefined ? c.pordefecto : c.crudo
-    const crudo    = c.crudo === undefined ? 'ausente' : String(c.crudo)
-    console.log(`  ${efectivo === false ? '✔' : '✖'} ${c.campo.padEnd(24)} efectivo=${String(efectivo).padEnd(5)} (crudo: ${crudo}, default ${c.pordefecto})`)
+    const efec  = efectivo(c.crudo, c.pordefecto)
+    const crudo = c.crudo === undefined ? 'ausente' : String(c.crudo)
+    console.log(`  ${efec === false ? '✔' : '✖'} ${c.campo.padEnd(24)} efectivo=${String(efec).padEnd(5)} (crudo: ${crudo}, default ${c.pordefecto})`)
   }
 }
 
-/** Objetivo 1: ¿aceptó Google al asistente, y en qué estado quedó? */
-function informeAsistentes(ev: calendar_v3.Schema$Event, invitado: string): void {
+/** Objetivo 1: ¿aceptó Google a LOS DOS asistentes, y en qué estado quedaron? */
+function informeAsistentes(
+  ev: calendar_v3.Schema$Event,
+  invitados: { medico: string; paciente: string },
+): void {
   const asistentes = ev.attendees ?? []
   console.log('')
-  console.log(`Asistentes en la respuesta: ${asistentes.length}`)
+  console.log(`Asistentes en la respuesta: ${asistentes.length}  (se pidieron 2)`)
   for (const a of asistentes) {
-    console.log(`  · ${a.email ?? '(sin correo)'}  responseStatus=${a.responseStatus ?? '?'}  organizer=${a.organizer === true}`)
+    const correo = a.email ?? '(sin correo)'
+    const quien  = correo.toLowerCase() === invitados.medico.toLowerCase()   ? 'médico'
+                 : correo.toLowerCase() === invitados.paciente.toLowerCase() ? 'paciente'
+                 : '¿?'
+    console.log(`  · ${correo}`)
+    console.log(`      quién=${quien}  responseStatus=${a.responseStatus ?? '?'}  organizer=${a.organizer === true}`)
   }
-  const entro = asistentes.some((a) => (a.email ?? '').toLowerCase() === invitado.toLowerCase())
-  console.log(entro
-    ? '✔ OBJETIVO 1 — el token de la app SÍ pudo añadir al asistente.'
-    : '✖ OBJETIVO 1 — el asistente NO aparece en la respuesta: Google lo descartó en silencio.')
-  console.log('  El correo NO se puede comprobar desde aquí: mira la bandeja del invitado.')
+
+  const esta = (correo: string) => asistentes.some((a) => (a.email ?? '').toLowerCase() === correo.toLowerCase())
+  const losDos = esta(invitados.medico) && esta(invitados.paciente)
+  console.log(losDos
+    ? '✔ OBJETIVO 1 — el token de la app pudo añadir a LOS DOS asistentes.'
+    : '✖ OBJETIVO 1 — falta alguno en la respuesta: Google lo descartó en silencio.')
+  if (!losDos) {
+    console.log(`      médico presente:   ${esta(invitados.medico)}`)
+    console.log(`      paciente presente: ${esta(invitados.paciente)}`)
+  }
+  console.log('  Que el correo SALIERA no se comprueba desde aquí: mira los buzones.')
+}
+
+/**
+ * OBJETIVO 3 — EL DE ESTA PASADA. Con la lista llena, ¿sigue en pie el
+ * interruptor que impide que los dos invitados se vean entre sí?
+ *
+ * ⚠ LA TRAMPA, otra vez, porque es donde se lee mal: `guestsCanSeeOtherGuests`
+ * vale `true` POR DEFECTO, así que un campo AUSENTE en la respuesta NO significa
+ * «aplicado» — significa que Google lo ignoró y los invitados SÍ se ven. Es al
+ * revés que en `guestsCanModify`, cuyo default es `false`. Hay que mirar el
+ * valor crudo, nunca si el campo está.
+ */
+function informeVisibilidadEntreInvitados(ev: calendar_v3.Schema$Event): void {
+  const crudo   = ev.guestsCanSeeOtherGuests
+  const cuantos = (ev.attendees ?? []).length
+  const efec    = efectivo(crudo, true)
+  const oculta  = efec === false
+
+  console.log('')
+  console.log(`OBJETIVO 3 — visibilidad entre invitados, con ${cuantos} en la lista:`)
+  console.log(`  guestsCanSeeOtherGuests crudo: ${crudo === undefined ? 'AUSENTE' : String(crudo)}`)
+  console.log(`  efectivo (default true):       ${String(efec)}`)
+
+  if (cuantos < 2) {
+    console.log('  ⚠ Hay menos de dos asistentes: este objetivo NO queda probado.')
+    console.log('    Con uno solo el interruptor no tiene nada que ocultar.')
+    return
+  }
+  if (oculta) {
+    console.log('  ✔ Google guardó el evento con la lista de invitados OCULTA.')
+    return
+  }
+  console.log('  ✖ LOS INVITADOS SE VEN ENTRE SÍ.')
+  console.log('    El correo personal del médico llegaría al paciente, y el del')
+  console.log('    paciente al médico. §12.4 se queda sin suelo en su punto 3 y hay')
+  console.log('    que replantear cómo le llega la cita al médico invitado.')
+}
+
+/**
+ * Qué devolvió la PRIMERA pasada (un solo invitado), el 2026-08-20. Está
+ * transcrito de la anotación de §12.4 del plan, que es donde quedó el resultado.
+ *
+ * Se compara campo a campo para que un cambio de comportamiento de Google entre
+ * las dos ejecuciones no pase inadvertido: si algo que salió verde con un
+ * invitado sale distinto con dos, el motivo es el segundo invitado, y eso es
+ * exactamente lo que se está probando.
+ */
+function informeDiferencias(ev: calendar_v3.Schema$Event, status: number): void {
+  const asistentes = ev.attendees ?? []
+  const todosNeedsAction = asistentes.length > 0
+    && asistentes.every((a) => a.responseStatus === 'needsAction')
+
+  const filas: { que: string; primera: string; ahora: string; igual: boolean }[] = [
+    { que: 'HTTP de events.insert', primera: '200',
+      ahora: String(status), igual: status === 200 },
+    { que: 'responseStatus',        primera: 'needsAction',
+      ahora: todosNeedsAction ? 'needsAction (todos)' : 'MEZCLA u otro',
+      igual: todosNeedsAction },
+    { que: 'guestsCanModify',       primera: 'false',
+      ahora: String(efectivo(ev.guestsCanModify, false)),
+      igual: efectivo(ev.guestsCanModify, false) === false },
+    { que: 'guestsCanInviteOthers', primera: 'false',
+      ahora: String(efectivo(ev.guestsCanInviteOthers, true)),
+      igual: efectivo(ev.guestsCanInviteOthers, true) === false },
+    { que: 'guestsCanSeeOtherGuests', primera: 'false',
+      ahora: String(efectivo(ev.guestsCanSeeOtherGuests, true)),
+      igual: efectivo(ev.guestsCanSeeOtherGuests, true) === false },
+    { que: 'conferenceData/Meet',   primera: 'ausente',
+      ahora: ev.conferenceData || ev.hangoutLink ? 'PRESENTE' : 'ausente',
+      igual: !ev.conferenceData && !ev.hangoutLink },
+    { que: 'organizer',             primera: 'el calendario de Spinus',
+      ahora: ev.organizer?.email ?? '(sin organizer)', igual: true },
+    { que: 'creator',               primera: 'el correo personal de quien administra',
+      ahora: ev.creator?.email ?? '(sin creator)', igual: true },
+  ]
+
+  console.log('')
+  console.log('Diferencias con la primera pasada (1 invitado, 2026-08-20):')
+  for (const f of filas) {
+    console.log(`  ${f.igual ? '=' : '≠'} ${f.que}`)
+    console.log(`      primera: ${f.primera}`)
+    console.log(`      ahora:   ${f.ahora}`)
+  }
+  const cambios = filas.filter((f) => !f.igual).length
+  console.log(cambios === 0
+    ? '  ✔ Nada cambió respecto de la primera pasada, salvo el número de invitados.'
+    : `  ✖ ${cambios} campo(s) se comportan distinto con dos invitados. Léelos arriba.`)
+  console.log('  Las dos últimas filas se imprimen para mirarlas, no se juzgan:')
+  console.log('  son identidades y varían por cuenta, no por número de invitados.')
 }
 
 /** Objetivo 2: ¿metió Google un Meet sin que nadie se lo pidiera? */
@@ -264,19 +397,50 @@ function informeConferencia(ev: calendar_v3.Schema$Event): void {
   console.log('  para una consulta PRESENCIAL. Hay que apagarlo a propósito.')
 }
 
+/**
+ * LO QUE ESTE SCRIPT NO PUEDE COMPROBAR, y va impreso para que no se confunda
+ * un verde de arriba con la respuesta a la pregunta entera.
+ *
+ * La API dice QUÉ SE GUARDÓ en el evento, no QUÉ VE cada destinatario en su
+ * correo. Son dos cosas distintas y sólo la segunda es la que importa: un
+ * `guestsCanSeeOtherGuests: false` bien guardado y un correo que aun así
+ * enseñara la lista serían indistinguibles desde aquí.
+ */
+function instruccionesParaLosBuzones(invitados: { medico: string; paciente: string }): void {
+  console.log('')
+  console.log('─'.repeat(74))
+  console.log('LO QUE FALTA, Y NO LO PUEDE HACER ESTE SCRIPT:')
+  console.log('')
+  console.log('La API dice qué se guardó, no qué ve cada destinatario. Abre LOS DOS')
+  console.log('buzones y mira, en cada correo de invitación, el bloque «Invitados»:')
+  console.log('')
+  console.log(`  1. ${invitados.medico}`)
+  console.log(`  2. ${invitados.paciente}`)
+  console.log('')
+  console.log('  ✔ BIEN si dice que la lista se ocultó a petición del organizador,')
+  console.log('    o si no aparece ningún otro correo además del propio.')
+  console.log('  ✖ MAL si en el correo del médico sale el del paciente, o al revés.')
+  console.log('')
+  console.log('OJO AL BORRAR: el evento se borra solo al terminar, así que en el')
+  console.log('calendario no vas a encontrar nada. El correo de invitación SÍ sigue')
+  console.log('en la bandeja: es ése el que hay que abrir, no el calendario.')
+  console.log('─'.repeat(74))
+}
+
 async function main(): Promise<void> {
   for (const v of ENV_REQUERIDAS) {
     if (!process.env[v]) aborta(`falta ${v} en .env.local. Sin eso esto no prueba nada.`)
   }
 
-  const invitado = correoDelInvitado()
+  const invitados = correosDeLosInvitados()
 
   // CONTRA QUÉ PROYECTO SE HABLA. Con un .env.local apuntando a otro sitio, el
   // veredicto sale igual de limpio y no vale nada. El ref es público (sale del
   // host de la URL); la clave de servicio NO se imprime nunca.
   const url = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!)
   console.log(`Proyecto Supabase: ${url.hostname.split('.')[0]}  (${url.hostname})`)
-  console.log(`Invitado de prueba: ${invitado}`)
+  console.log(`Invitado 1 (médico):   ${invitados.medico}`)
+  console.log(`Invitado 2 (paciente): ${invitados.paciente}`)
   console.log('')
 
   const conexion = await resolverConexion()
@@ -315,7 +479,12 @@ async function main(): Promise<void> {
         description: 'Evento de prueba de scripts/gcal-attendees-humo.ts. Sin datos de paciente. Se borra solo.',
         start: { dateTime: inicio, timeZone: ZONA },
         end:   { dateTime: fin,    timeZone: ZONA },
-        attendees: [{ email: invitado }],
+        // LOS DOS, en la misma cita: es la única forma de que
+        // `guestsCanSeeOtherGuests` tenga algo que ocultar.
+        attendees: [
+          { email: invitados.medico },
+          { email: invitados.paciente },
+        ],
         guestsCanModify:         false,
         guestsCanInviteOthers:   false,
         guestsCanSeeOtherGuests: false,
@@ -333,10 +502,12 @@ async function main(): Promise<void> {
     console.log(`  organizer: ${ev.organizer?.email ?? '?'}   status: ${ev.status ?? '?'}`)
     console.log('─'.repeat(74))
 
-    informeAsistentes(ev, invitado)
+    informeAsistentes(ev, invitados)
+    informeVisibilidadEntreInvitados(ev)
     informeConferencia(ev)
     console.log('')
     informeInterruptores(ev)
+    informeDiferencias(ev, respuesta.status)
 
     // La respuesta ENTERA, en UNA sola línea y al final: así el veredicto de
     // arriba se lee sin paginador y aquí no se oculta nada.
@@ -365,8 +536,15 @@ async function main(): Promise<void> {
     imprimeError('el borrado FALLÓ. BÓRRALO A MANO:', err)
     console.log(`  eventId:    ${eventId}`)
     console.log(`  calendarId: ${calendarId}`)
+    // La comprobación de los buzones sigue en pie aunque el borrado falle: el
+    // correo ya salió y es lo que se venía a mirar.
+    instruccionesParaLosBuzones(invitados)
     process.exit(1)
   }
+
+  // Va al final del todo, a propósito: es lo último que queda en pantalla y es
+  // la mitad del experimento que no sale de la API.
+  instruccionesParaLosBuzones(invitados)
   process.exit(0)
 }
 

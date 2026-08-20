@@ -843,6 +843,143 @@ Puede rechazarla: eso la quita de su calendario y **no altera** el de la clínic
 
 Nada de esto figura en §4: es alcance nuevo, no cubierto por ninguna fila F1-F13.
 
+> **⚠ SEGUNDA ANOTACIÓN 2026-08-20 — LA INVITACIÓN DEJA DE SER AUTOMÁTICA Y DEJA
+> DE SER SÓLO PARA EL MÉDICO.** El cuerpo de §12.4 dice «cada cita les manda una
+> invitación por correo», y esa frase es la que cambia. Lo verificado sigue en
+> pie —el token de la app puede invitar y el correo llega—; lo que cambia es
+> **quién dispara el envío y a quién**.
+>
+> ### Un botón, no un efecto de crear la cita
+>
+> La invitación va por un botón **«Enviar invitación»** en el modal de la cita.
+> Es una acción deliberada de quien está mirando esa cita, no algo que ocurra
+> solo al guardarla.
+>
+> ### Dos destinatarios, independientes y los dos opcionales
+>
+> El **médico asignado** a la cita y el **paciente**, cada uno con su botón. Las
+> dos acciones son **completamente opcionales por diseño**: ninguna es un paso
+> del flujo de agendar.
+>
+> **LA CREACIÓN DE LA CITA NUNCA DEPENDE DEL CORREO.** Sin correo, con un correo
+> mal escrito o con uno que rebota, **la cita se crea igual y no se bloquea
+> nada**. Un correo inválido significa que no llega el correo, y ya. Esto no es
+> tolerancia a fallos: es la regla, y hay que resistirse a «validar» de más.
+>
+> ### Cuándo NO se muestra el botón, y cuándo se muestra apagado
+>
+> | Situación | Qué se hace |
+> |---|---|
+> | El destinatario no tiene correo registrado | **El botón NO se muestra.** Mejor que enseñarlo deshabilitado sin que se entienda por qué |
+> | La cita todavía no tiene evento en Google | **Deshabilitado, CON EL MOTIVO VISIBLE.** Invitar es un `patch` sobre el evento: sin evento no hay dónde invitar |
+>
+> El segundo caso no es raro y conviene saber cuándo pasa: la clínica no tiene
+> Google conectado, o es la primera cita y el calendario aún no existe — que bajo
+> el modo estricto de §3.3 le pasa a la secretaria y al médico invitado hasta que
+> entre quien administra.
+>
+> ### No se guarda si ya se envió, y es una decisión
+>
+> El botón dice **«Enviar invitación» siempre** y se puede pulsar las veces que
+> haga falta: Google **no duplica** el asistente, sólo reenvía el correo — que es
+> justo lo que se quiere para quien lo perdió. **Se descarta a propósito una
+> columna de «ya enviada»:** ahorra una migración y evita mantener sincronizado
+> con Google un estado que Google ya conoce. **§12.15 se queda en cuatro
+> migraciones** (más la quinta condicionada); esto no añade ninguna.
+>
+> ### El rechazo del paciente NO vuelve a Spinus
+>
+> El paciente puede rechazar la invitación desde su correo. **Spinus no hace nada
+> con eso:** no cancela, no cambia el estado y no lee la respuesta. La
+> notificación cae en el buzón de la cuenta de Google de la clínica y **la
+> secretaria cancela a mano** en Spinus si procede.
+>
+> Leer el `responseStatus` desde Google sería **CAMINO DE VUELTA** y está fuera de
+> alcance (§12.2). Es exactamente el razonamiento que §12.2 previene: parece un
+> campo suelto y es la primera pieza de la sincronización bidireccional.
+>
+> ### Dónde vive cada correo — COMPROBADO CONTRA EL ESQUEMA, y con una corrección
+>
+> - **El del paciente:** `public.pacientes.email`, `text` **NULLABLE**
+>   (`supabase/baseline/02_tables.sql:339`) y **sin ningún CHECK de formato**. O
+>   sea que puede estar vacío y puede estar mal escrito, las dos cosas previstas
+>   arriba. ✔ como se dijo.
+> - **Y la cita puede no tener paciente en absoluto:** `appointments.paciente_id`
+>   es nullable (`02_tables.sql:64`), que es la puerta de los eventos genéricos de
+>   §12.14. Ahí el botón del paciente sencillamente no existe.
+> - **El del médico:** en `auth.users`, sí. **`public.profiles` NO TIENE COLUMNA
+>   `email`** — comprobado, son 16 columnas y ninguna es ésa
+>   (`02_tables.sql:404-424`).
+>
+> > **⚠ CORRECCIÓN A «hay que ampliar `APPOINTMENT_SELECT`».** Ampliarlo **no
+> > sirve, y no es cuestión de añadir un campo**: ese `select` trae al médico por
+> > `medico:profiles!appointments_medico_id_fkey(...)`
+> > (`src/lib/appointments.ts:11`), y en `profiles` **el correo no está**. No se
+> > puede pedir lo que la tabla no tiene. Tampoco hay vista que lo exponga: el
+> > esquema `public` **no tiene ni una** (`supabase/baseline/08_view.sql`), y
+> > PostgREST no cruza a `auth` desde aquí.
+> >
+> > **El correo del médico sale por la API de Admin de Auth, con service role**,
+> > que es como ya lo hace el repo hoy —`admin.auth.admin.listUsers()` en
+> > `src/app/api/admin/usuarios/route.ts:20`, cruzando después por `id`—. Para un
+> > solo médico lo que corresponde es la llamada dirigida (`getUserById`), no
+> > barrer mil usuarios. La alternativa sería una columna o una vista: **migración**,
+> > y no hace falta para esto.
+> >
+> > Consecuencia práctica: **es una consulta aparte, fuera de la forma canónica de
+> > la cita**, y no un campo más viajando en el payload de la agenda.
+>
+> ### Lo que esto NO decide
+>
+> **Quién puede pulsar los botones.** El permiso de escritura de §12.7 está
+> definido por COLUMNAS de `appointments`, y enviar una invitación no escribe
+> ninguna: es un `patch` contra Google. Así que no queda cubierto ni a favor ni en
+> contra. **Sin decidir; hay que zanjarlo al implementarlo.**
+
+> **✅ TERCERA ANOTACIÓN 2026-08-20 — `guestsCanSeeOtherGuests`, VERIFICADO OTRA
+> VEZ Y AHORA SÍ CON ALGO QUE OCULTAR. En verde.**
+>
+> ### Por qué hubo que repetirla
+>
+> La primera verificación (§12.12.3) dio verde en los tres interruptores, pero se
+> hizo **con UN SOLO invitado**. Y ahí `guestsCanSeeOtherGuests` **no tenía nada
+> que ocultar**: se guardó en `false` y no protegió nada, porque no había una
+> lista que esconder. Un campo bien guardado no es un campo que funcione.
+>
+> Con la anotación de arriba eso deja de ser un detalle: ahora hay **dos**
+> destinatarios en la misma cita, el médico y el paciente. **De ese verde depende
+> que el correo personal de un médico no acabe en el buzón de un paciente, ni al
+> revés.** Repetir la prueba con la lista llena era la única forma de saberlo.
+>
+> ### Qué se hizo y qué salió
+>
+> El 2026-08-20, con `scripts/gcal-attendees-humo.ts` ampliado para aceptar dos
+> correos y meter a los dos como `attendees` del mismo evento, contra la conexión
+> **real de producción**:
+>
+> - **Los dos asistentes entraron**, los dos en `responseStatus: needsAction`.
+> - **`guestsCanSeeOtherGuests` siguió en `false` con la lista llena.**
+> - **Y lo que la API no puede decir, comprobado en el buzón:** la invitación dice
+>   literalmente que **la lista de invitados se ocultó a petición del
+>   organizador**. Ni el médico ve el correo del paciente ni el paciente el del
+>   médico.
+> - **Nada más cambió** respecto de la primera pasada: mismo 200, mismos tres
+>   interruptores, sin Meet.
+>
+> **El punto 3 de la lista de §12.4 —«los invitados no se ven entre sí»— queda
+> verificado de verdad, no por defecto.** El script compara además campo a campo
+> contra el resultado de la primera pasada, así que un cambio de comportamiento de
+> Google entre las dos habría salido señalado.
+>
+> ### Una pieza para el inventario de §9, sin acción
+>
+> Que el paciente reciba invitación estrena un destinatario para algo que §9 ya
+> tenía anotado: **`creator` es el correo personal de quien administra la
+> clínica**. Antes viajaba al buzón del médico invitado; ahora también al del
+> paciente. **No es fuga entre invitados** —eso es lo que acaba de verificarse—,
+> es una identidad más saliendo de Spinus por la vía de Google. Sin acción en esta
+> rama; cuenta para cuando se redacte lo del aviso de privacidad (§9 y §12.5).
+
 ## 12.5 El título lleva el nombre completo del paciente
 
 **Decidido y no se discute.** El evento sigue llevando `Cita médica: <nombre>
@@ -1117,6 +1254,13 @@ la cita al médico invitado**. No es un ajuste: es volver a la mesa.
 > que no aparece, el matiz sobre el reenvío y el dato de `creator`— está en la
 > anotación de **§12.4**, que es donde sirve. Aquí sólo consta que la pregunta
 > está respondida.
+>
+> > **✅ Y SE REPITIÓ, el mismo 2026-08-20, con DOS invitados.** Esta ejecución se
+> > hizo con uno solo, así que `guestsCanSeeOtherGuests` dio verde **sin haber
+> > ocultado nada**. Al pasar §12.4 a dos destinatarios —médico y paciente— hubo
+> > que probarlo con la lista llena: salió en verde, y esta vez también **en el
+> > buzón**, donde el correo dice que la lista de invitados se ocultó a petición
+> > del organizador. **El resultado está en la tercera anotación de §12.4.**
 
 ### 12.12.4 — `isGoogleEvent`
 
