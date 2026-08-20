@@ -1,5 +1,12 @@
 -- ============================================================================
--- ESTADO: PENDIENTE DE APLICAR — la ejecuta Angel a mano, EN UN SOLO BLOQUE.
+-- ESTADO: APLICADA Y VERIFICADA EN PRODUCCIÓN 2026-08-19 — la ejecutó Angel a
+--         mano, EN UN SOLO BLOQUE.
+--         Verificación (2026-08-19, SQL Editor): la consulta
+--           SELECT proname FROM pg_proc
+--            WHERE proname = 'leer_conexion_google_con_secretos';
+--         devuelve una fila, así que el puente existe en la base.
+--         Hasta esa fecha esta línea decía «PENDIENTE DE APLICAR» estando ya
+--         aplicada. Es el caso que motiva AUDITORIA-MIGRACIONES.md §7.
 -- ============================================================================
 -- Puente de acceso a private.google_conexiones_secretos
 --

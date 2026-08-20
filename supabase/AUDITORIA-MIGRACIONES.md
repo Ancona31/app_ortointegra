@@ -233,6 +233,24 @@ hasta julio el archivo se commiteaba **después** de aplicar y el rótulo nacía
 cierto; desde agosto se commitea **antes**, y nada vuelve a mirarlo. Por eso el
 remedio tiene que ser un paso del ritual y no una buena intención.
 
+No basta con mover el rótulo de sitio: **el texto nuevo dice «APLICADA Y
+VERIFICADA EN PRODUCCIÓN», con la fecha y con la comprobación concreta que se
+usó** —el `SELECT` sobre `pg_proc`, `pg_policies` o `information_schema` que
+confirma que el objeto existe de verdad—. «Aplicada» a secas es la palabra de
+quien pegó el archivo; lo que la convierte en un hecho consultable es la consulta
+que la respalda, y dejarla escrita en la cabecera ahorra volver a inventarla cada
+vez que alguien dude. Conecta con la dimensión 5: el veredicto en la rejilla dice
+que la ejecución terminó, la comprobación posterior dice que el objeto quedó.
+
+**Una migración no está terminada hasta que su cabecera es cierta.** No lo está
+por haber corrido en verde. Mientras el rótulo mienta, queda trabajo abierto.
+
+*Precedente:* el 2026-08-19 se encontró `20260818_gcal_puente_secretos.sql`
+declarando «PENDIENTE DE APLICAR» con sus tres funciones ya vivas en producción.
+El daño no es cosmético: una cabecera así invita a reaplicar una migración
+aplicada, que es exactamente el escenario que la dimensión 3 obliga a separar
+entre no-op inofensivo y aborto ruidoso.
+
 **La región editable de una migración ya aplicada es el bloque de comentarios
 anterior a la primera sentencia ejecutable, y sólo para anotar.** De la primera
 sentencia hacia abajo no se cambia nada nunca, ni siquiera un comentario suelto
