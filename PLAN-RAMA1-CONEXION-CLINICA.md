@@ -578,6 +578,24 @@ Lo que importa de esto:
 > ancho: hay que declarar las **dos** rutas de salida, no una. La redacción
 > concreta que se quiere está en §12.5. Sigue sin ser de esta rama.
 
+> **⚠ SEGUNDA ANOTACIÓN 2026-08-20 — la segunda superficie dejó de ser hipótesis,
+> y trae un detalle que esta sección no contemplaba.** La invitación por correo
+> de §12.4 se probó contra producción y funciona (§12.12.3): esa ruta de salida
+> **existe de verdad**, no es un diseño sobre el papel.
+>
+> Y en la respuesta de la API aparece una pieza más: **`creator` es el correo
+> personal de quien administra la clínica**, mientras que `organizer` es el
+> calendario de Spinus. De cara al médico invitado el organizador se ve como
+> «Spinus - <nombre>», que es lo correcto; el correo personal viaja en el campo
+> `creator`.
+>
+> **Dentro de Spinus no estrena nada** —quien administra ya es identificable para
+> su clínica—, pero es una tercera pieza del mismo inventario que esta sección
+> lleva: **qué identidad de una persona física sale de Spinus por la vía de
+> Google**. Junto al ACL del calendario, que vive fuera de la RLS, y al nombre del
+> paciente en el título. **Sin acción en esta rama**; se nombra para que esté
+> contado cuando se redacte lo del aviso de privacidad.
+
 ---
 
 # 10. Los catorce hallazgos de la auditoría de este plan
@@ -754,6 +772,67 @@ Puede rechazarla: eso la quita de su calendario y **no altera** el de la clínic
 > código. **Hay que probarlo con un evento real antes de construir nada encima.**
 > Si resultara que no lo autoriza, esta decisión entera se queda sin suelo.
 
+> **✅ ANOTACIÓN 2026-08-20 — VERIFICADO, Y EN VERDE. El aviso de arriba queda
+> CUMPLIDO, no derogado:** se conserva porque describe la duda que hubo y por qué
+> había que despejarla antes de construir nada encima. Ya está despejada.
+>
+> **El token de la app, bajo `calendar.app.created` y sin ningún scope más, SÍ
+> puede invitar asistentes externos.** `events.insert` con `attendees` y
+> `sendUpdates: 'all'` respondió **200** contra la conexión real de producción,
+> con el asistente registrado en `responseStatus: needsAction`, **y el correo
+> llegó a la bandeja del invitado** —comprobado a mano, que es la única forma:
+> la respuesta de la API no dice si el correo salió—. **§12.4 tiene suelo.**
+>
+> **Los tres interruptores se aplicaron los tres:** `guestsCanModify`,
+> `guestsCanInviteOthers` y `guestsCanSeeOtherGuests`, los tres en `false`. El
+> tercero se confirmó además fuera de la API: el correo recibido dice
+> literalmente que la lista de invitados se ocultó a petición del organizador.
+>
+> > **⚠ TRAMPA PARA QUIEN REPITA ESTA VERIFICACIÓN — el campo AUSENTE no
+> > significa lo mismo en los tres.** Google omite estos campos de la respuesta
+> > cuando valen su valor por defecto, y **los defaults NO son iguales**:
+> > `guestsCanModify` es `false` por defecto, pero `guestsCanInviteOthers` y
+> > `guestsCanSeeOtherGuests` son **`true`**. Un campo que no aparece quiere
+> > decir «aplicado» en el primero y **«Google lo ignoró»** en los otros dos.
+> > Hay que mirar el valor crudo, no si el campo está.
+>
+> **Google Meet: la API NO añade conferencia sola.** La respuesta vino sin
+> `conferenceData` y sin `hangoutLink`. El enlace de Meet que aparecía al crear
+> el evento a mano desde la interfaz era una **preferencia de la cuenta**, no de
+> la API. **No hay que desactivar nada al crear eventos por código** — y conviene
+> que quede dicho, porque el reflejo es añadir un apagado explícito «por si
+> acaso», y eso es código que nadie sabría explicar después.
+>
+> ### El punto 2 de la lista de arriba hay que MATIZARLO
+>
+> «No puede reenviar la invitación» **se da por absoluto y no lo es.** Pese a
+> `guestsCanInviteOthers: false`, el correo de Google incluye una nota que dice
+> que si el destinatario reenvía la invitación, quien la reciba podrá responder
+> al organizador, ser agregado a la lista de invitados o modificar la
+> confirmación de asistencia.
+>
+> La lectura probable —**y va marcada como probable, no como verificada**— es que
+> el interruptor impide añadir invitados **desde el evento** y no impide
+> **reenviar el correo**. No es una fuga más allá de lo que ya viaja dentro de
+> ese correo (el título con el nombre completo del paciente, §12.5), pero el
+> punto 2 hay que leerlo así: **lo bloqueado es la invitación desde dentro del
+> evento; el reenvío no lo bloquea Google.**
+>
+> ### Un dato para el commit 3, sin acción en él
+>
+> En la respuesta, **`creator` es el correo personal de quien administra** y
+> `organizer` es el calendario de Spinus. El invitado ve como organizador
+> «Spinus - <nombre>», que es lo correcto, pero el correo personal del
+> administrador viaja en la respuesta de la API. No pide ningún cambio ahora;
+> queda anotado también en §9, que es donde vive el inventario de lo que sale
+> hacia fuera.
+>
+> **El artefacto que produjo esto:** `scripts/gcal-attendees-humo.ts`, de una
+> sola ejecución —resuelve la conexión por el puente, crea el evento de prueba y
+> lo borra él mismo—. **Estaba sin commitear al escribirse esta anotación**, así
+> que puede no existir en el repo: si hay que repetir la verificación y no
+> aparece, se vuelve a escribir. Lo que importa está en las líneas de arriba.
+
 Nada de esto figura en §4: es alcance nuevo, no cubierto por ninguna fila F1-F13.
 
 ## 12.5 El título lleva el nombre completo del paciente
@@ -916,6 +995,14 @@ la agenda**.
 > lo que no, es **dónde vive el «no mostrar más»**. Si acaba en la base, es la
 > quinta migración de §12.15.
 
+> **⚠ SEGUNDA ANOTACIÓN 2026-08-20 — sigue siendo lo único, y ahora sin
+> asterisco.** La anotación de arriba se escribió con §12.12.3 *decidida* pero
+> **no ejecutada**: la verificación de `attendees` estaba por hacer y §12.4 entera
+> colgaba de ella, así que «último asunto abierto» convivía con un supuesto sin
+> comprobar. **Ya se ejecutó, y salió en verde** (§12.12.3 y la anotación de
+> §12.4). Con eso, **dónde se guarda el «no mostrar más» por usuario es el ÚNICO
+> asunto abierto de todo §12**, sin nada pendiente detrás.
+
 ## 12.11 Hechos verificados el 2026-08-19
 
 - **El puente está APLICADO y verificado en producción.**
@@ -998,6 +1085,23 @@ llega el correo. Ninguna cantidad de lectura de código la sustituye.
 **Qué pasa si sale que no:** si `calendar.app.created` no autoriza invitar
 asistentes externos, §12.4 se queda sin suelo y hay que **replantear cómo le llega
 la cita al médico invitado**. No es un ajuste: es volver a la mesa.
+
+> **✅ EJECUTADA EL 2026-08-20 — EN VERDE. YA NO BLOQUEA NADA.**
+>
+> Se hizo con `scripts/gcal-attendees-humo.ts` contra la conexión **real de
+> producción**: token resuelto por el puente, evento de prueba creado con un
+> `attendee`, y borrado por el propio script al terminar. `events.insert`
+> respondió 200 con el asistente registrado, y **el correo llegó** —comprobado en
+> la bandeja del invitado, porque la API no lo dice—.
+>
+> **El «qué pasa si sale que no» de arriba NO se activa.** No hay que replantear
+> cómo le llega la cita al médico invitado: §12.4 tiene suelo y deja de colgar de
+> un supuesto.
+>
+> El resultado entero —los tres interruptores, la trampa de los defaults, el Meet
+> que no aparece, el matiz sobre el reenvío y el dato de `creator`— está en la
+> anotación de **§12.4**, que es donde sirve. Aquí sólo consta que la pregunta
+> está respondida.
 
 ### 12.12.4 — `isGoogleEvent`
 
@@ -1171,3 +1275,11 @@ por PostgREST. Las dos van en el **commit 7** (final de §6).
 
 > **El único punto que sigue abierto en todo §12** es dónde se guarda el «no
 > mostrar más» por usuario. Si va a la base, esta tabla pasa a cinco.
+
+> **⚠ ANOTACIÓN 2026-08-20 — la frase de arriba sigue siendo cierta, y ahora es
+> la única lectura posible.** Se escribió con la verificación de `attendees`
+> (§12.12.3) decidida pero **sin ejecutar**, y esa verificación podía haber
+> mandado §12.4 de vuelta a la mesa con lo que arrastrase. **Ya está ejecutada y
+> en verde:** §12.4 no pide migración, no pide replanteo y no añade nada a esta
+> tabla. **Se queda en cuatro, más la quinta condicionada**, exactamente como
+> está.
