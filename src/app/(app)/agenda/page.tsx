@@ -1071,7 +1071,7 @@ function GoogleGIcon({ size = 12 }: { size?: number }) {
    médico vía freebusy. Ese carril se eliminó entero —scope incluido—, así que
    aquí ya no llega nada anónimo: todo lo que pinta esta tarjeta viene del
    calendario de Spinus, tiene título real y no tiene cita ligada. De ahí que
-   la etiqueta "Sin cita" haya dejado de ser condicional.
+   la etiqueta haya dejado de ser condicional.
 
    NO SE VUELVE A METER EL CANDADO. Pintarlo aquí producía cosas como
    "🔒 Cita médica: Pedro Gonzalo Hernández Mendoza": el título completo debajo
@@ -1101,7 +1101,17 @@ const GoogleEventCard = memo(function GoogleEventCard({
           border: '1px solid currentColor', borderRadius: '999px',
           padding: '0 5px', lineHeight: 1.5,
         }}>
-          Sin cita
+          {/* "Evento", y antes decía "Sin cita". Aquel texto venía del modelo
+              viejo, cuando la etiqueta servía para separar estos eventos de los
+              bloques de "Ocupado" de freebusy. Eliminado freebusy (§12.6) sólo
+              queda un tipo de evento, y lo único que hacía ese texto era
+              sugerir que a la cita le falta algo. "Evento" lo distingue de una
+              cita sin insinuar carencia.
+
+              NADA DE "GCal" NI DE ABREVIATURAS TÉCNICAS: el médico no tiene por
+              qué saber qué es, y el icono de Google que ya lleva la tarjeta
+              identifica el origen de sobra. */}
+          Evento
         </span>
       </div>
       <span style={{ fontSize: '12px', fontWeight: 700, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -1151,7 +1161,13 @@ const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg }) {
           textTransform: 'uppercase', color: 'var(--ag-gcal-text)', opacity: 0.75,
           border: '1px solid currentColor', borderRadius: 999, padding: '0 4px', lineHeight: 1.5,
         }}>
-          Sin cita
+          {/* Mismo texto y mismo motivo que en GoogleEventCard, donde está
+              razonado entero: "Sin cita" era del modelo viejo —separaba estos
+              eventos de los bloques de "Ocupado" de freebusy, ya eliminado
+              (§12.6)— e insinuaba que a la cita le falta algo. Los dos sitios
+              cambian a la vez o la agenda dice dos cosas distintas del mismo
+              evento según la vista. */}
+          Evento
         </span>
       )}
     </div>
