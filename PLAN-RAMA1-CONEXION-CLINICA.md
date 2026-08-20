@@ -107,6 +107,25 @@ export function resolverConexionPropia(
 ): Promise<ConexionGoogle | null>
 ```
 
+> **⚠ ANOTACIÓN 2026-08-19 — `resolverConexionPropia` NO se implementa en F1.**
+>
+> La especificación de arriba y los cuatro párrafos de abajo se conservan tal
+> cual: describen el diseño aprobado el 2026-08-17 y no eran falsos. Lo que
+> cambió viene de fuera del plan — por decisión de producto posterior a su
+> cierre, **`freebusy` se elimina por completo**, y esa función no tenía ningún
+> otro llamador previsto: su propio docstring lo dice, «Sólo para freebusy sobre
+> `primary`». Escribirla sería estrenar código muerto en el mismo commit que lo
+> crea.
+>
+> **El commit 1 expone `resolverConexionClinica` y las cinco escrituras, y nada
+> más.** `resolverConexionClinica` sí filtra además por `rol = 'clinica'`, que el
+> párrafo siguiente no enumera: sin ese filtro la garantía de «cero o una fila»
+> se cae, porque el índice único parcial sólo cubre las filas de ese rol.
+>
+> No se tocan §0.3, la fila F6, el commit 2 de §6, el escenario de §7 ni H8:
+> siguen describiendo la rama tal como se cerró. Si `freebusy` volviera, esta
+> especificación está aquí entera y sirve sin reescribir nada.
+
 Las dos hacen `.eq('clinica_id', clinicaId)` **explícito** aunque la RLS ya lo imponga, y `.eq('estado','activa')`. `clinicaId` sale siempre de `profiles` de la sesión autenticada, nunca del body ni del query param.
 
 **Y `resolverConexionPropia` filtra además por `userId`, que NO es decorativo** (H8). La policy de `clinica_conexiones_google` deja leer **todas** las filas de la clínica a cualquier miembro, así que aquí la RLS no acota nada: el filtro por usuario es puramente código, y si se cae, «mi conexión» pasa a ser «una cualquiera de mi clínica». El `userId` sale de la sesión, igual que el `clinicaId`.
