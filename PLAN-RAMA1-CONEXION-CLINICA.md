@@ -32,6 +32,22 @@
 >
 > **Donde este plan y `BRIEF-MIGRACION-PUENTE-SECRETOS.md` discrepen, manda el
 > brief:** es la especificación del puente y está auditada.
+>
+> ---
+>
+> ## ⚠ LEE §12 ANTES DE ESCRIBIR CÓDIGO (añadido el 2026-08-19)
+>
+> Después de cerrarse este plan se tomaron **decisiones de producto** que cambian
+> qué hay que construir. Viven en **§12**, al final del documento, y **mandan
+> sobre lo que diga el cuerpo del plan** allí donde se contradigan.
+>
+> No están fundidas en el texto a propósito: la convención del repositorio es
+> anotar, no enmendar. Las secciones afectadas llevan su anotación en el sitio
+> —§0.3, §0.4, §0.9, §0.10, la tabla de §4, el commit 2 de §6, §7, §9 y §11— y
+> todas apuntan a §12.
+>
+> **Si empiezas por §6 sin haber leído §12, vas a construir la ruta de eventos al
+> revés de lo que se quiere.**
 
 Leí `CLAUDE.md` completo (y `AGENTS.md`). Sobre el módulo offline: lo viejo —`read-mirror`, `outbox-engine`, `useHybridQuery`, el SW de la app online— está muerto y no se revive; la app online no tiene capacidades offline; lo vivo es el Búnker aislado en `/public/bunker/` con SW de scope `/bunker/`, más `SessionGuard` y el cliente Supabase ya sin lógica offline.
 
@@ -57,6 +73,14 @@ Hay una segunda excepción forzada, menor, en §3.4 (leer el nombre del médico 
 
 **0.3 — «freebusy sigue amarrado a la sesión» no es «no tocar»: es código nuevo.** Hoy `consultarOcupado` corre **dentro** del callback de `conCalendarioSpinus` (`events/route.ts:136`) y usa el MISMO cliente de Google que `events.list`. En cuanto ese cliente pase a ser el de la conexión de la clínica, `freebusy` sobre `primary` consulta el calendario personal del administrador y se lo enseña a toda la clínica — exactamente la fuga que el brief quiere evitar, entrando por la puerta de al lado. Mantener el comportamiento descrito obliga a **abrir un segundo cliente de Google, el de la conexión propia de quien pregunta**, fuera del cuerpo que se reintenta. Con eso desaparece de paso la memoización de `ocupadoPromesa`, que existía sólo para no repetir freebusy en el reintento.
 
+> **⚠ ANOTACIÓN 2026-08-19 — §0.3 entera queda SIN EFECTO.** `freebusy` se
+> elimina por completo (§12.6), así que no hay segundo cliente que abrir ni
+> bloques de «Ocupado» que preservar. El análisis de arriba era correcto y sigue
+> siéndolo: describe el riesgo real de mantener `freebusy` bajo un calendario de
+> clínica. Lo que cambió es que ese riesgo se retira quitando la función, no
+> conteniéndola. **La memoización de `ocupadoPromesa` sí desaparece, como decía
+> este apartado, sólo que por otro motivo.**
+
 **Añadido al absorber H8:** hay un efecto lateral que el texto original no vio. Hoy el GET sólo devuelve `ocupado` cuando hay calendario de clínica resuelto (`events/route.ts:153-155`), porque los bloques viajan dentro de la misma respuesta que los eventos. Al separar los dos clientes eso deja de tener sentido: los bloques de «Ocupado» de una persona **no dependen de la conexión de la clínica**, así que un administrador cuya conexión de clínica falte perdería también sus propios bloques sin motivo. `ocupado` se resuelve y se devuelve **al margen** de que la conexión de clínica exista o no.
 
 **0.4 — La intersección de H2 deja un payload que es 100% duplicado.** Si sólo se devuelve un evento cuando su id está en el conjunto de citas que la sesión lee bajo RLS, entonces **todo evento devuelto tiene una cita detrás**, y la agenda ya pinta esa cita desde `/api/appointments` (`agenda/page.tsx:1341-1372`). Cada cita saldría dos veces: una como cita y otra como bloque morado `gcal-<id>`. Peor: el conjunto de dedupe no conoce el filtro por médico, así que filtrar la agenda por un médico seguiría pintando las citas de los demás como bloques de Google, con el nombre del paciente en el título.
@@ -64,6 +88,25 @@ Hay una segunda excepción forzada, menor, en §3.4 (leer el nombre del médico 
 La intersección es la regla de seguridad correcta y va en el servidor. Pero su consecuencia real no es «se pierden los eventos crudos»: es que **el array `events` deja de tener sentido**. Lo honesto es intersecar en el servidor *y* que la agenda deje de pintar `data.events` (≈20 líneas en `gcalSource`). Eso toca `agenda/page.tsx`, fuera de la lista original: **aprobado** (§4, F10, y el cierre de decisiones).
 
 **Precisión al absorber H2, y es peor de lo que este apartado decía.** El dedupe de hoy no es neutro: **agrava**. `yaSonCitas` (`events/route.ts:162-168`) se construye con las citas que la SESIÓN lee bajo RLS, y para un médico invitado eso es sólo lo suyo —`(medico_id = auth.uid() OR get_my_role() = 'secretaria') AND clinica_id = …`, `20260530_etapa5h_paso3_policies_appointments.sql:82-96`—. O sea que las citas de sus colegas **no se restan**: salen como eventos crudos de Google, y el título los lleva con nombre y apellidos del paciente (`tituloParaGoogle`, `src/lib/appointments.ts`). Restar lo propio de un calendario de clínica entera es exactamente el mecanismo que enseña lo ajeno. Por eso la intersección no es una mejora de limpieza: es la contención.
+
+> **⚠ ANOTACIÓN 2026-08-19 — la intersección queda DESCARTADA como mecanismo, y
+> este apartado es el que más engaña si se lee suelto.**
+>
+> El diagnóstico de §0.4 es correcto: restar lo propio de un calendario de clínica
+> entera es lo que enseña lo ajeno. **La cura que propone, no.** La intersección
+> devolvería sólo eventos que tienen cita detrás, y eso **borra exactamente los
+> eventos que el producto exige conservar**: los que el administrador escribe a
+> mano dentro del calendario de Spinus, que no tienen cita y tienen que seguir
+> viéndose en la agenda (§12.1).
+>
+> **El mecanismo correcto es la RESTA, acotada por capacidad.** La fuga no venía
+> de restar: venía de restar con un conjunto RLS parcial. El administrador y la
+> secretaria leen **todas** las citas de la clínica, así que para ellos la resta
+> deja exactamente los eventos escritos a mano y nada más — sin fuga posible. El
+> médico invitado no entra en esta ruta: recibe vacío (§12.1).
+>
+> Cae con esto la premisa de que «cada cita saldría dos veces»: bajo la resta las
+> citas se quitan, que es justo lo que hace la resta.
 
 **0.5 — El callback no tiene regla para decidir `rol`, y equivocarse es un 23505.** El índice único parcial deja como máximo una fila `rol='clinica'` por clínica. Hoy el callback hace `upsert` por `user_id` y ya está; bajo el modelo nuevo tiene que decidir si la conexión que nace es la de la clínica o una 'personal', y si decide mal, o si hay carrera, revienta con violación de índice dentro de un redirect. El brief no dice la regla.
 
@@ -77,7 +120,26 @@ La intersección es la regla de seguridad correcta y va en el servidor. Pero su 
 
 **0.9 — Menor:** `events.list` va con `maxResults: 100` y sin paginación (`events/route.ts:144`). Con un calendario de clínica entera eso se rebasa fácil y hoy se perderían eventos en silencio. Con la intersección de H2 el impacto es nulo (lo que falta era duplicado), pero conviene que quede dicho antes de que alguien reintroduzca los renglones sombra.
 
+> **⚠ ANOTACIÓN 2026-08-19 — esto deja de ser menor.** El «impacto nulo» dependía
+> de la intersección, y la intersección está descartada (anotación de §0.4). Bajo
+> la resta acotada por capacidad, lo que sobrevive al filtro son precisamente los
+> eventos escritos a mano (§12.1), que **no** son duplicados de nada: si el rango
+> consultado tiene más de 100 eventos, el evento escrito a mano número 101
+> desaparece de la agenda **sin un solo aviso**, y el administrador no tiene por
+> dónde enterarse.
+>
+> Los renglones sombra ya no son una amenaza futura: el camino de vuelta no se
+> construye (§12.2). El techo de `maxResults` sí lo es. **Queda como asunto
+> abierto en §12.12; no está decidido si se arregla en el commit 2 o después.**
+
 **0.10 — Sin migración.** Confirmado: todo cabe en el esquema del corte A. `estado` ya existe para la señal de revocación (§5).
+
+> **⚠ ANOTACIÓN 2026-08-19 — sigue siendo cierto para lo que este plan describe, y
+> dos decisiones nuevas lo desbordan.** El permiso de escritura en la agenda
+> (§12.7) necesita columna en `profiles`, entrada en el trigger guardián y cambio
+> de policy en `appointments`; el «no mostrar más» de los avisos (§12.10)
+> necesitaría columna si se guarda en la base. **No está dicho si esas dos
+> pertenecen a esta rama o a la siguiente** — ver §12.12.
 
 ---
 
@@ -316,6 +378,34 @@ Firma nueva: `(conexion: ConexionGoogle, admin, operacion, opciones: { puedeRepa
 
 Son **13** archivos —eran 11 antes de absorber H5 y H6—. Muy por encima del umbral del Protocolo 3, y por eso esto es un plan y no un parche.
 
+> **⚠ ANOTACIÓN 2026-08-19 — correcciones a F6 y F10.** Van aquí y no dentro de la
+> tabla porque una anotación entre renglones la rompería.
+>
+> **F6 — la fila enumera cinco cosas y NO son todas del mismo commit.** Leída
+> suelta induce a meterlas juntas, y dos de ellas no compilan en el commit 2:
+>
+> | Ítem de F6 | Dónde va | Por qué |
+> |---|---|---|
+> | dedupe `:162-168` + `.eq('clinica_id')` | **commit 2** | pero ya no como intersección, sino como **resta acotada por capacidad** (anotación de §0.4 y §12.1) |
+> | lista blanca en `:170-176` | **commit 2** | hoy `:172` devuelve el `Schema$Event` entero; la agenda sólo usa `id`, `summary`, `start` y `end` |
+> | `consultarOcupado` con cliente propio (H8) | **SIN EFECTO** | `freebusy` se elimina (§12.6). Y `resolverConexionPropia` no existe: no se escribió en el commit 1 (ver la anotación de §1) |
+> | `estadoDeFallo` `:22-41` **por clínica** | **commit 3** | necesita `resolverConexionClinica`; hoy pregunta por `google_tokens` del usuario |
+> | `puedeReparar` a `conCalendarioSpinus` | **commit 3** | es el cuarto argumento de la firma nueva de F2 (§3.6). Pasarlo antes no compila |
+>
+> **F10 — las dos mitades de su renglón cambian.** La cláusula «(sigue pintando
+> `ocupado`)» queda **sin efecto**: no habrá bloques de «Ocupado» (§12.6). Y
+> «deja de pintar `data.events`» queda **REVERTIDA para el administrador y la
+> secretaria**: esos eventos son los escritos a mano y tienen que seguir
+> pintándose (§12.1), con estilo propio e inertes. Para el médico invitado el
+> array llega vacío, así que no hay nada que pintar y el efecto es el que F10
+> describía.
+>
+> **Consecuencia sobre `gcalSource` y `GoogleEventCard`:** NO mueren. El
+> inventario que los daba por muertos partía de que F10 vaciaba el pintado y
+> `freebusy` se llevaba el resto; con §12.1 el carril de eventos de Google sigue
+> vivo para dos de los tres roles. Lo que sí muere es todo lo de «Ocupado»
+> (§12.6).
+
 ---
 
 # 5. Los tres estados, y la señal de revocación
@@ -340,6 +430,24 @@ El orden **no es negociable** por lo que explico en §7: el endurecimiento de `/
 
 1. **`feat(gcal): módulo dueño de la conexión de Google por clínica`** — F1 + tests unitarios del módulo. Inerte: nadie lo llama, producción no cambia.
 2. **`fix(gcal): endurecer /api/google/events antes del cambio de resolución`** — F6 (intersección + lista blanca + freebusy con conexión propia) y F10. Seguro antes del cambio: hoy `events.list` lee el calendario del propio médico, así que la única consecuencia visible es que la agenda deja de pintar eventos que ya pintaba como citas.
+
+   > **⚠ ANOTACIÓN 2026-08-19 — el alcance del commit 2 cambia.** El paréntesis
+   > de arriba dice «intersección + lista blanca + freebusy con conexión propia»,
+   > y de esos tres ya sólo sobrevive uno tal cual:
+   >
+   > - **intersección → RESTA acotada por capacidad** (anotación de §0.4, §12.1).
+   > - **lista blanca →** se mantiene igual.
+   > - **freebusy con conexión propia →** sin efecto; `freebusy` se elimina
+   >   entero, y eso también es de este commit (§12.6).
+   >
+   > Se añade lo que no estaba: el **helper de capacidad** en
+   > `src/lib/permissions.ts`, como lista blanca (administrador o secretaria),
+   > del que sale el vacío del médico invitado (§12.1 y §12.11).
+   >
+   > **Y NO entran en este commit los dos ítems de F6 que necesitan el 3**
+   > —`estadoDeFallo` por clínica y `puedeReparar`—: ver la anotación de la tabla
+   > de §4. El orden respecto del commit 3 no cambia y sigue siendo lo único
+   > innegociable de §6.
 3. **`feat(gcal): resolver la conexión por clínica y escribir en las dos fuentes`** — F2 + F3 + F4 + F5 + F7 + F8 + F9 (gate) + F12. **Indivisible, y ahora por dos razones.** La semántica: si el alta escribe en el calendario de la clínica y la baja borra la del actor, se rompen las dos. Y la compilación, que es H3 y no estaba visto:
 
    > **H3 — la serie no compilaba.** El commit 3 traía la firma nueva de `conCalendarioSpinus` (F2) y sus **tres llamadores restantes** cambiaban en el 4: `appointments/route.ts:272`, `[id]/route.ts:315` y `[id]/route.ts:415`. `npm run build` habría fallado ahí mismo, con tres call sites pasando `(admin, userId, operacion)` a una función que espera `(conexion, admin, operacion, opciones)`. El Protocolo 7 lo prohíbe explícitamente: build verde después de cada cambio.
@@ -366,6 +474,19 @@ Vercel despliega un commit entero, así que «a medias» es: (a) parte de la ser
 - **5 sin 6:** nada; falta el cerrojo, no la función.
 - **Rodante (vieja + nueva a la vez):** el alta de una cita puede ir al calendario del actor (instancia vieja) o al de la clínica (nueva) según a quién le toque; con una sola conexión, hoy, son el mismo calendario y no se nota. Lo que sí queda es que la instancia vieja refresque tokens escribiendo sólo `google_tokens` → divergencia de `expires_at` → **el archivo B aborta**, que es el comportamiento correcto: no se corta la fuente vieja hasta que la doble escritura lleve un rato limpia. Se repara con el primer refresh que pase por el código nuevo.
 - **Migración A sin código:** inocuo por diseño (aditivo puro). **Código sin migración A:** no aplica, ya está en producción.
+
+> **⚠ ANOTACIÓN 2026-08-19 — el escenario «1-2 sin 3» ya no dice la verdad.**
+> Afirmaba que los bloques de «Ocupado» pasarían a resolverse por conexión propia,
+> «mismo resultado que hoy». Con `freebusy` eliminado (§12.6) **no hay bloques**:
+> la agenda pierde ese carril, y eso es un cambio visible, no un empate. Lo que
+> sigue intacto es la conclusión que importaba —**sin fuga**— y también que la
+> agenda deja de pintar eventos que ya pintaba como citas.
+>
+> El escenario **«3 sin 2» sigue siendo el peligroso por el mismo motivo, y con
+> uno más:** sin el commit 2, además de la resta con conjunto parcial, tampoco
+> existe el helper de capacidad, así que un médico invitado recibiría los eventos
+> escritos a mano del administrador. **El commit 2 sigue sin poder quedar detrás
+> del 3.**
 
 ---
 
@@ -404,6 +525,17 @@ Lo que importa de esto:
 
 **Qué se hace en esta rama:** nada de código. Se nombra, se acepta conscientemente y se registra aquí. **Qué queda pendiente y no es de esta rama:** decidir si el aviso de privacidad de la clínica tiene que decir que las citas viajan a una cuenta de Google de un tercero, y si el nombre del calendario pasa a ser el de la clínica. Lo primero es cumplimiento y no lo decide un plan técnico.
 
+> **⚠ ANOTACIÓN 2026-08-19 — hay una SEGUNDA superficie hacia fuera, y esta
+> sección no la contemplaba.** §9 razona sobre una sola: los pacientes de la
+> clínica concentrados en el Google personal de quien administra. La decisión de
+> mandar a cada médico invitado una invitación por correo (§12.4) abre otra: el
+> título del evento —con el **nombre completo** del paciente (§12.5)— viaja al
+> buzón personal de cada médico invitado, y de ahí a su propia agenda.
+>
+> El pendiente de cumplimiento que §9 dejaba abierto sigue abierto y ahora es más
+> ancho: hay que declarar las **dos** rutas de salida, no una. La redacción
+> concreta que se quiere está en §12.5. Sigue sin ser de esta rama.
+
 ---
 
 # 10. Los catorce hallazgos de la auditoría de este plan
@@ -435,6 +567,19 @@ Esta sección era «Lo que necesito de ti antes de escribir una línea» y eran 
 
 1. **Gate `canManageClinica` en el callback y en `/connect`, y el 23505 explícito — SÍ a las dos** (§2.5). El gate que cuenta es el del **callback**, que es donde se escribe el renglón; el de `/connect` va por higiene, para no llevar a nadie a una pantalla de Google que va a acabar en un error. Y el conflicto **no se degrada a `'personal'` en silencio**: sale por `?gcal_error=clinica_ya_conectada`. Con el puente, además, el callback ya no ve un 23505 crudo (§2.5).
 2. **Tocar `agenda/page.tsx` para dejar de pintar `data.events` — SÍ** (§0.4, F10). No hacerlo significa pintar cada cita dos veces.
+
+   > **⚠ ANOTACIÓN 2026-08-19 — esta decisión queda REVERTIDA en su mitad
+   > principal.** La agenda **sigue pintando** `data.events` para el administrador
+   > y la secretaria: ahí van los eventos que el administrador escribe a mano en el
+   > calendario de Spinus, y conservarlos es requisito de producto (§12.1). Para el
+   > médico invitado el array llega vacío y no hay nada que pintar.
+   >
+   > El motivo que sostenía el «SÍ» —«pintar cada cita dos veces»— **desaparece con
+   > la resta**: bajo la resta las citas no salen en el array, así que no hay
+   > duplicado que evitar. Lo que sí se mantiene de esta decisión es que
+   > `agenda/page.tsx` se toca, sólo que para **cambiar cómo** se pintan esos
+   > eventos (inertes, estilo propio, interruptor) en vez de para dejar de
+   > pintarlos.
 3. **Estampar `gcal_calendar_id` en el `after()` — SÍ** (§0.7, F7 y F8). En el alta **y también en el PUT** cuando el evento se cree ahí. Sin eso la rama siguiente nace sin datos.
 4. **§3.4, opción (a): leer `profiles` con cliente admin filtrado por `id` y `clinica_id` — SÍ.** La (b) paga un SELECT en cada alta de cita para el 0,1% de los casos en que hay que crear un calendario. Y la tercera vía que parecía obvia —cargar el nombre en el descriptor de conexión al resolverla— **no sirve**: `profiles_select` deja leer los perfiles de la clínica a admin y secretaria, pero a un médico invitado sólo el suyo, así que el descriptor saldría sin nombre justo para el usuario que más probablemente dispare la creación.
 5. **Desconectar gateado a `canManageClinica` — SÍ** (§0.6, F5). Y con él viene F12: el botón de `/perfil` tiene que gatearse igual, o la interfaz miente (H5).
@@ -451,3 +596,256 @@ Las dos cambian la forma de la rama, y las dos están aceptadas:
 ---
 
 **Con esto el plan queda cerrado.** No hay ninguna pregunta abierta: las seis de arriba y las tres de aquí están decididas, y los catorce hallazgos de §10 están absorbidos o resueltos. Lo siguiente es el código, en el orden de §6.
+
+> **⚠ ANOTACIÓN 2026-08-19 — el plan siguió cerrado, y el producto no se paró.**
+> Lo de arriba describe el estado del 2026-08-17 y sigue siendo cierto **de aquel
+> día**. Entre entonces y hoy se tomaron decisiones de producto que cambian qué
+> hay que construir, y **§12 las recoge**. No sigas al código sin leerla: manda
+> sobre el cuerpo de este plan allí donde se contradigan.
+
+---
+
+# 12. Decisiones de producto posteriores al cierre
+
+> **Añadida el 2026-08-19.** Las decisiones de aquí se tomaron DESPUÉS de cerrarse
+> el plan y **mandan sobre el cuerpo del documento** donde discrepen. Vivían sólo
+> en conversación, que es como se pierden: un agente que arrancara en blanco
+> leyendo §0-§11 construiría otra cosa.
+>
+> El cuerpo del plan **no se ha reescrito**. Las secciones afectadas llevan su
+> anotación en el sitio y apuntan aquí. Lo que decidieron en su momento era
+> correcto; lo que cambió es el producto, no su razonamiento.
+
+## 12.1 Los eventos escritos a mano — LA FUNCIÓN QUE CASI SE PIERDE
+
+**El administrador escribe eventos a mano dentro del calendario secundario de
+Spinus, desde Google Calendar, y esos eventos SE SIGUEN VIENDO en la agenda de
+Spinus. No se elimina, no se aplaza y no se negocia.**
+
+Es la decisión que más cerca estuvo de perderse por deducción técnica, así que va
+primera y con el cuadro entero:
+
+| | |
+|---|---|
+| **Quién los escribe** | El administrador, desde Google Calendar (web o móvil). Es el único con acceso a esa cuenta de Google |
+| **Quién los ve en Spinus** | Administrador y secretaria. Nadie más |
+| **Médico invitado** | **NO los ve.** Por esta vía recibe vacío. Sus propias citas las sigue viendo por `appointments` bajo RLS, y eso no cambia |
+| **Cómo se ven** | Con su título tal cual, e **INERTES**: no se mueven, no se borran desde Spinus, sin paciente ni médico asignado |
+| **En la base de datos** | **No existen.** Ni una fila en `appointments` |
+| **Dónde aparecen** | **SÓLO en la agenda. NUNCA en la dashboard** |
+| **Estilo** | Propio, apagado y de fondo, para que no compitan visualmente con las citas reales |
+| **Control** | Interruptor en la agenda para mostrarlos u ocultarlos |
+| **La raya que no se cruza** | En el momento en que alguien quiera ligarles un paciente se entra en el «camino de vuelta», que está **fuera de alcance** (§12.2) |
+
+### ⛔ Opción descartada: retirar el array `events` del payload
+
+**Se consideró y SE DESCARTA EXPRESAMENTE.** Queda escrita como opción muerta —no
+sólo como decisión tomada— porque el razonamiento que lleva a ella es limpio,
+reaparece solo, y **es exactamente cómo se destruiría esta función**.
+
+El razonamiento tentador dice: si la ruta interseca, el array es 100% duplicado de
+`/api/appointments`; si además la agenda deja de pintarlo (F10), no lo consume
+nadie; luego retirarlo del payload para todos los roles satisface el vacío del
+invitado sin un solo chequeo de rol, y un rol futuro hereda el comportamiento
+correcto por construcción. Todo eso es cierto **bajo la intersección**.
+
+**Y es exactamente el error.** El array sólo parece redundante porque la
+intersección lo había vaciado de lo único que no era duplicado: los eventos
+escritos a mano. Retirarlo mata la función de §12.1 sin que nadie lo note en una
+revisión de código, porque no hay ningún test que pinte un calendario de Google.
+
+> **A quien vuelva a proponerlo:** el array `events` **no** es redundante. Bajo la
+> resta acotada por capacidad contiene justo lo que ninguna otra fuente tiene —lo
+> que el administrador escribió a mano en Google— y es el único camino por el que
+> eso llega a Spinus.
+
+### El mecanismo que sí cumple
+
+La fuga original **no venía de restar**: venía de restar contra un conjunto RLS
+parcial. Un médico invitado sólo lee sus citas, así que la resta le dejaba las de
+sus colegas como eventos crudos, con el nombre del paciente en el título.
+
+Administrador y secretaria leen **todas** las citas de su clínica
+(`appointments_select`, §12.11), así que para ellos la resta deja exactamente los
+eventos escritos a mano. Sin fuga posible. El invitado no entra en esta ruta.
+
+**Resta + capacidad, no intersección.** El vacío del invitado sale del helper de
+lista blanca de §12.11, no de un `if` por rol en la ruta.
+
+## 12.2 El «camino de vuelta» NO se construye
+
+Que un evento nacido en Google se convierta en cita de Spinus **queda fuera de
+alcance**. Caen con él, y no se echan de menos:
+
+- los renglones sombra;
+- ligar pacientes desde eventos de Google;
+- el alta rápida desde un evento;
+- la unión en la dashboard;
+- la edición bidireccional de horarios, **con todo el aparato de `gcal_etag` e
+  `If-Match`**.
+
+El flujo es de un solo sentido: Spinus escribe en Google, y de Google sólo se
+**lee** para pintar (§12.1).
+
+## 12.3 Quién conecta Google
+
+**Sólo el administrador. Una conexión por clínica.** Ni la secretaria ni los
+médicos invitados conectan nada. Coincide con §2.5 y con la decisión 1 de §11, que
+ya gateaban el callback y `/connect` con `canManageClinica`: esto lo confirma, no
+lo cambia.
+
+## 12.4 Médicos invitados: invitación por correo
+
+Los médicos invitados **no conectan Google**. En su lugar, cada cita les manda una
+invitación por correo (`attendees` + `sendUpdates`) para que les caiga en su propia
+agenda, con **tres interruptores**:
+
+1. el invitado **no puede modificar** el evento;
+2. **no puede reenviar** la invitación;
+3. **los invitados no se ven entre sí**.
+
+Puede rechazarla: eso la quita de su calendario y **no altera** el de la clínica.
+
+> **⚠ ASUMIDO Y NO PROBADO.** Que el scope `calendar.app.created` autorice invitar
+> asistentes externos y disparar el correo **no está verificado**. Es
+> comportamiento de Google, no del repositorio, y no se puede comprobar leyendo
+> código. **Hay que probarlo con un evento real antes de construir nada encima.**
+> Si resultara que no lo autoriza, esta decisión entera se queda sin suelo.
+
+Nada de esto figura en §4: es alcance nuevo, no cubierto por ninguna fila F1-F13.
+
+## 12.5 El título lleva el nombre completo del paciente
+
+**Decidido y no se discute.** El evento sigue llevando `Cita médica: <nombre>
+<apellidos>` (`tituloParaGoogle`, `src/lib/appointments.ts`).
+
+**Pendiente, fuera de esta rama:** actualizar el aviso de privacidad para declarar
+que el nombre del paciente se comparte con el médico al que se le agenda la cita,
+como parte del proceso de consulta, **sin información clínica ni sensible**. Ver la
+anotación de §9: son dos rutas de salida que declarar, no una.
+
+## 12.6 `freebusy` se elimina POR COMPLETO
+
+Desaparecen el scope `calendar.events.freebusy` y los bloques anónimos de
+«Ocupado». Deja sin efecto §0.3, el ítem correspondiente de F6, la cláusula de F10
+y el escenario «1-2 sin 3» de §7 (todos anotados en su sitio).
+
+**Inventario verificado el 2026-08-19.** El que circulaba estaba casi completo;
+esto es lo que hay, con el hueco y las dos banderas que le faltaban:
+
+| Archivo | Qué |
+|---|---|
+| `src/app/api/google/connect/route.ts` | el scope `:37` y su comentario `:34` |
+| `src/app/api/google/callback/route.ts` | el comentario `:56-58` |
+| `src/app/api/google/events/route.ts` | tipo `BloqueOcupado` `:11-12`; `consultarOcupado` `:54-94`; comentario de diseño `:43-53`; memoización `ocupadoPromesa` `:115-147`; campo `ocupado` `:175` |
+| `src/lib/gcal.ts` | la mención en el docstring `:88` (cosmética) |
+| `src/app/(app)/agenda/page.tsx` | `GoogleEventCard` prop `busy` y su rama de estilo; `renderEventContent` `:1178-1181`; en `gcalSource`, tipo local `BloqueOcupado` `:1399`, mapeo de `data.ocupado` `:1422`, título `'🔒 Ocupado'` `:1425` |
+| **`src/app/(app)/agenda/page.tsx` — FALTABA** | **`MonthChip` `:1128-1170`**, el camino de la Vista Mes: lee `isGcalBusy` en `:1133` (`isGcalSinCita`) y limpia el `🔒` en `:1137`. Es el hermano del camino de Semana/Día |
+
+**Dos hallazgos de propina, ninguno es de `freebusy`:**
+
+- **`isGoogleEvent` (`agenda/page.tsx:1797`) es una bandera MUERTA.** Nadie la
+  produce; sólo se escribe `isGcalBlock`. Se puede retirar, pero es limpieza
+  aparte y no entra por arrastre.
+- **`/api/google/events` tiene un único consumidor en todo el repo:**
+  `gcalSource:1391`. `/perfil` usa `/api/google/calendar` y su comentario `:214`
+  explica por qué.
+
+**Lo que NO muere:** `gcalSource`, `GoogleEventCard` ni el carril de eventos de
+Google. Ver la anotación de la tabla de §4.
+
+## 12.7 Permiso de escritura en la agenda, por usuario
+
+Lo administra el administrador desde el panel. **Por defecto ENCENDIDO para la
+secretaria y APAGADO para los médicos invitados.** Apagado significa: no crea, no
+mueve, no cancela y no borra **nada, ni siquiera lo suyo**.
+
+**Tres condiciones, y las tres son de seguridad, no de diseño:**
+
+1. **La regla va en la POLICY de `appointments`, no sólo en la ruta.** Si vive
+   sólo en el endpoint, se escribe directo por PostgREST y el permiso es
+   decorativo.
+2. **La columna nueva entra en el trigger que ya protege `role`, `clinica_id` y
+   `es_admin_de_clinica` en `profiles`**
+   (`20260602_sec_proteger_columnas_sensibles_profiles.sql`). Sin eso, un médico
+   invitado se concede el permiso a sí mismo con un `UPDATE` — la policy
+   `profiles_update` restringe la fila, no las columnas.
+3. **El administrador no debe poder quitárselo a sí mismo.**
+
+Necesita migración: ver la anotación de §0.10 y el punto abierto de §12.12.
+
+## 12.8 Eventos genéricos sin paciente
+
+Se quiere poder crear en la agenda **eventos genéricos sin paciente ligado**:
+cirugía, reunión, bloqueo de horario. **Si un médico quiere bloquear un espacio por
+un compromiso, lo hace en Spinus, no en Google.**
+
+Ojo con no confundirlos con los de §12.1: estos **sí** son filas de
+`appointments`, nacen en Spinus y se sincronizan a Google como cualquier cita. Los
+de §12.1 nacen en Google y no existen en la base.
+
+## 12.9 Compartir el calendario en lectura
+
+El calendario de la clínica **se puede compartir en modo lectura desde Google, a
+mano**, eligiendo el papel `reader`. Es **opcional y no lo hace Spinus**:
+automatizarlo pediría el scope sensible `calendar.acls`, que es justo lo que toda
+esta arquitectura evita. Conecta con §9: el ACL de ese calendario vive en Google,
+fuera de la RLS y fuera de `audit_log`.
+
+## 12.10 Avisos al usuario
+
+Tres, y los tres sobre lo mismo:
+
+1. **Un modal al conectar Google**, para quien conecta.
+2. **Una línea fija** junto al estado de la conexión en el perfil.
+3. **Un aviso contextual** la primera vez que a esa persona le aparece un evento
+   nacido en Google en su agenda, con casilla de **«no mostrar más»**.
+
+**El texto debe decir** que esos eventos no tienen paciente ligado, que **no se
+puede iniciar consulta** desde ellos y que **NO aparecen en la dashboard, sólo en
+la agenda**.
+
+> **PENDIENTE DE ZANJAR:** dónde se guarda el «no mostrar más» por usuario. Hoy no
+> hay sitio, y si va en la base es columna y por tanto migración. Ver §12.12.
+
+## 12.11 Hechos verificados el 2026-08-19
+
+- **El puente está APLICADO y verificado en producción.**
+  `20260818_gcal_puente_secretos.sql`; comprobado con `SELECT proname FROM pg_proc
+  WHERE proname = 'leer_conexion_google_con_secretos'`, que devuelve una fila. La
+  cabecera del archivo ya está corregida.
+- **La app está EN PRODUCCIÓN en Google Cloud, tipo Usuarios externos, y el tope
+  de 100 usuarios NO aplica** porque no se piden scopes sensibles. **Dos avisos que
+  conviene no perder:** ese contador **no se puede restablecer nunca**, así que
+  pasaría a ser una barrera real el día que alguien añada un scope sensible; y
+  «Volver al modo de prueba» está **a un clic** en la consola, lo que activaría el
+  tope de golpe.
+- **`appointments_select`** permite a la secretaria y al administrador leer
+  **todas** las citas de su clínica; al médico invitado, sólo las suyas
+  (`medico_id = auth.uid()`), y **las citas con `medico_id` NULL le son
+  invisibles** (`20260530_etapa5h_paso3_policies_appointments.sql:81-94`).
+- **`clinica_conexiones_google_select` filtra sólo por `clinica_id`, sin filtro por
+  usuario** (`20260817_gcal_conexion_clinica_a_esquema.sql:338-342`). **Un médico
+  invitado resuelve la conexión de la clínica igual que el administrador.**
+
+> **Consecuencia directa, y hay que tenerla escrita porque la intuición dice lo
+> contrario:** el vacío del médico invitado en `/api/google/events` **NO puede
+> derivarse de «no tiene conexión que resolver». Esa premisa es FALSA.** Necesita
+> un **helper de capacidad explícito en `src/lib/permissions.ts`**, construido
+> como **LISTA BLANCA** —administrador **o** secretaria—, **nunca** como negación
+> de `isMedicoInvitado`: así un rol futuro cae en vacío por defecto, que es el
+> fallo seguro. El nombre del helper no está fijado.
+
+## 12.12 Lo que queda abierto
+
+Ninguno de estos está decidido. **No los resuelva quien lea; pregúntelos.**
+
+1. **¿A qué rama pertenecen §12.7 (permiso de escritura) y el «no mostrar más» de
+   §12.10?** Las dos piden migración, y §0.10 afirma que esta rama no lleva
+   ninguna. Si son de ésta, §0.10 deja de valer.
+2. **El techo de `maxResults: 100` sin paginación** (`events/route.ts:144`). Con la
+   resta deja de ser inocuo: puede tragarse en silencio un evento escrito a mano.
+   Sin decidir si se arregla en el commit 2 o después. Ver la anotación de §0.9.
+3. **La verificación de `attendees` bajo `calendar.app.created`** (§12.4). Bloquea
+   toda esa decisión y sólo se resuelve con una prueba real contra Google.
+4. **Qué se hace con `isGoogleEvent`**, la bandera muerta de `agenda/page.tsx:1797`.
