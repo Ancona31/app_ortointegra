@@ -63,13 +63,43 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
   )
 }
 
+/**
+ * Qué se le dice al médico por cada `?gcal_error=` con el que puede volver aquí.
+ *
+ * Las claves son los literales que producen `/api/google/connect` (el gate de
+ * rol) y `/api/google/callback` (el consentimiento y los cinco errores con
+ * nombre del alta). Un literal sin entrada aquí no pinta nada, así que si se
+ * añade un redirect nuevo hay que añadirlo también en este mapa.
+ */
+const AVISOS_GCAL: Record<string, string> = {
+  permiso_calendario:
+    'No se pudo conectar: en la pantalla de Google quedó sin marcar el permiso para crear y '
+    + 'administrar su propio calendario. Spinus guarda tus citas en un calendario aparte que él '
+    + 'mismo crea, así que sin ese permiso no puede sincronizar nada. Vuelve a intentarlo y deja '
+    + 'la casilla marcada.',
+  solo_admin:
+    'Sólo quien administra la clínica puede conectar Google Calendar. La conexión es una por '
+    + 'clínica y da servicio a todo el equipo, así que no hace falta que la conectes tú: pídeselo '
+    + 'a quien administre la clínica y tus citas se sincronizarán igual.',
+  clinica_ya_conectada:
+    'Esta clínica ya tiene otra cuenta de Google conectada. Sólo puede haber una, así que para '
+    + 'usar ésta hay que desconectar primero la anterior desde esta misma página.',
+  rol_no_promovido:
+    'Esta cuenta de Google ya estaba enlazada a Spinus de otra forma y reconectar no la convierte '
+    + 'en la cuenta de la clínica. Desconéctala primero y vuelve a conectarla.',
+  alta_fallida:
+    'No se pudo guardar la conexión con Google. No ha quedado nada a medias: vuelve a intentarlo, '
+    + 'y si se repite, avísanos.',
+}
+
 export default function PerfilPage() {
   const { profile, loading: loadingProfile } = useProfile()
   const router = useRouter()
-  // El callback de Google redirige aquí con ?gcal_error=permiso_calendario
-  // cuando el médico desmarcó la casilla de crear calendarios y aun así
-  // continuó: quedaría "conectado" sin poder crear el calendario de Spinus.
-  const gcalPermisoFaltante = useSearchParams().get('gcal_error') === 'permiso_calendario'
+  // Los caminos de conexión redirigen aquí con ?gcal_error=... Sin una entrada
+  // en este mapa el redirect es un callejón sin salida: el médico vuelve al
+  // perfil, no ve nada y no sabe qué pasó.
+  const gcalError = useSearchParams().get('gcal_error')
+  const gcalAviso = gcalError ? AVISOS_GCAL[gcalError] ?? null : null
   const toast = useToast()
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -349,10 +379,26 @@ export default function PerfilPage() {
 
   async function desconectarGcal() {
     setDesconectandoGcal(true)
-    await fetch('/api/google/disconnect', { method: 'DELETE' })
-    setGcalEstado('sin_token')
-    setGcalNombre(null)
-    setDesconectandoGcal(false)
+    try {
+      // MIRAR LA RESPUESTA NO ES OPCIONAL. Esto ponía 'sin_token' pasara lo que
+      // pasara: con el DELETE ya gateado, quien no administra recibiría un 403
+      // y la interfaz le diría "desconectado" sin estarlo (H5). El botón de
+      // abajo ya no se le enseña, pero la mentira seguiría estando a un fetch
+      // de distancia.
+      const res = await fetch('/api/google/disconnect', { method: 'DELETE' })
+      if (!res.ok) {
+        toast.error(res.status === 403
+          ? 'Sólo quien administra la clínica puede desconectar Google.'
+          : 'No se pudo desconectar Google. Inténtalo de nuevo.')
+        return
+      }
+      setGcalEstado('sin_token')
+      setGcalNombre(null)
+    } catch {
+      toast.error('No se pudo desconectar Google. Inténtalo de nuevo.')
+    } finally {
+      setDesconectandoGcal(false)
+    }
   }
 
   async function recrearCalendarioGcal() {
@@ -717,15 +763,21 @@ export default function PerfilPage() {
                         Recrear calendario
                       </button>
                     )}
-                    <button
-                      type="button"
-                      onClick={desconectarGcal}
-                      disabled={desconectandoGcal || recreandoGcal}
-                      className="flex items-center gap-1 text-[11px] text-[#86868b] hover:text-red-500 transition-colors disabled:opacity-40"
-                    >
-                      {desconectandoGcal ? <Loader2 size={12} className="animate-spin" /> : <LogOut size={12} />}
-                      Desconectar
-                    </button>
+                    {/* Desconectar borra la conexión de la CLÍNICA ENTERA, así
+                        que va detrás del mismo gate que "Recrear calendario".
+                        El servidor lo gatea también: esto es la interfaz
+                        acompañando a la regla, no la regla. */}
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={desconectarGcal}
+                        disabled={desconectandoGcal || recreandoGcal}
+                        className="flex items-center gap-1 text-[11px] text-[#86868b] hover:text-red-500 transition-colors disabled:opacity-40"
+                      >
+                        {desconectandoGcal ? <Loader2 size={12} className="animate-spin" /> : <LogOut size={12} />}
+                        Desconectar
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <a
@@ -755,12 +807,9 @@ export default function PerfilPage() {
               </p>
             )}
 
-            {gcalPermisoFaltante && (
+            {gcalAviso && (
               <p className="mt-3 text-[11px] leading-relaxed text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
-                No se pudo conectar: en la pantalla de Google quedó sin marcar el permiso
-                para <strong>crear y administrar su propio calendario</strong>. Spinus guarda
-                tus citas en un calendario aparte que él mismo crea, así que sin ese permiso
-                no puede sincronizar nada. Vuelve a intentarlo y deja la casilla marcada.
+                {gcalAviso}
               </p>
             )}
           </div>

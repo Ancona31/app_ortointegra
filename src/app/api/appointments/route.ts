@@ -2,6 +2,8 @@ import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { conCalendarioSpinus, registrarFalloGCal, GCAL_TIMEZONE } from '@/lib/gcal'
+import { resolverConexionClinica } from '@/lib/gcalConexion'
+import { canManageClinica } from '@/lib/permissions'
 import { APPOINTMENT_SELECT, eventoParaGoogle, type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
 
 async function getProfile(supabase: Awaited<ReturnType<typeof createClient>>) {
@@ -247,90 +249,125 @@ export async function POST(req: NextRequest) {
 
     // Google Calendar sync en background con el cliente admin.
     //
-    // Este comentario decía "porque after() no tiene contexto de cookies" y era
-    // FALSO: `after()` conserva el contexto de la petición y la RLS funciona
-    // ahí con normalidad (comprobado en producción el 2026-08-16). El motivo
-    // real es a quién se le lee el token: `conCalendarioSpinus` recibe el id de
-    // quien ejecuta la acción y la RLS de `google_tokens` sólo deja leer
-    // `user_id = auth.uid()`, así que el cliente admin es el prerrequisito para
-    // leerle el token a otro usuario. Ver el comentario largo del PUT en
-    // appointments/[id]/route.ts.
+    // NO es por las cookies: `after()` conserva el contexto de la petición y la
+    // RLS funciona ahí con normalidad (comprobado en producción el 2026-08-16).
+    // El cliente admin está aquí porque los tokens de la conexión sólo se
+    // alcanzan por el puente, que exige service role.
+    //
+    // LO QUE ARREGLA ESTE COMMIT: antes se le buscaba token a QUIEN EJECUTA la
+    // acción. La secretaria no tenía fila, no se encontraba nada, y sus citas
+    // no llegaban a Google en silencio. Ahora la conexión se resuelve por
+    // CLÍNICA y quién agende deja de importar.
+    //
+    // LAS TRES COSAS SE CAPTURAN ANTES DE RESPONDER, con el cliente de sesión,
+    // y viajan por closure (plan §1): dentro de `after()` no se resuelve nada.
+    const conexion = await resolverConexionClinica(supabase, profile.clinica_id)
+    // Modo estricto para quien no administra: si el calendario de la clínica no
+    // existe todavía, la secretaria NO lo crea —eso escribiría en la cuenta de
+    // Google del administrador— y la cita queda 'pending' hasta que él entre.
+    const puedeReparar = canManageClinica(profile)
     const admin = createAdminClient()
     // El titulo del evento sale del paciente ligado; si la cita no tiene
     // paciente, del titulo libre de la cita.
     const pacienteCita: PacienteEnCita = apt.pacientes ?? null
     const clinicaCita:  ClinicaEnCita  = apt.clinicas  ?? null
-    after(async () => {
-      let gcal_sync_status: 'synced' | 'pending' | 'failed' = 'pending'
-      let google_event_id: string | null = null
-      let calendarIdUsado: string | null = null
+    // Sin conexión de clínica no se programa NADA. Antes se entraba igual y se
+    // salía con `gcal_sync_status = 'synced'` y sin evento —una mentira
+    // benigna—; marcarlo 'failed' en su lugar llenaría de citas fallidas la
+    // agenda de una clínica que simplemente no usa Google. No hay nada que
+    // sincronizar, así que la columna se queda como está y la respuesta ya
+    // dice 'disconnected'.
+    if (conexion) {
+      after(async () => {
+        let gcal_sync_status: 'synced' | 'pending' | 'failed' = 'pending'
+        let google_event_id: string | null = null
+        let calendarIdUsado: string | null = null
 
-      try {
-        // La descripción lleva un formato fijo (clínica y paciente) y NADA
-        // clínico: ni notes, ni motivo de consulta, ni diagnóstico.
-        const { summary, description, reminders } = eventoParaGoogle(pacienteCita, clinicaCita, title)
-        const creado = await conCalendarioSpinus(admin, profile.userId, (calendar, calendarId) => {
-          calendarIdUsado = calendarId
-          return calendar.events.insert({
-            calendarId,
-            requestBody: {
-              summary,
-              description,
-              // Sólo al crear: si el médico le cambia el recordatorio a mano en
-              // Google, ninguna edición posterior desde Spinus se lo reimpone.
-              reminders,
-              start: { dateTime: start_time, timeZone: GCAL_TIMEZONE },
-              end:   { dateTime: end_time,   timeZone: GCAL_TIMEZONE },
-            },
-          })
-        })
-        // creado === null → el médico no tiene Google conectado: nada que sincronizar.
-        google_event_id  = creado?.data.id ?? null
-        gcal_sync_status = 'synced'
-      } catch (gcalErr) {
-        // Corre dentro de after(): nadie ve el fallo del lado del cliente y la
-        // cita se queda en 'failed' sin más pista que esta línea.
-        registrarFalloGCal(
-          { operacion: 'events.insert (alta de cita)', userId: profile.userId, calendarId: calendarIdUsado },
-          gcalErr,
-        )
-        gcal_sync_status = 'failed'
-      }
+        try {
+          // La descripción lleva un formato fijo (clínica y paciente) y NADA
+          // clínico: ni notes, ni motivo de consulta, ni diagnóstico.
+          const { summary, description, reminders } = eventoParaGoogle(pacienteCita, clinicaCita, title)
+          const creado = await conCalendarioSpinus(conexion, admin, (calendar, calendarId) => {
+            calendarIdUsado = calendarId
+            return calendar.events.insert({
+              calendarId,
+              requestBody: {
+                summary,
+                description,
+                // Sólo al crear: si el médico le cambia el recordatorio a mano en
+                // Google, ninguna edición posterior desde Spinus se lo reimpone.
+                reminders,
+                start: { dateTime: start_time, timeZone: GCAL_TIMEZONE },
+                end:   { dateTime: end_time,   timeZone: GCAL_TIMEZONE },
+              },
+            })
+          }, { puedeReparar, actorId: profile.userId })
+          // EL 'synced' DEJA DE SER OPTIMISTA (H4). Antes se marcaba sincronizada
+          // toda cita que no hubiera lanzado, incluidas las que salieron sin id
+          // de evento: `creado` en null porque el modo estricto se negó a crear
+          // el calendario, o porque Google contestó sin `id`. Esas citas se
+          // quedaban en 'synced' sin nada en Google y nadie volvía a mirarlas.
+          google_event_id  = creado?.data.id ?? null
+          if (google_event_id) {
+            gcal_sync_status = 'synced'
+          } else {
+            gcal_sync_status = 'failed'
+            registrarFalloGCal(
+              { operacion: 'events.insert (alta de cita, sin id de evento)', userId: profile.userId, conexionId: conexion.id, calendarId: calendarIdUsado },
+              new Error(creado === null
+                ? 'no se resolvió calendario de clínica (¿modo estricto?)'
+                : 'Google respondió sin id de evento'),
+            )
+          }
+        } catch (gcalErr) {
+          // Corre dentro de after(): nadie ve el fallo del lado del cliente y la
+          // cita se queda en 'failed' sin más pista que esta línea.
+          registrarFalloGCal(
+            { operacion: 'events.insert (alta de cita)', userId: profile.userId, conexionId: conexion.id, calendarId: calendarIdUsado },
+            gcalErr,
+          )
+          gcal_sync_status = 'failed'
+        }
 
-      // `clinica_id` no es decorativo aunque `id` sea la clave primaria: con el
-      // cliente admin la RLS no acota nada. Mismo criterio que el `after()` del
-      // PUT en appointments/[id]/route.ts.
-      const { error: errEstado } = await admin
-        .from('appointments')
-        .update({ google_event_id, gcal_sync_status })
-        .eq('id', apt.id)
-        .eq('clinica_id', profile.clinica_id)
-      if (errEstado) {
-        registrarFalloGCal(
-          { operacion: 'appointments.update(gcal_sync_status)', userId: profile.userId, calendarId: calendarIdUsado },
-          errEstado,
-        )
-      }
-    })
+        // `clinica_id` no es decorativo aunque `id` sea la clave primaria: con el
+        // cliente admin la RLS no acota nada. Mismo criterio que el `after()` del
+        // PUT en appointments/[id]/route.ts.
+        //
+        // `gcal_calendar_id` se estampa aquí y es la razón de que la rama
+        // siguiente pueda arreglar el ámbito de `desvincularCitas`: sin saber en
+        // qué calendario vive cada evento, el barrido no puede dejar de acotar
+        // por `medico_id` (plan §0.7).
+        const { error: errEstado } = await admin
+          .from('appointments')
+          .update({ google_event_id, gcal_sync_status, gcal_calendar_id: calendarIdUsado })
+          .eq('id', apt.id)
+          .eq('clinica_id', profile.clinica_id)
+        if (errEstado) {
+          registrarFalloGCal(
+            { operacion: 'appointments.update(gcal_sync_status)', userId: profile.userId, conexionId: conexion.id, calendarId: calendarIdUsado },
+            errEstado,
+          )
+        }
+      })
+    }
 
     // La escritura a Google corre en el after() de arriba, o sea DESPUÉS de
     // responder: aquí nunca se puede decir "sincronizado". Lo que sí se puede
     // decir es si hay con qué sincronizar, y son dos cosas muy distintas de
     // cara al médico: 'pending' es el caso normal y no pide nada de él;
-    // 'disconnected' sí, tiene que ir a conectar Google.
+    // 'disconnected' sí, alguien tiene que ir a conectar Google.
     //
-    // El `calendar_id` no entra en la cuenta a propósito: si falta,
-    // `conCalendarioSpinus` lo crea dentro del mismo after(). Sin fila en
-    // `google_tokens` no hay nada que pueda crearlo.
-    const { data: tokenGoogle } = await supabase
-      .from('google_tokens')
-      .select('user_id')
-      .eq('user_id', profile.userId)
-      .maybeSingle()
-
+    // El veredicto sale de la conexión YA RESUELTA arriba, sin una segunda
+    // consulta, y la pregunta es por CLÍNICA: antes miraba si quien agendaba
+    // tenía fila propia, así que a la secretaria le contestaba 'disconnected'
+    // con la clínica perfectamente conectada.
+    //
+    // El `calendar_id` no entra en la cuenta a propósito: si falta y quien
+    // agenda administra la clínica, `conCalendarioSpinus` lo crea en el mismo
+    // after().
     return NextResponse.json({
       appointment: apt,
-      gcalSync:    tokenGoogle ? 'pending' : 'disconnected',
+      gcalSync:    conexion ? 'pending' : 'disconnected',
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Error interno'

@@ -17,20 +17,22 @@
  */
 import { google, type calendar_v3 } from 'googleapis'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { decrypt, encrypt } from '@/lib/encrypt'
+import { decrypt } from '@/lib/encrypt'
 import { logger } from '@/lib/logger'
 import { componerNombreMedicoCompleto, type CamposNombre } from '@/lib/nombreMedico'
+import {
+  leerConexionConSecretos,
+  guardarSecretos,
+  guardarCalendarIdSiEsperado,
+  releerCalendarId,
+  marcarRevocada,
+  type ConexionGoogle,
+} from '@/lib/gcalConexion'
 
 export const GCAL_TIMEZONE = 'America/Mexico_City'
 
 export type GCalCliente = calendar_v3.Calendar
 
-interface FilaTokens {
-  access_token:  string | null
-  refresh_token: string | null
-  expires_at:    number | null
-  calendar_id:   string | null
-}
 
 /**
  * Estado de la conexión con Google, tal como lo consumen la agenda y el perfil.
@@ -63,10 +65,10 @@ export function esNotFound(err: unknown): boolean {
  * `invalid_grant` al refrescar cuando el médico revocó el acceso desde su
  * cuenta o cuando el refresh token caducó.
  *
- * Importa separarlo de un fallo cualquiera: hay fila en `google_tokens`, pero
- * está muerta. Cuenta como 'sin_token' y no como 'error_google', porque esto SÍ
- * se arregla volviendo a conectar y tratarlo como fallo pasajero deja al médico
- * esperando para siempre a que Google "se recupere".
+ * Importa separarlo de un fallo cualquiera: la conexión de la clínica existe,
+ * pero está muerta. Cuenta como 'sin_token' y no como 'error_google', porque
+ * esto SÍ se arregla volviendo a conectar y tratarlo como fallo pasajero deja
+ * al médico esperando para siempre a que Google "se recupere".
  */
 export function esCredencialInvalida(err: unknown): boolean {
   if (typeof err !== 'object' || err === null) return false
@@ -87,7 +89,18 @@ export function esCredencialInvalida(err: unknown): boolean {
 export interface ContextoGCal {
   /** Qué se intentaba: 'calendars.insert', 'events.patch', 'events.list'… */
   operacion:   string
+  /**
+   * QUIÉN EJECUTA LA ACCIÓN, y no el dueño de la cuenta de Google. Los dos eran
+   * la misma persona mientras la conexión iba por usuario, y desde la conexión
+   * por clínica ya no lo son: la secretaria mueve una cita y el calendario es
+   * del administrador. Poner aquí el dueño de la cuenta haría que todos los
+   * logs dijeran «el administrador» y se perdería quién disparó cada cosa —que
+   * es justo lo que hace falta para diagnosticar H2—. El dueño viaja aparte, en
+   * `conexionId`.
+   */
   userId:      string
+  /** La conexión de clínica implicada. Identifica de quién es el calendario. */
+  conexionId?: string | null
   calendarId?: string | null
   eventId?:    string | null
 }
@@ -137,6 +150,7 @@ export function registrarFalloGCal(ctx: ContextoGCal, err: unknown): void {
   console.error('[GCal] fallo ' + JSON.stringify({
     operacion:  ctx.operacion,
     userId:     ctx.userId,
+    ...(ctx.conexionId ? { conexionId: ctx.conexionId } : {}),
     calendarId: ctx.calendarId ?? null,
     ...(ctx.eventId ? { eventId: ctx.eventId } : {}),
     status,
@@ -146,21 +160,58 @@ export function registrarFalloGCal(ctx: ContextoGCal, err: unknown): void {
 }
 
 /**
- * Abre sesión con Google para un médico: refresca el token si expiró y
- * devuelve el cliente de Calendar junto al calendario que tenga registrado
- * (null si todavía no se le ha creado uno).
- * Devuelve null si el médico no tiene Google conectado.
+ * Abre sesión con Google para LA CONEXIÓN DE LA CLÍNICA: refresca el token si
+ * expiró y devuelve el cliente de Calendar junto al calendario registrado (null
+ * si todavía no se ha creado uno).
+ *
+ * ── EL CAMBIO QUE ARREGLA EL BUG DE LA RAMA ─────────────────────────────────
+ * Hasta aquí esta función leía `google_tokens` por el `user_id` de QUIEN
+ * EJECUTA la acción. La secretaria no tiene fila, no se encontraba nada y el
+ * código seguía de largo devolviendo null: sus citas no llegaban a Google y
+ * nadie se enteraba. Ahora recibe la conexión ya resuelta por clínica y los
+ * tokens salen del puente, así que quién ejecute deja de importar.
+ *
+ * ── POR QUÉ YA NO DEVUELVE null ANTE UN PROBLEMA DE SECRETOS (plan §3.1) ────
+ * Antes, un fallo de la consulta se descartaba y se contestaba null, que aguas
+ * arriba se lee como «esta clínica nunca conectó». Con el puente esa misma rama
+ * se tragaría un PGRST202 (la función fuera de la caché de PostgREST), un 42501
+ * (falta el GRANT) o una conexión de otra clínica. Las TRES respuestas anómalas
+ * del RPC —error, cero filas, y `tieneSecretos = false`— se registran y se
+ * LANZAN. Aquí ya no se devuelve null nunca: «no hay conexión» lo decide el
+ * resolvedor bajo RLS antes de llegar a esta función.
  */
 async function abrirSesionGoogle(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<{ calendar: GCalCliente; calendarId: string | null } | null> {
-  const { data: tokenData } = await supabase
-    .from('google_tokens')
-    .select('access_token, refresh_token, expires_at, calendar_id')
-    .eq('user_id', userId)
-    .maybeSingle<FilaTokens>()
-  if (!tokenData) return null
+  conexion: ConexionGoogle,
+): Promise<{ calendar: GCalCliente; calendarId: string | null }> {
+  const { fila, error } = await leerConexionConSecretos({
+    clinicaId:  conexion.clinicaId,
+    conexionId: conexion.id,
+  })
+
+  const ctx = { userId: conexion.userId, conexionId: conexion.id, calendarId: conexion.calendarId }
+  if (error) {
+    registrarFalloGCal({ ...ctx, operacion: 'leer_conexion_google_con_secretos (error)' }, new Error(error))
+    throw new Error(`abrirSesionGoogle: el puente falló — ${error}`)
+  }
+  if (!fila) {
+    // La conexión existía al resolverla y ya no está: la borraron entre medias,
+    // o el filtro por clínica del RPC la descartó. No es «nunca conectó».
+    registrarFalloGCal(
+      { ...ctx, operacion: 'leer_conexion_google_con_secretos (cero filas)' },
+      new Error('la conexión resuelta no existe para esta clínica'),
+    )
+    throw new Error('abrirSesionGoogle: la conexión no existe para esta clínica')
+  }
+  if (!fila.tieneSecretos) {
+    // Metadata sin tokens. Es una ANOMALÍA, no un «desconectado»: el alta los
+    // escribe en la misma transacción que la fila, así que esto no debería
+    // poder ocurrir.
+    registrarFalloGCal(
+      { ...ctx, operacion: 'leer_conexion_google_con_secretos (tiene_secretos = false)' },
+      new Error('hay conexión y no hay tokens'),
+    )
+    throw new Error('abrirSesionGoogle: la conexión no tiene tokens')
+  }
 
   // Una instancia por petición: compartirla entre peticiones concurrentes
   // deja que un usuario sobrescriba las credenciales de otro.
@@ -170,66 +221,88 @@ async function abrirSesionGoogle(
     process.env.GOOGLE_REDIRECT_URI
   )
   oauth2Client.setCredentials({
-    access_token:  decrypt(tokenData.access_token),
-    refresh_token: decrypt(tokenData.refresh_token),
-    expiry_date:   tokenData.expires_at,
+    access_token:  decrypt(fila.accessToken),
+    refresh_token: decrypt(fila.refreshToken),
+    expiry_date:   fila.expiresAt,
   })
 
-  if (tokenData.expires_at && Date.now() > tokenData.expires_at) {
-    // Si el médico revocó el acceso desde su cuenta de Google, esto revienta
-    // con `invalid_grant` y hasta hoy subía sin dejar rastro hasta el catch
-    // mudo de la ruta de turno.
-    let credentials
-    try {
-      ({ credentials } = await oauth2Client.refreshAccessToken())
-    } catch (err) {
-      registrarFalloGCal(
-        { operacion: 'oauth2.refreshAccessToken', userId, calendarId: tokenData.calendar_id },
-        err,
-      )
-      throw err
-    }
-    const { error } = await supabase.from('google_tokens').update({
-      access_token: credentials.access_token ? encrypt(credentials.access_token) : null,
-      expires_at:   credentials.expiry_date ?? null,
-    }).eq('user_id', userId)
-    // No se aborta: la sesión en memoria sirve para esta petición. Pero si no
-    // se guardó, la siguiente vuelve a refrescar y conviene saberlo.
-    if (error) {
-      registrarFalloGCal(
-        { operacion: 'google_tokens.update(access_token)', userId, calendarId: tokenData.calendar_id },
-        error,
-      )
-    }
-    oauth2Client.setCredentials(credentials)
+  if (fila.expiresAt && Date.now() > fila.expiresAt) {
+    await refrescarSesion(oauth2Client, conexion)
   }
 
   return {
     calendar:   google.calendar({ version: 'v3', auth: oauth2Client }),
-    calendarId: tokenData.calendar_id,
+    calendarId: fila.calendarId,
   }
 }
 
 /**
- * Cliente de Calendar autenticado, sin resolver calendario.
- * Para operar sobre el calendario de Spinus usa `conCalendarioSpinus`.
+ * Refresca el access token y lo persiste por el módulo, en las dos fuentes.
+ *
+ * Va aparte para que `abrirSesionGoogle` no pase de 50 líneas (Protocolo 3), y
+ * porque lo que hace en el camino de error tiene entidad propia: si Google
+ * contesta `invalid_grant`, la conexión se marca revocada antes de relanzar.
  */
-export async function getGCalClient(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<GCalCliente | null> {
-  const sesion = await abrirSesionGoogle(supabase, userId)
-  return sesion?.calendar ?? null
+async function refrescarSesion(
+  oauth2Client: InstanceType<typeof google.auth.OAuth2>,
+  conexion: ConexionGoogle,
+): Promise<void> {
+  const ctx = { userId: conexion.userId, conexionId: conexion.id, calendarId: conexion.calendarId }
+  let credentials
+  try {
+    ({ credentials } = await oauth2Client.refreshAccessToken())
+  } catch (err) {
+    registrarFalloGCal({ ...ctx, operacion: 'oauth2.refreshAccessToken' }, err)
+    // El permiso se retiró desde la cuenta de Google: estos tokens no vuelven a
+    // servir y la conexión deja de contar como activa.
+    //
+    // ⚠ AQUÍ EL RADIO DEL FALLO PASA A SER LA CLÍNICA ENTERA, Y ESO ES NUEVO.
+    // `resolverConexionClinica` filtra por `estado = 'activa'`, así que en
+    // cuanto esta marca prende dejan de sincronizar el administrador, la
+    // secretaria y todos los médicos invitados a la vez, hasta que alguien
+    // reconecte a mano desde /perfil. Antes de la conexión por clínica, un
+    // `invalid_grant` afectaba sólo a la persona dueña de esos tokens. Es la
+    // consecuencia deliberada del plan §5 y está decidida; queda escrita aquí
+    // porque no se deduce leyendo la línea de abajo.
+    if (esCredencialInvalida(err)) await marcarRevocada(conexion)
+    throw err
+  }
+  if (credentials.access_token) {
+    // No aborta si el guardado falla: la sesión en memoria sirve para esta
+    // petición y tirarla significaría perder una cita que se podía sincronizar
+    // (plan §2.4, H9). El módulo registra el fallo por su cuenta.
+    await guardarSecretos({
+      clinicaId:   conexion.clinicaId,
+      conexion,
+      accessToken: credentials.access_token,
+      expiresAt:   credentials.expiry_date ?? null,
+    })
+  }
+  oauth2Client.setCredentials(credentials)
 }
 
 /**
- * Crea el calendario de Spinus del médico y persiste su id en `google_tokens`.
+ * Cliente de Calendar autenticado sobre la conexión de la clínica, sin resolver
+ * calendario. Para operar sobre el calendario de Spinus usa
+ * `conCalendarioSpinus`.
+ */
+export async function getGCalClient(conexion: ConexionGoogle): Promise<GCalCliente> {
+  const sesion = await abrirSesionGoogle(conexion)
+  return sesion.calendar
+}
+
+/**
+ * Crea el calendario de Spinus de la clínica y persiste su id en la conexión.
  * Se llama desde el callback de OAuth y, si allí falló, desde el helper en la
  * primera operación. Devuelve null si Google no devolvió id.
  *
- * `esperado` es el valor que `calendar_id` debe tener AHORA para aceptar el
- * cambio, y no es opcional de verdad: pasar el que no toca cuesta un
+ * `opciones.esperado` es el valor que `calendar_id` debe tener AHORA para
+ * aceptar el cambio, y ya no tiene default: el docstring decía «no es opcional
+ * de verdad» y ahora lo impone el tipo. Pasar el que no toca cuesta un
  * calendario huérfano o uno muerto adoptado como bueno.
+ *
+ * `opciones.actorId` es QUIEN EJECUTA, sólo para los logs. No se confunde con
+ * `conexion.userId`, que es el dueño de la cuenta de Google (ver `ContextoGCal`).
  *
  *   null            se está creando el primero, la columna está vacía.
  *   <id existente>  se está reemplazando ese id concreto porque Google
@@ -241,15 +314,23 @@ export async function getGCalClient(
  * calendario de esa otra petición: sirve igual y evita duplicados.
  */
 export async function crearCalendarioSpinus(
-  supabase: SupabaseClient,
-  userId: string,
+  conexion: ConexionGoogle,
+  admin: SupabaseClient,
   calendar: GCalCliente,
-  esperado: string | null = null,
+  opciones: { esperado: string | null; actorId: string },
 ): Promise<string | null> {
-  const { data: perfil } = await supabase
+  const { esperado, actorId } = opciones
+  // EXCEPCIÓN DE CLIENTE, aprobada en el plan §3.4 (a) y en la decisión 4 de
+  // §11. Esta lectura ocurre a veces dentro de `after()`, donde sólo entra el
+  // cliente admin, así que va con él y acotada A MANO por `id` Y `clinica_id`:
+  // sin RLS, el filtro por clínica es lo único que impide leer el perfil de
+  // otra. El nombre es el del DUEÑO de la cuenta de Google, no el de quien
+  // ejecuta, porque el calendario vive en su cuenta y se llama por él.
+  const { data: perfil } = await admin
     .from('profiles')
     .select('titulo, nombres, apellido_paterno')
-    .eq('id', userId)
+    .eq('id', conexion.userId)
+    .eq('clinica_id', conexion.clinicaId)
     .maybeSingle<CamposNombre>()
 
   // Perfil incompleto → "Spinus" a secas, nunca "Spinus - undefined".
@@ -280,20 +361,11 @@ export async function crearCalendarioSpinus(
   // última en escribir y las demás quedaban de basura invisible en la cuenta
   // del médico.
   //
-  // `.select()` es lo que permite enterarse: sin él PostgREST responde éxito
-  // sin decir cuántos renglones tocó. Cubre además el UPDATE que la RLS filtra
-  // o sobre un user_id que ya no tiene fila.
-  const cambio = supabase
-    .from('google_tokens')
-    .update({ calendar_id: calendarId })
-    .eq('user_id', userId)
-  const { data: guardado, error } = await (
-    esperado === null
-      ? cambio.is('calendar_id', null)
-      : cambio.eq('calendar_id', esperado)
-  ).select('calendar_id').maybeSingle()
-
-  if (!error && guardado) return calendarId
+  // Lo hace el módulo, que escribe en las DOS fuentes con el mismo `esperado`
+  // (plan §2.3 y §2.6): el espejo también es comparar-y-cambiar, o dos
+  // peticiones en carrera podrían persistirlas en orden inverso.
+  const prendio = await guardarCalendarIdSiEsperado({ conexion, nuevo: calendarId, esperado })
+  if (prendio) return calendarId
 
   // No prendió. Sea cual sea el motivo, el calendario recién creado sobra: un
   // calendario que nadie registró es basura invisible —el médico no tiene por
@@ -305,7 +377,7 @@ export async function crearCalendarioSpinus(
     // Se queda huérfano de verdad. Al menos ahora hay una línea con el id
     // exacto para poder borrarlo a mano.
     registrarFalloGCal(
-      { operacion: 'calendars.delete (limpieza de huérfano)', userId, calendarId },
+      { operacion: 'calendars.delete (limpieza de huérfano)', userId: actorId, conexionId: conexion.id, calendarId },
       errBorrado,
     )
   }
@@ -313,19 +385,15 @@ export async function crearCalendarioSpinus(
   // ¿Se perdió una carrera o falló el guardado de verdad? Lo dice el valor que
   // haya ahora: si ya no es el esperado, otra petición ganó y su calendario
   // sirve exactamente igual que el que acabamos de tirar.
-  const { data: fila } = await supabase
-    .from('google_tokens')
-    .select('calendar_id')
-    .eq('user_id', userId)
-    .maybeSingle<{ calendar_id: string | null }>()
-  const actual = fila?.calendar_id ?? null
+  const actual = await releerCalendarId(conexion)
 
   if (actual !== null && actual !== esperado) {
     // No es un fallo: es el mecanismo funcionando. Va como warn para que se
     // vea en producción sin ensuciar el conteo de errores.
     logger.warn('GCal', 'carrera de creación resuelta ' + JSON.stringify({
-      operacion:  'google_tokens.update(calendar_id) — comparar-y-cambiar no prendió',
-      userId,
+      operacion:  'clinica_conexiones_google.calendar_id — comparar-y-cambiar no prendió',
+      userId:     actorId,
+      conexionId: conexion.id,
       descartado: calendarId,
       adoptado:   actual,
     }))
@@ -333,8 +401,8 @@ export async function crearCalendarioSpinus(
   }
 
   registrarFalloGCal(
-    { operacion: 'google_tokens.update(calendar_id)', userId, calendarId },
-    error ?? new Error('UPDATE sin renglones afectados y calendar_id sin cambiar'),
+    { operacion: 'guardarCalendarIdSiEsperado', userId: actorId, conexionId: conexion.id, calendarId },
+    new Error('el comparar-y-cambiar no prendió y calendar_id sigue sin cambiar'),
   )
   return null
 }
@@ -376,11 +444,28 @@ export async function calendarioVive(calendar: GCalCliente, calendarId: string, 
  * médicos, las citas de otro pueden tener su evento en un calendario que sigue
  * vivo, y desvincularlas rompería un enlace bueno.
  *
+ * ⚠ ESE RAZONAMIENTO ERA CIERTO CON UN CALENDARIO POR MÉDICO Y HA DEJADO DE
+ * SERLO. Bajo la conexión por clínica hay UN SOLO calendario y todas las citas
+ * de todos los médicos viven en él, así que acotar por `medico_id` deja fuera
+ * precisamente a las que había que soltar: cuando el administrador recrea el
+ * calendario, las citas de los demás médicos conservan un `google_event_id`
+ * que apunta a un evento muerto, con `gcal_sync_status = 'synced'` mintiendo, y
+ * nada vuelve a intentarlo.
+ *
+ * ARREGLAR EL ÁMBITO ES DE LA RAMA SIGUIENTE, NO DE ÉSTA, y a propósito: se
+ * hace con `appointments.gcal_calendar_id` —«las citas cuyo evento vive en ESTE
+ * calendario»—, que es la columna que esta rama empieza a rellenar en los
+ * `after()` del alta y de la edición. Antes de tener esos datos, ampliar el
+ * barrido a la clínica entera sería barrer a ciegas.
+ *
+ * Lo que esta rama SÍ cierra es QUIÉN puede llegar hasta aquí: el
+ * `puedeReparar` de `conCalendarioSpinus` (plan §3.3, H2). Sin él, cualquier
+ * miembro de la clínica disparaba este UPDATE masivo con el cliente admin sin
+ * poder leer ni una de las filas que modifica.
+ *
  * Hueco conocido que esto NO cierra: el evento se crea en el calendario de
- * quien guarda la cita, no en el del médico de la cita. Si una secretaria
- * agenda para el Dr. B y luego borra su propio calendario, esa cita no se
- * desvincula. Cerrarlo pide una columna que registre de quién es el evento;
- * queda fuera de esta rama.
+ * quien guarda la cita, no en el del médico de la cita. Cerrarlo pide la misma
+ * columna de arriba; queda fuera de esta rama.
  */
 export async function desvincularCitas(supabase: SupabaseClient, userId: string): Promise<boolean> {
   const { data: perfil } = await supabase
@@ -410,7 +495,7 @@ export async function desvincularCitas(supabase: SupabaseClient, userId: string)
 }
 
 /**
- * Ejecuta una operación contra el calendario de Spinus del médico.
+ * Ejecuta una operación contra el calendario de Spinus DE LA CLÍNICA.
  *
  * Resuelve el calendario (creándolo si hace falta), corre la operación y, si
  * Google responde 404 **sobre ese calendario**, lo recrea, desvincula las
@@ -418,35 +503,70 @@ export async function desvincularCitas(supabase: SupabaseClient, userId: string)
  * `calendars.get` antes de actuar: un `events.patch` sobre un evento borrado
  * también responde 404 y no debe desencadenar nada de esto.
  *
- * Devuelve null si el médico no tiene Google conectado.
+ * Devuelve null si la clínica no tiene conexión activa —`conexion` en null—,
+ * que es la misma semántica de «nada que sincronizar» que tenía cuando el
+ * médico no tenía token. Los llamadores no cambian por eso.
+ *
+ * ── EL MODO ESTRICTO (`puedeReparar`), Y POR QUÉ NO TIENE DEFAULT ───────────
+ * Esta función NO es de lectura: crea calendarios y dispara un UPDATE masivo
+ * sobre `appointments`. Bajo la conexión por clínica lo hace con el cliente
+ * admin y sobre la cuenta de Google de OTRA PERSONA, y cualquier miembro de la
+ * clínica llega hasta aquí con sólo abrir la agenda (plan §3.3, H2).
+ *
+ *   puedeReparar = true    quien administra la clínica: como siempre.
+ *   puedeReparar = false   todos los demás. Si falta `calendar_id` o hay 404,
+ *                          devuelve null y NO ESCRIBE NADA, ni en la base ni
+ *                          en Google. Ni crea, ni desvincula, ni recrea.
+ *
+ * Es OBLIGATORIO y sin default permisivo a propósito: un default `true` es
+ * exactamente cómo se vuelve a abrir el agujero desde un llamador nuevo que no
+ * sabe que existe. Lo calcula cada ruta con `canManageClinica` ANTES de
+ * responder y lo hace viajar por closure hasta `after()`.
+ *
+ * Consecuencia aceptada: una secretaria que agenda la primera cita de una
+ * clínica cuyo calendario aún no existe NO lo crea, y la cita queda `pending`
+ * hasta que entre quien administra. Es peor UX que antes y es la contención
+ * correcta.
  *
  * Nota: si la operación llevaba un eventId del calendario muerto, el reintento
  * vuelve a fallar y el error sube al llamador — correcto, esa escritura sí
  * falló. La cita ya quedó desvinculada.
  */
 export async function conCalendarioSpinus<T>(
-  supabase: SupabaseClient,
-  userId: string,
+  conexion: ConexionGoogle | null,
+  admin: SupabaseClient,
   operacion: (calendar: GCalCliente, calendarId: string) => Promise<T>,
+  opciones: { puedeReparar: boolean; actorId: string },
 ): Promise<T | null> {
-  const sesion = await abrirSesionGoogle(supabase, userId)
-  if (!sesion) return null
-  const { calendar } = sesion
+  if (!conexion) return null
+  const { puedeReparar, actorId } = opciones
 
-  const calendarId = sesion.calendarId ?? await crearCalendarioSpinus(supabase, userId, calendar)
+  const { calendar, calendarId: registrado } = await abrirSesionGoogle(conexion)
+
+  // Sin calendario y sin permiso para crearlo: no hay nada que hacer aquí, y
+  // fingir que sí escribiría en la cuenta de Google de otra persona.
+  if (!registrado && !puedeReparar) return null
+
+  const calendarId = registrado
+    ?? await crearCalendarioSpinus(conexion, admin, calendar, { esperado: null, actorId })
   if (!calendarId) return null
 
   try {
     return await operacion(calendar, calendarId)
   } catch (err) {
     if (!esNotFound(err)) throw err
-    if (await calendarioVive(calendar, calendarId, userId)) throw err
+    if (await calendarioVive(calendar, calendarId, actorId)) throw err
+    // El calendario está muerto de verdad, y a partir de aquí todo es
+    // destructivo: el UPDATE masivo y una escritura en la cuenta ajena.
+    if (!puedeReparar) return null
 
-    await desvincularCitas(supabase, userId)
+    // El ámbito del barrido va por el DUEÑO de la cuenta de Google, que es de
+    // quien era el calendario que acaba de morir — no por quien ejecuta.
+    await desvincularCitas(admin, conexion.userId)
     // `calendarId` es el que acaba de dar 404: se reemplaza ESE. Pasar null
     // haría que el comparar-y-cambiar no prendiera y que se devolviera el id
     // muerto, dejando el reintento condenado a fallar otra vez.
-    const recreado = await crearCalendarioSpinus(supabase, userId, calendar, calendarId)
+    const recreado = await crearCalendarioSpinus(conexion, admin, calendar, { esperado: calendarId, actorId })
     if (!recreado) throw err
     return await operacion(calendar, recreado)
   }

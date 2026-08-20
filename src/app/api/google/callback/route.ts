@@ -1,8 +1,34 @@
 import { google } from 'googleapis'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { encrypt } from '@/lib/encrypt'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { canManageClinica } from '@/lib/permissions'
+import { altaConexion, resolverConexionClinica, type ErrorAlta } from '@/lib/gcalConexion'
 import { crearCalendarioSpinus, calendarioVive, registrarFalloGCal } from '@/lib/gcal'
+
+/**
+ * A dónde se manda al médico según qué contestó `alta_conexion_google`.
+ *
+ * Los cinco errores tienen nombre y el tipo obliga a cubrirlos todos. El plan
+ * §2.5 sólo asignaba destino a dos —los dos que el médico puede resolver por sí
+ * mismo—; los otros tres son anomalías que no sabe arreglar, así que comparten
+ * un destino genérico y se distinguen en el log.
+ */
+function destinoDeErrorAlta(error: ErrorAlta): string {
+  switch (error) {
+    // Otra cuenta de Google ya es la de esta clínica. NO se degrada a 'personal'
+    // en silencio: el relevo de administrador es un flujo consciente.
+    case 'clinica_ya_conectada':
+      return '/perfil?gcal_error=clinica_ya_conectada'
+    // Esta cuenta ya tenía una conexión 'personal' y reconectar NO la promueve.
+    // Sin este aviso, la clínica se quedaría con cero conexiones de clínica y
+    // las citas dejarían de sincronizarse sin que nadie se enterara.
+    case 'rol_no_promovido':
+      return '/perfil?gcal_error=rol_no_promovido'
+    default:
+      return '/perfil?gcal_error=alta_fallida'
+  }
+}
 
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get('code')
@@ -47,6 +73,26 @@ export async function GET(req: NextRequest) {
     }
     userId = user.id
 
+    // SÓLO EL ADMINISTRADOR CONECTA GOOGLE (plan §2.5 y §12.3). Éste es el gate
+    // que cuenta —el de /api/google/connect va por higiene—, porque aquí es
+    // donde se escribe el renglón. Sin él, un médico invitado crearía una
+    // conexión que no sirve para nada y confunde el estado de la clínica.
+    //
+    // El intercambio del código ya ocurrió arriba: a un no-administrador se le
+    // rechaza con el código quemado, que es inocuo (es de un solo uso y no se
+    // escribió nada).
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('clinica_id, role, es_admin_de_clinica')
+      .eq('id', user.id)
+      .single()
+    if (!canManageClinica(profile) || !profile?.clinica_id) {
+      const denegado = NextResponse.redirect(new URL('/perfil?gcal_error=solo_admin', req.url))
+      denegado.cookies.delete('oauth_state')
+      return denegado
+    }
+    const clinicaId: string = profile.clinica_id
+
     // CONSENTIMIENTO GRANULAR — Google presenta los permisos con casillas
     // individuales. Un médico puede desmarcar la de crear calendarios y darle
     // Continuar: quedaría conectado pero sin poder crear nada, y fallaría más
@@ -59,17 +105,37 @@ export async function GET(req: NextRequest) {
       return denegado
     }
 
-    const { error: errTokens } = await supabase.from('google_tokens').upsert({
-      user_id: user.id,
-      access_token: tokens.access_token ? encrypt(tokens.access_token) : null,
-      refresh_token: tokens.refresh_token ? encrypt(tokens.refresh_token) : null,
-      expires_at: tokens.expiry_date ?? null,
+    // Sin access token no hay nada que dar de alta. Se corta ANTES de llamar al
+    // módulo, que lo exige no nulo a propósito: una conexión sin token es la
+    // anomalía que el puente existe para hacer imposible.
+    if (!tokens.access_token) {
+      registrarFalloGCal(
+        { operacion: 'oauth2.getToken (sin access_token)', userId: user.id },
+        new Error('Google no devolvió access_token'),
+      )
+      const fallo = NextResponse.redirect(new URL('/perfil?gcal_error=alta_fallida', req.url))
+      fallo.cookies.delete('oauth_state')
+      return fallo
+    }
+
+    // UNA SOLA LLAMADA: metadata y secretos entran en la misma transacción
+    // dentro del RPC, así que no puede nacer una conexión sin tokens. Antes
+    // esto era un upsert sobre `google_tokens` por usuario — el modelo que esta
+    // rama sustituye.
+    const alta = await altaConexion({
+      userId:    user.id,
+      clinicaId,
+      rol:       'clinica',
+      cuenta:    { sub: null, email: null },   // los puebla el commit 4, con los scopes openid/email
+      tokens: {
+        accessToken:  tokens.access_token,
+        refreshToken: tokens.refresh_token ?? null,
+        expiresAt:    tokens.expiry_date ?? null,
+      },
     })
-    // Sin fila de tokens no hay conexión ni dónde guardar el calendario: no
-    // vale la pena crear uno para tener que borrarlo un renglón más abajo.
-    if (errTokens) {
-      registrarFalloGCal({ operacion: 'google_tokens.upsert', userId: user.id }, errTokens)
-      const fallo = NextResponse.redirect(new URL('/dashboard?error=oauth_failed', req.url))
+
+    if (!alta.ok) {
+      const fallo = NextResponse.redirect(new URL(destinoDeErrorAlta(alta.error), req.url))
       fallo.cookies.delete('oauth_state')
       return fallo
     }
@@ -80,11 +146,11 @@ export async function GET(req: NextRequest) {
     try {
       const gcal = google.calendar({ version: 'v3', auth: oauth2Client })
 
-      // RECONECTAR NO DEBE CREAR UN SEGUNDO CALENDARIO. El `upsert` de arriba
-      // no toca `calendar_id`, así que el de antes sigue ahí; crear otro lo
-      // pisaría y dejaría el anterior huérfano en la cuenta del médico, sin
-      // registro en ninguna parte — el mismo estropicio que este archivo
-      // acaba de dejar de causar, entrando por otra puerta.
+      // RECONECTAR NO DEBE CREAR UN SEGUNDO CALENDARIO. El alta de arriba no
+      // toca `calendar_id` al reconectar la misma cuenta, así que el de antes
+      // sigue ahí; crear otro lo pisaría y dejaría el anterior huérfano en la
+      // cuenta de Google, sin registro en ninguna parte — el mismo estropicio
+      // que este archivo acaba de dejar de causar, entrando por otra puerta.
       //
       // El camino que llevaba aquí —los GET de Google respondían
       // `connected: false` ante un fallo pasajero y el perfil le pintaba
@@ -94,19 +160,22 @@ export async function GET(req: NextRequest) {
       //
       // `calendarioVive` contesta "vive" ante cualquier error que no sea 404,
       // que es justo lo que conviene: si no se puede comprobar, no se crea.
-      const { data: fila } = await supabase
-        .from('google_tokens')
-        .select('calendar_id')
-        .eq('user_id', user.id)
-        .maybeSingle<{ calendar_id: string | null }>()
-      const yaRegistrado = fila?.calendar_id ?? null
+      // El `calendar_id` sale del descriptor que acaba de devolver el alta: el
+      // RPC ya lo trae, así que no hace falta una segunda consulta.
+      const yaRegistrado = alta.alta.calendarId
+
+      // La conexión completa, para pasársela al creador. Se resuelve con el
+      // cliente de sesión, aquí todavía dentro de la petición.
+      const conexion = await resolverConexionClinica(supabase, clinicaId)
 
       // `yaRegistrado` como valor esperado, no null: si llegamos aquí con un
       // id no nulo es porque ese calendario ya no existe y hay que reemplazar
       // ESE. Con null, el comparar-y-cambiar no prendería y se adoptaría el id
       // muerto como bueno.
-      if (!yaRegistrado || !(await calendarioVive(gcal, yaRegistrado, user.id))) {
-        await crearCalendarioSpinus(supabase, user.id, gcal, yaRegistrado)
+      if (conexion && (!yaRegistrado || !(await calendarioVive(gcal, yaRegistrado, user.id)))) {
+        await crearCalendarioSpinus(
+          conexion, createAdminClient(), gcal, { esperado: yaRegistrado, actorId: user.id },
+        )
       }
     } catch (err) {
       registrarFalloGCal({ operacion: 'calendars.insert (callback)', userId: user.id }, err)

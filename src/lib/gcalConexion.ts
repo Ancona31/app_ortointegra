@@ -8,9 +8,10 @@
  * `private.google_conexiones_secretos` (tokens), y la conexión se resuelve por
  * CLÍNICA, no por usuario.
  *
- * ESTE MÓDULO ESTÁ INERTE. Nadie lo llama todavía: es el commit 1 de §6 del
- * plan, escrito aparte para poder verificarlo por lectura antes de que tenga
- * consecuencias. Quien lo cablee es el commit 3.
+ * YA NO ESTÁ INERTE. Nació aparte en el commit 1 para poder verificarlo por
+ * lectura antes de que tuviera consecuencias, y el commit 3 lo cableó: `gcal.ts`
+ * y las seis rutas de Google resuelven por aquí. Desde ese commit, ningún otro
+ * archivo del repo toca `google_tokens` ni por lectura.
  *
  * ── POR QUÉ TODO PASA POR AQUÍ ──────────────────────────────────────────────
  * Son dos fuentes y hay que escribir en las dos hasta que el archivo B retire
@@ -392,6 +393,51 @@ export async function guardarSecretos(args: {
   if (errEspejo) registrarFalloEspejo('guardarSecretos', errEspejo.message)
 }
 
+/* ── Revocación ─────────────────────────────────────────── */
+
+/**
+ * Marca la conexión como revocada. La dispara el refresco de `gcal.ts` cuando
+ * Google contesta `invalid_grant`: el permiso se retiró desde la cuenta de
+ * Google y esos tokens ya no sirven.
+ *
+ * ⚠ EL RADIO DEL FALLO ES LA CLÍNICA ENTERA, Y ESO ES NUEVO. Como
+ * `resolverConexionClinica` filtra por `estado = 'activa'`, en cuanto esta
+ * columna pasa a 'revocada' la clínica **completa** deja de sincronizar —el
+ * administrador, la secretaria y todos los médicos invitados a la vez— hasta
+ * que alguien reconecte a mano desde /perfil. Antes de la conexión por clínica,
+ * un `invalid_grant` afectaba sólo a la persona dueña de esos tokens.
+ *
+ * Es la consecuencia deliberada del plan §5 —«conectado» pasa a significar «hay
+ * una conexión que la última vez que se usó seguía sirviendo», no «hay fila»— y
+ * viene con un segundo efecto que conviene saber: una conexión revocada SIGUE
+ * ocupando el índice único parcial, así que otro administrador no puede
+ * conectar encima sin desconectar primero. Coherente con «el relevo es un flujo
+ * consciente»; molesto el día que pase.
+ *
+ * NO ABORTA. El fallo de marcar no puede tumbar la operación que lo detectó: el
+ * llamador está en mitad de un `catch` relanzando el `invalid_grant`, y ese
+ * error es la información que importa. Se registra y se sigue.
+ *
+ * SIN ESPEJO, y no es un olvido: `google_tokens` no tiene columna `estado`. Por
+ * eso el archivo B no compara este campo — ver plan §2.6, que avisa de que un
+ * veredicto verde de B no dice nada sobre si la conexión sirve.
+ */
+export async function marcarRevocada(conexion: ConexionGoogle): Promise<void> {
+  const admin = createAdminClient()
+  const { error } = await admin
+    .from('clinica_conexiones_google')
+    .update({ estado: 'revocada' })
+    .eq('id', conexion.id)
+    .eq('clinica_id', conexion.clinicaId)
+
+  if (error) {
+    logger.error('GCal', 'fallo ' + JSON.stringify({
+      operacion: 'marcarRevocada — no aborta, ver el docstring',
+      mensaje:   error.message,
+    }))
+  }
+}
+
 /* ── Calendario ─────────────────────────────────────────── */
 
 /**
@@ -464,6 +510,39 @@ async function espejarCalendarId(
       'el CAS del espejo no prendió: la fuente vieja no tenía el calendar_id esperado',
     )
   }
+}
+
+/**
+ * Qué `calendar_id` tiene la conexión AHORA. Es el desempate del CAS: cuando
+ * `guardarCalendarIdSiEsperado` devuelve false, esto dice si fue porque otra
+ * petición ganó la carrera —y entonces su calendario sirve igual— o porque el
+ * guardado falló de verdad.
+ *
+ * VA CON CLIENTE ADMIN, y ésa es su razón de existir. La lectura de metadata la
+ * hace normalmente el cliente de sesión (`resolverConexionClinica`), pero este
+ * desempate ocurre a veces DENTRO de `after()`, donde por la regla del plan §1
+ * sólo entra el admin. Torcer `resolverConexionClinica` pasándole un cliente que
+ * su docstring no contempla dejaría esa documentación mintiendo; esto es una
+ * función con nombre propio que dice lo que hace.
+ *
+ * Los dos filtros son explícitos porque con el cliente admin la RLS no acota
+ * nada, ni siquiera teniendo la clave primaria.
+ *
+ * Un error de la consulta se LANZA. Devolver null lo haría indistinguible de
+ * «no hay calendario registrado», que es justo la confusión que H4 denuncia: el
+ * desempate leería «nadie ganó la carrera» ante un fallo de red.
+ */
+export async function releerCalendarId(conexion: ConexionGoogle): Promise<string | null> {
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from('clinica_conexiones_google')
+    .select('calendar_id')
+    .eq('id', conexion.id)
+    .eq('clinica_id', conexion.clinicaId)
+    .maybeSingle<{ calendar_id: string | null }>()
+
+  if (error) throw new Error(`releerCalendarId: ${error.message}`)
+  return data?.calendar_id ?? null
 }
 
 /* ── Baja ───────────────────────────────────────────────── */

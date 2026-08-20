@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { canVerAgendaCompleta } from '@/lib/permissions'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { canVerAgendaCompleta, canManageClinica } from '@/lib/permissions'
+import { resolverConexionClinica, type ConexionGoogle } from '@/lib/gcalConexion'
 import {
   conCalendarioSpinus,
   registrarFalloGCal,
@@ -38,42 +40,36 @@ const TOPE_PAGINAS = 20
 
 /**
  * Qué contestar cuando no hay eventos que devolver. Son dos situaciones que
- * hasta ahora se veían iguales (`connected: false`) y no lo son: sin token el
- * médico debe conectar, con token y Google caído no hay nada que pueda hacer.
+ * hasta ahora se veían iguales (`connected: false`) y no lo son: sin conexión
+ * hay que conectar, con conexión y Google caído no hay nada que hacer.
+ *
+ * La pregunta va POR CLÍNICA, no por usuario. Antes miraba si quien preguntaba
+ * tenía fila en `google_tokens`, y con la conexión por clínica eso contestaría
+ * 'sin_token' a una secretaria cuya clínica está perfectamente conectada.
  *
  * Ante la duda, 'sin_token': es el estado accionable y el que la interfaz
  * llevaba mostrando, así que equivocarse hacia ahí no estrena ningún camino.
  */
-async function estadoDeFallo(
-  supabase: Awaited<ReturnType<typeof createClient>> | null,
-  userId: string,
-  err?: unknown,
-): Promise<EstadoGoogle> {
+function estadoDeFallo(conexion: ConexionGoogle | null, err?: unknown): EstadoGoogle {
+  // Atajo: esta misma petición acaba de descubrir que la credencial está muerta.
+  // No hace falta preguntar por la conexión, que a estas alturas puede seguir
+  // marcada activa porque el marcado corre en paralelo.
   if (err !== undefined && esCredencialInvalida(err)) return 'sin_token'
-  if (!supabase) return 'sin_token'
-  try {
-    // La RLS de `google_tokens` acota por `user_id = auth.uid()`; aquí seguimos
-    // dentro de la petición, así que el médico lee su propia fila y nada más.
-    const { data } = await supabase
-      .from('google_tokens')
-      .select('user_id')
-      .eq('user_id', userId)
-      .maybeSingle()
-    return data ? 'error_google' : 'sin_token'
-  } catch {
-    return 'sin_token'
-  }
+  return conexion ? 'error_google' : 'sin_token'
 }
 
 export async function GET(req: NextRequest) {
-  // Los necesita el catch de afuera, donde `user`, el cliente y el calendario
-  // resuelto ya no están a la vista.
+  // Los necesita el catch de afuera, donde `user` y el calendario resuelto ya
+  // no están a la vista.
   let userId = 'sin-sesion'
   let calendarIdUsado: string | null = null
-  let supabase: Awaited<ReturnType<typeof createClient>> | null = null
+  // La necesita el catch de afuera para distinguir 'error_google' de
+  // 'sin_token'. Si la resolución misma revienta se queda en null, y eso
+  // contesta 'sin_token', que es el fallo hacia el lado accionable.
+  let conexion: ConexionGoogle | null = null
 
   try {
-    supabase = await createClient()
+    const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     userId = user.id
@@ -115,7 +111,18 @@ export async function GET(req: NextRequest) {
     const timeMin = fromParam ?? new Date(ahora.getFullYear(), ahora.getMonth(), 1).toISOString()
     const timeMax = toParam ?? new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59).toISOString()
 
-    const eventos = await conCalendarioSpinus(supabase, user.id, async (calendar, calendarId) => {
+    // La conexión se resuelve con el cliente de SESIÓN y antes de nada más; el
+    // admin sólo entra a partir de aquí, para que `conCalendarioSpinus` pueda
+    // leerle los tokens a la cuenta de la clínica.
+    conexion = await resolverConexionClinica(supabase, profile.clinica_id)
+    // Quien no administra la clínica opera en modo estricto: si el calendario
+    // falta o Google contesta 404, esta ruta NO lo crea ni desvincula nada.
+    // Abrir la agenda no puede ser el disparador de una escritura masiva en
+    // citas ajenas ni de un calendario nuevo en la cuenta de otra persona.
+    const puedeReparar = canManageClinica(profile)
+    const admin = createAdminClient()
+
+    const eventos = await conCalendarioSpinus(conexion, admin, async (calendar, calendarId) => {
       calendarIdUsado = calendarId
 
       // EL ACUMULADOR VA DENTRO DEL CALLBACK, NUNCA FUERA. `conCalendarioSpinus`
@@ -165,12 +172,12 @@ export async function GET(req: NextRequest) {
       }
 
       return acumulados
-    })
-    // null = no hay sesión de Google (sin token) o no se pudo resolver el
-    // calendario (Google falló al crearlo). Sólo lo segundo es un fallo.
-    // Comparación explícita: una lista vacía de eventos SÍ es una respuesta.
+    }, { puedeReparar, actorId: user.id })
+    // null = la clínica no tiene conexión activa, no se pudo resolver el
+    // calendario, o el modo estricto se negó a crearlo. Comparación explícita:
+    // una lista vacía de eventos SÍ es una respuesta.
     if (eventos === null) {
-      return NextResponse.json({ estado: await estadoDeFallo(supabase, userId) })
+      return NextResponse.json({ estado: estadoDeFallo(conexion) })
     }
 
     // RESTA acotada por capacidad, NO intersección. Lo que queda después de
@@ -208,13 +215,13 @@ export async function GET(req: NextRequest) {
     })
   } catch (err) {
     registrarFalloGCal(
-      { operacion: 'events.list (agenda)', userId, calendarId: calendarIdUsado },
+      { operacion: 'events.list (agenda)', userId, conexionId: conexion?.id, calendarId: calendarIdUsado },
       err,
     )
     // `err` entra en la cuenta para poder pescar el `invalid_grant`: ahí hay
-    // fila en `google_tokens`, pero está muerta y toca reconectar.
+    // conexión, pero está muerta y toca reconectar.
     return NextResponse.json({
-      estado: await estadoDeFallo(supabase, userId, err),
+      estado: estadoDeFallo(conexion, err),
       error:  'Error al obtener eventos',
     })
   }

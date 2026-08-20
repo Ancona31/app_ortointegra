@@ -1,8 +1,35 @@
 import { google } from 'googleapis'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
+import { createClient } from '@/lib/supabase/server'
+import { canManageClinica } from '@/lib/permissions'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // ESTA RUTA NO TENÍA NINGUNA AUTENTICACIÓN. Ni sesión, ni rol: un GET anónimo
+  // devolvía el redirect a la pantalla de consentimiento de Google con el
+  // client_id de Spinus y plantaba la cookie `oauth_state`. Lo que contenía el
+  // daño era que el callback sí exige sesión antes de escribir.
+  //
+  // El gate que cuenta sigue siendo el del callback, que es donde se escribe el
+  // renglón (plan §2.5); éste va por higiene, para no llevar a nadie a una
+  // pantalla de Google que va a acabar en un error.
+  //
+  // SE RECHAZA POR REDIRECT, NO CON UN 403 JSON, y no es cosmética: el
+  // disparador es un `<a href>` de /perfil, o sea navegación del navegador, y
+  // un 403 con cuerpo JSON le pintaría el JSON crudo en la pantalla al médico.
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.redirect(new URL('/login', req.url))
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, es_admin_de_clinica')
+    .eq('id', user.id)
+    .single()
+  if (!canManageClinica(profile)) {
+    return NextResponse.redirect(new URL('/perfil?gcal_error=solo_admin', req.url))
+  }
+
   const state = randomBytes(16).toString('hex')
 
   // Esta ruta no tiene ningún catch que tape nada —no llama a Google, sólo
