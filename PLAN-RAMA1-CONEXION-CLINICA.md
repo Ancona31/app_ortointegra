@@ -141,6 +141,19 @@ La intersección es la regla de seguridad correcta y va en el servidor. Pero su 
 > necesitaría columna si se guarda en la base. **No está dicho si esas dos
 > pertenecen a esta rama o a la siguiente** — ver §12.12.
 
+> **⚠ SEGUNDA ANOTACIÓN 2026-08-20 — «Sin migración» YA NO ES CIERTO. Resuelto.**
+> Las decisiones de §12.7 y §12.10 **son de esta rama** (§12.12.1), y con §12.13 y
+> §12.14 la cuenta sube a **cuatro migraciones**, con una quinta condicionada.
+> El listado operativo está en **§12.15**.
+>
+> El titular de este apartado —«todo cabe en el esquema del corte A»— sigue siendo
+> **cierto para lo que este plan describía**: la conexión por clínica no pide
+> esquema nuevo. Lo que lo desborda es producto que llegó después, no un error de
+> §0.10.
+>
+> **Y todas pasan por `supabase/AUDITORIA-MIGRACIONES.md`** y sus 15 dimensiones
+> antes de aplicarse.
+
 ---
 
 # 1. Cómo queda la resolución
@@ -448,6 +461,15 @@ El orden **no es negociable** por lo que explico en §7: el endurecimiento de `/
    > —`estadoDeFallo` por clínica y `puedeReparar`—: ver la anotación de la tabla
    > de §4. El orden respecto del commit 3 no cambia y sigue siendo lo único
    > innegociable de §6.
+   >
+   > **Añadido el 2026-08-20 (§12.12.2 y §12.12.4), dos cosas más a este commit:**
+   >
+   > - **El bucle de `pageToken` sobre `events.list`** (`events/route.ts:138-145`).
+   >   No es paginación completa: es recorrer el `nextPageToken` que hoy se
+   >   ignora, sobre la llamada que ya existe. Va aquí porque es **este** commit
+   >   el que convierte el techo de 100 en un fallo real (§0.9).
+   > - **Borrar `isGoogleEvent`** (`agenda/page.tsx:1797`), bandera muerta. Este
+   >   commit ya está dentro de ese archivo retirando lo de «Ocupado».
 3. **`feat(gcal): resolver la conexión por clínica y escribir en las dos fuentes`** — F2 + F3 + F4 + F5 + F7 + F8 + F9 (gate) + F12. **Indivisible, y ahora por dos razones.** La semántica: si el alta escribe en el calendario de la clínica y la baja borra la del actor, se rompen las dos. Y la compilación, que es H3 y no estaba visto:
 
    > **H3 — la serie no compilaba.** El commit 3 traía la firma nueva de `conCalendarioSpinus` (F2) y sus **tres llamadores restantes** cambiaban en el 4: `appointments/route.ts:272`, `[id]/route.ts:315` y `[id]/route.ts:415`. `npm run build` habría fallado ahí mismo, con tres call sites pasando `(admin, userId, operacion)` a una función que espera `(conexion, admin, operacion, opciones)`. El Protocolo 7 lo prohíbe explícitamente: build verde después de cada cambio.
@@ -459,6 +481,26 @@ El orden **no es negociable** por lo que explico en §7: el endurecimiento de `/
 4. **`feat(gcal): pedir openid y email en el consentimiento`** — los scopes de F9. **Commit propio y posterior al 3, a propósito:** si la pantalla de consentimiento de Google se comporta raro, se revierte solo sin tocar la resolución por clínica. Hasta que alguien reconecte, `google_account_sub` y `google_account_email` siguen en NULL, que es el estado de hoy.
 5. **`feat(gcal): registrar en audit_log conexión, desconexión y recreación`** — F13 (§8).
 6. **`test(gcal): prohibir escrituras de conexión fuera del módulo`** — F11. Va al final porque hasta aquí la prueba no puede pasar; a partir de aquí, cierra la puerta.
+
+> **⚠ ANOTACIÓN 2026-08-20 — la serie ya no acaba en el 6.** Las decisiones de
+> producto de §12 añaden trabajo que no cabía en este plan cuando se escribió. El
+> orden de arriba **no cambia**; lo que sigue va detrás.
+>
+> **7. El permiso de escritura en la agenda — COMMIT PROPIO, Y AL FINAL** (§12.7).
+> No se funde con ningún otro, y el motivo es de riesgo, no de orden:
+>
+> - **Es el único cambio de la rama que le quita algo a un usuario real.** Hoy los
+>   médicos invitados crean citas; después de este commit, los que no tengan el
+>   permiso encendido no podrán. Eso es visible en producción desde el primer
+>   minuto y va a generar preguntas.
+> - **Tiene que poder revertirse solo.** Fundido con el arreglo de la conexión por
+>   clínica, dar marcha atrás en el permiso significaría arrastrar consigo la
+>   corrección del bug que motiva toda esta rama. Separados, se revierte uno sin
+>   tocar el otro.
+>
+> Los demás trabajos que §12 añade —«atendida» (§12.13) y los eventos genéricos
+> (§12.14)— **no tienen commit asignado todavía**. Lo que sí está fijado es que el
+> permiso de escritura va el último.
 
 ---
 
@@ -756,9 +798,57 @@ Google. Ver la anotación de la tabla de §4.
 
 ## 12.7 Permiso de escritura en la agenda, por usuario
 
+> **Reescrito el 2026-08-20.** La primera versión de este apartado decía que
+> apagado significaba «no crea, no mueve, no cancela y no borra nada, ni siquiera
+> lo suyo». **Era cierto en intención y llevaba al error en la implementación:**
+> traducido directo a SQL —bloquear el `UPDATE` entero— dejaría al médico invitado
+> sin poder marcar una cita como confirmada o como no asistió, algo que **hoy hace
+> y tiene que seguir haciendo**. Se conserva dicho aquí porque es el atajo que
+> cualquiera vuelve a tomar al leer «no escribe».
+
 Lo administra el administrador desde el panel. **Por defecto ENCENDIDO para la
-secretaria y APAGADO para los médicos invitados.** Apagado significa: no crea, no
-mueve, no cancela y no borra **nada, ni siquiera lo suyo**.
+secretaria y APAGADO para los médicos invitados.**
+
+### El permiso NO es un interruptor sobre la operación: es sobre QUÉ COLUMNAS se tocan
+
+Un médico invitado **SIN** permiso de escritura **PUEDE**:
+
+- leer todas sus citas y abrir el modal;
+- cambiar **`status`**, a cualquiera de los estados de la cita. **«Cancelada» es
+  sólo un estado visual**: cambia el color de la cita y **NO borra la fila**;
+- cambiar **`consultorio_id`** — es el lugar físico y no afecta al horario;
+- cambiar las **notas** de la cita;
+- pulsar **«Iniciar consulta»**.
+
+Un médico invitado **SIN** permiso de escritura **NO PUEDE**:
+
+- **crear** citas ni **borrarlas**;
+- cambiar el **paciente**;
+- cambiar la **fecha y hora de inicio**;
+- cambiar la **duración**;
+- cambiar el **médico asignado**.
+
+Con el permiso **ENCENDIDO** puede todo, como hoy. **Secretaria: encendido por
+defecto. Médicos invitados: apagado por defecto.**
+
+> **Dependencia cruzada, y no es negociable:** §12.7 **tiene** que permitir
+> `status` pase lo que pase. Si se bloqueara, el médico invitado no podría pulsar
+> «Iniciar consulta», que a partir de §12.13 escribe el estado.
+
+### Dónde vive cada mitad de la regla
+
+**Una policy RLS no sabe qué columna cambió.** `USING` y `WITH CHECK` ven la fila
+entera, antes y después, pero no pueden decir «este `UPDATE` sólo tocó `status`».
+De ahí el reparto, y conviene tenerlo escrito antes de escribir SQL:
+
+| Qué | Dónde |
+|---|---|
+| Bloquear `INSERT` y `DELETE` | **Policy** sobre `appointments`. Es lo que una policy sí sabe hacer |
+| Bloquear el cambio de `paciente_id`, `start_time`, `end_time` y `medico_id` | **TRIGGER** sobre `appointments`, comparando `NEW` contra `OLD` **columna por columna**, con `IS DISTINCT FROM` |
+
+Es el mismo patrón que ya usa `proteger_columnas_sensibles_profiles`
+(`20260602_sec_proteger_columnas_sensibles_profiles.sql`), y por el mismo motivo:
+la policy restringe la fila, el trigger restringe la columna.
 
 **Tres condiciones, y las tres son de seguridad, no de diseño:**
 
@@ -772,7 +862,16 @@ mueve, no cancela y no borra **nada, ni siquiera lo suyo**.
    `profiles_update` restringe la fila, no las columnas.
 3. **El administrador no debe poder quitárselo a sí mismo.**
 
-Necesita migración: ver la anotación de §0.10 y el punto abierto de §12.12.
+**Dos migraciones, no una** (§12.15, migraciones 1 y 2), y **commit propio al final
+de la serie de §6** — el porqué, en la anotación del final de §6.
+
+> **Dimensión 15 de `supabase/AUDITORIA-MIGRACIONES.md`, y aquí es donde más
+> importa:** el alcance de los roles se comprueba **en las dos direcciones**. No
+> basta con verificar que un invitado sin permiso **no** pueda mover una cita:
+> hay que verificar que **sí** pueda cambiar `status`, `consultorio_id` y las
+> notas. Un trigger de más es tan defecto como uno de menos, y el de más es el que
+> nadie reporta como bug de seguridad — se reporta como «la app no me deja
+> confirmar».
 
 ## 12.8 Eventos genéricos sin paciente
 
@@ -783,6 +882,9 @@ un compromiso, lo hace en Spinus, no en Google.**
 Ojo con no confundirlos con los de §12.1: estos **sí** son filas de
 `appointments`, nacen en Spinus y se sincronizan a Google como cualquier cita. Los
 de §12.1 nacen en Google y no existen en la base.
+
+> **Desarrollado en §12.14** (2026-08-20): qué soporta ya la base, las dos columnas
+> nuevas y el trabajo de interfaz que hace falta.
 
 ## 12.9 Compartir el calendario en lectura
 
@@ -807,6 +909,12 @@ la agenda**.
 
 > **PENDIENTE DE ZANJAR:** dónde se guarda el «no mostrar más» por usuario. Hoy no
 > hay sitio, y si va en la base es columna y por tanto migración. Ver §12.12.
+
+> **⚠ ANOTACIÓN 2026-08-20 — sigue pendiente, y ya es lo ÚNICO.** Cerrados los
+> cuatro puntos de §12.12, **este aviso es el último asunto abierto de todo §12**.
+> Lo que sí quedó decidido es que **el aviso pertenece a esta rama** (§12.12.1);
+> lo que no, es **dónde vive el «no mostrar más»**. Si acaba en la base, es la
+> quinta migración de §12.15.
 
 ## 12.11 Hechos verificados el 2026-08-19
 
@@ -836,16 +944,230 @@ la agenda**.
 > de `isMedicoInvitado`: así un rol futuro cae en vacío por defecto, que es el
 > fallo seguro. El nombre del helper no está fijado.
 
-## 12.12 Lo que queda abierto
+## 12.12 Los cuatro puntos abiertos — CERRADOS el 2026-08-20
 
-Ninguno de estos está decidido. **No los resuelva quien lea; pregúntelos.**
+> Estaban abiertos desde el 2026-08-19 y **los cuatro tienen respuesta**. Se
+> conserva el enunciado original de cada uno para que se vea qué se preguntaba, y
+> debajo la respuesta **con su porqué**: el veredicto solo no sirve, porque el que
+> venga detrás va a querer saber si su caso es el mismo.
 
-1. **¿A qué rama pertenecen §12.7 (permiso de escritura) y el «no mostrar más» de
-   §12.10?** Las dos piden migración, y §0.10 afirma que esta rama no lleva
-   ninguna. Si son de ésta, §0.10 deja de valer.
-2. **El techo de `maxResults: 100` sin paginación** (`events/route.ts:144`). Con la
-   resta deja de ser inocuo: puede tragarse en silencio un evento escrito a mano.
-   Sin decidir si se arregla en el commit 2 o después. Ver la anotación de §0.9.
-3. **La verificación de `attendees` bajo `calendar.app.created`** (§12.4). Bloquea
-   toda esa decisión y sólo se resuelve con una prueba real contra Google.
-4. **Qué se hace con `isGoogleEvent`**, la bandera muerta de `agenda/page.tsx:1797`.
+### 12.12.1 — ¿A qué rama pertenecen §12.7 y el «no mostrar más» de §12.10?
+
+**SON DE ESTA RAMA.**
+
+**Consecuencia inmediata:** §0.10 («sin migración») deja de ser cierto, y está
+anotado allí. Esta rama pasa a llevar **cuatro migraciones** (§12.15), con una
+quinta condicionada a dónde acabe guardándose el «no mostrar más» — que **sigue sin
+decidirse** y es lo único que queda abierto de todo §12.12.
+
+**Todas pasan por `supabase/AUDITORIA-MIGRACIONES.md` y sus 15 dimensiones antes de
+aplicarse**, con atención especial a la **dimensión 15**: el alcance de los roles se
+comprueba **en las dos direcciones**. Ver la nota al final de §12.7.
+
+**Mitigación de riesgo, y es parte de la respuesta, no un añadido:** el permiso de
+escritura va en **su propio commit, al final de la serie de §6**. Hoy los médicos
+invitados pueden crear citas; después no podrán. Es un cambio de comportamiento
+visible para usuarios reales y **tiene que poder revertirse solo, sin arrastrar el
+arreglo de la conexión por clínica**, que es el bug que motiva toda la rama.
+
+### 12.12.2 — El techo de `maxResults: 100`
+
+**SE ARREGLA EN EL COMMIT 2.**
+
+**Por qué ahí y no después:** es el commit 2 el que convierte ese techo en un
+problema real. Hoy, con la resta contra el calendario propio, lo que se pierde
+pasados los 100 es material duplicado. Al pasar a la **resta acotada por
+capacidad**, lo que sobrevive al filtro son los **eventos escritos a mano** (§12.1),
+que **no están duplicados en ninguna otra fuente**. Un evento que desaparece en
+silencio es el peor fallo posible: nadie lo reporta porque nadie sabe que faltaba.
+
+**Y por qué es barato:** no es paginación completa. Es un **bucle de `pageToken`**
+sobre la llamada que ya existe (`events/route.ts:138-145`), en un archivo que el
+commit 2 toca igualmente.
+
+### 12.12.3 — La verificación de `attendees`
+
+**ANTES DEL COMMIT 3, y la hace Angel a mano.**
+
+**No bloquea el commit 2.** Bloquea **§12.4 entera**.
+
+**Por qué no se puede resolver aquí:** es comportamiento de Google, no del
+repositorio. La prueba es crear un evento real con un `attendee` y comprobar si
+llega el correo. Ninguna cantidad de lectura de código la sustituye.
+
+**Qué pasa si sale que no:** si `calendar.app.created` no autoriza invitar
+asistentes externos, §12.4 se queda sin suelo y hay que **replantear cómo le llega
+la cita al médico invitado**. No es un ajuste: es volver a la mesa.
+
+### 12.12.4 — `isGoogleEvent`
+
+**SE BORRA EN EL COMMIT 2.** Bandera muerta en `agenda/page.tsx:1797`; nadie la
+produce. El commit 2 ya está dentro de ese archivo retirando todo lo de «Ocupado»,
+así que no abre un frente nuevo.
+
+---
+
+## 12.13 El estado «atendida»
+
+**Hoy «Iniciar consulta» NO escribe.** No cambia el estado de la cita: el estado se
+cambia a mano en el modal. **Pasa a escribir:** al pulsarlo, una cita `agendada` o
+`confirmada` pasa a **`atendida`**.
+
+**Ese estado NO EXISTE.** El CHECK de `appointments.status`
+(`supabase/baseline/02_tables.sql:82-84`) sólo admite `scheduled`, `confirmed`,
+`cancelled` y `no_show`. **Hace falta migración** (§12.15, migración 3).
+
+> **⚠ CABO SUELTO A RESOLVER AL IMPLEMENTARLO — verificado el 2026-08-20.**
+> `STATUS_COLOR` en `src/app/api/appointments/[id]/route.ts:296-301` **ya incluye
+> `completed: '8'`** (línea 300). Es una rama **hoy muerta**: la base rechaza ese
+> valor, así que nunca se ha evaluado.
+>
+> **O se reutiliza ese nombre o se limpia, pero no pueden convivir dos nombres para
+> el mismo concepto.** Un `completed` en el código y un `atendida` en la base es
+> exactamente el tipo de desajuste que sobrevive años porque las dos mitades
+> «funcionan».
+
+**Decisión tomada sobre el fallo:** si el guardado del estado falla al iniciar
+consulta, **la consulta SE ABRE IGUAL** y el estado se reintenta. **Bloquear la
+atención de un paciente por un fallo de red es peor que un estado desactualizado.**
+
+**Dependencia con §12.7:** esto obliga a que el permiso de escritura **permita
+`status` siempre**. Si se bloqueara, el médico invitado no podría iniciar consulta
+— que es justamente lo que va a hacer todo el día.
+
+---
+
+## 12.14 Eventos genéricos sin paciente — desarrollo de §12.8
+
+Un evento genérico es **una fila de `appointments` SIN paciente**: nace en Spinus y
+se sincroniza a Google como cualquier cita.
+
+> **No confundir con §12.1.** Los de §12.1 nacen **en Google**, no existen en la
+> base y son inertes. Los de aquí nacen **en Spinus**, son filas de verdad, y por
+> tanto **sí aparecen en la dashboard** — al revés que los de §12.1, que no
+> aparecen nunca. Esa diferencia es la razón de que haya que arreglar los dos
+> consumidores del final de este apartado.
+
+### Lo que la base ya soporta (verificado el 2026-08-20)
+
+- **`paciente_id` es nullable** (`supabase/baseline/02_tables.sql:64`), con FK
+  `ON DELETE SET NULL` (`04_foreign_keys.sql:33-36`).
+- **`title` es NOT NULL** (`02_tables.sql:66`) — o sea que el campo donde va el
+  texto del evento ya existe y ya es obligatorio.
+- **`eventoParaGoogle`** (`src/lib/appointments.ts:43-45` y `:75-81`) **ya está
+  escrita para el caso sin paciente**: cae al título libre y compone la
+  descripción sólo con el nombre de la clínica.
+- **`POST /api/appointments:198`** ya acepta `paciente_id: null`.
+
+**No hace falta tocar nada de eso.** El trabajo está arriba, en la interfaz, y en
+dos columnas nuevas.
+
+### El título es texto libre
+
+El usuario escribe lo que quiera: «Cirugía Sr. Pérez», «Junta de personal», «Bloqueo
+— consulta externa». **NO hay tipos cerrados de evento.** Se usa el `title` que ya
+existe; **para esto no hace falta ninguna columna**.
+
+### Dos columnas nuevas, las dos con CHECK contra lista cerrada
+
+Un **icono** (de una lista predeterminada) y un **color** (de una paleta).
+
+> **El CHECK no es desconfianza del usuario.** Si la columna admite cualquier cosa,
+> un fallo de interfaz o un `UPDATE` por PostgREST mete un valor que la agenda no
+> sabe pintar, **y el evento sale roto** — sin error, sólo mal. La lista cerrada
+> convierte eso en un rechazo de la base.
+
+**Forma propuesta** (nombres provisionales, nullables porque una cita normal no
+lleva ninguno):
+
+```sql
+icono text CHECK (icono IS NULL OR icono = ANY (ARRAY[...])),
+color text CHECK (color IS NULL OR color = ANY (ARRAY[...]))
+```
+
+**⚠ LOS VALORES DE ABAJO SON PROVISIONALES.** Claude Design va a proponer la
+iconografía y rehacer la estética del calendario más adelante, **y los va a
+sustituir**. Lo que queda **FIJO es la forma** —dos columnas con CHECK contra lista
+cerrada—, porque cambiar los valores después es trivial y **cambiar de texto libre a
+lista cerrada no lo es**: obliga a migrar datos que ya no encajan.
+
+**Iconos iniciales:** `bisturi` (cirugía), `personas` (reunión), `candado` (bloqueo
+de horario), `avion` (ausencia o viaje), `libro` (formación), `punto` (genérico, sin
+icono).
+
+**Paleta inicial.** Restricción dura: **ningún color puede colisionar con los de los
+estados de cita**, o un evento genérico se confundirá con una cita de un vistazo.
+Ocupados hoy (`src/app/globals.css:90-97`): azul `#2f6fed` (agendada), verde
+`#16a34a` (confirmada), rojo `#dc2626` (cancelada), gris pizarra `#64748b` (no
+asistió) — **más el que se lleve «atendida»** (§12.13), que aún no está elegido, y
+**más el morado `#7c5cdb`** que ya es de los eventos de Google (`--ag-gcal-*`,
+`:100-104`). Con eso fuera:
+
+| Nombre | Hex | Se mantiene lejos de |
+|---|---|---|
+| `ambar` | `#d97706` | nada cercano |
+| `cian` | `#0891b2` | del verde de «confirmada» |
+| `rosa` | `#db2777` | del rojo de «cancelada» |
+| `terracota` | `#9a3412` | del rojo y del ámbar |
+| `indigo` | `#4338ca` | del azul de «agendada» y del morado de Google |
+
+> Al elegir el color de «atendida» (§12.13) **hay que mirar esta tabla**, no sólo la
+> de estados: son la misma paleta compartiendo un calendario.
+
+### Trabajo de interfaz que esto exige (verificado el 2026-08-20)
+
+- **El modal impide guardar sin paciente:** `handleSave` aborta
+  (`agenda/page.tsx:563`) y el botón está deshabilitado (`:865`).
+- **El título se compone del paciente** (`:580`) y **no hay campo de título
+  libre**. Hay que crearlo.
+- **`POST /api/appointments` exige `consultorio_id`** (`:89-94`) y, para
+  administrador y secretaria, **`medico_id`** (`:136-140`).
+
+  > **DECISIÓN — un evento genérico exige los dos igual que una cita.** No es
+  > inercia; es que quitarlos rompe cosas concretas:
+  >
+  > - **`medico_id`:** `appointments_select` deja al médico invitado **sólo** las
+  >   filas con su `medico_id`, y **las de `medico_id` NULL le son invisibles**
+  >   (§12.11). Un bloqueo de horario sin médico sería invisible **justo para la
+  >   persona cuyo tiempo bloquea**.
+  > - **`consultorio_id`:** su snapshot alimenta el badge de zona horaria
+  >   (`consultorio_timezone`) y toda la agenda lo da por presente desde la Fase
+  >   2.6. Hacerlo opcional estrena una segunda forma de fila que **todos** los
+  >   consumidores tendrían que contemplar.
+  >
+  > El coste es escoger consultorio para una junta, y el consultorio por defecto
+  > ya viene preseleccionado. **Es la decisión más reversible de las dos**: dejar
+  > de exigirlo después es fácil; empezar a exigirlo sobre filas que ya existen sin
+  > él, no.
+
+- **DOS CONSUMIDORES PINTAN UN RENGLÓN VACÍO, y se arreglan en el mismo commit:**
+  `src/app/(app)/dashboard/page.tsx:270` y `:324`, y
+  `src/app/(app)/dashboard/AsistenteDashboard.tsx:129`. Los tres sacan
+  `{cita.pacientes?.nombre} {cita.pacientes?.apellidos}` **sin caer al `title`**,
+  como sí hace la agenda (`renderEventContent:1208`). No revientan —los enlaces sí
+  están protegidos por `cita.paciente_id &&`, `:280` y `:331`— pero **pintan una
+  línea en blanco donde debería ir «Junta de personal»**.
+
+---
+
+## 12.15 Las migraciones de esta rama
+
+§0.10 decía que esta rama no llevaba ninguna. **Lleva cuatro**, y una quinta
+condicionada. Todas pasan por `supabase/AUDITORIA-MIGRACIONES.md` y sus 15
+dimensiones **antes** de aplicarse, y su cabecera se actualiza al aplicarlas (§7 de
+ese documento).
+
+| # | Qué | De dónde sale |
+|---|---|---|
+| 1 | La **columna del permiso** en `profiles`, **más su entrada en el trigger guardián** `proteger_columnas_sensibles_profiles` | §12.7 |
+| 2 | El **trigger sobre `appointments`** que compara `NEW` contra `OLD` **columna por columna**, más la policy de `INSERT`/`DELETE` | §12.7 |
+| 3 | El valor **`atendida`** en el CHECK de `appointments.status` | §12.13 |
+| 4 | Las **dos columnas de icono y color** con sus CHECK contra lista cerrada | §12.14 |
+| *(5)* | *El «no mostrar más» de los avisos, **si** acaba guardándose en la base* | §12.10 — **sigue sin decidirse dónde se guarda** |
+
+**Las 1 y 2 son inseparables en intención y separables en archivo:** sin la 1 no hay
+columna que consultar; sin la 2, el permiso es decorativo porque se escribe directo
+por PostgREST. Las dos van en el **commit 7** (final de §6).
+
+> **El único punto que sigue abierto en todo §12** es dónde se guarda el «no
+> mostrar más» por usuario. Si va a la base, esta tabla pasa a cinco.
