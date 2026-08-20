@@ -25,8 +25,62 @@ function destinoDeErrorAlta(error: ErrorAlta): string {
     // las citas dejarían de sincronizarse sin que nadie se enterara.
     case 'rol_no_promovido':
       return '/perfil?gcal_error=rol_no_promovido'
+    // Esa cuenta de Google ya está enlazada a OTRO usuario de Spinus. Lo
+    // detecta el módulo, no el RPC; antes de poblar la identidad no podía
+    // ocurrir. La salida es del médico: usar otra cuenta, o desconectarla
+    // desde el usuario que la tiene.
+    case 'cuenta_ya_vinculada':
+      return '/perfil?gcal_error=cuenta_ya_vinculada'
     default:
       return '/perfil?gcal_error=alta_fallida'
+  }
+}
+
+/**
+ * Qué cuenta de Google se acaba de conectar: el `sub` (identificador estable) y
+ * el correo, para `google_account_sub` y `google_account_email`.
+ *
+ * NO HACE FALTA LLAMAR A `userinfo`. Con `openid` en el consentimiento, el
+ * propio intercambio del código devuelve un `id_token` con las dos cosas
+ * dentro, así que esto no cuesta una vuelta más a la red por la identidad.
+ *
+ * SE VERIFICA LA FIRMA aunque la documentación de Google diga que no hace
+ * falta cuando el intercambio es servidor-a-Google sobre HTTPS autenticando con
+ * el client secret —que es exactamente nuestro caso—. Se verifica igual porque
+ * la alternativa es decodificar a mano el segundo segmento de un JWT dentro de
+ * un camino de redirect, y eso es cómo se cuela un `atob` sin comprobar nada.
+ *
+ * DEVOLVER `{ null, null }` NO ES UN FALLO Y NO ABORTA NADA. Esas dos columnas
+ * significan «no se sabe qué cuenta es», nunca «conexión defectuosa»: hay
+ * conexiones en producción que las tienen en NULL y siguen sincronizando
+ * perfectamente. Tumbar una conexión buena porque no se pudo leer su identidad
+ * sería cambiar un dato de diagnóstico por el servicio entero.
+ *
+ * `sub` es obligatorio en el payload; `email` es OPCIONAL y puede faltar. Si
+ * falta, va NULL — el `COALESCE` del RPC entiende NULL como «no lo toques».
+ *
+ * `email_verified` viene en el payload y NO se usa, y no es un olvido: el
+ * identificador estable es `sub`, y el correo es informativo (para que el
+ * médico vea a qué cuenta está enganchada su clínica). Lo dice ya el COMMENT de
+ * la columna en `20260817_gcal_conexion_clinica_a_esquema.sql`.
+ */
+async function identidadDeGoogle(
+  oauth2Client: InstanceType<typeof google.auth.OAuth2>,
+  idToken: string | null | undefined,
+  userId: string,
+): Promise<{ sub: string | null; email: string | null }> {
+  if (!idToken) return { sub: null, email: null }
+
+  try {
+    const ticket = await oauth2Client.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    })
+    const payload = ticket.getPayload()
+    return { sub: payload?.sub ?? null, email: payload?.email ?? null }
+  } catch (err) {
+    registrarFalloGCal({ operacion: 'verifyIdToken (identidad de la cuenta)', userId }, err)
+    return { sub: null, email: null }
   }
 }
 
@@ -98,6 +152,17 @@ export async function GET(req: NextRequest) {
     // Continuar: quedaría conectado pero sin poder crear nada, y fallaría más
     // tarde con un error opaco. La respuesta del token trae los permisos
     // realmente concedidos; si falta el imprescindible, no se guarda nada.
+    //
+    // ⚠ ESTE CHEQUEO NO SE AMPLÍA A `openid` NI A `email`, Y NO ES UN OLVIDO.
+    // El único permiso imprescindible es el del calendario: sin él no hay
+    // sincronización que valga. Sin identidad sí la hay — sólo se pierde poder
+    // decir de qué cuenta es, que es un dato de diagnóstico. Exigirlos aquí
+    // convertiría una conexión que funciona en un rechazo.
+    //
+    // Y si alguien lo amplía de todas formas, la trampa: Google devuelve `email`
+    // EXPANDIDO como `https://www.googleapis.com/auth/userinfo.email`, no como
+    // el literal corto que se pide en /connect. Un `includes('email')` sobre
+    // `tokens.scope` rechazaría conexiones perfectamente buenas.
     const CALENDARIO_PROPIO = 'https://www.googleapis.com/auth/calendar.app.created'
     if (!(tokens.scope ?? '').split(' ').includes(CALENDARIO_PROPIO)) {
       const denegado = NextResponse.redirect(new URL('/perfil?gcal_error=permiso_calendario', req.url))
@@ -122,11 +187,18 @@ export async function GET(req: NextRequest) {
     // dentro del RPC, así que no puede nacer una conexión sin tokens. Antes
     // esto era un upsert sobre `google_tokens` por usuario — el modelo que esta
     // rama sustituye.
+    //
+    // `cuenta` puede llegar con las dos mitades en null, y eso es NORMAL, no un
+    // fallo: significa «no se sabe qué cuenta de Google es». Ocurre si el
+    // `id_token` no viene o no verifica, y le pasa además a toda conexión
+    // anterior a este commit — se decidió CONVIVIR con ellas en vez de forzar
+    // reconexiones, así que nada aguas abajo puede romperse ni degradarse por
+    // eso. Se irán poblando solas conforme la gente reconecte.
     const alta = await altaConexion({
       userId:    user.id,
       clinicaId,
       rol:       'clinica',
-      cuenta:    { sub: null, email: null },   // los puebla el commit 4, con los scopes openid/email
+      cuenta:    await identidadDeGoogle(oauth2Client, tokens.id_token, user.id),
       tokens: {
         accessToken:  tokens.access_token,
         refreshToken: tokens.refresh_token ?? null,

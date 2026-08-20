@@ -43,7 +43,7 @@
  * NO importa `googleapis` a propósito (plan §1): eso vive en `gcal.ts`, y este
  * módulo va a ser importado DESDE allí. Importarlo de vuelta sería un ciclo.
  */
-import type { SupabaseClient } from '@supabase/supabase-js'
+import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { encrypt } from '@/lib/encrypt'
 import { logger } from '@/lib/logger'
@@ -238,10 +238,55 @@ export const ERRORES_ALTA = [
   'access_token_nulo',
 ] as const
 
-export type ErrorAlta = (typeof ERRORES_ALTA)[number]
+/**
+ * El sexto, y es de ESTE módulo, no del RPC: la cuenta de Google que se intenta
+ * conectar ya está enlazada a OTRO usuario de Spinus.
+ *
+ * Lo impone el índice único parcial `..._account_sub_uniq`
+ * (`20260817_gcal_conexion_clinica_a_esquema.sql:267-269`), y hasta hoy era
+ * INALCANZABLE: la columna valía siempre NULL y el índice es parcial
+ * (`WHERE google_account_sub IS NOT NULL`), así que nunca podía chocar. Al
+ * empezar a poblar la identidad, el choque se estrena.
+ *
+ * NO es el relevo de administrador. Ése es `clinica_ya_conectada` —otra cuenta
+ * ya es la de esta clínica— y lo resuelve el RPC. Éste es al revés: la misma
+ * cuenta de Google intentando dar servicio a dos usuarios de Spinus, cosa que
+ * el caso real produce sin ninguna malicia —una persona con dos contextos, dos
+ * clínicas y dos cuentas de Spinus— y que no puede permitirse, porque las citas
+ * de los dos acabarían en el mismo calendario.
+ *
+ * VA APARTE DE `ERRORES_ALTA` A PROPÓSITO: esa lista es el contrato del RPC —los
+ * cinco literales que levanta con `RAISE EXCEPTION` y que están en su `COMMENT`—
+ * y meter dentro uno que el RPC no produce dejaría esa documentación mintiendo.
+ * De cara al llamador los seis son lo mismo: respuestas con nombre, no fallos.
+ */
+export const ERROR_CUENTA_YA_VINCULADA = 'cuenta_ya_vinculada'
+
+export type ErrorAlta =
+  | (typeof ERRORES_ALTA)[number]
+  | typeof ERROR_CUENTA_YA_VINCULADA
 
 function esErrorAlta(mensaje: string): mensaje is ErrorAlta {
   return ERRORES_ALTA.some((nombre) => nombre === mensaje)
+}
+
+/** El índice único parcial sobre la identidad de la cuenta de Google. */
+const INDICE_CUENTA_UNICA = 'clinica_conexiones_google_account_sub_uniq'
+
+/**
+ * ¿Es el choque contra ese índice? Se reconoce POR EL NOMBRE DEL ÍNDICE, que
+ * Postgres pone en el mensaje del 23505, y no sólo por el SQLSTATE: sobre esta
+ * tabla hay tres índices únicos más y confundirlos daría un aviso equivocado.
+ *
+ * Se mira también `details`, donde Postgres repite el nombre de la columna. Ese
+ * campo lleva además el VALOR que chocó —el `sub` de la cuenta—, así que se usa
+ * para decidir y NUNCA se registra ni se devuelve.
+ *
+ * Que el reconocimiento falle no rompe nada: se cae al `throw` de abajo, que es
+ * el comportamiento que había antes de este commit.
+ */
+function esCuentaYaVinculada(error: PostgrestError): boolean {
+  return `${error.message} ${error.details ?? ''}`.includes(INDICE_CUENTA_UNICA)
 }
 
 /** Lo que el RPC devuelve del alta. */
@@ -277,11 +322,35 @@ interface FilaAlta {
  * aleatorio, así que cifrar dos veces daría dos ciphertexts distintos.
  *
  * Un error con nombre no toca el espejo: no se escribió nada en la fuente nueva.
+ *
+ * ── `cuenta` CON LAS DOS MITADES EN NULL ES NORMAL ──────────────────────────
+ * Significa **«no se sabe qué cuenta de Google es»**, y NUNCA «conexión
+ * defectuosa». Hay dos formas de llegar aquí con nulos y ninguna es un fallo:
+ * el `id_token` no vino o no verificó, y —la habitual— la conexión es anterior
+ * a los scopes `openid`/`email`.
+ *
+ * Añadir un scope NO le vuelve a pedir consentimiento a quien ya conectó: su
+ * token sigue sirviendo con los permisos viejos y sus dos columnas se quedan en
+ * NULL. **Se decidió CONVIVIR con eso en vez de forzar reconexiones** —con diez
+ * betatesters el dato no vale la molestia, y una reconexión mal hecha deja a una
+ * clínica sin sincronizar—, así que a partir de aquí conviven conexiones con
+ * identidad y sin ella. **Nada puede romperse, degradarse ni avisar por eso.**
+ * Se van poblando solas conforme la gente reconecte por otros motivos.
+ *
+ * El RPC ya está escrito para esto: hace `COALESCE` sobre las dos columnas, o
+ * sea que NULL es «no lo toques», nunca «bórralo» — la misma regla que el
+ * `refresh_token` en `guardarSecretos`.
+ *
+ * ⚠ SI ALGÚN DÍA ESTOS DOS CAMPOS SUBEN AL DESCRIPTOR `ConexionGoogle`, TIENEN
+ * QUE ENTRAR COMO `string | null`. Un tipo no-nulable ahí es exactamente cómo la
+ * decisión de convivir se rompe sin que nadie lo note: el compilador dejaría de
+ * obligar a contemplar el caso que hoy es mayoría en producción.
  */
 export async function altaConexion(args: {
   userId:    string
   clinicaId: string
   rol:       'clinica' | 'personal'
+  /** NULL en cualquiera de las dos = identidad desconocida. Ver el docstring. */
   cuenta:    { sub: string | null; email: string | null }
   tokens:    { accessToken: string; refreshToken: string | null; expiresAt: number | null }
 }): Promise<ResultadoAlta> {
@@ -302,6 +371,12 @@ export async function altaConexion(args: {
 
   if (error) {
     if (esErrorAlta(error.message)) return { ok: false, error: error.message }
+    // El 23505 del índice de identidad NO llega con nombre —el RPC sólo
+    // reetiqueta el de «una conexión de clínica por clínica» y vuelve a lanzar
+    // el resto—, así que se le pone aquí. Sin esto sube como excepción y el
+    // médico acaba en la dashboard con un `?error=oauth_failed` que nadie
+    // pinta: un fallo mudo, que es el patrón que abre esta rama entera.
+    if (esCuentaYaVinculada(error)) return { ok: false, error: ERROR_CUENTA_YA_VINCULADA }
     throw new Error(`altaConexion: ${error.message}`)
   }
 

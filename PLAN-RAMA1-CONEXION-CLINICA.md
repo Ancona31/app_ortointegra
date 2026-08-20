@@ -383,7 +383,7 @@ Firma nueva: `(conexion: ConexionGoogle, admin, operacion, opciones: { puedeRepa
 | F6 | `src/app/api/google/events/route.ts` | `estadoDeFallo` :22-41 por clínica; `consultarOcupado` :54-94 con **cliente propio** fuera del reintento y `ocupado: []` si no hay conexión propia (H8); dedupe :162-168 **intersección** + `.eq('clinica_id')`; lista blanca en :170-176; **`puedeReparar` calculado con `canManageClinica`** y pasado a `conCalendarioSpinus` (H2, §3.3) |
 | F7 | `src/app/api/appointments/route.ts` | conexión resuelta antes de responder, junto con `puedeReparar` (§3.6); `after()` :263-314 con la conexión; veredicto :325-333 por clínica; **`gcal_calendar_id: calendarIdUsado` en el UPDATE :303-307** (§0.7, aprobado); **el `'synced'` deja de ser optimista**: :288-289 pasa a `creado?.data.id ? 'synced' : 'failed'` con `registrarFalloGCal` en la rama falsa (H4) |
 | F8 | `src/app/api/appointments/[id]/route.ts` | ídem para PUT (`after()` :295-353, veredicto :361-369) y DELETE (`after()` :412-428); el `'synced'` optimista de :328-329 con el mismo arreglo que F7 (H4); y **`gcal_calendar_id` también en el PUT** cuando el evento se cree ahí |
-| F9 | `src/app/api/google/connect/route.ts` | gate `canManageClinica` por higiene —el que cuenta es el del callback, que es donde se escribe el renglón (§2.5)—; y los scopes `openid` y `email` :35-38, **en su propio commit** (§6) |
+| F9 | `src/app/api/google/connect/route.ts` | gate `canManageClinica` por higiene —el que cuenta es el del callback, que es donde se escribe el renglón (§2.5)—; y los scopes `openid` y `email` :67-69, **en su propio commit** (§6) |
 | F10 | `src/app/(app)/agenda/page.tsx` | `gcalSource` :1385-1440 deja de pintar `data.events` (sigue pintando `ocupado`). Fuera de la lista original: **aprobado** |
 | F11 | `src/lib/__tests__/gcalConexion.test.ts` **(nuevo)** | el cerrojo de §2.2 |
 | F12 | `src/app/(app)/perfil/page.tsx` | **H5.** «Desconectar» no está detrás de `isAdmin` —sólo lo está «Recrear calendario», :708— y su handler hace `setGcalEstado('sin_token')` incondicional ignorando la respuesta (:351-357). Con F5 gateando el DELETE, un invitado hace clic, recibe 403 y la interfaz le dice «desconectado» sin estarlo. Se gatea el botón y el handler pasa a mirar la respuesta. Segundo caso del mismo tipo que F10 |
@@ -418,6 +418,14 @@ Son **13** archivos —eran 11 antes de absorber H5 y H6—. Muy por encima del 
 > `freebusy` se llevaba el resto; con §12.1 el carril de eventos de Google sigue
 > vivo para dos de los tres roles. Lo que sí muere es todo lo de «Ocupado»
 > (§12.6).
+
+> **⚠ ANOTACIÓN 2026-08-20 — puntero corregido en F9.** La fila decía «los scopes
+> `openid` y `email` **:35-38**» y ese tramo dejó de ser el de los scopes: hoy
+> `:35-38` es la comprobación de variables de entorno. **Los scopes están en
+> `:67-69`**, y los movió el commit 2 al retirar `freebusy` del array. La fila
+> queda enmendada en el sitio —una anotación entre renglones rompería la tabla— y
+> se deja constancia aquí. No cambia nada del alcance: sólo el puntero estaba mal,
+> como ya le pasó a `gcal.ts:317` en §0.1.
 
 ---
 
@@ -1003,6 +1011,13 @@ la agenda**.
 > §12.4). Con eso, **dónde se guarda el «no mostrar más» por usuario es el ÚNICO
 > asunto abierto de todo §12**, sin nada pendiente detrás.
 
+> **⚠ TERCERA ANOTACIÓN 2026-08-20 — «el único» pasa a ser «uno de dos».** Las dos
+> anotaciones de arriba eran ciertas al escribirse y han dejado de serlo por un
+> añadido, no por un error suyo: **§12.16** recoge un caso que el plan no
+> contemplaba —reconectar con **otra cuenta de Google**— y queda **sin decidir**.
+> Lo de aquí sigue abierto exactamente igual; lo que ya no es cierto es que esté
+> solo.
+
 ## 12.11 Hechos verificados el 2026-08-19
 
 - **El puente está APLICADO y verificado en producción.**
@@ -1283,3 +1298,62 @@ por PostgREST. Las dos van en el **commit 7** (final de §6).
 > en verde:** §12.4 no pide migración, no pide replanteo y no añade nada a esta
 > tabla. **Se queda en cuatro, más la quinta condicionada**, exactamente como
 > está.
+
+---
+
+## 12.16 Reconexión con OTRA cuenta de Google — alcance nuevo, SIN DECIDIR
+
+> **Añadida el 2026-08-20, al escribir el commit 4** (los scopes `openid` y
+> `email`). Sale de la fase de lectura de ese commit: con la identidad de la
+> cuenta poblándose, aparece un caso que **el plan no contempla en ningún sitio**.
+> Aquí se describe **qué pasa hoy**; **no se decide nada.**
+
+El plan sí cubre el **relevo de administrador** —otra *persona* conectando—, y
+para eso están `clinica_ya_conectada` y `rol_no_promovido` (§2.5). Lo que nadie
+escribió es qué debe pasar cuando **la misma persona** reconecta con una **cuenta
+de Google distinta** de la que tenía registrada.
+
+### Qué hace el código hoy, paso a paso
+
+1. **Ninguna guarda del RPC lo ve.** La guarda 3 compara `user_id <> p_user_id`
+   (mismo usuario: no dispara) y la guarda 4 compara roles, no cuentas
+   (`20260818_gcal_puente_secretos.sql:250-277`).
+2. **El `ON CONFLICT (user_id) DO UPDATE` pisa el `sub` anterior en silencio.**
+   El `COALESCE` de `:301-302` protege contra NULL, no contra un valor distinto.
+   Hasta el commit 4 era inobservable, porque el `sub` llegaba siempre NULL.
+3. **El `calendar_id` NO se toca** (`:304-306`, deliberado), así que la conexión
+   queda apuntando a un calendario que vive **en la cuenta anterior** y al que el
+   token nuevo no llega.
+4. **El callback lo tapa creando otro calendario.** `calendarioVive` da 404 con
+   el cliente nuevo (`callback/route.ts`) y se crea uno nuevo con
+   `esperado: yaRegistrado`. La conexión sobrevive y sincroniza.
+5. **Y ahí queda el residuo:** las citas anteriores conservan un
+   `google_event_id` de un calendario muerto. `desvincularCitas` **no** corre por
+   este camino, así que nada vuelve a intentarlo.
+
+O sea: **hoy funciona mal, pero funciona.** No hay fuga ni corrupción; hay un
+rastro de citas con vínculos muertos y un `sub` sobrescrito sin dejar huella.
+
+### Las opciones, y por qué no se elige ninguna ahora
+
+- **Dejarlo como está.** Con la identidad ya poblada, al menos el 404 deja de ser
+  ambiguo para quien lea la base a mano — que es el motivo declarado del commit 4
+  (§7, escenario «3 sin 4»).
+- **Detectar y avisar** sin bloquear: comparar el `sub` entrante con el guardado
+  y registrar el cambio de cuenta.
+- **Bloquear** con un sexto error con nombre en el RPC. Tiene un contra real: hoy
+  reconectar con otra cuenta funciona, y convertirlo en error deja al
+  administrador **sin salida salvo desconectar primero**. Además es **migración**,
+  con sus 15 dimensiones de `supabase/AUDITORIA-MIGRACIONES.md`.
+
+**Nada de esto es del commit 4:** poner el dato y actuar sobre él son cosas
+distintas, y ese commit sólo pone el dato. **No añade migración a §12.15** salvo
+que se elija la tercera opción.
+
+> **NO CONFUNDIR CON `cuenta_ya_vinculada`, que sí se resolvió en el commit 4.**
+> Aquél es el choque del índice único `..._account_sub_uniq` cuando **dos
+> usuarios distintos** de Spinus intentan enlazar **la misma** cuenta de Google
+> (una persona con dos contextos, dos clínicas y dos cuentas de Spinus). Se
+> detecta en `altaConexion` y sale por `?gcal_error=cuenta_ya_vinculada`, sin
+> tocar el RPC ni la base. Éste de aquí es el contrario: **un solo usuario
+> cambiando de cuenta de Google**, que ningún índice ve.

@@ -87,6 +87,11 @@ const AVISOS_GCAL: Record<string, string> = {
   rol_no_promovido:
     'Esta cuenta de Google ya estaba enlazada a Spinus de otra forma y reconectar no la convierte '
     + 'en la cuenta de la clínica. Desconéctala primero y vuelve a conectarla.',
+  cuenta_ya_vinculada:
+    'Esa cuenta de Google ya está enlazada a otro usuario de Spinus. Una misma cuenta no puede dar '
+    + 'servicio a dos, porque las citas de ambos acabarían mezcladas en el mismo calendario. Tienes '
+    + 'dos salidas: conectar aquí una cuenta de Google distinta, o entrar con el usuario que la '
+    + 'tiene enlazada, desconectarla desde su perfil y volver a intentarlo.',
   alta_fallida:
     'No se pudo guardar la conexión con Google. No ha quedado nada a medias: vuelve a intentarlo, '
     + 'y si se repite, avísanos.',

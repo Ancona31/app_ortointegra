@@ -55,17 +55,40 @@ export async function GET(req: NextRequest) {
 
   const url = oauth2Client.generateAuthUrl({
     access_type: 'offline',
-    // Scope NO sensible: sin verificación, sin tope de 100 usuarios y sin
-    // pantalla de advertencia. Da CRUD sólo en calendarios que creó la app.
+    // LOS TRES SCOPES SON NO SENSIBLES, y eso es requisito, no un detalle: en
+    // cuanto uno solo fuera sensible o restringido, esta app volvería a
+    // necesitar verificación y estrenaría el tope de 100 usuarios nuevos —un
+    // contador que NO se puede restablecer nunca (plan §12.11)—.
     //
-    // Aquí había un segundo scope, `calendar.events.freebusy`, para pintar los
+    // Comprobado en Google Cloud Console → Acceso a los datos el 2026-08-20:
+    // los tres aparecen bajo «Tus permisos no sensibles», y los bloques de
+    // sensibles y restringidos están vacíos. Si añades uno más, míralo AHÍ
+    // antes de escribirlo aquí; la clasificación es de Google y no se deduce
+    // del nombre del scope.
+    //
+    //   · calendar.app.created → CRUD sólo en calendarios que creó la app.
+    //   · openid + userinfo.email → SÓLO para saber QUÉ cuenta de Google se
+    //     conectó (`google_account_sub` y `google_account_email`). Sin ellos,
+    //     un 404 sobre el calendario no se puede distinguir entre «lo
+    //     borraron» y «reconectaron con otra cuenta», que piden respuestas
+    //     opuestas. No dan acceso a nada más.
+    //
+    // `userinfo.email` va en su forma larga a propósito, aunque `email` sea su
+    // alias corto y válido: es la forma que Google devuelve en `tokens.scope` y
+    // la que aparece registrada en la consola. Ver la trampa que esto tiene en
+    // el callback, junto al chequeo de consentimiento granular.
+    //
+    // Aquí había un cuarto scope, `calendar.events.freebusy`, para pintar los
     // huecos del calendario PERSONAL de quien conectaba. Se retiró con la
     // función entera: bajo un calendario de clínica, esa consulta enseñaría la
     // disponibilidad personal del administrador a toda la clínica. Retirarlo
     // del consentimiento no afecta a quien ya conectó —su permiso concedido
-    // sigue vivo—, sólo a los consentimientos nuevos.
+    // sigue vivo—, sólo a los consentimientos nuevos. También se retiró de la
+    // lista de la consola, que seguía anunciándolo.
     scope: [
       'https://www.googleapis.com/auth/calendar.app.created',
+      'openid',
+      'https://www.googleapis.com/auth/userinfo.email',
     ],
     prompt: 'consent',
     state,
