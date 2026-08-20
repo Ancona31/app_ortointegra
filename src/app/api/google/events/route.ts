@@ -1,15 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { canVerAgendaCompleta } from '@/lib/permissions'
 import {
   conCalendarioSpinus,
   registrarFalloGCal,
   esCredencialInvalida,
-  type GCalCliente,
   type EstadoGoogle,
 } from '@/lib/gcal'
 
-/** Un hueco ocupado del calendario personal del médico. Sin título ni detalle. */
-type BloqueOcupado = { start: string; end: string }
+/**
+ * Los ÚNICOS campos del evento de Google que la agenda consume
+ * (`agenda/page.tsx`, `gcalSource`). Todo lo demás del `Schema$Event` se queda
+ * en el servidor: no viaja quien no se pinta.
+ *
+ * `start` y `end` conservan LAS DOS llaves a propósito. Un evento de día
+ * completo no trae `dateTime`, sólo `date`; quedarse con la primera los dejaría
+ * sin fecha de inicio y FullCalendar los descartaría sin decir nada. Los
+ * eventos escritos a mano en Google son justo donde aparecen los de día
+ * completo.
+ */
+type EventoAgenda = {
+  id:       string
+  summary?: string
+  start?:   { dateTime?: string; date?: string }
+  end?:     { dateTime?: string; date?: string }
+}
+
+/**
+ * Tope de páginas de `events.list`. Con `maxResults: 250` son ~5.000 eventos.
+ *
+ * Existe por dos motivos distintos: un calendario con muchas recurrencias
+ * expandidas por `singleEvents` podría encadenar decenas de páginas dentro de
+ * una petición que la agenda espera síncrona, y un `nextPageToken` que no
+ * avanzara sería un bucle infinito en producción.
+ */
+const TOPE_PAGINAS = 20
 
 /**
  * Qué contestar cuando no hay eventos que devolver. Son dos situaciones que
@@ -40,59 +65,6 @@ async function estadoDeFallo(
   }
 }
 
-/**
- * Disponibilidad del calendario personal (`primary`) del médico, vía
- * `freebusy.query`: horarios ocupados, sin títulos ni asistentes ni nada más.
- * Es todo lo que autoriza el scope no sensible `calendar.events.freebusy`.
- *
- * Va en su propio try/catch a propósito. Un fallo aquí (el médico desmarcó la
- * casilla del permiso, o Google rechaza el alias) NO puede tumbar la respuesta
- * entera: el catch de afuera contestaría 'error_google' y la agenda se quedaría
- * sin eventos teniendo el calendario de Spinus sano. Degradar a "sin bloques"
- * es lo correcto.
- */
-async function consultarOcupado(
-  calendar: GCalCliente,
-  timeMin: string,
-  timeMax: string,
-  userId: string,
-): Promise<BloqueOcupado[]> {
-  try {
-    const { data } = await calendar.freebusy.query({
-      requestBody: { timeMin, timeMax, items: [{ id: 'primary' }] },
-    })
-    const calendarios = data.calendars ?? {}
-    // El alias `primary` no está documentado para freebusy: si Google devuelve
-    // el calendario bajo otra llave (el correo de la cuenta), la tomamos igual
-    // y dejamos rastro en el log para saberlo.
-    let entrada = calendarios.primary
-    if (!entrada) {
-      const llaves = Object.keys(calendarios)
-      if (llaves.length > 0) {
-        // Las llaves son ids de calendario del médico, no datos de paciente.
-        registrarFalloGCal(
-          { operacion: 'freebusy.query (sin llave "primary")', userId },
-          new Error(`llaves devueltas: ${llaves.join(', ')}`),
-        )
-        entrada = calendarios[llaves[0]]
-      }
-    }
-    if (entrada?.errors?.length) {
-      registrarFalloGCal(
-        { operacion: 'freebusy.query (errores en el calendario personal)', userId },
-        new Error(entrada.errors.map((e) => e.reason ?? 'sin reason').join(', ')),
-      )
-      return []
-    }
-    return (entrada?.busy ?? []).flatMap((hueco) =>
-      hueco.start && hueco.end ? [{ start: hueco.start, end: hueco.end }] : []
-    )
-  } catch (err) {
-    registrarFalloGCal({ operacion: 'freebusy.query', userId }, err)
-    return []
-  }
-}
-
 export async function GET(req: NextRequest) {
   // Los necesita el catch de afuera, donde `user`, el cliente y el calendario
   // resuelto ya no están a la vista.
@@ -106,46 +78,93 @@ export async function GET(req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     userId = user.id
 
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('clinica_id, role, es_admin_de_clinica')
+      .eq('id', user.id)
+      .single()
+    if (!profile?.clinica_id) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+    // CORTE ANTICIPADO — el vacío del médico invitado, y es estructural.
+    //
+    // Este carril devuelve el calendario de la CLÍNICA, y lo que sobrevive al
+    // filtro de abajo son los eventos que el administrador escribió a mano.
+    // Sólo administrador y secretaria los ven; el médico invitado recibe vacío
+    // y sigue viendo sus citas por /api/appointments bajo RLS.
+    //
+    // El vacío NO puede derivarse de "el invitado no tiene conexión que
+    // resolver": la policy de `clinica_conexiones_google` filtra por clínica y
+    // no por usuario, así que un invitado resuelve la conexión igual que el
+    // administrador. De ahí que la puerta sea un helper de capacidad, y de ahí
+    // que sea lista blanca: un rol futuro cae en vacío por construcción.
+    //
+    // Se contesta 'conectado' sin haber comprobado nada, y se acepta: ningún
+    // consumidor usa ese valor para decidir nada (la agenda sólo distingue
+    // "pinta eventos" de "no pintes"), y quien informa del estado real de la
+    // conexión es /perfil por otra ruta. Estrenar un cuarto valor en
+    // `EstadoGoogle` tocaría un tipo compartido para una distinción que nadie
+    // consume. Cortar aquí evita además abrir una sesión de Google para tirar
+    // el resultado.
+    if (!canVerAgendaCompleta(profile)) {
+      return NextResponse.json({ estado: 'conectado' satisfies EstadoGoogle, events: [] })
+    }
+
     const ahora = new Date()
     const fromParam = req.nextUrl.searchParams.get('from')
     const toParam = req.nextUrl.searchParams.get('to')
     const timeMin = fromParam ?? new Date(ahora.getFullYear(), ahora.getMonth(), 1).toISOString()
     const timeMax = toParam ?? new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59).toISOString()
 
-    // Dos fuentes, en paralelo dentro de la misma sesión de Google:
-    //   1. El calendario propio de Spinus, con detalle completo.
-    //   2. La disponibilidad del calendario personal, sin detalle alguno.
-    //
-    // La segunda va MEMOIZADA y fuera del cuerpo que se reintenta. Si el
-    // calendario de Spinus da 404, `conCalendarioSpinus` lo recrea y vuelve a
-    // correr la operación entera; pero `freebusy` consulta `primary`, que no
-    // tiene nada que ver con el calendario caído y que ya respondió bien.
-    // Guardando la promesa, el reintento repite sólo `events.list`, que es lo
-    // único que depende del calendario recreado.
-    //
-    // Se guarda la promesa y no su resultado a propósito: así las dos siguen
-    // saliendo en paralelo en la primera pasada. `consultarOcupado` nunca
-    // rechaza —tiene su propio catch y degrada a lista vacía—, así que dejarla
-    // sin await en el camino de error no deja ningún rechazo suelto.
-    let ocupadoPromesa: Promise<BloqueOcupado[]> | null = null
-
     const eventos = await conCalendarioSpinus(supabase, user.id, async (calendar, calendarId) => {
       calendarIdUsado = calendarId
-      // El reintento trae el mismo cliente de Google (misma sesión), así que
-      // la promesa de la primera pasada sigue valiendo tal cual.
-      ocupadoPromesa ??= consultarOcupado(calendar, timeMin, timeMax, user.id)
-      const [lista] = await Promise.all([
-        calendar.events.list({
+
+      // EL ACUMULADOR VA DENTRO DEL CALLBACK, NUNCA FUERA. `conCalendarioSpinus`
+      // reejecuta la operación ENTERA si el calendario responde 404: lo recrea y
+      // vuelve a llamar aquí (`gcal.ts:451`). Un array declarado fuera sumaría
+      // las páginas de la primera pasada más las del reintento y cada evento se
+      // pintaría dos veces.
+      const acumulados: EventoAgenda[] = []
+      let pageToken: string | undefined
+      let paginas = 0
+
+      do {
+        const { data } = await calendar.events.list({
           calendarId,
           timeMin,
           timeMax,
           singleEvents: true,
           orderBy: 'startTime',
-          maxResults: 100,
-        }),
-        ocupadoPromesa,
-      ])
-      return lista.data.items ?? []
+          // Con el bucle esto deja de ser un techo y pasa a ser tamaño de
+          // página. 250 es el máximo que admite la API.
+          maxResults: 250,
+          pageToken,
+        })
+        for (const e of data.items ?? []) {
+          // Con `singleEvents` Google puede devolver instancias canceladas de
+          // series recurrentes. No se pintan, así que no se copian.
+          if (!e.id || e.status === 'cancelled') continue
+          acumulados.push({
+            id:      e.id,
+            summary: e.summary ?? undefined,
+            start:   { dateTime: e.start?.dateTime ?? undefined, date: e.start?.date ?? undefined },
+            end:     { dateTime: e.end?.dateTime   ?? undefined, date: e.end?.date   ?? undefined },
+          })
+        }
+        pageToken = data.nextPageToken ?? undefined
+        paginas++
+      } while (pageToken && paginas < TOPE_PAGINAS)
+
+      // Tocar el tope significa que SEGUIMOS perdiendo eventos en silencio, que
+      // es exactamente lo que el bucle viene a evitar. Sin este registro, el
+      // tope es el mismo defecto con otro número.
+      if (pageToken) {
+        registrarFalloGCal(
+          { operacion: 'events.list (agenda, tope de páginas alcanzado)', userId, calendarId },
+          new Error(`${TOPE_PAGINAS} páginas recorridas y Google sigue devolviendo nextPageToken`),
+        )
+      }
+
+      return acumulados
     })
     // null = no hay sesión de Google (sin token) o no se pudo resolver el
     // calendario (Google falló al crearlo). Sólo lo segundo es un fallo.
@@ -154,25 +173,38 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ estado: await estadoDeFallo(supabase, userId) })
     }
 
-    // Deduplicación del lado del servidor: los eventos que ya son una cita de
-    // Spinus se quitan aquí. La agenda pinta esas citas por su cuenta desde
-    // /api/appointments, así que devolverlas otra vez las duplicaría — y el
-    // cliente ya no necesita una segunda petición para averiguarlo.
-    // La RLS acota `appointments` a la clínica del médico.
+    // RESTA acotada por capacidad, NO intersección. Lo que queda después de
+    // quitar los eventos que ya son cita de Spinus son los que el administrador
+    // escribió a mano en el calendario de la clínica: no tienen fila en
+    // `appointments` y ninguna otra fuente los trae. Intersecar los borraría.
+    //
+    // El conjunto que se resta tiene que ser TODAS las citas de la clínica. La
+    // fuga original no venía de restar: venía de restar contra un conjunto
+    // parcial. Aquí sólo llegan administrador y secretaria (corte de arriba), y
+    // `appointments_select` les da todas las de su clínica, así que la resta es
+    // completa y no queda ninguna cita ajena colándose como evento crudo con el
+    // nombre del paciente en el título.
+    //
+    // El `.eq('clinica_id')` es redundante frente a la RLS y va explícito de
+    // todos modos: deja la barrera escrita para quien mañana cambie el cliente.
+    //
+    // La ventana se compara por SOLAPE, no por `start_time` dentro del rango.
+    // `events.list` devuelve todo evento que solape la ventana (`timeMin` es
+    // cota inferior del FIN del evento); filtrar las citas sólo por su inicio
+    // dejaría fuera del conjunto a la que empezó antes de `timeMin` y termina
+    // dentro, y esa cita saldría sin restar.
     const { data: citas } = await supabase
       .from('appointments')
       .select('google_event_id')
-      .gte('start_time', timeMin)
+      .eq('clinica_id', profile.clinica_id)
       .lte('start_time', timeMax)
+      .gte('end_time', timeMin)
       .not('google_event_id', 'is', null)
     const yaSonCitas = new Set((citas ?? []).map((c) => c.google_event_id))
 
     return NextResponse.json({
-      estado:  'conectado' satisfies EstadoGoogle,
-      events:  eventos.filter((e) => !e.id || !yaSonCitas.has(e.id)),
-      // No nula por construcción —el cuerpo de arriba corrió—, pero el
-      // fallback evita depender de eso para el compilador.
-      ocupado: ocupadoPromesa ? await ocupadoPromesa : [],
+      estado: 'conectado' satisfies EstadoGoogle,
+      events: eventos.filter((e) => !yaSonCitas.has(e.id)),
     })
   } catch (err) {
     registrarFalloGCal(

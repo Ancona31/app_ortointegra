@@ -85,7 +85,7 @@ export function esCredencialInvalida(err: unknown): boolean {
 
 /** Datos mínimos para que una línea de log sirva para diagnosticar. */
 export interface ContextoGCal {
-  /** Qué se intentaba: 'calendars.insert', 'events.patch', 'freebusy.query'… */
+  /** Qué se intentaba: 'calendars.insert', 'events.patch', 'events.list'… */
   operacion:   string
   userId:      string
   calendarId?: string | null

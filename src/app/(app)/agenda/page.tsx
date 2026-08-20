@@ -7,7 +7,7 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
 import { EventClickArg, EventDropArg, DateSelectArg, EventInput, EventContentArg, DayHeaderContentArg } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
-import { X, Calendar, User, Plus, Trash2, Settings, Lock, LayoutGrid, Columns3, Square, ChevronDown, FileText, Stethoscope, Loader2 } from 'lucide-react'
+import { X, Calendar, User, Plus, Trash2, Settings, LayoutGrid, Columns3, Square, ChevronDown, FileText, Stethoscope, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
@@ -1063,59 +1063,49 @@ function GoogleGIcon({ size = 12 }: { size?: number }) {
   )
 }
 
-/* Tarjeta de evento externo de Google Calendar (no arrastrable). Solo
-   presentación: la lógica de fetch/dedupe de Google no se toca.
+/* Tarjeta de evento del calendario de Google (no arrastrable). Solo
+   presentación: la lógica de fetch/resta de Google no se toca.
 
-   DOS COSAS DISTINTAS, NO UNA — `busy` las separa y NO deben volver a
-   compartir estilo:
+   UNA SOLA COSA, y antes eran dos. La prop `busy` separaba estos eventos de
+   los bloques anónimos de "Ocupado" que venían del calendario PERSONAL del
+   médico vía freebusy. Ese carril se eliminó entero —scope incluido—, así que
+   aquí ya no llega nada anónimo: todo lo que pinta esta tarjeta viene del
+   calendario de Spinus, tiene título real y no tiene cita ligada. De ahí que
+   la etiqueta "Sin cita" haya dejado de ser condicional.
 
-     busy=true   Bloque de ocupado del calendario PERSONAL del médico, vía
-                 freebusy. Es anónimo por construcción: el permiso no da
-                 título ni detalle. Candado, punteado y trama: "hay algo aquí
-                 y no puedo decirte qué".
-
-     busy=false  Evento del calendario de SPINUS que todavía no tiene cita
-                 ligada. Tiene título real y es de la clínica, no privado.
-                 Pintarlo con el candado producía cosas como "🔒 Cita médica:
-                 Pedro Gonzalo Hernández Mendoza" — el título completo debajo
-                 de un icono que promete privacidad. Va sólido, sin candado y
-                 con la etiqueta de que le falta cita. */
+   NO SE VUELVE A METER EL CANDADO. Pintarlo aquí producía cosas como
+   "🔒 Cita médica: Pedro Gonzalo Hernández Mendoza": el título completo debajo
+   de un icono que promete privacidad. */
 const GoogleEventCard = memo(function GoogleEventCard({
-  timeText, title, busy,
-}: { timeText: string; title: string; busy: boolean }) {
-  const label = title.replace(/^🔒\s*/, '') // sólo los bloques de ocupado lo llevan
+  timeText, title,
+}: { timeText: string; title: string }) {
   return (
     <div style={{
       height: '100%', boxSizing: 'border-box', overflow: 'hidden',
       color: 'var(--ag-gcal-text)',
-      border: busy ? '1px dashed var(--ag-gcal-border)' : '1px solid var(--ag-gcal-accent)',
+      border: '1px solid var(--ag-gcal-accent)',
       borderLeft: '3px solid var(--ag-gcal-accent)',
       borderRadius: '9px', padding: '5px 9px',
-      background: busy
-        ? 'repeating-linear-gradient(135deg, var(--ag-gcal-bg1), var(--ag-gcal-bg1) 8px, var(--ag-gcal-bg2) 8px, var(--ag-gcal-bg2) 9px)'
-        : 'var(--ag-gcal-bg1)',
+      background: 'var(--ag-gcal-bg1)',
       display: 'flex', flexDirection: 'column', gap: '2px',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: 0 }}>
         <GoogleGIcon size={12} />
-        {busy && <Lock size={11} style={{ flexShrink: 0 }} />}
         <span style={{ fontSize: '10.5px', fontWeight: 600, opacity: 0.85, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {timeText}
         </span>
-        {!busy && (
-          <span style={{
-            flexShrink: 0, marginLeft: 'auto',
-            fontSize: '9px', fontWeight: 700, letterSpacing: '.02em',
-            textTransform: 'uppercase', opacity: 0.75,
-            border: '1px solid currentColor', borderRadius: '999px',
-            padding: '0 5px', lineHeight: 1.5,
-          }}>
-            Sin cita
-          </span>
-        )}
+        <span style={{
+          flexShrink: 0, marginLeft: 'auto',
+          fontSize: '9px', fontWeight: 700, letterSpacing: '.02em',
+          textTransform: 'uppercase', opacity: 0.75,
+          border: '1px solid currentColor', borderRadius: '999px',
+          padding: '0 5px', lineHeight: 1.5,
+        }}>
+          Sin cita
+        </span>
       </div>
       <span style={{ fontSize: '12px', fontWeight: 700, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-        {label}
+        {title}
       </span>
     </div>
   )
@@ -1126,15 +1116,14 @@ const GoogleEventCard = memo(function GoogleEventCard({
    fila: marcador (punto por estado o "G" de Google) + hora (700) + nombre
    (ellipsis). Sin border/sombra/fondo de tarjeta. */
 const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg }) {
-  const ext = arg.event.extendedProps as Appointment & { isGcalBlock?: boolean; isGcalBusy?: boolean }
+  const ext = arg.event.extendedProps as Appointment & { isGcalBlock?: boolean }
+  // Todo lo que llega marcado como bloque de Google es un evento del calendario
+  // de Spinus sin cita ligada. La distinción con los bloques anónimos de
+  // "Ocupado" murió con freebusy; mismo criterio que GoogleEventCard.
   const isGcal = !!ext?.isGcalBlock
-  // Evento del calendario de Spinus sin cita ligada: ni cita normal ni bloque
-  // anónimo. Mismo criterio que GoogleEventCard en Semana/Día.
-  const isGcalSinCita = isGcal && !ext?.isGcalBusy
   const status = ext?.status
   const isCancelled = status === 'cancelled'
-  // Google: quitar el 🔒 que agrega gcalSource (el ícono G ya lo distingue).
-  const name = isGcal ? arg.event.title.replace(/^🔒\s*/, '') : arg.event.title
+  const name = arg.event.title
 
   const marker = isGcal
     ? <GoogleGIcon size={10} />
@@ -1154,9 +1143,9 @@ const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg }) {
         fontWeight: 600, minWidth: 0,
         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         textDecoration: isCancelled ? 'line-through' : 'none',
-        color: isGcalSinCita ? 'var(--ag-gcal-text)' : undefined,
+        color: isGcal ? 'var(--ag-gcal-text)' : undefined,
       }}>{name}</span>
-      {isGcalSinCita && (
+      {isGcal && (
         <span style={{
           flex: '0 0 auto', fontSize: 9, fontWeight: 700, letterSpacing: '.02em',
           textTransform: 'uppercase', color: 'var(--ag-gcal-text)', opacity: 0.75,
@@ -1175,9 +1164,9 @@ type InicialesDeCita = (ext: Appointment) => string | undefined
 function renderEventContent(arg: EventContentArg, navegadorTZ: string, inicialesDeCita: InicialesDeCita) {
   // Vista Mes: chip plano dedicado. El camino de Semana/Día (abajo) queda intacto.
   if (arg.view.type === 'dayGridMonth') return <MonthChip arg={arg} />
-  const ext = arg.event.extendedProps as Appointment & { isGcalBlock?: boolean; isGcalBusy?: boolean }
+  const ext = arg.event.extendedProps as Appointment & { isGcalBlock?: boolean }
   if (ext?.isGcalBlock) {
-    return <GoogleEventCard timeText={arg.timeText} title={arg.event.title} busy={!!ext.isGcalBusy} />
+    return <GoogleEventCard timeText={arg.timeText} title={arg.event.title} />
   }
   if (!ext?.status) return <>{arg.event.title}</>
   const pac = ext.pacientes
@@ -1375,12 +1364,14 @@ export default function AgendaPage() {
   }, [filtroMedico])
 
   /* ── Event source: Google Calendar ─────────────────────
-   * Dos cosas distintas en una sola petición:
-   *   `events`  — eventos del calendario propio de Spinus, con detalle. El
-   *               servidor ya quitó los que son citas de la app, así que aquí
-   *               NO hace falta pedir /api/appointments para deduplicar.
-   *   `ocupado` — huecos del calendario personal del médico vía freebusy. Sin
-   *               título ni detalle: es todo lo que el permiso concede.
+   * Una sola cosa: `events`, los eventos del calendario de Spinus que NO son
+   * cita de la app. El servidor ya los restó, así que aquí NO hace falta pedir
+   * /api/appointments para deduplicar, y ya llegan acotados a los cuatro campos
+   * que se usan abajo — el resto del evento de Google no viaja.
+   *
+   * El carril `ocupado` (huecos del calendario personal vía freebusy) se
+   * eliminó entero, scope incluido. Si vuelve a aparecer una lectura de
+   * `data.ocupado`, es que alguien lo revivió.
    */
   const gcalSource = useCallback(async (
     info: { startStr: string; endStr: string },
@@ -1395,16 +1386,16 @@ export default function AgendaPage() {
       // los dos casos de cara al médico es /perfil.
       if (data.estado !== 'conectado') { success([]); return }
 
-      type GCalEvent = { id?: string; summary?: string; start?: { dateTime?: string; date?: string }; end?: { dateTime?: string; date?: string } }
-      type BloqueOcupado = { start: string; end: string }
+      // Espeja la lista blanca del servidor (`EventoAgenda` en
+      // /api/google/events). Las dos llaves de `start` y `end` son necesarias:
+      // un evento de día completo trae `date` y no `dateTime`.
+      type GCalEvent = { id: string; summary?: string; start?: { dateTime?: string; date?: string }; end?: { dateTime?: string; date?: string } }
 
       const eventos = ((data.events ?? []) as GCalEvent[])
-        .filter((e) => e.id)
         .map((e) => ({
           id:              `gcal-${e.id}`,
           // Sin 🔒: esto viene del calendario de Spinus, tiene título real y no
-          // es privado. El candado se queda sólo para los bloques de ocupado
-          // del calendario personal, más abajo.
+          // es privado.
           title:           e.summary || 'Evento sin título',
           start:           e.start?.dateTime ?? e.start?.date ?? '',
           end:             e.end?.dateTime ?? e.end?.date ?? undefined,
@@ -1417,23 +1408,7 @@ export default function AgendaPage() {
           extendedProps:   { isGcalBlock: true },
         }))
 
-      // Bloques anónimos. `isGcalBusy` los distingue de los de arriba: no
-      // tienen id de Google, ni título real, ni nada que abrir.
-      const bloques = ((data.ocupado ?? []) as BloqueOcupado[])
-        .map((b, i) => ({
-          id:              `gcal-busy-${i}-${b.start}`,
-          title:           '🔒 Ocupado',
-          start:           b.start,
-          end:             b.end,
-          allDay:          false,
-          backgroundColor: 'transparent',
-          borderColor:     'transparent',
-          textColor:       '#6d4ec0',
-          editable:        false,
-          extendedProps:   { isGcalBlock: true, isGcalBusy: true },
-        }))
-
-      success([...eventos, ...bloques])
+      success(eventos)
     } catch (err: unknown) {
       failure(err instanceof Error ? err : new Error('Error cargando eventos'))
     }
@@ -1794,7 +1769,7 @@ export default function AgendaPage() {
   }
 
   function handleEventClick(arg: EventClickArg) {
-    if (arg.event.extendedProps.isGoogleEvent || arg.event.extendedProps.isGcalBlock) return
+    if (arg.event.extendedProps.isGcalBlock) return
     setModal({ mode: 'edit', appointment: arg.event.extendedProps as Appointment })
   }
 

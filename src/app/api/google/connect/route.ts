@@ -28,13 +28,17 @@ export async function GET() {
 
   const url = oauth2Client.generateAuthUrl({
     access_type: 'offline',
-    // Ambos scopes son NO sensibles: sin verificación, sin tope de 100
-    // usuarios y sin pantalla de advertencia.
-    //   calendar.app.created      → CRUD sólo en calendarios que creó la app.
-    //   calendar.events.freebusy  → disponibilidad de `primary`, sin títulos.
+    // Scope NO sensible: sin verificación, sin tope de 100 usuarios y sin
+    // pantalla de advertencia. Da CRUD sólo en calendarios que creó la app.
+    //
+    // Aquí había un segundo scope, `calendar.events.freebusy`, para pintar los
+    // huecos del calendario PERSONAL de quien conectaba. Se retiró con la
+    // función entera: bajo un calendario de clínica, esa consulta enseñaría la
+    // disponibilidad personal del administrador a toda la clínica. Retirarlo
+    // del consentimiento no afecta a quien ya conectó —su permiso concedido
+    // sigue vivo—, sólo a los consentimientos nuevos.
     scope: [
       'https://www.googleapis.com/auth/calendar.app.created',
-      'https://www.googleapis.com/auth/calendar.events.freebusy',
     ],
     prompt: 'consent',
     state,
