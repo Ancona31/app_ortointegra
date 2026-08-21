@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { conCalendarioSpinus, registrarFalloGCal, GCAL_TIMEZONE } from '@/lib/gcal'
+import { conCalendarioSpinus, registrarFalloGCal } from '@/lib/gcal'
 import { resolverConexionClinica } from '@/lib/gcalConexion'
 import { canManageClinica } from '@/lib/permissions'
 import { APPOINTMENT_SELECT, eventoParaGoogle, type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
+import { TZ_CLINICA } from '@/lib/dates'
 
 /* Formato UUID. A nivel de módulo porque lo usan el PUT (consultorio y
    client_id) y el GET; antes vivía dentro del bloque de consultorio del PUT. */
@@ -306,6 +307,22 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       // paciente, del titulo libre de la cita.
       const pacienteCita: PacienteEnCita = apt.pacientes ?? null
       const clinicaCita:  ClinicaEnCita  = apt.clinicas  ?? null
+      // EL HUSO DEL EVENTO ES EL DEL CONSULTORIO, NO EL DEL CENTRO. Espeja al
+      // POST: antes se etiquetaba con una constante fija (Ciudad de Mexico) y
+      // la invitacion de una cita en Hermosillo decia "hora estandar central".
+      // El instante siempre viajo bien; lo que estaba mal era la etiqueta.
+      //
+      // SALE DE `apt`, LA FILA YA ACTUALIZADA, Y NO DEL `consultorio` DE ARRIBA.
+      // Aquel `const` vive dentro del `if (consultorio_id !== undefined)` y no
+      // llega hasta aqui. Ademas `apt` es la fuente correcta: si esta edicion
+      // cambio de consultorio, ya trae el snapshot nuevo; si no lo toco, trae el
+      // que la cita tenia congelado.
+      //
+      // AQUI EL NULL SI PASA. `consultorio_timezone` se anadio sin rellenar las
+      // filas existentes, asi que una cita anterior a esa migracion llega sin
+      // huso y cae a `TZ_CLINICA` — exactamente lo que Google ya muestra hoy
+      // para ella. No se rompe nada y no hace falta migracion.
+      const tzCita: string = apt.consultorio_timezone ?? TZ_CLINICA
       after(async () => {
         const STATUS_COLOR: Record<string, string | undefined> = {
           confirmed: '2',
@@ -324,7 +341,10 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
         // La descripción lleva un formato fijo (clínica y paciente) y NADA
         // clínico: ni notes, ni motivo de consulta, ni diagnóstico.
         // `reminders` NO se manda aquí a propósito: es del insert.
-        const { summary, description } = eventoParaGoogle(pacienteCita, clinicaCita, apt.title)
+        // El instante del ancla sale de `apt.start_time` y NUNCA del `start_time`
+        // del cuerpo: este bloque corre tambien en ediciones que solo cambian el
+        // `status`, donde el cuerpo no trae hora ninguna.
+        const { summary, description } = eventoParaGoogle(pacienteCita, clinicaCita, apt.title, apt.start_time, tzCita)
         try {
           const parcheado = await conCalendarioSpinus(conexion, admin, (calendar, calendarId) => {
             calendarIdUsado = calendarId
@@ -334,8 +354,8 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
               requestBody: {
                 summary,
                 description,
-                ...(start_time !== undefined ? { start: { dateTime: start_time, timeZone: GCAL_TIMEZONE } } : {}),
-                ...(end_time   !== undefined ? { end:   { dateTime: end_time,   timeZone: GCAL_TIMEZONE } } : {}),
+                ...(start_time !== undefined ? { start: { dateTime: start_time, timeZone: tzCita } } : {}),
+                ...(end_time   !== undefined ? { end:   { dateTime: end_time,   timeZone: tzCita } } : {}),
                 ...(status     !== undefined && STATUS_COLOR[status] ? { colorId: STATUS_COLOR[status] }    : {}),
               },
             })

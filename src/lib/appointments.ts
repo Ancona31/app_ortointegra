@@ -1,3 +1,6 @@
+import { renderEnTZ } from '@/lib/dates'
+import { regionDeTimezone } from '@/lib/consultorios/zonas-mexico'
+
 /**
  * Forma canonica de una cita tal como la consume el calendario.
  * GET, POST y PUT deben devolver exactamente esta forma: el cliente
@@ -50,31 +53,80 @@ function nombreClinica(clinica: ClinicaEnCita): string {
 }
 
 /**
+ * ANCLA DE HORA LOCAL — el renglon que fija por escrito a que hora es la cita y
+ * en que huso, p.ej. "Hora de la cita: 9:00 a.m., hora Sonora".
+ *
+ * POR QUE EXISTE. Google traduce todo evento al huso de quien lo mira. Un
+ * paciente que abra la invitacion desde otro huso —de viaje, o viviendo
+ * fuera— ve una hora distinta de la que le dijeron por telefono. Esa
+ * traduccion es CORRECTA y no hay que pelearse con ella, pero confunde. El
+ * texto no se traduce: dice la hora del consultorio pase lo que pase.
+ *
+ * La region sale de `regionDeTimezone`, o sea el estado y no la ciudad:
+ * "Sonora" identifica mejor la zona para un paciente que "Hermosillo".
+ *
+ * El formato de la hora replica el del encabezado de las notas
+ * (`notaRenderData.ts`): `renderEnTZ` con locale `es` produce "9:00 a. m." con
+ * espacio interno, y se compacta a "9:00 a.m.". Son cinco lineas duplicadas a
+ * proposito — la version de notaRenderData es privada de aquel modulo y
+ * extraerla a un tercer sitio para dos usos seria abstraccion prematura.
+ *
+ * Nunca lanza: un instante corrupto devuelve null y la descripcion sale sin
+ * ancla, que es peor que con ella pero mucho mejor que un evento sin crear.
+ */
+function anclaDeHora(startISO: string, timezone: string): string | null {
+  if (Number.isNaN(new Date(startISO).getTime())) return null
+  try {
+    const hora = renderEnTZ(startISO, 'h:mm a', timezone)
+      .toLowerCase()
+      .replace(/([ap])\.?\s*m\.?/i, '$1.m.')
+    const region = regionDeTimezone(timezone)
+    return region ? `Hora de la cita: ${hora}, hora ${region}` : `Hora de la cita: ${hora}`
+  } catch {
+    return null
+  }
+}
+
+/**
  * Lo que Spinus escribe en el evento de Google. Punto unico: si el formato se
  * duplicara entre el POST y el PUT, el evento cambiaria de forma segun por
  * donde pasara la ultima edicion.
  *
  * PRIVACIDAD — la descripcion tiene formato fijo y solo lleva nombre de
- * clinica y nombre de paciente. NADA clinico: ni `notes`, ni motivo de
- * consulta, ni diagnostico, ni el estado de la cita. El aviso de privacidad
- * declara exactamente esto.
+ * clinica, nombre de paciente y la hora de la cita con su huso. NADA clinico:
+ * ni `notes`, ni motivo de consulta, ni diagnostico, ni el estado de la cita.
+ * El aviso de privacidad declara exactamente esto. El ancla de hora NO es una
+ * excepcion a esa regla: una hora y una region no dicen nada del padecimiento.
  *
  * `reminders` se devuelve siempre pero solo el `events.insert` debe mandarlo
  * (ver GCAL_RECORDATORIO_MINUTOS).
+ *
+ * `startISO` y `timezone` son el instante de inicio de la cita y el huso de su
+ * consultorio (`appointments.consultorio_timezone`, con `TZ_CLINICA` de
+ * respaldo para las citas anteriores a esa columna). OJO EN LA EDICION: el
+ * instante tiene que salir de la FILA YA ACTUALIZADA, nunca del `start_time`
+ * del cuerpo de la peticion — la descripcion se recalcula en toda edicion que
+ * toque Google, incluida una que solo cambie el `status`, y ahi `start_time`
+ * viene `undefined`.
  */
 export function eventoParaGoogle(
   paciente: PacienteEnCita,
   clinica: ClinicaEnCita,
   fallbackTitulo: string,
+  startISO: string,
+  timezone: string,
 ): {
   summary: string
   description: string
   reminders: { useDefault: false; overrides: Array<{ method: 'popup'; minutes: number }> }
 } {
   const clinicaNombre = nombreClinica(clinica)
+  // El ancla va tambien en las citas sin paciente ligado: habla de la hora, no
+  // de quien viene. `filter(Boolean)` se come el null si el instante no sirve.
+  const ancla = anclaDeHora(startISO, timezone)
   const renglones = paciente
-    ? [clinicaNombre, 'Consulta:', `${paciente.nombre} ${paciente.apellidos}`]
-    : [clinicaNombre]
+    ? [clinicaNombre, 'Consulta:', `${paciente.nombre} ${paciente.apellidos}`, ancla]
+    : [clinicaNombre, ancla]
 
   return {
     summary:     tituloParaGoogle(paciente, fallbackTitulo),

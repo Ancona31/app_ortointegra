@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { conCalendarioSpinus, registrarFalloGCal, GCAL_TIMEZONE } from '@/lib/gcal'
+import { conCalendarioSpinus, registrarFalloGCal } from '@/lib/gcal'
 import { resolverConexionClinica } from '@/lib/gcalConexion'
 import { canManageClinica } from '@/lib/permissions'
 import { APPOINTMENT_SELECT, eventoParaGoogle, type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
+import { TZ_CLINICA } from '@/lib/dates'
 
 async function getProfile(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -271,6 +272,18 @@ export async function POST(req: NextRequest) {
     // paciente, del titulo libre de la cita.
     const pacienteCita: PacienteEnCita = apt.pacientes ?? null
     const clinicaCita:  ClinicaEnCita  = apt.clinicas  ?? null
+    // EL HUSO DEL EVENTO ES EL DEL CONSULTORIO, NO EL DEL CENTRO. Antes se
+    // etiquetaba con una constante fija (Ciudad de Mexico), asi que la
+    // invitacion de una cita en Hermosillo decia "hora estandar central". El
+    // INSTANTE siempre viajo bien —`start_time` va en UTC y Google lo respeta—,
+    // o sea que esto nunca movio ninguna cita de sitio: lo que estaba mal era la
+    // ETIQUETA, y con ella el texto que lee el paciente.
+    //
+    // Sale del snapshot que la fila acaba de congelar: si el consultorio cambia
+    // de huso manana, esta cita conserva el suyo. En el alta nunca es null
+    // —`consultorios.timezone` es NOT NULL y el consultorio es obligatorio—,
+    // pero el respaldo va igual, por simetria con el PUT, donde SI puede serlo.
+    const tzCita: string = apt.consultorio_timezone ?? TZ_CLINICA
     // Sin conexión de clínica no se programa NADA. Antes se entraba igual y se
     // salía con `gcal_sync_status = 'synced'` y sin evento —una mentira
     // benigna—; marcarlo 'failed' en su lugar llenaría de citas fallidas la
@@ -286,7 +299,7 @@ export async function POST(req: NextRequest) {
         try {
           // La descripción lleva un formato fijo (clínica y paciente) y NADA
           // clínico: ni notes, ni motivo de consulta, ni diagnóstico.
-          const { summary, description, reminders } = eventoParaGoogle(pacienteCita, clinicaCita, title)
+          const { summary, description, reminders } = eventoParaGoogle(pacienteCita, clinicaCita, title, apt.start_time, tzCita)
           const creado = await conCalendarioSpinus(conexion, admin, (calendar, calendarId) => {
             calendarIdUsado = calendarId
             return calendar.events.insert({
@@ -297,8 +310,8 @@ export async function POST(req: NextRequest) {
                 // Sólo al crear: si el médico le cambia el recordatorio a mano en
                 // Google, ninguna edición posterior desde Spinus se lo reimpone.
                 reminders,
-                start: { dateTime: start_time, timeZone: GCAL_TIMEZONE },
-                end:   { dateTime: end_time,   timeZone: GCAL_TIMEZONE },
+                start: { dateTime: start_time, timeZone: tzCita },
+                end:   { dateTime: end_time,   timeZone: tzCita },
               },
             })
           }, { puedeReparar, actorId: profile.userId })

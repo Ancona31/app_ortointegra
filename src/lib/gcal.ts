@@ -29,6 +29,17 @@ import {
   type ConexionGoogle,
 } from '@/lib/gcalConexion'
 
+/**
+ * Zona de VISUALIZACIÓN del calendario «Spinus - Dr. X» que la app crea en la
+ * cuenta de Google del médico. Ver `crearCalendarioSpinus`, su único uso.
+ *
+ * ⚠️  NO ES EL HUSO DE LAS CITAS y no vale para etiquetar eventos. Cada evento
+ * lleva el suyo, el de su consultorio, desde `appointments.consultorio_timezone`
+ * (rutas de `appointments`). Hasta agosto de 2026 esta constante etiquetaba
+ * también los eventos, y por eso las invitaciones de una cita en Hermosillo
+ * decían «hora estándar central». Si vuelves a importarla desde una ruta de
+ * citas, estás reintroduciendo ese bug.
+ */
 export const GCAL_TIMEZONE = 'America/Mexico_City'
 
 export type GCalCliente = calendar_v3.Calendar
@@ -339,6 +350,22 @@ export async function crearCalendarioSpinus(
   const { data: cal } = await calendar.calendars.insert({
     requestBody: {
       summary:     nombre ? `Spinus - ${nombre}` : 'Spinus',
+      // EL CENTRO AQUÍ ES UNA DECISIÓN, NO UN DESCUIDO (agosto de 2026).
+      //
+      // La `timeZone` de un CALENDARIO es sólo su zona de visualización por
+      // defecto: cómo se pinta la cuadrícula al abrirlo si el médico no tiene
+      // zona fija en su cuenta de Google. No afecta a ningún evento —cada uno
+      // lleva su propia `start.timeZone`, la de su consultorio— ni, por tanto,
+      // a lo que ve el paciente ni a lo que dicen las invitaciones.
+      //
+      // Y no hay una zona mejor que elegir: el calendario se crea UNA VEZ por
+      // clínica, mientras que una clínica puede tener consultorios en husos
+      // distintos. Tomar la del primer consultorio sería igual de arbitrario
+      // que el Centro, con la desventaja de PARECER una decisión informada.
+      //
+      // O sea que si esto te chirría al leerlo, no lo arregles: no hay nada
+      // roto debajo. Lo que sí importaba —la etiqueta de cada evento— ya se
+      // arregló en las rutas de `appointments`.
       timeZone:    GCAL_TIMEZONE,
       // Quitarlo de la lista es tan destructivo como borrarlo y además es
       // indetectable desde Spinus (`calendarList.get` pide un permiso sensible

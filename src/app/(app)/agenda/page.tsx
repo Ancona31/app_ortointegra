@@ -21,7 +21,7 @@ import { useConsultorios } from '@/hooks/useConsultorios'
 import { useConsultoriosDeMedico } from '@/hooks/useConsultoriosDeMedico'
 import { componerNombreMedicoCompleto, componerInicialesMedico } from '@/lib/nombreMedico'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
-import { ZONAS_MEXICO } from '@/lib/consultorios/zonas-mexico'
+import { regionDeTimezone } from '@/lib/consultorios/zonas-mexico'
 import useSWR from 'swr'
 import {
   CLAVE_CONFIG,
@@ -294,14 +294,10 @@ function addMinutes(iso: string, mins: number) {
   const d = new Date(iso); d.setMinutes(d.getMinutes() + mins); return d.toISOString()
 }
 
-/* ─── F3-6e: helpers para badge de timezone ─── */
-function regionDeTimezone(tz: string | null): string {
-  if (!tz) return ''
-  const zona = ZONAS_MEXICO.find(z => z.value === tz)
-  if (!zona) return tz  // fallback al IANA crudo
-  return zona.label.split('—')[0].trim()  // em-dash U+2014
-}
-
+/* ─── F3-6e: helper para badge de timezone ───
+   `regionDeTimezone` estaba aquí y vive ahora en `@/lib/consultorios/zonas-mexico`:
+   el ancla de hora local de la descripción del evento de Google la necesita
+   desde el servidor, y este archivo es `'use client'`. */
 function horaEnTZ(startTimeISO: string, tz: string): string {
   try {
     return new Intl.DateTimeFormat('es-MX', {
