@@ -3,17 +3,53 @@
  *
  * Única fuente de verdad para fechas y horas en Spinus.
  *
- * Helpers dependientes de zona horaria (usan TZ_CLINICA): hoyEnTZ,
- * fechaHoraLocalAInstante, renderEnTZ. Calculan "hoy", convierten
- * hora-de-pared a UTC y renderizan, SIEMPRE en la zona de la clínica.
- * Eliminan el desfase de usar UTC del navegador o del servidor.
+ * ───────────────────────────────────────────────────────────────────────
+ * LA REGLA
+ * ───────────────────────────────────────────────────────────────────────
  *
- * Helpers de calendario puro (NO dependen de TZ_CLINICA): desplazarFecha,
- * fechaSoloSegura. Operan sobre fechas-solo ancladas a mediodía; su
- * resultado es independiente de la zona del runtime.
+ * Las horas de CITAS se pintan en el huso del DISPOSITIVO de quien mira.
  *
- * Multiconsultorio: cuando llegue, solo se cambia TZ_CLINICA por una zona
- * por-consultorio. Nada más en la app necesita tocarse.
+ * El huso del consultorio se señala APARTE, con un aviso —como ya hace la
+ * agenda leyendo `consultorio_timezone` en `agenda/page.tsx:1189-1207`—,
+ * NUNCA cambiando el huso de la hora principal.
+ *
+ * Los DOCUMENTOS CLÍNICOS son la excepción: llevan fecha fija de la clínica
+ * (`TZ_CLINICA`) y no cambian según quién los abra. Decisión de producto,
+ * tomada a propósito; ver el comentario en `notaRenderData.ts`.
+ *
+ * ───────────────────────────────────────────────────────────────────────
+ * ⚠️  TZ_CLINICA COMO VALOR POR DEFECTO ES PELIGROSO
+ * ───────────────────────────────────────────────────────────────────────
+ *
+ * `hoyEnTZ`, `fechaHoraLocalAInstante` y `renderEnTZ` llevan `TZ_CLINICA`
+ * como valor por defecto del parámetro `timezone`. Eso hace que todo
+ * llamador que omita el huso obtenga hora del Centro EN SILENCIO, con
+ * código que PARECE consciente del huso y no lo es.
+ *
+ * Así nació el bug de agosto de 2026: una médica en Sonora
+ * (`America/Hermosillo`, UTC-7 todo el año, sin horario de verano) veía las
+ * horas de sus citas una hora MÁS tarde de lo que eran, porque el dashboard,
+ * el contador de `/inicio` y la tarjeta del expediente llamaban a `renderEnTZ`
+ * y a `hoyEnTZ` sin pasar huso. La agenda no fallaba: FullCalendar usa
+ * `timeZone: 'local'` por defecto y ya pintaba en el huso del dispositivo.
+ *
+ * Quitar ese default y auditar sus ~20 llamadores es el commit siguiente.
+ * Mientras el default siga aquí: PASA EL HUSO A MANO, SIEMPRE.
+ *
+ * ───────────────────────────────────────────────────────────────────────
+ * QUÉ HAY EN ESTE MÓDULO
+ * ───────────────────────────────────────────────────────────────────────
+ *
+ * Dependientes de huso: `hoyEnTZ`, `fechaHoraLocalAInstante`, `renderEnTZ`.
+ * Calculan "hoy", convierten hora-de-pared a UTC y renderizan. Eliminan el
+ * desfase de usar UTC del navegador o del servidor.
+ *
+ * Huso del dispositivo: `tzDispositivo`. SÓLO CLIENTE — ver su docstring.
+ *
+ * Calendario puro (NO dependen de ningún huso): `desplazarFecha`,
+ * `fechaSoloSegura`. Operan sobre fechas-solo ancladas a mediodía; su
+ * resultado es independiente de la zona del runtime. Ojo con
+ * `fechaSoloSegura`, que corta en UTC: lee su aviso antes de combinarla.
  */
 
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz'
@@ -24,9 +60,40 @@ import { es } from 'date-fns/locale'
 export const TZ_CLINICA = 'America/Mexico_City'
 
 /**
- * "Hoy" como string YYYY-MM-DD, calculado en la zona de la clínica.
+ * Huso horario del DISPOSITIVO de quien mira. Es el huso con el que se
+ * pintan las horas de citas (ver LA REGLA arriba).
+ *
+ * ⚠️  LLAMAR SÓLO DESDE COMPONENTES DE CLIENTE.
+ *
+ * En la pasada de servidor, `Intl` devuelve el huso del SERVIDOR —UTC en
+ * Vercel—, no el del usuario. Y `'use client'` NO significa "sólo cliente":
+ * en el App Router esos componentes SÍ se renderizan en el servidor durante
+ * el SSR.
+ *
+ * Hoy ningún llamador explota, pero por una propiedad ACCIDENTAL, no por
+ * una garantía: en los sitios que la usan los datos de citas llegan por
+ * `useEffect`, que no corre en el servidor, así que durante el SSR la lista
+ * está vacía y estas funciones nunca se ejecutan con datos reales.
+ *
+ * Basta con que alguien suba uno de esos fetch a un Server Component para
+ * que reviente sin aviso, y reventaría PEOR que el bug que este helper
+ * arregla: de −1 h constante y visible se pasaría a +7 h en el primer
+ * pintado, corrigiéndose sola al hidratar. Un parpadeo es muchísimo más
+ * difícil de reportar —y de creerle a quien lo reporta— que un error
+ * estable. Si algún día hace falta el huso en servidor, hay que mandarlo
+ * desde el cliente, no adivinarlo aquí.
+ */
+export function tzDispositivo(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone
+}
+
+/**
+ * "Hoy" como string YYYY-MM-DD, calculado en la zona indicada.
  * Reemplaza el patrón roto new Date().toISOString().split('T')[0].
  * Bugs 1 y 2.
+ *
+ * Para horas de citas, pásale `tzDispositivo()`. El default a `TZ_CLINICA`
+ * es la trampa descrita en la cabecera.
  */
 export function hoyEnTZ(timezone: string = TZ_CLINICA): string {
   return formatInTimeZone(new Date(), timezone, 'yyyy-MM-dd')
@@ -52,10 +119,13 @@ export function desplazarFecha(
 
 /**
  * Convierte una fecha + hora "de pared" (tal como las teclea el médico,
- * en la zona de la clínica) al instante UTC correcto en formato ISO.
+ * en la zona indicada) al instante UTC correcto en formato ISO.
  * Reemplaza combinarFechaHora, que interpretaba la hora en la zona del
  * servidor (Vercel = UTC).
  * Bug 3.
+ *
+ * Para ventanas de citas, pásale `tzDispositivo()`. El default a
+ * `TZ_CLINICA` es la trampa descrita en la cabecera.
  */
 export function fechaHoraLocalAInstante(
   fecha: string,
@@ -74,6 +144,21 @@ export function fechaHoraLocalAInstante(
  * hora) y la ancla a mediodía local, devolviendo un Date seguro para
  * comparar con differenceIn* sin que el truncado salte de día.
  * Bug 5: ambos operandos de la comparación deben pasar por aquí.
+ *
+ * ⚠️  NO ES CONSCIENTE DEL HUSO, y su nombre no lo delata.
+ *
+ * `fechaISO.split('T')[0]` se queda con la parte de fecha TAL COMO VIENE en
+ * la cadena. Si el argumento es un `timestamptz` en ISO —que termina en Z—,
+ * eso es EL DÍA EN UTC, no el día en ninguna zona con sentido para el
+ * usuario. Combinarla con `hoyEnTZ()` compara DOS HUSOS DISTINTOS entre sí.
+ *
+ * Es la trampa que tenía `ultimaConsultaLabel` en `expedienteUtils.ts`:
+ * comparaba el día en Centro contra el día en UTC, y en Sonora rompía a
+ * partir de las 17:00 hora local.
+ *
+ * Regla: si el valor es un instante (timestamptz), NORMALÍZALO ANTES con
+ * `renderEnTZ(valor, 'yyyy-MM-dd', tz)` y pásale a esta función el
+ * resultado. Si ya es una fecha-solo, entra directo.
  */
 export function fechaSoloSegura(fechaISO: string): Date {
   const fecha = parseISO(`${fechaISO.split('T')[0]}T12:00:00`)
@@ -84,9 +169,12 @@ export function fechaSoloSegura(fechaISO: string): Date {
 }
 
 /**
- * Formatea un instante UTC para mostrarlo en la zona de la clínica, con
- * locale español. instante puede ser un Date o un ISO string.
+ * Formatea un instante UTC para mostrarlo en la zona indicada, con locale
+ * español. instante puede ser un Date o un ISO string.
  * Bug 4 (preparación del render simétrico de citas).
+ *
+ * Para horas de citas, pásale `tzDispositivo()`. El default a `TZ_CLINICA`
+ * es la trampa descrita en la cabecera.
  */
 export function renderEnTZ(
   instante: string | Date,

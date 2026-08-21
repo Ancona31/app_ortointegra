@@ -18,7 +18,7 @@ import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useClinica } from '@/hooks/useClinica'
 import { useProfile } from '@/hooks/useProfile'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
-import { hoyEnTZ, desplazarFecha, fechaHoraLocalAInstante } from '@/lib/dates'
+import { hoyEnTZ, desplazarFecha, fechaHoraLocalAInstante, tzDispositivo } from '@/lib/dates'
 
 type GridMode = 'sin_pacientes' | 'nuevo' | 'activo'
 
@@ -97,10 +97,22 @@ export default function InicioPage() {
         .catch(() => {})
         .finally(() => setLoading(false))
 
-      // Fetch quick stats
-      const inicioHoy = fechaHoraLocalAInstante(hoyEnTZ(), '00:00')
-      const inicioManana = fechaHoraLocalAInstante(desplazarFecha(hoyEnTZ(), { dias: 1 }), '00:00')
-      const inicioSemana = fechaHoraLocalAInstante(desplazarFecha(hoyEnTZ(), { dias: -7 }), '00:00')
+      // Fetch quick stats.
+      //
+      // Ventanas calculadas en el huso del DISPOSITIVO, no en el de la clínica
+      // (ver LA REGLA en la cabecera de `@/lib/dates`). Antes heredaban el
+      // default `TZ_CLINICA`: en el Centro coincide, pero en Sonora una cita de
+      // las 23:00 caía fuera de la ventana y no se contaba como de hoy.
+      //
+      // `inicioSemana` cuenta consultas, no citas, pero comparte ventana y
+      // criterio con las otras dos: dejarla en Centro sería incoherente.
+      //
+      // Todo esto vive dentro del `useEffect`, o sea sólo en cliente, que es lo
+      // que `tzDispositivo()` exige.
+      const tz = tzDispositivo()
+      const inicioHoy = fechaHoraLocalAInstante(hoyEnTZ(tz), '00:00', tz)
+      const inicioManana = fechaHoraLocalAInstante(desplazarFecha(hoyEnTZ(tz), { dias: 1 }), '00:00', tz)
+      const inicioSemana = fechaHoraLocalAInstante(desplazarFecha(hoyEnTZ(tz), { dias: -7 }), '00:00', tz)
 
       supabase
         .from('appointments')

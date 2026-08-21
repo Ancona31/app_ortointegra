@@ -6,6 +6,20 @@
  * render (PDF, visor, formulario) consume tal cual. La única lógica es la
  * cascada de fuentes (snapshot inmutable de la consulta → médico vivo → '')
  * y el formateo de fechas en la zona de la clínica.
+ *
+ * ─── LA ZONA DE LA CLÍNICA AQUÍ ES DELIBERADA. NO LA "ARREGLES". ───────
+ *
+ * `renderEnTZ` se llama SIN huso a propósito, o sea en `TZ_CLINICA`. Esto
+ * NO es el bug de husos de agosto de 2026, aunque se le parezca: aquel era
+ * de horas de CITAS, que se pintan en el huso del DISPOSITIVO de quien
+ * mira (ver LA REGLA en la cabecera de `@/lib/dates`).
+ *
+ * Un DOCUMENTO CLÍNICO es la excepción, y por eso vive aquí. Lleva fecha
+ * fija de la clínica y NO puede cambiar según quién lo abra: una nota es
+ * inmutable y su fecha forma parte del expediente. Si el huso dependiera
+ * del lector, el mismo PDF saldría fechado distinto para el médico que lo
+ * firmó y para el perito que lo revisa. Decisión de producto, tomada a
+ * propósito.
  */
 
 import type { Consulta, Paciente, MedicoInfo, Diagnostico, SignosVitales } from '@/types'
