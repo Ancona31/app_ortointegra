@@ -1630,3 +1630,102 @@ Tres avisos para quien lo implemente, los tres verificados el 2026-08-21:
 **No se implementa en esta rama.** Es un cambio de redacción del acuse que depende
 de un dato que hay que hacer llegar a la ruta, y llega tarde para el commit del
 botón.
+## 12.18 El médico entra solo · notificaciones · los tres costes aceptados
+
+> **Añadida el 2026-08-21**, al construir el flujo definitivo de la invitación.
+> Cambia §12.4 en un punto de fondo y añade lo que Google notifica.
+
+### El médico ya no se invita: entra solo
+
+El botón sirve para UNA cosa —meter a alguien en la lista de asistentes— y una
+vez dentro, **Google avisa SOLO de cada cambio que Spinus haga sobre el evento**,
+con `sendUpdates: 'all'` y sin que nadie pulse nada. Lo único que las ediciones
+no cubren es que ENTRE ALGUIEN NUEVO, y de eso sólo hay un caso automático: el
+médico.
+
+- **Al crear**, su correo va en el MISMO `events.insert` que crea el evento. Una
+  llamada y no dos: añadirlo después con un `patch` costaría un viaje más y un
+  segundo correo de «evento actualizado» pisando la invitación recién recibida.
+- **Al reasignar**, el nuevo entra y **el anterior SALE**, en el `patch` que el
+  PUT ya hacía. Sacarlo no es limpieza: mientras siga en la lista recibe todas
+  las actualizaciones futuras —cambios de hora, cancelaciones— **con el nombre de
+  un paciente que ya no atiende**.
+- **Su casilla desapareció del modal.** Si tiene la cita, tiene que tenerla en su
+  calendario: no es una elección de nadie y ofrecerla sería fingir una decisión
+  que no existe.
+
+**Lo que esto deroga de §12.4:** el botón ya no dice «Enviar invitación siempre».
+Tras enviar desaparece y queda «Aceptar». El motivo que daba §12.4 —Google no
+duplica al asistente, sólo reenvía— **sigue siendo cierto**, y reenviar sigue
+siendo posible: se entra de nuevo a la cita y se usa «Agregar invitados». Lo que
+cambió es que el modal ahora se abre solo al crear, así que es lo último que ve
+quien acaba de agendar, y un botón de enviar vivo ahí invita a pulsarlo «por si
+acaso» y a mandar dos correos por cita.
+
+### Qué notifica Google ahora, y qué sigue callado
+
+| Acción | Antes | Ahora |
+|---|---|---|
+| Mover la cita de hora | silencio | `sendUpdates: 'all'` |
+| Borrar la cita | silencio | `sendUpdates: 'all'` |
+| Marcar «Cancelada» | silencio | título «CANCELADA — …» + aviso |
+| Reactivar una cancelada | silencio | se quita el prefijo + aviso |
+| Reasignar el médico | silencio | el nuevo entra, el anterior sale |
+| Cambiar notas, o pasar a «Confirmada» | silencio | **silencio**, y a propósito |
+
+La última fila es la que hay que defender: se compara **la transición**, no el
+estado. Sin eso, editar las notas de una cita ya cancelada le volvería a mandar la
+cancelación al paciente en cada guardado.
+
+**La idempotencia del prefijo sale gratis y hay UNA sola forma de romperla.**
+`summary` se recompone desde cero en cada escritura, a partir del paciente y del
+estado de la fila; este código **nunca lee el título que hay ahora en Google**. El
+día que alguien lo lea para anteponerle algo —«así conservo lo que hubiera puesto
+el médico a mano»— aparece «CANCELADA — CANCELADA — …» al segundo guardado. Está
+escrito junto a la constante, en `lib/appointments.ts`.
+
+### Quitar el paciente **es** borrar la cita
+
+No son dos operaciones. Una cita sin paciente no existe en Spinus: el título del
+evento sale del paciente, Guardar está apagado sin él y no hay ningún estado
+intermedio que guardar.
+
+Por eso la **X junto al paciente**, en edición, no vacía un campo: lleva a una
+alerta y de ahí al **DELETE de la cita entera**, el mismo camino que la papelera
+—que ya borra el evento con `sendUpdates: 'all'`, así que el invitado recibe su
+cancelación—. En el alta sigue limpiando el campo, porque todavía no hay cita.
+
+**El texto de la alerta dice el desenlace en la primera frase**, y eso es el
+punto: quien pulsa una X sobre un nombre espera vaciar un campo, no borrar nada.
+
+> **Se consideró y se retiró:** una rama en el PUT que tratara `paciente_id: null`
+> como caso especial —borrar el evento y dejar la fila en `unbound`—. Estaba
+> escrita y se quitó al comprobar que **ningún llamador puede producirla**: el
+> único punto que manda `paciente_id` en un PUT es el modal de la agenda, y
+> siempre manda uno real. Los eventos genéricos de §12.14 tampoco la alcanzarían:
+> nacerán **sin** paciente, así que nunca hacen esa transición. Era código sin
+> camino que lo alcance, que es peor que no tenerlo — parece cubierto y nadie lo
+> ha probado nunca.
+
+### Los tres costes aceptados
+
+Van aquí **como aceptados, no como pendientes**. Ninguno se arregla en esta rama.
+
+1. **Si el calendario se recrea tras un 404, el evento nuevo nace SIN
+   ASISTENTES** y nadie se entera. Hay que reinvitar a mano. La rama de
+   reparación de `conCalendarioSpinus` copia la cita, no su lista de invitados.
+2. **Las citas ya canceladas hoy tienen su evento sin el prefijo** hasta que
+   alguien las edite. No hay backfill posible sin barrer Google.
+3. **Si a un paciente le editan el correo en su ficha, la dirección anterior
+   sigue invitada.** Y no es una omisión: **el dato que haría falta no existe.**
+   `PUT /api/pacientes/[id]` sobrescribe la columna y Spinus no guarda el valor
+   viejo en ninguna parte, así que no hay forma de saber cuál de las entradas de
+   la lista de Google era la suya — y adivinar está prohibido, porque en esa lista
+   están también el médico, el propietario del calendario y los invitados
+   externos. Entra la nueva y la vieja se queda hasta que alguien la quite a mano.
+   **El cambio de PACIENTE sí se resuelve**: al saliente se le lee su correo
+   porque su ficha sigue existiendo.
+
+> **DATO DE ESTADO (2026-08-21):** ningún beta tester tiene Google conectado, así
+> que no hay ni una cita con la lista de asistentes en mal estado. Estos tres
+> costes nacen sin deuda acumulada detrás; no hace falta corrección de datos.

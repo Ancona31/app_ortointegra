@@ -4,7 +4,9 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { conCalendarioSpinus, registrarFalloGCal } from '@/lib/gcal'
 import { resolverConexionClinica } from '@/lib/gcalConexion'
 import { canManageClinica } from '@/lib/permissions'
-import { APPOINTMENT_SELECT, eventoParaGoogle, type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
+import { APPOINTMENT_SELECT, eventoParaGoogle, componerAsistentes, INTERRUPTORES_INVITADOS,
+         type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
+import { correoDelMedico } from '@/lib/medicoCorreo'
 import { TZ_CLINICA } from '@/lib/dates'
 
 /* Formato UUID. A nivel de módulo porque lo usan el PUT (consultorio y
@@ -68,9 +70,13 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
     const { title, start_time, end_time, paciente_id, notes, status, medico_id, consultorio_id, updated_at: clientUpdatedAt, client_id } = body
 
     // RLS filtra por clinica_id
+    /* `status`, `start_time`, `end_time` y `paciente_id` no se leían aquí y ahora
+       hacen falta: son el ANTES contra el que se decide si Google tiene que
+       avisar a alguien. Sin `status`, editar las notas de una cita ya cancelada
+       volvería a mandarle la cancelación al paciente en cada guardado. */
     const { data: existing } = await supabase
       .from('appointments')
-      .select('id, google_event_id, gcal_sync_status, updated_at, medico_id')
+      .select('id, google_event_id, gcal_sync_status, updated_at, medico_id, status, start_time, end_time, paciente_id')
       .eq('id', id)
       .single()
 
@@ -323,6 +329,51 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       // huso y cae a `TZ_CLINICA` — exactamente lo que Google ya muestra hoy
       // para ella. No se rompe nada y no hace falta migracion.
       const tzCita: string = apt.consultorio_timezone ?? TZ_CLINICA
+
+      /* ── QUÉ CAMBIÓ DE VERDAD, Y QUIÉN TIENE QUE ENTERARSE ─────────────────
+         Todo esto compara `existing` (el ANTES) contra `apt` (la fila ya
+         actualizada). NO se mira si el campo vino en el cuerpo: el modal manda
+         siempre el lote completo, así que «vino» no distingue nada.
+
+         ⚠️ LAS HORAS SE COMPARAN POR INSTANTE, NUNCA POR CADENA. `existing`
+         llega de PostgREST como `2026-08-22T09:00:00+00:00` y el cuerpo trae
+         `2026-08-22T09:00:00.000Z`: son el mismo instante escrito de dos formas
+         y `!==` diría que cambió SIEMPRE, notificando al paciente en cada
+         guardado. */
+      const mismoInstante = (a: string | null, b: string | null): boolean =>
+        a !== null && b !== null && new Date(a).getTime() === new Date(b).getTime()
+
+      const seMovio =
+        !mismoInstante(existing.start_time, apt.start_time) ||
+        !mismoInstante(existing.end_time,   apt.end_time)
+
+      const estabaCancelada = existing.status === 'cancelled'
+      const estaCancelada   = apt.status      === 'cancelled'
+      /* La TRANSICIÓN, no el estado. Sin esto, editar las notas de una cita ya
+         cancelada le volvería a mandar la cancelación al paciente. */
+      const cambioCancelacion = estabaCancelada !== estaCancelada
+
+      const medicoAnteriorId = existing.medico_id as string | null
+      const medicoActualId   = apt.medico_id as string | null
+      const huboReasignacion = medicoAnteriorId !== medicoActualId
+
+      /* QUITAR AL PACIENTE DE UNA CITA **ES** BORRARLA, y por eso no hay aquí
+         ninguna rama que lo trate: no es una edición. La X del paciente en el
+         modal lleva al DELETE de la cita entera, con su alerta delante, y ese
+         camino ya borra el evento con `sendUpdates: 'all'`.
+
+         Lo que sí es una edición es cambiar de un paciente a OTRO. */
+      const cambioPaciente   = existing.paciente_id !== null
+                            && apt.paciente_id !== null
+                            && existing.paciente_id !== apt.paciente_id
+      const pacienteAnteriorId = existing.paciente_id as string | null
+
+      /* Cuándo Google manda correo. `'none'` es el silencio de hoy y sigue
+         siendo el caso por omisión: cambiar las notas o pasar a «Confirmada» no
+         molesta a nadie. */
+      const sendUpdates: 'all' | 'none' =
+        (seMovio || cambioCancelacion || huboReasignacion || cambioPaciente) ? 'all' : 'none'
+
       after(async () => {
         const STATUS_COLOR: Record<string, string | undefined> = {
           confirmed: '2',
@@ -332,28 +383,100 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
         }
         let gcal_sync_status: 'synced' | 'pending' | 'failed' = 'pending'
         let calendarIdUsado: string | null = null
-        // Título y descripción se recalculan y se reenvían SIEMPRE que la
-        // operación toque Google, no sólo cuando venga `title` en el cuerpo:
-        // ambos se derivan del paciente, así que ligar uno a una cita ya
-        // existente dejaría el evento con el nombre viejo. El fallback sale de
-        // `apt.title` (la fila ya actualizada), no del `title` del cuerpo, que
-        // puede no venir.
-        // La descripción lleva un formato fijo (clínica y paciente) y NADA
-        // clínico: ni notes, ni motivo de consulta, ni diagnóstico.
-        // `reminders` NO se manda aquí a propósito: es del insert.
-        // El instante del ancla sale de `apt.start_time` y NUNCA del `start_time`
-        // del cuerpo: este bloque corre tambien en ediciones que solo cambian el
-        // `status`, donde el cuerpo no trae hora ninguna.
-        const { summary, description } = eventoParaGoogle(pacienteCita, clinicaCita, apt.title, apt.start_time, tzCita)
+
+        /* El estado va al compositor del título: una cita cancelada estrena el
+           prefijo «CANCELADA — » y una reactivada lo pierde, sin código de
+           vuelta — se recompone desde cero, así que el prefijo no se acumula.
+           Ver `PREFIJO_CANCELADA` en `lib/appointments.ts`. */
+        const { summary, description } = eventoParaGoogle(pacienteCita, clinicaCita, apt.title, apt.start_time, tzCita, apt.status)
+
+        /* ── LOS CORREOS DE LOS MÉDICOS — SÓLO AL REASIGNAR ───────────────
+           Los dos se resuelven únicamente cuando cambia `medico_id`, que es la
+           única vez que hay alguien a quien meter y alguien a quien sacar. En
+           cualquier otra edición no se pregunta nada y el médico que ya estaba
+           en la lista se conserva solo: viene en `previos` y `componerAsistentes`
+           no quita a nadie que no se le nombre.
+
+           ⚠️ SE CONSIDERÓ RESOLVER EL ACTUAL SIEMPRE, Y SE DESCARTÓ POR COSTE.
+           No es un olvido. Hacerlo repararía un caso que casi nunca ocurre —una
+           cita cuyo evento nació sin el médico porque la API de Auth falló aquel
+           día— a cambio de una llamada a la API de Admin de Auth en TODA edición
+           que toque Google: mover una hora, cambiar el estado, corregir una
+           nota. Latencia permanente por un beneficio marginal.
+
+           Qué pasa entonces con una cita rota así: se repara el día que alguien
+           la reasigne, y si nunca se reasigna, el médico no tiene ese evento en
+           su calendario — que es exactamente lo que le pasa hoy.
+
+           Un fallo al resolver NO cancela la edición: se parchea sin tocar a ese
+           asistente y queda la línea de log. */
+        let correoMedicoActual: string | null = null
+        let correoMedicoSaliente: string | null = null
+        if (huboReasignacion) {
+          if (medicoActualId) {
+            const r = await correoDelMedico(admin, medicoActualId, clinicaId)
+            if (r.ok) correoMedicoActual = r.correo
+            else registrarFalloGCal(
+              { operacion: `events.patch (médico entrante sin resolver: ${r.motivo})`, userId, conexionId: conexion.id, eventId: gcalEventId },
+              new Error('no se pudo resolver el correo del médico que recibe la cita'),
+            )
+          }
+          if (medicoAnteriorId) {
+            const r = await correoDelMedico(admin, medicoAnteriorId, clinicaId)
+            if (r.ok) correoMedicoSaliente = r.correo
+            else registrarFalloGCal(
+              { operacion: `events.patch (médico saliente sin resolver: ${r.motivo})`, userId, conexionId: conexion.id, eventId: gcalEventId },
+              new Error('no se pudo resolver el correo del médico que deja la cita'),
+            )
+          }
+        }
+
+        /* El paciente saliente sólo se puede sacar cuando cambia el PACIENTE de
+           la cita: entonces su ficha sigue existiendo y su correo se puede leer.
+           Si lo que cambió fue el correo dentro de una misma ficha, la dirección
+           anterior no está en ninguna parte de Spinus y no hay a quién sacar —
+           coste aceptado, explicado en `AsistentesDeseados.pacienteSaliente`.
+
+           `clinica_id` explícito: es cliente admin y la RLS no acota nada. */
+        let correoPacienteSaliente: string | null = null
+        if (cambioPaciente && pacienteAnteriorId) {
+          const { data: anterior } = await admin
+            .from('pacientes')
+            .select('email')
+            .eq('id', pacienteAnteriorId)
+            .eq('clinica_id', clinicaId)
+            .maybeSingle<{ email: string | null }>()
+          correoPacienteSaliente = anterior?.email?.trim().toLowerCase() || null
+        }
+
         try {
-          const parcheado = await conCalendarioSpinus(conexion, admin, (calendar, calendarId) => {
+          const parcheado = await conCalendarioSpinus(conexion, admin, async (calendar, calendarId) => {
             calendarIdUsado = calendarId
+
+            /* ⚠️⚠️ EL `get` ES LA MITAD DE LA OPERACIÓN, NO UNA COMPROBACIÓN.
+               `events.patch` con `attendees` PISA LA LISTA ENTERA. Sin leer lo
+               que hay, este patch borraría al paciente invitado y Google le
+               mandaría una cancelación de una cita que sigue en pie.
+
+               Y va DENTRO del callback, como todo lo demás: `conCalendarioSpinus`
+               reejecuta la operación entera ante un 404. */
+            const { data: evento } = await calendar.events.get({ calendarId, eventId: gcalEventId })
+            const asistentes = componerAsistentes(evento.attendees ?? [], {
+              medicoActual:     correoMedicoActual,
+              medicoSaliente:   correoMedicoSaliente,
+              pacienteSaliente: correoPacienteSaliente,
+              nuevos:           [],
+            })
+
             return calendar.events.patch({
               calendarId,
               eventId:    gcalEventId,
+              sendUpdates,
               requestBody: {
                 summary,
                 description,
+                attendees: asistentes,
+                ...INTERRUPTORES_INVITADOS,
                 ...(start_time !== undefined ? { start: { dateTime: start_time, timeZone: tzCita } } : {}),
                 ...(end_time   !== undefined ? { end:   { dateTime: end_time,   timeZone: tzCita } } : {}),
                 ...(status     !== undefined && STATUS_COLOR[status] ? { colorId: STATUS_COLOR[status] }    : {}),
@@ -474,7 +597,16 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext<'/api/appointm
         try {
           await conCalendarioSpinus(conexion, admin, (calendar, calendarId) => {
             calendarIdUsado = calendarId
-            return calendar.events.delete({ calendarId, eventId: gcalEventId })
+            /* `sendUpdates: 'all'` — la cita desaparecía del calendario del
+               paciente EN SILENCIO. Quien la tuviera aceptada se quedaba con el
+               hueco reservado y sin enterarse de nada.
+
+               Sin asistentes no manda nada: las citas que nadie invitó se
+               siguen borrando calladas, igual que hasta hoy. Y al médico que es
+               dueño de la cuenta conectada tampoco le llega correo —Google no
+               notifica al organizador—, pero el evento sí se le va del
+               calendario, que es lo que necesita ver. */
+            return calendar.events.delete({ calendarId, eventId: gcalEventId, sendUpdates: 'all' })
           }, { puedeReparar, actorId: userId })
         } catch (gcalErr) {
           // Sigue siendo best-effort —la cita ya se borró de Spinus y no hay

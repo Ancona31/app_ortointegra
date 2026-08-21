@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import type { calendar_v3 } from 'googleapis'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { canVerAgendaCompleta } from '@/lib/permissions'
@@ -10,6 +9,7 @@ import {
   esNotFound,
   esCredencialInvalida,
 } from '@/lib/gcal'
+import { componerAsistentes, INTERRUPTORES_INVITADOS } from '@/lib/appointments'
 import { logAudit } from '@/lib/audit'
 
 /* ═══ POST /api/appointments/[id]/invitacion ═══════════════════════════════
@@ -43,8 +43,13 @@ import { logAudit } from '@/lib/audit'
    fallos. La cita queda exactamente igual que estaba, incluido su
    `gcal_sync_status`: una invitación que no sale no es una cita desincronizada.
 
-   NO devuelve al navegador el correo del médico. Se resuelve en el servidor, al
-   pulsar, y muere aquí. Ver `correoDelMedico`.
+   NO INVITA AL MÉDICO, y eso cambió. Antes tenía su casilla; ahora el médico
+   asignado entra SOLO, como asistente del `events.insert` que crea el evento, y
+   sale solo cuando se reasigna la cita. Si tiene la cita, tiene que tenerla en
+   su calendario: no es una elección de nadie, así que ofrecerla aquí sería
+   fingir una decisión que no existe. Lo que queda es lo que SÍ se elige — el
+   paciente, que puede no tener correo o querer que se avise a otra persona, y
+   cualquier invitado externo.
 
    NO lee la respuesta del invitado. Que el paciente rechace la invitación desde
    su correo no vuelve a Spinus: eso sería CAMINO DE VUELTA y está fuera de
@@ -67,7 +72,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
  * contra el dedo repetido y contra el bucle accidental de un `useEffect`, que es
  * de lo que protege de verdad: cada pulsación manda correo a personas reales.
  */
-const LIMITE_POR_HORA = 20
+const LIMITE_POR_HORA = 50
 
 /** La cita, con lo justo para invitar. `pacientes` llega por el join. */
 interface FilaCita {
@@ -81,7 +86,7 @@ interface FilaCita {
 
 /** A quién se invita, ya con su dirección resuelta. */
 interface Destinatario {
-  readonly papel: 'medico' | 'paciente'
+  readonly papel: 'paciente' | 'tecleado'
   readonly correo: string
 }
 
@@ -111,73 +116,6 @@ function esCorreoRechazado(err: unknown): boolean {
     : null
   if (status !== 400) return false
   return err instanceof Error && /attendee/i.test(err.message)
-}
-
-/**
- * El correo del médico asignado, resuelto EN EL SERVIDOR y al pulsar.
- *
- * ── POR QUÉ NO VIAJA EN LA CITA ───────────────────────────────────────────
- * `public.profiles` NO TIENE COLUMNA `email` —son 16 y ninguna es ésa—, así que
- * ampliar el join de `APPOINTMENT_SELECT` no es cuestión de añadir un campo:
- * no se puede pedir lo que la tabla no tiene. Tampoco hay vista que lo exponga
- * (`public` no tiene ninguna) y PostgREST no cruza al esquema `auth`. Sale por
- * la API de Admin de Auth, que exige service role.
- *
- * ── `getUserById` Y NUNCA `listUsers` ─────────────────────────────────────
- * `src/app/api/admin/usuarios/route.ts` barre el proyecto con `listUsers()` y
- * cruza después por id, porque necesita a todos. Aquí hace falta UNO. Barrer
- * mil cuentas para quedarse con una es traer al servidor la libreta entera de
- * la plataforma cada vez que alguien pulsa un botón.
- *
- * ── LA COMPROBACIÓN DE CLÍNICA NO ES DECORATIVA ───────────────────────────
- * El cliente admin esquiva la RLS, así que el perfil se comprueba por `id` Y
- * por `clinica_id` ANTES de pedirle el correo a Auth (pendiente prioritario de
- * `CLAUDE.md`). `medicoId` sale de la fila de la cita, que ya vino filtrada por
- * RLS, pero esta ruta no puede depender de eso: el día que alguien lea la cita
- * con el cliente admin, esta línea es lo único que impide sacar el correo de un
- * usuario de otra clínica.
- *
- * Devuelve null sólo si el usuario no tiene correo, que es casi inalcanzable:
- * todo usuario de Spinus nace de un alta con correo. Se contempla igualmente
- * porque el `null` está en el tipo que devuelve Auth.
- */
-async function correoDelMedico(
-  admin: ReturnType<typeof createAdminClient>,
-  medicoId: string,
-  clinicaId: string,
-): Promise<{ correo: string } | { fallo: NextResponse }> {
-  const { data: perfil } = await admin
-    .from('profiles')
-    .select('id')
-    .eq('id', medicoId)
-    .eq('clinica_id', clinicaId)
-    .maybeSingle<{ id: string }>()
-
-  if (!perfil) {
-    return {
-      fallo: NextResponse.json(
-        { error: 'medico_invalido', message: 'El médico de la cita no pertenece a tu clínica.' },
-        { status: 400 },
-      ),
-    }
-  }
-
-  const { data, error } = await admin.auth.admin.getUserById(medicoId)
-  const correo = data?.user?.email?.trim().toLowerCase() ?? ''
-
-  if (error || correo === '') {
-    return {
-      fallo: NextResponse.json(
-        {
-          error: 'medico_sin_correo',
-          message: 'No se pudo obtener el correo del médico asignado. Invita al paciente y avísale por otra vía.',
-        },
-        { status: 409 },
-      ),
-    }
-  }
-
-  return { correo }
 }
 
 export async function POST(
@@ -213,20 +151,26 @@ export async function POST(
 
     const cuerpo: unknown = await req.json()
     const datos = (typeof cuerpo === 'object' && cuerpo !== null ? cuerpo : {}) as {
-      medico?: unknown
       paciente?: unknown
-      pacienteEmail?: unknown
+      correoTecleado?: unknown
       confirmarCorreoTecleado?: unknown
     }
-    const pedirMedico   = datos.medico   === true
     const pedirPaciente = datos.paciente === true
-    /* Si llega, sustituye al de la ficha SÓLO para este envío: esta ruta no
-       escribe en `pacientes`. Guardarlo es otra petición, posterior y aparte. */
-    const correoTecleado = typeof datos.pacienteEmail === 'string'
-      ? datos.pacienteEmail.trim().toLowerCase()
-      : ''
+    /* Una dirección de UN SOLO USO. Puede ser otra del paciente —la que dicta
+       ese día— o la de un tercero: la hija que gestiona las citas de su padre,
+       alguien que acompaña. Esta ruta no escribe en `pacientes`, así que no se
+       guarda en ninguna parte; guardarla es otra petición, posterior y aparte,
+       y sólo se ofrece cuando la ficha estaba vacía.
 
-    if (!pedirMedico && !pedirPaciente) {
+       Se llamaba `pacienteEmail` y el nombre mentía a medias: nació pensada
+       como «otra dirección para el mismo paciente» y desde que se puede invitar
+       a un externo ya no tiene por qué serlo. */
+    const correoTecleado = typeof datos.correoTecleado === 'string'
+      ? datos.correoTecleado.trim().toLowerCase()
+      : ''
+    const pedirTecleado = correoTecleado !== ''
+
+    if (!pedirPaciente && !pedirTecleado) {
       return NextResponse.json(
         { error: 'sin_destinatarios', message: 'Marca al menos un destinatario.' },
         { status: 400 },
@@ -279,21 +223,11 @@ export async function POST(
       )
     }
 
-    // ── Los destinatarios ───────────────────────────────────────────────────
+    /* ── Los destinatarios ─────────────────────────────────────────────────
+       Dos, independientes, y los dos opcionales. El médico NO está aquí: entra
+       solo al crearse el evento (ver la cabecera). */
     const admin = createAdminClient()
     const destinos: Destinatario[] = []
-
-    if (pedirMedico) {
-      if (!cita.medico_id) {
-        return NextResponse.json(
-          { error: 'cita_sin_medico', message: 'Esta cita no tiene médico asignado.' },
-          { status: 400 },
-        )
-      }
-      const resuelto = await correoDelMedico(admin, cita.medico_id, profile.clinica_id)
-      if ('fallo' in resuelto) return resuelto.fallo
-      destinos.push({ papel: 'medico', correo: resuelto.correo })
-    }
 
     if (pedirPaciente) {
       if (!cita.paciente_id) {
@@ -303,9 +237,7 @@ export async function POST(
         )
       }
       const correoFicha = cita.pacientes?.email?.trim().toLowerCase() ?? ''
-      const destino = correoTecleado !== '' ? correoTecleado : correoFicha
-
-      if (destino === '') {
+      if (correoFicha === '') {
         return NextResponse.json(
           {
             error: 'paciente_sin_correo',
@@ -314,24 +246,38 @@ export async function POST(
           { status: 400 },
         )
       }
-      if (!EMAIL_REGEX.test(destino)) {
+      if (!EMAIL_REGEX.test(correoFicha)) {
         return NextResponse.json(
-          { error: 'correo_invalido', message: 'El correo del paciente no tiene forma válida.' },
+          {
+            error: 'correo_invalido',
+            message: 'El correo que tiene el paciente en su ficha no tiene forma válida. Corrígelo en la ficha o escribe otro aquí.',
+          },
+          { status: 400 },
+        )
+      }
+      /* La de la ficha NO pasa por la confirmación letra por letra, y es
+         deliberado: ese dato ya lo leyó y validó alguien al guardarlo. Lo que se
+         confirma es lo que acaba de salir de un teclado. */
+      destinos.push({ papel: 'paciente', correo: correoFicha })
+    }
+
+    if (pedirTecleado) {
+      if (!EMAIL_REGEX.test(correoTecleado)) {
+        return NextResponse.json(
+          { error: 'correo_invalido', message: 'El correo escrito no tiene forma válida.' },
           { status: 400 },
         )
       }
 
       /* ⚠️ TODA DIRECCIÓN QUE VENGA DEL TECLADO EXIGE CONFIRMACIÓN, tenga la
-         ficha correo o no. No es un «¿estás seguro?» de más: no existe
-         «cancelar invitación», y lo que sale lleva el nombre completo del
-         paciente en el título del evento.
+         ficha correo o no, y sea del paciente o de un tercero. No es un «¿estás
+         seguro?» de más: no existe «cancelar invitación», y lo que sale lleva el
+         nombre completo del paciente en el título del evento.
 
          La confirmación letra por letra vive en el panel, que es donde se lee.
          Esta comprobación es la segunda barrera: la que sigue en pie cuando
-         alguien cambia la primera. Con el correo de la ficha no hay nada que
-         confirmar —ese dato ya lo validó alguien al guardarlo— y por eso la
-         condición mira de dónde viene la dirección, no si coincide con la ficha. */
-      if (correoTecleado !== '' && datos.confirmarCorreoTecleado !== true) {
+         alguien cambia la primera. */
+      if (datos.confirmarCorreoTecleado !== true) {
         return NextResponse.json(
           {
             error: 'correo_no_confirmado',
@@ -341,7 +287,7 @@ export async function POST(
         )
       }
 
-      destinos.push({ papel: 'paciente', correo: destino })
+      destinos.push({ papel: 'tecleado', correo: correoTecleado })
     }
 
     // ── Google ──────────────────────────────────────────────────────────────
@@ -382,65 +328,44 @@ export async function POST(
            el `get`, no se va a notar en ninguna prueba de un solo envío. */
         const { data: evento } = await calendar.events.get({ calendarId, eventId })
 
+        /* ⚠️ EL COMPOSITOR ES EL PUNTO ÚNICO, y quitar de aquí lo que no se
+           reconozca está PROHIBIDO: en esa lista está también el médico
+           asignado, que entró solo al crearse el evento, y puede estar el
+           propietario del calendario. Ver `componerAsistentes`.
+
+           `medicoActual` va en null a propósito: resolverlo costaría una llamada
+           a la API de Admin de Auth en una ruta que responde en línea, y el PUT
+           ya lo repone en la siguiente edición de la cita. Aquí sólo se AÑADE. */
         const previos = evento.attendees ?? []
         const yaEstaban = new Set(
           previos.map(a => a.email?.trim().toLowerCase() ?? '').filter(e => e !== ''),
         )
-
-        /* Los que ya estaban se reenvían TAL CUAL, con su `responseStatus`
-           incluido: si el médico ya había aceptado, escribirle un `attendees`
-           sin ese campo le devolvería la cita a «pendiente de responder». Se
-           copia sólo lo que la API admite escribir; lo de sólo lectura (`id`,
-           `self`, `organizer`) se queda fuera. Un asistente sin correo no es
-           escribible y no puede reenviarse. */
-        const mezclados: calendar_v3.Schema$EventAttendee[] = previos.flatMap(a => {
-          const correo = a.email?.trim() ?? ''
-          if (correo === '') return []
-          return [{
-            email: correo,
-            ...(a.displayName      != null ? { displayName:      a.displayName }      : {}),
-            ...(a.optional         != null ? { optional:         a.optional }         : {}),
-            ...(a.responseStatus   != null ? { responseStatus:   a.responseStatus }   : {}),
-            ...(a.comment          != null ? { comment:          a.comment }          : {}),
-            ...(a.additionalGuests != null ? { additionalGuests: a.additionalGuests } : {}),
-            ...(a.resource         != null ? { resource:         a.resource }         : {}),
-          }]
+        const asistentes = componerAsistentes(previos, {
+          medicoActual:     null,
+          medicoSaliente:   null,
+          pacienteSaliente: null,
+          nuevos:           destinos.map(d => d.correo),
         })
 
-        for (const d of destinos) {
-          if (!yaEstaban.has(d.correo)) mezclados.push({ email: d.correo })
-        }
-
-        /* UN SOLO `patch` CON LOS DOS INVITADOS, nunca dos seguidos.
+        /* UN SOLO `patch` CON TODOS LOS INVITADOS, nunca uno por destinatario.
            `sendUpdates: 'all'` notifica a TODOS los asistentes en CADA patch, así
            que dos llamadas le meterían al médico un segundo correo de «evento
-           actualizado» encima de su invitación. */
+           actualizado» encima de lo que acabara de recibir. */
         await calendar.events.patch({
           calendarId,
           eventId,
           sendUpdates: 'all',
           requestBody: {
-            attendees: mezclados,
-            /* LOS TRES VAN SIEMPRE, aunque el evento ya los tuviera.
-               VERIFICADO CONTRA PRODUCCIÓN que los eventos NACEN sin ellos y que
-               los defaults NO son iguales: `guestsCanModify` es false por
-               omisión, pero `guestsCanInviteOthers` y `guestsCanSeeOtherGuests`
-               valen TRUE. Si este patch no los manda, el médico y el paciente se
-               ven el correo el uno al otro.
-
-               Cuidado al comprobarlo en la respuesta: Google omite el campo
-               cuando vale su default, así que un campo ausente significa
-               «aplicado» en el primero y «Google lo ignoró» en los otros dos. */
-            guestsCanModify:         false,
-            guestsCanInviteOthers:   false,
-            guestsCanSeeOtherGuests: false,
+            attendees: asistentes,
+            ...INTERRUPTORES_INVITADOS,
           },
         })
 
-        return {
-          medico:   pedirMedico   && yaEstaban.has(destinos.find(d => d.papel === 'medico')?.correo   ?? ''),
-          paciente: pedirPaciente && yaEstaban.has(destinos.find(d => d.papel === 'paciente')?.correo ?? ''),
+        const yaEstaba = (papel: Destinatario['papel']): boolean => {
+          const d = destinos.find(x => x.papel === papel)
+          return d !== undefined && yaEstaban.has(d.correo)
         }
+        return { paciente: yaEstaba('paciente'), tecleado: yaEstaba('tecleado') }
       }, {
         /* `puedeReparar: false` FIJO, y no `canManageClinica`. Si el calendario
            está muerto, la rama de reparación desvincula TODAS las citas del
@@ -487,12 +412,12 @@ export async function POST(
         registroId: cita.id,
         ip,
         /* El papel, nunca la dirección. Ver la nota de `AuditAccion`. */
-        descripcion: `Invitación de cita enviada a: ${destinos.map(d => d.papel === 'medico' ? 'el médico asignado' : 'el paciente').join(' y ')}.`,
+        descripcion: `Invitación de cita enviada a: ${destinos.map(d => d.papel === 'paciente' ? 'el paciente (correo de su ficha)' : 'una dirección escrita a mano').join(' y ')}.`,
       })
 
       return NextResponse.json({
         ok: true,
-        invitados: { medico: pedirMedico, paciente: pedirPaciente },
+        invitados: { paciente: pedirPaciente, tecleado: pedirTecleado },
         /* Quién ya figuraba como asistente antes de este patch. Sirve para que
            el acuse no prometa un alta que no ocurrió: a ése Google le reenvió el
            correo, que es lo que se buscaba. */

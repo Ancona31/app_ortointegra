@@ -1,3 +1,4 @@
+import type { calendar_v3 } from 'googleapis'
 import { renderEnTZ } from '@/lib/dates'
 import { regionDeTimezone } from '@/lib/consultorios/zonas-mexico'
 
@@ -98,6 +99,37 @@ function anclaDeHora(startISO: string, timezone: string): string | null {
   }
 }
 
+/** El valor de `appointments.status` que marca una cita cancelada. */
+const ESTADO_CANCELADA = 'cancelled'
+
+/**
+ * Lo que se antepone al titulo cuando la cita esta cancelada.
+ *
+ * ── POR QUE UN PREFIJO Y NO BORRAR EL EVENTO ────────────────────────────────
+ * En Spinus «Cancelada» es solo un estado visual: la fila sigue viva y la cita
+ * puede reactivarse. Borrar el evento haria irreversible en Google algo que en
+ * Spinus no lo es. El prefijo avisa sin destruir.
+ *
+ * ── ⚠️⚠️ LA IDEMPOTENCIA SALE GRATIS, Y HAY UNA SOLA FORMA DE ROMPERLA ──────
+ * Marcar cancelada dos veces NO produce «CANCELADA — CANCELADA — …» porque
+ * `summary` se RECOMPONE DESDE CERO en cada escritura a Google, a partir del
+ * paciente y del estado de la fila. Este modulo NUNCA lee el titulo que hay
+ * ahora mismo en el evento.
+ *
+ * Y esa es exactamente la linea que no se puede cruzar: el dia que alguien lea
+ * el `summary` de Google para anteponerle algo —«asi conservo lo que hubiera
+ * puesto el medico a mano»— la duplicacion aparece al segundo guardado. Si hace
+ * falta conservar algo del titulo ajeno, hay que resolverlo sin leerlo de
+ * vuelta.
+ *
+ * Por lo mismo, el camino de vuelta no necesita codigo: reactivar una cita
+ * recompone el titulo sin prefijo y el prefijo desaparece solo.
+ *
+ * El separador es una raya larga con espacios, no un guion: se lee como
+ * separador en la cuadricula del calendario, donde el titulo va apretado.
+ */
+const PREFIJO_CANCELADA = 'CANCELADA — '
+
 /**
  * Lo que Spinus escribe en el evento de Google. Punto unico: si el formato se
  * duplicara entre el POST y el PUT, el evento cambiaria de forma segun por
@@ -126,6 +158,7 @@ export function eventoParaGoogle(
   fallbackTitulo: string,
   startISO: string,
   timezone: string,
+  estado: string,
 ): {
   summary: string
   description: string
@@ -139,8 +172,10 @@ export function eventoParaGoogle(
     ? [clinicaNombre, 'Consulta:', `${paciente.nombre} ${paciente.apellidos}`, ancla]
     : [clinicaNombre, ancla]
 
+  const titulo = tituloParaGoogle(paciente, fallbackTitulo)
+
   return {
-    summary:     tituloParaGoogle(paciente, fallbackTitulo),
+    summary:     estado === ESTADO_CANCELADA ? PREFIJO_CANCELADA + titulo : titulo,
     description: renglones.filter(Boolean).join('\n'),
     reminders: {
       useDefault: false,
@@ -148,3 +183,134 @@ export function eventoParaGoogle(
     },
   }
 }
+
+/* ═══ ASISTENTES DEL EVENTO ══════════════════════════════════════════════════ */
+
+/** Quien tiene que estar, quien tiene que salir. Todo en correos, ya resueltos. */
+export interface AsistentesDeseados {
+  /**
+   * El medico asignado a la cita AHORA. Entra siempre y sin que nadie lo pida:
+   * si tiene la cita, tiene que tenerla en su calendario. No es una eleccion.
+   */
+  readonly medicoActual: string | null
+  /**
+   * El medico que DEJA de tener la cita, en una reasignacion. Sale.
+   *
+   * ⚠️ SACARLO NO ES OPCIONAL Y NO ES LIMPIEZA. Mientras siga en la lista recibe
+   * TODAS las actualizaciones futuras de esa cita —cambios de hora,
+   * cancelaciones— con el nombre de un paciente que ya no atiende.
+   */
+  readonly medicoSaliente: string | null
+  /**
+   * El paciente que DEJA de ser el de la cita, cuando cambia `paciente_id`. Sale
+   * por el mismo motivo que el medico saliente.
+   *
+   * ⚠️ SOLO CUBRE EL CAMBIO DE PACIENTE, NO EL CAMBIO DE SU CORREO, y no es una
+   * omision: es que el dato no existe. Si a un paciente le editan el correo en
+   * la ficha, `PUT /api/pacientes/[id]` sobrescribe la columna y la direccion
+   * anterior no queda en ninguna parte de Spinus. Sin ella no hay forma de saber
+   * cual de las entradas de la lista era la suya, y adivinar esta prohibido por
+   * la regla de abajo. Ahi entra la nueva y la vieja se queda hasta que alguien
+   * la quite a mano. Coste aceptado, anotado en el plan.
+   *
+   * El cambio de PACIENTE si se puede: al saliente se le lee su correo porque su
+   * ficha sigue existiendo.
+   */
+  readonly pacienteSaliente: string | null
+  /** Los que entran por el boton de invitacion: el paciente, o alguien externo. */
+  readonly nuevos: readonly string[]
+}
+
+/** Normaliza para comparar. Google no distingue mayusculas en los correos. */
+function correoNormalizado(correo: string | null | undefined): string {
+  return correo?.trim().toLowerCase() ?? ''
+}
+
+/**
+ * La lista de asistentes que debe quedar en el evento.
+ *
+ * PUNTO UNICO: toda la decision de quien esta y quien no vive aqui, y no
+ * repartida por los tres `patch` que escriben en Google. Es pura —no consulta
+ * nada, no lanza— asi que se puede razonar leyendola entera de una vez.
+ *
+ * ── ⚠️⚠️ POR QUE SE PARTE DE `previos` Y NO DE CERO ─────────────────────────
+ * `events.patch` con `attendees` PISA LA LISTA ENTERA: no anade, sustituye. Una
+ * lista compuesta desde cero borraria a todos los demas invitados, y Google les
+ * mandaria una CANCELACION de la cita. Por eso el llamador hace `events.get`
+ * antes y pasa aqui lo que habia.
+ *
+ * ── ⚠️ SE QUITA POR NOMBRE, NUNCA POR NO RECONOCER ──────────────────────────
+ * Solo salen los dos correos que el llamador nombra explicitamente. Todo lo
+ * demas se conserva aunque este modulo no sepa quien es, y tiene que ser asi:
+ * en esa lista estan tambien el paciente, los invitados externos del boton y a
+ * veces el propietario del calendario. Un «quito lo que no reconozco» los
+ * echaria a todos, y con la cancelacion de Google por delante.
+ *
+ * ── EL `responseStatus` SE CONSERVA ─────────────────────────────────────────
+ * Se copia con su respuesta: reenviar la lista sin ese campo devolveria a
+ * «pendiente de responder» a quien ya habia aceptado. Se copia solo lo que la
+ * API admite escribir; lo de solo lectura (`id`, `self`, `organizer`) se queda
+ * fuera. Un asistente sin correo no es escribible y no se puede reenviar.
+ */
+export function componerAsistentes(
+  previos: readonly calendar_v3.Schema$EventAttendee[],
+  deseados: AsistentesDeseados,
+): calendar_v3.Schema$EventAttendee[] {
+  const salen = new Set(
+    [deseados.medicoSaliente, deseados.pacienteSaliente]
+      .map(correoNormalizado)
+      .filter(c => c !== ''),
+  )
+
+  const lista: calendar_v3.Schema$EventAttendee[] = []
+  const yaEstan = new Set<string>()
+
+  for (const previo of previos) {
+    const correo = correoNormalizado(previo.email)
+    if (correo === '' || salen.has(correo) || yaEstan.has(correo)) continue
+    yaEstan.add(correo)
+    lista.push({
+      email: previo.email?.trim() ?? correo,
+      ...(previo.displayName      != null ? { displayName:      previo.displayName }      : {}),
+      ...(previo.optional         != null ? { optional:         previo.optional }         : {}),
+      ...(previo.responseStatus   != null ? { responseStatus:   previo.responseStatus }   : {}),
+      ...(previo.comment          != null ? { comment:          previo.comment }          : {}),
+      ...(previo.additionalGuests != null ? { additionalGuests: previo.additionalGuests } : {}),
+      ...(previo.resource         != null ? { resource:         previo.resource }         : {}),
+    })
+  }
+
+  // Los que entran van al final y sin `responseStatus`: Google los pone en
+  // `needsAction` solo. Uno que ya estuviera en la lista NO se duplica — se
+  // quedo arriba con su respuesta intacta, que es lo que hace que volver a
+  // pulsar «Enviar invitacion» reenvie el correo en vez de resetear a nadie.
+  for (const entrante of [deseados.medicoActual, ...deseados.nuevos]) {
+    const correo = correoNormalizado(entrante)
+    if (correo === '' || yaEstan.has(correo)) continue
+    yaEstan.add(correo)
+    lista.push({ email: correo })
+  }
+
+  return lista
+}
+
+/**
+ * Los tres interruptores, en un solo sitio porque van en TODA escritura de
+ * evento —el `insert` del alta y los tres `patch`— y separarlos es como se
+ * quedan desparejados.
+ *
+ * ⚠️ VAN SIEMPRE, AUNQUE EL EVENTO YA LOS TUVIERA. VERIFICADO CONTRA PRODUCCION
+ * que los eventos NACEN sin ellos y que los valores por defecto NO son iguales:
+ * `guestsCanModify` es false por omision, pero `guestsCanInviteOthers` y
+ * `guestsCanSeeOtherGuests` valen TRUE. Si una escritura no los manda, el medico
+ * y el paciente se ven el correo el uno al otro.
+ *
+ * Cuidado al comprobarlo en la respuesta: Google omite el campo cuando vale su
+ * valor por defecto, asi que un campo ausente significa «aplicado» en el primero
+ * y «Google lo ignoro» en los otros dos.
+ */
+export const INTERRUPTORES_INVITADOS = {
+  guestsCanModify:         false,
+  guestsCanInviteOthers:   false,
+  guestsCanSeeOtherGuests: false,
+} as const

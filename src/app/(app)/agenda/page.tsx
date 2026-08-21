@@ -469,7 +469,7 @@ function QuickPatientModal({
 
 function AppointmentModal({
   modal, onClose, onSave, onDelete, medicos, defaultMedicoId,
-  hideMedicoDropdown, medicoDropdownRequired, canVerExpediente, canInvitar,
+  hideMedicoDropdown, medicoDropdownRequired, canVerExpediente, canInvitar, onInvitar,
 }: {
   modal: ModalState
   onClose: () => void
@@ -484,6 +484,9 @@ function AppointmentModal({
      decide si el botón se PINTA — el permiso de verdad lo comprueba la ruta,
      porque ocultar un botón no impide llamar al endpoint. */
   canInvitar: boolean
+  /* El modal de invitación NO se monta aquí: vive en la página. Tiene que poder
+     abrirse solo al CREAR una cita, y para entonces este modal ya se cerró. */
+  onInvitar: () => void
 }) {
   const isEdit = modal.mode === 'edit'
   const apt    = modal.mode === 'edit' ? modal.appointment : null
@@ -508,7 +511,8 @@ function AppointmentModal({
   const [medicoId,    setMedicoId]    = useState<string>(apt?.medico_id ?? defaultMedicoId)
   const [saving,      setSaving]      = useState(false)
   const [deleting,    setDeleting]    = useState(false)
-  const [invitacionAbierta, setInvitacionAbierta] = useState(false)
+  /* La alerta de la X del paciente. Ver el botón, más abajo. */
+  const [quitarPaciente, setQuitarPaciente] = useState(false)
 
   // F3-6: hook de consultorio activo (siempre disponible bajo el Provider).
   const { consultorioActivo, cambiarActivo } = useConsultorioActivo()
@@ -661,7 +665,27 @@ function AppointmentModal({
                     {paciente.telefono && <p className="text-[11px]" style={{ color: 'var(--ag-brand-secondary)' }}>{paciente.telefono}</p>}
                   </div>
                 </div>
-                <button onClick={() => { setPaciente(null); setSearch('') }} className="transition-opacity hover:opacity-70" style={{ color: 'var(--ag-muted)' }}>
+                {/* ⚠️ EN EDICIÓN, ESTA X NO QUITA UN CAMPO: BORRA LA CITA.
+                    Y hay que decirlo, porque quien la pulsa cree lo contrario.
+
+                    Una cita sin paciente no existe en Spinus: el título del
+                    evento SALE del paciente, Guardar está apagado sin él, y no
+                    hay estado intermedio «cita sin paciente» que guardar. Así
+                    que quitarlo es borrarla, y se resuelve por el camino que ya
+                    existe —el mismo del botón de la papelera—, que además borra
+                    el evento de Google avisando a los invitados.
+
+                    En ALTA sigue limpiando el campo y ya está: no hay cita
+                    todavía que borrar. */}
+                <button
+                  onClick={() => {
+                    if (isEdit) setQuitarPaciente(true)
+                    else { setPaciente(null); setSearch('') }
+                  }}
+                  aria-label={isEdit ? 'Quitar paciente y eliminar la cita' : 'Quitar paciente'}
+                  className="transition-opacity hover:opacity-70"
+                  style={{ color: 'var(--ag-muted)' }}
+                >
                   <X size={14} />
                 </button>
               </div>
@@ -851,16 +875,16 @@ function AppointmentModal({
           {isEdit && canInvitar && (
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
-                Invitación
+                Invitados
               </label>
               <button
                 type="button"
-                onClick={() => setInvitacionAbierta(true)}
+                onClick={onInvitar}
                 disabled={!apt?.google_event_id}
                 className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-bold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 style={{ color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}
               >
-                <Mail size={15} /> Enviar invitación
+                <Mail size={15} /> Agregar invitados
               </button>
               {/* ⚠️ EL MOTIVO, SIEMPRE VISIBLE. Un botón apagado y mudo deja a
                   quien agenda buscando qué le falta, y este caso NO es raro: le
@@ -918,6 +942,25 @@ function AppointmentModal({
       </div>
     </div>
 
+    {/* La alerta de la X del paciente. Reusa `ConfirmModal`, que ya vive en este
+        archivo y se monta en su propio Portal por encima de este modal.
+
+        El texto nombra el desenlace REAL en la primera frase —se elimina la
+        cita completa— porque el gesto no lo sugiere: quien pulsa una X sobre un
+        nombre espera vaciar un campo. */}
+    {quitarPaciente && (
+      <ConfirmModal
+        message={
+          'Quitar al paciente elimina la CITA COMPLETA, no sólo su nombre: '
+          + 'desaparece de la agenda y también del calendario de Google de quien esté invitado, '
+          + 'que recibirá el aviso de cancelación. No se puede deshacer — habría que agendarla '
+          + 'de nuevo desde cero. ¿Deseas continuar?'
+        }
+        onConfirm={() => { setQuitarPaciente(false); void handleDelete() }}
+        onCancel={() => setQuitarPaciente(false)}
+      />
+    )}
+
     {/* Modal de creación rápida — z-index superior al modal de cita */}
     {quickCreate && (
       <QuickPatientModal
@@ -927,29 +970,6 @@ function AppointmentModal({
       />
     )}
 
-    {/* Confirmación de la invitación.
-        ⚠️ TODO LO QUE BAJA AQUÍ SALE DE `apt` —LA CITA GUARDADA— Y NUNCA DEL
-        ESTADO DEL FORMULARIO. Quien abra el modal, cambie el paciente o el
-        médico en los desplegables y pulse «Enviar invitación» SIN guardar,
-        estaría invitando a quien todavía no es de esa cita: el evento de Google
-        sigue siendo el de la cita tal como está en la base. `paciente` y
-        `medicoId` son borradores hasta que se pulsa Guardar. */}
-    {invitacionAbierta && apt && (
-      <ModalInvitacionCita
-        citaId={apt.id}
-        medicoNombre={apt.medico_id
-          ? (apt.medico ? componerNombreMedicoCompleto(apt.medico).trim() || 'Médico asignado' : 'Médico asignado')
-          : null}
-        paciente={apt.pacientes
-          ? {
-              id: apt.pacientes.id,
-              nombre: `${apt.pacientes.nombre} ${apt.pacientes.apellidos}`,
-              correoFicha: apt.pacientes.email?.trim() || null,
-            }
-          : null}
-        onClose={() => setInvitacionAbierta(false)}
-      />
-    )}
     </Portal>
   )
 }
@@ -1307,6 +1327,14 @@ export default function AgendaPage() {
   const [horarioOpen,  setHorarioOpen]  = useState(false)
   const [confirm,      setConfirm]      = useState<{ message: string; onConfirm: () => void; onCancel: () => void } | null>(null)
   const [citaCreada,   setCitaCreada]   = useState(false)
+  /* La invitación vive AQUÍ y no dentro del modal de la cita, porque tiene que
+     poder abrirse sola al crear una cita — y para entonces aquel modal ya se
+     cerró (`closeModal()` corre antes del `fetch` en `handleSave`).
+     `esperandoEvento` distingue las dos puertas: recién creada (hay que esperar
+     a que Google conteste) o abierta a mano desde una cita que ya tiene evento. */
+  const [invitacion, setInvitacion] = useState<
+    { citaId: string; paciente: { id: string; nombre: string; correoFicha: string | null } | null; esperandoEvento: boolean } | null
+  >(null)
   const [filtroMedico, setFiltroMedico] = useState<string>('')
 
   /* Horario y médicos salen del agregado de configuración, no de dos fetch
@@ -1927,6 +1955,19 @@ export default function AgendaPage() {
     ejecutarDrop(id, start_time, end_time, arg)
   }
 
+  /* El paciente tal como lo necesita el modal de invitación. Sale SIEMPRE de la
+     cita guardada, nunca del formulario: invitar es un `patch` sobre el evento
+     de Google, que refleja la cita tal como está en la base. */
+  function pacienteParaInvitacion(cita: Partial<Appointment>) {
+    return cita.pacientes
+      ? {
+          id: cita.pacientes.id,
+          nombre: `${cita.pacientes.nombre} ${cita.pacientes.apellidos}`,
+          correoFicha: cita.pacientes.email?.trim() || null,
+        }
+      : null
+  }
+
   async function handleSave(data: Partial<Appointment> & { id?: string }) {
     const isEdit = !!data.id
     const api = calendarRef.current?.getApi()
@@ -2019,6 +2060,31 @@ export default function AgendaPage() {
       toast.info('Sin conexión con Google Calendar — se sincronizará pronto.')
     } else if (json.gcalSync === 'pending') {
       toast.info('Sincronizando con Google…')
+    }
+
+    /* ── LA INVITACIÓN SE OFRECE AL CREAR, Y SÓLO AL CREAR ──────────────────
+       Antes había que guardar, volver a abrir la cita y pulsar el botón, porque
+       al cerrar el modal el evento de Google todavía no existía. Fricción
+       gratuita: se ofrece aquí mismo, y el modal espera al evento.
+
+       NO al editar, y es decisión: una vez que alguien está en la lista de
+       asistentes, Google le avisa SOLO de cada cambio que Spinus haga sobre el
+       evento. Preguntar en cada edición sería resolver un problema que Google ya
+       resuelve, y lo que cansa se cierra sin leer.
+
+       Tres condiciones, y ninguna sobra:
+        · sólo en el alta;
+        · `gcalSync === 'pending'` — con 'disconnected' no hay conexión y el
+          evento no va a existir NUNCA, así que el modal se abriría a esperar
+          algo que no llega;
+        · el permiso, o un médico invitado recibiría un modal condenado a un 403
+          (el gate de verdad está en la ruta; esto sólo evita el paseo). */
+    if (!isEdit && json.gcalSync === 'pending' && canVerAgendaCompleta(profile) && json.appointment?.id) {
+      setInvitacion({
+        citaId: json.appointment.id,
+        paciente: pacienteParaInvitacion(json.appointment),
+        esperandoEvento: true,
+      })
     }
   }
 
@@ -2234,6 +2300,28 @@ export default function AgendaPage() {
           medicoDropdownRequired={isSecretaria || isMedicoConAdmin}
           canVerExpediente={isDoctor}
           canInvitar={canVerAgendaCompleta(profile)}
+          onInvitar={() => {
+            if (modal.mode !== 'edit') return
+            setInvitacion({
+              citaId: modal.appointment.id,
+              paciente: pacienteParaInvitacion(modal.appointment),
+              /* Ya tiene evento —el botón está apagado si no— así que no hay
+                 nada que esperar: se entra directo a elegir. */
+              esperandoEvento: false,
+            })
+          }}
+        />
+      )}
+
+      {/* ── Invitar a la cita ────────────────────────────
+          Dos puertas al mismo modal: la automática de después de crear una cita
+          y el botón «Agregar invitados» del modal de edición. */}
+      {invitacion && (
+        <ModalInvitacionCita
+          citaId={invitacion.citaId}
+          paciente={invitacion.paciente}
+          esperandoEvento={invitacion.esperandoEvento}
+          onClose={() => setInvitacion(null)}
         />
       )}
 

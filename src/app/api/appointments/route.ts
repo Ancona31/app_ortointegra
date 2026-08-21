@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse, after } from 'next/server'
+import type { calendar_v3 } from 'googleapis'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { conCalendarioSpinus, registrarFalloGCal } from '@/lib/gcal'
 import { resolverConexionClinica } from '@/lib/gcalConexion'
 import { canManageClinica } from '@/lib/permissions'
-import { APPOINTMENT_SELECT, eventoParaGoogle, type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
+import { APPOINTMENT_SELECT, eventoParaGoogle, componerAsistentes, INTERRUPTORES_INVITADOS,
+         type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
+import { correoDelMedico } from '@/lib/medicoCorreo'
 import { TZ_CLINICA } from '@/lib/dates'
 
 async function getProfile(supabase: Awaited<ReturnType<typeof createClient>>) {
@@ -299,14 +302,60 @@ export async function POST(req: NextRequest) {
         try {
           // La descripción lleva un formato fijo (clínica y paciente) y NADA
           // clínico: ni notes, ni motivo de consulta, ni diagnóstico.
-          const { summary, description, reminders } = eventoParaGoogle(pacienteCita, clinicaCita, title, apt.start_time, tzCita)
+          // El estado en el alta es siempre 'scheduled' (se escribe arriba, en
+          // el insert de la fila), así que aquí nunca sale el prefijo de
+          // cancelación — va igualmente porque el título tiene un solo autor.
+          const { summary, description, reminders } = eventoParaGoogle(pacienteCita, clinicaCita, title, apt.start_time, tzCita, 'scheduled')
+
+          /* ── EL MÉDICO ENTRA AQUÍ, EN EL MISMO `insert` ────────────────────
+             Si tiene la cita asignada, tiene que tenerla en su calendario: no
+             es una elección de nadie y por eso no pasa por el botón de
+             invitación ni por su ruta.
+
+             UNA LLAMADA Y NO DOS. Añadirlo después con un `patch` costaría un
+             viaje más y, con `sendUpdates: 'all'`, un segundo correo de «evento
+             actualizado» pisándole la invitación que acababa de recibir.
+
+             Si el correo no se resuelve, el evento se crea IGUAL y sin
+             asistentes: una cita sin invitación es peor que una cita sin
+             evento, y ya existe `gcal_sync_status` para lo segundo. Queda la
+             línea de log y el botón de invitación para arreglarlo a mano.
+
+             `finalMedicoId` nunca es null en el alta: la ruta lo exige y lo
+             valida contra la clínica más arriba. */
+          let asistentes: calendar_v3.Schema$EventAttendee[] = []
+          const correoMedico = await correoDelMedico(admin, finalMedicoId, profile.clinica_id)
+          if (correoMedico.ok) {
+            asistentes = componerAsistentes([], {
+              medicoActual:     correoMedico.correo,
+              medicoSaliente:   null,
+              pacienteSaliente: null,
+              nuevos:           [],
+            })
+          } else {
+            registrarFalloGCal(
+              { operacion: `events.insert (alta de cita, médico sin invitar: ${correoMedico.motivo})`, userId: profile.userId, conexionId: conexion.id },
+              new Error('no se pudo resolver el correo del médico asignado'),
+            )
+          }
+
           const creado = await conCalendarioSpinus(conexion, admin, (calendar, calendarId) => {
             calendarIdUsado = calendarId
             return calendar.events.insert({
               calendarId,
+              /* Que Google le mande el correo, y no sólo le deje el evento en la
+                 agenda. Al médico que ES dueño de la cuenta conectada no le llega
+                 nada de todos modos —Google no notifica al organizador de su
+                 propio evento, §12.17—, así que esto sólo alcanza al médico
+                 invitado con su propia cuenta, que es justo quien no tiene otra
+                 vía de enterarse. Sin esto, que el evento le aparezca depende de
+                 un ajuste de SU cuenta que nosotros no controlamos. */
+              sendUpdates: 'all',
               requestBody: {
                 summary,
                 description,
+                attendees: asistentes,
+                ...INTERRUPTORES_INVITADOS,
                 // Sólo al crear: si el médico le cambia el recordatorio a mano en
                 // Google, ninguna edición posterior desde Spinus se lo reimpone.
                 reminders,
