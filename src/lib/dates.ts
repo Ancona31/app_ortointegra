@@ -18,23 +18,32 @@
  * tomada a propósito; ver el comentario en `notaRenderData.ts`.
  *
  * ───────────────────────────────────────────────────────────────────────
- * ⚠️  TZ_CLINICA COMO VALOR POR DEFECTO ES PELIGROSO
+ * ⚠️  EL HUSO ES OBLIGATORIO. NO HAY VALOR POR DEFECTO. NO SE LO PONGAS.
  * ───────────────────────────────────────────────────────────────────────
  *
- * `hoyEnTZ`, `fechaHoraLocalAInstante` y `renderEnTZ` llevan `TZ_CLINICA`
- * como valor por defecto del parámetro `timezone`. Eso hace que todo
- * llamador que omita el huso obtenga hora del Centro EN SILENCIO, con
- * código que PARECE consciente del huso y no lo es.
+ * `hoyEnTZ`, `fechaHoraLocalAInstante` y `renderEnTZ` exigen el parámetro
+ * `timezone`. Omitirlo es un error de compilación, y esa es toda la gracia:
+ * la red que impide que este bug vuelva no es un test, es `tsc`.
  *
- * Así nació el bug de agosto de 2026: una médica en Sonora
- * (`America/Hermosillo`, UTC-7 todo el año, sin horario de verano) veía las
- * horas de sus citas una hora MÁS tarde de lo que eran, porque el dashboard,
- * el contador de `/inicio` y la tarjeta del expediente llamaban a `renderEnTZ`
- * y a `hoyEnTZ` sin pasar huso. La agenda no fallaba: FullCalendar usa
- * `timeZone: 'local'` por defecto y ya pintaba en el huso del dispositivo.
+ * Hasta agosto de 2026 las tres llevaban `TZ_CLINICA` como valor por
+ * defecto, así que todo llamador que omitía el huso obtenía hora del Centro
+ * EN SILENCIO, con código que PARECÍA consciente del huso y no lo era. De
+ * ahí salió el bug: una médica en Sonora (`America/Hermosillo`, UTC-7 todo
+ * el año, sin horario de verano) veía las horas de sus citas una hora MÁS
+ * tarde de lo que eran, porque el dashboard, el contador de `/inicio` y la
+ * tarjeta del expediente llamaban a `renderEnTZ` y a `hoyEnTZ` sin pasar
+ * huso. La agenda no fallaba: FullCalendar usa `timeZone: 'local'` por
+ * defecto y ya pintaba en el huso del dispositivo.
  *
- * Quitar ese default y auditar sus ~20 llamadores es el commit siguiente.
- * Mientras el default siga aquí: PASA EL HUSO A MANO, SIEMPRE.
+ * El default se quitó auditando sus ~20 llamadores UNO POR UNO. Poner
+ * `TZ_CLINICA` en todos habría sido el mismo bug con más letras, así que
+ * cada sitio lleva el huso que le toca y los que se quedaron en la zona de
+ * la clínica lo dicen por escrito, con el motivo al lado.
+ *
+ * Si escribes un llamador nuevo y no sabes qué huso pasarle, la respuesta
+ * está en LA REGLA de arriba: cita → dispositivo; documento clínico →
+ * `TZ_CLINICA`. Si sigue sin estar claro, pregunta antes de elegir; poner
+ * `TZ_CLINICA` "porque compila" es reintroducir el default a mano.
  *
  * ───────────────────────────────────────────────────────────────────────
  * QUÉ HAY EN ESTE MÓDULO
@@ -92,10 +101,10 @@ export function tzDispositivo(): string {
  * Reemplaza el patrón roto new Date().toISOString().split('T')[0].
  * Bugs 1 y 2.
  *
- * Para horas de citas, pásale `tzDispositivo()`. El default a `TZ_CLINICA`
- * es la trampa descrita en la cabecera.
+ * El huso NO es opcional: para horas de citas pásale `tzDispositivo()`; para
+ * documentos clínicos, `TZ_CLINICA`. Ver la cabecera.
  */
-export function hoyEnTZ(timezone: string = TZ_CLINICA): string {
+export function hoyEnTZ(timezone: string): string {
   return formatInTimeZone(new Date(), timezone, 'yyyy-MM-dd')
 }
 
@@ -124,13 +133,13 @@ export function desplazarFecha(
  * servidor (Vercel = UTC).
  * Bug 3.
  *
- * Para ventanas de citas, pásale `tzDispositivo()`. El default a
- * `TZ_CLINICA` es la trampa descrita en la cabecera.
+ * El huso NO es opcional: para ventanas de citas pásale `tzDispositivo()`.
+ * Ver la cabecera.
  */
 export function fechaHoraLocalAInstante(
   fecha: string,
   hora: string,
-  timezone: string = TZ_CLINICA,
+  timezone: string,
 ): string {
   const instante = fromZonedTime(`${fecha}T${hora}:00`, timezone)
   if (Number.isNaN(instante.getTime())) {
@@ -173,13 +182,13 @@ export function fechaSoloSegura(fechaISO: string): Date {
  * español. instante puede ser un Date o un ISO string.
  * Bug 4 (preparación del render simétrico de citas).
  *
- * Para horas de citas, pásale `tzDispositivo()`. El default a `TZ_CLINICA`
- * es la trampa descrita en la cabecera.
+ * El huso NO es opcional: para horas de citas pásale `tzDispositivo()`; para
+ * documentos clínicos, `TZ_CLINICA`. Ver la cabecera.
  */
 export function renderEnTZ(
   instante: string | Date,
   formato: string,
-  timezone: string = TZ_CLINICA,
+  timezone: string,
 ): string {
   return formatInTimeZone(instante, timezone, formato, { locale: es })
 }

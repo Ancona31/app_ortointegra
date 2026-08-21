@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { CrearMedicionSchema } from '@/lib/labs/schemas'
-import { fechaHoraLocalAInstante } from '@/lib/dates'
+import { fechaHoraLocalAInstante, TZ_CLINICA } from '@/lib/dates'
 
 export async function POST(req: NextRequest) {
   try {
@@ -78,7 +78,21 @@ export async function POST(req: NextRequest) {
     if (pacError) return NextResponse.json({ error: pacError.message }, { status: 500 })
     if (!paciente) return NextResponse.json({ error: 'Paciente no encontrado' }, { status: 404 })
 
-    const medidoEn = fechaHoraLocalAInstante(input.fecha, input.hora)
+    // DEUDA CONSCIENTE — `TZ_CLINICA` aquí es un apaño, no la respuesta.
+    //
+    // `input.fecha` e `input.hora` son hora DE PARED: el médico tecleó "las
+    // 9:00" en `ModalAgregarMedicion`, así que el huso correcto para
+    // convertirlas a instante es el de SU DISPOSITIVO, no el del Centro. En
+    // Sonora esta línea guarda la medición una hora tarde.
+    //
+    // No se cableó porque el huso no viaja por el cable: haría falta un campo
+    // nuevo en las tres variantes de `CrearMedicionSchema`, mandarlo desde el
+    // modal y validarlo aquí contra `Intl.supportedValuesOf('timeZone')`.
+    // Cinco archivos y una validación nueva para un dato que no es una hora
+    // de cita. Se dejó anotado en vez de arreglado (commit B de husos,
+    // agosto de 2026). Hasta ese commit la zona del Centro llegaba sola, por
+    // el valor por defecto de `fechaHoraLocalAInstante`; ahora al menos se ve.
+    const medidoEn = fechaHoraLocalAInstante(input.fecha, input.hora, TZ_CLINICA)
     const notas = input.notas?.trim() || null
 
     if (input.tipo === 'catalogo') {

@@ -15,7 +15,7 @@ import { useProfile } from '@/hooks/useProfile'
 import { createClient } from '@/lib/supabase/client'
 import { folioImpreso } from '@/lib/documentos/folio'
 import { generarPdf, VERSION_DE_EMISION, versionQueEmite } from '@/lib/mobileShare'
-import { hoyEnTZ, desplazarFecha } from '@/lib/dates'
+import { hoyEnTZ, desplazarFecha, TZ_CLINICA } from '@/lib/dates'
 import { enfocarYAcercar } from '@/lib/scrollDoc'
 import { MEDICAMENTOS, type MedicamentoDB } from '@/data/medicamentos'
 import ComboEscribible from '@/components/documentos/ComboEscribible'
@@ -198,7 +198,12 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     ? medicamentosIniciales
     : [{ ...MED_VACIO }]
 
-  const [fecha, setFecha] = useState(hoyEnTZ())
+  // `TZ_CLINICA` explícito, no el huso del dispositivo: este inicializador de
+  // `useState` corre TAMBIÉN en la pasada de SSR, donde `tzDispositivo()`
+  // devolvería UTC de Vercel y el cliente lo corregiría al hidratar — fecha
+  // parpadeante en un formulario que emite un documento legal. Y la fecha del
+  // documento es de la clínica de todos modos (LA REGLA, en `@/lib/dates`).
+  const [fecha, setFecha] = useState(hoyEnTZ(TZ_CLINICA))
   const [medicamentos, setMedicamentos] = useState<MedicamentoConVia[]>(medInicial)
   const [pistas, setPistas] = useState<Pista[]>(medInicial.map(() => ({ ...PISTA_VACIA })))
   const [recomendaciones, setRecomendaciones] = useState('')
@@ -596,7 +601,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
             <div className="sp-doc-field">
               <label htmlFor="receta-fecha" className="sp-label-field">Fecha</label>
               <input id="receta-fecha" type="date" value={fecha}
-                min={FECHA_MIN} max={desplazarFecha(hoyEnTZ(), { anios: 1 })}
+                min={FECHA_MIN} max={desplazarFecha(hoyEnTZ(TZ_CLINICA), { anios: 1 })}
                 onChange={e => setFecha(e.target.value)} className="sp-input" />
             </div>
             <div className="sp-doc-field">

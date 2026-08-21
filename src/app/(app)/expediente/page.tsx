@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Plus, Search, Stethoscope, ArrowUp, ArrowDown, ListFilter } from 'lucide-react'
 import Link from 'next/link'
 import { calcularEdad } from '@/lib/patientUtils'
-import { renderEnTZ } from '@/lib/dates'
+import { renderEnTZ, TZ_CLINICA } from '@/lib/dates'
 import { KebabAccionesPaciente } from '@/components/expediente/KebabAccionesPaciente'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
 import { fetchPacientesExpediente, type PacienteExpediente, type OrdenColumna, type OrdenDireccion, type MedicoOpcion } from '@/lib/expediente/fetchPacientes'
@@ -427,7 +427,11 @@ export default function ExpedientePage() {
                     </div>
                     <div className="flex items-baseline gap-2 text-[12px]">
                       <span className="text-[#86868b] w-20 flex-shrink-0">Ingreso</span>
-                      <span className="text-[#3d3d3f] font-medium">{p.created_at ? renderEnTZ(p.created_at, 'd MMM yyyy') : '—'}</span>
+                      {/* `TZ_CLINICA`, no el huso del dispositivo: el ingreso es un
+                          dato de expediente —hermano de la fecha de apertura de la
+                          hoja frontal—, no una hora de cita. Ver LA REGLA en
+                          `@/lib/dates`. */}
+                      <span className="text-[#3d3d3f] font-medium">{p.created_at ? renderEnTZ(p.created_at, 'd MMM yyyy', TZ_CLINICA) : '—'}</span>
                     </div>
                   </div>
                 </div>

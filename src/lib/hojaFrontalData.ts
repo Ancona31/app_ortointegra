@@ -17,14 +17,18 @@
  *    convertiría de zona y podría correr el día.
  *  - `fechaAperturaISO` sale de `consultas.fecha`, que es `timestamptz` (un
  *    instante): se renderiza con `renderEnTZ` en la zona de la clínica, igual
- *    que hace notaRenderData con esa misma columna.
+ *    que hace notaRenderData con esa misma columna. `TZ_CLINICA` va escrito a
+ *    mano y es deliberado —la hoja frontal es un documento clínico, y su
+ *    fecha no puede cambiar según quién lo abra—; hasta agosto de 2026 esa
+ *    zona llegaba sola por el valor por defecto de `renderEnTZ`, que se
+ *    quitó. La decisión es la misma; sólo dejó de ser tácita.
  */
 
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { Paciente } from '@/types'
 import { calcularEdad } from '@/lib/patientUtils'
-import { fechaSoloSegura, renderEnTZ } from '@/lib/dates'
+import { fechaSoloSegura, renderEnTZ, TZ_CLINICA } from '@/lib/dates'
 
 /** Formato de fecha legible en español, idéntico al de notaRenderData. */
 const FMT_FECHA = "d 'de' MMMM 'de' yyyy"
@@ -148,7 +152,7 @@ export function buildHojaFrontalData(input: BuildHojaFrontalInput): HojaFrontalD
     },
     responsable: { nombre: limpiar(input.responsableNombre) ?? SIN_DATO },
     fechaApertura: input.fechaAperturaISO
-      ? renderEnTZ(input.fechaAperturaISO, FMT_FECHA)
+      ? renderEnTZ(input.fechaAperturaISO, FMT_FECHA, TZ_CLINICA)
       : null,
     colorPrimario: limpiar(input.colorPrimario) ?? undefined,
     colorSecundario: limpiar(input.colorSecundario) ?? undefined,

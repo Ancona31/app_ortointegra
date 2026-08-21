@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react'
 import { calcularEdad } from '@/lib/patientUtils'
-import { renderEnTZ } from '@/lib/dates'
+import { renderEnTZ, TZ_CLINICA } from '@/lib/dates'
 import { ListaChipsMedicos } from '@/components/expediente/ChipMedico'
 import { KebabAccionesPaciente } from '@/components/expediente/KebabAccionesPaciente'
 import type { PacienteExpediente, OrdenColumna, OrdenDireccion } from '@/lib/expediente/fetchPacientes'
@@ -139,7 +139,10 @@ export function TablaPacientesExpediente({ pacientes, orden, direccion, onOrden,
                   {p.numero_expediente || '—'}
                 </td>
                 <td className="px-4 py-3.5 text-sm text-[#3d3d3f] whitespace-nowrap">
-                  {p.created_at ? renderEnTZ(p.created_at, 'd MMM yyyy') : '—'}
+                  {/* `TZ_CLINICA`, no el huso del dispositivo: el ingreso es un dato
+                      de expediente —hermano de la fecha de apertura de la hoja
+                      frontal—, no una hora de cita. Ver LA REGLA en `@/lib/dates`. */}
+                  {p.created_at ? renderEnTZ(p.created_at, 'd MMM yyyy', TZ_CLINICA) : '—'}
                 </td>
                 <td className="px-4 py-3.5">
                   <ListaChipsMedicos medicos={p.medicos} />

@@ -9,10 +9,16 @@
  *
  * ─── LA ZONA DE LA CLÍNICA AQUÍ ES DELIBERADA. NO LA "ARREGLES". ───────
  *
- * `renderEnTZ` se llama SIN huso a propósito, o sea en `TZ_CLINICA`. Esto
- * NO es el bug de husos de agosto de 2026, aunque se le parezca: aquel era
- * de horas de CITAS, que se pintan en el huso del DISPOSITIVO de quien
- * mira (ver LA REGLA en la cabecera de `@/lib/dates`).
+ * `renderEnTZ` se llama con `TZ_CLINICA` a propósito. Esto NO es el bug de
+ * husos de agosto de 2026, aunque se le parezca: aquel era de horas de
+ * CITAS, que se pintan en el huso del DISPOSITIVO de quien mira (ver LA
+ * REGLA en la cabecera de `@/lib/dates`).
+ *
+ * Hasta agosto de 2026 el huso se OMITÍA y la zona de la clínica llegaba
+ * sola, por el valor por defecto de `renderEnTZ`. Ese default se quitó: la
+ * decisión no ha cambiado, sólo dejó de ser tácita. Que el huso esté
+ * escrito aquí no es un descuido de quien auditó los llamadores; es el
+ * resultado de la auditoría.
  *
  * Un DOCUMENTO CLÍNICO es la excepción, y por eso vive aquí. Lleva fecha
  * fija de la clínica y NO puede cambiar según quién lo abra: una nota es
@@ -25,7 +31,7 @@
 import type { Consulta, Paciente, MedicoInfo, Diagnostico, SignosVitales } from '@/types'
 import { parseNota, type NotaParseada } from '@/lib/notaParser'
 import { calcularEdad, type EdadPaciente } from '@/lib/patientUtils'
-import { renderEnTZ } from '@/lib/dates'
+import { renderEnTZ, TZ_CLINICA } from '@/lib/dates'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import { decodificarEntidadesHTML } from '@/lib/textUtils'
 
@@ -56,7 +62,7 @@ function renderFechaSegura(instante: Instante, formato: string): string | null {
   const parsed = instante instanceof Date ? instante : new Date(instante)
   if (Number.isNaN(parsed.getTime())) return null
   try {
-    return renderEnTZ(instante, formato)
+    return renderEnTZ(instante, formato, TZ_CLINICA)
   } catch {
     return null
   }

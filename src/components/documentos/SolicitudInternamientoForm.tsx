@@ -20,7 +20,7 @@ import IndicacionesPiso, {
 import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
 import { folioImpreso } from '@/lib/documentos/folio'
 import { createClient } from '@/lib/supabase/client'
-import { hoyEnTZ, desplazarFecha } from '@/lib/dates'
+import { hoyEnTZ, desplazarFecha, TZ_CLINICA } from '@/lib/dates'
 import { enfocarYAcercar } from '@/lib/scrollDoc'
 
 interface Props {
@@ -154,7 +154,12 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
   const perfilPendiente = cargandoPerfil && !medicoInfo
   const toast = useToast()
   const [paciente, setPaciente] = useState(pacienteInicial)
-  const [fecha, setFecha] = useState(hoyEnTZ())
+  // `TZ_CLINICA` explícito, no el huso del dispositivo: este inicializador de
+  // `useState` corre TAMBIÉN en la pasada de SSR, donde `tzDispositivo()`
+  // devolvería UTC de Vercel y el cliente lo corregiría al hidratar — fecha
+  // parpadeante en un formulario que emite un documento legal. Y la fecha del
+  // documento es de la clínica de todos modos (LA REGLA, en `@/lib/dates`).
+  const [fecha, setFecha] = useState(hoyEnTZ(TZ_CLINICA))
   const [fechaIngreso, setFechaIngreso] = useState('')
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
   const [diagnosticosSecundarios, setDiagnosticosSecundarios] = useState<string[]>([''])
@@ -485,7 +490,7 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
 
   const senalar = (clave: string) => intentado && faltantes.some(f => f.clave === clave)
   const conNumeral = diagnosticosSecundarios.length >= 2
-  const maxFecha = desplazarFecha(hoyEnTZ(), { anios: 1 })
+  const maxFecha = desplazarFecha(hoyEnTZ(TZ_CLINICA), { anios: 1 })
 
   return (
     <div ref={formRef} className="sp-doc-form">

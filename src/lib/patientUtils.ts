@@ -1,5 +1,22 @@
 import { differenceInYears, differenceInMonths, differenceInDays } from 'date-fns'
-import { hoyEnTZ, fechaSoloSegura } from '@/lib/dates'
+import { hoyEnTZ, fechaSoloSegura, TZ_CLINICA } from '@/lib/dates'
+
+/*
+ * EL HUSO SE QUEDA EN `TZ_CLINICA` Y NO SE PROPAGA. Decisión de Angel en el
+ * commit B de husos (agosto de 2026), al quitar el valor por defecto de
+ * `hoyEnTZ`.
+ *
+ * `calcularEdad` tiene ~30 llamadores repartidos entre cliente y servidor
+ * —componentes, `notaRenderData`, `hojaFrontalData`, cinco fórmulas de
+ * `@/lib/calculadoras` y el búnker offline—, así que darle un parámetro de
+ * huso obligaría a tocarlos todos. No compensa: el error por huso en una edad
+ * expresada en años es de UN DÍA sobre miles, y sólo se nota el día mismo del
+ * cumpleaños del paciente.
+ *
+ * Si algún día hace falta la edad exacta al día en el huso del lector, el
+ * cambio es añadir un parámetro opcional AQUÍ, no volver a poner un valor por
+ * defecto en `@/lib/dates`.
+ */
 
 /* ──────────────────────────────────────────────────────────────────────
    Title Case — normalización de nombres de pacientes
@@ -72,7 +89,7 @@ export interface EdadPaciente {
  */
 export function calcularEdad(fechaNacimiento: string): EdadPaciente {
   const nacimiento = fechaSoloSegura(fechaNacimiento)
-  const hoy = fechaSoloSegura(hoyEnTZ())
+  const hoy = fechaSoloSegura(hoyEnTZ(TZ_CLINICA))
 
   const anios = differenceInYears(hoy, nacimiento)
   const totalMeses = differenceInMonths(hoy, nacimiento)
@@ -103,7 +120,7 @@ export function calcularEdad(fechaNacimiento: string): EdadPaciente {
 
 /** Fecha de hoy en formato YYYY-MM-DD (para attr max de input[type=date]) */
 export function fechaHoyISO(): string {
-  return hoyEnTZ()
+  return hoyEnTZ(TZ_CLINICA)
 }
 
 /** Fecha mínima razonable para un paciente (1900-01-01) */
@@ -180,7 +197,7 @@ export function generateDocFileName(
  *   edadAFechaFicticia(35) // → '1991-01-01' (si año actual es 2026)
  */
 export function edadAFechaFicticia(edad: number): string {
-  const anioActual = Number(hoyEnTZ().slice(0, 4))
+  const anioActual = Number(hoyEnTZ(TZ_CLINICA).slice(0, 4))
   const anioNacimiento = anioActual - edad
   return `${anioNacimiento}-01-01`
 }

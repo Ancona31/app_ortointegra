@@ -15,7 +15,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { hoyEnTZ, desplazarFecha } from '@/lib/dates'
+import { hoyEnTZ, desplazarFecha, TZ_CLINICA } from '@/lib/dates'
 import { enfocarYAcercar } from '@/lib/scrollDoc'
 import DOMPurify from 'dompurify'
 import { decodificarNbsp } from '@/lib/textUtils'
@@ -151,7 +151,12 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
 
   const toast = useToast()
   const [paciente, setPaciente]       = useState(pacienteInicial)
-  const [fecha, setFecha]             = useState(hoyEnTZ())
+  // `TZ_CLINICA` explícito, no el huso del dispositivo: este inicializador de
+  // `useState` corre TAMBIÉN en la pasada de SSR, donde `tzDispositivo()`
+  // devolvería UTC de Vercel y el cliente lo corregiría al hidratar — fecha
+  // parpadeante en un formulario que emite un documento legal. Y la fecha del
+  // documento es de la clínica de todos modos (LA REGLA, en `@/lib/dates`).
+  const [fecha, setFecha]             = useState(hoyEnTZ(TZ_CLINICA))
   const [asunto, setAsunto]           = useState('')
   // El pie NO es un truncado del título: recortar por caracteres produce
   // «Constancia de atención médica y valoración ortopé…», que no identifica
@@ -436,7 +441,7 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
             <div className="sp-doc-field">
               <label htmlFor="escrito-fecha" className="sp-label-field">Fecha</label>
               <input id="escrito-fecha" type="date" value={fecha}
-                min={FECHA_MIN} max={desplazarFecha(hoyEnTZ(), { anios: 1 })}
+                min={FECHA_MIN} max={desplazarFecha(hoyEnTZ(TZ_CLINICA), { anios: 1 })}
                 onChange={e => setFecha(e.target.value)} className="sp-input" />
             </div>
 

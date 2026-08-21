@@ -19,7 +19,7 @@ import type { IdentificacionImpresa } from '@/lib/pdf/ConsentimientoInformadoPdf
 import { huellaDocumento } from '@/lib/documentos/firmaTrazo'
 import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
 import { createClient } from '@/lib/supabase/client'
-import { hoyEnTZ, desplazarFecha } from '@/lib/dates'
+import { hoyEnTZ, desplazarFecha, TZ_CLINICA } from '@/lib/dates'
 import { enfocarYAcercar } from '@/lib/scrollDoc'
 
 /**
@@ -314,7 +314,12 @@ export default function ConsentimientoInformadoForm({
   const toast = useToast()
 
   // ── Identificación: once controles en cuatro filas (§2) ─────────────
-  const [fecha, setFecha]                 = useState(hoyEnTZ())
+  // `TZ_CLINICA` explícito, no el huso del dispositivo: este inicializador de
+  // `useState` corre TAMBIÉN en la pasada de SSR, donde `tzDispositivo()`
+  // devolvería UTC de Vercel y el cliente lo corregiría al hidratar — fecha
+  // parpadeante en un formulario que emite un documento legal. Y la fecha del
+  // documento es de la clínica de todos modos (LA REGLA, en `@/lib/dates`).
+  const [fecha, setFecha]                 = useState(hoyEnTZ(TZ_CLINICA))
   const [lugar, setLugar]                 = useState('')
   const [paciente, setPaciente]           = useState(pacienteInicial)
   const [edad, setEdad]                   = useState(edadInicial)
@@ -462,7 +467,7 @@ export default function ConsentimientoInformadoForm({
    */
   const aplicarBorrador = useCallback((fila: FilaBorrador): void => {
     const c = fila.contenido ?? {}
-    setFecha(texto(c.fecha) || hoyEnTZ())
+    setFecha(texto(c.fecha) || hoyEnTZ(TZ_CLINICA))
     setLugar(texto(c.lugar))
     setPaciente(texto(c.paciente))
     setEdad(texto(c.edad))
@@ -1257,7 +1262,7 @@ export default function ConsentimientoInformadoForm({
   }
 
   const senalar = (clave: string) => intentado && faltantes.some(f => f.clave === clave)
-  const maxFecha = desplazarFecha(hoyEnTZ(), { anios: 1 })
+  const maxFecha = desplazarFecha(hoyEnTZ(TZ_CLINICA), { anios: 1 })
 
   return (
     <div ref={formRef} className="sp-doc-form">
