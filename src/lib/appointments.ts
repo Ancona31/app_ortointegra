@@ -9,9 +9,20 @@ import { regionDeTimezone } from '@/lib/consultorios/zonas-mexico'
  *
  * `clinicas` viaja aqui para que las rutas puedan armar la descripcion del
  * evento de Google sin un round trip extra.
+ *
+ * `pacientes.email` viaja por el mismo motivo y para un solo consumidor: el
+ * boton de invitacion del modal de la cita, que necesita saber si hay correo en
+ * la ficha ANTES de que nadie pulse nada —para decidir si ofrece la casilla del
+ * paciente o pide la direccion a mano— y no puede preguntarlo por su cuenta sin
+ * una peticion extra por cita abierta.
+ *
+ * NO ES EL CAMINO DEL CORREO DEL MEDICO, y no puede serlo: `profiles` no tiene
+ * columna `email` (son 16 y ninguna es esa), asi que ampliar el join del medico
+ * no sirve. Ese sale de la API de Admin de Auth, EN EL SERVIDOR y al pulsar, y
+ * no viaja al navegador nunca. Ver `/api/appointments/[id]/invitacion`.
  */
 export const APPOINTMENT_SELECT =
-  '*, pacientes(id, nombre, apellidos, telefono), clinicas(nombre, nombre_display), medico:profiles!appointments_medico_id_fkey(id, titulo, nombres, apellido_paterno, apellido_materno)'
+  '*, pacientes(id, nombre, apellidos, telefono, email), clinicas(nombre, nombre_display), medico:profiles!appointments_medico_id_fkey(id, titulo, nombres, apellido_paterno, apellido_materno)'
 
 /** El paciente tal como llega dentro de una cita de `APPOINTMENT_SELECT`. */
 export type PacienteEnCita = { nombre: string; apellidos: string } | null

@@ -33,9 +33,36 @@ import { logAudit } from '@/lib/audit'
    ⚠️ Y SE REGISTRA EN `audit_log`, porque es una escritura sobre datos
    personales del paciente. Nota para quien pase por aquí: `PUT
    /api/pacientes/[id]`, que también escribe `email`, NO registra nada. Es un
-   hueco anterior a este cambio y sigue abierto; no lo tapa esta ruta. */
+   hueco anterior a este cambio y sigue abierto; no lo tapa esta ruta.
+
+   ── `origen`, Y POR QUÉ NO ES TEXTO LIBRE ──────────────────────────────────
+   Esta ruta nació sirviendo a un solo llamador —el modal posterior a emitir un
+   documento— y su descripción de auditoría lo decía como un literal fijo. Desde
+   que el botón de invitación de la cita la reusa, ese literal MENTIRÍA sobre el
+   origen la mitad de las veces, y un registro que apunta al sitio equivocado es
+   peor que uno incompleto: quien reconstruya por qué se guardó el correo de un
+   paciente iría a buscar un documento que no existe.
+
+   El llamador dice DE DÓNDE VIENE y nada más. La frase la compone esta ruta a
+   partir de una lista cerrada: si el cliente pudiera mandar el texto, el
+   `audit_log` pasaría a contener lo que diga el cliente. Un valor desconocido o
+   ausente cae en 'documento', que es el comportamiento anterior — por eso el
+   modal de documentos no tuvo que cambiar ni una línea.
+
+   La acción sigue siendo `actualizar_paciente_correo`, una sola. Aquí no se
+   estrena ninguna segunda: el envío de la invitación tiene la suya propia
+   (`enviar_invitacion_cita`) y se registra en su ruta, no en ésta. */
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+/**
+ * De dónde vino el guardado, y la frase que le corresponde en `audit_log`.
+ * Lista cerrada: lo que no esté aquí es 'documento'. Ver la cabecera.
+ */
+const ORIGENES = {
+  documento:  'enviar un documento',
+  invitacion: 'enviar una invitación de cita',
+} as const
 
 export async function PATCH(
   req: NextRequest,
@@ -53,6 +80,12 @@ export async function PATCH(
     const correo = typeof (cuerpo as { correo?: unknown })?.correo === 'string'
       ? ((cuerpo as { correo: string }).correo).trim().toLowerCase()
       : ''
+
+    /* Sin `origen`, o con uno que no esté en la lista, se comporta como antes
+       de que existiera el campo. Ningún llamador viejo se entera. */
+    const pedido = (cuerpo as { origen?: unknown })?.origen
+    const origen: keyof typeof ORIGENES =
+      pedido === 'invitacion' ? 'invitacion' : 'documento'
 
     if (!EMAIL_REGEX.test(correo)) {
       return NextResponse.json({ error: 'Correo no válido' }, { status: 400 })
@@ -112,7 +145,7 @@ export async function PATCH(
       tabla: 'pacientes',
       registroId: id,
       ip,
-      descripcion: `Correo guardado en la ficha (${correo}) tras enviar un documento. La ficha no tenía ninguno.`,
+      descripcion: `Correo guardado en la ficha (${correo}) tras ${ORIGENES[origen]}. La ficha no tenía ninguno.`,
     })
 
     return NextResponse.json({ ok: true, correo })

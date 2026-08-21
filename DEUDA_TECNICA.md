@@ -3080,4 +3080,119 @@ control» de `globals.css`.
 
 ---
 
+## Auditoría — durabilidad de las escrituras en `audit_log`
+
+### LOG-DT-1 — `logAudit` sin `await`: el registro se pierde a veces, y en silencio
+- **Estado:** 🔴 abierta. Registrada el 2026-08-21 al construir la ruta de
+  invitación de citas (Rama 1, conexión de Google por clínica). **Es un hallazgo
+  de CUMPLIMIENTO, no de higiene de código** — ver «Por qué es cumplimiento».
+- **Prioridad:** alta. No bloqueante de lanzamiento como RG-01, pero por encima
+  de cualquier entrada de estilo o de UI de este documento.
+- **Función implicada:** `src/lib/audit.ts:100-114`.
+- **Alcance:** 15 llamadas sin esperar, de las cuales **8 tocan datos personales**
+  y 4 más son de autenticación. Lista completa abajo.
+
+- **Qué pasa.** `logAudit` es `async` y hace `await` sobre el `insert` en
+  `audit_log` dentro de un `try/catch` que se traga el error. Ese `catch`
+  garantiza que la función **nunca lance**; no garantiza que **termine**.
+
+  Cuando se la llama sin `await`, la promesa del `insert` sigue viva en el
+  momento en que la ruta devuelve la respuesta. En Vercel la función puede
+  congelarse o reclamarse en cuanto la respuesta se vacía, y el trabajo que no
+  pasa por `after()` no tiene ninguna garantía de completarse.
+
+- **⚠️ El modo de fallo es el peor posible, y es lo que hace que esto no se haya
+  detectado antes.** Congelar no es instantáneo, así que el `insert` **casi
+  siempre llega**. Se pierde de vez en cuando, sin excepción, sin log y sin
+  ningún síntoma del lado del usuario. Nadie sospecha del hueco porque el
+  registro está ahí el 99% de las veces que alguien va a mirarlo.
+
+  **Precisión honesta sobre lo verificado:** el mecanismo es comportamiento
+  documentado de la plataforma, no una pérdida observada en este repositorio. Y
+  no se puede observar por construcción — la única forma de medirlo sería
+  comparar operaciones ejecutadas contra entradas escritas, que es justo lo que
+  el `audit_log` debería poder contestar y aquí no puede.
+
+- **No hay convención de repo a la que apelar.** 16 llamadas la esperan y 15 no.
+  Y el reparto es exactamente el contrario del que convendría: las que **sí**
+  esperan están concentradas en `super-admin` registrando **LECTURAS** de
+  paneles; las que **no** esperan incluyen las **ESCRITURAS y los accesos sobre
+  datos personales**.
+
+- **Las ocho que importan** (todas verificadas el 2026-08-21):
+  - `src/app/api/email/enviar-documento/route.ts:246` — `enviar_documento_denegado`
+  - `src/app/api/email/enviar-documento/route.ts:280` — `enviar_documento_denegado`
+  - `src/app/api/email/enviar-documento/route.ts:350` — `enviar_documento`
+  - `src/app/api/pacientes/[id]/correo/route.ts:142` — `actualizar_paciente_correo`
+  - `src/app/api/paciente/[id]/exportar/route.ts:140` — `arco_acceso` · **ver el bloque de abajo**
+  - `src/app/api/pacientes/[id]/vincular/route.ts:73` — `vincular_medico`
+  - `src/app/api/admin/paciente/[id]/rectificar/route.ts:75` — `arco_rectificacion`
+  - `src/app/api/admin/paciente/[id]/anonimizar/route.ts:78` — `arco_cancelacion`
+
+  Del mismo tipo pero de autenticación: `src/app/api/auth/rate-limit/route.ts:41`,
+  `:54`, `:72`, y `src/app/api/auth/audit-login/route.ts:31`.
+
+- **⚠️⚠️ EL CASO ARCO, Y VA APARTE PORQUE ESTÁ EXACTAMENTE DEL REVÉS.**
+  En `src/app/api/paciente/[id]/exportar/route.ts` conviven las dos formas:
+
+  | Línea | Acción | ¿Espera? |
+  |---|---|---|
+  | `:73` | `arco_intento_denegado` | **SÍ** |
+  | `:140` | `arco_acceso` | **NO** |
+
+  O sea: **el intento RECHAZADO queda registrado con garantía, y la entrega
+  efectiva del expediente completo no.** Ante una reclamación por derechos ARCO
+  lo que se aporta es el `audit_log`: hay garantía de poder probar a quién se le
+  **negó** el acceso, y no la hay de probar a quién se le **entregaron** los
+  datos. Es al revés de lo que hace falta demostrar.
+
+  **Y no es un descuido: es una decisión razonada en la dirección equivocada.**
+  El comentario de `:68-71` explica el `await` del denegado diciendo que «aquí no
+  hay nada que entregar al usuario, así que no hay prisa que justifique perder el
+  evento». El razonamiento es correcto y su recíproco es el defecto: en el camino
+  que **sí** entrega, se aceptó perder el evento a cambio de prisa — y ése es
+  precisamente el evento que hay que conservar.
+
+- **Por qué es cumplimiento y no higiene.** Los datos de salud son datos
+  personales sensibles bajo la LFPDPPP vigente (DOF 20/03/2025, reformada
+  14/11/2025), y **las multas se duplican tratándose de datos sensibles**
+  (`CLAUDE.md`). El `audit_log` no es telemetría: es el medio de prueba. Una
+  bitácora que a veces no se escribe es peor que no tenerla, porque se confía en
+  ella para afirmar lo que no puede sostener. Toca además el bloqueante de RG-01
+  «Audit log incompleto (existe, falta cobertura total de eventos)»: el hueco no
+  es sólo de eventos que no se registran, también de eventos que se intentan
+  registrar y no se sabe si quedaron.
+
+- **Fix propuesto.** Poner `await` en esas llamadas. Trivial de escribir —una
+  palabra por sitio, y `logAudit` no lanza, así que esperarla no introduce
+  ninguna rama de fallo nueva—, pero **cada una hay que mirarla por separado**
+  para comprobar que el viaje extra a Supabase no cambia de forma perceptible el
+  tiempo de respuesta de su ruta. Donde sí lo cambie, la alternativa es `after()`,
+  que es la herramienta que la plataforma ofrece justo para esto y que el repo ya
+  usa en `/api/appointments`.
+
+- **NO SE ARREGLA EN LA RAMA DE GOOGLE.** Toca ocho rutas que no tienen nada que
+  ver con el calendario, y mezclarlo con la conexión por clínica haría irrevertible
+  por separado un cambio que afecta a cumplimiento. Sesión propia.
+
+- **La ruta nueva ya nació con `await`** y por eso NO está en la lista de arriba:
+  `src/app/api/appointments/[id]/invitacion/route.ts:483` espera su
+  `enviar_invitacion_cita`, con el porqué escrito al lado para que nadie lo
+  «simplifique» al alinearlo con sus hermanas.
+
+- **Familia.** Es el mismo agujero que **LP-DT-21** (el audit del export de
+  expediente es fire-and-forget) visto desde el otro lado: aquél es del CLIENTE
+  —`ExportarExpedienteButton.tsx` llamando a `/api/audit` con `.catch(() => {})`—
+  y éste del SERVIDOR. **Y se componen:** `src/app/api/audit/route.ts:51`, que es
+  el destino de aquella llamada, tampoco espera su `logAudit`. Una exportación
+  desde el botón atraviesa por tanto dos tramos sin garantía seguidos. Si se
+  abren en la misma sesión, van juntas.
+
+- **Condición de cierre:** que toda escritura o acceso sobre datos personales
+  tenga su entrada en `audit_log` garantizada antes de que la ruta responda —por
+  `await` o por `after()`—, y que el reparto restante entre esperadas y no
+  esperadas sea una decisión escrita en cada sitio, no un accidente.
+
+---
+
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)

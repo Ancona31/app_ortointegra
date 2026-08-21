@@ -7,14 +7,15 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
 import { EventClickArg, EventDropArg, DateSelectArg, EventInput, EventContentArg, DayHeaderContentArg } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
-import { X, Calendar, User, Plus, Trash2, Settings, LayoutGrid, Columns3, Square, ChevronDown, FileText, Stethoscope, Loader2 } from 'lucide-react'
+import { X, Calendar, User, Plus, Trash2, Settings, LayoutGrid, Columns3, Square, ChevronDown, FileText, Stethoscope, Loader2, Mail } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { useToast } from '@/components/ui/Toast'
 import { useProfile } from '@/hooks/useProfile'
-import { canManageClinica } from '@/lib/permissions'
+import { canManageClinica, canVerAgendaCompleta } from '@/lib/permissions'
 import QuickPatientModal from '@/components/ui/QuickPatientModal'
+import ModalInvitacionCita from '@/components/agenda/ModalInvitacionCita'
 import Portal from '@/components/ui/Portal'
 import { useSubscriptionGate } from '@/components/billing/SubscriptionGateProvider'
 import { useConsultorios } from '@/hooks/useConsultorios'
@@ -56,7 +57,16 @@ type Appointment = {
   consultorio_direccion: string | null
   consultorio_telefono: string | null
   consultorio_timezone: string | null
-  pacientes?: { id: string; nombre: string; apellidos: string; telefono: string | null } | null
+  /* `email` viaja desde `APPOINTMENT_SELECT` para un solo consumidor: el botón
+     de invitación. Que esté aquí es lo que evita una petición por cita abierta
+     sólo para saber si la ficha tiene correo.
+
+     OPCIONAL, y no por comodidad: la actualización optimista de `handleSave`
+     mete aquí el `PacienteBusqueda` que devuelve el buscador, que NO trae
+     correo porque su endpoint no lo selecciona. Ese hueco dura lo que tarda la
+     respuesta del PUT —que trae la fila canónica y la pisa vía
+     `aplicarAppointmentAlEvento`— y encima ocurre con el modal ya cerrado. */
+  pacientes?: { id: string; nombre: string; apellidos: string; telefono: string | null; email?: string | null } | null
   medico?: { id: string; titulo: string | null; nombres: string | null; apellido_paterno: string | null; apellido_materno: string | null } | null
 }
 
@@ -459,7 +469,7 @@ function QuickPatientModal({
 
 function AppointmentModal({
   modal, onClose, onSave, onDelete, medicos, defaultMedicoId,
-  hideMedicoDropdown, medicoDropdownRequired, canVerExpediente,
+  hideMedicoDropdown, medicoDropdownRequired, canVerExpediente, canInvitar,
 }: {
   modal: ModalState
   onClose: () => void
@@ -470,6 +480,10 @@ function AppointmentModal({
   hideMedicoDropdown: boolean
   medicoDropdownRequired: boolean
   canVerExpediente: boolean
+  /* `canVerAgendaCompleta`: administrador de clínica y secretaria. Esto sólo
+     decide si el botón se PINTA — el permiso de verdad lo comprueba la ruta,
+     porque ocultar un botón no impide llamar al endpoint. */
+  canInvitar: boolean
 }) {
   const isEdit = modal.mode === 'edit'
   const apt    = modal.mode === 'edit' ? modal.appointment : null
@@ -494,6 +508,7 @@ function AppointmentModal({
   const [medicoId,    setMedicoId]    = useState<string>(apt?.medico_id ?? defaultMedicoId)
   const [saving,      setSaving]      = useState(false)
   const [deleting,    setDeleting]    = useState(false)
+  const [invitacionAbierta, setInvitacionAbierta] = useState(false)
 
   // F3-6: hook de consultorio activo (siempre disponible bajo el Provider).
   const { consultorioActivo, cambiarActivo } = useConsultorioActivo()
@@ -825,6 +840,42 @@ function AppointmentModal({
               className="w-full px-3 py-2.5 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all resize-none"
             />
           </div>
+
+          {/* Invitación por correo — SÓLO EN EDICIÓN.
+              En `mode: 'create'` no existe: invitar es un `patch` sobre el evento
+              de Google, y una cita que aún no se ha guardado no tiene evento.
+
+              Va en el cuerpo y no en el pie por sitio: el motivo del botón
+              apagado es una frase, y en el pie no cabe sin apretujar «Iniciar
+              consulta», «Cancelar» y «Guardar». */}
+          {isEdit && canInvitar && (
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
+                Invitación
+              </label>
+              <button
+                type="button"
+                onClick={() => setInvitacionAbierta(true)}
+                disabled={!apt?.google_event_id}
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-bold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                style={{ color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}
+              >
+                <Mail size={15} /> Enviar invitación
+              </button>
+              {/* ⚠️ EL MOTIVO, SIEMPRE VISIBLE. Un botón apagado y mudo deja a
+                  quien agenda buscando qué le falta, y este caso NO es raro: le
+                  pasa a la secretaria en cuanto la clínica no tiene Google
+                  conectado, y también con la primera cita de una clínica cuyo
+                  calendario todavía no existe. */}
+              {!apt?.google_event_id && (
+                <p className="text-[12px] mt-1.5 leading-relaxed" style={{ color: 'var(--ag-muted)' }}>
+                  Esta cita todavía no tiene evento en Google, así que no hay a qué invitar.
+                  Ocurre cuando la clínica no tiene Google Calendar conectado, o cuando su
+                  calendario aún no existe — quien administra lo crea al abrir la agenda.
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -873,6 +924,30 @@ function AppointmentModal({
         nombreInicial={search}
         onCreated={p => { setPaciente(p); setQuickCreate(false); setSearch('') }}
         onClose={() => setQuickCreate(false)}
+      />
+    )}
+
+    {/* Confirmación de la invitación.
+        ⚠️ TODO LO QUE BAJA AQUÍ SALE DE `apt` —LA CITA GUARDADA— Y NUNCA DEL
+        ESTADO DEL FORMULARIO. Quien abra el modal, cambie el paciente o el
+        médico en los desplegables y pulse «Enviar invitación» SIN guardar,
+        estaría invitando a quien todavía no es de esa cita: el evento de Google
+        sigue siendo el de la cita tal como está en la base. `paciente` y
+        `medicoId` son borradores hasta que se pulsa Guardar. */}
+    {invitacionAbierta && apt && (
+      <ModalInvitacionCita
+        citaId={apt.id}
+        medicoNombre={apt.medico_id
+          ? (apt.medico ? componerNombreMedicoCompleto(apt.medico).trim() || 'Médico asignado' : 'Médico asignado')
+          : null}
+        paciente={apt.pacientes
+          ? {
+              id: apt.pacientes.id,
+              nombre: `${apt.pacientes.nombre} ${apt.pacientes.apellidos}`,
+              correoFicha: apt.pacientes.email?.trim() || null,
+            }
+          : null}
+        onClose={() => setInvitacionAbierta(false)}
       />
     )}
     </Portal>
@@ -2158,6 +2233,7 @@ export default function AgendaPage() {
           hideMedicoDropdown={isSingleDoctor || isMedicoSinAdmin}
           medicoDropdownRequired={isSecretaria || isMedicoConAdmin}
           canVerExpediente={isDoctor}
+          canInvitar={canVerAgendaCompleta(profile)}
         />
       )}
 

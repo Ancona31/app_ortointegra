@@ -34,6 +34,20 @@ export type AuditAccion =
      genérico: es un dato de contacto que se guarda a raíz de un envío, y quien
      audite una dirección equivocada quiere poder aislar justo esos. */
   | 'actualizar_paciente_correo'
+  /* Invitación de una cita enviada a Google desde el modal de la agenda: el
+     médico asignado, el paciente, o los dos, añadidos como asistentes del
+     evento con `sendUpdates: 'all'`.
+
+     ⚠️ LA DESCRIPCIÓN NO LLEVA NINGUNA DIRECCIÓN DE CORREO, y no es un olvido.
+     Lo que se registra es QUÉ PAPEL se invitó —«el médico asignado», «el
+     paciente»— y `registro_id` con el id de la cita, que basta para reconstruir
+     a quién le tocaba. El `audit_log` lo leen ojos que no tienen por qué ver la
+     libreta de direcciones de la clínica, y el correo del médico además no sale
+     del servidor en ningún otro punto de esa ruta.
+
+     `audit_log.accion` es `text` sin CHECK, así que esta línea no necesita
+     migración. */
+  | 'enviar_invitacion_cita'
   // Autenticación
   | 'login_exitoso'
   | 'login_fallido'
