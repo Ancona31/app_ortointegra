@@ -980,6 +980,26 @@ Nada de esto figura en §4: es alcance nuevo, no cubierto por ninguna fila F1-F1
 > es una identidad más saliendo de Spinus por la vía de Google. Sin acción en esta
 > rama; cuenta para cuando se redacte lo del aviso de privacidad (§9 y §12.5).
 
+> **✅ CUARTA ANOTACIÓN 2026-08-21 — EL MÉDICO PROPIETARIO SÍ RECIBE LA CITA, Y
+> ESO ESTRENA UNA FUNCIÓN QUE NO SE BUSCABA. Detalle entero en §12.17.**
+>
+> Invitar al médico que **es dueño de la cuenta de Google conectada** no le manda
+> correo —Google no notifica al organizador de su propio evento— pero **el evento
+> sí entra en su calendario personal**. La invitación funciona; lo que no ocurre
+> es el aviso.
+>
+> Con eso, esta sección resuelve de paso lo que **§12.9** daba por inalcanzable
+> sin el scope sensible `calendar.acls`: cada médico ve **sus** citas en su propio
+> Google, y sólo las suyas.
+>
+> **Consecuencia para el acuse, y es un pendiente:** el texto que dice que «Google
+> le mandó la invitación por correo» **es falso en ese caso**. Cómo detectarlo y
+> las tres trampas de hacerlo, en §12.17.
+>
+> Se descartaron además las **notificaciones del calendario** (`calendarList`)
+> como forma de tapar ese supuesto hueco: no había hueco, y el plan B pedía scopes
+> sensibles. La prueba no se ejecutó a propósito. §12.17.
+
 ## 12.5 El título lleva el nombre completo del paciente
 
 **Decidido y no se discute.** El evento sigue llevando `Cita médica: <nombre>
@@ -1117,6 +1137,17 @@ mano**, eligiendo el papel `reader`. Es **opcional y no lo hace Spinus**:
 automatizarlo pediría el scope sensible `calendar.acls`, que es justo lo que toda
 esta arquitectura evita. Conecta con §9: el ACL de ese calendario vive en Google,
 fuera de la RLS y fuera de `audit_log`.
+
+> **⚠ ANOTACIÓN 2026-08-21 — ESTO YA NO ES LA RESPUESTA A «CÓMO VE UN MÉDICO SU
+> AGENDA EN GOOGLE». Ver §12.17.** Todo lo de arriba sigue siendo cierto y este
+> apartado no se retira: compartir en lectura sigue disponible, a mano, y la nota
+> sobre el ACL fuera de la RLS sigue vigente.
+>
+> Lo que cambió es que **hay otro camino, y es mejor**: la invitación de §12.4
+> mete el evento en el calendario personal del médico aunque no le llegue correo,
+> y le mete **sólo sus citas**. `calendar.acls` habría compartido el calendario
+> entero —las de todos—, así que lo que este apartado daba por inalcanzable sin
+> scope sensible resulta estar ya resuelto, y con mejor alcance.
 
 ## 12.10 Avisos al usuario
 
@@ -1501,3 +1532,101 @@ que se elija la tercera opción.
 > detecta en `altaConexion` y sale por `?gcal_error=cuenta_ya_vinculada`, sin
 > tocar el RPC ni la base. Éste de aquí es el contrario: **un solo usuario
 > cambiando de cuenta de Google**, que ningún índice ve.
+
+
+## 12.17 El médico propietario recibe la cita en su calendario — y con eso cae §12.9
+
+> **Añadida el 2026-08-21**, al construir el botón de invitación. Toca **§12.4**
+> (qué hace la invitación), **§12.9** (compartir el calendario en lectura) y deja
+> **un pendiente de interfaz** que hay que arreglar después.
+
+### Lo que se descubrió
+
+**Cuando el médico asignado a una cita ES el dueño de la cuenta de Google
+conectada, la invitación SÍ funciona — sólo que no por correo.** No le llega
+ningún mensaje, porque **Google no notifica al organizador de su propio evento**,
+pero **el evento SÍ entra en su calendario personal**.
+
+Y eso es exactamente lo que hacía falta: **con el calendario de la clínica
+apagado, cada médico ve sólo SUS citas y no las de los demás.**
+
+### Esto resuelve lo que §12.9 daba por inalcanzable
+
+§12.9 dice que compartir el calendario en lectura es manual y opcional porque
+automatizarlo pediría el scope sensible `calendar.acls`, «que es justo lo que toda
+esta arquitectura evita». **La invitación llega al mismo sitio por otro camino, y
+además a uno mejor:** `calendar.acls` habría compartido el calendario ENTERO —las
+citas de todos—, mientras que el `attendees` del `patch` mete en la agenda de cada
+médico **sólo las citas que son suyas**. Lo que parecía el sucedáneo resulta ser
+lo que se quería.
+
+**§12.9 no se retira** —compartir en lectura sigue siendo una opción manual para
+quien la quiera, y su nota sobre el ACL fuera de la RLS sigue vigente—, pero deja
+de ser la respuesta a «cómo ve un médico invitado su agenda en Google».
+
+### Las notificaciones del calendario quedan DESCARTADAS
+
+Se consideró encender para la cuenta de la clínica los avisos por correo de
+«evento creado», «evento modificado» y «evento cancelado» —`calendarList`,
+`notificationSettings.notifications`— para que el administrador tuviera constancia
+de cada cita aunque no le llegara invitación. **Descartado, por dos motivos
+independientes:**
+
+1. **No cubre ningún hueco.** El hueco que pretendía tapar no existe: el médico
+   propietario ya recibe la cita en su calendario. Un correo por evento sería
+   avisarle de algo que ya tiene delante.
+2. **El plan B costaba la arquitectura entera.** Si `calendar.app.created` no lo
+   autorizara —desenlace probable: `calendarList` es la lista de suscripciones de
+   la CUENTA, no un calendario—, hacerlo por API exigiría `calendar.calendarlist`
+   o `calendar` a secas. **Los dos son SENSIBLES**, y §12.11 recuerda que eso
+   reabre la verificación de la app y activa el tope de 100 usuarios, **un
+   contador que no se puede restablecer nunca**.
+
+**La prueba NO se ejecutó, y es deliberado:** sus dos desenlaces terminaban en «no
+se hace». El script queda en `scripts/gcal-notificaciones-humo.ts` con la cabecera
+diciendo justo eso, para que nadie lo tome por trabajo a medias ni vuelva a
+plantear la idea creyéndola inexplorada.
+
+Lo que sí quedó averiguado sin gastar una llamada: **el ajuste vive en
+`calendarList` y NO en `calendars`** —comprobado en los tipos instalados; la
+documentación del propio tipo dice «the notifications that THE AUTHENTICATED USER
+is receiving»—, o sea que es una preferencia **por cuenta suscrita**, no una
+propiedad del calendario. Encenderla desde Spinus nunca habría servido para nadie
+más que para la cuenta conectada.
+
+Queda documentada en ese script la vía manual —escritorio, «Configuración y uso
+compartido», sección **«Notificaciones generales»**, que no es la de
+«Notificaciones de eventos»— por si algún médico quisiera esos avisos **para su
+propia cuenta**. Es cosa suya y Spinus no participa.
+
+### ⚠️ PENDIENTE DE INTERFAZ — el acuse miente en un caso
+
+**Cuando el destinatario invitado es el dueño de la cuenta conectada, el acuse NO
+puede decir que Google le mandó la invitación, porque no se la manda.** Hoy el
+panel dice que «quedó añadido a la cita y Google le mandó la invitación por
+correo»: la primera mitad es cierta siempre, la segunda es falsa en este caso.
+
+**Cómo se detecta:** comparando el correo del médico con
+`clinica_conexiones_google.google_account_email`, que se puebla desde el commit 4.
+
+Tres avisos para quien lo implemente, los tres verificados el 2026-08-21:
+
+- **Por correo, NO por `user_id`.** Tienta comparar `conexion.userId` con
+  `cita.medico_id` —los dos son ids de perfil de Spinus y el descriptor ya trae el
+  primero—, y **está mal**: lo que decide si Google notifica es qué **cuenta de
+  Google** organiza el evento, y quien administra puede haber conectado un Gmail
+  personal distinto de su cuenta de Spinus. Ese atajo daría falsos positivos.
+- **`google_account_email` puede ser NULL, y NULL significa «identidad
+  desconocida», no «no coincide»** (`20260817_gcal_conexion_clinica_a_esquema.sql:509`).
+  Las conexiones migradas desde `google_tokens` lo tienen vacío hasta que su dueño
+  reconecte. Con NULL no se puede afirmar ni lo uno ni lo otro, así que el acuse
+  tiene que caer en una redacción que sea cierta en los dos casos.
+- **`resolverConexionClinica` hoy NO lo devuelve:** `COLUMNAS_CONEXION`
+  (`src/lib/gcalConexion.ts:71`) es `id, clinica_id, user_id, rol, calendar_id,
+  estado`, y `ConexionGoogle` no tiene ese campo. Hay que ensancharlo — y el
+  correo **no debe viajar al navegador**, igual que el del médico: la comparación
+  se hace en el servidor y lo que baja es un booleano.
+
+**No se implementa en esta rama.** Es un cambio de redacción del acuse que depende
+de un dato que hay que hacer llegar a la ruta, y llega tarde para el commit del
+botón.
