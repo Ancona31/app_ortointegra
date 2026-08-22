@@ -17,20 +17,28 @@
 --      veredicto = 'REVISAR: el CHECK de icono NO admite estos valores: …'
 --    Ese REVISAR era el resultado correcto: describe el estado de ANTES.
 --
---    ⚠️ PERO ESA CORRIDA NO CUBRE EL VEREDICTO ENTERO TAL COMO ESTÁ HOY. Después
---    de correrla, la auditoría encontró que `faltan_*` y `sobran_*` son pruebas
---    de PERTENENCIA y no de igualdad, y se añadieron DOS RAMAS al CASE que
---    comparan la definición completa contra los literales exactos. Esas dos
---    ramas son SQL que NO se ha ejecutado nunca. Son de la misma familia que lo
---    ya probado —`regexp_replace` sobre `text`, `IS DISTINCT FROM` contra un
---    literal, `||` sobre `coalesce(text, text)`— y ninguna toca una columna de
---    catálogo de tipo raro, que es lo que mató a la 5. Pero eso es lectura, y
---    la lección de la 5 fue justamente que leer no basta:
+--    ⚠️ QUÉ CUBRE ESA CORRIDA Y QUÉ NO. Después de correrla, la auditoría
+--    encontró que `faltan_*` y `sobran_*` son pruebas de PERTENENCIA y no de
+--    igualdad, y se añadieron DOS RAMAS al CASE que comparan la definición
+--    completa contra los literales exactos. El veredicto CON esas dos ramas se
+--    volvió a correr suelto contra producción el 2026-08-22 y devolvió lo mismo
+--    de arriba, sin error de tipos.
 --
---       VOLVER A CORRER EL VEREDICTO SUELTO ANTES DE APLICAR.
+--    Eso cierra el riesgo de la migración 5 y sólo ése: el 42725 es un fallo de
+--    ANÁLISIS que rechaza la consulta entera antes de evaluar ninguna rama, así
+--    que una corrida que devuelve filas ya demuestra que no está.
 --
---    Sobre el estado de hoy debe devolver lo mismo de arriba: la rama que gana
---    sigue siendo `faltan_iconos`, porque va antes que las dos nuevas.
+--    ⚠️ LO QUE NINGUNA CORRIDA DE HOY PUEDE DEMOSTRAR: que el literal de esas
+--    dos ramas sea el correcto. Con los CHECK viejos puestos gana `faltan_iconos`
+--    —va antes— y el CASE corta ahí sin llegar a evaluarlas. La primera vez que
+--    se evalúan de verdad es en el veredicto de DESPUÉS de aplicar. Lo que
+--    respalda el literal no es la ejecución sino que es byte a byte el mismo
+--    `v_nuevo_icono` / `v_nuevo_color` de la guarda 2, leídos de Postgres en el
+--    paso (2) del pre-vuelo.
+--
+--    Y si aun así estuviera mal, el coste está acotado: un literal equivocado
+--    AQUÍ da un REVISAR de más con el DDL ya confirmado y correcto. En la
+--    guarda 2 abortaría la migración —le pasó a la 3—; aquí no.
 -- ============================================================================
 -- La pinta definitiva del evento genérico: 20 iconos y 6 colores
 --
@@ -139,6 +147,23 @@
 -- Y por lo mismo NO existe un valor «ninguno» dentro de las listas: NULL ya es
 -- eso. La migración 4 retiró `punto` de la propuesta de §12.14 por este motivo
 -- y aquí se mantiene retirado.
+--
+-- ── ⚠️ HUECO CONOCIDO Y ACEPTADO: EL VEREDICTO NO VIGILA EL `DEFAULT` ───────
+-- El párrafo de arriba es un argumento sobre lo que NO debe pasar, y el
+-- veredicto del final sólo comprueba la mitad de él. Mira que las dos columnas
+-- sigan siendo NULLABLE, pero NO que sigan SIN DEFAULT.
+--
+-- O sea que un `ALTER TABLE public.appointments ALTER COLUMN color SET DEFAULT
+-- ''grafito''` puesto a mano cualquier día pasaría el CHECK —`grafito` es un
+-- valor legítimo—, dejaría la columna nullable, y pintaría EN SILENCIO todas las
+-- citas de paciente que se creen a partir de entonces: exactamente lo que este
+-- apartado argumenta que no debe ocurrir. Y este veredicto diría OK.
+--
+-- Es un hueco PREVIO a este archivo —lo hereda del veredicto de la migración 4—
+-- y no lo introduce nada de lo que aquí se toca. **No se cierra ahora y no es
+-- motivo para retrasar la aplicación.** Cerrarlo son dos cosas pequeñas: un
+-- `a.atthasdef` en el CTE y una rama más en el CASE, en su día y por su
+-- migración.
 --
 -- ── ORDEN DE DESPLIEGUE — ESTE ARCHIVO VA ANTES DEL CÓDIGO ──────────────────
 -- ⚠️ EL ARGUMENTO DE LA MIGRACIÓN 4 NO SIRVE AQUÍ Y HAY QUE REHACERLO. Allí el
