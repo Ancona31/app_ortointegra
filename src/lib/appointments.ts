@@ -99,6 +99,56 @@ function anclaDeHora(startISO: string, timezone: string): string | null {
   }
 }
 
+/* ═══ LA PINTA DEL EVENTO GENÉRICO ═══════════════════════════════════════════
+ *
+ * Las dos listas cerradas de `appointments.icono` y `appointments.color`
+ * (plan §12.14). Viven aqui, y no en la pagina de la agenda, porque tienen TRES
+ * consumidores: el selector del modal, el POST y el PUT — y los dos ultimos son
+ * servidor. Una lista que el cliente conociera y el servidor no seria una
+ * validacion decorativa.
+ *
+ * ⚠️ ESTAS DOS LISTAS SON EL ESPEJO EXACTO DE LOS CHECK DE LA BASE
+ * (`appointments_icono_check` y `appointments_color_check`,
+ * 20260821_agenda_evento_generico_icono_color.sql). Si divergen, la base
+ * rechaza con un 23514 crudo que el usuario lee como «no se pudo guardar» sin
+ * mas. Cambiar una lista es cambiar las dos, y la de la base va por migracion.
+ *
+ * ⚠️ LOS VALORES SON PROVISIONALES; LA FORMA NO. Claude Design va a sustituir
+ * iconografia y paleta. Lo que no se puede deshacer barato es pasar de texto
+ * libre a lista cerrada, y por eso la lista cerrada entra ya.
+ *
+ * Lo que NO esta aqui y es a proposito: el componente de icono de cada valor
+ * (eso es interfaz y vive en la agenda) y el hex de cada color (eso vive en
+ * globals.css, junto a los de los estados, que es con quien no puede chocar).
+ */
+export const ICONOS_EVENTO = ['bisturi', 'personas', 'candado', 'avion', 'libro'] as const
+export type IconoEvento = typeof ICONOS_EVENTO[number]
+
+export const COLORES_EVENTO = ['ambar', 'rosa', 'terracota', 'indigo'] as const
+export type ColorEvento = typeof COLORES_EVENTO[number]
+
+/**
+ * Valida un valor de pinta que llega del cliente y lo normaliza.
+ *
+ * Devuelve `null` para ausente, vacio y para el string vacio: los tres
+ * significan lo mismo —sin icono, sin color— y la columna guarda NULL. NO
+ * existe un valor «ninguno» dentro de la lista; §12.14 proponia uno (`punto`)
+ * y se retiro justamente para no tener dos nombres del mismo concepto.
+ *
+ * Devuelve `undefined` cuando el valor NO es aceptable, que el llamador
+ * distingue de `null` para responder 400 en vez de guardar un vacio: tragarse
+ * en silencio un valor invalido es como el evento sale roto sin que nadie se
+ * entere, que es lo que el CHECK existe para impedir.
+ */
+export function pintaValida<T extends string>(
+  valor: unknown,
+  permitidos: readonly T[],
+): T | null | undefined {
+  if (valor === undefined || valor === null || valor === '') return null
+  if (typeof valor !== 'string') return undefined
+  return (permitidos as readonly string[]).includes(valor) ? (valor as T) : undefined
+}
+
 /** El valor de `appointments.status` que marca una cita cancelada. */
 const ESTADO_CANCELADA = 'cancelled'
 

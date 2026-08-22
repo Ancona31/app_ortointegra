@@ -95,6 +95,34 @@
   --ag-status-cancelled-bg: #fbecec;   --ag-status-cancelled-border: #f1c9c9;
   --ag-status-no_show-dot: #64748b;    --ag-status-no_show-text: #475569;
   --ag-status-no_show-bg: #eef1f6;     --ag-status-no_show-border: #d4dbe5;
+  /* «Atendida» (plan §12.13). El teal oscuro sale de mirar las DOS paletas a la
+     vez, no sólo la de estados: comparte calendario con los colores de los
+     eventos genéricos de §12.14, y por eso `cian` (#0891b2) se retiró de
+     aquélla — era el par más apretado con éste.
+     ⚠️ ESTOS CUATRO TOKENS Y SUS CUATRO HERMANOS OSCUROS NO LOS CAZA EL
+     COMPILADOR: se consumen por interpolación (`var(--ag-status-${status}-dot)`
+     en agenda/page.tsx). Si faltan, la tarjeta sale transparente y sin borde,
+     sin un solo error. */
+  --ag-status-attended-dot: #0f766e;   --ag-status-attended-text: #0d5f59;
+  --ag-status-attended-bg: #e6f4f2;    --ag-status-attended-border: #bfe0dc;
+
+  /* EVENTO GENÉRICO SIN PACIENTE (plan §12.14) — un token por color, y el
+     fondo/borde se derivan con color-mix. Uno solo en vez de cuatro porque
+     estos valores SON PROVISIONALES: Claude Design va a rehacer la paleta, y
+     lo que hay que dejar barato de cambiar es el color, no su descomposición.
+
+     RESTRICCIÓN DURA, y por eso viven aquí y no en la página: ninguno puede
+     colisionar con los colores de ESTADO de arriba —azul, verde, rojo, gris
+     pizarra, teal— ni con el morado de Google de abajo. Son la misma paleta
+     compartiendo un calendario. Por eso `cian` (#0891b2) se retiró de la
+     propuesta de §12.14: era el par más apretado con el teal de «atendida».
+
+     ⚠️ Se consumen por interpolación (`var(--ag-evento-${color})`), igual que
+     los de estado: un token que falte no da error, deja el evento sin color. */
+  --ag-evento-ambar: #d97706;
+  --ag-evento-rosa: #db2777;
+  --ag-evento-terracota: #9a3412;
+  --ag-evento-indigo: #4338ca;
 
   /* Google Calendar (eventos externos) */
   --ag-gcal-text: #6d4ec0;
@@ -975,6 +1003,18 @@ html.dark {
   --ag-status-cancelled-bg: rgba(220, 38, 38, .18);   --ag-status-cancelled-border: rgba(248, 113, 113, .34);
   --ag-status-no_show-dot: #9fb0c4;    --ag-status-no_show-text: #c7d2e0;
   --ag-status-no_show-bg: rgba(120, 134, 158, .22);   --ag-status-no_show-border: rgba(148, 163, 184, .40);
+  /* «Atendida» en oscuro: mismo criterio que los otros cuatro — el punto y el
+     texto se aclaran para que lean sobre fondo oscuro, el fondo y el borde son
+     el color base con alfa. Ver la nota de la variante clara. */
+  --ag-status-attended-dot: #2dd4bf;   --ag-status-attended-text: #7ee8dd;
+  --ag-status-attended-bg: rgba(15, 118, 110, .20);   --ag-status-attended-border: rgba(45, 212, 191, .34);
+  /* Evento genérico en oscuro: los mismos cuatro, aclarados para que lean
+     sobre fondo oscuro. Mismo criterio que los dots de estado. */
+  --ag-evento-ambar: #f59e0b;
+  --ag-evento-rosa: #f472b6;
+  --ag-evento-terracota: #ea8f6a;
+  --ag-evento-indigo: #818cf8;
+
   /* Google Calendar (extDark) */
   --ag-gcal-text: #c4b5fd;
   --ag-gcal-border: rgba(167, 139, 250, .36);

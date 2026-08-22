@@ -1,3 +1,5 @@
+import type { IconoEvento, ColorEvento } from '@/lib/appointments'
+
 // ─── Detección de duplicados ──────────────────────────────────────────────────
 export interface DuplicatePatientResponse {
   error: 'DUPLICATE_PATIENT'
@@ -99,6 +101,11 @@ export interface Consulta {
   consultorio_direccion?: string | null
   consultorio_telefono?: string | null
   consultorio_timezone?: string | null
+  /* La cita de la que salió esta consulta (plan §12.13). NULL = no vino de
+     ninguna cita agendada, o la cita se borró después (la FK es
+     ON DELETE SET NULL: el dato clínico sobrevive, el vínculo no). Se escribe
+     una sola vez, en el INSERT. */
+  appointment_id?: string | null
 }
 
 /**
@@ -117,7 +124,11 @@ export interface Appointment {
   title: string
   start_time: string
   end_time: string
-  status: 'scheduled' | 'confirmed' | 'cancelled' | 'no_show'
+  /* 'attended': la cita se atendió. Lo escribe el servidor al crear la nota
+     clínica que salió de ella (plan §12.13), y también se puede poner a mano
+     desde el modal de la agenda. La transición permitida es
+     'scheduled'|'confirmed' → 'attended'; 'cancelled' y 'no_show' no se tocan. */
+  status: 'scheduled' | 'confirmed' | 'cancelled' | 'no_show' | 'attended'
   notes: string | null
   google_event_id: string | null
   whatsapp_sent_at?: string | null
@@ -140,6 +151,11 @@ export interface Appointment {
   consultorio_direccion?: string | null
   consultorio_telefono?: string | null
   consultorio_timezone?: string | null
+  /* La pinta del evento genérico sin paciente (plan §12.14). Listas cerradas
+     en `@/lib/appointments` y con CHECK en la base. Una cita normal no lleva
+     ninguna de las dos: NULL es lo normal aquí, no la excepción. */
+  icono?: IconoEvento | null
+  color?: ColorEvento | null
 }
 
 /**

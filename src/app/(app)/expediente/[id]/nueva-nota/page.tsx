@@ -173,6 +173,27 @@ function construirSignosVitalesPayload(sv: SignosVitalesForm): SignosVitales | u
 export default function NuevaNotaPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  /* La cita de la que salió esta consulta, si salió de alguna (plan §12.13).
+     La ponen los tres botones de «Iniciar consulta» como `?cita=<uuid>`; viaja
+     al servidor en el cuerpo del POST, se guarda en `consultas.appointment_id`
+     y es lo que permite marcar la cita como atendida.
+
+     SE LEE DE `window.location` Y NO CON `useSearchParams`, que obligaría a
+     envolver la página en un `Suspense` sólo por esto. Es seguro: el
+     componente es de cliente y la lectura va dentro de un efecto.
+
+     RECARGAR LA PÁGINA NO LO PIERDE —el parámetro sigue en la URL—, así que no
+     hace falta guardarlo en el borrador cifrado. Y no se debe: el borrador está
+     indexado por paciente, no por cita, y uno viejo podría acabar marcando una
+     cita distinta del mismo paciente.
+
+     Si no viene, no pasa nada: se guarda la nota y no se marca ninguna cita,
+     que es lo correcto para un paciente que llegó sin agendar. */
+  const [citaOrigen, setCitaOrigen] = useState<string | null>(null)
+  useEffect(() => {
+    const v = new URLSearchParams(window.location.search).get('cita')
+    if (v) setCitaOrigen(v)
+  }, [])
   const { consultorioActivo } = useConsultorioActivo()
   useAuditAccess('consultas', id) // NOM-024: registrar acceso a nota médica
   const [medicoInfo, setMedicoInfo] = useState<MedicoInfo | null>(null)
@@ -672,6 +693,9 @@ export default function NuevaNotaPage() {
     const payload = {
       paciente_id: id,
       consultorio_id: consultorioActivo?.id,
+      // De qué cita salió, si salió de alguna. El servidor la valida y la marca
+      // como atendida; que falte o no cuadre nunca impide guardar la nota.
+      ...(citaOrigen ? { appointment_id: citaOrigen } : {}),
       motivo_consulta: form.motivo_consulta,
       exploracion_fisica: form.exploracion_fisica,
       diagnosticos: form.diagnosticos

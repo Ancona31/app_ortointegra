@@ -7,7 +7,8 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
 import { EventClickArg, EventDropArg, DateSelectArg, EventInput, EventContentArg, DayHeaderContentArg } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
-import { X, Calendar, User, Plus, Trash2, Settings, LayoutGrid, Columns3, Square, ChevronDown, FileText, Stethoscope, Loader2, Mail } from 'lucide-react'
+import { X, Calendar, User, Plus, Trash2, Settings, LayoutGrid, Columns3, Square, ChevronDown, FileText, Stethoscope, Loader2, Mail,
+         Scissors, Users, Lock, Plane, BookOpen, CalendarPlus, type LucideIcon } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
@@ -23,6 +24,7 @@ import { useConsultoriosDeMedico } from '@/hooks/useConsultoriosDeMedico'
 import { componerNombreMedicoCompleto, componerInicialesMedico } from '@/lib/nombreMedico'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { regionDeTimezone } from '@/lib/consultorios/zonas-mexico'
+import { ICONOS_EVENTO, COLORES_EVENTO, type IconoEvento, type ColorEvento } from '@/lib/appointments'
 import useSWR from 'swr'
 import {
   CLAVE_CONFIG,
@@ -36,7 +38,15 @@ import {
 
 /* ─── Tipos ────────────────────────────────────────────── */
 
-type Status = 'scheduled' | 'confirmed' | 'cancelled' | 'no_show'
+/* `attended` (plan §12.13). Lo escribe el servidor al crear la nota clínica que
+   salió de la cita, y también se puede poner a mano en el selector de abajo.
+
+   ⚠️ AÑADIR UN ESTADO AQUÍ ROMPE `STATUS_CONFIG` y `STATUS_STYLE` en compilación
+   —son `Record<Status, …>`— pero NO rompe los tokens CSS, que se consumen por
+   interpolación (`var(--ag-status-${status}-dot)`). Si faltan los cuatro tokens
+   del estado nuevo en globals.css, la tarjeta sale transparente y sin borde, sin
+   un solo error. Los de `attended` están puestos, en claro y en oscuro. */
+type Status = 'scheduled' | 'confirmed' | 'cancelled' | 'no_show' | 'attended'
 
 type Appointment = {
   id: string
@@ -57,6 +67,10 @@ type Appointment = {
   consultorio_direccion: string | null
   consultorio_telefono: string | null
   consultorio_timezone: string | null
+  /* La pinta del evento genérico sin paciente (§12.14). Una CITA no lleva
+     ninguna de las dos y ahí NULL es lo corriente, no una carencia. */
+  icono: IconoEvento | null
+  color: ColorEvento | null
   /* `email` viaja desde `APPOINTMENT_SELECT` para un solo consumidor: el botón
      de invitación. Que esté aquí es lo que evita una petición por cita abierta
      sólo para saber si la ficha tiene correo.
@@ -93,9 +107,23 @@ type Medico = { id: string; titulo: string | null; nombres: string | null; apell
    FullCalendar usa para decidir si repintar las tarjetas. */
 const SIN_MEDICOS: MedicoConfig[] = []
 
+/* `tipo` sólo existe al CREAR, y es deliberado (§12.14, decisión D5).
+ *
+ * ── POR QUÉ EL TIPO SE FIJA AL CREAR Y NO SE PUEDE CAMBIAR DESPUÉS ──────────
+ * En edición no hay `tipo` que elegir: se deduce de si la fila tiene paciente.
+ * Convertir una cita en evento sería QUITARLE EL PACIENTE, y esa puerta ya está
+ * cerrada por §12.18 — quitar el paciente **es** borrar la cita, con su alerta
+ * delante. Un selector mutable la reabriría por el lado, sin alerta y sin que
+ * se pareciera a un borrado.
+ *
+ * Al revés tampoco: un evento nació sin paciente, y ligarle uno es rozar el
+ * «camino de vuelta» que §12.2 deja fuera de alcance.
+ */
+type TipoFila = 'cita' | 'evento'
+
 type ModalState =
   | { mode: 'closed' }
-  | { mode: 'create'; start: string; end: string }
+  | { mode: 'create'; start: string; end: string; tipo: TipoFila }
   | { mode: 'edit';   appointment: Appointment }
 
 /* ─── Colores por estado ───────────────────────────────── */
@@ -105,7 +133,16 @@ const STATUS_CONFIG: Record<Status, { label: string; bg: string; text: string; d
   confirmed:  { label: 'Confirmada', bg: 'bg-green-50',  text: 'text-green-700',  dot: 'bg-green-500'  },
   cancelled:  { label: 'Cancelada',  bg: 'bg-red-50',    text: 'text-red-700',    dot: 'bg-red-500'    },
   no_show:    { label: 'No asistió', bg: 'bg-orange-50', text: 'text-orange-700', dot: 'bg-orange-500' },
+  attended:   { label: 'Atendida',   bg: 'bg-teal-50',   text: 'text-teal-700',   dot: 'bg-teal-600'   },
 }
+
+/* Los estados que el usuario puede elegir A MANO, por tipo de fila (§12.13, D5).
+   Una CITA los enseña los cinco. Un EVENTO GENÉRICO sólo dos: «No asistió» o
+   «Atendida» no significan nada sobre una junta de personal, y ofrecerlos sería
+   fingir que sí. El orden es el de `STATUS_CONFIG`, que es el que el selector
+   pintaba antes de que hubiera dos listas. */
+const ESTADOS_CITA:   readonly Status[] = ['scheduled', 'confirmed', 'cancelled', 'no_show', 'attended']
+const ESTADOS_EVENTO: readonly Status[] = ['scheduled', 'cancelled']
 
 // Paleta pastel estilo Google Calendar
 const STATUS_STYLE: Record<Status, { bg: string; text: string; border: string }> = {
@@ -113,6 +150,52 @@ const STATUS_STYLE: Record<Status, { bg: string; text: string; border: string }>
   confirmed:  { bg: '#F0FDF4', text: '#166534', border: '#22c55e' },
   cancelled:  { bg: '#FFF1F2', text: '#9f1239', border: '#ef4444' },
   no_show:    { bg: '#FFF7ED', text: '#9a3412', border: '#f97316' },
+  attended:   { bg: '#ECFDF5', text: '#0f766e', border: '#0f766e' },
+}
+
+/* ─── La pinta del evento genérico (§12.14) ─────────────
+ *
+ * Los VALORES de las dos listas viven en `@/lib/appointments`, junto al
+ * validador que usan las rutas: si la lista viviera aquí, el servidor no la
+ * conocería y su validación sería decorativa. Lo que hay en este archivo es lo
+ * que sólo la interfaz necesita — el componente de cada icono.
+ *
+ * ⚠️ `Record<IconoEvento, LucideIcon>` A PROPÓSITO, NO UN OBJETO SUELTO: si
+ * alguien añade un valor a la lista cerrada y olvida su icono, esto es un error
+ * de compilación. Con un objeto laxo sería un hueco en blanco en la agenda que
+ * nadie reporta.
+ *
+ * ⚠️ Los colores NO están aquí sino en globals.css (`--ag-evento-*`), que es
+ * donde viven los de los estados — o sea con quien no pueden chocar. Se
+ * consumen por interpolación, así que valen el mismo aviso que los de estado:
+ * un token que falte no da error, sólo deja el evento sin color.
+ */
+const ICONO_COMPONENTE: Record<IconoEvento, LucideIcon> = {
+  bisturi:  Scissors,
+  personas: Users,
+  candado:  Lock,
+  avion:    Plane,
+  libro:    BookOpen,
+}
+
+const ICONO_ETIQUETA: Record<IconoEvento, string> = {
+  bisturi:  'Cirugía',
+  personas: 'Reunión',
+  candado:  'Bloqueo de horario',
+  avion:    'Ausencia o viaje',
+  libro:    'Formación',
+}
+
+const COLOR_ETIQUETA: Record<ColorEvento, string> = {
+  ambar:     'Ámbar',
+  rosa:      'Rosa',
+  terracota: 'Terracota',
+  indigo:    'Índigo',
+}
+
+/** True si la fila es un evento genérico y no una cita: lo decide el paciente. */
+function esEventoGenerico(apt: { paciente_id?: string | null }): boolean {
+  return !apt.paciente_id
 }
 
 /* ─── Horario de consulta ──────────────────────────────── */
@@ -491,6 +574,15 @@ function AppointmentModal({
   const isEdit = modal.mode === 'edit'
   const apt    = modal.mode === 'edit' ? modal.appointment : null
 
+  /* CITA o EVENTO GENÉRICO. Al crear lo eligió quien abrió el modal; al editar
+     NO se elige: se deduce de la fila, porque el tipo es fijo tras crear
+     (ver `TipoFila`). Que sea una constante y no un `useState` es el punto:
+     no hay forma de cambiarlo desde dentro. */
+  const tipo: TipoFila = modal.mode === 'create'
+    ? modal.tipo
+    : (apt && esEventoGenerico(apt) ? 'evento' : 'cita')
+  const esEvento = tipo === 'evento'
+
   const initialDuration = apt ? calcDuration(apt.start_time, apt.end_time) : DEFAULT_DURATION
 
   const [startTime,   setStartTime]   = useState(
@@ -505,6 +597,16 @@ function AppointmentModal({
       ? { id: apt.pacientes.id, nombre: apt.pacientes.nombre, apellidos: apt.pacientes.apellidos, telefono: apt.pacientes.telefono ?? null }
       : null
   )
+  /* El título libre del evento genérico (§12.14). Va a `appointments.title`, la
+     columna que ya existía y ya era NOT NULL — para esto no hizo falta ninguna
+     columna nueva. En una CITA este estado no se usa: allí el título se compone
+     del paciente, como siempre.
+
+     NO HAY TIPOS CERRADOS DE EVENTO: el usuario escribe lo que quiera. Lo único
+     cerrado es la pinta (icono y color). */
+  const [titulo,      setTitulo]      = useState(esEvento ? (apt?.title ?? '') : '')
+  const [icono,       setIcono]       = useState<IconoEvento | null>(apt?.icono ?? null)
+  const [color,       setColor]       = useState<ColorEvento | null>(apt?.color ?? null)
   const [search,      setSearch]      = useState('')
   const [showSearch,  setShowSearch]  = useState(false)
   const [quickCreate, setQuickCreate] = useState(false)
@@ -535,6 +637,10 @@ function AppointmentModal({
   const citaConsultorio = apt?.consultorio_id
     ? consultoriosList.find(c => c.id === apt.consultorio_id)
     : undefined
+  /* Un evento genérico no tiene de quién abrir expediente, así que este botón
+     se apaga solo por el `paciente &&` que ya estaba. No hace falta añadir
+     nada, y coincide con lo que §12.10 promete de los eventos de Google: desde
+     ellos no se puede iniciar consulta. */
   const showIniciarConsulta =
     isEdit &&
     canVerExpediente &&
@@ -574,8 +680,16 @@ function AppointmentModal({
   const { results, loading: searchLoading } = usePacientes(search)
   const showDropdown = showSearch && search.trim().length >= 2
 
+  /* Lo mínimo para poder guardar, según el tipo. Una CITA necesita paciente; un
+     EVENTO necesita título con algo escrito —`appointments.title` es NOT NULL y
+     un título en blanco daría una tarjeta muda—. Se calcula aquí y no en dos
+     sitios porque lo leen el botón (para apagarse) y `handleSave` (defensa en
+     profundidad, por si el botón se saltara). */
+  const tituloLimpio = titulo.trim()
+  const faltaLoEsencial = esEvento ? tituloLimpio === '' : !paciente
+
   async function handleSave() {
-    if (!paciente || !startTime) return
+    if (faltaLoEsencial || !startTime) return
 
     // Defensa en profundidad: secretaria debe seleccionar médico
     // (el `required` HTML5 ya bloquea el submit, pero validamos aquí también)
@@ -592,15 +706,23 @@ function AppointmentModal({
 
     await onSave({
       id:          apt?.id,
-      title:       `${paciente.nombre} ${paciente.apellidos}`,
+      /* De dónde sale el título, que es la diferencia de fondo entre los dos
+         tipos: la cita lo COMPONE del paciente (y por eso no tiene campo de
+         título), el evento lo lleva escrito a mano. */
+      title:       esEvento ? tituloLimpio : `${paciente!.nombre} ${paciente!.apellidos}`,
       start_time,
       end_time:    addMinutes(start_time, duration),
       notes:       notes.trim() || null,
       status,
-      paciente_id: paciente.id,
+      paciente_id: esEvento ? null : paciente!.id,
       // El bloque optimista de handleSave pinta la tarjeta antes de que
       // responda el servidor; sin esto escribiria el paciente anterior.
-      pacientes:   paciente ?? null,
+      pacientes:   esEvento ? null : paciente,
+      // La pinta viaja SIEMPRE, también en una cita, y ahí va en null: si sólo
+      // se mandara desde el evento, convertir el valor a null nunca llegaría al
+      // servidor (el PUT sólo toca la columna si el campo viene).
+      icono:       esEvento ? icono : null,
+      color:       esEvento ? color : null,
       medico_id:   medicoId || null,
       ...(consultorioChanged ? { consultorio_id: consultorioId } : {}),
       updated_at:  apt?.updated_at,
@@ -628,7 +750,9 @@ function AppointmentModal({
             <Calendar size={20} style={{ color: 'var(--ag-brand-primary)' }} />
           </div>
           <h2 className="text-[18px] font-extrabold" style={{ color: 'var(--ag-ink)' }}>
-            {isEdit ? 'Editar cita' : 'Nueva cita'}
+            {esEvento
+              ? (isEdit ? 'Editar evento' : 'Nuevo evento')
+              : (isEdit ? 'Editar cita'   : 'Nueva cita')}
           </h2>
           {canVerExpediente && paciente && (
             <Link
@@ -648,7 +772,99 @@ function AppointmentModal({
         {/* Body */}
         <div className="px-[22px] py-5 space-y-4 flex-1 min-h-0 overflow-y-auto">
 
-          {/* Paciente — campo principal y obligatorio */}
+          {/* ── EVENTO GENÉRICO: título libre + pinta ────────────────────────
+              Ocupa el sitio del campo de paciente, no se suma a él: los dos
+              tipos comparten pantalla pero nunca los dos campos a la vez, que
+              es lo que haría dudar de qué se está creando. */}
+          {esEvento && (
+            <>
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
+                  Título <span className="text-red-500">*</span>
+                </label>
+                <input
+                  autoFocus={!isEdit}
+                  value={titulo}
+                  onChange={e => setTitulo(e.target.value)}
+                  placeholder="Cirugía Sr. Pérez, Junta de personal, Bloqueo…"
+                  className="w-full px-3 py-2.5 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
+                />
+                {/* ⚠️ ESTE TEXTO NO ES DE RELLENO. El título viaja TAL CUAL al
+                    calendario de Google —sin filtro y sin forma de sanearlo, que
+                    es texto libre— y ahí lo ve quien esté invitado al evento. La
+                    descripción sí tiene formato fijo y nada clínico; el título,
+                    desde ahora, es responsabilidad de quien escribe. Aceptado y
+                    declarado en el aviso de privacidad (plan §9 y §12.5). */}
+                <p className="text-[12px] mt-1.5 leading-relaxed" style={{ color: 'var(--ag-muted)' }}>
+                  Se verá tal cual en Google Calendar y en la invitación de quien asista.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
+                  Icono
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {ICONOS_EVENTO.map(key => {
+                    const Icono = ICONO_COMPONENTE[key]
+                    const on = icono === key
+                    return (
+                      <button
+                        key={key} type="button"
+                        // Volver a pulsar el elegido lo quita: NULL es «sin
+                        // icono» y no hay ningún valor de la lista que
+                        // signifique eso (§12.14 proponía `punto` y se retiró).
+                        onClick={() => setIcono(on ? null : key)}
+                        title={ICONO_ETIQUETA[key]}
+                        aria-label={ICONO_ETIQUETA[key]}
+                        aria-pressed={on}
+                        className="w-10 h-10 rounded-xl flex items-center justify-center transition-all"
+                        style={on
+                          ? { background: 'var(--ag-modal-icon-bg)', color: 'var(--ag-brand-primary)', border: '1.5px solid var(--ag-brand-primary)' }
+                          : { background: 'var(--ag-input-bg)', color: 'var(--ag-muted)', border: '1.5px solid var(--ag-input-border)' }}
+                      >
+                        <Icono size={17} />
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
+                  Color
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {COLORES_EVENTO.map(key => {
+                    const on = color === key
+                    return (
+                      <button
+                        key={key} type="button"
+                        onClick={() => setColor(on ? null : key)}
+                        title={COLOR_ETIQUETA[key]}
+                        aria-label={COLOR_ETIQUETA[key]}
+                        aria-pressed={on}
+                        className="w-10 h-10 rounded-xl flex items-center justify-center transition-all"
+                        style={{
+                          background: `color-mix(in srgb, var(--ag-evento-${key}) 14%, var(--ag-input-bg))`,
+                          border: on
+                            ? `2px solid var(--ag-evento-${key})`
+                            : '1.5px solid var(--ag-input-border)',
+                        }}
+                      >
+                        <span className="w-4 h-4 rounded-full" style={{ background: `var(--ag-evento-${key})` }} />
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Paciente — campo principal y obligatorio de una CITA.
+              En un evento genérico no existe: no es que esté vacío, es que esa
+              fila no lleva paciente. */}
+          {!esEvento && (
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
               Paciente <span className="text-red-500">*</span>
@@ -739,6 +955,7 @@ function AppointmentModal({
               </div>
             )}
           </div>
+          )}
 
           {/* Fecha y hora de inicio */}
           <div>
@@ -783,8 +1000,14 @@ function AppointmentModal({
           {isEdit && (
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>Estado</label>
+              {/* Los estados elegibles dependen del tipo (§12.13, D5): una cita
+                  los enseña los cinco, un evento genérico sólo «Agendada» y
+                  «Cancelada». Se recorre la lista del tipo y NO `STATUS_CONFIG`
+                  entero, que es lo que hacía antes: así añadir un estado no le
+                  aparece automáticamente a las juntas de personal. */}
               <div className="grid grid-cols-2 gap-2">
-                {(Object.entries(STATUS_CONFIG) as [Status, typeof STATUS_CONFIG[Status]][]).map(([key, cfg]) => {
+                {(esEvento ? ESTADOS_EVENTO : ESTADOS_CITA).map(key => {
+                  const cfg = STATUS_CONFIG[key]
                   const on = status === key
                   return (
                     <button key={key} onClick={() => setStatus(key)}
@@ -933,7 +1156,7 @@ function AppointmentModal({
             <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-bold transition-colors hover:bg-[var(--ag-btn-ghost-hover)]" style={{ color: 'var(--ag-muted)' }}>
               Cancelar
             </button>
-            <button onClick={handleSave} disabled={saving || !paciente || !startTime || !consultorioId}
+            <button onClick={handleSave} disabled={saving || faltaLoEsencial || !startTime || !consultorioId}
               className="px-5 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 transition-all hover:brightness-95 shadow-sm bg-[linear-gradient(135deg,var(--ag-brand-primary),var(--ag-brand-secondary))]">
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
@@ -1047,10 +1270,14 @@ const tzDiffStyle: CSSProperties = {
 }
 
 const MemoizedEventContent = memo(function MemoizedEventContent({
-  timeText, title, pacNombre, status, doctorInitial, tzDiff,
+  timeText, title, pacNombre, status, doctorInitial, tzDiff, icono, color,
 }: {
   timeText: string; title: string; pacNombre: string | null
   status: Status; doctorInitial?: string; tzDiff?: string
+  /* La pinta del evento genérico (§12.14). Null en una cita, y null también en
+     un evento al que no le eligieron ninguna: ahí la tarjeta cae al estilo por
+     estado, que es lo que hacía antes de que esto existiera. */
+  icono: IconoEvento | null; color: ColorEvento | null
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const [height, setHeight] = useState<number | null>(null)
@@ -1073,15 +1300,28 @@ const MemoizedEventContent = memo(function MemoizedEventContent({
         : height < CARD_COMPACT_MAX ? 'compact'
           : 'full'
 
-  const dot = `var(--ag-status-${status}-dot)`
-  const txt = `var(--ag-status-${status}-text)`
+  /* El color elegido MANDA sobre el del estado cuando lo hay, y sólo lo hay en
+     un evento genérico. Motivo: en un evento el estado dice poco —está agendado
+     o cancelado y ya— mientras que el color es lo que su autor eligió para
+     distinguirlo de un vistazo. En una cita no hay color y esto no cambia nada.
+     El fondo y el borde salen del mismo token con `color-mix`, así que basta un
+     token por color y la paleta sigue siendo barata de sustituir. */
+  const dot = color ? `var(--ag-evento-${color})` : `var(--ag-status-${status}-dot)`
+  const txt = color ? `var(--ag-evento-${color})` : `var(--ag-status-${status}-text)`
+  const fondo  = color
+    ? `color-mix(in srgb, var(--ag-evento-${color}) 10%, var(--ag-surface))`
+    : `var(--ag-status-${status}-bg)`
+  const marco = color
+    ? `color-mix(in srgb, var(--ag-evento-${color}) 32%, transparent)`
+    : `var(--ag-status-${status}-border)`
   const isCancelled = status === 'cancelled'
   const name = pacNombre ?? title
+  const Icono = icono ? ICONO_COMPONENTE[icono] : null
 
   const root: CSSProperties = {
     height: '100%', boxSizing: 'border-box', overflow: 'hidden', cursor: 'pointer',
-    background: `var(--ag-status-${status}-bg)`,
-    border: `1px solid var(--ag-status-${status}-border)`,
+    background: fondo,
+    border: `1px solid ${marco}`,
     borderLeft: `3.5px solid ${dot}`,
     borderRadius: '9px',
     boxShadow: 'var(--ag-shadow-card)',
@@ -1095,12 +1335,19 @@ const MemoizedEventContent = memo(function MemoizedEventContent({
     : NAME_BASE
   const chip = doctorInitial ? <span style={CHIP_STYLE}>{doctorInitial}</span> : null
 
-  // tiny: punto de estado + nombre, una fila centrada. Sin hora ni chip.
+  /* El icono del evento genérico SUSTITUYE al punto, no se suma: los dos ocupan
+     el mismo sitio y dicen lo mismo —de qué va esta tarjeta— con distinto grado
+     de detalle. Dos marcadores seguidos en una tarjeta de 34px no caben. */
+  const marcador = Icono
+    ? <Icono size={11} style={{ flexShrink: 0, color: dot }} />
+    : <span style={{ ...STATUS_DOT, background: dot }} />
+
+  // tiny: marcador + nombre, una fila centrada. Sin hora ni chip.
   if (tier === 'tiny') {
     return (
       <div ref={rootRef} style={root}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: 0 }}>
-          <span style={{ ...STATUS_DOT, background: dot }} />
+          {marcador}
           <span style={nameStyle}>{name}</span>
         </div>
       </div>
@@ -1134,7 +1381,7 @@ const MemoizedEventContent = memo(function MemoizedEventContent({
       <span style={nameStyle}>{name}</span>
       {tzDiff && <span style={tzDiffStyle}>{tzDiff}</span>}
       <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-        <span style={{ ...STATUS_DOT, background: dot }} />
+        {marcador}
         <span style={{ fontSize: '10.5px', fontWeight: 600, lineHeight: 1.2, color: txt }}>{STATUS_CONFIG[status].label}</span>
       </div>
     </div>
@@ -1226,9 +1473,19 @@ const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg }) {
   const isCancelled = status === 'cancelled'
   const name = arg.event.title
 
+  /* Tres marcadores posibles y un solo hueco, en este orden de precedencia:
+     la G de Google (el evento no es nuestro), el icono del evento genérico
+     (§12.14), y el punto de estado de siempre. El color del evento manda sobre
+     el del estado por el mismo motivo que en la tarjeta de Semana/Día. */
+  const IconoEvt = ext?.icono ? ICONO_COMPONENTE[ext.icono] : null
+  const tinta = ext?.color
+    ? `var(--ag-evento-${ext.color})`
+    : (status ? `var(--ag-status-${status}-dot)` : 'var(--ag-muted)')
   const marker = isGcal
     ? <GoogleGIcon size={10} />
-    : <span style={{ width: 6, height: 6, borderRadius: '50%', flex: '0 0 auto', background: status ? `var(--ag-status-${status}-dot)` : 'var(--ag-muted)' }} />
+    : IconoEvt
+      ? <IconoEvt size={10} style={{ flex: '0 0 auto', color: tinta }} />
+      : <span style={{ width: 6, height: 6, borderRadius: '50%', flex: '0 0 auto', background: tinta }} />
 
   return (
     <div style={{
@@ -1305,6 +1562,8 @@ function renderEventContent(arg: EventContentArg, navegadorTZ: string, iniciales
       status={ext.status}
       doctorInitial={inicialesDeCita(ext)}
       tzDiff={tzDiff}
+      icono={ext.icono ?? null}
+      color={ext.color ?? null}
     />
   )
 }
@@ -1861,12 +2120,12 @@ export default function AgendaPage() {
     if (!isWithinBusinessHours(arg.date, horario)) {
       setConfirm({
         message: '¿La consulta se agendará fuera del horario de consulta. ¿Desea continuar?',
-        onConfirm: () => { setConfirm(null); setModal({ mode: 'create', start, end: addHour(start) }) },
+        onConfirm: () => { setConfirm(null); setModal({ mode: 'create', start, end: addHour(start), tipo: 'cita' }) },
         onCancel:  () => setConfirm(null),
       })
       return
     }
-    setModal({ mode: 'create', start, end: addHour(start) })
+    setModal({ mode: 'create', start, end: addHour(start), tipo: 'cita' })
   }
 
   function handleSelect(arg: DateSelectArg) {
@@ -1875,12 +2134,12 @@ export default function AgendaPage() {
     if (!isWithinBusinessHours(arg.start, horario)) {
       setConfirm({
         message: 'La consulta se agendará fuera del horario de consulta. ¿Desea continuar?',
-        onConfirm: () => { setConfirm(null); setModal({ mode: 'create', start: arg.startStr, end: arg.endStr }) },
+        onConfirm: () => { setConfirm(null); setModal({ mode: 'create', start: arg.startStr, end: arg.endStr, tipo: 'cita' }) },
         onCancel:  () => setConfirm(null),
       })
       return
     }
-    setModal({ mode: 'create', start: arg.startStr, end: arg.endStr })
+    setModal({ mode: 'create', start: arg.startStr, end: arg.endStr, tipo: 'cita' })
   }
 
   function handleEventClick(arg: EventClickArg) {
@@ -1993,6 +2252,12 @@ export default function AgendaPage() {
           existing.setExtendedProp('colorStyle', ev.extendedProps?.colorStyle)
           existing.setExtendedProp('notes', data.notes ?? existing.extendedProps.notes)
           existing.setExtendedProp('pacientes', data.pacientes ?? null)
+          // La pinta del evento genérico. Va en la tanda optimista como el
+          // resto: sin esto, cambiar el color no se vería hasta que respondiera
+          // el servidor. `?? null` y no `??  lo que había`: el modal manda
+          // siempre las dos, y en una cita manda null a propósito.
+          existing.setExtendedProp('icono', data.icono ?? null)
+          existing.setExtendedProp('color', data.color ?? null)
           // F3-6 fix Bug 1: actualizar también médico y consultorio_id (optimistic).
           // El chip de iniciales sale de `medico_id` al pintar, así que basta con esto.
           existing.setExtendedProp('medico_id', data.medico_id ?? null)
@@ -2212,11 +2477,34 @@ export default function AgendaPage() {
               <span className="hidden sm:inline">Horario</span>
             </button>
           )}
+          {/* ── DOS PUERTAS, NO UN SELECTOR ESCONDIDO ──────────────────────
+              El tipo se elige al entrar y ya no se cambia (ver `TipoFila`), así
+              que la puerta ES la elección. Un segmento dentro del modal haría
+              lo mismo con un paso más y con la duda de qué se está creando
+              mientras se rellena.
+
+              Este botón es secundario a propósito: agendar es lo que la agenda
+              hace todo el día; bloquear un hueco o apuntar una junta, no.
+
+              Arrastrar sobre el calendario y pulsar en un hueco siguen abriendo
+              CITA — es lo que espera quien hace ese gesto. */}
           <button
             onClick={() => {
               if (subState.isBlocked) { openBloqueoModal(); return }
               const now = new Date().toISOString()
-              setModal({ mode: 'create', start: now, end: addHour(now) })
+              setModal({ mode: 'create', start: now, end: addHour(now), tipo: 'evento' })
+            }}
+            title="Cirugía, reunión, bloqueo de horario — sin paciente ligado"
+            className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors bg-[var(--ag-surface)] border border-[var(--ag-border-card)] text-[var(--ag-text)] hover:bg-[var(--ag-bg-app)]"
+          >
+            <CalendarPlus size={15} />
+            <span className="hidden sm:inline">Nuevo evento</span>
+          </button>
+          <button
+            onClick={() => {
+              if (subState.isBlocked) { openBloqueoModal(); return }
+              const now = new Date().toISOString()
+              setModal({ mode: 'create', start: now, end: addHour(now), tipo: 'cita' })
             }}
             data-onboard="nueva-cita"
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all shadow-sm hover:brightness-95 bg-[linear-gradient(135deg,var(--ag-brand-primary),var(--ag-brand-secondary))]"

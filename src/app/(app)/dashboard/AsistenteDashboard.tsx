@@ -125,8 +125,12 @@ export default function AsistenteDashboard() {
               </div>
               <div className="flex-1 min-w-0 space-y-1">
                 <div className="flex items-center justify-between gap-2">
+                  {/* Cae al `title` cuando no hay paciente: es un evento
+                      genérico de §12.14 y sin esto se pintaba un renglón en
+                      blanco. Mismo criterio que la dashboard del médico y que
+                      la agenda. */}
                   <p className="text-sm font-semibold text-[#1d1d1f]">
-                    {cita.pacientes?.nombre} {cita.pacientes?.apellidos}
+                    {cita.pacientes ? `${cita.pacientes.nombre} ${cita.pacientes.apellidos}` : cita.title}
                   </p>
                   <StatusChip status={cita.status} />
                 </div>

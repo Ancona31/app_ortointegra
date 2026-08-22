@@ -604,6 +604,33 @@ Lo que importa de esto:
 > paciente en el título. **Sin acción en esta rama**; se nombra para que esté
 > contado cuando se redacte lo del aviso de privacidad.
 
+> **⚠ TERCERA ANOTACIÓN 2026-08-21 — EL TÍTULO DEJA DE TENER FORMA CONOCIDA.
+> Esto AMPLÍA el pendiente de cumplimiento que esta sección ya llevaba abierto;
+> no abre uno nuevo.**
+>
+> Todo lo de arriba razona sobre un título de forma fija: `Cita médica: <nombre>
+> <apellidos>`, compuesto por `tituloParaGoogle` y por nadie más. Se podía decir
+> con exactitud qué salía de Spinus, y por eso §12.5 podía prometer una
+> redacción concreta —el nombre del paciente, sin nada clínico—.
+>
+> Los **eventos genéricos** de §12.14 rompen esa propiedad: su título es **TEXTO
+> LIBRE que escribe el usuario** y viaja a Google **tal cual, sin filtro**. El
+> ejemplo del propio §12.14 —«Cirugía Sr. Pérez»— ya lleva nombre de paciente, y
+> nada impide que alguien escriba además el diagnóstico.
+>
+> **No hay forma de sanearlo, y por eso se acepta en vez de mitigarse.** Un
+> filtro sobre texto libre o deja pasar lo que no reconoce o rechaza títulos
+> legítimos, y las dos cosas son peores que decirlo claro. Lo que sí se hace es
+> **decirlo donde se escribe**: el campo de título del modal lleva debajo, fijo,
+> «Se verá tal cual en Google Calendar y en la invitación de quien asista».
+>
+> **Consecuencia para el inventario de esta sección:** la descripción del evento
+> sigue teniendo formato fijo y garantía de mínimos —clínica, paciente y hora, y
+> NADA clínico, `eventoParaGoogle` en `lib/appointments.ts`—, pero **el título ya
+> no la tiene**. Quien redacte el aviso de privacidad tiene que declarar que el
+> contenido del título de un evento lo decide quien lo escribe. Sigue sin ser de
+> esta rama.
+
 ---
 
 # 10. Los catorce hallazgos de la auditoría de este plan
@@ -1010,6 +1037,24 @@ que el nombre del paciente se comparte con el médico al que se le agenda la cit
 como parte del proceso de consulta, **sin información clínica ni sensible**. Ver la
 anotación de §9: son dos rutas de salida que declarar, no una.
 
+> **⚠ ANOTACIÓN 2026-08-21 — «SIN INFORMACIÓN CLÍNICA NI SENSIBLE» YA NO SE PUEDE
+> PROMETER DEL TÍTULO. Amplía este pendiente; no lo sustituye.**
+>
+> La frase de arriba es exacta para una CITA, y ahí no cambia nada: su título lo
+> compone `tituloParaGoogle` y sólo lleva el nombre. Pero los **eventos genéricos**
+> de §12.14 llevan **título de texto libre**, escrito por el usuario y mandado a
+> Google **sin filtro** — no hay forma de sanear texto libre, y montar un filtro
+> que deje pasar lo que no reconoce sería peor que no tenerlo.
+>
+> **Decisión: se acepta.** Lo que la interfaz sí hace es advertirlo donde se
+> escribe, con una línea fija bajo el campo del título.
+>
+> Para la redacción del aviso, esto significa que hay **dos afirmaciones
+> distintas** y no una: de la cita se puede seguir prometiendo qué sale; del
+> evento genérico hay que declarar que su contenido lo decide quien lo escribe.
+> El detalle entero está en la tercera anotación de §9, que es donde vive el
+> inventario. **Sigue fuera de esta rama.**
+
 ## 12.6 `freebusy` se elimina POR COMPLETO
 
 Desaparecen el scope `calendar.events.freebusy` y los bloques anónimos de
@@ -1109,6 +1154,25 @@ la policy restringe la fila, el trigger restringe la columna.
 **Dos migraciones, no una** (§12.15, migraciones 1 y 2), y **commit propio al final
 de la serie de §6** — el porqué, en la anotación del final de §6.
 
+> **⚠ ANOTACIÓN 2026-08-21 — LAS DOS COLUMNAS DE §12.14 VAN DEL LADO PERMITIDO, Y
+> SE ESCRIBE AQUÍ PARA QUE NO SE DECIDA POR OMISIÓN.**
+>
+> Las listas de arriba se escribieron antes de que existieran
+> `appointments.icono` y `appointments.color` (§12.14, migración 4, ya aplicable),
+> así que **no las nombran ni a favor ni en contra**. Y eso importa más de lo que
+> parece: **el trigger de la migración 2 se escribe con una lista cerrada**, así
+> que lo que no esté nombrado queda decidido por quien lo teclee.
+>
+> **Un médico invitado SIN permiso de escritura PUEDE cambiar `icono` y
+> `color`.** Se suman a la lista de lo que sí puede, junto a `status`,
+> `consultorio_id` y las notas. El criterio es el mismo que separa las dos listas:
+> no mueven un horario, no cambian de paciente y no reasignan a nadie — sólo
+> cambian cómo se ve el evento en la agenda.
+>
+> Queda dicho además en el propio archivo de la migración 4 y en el PUT de
+> `/api/appointments/[id]`, para que quien escriba el trigger lo encuentre por
+> los dos caminos.
+
 > **Dimensión 15 de `supabase/AUDITORIA-MIGRACIONES.md`, y aquí es donde más
 > importa:** el alcance de los roles se comprueba **en las dos direcciones**. No
 > basta con verificar que un invitado sin permiso **no** pueda mover una cita:
@@ -1185,6 +1249,30 @@ la agenda**.
 > contemplaba —reconectar con **otra cuenta de Google**— y queda **sin decidir**.
 > Lo de aquí sigue abierto exactamente igual; lo que ya no es cierto es que esté
 > solo.
+
+> **✅ CUARTA ANOTACIÓN 2026-08-21 — DECIDIDO, Y CIERRA ESTE PUNTO: EL «NO MOSTRAR
+> MÁS» SE GUARDA EN EL NAVEGADOR, NO EN LA BASE.**
+>
+> Con esto, **el punto que llevaba abierto desde el 2026-08-19 queda cerrado** y
+> las tres anotaciones de arriba dejan de estar pendientes. Lo único abierto de
+> §12 pasa a ser §12.16.
+>
+> **El razonamiento, que es lo que hay que conservar:** son **preferencias de
+> vista**. No requieren trazabilidad, no hay nada que auditar ni que
+> reconstruir, y a nadie le hace daño que se pierdan al cambiar de dispositivo —
+> como mucho el aviso reaparece una vez—.
+>
+> Y una columna en `profiles` **no es gratis**: pasa por las 15 dimensiones de
+> `supabase/AUDITORIA-MIGRACIONES.md`, y encima entra en la lista del **trigger
+> guardián** del commit 7 (§12.7, migración 1), que es donde se decide qué
+> columnas puede tocar cada quien. Eso para una casilla de «no volver a
+> enseñarme esto».
+>
+> **Lo mismo vale para el interruptor de mostrar u ocultar los eventos de Google**
+> en la agenda (§12.1): misma naturaleza, mismo sitio, misma decisión.
+>
+> **Consecuencia para §12.15:** la «quinta migración condicionada» que aquella
+> tabla arrastraba **DESAPARECE**. No es que se aplace: no va a existir.
 
 ## 12.11 Hechos verificados el 2026-08-19
 
@@ -1329,6 +1417,91 @@ atención de un paciente por un fallo de red es peor que un estado desactualizad
 `status` siempre**. Si se bloqueara, el médico invitado no podría iniciar consulta
 — que es justamente lo que va a hacer todo el día.
 
+> **⚠ ANOTACIÓN 2026-08-21 — EL MECANISMO CAMBIA DE SITIO. EL «AL PULSARLO» DE
+> ARRIBA NO SE PUEDE CONSTRUIR.** Lo que esta sección decide —que iniciar una
+> consulta marque la cita— se mantiene entero; lo que cambia es **cuándo se
+> escribe**. Se conserva el texto original porque el atajo que propone es el que
+> cualquiera vuelve a tomar al leer «al pulsarlo».
+>
+> ### Por qué no se puede
+>
+> **«Iniciar consulta» no es un botón: es un enlace de navegación**, en los tres
+> sitios donde existe (`agenda/page.tsx`, y dos veces en `dashboard/page.tsx`).
+> Una petición disparada en el clic **compite con la navegación** y el navegador
+> puede abortarla. «El estado no se guarda» no sería el caso raro, sería el
+> normal. Y el «se reintenta» que promete el párrafo de arriba **no tenía dónde
+> vivir**: no hay ningún sitio en el cliente que sobreviva a la navegación para
+> alojar un reintento.
+>
+> ### Dónde se escribe ahora
+>
+> **En el servidor, en `POST /api/consultas`, cuando la consulta se crea de
+> verdad** — que es cuando la fila de `consultas` nace y no antes: entrar a la
+> pantalla de nota no escribe nada en la base, sólo un borrador cifrado en
+> `secureStorage`.
+>
+> Lo que se gana, y por eso se elige: no hay petición que el navegador pueda
+> abortar; no hace falta reintento; si falla, falla donde alguien lo ve; y da
+> igual desde cuál de los tres botones se haya llegado, porque los tres acaban en
+> el mismo sitio. **Efecto secundario buscado:** quien pulsa y se arrepiente sin
+> escribir nada **NO deja la cita marcada**, que es más correcto que lo contrario.
+>
+> ### Lo que hizo falta para que el servidor sepa de qué cita se trata
+>
+> **No existía relación entre `consultas` y `appointments`** — ninguna columna,
+> ninguna foreign key salvo `paciente_id`, y los tres enlaces no pasaban nada por
+> la URL. Sin eso el mecanismo no se sostiene, así que **§12.15 pasa a cinco
+> migraciones**: `consultas.appointment_id`, con FK `ON DELETE SET NULL`.
+>
+> Se eligió columna, y no un parámetro de paso, porque la columna da lo que el
+> parámetro no: **trazabilidad permanente** («¿de qué cita salió esta consulta?»)
+> y el dato que permite calcular **cuántas citas agendadas acaban en consulta**.
+> El identificador sigue viajando por la URL del enlace (`?cita=<uuid>`) y por el
+> cuerpo del POST: eso es el transporte, la columna es la memoria.
+>
+> ### Las reglas exactas, tal como quedaron
+>
+> - **La transición vive en el `WHERE` del UPDATE**, no en un CHECK: un CHECK ve
+>   la fila, no la transición. `AND status IN ('scheduled','confirmed')`.
+> - **La idempotencia sale de ese mismo `WHERE`.** Una segunda consulta sobre la
+>   misma cita no casa ninguna fila y no hace nada. Sin leer antes de escribir no
+>   hay carrera entre las dos cosas.
+> - **`cancelled` y `no_show` NO se tocan.** Machacarlos borraría una afirmación
+>   que alguien hizo a propósito, y en `cancelled` la base diría «atendida»
+>   mientras el evento de Google conserva su prefijo «CANCELADA — ». Se corrige a
+>   mano en el modal, que es donde se afirmó.
+> - **Sin cita no se marca nada**, y no es una comprobación sino una ausencia: el
+>   caso por defecto es no marcar. Cubre al paciente que llega sin agendar.
+> - **Ningún fallo de este camino impide guardar la nota.** Un id malformado, una
+>   cita de otra clínica o de otro paciente caen todos a «se ignora el vínculo, se
+>   guarda la nota, queda la línea de log». Es la decisión de esta sección llevada
+>   a su sitio.
+>
+> ### El nombre en la base es `attended`
+>
+> No `atendida` —los otros cuatro valores de la columna son inglés— y no
+> `completed`, que era el nombre muerto que el código traía en `STATUS_COLOR`: el
+> estado se escribe cuando la consulta **empieza**, así que «completada» sería
+> falso durante toda la consulta. `attended` es además el antónimo exacto de
+> `no_show`. **La etiqueta de cara al médico sigue siendo «Atendida».** El
+> `completed: '8'` se retiró y su `colorId` (grafito) pasó a `attended`.
+>
+> ### Coste aceptado: Google no se entera
+>
+> Como esto **no pasa por `PUT /api/appointments/[id]`**, el evento conserva el
+> color que tuviera y no recibe el `colorId` de `attended`. Replicarlo metería un
+> `events.get` + `events.patch` **en el camino crítico de guardar una nota
+> clínica**, a cambio de un matiz de color en un evento que ya pasó. **Aceptado,
+> no pendiente.** El `colorId` sí funciona cuando alguien marca el estado a mano
+> desde el modal, que sí pasa por el PUT.
+>
+> ### Un defecto viejo que se encontró al lado y NO se arregla aquí
+>
+> `STATUS_COLOR` no tiene entrada para `scheduled`, así que el patch no manda
+> `colorId` y **Google conserva el anterior**: reactivar una cita cancelada le
+> quita el prefijo del título **pero la deja roja** en el calendario. Es anterior
+> a todo esto y arreglarlo toca el color de citas que ya existen. Queda anotado.
+
 ---
 
 ## 12.14 Eventos genéricos sin paciente — desarrollo de §12.8
@@ -1442,6 +1615,86 @@ asistió) — **más el que se lleve «atendida»** (§12.13), que aún no está
   están protegidos por `cita.paciente_id &&`, `:280` y `:331`— pero **pintan una
   línea en blanco donde debería ir «Junta de personal»**.
 
+> **✅ ANOTACIÓN 2026-08-21 — IMPLEMENTADO, con tres cambios sobre lo propuesto
+> aquí y las decisiones de interfaz que faltaban.**
+>
+> ### 1. Fuera `punto` de la lista de iconos — quedan CINCO
+>
+> §12.14 proponía `punto` para «genérico, sin icono». **Se retira.** La columna
+> es nullable y **NULL ya significa exactamente eso**: dos nombres para el mismo
+> concepto es el cabo suelto que §12.13 prohíbe, y aquí se habría metido de
+> nacimiento. Quedan `bisturi`, `personas`, `candado`, `avion`, `libro`.
+>
+> En la interfaz esto se traduce en que **volver a pulsar el icono elegido lo
+> quita**: no hay ninguna opción «ninguno» que pulsar.
+>
+> ### 2. Fuera `cian` de la paleta — quedan CUATRO
+>
+> Al elegir el color de «atendida» (§12.13) se cumplió lo que esta misma sección
+> ordena —mirar las dos tablas a la vez— y salió que **`cian` (#0891b2) era el par
+> más apretado** con el teal oscuro **#0f766e** que se llevó «atendida» (hue 192
+> contra 175). **Gana el estado**, y por un motivo que no es de gusto: los colores
+> de estado NO son provisionales y éstos sí. Quedan `ambar` #d97706, `rosa`
+> #db2777, `terracota` #9a3412, `indigo` #4338ca.
+>
+> ### 3. Un token por color, no cuatro
+>
+> El fondo y el borde se derivan del color con `color-mix` en vez de declararse
+> aparte. Motivo: lo que hay que dejar barato de sustituir cuando Claude Design
+> rehaga la paleta es **el color**, no su descomposición en cuatro tonos. Viven en
+> `globals.css` como `--ag-evento-*`, junto a los de estado, que es con quien no
+> pueden chocar.
+>
+> ### 4. Cómo conviven cita y evento en el mismo modal — DECIDIDO
+>
+> **El tipo se elige al ENTRAR y no se puede cambiar después.** Dos puertas en la
+> cabecera de la agenda: «Nueva cita» (principal, como siempre) y **«Nuevo
+> evento»** (secundario). Arrastrar sobre el calendario y pulsar en un hueco
+> siguen abriendo **cita**, que es lo que espera quien hace ese gesto.
+>
+> **Por qué fijo y no un selector dentro del modal:** si fuera mutable,
+> convertir una cita en evento sería **quitarle el paciente por otra puerta**, y
+> esa puerta ya está cerrada por §12.18 —quitar el paciente **es** borrar la cita,
+> con su alerta delante—. Al revés tampoco: ligarle un paciente a un evento roza
+> el «camino de vuelta» de §12.2.
+>
+> En edición el tipo **se deduce de la fila** (tiene paciente o no lo tiene), y
+> por eso no hay ningún control que lo cambie.
+>
+> **Los dos tipos nunca enseñan los dos campos a la vez:** el título libre ocupa
+> el sitio del campo de paciente, no se suma a él.
+>
+> ### 5. El selector de estado enseña listas distintas
+>
+> Una **cita** enseña los cinco estados. Un **evento genérico**, sólo `scheduled`
+> y `cancelled`: «No asistió» o «Atendida» no significan nada sobre una junta de
+> personal, y ofrecerlos sería fingir que sí. El selector recorre la lista del
+> tipo y ya no `STATUS_CONFIG` entero, así que añadir un estado en el futuro **no
+> le aparece automáticamente a las juntas**.
+>
+> ### 6. Lo que NO hizo falta tocar, comprobado
+>
+> - **«Iniciar consulta» se apaga solo**: su condición ya exigía paciente.
+> - **El botón de invitación ya estaba preparado**: `ModalInvitacionCita` trae
+>   escrito «Null en eventos genéricos sin paciente» y la ruta responde
+>   `cita_sin_paciente`. La casilla de dirección tecleada a mano sigue sirviendo,
+>   que es justo lo que hace falta para invitar a alguien a una junta.
+> - **La agenda ya caía al título** (`pacNombre ?? title`). Los tres renglones en
+>   blanco eran sólo de la dashboard, y ya caen al `title`.
+>
+> ### 7. Lo que NO se cambió y conviene saber que es así
+>
+> **El evento genérico invita a su médico por correo, automáticamente**, porque el
+> alta mete al médico asignado en el mismo `events.insert` sin mirar si hay
+> paciente. **Se deja como está**: encaja con §12.18 —si la fila es suya, su
+> tiempo está bloqueado y tiene que verlo en su calendario— y cambiarlo sería
+> estrenar una excepción que nadie pidió. Queda escrito porque **no se decidió en
+> ninguna parte**: se heredó.
+>
+> **El `color` NO viaja a Google.** Allí el color del evento lo sigue decidiendo
+> el ESTADO, vía `STATUS_COLOR`. Que la pinta elegida se refleje también en Google
+> es una decisión que nadie ha tomado y que colisionaría con ese mapa.
+
 ---
 
 ## 12.15 Las migraciones de esta rama
@@ -1473,6 +1726,84 @@ por PostgREST. Las dos van en el **commit 7** (final de §6).
 > en verde:** §12.4 no pide migración, no pide replanteo y no añade nada a esta
 > tabla. **Se queda en cuatro, más la quinta condicionada**, exactamente como
 > está.
+
+> **⚠ ANOTACIÓN 2026-08-21 — LA TABLA DE ARRIBA QUEDA OBSOLETA EN SU RECUENTO.
+> SON CINCO, Y LA «QUINTA CONDICIONADA» YA NO EXISTE.** Las dos cosas cambian a la
+> vez y por motivos independientes, así que conviene leerlas por separado.
+>
+> ### El recuento vigente
+>
+> | # | Qué | De dónde sale | Estado |
+> |---|---|---|---|
+> | 1 | La **columna del permiso** en `profiles`, más su entrada en el trigger guardián | §12.7 | sin escribir (commit 7) |
+> | 2 | El **trigger sobre `appointments`** columna por columna, más la policy de `INSERT`/`DELETE` | §12.7 | sin escribir (commit 7) |
+> | 3 | El valor **`attended`** en el CHECK de `appointments.status` | §12.13 | escrita — `20260821_agenda_status_attended.sql` |
+> | 4 | Las **dos columnas de icono y color** con sus CHECK | §12.14 | escrita — `20260821_agenda_evento_generico_icono_color.sql` |
+> | 5 | **`consultas.appointment_id`** con FK `ON DELETE SET NULL` | §12.13 | escrita — `20260821_consultas_appointment_id.sql` |
+>
+> ### Por qué entra una quinta
+>
+> **`consultas.appointment_id` es nueva y no estaba prevista.** Sale de que el
+> mecanismo que §12.13 describía —escribir el estado al pulsar «Iniciar
+> consulta»— **no se puede construir**: los tres botones son enlaces de
+> navegación. El estado pasa a escribirse en el servidor al crear la consulta, y
+> para eso el servidor tiene que saber de qué cita se trata — cosa que **hoy no
+> tiene forma de saber**, porque no existía ninguna relación entre las dos tablas.
+> El razonamiento entero, en la anotación de §12.13.
+>
+> ### Por qué desaparece la condicionada
+>
+> **El «no mostrar más» de §12.10 se guarda en el navegador**, así que la quinta
+> que aquella fila reservaba no se aplaza: **no va a existir**. Decidido el
+> 2026-08-21; el porqué está en la cuarta anotación de §12.10, y vale igual para
+> el interruptor de mostrar u ocultar los eventos de Google.
+>
+> ### Sobre la FK de la migración 5, porque contradice una regla en apariencia
+>
+> Lleva **`ON DELETE SET NULL`** y `CLAUDE.md` fija `ON DELETE RESTRICT`. **Esa
+> regla habla de las FK a `pacientes`** y su motivo es que un expediente no
+> desaparezca. Aquí la dirección es la contraria: las citas **sí se borran** desde
+> la papelera, y con RESTRICT borrar una cita atendida quedaría bloqueado **para
+> siempre** por una consulta que es inmutable y no se borra nunca. Con CASCADE se
+> borraría la nota clínica, que es lo que las dos normas prohíben. SET NULL es lo
+> único que dice la verdad: **el dato clínico sobrevive, el vínculo no**. La
+> justificación va escrita también en la cabecera de esa migración.
+>
+> **Las tres nuevas van ANTES del código**, cada una por su motivo, y los tres
+> están escritos en su cabecera.
+
+> **✅ ANOTACIÓN 2026-08-21 — LAS TRES (3, 4 y 5) ESTÁN APLICADAS Y VERIFICADAS
+> EN PRODUCCIÓN.** La frase de arriba decía que ninguna se había aplicado
+> todavía; dejó de ser cierta el mismo día. El veredicto de cada una está en su
+> cabecera, con las cifras que devolvió la rejilla.
+>
+> - **3 — `attended`:** a la primera. El CHECK admite los cinco valores.
+> - **4 — `icono` y `color`:** a la primera. Las dos columnas nullables, los dos
+>   CHECK validados, sin grants por columna. La guarda de replay quedó
+>   verificada aparte, en seco, y coincide byte a byte.
+> - **5 — `consultas.appointment_id`:** **al segundo intento.** El primero murió
+>   en la consulta del veredicto con `ERROR 42725: operator is not unique:
+>   unknown || "char"` —`pg_constraint.confdeltype` concatenado sin `::text`— y
+>   lo hizo **con la transacción ya confirmada**, dejando la FK creada y NOT
+>   VALID. Corregido el cast, se probó el veredicto por separado y se reejecutó
+>   el archivo entero.
+>
+> **PostgREST comprobado desde fuera** en las dos que añaden columnas, con la
+> anon key: `appointments?select=id,icono,color` y
+> `consultas?select=id,appointment_id` responden 200 sin PGRST204. No hizo falta
+> forzar la recarga de la caché de esquema.
+>
+> **La lección, que es lo que importa conservar:** las tres pasaron por **dos
+> auditorías** y ninguna vio el `||` sobre `"char"`, porque **ninguna ejecutó
+> SQL**. Un error de resolución de operadores no se ve leyendo. Y le tocó a la
+> parte que menos se revisa y que corre siempre la última —el `SELECT` del
+> veredicto—, así que apareció con todo el esquema ya aplicado. **Antes de pegar
+> una migración, el veredicto se corre solo:** es lectura pura y se puede
+> ejecutar aparte sobre el estado que haya.
+>
+> **Lo que sigue abierto son las migraciones 1 y 2** (§12.7, commit 7), que ni
+> siquiera están escritas. Con las tres de aquí aplicadas, **el despliegue del
+> código de §12.13 y §12.14 ya no está bloqueado por esquema**.
 
 ---
 

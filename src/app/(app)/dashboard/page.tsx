@@ -266,8 +266,13 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex-1 min-w-0 space-y-1">
                     <div className="flex items-center justify-between gap-2">
+                      {/* Cae al `title` cuando no hay paciente: es un evento
+                          genérico de §12.14 («Junta de personal», «Cirugía
+                          Sr. Pérez») y sin esto se pintaba UN RENGLÓN EN
+                          BLANCO — no reventaba, sólo no decía nada. La agenda
+                          ya hacía esta misma caída (`pacNombre ?? title`). */}
                       <p className="text-sm font-semibold text-[#1d1d1f]">
-                        {cita.pacientes?.nombre} {cita.pacientes?.apellidos}
+                        {cita.pacientes ? `${cita.pacientes.nombre} ${cita.pacientes.apellidos}` : cita.title}
                       </p>
                       <StatusChip status={cita.status} />
                     </div>
@@ -281,7 +286,7 @@ export default function DashboardPage() {
                       <div className="flex items-center gap-1.5 pt-0.5">
                         {cita.medico?.id === profile?.id && (
                           <Link
-                            href={`/expediente/${cita.paciente_id}/nueva-nota`}
+                            href={`/expediente/${cita.paciente_id}/nueva-nota?cita=${cita.id}`}
                             onClick={() => iniciarConsulta(cita)}
                             className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a3a5c] transition-colors">
                             <Stethoscope size={10} /> Iniciar consulta
@@ -320,8 +325,10 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex-1 min-w-0 space-y-1.5">
                   <div>
+                    {/* Mismo motivo que en la lista de arriba: sin paciente es
+                        un evento genérico y el nombre sale del título libre. */}
                     <p className="font-semibold text-[17px] text-[#1d1d1f] leading-snug">
-                      {proximaCita.pacientes?.nombre} {proximaCita.pacientes?.apellidos}
+                      {proximaCita.pacientes ? `${proximaCita.pacientes.nombre} ${proximaCita.pacientes.apellidos}` : proximaCita.title}
                     </p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <p className="text-xs text-[#86868b]">{formatCitaHora(proximaCita.start_time)}</p>
@@ -331,7 +338,7 @@ export default function DashboardPage() {
                   {proximaCita.paciente_id && (
                     <div className="flex items-center gap-2">
                       <Link
-                        href={`/expediente/${proximaCita.paciente_id}/nueva-nota`}
+                        href={`/expediente/${proximaCita.paciente_id}/nueva-nota?cita=${proximaCita.id}`}
                         onClick={() => iniciarConsulta(proximaCita)}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a3a5c] transition-colors"
                       >

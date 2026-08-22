@@ -6,6 +6,7 @@ import { conCalendarioSpinus, registrarFalloGCal } from '@/lib/gcal'
 import { resolverConexionClinica } from '@/lib/gcalConexion'
 import { canManageClinica } from '@/lib/permissions'
 import { APPOINTMENT_SELECT, eventoParaGoogle, componerAsistentes, INTERRUPTORES_INVITADOS,
+         ICONOS_EVENTO, COLORES_EVENTO, pintaValida,
          type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
 import { correoDelMedico } from '@/lib/medicoCorreo'
 import { TZ_CLINICA } from '@/lib/dates'
@@ -85,10 +86,29 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { title, start_time, end_time, paciente_id, notes, medico_id, consultorio_id, client_id } = body
+    const { title, start_time, end_time, paciente_id, notes, medico_id, consultorio_id, client_id, icono, color } = body
 
     if (!title || !start_time || !end_time) {
       return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
+    }
+
+    /* ── LA PINTA DEL EVENTO GENÉRICO (§12.14) ──────────────────────────────
+       `paciente_id` sigue siendo opcional aquí, que es lo que hace posible el
+       evento genérico: una fila de `appointments` SIN paciente, con `title`
+       como texto libre. Eso ya estaba; lo nuevo son estas dos columnas.
+
+       SE VALIDA AUNQUE LA BASE TENGA SU CHECK, y no es duplicar por gusto: un
+       23514 sube al cliente como «no se pudo guardar la cita» y nada más. El
+       CHECK es la barrera que no se puede saltar por PostgREST; esto es el
+       mensaje que se entiende. `undefined` de `pintaValida` significa valor
+       inaceptable, `null` significa sin pinta — dos cosas distintas. */
+    const iconoValidado = pintaValida(icono, ICONOS_EVENTO)
+    const colorValidado = pintaValida(color, COLORES_EVENTO)
+    if (iconoValidado === undefined || colorValidado === undefined) {
+      return NextResponse.json(
+        { error: 'pinta_invalida', message: 'El icono o el color del evento no están en la lista permitida.' },
+        { status: 400 }
+      )
     }
 
     // Fase 2.6: consultorio_id es obligatorio para nuevas citas (multiconsultorio).
@@ -210,6 +230,10 @@ export async function POST(req: NextRequest) {
         medico_id:        finalMedicoId,
         gcal_sync_status: 'pending',
         client_id:        client_id ?? null,
+        // Pinta del evento genérico. NULL en una cita normal, que es el caso
+        // corriente y no una carencia.
+        icono:            iconoValidado,
+        color:            colorValidado,
         // Snapshot inmutable del consultorio (Fase 2.6).
         consultorio_id:            consultorio.id,
         consultorio_nombre:        consultorio.nombre,

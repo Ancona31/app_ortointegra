@@ -181,6 +181,32 @@ Recórrelas todas, en orden. Esta lista crece con cada auditoría (ver sección 
 
 14. **Cualquier otra cosa** que un DBA marcaría y que no esté en esta lista.
 
+15. **Alcance de los roles, EN LAS DOS DIRECCIONES.** Cuando la migración toca
+    policies, triggers de columna, helpers `SECURITY DEFINER` o cualquier cosa
+    de la que dependa un permiso, no basta con comprobar lo que un rol **deja
+    de poder**. Hay que hacer **dos preguntas por cada rol afectado**:
+
+    - **¿Qué gana?** — ¿puede ahora algo que antes no podía y que nadie decidió?
+    - **¿Qué pierde?** — ¿ha dejado de poder algo que hace todos los días?
+
+    **Una restricción de más es tan defecto como una de menos**, y es la que
+    nadie reporta como fallo de seguridad: se reporta como «la app no me deja
+    confirmar». Si la migración no toca permisos, dilo explícitamente —«el
+    alcance de los roles no cambia en ninguna de las dos direcciones»— en vez de
+    callarlo, que se lee igual que no haberlo mirado.
+
+    > **Por qué está al final y no en su sitio lógico, junto a la 10 y la 11:**
+    > esta lista crece por el final (ver sección 6), no se reordena.
+
+    > **De dónde nació.** De la Rama 1, que aplicó esta regla y la citó por
+    > número **antes de que existiera**: seis referencias a «la dimensión 15» y a
+    > «las 15 dimensiones» apuntando a una lista de catorce —cinco en
+    > `PLAN-RAMA1-CONEXION-CLINICA.md` y una en `DEUDA_TECNICA.md:3071`—. La
+    > regla se estuvo cumpliendo y el número no señalaba nada. Lo encontró una
+    > auditoría externa el 2026-08-21. Queda escrito porque el fallo no fue la
+    > regla —era buena— sino **citar por número algo que no se comprobó que
+    > existiera**.
+
 ---
 
 ## 5. Formato de respuesta

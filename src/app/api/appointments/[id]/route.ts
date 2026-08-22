@@ -5,6 +5,7 @@ import { conCalendarioSpinus, registrarFalloGCal } from '@/lib/gcal'
 import { resolverConexionClinica } from '@/lib/gcalConexion'
 import { canManageClinica } from '@/lib/permissions'
 import { APPOINTMENT_SELECT, eventoParaGoogle, componerAsistentes, INTERRUPTORES_INVITADOS,
+         ICONOS_EVENTO, COLORES_EVENTO, pintaValida,
          type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
 import { correoDelMedico } from '@/lib/medicoCorreo'
 import { TZ_CLINICA } from '@/lib/dates'
@@ -67,7 +68,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
 
     const { id } = await ctx.params
     const body = await req.json()
-    const { title, start_time, end_time, paciente_id, notes, status, medico_id, consultorio_id, updated_at: clientUpdatedAt, client_id } = body
+    const { title, start_time, end_time, paciente_id, notes, status, medico_id, consultorio_id, updated_at: clientUpdatedAt, client_id, icono, color } = body
 
     // RLS filtra por clinica_id
     /* `status`, `start_time`, `end_time` y `paciente_id` no se leían aquí y ahora
@@ -96,6 +97,36 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
     if (paciente_id !== undefined) updates.paciente_id = paciente_id || null
     if (notes       !== undefined) updates.notes       = notes || null
     if (status      !== undefined) updates.status      = status
+
+    /* La pinta del evento genérico (§12.14). Mismo criterio que el resto: sólo
+       se toca la columna si el campo VINO, así que una edición que no hable de
+       pinta la deja como está.
+
+       §12.7 las clasifica del lado PERMITIDO: un médico invitado sin permiso de
+       escritura puede cambiarlas. No mueven una hora, no cambian de paciente y
+       no reasignan a nadie — sólo cómo se ve el evento. Queda dicho aquí porque
+       el trigger del commit 7 se escribe con una lista cerrada, y lo que no esté
+       nombrado se decide por omisión. */
+    if (icono !== undefined) {
+      const v = pintaValida(icono, ICONOS_EVENTO)
+      if (v === undefined) {
+        return NextResponse.json(
+          { error: 'pinta_invalida', message: 'El icono del evento no está en la lista permitida.' },
+          { status: 400 }
+        )
+      }
+      updates.icono = v
+    }
+    if (color !== undefined) {
+      const v = pintaValida(color, COLORES_EVENTO)
+      if (v === undefined) {
+        return NextResponse.json(
+          { error: 'pinta_invalida', message: 'El color del evento no está en la lista permitida.' },
+          { status: 400 }
+        )
+      }
+      updates.color = v
+    }
 
     // `client_id` en la EDICIÓN no es lo mismo que en el alta, aunque sea la
     // misma columna. Aquí no hay idempotencia que ganar: el PUT ya es
@@ -375,11 +406,25 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
         (seMovio || cambioCancelacion || huboReasignacion || cambioPaciente) ? 'all' : 'none'
 
       after(async () => {
+        /* El color del evento en Google, por estado.
+           `completed: '8'` vivía aquí y ERA UNA RAMA MUERTA: la base rechazaba
+           ese valor, así que nunca se evaluó. Se retira y su colorId (grafito)
+           pasa a `attended`, que es el nombre que el concepto tiene de verdad
+           (plan §12.13). No pueden convivir dos nombres para lo mismo: un
+           `completed` en el código y un `attended` en la base es el desajuste
+           que sobrevive años porque las dos mitades «funcionan».
+
+           ⚠️ `scheduled` NO ESTÁ, Y NO ES UN OLVIDO ESTE — es un defecto viejo
+           que sigue aquí a propósito de no ampliar el alcance: sin entrada, el
+           patch no manda `colorId` y Google CONSERVA el que tuviera. O sea que
+           reactivar una cita cancelada le quita el prefijo «CANCELADA — » del
+           título pero la deja roja en el calendario. Está reportado; arreglarlo
+           es tocar el color de citas que ya existen y no entra por arrastre. */
         const STATUS_COLOR: Record<string, string | undefined> = {
           confirmed: '2',
           cancelled: '11',
           no_show:   '11',
-          completed: '8',
+          attended:  '8',
         }
         let gcal_sync_status: 'synced' | 'pending' | 'failed' = 'pending'
         let calendarIdUsado: string | null = null
