@@ -97,8 +97,9 @@
   --ag-status-no_show-bg: #eef1f6;     --ag-status-no_show-border: #d4dbe5;
   /* «Atendida» (plan §12.13). El teal oscuro sale de mirar las DOS paletas a la
      vez, no sólo la de estados: comparte calendario con los colores de los
-     eventos genéricos de §12.14, y por eso `cian` (#0891b2) se retiró de
-     aquélla — era el par más apretado con éste.
+     eventos genéricos, y por eso de aquélla se retiró primero `cian` (#0891b2),
+     el par más apretado con éste, y después el propio `teal` que la paleta
+     definitiva proponía — a cero grados de hue de esta línea.
      ⚠️ ESTOS CUATRO TOKENS Y SUS CUATRO HERMANOS OSCUROS NO LOS CAZA EL
      COMPILADOR: se consumen por interpolación (`var(--ag-status-${status}-dot)`
      en agenda/page.tsx). Si faltan, la tarjeta sale transparente y sin borde,
@@ -106,23 +107,43 @@
   --ag-status-attended-dot: #0f766e;   --ag-status-attended-text: #0d5f59;
   --ag-status-attended-bg: #e6f4f2;    --ag-status-attended-border: #bfe0dc;
 
-  /* EVENTO GENÉRICO SIN PACIENTE (plan §12.14) — un token por color, y el
-     fondo/borde se derivan con color-mix. Uno solo en vez de cuatro porque
-     estos valores SON PROVISIONALES: Claude Design va a rehacer la paleta, y
-     lo que hay que dejar barato de cambiar es el color, no su descomposición.
+  /* EVENTO GENÉRICO SIN PACIENTE — la paleta DEFINITIVA del rediseño: seis
+     colores, un token por color, y el fondo/borde se derivan con color-mix.
+     Uno solo en vez de cuatro tokens por color para que ajustar un tono siga
+     siendo una línea de CSS. El identificador es lo único que viaja a la base
+     (CHECK `appointments_color_check`); el hex no sale de aquí, así que
+     cambiarlo NO es una migración.
 
      RESTRICCIÓN DURA, y por eso viven aquí y no en la página: ninguno puede
-     colisionar con los colores de ESTADO de arriba —azul, verde, rojo, gris
+     confundirse con los colores de ESTADO de arriba —azul, verde, rojo, gris
      pizarra, teal— ni con el morado de Google de abajo. Son la misma paleta
-     compartiendo un calendario. Por eso `cian` (#0891b2) se retiró de la
-     propuesta de §12.14: era el par más apretado con el teal de «atendida».
+     compartiendo un calendario.
+
+     ⚠️⚠️ `teal` Y `pizarra` SE PROPUSIERON Y SE RETIRARON. NO LOS AÑADAS.
+     `teal` es literalmente el color de «atendida» (#0f766e) y `pizarra` el de
+     «no asistió» (#64748b): a cero grados de hue del estado que imitan. Sirve
+     de referencia que `cian` (#0891b2) ya se había retirado por estar a
+     diecisiete grados de ese mismo teal. `grafito` es el neutro que `pizarra`
+     iba a cubrir, con un tono que no se confunde con «no asistió».
+
+     ⚠️ NO TODOS SE SEPARAN DE LOS ESTADOS POR HUE, y comprobar sólo el hue
+     daría por bueno un choque. Medidos: `grafito` está a 0.4° del gris de «no
+     asistió», `indigo` a 11.4° del morado de Google, `bronce` a 21.7° del rojo
+     de «cancelada» y `carmin` a 24.9° de ese mismo rojo. Lo que los separa ahí
+     es la CLARIDAD: `grafito` queda 30 puntos de luminosidad por debajo del
+     gris de «no asistió» (3.08:1 entre ellos) y `bronce` 25 por debajo del
+     rojo. Quien añada un color mañana tiene que mirar las dos cosas.
+
+     Los seis pasan AA sobre texto blanco; el más apretado es `oliva`, 4.99:1.
 
      ⚠️ Se consumen por interpolación (`var(--ag-evento-${color})`), igual que
      los de estado: un token que falte no da error, deja el evento sin color. */
-  --ag-evento-ambar: #d97706;
-  --ag-evento-rosa: #db2777;
-  --ag-evento-terracota: #9a3412;
-  --ag-evento-indigo: #4338ca;
+  --ag-evento-indigo: #3730a3;
+  --ag-evento-magenta: #a21caf;
+  --ag-evento-carmin: #be185d;
+  --ag-evento-oliva: #4d7c0f;
+  --ag-evento-bronce: #78350f;
+  --ag-evento-grafito: #1f2937;
 
   /* Google Calendar (eventos externos) */
   --ag-gcal-text: #6d4ec0;
@@ -1008,12 +1029,25 @@ html.dark {
      el color base con alfa. Ver la nota de la variante clara. */
   --ag-status-attended-dot: #2dd4bf;   --ag-status-attended-text: #7ee8dd;
   --ag-status-attended-bg: rgba(15, 118, 110, .20);   --ag-status-attended-border: rgba(45, 212, 191, .34);
-  /* Evento genérico en oscuro: los mismos cuatro, aclarados para que lean
-     sobre fondo oscuro. Mismo criterio que los dots de estado. */
-  --ag-evento-ambar: #f59e0b;
-  --ag-evento-rosa: #f472b6;
-  --ag-evento-terracota: #ea8f6a;
+  /* Evento genérico en oscuro: los mismos seis, derivados con el criterio que
+     ya usaban los pares claro→oscuro de esta hoja —mismo hue, luminosidad
+     subida a L50-76, contraste sobre el fondo #0f1828 entre 5.9 y 12—.
+
+     ⚠️ `grafito` ES EL CASO QUE EL CRITERIO NO RESUELVE SOLO, y conviene saberlo
+     antes de «mejorarlo». En oscuro no hay forma de separarlo de «no asistió»
+     por hue: los dos son neutros azulados y el token oscuro de «no asistió»
+     (#9fb0c4) ya ocupa el gris medio. Lo que se conserva es el ORDEN de la
+     variante clara —grafito por debajo de «no asistió», 61 contra 70 de
+     luminosidad— en vez de saltar por encima, que lo dejaría pegado al color de
+     tinta de la app (#e8eef6) y lo haría parecer «sin color elegido». La
+     separación resultante (1.36:1) es menor que en claro (3.08:1); si algún día
+     hace falta más, la palanca es el token oscuro de «no asistió», no éste. */
   --ag-evento-indigo: #818cf8;
+  --ag-evento-magenta: #e879f9;
+  --ag-evento-carmin: #f472b6;
+  --ag-evento-oliva: #a3e635;
+  --ag-evento-bronce: #e2a36b;
+  --ag-evento-grafito: #7f96b8;
 
   /* Google Calendar (extDark) */
   --ag-gcal-text: #c4b5fd;

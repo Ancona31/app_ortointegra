@@ -8,7 +8,7 @@ import interactionPlugin, { DateClickArg, EventResizeDoneArg } from '@fullcalend
 import { EventClickArg, EventDropArg, DateSelectArg, EventInput, EventContentArg, DayHeaderContentArg } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
 import { X, Calendar, User, Plus, Trash2, Settings, LayoutGrid, Columns3, Square, ChevronDown, FileText, Stethoscope, Loader2, Mail,
-         Scissors, Users, Lock, Plane, BookOpen, CalendarPlus, type LucideIcon } from 'lucide-react'
+         CalendarPlus } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
@@ -153,44 +153,100 @@ const STATUS_STYLE: Record<Status, { bg: string; text: string; border: string }>
   attended:   { bg: '#ECFDF5', text: '#0f766e', border: '#0f766e' },
 }
 
-/* ─── La pinta del evento genérico (§12.14) ─────────────
+/* ─── La pinta del evento genérico ──────────────────────
  *
  * Los VALORES de las dos listas viven en `@/lib/appointments`, junto al
  * validador que usan las rutas: si la lista viviera aquí, el servidor no la
  * conocería y su validación sería decorativa. Lo que hay en este archivo es lo
- * que sólo la interfaz necesita — el componente de cada icono.
+ * que sólo la interfaz necesita — cómo se dibuja cada icono y cómo se llama.
  *
- * ⚠️ `Record<IconoEvento, LucideIcon>` A PROPÓSITO, NO UN OBJETO SUELTO: si
- * alguien añade un valor a la lista cerrada y olvida su icono, esto es un error
- * de compilación. Con un objeto laxo sería un hueco en blanco en la agenda que
- * nadie reporta.
+ * ⚠️⚠️ LEE ESTO ANTES DE AÑADIR UN ICONO: EL COMPILADOR YA NO TE CUBRE ENTERO.
+ * Los iconos eran componentes de `lucide-react` y el mapa era un
+ * `Record<IconoEvento, LucideIcon>`, así que olvidarse de uno era un error de
+ * compilación. Ahora son ARCHIVOS SVG de `/public/icons/` y la ruta se deriva
+ * del propio nombre (`/icons/${nombre}.svg`), que es lo mismo que guarda la
+ * base. Eso quita la duplicación —no hay tabla nombre→ruta que se desincronice—
+ * pero **TypeScript no puede comprobar que el archivo exista en disco**. Un
+ * nombre mal escrito en `ICONOS_EVENTO`, o un SVG que no se subió, compila sin
+ * una queja, pasa la validación del servidor, pasa el CHECK de la base y sale
+ * como un HUECO EN BLANCO en la agenda que nadie reporta.
+ *
+ * Lo mismo valdría con un `Record<IconoEvento, string>` de rutas escritas a
+ * mano: comprobaría que la ENTRADA está escrita, nunca que el archivo está.
+ * Esa garantía no existe en el tipo y no hay forma de fingirla.
+ *
+ * Lo que sí sigue siendo error de compilación es olvidar la ETIQUETA de un
+ * icono o de un color: `ICONO_ETIQUETA` y `COLOR_ETIQUETA` son
+ * `Record<IconoEvento|ColorEvento, string>` a propósito, no objetos sueltos.
  *
  * ⚠️ Los colores NO están aquí sino en globals.css (`--ag-evento-*`), que es
  * donde viven los de los estados — o sea con quien no pueden chocar. Se
  * consumen por interpolación, así que valen el mismo aviso que los de estado:
  * un token que falte no da error, sólo deja el evento sin color.
  */
-const ICONO_COMPONENTE: Record<IconoEvento, LucideIcon> = {
-  bisturi:  Scissors,
-  personas: Users,
-  candado:  Lock,
-  avion:    Plane,
-  libro:    BookOpen,
+
+/**
+ * El icono de un evento genérico, pintado con `mask-image` sobre un color.
+ *
+ * POR QUÉ MÁSCARA Y NO `<img>`: los SVG traen `fill="currentColor"`, y dentro
+ * de un `<img>` no hay `currentColor` que heredar — saldrían todos negros y no
+ * se podrían teñir del color del evento. La máscara usa el canal alfa del
+ * archivo y el color lo pone el `background` de este `<span>`, así que un mismo
+ * archivo sirve para los seis colores y para los dos temas.
+ *
+ * Sin `color` explícito hereda `currentColor`, que es como se comportaba el
+ * icono de lucide al que sustituye.
+ */
+function IconoDelEvento({ nombre, size, color }: { nombre: IconoEvento; size: number; color?: string }) {
+  const archivo = `url(/icons/${nombre}.svg)`
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        display: 'inline-block', width: size, height: size, flex: '0 0 auto',
+        background: color ?? 'currentColor',
+        WebkitMaskImage: archivo, maskImage: archivo,
+        WebkitMaskSize: 'contain', maskSize: 'contain',
+        WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
+        WebkitMaskPosition: 'center', maskPosition: 'center',
+      }}
+    />
+  )
 }
 
 const ICONO_ETIQUETA: Record<IconoEvento, string> = {
-  bisturi:  'Cirugía',
-  personas: 'Reunión',
-  candado:  'Bloqueo de horario',
-  avion:    'Ausencia o viaje',
-  libro:    'Formación',
+  // Quirófano y hospital
+  cirugia:        'Cirugía',
+  instrumental:   'Instrumental',
+  urgencias:      'Urgencias',
+  internamiento:  'Internamiento',
+  ronda:          'Ronda hospitalaria',
+  // Clínica y estudios
+  columna:        'Columna',
+  ortopedia:      'Ortopedia',
+  imagen:         'Imagenología',
+  ultrasonido:    'Ultrasonido',
+  rehabilitacion: 'Rehabilitación',
+  laboratorio:    'Laboratorio',
+  vacuna:         'Vacunación',
+  // Agenda no clínica
+  junta:          'Junta',
+  videollamada:   'Videollamada',
+  docencia:       'Docencia',
+  congreso:       'Congreso',
+  viaje:          'Viaje',
+  comida:         'Comida',
+  personal:       'Personal',
+  bloqueo:        'Bloqueo de horario',
 }
 
 const COLOR_ETIQUETA: Record<ColorEvento, string> = {
-  ambar:     'Ámbar',
-  rosa:      'Rosa',
-  terracota: 'Terracota',
-  indigo:    'Índigo',
+  indigo:  'Índigo',
+  magenta: 'Magenta',
+  carmin:  'Carmín',
+  oliva:   'Oliva',
+  bronce:  'Bronce',
+  grafito: 'Grafito',
 }
 
 /** True si la fila es un evento genérico y no una cita: lo decide el paciente. */
@@ -806,7 +862,6 @@ function AppointmentModal({
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {ICONOS_EVENTO.map(key => {
-                    const Icono = ICONO_COMPONENTE[key]
                     const on = icono === key
                     return (
                       <button
@@ -823,7 +878,7 @@ function AppointmentModal({
                           ? { background: 'var(--ag-modal-icon-bg)', color: 'var(--ag-brand-primary)', border: '1.5px solid var(--ag-brand-primary)' }
                           : { background: 'var(--ag-input-bg)', color: 'var(--ag-muted)', border: '1.5px solid var(--ag-input-border)' }}
                       >
-                        <Icono size={17} />
+                        <IconoDelEvento nombre={key} size={17} />
                       </button>
                     )
                   })}
@@ -1316,7 +1371,6 @@ const MemoizedEventContent = memo(function MemoizedEventContent({
     : `var(--ag-status-${status}-border)`
   const isCancelled = status === 'cancelled'
   const name = pacNombre ?? title
-  const Icono = icono ? ICONO_COMPONENTE[icono] : null
 
   const root: CSSProperties = {
     height: '100%', boxSizing: 'border-box', overflow: 'hidden', cursor: 'pointer',
@@ -1338,8 +1392,8 @@ const MemoizedEventContent = memo(function MemoizedEventContent({
   /* El icono del evento genérico SUSTITUYE al punto, no se suma: los dos ocupan
      el mismo sitio y dicen lo mismo —de qué va esta tarjeta— con distinto grado
      de detalle. Dos marcadores seguidos en una tarjeta de 34px no caben. */
-  const marcador = Icono
-    ? <Icono size={11} style={{ flexShrink: 0, color: dot }} />
+  const marcador = icono
+    ? <IconoDelEvento nombre={icono} size={11} color={dot} />
     : <span style={{ ...STATUS_DOT, background: dot }} />
 
   // tiny: marcador + nombre, una fila centrada. Sin hora ni chip.
@@ -1477,14 +1531,13 @@ const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg }) {
      la G de Google (el evento no es nuestro), el icono del evento genérico
      (§12.14), y el punto de estado de siempre. El color del evento manda sobre
      el del estado por el mismo motivo que en la tarjeta de Semana/Día. */
-  const IconoEvt = ext?.icono ? ICONO_COMPONENTE[ext.icono] : null
   const tinta = ext?.color
     ? `var(--ag-evento-${ext.color})`
     : (status ? `var(--ag-status-${status}-dot)` : 'var(--ag-muted)')
   const marker = isGcal
     ? <GoogleGIcon size={10} />
-    : IconoEvt
-      ? <IconoEvt size={10} style={{ flex: '0 0 auto', color: tinta }} />
+    : ext?.icono
+      ? <IconoDelEvento nombre={ext.icono} size={10} color={tinta} />
       : <span style={{ width: 6, height: 6, borderRadius: '50%', flex: '0 0 auto', background: tinta }} />
 
   return (

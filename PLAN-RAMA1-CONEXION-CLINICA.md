@@ -1506,6 +1506,45 @@ atención de un paciente por un fallo de red es peor que un estado desactualizad
 
 ## 12.14 Eventos genéricos sin paciente — desarrollo de §12.8
 
+> **⚠ ANOTACIÓN 2026-08-22 — LAS DOS LISTAS DE VALORES DE ESTA SECCIÓN ESTÁN
+> SUPERADAS. LA FORMA NO.**
+>
+> Todo lo que esta sección dice sobre *por qué* hay dos columnas, *por qué* llevan
+> CHECK contra lista cerrada y *por qué* son nullables **sigue vigente palabra por
+> palabra**. Lo que ya no vale son los VALORES: los cinco iconos y los cuatro
+> colores de más abajo eran provisionales por decisión propia —esta sección lo
+> anuncia dos veces— y el rediseño del calendario los sustituyó.
+>
+> **Las listas vigentes están en `20260822_agenda_pinta_definitiva.sql`**, que
+> reemplaza los dos CHECK de la migración 4:
+>
+> - **20 iconos**, y el identificador es el nombre de un archivo de
+>   `/public/icons/` sin `.svg`: `cirugia` · `instrumental` · `urgencias` ·
+>   `internamiento` · `ronda` · `columna` · `ortopedia` · `imagen` ·
+>   `ultrasonido` · `rehabilitacion` · `laboratorio` · `vacuna` · `junta` ·
+>   `videollamada` · `docencia` · `congreso` · `viaje` · `comida` · `personal` ·
+>   `bloqueo`.
+> - **6 colores**: `indigo` #3730a3 · `magenta` #a21caf · `carmin` #be185d ·
+>   `oliva` #4d7c0f · `bronce` #78350f · `grafito` #1f2937.
+>
+> **⚠⚠ `teal` y `pizarra` se propusieron para esa paleta y SE RETIRARON. No los
+> reintroduzcas.** Son, literalmente, los colores de dos estados de cita:
+> `teal` es el de «atendida» (#0f766e) y `pizarra` el de «no asistió» (#64748b) —
+> a **cero grados de hue** del estado que imitan. La tabla de más abajo retiró
+> `cian` por estar a diecisiete grados de ese mismo teal, así que el criterio ya
+> estaba fijado y estos dos lo incumplían por el doble. `grafito` es el neutro que
+> `pizarra` iba a cubrir. `magenta` sustituye a `fucsia` sólo por nombre.
+>
+> **Y un matiz que la tabla de abajo no recoge y hace falta para añadir colores:**
+> no todos se separan de los estados por hue. Medidos contra los estados vigentes,
+> `grafito` está a 0.4° del gris de «no asistió», `indigo` a 11.4° del morado de
+> Google, `bronce` a 21.7° del rojo de «cancelada» y `carmin` a 24.9° de ese rojo.
+> Lo que los separa ahí es la **claridad**, no el tono. Comprobar sólo el hue —que
+> es lo que la tabla de abajo insinúa— daría por bueno un choque.
+>
+> **`indigo` se repite de nombre pero NO es el mismo color:** su hex pasó de
+> #4338ca a #3730a3. Por eso el constraint se rehízo entero en vez de ampliarse.
+
 Un evento genérico es **una fila de `appointments` SIN paciente**: nace en Spinus y
 se sincroniza a Google como cualquier cita.
 

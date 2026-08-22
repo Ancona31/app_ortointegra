@@ -108,23 +108,46 @@ function anclaDeHora(startISO: string, timezone: string): string | null {
  * validacion decorativa.
  *
  * ⚠️ ESTAS DOS LISTAS SON EL ESPEJO EXACTO DE LOS CHECK DE LA BASE
- * (`appointments_icono_check` y `appointments_color_check`,
- * 20260821_agenda_evento_generico_icono_color.sql). Si divergen, la base
+ * (`appointments_icono_check` y `appointments_color_check`, definidos hoy por
+ * 20260822_agenda_pinta_definitiva.sql). Si divergen, la base
  * rechaza con un 23514 crudo que el usuario lee como «no se pudo guardar» sin
  * mas. Cambiar una lista es cambiar las dos, y la de la base va por migracion.
  *
- * ⚠️ LOS VALORES SON PROVISIONALES; LA FORMA NO. Claude Design va a sustituir
- * iconografia y paleta. Lo que no se puede deshacer barato es pasar de texto
- * libre a lista cerrada, y por eso la lista cerrada entra ya.
+ * ⚠️ LOS VALORES YA NO SON PROVISIONALES. Lo fueron: nacieron como cinco iconos
+ * y cuatro colores de relleno a la espera del rediseno del calendario. Ese
+ * rediseno cerro y estas son sus listas definitivas — 20 iconos y 6 colores,
+ * migracion 20260822_agenda_pinta_definitiva.sql. Si encuentras un comentario
+ * que siga anunciando que «Claude Design va a sustituirlas», esta desfasado.
  *
- * Lo que NO esta aqui y es a proposito: el componente de icono de cada valor
- * (eso es interfaz y vive en la agenda) y el hex de cada color (eso vive en
- * globals.css, junto a los de los estados, que es con quien no puede chocar).
+ * ⚠️ CADA NOMBRE DE ICONO ES EL NOMBRE DE UN ARCHIVO de `/public/icons/`, sin
+ * `.svg`. Anadir uno a esta lista sin subir su archivo compila, pasa la
+ * validacion del servidor, pasa el CHECK de la base y sale como un HUECO EN
+ * BLANCO en la agenda. Ver el aviso de `agenda/page.tsx`, que es donde se
+ * consume la ruta.
+ *
+ * ⚠️ `teal` Y `pizarra` NO ESTAN EN LA PALETA Y NO DEBEN ANADIRSE. Los dos se
+ * propusieron y se retiraron: `teal` es el color del estado «atendida»
+ * (#0f766e) y `pizarra` el de «no asistio» (#64748b). Un evento generico con
+ * cualquiera de los dos se lee como una cita de ese estado de un vistazo, que
+ * es lo unico que esta paleta tiene prohibido. `grafito` es el neutro que
+ * `pizarra` iba a cubrir.
+ *
+ * Lo que NO esta aqui y es a proposito: la ruta del SVG de cada icono y su
+ * etiqueta (eso es interfaz y vive en la agenda) y el hex de cada color (eso
+ * vive en globals.css, junto a los de los estados, que es con quien no puede
+ * chocar).
  */
-export const ICONOS_EVENTO = ['bisturi', 'personas', 'candado', 'avion', 'libro'] as const
+export const ICONOS_EVENTO = [
+  // Quirofano y hospital
+  'cirugia', 'instrumental', 'urgencias', 'internamiento', 'ronda',
+  // Clinica y estudios
+  'columna', 'ortopedia', 'imagen', 'ultrasonido', 'rehabilitacion', 'laboratorio', 'vacuna',
+  // Agenda no clinica
+  'junta', 'videollamada', 'docencia', 'congreso', 'viaje', 'comida', 'personal', 'bloqueo',
+] as const
 export type IconoEvento = typeof ICONOS_EVENTO[number]
 
-export const COLORES_EVENTO = ['ambar', 'rosa', 'terracota', 'indigo'] as const
+export const COLORES_EVENTO = ['indigo', 'magenta', 'carmin', 'oliva', 'bronce', 'grafito'] as const
 export type ColorEvento = typeof COLORES_EVENTO[number]
 
 /**
