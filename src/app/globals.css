@@ -86,7 +86,21 @@
 
   /* ESTADO — mapeo id DB (inglés) → estilo handoff (dot/text/bg/border).
      La tarjeta "clean" usa solo dot + text; bg/border quedan para el
-     modal de la sub-fase 4. */
+     modal de la sub-fase 4.
+
+     ⚠️⚠️ ESTOS TOKENS SON LA ÚNICA FUENTE DE COLOR DE ESTADO DE CITA. No
+     escribas el hex de un estado en ningún otro sitio, ni siquiera "sólo para
+     esta leyenda". Ya pasó: `agenda/page.tsx` tuvo una segunda paleta
+     (`STATUS_STYLE`, hexes a mano) que pintaba la leyenda de la agenda, y las
+     dos DIVERGIERON en cuatro de los cinco estados sin que nadie lo notara
+     durante meses — «no asistió» era naranja #f97316 allí y gris #64748b aquí,
+     así que la leyenda prometía un color que la tarjeta no pintaba. El único
+     estado que coincidía era `attended`, y sólo por haber nacido cuando las dos
+     paletas ya estaban puestas: el que llega tarde copia lo que ve, y por eso
+     una paleta duplicada no se delata sola.
+     Se consumen por interpolación, así que quien los necesite hace
+     `var(--ag-status-${estado}-bg)`. Sigue habiendo un `StatusChip` en el
+     dashboard con sus propias clases de Tailwind, fuera de aquí (pendiente). */
   --ag-status-scheduled-dot: #2f6fed;  --ag-status-scheduled-text: #1d4ed8;
   --ag-status-scheduled-bg: #e9f0fe;   --ag-status-scheduled-border: #c9dcfb;
   --ag-status-confirmed-dot: #16a34a;  --ag-status-confirmed-text: #15803d;

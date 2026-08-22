@@ -41,8 +41,8 @@ import {
 /* `attended` (plan §12.13). Lo escribe el servidor al crear la nota clínica que
    salió de la cita, y también se puede poner a mano en el selector de abajo.
 
-   ⚠️ AÑADIR UN ESTADO AQUÍ ROMPE `STATUS_CONFIG` y `STATUS_STYLE` en compilación
-   —son `Record<Status, …>`— pero NO rompe los tokens CSS, que se consumen por
+   ⚠️ AÑADIR UN ESTADO AQUÍ ROMPE `STATUS_CONFIG` en compilación —es un
+   `Record<Status, …>`— pero NO rompe los tokens CSS, que se consumen por
    interpolación (`var(--ag-status-${status}-dot)`). Si faltan los cuatro tokens
    del estado nuevo en globals.css, la tarjeta sale transparente y sin borde, sin
    un solo error. Los de `attended` están puestos, en claro y en oscuro. */
@@ -128,12 +128,17 @@ type ModalState =
 
 /* ─── Colores por estado ───────────────────────────────── */
 
-const STATUS_CONFIG: Record<Status, { label: string; bg: string; text: string; dot: string }> = {
-  scheduled:  { label: 'Agendada',   bg: 'bg-blue-50',   text: 'text-blue-700',   dot: 'bg-blue-500'   },
-  confirmed:  { label: 'Confirmada', bg: 'bg-green-50',  text: 'text-green-700',  dot: 'bg-green-500'  },
-  cancelled:  { label: 'Cancelada',  bg: 'bg-red-50',    text: 'text-red-700',    dot: 'bg-red-500'    },
-  no_show:    { label: 'No asistió', bg: 'bg-orange-50', text: 'text-orange-700', dot: 'bg-orange-500' },
-  attended:   { label: 'Atendida',   bg: 'bg-teal-50',   text: 'text-teal-700',   dot: 'bg-teal-600'   },
+/* SÓLO EL NOMBRE VISIBLE DE CADA ESTADO. El color NO está aquí y no debe
+   volver: este mapa llegó a tener `bg`/`text`/`dot` con clases de Tailwind que
+   ya nadie leía —el color salía de los tokens— y lo único que hacían era estar
+   a mano para que alguien los usara por error y estrenara una tercera paleta.
+   Ver el aviso de arriba, donde estaba `STATUS_STYLE`. */
+const STATUS_CONFIG: Record<Status, { label: string }> = {
+  scheduled:  { label: 'Agendada'   },
+  confirmed:  { label: 'Confirmada' },
+  cancelled:  { label: 'Cancelada'  },
+  no_show:    { label: 'No asistió' },
+  attended:   { label: 'Atendida'   },
 }
 
 /* Los estados que el usuario puede elegir A MANO, por tipo de fila (§12.13, D5).
@@ -144,14 +149,27 @@ const STATUS_CONFIG: Record<Status, { label: string; bg: string; text: string; d
 const ESTADOS_CITA:   readonly Status[] = ['scheduled', 'confirmed', 'cancelled', 'no_show', 'attended']
 const ESTADOS_EVENTO: readonly Status[] = ['scheduled', 'cancelled']
 
-// Paleta pastel estilo Google Calendar
-const STATUS_STYLE: Record<Status, { bg: string; text: string; border: string }> = {
-  scheduled: { bg: '#EFF6FF', text: '#1e40af', border: '#3b82f6' },
-  confirmed:  { bg: '#F0FDF4', text: '#166534', border: '#22c55e' },
-  cancelled:  { bg: '#FFF1F2', text: '#9f1239', border: '#ef4444' },
-  no_show:    { bg: '#FFF7ED', text: '#9a3412', border: '#f97316' },
-  attended:   { bg: '#ECFDF5', text: '#0f766e', border: '#0f766e' },
-}
+/* ⚠️ AQUÍ VIVÍA `STATUS_STYLE`, UNA SEGUNDA PALETA DE ESTADO. NO LA REPONGAS.
+ *
+ * Era un `Record<Status, {bg,text,border}>` de hexes a mano, y durante meses
+ * convivió con los tokens `--ag-status-*` de globals.css sin que nadie notara
+ * que habían DIVERGIDO en cuatro de los cinco estados. La peor: «no asistió»
+ * era naranja (#f97316) aquí y gris (#64748b) en los tokens, así que la leyenda
+ * de la agenda llevaba tiempo prometiendo un color que la tarjeta no pintaba.
+ * `attended` era el único que coincidía, y sólo porque nació cuando las dos
+ * paletas ya estaban puestas.
+ *
+ * El color de estado sale HOY de los tokens y de ningún otro sitio. Si te hace
+ * falta un color de estado, interpola el token (`var(--ag-status-${s}-bg)`);
+ * no escribas un hex.
+ *
+ * ⚠️ SI ALGÚN DÍA SE ROTA LA ASIGNACIÓN DE COLORES (p. ej. ámbar→agendada,
+ * azul→confirmada), `src/components/agenda/ModalInvitacionCita.tsx` SE REPINTA
+ * SIN QUERERLO: usa estos mismos tokens como paleta SEMÁNTICA —`no_show` como
+ * gris de advertencia, `confirmed` como verde de acuse, `cancelled` como rojo
+ * de error—, y ninguno de esos paneles habla del estado de una cita. Hay que
+ * desengancharlo ANTES de rotar, no después.
+ */
 
 /* ─── La pinta del evento genérico ──────────────────────
  *
@@ -1369,8 +1387,6 @@ function ConfirmModal({ message, onConfirm, onCancel }: {
 
 /* ─── Renderer de eventos (estilo Google) — memoizado ──── */
 
-type EventColor = { bg: string; text: string; border: string }
-
 /* Breakpoints de altura renderizada de la tarjeta (px). El tier se decide
    midiendo el alto real del contenedor con ResizeObserver (ver abajo): es
    lo más fiable con FullCalendar, cuyo alto de evento depende de la duración
@@ -1667,7 +1683,12 @@ function renderEventContent(arg: EventContentArg, navegadorTZ: string, iniciales
   if (ext?.isGcalBlock) {
     return <GoogleEventCard timeText={arg.timeText} title={arg.event.title} />
   }
-  if (!ext?.status) return <>{arg.event.title}</>
+  /* Salvavidas: una fila sin `status` no sabe de qué color va, así que sale
+     como texto pelado. El color es EXPLÍCITO y no decorativo — al quitar el
+     `textColor` que las fuentes pasaban, lo que hereda `.fc-event-main` es
+     `--fc-event-text-color`, que FullCalendar trae en BLANCO; sobre el harness
+     transparente esto saldría invisible. */
+  if (!ext?.status) return <span style={{ color: 'var(--ag-ink)' }}>{arg.event.title}</span>
   const pac = ext.pacientes
 
   // F3-6e: badge de hora en TZ del consultorio si la hora resultante difiere
@@ -1851,22 +1872,21 @@ export default function AgendaPage() {
       const data = await res.json()
       const apts: Appointment[] = data.appointments ?? []
 
-      success(apts.map(apt => {
-        // Color = ESTADO (siempre). El médico solo se identifica por el chip,
-        // que se calcula al pintar (ver `inicialesDeCita`), no aquí.
-        const colorStyle = STATUS_STYLE[apt.status] ?? STATUS_STYLE.scheduled
-
-        return {
-          id:              apt.id,
-          title:           apt.title,
-          start:           apt.start_time,
-          end:             apt.end_time,
-          backgroundColor: 'transparent',
-          borderColor:     'transparent',
-          textColor:       colorStyle.text,
-          extendedProps:   { ...apt, colorStyle },
-        }
-      }))
+      success(apts.map(apt => ({
+        id:              apt.id,
+        title:           apt.title,
+        start:           apt.start_time,
+        end:             apt.end_time,
+        // Harness transparente: el color de la cita —que es el de su ESTADO— lo
+        // pone `eventContent` leyendo los tokens al pintar. Aquí NO va
+        // `textColor`: FullCalendar lo aplicaría como `color` en línea sobre
+        // `.fc-event-main`, y las tres tarjetas fijan el suyo en cada texto, así
+        // que no se heredaba nada. Lo que sí hacía era obligar a resolver un
+        // color aquí, que es de donde salía la segunda paleta.
+        backgroundColor: 'transparent',
+        borderColor:     'transparent',
+        extendedProps:   { ...apt },
+      })))
     } catch (err: unknown) {
       failure(err instanceof Error ? err : new Error('Error cargando citas'))
     }
@@ -1953,20 +1973,16 @@ export default function AgendaPage() {
 
   /* ── Helper: construir EventInput desde datos de cita ── */
   function buildEventInput(data: Partial<Appointment> & { id?: string }): EventInput {
-    const status = data.status ?? 'scheduled'
-    // Color = ESTADO (siempre). El médico solo se identifica por el chip,
-    // que se calcula al pintar (ver `inicialesDeCita`), no aquí.
-    const colorStyle: EventColor = STATUS_STYLE[status] ?? STATUS_STYLE.scheduled
-
     return {
       id:              data.id ?? `${PREFIJO_OPTIMISTA}${Date.now()}`,
       title:           data.title ?? '',
       start:           data.start_time,
       end:             data.end_time,
+      // Sin `textColor`, por el mismo motivo que en `appointmentSource`: el
+      // color de estado lo pinta `eventContent` desde los tokens.
       backgroundColor: 'transparent',
       borderColor:     'transparent',
-      textColor:       colorStyle.text,
-      extendedProps:   { ...data, colorStyle },
+      extendedProps:   { ...data },
     }
   }
 
@@ -2001,7 +2017,9 @@ export default function AgendaPage() {
     if (appointment.start_time) existing.setStart(appointment.start_time)
     if (appointment.end_time)   existing.setEnd(appointment.end_time)
     existing.setProp('title', appointment.title ?? '')
-    if (input.textColor) existing.setProp('textColor', input.textColor as string)
+    /* Ya no se sincroniza `textColor`: `buildEventInput` no lo pone —el color
+       de estado lo pinta `eventContent` desde los tokens— así que esta línea
+       había quedado en una guarda que nunca se cumplía. */
 
     for (const [clave, valor] of Object.entries(input.extendedProps ?? {})) {
       existing.setExtendedProp(clave, valor)
@@ -2388,10 +2406,10 @@ export default function AgendaPage() {
           if (data.start_time) existing.setStart(data.start_time)
           if (data.end_time)   existing.setEnd(data.end_time)
           if (data.title)      existing.setProp('title', data.title)
-          // Actualizar extendedProps con nuevo color/status
-          const ev = buildEventInput(data)
+          // Actualizar extendedProps con el status nuevo. Ya no se copia
+          // ningún `colorStyle`: el color se deriva del status al pintar, así
+          // que basta con que el status esté al día.
           existing.setExtendedProp('status', data.status ?? existing.extendedProps.status)
-          existing.setExtendedProp('colorStyle', ev.extendedProps?.colorStyle)
           existing.setExtendedProp('notes', data.notes ?? existing.extendedProps.notes)
           existing.setExtendedProp('pacientes', data.pacientes ?? null)
           // La pinta del evento genérico. Va en la tanda optimista como el
@@ -2687,7 +2705,13 @@ export default function AgendaPage() {
             <div key={key} className="flex items-center gap-1.5">
               <span
                 className="w-3 h-3 rounded-sm flex-shrink-0"
-                style={{ backgroundColor: STATUS_STYLE[key as Status].bg, borderLeft: `3px solid ${STATUS_STYLE[key as Status].border}` }}
+                /* Los MISMOS tokens que pinta la tarjeta, y con el mismo
+                   reparto: relleno de `-bg`, barra izquierda de `-dot` (que es
+                   lo que la tarjeta usa en su `borderLeft`, no `-border`). Antes
+                   salían de una paleta aparte de hexes, y por eso la leyenda
+                   enseñaba «No asistió» en naranja mientras la tarjeta lo
+                   pintaba gris. */
+                style={{ backgroundColor: `var(--ag-status-${key}-bg)`, borderLeft: `3px solid var(--ag-status-${key}-dot)` }}
               />
               <span className="text-[11px] text-[#86868b] font-medium">{cfg.label}</span>
             </div>
