@@ -1140,7 +1140,7 @@ function AppointmentModal({
           )}
           {showIniciarConsulta && (
             <Link
-              href={`/expediente/${paciente.id}/nueva-nota`}
+              href={`/expediente/${paciente.id}/nueva-nota${apt ? `?cita=${apt.id}` : ''}`}
               onClick={() => {
                 cambiarActivo(citaConsultorio!)
                 onClose()
