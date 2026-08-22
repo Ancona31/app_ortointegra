@@ -8,7 +8,7 @@ import interactionPlugin, { DateClickArg, EventResizeDoneArg } from '@fullcalend
 import { EventClickArg, EventDropArg, DateSelectArg, EventInput, EventContentArg, DayHeaderContentArg } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
 import { X, Calendar, User, Plus, Trash2, Settings, LayoutGrid, Columns3, Square, ChevronDown, FileText, Stethoscope, Loader2, Mail,
-         CalendarPlus } from 'lucide-react'
+         CalendarPlus, type LucideIcon } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
@@ -239,6 +239,14 @@ const ICONO_ETIQUETA: Record<IconoEvento, string> = {
   personal:       'Personal',
   bloqueo:        'Bloqueo de horario',
 }
+
+/* Las dos posiciones del control del alta. `Record<TipoFila, …>` no sirve aquí
+   —hace falta el ORDEN, y la cita va primera porque es lo que la agenda hace
+   todo el día—, así que la exhaustividad la da el tipo de cada `id`. */
+const TIPOS_ALTA: ReadonlyArray<{ id: TipoFila; label: string; icono: LucideIcon }> = [
+  { id: 'cita',   label: 'Cita',   icono: Calendar },
+  { id: 'evento', label: 'Evento', icono: CalendarPlus },
+]
 
 const COLOR_ETIQUETA: Record<ColorEvento, string> = {
   indigo:  'Índigo',
@@ -609,6 +617,7 @@ function QuickPatientModal({
 function AppointmentModal({
   modal, onClose, onSave, onDelete, medicos, defaultMedicoId,
   hideMedicoDropdown, medicoDropdownRequired, canVerExpediente, canInvitar, onInvitar,
+  onCambiarTipo,
 }: {
   modal: ModalState
   onClose: () => void
@@ -626,14 +635,27 @@ function AppointmentModal({
   /* El modal de invitación NO se monta aquí: vive en la página. Tiene que poder
      abrirse solo al CREAR una cita, y para entonces este modal ya se cerró. */
   onInvitar: () => void
+  /* Cambia entre cita y evento EN EL ALTA. Sube a la página en vez de resolverse
+     con un `useState` de aquí dentro, y no es por gusto: el tipo vive en
+     `modal`, y la página monta este componente con `key={modal.tipo}` para que
+     cambiarlo REMONTE. Ese remonte es el que tira el paciente ya elegido, el
+     título ya tecleado y un `status` que el otro tipo no ofrece — sin una sola
+     línea de reseteo. Un estado local no remontaría nada y habría que limpiar a
+     mano cinco campos, que es donde se olvida uno. */
+  onCambiarTipo: (tipo: TipoFila) => void
 }) {
   const isEdit = modal.mode === 'edit'
   const apt    = modal.mode === 'edit' ? modal.appointment : null
 
-  /* CITA o EVENTO GENÉRICO. Al crear lo eligió quien abrió el modal; al editar
-     NO se elige: se deduce de la fila, porque el tipo es fijo tras crear
-     (ver `TipoFila`). Que sea una constante y no un `useState` es el punto:
-     no hay forma de cambiarlo desde dentro. */
+  /* CITA o EVENTO GENÉRICO. Al editar NO se elige: se deduce de la fila, porque
+     el tipo es fijo tras crear (ver `TipoFila`). Al crear lo trae `modal`, y lo
+     cambia el control de dos posiciones de más abajo — que NO escribe aquí, sino
+     que llama a `onCambiarTipo` y deja que la página reemplace el `modal`.
+
+     Sigue siendo una constante y no un `useState`, y eso no ha cambiado: desde
+     dentro de este componente el tipo no se toca. Cambiarlo es remontarlo
+     entero, que es justo la propiedad de la que depende no arrastrar el paciente
+     de una cita a un evento. */
   const tipo: TipoFila = modal.mode === 'create'
     ? modal.tipo
     : (apt && esEventoGenerico(apt) ? 'evento' : 'cita')
@@ -827,6 +849,66 @@ function AppointmentModal({
 
         {/* Body */}
         <div className="px-[22px] py-5 space-y-4 flex-1 min-h-0 overflow-y-auto">
+
+          {/* ── QUÉ SE ESTÁ CREANDO — SÓLO EN EL ALTA ────────────────────────
+              En `mode: 'edit'` este control NO EXISTE, y no es una omisión: el
+              tipo de una fila guardada es fijo. Cambiarlo ahí sería quitarle el
+              paciente a una cita por una puerta lateral, y esa puerta la cierra
+              §12.18 —quitar el paciente ES borrar la cita, con su alerta—.
+
+              En el ALTA ese argumento no aplica, porque todavía no hay fila a la
+              que quitarle nada: no se convierte nada, se elige qué se va a
+              crear. Las dos puertas del toolbar siguen siendo las de entrada con
+              el tipo ya elegido; esto es para quien llegó pulsando un hueco del
+              calendario, que entra en «cita» —lo que espera ese gesto— y hasta
+              ahora no tenía forma de cambiar de idea sin cerrar y volver.
+
+              ⚠️ VA ARRIBA DEL TODO, ANTES DE CUALQUIER CAMPO, A PROPÓSITO:
+              cambiar de tipo REMONTA el modal y se pierde lo que hubiera
+              escrito. Puesto abajo, invitaría a rellenar primero y a descubrir
+              la pérdida después. */}
+          {!isEdit && (
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
+                Qué vas a crear
+              </label>
+              <div
+                role="tablist"
+                aria-label="Tipo de lo que se va a crear"
+                className="inline-flex w-full"
+                style={{ background: 'var(--ag-segment-bg)', borderRadius: 12, padding: 3, gap: 2 }}
+              >
+                {TIPOS_ALTA.map(t => {
+                  const activo = tipo === t.id
+                  const Ico = t.icono
+                  return (
+                    <button
+                      key={t.id} type="button"
+                      role="tab"
+                      aria-selected={activo}
+                      onClick={() => { if (!activo) onCambiarTipo(t.id) }}
+                      className={`flex-1 inline-flex items-center justify-center gap-1.5 transition-all ${activo ? '' : 'hover:opacity-70'}`}
+                      style={{
+                        border: 'none', cursor: 'pointer', borderRadius: 9, padding: '7px 13px',
+                        fontSize: 13, fontWeight: activo ? 700 : 600,
+                        ...(activo
+                          ? { background: 'var(--ag-segment-active-bg)', color: 'var(--ag-segment-active-text)', boxShadow: 'var(--ag-segment-active-shadow)' }
+                          : { background: 'transparent', color: 'var(--ag-segment-text)' }),
+                      }}
+                    >
+                      <Ico size={14} />
+                      {t.label}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-[12px] mt-2 leading-relaxed" style={{ color: 'var(--ag-muted)' }}>
+                {esEvento
+                  ? 'Un evento no lleva paciente ni expediente: cirugía, junta, bloqueo de horario.'
+                  : 'Una cita va ligada a un paciente y a su expediente.'}
+              </p>
+            </div>
+          )}
 
           {/* ── EVENTO GENÉRICO: título libre + pinta ────────────────────────
               Ocupa el sitio del campo de paciente, no se suma a él: los dos
@@ -2166,6 +2248,13 @@ export default function AgendaPage() {
   }, [])
 
   /* ── Handlers ────────────────────────────────────────── */
+  /* ⚠️ `tipo: 'cita'` DE AQUÍ ABAJO ES EL VALOR DE PARTIDA, NO UN CIERRE.
+     Pulsar un hueco o arrastrar sobre el calendario siguen abriendo CITA, que es
+     lo que espera quien hace ese gesto y no ha cambiado. Lo que cambió es que
+     desde el modal se puede cambiar de idea sin cerrarlo: el control de dos
+     posiciones del alta llama a `onCambiarTipo` y reemplaza este `tipo`.
+     Antes esto era la única forma de decidirlo y por eso no había vuelta atrás
+     salvo cerrar el modal y entrar por el botón «Nuevo evento». */
   function handleDateClick(arg: DateClickArg) {
     // Fase 8.2: bloqueo creación de citas si suscripción cancelada con >5 pacientes
     if (subState.isBlocked) { openBloqueoModal(); return }
@@ -2540,7 +2629,25 @@ export default function AgendaPage() {
               hace todo el día; bloquear un hueco o apuntar una junta, no.
 
               Arrastrar sobre el calendario y pulsar en un hueco siguen abriendo
-              CITA — es lo que espera quien hace ese gesto. */}
+              CITA — es lo que espera quien hace ese gesto.
+
+              ── ⚠️ ANOTACIÓN 2026-08-22 — «NI UN SELECTOR ESCONDIDO» YA NO ES
+              EXACTO, Y LO QUE IMPORTA DE ESTE COMENTARIO SIGUE SIÉNDOLO ──────
+              Todo lo de arriba se mantiene: estos dos botones siguen siendo las
+              dos puertas, el hueco y el arrastre siguen abriendo CITA, y en
+              EDICIÓN el tipo sigue sin poder cambiarse.
+
+              Lo que dejó de ser cierto es que no haya ningún control: EN EL ALTA
+              hay uno, de dos posiciones, arriba del todo del modal. Se añadió
+              porque quien entra pulsando un hueco —que es la vía más usada— no
+              tenía forma de cambiar de idea sin cerrar y volver por la otra
+              puerta.
+
+              Y no contradice el motivo de aquella decisión, que era que cambiar
+              el tipo sería quitarle el paciente a una cita por una puerta
+              lateral (§12.18). Ese motivo presupone UNA FILA QUE YA EXISTE; en
+              el alta no la hay, así que no se convierte nada: se elige qué se va
+              a crear. En edición, donde el motivo sí aplica, no hay control. */}
           <button
             onClick={() => {
               if (subState.isBlocked) { openBloqueoModal(); return }
@@ -2631,6 +2738,18 @@ export default function AgendaPage() {
       {/* ── Modal cita ──────────────────────────────────── */}
       {modal.mode !== 'closed' && (
         <AppointmentModal
+          /* ⚠️ LA `key` NO ES DECORATIVA: ES EL MECANISMO DE RESETEO.
+             Cambiar de cita a evento en el alta cambia esta clave, React tira el
+             componente y monta uno nuevo, y con él vuelven a correr TODOS los
+             `useState` de dentro. Eso es lo que impide que el paciente ya
+             elegido viaje a un evento, que el título tecleado viaje a una cita, o
+             que un `status` quede fuera de la lista que su tipo ofrece
+             (`ESTADOS_EVENTO` no tiene «no asistió»).
+             Sin ella el modal NO remonta —React reconcilia por posición— y harían
+             falta cinco reseteos a mano, que es donde se olvida uno.
+             En edición la clave es el id de la fila: abrir otra cita distinta
+             también monta limpio, que es lo que ya se esperaba. */
+          key={modal.mode === 'create' ? modal.tipo : modal.appointment.id}
           modal={modal}
           onClose={closeModal}
           onSave={handleSave}
@@ -2641,6 +2760,12 @@ export default function AgendaPage() {
           medicoDropdownRequired={isSecretaria || isMedicoConAdmin}
           canVerExpediente={isDoctor}
           canInvitar={canVerAgendaCompleta(profile)}
+          /* Sólo lo llama el control del alta, y sólo puede llegar en
+             `mode: 'create'`: en edición ese control no se pinta. La guarda de
+             aquí no es desconfianza del componente, es lo que hace que el
+             `setModal` no pueda inventarse un estado de creación desde una
+             edición si alguien cablea mal esto mañana. */
+          onCambiarTipo={tipo => setModal(m => (m.mode === 'create' ? { ...m, tipo } : m))}
           onInvitar={() => {
             if (modal.mode !== 'edit') return
             setInvitacion({

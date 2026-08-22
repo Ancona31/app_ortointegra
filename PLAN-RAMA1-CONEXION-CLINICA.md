@@ -1703,6 +1703,42 @@ asistió) — **más el que se lleve «atendida»** (§12.13), que aún no está
 > **Los dos tipos nunca enseñan los dos campos a la vez:** el título libre ocupa
 > el sitio del campo de paciente, no se suma a él.
 >
+> > **⚠ ANOTACIÓN 2026-08-22 — EN EL ALTA SÍ SE PUEDE ELEGIR. LO DE ARRIBA VALE
+> > PARA LA EDICIÓN, Y AHÍ NO CAMBIA NADA.**
+> >
+> > Lo que sigue vigente palabra por palabra: **en `mode: 'edit'` el tipo se
+> > deduce de la fila y no hay ningún control que lo cambie**, por el motivo que
+> > este mismo punto da —convertir una cita en evento sería quitarle el paciente
+> > por una puerta lateral, y esa puerta la cierra §12.18—. También siguen ahí las
+> > dos puertas del toolbar, y **pulsar un hueco o arrastrar siguen abriendo
+> > CITA**, que es lo que espera quien hace ese gesto.
+> >
+> > Lo que cambia es la frase «el tipo se elige al ENTRAR y no se puede cambiar
+> > después», que se escribió como absoluta: **en `mode: 'create'` ahora hay un
+> > control de dos posiciones «Cita | Evento», arriba del todo del modal.**
+> >
+> > **Por qué esto no contradice el motivo de la decisión, que es lo que hay que
+> > entender antes de tocarlo:** el argumento de §12.18 presupone **una fila que
+> > ya existe y que tiene paciente**. En el alta no la hay. Cambiar de tipo antes
+> > de guardar no le quita el paciente a nada, no dispara ningún DELETE y no roza
+> > §12.18 —cuya X, en el alta, sigue limpiando el campo justamente porque
+> > «todavía no hay cita»—. No se convierte nada: se elige qué se va a crear. El
+> > «no» de este punto era más amplio que su propia razón.
+> >
+> > **Qué lo motivó:** la vía más usada para crear es pulsar un hueco del
+> > calendario, y desde ahí no había forma de cambiar de idea salvo cerrar el
+> > modal y volver a entrar por el botón «Nuevo evento».
+> >
+> > **Cómo se implementó, porque el detalle es el que sostiene la decisión:** el
+> > tipo sigue viviendo en `modal` y NO es estado del modal. El control llama a la
+> > página, que reemplaza el `modal`, y el componente se monta con
+> > `key={modal.tipo}` — así que cambiar de tipo **REMONTA el modal entero**. Ese
+> > remonte es lo que tira el paciente ya elegido, el título ya tecleado y un
+> > `status` que el otro tipo no ofrece (`ESTADOS_EVENTO` no tiene «no asistió»),
+> > sin una sola línea de reseteo. Por eso el control va **arriba del todo, antes
+> > de cualquier campo**: cambiarlo pierde lo escrito, y ponerlo abajo invitaría a
+> > descubrirlo tarde.
+>
 > ### 5. El selector de estado enseña listas distintas
 >
 > Una **cita** enseña los cinco estados. Un **evento genérico**, sólo `scheduled`
