@@ -1844,6 +1844,65 @@ por PostgREST. Las dos van en el **commit 7** (final de §6).
 > siquiera están escritas. Con las tres de aquí aplicadas, **el despliegue del
 > código de §12.13 y §12.14 ya no está bloqueado por esquema**.
 
+> **✅ ANOTACIÓN 2026-08-22 — ENTRA UNA SEXTA, Y ESTÁ APLICADA. LA RAMA VA POR
+> SEIS MIGRACIONES APLICADAS Y DOS PENDIENTES.**
+>
+> | # | Qué | De dónde sale | Estado |
+> |---|---|---|---|
+> | 1 | La **columna del permiso** en `profiles`, más su entrada en el trigger guardián | §12.7 | **sin escribir** (commit 7) |
+> | 2 | El **trigger sobre `appointments`** columna por columna, más la policy de `INSERT`/`DELETE` | §12.7 | **sin escribir** (commit 7) |
+> | 3 | El valor **`attended`** en el CHECK de `appointments.status` | §12.13 | aplicada 2026-08-21 |
+> | 4 | Las **dos columnas de icono y color** con sus CHECK | §12.14 | aplicada 2026-08-21 |
+> | 5 | **`consultas.appointment_id`** con FK `ON DELETE SET NULL` | §12.13 | aplicada 2026-08-21 (2.º intento) |
+> | 6 | Las **listas definitivas de icono y color**: 20 y 6 | §12.14 | **aplicada 2026-08-22, a la primera** — `20260822_agenda_pinta_definitiva.sql` |
+>
+> ### Qué es la 6 y por qué hacía falta
+>
+> **Sustituye los dos CHECK de la migración 4**, cuyos cinco iconos y cuatro
+> colores eran provisionales por decisión propia —su cabecera lo anuncia dos
+> veces— a la espera del rediseño del calendario. El rediseño cerró con otras
+> listas, así que sin esto un usuario que eligiera cualquier valor nuevo recibiría
+> un **23514** y no podría guardar el evento. Las listas vigentes y el porqué de
+> cada retirada están en la anotación del 2026-08-22 al principio de §12.14.
+>
+> **No añade ninguna columna**, y de ahí una diferencia con la 4 y la 5 que
+> conviene no copiar por inercia: **no hizo falta comprobar PostgREST desde
+> fuera**. Su caché es de columnas, no de constraints.
+>
+> ### Lo que esta migración deja como método, que es lo que vale conservar
+>
+> - **Los cuatro literales de su guarda de replay están LEÍDOS de Postgres**, no
+>   razonados: los dos vigentes por consulta directa a `pg_constraint`, y los dos
+>   nuevos —que aún no existían en ninguna base— con una `TEMP TABLE` y `ROLLBACK`
+>   que los deparsea igual sin dejar rastro. Es la respuesta al fallo que abortó
+>   la migración 3 en su primer intento.
+> - **El veredicto se corrió solo, dos veces**, antes de pegar nada: la lección de
+>   la 5 aplicada tal cual.
+> - **Una auditoría externa encontró un fallo real en el veredicto** y se corrigió
+>   antes de aplicar: `faltan_*` y `sobran_*` son pruebas de **pertenencia**, no
+>   de igualdad, así que una lista ampliada a mano con un valor de más habría
+>   pasado como OK. Ahora dos ramas comparan la **definición completa** contra los
+>   literales exactos, y en la corrida de después de aplicar se evaluaron por
+>   primera vez sin disparar.
+>
+> ### Un hueco conocido que se deja abierto a propósito
+>
+> El veredicto comprueba que las dos columnas sigan siendo **nullable**, pero no
+> que sigan **sin DEFAULT**. Un `SET DEFAULT 'grafito'` puesto a mano pasaría el
+> CHECK, dejaría la columna nullable y pintaría en silencio todas las citas de
+> paciente nuevas —justo lo que §12.14 argumenta que no debe pasar— y el veredicto
+> diría OK. Es un hueco **heredado del veredicto de la migración 4**, no lo
+> introduce la 6, y cerrarlo es un `atthasdef` en el CTE más una rama. No se
+> consideró motivo para retrasar la aplicación.
+>
+> ### Lo que sigue abierto
+>
+> **Sólo las migraciones 1 y 2** (§12.7, commit 7), que siguen sin escribirse. El
+> despliegue del código de §12.14 ya no está bloqueado por esquema — y el orden es
+> el de siempre: **esta migración va antes del código**, aunque aquí por un motivo
+> distinto al de la 4, porque las columnas ya existían y lo que cambia es qué
+> valores admiten. Está razonado en su cabecera.
+
 ---
 
 ## 12.16 Reconexión con OTRA cuenta de Google — alcance nuevo, SIN DECIDIR

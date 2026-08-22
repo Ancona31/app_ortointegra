@@ -1,5 +1,42 @@
--- ESTADO: ESCRITA, NO APLICADA. Angel la ejecuta a mano tras auditarla.
+-- ESTADO: APLICADA Y VERIFICADA EN PRODUCCIÓN EL 2026-08-22, a la primera.
+-- ============================================================================
+-- Veredicto devuelto en la rejilla:
 --
+--   columnas_text       = 2    (icono y color, las dos text)
+--   columnas_nullables  = 2    (las dos siguen nullable, que es la decisión)
+--   checks_validados    = 2    (los dos CHECK con convalidated = t)
+--   faltan_iconos       = ''   (los VEINTE están en el CHECK)
+--   faltan_colores      = ''   (los SEIS están en el CHECK)
+--   sobran_iconos       = ''   (ni rastro de bisturi, personas, candado, avion,
+--                               libro ni punto)
+--   sobran_colores      = ''   (ni rastro de ambar, rosa, terracota, cian,
+--                               fucsia — ni de teal ni de pizarra)
+--   grants_por_columna  = 0    (ninguna columna con ACL propio)
+--   filas_con_pinta     = 0    (informativo: el código aún no ha subido)
+--
+--   def_icono = CHECK (((icono IS NULL) OR (icono = ANY (ARRAY['cirugia'::text, 'instrumental'::text, 'urgencias'::text, 'internamiento'::text, 'ronda'::text, 'columna'::text, 'ortopedia'::text, 'imagen'::text, 'ultrasonido'::text, 'rehabilitacion'::text, 'laboratorio'::text, 'vacuna'::text, 'junta'::text, 'videollamada'::text, 'docencia'::text, 'congreso'::text, 'viaje'::text, 'comida'::text, 'personal'::text, 'bloqueo'::text]))))
+--   def_color = CHECK (((color IS NULL) OR (color = ANY (ARRAY['indigo'::text, 'magenta'::text, 'carmin'::text, 'oliva'::text, 'bronce'::text, 'grafito'::text]))))
+--
+--   veredicto = 'OK — … con la definición EXACTA de esta migración: ni un valor
+--                de menos ni uno de más.'
+--
+-- La comprobación que respalda este rótulo, para repetirla el día que haga falta
+-- —es la que §7 pide y ya estaba escrita más abajo, antes de aplicar—:
+--
+--   SELECT conname, convalidated, pg_get_constraintdef(oid)
+--     FROM pg_constraint
+--    WHERE conrelid = 'public.appointments'::regclass
+--      AND conname IN ('appointments_icono_check','appointments_color_check');
+--   -- Aplicada = DOS filas, las dos con convalidated = t, y las dos
+--   -- definiciones iguales a def_icono y def_color de aquí arriba.
+--
+-- ── NO HIZO FALTA COMPROBAR POSTGREST, Y ESTA VEZ ERA CORRECTO NO HACERLO ──
+-- Las migraciones 4 y 5 sí lo comprobaron desde fuera con la anon key, porque
+-- las dos hacían `ADD COLUMN` y PostgREST cachea el esquema de COLUMNAS. Ésta no
+-- añade ninguna: sustituye dos CHECK, y los constraints no se cachean — los
+-- evalúa Postgres al escribir. La cabecera lo anticipaba y se cumplió.
+--
+-- ============================================================================
 -- ✅ LOS CUATRO LITERALES DE LA GUARDA DE REPLAY ESTÁN LEÍDOS DE POSTGRES, no
 --    deducidos: verificados byte a byte el 2026-08-22 (114, 132, 147 y 419
 --    bytes). Cómo se leyeron y cómo repetirlo, en «LOS LITERALES» más abajo.
@@ -28,17 +65,28 @@
 --    ANÁLISIS que rechaza la consulta entera antes de evaluar ninguna rama, así
 --    que una corrida que devuelve filas ya demuestra que no está.
 --
---    ⚠️ LO QUE NINGUNA CORRIDA DE HOY PUEDE DEMOSTRAR: que el literal de esas
---    dos ramas sea el correcto. Con los CHECK viejos puestos gana `faltan_iconos`
---    —va antes— y el CASE corta ahí sin llegar a evaluarlas. La primera vez que
---    se evalúan de verdad es en el veredicto de DESPUÉS de aplicar. Lo que
---    respalda el literal no es la ejecución sino que es byte a byte el mismo
---    `v_nuevo_icono` / `v_nuevo_color` de la guarda 2, leídos de Postgres en el
---    paso (2) del pre-vuelo.
+--    ✅ Y LO QUE ESA CORRIDA NO PODÍA DEMOSTRAR, YA ESTÁ DEMOSTRADO. Este
+--    párrafo decía —con razón mientras se escribió— que ninguna corrida hecha
+--    ANTES de aplicar podía ejercitar el literal de esas dos ramas: con los
+--    CHECK viejos puestos ganaba `faltan_iconos`, que va antes, y el CASE
+--    cortaba ahí sin llegar a evaluarlas.
 --
---    Y si aun así estuviera mal, el coste está acotado: un literal equivocado
---    AQUÍ da un REVISAR de más con el DDL ya confirmado y correcto. En la
---    guarda 2 abortaría la migración —le pasó a la 3—; aquí no.
+--    **LA CORRIDA DE DESPUÉS DE APLICAR LAS EVALUÓ POR PRIMERA VEZ, Y NO
+--    DISPARARON.** Con los CHECK ya cambiados, `faltan_*` y `sobran_*` salen
+--    vacíos, el CASE llega hasta ellas, compara la definición completa contra
+--    los literales exactos y cae al ELSE. O sea que las dos ramas no sólo
+--    analizan: comparan, y comparan bien. Era el último dato que faltaba.
+--
+--    Lo que respaldaba el literal antes de esto era que es byte a byte el mismo
+--    `v_nuevo_icono` / `v_nuevo_color` de la guarda 2, leídos de Postgres en el
+--    paso (2) del pre-vuelo. Esa comparación era correcta y ahora, además, está
+--    confirmada contra la base.
+--
+--    (El coste acotado que este párrafo calculaba —un literal equivocado aquí
+--    daría un REVISAR de más con el DDL ya confirmado y correcto, mientras que
+--    en la guarda 2 abortaría la migración, como le pasó a la 3— se queda
+--    escrito: sigue siendo el motivo por el que este sitio es el bueno para una
+--    comparación estricta.)
 -- ============================================================================
 -- La pinta definitiva del evento genérico: 20 iconos y 6 colores
 --
