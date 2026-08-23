@@ -321,8 +321,13 @@ export default function ModalInvitacionCita({
     if (paso === 'enviado') {
       return (
         <div className="space-y-3">
-          <div className="rounded-xl border px-3 py-3" style={{ background: 'var(--ag-status-confirmed-bg)', borderColor: 'var(--ag-status-confirmed-border)' }}>
-            <p className="flex items-start gap-2 text-[13px] leading-relaxed" style={{ color: 'var(--ag-status-confirmed-text)' }} aria-live="polite">
+          {/* --ag-success-*, NO --ag-status-confirmed-*. Es el verde de «la
+              operación salió», no el del estado «confirmada»: aquí no se está
+              confirmando ninguna cita, y colgar de ese token hacía que retocar
+              el color del estado le moviera el color a este acuse. Mismo valor
+              pintado, distinto dueño. */}
+          <div className="rounded-xl border px-3 py-3" style={{ background: 'var(--ag-success-bg)', borderColor: 'var(--ag-success-border)' }}>
+            <p className="flex items-start gap-2 text-[13px] leading-relaxed" style={{ color: 'var(--ag-success-text)' }} aria-live="polite">
               <Check size={16} className="mt-0.5 flex-shrink-0" />
               {/* ⚠️ NO DICE «ENVIADO». Google contesta 200 al patch y no informa
                   de si el correo salió. Se afirma lo que consta. */}

@@ -54,10 +54,26 @@
   --ag-brand-primary: var(--cp, #1a3a5c);
   --ag-brand-secondary: var(--cs, #1e5fa8);
   --ag-now-line: #ef4444;
+  /* Fondo de la píldora de la hora. NO es --ag-now-line: sobre ese rojo el
+     blanco a 10.5 px da 3.76:1 y WCAG 1.4.3 pide 4.5:1 (10.5 px bold no es
+     texto grande, y `aria-hidden` no exime: la regla habla de texto VISIBLE).
+     Es la misma línea con la misma saturación (84) y 20 puntos de luminosidad
+     menos, para que se lea como un engrosamiento suyo y no como otro color.
+     Blanco encima: 6.52:1. */
+  --ag-now-pill-bg: #bc1010;
   /* Time-grid (sub-fase 2) — la sub-fase 6 añadirá las contrapartes en html.dark */
   --ag-today-bg: #eff4f9;             /* tinte columna de hoy */
   --ag-today-ring: #9ab7d8;           /* ring inset columna de hoy */
-  --ag-hatch: rgba(120, 134, 158, .05); /* color del hatching fuera-de-horario */
+  /* Fuera de horario. ES TRANSLÚCIDO A PROPÓSITO, y ése es el arreglo entero:
+     opaco daba #f1f4f7 plano y TAPABA las líneas de hora —el fondo del
+     .fc-non-business se pinta en la capa .fc-timegrid-col-bg (z-index 2), por
+     encima de la tabla de slots (z-index 1) que dibuja las líneas—, así que una
+     franja de varias horas o una columna entera de sábado dejaban de parecer
+     calendario y parecían un hueco. Como tinte deja ver la rejilla debajo: la
+     franja sigue leyéndose como rejilla, sólo que apagada.
+     Sobre el blanco de la rejilla compone ≈#fafbfc, 1.6 puntos de luminosidad
+     por debajo: se nota que ahí no se atiende y no pesa. */
+  --ag-offhours-bg: rgba(120, 134, 158, .04);
   /* Sombra tarjeta (claro) */
   --ag-shadow-card: 0 1px 2px rgba(16, 32, 64, .05);
   --ag-shadow-pop: 0 12px 28px rgba(16, 32, 64, .14);
@@ -121,6 +137,25 @@
   --ag-status-attended-dot: #0f766e;   --ag-status-attended-text: #0d5f59;
   --ag-status-attended-bg: #e6f4f2;    --ag-status-attended-border: #bfe0dc;
 
+  /* ÉXITO — NO ES UN ESTADO DE CITA, y por eso no vive en la tabla de arriba.
+     Es el verde de «la operación salió» (hoy: el acuse del modal de invitación).
+     Nació colgado de --ag-status-confirmed-* porque los dos verdes coincidían,
+     y esa coincidencia es un ACCIDENTE: mientras colgara de ahí, retocar el
+     color del estado «confirmada» —cosa que este rediseño puede hacer— le movía
+     el color a un acuse que no habla de ninguna cita confirmada. Los valores
+     son los que el acuse tenía efectivamente pintados; separarlos NO cambia
+     un píxel hoy, cambia quién los puede mover mañana.
+     ⚠️ Si algún día hace falta un verde de éxito FUERA de la agenda, éste es el
+     que se renombra; no se duplica. */
+  /* ⚠️ El texto es #157e3c y NO #15803d, que es lo que el acuse tenía pintado.
+     Ese verde daba 4.4881:1 sobre el fondo de aquí — a catorce diezmilésimas de
+     AA. No era regresión, venía así, pero darle token propio congelaba un valor
+     que no pasa, y bajar 1.4 puntos de luminosidad (mismo tono, misma
+     saturación) lo deja en 4.60:1 sin que el ojo lo note. */
+  --ag-success-text: #157e3c;
+  --ag-success-bg: #e7f6ec;
+  --ag-success-border: #bfe6cb;
+
   /* EVENTO GENÉRICO SIN PACIENTE — la paleta DEFINITIVA del rediseño: seis
      colores, un token por color, y el fondo/borde se derivan con color-mix.
      Uno solo en vez de cuatro tokens por color para que ajustar un tono siga
@@ -148,13 +183,24 @@
      gris de «no asistió» (3.08:1 entre ellos) y `bronce` 25 por debajo del
      rojo. Quien añada un color mañana tiene que mirar las dos cosas.
 
+     ⚠️ `carmin` YA SE AJUSTÓ POR ESE SEGUNDO EJE (era #be185d), y es el ejemplo
+     de por qué mirar sólo el hue no basta: estaba a 24.9° del rojo de
+     «cancelada», que parecía holgado, pero a sólo 8.6 puntos de luminosidad. En
+     la vista de Mes, donde el color entra en un punto de 7 px y no queda ni
+     texto ni borde que desempate, un evento en carmín y una cita cancelada se
+     confundían. #9d174d lleva esa separación a ~15 puntos. El hue casi no se
+     mueve (335.0° → 335.8°): lo que separa aquí es la claridad, igual que en
+     `grafito` y en `bronce`.
+     El identificador es lo único que viaja a la base, así que cambiar el hex
+     NO es una migración.
+
      Los seis pasan AA sobre texto blanco; el más apretado es `oliva`, 4.99:1.
 
      ⚠️ Se consumen por interpolación (`var(--ag-evento-${color})`), igual que
      los de estado: un token que falte no da error, deja el evento sin color. */
   --ag-evento-indigo: #3730a3;
   --ag-evento-magenta: #a21caf;
-  --ag-evento-carmin: #be185d;
+  --ag-evento-carmin: #9d174d;
   --ag-evento-oliva: #4d7c0f;
   --ag-evento-bronce: #78350f;
   --ag-evento-grafito: #1f2937;
@@ -578,12 +624,58 @@ body {
 .fc {
   font-family: system-ui, -apple-system, sans-serif;
   font-size: 13px;
-  --fc-border-color: #f1f5f9;
-  --fc-today-bg-color: #eff6ff;
-  --fc-highlight-color: #dbeafe;
+
+  /* TEMA NATIVO. Cuatro de éstas tenían aquí un hex horneado que repetía una
+     superficie o una línea ya tokenizada (--fc-border-color, --fc-page-bg-color,
+     --fc-today-bg-color, --fc-highlight-color): tenerlo dos veces era la receta
+     para que divergieran, y ahora salen del token.
+     Las otras dos NO estaban horneadas, caían al valor por defecto de la
+     librería —un gris neutro y un rojo— y lo que se hace con ellas es
+     ADOPTARLAS: --fc-neutral-bg-color y --fc-now-indicator-color pasan a la
+     paleta de la agenda por primera vez.
+     ⚠️ VAN EN EL ROOT .fc, NUNCA EN EL WRAPPER .agenda-fc: este bloque las
+     declara en el propio root, y una declaración en el wrapper quedaría
+     sombreada por ésta (ver la nota del bloque dark).
+     Las que van por var() NO se repiten en dark: el token ya cambia solo. En
+     dark sólo se redeclara la que necesita OTRO token. */
+  --fc-border-color: var(--ag-hairline);
+  --fc-page-bg-color: var(--ag-surface);
+  --fc-neutral-bg-color: var(--ag-chip-bg);
+  --fc-non-business-color: var(--ag-offhours-bg);
+  --fc-today-bg-color: var(--ag-today-bg);
+  /* El .85 de la línea de «ahora» vive AQUÍ, en el alfa del color, y no como
+     `opacity` sobre el elemento. Con `opacity` la atenuación caía también sobre
+     la píldora de la hora que la línea contiene, y le hundía el contraste del
+     texto (3.19:1 en claro, 2.60:1 en oscuro, contra el 4.5:1 que pide WCAG
+     1.4.3 a 10.5 px). En el alfa del borde el resultado visual de la línea es
+     el mismo y el contenido queda a opacidad plena. */
+  --fc-now-indicator-color: color-mix(in srgb, var(--ag-now-line) 85%, transparent);
   --fc-event-border-color: transparent;
-  --fc-page-bg-color: #ffffff;
+  /* ⚠️ NO CABLEES AQUÍ --fc-event-selected-overlay-color. Se intentó y se
+     revirtió: no es una superficie ni una línea del tema, es el INDICADOR DE
+     FOCO DE TECLADO de cada cita (.fc-event-selected:after, .fc-event:focus
+     :after; los eventos son focusables porque hay eventClick y
+     getSegAnchorAttrs les pone tabIndex 0). El default de la librería —negro al
+     25%— es lo que lo hace visible en las dos paletas; sustituirlo por un tinte
+     de marca al 8% lo dejaba invisible. Si el foco de las citas merece
+     tratamiento propio, es un trabajo aparte con su verificación en claro y en
+     oscuro.
+     Tampoco --fc-list-event-hover-bg-color: @fullcalendar/list no está
+     instalado, así que hoy no la lee nadie. Entra con la dependencia. */
+  /* ⚠️ --fc-highlight-color SE QUEDA EN HEX A PROPÓSITO. El único token --ag-*
+     con este valor es --ag-status-scheduled-bg, y engancharlo ahí ataría la
+     selección de un hueco al color del estado «programada»: el mismo enganche
+     accidental que --ag-success-* acaba de deshacer. Un hueco que arrastras no
+     es una cita programada. Si algún día molesta, lo que toca es un token
+     propio de selección, no reusar uno de estado. */
+  --fc-highlight-color: #dbeafe;
+  /* --fc-timegrid-slot-height NO se toca: la altura la fija .fc-timegrid-slot
+     con !important a 2.16rem y hay una nota que pide no reducirla. */
 }
+
+/* Cifras de ancho fijo en toda la agenda. Sin esto los dígitos cambian de
+   ancho y la columna de horas tiembla al navegar entre días. */
+.fc, .agenda-fc { font-variant-numeric: tabular-nums; }
 
 /* Toolbar */
 .fc .fc-toolbar {
@@ -746,9 +838,16 @@ body {
   box-shadow: inset 0 0 0 1.5px var(--ag-today-ring);
 }
 
-/* Bordes de grilla — ultra suaves */
-.fc .fc-scrollgrid { border-color: #f1f5f9 !important; }
-.fc td, .fc th    { border-color: #f1f5f9 !important; }
+/* Bordes de grilla — ultra suaves. Los pinta la propia hoja de FullCalendar
+   (.fc-theme-standard sobre .fc-scrollgrid y sobre td/th) con
+   --fc-border-color, ya apuntado a --ag-hairline. Las dos reglas que aquí
+   clavaban #f1f5f9 con !important se retiraron.
+   ⚠️ NO era el mismo valor: --ag-hairline es #eef1f6. Se cambia un hex por otro
+   a tres unidades de distancia por canal —equivalencia visual, no identidad—, y
+   lo mismo vale para --fc-today-bg-color, donde el #eff6ff horneado pasó a
+   --ag-today-bg (#eff4f9). Si algún día alguien mide y le salen números que no
+   cuadran con el original, es esto y es deliberado: gana tener una sola fuente
+   por línea y por superficie. */
 
 /* Líneas de hora del time-grid — token (contraparte oscura en sub-fase 6) */
 .fc-timegrid .fc-timegrid-slot { border-color: var(--ag-hour-line) !important; }
@@ -884,35 +983,99 @@ body {
 .fc .fc-daygrid-event        { border-radius: 6px !important; }
 .fc .fc-timegrid-event       { border-radius: 6px !important; margin: 0 1px !important; }
 
-/* Now-indicator — línea fina roja con punto */
+/* Now-indicator — línea fina roja sobre la columna de hoy, con la hora pegada
+   a su extremo izquierdo. El gutter ya no marca nada.
+
+   ⚠️ `border-width` VA EN LA FORMA DE CUATRO VALORES, y no es cosmética. La
+   forma de un solo valor (`2px`) aplica a los CUATRO lados, y como el nativo
+   deja `border-style: solid` en todos y el elemento no tiene altura, lo que se
+   pintaba no era una línea de 2 px sino una banda de 4 px (arriba + abajo) con
+   dos tapas laterales. El nativo usa `1px 0 0` por esta razón.
+
+   ⚠️⚠️ EL !important DEL ANCHO HACE FALTA. MEDIDO EN PANTALLA: sin él la línea
+   sale de 1 px, o sea que gana la regla nativa. Se retiró una vez razonando que
+   FullCalendar inyecta su hoja AL PRINCIPIO del <head>
+   (core/internal-common.js:31-35: `insertBefore` del primer script/link/style),
+   lo que a igual especificidad la dejaría por detrás de ésta. En el navegador
+   NO se comporta así. No lo vuelvas a quitar por ese razonamiento: está
+   comprobado y es falso.
+
+   El `border-color` NO se declara aquí a propósito: lo pinta la regla nativa
+   con --fc-now-indicator-color, que desde la fase B sale de --ag-now-line.
+
+   ⚠️ Y AQUÍ NO VUELVE UN `opacity`. Lo hubo (.85) y era un error de
+   accesibilidad: la opacidad de un elemento se aplica al GRUPO, así que
+   atenuaba también la píldora de la hora que este elemento contiene y le
+   hundía el contraste del texto por debajo de AA. El .85 vive ahora en el alfa
+   de --fc-now-indicator-color, donde afecta a la línea y a nada más. */
 .fc .fc-timegrid-now-indicator-line {
-  border-color: var(--ag-now-line) !important;
-  border-width: 2px !important;
-  opacity: .85;
-}
-.fc .fc-timegrid-now-indicator-arrow {
-  border: none !important;
-  width: 8px;
-  height: 8px;
-  background: var(--ag-now-line);
-  border-radius: 50%;
-  margin-top: -4px;
-  margin-left: -4px;
+  border-width: 2px 0 0 0 !important;
 }
 
-/* Selección de slot */
-.fc .fc-highlight { background: #dbeafe !important; border-radius: 6px; }
+/* El marcador del eje se apaga. FullCalendar monta SIEMPRE los dos elementos
+   —flecha en el gutter, línea en la columna— aunque `nowIndicatorContent`
+   devuelva null para uno; sin esta regla el triángulo rojo nativo (dibujado
+   entero con bordes: `border-width: 5px 0 5px 6px` y dos lados transparentes)
+   reaparecería en la columna de horas, ahora duplicando lo que ya dice la
+   píldora. Se oculta en vez de neutralizar declaración por declaración: es una
+   línea contra siete, y no deja restos que alguien crea vivos.
+   Sin !important: el nativo no declara `display`, así que no hay disputa. */
+.fc .fc-timegrid-now-indicator-arrow { display: none; }
 
-/* Horas fuera del horario de consulta — patrón diagonal "no disponible" */
-.fc .fc-non-business {
-  background: repeating-linear-gradient(
-    135deg,
-    var(--ag-hatch),
-    var(--ag-hatch) 6px,
-    transparent 6px,
-    transparent 12px
-  ) !important;
+/* La píldora de la hora, DENTRO de la línea (page.tsx la inyecta en la rama
+   `isAxis: false`). Se solapa con lo que haya en la columna a esa hora, y eso
+   es deliberado: en el gutter sobraba sitio pero el marcador quedaba lejos del
+   día al que se refiere.
+   Va por encima de las tarjetas sin pedir z-index propio: hereda el de la línea
+   que la contiene (nativo, z-index 4), que ya gana a .fc-timegrid-col-events
+   (z-index 3).
+   `top: 0` es el borde superior de la caja de relleno, o sea justo bajo el
+   borde de 2 px que ES la línea; `translateY(-50%)` la centra sobre ella, como
+   estaba el punto del gutter.
+
+   El fondo es --ag-now-pill-bg y NO --ag-now-line: sobre la línea el texto
+   blanco a 10.5 px no llega a AA. Ver la nota del token.
+
+   ⚠️ DEFECTO CONOCIDO Y ACEPTADO: se recorta por arriba. El contenedor del
+   indicador (.fc-timegrid-now-indicator-container) es `overflow: hidden`, así
+   que mientras la línea esté a menos de ~8 px del origen de la rejilla, a la
+   píldora le falta la mitad superior. Son unos siete minutos al día, PERO con
+   «Compactar» encendido la rejilla empieza en la hora de apertura de la
+   clínica, así que esos siete minutos caen justo en la apertura, todos los
+   días. No se arregla porque la salida sería sacar la píldora del contenedor, y
+   entonces pierde el z-index 4 que hereda de la línea —el que la mantiene por
+   encima de las tarjetas de cita— y habría que reconstruirlo a mano. */
+.fc .ag-hora-ahora {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translateY(-50%);
+  padding: 1px 4px;
+  border-radius: 999px;
+  background: var(--ag-now-pill-bg);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
+
+/* Selección de slot — el fondo lo pone la regla nativa .fc .fc-highlight con
+   --fc-highlight-color (mismo #dbeafe); aquí sólo queda la esquina redondeada. */
+.fc .fc-highlight { border-radius: 6px; }
+
+/* Horas fuera del horario de consulta — un VELO, ni textura ni bloque.
+   Fue rayado diagonal (competía con los eventos: la rejilla se veía tejida y un
+   evento de fondo claro encima se perdía dentro) y fue plano opaco (tapaba las
+   líneas de hora y la franja parecía un agujero de render). El velo es lo que
+   queda: apaga la zona y deja la rejilla visible debajo.
+   ⚠️ LA TRANSPARENCIA VIVE EN EL TOKEN. Si alguien convierte --ag-offhours-bg
+   en un color sólido «para simplificar», vuelve el agujero.
+   Aquí NO hay regla propia: quien pinta es la nativa .fc .fc-non-business con
+   --fc-non-business-color, que el bloque .fc apunta a --ag-offhours-bg. La
+   había, empataba en especificidad con la nativa y perdía, y las dos resolvían
+   al mismo token: no hacía nada. */
 
 /* Más eventos — "+N más" (sub-fase 7), alineado bajo los chips */
 .fc .fc-daygrid-more-link {
@@ -956,10 +1119,17 @@ body {
    .fc .fc-day-today (#e8f2ff, intacta para el time-grid). */
 .fc-daygrid .fc-day-today { background: var(--ag-month-today-bg) !important; }
 
-/* Fin de semana / inhábil — en Mes el hatching de celda completa se ve
-   pesado: se neutraliza SOLO aquí. El time-grid conserva su hatching
-   (la global .fc .fc-non-business NO se toca). El fondo lo da --ag-month-weekend. */
-.fc-daygrid .fc-non-business { background-image: none !important; }
+/* Fin de semana / inhábil — en Mes la celda entera es fuera de horario, y la
+   superficie inerte del time-grid a celda completa se ve pesada: se neutraliza
+   SOLO aquí para que Mes use SU fondo de celda (--ag-month-weekend en sábado y
+   domingo, --ag-month-other-day si además es de otro mes; ambos los pinta el
+   <td> de debajo, y .fc-non-business es un div superpuesto).
+   ⚠️ Antes esto anulaba `background-image` porque el fuera de horario era un
+   rayado. Ahora es un COLOR, así que hay que anular el background-color o se
+   colaría encima tapando los dos fondos de Mes. Por eso `transparent` y no un
+   fondo concreto: el que corresponde ya está debajo, y forzar aquí
+   --ag-month-weekend pintaría de fin de semana los sábados de otro mes. */
+.fc-daygrid .fc-non-business { background: transparent !important; }
 
 /* Popover del "+N más" (antes sin estilo). */
 .fc-daygrid .fc-popover,
@@ -1006,10 +1176,25 @@ html.dark {
   --ag-faint: #5d6b80;
   /* Marca: --ag-brand-* NO se tocan */
   --ag-now-line: #f87171;
-  /* Today / hatch / sombras */
+  /* Píldora de la hora (ver la nota de la variante clara). Aquí la línea es más
+     clara todavía —blanco encima da 2.77:1—, así que baja 27 puntos de
+     luminosidad conservando la saturación (90). Blanco encima: 5.37:1, y 3.11:1
+     contra la superficie de la tarjeta (#1E1E1E), que es lo que hace que la
+     píldora se recorte como forma y no se funda con el fondo. */
+  --ag-now-pill-bg: #d60b0b;
+  /* Today / fuera de horario / sombras */
   --ag-today-bg: rgba(47, 111, 237, .10);
   --ag-today-ring: rgba(91, 140, 255, .30);
-  --ag-hatch: rgba(255, 255, 255, .03);
+  /* Fuera de horario (translúcido por lo mismo que en claro: deja ver las
+     líneas de hora). Un velo negro, que oscurece sin mover el tono.
+     ⚠️ LA SUPERFICIE DE LA REJILLA EN OSCURO NO ES --ag-bg-main (#0f1828). La
+     tarjeta de la agenda es un `.bg-white`, y ThemeProvider lo repinta a
+     #1E1E1E con !important (layout/ThemeProvider.tsx:117); ése es el fondo real
+     sobre el que compone este velo. Sobre #1E1E1E da ≈#1a1a1a: 1.6 puntos de
+     luminosidad por debajo, los mismos que en claro. Por eso el velo es negro
+     puro y no un azul de la familia — el fondo que hay debajo es gris neutro,
+     no azulado. */
+  --ag-offhours-bg: rgba(0, 0, 0, .14);
   --ag-shadow-card: 0 1px 3px rgba(0, 0, 0, .45);
   --ag-shadow-pop: 0 12px 28px rgba(0, 0, 0, .55);
   /* Chip médico */
@@ -1043,6 +1228,11 @@ html.dark {
      el color base con alfa. Ver la nota de la variante clara. */
   --ag-status-attended-dot: #2dd4bf;   --ag-status-attended-text: #7ee8dd;
   --ag-status-attended-bg: rgba(15, 118, 110, .20);   --ag-status-attended-border: rgba(45, 212, 191, .34);
+  /* Éxito (NO es estado de cita — ver la nota de la variante clara). Los valores
+     son los que el acuse tenía pintados colgando de --ag-status-confirmed-*. */
+  --ag-success-text: #7eecb4;
+  --ag-success-bg: rgba(22, 163, 74, .18);
+  --ag-success-border: rgba(52, 211, 153, .34);
   /* Evento genérico en oscuro: los mismos seis, derivados con el criterio que
      ya usaban los pares claro→oscuro de esta hoja —mismo hue, luminosidad
      subida a L50-76, contraste sobre el fondo #0f1828 entre 5.9 y 12—.
@@ -1058,7 +1248,23 @@ html.dark {
      hace falta más, la palanca es el token oscuro de «no asistió», no éste. */
   --ag-evento-indigo: #818cf8;
   --ag-evento-magenta: #e879f9;
-  --ag-evento-carmin: #f472b6;
+  /* carmin. Aquí la contraparte NO se saca copiando el hue del claro, y conviene
+     saber por qué antes de «corregirlo».
+     El par a batir es «cancelada» oscura (#f87171). El #f472b6 histórico se
+     separaba SÓLO por hue (31.4°, razón de luminancia 1.04), que es justo lo
+     que en claro se demostró insuficiente para el punto de 7 px de la vista Mes.
+     Un intento intermedio (#ee689d, hue 336 como el claro) empeoró el asunto:
+     acercaba el hue a 23.7° sin ganar claridad.
+     #f391ca se separa por los DOS ejes: 34.9° de hue y 1.28 de razón de
+     luminancia. Su par más apretado pasa a ser `magenta` (33.1° / 1.14), que
+     sigue holgado —el peor par ya aceptado de esta paleta es grafito contra «no
+     asistió», 3.4° y 1.36—. Contraste 7.71:1 sobre la superficie real de la
+     tarjeta (#1E1E1E), dentro del rango de los otros cinco (5.5-11).
+     ⚠️ Se aparta 10.7° del hue del carmín claro (335.8° → 325.1°) y su L queda
+     en el techo de la banda (76). Las dos cosas son el precio de separarlo por
+     claridad sin salirse de la familia; quien lo retoque tiene que volver a
+     medir contra `magenta` y contra «cancelada», no sólo contra una. */
+  --ag-evento-carmin: #f391ca;
   --ag-evento-oliva: #a3e635;
   --ag-evento-bronce: #e2a36b;
   --ag-evento-grafito: #7f96b8;
@@ -1083,23 +1289,30 @@ html.dark {
 }
 
 /* ── PARTE B — FullCalendar: vars nativas --fc-* en dark. Se definen en el
-   ROOT .fc (no en el wrapper .agenda-fc): el bloque .fc{} (líneas ~212-216)
-   re-declara estas vars en el propio root, así que ponerlas en el wrapper
-   queda SOMBREADO. Sigue NAMESPACED (.agenda-fc .fc) → sólo aplica dentro
-   de la agenda, nunca a un `.fc` suelto. */
+   ROOT .fc (no en el wrapper .agenda-fc): el bloque .fc{} re-declara estas
+   vars en el propio root, así que ponerlas en el wrapper queda SOMBREADO.
+   Sigue NAMESPACED (.agenda-fc .fc) → sólo aplica dentro de la agenda, nunca
+   a un `.fc` suelto.
+   ⚠️ AQUÍ YA CASI NO HAY NADA, y no es un olvido: desde que el bloque .fc{}
+   apunta cada --fc-* a un token --ag-*, el modo oscuro lo resuelve el propio
+   token. Sólo sobreviven las dos que en oscuro necesitan OTRA cosa. No
+   devuelvas aquí las que faltan: duplicarían el valor y volverían a divergir. */
 html.dark .agenda-fc .fc {
-  --fc-border-color: rgba(255, 255, 255, .07);
-  --fc-today-bg-color: rgba(47, 111, 237, .10);
+  /* En claro la página de la rejilla es la superficie de tarjeta (--ag-surface,
+     blanca); en oscuro la rejilla es el fondo principal y las tarjetas quedan
+     POR ENCIMA (--ag-surface es #1b2a40, más claro). Son tokens distintos
+     porque son papeles distintos, no por descuido. */
+  --fc-page-bg-color: var(--ag-bg-main);
+  /* El azul de selección en oscuro. Sigue en literal por lo mismo que la
+     variante clara: el único --ag-* con este valor es un token de ESTADO. */
   --fc-highlight-color: rgba(47, 111, 237, .18);
-  --fc-page-bg-color: #0f1828;
-  --fc-neutral-bg-color: #16233a;             /* ◆ neutro oscuro p/ popover y celdas deshabilitadas */
-  /* --fc-event-border-color queda transparent (no se toca) */
 }
 
 /* ── PARTE C — Overrides namespaced de reglas .fc con hex claro horneado.
    Las reglas ya tokenizadas (today-col time-grid, hour/col lines,
-   now-indicator, hatch, more-link, bloque Mes .fc-daygrid, .fc-toolbar-title
-   que usa --ag-ink) se resuelven solas con la Parte A y NO se repiten. */
+   now-indicator, fuera de horario, more-link, bloque Mes .fc-daygrid,
+   .fc-toolbar-title que usa --ag-ink) se resuelven solas con la Parte A y NO
+   se repiten. */
 
 /* Toolbar (global .fc .fc-toolbar: bg #ffffff + border #f1f5f9) */
 html.dark .agenda-fc .fc-toolbar {
@@ -1126,14 +1339,18 @@ html.dark .agenda-fc .fc-timegrid .fc-col-header-cell {
   border-bottom-color: var(--fc-border-color) !important;
 }
 
-/* Marco + líneas grises horneadas (#f1f5f9). Mes ya cubierto por --ag-month-gap;
-   el override de td/th se acota a .fc-timegrid para no pisar la rejilla de Mes. */
-html.dark .agenda-fc .fc-scrollgrid { border-color: var(--ag-border-card) !important; }
-html.dark .agenda-fc .fc-timegrid td,
-html.dark .agenda-fc .fc-timegrid th { border-color: var(--ag-hour-line) !important; }
+/* Marco del scrollgrid. El !important sobra desde que la regla clara que
+   horneaba #f1f5f9 ya no existe: contra la nativa .fc-theme-standard
+   .fc-scrollgrid (2 clases) esta gana por especificidad (3 clases). Y NO se
+   retira la regla entera: el marco usa --ag-border-card a propósito, más
+   marcado que las líneas internas, así que --fc-border-color no la sustituye.
+   Las líneas de td/th del time-grid sí las cubre ya --fc-border-color
+   (--ag-hairline, rgba .08 contra el rgba .07 que había: imperceptible), y su
+   override se retiró. Mes sigue cubierto por --ag-month-gap. */
+html.dark .agenda-fc .fc-scrollgrid { border-color: var(--ag-border-card); }
 
-/* Selección de slot (global .fc .fc-highlight: #dbeafe) */
-html.dark .agenda-fc .fc-highlight { background: var(--fc-highlight-color) !important; }
+/* La selección de slot ya no necesita override: la pinta la regla nativa
+   .fc .fc-highlight con --fc-highlight-color, que este bloque redeclara. */
 
 /* ── PARTE C-bis — Marca de "hoy" ACLARADA en dark (decisión PO 🟠1/handoff).
    El navy de marca saturado se perdería contra el fondo #0f1828, así que se
