@@ -63,3 +63,13 @@ docs/b2-design-report.md
 # Docs locales (no commitear nada de docs/)
 docs/
 *:Zone.Identifier
+
+# Excepción: docs/mockups/ SÍ se versiona.
+# Son la referencia visual contra la que se implementa el rediseño de la agenda:
+# quien trabaje en ello necesita tenerlos delante para comparar contra lo que sale
+# en pantalla. Hacen falta las tres líneas porque git no entra a mirar dentro de un
+# directorio ignorado: primero se desbloquea docs/, luego se vuelve a ignorar todo
+# su contenido, y al final se exceptúa la subcarpeta que queremos.
+!docs/
+docs/*
+!docs/mockups/
