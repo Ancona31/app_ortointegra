@@ -116,23 +116,29 @@
  * aquí. Un `getUTCHours()` a ciegas cambia un bug por otro.
  */
 
-import type { Horario } from '@/lib/configApp'
+import type { DiaSemana, Horario, HorarioDia } from '@/lib/configApp'
 
 /**
- * Suelo de la ventana: la rejilla nunca enseña MENOS que 07:00–21:00.
+ * La ventana POR DEFECTO de la agenda: 07:00–21:00, exactamente la misma que
+ * la rejilla tenía clavada antes del rediseño.
  *
- * ⚠️  ESTO NO ES UNA POLÍTICA DE PRODUCTO. Es compatibilidad temporal.
+ * ⚠️  EL REDISEÑO NO LA RETIRÓ: LA CONVIRTIÓ EN EL ESTADO APAGADO DE UN BOTÓN.
  *
- * 07:00–21:00 es exactamente lo que la rejilla tenía clavado antes de este
- * arreglo. Sin este suelo, una clínica que atiende de 16:00 a 20:00 pasaría
- * de catorce horas de rejilla a cuatro el primer día y para todos: un cambio
- * visual grande, y una decisión estética —cuánto día se enseña— que le toca
- * al rediseño de la agenda, no a un commit de corrección.
+ * Encoger la rejilla al horario real es lo que hace el botón «Compactar», y lo
+ * hace porque alguien lo pide. Hacerlo para todos y sin pedirlo era otra cosa:
+ * una clínica que atiende de 16:00 a 20:00 habría pasado de catorce horas de
+ * rejilla a cuatro el primer día, un cambio visual grande y sin marcha atrás
+ * —no había dónde pulsar para recuperar la rejilla de siempre—. Con el botón
+ * la hay, y por eso este suelo sobrevivió al rediseño que iba a borrarlo.
  *
- * El rediseño es dueño de este número: puede bajarlo, subirlo, hacerlo
- * configurable o borrarlo. Hasta entonces se queda.
+ * Sigue siendo el suelo del modo normal: `calcularVentanaRejilla` la usa de
+ * semilla salvo que se le pase `{ compacta: true }`.
+ *
+ * ⚠️  QUIEN LA RETIRE TIENE QUE RETIRAR TAMBIÉN EL BOTÓN. Sin ella, el estado
+ * apagado del botón deja de existir: los dos estados darían la misma rejilla y
+ * el control quedaría mintiendo, encendido y apagado sin diferencia visible.
  */
-export const VENTANA_MINIMA_PRE_REDISENO = { inicioHora: 7, finHora: 21 } as const
+export const VENTANA_AMPLIA = { inicioHora: 7, finHora: 21 } as const
 
 const MINUTOS_POR_HORA = 60
 const MINUTOS_DEL_DIA = 24 * MINUTOS_POR_HORA
@@ -288,6 +294,35 @@ export function ventanaDeEventos(
 }
 
 /**
+ * Las horas de un día del horario, ya leídas. `null` si el día NO ABRE: o no
+ * está activo, o sus cadenas no son horas.
+ *
+ * ⚠️  UN `fin <= inicio` NO SALE POR AQUÍ. Es legible, así que vuelve con sus
+ * dos números; qué hacer con él es cosa de cada llamador, y no coinciden:
+ * `ventanaDeHorario` lo trata como día entero (ver el aviso de ahí abajo) y
+ * `diasOcultables` lo cuenta como cerrado. Este helper existe para que la
+ * LECTURA sea una sola —el día que el formato de `HorarioDia` cambie, se toca
+ * aquí y ya—, no para unificar dos políticas que son distintas a propósito.
+ *
+ * ⚠️  ESA DIVERGENCIA TIENE UNA CONSECUENCIA, Y NO ES TEÓRICA. Un horario
+ * NOCTURNO (sábado de 22:00 a 02:00) es `fin <= inicio`, así que abre la rejilla
+ * de par en par por el eje vertical y a la vez cuenta como CERRADO por el de
+ * columnas: una clínica así, en una semana sin citas el sábado, PIERDE LA
+ * COLUMNA DEL SÁBADO al compactar. Se acepta a sabiendas —el modo compacto se
+ * apaga con el botón y la columna vuelve— y hay al menos una clínica en
+ * producción con un día configurado de madrugada. Si algún día molesta, lo que
+ * hay que arreglar es que el horario nocturno sea representable, no unificar
+ * estas dos lecturas.
+ */
+function horasDeDia(dia: HorarioDia | undefined): { inicio: number; fin: number } | null {
+  if (!dia?.activo) return null
+  const inicio = hhmmAMinutos(dia.inicio)
+  const fin = hhmmAMinutos(dia.fin)
+  if (inicio === null || fin === null) return null
+  return { inicio, fin }
+}
+
+/**
  * El tramo que abarca el horario de consulta.
  *
  * Toma TODOS los días activos, no sólo los que la vista tiene delante: si no,
@@ -299,10 +334,9 @@ export function ventanaDeHorario(horario: Horario): Tramo | null {
   let hasta = Number.NEGATIVE_INFINITY
 
   for (const dia of Object.values(horario)) {
-    if (!dia?.activo) continue
-    const inicio = hhmmAMinutos(dia.inicio)
-    const fin = hhmmAMinutos(dia.fin)
-    if (inicio === null || fin === null) continue
+    const horas = horasDeDia(dia)
+    if (!horas) continue
+    const { inicio, fin } = horas
 
     /* ⚠️  HORARIO NOCTURNO (22:00–02:00): EL DÍA ENTERO, NO EL DESCARTE.
        Un fin que no es posterior al inicio no cabe en una ventana de un solo
@@ -351,14 +385,29 @@ function techoDeHora(minutos: number): number {
  * `rango` puede llegar `null` en el primer render, antes de que la vista haya
  * dicho qué fechas tiene pintadas; entonces manda el horario con su suelo, que
  * no depende de qué semana se esté mirando.
+ *
+ * Con `opciones.compacta` la semilla de `VENTANA_AMPLIA` no se aplica y la
+ * ventana es sólo la unión de horario y eventos: es lo que enciende el botón
+ * «Compactar» de la agenda. Por defecto está APAGADO y el resultado es
+ * exactamente el de siempre.
+ *
+ * ⚠️  LA GARANTÍA NO SE PIERDE AL COMPACTAR. Los eventos siguen entrando en la
+ * unión igual que en modo normal: compactar quita el SUELO, no los eventos. Una
+ * cita a las 06:00 abre la ventana hasta las 06:00 con el botón encendido y con
+ * el botón apagado.
  */
 export function calcularVentanaRejilla(
   eventos: readonly EventoParaVentana[],
   rango: RangoVisible | null,
   horario: Horario,
+  opciones?: { compacta?: boolean },
 ): VentanaRejilla {
-  let desde = VENTANA_MINIMA_PRE_REDISENO.inicioHora * MINUTOS_POR_HORA
-  let hasta = VENTANA_MINIMA_PRE_REDISENO.finHora * MINUTOS_POR_HORA
+  const compacta = opciones?.compacta ?? false
+
+  /* Compactando se arranca en ±∞ para que la unión salga limpia: el primer
+     mín/máx que muerda impone su valor, sin suelo que lo tape. */
+  let desde = compacta ? Number.POSITIVE_INFINITY : VENTANA_AMPLIA.inicioHora * MINUTOS_POR_HORA
+  let hasta = compacta ? Number.NEGATIVE_INFINITY : VENTANA_AMPLIA.finHora * MINUTOS_POR_HORA
 
   const porHorario = ventanaDeHorario(horario)
   if (porHorario) {
@@ -372,28 +421,260 @@ export function calcularVentanaRejilla(
     hasta = Math.max(hasta, porEventos.hasta)
   }
 
+  /* Compactando, una clínica sin días activos y sin eventos no deja NADA que
+     medir. Una rejilla de altura cero no es un estado válido —no hay dónde
+     pulsar para crear la primera cita—, así que se cae a la ventana de siempre:
+     el modo compacto encoge lo que sobra, no borra la agenda. */
+  if (desde === Number.POSITIVE_INFINITY) {
+    desde = VENTANA_AMPLIA.inicioHora * MINUTOS_POR_HORA
+    hasta = VENTANA_AMPLIA.finHora * MINUTOS_POR_HORA
+  }
+
   const min = pisoDeHora(desde)
   /* Al menos una hora de rejilla: `slotMinTime === slotMaxTime` deja la rejilla
      sin altura y sin nada que pintar.
 
-     ⚠️  HOY ESTA LÍNEA ES INALCANZABLE, Y NO POR CASUALIDAD: EL SUELO LA TAPA.
-     Con `VENTANA_MINIMA_PRE_REDISENO` vigente, `hasta` nunca baja de 1260 y
-     `min` nunca sube de 420, así que `techoDeHora(hasta)` gana siempre y el
-     `Math.max` no llega a morder. Por eso NO tiene test: no se le puede
-     escribir uno sin retirar antes el suelo.
+     ⚠️  ESTA LÍNEA YA MUERDE. Antes del modo compacto no podía: con el suelo de
+     `VENTANA_AMPLIA` siempre aplicado, `hasta` no bajaba de 1260 ni `min` subía
+     de 420, así que `techoDeHora(hasta)` ganaba el `Math.max` siempre y esto era
+     un adorno sin test posible.
 
-     Y por eso mismo es imprescindible el día que el rediseño lo retire —es su
-     dueño, ver el aviso de `VENTANA_MINIMA_PRE_REDISENO`—: sin suelo, un
-     horario degenerado o un único evento puntual pueden dejar `desde === hasta`
-     y esta línea pasa de adorno a única defensa.
+     Con `{ compacta: true }` no hay suelo, y entonces sí: una clínica sin días
+     activos y con un solo evento de longitud cero deja `desde === hasta`, y esta
+     línea es lo único que separa a la rejilla de no tener altura. La cubre
+     `ventanaRejilla.test.ts`, en «modo compacto» — el caso del evento puntual a
+     las 09:00 que da una rejilla de una hora.
 
-     QUIEN RETIRE EL SUELO TIENE QUE ESTRENARLE UNA PRUEBA. No la borre por
-     verla sin cobertura: la falta de cobertura es consecuencia del suelo, no
-     señal de código muerto. */
+     NO LA BORRES. Ahora tiene prueba; antes no la tenía porque el suelo la
+     tapaba, no porque fuera código muerto. */
   const max = Math.max(techoDeHora(hasta), min + MINUTOS_POR_HORA)
 
   return {
     slotMinTime: aHHMMSS(min),
     slotMaxTime: aHHMMSS(Math.min(max, MINUTOS_DEL_DIA)),
   }
+}
+
+/** Medianoche local del día de `t`, como instante. */
+function inicioDelDia(t: number): Date {
+  const d = new Date(t)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+/**
+ * Los días de la semana (`getDay()`) que cubre un rango, acotado a siete.
+ *
+ * Se avanza con `setDate(+1)` —aritmética de CALENDARIO— y no sumando
+ * 86 400 000 ms: en el cambio de horario de verano un día no dura 24 horas y el
+ * recorrido se desalinearía.
+ */
+function diasDelRango(rango: RangoVisible): Set<number> {
+  const dias = new Set<number>()
+  const hasta = rango.activeEnd.getTime() - 1
+  const cursor = inicioDelDia(rango.activeStart.getTime())
+  while (cursor.getTime() <= hasta && dias.size < 7) {
+    dias.add(cursor.getDay())
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return dias
+}
+
+/**
+ * Los días de la semana que un evento TOCA, no sólo aquel en el que empieza.
+ *
+ * ⚠️  MARCAR SÓLO `start.getDay()` ESCONDÍA MEDIO EVENTO. FullCalendar trocea
+ * por día lo que cruza medianoche —este mismo módulo lo sabe, ver la rama del
+ * cruce en `tramoDeEvento`—, así que una guardia de sábado 22:00 a domingo 02:00
+ * marcaba el sábado y dejaba el domingo plegable: el trozo de 00:00 a 02:00
+ * desaparecía de la vista. Y por el otro eje ese mismo evento estiraba la
+ * rejilla hasta las 24:00 para enseñar un tramo cuya columna se acababa de
+ * borrar. Con eventos de Google multidía es peor: un congreso de viernes a lunes
+ * tapaba el sábado y el domingo marcando sólo el viernes.
+ *
+ * El fin es EXCLUSIVO: terminar exactamente a medianoche no toca el día
+ * siguiente, y por eso se recorre hasta `end - 1 ms`. Sin `end` —o con un fin
+ * que no avanza— se marca sólo el día de `start`.
+ *
+ * ⚠️  Y AHÍ LOS DOS EJES DISCREPAN, A SABIENDAS. `tramoDeEvento` SÍ replica el
+ * `defaultTimedEventDuration` de FullCalendar —una hora
+ * (`@fullcalendar/core/internal-common.js:1491`)— para el evento sin `end`, y
+ * tiene su propio aviso explicando por qué no hacerlo reabría el bug original.
+ * Esta función NO lo replica: sin `end`, sólo el día de `start`.
+ *
+ * Lo que eso significa: un evento sin fin a las 23:30 de un sábado se pintaría
+ * hasta las 00:30 del domingo, estiraría la rejilla para enseñar ese trozo, y
+ * NO protegería la columna del domingo — justo el fallo que esta función existe
+ * para no tener.
+ *
+ * HOY ES INALCANZABLE: `appointments.end_time` es `NOT NULL` en la base y la API
+ * de Google siempre devuelve `end`, así que ningún camino produce uno. Queda
+ * escrito porque la asimetría se ve rara y alguien va a querer «alinearla».
+ *
+ * ⚠️  SI SE ALINEAN, SE ALINEAN A CONCIENCIA Y CON PRUEBA. No copies la rama de
+ * `tramoDeEvento` aquí sin más: allí el fin efectivo se calcula como FECHA
+ * precisamente para que un evento sin fin a las 23:30 caiga en el día siguiente,
+ * y ese detalle es el que importa en este eje. Copiarlo a medias marca el día
+ * equivocado, que es peor que no marcarlo.
+ *
+ * El recorrido se acota al rango recibido para que un evento de meses no haga
+ * iterar meses.
+ */
+function diasTocados(ev: EventoParaVentana, rango: RangoVisible): number[] {
+  const inicio = ev.start
+  if (!inicio) return []
+  if (!ev.end || ev.end.getTime() <= inicio.getTime()) return [inicio.getDay()]
+
+  const desde = Math.max(inicio.getTime(), rango.activeStart.getTime())
+  const hasta = Math.min(ev.end.getTime() - 1, rango.activeEnd.getTime() - 1)
+  if (hasta < desde) return []
+
+  const dias: number[] = []
+  const cursor = inicioDelDia(desde)
+  while (cursor.getTime() <= hasta && dias.length < 7) {
+    dias.push(cursor.getDay())
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return dias
+}
+
+/**
+ * Los días de la semana que la rejilla puede ocultar sin esconderle nada a
+ * nadie: los que la clínica tiene CERRADOS, que el rango recibido CUBRE, y que
+ * además no tienen ni un evento pintado. Devuelve sus índices `fc`
+ * (0 = domingo), listos para el `hiddenDays` de FullCalendar.
+ *
+ * La regla es la misma que en el eje vertical y es deliberadamente binaria:
+ * **hay evento, no se colapsa; no hay evento, se colapsa.** Un domingo cerrado
+ * con una sola cita se queda ENTERO. Nada a medias — una columna medio plegada
+ * es peor que las dos alternativas.
+ *
+ * ⚠️  SÓLO SE PLIEGA LO QUE EL RANGO CUBRE. Fuera del rango no hay información:
+ * sus citas no se han traído, así que «vacío» no se puede afirmar, sólo suponer.
+ * Sin esta guarda, en la vista de DÍA —donde el botón también se pinta— el rango
+ * es un solo día y los otros seis se plegaban con datos que nadie pidió. Y no
+ * era inocuo: con un día entero oculto, `buildRangeFromDuration` llama a
+ * `skipHiddenDays` y RECALCULA el rango
+ * (`@fullcalendar/core/internal-common.js:2955-2959`, versión 6.1.20), así que
+ * desde el viernes «siguiente» saltaba al lunes y una cita del sábado no había
+ * forma de alcanzarla.
+ *
+ * ⚠️  CUENTAN TODOS LOS EVENTOS, incluidos los `allDay` y los de fondo, al revés
+ * que en `ventanaDeEventos`. El motivo es CONSERVADOR, no de layout: aquí
+ * equivocarse de más deja una columna vacía a la vista —feo y reversible con el
+ * botón—, y equivocarse de menos ESCONDE algo que existe. Ante la duda, no se
+ * pliega. (Ojo: la agenda va con `allDaySlot={false}`, así que hoy los `allDay`
+ * ni siquiera se pintan en la rejilla; la regla se queda igual porque protege
+ * del caso en que eso cambie.)
+ *
+ * ⚠️  `rango === null` DEVUELVE `[]`. Sin saber qué hay pintado no se puede
+ * saber qué está vacío, y ante la duda no se oculta: quedarse ancho es
+ * recuperable de un vistazo, esconder una columna con trabajo dentro no.
+ *
+ * ⚠️  ESTO DECIDE SOBRE `currentRange`, Y LA VISTA MES PINTA `renderRange`.
+ * Quien cablea esta función le pasa el rango `completo`, que es `currentRange`:
+ * en `dayGridMonth` eso es el mes natural, del día 1 al último. Pero esa vista
+ * no pinta el mes natural — pinta `renderRange`, que `buildDayTableRenderRange`
+ * encaja a semanas completas y `fixedWeekCount` rellena hasta seis filas
+ * (`@fullcalendar/daygrid/internal.js:949-958`). Son hasta ~12 días de relleno
+ * VISIBLES que caen fuera del rango con el que se decide aquí, así que una cita
+ * en uno de esos días no protegería su columna.
+ *
+ * Hoy no muerde, porque `compactar` se apaga solo al salir de las vistas
+ * `timeGrid*` (el efecto de `agenda/page.tsx` que vigila `currentView` e
+ * `isMobile`). Aun así el cálculo llega a correr UN FOTOGRAMA con
+ * `compactarRef.current` todavía en `true` —el ref se escribe en render y el
+ * efecto de apagado despacha después—, y eso se ve como un parpadeo de columnas
+ * plegadas al pasar de Semana a Mes. Molesto, no grave.
+ *
+ * ⚠️  PASA A FALLO REAL EL DÍA QUE «COMPACTAR» SE HABILITE EN VISTA MES. Quien
+ * lo habilite tiene que resolver esto ANTES: hacer que aquí llegue el rango que
+ * de verdad se pinta, no la unidad que la vista representa. No es un detalle a
+ * pulir después — es el requisito previo.
+ *
+ * ⚠️  NUNCA PLIEGA TODOS LOS DÍAS QUE CUBRE. Con los siete, `initHiddenDays`
+ * lanza `invalid hiddenDays` (`internal-common.js:3045`) y la agenda se cae
+ * entera; con uno solo —la vista de Día— plegarlo dispara el salto de arriba.
+ * Las dos son el mismo caso: quedarse sin ninguna columna que enseñar.
+ *
+ * `diasFc` lo pasa la página con su propia constante `DIAS`, para que este
+ * módulo no tenga que importar nada de ella.
+ */
+export function diasOcultables(
+  eventos: readonly EventoParaVentana[],
+  rango: RangoVisible | null,
+  horario: Horario,
+  diasFc: readonly { key: DiaSemana; fc: number }[],
+): number[] {
+  if (!rango) return []
+
+  /* Mismo solapamiento SEMIABIERTO que `ventanaDeEventos`, por el mismo motivo:
+     con `<=` entrarían los eventos del corte del día siguiente, que esta vista
+     no pinta. Los días salen de `getDay()` — reloj de pared del navegador, igual
+     que todo lo demás aquí (ver el aviso de la cabecera). */
+  const conEventos = new Set<number>()
+  for (const ev of eventos) {
+    if (!ev.start) continue
+    const finSolape = ev.end ?? ev.start
+    if (!(ev.start < rango.activeEnd && finSolape > rango.activeStart)) continue
+    for (const dia of diasTocados(ev, rango)) conEventos.add(dia)
+  }
+
+  const cubiertos = diasDelRango(rango)
+  const ocultables: number[] = []
+  for (const { key, fc } of diasFc) {
+    if (!cubiertos.has(fc)) continue
+    if (conEventos.has(fc)) continue
+    const horas = horasDeDia(horario[key])
+    // Cerrado es no abrir, no ser legible, o un tramo que no avanza: los tres
+    // dejan la columna sin horario que enseñar. Ver `horasDeDia`.
+    if (!horas || horas.fin <= horas.inicio) ocultables.push(fc)
+  }
+
+  return ocultables.length >= cubiertos.size ? [] : ocultables
+}
+
+/**
+ * La frase que confiesa el recorte, o `null` si no se recortó nada.
+ *
+ * Un calendario que enseña MENOS de lo que enseñaba tiene que decirlo: sin esta
+ * línea, una rejilla que empieza a las 09:00 y una semana sin domingo se leen
+ * como datos que faltan, no como una vista plegada a propósito.
+ *
+ * Las dos mitades son independientes —se puede recortar sólo el alto, sólo el
+ * ancho, o los dos—, así que la mayúscula se pone al final, sobre la frase ya
+ * montada: cuando sólo hay días ocultos, el que abre la línea es «los lunes».
+ *
+ * `diasPlural` lo pasa la página con su constante `DIAS`, igual que en
+ * `diasOcultables`, para que este módulo no importe nada de ella.
+ */
+export function avisoDeRecorte(
+  ventana: VentanaRejilla,
+  diasOcultos: readonly number[],
+  diasPlural: readonly { plural: string; fc: number }[],
+): string | null {
+  const dosDigitos = (n: number): string => String(n).padStart(2, '0')
+  const masEstrecha =
+    ventana.slotMinTime > `${dosDigitos(VENTANA_AMPLIA.inicioHora)}:00:00` ||
+    ventana.slotMaxTime < `${dosDigitos(VENTANA_AMPLIA.finHora)}:00:00`
+
+  const partes: string[] = []
+  if (masEstrecha) {
+    partes.push(`Rejilla ajustada a ${ventana.slotMinTime.slice(0, 5)}–${ventana.slotMaxTime.slice(0, 5)}`)
+  }
+
+  /* Coma entre todos menos el último, y «y» antes del último: «los sábados y
+     los domingos», «los viernes, los sábados y los domingos». Con uno solo, el
+     `slice(0, -1)` queda vacío y sale tal cual. */
+  const plegados = diasPlural.filter(d => diasOcultos.includes(d.fc)).map(d => d.plural)
+  if (plegados.length > 0) {
+    const lista = plegados.length === 1
+      ? plegados[0]
+      : `${plegados.slice(0, -1).join(', ')} y ${plegados[plegados.length - 1]}`
+    partes.push(`${lista} ocultos`)
+  }
+
+  if (partes.length === 0) return null
+  const frase = partes.join(' · ')
+  return frase.charAt(0).toUpperCase() + frase.slice(1)
 }

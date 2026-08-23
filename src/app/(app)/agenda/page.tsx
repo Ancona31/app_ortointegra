@@ -8,7 +8,7 @@ import interactionPlugin, { DateClickArg, EventResizeDoneArg } from '@fullcalend
 import { EventClickArg, EventDropArg, DateSelectArg, EventInput, EventContentArg, DayHeaderContentArg } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
 import { X, Calendar, User, Plus, Trash2, Settings, LayoutGrid, Columns3, Square, ChevronDown, FileText, Stethoscope, Loader2, Mail,
-         CalendarPlus, type LucideIcon } from 'lucide-react'
+         CalendarPlus, ChevronsDownUp, type LucideIcon } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
@@ -25,8 +25,11 @@ import { componerNombreMedicoCompleto, componerInicialesMedico } from '@/lib/nom
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { regionDeTimezone } from '@/lib/consultorios/zonas-mexico'
 import { ICONOS_EVENTO, COLORES_EVENTO, type IconoEvento, type ColorEvento } from '@/lib/appointments'
+import { rangoQuePedir } from '@/lib/agenda/rangoQuePedir'
 import {
+  avisoDeRecorte,
   calcularVentanaRejilla,
+  diasOcultables,
   type EventoParaVentana,
   type RangoVisible,
   type VentanaRejilla,
@@ -313,6 +316,43 @@ const HORARIO_DEFAULT: Horario = {
   domingo:   { activo: false, inicio: '09:00', fin: '14:00' },
 }
 
+/**
+ * Los dos rangos que publica la vista, porque el cálculo necesita los dos.
+ *
+ * ⚠️  NO SON INTERCAMBIABLES Y NO SE PUEDEN UNIFICAR. Ver `aplicarVentana`.
+ *
+ *  · `activo` es `activeRange`: lo que la vista PINTA. Ya viene recortado por
+ *    `trimHiddenDays`, así que con columnas ocultas le faltan días.
+ *  · `completo` es `currentRange`: la unidad que la vista REPRESENTA, tal como
+ *    sale de `buildCurrentRangeInfo` ANTES de que nadie recorte nada
+ *    (`@fullcalendar/core/internal-common.js:2814`, versión 6.1.20).
+ *
+ * ⚠️  `completo` NO SON SIEMPRE SIETE DÍAS, y creerlo ya costó un fallo. Depende
+ * de la vista:
+ *
+ *    · `timeGridWeek` → la semana entera, de lunes a lunes: siete días.
+ *    · `timeGridDay`  → UN solo día.
+ *    · `dayGridMonth` → el mes natural, del día 1 al último. Ojo: son ~28-31
+ *      días, pero NO incluye el relleno de semanas que esa vista sí pinta —eso
+ *      vive en `renderRange`, que es más ancho.
+ *
+ * ⚠️  DE ESE HECHO DEPENDE UNA GUARDA DE `diasOcultables`, Y NO SE PUEDE
+ * RETIRAR. Ahí se calcula el conjunto `cubiertos` —los días de la semana que
+ * este rango abarca— y se pliega sólo lo que cae dentro, con el cierre
+ * `ocultables.length >= cubiertos.size`. Las dos cosas existen justamente
+ * porque `completo` puede traer menos de siete días: en la vista de Día trae
+ * uno, y sin la guarda se plegaban los otros seis con datos que nadie pidió, o
+ * se plegaba el único que hay y FullCalendar saltaba de día
+ * (`internal-common.js:2955-2959`). Leído como «aquí siempre hay siete», ese
+ * código parece muerto y se borra; hizo falta una auditoría entera para
+ * encontrar lo que pasa cuando no está.
+ *
+ * Los dos usan las llaves de `RangoVisible` (`activeStart`/`activeEnd`) por no
+ * duplicar el tipo; en `completo` esos nombres mienten un poco, y por eso este
+ * comentario.
+ */
+type RangosDeVista = { activo: RangoVisible; completo: RangoVisible }
+
 function horarioToBusinessHours(h: Horario) {
   return DIAS.filter(d => h[d.key]?.activo).map(d => ({
     daysOfWeek: [d.fc],
@@ -509,6 +549,7 @@ const FUENTE_APPOINTMENTS = 'appointments'
 
 /** Prefijo del id temporal que lleva una cita aun no confirmada por el servidor. */
 const PREFIJO_OPTIMISTA = 'optimistic-'
+
 
 /* Antigüedad a partir de la cual volver a la pestaña sí pide datos otra vez.
    Ver el efecto de `visibilitychange`, que es quien lo justifica. */
@@ -1916,9 +1957,27 @@ export default function AgendaPage() {
      aunque el rango no se mueva (la cadena está en la cabecera de
      `ventanaRejilla.ts`). La comparación por identidad diría «cambió» y daría
      la vuelta de más: ventana → datesSet → estado → recálculo → misma ventana. */
+  /* ── EL BOTÓN «COMPACTAR» ──────────────────────────────────────────────
+     Colapsa lo que la clínica no usa, en los dos ejes: quita el suelo de
+     07:00–21:00 del cálculo de la ventana (las FILAS caen al horario real) y
+     esconde con `hiddenDays` los días cerrados y sin ningún evento (las
+     COLUMNAS). La regla es la misma arriba y a los lados: hay evento, no se
+     colapsa; no hay evento, se colapsa.
+
+     NO SE PERSISTE, y es a propósito: es una lente para mirar la semana de hoy,
+     no una preferencia de la clínica. Que se apague solo al recargar evita el
+     peor final posible —abrir la agenda un lunes, encontrarla recortada por una
+     decisión de hace tres semanas y no saber qué la recortó.
+
+     ⚠️  DECLARADO ANTES QUE `ventana`: su inicializador lo lee en el render. */
+  const [compactar, setCompactar] = useState(false)
+
   const [ventana, setVentana] = useState<VentanaRejilla>(
-    () => calcularVentanaRejilla([], null, horario),
+    () => calcularVentanaRejilla([], null, horario, { compacta: false }),
   )
+
+  /** Índices `fc` de los días plegados. Vacío = la semana entera a la vista. */
+  const [diasOcultos, setDiasOcultos] = useState<number[]>([])
 
   /* `horario` se lee del ref, no de la clausura, para que `aplicarVentana`
      conserve identidad con deps `[]`: la llaman los dos handlers del calendario
@@ -1926,11 +1985,33 @@ export default function AgendaPage() {
   const horarioRef = useRef(horario)
   horarioRef.current = horario
 
+  /* Y `compactar` por el mismo camino y por el mismo motivo. Meterlo en las
+     deps recrearía `aplicarVentana` en cada pulsación del botón, y con ella los
+     handlers que la cierran. El ref se escribe en render, igual que el de
+     arriba: cuando el efecto de más abajo llame, ya vale lo nuevo. */
+  const compactarRef = useRef(compactar)
+  compactarRef.current = compactar
+
+  /* ⚠️  LOS DOS EJES USAN RANGOS DISTINTOS, Y ES DELIBERADO. NO LOS UNIFIQUES.
+
+     · La ALTURA (`calcularVentanaRejilla`) va con el rango ACTIVO, el pintado.
+       Tiene que reflejar sólo lo que se ve: contar los eventos de una columna
+       oculta para estirar el alto daría una rejilla alta con franjas vacías y
+       sin nada a la vista que las justifique — el médico vería hueco muerto de
+       06:00 a 09:00 sin una sola cita dentro.
+
+     · Las COLUMNAS (`diasOcultables`) van con el rango COMPLETO, sin recortar.
+       Con el activo el día oculto no puede volver JAMÁS: `trimHiddenDays` lo
+       saca del rango, así que sus eventos caen fuera del filtro, así que sigue
+       vacío, así que sigue oculto. Un punto fijo del que sólo se sale
+       recargando la página. Aquí hace falta preguntar por días que ahora mismo
+       NO se están pintando, que es justo lo que el otro eje no debe hacer. */
   const aplicarVentana = useCallback((
     eventos: readonly EventoParaVentana[],
-    rango: RangoVisible | null,
+    rangos: RangosDeVista | null,
   ) => {
-    const nueva = calcularVentanaRejilla(eventos, rango, horarioRef.current)
+    const compacta = compactarRef.current
+    const nueva = calcularVentanaRejilla(eventos, rangos?.activo ?? null, horarioRef.current, { compacta })
     /* Forma funcional, y devolviendo `prev` tal cual cuando no cambia: React se
        salta el re-render por su propio camino (bail-out por identidad). Un `if`
        alrededor del `setState` haría lo mismo, pero habría que repetirlo en los
@@ -1940,12 +2021,33 @@ export default function AgendaPage() {
         ? prev
         : nueva
     )
+
+    /* ⚠️  LA MISMA DISCIPLINA PARA LAS COLUMNAS, Y AQUÍ HACE MÁS FALTA TODAVÍA.
+       `diasOcultables` devuelve un array NUEVO cada vez, así que sin comparar
+       elemento a elemento cada `eventsSet` escribiría estado, y cada escritura
+       mueve `hiddenDays` → nuevo `dateProfileGenerator` → `datesSet` → otra
+       vuelta. Con la comparación, la segunda vuelta muere en el bail-out.
+       Y con el rango COMPLETO el ciclo sí converge de verdad: el conjunto no
+       depende de qué se recortó, así que la segunda vuelta da lo mismo que la
+       primera y muere ahí. */
+    const ocultos = compacta
+      ? diasOcultables(eventos, rangos?.completo ?? null, horarioRef.current, DIAS)
+      : []
+    setDiasOcultos(prev =>
+      prev.length === ocultos.length && prev.every((d, i) => d === ocultos[i])
+        ? prev
+        : ocultos
+    )
   }, [])
 
-  /** El rango pintado, leído de la vista. `null` antes del primer `datesSet`. */
-  const rangoDeVista = useCallback((): RangoVisible | null => {
+  /** Los dos rangos de la vista. `null` antes del primer `datesSet`. */
+  const rangoDeVista = useCallback((): RangosDeVista | null => {
     const vista = calendarRef.current?.getApi().view
-    return vista ? { activeStart: vista.activeStart, activeEnd: vista.activeEnd } : null
+    if (!vista) return null
+    return {
+      activo:   { activeStart: vista.activeStart,  activeEnd: vista.activeEnd },
+      completo: { activeStart: vista.currentStart, activeEnd: vista.currentEnd },
+    }
   }, [])
 
   /* El horario es la TERCERA entrada del cálculo y llega por SWR. Si la
@@ -1957,6 +2059,32 @@ export default function AgendaPage() {
     if (!api) return
     aplicarVentana(api.getEvents(), rangoDeVista())
   }, [horario, aplicarVentana, rangoDeVista])
+
+  /* Pulsar el botón no es navegación ni alta de eventos: no llega `datesSet` ni
+     `eventsSet`, así que nadie recalcularía. Este efecto es el disparador del
+     propio botón, calcado del de arriba —que cubre al horario— porque cubre a
+     la CUARTA entrada del cálculo. `aplicarVentana` lee `compactarRef`, que ya
+     vale lo nuevo: el ref se escribe en render y el efecto corre después. */
+  useEffect(() => {
+    const api = calendarRef.current?.getApi()
+    if (!api) return
+    aplicarVentana(api.getEvents(), rangoDeVista())
+  }, [compactar, aplicarVentana, rangoDeVista])
+
+  /* ⚠️  EL ESTADO SE APAGA DONDE NO HAY BOTÓN. El control sólo se pinta en
+     escritorio y en las vistas de rejilla, pero `hiddenDays` y la ventana se
+     seguían aplicando fuera: pasar a Mes, o estrechar a móvil, dejaba columnas
+     plegadas sin ningún sitio donde pulsar para deshacerlo —y en móvil ni
+     siquiera con el aviso, que también se esconde—. Un calendario que oculta
+     información sin dar salida es peor que uno que no la oculta. */
+  useEffect(() => {
+    if (!compactar) return
+    if (isMobile || !currentView.startsWith('timeGrid')) setCompactar(false)
+  }, [compactar, isMobile, currentView])
+
+  /* Sólo con el botón encendido y en escritorio: apagado no hay nada que
+     confesar, y en móvil no hay botón que lo haya encendido. */
+  const avisoRecorte = compactar && !isMobile ? avisoDeRecorte(ventana, diasOcultos, DIAS) : null
 
   /* ── Detectar mobile y actualizar vista del calendario ── */
   useEffect(() => {
@@ -2135,14 +2263,25 @@ export default function AgendaPage() {
   const gcalSourceRef = useRef(gcalSource)
   gcalSourceRef.current = gcalSource
 
+  /* El rango pedido se fija AQUÍ, en los envoltorios, y no dentro de cada
+     fuente: es una sola regla y vale para las dos. Por qué se ensancha a
+     semanas completas, y por qué se construye desde `info` y no leyendo la
+     vista, en `rangoQuePedir`.
+
+     Sigue siendo el CUERPO de estas funciones: sus deps siguen siendo `[]` y su
+     identidad no se mueve — `rangoQuePedir` es pura y de módulo, así que no las
+     ata a nada. Eso es lo que mantiene `eventSourcesStable` estable y, con
+     ella, callado el `handleEventSources` de FullCalendar
+     (`@fullcalendar/core/index.js:1065`), que reconoce las fuentes por
+     identidad del `_raw`. Ver el aviso largo de `gcalSource`. */
   const stableAppointmentSource = useCallback(
     (info: { startStr: string; endStr: string }, success: (events: EventInput[]) => void, failure: (err: Error) => void) =>
-      appointmentSourceRef.current(info, success, failure),
+      appointmentSourceRef.current(rangoQuePedir(info), success, failure),
     []
   )
   const stableGcalSource = useCallback(
     (info: { startStr: string; endStr: string }, success: (events: EventInput[]) => void, failure: (err: Error) => void) =>
-      gcalSourceRef.current(info, success, failure),
+      gcalSourceRef.current(rangoQuePedir(info), success, failure),
     []
   )
   /**
@@ -2822,6 +2961,39 @@ export default function AgendaPage() {
               })}
             </div>
           )}
+          {/* ── COMPACTAR ─────────────────────────────────────────────────
+              Sólo en escritorio y sólo en las vistas de rejilla: en `dayGrid`
+              no hay `slotMinTime` que encoger, y en móvil la vista es de un
+              solo día, así que no habría columnas que plegar ni sitio en la
+              fila para el control. */}
+          {!isMobile && currentView.startsWith('timeGrid') && (
+            <button
+              type="button"
+              onClick={() => setCompactar(v => !v)}
+              aria-pressed={compactar}
+              aria-label="Compactar la rejilla al horario de la clínica"
+              title="Compactar la rejilla al horario de la clínica"
+              className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors"
+              style={compactar
+                ? {
+                    background: 'var(--ag-segment-active-bg)',
+                    color: 'var(--ag-segment-active-text)',
+                    boxShadow: 'var(--ag-segment-active-shadow)',
+                    border: '1px solid var(--ag-segment-active-text)',
+                  }
+                : {
+                    background: 'var(--ag-surface)',
+                    color: 'var(--ag-text)',
+                    border: '1px solid var(--ag-border-card)',
+                  }}
+            >
+              <ChevronsDownUp size={15} />
+              {/* ⚠️  `xl`, NO `sm`. La fila ya lleva cinco controles y en
+                  anchos de portátil envuelve a dos líneas. El icono y el
+                  `aria-label` se bastan por debajo de ese punto. */}
+              <span className="hidden xl:inline">Compactar</span>
+            </button>
+          )}
           {/* Filtro por médico — solo en modo multi-doctor */}
           {!isSingleDoctor && (
             <div className="relative">
@@ -2934,6 +3106,11 @@ export default function AgendaPage() {
       )}
 
       {/* ── Calendario ──────────────────────────────────── */}
+      {avisoRecorte && (
+        <p role="status" className="text-xs mb-1.5" style={{ color: 'var(--ag-muted)' }}>
+          {avisoRecorte}
+        </p>
+      )}
       <div className="agenda-fc bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden" style={{ minHeight: '70vh' }}>
         <FullCalendar
           ref={calendarRef}
@@ -2957,13 +3134,20 @@ export default function AgendaPage() {
             setCurrentView(arg.view.type)
             aplicarVentana(
               calendarRef.current?.getApi().getEvents() ?? [],
-              { activeStart: arg.view.activeStart, activeEnd: arg.view.activeEnd },
+              {
+                activo:   { activeStart: arg.view.activeStart,  activeEnd: arg.view.activeEnd },
+                completo: { activeStart: arg.view.currentStart, activeEnd: arg.view.currentEnd },
+              },
             )
           }}
           eventsSet={eventos => aplicarVentana(eventos, rangoDeVista())}
           buttonText={{ today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día' }}
           slotMinTime={ventana.slotMinTime}
           slotMaxTime={ventana.slotMaxTime}
+          /* Vacío mientras «Compactar» esté apagado. Nunca los siete: lo
+             garantiza `diasOcultables`, y `initHiddenDays` lanza si no queda
+             ningún día visible. */
+          hiddenDays={diasOcultos}
           allDaySlot={false}
           dayMaxEvents={3}
           nowIndicator

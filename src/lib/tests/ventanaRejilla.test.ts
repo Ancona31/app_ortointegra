@@ -18,14 +18,16 @@
 
 import { describe, it, expect } from 'vitest'
 import {
+  avisoDeRecorte,
   calcularVentanaRejilla,
+  diasOcultables,
   tramoDeEvento,
   ventanaDeHorario,
-  VENTANA_MINIMA_PRE_REDISENO,
+  VENTANA_AMPLIA,
   type EventoParaVentana,
   type RangoVisible,
 } from '@/lib/agenda/ventanaRejilla'
-import type { Horario } from '@/lib/configApp'
+import type { DiaSemana, Horario } from '@/lib/configApp'
 
 /** Semana del lunes 24/08/2026 al lunes 31/08/2026, como la da `datesSet`. */
 const SEMANA: RangoVisible = {
@@ -77,7 +79,7 @@ describe('calcularVentanaRejilla — el suelo previo al rediseño', () => {
   })
 
   it('el suelo son las horas que la rejilla tenía clavadas', () => {
-    expect(VENTANA_MINIMA_PRE_REDISENO).toEqual({ inicioHora: 7, finHora: 21 })
+    expect(VENTANA_AMPLIA).toEqual({ inicioHora: 7, finHora: 21 })
   })
 
   it('con todos los días inactivos, se queda en el suelo', () => {
@@ -321,5 +323,276 @@ describe('calcularVentanaRejilla — sin rango todavía', () => {
   it('en el primer render manda el horario con su suelo', () => {
     const v = calcularVentanaRejilla([evento([23, 0], [23, 30])], null, horarioDe('06:00', '22:00'))
     expect(v).toEqual({ slotMinTime: '06:00:00', slotMaxTime: '22:00:00' })
+  })
+})
+
+/* ─────────────────────────────────────────────────────────────────────
+   EL MODO COMPACTO — el botón «Compactar» de la agenda
+   ───────────────────────────────────────────────────────────────────── */
+
+describe('calcularVentanaRejilla — modo compacto', () => {
+  it('una clínica de tarde (16:00–20:00) ve exactamente su horario', () => {
+    const v = calcularVentanaRejilla([], SEMANA, horarioDe('16:00', '20:00'), { compacta: true })
+    expect(v).toEqual({ slotMinTime: '16:00:00', slotMaxTime: '20:00:00' })
+  })
+
+  it('la MISMA clínica sin compactar sigue viendo la ventana amplia', () => {
+    // El par de arriba y éste son el botón encendido y apagado. Que el segundo
+    // no se mueva es lo que hace del modo compacto una opción y no un cambio.
+    const v = calcularVentanaRejilla([], SEMANA, horarioDe('16:00', '20:00'))
+    expect(v).toEqual({ slotMinTime: '07:00:00', slotMaxTime: '21:00:00' })
+  })
+
+  it('una cita a las 06:00 sigue abriendo la ventana, también compactando', () => {
+    /* ⚠️  ESTE ES EL TEST QUE PROTEGE LA GARANTÍA DEL MÓDULO ENTERO. Compactar
+       retira el SUELO, no los eventos: una cita fuera de horario tiene que
+       estirar la rejilla hasta cubrirla igual que con el botón apagado. Si
+       alguna vez falla, el modo compacto habrá reintroducido el bug original
+       —citas que existen y no se pintan— dentro del arreglo que lo cerró. */
+    const v = calcularVentanaRejilla(
+      [evento([6, 0], [6, 30])],
+      SEMANA,
+      horarioDe('16:00', '20:00'),
+      { compacta: true },
+    )
+    expect(v).toEqual({ slotMinTime: '06:00:00', slotMaxTime: '20:00:00' })
+  })
+
+  it('sin días activos y sin eventos, cae a la ventana amplia', () => {
+    // Compactar la nada daría una rejilla de altura cero, sin dónde pulsar
+    // para crear la primera cita. No es un estado válido.
+    const v = calcularVentanaRejilla([], SEMANA, horarioDe('09:00', '19:00', false), { compacta: true })
+    expect(v).toEqual({ slotMinTime: '07:00:00', slotMaxTime: '21:00:00' })
+  })
+
+  it('cubre la guarda del mínimo: un evento de longitud cero da UNA hora de rejilla', () => {
+    /* ⚠️  ESTE TEST EXISTE PARA `Math.max(techoDeHora(hasta), min + 60)`, y es
+       el primero que puede escribirse: hasta el modo compacto esa línea era
+       inalcanzable porque el suelo la tapaba. Sin días activos y con un solo
+       evento puntual a las 09:00, `desde === hasta === 09:00` y la guarda es lo
+       único que separa a la rejilla de no tener altura. Si desaparece, esto da
+       09:00–09:00 y la agenda se queda en blanco. */
+    const v = calcularVentanaRejilla(
+      [evento([9, 0], [9, 0])],
+      SEMANA,
+      horarioDe('09:00', '19:00', false),
+      { compacta: true },
+    )
+    expect(v).toEqual({ slotMinTime: '09:00:00', slotMaxTime: '10:00:00' })
+  })
+})
+
+/* ─────────────────────────────────────────────────────────────────────
+   LAS COLUMNAS — qué días se pueden plegar
+   ───────────────────────────────────────────────────────────────────── */
+
+/** La constante `DIAS` de `agenda/page.tsx`, reducida a lo que aquí importa. */
+const DIAS_FC: { key: DiaSemana; fc: number }[] = [
+  { key: 'lunes', fc: 1 }, { key: 'martes', fc: 2 }, { key: 'miercoles', fc: 3 },
+  { key: 'jueves', fc: 4 }, { key: 'viernes', fc: 5 }, { key: 'sabado', fc: 6 },
+  { key: 'domingo', fc: 0 },
+]
+
+/** Un evento del DOMINGO 30/08/2026, el domingo de `SEMANA`. */
+function eventoDelDomingo(extra: Partial<EventoParaVentana> = {}): EventoParaVentana {
+  return evento([11, 0], [12, 0], extra, 30)
+}
+
+describe('diasOcultables', () => {
+  it('un domingo cerrado y vacío es ocultable', () => {
+    // `horarioDe` deja sábado y domingo inactivos; sin eventos, los dos se
+    // pliegan y de lunes a viernes se quedan.
+    expect(diasOcultables([], SEMANA, HORARIO_NORMAL, DIAS_FC)).toEqual([6, 0])
+  })
+
+  it('un domingo cerrado CON UNA CITA no es ocultable', () => {
+    // La regla entera del rediseño en una línea: hay evento, no se colapsa.
+    expect(diasOcultables([eventoDelDomingo()], SEMANA, HORARIO_NORMAL, DIAS_FC)).toEqual([6])
+  })
+
+  it('un domingo que el rango NO cubre no es plegable, tenga o no citas', () => {
+    /* ⚠️  ESTE TEST ES EL ANTÍDOTO DE UN PUNTO FIJO. Con el domingo ya plegado,
+       FullCalendar lo saca del rango (`trimHiddenDays` recorta los EXTREMOS).
+       Si de ahí se dedujera «no tiene eventos → sigue plegado», el domingo no
+       volvería JAMÁS: había que recargar la página. La regla que lo cierra es
+       que fuera del rango no se afirma nada, porque sus citas ni se pidieron.
+
+       El rango de aquí es la semana YA RECORTADA, de lunes a domingo excluido,
+       que es justo lo que llegaría con el domingo plegado. */
+    const sinDomingo: RangoVisible = {
+      activeStart: new Date(2026, 7, 24, 0, 0),
+      activeEnd:   new Date(2026, 7, 30, 0, 0),
+    }
+    expect(diasOcultables([], sinDomingo, HORARIO_NORMAL, DIAS_FC)).toEqual([6])
+  })
+
+  it('un domingo cerrado con un evento de TODO EL DÍA tampoco', () => {
+    /* ⚠️  AQUÍ NO SE FILTRA POR `allDay`, al revés que en `ventanaDeEventos`, y
+       el motivo es CONSERVADOR, no de layout. La agenda va con
+       `allDaySlot={false}`, así que hoy estos eventos ni se pintan en la
+       rejilla; contarlos igual protege de más y nunca de menos, que es la
+       asimetría que importa: dejar una columna vacía a la vista es feo y se
+       deshace con el botón, esconder algo que existe no se ve venir. */
+    const ev = eventoDelDomingo({ allDay: true })
+    expect(diasOcultables([ev], SEMANA, HORARIO_NORMAL, DIAS_FC)).toEqual([6])
+  })
+
+  it('un domingo cerrado con un evento DE FONDO tampoco', () => {
+    // Mismo motivo: no será la cita de nadie, pero está pintado ahí.
+    const ev = eventoDelDomingo({ display: 'background' })
+    expect(diasOcultables([ev], SEMANA, HORARIO_NORMAL, DIAS_FC)).toEqual([6])
+  })
+
+  it('un día ACTIVO nunca es ocultable, aunque esté vacío', () => {
+    // Una semana entera sin una sola cita no pliega la agenda de la clínica:
+    // el horario dice que ahí se atiende, y eso basta.
+    const r = diasOcultables([], SEMANA, horarioDe('09:00', '19:00'), DIAS_FC)
+    expect(r).not.toContain(1)
+    expect(r).not.toContain(5)
+  })
+
+  it('un día con horario degenerado (fin <= inicio) cuenta como cerrado', () => {
+    // Un 09:00–09:00 es activo pero no enseña nada. Ver `horasDeDia`.
+    const h: Horario = { ...HORARIO_NORMAL, domingo: { activo: true, inicio: '09:00', fin: '09:00' } }
+    expect(diasOcultables([], SEMANA, h, DIAS_FC)).toContain(0)
+  })
+
+  it('con `rango === null` no oculta nada', () => {
+    // Sin saber qué hay pintado no se puede saber qué está vacío, y ante la
+    // duda no se esconde una columna que podría tener trabajo dentro.
+    expect(diasOcultables([], null, HORARIO_NORMAL, DIAS_FC)).toEqual([])
+  })
+
+  it('con los SIETE días cerrados y vacíos no oculta ninguno', () => {
+    /* ⚠️  NO ES UN CAPRICHO: `initHiddenDays` LANZA. Con los siete en
+       `hiddenDays`, FullCalendar tira `invalid hiddenDays`
+       (`@fullcalendar/core/internal-common.js:3045`, versión 6.1.20) y la
+       agenda se cae entera. Devolver `[]` deja una rejilla ancha y vacía, que
+       es fea pero es una rejilla. */
+    expect(diasOcultables([], SEMANA, horarioDe('09:00', '19:00', false), DIAS_FC)).toEqual([])
+  })
+})
+
+/* ─────────────────────────────────────────────────────────────────────
+   LO QUE UN EVENTO TOCA — no sólo el día en que empieza
+   ───────────────────────────────────────────────────────────────────── */
+
+describe('diasOcultables — eventos que cruzan de día', () => {
+  it('un evento de sábado 22:00 a domingo 01:00 protege LOS DOS días', () => {
+    /* ⚠️  MARCAR SÓLO `start.getDay()` ESCONDÍA MEDIO EVENTO: el sábado se
+       salvaba y el domingo se plegaba, así que el trozo de 00:00 a 01:00
+       desaparecía. Y por el otro eje ese mismo evento estira la rejilla hasta
+       las 24:00 para enseñar un tramo cuya columna se acababa de borrar. */
+    const guardia: EventoParaVentana = {
+      start: new Date(2026, 7, 29, 22, 0),
+      end:   new Date(2026, 7, 30, 1, 0),
+      allDay: false,
+    }
+    expect(diasOcultables([guardia], SEMANA, HORARIO_NORMAL, DIAS_FC)).toEqual([])
+  })
+
+  it('un evento de viernes a lunes protege los CUATRO días que toca', () => {
+    // El congreso de Google multidía: sin recorrer los días intermedios tapaba
+    // sábado y domingo marcando sólo el viernes.
+    const quincena: RangoVisible = {
+      activeStart: new Date(2026, 7, 24, 0, 0),
+      activeEnd:   new Date(2026, 8, 7, 0, 0),
+    }
+    // Lunes y viernes también cerrados, para que los cuatro días sean plegables
+    // de no ser por el evento. Sin él saldrían [1, 5, 6, 0].
+    const h: Horario = {
+      ...HORARIO_NORMAL,
+      lunes:   { activo: false, inicio: '09:00', fin: '19:00' },
+      viernes: { activo: false, inicio: '09:00', fin: '19:00' },
+    }
+    expect(diasOcultables([], quincena, h, DIAS_FC)).toEqual([1, 5, 6, 0])
+
+    const congreso: EventoParaVentana = {
+      start: new Date(2026, 7, 28, 10, 0),
+      end:   new Date(2026, 7, 31, 10, 0),
+      allDay: false,
+    }
+    expect(diasOcultables([congreso], quincena, h, DIAS_FC)).toEqual([])
+  })
+
+  it('terminar EXACTAMENTE a medianoche no protege el día siguiente', () => {
+    // El fin es exclusivo: un evento de 22:00 a 00:00 no toca el domingo, así
+    // que el domingo se pliega y el sábado no.
+    const ev: EventoParaVentana = {
+      start: new Date(2026, 7, 29, 22, 0),
+      end:   new Date(2026, 7, 30, 0, 0),
+      allDay: false,
+    }
+    expect(diasOcultables([ev], SEMANA, HORARIO_NORMAL, DIAS_FC)).toEqual([0])
+  })
+})
+
+describe('diasOcultables — sólo se pliega lo que el rango cubre', () => {
+  /** El miércoles 26/08/2026 a solas, como lo entrega `timeGridDay`. */
+  const UN_DIA: RangoVisible = {
+    activeStart: new Date(2026, 7, 26, 0, 0),
+    activeEnd:   new Date(2026, 7, 27, 0, 0),
+  }
+
+  it('con un rango de un solo día, ningún OTRO día es plegable', () => {
+    /* Sábado y domingo están cerrados y sin citas, pero el rango de un día no
+       trajo las suyas: «vacío» ahí no se puede afirmar, sólo suponer. */
+    expect(diasOcultables([], UN_DIA, HORARIO_NORMAL, DIAS_FC)).toEqual([])
+  })
+
+  it('y el propio día del rango tampoco, aunque esté cerrado y vacío', () => {
+    /* ⚠️  ESTO EVITA UN SALTO DE VISTA, no una fealdad. Con el único día del
+       rango oculto, `trimHiddenDays` devuelve `null` y
+       `buildRangeFromDuration` llama a `skipHiddenDays` y RECALCULA
+       (`@fullcalendar/core/internal-common.js:2955-2959`, versión 6.1.20): en
+       vista Día, desde el viernes «siguiente» saltaría al lunes y una cita del
+       sábado no habría forma de alcanzarla. Es el mismo caso que el de los
+       siete: quedarse sin ninguna columna que enseñar. */
+    const domingoSolo: RangoVisible = {
+      activeStart: new Date(2026, 7, 30, 0, 0),
+      activeEnd:   new Date(2026, 7, 31, 0, 0),
+    }
+    expect(diasOcultables([], domingoSolo, HORARIO_NORMAL, DIAS_FC)).toEqual([])
+  })
+})
+
+/* ─────────────────────────────────────────────────────────────────────
+   LA LÍNEA DEL RECORTE
+   ───────────────────────────────────────────────────────────────────── */
+
+/** La constante `DIAS` de `agenda/page.tsx`, con lo que la frase necesita. */
+const DIAS_PLURAL: { plural: string; fc: number }[] = [
+  { plural: 'los lunes', fc: 1 }, { plural: 'los martes', fc: 2 },
+  { plural: 'los miércoles', fc: 3 }, { plural: 'los jueves', fc: 4 },
+  { plural: 'los viernes', fc: 5 }, { plural: 'los sábados', fc: 6 },
+  { plural: 'los domingos', fc: 0 },
+]
+
+const AJUSTADA = { slotMinTime: '09:00:00', slotMaxTime: '19:00:00' }
+
+describe('avisoDeRecorte', () => {
+  it('con un día oculto, lo nombra en singular de lista', () => {
+    expect(avisoDeRecorte(AJUSTADA, [0], DIAS_PLURAL))
+      .toBe('Rejilla ajustada a 09:00–19:00 · los domingos ocultos')
+  })
+
+  it('con dos, los separa con «y», no con coma', () => {
+    expect(avisoDeRecorte(AJUSTADA, [6, 0], DIAS_PLURAL))
+      .toBe('Rejilla ajustada a 09:00–19:00 · los sábados y los domingos ocultos')
+  })
+
+  it('con tres, coma entre todos menos el último y «y» antes del último', () => {
+    expect(avisoDeRecorte(AJUSTADA, [5, 6, 0], DIAS_PLURAL))
+      .toBe('Rejilla ajustada a 09:00–19:00 · los viernes, los sábados y los domingos ocultos')
+  })
+
+  it('sin recorte de ningún eje, no hay nada que confesar', () => {
+    expect(avisoDeRecorte({ slotMinTime: '07:00:00', slotMaxTime: '21:00:00' }, [], DIAS_PLURAL)).toBeNull()
+  })
+
+  it('con sólo días ocultos, la frase abre en mayúscula', () => {
+    // Aquí el que abre la línea es «los domingos», no «Rejilla».
+    expect(avisoDeRecorte({ slotMinTime: '07:00:00', slotMaxTime: '21:00:00' }, [0], DIAS_PLURAL))
+      .toBe('Los domingos ocultos')
   })
 })
