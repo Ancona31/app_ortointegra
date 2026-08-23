@@ -258,6 +258,13 @@ export default function ModalInvitacionCita({
           {/* El motivo, siempre a la vista: una casilla apagada y muda deja a
               quien agenda buscando qué le falta. */}
           {apagada && (
+            /* ⚠️ DEUDA DECLARADA: `no_show` se usa aquí como GRIS DE ADVERTENCIA,
+               no porque nada esté en ese estado. Es el mismo acoplamiento
+               accidental que tenía el acuse verde de más abajo y que se deshizo
+               a `--ag-success-*`. Éste sobrevivió a la rotación de la paleta
+               (bloque 2B) por suerte: «no asistió» fue uno de los dos estados
+               que no cambiaron de color. Cuando se toque ese gris, esto se
+               desengancha primero a `--ag-warning-*`. */
             <span className="block text-[12px] mt-1 font-semibold" style={{ color: 'var(--ag-status-no_show-text)' }}>
               Escribe una dirección abajo para invitarlo.
             </span>
@@ -285,6 +292,7 @@ export default function ModalInvitacionCita({
 
     if (paso === 'sin_evento') {
       return (
+        /* Deuda declarada, la misma de arriba: `no_show` como gris de aviso. */
         <div className="rounded-xl border px-3 py-3" style={{ background: 'var(--ag-status-no_show-bg)', borderColor: 'var(--ag-status-no_show-border)' }}>
           <p className="flex items-start gap-2 text-[13px] leading-relaxed" style={{ color: 'var(--ag-text)' }}>
             <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
@@ -303,6 +311,7 @@ export default function ModalInvitacionCita({
          sola para que se lea LETRA POR LETRA. No hay «cancelar invitación»: en
          cuanto Google la manda, el nombre del paciente está en un buzón ajeno. */
       return (
+        /* Deuda declarada, la misma de arriba: `no_show` como gris de aviso. */
         <div className="rounded-xl border px-3 py-3 space-y-2.5" style={{ background: 'var(--ag-status-no_show-bg)', borderColor: 'var(--ag-status-no_show-border)' }}>
           <p className="text-[12px] font-bold uppercase tracking-[.06em]" style={{ color: 'var(--ag-muted2)' }}>
             Vas a invitar a esta dirección escrita a mano
@@ -523,6 +532,11 @@ export default function ModalInvitacionCita({
           <div className="px-[22px] py-5 space-y-3 flex-1 min-h-0 overflow-y-auto">
             {cuerpo()}
             {error !== '' && (
+              /* ⚠️ DEUDA DECLARADA: `cancelled` se usa aquí como ROJO DE ERROR,
+                 no porque haya ninguna cita cancelada. Igual que el gris de
+                 arriba, sobrevivió a la rotación del bloque 2B porque
+                 «cancelada» fue el otro estado que no cambió de color. Cuando se
+                 toque ese rojo, esto se desengancha primero a `--ag-danger-*`. */
               <p className="flex items-start gap-2 rounded-xl border px-3 py-2.5 text-[13px] leading-relaxed" role="alert"
                 style={{ background: 'var(--ag-status-cancelled-bg)', borderColor: 'var(--ag-status-cancelled-border)', color: 'var(--ag-status-cancelled-text)' }}>
                 <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />

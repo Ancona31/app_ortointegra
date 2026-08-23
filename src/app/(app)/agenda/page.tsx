@@ -54,7 +54,9 @@ import {
    `Record<Status, …>`— pero NO rompe los tokens CSS, que se consumen por
    interpolación (`var(--ag-status-${status}-dot)`). Si faltan los cuatro tokens
    del estado nuevo en globals.css, la tarjeta sale transparente y sin borde, sin
-   un solo error. Los de `attended` están puestos, en claro y en oscuro. */
+   un solo error. Los de `attended` están puestos, en claro y en oscuro.
+   El otro consumidor de esos mismos tokens es `dashboard/StatusChip.tsx`, que
+   sólo pinta `scheduled` y `confirmed` a propósito. */
 type Status = 'scheduled' | 'confirmed' | 'cancelled' | 'no_show' | 'attended'
 
 type Appointment = {
@@ -172,12 +174,18 @@ const ESTADOS_EVENTO: readonly Status[] = ['scheduled', 'cancelled']
  * falta un color de estado, interpola el token (`var(--ag-status-${s}-bg)`);
  * no escribas un hex.
  *
- * ⚠️ SI ALGÚN DÍA SE ROTA LA ASIGNACIÓN DE COLORES (p. ej. ámbar→agendada,
- * azul→confirmada), `src/components/agenda/ModalInvitacionCita.tsx` SE REPINTA
- * SIN QUERERLO: usa estos mismos tokens como paleta SEMÁNTICA —`no_show` como
- * gris de advertencia, `confirmed` como verde de acuse, `cancelled` como rojo
- * de error—, y ninguno de esos paneles habla del estado de una cita. Hay que
- * desengancharlo ANTES de rotar, no después.
+ * ⚠️ LA ROTACIÓN QUE ESTE AVISO ANUNCIABA YA OCURRIÓ (bloque 2B): ámbar es
+ * «agendada», azul «confirmada» y verde «atendida». El aviso hizo su trabajo —el
+ * verde de acuse de `ModalInvitacionCita.tsx` se desenganchó a `--ag-success-*`
+ * antes de rotar, y por eso no amaneció azul—.
+ *
+ * ⚠️ LO QUE QUEDA VIVO DE AQUEL AVISO, como deuda declarada: ese mismo modal
+ * sigue usando `--ag-status-no_show-*` como gris de advertencia y
+ * `--ag-status-cancelled-*` como rojo de error, y ninguno de esos dos paneles
+ * habla del estado de una cita. Sobrevivieron a esta rotación por suerte —esos
+ * dos estados no cambiaron de color—, no por estar bien. Si algún día se toca el
+ * gris o el rojo, hay que desengancharlos primero, a `--ag-warning-*` y
+ * `--ag-danger-*`, igual que se hizo con el verde.
  */
 
 /* ─── La pinta del evento genérico ──────────────────────

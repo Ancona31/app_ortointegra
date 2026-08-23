@@ -53,6 +53,10 @@
      ThemeProvider en :root, siempre con fallback). Mismo mecanismo que el Sidebar. */
   --ag-brand-primary: var(--cp, #1a3a5c);
   --ag-brand-secondary: var(--cs, #1e5fa8);
+  /* ⚠️ NO LO «UNIFIQUES» CON EL ROJO DE «CANCELADA» (--ag-status-cancelled-dot,
+     hoy #c0392b). Se parecen y la línea cruza por encima de las tarjetas, pero
+     dicen cosas distintas: una es la hora actual, la otra el estado de una cita.
+     Que sean dos tokens es lo que permite mover uno sin mover el otro. */
   --ag-now-line: #ef4444;
   /* Fondo de la píldora de la hora. NO es --ag-now-line: sobre ese rojo el
      blanco a 10.5 px da 3.76:1 y WCAG 1.4.3 pide 4.5:1 (10.5 px bold no es
@@ -115,36 +119,69 @@
      paletas ya estaban puestas: el que llega tarde copia lo que ve, y por eso
      una paleta duplicada no se delata sola.
      Se consumen por interpolación, así que quien los necesite hace
-     `var(--ag-status-${estado}-bg)`. Sigue habiendo un `StatusChip` en el
-     dashboard con sus propias clases de Tailwind, fuera de aquí (pendiente). */
-  --ag-status-scheduled-dot: #2f6fed;  --ag-status-scheduled-text: #1d4ed8;
-  --ag-status-scheduled-bg: #e9f0fe;   --ag-status-scheduled-border: #c9dcfb;
-  --ag-status-confirmed-dot: #16a34a;  --ag-status-confirmed-text: #15803d;
-  --ag-status-confirmed-bg: #e7f6ec;   --ag-status-confirmed-border: #bfe6cb;
-  --ag-status-cancelled-dot: #dc2626;  --ag-status-cancelled-text: #b91c1c;
-  --ag-status-cancelled-bg: #fbecec;   --ag-status-cancelled-border: #f1c9c9;
-  --ag-status-no_show-dot: #64748b;    --ag-status-no_show-text: #475569;
-  --ag-status-no_show-bg: #eef1f6;     --ag-status-no_show-border: #d4dbe5;
-  /* «Atendida» (plan §12.13). El teal oscuro sale de mirar las DOS paletas a la
-     vez, no sólo la de estados: comparte calendario con los colores de los
-     eventos genéricos, y por eso de aquélla se retiró primero `cian` (#0891b2),
-     el par más apretado con éste, y después el propio `teal` que la paleta
-     definitiva proponía — a cero grados de hue de esta línea.
+     `var(--ag-status-${estado}-bg)`. El `StatusChip` del dashboard, que tenía
+     sus propias clases de Tailwind, YA CUELGA DE AQUÍ (dashboard/StatusChip.tsx):
+     no queda ninguna segunda paleta de estado viva en el proyecto.
+     ⚠️⚠️ LA ASIGNACIÓN DE COLOR ROTÓ (bloque 2B) Y NO ES LA INTUITIVA:
+     ÁMBAR es «agendada», AZUL es «confirmada» y VERDE es «atendida». Antes azul
+     era «agendada», verde «confirmada» y teal «atendida». El motivo, escrito
+     aquí para que nadie lo «arregle» de vuelta: «agendada» es el único estado
+     que pide una acción —hay que llamar y confirmar— y en azul se leía como
+     resuelto; y verde es la lectura universal de «terminado», así que le toca a
+     «atendida» en vez de gastarse en un estado que aún no ha ocurrido.
+     Rotar es CSS y NO una migración: `appointments.status` guarda el NOMBRE del
+     estado y nunca un color, y el CHECK sólo admite los cinco nombres.
+
+     Ratios medidos de `text` sobre su propio `bg`; los cinco pasan AA (≥4.5:1):
+     scheduled 4.67 · confirmed 5.66 · attended 4.84 · cancelled 4.96 ·
+     no_show 5.03. El más justo es `scheduled`: quien retoque #b45309 o #fef6e7
+     tiene que volver a medir.
+
+     Y los del `dot` sobre ese mismo `bg`, que es gráfico y pide 3:1, no 4.5:
+     scheduled 2.97 · confirmed 5.66 · attended 2.98 · cancelled 4.96 ·
+     no_show 4.39.
+     ⚠️ SÍ, DOS QUEDAN UN PELO POR DEBAJO DE 3:1, y se acepta a sabiendas. No es
+     cosa de la rotación —en `main`, con la paleta anterior, el dot de
+     `confirmed` estaba en 2.95—. Se acepta porque el caso duro no es éste: el
+     punto de 7 px de la vista Mes, que es el único sitio donde el color va solo
+     y sin texto ni borde que lo acompañen, se dibuja sobre la CELDA BLANCA, no
+     sobre el `bg` del estado, y ahí dan 3.19 y 3.30. En la tarjeta el `dot` es
+     la barra de 3.5 px del borde izquierdo, con el texto y el marco al lado.
+     Quien retoque uno de estos cinco fondos tiene que rehacer las dos cuentas,
+     no sólo la del texto. */
+  --ag-status-scheduled-dot: #d97706;  --ag-status-scheduled-text: #b45309;
+  --ag-status-scheduled-bg: #fef6e7;   --ag-status-scheduled-border: #f4dfae;
+  --ag-status-confirmed-dot: #1e5fa8;  --ag-status-confirmed-text: #1e5fa8;
+  --ag-status-confirmed-bg: #eaf1f9;   --ag-status-confirmed-border: #c7dcef;
+  --ag-status-cancelled-dot: #c0392b;  --ag-status-cancelled-text: #c0392b;
+  --ag-status-cancelled-bg: #fdf2f2;   --ag-status-cancelled-border: #f3c9c9;
+  --ag-status-no_show-dot: #64748b;    --ag-status-no_show-text: #5a6b81;
+  --ag-status-no_show-bg: #f4f6f8;     --ag-status-no_show-border: #dfe5ec;
+  /* «Atendida» (plan §12.13). ERA TEAL (#0f766e) HASTA EL BLOQUE 2B; hoy es
+     verde, que es la lectura de «terminado».
+     ⚠️ CON ESO EL TEAL DEJA DE ESTAR BLOQUEADO para la paleta de eventos
+     genéricos de más abajo: se retiró de ella por estar a cero grados de hue de
+     esta línea, y esa línea ya no es teal. «Libre» NO es «gratis»: añadir un
+     color a esa paleta sí es una migración, porque los seis identificadores
+     viven en el CHECK `appointments_color_check`. Lo que cae es el veto de
+     color, no el coste. (Su hermano `cian`, #0891b2, se había retirado por el
+     mismo motivo y por la misma razón vuelve a ser discutible.)
      ⚠️ ESTOS CUATRO TOKENS Y SUS CUATRO HERMANOS OSCUROS NO LOS CAZA EL
      COMPILADOR: se consumen por interpolación (`var(--ag-status-${status}-dot)`
-     en agenda/page.tsx). Si faltan, la tarjeta sale transparente y sin borde,
-     sin un solo error. */
-  --ag-status-attended-dot: #0f766e;   --ag-status-attended-text: #0d5f59;
-  --ag-status-attended-bg: #e6f4f2;    --ag-status-attended-border: #bfe0dc;
+     en agenda/page.tsx y en dashboard/StatusChip.tsx). Si faltan, la tarjeta
+     sale transparente y sin borde, sin un solo error. */
+  --ag-status-attended-dot: #16a34a;   --ag-status-attended-text: #0f7a52;
+  --ag-status-attended-bg: #e9f7ef;    --ag-status-attended-border: #cfe6d6;
 
   /* ÉXITO — NO ES UN ESTADO DE CITA, y por eso no vive en la tabla de arriba.
      Es el verde de «la operación salió» (hoy: el acuse del modal de invitación).
-     Nació colgado de --ag-status-confirmed-* porque los dos verdes coincidían,
-     y esa coincidencia es un ACCIDENTE: mientras colgara de ahí, retocar el
-     color del estado «confirmada» —cosa que este rediseño puede hacer— le movía
-     el color a un acuse que no habla de ninguna cita confirmada. Los valores
-     son los que el acuse tenía efectivamente pintados; separarlos NO cambia
-     un píxel hoy, cambia quién los puede mover mañana.
+     Nació colgado de --ag-status-confirmed-* porque en su momento los dos verdes
+     coincidían, y esa coincidencia era un ACCIDENTE. LA ROTACIÓN DEL BLOQUE 2B
+     LO DEMOSTRÓ: «confirmada» es hoy AZUL, así que de no haberse separado antes
+     este acuse habría amanecido azul sin que nadie lo pidiera. Sigue siendo
+     verde porque el verde es suyo.
+     ⚠️ Que ahora se parezca al verde de «atendida» es la MISMA coincidencia otra
+     vez, en otro token. No lo cuelgues de --ag-status-attended-*.
      ⚠️ Si algún día hace falta un verde de éxito FUERA de la agenda, éste es el
      que se renombra; no se duplica. */
   /* ⚠️ El texto es #157e3c y NO #15803d, que es lo que el acuse tenía pintado.
@@ -164,24 +201,34 @@
      cambiarlo NO es una migración.
 
      RESTRICCIÓN DURA, y por eso viven aquí y no en la página: ninguno puede
-     confundirse con los colores de ESTADO de arriba —azul, verde, rojo, gris
-     pizarra, teal— ni con el morado de Google de abajo. Son la misma paleta
-     compartiendo un calendario.
+     confundirse con los colores de ESTADO de arriba —ámbar, azul, verde, rojo,
+     gris— ni con el morado de Google de abajo. Son la misma paleta compartiendo
+     un calendario. Y cuando un estado y un color de evento chocan, EL QUE SE
+     MUEVE ES EL DECORATIVO: los estados los lee todo el mundo todos los días,
+     el color de un evento lo eligió una persona una vez.
 
-     ⚠️⚠️ `teal` Y `pizarra` SE PROPUSIERON Y SE RETIRARON. NO LOS AÑADAS.
-     `teal` es literalmente el color de «atendida» (#0f766e) y `pizarra` el de
-     «no asistió» (#64748b): a cero grados de hue del estado que imitan. Sirve
-     de referencia que `cian` (#0891b2) ya se había retirado por estar a
-     diecisiete grados de ese mismo teal. `grafito` es el neutro que `pizarra`
-     iba a cubrir, con un tono que no se confunde con «no asistió».
+     ⚠️ `pizarra` SE PROPUSO Y SE RETIRÓ. NO LO AÑADAS: es literalmente el color
+     de «no asistió» (#64748b), a cero grados de hue del estado que imita, y ese
+     estado no se ha movido. `grafito` es el neutro que `pizarra` iba a cubrir,
+     con un tono que no se confunde con él.
+
+     ⚠️ `teal` TAMBIÉN SE HABÍA RETIRADO Y HOY YA NO ESTÁ VETADO. Lo estuvo
+     mientras «atendida» era teal (#0f766e); tras la rotación del bloque 2B ese
+     estado es verde y nada queda a cero grados de `teal`. Lo mismo vale para
+     `cian` (#0891b2), retirado en su día por estar a diecisiete grados de aquel
+     teal. Que se pueda no quiere decir que salga gratis: los seis
+     identificadores viven en el CHECK `appointments_color_check`, así que
+     añadir un séptimo color SÍ es una migración. Lo que cayó es el veto.
 
      ⚠️ NO TODOS SE SEPARAN DE LOS ESTADOS POR HUE, y comprobar sólo el hue
-     daría por bueno un choque. Medidos: `grafito` está a 0.4° del gris de «no
-     asistió», `indigo` a 11.4° del morado de Google, `bronce` a 21.7° del rojo
-     de «cancelada» y `carmin` a 24.9° de ese mismo rojo. Lo que los separa ahí
-     es la CLARIDAD: `grafito` queda 30 puntos de luminosidad por debajo del
-     gris de «no asistió» (3.08:1 entre ellos) y `bronce` 25 por debajo del
-     rojo. Quien añada un color mañana tiene que mirar las dos cosas.
+     daría por bueno un choque. Medidos contra la paleta de estados VIGENTE:
+     `grafito` está a 0.4° del gris de «no asistió», `indigo` a 11.5° del morado
+     de Google, `bronce` a 10.4° del ámbar de «agendada» y a 16.1° del rojo de
+     «cancelada», y `carmin` a 29.8° de ese mismo rojo. Lo que los separa ahí es
+     la CLARIDAD: `grafito` queda 30 puntos de luminosidad por debajo del gris de
+     «no asistió» (3.08:1 entre ellos) y `bronce` es 4.25 veces menos luminoso
+     que el ámbar y 2.18 que el rojo. Quien añada un color mañana tiene que
+     mirar las dos cosas.
 
      ⚠️ `carmin` YA SE AJUSTÓ POR ESE SEGUNDO EJE (era #be185d), y es el ejemplo
      de por qué mirar sólo el hue no basta: estaba a 24.9° del rojo de
@@ -223,7 +270,7 @@
   --ag-modal-icon-bg: #eff4f9;           /* azul muy suave (~blue-50) */
   --ag-btn-ghost-hover: #f1f5f9;         /* ~slate-100 */
   --ag-patient-card-bg: #eff4f9;         /* azul suave (~blue-50) */
-  --ag-patient-card-border: #c9dcfb;     /* azul (~blue-200), alineado con scheduled-border */
+  --ag-patient-card-border: #c9dcfb;     /* azul (~blue-200), a juego con el bg de arriba */
 
   /* ── Extensión de landing (movimiento) ─────────────────────────────
      Prefijo --lp-. EXTIENDE la escala de --sp-dur- y --sp-ease- de
@@ -662,12 +709,14 @@ body {
      oscuro.
      Tampoco --fc-list-event-hover-bg-color: @fullcalendar/list no está
      instalado, así que hoy no la lee nadie. Entra con la dependencia. */
-  /* ⚠️ --fc-highlight-color SE QUEDA EN HEX A PROPÓSITO. El único token --ag-*
-     con este valor es --ag-status-scheduled-bg, y engancharlo ahí ataría la
-     selección de un hueco al color del estado «programada»: el mismo enganche
-     accidental que --ag-success-* acaba de deshacer. Un hueco que arrastras no
-     es una cita programada. Si algún día molesta, lo que toca es un token
-     propio de selección, no reusar uno de estado. */
+  /* ⚠️ --fc-highlight-color SE QUEDA EN HEX A PROPÓSITO. El candidato obvio a
+     engancharlo era --ag-status-scheduled-bg, el tinte azul claro al que más se
+     parecía, y hacerlo habría atado la selección de un hueco al color del estado
+     «programada»: el mismo enganche accidental que --ag-success-* deshizo.
+     Un hueco que arrastras no es una cita programada — y la rotación del bloque
+     2B lo deja a la vista, porque ese token es hoy ÁMBAR y la selección habría
+     cambiado de color sin que nadie lo pidiera. Si algún día molesta, lo que
+     toca es un token propio de selección, no reusar uno de estado. */
   --fc-highlight-color: #dbeafe;
   /* --fc-timegrid-slot-height NO se toca: la altura la fija .fc-timegrid-slot
      con !important a 2.16rem y hay una nota que pide no reducirla. */
@@ -1175,6 +1224,12 @@ html.dark {
   --ag-muted2: #6b7a90;
   --ag-faint: #5d6b80;
   /* Marca: --ag-brand-* NO se tocan */
+  /* ⚠️ HASTA EL BLOQUE 2B ESTE ROJO ERA EXACTAMENTE --ag-status-cancelled-dot
+     (los dos #f87171), y era una coincidencia incómoda: la línea de la hora
+     cruza por encima de las tarjetas, así que dos cosas superpuestas en pantalla
+     y con significados distintos compartían color. Con «cancelada» en #ef4444
+     ya no coinciden, y eso es una mejora, no una deriva. No los vuelvas a
+     igualar. */
   --ag-now-line: #f87171;
   /* Píldora de la hora (ver la nota de la variante clara). Aquí la línea es más
      clara todavía —blanco encima da 2.77:1—, así que baja 27 puntos de
@@ -1214,22 +1269,67 @@ html.dark {
   --ag-segment-active-shadow: none;           /* ◆ Material elimina sombras en dark */
   --ag-segment-text: #8b9bb0;
   --ag-segment-active-text: #dbe7ff;          /* handoff dark.segActiveText */
-  /* Estado (mapeo inglés DB → statusDark español del handoff) */
-  --ag-status-scheduled-dot: #6b9bff;  --ag-status-scheduled-text: #a9c8ff;
-  --ag-status-scheduled-bg: rgba(47, 111, 237, .18);  --ag-status-scheduled-border: rgba(91, 140, 255, .36);
-  --ag-status-confirmed-dot: #34d399;  --ag-status-confirmed-text: #7eecb4;
-  --ag-status-confirmed-bg: rgba(22, 163, 74, .18);   --ag-status-confirmed-border: rgba(52, 211, 153, .34);
-  --ag-status-cancelled-dot: #f87171;  --ag-status-cancelled-text: #fca5a5;
-  --ag-status-cancelled-bg: rgba(220, 38, 38, .18);   --ag-status-cancelled-border: rgba(248, 113, 113, .34);
+  /* Estado (mapeo inglés DB → statusDark español del handoff).
+     ⚠️ LA ASIGNACIÓN ROTÓ: ámbar es «agendada», azul «confirmada», verde
+     «atendida». El porqué está en la nota larga de la variante clara.
+
+     CRITERIO DE DERIVACIÓN — para quien añada un valor futuro. NO inventes un
+     hex: los cuatro salen del color claro y de su familia.
+       · `dot`    tono 400 de la familia. Es GRÁFICO y no texto, así que su
+                  listón es 3:1 contra su propio `bg`, no 4.5.
+       · `text`   un escalón más claro, nivel 300.
+       · `bg`     EL HEX DEL `dot` DE MODO CLARO al 18-22 %, nunca un hex nuevo,
+                  para que el tono siga siendo reconociblemente el mismo estado.
+                  (No el `bg` claro: ése es un tinte casi blanco y al 20 % sobre
+                  negro no deja color.)
+       · `border` el `dot` al 34-40 %.
+
+     ⚠️⚠️ ES UNA GUÍA, NO UNA FÓRMULA QUE SE APLIQUE A CIEGAS, y dos de los cinco
+     ya se salen de ella a propósito. Si la sigues al pie de la letra sin leer
+     esto, reintroduces un valor del que ya se huyó:
+       · `cancelled` dot es #ef4444, que es el 500 de la familia, NO el 400. El
+         400 es #f87171, y ése es exactamente el valor que se abandonó para dejar
+         de coincidir con --ag-now-line, que cruza por encima de las tarjetas.
+         El razonamiento largo está junto a ese token, más arriba en este mismo
+         bloque. No lo «corrijas» al 400.
+       · `confirmed` (#6b9bff / #a9c8ff) no son el 400 ni el 300 de Tailwind
+         (serían #60a5fa y #93c5fd): vienen del handoff de diseño y llevan ahí
+         desde antes de la rotación. Sólo `scheduled` es literalmente amber-400 /
+         amber-300; los `text` de `attended` y de `no_show` son también ajustes
+         finos, cercanos al escalón pero no iguales.
+     Es decir: el criterio dice de dónde SALIR, no dónde hay que aterrizar.
+     Mide siempre el resultado.
+
+     ⚠️ TODO ESTO SE COMPONE SOBRE #1E1E1E, NO sobre --ag-bg-main (#0f1828). La
+     tarjeta de la agenda es un `.bg-white` que ThemeProvider repinta a #1E1E1E
+     con !important (layout/ThemeProvider.tsx:117). Medir contra el azul oscuro
+     del resto de la app da números que no son los que se ven.
+
+     Ratios de `text` sobre su `bg` ya compuesto: scheduled 8.98 · confirmed 8.48
+     · attended 9.04 · cancelled 7.64 · no_show 8.04.
+     ⚠️ EL ÚNICO QUE CONVIENE MIRAR EN PANTALLA es el dot de `cancelled`: queda
+     en 3.86:1 contra su fondo compuesto. Pasa el 3:1 de gráfico, pero sin
+     holgura; los otros cuatro van de 5.3 a 7.8.
+     ⚠️ `no_show` ES LA EXCEPCIÓN al criterio y viene siendo así: su `bg` sale de
+     #78869e y su `border` de #94a3b8, ninguno de los dos es su `dot` claro
+     (#64748b). Un gris neutro necesita más cuerpo para verse sobre negro. Si lo
+     tocas, tócalo entero. */
+  --ag-status-scheduled-dot: #fbbf24;  --ag-status-scheduled-text: #fcd34d;
+  --ag-status-scheduled-bg: rgba(217, 119, 6, .18);   --ag-status-scheduled-border: rgba(251, 191, 36, .36);
+  --ag-status-confirmed-dot: #6b9bff;  --ag-status-confirmed-text: #a9c8ff;
+  --ag-status-confirmed-bg: rgba(30, 95, 168, .20);   --ag-status-confirmed-border: rgba(107, 155, 255, .36);
+  --ag-status-cancelled-dot: #ef4444;  --ag-status-cancelled-text: #fca5a5;
+  --ag-status-cancelled-bg: rgba(192, 57, 43, .18);   --ag-status-cancelled-border: rgba(239, 68, 68, .36);
   --ag-status-no_show-dot: #9fb0c4;    --ag-status-no_show-text: #c7d2e0;
   --ag-status-no_show-bg: rgba(120, 134, 158, .22);   --ag-status-no_show-border: rgba(148, 163, 184, .40);
-  /* «Atendida» en oscuro: mismo criterio que los otros cuatro — el punto y el
-     texto se aclaran para que lean sobre fondo oscuro, el fondo y el borde son
-     el color base con alfa. Ver la nota de la variante clara. */
-  --ag-status-attended-dot: #2dd4bf;   --ag-status-attended-text: #7ee8dd;
-  --ag-status-attended-bg: rgba(15, 118, 110, .20);   --ag-status-attended-border: rgba(45, 212, 191, .34);
+  /* «Atendida» en oscuro: mismo criterio que los otros cuatro. Ya no es teal
+     (#2dd4bf) sino verde, por la rotación. Ver la nota de la variante clara. */
+  --ag-status-attended-dot: #34d399;   --ag-status-attended-text: #7eecb4;
+  --ag-status-attended-bg: rgba(22, 163, 74, .18);    --ag-status-attended-border: rgba(52, 211, 153, .34);
   /* Éxito (NO es estado de cita — ver la nota de la variante clara). Los valores
-     son los que el acuse tenía pintados colgando de --ag-status-confirmed-*. */
+     son los que el acuse tenía pintados cuando colgaba de --ag-status-confirmed-*,
+     y ese token es hoy AZUL: haberlo separado es lo que impidió que este acuse
+     se volviera azul solo. */
   --ag-success-text: #7eecb4;
   --ag-success-bg: rgba(22, 163, 74, .18);
   --ag-success-border: rgba(52, 211, 153, .34);
@@ -1250,23 +1350,41 @@ html.dark {
   --ag-evento-magenta: #e879f9;
   /* carmin. Aquí la contraparte NO se saca copiando el hue del claro, y conviene
      saber por qué antes de «corregirlo».
-     El par a batir es «cancelada» oscura (#f87171). El #f472b6 histórico se
-     separaba SÓLO por hue (31.4°, razón de luminancia 1.04), que es justo lo
-     que en claro se demostró insuficiente para el punto de 7 px de la vista Mes.
-     Un intento intermedio (#ee689d, hue 336 como el claro) empeoró el asunto:
-     acercaba el hue a 23.7° sin ganar claridad.
-     #f391ca se separa por los DOS ejes: 34.9° de hue y 1.28 de razón de
-     luminancia. Su par más apretado pasa a ser `magenta` (33.1° / 1.14), que
-     sigue holgado —el peor par ya aceptado de esta paleta es grafito contra «no
-     asistió», 3.4° y 1.36—. Contraste 7.71:1 sobre la superficie real de la
-     tarjeta (#1E1E1E), dentro del rango de los otros cinco (5.5-11).
+     El par a batir es «cancelada» oscura, HOY #ef4444 (era #f87171 antes de la
+     rotación del bloque 2B; ese cambio de rojo relaja el par por sí solo, y este
+     token no se movió por él).
+     Contra el rojo vigente, #f391ca se separa por los DOS ejes: 34.9° de hue y
+     1.90 de razón de luminancia. Las alternativas que se consideraron quedan
+     peor por los dos: el #f472b6 histórico da 31.4° / 1.51 y un intento
+     intermedio (#ee689d, hue 336 como el claro) 23.7° / 1.33. NO VUELVAS A
+     NINGUNO DE LOS DOS creyendo que restauras algo.
+     Su par más apretado pasa a ser `magenta` (33.1° / 1.16), que sigue holgado
+     —el peor par ya aceptado de esta paleta es grafito contra «no asistió», 3.4°
+     y 1.42—. Contraste 7.71:1 sobre la superficie real de la tarjeta (#1E1E1E),
+     dentro del rango de los otros cinco (5.5-11).
      ⚠️ Se aparta 10.7° del hue del carmín claro (335.8° → 325.1°) y su L queda
      en el techo de la banda (76). Las dos cosas son el precio de separarlo por
      claridad sin salirse de la familia; quien lo retoque tiene que volver a
      medir contra `magenta` y contra «cancelada», no sólo contra una. */
   --ag-evento-carmin: #f391ca;
   --ag-evento-oliva: #a3e635;
-  --ag-evento-bronce: #e2a36b;
+  /* bronce. BAJÓ DE #e2a36b A #c98a4b POR LA ROTACIÓN, y conviene saber por qué
+     antes de «devolverlo a su sitio».
+     El ámbar nuevo de «agendada» (#fbbf24) lo dejaba a 15.0° de hue y 1.33 de
+     razón de luminancia: empate en los DOS ejes, que es justo lo que la regla de
+     esta paleta prohíbe —hue O claridad, nunca ninguno de los dos—.
+     #c98a4b resuelve por CLARIDAD: 1.86 de razón, con holgura. A cambio el hue
+     se aprieta un poco (15.0° → 13.3°), y eso es aceptable a propósito: el peor
+     par ya vivo de esta paleta es `grafito` contra «no asistió», 3.4° y 1.42,
+     bastante más extremo. Un eje resuelto basta; dos empatados, no.
+     Su otro par vigilado, el rojo de «cancelada» (#ef4444), queda en 30.0° /
+     1.36. Sobre la superficie real de la tarjeta (#1E1E1E) da 5.73:1, dentro del
+     rango de los otros cinco.
+     ⚠️ Quien lo retoque tiene que medir contra el ÁMBAR y contra el ROJO, no
+     sólo contra uno. En modo claro no hizo falta tocar nada: allí `bronce`
+     (#78350f) está a 10.4° del ámbar pero 4.25 veces por debajo en luminosidad,
+     que es separación de sobra. */
+  --ag-evento-bronce: #c98a4b;
   --ag-evento-grafito: #7f96b8;
 
   /* Google Calendar (extDark) */
@@ -1284,8 +1402,18 @@ html.dark {
   --ag-input-focus-border: #5b8cff;                   /* ◆ */
   --ag-modal-icon-bg: #1f2f48;                        /* ◆ ≈ dark.rowIconBg */
   --ag-btn-ghost-hover: #1f2f48;                      /* ◆ */
-  --ag-patient-card-bg: rgba(47, 111, 237, .12);      /* ◆ ≈ scheduled-bg tenue */
-  --ag-patient-card-border: rgba(91, 140, 255, .36);  /* ◆ = scheduled-border dark */
+  /* Tarjeta de paciente: azul tenue sobre el fondo oscuro, hermana del
+     #eff4f9/#c9dcfb de la variante clara. Fondo = azul de la familia al 12 %,
+     borde = el mismo azul aclarado al 36 %.
+     ⚠️ NO LOS REALINEES CON `scheduled`. Hasta el bloque 2B el borde era
+     EXACTAMENTE --ag-status-scheduled-border y estos dos comentarios lo
+     anunciaban como igualdad; hoy «agendada» es ámbar y esa igualdad ya no
+     existe. Una igualdad rota que se sigue anunciando es cómo se reintroducen
+     divergencias aquí, así que se dice al derecho: la tarjeta de paciente es
+     azul porque es azul, no porque copie el color de ningún estado. Si mañana
+     «agendada» vuelve a ser azul, seguirá sin ser un motivo para atarlas. */
+  --ag-patient-card-bg: rgba(47, 111, 237, .12);      /* ◆ azul de la familia, 12 % */
+  --ag-patient-card-border: rgba(91, 140, 255, .36);  /* ◆ el mismo azul aclarado, 36 % */
 }
 
 /* ── PARTE B — FullCalendar: vars nativas --fc-* en dark. Se definen en el
@@ -1304,7 +1432,13 @@ html.dark .agenda-fc .fc {
      porque son papeles distintos, no por descuido. */
   --fc-page-bg-color: var(--ag-bg-main);
   /* El azul de selección en oscuro. Sigue en literal por lo mismo que la
-     variante clara: el único --ag-* con este valor es un token de ESTADO. */
+     variante clara: el candidato obvio a engancharlo era --ag-status-scheduled-bg,
+     que valía este mismo rgba, y hacerlo habría atado la selección de un hueco al
+     color del estado «programada». Un hueco que arrastras no es una cita
+     programada — y la rotación del bloque 2B lo deja a la vista, porque ese token
+     es hoy ÁMBAR y la selección habría cambiado de color sin que nadie lo pidiera.
+     Si algún día molesta, lo que toca es un token propio de selección, no reusar
+     uno de estado. */
   --fc-highlight-color: rgba(47, 111, 237, .18);
 }
 

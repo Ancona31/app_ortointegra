@@ -125,12 +125,18 @@ function anclaDeHora(startISO: string, timezone: string): string | null {
  * BLANCO en la agenda. Ver el aviso de `agenda/page.tsx`, que es donde se
  * consume la ruta.
  *
- * ⚠️ `teal` Y `pizarra` NO ESTAN EN LA PALETA Y NO DEBEN ANADIRSE. Los dos se
- * propusieron y se retiraron: `teal` es el color del estado «atendida»
- * (#0f766e) y `pizarra` el de «no asistio» (#64748b). Un evento generico con
- * cualquiera de los dos se lee como una cita de ese estado de un vistazo, que
- * es lo unico que esta paleta tiene prohibido. `grafito` es el neutro que
- * `pizarra` iba a cubrir.
+ * ⚠️ `pizarra` NO ESTA EN LA PALETA Y NO DEBE ANADIRSE: es el color del estado
+ * «no asistio» (#64748b), y un evento generico con el se lee como una cita de
+ * ese estado de un vistazo, que es lo unico que esta paleta tiene prohibido.
+ * `grafito` es el neutro que `pizarra` iba a cubrir.
+ *
+ * ⚠️ `teal` TAMBIEN SE HABIA RETIRADO Y YA NO ESTA VETADO. Lo estuvo mientras
+ * «atendida» era teal (#0f766e); la rotacion de la paleta de estados dejo ese
+ * estado en verde y nada choca ya con el teal. Lo mismo vale para `cian`
+ * (#0891b2), retirado en su dia por estar a diecisiete grados de aquel teal.
+ * OJO: que se pueda no quiere decir que salga gratis. Esta lista viaja al CHECK
+ * `appointments_color_check`, asi que anadir un septimo color SI es una
+ * migracion. Lo que cayo es el veto de color, no el coste.
  *
  * Lo que NO esta aqui y es a proposito: la ruta del SVG de cada icono y su
  * etiqueta (eso es interfaz y vive en la agenda) y el hex de cada color (eso
