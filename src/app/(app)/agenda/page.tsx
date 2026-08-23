@@ -25,6 +25,12 @@ import { componerNombreMedicoCompleto, componerInicialesMedico } from '@/lib/nom
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { regionDeTimezone } from '@/lib/consultorios/zonas-mexico'
 import { ICONOS_EVENTO, COLORES_EVENTO, type IconoEvento, type ColorEvento } from '@/lib/appointments'
+import {
+  calcularVentanaRejilla,
+  type EventoParaVentana,
+  type RangoVisible,
+  type VentanaRejilla,
+} from '@/lib/agenda/ventanaRejilla'
 import useSWR from 'swr'
 import {
   CLAVE_CONFIG,
@@ -285,14 +291,16 @@ function esEventoGenerico(apt: { paciente_id?: string | null }): boolean {
 /* `DiaSemana`, `HorarioDia` y `Horario` viven en src/lib/configApp.ts: es el
    tipo de `clinicas.horario_consulta` tal como lo devuelve el agregado. */
 
-const DIAS: { key: DiaSemana; label: string; fc: number }[] = [
-  { key: 'lunes',     label: 'Lunes',     fc: 1 },
-  { key: 'martes',    label: 'Martes',    fc: 2 },
-  { key: 'miercoles', label: 'Miércoles', fc: 3 },
-  { key: 'jueves',    label: 'Jueves',    fc: 4 },
-  { key: 'viernes',   label: 'Viernes',   fc: 5 },
-  { key: 'sabado',    label: 'Sábado',    fc: 6 },
-  { key: 'domingo',   label: 'Domingo',   fc: 0 },
+/* `plural` es para la frase del aviso de fuera de horario («esta clínica no
+   atiende los domingos»), no para ninguna etiqueta de la interfaz. */
+const DIAS: { key: DiaSemana; label: string; plural: string; fc: number }[] = [
+  { key: 'lunes',     label: 'Lunes',     plural: 'los lunes',     fc: 1 },
+  { key: 'martes',    label: 'Martes',    plural: 'los martes',    fc: 2 },
+  { key: 'miercoles', label: 'Miércoles', plural: 'los miércoles', fc: 3 },
+  { key: 'jueves',    label: 'Jueves',    plural: 'los jueves',    fc: 4 },
+  { key: 'viernes',   label: 'Viernes',   plural: 'los viernes',   fc: 5 },
+  { key: 'sabado',    label: 'Sábado',    plural: 'los sábados',   fc: 6 },
+  { key: 'domingo',   label: 'Domingo',   plural: 'los domingos',  fc: 0 },
 ]
 
 const HORARIO_DEFAULT: Horario = {
@@ -313,13 +321,58 @@ function horarioToBusinessHours(h: Horario) {
   }))
 }
 
-function isWithinBusinessHours(date: Date, h: Horario): boolean {
+/** Hora de pared del navegador, `HH:MM`. Comparable con `horario.inicio`/`fin`. */
+function horaDeReloj(date: Date): string {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+/**
+ * El aviso de que una hora cae fuera del horario de consulta, YA REDACTADO, o
+ * `null` si cae dentro.
+ *
+ * ⚠️  EL TEXTO DICE LA HORA Y DICE EL HORARIO, A PROPÓSITO. Un «23:00» dentro
+ * de una frase se reconoce como error de tecleo; un campo del formulario ya
+ * relleno con 23:00 no se reconoce, porque es justo lo que no se vuelve a
+ * mirar. En producción hay cinco citas de madrugada que salieron de ahí.
+ *
+ * ⚠️  NO BLOQUEA NADA, Y NO DEBE HACERLO. Agendar fuera de horario sigue
+ * siendo un clic: hay urgencias, favores y consultas a deshora. Un bloqueo
+ * duro no evita la cita rara, enseña a falsear el dato para colarla.
+ *
+ * `encabezado` es la frase hasta la hora, sin ella: «Vas a agendar a las».
+ */
+function avisoFueraDeHorario(date: Date, h: Horario, encabezado: string): string | null {
   const dia = DIAS.find(d => d.fc === date.getDay())
-  if (!dia) return false
+  if (!dia) return null
   const horarioDia = h[dia.key]
-  if (!horarioDia.activo) return false
-  const hhmm = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-  return hhmm >= horarioDia.inicio && hhmm < horarioDia.fin
+  const hhmm = horaDeReloj(date)
+  if (!horarioDia?.activo) {
+    return `${encabezado} ${hhmm} del ${dia.label.toLowerCase()}, y esta clínica no atiende ${dia.plural}. ¿Es correcto?`
+  }
+  if (hhmm >= horarioDia.inicio && hhmm < horarioDia.fin) return null
+  return `${encabezado} ${hhmm}, y esta clínica atiende de ${horarioDia.inicio} a ${horarioDia.fin}. ¿Es correcto?`
+}
+
+/**
+ * Lo mismo para la hora de FIN, que necesita su propia regla.
+ *
+ * ⚠️  EL CIERRE ES INCLUSIVO AQUÍ. Una cita de 18:00 a 19:00 en una clínica
+ * que atiende hasta las 19:00 termina justo al cerrar y no tiene nada de raro;
+ * con la regla del inicio (`hhmm < fin`) saltaría el aviso en TODAS las citas
+ * de última hora, y un aviso que salta siempre se aprende a despachar sin
+ * leerlo — que es peor que no tenerlo.
+ *
+ * Devuelve `null` en un día no atendido: de eso ya avisa la hora de inicio, y
+ * dos ventanas seguidas para el mismo error son una de más.
+ */
+function avisoFinFueraDeHorario(fin: Date, h: Horario): string | null {
+  const dia = DIAS.find(d => d.fc === fin.getDay())
+  if (!dia) return null
+  const horarioDia = h[dia.key]
+  if (!horarioDia?.activo) return null
+  const hhmm = horaDeReloj(fin)
+  if (hhmm > horarioDia.inicio && hhmm <= horarioDia.fin) return null
+  return `La cita terminaría a las ${hhmm}, y esta clínica atiende de ${horarioDia.inicio} a ${horarioDia.fin}. ¿Es correcto?`
 }
 
 /* ─── Modal de configuración de horario ─────────────────── */
@@ -635,7 +688,7 @@ function QuickPatientModal({
 function AppointmentModal({
   modal, onClose, onSave, onDelete, medicos, defaultMedicoId,
   hideMedicoDropdown, medicoDropdownRequired, canVerExpediente, canInvitar, onInvitar,
-  onCambiarTipo,
+  onCambiarTipo, horario,
 }: {
   modal: ModalState
   onClose: () => void
@@ -643,6 +696,11 @@ function AppointmentModal({
   onDelete: (id: string) => Promise<void>
   medicos: Medico[]
   defaultMedicoId: string
+  /* El horario de consulta, para el aviso de fuera de horario. Hasta ahora ese
+     aviso sólo existía en el GESTO sobre la rejilla (pulsar un hueco,
+     arrastrar), donde la hora la pone el sitio donde caes; por el formulario se
+     tecleaba cualquier hora y nadie decía nada. Ver `avisoFueraDeHorario`. */
+  horario: Horario
   hideMedicoDropdown: boolean
   medicoDropdownRequired: boolean
   canVerExpediente: boolean
@@ -711,6 +769,10 @@ function AppointmentModal({
   const [deleting,    setDeleting]    = useState(false)
   /* La alerta de la X del paciente. Ver el botón, más abajo. */
   const [quitarPaciente, setQuitarPaciente] = useState(false)
+  /* El aviso de fuera de horario ya redactado, o `null`. Guardar la FRASE y no
+     un booleano es lo que deja que el mismo estado sirva para el inicio y para
+     el fin sin tener que volver a decidir cuál de los dos falló. */
+  const [avisoHorario, setAvisoHorario] = useState<string | null>(null)
 
   // F3-6: hook de consultorio activo (siempre disponible bajo el Provider).
   const { consultorioActivo, cambiarActivo } = useConsultorioActivo()
@@ -792,6 +854,20 @@ function AppointmentModal({
     if (medicoDropdownRequired && !medicoId) return
     if (!consultorioId) return  // F3-6: consultorio obligatorio
 
+    /* El aviso de fuera de horario, que hasta ahora este formulario no daba.
+       Se comprueba el INICIO y también el FIN: teclear 18:00 con duración de
+       tres horas deja la cita terminando a las 21:00, que es exactamente el
+       mismo error que arrastrar el borde de abajo hasta ahí. */
+    const inicioIso = fromDatetimeLocal(startTime)
+    const aviso =
+      avisoFueraDeHorario(new Date(inicioIso), horario, 'Vas a agendar a las')
+      ?? avisoFinFueraDeHorario(new Date(addMinutes(inicioIso, duration)), horario)
+    if (aviso) { setAvisoHorario(aviso); return }
+
+    await guardar()
+  }
+
+  async function guardar() {
     setSaving(true)
     const start_time = fromDatetimeLocal(startTime)
 
@@ -1339,6 +1415,18 @@ function AppointmentModal({
       />
     )}
 
+    {/* El aviso de fuera de horario. Mismo patrón que la alerta de la X del
+        paciente: `ConfirmModal` se monta en su propio Portal, por encima de
+        este modal, que se queda tal cual detrás — cancelar devuelve al
+        formulario con la hora puesta, lista para corregirla. */}
+    {avisoHorario && (
+      <ConfirmModal
+        message={avisoHorario}
+        onConfirm={() => { setAvisoHorario(null); void guardar() }}
+        onCancel={() => setAvisoHorario(null)}
+      />
+    )}
+
     {/* Modal de creación rápida — z-index superior al modal de cita */}
     {quickCreate && (
       <QuickPatientModal
@@ -1807,6 +1895,68 @@ export default function AgendaPage() {
     (arg: EventContentArg) => renderEventContent(arg, navegadorTZ, inicialesDeCita),
     [navegadorTZ, inicialesDeCita]
   )
+
+  /* ── Ventana vertical de la rejilla ──────────────────────
+     Antes `slotMinTime`/`slotMaxTime` eran dos cadenas clavadas en 07:00–21:00
+     y una cita a las 23:00 —hay cinco en producción— existía sin poder verse.
+     Ahora la ventana se deriva de horario ∪ eventos visibles ∪ el mismo suelo
+     de antes; el cálculo entero vive en `@/lib/agenda/ventanaRejilla`.
+
+     ⚠️  EL ESTADO GUARDA LA SALIDA, no los tramos ni los eventos de los que
+     sale. No es una simplificación, es lo que hace FIABLE la guarda de
+     igualdad. La alternativa —comparar el array que llega en `eventsSet`— no
+     sirve: ese array se construye recorriendo un mapa (`buildEventApis` sobre
+     `eventStore`), así que su ORDEN cambia con altas, bajas y refetches. Un
+     reordenamiento sin ningún cambio real diría «cambió» y volvería a escribir
+     estado. Dos cadenas no tienen esa trampa.
+
+     ⚠️  Y POR LO MISMO EL RANGO VISIBLE NO SE GUARDA: se lee de la vista en el
+     momento de calcular. Guardado, cada `datesSet` traería `Date` nuevos con
+     las mismas fechas — y `datesSet` SE REEMITE en cada cambio de ventana,
+     aunque el rango no se mueva (la cadena está en la cabecera de
+     `ventanaRejilla.ts`). La comparación por identidad diría «cambió» y daría
+     la vuelta de más: ventana → datesSet → estado → recálculo → misma ventana. */
+  const [ventana, setVentana] = useState<VentanaRejilla>(
+    () => calcularVentanaRejilla([], null, horario),
+  )
+
+  /* `horario` se lee del ref, no de la clausura, para que `aplicarVentana`
+     conserve identidad con deps `[]`: la llaman los dos handlers del calendario
+     y el efecto de abajo, y recrearla no aporta nada. */
+  const horarioRef = useRef(horario)
+  horarioRef.current = horario
+
+  const aplicarVentana = useCallback((
+    eventos: readonly EventoParaVentana[],
+    rango: RangoVisible | null,
+  ) => {
+    const nueva = calcularVentanaRejilla(eventos, rango, horarioRef.current)
+    /* Forma funcional, y devolviendo `prev` tal cual cuando no cambia: React se
+       salta el re-render por su propio camino (bail-out por identidad). Un `if`
+       alrededor del `setState` haría lo mismo, pero habría que repetirlo en los
+       tres llamadores y basta olvidarlo en uno para reabrir la vuelta extra. */
+    setVentana(prev =>
+      prev.slotMinTime === nueva.slotMinTime && prev.slotMaxTime === nueva.slotMaxTime
+        ? prev
+        : nueva
+    )
+  }, [])
+
+  /** El rango pintado, leído de la vista. `null` antes del primer `datesSet`. */
+  const rangoDeVista = useCallback((): RangoVisible | null => {
+    const vista = calendarRef.current?.getApi().view
+    return vista ? { activeStart: vista.activeStart, activeEnd: vista.activeEnd } : null
+  }, [])
+
+  /* El horario es la TERCERA entrada del cálculo y llega por SWR. Si la
+     configuración resuelve DESPUÉS del último `eventsSet` —cache frío—, la
+     rejilla se quedaría con una ventana calculada sin él. Esto no es un tercer
+     disparador del calendario: es el que cubre a su propia entrada. */
+  useEffect(() => {
+    const api = calendarRef.current?.getApi()
+    if (!api) return
+    aplicarVentana(api.getEvents(), rangoDeVista())
+  }, [horario, aplicarVentana, rangoDeVista])
 
   /* ── Detectar mobile y actualizar vista del calendario ── */
   useEffect(() => {
@@ -2313,9 +2463,10 @@ export default function AgendaPage() {
     // Fase 8.2: bloqueo creación de citas si suscripción cancelada con >5 pacientes
     if (subState.isBlocked) { openBloqueoModal(); return }
     const start = arg.date.toISOString()
-    if (!isWithinBusinessHours(arg.date, horario)) {
+    const aviso = avisoFueraDeHorario(arg.date, horario, 'Vas a agendar a las')
+    if (aviso) {
       setConfirm({
-        message: '¿La consulta se agendará fuera del horario de consulta. ¿Desea continuar?',
+        message: aviso,
         onConfirm: () => { setConfirm(null); setModal({ mode: 'create', start, end: addHour(start), tipo: 'cita' }) },
         onCancel:  () => setConfirm(null),
       })
@@ -2327,9 +2478,14 @@ export default function AgendaPage() {
   function handleSelect(arg: DateSelectArg) {
     // Fase 8.2: idem handleDateClick
     if (subState.isBlocked) { openBloqueoModal(); return }
-    if (!isWithinBusinessHours(arg.start, horario)) {
+    // Arrastrar sobre la rejilla fija las dos puntas, así que aquí se miran
+    // las dos: seleccionar de 18:00 a 21:00 con horario hasta las 19:00 no
+    // diría nada mirando sólo el inicio.
+    const aviso = avisoFueraDeHorario(arg.start, horario, 'Vas a agendar a las')
+      ?? avisoFinFueraDeHorario(arg.end, horario)
+    if (aviso) {
       setConfirm({
-        message: 'La consulta se agendará fuera del horario de consulta. ¿Desea continuar?',
+        message: aviso,
         onConfirm: () => { setConfirm(null); setModal({ mode: 'create', start: arg.startStr, end: arg.endStr, tipo: 'cita' }) },
         onCancel:  () => setConfirm(null),
       })
@@ -2351,9 +2507,14 @@ export default function AgendaPage() {
 
     if (!start_time) { arg.revert(); return }
 
-    if (!isWithinBusinessHours(arg.event.start!, horario)) {
+    // Arrastrar mueve el bloque entero: si el inicio queda dentro, el fin
+    // puede haberse salido igual (una cita de dos horas movida a las 18:00
+    // con horario hasta las 19:00).
+    const aviso = avisoFueraDeHorario(arg.event.start!, horario, 'Vas a mover la cita a las')
+      ?? (arg.event.end ? avisoFinFueraDeHorario(arg.event.end, horario) : null)
+    if (aviso) {
       setConfirm({
-        message: 'La consulta se movió fuera del horario de consulta. ¿Está seguro?',
+        message: aviso,
         onConfirm: () => { setConfirm(null); ejecutarDrop(id, start_time, end_time, arg) },
         onCancel:  () => { setConfirm(null); arg.revert() },
       })
@@ -2407,6 +2568,23 @@ export default function AgendaPage() {
     const start_time = arg.event.start?.toISOString()
     const end_time   = arg.event.end?.toISOString()
     if (!start_time) { arg.revert(); return }
+
+    /* Redimensionar no avisaba de nada, y es el gesto que MÁS fácil saca una
+       cita del horario sin tocar su inicio: estirar de 18:00-19:00 a
+       18:00-21:00 con horario hasta las 19:00 deja el inicio intacto. Por eso
+       aquí el FIN importa tanto como el inicio — `eventResizableFromStart`
+       está puesto, así que se puede arrastrar cualquiera de los dos bordes. */
+    const aviso = avisoFueraDeHorario(arg.event.start!, horario, 'La cita empezaría a las')
+      ?? (arg.event.end ? avisoFinFueraDeHorario(arg.event.end, horario) : null)
+    if (aviso) {
+      setConfirm({
+        message: aviso,
+        onConfirm: () => { setConfirm(null); ejecutarDrop(id, start_time, end_time, arg) },
+        onCancel:  () => { setConfirm(null); arg.revert() },
+      })
+      return
+    }
+
     ejecutarDrop(id, start_time, end_time, arg)
   }
 
@@ -2766,10 +2944,26 @@ export default function AgendaPage() {
             ? { left: 'prev,next', center: 'title', right: 'today' }
             : { left: 'prev,next today', center: 'title', right: '' }
           }
-          datesSet={arg => setCurrentView(arg.view.type)}
+          /* ── LOS DOS DISPARADORES DE LA VENTANA, Y NO POR REDUNDANCIA ──
+             `datesSet` cubre la navegación que NO reemite `eventsSet` —volver a
+             un rango que ya está cacheado, donde el `eventStore` no se toca—;
+             `eventsSet` cubre todo lo que no es navegación: la llegada del
+             fetch, el alta optimista, el borrado y la re-hidratación tras un
+             arrastre. Ninguno es superconjunto del otro, y quitar cualquiera de
+             los dos deja un camino por el que la rejilla se queda corta.
+             Durante el ARRASTRE no llega ninguno: el gesto vive en la rebanada
+             `eventDrag` y el `eventStore` no se toca hasta el drop. */
+          datesSet={arg => {
+            setCurrentView(arg.view.type)
+            aplicarVentana(
+              calendarRef.current?.getApi().getEvents() ?? [],
+              { activeStart: arg.view.activeStart, activeEnd: arg.view.activeEnd },
+            )
+          }}
+          eventsSet={eventos => aplicarVentana(eventos, rangoDeVista())}
           buttonText={{ today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día' }}
-          slotMinTime="07:00:00"
-          slotMaxTime="21:00:00"
+          slotMinTime={ventana.slotMinTime}
+          slotMaxTime={ventana.slotMaxTime}
           allDaySlot={false}
           dayMaxEvents={3}
           nowIndicator
@@ -2815,6 +3009,7 @@ export default function AgendaPage() {
           onSave={handleSave}
           onDelete={handleDelete}
           medicos={medicos}
+          horario={horario}
           defaultMedicoId={defaultMedicoId}
           hideMedicoDropdown={isSingleDoctor || isMedicoSinAdmin}
           medicoDropdownRequired={isSecretaria || isMedicoConAdmin}
