@@ -91,6 +91,26 @@
   --ag-chip-bg: #eef1f6;
   --ag-chip-text: #7c8aa0;
 
+  /* ── Movimiento ─────────────────────────────────────────────────────
+     NO SE DUPLICAN EN html.dark: son duraciones y curvas, no color. Si alguna
+     vez aparece una contraparte oscura de uno de estos, es un error de copia.
+
+     El tope son 240 ms y no hay excepción. Una agenda es herramienta de
+     consulta: el médico la abre decenas de veces al día, y lo que se nota dos
+     veces molesta a la trigésima. El movimiento sirve para que un cambio no
+     aparezca de la nada, no para lucirse.
+
+     ⚠️ SÓLO SE ANIMAN `opacity` Y `transform: translateY()`. Nunca `height`,
+     `top` ni `width`: FullCalendar recalcula posiciones a partir del layout y
+     animar algo que lo dispare sale como temblor de la rejilla entera. */
+  --ag-dur-micro: 120ms;   /* hover, press, focus */
+  --ag-dur-base:  180ms;   /* entrada de evento, cambio de vista */
+  --ag-dur-lento: 240ms;   /* aviso, panel, remonte del modal */
+
+  --ag-ease-out: cubic-bezier(0, 0, .2, 1);    /* algo llega */
+  --ag-ease-in:  cubic-bezier(.4, 0, 1, 1);    /* algo se va */
+  --ag-ease:     cubic-bezier(.4, 0, .2, 1);   /* algo se mueve */
+
   /* VISTA MES (sub-fase 7) — variante clara. La sub-fase 6 (dark) añadirá
      las contrapartes en html.dark. El círculo de HOY reusa --ag-brand-primary
      y el punto de los chips reusa --ag-status-*-dot (NO duplicar). */
@@ -941,6 +961,80 @@ body {
   transform: scale(1.02) !important;
   filter:    drop-shadow(0 4px 8px rgba(0,0,0,0.12)) !important;
   z-index:   10 !important;
+}
+
+/* ── Entrada de la tarjeta de evento ──────────────────────────────────
+   Un fundido y una subida de 4 px cada vez que la tarjeta se monta, para que no
+   aparezca de la nada. 4 px y no más: una tarjeta de 30 min mide 34 px, y un
+   recorrido largo dentro de una rejilla de horas no se lee como entrada, se lee
+   como salto.
+
+   TRES TRAMPAS DE MANTENIMIENTO, y las tres muerden en silencio:
+
+   1. ⚠️ EL RELLENO ES `backwards`. NUNCA `forwards` NI `both`, Y ESTO YA SE
+      ROMPIÓ UNA VEZ. Con `both`, la animación RETIENE el valor de `transform` al
+      terminar, y este elemento tiene además una TRANSICIÓN de `transform` en el
+      hover (la regla de aquí arriba, 0.15s). Al sacar el ratón, esa transición
+      arranca y el valor subyacente se está moviendo de `scale(1.02)` a nada
+      durante 150 ms; la animación retenida lo congela en el punto intermedio en
+      que la pilló y la tarjeta se queda agrandada para siempre. Ocurría en cada
+      hover, no en un caso raro.
+
+      Lo que despistó la primera vez: es cierto que, con sólo `from`, el
+      fotograma del 100 % toma el «valor subyacente». Eso es inocuo con el
+      elemento EN REPOSO —el valor subyacente es estable y retenerlo no cambia
+      nada— y deja de serlo en cuanto una transición mueve esa misma propiedad,
+      porque entonces el valor subyacente es un fotograma cualquiera de la
+      transición. La conclusión es simple: LA ENTRADA NO PUEDE RETENER
+      `transform` BAJO NINGUNA CIRCUNSTANCIA.
+
+      `backwards` aplica el estado inicial ANTES de arrancar —que es lo único que
+      hacía falta, para que la tarjeta no destelle a opacidad plena en el primer
+      fotograma— y NO retiene nada al acabar: el `transform` vuelve a manos del
+      hover y de su transición.
+
+   2. Y POR LO MISMO, NUNCA LE AÑADAS UN BLOQUE `to {}` A ESTE KEYFRAME. Sigue
+      vigente aunque el relleno ya no retenga: un `to { transform: none }`
+      impondría ese valor durante los 180 ms de la entrada, así que un hover que
+      empiece mientras la tarjeta entra se comería el escalado. Es el «arreglo»
+      que le sale a cualquiera que lea esto y le parezca incompleto.
+
+   3. LA EXCLUSIÓN DE `.fc-event-mirror` NO ES COSMÉTICA. El fantasma de
+      `selectMirror` —arrastrar sobre la rejilla vacía para crear una cita— vive
+      en un harness keyeado por columna, así que cruzar de día lo desmonta y lo
+      vuelve a montar. Sin la exclusión, arrastrar de martes a jueves hace que el
+      bloque pegue un salto de 4 px en cada cruce de columna.
+
+   ⚠️ Y UNA CREENCIA FALSA QUE HAY QUE MATAR, porque es la que produjo el fallo:
+   el `!important` del hover NO lo protege de esta animación. En la cascada, el
+   origen de las animaciones va POR ENCIMA de las declaraciones `!important` de
+   autor — es justo al revés de lo que parece. Mientras la entrada corre, manda
+   la entrada. Lo que hace que el hover funcione no es su `!important`, es que la
+   entrada suelta el elemento al acabar. NO TOQUES LA REGLA DEL HOVER. */
+@keyframes ag-entra {
+  from { opacity: 0; transform: translateY(4px); }
+}
+.agenda-fc .fc-event:not(.fc-event-mirror) {
+  animation: ag-entra var(--ag-dur-base) var(--ag-ease-out) backwards;
+}
+
+/* Preferencia de sistema de movimiento reducido, para la agenda.
+   El bloque que ya existe más abajo en esta hoja sólo casa `[class*="animate-"]`
+   y los reveals de la landing; `.fc-event` no casa con ninguno de los dos, así
+   que sin esto la agenda sería lo único de la app que ignora la preferencia.
+
+   `.01ms` Y NO `none`, por convención: con `none` los eventos `animationend` y
+   `transitionend` no llegan a dispararse y cualquier lógica que los espere se
+   queda colgada. ⚠️ QUE NADIE LO LEA AL REVÉS: hoy NO hay un solo listener de
+   esos eventos en este proyecto, así que no se está protegiendo nada concreto.
+   Es la forma segura por defecto, para que el día que aparezca uno no haga falta
+   acordarse de esto. */
+@media (prefers-reduced-motion: reduce) {
+  .fc *, .agenda-fc *, .fc *::before, .fc *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════════
