@@ -46,6 +46,12 @@
   /* Texto */
   --ag-ink: #15243e;
   --ag-text: #27364f;
+  /* Escalón intermedio de la familia de tinta: entre --ag-text y --ag-muted, que
+     tenían un salto grande y ninguno servía. Lo pide la HORA de una tarjeta de
+     evento genérico, que va en neutro y nunca en el color del evento; el porqué
+     está entero junto a la regla, en agenda/page.tsx. --ag-muted NO vale ahí:
+     sobre el tinte de un evento da 2.91:1 en claro y 4.04:1 en oscuro. */
+  --ag-ink-600: #52627a;
   --ag-muted: #7c8aa0;
   --ag-muted2: #9aa6b8;
   --ag-faint: #aab4c4;
@@ -1598,6 +1604,7 @@ html.dark {
   /* Texto */
   --ag-ink: #e8eef6;
   --ag-text: #cdd8e6;
+  --ag-ink-600: #a8b4c2;                      /* ver la nota de la variante clara */
   --ag-muted: #8b9bb0;
   --ag-muted2: #6b7a90;
   --ag-faint: #5d6b80;

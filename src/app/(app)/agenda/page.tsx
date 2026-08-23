@@ -1563,7 +1563,12 @@ const FORMATO_HORA_INICIO = new Intl.DateTimeFormat('es-MX', {
 
 const MemoizedEventContent = memo(function MemoizedEventContent({
   timeText, horaInicio, title, pacNombre, status, doctorInitial, tzDiff, icono, color, descriptor,
+  esEvento,
 }: {
+  /* True si la fila es un evento genérico y no una cita. Lo deriva el
+     despachador con `esEventoGenerico`; aquí no se puede deducir de `icono` ni
+     de `color`, que un evento puede no tener. Sólo decide la tinta de la hora. */
+  esEvento: boolean
   /* LAS DOS CADENAS DE HORA VIAJAN JUNTAS Y ELIGE EL CSS, y no es adorno.
      `timeText` es lo que compone FullCalendar y en `timeGrid` es el RANGO
      —«10:30 – 11:00»—, porque `displayEventEnd` se resuelve a `true` cuando la
@@ -1664,9 +1669,35 @@ const MemoizedEventContent = memo(function MemoizedEventContent({
   return (
     <div ref={rootRef} className={`ag-tarjeta ag-tarjeta--${tier}`} style={root}>
       <div className="ag-tarjeta-cab">
-        {/* La hora toma el color del estado (antes gris fijo), y con él respeta
-            también el color elegido del evento, porque `txt` ya lo resuelve. */}
-        <span className="ag-tarjeta-hora" style={{ color: txt }}>
+        {/* ⚠️ LA HORA DE UN EVENTO GENÉRICO VA EN NEUTRO, NUNCA EN EL COLOR DEL
+            EVENTO. La de una cita sí toma el color de su estado.
+
+            1. EL MOTIVO ES ESTRUCTURAL, no que estos seis colores concretos
+               fallen. El fondo de la tarjeta es una MEZCLA DEL PROPIO COLOR
+               (`fondo` = color al 10 % sobre la superficie), así que pintar el
+               texto de ese mismo color acota el contraste a la distancia entre
+               un color y una mezcla de sí mismo. Cuatro de los seis quedaban
+               por debajo de AA —oliva 4.39:1 en claro; indigo 4.16, bronce 4.31
+               y grafito 4.11 en oscuro— y los dos que pasaban lo hacían por
+               suerte. Retiñir esos cuatro dejaría la trampa armada para el
+               séptimo color que alguien añada.
+            2. SUBIR EL PORCENTAJE DEL TINTE LO EMPEORA, en los dos modos: en
+               claro el fondo se oscurece hacia el color y en oscuro se aclara
+               hacia él. No lo intentes.
+            3. LOS CINCO ESTADOS SÍ CONSERVAN SU COLOR, y la asimetría es
+               deliberada: son cinco valores fijos que elige el sistema, se
+               verifican una vez y se acabó. Los colores de evento son seis y
+               creciendo, los elige un usuario, y no hay forma de verificar a
+               futuro lo que todavía no existe.
+            4. EFECTO SECUNDARIO, Y ES UNA MEJORA: la hora en color pasa a
+               significar «esto es una cita con estado» y la hora en neutro
+               «esto es un evento». Es un signo de tipo donde no había ninguno.
+               Deliberado, no un descuido: no lo «unifiques».
+
+            El color del evento sigue vivo donde no tiene este problema: la barra
+            izquierda (gráfico, umbral 3:1), el icono, el punto del mes, la
+            píldora —fondo opaco— y el tinte del fondo. */}
+        <span className="ag-tarjeta-hora" style={{ color: esEvento ? 'var(--ag-ink-600)' : txt }}>
           <span className="ag-tarjeta-hora-rango">{timeText}</span>
           <span className="ag-tarjeta-hora-inicio">{horaInicio}</span>
         </span>
@@ -1927,6 +1958,7 @@ function renderEventContent(arg: EventContentArg, navegadorTZ: string, iniciales
       icono={ext.icono ?? null}
       color={ext.color ?? null}
       descriptor={ext.notes?.trim() || null}
+      esEvento={esEventoGenerico(ext)}
     />
   )
 }
