@@ -232,7 +232,7 @@ const ESTADOS_EVENTO: readonly Status[] = ['scheduled', 'cancelled']
  * Sin `color` explícito hereda `currentColor`, que es como se comportaba el
  * icono de lucide al que sustituye.
  */
-function IconoDelEvento({ nombre, size, color }: { nombre: IconoEvento; size: number; color?: string }) {
+function IconoDelEvento({ nombre, size, color }: { nombre: IconoEvento; size: number | string; color?: string }) {
   const archivo = `url(/icons/${nombre}.svg)`
   return (
     <span
@@ -1534,40 +1534,60 @@ function ConfirmModal({ message, onConfirm, onCancel }: {
 const CARD_TINY_MAX = 40
 const CARD_COMPACT_MAX = 56
 
-/* Estilo neutro del chip de médico (handoff). El contenido (2 iniciales,
-   solo multi-doctor) lo decide el event source; aquí solo se estiliza. */
-const CHIP_STYLE: CSSProperties = {
-  fontSize: '9px', fontWeight: 800, letterSpacing: '.02em',
-  borderRadius: '5px', padding: '1px 5px', lineHeight: 1.4, flexShrink: 0,
-  background: 'var(--ag-chip-bg)', color: 'var(--ag-chip-text)',
-}
-const NAME_BASE: CSSProperties = {
-  fontSize: '12px', fontWeight: 700, color: 'var(--ag-ink)', lineHeight: 1.25,
-  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0,
-  // flexShrink:0 → el nombre nunca se comprime; ante desborde se recorta la
-  // fila de estado (última), nunca el nombre.
-  flexShrink: 0,
-}
-const STATUS_DOT: CSSProperties = {
-  width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-}
-const tzDiffStyle: CSSProperties = {
-  fontSize: '9.5px',
-  fontWeight: 500,
-  lineHeight: 1.2,
-  color: 'var(--ag-muted)',
-  fontStyle: 'italic',
-}
+/* La hora de INICIO sola, para el tier `tiny` fuera de Día (ver la nota de las
+   dos horas en la tarjeta). Espeja el `eventTimeFormat` del <FullCalendar> —2
+   dígitos, 24 h— para que las dos cadenas se lean igual; `hourCycle: 'h23'` y no
+   `hour12: false` por lo mismo que en el indicador de hora: el segundo deja
+   pasar «24:00» en algunas locales. A nivel de módulo para no reconstruir un
+   Intl por tarjeta y por render. */
+const FORMATO_HORA_INICIO = new Intl.DateTimeFormat('es-MX', {
+  hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+})
+
+/* ── DÓNDE VIVE CADA ESTILO DE ESTA TARJETA (bloque 3A) ────────────────
+   El criterio de reparto, para que el siguiente no tenga que adivinarlo:
+
+   · VA A globals.css (`.ag-tarjeta-*`, junto al harness de `.fc-event`) todo
+     lo que es CAJA: layout, tipografía, huecos, y qué hijos se ven en cada
+     vista y en cada tier. Es lo que permite que la vista Día se resuelva
+     cambiando la dirección del flex desde `.fc-timeGridDay-view`, sin una rama
+     nueva en `renderEventContent`.
+   · SE QUEDA EN LÍNEA sólo lo que depende de un valor calculado en JS: los
+     cuatro colores interpolados (`dot`, `txt`, `fondo`, `marco`), que salen del
+     estado o del color elegido del evento, y el tachado de una cancelada. Nada
+     de esto se puede escribir como regla estática sin volcar la paleta entera
+     a CSS y duplicarla.
+   · El TIER es la excepción interesante: se calcula en JS (ResizeObserver) pero
+     viaja como CLASE, no como estilo. Tiene que ser así — ver la nota de
+     `tier` abajo. */
 
 const MemoizedEventContent = memo(function MemoizedEventContent({
-  timeText, title, pacNombre, status, doctorInitial, tzDiff, icono, color,
+  timeText, horaInicio, title, pacNombre, status, doctorInitial, tzDiff, icono, color, descriptor,
 }: {
-  timeText: string; title: string; pacNombre: string | null
+  /* LAS DOS CADENAS DE HORA VIAJAN JUNTAS Y ELIGE EL CSS, y no es adorno.
+     `timeText` es lo que compone FullCalendar y en `timeGrid` es el RANGO
+     —«10:30 – 11:00»—, porque `displayEventEnd` se resuelve a `true` cuando la
+     vista no lo fija (core/internal-common.js:4402, y timegrid no lo fija). Ese
+     rango mide ~78 px y no encoge; en una columna de Semana de ~135 px se come
+     el nombre de la cita de 30 min, que es justo la que cae en el tier `tiny`.
+     `horaInicio` es sólo la de arranque, que es lo que retrata `semana.png`.
+     Se manda el par y `globals.css` enseña una u otra, porque quien decide es
+     la VISTA —Día se queda con el rango— y la vista es lo único que este
+     componente no sabe: el tier sí lo tiene, la vista no. */
+  timeText: string; horaInicio: string; title: string; pacNombre: string | null
   status: Status; doctorInitial?: string; tzDiff?: string
   /* La pinta del evento genérico (§12.14). Null en una cita, y null también en
      un evento al que no le eligieron ninguna: ahí la tarjeta cae al estilo por
      estado, que es lo que hacía antes de que esto existiera. */
   icono: IconoEvento | null; color: ColorEvento | null
+  /* Texto base de la tercera línea: `notes`, y NADA MÁS, en una cita y en un
+     evento genérico por igual. Sin nota, la línea la ocupa el estado.
+
+     ⚠️ HUBO UN RESPALDO A LA SEDE DEL CONSULTORIO cuando `notes` venía vacía en
+     un evento genérico. Está revocado: salió de leer «Star Médica · quirófano
+     2» en el mockup como si fuera un campo, y ahí es texto escrito a mano en
+     `notes`, no una sede. No lo repongas. */
+  descriptor: string | null
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const [height, setHeight] = useState<number | null>(null)
@@ -1583,7 +1603,17 @@ const MemoizedEventContent = memo(function MemoizedEventContent({
     return () => ro.disconnect()
   }, [])
 
-  // height null = aún sin medir → 'full' hasta el primer ResizeObserver.
+  /* height null = aún sin medir → 'full' hasta el primer ResizeObserver.
+
+     ⚠️ EL TIER SALE COMO CLASE Y NO COMO RAMA DE MARKUP, Y NO ES ESTILO: ES LO
+     QUE HACE POSIBLE LA VISTA DÍA. Antes cada tier renderizaba hijos distintos
+     —`tiny` no montaba la hora ni el descriptor—, así que una cita de 30 min,
+     que mide 34 px y cae en `tiny` en CUALQUIER vista, llegaba a Día sin los
+     elementos que su fila horizontal tiene que enseñar. En Día sobra ancho y no
+     falta nada, pero un hijo que no existe no se puede volver a enseñar con
+     CSS. Montando siempre los mismos hijos y escondiéndolos por clase, la regla
+     de `.fc-timeGridDay-view` los recupera. Si vuelves a ramificar el markup por
+     tier, la vista Día se rompe en silencio para las citas cortas. */
   const tier: 'tiny' | 'compact' | 'full' =
     height == null ? 'full'
       : height < CARD_TINY_MAX ? 'tiny'
@@ -1606,73 +1636,88 @@ const MemoizedEventContent = memo(function MemoizedEventContent({
     : `var(--ag-status-${status}-border)`
   const isCancelled = status === 'cancelled'
   const name = pacNombre ?? title
+  const etiquetaEstado = STATUS_CONFIG[status].label
 
+  /* SIN `opacity` EN LAS CANCELADAS. La tenía (0.7) y se retiró en el bloque
+     3A: arrastraba el texto con el fondo y los ratios de la paleta de estado se
+     midieron sin ella, así que al 70 % una cancelada bajaba de AA. El tachado
+     del nombre y el fondo rojo ya dicen «cancelada» sin tocar el contraste. */
   const root: CSSProperties = {
-    height: '100%', boxSizing: 'border-box', overflow: 'hidden', cursor: 'pointer',
     background: fondo,
-    border: `1px solid ${marco}`,
-    borderLeft: `3.5px solid ${dot}`,
-    borderRadius: '9px',
-    boxShadow: 'var(--ag-shadow-card)',
-    display: 'flex', flexDirection: 'column', gap: '1px',
-    justifyContent: tier === 'tiny' ? 'center' : 'flex-start',
-    padding: tier === 'tiny' ? '2px 8px' : '4px 9px',
-    opacity: isCancelled ? 0.7 : 1,
-  }
-  const nameStyle: CSSProperties = isCancelled
-    ? { ...NAME_BASE, textDecoration: 'line-through' }
-    : NAME_BASE
-  const chip = doctorInitial ? <span style={CHIP_STYLE}>{doctorInitial}</span> : null
-
-  /* El icono del evento genérico SUSTITUYE al punto, no se suma: los dos ocupan
-     el mismo sitio y dicen lo mismo —de qué va esta tarjeta— con distinto grado
-     de detalle. Dos marcadores seguidos en una tarjeta de 34px no caben. */
-  const marcador = icono
-    ? <IconoDelEvento nombre={icono} size={11} color={dot} />
-    : <span style={{ ...STATUS_DOT, background: dot }} />
-
-  // tiny: marcador + nombre, una fila centrada. Sin hora ni chip.
-  if (tier === 'tiny') {
-    return (
-      <div ref={rootRef} style={root}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: 0 }}>
-          {marcador}
-          <span style={nameStyle}>{name}</span>
-        </div>
-      </div>
-    )
+    borderColor: marco,
+    borderLeftColor: dot,
   }
 
-  const timeRow = (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: 0 }}>
-      <span style={{ fontSize: '10.5px', fontWeight: 600, lineHeight: 1.2, color: 'var(--ag-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {timeText}
-      </span>
-      {chip}
-    </div>
-  )
+  /* EL EMPUJE AL BORDE DERECHO DE LA FILA, y lo lleva UNO SOLO: el primero del
+     grupo de la derecha. Dos márgenes `auto` se repartirían el hueco a partes
+     iguales y el chip acabaría a media fila, que es justo lo que se arregló al
+     sacarlo de entre el nombre y el descriptor.
+     Casi siempre es inerte —mientras el descriptor esté y crezca, el espacio
+     libre es cero— y sólo manda cuando el descriptor no se pinta: un evento
+     genérico sin `notes` en la vista Día. Está en línea y no en `globals.css`
+     porque quién lo lleva depende de si hay chip, que es un dato de aquí. En la
+     disposición vertical no estorba: el chip ya iba a la derecha de su fila
+     empujado por la hora, y la píldora está apagada. */
+  const empujeChip: CSSProperties | undefined = doctorInitial ? { marginLeft: 'auto' } : undefined
+  const estiloPildora: CSSProperties = doctorInitial ? { color: txt } : { color: txt, marginLeft: 'auto' }
 
-  // compact: fila hora + chip, luego nombre. Sin fila de estado.
-  if (tier === 'compact') {
-    return (
-      <div ref={rootRef} style={root}>
-        {timeRow}
-        <span style={nameStyle}>{name}</span>
-        {tzDiff && <span style={tzDiffStyle}>{tzDiff}</span>}
-      </div>
-    )
-  }
-
-  // full: fila hora + chip, nombre, fila (punto + estado corto).
   return (
-    <div ref={rootRef} style={root}>
-      {timeRow}
-      <span style={nameStyle}>{name}</span>
-      {tzDiff && <span style={tzDiffStyle}>{tzDiff}</span>}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-        {marcador}
-        <span style={{ fontSize: '10.5px', fontWeight: 600, lineHeight: 1.2, color: txt }}>{STATUS_CONFIG[status].label}</span>
+    <div ref={rootRef} className={`ag-tarjeta ag-tarjeta--${tier}`} style={root}>
+      <div className="ag-tarjeta-cab">
+        {/* La hora toma el color del estado (antes gris fijo), y con él respeta
+            también el color elegido del evento, porque `txt` ya lo resuelve. */}
+        <span className="ag-tarjeta-hora" style={{ color: txt }}>
+          <span className="ag-tarjeta-hora-rango">{timeText}</span>
+          <span className="ag-tarjeta-hora-inicio">{horaInicio}</span>
+        </span>
+        {doctorInitial && <span className="ag-tarjeta-chip" style={empujeChip}>{doctorInitial}</span>}
       </div>
+      <div className="ag-tarjeta-tit">
+        {/* El icono del evento genérico va DELANTE DEL NOMBRE, no en el hueco
+            del punto de estado: el punto murió con la fila de estado, que ahora
+            es el descriptor. En una cita no hay icono y aquí no hay nada.
+
+            EL ENVOLTORIO NO ES DECORATIVO NI ES CASO DE DÍA: es el item de flex
+            que `order` coloca, y en Día crece hasta ser el cuadro con fondo y
+            borde del mockup. El TAMAÑO del glifo tampoco se fija aquí —viaja en
+            `--ag-tarjeta-icono-px`, que globals.css sube de 16 a 26 px en Día—
+            porque un número en línea ganaría a cualquier regla por vista sin
+            necesidad de `!important`, y entonces esto no se podría escalar. */}
+        {icono && (
+          <span className="ag-tarjeta-icono">
+            <IconoDelEvento nombre={icono} size="var(--ag-tarjeta-icono-px)" color={dot} />
+          </span>
+        )}
+        <span
+          className="ag-tarjeta-nombre"
+          style={isCancelled ? { textDecoration: 'line-through' } : undefined}
+        >{name}</span>
+      </div>
+      {tzDiff && <span className="ag-tarjeta-tz">{tzDiff}</span>}
+      {/* Tercera línea: «Consulta de seguimiento · atendida». El estado va en su
+          propio span —con su separador— porque la vista Día lo esconde: allí lo
+          dice la píldora, y repetirlo sería decir dos veces lo mismo en la misma
+          fila. Sin `descriptor` queda sólo el estado, sin separador huérfano. */}
+      <span className={descriptor ? 'ag-tarjeta-desc' : 'ag-tarjeta-desc ag-tarjeta-desc--solo-estado'}>
+        {descriptor}
+        {descriptor && <span className="ag-tarjeta-desc-sep"> · </span>}
+        {/* ⚠️ EL ESTADO LLEVA SU COLOR, NO EL GRIS DEL DESCRIPTOR. Heredando
+            `--ag-muted` los cinco estados caen a 3.07–3.26:1 en claro y `no_show`
+            a 4.35:1 en oscuro — por debajo de AA, y en Semana esta línea es el
+            ÚNICO sitio donde se escribe el estado, porque la píldora está
+            apagada. Es el mismo motivo por el que arriba se retiró la `opacity`
+            de las canceladas. El ` · ` y la nota se quedan en gris: ahí no hay
+            información de estado que leer. */}
+        <span className="ag-tarjeta-desc-estado" style={{ color: txt }}>{etiquetaEstado.toLowerCase()}</span>
+      </span>
+      {/* Píldora de estado: montada siempre, visible SÓLO en Día (globals.css), y
+          en TODA fila con estado —cita o evento genérico—, que es lo que hace que
+          la columna de Día se lea alineada. El borde y el punto salen de
+          `currentColor`, así que basta fijar aquí el color una vez y las otras
+          dos declaraciones lo heredan. Y como el color es `txt`, un evento con
+          color elegido pinta su píldora con él, igual que ya hacen la barra
+          izquierda, la hora y la etiqueta del descriptor. */}
+      <span className="ag-tarjeta-pildora" style={estiloPildora}>{etiquetaEstado}</span>
     </div>
   )
 })
@@ -1706,28 +1751,17 @@ function GoogleGIcon({ size = 12 }: { size?: number }) {
 const GoogleEventCard = memo(function GoogleEventCard({
   timeText, title,
 }: { timeText: string; title: string }) {
+  /* SIN UN SOLO ESTILO EN LÍNEA, y a propósito: aquí no hay ningún valor
+     calculado en JS —ni estado, ni color elegido, ni paciente— así que la caja
+     entera cabe en `globals.css` y la vista Día la vuelve horizontal desde allí,
+     igual que a la tarjeta de cita. Si alguna vez hace falta un color derivado
+     de datos, ése y sólo ése vuelve a línea. */
   return (
-    <div style={{
-      height: '100%', boxSizing: 'border-box', overflow: 'hidden',
-      color: 'var(--ag-gcal-text)',
-      border: '1px solid var(--ag-gcal-accent)',
-      borderLeft: '3px solid var(--ag-gcal-accent)',
-      borderRadius: '9px', padding: '5px 9px',
-      background: 'var(--ag-gcal-bg1)',
-      display: 'flex', flexDirection: 'column', gap: '2px',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: 0 }}>
+    <div className="ag-gcal">
+      <div className="ag-gcal-cab">
         <GoogleGIcon size={12} />
-        <span style={{ fontSize: '10.5px', fontWeight: 600, opacity: 0.85, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {timeText}
-        </span>
-        <span style={{
-          flexShrink: 0, marginLeft: 'auto',
-          fontSize: '9px', fontWeight: 700, letterSpacing: '.02em',
-          textTransform: 'uppercase', opacity: 0.75,
-          border: '1px solid currentColor', borderRadius: '999px',
-          padding: '0 5px', lineHeight: 1.5,
-        }}>
+        <span className="ag-gcal-hora">{timeText}</span>
+        <span className="ag-gcal-badge">
           {/* "Evento", y antes decía "Sin cita". Aquel texto venía del modelo
               viejo, cuando la etiqueta servía para separar estos eventos de los
               bloques de "Ocupado" de freebusy. Eliminado freebusy (§12.6) sólo
@@ -1741,9 +1775,7 @@ const GoogleEventCard = memo(function GoogleEventCard({
           Evento
         </span>
       </div>
-      <span style={{ fontSize: '12px', fontWeight: 700, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-        {title}
-      </span>
+      <span className="ag-gcal-titulo">{title}</span>
     </div>
   )
 })
@@ -1813,6 +1845,42 @@ const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg }) {
 /** Resuelve las iniciales del chip de médico de una cita ya pintada. */
 type InicialesDeCita = (ext: Appointment) => string | undefined
 
+/* ⚠️ AQUÍ VIVÍA `clasesDelEvento`, LA FUNCIÓN DE `eventClassNames`. NO LA
+ * REPONGAS SIN UNA REGLA QUE LEA LO QUE EMITE.
+ *
+ * Emitía marcadores semánticos en el `<a>` raíz del evento —categoría, estado, y
+ * si el evento genérico tenía color elegido— para que `globals.css` decidiera
+ * desde ellos qué hijos se ven dentro de la tarjeta. Nacieron seis; cinco no los
+ * leyó nunca nadie y se fueron. El último, `ag-ev-cita`, encendía la píldora de
+ * estado sólo en las citas, y eso resultó ser el bug: la píldora es del ESTADO,
+ * y un evento genérico tiene estado igual que una cita. Al corregirlo, la regla
+ * dejó de necesitar distinguir categorías y el marcador se quedó sin un solo
+ * consumidor.
+ *
+ * Un marcador emitido que nadie lee no se distingue de un descuido, así que se
+ * fue la función entera y con ella la prop del `<FullCalendar>`. Si un bloque
+ * futuro necesita distinguir categorías desde el CSS, esto vuelve —pero JUNTO
+ * con la regla que lo lee, no antes.
+ *
+ * Si vuelve, dos cosas que costaron encontrarse y no hay que redescubrir:
+ *
+ *   1. NINGUNA CLASE PUEDE PINTAR EL `<a>` RAÍZ. Ese elemento es el harness
+ *      TRANSPARENTE de `globals.css` (`.fc .fc-event`: fondo, borde y sombra a
+ *      cero con `!important`) y toda la pinta la ponen las tarjetas de
+ *      `eventContent` por dentro. Un marcador sirve como ANCESTRO y nada más.
+ *   2. EL TIPO SE DERIVA, NO SE GUARDA. La tentación es meter un campo `tipo` en
+ *      `extendedProps`, pero ese objeto tiene TRES productores independientes:
+ *      el GET de `/api/appointments` (que vuelca la fila con `{ ...apt }`), la
+ *      escritura optimista de `buildEventInput` —luego fusionada clave por clave
+ *      por `aplicarAppointmentAlEvento`— y la fuente de Google, que no produce
+ *      filas de `appointments` en absoluto y pone `{ isGcalBlock: true }` y nada
+ *      más. Un valor guardado habría que escribirlo en los tres y reescribirlo en
+ *      cada fusión; el día que uno se olvide, la tarjeta se pinta con el tipo
+ *      anterior y no falla nada. `esEventoGenerico(ext)` lo deriva de lo que ya
+ *      llega y no hay nada que sincronizar. (Y `TipoFila` ya existe en este
+ *      archivo y significa otra cosa.)
+ */
+
 function renderEventContent(arg: EventContentArg, navegadorTZ: string, inicialesDeCita: InicialesDeCita) {
   // Vista Mes: chip plano dedicado. El camino de Semana/Día (abajo) queda intacto.
   if (arg.view.type === 'dayGridMonth') return <MonthChip arg={arg} />
@@ -1850,6 +1918,7 @@ function renderEventContent(arg: EventContentArg, navegadorTZ: string, iniciales
   return (
     <MemoizedEventContent
       timeText={arg.timeText}
+      horaInicio={arg.event.start ? FORMATO_HORA_INICIO.format(arg.event.start) : arg.timeText}
       title={ext.title}
       pacNombre={pac ? `${pac.nombre} ${pac.apellidos}` : null}
       status={ext.status}
@@ -1857,6 +1926,7 @@ function renderEventContent(arg: EventContentArg, navegadorTZ: string, iniciales
       tzDiff={tzDiff}
       icono={ext.icono ?? null}
       color={ext.color ?? null}
+      descriptor={ext.notes?.trim() || null}
     />
   )
 }
@@ -2317,9 +2387,14 @@ export default function AgendaPage() {
           end:             e.end?.dateTime ?? e.end?.date ?? undefined,
           allDay:          !e.start?.dateTime,
           // Harness transparente: la GoogleEventCard pinta su propio fondo/borde.
+          // Sin `textColor`, y era el ÚLTIMO que quedaba en las tres fuentes.
+          // Era un hex a mano que duplicaba --ag-gcal-text y que en tema oscuro
+          // se quedaba clavado mientras el token sí cambiaba. No hace falta:
+          // `GoogleEventCard` fija `color: var(--ag-gcal-text)` en su <div>
+          // raíz, y de ahí lo heredan la hora, el título y el borde de la
+          // etiqueta («currentColor»), así que no dependían de esta herencia.
           backgroundColor: 'transparent',
           borderColor:     'transparent',
-          textColor:       '#6d4ec0',
           editable:        false,
           extendedProps:   { isGcalBlock: true },
         }))

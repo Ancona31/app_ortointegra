@@ -937,6 +937,384 @@ body {
   z-index:   10 !important;
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   TARJETA DE EVENTO DE SEMANA/DÍA (`.ag-tarjeta`) — bloque 3A
+   ══════════════════════════════════════════════════════════════════════
+   La caja de `MemoizedEventContent`, que antes vivía entera en estilos en
+   línea. CRITERIO DEL REPARTO, para que el siguiente no lo adivine:
+
+   · AQUÍ va todo lo que es CAJA — layout, tipografía, huecos, y qué hijos se
+     ven en cada vista y en cada tier. Que esté aquí es lo que permite que la
+     vista Día sea una fila horizontal sin una rama nueva en el despachador de
+     `renderEventContent`: el markup es el mismo y sólo cambia el CSS.
+   · SIGUE EN LÍNEA lo que depende de un valor calculado en JS: los cuatro
+     colores interpolados por estado o por color de evento (`dot`, `txt`,
+     `fondo`, `marco`) y el tachado de una cancelada. Escribirlos como reglas
+     estáticas exigiría volcar aquí la paleta entera, multiplicada por los
+     cinco estados y los seis colores.
+
+   ⚠️ ESTAS REGLAS NO PINTAN EL `<a>` RAÍZ del evento (`.fc .fc-event`, arriba),
+   que es transparente a propósito y con `!important`. Lo único que se usa de
+   fuera de la tarjeta es `.fc-timeGridDay-view`, y siempre como ANCESTRO. Hubo
+   además marcadores propios en ese `<a>` vía `eventClassNames`; se retiraron al
+   quedarse sin consumidores, y el porqué está en page.tsx, donde vivía la
+   función que los emitía. */
+
+/* Caja. El color de `background` y de los bordes lo pone el estilo en línea. */
+.agenda-fc .ag-tarjeta {
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 1px;
+  padding: 4px 9px;
+  border: 1px solid;
+  border-left-width: 3.5px;
+  border-radius: 9px;
+  box-shadow: var(--ag-shadow-card);
+}
+
+/* Las dos filas de la disposición vertical. `flex-shrink: 0` va en el
+   ENVOLTORIO, no en el nombre: así la fila no se comprime a lo alto y el nombre
+   sigue pudiendo encogerse a lo ancho para que le entre la elipsis. */
+.agenda-fc .ag-tarjeta-cab,
+.agenda-fc .ag-tarjeta-tit {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.agenda-fc .ag-tarjeta-hora {
+  flex: 1;
+  min-width: 0;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* LAS DOS HORAS. La tarjeta monta el rango («10:30 – 11:00», que es lo que
+   compone FullCalendar en `timeGrid`) y la hora de inicio sola, y aquí se elige.
+   Por defecto manda el rango; el tier `tiny` se queda con la de inicio, y la
+   vista Día le devuelve el rango porque ahí el ancho es la columna entera.
+
+   NO ES UN LUJO: el rango mide ~78 px con `tabular-nums` a 10.5 px/600 y no
+   encoge. En una columna de Semana de ~135 px, la cita de 30 min —que es
+   exactamente la que cae en `tiny`— se quedaba con ~26 px para el nombre, y con
+   ~2 px si el evento llevaba icono. */
+.agenda-fc .ag-tarjeta-hora-inicio { display: none; }
+.agenda-fc .ag-tarjeta--tiny .ag-tarjeta-hora-rango { display: none; }
+.agenda-fc .ag-tarjeta--tiny .ag-tarjeta-hora-inicio { display: inline; }
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta--tiny .ag-tarjeta-hora-rango { display: inline; }
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta--tiny .ag-tarjeta-hora-inicio { display: none; }
+
+/* Chip de iniciales del médico. Neutro a propósito: no lleva color de médico. */
+.agenda-fc .ag-tarjeta-chip {
+  flex: 0 0 auto;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  line-height: 1.4;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--ag-chip-bg);
+  color: var(--ag-chip-text);
+}
+
+/* Envoltorio del icono del evento genérico. En Semana es un hueco transparente
+   del tamaño del glifo; en Día crece hasta el cuadro del mockup (ver abajo).
+   El tamaño del glifo viaja en una custom property y NO como número en línea:
+   un `width` en línea ganaría a cualquier regla por vista. */
+.agenda-fc .ag-tarjeta-icono {
+  --ag-tarjeta-icono-px: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.agenda-fc .ag-tarjeta-nombre {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--ag-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agenda-fc .ag-tarjeta-tz {
+  flex: 0 0 auto;
+  font-size: 9.5px;
+  font-weight: 500;
+  line-height: 1.2;
+  font-style: italic;
+  color: var(--ag-muted);
+}
+
+/* Tercera línea: descriptor + estado. Sustituye a la fila de punto + estado. */
+.agenda-fc .ag-tarjeta-desc {
+  min-width: 0;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--ag-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Píldora de estado — SÓLO en la vista Día, que es donde sobra ancho.
+   `currentColor` hace que el borde y el punto hereden el color del texto, que
+   es lo único que pone el estilo en línea: una declaración en vez de tres. El
+   fondo es la superficie elevada de la familia, blanca en claro y azul oscuro
+   en oscuro, sin que haga falta una regla por tema. */
+.agenda-fc .ag-tarjeta-pildora {
+  display: none;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  padding: 2px 9px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: var(--ag-surface);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+.agenda-fc .ag-tarjeta-pildora::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ── Escalera por tier ────────────────────────────────────────────────
+   El tier lo mide `ResizeObserver` en JS y llega como clase. Los hijos se
+   MONTAN SIEMPRE y aquí sólo se esconden: es lo que permite que la vista Día
+   los recupere (una cita de 30 min mide 34 px y cae en `tiny` en cualquier
+   vista, pero en Día tiene ancho de sobra para enseñarlo todo).
+
+   ESTE BLOQUE ES EL DE SEMANA. En Día, todo lo que decide aquí lo pisa después
+   el bloque de esa vista, que tiene un selector más específico: el relleno de
+   abajo sólo se ve en Semana, y los tres hijos que esconde vuelven allí. */
+.agenda-fc .ag-tarjeta--tiny { padding: 2px 8px; }
+.agenda-fc .ag-tarjeta--tiny .ag-tarjeta-chip,
+.agenda-fc .ag-tarjeta--tiny .ag-tarjeta-tz,
+.agenda-fc .ag-tarjeta--tiny .ag-tarjeta-desc { display: none; }
+/* `compact` gana el chip y el badge de huso, pero no el descriptor. */
+.agenda-fc .ag-tarjeta--compact .ag-tarjeta-desc { display: none; }
+
+/* ── Fila única ───────────────────────────────────────────────────────
+   Dos casos, un solo juego de reglas: el tier `tiny` en cualquier vista y la
+   vista Día en cualquier tier. Los dos envoltorios pasan a `display: contents`
+   para que sus hijos suban a ser items del flex raíz; ahí `order` los coloca en
+   el orden del mockup —icono · hora · nombre · descriptor · píldora— sin tocar
+   el orden del markup, que es el que necesita la disposición vertical. */
+.agenda-fc .ag-tarjeta--tiny,
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+}
+.agenda-fc .ag-tarjeta--tiny .ag-tarjeta-cab,
+.agenda-fc .ag-tarjeta--tiny .ag-tarjeta-tit,
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta-cab,
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta-tit { display: contents; }
+
+/* EL ICONO VA PEGADO AL NOMBRE, no delante de la hora, y en las dos vistas: es
+   el mismo sitio que ocupa en la disposición vertical de Semana. Aquí el markup
+   lo pone dentro de `.ag-tarjeta-tit`, detrás de la hora, así que el único modo
+   de colocarlo es `order` — y por eso el badge de huso se va DETRÁS del nombre
+   en vez de pegarse a la hora, que sería su sitio natural: metido entre los dos
+   separaría el icono del nombre. */
+.agenda-fc .ag-tarjeta--tiny .ag-tarjeta-hora,
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta-hora { order: 1; flex: 0 0 auto; }
+.agenda-fc .ag-tarjeta--tiny .ag-tarjeta-icono,
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta-icono { order: 2; }
+.agenda-fc .ag-tarjeta--tiny .ag-tarjeta-nombre,
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta-nombre { order: 3; }
+.agenda-fc .ag-tarjeta--tiny .ag-tarjeta-tz,
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta-tz { order: 4; }
+.agenda-fc .ag-tarjeta--tiny .ag-tarjeta-desc,
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta-desc { order: 5; flex: 1 1 auto; }
+/* El chip de iniciales se va al extremo derecho, junto a la píldora. En vertical
+   cerraba su propia línea y no estorbaba; en la fila horizontal, entre el nombre
+   y el descriptor, partía en dos la única frase que hay que leer de un vistazo
+   (hora → nombre → descriptor). A la derecha queda con la otra pieza de metadato.
+
+   EL EMPUJE AL BORDE NO ESTÁ AQUÍ, y no por olvido: mientras el descriptor está
+   y crece, el espacio libre es cero y cualquier margen `auto` sería letra
+   muerta. Pero un evento genérico sin `notes` se queda en Día SIN descriptor, y
+   ahí hace falta uno — y exactamente uno, porque dos se repartirían el hueco y
+   dejarían el chip a media fila. Cuál de los dos lo lleva depende de si hay
+   chip, que es un dato del JS: lo pone la tarjeta en línea. */
+.agenda-fc .ag-tarjeta--tiny .ag-tarjeta-chip,
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta-chip { order: 6; }
+.agenda-fc .ag-tarjeta--tiny .ag-tarjeta-pildora,
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta-pildora { order: 7; }
+
+/* ── VISTA DÍA ────────────────────────────────────────────────────────
+   Aquí no falta ancho: se recupera todo lo que la escalera de tiers había
+   escondido, aparece la píldora y la tipografía sube.
+
+   La tarjeta de Día ocupa la columna entera, así que no se lee con el cuerpo de
+   una tarjeta vertical de Semana. Los tamaños salen de medir `docs/mockups/
+   dia.png` y traerlos a la escala en la que el nombre son 15 px: hora y
+   descriptor miden ahí el 0.87 y el 0.85 del nombre → 13 px los dos, un escalón
+   por encima de los 10.5 px de Semana y todavía por debajo del nombre. El hueco
+   entre piezas sube en la misma proporción (8 → 14 px), medido en el mockup
+   entre la hora y el cuadro del icono. */
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta { padding: 6px 12px; gap: 14px; }
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta-nombre { font-size: 15px; }
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta-hora,
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta-desc { font-size: 13px; }
+
+/* El icono deja de ser un glifo suelto y pasa a un cuadro con fondo y borde,
+   como en el mockup. `--ag-surface` es el mismo token que usa la píldora: blanco
+   en claro y la superficie elevada en oscuro, sin regla por tema.
+
+   SÓLO EN EL TIER `full`, y no por gusto: el cuadro mide 38 px y la tarjeta de
+   Día de un evento de 30 min mide 34,5 px en total — no cabe, y ni bajando el
+   relleno cabría. En `compact` y en `tiny` el icono se queda en los 16 px de
+   Semana, sin cuadro, que es lo que entra. Un evento genérico de media hora es
+   raro (son sesiones y guardias), pero existe. */
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta--full .ag-tarjeta-icono {
+  --ag-tarjeta-icono-px: 26px;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--ag-surface);
+  border: 1px solid var(--ag-border-card);
+}
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta--tiny .ag-tarjeta-chip,
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta--tiny .ag-tarjeta-tz,
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta--tiny .ag-tarjeta-desc,
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta--compact .ag-tarjeta-desc { display: block; }
+
+/* LA PÍLDORA ES DEL ESTADO, NO DE LA CATEGORÍA. Estuvo un tiempo encendida sólo
+   bajo un marcador `.ag-ev-cita`, y entonces en la misma columna de Día una cita
+   pintaba su estado como píldora a la derecha y un evento genérico como texto
+   pegado al título: la misma información en dos formas y la fila dejaba de
+   leerse en columnas alineadas. Un evento genérico tiene estado igual que una
+   cita, así que la condición es tener estado, y aquí lo tienen todos los que
+   llegan (la tarjeta de Google es otro componente y no pasa por estas reglas).
+   Con la píldora encendida, la etiqueta se va del descriptor: decirlo dos veces
+   en la misma fila es ruido. */
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta-pildora { display: inline-flex; }
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta-desc-sep,
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta-desc-estado { display: none; }
+
+/* Y si el estado era lo ÚNICO que llevaba el descriptor —un evento genérico sin
+   `notes`—, en Día la línea se queda sin nada que decir: no se pinta, en vez de
+   dejar un item de flex vacío entre el nombre y la píldora. Quién está vacío lo
+   sabe el JS, que pone la clase; cuándo importa lo decide la vista, aquí. Cuatro
+   clases y detrás de las reglas que devuelven el descriptor en `tiny` y
+   `compact`, para ganarles. */
+.agenda-fc .fc-timeGridDay-view .ag-tarjeta .ag-tarjeta-desc--solo-estado { display: none; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   TARJETA DE EVENTO DE GOOGLE (`.ag-gcal`)
+   ══════════════════════════════════════════════════════════════════════
+   Mismo reparto que `.ag-tarjeta`, sólo que aquí NO queda nada en línea: esta
+   tarjeta no tiene estado, ni color elegido, ni paciente, así que no hay un solo
+   valor calculado en JS del que dependa su pinta.
+
+   Su fila es más corta que la de la cita porque tiene menos que decir: marca de
+   Google · hora · título · píldora «EVENTO». */
+.agenda-fc .ag-gcal {
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 9px;
+  border: 1px solid var(--ag-gcal-accent);
+  border-left-width: 3px;
+  border-radius: 9px;
+  background: var(--ag-gcal-bg1);
+  color: var(--ag-gcal-text);
+}
+.agenda-fc .ag-gcal-cab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+.agenda-fc .ag-gcal-hora {
+  min-width: 0;
+  font-size: 10.5px;
+  font-weight: 600;
+  opacity: .85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.agenda-fc .ag-gcal-titulo {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* La píldora se va al extremo derecho con `margin-left: auto`, y aquí el margen
+   SÍ está vivo en las dos vistas: nada más en esta tarjeta tiene `flex-grow`, así
+   que el espacio libre llega hasta ella. (En `.ag-tarjeta` no lo está, porque el
+   descriptor crece y no deja hueco; ver la nota del chip más arriba.) */
+.agenda-fc .ag-gcal-badge {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 0 5px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  line-height: 1.5;
+  text-transform: uppercase;
+  opacity: .75;
+}
+
+/* Vista Día: fila única y la misma subida de cuerpo que la tarjeta de cita.
+   `display: contents` en la cabecera sube sus tres hijos a items del flex raíz, y
+   la píldora se va al final con `order` — es la única pieza que cambia de sitio,
+   el resto ya viene en el orden bueno desde el markup. El tamaño de la «G» se
+   fija aquí y no por prop: el `size` de `GoogleGIcon` sale como atributo del
+   `<svg>`, y cualquier regla CSS le gana sin necesidad de `!important`. */
+.agenda-fc .fc-timeGridDay-view .ag-gcal {
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 12px;
+}
+.agenda-fc .fc-timeGridDay-view .ag-gcal-cab { display: contents; }
+.agenda-fc .fc-timeGridDay-view .ag-gcal svg { width: 18px; height: 18px; }
+.agenda-fc .fc-timeGridDay-view .ag-gcal-hora { font-size: 13px; }
+.agenda-fc .fc-timeGridDay-view .ag-gcal-titulo { font-size: 15px; }
+.agenda-fc .fc-timeGridDay-view .ag-gcal-badge {
+  order: 1;
+  font-size: 11px;
+  padding: 1px 8px;
+}
+
 /* Drag & Drop — elevación y transparencia mientras se arrastra */
 .fc .fc-event-dragging,
 .fc .fc-event-resizing {
