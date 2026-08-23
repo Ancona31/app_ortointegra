@@ -1848,9 +1848,11 @@ export default function AgendaPage() {
 
   /* ── Refetch al cambiar el filtro de médico ─────────────
      Se dispara DESPUÉS del commit del estado (no en el onChange síncrono),
-     cuando appointmentSourceRef.current ya apunta al appointmentSource
-     recreado con el filtroMedico nuevo → el fetch sale con el médico
-     correcto. El guard de primer render evita el doble fetch en montaje
+     cuando appointmentSourceRef.current y gcalSourceRef.current ya apuntan a
+     las fuentes recreadas con el filtroMedico nuevo → los dos fetches salen
+     con el médico correcto. `refetch()` retrae LAS DOS fuentes, así que un
+     cambio de filtro dispara exactamente dos peticiones: citas y eventos de
+     Google. El guard de primer render evita el doble fetch en montaje
      (FullCalendar ya hace su fetch inicial por sí mismo). */
   const filtroFirstRender = useRef(true)
   useEffect(() => {
@@ -1901,6 +1903,36 @@ export default function AgendaPage() {
    * El carril `ocupado` (huecos del calendario personal vía freebusy) se
    * eliminó entero, scope incluido. Si vuelve a aparecer una lectura de
    * `data.ocupado`, es que alguien lo revivió.
+   *
+   * ── EL FILTRO DE MÉDICO VIAJA, PERO NO SE APLICA AQUÍ ──────────────────
+   * Estos eventos pertenecen a quien conectó Google, y con el filtro puesto en
+   * otro médico no se pintan. Quien decide eso es el SERVIDOR: aquí sólo se le
+   * manda el `medico_id` elegido y se pinta lo que conteste. El motivo está
+   * escrito en /api/google/events, junto a la comparación; el que decide es que
+   * cortando allá se ahorra la llamada a Google entera, y que así no baja al
+   * navegador el `user_id` de nadie con quien comparar.
+   *
+   * Filtrar aquí exigiría justo eso último. NO lo traigas.
+   *
+   * ── POR QUÉ DEPENDER DE `filtroMedico` NO DUPLICA PETICIONES ───────────
+   * Esta función cambia de identidad en cada cambio de filtro, pero FullCalendar
+   * NUNCA la ve: lo que registra es `stableGcalSource`, un envoltorio con deps
+   * `[]` que lee `gcalSourceRef.current` al llamar. La lista `eventSourcesStable`
+   * no cambia, así que la fuente no se re-registra y no hay traída extra por
+   * cambio de identidad.
+   *
+   * La única traída por cambio de filtro sigue siendo el `refetch()` del efecto
+   * de arriba, que retrae LAS DOS fuentes: dos peticiones por cambio de filtro
+   * —citas y eventos—, las mismas que antes de este cambio.
+   *
+   * ⚠️ QUÉ CUESTA ROMPER ESA MEMOIZACIÓN. Si alguien le añade una dependencia a
+   * `stableGcalSource`, a `stableAppointmentSource` o a `eventSourcesStable`, el
+   * array llega distinto y `handleEventSources` de FullCalendar sí corre: no
+   * reconoce los `_raw` por identidad, hace `REMOVE_EVENT_SOURCE` de las dos
+   * fuentes y `addEventSource` de las dos, que trae de inmediato. Son CUATRO
+   * peticiones por cambio de filtro en vez de dos, más un parpadeo con el
+   * calendario vacío entre el remove y el add. Los datos que hagan falta aquí se
+   * leen del ref, como este; la lista de fuentes no se toca.
    */
   const gcalSource = useCallback(async (
     info: { startStr: string; endStr: string },
@@ -1908,7 +1940,11 @@ export default function AgendaPage() {
     failure: (err: Error) => void
   ) => {
     try {
-      const res = await fetch(`/api/google/events?from=${info.startStr}&to=${info.endStr}`)
+      let url = `/api/google/events?from=${info.startStr}&to=${info.endStr}`
+      // Cadena vacía = 'todos los médicos'; ahí no se manda nada y el servidor
+      // devuelve el calendario completo de la clínica, como siempre.
+      if (filtroMedico) url += `&medico_id=${filtroMedico}`
+      const res = await fetch(url)
       const data = await res.json()
       // 'sin_token' y 'error_google' se pintan igual aquí —sin eventos de
       // Google— porque la agenda no tiene botón de conectar: quien distingue
@@ -1941,7 +1977,7 @@ export default function AgendaPage() {
     } catch (err: unknown) {
       failure(err instanceof Error ? err : new Error('Error cargando eventos'))
     }
-  }, [])
+  }, [filtroMedico])
 
   /* ── Stable eventSources ref (evita re-registro en cada render) ── */
   const appointmentSourceRef = useRef(appointmentSource)

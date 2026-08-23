@@ -38,6 +38,9 @@ type EventoAgenda = {
  */
 const TOPE_PAGINAS = 20
 
+/** Forma de un UUID, para validar el `medico_id` que llega por parámetro. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 /**
  * Qué contestar cuando no hay eventos que devolver. Son dos situaciones que
  * hasta ahora se veían iguales (`connected: false`) y no lo son: sin conexión
@@ -115,6 +118,106 @@ export async function GET(req: NextRequest) {
     // admin sólo entra a partir de aquí, para que `conCalendarioSpinus` pueda
     // leerle los tokens a la cuenta de la clínica.
     conexion = await resolverConexionClinica(supabase, profile.clinica_id)
+
+    // ── FILTRO DE MÉDICO ──────────────────────────────────────────────────
+    // Lo que esta ruta devuelve son los eventos que alguien escribió A MANO en
+    // el calendario de la clínica, y PERTENECEN A QUIEN CONECTÓ GOOGLE: la
+    // cuenta que los organiza es la suya. Con el filtro de la agenda puesto en
+    // otro médico no son suyos, así que no se pintan; sin filtro ('todos los
+    // médicos') o con el filtro en el propio conector, sí.
+    //
+    // Antes de esto la agenda no filtraba estos eventos EN ABSOLUTO: filtrando
+    // por el Dr. X aparecían encima de sus horas los eventos del administrador
+    // y su hueco libre parecía ocupado.
+    //
+    // ⚠️ EL PRECIO, ACEPTADO A SABIENDAS: se cambia un FALSO OCUPADO para todos
+    // por un FALSO LIBRE para el médico al que el bloque le concierne. Si el
+    // administrador escribe «Junta Dr. Pérez 16:00-17:00» en el calendario
+    // compartido, filtrando por el Dr. Pérez ese hueco sale LIBRE y alguien
+    // puede agendarle encima; antes se veía —mal atribuido, pero se veía—. El
+    // evento no dice a quién concierne: Google sólo sabe qué cuenta lo organiza,
+    // y ésa es la del conector. Esto NO es un defecto pendiente de arreglar aquí;
+    // atribuir un evento suelto a un médico exige que el evento lo diga, que es
+    // otro cambio. Si alguien lo reporta como bug nuevo, es esta línea.
+    //
+    // POR QUÉ EL CORTE VA EN EL SERVIDOR Y NO EN EL NAVEGADOR. Tres razones, y
+    // la primera es la que decide:
+    //  1. Se ahorra la sesión con Google ENTERA —OAuth + `events.list` con su
+    //     paginación— cuando el filtro no es del conector. Filtrar en el
+    //     cliente pagaría esa llamada para tirar el resultado.
+    //  2. La regla queda escrita al lado de la resta contra `appointments`,
+    //     que es el otro sitio donde se decide qué evento sobrevive; quien
+    //     venga a cambiar una va a leer la otra.
+    //  3. NO baja al navegador el `user_id` de nadie. Lo único que sube es el
+    //     `medico_id` del filtro, que el cliente ya tiene porque él lo eligió;
+    //     lo que baja es la lista, vacía o no.
+    //
+    // ⚠️ LA COMPARACIÓN VA POR `clinica_conexiones_google.user_id` —el usuario
+    // de SPINUS que conectó Google— Y NUNCA POR `google_account_email`. NO LO
+    // "CORRIJAS": son dos identidades distintas y no tienen por qué coincidir.
+    // Hay quien entra a Spinus con un correo y conectó Google con otro; comparar
+    // por correo lo dejaría fuera de su propio calendario, que es justo el fallo
+    // que este bloque viene a evitar. El filtro de la agenda ofrece `profiles`,
+    // o sea usuarios de Spinus, así que `user_id` es lo único con lo que ese
+    // valor es comparable.
+    //
+    // (No confundir con la comparación POR CORREO que hace falta en otro sitio,
+    // para saber si Google le manda invitación a alguien: eso depende de qué
+    // cuenta de Google organiza el evento. La pregunta de aquí es otra: de quién
+    // son estos eventos DENTRO de Spinus.)
+    //
+    // NO AÑADE NINGUNA CONSULTA. `conexion` ya está resuelta arriba porque esta
+    // ruta la necesita igual para leer los tokens, y `userId` viene en ella. Si
+    // alguien se encuentra escribiendo un `SELECT` nuevo aquí, la solución es la
+    // equivocada. Y sin lectura nueva no hay `createAdminClient()` nuevo que
+    // filtrar por `clinica_id` (pendiente prioritario de CLAUDE.md); el admin de
+    // abajo sigue leyendo sólo los tokens de esta conexión ya resuelta.
+    //
+    // ⚠️ LA PREMISA NO ESTÁ GARANTIZADA, y también se acepta: que el conector
+    // sea FILTRABLE. El desplegable de la agenda se llena con /api/me/config,
+    // que sólo devuelve perfiles con `role='medico'` de la clínica. Si quien
+    // conectó Google no lo es —una secretaria administradora, un administrador
+    // que no pasa consulta—, su `user_id` no aparece nunca como opción, así que
+    // sus eventos sólo se ven en «Todos los médicos» y no hay filtro que los
+    // traiga de vuelta. La interfaz no lo explica. NO lo cubras con más código
+    // aquí: el gate está bien, lo que falta es que el conector sea elegible, y
+    // eso se decide en el desplegable, no en esta comparación.
+    //
+    // Va DESPUÉS del corte de `canVerAgendaCompleta`, que no se toca: aquél es
+    // lista blanca por capacidad y devuelve vacío al médico invitado pase lo que
+    // pase. Este es un filtro de pertenencia, y sólo lo alcanza quien ya pasó
+    // aquél.
+    const medicoFiltro = req.nextUrl.searchParams.get('medico_id')
+    // Cadena VACÍA cuenta como ausencia, y por eso la guarda es el valor y no
+    // `!== null`: `medico_id=` sin valor devuelve `''`, no `null`, y significa
+    // «todos los médicos». Comprobarle el formato lo convertiría en un 400 para
+    // quien arme la URL a mano o escriba un test, por decir lo mismo que no
+    // mandar el parámetro.
+    if (medicoFiltro) {
+      // El formato se valida ANTES de tocarlo, aunque sólo se compare. El 400
+      // es para quien llame a esta ruta directamente: la agenda no mira
+      // `res.ok` y pinta lo mismo —nada— con cualquier respuesta que no traiga
+      // `estado: 'conectado'`, y así se queda a propósito (no hay forma de
+      // llegar aquí desde la interfaz, y un `failure()` estrenaría un error
+      // visible de FullCalendar donde hoy no hay ninguno).
+      // El valor NO se usa para nada más que la comparación de abajo — no entra
+      // en ninguna consulta ni sale en ninguna respuesta.
+      if (!UUID_RE.test(medicoFiltro)) {
+        return NextResponse.json({ error: 'medico_id_invalido' }, { status: 400 })
+      }
+      // Se comparan en minúsculas los dos lados: un UUID es el mismo escrito
+      // como sea, y Postgres los emite en minúscula. Comparar en crudo dejaría
+      // al conector sin sus propios eventos si el valor llega en mayúsculas
+      // —hoy sale del `<select>` y no pasa, pero el fallo sería silencioso—.
+      //
+      // `conexion === null` se deja pasar a propósito: ahí no hay dueño contra
+      // quien comparar y el camino de abajo ya contesta 'sin_token', que es el
+      // estado accionable. Contestar 'conectado' aquí lo taparía.
+      if (conexion !== null && medicoFiltro.toLowerCase() !== conexion.userId.toLowerCase()) {
+        return NextResponse.json({ estado: 'conectado' satisfies EstadoGoogle, events: [] })
+      }
+    }
+
     // Quien no administra la clínica opera en modo estricto: si el calendario
     // falta o Google contesta 404, esta ruta NO lo crea ni desvincula nada.
     // Abrir la agenda no puede ser el disparador de una escritura masiva en
