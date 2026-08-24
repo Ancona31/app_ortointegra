@@ -134,7 +134,31 @@ type TipoFila = 'cita' | 'evento'
 
 type ModalState =
   | { mode: 'closed' }
-  | { mode: 'create'; start: string; end: string; tipo: TipoFila }
+  /* ⚠️ LA FECHA Y LA HORA VIAJAN SEPARADAS, Y `hora: null` ES UN VALOR CON
+     SIGNIFICADO: «el usuario eligió un DÍA, no un momento». Lo produce la vista
+     Mes, donde pulsar una celda sólo aporta el día; el modal abre entonces con
+     la fecha puesta y la hora en blanco, para que se escriba sin borrar nada.
+     Antes esto era un único `start: string` y había que inventarse una hora
+     para rellenarlo — la apertura de la clínica, o las 00:00 —, que es
+     exactamente el dato que el usuario no dio. Un `string | null` lo dice sin
+     inventar nada, y el compilador obliga a decidir qué hacer con el null.
+
+     El formato es el de los dos controles del modal, no ISO: `fecha` es
+     `YYYY-MM-DD` y `hora` es `HH:MM`. Así el modal no parsea nada al abrir, y
+     quien trae un instante lo parte una vez con `partirFechaHora`.
+
+     ⚠️ AQUÍ VIVÍA `end`, Y NO LO REPONGAS. Era un `string` obligatorio que NO
+     LEÍA NADIE: el fin de la cita sale siempre de `start_time + duration` en
+     `guardar()`, nunca de este campo. Lo alimentaban `addHour(start)` desde el
+     clic y `arg.endStr` desde el arrastre.
+     Lo que se perdió con él ya estaba perdido, y conviene saberlo antes de
+     "arreglarlo": ARRASTRAR DE 10:00 A 12:00 NO ABRE UNA CITA DE DOS HORAS.
+     El `endStr` del arrastre se descartaba aquí mismo y el modal abre con
+     `DEFAULT_DURATION` (60 min), como todas. Es anterior a esto y sigue igual;
+     si algún día se quiere respetar la duración arrastrada, lo que hace falta
+     es que el modal reciba una DURACIÓN y la meta en su `useState`, no un `end`
+     que se vuelva a ignorar. */
+  | { mode: 'create'; fecha: string; hora: string | null; tipo: TipoFila }
   | { mode: 'edit';   appointment: Appointment }
 
 /* ─── Colores por estado ───────────────────────────────── */
@@ -423,6 +447,32 @@ function avisoFinFueraDeHorario(fin: Date, h: Horario): string | null {
   return `La cita terminaría a las ${hhmm}, y esta clínica atiende de ${horarioDia.inicio} a ${horarioDia.fin}. ¿Es correcto?`
 }
 
+/**
+ * El aviso de DÍA CERRADO, sin mencionar ninguna hora.
+ *
+ * Existe porque la vista Mes abre el alta SIN HORA (`ModalState`, `hora: null`),
+ * y `avisoFueraDeHorario` no sirve ahí: su mensaje interpola la hora en las dos
+ * ramas, así que soltaría «vas a agendar a las 00:00 del domingo» — justo el
+ * dato inventado que se quiso quitar de esa ruta.
+ *
+ * ⚠️ NO LO FUSIONES CON `avisoFueraDeHorario` NI LA TOQUES A ELLA PARA
+ * REUTILIZARLA. Esa función la usan `handleSelect` y las vistas de rejilla, con
+ * una hora real y un mensaje que la nombra a propósito; ahí funciona bien.
+ * Aquí la pregunta es OTRA —¿se atiende este día?— y por eso son dos.
+ *
+ * ⚠️ Y AQUÍ VIVÍA `horaDeAperturaDelDia`, QUE SE RETIRÓ: subía el clic del mes
+ * a la hora de apertura para que el aviso no saltara siempre. Ya no hace falta
+ * suponer ninguna hora, porque la ruta del mes no pone hora en absoluto. Si
+ * vuelves a necesitar una hora por defecto para el mes, léete antes por qué se
+ * quitó: inventarla hacía que el médico viera «07:00» donde quería las 10:00 y
+ * cancelara creyendo que el sistema le había entendido mal.
+ */
+function avisoDiaCerrado(date: Date, h: Horario): string | null {
+  const dia = DIAS.find(d => d.fc === date.getDay())
+  if (!dia || h[dia.key]?.activo) return null
+  return `Vas a agendar un ${dia.label.toLowerCase()}, y esta clínica no atiende ${dia.plural}. ¿Es correcto?`
+}
+
 /* ─── Modal de configuración de horario ─────────────────── */
 
 function HorarioModal({ onClose, onSave }: { onClose: () => void; onSave: (h: Horario) => Promise<void> }) {
@@ -590,15 +640,24 @@ function horaEnTZ(startTimeISO: string, tz: string): string {
 
 /* ─── Helpers ──────────────────────────────────────────── */
 
-function toDatetimeLocal(iso: string) {
+/* Las dos mitades que piden los dos controles del modal, en hora LOCAL.
+   Sustituyen al par `toDatetimeLocal`/`fromDatetimeLocal` de cuando el campo era
+   un único `datetime-local`. Ese control no sabe sostener una fecha sin hora
+   —asignarle «2026-08-19» lo deja en cadena vacía y se lleva la fecha por
+   delante, comprobado en navegador—, y eso es justo lo que la vista Mes
+   necesita, así que el campo se partió en `<input type="date">` +
+   `<input type="time">` y estos dos ayudantes hablan su idioma. */
+function partirFechaHora(iso: string): { fecha: string; hora: string } {
   const d = new Date(iso)
   const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return {
+    fecha: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    hora:  `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+  }
 }
-function fromDatetimeLocal(val: string) { return new Date(val).toISOString() }
-function addHour(iso: string) {
-  const d = new Date(iso); d.setHours(d.getHours() + 1); return d.toISOString()
-}
+/* La vuelta. `new Date('2026-08-19T10:00')` —sin zona— lo interpreta el motor en
+   la zona LOCAL, que es lo que queremos: el médico teclea su hora de pared. */
+function componerIso(fecha: string, hora: string) { return new Date(`${fecha}T${hora}`).toISOString() }
 
 /* ─── Hook: búsqueda de pacientes ─────────────────────── */
 
@@ -788,10 +847,18 @@ function AppointmentModal({
 
   const initialDuration = apt ? calcDuration(apt.start_time, apt.end_time) : DEFAULT_DURATION
 
-  const [startTime,   setStartTime]   = useState(
-    modal.mode === 'create' ? toDatetimeLocal(modal.start)
-    : apt ? toDatetimeLocal(apt.start_time) : ''
-  )
+  /* LA FECHA Y LA HORA SON DOS ESTADOS, no uno. El campo era un único
+     `datetime-local` y se partió porque ese control NO PUEDE sostener una fecha
+     sin hora: asignarle «2026-08-19» lo deja en cadena vacía y se lleva la fecha
+     por delante (medido en navegador). La vista Mes necesita justo eso —día sí,
+     hora no—, así que el control se partió en dos y el estado con él.
+     `hora` en `''` es el estado nuevo y legítimo: hay día elegido y falta la
+     hora. Lo cubren la guarda de `handleSave` y el `disabled` del botón. */
+  const inicial = modal.mode === 'create'
+    ? { fecha: modal.fecha, hora: modal.hora ?? '' }
+    : apt ? partirFechaHora(apt.start_time) : { fecha: '', hora: '' }
+  const [fecha, setFecha] = useState(inicial.fecha)
+  const [hora,  setHora]  = useState(inicial.hora)
   const [duration,    setDuration]    = useState(initialDuration)
   const [notes,       setNotes]       = useState(apt?.notes ?? '')
   const [status,      setStatus]      = useState<Status>(apt?.status ?? 'scheduled')
@@ -896,7 +963,11 @@ function AppointmentModal({
   const faltaLoEsencial = esEvento ? tituloLimpio === '' : !paciente
 
   async function handleSave() {
-    if (faltaLoEsencial || !startTime) return
+    /* `!hora` es el caso NUEVO: la vista Mes abre con fecha y sin hora, así que
+       este formulario ya no arranca siempre completo. `!fecha` no debería pasar
+       nunca —todas las rutas traen día— pero se comprueba igual: son la misma
+       frase y el día que alguien abra el modal de otra forma, esto aguanta. */
+    if (faltaLoEsencial || !fecha || !hora) return
 
     // Defensa en profundidad: secretaria debe seleccionar médico
     // (el `required` HTML5 ya bloquea el submit, pero validamos aquí también)
@@ -907,7 +978,7 @@ function AppointmentModal({
        Se comprueba el INICIO y también el FIN: teclear 18:00 con duración de
        tres horas deja la cita terminando a las 21:00, que es exactamente el
        mismo error que arrastrar el borde de abajo hasta ahí. */
-    const inicioIso = fromDatetimeLocal(startTime)
+    const inicioIso = componerIso(fecha, hora)
     const aviso =
       avisoFueraDeHorario(new Date(inicioIso), horario, 'Vas a agendar a las')
       ?? avisoFinFueraDeHorario(new Date(addMinutes(inicioIso, duration)), horario)
@@ -918,7 +989,7 @@ function AppointmentModal({
 
   async function guardar() {
     setSaving(true)
-    const start_time = fromDatetimeLocal(startTime)
+    const start_time = componerIso(fecha, hora)
 
     // F3-6: enviar consultorio_id en creación SIEMPRE; en edición SOLO si cambió.
     // Evita re-validación innecesaria del consultorio en el backend cuando se edita
@@ -1237,18 +1308,40 @@ function AppointmentModal({
           </div>
           )}
 
-          {/* Fecha y hora de inicio */}
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
-              Fecha y hora de inicio
-            </label>
-            <input
-              type="datetime-local"
-              value={startTime}
-              step={900}
-              onChange={e => setStartTime(e.target.value)}
-              className="w-full px-3 py-2.5 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
-            />
+          {/* ⚠️ DOS CONTROLES Y NO UN `datetime-local`, Y NO LOS VUELVAS A JUNTAR.
+              Aquí había uno solo, y se partió porque ese control NO ADMITE una
+              fecha sin hora: su algoritmo de saneamiento descarta cualquier valor
+              que no sea fecha-y-hora completa, así que «2026-08-19» se convierte
+              en cadena vacía Y LA FECHA SE PIERDE con ella. Medido en navegador,
+              no deducido.
+              Eso bloqueaba lo que pide la vista Mes: abrir con el día puesto y la
+              hora en blanco, para que el médico la escriba sin borrar nada. Con
+              dos controles la fecha se queda y la hora puede estar vacía.
+              El `step={900}` viaja con la HORA, que es de quien era. */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
+                Fecha
+              </label>
+              <input
+                type="date"
+                value={fecha}
+                onChange={e => setFecha(e.target.value)}
+                className="w-full px-3 py-2.5 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
+                Hora de inicio
+              </label>
+              <input
+                type="time"
+                value={hora}
+                step={900}
+                onChange={e => setHora(e.target.value)}
+                className="w-full px-3 py-2.5 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
+              />
+            </div>
           </div>
 
           {/* Duración */}
@@ -1266,11 +1359,15 @@ function AppointmentModal({
                 </button>
               ))}
             </div>
-            {startTime && (
+            {/* Sin hora no hay nada que calcular, y el envoltorio ya lo
+                contemplaba antes de que la hora vacía existiera. Ahora es el
+                caso normal de la vista Mes: la línea aparece en cuanto se
+                teclea la hora. */}
+            {fecha && hora && (
               <p className="text-[12.5px] mt-2.5" style={{ color: 'var(--ag-muted)' }}>
                 Termina a las{' '}
                 <span className="font-bold" style={{ color: 'var(--ag-text)' }}>
-                  {toDatetimeLocal(addMinutes(fromDatetimeLocal(startTime), duration)).slice(11, 16)}
+                  {partirFechaHora(addMinutes(componerIso(fecha, hora), duration)).hora}
                 </span>
               </p>
             )}
@@ -1436,7 +1533,7 @@ function AppointmentModal({
             <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-bold transition-colors hover:bg-[var(--ag-btn-ghost-hover)]" style={{ color: 'var(--ag-muted)' }}>
               Cancelar
             </button>
-            <button onClick={handleSave} disabled={saving || faltaLoEsencial || !startTime || !consultorioId}
+            <button onClick={handleSave} disabled={saving || faltaLoEsencial || !fecha || !hora || !consultorioId}
               className="px-5 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 transition-all hover:brightness-95 shadow-sm bg-[linear-gradient(135deg,var(--ag-brand-primary),var(--ag-brand-secondary))]">
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
@@ -1811,55 +1908,90 @@ const GoogleEventCard = memo(function GoogleEventCard({
   )
 })
 
-/* Chip plano de cita para la Vista Mes (dayGridMonth). Branch DEDICADO: NO
-   comparte chrome con MemoizedEventContent (tarjetas de Semana/Día). Una sola
-   fila: marcador (punto por estado o "G" de Google) + hora (700) + nombre
-   (ellipsis). Sin border/sombra/fondo de tarjeta. */
+/* Los colores del chip de Mes, derivados de la fila. Vive FUERA de `MonthChip`
+   para que el componente quepa en su presupuesto de líneas.
+
+   Repite la precedencia de `MemoizedEventContent` (el color elegido manda sobre
+   el del estado) en vez de compartirla, y la duplicación es deliberada: son dos
+   cajas distintas, y un helper común ataría la pinta del mes a cualquier cambio
+   de la semana. Si alguna vez divergen, es que tenían que divergir.
+
+   `undefined` quiere decir «que lo ponga la clase», y sólo pasa con Google: su
+   fondo y su tinta son fijos y viven en `.ag-mes--gcal`.
+
+   ⚠️ SIN `status` NO HAY PALETA QUE INTERPOLAR: `var(--ag-status-undefined-bg)`
+   no resuelve a nada y el chip saldría sin fondo. Es el mismo salvavidas que el
+   despachador tiene abajo en su rama de texto pelado para Semana/Día. */
+type TintasDelChip = { fondo?: string; tinta: string; hora?: string }
+
+function tintasDelChipDeMes(
+  ext: Appointment & { isGcalBlock?: boolean },
+  isGcal: boolean,
+  esEvento: boolean,
+): TintasDelChip {
+  if (isGcal) return { tinta: 'var(--ag-gcal-text)' }
+  const { color, status } = ext
+  return {
+    tinta: color ? `var(--ag-evento-${color})`
+      : status ? `var(--ag-status-${status}-dot)` : 'var(--ag-muted)',
+    fondo: color ? `color-mix(in srgb, var(--ag-evento-${color}) 10%, var(--ag-surface))`
+      : status ? `var(--ag-status-${status}-bg)` : undefined,
+    /* ⚠️ LA HORA DE UN EVENTO VA EN NEUTRO Y LA DE UNA CITA EN EL COLOR DE SU
+       ESTADO. Está razonado entero en `MemoizedEventContent` y no se repite
+       aquí, pero hay un motivo extra que es SÓLO del mes: en un chip de una
+       línea la hora es el único texto que puede llevar color, así que es el
+       único sitio donde cabe el signo de tipo «en color = cita, en neutro =
+       evento». La tarjeta de Semana tiene otras cinco señales; ésta no. */
+    hora: esEvento ? 'var(--ag-ink-600)'
+      : status ? `var(--ag-status-${status}-text)` : 'var(--ag-muted)',
+  }
+}
+
+/* Chip de una línea para la Vista Mes (dayGridMonth). Branch DEDICADO: NO
+   comparte caja con `MemoizedEventContent` (Semana/Día). Una sola fila:
+   marcador · hora · icono · nombre, y la píldora «Evento» si viene de Google.
+
+   ⚠️ SU FONDO VA EN ESTE `<div>` Y NUNCA EN EL `<a>` RAÍZ, que es el harness
+   transparente de `globals.css` (`.fc .fc-event`, con `!important`). Este chip
+   es el más expuesto de los tres: no tiene borde ni sombra, así que la píldora
+   de aquí es la única superficie que se ve. */
 const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg }) {
   const ext = arg.event.extendedProps as Appointment & { isGcalBlock?: boolean }
   // Todo lo que llega marcado como bloque de Google es un evento del calendario
   // de Spinus sin cita ligada. La distinción con los bloques anónimos de
   // "Ocupado" murió con freebusy; mismo criterio que GoogleEventCard.
   const isGcal = !!ext?.isGcalBlock
-  const status = ext?.status
-  const isCancelled = status === 'cancelled'
-  const name = arg.event.title
-
-  /* Tres marcadores posibles y un solo hueco, en este orden de precedencia:
-     la G de Google (el evento no es nuestro), el icono del evento genérico
-     (§12.14), y el punto de estado de siempre. El color del evento manda sobre
-     el del estado por el mismo motivo que en la tarjeta de Semana/Día. */
-  const tinta = ext?.color
-    ? `var(--ag-evento-${ext.color})`
-    : (status ? `var(--ag-status-${status}-dot)` : 'var(--ag-muted)')
-  const marker = isGcal
-    ? <GoogleGIcon size={10} />
-    : ext?.icono
-      ? <IconoDelEvento nombre={ext.icono} size={10} color={tinta} />
-      : <span style={{ width: 6, height: 6, borderRadius: '50%', flex: '0 0 auto', background: tinta }} />
+  const esEvento = esEventoGenerico(ext)
+  const { fondo, tinta, hora } = tintasDelChipDeMes(ext, isGcal, esEvento)
+  // El MISMO nombre que enseña la semana. Antes era `arg.event.title` a secas,
+  // así que una cita salía con el motivo escrito en el alta y no con el
+  // paciente, que es lo que el médico busca al barrer el mes con la vista.
+  const pac = ext?.pacientes
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 5, minWidth: 0,
-      fontSize: 11, color: 'var(--ag-text)', cursor: 'pointer', overflow: 'hidden',
-      opacity: isCancelled ? 0.62 : 1,
-    }}>
-      {marker}
-      {arg.timeText && (
-        <span style={{ fontWeight: 700, color: 'var(--ag-muted)', flex: '0 0 auto' }}>{arg.timeText}</span>
+    <div
+      className={`ag-mes${isGcal ? ' ag-mes--gcal' : ''}${esEvento ? ' ag-mes--evento' : ''}${
+        ext?.status === 'cancelled' ? ' ag-mes--cancelada' : ''}`}
+      style={{ background: fondo }}
+    >
+      {/* El hueco del marcador. La G de Google gana a todo: es una marca y va en
+          sus cuatro colores. Lo demás es el punto, redondo en una cita y
+          cuadrado en un evento — el icono ya NO lo sustituye, va detrás. */}
+      {isGcal
+        ? <GoogleGIcon size={10} />
+        : <span
+            className={esEvento ? 'ag-mes-punto ag-mes-punto--cuadro' : 'ag-mes-punto'}
+            style={{ background: tinta }}
+          />}
+      {arg.timeText && <span className="ag-mes-hora" style={{ color: hora }}>{arg.timeText}</span>}
+      {ext?.icono && (
+        <span className="ag-mes-icono">
+          <IconoDelEvento nombre={ext.icono} size="var(--ag-mes-icono-px)" color={tinta} />
+        </span>
       )}
-      <span style={{
-        fontWeight: 600, minWidth: 0,
-        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-        textDecoration: isCancelled ? 'line-through' : 'none',
-        color: isGcal ? 'var(--ag-gcal-text)' : undefined,
-      }}>{name}</span>
+      <span className="ag-mes-nombre">{pac ? `${pac.nombre} ${pac.apellidos}` : arg.event.title}</span>
       {isGcal && (
-        <span style={{
-          flex: '0 0 auto', fontSize: 9, fontWeight: 700, letterSpacing: '.02em',
-          textTransform: 'uppercase', color: 'var(--ag-gcal-text)', opacity: 0.75,
-          border: '1px solid currentColor', borderRadius: 999, padding: '0 4px', lineHeight: 1.5,
-        }}>
+        <span className="ag-mes-badge">
           {/* Mismo texto y mismo motivo que en GoogleEventCard, donde está
               razonado entero: "Sin cita" era del modelo viejo —separaba estos
               eventos de los bloques de "Ocupado" de freebusy, ya eliminado
@@ -2038,6 +2170,20 @@ const VIEWS = [
   { type: 'timeGridDay',  label: 'Día',    icon: Square },
 ] as const
 
+/* Opciones POR VISTA. A nivel de módulo por la regla de identidad estable: un
+   literal en el JSX sería un objeto nuevo en cada render y FullCalendar vuelve
+   a refinar sus opciones cuando la referencia cambia.
+
+   `dayHeaderFormat` va aquí dentro y NO como prop suelta del calendario: a
+   nivel raíz se la comería también el time-grid, donde la cabecera la compone
+   `renderDayHeader` con su abreviatura de tres letras y su número apilado.
+   Sin esto, el fallback de FullCalendar para una vista de varias semanas es
+   `weekday: 'short'` (core/internal-common.js:6143-6144), que con `esLocale` da
+   «lun» — y el mockup del mes pide «LUNES». Las mayúsculas ya las pone
+   `globals.css` en `.fc-col-header-cell-cushion`; aquí sólo se pide el nombre
+   largo. */
+const VISTAS_FC = { dayGridMonth: { dayHeaderFormat: { weekday: 'long' } } } as const
+
 export default function AgendaPage() {
   const calendarRef = useRef<InstanceType<typeof FullCalendar>>(null)
   const [modal,        setModal]        = useState<ModalState>({ mode: 'closed' })
@@ -2151,6 +2297,30 @@ export default function AgendaPage() {
     () => calcularVentanaRejilla([], null, horario, { compacta: false }),
   )
 
+  /* ── LA HORA A LA QUE ARRANCA LA REJILLA ────────────────────────────────
+     `scrollTime` estuvo INERTE hasta el bloque 3C: con `height="auto"` no había
+     scroller interno que posicionar. Con la altura acotada despierta, y sus dos
+     defaults son hostiles — de ahí esto y el `scrollTimeReset={false}` de abajo.
+
+     El default es `06:00:00`, una hora a la que no atiende ninguna clínica, así
+     que la rejilla abría con una franja muerta arriba. Aquí se apunta a la
+     APERTURA MÁS TEMPRANA de los días activos: en Semana se ven varios días a la
+     vez, así que tomar la de uno concreto dejaría fuera la primera cita de otro.
+
+     Sobre el orden: `inicio` es «HH:MM» con cero delante, así que el orden
+     alfabético y el cronológico coinciden y basta con `sort()`.
+
+     ⚠️ ESTE VALOR SÓLO SE LEE AL MONTAR. `ScrollResponder` lo captura en el
+     `componentDidMount` de la vista (`core/internal-common.js:2359-2361`), y con
+     `scrollTimeReset={false}` no vuelve a dispararse. Dos consecuencias que NO
+     son defectos: que cambie después no mueve la rejilla, y como `horario` llega
+     por SWR, el primer montaje puede usar `HORARIO_DEFAULT` (09:00) si la config
+     aún no ha respondido. Afecta a la posición inicial del scroll y a nada más. */
+  const scrollTime = useMemo(() => {
+    const aperturas = DIAS.map(d => horario[d.key]).filter(h => h?.activo).map(h => h.inicio)
+    return aperturas.length ? `${aperturas.sort()[0]}:00` : ventana.slotMinTime
+  }, [horario, ventana.slotMinTime])
+
   /** Índices `fc` de los días plegados. Vacío = la semana entera a la vista. */
   const [diasOcultos, setDiasOcultos] = useState<number[]>([])
 
@@ -2190,7 +2360,19 @@ export default function AgendaPage() {
     /* Forma funcional, y devolviendo `prev` tal cual cuando no cambia: React se
        salta el re-render por su propio camino (bail-out por identidad). Un `if`
        alrededor del `setState` haría lo mismo, pero habría que repetirlo en los
-       tres llamadores y basta olvidarlo en uno para reabrir la vuelta extra. */
+       tres llamadores y basta olvidarlo en uno para reabrir la vuelta extra.
+
+       ⚠️⚠️ DESDE EL BLOQUE 3C ESTA GUARDA YA NO ES UNA OPTIMIZACIÓN: ES CARGA
+       ESTRUCTURAL, Y RELAJARLA SE VE EN PANTALLA. Al acotar la altura del
+       calendario despertó el scroller interno, y con él `scrollTime`. Escribir
+       esta ventana mueve `slotMinTime`/`slotMaxTime` → FullCalendar reconstruye
+       el `dateProfile` → `timegrid/internal.js:969` avisa al `ScrollResponder`
+       de que las fechas son nuevas. Hoy eso no salta porque el `<FullCalendar>`
+       lleva `scrollTimeReset={false}`, pero la cadena está viva: una escritura
+       de más aquí es un candidato a SALTO DE SCROLL, no sólo un render de más.
+       Quien piense «comparar dos cadenas es redundante, esto ya lo hace React»
+       está mirando la mitad del coste. Las dos piezas —esta guarda y el
+       `scrollTimeReset={false}`— se sostienen la una a la otra. */
     setVentana(prev =>
       prev.slotMinTime === nueva.slotMinTime && prev.slotMaxTime === nueva.slotMaxTime
         ? prev
@@ -2781,36 +2963,52 @@ export default function AgendaPage() {
   function handleDateClick(arg: DateClickArg) {
     // Fase 8.2: bloqueo creación de citas si suscripción cancelada con >5 pacientes
     if (subState.isBlocked) { openBloqueoModal(); return }
-    const start = arg.date.toISOString()
-    const aviso = avisoFueraDeHorario(arg.date, horario, 'Vas a agendar a las')
+    /* `allDay` y no `view.type === 'dayGridMonth'`: lo que decide es que el
+       hueco pulsado sea un DÍA y no una hora, que es justo lo que esa bandera
+       significa. En las rejillas es `false` —`allDaySlot` está apagado, así que
+       no hay ninguna otra franja de día completo— y `arg.date` trae hora real. */
+    const { fecha, hora } = partirFechaHora(arg.date.toISOString())
+    abrirAlta(arg.date, fecha, arg.allDay ? null : hora)
+  }
+
+  /* El alta desde la rejilla, con o sin hora, y el aviso que corresponda a cada
+     caso. Los dos caminos —clic y arrastre— pasan por aquí para que no se les
+     desincronice el criterio del aviso, que es lo que ya pasó una vez.
+
+     ⚠️ SIN HORA NO SE COMPRUEBA EL HORARIO, Y NO ES UN OLVIDO. `avisoFueraDeHorario`
+     compara una hora contra el tramo del día; sin hora no hay nada que comparar,
+     y forzarlo obligaría a inventarse una —que es justo lo que se retiró—. Lo
+     que SÍ se comprueba es el día: `avisoDiaCerrado` no mira la hora, así que
+     agendar en domingo sigue avisando. El aviso de hora no desaparece del
+     sistema: salta al guardar, desde `handleSave`, cuando ya hay hora escrita. */
+  function abrirAlta(instante: Date, fecha: string, hora: string | null, finParaAvisar?: Date) {
+    const aviso = hora === null
+      ? avisoDiaCerrado(instante, horario)
+      : (avisoFueraDeHorario(instante, horario, 'Vas a agendar a las')
+         ?? (finParaAvisar ? avisoFinFueraDeHorario(finParaAvisar, horario) : null))
+    const abrir = () => setModal({ mode: 'create', fecha, hora, tipo: 'cita' })
     if (aviso) {
       setConfirm({
         message: aviso,
-        onConfirm: () => { setConfirm(null); setModal({ mode: 'create', start, end: addHour(start), tipo: 'cita' }) },
+        onConfirm: () => { setConfirm(null); abrir() },
         onCancel:  () => setConfirm(null),
       })
       return
     }
-    setModal({ mode: 'create', start, end: addHour(start), tipo: 'cita' })
+    abrir()
   }
 
   function handleSelect(arg: DateSelectArg) {
     // Fase 8.2: idem handleDateClick
     if (subState.isBlocked) { openBloqueoModal(); return }
-    // Arrastrar sobre la rejilla fija las dos puntas, así que aquí se miran
-    // las dos: seleccionar de 18:00 a 21:00 con horario hasta las 19:00 no
-    // diría nada mirando sólo el inicio.
-    const aviso = avisoFueraDeHorario(arg.start, horario, 'Vas a agendar a las')
-      ?? avisoFinFueraDeHorario(arg.end, horario)
-    if (aviso) {
-      setConfirm({
-        message: aviso,
-        onConfirm: () => { setConfirm(null); setModal({ mode: 'create', start: arg.startStr, end: arg.endStr, tipo: 'cita' }) },
-        onCancel:  () => setConfirm(null),
-      })
-      return
-    }
-    setModal({ mode: 'create', start: arg.startStr, end: arg.endStr, tipo: 'cita' })
+    /* Arrastrar sobre la rejilla fija las dos puntas, así que se miran las dos:
+       seleccionar de 18:00 a 21:00 con horario hasta las 19:00 no diría nada
+       mirando sólo el inicio. El fin sólo se pasa cuando hay hora — arrastrar
+       sobre las celdas del MES selecciona días enteros (`allDay`), y ahí el fin
+       es medianoche del día siguiente, que no dice nada de la cita. */
+    const { fecha, hora } = partirFechaHora(arg.start.toISOString())
+    if (arg.allDay) { abrirAlta(arg.start, fecha, null); return }
+    abrirAlta(arg.start, fecha, hora, arg.end)
   }
 
   function handleEventClick(arg: EventClickArg) {
@@ -3093,7 +3291,37 @@ export default function AgendaPage() {
   }
 
   return (
-    <div className="flex flex-col">
+    /* ⚠️⚠️ LA ALTURA DE ESTE `<div>` ES LO QUE PARTE LA PÁGINA EN DOS ZONAS: la
+       de arriba fija (título, controles, barra de navegación y cabecera de
+       días) y la rejilla de horas, que es la única que scrollea. Sin altura
+       definida aquí, `.agenda-fc` no puede ser `flex-1`, el calendario vuelve a
+       crecer con su contenido y quien scrollea es `<main>` otra vez.
+       Las dos zonas NO se construyen a mano: son el modo nativo de
+       FullCalendar. `.fc` ya es `flex-direction: column` y `.fc-view-harness`
+       ya es `flex-grow: 1`, así que con altura acotada el toolbar queda arriba
+       y la rejilla se lleva el resto. Y la cabecera de días NO necesita
+       `sticky`: es una sección del scrollgrid, hermana y anterior a la del
+       cuerpo, y sólo el cuerpo monta `Scroller`.
+
+       ⚠️ `dvh` Y NO `h-full`, Y NO ES INTERCAMBIABLE. `h-full` es `height:100%`,
+       que exige altura DEFINIDA en el padre; el nodo de arriba
+       (`(app)/layout.tsx:60`) es `min-h-full`, y un `min-height` no establece
+       altura definida para el porcentaje de un hijo. Con `h-full` esto
+       resolvería a `auto` y no acotaría nada. Arreglarlo por ahí obligaría a
+       tocar el layout de TODA la app, que está fuera de este alcance.
+
+       ⚠️⚠️ LOS DOS NÚMEROS SON EL PADDING VERTICAL DEL NODO PADRE, REPLICADO A
+       MANO, Y ES EL PRECIO DE NO TOCAR EL LAYOUT COMPARTIDO. Salen de
+       `(app)/layout.tsx:60`, que hoy es `pt-16 px-4 pb-6 lg:pt-8 lg:px-8
+       lg:pb-8`:
+         · por debajo de `lg`: pt-16 (64px) + pb-6 (24px) = 88px
+         · de `lg` en adelante: pt-8 (32px) + pb-8 (32px) = 64px
+       SI ALGUIEN CAMBIA ESE PADDING, ESTO SE DESAJUSTA EN SILENCIO: no rompe
+       nada visible de golpe, sólo deja la rejilla unos píxeles más alta o más
+       baja que el hueco, y reaparece el scroll de `<main>` bajo la zona fija.
+       Hay una nota recíproca en `(app)/layout.tsx` junto al padding. Si cambias
+       uno, cambia el otro. */
+    <div className="flex flex-col h-[calc(100dvh-88px)] lg:h-[calc(100dvh-64px)]">
 
       {/* ── Header ──────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-6">
@@ -3235,8 +3463,10 @@ export default function AgendaPage() {
           <button
             onClick={() => {
               if (subState.isBlocked) { openBloqueoModal(); return }
-              const now = new Date().toISOString()
-              setModal({ mode: 'create', start: now, end: addHour(now), tipo: 'evento' })
+              /* El botón sí aporta hora: la de ahora. Es una de las cuatro
+                 rutas que NO cambian con la hora vacía de la vista Mes. */
+              const { fecha, hora } = partirFechaHora(new Date().toISOString())
+              setModal({ mode: 'create', fecha, hora, tipo: 'evento' })
             }}
             title="Cirugía, reunión, bloqueo de horario — sin paciente ligado"
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors bg-[var(--ag-surface)] border border-[var(--ag-border-card)] text-[var(--ag-text)] hover:bg-[var(--ag-bg-app)]"
@@ -3247,8 +3477,10 @@ export default function AgendaPage() {
           <button
             onClick={() => {
               if (subState.isBlocked) { openBloqueoModal(); return }
-              const now = new Date().toISOString()
-              setModal({ mode: 'create', start: now, end: addHour(now), tipo: 'cita' })
+              /* El botón sí aporta hora: la de ahora. Es una de las cuatro
+                 rutas que NO cambian con la hora vacía de la vista Mes. */
+              const { fecha, hora } = partirFechaHora(new Date().toISOString())
+              setModal({ mode: 'create', fecha, hora, tipo: 'cita' })
             }}
             data-onboard="nueva-cita"
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all shadow-sm hover:brightness-95 bg-[linear-gradient(135deg,var(--ag-brand-primary),var(--ag-brand-secondary))]"
@@ -3291,7 +3523,79 @@ export default function AgendaPage() {
           {avisoRecorte}
         </p>
       )}
-      <div className="agenda-fc bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden" style={{ minHeight: '70vh' }}>
+      {/* ⚠️ `overflow-clip` Y NO `overflow-hidden`. Recorta igual —es lo que
+          mantiene las esquinas del `rounded-2xl` sobre el `<table>` cuadrado del
+          calendario, y para eso está— pero SIN crear un contenedor de scroll.
+          `overflow: visible` arreglaría el scroll y dejaría asomar las cuatro
+          esquinas, así que no vale.
+
+          ⚠️ POR QUÉ IMPORTA QUE NO CREE SCROLLPORT, hoy: con la altura acotada
+          quien scrollea es el `Scroller` que FullCalendar monta DENTRO de la
+          sección del cuerpo del scrollgrid. Un `overflow: hidden` aquí añadiría
+          un segundo contenedor de scroll por encima de ése, entre la tarjeta y
+          `<main>`, y la rejilla podría quedar recortada sin poder alcanzarse.
+
+          ⚠️ ESTE COMENTARIO DECÍA OTRA COSA HASTA EL BLOQUE 3C, Y LA VERSIÓN
+          VIEJA YA NO ES CIERTA. Explicaba que `clip` era lo que desbloqueaba la
+          cabecera de días PEGAJOSA (`stickyHeaderDates` + `position: sticky`).
+          Eso valía con `height="auto"`: la opción se resuelve a `true`
+          precisamente cuando el calendario NO tiene scroller propio
+          (`core/internal-common.js:6913-6918`). Ahora el calendario va con
+          `height="100%"`, así que `stickyHeaderDates` queda APAGADA y no hay
+          ningún sticky que salvar: la cabecera se queda arriba porque es una
+          sección hermana y anterior a la del cuerpo, y sólo el cuerpo scrollea.
+          No repongas aquel razonamiento ni lo cites: la cabecera ya no depende
+          de esto. Lo único que sigue dependiendo de `clip` son las esquinas.
+
+          ⚠️ SOPORTE: `overflow: clip` pide Chrome 90+, Firefox 81+, Safari 16+.
+          Por debajo degrada a `visible` — esquinas asomando — nunca a roto.
+
+          ⚠️ DEUDA CONOCIDA, NO SE ARREGLA AQUÍ: `SuscripcionBanner`
+          (`(app)/layout.tsx:56`) es `sticky top-0` y se monta FUERA del
+          `div.h-screen`. Con la suscripción BLOQUEADA ocupa su alto en flujo y
+          empuja todo hacia abajo, pero el `100dvh` de la raíz de esta página no
+          lo descuenta: la zona fija —título, controles y cabecera de días— se
+          va parcialmente fuera del viewport y hay que scrollear `<main>` para
+          alcanzarla, con lo que deja de estar fija. Esta vía lo deja PEOR que
+          antes, cuando el calendario simplemente crecía. El arreglo vive en
+          `(app)/layout.tsx` (meter el banner dentro del `div.h-screen`, o
+          descontar su alto), que es de toda la app y va en otra ventana. */}
+      {/* ⚠️ EL `min-height` EXPLÍCITO NO ES DECORATIVO Y NO SE QUITA. Un ítem de
+          flex trae `min-height: auto`, que le impide encoger por debajo de su
+          contenido; sin un valor explícito, `flex-1` no acota nada, la tarjeta
+          crece hasta lo que mida la rejilla y el calendario desborda su zona.
+          Aquí estuvo `min-h-0` haciendo ese trabajo. Ya no hace falta: CUALQUIER
+          valor explícito desactiva el `auto`, así que el `min-h-[280px]` de
+          abajo cumple las dos funciones a la vez. No los pongas juntos — serían
+          dos `min-height` compitiendo, y quién gana dependería del orden en que
+          Tailwind los emita.
+          Y el `minHeight: '70vh'` que había aquí en línea SE RETIRÓ a propósito:
+          con `flex-1` actuaba de suelo, así que en una ventana baja el
+          calendario volvía a desbordar `<main>` y reaparecía el segundo scroll.
+          No lo repongas «para que no quede pequeño en pantallas grandes»: en
+          pantallas grandes `flex-1` ya le da todo el hueco sobrante.
+
+          ⚠️ Y EL PISO VA EN PÍXELES — `min-h-[280px]`, en la clase de abajo.
+          Con `min-h-0` la tarjeta encogía hasta CERO y aparecía un caso
+          degradado real: a zoom extremo (~270 px de viewport CSS) la zona
+          fija se come casi todo, `flex-1` deja la rejilla en una decena de
+          píxeles, los hermanos ya no pueden encoger más y el sobrante se va al
+          área scrollable de `<main>` — o sea, vuelven los dos scrollers, que es
+          lo que todo esto vino a quitar.
+          EN PÍXELES Y NO EN `vh`: el `minHeight: '70vh'` de antes fallaba
+          justamente por ser relativo — crecía con la ventana y volvía a
+          desbordar. Un suelo fijo no puede perseguir al contenedor.
+          DE DÓNDE SALE EL 280, medido sobre la rejilla real: el cromo del
+          calendario (toolbar 60.3 px + cabecera de días 37.5 px) son 97.8 px, y
+          cada franja mide 34.6 px. 280 deja ~182 px de cuerpo ≈ 5 franjas, o sea
+          dos horas y media de rejilla más el toolbar y la cabecera enteros:
+          apretado pero utilizable, y con scroll interno para el resto del día.
+          CUÁNDO ENTRA EN JUEGO: sólo cuando `100dvh − 64 − (zona fija)` baja de
+          280, es decir por debajo de ~420-460 px de viewport según envuelvan o
+          no los controles. Ninguna ventana de trabajo normal llega ahí; el caso
+          degradado sí, y ahí preferimos una rejilla usable con un segundo
+          scroll a una rejilla de diez píxeles sin él. */}
+      <div className="agenda-fc bg-white rounded-2xl border border-slate-100 shadow-sm overflow-clip flex-1 min-h-[280px]">
         <FullCalendar
           ref={calendarRef}
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -3330,6 +3634,22 @@ export default function AgendaPage() {
           hiddenDays={diasOcultos}
           allDaySlot={false}
           dayMaxEvents={3}
+          views={VISTAS_FC}
+          /* El número de día del mes lleva a la vista Día de ESE día. Antes no
+             había forma de llegar ahí: la celda abre el alta, el «+N más» abre
+             un popover, y el segmentado llama a `changeView` SIN fecha, así que
+             saltaba a hoy.
+
+             ⚠️ EL DESTINO SE FIJA A MANO Y NO ES PARANOIA. Sin `navLinkDayClick`
+             FullCalendar resuelve el genérico 'day' con `getUnitViewSpec`
+             (core/internal-common.js:4955), que recorre las vistas registradas
+             EN EL ORDEN DE LOS PLUGINS y devuelve la primera de un solo día.
+             `dayGridPlugin` va antes que `timeGridPlugin` en `plugins`, así que
+             la ganadora sería `dayGridDay` — una vista que no está en el
+             segmentado y que nadie ha diseñado. Si algún día se reordenan los
+             plugins, esta línea es lo que impide que el destino cambie solo. */
+          navLinks
+          navLinkDayClick="timeGridDay"
           nowIndicator
           nowIndicatorContent={renderNowIndicator}
           selectable
@@ -3346,7 +3666,33 @@ export default function AgendaPage() {
           eventClick={handleEventClick}
           eventDrop={handleEventDrop}
           eventResize={handleEventResize}
-          height="auto"
+          /* ⚠️ `100%` Y NO `auto`, y de aquí cuelga todo lo demás. Con `auto` el
+             calendario crece hasta su altura completa y scrollea `<main>`: no
+             hay zona fija posible. Con `100%` se acota a la tarjeta —que es
+             `flex-1 min-h-0` dentro de una raíz en `dvh`— y FullCalendar reparte
+             solo: toolbar y cabecera de días arriba, `Scroller` en el cuerpo. */
+          height="100%"
+          /* ⚠️⚠️ LOS DOS VAN JUNTOS Y `scrollTimeReset={false}` NO ES OPCIONAL.
+             El default es `true`, y su disparador es peor de lo que parece:
+             `timegrid/internal.js:969` re-lanza el scroll inicial cuando cambia
+             el `dateProfile`, y el `dateProfile` SE RECONSTRUYE EN CADA CAMBIO DE
+             VENTANA de la rejilla. Caso concreto: arrastras una cita a una hora
+             fuera de la ventana, la ventana se estira para que quepa, y la
+             rejilla salta a `scrollTime` justo después del drop — el usuario
+             pierde de vista la cita que acaba de mover. Con `false` sólo queda
+             el scroll de montaje (`core/internal-common.js:2317-2323`). */
+          scrollTime={scrollTime}
+          scrollTimeReset={false}
+          /* Las franjas se estiran para llenar el alto en vez de dejar hueco
+             debajo. Se nota con «Compactar»: una ventana de cuatro horas sobre
+             ~600 px pasa cada franja de ~34 a ~75 px. Es deliberado — un hueco
+             blanco dentro de una tarjeta con borde se lee como un fallo de
+             render, y una rejilla estirada se lee como una rejilla.
+             El `height: 2.16rem !important` de `.fc .fc-timegrid-slot` no lo
+             impide: en layout de tabla ese `height` es un MÍNIMO, así que sigue
+             siendo el suelo y las filas crecen por encima. Coherente con la nota
+             de esa regla: reducirla es peligroso, aumentarla es seguro. */
+          expandRows
           slotDuration="00:30:00"
           slotLabelInterval="01:00:00"
           eventTimeFormat={{ hour: '2-digit', minute: '2-digit', meridiem: false, hour12: false }}
@@ -3367,7 +3713,21 @@ export default function AgendaPage() {
              Sin ella el modal NO remonta —React reconcilia por posición— y harían
              falta cinco reseteos a mano, que es donde se olvida uno.
              En edición la clave es el id de la fila: abrir otra cita distinta
-             también monta limpio, que es lo que ya se esperaba. */
+             también monta limpio, que es lo que ya se esperaba.
+
+             ⚠️ EFECTO CONOCIDO Y ACEPTADO, ANOTADO EN EL BLOQUE 3C: CAMBIAR DE
+             CITA A EVENTO BORRA LA HORA YA TECLEADA. El remonte vuelve a sembrar
+             los `useState` desde `modal`, y en el alta desde la vista MES
+             `modal.hora` es `null`, así que la hora que el médico acababa de
+             escribir se pierde y el campo queda otra vez en blanco.
+             NO ES UNA REGRESIÓN de la hora vacía: la pérdida ya existía —antes
+             el campo revertía a la hora inventada de la ruta, que era igual de
+             falsa— y el remonte es justo la propiedad de la que dependen los
+             cinco reseteos de arriba. Se anota, no se arregla: conservarla
+             obligaría a sacar la hora fuera del componente o a levantar el
+             estado, y eso desarma el mecanismo entero por un caso de borde
+             —teclear la hora ANTES de cambiar de tipo— que además avisa solo,
+             porque el campo se ve vacío. */
           key={modal.mode === 'create' ? modal.tipo : modal.appointment.id}
           modal={modal}
           onClose={closeModal}

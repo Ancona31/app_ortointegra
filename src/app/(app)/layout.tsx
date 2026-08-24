@@ -57,6 +57,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <div className="flex h-screen overflow-hidden">
                 <Sidebar />
                 <main className="flex-1 lg:ml-64 overflow-y-auto">
+                  {/* ⚠️ EL PADDING VERTICAL DE ESTE DIV ESTÁ REPLICADO A MANO EN LA
+                      AGENDA. `src/app/(app)/agenda/page.tsx` acota la altura de su
+                      raíz con `h-[calc(100dvh-88px)] lg:h-[calc(100dvh-64px)]` para
+                      partir la vista en zona fija + rejilla con scroll, y esos dos
+                      números son exactamente pt-16+pb-6 (88px) y lg:pt-8+lg:pb-8
+                      (64px) de aquí.
+                      No pudo resolverse con `h-full` porque este div es
+                      `min-h-full`, y un `min-height` no da altura definida al
+                      porcentaje de un hijo — tocar eso cambiaría el layout de toda
+                      la app, así que la agenda paga la duplicación.
+                      SI CAMBIAS ESTE PADDING, ACTUALIZA ESOS DOS NÚMEROS: la agenda
+                      no falla de forma visible, sólo se desajusta en silencio y le
+                      reaparece un segundo scroll. El razonamiento largo está allí. */}
                   <div className="min-h-full pt-16 px-4 pb-6 lg:pt-8 lg:px-8 lg:pb-8">
                     <ErrorBoundary>
                       <PageTransition>

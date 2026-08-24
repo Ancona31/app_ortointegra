@@ -121,6 +121,17 @@
   --ag-month-gap: #e7ecf3;           /* color de líneas/bordes de rejilla */
   --ag-month-today-bg: color-mix(in srgb, var(--ag-brand-primary) 10%, white); /* tinte hoy, hereda marca */
   --ag-month-num: #64748b;           /* color número de día normal */
+  /* Los dos azules del bloque 3C. NO reusan --ag-brand-primary (el navy) sino
+     --ag-brand-secondary (el azul brillante): ver la trampa de nombres en
+     CLAUDE.md. En claro apuntan a la marca; en oscuro NO pueden hacerlo y son
+     literales — el porqué está en la nota de sus contrapartes.
+     Con la marca por defecto (#1e5fa8) miden 6.45:1 sobre la celda normal y
+     5.39:1 sobre la de hoy. Al heredar --cs esos ratios los mueve el usuario:
+     una marca clara los baja, y eso ya vale para --ag-month-today-bg desde la
+     sub-fase 7. Si alguna vez se acota el rango de --cs, se acota para toda la
+     familia de marca a la vez, no aquí. */
+  --ag-month-more: var(--ag-brand-secondary);       /* «+N más» */
+  --ag-month-today-ring: var(--ag-brand-secondary); /* anillo de la celda de hoy */
 
   /* SEGMENTED CONTROL de vistas (Mes/Semana/Día). Nombrados para que
      la sub-fase 6 (dark) añada las contrapartes en html.dark. */
@@ -174,7 +185,23 @@
      sobre el `bg` del estado, y ahí dan 3.19 y 3.30. En la tarjeta el `dot` es
      la barra de 3.5 px del borde izquierdo, con el texto y el marco al lado.
      Quien retoque uno de estos cinco fondos tiene que rehacer las dos cuentas,
-     no sólo la del texto. */
+     no sólo la del texto.
+
+     ⚠️ Y AHORA SON TRES CUENTAS: EL PUNTO DEL CHIP DE MES TAMBIÉN VIVE SOBRE
+     ESTOS FONDOS. Desde el bloque 3C el chip de la vista Mes tiene fondo teñido
+     (`--ag-status-*-bg`) y el marcador de 7 px se pinta encima con
+     `--ag-status-*-dot`, que es de la misma familia de tono. Medido en claro,
+     dos bajan por poco del umbral de 3.0 que pide un elemento gráfico:
+
+         scheduled   3.19 sobre blanco  →  2.97 sobre su -bg
+         attended    3.30 sobre blanco  →  2.98 sobre su -bg
+
+     Un 1 % por debajo. SE ACEPTA Y NO SE CORRIGE AQUÍ, por dos razones: son
+     exactamente los mismos ratios que la tarjeta de Semana ya lleva en
+     producción —su punto vive sobre el mismo fondo desde el bloque 3A—, y
+     arreglarlo significaría mover la paleta, no el chip. El número queda escrito
+     para quien retoque estos fondos: si oscureces un `-bg`, estos dos se
+     recuperan solos; si lo aclaras, empeoran. */
   --ag-status-scheduled-dot: #d97706;  --ag-status-scheduled-text: #b45309;
   --ag-status-scheduled-bg: #fef6e7;   --ag-status-scheduled-border: #f4dfae;
   --ag-status-confirmed-dot: #1e5fa8;  --ag-status-confirmed-text: #1e5fa8;
@@ -1415,6 +1442,137 @@ body {
   padding: 1px 8px;
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   CHIP DE LA VISTA MES (`.ag-mes`) — bloque 3C
+   ══════════════════════════════════════════════════════════════════════
+   La caja de `MonthChip`, que hasta este bloque vivía entera en estilos en
+   línea. Mismo reparto que `.ag-tarjeta`: aquí la CAJA, en línea sólo los
+   colores que salen de un valor calculado en JS (`fondo`, `tinta`, la tinta de
+   la hora). El Google conserva los suyos en clase porque son fijos.
+
+   ⚠️ ESTE BLOQUE NO PINTA EL `<a>` RAÍZ, y aquí importa más que en las otras
+   dos tarjetas: `.ag-mes` es la ÚNICA superficie del chip. El `<a>`
+   (`.fc .fc-event`, arriba) es transparente con `!important` y las tres
+   fuentes le pasan `backgroundColor: 'transparent'`; su `border-radius: 6px`
+   —que se lo dan DOS reglas nuestras, `.fc .fc-event` (arriba, la del harness) y
+   `.fc .fc-daygrid-event`, con la misma especificidad, así que gana la última
+   por orden; el nativo de daygrid son 3 px, no 6— no se ve, porque un radio
+   sólo asoma con fondo, borde, sombra o recorte, y no tiene ninguno de los
+   cuatro. El
+   radio que se ve es el de aquí abajo. */
+
+/* ⚠️⚠️ `flex: 1 1 auto` ES LO QUE HACE QUE EL CHIP LLEGUE AL BORDE, Y NO SE
+   TOCA. Sin él la píldora se encoge al ancho de su texto —«09:00 Prueba 2»
+   ocupaba 107 px de los 152 disponibles— y la columna de chips sale desalineada.
+
+   EL MOTIVO ES QUE EN MES ESTE `<div>` CUELGA DIRECTAMENTE DEL `<a>`, sin el
+   `.fc-event-main` que envuelve a las otras dos tarjetas. No es un detalle:
+
+     Semana/Día → `StandardEvent` le pasa hijos a `EventContainer`
+       (core/internal-common.js:7148-7154) y esos hijos montan
+       `<div class="fc-event-main">`. La tarjeta va DENTRO de ese div.
+     Mes        → `TableListItemEvent` llama a `EventContainer` SIN hijos
+       (daygrid/internal.js:157), así que `ContentContainer` cae a su otra rama
+       (:2580-2581) y el `<a>` pasa a ser él mismo el contenedor del render
+       personalizado. `.fc-event-main` NO EXISTE en Mes — cero en el DOM.
+
+   Y como el `<a>` es `display: flex` (nativo `.fc-daygrid-dot-event`), este
+   chip es un FLEX ITEM suyo, con el `flex: 0 1 auto` por defecto: se encoge a
+   su contenido. De ahí el arreglo, y de ahí que vaya AQUÍ y no en un envoltorio.
+
+   ⚠️ NO INTENTES ARREGLARLO EN EL `<a>`: darle `display: block` o un ancho es
+   tocar el harness transparente, y además no hace falta — el `<a>` YA ocupa el
+   ancho de la celda; el que se encogía era este hijo.
+   ⚠️ Y NO REPONGAS UNA REGLA SOBRE `.fc-daygrid-event .fc-event-main`: la hubo
+   en el primer intento de este bloque y era CÓDIGO MUERTO por lo de arriba. */
+.agenda-fc .ag-mes {
+  box-sizing: border-box;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 2px 7px;
+  border-radius: 7px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ag-text);
+  cursor: pointer;
+}
+
+/* El chip de Google es el único con fondo y tinta FIJOS —no dependen de
+   estado ni de color elegido— así que salen de aquí y no de línea. Es el mismo
+   par que usa `.ag-gcal` en Semana/Día: la hora y el nombre lo heredan. */
+.agenda-fc .ag-mes--gcal {
+  background: var(--ag-gcal-bg1);
+  color: var(--ag-gcal-text);
+}
+
+/* EL MARCADOR DESEMPATA POR FORMA, no sólo por color. Círculo = cita;
+   cuadrado de esquinas suaves = todo lo demás. Es la única señal de tipo que
+   le queda al chip cuando el evento no tiene icono: antes de esto un evento
+   genérico sin icono y sin color salía IDÉNTICO a una cita. */
+.agenda-fc .ag-mes-punto {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.agenda-fc .ag-mes-punto--cuadro { border-radius: 2px; }
+
+.agenda-fc .ag-mes-hora {
+  flex: 0 0 auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* El icono va ADEMÁS del marcador y DELANTE del nombre, no en el hueco del
+   punto: sustituirlo dejaba la fila sin el desempate de forma de arriba.
+   El tamaño viaja en custom property por el mismo motivo que en `.ag-tarjeta`
+   —un número en línea ganaría a cualquier regla por vista— aunque hoy Mes no
+   tenga ninguna variante que lo cambie. */
+.agenda-fc .ag-mes-icono {
+  --ag-mes-icono-px: 10px;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.agenda-fc .ag-mes-nombre {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* El nombre de un evento genérico va más grueso que el de una cita. En el mes
+   el evento suele no llevar hora («Guardia hosp.»), así que sin esto su fila
+   se lee más floja que las de alrededor pese a ser la que manda el día. */
+.agenda-fc .ag-mes--evento .ag-mes-nombre { font-weight: 700; }
+
+/* ⚠️ EL TACHADO SÍ, LA `opacity` NO. La tenía (0.62) y se retira en el bloque
+   3C por el mismo motivo por el que se quitó de `.ag-tarjeta` en el 3A: la
+   opacidad se aplica al GRUPO, así que arrastraba el texto junto con el fondo y
+   los ratios de la paleta de estado —medidos sin ella— caían por debajo de AA.
+   El fondo rojo y el tachado ya dicen «cancelada». No la repongas. */
+.agenda-fc .ag-mes--cancelada .ag-mes-nombre { text-decoration: line-through; }
+
+.agenda-fc .ag-mes-badge {
+  flex: 0 0 auto;
+  padding: 0 4px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  line-height: 1.5;
+  text-transform: uppercase;
+  opacity: .75;
+}
+
 /* Drag & Drop — elevación y transparencia mientras se arrastra */
 .fc .fc-event-dragging,
 .fc .fc-event-resizing {
@@ -1604,20 +1762,33 @@ body {
    había, empataba en especificidad con la nativa y perdía, y las dos resolvían
    al mismo token: no hacía nada. */
 
-/* Más eventos — "+N más" (sub-fase 7), alineado bajo los chips */
+/* Más eventos — "+N más" (sub-fase 7), alineado bajo los chips.
+   En AZUL DE MARCA desde el bloque 3C, y no en gris: es lo único de la celda
+   que se pulsa aparte de los chips, y en gris no se distinguía de un rótulo. */
 .fc .fc-daygrid-more-link {
-  color: var(--ag-muted);
+  color: var(--ag-month-more);
   font-size: 11px;
   font-weight: 700;
   padding-left: 11px;
 }
 
 /* ── VISTA MES (sub-fase 7) — todo prefijado .fc-daygrid para NO tocar
-   Semana/Día (.fc-timegrid). Tokens --ag-month-* en :root. ── */
+   Semana/Día (.fc-timegrid). Tokens --ag-month-* en :root. ──
+   AQUÍ VA EL CROMO DE LA REJILLA Y NADA MÁS. El chip que se pinta DENTRO de
+   cada celda es `.ag-mes` y vive mucho más arriba, junto a `.ag-tarjeta` y
+   `.ag-gcal`: las tres tarjetas de la agenda están juntas a propósito, porque
+   lo que se compara al tocar una son las otras dos, no la rejilla. */
 
 /* Altura MÍNIMA por celda (~handoff 116px) para una rejilla alta y pareja.
    .fc-daygrid-day-frame = contenedor interno de la celda; darle min-height
-   crece la fila sin fijar altura de vista (height="auto" se conserva). */
+   crece la fila sin fijar la altura de la vista.
+   ⚠️ ESTA NOTA DECÍA «height="auto" se conserva» Y YA NO ES CIERTO: desde el
+   bloque 3C el calendario va con `height="100%"` para poder partir la página en
+   zona fija + rejilla con scroll. Lo que sigue en pie es lo de arriba —esto es
+   un mínimo por celda, no una altura de vista—, y su consecuencia cambió de
+   signo: con altura acotada, seis filas de 116 px no caben en un portátil, así
+   que el mes gana scroll interno en vez de estirar la página. Es deliberado;
+   está razonado en `agenda/page.tsx`, junto al `height` del <FullCalendar>. */
 .fc-daygrid .fc-daygrid-day-frame { min-height: 116px; }
 
 /* Fondo de celdas. Orden = especificidad equivalente, gana el último:
@@ -1639,12 +1810,82 @@ body {
   font-weight: 600;
 }
 
+/* EL NÚMERO ES UN ENLACE y tiene que verse. Desde que `navLinks` entró (bloque
+   3C) lleva a la vista Día de ese día, y lo único que lo delataba era el
+   cursor: FullCalendar trae `.fc a[data-navlink]:hover{text-decoration:underline}`
+   pero `.fc .fc-daygrid-day-number` lo apaga con `text-decoration: none
+   !important` y le gana.
+
+   ⚠️ EL `!important` DE AQUÍ NO ES RUIDO. La declaración a vencer ya es
+   `!important`, así que entre dos declaraciones importantes decide la
+   especificidad — y sin el `!important` propio esta regla ni siquiera entra en
+   esa comparación: perdería contra una normal. Con él, `.fc-daygrid
+   .fc-daygrid-day-number:hover` (0,3,0) gana a `.fc .fc-daygrid-day-number`
+   (0,2,0).
+
+   `:focus-visible` y no `:focus`: el foco se dibuja para quien navega con
+   teclado y no en cada clic de ratón. El `tabIndex: 0` lo pone FullCalendar
+   junto al enlace (`createAriaClickAttrs`), así que la parada existe ya.
+
+   ⚠️ NI EL CÍRCULO DE HOY NI EL COLOR SE TOCAN: esta regla declara
+   `text-decoration` y nada más. `text-underline-offset` separa la raya de los
+   dígitos para que dentro del círculo de 26 px de hoy no quede pegada al borde.
+
+   OJO CON HOY: su número es `display: inline-flex` (la regla del círculo), o
+   sea una caja en línea ATÓMICA, y la decoración de texto no se propaga dentro
+   de una de esas. Por eso el subrayado se declara aquí, EN EL PROPIO ELEMENTO
+   que lleva el texto, y no se hereda de ningún ancestro: declarada aquí sí
+   pinta en los dos casos. Verificado en Firefox con la rejilla real. */
+.fc-daygrid .fc-daygrid-day-number:hover,
+.fc-daygrid .fc-daygrid-day-number:focus-visible {
+  text-decoration: underline !important;
+  text-underline-offset: 2px;
+}
+
+/* LO MISMO PARA LAS CABECERAS DE DÍA DE SEMANA, que también son enlaces desde
+   que entró `navLinks` — y esto NO se pidió, se descubrió: `navLinks` es de
+   ámbito CALENDARIO, no del número del mes. `TableDateCell`
+   (`core/internal-common.js:6167`) monta el navlink en toda cabecera con
+   `colCnt > 1`, así que las siete de Semana pasaron a saltar a la vista Día. Se
+   quedan porque pulsar «MIÉ 19» y llegar a ese día es útil, pero necesitaban la
+   pista: `.fc .fc-col-header-cell-cushion` las deja sin subrayado con
+   `!important` y quedaban pulsables y tabulables sin ninguna señal.
+
+   ⚠️ EL SELECTOR SE APOYA EN `[data-navlink]`, Y ESO ES LO QUE LO ACOTA. Ese
+   atributo lo pone `buildNavLinkAttrs` SÓLO cuando de verdad hay enlace
+   (`:5465`), así que la regla no puede alcanzar:
+     · las cabeceras de MES — las monta `TableDowCell`, que no menciona navlink
+       en ninguna línea, porque una columna de mes es un día de la semana y no
+       una fecha a la que saltar;
+     · la cabecera de DÍA — ahí `colCnt` es 1 y FullCalendar se salta el navlink
+       a propósito («if colCnt is 1, we are already in a day-view»).
+   No lo cambies por un selector por vista: éste sigue al dato real.
+
+   El subrayado se declara en el `<a>` y ALCANZA a `.ag-dayhead`, que es
+   `display: flex`. Comprobado en navegador, porque no era obvio: la excepción
+   de propagación de `text-decoration` es para las cajas en línea ATÓMICAS, y un
+   contenedor flex de nivel bloque no lo es. Declararlo en los dos spans hoja da
+   el mismo resultado; se deja en el `<a>` por ser la misma forma que la regla
+   del número del mes de aquí arriba. */
+.fc .fc-col-header-cell-cushion[data-navlink]:hover,
+.fc .fc-col-header-cell-cushion[data-navlink]:focus-visible {
+  text-decoration: underline !important;
+  text-underline-offset: 2px;
+}
+
 /* Fila de headers de Mes (LUN MAR…). Solo daygrid: no afecta time-grid. */
 .fc-daygrid .fc-col-header-cell { background: var(--ag-month-head); }
 
 /* Día de hoy en Mes — regla NUEVA más específica que la global
-   .fc .fc-day-today (#e8f2ff, intacta para el time-grid). */
-.fc-daygrid .fc-day-today { background: var(--ag-month-today-bg) !important; }
+   .fc .fc-day-today (#e8f2ff, intacta para el time-grid).
+   El ANILLO (bloque 3C) va como `box-shadow: inset` y NO como `border`, igual
+   que el de la columna de hoy del time-grid (ver .fc-timegrid-col.fc-day-today
+   más arriba): un borde en un <td> de una tabla con `border-collapse` empuja la
+   rejilla entera y desalinea la fila. La sombra interior no ocupa espacio. */
+.fc-daygrid .fc-day-today {
+  background: var(--ag-month-today-bg) !important;
+  box-shadow: inset 0 0 0 2px var(--ag-month-today-ring);
+}
 
 /* Fin de semana / inhábil — en Mes la celda entera es fuera de horario, y la
    superficie inerte del time-grid a celda completa se ve pesada: se neutraliza
@@ -1742,6 +1983,18 @@ html.dark {
   --ag-month-gap: #22324c;
   --ag-month-today-bg: color-mix(in srgb, var(--ag-brand-secondary) 12%, #0f1828); /* aclarado handoff */
   --ag-month-num: #8b9bb0;                    /* ◆ ≈ dark.muted */
+  /* ⚠️ LITERALES, Y NO PUEDEN HEREDAR LA MARCA. --ag-brand-secondary NO se
+     redefine en oscuro (sigue siendo --cs, #1e5fa8 por defecto), y ese azul
+     sobre --ag-month-cell (#141f33) da 2.56:1 — ilegible como texto e
+     invisible como línea. La salida que usa el resto del bloque para la marca
+     en oscuro —mezclarla hacia el fondo, como --ag-month-today-bg— sirve para
+     una SUPERFICIE y aquí haría lo contrario de lo que hace falta: estos dos
+     tienen que ACLARARSE contra la celda, no oscurecerse.
+     Medidos: «+N más» 7.82:1 sobre la celda normal y 7.69:1 sobre la de hoy
+     (AA a 11 px pide 4.5); el anillo 5.98:1 sobre la celda de hoy, que es la
+     única sobre la que se dibuja (un elemento gráfico pide 3.0). */
+  --ag-month-more: #8ab4f8;                   /* ◆ */
+  --ag-month-today-ring: #6b9bff;             /* ◆ = familia de confirmed-dot */
   /* Segmented control */
   --ag-segment-bg: #16233a;
   --ag-segment-active-bg: #27395a;
@@ -1984,12 +2237,26 @@ html.dark .agenda-fc .fc-daygrid .fc-day-today .fc-daygrid-day-number {
 }
 
 /* ── Flecos dark sub-fase 6 ─────────────────────────────────────────
-   FIX 1 — esquina blanca del time-grid. El fondo lo pinta la regla nativa
-   .fc .fc-scrollgrid-section-sticky > * { background: var(--fc-page-bg-color) }
-   sobre las celdas-cromo <td> de la fila de header (incluida la esquina del
-   gutter). Con la Parte B ya corregida --fc-page-bg-color es oscuro, pero
-   para que la esquina se funda SIN COSTURA con los headers de día (que usan
-   --ag-surface) se repinta la celda-cromo del header con el mismo token.
+   FIX 1 — esquina del time-grid. LA REGLA SIGUE HACIENDO FALTA, PERO SU MOTIVO
+   CAMBIÓ EN EL BLOQUE 3C, y conviene leerlo antes de tocarla.
+
+   Decía que venía a corregir el fondo que pinta la nativa
+   `.fc .fc-scrollgrid-section-sticky > * { background: var(--fc-page-bg-color) }`
+   sobre las celdas-cromo <td> de la fila de header. Eso ERA cierto mientras el
+   calendario iba con `height="auto"`, porque entonces `stickyHeaderDates` se
+   resolvía a `true` y esa clase estaba puesta. Con `height="100%"` la opción
+   queda APAGADA, la clase `-sticky` ya no se emite y esa declaración nativa no
+   se aplica a nadie — comprobado: es la ÚNICA regla nativa que daba fondo a
+   esas celdas.
+
+   Lo que hace hoy: sin ella, esas celdas-cromo quedan TRANSPARENTES y dejan ver
+   la superficie de la tarjeta que hay detrás, con lo que la esquina del gutter
+   no casa con los headers de día (que usan --ag-surface) y aparece la costura.
+   La regla les da ese mismo token y la costura desaparece. O sea que antes
+   REEMPLAZABA un fondo y ahora APORTA el único que hay.
+
+   Por eso apunta a `-section-header` y no a `-sticky`: ese selector nunca
+   dependió de la opción, y es lo que la ha dejado funcionando sin cambios.
    Cubre la esquina y el cromo tras los headers (inocuo: el <th> de cada día
    ya pinta su propio fondo encima). El gutter de horas del cuerpo
    (.fc-timegrid-slot-label) hereda el fondo oscuro del scroller; su borde lo
