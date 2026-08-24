@@ -59,6 +59,22 @@
      ThemeProvider en :root, siempre con fallback). Mismo mecanismo que el Sidebar. */
   --ag-brand-primary: var(--cp, #1a3a5c);
   --ag-brand-secondary: var(--cs, #1e5fa8);
+  /* La marca CUANDO ES TINTA O LÍNEA sobre la superficie, en vez de relleno.
+     No es un alias de --ag-brand-secondary: en claro coincide, y en oscuro NO
+     puede coincidir. Medido sobre --ag-surface (#1b2a40): la marca cruda da
+     2.24:1, o sea ilegible; aclarada al 55 % hacia el blanco da 5.78:1.
+
+     ⚠️ ES LA OPERACIÓN INVERSA A LA DE LOS RELLENOS DE MARCA EN OSCURO, y las
+     dos conviven a propósito. Un relleno lleva tinta blanca encima, así que en
+     oscuro se OSCURECE hacia el fondo (`color-mix(… 55%, #0f1828)`, como el
+     círculo de hoy). Esto es lo contrario: es la tinta, así que se ACLARA. Si
+     alguien las unifica «porque las dos mezclan al 55 %», rompe una de las dos.
+
+     ⚠️ Y NO LO CUELGUES DE --ag-status-confirmed-dot, que hoy vale justo estos
+     dos azules. Sería el mismo enganche accidental que este archivo ya deshizo
+     dos veces: el acento de un control no es el color del estado «confirmada»,
+     y la próxima rotación de la paleta de estado se lo llevaría por delante. */
+  --ag-brand-legible: var(--ag-brand-secondary);
   /* ⚠️ NO LO «UNIFIQUES» CON EL ROJO DE «CANCELADA» (--ag-status-cancelled-dot,
      hoy #c0392b). Se parecen y la línea cruza por encima de las tarjetas, pero
      dicen cosas distintas: una es la hora actual, la otra el estado de una cita.
@@ -111,9 +127,56 @@
   --ag-ease-in:  cubic-bezier(.4, 0, 1, 1);    /* algo se va */
   --ag-ease:     cubic-bezier(.4, 0, .2, 1);   /* algo se mueve */
 
+  /* ── RADIOS — LA ESCALA DEL REDISEÑO (spec §1.3) ──────────────────────
+     Cinco peldaños, y cada uno nombra un PAPEL, no un tamaño. Esa es toda la
+     gracia: el que llegue después no elige «un radio que quede bien», elige el
+     papel del elemento y el radio viene dado. Si algo no encaja en ninguno de
+     los cinco, la pregunta correcta es qué es ese elemento — no qué número
+     ponerle.
+
+     ⚠️ SON LA REFERENCIA, NO UN RESUMEN DE LO QUE HAY PUESTO. Salen del spec, y
+     al declararlos quedaron a la vista tres divergencias que este bloque SÍ
+     corrigió (la tarjeta de evento iba a 9, la de Google a 9, el chip de Mes a
+     7) y dos que NO, por estar fuera de su alcance — apuntadas abajo, en cada
+     token. Ante una diferencia entre esta escala y un valor suelto, manda ésta.
+
+     ⚠️ NO CONVIVEN CON UNA SEGUNDA ESCALA `--ag-*`: no había ninguna. Sí conviven
+     con la de Tailwind (`rounded-xl` y compañía), que es de donde salían todos
+     estos números. La frontera de hoy: dentro de la agenda mandan estos tokens;
+     fuera, Tailwind. No migres el resto de la app a esto sin pedirlo.
+
+     ⚠️ LA TIPOGRAFÍA Y EL ESPACIADO DEL SPEC NO ESTÁN AQUÍ, Y ES DELIBERADO. Son
+     escalas largas y se irán creando cuando llegue el bloque que las consuma.
+     No las adelantes «para tenerlas». */
+  --ag-r-note:    6px;   /* tarjeta de evento: .ag-tarjeta, .ag-gcal, .ag-mes.
+                            NO el harness `.fc-event` que las envuelve — ése ya
+                            vale 6 pero es otra cosa (un <a> transparente cuyo
+                            radio no llega a verse), y se deja suelto a
+                            propósito para no dar a entender que son lo mismo. */
+  --ag-r-btn-sm:  8px;   /* contenedor de icono: el cuadro del icono de evento
+                            en la vista Día. */
+  --ag-r-btn:    10px;   /* botón y chip de vista: los controles del header, los
+                            prev/next/Hoy del toolbar y cada segmento del
+                            selector de vista. */
+  --ag-r-card:   12px;   /* card del panel y aviso. SIN CONSUMIDOR TODAVÍA: sus
+                            dos destinos —el panel lateral de Día y el aviso de
+                            Google— llegan en bloques posteriores. Candidato que
+                            NO se enganchó por quedar fuera de este alcance:
+                            `.fc-daygrid .fc-more-popover`, que ya vale 12.
+                            La tarjeta del calendario (`.agenda-fc`) va a 16 vía
+                            `rounded-2xl` y tampoco se tocó: es el contenedor de
+                            todo, no una card del panel. */
+  --ag-r-pill:  999px;   /* píldora de estado: .ag-tarjeta-pildora. Hay tres más
+                            que ya valen 999 y no se engancharon por estar fuera
+                            de este alcance — .ag-gcal-badge, .ag-mes-badge y
+                            .ag-hora-ahora. Son candidatas evidentes el día que
+                            se toquen. */
+
   /* VISTA MES (sub-fase 7) — variante clara. La sub-fase 6 (dark) añadirá
-     las contrapartes en html.dark. El círculo de HOY reusa --ag-brand-primary
-     y el punto de los chips reusa --ag-status-*-dot (NO duplicar). */
+     las contrapartes en html.dark. El círculo de HOY reusa
+     --ag-brand-secondary —ojo, decía --ag-brand-primary hasta el cierre del
+     bloque 4, y era el navy: ver la nota de la propia regla— y el punto de los
+     chips reusa --ag-status-*-dot (NO duplicar). */
   --ag-month-cell: #ffffff;          /* fondo celda día normal */
   --ag-month-weekend: #fafbfc;       /* fondo celda fin de semana/inhábil */
   --ag-month-other-day: #f4f6f9;     /* fondo celda de otro mes */
@@ -133,13 +196,61 @@
   --ag-month-more: var(--ag-brand-secondary);       /* «+N más» */
   --ag-month-today-ring: var(--ag-brand-secondary); /* anillo de la celda de hoy */
 
-  /* SEGMENTED CONTROL de vistas (Mes/Semana/Día). Nombrados para que
-     la sub-fase 6 (dark) añada las contrapartes en html.dark. */
+  /* SEGMENTED CONTROL. Lo consumen DOS: el de vistas (Mes/Semana/Día) del
+     header y el de tipo (Cita/Evento) del alta. Son el mismo control, así que
+     comparten EL COLOR a propósito — tocar estos tokens cambia los dos, y eso es
+     lo que se quiere.
+
+     ⚠️ EL COLOR SÍ, EL RADIO NO, Y HOY ESTÁN DIVERGIDOS. El del header pasó a la
+     escala del spec (`calc(var(--ag-r-btn) + 3px)` en la pista y `--ag-r-btn` en
+     la pastilla); el del alta sigue con 12 y 9 a número pelado en su JSX, porque
+     el modal quedó fuera del alcance del bloque 4. PENDIENTE: engancharlo a los
+     mismos tokens cuando se toque el modal. Hasta entonces, no leas esta nota
+     como que el radio también se propaga: no lo hace.
+
+     ⚠️ EL SEGMENTO ACTIVO PASÓ A RELLENO DE MARCA CON TINTA BLANCA (bloque 4).
+     Era una pastilla BLANCA con sombra sobre la pista gris, o sea la misma
+     superficie que la tarjeta que la contiene: se leía como un hueco, no como
+     una selección. Ahora es un relleno sólido, que es lo que enseña el mockup.
+
+     ⚠️ `--ag-brand-secondary` Y NO `--ag-brand-primary`: la trampa de nombres de
+     CLAUDE.md (regla 4) otra vez — «primary» es el navy #1a3a5c y «secondary»
+     el azul #1e5fa8. Con el navy la pastilla se lee negra.
+
+     ⚠️ EL BLANCO ES UN HEX, Y ESTÁ BIEN QUE LO SEA: aquí es la CAPA DE TOKENS,
+     que es donde los hex viven (`--ag-surface: #ffffff` está tres líneas más
+     arriba). Lo prohibido es el hex en el componente, y por eso el JSX sigue
+     leyendo `var(--ag-segment-active-text)` y no sabe de qué color es.
+     No lo cambies por `--ag-surface`: ése vale #1b2a40 en oscuro y la tinta se
+     volvería ilegible sobre el azul. Aquí hace falta un blanco de verdad, igual
+     en las dos paletas — el relleno es de marca en las dos.
+     Contraste medido con la marca por defecto (--cs #1e5fa8): 6.45:1, AA
+     holgado. Depende de `--cs`, que cada clínica configura: una marca muy clara
+     lo bajaría.
+
+     ⚠️ Y ESTE TOKEN NO ES EL ÚNICO EXPUESTO — EL BLOQUE 4 AMPLIÓ LA SUPERFICIE.
+     Hoy cuelgan de `--cs` SIN aclarar ni oscurecer, o sea sin red:
+       · este blanco sobre el relleno del segmentado activo;
+       · la mitad CLARA de `--ag-brand-legible` (tinta y borde de «Compactar»
+         encendido; la oscura sí se aclara y está a salvo);
+       · la cifra blanca del círculo de HOY, en Semana y en Mes.
+     Las tres están bien con el default y las tres bajan de AA en cuanto `--cs`
+     pase de ≈#2f6fed. No se toca nada: queda anotado para que, el día que se
+     revise la personalización de marca, se sepa dónde mirar y no haya que
+     redescubrirlo. Es el mismo riesgo que ya reconocía el párrafo de arriba,
+     sólo que ahora en tres sitios en vez de en uno.
+
+     ⚠️ Y LA SOMBRA SE APAGA EN LAS DOS PALETAS. En oscuro ya estaba a `none`; en
+     claro sostenía la pastilla blanca, y sin pastilla blanca no sostiene nada.
+     El token se queda declarado —lo interpolan los DOS segmentados, el de vistas
+     y el del alta— en vez de retirarlo de sus estilos. El tercer consumidor que
+     tenía, el botón «Compactar», dejó de leerlo: encendido se marca ahora con el
+     borde y no con relleno. */
   --ag-segment-bg: #eef1f6;
-  --ag-segment-active-bg: #ffffff;
-  --ag-segment-active-shadow: 0 1px 3px rgba(16, 32, 64, .12);
+  --ag-segment-active-bg: var(--ag-brand-secondary);
+  --ag-segment-active-shadow: none;
   --ag-segment-text: #7c8aa0;
-  --ag-segment-active-text: var(--ag-brand-primary);
+  --ag-segment-active-text: #ffffff;
 
   /* ESTADO — mapeo id DB (inglés) → estilo handoff (dot/text/bg/border).
      La tarjeta "clean" usa solo dot + text; bg/border quedan para el
@@ -775,12 +886,240 @@ body {
      con !important a 2.16rem y hay una nota que pide no reducirla. */
 }
 
+/* ── QUÉ SOSTIENE ESTE REPARTO: `display: contents` SOBRE `.fc` ────────────
+   Léelo antes de tocar el bloque de abajo. Explica por qué existe la pieza rara,
+   qué se comprobó de ella y qué NO se rompe. El reparto en sí —qué va en cada
+   celda y por qué la leyenda comparte fila— lo cuenta el bloque siguiente.
+
+   El problema es de anidamiento, no de estilo. FullCalendar monta
+
+       .agenda-fc                     ← nuestra tarjeta
+         └ .fc                        ← su raíz, display:flex column
+             ├ .fc-header-toolbar     ← ‹ › Hoy + fecha
+             └ .fc-view-harness       ← flex-grow: 1, y dentro el scroller
+
+   y los dos sitios que el rediseño pide —la leyenda AL LADO del toolbar, la
+   banda de recorte ENTRE el toolbar y la rejilla— caen entre esos dos hermanos,
+   que son hijos de `.fc` y no nuestros. El componente de React no acepta
+   children, así que no hay forma de colar un tercero ahí dentro. Con
+   `display: contents` la caja de `.fc` desaparece y sus dos hijos ASCIENDEN a
+   ítems de la rejilla de `.agenda-fc`, junto a la leyenda y la banda; a partir
+   de ahí los coloca el `grid-template-areas`.
+
+   Qué NO se rompe, y por qué (comprobado, no supuesto):
+     · Los selectores. `display: contents` quita la caja, no el elemento: `.fc`
+       sigue en el árbol, así que `.fc .fc-toolbar`, `.fc .fc-view-harness` y las
+       docenas de reglas descendentes de esta hoja siguen casando igual.
+     · Las variables. El bloque `.fc { --fc-border-color: …; … }` y su gemelo
+       `html.dark .agenda-fc .fc { … }` declaran las nativas EN ESTE MISMO nodo.
+       Las propiedades personalizadas heredan a través de `display: contents`, así
+       que llegan abajo intactas. (Y por eso siguen sin poder ir en el wrapper:
+       ver la nota de aquel bloque.)
+     · El recorte. `.agenda-fc` conserva su `overflow-clip` y su radio, y ahora
+       recorta a cuatro ítems en vez de a uno.
+
+   ⚠️ LO QUE SÍ CAMBIA DE SIGNIFICADO ES EL `height="100%"` DEL CALENDARIO, y no
+   deja de hacer falta — hace otra cosa. FullCalendar lo usa por DOS vías
+   separadas: escribe `height: 100%` en línea sobre `.fc` (esa se pierde aquí, y
+   no importa) y, sobre todo, pone `viewVGrow` a true, que es lo que le da a
+   `.fc-view-harness` su clase `-active` y lo que absolutiza la vista dentro. Esa
+   segunda vía es la que sostiene el scroll interno y sigue viva. Poner
+   `height="auto"` seguiría rompiéndolo todo exactamente igual que antes: la nota
+   larga de `page.tsx` no caduca.
+   El `flex-grow: 1` nativo del harness, en cambio, SÍ quedó inerte: aquí el alto
+   se lo da la fila `minmax(0, 1fr)` de la rejilla.
+
+   ⚠️ Y LA BANDA QUEDA FUERA DEL SCROLLER, que era la condición. Quien scrollea
+   es el `Scroller` que FullCalendar monta dentro de la sección del cuerpo del
+   scrollgrid, tres niveles por debajo de `.fc-view-harness`. La banda es hermana
+   del harness, no descendiente: se queda fija arriba con el toolbar y la
+   cabecera de días, y la rejilla scrollea por debajo. */
+/* ── EL REPARTO DE LA TARJETA, EN REJILLA ─────────────────────────────
+   Cuatro piezas y dos columnas. La leyenda comparte FILA con el toolbar —es
+   donde la pone el mockup, y esa fila va mucho más vacía que la de controles
+   del header, que envuelve a ~1170 px—; la banda y la rejilla ocupan el ancho
+   entero debajo.
+
+       ┌──────────────────────┬──────────────────────┐
+       │ toolbar  ‹ › Hoy 17… │  ● Agendada … Google │  auto
+       ├──────────────────────┴──────────────────────┤
+       │ banda    ↖ Vista compacta: …   Mostrar…     │  auto (0 si no hay)
+       ├─────────────────────────────────────────────┤
+       │ rejilla                                     │  1fr
+       └─────────────────────────────────────────────┘
+
+   ⚠️ POR QUÉ REJILLA Y NO LAS TRES VÍAS OBVIAS:
+     · `customButtons` de FullCalendar (el slot `right` del toolbar) sólo acepta
+       un `text` de cadena o el nombre de un icono registrado. La leyenda son
+       cinco marcas de color más el SVG multicolor de Google: habría que
+       inyectar DOM en un `didMount`, o sea construir contenido fuera de React
+       y perder los tokens que hoy interpola el JSX.
+     · Un segundo `display: contents` sobre `.fc-header-toolbar` promocionaría
+       sus TRES chunks a este mismo contenedor, y con ellos se iría el
+       `justify-content: space-between` que es lo único que los coloca.
+     · Una banda propia posicionada encima con `absolute` no reserva alto, así
+       que al envolver se comería el toolbar.
+
+   ⚠️ Y NO ES MAQUINARIA NUEVA: el `display: contents` sobre `.fc` de aquí abajo
+   YA estaba —lo puso la banda de vista compacta— y la rejilla lo acepta igual
+   que lo aceptaba el flex. Lo que cambia es que los tres `order` que había se
+   convierten en cuatro `grid-area`, que son MENOS piezas y encima se leen de un
+   vistazo en el `grid-template-areas` de arriba.
+
+   ⚠️ `minmax(0, 1fr)` EN LA SEGUNDA COLUMNA, Y NO `1fr` A SECAS: sin el 0 el
+   suelo es `min-content`, y la leyenda —que es larga— EMPUJARÍA al toolbar
+   hasta sacar la fecha de sitio. Con el 0 se comprime y envuelve dentro de su
+   celda, alineada a la derecha, y la fecha no se mueve nunca.
+   Lo mismo en la tercera FILA: es lo que ocupa el papel del `min-height: 0` que
+   hacía falta en flex, y lo que impide que la rejilla desborde la tarjeta. */
+.agenda-fc {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-areas:
+    "toolbar leyenda"
+    "banda   banda"
+    "rejilla rejilla";
+}
+.agenda-fc .fc { display: contents; }
+.agenda-fc .fc-header-toolbar { grid-area: toolbar; }
+.agenda-fc .ag-leyenda        { grid-area: leyenda; }
+.ag-banda-compacta            { grid-area: banda; }
+.agenda-fc .fc-view-harness   { grid-area: rejilla; }
+
+/* El aspecto propio de la leyenda —y el `@media` que la baja de fila— NO viven
+   aquí sino DETRÁS del bloque del toolbar, unas líneas más abajo. Es a
+   propósito: comparte con él la regla que pinta fondo y borde, y esa regla
+   declara además `padding` y `gap`. Los tres selectores implicados pesan lo
+   mismo —(0,2,0)—, así que quien gana es el ÚLTIMO de la hoja y no el más
+   específico. Estuvieron aquí arriba y perdían en silencio: la leyenda salía con
+   el padding y el gap del toolbar. Si mueves algo, comprueba el orden. */
+
+.ag-banda-compacta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 18px;   /* los 18 son los del toolbar: las dos bandas alinean */
+  background: var(--ag-bg-app);
+  border-bottom: 1px solid var(--ag-hairline);
+  font-size: 12px;
+  color: var(--ag-muted);
+}
+.ag-banda-compacta-icono {
+  flex: 0 0 auto;
+  color: var(--ag-muted2);
+}
+/* `min-width: 0` para que el texto pueda encogerse y elipsar en vez de empujar
+   al enlace fuera de la banda: un ítem de flex trae `min-width: auto`, que se
+   lo impide. El enlace es lo último que debe desaparecer — es la salida. */
+.ag-banda-compacta-texto {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ag-banda-compacta-texto strong {
+  font-weight: 700;
+  color: var(--ag-text);
+}
+/* Un `<button>` vestido de enlace, y no un `<a>`: no navega a ninguna parte,
+   apaga un estado. El rol correcto es el del botón; el aspecto de enlace es lo
+   que dice «esto es la salida» sin competir con los botones del toolbar. */
+.ag-banda-compacta-salida {
+  flex: 0 0 auto;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ag-brand-secondary);
+  text-underline-offset: 2px;
+}
+.ag-banda-compacta-salida:hover,
+.ag-banda-compacta-salida:focus-visible { text-decoration: underline; }
+
+/* La fecha ya no flota en el centro: vive en el chunk `left`, junto a las
+   flechas y a «Hoy». Los tres son hermanos dentro del chunk y necesitan aire.
+
+   ⚠️ EL `gap` NO BASTA SOLO, y por eso van las DOS reglas. FullCalendar separa
+   los widgets de un chunk con `.fc-toolbar > * > :not(:first-child) {
+   margin-left: .75em }`, que es margen y NO gap: dejándolo, los dos se SUMAN y
+   salen 26 px donde se querían 14. Se neutraliza aquí en vez de bajar el gap
+   para compensar, porque un `gap` solo se lee y se ajusta; un gap calculado
+   contra un margen ajeno se rompe el día que la librería cambie ese `.75em`.
+   Tres clases contra las dos de la nativa, así que gana sin `!important`. */
+.agenda-fc .fc-toolbar-chunk { display: flex; align-items: center; gap: 14px; }
+.agenda-fc .fc-toolbar > * > :not(:first-child) { margin-left: 0; margin-right: 0; }
+
+/* ── LA BARRA DE SCROLL DE LA REJILLA ──────────────────────────────────────
+   Desde que la rejilla tiene scroll propio (bloque 3C), su barra vertical
+   estaba SIEMPRE visible y comiéndose ancho de columna de forma permanente.
+
+   ⚠️ LA CAUSA NO ERA FULLCALENDAR. Su `Scroller` monta el div con
+   `overflow-y: auto` calculado en `SimpleScrollGrid` (`internal-common.js:7003`:
+   `auto` salvo que `forceYScrollbars`), que es lo correcto. Quien la volvía
+   permanente era NUESTRA regla global `::-webkit-scrollbar { width: 6px }` de
+   más arriba: en Blink y WebKit, personalizar ese pseudo-elemento saca la barra
+   del modo OVERLAY y la pasa a modo clásico, que reserva su ancho en el layout.
+   La regla global se queda —viste las barras de toda la app— y aquí se le gana
+   por especificidad, sólo dentro de la agenda.
+
+   ⚠️ LO QUE SE PIDIÓ Y NO SE PUDO DAR ENTERO, para que nadie lo intente otra vez
+   creyendo que se olvidó: «oculta, y que aparezca mientras se scrollea, sin
+   empujar». Las dos mitades son incompatibles hoy en Windows y Linux:
+     · Una barra visible de `::-webkit-scrollbar` SIEMPRE reserva su ancho. No
+       hay ancho 0 en reposo y 6 px al scrollear sin que la rejilla salte.
+     · `overflow-y: overlay`, que hacía exactamente esto, está eliminado de
+       Chrome desde la 120. No lo repongas: hoy se ignora.
+     · Las barras overlay que aparecen y se desvanecen son del SISTEMA
+       (macOS, iOS, Android) y sólo salen si NO se personaliza NADA — ni
+       `::-webkit-scrollbar` ni `scrollbar-width`. En cuanto se toca una, se
+       pierden, así que no se pueden combinar con garantizar ancho cero aquí.
+     · La vía que sí daría el efecto es `scrollbar-width: thin` +
+       `scrollbar-color: transparent transparent`, alternando el color con una
+       clase al scrollear: aparece sin mover nada, y funciona en Firefox y en
+       Chrome 121+. Pero reserva su ancho SIEMPRE, sólo que invisible — y eso es
+       justo lo que se puso como no negociable. Queda escrita por si algún día se
+       prefiere ese trato.
+   Así que se cumple el requisito duro —ancho cero, siempre, en los cuatro
+   navegadores— y se renuncia al indicador. El contexto de scroll lo siguen dando
+   la cabecera de días, que no se mueve, y las horas del gutter, que sí.
+
+   ⚠️ NO DESALINEA LA CABECERA, PERO NO POR EL MOTIVO QUE PARECE — Y QUEDAN ~6 PX
+   MUERTOS AL BORDE DERECHO. Aquí hubo escrito que FullCalendar mediría 0 y se
+   ajustaría solo. Es falso, y conviene saber por qué:
+   `getScrollbarWidths` (`internal-common.js:5514`) es GLOBAL y está CACHEADA en
+   un módulo. No mide `.fc-scroller`: crea un `<div style="overflow:scroll">`
+   suelto, lo cuelga de `document.body`, lo mide y lo tira. A ese div NO le llega
+   esta regla —está acotada a `.agenda-fc`—, pero SÍ le llega el
+   `::-webkit-scrollbar { width: 6px }` global. Así que en Blink sigue midiendo
+   6, no 0.
+   La cabecera y el cuerpo siguen alineados porque ese descuento se aplica por
+   igual a los dos, no porque haya desaparecido. Lo que queda es una franja de
+   ~6 px reservada a una barra que ya no los ocupa.
+   NO SE ARREGLA AQUÍ, y no es pereza: recuperarlos exige desactivar la regla
+   global, que viste las barras de TODA la app y está fuera de esta ventana.
+   Lo que se ganó, dicho sin adornos: se quitó la barra de la vista, no su ancho.
+
+   Las tres declaraciones son la misma orden en tres dialectos: `scrollbar-width`
+   es el estándar (Firefox 64+, Chrome 121+), `-ms-overflow-style` es para el
+   Edge viejo, y el pseudo-elemento para Blink y WebKit. */
+.agenda-fc .fc-scroller {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.agenda-fc .fc-scroller::-webkit-scrollbar { display: none; }
+
 /* Cifras de ancho fijo en toda la agenda. Sin esto los dígitos cambian de
    ancho y la columna de horas tiembla al navegar entre días. */
 .fc, .agenda-fc { font-variant-numeric: tabular-nums; }
 
 /* Toolbar */
-.fc .fc-toolbar {
+.fc .fc-toolbar,
+.agenda-fc .ag-leyenda {
   padding: 12px 16px;
   background: #ffffff;
   border-bottom: 1px solid #f1f5f9;
@@ -837,15 +1176,76 @@ body {
 .agenda-fc .fc-toolbar {
   padding: 14px 18px;
 }
-.agenda-fc .fc-toolbar-title {
-  font-size: 16px !important;
-  font-weight: 800;
-  color: var(--ag-ink);
+
+/* ── LA LEYENDA, SU ASPECTO PROPIO ────────────────────────────────────
+   ⚠️ ESTE BLOQUE VA DESPUÉS DE `.fc .fc-toolbar` A PROPÓSITO, Y NO SE SUBE.
+   Comparte con esa regla el fondo y la línea inferior —para que no se vea un
+   escalón en mitad de la fila, y compartiéndola en vez de copiarla para que no
+   puedan divergir—, pero esa regla trae también `padding: 12px 16px` y
+   `gap: 8px`, que aquí no valen. Los dos selectores pesan (0,2,0): a igual
+   especificidad gana el último de la hoja, así que lo que decida esto tiene que
+   ir escrito DESPUÉS. Estuvo antes y las dos declaraciones de abajo no hacían
+   nada — la leyenda salía con 16 px de padding izquierdo pese al comentario que
+   decía lo contrario.
+   Lo que sí se hereda de allí y se quiere: `flex-wrap: wrap`, que es lo que la
+   deja envolver dentro de su celda sin empujar la fecha. */
+.agenda-fc .ag-leyenda {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 14px 18px 14px 0;   /* sin izquierdo: el del toolbar ya separa */
 }
+
+/* En móvil la fila del toolbar ya va con las flechas, la fecha y «Hoy», y la
+   leyenda no cabe al lado ni comprimida: baja a fila propia a ancho completo y
+   alineada a la izquierda. El umbral es 768, el MISMO que el `isMobile` de
+   `page.tsx` — si alguien mueve uno, que mueva el otro.
+
+   ⚠️ Y VA DESPUÉS DEL BLOQUE DE ARRIBA POR LO MISMO: UNA MEDIA QUERY NO SUMA
+   ESPECIFICIDAD. `.agenda-fc .ag-leyenda` dentro de un `@media` sigue pesando
+   (0,2,0), así que envuelta arriba su `justify-content: flex-start` perdía
+   contra el `flex-end` de aquí — y en móvil la leyenda bajaba de fila pero
+   seguía pegada a la derecha, que es justo lo que esta regla viene a evitar. */
+@media (max-width: 767px) {
+  .agenda-fc {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "toolbar" "leyenda" "banda" "rejilla";
+  }
+  .agenda-fc .ag-leyenda { justify-content: flex-start; padding-left: 18px; }
+}
+/* El título de vista, a los 22 px / 800 del spec (§2). Venía de 16.
+
+   ⚠️ EL `line-height` VA EXPLÍCITO Y NO ES COSMÉTICO: es lo que hace que subir
+   el cuerpo NO mueva el alto del toolbar, y de eso cuelga el piso de la tarjeta.
+   La fila la manda el elemento más alto, y son los botones: 12 px × 1.5 de línea
+   + 5+5 de padding + 2 de borde = 30 px (`.fc .fc-button`, aquí arriba). El
+   título a 22 × 1.2 son 26.4, o sea que cabe por debajo y el toolbar se queda
+   como estaba. Heredando el 1.5 del documento serían 33 px y SÍ empujaría, tres
+   píxeles que habría que devolverle al piso. Si alguien lo quita, que rehaga esa
+   cuenta y la nota del `min-h` en page.tsx.
+
+   ⚠️ `text-transform: none` ANULA A PROPÓSITO el `capitalize` de la regla global
+   `.fc .fc-toolbar-title`, y no es limpieza: con el `titleFormat` largo del
+   bloque 4 ese capitalize pone mayúscula en CADA palabra y el título sale
+   «17 – 22 De Agosto De 2026». No se notaba con el formato corto de antes
+   («17 – 23 Ago 2026») porque no tenía preposiciones que estropear.
+   Lo que sí hace falta es la mayúscula INICIAL —Intl da «agosto de 2026» y
+   «miércoles, 19 de agosto» en minúscula, que es correcto en español pero no
+   abre bien una cabecera—, y eso lo da el `::first-letter` de abajo, que sólo
+   toca la primera. En Semana la primera es un dígito y no pasa nada. */
+.agenda-fc .fc-toolbar-title {
+  font-size: 22px !important;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--ag-ink);
+  text-transform: none;
+}
+.agenda-fc .fc-toolbar-title::first-letter { text-transform: uppercase; }
 .agenda-fc .fc-button {
   border-color: var(--ag-border-card) !important;
   color: var(--ag-text) !important;
-  border-radius: 10px !important;
+  border-radius: var(--ag-r-btn) !important;
 }
 .agenda-fc .fc-today-button {
   background: var(--ag-brand-primary) !important;
@@ -862,14 +1262,52 @@ body {
   color: #fff !important;  /* texto legible aun atenuado */
 }
 
-/* Cabecera de días */
-.fc .fc-col-header-cell {
-  background: #ffffff;
+/* Cabecera de días.
+
+   ⚠️ ACOTADAS A `.agenda-fc` EN EL BLOQUE 4. Eran `.fc …` a secas y alcanzaban a
+   cualquier calendario del proyecto; hoy sólo hay uno, así que no cambió nada a
+   la vista, pero el siguiente `.fc` que se monte heredaba este padding y este
+   gris sin pedirlos. La ESPECIFICIDAD NO SE MUEVE —dos clases antes, dos
+   después— y la posición en la hoja tampoco, así que ninguna nativa que
+   estuviera perdiendo pasa a ganar: lo único que cambia es a quién alcanzan.
+   Comprobado sobre el `.fc-col-header-cell` nativo, que sólo trae `text-align`
+   del bloque de tema; nada de fondo, padding ni borde inferior.
+
+   ⚠️ LOS TRES VALORES SALEN YA DE TOKENS. Aquí hubo tres hex a mano y cada uno
+   se cambió por una razón distinta; conviene saber cuál antes de tocarlos:
+
+     · FONDO, `#ffffff` → `--ag-surface`. Cambio EXACTO: el token vale
+       literalmente #ffffff en claro, y en oscuro se resuelve solo.
+
+     · BORDE, `#f1f5f9` → `--ag-hairline` (#eef1f6). NO es exacto: son 3-4
+       unidades por canal, equivalencia visual y no identidad. Es la MISMA
+       sustitución que ya se hizo en su día con las dos reglas que clavaban ese
+       hex y hoy salen de --fc-border-color (que apunta a este token): ver la
+       nota de los bordes de grilla más abajo. Se elige la coherencia con
+       aquello antes que conservar tres unidades de diferencia.
+
+     · CUSHION, `#94a3b8` → `--ag-muted` (#7c8aa0). ⚠️ NO HAY TOKEN EXACTO, y el
+       más parecido NO es el que está puesto. Medido:
+         --ag-muted2 (#9aa6b8) queda a ΔR6/ΔG3/ΔB0 — casi idéntico en claro—
+         pero en OSCURO vale #6b7a90, o sea que se OSCURECE sobre fondo oscuro:
+         el contraste de la fila de cabeceras de Mes caería de 6.80:1 a 3.99:1.
+         --ag-muted queda lejos por hex (Δ~24 por canal) y es el único que se
+         comporta en los dos temas: 3.32:1 en claro (MEJORA sobre el 2.43:1 del
+         hex) y 6.15:1 en oscuro. Y es el token semánticamente correcto: una
+         cabecera de columna es contenido, no una pista tenue.
+       Ninguno de los dos llega a los 4.5:1 de AA en claro, y eso YA pasaba con
+       el hex — este cambio acerca, no aleja. Queda anotado como lo que es:
+       deuda de contraste heredada, no estrenada aquí.
+       Dónde se ve: SÓLO en Mes. En Semana y Día el `<a>` del cushion envuelve a
+       `.ag-dayhead`, cuyos dos spans llevan su color en línea desde
+       `renderDayHeader`, así que este valor no llega a pintarse. */
+.agenda-fc .fc-col-header-cell {
+  background: var(--ag-surface);
   padding: 8px 4px;
-  border-bottom: 1px solid #f1f5f9 !important;
+  border-bottom: 1px solid var(--ag-hairline) !important;
 }
-.fc .fc-col-header-cell-cushion {
-  color: #94a3b8;
+.agenda-fc .fc-col-header-cell-cushion {
+  color: var(--ag-muted);
   font-weight: 600;
   font-size: 11px;
   text-transform: uppercase;
@@ -901,9 +1339,21 @@ body {
 /* Día actual — fondo azul claro distintivo */
 .fc .fc-day-today { background: #e8f2ff !important; }
 
-/* Vista mes — círculo en el número (hereda la marca del usuario vía --cp/--cs) */
+/* Vista mes — círculo en el número (hereda la marca del usuario vía --cp/--cs).
+
+   ⚠️ `--ag-brand-secondary` Y NO `--ag-brand-primary`. Es la MISMA marca de hoy
+   que la cabecera del time-grid, en el mismo elemento y con el mismo
+   significado, así que tiene que ser el mismo azul: hasta el cierre del bloque 4
+   éste era el navy `--cp` (#1a3a5c) y el de Semana el azul `--cs` (#1e5fa8), y
+   el médico veía dos «hoy» distintos al cambiar de vista. La trampa de nombres
+   de CLAUDE.md (regla 4) aplica igual en las dos: «primary» es el APAGADO.
+   En OSCURO no cambia nada — el override de más abajo ya mezclaba
+   --ag-brand-secondary, así que allí los dos círculos ya eran idénticos y lo
+   único que divergía era el claro.
+   El blanco de la cifra sigue holgado sobre el azul nuevo: 6.45:1 (era 11.64:1
+   sobre el navy, y AA pide 4.5:1 — se pierde margen, no cumplimiento). */
 .fc-daygrid .fc-day-today .fc-daygrid-day-number {
-  background: var(--ag-brand-primary);
+  background: var(--ag-brand-secondary);
   color: white !important;
   border-radius: 50%;
   width: 26px;
@@ -920,16 +1370,57 @@ body {
   padding: 4px 6px;
 }
 
-/* Vista semana/día — caja de "hoy" con gradiente de marca (hereda --cp/--cs).
-   El texto blanco lo da el render inline del header apilado (dayHeaderContent). */
-.fc-timegrid .fc-col-header-cell.fc-day-today {
-  background: linear-gradient(
-    180deg,
-    var(--ag-brand-primary),
-    color-mix(in srgb, var(--ag-brand-primary) 78%, var(--ag-brand-secondary))
-  ) !important;
-  border-radius: 11px 11px 0 0;
-  padding: 8px 0 10px;
+/* Vista semana/día — la cabecera de HOY.
+
+   ⚠️ AQUÍ HUBO UNA CAJA CON DEGRADADO DE MARCA Y TEXTO BLANCO, Y NO VUELVE. La
+   columna de hoy quedaba con dos marcas peleadas: un bloque oscuro arriba y el
+   tinte claro `--ag-today-bg` debajo, sin relación visual entre los dos. Ahora
+   la cabecera es CLARA como las otras seis —el mismo tinte que su columna— y
+   quien señala el día es el número dentro de su círculo. Si alguien repone el
+   degradado, tiene que quitar antes el círculo, o serán tres marcas.
+
+   La línea inferior va como `box-shadow: inset` y NO como `border-bottom`, por
+   lo mismo que el anillo de la celda de Mes (ver `.fc-daygrid .fc-day-today`):
+   un borde en un `<th>` de una tabla con `border-collapse` empuja la rejilla
+   entera y desalinea la fila. La sombra interior no ocupa espacio — y además
+   tiene que ganarle al `border-bottom: … !important` de la regla de arriba, que
+   una sombra no discute porque no es la misma propiedad. */
+.agenda-fc .fc-timegrid .fc-col-header-cell.fc-day-today {
+  background: var(--ag-today-bg) !important;
+  box-shadow: inset 0 -3px 0 0 var(--ag-brand-secondary);
+}
+
+/* El «· HOY» que `renderDayHeader` cuelga de la abreviatura.
+
+   ⚠️ `--ag-brand-secondary` Y NO `--ag-brand-primary`, y es LA trampa de nombres
+   de este proyecto (CLAUDE.md, regla 4): `--cp` es el navy oscuro #1a3a5c y
+   `--cs` el azul brillante #1e5fa8, o sea que «primary» es el APAGADO. Sobre un
+   fondo claro el navy se lee como tinta negra y deja de señalar nada. El mismo
+   azul lo usa ya `--ag-month-today-ring` para el anillo de hoy en Mes, así que
+   esto no estrena color: lo reusa.
+
+   El color va en el hijo y le gana al `color` en línea que `renderDayHeader`
+   pone en el padre `.ag-dayhead-dow`: un estilo en línea del padre es herencia
+   para el hijo, y cualquier regla propia del hijo le gana a lo heredado. */
+.agenda-fc .ag-dayhead-hoy {
+  color: var(--ag-brand-secondary);
+  font-weight: 800;
+}
+
+/* El número de hoy, en círculo relleno. Mismo tamaño de cifra que un día
+   normal (18px/800 los da `.ag-dayhead-num`): lo que cambia es el disco de
+   debajo, no la tipografía. La caja es cuadrada y fija para que el círculo no
+   se deforme con los números de dos cifras. */
+.agenda-fc .ag-dayhead-num--hoy {
+  width: 28px;
+  height: 28px;
+  margin-top: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--ag-brand-secondary);
+  color: #fff;
 }
 
 /* Columna de HOY en el cuerpo del time-grid — tinte + ring inset.
@@ -1100,7 +1591,7 @@ body {
   padding: 4px 9px;
   border: 1px solid;
   border-left-width: 3.5px;
-  border-radius: 9px;
+  border-radius: var(--ag-r-note);
   box-shadow: var(--ag-shadow-card);
 }
 
@@ -1212,7 +1703,7 @@ body {
   flex: 0 0 auto;
   padding: 2px 9px;
   border: 1px solid currentColor;
-  border-radius: 999px;
+  border-radius: var(--ag-r-pill);
   background: var(--ag-surface);
   font-size: 10.5px;
   font-weight: 700;
@@ -1323,7 +1814,7 @@ body {
   --ag-tarjeta-icono-px: 26px;
   width: 38px;
   height: 38px;
-  border-radius: 10px;
+  border-radius: var(--ag-r-btn-sm);
   background: var(--ag-surface);
   border: 1px solid var(--ag-border-card);
 }
@@ -1372,7 +1863,7 @@ body {
   padding: 5px 9px;
   border: 1px solid var(--ag-gcal-accent);
   border-left-width: 3px;
-  border-radius: 9px;
+  border-radius: var(--ag-r-note);
   background: var(--ag-gcal-bg1);
   color: var(--ag-gcal-text);
 }
@@ -1494,7 +1985,7 @@ body {
   min-width: 0;
   overflow: hidden;
   padding: 2px 7px;
-  border-radius: 7px;
+  border-radius: var(--ag-r-note);
   font-size: 11px;
   line-height: 1.45;
   color: var(--ag-text);
@@ -1666,7 +2157,34 @@ body {
 
 .fc .fc-event .fc-event-main { padding: 0; }
 .fc .fc-daygrid-event        { border-radius: 6px !important; }
-.fc .fc-timegrid-event       { border-radius: 6px !important; margin: 0 1px !important; }
+/* ⚠️ ACOTADA A `.agenda-fc` EN EL BLOQUE 4 (sus dos vecinas de arriba NO: quedan
+   fuera del alcance de esa ventana, no de un olvido). Misma especificidad —dos
+   clases— y misma posición en la hoja, y además las dos declaraciones llevan
+   `!important`, así que no había nativa a la que pudiera pasarle a perder. */
+.agenda-fc .fc-timegrid-event { border-radius: 6px !important; margin: 0 1px !important; }
+
+/* ── EL ANCHO DE LA COLUMNA DE TARJETAS ────────────────────────────────
+   El nativo es `margin: 0 2.5% 0 2px` (`.fc-direction-ltr .fc-timegrid-col-events`,
+   @fullcalendar/timegrid): un hueco ASIMÉTRICO, con un 2,5 % del ancho de la
+   columna a la derecha —unos 6 px en una semana de seis columnas sobre 1500 px—
+   contra 2 px a la izquierda. Se ve, y el mockup no lo tiene.
+
+   ⚠️ ESE 2,5 % NO ES DECORATIVO EN EL NATIVO: FullCalendar reserva ahí el enlace
+   «+N más» del time-grid, que es `position: absolute; right: 0`. COMPROBADO
+   ANTES DE TOCARLO, y por eso se puede tocar: ese enlace SÓLO se monta cuando
+   `eventMaxStack` limita el apilado (`computeFgSegPlacements` →
+   `buildPositioning`, que ignora el límite si llega `null`), y esta agenda no
+   pasa `eventMaxStack` en ninguna parte. `dayMaxEvents={3}` sí está puesto, pero
+   en time-grid sólo gobierna la fila de todo el día — y `allDaySlot={false}`.
+   O sea: cero `.fc-timegrid-more-link` en el DOM, hoy.
+
+   ⚠️ LO QUE SÍ HAY QUE SABER SI ALGÚN DÍA SE ENCIENDE `eventMaxStack`: con este
+   margen simétrico el «+N más» quedaría pegado al borde derecho de la columna,
+   solapando la última tarjeta en vez de sentarse a su lado. No es que se rompa,
+   es que hay que devolverle su carril. Este párrafo es el aviso.
+
+   Tres clases para no empatar con la nativa (dos) y ahorrarse un `!important`. */
+.agenda-fc .fc .fc-timegrid-col-events { margin: 0 2px; }
 
 /* Now-indicator — línea fina roja sobre la columna de hoy, con la hora pegada
    a su extremo izquierdo. El gutter ya no marca nada.
@@ -1995,12 +2513,17 @@ html.dark {
      única sobre la que se dibuja (un elemento gráfico pide 3.0). */
   --ag-month-more: #8ab4f8;                   /* ◆ */
   --ag-month-today-ring: #6b9bff;             /* ◆ = familia de confirmed-dot */
-  /* Segmented control */
+  /* Ver la nota larga de la variante clara: aquí la marca se ACLARA, no se
+     oscurece, porque es tinta y no relleno. */
+  --ag-brand-legible: color-mix(in srgb, var(--ag-brand-secondary) 55%, white);
+  /* Segmented control. El relleno activo y su tinta NO se redeclaran desde el
+     bloque 4: son de MARCA, y la marca no cambia con el tema — la misma pastilla
+     azul con la misma cifra blanca en las dos paletas. Redeclararlas aquí
+     (#27395a y #dbe7ff, lo que había) devolvería la pastilla apagada que el
+     rediseño vino a quitar, y sólo en oscuro. La pista y la tinta inactiva sí,
+     que ésas sí son superficie. */
   --ag-segment-bg: #16233a;
-  --ag-segment-active-bg: #27395a;
-  --ag-segment-active-shadow: none;           /* ◆ Material elimina sombras en dark */
   --ag-segment-text: #8b9bb0;
-  --ag-segment-active-text: #dbe7ff;          /* handoff dark.segActiveText */
   /* Estado (mapeo inglés DB → statusDark español del handoff).
      ⚠️ LA ASIGNACIÓN ROTÓ: ámbar es «agendada», azul «confirmada», verde
      «atendida». El porqué está en la nota larga de la variante clara.
@@ -2181,7 +2704,8 @@ html.dark .agenda-fc .fc {
    se repiten. */
 
 /* Toolbar (global .fc .fc-toolbar: bg #ffffff + border #f1f5f9) */
-html.dark .agenda-fc .fc-toolbar {
+html.dark .agenda-fc .fc-toolbar,
+html.dark .agenda-fc .ag-leyenda {
   background: var(--ag-surface);
   border-bottom-color: var(--ag-border-card);
 }
@@ -2198,12 +2722,23 @@ html.dark .agenda-fc .fc-button:hover {
 }
 /* (.fc-today-button conserva --ag-brand-primary: es marca, texto blanco legible — decisión PO 🟠2) */
 
-/* Cabecera de días — SOLO time-grid (Mes usa --ag-month-head, ya tokenizado).
-   Global .fc .fc-col-header-cell: bg #ffffff + border-bottom #f1f5f9. */
-html.dark .agenda-fc .fc-timegrid .fc-col-header-cell {
-  background: var(--ag-surface);
-  border-bottom-color: var(--fc-border-color) !important;
-}
+/* ⚠️ AQUÍ VIVÍA `html.dark .agenda-fc .fc-timegrid .fc-col-header-cell`, Y SE
+   RETIRÓ ENTERA AL CIERRE DEL BLOQUE 4 PORQUE NO LE QUEDABA NADA VIVO. No la
+   repongas «por si acaso»: sus dos declaraciones pasaron a ser duplicados
+   exactos de la regla clara, y un duplicado exacto es justo lo que en esta hoja
+   acaba divergiendo.
+
+     · `background: var(--ag-surface)` — la regla clara horneaba `#ffffff` y
+       ahora declara ese mismo token, que ya se resuelve solo en oscuro.
+     · `border-bottom-color: var(--fc-border-color) !important` — la regla clara
+       horneaba `#f1f5f9` y ahora declara `var(--ag-hairline)`. Y
+       `--fc-border-color` NO es otra cosa: el bloque `.fc {}` la define como
+       `var(--ag-hairline)`. Mismo valor por dos nombres.
+
+   LO QUE SÍ SIGUE VIVO, y por eso no se retiró con ésta, es la de MES:
+   `html.dark .agenda-fc .fc-daygrid .fc-col-header-cell` (más abajo) apunta el
+   borde a `--ag-month-gap`, que es OTRO token — la rejilla de Mes tiene sus
+   propias líneas— y le gana a la clara por especificidad. Ésa hace trabajo. */
 
 /* Marco del scrollgrid. El !important sobra desde que la regla clara que
    horneaba #f1f5f9 ya no existe: contra la nativa .fc-theme-standard
@@ -2220,15 +2755,26 @@ html.dark .agenda-fc .fc-scrollgrid { border-color: var(--ag-border-card); }
 
 /* ── PARTE C-bis — Marca de "hoy" ACLARADA en dark (decisión PO 🟠1/handoff).
    El navy de marca saturado se perdería contra el fondo #0f1828, así que se
-   mezcla hacia el fondo. El texto blanco del header (render inline) se conserva. */
+   mezcla hacia el fondo. */
 
-/* Header de "hoy" del time-grid (Semana/Día) */
+/* Header de "hoy" del time-grid (Semana/Día).
+
+   ⚠️ AQUÍ HABÍA EL DEGRADADO GEMELO DEL DE CLARO, y se fue con él en el bloque
+   4. Dejarlo habría partido el rediseño por temas: cabecera clara con círculo en
+   claro, bloque azul en oscuro, sobre el mismo componente.
+   La LÍNEA y el RÓTULO «HOY» van en --ag-month-today-ring (#6b9bff en oscuro),
+   que es el azul que este modo ya reserva para la marca de hoy en Mes: sobre el
+   fondo oscuro el #1e5fa8 de claro se hunde. El CÍRCULO, en cambio, calca la
+   mezcla del círculo de Mes de aquí abajo —brand-secondary hacia el fondo— para
+   que el blanco de su cifra siga teniendo contraste; el azul claro de la línea
+   con texto blanco no llegaba a AA. */
 html.dark .agenda-fc .fc-timegrid .fc-col-header-cell.fc-day-today {
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--ag-brand-secondary) 55%, #0f1828),
-    color-mix(in srgb, var(--ag-brand-secondary) 42%, #0f1828)
-  ) !important;
+  background: var(--ag-today-bg) !important;
+  box-shadow: inset 0 -3px 0 0 var(--ag-month-today-ring);
+}
+html.dark .agenda-fc .ag-dayhead-hoy { color: var(--ag-month-today-ring); }
+html.dark .agenda-fc .ag-dayhead-num--hoy {
+  background: color-mix(in srgb, var(--ag-brand-secondary) 55%, #0f1828);
 }
 
 /* Círculo de "hoy" de Mes */

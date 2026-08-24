@@ -1,4 +1,42 @@
 /**
+ * ─────────────────────────────────────────────────────────────────────
+ * RECUENTO DE CASOS — 63 EN TOTAL
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * ⚠️ ESTA TABLA NO ES ADORNO: ES UN DETECTOR DE BORRADOS ACCIDENTALES, y está
+ * aquí porque uno ocurrió. Al reescribir la sección de `avisoDeRecorte` en el
+ * bloque 4, un reemplazo anclado por TEXTO casó antes de tiempo —la cadena que
+ * abría la sección aparecía también más arriba— y se llevó por delante tres
+ * `describe` enteros de `diasOcultables`, 16 casos. La suite siguió en verde,
+ * porque lo que quedaba pasaba.
+ *
+ * Lo que falló no fue el anclaje: fue que el total bajó a 48 y NO SALTÓ NINGUNA
+ * ALARMA, porque 48 parecía un número plausible. Un recuento que no cuadra con
+ * lo esperado es señal aunque el número parezca razonable, y «parecía plausible»
+ * es exactamente lo que hace que un borrado silencioso sobreviva a la revisión.
+ *
+ * SI TOCAS ESTE ARCHIVO: cuadra el total contra lo que imprime vitest antes de
+ * dar nada por bueno, y actualiza la tabla en el mismo cambio. Si el número que
+ * sale no es el que esperabas, no sigas — averigua por qué. Y prefiere anclar
+ * por número de línea o por el cierre del `describe` antes que por una cadena
+ * que puede repetirse.
+ *
+ *   calcularVentanaRejilla — el suelo previo al rediseño     4
+ *   calcularVentanaRejilla — el horario abre la ventana      7
+ *   calcularVentanaRejilla — los eventos abren la ventana    4
+ *   calcularVentanaRejilla — alineación a la hora en punto   4
+ *   calcularVentanaRejilla — qué eventos NO cuentan          4
+ *   calcularVentanaRejilla — solapamiento semiabierto        3
+ *   tramoDeEvento — los que cruzan medianoche                9
+ *   calcularVentanaRejilla — sin rango todavía               1
+ *   calcularVentanaRejilla — modo compacto                   5
+ *   diasOcultables                                           9
+ *   diasOcultables — eventos que cruzan de día               3
+ *   diasOcultables — sólo se pliega lo que el rango cubre    2
+ *   avisoDeRecorte                                           8
+ */
+
+/**
  * ventanaRejilla.test.ts — la rejilla de la agenda tiene que enseñar
  * TODAS las citas que existen, no sólo las que caen en 07:00–21:00.
  *
@@ -560,39 +598,60 @@ describe('diasOcultables — sólo se pliega lo que el rango cubre', () => {
    LA LÍNEA DEL RECORTE
    ───────────────────────────────────────────────────────────────────── */
 
-/** La constante `DIAS` de `agenda/page.tsx`, con lo que la frase necesita. */
-const DIAS_PLURAL: { plural: string; fc: number }[] = [
-  { plural: 'los lunes', fc: 1 }, { plural: 'los martes', fc: 2 },
-  { plural: 'los miércoles', fc: 3 }, { plural: 'los jueves', fc: 4 },
-  { plural: 'los viernes', fc: 5 }, { plural: 'los sábados', fc: 6 },
-  { plural: 'los domingos', fc: 0 },
+/** La constante `DIAS` de `agenda/page.tsx`, con lo que la frase necesita.
+    Lee `label` y no `plural` desde el bloque 4: ver la cabecera de la función. */
+const DIAS_LABEL: { label: string; fc: number }[] = [
+  { label: 'Lunes', fc: 1 }, { label: 'Martes', fc: 2 },
+  { label: 'Miércoles', fc: 3 }, { label: 'Jueves', fc: 4 },
+  { label: 'Viernes', fc: 5 }, { label: 'Sábado', fc: 6 },
+  { label: 'Domingo', fc: 0 },
 ]
 
 const AJUSTADA = { slotMinTime: '09:00:00', slotMaxTime: '19:00:00' }
+const AMPLIA   = { slotMinTime: '07:00:00', slotMaxTime: '21:00:00' }
 
 describe('avisoDeRecorte', () => {
-  it('con un día oculto, lo nombra en singular de lista', () => {
-    expect(avisoDeRecorte(AJUSTADA, [0], DIAS_PLURAL))
-      .toBe('Rejilla ajustada a 09:00–19:00 · los domingos ocultos')
+  it('con un día oculto, lo nombra en singular — nombre Y participio', () => {
+    // El caso que el formato viejo no podía distinguir: decía «los domingos
+    // ocultos» tanto con uno como con cinco. Es la prueba nueva del bloque 4.
+    expect(avisoDeRecorte(AMPLIA, [0], DIAS_LABEL)).toBe('domingo oculto')
+  })
+
+  it('con un día oculto y la ventana estrecha, las dos mitades y el orden', () => {
+    // Los días PRIMERO: lo que no se deduce de la rejilla se dice antes.
+    expect(avisoDeRecorte(AJUSTADA, [0], DIAS_LABEL))
+      .toBe('domingo oculto · horas fuera de horario recortadas')
   })
 
   it('con dos, los separa con «y», no con coma', () => {
-    expect(avisoDeRecorte(AJUSTADA, [6, 0], DIAS_PLURAL))
-      .toBe('Rejilla ajustada a 09:00–19:00 · los sábados y los domingos ocultos')
+    expect(avisoDeRecorte(AJUSTADA, [6, 0], DIAS_LABEL))
+      .toBe('sábado y domingo ocultos · horas fuera de horario recortadas')
   })
 
   it('con tres, coma entre todos menos el último y «y» antes del último', () => {
-    expect(avisoDeRecorte(AJUSTADA, [5, 6, 0], DIAS_PLURAL))
-      .toBe('Rejilla ajustada a 09:00–19:00 · los viernes, los sábados y los domingos ocultos')
+    expect(avisoDeRecorte(AJUSTADA, [5, 6, 0], DIAS_LABEL))
+      .toBe('viernes, sábado y domingo ocultos · horas fuera de horario recortadas')
   })
 
   it('sin recorte de ningún eje, no hay nada que confesar', () => {
-    expect(avisoDeRecorte({ slotMinTime: '07:00:00', slotMaxTime: '21:00:00' }, [], DIAS_PLURAL)).toBeNull()
+    expect(avisoDeRecorte(AMPLIA, [], DIAS_LABEL)).toBeNull()
   })
 
-  it('con sólo días ocultos, la frase abre en mayúscula', () => {
-    // Aquí el que abre la línea es «los domingos», no «Rejilla».
-    expect(avisoDeRecorte({ slotMinTime: '07:00:00', slotMaxTime: '21:00:00' }, [0], DIAS_PLURAL))
-      .toBe('Los domingos ocultos')
+  it('con sólo la ventana estrecha, la frase es la mitad de las horas', () => {
+    // Y no da el rango: 09:00 y 19:00 ya están impresos en el gutter.
+    expect(avisoDeRecorte(AJUSTADA, [], DIAS_LABEL))
+      .toBe('horas fuera de horario recortadas')
+  })
+
+  it('la frase NO abre en mayúscula: la abre «Vista compacta:» en la banda', () => {
+    const frase = avisoDeRecorte(AJUSTADA, [0], DIAS_LABEL)
+    expect(frase).not.toBeNull()
+    expect(frase![0]).toBe(frase![0].toLowerCase())
+  })
+
+  it('los días salen en el orden de la constante, no en el de `diasOcultos`', () => {
+    // `diasOcultables` los devuelve recorriendo DIAS, pero el filtro es de la
+    // constante y no del array de entrada: da igual cómo llegue ordenado.
+    expect(avisoDeRecorte(AMPLIA, [0, 6], DIAS_LABEL)).toBe('sábado y domingo ocultos')
   })
 })

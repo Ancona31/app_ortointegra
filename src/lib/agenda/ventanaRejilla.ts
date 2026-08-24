@@ -641,17 +641,42 @@ export function diasOcultables(
  * línea, una rejilla que empieza a las 09:00 y una semana sin domingo se leen
  * como datos que faltan, no como una vista plegada a propósito.
  *
- * Las dos mitades son independientes —se puede recortar sólo el alto, sólo el
- * ancho, o los dos—, así que la mayúscula se pone al final, sobre la frase ya
- * montada: cuando sólo hay días ocultos, el que abre la línea es «los lunes».
+ * ⚠️ VA SIN MAYÚSCULA INICIAL, Y NO ES UN DESCUIDO. Quien abre la línea es la
+ * etiqueta «Vista compacta:» que pinta la banda en `agenda/page.tsx`, así que
+ * esto es la continuación de una oración y no su principio. Hubo aquí un
+ * `charAt(0).toUpperCase()` sobre la frase ya montada y se retiró con la banda;
+ * si algún día vuelve a usarse suelta, la mayúscula la pone el llamador.
  *
- * `diasPlural` lo pasa la página con su constante `DIAS`, igual que en
- * `diasOcultables`, para que este módulo no importe nada de ella.
+ * ⚠️ LOS DÍAS VAN PRIMERO, y el orden no es estético. Una columna que falta NO
+ * se deduce de la rejilla —ver cinco días seguidos no dice si la clínica abre el
+ * sexto—, mientras que las horas recortadas sí: el gutter imprime la primera y
+ * la última a la izquierda de la propia rejilla. Lo que no se puede deducir se
+ * dice antes. Hasta el bloque 4 iban al revés.
+ *
+ * ⚠️ Y LA MITAD DE LAS HORAS NO DA EL RANGO, A PROPÓSITO. Decía «Rejilla
+ * ajustada a 09:00–19:00» y ahora sólo declara que se recortó, por lo mismo del
+ * párrafo de arriba: esos dos números ya están impresos a dos centímetros, en el
+ * gutter. Repetirlos alargaba una banda que lleva el enlace de salida a la
+ * derecha, a cambio de nada. Si algún día el gutter deja de enseñar sus
+ * extremos, este párrafo es el que hay que releer.
+ *
+ * Las dos mitades son independientes —se puede recortar sólo el alto, sólo el
+ * ancho, o los dos— y se unen SIEMPRE con ` · `. La tentación es la «y», que es
+ * lo que enseña el mockup, pero el mockup sólo dibuja el caso de UN día: con dos
+ * o más la lista ya trae su propia «y» («sábado y domingo ocultos») y saldría
+ * una segunda seguida. Un separador que no depende del número de días es una
+ * forma sola, y una forma sola es lo que se pidió.
+ *
+ * `diasEtiqueta` lo pasa la página con su constante `DIAS`, igual que en
+ * `diasOcultables`, para que este módulo no importe nada de ella. Lee `label`
+ * («Domingo») y NO `plural` («los domingos»): el campo `plural` sigue vivo y con
+ * dueño —los dos avisos de fuera de horario del alta— pero aquí daba «los
+ * domingos oculto» en singular, que no es una frase.
  */
 export function avisoDeRecorte(
   ventana: VentanaRejilla,
   diasOcultos: readonly number[],
-  diasPlural: readonly { plural: string; fc: number }[],
+  diasEtiqueta: readonly { label: string; fc: number }[],
 ): string | null {
   const dosDigitos = (n: number): string => String(n).padStart(2, '0')
   const masEstrecha =
@@ -659,22 +684,22 @@ export function avisoDeRecorte(
     ventana.slotMaxTime < `${dosDigitos(VENTANA_AMPLIA.finHora)}:00:00`
 
   const partes: string[] = []
-  if (masEstrecha) {
-    partes.push(`Rejilla ajustada a ${ventana.slotMinTime.slice(0, 5)}–${ventana.slotMaxTime.slice(0, 5)}`)
-  }
 
-  /* Coma entre todos menos el último, y «y» antes del último: «los sábados y
-     los domingos», «los viernes, los sábados y los domingos». Con uno solo, el
-     `slice(0, -1)` queda vacío y sale tal cual. */
-  const plegados = diasPlural.filter(d => diasOcultos.includes(d.fc)).map(d => d.plural)
+  /* Coma entre todos menos el último, y «y» antes del último: «sábado y
+     domingo», «viernes, sábado y domingo». Con uno solo el `slice(0, -1)` queda
+     vacío y sale tal cual — y es justo ahí donde el singular tiene que aparecer
+     también en el participio, o se lee «domingo ocultos». */
+  const plegados = diasEtiqueta
+    .filter(d => diasOcultos.includes(d.fc))
+    .map(d => d.label.toLowerCase())
   if (plegados.length > 0) {
     const lista = plegados.length === 1
       ? plegados[0]
       : `${plegados.slice(0, -1).join(', ')} y ${plegados[plegados.length - 1]}`
-    partes.push(`${lista} ocultos`)
+    partes.push(`${lista} ${plegados.length === 1 ? 'oculto' : 'ocultos'}`)
   }
 
-  if (partes.length === 0) return null
-  const frase = partes.join(' · ')
-  return frase.charAt(0).toUpperCase() + frase.slice(1)
+  if (masEstrecha) partes.push('horas fuera de horario recortadas')
+
+  return partes.length === 0 ? null : partes.join(' · ')
 }

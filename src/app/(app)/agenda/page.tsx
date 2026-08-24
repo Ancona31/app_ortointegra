@@ -7,7 +7,7 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
 import { EventClickArg, EventDropArg, DateSelectArg, EventInput, EventContentArg, DayHeaderContentArg, NowIndicatorContentArg } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
-import { X, Calendar, User, Plus, Trash2, Settings, LayoutGrid, Columns3, Square, ChevronDown, FileText, Stethoscope, Loader2, Mail,
+import { X, Calendar, User, Plus, Trash2, Settings, ChevronDown, FileText, Stethoscope, Loader2, Mail,
          CalendarPlus, ChevronsDownUp, type LucideIcon } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -2162,12 +2162,16 @@ function renderNowIndicator(arg: NowIndicatorContentArg): ReactElement | null {
 
 /* ─── Página principal ─────────────────────────────────── */
 
-// Segmentos del control de vistas. Íconos lucide representativos:
-// LayoutGrid (rejilla = Mes), Columns3 (columnas = Semana), Square (Día).
+/* Segmentos del control de vistas. SÓLO TEXTO desde el bloque 4: llevaban un
+   icono lucide cada uno (LayoutGrid / Columns3 / Square) y se retiraron. Tres
+   palabras de una sílaba y media no necesitan pictograma, y los tres iconos
+   —una rejilla, unas columnas, un cuadrado— nombraban la FORMA de la vista, no
+   su periodo, que es lo que el médico elige. Ensanchaban la fila unos 60 px en
+   una zona que ya envuelve a dos líneas en anchos de portátil. */
 const VIEWS = [
-  { type: 'dayGridMonth', label: 'Mes',    icon: LayoutGrid },
-  { type: 'timeGridWeek', label: 'Semana', icon: Columns3 },
-  { type: 'timeGridDay',  label: 'Día',    icon: Square },
+  { type: 'dayGridMonth', label: 'Mes'    },
+  { type: 'timeGridWeek', label: 'Semana' },
+  { type: 'timeGridDay',  label: 'Día'    },
 ] as const
 
 /* Opciones POR VISTA. A nivel de módulo por la regla de identidad estable: un
@@ -2182,7 +2186,146 @@ const VIEWS = [
    «lun» — y el mockup del mes pide «LUNES». Las mayúsculas ya las pone
    `globals.css` en `.fc-col-header-cell-cushion`; aquí sólo se pide el nombre
    largo. */
-const VISTAS_FC = { dayGridMonth: { dayHeaderFormat: { weekday: 'long' } } } as const
+/* ⚠️ `titleFormat` VA AQUÍ DENTRO, POR VISTA, y no como prop suelta: cada una
+   quiere una forma distinta y a nivel raíz se la comerían las tres. El default
+   de FullCalendar para Semana es `{month:'short', day:'numeric', year:'numeric'}`,
+   que con `esLocale` daba «17 – 23 Ago 2026» — mes abreviado y sin preposición.
+
+   Cómo compone el rango la de SEMANA, porque no es obvio: `NativeFormatter`
+   detecta que la unidad que difiere es el DÍA, formatea los dos extremos
+   enteros («17 de agosto de 2026» / «22 de agosto de 2026»), busca la parte
+   común y la saca fuera. Resultado: «17 – 22 de agosto de 2026». Por eso basta
+   con pedir el formato de UNA fecha; el rango sale solo. El guión largo lo pone
+   `titleRangeSeparator` en el calendario — el default es « - », con guión
+   corto.
+
+   ⚠️ QUE EL TÍTULO LLEGUE HASTA EL 23 Y EL MOCKUP HASTA EL 22 NO ES UN FALLO DE
+   FORMATO: el mockup tiene el domingo plegado y nosotros no. El título sigue al
+   rango real de la vista, que es lo correcto. No lo «arregles».
+
+   La de DÍA sale «miércoles, 19 de agosto de 2026»: con coma, que es la forma
+   del locale, mientras que el mockup la dibujó sin ella. Se respeta el locale.
+   La mayúscula inicial —que Intl no pone en español— la da un `::first-letter`
+   en `globals.css`. Y NO el `text-transform: capitalize` de
+   `.fc .fc-toolbar-title`, que la regla de la agenda anula a propósito: ese
+   capitalize pone mayúscula en CADA palabra y con este formato largo daría
+   «17 – 22 De Agosto De 2026». Con el formato corto de antes no se notaba
+   porque no había preposiciones que estropear. */
+const VISTAS_FC = {
+  dayGridMonth: {
+    dayHeaderFormat: { weekday: 'long' },
+    titleFormat:     { month: 'long', year: 'numeric' },
+  },
+  timeGridWeek: { titleFormat: { day: 'numeric', month: 'long', year: 'numeric' } },
+  timeGridDay:  { titleFormat: { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' } },
+} as const
+
+/* Las dos configuraciones del toolbar nativo, A NIVEL DE MÓDULO por la regla de
+   identidad estable: un literal en el JSX es un objeto nuevo en cada render y
+   FullCalendar vuelve a refinar sus opciones cuando la referencia cambia.
+   Estaban en línea y se subieron aquí al tocarlas en el bloque 4.
+
+   ⚠️ EN ESCRITORIO LA FECHA VA EN EL CHUNK `left`, con los botones, y `center`
+   queda vacío. Antes iba en `center`, o sea flotando en mitad de la tarjeta y
+   lejos de las flechas que la mueven. En MÓVIL se queda centrada: ahí el chunk
+   izquierdo sólo lleva las dos flechas y no hay ancho para poner la fecha al
+   lado sin partirla. */
+const TOOLBAR_MOVIL       = { left: 'prev,next', center: 'title', right: 'today' } as const
+const TOOLBAR_ESCRITORIO  = { left: 'prev,next today title', center: '', right: '' } as const
+
+/** Lo que el subtítulo cuenta, por categoría. */
+type ConteoVisible = { citas: number; eventos: number; google: number }
+
+const CONTEO_VACIO: ConteoVisible = { citas: 0, eventos: 0, google: 0 }
+
+/* Un evento tal como lo necesita el CONTEO, y nada más. Calca a propósito la
+   forma de `EventoParaVentana` —que a su vez calca la de `EventApi`— para que
+   los dos cálculos se alimenten de la MISMA llamada, sin recorrer dos listas. */
+type EventoParaConteo = { start: Date | null; allDay: boolean; extendedProps: Record<string, unknown> }
+
+/**
+ * Cuenta por categoría lo que la vista está PINTANDO ahora mismo.
+ *
+ * ⚠️ NO CUENTA EL `eventStore`, Y LA DIFERENCIA ES VISIBLE. `rangoQuePedir`
+ * ensancha cada petición a semanas completas, así que el store guarda eventos
+ * que la vista no dibuja; contarlos daría un subtítulo que promete citas que no
+ * están en pantalla. De ahí el filtro por el rango ACTIVO.
+ *
+ * ⚠️ Y DESCUENTA `diasOcultos`, que es el caso que se escapa al filtro anterior:
+ * con «Compactar» encendido, `hiddenDays` quita COLUMNAS que siguen cayendo
+ * dentro de activeStart..activeEnd. Sin esta línea el subtítulo diría «5 citas»
+ * con tres a la vista.
+ *
+ * ⚠️ Y LA TERCERA REJA, `sinAllDay`, QUE ES LA MENOS EVIDENTE DE LAS TRES. El
+ * calendario va con `allDaySlot={false}`, y eso no esconde la fila de todo el
+ * día: hace que FullCalendar NO LA MONTE. Un evento `allDay` que caiga dentro
+ * del rango activo y en un día visible sigue en el `eventStore`, pasa las otras
+ * dos rejas y NO SE DIBUJA EN NINGUNA PARTE de Semana ni de Día.
+ * No es un caso de laboratorio: la fuente de Google los produce de rutina
+ * (`allDay: !e.start?.dateTime`, y `start.date` es lo que manda Google para unas
+ * vacaciones o un día bloqueado entero). Las citas no — siempre llevan hora.
+ * Sin esta reja, un «Vacaciones» el miércoles daba «1 de Google» sobre una
+ * rejilla que no lo enseñaba.
+ *
+ * ⚠️ ES POR VISTA, Y POR ESO ENTRA COMO PARÁMETRO Y NO COMO REGLA FIJA: en MES
+ * los eventos de todo el día SÍ se pintan, así que allí contarlos es lo
+ * correcto. Sólo se descuentan en las de time-grid.
+ *
+ * ⚠️ SI ALGÚN DÍA SE ENCIENDE `allDaySlot` (el bloque siguiente lo toca): esta
+ * reja deja de ser cierta y hay que retirarla, o el subtítulo empezará a no
+ * contar unos eventos que sí están en pantalla. Es el único de los tres filtros
+ * que depende de una opción del calendario y no de la geometría de la vista.
+ *
+ * ⚠️ EL FILTRO DE MÉDICO NO SE APLICA AQUÍ, Y NO ES UN OLVIDO: NO LO AÑADAS. Lo
+ * aplica el SERVIDOR —las dos fuentes le mandan `medico_id` y devuelven ya
+ * filtrado—, así que el store sólo contiene lo que pasa el filtro y contar el
+ * store es contar lo filtrado. Un filtro de cliente encima sería o inocuo o,
+ * el día que las dos reglas discrepen, un conteo distinto del que se pinta.
+ *
+ * ⚠️ AVISO PARA EL INTERRUPTOR DE GOOGLE (bloque siguiente): esto cuenta lo que
+ * hay EN EL STORE. Si el interruptor se implementa retirando la fuente `gcal` de
+ * `eventSourcesStable`, los eventos salen del store y el conteo se corrige solo.
+ * Si en cambio se implementa ESCONDIENDO los eventos ya cargados —CSS,
+ * `display: none`, una clase por `eventClassNames`—, seguirán aquí dentro y el
+ * subtítulo dirá «1 de Google» con cero a la vista. La decisión es de aquel
+ * bloque; la consecuencia cae en esta función.
+ */
+function contarVisibles(
+  eventos: readonly EventoParaConteo[],
+  activo: RangoVisible | null,
+  ocultos: readonly number[],
+  sinAllDay: boolean,
+): ConteoVisible {
+  let citas = 0, genericos = 0, google = 0
+  for (const ev of eventos) {
+    const inicio = ev.start
+    if (!inicio) continue
+    if (sinAllDay && ev.allDay) continue
+    if (activo && (inicio < activo.activeStart || inicio >= activo.activeEnd)) continue
+    if (ocultos.includes(inicio.getDay())) continue
+
+    const ext = ev.extendedProps
+    if (ext.isGcalBlock === true) { google += 1; continue }
+    /* Por `esEventoGenerico` y no reimplementando su regla: es el mismo
+       despachador que usan las tarjetas, y así no puede divergir. El `typeof`
+       es lo que estrecha el `unknown` de `extendedProps` sin un `as`. */
+    const pacienteId = ext.paciente_id
+    if (esEventoGenerico({ paciente_id: typeof pacienteId === 'string' ? pacienteId : null })) genericos += 1
+    else citas += 1
+  }
+  return { citas, eventos: genericos, google }
+}
+
+/** «· 3 citas · 2 eventos · 1 de Google». Sólo las categorías con al menos uno;
+ *  cadena vacía si no hay ninguna, para que el subtítulo quede tal cual. */
+function frasearConteo(c: ConteoVisible): string {
+  const partes: string[] = []
+  if (c.citas > 0)   partes.push(`${c.citas} ${c.citas === 1 ? 'cita' : 'citas'}`)
+  if (c.eventos > 0) partes.push(`${c.eventos} ${c.eventos === 1 ? 'evento' : 'eventos'}`)
+  // Sin plural que cambiar: «1 de Google», «4 de Google».
+  if (c.google > 0)  partes.push(`${c.google} de Google`)
+  return partes.length === 0 ? '' : ` · ${partes.join(' · ')}`
+}
 
 export default function AgendaPage() {
   const calendarRef = useRef<InstanceType<typeof FullCalendar>>(null)
@@ -2442,6 +2585,70 @@ export default function AgendaPage() {
   /* Sólo con el botón encendido y en escritorio: apagado no hay nada que
      confesar, y en móvil no hay botón que lo haya encendido. */
   const avisoRecorte = compactar && !isMobile ? avisoDeRecorte(ventana, diasOcultos, DIAS) : null
+
+  /* ── EL CONTEO DEL SUBTÍTULO ─────────────────────────────────────────
+     Mismo patrón que la ventana de la rejilla, y por el mismo motivo: cuelga de
+     `eventsSet`, que se emite en cada llegada de fetch —DOS por navegación, una
+     por fuente—, en cada alta optimista, en cada baja, en cada re-hidratación
+     tras un arrastre y en cada eco de Realtime.
+
+     ⚠️  EL ESTADO GUARDA LA SALIDA —tres enteros—, NO LOS EVENTOS DE LOS QUE
+     SALE. Es lo mismo que hace `ventana` con sus dos cadenas, y por la misma
+     razón: el array que llega en `eventsSet` NO se puede comparar, porque se
+     construye recorriendo un mapa (`buildEventApis` sobre `eventStore`) y su
+     ORDEN cambia con altas, bajas y refetches. Un reordenamiento sin ningún
+     cambio real diría «cambió». Tres números no tienen esa trampa.
+
+     La diferencia con la ventana, que conviene saber: esto NO alimenta ninguna
+     prop de FullCalendar, así que una escritura de más aquí es un render de más
+     y no un candidato a salto de scroll. La guarda sigue haciendo falta —dos
+     emisiones por navegación son dos renders del árbol entero— pero el precio de
+     fallarla es menor que allí. No la quites; sí sepas que no es lo mismo. */
+  const [conteo, setConteo] = useState<ConteoVisible>(CONTEO_VACIO)
+
+  /* Por ref y no por deps, igual que `horarioRef` y `compactarRef`: mete
+     `diasOcultos` en las deps y `aplicarConteo` se recrea con cada pliegue. */
+  const diasOcultosRef = useRef(diasOcultos)
+  diasOcultosRef.current = diasOcultos
+
+  /* `vista` llega POR PARÁMETRO y no de un ref ni del estado `currentView`, y es
+     por el mismo motivo por el que `diasOcultos` necesita su propio efecto: en
+     `datesSet` el `setCurrentView` de la línea de al lado todavía no ha llegado
+     al render, así que el estado vale la vista ANTERIOR justo cuando hace falta
+     la nueva. El `arg.view.type` del handler sí es el bueno. */
+  const aplicarConteo = useCallback((
+    eventos: readonly EventoParaConteo[],
+    rangos: RangosDeVista | null,
+    vista: string,
+  ) => {
+    const nuevo = contarVisibles(
+      eventos,
+      rangos?.activo ?? null,
+      diasOcultosRef.current,
+      /* Sólo las vistas de rejilla descartan los `allDay`: en Mes sí se pintan.
+         Ver la tercera nota ⚠️ de `contarVisibles`. */
+      vista.startsWith('timeGrid'),
+    )
+    /* Forma funcional devolviendo `prev` tal cual cuando no cambia, para que
+       React se salte el re-render por bail-out de identidad. Calcado de
+       `setVentana` y `setDiasOcultos`. */
+    setConteo(prev =>
+      prev.citas === nuevo.citas && prev.eventos === nuevo.eventos && prev.google === nuevo.google
+        ? prev
+        : nuevo
+    )
+  }, [])
+
+  /* `diasOcultos` es la TERCERA entrada del conteo y la escribe `aplicarVentana`
+     DESPUÉS de que los handlers hayan contado: dentro del handler el ref todavía
+     vale lo viejo. Este efecto es quien cubre esa entrada, igual que los dos de
+     más arriba cubren al horario y al botón. Y de paso hace el conteo del
+     montaje, antes del primer `eventsSet`. */
+  useEffect(() => {
+    const api = calendarRef.current?.getApi()
+    if (!api) return
+    aplicarConteo(api.getEvents(), rangoDeVista(), api.view.type)
+  }, [diasOcultos, aplicarConteo, rangoDeVista])
 
   /* ── Detectar mobile y actualizar vista del calendario ── */
   useEffect(() => {
@@ -3265,30 +3472,51 @@ export default function AgendaPage() {
     }
   }
 
-  // Header de día apilado para Semana/Día. Mes (sub-fase 7) conserva su
-  // header por defecto devolviendo arg.text sin tocar. El estado "inhábil"
-  // se deriva del MISMO objeto `horario` que alimenta businessHours (no se
-  // inventa lógica de horario): un día es hábil si horario[dia].activo === true.
-  function renderDayHeader(arg: DayHeaderContentArg) {
+  /* Header de día apilado para Semana/Día. Mes conserva su header por defecto
+     devolviendo `arg.text` sin tocar. El estado "inhábil" se deriva del MISMO
+     objeto `horario` que alimenta businessHours (no se inventa lógica de
+     horario): un día es hábil si horario[dia].activo === true.
+
+     ⚠️ MEMOIZADO, y hasta el bloque 4 no lo estaba: era la única prop de
+     FullCalendar de esta página declarada dentro del componente sin
+     `useCallback`, o sea identidad nueva en cada render. Deps `[horario]`, que es
+     lo único que lee de fuera — igual que `renderEC` con las suyas.
+
+     ⚠️ HOY YA NO PINTA BLANCO SOBRE UN BLOQUE DE MARCA. Su cabecera es clara como
+     las otras seis y quien lo señala es el número dentro de su círculo, más el
+     «· HOY» y la línea inferior de la columna, que pone la hoja. Aquí sólo queda
+     la marca semántica: la clase y el rótulo. El porqué del cambio, y qué NO
+     reponer, está en globals.css junto a `.fc-col-header-cell.fc-day-today`. */
+  const renderDayHeader = useCallback((arg: DayHeaderContentArg) => {
     if (arg.view.type === 'dayGridMonth') return arg.text
 
     const diaInfo = DIAS.find(d => d.fc === arg.date.getDay())
     const habil   = diaInfo ? (horario[diaInfo.key]?.activo ?? false) : false
     const abbr    = diaInfo ? diaInfo.label.slice(0, 3).toUpperCase() : arg.text
 
-    // Color por estado: HOY (blanco) > inhábil (atenuado) > hábil normal.
-    let dowColor: string, numColor: string
-    if (arg.isToday)  { dowColor = 'rgba(255,255,255,.72)'; numColor = '#fff' }
-    else if (!habil)  { dowColor = 'var(--ag-faint)';       numColor = 'var(--ag-muted2)' }
-    else              { dowColor = 'var(--ag-muted)';       numColor = 'var(--ag-text)' }
+    // Dos estados, no tres: inhábil (atenuado) y hábil normal.
+    const dowColor = habil ? 'var(--ag-muted)' : 'var(--ag-faint)'
+    const numColor = habil ? 'var(--ag-text)'  : 'var(--ag-muted2)'
 
     return (
       <span className="ag-dayhead">
-        <span className="ag-dayhead-dow" style={{ color: dowColor }}>{abbr}</span>
-        <span className="ag-dayhead-num" style={{ color: numColor }}>{arg.date.getDate()}</span>
+        <span className="ag-dayhead-dow" style={{ color: dowColor }}>
+          {abbr}
+          {/* El separador va DENTRO del span, no como texto suelto entre los
+              dos, para que el color de marca alcance también al punto medio. */}
+          {arg.isToday && <span className="ag-dayhead-hoy">{' · HOY'}</span>}
+        </span>
+        {/* Sin `color` en línea cuando es hoy: el blanco de la cifra sale de la
+            regla del círculo, que es la que sabe de qué color es el disco. */}
+        <span
+          className={arg.isToday ? 'ag-dayhead-num ag-dayhead-num--hoy' : 'ag-dayhead-num'}
+          style={arg.isToday ? undefined : { color: numColor }}
+        >
+          {arg.date.getDate()}
+        </span>
       </span>
     )
-  }
+  }, [horario])
 
   return (
     /* ⚠️⚠️ LA ALTURA DE ESTE `<div>` ES LO QUE PARTE LA PÁGINA EN DOS ZONAS: la
@@ -3327,7 +3555,10 @@ export default function AgendaPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[#1d1d1f]">Agenda</h1>
-          <p className="text-sm text-[#86868b] mt-0.5">Gestión de citas clínicas</p>
+          {/* El conteo es de LO QUE LA VISTA PINTA, así que sale solo del rango
+              activo y no hace falta condicionarlo por vista: en Mes cuenta el
+              mes, en Semana la semana y en Día el día. Ver `contarVisibles`. */}
+          <p className="text-sm text-[#86868b] mt-0.5">Gestión de citas clínicas{frasearConteo(conteo)}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           {/* Segmented control de vistas — desktop only (móvil queda fijo en Día,
@@ -3337,11 +3568,13 @@ export default function AgendaPage() {
               role="tablist"
               aria-label="Vista del calendario"
               className="inline-flex"
-              style={{ background: 'var(--ag-segment-bg)', borderRadius: 10, padding: 3, gap: 2 }}
+              /* El radio de la pista SALE del de la pastilla: radio exterior =
+                 interior + padding es la regla geométrica que evita que las
+                 esquinas se vean pellizcadas. Derivado, no un número nuevo. */
+              style={{ background: 'var(--ag-segment-bg)', borderRadius: 'calc(var(--ag-r-btn) + 3px)', padding: 3, gap: 2 }}
             >
               {VIEWS.map(v => {
                 const active = currentView === v.type
-                const Ico = v.icon
                 return (
                   <button
                     key={v.type}
@@ -3353,22 +3586,28 @@ export default function AgendaPage() {
                       api.changeView(v.type)
                       setCurrentView(v.type)
                     }}
-                    className={`inline-flex items-center gap-1.5 transition-all ${active ? '' : 'hover:opacity-70'}`}
+                    className={`inline-flex items-center transition-all ${active ? '' : 'hover:opacity-70'}`}
                     style={{
-                      border: 'none', cursor: 'pointer', borderRadius: 8, padding: '6px 13px',
+                      border: 'none', cursor: 'pointer', borderRadius: 'var(--ag-r-btn)', padding: '6px 13px',
                       fontSize: 12.5, fontWeight: active ? 700 : 600,
                       ...(active
                         ? { background: 'var(--ag-segment-active-bg)', color: 'var(--ag-segment-active-text)', boxShadow: 'var(--ag-segment-active-shadow)' }
                         : { background: 'transparent', color: 'var(--ag-segment-text)' }),
                     }}
                   >
-                    <Ico size={15} />
                     {v.label}
                   </button>
                 )
               })}
             </div>
           )}
+          {/* ⚠️ EL RADIO DE ESTOS CINCO CONTROLES SALE DE `--ag-r-btn` (10 px) Y NO
+              DE LA ESCALA DE TAILWIND. Eran `rounded-xl`, que son 12. El token
+              lo fija el spec del rediseño (§1.3) y su familia está declarada en
+              globals.css con lo que significa cada peldaño; si necesitas un
+              radio aquí, elige el papel del elemento y no el número.
+              Los que quedan en `rounded-xl` en este archivo son los del MODAL,
+              que están fuera de este alcance. */}
           {/* ── COMPACTAR ─────────────────────────────────────────────────
               Sólo en escritorio y sólo en las vistas de rejilla: en `dayGrid`
               no hay `slotMinTime` que encoger, y en móvil la vista es de un
@@ -3381,13 +3620,21 @@ export default function AgendaPage() {
               aria-pressed={compactar}
               aria-label="Compactar la rejilla al horario de la clínica"
               title="Compactar la rejilla al horario de la clínica"
-              className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors"
+              className="flex items-center gap-2 px-3 py-2.5 rounded-[var(--ag-r-btn)] text-sm font-medium transition-colors"
+              /* ENCENDIDO SE MARCA CON EL BORDE, NO CON RELLENO. Compartía los
+                 tokens del segmentado activo, o sea que se pintaba como un
+                 segmento seleccionado: dos controles distintos con el mismo
+                 tratamiento, y el ojo leía «Compactar» como una cuarta vista.
+                 Ahora el relleno sólido es del segmentado y sólo de él; esto es
+                 un interruptor, y un interruptor encendido se dice con el marco.
+                 Sin sombra: la superficie no se levanta, se enmarca. */
               style={compactar
                 ? {
-                    background: 'var(--ag-segment-active-bg)',
-                    color: 'var(--ag-segment-active-text)',
-                    boxShadow: 'var(--ag-segment-active-shadow)',
-                    border: '1px solid var(--ag-segment-active-text)',
+                    background: 'var(--ag-surface)',
+                    /* `--ag-brand-legible` y NO `--ag-brand-secondary`: la marca
+                       cruda sobre la superficie oscura da 2.24:1. Ver su nota. */
+                    color: 'var(--ag-brand-legible)',
+                    border: '1px solid var(--ag-brand-legible)',
                   }
                 : {
                     background: 'var(--ag-surface)',
@@ -3408,7 +3655,7 @@ export default function AgendaPage() {
               <select
                 value={filtroMedico}
                 onChange={e => setFiltroMedico(e.target.value)}
-                className="appearance-none pl-3 pr-9 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-[var(--ag-surface)] border border-[var(--ag-border-card)] text-[var(--ag-text)] hover:bg-[var(--ag-bg-app)]"
+                className="appearance-none pl-3 pr-9 py-2.5 rounded-[var(--ag-r-btn)] text-sm font-medium cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-[var(--ag-surface)] border border-[var(--ag-border-card)] text-[var(--ag-text)] hover:bg-[var(--ag-bg-app)]"
               >
                 <option value="">Todos los médicos</option>
                 {medicos.map(m => (
@@ -3424,7 +3671,7 @@ export default function AgendaPage() {
           {canEditHorario && (
             <button
               onClick={() => setHorarioOpen(true)}
-              className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors bg-[var(--ag-surface)] border border-[var(--ag-border-card)] text-[var(--ag-text)] hover:bg-[var(--ag-bg-app)]"
+              className="flex items-center gap-2 px-3 py-2.5 rounded-[var(--ag-r-btn)] text-sm font-medium transition-colors bg-[var(--ag-surface)] border border-[var(--ag-border-card)] text-[var(--ag-text)] hover:bg-[var(--ag-bg-app)]"
               title="Configurar horario de consulta"
             >
               <Settings size={15} />
@@ -3469,7 +3716,7 @@ export default function AgendaPage() {
               setModal({ mode: 'create', fecha, hora, tipo: 'evento' })
             }}
             title="Cirugía, reunión, bloqueo de horario — sin paciente ligado"
-            className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors bg-[var(--ag-surface)] border border-[var(--ag-border-card)] text-[var(--ag-text)] hover:bg-[var(--ag-bg-app)]"
+            className="flex items-center gap-2 px-3 py-2.5 rounded-[var(--ag-r-btn)] text-sm font-medium transition-colors bg-[var(--ag-surface)] border border-[var(--ag-border-card)] text-[var(--ag-text)] hover:bg-[var(--ag-bg-app)]"
           >
             <CalendarPlus size={15} />
             <span className="hidden sm:inline">Nuevo evento</span>
@@ -3483,7 +3730,7 @@ export default function AgendaPage() {
               setModal({ mode: 'create', fecha, hora, tipo: 'cita' })
             }}
             data-onboard="nueva-cita"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all shadow-sm hover:brightness-95 bg-[linear-gradient(135deg,var(--ag-brand-primary),var(--ag-brand-secondary))]"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-[var(--ag-r-btn)] text-sm font-semibold text-white transition-all shadow-sm hover:brightness-95 bg-[linear-gradient(135deg,var(--ag-brand-primary),var(--ag-brand-secondary))]"
           >
             <Plus size={15} />
             Nueva cita
@@ -3493,36 +3740,7 @@ export default function AgendaPage() {
 
       {citaCreada && <div data-onboard="cita-creada" className="hidden" />}
 
-      {/* ── Leyenda ─────────────────────────────────────── */}
-      {/* Solo single-doctor: leyenda por estado. La leyenda multi-doctor
-          (puntos de color por médico) se eliminó: las tarjetas ya no se
-          colorean por médico, así que prometía un código de color inexistente. */}
-      {isSingleDoctor && (
-        <div className="flex flex-wrap items-center gap-3 mb-4">
-          {(Object.entries(STATUS_CONFIG) as [Status, typeof STATUS_CONFIG[Status]][]).map(([key, cfg]) => (
-            <div key={key} className="flex items-center gap-1.5">
-              <span
-                className="w-3 h-3 rounded-sm flex-shrink-0"
-                /* Los MISMOS tokens que pinta la tarjeta, y con el mismo
-                   reparto: relleno de `-bg`, barra izquierda de `-dot` (que es
-                   lo que la tarjeta usa en su `borderLeft`, no `-border`). Antes
-                   salían de una paleta aparte de hexes, y por eso la leyenda
-                   enseñaba «No asistió» en naranja mientras la tarjeta lo
-                   pintaba gris. */
-                style={{ backgroundColor: `var(--ag-status-${key}-bg)`, borderLeft: `3px solid var(--ag-status-${key}-dot)` }}
-              />
-              <span className="text-[11px] text-[#86868b] font-medium">{cfg.label}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* ── Calendario ──────────────────────────────────── */}
-      {avisoRecorte && (
-        <p role="status" className="text-xs mb-1.5" style={{ color: 'var(--ag-muted)' }}>
-          {avisoRecorte}
-        </p>
-      )}
       {/* ⚠️ `overflow-clip` Y NO `overflow-hidden`. Recorta igual —es lo que
           mantiene las esquinas del `rounded-2xl` sobre el `<table>` cuadrado del
           calendario, y para eso está— pero SIN crear un contenedor de scroll.
@@ -3565,7 +3783,7 @@ export default function AgendaPage() {
           contenido; sin un valor explícito, `flex-1` no acota nada, la tarjeta
           crece hasta lo que mida la rejilla y el calendario desborda su zona.
           Aquí estuvo `min-h-0` haciendo ese trabajo. Ya no hace falta: CUALQUIER
-          valor explícito desactiva el `auto`, así que el `min-h-[280px]` de
+          valor explícito desactiva el `auto`, así que el `min-h-[315px]` de
           abajo cumple las dos funciones a la vez. No los pongas juntos — serían
           dos `min-height` compitiendo, y quién gana dependería del orden en que
           Tailwind los emita.
@@ -3575,7 +3793,7 @@ export default function AgendaPage() {
           No lo repongas «para que no quede pequeño en pantallas grandes»: en
           pantallas grandes `flex-1` ya le da todo el hueco sobrante.
 
-          ⚠️ Y EL PISO VA EN PÍXELES — `min-h-[280px]`, en la clase de abajo.
+          ⚠️ Y EL PISO VA EN PÍXELES — `min-h-[315px]`, en la clase de abajo.
           Con `min-h-0` la tarjeta encogía hasta CERO y aparecía un caso
           degradado real: a zoom extremo (~270 px de viewport CSS) la zona
           fija se come casi todo, `flex-1` deja la rejilla en una decena de
@@ -3585,26 +3803,138 @@ export default function AgendaPage() {
           EN PÍXELES Y NO EN `vh`: el `minHeight: '70vh'` de antes fallaba
           justamente por ser relativo — crecía con la ventana y volvía a
           desbordar. Un suelo fijo no puede perseguir al contenedor.
-          DE DÓNDE SALE EL 280, medido sobre la rejilla real: el cromo del
-          calendario (toolbar 60.3 px + cabecera de días 37.5 px) son 97.8 px, y
-          cada franja mide 34.6 px. 280 deja ~182 px de cuerpo ≈ 5 franjas, o sea
-          dos horas y media de rejilla más el toolbar y la cabecera enteros:
-          apretado pero utilizable, y con scroll interno para el resto del día.
-          CUÁNDO ENTRA EN JUEGO: sólo cuando `100dvh − 64 − (zona fija)` baja de
-          280, es decir por debajo de ~420-460 px de viewport según envuelvan o
-          no los controles. Ninguna ventana de trabajo normal llega ahí; el caso
-          degradado sí, y ahí preferimos una rejilla usable con un segundo
-          scroll a una rejilla de diez píxeles sin él. */}
-      <div className="agenda-fc bg-white rounded-2xl border border-slate-100 shadow-sm overflow-clip flex-1 min-h-[280px]">
+          DE DÓNDE SALE EL 315. El criterio no ha cambiado —cromo constante más
+          CINCO FRANJAS de cuerpo (34.6 px cada una = 173 px), o sea dos horas y
+          media de rejilla: apretado pero utilizable, con scroll interno para el
+          resto del día—. Lo que cambió es el cromo, y por dos motivos, ninguno
+          de ellos el título:
+
+            · toolbar 59 px   (14+14 de padding + 30 del botón más alto —12 px
+              × 1.5 de línea + 5+5 + 2 de borde— + 1 de línea inferior)
+            · banda de vista compacta 33 px, SÓLO con «Compactar» encendido
+            · cabecera de días 47 px  (8+8 + 11 de la abreviatura + 1 + 18 del
+              número + 1)
+
+          Sumas: 106 sin banda → piso 279. Con banda → 312. Y por debajo de
+          768 px, donde la leyenda baja a fila propia (45.5), → 324.
+          Se toma 315: cubre con las cinco franjas el peor caso de ESCRITORIO,
+          que es donde el piso actúa de verdad, y en móvil deja 4,7 franjas.
+          Subirlo hasta cubrir también los 324 adelantaría la reaparición del
+          segundo scroll a cambio de un tercio de franja.
+
+          ⚠️ EL 280 ANTERIOR NO SUBIÓ POR EL TÍTULO. Pasó de 16 a 22 px y el
+          toolbar NO creció: la fila la manda el botón, con 30 px, y el título a
+          22 × 1.2 son 26.4. Lo que engordó el cromo fue meter la LEYENDA dentro
+          de la tarjeta (gratis en escritorio, porque comparte fila con el
+          toolbar; 45.5 px por debajo de 768) y la banda de recorte. Su
+          `line-height: 1.2` explícito es lo que sostiene esa cuenta — está
+          anotado también en globals.css.
+          Y las cifras viejas de aquel comentario (toolbar 60.3, cabecera 37.5)
+          eran de antes del header de día apilado; no las restaures.
+
+          CUÁNDO ENTRA EN JUEGO: cuando `100dvh − 64 − (zona fija de página)`
+          baja de 315. Con el header en una línea la zona fija son ~140 px, así
+          que actúa por debajo de ~455 px de viewport; si el header envuelve a
+          dos líneas (anchos por debajo de ~1170 px), ~505 px. Ninguna ventana de
+          trabajo normal llega ahí; el caso degradado sí, y ahí preferimos una
+          rejilla usable con un segundo scroll a una rejilla de diez píxeles sin
+          él. */}
+      {/* ⚠️ ESTA TARJETA NO LLEVA CLASE DE LAYOUT, Y NO ES UN OLVIDO. Tuvo un
+          `flex flex-col` y se retiró: el reparto entero lo hace un
+          `grid-template-areas` en `globals.css`, sobre `.agenda-fc`. Si repones
+          el flex, el grid se apaga y la leyenda se cae de la fila de la fecha.
+
+          Tiene TRES hijos —la leyenda, la banda de vista compacta y el
+          `<FullCalendar>`— y hay que colocar la leyenda al lado del toolbar y la
+          banda ENTRE el toolbar y la rejilla. Ninguna de las dos cosas se puede
+          hacer desde React: el componente no acepta children, y el toolbar y la
+          rejilla son hijos de `.fc`, no nuestros. Lo resuelve la hoja
+          promocionando los hijos de `.fc` a ítems de esta rejilla con
+          `display: contents` y colocando las cuatro piezas con `grid-area`.
+          El razonamiento completo, qué se comprobó y qué NO se rompe está allí,
+          junto a `.ag-banda-compacta`. Antes de tocar esta línea, léelo. */}
+      <div className="agenda-fc bg-white rounded-2xl border border-slate-100 shadow-sm overflow-clip flex-1 min-h-[315px]">
+        {/* ── Leyenda ───────────────────────────────────────────────────
+            ⚠️ VIVE DENTRO DE LA TARJETA Y EN LA FILA DEL TOOLBAR, junto a la
+            fecha. Estuvo en una banda propia ENCIMA del calendario, y el
+            argumento para dejarla fuera —que la fila de controles envuelve a
+            ~1170 px— medía la fila EQUIVOCADA: el mockup no la pone ahí, la
+            pone en la de navegación (flechas, «Hoy», fecha), que va mucho más
+            vacía. Quien la coloca es el `grid-template-areas` de `.agenda-fc`
+            en globals.css, y allí está el porqué de esa vía y no de
+            `customButtons`. Cuando no cabe envuelve dentro de su celda sin
+            mover la fecha; por debajo de 768 px baja a fila propia.
+
+            ⚠️ SE PINTA SIEMPRE, también en multi-doctor. Llevaba un
+            `isSingleDoctor` heredado de cuando existía OTRA leyenda —puntos por
+            médico— que ocupaba este sitio en ese modo; aquélla se eliminó y la
+            condición se quedó huérfana, dejando sin descifrar unas tarjetas que
+            SÍ están coloreadas por estado.
+
+            Es una LEYENDA, no un resumen: los cinco estados salen siempre, esté
+            o no presente cada uno. Quien cuenta lo que hay es el subtítulo. */}
+        <div className="ag-leyenda">
+          {(Object.entries(STATUS_CONFIG) as [Status, typeof STATUS_CONFIG[Status]][]).map(([key, cfg]) => (
+            <div key={key} className="flex items-center gap-1.5">
+              <span
+                className="w-2 h-2 rounded-full flex-shrink-0"
+                /* UN token y un solo color: `-dot`, que es exactamente el que la
+                   tarjeta pinta en su `borderLeft`. Aquí hubo un cuadrado que
+                   mezclaba relleno de `-bg` con barra de `-dot` —dos colores
+                   para nombrar uno— y de lejos se leía el relleno pálido.
+                   Nunca un hex: hubo una segunda paleta a mano y enseñaba «No
+                   asistió» en naranja mientras la tarjeta lo pintaba gris. */
+                style={{ backgroundColor: `var(--ag-status-${key}-dot)` }}
+              />
+              <span className="text-[11px] font-medium text-[var(--ag-muted)]">{cfg.label}</span>
+            </div>
+          ))}
+          {/* ── GOOGLE VA APARTE, DETRÁS DE UNA BARRA ─────────────────────
+              Y no como un sexto estado. `STATUS_CONFIG` es `Record<Status, …>`
+              y ahí no cabe: un evento de Google no tiene estado de cita, viene
+              de otro sitio y no se edita. Meterlo dentro obligaría a ensanchar
+              `Status`, que es el tipo del que cuelgan el selector del modal, los
+              tokens de color y la exhaustividad que garantiza el compilador. La
+              barra dice justo eso: lo de la izquierda es una escala, esto no. */}
+          <span aria-hidden className="text-[11px] text-[var(--ag-faint)]">|</span>
+          <div className="flex items-center gap-1.5">
+            <GoogleGIcon size={11} />
+            <span className="text-[11px] font-medium text-[var(--ag-gcal-text)]">Google Calendar</span>
+          </div>
+        </div>
+        {/* Va PRIMERA en el DOM aunque se pinte segunda, y es a propósito: el
+            `order` de la hoja la coloca bajo el toolbar, y así el lector de
+            pantalla oye el aviso antes que los controles y la rejilla que
+            describe, en vez de después de todo. */}
+        {avisoRecorte && (
+          <div className="ag-banda-compacta" role="status">
+            <ChevronsDownUp size={14} className="ag-banda-compacta-icono" aria-hidden />
+            <p className="ag-banda-compacta-texto">
+              <strong>Vista compacta:</strong> {avisoRecorte}
+            </p>
+            {/* SEGUNDA salida, no la única: el botón del header sigue siendo por
+                donde se enciende y también apaga. Existe porque el efecto que
+                apaga «Compactar» al salir de time-grid ya dice el principio —un
+                calendario que oculta información sin dar salida es peor que uno
+                que no la oculta— y hasta ahora la única salida estaba en la otra
+                punta de la pantalla, lejos de la frase que confiesa el recorte. */}
+            <button
+              type="button"
+              className="ag-banda-compacta-salida"
+              onClick={() => setCompactar(false)}
+            >
+              Mostrar rejilla completa
+            </button>
+          </div>
+        )}
         <FullCalendar
           ref={calendarRef}
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView={isMobile ? 'timeGridDay' : 'timeGridWeek'}
           locale={esLocale}
-          headerToolbar={isMobile
-            ? { left: 'prev,next', center: 'title', right: 'today' }
-            : { left: 'prev,next today', center: 'title', right: '' }
-          }
+          headerToolbar={isMobile ? TOOLBAR_MOVIL : TOOLBAR_ESCRITORIO}
+          /* Guión largo. El default de FullCalendar es « - », con guión corto. */
+          titleRangeSeparator=" – "
           /* ── LOS DOS DISPARADORES DE LA VENTANA, Y NO POR REDUNDANCIA ──
              `datesSet` cubre la navegación que NO reemite `eventsSet` —volver a
              un rango que ya está cacheado, donde el `eventStore` no se toca—;
@@ -3614,17 +3944,30 @@ export default function AgendaPage() {
              los dos deja un camino por el que la rejilla se queda corta.
              Durante el ARRASTRE no llega ninguno: el gesto vive en la rebanada
              `eventDrag` y el `eventStore` no se toca hasta el drop. */
+          /* El conteo del subtítulo va detrás de la ventana en los DOS
+             disparadores, y de la misma llamada: los eventos y los rangos ya
+             están resueltos aquí, así que no cuesta una segunda lectura del
+             `eventStore`. Su tercera entrada —`diasOcultos`, que `aplicarVentana`
+             escribe justo encima y que aquí todavía no ha llegado al ref— la
+             cubre un efecto propio, arriba. */
           datesSet={arg => {
             setCurrentView(arg.view.type)
-            aplicarVentana(
-              calendarRef.current?.getApi().getEvents() ?? [],
-              {
-                activo:   { activeStart: arg.view.activeStart,  activeEnd: arg.view.activeEnd },
-                completo: { activeStart: arg.view.currentStart, activeEnd: arg.view.currentEnd },
-              },
-            )
+            const eventos = calendarRef.current?.getApi().getEvents() ?? []
+            const rangos = {
+              activo:   { activeStart: arg.view.activeStart,  activeEnd: arg.view.activeEnd },
+              completo: { activeStart: arg.view.currentStart, activeEnd: arg.view.currentEnd },
+            }
+            aplicarVentana(eventos, rangos)
+            aplicarConteo(eventos, rangos, arg.view.type)
           }}
-          eventsSet={eventos => aplicarVentana(eventos, rangoDeVista())}
+          eventsSet={eventos => {
+            const rangos = rangoDeVista()
+            aplicarVentana(eventos, rangos)
+            /* La vista se lee del calendario y no de `currentView`: aquí no hay
+               un `arg` que la traiga, y el estado puede ir un render por detrás. */
+            const vista = calendarRef.current?.getApi().view.type ?? ''
+            aplicarConteo(eventos, rangos, vista)
+          }}
           buttonText={{ today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día' }}
           slotMinTime={ventana.slotMinTime}
           slotMaxTime={ventana.slotMaxTime}
@@ -3669,7 +4012,7 @@ export default function AgendaPage() {
           /* ⚠️ `100%` Y NO `auto`, y de aquí cuelga todo lo demás. Con `auto` el
              calendario crece hasta su altura completa y scrollea `<main>`: no
              hay zona fija posible. Con `100%` se acota a la tarjeta —que es
-             `flex-1 min-h-0` dentro de una raíz en `dvh`— y FullCalendar reparte
+             `flex-1 min-h-[315px]` dentro de una raíz en `dvh`— y reparte
              solo: toolbar y cabecera de días arriba, `Scroller` en el cuerpo. */
           height="100%"
           /* ⚠️⚠️ LOS DOS VAN JUNTOS Y `scrollTimeReset={false}` NO ES OPCIONAL.
