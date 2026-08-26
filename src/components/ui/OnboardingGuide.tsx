@@ -163,7 +163,13 @@ const PAGE_CONTEXTS: PageContext[] = [
       {
         id: 'agenda-cita',
         title: 'Crear una cita',
-        message: 'Haz clic en "Nueva cita" o directamente en cualquier horario del calendario para agendar una consulta. Selecciona un paciente y listo.',
+        /* ⚠️ EL BOTÓN SE LLAMA «Agendar», NO «Nueva cita». Decía lo segundo hasta
+           el 2026-08-25, cuando el header se retiró a una sola línea: se quitó el
+           botón «Nuevo evento» —el conmutador del modal ya hacía su trabajo— y el
+           que quedó pasó a llamarse «Agendar», porque abre las dos cosas y
+           «Nueva cita» ya no describía lo que abre.
+           `highlight` NO cambia: apunta al `data-onboard`, no al texto. */
+        message: 'Haz clic en "Agendar" o directamente en cualquier horario del calendario. El modal abre en "Cita": selecciona al paciente y listo. Arriba del modal puedes cambiar a "Evento" para bloqueos, cirugías o reuniones.',
         highlight: 'nueva-cita',
       },
       {

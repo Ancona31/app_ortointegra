@@ -63,6 +63,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                       partir la vista en zona fija + rejilla con scroll, y esos dos
                       números son exactamente pt-16+pb-6 (88px) y lg:pt-8+lg:pb-8
                       (64px) de aquí.
+
+                      ⚠️⚠️ Y LA AGENDA SE SALTA ESTE PADDING DE `lg` EN ADELANTE.
+                      `globals.css`, en la regla `main > div:has(.agenda-fc)` que
+                      está junto a `.agenda-fc`, lo baja a 16 px SÓLO en esa página:
+                      su hijo es la tarjeta del calendario, que ya trae marco
+                      propio, y esos 64 px le costaban 1,4 horas de rejilla en un
+                      portátil. Las otras 20 páginas del layout NO se tocan y siguen
+                      con los 64 de aquí.
+                      Si cambias el padding de abajo, esa regla y el `lg:` de la
+                      agenda son el respaldo mutuo: mira las dos notas antes.
                       No pudo resolverse con `h-full` porque este div es
                       `min-h-full`, y un `min-height` no da altura definida al
                       porcentaje de un hijo — tocar eso cambiaría el layout de toda

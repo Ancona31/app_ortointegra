@@ -780,9 +780,50 @@ body {
 }
 
 /* iOS-style page transition — bloom + fade */
+/* ⚠️⚠️ ESTA ANIMACIÓN NO PUEDE LLEVAR `scale`, Y NO ES UNA PREFERENCIA ESTÉTICA.
+   Llevaba `scale(0.97)` en el fotograma inicial y eso ROMPÍA LA AGENDA de una
+   forma que no se parecía en nada a su causa: la rejilla se quedaba corta y
+   dejaba una banda en blanco al final, permanente.
+
+   LA CADENA, medida el 2026-08-25 sobre la rejilla real:
+
+     · `.fc-view-harness` tenía el alto bueno ....... 469 px de caja de layout
+     · el `.fc-scroller` del cuerpo lo recibía ...... 432 px
+     · `.fc-timegrid-slots table` recibía .......... 418 px   ← aquí se perdía
+
+   418 = 432 × 0,97. FullCalendar decide el estirado de `expandRows` MIDIENDO el
+   contenedor y escribiendo el resultado en línea sobre la tabla de franjas
+   —`@fullcalendar/timegrid/internal.js:962` se lo pasa como `minHeight` al
+   `TimeColsSlats`, y `:268` como `height` a la tabla del eje de horas—. PERO LA
+   MEDIDA NO ESTÁ AHÍ, y es la que hay que ir a ver:
+
+     @fullcalendar/core/internal-common.js:7068
+       scrollerClientHeights[k] = Math.floor(harnessEl.getBoundingClientRect().height)
+
+   `getBoundingClientRect` SÍ ve los `transform`, así que devuelve el alto ya
+   escalado; ese número es el `clientHeight` que baja después a las dos líneas de
+   `timegrid`. Y el montaje del calendario cae dentro de los 240 ms que dura la
+   animación: se lleva el alto escalado.
+
+   ⚠️ Y NO SE CORRIGE SOLO. Comprobado forzando el final de la animación: el
+   `transform` vuelve a `matrix(1,…)`, el contenedor recupera sus 432 px y la
+   tabla SIGUE con 418. FullCalendar no observa su contenedor —sólo reacciona a
+   `window.resize` y a sus propios cambios de estado—, así que el 3 % se queda
+   ahí para siempre. Con un `resize` a mano pasaba a 431 y el hueco desaparecía;
+   ésa fue la prueba.
+
+   POR QUÉ `translateY` SÍ Y `scale` NO: un `translate` mueve la caja pintada
+   pero no cambia su ALTO medido; un `scale` sí. La entrada conserva el
+   desplazamiento y el fundido, que es de donde salía casi todo el efecto, y
+   pierde sólo el zoom.
+
+   ⚠️ SI ALGUIEN REPONE EL `scale`: no se romperá nada visible al instante y la
+   agenda no dará ningún error. Sólo volverá la banda en blanco, y costará otra
+   sesión encontrarla. Si hace falta el zoom, hay que darle ANTES a la agenda
+   una forma de volver a medirse cuando la animación acabe. */
 @keyframes pageEnter {
-  from { opacity: 0; transform: scale(0.97) translateY(6px); }
-  to   { opacity: 1; transform: scale(1)    translateY(0);   }
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0);   }
 }
 .animate-page-enter {
   animation: pageEnter 0.24s cubic-bezier(0.32, 0.72, 0, 1) both;
@@ -882,8 +923,11 @@ body {
      cambiado de color sin que nadie lo pidiera. Si algún día molesta, lo que
      toca es un token propio de selección, no reusar uno de estado. */
   --fc-highlight-color: #dbeafe;
-  /* --fc-timegrid-slot-height NO se toca: la altura la fija .fc-timegrid-slot
-     con !important a 2.16rem y hay una nota que pide no reducirla. */
+  /* --fc-timegrid-slot-height NO se toca: la altura de franja la fija
+     .fc-timegrid-slot con !important, y desde el 2026-08-25 su valor sale de
+     nuestro propio token `--ag-slot-h`, que varía con el ALTO de ventana. La
+     nota larga está junto a esa regla; léela antes de tocar ninguna de las dos
+     variables, porque explica por qué hay un token de por medio. */
 }
 
 /* ── QUÉ SOSTIENE ESTE REPARTO: `display: contents` SOBRE `.fc` ────────────
@@ -948,6 +992,11 @@ body {
        │ rejilla                                     │  1fr
        └─────────────────────────────────────────────┘
 
+   ⚠️ ESTA BANDA SE PROBÓ COMO CHIP EN LA FILA DEL TOOLBAR Y SE REVIRTIÓ. Cabía
+   y ahorraba los 33 px de su fila, pero obligaba a mandar la frase que dice QUÉ
+   se recortó a un `title` y a un `sr-only`. El porqué largo está en el JSX,
+   junto al markup de la banda.
+
    ⚠️ POR QUÉ REJILLA Y NO LAS TRES VÍAS OBVIAS:
      · `customButtons` de FullCalendar (el slot `right` del toolbar) sólo acepta
        un `text` de cadena o el nombre de un icono registrado. La leyenda son
@@ -972,6 +1021,46 @@ body {
    celda, alineada a la derecha, y la fecha no se mueve nunca.
    Lo mismo en la tercera FILA: es lo que ocupa el papel del `min-height: 0` que
    hacía falta en flex, y lo que impide que la rejilla desborde la tarjeta. */
+/* ── EL PADDING DEL LAYOUT, RECORTADO SÓLO PARA LA AGENDA ──────────────────
+   `(app)/layout.tsx` da a su hijo `lg:pt-8 lg:pb-8` = 64 px de alto, y a las
+   otras 20 páginas del layout les hacen falta: son páginas de contenido que
+   scrollean y necesitan aire arriba. La agenda no: su hijo directo es la
+   tarjeta del calendario, que ya trae `rounded-2xl border shadow-sm`, o sea su
+   propio marco. Esos 64 px son 1,4 horas de rejilla a cambio de nada.
+
+   ⚠️⚠️ POR QUÉ LAS DOS DECLARACIONES VAN JUNTAS EN LA MISMA REGLA, Y NO SE
+   SEPARAN. Los dos números —el padding del layout y el que la agenda le RESTA
+   a `100dvh` para acotar su raíz— tienen que valer lo mismo o reaparece el
+   segundo scroll bajo la zona fija. Hasta ahora vivían en dos archivos
+   distintos con sendas notas pidiendo que se movieran a la vez; ahora son dos
+   líneas contiguas y ya no hay forma de cambiar una y olvidar la otra.
+
+   ⚠️ Y POR ESO EL `height` VA AQUÍ Y NO EN LA CLASE DE TAILWIND DE `page.tsx`.
+   Allí sigue el `lg:h-[calc(100dvh-64px)]`, que es el valor CORRECTO para un
+   padding de 64. Si `:has()` no está soportado, esta regla entera no casa: la
+   página se queda con 64 de padding Y con el calc de 64, o sea exactamente el
+   comportamiento de antes de este bloque. Degrada a lo anterior, no a roto —
+   que es la única razón por la que `:has()` es aceptable aquí.
+   Soporte: Chrome 105+, Safari 15.4+, Firefox 121+. Por debajo, 64 px y 6,4 h.
+
+   ⚠️ ESPECIFICIDAD: (0,2,2) contra los (0,1,0) de la utilidad de Tailwind, y
+   además esto va sin `@layer` mientras las utilidades sí — no hace falta
+   `!important` y no lo lleva. Si algún día esto deja de ganar, es que alguien
+   metió el bloque dentro de una capa.
+
+   ⚠️ SÓLO DE `lg` EN ADELANTE. Por debajo el layout da `pt-16 pb-6` = 88 px, y
+   esos 64 de arriba son la barra superior móvil, que sí hace falta. El móvil se
+   queda como estaba, con su `h-[calc(100dvh-88px)]`. */
+@media (min-width: 1024px) {
+  main > div:has(.agenda-fc) {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  main > div:has(.agenda-fc) .agenda-raiz {
+    height: calc(100dvh - 16px);   /* ← 8 + 8 de la regla de encima */
+  }
+}
+
 .agenda-fc {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -1214,16 +1303,23 @@ body {
   }
   .agenda-fc .ag-leyenda { justify-content: flex-start; padding-left: 18px; }
 }
-/* El título de vista, a los 22 px / 800 del spec (§2). Venía de 16.
+/* La etiqueta de fecha, a los 15 px / 700 del spec.
 
-   ⚠️ EL `line-height` VA EXPLÍCITO Y NO ES COSMÉTICO: es lo que hace que subir
-   el cuerpo NO mueva el alto del toolbar, y de eso cuelga el piso de la tarjeta.
+   ⚠️ ESTUVO EN 22 px / 800 Y BAJÓ POR ANCHO, NO POR GUSTO. A 22 px «24 – 28 de
+   agosto de 2026» medía 282,77 px —el elemento más ancho de la fila con
+   diferencia— y era, junto con el formato largo, lo que dejaba a la leyenda sin
+   sitio para caber en una línea. Los dos se corrigieron a la vez: el cuerpo aquí
+   y el `titleFormat` de `VISTAS_FC` en page.tsx. Si repones uno sin el otro,
+   la leyenda vuelve a envolver y el toolbar vuelve a 74 px.
+
+   ⚠️ EL `line-height` VA EXPLÍCITO Y NO ES COSMÉTICO: es lo que hace que el
+   cuerpo NO mueva el alto del toolbar, y de eso cuelga el piso de la tarjeta.
    La fila la manda el elemento más alto, y son los botones: 12 px × 1.5 de línea
    + 5+5 de padding + 2 de borde = 30 px (`.fc .fc-button`, aquí arriba). El
-   título a 22 × 1.2 son 26.4, o sea que cabe por debajo y el toolbar se queda
-   como estaba. Heredando el 1.5 del documento serían 33 px y SÍ empujaría, tres
-   píxeles que habría que devolverle al piso. Si alguien lo quita, que rehaga esa
-   cuenta y la nota del `min-h` en page.tsx.
+   título a 15 × 1.2 son 18, o sea que cabe holgado y el toolbar no se entera.
+   Heredando el 1.5 del documento serían 22.5 y seguiría cabiendo, pero el
+   explícito es lo que hace la cuenta comprobable. Si alguien lo quita, que
+   rehaga esa cuenta y la nota del `min-h` en page.tsx.
 
    ⚠️ `text-transform: none` ANULA A PROPÓSITO el `capitalize` de la regla global
    `.fc .fc-toolbar-title`, y no es limpieza: con el `titleFormat` largo del
@@ -1235,8 +1331,8 @@ body {
    abre bien una cabecera—, y eso lo da el `::first-letter` de abajo, que sólo
    toca la primera. En Semana la primera es un dígito y no pasa nada. */
 .agenda-fc .fc-toolbar-title {
-  font-size: 22px !important;
-  font-weight: 800;
+  font-size: 15px !important;
+  font-weight: 700;
   line-height: 1.2;
   color: var(--ag-ink);
   text-transform: none;
@@ -1315,14 +1411,56 @@ body {
   text-decoration: none !important;
 }
 
-/* Header de día APILADO — solo time-grid (Semana/Día). Mes (sub-fase 7)
+/* Header de día EN UNA LÍNEA — solo time-grid (Semana/Día). Mes (sub-fase 7)
    conserva su header por defecto vía el guard de vista en dayHeaderContent.
-   El color del texto lo fija el render inline según estado del día. */
+   El color del texto lo fija el render inline según estado del día.
+
+   ⚠️ ESTUVO APILADO —abreviatura arriba, número debajo— Y BAJÓ A UNA LÍNEA POR
+   ALTO. Apilado medía 65 px con hoy a la vista y 54 sin él; en fila mide 35:
+   8+8 del `padding` de `.fc-col-header-cell`, 18 de la cifra (la pieza más
+   alta) y 1 del borde. Son 30 px de rejilla recuperados, que a 22 px de franja
+   son casi hora y media.
+
+   ⚠️ Y DE PASO SE LLEVA EL VAIVÉN DE 11 px. Apilado, la columna de HOY era más
+   alta que las otras seis porque su cifra iba dentro de un disco de 28×28: la
+   fila entera la mandaba ella, así que la rejilla MEDÍA DISTINTO en una semana
+   con hoy que en una sin él (299 contra 310, medido) y saltaba al navegar. En
+   fila no hay disco, las siete columnas miden lo mismo y el salto desaparece.
+
+   ⚠️ `baseline` Y NO `center`: son dos cuerpos distintos —11 px la abreviatura,
+   18 la cifra— y centrados por caja se ven descolgados uno del otro. Alineados
+   por la línea de base se leen como una sola palabra, que es lo que son.
+
+   ⚠️ EL MARKUP NO CAMBIÓ. `renderDayHeader` ya emitía los dos `<span>` en este
+   orden; lo único que hacía falta era dejar de apilarlos. Si vuelves a
+   `flex-direction: column`, todo lo de arriba se deshace sin tocar page.tsx. */
 .fc-timegrid .ag-dayhead {
   display: flex;
-  flex-direction: column;
-  align-items: center;
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
   line-height: 1;
+}
+/* Los 2+2 px que FullCalendar le pone de suyo al cushion (`padding: 2px 4px`).
+   Con la cabecera apilada se perdían dentro de los 65 y daba igual; en una línea
+   son 4 de 39, o sea la diferencia entre 39 y los 35 que esto tiene que medir.
+   ⚠️ SÓLO EN TIME-GRID. El mismo cushion lo usa la cabecera de Mes, que no ha
+   cambiado de forma y donde esos 4 px sí son el aire que separa la fila de
+   nombres de la primera semana. Por eso el `.fc-timegrid` delante, y por eso no
+   se toca la regla de `.agenda-fc .fc-col-header-cell-cushion` de más arriba,
+   que es la que comparten las dos vistas. */
+.agenda-fc .fc-timegrid .fc-col-header-cell-cushion {
+  padding-block: 0;
+  /* ⚠️ `block` Y NO EL `inline-block` QUE TRAE LA LIBRERÍA, Y NO ES COSMÉTICA:
+     son 3 px más. Un `inline-block` se asienta sobre la línea base de su
+     contenedor, así que la caja de línea le reserva DEBAJO el hueco del
+     descendente de la fuente del `<th>` — espacio vacío que no se ve y que sí
+     mide. Con la cabecera apilada nadie lo notaba dentro de 65 px; en una línea
+     eran 3 de 38. En `block` no hay caja de línea que reservar nada y la celda
+     mide sus 8+18+8. El centrado no se pierde: lo hace el `justify-content` del
+     `.ag-dayhead` de aquí arriba, no el flujo en línea. */
+  display: block;
 }
 .fc-timegrid .ag-dayhead-dow {
   font-size: 11px;
@@ -1333,7 +1471,6 @@ body {
 .fc-timegrid .ag-dayhead-num {
   font-size: 18px;
   font-weight: 800;
-  margin-top: 1px;
 }
 
 /* Día actual — fondo azul claro distintivo */
@@ -1407,20 +1544,42 @@ body {
   font-weight: 800;
 }
 
-/* El número de hoy, en círculo relleno. Mismo tamaño de cifra que un día
-   normal (18px/800 los da `.ag-dayhead-num`): lo que cambia es el disco de
-   debajo, no la tipografía. La caja es cuadrada y fija para que el círculo no
-   se deforme con los números de dos cifras. */
+/* El número de hoy.
+
+   ⚠️ AQUÍ HUBO UN DISCO RELLENO DE 28×28 Y SE RETIRÓ POR ALTO, NO POR GUSTO.
+   Era la pieza más alta de la cabecera —28 del disco más 2 de margen contra los
+   18 de una cifra normal— y por sí sola ponía la fila en 65 px cuando hoy
+   estaba a la vista, contra 54 cuando no. Al pasar la cabecera a una línea
+   (ver `.fc-timegrid .ag-dayhead`) ya no cabe: metería la fila de vuelta en 44.
+
+   QUÉ SEÑALA HOY AHORA, y por qué basta. Había TRES marcas y ahora hay dos:
+
+     1. el tinte de la columna entera .... `.fc-timegrid .fc-col-header-cell.fc-day-today`
+     2. la línea inferior de marca ....... el `box-shadow: inset 0 -3px` de esa misma regla
+     3. ~~el disco~~ ..................... retirado
+
+   Las dos que quedan NO OCUPAN ALTO: un fondo no mide, y la sombra interior
+   tampoco (por eso se eligió `box-shadow` y no `border-bottom` — ver la nota de
+   esa regla). Y el propio comentario de arriba ya argumentaba que tres marcas
+   para una cosa sobran: «Si alguien repone el degradado, tiene que quitar antes
+   el círculo, o serán tres marcas». Esto es esa misma cuenta, resuelta por el
+   otro lado.
+
+   Queda además el «· HOY» que `renderDayHeader` cuelga de la abreviatura, que
+   es la marca EN TEXTO y la única que no depende del color. Son tres señales
+   entonces, contando esa — pero ninguna de las tres cuesta un píxel de alto.
+
+   Lo que sí conserva del disco es el COLOR: la cifra se pinta en la marca, y en
+   `--ag-brand-secondary` (el azul brillante `--cs`) y no en `--ag-brand-primary`
+   (el navy `--cp`), por la trampa de nombres de CLAUDE.md regla 4 — la misma que
+   ya respetan `.ag-dayhead-hoy` y el anillo de hoy en Mes.
+
+   ⚠️ NO LLEVA `color` EN LÍNEA y eso es de `renderDayHeader`: pasa
+   `style={arg.isToday ? undefined : {color: numColor}}`, o sea que en hoy deja
+   el hueco libre a propósito para que mande esta regla. Si alguien le pone un
+   color en línea también al día de hoy, esto deja de verse. */
 .agenda-fc .ag-dayhead-num--hoy {
-  width: 28px;
-  height: 28px;
-  margin-top: 2px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: var(--ag-brand-secondary);
-  color: #fff;
+  color: var(--ag-brand-secondary);
 }
 
 /* Columna de HOY en el cuerpo del time-grid — tinte + ring inset.
@@ -1453,9 +1612,116 @@ body {
    detrás. Prefijado .fc-timegrid → no afecta Mes. */
 .fc-timegrid .fc-timegrid-col { border-color: var(--ag-col-line) !important; }
 
-/* Altura de franjas horarias — suficiente para nombres largos y badge de TZ.
-   NO REDUCIR (los nombres dejarían de caber). Aumentar es seguro. */
-.fc .fc-timegrid-slot { height: 2.16rem !important; }
+/* ── ALTURA DE FRANJA: ES UN SUELO, NO UNA ALTURA ──────────────────────────
+   ⚠️ ESTA NOTA DECÍA «NO REDUCIR (los nombres dejarían de caber)» Y ERA FALSA.
+   Medido el 2026-08-25 sobre citas reales en la rejilla: el suelo de la tarjeta
+   de 30 min son 22 px con icono y 21 sin él —16 del icono o 15 del nombre
+   (12px/15), más 2+2 de relleno y 1+1 de borde—, así que al piso de hoy (36) le
+   sobran 14. La nota daba por hecho una tarjeta de DOS líneas, y la de 30 min
+   no lo es: cae en el tier `tiny`, que ya es una fila horizontal —hora · icono ·
+   nombre, con `display: contents` en los dos envoltorios— desde que existe el
+   bloque `.ag-tarjeta--tiny` de más abajo. No había nada que desapilar.
+
+   ⚠️ PERO LOS OTROS DOS TIERS SÍ TIENEN SUELO, Y ES MÁS ALTO QUE LA FRANJA:
+   `compact` son 42 px (dos filas) y `full` 55 (tres). O sea que la nota vieja
+   acertaba en el peligro y erraba en el tier: quien se queda sin sitio al bajar
+   la franja no es la tarjeta de 30 minutos, son las de 45 y 60. Los tres suelos
+   están cableados en page.tsx —`ALTO_MINIMO_COMPACT` y `ALTO_MINIMO_FULL`— para
+   que un tier no se pinte donde no cabe. Si cambias el relleno, el hueco o la
+   tipografía de `.ag-tarjeta`, esos dos números hay que volver a medirlos.
+
+   ⚠️ LO QUE SÍ HAY QUE CUIDAR, Y LA NOTA VIEJA NO NOMBRABA: MOVER LA FRANJA
+   MUEVE LOS TIERS, EN LOS DOS SENTIDOS. El tier no se decide por duración sino
+   por ALTO RENDERIZADO (`ResizeObserver`, en page.tsx), y una cita mide siempre
+   las mismas FRANJAS: 30 min = 1, 45 = 1,5, 60 = 2, 90 = 3. Con los umbrales
+   constantes que había —40 y 56 px, calibrados a 34,56— a 24 px de franja la
+   cita de 45 min caía a `tiny` y perdía chip, huso y descriptor, y la de 60
+   caía a `compact` y perdía el descriptor. Por eso esos umbrales YA NO SON
+   CONSTANTES: se derivan de `--ag-slot-h`. Cambiar los tres valores de aquí
+   abajo no obliga a recalibrar nada allí; cambiar el NOMBRE del token, sí.
+   La tabla de qué clasifica cada piso está en el bloque de aviso de abajo.
+
+   POR QUÉ ES UN SUELO Y NO UNA ALTURA: `expandRows` está encendido en el
+   `<FullCalendar>` y en layout de tabla este `height` actúa como MÍNIMO, así que
+   las filas crecen por encima cuando sobra alto. Subirlo es seguro siempre;
+   bajarlo NO, y no por la tarjeta sino por la legibilidad de la rejilla entera.
+   Ver el bloque de aviso de más abajo antes de tocar ese número.
+
+   POR QUÉ EL UMBRAL VA POR ALTO DE VENTANA Y NO POR ANCHO: es el alto el que
+   decide cuántas horas caben. Un iPad horizontal (834) tiene el mismo problema
+   que un portátil maximizado, cuyo viewport real son 617 px —medido, no 800:
+   la pantalla son 832, `availHeight` 738 y Chrome se lleva 121—.
+
+   ⚠️ EL TOKEN EXISTE PARA ESQUIVAR EL `!important`, Y ÉSE ES TODO SU TRABAJO.
+   La declaración necesita el `!important` —hay que ganarle al alto que calcula
+   la librería—, pero un `!important` no se deja sobrescribir desde una media
+   query sin repetir la regla entera en cada tramo. Las custom properties no
+   entienden de `!important`: se resuelven ANTES de la cascada de la declaración,
+   así que basta redeclarar el token y la única línea con `!important` se queda
+   quieta. NO conviertas esto en tres reglas `.fc .fc-timegrid-slot { height: …
+   !important }` — volverías a tener el problema y encima por triplicado.
+   Y NO es `--fc-timegrid-slot-height`, la variable de la librería: ésa aquí no
+   la lee nadie (ver la nota del bloque de tokens `.fc`, más arriba).
+
+   Los dos `min-height` se acumulan en vez de acotar tramos cerrados: por encima
+   de 1101 casan los dos y gana el último, que es lo que se quiere. Un tramo
+   cerrado `(min-height: 861px) and (max-height: 1100px)` diría lo mismo con más
+   letra y con una frontera más que mantener.
+
+   ─────────────────────────────────────────────────────────────────────────
+   ⚠️⚠️ ESTOS TRES NÚMEROS SE MUEVEN JUNTOS, Y NO SON UN AJUSTE FINO.
+   ─────────────────────────────────────────────────────────────────────────
+
+   Historia corta, porque el camino ya se recorrió dos veces:
+
+       24 / 28 / 32 ....... lo que había
+       22 / 28 / 32 ....... se probó bajar el tramo bajo, y SE REVIRTIÓ
+       36 / 42 / 48 ....... lo de ahora: los tres, +50 %
+
+   ⚠️ LO QUE SE APRENDIÓ BAJANDO A 22, para que nadie lo repita: la tarjeta
+   `tiny` mide 22 px con icono y 21 sin él, o sea que a 22 CABE y ninguna
+   duración recortaba texto. Aun así se revirtió, porque «la tarjeta cabe» y «la
+   rejilla se lee» son dos criterios distintos y aquí manda el segundo: a 22 px
+   de franja la hora son 44 y la jornada se ve apelmazada aunque cada tarjeta
+   suelta esté entera. Ahora la hora son 72.
+
+   ⚠️ SUBIR EL PISO CUESTA HORAS VISIBLES, Y ES LA COMPRA QUE SE HIZO. A 617 px
+   de viewport se pasó de 8,8 h a 5,9 (5,4 compactando). El scroll sigue ahí para
+   el resto del día. Si alguien vuelve a bajarlos «para que quepa el día», que
+   sepa que eso es deshacer esta decisión, no afinarla.
+
+   ⚠️ Y MUEVEN LOS TIERS — el tramo bajo, además, para BIEN. El tier lo deciden
+   dos umbrales en page.tsx, y cada uno es un `Math.max` de dos criterios:
+   `piso × TIER_TINY_FRANJAS` contra `ALTO_MINIMO_COMPACT`, y
+   `piso × TIER_COMPACT_FRANJAS` contra `ALTO_MINIMO_FULL`. SÓLO LOS DOS
+   FACTORES SE DERIVAN DE ESTE PISO. Los dos suelos son píxeles fijos y hoy NO
+   MANDAN NUNCA —el primero pediría un piso por debajo de 33,6 y el segundo por
+   debajo de 31,43; ver la nota de las cuatro constantes en page.tsx—, así que
+   con los tramos vigentes la clasificación la recalcula sola la proporción.
+   Comprobado:
+
+       piso 24 → 30 min `tiny` · 45 `tiny`    · 60 `compact` · 90 `full`
+       piso 36 → 30 min `tiny` · 45 `compact` · 60 `full`    · 90 `full`
+
+   O sea que a 24 el tramo bajo era EL DESALINEADO: clasificaba peor que los
+   tramos de 28 y 32, donde la de 45 ya era `compact` y la de 60 ya era `full`.
+   A 36 los tres coinciden. La de 45 gana chip y huso, la de 60 gana descriptor,
+   y las dos caben de sobra sobre sus suelos físicos (54 contra 42, y 72 contra
+   55).
+
+   ⚠️ QUIÉN ARRASTRA ESTO IGUALMENTE: cualquiera que toque `.ag-tarjeta` — su
+   `padding`, su `gap`, el `font-size` de `.ag-tarjeta-nombre` o el `size` del
+   icono de `renderEventContent`. Con el piso en 36 hay colchón de sobra sobre
+   los 22 px que mide la tarjeta `tiny`, pero nada avisa cuando se acaba: la
+   tarjeta no desborda, sólo se corta el texto.
+
+   ⚠️ Y HAY UN CUARTO NÚMERO, EN OTRO ARCHIVO: `PISO_FRANJA_FALLBACK` en
+   page.tsx espeja el tramo bajo para el caso en que la lectura del token falle.
+   Subió a 36 con éste. */
+:root { --ag-slot-h: 36px; }                            /* ≤ 860 px de ventana */
+@media (min-height:  861px) { :root { --ag-slot-h: 42px } }
+@media (min-height: 1101px) { :root { --ag-slot-h: 48px } }
+.fc .fc-timegrid-slot { height: var(--ag-slot-h) !important; }
 
 /* Etiquetas del gutter de horas */
 .fc .fc-timegrid-slot-label-cushion {
@@ -1483,9 +1749,9 @@ body {
 
 /* ── Entrada de la tarjeta de evento ──────────────────────────────────
    Un fundido y una subida de 4 px cada vez que la tarjeta se monta, para que no
-   aparezca de la nada. 4 px y no más: una tarjeta de 30 min mide 34 px, y un
-   recorrido largo dentro de una rejilla de horas no se lee como entrada, se lee
-   como salto.
+   aparezca de la nada. 4 px y no más: una tarjeta de 30 min mide UNA FRANJA
+   —36, 42 o 48 px según el tramo de `--ag-slot-h`—, y un recorrido largo dentro
+   de una rejilla de horas no se lee como entrada, se lee como salto.
 
    TRES TRAMPAS DE MANTENIMIENTO, y las tres muerden en silencio:
 
@@ -1722,8 +1988,9 @@ body {
 /* ── Escalera por tier ────────────────────────────────────────────────
    El tier lo mide `ResizeObserver` en JS y llega como clase. Los hijos se
    MONTAN SIEMPRE y aquí sólo se esconden: es lo que permite que la vista Día
-   los recupere (una cita de 30 min mide 34 px y cae en `tiny` en cualquier
-   vista, pero en Día tiene ancho de sobra para enseñarlo todo).
+   los recupere (una cita de 30 min mide una franja —36, 42 o 48 px— y cae en
+   `tiny` en cualquier vista, pero en Día tiene ancho de sobra para enseñarlo
+   todo).
 
    ESTE BLOQUE ES EL DE SEMANA. En Día, todo lo que decide aquí lo pisa después
    el bloque de esa vista, que tiene un selector más específico: el relleno de
@@ -1806,10 +2073,13 @@ body {
    en claro y la superficie elevada en oscuro, sin regla por tema.
 
    SÓLO EN EL TIER `full`, y no por gusto: el cuadro mide 38 px y la tarjeta de
-   Día de un evento de 30 min mide 34,5 px en total — no cabe, y ni bajando el
-   relleno cabría. En `compact` y en `tiny` el icono se queda en los 16 px de
-   Semana, sin cuadro, que es lo que entra. Un evento genérico de media hora es
-   raro (son sesiones y guardias), pero existe. */
+   Día de un evento de 30 min mide UNA FRANJA en total —36, 42 o 48 px según el
+   alto de ventana; eran 34,5 fijos cuando se escribió esto—. Descontados el
+   relleno vertical de Día (6+6) y el borde (1+1), a la caja de contenido le
+   quedan 22, 28 o 34 px, así que el cuadro NO ENTRA EN NINGUNO DE LOS TRES
+   TRAMOS: en el más alto se queda a 4 px. En `compact` y en `tiny` el icono se
+   queda en los 16 px de Semana, sin cuadro, que es lo que entra. Un evento
+   genérico de media hora es raro (son sesiones y guardias), pero existe. */
 .agenda-fc .fc-timeGridDay-view .ag-tarjeta--full .ag-tarjeta-icono {
   --ag-tarjeta-icono-px: 26px;
   width: 38px;
@@ -2773,8 +3043,16 @@ html.dark .agenda-fc .fc-timegrid .fc-col-header-cell.fc-day-today {
   box-shadow: inset 0 -3px 0 0 var(--ag-month-today-ring);
 }
 html.dark .agenda-fc .ag-dayhead-hoy { color: var(--ag-month-today-ring); }
+/* ⚠️ ESTO ERA UN `background` Y TUVO QUE CAMBIAR A `color`. Mientras la cifra de
+   hoy fue un DISCO relleno, aquí se rebajaba ese relleno para que el blanco de
+   la cifra conservara contraste sobre fondo oscuro. Al pasar la cabecera a una
+   línea el disco se retiró (ver `.agenda-fc .ag-dayhead-num--hoy`), y un
+   `background` sin `border-radius` ni caja cuadrada dejaba un RECTÁNGULO
+   pintado detrás del número. Ahora la cifra se pinta con el mismo token que el
+   «· HOY» de la línea de arriba, así que las dos marcas de texto de la cabecera
+   dicen hoy en el mismo color. */
 html.dark .agenda-fc .ag-dayhead-num--hoy {
-  background: color-mix(in srgb, var(--ag-brand-secondary) 55%, #0f1828);
+  color: var(--ag-month-today-ring);
 }
 
 /* Círculo de "hoy" de Mes */

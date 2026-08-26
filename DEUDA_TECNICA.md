@@ -3195,4 +3195,100 @@ control» de `globals.css`.
 
 ---
 
+## Agenda — rediseño
+
+### AG-DT-1 — `mobileOpen` del Sidebar no se resetea al cruzar el breakpoint
+
+**Estado:** 🔴 abierta · **Archivo:** `src/components/layout/Sidebar.tsx:145`
+**Detectado:** 2026-08-25, de paso, midiendo el header de la agenda a 1024 px.
+**Alcance:** las 21 páginas de `(app)/layout.tsx`, no la agenda. Por eso NO se
+tocó en la rama `feature/rediseno-agenda`: el arreglo es de una línea, pero cae
+en el layout compartido de toda la app y merece su propia sesión y su propio QA.
+
+**El caso concreto**
+
+`mobileOpen` es estado local sin ninguna suscripción al ancho de la ventana. La
+única forma de apagarlo es `close()`, que cuelga del backdrop y del botón
+hamburguesa, y los dos son `lg:hidden`. Entonces:
+
+1. El usuario estrecha la ventana por debajo de 1024 —o abre las herramientas de
+   desarrollador acopladas al lado, que es la vía más frecuente y no parece un
+   redimensionado.
+2. Abre la barra lateral con la hamburguesa: `mobileOpen = true`.
+3. Vuelve a ensanchar por encima de 1024.
+
+A partir de ahí el estado queda encendido y **no hay ningún camino que lo apague
+mientras la ventana siga ancha**, porque sus dos únicos disparadores están
+ocultos por `lg:hidden`. Falta el `useEffect` con `matchMedia('(min-width:1024px)')`
+que llame a `close()` al cruzar hacia arriba.
+
+**⚠️ CORRECCIÓN AL PARTE ORIGINAL: HOY ESO NO SE VE, Y CONVIENE SABER POR QUÉ**
+
+El síntoma con el que se reportó era «la barra se queda encima del contenido sin
+forma de cerrarla». **No se reproduce con las clases actuales**, y quien vaya a
+arreglar esto debe saberlo para no ir a buscar un fallo visual que no está:
+
+- El `<aside>` es `${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`
+  (`Sidebar.tsx:253`). **Las dos ramas dan `translate-x-0` de `lg` en adelante**,
+  así que el estado rancio no mueve la barra ni un píxel.
+- El backdrop (`Sidebar.tsx:242`) es `lg:hidden`: no llega a pintarse, y por
+  tanto no hay nada tapando el contenido ni interceptando clics.
+- `<main>` es `lg:ml-64` (`(app)/layout.tsx:59`), o sea que en ancho la barra
+  tiene su propio carril y no se superpone a nada.
+
+Lo que queda es **estado rancio sin síntoma en el ancho**, con dos consecuencias
+reales aunque menores:
+
+- Al volver a estrechar, la barra aparece ABIERTA sola, sin que nadie la haya
+  pedido. Es molesto, pero se cierra: ahí la hamburguesa y el backdrop vuelven a
+  existir.
+- El icono de la hamburguesa está en `X` en vez de en `≡` la primera vez que
+  reaparece (`Sidebar.tsx:237`), o sea que anuncia «cerrar» sobre una barra que
+  el usuario ve por primera vez.
+
+**Por qué se anota igualmente:** el arreglo correcto es el mismo en los dos
+diagnósticos, y la ausencia de síntoma depende de que esas tres clases sigan
+exactamente como están. El día que la barra pase a `lg:static`, o que el backdrop
+pierda su `lg:hidden`, el bug se vuelve el bloqueo que se reportó — y entonces se
+descubre en producción y no aquí.
+
+---
+
+### AG-DT-2 — `.ag-tarjeta-hora` recorta el rango en multi-médico a 1280 px
+
+**Estado:** 🔴 abierta · **Archivo:** `src/app/globals.css:1870`
+(`.agenda-fc .ag-tarjeta-hora`)
+**Detectado:** 2026-08-25, en la auditoría del rediseño de la agenda.
+**Alcance:** NO se tocó en `feature/rediseno-agenda`. Es **preexistente** y es un
+problema **de ancho**, no de la escalera de alto que esa rama vino a arreglar:
+con los umbrales de tier anteriores los tres tiers de 30, 45 y 60 min salían
+idénticos en este caso, así que el rediseño no lo introdujo ni lo movió.
+
+**El caso concreto**
+
+Con más de un médico en la agenda, la tarjeta monta además
+`.ag-tarjeta-chip` con las iniciales. En vista Semana a 1280 px de viewport y
+con la barra lateral puesta, la columna de día mide **124 px**; descontados el
+relleno de `.ag-tarjeta` (9+9), el borde (1 + 3,5 del izquierdo engrosado), los
+márgenes de `.fc-timegrid-event` y `.fc-timegrid-col-events`, y el ancho del
+chip con su hueco, a `.ag-tarjeta-hora` le quedan **70 px** de los **75** que
+pide el rango («10:30 – 11:00», `tabular-nums` a 10,5 px/600). La regla lleva
+`overflow: hidden; text-overflow: ellipsis`, así que **no desborda: recorta en
+horizontal** y la hora de fin se queda a medias o en puntos suspensivos.
+
+**Por qué no se arregla de paso:** la salida obvia —caer a
+`.ag-tarjeta-hora-inicio`, la hora sola, como ya hace el tier `tiny`— es una
+decisión de producto (en multi-médico se pierde la hora de fin de un vistazo) y
+depende de una condición que hoy no existe en el CSS: «hay chip». El tier no
+sirve para expresarla, porque es de alto y esto es de ancho. Hay al menos tres
+caminos —una clase `--con-chip` desde el JS, un `@container` sobre la columna, o
+bajar el chip a la segunda fila cuando la columna es estrecha— y elegir pide su
+propia sesión.
+
+**Dónde vive lo relacionado:** la nota de LAS DOS HORAS en `globals.css:1881` ya
+documenta el mismo choque para el tier `tiny` sin chip, y es donde hay que
+enganchar la solución.
+
+---
+
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)

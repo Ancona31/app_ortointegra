@@ -1621,15 +1621,109 @@ function ConfirmModal({ message, onConfirm, onCancel }: {
 
 /* ─── Renderer de eventos (estilo Google) — memoizado ──── */
 
-/* Breakpoints de altura renderizada de la tarjeta (px). El tier se decide
-   midiendo el alto real del contenedor con ResizeObserver (ver abajo): es
-   lo más fiable con FullCalendar, cuyo alto de evento depende de la duración
-   y del alto de hora del grid, no calculable con certeza solo desde datos.
-   Calibrados al grid real: slot de 30min = 2.16rem ≈ 34.56px (globals.css),
-   así una cita de 1h ≈ 69.12px → cae en 'full' y el layout (con line-heights
-   ajustados abajo) cabe sin recortar el nombre. */
-const CARD_TINY_MAX = 40
-const CARD_COMPACT_MAX = 56
+/* Umbrales de tier de la tarjeta, EN FRANJAS Y NO EN PÍXELES. El tier se decide
+   midiendo el alto real del contenedor con ResizeObserver (ver abajo): es lo más
+   fiable con FullCalendar, cuyo alto de evento depende de la duración y del alto
+   de franja del grid, no calculable con certeza sólo desde datos.
+
+   ⚠️ ERAN DOS CONSTANTES EN PÍXELES —40 y 56— CALIBRADAS A UNA FRANJA DE 34,56,
+   Y DEJARON DE SERVIR cuando la franja pasó a variar con el alto de ventana
+   (`--ag-slot-h` en globals.css: 36 / 42 / 48; la nota larga está junto a
+   `.fc .fc-timegrid-slot`). Una cita mide siempre las mismas FRANJAS —30 min =
+   1, 45 = 1,5, 60 = 2, 90 = 3—, así que con umbrales fijos la clasificación se
+   descoloca en cuanto la franja se mueve, en la dirección que sea. Con los
+   tramos que había entonces —24/28/32— se descolocaba HACIA ABAJO: a 24 px la
+   de 45 min caía a `tiny` y perdía chip, huso y descriptor, y la de 60 caía a
+   `compact` y perdía el descriptor. Con los de hoy se descolocaría hacia
+   arriba —a 42 la de 30 min subiría a `compact`—, que es el mismo fallo por el
+   otro lado.
+
+   POR QUÉ 1,25 Y 1,75: son los PUNTOS MEDIOS entre las duraciones que separan
+   —1,25 está entre 1 y 1,5 franjas; 1,75 entre 1,5 y 2—, así que dejan un cuarto
+   de franja de margen a cada lado (9 px a 36, 12 a 48) y NINGÚN umbral cae sobre
+   un alto alcanzable. El 56 de antes caía EXACTAMENTE sobre la cita de 60 min
+   con la franja a 28 (2 × 28 = 56) y la comparación es `<`, así que un subpíxel
+   a la baja la degradaba. Si tocas estos factores, comprueba que ninguno quede
+   en 1, 1,5, 2 ni 3.
+
+   ⚠️ SE DERIVAN DEL PISO, NO DEL ALTO YA RENDERIZADO, y esa distinción es la que
+   mantiene vivo lo bueno de `expandRows`: cuando sobra alto las franjas se
+   estiran, las tarjetas suben de tier y enseñan más, que es justo lo que se
+   quiere. Derivarlos del alto estirado ataría el tier a la duración para
+   siempre, y una cita de 30 min en una rejilla de cuatro horas se quedaría en
+   una línea dentro de una tarjeta de 75 px. */
+const TIER_TINY_FRANJAS = 1.25
+const TIER_COMPACT_FRANJAS = 1.75
+
+/* ⚠️ SUELOS FÍSICOS DE CADA TIER — HOY SON DOS GUARDAS INERTES, Y ASÍ HAY QUE
+   LEERLAS. No actúan en ninguno de los tres tramos de `--ag-slot-h` (36/42/48).
+   No se borran porque el día que la franja baje vuelven a hacer falta, y porque
+   son lo único que documenta cuánto alto pide cada tier de verdad.
+
+   QUÉ HACEN. Entran por el `Math.max` de abajo, una por umbral, y sólo mandan
+   cuando la proporción se queda por debajo del suelo:
+
+     · `Math.max(piso × 1,25, 42)` → el suelo gana con piso < 33,6.
+     · `Math.max(piso × 1,75, 55)` → el suelo gana con piso < 31,43.
+
+   O sea que el tramo bajo tendría que caer de 36 a menos de 33,6 para que la
+   primera muerda. Mientras los tres tramos sean 36/42/48, la clasificación la
+   decide ENTERA la proporción de arriba.
+
+   DE DÓNDE SALEN LOS NÚMEROS. Medido el 2026-08-25 sobre citas reales en la
+   rejilla:
+
+     · `tiny` = 22 px. Es una fila: sus dos envoltorios pasan a `display:
+       contents` y sólo queda el más alto (16 del icono, 15 del nombre) + 2+2 de
+       relleno + 1+1 de borde.
+     · `compact` = 41 px, 42 con icono. Dos filas: 15 (hora + chip) + 1 de hueco
+       + 15 del nombre (16 si hay icono) + 4+4 + 1+1.
+     · `full` = 55 px. Las dos de `compact` más la del descriptor: + 1 de hueco
+       + 13 de línea.
+
+   POR QUÉ EXISTEN, que es lo que las hace valer aunque hoy no disparen. Se
+   escribieron con el tramo bajo en 24, donde la proporción sola clasificaba
+   bien y RECORTABA:
+
+     · Una cita de 45 min mide 1,5 franjas = 36 px a piso 24, caía en `compact`
+       por proporción y le faltaban 5: se comía la fila del NOMBRE. Eso sí lo
+       delataba el `scrollHeight`.
+     · Una de 60 min mide 2 franjas = 48 px, caía en `full` y le faltaban 7.
+       Pero `.ag-tarjeta-desc` NO lleva `flex-shrink: 0` —sus dos hermanas sí—,
+       así que en vez de desbordar SE ENCOGÍA de 13 px a 6 y partía la palabra
+       del estado por la mitad, en horizontal. La tarjeta no desbordaba y el
+       `scrollHeight` daba 0: hay que mirarlo, o medir la fila del descriptor.
+
+   Con el `Math.max`, a piso 24 la de 45 bajaba a `tiny` y la de 60 a `compact`:
+   se perdía contenido a propósito —chip, huso, descriptor— porque perderlo es
+   mejor que enseñarlo cortado. Al subir el tramo bajo a 36 ese régimen
+   desapareció, no la razón de tenerlo cubierto.
+
+   ⚠️ SI TOCAS EL RELLENO, EL HUECO O LA TIPOGRAFÍA DE `.ag-tarjeta`, ESTOS DOS
+   NÚMEROS SE QUEDAN VIEJOS EN SILENCIO — y ahora encima sin síntoma, porque no
+   disparan: el error se descubriría el día que baje la franja. Vuelve a medir
+   la fila más alta de cada tier, y recalcula los dos puntos de corte de arriba
+   (suelo ÷ 1,25 y suelo ÷ 1,75) para saber si has metido alguno dentro de los
+   tramos vigentes. */
+const ALTO_MINIMO_COMPACT = 42
+const ALTO_MINIMO_FULL = 55
+
+/* El tramo de ventana baja. Es el fallback porque es el único en el que el piso
+   aprieta de verdad: si la lectura del token fallara, es el que menos daño hace
+   —clasifica igual que hoy en cualquier ventana, sólo que sin margen extra en
+   las altas—.
+   ⚠️ TIENE QUE SEGUIR AL TRAMO BAJO DE `--ag-slot-h` (globals.css). Subió de 24
+   a 36 con él. Desincronizarlos no rompe nada visible: sólo haría que, en el
+   caso en que la lectura del token falla, los umbrales de tier se calculen sobre
+   un piso que no es el que la rejilla está usando. */
+const PISO_FRANJA_FALLBACK = 36
+
+/** Piso de franja vigente, leído del token que fijan las media queries. */
+function leerPisoFranja(): number {
+  const crudo = getComputedStyle(document.documentElement).getPropertyValue('--ag-slot-h')
+  const px = Number.parseFloat(crudo)
+  return Number.isFinite(px) && px > 0 ? px : PISO_FRANJA_FALLBACK
+}
 
 /* La hora de INICIO sola, para el tier `tiny` fuera de Día (ver la nota de las
    dos horas en la tarjeta). Espeja el `eventTimeFormat` del <FullCalendar> —2
@@ -1693,12 +1787,28 @@ const MemoizedEventContent = memo(function MemoizedEventContent({
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const [height, setHeight] = useState<number | null>(null)
+  const [pisoFranja, setPisoFranja] = useState(PISO_FRANJA_FALLBACK)
 
-  // Mide el alto real asignado por FullCalendar (root con height:100%).
+  /* Mide el alto real asignado por FullCalendar (root con height:100%), y de
+     paso relee el piso de franja.
+
+     ⚠️ EL PISO SE RELEE AQUÍ Y NO EN UN LISTENER DE `resize` PROPIO, y no es
+     pereza: cualquier cambio de alto de ventana redimensiona la rejilla —es
+     `flex-1` dentro de una raíz en `dvh`— y con ella todas las tarjetas, así que
+     este observer ya se dispara. Un segundo listener sería el mismo evento
+     contado dos veces.
+
+     Los dos `setState` van sueltos y con valores PRIMITIVOS a propósito: React
+     los agrupa en el mismo tick y descarta el render si el valor no cambió. Un
+     único `useState` con un objeto `{height, piso}` re-renderizaría en cada
+     latido del observer, que es varias veces por arrastre y por tarjeta. */
   useEffect(() => {
     const el = rootRef.current
     if (!el) return
-    const update = () => setHeight(el.getBoundingClientRect().height)
+    const update = () => {
+      setHeight(el.getBoundingClientRect().height)
+      setPisoFranja(leerPisoFranja())
+    }
     update()
     const ro = new ResizeObserver(update)
     ro.observe(el)
@@ -1710,16 +1820,21 @@ const MemoizedEventContent = memo(function MemoizedEventContent({
      ⚠️ EL TIER SALE COMO CLASE Y NO COMO RAMA DE MARKUP, Y NO ES ESTILO: ES LO
      QUE HACE POSIBLE LA VISTA DÍA. Antes cada tier renderizaba hijos distintos
      —`tiny` no montaba la hora ni el descriptor—, así que una cita de 30 min,
-     que mide 34 px y cae en `tiny` en CUALQUIER vista, llegaba a Día sin los
+     que mide UNA FRANJA y cae en `tiny` en CUALQUIER vista, llegaba a Día sin los
      elementos que su fila horizontal tiene que enseñar. En Día sobra ancho y no
      falta nada, pero un hijo que no existe no se puede volver a enseñar con
      CSS. Montando siempre los mismos hijos y escondiéndolos por clase, la regla
      de `.fc-timeGridDay-view` los recupera. Si vuelves a ramificar el markup por
      tier, la vista Día se rompe en silencio para las citas cortas. */
+  /* Dos criterios por umbral y gana el mayor: la PROPORCIÓN conserva la escalera
+     por duración cuando la franja da de sí, y el SUELO FÍSICO impide pintar un
+     tier donde iba a salir cortado. Ver la nota de las cuatro constantes. */
+  const umbralTiny = Math.max(pisoFranja * TIER_TINY_FRANJAS, ALTO_MINIMO_COMPACT)
+  const umbralCompact = Math.max(pisoFranja * TIER_COMPACT_FRANJAS, ALTO_MINIMO_FULL)
   const tier: 'tiny' | 'compact' | 'full' =
     height == null ? 'full'
-      : height < CARD_TINY_MAX ? 'tiny'
-        : height < CARD_COMPACT_MAX ? 'compact'
+      : height < umbralTiny ? 'tiny'
+        : height < umbralCompact ? 'compact'
           : 'full'
 
   /* El color elegido MANDA sobre el del estado cuando lo hay, y sólo lo hay en
@@ -2216,7 +2331,14 @@ const VISTAS_FC = {
     dayHeaderFormat: { weekday: 'long' },
     titleFormat:     { month: 'long', year: 'numeric' },
   },
-  timeGridWeek: { titleFormat: { day: 'numeric', month: 'long', year: 'numeric' } },
+  /* ⚠️ `month: 'short'` Y NO `'long'`. En largo esto daba «24 – 28 de agosto de
+     2026» y medía 282,77 px a 22 px de cuerpo — el elemento más ancho de la fila
+     con diferencia, y lo que dejaba a la leyenda sin sitio para caber en una
+     línea. En corto sale «24 – 28 ago 2026». El separador largo lo pone
+     `titleRangeSeparator` en el <FullCalendar>, no esto.
+     Mes y Día se quedan en largo A PROPÓSITO: Mes ya es sólo «agosto de 2026» y
+     no aprieta, y en Día el día de la semana es información que ahí se quiere. */
+  timeGridWeek: { titleFormat: { day: 'numeric', month: 'short', year: 'numeric' } },
   timeGridDay:  { titleFormat: { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' } },
 } as const
 
@@ -2316,15 +2438,21 @@ function contarVisibles(
   return { citas, eventos: genericos, google }
 }
 
-/** «· 3 citas · 2 eventos · 1 de Google». Sólo las categorías con al menos uno;
- *  cadena vacía si no hay ninguna, para que el subtítulo quede tal cual. */
+/** «3 citas · 2 eventos · 1 de Google». Sólo las categorías con al menos uno;
+ *  cadena vacía si no hay ninguna.
+ *
+ *  ⚠️ DEVUELVE LA FRASE SUELTA, SIN SEPARADOR DELANTE. Lo llevaba —empezaba por
+ *  « · » para pegarse detrás de «Gestión de citas clínicas»— y dejó de servir
+ *  cuando esa frase pasó a esconderse por debajo de `2xl`: el separador se
+ *  quedaba huérfano al principio de la línea. Ahora lo pone quien compone el
+ *  subtítulo, que es el único que sabe si hay algo delante. */
 function frasearConteo(c: ConteoVisible): string {
   const partes: string[] = []
   if (c.citas > 0)   partes.push(`${c.citas} ${c.citas === 1 ? 'cita' : 'citas'}`)
   if (c.eventos > 0) partes.push(`${c.eventos} ${c.eventos === 1 ? 'evento' : 'eventos'}`)
   // Sin plural que cambiar: «1 de Google», «4 de Google».
   if (c.google > 0)  partes.push(`${c.google} de Google`)
-  return partes.length === 0 ? '' : ` · ${partes.join(' · ')}`
+  return partes.join(' · ')
 }
 
 export default function AgendaPage() {
@@ -3166,7 +3294,9 @@ export default function AgendaPage() {
      desde el modal se puede cambiar de idea sin cerrarlo: el control de dos
      posiciones del alta llama a `onCambiarTipo` y reemplaza este `tipo`.
      Antes esto era la única forma de decidirlo y por eso no había vuelta atrás
-     salvo cerrar el modal y entrar por el botón «Nuevo evento». */
+     salvo cerrar el modal y entrar por un segundo botón del header, «Nuevo
+     evento», que ya no existe: el conmutador lo dejó sin trabajo y se retiró
+     para que el header cupiera en una línea. Ver la nota del botón «Agendar». */
   function handleDateClick(arg: DateClickArg) {
     // Fase 8.2: bloqueo creación de citas si suscripción cancelada con >5 pacientes
     if (subState.isBlocked) { openBloqueoModal(); return }
@@ -3518,6 +3648,10 @@ export default function AgendaPage() {
     )
   }, [horario])
 
+  /* Fuera del JSX porque el subtítulo lo consulta DOS veces: para decidir si la
+     frase descriptiva se esconde y para pintar la frase misma. */
+  const resumenConteo = frasearConteo(conteo)
+
   return (
     /* ⚠️⚠️ LA ALTURA DE ESTE `<div>` ES LO QUE PARTE LA PÁGINA EN DOS ZONAS: la
        de arriba fija (título, controles, barra de navegación y cabecera de
@@ -3548,17 +3682,56 @@ export default function AgendaPage() {
        nada visible de golpe, sólo deja la rejilla unos píxeles más alta o más
        baja que el hueco, y reaparece el scroll de `<main>` bajo la zona fija.
        Hay una nota recíproca en `(app)/layout.tsx` junto al padding. Si cambias
-       uno, cambia el otro. */
-    <div className="flex flex-col h-[calc(100dvh-88px)] lg:h-[calc(100dvh-64px)]">
+       uno, cambia el otro.
+
+       ⚠️⚠️ PERO DE `lg` EN ADELANTE ESTOS 64 YA NO SON LO QUE MANDA, Y LA CLASE
+       `agenda-raiz` DE AQUÍ ARRIBA ES POR QUÉ. En `globals.css`, junto a
+       `.agenda-fc`, hay una regla `main > div:has(.agenda-fc)` que recorta el
+       padding del layout A 16 px SÓLO en esta página y, EN LA MISMA REGLA, le
+       da a `.agenda-raiz` el `calc(100dvh - 16px)` que le corresponde. Los dos
+       números viven ahí en líneas contiguas y ya no pueden divergir.
+       LO QUE SIGUE VIVO DE ESTE `lg:h-[calc(100dvh-64px)]`: es el RESPALDO. Si
+       `:has()` no está soportado (Firefox < 121), aquella regla no casa, el
+       padding se queda en 64 y este calc de 64 vuelve a ser el correcto. Por eso
+       el número de aquí NO se cambia a 16: emparejado con el padding que habría
+       en ese caso, es exacto. Cambiarlo rompería precisamente el respaldo. */
+    <div className="agenda-raiz flex flex-col h-[calc(100dvh-88px)] lg:h-[calc(100dvh-64px)]">
 
       {/* ── Header ──────────────────────────────────────── */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight text-[#1d1d1f]">Agenda</h1>
           {/* El conteo es de LO QUE LA VISTA PINTA, así que sale solo del rango
               activo y no hace falta condicionarlo por vista: en Mes cuenta el
               mes, en Semana la semana y en Día el día. Ver `contarVisibles`. */}
-          <p className="text-sm text-[#86868b] mt-0.5">Gestión de citas clínicas{frasearConteo(conteo)}</p>
+          {/* ── ⚠️ ESTE SUBTÍTULO NO PUEDE ENVOLVER, Y POR ESO LA FRASE SE VA ──
+              La barra lateral es fija y se lleva 256 px, así que en un portátil
+              con la ventana maximizada (1280 px) a la agenda le quedan 1024. A
+              ese ancho «Gestión de citas clínicas · 1 cita · 1 evento» caía a
+              dos líneas él solo y empujaba la fila entera a tres.
+
+              De las dos mitades, la que se va es la frase: es decorativa y dice
+              lo que el `<h1>` de arriba y la propia rejilla ya dicen. El conteo
+              no, que es dato y cambia al navegar. Por eso la frase sólo aparece
+              de `2xl` (1536 px de viewport = 1280 útiles) en adelante.
+
+              ⚠️ EL `2xl` ES DE VIEWPORT Y EL ANCHO QUE IMPORTA ES EL ÚTIL: hay
+              256 px de diferencia entre los dos y Tailwind no sabe de la barra
+              lateral. Mismo desfase que en «Compactar» y «Horario», y por eso
+              los tres usan el mismo peldaño: si se toca uno, se tocan los tres.
+
+              Sin conteo (rango vacío) la frase se queda pase lo que pase: es
+              eso o un subtítulo en blanco, que además encogería el bloque y
+              haría saltar el alto del header al navegar. */}
+          <p className="text-sm text-[#86868b] mt-0.5 whitespace-nowrap">
+            <span className={resumenConteo ? 'hidden 2xl:inline' : undefined}>Gestión de citas clínicas</span>
+            {resumenConteo && (
+              <>
+                <span className="hidden 2xl:inline"> · </span>
+                {resumenConteo}
+              </>
+            )}
+          </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           {/* Segmented control de vistas — desktop only (móvil queda fijo en Día,
@@ -3643,19 +3816,58 @@ export default function AgendaPage() {
                   }}
             >
               <ChevronsDownUp size={15} />
-              {/* ⚠️  `xl`, NO `sm`. La fila ya lleva cinco controles y en
-                  anchos de portátil envuelve a dos líneas. El icono y el
-                  `aria-label` se bastan por debajo de ese punto. */}
-              <span className="hidden xl:inline">Compactar</span>
+              {/* ⚠️  `2xl`, NO `xl` NI `sm`. Y el peldaño NO se elige por cómo
+                  se ve el botón suelto: se elige por si la FILA ENTERA cabe en
+                  una línea, que es lo que se rompía.
+
+                  El desfase que hay que tener en la cabeza: la barra lateral es
+                  fija y se lleva 256 px, así que un portátil maximizado (1280 de
+                  viewport, o sea `xl`) le deja a la agenda 1024 útiles. Con `xl`
+                  la etiqueta aparecía justo ahí, que es el ancho donde no cabe.
+                  `2xl` (1536 de viewport) son 1280 útiles, y ahí sí.
+
+                  Por debajo manda el icono, que es lo que este botón tiene de
+                  suyo: `aria-label` y `title` dicen lo mismo que la etiqueta y
+                  no dependen del ancho. Hermanos de peldaño: la etiqueta de
+                  «Horario» y la frase del subtítulo. Los tres se mueven a la
+                  vez o el header vuelve a envolver. */}
+              <span className="hidden 2xl:inline">Compactar</span>
             </button>
           )}
           {/* Filtro por médico — solo en modo multi-doctor */}
           {!isSingleDoctor && (
             <div className="relative">
+              {/* ── ⚠️ EL TOPE DE 240 px ES LO QUE IMPIDE QUE ESTE CONTROL VUELVA A
+                  TIRAR LA FILA A DOS LÍNEAS, Y EL NÚMERO ESTÁ MEDIDO ──────────
+                  Un `<select>` se dimensiona por su OPCIÓN MÁS ANCHA, no por la
+                  seleccionada. O sea que es el único control del header cuyo
+                  ancho lo decide el contenido de la clínica y no el diseño: una
+                  clínica con «Dra. María Guadalupe Hernández Villaseñor» en la
+                  lista arrastra la fila entera aunque el filtro esté en «Todos
+                  los médicos».
+
+                  El caso peor NO es el ancho más estrecho, que es lo que
+                  engaña: es `2xl` (1280 px útiles), donde las etiquetas de
+                  «Compactar» y «Horario» vuelven y el subtítulo recupera su
+                  frase. Medido ahí, con el subtítulo largo («128 citas · 34
+                  eventos · 12 de Google»), la fila tenía 85 px de holgura sobre
+                  un `<select>` de 226. Es decir: envuelve pasando de 311 px.
+                  A 1024 útiles la holgura es de 135, así que ese ancho NO es el
+                  que manda. Si vuelves a medir, mide a `2xl`.
+
+                  240 se eligió por encima de los 226 de hoy —así que con los
+                  datos actuales no recorta nada— y 71 px por debajo del punto de
+                  ruptura, que es el margen que se le deja al día que cambie la
+                  tipografía, el padding o el texto del subtítulo.
+
+                  ⚠️ NO LO SUBAS PARA QUE «QUEPA UN NOMBRE LARGO». Ese es el
+                  trabajo del desplegable: el `<option>` no está capado y enseña
+                  el nombre completo, así que la elipsis no esconde información,
+                  sólo la aplaza un clic. */}
               <select
                 value={filtroMedico}
                 onChange={e => setFiltroMedico(e.target.value)}
-                className="appearance-none pl-3 pr-9 py-2.5 rounded-[var(--ag-r-btn)] text-sm font-medium cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-[var(--ag-surface)] border border-[var(--ag-border-card)] text-[var(--ag-text)] hover:bg-[var(--ag-bg-app)]"
+                className="appearance-none max-w-[240px] truncate pl-3 pr-9 py-2.5 rounded-[var(--ag-r-btn)] text-sm font-medium cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-[var(--ag-surface)] border border-[var(--ag-border-card)] text-[var(--ag-text)] hover:bg-[var(--ag-bg-app)]"
               >
                 <option value="">Todos los médicos</option>
                 {medicos.map(m => (
@@ -3672,55 +3884,61 @@ export default function AgendaPage() {
             <button
               onClick={() => setHorarioOpen(true)}
               className="flex items-center gap-2 px-3 py-2.5 rounded-[var(--ag-r-btn)] text-sm font-medium transition-colors bg-[var(--ag-surface)] border border-[var(--ag-border-card)] text-[var(--ag-text)] hover:bg-[var(--ag-bg-app)]"
+              /* El `aria-label` se añadió AL ESCONDER LA ETIQUETA: por debajo de
+                 `2xl` este botón es sólo un engranaje, y sin él su nombre
+                 accesible dependía del `title`, que es el último recurso del
+                 algoritmo de nombre y no todos los lectores lo anuncian igual. */
+              aria-label="Configurar horario de consulta"
               title="Configurar horario de consulta"
             >
               <Settings size={15} />
-              <span className="hidden sm:inline">Horario</span>
+              {/* `2xl` por lo mismo que «Compactar» —ver su nota—: `sm` mostraba
+                  la etiqueta desde 640 px, o sea prácticamente siempre, y estos
+                  ~60 px eran parte de lo que tiraba la fila a la línea de
+                  abajo. El `title` de arriba es lo que queda diciéndolo. */}
+              <span className="hidden 2xl:inline">Horario</span>
             </button>
           )}
-          {/* ── DOS PUERTAS, NO UN SELECTOR ESCONDIDO ──────────────────────
-              El tipo se elige al entrar y ya no se cambia (ver `TipoFila`), así
-              que la puerta ES la elección. Un segmento dentro del modal haría
-              lo mismo con un paso más y con la duda de qué se está creando
-              mientras se rellena.
+          {/* ── UNA PUERTA, Y EL TIPO SE ELIGE DENTRO ──────────────────────
+              Aquí hubo DOS botones —«Nuevo evento» y «Nueva cita»—, cada uno
+              abriendo el modal con su tipo. El comentario que los defendía decía
+              que «el tipo se elige al entrar y ya no se cambia, así que la
+              puerta ES la elección». Eso era verdad mientras el alta no tuvo
+              ningún control de tipo, y dejó de serlo el 2026-08-22, cuando se le
+              puso arriba uno de dos posiciones (`TIPOS_ALTA`) porque quien entra
+              pulsando un hueco —la vía más usada— no tenía forma de cambiar de
+              idea sin cerrar y volver por la otra puerta.
 
-              Este botón es secundario a propósito: agendar es lo que la agenda
-              hace todo el día; bloquear un hueco o apuntar una junta, no.
+              Desde entonces las dos puertas llevaban al mismo sitio y la de
+              «Nuevo evento» sólo preseleccionaba lo que el conmutador ya hace en
+              un clic. Se retira: costaba ~134 px de una fila que a 1024 px
+              útiles envolvía a tres líneas y se comía un tercio del alto de la
+              rejilla. Lo que se pierde es un atajo; lo que se gana es la agenda.
 
-              Arrastrar sobre el calendario y pulsar en un hueco siguen abriendo
-              CITA — es lo que espera quien hace ese gesto.
+              ⚠️ NO LA REPONGAS «PARA QUE SE VEA QUE SE PUEDEN CREAR EVENTOS».
+              Si eso no se ve, el sitio donde arreglarlo es el conmutador del
+              modal, no el header.
 
-              ── ⚠️ ANOTACIÓN 2026-08-22 — «NI UN SELECTOR ESCONDIDO» YA NO ES
-              EXACTO, Y LO QUE IMPORTA DE ESTE COMENTARIO SIGUE SIÉNDOLO ──────
-              Todo lo de arriba se mantiene: estos dos botones siguen siendo las
-              dos puertas, el hueco y el arrastre siguen abriendo CITA, y en
-              EDICIÓN el tipo sigue sin poder cambiarse.
+              LO QUE DE AQUEL COMENTARIO SIGUE SIENDO CIERTO:
 
-              Lo que dejó de ser cierto es que no haya ningún control: EN EL ALTA
-              hay uno, de dos posiciones, arriba del todo del modal. Se añadió
-              porque quien entra pulsando un hueco —que es la vía más usada— no
-              tenía forma de cambiar de idea sin cerrar y volver por la otra
-              puerta.
+              · **En EDICIÓN el tipo no se puede cambiar, y no es un olvido.**
+                Convertir una cita en evento sería quitarle el paciente por una
+                puerta lateral, y eso se parece demasiado a un borrado (§12.18,
+                y la nota larga de `TipoFila`). Ese motivo presupone UNA FILA QUE
+                YA EXISTE; en el alta no la hay, así que el conmutador no
+                convierte nada: elige qué se va a crear. Por eso hay control en
+                el alta y no en la edición.
 
-              Y no contradice el motivo de aquella decisión, que era que cambiar
-              el tipo sería quitarle el paciente a una cita por una puerta
-              lateral (§12.18). Ese motivo presupone UNA FILA QUE YA EXISTE; en
-              el alta no la hay, así que no se convierte nada: se elige qué se va
-              a crear. En edición, donde el motivo sí aplica, no hay control. */}
-          <button
-            onClick={() => {
-              if (subState.isBlocked) { openBloqueoModal(); return }
-              /* El botón sí aporta hora: la de ahora. Es una de las cuatro
-                 rutas que NO cambian con la hora vacía de la vista Mes. */
-              const { fecha, hora } = partirFechaHora(new Date().toISOString())
-              setModal({ mode: 'create', fecha, hora, tipo: 'evento' })
-            }}
-            title="Cirugía, reunión, bloqueo de horario — sin paciente ligado"
-            className="flex items-center gap-2 px-3 py-2.5 rounded-[var(--ag-r-btn)] text-sm font-medium transition-colors bg-[var(--ag-surface)] border border-[var(--ag-border-card)] text-[var(--ag-text)] hover:bg-[var(--ag-bg-app)]"
-          >
-            <CalendarPlus size={15} />
-            <span className="hidden sm:inline">Nuevo evento</span>
-          </button>
+              · **Pulsar un hueco y arrastrar sobre el calendario siguen
+                abriendo CITA**, que es lo que espera quien hace ese gesto. Este
+                botón hace lo mismo, por lo mismo: agendar es lo que la agenda
+                hace todo el día.
+
+              ⚠️ EL TEXTO NO PUEDE DECIR «NUEVA CITA», que es lo que decía. Ya no
+              describe lo que abre —un modal que también crea eventos— y sería la
+              única pista de que el conmutador existe apuntando en la dirección
+              contraria. «Agendar» es el verbo que cubre las dos cosas y de paso
+              ocupa menos. El `title` dice el resto. */}
           <button
             onClick={() => {
               if (subState.isBlocked) { openBloqueoModal(); return }
@@ -3730,10 +3948,11 @@ export default function AgendaPage() {
               setModal({ mode: 'create', fecha, hora, tipo: 'cita' })
             }}
             data-onboard="nueva-cita"
+            title="Nueva cita o evento — el tipo se elige arriba del modal"
             className="flex items-center gap-2 px-4 py-2.5 rounded-[var(--ag-r-btn)] text-sm font-semibold text-white transition-all shadow-sm hover:brightness-95 bg-[linear-gradient(135deg,var(--ag-brand-primary),var(--ag-brand-secondary))]"
           >
             <Plus size={15} />
-            Nueva cita
+            Agendar
           </button>
         </div>
       </div>
@@ -3783,7 +4002,7 @@ export default function AgendaPage() {
           contenido; sin un valor explícito, `flex-1` no acota nada, la tarjeta
           crece hasta lo que mida la rejilla y el calendario desborda su zona.
           Aquí estuvo `min-h-0` haciendo ese trabajo. Ya no hace falta: CUALQUIER
-          valor explícito desactiva el `auto`, así que el `min-h-[315px]` de
+          valor explícito desactiva el `auto`, así que el `min-h-[250px]` de
           abajo cumple las dos funciones a la vez. No los pongas juntos — serían
           dos `min-height` compitiendo, y quién gana dependería del orden en que
           Tailwind los emita.
@@ -3793,7 +4012,7 @@ export default function AgendaPage() {
           No lo repongas «para que no quede pequeño en pantallas grandes»: en
           pantallas grandes `flex-1` ya le da todo el hueco sobrante.
 
-          ⚠️ Y EL PISO VA EN PÍXELES — `min-h-[315px]`, en la clase de abajo.
+          ⚠️ Y EL PISO VA EN PÍXELES — `min-h-[250px]`, en la clase de abajo.
           Con `min-h-0` la tarjeta encogía hasta CERO y aparecía un caso
           degradado real: a zoom extremo (~270 px de viewport CSS) la zona
           fija se come casi todo, `flex-1` deja la rejilla en una decena de
@@ -3803,42 +4022,84 @@ export default function AgendaPage() {
           EN PÍXELES Y NO EN `vh`: el `minHeight: '70vh'` de antes fallaba
           justamente por ser relativo — crecía con la ventana y volvía a
           desbordar. Un suelo fijo no puede perseguir al contenedor.
-          DE DÓNDE SALE EL 315. El criterio no ha cambiado —cromo constante más
-          CINCO FRANJAS de cuerpo (34.6 px cada una = 173 px), o sea dos horas y
-          media de rejilla: apretado pero utilizable, con scroll interno para el
-          resto del día—. Lo que cambió es el cromo, y por dos motivos, ninguno
-          de ellos el título:
+          DE DÓNDE SALE EL 250. El criterio con el que se eligió —el mismo desde
+          el 280, el 295 y el 220— es cromo constante más CINCO FRANJAS de cuerpo
+          —dos horas y media de rejilla, apretado pero utilizable, con scroll
+          interno para el resto del día—. El cromo se midió el 2026-08-25 en la
+          rejilla real a 1280 × 617 con la barra lateral puesta:
 
-            · toolbar 59 px   (14+14 de padding + 30 del botón más alto —12 px
-              × 1.5 de línea + 5+5 + 2 de borde— + 1 de línea inferior)
+            · fila del toolbar 60,32 px  MEDIDO, ya sin envolver — ver abajo.
             · banda de vista compacta 33 px, SÓLO con «Compactar» encendido
-            · cabecera de días 47 px  (8+8 + 11 de la abreviatura + 1 + 18 del
-              número + 1)
+            · cabecera de días 35 px, y ya sin vaivén — ver abajo.
 
-          Sumas: 106 sin banda → piso 279. Con banda → 312. Y por debajo de
-          768 px, donde la leyenda baja a fila propia (45.5), → 324.
-          Se toma 315: cubre con las cinco franjas el peor caso de ESCRITORIO,
-          que es donde el piso actúa de verdad, y en móvil deja 4,7 franjas.
-          Subirlo hasta cubrir también los 324 adelantaría la reaparición del
-          segundo scroll a cambio de un tercio de franja.
+          Cromo del peor caso (con banda, con hoy): 60,32 + 33 + 35 = 128,32.
 
-          ⚠️ EL 280 ANTERIOR NO SUBIÓ POR EL TÍTULO. Pasó de 16 a 22 px y el
-          toolbar NO creció: la fila la manda el botón, con 30 px, y el título a
-          22 × 1.2 son 26.4. Lo que engordó el cromo fue meter la LEYENDA dentro
-          de la tarjeta (gratis en escritorio, porque comparte fila con el
-          toolbar; 45.5 px por debajo de 768) y la banda de recorte. Su
-          `line-height: 1.2` explícito es lo que sostiene esa cuenta — está
-          anotado también en globals.css.
-          Y las cifras viejas de aquel comentario (toolbar 60.3, cabecera 37.5)
-          eran de antes del header de día apilado; no las restaures.
+          ⚠️ Y EL 250 SE QUEDÓ CORTO RESPECTO A SU PROPIO CRITERIO — LÉELO ANTES
+          DE APOYARTE EN ÉL. Se fijó con el tramo bajo de `--ag-slot-h` en 24:
+          cinco franjas eran 120 y el total 248,32 → 250. Ese tramo subió a 36
+          (ver la nota junto a `.fc .fc-timegrid-slot`), así que cinco franjas
+          son hoy 180 y el mismo criterio pediría 128,32 + 180 = 308,32 → 310.
+          Con 250, al cuerpo le quedan 121,68 px = 3,38 FRANJAS: hora y media
+          larga de rejilla, no dos y media.
+          SE DEJA EN 250 A PROPÓSITO, no por descuido. Subirlo a 310 adelanta el
+          punto en el que el piso muerde de ~344 a ~404 px de viewport (ver
+          «CUÁNDO ENTRA EN JUEGO», abajo), o sea que devuelve el segundo scroller
+          a una banda de 60 px de alturas de ventana donde hoy no está — y ese
+          segundo scroller es exactamente lo que todo este bloque vino a quitar.
+          A cambio, en el caso degradado se ven 3,38 franjas en vez de 5. Si
+          alguien decide que no bastan, el número al que hay que ir es 310 y el
+          coste es ése; no lo subas a ojo.
 
-          CUÁNDO ENTRA EN JUEGO: cuando `100dvh − 64 − (zona fija de página)`
-          baja de 315. Con el header en una línea la zona fija son ~140 px, así
-          que actúa por debajo de ~455 px de viewport; si el header envuelve a
-          dos líneas (anchos por debajo de ~1170 px), ~505 px. Ninguna ventana de
-          trabajo normal llega ahí; el caso degradado sí, y ahí preferimos una
-          rejilla usable con un segundo scroll a una rejilla de diez píxeles sin
-          él. */}
+          ⚠️ POR QUÉ BAJÓ DE 295 A 250, pieza a pieza, para que nadie lo lea como
+          un número aflojado: la cabecera de día pasó de apilada a una línea
+          (−30) y el toolbar dejó de envolver al acortarse la fecha (−13,68). El
+          piso de franja NO participa en esa bajada: cuando se fijó el 250 valía
+          24 —había pasado por 22 y se devolvió a 24— y las cinco franjas eran
+          120. Que después subiera a 36 es lo que abrió el hueco de arriba, y es
+          posterior a esta bajada. Los dos cambios están anotados donde viven.
+
+          ⚠️ LA LEYENDA YA NO ENVUELVE, Y ESO SE GANÓ POR EL LADO DE LA FECHA.
+          Necesita 479 px en una línea con «GCal» y durante un tiempo su celda le
+          daba 453,46 a 954 px de interior de tarjeta: faltaban 25,54 y la fila
+          medía 74 en vez de 60,32. Lo que cerró el hueco NO fue tocar la
+          leyenda sino encoger la etiqueta de fecha —de «24 – 28 de agosto de
+          2026» a 22 px (282,77) a «24 – 28 ago 2026» a 15 px (129,53)—, que le
+          devolvió 153,24 px a la celda. Hoy la leyenda tiene 606,7 y le sobran
+          127,7.
+          ⚠️ SI ALGUIEN REPONE LA FECHA LARGA O SUBE SU CUERPO, LA LEYENDA VUELVE
+          A ENVOLVER Y ESTE PISO SUBE 14. Los dos números viven en
+          `globals.css` (`.agenda-fc .fc-toolbar-title`) y en `VISTAS_FC`, y
+          los dos llevan nota.
+
+          ⚠️ Y LA CABECERA YA NO VAIVENEA. Apilada medía 65 px con hoy a la vista
+          y 54 sin él —el disco de 28×28 mandaba sobre la fila—, así que la
+          rejilla cambiaba de alto al navegar a una semana sin hoy (medido: 299 →
+          310). En una línea no hay disco, las siete columnas miden 35 y el salto
+          desapareció. Ya no hay «peor caso» de cabecera que cubrir.
+
+          ⚠️ EL 280 ANTERIOR NO SUBIÓ POR EL TÍTULO, y la cuenta de entonces ya no
+          aplica porque el título volvió a 15 px. Se deja dicho lo que sigue
+          siendo cierto: la fila la manda el BOTÓN, con 30 px, no el título —a 15
+          × 1.2 son 18—. Su `line-height: 1.2` explícito es lo que sostiene esa
+          cuenta y está anotado también en globals.css.
+
+          EN MÓVIL EL CROMO ES MENOR: por debajo de 768 la leyenda baja a fila
+          propia (45) y «Compactar» se apaga solo, así que no hay banda — 60 + 45
+          + 35 = 140, y 250 deja 110 px = 3,06 franjas, algo por debajo de las
+          3,38 del peor caso de escritorio porque la fila propia de la leyenda
+          cuesta más que la banda que se ahorra.
+          LO QUE NO CUBRE, dicho para que no sorprenda: a
+          anchos muy pequeños la leyenda envuelve a tres o cuatro filas y se come
+          el margen. El piso es un amortiguador del caso degradado, no una
+          garantía; ahí preferimos una rejilla usable con un segundo scroll a una
+          rejilla de diez píxeles sin él.
+
+          CUÁNDO ENTRA EN JUEGO: cuando `100dvh − 16 − (zona fija de página)`
+          baja de 250. La zona fija son 78 px —54 del header en una línea más los
+          24 del `mb-6`—, así que actúa por debajo de ~344 px de viewport. Con
+          295 y el padding de 64 era ~437, y con 315 era ~455. Cada recorte de
+          cromo empuja este umbral hacia abajo, que es justo lo que se quiere:
+          el piso sólo debe morder en el caso degradado de verdad. */}
       {/* ⚠️ ESTA TARJETA NO LLEVA CLASE DE LAYOUT, Y NO ES UN OLVIDO. Tuvo un
           `flex flex-col` y se retiró: el reparto entero lo hace un
           `grid-template-areas` en `globals.css`, sobre `.agenda-fc`. Si repones
@@ -3853,7 +4114,7 @@ export default function AgendaPage() {
           `display: contents` y colocando las cuatro piezas con `grid-area`.
           El razonamiento completo, qué se comprobó y qué NO se rompe está allí,
           junto a `.ag-banda-compacta`. Antes de tocar esta línea, léelo. */}
-      <div className="agenda-fc bg-white rounded-2xl border border-slate-100 shadow-sm overflow-clip flex-1 min-h-[315px]">
+      <div className="agenda-fc bg-white rounded-2xl border border-slate-100 shadow-sm overflow-clip flex-1 min-h-[250px]">
         {/* ── Leyenda ───────────────────────────────────────────────────
             ⚠️ VIVE DENTRO DE LA TARJETA Y EN LA FILA DEL TOOLBAR, junto a la
             fecha. Estuvo en una banda propia ENCIMA del calendario, y el
@@ -3899,13 +4160,48 @@ export default function AgendaPage() {
           <span aria-hidden className="text-[11px] text-[var(--ag-faint)]">|</span>
           <div className="flex items-center gap-1.5">
             <GoogleGIcon size={11} />
-            <span className="text-[11px] font-medium text-[var(--ag-gcal-text)]">Google Calendar</span>
+            {/* ── «GCal» Y NO «GOOGLE CALENDAR», POR ANCHO ─────────────────
+                Medido el 2026-08-25 a 1280 px de ventana, con la tarjeta a 954
+                px de interior: la leyenda pedía 542 px para caber en UNA línea y
+                su celda le daba 453,46, así que envolvía a dos y subía el
+                toolbar de 60,32 a 74 px. Acortar este rótulo se lleva 63 de esos
+                px —de 542 a 479—, que es el recorte más grande que se puede
+                hacer sin tocar los cinco rótulos de estado.
+
+                ⚠️ SOLO NO BASTABA: con 479 contra 453,46 seguían faltando 25,54
+                y la leyenda seguía en dos líneas. Lo que cerró el hueco fue
+                encoger la ETIQUETA DE FECHA —formato corto y 15 px en vez de
+                22—, que le devolvió 153,24 px a esta celda. Hoy tiene 606,7 y le
+                sobran 127,7, o sea que hay margen de sobra… PERO LOS DOS
+                RECORTES SE SOSTIENEN MUTUAMENTE: reponer el nombre completo aquí
+                gasta 63 de esos 127,7 y aún cabría; reponer además la fecha
+                larga, no. Si tocas uno, mide.
+
+                ⚠️ EL NOMBRE COMPLETO SIGUE ACCESIBLE en el `title`: la
+                abreviatura es visual, no semántica, y un lector de pantalla no
+                tiene por qué deletrear «GCal». */}
+            <span
+              className="text-[11px] font-medium text-[var(--ag-gcal-text)]"
+              title="Google Calendar"
+            >
+              GCal
+            </span>
           </div>
         </div>
         {/* Va PRIMERA en el DOM aunque se pinte segunda, y es a propósito: el
             `order` de la hoja la coloca bajo el toolbar, y así el lector de
             pantalla oye el aviso antes que los controles y la rejilla que
-            describe, en vez de después de todo. */}
+            describe, en vez de después de todo.
+
+            ⚠️ ESTO SE PROBÓ COMO CHIP EN LA FILA DEL TOOLBAR Y SE REVIRTIÓ.
+            Cabía —143,91 px, y la leyenda aguantaba el recorte sin pasar a tres
+            líneas—, así que la cuenta salía: 33 px de rejilla por nada. Lo que
+            no salía era lo otro: el rótulo tenía que encogerse a «Vista
+            compacta» y la frase que dice QUÉ se recortó —«sábado y domingo
+            ocultos · horas fuera de horario recortadas»— se iba a un `title` y a
+            un `sr-only`, o sea fuera de la vista. Un aviso que hay que
+            descubrir con el ratón no es un aviso. NO LO VUELVAS A PLEGAR sin
+            resolver antes dónde se lee esa frase. */}
         {avisoRecorte && (
           <div className="ag-banda-compacta" role="status">
             <ChevronsDownUp size={14} className="ag-banda-compacta-icono" aria-hidden />
@@ -4012,7 +4308,7 @@ export default function AgendaPage() {
           /* ⚠️ `100%` Y NO `auto`, y de aquí cuelga todo lo demás. Con `auto` el
              calendario crece hasta su altura completa y scrollea `<main>`: no
              hay zona fija posible. Con `100%` se acota a la tarjeta —que es
-             `flex-1 min-h-[315px]` dentro de una raíz en `dvh`— y reparte
+             `flex-1 min-h-[250px]` dentro de una raíz en `dvh`— y reparte
              solo: toolbar y cabecera de días arriba, `Scroller` en el cuerpo. */
           height="100%"
           /* ⚠️⚠️ LOS DOS VAN JUNTOS Y `scrollTimeReset={false}` NO ES OPCIONAL.
