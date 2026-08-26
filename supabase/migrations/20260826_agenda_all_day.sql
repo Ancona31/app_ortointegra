@@ -1,7 +1,60 @@
--- ESTADO: PENDIENTE DE APLICAR.
+-- ESTADO: APLICADA Y VERIFICADA EN PRODUCCIÓN EL 2026-08-26.
 -- ============================================================================
--- ⚠️ AL APLICAR: sustituir esta línea por «APLICADA Y VERIFICADA EN PRODUCCIÓN
--- EL <fecha>», pegar aquí el veredicto que devolvió la rejilla, y commitear.
+-- Veredicto devuelto en la rejilla:
+--
+--   columna_boolean     = 1      (la columna existe y es boolean)
+--   es_not_null         = true   (no admite un tercer estado)
+--   defecto             = false  (el INSERT del código viejo sigue valiendo)
+--   check_convenio      = 1      (el CHECK existe Y con convalidated = t)
+--   default_rapido      = true   (ruta de PG 11+: NO hubo reescritura de tabla)
+--   grants_por_columna  = 0      (ninguna columna con ACL propio)
+--   realtime_publica    = 1      (all_day viaja en el payload de Realtime)
+--   filas_todo_el_dia   = 0      (correcto: el código aún no ha subido)
+--   filas_totales       = 134
+--
+--   veredicto = 'OK — appointments.all_day boolean NOT NULL DEFAULT false, con
+--                su CHECK de convenio validado y publicada en Realtime.'
+--
+-- `default_rapido = true` es la prueba de que la afirmación de «BLOQUEOS» no era
+-- una promesa: el valor de las 134 filas viejas vive en el catálogo
+-- (`pg_attribute.attmissingval`) y el heap no se tocó.
+--
+-- ── POSTGREST: VERIFICADO DESDE FUERA, NO SÓLO EN EL SQL EDITOR ────────────
+-- El 2026-08-26: `GET /api/appointments` devolvió **200**, y
+-- `appointments[0].all_day` vino como **false**. La caché de esquema de
+-- PostgREST ya conocía la columna y NO hizo falta el
+-- `NOTIFY pgrst, 'reload schema'` que la sección de abajo deja preparado.
+-- Esto cierra el hueco que el propio veredicto confiesa —«FALTA COMPROBAR
+-- PostgREST DESDE FUERA: esta consulta no pasa por ahí»—, que sigue escrito
+-- ahí abajo porque es un literal de una sentencia ya ejecutada y §7 sólo deja
+-- anotar por encima. Lo cierto es esta anotación, no aquella línea.
+--
+-- ── LA COLUMNA ESTÁ, Y NO HACE NADA TODAVÍA ────────────────────────────────
+-- `filas_todo_el_dia = 0` no es un defecto: `allDaySlot` sigue en `false`
+-- (agenda/page.tsx:4274) y no hay forma de crear una cita de todo el día. La
+-- columna es INERTE hasta que suba el código, como anuncia la cabecera.
+--
+-- ── ⚠️ INCIDENTE DE APLICACIÓN: SE PERDIÓ UN GUION AL PEGAR ────────────────
+-- Al pegar el archivo en el SQL Editor, la primera línea llegó como
+-- `- ESTADO:` en vez de `-- ESTADO:`, y la ejecución murió con
+-- `42601: syntax error at or near "-"`. NO ES UN FALLO DEL ARCHIVO, es del
+-- copiado; se resolvió volviendo a copiar y aplicó a la primera.
+--
+-- QUEDA ESCRITO PORQUE EL SÍNTOMA ENGAÑA: un `42601` en la línea 1 se lee como
+-- «la migración está mal» y manda a revisar el SQL, cuando lo que falla es el
+-- portapapeles. Y es especialmente fácil aquí, donde la primera línea es un
+-- comentario: perder un guion la convierte en un operador suelto en vez de en
+-- texto inerte.
+--
+-- ⚠️ QUIEN APLIQUE LA SIGUIENTE MIGRACIÓN DE ESTA SERIE: comprueba la primera
+-- línea del editor ANTES de ejecutar. Que empiece por dos guiones.
+--
+-- ============================================================================
+-- ⚠️ LO QUE SIGUE ERA LA INSTRUCCIÓN DE APLICACIÓN, Y YA SE CUMPLIÓ EL
+-- 2026-08-26 — el rótulo de arriba es su resultado. Se conserva, no se borra,
+-- porque las dos consultas que trae son LA COMPROBACIÓN REPETIBLE que §7 pide
+-- dejar escrita para no tener que inventarla el día que alguien dude.
+--
 -- Es el §7 de supabase/AUDITORIA-MIGRACIONES.md, y es el paso que más se
 -- olvida: ver DEUDA_TECNICA.md:2940 y el precedente de
 -- 20260818_gcal_puente_secretos.sql, que declaró «PENDIENTE» con sus tres
