@@ -207,6 +207,20 @@ Recórrelas todas, en orden. Esta lista crece con cada auditoría (ver sección 
     > regla —era buena— sino **citar por número algo que no se comprobó que
     > existiera**.
 
+16. **Convenios que ninguna restricción puede imponer.** Cuando una migración
+    añade una columna cuyo significado depende de un convenio que el esquema NO
+    puede validar —una bandera que obliga a una forma de los datos vecinos, un
+    formato acordado, un fin exclusivo—, hay que preguntar tres cosas, porque
+    ningún CHECK las va a preguntar por ti: (a) qué lectores ya asumen un
+    convenio distinto, uno por uno y citando el renglón; (b) dónde queda escrito
+    el convenio para quien llegue dentro de un año —el `COMMENT ON COLUMN` es el
+    único texto que viaja con la base, así que el convenio va ahí y no sólo en la
+    cabecera del `.sql`—; y (c) cómo se manifiesta el incumplimiento. Si la
+    respuesta a (c) es «se pinta casi bien» o «no falla», el convenio necesita
+    más comprobación externa, no menos. Es distinta de la dimensión 9: aquélla
+    pregunta si los valores que escribe ESTA migración son verdaderos; ésta, si
+    los que escribirá el código MAÑANA podrán ser falsos sin que nada lo note.
+
 ---
 
 ## 5. Formato de respuesta
