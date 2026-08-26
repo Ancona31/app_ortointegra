@@ -3291,4 +3291,249 @@ enganchar la solución.
 
 ---
 
+### AG-DT-3 — El all-day se lee en el huso del DISPOSITIVO, así que se corre un día
+
+**Estado:** 🔴 abierta · **Archivos:** `src/lib/dates.ts:10`,
+`supabase/migrations/20260826_agenda_all_day.sql` (el `COMMENT ON COLUMN`)
+**Detectado:** 2026-08-26, en la auditoría de la migración de `all_day`.
+**Alcance:** es el precio de guardar un rango de FECHAS en dos `timestamptz`.
+No lo introduce la columna: lo hace visible.
+
+**El caso concreto**
+
+`all_day` fija que `start_time` es medianoche del primer día «en la zona del
+consultorio». Pero la regla de lectura de este producto es la contraria, y está
+escrita: `src/lib/dates.ts:10` dice **«Las horas de CITAS se pintan en el huso
+del DISPOSITIVO de quien mira»**, y el huso del consultorio sólo se señala
+aparte, con un aviso. `consultorio_timezone` NO se usa para resolver la hora
+principal de nada.
+
+Vacaciones creadas en Cancún (`America/Cancun`, UTC-5) el 19 de agosto: se
+guarda `2026-08-19T05:00:00Z`. La secretaria las mira desde Mérida
+(`America/Merida`, UTC-6) y su dispositivo resuelve ese instante como
+**2026-08-18T23:00**, o sea el día 18. FullCalendar va con `timeZone: 'local'`,
+así que **la barra se pinta un día antes**. Con `renderEnTZ` pasa lo mismo en
+cualquier lector que no sea la agenda.
+
+**Por qué la mitigación que se escribió primero era falsa:** el encabezado de la
+migración decía que la deriva es aceptable «porque la cita guarda su zona». La
+guarda, sí, pero **nadie la lee** para esto. Guardar un dato que ningún lector
+consulta no mitiga nada.
+
+**Las dos salidas, y ninguna es un parche de lectura:** o el convenio de
+ESCRITURA se fija a un huso único y explícito para los `all_day` —y entonces
+`dates.ts` necesita una excepción escrita, como ya la tienen los documentos
+clínicos con `TZ_CLINICA`—, o se migra a columnas `date`, que es lo honesto
+para un rango de fechas. Elegir pide su propia sesión; lo que no vale es
+descubrirlo depurando.
+
+---
+
+### AG-DT-4 — `aplicarAppointmentAlEvento` no puede propagar `all_day`: no hay `setAllDay` en su bucle
+
+**Estado:** 🔴 abierta · **Archivo:** `src/app/(app)/agenda/page.tsx:3033`
+**Detectado:** 2026-08-26, misma auditoría.
+
+**El caso concreto**
+
+La función re-hidrata el evento pintado con la fila que devolvió el servidor.
+Hace `setStart` y `setEnd` explícitos y luego **fusiona `extendedProps` clave por
+clave**. `allDay` **no es un `extendedProp`**: es una propiedad de primer nivel
+de `EventApi`, y se cambia con `setAllDay(bool)`, que ahí no se llama.
+
+Consecuencia: la secretaria convierte una cita en bloqueo de todo el día desde
+su equipo; al médico le llega el eco por Realtime —`appointments` está publicada
+(`20260816`) con `REPLICA IDENTITY` default, así que `all_day` sí viaja en el
+payload—, la fusión escribe `extendedProps.all_day = true` y **el evento se
+queda en la rejilla horaria**, con su `start`/`end` ya movidos a medianoche. O
+sea: una barra de 24 horas atravesando la columna, y la ventana vertical de la
+rejilla abierta a las 24 h por `tramoDeEvento`. No falla nada; sólo está mal
+hasta el siguiente refetch.
+
+**El mismo agujero afecta al alta optimista**, que pasa por `buildEventInput`
+(`page.tsx:2996`) y hoy tampoco emite `allDay`.
+
+---
+
+### AG-DT-5 — La sincronización a Google manda `dateTime` siempre, y el ancla de hora mete una línea falsa en el correo al paciente
+
+**Estado:** 🔴 abierta · **Archivos:** `src/app/api/appointments/route.ts:386`,
+`src/app/api/appointments/[id]/route.ts:525`, `src/lib/appointments.ts:89-100`
+**Detectado:** 2026-08-26, misma auditoría.
+
+**El caso concreto, que son dos**
+
+**(a) El evento vuelve convertido en cita con hora.** Las dos rutas componen
+siempre `start: { dateTime: start_time, timeZone: tzCita }`. Para un evento de
+día completo la API de Google exige `{ date: 'YYYY-MM-DD' }`. Mandando
+`dateTime` **no falla**: Google acepta un evento con hora de 00:00 a 00:00 del
+día siguiente. El médico ve en su calendario una barra de 24 h atravesando la
+rejilla en vez de un evento de día completo. Y da la vuelta entera: `gcalSource`
+lo relee, `allDay: !e.start?.dateTime` sale **`false`**
+(`agenda/page.tsx:2936`), y regresa a la agenda como cita con hora. Es el
+recorrido que más se parece a «funciona» sin funcionar.
+
+**(b) El correo al paciente afirma una hora que no existe.** `anclaDeHora`
+(`appointments.ts:89`) se llama sin condición en `:249` y compone
+`«Hora de la cita: 12:00 a.m., hora del Sureste»` a partir de la medianoche del
+`all_day`. Esa línea va dentro del `description` del evento de Google, que es lo
+que le llega al paciente invitado. **Un bloqueo de vacaciones no tiene hora, y el
+correo dice que es a medianoche.** El comentario de `:247` es explícito en que
+el ancla va también en las citas sin paciente ligado «porque habla de la hora»;
+con `all_day` esa premisa deja de sostenerse.
+
+---
+
+### AG-DT-6 — `GET /api/appointments` filtra sólo por `start_time`: un evento de varios días desaparece al navegar
+
+**Estado:** 🔴 abierta · **Archivo:** `src/app/api/appointments/route.ts:46-47`
+**Detectado:** 2026-08-26, misma auditoría.
+**Alcance:** **preexistente.** Ya hoy pierde una cita con hora que cruce la
+medianoche del borde. `all_day` sólo lo vuelve frecuente, porque un evento de
+varios días es su caso normal.
+
+**El caso concreto**
+
+```ts
+if (from) query = query.gte('start_time', from)
+if (to)   query = query.lte('start_time', to)
+```
+
+Filtra por el INICIO. Unas vacaciones del 10 al 25 de agosto **desaparecen de la
+agenda al navegar a la semana del 17**: su `start_time` cae fuera del `from`, y
+`rangoQuePedir` ensancha a semanas completas, no a meses.
+
+**El arreglo ya está resuelto en el otro lado de la casa** —
+`src/app/api/google/events/route.ts:302-311` explica el problema y filtra por
+solape— **pero no se copia tal cual.** Aquel usa `.lte('start_time', timeMax)` y
+`.gte('end_time', timeMin)`, y con fin EXCLUSIVO eso es un off-by-one: un evento
+que termina justo en `timeMin` no solapa la ventana y aun así entraría. El
+predicado correcto es semiabierto, el mismo que `ventanaRejilla.ts:286` ya usa:
+
+```
+start_time <  to    → .lt('start_time', to)
+end_time   >  from  → .gt('end_time',  from)
+```
+
+O sea que arreglar esto **también corrige el patrón de `google/events`**, no lo
+imita.
+
+---
+
+### AG-DT-7 — Las cuatro consultas de «próximas citas» pierden el all-day de hoy
+
+**Estado:** 🔴 abierta · **Archivos:** `src/app/(app)/dashboard/page.tsx:177`,
+`src/app/(app)/dashboard/AsistenteDashboard.tsx:67`,
+`src/app/(launcher)/inicio/page.tsx:120-121`,
+`src/app/(app)/expediente/[id]/page.tsx:105`
+**Detectado:** 2026-08-26, misma auditoría.
+
+**El caso concreto**
+
+Las cuatro filtran por `start_time` contra «ahora» o contra el borde de un día,
+suponiendo que toda cita tiene hora. Un evento de todo el día empieza a las
+00:00, así que **su `start_time` está en el pasado durante casi todo el día que
+ocupa**.
+
+- `dashboard/page.tsx:177` y `AsistenteDashboard.tsx:67` → `.gt('start_time',
+  ahora)`: el bloqueo de todo el día **de hoy** no sale en «próximas citas».
+- `inicio/page.tsx:120-121` → `.gte(inicioHoy).lt(inicioManana)`: las vacaciones
+  de hoy sí entran; **las que empezaron ayer y siguen corriendo, no**.
+- `expediente/[id]/page.tsx:105` → mismo sesgo. Es el menos probable: unas
+  vacaciones no llevan paciente.
+
+**Ninguna revienta; las cuatro mienten por omisión**, que es lo que las hace
+difíciles de ver. Decidir si un all-day debe aparecer en «próximas citas» es de
+producto y va antes del arreglo.
+
+---
+
+### AG-DT-8 — Arrastrar o redimensionar en la banda de todo el día escribe una cita corrupta, sin deshacer
+
+**Estado:** 🔴 abierta · **Archivos:** `src/app/(app)/agenda/page.tsx:3356`
+(`handleEventDrop`), `:3419` (`handleEventResize`)
+**Detectado:** 2026-08-26, misma auditoría.
+**Depende de:** que se encienda `allDaySlot`. Hoy no muerde porque la banda no
+se monta.
+
+**El caso concreto**
+
+Con la banda encendida, el plugin de interacción registra sus hits y una cita se
+puede arrastrar de la rejilla a la banda sin haber pedido nada. La mutación llega
+con `standardProps.allDay = true`, y `applyMutationToEventInstance`
+(`@fullcalendar/core/internal-common.js:3807-3811`) hace `forceAllDay` →
+`computeAlignedDayRange`. Con `allDayMaintainDuration` en su default `false`
+(`:1523`), **la duración no se conserva**: una cita de 09:00–10:00 queda 00:00 →
+00:00 del día siguiente.
+
+`handleEventDrop` no tiene guarda de `allDay`: manda ese rango al `PUT` con
+`all_day` sin tocar. **La base guarda una cita de 24 horas que empieza a
+medianoche**, y al recargar vuelve como cita con hora que abre la ventana de la
+rejilla a las 24 h (`tramoDeEvento`, `ventanaRejilla.ts:250-253`).
+
+**El aviso que salta no protege, confunde:** `avisoFueraDeHorario` compara la
+medianoche y dice *«Vas a mover la cita a las 00:00, y esta clínica atiende de
+09:00 a 19:00»*. Describe un cambio de HORA cuando lo que ocurre es un cambio de
+TIPO. Quien lea eso y pulse «sí» no ha consentido lo que va a pasar.
+
+`handleEventResize` tiene el gesto hermano: estirar la barra a días adyacentes
+manda un rango en días por el camino escrito para horas.
+
+**Lo relacionado, que sí está bien y no hay que tocar:** `handleDateClick:3300`
+ya decide por `arg.allDay` y no por la vista, así que el clic en la banda abre el
+alta sin hora y con `avisoDiaCerrado`. Fue la decisión correcta y aguanta. Lo que
+sí se pierde es `arg.end` en `handleSelect:3347`: arrastrar de lunes a miércoles
+sobre la banda dice el rango y la línea lo descarta.
+
+---
+
+### AG-DT-9 — `calcDuration` devuelve 1440 para un all-day y el modal lo enseña como duración
+
+**Estado:** 🟡 abierta, menor · **Archivo:**
+`src/app/(app)/agenda/page.tsx:616`, consumido en `:848`
+**Detectado:** 2026-08-26, misma auditoría.
+
+**El caso concreto**
+
+`calcDuration` resta los dos instantes y divide entre 60 000. Para un all-day de
+un solo día —00:00 a 00:00 del día siguiente, fin exclusivo— son **1440
+minutos**, y ese número alimenta `initialDuration` del modal (`:848`). Abrir unas
+vacaciones para editarlas enseña «1440 min» en el selector de duración.
+
+No corrompe nada por sí solo —es un valor derivado, no persistido— pero es la
+puerta por la que un guardado inocente reescribe `end_time` desde una duración
+que el formulario nunca debió ofrecer. El interruptor de «Todo el día» del
+bloque del modal tiene que apagar ese campo, no sólo rellenarlo.
+
+---
+
+### AG-DT-10 — `appointments` no tiene trigger de auditoría, y es la única tabla clínica sin él
+
+**Estado:** 🔴 abierta · **Archivo:** `supabase/baseline/06_triggers.sql`
+**Detectado:** 2026-08-26, misma auditoría (hallazgo lateral: no lo introduce
+`all_day`).
+
+**El caso concreto**
+
+`06_triggers.sql` lista doce triggers y **ninguno es de `appointments`**; ninguna
+migración posterior crea uno. `pacientes`, `consultas`, `documentos`,
+`addendums` y `mediciones_analitos` sí tienen su `audit_*`. Comprobado: cero
+coincidencias de `audit_appointments` en todo `supabase/`.
+
+O sea que **quién movió, canceló o borró una cita no queda registrado en
+`audit_log`**. Y una agenda es un dato de salud: dice que un paciente concreto
+tenía consulta un día concreto.
+
+**Choca con dos reglas escritas de `CLAUDE.md`:** «Todo cambio en datos sensibles
+DEBE registrarse en `audit_log`» y «NUNCA quites el audit log de ninguna
+acción». La segunda habla de quitar; aquí nunca se puso.
+
+**Familia.** Es de la misma clase que **LOG-DT-1** (`logAudit` sin `await`) y que
+el bloque de **CUMPLIMIENTO REGULATORIO** de la cabecera de este archivo:
+lagunas del rastro de auditoría, no de la agenda. Se anota aquí porque salió
+mirando la agenda; cuando se ataque, se ataca con esa familia y no con el
+rediseño.
+
+---
+
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)
