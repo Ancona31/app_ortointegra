@@ -820,14 +820,79 @@ body {
    ⚠️ SI ALGUIEN REPONE EL `scale`: no se romperá nada visible al instante y la
    agenda no dará ningún error. Sólo volverá la banda en blanco, y costará otra
    sesión encontrarla. Si hace falta el zoom, hay que darle ANTES a la agenda
-   una forma de volver a medirse cuando la animación acabe. */
+   una forma de volver a medirse cuando la animación acabe.
+
+   ─────────────────────────────────────────────────────────────────────────
+   ⚠️⚠️ SEGUNDO PROBLEMA DE ESTA MISMA ANIMACIÓN, Y ES OTRO MECANISMO (bloque 5).
+   ─────────────────────────────────────────────────────────────────────────
+
+   Lo de arriba trata de MEDIDAS: un `scale` cambia el alto que FullCalendar mide.
+   Esto trata de COORDENADAS, y no tiene nada que ver con el `scale` ni se
+   arreglaba retirándolo. Léelo entero antes de reponer `both` o `will-change:
+   transform`, que son las dos cosas que se acaban de quitar de aquí abajo.
+
+   EL SÍNTOMA: al arrastrar una cita de la rejilla hacia la banda de todo el día,
+   el fantasma del arrastre se separaba del puntero y se pintaba 272 px a la
+   derecha y 16 abajo, dos columnas fuera de la celda que el resaltado señalaba.
+
+   LA CADENA, medida el 2026-08-26 sobre la rejilla real:
+
+     · El clon del arrastre es `position: fixed` y se cuelga DENTRO del `.fc`
+       (`@fullcalendar/interaction/index.js:1259` → `elementClosest(origTarget,
+       '.fc')`), no en `document.body`.
+     · Sus `left`/`top` son coordenadas de VIEWPORT: `sourceElRect.left + deltaX`
+       (`:366-367`), con `sourceElRect` de `getBoundingClientRect()` (`:293`).
+     · `.animate-page-enter` es ancestro de ese `.fc`, y creaba BLOQUE CONTENEDOR
+       para descendientes `position: fixed`. Entonces «coordenada de viewport» se
+       resolvía contra la capa, no contra la ventana, y el clon se iba justo el
+       origen de la capa: (272, 16) — el ancho de la barra lateral y el padding
+       de `main`.
+
+   ⚠️ LAS DOS PROPIEDADES LO CAUSABAN POR SEPARADO, medido con una sonda de cinco
+   variantes (un `position: fixed` de 4 px dentro de la capa, leyendo su rect):
+
+       sin nada ....................... no crea bloque contenedor
+       `will-change: opacity` ......... no crea bloque contenedor
+       `will-change: transform` ....... SÍ — desfase (272, 16)
+       `transform: translateY(0)` ..... SÍ — desfase (272, 16)
+       las dos juntas ................. SÍ — desfase (272, 16)
+
+   O sea que **quitar una sola no arreglaba nada**. Y el `transform` residual no
+   venía de los keyframes sino del `fill-mode`: `both` incluye `forwards`, que
+   RETIENE el último fotograma para siempre. `translateY(0)` no es `none`.
+
+   EL ARREGLO, y por qué no cuesta nada visualmente: `both` → `backwards`. El
+   fotograma final (`opacity: 1`, `translateY(0)`) es EXACTAMENTE el estado
+   natural del elemento sin animación, así que dejar de retenerlo no produce
+   ningún salto ni parpadeo — el deslizamiento y el fundido de entrada quedan
+   idénticos. `backwards` y no quitar el `fill-mode` entero porque es lo que
+   aplica el primer fotograma antes de arrancar y evita un destello a opacidad 1.
+   Y `will-change` se queda sólo con `opacity`, que la sonda mide como inocua.
+
+   ⚠️ DURANTE los 240 ms de la animación el bloque contenedor SÍ existe, y es
+   aceptable a sabiendas: en esa ventana la página está montándose y no hay
+   arrastre posible. No es un descuido, es el alcance del arreglo.
+
+   ⚠️ TERCER AVISO, EL QUE IMPORTA: ÉSTA ES LA SEGUNDA VEZ QUE ESTA ANIMACIÓN
+   ROMPE LA AGENDA POR VÍAS DISTINTAS —primero midiendo de menos, ahora
+   desplazando coordenadas— y las dos veces sin un solo error en consola. Es una
+   animación de TODA la aplicación colgada por encima de un componente que mide
+   y posiciona a mano. Antes de añadirle una propiedad nueva, pregúntate si crea
+   bloque contenedor, si cambia el alto medido, o si establece contexto de
+   apilamiento. Si la respuesta a alguna es «sí», no la pongas sin medirlo. */
 @keyframes pageEnter {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0);   }
 }
 .animate-page-enter {
-  animation: pageEnter 0.24s cubic-bezier(0.32, 0.72, 0, 1) both;
-  will-change: transform, opacity;
+  /* `backwards` y NO `both`: ver el segundo bloque ⚠️⚠️ de arriba. `both`
+     retenía `translateY(0)`, y un transform retenido —aunque sea la identidad—
+     convierte a este div en bloque contenedor de todo `position: fixed` que
+     cuelgue debajo. */
+  animation: pageEnter 0.24s cubic-bezier(0.32, 0.72, 0, 1) backwards;
+  /* Sólo `opacity`. `transform` aquí hacía lo mismo que el transform retenido, y
+     por su cuenta: medido, no deducido. */
+  will-change: opacity;
 }
 
 /* iOS-style tab transition */
@@ -2204,6 +2269,131 @@ body {
 }
 
 /* ══════════════════════════════════════════════════════════════════════
+   CHIP DE LA BANDA DE TODO EL DÍA (`.ag-banda`) — bloque 5
+   ══════════════════════════════════════════════════════════════════════
+   La caja de `BandaChip`, la fila de todo el día de Semana y Día. Cuarta
+   tarjeta de la agenda, y va aquí —entre `.ag-gcal` y `.ag-mes`— por la misma
+   razón que las otras tres están juntas: lo que se compara al tocar una son
+   las otras.
+
+   ⚠️ NO LLEVA `height: 100%`, Y ES LA ÚNICA DE LAS CUATRO. Sus tres hermanas
+   lo llevan para llenar un harness que tiene alto propio (la rejilla horaria lo
+   deriva de la duración, la celda del mes de `min-height`). El harness de la
+   banda NO tiene alto propio: crece con su contenido. Un `height: 100%` ahí
+   resuelve a `auto` y la caja colapsa a cero. De ahí el `height` fijo.
+
+   ⚠️ Y NO HAY TIERS. `.ag-tarjeta` cambia de disposición según los píxeles que
+   le tocan (`pisoFranja` / `umbralTiny` / `umbralCompact` en page.tsx), porque
+   allí el alto lo dicta la duración de la cita. Aquí no: un evento de un día y
+   uno de quince miden lo mismo, 20 px, y lo que crece es el ANCHO. No traigas
+   el ResizeObserver a esta caja; no tiene nada que observar.
+
+   Colores: los mismos tokens `--ag-gcal-*` que la tarjeta de Google con hora.
+   Hoy es su único origen posible —un `allDay` sólo puede venir de Google— así
+   que una paleta propia sería una segunda paleta para el mismo dato. */
+.agenda-fc .ag-banda {
+  box-sizing: border-box;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 6px;
+  border: 1px solid var(--ag-gcal-accent);
+  border-left-width: 3px;
+  border-radius: var(--ag-r-note);
+  background: var(--ag-gcal-bg1);
+  color: var(--ag-gcal-text);
+  cursor: pointer;
+}
+/* UNA LÍNEA Y ELIPSIS, sin caer a dos. `.ag-gcal-titulo` sí puede envolver a dos
+   en la rejilla porque allí sobra alto vertical; aquí la caja son 20 px fijos y
+   una segunda línea se cortaría a la mitad. `line-height: 1` y no un múltiplo:
+   con 18 px de contenido (20 menos los dos bordes) cualquier valor por encima
+   de 1,6 empieza a recortar las descendentes de la «g» y la «p». */
+.agenda-fc .ag-banda-titulo {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Los 2 px de separación entre chips apilados. Van en el `<a>` de FullCalendar y
+   NO en `.ag-banda`, y no es un atajo: `.ag-banda` mide 20 px exactos dentro de
+   ese harness, así que un margen suyo empujaría la caja fuera de su propio
+   contenedor en vez de separar las dos.
+
+   ⚠️ ESTO NO ROMPE LA REGLA DEL HARNESS TRANSPARENTE. La regla prohíbe PINTAR el
+   `<a>` raíz —fondo, borde, sombra—, que es lo que `.fc .fc-event` fuerza a
+   transparente con `!important` y lo que las tres fuentes refuerzan pasando
+   `backgroundColor: 'transparent'`. `margin` es colocación, no pintura: no añade
+   ninguna superficie. Aquí sólo se sustituye el `margin-top: 1px` que la propia
+   librería le pone a `.fc-daygrid-event`.
+
+   Acotado a la banda de timeGrid por el prefijo `.fc-timegrid`: en Mes los chips
+   siguen con el 1 px nativo, que es lo que ese bloque ya tenía calibrado. */
+.agenda-fc .fc-timegrid .fc-daygrid-body .fc-daygrid-event { margin-top: 2px; }
+
+/* Los 13 px muertos DEBAJO del chip. `.fc .fc-daygrid-body-natural
+   .fc-daygrid-day-events` trae `margin-bottom: 1em`, y ese `1em` se resuelve
+   contra los 13 px de `.fc` (globals.css:876), no contra los 11 del chip: la
+   fila reservaba un renglón entero de aire bajo una caja de 20 px y el chip
+   quedaba descolgado hacia arriba.
+
+   ⚠️ EL `margin-top: 0` NO ES UN DESCUIDO, y los 2 px de arriba SÍ están. Los
+   pone el `margin-top: 2px` de `.fc-daygrid-event`, la regla de aquí encima:
+   es la MISMA declaración que separa dos chips apilados, así que el hueco
+   superior y el que va entre chips no pueden divergir. Dejar además el
+   `margin-top: 1px` nativo de `.fc-daygrid-day-events` sumaría un tercer margen
+   y la fila saldría de 25, no de 24. Un chip = 2 + 20 + 2.
+
+   Acotada a `.fc-timegrid`: en Mes ese `1em` no aplica —la celda del mes usa
+   `body-unbalanced`/`body-balanced`, no `body-natural`— pero el `margin-top: 1px`
+   sí, y ahí está calibrado con el `min-height: 116px` de la celda. */
+.agenda-fc .fc-timegrid .fc-daygrid-body .fc-daygrid-day-events {
+  margin-top: 0;
+  margin-bottom: 2px;
+  /* ⚠️ Y EL TERCER MARGEN ESCONDIDO, QUE NO ES UN MARGEN: `min-height: 2em` de
+     `.fc .fc-daygrid-body-unbalanced .fc-daygrid-day-events`. Ese `2em` se
+     resuelve contra la fuente del PROPIO elemento —los 13 px heredados de
+     `.fc`— así que son 26 px CLAVADOS de suelo, por encima de los 22 que mide
+     un chip con su margen. Sin quitarlo, los 24 px de fila son inalcanzables:
+     mandaría siempre el suelo y daría 28.
+     No se ve en la hoja de la librería como un número; hay que resolver el `em`
+     para encontrarlo. Se descubrió midiendo el `min-height` COMPUTADO, no
+     leyendo el CSS. */
+  min-height: 0;
+}
+
+/* El rótulo «todo el día» del eje.
+   A 13 px envolvía a dos líneas contra el `max-width: 60px` del cushion nativo y
+   medía 30 px: MÁS que el chip de 20 que la fila existe para enseñar, y era él
+   —no el contenido— quien fijaba el alto de la banda. De ahí que la fila vacía
+   costara 41 px.
+
+   ⚠️ `line-height: 1` ES LO QUE LE QUITA EL MANDO DEL ALTO, no el `font-size`.
+   Con 10 px y `normal` la caja de línea sigue siendo ~12 px; con `1` son 10
+   clavados, y el alto de la fila pasa a decidirlo el contenido, que es lo que
+   se quería. El `nowrap` es el que garantiza que no vuelva a partirse.
+
+   ⚠️ NO TOCA EL ANCHO DEL EJE, Y ESO HAY QUE MIRARLO AL CAMBIARLO. La columna
+   del eje es LA MISMA que la de las horas, así que moverla mueve la rejilla
+   entera. A 10 px y en una línea el rótulo mide ~55 px, por debajo del
+   `max-width: 60px` que la librería ya le imponía, así que la columna no crece.
+   Si alguien sube este cuerpo o alarga el texto, ese `max-width` es lo único
+   que impide que la rejilla se desplace. */
+.agenda-fc .fc-timegrid .fc-timegrid-axis-cushion {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
    CHIP DE LA VISTA MES (`.ag-mes`) — bloque 3C
    ══════════════════════════════════════════════════════════════════════
    La caja de `MonthChip`, que hasta este bloque vivía entera en estilos en
@@ -2426,7 +2616,19 @@ body {
 }
 
 .fc .fc-event .fc-event-main { padding: 0; }
-.fc .fc-daygrid-event        { border-radius: 6px !important; }
+/* ⚠️ PREFIJADA CON `.fc-daygrid` EN EL BLOQUE 5, Y ES UNA CORRECCIÓN, NO UN
+   CAMBIO DE ALCANCE. Nació como `.fc .fc-daygrid-event` dentro del trabajo de la
+   vista Mes, cuyo bloque declara por escrito que va «todo prefijado .fc-daygrid
+   para NO tocar Semana/Día». Ésta se quedó sin el prefijo y no se notaba: la
+   única superficie con esa clase era la del mes, porque `allDaySlot` estaba
+   apagado y la banda de todo el día ni se montaba.
+   Al encenderla, `.fc-daygrid-event` aparece TAMBIÉN en Semana y Día —la banda
+   la emite `@fullcalendar/timegrid/internal.js:1142`— y este radio se colaba
+   sobre un harness que no es el suyo. El prefijo la devuelve a donde su propio
+   bloque dice que vive: `fc-daygrid` sólo la pone el `ViewContainer` de
+   `DayGridView` (`@fullcalendar/daygrid/internal.js:35`), o sea Mes y nada más.
+   El radio de la banda lo pone `.ag-banda` con `--ag-r-note`. */
+.fc-daygrid .fc-daygrid-event { border-radius: 6px !important; }
 /* ⚠️ ACOTADA A `.agenda-fc` EN EL BLOQUE 4 (sus dos vecinas de arriba NO: quedan
    fuera del alcance de esa ventana, no de un olvido). Misma especificidad —dos
    clases— y misma posición en la hoja, y además las dos declaraciones llevan
@@ -2552,8 +2754,19 @@ body {
 
 /* Más eventos — "+N más" (sub-fase 7), alineado bajo los chips.
    En AZUL DE MARCA desde el bloque 3C, y no en gris: es lo único de la celda
-   que se pulsa aparte de los chips, y en gris no se distinguía de un rótulo. */
-.fc .fc-daygrid-more-link {
+   que se pulsa aparte de los chips, y en gris no se distinguía de un rótulo.
+
+   ⚠️ PREFIJADA CON `.fc-daygrid` EN EL BLOQUE 5, por el mismo motivo y con la
+   misma comprobación que `.fc-daygrid-event` más arriba: es una regla del
+   bloque de Mes, cuyo encabezado dice que todo va prefijado para NO tocar
+   Semana/Día, y se había quedado sin el prefijo sin que se notara porque la
+   banda de todo el día no se montaba. Encendida `allDaySlot`, la banda tiene su
+   propio «+N más» —el tope de dos chips lo pone `dayMaxEvents` por vista en
+   `VISTAS_FC`— y este `padding-left: 11px`, que existe para alinear el enlace
+   bajo los chips de la CELDA DEL MES, allí no alinea con nada.
+   La banda se queda con el enlace nativo, sin retoque, que es lo que este
+   bloque no cubre. */
+.fc-daygrid .fc-daygrid-more-link {
   color: var(--ag-month-more);
   font-size: 11px;
   font-weight: 700;

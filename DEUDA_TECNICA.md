@@ -3450,11 +3450,37 @@ producto y va antes del arreglo.
 
 ### AG-DT-8 — Arrastrar o redimensionar en la banda de todo el día escribe una cita corrupta, sin deshacer
 
-**Estado:** 🔴 abierta · **Archivos:** `src/app/(app)/agenda/page.tsx:3356`
-(`handleEventDrop`), `:3419` (`handleEventResize`)
+**Estado:** 🟡 **abierta, con tapón puesto** · **Archivos:**
+`src/app/(app)/agenda/page.tsx:3487` (`esGestoDeTodoElDia`, la guarda), `:3494`
+(`handleEventDrop`), `:3558` (`handleEventResize`)
 **Detectado:** 2026-08-26, misma auditoría.
-**Depende de:** que se encienda `allDaySlot`. Hoy no muerde porque la banda no
-se monta.
+**Depende de:** ~~que se encienda `allDaySlot`~~. **Ya está encendido** (bloque 5,
+2026-08-26): la banda se monta y el gesto es alcanzable. La descripción de abajo
+pasó de hipotética a real.
+
+> ### ⚠️ EL RIESGO DE CORRUPCIÓN ESTÁ TAPADO; LA FUNCIONALIDAD NO EXISTE
+>
+> El mismo bloque 5 que armó este defecto le puso la guarda. `esGestoDeTodoElDia`
+> corre en los dos manejadores **antes** de leer `start`/`end` y antes de
+> cualquier aviso de fuera de horario: si `arg.event.allDay` es `true`, revierte,
+> avisa con «Todavía no se pueden crear citas de todo el día.» y sale sin tocar
+> el servidor. Ninguna fila corrupta llega a la base.
+>
+> **Por qué la ficha NO se cierra:** la guarda no da la funcionalidad, sólo la
+> niega. Una cita de todo el día es legítima —la banda ya sabe pintarla— y lo que
+> falta es el camino de ESCRITURA de `appointments.all_day`, que es el **bloque
+> 5B**. Hasta entonces, arrastrar a la banda no hace nada útil.
+>
+> **Qué se sustituye en 5B:** la guarda entera, por el manejo real —componer la
+> medianoche en la zona del consultorio y mandar `all_day: true`—. **No se borra
+> y ya**: quitarla sin poner el camino de escritura devuelve exactamente el
+> defecto que esta ficha describe.
+>
+> **Y ojo con el CHECK, que aquí no protege:**
+> `appointments_all_day_medianoche_check` sólo exige medianoche y huso cuando
+> `all_day` es `true`. Sin la guarda, la columna se quedaría en `false` —nadie la
+> escribe todavía— y la base aceptaría sin protestar una cita CON HORA de 24
+> horas que empieza a medianoche. La barrera es de código, no de base.
 
 **El caso concreto**
 
@@ -3466,24 +3492,29 @@ con `standardProps.allDay = true`, y `applyMutationToEventInstance`
 (`:1523`), **la duración no se conserva**: una cita de 09:00–10:00 queda 00:00 →
 00:00 del día siguiente.
 
-`handleEventDrop` no tiene guarda de `allDay`: manda ese rango al `PUT` con
-`all_day` sin tocar. **La base guarda una cita de 24 horas que empieza a
-medianoche**, y al recargar vuelve como cita con hora que abre la ventana de la
-rejilla a las 24 h (`tramoDeEvento`, `ventanaRejilla.ts:250-253`).
+Sin guarda, `handleEventDrop` mandaría ese rango al `PUT` con `all_day` sin
+tocar. **La base guardaría una cita de 24 horas que empieza a medianoche**, y al
+recargar volvería como cita con hora que abre la ventana de la rejilla a las
+24 h (`tramoDeEvento`, `ventanaRejilla.ts:250-253`). Es justo lo que
+`esGestoDeTodoElDia` corta desde el bloque 5.
 
-**El aviso que salta no protege, confunde:** `avisoFueraDeHorario` compara la
-medianoche y dice *«Vas a mover la cita a las 00:00, y esta clínica atiende de
-09:00 a 19:00»*. Describe un cambio de HORA cuando lo que ocurre es un cambio de
-TIPO. Quien lea eso y pulse «sí» no ha consentido lo que va a pasar.
+**El aviso que saltaría no protege, confunde,** y por eso la guarda va DELANTE de
+él: `avisoFueraDeHorario` compara la medianoche y dice *«Vas a mover la cita a
+las 00:00, y esta clínica atiende de 09:00 a 19:00»*. Describe un cambio de HORA
+cuando lo que ocurre es un cambio de TIPO. Quien lea eso y pulse «sí» no ha
+consentido lo que va a pasar.
 
-`handleEventResize` tiene el gesto hermano: estirar la barra a días adyacentes
-manda un rango en días por el camino escrito para horas.
+`handleEventResize` tiene el gesto hermano —estirar la barra a días adyacentes
+manda un rango en días por el camino escrito para horas— y lleva la misma guarda
+en la misma posición.
 
-**Lo relacionado, que sí está bien y no hay que tocar:** `handleDateClick:3300`
+**Lo relacionado, que sí está bien y no hay que tocar:** `handleDateClick:3386`
 ya decide por `arg.allDay` y no por la vista, así que el clic en la banda abre el
 alta sin hora y con `avisoDiaCerrado`. Fue la decisión correcta y aguanta. Lo que
-sí se pierde es `arg.end` en `handleSelect:3347`: arrastrar de lunes a miércoles
-sobre la banda dice el rango y la línea lo descarta.
+sí se pierde es `arg.end` en `handleSelect:3443`: arrastrar de lunes a miércoles
+sobre la banda dice el rango y la línea lo descarta. **Ese hueco sigue abierto:**
+la guarda de arriba cubre el arrastre de un evento YA EXISTENTE, no la selección
+de un rango vacío, que es otro camino y va también al bloque 5B.
 
 ---
 
@@ -3533,6 +3564,56 @@ el bloque de **CUMPLIMIENTO REGULATORIO** de la cabecera de este archivo:
 lagunas del rastro de auditoría, no de la agenda. Se anota aquí porque salió
 mirando la agenda; cuando se ataque, se ataca con esa familia y no con el
 rediseño.
+
+---
+
+### AG-DT-11 — `contarVisibles` filtra por el INSTANTE DE INICIO, así que un evento de varios días no entra en el subtítulo
+
+**Estado:** 🟡 abierta, menor · **Archivo:**
+`src/app/(app)/agenda/page.tsx:2511` (la reja del rango, dentro de
+`contarVisibles`)
+**Detectado:** 2026-08-26, auditoría del bloque 5 (hallazgo **M4** del auditor).
+
+> ### ⚠️ NO ES REGRESIÓN DEL BLOQUE 5. EL BLOQUE LO EXTIENDE, NO LO INTRODUCE.
+>
+> La reja es **preexistente** y Mes ya tenía exactamente el mismo sesgo desde que
+> el subtítulo existe: allí los `allDay` siempre se contaron y siempre se
+> contaron así. Lo que cambia es el ALCANCE — hasta ahora, en Semana y Día no se
+> notaba porque los `allDay` ni se pintaban (`allDaySlot` apagado) ni se contaban
+> (la reja `sinAllDay`, retirada en este bloque). Con la banda montada, el caso
+> pasa a ocurrir en las dos vistas donde un evento de varios días es lo NORMAL.
+>
+> Quien lo arregle: no lo trates como algo que rompió el bloque 5, ni lo busques
+> en el diff de la banda. La línea lleva ahí desde antes.
+
+**El caso concreto**
+
+```ts
+if (activo && (inicio < activo.activeStart || inicio >= activo.activeEnd)) continue
+```
+
+Compara el **inicio** contra la ventana activa. Unas vacaciones del 10 al 25 de
+agosto tienen su `start` el día 10; al mirar la semana del 17, ese instante cae
+antes de `activeStart` y la reja las descarta. **La barra se pinta —FullCalendar
+recorta el segmento a la ventana y lo dibuja— pero el subtítulo no la cuenta.**
+El médico ve una banda con un evento encima de un subtítulo que dice cero.
+
+Es el mismo error de forma que **AG-DT-6**, y conviene leerlos juntos: allí es el
+`GET` el que filtra por inicio y pierde la fila entera; aquí es el conteo el que
+filtra por inicio y pierde el renglón del subtítulo. **El predicado correcto es
+el mismo en los dos sitios** —solape semiabierto, `start < to && end > from`, el
+que `ventanaRejilla.ts:286` ya usa— y por eso los dos se arreglan con la misma
+idea, aunque en capas distintas.
+
+**Lo que hace falta antes de tocarlo:** `EventoParaConteo` (`page.tsx:2453`) hoy
+sólo lleva `start` y `extendedProps`. Para comparar por solape necesita también
+`end`, que `EventApi` ya trae y que `EventoParaVentana` ya declara. Es un campo,
+no una refactorización.
+
+**Por qué queda en menor y no en 🔴:** no corrompe nada, no pierde ningún dato y
+no impide ninguna operación. Miente en un renglón de texto, y miente por defecto
+—cuenta de menos, nunca de más—, así que nadie va a agendar sobre un hueco
+creyéndolo libre: el evento está a la vista en la banda.
 
 ---
 

@@ -613,6 +613,42 @@ const PREFIJO_OPTIMISTA = 'optimistic-'
    Ver el efecto de `visibilitychange`, que es quien lo justifica. */
 const UMBRAL_REFETCH_FOCO_MS = 120_000
 
+/* Lo que como mucho puede durar un arrastre antes de que el candado de
+   `refetch()` se dé por atascado y se suelte solo. NO es la duración de un
+   gesto normal —esos son dos o tres segundos—, es la VÁLVULA DE SEGURIDAD:
+   el techo del daño si `eventDragStop` no llega nunca. Ver `hayGestoEnCurso`. */
+const TOPE_GESTO_MS = 30_000
+
+/* La válvula de seguridad del candado de `refetch()`, y NO es paranoia: hay un
+   camino real por el que `eventDragStop` puede no llegar nunca.
+
+   `stopDrag` —el único que dispara `dragend`, y con él `eventDragStop`— sale de
+   `mirror.stop()` (`@fullcalendar/interaction/index.js:818-826`). Cuando el
+   fantasma flotante está visible y hay que devolverlo a su sitio, ese `stop()`
+   pasa por `doRevertAnimation` y espera a `whenTransitionDone`
+   (`@fullcalendar/core/internal-common.js:301-311`), que SÓLO escucha
+   `transitionend` y NO tiene temporizador de respaldo. Si esa transición no
+   termina —la pestaña se va a segundo plano a mitad de la vuelta, el elemento
+   se retira— el callback no corre y el gesto no se cierra jamás. La agenda va
+   con `dragRevertDuration={200}`, así que ese camino está vivo.
+
+   De ahí que la marca sea un INSTANTE y no un booleano: pasado el tope se
+   suelta sola, y se suelta AQUÍ, en la primera consulta que la encuentre
+   caducada. Un booleano dejaría la agenda sin traer datos para siempre y sin
+   que nadie se entere, que es justo lo que un candado no debe hacer.
+
+   ⚠️ VIVE FUERA DEL COMPONENTE A PROPÓSITO. Dentro, `refetch` pasaba a cerrar
+   sobre una función del cuerpo y los tres efectos que llaman a `refetch` con
+   deps `[]` empezaban a dar `react-hooks/exhaustive-deps`. Esos `[]` están
+   razonados en cada efecto —sólo leen refs— y no se tocan; el que se mueve es
+   este ayudante. El ref entra por parámetro. */
+function hayGestoEnCurso(marca: { current: number }): boolean {
+  if (!marca.current) return false
+  if (Date.now() - marca.current < TOPE_GESTO_MS) return true
+  marca.current = 0
+  return false
+}
+
 function calcDuration(startIso: string, endIso: string) {
   return Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 60000)
 }
@@ -2023,6 +2059,58 @@ const GoogleEventCard = memo(function GoogleEventCard({
   )
 })
 
+/* ══════════════════════════════════════════════════════════════════════
+   CHIP DE LA BANDA DE TODO EL DÍA (`.ag-banda`) — bloque 5
+   ══════════════════════════════════════════════════════════════════════
+   La tarjeta de la fila de todo el día de Semana y Día, que existe desde que
+   `allDaySlot` pasó a `true`. Es la CUARTA caja de la agenda, detrás de
+   `.ag-tarjeta` (cita), `.ag-gcal` (evento de Google con hora) y `.ag-mes`.
+
+   ⚠️ NO REUSA `.ag-gcal` NI `.ag-tarjeta`, Y NO ES POR GUSTO. Las dos llevan
+   `height: 100%` para llenar su harness de la rejilla horaria, que tiene alto
+   propio; el harness de la banda NO lo tiene —crece con su contenido—, así que
+   ahí un `height: 100%` resuelve a `auto` y la caja colapsa. Y el sistema de
+   tiers de `.ag-tarjeta` (`pisoFranja`, `umbralTiny`, `umbralCompact`) está
+   calibrado sobre ALTURA DE FRANJA, que en la banda no significa nada: aquí
+   todos los chips miden lo mismo, 20 px, sea el evento de un día o de quince.
+
+   ⚠️ SU FONDO VA EN ESTE `<div>` Y NUNCA EN EL `<a>` RAÍZ, igual que en las
+   otras tres. El `<a>` es el harness que `globals.css` fuerza a transparente
+   con `!important` (`.fc .fc-event`), y las tres fuentes le pasan además
+   `backgroundColor: 'transparent'`. Pintar ahí es cómo se rompe el harness.
+
+   ⚠️ SÓLO EL TÍTULO, SIN UBICACIÓN, y está comprobado: la lista blanca del
+   servidor (`EventoAgenda` en `/api/google/events:24-29`) son cuatro campos
+   —`id`, `summary`, `start`, `end`— y `location` no viaja. El «Star Médica ·
+   quirófano 2» del mockup NO es un campo de sede: es texto escrito a mano en
+   `notes`, y eso ya está dicho y revocado en el docstring de
+   `MemoizedEventContent`. No compongas un « · algo » que no tienes.
+
+   ⚠️ LA «G» ES CONDICIONAL, Y NO POR SIMETRÍA CON LAS OTRAS TARJETAS. Se pintaba
+   siempre, con este argumento: «el único origen de un `allDay` es Google, así
+   que la marca sobra comprobarla». Eso es cierto del evento EN REPOSO y falso
+   del ESPEJO DEL ARRASTRE: al arrastrar una cita de la rejilla hacia la banda,
+   FullCalendar monta un `.fc-event-mirror` que pasa por `renderEventContent` con
+   `allDay: true` —la mutación ya trae `forceAllDay`— aunque la fila sea una cita
+   de un paciente. Con el icono incondicional, ese fantasma salía con la marca de
+   Google encima de un dato que no es de Google, y la marca de un tercero no se
+   pinta sobre lo que no le pertenece.
+   El gesto termina revertido por `esGestoDeTodoElDia` (AG-DT-8), pero el
+   fantasma se ve DURANTE el arrastre, que es antes de que nada revierta. */
+const BandaChip = memo(function BandaChip({ title, esDeGoogle }: { title: string; esDeGoogle: boolean }) {
+  /* Sin un solo estilo en línea, por el mismo motivo que `GoogleEventCard`: aquí
+     no hay ningún valor calculado en JS del que dependa la pinta, así que la caja
+     entera cabe en `globals.css` con sus tokens `--ag-gcal-*`. Los conserva
+     también el espejo del arrastre: sólo se le quita la marca, no el color —el
+     fantasma tiene que parecerse a donde va a caer. */
+  return (
+    <div className="ag-banda">
+      {esDeGoogle && <GoogleGIcon size={10} />}
+      <span className="ag-banda-titulo">{title}</span>
+    </div>
+  )
+})
+
 /* Los colores del chip de Mes, derivados de la fila. Vive FUERA de `MonthChip`
    para que el componente quepa en su presupuesto de líneas.
 
@@ -2162,6 +2250,21 @@ type InicialesDeCita = (ext: Appointment) => string | undefined
 function renderEventContent(arg: EventContentArg, navegadorTZ: string, inicialesDeCita: InicialesDeCita) {
   // Vista Mes: chip plano dedicado. El camino de Semana/Día (abajo) queda intacto.
   if (arg.view.type === 'dayGridMonth') return <MonthChip arg={arg} />
+  /* Banda de todo el día de Semana y Día (bloque 5). Va DESPUÉS de Mes y no
+     antes, y el orden es lo que decide: en Mes TODO evento es `allDay` —la
+     rejilla del mes no tiene horas—, así que puesto delante se comería la vista
+     entera y `MonthChip` no se pintaría nunca. Con Mes ya devuelto, llegar aquí
+     con `allDay` sólo puede ser la banda.
+
+     `isGcalBlock` sale de `extendedProps` y es el MISMO criterio que usan
+     `renderEventContent` cuatro líneas más abajo, `MonthChip` y `contarVisibles`;
+     leerlo aquí y no fiarse de que «todo `allDay` es de Google» es lo que
+     distingue al evento real del espejo del arrastre, que llega con `allDay` en
+     `true` y con los `extendedProps` de una CITA. Ver el docstring de
+     `BandaChip`. */
+  if (arg.event.allDay) {
+    return <BandaChip title={arg.event.title} esDeGoogle={arg.event.extendedProps.isGcalBlock === true} />
+  }
   const ext = arg.event.extendedProps as Appointment & { isGcalBlock?: boolean }
   if (ext?.isGcalBlock) {
     return <GoogleEventCard timeText={arg.timeText} title={arg.event.title} />
@@ -2338,8 +2441,22 @@ const VISTAS_FC = {
      `titleRangeSeparator` en el <FullCalendar>, no esto.
      Mes y Día se quedan en largo A PROPÓSITO: Mes ya es sólo «agosto de 2026» y
      no aprieta, y en Día el día de la semana es información que ahí se quiere. */
-  timeGridWeek: { titleFormat: { day: 'numeric', month: 'short', year: 'numeric' } },
-  timeGridDay:  { titleFormat: { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' } },
+  /* ⚠️ `dayMaxEvents: 2` VA AQUÍ Y NO EN EL <FullCalendar>, y la diferencia es
+     visible. Es el tope de la BANDA DE TODO EL DÍA, y `dayMaxEvents` es una
+     opción global que Mes también lee: bajarla en el componente dejaría las
+     celdas del mes en dos chips, que es otro bloque y otra decisión. Puesta por
+     vista, sólo alcanza a las dos de rejilla.
+
+     QUE LA BANDA LA LEA ESTÁ COMPROBADO EN LA LIBRERÍA, no supuesto:
+     `@fullcalendar/timegrid/internal.js:315-322` (`getAllDayMaxEventProps`) la
+     saca de `this.context.options` y la reparte al `DayTable` de la banda en
+     `:1130`; sólo convierte el valor cuando es `true` (el modo «auto»), así que
+     un número pasa entero. Y `context.options` es POR VISTA —
+     `@fullcalendar/core/internal-common.js:2338-2342`, `buildViewContext` recibe
+     `viewOptions` y los publica como `options`—, que es lo que hace que ponerla
+     aquí funcione. */
+  timeGridWeek: { titleFormat: { day: 'numeric', month: 'short', year: 'numeric' }, dayMaxEvents: 2 },
+  timeGridDay:  { titleFormat: { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }, dayMaxEvents: 2 },
 } as const
 
 /* Las dos configuraciones del toolbar nativo, A NIVEL DE MÓDULO por la regla de
@@ -2360,10 +2477,16 @@ type ConteoVisible = { citas: number; eventos: number; google: number }
 
 const CONTEO_VACIO: ConteoVisible = { citas: 0, eventos: 0, google: 0 }
 
-/* Un evento tal como lo necesita el CONTEO, y nada más. Calca a propósito la
-   forma de `EventoParaVentana` —que a su vez calca la de `EventApi`— para que
-   los dos cálculos se alimenten de la MISMA llamada, sin recorrer dos listas. */
-type EventoParaConteo = { start: Date | null; allDay: boolean; extendedProps: Record<string, unknown> }
+/* Un evento tal como lo necesita el CONTEO, y nada más. Es un SUBCONJUNTO de
+   `EventoParaVentana` —que a su vez calca la de `EventApi`— para que los dos
+   cálculos se alimenten de la MISMA llamada, sin recorrer dos listas.
+
+   ⚠️ `allDay` SE CAYÓ DE AQUÍ EN EL BLOQUE 5 y no es un descuido: era la entrada
+   de la reja `sinAllDay`, que se retiró al encender la banda (ver el docstring
+   de `contarVisibles`). En `EventoParaVentana` SIGUE VIVO y ahí no se toca: lo
+   lee `tramoDeEvento` para que un evento de todo el día no estire la ventana
+   vertical de la rejilla a 24 horas. Son dos usos distintos del mismo campo. */
+type EventoParaConteo = { start: Date | null; extendedProps: Record<string, unknown> }
 
 /**
  * Cuenta por categoría lo que la vista está PINTANDO ahora mismo.
@@ -2378,25 +2501,25 @@ type EventoParaConteo = { start: Date | null; allDay: boolean; extendedProps: Re
  * dentro de activeStart..activeEnd. Sin esta línea el subtítulo diría «5 citas»
  * con tres a la vista.
  *
- * ⚠️ Y LA TERCERA REJA, `sinAllDay`, QUE ES LA MENOS EVIDENTE DE LAS TRES. El
- * calendario va con `allDaySlot={false}`, y eso no esconde la fila de todo el
- * día: hace que FullCalendar NO LA MONTE. Un evento `allDay` que caiga dentro
- * del rango activo y en un día visible sigue en el `eventStore`, pasa las otras
- * dos rejas y NO SE DIBUJA EN NINGUNA PARTE de Semana ni de Día.
- * No es un caso de laboratorio: la fuente de Google los produce de rutina
- * (`allDay: !e.start?.dateTime`, y `start.date` es lo que manda Google para unas
- * vacaciones o un día bloqueado entero). Las citas no — siempre llevan hora.
- * Sin esta reja, un «Vacaciones» el miércoles daba «1 de Google» sobre una
- * rejilla que no lo enseñaba.
+ * ⚠️ HUBO UNA TERCERA REJA, `sinAllDay`, Y SE RETIRÓ EN EL BLOQUE 5. NO LA
+ * REPONGAS. Decía —y era cierto— que con `allDaySlot={false}` FullCalendar no
+ * MONTA la fila de todo el día, así que un evento `allDay` pasaba las otras dos
+ * rejas y no se dibujaba en ninguna parte de Semana ni de Día: contarlo daba «1
+ * de Google» sobre una rejilla que no lo enseñaba. Su propia nota avisaba de que
+ * era el único de los tres filtros que dependía de una OPCIÓN del calendario y
+ * no de la geometría de la vista, y de que había que retirarla el día que la
+ * banda se encendiera.
  *
- * ⚠️ ES POR VISTA, Y POR ESO ENTRA COMO PARÁMETRO Y NO COMO REGLA FIJA: en MES
- * los eventos de todo el día SÍ se pintan, así que allí contarlos es lo
- * correcto. Sólo se descuentan en las de time-grid.
+ * Ese día llegó: `allDaySlot` está en `true` y la banda pinta los `allDay` en
+ * las tres vistas. La reja pasó de proteger a mentir al revés —descontaría unos
+ * eventos que ahora SÍ están en pantalla—, así que se fue, y con ella el
+ * parámetro y el `vista` que el llamador calculaba sólo para pasárselo.
  *
- * ⚠️ SI ALGÚN DÍA SE ENCIENDE `allDaySlot` (el bloque siguiente lo toca): esta
- * reja deja de ser cierta y hay que retirarla, o el subtítulo empezará a no
- * contar unos eventos que sí están en pantalla. Es el único de los tres filtros
- * que depende de una opción del calendario y no de la geometría de la vista.
+ * Es correcto HOY porque el único `allDay` posible viene de Google y cae en la
+ * categoría `google`, que es la que le toca. El día que la aplicación sepa
+ * escribir `all_day` (bloque 5B), un bloqueo de todo el día entrará por el
+ * `else` de abajo y se contará como `cita` o como `evento` según tenga paciente:
+ * eso es una decisión de producto que aquí no está tomada.
  *
  * ⚠️ EL FILTRO DE MÉDICO NO SE APLICA AQUÍ, Y NO ES UN OLVIDO: NO LO AÑADAS. Lo
  * aplica el SERVIDOR —las dos fuentes le mandan `medico_id` y devuelven ya
@@ -2416,13 +2539,11 @@ function contarVisibles(
   eventos: readonly EventoParaConteo[],
   activo: RangoVisible | null,
   ocultos: readonly number[],
-  sinAllDay: boolean,
 ): ConteoVisible {
   let citas = 0, genericos = 0, google = 0
   for (const ev of eventos) {
     const inicio = ev.start
     if (!inicio) continue
-    if (sinAllDay && ev.allDay) continue
     if (activo && (inicio < activo.activeStart || inicio >= activo.activeEnd)) continue
     if (ocultos.includes(inicio.getDay())) continue
 
@@ -2739,23 +2860,24 @@ export default function AgendaPage() {
   const diasOcultosRef = useRef(diasOcultos)
   diasOcultosRef.current = diasOcultos
 
-  /* `vista` llega POR PARÁMETRO y no de un ref ni del estado `currentView`, y es
-     por el mismo motivo por el que `diasOcultos` necesita su propio efecto: en
-     `datesSet` el `setCurrentView` de la línea de al lado todavía no ha llegado
-     al render, así que el estado vale la vista ANTERIOR justo cuando hace falta
-     la nueva. El `arg.view.type` del handler sí es el bueno. */
+  /* ⚠️ YA NO RECIBE LA VISTA, Y ESO ES DEL BLOQUE 5. Llevaba un `vista: string`
+     con su propia nota —llegaba por parámetro y no del estado `currentView`
+     porque en `datesSet` el `setCurrentView` de al lado todavía no ha llegado al
+     render—, pero su ÚNICO consumidor era la reja `sinAllDay` de
+     `contarVisibles`, que se retiró al encender la banda. Sin ella el parámetro
+     quedaba muerto, y con él el `view.type` que los tres llamadores calculaban
+     sólo para pasárselo. El conteo no depende de la vista.
+
+     Si algún día vuelve a hacer falta la vista aquí, el motivo de arriba sigue
+     en pie: sácala del `arg` del handler, nunca de `currentView`. */
   const aplicarConteo = useCallback((
     eventos: readonly EventoParaConteo[],
     rangos: RangosDeVista | null,
-    vista: string,
   ) => {
     const nuevo = contarVisibles(
       eventos,
       rangos?.activo ?? null,
       diasOcultosRef.current,
-      /* Sólo las vistas de rejilla descartan los `allDay`: en Mes sí se pintan.
-         Ver la tercera nota ⚠️ de `contarVisibles`. */
-      vista.startsWith('timeGrid'),
     )
     /* Forma funcional devolviendo `prev` tal cual cuando no cambia, para que
        React se salte el re-render por bail-out de identidad. Calcado de
@@ -2775,7 +2897,7 @@ export default function AgendaPage() {
   useEffect(() => {
     const api = calendarRef.current?.getApi()
     if (!api) return
-    aplicarConteo(api.getEvents(), rangoDeVista(), api.view.type)
+    aplicarConteo(api.getEvents(), rangoDeVista())
   }, [diasOcultos, aplicarConteo, rangoDeVista])
 
   /* ── Detectar mobile y actualizar vista del calendario ── */
@@ -2798,7 +2920,58 @@ export default function AgendaPage() {
 
   function closeModal() { setModal({ mode: 'closed' }) }
 
+  /* ══════════════════════════════════════════════════════════════════════
+     EL CANDADO DEL ARRASTRE — NO LO QUITES SIN LEER ESTO
+     ══════════════════════════════════════════════════════════════════════
+     Una traída que caiga ENTRE el `mousedown` y el `mouseup` de un arrastre
+     DUPLICA la cita en pantalla. Comprobado en banco con la librería real, no
+     deducido; el gesto sin traída a mitad no duplica nunca.
+
+     POR QUÉ, que es lo que hay que entender antes de tocar nada:
+
+       · Al empezar el gesto, `@fullcalendar/interaction` se guarda una copia de
+         la cita —`relevantEvents`, indexada por su `defId` INTERNO— y no la
+         vuelve a mirar hasta que sueltas.
+       · Nuestras dos fuentes son de FUNCIÓN, así que cada traída vuelve a
+         PARSEAR la cita y le asigna un `defId` NUEVO. El viejo desaparece del
+         store.
+       · Al soltar, `handleDragEnd` mergea la copia vieja ya movida
+         (`interaction/index.js:1381-1384`). El merge es un `Object.assign` por
+         clave (`core/internal-common.js:3342-3347`), y como ese `defId` ya no
+         existe, NO SUSTITUYE A NADIE: se añade. Dos entradas.
+
+     ⚠️ Y NO SE DETECTA CON `getEventById`. Las dos copias comparten el id
+     PÚBLICO —el uuid de la cita— y difieren sólo en los ids internos. Medido:
+     `defId 78/instanceId 79` a la hora nueva y `defId 138/instanceId 139` a la
+     vieja, las dos con el mismo `id`. `getEventById` devuelve la primera y se
+     queda tan tranquilo, así que las guardas de `aplicarCambioRealtime` y de
+     `handleSave` —que sí comprueban por id— no ven nada raro. Recargar la
+     limpia, y por eso parecía un fantasma.
+
+     ⚠️ NO LO CAUSA `revert()`, y esa pista se siguió y se descartó midiendo: el
+     duplicado sale IGUAL con el handler reviertiendo y sin revertir. `revert()`
+     mergea por las mismas claves y es inocuo.
+
+     LA TRAÍDA SE DESCARTA, NO SE APLAZA. Guardar la respuesta para aplicarla
+     después sería aplicar datos viejos contra un estado ya cambiado, que es
+     otra carrera. Lo que se pierde es una traída; la cubre el siguiente
+     disparador (cambio de filtro, foco o reconexión).
+
+     ⚠️ EL REDIMENSIONADO VA EN EL MISMO CANDADO. Tiene exactamente la misma
+     exposición: también captura `relevantEvents` al empezar. */
+  /* Instante en que empezó el gesto, o 0 si no hay ninguno. Un ref y no estado:
+     no debe provocar render, y `refetch()` lo lee de forma síncrona. Quien lo
+     interpreta —y quien lo suelta si se quedó atascado— es `hayGestoEnCurso`,
+     a nivel de módulo, con la explicación de la válvula al lado. */
+  const gestoEnCursoRef = useRef(0)
+
+  /* Identidad estable: sólo tocan un ref, así que `[]` y no se re-registran en
+     FullCalendar. Misma regla que `renderEC` y las fuentes. */
+  const alEmpezarGesto = useCallback(() => { gestoEnCursoRef.current = Date.now() }, [])
+  const alTerminarGesto = useCallback(() => { gestoEnCursoRef.current = 0 }, [])
+
   function refetch() {
+    if (hayGestoEnCurso(gestoEnCursoRef)) return
     calendarRef.current?.getApi().refetchEvents()
   }
 
@@ -3302,8 +3475,19 @@ export default function AgendaPage() {
     if (subState.isBlocked) { openBloqueoModal(); return }
     /* `allDay` y no `view.type === 'dayGridMonth'`: lo que decide es que el
        hueco pulsado sea un DÍA y no una hora, que es justo lo que esa bandera
-       significa. En las rejillas es `false` —`allDaySlot` está apagado, así que
-       no hay ninguna otra franja de día completo— y `arg.date` trae hora real. */
+       significa.
+
+       ⚠️ Y DESDE EL BLOQUE 5 ESO YA NO ES SÓLO MES. `allDaySlot` está ENCENDIDO,
+       así que Semana y Día tienen su banda de todo el día y un clic ahí llega
+       con `arg.allDay === true` y `arg.date` a medianoche: el alta se abre sin
+       hora, igual que en Mes. En la rejilla horaria sigue llegando `false` con
+       hora real.
+
+       POR ESO ESTA LÍNEA NO SE TOCÓ AL MONTAR LA BANDA, y es la única de los
+       cuatro manejadores de interacción que no necesitó nada: preguntar por la
+       BANDERA y no por la vista ya cubría un caso que entonces no existía.
+       Decidir por `view.type` habría mandado el clic de la banda por el camino
+       de la hora. No lo cambies a la vista. */
     const { fecha, hora } = partirFechaHora(arg.date.toISOString())
     abrirAlta(arg.date, fecha, arg.allDay ? null : hora)
   }
@@ -3353,8 +3537,50 @@ export default function AgendaPage() {
     setModal({ mode: 'edit', appointment: arg.event.extendedProps as Appointment })
   }
 
+  /**
+   * ⚠️ GUARDA TEMPORAL DE AG-DT-8 — SE SUSTITUYE EN EL BLOQUE 5B, NO SE BORRA.
+   *
+   * Devuelve `true` —y ya ha revertido— cuando el gesto dejaría la fila como
+   * cita de todo el día. Los dos manejadores salen sin tocar el servidor.
+   *
+   * POR QUÉ EXISTE. El bloque 5 encendió `allDaySlot`, y montar la banda es lo
+   * que la convierte en zona de destino del plugin de interacción: una cita se
+   * puede arrastrar de la rejilla a la banda sin que nadie lo haya pedido. La
+   * mutación llega con `standardProps.allDay = true` y
+   * `applyMutationToEventInstance` (`@fullcalendar/core/internal-common.js`
+   * :3807-3811) hace `forceAllDay` → `computeAlignedDayRange`. Con
+   * `allDayMaintainDuration` en su default `false`, la duración NO se conserva:
+   * una cita de 09:00-10:00 queda 00:00 → 00:00 del día siguiente.
+   *
+   * LO QUE SE EVITA ES UNA FILA CORRUPTA, y el CHECK de la base NO la atrapa:
+   * `appointments_all_day_medianoche_check` sólo exige medianoche y huso cuando
+   * `all_day` es `true`, y esa columna se quedaría en `false` porque la
+   * aplicación todavía no sabe escribirla. O sea que la base guardaría, tan
+   * contenta, una cita con hora de 24 horas que empieza a medianoche, y al
+   * recargar abriría la ventana de la rejilla al día entero.
+   *
+   * VA ANTES DE LEER `start`/`end` Y ANTES DE CUALQUIER AVISO, a propósito: el
+   * `avisoFueraDeHorario` compararía la medianoche y diría «vas a mover la cita
+   * a las 00:00», describiendo un cambio de HORA cuando lo que ocurre es un
+   * cambio de TIPO. Quien leyera eso y pulsara «sí» no habría consentido lo que
+   * iba a pasar.
+   *
+   * NO ES LA FUNCIONALIDAD, ES EL TAPÓN. Una cita de todo el día es legítima y
+   * la banda ya sabe pintarla; lo que falta es el camino de ESCRITURA de
+   * `appointments.all_day` (bloque 5B). Cuando exista, esto se reemplaza por el
+   * manejo real —componer la medianoche en la zona del consultorio y mandar
+   * `all_day: true`—, no por un borrado de la guarda.
+   */
+  function esGestoDeTodoElDia(arg: EventDropArg | EventResizeDoneArg): boolean {
+    if (!arg.event.allDay) return false
+    arg.revert()
+    toast.info('Todavía no se pueden crear citas de todo el día.')
+    return true
+  }
+
   async function handleEventDrop(arg: EventDropArg) {
     if (arg.event.extendedProps.isGcalBlock) { arg.revert(); return }
+    if (esGestoDeTodoElDia(arg)) return
     const id         = arg.event.id
     const start_time = arg.event.start?.toISOString()
     const end_time   = arg.event.end?.toISOString()
@@ -3418,6 +3644,7 @@ export default function AgendaPage() {
 
   async function handleEventResize(arg: EventResizeDoneArg) {
     if (arg.event.extendedProps.isGcalBlock) { arg.revert(); return }
+    if (esGestoDeTodoElDia(arg)) return
     const id         = arg.event.id
     const start_time = arg.event.start?.toISOString()
     const end_time   = arg.event.end?.toISOString()
@@ -4254,15 +4481,12 @@ export default function AgendaPage() {
               completo: { activeStart: arg.view.currentStart, activeEnd: arg.view.currentEnd },
             }
             aplicarVentana(eventos, rangos)
-            aplicarConteo(eventos, rangos, arg.view.type)
+            aplicarConteo(eventos, rangos)
           }}
           eventsSet={eventos => {
             const rangos = rangoDeVista()
             aplicarVentana(eventos, rangos)
-            /* La vista se lee del calendario y no de `currentView`: aquí no hay
-               un `arg` que la traiga, y el estado puede ir un render por detrás. */
-            const vista = calendarRef.current?.getApi().view.type ?? ''
-            aplicarConteo(eventos, rangos, vista)
+            aplicarConteo(eventos, rangos)
           }}
           buttonText={{ today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día' }}
           slotMinTime={ventana.slotMinTime}
@@ -4271,7 +4495,17 @@ export default function AgendaPage() {
              garantiza `diasOcultables`, y `initHiddenDays` lanza si no queda
              ningún día visible. */
           hiddenDays={diasOcultos}
-          allDaySlot={false}
+          /* ENCENDIDA EN EL BLOQUE 5. Estuvo en `false` desde el principio y eso
+             no escondía la banda: hacía que FullCalendar NO LA MONTARA, así que
+             los eventos de todo el día de Google —que la fuente ya traía con
+             `allDay: true`— se quedaban en el `eventStore` sin dibujarse en
+             ninguna parte de Semana ni de Día. Ver la nota retirada de
+             `contarVisibles`. */
+          allDaySlot
+          /* SIGUE EN 3 PARA MES, Y NO SE BAJA AQUÍ. La banda de todo el día lleva
+             su propio tope de 2 desde `VISTAS_FC`, que es opción POR VISTA: este
+             valor global sólo alcanza ya a `dayGridMonth`. Bajarlo aquí cambiaría
+             las celdas del mes, que están fuera de este bloque. */
           dayMaxEvents={3}
           views={VISTAS_FC}
           /* El número de día del mes lleva a la vista Día de ESE día. Antes no
@@ -4305,6 +4539,17 @@ export default function AgendaPage() {
           eventClick={handleEventClick}
           eventDrop={handleEventDrop}
           eventResize={handleEventResize}
+          /* Las cuatro puntas del candado de `refetch()`. Mientras haya un gesto
+             en curso NO se traen citas: una traída a mitad de arrastre duplica
+             la cita en pantalla, con el mismo id público y distintos ids
+             internos. El porqué entero está junto a `hayGestoEnCurso`, y ahí
+             está también por qué la marca caduca sola en vez de ser un booleano.
+             Arrastre y redimensionado comparten el mismo par de manejadores
+             porque comparten el defecto. */
+          eventDragStart={alEmpezarGesto}
+          eventDragStop={alTerminarGesto}
+          eventResizeStart={alEmpezarGesto}
+          eventResizeStop={alTerminarGesto}
           /* ⚠️ `100%` Y NO `auto`, y de aquí cuelga todo lo demás. Con `auto` el
              calendario crece hasta su altura completa y scrollea `<main>`: no
              hay zona fija posible. Con `100%` se acota a la tarjeta —que es
