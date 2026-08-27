@@ -1,14 +1,15 @@
+import type { calendar_v3 } from 'googleapis'
 import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { conCalendarioSpinus, registrarFalloGCal } from '@/lib/gcal'
-import { resolverConexionClinica } from '@/lib/gcalConexion'
+import { resolverConexionClinica, type ConexionGoogle } from '@/lib/gcalConexion'
 import { canManageClinica } from '@/lib/permissions'
-import { APPOINTMENT_SELECT, eventoParaGoogle, componerAsistentes, INTERRUPTORES_INVITADOS,
+import { APPOINTMENT_SELECT, eventoParaGoogle, puntasParaGoogle, componerAsistentes, INTERRUPTORES_INVITADOS,
          ICONOS_EVENTO, COLORES_EVENTO, pintaValida,
          type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
 import { correoDelMedico } from '@/lib/medicoCorreo'
-import { TZ_CLINICA, desplazarFecha, fechaHoraLocalAInstante } from '@/lib/dates'
+import { TZ_CLINICA, desplazarFecha, fechaHoraLocalAInstante, renderEnTZ } from '@/lib/dates'
 
 /* Una fecha-solo `YYYY-MM-DD` QUE ADEMÁS EXISTE EN EL CALENDARIO: la forma no
    basta, porque `2026-02-30` la pasa y el motor la DESBORDA al 2 de marzo en vez
@@ -21,6 +22,79 @@ function esFechaDeCalendario(valor: string): boolean {
   if (!FECHA_SOLA.test(valor)) return false
   const instante = new Date(`${valor}T00:00:00Z`)
   return !Number.isNaN(instante.getTime()) && instante.toISOString().startsWith(valor)
+}
+
+/**
+ * FIJA EL EVENTO RECIÉN CREADO POR LA REPARACIÓN — O LO DESHACE SI PERDIÓ.
+ *
+ * ⚠️ EL `.is('google_event_id', null)` ES UN CANDADO, NO UN FILTRO DE ADORNO.
+ * La reparación corre dentro de `after()`, o sea DESPUÉS de responder, así que
+ * dos ediciones seguidas de la misma fila huérfana pueden solaparse: las dos
+ * leen `google_event_id` en null, las dos crean, y el médico acaba con la cita
+ * DUPLICADA en su calendario. El chequeo de concurrencia del PUT no lo cubre —
+ * lo dispara `updated_at`, que el modal manda pero el arrastre NO
+ * (`agenda/page.tsx`, «Sin updated_at — drag & drop no requiere chequeo»).
+ *
+ * Así que la escritura del identificador es un COMPARE-AND-SWAP: sólo entra si
+ * la columna sigue vacía. Quien llega segundo no pisa nada, se entera por el
+ * conteo de filas y borra el evento que acababa de crear. Gana el primero, y
+ * en Google queda uno.
+ *
+ * `select('id')` no es curiosidad: sin él PostgREST no dice cuántas filas tocó,
+ * y perder la carrera es indistinguible de ganarla.
+ *
+ * El borrado va con `sendUpdates: 'none'` y `puedeReparar: false`: es basura
+ * nuestra de hace un segundo, nadie ha tenido tiempo de verla y desde luego no
+ * hay que avisar a nadie de que se cancela. Y si el borrado falla, se registra
+ * y se sigue: el duplicado en Google es feo, perder la respuesta buena sería
+ * peor.
+ */
+async function fijarEventoCreado(
+  admin: ReturnType<typeof createAdminClient>,
+  conexion: ConexionGoogle,
+  datos: {
+    appointmentId: string
+    clinicaId: string
+    userId: string
+    googleEventId: string | null
+    estado: 'synced' | 'failed'
+    calendarId: string | null
+  },
+): Promise<void> {
+  const { data: fijadas, error } = await admin
+    .from('appointments')
+    .update({
+      google_event_id:  datos.googleEventId,
+      gcal_sync_status: datos.estado,
+      gcal_calendar_id: datos.calendarId,
+    })
+    .eq('id', datos.appointmentId)
+    .eq('clinica_id', datos.clinicaId)
+    .is('google_event_id', null)
+    .select('id')
+
+  if (error) {
+    registrarFalloGCal(
+      { operacion: 'appointments.update(reparación gcal)', userId: datos.userId, conexionId: conexion.id, calendarId: datos.calendarId },
+      error,
+    )
+    return
+  }
+  if ((fijadas?.length ?? 0) > 0 || !datos.googleEventId) return
+
+  // Perdimos la carrera: otra escritura ya dejó su identificador en la fila.
+  const eventId = datos.googleEventId
+  try {
+    await conCalendarioSpinus(conexion, admin, (calendar, calendarId) =>
+      calendar.events.delete({ calendarId, eventId, sendUpdates: 'none' }),
+      { puedeReparar: false, actorId: datos.userId },
+    )
+  } catch (err) {
+    registrarFalloGCal(
+      { operacion: 'events.delete (duplicado de reparación)', userId: datos.userId, conexionId: conexion.id, calendarId: datos.calendarId, eventId },
+      err,
+    )
+  }
 }
 
 /* Formato UUID. A nivel de módulo porque lo usan el PUT (consultorio y
@@ -125,48 +199,19 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
     if (notes       !== undefined) updates.notes       = notes || null
     if (status      !== undefined) updates.status      = status
 
-    /* ── TODO EL DÍA: LAS DOS PUNTAS SE COMPONEN AQUÍ ────────────────────────
-       Mismo trato que en el POST y por el mismo motivo: el cliente manda dos
-       FECHAS y el servidor las convierte en medianoche, porque la zona que vale
-       es la del consultorio de la fila y el navegador compondría con la suya.
-       `all_day_hasta` es el ÚLTIMO DÍA INCLUIDO; el `+1 día` de aquí es el paso
-       a fin exclusivo, y es el único del servidor en esta ruta.
+    /* ── EL INTERRUPTOR SE ANOTA AQUÍ; LAS DOS PUNTAS SE COMPONEN ABAJO ──────
+       La bandera es un booleano suelto y no depende de nada, así que va con el
+       resto de campos. La composición de la medianoche NO puede estar aquí, y
+       estuvo: necesita la zona horaria EFECTIVA de la fila, y ésa no se conoce
+       hasta que el bloque de consultorio haya decidido si esta edición cambia
+       de consultorio —lo que ocurre 190 líneas más abajo—. Compuesta aquí, un
+       cuerpo con `all_day: true` Y `consultorio_id` dejaba las puntas en la
+       zona VIEJA y la columna `consultorio_timezone` en la NUEVA, y el CHECK
+       de la base las compara entre sí: 23514 y 500 crudo.
 
-       Cuando `all_day` es true estas dos líneas PISAN lo que hubiera dejado el
-       bloque de arriba: si el cuerpo trajera además `start_time`, manda el
-       interruptor. No pueden discrepar sin que una de las dos esté mal, y la
-       que la base va a comprobar es ésta. */
+       Vive ahora justo después de ese bloque, con el porqué entero al lado.
+       NO LA SUBAS DE VUELTA. */
     if (all_day !== undefined) updates.all_day = all_day === true
-    if (all_day === true) {
-      const tz = existing.consultorio_timezone
-      const desde = typeof all_day_desde === 'string' ? all_day_desde : ''
-      const hasta = typeof all_day_hasta === 'string' ? all_day_hasta : ''
-      if (!tz) {
-        return NextResponse.json(
-          { error: 'consultorio_sin_huso', message: 'Esta cita no tiene zona horaria de consultorio, y un evento de todo el día no se puede guardar sin ella.' },
-          { status: 400 }
-        )
-      }
-      /* Dos comprobaciones con dos mensajes, como en el POST: que las fechas
-         EXISTAN y que estén en orden. Y el mismo día es VÁLIDO —un evento de una
-         sola jornada—, así que la guarda es `hasta < desde` y el texto dice «no
-         puede ir antes», no «tiene que ir después», que prometía una regla más
-         estricta que la que el código aplica. */
-      if (!esFechaDeCalendario(desde) || !esFechaDeCalendario(hasta)) {
-        return NextResponse.json(
-          { error: 'fecha_invalida', message: 'Las fechas del evento no existen en el calendario. Se espera un día real, en formato AAAA-MM-DD.' },
-          { status: 400 }
-        )
-      }
-      if (hasta < desde) {
-        return NextResponse.json(
-          { error: 'rango_invalido', message: 'El último día del evento no puede ir antes del primero.' },
-          { status: 400 }
-        )
-      }
-      updates.start_time = fechaHoraLocalAInstante(desde, '00:00', tz)
-      updates.end_time   = fechaHoraLocalAInstante(desplazarFecha(hasta, { dias: 1 }), '00:00', tz)
-    }
 
     /* ── TODO EL DÍA Y PACIENTE NO PUEDEN IR JUNTOS ──────────────────────────
        El razonamiento entero está en el POST, y es el mismo: la regla es de
@@ -197,7 +242,16 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
        `end_time` viajan por separado, así que un PUT que sólo mande el fin se
        compara contra el inicio que ya hay en la fila. Se comprueba aquí y no en
        la base porque `appointments` no tiene `CHECK (end_time > start_time)`
-       incondicional: sin esto, el fin adelantado entraría sin más. */
+       incondicional: sin esto, el fin adelantado entraría sin más.
+
+       ⚠️ ESTO NO CUBRE LAS FILAS DE TODO EL DÍA, Y NO HACE FALTA QUE LO CUBRA.
+       Sus dos puntas se componen MÁS ABAJO —después del bloque de consultorio,
+       que es donde se sabe el huso efectivo; el porqué entero está allí—, así
+       que cuando esta línea corre `updates` todavía no las tiene y lo que
+       compara es lo que la fila ya tenía. El caso lo valida la guarda
+       `hasta < desde` de aquel bloque, y lo valida MEJOR: habla de días, que es
+       lo que el cliente manda, en vez de instantes que aún no existen.
+       Bajar esta comprobación para «alcanzarlas» sólo la haría redundante. */
     const inicioEfectivo = typeof updates.start_time === 'string' ? updates.start_time : existing.start_time
     const finEfectivo    = typeof updates.end_time   === 'string' ? updates.end_time   : existing.end_time
     if (!(new Date(finEfectivo) > new Date(inicioEfectivo))) {
@@ -394,6 +448,86 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       updates.consultorio_timezone      = consultorio.timezone
     }
 
+    /* ── TODO EL DÍA: LAS DOS PUNTAS SE COMPONEN AQUÍ, Y AQUÍ ES ABAJO ───────
+       Mismo trato que en el POST y por el mismo motivo: el cliente manda dos
+       FECHAS y el servidor las convierte en medianoche, porque la zona que vale
+       es la del consultorio de la fila y el navegador compondría con la suya.
+       `all_day_hasta` es el ÚLTIMO DÍA INCLUIDO; el `+1 día` de aquí es el paso
+       a fin exclusivo, y es el único del servidor en esta ruta.
+
+       ⚠️ ESTÁ DESPUÉS DEL BLOQUE DE CONSULTORIO A PROPÓSITO, Y ESTUVO ANTES.
+       El huso que hay que usar es el que la fila va a TENER cuando termine este
+       PUT, no el que traía: si esta misma edición cambia de consultorio, el
+       snapshot de arriba ya escribió el nuevo en `updates`. Compuesta antes,
+       una edición con `all_day: true` Y `consultorio_id` dejaba las puntas en
+       la zona vieja y la columna en la nueva, y el CHECK
+       `appointments_all_day_medianoche_check` compara justamente esas dos cosas
+       ENTRE SÍ: rechazaba con 23514. Se llegaba desde la interfaz sin nada
+       raro —editar un evento de todo el día y moverlo a un consultorio de otra
+       zona—, así que no era teórico.
+
+       De ahí el `typeof`, que es el mismo `??` de siempre escrito con la
+       guarda que obliga el `Record<string, unknown>` de `updates` (idéntico al
+       de `inicioEfectivo` más arriba): si el bloque de consultorio corrió,
+       manda su huso; si no, el que la fila ya tenía. `consultorios.timezone` es
+       NOT NULL, así que cuando ese bloque corre siempre hay cadena.
+
+       ⚠️ Y NO SUBAS EL BLOQUE DE CONSULTORIO EN SU LUGAR: depende de
+       `updates.medico_id`, que se decide más arriba, y habría que subir los dos.
+
+       ⚠️ LO QUE ESTE ORDEN DEJA FUERA, Y NO ES UN DESCUIDO. La comprobación de
+       «el fin después del inicio» vive ARRIBA y lee `updates.start_time` /
+       `updates.end_time`, así que ya no ve estas dos puntas: para una fila de
+       todo el día compara las que la fila ya tenía. No abre ningún hueco —el
+       caso lo valida la guarda `hasta < desde` de aquí abajo, que es la que
+       habla el idioma de este camino (días, no instantes)— y bajar aquella
+       comprobación sólo la volvería a hacer redundante. Si vas a «arreglarlo»,
+       lee antes esta línea: ya está arreglado. */
+    /* LAS DOS FECHAS DEL EVENTO, VIVAS FUERA DEL BLOQUE, para que el `after()`
+       de Google las alcance. Son las MISMAS cadenas con las que se compone la
+       fila —`hasta` ya con su dia sumado—, y Google las quiere tal cual: su
+       `end` tambien es exclusivo. Sacarlas aqui es lo que evita un CUARTO `+1`
+       del convenio alla abajo.
+
+       En null significa «este PUT no deja la fila como evento de todo el dia»,
+       que es tambien la senal de que a Google hay que mandarle instantes. */
+    let fechasDelEvento: { desde: string; hastaExclusivo: string } | null = null
+
+    if (all_day === true) {
+      const tz = typeof updates.consultorio_timezone === 'string'
+        ? updates.consultorio_timezone
+        : existing.consultorio_timezone
+      const desde = typeof all_day_desde === 'string' ? all_day_desde : ''
+      const hasta = typeof all_day_hasta === 'string' ? all_day_hasta : ''
+      if (!tz) {
+        return NextResponse.json(
+          { error: 'consultorio_sin_huso', message: 'Esta cita no tiene zona horaria de consultorio, y un evento de todo el día no se puede guardar sin ella.' },
+          { status: 400 }
+        )
+      }
+      /* Dos comprobaciones con dos mensajes, como en el POST: que las fechas
+         EXISTAN y que estén en orden. Y el mismo día es VÁLIDO —un evento de una
+         sola jornada—, así que la guarda es `hasta < desde` y el texto dice «no
+         puede ir antes», no «tiene que ir después», que prometía una regla más
+         estricta que la que el código aplica. */
+      if (!esFechaDeCalendario(desde) || !esFechaDeCalendario(hasta)) {
+        return NextResponse.json(
+          { error: 'fecha_invalida', message: 'Las fechas del evento no existen en el calendario. Se espera un día real, en formato AAAA-MM-DD.' },
+          { status: 400 }
+        )
+      }
+      if (hasta < desde) {
+        return NextResponse.json(
+          { error: 'rango_invalido', message: 'El último día del evento no puede ir antes del primero.' },
+          { status: 400 }
+        )
+      }
+      const hastaExclusivo = desplazarFecha(hasta, { dias: 1 })
+      fechasDelEvento = { desde, hastaExclusivo }
+      updates.start_time = fechaHoraLocalAInstante(desde, '00:00', tz)
+      updates.end_time   = fechaHoraLocalAInstante(hastaExclusivo, '00:00', tz)
+    }
+
     // RLS filtra por clinica_id
     const { data: apt, error } = await supabase
       .from('appointments')
@@ -402,6 +536,30 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       .select(APPOINTMENT_SELECT)
       .single()
 
+    /* 23514 = check_violation. La vía conocida hasta este commit era el desfase
+       entre las puntas de todo el día y `consultorio_timezone`, y el reordenado
+       de arriba la cierra — pero `appointments` tiene varios CHECK (la
+       medianoche, `icono`, `color`) y cualquiera de ellos sube por aquí. Sin
+       esto el usuario lee el texto del constraint dentro de un 500, que no le
+       dice nada y a nosotros nos oculta que aquel 500 era en realidad un dato
+       rechazado. Mismo criterio que `consultorio_sin_huso` y `rango_invalido`:
+       la base es la barrera que no se puede saltar, esto es el mensaje que se
+       entiende.
+
+       Es 400 y no 500 a propósito: lo que falló es el cuerpo de la petición, no
+       el servidor. El texto de Postgres NO viaja al cliente —nombra columnas y
+       constraints— pero sí queda en el log del servidor, que es donde hace
+       falta para diagnosticar. */
+    if (error?.code === '23514') {
+      console.error('[PUT /api/appointments/[id]] CHECK rechazado:', error.message)
+      return NextResponse.json(
+        {
+          error: 'datos_invalidos',
+          message: 'La base rechazó estos datos por incoherentes. Si es un evento de todo el día, revisa las fechas y el consultorio; si no, vuelve a intentarlo.',
+        },
+        { status: 400 }
+      )
+    }
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     // Google Calendar sync en background con el cliente admin, espejando al
@@ -431,14 +589,168 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
     // `paciente_id` entra en la lista porque el título del evento se deriva del
     // paciente: ligar o desligar uno cambia lo que Google debe mostrar aunque
     // no se toque ningún otro campo.
-    const gcalFieldChanged = title !== undefined || start_time !== undefined || end_time !== undefined || notes !== undefined || status !== undefined || paciente_id !== undefined
+    /* ⚠️ LAS TRES CLAVES DE TODO EL DIA ENTRAN AQUI, Y SIN ELLAS NO SE
+       SINCRONIZABA NADA. En una fila de todo el dia el cuerpo NUNCA trae
+       `start_time` ni `end_time` —el cliente manda fechas, y las puntas las
+       compone el servidor—, asi que sin nombrar estas tres, ni encender el
+       interruptor ni cambiar los dias de un evento llegaban a Google: la
+       edicion se guardaba en la base y el calendario se quedaba como estaba,
+       en silencio.
+
+       Basta con la lista: el escalon siguiente ya estaba bien. `seMovio` compara
+       `existing` contra `apt` —la fila YA ESCRITA, no el cuerpo— asi que en
+       cuanto se deja pasar el caso, el `sendUpdates: 'all'` sale solo. */
+    const gcalFieldChanged = title !== undefined || start_time !== undefined || end_time !== undefined || notes !== undefined || status !== undefined || paciente_id !== undefined || all_day !== undefined || all_day_desde !== undefined || all_day_hasta !== undefined
     // Se resuelve una sola vez y sólo si hay algo que sincronizar; la usan el
     // after() de abajo y el veredicto de la respuesta. Con el cliente de sesión
     // y antes de responder, como manda el plan §1: dentro de `after()` no se
     // resuelve nada.
-    const conexion = (existing.google_event_id && gcalFieldChanged)
+    /* ⚠️ YA NO SE EXIGE `google_event_id` PARA RESOLVER LA CONEXIÓN, y ése es
+       el cambio que repara las filas huérfanas. Una fila puede no tener
+       identificador porque su evento NUNCA se creó —el alta falló, o la clínica
+       no tenía Google conectado entonces— y con la condición vieja esa fila no
+       volvía a intentarlo JAMÁS: el PUT sólo sabía parchear, y no hay nada que
+       parchear. Quedaba huérfana para siempre, sin evento en el calendario del
+       médico y sin nadie que la recuperara.
+
+       Lo que decide ahora es sólo `gcalFieldChanged`. Con la conexión resuelta,
+       el bloque de abajo elige verbo: `patch` si hay identificador, `insert` si
+       no. */
+    const conexion = gcalFieldChanged
       ? await resolverConexionClinica(supabase, profile.clinica_id)
       : null
+
+    /* ── LA FILA HUÉRFANA: NO SE PARCHEA, SE CREA ────────────────────────
+       Una fila sin `google_event_id` no tiene evento que actualizar, así que
+       aquí el verbo es `insert` y no `patch`. Con esto, CUALQUIER edición
+       posterior repara la fila: escribe el identificador que le faltaba y la
+       deja sincronizada. No es cosa de los eventos de todo el día — a una cita
+       normal le pasa igual si Google falla en el momento del alta.
+
+       ⚠️ LA CONDICIÓN ES LA AUSENCIA DEL IDENTIFICADOR, Y NO EL
+       `gcal_sync_status`. Ese estado NO sirve para decidir, porque hay TRES
+       formas de quedarse sin evento y sólo una se llama 'failed':
+         · 'pending' — la fila nace así (`POST`), y ahí se queda si la clínica
+           no tenía Google conectado: el `after()` del alta ni siquiera corre.
+           Conectarlo después no repara nada por su cuenta; esta rama sí.
+         · 'failed'  — el alta lo intentó y no salió.
+         · 'unbound' — el médico borró el calendario y `desvincularCitas`
+           (`lib/gcal.ts`) soltó los vínculos. El evento existió y ya no.
+       Las tres dicen lo mismo —«no hay evento en Google para esta fila»— y las
+       tres se reparan igual. Mirar el estado dejaría fuera a dos de ellas.
+
+       ⚠️ AL PACIENTE NO SE LE INVITA AQUÍ, Y NO ES UN OLVIDO. Espeja al alta,
+       que sólo mete al MÉDICO (`nuevos: []` en su `componerAsistentes`): al
+       paciente se le invita a mano, desde el botón del modal, que es la única
+       ruta que le manda correo. Así que reparar una cita de hace meses NO le
+       escribe al paciente de golpe — no puede, no hay camino. Y tampoco había
+       nada que conservar: si la fila nunca tuvo evento, nunca tuvo invitados,
+       por eso `componerAsistentes` arranca de `[]` y no de un `events.get`
+       como el patch. */
+    if (!existing.google_event_id && gcalFieldChanged && conexion) {
+      const userId = user.id
+      const clinicaId = profile.clinica_id
+      const puedeReparar = canManageClinica(profile)
+      const admin = createAdminClient()
+      const pacienteCita: PacienteEnCita = apt.pacientes ?? null
+      const clinicaCita:  ClinicaEnCita  = apt.clinicas  ?? null
+      const tzCita: string = apt.consultorio_timezone ?? TZ_CLINICA
+      const esTodoElDia = apt.all_day === true
+      // `typeof` y no un `as`: `apt` llega sin tipar de PostgREST, y una
+      // aserción aquí sería creerle a la fila en vez de comprobarla.
+      const medicoDeLaCita = typeof apt.medico_id === 'string' ? apt.medico_id : null
+
+      /* LAS DOS PUNTAS SALEN DE `apt`, LA FILA YA GUARDADA, Y NUNCA DEL CUERPO.
+         El `patch` manda sólo lo que cambió porque el evento ya tiene el resto;
+         un `insert` necesita el estado COMPLETO, y esta edición pudo no tocar
+         las fechas —reparar una fila huérfana cambiándole el título es el caso
+         normal—.
+
+         En todo el día se vuelve de instante a fecha-sola en la zona del
+         consultorio, que es la única en la que esa fila significa algo. SIN
+         `±1`: `apt.end_time` YA es el fin exclusivo, y el `end.date` de Google
+         también lo es, así que la fecha se pasa tal cual. Si te ves sumando un
+         día aquí, sobra. */
+      const puntasDelAlta = esTodoElDia
+        ? puntasParaGoogle(
+            { todoElDia: true, inicio: renderEnTZ(apt.start_time, 'yyyy-MM-dd', tzCita), fin: renderEnTZ(apt.end_time, 'yyyy-MM-dd', tzCita), timezone: tzCita },
+            { limpiarLaOtraForma: false },
+          )
+        : puntasParaGoogle(
+            { todoElDia: false, inicio: apt.start_time, fin: apt.end_time, timezone: tzCita },
+            { limpiarLaOtraForma: false },
+          )
+
+      after(async () => {
+        let google_event_id: string | null = null
+        let calendarIdUsado: string | null = null
+        try {
+          // `null` apaga el ancla de hora en un evento de todo el día, igual que
+          // en el alta y en el patch.
+          const instanteParaAncla = esTodoElDia ? null : apt.start_time
+          const { summary, description, reminders } =
+            eventoParaGoogle(pacienteCita, clinicaCita, apt.title, instanteParaAncla, tzCita, apt.status)
+
+          /* El médico entra en el mismo `insert`, como en el alta: si tiene la
+             cita asignada, tiene que tenerla en su calendario. Si su correo no
+             se resuelve, el evento se crea igual y sin asistentes — el mismo
+             criterio del POST, y sigue quedando el botón de invitación. */
+          let asistentes: calendar_v3.Schema$EventAttendee[] = []
+          if (medicoDeLaCita) {
+            const r = await correoDelMedico(admin, medicoDeLaCita, clinicaId)
+            if (r.ok) {
+              asistentes = componerAsistentes([], {
+                medicoActual: r.correo, medicoSaliente: null, pacienteSaliente: null, nuevos: [],
+              })
+            } else {
+              registrarFalloGCal(
+                { operacion: `events.insert (reparación, médico sin invitar: ${r.motivo})`, userId, conexionId: conexion.id },
+                new Error('no se pudo resolver el correo del médico asignado'),
+              )
+            }
+          }
+
+          const creado = await conCalendarioSpinus(conexion, admin, (calendar, calendarId) => {
+            calendarIdUsado = calendarId
+            /* `sendUpdates: 'all'` como en el alta, y por lo mismo: esto ES el
+               alta que no llegó a ocurrir. El médico invitado con su propia
+               cuenta no tiene esta cita en ninguna parte, que es justo lo que
+               se está arreglando. Al dueño de la cuenta conectada Google no le
+               escribe —no notifica al organizador de su propio evento—. */
+            return calendar.events.insert({
+              calendarId,
+              sendUpdates: 'all',
+              requestBody: {
+                summary, description, attendees: asistentes,
+                ...INTERRUPTORES_INVITADOS, reminders, ...puntasDelAlta,
+              },
+            })
+          }, { puedeReparar, actorId: userId })
+
+          google_event_id = creado?.data.id ?? null
+          if (!google_event_id) {
+            registrarFalloGCal(
+              { operacion: 'events.insert (reparación, sin respuesta)', userId, conexionId: conexion.id, calendarId: calendarIdUsado },
+              new Error('no se resolvió calendario de clínica (¿modo estricto?)'),
+            )
+          }
+        } catch (gcalErr) {
+          registrarFalloGCal(
+            { operacion: 'events.insert (reparación de cita sin evento)', userId, conexionId: conexion.id, calendarId: calendarIdUsado },
+            gcalErr,
+          )
+        }
+
+        await fijarEventoCreado(admin, conexion, {
+          appointmentId: id,
+          clinicaId,
+          userId,
+          googleEventId: google_event_id,
+          estado:        google_event_id ? 'synced' : 'failed',
+          calendarId:    calendarIdUsado,
+        })
+      })
+    }
 
     if (existing.google_event_id && gcalFieldChanged && conexion) {
       const gcalEventId = existing.google_event_id
@@ -514,6 +826,37 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       const sendUpdates: 'all' | 'none' =
         (seMovio || cambioCancelacion || huboReasignacion || cambioPaciente) ? 'all' : 'none'
 
+      /* ── LAS DOS PUNTAS PARA EL `patch` ──────────────────────────────────
+         Dos formas, y la de todo el dia manda cuando esta edicion deja la fila
+         como evento de todo el dia — que es exactamente lo que significa que
+         `fechasDelEvento` no sea null. Sus dos cadenas son las MISMAS con las
+         que se compuso la fila, y Google las quiere tal cual: su `end` tambien
+         es exclusivo, asi que no hay `+1` nuevo por ninguna parte.
+
+         ⚠️ `limpiarLaOtraForma: true` EN LAS DOS RAMAS, Y NO ES SIMETRIA
+         DECORATIVA. `events.patch` FUSIONA: mandar `{ date }` sobre un evento
+         que hoy tiene `dateTime` dejaria los dos puestos, y Google exige que
+         las dos puntas sean del mismo tipo. Hay que borrar la vieja con un
+         `null` explicito, y hace falta EN LOS DOS SENTIDOS: encender el
+         interruptor (sobra `dateTime`) y apagarlo (sobra `date`). El porque
+         entero, con la referencia, esta en `puntasParaGoogle`.
+
+         ⚠️ Y CADA PUNTA SE MANDA SOLO SI CAMBIO, que es como estaba antes y
+         hay que conservarlo: un PUT que solo mueva el fin no debe reescribir el
+         inicio. En todo el dia las dos van juntas siempre —se componen juntas—,
+         asi que ahi la condicion es la misma para ambas. */
+      const puntasDelPatch = fechasDelEvento !== null
+        ? puntasParaGoogle(
+            { todoElDia: true, inicio: fechasDelEvento.desde, fin: fechasDelEvento.hastaExclusivo, timezone: tzCita },
+            { limpiarLaOtraForma: true },
+          )
+        : puntasParaGoogle(
+            { todoElDia: false, inicio: start_time, fin: end_time, timezone: tzCita },
+            { limpiarLaOtraForma: true },
+          )
+      const mandaInicio = fechasDelEvento !== null || start_time !== undefined
+      const mandaFin    = fechasDelEvento !== null || end_time   !== undefined
+
       after(async () => {
         /* El color del evento en Google, por estado.
            `completed: '8'` vivía aquí y ERA UNA RAMA MUERTA: la base rechazaba
@@ -542,7 +885,14 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
            prefijo «CANCELADA — » y una reactivada lo pierde, sin código de
            vuelta — se recompone desde cero, así que el prefijo no se acumula.
            Ver `PREFIJO_CANCELADA` en `lib/appointments.ts`. */
-        const { summary, description } = eventoParaGoogle(pacienteCita, clinicaCita, apt.title, apt.start_time, tzCita, apt.status)
+        /* `null` APAGA EL ANCLA DE HORA en un evento de todo el dia, cuyo
+           `start_time` es medianoche: sin esto la descripcion decia «Hora de la
+           cita: 12:00 a.m.» sobre algo que no tiene hora. Sale de `apt` —la fila
+           ya actualizada— y no del cuerpo, por lo mismo que el instante: una
+           edicion que solo cambie el `status` no trae `all_day` y la fila puede
+           serlo igual. */
+        const instanteParaAncla = apt.all_day === true ? null : apt.start_time
+        const { summary, description } = eventoParaGoogle(pacienteCita, clinicaCita, apt.title, instanteParaAncla, tzCita, apt.status)
 
         /* ── LOS CORREOS DE LOS MÉDICOS — SÓLO AL REASIGNAR ───────────────
            Los dos se resuelven únicamente cuando cambia `medico_id`, que es la
@@ -631,8 +981,8 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
                 description,
                 attendees: asistentes,
                 ...INTERRUPTORES_INVITADOS,
-                ...(start_time !== undefined ? { start: { dateTime: start_time, timeZone: tzCita } } : {}),
-                ...(end_time   !== undefined ? { end:   { dateTime: end_time,   timeZone: tzCita } } : {}),
+                ...(mandaInicio ? { start: puntasDelPatch.start } : {}),
+                ...(mandaFin    ? { end:   puntasDelPatch.end   } : {}),
                 ...(status     !== undefined && STATUS_COLOR[status] ? { colorId: STATUS_COLOR[status] }    : {}),
               },
             })
@@ -691,8 +1041,13 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
     // consulta, y la pregunta es por CLÍNICA: antes miraba la fila propia de
     // quien editaba, así que a la secretaria le contestaba 'disconnected' con
     // la clínica perfectamente conectada.
+    // `skipped` sigue queriendo decir «no había nada que mandar», pero eso ya no
+    // incluye a la fila sin evento: ahora hay algo que mandar —el alta que le
+    // faltaba— así que contesta 'pending' como cualquier otra, o 'disconnected'
+    // si la clínica no tiene Google. La condición pierde el `google_event_id`
+    // por el mismo motivo que la conexión de arriba.
     let gcalSync: 'pending' | 'disconnected' | 'skipped' = 'skipped'
-    if (existing.google_event_id && gcalFieldChanged) {
+    if (gcalFieldChanged) {
       gcalSync = conexion ? 'pending' : 'disconnected'
     }
 

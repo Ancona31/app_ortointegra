@@ -5,7 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { conCalendarioSpinus, registrarFalloGCal } from '@/lib/gcal'
 import { resolverConexionClinica } from '@/lib/gcalConexion'
 import { canManageClinica } from '@/lib/permissions'
-import { APPOINTMENT_SELECT, eventoParaGoogle, componerAsistentes, INTERRUPTORES_INVITADOS,
+import { APPOINTMENT_SELECT, eventoParaGoogle, puntasParaGoogle, componerAsistentes, INTERRUPTORES_INVITADOS,
          ICONOS_EVENTO, COLORES_EVENTO, pintaValida,
          type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
 import { correoDelMedico } from '@/lib/medicoCorreo'
@@ -328,11 +328,20 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       )
     }
+    /* EL FIN EXCLUSIVO, EN FECHA-SOLA Y EN SU PROPIA CONSTANTE. Estaba escrito
+       dentro de la expresion de abajo, y sacarlo no es cosmetica: esta MISMA
+       cadena es la que Google quiere en `end.date` (su `end` tambien es
+       exclusivo), y con el `desplazarFecha` enterrado en el `fechaHoraLocalAInstante`
+       la unica forma de llegar a ella desde el `after()` habria sido volver a
+       sumar el dia — un CUARTO `+1` del convenio, que es exactamente lo que no
+       puede haber. Ahora la fecha se compone una vez y la usan los dos: la fila
+       (convertida a instante) y el evento (tal cual). */
+    const finExclusivo = esTodoElDia ? desplazarFecha(fechaHasta, { dias: 1 }) : null
     const inicioFila = esTodoElDia
       ? fechaHoraLocalAInstante(fechaDesde, '00:00', consultorio.timezone)
       : start_time
-    const finFila = esTodoElDia
-      ? fechaHoraLocalAInstante(desplazarFecha(fechaHasta, { dias: 1 }), '00:00', consultorio.timezone)
+    const finFila = finExclusivo !== null
+      ? fechaHoraLocalAInstante(finExclusivo, '00:00', consultorio.timezone)
       : end_time
 
     // RLS filtra por clinica_id
@@ -450,7 +459,37 @@ export async function POST(req: NextRequest) {
           // El estado en el alta es siempre 'scheduled' (se escribe arriba, en
           // el insert de la fila), así que aquí nunca sale el prefijo de
           // cancelación — va igualmente porque el título tiene un solo autor.
-          const { summary, description, reminders } = eventoParaGoogle(pacienteCita, clinicaCita, title, apt.start_time, tzCita, 'scheduled')
+          /* `null` APAGA EL ANCLA DE HORA, y es lo que toca en un evento de
+             todo el dia: su `start_time` es medianoche, asi que el ancla salia
+             diciendo «Hora de la cita: 12:00 a.m.» sobre algo que no tiene
+             hora. Ver el aviso de `eventoParaGoogle`. */
+          const instanteParaAncla = esTodoElDia ? null : apt.start_time
+          const { summary, description, reminders } = eventoParaGoogle(pacienteCita, clinicaCita, title, instanteParaAncla, tzCita, 'scheduled')
+
+          /* LAS DOS PUNTAS SALEN DE LO QUE SE GUARDO, NO DEL CUERPO DE LA
+             PETICION, y aqui estaba el fallo gordo: estas dos lineas leian
+             `start_time` / `end_time` del body, que en un alta de todo el dia
+             NO VIENEN —el cliente manda `all_day_desde` / `all_day_hasta`—, asi
+             que a Google le llegaba `{ dateTime: undefined }` y el evento no se
+             creaba. La cita quedaba en `failed` sin que nadie supiera por que.
+
+             Con hora se pasan los instantes; en todo el dia, las dos fechas:
+             `fechaDesde` tal como llego y `finExclusivo`, la misma cadena con la
+             que se compuso la fila. Sin `+1` nuevo y sin volver a instantes.
+
+             `limpiarLaOtraForma: false` porque en un alta no hay nada previo que
+             borrar; el `patch` del PUT si lo necesita. */
+          const puntas = puntasParaGoogle(
+            /* Se discrimina por `finExclusivo` y no por `esTodoElDia` aunque
+               digan lo mismo por construccion (se compone justo de eso): asi el
+               compilador ve que en esta rama la fecha NO es null, y no hace
+               falta inventarse un respaldo que taparia el fallo si algun dia
+               dejaran de decir lo mismo. */
+            finExclusivo !== null
+              ? { todoElDia: true,  inicio: fechaDesde, fin: finExclusivo, timezone: tzCita }
+              : { todoElDia: false, inicio: inicioFila, fin: finFila,      timezone: tzCita },
+            { limpiarLaOtraForma: false },
+          )
 
           /* ── EL MÉDICO ENTRA AQUÍ, EN EL MISMO `insert` ────────────────────
              Si tiene la cita asignada, tiene que tenerla en su calendario: no
@@ -504,8 +543,7 @@ export async function POST(req: NextRequest) {
                 // Sólo al crear: si el médico le cambia el recordatorio a mano en
                 // Google, ninguna edición posterior desde Spinus se lo reimpone.
                 reminders,
-                start: { dateTime: start_time, timeZone: tzCita },
-                end:   { dateTime: end_time,   timeZone: tzCita },
+                ...puntas,
               },
             })
           }, { puedeReparar, actorId: profile.userId })

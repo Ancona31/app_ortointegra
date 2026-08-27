@@ -2288,9 +2288,26 @@ body {
    uno de quince miden lo mismo, 20 px, y lo que crece es el ANCHO. No traigas
    el ResizeObserver a esta caja; no tiene nada que observar.
 
-   Colores: los mismos tokens `--ag-gcal-*` que la tarjeta de Google con hora.
-   Hoy es su único origen posible —un `allDay` sólo puede venir de Google— así
-   que una paleta propia sería una segunda paleta para el mismo dato. */
+   ⚠️ LA PALETA DE GOOGLE ESTÁ EN `.ag-banda--gcal` Y NO AQUÍ, y estuvo aquí.
+   El argumento de entonces era que «un `allDay` sólo puede venir de Google, así
+   que una paleta propia sería una segunda paleta para el mismo dato». ESO
+   CADUCÓ con el bloque 5B: los eventos PROPIOS de todo el día caen en esta
+   banda, y con la paleta en la clase base salían todos vestidos de Google —un
+   evento en verde incluido—. El color no es decoración ahí: estaba AFIRMANDO un
+   origen falso.
+
+   Así que esta clase se queda con lo que NO depende de la fila —la caja, la
+   tinta neutra del título— y lo que sí depende va en línea desde
+   `tintasDelChipDeBanda`: fondo al 10 %, marco al 32 % y filo izquierdo a
+   tope, las mismas tres fórmulas que `.ag-tarjeta`. Mismo reparto que
+   `.ag-mes` / `.ag-mes--gcal`, y por el mismo motivo.
+
+   ⚠️ EL TÍTULO VA EN `--ag-ink` Y NUNCA EN EL COLOR DEL EVENTO. No es una
+   preferencia: el fondo es una mezcla del propio color, así que teñir el texto
+   igual acota el contraste a la distancia entre un color y una mezcla de sí
+   mismo, y cuatro de los seis caían por debajo de AA. Está medido y escrito
+   entero en `MemoizedEventContent` (page.tsx). El icono sí lleva el color, que
+   es objeto gráfico y le basta 3:1. */
 .agenda-fc .ag-banda {
   box-sizing: border-box;
   height: 20px;
@@ -2300,24 +2317,60 @@ body {
   min-width: 0;
   overflow: hidden;
   padding: 0 6px;
-  border: 1px solid var(--ag-gcal-accent);
+  border: 1px solid transparent;
   border-left-width: 3px;
   border-radius: var(--ag-r-note);
+  color: var(--ag-ink);
+  cursor: pointer;
+}
+/* El chip de Google es el único con paleta FIJA —no depende de estado ni de
+   color elegido— así que sale de aquí y no de línea. Es el mismo par de tokens
+   que usa `.ag-gcal` en Semana/Día, y el mismo reparto que `.ag-mes--gcal`. */
+.agenda-fc .ag-banda--gcal {
+  border-color: var(--ag-gcal-accent);
   background: var(--ag-gcal-bg1);
   color: var(--ag-gcal-text);
-  cursor: pointer;
 }
 /* UNA LÍNEA Y ELIPSIS, sin caer a dos. `.ag-gcal-titulo` sí puede envolver a dos
    en la rejilla porque allí sobra alto vertical; aquí la caja son 20 px fijos y
-   una segunda línea se cortaría a la mitad. `line-height: 1` y no un múltiplo:
-   con 18 px de contenido (20 menos los dos bordes) cualquier valor por encima
-   de 1,6 empieza a recortar las descendentes de la «g» y la «p». */
+   una segunda línea se cortaría a la mitad.
+
+   ⚠️ ESTA CAJA SE RECORTA POR LOS DOS EXTREMOS, Y EL COMENTARIO QUE HABÍA AQUÍ
+   SÓLO CONOCÍA UNO. Decía, y era cierto, que por encima de ~1,6 la caja de línea
+   pasa de los 18 px de contenido del chip (20 menos los dos bordes) y el
+   `overflow: hidden` de `.ag-banda` empieza a comerse las descendentes. De ahí
+   dedujo que lo seguro era el mínimo, y puso `line-height: 1`. Es justo el otro
+   fallo: con la caja de línea igual al tamaño de letra, el medio interlineado
+   sale NEGATIVO —las tintas de una fuente ocupan entre 1,16 y 1,36 em— así que
+   los glifos desbordan su propia caja de contenido por arriba y por abajo, y el
+   `overflow: hidden` de AQUÍ MISMO (el que hace falta para la elipsis) los
+   corta. La «g» de «Testeo Vergas» perdía la cola por eso.
+
+   La ventana buena no es un extremo, es el centro: la caja de línea tiene que
+   ser MAYOR que las tintas de la fuente y MENOR que los 18 px del chip.
+
+   ⚠️ Y EL NÚMERO NO ES A OJO NI ES UN AJUSTE EXACTO — el ajuste exacto es lo que
+   falló dos veces en el rótulo del eje. Son 16 px por tres motivos:
+     · `.ag-mes` usa 1.45 sobre el MISMO tamaño de letra (11 px) = 15,95 px, y
+       esa caja lleva meses sin recortar a nadie. O sea que 16 no es una
+       hipótesis: es el valor que ya funciona en otra caja de esta agenda.
+     · cubre tintas de hasta 16/11 = 1,45 em, por encima de cualquier fuente de
+       sistema realista (Noto Sans 1,36 · Segoe UI 1,25 · SF Pro 1,20 · Roboto
+       1,17 · DejaVu 1,16). Importa porque la familia es `system-ui`: las
+       métricas NO son las mismas en Linux, macOS y Windows, así que un número
+       calcado de una sola máquina se rompe en las otras.
+     · deja 2 px de aire contra el techo de 18, o sea 1 px por lado tras el
+       `align-items: center`. Margen por los dos lados en vez de tocar ninguno.
+
+   ⚠️ EN PÍXELES Y NO EN MÚLTIPLO, a propósito: un múltiplo se computa y luego la
+   caja de línea se redondea hacia arriba, así que con él no se puede razonar
+   sobre el techo de 18. En píxeles, lo que se escribe es lo que mide. */
 .agenda-fc .ag-banda-titulo {
   flex: 0 1 auto;
   min-width: 0;
   font-size: 11px;
   font-weight: 600;
-  line-height: 1;
+  line-height: 16px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

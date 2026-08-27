@@ -210,6 +210,66 @@ const ESTADO_CANCELADA = 'cancelled'
 const PREFIJO_CANCELADA = 'CANCELADA — '
 
 /**
+ * LAS DOS PUNTAS DEL EVENTO, TAL COMO LAS QUIERE GOOGLE.
+ *
+ * Punto unico por el mismo motivo que `eventoParaGoogle`: el alta y la edicion
+ * tienen que mandar la misma forma, y aqui hay dos formas que no se parecen.
+ *
+ * ── LAS DOS FORMAS ──────────────────────────────────────────────────────────
+ * Con hora     → `{ dateTime, timeZone }`, el instante ISO y el huso.
+ * Todo el dia  → `{ date }`, una fecha `yyyy-mm-dd` Y SIN `timeZone`: la propia
+ *                documentacion dice que «the timezone field has no significance
+ *                for all-day events», y mandarlo invita a creer que la fecha se
+ *                traduce a algun huso, que es justo lo que no pasa.
+ *
+ * ⚠️ `fin` ES EXCLUSIVO EN LAS DOS FORMAS, Y EN GOOGLE TAMBIEN. La referencia
+ * de la API lo dice de su campo `end`: «The (exclusive) end time of the event»
+ * (googleapis, `calendar/v3.d.ts`). O sea que es EXACTAMENTE nuestra misma
+ * convencion y no hay nada que convertir: la fecha que ya compuso el servidor
+ * —`all_day_hasta` mas un dia— se pasa tal cual.
+ *
+ * ⚠️ NO SUMES NI RESTES DIAS AQUI. El `+1` del convenio vive en el POST y en el
+ * PUT, uno en cada ruta, y el `-1` de vuelta en el cliente. Esta funcion solo
+ * cambia de envoltorio. Si te ves anadiendo un dia aqui, el que sobra es este.
+ *
+ * ── POR QUE `limpiarLaOtraForma` ────────────────────────────────────────────
+ * Google exige que las dos puntas sean del mismo tipo: «The start and end of
+ * the event must both be timed or both be all-day. For example, it is not valid
+ * to specify start.date and end.dateTime». En un `events.insert` eso sale solo,
+ * porque no habia nada antes.
+ *
+ * En un `events.patch` NO sale solo, y ahi esta la trampa: patch fusiona en vez
+ * de reemplazar, asi que mandar `{ date }` sobre un evento que hoy tiene
+ * `dateTime` deja LOS DOS puestos y Google contesta que el inicio es invalido.
+ * Hay que borrar el viejo mandando su clave en `null` explicito — es el bug de
+ * googleapis/google-api-dotnet-client#740, donde el cliente .NET no serializaba
+ * los nulls y por eso no se podia convertir un evento de todo el dia en uno con
+ * hora. En Node no aplica: `googleapis` deja el `resource` tal cual
+ * (`googleapis-common/build/src/apirequest.js:229`, `options.data = resource`) y
+ * `JSON.stringify` conserva los nulls, asi que basta con escribirlos.
+ *
+ * Va como parametro y no siempre encendido porque en el alta no hay nada que
+ * limpiar, y un null de mas en el `insert` seria una apuesta sin necesidad.
+ */
+export function puntasParaGoogle(
+  fila: { todoElDia: boolean; inicio: string; fin: string; timezone: string },
+  opciones: { limpiarLaOtraForma: boolean },
+): { start: calendar_v3.Schema$EventDateTime; end: calendar_v3.Schema$EventDateTime } {
+  if (fila.todoElDia) {
+    const limpieza = opciones.limpiarLaOtraForma ? { dateTime: null } : {}
+    return {
+      start: { date: fila.inicio, ...limpieza },
+      end:   { date: fila.fin,    ...limpieza },
+    }
+  }
+  const limpieza = opciones.limpiarLaOtraForma ? { date: null } : {}
+  return {
+    start: { dateTime: fila.inicio, timeZone: fila.timezone, ...limpieza },
+    end:   { dateTime: fila.fin,    timeZone: fila.timezone, ...limpieza },
+  }
+}
+
+/**
  * Lo que Spinus escribe en el evento de Google. Punto unico: si el formato se
  * duplicara entre el POST y el PUT, el evento cambiaria de forma segun por
  * donde pasara la ultima edicion.
@@ -230,12 +290,30 @@ const PREFIJO_CANCELADA = 'CANCELADA — '
  * del cuerpo de la peticion — la descripcion se recalcula en toda edicion que
  * toque Google, incluida una que solo cambie el `status`, y ahi `start_time`
  * viene `undefined`.
+ *
+ * ⚠️ `startISO` EN NULL ES UN VALOR CON SIGNIFICADO: «esta fila no tiene hora».
+ * Lo manda un EVENTO DE TODO EL DIA, y lo unico que hace es apagar el ancla,
+ * que es el unico renglon de la descripcion que habla de horas. Sin esto, un
+ * evento de todo el dia salia a Google con «Hora de la cita: 12:00 a.m., hora
+ * Sonora» — un dato correcto (la fila empieza a medianoche en la zona de su
+ * consultorio) sobre algo que por definicion no tiene hora, o sea ruido con
+ * pinta de dato.
+ *
+ * SE APAGA AQUI Y NO EN `anclaDeHora`, y la diferencia importa: aquella
+ * funcion esta bien y su trabajo es formatear un instante. Quien sabe si hay
+ * instante que valga la pena formatear es este nivel, que es el que conoce la
+ * fila. Si algun dia hace falta el ancla en otro sitio, sigue intacta.
+ *
+ * NO ES UN BOOLEANO SUELTO A PROPOSITO. Un septimo parametro `esTodoElDia`
+ * dejaria las llamadas terminadas en un `true` pelado, que es justo la forma
+ * que se copia mal; y ademas admitiria la combinacion imposible «todo el dia
+ * PERO con instante». Aqui el dato y su ausencia viajan en el mismo hueco.
  */
 export function eventoParaGoogle(
   paciente: PacienteEnCita,
   clinica: ClinicaEnCita,
   fallbackTitulo: string,
-  startISO: string,
+  startISO: string | null,
   timezone: string,
   estado: string,
 ): {
@@ -245,8 +323,11 @@ export function eventoParaGoogle(
 } {
   const clinicaNombre = nombreClinica(clinica)
   // El ancla va tambien en las citas sin paciente ligado: habla de la hora, no
-  // de quien viene. `filter(Boolean)` se come el null si el instante no sirve.
-  const ancla = anclaDeHora(startISO, timezone)
+  // de quien viene. Por eso NO basta con mirar `paciente` para decidir si sale
+  // —un evento de todo el dia tampoco lleva paciente y si caia en esta rama—:
+  // quien lo decide es `startISO`, arriba. `filter(Boolean)` se come el null,
+  // venga de aqui o de un instante corrupto.
+  const ancla = startISO === null ? null : anclaDeHora(startISO, timezone)
   const renglones = paciente
     ? [clinicaNombre, 'Consulta:', `${paciente.nombre} ${paciente.apellidos}`, ancla]
     : [clinicaNombre, ancla]

@@ -5,7 +5,7 @@ import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
-import { EventClickArg, EventDropArg, DateSelectArg, EventInput, EventContentArg, DayHeaderContentArg, NowIndicatorContentArg } from '@fullcalendar/core'
+import { EventClickArg, EventDropArg, DateSelectArg, EventInput, EventApi, EventContentArg, DayHeaderContentArg, NowIndicatorContentArg } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
 import { X, Calendar, User, Plus, Trash2, Settings, ChevronDown, FileText, Stethoscope, Loader2, Mail,
          CalendarPlus, ChevronsDownUp, type LucideIcon } from 'lucide-react'
@@ -185,8 +185,20 @@ type ModalState =
      la meta en el `setModal`, y que `valoresInicialesDelModal` la use en vez de
      la constante.
 
-     `todoElDia` es CON QUÉ INTERRUPTOR SE ABRE. Ver `TodoElDiaInicial`. */
-  | { mode: 'create'; fecha: string; hora: string | null; tipo: TipoFila; todoElDia: TodoElDiaInicial }
+     `todoElDia` es CON QUÉ INTERRUPTOR SE ABRE. Ver `TodoElDiaInicial`.
+
+     ⚠️ `fechaFin` ES LA ÚNICA EXCEPCIÓN AL AVISO DE ARRIBA, Y NO LO CONTRADICE.
+     Aquel aviso dice que el fin NO viaja en este estado porque ninguna ruta de
+     apertura aporta uno, y sigue siendo cierto de LAS CITAS: su fin se deriva
+     de `hora + DEFAULT_DURATION`, así que heredarlo sería inventar un dato.
+     El ÚLTIMO DÍA de un evento de todo el día no se deriva de nada — arrastrar
+     del 19 al 22 sobre la banda es la única forma de decirlo, y sin este campo
+     esa información se perdía entre `handleSelect` y el modal, que abría con
+     los dos días iguales.
+     Es fecha-sola (`YYYY-MM-DD`) y es el ÚLTIMO DÍA INCLUIDO, no el fin
+     exclusivo: el mismo formato y el mismo significado que el campo del modal
+     donde acaba. Sólo lo pone el gesto sobre la BANDA. */
+  | { mode: 'create'; fecha: string; hora: string | null; tipo: TipoFila; todoElDia: TodoElDiaInicial; fechaFin?: string }
   | { mode: 'edit';   appointment: Appointment }
 
 /**
@@ -753,24 +765,71 @@ function diasEntreFechas(desde: string, hasta: string): number {
 }
 
 /**
- * Las dos fechas que el modal enseña para un evento de TODO EL DÍA.
+ * EL DÍA DE CALENDARIO DE UN INSTANTE, EN LA ZONA DEL CONSULTORIO DE SU FILA.
  *
- * ⚠️ NO USA `partirFechaHora`, Y ÉSA ES TODA LA GRACIA. Esa función lee en el
- * huso del DISPOSITIVO, que es la regla del resto de la agenda (`dates.ts`) y
- * aquí sería el bug: una fila de todo el día guarda medianoche en la zona de SU
+ * ⚠️ NO ES `partirFechaHora`, Y ÉSA ES TODA LA GRACIA. Aquella lee en el huso
+ * del DISPOSITIVO, que es la regla del resto de la agenda (`dates.ts`) y aquí
+ * sería el bug: una fila de todo el día guarda medianoche en la zona de SU
  * consultorio, y leerla desde otro huso la corre un día entero. Un evento de
  * Cancún visto desde Tijuana empezaría el día anterior.
  *
- * ⚠️ EL `-1 DÍA` ES LA CONVERSIÓN DE FIN EXCLUSIVO A ÚLTIMO DÍA INCLUIDO, y
- * éste es el ÚNICO sitio del cliente que corre días. La vuelta —sumar el día
- * para volver al fin exclusivo— la hace el SERVIDOR al guardar, y también en un
- * solo sitio. Si alguna vez aparece un tercer `±1 día`, uno de los tres sobra.
+ * `TZ_CLINICA` de respaldo por las filas anteriores a `consultorio_timezone`,
+ * que se añadió sin rellenar las existentes. Una fila de todo el día NO puede
+ * caer ahí —el CHECK de la base exige el huso— pero el respaldo va igual, que
+ * es lo que permite llamar a esto sin preguntar antes.
+ *
+ * DOS CONSUMIDORES, Y NO HACEN LO MISMO CON EL RESULTADO: la FUENTE del
+ * calendario se queda las dos fechas tal cual (su fin es exclusivo, como el de
+ * la base), y `fechasDeTodoElDia` le resta un día al fin para enseñar el último
+ * día INCLUIDO. Por eso lo común es esta lectura y no la función entera.
+ */
+function diaEnZonaDelConsultorio(instante: string, timezone: string | null | undefined): string {
+  return renderEnTZ(instante, 'yyyy-MM-dd', timezone ?? TZ_CLINICA)
+}
+
+/* ── EL CONVENIO DE FIN EXCLUSIVO, SUS DOS DIRECCIONES, Y NADA MÁS ──────────
+   Los ÚNICOS dos sitios del cliente donde se corre un día, juntos a propósito:
+   son la misma regla leída al derecho y al revés, y separarlos es como se
+   consigue que una de las dos se quede desfasada.
+
+   La base, FullCalendar y Google usan las TRES el mismo convenio —el fin es
+   exclusivo—, así que casi todo el código pasa las fechas derechas y no llama a
+   ninguna de estas dos. Quien sí habla de «último día incluido» es la CAPA DE
+   ARRIBA: el modal, porque es lo que un humano entiende por «hasta el 21», y el
+   SERVIDOR, que recibe ese mismo formato en `all_day_hasta`.
+
+   Los cuatro llamadores, para que el censo no se quede corto otra vez:
+     · `ultimoDiaIncluido` ← `fechasDeTodoElDia` (leer una fila para el modal),
+       la rama `allDay` de `handleSelect` (el fin de un arrastre sobre la banda)
+       y `fechasDelGestoDeTodoElDia` (el fin de un evento movido o estirado).
+     · `finExclusivoDeUltimoDia` ← `puntasParaLaRejilla`, y sólo en el alta
+       optimista, que es el único sitio donde el cliente pinta desde lo que se
+       escribió en el modal y no desde la fila guardada.
+   Los tres primeros convierten HACIA el formato humano y el cuarto DESDE él, que
+   es exactamente el reparto que estas dos funciones existen para sostener.
+
+   ⚠️ SI TE VES ESCRIBIENDO UN `desplazarFecha(..., { dias: ±1 })` EN OTRO SITIO
+   DE ESTE ARCHIVO, PARA. O estás convirtiendo algo que ya venía convertido, o
+   la conversión que necesitas es una de estas dos. El servidor tiene su propio
+   `+1` al guardar (uno por ruta) y no cuenta aquí. */
+function ultimoDiaIncluido(finExclusivo: string): string {
+  return desplazarFecha(finExclusivo, { dias: -1 })
+}
+function finExclusivoDeUltimoDia(ultimoDia: string): string {
+  return desplazarFecha(ultimoDia, { dias: 1 })
+}
+
+/**
+ * Las dos fechas que el modal enseña para un evento de TODO EL DÍA.
+ *
+ * El `-1` es la conversión de fin exclusivo a último día incluido, y vive en
+ * `ultimoDiaIncluido` — ver el aviso de ahí arriba.
  */
 function fechasDeTodoElDia(apt: Appointment): { fecha: string; fechaFin: string } {
-  const tz = apt.consultorio_timezone ?? TZ_CLINICA
+  const tz = apt.consultorio_timezone
   return {
-    fecha:    renderEnTZ(apt.start_time, 'yyyy-MM-dd', tz),
-    fechaFin: desplazarFecha(renderEnTZ(apt.end_time, 'yyyy-MM-dd', tz), { dias: -1 }),
+    fecha:    diaEnZonaDelConsultorio(apt.start_time, tz),
+    fechaFin: ultimoDiaIncluido(diaEnZonaDelConsultorio(apt.end_time, tz)),
   }
 }
 
@@ -807,7 +866,9 @@ function valoresInicialesDelModal(modal: ModalState, todoElDia: boolean): Valore
      `DEFAULT_DURATION` necesita un inicio del que colgar, y aquí no lo hay. Lo
      rellena `moverInicio` en cuanto se teclee la hora. */
   const hora = todoElDia ? '' : (modal.hora ?? '')
-  if (!hora) return { fecha: modal.fecha, hora: '', fechaFin: modal.fecha, horaFin: '' }
+  /* `modal.fechaFin` sólo llega desde el arrastre sobre la banda; el clic suelto
+     y la vista Mes no lo traen y el fin se propone igual al inicio, como siempre. */
+  if (!hora) return { fecha: modal.fecha, hora: '', fechaFin: modal.fechaFin ?? modal.fecha, horaFin: '' }
   const fin = partirFechaHora(addMinutes(componerIso(modal.fecha, hora), DEFAULT_DURATION))
   return { fecha: modal.fecha, hora, fechaFin: fin.fecha, horaFin: fin.hora }
 }
@@ -1004,6 +1065,62 @@ type DatosGuardado = Partial<Appointment> & {
   id?: string
   all_day_desde?: string
   all_day_hasta?: string
+}
+
+/**
+ * LAS DOS PUNTAS DE UNA FILA TAL COMO LAS QUIERE LA REJILLA, y si es de todo
+ * el día. Punto único de las DOS construcciones de `EventInput` —la fuente y
+ * `buildEventInput`—, que antes decían cada una lo suyo.
+ *
+ * ⚠️ CON `allDay` NO SE PUEDEN ENTREGAR INSTANTES, Y AHÍ ESTABA EL BUG. Poner
+ * `allDay: true` con un ISO hace que FullCalendar TRUNQUE al día en el huso del
+ * CALENDARIO (`@fullcalendar/core/internal-common.js:3261-3263`,
+ * `if (allDay && startMarker) startMarker = startOfDay(startMarker)`), y ese
+ * huso es el del navegador: no hay opción `timeZone` en el `<FullCalendar>` de
+ * abajo. Un evento de Hermosillo visto desde Cancún se pintaría el día
+ * anterior. Por eso en todo el día viajan CADENAS DE SÓLO FECHA, que no tienen
+ * huso que malinterpretar, leídas con `diaEnZonaDelConsultorio`.
+ *
+ * ⚠️ Y LOS DOS EXTREMOS VAN DERECHOS, SIN `-1`. El `end` de FullCalendar es
+ * exclusivo, igual que el de la base. `fechasDeTodoElDia` NO sirve aquí: aquélla
+ * devuelve el último día INCLUIDO —lo que enseña el modal— y usarla pintaría
+ * todos los eventos un día cortos, y los de una sola jornada no los pintaría.
+ *
+ * ── LAS TRES FORMAS EN QUE LLEGA UNA FILA DE TODO EL DÍA ────────────────────
+ * 1. Con sus dos instantes (`start_time`/`end_time`): es la fila YA GUARDADA,
+ *    venga de la fuente, de Realtime o de la respuesta del POST. Se leen como
+ *    días en la zona de su consultorio. Es el camino normal.
+ * 2. Con `all_day_desde`/`all_day_hasta` y sin instantes: es el ALTA OPTIMISTA,
+ *    donde todavía no hay fila —sólo lo que se escribió en el modal— y el
+ *    servidor aún no ha compuesto nada. Aquí `all_day_hasta` es el último día
+ *    incluido, así que hay que pasar al fin exclusivo.
+ * 3. Ninguna de las dos: no debería ocurrir, y se sale con lo que haya en vez
+ *    de inventar fechas. FullCalendar descartará el evento, que es lo honesto.
+ *
+ * El orden importa: los instantes mandan sobre las fechas del formulario,
+ * porque el objeto de la respuesta del POST trae LAS DOS COSAS
+ * (`{ ...data, ...json.appointment }`) y la buena es la de la fila.
+ */
+function puntasParaLaRejilla(data: DatosGuardado): { allDay: boolean; start?: string; end?: string } {
+  if (data.all_day !== true) {
+    return { allDay: false, start: data.start_time, end: data.end_time }
+  }
+  if (data.start_time && data.end_time) {
+    const tz = data.consultorio_timezone
+    return {
+      allDay: true,
+      start:  diaEnZonaDelConsultorio(data.start_time, tz),
+      end:    diaEnZonaDelConsultorio(data.end_time, tz),
+    }
+  }
+  if (data.all_day_desde && data.all_day_hasta) {
+    return {
+      allDay: true,
+      start:  data.all_day_desde,
+      end:    finExclusivoDeUltimoDia(data.all_day_hasta),
+    }
+  }
+  return { allDay: true, start: data.start_time, end: data.end_time }
 }
 
 function AppointmentModal({
@@ -2476,6 +2593,52 @@ const GoogleEventCard = memo(function GoogleEventCard({
   )
 })
 
+/* Las tintas del chip de la BANDA, derivadas de la fila. Fuera del componente
+   por el mismo motivo que `tintasDelChipDeMes`: para que quepa en su
+   presupuesto de líneas.
+
+   ⚠️ ES LA TERCERA COPIA DE LA PRECEDENCIA «color elegido > estado», Y ESO ESTÁ
+   DECIDIDO. `tintasDelChipDeMes` ya razona por qué no hay un helper común: son
+   cajas distintas y compartirlo ataría la pinta de una a cualquier cambio de la
+   otra. Lo que NO se duplica son las FÓRMULAS: el 10 % del fondo, el 32 % del
+   marco y el token pelado del filo son exactamente los de `MemoizedEventContent`,
+   que es donde se midieron. Si alguna vez hay que retocarlas, se retocan en los
+   tres sitios o la agenda dice tres cosas del mismo evento.
+
+   ⚠️ EL TÍTULO NO ENTRA AQUÍ, Y ES DELIBERADO. Va en tinta neutra por CLASE
+   (`.ag-banda`), nunca en el color del evento, y el motivo está medido y escrito
+   entero en `MemoizedEventContent`: el fondo es una MEZCLA DEL PROPIO COLOR al
+   10 %, así que teñir el texto de ese mismo color acota el contraste a la
+   distancia entre un color y una mezcla de sí mismo — cuatro de los seis caían
+   por debajo de AA. El icono sí lo lleva, y ahí no hay problema: es objeto
+   gráfico, umbral 3:1.
+
+   `undefined` quiere decir «que lo ponga la clase», y sólo pasa con Google: su
+   fondo, su marco y su tinta son fijos y viven en `.ag-banda--gcal`.
+
+   ⚠️ SIN `status` NO HAY PALETA QUE INTERPOLAR —`var(--ag-status-undefined-bg)`
+   no resuelve a nada y el chip saldría sin fondo—, así que el salvavidas cae a
+   `--ag-muted` y a dejar el fondo a la clase. Mismo criterio que el mes. */
+type TintasDeLaBanda = { fondo?: string; marco?: string; filo?: string; tinta: string }
+
+function tintasDelChipDeBanda(
+  isGcal: boolean,
+  color: ColorEvento | null,
+  status: Status | undefined,
+): TintasDeLaBanda {
+  if (isGcal) return { tinta: 'var(--ag-gcal-accent)' }
+  return {
+    tinta: color ? `var(--ag-evento-${color})`
+      : status ? `var(--ag-status-${status}-dot)` : 'var(--ag-muted)',
+    fondo: color ? `color-mix(in srgb, var(--ag-evento-${color}) 10%, var(--ag-surface))`
+      : status ? `var(--ag-status-${status}-bg)` : undefined,
+    marco: color ? `color-mix(in srgb, var(--ag-evento-${color}) 32%, transparent)`
+      : status ? `var(--ag-status-${status}-border)` : undefined,
+    filo: color ? `var(--ag-evento-${color})`
+      : status ? `var(--ag-status-${status}-dot)` : undefined,
+  }
+}
+
 /* ══════════════════════════════════════════════════════════════════════
    CHIP DE LA BANDA DE TODO EL DÍA (`.ag-banda`) — bloque 5
    ══════════════════════════════════════════════════════════════════════
@@ -2503,6 +2666,36 @@ const GoogleEventCard = memo(function GoogleEventCard({
    `notes`, y eso ya está dicho y revocado en el docstring de
    `MemoizedEventContent`. No compongas un « · algo » que no tienes.
 
+   ── EL HUECO DEL MARCADOR TIENE DOS INQUILINOS, Y SÓLO CABE UNO ────────────
+   La banda tuvo un único origen posible —Google— y por eso este hueco fue
+   durante un tiempo sólo la «G». Dejó de serlo cuando los eventos PROPIOS de
+   todo el día empezaron a caer aquí (bloque 5B): un evento con icono asignado
+   salía pelado en la banda mientras la rejilla y el mes sí lo enseñaban.
+
+   Ahora el hueco lo ocupa, por este orden:
+     · la «G» si la fila viene de Google, y
+     · el icono del evento si el médico le puso uno.
+   Sin icono y sin ser de Google no se pinta nada, y el título empieza pegado al
+   borde: es el caso de un evento propio al que nadie le eligió pinta, y
+   rellenarlo con un glifo por omisión sería inventarse un dato.
+
+   LA «G» GANA, y es el mismo desempate que `MonthChip` («la G de Google gana a
+   todo: es una marca»). Hoy no hay empate posible —los eventos de Google no
+   traen `icono`, no son filas de `appointments`— así que el orden es una
+   política escrita, no una rama que se ejecute.
+
+   EL ICONO SE RESUELVE COMO EN LAS OTRAS DOS TARJETAS y no de una segunda
+   forma: `IconoDelEvento` con el nombre que trae la fila, el mismo criterio de
+   «sólo si lo hay», y el color del evento —`tinta`, de `tintasDelChipDeBanda`—
+   igual que la tarjeta de la rejilla y el chip del mes. Ahí no hay problema de
+   contraste: es objeto gráfico y le basta 3:1. El título es el que va en tinta
+   neutra, y su porqué está medido en `MemoizedEventContent`.
+
+   Lo único propio de aquí es el TAMAÑO: 14 px, el mismo que la «G» de este
+   chip. Entra en los 18 px de contenido —20 menos los dos bordes— con 2 px de
+   aire arriba y abajo, y ése es el techo: por encima de 14 la caja no crece
+   (`height` es fijo) pero el `overflow: hidden` empezaría a recortar el glifo.
+
    ⚠️ LA «G» ES CONDICIONAL, Y NO POR SIMETRÍA CON LAS OTRAS TARJETAS. Se pintaba
    siempre, con este argumento: «el único origen de un `allDay` es Google, así
    que la marca sobra comprobarla». Eso es cierto del evento EN REPOSO y falso
@@ -2513,16 +2706,45 @@ const GoogleEventCard = memo(function GoogleEventCard({
    Google encima de un dato que no es de Google, y la marca de un tercero no se
    pinta sobre lo que no le pertenece.
    El gesto termina revertido por `esGestoDeTodoElDia` (AG-DT-8), pero el
-   fantasma se ve DURANTE el arrastre, que es antes de que nada revierta. */
-const BandaChip = memo(function BandaChip({ title, esDeGoogle }: { title: string; esDeGoogle: boolean }) {
-  /* Sin un solo estilo en línea, por el mismo motivo que `GoogleEventCard`: aquí
-     no hay ningún valor calculado en JS del que dependa la pinta, así que la caja
-     entera cabe en `globals.css` con sus tokens `--ag-gcal-*`. Los conserva
-     también el espejo del arrastre: sólo se le quita la marca, no el color —el
-     fantasma tiene que parecerse a donde va a caer. */
+   fantasma se ve DURANTE el arrastre, que es antes de que nada revierta.
+   El espejo tampoco trae icono ni color: sus `extendedProps` son los de una
+   CITA, y una cita no tiene pinta. Lo que sí trae es `status`, así que el
+   fantasma se viste con la paleta de SU ESTADO —la misma con la que se veía en
+   la rejilla un segundo antes— en vez de con la de Google, que era lo que
+   pasaba cuando la paleta vivía en la clase base. */
+const BandaChip = memo(function BandaChip(
+  { title, esDeGoogle, icono, color, status }: {
+    title: string; esDeGoogle: boolean; icono: IconoEvento | null
+    color: ColorEvento | null; status: Status | undefined
+  },
+) {
+  /* LA PINTA VA EN ESTE `<div>` Y NUNCA EN EL `<a>` RAÍZ, que es el harness
+     transparente de `globals.css` (`.fc .fc-event`, con `!important`). Misma
+     regla que las otras tres tarjetas.
+
+     Y va EN LÍNEA porque ahora sí depende de un dato de la fila —el color que
+     eligió el médico—, que es la misma razón por la que `.ag-tarjeta` y
+     `.ag-mes` llevan el suyo en línea. Lo que queda en la clase es lo fijo: la
+     caja, la tinta neutra del título y, en `.ag-banda--gcal`, la paleta de
+     Google, que no depende de ninguna fila.
+
+     `undefined` en cualquiera de las tres deja mandar a la clase, que es como
+     el chip de Google se queda con la suya sin una rama aparte.
+
+     NI EL GLIFO NI EL TÍTULO PUEDEN ESTIRAR LA CAJA: los 20 px son fijos, el
+     glifo mide 14 sobre 18 de contenido útil —2 px de aire arriba y abajo— y
+     `IconoDelEvento` ya trae `flex: 0 0 auto`. La separación es el `gap: 5px`
+     de `.ag-banda`, el mismo que separaba la «G», así que el título sólo pierde
+     ancho —se trunca antes, con su elipsis— y nunca alto. */
+  const { fondo, marco, filo, tinta } = tintasDelChipDeBanda(esDeGoogle, color, status)
   return (
-    <div className="ag-banda">
-      {esDeGoogle && <GoogleGIcon size={10} />}
+    <div
+      className={`ag-banda${esDeGoogle ? ' ag-banda--gcal' : ''}`}
+      style={{ background: fondo, borderColor: marco, borderLeftColor: filo }}
+    >
+      {esDeGoogle
+        ? <GoogleGIcon size={14} />
+        : icono && <IconoDelEvento nombre={icono} size={14} color={tinta} />}
       <span className="ag-banda-titulo">{title}</span>
     </div>
   )
@@ -2678,11 +2900,25 @@ function renderEventContent(arg: EventContentArg, navegadorTZ: string, iniciales
      leerlo aquí y no fiarse de que «todo `allDay` es de Google» es lo que
      distingue al evento real del espejo del arrastre, que llega con `allDay` en
      `true` y con los `extendedProps` de una CITA. Ver el docstring de
-     `BandaChip`. */
-  if (arg.event.allDay) {
-    return <BandaChip title={arg.event.title} esDeGoogle={arg.event.extendedProps.isGcalBlock === true} />
-  }
+     `BandaChip`.
+
+     ⚠️ `ext` SE DECLARA ARRIBA DE ESTA RAMA Y NO DEBAJO, que es donde estuvo.
+     Subirlo es lo que deja a la banda leer `icono` de la MISMA fila tipada que
+     usan las otras dos tarjetas, en vez de estrenar una segunda forma de
+     resolverlo. Es una lectura pura y la vista Mes ya ha devuelto más arriba,
+     así que moverlo no cambia cuándo se evalúa para nadie. */
   const ext = arg.event.extendedProps as Appointment & { isGcalBlock?: boolean }
+  if (arg.event.allDay) {
+    return (
+      <BandaChip
+        title={arg.event.title}
+        esDeGoogle={ext?.isGcalBlock === true}
+        icono={ext?.icono ?? null}
+        color={ext?.color ?? null}
+        status={ext?.status}
+      />
+    )
+  }
   if (ext?.isGcalBlock) {
     return <GoogleEventCard timeText={arg.timeText} title={arg.event.title} />
   }
@@ -3437,8 +3673,12 @@ export default function AgendaPage() {
       success(apts.map(apt => ({
         id:              apt.id,
         title:           apt.title,
-        start:           apt.start_time,
-        end:             apt.end_time,
+        /* Las dos puntas y el `allDay`, de `puntasParaLaRejilla`: una fila de
+           todo el día sale como fechas-solo en la zona de su consultorio, y
+           cualquier otra como los instantes de siempre. Sin esto, un evento de
+           todo el día entraba en la rejilla horaria como un bloque de 24 h a
+           caballo entre dos días. */
+        ...puntasParaLaRejilla(apt),
         // Harness transparente: el color de la cita —que es el de su ESTADO— lo
         // pone `eventContent` leyendo los tokens al pintar. Aquí NO va
         // `textColor`: FullCalendar lo aplicaría como `color` en línea sobre
@@ -3584,12 +3824,19 @@ export default function AgendaPage() {
   ], [stableAppointmentSource, stableGcalSource])
 
   /* ── Helper: construir EventInput desde datos de cita ── */
-  function buildEventInput(data: Partial<Appointment> & { id?: string }): EventInput {
+  /* ⚠️ EL PARÁMETRO ES `DatosGuardado` Y NO `Partial<Appointment>`, Y ES LO QUE
+     ARREGLA EL ALTA OPTIMISTA DE TODO EL DÍA. El camino optimista llama a esto
+     con lo que el modal mandó a guardar, que en todo el día son
+     `all_day_desde`/`all_day_hasta` y NO `start_time`. Con el tipo viejo esas
+     dos claves ni se veían, así que salía un `EventInput` sin `start`,
+     `addEvent` devolvía `null` y no se pintaba nada hasta que contestara el
+     servidor. `DatosGuardado` es un superconjunto, así que los demás llamadores
+     no se enteran. */
+  function buildEventInput(data: DatosGuardado): EventInput {
     return {
       id:              data.id ?? `${PREFIJO_OPTIMISTA}${Date.now()}`,
       title:           data.title ?? '',
-      start:           data.start_time,
-      end:             data.end_time,
+      ...puntasParaLaRejilla(data),
       // Sin `textColor`, por el mismo motivo que en `appointmentSource`: el
       // color de estado lo pinta `eventContent` desde los tokens.
       backgroundColor: 'transparent',
@@ -3626,8 +3873,44 @@ export default function AgendaPage() {
     if (!existing) return
 
     const input = buildEventInput(appointment)
-    if (appointment.start_time) existing.setStart(appointment.start_time)
-    if (appointment.end_time)   existing.setEnd(appointment.end_time)
+    /* ── LAS DOS PUNTAS Y EL TIPO, EN UNA SOLA MUTACIÓN ──────────────────────
+       `setStart` + `setEnd` no valen desde el bloque 5B, y por dos motivos a la
+       vez: aplicaban los INSTANTES tal cual —una fila de todo el día quiere
+       fechas-solo en la zona de su consultorio— y ninguno de los dos toca
+       `allDay`, así que un evento que pasara a ser de todo el día se quedaba
+       como bloque de 24 h en la rejilla. `setDates` es el único de los tres que
+       acepta las tres cosas juntas (`internal-common.d.ts:350-353`).
+
+       Lo que le damos sale de `puntasParaLaRejilla`, el MISMO helper que
+       alimenta a la fuente y a `buildEventInput`. No es una segunda conversión:
+       es la misma, y por eso el evento repintado por Realtime cae en el mismo
+       día que si se hubiera traído del servidor.
+
+       ⚠️ SÍ FUNCIONA CUANDO CAMBIA EL TIPO, y lo comprobé antes de escribirlo
+       porque parecía que no. `setDates` es aritmética de DELTAS sobre lo que ya
+       está en pantalla, así que convertir una cita con hora en un evento de todo
+       el día parecía comparar dos cosas incomparables. No lo son, porque la
+       alineación se aplica DOS VECES y se cancela: `setDates` calcula el delta
+       contra `computeAlignedDayRange(rango)` (`internal-common.js:3980-3986`) y
+       `applyMutationToEventInstance` vuelve a alinear el MISMO rango antes de
+       sumarlo (`:3810-3812`). Como `computeAlignedDayRange` es idempotente sobre
+       un rango ya alineado (`:2730-2735`), el resultado aterriza EXACTAMENTE en
+       los marcadores que pasamos. En el sentido contrario no hay alineación en
+       ninguno de los dos lados y el delta es directo.
+
+       ⚠️ Y POR ESO NO SE QUITA Y SE VUELVE A AÑADIR, que era la otra salida.
+       `remove()` + `addEvent(buildEventInput(...))` es un REEMPLAZO EN BLOQUE, y
+       eso destruiría justo lo que el aviso de aquí arriba protege: `appointment`
+       llega PARCIAL —Realtime no manda las columnas TOAST que el UPDATE no tocó—
+       así que una `notes` larga que nadie editó desaparecería de la tarjeta sin
+       que fallara nada. La fusión clave por clave de abajo es obligatoria, y
+       `setDates` es la única forma de mover las fechas sin romperla.
+
+       Sin `start` no se llama: una fila sin puntas no tiene nada que mover, y
+       `setDates` con `undefined` no haría nada bueno. */
+    if (typeof input.start === 'string') {
+      existing.setDates(input.start, input.end ?? null, { allDay: input.allDay === true })
+    }
     existing.setProp('title', appointment.title ?? '')
     /* Ya no se sincroniza `textColor`: `buildEventInput` no lo pone —el color
        de estado lo pinta `eventContent` desde los tokens— así que esta línea
@@ -3937,7 +4220,16 @@ export default function AgendaPage() {
      el clic del mes en un alta de evento de todo el día. El mes abre en CITA sin
      hora, como siempre; quien quiera un evento de todo el día desde ahí conmuta
      a Evento y enciende el interruptor a mano. */
-  function abrirAlta(instante: Date, fecha: string, hora: string | null, todoElDia: TodoElDiaInicial, finParaAvisar?: Date) {
+  /* ⚠️ `finParaAvisar` Y `ultimoDia` SON DOS COSAS DISTINTAS Y NO SE FUSIONAN.
+     El primero es un `Date`, sólo se mira para el aviso de fuera de horario y
+     NO entra en el modal. El segundo es una fecha-sola que SÍ entra, y nunca
+     coinciden: el aviso es de citas con hora y el último día es de eventos de
+     todo el día. Juntarlos en un parámetro obligaría a convertir de uno a otro,
+     y esa conversión es justo la que corre un día cuando el huso no cuadra. */
+  function abrirAlta(
+    instante: Date, fecha: string, hora: string | null,
+    todoElDia: TodoElDiaInicial, finParaAvisar?: Date, ultimoDia?: string,
+  ) {
     const aviso = hora === null
       ? avisoDiaCerrado(instante, horario)
       : (avisoFueraDeHorario(instante, horario, 'Vas a agendar a las')
@@ -3946,6 +4238,7 @@ export default function AgendaPage() {
       mode: 'create', fecha, hora,
       tipo: todoElDia === 'fijo' ? 'evento' : 'cita',
       todoElDia,
+      ...(ultimoDia ? { fechaFin: ultimoDia } : {}),
     })
     if (aviso) {
       setConfirm({
@@ -3975,7 +4268,25 @@ export default function AgendaPage() {
        banda, que es lo recuperable. */
     if (arg.allDay) {
       const enLaBanda = cayoEnLaBandaDeTodoElDia(arg.jsEvent?.target, true)
-      abrirAlta(arg.start, fecha, null, enLaBanda ? 'fijo' : 'no')
+      /* ⚠️ `arg.endStr` Y NO `arg.end`, Y LA DIFERENCIA ES UN DÍA ENTERO.
+         `buildRangeApi` formatea las dos cadenas con `omitTime: span.allDay`
+         (`@fullcalendar/core/internal-common.js:4571-4577`), así que en la banda
+         salen ya como `YYYY-MM-DD` PELADOS: son los días que el ratón marcó, sin
+         huso que nadie pueda malinterpretar. `arg.end` es un `Date` construido
+         con el huso del navegador, y leerlo de vuelta reintroduce exactamente el
+         bug que `diaEnZonaDelConsultorio` existe para evitar.
+
+         Y es FIN EXCLUSIVO —`joinHitsIntoSelection` toma el mayor de los cuatro
+         extremos, que es el `addDays(start, 1)` del último día tocado
+         (`@fullcalendar/interaction/index.js:1201-1223`)— mientras que el modal
+         enseña el ÚLTIMO DÍA INCLUIDO. La conversión es `ultimoDiaIncluido`, que
+         YA EXISTE: aquí no se escribe ningún desplazamiento nuevo.
+
+         SÓLO SE SIEMBRA DESDE LA BANDA. La otra puerta de esta rama es la vista
+         Mes, donde el modal abre como CITA y `fechaFin` significa otra cosa —el
+         día del fin CON HORA—: sembrarlo allí cambiaría el alta de siempre. */
+      const ultimoDia = enLaBanda && arg.endStr ? ultimoDiaIncluido(arg.endStr) : undefined
+      abrirAlta(arg.start, fecha, null, enLaBanda ? 'fijo' : 'no', undefined, ultimoDia)
       return
     }
     abrirAlta(arg.start, fecha, hora, 'no', arg.end)
@@ -3987,68 +4298,170 @@ export default function AgendaPage() {
   }
 
   /**
-   * ⚠️ GUARDA TEMPORAL DE AG-DT-8 — SE SUSTITUYE EN EL BLOQUE 5B, NO SE BORRA.
+   * ¿Hay que REVERTIR este gesto? Devuelve `true` —y ya ha revertido— sólo en
+   * una de las dos conversiones posibles. Los dos manejadores salen sin tocar
+   * el servidor cuando contesta que sí.
    *
-   * Devuelve `true` —y ya ha revertido— cuando el gesto dejaría la fila como
-   * cita de todo el día. Los dos manejadores salen sin tocar el servidor.
+   * ⚠️ LA PREGUNTA ES EL CAMBIO DE TIPO, NO EL DESTINO. `arg.event.allDay` dice
+   * dónde CAE el gesto; `extendedProps.all_day` dice qué ERA la fila. Cuando
+   * coinciden no hay conversión —moverse dentro de la banda, o dentro de la
+   * rejilla— y no hay nada que decidir aquí.
    *
-   * POR QUÉ EXISTE. El bloque 5 encendió `allDaySlot`, y montar la banda es lo
-   * que la convierte en zona de destino del plugin de interacción: una cita se
-   * puede arrastrar de la rejilla a la banda sin que nadie lo haya pedido. La
-   * mutación llega con `standardProps.allDay = true` y
-   * `applyMutationToEventInstance` (`@fullcalendar/core/internal-common.js`
-   * :3807-3811) hace `forceAllDay` → `computeAlignedDayRange`. Con
-   * `allDayMaintainDuration` en su default `false`, la duración NO se conserva:
-   * una cita de 09:00-10:00 queda 00:00 → 00:00 del día siguiente.
+   * ── LAS DOS DIRECCIONES, Y NO SE TRATAN IGUAL ──────────────────────────────
    *
-   * LO QUE SE EVITA ES UNA FILA CORRUPTA, y el CHECK de la base NO la atrapa:
-   * `appointments_all_day_medianoche_check` sólo exige medianoche y huso cuando
-   * `all_day` es `true`, y esa columna se quedaría en `false` porque la
-   * aplicación todavía no sabe escribirla. O sea que la base guardaría, tan
-   * contenta, una cita con hora de 24 horas que empieza a medianoche, y al
-   * recargar abriría la ventana de la rejilla al día entero.
+   * · ENTRAR (cita → todo el día): SE REVIERTE. No es una limitación técnica
+   *   que algún día se levante: «todo el día» es de EVENTOS y nunca de citas,
+   *   porque una cita siempre lleva hora. Es la misma regla que el modal impone
+   *   deshabilitando el conmutador «Cita» y que las dos rutas del servidor
+   *   cierran con `todo_el_dia_con_paciente`; esto es la tercera copia, en el
+   *   único idioma que entiende el ratón.
+   *   Y evita además una fila corrupta que el CHECK no atraparía: la mutación
+   *   llega con `standardProps.allDay = true` y `applyMutationToEventInstance`
+   *   (`@fullcalendar/core/internal-common.js:3807-3811`) hace `forceAllDay` →
+   *   `computeAlignedDayRange`. Con `allDayMaintainDuration` en su default
+   *   `false` la duración NO se conserva: una cita de 09:00-10:00 quedaría
+   *   00:00 → 00:00 del día siguiente. Y `appointments_all_day_medianoche_check`
+   *   sólo mira las filas con `all_day` en `true`, así que la base guardaría tan
+   *   contenta una cita con hora de 24 horas.
+   *
+   * · SALIR (todo el día → con hora): SE PERMITE, y esta función contesta
+   *   `false` para dejarla pasar. Sacar un evento de la banda a la rejilla es
+   *   exactamente lo mismo que apagar el interruptor en el modal, así que el
+   *   ratón hace lo que ya hace el formulario. La conversión NO se hace aquí:
+   *   la hace el llamador, mandando `all_day: false` junto a los dos instantes
+   *   —ver `handleEventDrop`—. ⚠️ Contestar `false` a secas SIN esa rama es lo
+   *   que estuvo mal: el gesto caía al camino de citas, mandaba instantes sin
+   *   apagar la bandera, la fila se quedaba con `all_day` en `true` y horas que
+   *   no son medianoche, y el CHECK la rechazaba con un 400 que el usuario no
+   *   podía entender ni evitar.
+   *
+   * ⚠️ REDIMENSIONAR NO PUEDE LLEGAR A NINGUNA DE LAS DOS. El `computeMutation`
+   * del redimensionado (`@fullcalendar/interaction/index.js:1716-1730`) sólo
+   * devuelve `startDelta` o `endDelta` y NUNCA toca `standardProps`, así que el
+   * tipo de la fila no cambia estirando. La llamada desde `handleEventResize`
+   * se queda como red, no como camino vivo.
    *
    * VA ANTES DE LEER `start`/`end` Y ANTES DE CUALQUIER AVISO, a propósito: el
    * `avisoFueraDeHorario` compararía la medianoche y diría «vas a mover la cita
    * a las 00:00», describiendo un cambio de HORA cuando lo que ocurre es un
    * cambio de TIPO. Quien leyera eso y pulsara «sí» no habría consentido lo que
    * iba a pasar.
-   *
-   * NO ES LA FUNCIONALIDAD, ES EL TAPÓN. Una cita de todo el día es legítima y
-   * la banda ya sabe pintarla; lo que falta es el camino de ESCRITURA de
-   * `appointments.all_day` (bloque 5B). Cuando exista, esto se reemplaza por el
-   * manejo real —componer la medianoche en la zona del consultorio y mandar
-   * `all_day: true`—, no por un borrado de la guarda.
    */
   function esGestoDeTodoElDia(arg: EventDropArg | EventResizeDoneArg): boolean {
-    if (!arg.event.allDay) return false
+    const caeEnLaBanda   = arg.event.allDay === true
+    const eraDeTodoElDia = arg.event.extendedProps.all_day === true
+    /* La única prohibida. Las otras tres combinaciones pasan: las dos sin
+       conversión, y la salida a la rejilla, que convierte el llamador. */
+    if (!(caeEnLaBanda && !eraDeTodoElDia)) return false
     arg.revert()
-    /* «nada» y no «citas»: la guarda corta el gesto sobre CUALQUIER tarjeta, y
-       arrastrar un evento genérico a la banda contestaba «no se pueden crear
-       citas de todo el día» — que además de nombrar mal la fila prometía lo
-       contrario de lo que el bloque 5B acababa de habilitar desde el modal. */
-    toast.info('Todavía no se puede mover nada a la banda de todo el día.')
+    /* Ahora sí puede decir «cita» sin mentir: llegar aquí significa que la fila
+       de origen NO es de todo el día, y en la banda sólo caben eventos. La
+       versión anterior decía «no se puede mover nada», que era cierto entonces
+       y hoy prometería lo contrario de lo que este mismo bloque habilita. */
+    toast.info('Una cita no puede ser de todo el día.')
     return true
+  }
+
+  /* Las dos fechas que el servidor necesita para mover un evento de TODO EL DÍA,
+     sacadas del evento que FullCalendar acaba de dejar en su sitio.
+
+     ⚠️ `startStr`/`endStr` Y NO `start`/`end`, exactamente igual que en
+     `handleSelect`. `EventImpl` los formatea con `omitTime: this._def.allDay`
+     (`@fullcalendar/core/internal-common.js:4123-4139`), así que en una fila de
+     todo el día salen ya como `YYYY-MM-DD` pelados. Los `Date` hermanos son
+     marcadores en el huso del navegador, y componer la medianoche con el reloj
+     del dispositivo es LO QUE EL BLOQUE 5B DECIDIÓ QUE EL CLIENTE NO HACE: la
+     zona que vale es la del consultorio y sólo el servidor la conoce.
+
+     ⚠️ EL FIN DE FULLCALENDAR ES EXCLUSIVO Y EL QUE ESPERA EL SERVIDOR ES EL
+     ÚLTIMO DÍA INCLUIDO. La conversión es `ultimoDiaIncluido`, que ya existe:
+     aquí no se escribe ningún desplazamiento nuevo.
+
+     Sin `endStr` —`hasEnd` en falso— el evento dura un día y el último incluido
+     es el primero. */
+  function fechasDelGestoDeTodoElDia(evento: EventApi): { desde: string; hasta: string } | null {
+    const desde = evento.startStr
+    if (!desde) return null
+    return { desde, hasta: evento.endStr ? ultimoDiaIncluido(evento.endStr) : desde }
   }
 
   async function handleEventDrop(arg: EventDropArg) {
     if (arg.event.extendedProps.isGcalBlock) { arg.revert(); return }
     if (esGestoDeTodoElDia(arg)) return
     const id         = arg.event.id
-    const start_time = arg.event.start?.toISOString()
-    const end_time   = arg.event.end?.toISOString()
 
+    /* ── MOVER UN EVENTO DE TODO EL DÍA ─────────────────────────────────────
+       Sale por aquí y NO por el camino de abajo, que compondría instantes con
+       el reloj del navegador. Llegar aquí ya significa que la fila es de todo
+       el día: la guarda de arriba corta cualquier otra cosa que caiga en la
+       banda.
+
+       ⚠️ Y NO PASA POR `avisoFueraDeHorario`, a propósito. Ese aviso habla de
+       horas —«vas a moverlo a las 00:00»— y aquí no hay ninguna que nadie haya
+       elegido: la medianoche es un detalle de cómo se guarda la fila, no un dato
+       del gesto. Es el mismo razonamiento que ya defiende el orden de la guarda.
+       Un evento de todo el día tampoco puede caer «fuera de horario»: ocupa el
+       día entero por definición y no reserva hueco. */
+    if (arg.event.allDay) {
+      const fechas = fechasDelGestoDeTodoElDia(arg.event)
+      if (!fechas) { arg.revert(); return }
+      ejecutarDrop(id, { all_day: true, all_day_desde: fechas.desde, all_day_hasta: fechas.hasta }, arg)
+      return
+    }
+
+    const start_time = arg.event.start?.toISOString()
     if (!start_time) { arg.revert(); return }
 
-    // Arrastrar mueve el bloque entero: si el inicio queda dentro, el fin
-    // puede haberse salido igual (una cita de dos horas movida a las 18:00
-    // con horario hasta las 19:00).
+    /* ── SACAR UN EVENTO DE TODO EL DÍA A LA REJILLA ─────────────────────────
+       Llegar aquí con `all_day` en `true` sólo puede significar eso: la guarda
+       ya dejó pasar la salida y la rama de arriba se llevó lo que sigue en la
+       banda. Es la misma conversión que hace el modal al apagar el interruptor,
+       y por eso `all_day: false` tiene que VIAJAR: sin él la fila conservaría la
+       bandera con horas que no son medianoche, y el CHECK la rechazaría.
+
+       ⚠️ EL FIN HAY QUE RECOMPONERLO, Y NO ES UN CAPRICHO. Al convertir de todo
+       el día a con hora, `computeEventMutation` pone `standardProps.hasEnd` a
+       `allDayMaintainDuration`, que en su default es `false`
+       (`@fullcalendar/interaction/index.js:1529-1541`). El evento SÍ se pinta
+       con una hora —`applyMutationToEventInstance` le da
+       `getDefaultEventEnd`— pero el getter público `event.end` mira `hasEnd` y
+       devuelve `null` (`@fullcalendar/core/internal-common.js:4118-4122`). O sea
+       que sin este respaldo `end_time` saldría `undefined`, el PUT no tocaría la
+       columna y la fila se quedaría terminando en la medianoche del día
+       siguiente: diez horas en la base contra una en pantalla, y un salto en el
+       siguiente refetch.
+
+       ⚠️ Y NO SE INVENTA NINGUNA DURACIÓN: `DEFAULT_DURATION` son 60 minutos y el
+       `defaultTimedEventDuration` de FullCalendar es `'01:00:00'`
+       (`@fullcalendar/core/internal-common.js:1491`). Son el mismo número, así
+       que lo que se guarda es exactamente lo que se está viendo. SI ALGUIEN
+       CAMBIA UNO DE LOS DOS, HAY QUE CAMBIAR EL OTRO — hoy coinciden por valor y
+       nada lo comprueba. */
+    const dejaDeSerDeTodoElDia = arg.event.extendedProps.all_day === true
+    const end_time = arg.event.end?.toISOString()
+      ?? (dejaDeSerDeTodoElDia ? addMinutes(start_time, DEFAULT_DURATION) : undefined)
+    const puntas: PuntasDelMovimiento = dejaDeSerDeTodoElDia
+      ? { start_time, end_time, all_day: false }
+      : { start_time, end_time }
+
+    /* Arrastrar mueve el bloque entero: si el inicio queda dentro, el fin
+       puede haberse salido igual (una cita de dos horas movida a las 18:00
+       con horario hasta las 19:00).
+
+       ⚠️ AQUÍ EL AVISO SÍ CORRE, Y ES LO CONTRARIO DE LA RAMA DE ENTRADA. Allí
+       se calla porque no hay ninguna hora que nadie haya elegido; aquí el evento
+       ACABA DE ESTRENAR una, y esa hora puede caer fuera del horario de la
+       clínica igual que la de cualquier cita.
+
+       El fin se mira desde `end_time` y no desde `arg.event.end`, que en la
+       conversión es `null` por lo explicado arriba: con el getter, el aviso del
+       fin se saltaba justo en el único caso donde el fin es nuevo. */
     const aviso = avisoFueraDeHorario(arg.event.start!, horario, 'Vas a moverlo a las')
-      ?? (arg.event.end ? avisoFinFueraDeHorario(arg.event.end, horario) : null)
+      ?? (end_time ? avisoFinFueraDeHorario(new Date(end_time), horario) : null)
     if (aviso) {
       setConfirm({
         message: aviso,
-        onConfirm: () => { setConfirm(null); ejecutarDrop(id, start_time, end_time, arg) },
+        onConfirm: () => { setConfirm(null); ejecutarDrop(id, puntas, arg) },
         onCancel:  () => { setConfirm(null); arg.revert() },
       })
       return
@@ -4056,10 +4469,23 @@ export default function AgendaPage() {
 
     // Sin updated_at — drag & drop no requiere chequeo de concurrencia
     // FullCalendar ya movió el evento visualmente — solo sincronizar con servidor
-    ejecutarDrop(id, start_time, end_time, arg)
+    ejecutarDrop(id, puntas, arg)
   }
 
-  async function ejecutarDrop(id: string, start_time: string, end_time: string | undefined, arg: EventDropArg | EventResizeDoneArg) {
+  /* Las dos formas del cuerpo de un movimiento, y NUNCA las cuatro claves a la
+     vez. Es el mismo reparto que ya hace el modal en `DatosGuardado`, y por el
+     mismo motivo: una fila de todo el día manda DÍAS y deja que el servidor
+     componga la medianoche con la zona del consultorio. */
+  type PuntasDelMovimiento =
+    /* `all_day: false` sólo viaja cuando la fila DEJA de ser de todo el día. En
+       un movimiento normal se omite, y el PUT no toca la columna: sólo la
+       escribe si el campo viene. Por eso es opcional y no un booleano siempre
+       presente — mandar `false` en cada arrastre convertiría un `UPDATE` de dos
+       columnas en uno de tres sin que nadie lo hubiera pedido. */
+    | { start_time: string; end_time: string | undefined; all_day?: false }
+    | { all_day: true; all_day_desde: string; all_day_hasta: string }
+
+  async function ejecutarDrop(id: string, puntas: PuntasDelMovimiento, arg: EventDropArg | EventResizeDoneArg) {
     // Guarda: un id temporal no existe en la base, el PUT devolveria un error
     // sin sentido. El evento optimista ya nace con `editable: false`, asi que
     // esto solo cubre cualquier camino futuro que se nos escape.
@@ -4070,7 +4496,7 @@ export default function AgendaPage() {
       headers: { 'Content-Type': 'application/json' },
       // `client_id` firma la escritura para que el eco de Realtime se
       // reconozca como propio (ver `firmarEscritura`).
-      body:    JSON.stringify({ start_time, end_time, client_id: firmarEscritura() }),
+      body:    JSON.stringify({ ...puntas, client_id: firmarEscritura() }),
     })
 
     if (!res.ok) {
@@ -4104,6 +4530,24 @@ export default function AgendaPage() {
     if (arg.event.extendedProps.isGcalBlock) { arg.revert(); return }
     if (esGestoDeTodoElDia(arg)) return
     const id         = arg.event.id
+
+    /* ── ESTIRAR UN EVENTO DE TODO EL DÍA SÍ SIGNIFICA ALGO, y por eso tiene
+       rama propia en vez de quedarse revirtiendo. En la banda el gesto es
+       HORIZONTAL: arrastrar el borde derecho de un evento del 19 lo lleva al 22,
+       que es exactamente «dura cuatro días» — el mismo dato que el campo del
+       último día del modal, dicho con el ratón. Sin esto, la única forma de
+       alargar un evento sería abrir el modal, que es peor y además incoherente
+       con que la banda ya acepte el arrastre.
+
+       Mismo cuerpo y mismas dos exclusiones que el movimiento: fechas de sólo
+       día, y sin aviso de fuera de horario. */
+    if (arg.event.allDay) {
+      const fechas = fechasDelGestoDeTodoElDia(arg.event)
+      if (!fechas) { arg.revert(); return }
+      ejecutarDrop(id, { all_day: true, all_day_desde: fechas.desde, all_day_hasta: fechas.hasta }, arg)
+      return
+    }
+
     const start_time = arg.event.start?.toISOString()
     const end_time   = arg.event.end?.toISOString()
     if (!start_time) { arg.revert(); return }
@@ -4118,13 +4562,13 @@ export default function AgendaPage() {
     if (aviso) {
       setConfirm({
         message: aviso,
-        onConfirm: () => { setConfirm(null); ejecutarDrop(id, start_time, end_time, arg) },
+        onConfirm: () => { setConfirm(null); ejecutarDrop(id, { start_time, end_time }, arg) },
         onCancel:  () => { setConfirm(null); arg.revert() },
       })
       return
     }
 
-    ejecutarDrop(id, start_time, end_time, arg)
+    ejecutarDrop(id, { start_time, end_time }, arg)
   }
 
   /* El paciente tal como lo necesita el modal de invitación. Sale SIEMPRE de la
@@ -4227,12 +4671,19 @@ export default function AgendaPage() {
       // refetch corrio durante el POST, la cita ya llego del servidor: hay que
       // re-hidratarla, no agregarla de nuevo — serian dos con el mismo id.
       //
-      // ⚠️ YA NO SE EXIGE `optimisticEvent`, Y ES POR EL ALTA DE TODO EL DÍA.
-      // Esa manda FECHAS en vez de `start_time`, así que `buildEventInput` sale
-      // sin `start` y `addEvent` devuelve `null` — FullCalendar descarta el
-      // evento al parsearlo. Con la condición vieja eso se llevaba por delante
-      // también el alta REAL, y la fila recién creada no aparecia hasta el
-      // siguiente refetch. El `?.` de abajo cubre el caso.
+      // ⚠️ NO SE EXIGE `optimisticEvent`, Y EL `?.` HOY ES UNA RED, NO UNA MULETA.
+      // Nació siéndolo: el alta de todo el día manda FECHAS en vez de
+      // `start_time`, `buildEventInput` salía sin `start`, `addEvent` devolvía
+      // `null` y la condición vieja —que exigía el evento optimista— se llevaba
+      // por delante también el alta REAL, que no aparecía hasta el siguiente
+      // refetch. Eso YA NO PASA: `puntasParaLaRejilla` lee `all_day_desde` /
+      // `all_day_hasta` y el evento optimista de todo el día se crea como
+      // cualquier otro, así que aquí llega un objeto de verdad.
+      //
+      // El `?.` se queda de todas formas, y no por inercia: `addEvent` devuelve
+      // `null` ante CUALQUIER `EventInput` que FullCalendar no sepa parsear, y
+      // esta línea no debe ser la que rompa un alta que por lo demás salió bien.
+      // Lo que ya no hay que hacer es leerlo como «aquí falta un caso».
       optimisticEvent?.remove()
       const yaPresente = api?.getEventById(json.appointment.id)
       if (yaPresente) {
