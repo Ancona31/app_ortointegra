@@ -2365,31 +2365,85 @@ body {
      mandaría siempre el suelo y daría 28.
      No se ve en la hoja de la librería como un número; hay que resolver el `em`
      para encontrarlo. Se descubrió midiendo el `min-height` COMPUTADO, no
-     leyendo el CSS. */
-  min-height: 0;
+     leyendo el CSS.
+
+     ⚠️ ESTUVO EN `0`, Y ESO HUNDÍA LA FILA VACÍA HASTA LOS 2 px. Poner `0` era
+     media verdad: quitaba el suelo de 26 que impedía llegar a 24 con un chip, y
+     de paso quitaba el ÚNICO suelo que había. Sin chip, la celda del día no
+     aporta nada (`dayEvents 0`, medido) y la fila caía a 2 px —los del
+     `margin-bottom` de aquí—, con lo que el `overflow: hidden` del frame del eje
+     recortaba el rótulo «Todo el día» a una rebanada que parecía solaparse con la
+     cabecera. Ése era el defecto, y no el `line-height` del rótulo: éste pide 13
+     px de alto tanto con la banda vacía como con un chip, y la ÚNICA variable
+     entre los dos casos es lo que aporta la celda del día.
+
+     ⚠️ EL 22 ESTÁ ATADO AL ALTO DEL CHIP, NO ES UN NÚMERO SUELTO. Son los 20 px
+     de `.ag-banda` (más abajo) más los 2 de su `margin-top` (la regla de aquí
+     encima). Con el `margin-bottom: 2px` de esta misma regla, la fila cierra en
+     24 — la misma cuenta que hace el contenido real cuando SÍ hay un chip, así
+     que el suelo iguala y no muerde: con uno o con dos chips la fila no se mueve
+     (24 y 46). ⚠️ SI EL CHIP DEJA DE MEDIR 20, ESTE NÚMERO CAMBIA CON ÉL. Son la
+     misma medida escrita en dos sitios y no hay quien avise si divergen.
+
+     ⚠️ Y NO LO PONGAS SOBRE `.fc-timegrid-axis-frame`, que es lo que parece el
+     sitio natural —ahí está el rótulo que se recorta—. Ese frame va en
+     `position: absolute` por el liquid-hack de la librería: crecería FUERA de su
+     `<td>` sin empujar la fila, y entonces sí habría un solapamiento de verdad
+     con la cabecera. El alto de la fila lo fija la celda del DÍA; el eje nunca. */
+  min-height: 22px;
 }
 
 /* El rótulo «todo el día» del eje.
-   A 13 px envolvía a dos líneas contra el `max-width: 60px` del cushion nativo y
-   medía 30 px: MÁS que el chip de 20 que la fila existe para enseñar, y era él
-   —no el contenido— quien fijaba el alto de la banda. De ahí que la fila vacía
-   costara 41 px.
+   El cuerpo baja a 10 px y el `nowrap` le impide envolver: a los 13 px heredados
+   partía en dos líneas contra el `max-width: 60px` del cushion nativo, y dos
+   líneas dentro de una fila de 24 px se cortan por la mitad. Eso es lo que
+   arreglan las dos declaraciones de abajo, y es todo lo que arreglan.
 
-   ⚠️ `line-height: 1` ES LO QUE LE QUITA EL MANDO DEL ALTO, no el `font-size`.
-   Con 10 px y `normal` la caja de línea sigue siendo ~12 px; con `1` son 10
-   clavados, y el alto de la fila pasa a decidirlo el contenido, que es lo que
-   se quería. El `nowrap` es el que garantiza que no vuelva a partirse.
+   ⚠️ ESTE COMENTARIO AFIRMABA QUE EL RÓTULO FIJABA EL ALTO DE LA BANDA —«la fila
+   vacía costaba 41 px»— Y ESO NO SE SOSTIENE con lo medido después: el eje va en
+   `position: absolute` y no le aporta alto a nadie (ver el aviso siguiente). Sea
+   lo que fuere aquel 41, no lo ponía esta regla. Se deja dicho porque esa frase
+   mandó a dos intentos seguidos a buscar el defecto aquí, que es donde no estaba.
+
+   ⚠️ EL EJE NO APORTA ALTO A LA FILA. NUNCA, CON NINGÚN `line-height`.
+   Su frame —`.fc-timegrid-axis-frame`, de la librería— resuelve a
+   `position: absolute` por el liquid-hack, y una caja absoluta no le aporta alto
+   a su `<td>`. Medido: con la banda vacía el `<td>` del eje mide 2 px y el frame
+   2; con un chip miden 24 y 24. El eje SIGUE a la fila, no la manda.
+
+   Quien manda es SIEMPRE la celda del día, y la aritmética es 2 + 20 + 2 = 24
+   (margen, chip, margen — ver `.fc-daygrid-day-events` aquí arriba). Con la banda
+   vacía esa celda no aporta nada, y por eso existe allí un `min-height`: es el
+   suelo que impide que la fila se hunda por debajo del rótulo. Bajarlo devuelve
+   este defecto — ya pasó, con `min-height: 0`, y la fila vacía cayó a 2 px.
+
+   ⚠️ EL RECORTE ES MUDO, Y ÉSA ES LA TRAMPA DE ESTA PIEZA. El frame lleva
+   `overflow: hidden`, así que lo que no quepa DESAPARECE sin error, sin aviso y
+   sin rastro en ninguna herramienta que no sea medir la caja. Cuando la fila se
+   hundió a 2 px, del rótulo quedó una rebanada que PARECÍA solapada con la
+   cabecera — y el síntoma manda a mirar el rótulo, que era justo donde no estaba
+   el problema. Antes de tocar nada de aquí, mide `dayEvents` y el alto de la
+   fila; si la fila es más baja que el texto, el fallo está en el suelo de la
+   celda del día y no en esta regla.
+
+   ⚠️ EL `line-height` NO ERA LA CAUSA, aunque dos intentos lo dieran por tal.
+   El cushion va en `overflow: visible`, o sea que no se recorta a sí mismo:
+   `scrollHeight` 13 contra `clientHeight` 12 es un desbordamiento que se PINTA,
+   no uno que se corte. `1,2` se queda porque es el valor honesto para 10 px de
+   cuerpo —12 px de caja de línea, sin estrangular el texto por debajo de lo que
+   pide—, pero con 24 px de fila para 13 de texto eso es holgura, no una igualdad
+   ajustada de la que dependa nada. El `1` de antes tampoco recortaba por sí solo.
 
    ⚠️ NO TOCA EL ANCHO DEL EJE, Y ESO HAY QUE MIRARLO AL CAMBIARLO. La columna
    del eje es LA MISMA que la de las horas, así que moverla mueve la rejilla
-   entera. A 10 px y en una línea el rótulo mide ~55 px, por debajo del
-   `max-width: 60px` que la librería ya le imponía, así que la columna no crece.
-   Si alguien sube este cuerpo o alarga el texto, ese `max-width` es lo único
-   que impide que la rejilla se desplace. */
+   entera. El `max-width: 60px` de la librería es lo único que lo impide, y el
+   cushion ya mide 60 —o sea que está TOCANDO el tope, no por debajo—: cualquier
+   texto más largo o cualquier cuerpo mayor se recorta a lo ancho, en silencio,
+   antes de mover nada. El `line-height` no participa en esto. */
 .agenda-fc .fc-timegrid .fc-timegrid-axis-cushion {
   font-size: 10px;
   font-weight: 600;
-  line-height: 1;
+  line-height: 1.2;
   white-space: nowrap;
 }
 

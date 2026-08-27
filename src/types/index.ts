@@ -124,6 +124,13 @@ export interface Appointment {
   title: string
   start_time: string
   end_time: string
+  /* Días enteros en vez de horas. CONVENIO DE FECHAS, no romperlo: `start_time`
+     es medianoche del primer día y `end_time` medianoche del día SIGUIENTE al
+     último —fin EXCLUSIVO—, ambas en `consultorio_timezone` y no en el huso de
+     quien mira. Lo impone `appointments_all_day_medianoche_check`, que además
+     obliga a que la fila lleve su zona. Lo escribe el servidor: el modal manda
+     dos fechas y las rutas componen la medianoche. */
+  all_day: boolean
   /* 'attended': la cita se atendió. Lo escribe el servidor al crear la nota
      clínica que salió de ella (plan §12.13), y también se puede poner a mano
      desde el modal de la agenda. La transición permitida es

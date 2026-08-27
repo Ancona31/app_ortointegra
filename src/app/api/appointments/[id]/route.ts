@@ -8,7 +8,20 @@ import { APPOINTMENT_SELECT, eventoParaGoogle, componerAsistentes, INTERRUPTORES
          ICONOS_EVENTO, COLORES_EVENTO, pintaValida,
          type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
 import { correoDelMedico } from '@/lib/medicoCorreo'
-import { TZ_CLINICA } from '@/lib/dates'
+import { TZ_CLINICA, desplazarFecha, fechaHoraLocalAInstante } from '@/lib/dates'
+
+/* Una fecha-solo `YYYY-MM-DD` QUE ADEMÁS EXISTE EN EL CALENDARIO: la forma no
+   basta, porque `2026-02-30` la pasa y el motor la DESBORDA al 2 de marzo en vez
+   de rechazarla, así que llegaría viva hasta `fechaHoraLocalAInstante` y saldría
+   como 500. De ahí el ida y vuelta por `toISOString`.
+   Espejo del POST; el razonamiento entero está allí. */
+const FECHA_SOLA = /^\d{4}-\d{2}-\d{2}$/
+
+function esFechaDeCalendario(valor: string): boolean {
+  if (!FECHA_SOLA.test(valor)) return false
+  const instante = new Date(`${valor}T00:00:00Z`)
+  return !Number.isNaN(instante.getTime()) && instante.toISOString().startsWith(valor)
+}
 
 /* Formato UUID. A nivel de módulo porque lo usan el PUT (consultorio y
    client_id) y el GET; antes vivía dentro del bloque de consultorio del PUT. */
@@ -68,16 +81,30 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
 
     const { id } = await ctx.params
     const body = await req.json()
-    const { title, start_time, end_time, paciente_id, notes, status, medico_id, consultorio_id, updated_at: clientUpdatedAt, client_id, icono, color } = body
+    const { title, start_time, end_time, all_day, all_day_desde, all_day_hasta, paciente_id, notes, status, medico_id, consultorio_id, updated_at: clientUpdatedAt, client_id, icono, color } = body
 
     // RLS filtra por clinica_id
     /* `status`, `start_time`, `end_time` y `paciente_id` no se leían aquí y ahora
        hacen falta: son el ANTES contra el que se decide si Google tiene que
        avisar a alguien. Sin `status`, editar las notas de una cita ya cancelada
-       volvería a mandarle la cancelación al paciente en cada guardado. */
+       volvería a mandarle la cancelación al paciente en cada guardado.
+
+       ⚠️ `consultorio_timezone` ES LA ZONA CON LA QUE SE COMPONE LA MEDIANOCHE
+       de un evento de todo el día, y viene de AQUÍ y no del bloque de
+       consultorio de más abajo: ese bloque sólo corre cuando el cuerpo trae
+       `consultorio_id`, y el modal sólo lo manda cuando el consultorio CAMBIÓ.
+       Sin esta columna, mover la fecha de un evento de todo el día sin tocar el
+       consultorio dejaba al servidor sin huso.
+
+       ⚠️ `all_day` ES EL ANTES DEL INTERRUPTOR, y hace falta por lo mismo que
+       `paciente_id` —que ya estaba—: en un PUT los dos campos VIAJAN POR
+       SEPARADO, así que la comprobación de que no coincidan tiene que hacerse
+       sobre los valores EFECTIVOS, y el que no venga en el cuerpo sale de aquí.
+       Sin esta columna, un PUT que sólo mandara `paciente_id` sobre una fila que
+       ya es de todo el día no vería el conflicto. */
     const { data: existing } = await supabase
       .from('appointments')
-      .select('id, google_event_id, gcal_sync_status, updated_at, medico_id, status, start_time, end_time, paciente_id')
+      .select('id, google_event_id, gcal_sync_status, updated_at, medico_id, status, start_time, end_time, paciente_id, consultorio_timezone, all_day')
       .eq('id', id)
       .single()
 
@@ -97,6 +124,88 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
     if (paciente_id !== undefined) updates.paciente_id = paciente_id || null
     if (notes       !== undefined) updates.notes       = notes || null
     if (status      !== undefined) updates.status      = status
+
+    /* ── TODO EL DÍA: LAS DOS PUNTAS SE COMPONEN AQUÍ ────────────────────────
+       Mismo trato que en el POST y por el mismo motivo: el cliente manda dos
+       FECHAS y el servidor las convierte en medianoche, porque la zona que vale
+       es la del consultorio de la fila y el navegador compondría con la suya.
+       `all_day_hasta` es el ÚLTIMO DÍA INCLUIDO; el `+1 día` de aquí es el paso
+       a fin exclusivo, y es el único del servidor en esta ruta.
+
+       Cuando `all_day` es true estas dos líneas PISAN lo que hubiera dejado el
+       bloque de arriba: si el cuerpo trajera además `start_time`, manda el
+       interruptor. No pueden discrepar sin que una de las dos esté mal, y la
+       que la base va a comprobar es ésta. */
+    if (all_day !== undefined) updates.all_day = all_day === true
+    if (all_day === true) {
+      const tz = existing.consultorio_timezone
+      const desde = typeof all_day_desde === 'string' ? all_day_desde : ''
+      const hasta = typeof all_day_hasta === 'string' ? all_day_hasta : ''
+      if (!tz) {
+        return NextResponse.json(
+          { error: 'consultorio_sin_huso', message: 'Esta cita no tiene zona horaria de consultorio, y un evento de todo el día no se puede guardar sin ella.' },
+          { status: 400 }
+        )
+      }
+      /* Dos comprobaciones con dos mensajes, como en el POST: que las fechas
+         EXISTAN y que estén en orden. Y el mismo día es VÁLIDO —un evento de una
+         sola jornada—, así que la guarda es `hasta < desde` y el texto dice «no
+         puede ir antes», no «tiene que ir después», que prometía una regla más
+         estricta que la que el código aplica. */
+      if (!esFechaDeCalendario(desde) || !esFechaDeCalendario(hasta)) {
+        return NextResponse.json(
+          { error: 'fecha_invalida', message: 'Las fechas del evento no existen en el calendario. Se espera un día real, en formato AAAA-MM-DD.' },
+          { status: 400 }
+        )
+      }
+      if (hasta < desde) {
+        return NextResponse.json(
+          { error: 'rango_invalido', message: 'El último día del evento no puede ir antes del primero.' },
+          { status: 400 }
+        )
+      }
+      updates.start_time = fechaHoraLocalAInstante(desde, '00:00', tz)
+      updates.end_time   = fechaHoraLocalAInstante(desplazarFecha(hasta, { dias: 1 }), '00:00', tz)
+    }
+
+    /* ── TODO EL DÍA Y PACIENTE NO PUEDEN IR JUNTOS ──────────────────────────
+       El razonamiento entero está en el POST, y es el mismo: la regla es de
+       producto —«todo el día» sólo existe para EVENTOS, y una cita siempre lleva
+       hora—, la interfaz ya la impone deshabilitando el conmutador «Cita», y
+       esto es el segundo cerrojo porque la base no la conoce: el CHECK de la
+       columna mira las puntas y el huso, no `paciente_id`. Una fila con las dos
+       cosas entraría sin romper nada, que es justo por lo que nadie la vería.
+
+       ⚠️ AQUÍ SE COMPARAN LOS VALORES EFECTIVOS Y NO LO QUE TRAE EL CUERPO. En
+       un PUT cada campo viaja por su cuenta, así que hay tres formas de llegar a
+       la fila incoherente y sólo una manda las dos cosas juntas: encender
+       `all_day` sobre una cita sin nombrar al paciente, o colgarle un paciente a
+       un evento de todo el día sin nombrar el interruptor. Lo que no viene en el
+       cuerpo sale de `existing`, y `paciente_id` se normaliza con el MISMO
+       `|| null` que usa el `updates` de arriba para que la cadena vacía no
+       cuente como paciente en un sitio y sí en el otro. */
+    const todoElDiaEfectivo = all_day !== undefined ? all_day === true : existing.all_day === true
+    const pacienteEfectivo  = paciente_id !== undefined ? (paciente_id || null) : existing.paciente_id
+    if (todoElDiaEfectivo && pacienteEfectivo) {
+      return NextResponse.json(
+        { error: 'todo_el_dia_con_paciente', message: 'Un evento de todo el día no puede ser una cita: una cita siempre lleva hora.' },
+        { status: 400 }
+      )
+    }
+
+    /* EL FIN DESPUÉS DEL INICIO, sobre los valores EFECTIVOS. `start_time` y
+       `end_time` viajan por separado, así que un PUT que sólo mande el fin se
+       compara contra el inicio que ya hay en la fila. Se comprueba aquí y no en
+       la base porque `appointments` no tiene `CHECK (end_time > start_time)`
+       incondicional: sin esto, el fin adelantado entraría sin más. */
+    const inicioEfectivo = typeof updates.start_time === 'string' ? updates.start_time : existing.start_time
+    const finEfectivo    = typeof updates.end_time   === 'string' ? updates.end_time   : existing.end_time
+    if (!(new Date(finEfectivo) > new Date(inicioEfectivo))) {
+      return NextResponse.json(
+        { error: 'rango_invalido', message: 'El fin de la cita tiene que ir después del inicio.' },
+        { status: 400 }
+      )
+    }
 
     /* La pinta del evento genérico (§12.14). Mismo criterio que el resto: sólo
        se toca la columna si el campo VINO, así que una edición que no hable de

@@ -34,6 +34,8 @@ import {
   type RangoVisible,
   type VentanaRejilla,
 } from '@/lib/agenda/ventanaRejilla'
+import { differenceInCalendarDays } from 'date-fns'
+import { TZ_CLINICA, desplazarFecha, fechaSoloSegura, renderEnTZ } from '@/lib/dates'
 import useSWR from 'swr'
 import {
   CLAVE_CONFIG,
@@ -64,6 +66,15 @@ type Appointment = {
   title: string
   start_time: string
   end_time: string
+  /* Días enteros en vez de horas (bloque 5B). El CONVENIO va con la columna y
+     no se puede leer de otra forma: `start_time` es medianoche del primer día y
+     `end_time` medianoche del día SIGUIENTE al último —fin EXCLUSIVO—, las dos
+     en `consultorio_timezone`, NO en el huso de quien mira. Un evento del 19
+     va de `19T00:00` a `20T00:00`.
+     Quien la escribe es el SERVIDOR: el modal manda dos fechas y las rutas
+     componen la medianoche con la zona del consultorio. Ver
+     `appointments_all_day_medianoche_check`. */
+  all_day: boolean
   status: Status
   notes: string | null
   paciente_id: string | null
@@ -147,19 +158,55 @@ type ModalState =
      `YYYY-MM-DD` y `hora` es `HH:MM`. Así el modal no parsea nada al abrir, y
      quien trae un instante lo parte una vez con `partirFechaHora`.
 
-     ⚠️ AQUÍ VIVÍA `end`, Y NO LO REPONGAS. Era un `string` obligatorio que NO
-     LEÍA NADIE: el fin de la cita sale siempre de `start_time + duration` en
-     `guardar()`, nunca de este campo. Lo alimentaban `addHour(start)` desde el
-     clic y `arg.endStr` desde el arrastre.
-     Lo que se perdió con él ya estaba perdido, y conviene saberlo antes de
-     "arreglarlo": ARRASTRAR DE 10:00 A 12:00 NO ABRE UNA CITA DE DOS HORAS.
-     El `endStr` del arrastre se descartaba aquí mismo y el modal abre con
-     `DEFAULT_DURATION` (60 min), como todas. Es anterior a esto y sigue igual;
-     si algún día se quiere respetar la duración arrastrada, lo que hace falta
-     es que el modal reciba una DURACIÓN y la meta en su `useState`, no un `end`
-     que se vuelva a ignorar. */
-  | { mode: 'create'; fecha: string; hora: string | null; tipo: TipoFila }
+     ⚠️ EL FIN VOLVIÓ, PERO NO AQUÍ. Aquí vivió un `end: string` que no leía
+     nadie —el fin salía siempre de `start_time + duration` en `guardar()`— y se
+     retiró por eso. El bloque 5B lo repone COMO CAMPO DEL FORMULARIO, no como
+     campo de este estado, y la distinción es la que hace que el aviso siga
+     valiendo: este tipo describe CON QUÉ SE ABRE el modal, y ninguna de las
+     rutas de apertura aporta un fin.
+     Lo consumen hoy los `useState` `fechaFin` y `horaFin` de
+     `AppointmentModal`, que siembra `valoresInicialesDelModal` por tres vías, y
+     son la ÚNICA verdad del fin: los chips de duración escriben en ellos y
+     `guardar()` compone `end_time` a partir de ellos. Las tres vías, porque no
+     hacen lo mismo: en EDICIÓN el fin sale de `apt.end_time`; en el alta CON
+     hora, de `hora`+`DEFAULT_DURATION`; y en el alta SIN hora —vista Mes y banda
+     de todo el día— NO se propone ningún fin: se siembra `fechaFin` con el mismo
+     día y `horaFin` en `''`, y el `DEFAULT_DURATION` lo aporta después
+     `moverInicio`, cuando ya hay un inicio del que colgarlo. Reponer un `end`
+     aquí volvería a crear un dato que nadie lee, porque el fin ya no se hereda
+     de la apertura.
+     Lo que sigue perdido, y conviene saberlo antes de "arreglarlo": ARRASTRAR
+     DE 10:00 A 12:00 NO ABRE UNA CITA DE DOS HORAS. El `endStr` del arrastre SÍ
+     llega hasta `abrirAlta` —`handleSelect` se lo pasa como `finParaAvisar`—,
+     pero ahí muere: se usa sólo para el aviso de fuera de horario y NO entra en
+     el `setModal`, así que el modal abre con `DEFAULT_DURATION` (60 min), como
+     todas. Es anterior a esto y sigue igual; para respetar la duración
+     arrastrada hace falta que `abrirAlta` convierta ese fin en una DURACIÓN, que
+     la meta en el `setModal`, y que `valoresInicialesDelModal` la use en vez de
+     la constante.
+
+     `todoElDia` es CON QUÉ INTERRUPTOR SE ABRE. Ver `TodoElDiaInicial`. */
+  | { mode: 'create'; fecha: string; hora: string | null; tipo: TipoFila; todoElDia: TodoElDiaInicial }
   | { mode: 'edit';   appointment: Appointment }
+
+/**
+ * Con qué interruptor de «todo el día» abre el alta, y si se puede tocar.
+ *
+ * · `'no'`   — apagado y suelto. Es lo normal: el botón «Agendar», el clic en
+ *              una celda de la vista MES y el clic o el arrastre sobre la
+ *              rejilla horaria. Desde ahí se puede encender a mano.
+ * · `'fijo'` — encendido Y BLOQUEADO, con la posición «Cita» del conmutador
+ *              deshabilitada. Sólo lo produce el gesto sobre la BANDA de todo
+ *              el día de Semana o Día, y el bloqueo es lo que significa esa
+ *              banda: ahí no se crea nada con hora.
+ *
+ * ⚠️ NO ES UN BOOLEANO, Y NO LO CONVIERTAS EN DOS. «Encendido» y «bloqueado»
+ * son hoy la misma cosa —sólo la banda enciende, y la banda bloquea—, así que
+ * dos booleanos admitirían el estado imposible «apagado pero bloqueado». No hay
+ * un tercer valor «encendido pero suelto» porque no hay quien lo produzca; el
+ * día que lo haya se añade aquí y `todoElDiaFijo` deja de ser `=== 'fijo'`.
+ */
+type TodoElDiaInicial = 'no' | 'fijo'
 
 /* ─── Colores por estado ───────────────────────────────── */
 
@@ -444,7 +491,11 @@ function avisoFinFueraDeHorario(fin: Date, h: Horario): string | null {
   if (!horarioDia?.activo) return null
   const hhmm = horaDeReloj(fin)
   if (hhmm > horarioDia.inicio && hhmm <= horarioDia.fin) return null
-  return `La cita terminaría a las ${hhmm}, y esta clínica atiende de ${horarioDia.inicio} a ${horarioDia.fin}. ¿Es correcto?`
+  /* «Terminaría» y no «La cita terminaría»: esto lo disparan también el modal de
+     un EVENTO genérico y el redimensionado de su tarjeta, y ahí «la cita» nombra
+     algo que no existe. Sin sujeto la frase vale para los dos y no hace falta
+     pasarle el tipo de fila, que este ayudante no tiene ni necesita. */
+  return `Terminaría a las ${hhmm}, y esta clínica atiende de ${horarioDia.inicio} a ${horarioDia.fin}. ¿Es correcto?`
 }
 
 /**
@@ -695,6 +746,107 @@ function partirFechaHora(iso: string): { fecha: string; hora: string } {
    la zona LOCAL, que es lo que queremos: el médico teclea su hora de pared. */
 function componerIso(fecha: string, hora: string) { return new Date(`${fecha}T${hora}`).toISOString() }
 
+/** Los días de calendario entre dos fechas-solo. Ancladas a mediodía, así que
+ *  un cambio de horario de verano no suma ni resta un día por error. */
+function diasEntreFechas(desde: string, hasta: string): number {
+  return differenceInCalendarDays(fechaSoloSegura(hasta), fechaSoloSegura(desde))
+}
+
+/**
+ * Las dos fechas que el modal enseña para un evento de TODO EL DÍA.
+ *
+ * ⚠️ NO USA `partirFechaHora`, Y ÉSA ES TODA LA GRACIA. Esa función lee en el
+ * huso del DISPOSITIVO, que es la regla del resto de la agenda (`dates.ts`) y
+ * aquí sería el bug: una fila de todo el día guarda medianoche en la zona de SU
+ * consultorio, y leerla desde otro huso la corre un día entero. Un evento de
+ * Cancún visto desde Tijuana empezaría el día anterior.
+ *
+ * ⚠️ EL `-1 DÍA` ES LA CONVERSIÓN DE FIN EXCLUSIVO A ÚLTIMO DÍA INCLUIDO, y
+ * éste es el ÚNICO sitio del cliente que corre días. La vuelta —sumar el día
+ * para volver al fin exclusivo— la hace el SERVIDOR al guardar, y también en un
+ * solo sitio. Si alguna vez aparece un tercer `±1 día`, uno de los tres sobra.
+ */
+function fechasDeTodoElDia(apt: Appointment): { fecha: string; fechaFin: string } {
+  const tz = apt.consultorio_timezone ?? TZ_CLINICA
+  return {
+    fecha:    renderEnTZ(apt.start_time, 'yyyy-MM-dd', tz),
+    fechaFin: desplazarFecha(renderEnTZ(apt.end_time, 'yyyy-MM-dd', tz), { dias: -1 }),
+  }
+}
+
+/** Los minutos entre las dos puntas ESCRITAS, o `null` si falta alguna de las
+ *  cuatro mitades. Es lo que decide qué chip de duración sale marcado. */
+function duracionEscrita(fecha: string, hora: string, fechaFin: string, horaFin: string): number | null {
+  if (!fecha || !hora || !fechaFin || !horaFin) return null
+  return calcDuration(componerIso(fecha, hora), componerIso(fechaFin, horaFin))
+}
+
+type ValoresIniciales = { fecha: string; hora: string; fechaFin: string; horaFin: string }
+
+/**
+ * Lo que llevan los CUATRO campos de fecha y hora al abrir el modal.
+ *
+ * Vive fuera del componente porque no lee nada suyo, y junta en un solo sitio
+ * las tres siembras que antes estaban repartidas: la fila en edición, el alta
+ * con hora y el alta sin ella. El fin no viaja en `ModalState` (ver su aviso),
+ * así que en el alta se PROPONE, nunca se hereda.
+ */
+function valoresInicialesDelModal(modal: ModalState, todoElDia: boolean): ValoresIniciales {
+  if (modal.mode === 'edit') {
+    const apt = modal.appointment
+    if (todoElDia) {
+      const { fecha, fechaFin } = fechasDeTodoElDia(apt)
+      return { fecha, hora: '', fechaFin, horaFin: '' }
+    }
+    const ini = partirFechaHora(apt.start_time)
+    const fin = partirFechaHora(apt.end_time)
+    return { fecha: ini.fecha, hora: ini.hora, fechaFin: fin.fecha, horaFin: fin.hora }
+  }
+  if (modal.mode !== 'create') return { fecha: '', hora: '', fechaFin: '', horaFin: '' }
+  /* Sin hora —vista Mes y banda de todo el día— no hay fin que proponer: el
+     `DEFAULT_DURATION` necesita un inicio del que colgar, y aquí no lo hay. Lo
+     rellena `moverInicio` en cuanto se teclee la hora. */
+  const hora = todoElDia ? '' : (modal.hora ?? '')
+  if (!hora) return { fecha: modal.fecha, hora: '', fechaFin: modal.fecha, horaFin: '' }
+  const fin = partirFechaHora(addMinutes(componerIso(modal.fecha, hora), DEFAULT_DURATION))
+  return { fecha: modal.fecha, hora, fechaFin: fin.fecha, horaFin: fin.hora }
+}
+
+/**
+ * ¿El gesto cayó en la BANDA DE TODO EL DÍA de Semana o Día, y no en una celda
+ * de la vista Mes?
+ *
+ * ⚠️ `arg.allDay` NO BASTA, Y CREERLO FUE UN ERROR REAL DE ESTE BLOQUE. Esa
+ * bandera llega en `true` en los DOS sitios: la banda de las vistas de tiempo y
+ * cualquier celda de `dayGridMonth`. Decidir sólo por ella convertía el clic en
+ * el mes —que es como se agenda todo el día— en un alta de evento de todo el
+ * día. Sigue haciendo falta para saber si hay HORA; no sirve para saber DÓNDE.
+ *
+ * ⚠️ Y NO SE PREGUNTA POR `view.type`, que es la otra tentación: lo prohíbe el
+ * aviso de `handleDateClick`, y con razón —la banda existe en tres vistas—.
+ *
+ * SE PREGUNTA POR EL DOM, que es donde la diferencia es real:
+ *   · la vista de tiempo monta su raíz con la clase `fc-timegrid`
+ *     (`@fullcalendar/timegrid/internal.js:200` y `:307`), y la banda es una
+ *     sección del ScrollGrid que cuelga DENTRO de esa raíz (`:232`, el bloque
+ *     `allDayContent`), así que todo elemento suyo la tiene por ancestro;
+ *   · la vista Mes monta la suya con `fc-daygrid`
+ *     (`@fullcalendar/daygrid/internal.js:35` y `:80`) y NUNCA emite
+ *     `fc-timegrid` — cero coincidencias en todo el paquete.
+ * Es la misma distinción de la que ya depende el CSS de la banda desde el
+ * bloque 5 (`globals.css:2337-2339`, que acota los chips a `.fc-timegrid`
+ * justamente para que el Mes no los herede).
+ *
+ * SIN OBJETIVO SE CONTESTA `false`, y es la respuesta prudente: `DateSelectArg`
+ * trae `jsEvent` OPCIONAL —`null` cuando la selección no la hizo un gesto— y
+ * quedarse corto abre una cita, que es lo recuperable. Al revés se estropearía
+ * el alta desde el mes, que es el camino de todos los días.
+ */
+function cayoEnLaBandaDeTodoElDia(objetivo: EventTarget | null | undefined, allDay: boolean): boolean {
+  if (!allDay) return false
+  return objetivo instanceof Element && objetivo.closest('.fc-timegrid') !== null
+}
+
 /* ─── Hook: búsqueda de pacientes ─────────────────────── */
 
 function usePacientes(query: string) {
@@ -829,6 +981,31 @@ function QuickPatientModal({
 
 /* ─── Modal de cita ─────────────────────────────────────── */
 
+/**
+ * Lo que el modal manda a guardar.
+ *
+ * Es `Partial<Appointment>` más DOS CAMPOS QUE NO SON COLUMNAS, y por eso están
+ * nombrados aparte en vez de colarse dentro del tipo de la fila: `all_day_desde`
+ * y `all_day_hasta` son FECHAS-SOLO (`YYYY-MM-DD`), y `all_day_hasta` es el
+ * ÚLTIMO DÍA INCLUIDO, no el fin exclusivo que guarda la columna.
+ *
+ * ⚠️ POR QUÉ EL CLIENTE MANDA FECHAS Y NO INSTANTES. La medianoche de una fila
+ * de todo el día es la de la zona del CONSULTORIO, y componerla aquí exigiría
+ * que el navegador la conociera y la aplicara bien. `componerIso` no lo hace
+ * —usa el reloj del dispositivo— y el resultado violaría
+ * `appointments_all_day_medianoche_check` desde cualquier huso que no sea el
+ * del consultorio. Así que el cliente manda el DÍA, que no tiene huso, y las
+ * rutas componen el instante con la zona que ya tienen a mano.
+ *
+ * Cuando `all_day` es `false` estos dos no viajan y las puntas van en
+ * `start_time`/`end_time` como siempre. Nunca viajan las cuatro a la vez.
+ */
+type DatosGuardado = Partial<Appointment> & {
+  id?: string
+  all_day_desde?: string
+  all_day_hasta?: string
+}
+
 function AppointmentModal({
   modal, onClose, onSave, onDelete, medicos, defaultMedicoId,
   hideMedicoDropdown, medicoDropdownRequired, canVerExpediente, canInvitar, onInvitar,
@@ -836,7 +1013,7 @@ function AppointmentModal({
 }: {
   modal: ModalState
   onClose: () => void
-  onSave: (data: Partial<Appointment> & { id?: string }) => Promise<void>
+  onSave: (data: DatosGuardado) => Promise<void>
   onDelete: (id: string) => Promise<void>
   medicos: Medico[]
   defaultMedicoId: string
@@ -881,7 +1058,24 @@ function AppointmentModal({
     : (apt && esEventoGenerico(apt) ? 'evento' : 'cita')
   const esEvento = tipo === 'evento'
 
-  const initialDuration = apt ? calcDuration(apt.start_time, apt.end_time) : DEFAULT_DURATION
+  /* EL INTERRUPTOR DE TODO EL DÍA, y la guarda que impide que exista fuera de un
+     evento. `esEvento &&` no es defensa de más: al cambiar de rama el modal
+     REMONTA leyendo `modal.todoElDia`, que sigue en `true` si se abrió desde la
+     banda, y sin esta conjunción la rama de cita arrancaría con un interruptor
+     encendido que ni siquiera se pinta. Con ella, cambiar a cita lo apaga solo.
+     (Hoy no existe ninguna fila con `all_day` y paciente, y el segmento no deja
+     crearla; si algún día llegara una, se abriría como cita con hora.) */
+  const todoElDiaInicial = esEvento && (
+    modal.mode === 'create' ? modal.todoElDia === 'fijo' : (apt?.all_day ?? false)
+  )
+
+  /* EL INTERRUPTOR NO SE PUEDE APAGAR, y con él la posición «Cita» queda
+     deshabilitada durante todo el modal. Es lo que significa haber entrado por
+     la BANDA de todo el día: ahí no se crea nada con hora, así que ofrecer el
+     camino de vuelta sería ofrecer salir de la banda sin haberla dejado.
+     Por las demás vías esto es `false` y el interruptor se toca con normalidad
+     —incluida la de encenderlo a mano desde el mes—. */
+  const todoElDiaFijo = esEvento && modal.mode === 'create' && modal.todoElDia === 'fijo'
 
   /* LA FECHA Y LA HORA SON DOS ESTADOS, no uno. El campo era un único
      `datetime-local` y se partió porque ese control NO PUEDE sostener una fecha
@@ -889,13 +1083,18 @@ function AppointmentModal({
      por delante (medido en navegador). La vista Mes necesita justo eso —día sí,
      hora no—, así que el control se partió en dos y el estado con él.
      `hora` en `''` es el estado nuevo y legítimo: hay día elegido y falta la
-     hora. Lo cubren la guarda de `handleSave` y el `disabled` del botón. */
-  const inicial = modal.mode === 'create'
-    ? { fecha: modal.fecha, hora: modal.hora ?? '' }
-    : apt ? partirFechaHora(apt.start_time) : { fecha: '', hora: '' }
-  const [fecha, setFecha] = useState(inicial.fecha)
-  const [hora,  setHora]  = useState(inicial.hora)
-  const [duration,    setDuration]    = useState(initialDuration)
+     hora. Lo cubren la guarda de `handleSave` y el `disabled` del botón.
+
+     Y AHORA SON CUATRO, porque el FIN volvió a ser un campo: `fechaFin` y
+     `horaFin` son la verdad del fin, y los chips de duración sólo escriben en
+     ellos (ver `escribirFinConChip`). En todo el día las dos horas se quedan en
+     `''` y no se pintan; `fechaFin` enseña el ÚLTIMO DÍA INCLUIDO. */
+  const inicial = valoresInicialesDelModal(modal, todoElDiaInicial)
+  const [fecha,     setFecha]     = useState(inicial.fecha)
+  const [hora,      setHora]      = useState(inicial.hora)
+  const [fechaFin,  setFechaFin]  = useState(inicial.fechaFin)
+  const [horaFin,   setHoraFin]   = useState(inicial.horaFin)
+  const [todoElDia, setTodoElDia] = useState(todoElDiaInicial)
   const [notes,       setNotes]       = useState(apt?.notes ?? '')
   const [status,      setStatus]      = useState<Status>(apt?.status ?? 'scheduled')
   const [paciente,    setPaciente]    = useState<PacienteBusqueda | null>(
@@ -998,12 +1197,96 @@ function AppointmentModal({
   const tituloLimpio = titulo.trim()
   const faltaLoEsencial = esEvento ? tituloLimpio === '' : !paciente
 
+  /* Las puntas que el formulario exige, que dependen del interruptor: con todo
+     el día encendido no hay horas que pedir, sólo los dos días. Apagado sigue
+     exigiendo lo de siempre —`fecha` y `hora`— más el fin, que antes no podía
+     faltar porque no era un campo y ahora sí puede: se puede vaciar a mano. */
+  const faltanPuntas = todoElDia
+    ? (!fecha || !fechaFin)
+    : (!fecha || !hora || !fechaFin || !horaFin)
+
+  /* El fin ANTES del inicio, que hasta ahora no podía ocurrir —el fin era
+     `inicio + chip`— y con dos fechas tecleadas a mano sí. El `!faltanPuntas`
+     va delante y CORTOCIRCUITA a propósito: `componerIso('', '')` da un `Date`
+     inválido y `toISOString()` lanza.
+     En todo el día el mismo día es válido —un evento de una jornada—, así que
+     se compara `<` y no `<=`. */
+  const finAntesDelInicio = todoElDia
+    ? Boolean(fecha && fechaFin && fechaFin < fecha)
+    : Boolean(!faltanPuntas && componerIso(fechaFin, horaFin) <= componerIso(fecha, hora))
+
+  /* El chip marcado, o `null` si la hora tecleada no cuadra con ninguno. NO se
+     redondea al más cercano: el campo es la verdad y un chip marcado de más
+     diría que la duración es otra. */
+  const duracionElegida = todoElDia ? null : duracionEscrita(fecha, hora, fechaFin, horaFin)
+
+  /* Mover el INICIO arrastra el fin y CONSERVA LA DURACIÓN, que es como se
+     comportaba este formulario cuando el fin salía de `inicio + duration`:
+     cambiar la hora de una cita de 30 min la dejaba de 30 min. Sin esto,
+     reagendar de 10:00 a 11:00 dejaría el fin en las 10:30 y el guardado
+     bloqueado por `finAntesDelInicio`.
+     Sin fin escrito —el alta desde la vista Mes— se propone `DEFAULT_DURATION`,
+     que es lo que `valoresInicialesDelModal` no pudo hacer por no haber hora. */
+  function moverInicio(nuevaFecha: string, nuevaHora: string) {
+    setFecha(nuevaFecha)
+    setHora(nuevaHora)
+    if (!nuevaFecha || !nuevaHora) return
+    const mins = duracionEscrita(fecha, hora, fechaFin, horaFin)
+    const fin  = partirFechaHora(addMinutes(componerIso(nuevaFecha, nuevaHora), mins && mins > 0 ? mins : DEFAULT_DURATION))
+    setFechaFin(fin.fecha)
+    setHoraFin(fin.hora)
+  }
+
+  /* Lo mismo en todo el día, pero en DÍAS: mover el primer día corre el último
+     con él y conserva cuántos dura. */
+  function moverFechaDeTodoElDia(nueva: string) {
+    setFecha(nueva)
+    if (!nueva) return
+    const dias = fecha && fechaFin ? diasEntreFechas(fecha, fechaFin) : 0
+    setFechaFin(desplazarFecha(nueva, { dias: Math.max(dias, 0) }))
+  }
+
+  /* EL CHIP ES UN ATAJO QUE ESCRIBE EL FIN Y NO GUARDA NADA. Antes era al revés
+     —el chip era el estado y el fin se derivaba de él—, y por eso no se podía
+     teclear una duración que no estuviera en la lista.
+     Escribe la fecha TAMBIÉN, y no es de más: dos horas sobre las 23:00 cruzan
+     la medianoche. Poner sólo la hora dejaría el fin antes del inicio. */
+  function escribirFinConChip(minutos: number) {
+    if (!fecha || !hora) return
+    const fin = partirFechaHora(addMinutes(componerIso(fecha, hora), minutos))
+    setFechaFin(fin.fecha)
+    setHoraFin(fin.hora)
+  }
+
+  /* El interruptor. Al ENCENDER, el último día se propone igual al primero. Al
+     APAGAR vuelven las horas con lo que tuvieran escrito, y si no había nada
+     —el clic en la banda abre sin hora— se propone la de AHORA más
+     `DEFAULT_DURATION`: el mismo criterio del botón «Agendar» del toolbar, que
+     también aporta la hora de ahora. Nunca `00:00`, que es la hora que nadie
+     eligió y justo la que este formulario dejó de inventarse. */
+  function alternarTodoElDia(siguiente: boolean) {
+    /* Abierto desde la banda no hay nada que alternar. La guarda está aquí y no
+       sólo en el `disabled` del botón porque este cuerpo es el que define el
+       comportamiento; el atributo sólo lo enseña. */
+    if (todoElDiaFijo) return
+    setTodoElDia(siguiente)
+    if (siguiente) { setFechaFin(fecha); return }
+    const ahora  = partirFechaHora(new Date().toISOString())
+    const inicio = hora || ahora.hora
+    setHora(inicio)
+    if (horaFin) return
+    const fin = partirFechaHora(addMinutes(componerIso(fecha || ahora.fecha, inicio), DEFAULT_DURATION))
+    setFechaFin(fin.fecha)
+    setHoraFin(fin.hora)
+  }
+
   async function handleSave() {
-    /* `!hora` es el caso NUEVO: la vista Mes abre con fecha y sin hora, así que
-       este formulario ya no arranca siempre completo. `!fecha` no debería pasar
-       nunca —todas las rutas traen día— pero se comprueba igual: son la misma
-       frase y el día que alguien abra el modal de otra forma, esto aguanta. */
-    if (faltaLoEsencial || !fecha || !hora) return
+    /* `faltanPuntas` es el caso NUEVO: la vista Mes abre con fecha y sin hora, y
+       la banda de todo el día abre sin ninguna de las dos, así que este
+       formulario ya no arranca siempre completo. `fecha` no debería faltar nunca
+       —todas las rutas traen día— pero entra en la misma frase: el día que
+       alguien abra el modal de otra forma, esto aguanta. */
+    if (faltaLoEsencial || faltanPuntas || finAntesDelInicio) return
 
     // Defensa en profundidad: secretaria debe seleccionar médico
     // (el `required` HTML5 ya bloquea el submit, pero validamos aquí también)
@@ -1011,13 +1294,22 @@ function AppointmentModal({
     if (!consultorioId) return  // F3-6: consultorio obligatorio
 
     /* El aviso de fuera de horario, que hasta ahora este formulario no daba.
-       Se comprueba el INICIO y también el FIN: teclear 18:00 con duración de
-       tres horas deja la cita terminando a las 21:00, que es exactamente el
-       mismo error que arrastrar el borde de abajo hasta ahí. */
-    const inicioIso = componerIso(fecha, hora)
-    const aviso =
-      avisoFueraDeHorario(new Date(inicioIso), horario, 'Vas a agendar a las')
-      ?? avisoFinFueraDeHorario(new Date(addMinutes(inicioIso, duration)), horario)
+       Se comprueba el INICIO y también el FIN: teclear 18:00 y terminar a las
+       21:00 es exactamente el mismo error que arrastrar el borde de abajo hasta
+       ahí.
+
+       ⚠️ EN TODO EL DÍA NO SE PREGUNTA POR LA HORA, Y NO ES UN OLVIDO. Las dos
+       puntas de un evento de todo el día son medianoche, así que
+       `avisoFueraDeHorario` soltaría «vas a agendar a las 00:00» y
+       `avisoFinFueraDeHorario` saltaría SIEMPRE —`00:00` no cae dentro del
+       tramo de ninguna clínica—: dos frases sobre una hora que el usuario no
+       eligió. Lo que sí tiene sentido preguntar es por el DÍA, y de eso se
+       ocupa `avisoDiaCerrado`, que no menciona ninguna hora. Es el mismo reparto
+       que ya hace `abrirAlta` en la ruta sin hora. */
+    const aviso = todoElDia
+      ? avisoDiaCerrado(new Date(componerIso(fecha, '12:00')), horario)
+      : (avisoFueraDeHorario(new Date(componerIso(fecha, hora)), horario, 'Vas a agendar a las')
+         ?? avisoFinFueraDeHorario(new Date(componerIso(fechaFin, horaFin)), horario))
     if (aviso) { setAvisoHorario(aviso); return }
 
     await guardar()
@@ -1025,12 +1317,17 @@ function AppointmentModal({
 
   async function guardar() {
     setSaving(true)
-    const start_time = componerIso(fecha, hora)
 
     // F3-6: enviar consultorio_id en creación SIEMPRE; en edición SOLO si cambió.
     // Evita re-validación innecesaria del consultorio en el backend cuando se edita
     // hora/status sin tocar consultorio.
     const consultorioChanged = !apt || consultorioId !== apt.consultorio_id
+
+    /* El interruptor sólo cuenta en un evento. Va por separado del estado para
+       que una cita mande siempre `false` explícito: el PUT sólo toca la columna
+       si el campo VIENE, así que apagar el todo-el-día de un evento no llegaría
+       nunca si esto se omitiera. Mismo criterio que `icono` y `color`. */
+    const esTodoElDia = esEvento && todoElDia
 
     await onSave({
       id:          apt?.id,
@@ -1038,8 +1335,16 @@ function AppointmentModal({
          tipos: la cita lo COMPONE del paciente (y por eso no tiene campo de
          título), el evento lo lleva escrito a mano. */
       title:       esEvento ? tituloLimpio : `${paciente!.nombre} ${paciente!.apellidos}`,
-      start_time,
-      end_time:    addMinutes(start_time, duration),
+      all_day:     esTodoElDia,
+      /* LAS DOS PUNTAS, Y NUNCA LAS CUATRO A LA VEZ. Un evento de todo el día
+         manda FECHAS y deja que el servidor componga la medianoche en la zona
+         del consultorio; `componerIso` no sirve ahí porque usa el reloj del
+         navegador. `all_day_hasta` es el ÚLTIMO DÍA INCLUIDO, tal como se ve en
+         el campo: el paso a fin exclusivo lo da el servidor. Ver
+         `DatosGuardado`. */
+      ...(esTodoElDia
+        ? { all_day_desde: fecha, all_day_hasta: fechaFin }
+        : { start_time: componerIso(fecha, hora), end_time: componerIso(fechaFin, horaFin) }),
       notes:       notes.trim() || null,
       status,
       paciente_id: esEvento ? null : paciente!.id,
@@ -1131,19 +1436,34 @@ function AppointmentModal({
                 {TIPOS_ALTA.map(t => {
                   const activo = tipo === t.id
                   const Ico = t.icono
+                  /* «Todo el día» sólo existe para EVENTOS: una cita siempre
+                     lleva hora. Mientras el interruptor esté encendido, la
+                     posición «Cita» no se puede elegir —se libera al apagarlo—.
+                     No se oculta, se deshabilita: quitarla dejaría un segmento
+                     de una sola posición, que no parece un control.
+                     `|| todoElDiaFijo` es redundante HOY —abierto desde la banda
+                     el interruptor no se puede apagar, así que `todoElDia` ya no
+                     baja nunca— y se escribe igual porque la regla no es «está
+                     encendido» sino «se abrió desde la banda»: si algún día el
+                     interruptor se soltara, esta línea seguiría diciendo la
+                     verdad. */
+                  const bloqueado = t.id === 'cita' && (todoElDia || todoElDiaFijo)
                   return (
                     <button
                       key={t.id} type="button"
                       role="tab"
                       aria-selected={activo}
-                      onClick={() => { if (!activo) onCambiarTipo(t.id) }}
-                      className={`flex-1 inline-flex items-center justify-center gap-1.5 transition-all ${activo ? '' : 'hover:opacity-70'}`}
+                      disabled={bloqueado}
+                      title={bloqueado ? 'Un evento de todo el día no puede ser una cita.' : undefined}
+                      onClick={() => { if (!activo && !bloqueado) onCambiarTipo(t.id) }}
+                      className={`flex-1 inline-flex items-center justify-center gap-1.5 transition-all ${activo || bloqueado ? '' : 'hover:opacity-70'}`}
                       style={{
-                        border: 'none', cursor: 'pointer', borderRadius: 9, padding: '7px 13px',
+                        border: 'none', cursor: bloqueado ? 'not-allowed' : 'pointer', borderRadius: 9, padding: '7px 13px',
                         fontSize: 13, fontWeight: activo ? 700 : 600,
                         ...(activo
                           ? { background: 'var(--ag-segment-active-bg)', color: 'var(--ag-segment-active-text)', boxShadow: 'var(--ag-segment-active-shadow)' }
                           : { background: 'transparent', color: 'var(--ag-segment-text)' }),
+                        ...(bloqueado ? { opacity: .45 } : {}),
                       }}
                     >
                       <Ico size={14} />
@@ -1344,70 +1664,159 @@ function AppointmentModal({
           </div>
           )}
 
-          {/* ⚠️ DOS CONTROLES Y NO UN `datetime-local`, Y NO LOS VUELVAS A JUNTAR.
-              Aquí había uno solo, y se partió porque ese control NO ADMITE una
-              fecha sin hora: su algoritmo de saneamiento descarta cualquier valor
-              que no sea fecha-y-hora completa, así que «2026-08-19» se convierte
-              en cadena vacía Y LA FECHA SE PIERDE con ella. Medido en navegador,
-              no deducido.
+          {/* ── TODO EL DÍA — SÓLO EN LA RAMA DE EVENTO ──────────────────────
+              En una CITA este interruptor NO SE PINTA, ni apagado ni
+              deshabilitado, y eso es la decisión: una cita siempre lleva hora, y
+              un control apagado que nunca se puede encender es una promesa que
+              el formulario no piensa cumplir.
+              Va ENCIMA de los campos porque los cambia: encenderlo retira las
+              dos horas y los chips. Debajo, el médico ya habría tecleado. */}
+          {esEvento && (
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={todoElDia}
+                /* El botón sólo contiene la perilla, que no es texto: sin esto
+                   el lector de pantalla anuncia un interruptor sin nombre. */
+                aria-label="Todo el día"
+                disabled={todoElDiaFijo}
+                title={todoElDiaFijo ? 'Se abrió desde la banda de todo el día, donde sólo se crean eventos de todo el día.' : undefined}
+                onClick={() => alternarTodoElDia(!todoElDia)}
+                className="relative w-10 h-6 rounded-full transition-colors flex-shrink-0"
+                style={{
+                  background: todoElDia ? 'var(--ag-brand-primary)' : 'var(--ag-input-border)',
+                  ...(todoElDiaFijo ? { opacity: .55, cursor: 'not-allowed' } : {}),
+                }}
+              >
+                {/* `bg-white` y no un `#fff` a mano, igual que la perilla del
+                    interruptor de `HorarioModal`: en este archivo el blanco se
+                    escribe con la utilidad, no con un hex. */}
+                <span
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${todoElDia ? 'translate-x-4' : 'translate-x-0'}`}
+                />
+              </button>
+              <span className="text-sm font-semibold" style={{ color: 'var(--ag-text)' }}>Todo el día</span>
+              {/* Por qué no se puede tocar, dicho donde se mira. El `title` del
+                  botón sólo aparece al pasar el cursor, y en táctil no aparece
+                  nunca. */}
+              {todoElDiaFijo && (
+                <span className="text-[12px]" style={{ color: 'var(--ag-muted)' }}>
+                  · la banda sólo crea eventos de todo el día
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* ⚠️ DOS CONTROLES POR PUNTA Y NO UN `datetime-local`, Y NO LOS
+              VUELVAS A JUNTAR. Aquí había uno solo, y se partió porque ese
+              control NO ADMITE una fecha sin hora: su algoritmo de saneamiento
+              descarta cualquier valor que no sea fecha-y-hora completa, así que
+              «2026-08-19» se convierte en cadena vacía Y LA FECHA SE PIERDE con
+              ella. Medido en navegador, no deducido.
               Eso bloqueaba lo que pide la vista Mes: abrir con el día puesto y la
               hora en blanco, para que el médico la escriba sin borrar nada. Con
-              dos controles la fecha se queda y la hora puede estar vacía.
-              El `step={900}` viaja con la HORA, que es de quien era. */}
+              dos controles la fecha se queda y la hora puede estar vacía. En todo
+              el día hace falta lo mismo llevado al extremo: fecha y NINGUNA hora.
+              El `step={900}` viaja con la HORA, que es de quien era.
+
+              ⚠️ EL CAMPO DE FIN ENSEÑA EL ÚLTIMO DÍA INCLUIDO, no el fin
+              exclusivo que guarda la columna. Un evento de un solo día tiene las
+              dos fechas IGUALES aquí y `19T00:00 .. 20T00:00` en la base. El
+              salto entre las dos lecturas lo da el servidor al guardar, y no se
+              ve desde aquí a propósito: «hasta el 20» para un evento que termina
+              el 19 es la clase de dato que nadie corrige porque nadie se lo
+              cree. */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
-                Fecha
+                {todoElDia ? 'Primer día' : 'Fecha de inicio'}
               </label>
               <input
                 type="date"
                 value={fecha}
-                onChange={e => setFecha(e.target.value)}
+                onChange={e => todoElDia ? moverFechaDeTodoElDia(e.target.value) : moverInicio(e.target.value, hora)}
                 className="w-full px-3 py-2.5 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
               />
             </div>
+            {!todoElDia && (
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
+                  Hora de inicio
+                </label>
+                <input
+                  type="time"
+                  value={hora}
+                  step={900}
+                  onChange={e => moverInicio(fecha, e.target.value)}
+                  className="w-full px-3 py-2.5 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
+                />
+              </div>
+            )}
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
-                Hora de inicio
+                {todoElDia ? 'Último día' : 'Fecha de fin'}
               </label>
               <input
-                type="time"
-                value={hora}
-                step={900}
-                onChange={e => setHora(e.target.value)}
+                type="date"
+                value={fechaFin}
+                onChange={e => setFechaFin(e.target.value)}
                 className="w-full px-3 py-2.5 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
               />
             </div>
-          </div>
-
-          {/* Duración */}
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>Duración</label>
-            <div className="flex flex-wrap gap-2">
-              {DURATIONS.map(d => (
-                <button key={d.value} type="button" onClick={() => setDuration(d.value)}
-                  className="px-4 py-2 rounded-full text-[13px] font-bold border transition-all"
-                  style={duration === d.value
-                    ? { background: 'var(--ag-brand-primary)', color: '#fff', borderColor: 'var(--ag-brand-primary)' }
-                    : { background: 'var(--ag-input-bg)', color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-            {/* Sin hora no hay nada que calcular, y el envoltorio ya lo
-                contemplaba antes de que la hora vacía existiera. Ahora es el
-                caso normal de la vista Mes: la línea aparece en cuanto se
-                teclea la hora. */}
-            {fecha && hora && (
-              <p className="text-[12.5px] mt-2.5" style={{ color: 'var(--ag-muted)' }}>
-                Termina a las{' '}
-                <span className="font-bold" style={{ color: 'var(--ag-text)' }}>
-                  {partirFechaHora(addMinutes(componerIso(fecha, hora), duration)).hora}
-                </span>
-              </p>
+            {!todoElDia && (
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
+                  Hora de fin
+                </label>
+                <input
+                  type="time"
+                  value={horaFin}
+                  step={900}
+                  onChange={e => setHoraFin(e.target.value)}
+                  className="w-full px-3 py-2.5 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
+                />
+              </div>
             )}
           </div>
+
+          {/* El fin antes del inicio, DICHO AQUÍ Y NO DESPUÉS DE ENVIAR. La base
+              lo rechazaría con un 23514 que sube al cliente como «no se pudo
+              guardar la cita», que no dice qué corregir. */}
+          {finAntesDelInicio && (
+            <p className="text-[12.5px] font-semibold text-red-500">
+              {todoElDia
+                ? 'El último día no puede ir antes del primero.'
+                : 'La hora de fin tiene que ir después de la de inicio.'}
+            </p>
+          )}
+
+          {/* Duración — un ATAJO para escribir el fin, no un dato aparte. En todo
+              el día no se pinta: no hay horas que abreviar. */}
+          {!todoElDia && (
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>Duración</label>
+              {/* El blanco del chip marcado sale de `text-white` y no de un
+                  `#fff` en el `style`, por lo mismo que la perilla de arriba. El
+                  fondo y el borde sí van en línea: son tokens. */}
+              <div className="flex flex-wrap gap-2">
+                {DURATIONS.map(d => (
+                  <button key={d.value} type="button" onClick={() => escribirFinConChip(d.value)}
+                    className={`px-4 py-2 rounded-full text-[13px] font-bold border transition-all ${duracionElegida === d.value ? 'text-white' : ''}`}
+                    style={duracionElegida === d.value
+                      ? { background: 'var(--ag-brand-primary)', borderColor: 'var(--ag-brand-primary)' }
+                      : { background: 'var(--ag-input-bg)', color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+              {/* AQUÍ VIVÍA «Termina a las …», Y NO LO REPONGAS: era la única
+                  forma de ver el fin cuando el fin no era un campo. Ahora lo
+                  enseña el campo de al lado, y repetirlo sería un segundo sitio
+                  donde leer el mismo dato —el que se queda viejo—. */}
+            </div>
+          )}
 
           {/* Estado (solo edición) */}
           {isEdit && (
@@ -1540,12 +1949,20 @@ function AppointmentModal({
 
         {/* Footer */}
         <div className="px-[22px] py-3.5 border-t flex items-center gap-2" style={{ borderColor: 'var(--ag-hairline)' }}>
+          {/* El sustantivo de las dos etiquetas sale de `esEvento`, que aquí ya
+              está resuelto por el DATO de la fila (`esEventoGenerico`, o sea el
+              paciente) y nunca por el título, que en un evento lo escribe el
+              médico y puede decir «Cita: Pancho» sin serlo.
+              Aquí se ramifica en vez de buscar una frase neutra: es un control
+              con etiqueta y merece el nombre exacto de lo que borra. */}
           {isEdit && (
             <button
               onClick={handleDelete}
               disabled={deleting}
-              title={deleting ? 'Eliminando...' : 'Eliminar cita'}
-              aria-label={deleting ? 'Eliminando cita' : 'Eliminar cita'}
+              title={deleting ? 'Eliminando...' : (esEvento ? 'Eliminar evento' : 'Eliminar cita')}
+              aria-label={deleting
+                ? (esEvento ? 'Eliminando evento' : 'Eliminando cita')
+                : (esEvento ? 'Eliminar evento'   : 'Eliminar cita')}
               className="flex items-center justify-center p-2.5 rounded-xl text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
             >
               {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
@@ -1569,7 +1986,7 @@ function AppointmentModal({
             <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-bold transition-colors hover:bg-[var(--ag-btn-ghost-hover)]" style={{ color: 'var(--ag-muted)' }}>
               Cancelar
             </button>
-            <button onClick={handleSave} disabled={saving || faltaLoEsencial || !fecha || !hora || !consultorioId}
+            <button onClick={handleSave} disabled={saving || faltaLoEsencial || faltanPuntas || finAntesDelInicio || !consultorioId}
               className="px-5 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 transition-all hover:brightness-95 shadow-sm bg-[linear-gradient(135deg,var(--ag-brand-primary),var(--ag-brand-secondary))]">
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
@@ -3487,9 +3904,16 @@ export default function AgendaPage() {
        cuatro manejadores de interacción que no necesitó nada: preguntar por la
        BANDERA y no por la vista ya cubría un caso que entonces no existía.
        Decidir por `view.type` habría mandado el clic de la banda por el camino
-       de la hora. No lo cambies a la vista. */
+       de la hora. No lo cambies a la vista.
+
+       ⚠️ PARA LA HORA BASTA, PARA EL SITIO NO. La misma bandera llega en `true`
+       en la banda Y en cualquier celda del mes, así que decidir con ella si se
+       abre un evento de todo el día convertía el clic del mes —que es como se
+       agenda— en un alta de evento. Esa pregunta la contesta el DOM, en
+       `cayoEnLaBandaDeTodoElDia`; la de si hay hora se queda aquí. */
     const { fecha, hora } = partirFechaHora(arg.date.toISOString())
-    abrirAlta(arg.date, fecha, arg.allDay ? null : hora)
+    const enLaBanda = cayoEnLaBandaDeTodoElDia(arg.dayEl, arg.allDay)
+    abrirAlta(arg.date, fecha, arg.allDay ? null : hora, enLaBanda ? 'fijo' : 'no')
   }
 
   /* El alta desde la rejilla, con o sin hora, y el aviso que corresponda a cada
@@ -3501,13 +3925,28 @@ export default function AgendaPage() {
      y forzarlo obligaría a inventarse una —que es justo lo que se retiró—. Lo
      que SÍ se comprueba es el día: `avisoDiaCerrado` no mira la hora, así que
      agendar en domingo sigue avisando. El aviso de hora no desaparece del
-     sistema: salta al guardar, desde `handleSave`, cuando ya hay hora escrita. */
-  function abrirAlta(instante: Date, fecha: string, hora: string | null, finParaAvisar?: Date) {
+     sistema: salta al guardar, desde `handleSave`, cuando ya hay hora escrita.
+
+     ⚠️ `'fijo'` ABRE EN LA RAMA DE EVENTO, y no es un capricho de tipo: una cita
+     siempre lleva hora, así que el gesto sobre la BANDA no puede estar pidiendo
+     una. Abrir ya en «evento» —en vez de en «cita» y que el médico cambie—
+     evita el REMONTE del modal que provoca `key={modal.tipo}`, con el que se
+     pierde lo que hubiera escrito (ver el aviso del montaje).
+     Quién manda `'fijo'` lo decide `cayoEnLaBandaDeTodoElDia`, NO `arg.allDay`:
+     esa bandera también llega en `true` en la vista Mes, y usarla aquí convertía
+     el clic del mes en un alta de evento de todo el día. El mes abre en CITA sin
+     hora, como siempre; quien quiera un evento de todo el día desde ahí conmuta
+     a Evento y enciende el interruptor a mano. */
+  function abrirAlta(instante: Date, fecha: string, hora: string | null, todoElDia: TodoElDiaInicial, finParaAvisar?: Date) {
     const aviso = hora === null
       ? avisoDiaCerrado(instante, horario)
       : (avisoFueraDeHorario(instante, horario, 'Vas a agendar a las')
          ?? (finParaAvisar ? avisoFinFueraDeHorario(finParaAvisar, horario) : null))
-    const abrir = () => setModal({ mode: 'create', fecha, hora, tipo: 'cita' })
+    const abrir = () => setModal({
+      mode: 'create', fecha, hora,
+      tipo: todoElDia === 'fijo' ? 'evento' : 'cita',
+      todoElDia,
+    })
     if (aviso) {
       setConfirm({
         message: aviso,
@@ -3528,8 +3967,18 @@ export default function AgendaPage() {
        sobre las celdas del MES selecciona días enteros (`allDay`), y ahí el fin
        es medianoche del día siguiente, que no dice nada de la cita. */
     const { fecha, hora } = partirFechaHora(arg.start.toISOString())
-    if (arg.allDay) { abrirAlta(arg.start, fecha, null); return }
-    abrirAlta(arg.start, fecha, hora, arg.end)
+    /* Mismo reparto que en `handleDateClick`, y por el mismo motivo: `allDay`
+       dice si hay hora, el DOM dice si fue la banda. Aquí el objetivo sale de
+       `jsEvent`, que `DateSelectArg` declara OPCIONAL —`MouseEvent | null`,
+       `@fullcalendar/core/internal-common.d.ts:874-877`— porque una selección
+       puede venir de la API y no de un gesto; sin él se contesta que no fue la
+       banda, que es lo recuperable. */
+    if (arg.allDay) {
+      const enLaBanda = cayoEnLaBandaDeTodoElDia(arg.jsEvent?.target, true)
+      abrirAlta(arg.start, fecha, null, enLaBanda ? 'fijo' : 'no')
+      return
+    }
+    abrirAlta(arg.start, fecha, hora, 'no', arg.end)
   }
 
   function handleEventClick(arg: EventClickArg) {
@@ -3574,7 +4023,11 @@ export default function AgendaPage() {
   function esGestoDeTodoElDia(arg: EventDropArg | EventResizeDoneArg): boolean {
     if (!arg.event.allDay) return false
     arg.revert()
-    toast.info('Todavía no se pueden crear citas de todo el día.')
+    /* «nada» y no «citas»: la guarda corta el gesto sobre CUALQUIER tarjeta, y
+       arrastrar un evento genérico a la banda contestaba «no se pueden crear
+       citas de todo el día» — que además de nombrar mal la fila prometía lo
+       contrario de lo que el bloque 5B acababa de habilitar desde el modal. */
+    toast.info('Todavía no se puede mover nada a la banda de todo el día.')
     return true
   }
 
@@ -3590,7 +4043,7 @@ export default function AgendaPage() {
     // Arrastrar mueve el bloque entero: si el inicio queda dentro, el fin
     // puede haberse salido igual (una cita de dos horas movida a las 18:00
     // con horario hasta las 19:00).
-    const aviso = avisoFueraDeHorario(arg.event.start!, horario, 'Vas a mover la cita a las')
+    const aviso = avisoFueraDeHorario(arg.event.start!, horario, 'Vas a moverlo a las')
       ?? (arg.event.end ? avisoFinFueraDeHorario(arg.event.end, horario) : null)
     if (aviso) {
       setConfirm({
@@ -3623,11 +4076,16 @@ export default function AgendaPage() {
     if (!res.ok) {
       arg.revert()
       const { error, message } = await res.json().catch(() => ({ error: 'Error desconocido' }))
-      toast.error(message || error || 'Error de conexión — cita devuelta a su horario original')
+      toast.error(message || error || 'Error de conexión — se devolvió a su horario original')
       return
     }
 
-    toast.success('Cita reagendada')
+    /* Decía «Cita reagendada» y ahora va en neutro, porque este camino mueve
+       también EVENTOS genéricos. ⚠️ Y NO DICE «Horario actualizado», que fue el
+       primer intento: ésa es palabra por palabra la que ya usa el guardado del
+       HORARIO DE LA CLÍNICA (`HorarioModal`, más abajo). Dos acciones muy
+       distintas con el mismo acuse enseñan a no leerlo. */
+    toast.success('Se movió en la agenda')
 
     // Sin esto, extendedProps.updated_at se queda con el valor de la carga
     // inicial y la siguiente edicion por formulario falla con 409.
@@ -3655,7 +4113,7 @@ export default function AgendaPage() {
        18:00-21:00 con horario hasta las 19:00 deja el inicio intacto. Por eso
        aquí el FIN importa tanto como el inicio — `eventResizableFromStart`
        está puesto, así que se puede arrastrar cualquiera de los dos bordes. */
-    const aviso = avisoFueraDeHorario(arg.event.start!, horario, 'La cita empezaría a las')
+    const aviso = avisoFueraDeHorario(arg.event.start!, horario, 'Empezaría a las')
       ?? (arg.event.end ? avisoFinFueraDeHorario(arg.event.end, horario) : null)
     if (aviso) {
       setConfirm({
@@ -3682,13 +4140,22 @@ export default function AgendaPage() {
       : null
   }
 
-  async function handleSave(data: Partial<Appointment> & { id?: string }) {
+  async function handleSave(data: DatosGuardado) {
     const isEdit = !!data.id
     const api = calendarRef.current?.getApi()
 
     // ── Optimistic update: inyectar/actualizar evento en FullCalendar al instante ──
     closeModal()
-    toast.success(isEdit ? 'Cita actualizada' : 'Cita agendada correctamente')
+    /* ⚠️ SIN LA PALABRA «CITA», Y NO ES DESCUIDO. Este mismo camino guarda CITAS
+       y EVENTOS genéricos —unas vacaciones acababan saliendo como «Cita
+       creada»—, así que el acuse va en neutro.
+       Y en neutro EN VEZ DE ramificar, que fue lo primero que se probó: «cita» es
+       femenino y «evento» masculino, de modo que una plantilla con el sustantivo
+       dentro arrastra la concordancia de todo el participio («actualizada» /
+       «actualizado») y acaba siendo dos frases escritas como una. Cuando la frase
+       neutra sale natural, gana. Donde no —el botón de eliminar del modal, que es
+       un control con etiqueta— sí se ramifica. */
+    toast.success(isEdit ? 'Cambios guardados' : 'Se agendó correctamente')
     if (!isEdit) setCitaCreada(true)
 
     let optimisticEvent: ReturnType<NonNullable<typeof api>['addEvent']> | null = null
@@ -3745,7 +4212,7 @@ export default function AgendaPage() {
       if (optimisticEvent) optimisticEvent.remove()
       refetch()
       const { error, message } = await res.json().catch(() => ({ error: 'Error desconocido' }))
-      toast.error(message || error || 'No se pudo guardar la cita')
+      toast.error(message || error || 'No se pudo guardar')
       return
     }
 
@@ -3755,11 +4222,18 @@ export default function AgendaPage() {
       aplicarAppointmentAlEvento(json.appointment)
     }
 
-    if (!isEdit && optimisticEvent && json.appointment?.id) {
+    if (!isEdit && json.appointment?.id) {
       // Reemplazar evento optimista con el real (que tiene ID de DB). Si un
       // refetch corrio durante el POST, la cita ya llego del servidor: hay que
       // re-hidratarla, no agregarla de nuevo — serian dos con el mismo id.
-      optimisticEvent.remove()
+      //
+      // ⚠️ YA NO SE EXIGE `optimisticEvent`, Y ES POR EL ALTA DE TODO EL DÍA.
+      // Esa manda FECHAS en vez de `start_time`, así que `buildEventInput` sale
+      // sin `start` y `addEvent` devuelve `null` — FullCalendar descarta el
+      // evento al parsearlo. Con la condición vieja eso se llevaba por delante
+      // también el alta REAL, y la fila recién creada no aparecia hasta el
+      // siguiente refetch. El `?.` de abajo cubre el caso.
+      optimisticEvent?.remove()
       const yaPresente = api?.getEventById(json.appointment.id)
       if (yaPresente) {
         aplicarAppointmentAlEvento(json.appointment)
@@ -3810,7 +4284,7 @@ export default function AgendaPage() {
 
   async function handleDelete(id: string) {
     closeModal()
-    toast.success('Cita eliminada')
+    toast.success('Se eliminó de la agenda')
 
     // Optimistic: remover evento del calendario al instante.
     // Sin firma de escritura, y no hace falta: el eco de un DELETE llega
@@ -3825,7 +4299,7 @@ export default function AgendaPage() {
     if (!res.ok) {
       // Rollback: restaurar estado desde servidor
       refetch()
-      toast.error('No se pudo eliminar la cita')
+      toast.error('No se pudo eliminar')
     }
   }
 
@@ -4172,7 +4646,7 @@ export default function AgendaPage() {
               /* El botón sí aporta hora: la de ahora. Es una de las cuatro
                  rutas que NO cambian con la hora vacía de la vista Mes. */
               const { fecha, hora } = partirFechaHora(new Date().toISOString())
-              setModal({ mode: 'create', fecha, hora, tipo: 'cita' })
+              setModal({ mode: 'create', fecha, hora, tipo: 'cita', todoElDia: 'no' })
             }}
             data-onboard="nueva-cita"
             title="Nueva cita o evento — el tipo se elige arriba del modal"

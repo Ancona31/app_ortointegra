@@ -283,8 +283,12 @@ export default function ModalInvitacionCita({
             Creando el evento en Google…
           </p>
           <p className="text-[12.5px] leading-relaxed max-w-xs" style={{ color: 'var(--ag-muted)' }}>
-            La cita ya está guardada. Hay que esperar a que exista el evento para poder
-            invitar a alguien; suele tardar un par de segundos.
+            {/* Neutro: este modal se abre igual tras crear una CITA que tras crear un
+                EVENTO genérico (unas vacaciones), y «la cita» nombraba mal la mitad de
+                los casos. «El evento» que sí se nombra aquí es el de GOOGLE, que es de
+                lo que se está esperando. */}
+            Ya está guardado en la agenda. Hay que esperar a que exista el evento en
+            Google para poder invitar a alguien; suele tardar un par de segundos.
           </p>
         </div>
       )
@@ -298,7 +302,7 @@ export default function ModalInvitacionCita({
             <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
             <span>
               El evento en Google no llegó a crearse, así que todavía no hay a qué invitar.
-              <strong> La cita está guardada</strong> y no se ha perdido nada. Vuelve a abrirla
+              <strong> Lo agendado está guardado</strong> y no se ha perdido nada. Vuelve a abrirlo
               en un rato y usa «Agregar invitados».
             </span>
           </p>
@@ -319,9 +323,20 @@ export default function ModalInvitacionCita({
           <p className="text-[17px] font-bold leading-tight break-all select-all" style={{ color: 'var(--ag-ink)' }}>
             {correoTecleado}
           </p>
+          {/* ⚠️ AQUÍ SÍ SE RAMIFICA, Y NO SE NEUTRALIZA. Esta frase no nombra la
+              fila: nombra QUÉ VIAJA en el correo, y no es lo mismo en los dos
+              casos. En una CITA es el nombre completo del paciente —lo compone
+              `tituloParaGoogle` como «Cita médica: …»— y ése es el dato cuya fuga
+              justifica todo este paso de confirmación. En un EVENTO genérico no
+              hay paciente: el título es el texto libre que escribió el médico, y
+              decir «el nombre del paciente» ahí sería avisar de una fuga que no
+              ocurre y callar la que sí puede ocurrir. Una frase neutra perdería
+              justo la advertencia. */}
           <p className="text-[12px] leading-relaxed" style={{ color: 'var(--ag-text)' }}>
-            Compruébala letra por letra. La invitación lleva el nombre completo del paciente
-            en el título de la cita, y un correo enviado no se puede recuperar.
+            Compruébala letra por letra. {paciente
+              ? 'La invitación lleva el nombre completo del paciente en el título'
+              : 'La invitación lleva el título tal como lo escribiste'}, y un correo
+            enviado no se puede recuperar.
           </p>
         </div>
       )
@@ -346,7 +361,7 @@ export default function ModalInvitacionCita({
           <p className="text-[12px] leading-relaxed" style={{ color: 'var(--ag-muted)' }}>
             Google no confirma la entrega. Si alguien no la ve, pídele que revise su carpeta
             de <strong>spam o correo no deseado</strong>; puedes volver a invitarlo entrando
-            de nuevo a la cita, no se duplica nada.
+            de nuevo, no se duplica nada.
           </p>
 
           {/* La invitación YA salió; esto es sólo para la próxima vez. Por eso se
@@ -389,11 +404,11 @@ export default function ModalInvitacionCita({
     return (
       <>
         <p className="text-[12.5px] leading-relaxed" style={{ color: 'var(--ag-muted)' }}>
-          Quien invites queda añadido al evento de esta cita en Google, y Google le manda la
-          invitación por correo. No se ven el correo entre ellos, no pueden modificar la cita
-          y rechazarla no cambia nada aquí.
+          Quien invites queda añadido al evento en Google, y Google le manda la
+          invitación por correo. No se ven el correo entre ellos, no pueden modificar nada
+          y rechazar la invitación no cambia nada aquí.
           {/* El médico ya está dentro y no se ofrece: entró al crearse el evento. */}
-          {' '}El médico asignado ya la tiene en su calendario.
+          {' '}El médico asignado ya lo tiene en su calendario.
         </p>
 
         {casillaPaciente()}
@@ -406,7 +421,7 @@ export default function ModalInvitacionCita({
         {editandoCorreo || paciente === null || correoFicha === '' ? (
           <div className="space-y-1.5">
             <label htmlFor="inv-correo" className="block text-[11px] font-bold uppercase tracking-[.06em]" style={{ color: 'var(--ag-muted2)' }}>
-              Invitar a otra dirección (sólo para esta cita)
+              Invitar a otra dirección (sólo para esta invitación)
             </label>
             <input
               id="inv-correo"
@@ -522,7 +537,7 @@ export default function ModalInvitacionCita({
               <Mail size={20} style={{ color: 'var(--ag-brand-primary)' }} />
             </div>
             <h2 className="text-[18px] font-extrabold" style={{ color: 'var(--ag-ink)' }}>
-              Invitar a esta cita
+              Invitar por correo
             </h2>
             <button onClick={onClose} className="ml-auto p-1 transition-opacity hover:opacity-70" style={{ color: 'var(--ag-muted2)' }} aria-label="Cerrar">
               <X size={20} />
@@ -577,10 +592,10 @@ function textoAcuse(
 
   const frases: string[] = []
   if (nuevos.length > 0) {
-    frases.push(`${unirY(nuevos)} ${nuevos.length > 1 ? 'quedaron añadidos' : 'quedó añadido'} a la cita y Google ${nuevos.length > 1 ? 'les' : 'le'} mandó la invitación por correo.`)
+    frases.push(`${unirY(nuevos)} ${nuevos.length > 1 ? 'quedaron añadidos' : 'quedó añadido'} y Google ${nuevos.length > 1 ? 'les' : 'le'} mandó la invitación por correo.`)
   }
   if (repetidos.length > 0) {
-    frases.push(`${unirY(repetidos)} ya ${repetidos.length > 1 ? 'estaban' : 'estaba'} en la cita, así que Google ${repetidos.length > 1 ? 'les' : 'le'} reenvió el correo.`)
+    frases.push(`${unirY(repetidos)} ya ${repetidos.length > 1 ? 'estaban' : 'estaba'} en la lista de invitados, así que Google ${repetidos.length > 1 ? 'les' : 'le'} reenvió el correo.`)
   }
   const texto = frases.join(' ')
   return texto.charAt(0).toUpperCase() + texto.slice(1)

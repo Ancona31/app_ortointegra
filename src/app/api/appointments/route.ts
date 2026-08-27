@@ -9,7 +9,33 @@ import { APPOINTMENT_SELECT, eventoParaGoogle, componerAsistentes, INTERRUPTORES
          ICONOS_EVENTO, COLORES_EVENTO, pintaValida,
          type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
 import { correoDelMedico } from '@/lib/medicoCorreo'
-import { TZ_CLINICA } from '@/lib/dates'
+import { TZ_CLINICA, desplazarFecha, fechaHoraLocalAInstante } from '@/lib/dates'
+
+/* Una fecha-solo `YYYY-MM-DD`, que es lo que manda el modal para un evento de
+   todo el día. NO acepta un instante ISO: si llegara uno, `AT TIME ZONE` de la
+   base lo pondría en una hora que no es medianoche y el CHECK lo rechazaría con
+   un 23514 sin explicación. Mejor un 400 que diga qué pasa. */
+const FECHA_SOLA = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * La forma NO basta: `2026-02-30` la pasa y no existe.
+ *
+ * ⚠️ Y NO SE DETECTA CON `Number.isNaN`, QUE ES LA TRAMPA. El motor no rechaza
+ * un día fuera de rango, lo DESBORDA: `new Date('2026-02-30T00:00:00Z')` da el
+ * 2 de marzo tan tranquilo (comprobado en el Node de este repo; `2026-04-31` da
+ * el 1 de mayo). Sólo el mes fuera de 1..12 sale como `Invalid Date`.
+ * Por eso la comprobación es un IDA Y VUELTA: si el día existía, `toISOString`
+ * devuelve el mismo texto con el que se entró; si desbordó, otro.
+ *
+ * Sin esto, `2026-02-30` llegaba viva hasta `fechaHoraLocalAInstante` o
+ * `desplazarFecha`, que sí lanzan, y el `catch` del route la convertía en un
+ * 500 — justo el error mudo que el comentario de arriba dice querer evitar.
+ */
+function esFechaDeCalendario(valor: string): boolean {
+  if (!FECHA_SOLA.test(valor)) return false
+  const instante = new Date(`${valor}T00:00:00Z`)
+  return !Number.isNaN(instante.getTime()) && instante.toISOString().startsWith(valor)
+}
 
 async function getProfile(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -86,10 +112,80 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { title, start_time, end_time, paciente_id, notes, medico_id, consultorio_id, client_id, icono, color } = body
+    const { title, start_time, end_time, all_day, all_day_desde, all_day_hasta,
+            paciente_id, notes, medico_id, consultorio_id, client_id, icono, color } = body
 
-    if (!title || !start_time || !end_time) {
+    /* ── LAS DOS PUNTAS, SEGÚN SI LA FILA ES DE TODO EL DÍA ──────────────────
+       Un evento de todo el día NO manda instantes: manda dos FECHAS, y la
+       medianoche se compone más abajo con la zona del consultorio. El cliente no
+       puede componerla —lo haría con el reloj del navegador y la fila violaría
+       `appointments_all_day_medianoche_check` desde cualquier huso que no sea el
+       del consultorio—, así que manda el DÍA, que no tiene huso.
+
+       `all_day_hasta` es el ÚLTIMO DÍA INCLUIDO, tal como se ve en el modal. El
+       paso a fin exclusivo se da abajo, en un solo sitio. */
+    const esTodoElDia = all_day === true
+    const fechaDesde  = typeof all_day_desde === 'string' ? all_day_desde : ''
+    const fechaHasta  = typeof all_day_hasta === 'string' ? all_day_hasta : ''
+
+    if (!title || (esTodoElDia ? (!fechaDesde || !fechaHasta) : (!start_time || !end_time))) {
       return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
+    }
+
+    /* EL FIN DESPUÉS DEL INICIO, COMPROBADO AQUÍ Y NO POR LA BASE. No hay
+       `CHECK (end_time > start_time)` incondicional en `appointments`, y el que
+       sí existe sólo mira las filas de todo el día y contesta un 23514 que sube
+       al cliente como «no se pudo guardar la cita».
+
+       Son DOS comprobaciones y no una, y cada una tiene su mensaje: que las
+       fechas EXISTAN y que estén en orden. Juntarlas obligaría a un texto que
+       valiera para las dos, o sea que no dijera cuál falló.
+
+       ⚠️ EL MISMO DÍA ES VÁLIDO EN TODO EL DÍA —un evento de una sola jornada—,
+       así que la regla es `>=` y el mensaje dice «no puede ir antes», no «tiene
+       que ir después». Con hora es al revés: `>` estricto, porque una cita que
+       empieza y termina en el mismo instante no es una cita. */
+    if (esTodoElDia && (!esFechaDeCalendario(fechaDesde) || !esFechaDeCalendario(fechaHasta))) {
+      return NextResponse.json(
+        { error: 'fecha_invalida', message: 'Las fechas del evento no existen en el calendario. Se espera un día real, en formato AAAA-MM-DD.' },
+        { status: 400 }
+      )
+    }
+    const rangoValido = esTodoElDia
+      ? fechaHasta >= fechaDesde
+      : new Date(end_time) > new Date(start_time)
+    if (!rangoValido) {
+      return NextResponse.json(
+        {
+          error: 'rango_invalido',
+          message: esTodoElDia
+            ? 'El último día del evento no puede ir antes del primero.'
+            : 'El fin de la cita tiene que ir después del inicio.',
+        },
+        { status: 400 }
+      )
+    }
+
+    /* ── TODO EL DÍA Y PACIENTE NO PUEDEN IR JUNTOS ──────────────────────────
+       Es decisión de producto, no una limitación técnica: «todo el día» sólo
+       existe para EVENTOS, y una cita siempre lleva hora. La interfaz ya lo
+       impone —el conmutador «Cita» del modal se deshabilita en cuanto el
+       interruptor está encendido, y el gesto sobre la banda lo deja bloqueado—,
+       así que este `if` NO se dispara en el uso normal.
+
+       ESTÁ AQUÍ PORQUE LA BASE NO LO SABE. `appointments_all_day_medianoche_check`
+       mira las puntas y el huso, y no dice nada de `paciente_id`: una fila con
+       las dos cosas entraría tan contenta. Y NO ROMPERÍA NADA HOY, que es lo
+       peor que se puede decir de una fila incoherente — nadie la vería hasta que
+       algo empezara a depender de la regla. Un cuerpo fabricado a mano, o un
+       error futuro en otra parte del código, bastan para crearla.
+       Segundo cerrojo, entonces, del mismo estilo que el gate de rol de más
+       abajo: la interfaz esconde el camino, esto lo cierra. */
+    if (esTodoElDia && paciente_id) {
+      return NextResponse.json(
+        { error: 'todo_el_dia_con_paciente', message: 'Un evento de todo el día no puede ser una cita: una cita siempre lleva hora.' },
+        { status: 400 }
+      )
     }
 
     /* ── LA PINTA DEL EVENTO GENÉRICO (§12.14) ──────────────────────────────
@@ -215,6 +311,30 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    /* ── LA MEDIANOCHE SE COMPONE AQUÍ, Y SÓLO AQUÍ ─────────────────────────
+       Con `consultorio.timezone`, que acaba de cargarse arriba y es la ÚNICA
+       zona con la que esta fila tiene sentido: el mismo instante es un día
+       distinto según el huso, y el que manda es el del consultorio (es lo que
+       comprueba `appointments_all_day_medianoche_check` leyendo
+       `consultorio_timezone` de la propia fila).
+
+       ⚠️ EL `+1 DÍA` ES EL PASO A FIN EXCLUSIVO, y es el único del servidor. El
+       modal enseña el ÚLTIMO DÍA INCLUIDO —un evento del 19 dice «19» en los dos
+       campos— y la columna guarda `19T00:00 .. 20T00:00`. La vuelta la hace
+       `fechasDeTodoElDia` en el cliente, también una sola vez. */
+    if (esTodoElDia && !consultorio.timezone) {
+      return NextResponse.json(
+        { error: 'consultorio_sin_huso', message: 'El consultorio no tiene zona horaria, y un evento de todo el día no se puede guardar sin ella.' },
+        { status: 400 }
+      )
+    }
+    const inicioFila = esTodoElDia
+      ? fechaHoraLocalAInstante(fechaDesde, '00:00', consultorio.timezone)
+      : start_time
+    const finFila = esTodoElDia
+      ? fechaHoraLocalAInstante(desplazarFecha(fechaHasta, { dias: 1 }), '00:00', consultorio.timezone)
+      : end_time
+
     // RLS filtra por clinica_id
     const { data: apt, error } = await supabase
       .from('appointments')
@@ -223,8 +343,9 @@ export async function POST(req: NextRequest) {
         created_by:      profile.userId,
         paciente_id:     paciente_id || null,
         title,
-        start_time,
-        end_time,
+        start_time:      inicioFila,
+        end_time:        finFila,
+        all_day:         esTodoElDia,
         notes:           notes || null,
         status:          'scheduled',
         medico_id:        finalMedicoId,
