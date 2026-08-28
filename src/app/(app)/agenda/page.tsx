@@ -5037,7 +5037,34 @@ const CONTEO_VACIO: ConteoVisible = { citas: 0, eventos: 0, google: 0 }
    de `contarVisibles`). En `EventoParaVentana` SIGUE VIVO y ahí no se toca: lo
    lee `tramoDeEvento` para que un evento de todo el día no estire la ventana
    vertical de la rejilla a 24 horas. Son dos usos distintos del mismo campo. */
-type EventoParaConteo = { start: Date | null; extendedProps: Record<string, unknown> }
+/**
+ * ¿El tramo `[inicio, fin)` toca algún día que NO esté plegado?
+ *
+ * Sólo lo usa `contarVisibles`, y sólo tiene efecto con «Compactar» encendido:
+ * `ocultos` es el `hiddenDays` de FullCalendar, o sea los `getDay()` de las
+ * columnas que se han quitado.
+ *
+ * ⚠️ RECORRE DÍAS DE CALENDARIO CON `setDate()` Y NO SUMANDO 24 h, por lo mismo
+ * que `rangoQuePedir`: en el cambio de horario de verano un día no dura 24 horas
+ * y la suma se desalinea. El tope de 7 vueltas es lo que impide que un evento
+ * larguísimo pasee la semana entera sin necesidad: con siete días ya se han visto
+ * todos los `getDay()` posibles, así que si ninguno era visible, ninguno lo será.
+ */
+function tocaDiaVisible(inicio: Date, fin: Date, ocultos: readonly number[]): boolean {
+  const cursor = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate())
+  for (let i = 0; i < 7; i += 1) {
+    if (i > 0 && cursor >= fin) break
+    if (!ocultos.includes(cursor.getDay())) return true
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return false
+}
+
+/* ⚠️ LLEVA `end` DESDE QUE LA CONSULTA FILTRA POR SOLAPE, y no es opcional: sin
+   él no hay forma de saber si un evento que empezó antes de la ventana sigue
+   dentro. `EventApi` de FullCalendar lo trae, así que los tres llamadores lo
+   pasan sin cambiar nada. */
+type EventoParaConteo = { start: Date | null; end: Date | null; extendedProps: Record<string, unknown> }
 
 /**
  * Cuenta por categoría lo que la vista está PINTANDO ahora mismo.
@@ -5046,6 +5073,25 @@ type EventoParaConteo = { start: Date | null; extendedProps: Record<string, unkn
  * ensancha cada petición a semanas completas, así que el store guarda eventos
  * que la vista no dibuja; contarlos daría un subtítulo que promete citas que no
  * están en pantalla. De ahí el filtro por el rango ACTIVO.
+ *
+ * ⚠️⚠️ ESE FILTRO ES POR SOLAPE Y NO POR DÓNDE EMPIEZA EL EVENTO, y el cambio va
+ * en pareja con el de `/api/appointments`. Mientras la consulta sólo devolvía lo
+ * que EMPEZABA dentro de la ventana, mirar el inicio aquí bastaba porque no podía
+ * llegar otra cosa. Desde que la consulta compara por solape sí llega: un evento
+ * de varios días que arrancó la semana pasada. Con la reja vieja, ese evento se
+ * PINTA y no se CUENTA — y eso no es un número flojo, es una contradicción en
+ * pantalla, porque de este conteo cuelga también la banda de vacío del bloque 9:
+ * la agenda enseñaría un congreso encima de una banda que dice «Sin citas esta
+ * semana».
+ *
+ * La forma del test es la MISMA que la de `filasDelDia`, que ya contaba por
+ * solape desde el bloque 6 (`ev.start < hasta && (ev.end ?? ev.start) > desde`).
+ * Se copia en vez de compartirse porque son dos rejas contra rangos distintos —un
+ * día allí, el rango activo aquí— y un helper común ataría el panel del mes al
+ * conteo del subtítulo. Si divergen, es que tenían que divergir.
+ *
+ * `ev.end ?? ev.start` para el evento sin fin: entonces el solape se reduce a que
+ * su instante caiga dentro, que es lo que se quiere.
  *
  * ⚠️ Y DESCUENTA `diasOcultos`, que es el caso que se escapa al filtro anterior:
  * con «Compactar» encendido, `hiddenDays` quita COLUMNAS que siguen cayendo
@@ -5095,8 +5141,15 @@ function contarVisibles(
   for (const ev of eventos) {
     const inicio = ev.start
     if (!inicio) continue
-    if (activo && (inicio < activo.activeStart || inicio >= activo.activeEnd)) continue
-    if (ocultos.includes(inicio.getDay())) continue
+    const fin = ev.end ?? inicio
+    if (activo && !(inicio < activo.activeEnd && fin > activo.activeStart)) continue
+    /* ⚠️ LA REJA DE DÍAS OCULTOS MIRA EL TRAMO ENTERO Y NO SÓLO EL DÍA DE INICIO,
+       y es la misma corrección que la de arriba llevada a su terreno. Mirando el
+       inicio, un evento de varios días que ARRANCA en un sábado plegado no se
+       contaba aunque siguiera pintándose de lunes a viernes. Para un evento de un
+       solo día —que son todos menos los de todo el día— esto da exactamente lo
+       mismo que antes: su único día es el de inicio. */
+    if (ocultos.length > 0 && !tocaDiaVisible(inicio, fin, ocultos)) continue
 
     const ext = ev.extendedProps
     if (ext.isGcalBlock === true) { google += 1; continue }

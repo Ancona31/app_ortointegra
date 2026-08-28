@@ -401,28 +401,43 @@ uno, míralo a 10 px, no a 24 — si a 10 px no se distingue de otro del set, no
 
 ### Inyección
 
-```js
-eventDidMount: (a) => {
-  const { color, icono } = a.event.extendedProps;
-  if (color) a.el.style.setProperty('--ev-color', color);
-  if (icono) a.el.style.setProperty('--ev-icono', `url(/icons/${icono}.svg)`);
+> ### ✅ CONSTRUIDO POR OTRA VÍA — esta sección describe lo que HAY
+>
+> El plan era `eventDidMount` escribiendo dos custom properties sobre el `<td>`
+> del evento, y el CSS leyéndolas. **No se hizo así, y no queda pendiente:** el
+> icono lo pinta un componente de React, `IconoDelEvento`, desde dentro de
+> `eventContent`. **No hay un solo `eventDidMount` en la agenda.**
+>
+> Por qué salió así: las tarjetas se acabaron construyendo enteras en React
+> —`MemoizedEventContent`, `MonthChip`, `GoogleEventCard`, `ChipDeBanda`—, y una
+> vez ahí dentro el icono es un hijo más. `eventDidMount` habría sido un segundo
+> camino, imperativo y sobre el DOM ya pintado, para decidir lo mismo que el
+> renderizador acababa de decidir con los datos en la mano.
+>
+> Lo que sí sobrevive del plan es la MECÁNICA: sigue siendo una máscara CSS sobre
+> el SVG, para que el icono herede el color en vez de traerlo horneado. Lo que
+> cambia es quién la aplica.
+
+Lo que hay, en `agenda/page.tsx`:
+
+```tsx
+function IconoDelEvento({ nombre, size, color }: {…}) {
+  const archivo = `url(/icons/${nombre}.svg)`
+  return <span aria-hidden="true" style={{
+    background: color ?? 'currentColor',
+    WebkitMaskImage: archivo, maskImage: archivo, …
+  }} />
 }
 ```
 
-Dos custom properties por evento. Todo lo demás es CSS.
+Sin `color`, hereda `currentColor` — que es como se comporta cualquier icono de
+la librería a la que sustituye. El color del evento lo resuelve el propio
+renderizador con la precedencia de §5, y se lo pasa.
 
-```css
-.ev--evento { background: var(--ev-bg); border-color: var(--ev-brd);
-              border-left-color: var(--ev-color) }
-.ev--evento .ev__hora { color: var(--ev-color) }
-.ev__ico { display: none }
-.ev--evento .ev__ico, .ev--gcal .ev__ico {
-  display: block; flex: none; width: 16px; height: 16px;
-  background: var(--ev-color);
-  -webkit-mask: var(--ev-icono) center / contain no-repeat;
-          mask: var(--ev-icono) center / contain no-repeat;
-}
-```
+⚠️ **Si algún día vuelve a hacer falta una custom property por evento**, el sitio
+NO es `eventDidMount` sino `eventClassNames` + una regla de CSS, o el `style` del
+propio componente. Volver a montar un hook de DOM sobre las tarjetas reabre el
+problema de las dos fuentes de verdad.
 
 ### Tamaño de icono por vista
 
@@ -902,6 +917,21 @@ Reintentar», y las citas propias se muestran normal.
 
 ## 12. Accesibilidad visual
 
+> ### 🔴 TRES COSAS DE ESTA SECCIÓN NO SE CONSTRUYERON, Y NO ESTÁN PENDIENTES
+>
+> Se decidieron **descartar** al cerrar el bloque 9 (2026-08-28), con el trabajo
+> de accesibilidad de los modales ya hecho y a la vista de lo que costaba cada
+> una. **No son deuda, no son un olvido y no hay que «terminarlas»:** son las
+> tres que están marcadas ⛔ abajo. Si vuelves a proponerlas, que sea como
+> trabajo NUEVO y con su propio argumento, no como el remate de éste.
+>
+> Lo que SÍ se construyó de accesibilidad en esta rama, y funciona: rol de
+> diálogo, nombre accesible, foco inicial, foco atrapado, cierre con Escape y
+> devolución del foco en los cuatro modales de la agenda y en `ModalShell`, que
+> lo reparte a otras veintiséis pantallas. Eso no está en esta sección porque
+> cuando se escribió el spec no se había mirado.
+
+
 ### Contraste — pares verificados
 
 | Par | Ratio |
@@ -932,7 +962,20 @@ deuteranopia lee la agenda completa sin color.
 - Los chips dentro de una celda del mes **no** llegan a 44 px. Es la excepción aceptada, y por
   eso existe el panel del día debajo del mes: es la ruta táctil real.
 
-### Foco
+### Foco — ⛔ DESCARTADO
+
+> **Decisión de 2026-08-28: el anillo global de 3 px NO se hace.** El argumento
+> de abajo sigue siendo bueno; lo que se descartó es la REGLA GLOBAL, por su
+> alcance: `.fc *` y `.agenda *` con especificidad cero pisan —o son pisados
+> por— los anillos que ya declaran a mano el botón de hueco, el número de día,
+> la cabecera navegable y la salida de la banda compacta, y auditar esos cuatro
+> más los controles de FullCalendar no cabía en el bloque. Lo que hay hoy es el
+> anillo por defecto del navegador más esos cuatro propios.
+>
+> Si se retoma, va con una auditoría de foco de la agenda entera, no como una
+> regla suelta al final de la hoja.
+
+La regla que se planeaba, para quien la retome:
 
 ```css
 .fc *:focus-visible, .agenda *:focus-visible {
@@ -946,10 +989,27 @@ reemplazo.
 Orden de tabulación: toolbar → chips → navegación → filtro → calendario → panel. El panel
 **después** del calendario: es apoyo, no contenido principal.
 
-### Etiqueta para lector de pantalla
+### Etiqueta para lector de pantalla — ⛔ DESCARTADO
 
-El DOM de la tarjeta está fragmentado en spans y se leería como una sopa. `eventDidMount`
-compone la etiqueta completa:
+> **Decisión de 2026-08-28: la etiqueta compuesta NO se hace.** El diagnóstico de
+> abajo es correcto —el DOM de la tarjeta está fragmentado y se lee como una sopa
+> de spans— y aun así se descartó, por dos razones:
+>
+> 1. **No hay ningún `eventDidMount` en la agenda**, y montarlo sólo para esto
+>    reabre lo que §5 cerró: un segundo camino imperativo sobre el DOM ya pintado
+>    para decir lo que el renderizador de React acaba de decidir. Si esta etiqueta
+>    vuelve, el sitio es `eventContent` —un `aria-label` en el nodo raíz de cada
+>    tarjeta— y no un hook de montaje.
+> 2. El riesgo 18 de `RIESGOS_AGENDA.md` describe exactamente cómo se rompe: un
+>    `switch` que se olvida de un tipo. Con cuatro tipos de tarjeta ya escritos en
+>    componentes distintos, el trabajo real no es componer la frase sino
+>    garantizar que los cuatro la componen.
+>
+> **La agenda hoy NO es utilizable con lector de pantalla al nivel que esta
+> sección describe.** Queda dicho aquí para que nadie lo descubra creyendo que
+> estaba hecho.
+
+Lo que se planeaba, para quien lo retome:
 
 ```
 "Hugo Interián, 10:30 a 11:00, control postoperatorio, agendada"
@@ -966,8 +1026,21 @@ Los `display: 'background'` llevan `aria-hidden="true"`: son decoración informa
 ### Los dos límites de FullCalendar
 
 1. **No hay recorrido por teclado celda a celda en `timeGrid`.** No existe en v6. Ruta alterna:
-   `listWeek`, completamente navegable, enlazada de forma **visible** desde el toolbar («Ver
-   como lista»), no escondida en un menú. En móvil es gratis: Día y Semana **son** listas.
+   `listWeek`, completamente navegable. En móvil es gratis: Día y Semana **son** listas.
+
+   > **⛔ El «Ver como lista» de ESCRITORIO está descartado (2026-08-28), y no
+   > volverá.** El spec lo pedía visible en el toolbar y no escondido en un menú.
+   > No se hizo, y la decisión es firme: `FORMATOS_DE_VISTA` en `agenda/page.tsx`
+   > ata cada vista a un formato **por ancho** —`timeGridWeek` ↔ `listWeek`,
+   > `timeGridDay` ↔ `listDay`—, así que un conmutador de escritorio no sería un
+   > botón más: convertiría «vista × formato» en un tercer eje que hoy no existe,
+   > con el `changeView` del segmentado, el efecto del `resize` y la idempotencia
+   > de `vistaEnElOtroFormato` colgando de él.
+   >
+   > **Consecuencia asumida, escrita para que nadie la descubra sola:** en
+   > escritorio la rejilla de `timeGrid` NO tiene ruta de teclado alterna. Quien
+   > navegue sólo con teclado depende de estrechar la ventana por debajo de
+   > 1024 px, que es donde las listas aparecen solas.
 2. **`nowIndicator` solo existe en `timeGrid`.** En `listDay` la hora actual se marca con un
    separador propio entre filas.
 

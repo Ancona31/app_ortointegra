@@ -69,8 +69,42 @@ export async function GET(req: NextRequest) {
 
     if (medicoFilter) query = query.eq('medico_id', medicoFilter)
 
-    if (from) query = query.gte('start_time', from)
-    if (to)   query = query.lte('start_time', to)
+    /* ⚠️⚠️ LA VENTANA SE COMPARA POR SOLAPE, NO POR `start_time` DENTRO DEL RANGO,
+       Y ESTO ES UNA CORRECCIÓN, NO UN AFINADO. Filtrando por el inicio —que es lo
+       que había— una fila que EMPEZÓ ANTES de `from` y sigue viva dentro de la
+       ventana no se devolvía, así que un evento de VARIOS DÍAS desaparecía de
+       todas las semanas menos la que lo inicia. Un congreso de lunes a lunes se
+       veía la primera semana y no la segunda, sin error y sin hueco: simplemente
+       no estaba.
+
+       No lo tapaba `rangoQuePedir`: ése encaja la petición a semanas naturales, y
+       en vista Semana el borde ya ES el lunes, o sea margen cero.
+
+       ES EL MISMO CRITERIO QUE /api/google/events, donde está argumentado desde
+       el principio: «filtrar las citas sólo por su inicio dejaría fuera del
+       conjunto a la que empezó antes de `timeMin` y termina dentro». Allí el
+       síntoma era otro —una cita sin restar, que salía duplicada como evento
+       crudo— pero la causa es la misma y la cura también. Hasta ahora las dos
+       rutas leían la misma tabla con dos reglas distintas.
+
+       ⚠️ POR QUÉ EL CORTE DE ARRIBA ES ESTRICTO Y EL DE ABAJO NO. `to` es un fin
+       EXCLUSIVO —lo manda FullCalendar y lo ensancha `rangoQuePedir`—, así que una
+       cita que empieza justo en `to` cae FUERA de la ventana por definición: con
+       `lte` se traía una fila que la vista no llega a pintar. Con `lt` no.
+       Abajo se queda inclusivo a propósito: `end_time = from` también está fuera,
+       pero en `appointments` NO existe un CHECK incondicional de
+       `end_time > start_time` (sólo lo hay para las filas de todo el día), así que
+       pueden quedar filas heredadas de duración cero; con un `gt` estricto una de
+       ellas apoyada en el borde desaparecería. Esta consulta es la RED GRUESA: se
+       permite una fila de más, que no cuesta nada. El corte fino lo hacen el
+       propio FullCalendar al pintar y `contarVisibles` en el cliente, que sí
+       aplica el solape estricto — ver su nota, que es la otra mitad de esto.
+
+       ⚠️ LAS DOS PUNTAS SON OBLIGATORIAS Y VAN EN EL MISMO SENTIDO: `start_time`
+       contra el FIN de la ventana y `end_time` contra su INICIO. Cruzadas, o con
+       las dos contra `start_time`, se vuelve al fallo. */
+    if (to)   query = query.lt('start_time', to)
+    if (from) query = query.gte('end_time', from)
 
     const { data, error } = await query
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
