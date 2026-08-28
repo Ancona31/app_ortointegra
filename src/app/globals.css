@@ -1136,17 +1136,35 @@ body {
    `!important` y no lo lleva. Si algún día esto deja de ganar, es que alguien
    metió el bloque dentro de una capa.
 
-   ⚠️ SÓLO DE `lg` EN ADELANTE. Por debajo el layout da `pt-16 pb-6` = 88 px, y
-   esos 64 de arriba son la barra superior móvil, que sí hace falta. El móvil se
-   queda como estaba, con su `h-[calc(100dvh-88px)]`. */
-@media (min-width: 1024px) {
-  main > div:has(.agenda-fc) {
-    padding-top: 8px;
-    padding-bottom: 8px;
-  }
-  main > div:has(.agenda-fc) .agenda-raiz {
-    height: calc(100dvh - 16px);   /* ← 8 + 8 de la regla de encima */
-  }
+   ⚠️⚠️ ESTUVO ACOTADO A `lg` EN ADELANTE Y DEJÓ DE ESTARLO EN EL BLOQUE 6. El
+   aviso de aquí decía: «por debajo el layout da `pt-16 pb-6` = 88 px, y esos 64
+   de arriba son la barra superior móvil, que sí hace falta». Era cierto: esos 64
+   px eran el hueco del BOTÓN FLOTANTE del menú, que el `Sidebar` monta en
+   `fixed top-4 left-4`.
+
+   Ya no lo es EN ESTA PÁGINA. Desde el paso 8a la agenda móvil lleva su propia
+   banda azul con el hamburguesa dentro, y el botón flotante se esconde en
+   `/agenda` (`Sidebar.tsx`, la nota del toggle). O sea que esos 64 px pasaron a
+   reservar sitio para algo que no se pinta — y con la banda y la barra inferior
+   ocupando cromo, se notaba: en un Android real quedaban tres o cuatro citas a
+   la vista.
+   Se recuperan 72: 56 de arriba (64 → 8) y 16 de abajo (24 → 8).
+
+   ⚠️ ESTO NO TOCA A LAS OTRAS VEINTE PÁGINAS. El selector sigue siendo
+   `main > div:has(.agenda-fc)`, o sea sólo el hijo de `<main>` que contiene el
+   calendario. Y NO se sube al layout: allí los 88 px siguen haciendo falta,
+   porque en todas las demás el botón flotante sí está.
+
+   ⚠️ Y POR ESO EL `h-[calc(100dvh-88px)]` DE `page.tsx` SE QUEDA COMO ESTÁ. No
+   es un número obsoleto: es el respaldo para cuando `:has()` no está soportado,
+   y ahí el padding sigue siendo 88. Los dos números tienen que seguir casando
+   EN CADA RAMA — 88 con 88 sin `:has()`, 16 con 16 con él. */
+main > div:has(.agenda-fc) {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+main > div:has(.agenda-fc) .agenda-raiz {
+  height: calc(100dvh - 16px);   /* ← 8 + 8 de la regla de encima */
 }
 
 /* ⚠️⚠️ `grid-template-rows` Y `grid-template-areas` SON UNA PAREJA: EL NÚMERO DE
@@ -1191,7 +1209,17 @@ body {
 .agenda-fc .fc-header-toolbar { grid-area: toolbar; }
 .agenda-fc .ag-leyenda        { grid-area: leyenda; }
 .ag-banda-compacta            { grid-area: banda; }
-.agenda-fc .fc-view-harness   { grid-area: rejilla; }
+/* ⚠️ EL `min-width: 0` NO ES ADORNO: SIN ÉL LA LISTA SE SALÍA POR LA DERECHA EN
+   390 px. Un ítem de grid trae `min-width: auto`, que es su ancho MÍNIMO DE
+   CONTENIDO, y eso le permite desbordar su pista aunque la pista sea
+   `minmax(0, 1fr)` —el 0 acota la PISTA, no al ítem—. Dentro del harness va la
+   `<table>` de la vista de lista, cuyo mínimo de contenido lo fijaban los nombres
+   de paciente (ver la nota de `.ag-listafila-nombre`), así que en un teléfono el
+   calendario entero se iba a la derecha y con él la palabra de la cabecera de
+   día. Es la mitad del arreglo; la otra mitad es que ese mínimo deje de ser
+   enorme. Las dos hacen falta.
+   En escritorio no cambia nada: allí sobra ancho y la pista nunca aprieta. */
+.agenda-fc .fc-view-harness   { grid-area: rejilla; min-width: 0; }
 
 /* El aspecto propio de la leyenda —y el `@media` que la baja de fila— NO viven
    aquí sino DETRÁS del bloque del toolbar, unas líneas más abajo. Es a
@@ -1473,12 +1501,15 @@ body {
      Ese meta es del paso 10 y toca un archivo global; hasta entonces esto
      resuelve a 0 y la banda se ve exactamente como en el mockup. Degrada a lo
      de siempre, no a roto. */
-  padding: calc(env(safe-area-inset-top, 0px) + 6px) 16px 14px;
+  /* ⚠️ 8/10 Y HUECOS DE 8, Y ANTES ERAN 6/14 CON HUECOS DE 12 (paso 8c). Los del
+     mockup. Recortarlos es la parte pequeña de la compactación —10 px— pero es
+     gratis: a este cuerpo de texto no le falta aire. La grande fue fundir la
+     fila de la navegación; ver la nota de `BandaMovil`. */
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) 14px 10px;
+  gap: 8px;
 }
 .ag-banda-movil-fila,
-.ag-banda-movil-filtros,
-.ag-banda-movil-fecha { display: flex; align-items: center; gap: 8px; }
-.ag-banda-movil-fila { gap: 12px; }
+.ag-banda-movil-filtros { display: flex; align-items: center; gap: 8px; }
 
 /* 44 px es el mínimo táctil, y aquí no se negocia: son los cinco controles con
    los que se navega la agenda en un teléfono. */
@@ -1504,6 +1535,16 @@ body {
    El azul claro sobre el navy da 5.9:1 según el propio mockup, y es el mismo
    papel que `--ag-navy-tx` tenía allí: aquí sale de la marca aclarada, para que
    siga siendo el azul del usuario y no un valor suelto. */
+/* ⚠️ EL SUBTÍTULO LLEVA AHORA LA FECHA Y EL CONTEO, en ese orden y separados por
+   « · ». La decisión cerrada era que el subtítulo fuese SÓLO el conteo —ni el
+   nombre del consultorio ni el lema— y sigue en pie: la fecha no es adorno, es
+   el estado de navegación que se quedó sin fila propia al compactar la banda, y
+   tenía que seguir viéndose.
+   Una línea con elipsis: si algo no cabe, se recorta el final —el conteo— y la
+   fecha, que es lo que se navega, se lee entera.
+   La mayúscula inicial que Intl no pone en español («agosto de 2026») la da el
+   `::first-letter`, igual que el título del toolbar de escritorio. NO con
+   `text-transform: capitalize`, que daría «17 – 22 De Agosto». */
 .ag-banda-movil-titulo span {
   font-size: 12.5px;
   color: color-mix(in srgb, #fff 62%, var(--ag-navy));
@@ -1511,12 +1552,23 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.ag-banda-movil-titulo span::first-letter { text-transform: uppercase; }
 
-/* Conmutador de vistas: pista oscura, pestaña activa BLANCA. */
+/* Conmutador de vistas: pista oscura, pestaña activa BLANCA.
+
+   ⚠️ LA PISTA VA SIN RELLENO, Y ESO ES DELIBERADO (paso 8c). Tenía 4 px por
+   lado, que con botones de 44 daban una fila de 52. Quitarlo la deja en 44
+   exactos y CONSERVA el objetivo táctil, que era la alternativa mala: bajar los
+   botones a 38 habría dado los mismos 44 a costa de la altura del dedo, y estos
+   tres son de los controles más pulsados de la pantalla.
+   ⚠️ POR ESO LOS DOS RADIOS SON IGUALES. La regla geométrica es «radio exterior =
+   interior + relleno», y con relleno cero eso significa el MISMO valor. Si algún
+   día vuelve el relleno, el de fuera tiene que crecer con él o las esquinas se
+   ven pellizcadas — es la misma cuenta que hace el segmentado de escritorio. */
 .ag-banda-movil-vistas {
   display: flex;
   gap: 4px;
-  padding: 4px;
+  padding: 0;
   background: rgba(0, 0, 0, .22);
   border-radius: var(--ag-r-btn);
 }
@@ -1524,7 +1576,7 @@ body {
   flex: 1;
   min-height: 44px;
   border: 0;
-  border-radius: var(--ag-r-btn-sm);
+  border-radius: var(--ag-r-btn);
   background: transparent;
   color: color-mix(in srgb, #fff 74%, var(--ag-navy));
   font-family: inherit;
@@ -1557,21 +1609,10 @@ body {
    no hereda el color del `<select>`. Lo avisa el propio mockup. */
 .ag-banda-movil-filtros select option { color: var(--ag-ink); background: var(--ag-surface); }
 
-.ag-banda-movil-etiqueta {
-  flex: 1;
-  min-width: 0;
-  text-align: center;
-  font-size: 15.5px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-/* La mayúscula inicial que Intl no pone en español —«agosto de 2026»—, con el
-   mismo `::first-letter` que ya usa el título del toolbar de escritorio. NO con
-   `text-transform: capitalize`, que pondría mayúscula en cada palabra y daría
-   «17 – 22 De Agosto». */
-.ag-banda-movil-etiqueta::first-letter { text-transform: uppercase; }
+/* ⚠️ AQUÍ VIVÍAN `.ag-banda-movil-fecha` Y `.ag-banda-movil-etiqueta`, LA CUARTA
+   FILA. Se fueron en el paso 8c: la navegación se fundió en la fila del título y
+   la etiqueta bajó al subtítulo. No las repongas sin volver a medir la banda —
+   costaban 52 px de los 70 que se recuperaron. */
 
 /* ═══ BARRA INFERIOR ════════════════════════════════════════════════════════
    ⚠️ ES LA ÚNICA PUERTA PARA CREAR EN MÓVIL. Las vistas de lista no disparan
@@ -1951,10 +1992,16 @@ body {
    envoltorio propio, el `::after` se queda fuera y no estorba — y de paso los
    dos `float` nativos no llegan a nada, porque esta cabecera no emite
    `.fc-list-day-text` ni `.fc-list-day-side-text`. */
+/* ⚠️ LOS DOS `min-width: 0` DE ABAJO SON DEL PASO 8c. La cabecera vive en un
+   `<th colspan="3">`, o sea que también participa en el cálculo de anchos de la
+   tabla; sin ellos, sus dos textos —que no envuelven— aportaban su ancho entero
+   al mínimo de contenido, igual que hacían los nombres. Con el suelo a cero, el
+   que sobre encoge y elipsa en vez de empujar la tabla. */
 .agenda-fc .ag-listahead {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  min-width: 0;
   /* Lo ÚNICO que no está en el mockup. Allí no hace falta porque dibuja un
      teléfono de 390 px con textos cortos; con «19 de agosto de 2026» y
      «miércoles» a 320 px los dos extremos llegan a tocarse, y `space-between`
@@ -1962,6 +2009,10 @@ body {
   gap: 12px;
 }
 .agenda-fc .ag-listahead-fecha {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 14px;
   font-weight: 700;
   /* La marca COMO TINTA, que es el papel exacto de este token; ver su nota. En
@@ -1971,7 +2022,12 @@ body {
      6.28:1 en oscuro. */
   color: var(--ag-brand-legible);
 }
+/* `flex: none` para que el día de la semana NUNCA sea el que se recorta: si algo
+   tiene que ceder es la fecha de la izquierda, que es más larga y más adivinable.
+   Era justo al revés de lo que pasaba —salía «mié…», «j…»— porque los dos
+   crecían y quien se salía de la pantalla era éste. */
 .agenda-fc .ag-listahead-dow {
+  flex: none;
   font-size: 13.5px;
   font-weight: 600;
   /* ⚠️ `--ag-ink-600` Y NO `--ag-muted`, QUE ES EL GRIS QUE PARECE TOCAR AQUÍ.
@@ -2123,15 +2179,39 @@ body {
   gap: 6px;
   min-width: 0;
 }
+/* ⚠️⚠️ AQUÍ HUBO `white-space: nowrap` CON ELIPSIS Y ERA LA CAUSA DE QUE LA LISTA
+   SE SALIERA POR LA DERECHA EN UN TELÉFONO. No es que la elipsis fallara: es que
+   NUNCA LLEGABA A DISPARARSE.
+
+   El motivo está en cómo se mide una tabla. `.fc-list-table` va con maquetación
+   AUTOMÁTICA —la librería no le pone `table-layout: fixed`—, y ahí el ancho
+   mínimo de una columna es el ancho MÍNIMO DE CONTENIDO de sus celdas. Para un
+   texto con `nowrap` ese mínimo es el TEXTO ENTERO: no hay punto por donde
+   partir. Así que un paciente de nombre largo no producía una elipsis, producía
+   una columna más ancha; la tabla pasaba del 100 % de su contenedor, el harness
+   la seguía (no tenía `min-width: 0`, ver su nota) y el calendario entero se iba
+   a la derecha. Lo que se veía cortado era la palabra de la derecha de la
+   cabecera de día, que es lo último de cada fila.
+   `text-overflow: ellipsis` es INERTE en ese escenario, y por eso el defecto no
+   se parecía a un problema de texto.
+
+   AHORA ENVUELVE. El mínimo de contenido pasa a ser la palabra más larga —unos
+   100 px— y la tabla cabe siempre. Un nombre largo ocupa dos líneas en vez de
+   una con «…», que en una fila de lista se lee mejor: se ve el nombre entero.
+   ⚠️ `overflow-wrap: anywhere` ES EL SUELO DEL SUELO: cubre el caso de un token
+   único sin espacios más ancho que la columna, donde «la palabra más larga» sigue
+   siendo demasiado. Sin él ese caso reabre el desbordamiento.
+   ⚠️ NO REPONGAS EL `nowrap` «para que se vea como el mockup». El mockup no tiene
+   ningún nombre que no quepa; el problema aparece con datos reales. Si algún día
+   hace falta la elipsis de verdad, la vía es `table-layout: fixed` con anchos
+   declarados en el `<thead>` que la librería monta, no volver aquí. */
 .agenda-fc .ag-listafila-nombre {
   min-width: 0;
   flex: 1;
   font-size: 15.5px;
   font-weight: 600;
   color: var(--ag-ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 /* ⚠️ EL TACHADO ES SÓLO DE «CANCELADA», y «No asistió» NO lo lleva: la cita sí
    ocurrió en la agenda, el paciente no llegó. La rama que lo decide está en

@@ -3400,7 +3400,23 @@ function CabeceraDiaLista({ date, esHoy, conAnio }: {
    «Gestión de citas clínicas», que en 390 px no cabe con nada más.
 
    ⚠️ EL HAMBURGUESA ABRE EL MENÚ DE VERDAD, vía `MenuMovilContext`. El botón
-   flotante del `Sidebar` se esconde en esta ruta para que no salgan dos. */
+   flotante del `Sidebar` se esconde en esta ruta para que no salgan dos.
+
+   ⚠️⚠️ TRES FILAS, Y LA CUARTA SE FUNDIÓ EN LA PRIMERA (paso 8c). La navegación
+   de fecha tenía fila propia y la banda medía 240 px — que son EXACTAMENTE los
+   del mockup, no un crecimiento nuestro: su `.appbar` suma 20 de relleno + 184
+   de cuatro filas + 36 de huecos. En un Android real eso dejaba tres o cuatro
+   citas a la vista, así que hubo que bajar por debajo de lo dibujado.
+   Lo que se hizo, sin perder un control ni bajar un objetivo táctil de 44:
+     · las dos flechas suben a la fila del título, pegadas al subtítulo;
+     · la ETIQUETA DE FECHA baja a ese subtítulo, junto al conteo — son las dos
+       cosas que dicen «qué estás mirando», y juntas se leen incluso mejor;
+     · la pista del conmutador pierde sus 4+4 de relleno (52 → 44);
+     · relleno y huecos bajan de 20/12 a 18/8.
+   Resultado: 114 px sin fila de filtro y 166 con ella, contra 184 y 240.
+   ⚠️ LAS FLECHAS VAN JUNTO AL SUBTÍTULO Y NO JUNTO AL CONMUTADOR, y no es
+   estética: pegadas a las tres pestañas se leerían como «cambia de vista», que
+   es lo que NO hacen. Al lado de la fecha se lee lo que son. */
 /* La tercera fila de la banda: filtro de médico y engrane de horario.
 
    ⚠️ ES UN COMPONENTE APARTE POR TAMAÑO, NO POR REUTILIZACIÓN — sólo lo usa la
@@ -3461,8 +3477,14 @@ function BandaMovil(
         </button>
         <span className="ag-banda-movil-titulo">
           <b>Agenda</b>
-          {conteo && <span>{conteo}</span>}
+          <span>{conteo ? `${titulo} · ${conteo}` : titulo}</span>
         </span>
+        <button type="button" className="ag-banda-movil-ctrl" onClick={onPrev} aria-label="Periodo anterior">
+          <ChevronLeft size={20} />
+        </button>
+        <button type="button" className="ag-banda-movil-ctrl" onClick={onNext} aria-label="Periodo siguiente">
+          <ChevronRight size={20} />
+        </button>
       </div>
       <div className="ag-banda-movil-vistas" role="tablist" aria-label="Vista del calendario">
         {VIEWS.map(v => {
@@ -3480,15 +3502,6 @@ function BandaMovil(
         medicos={medicos} filtroMedico={filtroMedico}
         onFiltroMedico={onFiltroMedico} onHorario={onHorario}
       />
-      <div className="ag-banda-movil-fecha">
-        <button type="button" className="ag-banda-movil-ctrl" onClick={onPrev} aria-label="Anterior">
-          <ChevronLeft size={20} />
-        </button>
-        <span className="ag-banda-movil-etiqueta">{titulo}</span>
-        <button type="button" className="ag-banda-movil-ctrl" onClick={onNext} aria-label="Siguiente">
-          <ChevronRight size={20} />
-        </button>
-      </div>
     </header>
   )
 }
