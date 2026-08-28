@@ -1553,11 +1553,85 @@ function AppointmentModal({
     setDeleting(false)
   }
 
+  /* ── EL ÁREA QUE DE VERDAD SE VE ────────────────────────────────────────
+     ⚠️⚠️ ESTO ES LO QUE SACA AL PIE DE DEBAJO DEL TECLADO. NO LO QUITES SIN
+     LEER LOS DOS PÁRRAFOS.
+
+     El proyecto NO declara `viewport` en `src/app/layout.tsx`, así que Next
+     emite el meta por defecto y NO va `interactive-widget`. El default de Chrome
+     en Android es `resizes-visual`: al abrir el teclado, el viewport de LAYOUT
+     no encoge. Un `position: fixed; inset: 0` conserva entonces todo su alto y
+     el teclado se limita a taparle la parte de abajo — que es justo donde está
+     el pie con «Guardar». Y el teclado se abre SOLO al crear una cita (ver el
+     `autoFocus` del buscador de paciente), así que el pie nacía tapado.
+
+     `visualViewport` sí describe el área visible de verdad: encoge con el
+     teclado y se desplaza con el zoom de pellizco. Fijando el envoltorio a ese
+     rectángulo, el modal vive siempre dentro de lo que se ve, y con el pie
+     anclado abajo (`h-full` en móvil) «Guardar» queda por encima del teclado.
+     La alternativa era `interactive-widget=resizes-content` en el meta, que es
+     un archivo global y otra decisión; ésta se resuelve aquí dentro.
+
+     ⚠️ EN ESCRITORIO ES UN NO-OP: allí `visualViewport.height` vale lo mismo que
+     `innerHeight` y `offsetTop` es 0, así que el envoltorio queda como estaba.
+
+     ⚠️ EL VALOR INICIAL VA EN EL INICIALIZADOR PEREZOSO Y NO EN EL EFECTO, y no
+     es estilo: `setState` síncrono dentro del cuerpo de un efecto es un error de
+     `react-hooks/set-state-in-effect`. Aquí el efecto sólo SUSCRIBE; quien
+     escribe estado es el manejador del evento, que sí está permitido.
+     El `typeof window` es por el render de servidor: este componente se evalúa
+     allí aunque su `Portal` no pinte nada hasta montar. */
+  const [areaVisible, setAreaVisible] = useState<{ alto: number; desde: number } | null>(
+    () => {
+      const vv = typeof window === 'undefined' ? null : window.visualViewport
+      return vv ? { alto: vv.height, desde: vv.offsetTop } : null
+    },
+  )
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    /* Guarda de igualdad, como el resto de esta página: `scroll` de
+       `visualViewport` se emite en ráfaga al arrastrar y sin esto serían decenas
+       de renders del formulario entero por gesto. */
+    const medir = () => setAreaVisible(prev => (
+      prev && prev.alto === vv.height && prev.desde === vv.offsetTop
+        ? prev
+        : { alto: vv.height, desde: vv.offsetTop }
+    ))
+    vv.addEventListener('resize', medir)
+    vv.addEventListener('scroll', medir)
+    return () => {
+      vv.removeEventListener('resize', medir)
+      vv.removeEventListener('scroll', medir)
+    }
+  }, [])
+
   return (
     <Portal>
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+    {/* ⚠️ `top` Y `height` EN LÍNEA GANAN AL `inset-0`, y el `bottom: 0` que
+        queda sobra sin estorbar: con alto definido, la posición vertical queda
+        sobre-restringida y `bottom` es la declaración que se ignora. */}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-6 max-md:p-0"
+      style={areaVisible ? { top: areaVisible.desde, height: areaVisible.alto } : undefined}
+    >
       <div className="absolute inset-0 backdrop-blur-sm" style={{ background: 'var(--ag-modal-overlay)' }} onClick={onClose} />
-      <div className="relative rounded-[22px] w-full max-w-[480px] max-h-[92vh] flex flex-col animate-modal-enter overflow-hidden"
+      {/* ── PANTALLA COMPLETA POR DEBAJO DE `md`, VENTANA DE AHÍ PARA ARRIBA ──
+          Es el mismo trato que `ModalShell` da a sus modales con
+          `fullscreenMobile` (`ModalShell.tsx:117`), o sea el patrón de la casa y
+          no uno nuevo. Compra las dos cosas que aquí escaseaban: ANCHO —los 48 px
+          del relleno del envoltorio vuelven a la fila del pie— y ALTO, que es lo
+          que el teclado se come.
+
+          ⚠️ `md:max-h-[92dvh]` Y NO `92vh`. `vh` es el viewport GRANDE, el de la
+          barra de URL escondida, así que con la barra a la vista un panel de 92vh
+          se sale por abajo y lo que se sale es el pie. Es el mismo fallo que ya
+          se corrigió en la raíz de la agenda —ver la nota del `dvh` junto a
+          `.agenda-raiz`— y del que este modal se había quedado fuera.
+          ⚠️ Y EN MÓVIL NO ES `h-dvh` SINO `h-full`: el alto lo manda el
+          envoltorio, que sigue al `visualViewport`. `dvh` no encoge con el
+          teclado; el envoltorio sí. */}
+      <div className="relative rounded-[22px] max-md:rounded-none w-full max-w-[480px] max-md:max-w-full md:max-h-[92dvh] max-md:h-full flex flex-col animate-modal-enter overflow-hidden"
         style={{ background: 'var(--ag-modal-bg)', boxShadow: '0 30px 80px rgba(16, 32, 64, .28)' }}>
 
         {/* Header */}
@@ -1573,14 +1647,22 @@ function AppointmentModal({
           {canVerExpediente && paciente && (
             <Link
               href={`/expediente/${paciente.id}`}
-              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)]"
+              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 max-md:py-3 rounded-xl text-sm font-bold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)]"
               style={{ color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}
             >
               <FileText size={14} />
               Expediente
             </Link>
           )}
-          <button onClick={onClose} className={`${canVerExpediente && paciente ? '' : 'ml-auto'} p-1 transition-opacity hover:opacity-70`} style={{ color: 'var(--ag-muted2)' }}>
+          {/* ⚠️ `p-3` EN MÓVIL: con `p-1` la caja medía 28 px, la más pequeña del
+              modal, y encima está en la esquina superior derecha, que es la peor
+              alcanzable con el pulgar. 12 + 20 + 12 = 44. No se mueve de sitio
+              —eso es rediseño y no toca hoy—, pero al menos se puede acertar.
+              `flex-none` para que la fila del encabezado no se la coma cuando el
+              título envuelve. */}
+          <button onClick={onClose} aria-label="Cerrar"
+            className={`${canVerExpediente && paciente ? '' : 'ml-auto'} p-1 transition-opacity hover:opacity-70 max-md:p-3 max-md:flex-none`}
+            style={{ color: 'var(--ag-muted2)' }}>
             <X size={20} />
           </button>
         </div>
@@ -1678,7 +1760,7 @@ function AppointmentModal({
                   value={titulo}
                   onChange={e => setTitulo(e.target.value)}
                   placeholder="Cirugía Sr. Pérez, Junta de personal, Bloqueo…"
-                  className="w-full px-3 py-2.5 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
+                  className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
                 />
                 {/* ⚠️ ESTE TEXTO NO ES DE RELLENO. El título viaja TAL CUAL al
                     calendario de Google —sin filtro y sin forma de sanearlo, que
@@ -1708,7 +1790,7 @@ function AppointmentModal({
                         title={ICONO_ETIQUETA[key]}
                         aria-label={ICONO_ETIQUETA[key]}
                         aria-pressed={on}
-                        className="w-10 h-10 rounded-xl flex items-center justify-center transition-all"
+                        className="w-10 h-10 max-md:w-11 max-md:h-11 rounded-xl flex items-center justify-center transition-all"
                         style={on
                           ? { background: 'var(--ag-modal-icon-bg)', color: 'var(--ag-brand-primary)', border: '1.5px solid var(--ag-brand-primary)' }
                           : { background: 'var(--ag-input-bg)', color: 'var(--ag-muted)', border: '1.5px solid var(--ag-input-border)' }}
@@ -1734,7 +1816,7 @@ function AppointmentModal({
                         title={COLOR_ETIQUETA[key]}
                         aria-label={COLOR_ETIQUETA[key]}
                         aria-pressed={on}
-                        className="w-10 h-10 rounded-xl flex items-center justify-center transition-all"
+                        className="w-10 h-10 max-md:w-11 max-md:h-11 rounded-xl flex items-center justify-center transition-all"
                         style={{
                           background: `color-mix(in srgb, var(--ag-evento-${key}) 14%, var(--ag-input-bg))`,
                           border: on
@@ -1789,7 +1871,13 @@ function AppointmentModal({
                     else { setPaciente(null); setSearch('') }
                   }}
                   aria-label={isEdit ? 'Quitar paciente y eliminar la cita' : 'Quitar paciente'}
-                  className="transition-opacity hover:opacity-70"
+                  /* ⚠️ ERA EL CONTROL MÁS PEQUEÑO DEL MODAL Y EL MÁS PELIGROSO:
+                     14 × 14 px sin relleno, y en EDICIÓN no vacía un campo sino
+                     que abre la confirmación que borra la cita entera. Un
+                     objetivo de 14 px para eso, en un teléfono y pegado a la
+                     tarjeta del paciente, es donde se falla el dedo. Caja fija
+                     de 44 en móvil; el aspa sigue midiendo 14. */
+                  className="transition-opacity hover:opacity-70 max-md:w-11 max-md:h-11 max-md:flex-none max-md:flex max-md:items-center max-md:justify-center"
                   style={{ color: 'var(--ag-muted)' }}
                 >
                   <X size={14} />
@@ -1803,10 +1891,23 @@ function AppointmentModal({
                   onChange={e => { setSearch(e.target.value); setShowSearch(true) }}
                   onFocus={() => setShowSearch(true)}
                   placeholder="Buscar paciente por nombre o apellido..."
-                  className="w-full px-3 py-2.5 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
+                  className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
                 />
+                {/* ⚠️ ALTO MÁXIMO Y SCROLL PROPIO. Esta lista es `absolute` DENTRO
+                    del cuerpo del modal, que es `overflow-y: auto`: todo lo que
+                    sobresalga se recorta, y la consulta trae hasta OCHO
+                    resultados de ~56 px más la fila de «Registrar…», o sea unos
+                    500 px de desplegable. En un teléfono eso se cortaba por
+                    abajo y no había forma de llegar a los últimos.
+                    Los 280 son cinco filas: el corte se ve —la quinta queda a
+                    medias— así que se lee como «hay más» y no como el final.
+                    `overscroll-contain` para que al llegar al tope no se
+                    arrastre el formulario de detrás.
+                    `overflow-y-auto` sustituye al `overflow-hidden` que había y
+                    sigue recortando en las esquinas: basta un eje no visible
+                    para que el redondeo recorte. */}
                 {showDropdown && (
-                  <div className="absolute z-10 top-full mt-1 w-full rounded-xl border shadow-lg overflow-hidden"
+                  <div className="absolute z-10 top-full mt-1 w-full rounded-xl border shadow-lg overflow-y-auto overscroll-contain max-h-[280px]"
                     style={{ background: 'var(--ag-modal-bg)', borderColor: 'var(--ag-input-border)' }}>
                     {searchLoading && <div className="px-3 py-2.5 text-xs" style={{ color: 'var(--ag-muted)' }}>Buscando...</div>}
                     {results.map(p => (
@@ -1866,7 +1967,15 @@ function AppointmentModal({
                 disabled={todoElDiaFijo}
                 title={todoElDiaFijo ? 'Se abrió desde la banda de todo el día, donde sólo se crean eventos de todo el día.' : undefined}
                 onClick={() => alternarTodoElDia(!todoElDia)}
-                className="relative w-10 h-6 rounded-full transition-colors flex-shrink-0"
+                /* ⚠️ EL ÁREA TÁCTIL SE AGRANDA CON UN `::after`, NO CON LA PISTA.
+                   La pista mide 40 × 24 y es lo que el diseño dibuja; subirla a
+                   44 la convertiría en otra cosa. El pseudo-elemento estira la
+                   zona sensible a 48 × 44 sin mover un píxel de lo que se ve, y
+                   sin empujar la fila: va posicionado dentro del botón, que ya
+                   es `relative`. Era el control más pequeño del modal —24 px de
+                   alto— y el único que ni siquiera llegaba a la mitad del
+                   mínimo. */
+                className="relative w-10 h-6 rounded-full transition-colors flex-shrink-0 max-md:after:absolute max-md:after:-inset-y-2.5 max-md:after:-inset-x-1 max-md:after:content-['']"
                 style={{
                   background: todoElDia ? 'var(--ag-brand-primary)' : 'var(--ag-input-border)',
                   ...(todoElDiaFijo ? { opacity: .55, cursor: 'not-allowed' } : {}),
@@ -1919,7 +2028,7 @@ function AppointmentModal({
                 type="date"
                 value={fecha}
                 onChange={e => todoElDia ? moverFechaDeTodoElDia(e.target.value) : moverInicio(e.target.value, hora)}
-                className="w-full px-3 py-2.5 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
+                className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
               />
             </div>
             {!todoElDia && (
@@ -1932,7 +2041,7 @@ function AppointmentModal({
                   value={hora}
                   step={900}
                   onChange={e => moverInicio(fecha, e.target.value)}
-                  className="w-full px-3 py-2.5 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
+                  className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
                 />
               </div>
             )}
@@ -1944,7 +2053,7 @@ function AppointmentModal({
                 type="date"
                 value={fechaFin}
                 onChange={e => setFechaFin(e.target.value)}
-                className="w-full px-3 py-2.5 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
+                className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
               />
             </div>
             {!todoElDia && (
@@ -1957,7 +2066,7 @@ function AppointmentModal({
                   value={horaFin}
                   step={900}
                   onChange={e => setHoraFin(e.target.value)}
-                  className="w-full px-3 py-2.5 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
+                  className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all"
                 />
               </div>
             )}
@@ -1985,7 +2094,7 @@ function AppointmentModal({
               <div className="flex flex-wrap gap-2">
                 {DURATIONS.map(d => (
                   <button key={d.value} type="button" onClick={() => escribirFinConChip(d.value)}
-                    className={`px-4 py-2 rounded-full text-[13px] font-bold border transition-all ${duracionElegida === d.value ? 'text-white' : ''}`}
+                    className={`px-4 py-2 max-md:py-3 rounded-full text-[13px] font-bold border transition-all ${duracionElegida === d.value ? 'text-white' : ''}`}
                     style={duracionElegida === d.value
                       ? { background: 'var(--ag-brand-primary)', borderColor: 'var(--ag-brand-primary)' }
                       : { background: 'var(--ag-input-bg)', color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}
@@ -2041,7 +2150,7 @@ function AppointmentModal({
                   value={medicoId}
                   onChange={e => setMedicoId(e.target.value)}
                   required={medicoDropdownRequired}
-                  className="w-full pl-3 pr-9 py-2.5 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all appearance-none cursor-pointer"
+                  className="w-full pl-3 pr-9 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all appearance-none cursor-pointer"
                 >
                   {!medicoDropdownRequired && <option value="">Sin asignar</option>}
                   {medicos.map(m => (
@@ -2064,7 +2173,7 @@ function AppointmentModal({
                 onChange={e => setConsultorioId(e.target.value)}
                 required
                 disabled={consultoriosList.length === 0}
-                className="w-full pl-3 pr-9 py-2.5 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full pl-3 pr-9 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {consultoriosList.length === 0 ? (
                   <option value="">Sin consultorios disponibles</option>
@@ -2089,7 +2198,7 @@ function AppointmentModal({
             <textarea value={notes} onChange={e => setNotes(e.target.value)}
               placeholder="Instrucciones, observaciones..."
               rows={3}
-              className="w-full px-3 py-2.5 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all resize-none"
+              className="w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] transition-all resize-none"
             />
           </div>
 
@@ -2146,7 +2255,7 @@ function AppointmentModal({
               aria-label={deleting
                 ? (esEvento ? 'Eliminando evento' : 'Eliminando cita')
                 : (esEvento ? 'Eliminar evento'   : 'Eliminar cita')}
-              className="flex items-center justify-center p-2.5 rounded-xl text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+              className="flex items-center justify-center p-2.5 rounded-xl text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 max-md:w-11 max-md:h-11 max-md:p-0 max-md:flex-none"
             >
               {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
             </button>
@@ -2158,20 +2267,47 @@ function AppointmentModal({
                 cambiarActivo(citaConsultorio!)
                 onClose()
               }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)]"
+              /* ⚠️ EN MÓVIL SE QUEDA EN EL ICONO, y las dos etiquetas que CIERRAN
+                 el modal no. Es la única de las cuatro que puede ceder su
+                 rótulo: lleva al expediente, o sea navegación, y ni guarda ni
+                 descarta nada. Un icono sin etiqueta en «Cancelar» o «Guardar»
+                 invita al error sobre datos clínicos; aquí, a un paseo de más.
+                 El nombre no se pierde para quien no ve el icono: va en
+                 `aria-label` y en `title`, los dos en las dos anchuras. */
+              aria-label="Iniciar consulta"
+              title="Iniciar consulta"
+              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)] max-md:w-11 max-md:h-11 max-md:px-0 max-md:py-0 max-md:flex-none"
               style={{ color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}
             >
               <Stethoscope size={15} />
-              Iniciar consulta
+              <span className="max-md:hidden">Iniciar consulta</span>
             </Link>
           )}
-          <div className="flex items-center gap-2 ml-auto">
-            <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-bold transition-colors hover:bg-[var(--ag-btn-ghost-hover)]" style={{ color: 'var(--ag-muted)' }}>
+          {/* ── LAS DOS QUE CIERRAN EL MODAL ────────────────────────────────
+              En móvil se reparten TODO el ancho que dejan los dos iconos
+              (`flex-1`), que es lo que las saca de los ~36-40 px de alto y las
+              pone al alcance del pulgar. En escritorio siguen alineadas a la
+              derecha con su tamaño de siempre: el `ml-auto` sólo se apaga por
+              debajo de `md`. */}
+          <div className="flex items-center gap-2 ml-auto max-md:ml-0 max-md:flex-1 max-md:min-w-0">
+            <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-bold transition-colors hover:bg-[var(--ag-btn-ghost-hover)] max-md:flex-1 max-md:min-w-0 max-md:h-11 max-md:px-2" style={{ color: 'var(--ag-muted)' }}>
               Cancelar
             </button>
+            {/* ⚠️ GUARDANDO ES UN GIRADOR Y YA NO «Guardando...», Y NO ES UN
+                CAPRICHO. Ese texto mide ~30 px más que «Guardar», así que al
+                pulsar ensanchaba el botón — y con `flex-1` y `min-width: auto`
+                un ítem de flex no encoge por debajo de su contenido mínimo, o
+                sea que el reparto del pie se rompía justo al guardar, que es el
+                peor momento. Con el girador el ancho mínimo del botón es
+                siempre el de «Guardar».
+                Es además lo que ya hace su vecina la papelera cuatro líneas más
+                arriba, así que el pie no estrena dos formas de decir «estoy
+                trabajando». El estado lo dicen también el `disabled` y el
+                `aria-label`. */}
             <button onClick={handleSave} disabled={saving || faltaLoEsencial || faltanPuntas || finAntesDelInicio || !consultorioId}
-              className="px-5 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 transition-all hover:brightness-95 shadow-sm bg-[linear-gradient(135deg,var(--ag-brand-primary),var(--ag-brand-secondary))]">
-              {saving ? 'Guardando...' : 'Guardar'}
+              aria-label={saving ? 'Guardando' : undefined}
+              className="flex items-center justify-center px-5 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 transition-all hover:brightness-95 shadow-sm bg-[linear-gradient(135deg,var(--ag-brand-primary),var(--ag-brand-secondary))] max-md:flex-1 max-md:min-w-0 max-md:h-11 max-md:px-2">
+              {saving ? <Loader2 size={16} className="animate-spin" /> : 'Guardar'}
             </button>
           </div>
         </div>
