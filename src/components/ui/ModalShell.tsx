@@ -1,8 +1,38 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useId, useRef } from 'react'
 import { X } from 'lucide-react'
 import Portal from '@/components/ui/Portal'
+
+/* ═══ ACCESIBILIDAD DEL DIÁLOGO (bloque 9 de la agenda) ═══════════════════════
+   Lo que le faltaba a este componente: rol de diálogo, nombre accesible, foco
+   inicial, foco ATRAPADO y devolución del foco al cerrar. El Escape y el bloqueo
+   del scroll ya estaban.
+
+   ⚠️ ESTA MISMA LÓGICA ESTÁ ESCRITA OTRAS DOS VECES —en `agenda/page.tsx`, como
+   el hook `useDialogoModal` que comparten sus tres modales, y en
+   `agenda/ModalInvitacionCita.tsx`—. Son TRES COPIAS Y SE SABE. Aquellos cuatro
+   modales NO usan este componente: montan su propio portal porque su geometría
+   (pantalla completa, seguimiento del `visualViewport`, áreas seguras) no cabe
+   aquí, y unificarlos era arriesgar una ronda de trabajo que ya está hecha.
+   Si tocas el trapo del foco, tócalo en las tres. */
+
+/* Lo que puede recibir foco dentro de un panel, en orden de DOM. Sin `details`
+   ni `iframe` ni `audio/video[controls]`: no hay ninguno en los 26 consumidores,
+   y una lista corta que se entiende vale más que una exhaustiva que no. */
+const SELECTOR_FOCO =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), ' +
+  'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+/* ⚠️ EL FILTRO DE VISIBILIDAD NO ES `offsetParent !== null`, y es el error
+   clásico: `offsetParent` vale null también para cualquier ancestro
+   `position: fixed`, o sea para TODO panel montado en un portal fijo — con esa
+   comprobación la lista salía vacía siempre y el trapo no atrapaba nada.
+   Medir caja sí funciona: un `display: none` mide 0×0 y lo demás no. */
+function focusablesDe(raiz: HTMLElement): HTMLElement[] {
+  return Array.from(raiz.querySelectorAll<HTMLElement>(SELECTOR_FOCO))
+    .filter(el => el.offsetWidth > 0 || el.offsetHeight > 0)
+}
 
 // Counter global para manejar body scroll lock con modales anidados.
 // Solo el primero en abrir hace el lock; solo el último en cerrar lo libera.
@@ -68,6 +98,33 @@ export default function ModalShell({
   const onCloseRef = useRef(onClose)
   useEffect(() => { onCloseRef.current = onClose }, [onClose])
 
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  /* Callback ref: React lo llama con el nodo justo cuando el portal lo monta, que
+     es lo que un efecto con deps `[open]` se pierde. Ver el aviso del efecto.
+     ⚠️ `useCallback` CON DEPS `[]` ES OBLIGATORIO: con identidad nueva en cada
+     render React lo llamaría con `null` y con el nodo EN CADA RENDER, y el panel
+     robaría el foco en cada tecla que se escriba dentro del modal.
+     Foco en el PANEL y no en su primer control a propósito: ése suele ser la ✕,
+     así que enfocarlo pondría «Cerrar» como lo primero que se oye de un diálogo
+     recién abierto. Desde el panel, el lector lee el nombre y el Tab siguiente ya
+     entra en el contenido. `preventScroll` porque el panel puede estar bajo el
+     pliegue mientras entra su animación. */
+  const montarPanel = useCallback((node: HTMLDivElement | null) => {
+    panelRef.current = node
+    /* ⚠️ SÓLO SI EL FOCO NO ESTÁ YA DENTRO. Varios de los 26 consumidores llevan
+       `autoFocus` en su primer campo, y React lo aplica ANTES de atar el ref del
+       padre —la fase de layout va de dentro hacia fuera—, así que un `focus()` a
+       secas se lo comería y el cursor saldría del campo. Que el foco caiga en un
+       control de dentro no estropea el anuncio: con `role="dialog"`, `aria-modal`
+       y el nombre puestos, un lector nombra el diálogo al entrar en él. */
+    if (node && !node.contains(document.activeElement)) node.focus({ preventScroll: true })
+  }, [])
+  /* Id del <h2> de la cabecera, para `aria-labelledby`. `useId` y no una
+     constante: con dos modales abiertos a la vez —que es un caso real, de ahí el
+     `modalStack`— dos ids iguales dejarían el nombre del diálogo interno
+     apuntando al título del externo. */
+  const tituloId = useId()
+
   useEffect(() => {
     if (!open) return
 
@@ -78,10 +135,44 @@ export default function ModalShell({
       document.body.style.overflow = 'hidden'
     }
 
+    /* Quién tenía el foco antes de abrir. Se guarda ANTES de moverlo, y se le
+       devuelve al cerrar: sin esto, cerrar un modal manda el foco al <body> y
+       quien navega con teclado vuelve a empezar desde arriba de la página. */
+    const previo = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    /* ⚠️ EL FOCO INICIAL NO PUEDE IR AQUÍ, Y AQUÍ ESTUVO SIN HACER NADA. `Portal`
+       devuelve `null` en su primer render —monta a sus hijos en el segundo—, así
+       que cuando este efecto corre EL PANEL NO EXISTE TODAVÍA EN EL DOM y
+       `panelRef.current` vale `null`: el `focus()` era un no-op silencioso. Lo
+       hace ahora `montarPanel`, el callback ref, al que React llama con el nodo
+       en el commit en que aparece.
+       LO DEMÁS DE ESTE EFECTO SÍ FUNCIONABA y no se toca: el Escape y el trapo
+       cuelgan de `document` y leen `panelRef.current` EN EL MOMENTO DE LA TECLA,
+       cuando ya está puesto; y `previo` se captura bien porque aquí el foco
+       todavía no se ha movido —el callback ref corre después—. */
+
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
-      // Solo el modal más interno responde al Escape
-      if (modalStack === myDepth) onCloseRef.current()
+      // Solo el modal más interno responde, igual que hacía ya el Escape.
+      if (modalStack !== myDepth) return
+      if (e.key === 'Escape') { onCloseRef.current(); return }
+      if (e.key !== 'Tab') return
+
+      const panel = panelRef.current
+      if (!panel) return
+      const focos = focusablesDe(panel)
+      /* Un panel sin nada enfocable —una confirmación de sólo texto— devuelve el
+         foco a sí mismo en vez de dejarlo salir al documento de detrás. */
+      if (focos.length === 0) { e.preventDefault(); panel.focus({ preventScroll: true }); return }
+
+      const primero = focos[0]
+      const ultimo  = focos[focos.length - 1]
+      const activo  = document.activeElement
+      /* La rama `!panel.contains(activo)` es la que cubre el estado inicial, con
+         el foco en el propio panel: sin ella el primer Tab se iba al documento. */
+      if (e.shiftKey && (activo === primero || !panel.contains(activo))) {
+        e.preventDefault(); ultimo.focus()
+      } else if (!e.shiftKey && (activo === ultimo || !panel.contains(activo))) {
+        e.preventDefault(); primero.focus()
+      }
     }
     document.addEventListener('keydown', onKey)
 
@@ -91,6 +182,7 @@ export default function ModalShell({
       if (modalStack === 0) {
         document.body.style.overflow = prevBodyOverflow
       }
+      previo?.focus({ preventScroll: true })
     }
   }, [open])
 
@@ -131,8 +223,29 @@ export default function ModalShell({
             el manifiesto fija `portrait-primary`.
             ⚠️ LA OTRA RAMA NO SE TOCA. Sin `fullscreenMobile` el modal se centra
             con `p-4` y `max-h-[85vh]`, o sea que no toca ningún borde. */}
+        {/* ⚠️ EL NOMBRE DEL DIÁLOGO SALE DEL <h2> CUANDO LA CABECERA SE PINTA, Y
+            DEL `title` CUANDO NO. `headerVacio` esconde la cabecera entera en el
+            funnel de nota, y un `aria-labelledby` apuntando a un id que no está
+            en el DOM deja al diálogo SIN NOMBRE — peor que no ponerlo, porque
+            parece puesto. La rama del `aria-label` cubre ese caso; si además el
+            `title` viene vacío, los dos quedan en `undefined` y el diálogo se
+            anuncia sin nombre, que es lo honesto.
+            `tabIndex={-1}` no lo mete en el recorrido del Tab: sólo lo hace
+            enfocable por programa, que es lo que pide el foco inicial. */}
         <div
-          className={`relative ${geo ? 'bg-white' : 'bg-white/95 backdrop-blur-xl'} rounded-2xl shadow-2xl w-full ${maxWidth} max-h-[85vh] flex flex-col animate-modal-enter overflow-hidden${fullscreenMobile ? ' max-md:h-dvh max-md:max-h-dvh max-md:max-w-full max-md:rounded-none max-md:pt-[env(safe-area-inset-top,0px)] max-md:pb-[env(safe-area-inset-bottom,0px)]' : ''}${geo ? ` ${geo.panel} md:rounded-[var(--sp-r-modal)] md:shadow-[var(--sp-shadow-modal)] md:transition-[max-width] md:duration-[240ms] md:ease-[cubic-bezier(.4,0,.2,1)]` : ''}`}
+          ref={montarPanel}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={!headerVacio && title ? tituloId : undefined}
+          aria-label={headerVacio && title ? title : undefined}
+          tabIndex={-1}
+          /* `focus:outline-none` SÍ, y no contradice la regla de «nunca
+             `outline: none` sin reemplazo»: ésa protege a los CONTROLES, y este
+             panel no es uno —no está en el recorrido del Tab y sólo recibe el
+             foco por programa, al abrir—. Sin esto, Chrome dibuja un anillo
+             alrededor del modal entero en cuanto la última interacción fue de
+             teclado. Los controles de dentro conservan el suyo. */
+          className={`relative focus:outline-none ${geo ? 'bg-white' : 'bg-white/95 backdrop-blur-xl'} rounded-2xl shadow-2xl w-full ${maxWidth} max-h-[85vh] flex flex-col animate-modal-enter overflow-hidden${fullscreenMobile ? ' max-md:h-dvh max-md:max-h-dvh max-md:max-w-full max-md:rounded-none max-md:pt-[env(safe-area-inset-top,0px)] max-md:pb-[env(safe-area-inset-bottom,0px)]' : ''}${geo ? ` ${geo.panel} md:rounded-[var(--sp-r-modal)] md:shadow-[var(--sp-shadow-modal)] md:transition-[max-width] md:duration-[240ms] md:ease-[cubic-bezier(.4,0,.2,1)]` : ''}`}
         >
           {!headerVacio && (
           <div className={`flex items-center justify-between px-5 py-4 border-b ${geo ? 'border-[var(--sp-line-divider)] md:px-6' : 'border-slate-100'} flex-shrink-0`}>
@@ -143,7 +256,7 @@ export default function ModalShell({
                 </div>
               )}
               <div className="min-w-0">
-                <h2 className={geo ? 'sp-title-modal truncate' : 'text-sm font-semibold text-[#1d1d1f] truncate'}>{title}</h2>
+                <h2 id={tituloId} className={geo ? 'sp-title-modal truncate' : 'text-sm font-semibold text-[#1d1d1f] truncate'}>{title}</h2>
                 {subtitle && <p className={geo ? 'sp-sub-modal truncate' : 'text-[11px] text-[#86868b] truncate'}>{subtitle}</p>}
               </div>
             </div>

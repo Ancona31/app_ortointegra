@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback, useMemo, memo, type CSSProperties, type ReactElement } from 'react'
+import { useEffect, useId, useRef, useState, useCallback, useMemo, memo, type CSSProperties, type KeyboardEvent as EventoTeclado, type ReactElement, type ReactNode } from 'react'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -9,7 +9,7 @@ import listPlugin, { type NoEventsContentArg } from '@fullcalendar/list'
 import { EventClickArg, EventDropArg, DateSelectArg, EventInput, EventApi, EventContentArg, DayCellContentArg, DayHeaderContentArg, MoreLinkContentArg, NowIndicatorContentArg, ViewApi } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
 import { X, Calendar, User, Plus, Trash2, Settings, ChevronDown, FileText, Stethoscope, Loader2, Mail,
-         CalendarPlus, ChevronsDownUp, Menu, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react'
+         CalendarPlus, ChevronsDownUp, Menu, ChevronLeft, ChevronRight, TriangleAlert, type LucideIcon } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
@@ -62,6 +62,17 @@ import {
    El otro consumidor de esos mismos tokens es `dashboard/StatusChip.tsx`, que
    sólo pinta `scheduled` y `confirmed` a propósito. */
 type Status = 'scheduled' | 'confirmed' | 'cancelled' | 'no_show' | 'attended'
+
+/* Lo que contesta `/api/google/events` en su campo `estado` (bloque 9).
+   ESPEJA `EstadoGoogle` de `src/lib/gcal.ts:62` y NO se importa de ahí a
+   propósito: ese módulo carga `googleapis`, y aunque un `import type` se borre
+   al compilar, dejaría escrita en un archivo de CLIENTE una ruta a un módulo de
+   servidor — el día que alguien le quite la palabra `type` se arrastra la
+   librería entera al navegador y nadie se entera hasta medir el bundle. Tres
+   literales copiados cuestan menos que ese riesgo.
+   Si el tipo de allá crece, esto no se rompe: quien lo consume compara contra
+   `'error_google'` y cualquier valor nuevo cae del lado silencioso. */
+type EstadoGoogleAgenda = 'conectado' | 'sin_token' | 'error_google'
 
 type Appointment = {
   id: string
@@ -605,6 +616,8 @@ function avisoDiaCerrado(date: Date, h: Horario): string | null {
 /* ─── Modal de configuración de horario ─────────────────── */
 
 function HorarioModal({ onClose, onSave }: { onClose: () => void; onSave: (h: Horario) => Promise<void> }) {
+  const { montarPanel, alPulsarTecla } = useDialogoModal(onClose)
+  const tituloId = useId()
   const [horario, setHorario] = useState<Horario | null>(null)
   const [saving,  setSaving]  = useState(false)
 
@@ -633,14 +646,24 @@ function HorarioModal({ onClose, onSave }: { onClose: () => void; onSave: (h: Ho
     <Portal>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md animate-modal-enter overflow-hidden">
+      {/* Los cinco atributos del bloque 9 son los mismos en los tres modales de
+          este archivo; el porqué de cada uno está junto a `useDialogoModal`. */}
+      <div
+        ref={montarPanel}
+        onKeyDown={alPulsarTecla}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={tituloId}
+        tabIndex={-1}
+        className="relative focus:outline-none bg-white rounded-2xl shadow-2xl w-full max-w-md animate-modal-enter overflow-hidden"
+      >
 
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center">
               <Settings size={15} className="text-slate-600" />
             </div>
-            <h2 className="font-semibold text-[15px] text-[#1d1d1f]">Horario de consulta</h2>
+            <h2 id={tituloId} className="font-semibold text-[15px] text-[#1d1d1f]">Horario de consulta</h2>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
             <X size={18} />
@@ -731,6 +754,150 @@ const DURATIONS = [
 
 const DEFAULT_DURATION = 60
 
+/* ═══ BLOQUE 9 · ACCESIBILIDAD DE LOS TRES MODALES DE ESTE ARCHIVO ═══════════
+   Los modales de la agenda —horario, cita, confirmación— no usan `ModalShell`:
+   montan su propio `<Portal>` porque su geometría (pantalla completa por debajo
+   de `md`, seguimiento del `visualViewport`, áreas seguras) no cabe en aquel
+   componente. Lo que sí les faltaba era todo lo demás: rol de diálogo, foco
+   inicial, foco ATRAPADO, cierre con Escape y devolución del foco al cerrar.
+
+   ⚠️ ES LA TERCERA COPIA DE ESTA LÓGICA. Las otras dos están en
+   `components/ui/ModalShell.tsx` y en `components/agenda/ModalInvitacionCita.tsx`.
+   SE SABE Y ES DELIBERADO: sacarla a `src/hooks/` sería una abstracción
+   compartida nueva, y esa decisión no se toma de paso en un bloque de estados
+   vacíos. Mientras haya tres copias, un arreglo del trapo se aplica a las tres.
+
+   Aquí SÍ es un hook y en los otros dos archivos no, y la razón es aritmética:
+   este archivo tiene TRES modales y aquéllos uno cada uno.
+
+   ⚠️ NO BLOQUEA EL SCROLL DEL BODY, y `ModalShell` sí. Tampoco lo bloqueaba
+   antes: la agenda vive dentro de una raíz en `dvh` que no scrollea, así que
+   detrás del modal no hay nada que se mueva. Añadirlo aquí sería un cambio de
+   comportamiento fuera del alcance de este bloque. */
+const SELECTOR_FOCO_MODAL =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), ' +
+  'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+/* ⚠️ EL FILTRO DE VISIBILIDAD MIDE CAJA Y NO USA `offsetParent`: ése vale null
+   bajo cualquier ancestro `position: fixed`, o sea bajo TODO panel de portal, y
+   con él la lista salía vacía y el trapo no atrapaba nada. */
+function focusablesDelPanel(raiz: HTMLElement): HTMLElement[] {
+  return Array.from(raiz.querySelectorAll<HTMLElement>(SELECTOR_FOCO_MODAL))
+    .filter(el => el.offsetWidth > 0 || el.offsetHeight > 0)
+}
+
+/**
+ * Ata un panel de modal: foco inicial, trapo de Tab, Escape y devolución del
+ * foco. Devuelve el `ref` que va en el panel y el manejador de teclado que hay
+ * que ponerle en `onKeyDown`. LOS DOS, o no funciona nada.
+ *
+ * ⚠️⚠️ NI EL OYENTE NI EL FOCO PUEDEN COLGAR DE UN `useEffect` CON DEPS `[]`, Y
+ * ÉSA FUE LA PRIMERA VERSIÓN, QUE NO FUNCIONABA. El motivo es `Portal`: su
+ * primer render devuelve `null` —monta a sus hijos en el SEGUNDO, cuando su
+ * propio efecto pone `mounted`— así que en el primer commit de este modal EL
+ * PANEL NO EXISTE TODAVÍA EN EL DOM. Un efecto con deps `[]` corre exactamente
+ * ahí, encuentra el ref en `null`, se va por el `return` y NO VUELVE A CORRER
+ * NUNCA: ni oyente, ni foco, ni limpieza. Escape quedaba muerto en los cuatro
+ * modales de la agenda.
+ * Que el efecto de `Portal` corra ANTES que éste —los hijos primero— no salva
+ * nada: `setMounted` agenda un render, no lo commitea de golpe, así que cuando
+ * este efecto se ejecuta el DOM sigue sin el panel.
+ *
+ * Por eso las dos piezas son DECLARATIVAS y no imperativas:
+ *   · el teclado va en un `onKeyDown` del panel, que React cablea sobre el
+ *     elemento sin que a nadie le importe cuándo se montó;
+ *   · el foco va en un CALLBACK REF, al que React llama con el nodo justo cuando
+ *     lo monta, sea el commit que sea.
+ * Sólo queda en un efecto la DEVOLUCIÓN del foco, que es lo único que ocurre al
+ * desmontar y no necesita el nodo.
+ *
+ * ⚠️ SIGUE RESOLVIENDO EL ANIDAMIENTO SIN NINGÚN CONTADOR, y hay que saber por
+ * qué para no romperlo: el modal de la cita y el de invitación se abren A LA VEZ
+ * —`onInvitar` no cierra el de debajo— y viven en archivos distintos, así que el
+ * `modalStack` de `ModalShell` no les serviría. Un `onKeyDown` de React propaga
+ * por el ÁRBOL DE REACT y no por el DOM, y los dos modales son HERMANOS en ese
+ * árbol (dos hijos de `AgendaPage`), no uno dentro del otro: una tecla pulsada
+ * en el de arriba no pasa por el panel del de abajo. Con `document` sí pasaría.
+ *
+ * ⚠️ Y DA IGUAL QUIÉN SE QUEDE EL FOCO INICIAL. El evento burbujea desde
+ * cualquier hijo hasta el panel, así que Escape cierra tanto si el foco está en
+ * el panel como si el `autoFocus` del buscador de paciente se lo llevó a él.
+ * Ésa es la propiedad que la versión con `addEventListener` también tenía, y por
+ * eso el fallo NO era del foco: era que el oyente no llegó a existir. Si algún
+ * día Escape vuelve a fallar, mira si el oyente existe antes de mirar el foco.
+ *
+ * ⚠️ `alCerrar` ENTRA POR REF Y NO POR DEPENDENCIA. Los tres llamadores le pasan
+ * una flecha nueva en cada render; como dependencia, esto se recrearía en cada
+ * tecleo dentro del formulario de la cita.
+ */
+function useDialogoModal(alCerrar: () => void) {
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  const focoPrevioRef = useRef<HTMLElement | null>(null)
+  /* El ref se sincroniza en un EFECTO y no en el cuerpo: escribir `.current`
+     durante el render es lo que prohíbe `react-hooks/refs`. Mismo patrón que
+     `ModalShell` con su `onCloseRef`. */
+  const alCerrarRef = useRef(alCerrar)
+  useEffect(() => { alCerrarRef.current = alCerrar }, [alCerrar])
+
+  /* ⚠️ `useCallback` CON DEPS `[]` NO ES DECORACIÓN AQUÍ, ES OBLIGATORIO. Un
+     callback ref con identidad nueva en cada render hace que React lo llame con
+     `null` y otra vez con el nodo EN CADA RENDER — o sea que el panel robaría el
+     foco cada vez que se teclea una letra en el formulario. */
+  const montarPanel = useCallback((node: HTMLDivElement | null) => {
+    panelRef.current = node
+    /* ⚠️ SÓLO SE ENFOCA EL PANEL SI EL FOCO NO ESTÁ YA DENTRO, Y ESA GUARDA VALE
+       UNA REGRESIÓN. El modal de la cita lleva `autoFocus` en el buscador de
+       paciente, y en el alta ése es EL gesto: se abre y se teclea el nombre.
+       React aplica el `autoFocus` de un hijo ANTES de atar el ref del padre —la
+       fase de layout va de dentro hacia fuera—, así que un `focus()` a secas
+       aquí se lo comía y el cursor salía del campo. No se notó mientras esto
+       vivía en un efecto que nunca corría; en cuanto empezó a correr, sí.
+       Que el foco caiga en un control de dentro NO estropea el anuncio: con
+       `role="dialog"`, `aria-modal` y `aria-labelledby` puestos, un lector de
+       pantalla nombra el diálogo al entrar en él. Y Escape sigue funcionando
+       igual, porque la tecla burbujea desde el campo hasta este panel. */
+    if (node && !node.contains(document.activeElement)) node.focus({ preventScroll: true })
+  }, [])
+
+  /* ⚠️ QUIÉN TENÍA EL FOCO SE APUNTA AQUÍ Y NO EN EL CALLBACK REF, y el orden es
+     el motivo: este efecto corre en el PRIMER commit, cuando el `Portal` todavía
+     no ha montado nada, así que `document.activeElement` sigue siendo el botón
+     que abrió el modal. En el callback ref sería un commit más tarde y el
+     `autoFocus` del buscador ya podría haberse llevado el foco — se apuntaría un
+     campo de dentro del propio modal y al cerrar el foco no volvería a ninguna
+     parte, porque ese campo ya no existe.
+     La limpieza es lo único que hace: al cerrar, el foco vuelve a donde estaba.
+     Sin esto se va al `<body>` y quien navega con teclado empieza otra vez desde
+     arriba de la página. */
+  useEffect(() => {
+    focoPrevioRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    return () => { focoPrevioRef.current?.focus({ preventScroll: true }) }
+  }, [])
+
+  const alPulsarTecla = useCallback((e: EventoTeclado<HTMLDivElement>) => {
+    if (e.key === 'Escape') { alCerrarRef.current(); return }
+    if (e.key !== 'Tab') return
+    const panel = panelRef.current
+    if (!panel) return
+    const focos = focusablesDelPanel(panel)
+    /* Un panel sin nada enfocable —una confirmación de sólo texto— devuelve el
+       foco a sí mismo en vez de dejarlo salir al documento de detrás. */
+    if (focos.length === 0) { e.preventDefault(); panel.focus({ preventScroll: true }); return }
+    const primero = focos[0]
+    const ultimo  = focos[focos.length - 1]
+    const activo  = document.activeElement
+    /* La rama `!panel.contains(activo)` cubre el estado inicial, con el foco en
+       el propio panel: sin ella el primer Tab se iba al documento. */
+    if (e.shiftKey && (activo === primero || !panel.contains(activo))) {
+      e.preventDefault(); ultimo.focus()
+    } else if (!e.shiftKey && (activo === ultimo || !panel.contains(activo))) {
+      e.preventDefault(); primero.focus()
+    }
+  }, [])
+
+  return { montarPanel, alPulsarTecla }
+}
+
 /** Id de la eventSource de citas; ver `eventSourcesStable`. */
 const FUENTE_APPOINTMENTS = 'appointments'
 
@@ -741,6 +908,14 @@ const PREFIJO_OPTIMISTA = 'optimistic-'
 /* Antigüedad a partir de la cual volver a la pestaña sí pide datos otra vez.
    Ver el efecto de `visibilitychange`, que es quien lo justifica. */
 const UMBRAL_REFETCH_FOCO_MS = 120_000
+
+/* Lo que tiene que tardar una traída para que se note que está tardando (§11:
+   «Bajo 150 ms no se muestra nada. Evita el flash»).
+   ⚠️ NO LO BAJES PENSANDO QUE ASÍ SE «RESPONDE ANTES». Lo que hay debajo de este
+   umbral no es una espera, es un parpadeo: la rejilla se atenúa y vuelve antes
+   de que el ojo lo lea como un estado, y encima le cae encima la rampa de
+   opacidad de 180 ms de `--ag-dur-base` (CONTRASTE_Y_MOVIMIENTO §3). */
+const UMBRAL_CARGA_MS = 150
 
 /* Lo que como mucho puede durar un arrastre antes de que el candado de
    `refetch()` se dé por atascado y se suelte solo. NO es la duración de un
@@ -1587,6 +1762,18 @@ function AppointmentModal({
       return vv ? { alto: vv.height, desde: vv.offsetTop } : null
     },
   )
+
+  /* ⚠️ EL FOCO INICIAL DE ESTE MODAL ES EL PANEL, Y NO PISA AL `autoFocus` DEL
+     BUSCADOR DE PACIENTE. Los dos ocurren al montar y gana el ÚLTIMO en correr:
+     `autoFocus` lo aplica React durante el commit, y el `focus()` de
+     `useDialogoModal` va en un efecto, que corre después. O sea que en el alta
+     el foco acaba en el panel y no en el campo de búsqueda.
+     Es lo que se quiere: al abrir, un lector de pantalla anuncia el diálogo y su
+     nombre en vez de soltar al usuario dentro de un campo sin contexto, y el
+     primer Tab ya entra en el formulario. Si algún día se prefiere lo contrario,
+     el sitio es el `focus()` del hook, no un `autoFocus` más. */
+  const { montarPanel, alPulsarTecla } = useDialogoModal(onClose)
+  const tituloId = useId()
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv) return
@@ -1656,7 +1843,20 @@ function AppointmentModal({
           ⚠️ Y EN MÓVIL NO ES `h-dvh` SINO `h-full`: el alto lo manda el
           envoltorio, que sigue al `visualViewport`. `dvh` no encoge con el
           teclado; el envoltorio sí. */}
-      <div className="relative rounded-[22px] max-md:rounded-none w-full max-w-[480px] max-md:max-w-full md:max-h-[92dvh] max-md:h-full flex flex-col animate-modal-enter overflow-hidden"
+      {/* ⚠️ LOS CINCO ATRIBUTOS DEL BLOQUE 9 SE AÑADEN SIN TOCAR UNA SOLA CLASE
+          DE ESTE PANEL. La geometría de aquí —pantalla completa por debajo de
+          `md`, `h-full` atado al `visualViewport` del envoltorio, `92dvh` en
+          escritorio, áreas seguras en la cabecera y en el pie— costó una ronda
+          entera y no se roza: lo único nuevo es el `ref`, el rol, el nombre, el
+          `tabIndex` y un `focus:outline-none`. Ver `useDialogoModal`. */}
+      <div
+        ref={montarPanel}
+        onKeyDown={alPulsarTecla}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={tituloId}
+        tabIndex={-1}
+        className="relative focus:outline-none rounded-[22px] max-md:rounded-none w-full max-w-[480px] max-md:max-w-full md:max-h-[92dvh] max-md:h-full flex flex-col animate-modal-enter overflow-hidden"
         style={{ background: 'var(--ag-modal-bg)', boxShadow: '0 30px 80px rgba(16, 32, 64, .28)' }}>
 
         {/* Header
@@ -1677,7 +1877,7 @@ function AppointmentModal({
           <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'var(--ag-modal-icon-bg)' }}>
             <Calendar size={20} style={{ color: 'var(--ag-brand-primary)' }} />
           </div>
-          <h2 className="text-[18px] font-extrabold" style={{ color: 'var(--ag-ink)' }}>
+          <h2 id={tituloId} className="text-[18px] font-extrabold" style={{ color: 'var(--ag-ink)' }}>
             {esEvento
               ? (isEdit ? 'Editar evento' : 'Nuevo evento')
               : (isEdit ? 'Editar cita'   : 'Nueva cita')}
@@ -2416,12 +2616,27 @@ function ConfirmModal({ message, onConfirm, onCancel }: {
   onConfirm: () => void
   onCancel: () => void
 }) {
+  const { montarPanel, alPulsarTecla } = useDialogoModal(onCancel)
+  const mensajeId = useId()
   return (
     <Portal>
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm animate-modal-enter p-6">
-        <p className="text-sm text-[#1d1d1f] leading-relaxed">{message}</p>
+      {/* ⚠️ `aria-alertdialog` NO: el rol correcto para una confirmación es
+          `alertdialog`, pero exige `aria-describedby` apuntando al mensaje y
+          `role="dialog"` con el mensaje como NOMBRE hace exactamente lo que
+          aquí se necesita —el lector lee la pregunta al abrir— con una pieza
+          menos. El texto es corto y es lo único que hay dentro. */}
+      <div
+        ref={montarPanel}
+        onKeyDown={alPulsarTecla}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={mensajeId}
+        tabIndex={-1}
+        className="relative focus:outline-none bg-white rounded-2xl shadow-2xl w-full max-w-sm animate-modal-enter p-6"
+      >
+        <p id={mensajeId} className="text-sm text-[#1d1d1f] leading-relaxed">{message}</p>
         <div className="flex justify-end gap-2 mt-5">
           <button
             onClick={onCancel}
@@ -4713,6 +4928,84 @@ function renderSinEventos(arg: NoEventsContentArg): string {
   return arg.text
 }
 
+/* ═══ BLOQUE 9 · LAS BANDAS DE AVISO ══════════════════════════════════════
+   Las cuatro bandas que pueden aparecer entre el toolbar y la rejilla. Viven
+   todas dentro de UN envoltorio, `<div class="ag-avisos">`, y ése es el detalle
+   que importa.
+
+   ⚠️⚠️ POR QUÉ UN ENVOLTORIO Y NO UNA FILA NUEVA EN EL GRID. `.agenda-fc`
+   reparte sus piezas con un `grid-template-rows` y un `grid-template-areas` que
+   TIENEN QUE TENER EL MISMO NÚMERO DE FILAS, y descuadrar ese par ya dejó el
+   calendario entero en blanco una vez, sin un solo error, durante dos bloques
+   de trabajo (la historia está escrita al lado de la regla, en globals.css).
+   Añadir tres bandas por la vía de las áreas serían tres filas nuevas en los dos
+   sitios y tres ocasiones de repetir aquello. Con el envoltorio, el par sigue
+   siendo 4 ↔ 4 y no se toca: lo único que cambia es QUIÉN ocupa el área `banda`
+   —antes `.ag-banda-compacta`, ahora el envoltorio— y las bandas se apilan
+   dentro de él como bloques. Una sola línea de CSS movida.
+
+   ⚠️ EL ENVOLTORIO SE PINTA SIEMPRE, incluso vacío. Sin bandas mide cero —el
+   área es `auto` y dentro no hay nada— y a cambio le da a la barra de carga un
+   ancla fija donde posicionarse sin empujar la rejilla hacia abajo.
+
+   ── EL ORDEN EN QUE SE PINTAN ES LA PRIORIDAD ──────────────────────────────
+   Está escrito AQUÍ, junto a la pieza que las cuatro comparten, y no en el JSX
+   donde se montan: allí el orden es una línea que cualquiera reordena sin ver
+   que estaba decidido. De más grave a menos, que es el orden en que hay que
+   leerlas:
+
+     1. ERROR DE CARGA — faltan datos y no se sabe cuáles. Es lo único que
+        invalida lo que se está viendo.
+     2. FALLO DE GOOGLE — falta una PARTE conocida de los datos. Grave, pero la
+        agenda propia de debajo es correcta.
+     3. VACÍO — no falta nada: no hay nada. Sólo se pinta si NINGUNA de las dos
+        de arriba está puesta, y el porqué está en su propia condición.
+     4. VISTA COMPACTA — no falta nada y no es un aviso de datos: es la confesión
+        de un recorte que pidió el usuario. Va la última porque es la única que
+        habla de la vista y no del contenido.
+
+   Pueden coincidir las cuatro menos la 3, que se excluye con la 1 y la 2. */
+
+/* El mes de la banda de vacío, en minúsculas y sin año: «agosto». Sin `timeZone`
+   a propósito — el <FullCalendar> no lleva opción `timeZone`, así que sus fechas
+   son del huso del navegador y formatearlas en otro las movería de mes en el
+   primer día y en el último. */
+const FMT_MES_BANDA = new Intl.DateTimeFormat('es-MX', { month: 'long' })
+
+/**
+ * Lo que va detrás de «Sin citas…» en la banda de vacío: «esta semana», «en
+ * agosto». Cadena vacía en cualquier otra vista, y eso APAGA la banda — es lo
+ * que la deja fuera de las dos vistas de LISTA, que ya tienen su propio vacío en
+ * `noEventsContent`, y fuera de la vista Día, cuyo vacío lo cuenta el panel.
+ *
+ * ⚠️ «ESTA SEMANA» AUNQUE NO SEA ESTA SEMANA, y es literal del spec (§11). La
+ * fecha exacta está en el toolbar, tres centímetros más arriba y en cuerpo
+ * grande; repetirla aquí alargaría la frase para no decir nada nuevo.
+ */
+function periodoDeLaVista(vista: ViewApi): string {
+  if (vista.type === 'dayGridMonth') return `en ${FMT_MES_BANDA.format(vista.currentStart)}`
+  if (vista.type === 'timeGridWeek') return 'esta semana'
+  return ''
+}
+
+/** La caja de una banda. Las cuatro comparten geometría y sólo cambia el tono. */
+function Banda(
+  { tono, urgente, children }: {
+    tono: 'error' | 'gcal' | 'vacio'
+    /** `role="alert"` en vez de `role="status"`: interrumpe al lector de
+     *  pantalla. Sólo la banda de error lo lleva — una agenda que no cargó sí
+     *  merece cortar lo que se estuviera leyendo; un día sin citas, no. */
+    urgente?: boolean
+    children: ReactNode
+  },
+): ReactElement {
+  return (
+    <div className={`ag-aviso ag-aviso--${tono}`} role={urgente ? 'alert' : 'status'}>
+      {children}
+    </div>
+  )
+}
+
 /* Las dos configuraciones del toolbar nativo, A NIVEL DE MÓDULO por la regla de
    identidad estable: un literal en el JSX es un objeto nuevo en cada render y
    FullCalendar vuelve a refinar sus opciones cuando la referencia cambia.
@@ -4869,6 +5162,15 @@ export default function AgendaPage() {
      FullCalendar (`view.title`, que sale del `titleFormat` de `VISTAS_FC`) y se
      escribe en `datesSet`, que es quien sabe cuándo cambia el rango. */
   const [tituloVista, setTituloVista] = useState('')
+  /* El periodo que nombra la banda de vacío —«esta semana», «en agosto»—, ya
+     formateado. Se escribe en `datesSet` junto al título, que es el único sitio
+     donde se sabe qué rango pinta la vista.
+     ⚠️ SE GUARDA LA CADENA Y NO LA FECHA, igual que `tituloVista`, `ventana` y
+     `conteo`: una `Date` es un objeto nuevo en cada `datesSet` y no se puede
+     comparar, así que reescribiría el estado —y re-renderizaría el árbol— en
+     cada navegación aunque el mes fuera el mismo. Una cadena se compara sola en
+     el bail-out de React. */
+  const [periodoVacio, setPeriodoVacio] = useState('')
   const [horarioOpen,  setHorarioOpen]  = useState(false)
   const [confirm,      setConfirm]      = useState<{ message: string; onConfirm: () => void; onCancel: () => void } | null>(null)
   const [citaCreada,   setCitaCreada]   = useState(false)
@@ -4881,6 +5183,51 @@ export default function AgendaPage() {
     { citaId: string; paciente: { id: string; nombre: string; correoFicha: string | null } | null; esperandoEvento: boolean } | null
   >(null)
   const [filtroMedico, setFiltroMedico] = useState<string>('')
+
+  /* ═══ BLOQUE 9 · LO QUE SE SABE DE LA ÚLTIMA TRAÍDA ═══════════════════════
+     Cuatro estados y ninguno derivado de otro, porque describen cosas distintas:
+     si hay algo en vuelo, si ya llegó algo alguna vez, si las CITAS fallaron y
+     qué contestó Google. Los pintan las cuatro bandas de `.ag-avisos`, cuyo
+     orden de prioridad está escrito junto al componente `Banda`.
+
+     ⚠️ `cargando` NO es «la primera carga»: FullCalendar emite su hook `loading`
+     con el AGREGADO de las dos fuentes (`computeEventSourcesLoading`,
+     @fullcalendar/core/index.js:549-556), así que vale también para cada cambio
+     de fecha, de vista y de filtro. Eso es justo lo que se quiere: la atenuación
+     de §11 es para la NAVEGACIÓN, no para el montaje. */
+  const [cargando, setCargando] = useState(false)
+  /* La misma señal, retrasada 150 ms. §11: «Bajo 150 ms no se muestra nada.
+     Evita el flash», y CONTRASTE_Y_MOVIMIENTO §3 lo remacha —con la rampa de
+     180 ms encima, atenuar una carga de 80 ms parpadea peor que no atenuar—.
+     Es lo que consumen la clase y la barra; `cargando` a secas no se pinta. */
+  const [cargaVisible, setCargaVisible] = useState(false)
+  /* Falso hasta que la primera traída TERMINA, con datos o con error. Es el
+     seguro del estado vacío: `conteo` arranca en `CONTEO_VACIO`, así que sin
+     esto la banda «Sin citas esta semana» saldría durante toda la primera
+     carga, que es exactamente la mentira que este bloque viene a matar. */
+  const [huboTraida, setHuboTraida] = useState(false)
+  /* La fuente de CITAS falló. Sólo ella: un fallo de Google no entra aquí y por
+     eso la agenda propia no se cae con él. Ver `estadoGoogle`. */
+  const [errorCitas, setErrorCitas] = useState(false)
+
+  /* Qué contestó lo último que se le preguntó a `/api/google/events`.
+     ⚠️ ARRANCA EN 'conectado' Y NO EN NULL, y no es optimismo: el único valor
+     que pinta banda es 'error_google', así que el estado inicial tiene que ser
+     cualquiera de los otros dos. */
+  const [estadoGoogle, setEstadoGoogle] = useState<EstadoGoogleAgenda>('conectado')
+
+  /* El retraso de 150 ms de `cargaVisible`. Efecto y no `setTimeout` suelto para
+     que el temporizador se cancele solo al desmontar y en cada cambio de
+     `cargando`: sin la limpieza, una traída de 80 ms dejaría el temporizador
+     vivo y la rejilla se atenuaría 70 ms DESPUÉS de haber terminado, que es el
+     parpadeo al revés y el más difícil de diagnosticar.
+     El apagado es INMEDIATO y no simétrico a propósito: hacer esperar a que la
+     rejilla vuelva a plena opacidad no compra nada. */
+  useEffect(() => {
+    if (!cargando) { setCargaVisible(false); return }
+    const t = window.setTimeout(() => setCargaVisible(true), UMBRAL_CARGA_MS)
+    return () => window.clearTimeout(t)
+  }, [cargando])
 
   /* Horario y médicos salen del agregado de configuración, no de dos fetch
      propios: la misma clave la piden ya el Sidebar y el provider de
@@ -5440,8 +5787,26 @@ export default function AgendaPage() {
       let url = `/api/appointments?from=${info.startStr}&to=${info.endStr}`
       if (filtroMedico) url += `&medico_id=${filtroMedico}`
       const res = await fetch(url)
-      const data = await res.json()
-      const apts: Appointment[] = data.appointments ?? []
+      /* ⚠️⚠️ ESTAS DOS GUARDAS SON EL BLOQUE 9 ENTERO, Y NO SON DEFENSIVAS: sin
+         ellas un fallo del servidor se pintaba como UNA AGENDA VACÍA.
+         El camino era éste y no tenía nada de raro: `/api/appointments` contesta
+         `{ error }` con 500 (route.ts:76 y :81), ese JSON no trae `appointments`,
+         el `??` de abajo lo convertía en `[]` y se llamaba a `success([])` — o
+         sea que se le decía a FullCalendar «la traída fue bien y no hay ninguna
+         cita». El médico veía una semana limpia y concluía que no tenía citas.
+         Un 500 NO es una semana vacía. `res.ok` lo separa.
+
+         ⚠️ LA SEGUNDA GUARDA NO SOBRA. `res.ok` sólo cubre el código de estado;
+         un 200 con el cuerpo cambiado —un despliegue a medias, un proxy que
+         reescribe— volvería a caer en el mismo `?? []`. Comprobar que la clave
+         es un array es lo que cierra esa puerta, y cuesta una línea.
+         Las dos LANZAN en vez de contestar: así hay UN solo camino de fallo, el
+         `catch` de abajo, y no dos que se puedan desincronizar. */
+      if (!res.ok) throw new Error(`El servidor respondió ${res.status}`)
+      const data: { appointments?: Appointment[] } = await res.json()
+      if (!Array.isArray(data.appointments)) throw new Error('Respuesta de citas ilegible')
+      const apts: Appointment[] = data.appointments
+      setErrorCitas(false)
 
       success(apts.map(apt => ({
         id:              apt.id,
@@ -5463,6 +5828,11 @@ export default function AgendaPage() {
         extendedProps:   { ...apt },
       })))
     } catch (err: unknown) {
+      /* El estado va ANTES del `failure()`, aunque el orden no se note: quien
+         pinta la banda es esto, y `failure()` sólo cierra la traída dentro de
+         FullCalendar. Ver `eventSourceFailure` en el <FullCalendar>, que es la
+         otra mitad —la que cubre a un fallo que no pase por aquí. */
+      setErrorCitas(true)
       failure(err instanceof Error ? err : new Error('Error cargando citas'))
     }
   }, [filtroMedico])
@@ -5517,19 +5887,46 @@ export default function AgendaPage() {
       // Cadena vacía = 'todos los médicos'; ahí no se manda nada y el servidor
       // devuelve el calendario completo de la clínica, como siempre.
       if (filtroMedico) url += `&medico_id=${filtroMedico}`
-      const res = await fetch(url)
-      const data = await res.json()
-      // 'sin_token' y 'error_google' se pintan igual aquí —sin eventos de
-      // Google— porque la agenda no tiene botón de conectar: quien distingue
-      // los dos casos de cara al médico es /perfil.
-      if (data.estado !== 'conectado') { success([]); return }
 
       // Espeja la lista blanca del servidor (`EventoAgenda` en
       // /api/google/events). Las dos llaves de `start` y `end` son necesarias:
       // un evento de día completo trae `date` y no `dateTime`.
       type GCalEvent = { id: string; summary?: string; start?: { dateTime?: string; date?: string }; end?: { dateTime?: string; date?: string } }
 
-      const eventos = ((data.events ?? []) as GCalEvent[])
+      const res = await fetch(url)
+      /* ⚠️ UN `res.ok` FALSO NO TUMBA LA AGENDA: se anota como fallo de Google y
+         se contesta `success([])`. La ruta ya devuelve 200 en todos sus caminos
+         de fallo —el motivo viaja en `estado`— así que aquí sólo caen el 401 y
+         el 400 del `medico_id` mal formado. Ninguno de los dos es razón para
+         que las citas propias dejen de pintarse. */
+      const data: { estado?: EstadoGoogleAgenda; events?: GCalEvent[] } =
+        res.ok ? await res.json() : { estado: 'error_google' }
+
+      /* ⚠️ AQUÍ EL ESTADO YA NO SE TIRA, Y ES EL BLOQUE 9. Hasta ahora
+         'sin_token' y 'error_google' se pintaban igual —sin eventos y sin una
+         palabra—, con este argumento: la agenda no tiene botón de conectar, así
+         que quien distingue los dos casos de cara al médico es /perfil. El
+         argumento explica por qué no hay BOTÓN; no explicaba por qué no hay
+         AVISO, y sin aviso «Google falló» es indistinguible de «hoy no tengo
+         eventos».
+
+         ⚠️ SÓLO 'error_google' PINTA BANDA, y esa asimetría es deliberada.
+         `estadoDeFallo` (api/google/events/route.ts:56-61) mete en 'sin_token'
+         DOS situaciones que desde aquí no se pueden separar: la clínica que
+         nunca conectó Google y la que tenía credencial y se le murió. Levantar
+         banda con 'sin_token' le pondría un aviso permanente a toda clínica que
+         sencillamente no usa Google, que son la mayoría. Se paga el precio
+         contrario: la credencial muerta sigue siendo silenciosa aquí y se
+         descubre en /perfil, igual que antes.
+         Si algún día la ruta distingue los dos casos, ESTE es el sitio. */
+      setEstadoGoogle(data.estado ?? 'error_google')
+
+      /* La salida sin eventos se mantiene EXACTAMENTE como estaba: `success([])`
+         y no `failure()`. Es lo que aísla el fallo de Google de las citas
+         propias, y no depende de la banda de arriba para nada. */
+      if (data.estado !== 'conectado') { success([]); return }
+
+      const eventos = (data.events ?? [])
         .map((e) => ({
           id:              `gcal-${e.id}`,
           // Sin 🔒: esto viene del calendario de Spinus, tiene título real y no
@@ -5553,6 +5950,12 @@ export default function AgendaPage() {
 
       success(eventos)
     } catch (err: unknown) {
+      /* Aquí sólo se cae por red o por un cuerpo ilegible: la ruta contesta 200
+         hasta cuando Google falla. Se anota como fallo de Google y se llama a
+         `failure()` como siempre — que la fuente de Google fracase NO purga los
+         eventos de la fuente de citas: `RECEIVE_EVENT_ERROR` va por `sourceId`
+         (@fullcalendar/core/index.js:634-639). El aislamiento es estructural. */
+      setEstadoGoogle('error_google')
       failure(err instanceof Error ? err : new Error('Error cargando eventos'))
     }
   }, [filtroMedico])
@@ -6676,6 +7079,37 @@ export default function AgendaPage() {
      larga. Ver `frasearConteoBreve`. */
   const resumenConteoBreve = frasearConteoBreve(conteo)
 
+  /* ── BLOQUE 9 · LAS TRES CONDICIONES DE LAS BANDAS ────────────────────────
+     Se resuelven aquí y no en el JSX porque cada una es una frase con motivo, y
+     una condición con motivo dentro de un `&&` deja de leerse.
+
+     `googleFallo` — sólo `error_google`. El porqué de que `sin_token` no cuente
+     está entero en `gcalSource`, donde se escribe el estado. */
+  const googleFallo = estadoGoogle === 'error_google'
+
+  /* `vacioReal` — el cero de `conteo` es un cero de verdad. TRES condiciones y
+     ninguna sobra:
+       · `huboTraida`  — si no ha terminado ninguna traída, el cero es que aún no
+                         ha llegado nada. Sin esto la banda saldría en cada
+                         primera carga, que es la mentira que este bloque mata.
+       · `!errorCitas` — con la carga rota no se sabe cuántas citas hay. Decir
+                         «sin citas» sobre un error es la misma mentira otra vez,
+                         y encima con la banda roja al lado contradiciéndola.
+       · `!googleFallo`— con Google caído faltan eventos que sí existen. El cero
+                         de la agenda propia puede ser cierto, pero la frase
+                         «Sin citas esta semana» no lo sería.
+     `periodoVacio` vacío apaga la banda en Día y en las dos listas; ver
+     `periodoDeLaVista`. */
+  const vacioReal =
+    huboTraida && !errorCitas && !googleFallo &&
+    conteo.citas === 0 && conteo.eventos === 0 && conteo.google === 0 &&
+    periodoVacio !== ''
+
+  /* Con filtro puesto, un vacío no dice «no hay nada»: dice «no hay nada DE
+     ESTE MÉDICO», y la salida no es agendar sino quitar el filtro. Es el sexto
+     estado vacío de §11 y el mismo cero que el de arriba, contado distinto. */
+  const vacioFiltrado = vacioReal && medicoFiltrado !== undefined
+
   return (
     /* ⚠️⚠️ LA ALTURA DE ESTE `<div>` ES LO QUE PARTE LA PÁGINA EN DOS ZONAS: la
        de arriba fija (título, controles, barra de navegación y cabecera de
@@ -7255,8 +7689,24 @@ export default function AgendaPage() {
           ~320 líneas de diff que taparían el cambio de verdad, que son estas
           dos etiquetas. */}
       <div className={`ag-dia${panelDelDia ? ' ag-dia--con-panel' : ''}`}>
-      <div className={`agenda-fc bg-white rounded-2xl border border-slate-100 shadow-sm overflow-clip flex-1 min-h-[250px]${
-        esMesMovil ? ' ag-cal-mes-movil' : ''}`}>
+      {/* ⚠️ LAS DOS CLASES DE ESTADO DEL BLOQUE 9 SON DISTINTAS Y NO SE FUNDEN EN
+          UNA. Las dos atenúan la rejilla al mismo .55 (CONTRASTE_Y_MOVIMIENTO §3:
+          «.55 y no .5 — la rejilla atenuada tiene que seguir siendo legible: es
+          contexto, no un velo»), pero sólo `ag-cargando` apaga los punteros.
+          Por qué el error NO los apaga: la agenda se sigue pudiendo usar con la
+          lectura rota —pulsar una hora y crear una cita escribe por otra ruta— y
+          §11 pide justo eso, «una rejilla vacía sigue siendo una rejilla». Un
+          error de carga que además deja el calendario muerto al tacto convierte
+          un fallo de lectura en un fallo total.
+          Mientras carga sí se apagan: lo que hay en pantalla es de otro rango y
+          pulsarlo abriría el alta sobre datos que están a punto de irse.
+          ⚠️ `cargaVisible` Y NO `cargando`: el umbral de 150 ms va en medio, ver
+          `UMBRAL_CARGA_MS`. */}
+      <div
+        aria-busy={cargaVisible}
+        className={`agenda-fc bg-white rounded-2xl border border-slate-100 shadow-sm overflow-clip flex-1 min-h-[250px]${
+        esMesMovil ? ' ag-cal-mes-movil' : ''}${cargaVisible ? ' ag-cargando' : ''}${
+        errorCitas ? ' ag-desactualizada' : ''}`}>
         {/* ── Leyenda ───────────────────────────────────────────────────
             ⚠️ VIVE DENTRO DE LA TARJETA Y EN FILA PROPIA, entre la fila de
             navegación y la cabecera del día. Quien la coloca es el
@@ -7374,27 +7824,114 @@ export default function AgendaPage() {
             un `sr-only`, o sea fuera de la vista. Un aviso que hay que
             descubrir con el ratón no es un aviso. NO LO VUELVAS A PLEGAR sin
             resolver antes dónde se lee esa frase. */}
-        {avisoRecorte && (
-          <div className="ag-banda-compacta" role="status">
-            <ChevronsDownUp size={14} className="ag-banda-compacta-icono" aria-hidden />
-            <p className="ag-banda-compacta-texto">
-              <strong>Vista compacta:</strong> {avisoRecorte}
-            </p>
-            {/* SEGUNDA salida, no la única: el botón del header sigue siendo por
-                donde se enciende y también apaga. Existe porque el efecto que
-                apaga «Compactar» al salir de time-grid ya dice el principio —un
-                calendario que oculta información sin dar salida es peor que uno
-                que no la oculta— y hasta ahora la única salida estaba en la otra
-                punta de la pantalla, lejos de la frase que confiesa el recorte. */}
-            <button
-              type="button"
-              className="ag-banda-compacta-salida"
-              onClick={() => setCompactar(false)}
-            >
-              {compactaElMes ? 'Mostrar todos los días' : 'Mostrar rejilla completa'}
-            </button>
-          </div>
-        )}
+        {/* ⚠️ EL ENVOLTORIO ES QUIEN OCUPA EL ÁREA `banda` DESDE EL BLOQUE 9, y
+            antes la ocupaba directamente `.ag-banda-compacta`. Se hizo así para
+            no tocar el par `grid-template-rows` ↔ `grid-template-areas` de
+            `.agenda-fc`: el razonamiento entero está junto al componente
+            `Banda`, y merece leerse antes de mover nada de aquí.
+            SE MONTA SIEMPRE, también sin ninguna banda: entonces mide cero y le
+            sirve de ancla a la barra de carga, que se posiciona sobre él sin
+            empujar la rejilla. El ORDEN de los hijos es la prioridad. */}
+        <div className="ag-avisos">
+          {/* La barra de 2 px de §11. Cae justo ENCIMA de la rejilla y no pegada
+              al toolbar, y es consecuencia de dónde vive el envoltorio: entre
+              medias está la fila de la leyenda, que es cromo de la tarjeta desde
+              el bloque 8. Marca el borde de lo que está cargando, que es lo que
+              se quería decir.
+              `aria-hidden` porque una raya no se lee; lo que declara el estado a
+              las ayudas técnicas es el `aria-busy` de la tarjeta. */}
+          {cargaVisible && <span className="ag-barra-carga" aria-hidden />}
+
+          {/* 1 · Error de carga. «Reintentar» llama al MISMO `refetch()` que usan
+              el cambio de filtro, la reconexión y la vuelta a la pestaña: una
+              sola puerta de recarga, y con el candado de arrastre incluido. */}
+          {errorCitas && (
+            <Banda tono="error" urgente>
+              <TriangleAlert size={14} className="ag-aviso-icono" aria-hidden />
+              <p className="ag-aviso-texto">
+                <strong>No se pudo cargar la agenda.</strong> Lo que se ve puede estar incompleto o desactualizado.
+              </p>
+              <button type="button" className="ag-aviso-accion" onClick={refetch}>
+                Reintentar
+              </button>
+            </Banda>
+          )}
+
+          {/* 2 · Fallo de Google. SIN «Reintentar» a propósito: reintentar no
+              arregla una credencial ni una cuota, y un botón que casi siempre
+              falla enseña a ignorarlo. La salida es /perfil, que es donde se
+              reconecta de verdad. */}
+          {googleFallo && (
+            <Banda tono="gcal">
+              <GoogleGIcon size={14} />
+              <p className="ag-aviso-texto">
+                <strong>No se pudo sincronizar con Google Calendar.</strong> Tus citas se muestran normal; faltan los eventos del calendario.
+              </p>
+              <Link href="/perfil" className="ag-aviso-accion">Revisar conexión</Link>
+            </Banda>
+          )}
+
+          {/* 3 · Vacío. Las dos frases salen del mismo cero; ver `vacioReal`. */}
+          {vacioReal && (
+            <Banda tono="vacio">
+              <Calendar size={14} className="ag-aviso-icono" aria-hidden />
+              <p className="ag-aviso-texto">
+                {vacioFiltrado && medicoFiltrado
+                  ? `Ningún evento de ${componerNombreMedicoCompleto(medicoFiltrado)} ${periodoVacio}`
+                  : `Sin citas ${periodoVacio}`}
+              </p>
+              {vacioFiltrado ? (
+                <button type="button" className="ag-aviso-accion" onClick={() => setFiltroMedico('')}>
+                  Ver todos los médicos
+                </button>
+              ) : (
+                /* ⚠️ DICE «AGENDAR» Y NO «NUEVA CITA», que es lo que pedía §11.
+                   El botón del header se renombró a «Agendar» al montarle el
+                   conmutador «Cita | Evento»: el modal ya no crea sólo citas.
+                   Dos nombres para la misma puerta es peor que apartarse del
+                   spec en una palabra. Y hace lo mismo que aquel botón, bloqueo
+                   por suscripción incluido. */
+                <button
+                  type="button"
+                  className="ag-aviso-accion"
+                  onClick={() => {
+                    if (subState.isBlocked) { openBloqueoModal(); return }
+                    const { fecha, hora } = partirFechaHora(new Date().toISOString())
+                    setModal({ mode: 'create', fecha, hora, tipo: 'cita', todoElDia: 'no' })
+                  }}
+                >
+                  Agendar
+                </button>
+              )}
+            </Banda>
+          )}
+
+          {/* 4 · Vista compacta. Se queda EXACTAMENTE como estaba, sólo que ahora
+              dentro del envoltorio: no se migra a `Banda` porque su caja lleva su
+              propia geometría y sus propias clases desde el bloque 6, y
+              reescribirla para ganar tres líneas es arriesgar una que funciona. */}
+          {avisoRecorte && (
+            <div className="ag-banda-compacta" role="status">
+              <ChevronsDownUp size={14} className="ag-banda-compacta-icono" aria-hidden />
+              <p className="ag-banda-compacta-texto">
+                <strong>Vista compacta:</strong> {avisoRecorte}
+              </p>
+              {/* SEGUNDA salida, no la única: el botón del header sigue siendo por
+                  donde se enciende y también apaga. Existe porque el efecto que
+                  apaga «Compactar» al salir de time-grid ya dice el principio —un
+                  calendario que oculta información sin dar salida es peor que uno
+                  que no la oculta— y hasta ahora la única salida estaba en la otra
+                  punta de la pantalla, lejos de la frase que confiesa el recorte. */}
+              <button
+                type="button"
+                className="ag-banda-compacta-salida"
+                onClick={() => setCompactar(false)}
+              >
+                {compactaElMes ? 'Mostrar todos los días' : 'Mostrar rejilla completa'}
+              </button>
+            </div>
+          )}
+        </div>
         <FullCalendar
           ref={calendarRef}
           /* ⚠️ `listPlugin` VA EL ÚLTIMO, Y LA POSICIÓN ES UNA DECISIÓN. Este
@@ -7448,6 +7985,7 @@ export default function AgendaPage() {
           datesSet={arg => {
             setCurrentView(arg.view.type)
             setTituloVista(arg.view.title)
+            setPeriodoVacio(periodoDeLaVista(arg.view))
             const eventos = calendarRef.current?.getApi().getEvents() ?? []
             const rangos = rangosDeLaVista(arg.view)
             aplicarVentana(eventos, rangos)
@@ -7535,6 +8073,34 @@ export default function AgendaPage() {
           eventResizableFromStart
           businessHours={horarioToBusinessHours(horario)}
           eventSources={eventSourcesStable}
+          /* ── LOS DOS GANCHOS DE ESTADO DE CARGA (bloque 9) ────────────────
+             `loading` es el AGREGADO de las dos fuentes: FullCalendar lo emite
+             en `true` cuando la primera empieza a traer y en `false` cuando la
+             última termina (`computeEventSourcesLoading`,
+             @fullcalendar/core/index.js:549-556 y :1427-1430). No hay forma de
+             saber por aquí CUÁL de las dos sigue en vuelo, y no hace falta: lo
+             que atenúa la rejilla es que haya algo pendiente, sea lo que sea.
+
+             ⚠️ `huboTraida` SE ENCIENDE EN EL FLANCO DE BAJADA Y NUNCA SE APAGA.
+             Es lo que separa «todavía no ha llegado nada» de «llegó y no había
+             nada», que es la distinción de la que vive la banda de vacío. En una
+             navegación posterior vuelve a haber carga, pero ya no vuelve a haber
+             ignorancia: los datos viejos siguen en la rejilla. */
+          loading={estaCargando => {
+            setCargando(estaCargando)
+            if (!estaCargando) setHuboTraida(true)
+          }}
+          /* ⚠️ AQUÍ NO VA `eventSourceFailure`, Y SE PROBÓ. Es el gancho GLOBAL
+             de fallo y su firma sólo trae el `Error`: no dice QUÉ fuente falló.
+             Cableado, un fallo de red de la fuente de Google levantaba la banda
+             ROJA de «No se pudo cargar la agenda» — justo lo contrario de lo que
+             este bloque persigue, que es que un fallo de Google no se lea como
+             una agenda caída. Quien anota el fallo es el `catch` de CADA fuente,
+             que sí sabe cuál es, y entre los dos cubren todo lo que puede fallar:
+             el cuerpo entero de las dos va dentro de su `try`.
+             Si algún día hace falta el suelo global, la vía NO es esta prop sino
+             la clave `failure` de cada entrada de `eventSourcesStable` — pero eso
+             cambia la lista de fuentes, con todo lo que su aviso dice. */
           dayHeaderContent={renderDayHeader}
           /* Sólo lo leen las vistas de lista; en rejilla y en Mes no hay nada
              que reemplazar y esta prop no llega a consultarse. */

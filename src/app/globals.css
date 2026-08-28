@@ -1394,7 +1394,19 @@ main > div:has(.agenda-fc) .agenda-raiz {
 .agenda-fc .fc { display: contents; }
 .agenda-fc .fc-header-toolbar { grid-area: toolbar; }
 .agenda-fc .ag-leyenda        { grid-area: leyenda; }
-.ag-banda-compacta            { grid-area: banda; }
+/* ⚠️ EL ÁREA `banda` LA OCUPA EL ENVOLTORIO DE AVISOS, Y ANTES LA OCUPABA
+   `.ag-banda-compacta` DIRECTAMENTE (bloque 9). Es la ÚNICA línea que cambió
+   aquí al montar las tres bandas nuevas, y ese es justo el punto: apilarlas
+   dentro de un envoltorio deja intacto el par `grid-template-rows` ↔
+   `grid-template-areas` de arriba, que es el que ya dejó el calendario en blanco
+   una vez cuando se descuadró. Tres bandas por la vía de las áreas habrían sido
+   tres filas nuevas en DOS listas y tres ocasiones de repetirlo.
+   `position: relative` es el ancla de `.ag-barra-carga`, que va absoluta encima
+   para no empujar la rejilla 2 px cada vez que aparece.
+   `min-width: 0` por el mismo motivo que en el harness, tres líneas abajo: un
+   ítem de grid trae `min-width: auto` y el texto largo de una banda podría
+   ensanchar la pista en un teléfono. */
+.ag-avisos                    { grid-area: banda; position: relative; min-width: 0; }
 /* ⚠️ EL `min-width: 0` NO ES ADORNO: SIN ÉL LA LISTA SE SALÍA POR LA DERECHA EN
    390 px. Un ítem de grid trae `min-width: auto`, que es su ancho MÍNIMO DE
    CONTENIDO, y eso le permite desbordar su pista aunque la pista sea
@@ -1459,6 +1471,152 @@ main > div:has(.agenda-fc) .agenda-raiz {
 }
 .ag-banda-compacta-salida:hover,
 .ag-banda-compacta-salida:focus-visible { text-decoration: underline; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   BLOQUE 9 · LAS BANDAS DE AVISO Y EL ESTADO DE CARGA
+   ══════════════════════════════════════════════════════════════════════════
+   Tres bandas —error, fallo de Google, vacío— que se apilan dentro de
+   `.ag-avisos` junto a la de vista compacta. La GEOMETRÍA es la misma que la de
+   `.ag-banda-compacta` de arriba, y está duplicada A PROPÓSITO en vez de
+   factorizada: aquella regla es del bloque 6, funciona, y unificarlas obligaría
+   a tocarla para ganar seis declaraciones. Si algún día se unifican, que sea
+   moviendo ÉSTA hacia aquélla y no al revés.
+   Lo que sí cambia entre las cuatro es el color, y ahí no hay nada duplicado:
+   cada tono cuelga de sus tokens y no de un hex. */
+.ag-aviso {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 18px;   /* los 18 son los del toolbar: todas las bandas alinean */
+  border-bottom: 1px solid var(--ag-hairline);
+  font-size: 12px;
+}
+/* El icono no encoge y hereda la tinta de su banda —cada tono la fija abajo—,
+   así que no hay un solo color de icono declarado por separado. */
+.ag-aviso-icono { flex: 0 0 auto; }
+/* `min-width: 0` para que el texto elipse en vez de empujar a la acción fuera de
+   la banda. Misma razón y misma cura que en `.ag-banda-compacta-texto`: la
+   salida es lo último que debe desaparecer. */
+.ag-aviso-texto {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ag-aviso-texto strong { font-weight: 700; }
+/* La acción es a veces un <button> (reintentar, agendar, quitar filtro) y a
+   veces un <a> (revisar conexión). Una sola regla para los dos: `all: unset`
+   sería más limpio pero se lleva por delante el foco del navegador, así que se
+   neutraliza sólo lo que estorba. Hereda la tinta del tono, en negrita: sobre
+   una banda de color un azul de enlace competiría con el propio aviso. */
+.ag-aviso-accion {
+  flex: 0 0 auto;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.ag-aviso-accion:hover { text-decoration: none; }
+
+/* Los tres tonos. Los seis tokens existen en las DOS paletas y ninguno es un hex
+   escrito aquí; en oscuro los de estado pasan a `rgba()` sobre el fondo hundido,
+   así que las bandas se oscurecen solas.
+   ⚠️ EL ROJO SALE DE LA FAMILIA `cancelled` Y NO ES UN ENGANCHE CASUAL: §11 pide
+   fondo #fdf2f2 y borde #f3c9c9, que son EXACTAMENTE los valores de
+   `--ag-status-cancelled-bg` y `--ag-status-cancelled-border`. El spec y la
+   paleta ya coincidían; esto sólo deja de escribirlos dos veces. */
+.ag-aviso--error {
+  background: var(--ag-status-cancelled-bg);
+  border-bottom-color: var(--ag-status-cancelled-border);
+  color: var(--ag-status-cancelled-text);
+}
+.ag-aviso--gcal {
+  background: var(--ag-gcal-bg1);
+  border-bottom-color: var(--ag-gcal-border);
+  color: var(--ag-gcal-text);
+}
+/* El vacío es neutro: no ha pasado nada malo. `--ag-ink-600` y no `--ag-muted`
+   por contraste, el mismo criterio que ya está escrito en `.ag-chip`. */
+.ag-aviso--vacio {
+  background: var(--ag-surface-sunken);
+  color: var(--ag-ink-600);
+}
+
+/* ── La barra de carga de 2 px bajo el toolbar (§11) ──────────────────────
+   Absoluta sobre `.ag-avisos`, que puede medir cero: así aparecer y desaparecer
+   no mueve la rejilla ni un píxel. El `z-index` la pone por encima de la vista,
+   cuyos hijos son `position: absolute` con z-index automático. */
+.ag-barra-carga {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 2px;
+  z-index: 3;
+  overflow: hidden;
+  background: var(--ag-hairline);
+}
+/* El rastro que recorre la pista. La duración va en literal y no en `--ag-dur-*`:
+   esos tres tokens son duraciones de TRANSICIÓN (120/180/240 ms) y ninguno es el
+   periodo de un bucle; meter 1.1s en la escala sería ensuciarla para un solo uso. */
+.ag-barra-carga::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  width: 32%;
+  background: var(--ag-brand-legible);
+  animation: ag-barra-carga 1.1s linear infinite;
+}
+@keyframes ag-barra-carga {
+  from { transform: translateX(-110%) }
+  to   { transform: translateX(420%) }
+}
+
+/* ⚠️⚠️ ESTA ESCOTILLA HACE FALTA APARTE, Y NO ES REDUNDANTE CON LA GENERAL.
+   La de más abajo en esta hoja casa `.fc *, .agenda-fc *, .ag-dia-aside *,
+   .fc *::before, .fc *::after` — fíjate en que los DOS pseudos de la lista
+   cuelgan de `.fc` y NO de `.agenda-fc`. Este rastro es un `::after` de un
+   elemento que es hijo de `.agenda-fc` pero NO de `.fc`, así que allí no entra
+   por ningún lado: un selector universal no casa pseudo-elementos, y
+   `animation-*` no se hereda, o sea que neutralizarlo en el padre tampoco lo
+   alcanza. Sin estas dos líneas el bucle seguía corriendo con
+   `prefers-reduced-motion: reduce` puesto, que es exactamente lo que la
+   preferencia pide que no pase.
+   `.01ms` y no `none`, por la convención de esta hoja: así `animationend` sigue
+   disparando.
+   ⚠️ LO QUE SÍ SOBREVIVE, Y DEBE: la PISTA (`.ag-barra-carga` a secas) no es una
+   animación sino un fondo, así que queda una raya de acento quieta bajo la
+   cabecera. Es lo correcto —el estado de carga es información, no decoración— y
+   va en la misma línea que CONTRASTE_Y_MOVIMIENTO §7, que deja a la atenuación
+   de carga como lo único que sobrevive a `reduce`. */
+@media (prefers-reduced-motion: reduce) {
+  .ag-barra-carga::after {
+    animation-duration: .01ms;
+    animation-iteration-count: 1;
+  }
+}
+
+/* ── La atenuación de la rejilla ──────────────────────────────────────────
+   `.55` y no `.5`, literal de CONTRASTE_Y_MOVIMIENTO §3: la rejilla atenuada
+   tiene que seguir siendo legible, es contexto y no un velo. La rampa va en la
+   regla base para que valga en los dos sentidos —entrar y salir— con la misma
+   duración, que es lo que hace que se lea como un movimiento y no como dos
+   sucesos.
+   ⚠️ SOBREVIVE A `prefers-reduced-motion` A PROPÓSITO. La escotilla neutraliza
+   la `transition-duration`, o sea la RAMPA; el valor de opacidad es un estado y
+   se queda. Quitarlo eliminaría información. */
+.agenda-fc .fc-view-harness { transition: opacity var(--ag-dur-base) var(--ag-ease-out); }
+.agenda-fc.ag-cargando .fc-view-harness { opacity: .55; pointer-events: none; }
+/* El error atenúa igual pero NO apaga los punteros: se sigue pudiendo pulsar una
+   hora y crear una cita con la lectura rota. El porqué está en el JSX, junto a
+   las dos clases. */
+.agenda-fc.ag-desactualizada .fc-view-harness { opacity: .55; }
 
 /* La fecha ya no flota en el centro: vive en el chunk `left`, junto a las
    flechas y a «Hoy». Los tres son hermanos dentro del chunk y necesitan aire.

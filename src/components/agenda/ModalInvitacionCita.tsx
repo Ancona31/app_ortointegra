@@ -1,9 +1,37 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import type { ReactNode } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import type { KeyboardEvent, ReactNode } from 'react'
 import { AlertTriangle, Check, Loader2, Mail, Send, User, X } from 'lucide-react'
 import Portal from '@/components/ui/Portal'
+
+/* ═══ ACCESIBILIDAD DEL DIÁLOGO (bloque 9 de la agenda) ═══════════════════════
+   Rol de diálogo, nombre, foco inicial, foco ATRAPADO, Escape y devolución del
+   foco. Este modal no usa `ModalShell` —monta su propio portal, como los tres de
+   `agenda/page.tsx`— y por eso no heredaba nada de aquello.
+
+   ⚠️ TERCERA COPIA DE ESTA LÓGICA. Las otras dos están en
+   `components/ui/ModalShell.tsx` y en `app/(app)/agenda/page.tsx` (el hook
+   `useDialogoModal`, que allí sirve a tres modales). Se sabe y es deliberado:
+   sacarla a `src/hooks/` sería una abstracción compartida nueva y esa decisión
+   no se toma de paso. Si arreglas el trapo, arréglalo en las tres.
+
+   ⚠️ EL OYENTE VA EN EL PANEL Y NO EN `document`, y aquí es OBLIGATORIO: este
+   modal se abre ENCIMA del modal de la cita —`onInvitar` no cierra el de
+   debajo— y los dos viven en archivos distintos, así que ningún contador
+   compartido los ordena. Como los dos paneles son portales hermanos colgando de
+   `<body>`, un Escape dentro de éste no llega nunca al otro. */
+const SELECTOR_FOCO_MODAL =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), ' +
+  'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+/* El filtro mide caja y NO usa `offsetParent`: ése vale null bajo cualquier
+   ancestro `position: fixed`, o sea bajo todo panel de portal, y con él la lista
+   salía vacía y el trapo no atrapaba nada. */
+function focusablesDelPanel(raiz: HTMLElement): HTMLElement[] {
+  return Array.from(raiz.querySelectorAll<HTMLElement>(SELECTOR_FOCO_MODAL))
+    .filter(el => el.offsetWidth > 0 || el.offsetHeight > 0)
+}
 
 /**
  * Invitar a alguien a una cita: al paciente, o a un tercero.
@@ -85,6 +113,64 @@ export default function ModalInvitacionCita({
   esperandoEvento: boolean
   onClose: () => void
 }) {
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  const focoPrevioRef = useRef<HTMLElement | null>(null)
+  const tituloId = useId()
+  /* `onClose` por ref y no por dependencia: el padre le pasa una flecha nueva en
+     cada render. En un efecto y no en el cuerpo: escribir `.current` durante el
+     render es lo que prohíbe `react-hooks/refs`. */
+  const onCloseRef = useRef(onClose)
+  useEffect(() => { onCloseRef.current = onClose }, [onClose])
+
+  /* ⚠️⚠️ NI EL OYENTE NI EL FOCO CUELGAN DE UN `useEffect`, Y ÉSA FUE LA PRIMERA
+     VERSIÓN, QUE NO FUNCIONABA — Escape no cerraba este modal ni el de la cita.
+     El motivo es `Portal`: su primer render devuelve `null` y monta a sus hijos
+     en el SEGUNDO, así que en el primer commit de este componente EL PANEL NO
+     EXISTE EN EL DOM. Un efecto con deps `[]` corre justo ahí, encuentra el ref
+     en `null` y no vuelve a correr nunca: sin oyente y sin foco.
+     Por eso el teclado va en un `onKeyDown` —React lo cablea sobre el elemento,
+     se monte cuando se monte— y el foco en un CALLBACK REF, al que React llama
+     con el nodo en el commit en que aparece. La explicación larga, con lo del
+     anidamiento, está junto a `useDialogoModal` en `agenda/page.tsx`.
+
+     ⚠️ `useCallback` CON DEPS `[]` ES OBLIGATORIO: un callback ref con identidad
+     nueva en cada render se llama con `null` y con el nodo EN CADA RENDER, o sea
+     que el panel robaría el foco en cada letra que se teclea en el correo. */
+  const montarPanel = useCallback((node: HTMLDivElement | null) => {
+    panelRef.current = node
+    /* Sólo se enfoca el panel si el foco no está ya dentro: así un `autoFocus`
+       de un campo del formulario gana, que es lo que el usuario espera. El
+       diálogo se anuncia igual —`role`, `aria-modal` y `aria-labelledby` están
+       puestos— y Escape también, porque la tecla burbujea hasta este panel. */
+    if (node && !node.contains(document.activeElement)) node.focus({ preventScroll: true })
+  }, [])
+
+  /* Quién tenía el foco se apunta en el PRIMER commit, cuando el `Portal` aún no
+     ha montado nada y `document.activeElement` sigue siendo el botón que abrió
+     el modal. En el callback ref sería un commit más tarde y podría apuntarse un
+     campo de dentro. La limpieza devuelve el foco al cerrar. */
+  useEffect(() => {
+    focoPrevioRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    return () => { focoPrevioRef.current?.focus({ preventScroll: true }) }
+  }, [])
+
+  const alPulsarTecla = useCallback((e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Escape') { onCloseRef.current(); return }
+    if (e.key !== 'Tab') return
+    const panel = panelRef.current
+    if (!panel) return
+    const focos = focusablesDelPanel(panel)
+    if (focos.length === 0) { e.preventDefault(); panel.focus({ preventScroll: true }); return }
+    const primero = focos[0]
+    const ultimo  = focos[focos.length - 1]
+    const activo  = document.activeElement
+    if (e.shiftKey && (activo === primero || !panel.contains(activo))) {
+      e.preventDefault(); ultimo.focus()
+    } else if (!e.shiftKey && (activo === ultimo || !panel.contains(activo))) {
+      e.preventDefault(); primero.focus()
+    }
+  }, [])
+
   const [paso, setPaso] = useState<Paso>(esperandoEvento ? 'esperando' : 'eligiendo')
   const [invitarPaciente, setInvitarPaciente] = useState(false)
   const [correoEscrito, setCorreoEscrito] = useState('')
@@ -529,14 +615,20 @@ export default function ModalInvitacionCita({
       <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
         <div className="absolute inset-0 backdrop-blur-sm" style={{ background: 'var(--ag-modal-overlay)' }} onClick={onClose} />
         <div
-          className="relative rounded-[22px] w-full max-w-[440px] max-h-[92vh] flex flex-col animate-modal-enter overflow-hidden"
+          ref={montarPanel}
+          onKeyDown={alPulsarTecla}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={tituloId}
+          tabIndex={-1}
+          className="relative focus:outline-none rounded-[22px] w-full max-w-[440px] max-h-[92vh] flex flex-col animate-modal-enter overflow-hidden"
           style={{ background: 'var(--ag-modal-bg)', boxShadow: '0 30px 80px rgba(16, 32, 64, .28)' }}
         >
           <div className="flex items-center gap-3 px-[22px] py-[18px] border-b" style={{ borderColor: 'var(--ag-hairline)' }}>
             <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'var(--ag-modal-icon-bg)' }}>
               <Mail size={20} style={{ color: 'var(--ag-brand-primary)' }} />
             </div>
-            <h2 className="text-[18px] font-extrabold" style={{ color: 'var(--ag-ink)' }}>
+            <h2 id={tituloId} className="text-[18px] font-extrabold" style={{ color: 'var(--ag-ink)' }}>
               Invitar por correo
             </h2>
             <button onClick={onClose} className="ml-auto p-1 transition-opacity hover:opacity-70" style={{ color: 'var(--ag-muted2)' }} aria-label="Cerrar">
