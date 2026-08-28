@@ -1140,18 +1140,49 @@ body::before {
    del harness, no descendiente: se queda fija arriba con el toolbar y la
    cabecera de días, y la rejilla scrollea por debajo. */
 /* ── EL REPARTO DE LA TARJETA, EN REJILLA ─────────────────────────────
-   Cuatro piezas y dos columnas. La leyenda comparte FILA con el toolbar —es
-   donde la pone el mockup, y esa fila va mucho más vacía que la de controles
-   del header, que envuelve a ~1170 px—; la banda y la rejilla ocupan el ancho
-   entero debajo.
+   Cuatro piezas en UNA columna, una debajo de otra.
 
-       ┌──────────────────────┬──────────────────────┐
-       │ toolbar  ‹ › Hoy 17… │  ● Agendada … Google │  auto
-       ├──────────────────────┴──────────────────────┤
+       ┌─────────────────────────────────────────────┐
+       │ toolbar  ‹ › Hoy 24 – 28 ago 2026           │  auto
+       ├─────────────────────────────────────────────┤
+       │ leyenda  ● Agendada ● Confirmada … │ GCal   │  auto (0 si no está)
+       ├─────────────────────────────────────────────┤
        │ banda    ↖ Vista compacta: …   Mostrar…     │  auto (0 si no hay)
        ├─────────────────────────────────────────────┤
        │ rejilla                                     │  1fr
        └─────────────────────────────────────────────┘
+
+   ⚠️ LA LEYENDA COMPARTIÓ FILA CON EL TOOLBAR HASTA EL BLOQUE 8, Y BAJÓ POR
+   ANCHO. Ahí es donde la pone el mockup —esa fila va mucho más vacía que la de
+   controles del header, que envuelve a ~1170 px— y cabía en una línea con 127,7
+   px de sobra… MIENTRAS LA TARJETA OCUPÓ EL ANCHO ENTERO. El panel lateral de la
+   vista Día le quita `--ag-rail-w` más el `gap` de `.ag-dia--con-panel`, y con
+   eso la celda se queda corta y la leyenda se apila en dos o tres renglones
+   pegada a la derecha. En fila propia dispone del ancho ENTERO de la tarjeta y
+   deja de depender de cuánto mida la etiqueta de fecha.
+
+   ⚠️ HASTA DÓNDE LLEGA, con la aritmética a la vista para que nadie la dé por
+   infinita. La leyenda pide 479 px con «GCal» (medido, ver page.tsx) y su fila
+   le da el interior de la tarjeta menos los 36 de relleno. Sin panel sobra en
+   todo el rango de escritorio. CON PANEL hacen falta unos 515 de interior de
+   tarjeta, o sea ~1155 px de ventana contando los 300 del riel, los 14 del
+   `gap`, los 256 del `lg:ml-64` del layout y los ~70 de relleno de la página:
+   entre 1024 y ~1155, con el panel de Día abierto, todavía envuelve a dos
+   líneas. Es el tramo más estrecho del escritorio y ahí lo recoge el
+   `flex-wrap`; compartiendo fila con el toolbar envolvía MUCHO antes.
+
+   ⚠️ ES EL MISMO REPARTO QUE YA TENÍA EL MÓVIL desde el bloque 6, donde la
+   leyenda bajó de fila por lo mismo. Aquí había un `@media (max-width: 1023px)`
+   que redeclaraba las tres propiedades para el tramo estrecho; con las dos
+   variantes diciendo lo mismo se retiró, y éste es el único bloque que las
+   declara. Lo que NO se unificó es la VISIBILIDAD: en móvil la leyenda sólo se
+   monta en Día, y eso lo decide `page.tsx` —desde la hoja no hay forma de
+   preguntar por la vista, ver su nota.
+
+   ⚠️ LO QUE CUESTA, dicho para que nadie lo lea como gratis: la fila propia son
+   ~45 px que en escritorio antes no se gastaban, o sea 1,25 franjas a 36 px. La
+   cuenta del piso de 250 px de la tarjeta vive en `page.tsx`, junto a su
+   `min-h-[250px]`, y se rehízo con esto.
 
    ⚠️ ESTA BANDA SE PROBÓ COMO CHIP EN LA FILA DEL TOOLBAR Y SE REVIRTIÓ. Cabía
    y ahorraba los 33 px de su fila, pero obligaba a mandar la frase que dice QUÉ
@@ -1176,11 +1207,12 @@ body::before {
    convierten en cuatro `grid-area`, que son MENOS piezas y encima se leen de un
    vistazo en el `grid-template-areas` de arriba.
 
-   ⚠️ `minmax(0, 1fr)` EN LA SEGUNDA COLUMNA, Y NO `1fr` A SECAS: sin el 0 el
-   suelo es `min-content`, y la leyenda —que es larga— EMPUJARÍA al toolbar
-   hasta sacar la fecha de sitio. Con el 0 se comprime y envuelve dentro de su
-   celda, alineada a la derecha, y la fecha no se mueve nunca.
-   Lo mismo en la tercera FILA: es lo que ocupa el papel del `min-height: 0` que
+   ⚠️ `minmax(0, 1fr)` EN LA COLUMNA, Y NO `1fr` A SECAS: sin el 0 el suelo es
+   `min-content`, y dentro de la rejilla va la `<table>` de FullCalendar, cuyo
+   mínimo de contenido puede ser enorme (la historia entera está en el
+   `min-width: 0` del harness, aquí abajo). Con el 0 la pista se comprime y la
+   tarjeta no desborda por la derecha.
+   Lo mismo en la CUARTA fila: es lo que ocupa el papel del `min-height: 0` que
    hacía falta en flex, y lo que impide que la rejilla desborde la tarjeta. */
 /* ── EL PADDING DEL LAYOUT, RECORTADO SÓLO PARA LA AGENDA ──────────────────
    `(app)/layout.tsx` da a su hijo `lg:pt-8 lg:pb-8` = 64 px de alto, y a las
@@ -1322,10 +1354,10 @@ main > div:has(.agenda-fc) .agenda-raiz {
 
 /* ⚠️⚠️ `grid-template-rows` Y `grid-template-areas` SON UNA PAREJA: EL NÚMERO DE
    PISTAS Y EL NÚMERO DE FILAS DE ÁREAS TIENEN QUE COINCIDIR, Y SE MUEVEN JUNTOS.
-   Aquí son TRES y TRES. En la variante estrecha (`@media (max-width: 1023px)`,
-   más abajo) son CUATRO y CUATRO. Si añades o quitas una fila de áreas en
-   cualquiera de los dos sitios, la lista de pistas del MISMO bloque cambia con
-   ella.
+   Aquí son CUATRO y CUATRO, y desde el bloque 8 éste es el ÚNICO sitio donde se
+   declaran: la variante estrecha que las redeclaraba se retiró al quedarse
+   idéntica a ésta. Si añades o quitas una fila de áreas, la lista de pistas
+   cambia con ella.
 
    POR QUÉ ES GRAVE Y NO SÓLO FEO: sobrar filas de áreas NO es un error de CSS y
    no se queja nadie. Las que no tienen tamaño en `grid-template-rows` las
@@ -1351,12 +1383,13 @@ main > div:has(.agenda-fc) .agenda-raiz {
    compacta, que ni siquiera estaba en el DOM, y cero en la de la rejilla. */
 .agenda-fc {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  grid-template-rows: auto auto minmax(0, 1fr);   /* 3 pistas ↔ 3 filas de áreas */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);   /* 4 pistas ↔ 4 filas */
   grid-template-areas:
-    "toolbar leyenda"
-    "banda   banda"
-    "rejilla rejilla";
+    "toolbar"
+    "leyenda"
+    "banda"
+    "rejilla";
 }
 .agenda-fc .fc { display: contents; }
 .agenda-fc .fc-header-toolbar { grid-area: toolbar; }
@@ -1374,13 +1407,12 @@ main > div:has(.agenda-fc) .agenda-raiz {
    En escritorio no cambia nada: allí sobra ancho y la pista nunca aprieta. */
 .agenda-fc .fc-view-harness   { grid-area: rejilla; min-width: 0; }
 
-/* El aspecto propio de la leyenda —y el `@media` que la baja de fila— NO viven
-   aquí sino DETRÁS del bloque del toolbar, unas líneas más abajo. Es a
-   propósito: comparte con él la regla que pinta fondo y borde, y esa regla
-   declara además `padding` y `gap`. Los tres selectores implicados pesan lo
-   mismo —(0,2,0)—, así que quien gana es el ÚLTIMO de la hoja y no el más
-   específico. Estuvieron aquí arriba y perdían en silencio: la leyenda salía con
-   el padding y el gap del toolbar. Si mueves algo, comprueba el orden. */
+/* El aspecto propio de la leyenda NO vive aquí sino DETRÁS del bloque del
+   toolbar, unas líneas más abajo. Es a propósito: comparte con él la regla que
+   pinta fondo y borde, y esa regla declara además `padding` y `gap`. Los tres
+   selectores implicados pesan lo mismo —(0,2,0)—, así que quien gana es el
+   ÚLTIMO de la hoja y no el más específico. Estuvieron aquí arriba y perdían en
+   silencio: la leyenda salía con el padding y el gap del toolbar. Si mueves algo, comprueba el orden. */
 
 .ag-banda-compacta {
   display: flex;
@@ -1574,52 +1606,29 @@ main > div:has(.agenda-fc) .agenda-raiz {
    ir escrito DESPUÉS. Estuvo antes y las dos declaraciones de abajo no hacían
    nada — la leyenda salía con 16 px de padding izquierdo pese al comentario que
    decía lo contrario.
-   Lo que sí se hereda de allí y se quiere: `flex-wrap: wrap`, que es lo que la
-   deja envolver dentro de su celda sin empujar la fecha. */
+   Lo que sí se hereda de allí y se quiere: `flex-wrap: wrap`. Ya no es lo que la
+   deja envolver «dentro de su celda» —desde el bloque 8 la celda es la fila
+   entera y la leyenda cabe en una línea—, sino la red de seguridad de los anchos
+   muy pequeños: sin él, las seis marcas empujarían la tarjeta a lo ancho en vez
+   de bajar de renglón.
+
+   ⚠️ ALINEADA A LA IZQUIERDA, Y ESTUVO A LA DERECHA. El `flex-end` tenía sentido
+   mientras compartía fila con el toolbar: la empujaba al extremo opuesto de la
+   fecha. En fila propia deja un renglón vacío por delante y la leyenda flotando
+   al final; alineada a la izquierda arranca en el mismo canalón que las flechas
+   de arriba, y es además lo que ya hacía el móvil.
+
+   ⚠️ LOS 18 px SON LOS DEL TOOLBAR (`.agenda-fc .fc-toolbar`) Y LOS DE
+   `.ag-banda-compacta`: las tres filas de cromo de la tarjeta alinean su
+   contenido en la misma vertical. Si mueves uno, mueve los tres. */
 .agenda-fc .ag-leyenda {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 12px;
-  padding: 14px 18px 14px 0;   /* sin izquierdo: el del toolbar ya separa */
+  padding: 14px 18px;
 }
 
-/* En móvil la fila del toolbar ya va con las flechas, la fecha y «Hoy», y la
-   leyenda no cabe al lado ni comprimida: baja a fila propia a ancho completo y
-   alineada a la izquierda. El umbral es 1024, el MISMO que el `ANCHO_MOVIL` de
-   `page.tsx` — si alguien mueve uno, que mueva el otro.
-
-   ⚠️ SUBIÓ DE 768 A 1024 EN EL BLOQUE 6, Y NO ES UN AJUSTE DE ESTA REGLA. Lo
-   que cambió es qué significa «estrecho» para la agenda entera: por debajo del
-   umbral, Semana y Día dejan de ser rejillas y pasan a ser listas
-   (`listWeek` / `listDay`). Entre 768 y 1024 —tabletas y portátiles pequeños—
-   antes había rejilla con cromo de escritorio y ahora hay lista, así que esta
-   media query tenía que acompañar o esa franja se quedaba con la leyenda a la
-   derecha de un toolbar que ya no le deja sitio.
-
-   ⚠️ Y VA DESPUÉS DEL BLOQUE DE ARRIBA POR LO MISMO: UNA MEDIA QUERY NO SUMA
-   ESPECIFICIDAD. `.agenda-fc .ag-leyenda` dentro de un `@media` sigue pesando
-   (0,2,0), así que envuelta arriba su `justify-content: flex-start` perdía
-   contra el `flex-end` de aquí — y en móvil la leyenda bajaba de fila pero
-   seguía pegada a la derecha, que es justo lo que esta regla viene a evitar. */
-@media (max-width: 1023px) {
-  .agenda-fc {
-    grid-template-columns: minmax(0, 1fr);
-    /* ⚠️⚠️ LAS DOS LÍNEAS DE ABAJO SON UNA PAREJA Y SE MUEVEN JUNTAS: CUATRO
-       PISTAS PARA CUATRO FILAS DE ÁREAS. Aquí la leyenda baja a fila propia, así
-       que hay una fila MÁS que en el bloque ancho, y por eso las pistas se
-       redeclaran enteras en vez de heredarse.
-       La historia completa —qué se rompe cuando no cuadran, y por qué esto
-       estuvo mal desde el bloque 4 sin que se notara— está junto a la
-       declaración del bloque base. Léela antes de tocar cualquiera de las dos.
-       El `minmax(0, 1fr)` va en la CUARTA y no en la tercera: el hueco libre es
-       de la rejilla. En la tercera se lo comía la banda compacta, que además
-       sólo está en el DOM con «Compactar» encendido. */
-    grid-template-rows: auto auto auto minmax(0, 1fr);   /* 4 pistas ↔ 4 filas */
-    grid-template-areas: "toolbar" "leyenda" "banda" "rejilla";
-  }
-  .agenda-fc .ag-leyenda { justify-content: flex-start; padding-left: 18px; }
-}
 /* ═══ BANDA AZUL DEL ENCABEZADO MÓVIL Y BARRA INFERIOR (bloque 6 · 8a) ══════
    Las dos son cromo de la agenda en móvil y viven fuera de `.agenda-fc`: son
    hermanas de la tarjeta del calendario dentro de `.agenda-raiz`, que es un
@@ -2095,7 +2104,11 @@ main > div:has(.agenda-fc) .agenda-raiz {
    un borde en un `<th>` de una tabla con `border-collapse` empuja la rejilla
    entera y desalinea la fila. La sombra interior no ocupa espacio — y además
    tiene que ganarle al `border-bottom: … !important` de la regla de arriba, que
-   una sombra no discute porque no es la misma propiedad. */
+   una sombra no discute porque no es la misma propiedad.
+
+   ⚠️ EN LA VISTA DÍA ESTA REGLA SE APAGA ENTERA —tinte y línea—, junto con la
+   columna y la banda. El porqué está en el bloque «EN DÍA NO HAY HOY QUE
+   SEÑALAR», más abajo. */
 .agenda-fc .fc-timegrid .fc-col-header-cell.fc-day-today {
   background: var(--ag-today-bg) !important;
   box-shadow: inset 0 -3px 0 0 var(--ag-brand-secondary);
@@ -2703,10 +2716,71 @@ main > div:has(.agenda-fc) .agenda-raiz {
 
 /* Columna de HOY en el cuerpo del time-grid — tinte + ring inset.
    Más específica que el .fc .fc-day-today global (#e8f2ff, que se deja
-   intacto para la vista Mes / sub-fase 7). */
+   intacto para la vista Mes / sub-fase 7).
+   ⚠️ EN LA VISTA DÍA ESTO SE APAGA: ver el bloque de aquí abajo. */
 .fc-timegrid .fc-timegrid-col.fc-day-today {
   background: var(--ag-today-bg) !important;
   box-shadow: inset 0 0 0 1.5px var(--ag-today-ring);
+}
+
+/* ── EN DÍA NO HAY «HOY» QUE SEÑALAR (bloque 8) ────────────────────────────
+   El tinte de hoy CONTRASTA, y para contrastar hacen falta al menos dos días.
+   En Semana pinta una de siete columnas y en Mes una de treinta y pico; en Día
+   sólo hay una columna, así que el tinte no separa nada de nada — pinta la
+   pantalla entera de azul y encima compite con el color de las tarjetas, que es
+   lo único que ahí tiene que leerse. Que el día que se está viendo es hoy ya lo
+   dicen la cabecera y el título del toolbar.
+
+   QUÉ SE APAGA, Y DE QUÉ REGLA VIENE CADA COSA. Son TRES nodos con la misma
+   clase `fc-day-today` y tres dueños distintos, y por eso hacen falta las tres
+   líneas de abajo:
+     1. la celda de la cabecera .... `.agenda-fc .fc-timegrid .fc-col-header-cell.fc-day-today`
+                                     (tinte + la línea de marca de 3 px), y su
+                                     gemela `html.dark …`
+     2. la columna del cuerpo ...... `.fc-timegrid .fc-timegrid-col.fc-day-today`
+                                     (tinte + anillo), aquí arriba
+     3. la celda de la BANDA de
+        todo el día ................ el hex global `.fc .fc-day-today` en claro y
+                                     `html.dark .agenda-fc .fc-timegrid .fc-daygrid-day.fc-day-today`
+                                     en oscuro
+
+   ⚠️ LA BANDA ENTRA EN LA LISTA A PROPÓSITO. Apagar la columna y dejar la banda
+   con su tinte deja un rectángulo azul suelto encima de una rejilla que ya no lo
+   tiene — la costura que la nota de esa regla oscura vino justamente a evitar.
+   Se van las dos o no se va ninguna, y en Día se van las dos.
+
+   ⚠️ LO QUE NO SE TOCA: el «· HOY» de la cabecera (`.ag-dayhead-hoy`) y el color
+   de marca de su cifra (`.ag-dayhead-num--hoy`). Son las marcas de TEXTO, las
+   que siguen diciendo qué día es sin pintar ninguna superficie, y son las que
+   este bloque da por buenas al quitar las otras. Tampoco se toca el indicador de
+   la hora actual, que dice otra cosa.
+
+   ⚠️ SEMANA Y MES NO SE ENTERAN: los tres selectores llevan
+   `.fc-timeGridDay-view`, que sólo emite el `ViewContainer` de esa vista
+   (`core/internal-common.js`, `buildViewClassNames`). Va COMPUESTO con
+   `.fc-timegrid` porque las dos clases están en el MISMO elemento —la raíz de la
+   vista—, no una dentro de otra.
+
+   ⚠️ Y LA ESPECIFICIDAD ES LO QUE SOSTIENE EL BLOQUE, no el orden en la hoja.
+   Cada selector pesa (0,5,0) contra los (0,4,1) de las dos reglas de `html.dark`
+   y los (0,4,0), (0,3,0) y (0,2,0) de las de claro, así que gana en las dos
+   paletas y desde aquí, sin tener que duplicarse abajo, en la sección oscura.
+   Si alguien añade una regla de hoy con MÁS peso, tiene que añadir su pareja
+   aquí — no vale con confiar en que este bloque vaya después.
+
+   Los dos valores son los del día que NO es hoy, no un color nuevo: la cabecera
+   vuelve a `--ag-surface`, que es lo que `.agenda-fc .fc-col-header-cell` pinta
+   en las otras seis columnas de Semana, y las dos celdas del cuerpo vuelven a
+   transparentes, que es como van las columnas normales del time-grid (ver la
+   nota de los separadores verticales). */
+.agenda-fc .fc-timegrid.fc-timeGridDay-view .fc-col-header-cell.fc-day-today {
+  background: var(--ag-surface) !important;
+  box-shadow: none;
+}
+.agenda-fc .fc-timegrid.fc-timeGridDay-view .fc-timegrid-col.fc-day-today,
+.agenda-fc .fc-timegrid.fc-timeGridDay-view .fc-daygrid-day.fc-day-today {
+  background: transparent !important;
+  box-shadow: none;
 }
 
 /* Bordes de grilla — ultra suaves. Los pinta la propia hoja de FullCalendar
@@ -4116,9 +4190,13 @@ main > div:has(.agenda-fc) .agenda-raiz {
        panel contesta «qué». Un punto de 5 px no es un objetivo táctil.
 
    ⚠️ EL UMBRAL ES 1023/1024, EL MISMO `ANCHO_MOVIL` DE `page.tsx` Y EL MISMO DE
-   LA MEDIA QUERY DE LA LEYENDA. Si alguien mueve uno, mueve los tres: por debajo
-   de él `isMobile` es `true`, y de eso dependen la clase `.ag-cal-mes-movil` de
-   la tarjeta, `VISTAS_FC_MOVIL` y el panel. Media query y estado de React tienen
+   LAS OTRAS TRES MEDIA QUERIES DE LA AGENDA (el relleno de la página, el cromo
+   de la tarjeta y ésta). Si alguien mueve uno, los mueve todos: por debajo de él
+   `isMobile` es `true`, y de eso dependen la clase `.ag-cal-mes-movil` de la
+   tarjeta, `VISTAS_FC_MOVIL` y el panel.
+   ⚠️ LA DE LA LEYENDA YA NO ESTÁ EN LA LISTA: se retiró en el bloque 8, cuando
+   la leyenda pasó a tener fila propia TAMBIÉN en escritorio y las dos variantes
+   quedaron idénticas. No la repongas creyendo que falta. Media query y estado de React tienen
    que cruzar el umbral en el mismo píxel o hay una franja con las opciones de
    móvil y los estilos de escritorio, o al revés. */
 @media (max-width: 1023px) {
@@ -5100,7 +5178,10 @@ html.dark .agenda-fc .fc-scrollgrid { border-color: var(--ag-border-card); }
    fondo oscuro el #1e5fa8 de claro se hunde. El CÍRCULO, en cambio, calca la
    mezcla del círculo de Mes de aquí abajo —brand-secondary hacia el fondo— para
    que el blanco de su cifra siga teniendo contraste; el azul claro de la línea
-   con texto blanco no llegaba a AA. */
+   con texto blanco no llegaba a AA.
+
+   ⚠️ EN DÍA NO SE PINTA NINGUNA DE LAS DOS: el bloque «EN DÍA NO HAY HOY QUE
+   SEÑALAR» pesa (0,5,0) contra los (0,4,1) de aquí y gana en las dos paletas. */
 html.dark .agenda-fc .fc-timegrid .fc-col-header-cell.fc-day-today {
   background: var(--ag-today-bg) !important;
   box-shadow: inset 0 -3px 0 0 var(--ag-month-today-ring);
@@ -5138,7 +5219,12 @@ html.dark .agenda-fc .fc-timegrid .fc-col-header-cell.fc-day-today {
    una sola franja vertical, sin costura. SIN anillo — el de la columna ya lo
    pone, y repetirlo aquí dibujaría una línea a media altura.
    Especificidad (0,4,1) contra los (0,2,0) del hex global: las dos llevan
-   `!important`, así que decide la especificidad. */
+   `!important`, así que decide la especificidad.
+
+   ⚠️ Y EN DÍA NO SE PINTA NINGUNO DE LOS DOS, ni éste ni el hex de claro: allí la
+   banda va transparente como la columna, por el mismo argumento de «una sola
+   franja vertical sin costura» de aquí arriba, leído al revés. Lo apaga el
+   bloque «EN DÍA NO HAY HOY QUE SEÑALAR». */
 html.dark .agenda-fc .fc-timegrid .fc-daygrid-day.fc-day-today {
   background: var(--ag-today-bg) !important;
 }

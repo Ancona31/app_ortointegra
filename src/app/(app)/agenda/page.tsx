@@ -4439,13 +4439,17 @@ const VIEWS = [
   { type: 'timeGridDay',  label: 'Día'    },
 ] as const
 
-/* ── EL UMBRAL, Y ES UNA PAREJA ────────────────────────────────────────────
-   ⚠️ SUBIÓ DE 768 A 1024 EN EL BLOQUE 6, Y NO VIAJA SOLO. El otro miembro es la
-   media query de `globals.css` que baja la leyenda a fila propia, hoy en
-   `max-width: 1023px`. Los dos dicen lo MISMO —«a partir de aquí la agenda es
-   estrecha»— y si divergen aparece la franja de anchos en la que el calendario
-   ya es una lista pero el cromo sigue creyéndose de escritorio, o al revés.
-   El aviso está escrito en los dos sitios: si mueves uno, mueve el otro. */
+/* ── EL UMBRAL, Y NO VIAJA SOLO ────────────────────────────────────────────
+   ⚠️ SUBIÓ DE 768 A 1024 EN EL BLOQUE 6. Los otros miembros son las media
+   queries `max-width: 1023px` de `globals.css` —el relleno de la página, el
+   cromo de la tarjeta y el mes del teléfono—. Todas dicen lo MISMO —«a partir de
+   aquí la agenda es estrecha»— y si divergen aparece la franja de anchos en la
+   que el calendario ya es una lista pero el cromo sigue creyéndose de
+   escritorio, o al revés. El aviso está escrito en los dos sitios: si mueves
+   uno, muévelos todos.
+   ⚠️ LA DE LA LEYENDA ERA DE ESTA LISTA Y SE RETIRÓ EN EL BLOQUE 8: la leyenda
+   pasó a tener fila propia también en escritorio, así que ya no hay nada que
+   redeclarar por debajo del umbral. */
 const ANCHO_MOVIL = 1024
 
 /* ── LAS TRES VISTAS, CADA UNA EN SUS DOS FORMATOS ─────────────────────────
@@ -7155,18 +7159,26 @@ export default function AgendaPage() {
           120. Que después subiera a 36 es lo que abrió el hueco de arriba, y es
           posterior a esta bajada. Los dos cambios están anotados donde viven.
 
-          ⚠️ LA LEYENDA YA NO ENVUELVE, Y ESO SE GANÓ POR EL LADO DE LA FECHA.
-          Necesita 479 px en una línea con «GCal» y durante un tiempo su celda le
-          daba 453,46 a 954 px de interior de tarjeta: faltaban 25,54 y la fila
-          medía 74 en vez de 60,32. Lo que cerró el hueco NO fue tocar la
-          leyenda sino encoger la etiqueta de fecha —de «24 – 28 de agosto de
-          2026» a 22 px (282,77) a «24 – 28 ago 2026» a 15 px (129,53)—, que le
-          devolvió 153,24 px a la celda. Hoy la leyenda tiene 606,7 y le sobran
-          127,7.
-          ⚠️ SI ALGUIEN REPONE LA FECHA LARGA O SUBE SU CUERPO, LA LEYENDA VUELVE
-          A ENVOLVER Y ESTE PISO SUBE 14. Los dos números viven en
-          `globals.css` (`.agenda-fc .fc-toolbar-title`) y en `VISTAS_FC`, y
-          los dos llevan nota.
+          ⚠️ LA LEYENDA YA NO COMPARTE FILA CON EL TOOLBAR, Y ESTA CUENTA SUBIÓ
+          45 EN EL BLOQUE 8. Compartiéndola no gastaba alto propio: cabía en la
+          celda de al lado de la fecha —479 px en una línea con «GCal» contra los
+          606,7 que le daba su celda— y durante un tiempo ni eso, que es lo que
+          se arregló encogiendo la etiqueta de fecha (de «24 – 28 de agosto de
+          2026» a 22 px, 282,77, a «24 – 28 ago 2026» a 15 px, 129,53).
+          Ese equilibrio se rompió con el panel lateral de la vista Día: la
+          tarjeta pierde el ancho del riel y la leyenda vuelve a apilarse en dos o
+          tres renglones. Ahora va en FILA PROPIA, como en móvil, y cuesta sus
+          ~45 px en las tres vistas de escritorio.
+          ⚠️ LO QUE ESTO LE HACE AL PEOR CASO: 60 (toolbar) + 45 (leyenda) + 33
+          (banda compacta) + 35 (cabecera) = 173, así que de los 250 quedan 77 =
+          2,14 franjas a 36 px, contra las 3,38 de antes. SIGUE SIENDO EL CASO
+          DEGRADADO —sólo muerde por debajo de ~344 px de viewport, ver abajo— y
+          por eso el 250 no se toca; pero si alguien vuelve a añadir cromo fijo a
+          la tarjeta, ésta es la cuenta que hay que rehacer.
+          ⚠️ LA FECHA CORTA SE QUEDA IGUAL. Ya no la sostiene la leyenda —que no
+          comparte fila con ella—, pero sí el alto del toolbar: los dos números
+          viven en `globals.css` (`.agenda-fc .fc-toolbar-title`) y en
+          `VISTAS_FC`, y los dos llevan nota.
 
           ⚠️ Y LA CABECERA YA NO VAIVENEA. Apilada medía 65 px con hoy a la vista
           y 54 sin él —el disco de 28×28 mandaba sobre la fila—, así que la
@@ -7180,11 +7192,15 @@ export default function AgendaPage() {
           × 1.2 son 18—. Su `line-height: 1.2` explícito es lo que sostiene esa
           cuenta y está anotado también en globals.css.
 
-          EN MÓVIL EL CROMO ES MENOR: por debajo de 1024 la leyenda baja a fila
-          propia (45) y «Compactar» se apaga solo, así que no hay banda — 60 + 45
-          + 35 = 140, y 250 deja 110 px = 3,06 franjas, algo por debajo de las
-          3,38 del peor caso de escritorio porque la fila propia de la leyenda
-          cuesta más que la banda que se ahorra.
+          EN MÓVIL EL CROMO ES MENOR: por debajo de 1024 la leyenda va en fila
+          propia (45) —igual que ahora en escritorio— y «Compactar» se apaga solo,
+          así que no hay banda: 60 + 45 + 35 = 140, y 250 deja 110 px = 3,06
+          franjas. ⚠️ ESA COMPARACIÓN CON ESCRITORIO SE DIO LA VUELTA EN EL BLOQUE
+          8. Decía que el móvil quedaba «algo por debajo de las 3,38 del peor caso
+          de escritorio porque la fila propia de la leyenda cuesta más que la
+          banda que se ahorra»; hoy escritorio TAMBIÉN paga esa fila y encima
+          conserva la banda, así que el peor caso de escritorio son 2,14 franjas y
+          el móvil va por encima.
           LO QUE NO CUBRE, dicho para que no sorprenda: a
           anchos muy pequeños la leyenda envuelve a tres o cuatro filas y se come
           el margen. El piso es un amortiguador del caso degradado, no una
@@ -7200,11 +7216,12 @@ export default function AgendaPage() {
       {/* ⚠️ ESTA TARJETA NO LLEVA CLASE DE LAYOUT, Y NO ES UN OLVIDO. Tuvo un
           `flex flex-col` y se retiró: el reparto entero lo hace un
           `grid-template-areas` en `globals.css`, sobre `.agenda-fc`. Si repones
-          el flex, el grid se apaga y la leyenda se cae de la fila de la fecha.
+          el flex, el grid se apaga y la leyenda y la banda se van al final, por
+          debajo de la rejilla, que es el orden en que están en el DOM.
 
           Tiene TRES hijos —la leyenda, la banda de vista compacta y el
-          `<FullCalendar>`— y hay que colocar la leyenda al lado del toolbar y la
-          banda ENTRE el toolbar y la rejilla. Ninguna de las dos cosas se puede
+          `<FullCalendar>`— y hay que colocar las dos primeras ENTRE el toolbar y
+          la rejilla, en ese orden. Ninguna de las dos cosas se puede
           hacer desde React: el componente no acepta children, y el toolbar y la
           rejilla son hijos de `.fc`, no nuestros. Lo resuelve la hoja
           promocionando los hijos de `.fc` a ítems de esta rejilla con
@@ -7241,15 +7258,21 @@ export default function AgendaPage() {
       <div className={`agenda-fc bg-white rounded-2xl border border-slate-100 shadow-sm overflow-clip flex-1 min-h-[250px]${
         esMesMovil ? ' ag-cal-mes-movil' : ''}`}>
         {/* ── Leyenda ───────────────────────────────────────────────────
-            ⚠️ VIVE DENTRO DE LA TARJETA Y EN LA FILA DEL TOOLBAR, junto a la
-            fecha. Estuvo en una banda propia ENCIMA del calendario, y el
-            argumento para dejarla fuera —que la fila de controles envuelve a
-            ~1170 px— medía la fila EQUIVOCADA: el mockup no la pone ahí, la
-            pone en la de navegación (flechas, «Hoy», fecha), que va mucho más
-            vacía. Quien la coloca es el `grid-template-areas` de `.agenda-fc`
-            en globals.css, y allí está el porqué de esa vía y no de
-            `customButtons`. Cuando no cabe envuelve dentro de su celda sin
-            mover la fecha; por debajo de 1024 px baja a fila propia.
+            ⚠️ VIVE DENTRO DE LA TARJETA Y EN FILA PROPIA, entre la fila de
+            navegación y la cabecera del día. Quien la coloca es el
+            `grid-template-areas` de `.agenda-fc` en globals.css, y allí está el
+            porqué de esa vía y no de `customButtons`.
+
+            ⚠️ COMPARTIÓ FILA CON EL TOOLBAR HASTA EL BLOQUE 8, que es donde la
+            pone el mockup, y bajó por ANCHO: con el panel lateral de la vista Día
+            la tarjeta pierde el ancho del riel y la leyenda se apilaba en dos o
+            tres renglones a la derecha de la fecha. Antes de eso estuvo en una
+            banda propia ENCIMA del calendario, y el argumento para dejarla fuera
+            —que la fila de controles envuelve a ~1170 px— medía la fila
+            EQUIVOCADA. La fila propia de hoy NO es aquella banda: va dentro de la
+            tarjeta y dentro del grid, cosida al toolbar.
+            ⚠️ EL MOCKUP DEL BLOQUE 8 LA ELIMINA ENTERA. No se le hace caso: es lo
+            único que dice qué significa cada color.
 
             ⚠️ SE PINTA SIEMPRE, también en multi-doctor. Llevaba un
             `isSingleDoctor` heredado de cuando existía OTRA leyenda —puntos por
@@ -7308,11 +7331,22 @@ export default function AgendaPage() {
                 ⚠️ SOLO NO BASTABA: con 479 contra 453,46 seguían faltando 25,54
                 y la leyenda seguía en dos líneas. Lo que cerró el hueco fue
                 encoger la ETIQUETA DE FECHA —formato corto y 15 px en vez de
-                22—, que le devolvió 153,24 px a esta celda. Hoy tiene 606,7 y le
-                sobran 127,7, o sea que hay margen de sobra… PERO LOS DOS
-                RECORTES SE SOSTIENEN MUTUAMENTE: reponer el nombre completo aquí
-                gasta 63 de esos 127,7 y aún cabría; reponer además la fecha
-                larga, no. Si tocas uno, mide.
+                22—, que le devolvió 153,24 px a aquella celda.
+
+                ⚠️ ESA CUENTA CADUCÓ EN EL BLOQUE 8, y lo que queda de ella es el
+                orden de magnitud, no el margen. La leyenda ya no comparte fila con
+                la fecha: tiene fila propia y dispone del ancho entero de la
+                tarjeta menos los 36 px de su relleno, así que la etiqueta de fecha
+                salió de esta ecuación y reponerla larga ya no la estrecha.
+                Quien la estrecha ahora es el PANEL de la vista Día, que se lleva
+                los 300 px del riel más 14 de `gap`: sobre los 954 px de interior
+                medidos a 1280 de ventana quedan ~640, o ~604 para el contenido.
+                Ahí los 479 de «GCal» entran con holgura; por debajo de ~1155 px
+                de ventana, con el panel abierto, ya no —esa cuenta está en
+                `globals.css`, en el bloque del reparto de la tarjeta—. El rótulo
+                corto se queda porque no cuesta nada y porque es lo que empuja ese
+                umbral hacia abajo. Si lo alargas, mide CON EL PANEL PUESTO, que es
+                el caso estrecho.
 
                 ⚠️ EL NOMBRE COMPLETO SIGUE ACCESIBLE en el `title`: la
                 abreviatura es visual, no semántica, y un lector de pantalla no
