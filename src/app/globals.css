@@ -43,6 +43,16 @@
   --ag-hour-line: #eef1f6;
   --ag-col-line: #f1f4f8;
   --ag-hairline: #eef1f6;
+  /* ── Tres tokens del panel lateral de la vista Día (bloque 8) ──────────
+     ⚠️ LOS NOMBRES SON LOS DEL SPEC (§1.2), LOS VALORES TAMBIÉN. No son alias
+     de nada de aquí arriba, aunque se le parezcan: `--ag-chip-bg` (#eef1f6) es
+     dos escalones más oscuro que el hundido y sirve a los chips; `--ag-faint`
+     (#aab4c4) es texto terciario y no una línea. Reusar cualquiera de los dos
+     habría metido en el panel un tono que no es el que el mockup mide.
+     El hundido lo comparten los tiles del resumen y el botón de hueco. */
+  --ag-surface-sunken: #f7f9fb;
+  --ag-line-dash: #c3ccd8;          /* borde discontinuo del hueco */
+  --ag-primary-bg-faint: #f5f8fc;   /* tile de «h libres» y hover del hueco */
   /* Texto */
   --ag-ink: #15243e;
   --ag-text: #27364f;
@@ -186,6 +196,16 @@
                             de este alcance — .ag-gcal-badge, .ag-mes-badge y
                             .ag-hora-ahora. Son candidatas evidentes el día que
                             se toquen. */
+
+  /* ⚠️ UNA MEDIDA, NO UN COLOR: NO TIENE CONTRAPARTE EN `html.dark` y no debe
+     tenerla. El ancho del riel del panel de la vista Día (bloque 8, spec §1.3).
+     Va aquí, con los radios, porque es lo mismo que ellos: geometría que la
+     hoja fija de una vez para que ningún componente la escriba a mano.
+     ⚠️ ANCHO FIJO, NUNCA `flex-basis`. Si el riel encogiera contra la rejilla,
+     los cuatro tiles caerían a dos columnas de ~90 px y el número de 24 px se
+     saldría de su caja. La que encoge es la rejilla; para eso lleva
+     `min-width: 0`. */
+  --ag-rail-w: 300px;
 
   /* VISTA MES (sub-fase 7) — variante clara. La sub-fase 6 (dark) añadirá
      las contrapartes en html.dark. El círculo de HOY reusa
@@ -2930,7 +2950,10 @@ main > div:has(.agenda-fc) .agenda-raiz {
    Es la forma segura por defecto, para que el día que aparezca uno no haga falta
    acordarse de esto. */
 @media (prefers-reduced-motion: reduce) {
-  .fc *, .agenda-fc *, .fc *::before, .fc *::after {
+  /* `.ag-dia-aside` va en la lista porque el panel del bloque 8 es HERMANO
+     de `.agenda-fc`, no descendiente suyo: sin él, la transición de color del
+     botón de hueco se quedaría fuera de esta escotilla. */
+  .fc *, .agenda-fc *, .ag-dia-aside *, .fc *::before, .fc *::after {
     animation-duration: .01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
@@ -4515,6 +4538,221 @@ main > div:has(.agenda-fc) .agenda-raiz {
   color: var(--ag-muted);
 }
 
+/* ═══ PANEL LATERAL DE LA VISTA DÍA (bloque 8) ═══════════════════════════════
+   Las dos tarjetas a la derecha de la rejilla en `timeGridDay` de escritorio.
+   Quien decide si se montan es `page.tsx` por el tipo de vista, NO un media
+   query: aquí no hay ninguna condición de ancho, y no debe haberla.
+
+   Los nombres del spec (§8.2–§8.4) son `.dia`, `.dia__cal`, `.dia__aside`,
+   `.tile` y `.hueco`, sin prefijo. Aquí llevan `ag-` como todo lo demás de la
+   agenda: en una hoja global compartida con veinte páginas, `.tile` y `.hueco`
+   son nombres que alguien más va a querer.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* APAGADO POR DEFECTO, y `display: contents` es exactamente por qué. El nodo
+   está SIEMPRE en el DOM —montarlo y desmontarlo remontaría `<FullCalendar>`,
+   ver su nota en page.tsx— pero fuera de Día desaparece del layout y la tarjeta
+   del calendario sigue siendo hijo flex directo de `.agenda-raiz`, con su
+   `flex-1 min-h-[250px]` intacto. Las otras cuatro vistas no se enteran. */
+.ag-dia { display: contents; }
+
+/* ENCENDIDO: la fila de dos columnas. El `flex-1 min-h-[250px]` que la tarjeta
+   trae en sus clases pasa a repartir ANCHO —ahora es ítem de una fila—, así que
+   el reparto VERTICAL y el piso en píxeles suben a este nodo. El 250 y el
+   porqué de que vaya en px y no en `vh` están documentados en page.tsx, junto a
+   la clase de la tarjeta; si se toca uno, se tocan los dos. */
+.ag-dia--con-panel {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+  flex: 1 1 auto;
+  min-height: 250px;
+}
+
+/* ⚠️ EL `min-width: 0` ES EL RIESGO 1 DEL DOCUMENTO DE RIESGOS, NO UN ADORNO.
+   FullCalendar renderiza un `<table>`, y un `<table>` dentro de un ítem flex
+   arrastra `min-width: auto` —su ancho MÍNIMO DE CONTENIDO—, así que no encoge
+   por debajo de él y desborda la fila: o el panel se sale de la pantalla, o se
+   queda en 40 px. `flex: 1 1 0%` NO basta: el `0` fija la BASE, no el mínimo.
+   A 1920 px no se nota porque sobra ancho; muerde a 1280 y por debajo, que es
+   la ventana maximizada del portátil del médico. Es la misma trampa que ya
+   documenta `.agenda-fc .fc-view-harness` para el eje de la rejilla.
+
+   El `min-height: 0` es su pareja en el eje que aquí NO reparte: el piso de 250
+   vive ahora en el envoltorio, y sin esto la tarjeta traería otra vez su
+   `min-height: auto` de ítem flex y no podría encoger. */
+.ag-dia--con-panel > .agenda-fc {
+  flex: 1 1 0%;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* El riel. Ancho fijo del token; nunca `flex-basis`, que se encogería contra la
+   rejilla y dejaría los tiles en dos columnas de 90 px.
+   `overflow-y: auto` + `min-height: 0`: con muchos huecos el panel scrollea por
+   dentro en vez de estirar la fila y volver a desbordar `<main>`. La barra se
+   esconde igual que en `.ag-mespanel` y en `.fc-scroller`. */
+.ag-dia-aside {
+  width: var(--ag-rail-w);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.ag-dia-aside::-webkit-scrollbar { display: none; }
+
+/* ── Las tarjetas ─────────────────────────────────────────────────────────
+   ⚠️ PRIMER CONSUMIDOR DE `--ag-r-card`. El token existía desde el bloque de
+   radios con la nota «SIN CONSUMIDOR TODAVÍA»; era para esto. Si algún día se
+   queda otra vez sin nadie, es que el panel se fue. */
+.ag-panelcard {
+  flex: none;
+  padding: 14px;
+  background: var(--ag-surface);
+  border: 1px solid var(--ag-border-card);
+  border-radius: var(--ag-r-card);
+  box-shadow: var(--ag-shadow-card);
+}
+.ag-panelcard-tit {
+  margin: 0 0 10px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ag-muted2);
+}
+
+/* Las notas de debajo del desglose: la de «Todos los médicos», la de día sin
+   horario y la de los eventos de todo el día. Todas explican un número que
+   falta o que no cuadra a simple vista, así que van en secundario y pequeñas —
+   son una glosa, no un dato más. */
+.ag-panelcard-nota {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--ag-muted);
+}
+
+/* ── Los cuatro tiles ─────────────────────────────────────────────────── */
+.ag-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.ag-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 10px;
+  background: var(--ag-surface-sunken);
+  border-radius: var(--ag-r-btn-sm);
+}
+/* Sólo «h libres» lo lleva: es el único de los cuatro que responde a la
+   pregunta con la que se abre el panel —¿qué me queda?—, y por eso es el único
+   que se pinta con la marca. Si algún día lo llevan dos, deja de significar. */
+.ag-tile--primario { background: var(--ag-primary-bg-faint); }
+.ag-tile-n {
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1.1;
+  color: var(--ag-ink);
+}
+.ag-tile--primario .ag-tile-n { color: var(--ag-brand-legible); }
+.ag-tile-l {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ag-muted);
+}
+
+/* ── El desglose por estado ───────────────────────────────────────────── */
+.ag-desglose {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--ag-hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ag-desglose-fila {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--ag-text);
+}
+/* El color lo pone `page.tsx` con el token `-dot` del estado, el mismo que la
+   barra de la tarjeta y el mismo que la leyenda. Aquí sólo va la forma. */
+.ag-desglose-punto {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  flex: none;
+}
+
+/* ── Los huecos ───────────────────────────────────────────────────────────
+   ⚠️ EL BORDE DISCONTINUO NO ES DECORACIÓN: es lo que distingue «espacio
+   disponible» de «evento existente» SIN depender del color, que es la misma
+   regla que hace legible la agenda entera para quien no distingue tonos. Si
+   alguien lo pasa a sólido «porque queda más limpio», el hueco pasa a leerse
+   como una cita más. */
+.ag-huecos {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ag-hueco {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;               /* el mínimo táctil de la agenda */
+  padding: 0 12px;
+  background: var(--ag-surface-sunken);
+  border: 1px dashed var(--ag-line-dash);
+  border-radius: var(--ag-r-btn-sm);
+  cursor: pointer;
+  /* Sólo color, nunca geometría: animar el alto de la lista al recalcularse es
+     justo lo que el documento de contraste y movimiento deja fuera. */
+  transition: background-color var(--ag-dur-micro) var(--ag-ease),
+              border-color var(--ag-dur-micro) var(--ag-ease);
+}
+.ag-hueco:hover,
+.ag-hueco:focus-visible {
+  background: var(--ag-primary-bg-faint);
+  border-color: var(--ag-brand-legible);
+}
+.ag-hueco-rango {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ag-ink);
+}
+.ag-hueco-dur {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--ag-muted);
+}
+
+/* El vacío de la tarjeta de huecos. La tarjeta NO se oculta —una card que
+   desaparece se lee como un fallo de carga—, así que este estado tiene que
+   verse como contenido y no como un agujero. */
+.ag-panelcard-vacio {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ag-muted);
+}
+.ag-panelcard-vacio > svg {
+  flex: none;
+  color: var(--ag-faint);
+}
+
 /* ════════════════════════════════════════════════════════════════
    AGENDA — MODO OSCURO (sub-fase 6). Contrapartes de los --ag-*.
    Valores del handoff design/agenda/design_handoff_agenda/theme.js
@@ -4534,6 +4772,21 @@ html.dark {
   --ag-hour-line: rgba(255, 255, 255, .07);
   --ag-col-line: rgba(255, 255, 255, .05);
   --ag-hairline: rgba(255, 255, 255, .08);
+  /* ── Los tres del panel lateral (bloque 8) ────────────────────────────
+     ⚠️ DERIVADOS DE LA FAMILIA NAVY DE ESTE BLOQUE, NO DE `MODO_OSCURO_AGENDA.md`.
+     Aquel documento pide neutros grises (#1E1E1E de fondo, #262626 elevada,
+     #171717 hundida) y esa parte suya QUEDÓ DESFASADA: lo que se shippeó fue
+     esta paleta azul —`--ag-surface: #1b2a40`—, y un hundido gris encima de un
+     navy se vería como una mancha sucia, no como profundidad. Sus colores de
+     ESTADO sí se implementaron tal cual y siguen siendo la referencia; sus
+     neutros no. No los "corrijas" contra el documento.
+     El hundido es el mismo tono que `--ag-chip-bg`/`--ag-segment-bg` usan en
+     oscuro: ahí abajo la familia converge en un solo escalón bajo la superficie.
+     La línea va en blanco con alfa —la «línea fuerte» del documento, que esa
+     parte sí vale— para funcionar igual sobre superficie y sobre hundido. */
+  --ag-surface-sunken: #16233a;
+  --ag-line-dash: rgba(255, 255, 255, .16);
+  --ag-primary-bg-faint: rgba(91, 140, 255, .10);
   /* Texto */
   --ag-ink: #e8eef6;
   --ag-text: #cdd8e6;

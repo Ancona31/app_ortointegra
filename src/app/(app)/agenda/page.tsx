@@ -3983,6 +3983,448 @@ function PanelDelDia(
   )
 }
 
+/* ═══ BLOQUE 8 · EL PANEL LATERAL DE LA VISTA DÍA ══════════════════════════
+   Dos tarjetas a la derecha de la rejilla, SÓLO en `timeGridDay` y SÓLO en
+   escritorio. El montaje lo decide el tipo de vista que reporta FullCalendar,
+   nunca un media query (SPEC_AGENDA §8.2).
+
+   ⚠️ LAS REGLAS DE OCUPACIÓN DE AQUÍ CORRIGEN AL SPEC, Y LA DIFERENCIA IMPORTA.
+   §8.3 y la tabla de §8.4 dicen que ni «cancelada» ni «no asistió» restan hueco.
+   La decisión de producto es otra y es la que manda:
+
+     · `cancelled` NO ocupa — el tramo queda libre y es el caso de negocio que
+       crea huecos: alguien canceló, ¿qué me queda?
+     · `no_show` SÍ ocupa — el paciente no vino, pero la hora se consumió y
+       ofrecerla como libre sería ofrecer una hora que ya pasó.
+     · Eventos de Google CON HORA ocupan, visibles u ocultos. Hoy no hay
+       interruptor de visibilidad, así que la segunda mitad de esa frase no
+       tiene todavía a qué aplicarse; se deja escrita porque el día que exista,
+       ocultar no debe liberar.
+     · Los de TODO EL DÍA no dan horas, ni de Google ni propios. Una guardia
+       hospitalaria de 24 h no deja el día sin huecos.
+     · Los eventos propios con hora ocupan.
+
+   Si alguien vuelve al spec y ve la contradicción: la que vale es ésta. */
+
+/** Un tramo del día, en MINUTOS DESDE LA MEDIANOCHE LOCAL.
+ *
+ *  ⚠️ MINUTOS Y NO `Date`, A PROPÓSITO. El horario del consultorio es hora de
+ *  PARED (`'09:00'`) y la rejilla coloca los eventos en la zona del navegador,
+ *  que es la misma base. Trabajar en minutos desde medianoche deja la
+ *  aritmética en enteros y hace que recortar, fusionar y restar sean una línea
+ *  cada uno. La única grieta conocida es el día del cambio de horario de
+ *  verano, donde «minutos desde medianoche» y hora de pared se separan 60: en
+ *  México no aplica desde 2022, y el precio de cubrirlo sería arrastrar husos
+ *  por todo el cálculo. */
+type Tramo = { desde: number; hasta: number }
+
+const MINUTOS_POR_DIA = 24 * 60
+
+/** El tramo libre más corto que se ofrece. Por debajo no cabe una consulta, y
+ *  listarlo sería ruido: en el mockup los huecos de 30 min entre citas no
+ *  salen. Es la misma cifra que dice el texto de la tarjeta vacía. */
+const HUECO_MINIMO = 60
+
+function minutosDeReloj(hhmm: string): number {
+  const [h = '0', m = '0'] = hhmm.split(':')
+  return Number(h) * 60 + Number(m)
+}
+
+function relojDeMinutos(min: number): string {
+  return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`
+}
+
+/** «08:00 – 09:00». Guión largo, el mismo que `titleRangeSeparator`. */
+function etiquetaDeRango(t: Tramo): string {
+  return `${relojDeMinutos(t.desde)} – ${relojDeMinutos(t.hasta)}`
+}
+
+/** «60 min», «2 h», «2 h 30 min». El corte en 120 no es arbitrario: el mockup
+ *  escribe «60 min» y no «1 h», así que la hora sola no se abrevia. */
+function etiquetaDeDuracion(min: number): string {
+  if (min < 120) return `${min} min`
+  const resto = min % 60
+  return resto === 0 ? `${min / 60} h` : `${Math.floor(min / 60)} h ${resto} min`
+}
+
+/** «5:00». El número grande del tile, en la forma H:MM del mockup. */
+function etiquetaDeHoras(min: number): string {
+  return `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`
+}
+
+/** Las formas contadas de cada estado: «2 agendadas», «1 no asistió».
+ *
+ *  ⚠️ ES UNA SEGUNDA REDACCIÓN DE `STATUS_CONFIG`, y aquí sí hace falta. Aquél
+ *  guarda la etiqueta suelta y capitalizada que pinta la leyenda y el selector
+ *  («Agendada»); esto guarda la forma que va detrás de un número, en minúscula
+ *  y con plural propio. No se puede derivar con un sufijo: «No asistió» en
+ *  plural es «no asistieron», no «no asistiós». */
+const ESTADO_CONTADO: Record<Status, { uno: string; varios: string }> = {
+  scheduled: { uno: 'agendada',   varios: 'agendadas'     },
+  confirmed: { uno: 'confirmada', varios: 'confirmadas'   },
+  cancelled: { uno: 'cancelada',  varios: 'canceladas'    },
+  no_show:   { uno: 'no asistió', varios: 'no asistieron' },
+  attended:  { uno: 'atendida',   varios: 'atendidas'     },
+}
+
+/** La medianoche local del día. Base de toda la aritmética de este bloque. */
+function medianocheDe(dia: Date): Date {
+  const d = new Date(dia)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+/** La jornada del consultorio ese día, o `null` si no abre.
+ *
+ *  Sale del MISMO objeto `horario` que alimenta `businessHours`, así que el
+ *  gris de fuera de horario de la rejilla y el suelo/techo de los huecos no
+ *  pueden decir cosas distintas. */
+function jornadaDelDia(dia: Date, horario: Horario): Tramo | null {
+  const conf = DIAS.find(d => d.fc === dia.getDay())
+  if (!conf) return null
+  const hd = horario[conf.key]
+  if (!hd?.activo) return null
+  const desde = minutosDeReloj(hd.inicio)
+  const hasta = minutosDeReloj(hd.fin)
+  return hasta > desde ? { desde, hasta } : null
+}
+
+/** Si un evento consume hora del día. Las reglas están arriba, en la cabecera
+ *  del bloque; esto es su única implementación. */
+function eventoOcupa(ev: EventApi): boolean {
+  if (ev.allDay) return false
+  /* ANOTADO Y NO CASTEADO, igual que en `filasDelDia`: `extendedProps` es
+     `Dictionary` (`Record<string, any>`) y leerlo directo mete `any` en el
+     archivo. `Partial` porque la fuente de Google no trae ninguno. */
+  const ext: Partial<Appointment> & { isGcalBlock?: boolean } = ev.extendedProps
+  if (ext?.isGcalBlock === true) return true
+  return ext?.status !== 'cancelled'
+}
+
+/**
+ * Los tramos que los eventos ocupan dentro del día, ya recortados a él y sin
+ * ordenar. Uno por evento: la fusión es el paso siguiente.
+ *
+ * ⚠️ SOLAPAMIENTO SEMIABIERTO, igual que en `filasDelDia`: un evento que TERMINA
+ * a la medianoche de este día es del día anterior y no entra. Y el recorte a
+ * `[0, MINUTOS_POR_DIA]` es lo que deja pasar sin cuidado a los eventos que
+ * cruzan la medianoche por cualquiera de los dos extremos.
+ */
+function tramosDeOcupacion(eventos: readonly EventApi[], dia: Date): Tramo[] {
+  const base = medianocheDe(dia).getTime()
+  const fin = base + MINUTOS_POR_DIA * 60_000
+  const tramos: Tramo[] = []
+  for (const ev of eventos) {
+    if (!ev.start || !ev.end) continue
+    if (!(ev.start.getTime() < fin && ev.end.getTime() > base)) continue
+    if (!eventoOcupa(ev)) continue
+    const desde = Math.max(0, Math.round((ev.start.getTime() - base) / 60_000))
+    const hasta = Math.min(MINUTOS_POR_DIA, Math.round((ev.end.getTime() - base) / 60_000))
+    if (hasta > desde) tramos.push({ desde, hasta })
+  }
+  return tramos
+}
+
+/** Ordena y funde los solapados en uno. Sin esto dos citas de 09:00–10:00 y
+ *  09:30–10:30 darían dos horas ocupadas donde sólo hay hora y media, y el
+ *  complemento —los huecos— saldría con tramos negativos. */
+function fusionarTramos(tramos: readonly Tramo[]): Tramo[] {
+  const fundidos: Tramo[] = []
+  for (const t of [...tramos].sort((a, b) => a.desde - b.desde)) {
+    const ultimo = fundidos[fundidos.length - 1]
+    if (ultimo && t.desde <= ultimo.hasta) ultimo.hasta = Math.max(ultimo.hasta, t.hasta)
+    else fundidos.push({ ...t })
+  }
+  return fundidos
+}
+
+/**
+ * Recorta los tramos a la jornada y descarta los que se quedan fuera.
+ *
+ * ⚠️ ES LO QUE HACE QUE `ocupadas + libres` SEA LA JORNADA, SIEMPRE. Una cirugía
+ * de 19:00 a 21:00 con el consultorio hasta las 18:00 aporta CERO horas
+ * ocupadas: el día tiene diez horas de consulta y las diez se reparten entre
+ * ocupadas y libres. Sin el recorte los dos números dejarían de ser
+ * complementarios y el panel enseñaría una suma que no cuadra con su propio
+ * horario. Es también lo que el mockup comprueba: 08:00–18:00, 5:00 y 5:00.
+ */
+function recortarATramo(tramos: readonly Tramo[], jornada: Tramo): Tramo[] {
+  const dentro: Tramo[] = []
+  for (const t of tramos) {
+    const desde = Math.max(t.desde, jornada.desde)
+    const hasta = Math.min(t.hasta, jornada.hasta)
+    if (hasta > desde) dentro.push({ desde, hasta })
+  }
+  return dentro
+}
+
+/** El complemento de la ocupación dentro de la jornada, con suelo de duración.
+ *  `ocupados` tiene que llegar ordenado y fundido. */
+function huecosDe(jornada: Tramo, ocupados: readonly Tramo[], minimo: number): Tramo[] {
+  const huecos: Tramo[] = []
+  let cursor = jornada.desde
+  for (const t of ocupados) {
+    if (t.desde - cursor >= minimo) huecos.push({ desde: cursor, hasta: t.desde })
+    cursor = Math.max(cursor, t.hasta)
+  }
+  if (jornada.hasta - cursor >= minimo) huecos.push({ desde: cursor, hasta: jornada.hasta })
+  return huecos
+}
+
+/**
+ * El desglose por estado, SÓLO DE CITAS y sólo con los estados presentes.
+ *
+ * Ni los eventos genéricos ni los de Google entran: un evento no tiene estado
+ * de cita —`ESTADOS_EVENTO` sólo le ofrece dos de los cinco— y un bloque de
+ * Google no tiene ninguno. El mockup lo confirma: tres citas arriba, «2
+ * agendadas · 1 atendida» abajo, y los tres eventos fuera de la lista.
+ *
+ * El orden es el de `ESTADOS_CITA`, que es el mismo del selector y el de la
+ * leyenda: tres sitios que enumeran estados y ninguno en un orden propio.
+ */
+function desgloseDeEstados(
+  eventos: readonly EventApi[],
+  dia: Date,
+): { estado: Status; n: number }[] {
+  const base = medianocheDe(dia).getTime()
+  const fin = base + MINUTOS_POR_DIA * 60_000
+  const cuenta = new Map<Status, number>()
+  for (const ev of eventos) {
+    if (!ev.start) continue
+    if (ev.start.getTime() < base || ev.start.getTime() >= fin) continue
+    const ext: Partial<Appointment> & { isGcalBlock?: boolean } = ev.extendedProps
+    if (ext?.isGcalBlock === true) continue
+    if (esEventoGenerico({ paciente_id: ext?.paciente_id ?? null })) continue
+    const estado = ext?.status
+    if (!estado) continue
+    cuenta.set(estado, (cuenta.get(estado) ?? 0) + 1)
+  }
+  return ESTADOS_CITA
+    .map(estado => ({ estado, n: cuenta.get(estado) ?? 0 }))
+    .filter(x => x.n > 0)
+}
+
+/** Cuántos eventos de todo el día caen en el día. Sólo para la línea que
+ *  explica por qué no dan horas; no entra en ningún número. */
+function contarTodoElDia(eventos: readonly EventApi[], dia: Date): number {
+  const base = medianocheDe(dia).getTime()
+  const fin = base + MINUTOS_POR_DIA * 60_000
+  let n = 0
+  for (const ev of eventos) {
+    if (!ev.allDay || !ev.start) continue
+    if (ev.start.getTime() < fin && (ev.end ?? ev.start).getTime() > base) n += 1
+  }
+  return n
+}
+
+/** Todo lo que el panel pinta, ya resuelto. Aquí no se vuelve a mirar ningún
+ *  `EventApi`: el panel es una función de esto. */
+type ResumenDia = {
+  /** El día resumido. Lo necesita el clic en un hueco para componer la
+      selección; no se vuelve a derivar del calendario. */
+  dia: Date
+  porEstado: readonly { estado: Status; n: number }[]
+  todoElDia: number
+  /** `null` cuando el consultorio no abre. Entonces no hay horas ni huecos. */
+  jornada: Tramo | null
+  /** Minutos. Complementarios dentro de la jornada: suman su duración. */
+  ocupadas: number
+  libres: number
+  huecos: readonly Tramo[]
+}
+
+function resumenDelDia(eventos: readonly EventApi[], dia: Date, horario: Horario): ResumenDia {
+  const porEstado = desgloseDeEstados(eventos, dia)
+  const todoElDia = contarTodoElDia(eventos, dia)
+  const jornada = jornadaDelDia(dia, horario)
+  if (!jornada) return { dia, porEstado, todoElDia, jornada: null, ocupadas: 0, libres: 0, huecos: [] }
+
+  const ocupados = recortarATramo(fusionarTramos(tramosDeOcupacion(eventos, dia)), jornada)
+  const ocupadas = ocupados.reduce((suma, t) => suma + (t.hasta - t.desde), 0)
+  return {
+    dia,
+    porEstado,
+    todoElDia,
+    jornada,
+    ocupadas,
+    libres: (jornada.hasta - jornada.desde) - ocupadas,
+    huecos: huecosDe(jornada, ocupados, HUECO_MINIMO),
+  }
+}
+
+/* La misma disciplina de guarda que `ventana`, `conteo` y `filasDia`: se compara
+   una CADENA y no el objeto, porque el resumen se reconstruye entero en cada
+   llamada y su identidad no vale para nada. Con la firma, un `eventsSet` que no
+   cambia nada del día muere en el bail-out de React. */
+function firmaDelResumen(r: ResumenDia | null): string {
+  if (!r) return ''
+  return [
+    r.dia.getTime(), r.todoElDia, r.ocupadas, r.libres,
+    r.jornada ? `${r.jornada.desde}-${r.jornada.hasta}` : 'cerrado',
+    r.porEstado.map(e => `${e.estado}:${e.n}`).join(','),
+    r.huecos.map(h => `${h.desde}-${h.hasta}`).join(','),
+  ].join('|')
+}
+
+/* ─── Las piezas visuales ──────────────────────────────────────────────── */
+
+/** Un tile del resumen. `valor` es una CADENA ya formateada y no un número
+ *  porque el guión de «sin dato» es un valor legítimo — ver `SIN_DATO`. */
+const TileResumen = memo(function TileResumen(
+  { valor, etiqueta, tono }: { valor: string; etiqueta: string; tono?: 'primario' },
+) {
+  return (
+    <div className={`ag-tile${tono === 'primario' ? ' ag-tile--primario' : ''}`}>
+      <span className="ag-tile-n">{valor}</span>
+      <span className="ag-tile-l">{etiqueta}</span>
+    </div>
+  )
+})
+
+/* ⚠️ UN GUIÓN Y NO UN CERO, y es una regla de §11, no una preferencia. Un `0`
+   es un dato: dice «hoy no tienes nada ocupado». El guión dice «esto no se
+   sabe», que es lo cierto mientras el horario no ha llegado, el consultorio no
+   abre o el filtro está en «Todos los médicos». Enseñar `0:00` en cualquiera de
+   esos tres casos sería inventarse una jornada vacía. */
+const SIN_DATO = '—'
+
+/* El desglose por estado. Fuera de `CardResumen` porque es la costura natural
+   de la tarjeta —arriba los cuatro números, abajo el detalle— y porque juntas
+   pasaban de 50 líneas.
+
+   ⚠️ LOS ESTADOS CON CERO NO SE LISTAN, y los filtra `desgloseDeEstados` antes
+   de llegar aquí: esto es un RESUMEN, no una tabla (§8.3). Es justo lo
+   contrario que la leyenda de la tarjeta del calendario, que sí pinta los cinco
+   siempre — allí explica una escala, aquí cuenta lo que hay. */
+function DesgloseEstados({ filas }: { filas: readonly { estado: Status; n: number }[] }): ReactElement | null {
+  if (filas.length === 0) return null
+  return (
+    <ul className="ag-desglose">
+      {filas.map(({ estado, n }) => (
+        <li key={estado} className="ag-desglose-fila">
+          {/* UN token y un solo color, `-dot`: el mismo que la tarjeta pinta en
+              su `borderLeft` y el mismo que la leyenda. Nunca un hex. */}
+          <span className="ag-desglose-punto" style={{ backgroundColor: `var(--ag-status-${estado}-dot)` }} />
+          <span>{n} {n === 1 ? ESTADO_CONTADO[estado].uno : ESTADO_CONTADO[estado].varios}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function CardResumen(
+  { titulo, citas, eventos, resumen, horasVisibles }: {
+    titulo: string
+    citas: number
+    eventos: number
+    resumen: ResumenDia | null
+    /** `false` en «Todos los médicos»: los dos tiles de horas pasan a guión. */
+    horasVisibles: boolean
+  },
+): ReactElement {
+  const conHoras = horasVisibles && resumen?.jornada != null
+  return (
+    <section className="ag-panelcard" aria-label={titulo}>
+      <h2 className="ag-panelcard-tit">{titulo}</h2>
+      <div className="ag-tiles">
+        <TileResumen valor={String(citas)} etiqueta={citas === 1 ? 'cita' : 'citas'} />
+        <TileResumen valor={String(eventos)} etiqueta={eventos === 1 ? 'evento' : 'eventos'} />
+        <TileResumen valor={conHoras ? etiquetaDeHoras(resumen.ocupadas) : SIN_DATO} etiqueta="h ocupadas" />
+        <TileResumen valor={conHoras ? etiquetaDeHoras(resumen.libres) : SIN_DATO} etiqueta="h libres" tono="primario" />
+      </div>
+      <DesgloseEstados filas={resumen?.porEstado ?? []} />
+      {!horasVisibles && (
+        <p className="ag-panelcard-nota">Elige un médico para ver las horas y los huecos.</p>
+      )}
+      {horasVisibles && resumen && resumen.jornada == null && (
+        <p className="ag-panelcard-nota">Sin horario de consulta este día.</p>
+      )}
+      {/* Los de todo el día no dan horas y eso, sin decirlo, se lee como un
+          error: la banda de arriba enseña una guardia de 24 h y el panel sigue
+          ofreciendo huecos. La línea es la explicación. */}
+      {horasVisibles && resumen && resumen.todoElDia > 0 && (
+        <p className="ag-panelcard-nota">
+          {resumen.todoElDia === 1
+            ? '1 evento de todo el día, que no ocupa horas.'
+            : `${resumen.todoElDia} eventos de todo el día, que no ocupan horas.`}
+        </p>
+      )}
+    </section>
+  )
+}
+
+/* La tarjeta NO se oculta cuando no hay huecos, y es deliberado (§8.4): una
+   card que desaparece se lee como un fallo de carga. Lo que cambia es el
+   contenido, y el texto dice cuál de los dos motivos es. */
+function CardHuecos(
+  { resumen, onHueco }: { resumen: ResumenDia | null; onHueco: (t: Tramo) => void },
+): ReactElement {
+  const jornada = resumen?.jornada ?? null
+  const huecos = resumen?.huecos ?? []
+  return (
+    <section className="ag-panelcard" aria-label="Huecos disponibles">
+      <h2 className="ag-panelcard-tit">Huecos disponibles</h2>
+      {huecos.length > 0 ? (
+        <div className="ag-huecos">
+          {huecos.map(h => (
+            <button
+              key={`${h.desde}-${h.hasta}`}
+              type="button"
+              className="ag-hueco"
+              onClick={() => onHueco(h)}
+            >
+              <span className="ag-hueco-rango">{etiquetaDeRango(h)}</span>
+              <span className="ag-hueco-dur">{etiquetaDeDuracion(h.hasta - h.desde)}</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="ag-panelcard-vacio">
+          <Calendar size={22} aria-hidden />
+          {jornada
+            ? `Día completo · No queda ningún tramo de ${HUECO_MINIMO} min libre entre ${etiquetaDeRango(jornada)}`
+            : 'Consultorio cerrado · No hay horario de consulta este día'}
+        </p>
+      )}
+    </section>
+  )
+}
+
+/**
+ * El panel entero.
+ *
+ * ⚠️ LA TARJETA DE HUECOS NO SALE CON EL FILTRO EN «TODOS LOS MÉDICOS», y no es
+ * un recorte de funciones: con varios médicos un hueco de uno es hora ocupada
+ * de otro, así que CUALQUIER número sería mentira. Los conteos de citas y
+ * eventos sí valen agregados —son cosas que existen, se sumen como se sumen—;
+ * las horas y los huecos no, y por eso los tiles de horas pasan a guión por el
+ * mismo camino (`horasVisibles`). Ver la nota de `SIN_DATO`.
+ */
+function PanelDia(
+  { titulo, citas, eventos, resumen, unMedico, onHueco }: {
+    titulo: string
+    citas: number
+    eventos: number
+    resumen: ResumenDia | null
+    unMedico: boolean
+    onHueco: (t: Tramo) => void
+  },
+): ReactElement {
+  return (
+    <aside className="ag-dia-aside">
+      <CardResumen
+        titulo={titulo}
+        citas={citas}
+        eventos={eventos}
+        resumen={resumen}
+        horasVisibles={unMedico}
+      />
+      {unMedico && <CardHuecos resumen={resumen} onHueco={onHueco} />}
+    </aside>
+  )
+}
+
+
 /* ─── Página principal ─────────────────────────────────── */
 
 /* Segmentos del control de vistas. SÓLO TEXTO desde el bloque 4: llevaban un
@@ -4791,6 +5233,48 @@ export default function AgendaPage() {
     if (!api) return
     aplicarPanel(api.getEvents())
   }, [diaSel, aplicarPanel])
+
+  /* ── EL RESUMEN Y LOS HUECOS DE LA VISTA DÍA (bloque 8) ────────────────
+     Mismo patrón que `conteo` y que el panel del mes, y por el mismo motivo:
+     cuelga de los dos disparadores del calendario, guarda LA SALIDA y no los
+     eventos de los que sale, y se protege con una firma para que las dos
+     emisiones por navegación no sean dos renders del árbol entero.
+
+     ⚠️ SE CALCULA EN EL CLIENTE Y SOBRE LO QUE YA ESTÁ CARGADO. Ni ruta nueva
+     ni consulta al servidor: los eventos del día ya están en el `eventStore` y
+     el horario ya llegó por SWR para `businessHours`. Un endpoint de
+     disponibilidad sería una segunda fuente de verdad sobre las mismas filas.
+
+     ⚠️ INERTE FUERA DE `timeGridDay`. Vale `null` en cualquier otra vista, así
+     que en Semana, en Mes y en las listas esto no cuesta ni un recorrido: la
+     guarda de vista está ANTES del cálculo, no después. */
+  const [resumenDia, setResumenDia] = useState<ResumenDia | null>(null)
+
+  const aplicarResumen = useCallback((
+    eventos: readonly EventApi[],
+    rangos: RangosDeVista | null,
+    vista: string,
+  ) => {
+    /* El día es `activeStart` y no `new Date()`: el panel sigue al calendario,
+       no compite con él (§8.3). En `timeGridDay` el rango activo es ese único
+       día, así que «el primer día del rango» y «el día pintado» son lo mismo y
+       no hace falta la rama de «hoy si cae dentro» que pide el spec para las
+       vistas de varios días — aquí no hay ninguna. */
+    const nuevo = vista === 'timeGridDay' && rangos
+      ? resumenDelDia(eventos, rangos.activo.activeStart, horarioRef.current)
+      : null
+    setResumenDia(prev => (firmaDelResumen(prev) === firmaDelResumen(nuevo) ? prev : nuevo))
+  }, [])
+
+  /* El horario es la SEGUNDA entrada del resumen y llega por SWR, que puede
+     resolver DESPUÉS del último `eventsSet`. Este efecto es quien cubre esa
+     entrada —igual que el gemelo que cubre la ventana de la rejilla— y de paso
+     hace el primer cálculo del montaje. */
+  useEffect(() => {
+    const api = calendarRef.current?.getApi()
+    if (!api) return
+    aplicarResumen(api.getEvents(), rangoDeVista(), api.view.type)
+  }, [horario, aplicarResumen, rangoDeVista])
 
   /* ⚠️ EL MES SE COMPARA CON UN REF, Y SIN ESO EL PANEL NO SE PODRÍA USAR.
      La regla es «al navegar de mes, el panel muestra el primer día del mes», y
@@ -6146,6 +6630,43 @@ export default function AgendaPage() {
      combinación que se lleva por delante el toque en una celda. */
   const esMesMovil = isMobile && currentView === 'dayGridMonth'
 
+  /* ── EL PANEL LATERAL DE LA VISTA DÍA (bloque 8) ───────────────────────
+     ⚠️ POR EL TIPO DE VISTA Y POR `isMobile`, NUNCA POR UN MEDIA QUERY. El
+     montaje lo decide la vista que reporta FullCalendar (§8.2), e `isMobile`
+     cuelga de `ANCHO_MOVIL`, que ya es el umbral de 1024 del spec: entre 768 y
+     1024 va el layout de escritorio SIN panel, y eso es exactamente lo que esta
+     condición deja fuera. Por debajo del umbral el panel NO SE RENDERIZA — no
+     es que se esconda con CSS. */
+  const panelDelDia = !isMobile && currentView === 'timeGridDay'
+
+  /* Con un médico se puede hablar de horas y de huecos; con «Todos los
+     médicos» no. Cubre los dos caminos por los que hay uno solo: la clínica que
+     sólo tiene uno —donde el desplegable ni se pinta— y el filtro puesto. El
+     porqué está en la nota de `PanelDia`. */
+  const unMedico = isSingleDoctor || filtroMedico !== ''
+
+  /* «Resumen · Dra. X» sólo cuando hay filtro: en una clínica de un solo médico
+     el nombre no distingue nada de nada y ocuparía la línea del título. */
+  const medicoFiltrado = filtroMedico ? medicos.find(m => m.id === filtroMedico) : undefined
+  const tituloResumen = medicoFiltrado
+    ? `Resumen · ${componerNombreMedicoCompleto(medicoFiltrado)}`
+    : 'Resumen del día'
+
+  /* ⚠️ `select()` ANTES DE ABRIR EL FORMULARIO, Y ESE ORDEN ES EL PUNTO (§8.4):
+     el usuario ve marcado en la rejilla el tramo que va a ocupar antes de que el
+     modal lo tape. Aquí NO se llama a `abrirAlta`: `select()` dispara el
+     callback `select`, o sea `handleSelect`, que es LA MISMA PUERTA que el
+     arrastre sobre la rejilla —mismo bloqueo por suscripción, mismo aviso de
+     fuera de horario, mismo `tipo: 'cita'`—. Dos puertas al mismo sitio tienen
+     que hacer lo mismo, y ésta lo consigue no siendo una segunda puerta.
+     Requiere `selectable`, que en escritorio está encendido. */
+  function abrirHueco(t: Tramo) {
+    const api = calendarRef.current?.getApi()
+    if (!api || !resumenDia) return
+    const base = medianocheDe(resumenDia.dia).getTime()
+    api.select(new Date(base + t.desde * 60_000), new Date(base + t.hasta * 60_000))
+  }
+
   const resumenConteo = frasearConteo(conteo)
   /* La banda del teléfono lleva la forma abreviada; el header de escritorio, la
      larga. Ver `frasearConteoBreve`. */
@@ -6697,6 +7218,26 @@ export default function AgendaPage() {
           del día—, así que la cuadrícula pasa a medir lo suyo (seis semanas) y
           el sobrante se lo lleva el panel. El alto exacto y el porqué de que sea
           calculable están en `globals.css`, junto a `.ag-cal-mes-movil`. */}
+      {/* ═══ EL REPARTO EN DOS COLUMNAS DE LA VISTA DÍA (bloque 8) ═════════
+          ⚠️ ESTE ENVOLTORIO ESTÁ SIEMPRE EN EL DOM, Y ESO ES LO QUE PROTEGE AL
+          CALENDARIO. Montarlo sólo en Día cambiaría el PADRE de `.agenda-fc` al
+          entrar y al salir de la vista, y React no reconcilia eso: desmonta el
+          subárbol entero y vuelve a montarlo, o sea que `<FullCalendar>` se
+          reconstruye —pierde el scroll, rehace las fuentes— en cada cambio de
+          vista. Con el nodo fijo, lo único que cambia es una clase.
+
+          ⚠️ Y POR ESO LA CLASE BASE ES `display: contents`. Sin panel, el
+          envoltorio DESAPARECE del layout y `.agenda-fc` sigue siendo hijo flex
+          directo de `.agenda-raiz` con su `flex-1 min-h-[250px]` intacto: el
+          reparto vertical de las otras cuatro vistas no se entera de que este
+          nodo existe. Sólo `--con-panel` lo enciende como fila flex, y ahí el
+          `flex-1 min-h-[250px]` pasa a vivir en el envoltorio. Los dos estados
+          están en `globals.css`, en líneas contiguas.
+
+          ⚠️ LA TARJETA CONSERVA SU SANGRÍA A PROPÓSITO. Re-indentarla serían
+          ~320 líneas de diff que taparían el cambio de verdad, que son estas
+          dos etiquetas. */}
+      <div className={`ag-dia${panelDelDia ? ' ag-dia--con-panel' : ''}`}>
       <div className={`agenda-fc bg-white rounded-2xl border border-slate-100 shadow-sm overflow-clip flex-1 min-h-[250px]${
         esMesMovil ? ' ag-cal-mes-movil' : ''}`}>
         {/* ── Leyenda ───────────────────────────────────────────────────
@@ -6884,12 +7425,19 @@ export default function AgendaPage() {
                quien recalcula es su propio efecto, un render después. */
             sincronizarDiaDelPanel(arg.view)
             aplicarPanel(eventos)
+            /* El resumen del bloque 8 va el último y de la misma llamada, por
+               lo mismo que los tres de arriba: los eventos y los rangos ya
+               están resueltos aquí. La VISTA sale del `arg` y NUNCA de
+               `currentView`: el `setCurrentView` de la primera línea de este
+               handler todavía no ha llegado al render. */
+            aplicarResumen(eventos, rangos, arg.view.type)
           }}
           eventsSet={eventos => {
             const rangos = rangoDeVista()
             aplicarVentana(eventos, rangos)
             aplicarConteo(eventos, rangos)
             aplicarPanel(eventos)
+            aplicarResumen(eventos, rangos, calendarRef.current?.getApi().view.type ?? '')
           }}
           buttonText={{ today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día' }}
           slotMinTime={ventana.slotMinTime}
@@ -7010,6 +7558,25 @@ export default function AgendaPage() {
           eventTimeFormat={{ hour: '2-digit', minute: '2-digit', meridiem: false, hour12: false }}
           slotLabelFormat={{ hour: '2-digit', minute: '2-digit', meridiem: false, hour12: false }}
         />
+      </div>
+
+      {/* El panel va DENTRO del envoltorio y detrás de la tarjeta: es la
+          segunda columna de la fila, no un hermano de la raíz. */}
+      {panelDelDia && (
+        <PanelDia
+          titulo={tituloResumen}
+          citas={conteo.citas}
+          /* ⚠️ LOS DOS SUMANDOS, Y NO SÓLO `conteo.eventos`. Para el subtítulo
+             de la página los eventos propios y los de Google son categorías
+             distintas —«2 eventos · 1 de Google»—; para este tile son la misma
+             cosa: lo que hay en la agenda que no es una cita. El mockup lo
+             fija en «3 eventos» con un evento propio y dos de Google. */
+          eventos={conteo.eventos + conteo.google}
+          resumen={resumenDia}
+          unMedico={unMedico}
+          onHueco={abrirHueco}
+        />
+      )}
       </div>
 
       {/* ═══ PANEL DEL DÍA (sólo el mes del teléfono) ═════════════════════
