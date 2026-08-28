@@ -6,7 +6,7 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
 import listPlugin, { type NoEventsContentArg } from '@fullcalendar/list'
-import { EventClickArg, EventDropArg, DateSelectArg, EventInput, EventApi, EventContentArg, DayHeaderContentArg, NowIndicatorContentArg } from '@fullcalendar/core'
+import { EventClickArg, EventDropArg, DateSelectArg, EventInput, EventApi, EventContentArg, DayCellContentArg, DayHeaderContentArg, MoreLinkContentArg, NowIndicatorContentArg, ViewApi } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
 import { X, Calendar, User, Plus, Trash2, Settings, ChevronDown, FileText, Stethoscope, Loader2, Mail,
          CalendarPlus, ChevronsDownUp, Menu, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react'
@@ -36,7 +36,7 @@ import {
   type RangoVisible,
   type VentanaRejilla,
 } from '@/lib/agenda/ventanaRejilla'
-import { differenceInCalendarDays } from 'date-fns'
+import { addWeeks, differenceInCalendarDays, startOfWeek } from 'date-fns'
 import { TZ_CLINICA, desplazarFecha, fechaSoloSegura, renderEnTZ } from '@/lib/dates'
 import useSWR from 'swr'
 import {
@@ -416,18 +416,24 @@ const HORARIO_DEFAULT: Horario = {
  *
  *  · `activo` es `activeRange`: lo que la vista PINTA. Ya viene recortado por
  *    `trimHiddenDays`, así que con columnas ocultas le faltan días.
- *  · `completo` es `currentRange`: la unidad que la vista REPRESENTA, tal como
- *    sale de `buildCurrentRangeInfo` ANTES de que nadie recorte nada
- *    (`@fullcalendar/core/internal-common.js:2814`, versión 6.1.20).
+ *  · `completo` es lo que la vista representa SIN recortar por columnas
+ *    plegadas. En Semana y Día es `currentRange` tal cual sale de
+ *    `buildCurrentRangeInfo` (`@fullcalendar/core/internal-common.js:2814`,
+ *    versión 6.1.20); en MES es `renderRange` —el mes encajado a seis semanas—,
+ *    que es lo que esa vista pinta de verdad. Lo calcula `rangosDeLaVista`, y el
+ *    porqué de la excepción está en `semanasPintadasDelMes`.
+ *  · `esMes` dice si la vista es `dayGridMonth`. Lo lee `aplicarVentana` para
+ *    apagar la MITAD DEL ALTO del modo compacto: en Mes no hay `slotMinTime` que
+ *    encoger, así que compactar ahí sólo pliega columnas.
  *
  * ⚠️  `completo` NO SON SIEMPRE SIETE DÍAS, y creerlo ya costó un fallo. Depende
  * de la vista:
  *
  *    · `timeGridWeek` → la semana entera, de lunes a lunes: siete días.
  *    · `timeGridDay`  → UN solo día.
- *    · `dayGridMonth` → el mes natural, del día 1 al último. Ojo: son ~28-31
- *      días, pero NO incluye el relleno de semanas que esa vista sí pinta —eso
- *      vive en `renderRange`, que es más ancho.
+ *    · `dayGridMonth` → SEIS SEMANAS enteras, de lunes a lunes: 42 días. Aquí
+ *      es donde `completo` dejó de ser `currentRange` (que daba el mes natural,
+ *      de 28 a 31 días, sin el relleno de semanas que la vista sí pinta).
  *
  * ⚠️  DE ESE HECHO DEPENDE UNA GUARDA DE `diasOcultables`, Y NO SE PUEDE
  * RETIRAR. Ahí se calcula el conjunto `cubiertos` —los días de la semana que
@@ -444,7 +450,65 @@ const HORARIO_DEFAULT: Horario = {
  * duplicar el tipo; en `completo` esos nombres mienten un poco, y por eso este
  * comentario.
  */
-type RangosDeVista = { activo: RangoVisible; completo: RangoVisible }
+type RangosDeVista = { activo: RangoVisible; completo: RangoVisible; esMes: boolean }
+
+/* ⚠️ EL PRIMER DÍA DE LA SEMANA, Y TIENE QUE SER EL DE `esLocale`. El locale
+   español declara `week.dow: 1` (`@fullcalendar/core/locales/es.js:4`), o sea
+   lunes, y de ahí sale la primera columna de la rejilla del mes. Si algún día se
+   cambia el locale del calendario, este número cambia con él o el rango de abajo
+   deja de coincidir con lo que se pinta. */
+const PRIMER_DIA_SEMANA = 1
+
+/* ⚠️ SEIS, PORQUE `fixedWeekCount` NO SE TOCA. Su default es `true`
+   (`@fullcalendar/daygrid/internal.js:949-958`), así que `dayGridMonth` rellena
+   SIEMPRE hasta seis filas, mida lo que mida el mes. Si alguien pone
+   `fixedWeekCount: false` en `VISTAS_FC`, este número deja de ser fijo y hay que
+   derivarlo del rango. */
+const SEMANAS_PINTADAS_DEL_MES = 6
+
+/**
+ * El rango que la vista Mes PINTA de verdad: el mes encajado a semanas
+ * completas y rellenado hasta seis filas, o sea `renderRange`.
+ *
+ * ⚠️ ESTO ES EL «REQUISITO PREVIO» QUE PEDÍA `diasOcultables` POR ESCRITO, y no
+ * un refinamiento. Aquella función decide qué columnas se pliegan a partir del
+ * rango que se le pasa, y hasta ahora recibía `currentRange` — el mes natural,
+ * del 1 al último. Pero el mes natural NO es lo que se pinta: faltan hasta ~12
+ * días de relleno de las semanas de los extremos, así que una cita en uno de
+ * esos días no protegía su columna y el mes podía plegar un día CON trabajo
+ * dentro. Mientras «Compactar» estuvo apagado en Mes eso no mordía; al
+ * encenderlo pasa a ser un fallo real, y por eso esto va PRIMERO.
+ *
+ * ⚠️ Y NO SIRVE `activeRange` PARA ESTO, aunque sea exactamente el rango
+ * pintado. `trimHiddenDays` lo recorta por los dos extremos, así que con una
+ * columna ya plegada el rango se estrecha, sus eventos caen fuera del filtro, la
+ * columna sigue vacía y sigue plegada: un punto fijo del que sólo se sale
+ * recargando. Esto se calcula desde `currentRange`, que nadie recorta, así que
+ * el conjunto no depende de qué se plegó y el ciclo converge.
+ *
+ * Aritmética de CALENDARIO —`startOfWeek` y `addWeeks` de date-fns—, no de
+ * milisegundos: en el cambio de horario de verano un día no dura 24 horas.
+ */
+function semanasPintadasDelMes(inicio: Date): RangoVisible {
+  const desde = startOfWeek(inicio, { weekStartsOn: PRIMER_DIA_SEMANA })
+  return { activeStart: desde, activeEnd: addWeeks(desde, SEMANAS_PINTADAS_DEL_MES) }
+}
+
+/**
+ * Los dos rangos de una vista, ya resueltos. Lo llaman los DOS sitios que antes
+ * armaban el objeto a mano —`datesSet` y `rangoDeVista`—, para que la corrección
+ * de Mes no pueda aplicarse en uno y olvidarse en el otro.
+ */
+function rangosDeLaVista(vista: ViewApi): RangosDeVista {
+  const esMes = vista.type === 'dayGridMonth'
+  return {
+    activo:   { activeStart: vista.activeStart, activeEnd: vista.activeEnd },
+    completo: esMes
+      ? semanasPintadasDelMes(vista.currentStart)
+      : { activeStart: vista.currentStart, activeEnd: vista.currentEnd },
+    esMes,
+  }
+}
 
 function horarioToBusinessHours(h: Horario) {
   return DIAS.filter(d => h[d.key]?.activo).map(d => ({
@@ -2825,8 +2889,14 @@ const BandaChip = memo(function BandaChip(
    despachador tiene abajo en su rama de texto pelado para Semana/Día. */
 type TintasDelChip = { fondo?: string; tinta: string; hora?: string }
 
+/* ⚠️ EL PARÁMETRO SE ENSANCHÓ A `Partial` EN EL PASO 9, y es un ensanche, no un
+   aflojamiento: esta función sólo lee `color` y `status`, y ya trataba a los dos
+   como ausentes en su cadena de ternarios —tenía que hacerlo, porque la fuente
+   de Google no trae ninguno—. Lo que cambia es que ahora también la llama el
+   panel del día, que anota `extendedProps` como `Partial` en vez de castearlo.
+   Quien pasaba una cita entera (`MonthChip`) sigue pudiendo. */
 function tintasDelChipDeMes(
-  ext: Appointment & { isGcalBlock?: boolean },
+  ext: Partial<Appointment> & { isGcalBlock?: boolean },
   isGcal: boolean,
   esEvento: boolean,
 ): TintasDelChip {
@@ -3424,23 +3494,30 @@ function CabeceraDiaLista({ date, esHoy, conAnio }: {
    el tope en 50; la fila de los filtros es el trozo más autocontenido y el único
    con condiciones propias, así que es el que sale.
 
-   ⚠️ DEVUELVE `null` CUANDO NO HAY NADA QUE ENSEÑAR, y eso importa: en una
-   clínica de un solo médico sin permiso de horario esta fila no se pinta, y con
-   ella se ahorran 56 px de alto —los 44 de la fila más su hueco—, que en un
-   teléfono bajo es la diferencia entre que la lista respire o no. Un
-   contenedor vacío seguiría ocupando su hueco de flex. */
+   ⚠️ SE PARTIÓ EN DOS EN EL PASO 9b, y sigue siendo por tamaño y no por
+   reutilización: la fila entera —flechas incluidas— pasaba de las 50 líneas de
+   tope. `NavegacionBandaMovil` es la fila; esto es lo que va en su centro.
+
+   ⚠️ Y YA NO DEVUELVE `null` PARA AHORRAR LA FILA. Devolvía `null` en una clínica
+   de un solo médico sin permiso de horario, y con ello se ahorraban 56 px. Hoy
+   la fila lleva además las DOS FLECHAS DE NAVEGACIÓN, que no son opcionales en
+   ninguna clínica —sin ellas no hay forma de cambiar de día, de semana ni de
+   mes—, así que la fila se pinta siempre y este centro puede quedarse vacío. La
+   caja sigue existiendo aunque no tenga hijos: es el muelle que empuja la flecha
+   derecha contra el borde. Ver su nota en globals.css. */
 function FiltrosBandaMovil(
-  { medicos, filtroMedico, onFiltroMedico, onHorario }: {
+  { medicos, filtroMedico, onFiltroMedico, onHorario, onCompactar, compactado }: {
     medicos: readonly Medico[]; filtroMedico: string
     onFiltroMedico: (id: string) => void; onHorario: (() => void) | null
+    onCompactar: (() => void) | null; compactado: boolean
   },
 ) {
   /* Mismo criterio que el header de escritorio: el filtro sólo tiene sentido en
-     modo multi-doctor, y el engrane sólo si se puede editar el horario. */
+     modo multi-doctor, el engrane sólo si se puede editar el horario y
+     «Compactar» sólo donde la vista lo admite. Los tres pueden faltar a la vez. */
   const hayFiltro = medicos.length > 1
-  if (!hayFiltro && !onHorario) return null
   return (
-    <div className="ag-banda-movil-filtros">
+    <div className="ag-banda-movil-medio">
       {hayFiltro && (
         <label>
           <span className="sr-only">Filtrar por médico</span>
@@ -3449,6 +3526,17 @@ function FiltrosBandaMovil(
             {medicos.map(m => <option key={m.id} value={m.id}>{componerNombreMedicoCompleto(m)}</option>)}
           </select>
         </label>
+      )}
+      {onCompactar && (
+        /* Mismo criterio de encendido que en escritorio: el estado se dice con el
+           MARCO, no con relleno — el único relleno blanco de la banda es la
+           pestaña activa del conmutador y no puede tener competencia. */
+        <button type="button"
+          className={`ag-banda-movil-ctrl ag-banda-movil-ctrl--marco${compactado ? ' ag-banda-movil-ctrl--on' : ''}`}
+          onClick={onCompactar} aria-pressed={compactado}
+          aria-label="Ocultar los días de la semana sin actividad">
+          <ChevronsDownUp size={18} />
+        </button>
       )}
       {onHorario && (
         <button type="button" className="ag-banda-movil-ctrl ag-banda-movil-ctrl--marco"
@@ -3460,13 +3548,58 @@ function FiltrosBandaMovil(
   )
 }
 
+/* La tercera fila de la banda: navegación de periodo con los filtros en medio.
+
+   ⚠️ LAS FLECHAS VAN AQUÍ Y PEGADAS A LOS BORDES, Y ES EL SITIO DEL MOCKUP —los
+   tres lo dibujan igual, en su `.datenav`—. En el paso 8c subieron a la fila del
+   título para ahorrar una fila entera, y ahí no se leen: junto a «Agenda»
+   parecen navegación de la app y no del periodo. Flanqueando el filtro, con la
+   fecha centrada justo debajo, dicen lo que hacen.
+
+   ⚠️ QUIEN LAS EMPUJA A LOS EXTREMOS ES LA CAJA ELÁSTICA DEL MEDIO, no un
+   `justify-content: space-between` en esta fila: con tres o cuatro hijos, aquél
+   repartiría el hueco entre todos y el engrane se despegaría del filtro. El
+   porqué entero está junto a `.ag-banda-movil-medio` en globals.css. */
+function NavegacionBandaMovil(
+  { medicos, filtroMedico, onFiltroMedico, onHorario, onCompactar, compactado, onPrev, onNext }: {
+    medicos: readonly Medico[]; filtroMedico: string
+    onFiltroMedico: (id: string) => void; onHorario: (() => void) | null
+    onCompactar: (() => void) | null; compactado: boolean
+    onPrev: () => void; onNext: () => void
+  },
+) {
+  return (
+    <div className="ag-banda-movil-filtros">
+      <button type="button" className="ag-banda-movil-ctrl" onClick={onPrev} aria-label="Periodo anterior">
+        <ChevronLeft size={20} />
+      </button>
+      <FiltrosBandaMovil
+        medicos={medicos} filtroMedico={filtroMedico}
+        onFiltroMedico={onFiltroMedico} onHorario={onHorario}
+        onCompactar={onCompactar} compactado={compactado}
+      />
+      <button type="button" className="ag-banda-movil-ctrl" onClick={onNext} aria-label="Periodo siguiente">
+        <ChevronRight size={20} />
+      </button>
+    </div>
+  )
+}
+
+/* ⚠️ EL SUBTÍTULO VUELVE A SER SÓLO EL CONTEO (paso 9b), que es la decisión
+   original y lo que enseñan la vista Día y la Semana del mockup. La fecha estuvo
+   ahí desde el 8c por no tener fila propia; ahora la tiene otra vez, la cuarta.
+   Y con ella se va el separador « · » que se pintaba sin su espacio de delante.
+   ⚠️ Y LA CUARTA FILA VUELVE A EXISTIR, después de haberla fundido en el 8c. No
+   es un paso atrás: entonces costaba 52 px porque llevaba dentro las dos flechas
+   de 44; ahora sólo lleva la etiqueta, que son unos 19. */
 function BandaMovil(
   { conteo, vistaActual, onVista, titulo, onPrev, onNext, onMenu,
-    medicos, filtroMedico, onFiltroMedico, onHorario }: {
+    medicos, filtroMedico, onFiltroMedico, onHorario, onCompactar, compactado }: {
     conteo: string; vistaActual: string; onVista: (tipo: string) => void
     titulo: string; onPrev: () => void; onNext: () => void; onMenu: () => void
     medicos: readonly Medico[]; filtroMedico: string
     onFiltroMedico: (id: string) => void; onHorario: (() => void) | null
+    onCompactar: (() => void) | null; compactado: boolean
   },
 ) {
   return (
@@ -3477,14 +3610,8 @@ function BandaMovil(
         </button>
         <span className="ag-banda-movil-titulo">
           <b>Agenda</b>
-          <span>{conteo ? `${titulo} · ${conteo}` : titulo}</span>
+          <span className="ag-banda-movil-sub">{conteo}</span>
         </span>
-        <button type="button" className="ag-banda-movil-ctrl" onClick={onPrev} aria-label="Periodo anterior">
-          <ChevronLeft size={20} />
-        </button>
-        <button type="button" className="ag-banda-movil-ctrl" onClick={onNext} aria-label="Periodo siguiente">
-          <ChevronRight size={20} />
-        </button>
       </div>
       <div className="ag-banda-movil-vistas" role="tablist" aria-label="Vista del calendario">
         {VIEWS.map(v => {
@@ -3498,11 +3625,174 @@ function BandaMovil(
           )
         })}
       </div>
-      <FiltrosBandaMovil
+      <NavegacionBandaMovil
         medicos={medicos} filtroMedico={filtroMedico}
         onFiltroMedico={onFiltroMedico} onHorario={onHorario}
+        onCompactar={onCompactar} compactado={compactado}
+        onPrev={onPrev} onNext={onNext}
       />
+      {/* La fecha, centrada bajo las flechas. `<p>` y no `<span>`: es la etiqueta
+          de lo que se está mirando, no un trozo del título. */}
+      <p className="ag-banda-movil-fecha">{titulo}</p>
     </header>
+  )
+}
+
+/* ═══ PANEL DEL DÍA SELECCIONADO (bloque 6 · paso 9) ════════════════════════
+   Va DEBAJO de la cuadrícula del mes y NO lo pinta FullCalendar: es un
+   componente propio alimentado por `getEvents()`.
+
+   ⚠️ EXISTE PORQUE LA CELDA DEL MES NO ES UNA RUTA TÁCTIL. A 390 px cada celda
+   mide ~51 px de ancho y ~52 de alto, y dentro caben tres PUNTOS de 5 px. Un
+   punto de 5 px no es un objetivo pulsable —el mínimo son 44— y tampoco dice
+   qué hay: contesta «cuánto», no «qué». El «qué» y el dedo viven aquí.
+
+   ⚠️ Y POR ESO LA CUADRÍCULA PASÓ A MODO PUNTO. Antes cada celda intentaba
+   pintar el chip de escritorio —marcador, hora y nombre— dentro de esos 51 px:
+   la hora salía cortada a media palabra y el nombre no salía. El chip no se
+   retiró del código, se APAGA por hoja en móvil (ver `.ag-mes` en globals.css);
+   así Mes sigue teniendo UN solo renderizador de evento y no dos que puedan
+   divergir. */
+
+/** Una fila del panel, ya resuelta: aquí no se vuelve a mirar el `EventApi`. */
+type FilaDelDia = {
+  id: string
+  /** Milisegundos del inicio, o `-1` en los de todo el día, que van primero. */
+  orden: number
+  hora: string
+  todoElDia: boolean
+  nombre: string
+  esDeGoogle: boolean
+  esEvento: boolean
+  cancelada: boolean
+  tinta: string
+}
+
+/**
+ * Las filas del día `dia`, ordenadas: primero los de todo el día y después por
+ * hora de inicio.
+ *
+ * ⚠️ SOLAPAMIENTO SEMIABIERTO, igual que en `ventanaDeEventos` y en
+ * `diasOcultables` y por el mismo motivo: con `<=` entrarían los eventos que
+ * TERMINAN a la medianoche de este día, o sea los del día anterior.
+ *
+ * ⚠️ EL NOMBRE ES EL DEL PACIENTE Y NO `event.title`, que es el motivo escrito
+ * en el alta. Es la misma regla que ya aplica `MonthChip`, y las dos tienen que
+ * decir lo mismo: el punto de la celda y la fila de abajo son el mismo evento.
+ */
+function filasDelDia(eventos: readonly EventApi[], dia: Date): FilaDelDia[] {
+  const desde = new Date(dia)
+  desde.setHours(0, 0, 0, 0)
+  const hasta = new Date(desde)
+  hasta.setDate(hasta.getDate() + 1)
+
+  const filas: FilaDelDia[] = []
+  for (const ev of eventos) {
+    if (!ev.start) continue
+    if (!(ev.start < hasta && (ev.end ?? ev.start) > desde)) continue
+    /* ANOTADO Y NO CASTEADO, igual que en `clasesDelEvento` y por su mismo
+       motivo: `extendedProps` es `Record<string, any>` (`Dictionary`,
+       `core/internal-common.d.ts`) y leerlo directo mete `any` en el archivo.
+       `Partial` porque la fuente de Google no trae ninguno de estos campos.
+       Esta fila NO lleva la cita entera: para abrirla basta el `id`, y quien la
+       resuelve es `abrirCita` desde el `EventApi` — así el único punto del
+       archivo que estrecha `extendedProps` a `Appointment` sigue siendo uno. */
+    const ext: Partial<Appointment> & { isGcalBlock?: boolean } = ev.extendedProps
+    const esDeGoogle = ext?.isGcalBlock === true
+    const esEvento = esEventoGenerico(ext)
+    const pac = ext?.pacientes
+    filas.push({
+      id: ev.id,
+      orden: ev.allDay ? -1 : ev.start.getTime(),
+      hora: ev.allDay ? 'todo el día' : horaDeReloj(ev.start),
+      todoElDia: ev.allDay,
+      nombre: pac ? `${pac.nombre} ${pac.apellidos}` : ev.title,
+      esDeGoogle,
+      esEvento,
+      cancelada: ext?.status === 'cancelled',
+      tinta: tintasDelChipDeMes(ext, esDeGoogle, esEvento).tinta,
+    })
+  }
+  return filas.sort((a, b) => a.orden - b.orden)
+}
+
+/* La misma disciplina de guarda que `ventana` y `conteo`: se compara una CADENA
+   y no el array. `getEvents()` recorre un mapa, así que su orden cambia con
+   altas, bajas y refetches; aquí además las filas se reconstruyen enteras en
+   cada llamada, o sea que la identidad no vale para nada. Con la firma, un
+   `eventsSet` que no cambia nada del día muere en el bail-out de React. */
+function firmaDeFilas(filas: readonly FilaDelDia[]): string {
+  return filas.map(f => `${f.id}|${f.hora}|${f.nombre}|${f.tinta}|${f.cancelada}`).join('\n')
+}
+
+/** El conteo del día, en la MISMA forma que consume `frasearConteo`. */
+function contarFilas(filas: readonly FilaDelDia[]): ConteoVisible {
+  let citas = 0, eventos = 0, google = 0
+  for (const f of filas) {
+    if (f.esDeGoogle) google++
+    else if (f.esEvento) eventos++
+    else citas++
+  }
+  return { citas, eventos, google }
+}
+
+/* «mié, 19 ago». A nivel de módulo: un `Intl.DateTimeFormat` nuevo por render
+   es caro y aquí no depende de nada que cambie. La mayúscula inicial la pone un
+   `::first-letter` en la hoja, igual que en el resto de la agenda. */
+const FMT_DIA_PANEL = new Intl.DateTimeFormat('es-MX', { weekday: 'short', day: 'numeric', month: 'short' })
+
+/* Una fila. Botón y no enlace: no navega, abre el modal de la cita — el mismo
+   `setModal` al que llega `handleEventClick` desde la rejilla.
+
+   Misma regla de forma que en las listas y en la celda del mes: REDONDO es cita,
+   CUADRADO es evento, y la G de Google gana a las dos. La forma es lo que
+   sobrevive a la ceguera al color. */
+const FilaDelPanel = memo(function FilaDelPanel(
+  { fila, onAbrir }: { fila: FilaDelDia; onAbrir: (id: string) => void },
+) {
+  return (
+    <button type="button" className="ag-mespanel-fila" onClick={() => onAbrir(fila.id)}>
+      <span className={`ag-mespanel-hora${fila.todoElDia ? ' ag-mespanel-hora--todo' : ''}`}>
+        {fila.hora}
+      </span>
+      {fila.esDeGoogle
+        ? <GoogleGIcon size={11} />
+        : <span
+            className={`ag-mespanel-punto${fila.esEvento ? ' ag-mespanel-punto--cuadro' : ''}`}
+            style={{ background: fila.tinta }}
+          />}
+      <span className={`ag-mespanel-nombre${fila.cancelada ? ' ag-mespanel-nombre--cancelada' : ''}`}>
+        {fila.nombre}
+      </span>
+      <ChevronRight size={15} className="ag-mespanel-chev" aria-hidden />
+    </button>
+  )
+})
+
+/* La cabecera del panel: fecha, conteo del día y la salida a la vista Día.
+   Va PEGAJOSA (`position: sticky` en la hoja) porque el panel scrollea y sin
+   ella una lista larga deja de decir de qué día es. */
+function PanelDelDia(
+  { dia, filas, onAbrir, onVerDia }: {
+    dia: Date; filas: readonly FilaDelDia[]
+    onAbrir: (id: string) => void; onVerDia: () => void
+  },
+) {
+  const esHoy = differenceInCalendarDays(dia, new Date()) === 0
+  /* La forma BREVE: este panel es de móvil y su cabecera comparte fila con la
+     fecha y con el enlace de salida. Mismo criterio que el subtítulo de la
+     banda. */
+  const conteo = frasearConteoBreve(contarFilas(filas))
+  return (
+    <section className="ag-mespanel" aria-label="Citas del día seleccionado">
+      <div className="ag-mespanel-cab">
+        <h2>{FMT_DIA_PANEL.format(dia)}{esHoy ? ' · hoy' : ''}</h2>
+        <span className="ag-mespanel-conteo">{conteo || 'sin citas'}</span>
+        <button type="button" className="ag-mespanel-verdia" onClick={onVerDia}>Ver día ›</button>
+      </div>
+      {filas.map(f => <FilaDelPanel key={f.id} fila={f} onAbrir={onAbrir} />)}
+      {filas.length === 0 && <p className="ag-mespanel-vacio">Sin citas este día</p>}
+    </section>
   )
 }
 
@@ -3567,6 +3857,39 @@ function vistaEnElOtroFormato(viewType: string, movil: boolean): string {
   const par = FORMATOS_DE_VISTA.find(p => p.ancho === viewType || p.estrecho === viewType)
   if (!par) return viewType
   return movil ? par.estrecho : par.ancho
+}
+
+/**
+ * El rótulo de «Compactar», que NO es el mismo en las dos vistas que lo admiten.
+ *
+ * En rejilla el botón hace dos cosas —encoge el alto al horario y pliega las
+ * columnas vacías—, y el rótulo nombra la primera porque es la que se ve de
+ * golpe. En Mes sólo hace la segunda: ahí no hay `slotMinTime` que encoger, así
+ * que hablar de «rejilla» y de «horario» describiría un recorte que esa vista no
+ * puede hacer. Es el mismo criterio del gate de `aplicarVentana` y del texto de
+ * salida de la banda; los tres cambian juntos o el botón promete una cosa, la
+ * banda otra y la pantalla una tercera.
+ */
+function etiquetaCompactar(viewType: string): string {
+  return viewType === 'dayGridMonth'
+    ? 'Ocultar los días de la semana sin actividad'
+    : 'Compactar la rejilla al horario de la clínica'
+}
+
+/**
+ * ¿Tiene sentido «Compactar» en esta vista?
+ *
+ * Las de REJILLA por los dos ejes —alto y columnas— y MES sólo por el de las
+ * columnas (ver el gate de `aplicarVentana`). Las dos de LISTA por ninguno: no
+ * tienen ni rejilla de horas ni columnas de día, así que ahí el botón no se
+ * pinta y el estado se apaga solo.
+ *
+ * ⚠️ ES LA MISMA PREGUNTA EN LOS DOS SITIOS —el apagado automático y el pintado
+ * del botón— y por eso vive en una función y no duplicada en dos condiciones.
+ * Si divergen, se puede quedar encendido donde no hay con qué apagarlo.
+ */
+function vistaAdmiteCompactar(viewType: string): boolean {
+  return viewType.startsWith('timeGrid') || viewType === 'dayGridMonth'
 }
 
 /* Opciones POR VISTA. A nivel de módulo por la regla de identidad estable: un
@@ -3644,6 +3967,89 @@ const VISTAS_FC = {
      año, porque en una pantalla de 390 px el año es la parte que no aporta.
      El rango lo compone solo `NativeFormatter` a partir del formato de UNA fecha,
      igual que en `timeGridWeek`; el guión largo lo pone `titleRangeSeparator`. */
+  listDay:  { titleFormat: { weekday: 'short', day: 'numeric', month: 'long' } },
+  listWeek: { titleFormat: { day: 'numeric', month: 'long' } },
+} as const
+
+/* ── LAS OPCIONES DEL MES EN UN TELÉFONO ────────────────────────────────────
+   La MISMA tabla que la de arriba con la entrada de Mes sustituida. A nivel de
+   módulo por la regla de identidad estable, igual que su hermana, y como objeto
+   COMPLETO y no como spread: es la lista que hay que leer para saber qué ve el
+   teléfono, y un spread obliga a mirar dos sitios.
+
+   ⚠️ LA CUADRÍCULA SIGUE SIENDO LA DE FULLCALENDAR. Aquí no hay ninguna rejilla
+   propia: lo único que cambia son cuatro opciones y una hoja de estilos.
+
+   · `dayHeaderFormat: { weekday: 'narrow' }` — «L M X J V S D». En `long` («LUNES»)
+     las siete cabeceras se pisaban unas a otras a 51 px de columna. Es la
+     abreviatura más corta que el locale ofrece, que es «lo que quepa».
+   · `showNonCurrentDates: false` — los días de los meses vecinos se dejan en
+     blanco. Con `fixedWeekCount` en su default (`true`, y NO se toca: de él
+     depende el rango de `semanasPintadasDelMes`) las seis filas siguen ahí, así
+     que la rejilla no cambia de alto al navegar; lo que se va es el número de un
+     día que no es de este mes y que en modo punto no se distingue de los suyos.
+   · `dayMaxEvents: 3` — tres puntos y el cuarto hueco como «+N». El global es 3
+     también, pero el de aquí es POR VISTA y sobrevive a que alguien mueva aquél.
+   · `moreLinkContent` — «+2» y no «+2 más». El texto del locale son 35 px en una
+     celda de 51 que ya lleva tres puntos.
+   · ⚠️ `eventDisplay: 'list-item'` — Y ESTA NO ES COSMÉTICA, ES LO QUE HACE QUE
+     LA FILA DE PUNTOS FUNCIONE. Con el default (`'auto'`) `dayGridMonth` reparte
+     los segmentos en DOS mecanismos: los de hora van EN FLUJO dentro de la celda
+     y los de todo el día —y los de varios días— van a una capa de la FILA con
+     `position: absolute`. Un hijo posicionado en absoluto NO es un ítem de flex,
+     así que la fila centrada de la hoja no lo colocaría: la barra se quedaría en
+     el `top` que se calculó para el apilado vertical, encima del número del día.
+     Con `'list-item'` todos los segmentos van por el camino en flujo y por
+     celda, que es el único que la fila de puntos sabe repartir. De paso, un
+     evento de varios días deja un punto en CADA día que ocupa, que es justo lo
+     que un resumen de «cuánto hay» tiene que decir.
+   · `navLinks: false` — ⚠️ Y ESTO NO ES UN RECORTE, ES QUITAR UN CONFLICTO. El
+     número del día es un enlace a `timeGridDay` (ver `navLinkDayClick`), o sea
+     que en el teléfono llevaba a una REJILLA de horas, que es justo el formato
+     que el móvil no usa. Y además competía con el toque de la celda, que ahora
+     selecciona el día. La ruta a la vista Día en móvil es el «Ver día ›» del
+     panel de abajo, y es una sola.
+
+   ⚠️ `hiddenDays` NO SE TOCA AQUÍ: el mes arranca con las SIETE columnas. Que se
+   plieguen las vacías es una decisión del médico —el botón «Compactar» de la
+   banda— y es reversible desde la misma banda. El mockup dibuja seis columnas
+   con el domingo fijo; eso se descartó. */
+/* «+2», sin la palabra del locale. A nivel de módulo por la regla de identidad
+   estable, igual que el resto de renderizadores de esta página. El texto largo
+   sigue disponible para quien no lo ve: `moreLinkHint` del locale («Mostrar N
+   eventos más») es lo que va al `title` y al lector de pantalla, y no se toca. */
+function masBreve(arg: MoreLinkContentArg): string {
+  return `+${arg.num}`
+}
+
+const VISTAS_FC_MOVIL = {
+  dayGridMonth: {
+    dayHeaderFormat:     { weekday: 'narrow' },
+    titleFormat:         { month: 'long', year: 'numeric' },
+    showNonCurrentDates: false,
+    dayMaxEvents:        3,
+    moreLinkContent:     masBreve,
+    eventDisplay:        'list-item',
+    navLinks:            false,
+  },
+  timeGridWeek: { titleFormat: { day: 'numeric', month: 'short', year: 'numeric' }, dayMaxEvents: 2 },
+  timeGridDay:  { titleFormat: { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }, dayMaxEvents: 2 },
+  /* ⚠️ AQUÍ ESTUVO `stickyHeaderDates: false` PARA `listDay`, Y SE RETIRÓ. NO LO
+     REPONGAS SIN LEER ESTO: el problema que venía a esquivar está resuelto por
+     su causa, y volver a apagar el pegado sólo lo taparía otra vez.
+
+     LA HISTORIA. En Día, al scrollear, la primera cita se metía debajo de la
+     cabecera del día y se leía a medias. Se apagó el pegado con el argumento de
+     que con UN solo grupo no hay relevo que hacer. Después se comprobó, mockup
+     en mano, que el solape es inevitable con cualquier cabecera pegada —el
+     propio mockup lo asume por escrito: «el fondo tiene que ser OPACO, o las
+     filas se ven por debajo»— y que el defecto de verdad era otro: el fondo NO
+     estaba tapando, porque vivía en el `<th>`, una caja de tabla cuyos adornos
+     se pintan en la posición de flujo y no viajan con el desplazamiento
+     pegajoso. Arreglado eso —fondo y líneas mudados al cushion, y orden de
+     pintado explícito; todo en `globals.css`, junto a `.fc-list-day-cushion`—,
+     el pegado ya no tapa nada legible y las dos vistas de lista se comportan
+     igual, que es lo que se quería. */
   listDay:  { titleFormat: { weekday: 'short', day: 'numeric', month: 'long' } },
   listWeek: { titleFormat: { day: 'numeric', month: 'long' } },
 } as const
@@ -3792,6 +4198,31 @@ function frasearConteo(c: ConteoVisible): string {
   if (c.eventos > 0) partes.push(`${c.eventos} ${c.eventos === 1 ? 'evento' : 'eventos'}`)
   // Sin plural que cambiar: «1 de Google», «4 de Google».
   if (c.google > 0)  partes.push(`${c.google} de Google`)
+  return partes.join(' · ')
+}
+
+/**
+ * El mismo conteo, abreviado. SÓLO PARA MÓVIL.
+ *
+ * ⚠️ ES UNA SEGUNDA REDACCIÓN DEL MISMO DATO, y eso normalmente sería un olor.
+ * Aquí es la decisión: en la banda del teléfono el subtítulo comparte fila con
+ * el hamburguesa y la caja del título, y en 390 px «13 citas · 2 eventos · 1 de
+ * Google» no cabe entero. Recortarlo con elipsis parte la última palabra a la
+ * mitad («… · 1 de Goo…»), que se lee como un fallo; abreviado cabe y se
+ * entiende. Escritorio se queda con la forma larga, donde sobra ancho.
+ *
+ * ⚠️ «GCal» Y NO «Google»: es exactamente el rótulo que la leyenda de la agenda
+ * ya usa para lo mismo, y por el mismo motivo (ver su nota, con la medida). Dos
+ * abreviaturas distintas del mismo origen serían peor que una.
+ *
+ * ⚠️ LOS NÚMEROS SON LOS MISMOS: esto sólo cambia las palabras. Si algún día hay
+ * que tocar QUÉ se cuenta, se toca `contarVisibles` y las dos frases siguen.
+ */
+function frasearConteoBreve(c: ConteoVisible): string {
+  const partes: string[] = []
+  if (c.citas > 0)   partes.push(`${c.citas} cit`)
+  if (c.eventos > 0) partes.push(`${c.eventos} ev`)
+  if (c.google > 0)  partes.push(`${c.google} GCal`)
   return partes.join(' · ')
 }
 
@@ -3976,7 +4407,17 @@ export default function AgendaPage() {
     rangos: RangosDeVista | null,
   ) => {
     const compacta = compactarRef.current
-    const nueva = calcularVentanaRejilla(eventos, rangos?.activo ?? null, horarioRef.current, { compacta })
+    /* ⚠️ LA MITAD DEL ALTO SE APAGA EN MES, Y NO ES UNA OPTIMIZACIÓN. `compacta`
+       quita el suelo de 07:00-21:00 del cálculo de la ventana vertical, y esa
+       ventana es `slotMinTime`/`slotMaxTime`: dos opciones que `dayGridMonth` NI
+       SIQUIERA LEE —no tiene rejilla de horas—. Encendida ahí no cambia nada de
+       lo que se ve… salvo `avisoDeRecorte`, que sí la mira: la frase diría
+       «horas fuera de horario recortadas» sobre una vista sin ninguna hora a la
+       vista. O sea que la línea que confiesa el recorte MENTIRÍA. En Mes
+       compactar es sólo el eje de las COLUMNAS, y eso es lo que queda vivo dos
+       líneas más abajo. */
+    const compactaElAlto = compacta && !(rangos?.esMes ?? false)
+    const nueva = calcularVentanaRejilla(eventos, rangos?.activo ?? null, horarioRef.current, { compacta: compactaElAlto })
     /* Forma funcional, y devolviendo `prev` tal cual cuando no cambia: React se
        salta el re-render por su propio camino (bail-out por identidad). Un `if`
        alrededor del `setState` haría lo mismo, pero habría que repetirlo en los
@@ -4020,11 +4461,7 @@ export default function AgendaPage() {
   /** Los dos rangos de la vista. `null` antes del primer `datesSet`. */
   const rangoDeVista = useCallback((): RangosDeVista | null => {
     const vista = calendarRef.current?.getApi().view
-    if (!vista) return null
-    return {
-      activo:   { activeStart: vista.activeStart,  activeEnd: vista.activeEnd },
-      completo: { activeStart: vista.currentStart, activeEnd: vista.currentEnd },
-    }
+    return vista ? rangosDeLaVista(vista) : null
   }, [])
 
   /* El horario es la TERCERA entrada del cálculo y llega por SWR. Si la
@@ -4048,20 +4485,33 @@ export default function AgendaPage() {
     aplicarVentana(api.getEvents(), rangoDeVista())
   }, [compactar, aplicarVentana, rangoDeVista])
 
-  /* ⚠️  EL ESTADO SE APAGA DONDE NO HAY BOTÓN. El control sólo se pinta en
-     escritorio y en las vistas de rejilla, pero `hiddenDays` y la ventana se
-     seguían aplicando fuera: pasar a Mes, o estrechar a móvil, dejaba columnas
-     plegadas sin ningún sitio donde pulsar para deshacerlo —y en móvil ni
-     siquiera con el aviso, que también se esconde—. Un calendario que oculta
-     información sin dar salida es peor que uno que no la oculta. */
+  /* ⚠️  EL ESTADO SE APAGA DONDE NO HAY BOTÓN, y esta guarda SE REESCRIBIÓ en el
+     paso 9 en vez de relajarse. Decía `isMobile || !currentView.startsWith(
+     'timeGrid')`, o sea que apagaba en Mes y apagaba en todo el móvil.
+     Las dos mitades caducaron a la vez: Mes ahora pliega columnas —es el único
+     eje que le sirve— y el botón existe también en la banda móvil, así que ya no
+     hay ningún sitio donde el estado pueda quedarse encendido sin salida.
+     LO QUE SIGUE EN PIE, y es todo el motivo de que la guarda exista: en móvil
+     Semana y Día son LISTAS (`listWeek` / `listDay`), y una lista no tiene ni
+     columnas que plegar ni rejilla que encoger. `vistaAdmiteCompactar` contesta
+     `false` para las dos, así que el apagado automático sigue cubriéndolas — y
+     ése era el caso de verdad, no «el móvil». */
   useEffect(() => {
     if (!compactar) return
-    if (isMobile || !currentView.startsWith('timeGrid')) setCompactar(false)
-  }, [compactar, isMobile, currentView])
+    if (!vistaAdmiteCompactar(currentView)) setCompactar(false)
+  }, [compactar, currentView])
 
-  /* Sólo con el botón encendido y en escritorio: apagado no hay nada que
-     confesar, y en móvil no hay botón que lo haya encendido. */
-  const avisoRecorte = compactar && !isMobile ? avisoDeRecorte(ventana, diasOcultos, DIAS) : null
+  /* Sólo con el botón encendido: apagado no hay nada que confesar. El `!isMobile`
+     que había aquí se fue con el botón de la banda — el aviso tiene que salir
+     allí donde se pueda haber encendido, y ahora eso incluye el teléfono.
+     En Mes la frase sólo puede hablar de columnas: la mitad del alto va gateada
+     en `aplicarVentana`, así que `ventana` no se estrecha y `avisoDeRecorte` no
+     tiene nada que decir de las horas. */
+  const avisoRecorte = compactar ? avisoDeRecorte(ventana, diasOcultos, DIAS) : null
+
+  /* En Mes el recorte es SÓLO de columnas, así que los rótulos cambian: hablar
+     de «rejilla» y de «horario» ahí describe algo que no está en pantalla. */
+  const compactaElMes = compactar && currentView === 'dayGridMonth'
 
   /* ── EL CONTEO DEL SUBTÍTULO ─────────────────────────────────────────
      Mismo patrón que la ventana de la rejilla, y por el mismo motivo: cuelga de
@@ -4127,6 +4577,59 @@ export default function AgendaPage() {
     if (!api) return
     aplicarConteo(api.getEvents(), rangoDeVista())
   }, [diasOcultos, aplicarConteo, rangoDeVista])
+
+  /* ── EL DÍA QUE ENSEÑA EL PANEL DEL MES ────────────────────────────────
+     Sólo lo consume la vista Mes del teléfono. En cualquier otra queda inerte:
+     ni se pinta el panel ni se marca ninguna celda. */
+  const [diaSel, setDiaSel] = useState<Date | null>(null)
+  const [filasDia, setFilasDia] = useState<readonly FilaDelDia[]>([])
+
+  /* Por ref y no por deps, igual que `horarioRef` y `compactarRef`: con
+     `diaSel` en las deps, `aplicarPanel` se recrearía en cada toque de celda. */
+  const diaSelRef = useRef(diaSel)
+  diaSelRef.current = diaSel
+
+  const aplicarPanel = useCallback((eventos: readonly EventApi[]) => {
+    const dia = diaSelRef.current
+    const nuevas = dia ? filasDelDia(eventos, dia) : []
+    setFilasDia(prev => (firmaDeFilas(prev) === firmaDeFilas(nuevas) ? prev : nuevas))
+  }, [])
+
+  /* El día seleccionado es la SEGUNDA entrada del panel y no llega por ningún
+     handler del calendario: la escribe el toque en una celda y el cambio de mes.
+     Este efecto es quien la cubre, igual que los de más arriba cubren al horario,
+     al botón y a `diasOcultos`. */
+  useEffect(() => {
+    const api = calendarRef.current?.getApi()
+    if (!api) return
+    aplicarPanel(api.getEvents())
+  }, [diaSel, aplicarPanel])
+
+  /* ⚠️ EL MES SE COMPARA CON UN REF, Y SIN ESO EL PANEL NO SE PODRÍA USAR.
+     La regla es «al navegar de mes, el panel muestra el primer día del mes», y
+     el sitio donde se sabe que el rango cambió es `datesSet`. Pero `datesSet` SE
+     REEMITE en cada cambio de la ventana vertical aunque el rango no se mueva
+     (la cadena está en la cabecera de `ventanaRejilla.ts`), así que escribir el
+     día en cada emisión borraría la selección del médico un fotograma después de
+     hacerla. Comparando la clave del mes, sólo escribe cuando el mes es otro. */
+  const mesDelPanelRef = useRef('')
+  const sincronizarDiaDelPanel = useCallback((vista: ViewApi) => {
+    if (vista.type !== 'dayGridMonth') { mesDelPanelRef.current = ''; return }
+    const clave = vista.currentStart.toISOString()
+    if (mesDelPanelRef.current === clave) return
+    mesDelPanelRef.current = clave
+    setDiaSel(vista.currentStart)
+  }, [])
+
+  /* La marca del día seleccionado. CONTORNO, no relleno: el relleno es de HOY, y
+     dos rellenos en la misma cuadrícula no se distinguen de un vistazo.
+     ⚠️ ACOTADA A MÓVIL A PROPÓSITO. `sincronizarDiaDelPanel` corre también en el
+     Mes de escritorio —es el mismo `datesSet`—, así que sin este `isMobile` el
+     día 1 aparecería contorneado en un escritorio donde no hay panel al que
+     corresponda ni forma de cambiar la selección. */
+  const dayCellClassNames = useCallback((arg: DayCellContentArg): string[] => (
+    isMobile && diaSel && differenceInCalendarDays(arg.date, diaSel) === 0 ? ['ag-mes-dia-sel'] : []
+  ), [isMobile, diaSel])
 
   /* ── Detectar ancho y cambiar de FORMATO, no de vista ──────────────────
      ⚠️ ESTO ERA OTRA COSA HASTA EL BLOQUE 6, Y LA DIFERENCIA IMPORTA. Antes
@@ -4766,6 +5269,13 @@ export default function AgendaPage() {
      evento», que ya no existe: el conmutador lo dejó sin trabajo y se retiró
      para que el header cupiera en una línea. Ver la nota del botón «Agendar». */
   function handleDateClick(arg: DateClickArg) {
+    /* ⚠️ EN EL MES DEL TELÉFONO UN TOQUE SELECCIONA, NO CREA, y va ANTES del
+       gate de suscripción a propósito: elegir qué día enseña el panel es una
+       lectura, y una clínica bloqueada sigue pudiendo leer su agenda. La puerta
+       de creación en móvil es una sola y está abajo, en la barra fija.
+       Sin esta rama el toque abría el alta —que es lo correcto en escritorio— y
+       el panel se quedaba sin forma de cambiar de día. */
+    if (isMobile && arg.view.type === 'dayGridMonth') { setDiaSel(arg.date); return }
     // Fase 8.2: bloqueo creación de citas si suscripción cancelada con >5 pacientes
     if (subState.isBlocked) { openBloqueoModal(); return }
     /* `allDay` y no `view.type === 'dayGridMonth'`: lo que decide es que el
@@ -4887,9 +5397,21 @@ export default function AgendaPage() {
     abrirAlta(arg.start, fecha, hora, 'no', arg.end)
   }
 
+  /* ⚠️ LA ÚNICA PUERTA A LA EDICIÓN DE UNA CITA, Y POR ESO ESTÁ SUELTA. Nació
+     dentro de `handleEventClick` y salió en el paso 9, cuando el panel del mes
+     estrenó una SEGUNDA forma de abrir la misma cita. Que las dos pasen por aquí
+     es lo que garantiza que la regla de Google —los bloques del calendario de
+     Google no abren nada, porque no son filas de `appointments` y no hay qué
+     editar— no pueda aplicarse en una y olvidarse en la otra.
+     Y de paso deja UN solo sitio en el archivo donde `extendedProps` se estrecha
+     a `Appointment`. Si algún día se abre una tercera puerta, entra por aquí. */
+  function abrirCita(evento: EventApi) {
+    if (evento.extendedProps.isGcalBlock) return
+    setModal({ mode: 'edit', appointment: evento.extendedProps as Appointment })
+  }
+
   function handleEventClick(arg: EventClickArg) {
-    if (arg.event.extendedProps.isGcalBlock) return
-    setModal({ mode: 'edit', appointment: arg.event.extendedProps as Appointment })
+    abrirCita(arg.event)
   }
 
   /**
@@ -5430,7 +5952,17 @@ export default function AgendaPage() {
 
   /* Fuera del JSX porque el subtítulo lo consulta DOS veces: para decidir si la
      frase descriptiva se esconde y para pintar la frase misma. */
+  /* ⚠️ UNA SOLA CONDICIÓN PARA LAS TRES COSAS QUE DEPENDEN DE ELLA: la clase de
+     la tarjeta, el panel del día y el apagado de `selectable`. Estaba escrita a
+     mano en dos sitios y el tercero la habría hecho tres. Si divergen, se puede
+     acabar con el panel pintado y la selección de rango encendida, que es la
+     combinación que se lleva por delante el toque en una celda. */
+  const esMesMovil = isMobile && currentView === 'dayGridMonth'
+
   const resumenConteo = frasearConteo(conteo)
+  /* La banda del teléfono lleva la forma abreviada; el header de escritorio, la
+     larga. Ver `frasearConteoBreve`. */
+  const resumenConteoBreve = frasearConteoBreve(conteo)
 
   return (
     /* ⚠️⚠️ LA ALTURA DE ESTE `<div>` ES LO QUE PARTE LA PÁGINA EN DOS ZONAS: la
@@ -5592,17 +6124,23 @@ export default function AgendaPage() {
               Los que quedan en `rounded-xl` en este archivo son los del MODAL,
               que están fuera de este alcance. */}
           {/* ── COMPACTAR ─────────────────────────────────────────────────
-              Sólo en escritorio y sólo en las vistas de rejilla: en `dayGrid`
-              no hay `slotMinTime` que encoger, y en móvil la vista es de un
-              solo día, así que no habría columnas que plegar ni sitio en la
-              fila para el control. */}
-          {!isMobile && currentView.startsWith('timeGrid') && (
+              ⚠️ ESTA NOTA DECÍA «en móvil la vista es de un solo día», Y CADUCÓ
+              CON EL BLOQUE 6. El teléfono ya no impone Día: conserva el periodo
+              y cambia de formato, así que en móvil se puede estar en Mes. El
+              control existe también allí — lo pinta la banda azul, no esta fila.
+              Lo que decide hoy es la VISTA y sólo la vista: rejilla (los dos
+              ejes) o Mes (sólo columnas). Ver `vistaAdmiteCompactar`. */}
+          {!isMobile && vistaAdmiteCompactar(currentView) && (
             <button
               type="button"
               onClick={() => setCompactar(v => !v)}
               aria-pressed={compactar}
-              aria-label="Compactar la rejilla al horario de la clínica"
-              title="Compactar la rejilla al horario de la clínica"
+              /* ⚠️ EL RÓTULO DEPENDE DE LA VISTA. En Mes no hay rejilla ni
+                 horario que nombrar: lo único que se pliega son las columnas de
+                 los días sin nada dentro. Decirlo igual que en Semana prometería
+                 un recorte de horas que esa vista no puede hacer. */
+              aria-label={etiquetaCompactar(currentView)}
+              title={etiquetaCompactar(currentView)}
               className="flex items-center gap-2 px-3 py-2.5 rounded-[var(--ag-r-btn)] text-sm font-medium transition-colors"
               /* ENCENDIDO SE MARCA CON EL BORDE, NO CON RELLENO. Compartía los
                  tokens del segmentado activo, o sea que se pintaba como un
@@ -5770,7 +6308,7 @@ export default function AgendaPage() {
 
       {isMobile && (
         <BandaMovil
-          conteo={resumenConteo}
+          conteo={resumenConteoBreve}
           vistaActual={currentView}
           onVista={tipo => {
             const api = calendarRef.current?.getApi()
@@ -5788,6 +6326,11 @@ export default function AgendaPage() {
           /* `null` y no un booleano: es el manejador o no hay botón. Misma
              condición que el de escritorio (`canEditHorario`). */
           onHorario={canEditHorario ? () => setHorarioOpen(true) : null}
+          /* Misma forma y misma pregunta que el de escritorio: en móvil las dos
+             vistas que `vistaAdmiteCompactar` acepta se reducen a Mes, porque
+             Semana y Día son listas aquí. */
+          onCompactar={vistaAdmiteCompactar(currentView) ? () => setCompactar(v => !v) : null}
+          compactado={compactar}
         />
       )}
 
@@ -5948,7 +6491,15 @@ export default function AgendaPage() {
           `display: contents` y colocando las cuatro piezas con `grid-area`.
           El razonamiento completo, qué se comprobó y qué NO se rompe está allí,
           junto a `.ag-banda-compacta`. Antes de tocar esta línea, léelo. */}
-      <div className="agenda-fc bg-white rounded-2xl border border-slate-100 shadow-sm overflow-clip flex-1 min-h-[250px]">
+      {/* ⚠️ LA CLASE DE MÓVIL-MES NO ES COSMÉTICA: es lo que cambia el reparto
+          vertical. Fuera de ella la tarjeta es `flex-1` y se lleva TODO el hueco
+          sobrante, que es lo correcto cuando el calendario es lo único que hay
+          debajo de la banda. En el mes del teléfono no lo es —debajo va el panel
+          del día—, así que la cuadrícula pasa a medir lo suyo (seis semanas) y
+          el sobrante se lo lleva el panel. El alto exacto y el porqué de que sea
+          calculable están en `globals.css`, junto a `.ag-cal-mes-movil`. */}
+      <div className={`agenda-fc bg-white rounded-2xl border border-slate-100 shadow-sm overflow-clip flex-1 min-h-[250px]${
+        esMesMovil ? ' ag-cal-mes-movil' : ''}`}>
         {/* ── Leyenda ───────────────────────────────────────────────────
             ⚠️ VIVE DENTRO DE LA TARJETA Y EN LA FILA DEL TOOLBAR, junto a la
             fecha. Estuvo en una banda propia ENCIMA del calendario, y el
@@ -6066,7 +6617,7 @@ export default function AgendaPage() {
               className="ag-banda-compacta-salida"
               onClick={() => setCompactar(false)}
             >
-              Mostrar rejilla completa
+              {compactaElMes ? 'Mostrar todos los días' : 'Mostrar rejilla completa'}
             </button>
           </div>
         )}
@@ -6124,17 +6675,22 @@ export default function AgendaPage() {
             setCurrentView(arg.view.type)
             setTituloVista(arg.view.title)
             const eventos = calendarRef.current?.getApi().getEvents() ?? []
-            const rangos = {
-              activo:   { activeStart: arg.view.activeStart,  activeEnd: arg.view.activeEnd },
-              completo: { activeStart: arg.view.currentStart, activeEnd: arg.view.currentEnd },
-            }
+            const rangos = rangosDeLaVista(arg.view)
             aplicarVentana(eventos, rangos)
             aplicarConteo(eventos, rangos)
+            /* El panel del mes va DETRÁS de los otros dos y de la misma llamada,
+               por lo mismo: los eventos ya están resueltos aquí. Primero se
+               sincroniza el día —que sólo escribe si el mes cambió— y luego se
+               recalculan las filas del que ya estaba; si el día acaba de cambiar,
+               quien recalcula es su propio efecto, un render después. */
+            sincronizarDiaDelPanel(arg.view)
+            aplicarPanel(eventos)
           }}
           eventsSet={eventos => {
             const rangos = rangoDeVista()
             aplicarVentana(eventos, rangos)
             aplicarConteo(eventos, rangos)
+            aplicarPanel(eventos)
           }}
           buttonText={{ today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día' }}
           slotMinTime={ventana.slotMinTime}
@@ -6155,7 +6711,13 @@ export default function AgendaPage() {
              valor global sólo alcanza ya a `dayGridMonth`. Bajarlo aquí cambiaría
              las celdas del mes, que están fuera de este bloque. */
           dayMaxEvents={3}
-          views={VISTAS_FC}
+          /* ⚠️ DOS TABLAS Y NO UNA CON RAMAS: las dos son literales de módulo,
+             así que la identidad sigue siendo estable en los dos lados y
+             FullCalendar no vuelve a refinar opciones por culpa de esto. Lo
+             único que cambia entre ellas es la entrada de Mes. */
+          views={isMobile ? VISTAS_FC_MOVIL : VISTAS_FC}
+          /* Marca la celda del día que enseña el panel. Sólo pinta en móvil. */
+          dayCellClassNames={dayCellClassNames}
           /* El número de día del mes lleva a la vista Día de ESE día. Antes no
              había forma de llegar ahí: la celda abre el alta, el «+N más» abre
              un popover, y el segmentado llama a `changeView` SIN fecha, así que
@@ -6173,7 +6735,19 @@ export default function AgendaPage() {
           navLinkDayClick="timeGridDay"
           nowIndicator
           nowIndicatorContent={renderNowIndicator}
-          selectable
+          /* ⚠️ APAGADO EN EL MES DEL TELÉFONO, Y NO ES UN RECORTE DE FUNCIONES.
+             Arrastrar sobre las celdas del mes crea un rango de días y abre el
+             alta; en un teléfono ese gesto no existe a propósito —la única
+             puerta para crear en móvil es la barra de abajo, ver su nota— y lo
+             que sí existe es el TOQUE, que selecciona el día para el panel.
+             Los dos gestos se pisan: un toque real trae uno o dos píxeles de
+             deriva, y con `selectMinDistance` en su default de 0 eso basta para
+             que `DateSelecting` dispare `select` además del `dateClick`. O sea
+             que tocar una celda podía seleccionar el día Y abrir el alta encima.
+             Apagado, en Mes móvil sólo queda el toque, y de paso desaparece el
+             resaltado azul de selección, que competía con el contorno del día
+             elegido. En cualquier otra vista y en escritorio no cambia nada. */
+          selectable={!esMesMovil}
           selectMirror
           editable
           dragRevertDuration={200}
@@ -6238,6 +6812,37 @@ export default function AgendaPage() {
           slotLabelFormat={{ hour: '2-digit', minute: '2-digit', meridiem: false, hour12: false }}
         />
       </div>
+
+      {/* ═══ PANEL DEL DÍA (sólo el mes del teléfono) ═════════════════════
+          Hermano de la tarjeta dentro de `.agenda-raiz`, no hijo suyo: así no
+          entra en el `grid-template-areas` de `.agenda-fc` y el reparto de filas
+          de esa rejilla —que es delicado y está avisado en globals.css— se queda
+          exactamente como estaba. Aquí sólo hay un ítem más del flex de la raíz.
+
+          ⚠️ EL ENLACE DE SALIDA VA A `listDay` Y NO A `timeGridDay`, y lo decide
+          `vistaEnElOtroFormato`, no una cadena escrita a mano: en móvil el
+          periodo «Día» se dibuja como lista. Escribir el nombre de la vista aquí
+          sería la cuarta copia de esa tabla y la primera que se olvidaría. */}
+      {esMesMovil && diaSel && (
+        <PanelDelDia
+          dia={diaSel}
+          filas={filasDia}
+          /* LA MISMA PUERTA que el clic sobre la rejilla, literalmente: la fila
+             sólo lleva el `id` y quien resuelve la cita es `abrirCita`, que es
+             también quien deja fuera a los bloques de Google. */
+          onAbrir={id => {
+            const evento = calendarRef.current?.getApi().getEventById(id)
+            if (evento) abrirCita(evento)
+          }}
+          onVerDia={() => {
+            const api = calendarRef.current?.getApi()
+            if (!api) return
+            const destino = vistaEnElOtroFormato('timeGridDay', true)
+            api.changeView(destino, diaSel)
+            setCurrentView(destino)
+          }}
+        />
+      )}
 
       {/* ═══ BARRA INFERIOR MÓVIL ═════════════════════════════════════════
           ⚠️ ES LA ÚNICA PUERTA PARA CREAR EN MÓVIL, y por eso es una barra fija

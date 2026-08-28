@@ -1166,6 +1166,79 @@ main > div:has(.agenda-fc) {
 main > div:has(.agenda-fc) .agenda-raiz {
   height: calc(100dvh - 16px);   /* ← 8 + 8 de la regla de encima */
 }
+/* ═══ EN MÓVIL LA PÁGINA NO TIENE MARCO (bloque 6 · paso 9b) ════════════════
+   ⚠️ ESTO SUSTITUYE A CUATRO MÁRGENES NEGATIVOS, Y ES LA MISMA IDEA MEJOR
+   PUESTA. En el paso 9 la banda salía a sangre cancelando el relleno del layout
+   con `margin-inline: -16px` y `margin-top: -8px`; el paso 9b pide lo mismo para
+   la tarjeta del calendario y para la barra inferior, y replicar el truco tres
+   veces son tres sitios donde el 16 y el 8 pueden divergir del relleno real.
+   Se ataca en el origen: por debajo de `ANCHO_MOVIL` esta página NO lleva
+   relleno, y su raíz mide el alto entero. Con eso, la banda, la tarjeta, el panel
+   del día y la barra llegan solas a los cuatro bordes, sin un solo margen
+   negativo y sin ningún número replicado.
+
+   ⚠️ VA DESPUÉS DE LA REGLA DE ARRIBA A PROPÓSITO: una media query NO suma
+   especificidad, así que estos dos selectores pesan lo mismo que aquéllos y quien
+   gana es el ÚLTIMO de la hoja. Si mueves uno de los dos bloques, mueve el otro.
+
+   ⚠️ Y SIGUE COLGANDO DE `:has()`, con la misma degradación de siempre: sin
+   soporte (Firefox < 121) la página se queda con el `pt-16 px-4 pb-6` del layout
+   y la raíz con su `h-[calc(100dvh-88px)]` de respaldo — o sea el marco de antes,
+   que es feo pero coherente. Los dos lados del respaldo siguen casando.
+
+   ⚠️ EL RELLENO HORIZONTAL QUE SE ANULA ES EL `px-4` DEL LAYOUT, y por eso aquí
+   va `padding: 0` y no `padding-block: 0`: es el marco lateral lo que el paso 9b
+   viene a quitar. Nadie de dentro depende de él — la banda, las filas del panel
+   y la barra traen su propio relleno. */
+@media (max-width: 1023px) {
+  main > div:has(.agenda-fc) { padding: 0; }
+  main > div:has(.agenda-fc) .agenda-raiz { height: 100dvh; }
+}
+
+/* ═══ EN MÓVIL LA TARJETA DEJA DE SER UNA TARJETA (paso 9b) ════════════════
+   El mockup no dibuja ninguna: la cuadrícula del mes y las listas van de borde a
+   borde, cosidas a la banda azul. Un `rounded-2xl` con borde y sombra dentro de
+   una pantalla de 390 px no separa dos superficies —no hay nada alrededor de lo
+   que separarla, la página ya no tiene relleno— sino que mete una costura y
+   cuatro esquinas en mitad del contenido.
+
+   ⚠️ EL FONDO NO SE TOCA, Y NO ES UN OLVIDO. La tarjeta es un `.bg-white` de
+   Tailwind que `ThemeProvider` REPINTA a #1E1E1E con `!important` en oscuro
+   (`layout/ThemeProvider.tsx:117`) — y de ese fondo real cuelgan valores medidos
+   de la paleta oscura, entre ellos `--ag-offhours-bg` (ver su nota). Declarar
+   aquí un fondo propio rompería esa cuenta en un tema y no en el otro. Lo que se
+   retira es el CROMO —marco, radio y sombra—, que no participa en ningún
+   contraste.
+
+   ⚠️ EN ESCRITORIO NO CAMBIA NADA: la media query es el mismo 1023/1024 de
+   `ANCHO_MOVIL`, así que de ahí para arriba la tarjeta sigue con sus clases de
+   Tailwind intactas.
+
+   ⚠️ Y LOS MARCOS DE FULLCALENDAR SE VAN CON ELLA, que si no la costura sólo
+   cambia de dueño: `.fc-theme-standard .fc-scrollgrid` y `.fc-theme-standard
+   .fc-list` traen cada uno su `border: 1px` de contenedor, o sea una raya en los
+   cuatro lados de la pantalla. Los selectores llevan `.fc` en medio para pesar
+   TRES clases contra las dos de la librería y ganar por ESPECIFICIDAD. El orden
+   de la cascada también nos favorece —FullCalendar inserta su `<style>` el
+   PRIMERO de la cabecera a propósito (`core/internal-common.js:31-35`), para que
+   el CSS de la app lo pise sin pelear— pero eso es el cinturón; la especificidad
+   son los tirantes.
+
+   ⚠️ EL DE `.fc-list` ES ADEMÁS EL VACÍO DE LA VISTA DÍA. Con dos o tres citas la
+   lista termina y debajo quedaba el resto del alto encerrado en ese marco: un
+   recuadro enorme y vacío que se lee como un error de carga. Sin él, las filas
+   acaban donde acaba su contenido y lo de abajo es la misma superficie, que es
+   exactamente lo que hace el mockup (su `.scroll` es `flex: 1` con fondo blanco y
+   las filas simplemente se paran). */
+@media (max-width: 1023px) {
+  .agenda-fc {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .agenda-fc .fc .fc-scrollgrid,
+  .agenda-fc .fc .fc-list { border: 0; }
+}
 
 /* ⚠️⚠️ `grid-template-rows` Y `grid-template-areas` SON UNA PAREJA: EL NÚMERO DE
    PISTAS Y EL NÚMERO DE FILAS DE ÁREAS TIENEN QUE COINCIDIR, Y SE MUEVEN JUNTOS.
@@ -1507,6 +1580,14 @@ main > div:has(.agenda-fc) .agenda-raiz {
      fila de la navegación; ver la nota de `BandaMovil`. */
   padding: calc(env(safe-area-inset-top, 0px) + 8px) 14px 10px;
   gap: 8px;
+  /* ⚠️ AQUÍ ESTUVO `margin-inline: -16px` EN EL PASO 9 —el relleno del layout
+     replicado a mano para cancelarlo— y SE RETIRÓ EN EL 9b. La sangría ya no es
+     cosa de la banda: la página entera va sin relleno en móvil (ver el bloque
+     `main > div:has(.agenda-fc)` de más arriba), así que la banda llega a los
+     bordes sin hacer nada. No lo repongas — sumaría 16 px por lado a un relleno
+     que ya vale cero y la banda se saldría de la pantalla.
+     ⚠️ Y NADA DE RADIOS ARRIBA: no los tiene y no debe tenerlos. Un radio en una
+     banda a sangre la despega del borde. */
 }
 .ag-banda-movil-fila,
 .ag-banda-movil-filtros { display: flex; align-items: center; gap: 8px; }
@@ -1526,6 +1607,15 @@ main > div:has(.agenda-fc) .agenda-raiz {
   cursor: pointer;
 }
 .ag-banda-movil-ctrl--marco { border: 1px solid rgba(255, 255, 255, .24); }
+/* «Compactar» encendido. MARCO Y NO RELLENO, igual que el de escritorio y por el
+   mismo motivo: el único blanco sólido de esta banda es la pestaña activa del
+   conmutador, y un segundo relleno blanco competiría con ella. Aquí el marco se
+   opacifica en vez de cambiar de color — sobre el navy no hay más paleta que las
+   opacidades del blanco. */
+.ag-banda-movil-ctrl--on {
+  border-color: #fff;
+  background: rgba(255, 255, 255, .28);
+}
 .ag-banda-movil-ctrl:hover { background: rgba(255, 255, 255, .22); }
 
 .ag-banda-movil-titulo { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
@@ -1545,14 +1635,28 @@ main > div:has(.agenda-fc) .agenda-raiz {
    La mayúscula inicial que Intl no pone en español («agosto de 2026») la da el
    `::first-letter`, igual que el título del toolbar de escritorio. NO con
    `text-transform: capitalize`, que daría «17 – 22 De Agosto». */
-.ag-banda-movil-titulo span {
-  font-size: 12.5px;
-  color: color-mix(in srgb, #fff 62%, var(--ag-navy));
-  white-space: nowrap;
+/* ⚠️ EL SUBTÍTULO VUELVE A SER SÓLO EL CONTEO (paso 9b), que es la decisión
+   original y lo que enseñan dos de los tres mockups. En el paso 8c la fecha se
+   metió aquí porque se había quedado sin fila; en el 9b recupera la suya (ver
+   `.ag-banda-movil-fecha`, abajo), así que aquí sobra — y con ella se va el
+   problema que arrastraba: se leía «Agosto de 2026· 13 citas», sin el espacio de
+   delante del punto medio. La causa era el reparto en flex del paso 9: el conteo
+   iba en su propio `<span>` con el texto « · 13 citas», y ese span era un ÍTEM
+   DE FLEX, así que su espacio INICIAL se elimina en el procesado de blancos —un
+   ítem de flex empieza caja de línea propia—. No era el `<span>` en sí: en línea
+   normal ese espacio sí se habría pintado. Sin dos mitades no hay separador que
+   espaciar y el caso desaparece; si algún día vuelven, el espacio va en un
+   `padding-inline-start` o en un `&nbsp;`, nunca en el texto.
+   El azul claro sobre el navy da 5.9:1 según el mockup, y sale de la marca
+   aclarada para que siga siendo el azul del usuario y no un valor suelto. */
+.ag-banda-movil-sub {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: color-mix(in srgb, #fff 62%, var(--ag-navy));
 }
-.ag-banda-movil-titulo span::first-letter { text-transform: uppercase; }
 
 /* Conmutador de vistas: pista oscura, pestaña activa BLANCA.
 
@@ -1590,6 +1694,22 @@ main > div:has(.agenda-fc) .agenda-raiz {
   font-weight: 700;
 }
 
+/* ⚠️ LA CAJA DEL MEDIO EXISTE PARA QUE LAS FLECHAS QUEDEN EN LOS EXTREMOS SIEMPRE,
+   y no sólo cuando hay filtro. Es `flex: 1`, así que empuja la flecha derecha
+   contra el borde aunque dentro no haya nada — y sí que puede no haberlo: en una
+   clínica de un solo médico sin permiso de horario y fuera de Mes, los tres
+   controles del centro desaparecen a la vez. Sin esta caja, en ese caso las dos
+   flechas se juntarían a la izquierda.
+   La alternativa era `justify-content: space-between` en la fila, y no vale: con
+   tres o cuatro hijos reparte el hueco ENTRE TODOS y el engrane se separaría del
+   filtro. Aquí el único hueco elástico es éste. */
+.ag-banda-movil-medio {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .ag-banda-movil-filtros label { flex: 1; min-width: 0; display: flex; }
 .ag-banda-movil-filtros select {
   width: 100%;
@@ -1609,10 +1729,32 @@ main > div:has(.agenda-fc) .agenda-raiz {
    no hereda el color del `<select>`. Lo avisa el propio mockup. */
 .ag-banda-movil-filtros select option { color: var(--ag-ink); background: var(--ag-surface); }
 
-/* ⚠️ AQUÍ VIVÍAN `.ag-banda-movil-fecha` Y `.ag-banda-movil-etiqueta`, LA CUARTA
-   FILA. Se fueron en el paso 8c: la navegación se fundió en la fila del título y
-   la etiqueta bajó al subtítulo. No las repongas sin volver a medir la banda —
-   costaban 52 px de los 70 que se recuperaron. */
+/* ── LA FECHA, EN SU FILA Y CENTRADA (vuelve en el paso 9b) ────────────────
+   Es el `.datenav__label` del mockup, que los TRES dibujan igual: una línea
+   propia, centrada, debajo de los controles. En el paso 8c se fue al subtítulo
+   porque su fila costaba 52 px — pero esos 52 eran de las DOS FLECHAS de 44 que
+   la acompañaban, no de la etiqueta. Con las flechas mudadas a la fila del filtro
+   (paso 9b), la fila de la fecha vuelve a existir por unos 19 px: 15,5 de cuerpo
+   por 1.2 de interlínea, sin relleno propio.
+
+   ⚠️ NO LLEVA COLOR PROPIO: hereda el blanco de `.ag-banda-movil`. La fecha es lo
+   que se está mirando, así que va en la tinta principal de la banda y no en el
+   azul apagado del subtítulo, que es dato secundario.
+
+   La mayúscula inicial que `Intl` no pone en español («agosto de 2026») la da el
+   `::first-letter`, igual que el título del toolbar de escritorio. NO
+   `text-transform: capitalize`, que daría «17 – 22 De Agosto». */
+.ag-banda-movil-fecha {
+  margin: 0;
+  text-align: center;
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ag-banda-movil-fecha::first-letter { text-transform: uppercase; }
 
 /* ═══ BARRA INFERIOR ════════════════════════════════════════════════════════
    ⚠️ ES LA ÚNICA PUERTA PARA CREAR EN MÓVIL. Las vistas de lista no disparan
@@ -1929,6 +2071,12 @@ main > div:has(.agenda-fc) .agenda-raiz {
    arriba está acotada a `.fc-timegrid` y ésta vive donde no hay rejilla. Compone
    `agenda/page.tsx` (`CabeceraDiaLista`); aquí va la caja.
 
+   ⚠️ EL PEGADO ES DE LAS DOS LISTAS, Semana y Día. `listDay` lo tuvo apagado una
+   temporada —para esquivar que la primera cita se metiera debajo— y se volvió a
+   encender al arreglar la causa real: el fondo no tapaba. Si vuelves a ver filas
+   a través de la cabecera, lo que hay que mirar es la regla del CUSHION de más
+   abajo, no la opción; el porqué está entero allí.
+
    ⚠️ EL FONDO VA EN EL `<th>` Y NO SÓLO EN EL CUSHION, Y ES LO QUE HACE QUE EL
    PEGADO FUNCIONE. El elemento que el plugin vuelve pegajoso es el HIJO DIRECTO
    del `<tr>` —`.fc-list-sticky .fc-list-day > * { position: sticky; top: 0 }`,
@@ -1975,13 +2123,62 @@ main > div:has(.agenda-fc) .agenda-raiz {
      arriba por su propia regla, que es lo que evita la doble raya del borde
      superior de la lista. `--ag-border-card` y no `--ag-hairline`: el mockup
      separa la cabecera con una línea MÁS marcada que la que divide dos filas, y
-     `--ag-hairline` es exactamente el valor de esa división. */
+     `--ag-hairline` es exactamente el valor de esa división.
+     ⚠️ ESTAS DOS LÍNEAS SE QUEDAN EN EL SITIO AL PEGARSE, y no es arreglable
+     desde aquí: en el modelo de bordes COLAPSADOS (`.fc table { border-collapse:
+     collapse }`, CSS del núcleo) el borde pertenece a la TABLA y no a la celda.
+     Quien viaja con el desplazamiento pegajoso es el cushion, y por eso las
+     líneas que se ven de verdad las dibuja él — ver su regla, abajo. Éstas
+     siguen aquí porque son la línea de la RETÍCULA, la que separa dos filas, y
+     ésa sí tiene que quedarse donde está. */
   border-top-color: var(--ag-border-card);
   border-bottom-color: var(--ag-border-card);
+  /* ⚠️⚠️ EL ORDEN DE PINTADO, EXPLÍCITO. Hasta aquí la cabecera quedaba encima
+     de las filas POR ACCIDENTE: es un elemento posicionado (el `sticky` lo hace)
+     y las celdas de las filas no lo son, así que ganaba el paso 6 del algoritmo
+     de pintado contra el paso 5 de ellas. Basta con que alguien dé `position` o
+     `z-index` a cualquier cosa dentro de una fila —o con que la librería lo haga
+     por su cuenta: `.fc-event-selected:before` es `position: absolute; z-index:
+     3`— para que ese trozo se pinte POR ENCIMA de la cabecera y se lea a través.
+     El 3 no es un número al azar: es el que la propia librería usa para sus
+     secciones pegajosas (`.fc-scrollgrid-section-sticky > *`), así que la agenda
+     no estrena escala. El mockup declara 2 por lo mismo. */
+  z-index: 3;
 }
-/* 16 y no los 14 que trae la librería: es el canalón lateral del mockup, el
-   mismo que llevarán las filas. El vertical no cambia. */
-.agenda-fc .fc .fc-list-day-cushion { padding: 8px 16px; }
+/* ⚠️⚠️ AQUÍ VIVE LA OPACIDAD DE VERDAD, Y ÉSTE ES EL NODO QUE SE MUEVE.
+   El fondo estaba declarado sólo en el `<th>` y era opaco en las dos paletas
+   —#eef1f6 y #16233a, comprobado—, así que el defecto NUNCA fue un color con
+   alfa. Era DÓNDE estaba pintado: un `<th>` es una caja de TABLA, y sus adornos
+   —fondo y bordes— se pintan en la fase de la tabla, en la posición de FLUJO de
+   la celda. El desplazamiento pegajoso mueve el contenido de la celda, no esa
+   capa. De ahí que al scrollear se leyeran las filas a través de la cabecera, y
+   de ahí también que las líneas se despeguen en Chrome de Android y en Samsung
+   Internet: son el mismo mecanismo visto dos veces.
+   El cushion es un `<div>` corriente dentro de la celda pegajosa: su fondo y su
+   sombra los pinta ÉL, así que viajan con el desplazamiento en todos los
+   motores. Por eso todo lo que tiene que taparse va aquí.
+
+   ⚠️ EL FONDO SE DECLARA, YA NO SE HEREDA. Lo daba la regla de la librería
+   (`.fc-theme-standard .fc-list-day-cushion`, vía `--fc-neutral-bg-color`), o
+   sea que la opacidad de la cabecera dependía de una regla ajena y de que
+   siguiera apuntando a nuestro token. Es el MISMO valor que el `<th>`: si el
+   token cambia, cambian los dos a la vez.
+
+   ⚠️ LAS LÍNEAS VAN EN SOMBRA HACIA FUERA (sin `inset`) Y ES LO QUE EVITA LA
+   RAYA DOBLE. Con `padding: 0` en el `<th>` (regla del núcleo), la caja del
+   cushion coincide con la caja de contenido de la celda, así que una sombra de
+   1px hacia fuera cae EXACTAMENTE encima del borde colapsado. En reposo las dos
+   líneas se superponen y se ven como una —mismo grosor, mismo token—; al pegarse,
+   la sombra se va con la cabecera y el borde se queda marcando la retícula. Si
+   la cambias a `inset`, la sombra se mete 1px dentro y en reposo verás 2px.
+
+   Y los 16 del relleno son el canalón lateral del mockup, el mismo que llevan
+   las filas; los 8 verticales son los de la librería. */
+.agenda-fc .fc .fc-list-day-cushion {
+  padding: 8px 16px;
+  background: var(--ag-chip-bg);
+  box-shadow: 0 -1px 0 var(--ag-border-card), 0 1px 0 var(--ag-border-card);
+}
 
 /* ⚠️ EL FLEX VA EN ESTE SPAN Y NO EN EL CUSHION, Y NO ES UN NODO DE MÁS. El
    cushion arrastra un `::after` de limpieza de floats
@@ -3808,6 +4005,445 @@ main > div:has(.agenda-fc) .agenda-raiz {
   padding: 8px 10px !important;
 }
 .fc-daygrid .fc-popover-body { padding: 8px !important; }
+
+/* ═══ EL MES DEL TELÉFONO — MODO PUNTO (bloque 6 · paso 9) ═══════════════════
+   Hasta aquí, por debajo de 1024 px, Mes era el de escritorio metido en un
+   teléfono: siete cabeceras con el nombre del día entero pisándose unas a otras
+   y chips que intentaban imprimir hora y nombre en 51 px de columna, con la hora
+   cortada a media palabra. Inservible.
+
+   LO QUE CAMBIA, Y LO QUE NO:
+     · La cuadrícula SIGUE SIENDO LA DE FULLCALENDAR. Aquí no se dibuja ninguna
+       rejilla propia; se reaprovecha `dayGridMonth` entero.
+     · El CHIP SIGUE SIENDO `MonthChip`, el mismo componente de escritorio: lo
+       que hace este bloque es apagarle todo lo que no quepa y dejar el punto.
+       Es deliberado que no haya un segundo renderizador de evento para el mes —
+       dos podrían divergir y decir cosas distintas del mismo evento.
+     · El detalle vive DEBAJO, en `.ag-mespanel`. El punto contesta «cuánto», el
+       panel contesta «qué». Un punto de 5 px no es un objetivo táctil.
+
+   ⚠️ EL UMBRAL ES 1023/1024, EL MISMO `ANCHO_MOVIL` DE `page.tsx` Y EL MISMO DE
+   LA MEDIA QUERY DE LA LEYENDA. Si alguien mueve uno, mueve los tres: por debajo
+   de él `isMobile` es `true`, y de eso dependen la clase `.ag-cal-mes-movil` de
+   la tarjeta, `VISTAS_FC_MOVIL` y el panel. Media query y estado de React tienen
+   que cruzar el umbral en el mismo píxel o hay una franja con las opciones de
+   móvil y los estilos de escritorio, o al revés. */
+@media (max-width: 1023px) {
+  /* ── EL ALTO DE LA TARJETA EN MES ─────────────────────────────────────
+     ⚠️ ES CALCULABLE, Y SÓLO PORQUE `fixedWeekCount` SIGUE EN SU DEFAULT.
+     `dayGridMonth` rellena SIEMPRE hasta seis filas, mida lo que mida el mes
+     (`@fullcalendar/daygrid/internal.js:949-958`), así que el alto de la
+     cuadrícula no depende del mes que se esté mirando y se puede escribir aquí.
+     Si algún día alguien pone `fixedWeekCount: false` en `VISTAS_FC_MOVIL`, esto
+     deja de valer — y también deja de valer `SEMANAS_PINTADAS_DEL_MES` en
+     `page.tsx`, que es de donde sale el rango con el que se decide qué columnas
+     se pliegan. Los dos seises son el mismo seis.
+
+     ⚠️ Y POR QUÉ HAY QUE FIJARLO: la tarjeta es `flex-1`, o sea que se lleva TODO
+     el sobrante de la raíz. Con el panel debajo eso dejaba al panel en su altura
+     de contenido y a la cuadrícula estirada con seis filas enormes. Aquí se le
+     dice lo que mide y el sobrante pasa a ser del panel, que es quien scrollea.
+
+     `flex: 0 1 auto` y no `none`: en una pantalla baja la tarjeta TIENE que
+     poder encoger, o el panel se quedaría en cero y desbordaría la raíz. Al
+     encoger, la cuadrícula gana su propio scroll interno (el calendario va con
+     `height="100%"`), que es degradar, no romper.
+     El `min-height` cae de 250 a 180 por lo mismo: 250 era el suelo pensado para
+     una rejilla de HORAS con su cromo, y aquí no hay ni toolbar ni cabecera de
+     horas — 180 son la cabecera de días más tres semanas. */
+  .agenda-fc.ag-cal-mes-movil {
+    --ag-mes-celda-movil: 52px;
+    /* ⚠️⚠️ EL ALTO SE LE PONE A LA PISTA DE LA REJILLA, NO A LA TARJETA, Y ES LA
+       DIFERENCIA ENTRE QUE ESTO AGUANTE Y QUE NO. La tentación es
+       `height: calc(...)` aquí: funciona… hasta que «Compactar» enciende la banda
+       de aviso, que es OTRO hijo de este grid y cuyo alto no se puede saber desde
+       la hoja —a 358 px de ancho su frase envuelve a dos líneas, o a tres—. Con
+       la altura clavada en la tarjeta, esa banda se come el hueco de la
+       cuadrícula y aparece un scroll interno; con la altura en la PISTA, la banda
+       suma lo suyo y la tarjeta crece con ella. Aquí no hay ningún número que
+       adivinar.
+       ⚠️ CUATRO PISTAS PARA CUATRO FILAS DE ÁREAS, igual que el bloque estrecho
+       que hay más arriba: esto lo REDECLARA entero, no lo parchea. La historia de
+       qué se rompe cuando no cuadran está junto a la declaración base.
+       ⚠️ `minmax(0, …)` Y NO EL CALC PELADO: en una pantalla baja la tarjeta tiene
+       que poder encoger, y una pista fija no encoge. Al hacerlo, la cuadrícula
+       gana su propio scroll dentro del harness — degradar, no romper.
+       LOS 28 SON LA FILA DE CABECERAS, redondeados HACIA ARRIBA: la suma real es
+       5 + 5 de relleno del cushion, ~13 del texto de 11 px y 1 del borde inferior,
+       o sea 24. Pasarse deja a `expandRows` estirando las filas un píxel por
+       encima de los 52 (imperceptible); quedarse corto da scroll interno. */
+    grid-template-rows: auto auto auto minmax(0, calc(28px + 6 * var(--ag-mes-celda-movil)));
+    flex: 0 1 auto;
+    min-height: 180px;
+  }
+
+  /* La celda. 52 px de alto —el mínimo en el que caben el número y su fila de
+     puntos— contra los 116 de escritorio, que son los que hacían falta para
+     tres chips con texto. */
+  .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-daygrid-day-frame {
+    min-height: var(--ag-mes-celda-movil);
+    padding: 3px 0;
+  }
+
+  /* El número, CENTRADO. En escritorio va a la derecha porque comparte fila con
+     chips que empiezan a la izquierda; aquí es lo único de su fila. */
+  .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-daygrid-day-top { justify-content: center; }
+  .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-daygrid-day-number {
+    padding: 0;
+    font-size: 13px;
+    line-height: 1.25;
+  }
+
+  /* ── LA FILA DE PUNTOS ────────────────────────────────────────────────
+     `.fc-daygrid-day-events` es el contenedor que FullCalendar apila en
+     vertical; aquí pasa a ser una fila centrada que envuelve. El «+N» vive
+     DENTRO de él (`.fc-daygrid-day-bottom`), así que entra en el mismo flujo y
+     queda como cuarto elemento de la fila, que es justo lo que pide el diseño:
+     tres puntos y el resto contado.
+     Los márgenes se ponen a cero uno a uno porque los pone la librería en tres
+     nodos distintos —el contenedor, el arnés y el `.fc-daygrid-event`— y basta
+     con que sobreviva uno para que la fila crezca de alto. */
+  /* ⚠️⚠️ `pointer-events: none` ES LO QUE HACE QUE LA CELDA ENTERA SEA UN SOLO
+     OBJETIVO TÁCTIL, Y ARREGLA DOS COSAS DE GOLPE. NO LO QUITES.
+
+     La causa está en el núcleo, en `isValidDateDownEl`
+     (`@fullcalendar/core/internal-common.js:5836-5841`): `dateClick` NO se emite
+     si el `pointerdown` cae dentro de `.fc-event` o de `.fc-more-link`. En esta
+     vista los puntos SON `.fc-event` —anclas de 5 px— y el «+N» ES
+     `.fc-more-link`, así que:
+
+       · tocar el centro de un día ocupado caía en un punto, no en la celda: no
+         llegaba `dateClick`, el panel de abajo no cambiaba de día y en su lugar
+         se disparaba `eventClick`. Con una cita se abría el modal de edición;
+         con un bloque de Google, `abrirCita` sale sin hacer nada y el toque
+         parecía perdido. Era eso: el día ocupado no se podía seleccionar.
+       · tocar «+N» abría el globo emergente de FullCalendar, que aquí no informa
+         de nada —los chips de dentro son los mismos `.ag-mes` que este bloque
+         reduce a puntos, así que el globo enseña puntos sin nombre ni hora— y
+         además duplica al panel del día, que sí trae la lista entera.
+
+     Con los hijos inertes, el `target` del `pointerdown` pasa a ser la celda,
+     `isValidDateDownEl` contesta que sí y `dateClick` se emite con normalidad.
+     Resultado: el punto, el «+N» y el hueco vacío hacen los tres LO MISMO —
+     seleccionar el día—, que es la regla de esta vista: las citas de un día se
+     leen en un solo sitio, el panel de abajo.
+
+     ⚠️ POR QUÉ NO SE USA `moreLinkClick`, que sería lo obvio: su manejador NO
+     puede impedir el globo. `MoreLinkContainer.handleClick` abre el emergente
+     cuando el valor es FALSY (`internal-common.js:7411`), así que una función que
+     no devuelve nada lo abre igual, y suprimirlo exigiría devolver un valor
+     verdadero que no sea cadena — un hueco del contrato, no una opción. Además
+     eso sólo cubriría el «+N» y dejaría los puntos igual de sordos.
+
+     ⚠️ LO QUE SE PIERDE, dicho para que no sorprenda: en el mes del teléfono ya
+     no se puede abrir una cita tocando su punto, ni arrastrarla a otro día. Las
+     dos cosas son deliberadas — un objetivo de 5 px no es ninguna de las dos —
+     y las dos siguen ahí desde el panel y desde la vista Día.
+     ⚠️ Y SÓLO ALCANZA A MÓVIL: en escritorio el emergente, el clic en el chip y
+     el arrastre siguen exactamente como estaban. */
+  .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-daygrid-day-events {
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    justify-content: center;
+    gap: 2px;
+    margin: 2px 0 0 !important;
+    min-height: 0;
+    pointer-events: none;
+  }
+  .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-daygrid-event-harness { margin-top: 0 !important; }
+  /* El `padding: 2px 0` es del nativo `.fc-daygrid-dot-event`, que es el `<a>`
+     de cada segmento con `eventDisplay: 'list-item'`. Cuatro píxeles por punto
+     en una celda de 52 no son un detalle. */
+  .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-daygrid-event {
+    margin-top: 0 !important;
+    padding: 0;
+  }
+  .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-daygrid-day-bottom { margin: 0; padding: 0; }
+  /* Ese `<div>` lo monta `TableCell` SIEMPRE (daygrid/internal.js:236), tenga o
+     no un «+N» dentro; sin esto, un día sin desborde gastaba un hueco de 2 px de
+     la fila de puntos en una caja vacía. */
+  .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-daygrid-day-bottom:empty { display: none; }
+  .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-daygrid-more-link {
+    padding: 0 1px;
+    font-size: 10px;
+    line-height: 1;
+  }
+
+  /* ── EL CHIP, REDUCIDO A SU PUNTO ─────────────────────────────────────
+     Se apaga todo lo que no cabe y se deja el marcador, que ya viene con el
+     color del estado (o del evento, o la G de Google) puesto por `MonthChip`.
+     `!important` en el fondo porque el chip lo lleva EN LÍNEA —lo calcula
+     `tintasDelChipDeMes`— y una declaración de hoja no le gana de otro modo. */
+  .agenda-fc.ag-cal-mes-movil .ag-mes {
+    padding: 0;
+    gap: 0;
+    background: none !important;
+    border-radius: 0;
+  }
+  .agenda-fc.ag-cal-mes-movil .ag-mes-hora,
+  .agenda-fc.ag-cal-mes-movil .ag-mes-icono,
+  .agenda-fc.ag-cal-mes-movil .ag-mes-nombre,
+  .agenda-fc.ag-cal-mes-movil .ag-mes-badge { display: none; }
+  .agenda-fc.ag-cal-mes-movil .ag-mes-punto { width: 5px; height: 5px; }
+
+  /* ── HOY Y EL DÍA SELECCIONADO ────────────────────────────────────────
+     HOY va con RELLENO y el seleccionado con CONTORNO, y no al revés: el relleno
+     es la única marca que se lee de reojo, y «hoy» es la que hay que reconocer
+     sin buscarla. El contorno es la que el dedo acaba de poner, así que ya se
+     sabe dónde está.
+     El relleno gana al tinte de escritorio (`--ag-month-today-bg`), que sobre una
+     celda de 52 px casi no se ve. Los puntos sobre el azul llevan un halo blanco
+     para no desaparecer, igual que en el mockup. */
+  .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-day-today {
+    background: var(--ag-brand-secondary) !important;
+  }
+  /* ⚠️ `--ag-segment-active-text` Y NO UN BLANCO SUELTO: es el token que este
+     archivo ya declara para «tinta sobre un relleno de marca», que es
+     exactamente lo que esto es, y vale lo mismo en las dos paletas —el relleno
+     es de marca en las dos—. Su nota mide el contraste (6.45:1 con la marca por
+     defecto) y avisa de qué pasa con una `--cs` muy clara. */
+  .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-day-today .fc-daygrid-day-number {
+    /* ⚠️ EL DISCO DE 26×26 DE ESCRITORIO SE APAGA AQUÍ, y no por gusto. Con la
+       celda entera rellena ese disco es del MISMO azul: invisible, pero mide —
+       obliga a la cifra de hoy a 26 px cuando las otras miden 16, así que la
+       fila de puntos de ese único día bajaba respecto a la de sus vecinos.
+       El relleno se mudó a la celda; aquí sólo queda la cifra. */
+    background: none !important;
+    width: auto;
+    height: auto;
+    font-weight: 700;
+    /* ⚠️ EL BLANCO DE LA CIFRA NO SE DECLARA AQUÍ, Y NO ES UN OLVIDO: ya lo pone
+       la misma regla de escritorio, con `color: white !important`. Repetirlo
+       sería una declaración muerta —perdería contra ese `!important` aunque esta
+       regla sea más específica— y una segunda fuente para el mismo color. */
+  }
+  /* ⚠️ EN OSCURO EL RELLENO SE MEZCLA HACIA EL FONDO, Y ES LA MISMA FÓRMULA que
+     ya usa el círculo de «hoy» de Mes unas cuantas reglas más abajo —la marca
+     saturada se dispara contra el fondo oscuro—. Se apunta a `--ag-bg-app` en
+     vez de repetir su hex: en oscuro ese token ES el fondo de la app.
+     El círculo de la cifra ya lo apaga la regla clara de aquí arriba, que en
+     oscuro sigue valiendo. */
+  html.dark .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-day-today {
+    background: color-mix(in srgb, var(--ag-brand-secondary) 55%, var(--ag-bg-app)) !important;
+  }
+  .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-day-today .ag-mes-punto {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, .55);
+  }
+  /* El contorno va POR DENTRO (`inset`) para no quedar tapado por las celdas
+     vecinas: los `<td>` no crean contexto de apilamiento y una sombra hacia
+     fuera se solapa con el borde del vecino. */
+  .agenda-fc.ag-cal-mes-movil .fc-daygrid .ag-mes-dia-sel {
+    box-shadow: inset 0 0 0 2px var(--ag-month-today-ring);
+  }
+
+  /* ⚠️⚠️ EL CARRIL VACÍO DE LA DERECHA: LA CUADRÍCULA SE ENCOGÍA PARA DEJAR SITIO
+     A UNA BARRA DE SCROLL QUE NOSOTROS ESCONDEMOS. NO QUITES ESTA REGLA SIN
+     LEER ESTO.
+
+     La cuenta la hace `SimpleScrollGrid.computeScrollerDims`
+     (`@fullcalendar/core/index.global.js:6620-6644`):
+
+         scrollerClientWidths[k] = Math.floor(
+           harnessEl.getBoundingClientRect().width
+           - (forceYScrollbars ? scrollbarWidth.y : 0))
+
+     y ese ancho se aplica EN LÍNEA al `<div class="fc-daygrid-body">`, a su
+     `<table class="fc-scrollgrid-sync-table">` y a la `<table class="fc-col-header">`
+     de la cabecera (`renderChunkContent`, `:6400-6417`).
+
+     Las dos mitades del problema:
+
+       · `forceYScrollbars` se enciende en cuanto CUALQUIER scroller del grid
+         necesita scroll vertical, y en el mes del teléfono lo necesita en cuanto
+         las seis filas de 52 px no caben justas (cabecera un píxel más alta de
+         lo previsto, pantalla baja, o la banda de «Vista compacta» encendida).
+       · `scrollbarWidth.y` NO se mide sobre nuestro scroller: sale de una sonda
+         GLOBAL —un `<div style="overflow:scroll">` que se cuelga de
+         `document.body` (`:2629-2633`)—, o sea FUERA de `.agenda-fc`, donde
+         nuestro `scrollbar-width: none` no la alcanza. La sonda contesta lo que
+         mide una barra clásica (~15 px) mientras que nuestro scroller la tiene
+         escondida y vale 0.
+
+     Resultado: la cuadrícula se dibuja ~15 px más estrecha que su hueco y
+     aparece una franja vertical vacía a la derecha del domingo, del alto del
+     cuerpo. No es un margen ni una columna de más: es un hueco reservado para
+     algo que no se pinta.
+
+     Se le devuelve el ancho a los tres nodos que lo llevan en línea. `!important`
+     porque un estilo en línea no se vence de otra forma. Y a los TRES a la vez:
+     cabecera y cuerpo reciben la MISMA resta, así que devolvérsela sólo a uno
+     desalinearía las columnas — que es peor que el carril.
+
+     ⚠️ ES SEGURO PORQUE NUESTRA BARRA MIDE CERO DE VERDAD: la esconden
+     `scrollbar-width: none` y `::-webkit-scrollbar { display: none }` en
+     `.agenda-fc .fc-scroller`, en los tres motores. Si algún día se decide
+     ENSEÑAR la barra de scroll de la agenda, esta regla hay que retirarla en el
+     mismo cambio o la barra tapará la última columna.
+
+     ⚠️ ACOTADO AL MES DEL TELÉFONO A PROPÓSITO, que es donde se reportó. El
+     mecanismo NO es exclusivo de móvil —en escritorio el cuerpo del mes y el de
+     la rejilla también piden scroll, así que el mismo carril debe de estar ahí—
+     pero eso es una decisión aparte y el escritorio no entra en este bloque. */
+  .agenda-fc.ag-cal-mes-movil .fc-daygrid-body,
+  .agenda-fc.ag-cal-mes-movil .fc-scrollgrid-sync-table,
+  .agenda-fc.ag-cal-mes-movil .fc-col-header { width: 100% !important; }
+
+  /* Cabeceras de día: `weekday: 'narrow'` da una sola letra, así que aquí sólo
+     hay que apretar el relleno para que la fila no se lleve 35 px. */
+  /* Los `8px 4px` de la celda son de la regla de escritorio y aquí sobran: con
+     ellos la fila de cabeceras medía 40 px, o sea casi una semana entera de las
+     seis que hay que meter en la pantalla. El aire lo pone el cushion. */
+  .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-col-header-cell {
+    background: var(--ag-month-head);
+    padding: 0 2px;
+  }
+  .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-col-header-cell-cushion {
+    padding: 5px 0;
+    font-size: 11px;
+    font-weight: 700;
+  }
+}
+
+/* ═══ PANEL DEL DÍA SELECCIONADO (bloque 6 · paso 9) ═════════════════════════
+   Hermano de la tarjeta del calendario dentro de `.agenda-raiz`, que es un
+   `flex flex-col`: por eso se lleva el sobrante con `flex: 1` y no necesita
+   `position` ninguna. Misma mecánica que la banda y la barra inferior.
+
+   ⚠️ `min-height: 0` NO ES ADORNO. Un ítem de flex trae `min-height: auto`, que
+   le impide encoger por debajo de su contenido; sin esto, una lista de doce
+   citas empujaría la barra inferior fuera de la pantalla en vez de scrollear
+   dentro. Es la misma trampa que ya documenta `.agenda-fc`. */
+.ag-mespanel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--ag-surface);
+  /* SÓLO LA LÍNEA DE ARRIBA, como el `.daypanel` del mockup. Tuvo marco de los
+     cuatro lados, radio y un margen de 8 px, y se retiró en el paso 9b junto con
+     la tarjeta del calendario: un panel con esquinas pegado a una cuadrícula a
+     sangre se lee como un parche encima, no como su continuación. */
+  border-top: 1px solid var(--ag-border-card);
+  /* La barra de scroll se oculta a propósito —el diseño no la enseña— y el
+     scroll sigue funcionando. Los tres prefijos son los tres motores. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+.ag-mespanel::-webkit-scrollbar { display: none; }
+
+/* PEGAJOSA, y funciona porque es hermana de las filas dentro del MISMO
+   contenedor de scroll. Fondo OPACO obligatorio o las filas se ven por debajo.
+   Es la misma mecánica de las cabeceras de día de las vistas de lista. */
+.ag-mespanel-cab {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 12px 14px 8px;
+  background: var(--ag-surface);
+  border-bottom: 1px solid var(--ag-hairline);
+}
+.ag-mespanel-cab h2 {
+  flex: none;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ag-ink);
+}
+.ag-mespanel-cab h2::first-letter { text-transform: uppercase; }
+/* El conteo es lo que cede cuando no cabe, igual que en el subtítulo de la
+   banda y por lo mismo: la fecha y la salida son navegación, esto es dato. */
+.ag-mespanel-conteo {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--ag-muted);
+}
+.ag-mespanel-verdia {
+  flex: none;
+  margin-left: auto;
+  border: 0;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ag-brand-legible);
+  cursor: pointer;
+}
+
+/* 44 px de alto mínimo: ESTA es la ruta táctil del mes, la que los puntos de la
+   cuadrícula no pueden ser. */
+.ag-mespanel-fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--ag-hairline);
+  background: var(--ag-surface);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ag-mespanel-fila:hover { background: var(--ag-bg-app); }
+/* La G de Google llega como <svg> suelto, en el hueco del punto. */
+.ag-mespanel-fila > svg { flex: none; }
+
+/* 52 px fijos y cifras tabulares (`.fc, .agenda-fc` ya las declaran arriba, pero
+   este panel vive FUERA de la tarjeta): sin las dos cosas las horas tiemblan en
+   vertical al cambiar de día. */
+.ag-mespanel-hora {
+  flex: none;
+  width: 52px;
+  font-variant-numeric: tabular-nums;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ag-ink);
+}
+.ag-mespanel-hora--todo {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ag-muted);
+}
+.ag-mespanel-punto {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.ag-mespanel-punto--cuadro { border-radius: 2px; }
+.ag-mespanel-nombre {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ag-ink);
+}
+/* Cancelada lleva tachado; «no asistió» NO. La cita sí ocurrió en la agenda, el
+   paciente no llegó: son cosas distintas y se ven distintas. Misma regla que
+   `.ag-mes--cancelada` y que las filas de lista. */
+.ag-mespanel-nombre--cancelada {
+  color: var(--ag-muted);
+  text-decoration: line-through;
+}
+.ag-mespanel-chev { flex: none; color: var(--ag-faint); }
+.ag-mespanel-vacio {
+  margin: 0;
+  padding: 18px 14px;
+  font-size: 13.5px;
+  color: var(--ag-muted);
+}
 
 /* ════════════════════════════════════════════════════════════════
    AGENDA — MODO OSCURO (sub-fase 6). Contrapartes de los --ag-*.
