@@ -185,7 +185,20 @@ function ExpedientePacienteContent() {
       {/* ── Modal eliminar paciente — macOS alert dialog ── */}
       {mostrarEliminarPaciente && (
         <Portal>
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+        {/* ⚠️ EL RELLENO DE ABAJO LLEVA LA BARRA DE GESTOS SUMADA (bloque 6 ·
+            paso 10), Y AQUÍ NO ES COSMÉTICO. Por debajo de `sm` este diálogo va
+            anclado al borde inferior (`items-end`), y desde que el viewport es
+            `viewport-fit=cover` esos 16 px de `p-4` se miden contra el borde
+            FÍSICO de la pantalla. La barra de gestos mide ~34: la fila de
+            botones quedaba a medias debajo de ella. Y esa fila es «Cancelar» y
+            «Eliminar» —borrado permanente de un expediente— repartidos al 50 %,
+            o sea que el dedo que falla acierta en el otro.
+            ⚠️ SÓLO POR DEBAJO DE `sm`. De ahí para arriba el diálogo se centra
+            (`sm:items-center`) y no toca ningún borde; sumarle relleno inferior
+            lo descentraría hacia arriba media área segura.
+            ⚠️ EL 16 DE DISEÑO NO SE TOCA: se suma. Donde el sistema no se
+            superpone, `env()` vale 0 y esto es el `p-4` de siempre. */}
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 max-sm:pb-[calc(1rem+env(safe-area-inset-bottom,0px))] bg-black/40 backdrop-blur-sm animate-fade-in">
           <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
             {/* Icon + title */}
             <div className="px-6 pt-6 pb-4 text-center">

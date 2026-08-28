@@ -113,8 +113,26 @@ export default function ModalShell({
           className={`absolute inset-0 ${geo ? 'bg-[var(--sp-backdrop)]' : 'bg-black/40 backdrop-blur-sm'} animate-fade-in`}
           onClick={onClose}
         />
+        {/* ⚠️ EL RELLENO VERTICAL DE LA RAMA `fullscreenMobile` ES DEL PASO 10.
+            Ahí el panel es `h-dvh` de borde a borde, y desde que el viewport es
+            `viewport-fit=cover` esos bordes son los FÍSICOS: la cabecera nacía
+            bajo el reloj y el pie bajo la barra de gestos.
+            ⚠️ VA EN EL PANEL Y NO EN LA CABECERA Y EL PIE POR SEPARADO, que era
+            la otra forma. Motivo: el pie es OPCIONAL y la cabecera se oculta
+            cuando está vacía (`headerVacio`), así que repartirlo daría cuatro
+            combinaciones y en dos de ellas el hueco se lo comería quien no está.
+            Puesto aquí, encoge lo que haya dentro sea lo que sea.
+            ⚠️ Y NO DESBORDA: con `box-sizing: border-box` —el preflight de
+            Tailwind— el relleno va DENTRO del `h-dvh`, así que el panel sigue
+            midiendo exactamente la pantalla y su fondo llega a los cuatro
+            bordes. Si alguien cambia el `h-dvh` por un alto de contenido, esto
+            hay que revisarlo.
+            ⚠️ SÓLO VERTICAL: los insets laterales sólo valen algo en apaisado y
+            el manifiesto fija `portrait-primary`.
+            ⚠️ LA OTRA RAMA NO SE TOCA. Sin `fullscreenMobile` el modal se centra
+            con `p-4` y `max-h-[85vh]`, o sea que no toca ningún borde. */}
         <div
-          className={`relative ${geo ? 'bg-white' : 'bg-white/95 backdrop-blur-xl'} rounded-2xl shadow-2xl w-full ${maxWidth} max-h-[85vh] flex flex-col animate-modal-enter overflow-hidden${fullscreenMobile ? ' max-md:h-dvh max-md:max-h-dvh max-md:max-w-full max-md:rounded-none' : ''}${geo ? ` ${geo.panel} md:rounded-[var(--sp-r-modal)] md:shadow-[var(--sp-shadow-modal)] md:transition-[max-width] md:duration-[240ms] md:ease-[cubic-bezier(.4,0,.2,1)]` : ''}`}
+          className={`relative ${geo ? 'bg-white' : 'bg-white/95 backdrop-blur-xl'} rounded-2xl shadow-2xl w-full ${maxWidth} max-h-[85vh] flex flex-col animate-modal-enter overflow-hidden${fullscreenMobile ? ' max-md:h-dvh max-md:max-h-dvh max-md:max-w-full max-md:rounded-none max-md:pt-[env(safe-area-inset-top,0px)] max-md:pb-[env(safe-area-inset-bottom,0px)]' : ''}${geo ? ` ${geo.panel} md:rounded-[var(--sp-r-modal)] md:shadow-[var(--sp-shadow-modal)] md:transition-[max-width] md:duration-[240ms] md:ease-[cubic-bezier(.4,0,.2,1)]` : ''}`}
         >
           {!headerVacio && (
           <div className={`flex items-center justify-between px-5 py-4 border-b ${geo ? 'border-[var(--sp-line-divider)] md:px-6' : 'border-slate-100'} flex-shrink-0`}>

@@ -53,7 +53,16 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={toast}>
       {children}
-      <div className="fixed bottom-5 right-5 z-[9999] flex flex-col gap-2 pointer-events-none">
+      {/* ⚠️ EL `bottom` LLEVA LA BARRA DE GESTOS SUMADA (bloque 6 · paso 10).
+          Con `viewport-fit=cover` los 20 px de `bottom-5` se miden desde el
+          borde FÍSICO de la pantalla y la barra de gestos mide ~34, así que el
+          aviso salía por debajo de ella. El 20 de diseño no se toca: se suma, y
+          donde el sistema no se superpone `env()` vale 0.
+          ⚠️ ES EL MENOS GRAVE DE LA TANDA y aun así se arregla: el aviso es
+          `pointer-events-none` y se va solo, o sea que nadie se queda sin poder
+          pulsar nada — pero es donde la app dice «guardado» o «falló», y medio
+          tapado por el indicador del sistema se lee mal justo cuando importa. */}
+      <div className="fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom,0px))] right-5 z-[9999] flex flex-col gap-2 pointer-events-none">
         {toasts.map(t => (
           <div
             key={t.id}

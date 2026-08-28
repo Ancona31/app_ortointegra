@@ -1606,6 +1606,31 @@ function AppointmentModal({
     }
   }, [])
 
+  /* ── ¿EL PIE TERMINA EN EL BORDE DE LA PANTALLA? ────────────────────────
+     Desde el paso 10 el viewport es `viewport-fit=cover`, así que en móvil este
+     modal es de verdad de borde a borde y el pie con «Guardar» cae sobre la
+     barra de gestos. Se le suma `env(safe-area-inset-bottom)` — PERO NO SIEMPRE,
+     y aquí está el detalle que hace falta pensar:
+
+     con el teclado abierto el envoltorio ya NO llega al borde de la pantalla,
+     porque sigue al `visualViewport` y ése termina en el borde SUPERIOR DEL
+     TECLADO. La barra de gestos queda por debajo del teclado, o sea tapada por
+     él y a cargo del sistema. Sumar el área segura ahí serían ~34 px de vacío
+     entre «Guardar» y el teclado: el hueco duplicado, justo lo que se quiere
+     evitar. Y el teclado se abre SOLO al crear una cita, así que sería el caso
+     normal, no el raro.
+
+     `desde + alto` es dónde acaba el rectángulo visible; si no llega a
+     `innerHeight` —el viewport de LAYOUT, que con `cover` sí mide la pantalla
+     entera y no encoge con el teclado— es que hay teclado. El píxel de tolerancia
+     es por el redondeo de las medidas fraccionarias.
+
+     ⚠️ SIN `visualViewport` (y en el render de servidor) SE DA POR CIERTO. Es la
+     rama segura: sin teclado detectable, el pie está en el borde y el área segura
+     hace falta. Y en escritorio el `env()` vale 0, así que esto es un no-op. */
+  const pieAlBorde = typeof window === 'undefined' || !areaVisible
+    || areaVisible.desde + areaVisible.alto >= window.innerHeight - 1
+
   return (
     <Portal>
     {/* ⚠️ `top` Y `height` EN LÍNEA GANAN AL `inset-0`, y el `bottom: 0` que
@@ -1634,8 +1659,21 @@ function AppointmentModal({
       <div className="relative rounded-[22px] max-md:rounded-none w-full max-w-[480px] max-md:max-w-full md:max-h-[92dvh] max-md:h-full flex flex-col animate-modal-enter overflow-hidden"
         style={{ background: 'var(--ag-modal-bg)', boxShadow: '0 30px 80px rgba(16, 32, 64, .28)' }}>
 
-        {/* Header */}
-        <div className="flex items-center gap-3 px-[22px] py-[18px] border-b" style={{ borderColor: 'var(--ag-hairline)' }}>
+        {/* Header
+
+            ⚠️ EL RELLENO DE ARRIBA LLEVA EL ÁREA SEGURA SUMADA EN MÓVIL (paso
+            10). Por debajo de `md` este panel es pantalla completa y su borde
+            superior es el borde FÍSICO, así que sin esto el icono y el «Nueva
+            cita» se meten bajo el reloj. Los 18 px de diseño no se tocan: se
+            suman.
+            ⚠️ VA CON `max-md:` AUNQUE EN ESCRITORIO EL `env()` VALGA 0. Ahí el
+            modal es una tarjeta centrada y no toca ningún borde de pantalla: si
+            algún día un navegador de escritorio reporta insets, esto no debe
+            heredarlos.
+            ⚠️ Y NO LO CUBRE LA FRANJA NAVY de `globals.css`: ésa va a z-index 45
+            y este modal a 50, o sea que se pinta ENCIMA de ella. Los modales a
+            pantalla completa se pagan su propio hueco; éste es el suyo. */}
+        <div className="flex items-center gap-3 px-[22px] py-[18px] max-md:pt-[calc(18px+env(safe-area-inset-top,0px))] border-b" style={{ borderColor: 'var(--ag-hairline)' }}>
           <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'var(--ag-modal-icon-bg)' }}>
             <Calendar size={20} style={{ color: 'var(--ag-brand-primary)' }} />
           </div>
@@ -2239,8 +2277,21 @@ function AppointmentModal({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="px-[22px] py-3.5 border-t flex items-center gap-2" style={{ borderColor: 'var(--ag-hairline)' }}>
+        {/* Footer
+
+            ⚠️ EL RELLENO DE ABAJO SE CALCULA, Y EL PORQUÉ ESTÁ EN LA NOTA DE
+            `pieAlBorde`, ARRIBA. Resumen: con el pie contra el borde de la
+            pantalla se le suma la barra de gestos; con el teclado abierto NO,
+            porque entonces el pie termina donde empieza el teclado y esos 34 px
+            serían un hueco de más.
+            ⚠️ EL `14px` ES EL `py-3.5` DE LA CLASE, escrito otra vez porque un
+            estilo en línea sustituye, no suma. Si cambias uno, cambia el otro o
+            el pie deja de ser simétrico. */}
+        <div className="px-[22px] py-3.5 border-t flex items-center gap-2"
+          style={{
+            borderColor: 'var(--ag-hairline)',
+            ...(pieAlBorde ? { paddingBottom: 'calc(14px + env(safe-area-inset-bottom, 0px))' } : {}),
+          }}>
           {/* El sustantivo de las dos etiquetas sale de `esEvento`, que aquí ya
               está resuelto por el DATO de la fila (`esEventoGenerico`, o sea el
               paciente) y nunca por el título, que en un evento lo escribe el
@@ -6142,8 +6193,20 @@ export default function AgendaPage() {
        `:has()` no está soportado (Firefox < 121), aquella regla no casa, el
        padding se queda en 64 y este calc de 64 vuelve a ser el correcto. Por eso
        el número de aquí NO se cambia a 16: emparejado con el padding que habría
-       en ese caso, es exacto. Cambiarlo rompería precisamente el respaldo. */
-    <div className="agenda-raiz flex flex-col h-[calc(100dvh-88px)] lg:h-[calc(100dvh-64px)]">
+       en ese caso, es exacto. Cambiarlo rompería precisamente el respaldo.
+
+       ⚠️ Y POR ESO RESTAN TAMBIÉN LOS DOS `env()` (bloque 6 · paso 10). Aquel
+       padding pasó a llevar el área segura sumada, así que el respaldo tiene que
+       restar lo mismo o volvería a divergir en el único caso para el que existe.
+       Los 88 y los 64 no se tocan: el área segura se AÑADE a la resta, igual que
+       se añadió allí a la suma. En escritorio y en una pestaña normal los dos
+       `env()` valen 0 y esto es el calc de siempre.
+       ⚠️ ESTO NO ES LO QUE SE VE EN UN TELÉFONO CON `:has()`: allí manda la regla
+       de `globals.css`, que pone la página a `padding: 0` y esta raíz a `100dvh`
+       ENTERO —sin restar nada—, que es lo que deja a la banda meterse bajo el
+       reloj y a la barra de «Agendar» bajo la de gestos. Si te preguntas por qué
+       aquí no hay duplicación: porque en esa rama este calc no se aplica. */
+    <div className="agenda-raiz flex flex-col h-[calc(100dvh-88px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] lg:h-[calc(100dvh-64px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))]">
 
       {/* ── Header ──────────────────────────────────────── */}
       {/* ⚠️ EL ENCABEZADO DE ESCRITORIO SE ENVUELVE, NO SE TOCA POR DENTRO. Por

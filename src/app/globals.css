@@ -735,6 +735,59 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* ═══ LA FRANJA DEL SISTEMA, EN EL NAVY DEL CROMO (bloque 6 · paso 10) ══════
+   Desde que `src/app/layout.tsx` declara `viewportFit: 'cover'`, la página se
+   dibuja POR DEBAJO de la barra de estado. En la agenda eso es justo lo que se
+   quería —su banda azul llega al borde y el reloj queda encima—, pero en las
+   otras veinte páginas lo que queda debajo del reloj es `--background`, que en
+   claro es casi blanco. Y en la app instalada de iOS el estilo de la barra es
+   `black-translucent`, que pinta los glifos SIEMPRE EN BLANCO: reloj blanco
+   sobre fondo casi blanco, o sea ilegible.
+
+   Esta franja lo resuelve para toda la aplicación de una vez: tapa esa altura
+   con el mismo navy del menú lateral y de la banda de la agenda, que es contra
+   lo que el blanco de los glifos sí contrasta.
+
+   ⚠️ ES EL COLOR DE LA CLÍNICA, NO UNO FIJO. Sale de `--ag-navy`, o sea de
+   `--cp` bajada al 20 % de luminosidad; si la clínica cambia su marca, la barra
+   de estado cambia con ella. El `theme-color` del `<head>` NO puede hacer esto
+   —se lee antes de que exista CSS— y por eso lleva el valor por defecto: los dos
+   dicen lo mismo para la marca de fábrica y sólo éste sigue al usuario.
+
+   ⚠️ NO SE REDECLARA EN OSCURO Y ES CORRECTO: `--ag-navy` tampoco: el cromo de
+   marca no cambia con el tema. Las dos paletas ven la misma franja, igual que
+   ven el mismo menú lateral.
+
+   ⚠️ NO OCUPA SITIO EN EL FLUJO. Es `fixed`, así que NO empuja nada y NO puede
+   duplicar el espacio de nadie. Quien reserva el hueco es el relleno de cada
+   pantalla (`(app)/layout.tsx`), y quien lo pinta es esto. Son dos trabajos
+   distintos sobre la misma altura y por eso no se estorban.
+
+   ⚠️ EN LA AGENDA ES INVISIBLE, Y ASÍ DEBE SER: allí debajo ya hay banda, y es
+   exactamente este mismo `--ag-navy`. Navy sobre navy.
+
+   ⚠️ `z-index: 45` NO ES UN NÚMERO AL AZAR. Va POR ENCIMA del menú lateral (40)
+   y de su velo (30), para que al abrir el menú la franja siga siendo franja; y
+   POR DEBAJO del hamburguesa (50) y de todos los modales (50 y más), que se
+   pintan encima. Los modales a pantalla completa tienen que traer su propio
+   relleno superior — el de cita ya lo trae.
+
+   ⚠️ `pointer-events: none` ES OBLIGATORIO. Sin él, esta cinta se comería los
+   toques de lo que tenga debajo en esa franja.
+
+   ⚠️ Y EN UN NAVEGADOR NORMAL MIDE CERO. `env(safe-area-inset-top)` sólo tiene
+   valor donde el sistema se superpone; en escritorio y en una pestaña normal la
+   altura es 0 y aquí no se pinta nada. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: env(safe-area-inset-top, 0px);
+  background: var(--ag-navy);
+  z-index: 45;
+  pointer-events: none;
+}
+
 /* Elimina tap delay en móvil — hace que los toques respondan de inmediato */
 * {
   touch-action: manipulation;
@@ -1155,10 +1208,16 @@ body {
    calendario. Y NO se sube al layout: allí los 88 px siguen haciendo falta,
    porque en todas las demás el botón flotante sí está.
 
-   ⚠️ Y POR ESO EL `h-[calc(100dvh-88px)]` DE `page.tsx` SE QUEDA COMO ESTÁ. No
+   ⚠️ Y POR ESO EL `h-[calc(100dvh-88px …)]` DE `page.tsx` SE QUEDA COMO ESTÁ. No
    es un número obsoleto: es el respaldo para cuando `:has()` no está soportado,
    y ahí el padding sigue siendo 88. Los dos números tienen que seguir casando
-   EN CADA RAMA — 88 con 88 sin `:has()`, 16 con 16 con él. */
+   EN CADA RAMA — 88 con 88 sin `:has()`, 16 con 16 con él.
+   ⚠️ DESDE EL PASO 10 ESE RESPALDO RESTA ADEMÁS LOS DOS `env()`, porque el
+   padding del layout pasó a sumarlos. La pareja sigue casando; lo que cambió es
+   que ahora son «88 + áreas seguras» a los dos lados. AQUÍ NO SE SUMA NINGUNA:
+   esta rama pone la página a 16 px y la raíz a `100dvh - 16px`, y quien se mete
+   bajo el reloj y bajo la barra de gestos es la banda y la barra de «Agendar»,
+   cada una con el suyo. */
 main > div:has(.agenda-fc) {
   padding-top: 8px;
   padding-bottom: 8px;
@@ -1183,7 +1242,8 @@ main > div:has(.agenda-fc) .agenda-raiz {
 
    ⚠️ Y SIGUE COLGANDO DE `:has()`, con la misma degradación de siempre: sin
    soporte (Firefox < 121) la página se queda con el `pt-16 px-4 pb-6` del layout
-   y la raíz con su `h-[calc(100dvh-88px)]` de respaldo — o sea el marco de antes,
+   —áreas seguras incluidas desde el paso 10— y la raíz con su respaldo
+   `h-[calc(100dvh-88px - env(top) - env(bottom))]` — o sea el marco de antes,
    que es feo pero coherente. Los dos lados del respaldo siguen casando.
 
    ⚠️ EL RELLENO HORIZONTAL QUE SE ANULA ES EL `px-4` DEL LAYOUT, y por eso aquí
@@ -1570,10 +1630,16 @@ main > div:has(.agenda-fc) .agenda-raiz {
      escritorio y en cualquier teléfono sin muesca vale CERO y queda el relleno
      de diseño, que son los 6 px del mockup. Por eso es `calc(env() + 6px)` y no
      `max()`: los dos sumandos son cosas distintas.
-     ⚠️ EL `env()` NO ENTREGA NADA HASTA QUE EL VIEWPORT SEA `viewport-fit=cover`.
-     Ese meta es del paso 10 y toca un archivo global; hasta entonces esto
-     resuelve a 0 y la banda se ve exactamente como en el mockup. Degrada a lo
-     de siempre, no a roto. */
+     ⚠️ EL `env()` YA ENTREGA (paso 10). `src/app/layout.tsx` declara
+     `viewportFit: 'cover'`, así que en la app instalada esto vale de verdad lo
+     que mide la barra de estado y la banda se mete debajo de ella. En una
+     pestaña de navegador y en escritorio sigue valiendo 0 y quedan los 8 px del
+     mockup: degrada a lo de siempre, no a roto.
+     ⚠️ Y NO LO SUMA NADIE MÁS. La página, en móvil, va a `padding: 0` (regla
+     `main > div:has(.agenda-fc)`) y la raíz mide `100dvh` entero, así que el
+     relleno del layout de `(app)` —que sí lleva su propia área segura— NO llega
+     hasta aquí. Éste es el único que la suma arriba; si algún día reaparece el
+     relleno de la página, uno de los dos sobra. */
   /* ⚠️ 8/10 Y HUECOS DE 8, Y ANTES ERAN 6/14 CON HUECOS DE 12 (paso 8c). Los del
      mockup. Recortarlos es la parte pequeña de la compactación —10 px— pero es
      gratis: a este cuerpo de texto no le falta aire. La grande fue fundir la
@@ -1765,7 +1831,11 @@ main > div:has(.agenda-fc) .agenda-raiz {
   background: var(--ag-surface);
   border-top: 1px solid var(--ag-border-card);
   /* Mismo criterio que el relleno de arriba de la banda: el área segura se SUMA
-     al relleno de diseño. Aquí el `env()` de abajo es la barra de gestos. */
+     al relleno de diseño. Aquí el `env()` de abajo es la barra de gestos.
+     ⚠️ Y DESDE EL PASO 10 YA VALE: `viewportFit: 'cover'` en `layout.tsx`. Sin
+     duplicar con nadie, por lo mismo que la banda de arriba — en móvil la página
+     no tiene relleno y la raíz mide `100dvh`, así que el `pb` del layout de
+     `(app)` no alcanza a esta barra. */
   padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px);
 }
 .ag-barra-movil-cta {

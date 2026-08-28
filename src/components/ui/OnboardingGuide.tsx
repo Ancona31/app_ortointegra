@@ -550,7 +550,16 @@ export default function OnboardingGuide() {
   if (phase === 'bubble') {
     return (
       <Portal>
-        <div className="fixed bottom-6 right-6 z-[10002]">
+        {/* ⚠️ EL `bottom` LLEVA LA BARRA DE GESTOS SUMADA (bloque 6 · paso 10).
+            Con `viewport-fit=cover` los 24 px de `bottom-6` se miden desde el
+            borde FÍSICO, y la barra de gestos mide ~34: el tercio inferior de
+            esta burbuja de 48 px caía dentro de la zona del sistema, donde el
+            toque se lo lleva el gesto de volver al inicio y no el botón.
+            El 24 de diseño no se toca: se suma. Va aquí Y en la tarjeta de más
+            abajo — son dos elementos distintos con el mismo anclaje, y si sólo
+            se corrige uno la burbuja y la tarjeta dejan de estar a la misma
+            altura al alternar entre ellas. */}
+        <div className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] right-6 z-[10002]">
           <button
             onClick={handleBubbleClick}
             className="relative w-12 h-12 bg-gradient-to-br from-[#1a3a5c] to-[#1e5fa8] rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-transform duration-200"
@@ -578,7 +587,9 @@ export default function OnboardingGuide() {
 
       {/* Main card */}
       <div
-        className={`fixed bottom-6 right-6 z-[10002] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+        /* El mismo anclaje que la burbuja, con la misma área segura sumada.
+           Ver la nota de allí: si cambias uno, cambia el otro. */
+        className={`fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] right-6 z-[10002] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
           entering
             ? 'opacity-100 translate-y-0 scale-100'
             : 'opacity-0 translate-y-4 scale-95'

@@ -250,9 +250,20 @@ export default function Sidebar() {
           padding de esa página; se descartó porque `:has()` degrada a «la regla
           no casa», y aquí eso significa DOS hamburguesas encima de la banda, que
           es peor que el defecto que viene a evitar. */}
+      {/* ⚠️ EL `top` LLEVA EL ÁREA SEGURA SUMADA (bloque 6 · paso 10). Con
+          `viewport-fit=cover` los 16 px de `top-4` se miden desde el borde
+          FÍSICO, y una muesca de iPhone mide entre 47 y 59: este botón nacía
+          DEBAJO DEL RELOJ, medio tapado y con la mitad de su área táctil comida
+          por el sistema. Es el único acceso al menú en las veinte páginas que no
+          son la agenda, así que no es un detalle estético.
+          El 16 de diseño no se toca: se suma. En escritorio y en una pestaña
+          normal el `env()` vale 0 y esto es exactamente el `top-4` de siempre.
+          ⚠️ TIENE QUE QUEDAR POR ENCIMA DE LA FRANJA NAVY de `globals.css`
+          (`body::before`, z-index 45) y por eso conserva su `z-50`. Si alguien
+          sube la franja por encima de 50, este botón desaparece. */}
       <button
         onClick={alternarMenu}
-        className={`lg:hidden fixed top-4 left-4 z-50 text-white p-2 rounded-lg shadow-lg${
+        className={`lg:hidden fixed top-[calc(1rem+env(safe-area-inset-top,0px))] left-4 z-50 text-white p-2 rounded-lg shadow-lg${
           pathname === '/agenda' ? ' hidden' : ''}`}
         style={{ background: 'var(--cp)' }}
       >
@@ -265,12 +276,28 @@ export default function Sidebar() {
       )}
 
       {/* Sidebar */}
+      {/* ⚠️ EL RELLENO VERTICAL ES DEL PASO 10. El `inset-y-0` llega a los dos
+          bordes físicos desde que el viewport es `viewport-fit=cover`, así que
+          sin esto el logo y el nombre del médico se meten bajo la barra de
+          estado y, abajo, «Cerrar sesión» y el aviso de privacidad quedan bajo
+          la barra de gestos — con el dedo compitiendo con el gesto de volver al
+          inicio, que es la peor mezcla posible para un botón de salir.
+          ⚠️ VA COMO RELLENO Y NO COMO `inset`, a propósito: el navy tiene que
+          seguir llegando a los cuatro bordes —un menú que se queda corto arriba
+          enseña una franja del fondo de la página y se lee como un panel mal
+          puesto—. El relleno encoge el CONTENIDO y deja el fondo entero.
+          ⚠️ ES EL MISMO NAVY QUE LA FRANJA de `globals.css`, así que en la app
+          instalada el menú y la barra de estado son una sola superficie.
+          ⚠️ SE APAGA EN `lg`: en escritorio no hay áreas seguras que valgan y
+          los `env()` ya devuelven 0, pero dejarlo explícito evita que un futuro
+          navegador de escritorio con insets meta relleno donde no toca. */}
       <aside
         style={{
           background: 'hsl(from var(--cp, #1a3a5c) h s 20%)',
         }}
         className={`
           fixed inset-y-0 left-0 w-64 text-white z-40 flex flex-col
+          pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] lg:pt-0 lg:pb-0
           transition-transform duration-300
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}

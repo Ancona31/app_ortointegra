@@ -59,7 +59,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 Ver la nota del contexto. */}
             <MenuMovilProvider>
               <OfflineAlert />
-              <SuscripcionBanner desktopSidebarOffset />
+              {/* ⚠️ EL ENVOLTORIO ES DEL PASO 10 Y NO ES DECORATIVO. Este
+                  banner es el PRIMER elemento del documento, así que desde que
+                  el viewport es `viewport-fit=cover` sus primeros ~50 px caen
+                  bajo la barra de estado —y bajo la franja navy que los tapa—,
+                  o sea que se perdería media frase y parte del botón de
+                  reactivar. El relleno lo baja hasta debajo del reloj.
+                  ⚠️ `empty:hidden` NO SOBRA: el banner devuelve `null` cuando la
+                  suscripción está al día, que es el caso normal. Sin esto, el
+                  envoltorio seguiría midiendo el área segura y metería esa
+                  altura en blanco arriba de las veinte páginas — el hueco
+                  duplicado clásico. Vacío, desaparece.
+                  ⚠️ SE HACE AQUÍ Y NO EN `SuscripcionBanner.tsx` porque ese
+                  componente lo comparte `(launcher)/inicio`, que tiene otro
+                  cromo; esto es la corrección del layout de `(app)`. */}
+              <div className="empty:hidden pt-[env(safe-area-inset-top,0px)]">
+                <SuscripcionBanner desktopSidebarOffset />
+              </div>
               <div className="flex h-screen overflow-hidden">
                 <Sidebar />
                 <main className="flex-1 lg:ml-64 overflow-y-auto">
@@ -85,8 +101,28 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                       la app, así que la agenda paga la duplicación.
                       SI CAMBIAS ESTE PADDING, ACTUALIZA ESOS DOS NÚMEROS: la agenda
                       no falla de forma visible, sólo se desajusta en silencio y le
-                      reaparece un segundo scroll. El razonamiento largo está allí. */}
-                  <div className="min-h-full pt-16 px-4 pb-6 lg:pt-8 lg:px-8 lg:pb-8">
+                      reaparece un segundo scroll. El razonamiento largo está allí.
+
+                      ⚠️ Y ESO ES LO QUE SE ACABA DE HACER EN EL PASO 10: al sumar
+                      aquí las áreas seguras (ver la nota pegada al `div`), el
+                      `h-[calc(100dvh-88px)]` de la agenda ha pasado a restar
+                      TAMBIÉN los dos `env()`. Los dos lados siguen casando en las
+                      dos ramas. */}
+                  {/* ⚠️ EL RELLENO VERTICAL LLEVA EL ÁREA SEGURA SUMADA
+                      (bloque 6 · paso 10). Los números de diseño son los de
+                      siempre —64/24 en móvil, 32/32 en `lg`— y el `env()` se
+                      SUMA, no los sustituye: en escritorio y en una pestaña de
+                      navegador vale 0 y esto es carácter por carácter el
+                      `pt-16 pb-6 lg:pt-8 lg:pb-8` de antes.
+                      Hace falta porque con `viewport-fit=cover` estos 64 px ya
+                      no se miden desde debajo del reloj sino desde el borde
+                      FÍSICO de la pantalla, y una muesca de iPhone se come
+                      hasta 59 de ellos: al contenido le quedaban 5.
+                      ⚠️ EL HORIZONTAL NO LO LLEVA, Y ES DELIBERADO. Los insets
+                      laterales sólo valen algo en apaisado, y el manifiesto fija
+                      `orientation: portrait-primary`. Si algún día se permite
+                      girar, aquí van `env(safe-area-inset-left/right)`. */}
+                  <div className="min-h-full pt-[calc(4rem+env(safe-area-inset-top,0px))] px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] lg:pt-[calc(2rem+env(safe-area-inset-top,0px))] lg:px-8 lg:pb-[calc(2rem+env(safe-area-inset-bottom,0px))]">
                     <ErrorBoundary>
                       <PageTransition>
                         {children}
