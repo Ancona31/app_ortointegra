@@ -12,6 +12,7 @@ import {
   Calculator,
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
+import { useMenuMovil } from '@/contexts/MenuMovilContext'
 import { useRouter } from 'next/navigation'
 import { useProfile, clearProfileCache } from '@/hooks/useProfile'
 import ConsultorioActivoSelector from '@/components/sidebar/ConsultorioActivoSelector'
@@ -142,7 +143,15 @@ function groupHasActiveChild(group: NavGroup, pathname: string) {
 export default function Sidebar() {
   const pathname = usePathname()
   const router   = useRouter()
-  const [mobileOpen, setMobileOpen] = useState(false)
+  /* ⚠️ EL ABIERTO/CERRADO DEL MENÚ MÓVIL YA NO VIVE AQUÍ, y el cambio es del
+     bloque 6. Aquí estuvo como `useState` local, que bastaba mientras el único
+     botón que lo tocaba era el de este mismo componente. Dejó de bastar cuando
+     la agenda móvil metió su hamburguesa DENTRO de su banda azul: ese botón está
+     en un componente HERMANO de éste y no podía alcanzar un estado local.
+     El comportamiento no cambia en ninguna página: el botón flotante de abajo
+     sigue existiendo igual y sigue siendo quien lo abre en las otras veinte. Lo
+     único que cambia es DÓNDE se guarda el booleano. Ver `MenuMovilContext`. */
+  const { abierto: mobileOpen, alternar: alternarMenu, cerrar: cerrarMenu } = useMenuMovil()
   const [expanded, setExpanded]     = useState<Set<string>>(new Set())
   const { profile }  = useProfile()
   const { nombreDisplay, subtitulo, logoUrl } = useClinica()
@@ -223,15 +232,28 @@ export default function Sidebar() {
     router.refresh()
   }
 
-  function close() { setMobileOpen(false) }
+  function close() { cerrarMenu() }
 
   /* ── Render ─────────────────────────────────────────────── */
   return (
     <>
-      {/* Mobile toggle */}
+      {/* Mobile toggle.
+
+          ⚠️ SE ESCONDE EN LA AGENDA, Y SÓLO AHÍ. Esa página sustituye el
+          encabezado móvil por una banda azul con su propio hamburguesa dentro
+          (bloque 6), así que este botón flotante quedaría duplicado y encima
+          por delante de la banda. En las otras veinte páginas no cambia nada.
+          El estado es el mismo en los dos sitios —vive en `MenuMovilContext`—,
+          o sea que el de la banda abre este mismo menú.
+          ⚠️ SE DECIDE POR `pathname` Y NO POR CSS. La alternativa era esconderlo
+          con un `:has(.agenda-fc)` desde globals.css, como ya hace la regla del
+          padding de esa página; se descartó porque `:has()` degrada a «la regla
+          no casa», y aquí eso significa DOS hamburguesas encima de la banda, que
+          es peor que el defecto que viene a evitar. */}
       <button
-        onClick={() => setMobileOpen(!mobileOpen)}
-        className="lg:hidden fixed top-4 left-4 z-50 text-white p-2 rounded-lg shadow-lg"
+        onClick={alternarMenu}
+        className={`lg:hidden fixed top-4 left-4 z-50 text-white p-2 rounded-lg shadow-lg${
+          pathname === '/agenda' ? ' hidden' : ''}`}
         style={{ background: 'var(--cp)' }}
       >
         {mobileOpen ? <X size={20} /> : <Menu size={20} />}

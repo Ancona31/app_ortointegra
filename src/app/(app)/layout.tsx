@@ -14,6 +14,7 @@ import { SubscriptionGateProvider } from '@/components/billing/SubscriptionGateP
 import { getSubscriptionState } from '@/lib/subscription'
 import { AuthProvider } from '@/lib/auth-context'
 import { ConsultorioActivoProvider } from '@/contexts/ConsultorioActivoContext'
+import { MenuMovilProvider } from '@/contexts/MenuMovilContext'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -52,6 +53,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <ThemeProvider>
           <SubscriptionGateProvider initialState={subscriptionState}>
             <ConsultorioActivoProvider>
+            {/* El abierto/cerrado del menú lateral en móvil. Va AQUÍ y no dentro
+                del `Sidebar` porque tiene que alcanzar también a sus HERMANOS:
+                la agenda móvil pone su hamburguesa dentro de su propia banda.
+                Ver la nota del contexto. */}
+            <MenuMovilProvider>
               <OfflineAlert />
               <SuscripcionBanner desktopSidebarOffset />
               <div className="flex h-screen overflow-hidden">
@@ -91,6 +97,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </div>
               <CommandPalette />
               <SessionGuard />
+            </MenuMovilProvider>
             </ConsultorioActivoProvider>
           </SubscriptionGateProvider>
         </ThemeProvider>

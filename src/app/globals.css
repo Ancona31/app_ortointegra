@@ -75,6 +75,21 @@
      dos veces: el acento de un control no es el color del estado «confirmada»,
      y la próxima rotación de la paleta de estado se lo llevaría por delante. */
   --ag-brand-legible: var(--ag-brand-secondary);
+  /* ⚠️ EL NAVY DE LA BANDA MÓVIL, Y ES LA FÓRMULA DEL MENÚ LATERAL, NO UN VALOR
+     NUEVO. Está copiada de `Sidebar.tsx:248` para que las dos superficies de
+     cromo de la app —el menú y la banda de la agenda— salgan del MISMO azul del
+     usuario y no puedan divergir. Que viva aquí como token y no en línea es lo
+     que hace que se pueda comprobar de un vistazo que son la misma.
+     ⚠️ NO ES `--ag-brand-primary`. Ése es `--cp` a pelo (#1a3a5c por defecto);
+     esto es ese mismo tono bajado al 20 % de luminosidad, que es lo que el menú
+     enseña de verdad.
+     ⚠️ NO SE REDECLARA EN OSCURO, y es correcto: el cromo de marca no cambia con
+     el tema —el menú lateral tampoco cambia—, así que la banda se ve igual en
+     los dos modos. Los controles de dentro van en blancos translúcidos sobre
+     ella, o sea que tampoco dependen del tema.
+     ⚠️ Y NO SE TOCAN `--sp-nav-from/mid/to` de `spinus-tokens.css`: están
+     comentados con un «No usar: el sidebar se tematiza en Sidebar.tsx». */
+  --ag-navy: hsl(from var(--cp, #1a3a5c) h s 20%);
   /* ⚠️ NO LO «UNIFIQUES» CON EL ROJO DE «CANCELADA» (--ag-status-cancelled-dot,
      hoy #c0392b). Se parecen y la línea cruza por encima de las tarjetas, pero
      dicen cosas distintas: una es la hora actual, la otra el estado de una cita.
@@ -959,6 +974,13 @@ body {
   --fc-page-bg-color: var(--ag-surface);
   --fc-neutral-bg-color: var(--ag-chip-bg);
   --fc-non-business-color: var(--ag-offhours-bg);
+  /* Fondo de la fila de lista bajo el ratón. Se ADOPTA, como las dos de arriba:
+     el default de la librería es un #f5f5f5 horneado que no es de esta paleta y
+     que en oscuro se quedaría blanco. `--ag-btn-ghost-hover` es el token del
+     hover de una superficie neutra —que es exactamente el papel de una fila— y
+     es opaco en los dos modos. Lo lee la regla nativa
+     `.fc .fc-list-event:hover td`, así que basta con apuntarlo aquí. */
+  --fc-list-event-hover-bg-color: var(--ag-btn-ghost-hover);
   --fc-today-bg-color: var(--ag-today-bg);
   /* El .85 de la línea de «ahora» vive AQUÍ, en el alfa del color, y no como
      `opacity` sobre el elemento. Con `opacity` la atenuación caía también sobre
@@ -977,8 +999,9 @@ body {
      de marca al 8% lo dejaba invisible. Si el foco de las citas merece
      tratamiento propio, es un trabajo aparte con su verificación en claro y en
      oscuro.
-     Tampoco --fc-list-event-hover-bg-color: @fullcalendar/list no está
-     instalado, así que hoy no la lee nadie. Entra con la dependencia. */
+     (Aquí decía además que --fc-list-event-hover-bg-color se quedaba fuera
+     porque @fullcalendar/list no estaba instalado. Ya lo está, y esa variable
+     SÍ se adoptó: vive unas líneas más arriba, con el resto.) */
   /* ⚠️ --fc-highlight-color SE QUEDA EN HEX A PROPÓSITO. El candidato obvio a
      engancharlo era --ag-status-scheduled-bg, el tinte azul claro al que más se
      parecía, y hacerlo habría atado la selección de un hueco al color del estado
@@ -1126,10 +1149,39 @@ body {
   }
 }
 
+/* ⚠️⚠️ `grid-template-rows` Y `grid-template-areas` SON UNA PAREJA: EL NÚMERO DE
+   PISTAS Y EL NÚMERO DE FILAS DE ÁREAS TIENEN QUE COINCIDIR, Y SE MUEVEN JUNTOS.
+   Aquí son TRES y TRES. En la variante estrecha (`@media (max-width: 1023px)`,
+   más abajo) son CUATRO y CUATRO. Si añades o quitas una fila de áreas en
+   cualquiera de los dos sitios, la lista de pistas del MISMO bloque cambia con
+   ella.
+
+   POR QUÉ ES GRAVE Y NO SÓLO FEO: sobrar filas de áreas NO es un error de CSS y
+   no se queja nadie. Las que no tienen tamaño en `grid-template-rows` las
+   dimensiona `grid-auto-rows`, o sea `auto` — y `auto` para el harness de
+   FullCalendar significa CERO, porque su único hijo va posicionado en absoluto
+   (`.fc .fc-view-harness-active > .fc-view { position: absolute; inset: 0 }`,
+   CSS del núcleo) y no aporta alto de contenido. Peor todavía: el `minmax(0,1fr)`
+   se queda donde estaba en la lista, o sea en la fila EQUIVOCADA, y se lleva
+   todo el hueco libre.
+
+   ESTO PASÓ DE VERDAD, y conviene tener la historia porque el síntoma no señala
+   a la causa. El bloque estrecho nació en el bloque 4 (commit `1cbdc16`) con
+   cuatro filas de áreas y sin redeclarar las pistas. El calendario salía en
+   blanco —las tres vistas, con la vista MONTADA y llena dentro de una caja de
+   cero— y estuvo así, sin que nadie lo viera, hasta el bloque 6. Dos cosas lo
+   tapaban: el umbral estaba en 767, así que ese tramo era territorio de
+   escritorio y le aplicaba ESTE bloque, que sí cuadra; y por debajo el móvil
+   forzaba una única vista, así que nadie recorría el rango. Al subir el umbral a
+   1023 —porque de ahí para abajo Semana y Día pasan a ser listas— el tramo
+   estrenó el bloque estrecho y el fallo salió a la luz.
+   NO LO INTRODUJO EL BLOQUE 6: lo destapó. Medido a 921 px, las pistas usadas
+   salían `60.32px 45.5px 407.18px 0px` — el hueco entero en la fila de la banda
+   compacta, que ni siquiera estaba en el DOM, y cero en la de la rejilla. */
 .agenda-fc {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);   /* 3 pistas ↔ 3 filas de áreas */
   grid-template-areas:
     "toolbar leyenda"
     "banda   banda"
@@ -1353,21 +1405,205 @@ body {
 
 /* En móvil la fila del toolbar ya va con las flechas, la fecha y «Hoy», y la
    leyenda no cabe al lado ni comprimida: baja a fila propia a ancho completo y
-   alineada a la izquierda. El umbral es 768, el MISMO que el `isMobile` de
+   alineada a la izquierda. El umbral es 1024, el MISMO que el `ANCHO_MOVIL` de
    `page.tsx` — si alguien mueve uno, que mueva el otro.
+
+   ⚠️ SUBIÓ DE 768 A 1024 EN EL BLOQUE 6, Y NO ES UN AJUSTE DE ESTA REGLA. Lo
+   que cambió es qué significa «estrecho» para la agenda entera: por debajo del
+   umbral, Semana y Día dejan de ser rejillas y pasan a ser listas
+   (`listWeek` / `listDay`). Entre 768 y 1024 —tabletas y portátiles pequeños—
+   antes había rejilla con cromo de escritorio y ahora hay lista, así que esta
+   media query tenía que acompañar o esa franja se quedaba con la leyenda a la
+   derecha de un toolbar que ya no le deja sitio.
 
    ⚠️ Y VA DESPUÉS DEL BLOQUE DE ARRIBA POR LO MISMO: UNA MEDIA QUERY NO SUMA
    ESPECIFICIDAD. `.agenda-fc .ag-leyenda` dentro de un `@media` sigue pesando
    (0,2,0), así que envuelta arriba su `justify-content: flex-start` perdía
    contra el `flex-end` de aquí — y en móvil la leyenda bajaba de fila pero
    seguía pegada a la derecha, que es justo lo que esta regla viene a evitar. */
-@media (max-width: 767px) {
+@media (max-width: 1023px) {
   .agenda-fc {
     grid-template-columns: minmax(0, 1fr);
+    /* ⚠️⚠️ LAS DOS LÍNEAS DE ABAJO SON UNA PAREJA Y SE MUEVEN JUNTAS: CUATRO
+       PISTAS PARA CUATRO FILAS DE ÁREAS. Aquí la leyenda baja a fila propia, así
+       que hay una fila MÁS que en el bloque ancho, y por eso las pistas se
+       redeclaran enteras en vez de heredarse.
+       La historia completa —qué se rompe cuando no cuadran, y por qué esto
+       estuvo mal desde el bloque 4 sin que se notara— está junto a la
+       declaración del bloque base. Léela antes de tocar cualquiera de las dos.
+       El `minmax(0, 1fr)` va en la CUARTA y no en la tercera: el hueco libre es
+       de la rejilla. En la tercera se lo comía la banda compacta, que además
+       sólo está en el DOM con «Compactar» encendido. */
+    grid-template-rows: auto auto auto minmax(0, 1fr);   /* 4 pistas ↔ 4 filas */
     grid-template-areas: "toolbar" "leyenda" "banda" "rejilla";
   }
   .agenda-fc .ag-leyenda { justify-content: flex-start; padding-left: 18px; }
 }
+/* ═══ BANDA AZUL DEL ENCABEZADO MÓVIL Y BARRA INFERIOR (bloque 6 · 8a) ══════
+   Las dos son cromo de la agenda en móvil y viven fuera de `.agenda-fc`: son
+   hermanas de la tarjeta del calendario dentro de `.agenda-raiz`, que es un
+   `flex flex-col`. De ahí que ninguna necesite `position: fixed` para quedarse
+   quieta — la banda es el primer ítem, la tarjeta es `flex-1` y la barra el
+   último, así que sólo scrollea lo de en medio. Es la misma mecánica de la que
+   ya viven la zona fija y la rejilla.
+
+   ⚠️ EL COLOR SALE DE `--ag-navy`, que es la fórmula del menú lateral. Ver su
+   nota junto a la declaración. PLANA, sin degradado: el mockup dibuja uno y
+   afirma que es el del menú, y el menú es plano.
+
+   ⚠️ LOS CONTROLES VAN EN BLANCO TRANSLÚCIDO Y NUNCA EN BLANCO SÓLIDO. Es del
+   mockup y tiene motivo: el único blanco sólido de esta pantalla es la pestaña
+   activa del conmutador, y un segundo blanco sólido competiría con ella y con
+   el azul de «Agendar». Los `rgba` van sobre el navy, así que no dependen del
+   tema y no llevan token: no son colores de la paleta, son opacidades. */
+.ag-banda-movil {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--ag-navy);
+  color: #fff;
+  /* ⚠️ EL RELLENO DE ARRIBA LLEVA EL ÁREA SEGURA SUMADA, no sustituida. En un
+     teléfono con muesca `env(safe-area-inset-top)` vale lo que mida la barra de
+     estado y la banda se extiende por debajo de ella; en un navegador de
+     escritorio y en cualquier teléfono sin muesca vale CERO y queda el relleno
+     de diseño, que son los 6 px del mockup. Por eso es `calc(env() + 6px)` y no
+     `max()`: los dos sumandos son cosas distintas.
+     ⚠️ EL `env()` NO ENTREGA NADA HASTA QUE EL VIEWPORT SEA `viewport-fit=cover`.
+     Ese meta es del paso 10 y toca un archivo global; hasta entonces esto
+     resuelve a 0 y la banda se ve exactamente como en el mockup. Degrada a lo
+     de siempre, no a roto. */
+  padding: calc(env(safe-area-inset-top, 0px) + 6px) 16px 14px;
+}
+.ag-banda-movil-fila,
+.ag-banda-movil-filtros,
+.ag-banda-movil-fecha { display: flex; align-items: center; gap: 8px; }
+.ag-banda-movil-fila { gap: 12px; }
+
+/* 44 px es el mínimo táctil, y aquí no se negocia: son los cinco controles con
+   los que se navega la agenda en un teléfono. */
+.ag-banda-movil-ctrl {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--ag-r-btn);
+  background: rgba(255, 255, 255, .14);
+  color: #fff;
+  cursor: pointer;
+}
+.ag-banda-movil-ctrl--marco { border: 1px solid rgba(255, 255, 255, .24); }
+.ag-banda-movil-ctrl:hover { background: rgba(255, 255, 255, .22); }
+
+.ag-banda-movil-titulo { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ag-banda-movil-titulo b { font-size: 19px; font-weight: 700; }
+/* ⚠️ EL SUBTÍTULO ES SÓLO EL CONTEO. El mockup escribe además el nombre del
+   consultorio; esta página no tiene ese concepto y el lema de escritorio no cabe.
+   El azul claro sobre el navy da 5.9:1 según el propio mockup, y es el mismo
+   papel que `--ag-navy-tx` tenía allí: aquí sale de la marca aclarada, para que
+   siga siendo el azul del usuario y no un valor suelto. */
+.ag-banda-movil-titulo span {
+  font-size: 12.5px;
+  color: color-mix(in srgb, #fff 62%, var(--ag-navy));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Conmutador de vistas: pista oscura, pestaña activa BLANCA. */
+.ag-banda-movil-vistas {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: rgba(0, 0, 0, .22);
+  border-radius: var(--ag-r-btn);
+}
+.ag-banda-movil-vistas button {
+  flex: 1;
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--ag-r-btn-sm);
+  background: transparent;
+  color: color-mix(in srgb, #fff 74%, var(--ag-navy));
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ag-banda-movil-vistas button[aria-selected="true"] {
+  background: #fff;
+  color: var(--ag-navy);
+  font-weight: 700;
+}
+
+.ag-banda-movil-filtros label { flex: 1; min-width: 0; display: flex; }
+.ag-banda-movil-filtros select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, .24);
+  border-radius: var(--ag-r-btn);
+  background: rgba(255, 255, 255, .14);
+  color: #fff;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+}
+/* ⚠️ OBLIGATORIO, Y ES UN BUG REAL, NO UN DETALLE: sin este color explícito las
+   `<option>` salen blanco sobre blanco en el desplegable NATIVO de Android, que
+   no hereda el color del `<select>`. Lo avisa el propio mockup. */
+.ag-banda-movil-filtros select option { color: var(--ag-ink); background: var(--ag-surface); }
+
+.ag-banda-movil-etiqueta {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: 15.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* La mayúscula inicial que Intl no pone en español —«agosto de 2026»—, con el
+   mismo `::first-letter` que ya usa el título del toolbar de escritorio. NO con
+   `text-transform: capitalize`, que pondría mayúscula en cada palabra y daría
+   «17 – 22 De Agosto». */
+.ag-banda-movil-etiqueta::first-letter { text-transform: uppercase; }
+
+/* ═══ BARRA INFERIOR ════════════════════════════════════════════════════════
+   ⚠️ ES LA ÚNICA PUERTA PARA CREAR EN MÓVIL. Las vistas de lista no disparan
+   `dateClick` ni `select`, así que no hay forma de agendar tocando la pantalla.
+   El porqué entero está junto al botón, en page.tsx. */
+.ag-barra-movil {
+  flex: none;
+  background: var(--ag-surface);
+  border-top: 1px solid var(--ag-border-card);
+  /* Mismo criterio que el relleno de arriba de la banda: el área segura se SUMA
+     al relleno de diseño. Aquí el `env()` de abajo es la barra de gestos. */
+  padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px);
+}
+.ag-barra-movil-cta {
+  width: 100%;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: var(--ag-r-card);
+  background: var(--ag-brand-secondary);
+  color: #fff;
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--ag-shadow-card);
+}
+.ag-barra-movil-cta:hover { background: var(--ag-brand-primary); }
+
 /* La etiqueta de fecha, a los 15 px / 700 del spec.
 
    ⚠️ ESTUVO EN 22 px / 800 Y BAJÓ POR ANCHO, NO POR GUSTO. A 22 px «24 – 28 de
@@ -1647,6 +1883,457 @@ body {
   color: var(--ag-brand-secondary);
 }
 
+/* ═══ CABECERA DE DÍA DE LAS VISTAS DE LISTA (bloque 6) ═════════════════════
+   La hermana de `.ag-dayhead`, y deliberadamente OTRA familia de clases: la de
+   arriba está acotada a `.fc-timegrid` y ésta vive donde no hay rejilla. Compone
+   `agenda/page.tsx` (`CabeceraDiaLista`); aquí va la caja.
+
+   ⚠️ EL FONDO VA EN EL `<th>` Y NO SÓLO EN EL CUSHION, Y ES LO QUE HACE QUE EL
+   PEGADO FUNCIONE. El elemento que el plugin vuelve pegajoso es el HIJO DIRECTO
+   del `<tr>` —`.fc-list-sticky .fc-list-day > * { position: sticky; top: 0 }`,
+   `@fullcalendar/list/internal.js`—, o sea el `<th>`; el `.fc-list-day-cushion`
+   es un `<div>` DENTRO de él. Un fondo puesto sólo en el cushion deja al `<th>`
+   con lo que le dé la librería, y por ahí se ven pasar las filas al scrollear.
+
+   ⚠️ EL PEGADO SALE DE FÁBRICA Y NO LO APAGA LA ALTURA DEL CALENDARIO. La clase
+   `fc-list-sticky` se emite cuando `context.options.stickyHeaderDates !== false`
+   (`list/internal.js:141-143`) — la opción CRUDA, sin pasar por
+   `getStickyHeaderDates()`. No está puesta, así que vale `undefined` y la
+   comparación da `true`. Es decir: lo que dice la nota de `agenda/page.tsx`
+   sobre que `height="100%"` apaga `stickyHeaderDates` vale para el scrollgrid
+   del time-grid y NO para las listas, que leen otra cosa. No «arregles» esto
+   poniendo la opción a mano.
+
+   ⚠️ Y ESTE SELECTOR EMPATA A PROPÓSITO CON EL DE LA LIBRERÍA, sin `!important`.
+   El suyo es `.fc .fc-list-sticky .fc-list-day > *` (tres clases); éste es
+   `.agenda-fc .fc .fc-list-day > *`, también tres, y gana por orden de cascada
+   porque FullCalendar INSERTA su `<style data-fullcalendar>` ANTES del primer
+   `script, link[rel=stylesheet], link[as=style], style` de la cabecera
+   (`core/internal-common.js:31-35`) — o sea, deliberadamente el primero, para
+   que el CSS de la app lo pise sin pelear.
+   ⚠️ Y NO SE ESCRIBE CON `.fc-list-sticky` DELANTE aunque eso también empataría:
+   ese selector dejaría de casar el día que alguien ponga `stickyHeaderDates` a
+   `false`, y la cabecera se quedaría sin fondo. El fondo no debe depender de si
+   está pegada.
+
+   ⚠️ EL TOKEN ES `--ag-chip-bg` Y NO ES ARBITRARIO: es al que ya apunta
+   `--fc-neutral-bg-color` en el bloque `.fc {}` de esta hoja, y ése es el que la
+   librería usa para el cushion. Poniendo el mismo en el `<th>`, los dos nodos
+   pintan el MISMO color y ninguno de los dos queda de carga: si mañana cambia el
+   token, cambian los dos a la vez. Por eso no se declara el cushion aquí — sería
+   el mismo valor escrito dos veces, que es justo lo que la nota del bloque `.fc`
+   dice que acaba divergiendo.
+   Es opaco en las dos paletas (#eef1f6 claro, #16233a oscuro), que es el otro
+   requisito del pegado, y en las dos queda un escalón por detrás de la
+   superficie de las filas —blanco y #1b2a40—, así que la cabecera se lee
+   hundida en los dos modos y no sólo en claro. */
+.agenda-fc .fc .fc-list-day > * {
+  background: var(--ag-chip-bg);
+  /* Sólo el COLOR: el 1px lo pone el tema de la librería
+     (`.fc-theme-standard th`) y la primera cabecera se queda sin línea de
+     arriba por su propia regla, que es lo que evita la doble raya del borde
+     superior de la lista. `--ag-border-card` y no `--ag-hairline`: el mockup
+     separa la cabecera con una línea MÁS marcada que la que divide dos filas, y
+     `--ag-hairline` es exactamente el valor de esa división. */
+  border-top-color: var(--ag-border-card);
+  border-bottom-color: var(--ag-border-card);
+}
+/* 16 y no los 14 que trae la librería: es el canalón lateral del mockup, el
+   mismo que llevarán las filas. El vertical no cambia. */
+.agenda-fc .fc .fc-list-day-cushion { padding: 8px 16px; }
+
+/* ⚠️ EL FLEX VA EN ESTE SPAN Y NO EN EL CUSHION, Y NO ES UN NODO DE MÁS. El
+   cushion arrastra un `::after` de limpieza de floats
+   (`.fc .fc-list-day-cushion:after { content: ""; display: table }`), que existe
+   para la disposición nativa a base de `float`. Puesto el flex ahí, ese
+   pseudo-elemento pasa a ser un TERCER ítem de flex: con `space-between` se
+   queda el borde derecho y empuja el día de la semana al centro. Con el
+   envoltorio propio, el `::after` se queda fuera y no estorba — y de paso los
+   dos `float` nativos no llegan a nada, porque esta cabecera no emite
+   `.fc-list-day-text` ni `.fc-list-day-side-text`. */
+.agenda-fc .ag-listahead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* Lo ÚNICO que no está en el mockup. Allí no hace falta porque dibuja un
+     teléfono de 390 px con textos cortos; con «19 de agosto de 2026» y
+     «miércoles» a 320 px los dos extremos llegan a tocarse, y `space-between`
+     no reserva nada entre ellos. */
+  gap: 12px;
+}
+.agenda-fc .ag-listahead-fecha {
+  font-size: 14px;
+  font-weight: 700;
+  /* La marca COMO TINTA, que es el papel exacto de este token; ver su nota. En
+     oscuro se aclara sola y por eso esto no necesita override, al revés que
+     `.ag-dayhead-hoy`, que se escribió antes de que el token existiera.
+     Medido sobre `--ag-chip-bg` con la marca por defecto: 5.69:1 en claro y
+     6.28:1 en oscuro. */
+  color: var(--ag-brand-legible);
+}
+.agenda-fc .ag-listahead-dow {
+  font-size: 13.5px;
+  font-weight: 600;
+  /* ⚠️ `--ag-ink-600` Y NO `--ag-muted`, QUE ES EL GRIS QUE PARECE TOCAR AQUÍ.
+     Sobre `--ag-chip-bg` el `--ag-muted` da 3.09:1 en claro, por debajo de AA
+     para texto normal; `--ag-ink-600` da 5.48:1 en claro y 7.47:1 en oscuro. Es
+     el mismo motivo por el que ese escalón intermedio se creó — ver su nota
+     junto a la declaración del token. */
+  color: var(--ag-ink-600);
+}
+
+/* ═══ FILA DE LAS VISTAS DE LISTA (bloque 6) ═══════════════════════════════
+   La variante COMPACTA del mockup (`agenda-movil-semana.html`): hora · marca ·
+   nombre. La de detalle de `listDay` —duración, motivo y píldora— es del paso
+   siguiente y todavía no existe.
+
+   ⚠️ EL MOCKUP DIBUJA UN `<a>` EN FLEX Y ESTO ES UNA `<tr>` CON TRES `<td>`, así
+   que sus tres medidas se traducen y no se copian: el `gap: 12px` pasa a ser
+   relleno DERECHO de las dos primeras celdas, el `padding: 10px 16px` de la fila
+   se reparte entre las tres, y el `min-height: 44px` va como `height` del `<td>`
+   —en una tabla ese `height` actúa de mínimo, y `min-height` no aplica a una
+   fila—. El resultado medido es el mismo; el camino no puede serlo.
+
+   ⚠️ TODAS LAS REGLAS DE AQUÍ LLEVAN `.fc-list-event` O `.fc-list-table`, SIN
+   EXCEPCIÓN. Es la garantía de que los marcadores de `clasesDelEvento` —que son
+   una opción GLOBAL y aterrizan también en el `<a>` de cada cita de la rejilla—
+   no pintan nada fuera de las listas. Si escribes una regla nueva que lea un
+   `ag-ev-*` sin ese trozo en el selector, estás pintando el `<a>` raíz.
+
+   ⚠️ Y GANAN A LA LIBRERÍA POR ESPECIFICIDAD, sin `!important`: las suyas son
+   `.fc .fc-list-…` (dos clases) y éstas llevan `.agenda-fc` delante (tres).
+   Sobre el orden de cascada no hace falta apoyarse, aunque también nos favorece:
+   FullCalendar inserta su `<style>` el primero de la cabecera a propósito
+   (`core/internal-common.js:31-35`). */
+
+/* ── Las tres celdas ──────────────────────────────────────────────────────
+   Vertical común, horizontal por celda. Los 44 son el mínimo táctil. */
+.agenda-fc .fc .fc-list-event > td {
+  height: 44px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  vertical-align: middle;
+}
+/* La columna de hora. 80 = 16 de canalón izquierdo + 52 de la columna del
+   mockup + 12 de hueco hasta la marca; el `box-sizing: border-box` que la
+   librería pone a todo lo suyo hace que el ancho los incluya.
+   ⚠️ ANCHO FIJO Y `tabular-nums` PARA QUE LAS HORAS NO TIEMBLEN al navegar
+   entre semanas — el mismo motivo por el que la agenda entera va en cifras de
+   ancho fijo. Sin el ancho, la librería trae `width: 1px`, que en una tabla de
+   maquetación automática significa «encógete a tu contenido»: la columna
+   cambiaría de ancho según la semana tuviera o no algún evento de todo el día,
+   que escribe un texto mucho más largo que una hora. */
+.agenda-fc .fc .fc-list-event-time {
+  width: 80px;
+  padding-left: 16px;
+  padding-right: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ag-ink);
+}
+/* El evento de todo el día escribe «Todo el día» en esa misma columna, y ahí no
+   es una hora: cuerpo menor y tinta secundaria, como en el mockup.
+   ⚠️ LA MINÚSCULA LA PONE EL CSS Y NO LA OPCIÓN `allDayText`. Esa opción es
+   GLOBAL y la lee también el rótulo del eje de la banda de todo el día del
+   time-grid, así que cambiarla ahí para arreglar esto de aquí movería la
+   rejilla. `text-transform` sólo alcanza a esta celda. */
+.agenda-fc .fc .ag-ev-allday .fc-list-event-time {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ag-ink-600);
+  text-transform: lowercase;
+}
+/* La celda de la marca. La librería le quita el relleno derecho con un selector
+   de tres clases (`.fc-direction-ltr .fc-list-table .fc-list-event-graphic`);
+   éste empata y gana por orden. El izquierdo se queda en cero: el hueco contra
+   la hora ya lo puso la celda anterior. */
+.agenda-fc .fc .fc-list-event-graphic {
+  padding-left: 0;
+  padding-right: 12px;
+}
+.agenda-fc .fc .fc-list-event-title { padding-left: 0; padding-right: 16px; }
+
+/* ── La marca de color ────────────────────────────────────────────────────
+   ⚠️ LA FORMA DISTINGUE EL TIPO, NO SÓLO EL COLOR, y es del mockup: redondo =
+   cita, cuadrado = evento propio. Es la señal que sobrevive a la ceguera al
+   color, así que no la conviertas en «dos colores del mismo punto».
+
+   ⚠️ EL COLOR VIAJA POR VARIABLE Y NO HAY UNA REGLA POR COMBINACIÓN. Cada
+   marcador declara `--ag-ev-marca` y UNA sola regla la pinta. Así añadir un
+   estado o un séptimo color es una línea, no once; y la PRECEDENCIA —el color
+   elegido manda sobre el del estado, igual que en la tarjeta de la rejilla— sale
+   sola del orden: los `ag-ev-color--*` van DESPUÉS de los `ag-ev-status--*` y
+   pesan lo mismo, así que ganan cuando una fila lleva los dos.
+   ⚠️ SI REORDENAS ESOS DOS GRUPOS, INVIERTES LA PRECEDENCIA sin que falle nada
+   visible: un evento con color elegido pasaría a pintarse con el de su estado. */
+.agenda-fc .fc-list-event.ag-ev-status--scheduled { --ag-ev-marca: var(--ag-status-scheduled-dot); }
+.agenda-fc .fc-list-event.ag-ev-status--confirmed { --ag-ev-marca: var(--ag-status-confirmed-dot); }
+.agenda-fc .fc-list-event.ag-ev-status--cancelled { --ag-ev-marca: var(--ag-status-cancelled-dot); }
+.agenda-fc .fc-list-event.ag-ev-status--no_show   { --ag-ev-marca: var(--ag-status-no_show-dot); }
+.agenda-fc .fc-list-event.ag-ev-status--attended  { --ag-ev-marca: var(--ag-status-attended-dot); }
+.agenda-fc .fc-list-event.ag-ev-color--indigo     { --ag-ev-marca: var(--ag-evento-indigo); }
+.agenda-fc .fc-list-event.ag-ev-color--magenta    { --ag-ev-marca: var(--ag-evento-magenta); }
+.agenda-fc .fc-list-event.ag-ev-color--carmin     { --ag-ev-marca: var(--ag-evento-carmin); }
+.agenda-fc .fc-list-event.ag-ev-color--oliva      { --ag-ev-marca: var(--ag-evento-oliva); }
+.agenda-fc .fc-list-event.ag-ev-color--bronce     { --ag-ev-marca: var(--ag-evento-bronce); }
+.agenda-fc .fc-list-event.ag-ev-color--grafito    { --ag-ev-marca: var(--ag-evento-grafito); }
+/* Google no tiene estado ni color propios: su acento es fijo, como en las otras
+   tres tarjetas. La «G» de cuatro colores va aparte, en el contenido — no cabe
+   en este nodo, que no admite hijos. */
+.agenda-fc .fc-list-event.ag-ev-gcal              { --ag-ev-marca: var(--ag-gcal-accent); }
+/* Suelo, para una fila sin estado —hoy no llega ninguna, pero un `border-color`
+   sin valor deja la marca invisible y eso no se ve venir. */
+.agenda-fc .fc-list-event                         { --ag-ev-marca: var(--ag-muted2); }
+
+/* ⚠️ SE REESCRIBE EL MODELO DE CAJA ENTERO, y hay que saber contra qué. La
+   librería dibuja este punto SIN TAMAÑO: una caja de 0×0 con un borde de 5 px y
+   `box-sizing: content-box` (`--fc-list-event-dot-width: 10px`). Ese borde es su
+   único color, y lo saca del `borderColor` en línea del evento — que las tres
+   fuentes de esta página pasan en `transparent`, así que tal cual llega
+   INVISIBLE. Aquí pasa a ser una caja de verdad, con fondo, para que las dos
+   formas compartan modelo y la cuadrada pueda llevar su filo izquierdo. */
+.agenda-fc .fc-list-event .fc-list-event-dot {
+  box-sizing: border-box;
+  width: 11px;
+  height: 11px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ag-ev-marca);
+}
+/* El evento propio: cuadrado de esquinas suaves, con filo izquierdo — la misma
+   figura que la barra de su tarjeta en la rejilla.
+   El tinte del fondo va al 10 % y no al 8 % que escribe el mockup: 10 es el de
+   `MemoizedEventContent` y el del chip del mes, y las tres superficies del mismo
+   evento tienen que casar. */
+.agenda-fc .fc-list-event.ag-ev-evento .fc-list-event-dot {
+  border: 1px solid var(--ag-ev-marca);
+  border-left-width: 3px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--ag-ev-marca) 10%, var(--ag-surface));
+}
+
+/* ── El contenido de la celda del nombre ──────────────────────────────────
+   `min-width: 0` en la celda Y en el span: sin los dos, la elipsis del nombre no
+   llega a activarse nunca —un ítem de flex no baja de su contenido mínimo— y la
+   fila se ensancha hasta desbordar la tabla. */
+.agenda-fc .fc .fc-list-event-title { min-width: 0; }
+.agenda-fc .ag-listafila {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.agenda-fc .ag-listafila-nombre {
+  min-width: 0;
+  flex: 1;
+  font-size: 15.5px;
+  font-weight: 600;
+  color: var(--ag-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* ⚠️ EL TACHADO ES SÓLO DE «CANCELADA», y «No asistió» NO lo lleva: la cita sí
+   ocurrió en la agenda, el paciente no llegó. La rama que lo decide está en
+   `renderEventContent`; esto es sólo su pinta. La tinta baja un escalón para que
+   el tachado no compita con los nombres vivos, pero se queda en `--ag-ink-600`
+   y no en `--ag-muted`, que sobre blanco no llega a AA. */
+.agenda-fc .ag-listafila-nombre--cancelada {
+  color: var(--ag-ink-600);
+  text-decoration: line-through;
+}
+
+/* ═══ FILA ANCHA DE `listDay` (bloque 6 · paso 7) ═══════════════════════════
+   La variante de detalle del mockup (`agenda-movil-dia.html`): marca · nombre ·
+   duración · motivo · píldora.
+
+   ⚠️⚠️ TODO ESTE BLOQUE CUELGA DE `.fc-listDay-view`, SIN UNA SOLA EXCEPCIÓN, y
+   ésa es la garantía de que `listWeek` y el panel del Mes no se enteran de este
+   paso. Esa clase la pone el `ViewContainer` del núcleo como `fc-${viewType}-view`
+   —la misma mecánica de la que ya vive `.fc-timeGridDay-view` en esta hoja—, así
+   que sólo casa cuando la vista montada es la lista de UN día. Si escribes una
+   regla nueva aquí sin ese trozo, se la lleva también la semana.
+
+   ⚠️ LA COLUMNA DE LA MARCA DEL PLUGIN SE APAGA EN ESTA VISTA. En el compacto la
+   marca vive en el `<td class="fc-list-event-graphic">` que construye la
+   librería; aquí no puede, porque lo que va dentro es un CUADRO de 34 px con un
+   icono o con la «G» de cuatro colores, y ese nodo no admite hijos ni se le
+   puede meter una imagen sin hornear un asset. Así que en `listDay` la celda se
+   retira y la marca pasa al contenido, que es nuestro.
+   ⚠️ PODEMOS APAGARLA AQUÍ Y NO EN EL COMPACTO POR UNA RAZÓN CONCRETA: cada
+   vista monta SU PROPIA `<table class="fc-list-table">`, y esa tabla va con
+   maquetación automática (la librería no le pone `table-layout: fixed`), así que
+   el ancho de una columna lo comparten TODAS las filas de esa tabla — pero no
+   cruza de una vista a otra. En `listDay` la apagan todas las filas a la vez, así
+   que no queda columna ragged. En el compacto sigue en pie y sin tocar. */
+.agenda-fc .fc-listDay-view .fc-list-event-graphic { display: none; }
+
+/* La fila crece: el mockup sube el relleno vertical de 10 a 14 y ancla arriba,
+   porque el cuerpo ya no es una línea. */
+.agenda-fc .fc-listDay-view .fc-list-event > td {
+  padding-top: 14px;
+  padding-bottom: 14px;
+  vertical-align: top;
+}
+/* La hora deja de ir centrada con una línea y se alinea con el nombre. El resto
+   de su pinta —ancho, cuerpo, peso, tinta— la hereda del bloque compacto y no se
+   repite: es la misma columna. */
+.agenda-fc .fc-listDay-view .fc-list-event-time { padding-top: 1px; }
+
+.agenda-fc .fc-listDay-view .ag-listadia {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+/* ── La marca ─────────────────────────────────────────────────────────────
+   Dos formas, y la diferencia es del mockup: una CITA se queda con su punto y
+   un evento —propio o de Google— estrena el cuadro. El cuadro es para quien
+   tiene algo que enseñar dentro; un punto de 34 px sería una mancha.
+
+   ⚠️⚠️ PERO LA COLUMNA MIDE 34 EN LOS DOS CASOS, Y ESO NO ES NEGOCIABLE. El
+   punto es la FIGURA, no la columna: va centrado dentro de una caja del ancho
+   del recuadro. Sin eso, el nombre —y con él la duración y la píldora— arranca
+   en una vertical distinta según la fila lleve punto o recuadro, y la lista
+   entera se lee escalonada.
+   Aquí hubo escrito lo contrario: que el desalineado «es así en el mockup» y
+   que no se arreglara. Era una lectura equivocada del export —sus dos anchos
+   conviven, sí, pero el ojo lo lee como un defecto— y se revocó al verlo en
+   pantalla. No repongas aquel aviso.
+   ⚠️ EL PUNTO CONSERVA SU `margin-top: 5px` Y NO SE CENTRA EN VERTICAL. La caja
+   ancla arriba (`align-items: flex-start` en `.ag-listadia`) y esos 5 px son lo
+   que lo pone a la altura óptica de la PRIMERA LÍNEA del nombre. Centrado en los
+   34 px caería a media altura del bloque de cuatro renglones, que es donde no
+   hay nada con lo que alinearse. */
+.agenda-fc .fc-listDay-view .ag-listadia-punto {
+  flex: none;
+  width: 34px;
+  display: flex;
+  justify-content: center;
+}
+.agenda-fc .fc-listDay-view .ag-listadia-punto::before {
+  content: '';
+  box-sizing: border-box;
+  width: 11px;
+  height: 11px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--ag-ev-marca);
+}
+/* El cuadro del icono. Las dos fórmulas —relleno al 10 %, marco al 32 %— son las
+   mismas que la tarjeta de la rejilla y el chip de la banda, así que las tres
+   superficies del mismo evento casan. `--ag-ev-marca` la declara
+   `clasesDelEvento` en el `<tr>` y baja por herencia. */
+.agenda-fc .fc-listDay-view .ag-listadia-slot {
+  flex: none;
+  box-sizing: border-box;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--ag-r-btn-sm);
+  background: color-mix(in srgb, var(--ag-ev-marca) 10%, var(--ag-surface));
+  border: 1px solid color-mix(in srgb, var(--ag-ev-marca) 32%, transparent);
+}
+/* Google tiene paleta FIJA y no depende de estado ni de color elegido, igual que
+   en las otras tres tarjetas: su cuadro sale de sus propios tokens y no de la
+   variable. Es el mismo par que `.ag-banda--gcal` y `.ag-mes--gcal`. */
+.agenda-fc .fc-listDay-view .ag-ev-gcal .ag-listadia-slot {
+  background: var(--ag-gcal-bg1);
+  border-color: var(--ag-gcal-border);
+}
+
+/* ── El cuerpo, cuatro renglones ──────────────────────────────────────── */
+.agenda-fc .fc-listDay-view .ag-listadia-cuerpo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+/* 16 px y sin elipsis, al revés que el compacto: aquí sobra ancho y el nombre
+   puede envolver a dos líneas sin comerse nada. */
+.agenda-fc .fc-listDay-view .ag-listadia-nombre {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ag-ink);
+}
+.agenda-fc .fc-listDay-view .ag-listadia-nombre--cancelada {
+  color: var(--ag-ink-600);
+  text-decoration: line-through;
+}
+/* La duración, en su renglón. Es el dato más débil de la fila —se deduce de la
+   hora de inicio y la de fin— así que va en el escalón de tinta más bajo que
+   sigue pasando AA, y en cifras de ancho fijo como toda hora de la agenda. */
+.agenda-fc .fc-listDay-view .ag-listadia-dur {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ag-ink-600);
+}
+.agenda-fc .fc-listDay-view .ag-listadia-meta {
+  font-size: 13.5px;
+  color: var(--ag-ink-600);
+}
+
+/* ── La píldora ───────────────────────────────────────────────────────────
+   ⚠️ NO REUSA `.ag-tarjeta-pildora`, y no es duplicación por descuido: aquélla
+   se dibuja con `currentColor` sobre `--ag-surface` y un punto en `::before`,
+   y ésta es la del mockup —fondo OPACO, marco propio y un glifo por estado—.
+   Tocar la de la rejilla para que sirviera aquí habría cambiado la vista Día de
+   escritorio, que está auditada desde el bloque 3.
+
+   ⚠️ EL COLOR LO PONE EL MARCADOR DEL `<tr>`, no una clase en la píldora. El
+   estado ya viaja en `ag-ev-status--*` desde el paso 6; leerlo desde aquí evita
+   un segundo juego de clases que diga lo mismo y que podría desincronizarse.
+   Los tres tokens de cada estado son los MISMOS que usa la tarjeta de la
+   rejilla, así que las dos píldoras no pueden divergir de paleta. */
+.agenda-fc .fc-listDay-view .ag-listadia-pildora {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 3px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--ag-r-pill);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+.agenda-fc .fc-listDay-view .ag-ev-status--scheduled .ag-listadia-pildora {
+  background: var(--ag-status-scheduled-bg);
+  border-color: var(--ag-status-scheduled-border);
+  color: var(--ag-status-scheduled-text);
+}
+.agenda-fc .fc-listDay-view .ag-ev-status--confirmed .ag-listadia-pildora {
+  background: var(--ag-status-confirmed-bg);
+  border-color: var(--ag-status-confirmed-border);
+  color: var(--ag-status-confirmed-text);
+}
+.agenda-fc .fc-listDay-view .ag-ev-status--cancelled .ag-listadia-pildora {
+  background: var(--ag-status-cancelled-bg);
+  border-color: var(--ag-status-cancelled-border);
+  color: var(--ag-status-cancelled-text);
+}
+.agenda-fc .fc-listDay-view .ag-ev-status--no_show .ag-listadia-pildora {
+  background: var(--ag-status-no_show-bg);
+  border-color: var(--ag-status-no_show-border);
+  color: var(--ag-status-no_show-text);
+}
+.agenda-fc .fc-listDay-view .ag-ev-status--attended .ag-listadia-pildora {
+  background: var(--ag-status-attended-bg);
+  border-color: var(--ag-status-attended-border);
+  color: var(--ag-status-attended-text);
+}
+/* La de Google no dice un estado: dice de dónde viene la fila. Mismos tres
+   tokens que su chip de la banda y su badge del mes. */
+.agenda-fc .fc-listDay-view .ag-listadia-pildora--gcal {
+  background: var(--ag-gcal-bg1);
+  border-color: var(--ag-gcal-border);
+  color: var(--ag-gcal-text);
+}
+
 /* Columna de HOY en el cuerpo del time-grid — tinte + ring inset.
    Más específica que el .fc .fc-day-today global (#e8f2ff, que se deja
    intacto para la vista Mes / sub-fase 7). */
@@ -1806,7 +2493,17 @@ body {
   cursor:        pointer !important;
   transition:    transform 0.15s ease, filter 0.15s ease !important;
 }
-.fc .fc-event:hover {
+/* ⚠️ `:not(.fc-list-event)` ACOTA ESTO A LA REJILLA, Y NO ES COSMÉTICA. Las
+   filas de las vistas de lista son `<tr>` y también llevan `fc-event` —se lo
+   pone `getEventClassNames` desde el `EventContainer` del núcleo, igual que a
+   las tarjetas—, así que sin la exclusión una fila de tabla se ESCALABA al pasar
+   el ratón: la fila se despega de sus vecinas, las líneas divisorias dejan de
+   casar y el `drop-shadow` recorta contra el borde de la celda. En la rejilla el
+   zoom sigue exactamente igual.
+   El hover de la lista lo pone la regla nativa `.fc .fc-list-event:hover td`,
+   que tiñe el fondo de las tres celdas — ver `--fc-list-event-hover-bg-color`
+   arriba. No hace falta nada más aquí. */
+.fc .fc-event:not(.fc-list-event):hover {
   transform: scale(1.02) !important;
   filter:    drop-shadow(0 4px 8px rgba(0,0,0,0.12)) !important;
   z-index:   10 !important;
@@ -1863,7 +2560,14 @@ body {
 @keyframes ag-entra {
   from { opacity: 0; transform: translateY(4px); }
 }
-.agenda-fc .fc-event:not(.fc-event-mirror) {
+/* ⚠️ LA SEGUNDA EXCLUSIÓN ES DEL BLOQUE 6 Y ES LA MISMA HISTORIA QUE LA DEL
+   HOVER: esta entrada anima `transform`, y las filas de lista son `<tr>`. Un
+   `transform` sobre una fila de tabla crea un bloque contenedor y la despega de
+   la rejilla de celdas mientras dura, así que la lista entera entraba
+   desencajándose fila a fila. La rejilla conserva su entrada intacta.
+   Y la exclusión va DENTRO del mismo `:not()` encadenado y no en un selector
+   aparte: dos reglas con el mismo cuerpo se desincronizan. */
+.agenda-fc .fc-event:not(.fc-event-mirror):not(.fc-list-event) {
   animation: ag-entra var(--ag-dur-base) var(--ag-ease-out) backwards;
 }
 
@@ -3361,6 +4065,43 @@ html.dark .agenda-fc .fc-scrollgrid { border-color: var(--ag-border-card); }
 html.dark .agenda-fc .fc-timegrid .fc-col-header-cell.fc-day-today {
   background: var(--ag-today-bg) !important;
   box-shadow: inset 0 -3px 0 0 var(--ag-month-today-ring);
+}
+
+/* ⚠️ LA CELDA DE HOY DE LA BANDA DE TODO EL DÍA, Y ES UN ARREGLO, NO UN RETOQUE.
+   En oscuro esa celda salía pintada de #e8f2ff —AZUL CLARO— y con ella el chip
+   que lleva dentro: un recuadro claro en mitad de una rejilla oscura, y el
+   título del chip de Google (`--ag-gcal-text`, #c4b5fd, pensado para fondo
+   oscuro) encima de una superficie clara, o sea ilegible. En claro se veía bien,
+   que es por lo que tardó en salir.
+
+   DE DÓNDE VENÍA, porque el sitio no es obvio: la culpable es la regla GLOBAL
+   `.fc .fc-day-today { background: #e8f2ff !important }` —un hex claro horneado,
+   anterior al rediseño—. Sus dos correctoras no alcanzan aquí:
+     · `.fc-daygrid .fc-day-today` es de la vista MES, y `fc-daygrid` sólo lo
+       emite `DayGridView` (`@fullcalendar/daygrid/internal.js:35` y `:80`).
+       El paquete `timegrid` NO lo emite NUNCA —cero coincidencias—, así que la
+       banda de Semana y Día queda fuera de su alcance. Es la misma distinción de
+       la que ya depende `cayoEnLaBandaDeTodoElDia` en page.tsx.
+     · `.fc-timegrid .fc-timegrid-col.fc-day-today` sí está dentro de
+       `.fc-timegrid`, pero apunta a las columnas del CUERPO horario; las celdas
+       de la banda son `.fc-daygrid-day`, otra clase.
+   O sea que la banda era el único sitio de la agenda al que llegaba el hex sin
+   corregir. No lo introdujo el bloque 6: estaba ahí desde antes y quedó a la
+   vista cuando `allDaySlot` se encendió y la banda empezó a tener contenido.
+
+   ⚠️ VA SÓLO EN OSCURO A PROPÓSITO. En claro ese #e8f2ff está validado y
+   aprobado, y unificarlo con `--ag-today-bg` (#eff4f9) cambiaría un tono que
+   nadie ha pedido cambiar. Si algún día se unifican, se unifican con su medición
+   en los dos modos.
+
+   ⚠️ EL TOKEN ES EL MISMO QUE EL DE LA COLUMNA DE ABAJO, y ésa es la gracia: la
+   banda y su columna horaria quedan del mismo tinte y el día de hoy se lee como
+   una sola franja vertical, sin costura. SIN anillo — el de la columna ya lo
+   pone, y repetirlo aquí dibujaría una línea a media altura.
+   Especificidad (0,4,1) contra los (0,2,0) del hex global: las dos llevan
+   `!important`, así que decide la especificidad. */
+html.dark .agenda-fc .fc-timegrid .fc-daygrid-day.fc-day-today {
+  background: var(--ag-today-bg) !important;
 }
 html.dark .agenda-fc .ag-dayhead-hoy { color: var(--ag-month-today-ring); }
 /* ⚠️ ESTO ERA UN `background` Y TUVO QUE CAMBIAR A `color`. Mientras la cifra de

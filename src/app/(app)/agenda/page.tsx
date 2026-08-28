@@ -5,10 +5,11 @@ import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
+import listPlugin, { type NoEventsContentArg } from '@fullcalendar/list'
 import { EventClickArg, EventDropArg, DateSelectArg, EventInput, EventApi, EventContentArg, DayHeaderContentArg, NowIndicatorContentArg } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
 import { X, Calendar, User, Plus, Trash2, Settings, ChevronDown, FileText, Stethoscope, Loader2, Mail,
-         CalendarPlus, ChevronsDownUp, type LucideIcon } from 'lucide-react'
+         CalendarPlus, ChevronsDownUp, Menu, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
@@ -23,6 +24,7 @@ import { useConsultorios } from '@/hooks/useConsultorios'
 import { useConsultoriosDeMedico } from '@/hooks/useConsultoriosDeMedico'
 import { componerNombreMedicoCompleto, componerInicialesMedico } from '@/lib/nombreMedico'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
+import { useMenuMovil } from '@/contexts/MenuMovilContext'
 import { regionDeTimezone } from '@/lib/consultorios/zonas-mexico'
 import { ICONOS_EVENTO, COLORES_EVENTO, type IconoEvento, type ColorEvento } from '@/lib/appointments'
 import { rangoQuePedir } from '@/lib/agenda/rangoQuePedir'
@@ -2322,9 +2324,31 @@ const FORMATO_HORA_INICIO = new Intl.DateTimeFormat('es-MX', {
      viaja como CLASE, no como estilo. Tiene que ser así — ver la nota de
      `tier` abajo. */
 
+/* ¿La vista dibuja una REJILLA DE HORAS —Semana o Día—?
+ *
+ * ⚠️ NO ES LA MISMA PREGUNTA QUE «¿no es Mes?», y hasta el bloque 6 sí lo era
+ * porque no había un tercer grupo de vistas. Con `@fullcalendar/list` instalado
+ * lo hay, y las dos piezas que dependen de esto —el chip de la banda y el
+ * sistema de tiers— sólo tienen sentido donde FullCalendar ASIGNA UN ALTO al
+ * evento, que es exactamente la rejilla horaria.
+ *
+ * ⚠️ SE ENUMERAN LAS DOS QUE HAY, NO SE DESCARTAN LAS DE LISTA. Por descarte,
+ * cualquier vista que se monte mañana —otra lista, `multiMonth`, lo que sea—
+ * entraría en el camino de la rejilla y estrenaría el fallo en silencio; en
+ * blanco, cae en el camino que no supone alto y como mucho se le queda corta la
+ * pinta, que se ve. Las tres vistas del segmentado están en `VIEWS`.
+ *
+ * ⚠️ ESTO NO CONTRADICE EL AVISO DE `cayoEnLaBandaDeTodoElDia`, que prohíbe
+ * preguntar por `view.type`. Allí la pregunta es DÓNDE cayó un gesto, y esa la
+ * contesta el DOM porque la banda existe en más de una vista. Aquí la pregunta
+ * es QUÉ VISTA está pintando, que es literalmente lo que este campo dice. */
+function esVistaDeRejilla(viewType: string): boolean {
+  return viewType === 'timeGridWeek' || viewType === 'timeGridDay'
+}
+
 const MemoizedEventContent = memo(function MemoizedEventContent({
   timeText, horaInicio, title, pacNombre, status, doctorInitial, tzDiff, icono, color, descriptor,
-  esEvento,
+  esEvento, enRejilla,
 }: {
   /* True si la fila es un evento genérico y no una cita. Lo deriva el
      despachador con `esEventoGenerico`; aquí no se puede deducir de `icono` ni
@@ -2354,6 +2378,11 @@ const MemoizedEventContent = memo(function MemoizedEventContent({
      2» en el mockup como si fuera un campo, y ahí es texto escrito a mano en
      `notes`, no una sede. No lo repongas. */
   descriptor: string | null
+  /* INTERRUPTOR DEL SISTEMA DE TAMAÑOS. Viaja como prop porque la VISTA es lo
+     único que esta tarjeta no sabe: la resuelve el despachador, que sí tiene el
+     `arg.view`, con `esVistaDeRejilla`. En `false` ni se mide ni sale clase de
+     tier — el porqué de cada una, en las dos notas de abajo. */
+  enRejilla: boolean
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const [height, setHeight] = useState<number | null>(null)
@@ -2372,7 +2401,21 @@ const MemoizedEventContent = memo(function MemoizedEventContent({
      los agrupa en el mismo tick y descarta el render si el valor no cambió. Un
      único `useState` con un objeto `{height, piso}` re-renderizaría en cada
      latido del observer, que es varias veces por arrastre y por tarjeta. */
+  /* ⚠️ FUERA DE LA REJILLA EL OBSERVER NO SE MONTA, y es una decisión, no una
+     omisión: montarlo y descartar el valor también «funcionaría».
+     1. La medida no significaría lo mismo. En la rejilla el alto es el SITIO QUE
+        FULLCALENDAR LE DA a la tarjeta —proporcional a su duración—, y de ahí
+        sale el tier. En una fila de lista el alto lo pone el CONTENIDO, así que
+        medirlo es preguntarle a la tarjeta por su propio tamaño y clasificarla
+        con la respuesta.
+     2. El coste es real y por fila. Es un ResizeObserver por evento y, sobre
+        todo, DOS `setState` en el primer latido —que llega siempre: el observer
+        dispara al observar—, o sea un segundo render de la lista entera para
+        producir un dato que nadie va a leer.
+     La dep es `enRejilla` y no `[]`: un cambio de vista sin desmontar la tarjeta
+     tiene que poder encender y apagar la medición. */
   useEffect(() => {
+    if (!enRejilla) return
     const el = rootRef.current
     if (!el) return
     const update = () => {
@@ -2383,7 +2426,7 @@ const MemoizedEventContent = memo(function MemoizedEventContent({
     const ro = new ResizeObserver(update)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [])
+  }, [enRejilla])
 
   /* height null = aún sin medir → 'full' hasta el primer ResizeObserver.
 
@@ -2399,13 +2442,29 @@ const MemoizedEventContent = memo(function MemoizedEventContent({
   /* Dos criterios por umbral y gana el mayor: la PROPORCIÓN conserva la escalera
      por duración cuando la franja da de sí, y el SUELO FÍSICO impide pintar un
      tier donde iba a salir cortado. Ver la nota de las cuatro constantes. */
+  /* ⚠️ `null` FUERA DE LA REJILLA, Y ES LO QUE APAGA EL MECANISMO. Sin tier no
+     se emite clase `ag-tarjeta--*`, y sin esa clase no hay una sola regla de
+     tamaño que pueda aplicar: la tarjeta se queda en la base de `.ag-tarjeta`,
+     que monta y enseña TODOS sus hijos. Es lo que quiere una fila de lista,
+     donde el ancho sobra y el alto lo pone el contenido.
+
+     ⚠️ Y NO ES «FORZAR `full`», aunque hoy se vea casi igual. `full` es una
+     CLASIFICACIÓN —la de la tarjeta que tiene sitio de sobra— y en una lista no
+     hay nada que clasificar; encima la vista Día ya cuelga una regla propia de
+     `--full` (globals.css:2148, el cuadro del icono), y ese es exactamente el
+     tipo de regla que una fila de lista no debe heredar por accidente.
+
+     El resto del régimen —los tres tiers, los dos criterios por umbral y el
+     `Math.max`— NO SE TOCA: en la rejilla `enRejilla` es `true` y esto es la
+     escalera de siempre, letra por letra. */
   const umbralTiny = Math.max(pisoFranja * TIER_TINY_FRANJAS, ALTO_MINIMO_COMPACT)
   const umbralCompact = Math.max(pisoFranja * TIER_COMPACT_FRANJAS, ALTO_MINIMO_FULL)
-  const tier: 'tiny' | 'compact' | 'full' =
-    height == null ? 'full'
-      : height < umbralTiny ? 'tiny'
-        : height < umbralCompact ? 'compact'
-          : 'full'
+  const tier: 'tiny' | 'compact' | 'full' | null =
+    !enRejilla ? null
+      : height == null ? 'full'
+        : height < umbralTiny ? 'tiny'
+          : height < umbralCompact ? 'compact'
+            : 'full'
 
   /* El color elegido MANDA sobre el del estado cuando lo hay, y sólo lo hay en
      un evento genérico. Motivo: en un evento el estado dice poco —está agendado
@@ -2449,7 +2508,7 @@ const MemoizedEventContent = memo(function MemoizedEventContent({
   const estiloPildora: CSSProperties = doctorInitial ? { color: txt } : { color: txt, marginLeft: 'auto' }
 
   return (
-    <div ref={rootRef} className={`ag-tarjeta ag-tarjeta--${tier}`} style={root}>
+    <div ref={rootRef} className={tier ? `ag-tarjeta ag-tarjeta--${tier}` : 'ag-tarjeta'} style={root}>
       <div className="ag-tarjeta-cab">
         {/* ⚠️ LA HORA DE UN EVENTO GENÉRICO VA EN NEUTRO, NUNCA EN EL COLOR DEL
             EVENTO. La de una cita sí toma el color de su estado.
@@ -2850,29 +2909,38 @@ const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg }) {
 /** Resuelve las iniciales del chip de médico de una cita ya pintada. */
 type InicialesDeCita = (ext: Appointment) => string | undefined
 
-/* ⚠️ AQUÍ VIVÍA `clasesDelEvento`, LA FUNCIÓN DE `eventClassNames`. NO LA
- * REPONGAS SIN UNA REGLA QUE LEA LO QUE EMITE.
+/* ⚠️ `clasesDelEvento` ESTUVO RETIRADA Y HA VUELTO EN EL BLOQUE 6. Lee esto
+ * antes de tocarla: la condición con la que se fue sigue vigente.
  *
- * Emitía marcadores semánticos en el `<a>` raíz del evento —categoría, estado, y
- * si el evento genérico tenía color elegido— para que `globals.css` decidiera
- * desde ellos qué hijos se ven dentro de la tarjeta. Nacieron seis; cinco no los
- * leyó nunca nadie y se fueron. El último, `ag-ev-cita`, encendía la píldora de
- * estado sólo en las citas, y eso resultó ser el bug: la píldora es del ESTADO,
- * y un evento genérico tiene estado igual que una cita. Al corregirlo, la regla
- * dejó de necesitar distinguir categorías y el marcador se quedó sin un solo
- * consumidor.
- *
+ * SE FUE porque emitía seis marcadores semánticos en el `<a>` raíz del evento y
+ * cinco no los leyó nunca nadie. El último, `ag-ev-cita`, encendía la píldora de
+ * estado sólo en las citas, y eso resultó ser el bug: la píldora es del ESTADO, y
+ * un evento genérico tiene estado igual que una cita. Al corregirlo, la regla
+ * dejó de necesitar distinguir categorías y el marcador se quedó sin consumidor.
  * Un marcador emitido que nadie lee no se distingue de un descuido, así que se
- * fue la función entera y con ella la prop del `<FullCalendar>`. Si un bloque
- * futuro necesita distinguir categorías desde el CSS, esto vuelve —pero JUNTO
+ * fue la función entera y con ella la prop. La condición para volver era: JUNTO
  * con la regla que lo lee, no antes.
  *
- * Si vuelve, dos cosas que costaron encontrarse y no hay que redescubrir:
+ * VUELVE PORQUE ESA REGLA EXISTE. Las vistas de lista pintan su marca de color
+ * en un nodo que el plugin construye a mano —`<span class="fc-list-event-dot">`,
+ * `@fullcalendar/list/internal.js:60-63`, sin `ContentContainer` ni generador de
+ * contenido—, así que NO hay forma de componerlo desde `eventContent`. Y encima
+ * llega invisible: su único color sale del `borderColor` en línea del evento, y
+ * las tres fuentes de esta página pasan `borderColor: 'transparent'`. La única
+ * vía es la hoja de estilos, y para llegar ahí la fila necesita marcadores.
+ * Los consumidores están en `globals.css`, en el bloque de la fila de lista.
+ *
+ * LAS DOS COSAS QUE COSTARON ENCONTRARSE Y SIGUEN SIENDO CIERTAS:
  *
  *   1. NINGUNA CLASE PUEDE PINTAR EL `<a>` RAÍZ. Ese elemento es el harness
  *      TRANSPARENTE de `globals.css` (`.fc .fc-event`: fondo, borde y sombra a
  *      cero con `!important`) y toda la pinta la ponen las tarjetas de
  *      `eventContent` por dentro. Un marcador sirve como ANCESTRO y nada más.
+ *      ⚠️ ESTOS MARCADORES SALEN EN LAS CUATRO VISTAS, no sólo en las listas:
+ *      `eventClassNames` es una opción GLOBAL y en rejilla aterriza en ese `<a>`.
+ *      Por eso TODA regla que los lea lleva `.fc-list-event` en el selector, sin
+ *      excepción. Es lo que garantiza que la rejilla no se entere de que existen.
+ *      Si añades una regla nueva sin ese trozo, estás pintando el `<a>`.
  *   2. EL TIPO SE DERIVA, NO SE GUARDA. La tentación es meter un campo `tipo` en
  *      `extendedProps`, pero ese objeto tiene TRES productores independientes:
  *      el GET de `/api/appointments` (que vuelca la fila con `{ ...apt }`), la
@@ -2884,16 +2952,179 @@ type InicialesDeCita = (ext: Appointment) => string | undefined
  *      anterior y no falla nada. `esEventoGenerico(ext)` lo deriva de lo que ya
  *      llega y no hay nada que sincronizar. (Y `TipoFila` ya existe en este
  *      archivo y significa otra cosa.)
+ *
+ * ⚠️ LOS NOMBRES SON LOS DEL PRODUCTO Y EN INGLÉS —`scheduled`, `no_show`,
+ * `attended`—, que es como están en la columna `appointments.status`, y NO los
+ * del mockup, que los escribe en español. Lo mismo con los seis colores, que
+ * viajan tal cual al `CHECK` `appointments_color_check`. Interpolar aquí el
+ * valor de la base es lo que hace que añadir un estado o un color no obligue a
+ * tocar esta función; lo que sí hay que añadir entonces es su línea de token en
+ * `globals.css`, igual que ya pasa con los tokens `--ag-status-*`.
+ *
+ * ⚠️ `extendedProps` SE ANOTA, NO SE CASTEA. Su tipo es `Record<string, any>`
+ * (`Dictionary`, `core/internal-common.d.ts:2305`), así que leerlo directo
+ * mete `any` en el archivo. Asignarlo a un local ANOTADO lo estrecha sin `as` y
+ * sin `any`, y de paso declara qué se espera encontrar: `Partial`, porque la
+ * fuente de Google no trae ninguno de estos campos.
  */
+function clasesDelEvento(arg: EventContentArg): string[] {
+  const ext: Partial<Appointment> & { isGcalBlock?: boolean } = arg.event.extendedProps
+  const clases: string[] = []
+  /* La bandera y no la vista: en una lista un evento de todo el día llega aquí
+     igual que en la banda, y su columna de hora es la que cambia de pinta. */
+  if (arg.event.allDay) clases.push('ag-ev-allday')
+  /* Google sale por su propia puerta y no lleva ni estado ni color: su fuente no
+     produce filas de `appointments`, así que no hay nada que interpolar. */
+  if (ext.isGcalBlock === true) { clases.push('ag-ev-gcal'); return clases }
+  if (esEventoGenerico(ext)) clases.push('ag-ev-evento')
+  if (ext.status) clases.push(`ag-ev-status--${ext.status}`)
+  if (ext.color)  clases.push(`ag-ev-color--${ext.color}`)
+  return clases
+}
+
+/* La fila de una vista de lista, variante COMPACTA (`listWeek`, y `listDay`
+   hasta que el paso siguiente le dé su variante de detalle).
+
+   ⚠️ AQUÍ NO VA LA HORA, Y NO ES UN OLVIDO. La pinta el plugin en una celda
+   PROPIA (`<td class="fc-list-event-time">`) que queda fuera de `eventContent`,
+   y para un evento con hora ni siquiera pasa por un generador de contenido
+   (`@fullcalendar/list/internal.js:103`). Lo que llega aquí en `arg.timeText` es
+   la cadena VACÍA —el `EventContainer` de la lista se construye con
+   `timeText: ""`, `:56`—, así que leerla no daría nada. La columna existe; lo
+   único que se hace con ella es darle forma, desde `globals.css`.
+
+   ⚠️ Y TAMPOCO VA LA MARCA DE COLOR. Vive en la otra celda que el plugin
+   construye a mano, y se pinta por hoja de estilos con los marcadores de
+   `clasesDelEvento`. Ver su nota.
+
+   LA «G» DE GOOGLE SÍ VIENE AQUÍ, y es la excepción de las tres marcas: es de
+   cuatro colores por definición, así que ni una regla de color ni una máscara
+   pueden producirla, y el nodo del plugin no admite hijos. Va en línea delante
+   del nombre, exactamente en el sitio donde un evento genérico lleva su icono.
+   El componente es el mismo que ya usan `MonthChip` y `GoogleEventCard`. */
+const FilaLista = memo(function FilaLista(
+  { nombre, esDeGoogle, icono, tinta, cancelada }: {
+    nombre: string; esDeGoogle: boolean; icono: IconoEvento | null
+    tinta: string | null; cancelada: boolean
+  },
+) {
+  return (
+    <span className="ag-listafila">
+      {esDeGoogle && <GoogleGIcon size={11} />}
+      {/* 13 px es el `.ico--sm` del mockup, el tamaño del icono cuando acompaña
+          al nombre en vez de ocupar su propio cuadro. El color es el del evento,
+          igual que en la tarjeta de la rejilla y en el chip del mes. */}
+      {icono && <IconoDelEvento nombre={icono} size={13} color={tinta ?? undefined} />}
+      {/* ⚠️ TACHADO SÓLO EN CANCELADA. «No asistió» NO lo lleva, y la distinción
+          es del mockup: la cita SÍ ocurrió en la agenda, el paciente no llegó.
+          Son cosas distintas y se ven distintas. */}
+      <span className={cancelada ? 'ag-listafila-nombre ag-listafila-nombre--cancelada' : 'ag-listafila-nombre'}>
+        {nombre}
+      </span>
+    </span>
+  )
+})
+
+/* El glifo de cada estado en la píldora de `listDay`. Sale del mockup, que dibuja
+   cuatro de los cinco; el de «cancelada» —la ✕— no lo dibuja porque su fila de
+   ejemplo no aparece, así que lo elige esta línea y es lo único de la píldora
+   que no viene de allí.
+   ⚠️ VAN CON `aria-hidden`: son adorno, y quien nombra el estado es la etiqueta
+   de al lado. Un lector de pantalla que leyera «punto Agendada» diría de más. */
+const GLIFO_PILDORA: Record<Status, string> = {
+  scheduled: '●', confirmed: '●', attended: '✓', no_show: '—', cancelled: '✕',
+}
+
+/** «60 min», o null si el evento no da un tramo con el que contar. */
+function duracionDeLaFila(inicio: Date | null, fin: Date | null): string | null {
+  if (!inicio || !fin) return null
+  const min = Math.round((fin.getTime() - inicio.getTime()) / 60000)
+  return min > 0 ? `${min} min` : null
+}
+
+/* La fila ANCHA, sólo de `listDay`. Cuatro renglones: nombre · duración ·
+   motivo · píldora, con la marca a la izquierda.
+
+   ⚠️ ES UN COMPONENTE APARTE Y NO UNA RAMA DE `FilaLista`, a propósito. Son dos
+   ÁRBOLES distintos —éste tiene envoltorio de cuerpo y tres hijos que el
+   compacto no monta—, no dos hojas de estilo del mismo markup. Y separarlos es
+   lo que garantiza que `listWeek` no se entere de este paso: su componente no se
+   ha tocado. Si algún día se fusionan, el que hay que volver a mirar es el
+   compacto.
+
+   ⚠️ LA DURACIÓN VA EN SU PROPIO RENGLÓN Y NO BAJO LA HORA, que es donde la pone
+   el mockup. Dos motivos, y el segundo es el que decide: la columna de la hora la
+   compone el plugin y para un evento CON HORA no pasa por ningún generador de
+   contenido (`@fullcalendar/list/internal.js:103`), así que ahí no se puede
+   inyectar nada; y compartiendo línea con el nombre, un paciente de nombre largo
+   se la comería. Renglón propio y no se discute.
+
+   ⚠️ EL MOTIVO SON LAS NOTAS Y NADA MÁS. Sin notas no hay renglón. El mockup
+   escribe «Google Calendar · solo lectura» en esa línea para los de Google; aquí
+   NO se compone: sería un respaldo inventado, y es el mismo respaldo que se
+   revocó en la tarjeta de la rejilla (ver el aviso de `descriptor` en
+   `MemoizedEventContent`). No lo repongas. */
+const FilaListaDetalle = memo(function FilaListaDetalle(
+  { nombre, esDeGoogle, icono, cancelada, duracion, motivo, status, esEvento }: {
+    nombre: string; esDeGoogle: boolean; icono: IconoEvento | null
+    cancelada: boolean; duracion: string | null; motivo: string | null
+    status: Status | undefined; esEvento: boolean
+  },
+) {
+  /* ⚠️ EL COLOR NO SE CALCULA AQUÍ Y NO ES UN OLVIDO: sale de `--ag-ev-marca`,
+     la variable que `clasesDelEvento` ya declara en el `<tr>` de la fila y que
+     baja por herencia hasta aquí. Es la MISMA que pinta el punto del compacto,
+     así que las dos variantes no pueden divergir de color. */
+  const marca = esDeGoogle
+    ? <span className="ag-listadia-slot"><GoogleGIcon size={19} /></span>
+    : icono
+      ? <span className="ag-listadia-slot"><IconoDelEvento nombre={icono} size={21} color="var(--ag-ev-marca)" /></span>
+      : <span className="ag-listadia-punto" />
+  return (
+    <span className="ag-listadia">
+      {marca}
+      <span className="ag-listadia-cuerpo">
+        <span className={cancelada ? 'ag-listadia-nombre ag-listadia-nombre--cancelada' : 'ag-listadia-nombre'}>
+          {nombre}
+        </span>
+        {duracion && <span className="ag-listadia-dur">{duracion}</span>}
+        {motivo && <span className="ag-listadia-meta">{motivo}</span>}
+        {/* La píldora de ESTADO es de las citas. Un evento genérico sí tiene
+            estado en este producto —`ESTADOS_EVENTO`, dos de los cinco— pero
+            aquí no se pinta, y eso NO reabre el bug de la píldora de la rejilla
+            (ver su aviso en globals.css): allí el problema era que la píldora se
+            encendía por CATEGORÍA mientras la misma información salía como texto
+            en la otra, o sea dos formas del mismo dato en la misma columna. Aquí
+            no hay texto de estado en ninguna fila, así que no hay asimetría que
+            crear; y la única de las dos que importa de un vistazo —cancelada—
+            sigue diciéndose con el tachado del nombre. */}
+        {status && !esEvento && !esDeGoogle && (
+          <span className="ag-listadia-pildora">
+            <span aria-hidden="true">{GLIFO_PILDORA[status]}</span>
+            {STATUS_CONFIG[status].label}
+          </span>
+        )}
+        {/* Mismo texto que el badge de `MonthChip` y el de `GoogleEventCard`, y
+            tiene que serlo: los tres nombran lo mismo y la agenda no puede decir
+            dos cosas distintas del mismo evento según la vista. */}
+        {esDeGoogle && <span className="ag-listadia-pildora ag-listadia-pildora--gcal">Evento</span>}
+      </span>
+    </span>
+  )
+})
 
 function renderEventContent(arg: EventContentArg, navegadorTZ: string, inicialesDeCita: InicialesDeCita) {
   // Vista Mes: chip plano dedicado. El camino de Semana/Día (abajo) queda intacto.
   if (arg.view.type === 'dayGridMonth') return <MonthChip arg={arg} />
+  /* La misma pregunta que la línea de arriba, en la otra dirección: allí «¿es
+     Mes?», aquí «¿es rejilla?». Las dos piezas que la usan están abajo. */
+  const enRejilla = esVistaDeRejilla(arg.view.type)
   /* Banda de todo el día de Semana y Día (bloque 5). Va DESPUÉS de Mes y no
      antes, y el orden es lo que decide: en Mes TODO evento es `allDay` —la
      rejilla del mes no tiene horas—, así que puesto delante se comería la vista
-     entera y `MonthChip` no se pintaría nunca. Con Mes ya devuelto, llegar aquí
-     con `allDay` sólo puede ser la banda.
+     entera y `MonthChip` no se pintaría nunca. (Que Mes haya devuelto ya no es
+     lo ÚNICO que acota esta rama desde el bloque 6 — ver el aviso pegado al
+     `if`—, pero sigue siendo necesario: el orden no se puede invertir.)
 
      `isGcalBlock` sale de `extendedProps` y es el MISMO criterio que usan
      `renderEventContent` cuatro líneas más abajo, `MonthChip` y `contarVisibles`;
@@ -2908,7 +3139,16 @@ function renderEventContent(arg: EventContentArg, navegadorTZ: string, iniciales
      resolverlo. Es una lectura pura y la vista Mes ya ha devuelto más arriba,
      así que moverlo no cambia cuándo se evalúa para nadie. */
   const ext = arg.event.extendedProps as Appointment & { isGcalBlock?: boolean }
-  if (arg.event.allDay) {
+  /* ⚠️ `allDay` NO BASTA DESDE EL BLOQUE 6, y por eso lleva la segunda mitad.
+     Esa bandera dice QUÉ es el evento —uno de todo el día—, no DÓNDE se está
+     pintando, y sigue llegando en `true` en una vista de lista. Sin esta
+     condición, un evento de todo el día en una lista se llevaba el chip de la
+     banda: una caja de 20 px de alto FIJO, dimensionada para el contenedor de
+     la banda de la rejilla, metida dentro de una fila que se dimensiona sola.
+     `BandaChip` no cambia; lo que cambia es dónde se aplica.
+     Con Mes ya devuelto arriba y la rejilla exigida aquí, llegar a este `return`
+     sólo puede ser la banda de Semana o Día, que es lo que era antes. */
+  if (arg.event.allDay && enRejilla) {
     return (
       <BandaChip
         title={arg.event.title}
@@ -2916,6 +3156,56 @@ function renderEventContent(arg: EventContentArg, navegadorTZ: string, iniciales
         icono={ext?.icono ?? null}
         color={ext?.color ?? null}
         status={ext?.status}
+      />
+    )
+  }
+  /* ⚠️ LA RAMA DE LISTA VA ANTES QUE LA DE GOOGLE, Y EL ORDEN DECIDE. En una
+     lista un evento de Google es una fila más —con su «G» delante del nombre—,
+     no la tarjeta de la rejilla: puesta detrás, `GoogleEventCard` se quedaría
+     con esas filas y metería una tarjeta de dos líneas dentro de un `<td>`.
+     Y va DESPUÉS de la banda porque la banda ya exige rejilla, así que aquella
+     rama no puede robarle nada a ésta.
+
+     Aquí llegan las cuatro clases de fila —cita, evento propio, Google y el
+     evento de todo el día de cualquiera de los tres—: la lista no separa por
+     tipo como hace la rejilla, sólo cambia lo que se pinta dentro. */
+  if (!enRejilla) {
+    const pacLista = ext?.pacientes
+    const nombreLista = pacLista ? `${pacLista.nombre} ${pacLista.apellidos}` : arg.event.title
+    /* ⚠️ LAS DOS VARIANTES SE SEPARAN POR TIPO DE VISTA, Y SÓLO AQUÍ. `listDay`
+       tiene ancho para el detalle; `listWeek` y el panel del mes se quedan con la
+       compacta. Es el mismo `arg.view.type === 'listDay'` con el que la cabecera
+       de día decide si escribe el año — y por el mismo motivo: en una lista de un
+       solo día sobra sitio, en una de siete no. */
+    if (arg.view.type === 'listDay') {
+      return (
+        <FilaListaDetalle
+          nombre={nombreLista}
+          esDeGoogle={ext?.isGcalBlock === true}
+          icono={ext?.icono ?? null}
+          cancelada={ext?.status === 'cancelled'}
+          /* Sin duración en un evento de todo el día: su tramo son días enteros
+             —medianoche a medianoche del día siguiente, ver `all_day`— y
+             contarlo en minutos daría «1440 min». La columna de hora ya dice
+             «todo el día», que es lo que ahí significa la duración. */
+          duracion={arg.event.allDay ? null : duracionDeLaFila(arg.event.start, arg.event.end)}
+          motivo={ext?.notes?.trim() || null}
+          status={ext?.status}
+          esEvento={ext ? esEventoGenerico(ext) : false}
+        />
+      )
+    }
+    return (
+      <FilaLista
+        nombre={nombreLista}
+        esDeGoogle={ext?.isGcalBlock === true}
+        icono={ext?.icono ?? null}
+        /* La MISMA precedencia que la tarjeta de la rejilla y el chip del mes: el
+           color elegido manda sobre el del estado cuando lo hay, y sólo lo hay en
+           un evento genérico. Su porqué está entero en `MemoizedEventContent`. */
+        tinta={ext?.color ? `var(--ag-evento-${ext.color})`
+          : ext?.status ? `var(--ag-status-${ext.status}-dot)` : null}
+        cancelada={ext?.status === 'cancelled'}
       />
     )
   }
@@ -2962,6 +3252,7 @@ function renderEventContent(arg: EventContentArg, navegadorTZ: string, iniciales
       color={ext.color ?? null}
       descriptor={ext.notes?.trim() || null}
       esEvento={esEventoGenerico(ext)}
+      enRejilla={enRejilla}
     />
   )
 }
@@ -3031,6 +3322,177 @@ function renderNowIndicator(arg: NowIndicatorContentArg): ReactElement | null {
   )
 }
 
+/* ─── Cabecera de día de las vistas de LISTA ────────────────────────────
+   La caja la pinta `globals.css`; aquí sólo se decide qué texto va en cada
+   lado. Fecha a la izquierda, día de la semana a la derecha.
+
+   ⚠️ LOS DOS TEXTOS SE COMPONEN AQUÍ Y NO SALEN DE `listDayFormat` /
+   `listDaySideFormat`, QUE ES LA VÍA QUE PARECE. Tres motivos, y el primero
+   basta:
+
+     1. LOS DEFAULTS DEL PLUGIN VIENEN AL REVÉS. `listDay` trae
+        `listDayFormat: { weekday: 'long' }` y NINGÚN formato lateral
+        (`@fullcalendar/list/index.js:31`), o sea la izquierda con «miércoles» y
+        la derecha vacía; `listWeek` trae el día de la semana a la izquierda y
+        la fecha a la derecha (`:35-37`). El mockup pide justo lo contrario en
+        las dos. Corregirlo por formatos obliga a escribir opciones en
+        `VISTAS_FC` para vistas que TODAVÍA NO SE MONTAN, que es el bloque
+        siguiente.
+     2. `arg.sideText` NO ESTÁ TIPADO. `DayHeaderContentArg` declara `date`,
+        `view`, `text` y un índice `[otherProp: string]: any`
+        (`core/internal-common.d.ts:1741-1746`), así que leer el lateral entra
+        como `any` — prohibido en este proyecto.
+     3. La fecha quiere DOS formas y el formato es por vista: en la lista de un
+        día ésta es la única fecha completa de la pantalla y lleva año; en la de
+        una semana el año ya lo dice la barra de arriba y repetirlo en cada una
+        de las siete cabeceras es ruido.
+
+   ⚠️ Y NO LLEVA ENLACE, aunque el mockup dibuje un `<a>`. El destino natural
+   sería el `navLinkAttrs` que el plugin ya calcula y pasa en los renderProps,
+   pero entra por el mismo índice `any` del punto 2. Queda como decisión
+   pendiente del bloque siguiente, no como olvido: hoy la fecha es texto. */
+const FORMATO_DIA_LISTA_CON_ANIO = new Intl.DateTimeFormat('es-MX', {
+  day: 'numeric', month: 'long', year: 'numeric',
+})
+const FORMATO_DIA_LISTA = new Intl.DateTimeFormat('es-MX', {
+  day: 'numeric', month: 'long',
+})
+const FORMATO_DIA_SEMANA = new Intl.DateTimeFormat('es-MX', { weekday: 'long' })
+
+function CabeceraDiaLista({ date, esHoy, conAnio }: {
+  date: Date; esHoy: boolean; conAnio: boolean
+}) {
+  const fecha = conAnio
+    ? FORMATO_DIA_LISTA_CON_ANIO.format(date)
+    : FORMATO_DIA_LISTA.format(date)
+  return (
+    <span className="ag-listahead">
+      {/* El « · hoy» va DENTRO del mismo span que la fecha y sin marcador
+          propio, que es como lo escribe el mockup: ahí es texto corriente
+          dentro del enlace, no una etiqueta aparte. La cabecera de la REJILLA
+          sí envuelve su «· HOY» en `.ag-dayhead-hoy`, y la diferencia no es
+          incoherencia: allí el rótulo cuelga de una abreviatura en gris y
+          necesita su propio color para verse; aquí la línea entera ya va en la
+          tinta de marca, así que un span sin regla que lo lea sería un marcador
+          muerto. */}
+      <span className="ag-listahead-fecha">{fecha}{esHoy && ' · hoy'}</span>
+      <span className="ag-listahead-dow">{FORMATO_DIA_SEMANA.format(date)}</span>
+    </span>
+  )
+}
+
+/* ═══ BANDA AZUL DEL ENCABEZADO MÓVIL (bloque 6 · paso 8a) ══════════════════
+   Sustituye al encabezado blanco de escritorio por debajo de `ANCHO_MOVIL`, y
+   sólo ahí: el de escritorio no se toca por dentro, se envuelve.
+
+   ⚠️ EL COLOR SALE DE LA FÓRMULA DEL MENÚ LATERAL, no de un valor copiado. Es
+   `hsl(from var(--cp) h s 20%)`, la misma que `Sidebar.tsx:248`, y va como token
+   `--ag-navy` en globals.css para que las dos superficies no puedan divergir.
+   ⚠️ PLANA, SIN DEGRADADO. El mockup dibuja un `linear-gradient` y AFIRMA que es
+   «el mismo del sidebar de escritorio»; eso es falso hoy —el sidebar es plano— y
+   un degradado que el original no tiene SEPARA las dos superficies en vez de
+   unirlas, que era justo lo que la decisión buscaba. Y los tokens
+   `--sp-nav-from/mid/to` de `spinus-tokens.css` NO se tocan: están comentados
+   con un «no usar» explícito.
+
+   ⚠️ EL SUBTÍTULO ES SÓLO EL CONTEO. Ni el nombre del consultorio —que el mockup
+   escribe («Umán») y que esta página no tiene como concepto— ni el lema
+   «Gestión de citas clínicas», que en 390 px no cabe con nada más.
+
+   ⚠️ EL HAMBURGUESA ABRE EL MENÚ DE VERDAD, vía `MenuMovilContext`. El botón
+   flotante del `Sidebar` se esconde en esta ruta para que no salgan dos. */
+/* La tercera fila de la banda: filtro de médico y engrane de horario.
+
+   ⚠️ ES UN COMPONENTE APARTE POR TAMAÑO, NO POR REUTILIZACIÓN — sólo lo usa la
+   banda. `BandaMovil` con esta fila dentro medía 63 líneas y el proyecto tiene
+   el tope en 50; la fila de los filtros es el trozo más autocontenido y el único
+   con condiciones propias, así que es el que sale.
+
+   ⚠️ DEVUELVE `null` CUANDO NO HAY NADA QUE ENSEÑAR, y eso importa: en una
+   clínica de un solo médico sin permiso de horario esta fila no se pinta, y con
+   ella se ahorran 56 px de alto —los 44 de la fila más su hueco—, que en un
+   teléfono bajo es la diferencia entre que la lista respire o no. Un
+   contenedor vacío seguiría ocupando su hueco de flex. */
+function FiltrosBandaMovil(
+  { medicos, filtroMedico, onFiltroMedico, onHorario }: {
+    medicos: readonly Medico[]; filtroMedico: string
+    onFiltroMedico: (id: string) => void; onHorario: (() => void) | null
+  },
+) {
+  /* Mismo criterio que el header de escritorio: el filtro sólo tiene sentido en
+     modo multi-doctor, y el engrane sólo si se puede editar el horario. */
+  const hayFiltro = medicos.length > 1
+  if (!hayFiltro && !onHorario) return null
+  return (
+    <div className="ag-banda-movil-filtros">
+      {hayFiltro && (
+        <label>
+          <span className="sr-only">Filtrar por médico</span>
+          <select value={filtroMedico} onChange={e => onFiltroMedico(e.target.value)}>
+            <option value="">Todos los médicos</option>
+            {medicos.map(m => <option key={m.id} value={m.id}>{componerNombreMedicoCompleto(m)}</option>)}
+          </select>
+        </label>
+      )}
+      {onHorario && (
+        <button type="button" className="ag-banda-movil-ctrl ag-banda-movil-ctrl--marco"
+          onClick={onHorario} aria-label="Configurar horario de consulta">
+          <Settings size={18} />
+        </button>
+      )}
+    </div>
+  )
+}
+
+function BandaMovil(
+  { conteo, vistaActual, onVista, titulo, onPrev, onNext, onMenu,
+    medicos, filtroMedico, onFiltroMedico, onHorario }: {
+    conteo: string; vistaActual: string; onVista: (tipo: string) => void
+    titulo: string; onPrev: () => void; onNext: () => void; onMenu: () => void
+    medicos: readonly Medico[]; filtroMedico: string
+    onFiltroMedico: (id: string) => void; onHorario: (() => void) | null
+  },
+) {
+  return (
+    <header className="ag-banda-movil">
+      <div className="ag-banda-movil-fila">
+        <button type="button" className="ag-banda-movil-ctrl" onClick={onMenu} aria-label="Abrir menú">
+          <Menu size={19} />
+        </button>
+        <span className="ag-banda-movil-titulo">
+          <b>Agenda</b>
+          {conteo && <span>{conteo}</span>}
+        </span>
+      </div>
+      <div className="ag-banda-movil-vistas" role="tablist" aria-label="Vista del calendario">
+        {VIEWS.map(v => {
+          /* El mismo traductor que el segmentado de escritorio y que el efecto
+             del ancho: aquí `isMobile` es true por construcción —esta banda sólo
+             se monta en móvil—, así que «Semana» apunta a `listWeek`. */
+          const tipo = vistaEnElOtroFormato(v.type, true)
+          return (
+            <button key={v.type} type="button" role="tab" aria-selected={vistaActual === tipo}
+              onClick={() => onVista(tipo)}>{v.label}</button>
+          )
+        })}
+      </div>
+      <FiltrosBandaMovil
+        medicos={medicos} filtroMedico={filtroMedico}
+        onFiltroMedico={onFiltroMedico} onHorario={onHorario}
+      />
+      <div className="ag-banda-movil-fecha">
+        <button type="button" className="ag-banda-movil-ctrl" onClick={onPrev} aria-label="Anterior">
+          <ChevronLeft size={20} />
+        </button>
+        <span className="ag-banda-movil-etiqueta">{titulo}</span>
+        <button type="button" className="ag-banda-movil-ctrl" onClick={onNext} aria-label="Siguiente">
+          <ChevronRight size={20} />
+        </button>
+      </div>
+    </header>
+  )
+}
+
 /* ─── Página principal ─────────────────────────────────── */
 
 /* Segmentos del control de vistas. SÓLO TEXTO desde el bloque 4: llevaban un
@@ -3044,6 +3506,55 @@ const VIEWS = [
   { type: 'timeGridWeek', label: 'Semana' },
   { type: 'timeGridDay',  label: 'Día'    },
 ] as const
+
+/* ── EL UMBRAL, Y ES UNA PAREJA ────────────────────────────────────────────
+   ⚠️ SUBIÓ DE 768 A 1024 EN EL BLOQUE 6, Y NO VIAJA SOLO. El otro miembro es la
+   media query de `globals.css` que baja la leyenda a fila propia, hoy en
+   `max-width: 1023px`. Los dos dicen lo MISMO —«a partir de aquí la agenda es
+   estrecha»— y si divergen aparece la franja de anchos en la que el calendario
+   ya es una lista pero el cromo sigue creyéndose de escritorio, o al revés.
+   El aviso está escrito en los dos sitios: si mueves uno, mueve el otro. */
+const ANCHO_MOVIL = 1024
+
+/* ── LAS TRES VISTAS, CADA UNA EN SUS DOS FORMATOS ─────────────────────────
+   Lo que el médico elige es un PERIODO —mes, semana, día—, no una vista de
+   FullCalendar. El formato en el que ese periodo se dibuja lo decide el ancho:
+   rejilla cuando sobra y lista cuando no.
+
+   ⚠️ MES APARECE A LOS DOS LADOS CON EL MISMO VALOR, Y NO ES UN HUECO SIN
+   RELLENAR. El mes se dibuja igual de ancho que de estrecho —lo que cambia son
+   sus celdas, que es otro bloque—, así que su pareja es él mismo. Ponerlo aquí y
+   no tratarlo como caso aparte es lo que deja `vistaEnElOtroFormato` sin ninguna
+   rama especial: la tabla contesta por las tres.
+
+   ⚠️ ESTA TABLA NO REGISTRA NADA. Las vistas se registran por el PLUGIN, en la
+   prop `plugins` del <FullCalendar>; esto sólo dice quién es pareja de quién. Si
+   añades un par aquí sin que las dos vistas existan, `changeView` lanzará. */
+const FORMATOS_DE_VISTA = [
+  { ancho: 'dayGridMonth', estrecho: 'dayGridMonth' },
+  { ancho: 'timeGridWeek', estrecho: 'listWeek'     },
+  { ancho: 'timeGridDay',  estrecho: 'listDay'      },
+] as const
+
+/**
+ * La vista que le toca a `viewType` con el ancho de ahora, conservando el
+ * periodo. Semana sigue siendo Semana; sólo cambia de formato.
+ *
+ * ⚠️ ES IDEMPOTENTE A PROPÓSITO: pasarle una vista que YA está en el formato
+ * correcto devuelve la misma cadena. De eso vive el efecto del `resize`, que
+ * dispara en cada píxel de arrastre y compara antes de llamar a `changeView`;
+ * sin la idempotencia habría que acordarse de comparar fuera, y basta olvidarlo
+ * una vez para reconstruir el `dateProfile` sesenta veces por segundo.
+ *
+ * ⚠️ UNA VISTA DESCONOCIDA SE DEVUELVE TAL CUAL, y no es pereza: es lo que
+ * impide que un `changeView` a ciegas mande la agenda a una vista que nadie ha
+ * registrado. Ante la duda, no se mueve.
+ */
+function vistaEnElOtroFormato(viewType: string, movil: boolean): string {
+  const par = FORMATOS_DE_VISTA.find(p => p.ancho === viewType || p.estrecho === viewType)
+  if (!par) return viewType
+  return movil ? par.estrecho : par.ancho
+}
 
 /* Opciones POR VISTA. A nivel de módulo por la regla de identidad estable: un
    literal en el JSX sería un objeto nuevo en cada render y FullCalendar vuelve
@@ -3110,7 +3621,45 @@ const VISTAS_FC = {
      aquí funcione. */
   timeGridWeek: { titleFormat: { day: 'numeric', month: 'short', year: 'numeric' }, dayMaxEvents: 2 },
   timeGridDay:  { titleFormat: { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }, dayMaxEvents: 2 },
+  /* ⚠️ LAS DOS DE LISTA SÓLO LLEVAN `titleFormat`, Y NO ES UN OLVIDO: sus
+     `listDayFormat` / `listDaySideFormat` siguen SIN PONERSE a propósito, porque
+     los textos de la cabecera de día los compone `CabeceraDiaLista` a mano —los
+     defaults del plugin vienen invertidos, ver su nota—. Esto es otra cosa: es la
+     etiqueta de FECHA de la banda móvil, que sale de `view.title`.
+     Sin estas dos entradas caían al default de FullCalendar, que trae el año y el
+     mes abreviado —«17 – 22 ago 2026»—; el mockup pide «17 – 22 de agosto», sin
+     año, porque en una pantalla de 390 px el año es la parte que no aporta.
+     El rango lo compone solo `NativeFormatter` a partir del formato de UNA fecha,
+     igual que en `timeGridWeek`; el guión largo lo pone `titleRangeSeparator`. */
+  listDay:  { titleFormat: { weekday: 'short', day: 'numeric', month: 'long' } },
+  listWeek: { titleFormat: { day: 'numeric', month: 'long' } },
 } as const
+
+/* El estado vacío de las listas.
+   Una rejilla vacía sigue siendo una rejilla —se ven las horas, hay dónde
+   pulsar— y por eso las de tiempo no llevan nada de esto. Una lista sin filas no
+   es nada: sin este texto sale un hueco blanco que se lee como un fallo de
+   carga.
+
+   ⚠️ A NIVEL DE MÓDULO POR LA REGLA DE IDENTIDAD ESTABLE, como las fuentes y los
+   otros renderizadores. Una función declarada en el JSX sería nueva en cada
+   render y FullCalendar vuelve a refinar sus opciones cuando la referencia
+   cambia.
+
+   ⚠️ DEVUELVE UNA CADENA PELADA, SIN MARCADO. La caja ya la pone el plugin
+   (`.fc-list-empty` con su `.fc-list-empty-cushion` dentro), y aquí no hay ni
+   icono ni botón A PROPÓSITO: eso se decide viendo la pantalla, no antes.
+   Mismo trato que la rama de Mes en `renderDayHeader`, que también devuelve
+   texto.
+
+   El `arg.text` del final es el `noEventsText` del locale —«No hay eventos para
+   mostrar»— y cubre a cualquier vista de lista que se monte sin pasar por aquí:
+   es peor texto que los dos de arriba, pero es texto. */
+function renderSinEventos(arg: NoEventsContentArg): string {
+  if (arg.view.type === 'listDay')  return 'Sin citas este día'
+  if (arg.view.type === 'listWeek') return 'Sin citas esta semana'
+  return arg.text
+}
 
 /* Las dos configuraciones del toolbar nativo, A NIVEL DE MÓDULO por la regla de
    identidad estable: un literal en el JSX es un objeto nuevo en cada render y
@@ -3122,7 +3671,11 @@ const VISTAS_FC = {
    lejos de las flechas que la mueven. En MÓVIL se queda centrada: ahí el chunk
    izquierdo sólo lleva las dos flechas y no hay ancho para poner la fecha al
    lado sin partirla. */
-const TOOLBAR_MOVIL       = { left: 'prev,next', center: 'title', right: 'today' } as const
+/* ⚠️ AQUÍ VIVÍA `TOOLBAR_MOVIL`, Y SE FUE EN EL PASO 8a. Era
+   `{ left: 'prev,next', center: 'title', right: 'today' }`, la configuración del
+   toolbar NATIVO en móvil. Ya no hay toolbar nativo en móvil: `headerToolbar` va
+   en `false` y lo sustituye entero `BandaMovil`. Si algún día vuelve el toolbar
+   nativo ahí, esa es la línea — pero entonces sobra la banda, no conviven. */
 const TOOLBAR_ESCRITORIO  = { left: 'prev,next today title', center: '', right: '' } as const
 
 /** Lo que el subtítulo cuenta, por categoría. */
@@ -3234,6 +3787,11 @@ export default function AgendaPage() {
   const [modal,        setModal]        = useState<ModalState>({ mode: 'closed' })
   const [isMobile,     setIsMobile]     = useState(false)
   const [currentView,  setCurrentView]  = useState<string>('timeGridWeek')
+  /* La etiqueta de fecha de la banda móvil. Con `headerToolbar={false}` ya no
+     hay toolbar nativo que la pinte, así que se guarda lo que compone
+     FullCalendar (`view.title`, que sale del `titleFormat` de `VISTAS_FC`) y se
+     escribe en `datesSet`, que es quien sabe cuándo cambia el rango. */
+  const [tituloVista, setTituloVista] = useState('')
   const [horarioOpen,  setHorarioOpen]  = useState(false)
   const [confirm,      setConfirm]      = useState<{ message: string; onConfirm: () => void; onCancel: () => void } | null>(null)
   const [citaCreada,   setCitaCreada]   = useState(false)
@@ -3267,6 +3825,10 @@ export default function AgendaPage() {
   const isSecretaria = profile?.role === 'secretaria'
 
   const canEditHorario  = canManageClinica(profile)
+  /* Sólo `abrir`, no `alternar`: el hamburguesa de la banda no cierra el menú,
+     porque cuando el menú está abierto lo tapa entero. Quien cierra es el propio
+     menú —su botón de arriba y su velo—, igual que en el resto de la app. */
+  const { abrir: abrirMenu } = useMenuMovil()
   const isSingleDoctor  = medicos.length <= 1
   const defaultMedicoId = useMemo(() => {
     // Médico (admin o no): default es él mismo
@@ -3553,18 +4115,38 @@ export default function AgendaPage() {
     aplicarConteo(api.getEvents(), rangoDeVista())
   }, [diasOcultos, aplicarConteo, rangoDeVista])
 
-  /* ── Detectar mobile y actualizar vista del calendario ── */
+  /* ── Detectar ancho y cambiar de FORMATO, no de vista ──────────────────
+     ⚠️ ESTO ERA OTRA COSA HASTA EL BLOQUE 6, Y LA DIFERENCIA IMPORTA. Antes
+     comparaba contra dos nombres de vista literales y FORZABA: al estrechar
+     mandaba a `timeGridDay` viniera de donde viniera, y al ensanchar devolvía a
+     `timeGridWeek` sólo si estaba en Día. O sea que el teléfono se comía la
+     elección del médico —quien estuviera en Mes acababa en Día— y al volver a
+     escritorio no recuperaba lo que tenía.
+
+     Ahora se conserva el PERIODO y sólo cambia el formato, vía
+     `vistaEnElOtroFormato`. Semana en rejilla ↔ Semana en lista, Día ↔ Día, Mes
+     se queda donde está.
+
+     ⚠️ Y LA COMPARACIÓN ANTES DEL `changeView` NO ES UNA OPTIMIZACIÓN. `resize`
+     dispara en cada píxel mientras se arrastra el borde de la ventana; sin ella
+     habría un `changeView` por evento, y cada uno reconstruye el `dateProfile`,
+     reemite `datesSet` y arrastra detrás la ventana vertical y el conteo. Con
+     ella, mover la ventana dentro del mismo lado del umbral no cuesta nada.
+     La idempotencia de `vistaEnElOtroFormato` es lo que la hace fiable.
+
+     `changeView` va SIN fecha a propósito: así conserva la que se está mirando.
+     Con fecha saltaría a hoy en cada cruce del umbral.
+
+     `setCurrentView` no se toca aquí: lo escribe `datesSet`, que `changeView`
+     reemite. Escribirlo también aquí serían dos fuentes para el mismo dato. */
   useEffect(() => {
     function check() {
-      const mobile = window.innerWidth < 768
-      setIsMobile(mobile)
+      const movil = window.innerWidth < ANCHO_MOVIL
+      setIsMobile(movil)
       const api = calendarRef.current?.getApi()
       if (!api) return
-      if (mobile && api.view.type !== 'timeGridDay') {
-        api.changeView('timeGridDay')
-      } else if (!mobile && api.view.type === 'timeGridDay') {
-        api.changeView('timeGridWeek')
-      }
+      const destino = vistaEnElOtroFormato(api.view.type, movil)
+      if (destino !== api.view.type) api.changeView(destino)
     }
     check()
     window.addEventListener('resize', check)
@@ -4771,6 +5353,39 @@ export default function AgendaPage() {
      reponer, está en globals.css junto a `.fc-col-header-cell.fc-day-today`. */
   const renderDayHeader = useCallback((arg: DayHeaderContentArg) => {
     if (arg.view.type === 'dayGridMonth') return arg.text
+    /* ⚠️ LAS VISTAS DE LISTA TAMBIÉN PASAN POR AQUÍ, Y HASTA EL BLOQUE 6 ESO ERA
+       UN FALLO ESPERANDO. No es una suposición: `ListViewHeaderRow` monta su
+       `<tr>` con `generatorName: 'dayHeaderContent', customGenerator:
+       options.dayHeaderContent` (`@fullcalendar/list/internal.js:29`), o sea que
+       esta misma función compone la cabecera de día de una lista. Sin esta rama
+       devolvía la de la rejilla —abreviatura de tres letras, cifra de 18 px y
+       «· HOY»— dentro de un `<th>` de lista, y ADEMÁS sin estilos, porque todo
+       lo de `.ag-dayhead` cuelga de `.fc-timegrid` en globals.css.
+
+       ⚠️ EL ORDEN DE LAS DOS PRIMERAS LÍNEAS ES LO QUE HACE QUE ESTO FUNCIONE, y
+       es el mismo de `renderEventContent`: Mes NO es vista de rejilla, así que
+       puesto detrás caería por esta rama y estrenaría la cabecera de lista en el
+       mes. Devolviendo Mes primero, llegar aquí sólo puede ser una lista.
+
+       ⚠️ Y CONTRADICE LO QUE AFIRMAN EL SPEC Y EL MOCKUP: los dos dicen que las
+       cabeceras de lista «no tienen hook de contenido, sólo `listDayFormat` y
+       `listDaySideFormat`» (`SPEC_AGENDA.md` §12 y el comentario de `.dayhead`
+       en `docs/spec/export-movil/agenda-movil-dia.html`). Es falso, y de ahí
+       deducían que la marca de «hoy» no era alcanzable. Sí lo es: sale de
+       `arg.isToday`, que el plugin mete en los renderProps vía `getDateMeta`
+       (`list/internal.js:15` y `:22`). */
+    if (!esVistaDeRejilla(arg.view.type)) {
+      return (
+        <CabeceraDiaLista
+          date={arg.date}
+          esHoy={arg.isToday}
+          /* El año sólo en la lista de UN día: ahí esta cabecera es la única
+             fecha completa de la pantalla. En la de una semana son siete
+             cabeceras y el año ya lo dice la barra de arriba una vez. */
+          conAnio={arg.view.type === 'listDay'}
+        />
+      )
+    }
 
     const diaInfo = DIAS.find(d => d.fc === arg.date.getDay())
     const habil   = diaInfo ? (horario[diaInfo.key]?.activo ?? false) : false
@@ -4850,6 +5465,13 @@ export default function AgendaPage() {
     <div className="agenda-raiz flex flex-col h-[calc(100dvh-88px)] lg:h-[calc(100dvh-64px)]">
 
       {/* ── Header ──────────────────────────────────────── */}
+      {/* ⚠️ EL ENCABEZADO DE ESCRITORIO SE ENVUELVE, NO SE TOCA POR DENTRO. Por
+          debajo de `ANCHO_MOVIL` lo sustituye `BandaMovil`, que es otra cosa —
+          navy, cuatro filas, controles de 44 px— y no una versión estrecha de
+          esto. Las 260 líneas de aquí dentro quedan exactamente como estaban:
+          sus peldaños `2xl`, su tope de 240 px del selector y sus notas siguen
+          hablando de anchos de escritorio, que es lo único donde se ven. */}
+      {!isMobile && (
       <div className="flex items-center justify-between gap-4 mb-6">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight text-[#1d1d1f]">Agenda</h1>
@@ -4886,46 +5508,69 @@ export default function AgendaPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
-          {/* Segmented control de vistas — desktop only (móvil queda fijo en Día,
-              igual que hoy). Sincronizado con la vista real vía datesSet. */}
-          {!isMobile && (
-            <div
-              role="tablist"
-              aria-label="Vista del calendario"
-              className="inline-flex"
-              /* El radio de la pista SALE del de la pastilla: radio exterior =
-                 interior + padding es la regla geométrica que evita que las
-                 esquinas se vean pellizcadas. Derivado, no un número nuevo. */
-              style={{ background: 'var(--ag-segment-bg)', borderRadius: 'calc(var(--ag-r-btn) + 3px)', padding: 3, gap: 2 }}
-            >
-              {VIEWS.map(v => {
-                const active = currentView === v.type
-                return (
-                  <button
-                    key={v.type}
-                    role="tab"
-                    aria-selected={active}
-                    onClick={() => {
-                      const api = calendarRef.current?.getApi()
-                      if (!api) return
-                      api.changeView(v.type)
-                      setCurrentView(v.type)
-                    }}
-                    className={`inline-flex items-center transition-all ${active ? '' : 'hover:opacity-70'}`}
-                    style={{
-                      border: 'none', cursor: 'pointer', borderRadius: 'var(--ag-r-btn)', padding: '6px 13px',
-                      fontSize: 12.5, fontWeight: active ? 700 : 600,
-                      ...(active
-                        ? { background: 'var(--ag-segment-active-bg)', color: 'var(--ag-segment-active-text)', boxShadow: 'var(--ag-segment-active-shadow)' }
-                        : { background: 'transparent', color: 'var(--ag-segment-text)' }),
-                    }}
-                  >
-                    {v.label}
-                  </button>
-                )
-              })}
-            </div>
-          )}
+          {/* Segmented control de vistas. Sincronizado con la vista real vía
+              `datesSet`.
+
+              ⚠️ YA NO LLEVA `!isMobile`, Y ERA LO QUE DEJABA AL TELÉFONO CON UNA
+              SOLA VISTA. El control se escondía en móvil porque el efecto del
+              ancho forzaba Día y no había nada que elegir; retirada esa
+              imposición, esconderlo dejaba al médico encerrado en el periodo con
+              el que hubiera entrado, sin ninguna puerta. Ahora las tres se
+              alcanzan desde el teléfono.
+
+              ⚠️ SE APRIETA EN ANCHOS DE MÓVIL, Y ES ESPERADO. Este control vive
+              en el header de escritorio, que en móvil sustituye la banda azul de
+              un bloque posterior. Hasta entonces comparte fila con el resto y la
+              fila envuelve. No lo escondas otra vez «mientras tanto»: eso es
+              volver a la vista única. */}
+          <div
+            role="tablist"
+            aria-label="Vista del calendario"
+            className="inline-flex"
+            /* El radio de la pista SALE del de la pastilla: radio exterior =
+               interior + padding es la regla geométrica que evita que las
+               esquinas se vean pellizcadas. Derivado, no un número nuevo. */
+            style={{ background: 'var(--ag-segment-bg)', borderRadius: 'calc(var(--ag-r-btn) + 3px)', padding: 3, gap: 2 }}
+          >
+            {VIEWS.map(v => {
+              /* ⚠️ EL SEGMENTO NOMBRA UN PERIODO, NO UNA VISTA, Y POR ESO
+                 TRADUCE. `VIEWS` guarda el tipo ANCHO de cada uno —es la lista
+                 del segmentado desde el bloque 4 y no se toca—, así que en un
+                 teléfono «Semana» tiene que apuntar a `listWeek` y no a
+                 `timeGridWeek`. Sin esta línea pasaban las dos cosas a la vez:
+                 ningún segmento se veía activo, porque `currentView` valía
+                 `listWeek` y aquí se comparaba contra `timeGridWeek`; y pulsarlo
+                 metía la rejilla de siete columnas en 390 px, que es justo lo
+                 que las listas vienen a evitar.
+                 Es el mismo `vistaEnElOtroFormato` del efecto del ancho, y tiene
+                 que serlo: dos tablas de parejas divergen. */
+              const tipo = vistaEnElOtroFormato(v.type, isMobile)
+              const active = currentView === tipo
+              return (
+                <button
+                  key={v.type}
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => {
+                    const api = calendarRef.current?.getApi()
+                    if (!api) return
+                    api.changeView(tipo)
+                    setCurrentView(tipo)
+                  }}
+                  className={`inline-flex items-center transition-all ${active ? '' : 'hover:opacity-70'}`}
+                  style={{
+                    border: 'none', cursor: 'pointer', borderRadius: 'var(--ag-r-btn)', padding: '6px 13px',
+                    fontSize: 12.5, fontWeight: active ? 700 : 600,
+                    ...(active
+                      ? { background: 'var(--ag-segment-active-bg)', color: 'var(--ag-segment-active-text)', boxShadow: 'var(--ag-segment-active-shadow)' }
+                      : { background: 'transparent', color: 'var(--ag-segment-text)' }),
+                  }}
+                >
+                  {v.label}
+                </button>
+              )
+            })}
+          </div>
           {/* ⚠️ EL RADIO DE ESTOS CINCO CONTROLES SALE DE `--ag-r-btn` (10 px) Y NO
               DE LA ESCALA DE TAILWIND. Eran `rounded-xl`, que son 12. El token
               lo fija el spec del rediseño (§1.3) y su familia está declarada en
@@ -5108,6 +5753,30 @@ export default function AgendaPage() {
           </button>
         </div>
       </div>
+      )}
+
+      {isMobile && (
+        <BandaMovil
+          conteo={resumenConteo}
+          vistaActual={currentView}
+          onVista={tipo => {
+            const api = calendarRef.current?.getApi()
+            if (!api) return
+            api.changeView(tipo)
+            setCurrentView(tipo)
+          }}
+          titulo={tituloVista}
+          onPrev={() => calendarRef.current?.getApi().prev()}
+          onNext={() => calendarRef.current?.getApi().next()}
+          onMenu={abrirMenu}
+          medicos={medicos}
+          filtroMedico={filtroMedico}
+          onFiltroMedico={setFiltroMedico}
+          /* `null` y no un booleano: es el manejador o no hay botón. Misma
+             condición que el de escritorio (`canEditHorario`). */
+          onHorario={canEditHorario ? () => setHorarioOpen(true) : null}
+        />
+      )}
 
       {citaCreada && <div data-onboard="cita-creada" className="hidden" />}
 
@@ -5235,7 +5904,7 @@ export default function AgendaPage() {
           × 1.2 son 18—. Su `line-height: 1.2` explícito es lo que sostiene esa
           cuenta y está anotado también en globals.css.
 
-          EN MÓVIL EL CROMO ES MENOR: por debajo de 768 la leyenda baja a fila
+          EN MÓVIL EL CROMO ES MENOR: por debajo de 1024 la leyenda baja a fila
           propia (45) y «Compactar» se apaga solo, así que no hay banda — 60 + 45
           + 35 = 140, y 250 deja 110 px = 3,06 franjas, algo por debajo de las
           3,38 del peor caso de escritorio porque la fila propia de la leyenda
@@ -5276,7 +5945,7 @@ export default function AgendaPage() {
             vacía. Quien la coloca es el `grid-template-areas` de `.agenda-fc`
             en globals.css, y allí está el porqué de esa vía y no de
             `customButtons`. Cuando no cabe envuelve dentro de su celda sin
-            mover la fecha; por debajo de 768 px baja a fila propia.
+            mover la fecha; por debajo de 1024 px baja a fila propia.
 
             ⚠️ SE PINTA SIEMPRE, también en multi-doctor. Llevaba un
             `isSingleDoctor` heredado de cuando existía OTRA leyenda —puntos por
@@ -5285,7 +5954,19 @@ export default function AgendaPage() {
             SÍ están coloreadas por estado.
 
             Es una LEYENDA, no un resumen: los cinco estados salen siempre, esté
-            o no presente cada uno. Quien cuenta lo que hay es el subtítulo. */}
+            o no presente cada uno. Quien cuenta lo que hay es el subtítulo.
+
+            ⚠️ EN MÓVIL SÓLO SALE EN DÍA, y la condición está aquí y no en CSS a
+            propósito: la leyenda es HERMANA del calendario dentro del grid de
+            `.agenda-fc`, así que desde la hoja no hay forma de preguntarle a la
+            VISTA —su clase `.fc-listDay-view` cuelga del harness, que es la otra
+            celda del grid, y no hay selector de hermano anterior.
+            Por qué sólo en Día: ahí la fila lleva su píldora de estado con el
+            nombre escrito, así que la leyenda explica algo que se está viendo. En
+            Semana la fila sólo tiene el punto de color y la leyenda ocuparía una
+            fila entera de las pocas que caben; en Mes no hay ni punto de estado.
+            En escritorio no cambia nada: sale en las tres. */}
+        {(!isMobile || currentView === 'listDay') && (
         <div className="ag-leyenda">
           {(Object.entries(STATUS_CONFIG) as [Status, typeof STATUS_CONFIG[Status]][]).map(([key, cfg]) => (
             <div key={key} className="flex items-center gap-1.5">
@@ -5340,6 +6021,7 @@ export default function AgendaPage() {
             </span>
           </div>
         </div>
+        )}
         {/* Va PRIMERA en el DOM aunque se pinte segunda, y es a propósito: el
             `order` de la hoja la coloca bajo el toolbar, y así el lector de
             pantalla oye el aviso antes que los controles y la rejilla que
@@ -5377,10 +6059,37 @@ export default function AgendaPage() {
         )}
         <FullCalendar
           ref={calendarRef}
-          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-          initialView={isMobile ? 'timeGridDay' : 'timeGridWeek'}
+          /* ⚠️ `listPlugin` VA EL ÚLTIMO, Y LA POSICIÓN ES UNA DECISIÓN. Este
+             array es el ORDEN EN QUE `getUnitViewSpec` recorre las vistas
+             registradas (`core/internal-common.js:4955`) para resolver un
+             destino genérico como el 'day' de un enlace de día: gana la primera
+             vista de esa unidad. Hoy ese destino no se deja al azar —lo clava
+             `navLinkDayClick="timeGridDay"`, cuatro líneas más abajo—, pero si
+             `listPlugin` fuera el primero, el día que alguien retire ese clavo
+             el ganador pasaría de `dayGridDay` a `listDay`, o sea que montar las
+             listas habría CAMBIADO un comportamiento que no tenían que tocar.
+             Puesto el último, añadirlo no mueve a nadie de sitio: el orden de
+             desempate sigue siendo exactamente el de antes. */
+          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
+          /* ⚠️ LITERAL, Y ANTES ERA `isMobile ? 'timeGridDay' : …`. Aquel
+             ternario no decidía nada: `isMobile` arranca en `false` y sólo lo
+             escribe un efecto, que corre DESPUÉS del montaje, así que
+             FullCalendar —que lee esta opción una única vez— recibía
+             `timeGridWeek` siempre. Quien ponía la vista del teléfono era el
+             efecto del ancho, y sigue siéndolo. Dejarlo escrito daba a entender
+             que el móvil arranca en Día, que es justo la imposición que el
+             bloque 6 retira. */
+          initialView="timeGridWeek"
           locale={esLocale}
-          headerToolbar={isMobile ? TOOLBAR_MOVIL : TOOLBAR_ESCRITORIO}
+          /* ⚠️ `false` EN MÓVIL, Y CON ÉL SE FUE `TOOLBAR_MOVIL`. El toolbar
+             nativo lo sustituye entero la banda azul: sus flechas llaman a
+             `prev()`/`next()` y su etiqueta sale de `view.title`, que es la
+             MISMA cadena que pintaba el toolbar. De paso desaparece el título
+             con formato de escritorio que quedaba colgando desde el paso 5.
+             ⚠️ `false` Y NO UN OBJETO VACÍO: con `{}` FullCalendar sigue montando
+             la fila del toolbar —vacía, pero con su `margin-bottom: 1.5em`— y
+             además seguiría ocupando su `grid-area: toolbar`. */
+          headerToolbar={isMobile ? false : TOOLBAR_ESCRITORIO}
           /* Guión largo. El default de FullCalendar es « - », con guión corto. */
           titleRangeSeparator=" – "
           /* ── LOS DOS DISPARADORES DE LA VENTANA, Y NO POR REDUNDANCIA ──
@@ -5400,6 +6109,7 @@ export default function AgendaPage() {
              cubre un efecto propio, arriba. */
           datesSet={arg => {
             setCurrentView(arg.view.type)
+            setTituloVista(arg.view.title)
             const eventos = calendarRef.current?.getApi().getEvents() ?? []
             const rangos = {
               activo:   { activeStart: arg.view.activeStart,  activeEnd: arg.view.activeEnd },
@@ -5458,7 +6168,14 @@ export default function AgendaPage() {
           businessHours={horarioToBusinessHours(horario)}
           eventSources={eventSourcesStable}
           dayHeaderContent={renderDayHeader}
+          /* Sólo lo leen las vistas de lista; en rejilla y en Mes no hay nada
+             que reemplazar y esta prop no llega a consultarse. */
+          noEventsContent={renderSinEventos}
           eventContent={renderEC}
+          /* Los marcadores semánticos de la fila. A nivel de módulo, o sea
+             identidad estable. Volvió en el bloque 6 y su nota larga —incluida
+             la condición con la que se fue— está junto a la función. */
+          eventClassNames={clasesDelEvento}
           dateClick={handleDateClick}
           select={handleSelect}
           eventClick={handleEventClick}
@@ -5508,6 +6225,39 @@ export default function AgendaPage() {
           slotLabelFormat={{ hour: '2-digit', minute: '2-digit', meridiem: false, hour12: false }}
         />
       </div>
+
+      {/* ═══ BARRA INFERIOR MÓVIL ═════════════════════════════════════════
+          ⚠️ ES LA ÚNICA PUERTA PARA CREAR EN MÓVIL, y por eso es una barra fija
+          y no un botón dentro del scroll. Las vistas de lista NO disparan
+          `dateClick` ni `select` —`ListView` se registra como componente
+          interactivo pero no implementa consulta de posición—, así que tocar una
+          fila abre la cita que ya existe y tocar el hueco no hace nada. Sin esta
+          barra, un teléfono no puede agendar.
+          De ahí las dos propiedades que no se negocian: no depende de scroll y
+          no la tapa nada. Si algún día se esconde al hacer scroll, hay que dar
+          antes otra puerta.
+
+          ⚠️ EL `onClick` ES EL MISMO QUE EL DE ESCRITORIO, LITERALMENTE. Mismo
+          bloqueo por suscripción, misma hora de arranque —la de ahora— y mismo
+          `tipo: 'cita'`. Dos puertas al mismo sitio tienen que hacer lo mismo;
+          si una de las dos cambia, cambian las dos. */}
+      {isMobile && (
+        <div className="ag-barra-movil">
+          <button
+            type="button"
+            className="ag-barra-movil-cta"
+            data-onboard="nueva-cita-movil"
+            onClick={() => {
+              if (subState.isBlocked) { openBloqueoModal(); return }
+              const { fecha, hora } = partirFechaHora(new Date().toISOString())
+              setModal({ mode: 'create', fecha, hora, tipo: 'cita', todoElDia: 'no' })
+            }}
+          >
+            <Plus size={19} />
+            Agendar
+          </button>
+        </div>
+      )}
 
       {/* ── Modal cita ──────────────────────────────────── */}
       {modal.mode !== 'closed' && (
