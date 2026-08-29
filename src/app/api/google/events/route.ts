@@ -303,14 +303,75 @@ export async function GET(req: NextRequest) {
     // cota inferior del FIN del evento); filtrar las citas sólo por su inicio
     // dejaría fuera del conjunto a la que empezó antes de `timeMin` y termina
     // dentro, y esa cita saldría sin restar.
-    const { data: citas } = await supabase
+    //
+    // ── NO SE PUEDE ACOTAR MÁS, Y EL FILTRO DE MÉDICO ES LA TENTACIÓN ──────
+    // La agenda viene filtrada por médico y esta resta NO, a propósito. Lo que
+    // Google devuelve arriba es el calendario ENTERO de la clínica, así que
+    // entre esos eventos están las citas de TODOS los médicos; restar sólo las
+    // del médico filtrado dejaría las ajenas sin restar y saldrían pintadas
+    // como evento crudo de Google, con el nombre del paciente en el título. Es
+    // exactamente la fuga del párrafo de arriba, reintroducida por el otro
+    // lado. El caso peor no es «todos los médicos»: es justo el FILTRADO, donde
+    // el conjunto que se resta y el que se pinta dejan de coincidir.
+    // La única otra acotación posible sería `.in('google_event_id', …)` con los
+    // ids que Google acaba de devolver — hasta 5.000 en la URL de un GET, y
+    // truncable igual. No compensa.
+
+    // ── SIN EVENTOS NO HAY NADA QUE RESTAR ────────────────────────────────
+    // Además de ahorrar la consulta (con su COUNT exacto) en toda clínica que
+    // no escribe eventos a mano, evita que la guarda de abajo levante la banda
+    // violeta por un conjunto incompleto que no podía duplicar nada.
+    if (eventos.length === 0) {
+      return NextResponse.json({ estado: 'conectado' satisfies EstadoGoogle, events: [] })
+    }
+
+    // ⚠️ EL `count` NO ES UNA MÉTRICA: ES LA GUARDA DEL TRUNCADO SILENCIOSO.
+    // NO LO QUITES, Y NO LE PONGAS UN `.limit()` EN SU LUGAR.
+    //
+    // El techo de filas del proveedor es DURO y GLOBAL (mil por respuesta): no
+    // se sube desde la consulta, y cuando se alcanza la respuesta llega
+    // recortada SIN error y sin aviso. Un `.limit()` no lo supera; sólo lo
+    // baja. Aquí eso no se traduce en «faltan datos» sino en algo peor: cada
+    // cita que no entró en el conjunto NO se resta, y se pinta DOS VECES —una
+    // como cita de Spinus y otra como evento crudo de Google, esta segunda CON
+    // EL NOMBRE DEL PACIENTE en el título—. No se parece a un problema de
+    // carga, así que se diagnostica tarde y por el peor sitio.
+    //
+    // `count: 'exact'` viene del `Content-Range` y cuenta las filas que
+    // CUMPLEN el filtro, no las que caben en la respuesta. Si sobran filas,
+    // el conjunto está incompleto y la resta no es de fiar.
+    const { data: citas, count: totalCitas, error: errorCitas } = await supabase
       .from('appointments')
-      .select('google_event_id')
+      .select('google_event_id', { count: 'exact' })
       .eq('clinica_id', profile.clinica_id)
       .lte('start_time', timeMax)
       .gte('end_time', timeMin)
       .not('google_event_id', 'is', null)
-    const yaSonCitas = new Set((citas ?? []).map((c) => c.google_event_id))
+
+    // Las cuatro ramas son el MISMO fallo: no hay conjunto completo contra el
+    // que restar. El `citas ?? []` que había aquí se tragaba las tres primeras
+    // —consulta rota, RLS, cuerpo ilegible— y restaba contra el conjunto vacío,
+    // que es la duplicación de TODA la agenda de una vez.
+    //
+    // ⚠️ SE ELIGE NO PINTAR LOS EVENTOS DE GOOGLE, no avisar y seguir. Con el
+    // conjunto incompleto no se sabe CUÁLES son las citas que faltan por
+    // restar, así que no hay media respuesta correcta que dar: o se pintan
+    // todos los eventos crudos —con las duplicadas y su PII dentro— o ninguno.
+    // Se contesta 'error_google', que la agenda ya sabe pintar: la banda
+    // violeta del bloque 9 dice literalmente «Tus citas se muestran normal;
+    // faltan los eventos del calendario», que es exactamente lo que pasa. Las
+    // citas propias no se tocan: viajan por /api/appointments, por otra fuente.
+    if (errorCitas || citas === null || totalCitas === null || totalCitas > citas.length) {
+      registrarFalloGCal(
+        { operacion: 'resta de citas (agenda, conjunto incompleto)', userId, calendarId: calendarIdUsado },
+        errorCitas ?? new Error(
+          `la resta necesita ${totalCitas ?? 'un conteo que no llegó'} citas con google_event_id y llegaron ${citas?.length ?? 0}`,
+        ),
+      )
+      return NextResponse.json({ estado: 'error_google' satisfies EstadoGoogle })
+    }
+
+    const yaSonCitas = new Set(citas.map((c) => c.google_event_id))
 
     return NextResponse.json({
       estado: 'conectado' satisfies EstadoGoogle,

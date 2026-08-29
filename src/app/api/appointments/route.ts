@@ -10,6 +10,7 @@ import { APPOINTMENT_SELECT, eventoParaGoogle, puntasParaGoogle, componerAsisten
          type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
 import { correoDelMedico } from '@/lib/medicoCorreo'
 import { TZ_CLINICA, desplazarFecha, fechaHoraLocalAInstante } from '@/lib/dates'
+import { logger } from '@/lib/logger'
 
 /* Una fecha-solo `YYYY-MM-DD`, que es lo que manda el modal para un evento de
    todo el día. NO acepta un instante ISO: si llegara uno, `AT TIME ZONE` de la
@@ -61,9 +62,11 @@ export async function GET(req: NextRequest) {
     const medicoFilter = req.nextUrl.searchParams.get('medico_id')
 
     // RLS filtra por clinica_id
+    /* El `count: 'exact'` NO es una métrica: es la guarda del truncado, y su
+       porqué entero está abajo, junto al `incompleta` que lo consume. */
     let query = supabase
       .from('appointments')
-      .select(APPOINTMENT_SELECT)
+      .select(APPOINTMENT_SELECT, { count: 'exact' })
       .eq('clinica_id', profile.clinica_id)
       .order('start_time', { ascending: true })
 
@@ -106,10 +109,46 @@ export async function GET(req: NextRequest) {
     if (to)   query = query.lt('start_time', to)
     if (from) query = query.gte('end_time', from)
 
-    const { data, error } = await query
+    const { data, error, count } = await query
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    return NextResponse.json({ appointments: data })
+    const filas = data ?? []
+
+    /* ⚠️⚠️ `incompleta` ES LO ÚNICO QUE SEPARA «no hay citas» DE «no llegaron
+       las citas», Y NO SE PUEDE DEDUCIR DESDE EL CLIENTE.
+
+       El techo de filas del proveedor es DURO y GLOBAL —mil por respuesta—: no
+       se sube desde la consulta y, al alcanzarlo, la respuesta llega RECORTADA
+       sin error, sin cabecera de aviso y con un array perfectamente válido.
+
+       ⚠️ Y LA FORMA DEL RECORTE ES LA PEOR POSIBLE, POR EL `.order()` DE
+       ARRIBA. Se queda con las mil PRIMERAS por fecha, así que un mes cargado
+       vuelve con las dos primeras semanas llenas y el resto EN BLANCO. No hay
+       error que pintar, no hay hueco que se vea, y la banda de vacío tampoco
+       sale porque el conteo no es cero. Parecen semanas libres de verdad, y
+       encima de una de ellas se puede agendar encima de una cita que existe.
+
+       ⚠️ NO LO "ARREGLES" CON UN `.limit()`. Un límite propio no supera el
+       techo: sólo lo baja. La vía es saber CUÁNTAS había, no pedir menos.
+
+       `count: 'exact'` viene del `Content-Range` y cuenta las filas que CUMPLEN
+       el filtro, no las que caben en la respuesta. Si sobran, faltan.
+
+       El `count === null` cuenta como incompleta A PROPÓSITO: sin conteo no se
+       puede afirmar que la traída esté entera, y entre avisar de más y callarse
+       de menos, este defecto se diagnostica tarde precisamente por lo segundo.
+       El coste de equivocarse hacia aquí es una banda visible que alguien
+       reporta el primer día; el de equivocarse hacia el otro lado es la agenda
+       en blanco de arriba. */
+    const incompleta = count === null || count > filas.length
+    if (incompleta) {
+      logger.warn(
+        'agenda',
+        `traída de citas incompleta: la clínica ${profile.clinica_id} tiene ${count ?? 'un conteo que no llegó'} citas en [${from ?? 'sin from'}, ${to ?? 'sin to'}] y llegaron ${filas.length}`,
+      )
+    }
+
+    return NextResponse.json({ appointments: filas, incompleta })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Error interno'
     return NextResponse.json({ error: message }, { status: 500 })

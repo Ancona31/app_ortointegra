@@ -4956,15 +4956,20 @@ function renderSinEventos(arg: NoEventsContentArg): string {
 
      1. ERROR DE CARGA — faltan datos y no se sabe cuáles. Es lo único que
         invalida lo que se está viendo.
+     1 bis. CITAS INCOMPLETAS — llegaron datos válidos, pero no todos: la traída
+        tocó el techo de filas del proveedor. Va JUSTO DESPUÉS de la 1 y con su
+        mismo tono porque es la misma clase de gravedad —lo que se ve no es la
+        agenda— y NUNCA sale con ella: la 1 se escribe en el `catch` y ésta en el
+        camino de éxito. Si algún día pudieran coincidir, la 1 manda.
      2. FALLO DE GOOGLE — falta una PARTE conocida de los datos. Grave, pero la
         agenda propia de debajo es correcta.
-     3. VACÍO — no falta nada: no hay nada. Sólo se pinta si NINGUNA de las dos
-        de arriba está puesta, y el porqué está en su propia condición.
+     3. VACÍO — no falta nada: no hay nada. Sólo se pinta si NINGUNA de las de
+        arriba está puesta, y el porqué está en su propia condición.
      4. VISTA COMPACTA — no falta nada y no es un aviso de datos: es la confesión
         de un recorte que pidió el usuario. Va la última porque es la única que
         habla de la vista y no del contenido.
 
-   Pueden coincidir las cuatro menos la 3, que se excluye con la 1 y la 2. */
+   Pueden coincidir todas menos la 3, que se excluye con la 1, la 1 bis y la 2. */
 
 /* El mes de la banda de vacío, en minúsculas y sin año: «agosto». Sin `timeZone`
    a propósito — el <FullCalendar> no lleva opción `timeZone`, así que sus fechas
@@ -5235,7 +5240,27 @@ export default function AgendaPage() {
   const [invitacion, setInvitacion] = useState<
     { citaId: string; paciente: { id: string; nombre: string; correoFicha: string | null } | null; esperandoEvento: boolean } | null
   >(null)
-  const [filtroMedico, setFiltroMedico] = useState<string>('')
+  /* ⚠️ ESTE ESTADO YA NO ES «EL FILTRO»: ES LO QUE EL USUARIO HA ELEGIDO A MANO,
+     y `null` significa «todavía no ha elegido nada». El filtro que de verdad
+     manda es `filtroEfectivo`, unas líneas más abajo.
+
+     Por qué hizo falta partirlo en dos. La agenda abre ahora con el médico que
+     le toca al rol, y el rol llega TARDE: `useProfile` arranca en null y
+     resuelve en una promesa, mientras que la traída inicial de FullCalendar sale
+     en su efecto de montaje —efecto de hijo, o sea ANTES que el del padre—. Con
+     un solo estado sólo había dos salidas, y las dos malas: sembrar en un efecto
+     y pagar una traída de «todos los médicos» antes de corregirla (la traída
+     cara, justo la que este cambio viene a evitar, y un parpadeo de la agenda
+     entera), o sembrar en el `useState` inicial, donde el perfil todavía no
+     existe.
+
+     Con dos piezas no hay siembra que hacer: la elección del usuario, cuando la
+     hay, TAPA a la semilla; mientras no la haya, manda la semilla. Y `null` no
+     es lo mismo que `''` — `''` es una elección legítima («Todos los médicos») y
+     tiene que ganarle a la semilla, que es exactamente lo que hace `??`. Con un
+     `||` en su lugar, elegir «Todos» rebotaría a la semilla y el desplegable no
+     obedecería. */
+  const [filtroMedico, setFiltroMedico] = useState<string | null>(null)
 
   /* ═══ BLOQUE 9 · LO QUE SE SABE DE LA ÚLTIMA TRAÍDA ═══════════════════════
      Cuatro estados y ninguno derivado de otro, porque describen cosas distintas:
@@ -5262,6 +5287,20 @@ export default function AgendaPage() {
   /* La fuente de CITAS falló. Sólo ella: un fallo de Google no entra aquí y por
      eso la agenda propia no se cae con él. Ver `estadoGoogle`. */
   const [errorCitas, setErrorCitas] = useState(false)
+  /* La traída de CITAS fue BIEN y aun así vino RECORTADA: el servidor contó más
+     filas de las que le cupieron en la respuesta (`incompleta`, en
+     /api/appointments).
+
+     ⚠️ ES OTRA COSA QUE `errorCitas` Y NO SE PUEDE FUNDIR CON ÉL, aunque las dos
+     bandas salgan del mismo tono. `errorCitas` significa «lo que ves puede estar
+     viejo»: no llegó nada y se sigue pintando lo anterior, y por eso enciende
+     `ag-desactualizada` y ofrece «Reintentar». Esto significa lo contrario: lo
+     que ves es NUEVO y CORRECTO, sólo que hay MÁS. Atenuar la rejilla mentiría, y
+     reintentar traería exactamente las mismas mil filas.
+
+     Se excluyen por construcción: ésta sólo se escribe en el camino de éxito y
+     aquélla sólo en el `catch`, así que nunca hay dos bandas rojas a la vez. */
+  const [citasIncompletas, setCitasIncompletas] = useState(false)
 
   /* Qué contestó lo último que se le preguntó a `/api/google/events`.
      ⚠️ ARRANCA EN 'conectado' Y NO EN NULL, y no es optimismo: el único valor
@@ -5293,7 +5332,7 @@ export default function AgendaPage() {
   )
   const horario = config?.horario ?? HORARIO_DEFAULT
   const medicos = config?.medicos ?? SIN_MEDICOS
-  const { profile, isDoctor } = useProfile()
+  const { profile, isDoctor, loading: cargandoPerfil } = useProfile()
   const toast = useToast()
   const { state: subState, openBloqueoModal } = useSubscriptionGate()
 
@@ -5315,6 +5354,35 @@ export default function AgendaPage() {
     // Secretaria u otros: sin default (obligar elección)
     return ''
   }, [profile, isSingleDoctor, medicos])
+
+  /* ── CON QUÉ MÉDICO ABRE LA AGENDA ────────────────────────────────────────
+     Médico y administrador abren en SU agenda; la secretaria, en todas. En los
+     tres casos el desplegable sigue entero: esto decide con qué se abre, no qué
+     se puede elegir después.
+
+     ⚠️ REUTILIZA `defaultMedicoId` Y NO LO DUPLICA. Ese `useMemo` ya contestaba
+     esta misma pregunta para el modal —«¿de quién es esto por defecto?»— y para
+     un `role: 'medico'` devuelve `profile.id` sin depender de que `medicos` haya
+     llegado, que es lo que hace que la semilla del caso principal esté lista en
+     cuanto lo está el perfil. La ÚNICA excepción es la secretaria: allí
+     `defaultMedicoId` vale `''` para obligar a elegir en el modal, salvo en una
+     clínica de un solo médico, donde devuelve a ése — y para el FILTRO eso sería
+     abrir con un filtro puesto a quien su trabajo pide ver todo. De ahí la rama.
+
+     ⚠️ `null` MIENTRAS SE CARGA EL PERFIL, Y NO `''`. No es un tecnicismo: es lo
+     que impide que salga una traída de «todos los médicos» antes de saber el
+     rol. Quien lo aprovecha es el gate de las dos fuentes; ver
+     `filtroDecididoRef`. Si alguien pone aquí `''` de arranque «para simplificar»,
+     vuelve la traída cara en cada apertura y este bloque entero deja de servir.
+
+     Por qué NO es un efecto que llame a `setFiltroMedico`: un efecto corre
+     DESPUÉS del primer commit, o sea después de que FullCalendar ya haya pedido.
+     Derivarlo en render es lo que deja la primera petición ya correcta. */
+  const semillaFiltro = cargandoPerfil ? null : (isSecretaria ? '' : defaultMedicoId)
+
+  /* El filtro que manda, y el que leen TODOS los consumidores: la elección del
+     usuario si la hay, y si no la semilla. `null` = todavía no se sabe. */
+  const filtroEfectivo = filtroMedico ?? semillaFiltro
 
   // F3-6e: TZ del navegador (estable) + wrapper para inyectarla a renderEventContent.
   const navegadorTZ = useMemo(
@@ -5818,16 +5886,24 @@ export default function AgendaPage() {
   /* ── Refetch al cambiar el filtro de médico ─────────────
      Se dispara DESPUÉS del commit del estado (no en el onChange síncrono),
      cuando appointmentSourceRef.current y gcalSourceRef.current ya apuntan a
-     las fuentes recreadas con el filtroMedico nuevo → los dos fetches salen
+     las fuentes recreadas con el `filtroEfectivo` nuevo → los dos fetches salen
      con el médico correcto. `refetch()` retrae LAS DOS fuentes, así que un
      cambio de filtro dispara exactamente dos peticiones: citas y eventos de
      Google. El guard de primer render evita el doble fetch en montaje
-     (FullCalendar ya hace su fetch inicial por sí mismo). */
+     (FullCalendar ya hace su fetch inicial por sí mismo).
+
+     ⚠️ AHORA TAMBIÉN ES QUIEN DISPARA LA PRIMERA TRAÍDA DE VERDAD, y por eso
+     `refetch()` NO puede condicionarse a que el filtro sea distinto de vacío. En
+     el montaje `filtroEfectivo` vale `null` y las fuentes no piden nada (ver
+     `filtroDecididoRef`); cuando llega el perfil pasa a `''` o a un id, este
+     efecto ve el cambio y pide. Para la SECRETARIA ese cambio es `null → ''`,
+     que no toca el desplegable pero sí es un cambio: sin él su agenda se
+     quedaría cargando para siempre. */
   const filtroFirstRender = useRef(true)
   useEffect(() => {
     if (filtroFirstRender.current) { filtroFirstRender.current = false; return }
     refetch()
-  }, [filtroMedico])
+  }, [filtroEfectivo])
 
   /* ── Event source: nuestras citas ───────────────────── */
   const appointmentSource = useCallback(async (
@@ -5838,7 +5914,7 @@ export default function AgendaPage() {
     try {
       ultimaTraidaRef.current = Date.now()
       let url = `/api/appointments?from=${info.startStr}&to=${info.endStr}`
-      if (filtroMedico) url += `&medico_id=${filtroMedico}`
+      if (filtroEfectivo) url += `&medico_id=${filtroEfectivo}`
       const res = await fetch(url)
       /* ⚠️⚠️ ESTAS DOS GUARDAS SON EL BLOQUE 9 ENTERO, Y NO SON DEFENSIVAS: sin
          ellas un fallo del servidor se pintaba como UNA AGENDA VACÍA.
@@ -5856,10 +5932,15 @@ export default function AgendaPage() {
          Las dos LANZAN en vez de contestar: así hay UN solo camino de fallo, el
          `catch` de abajo, y no dos que se puedan desincronizar. */
       if (!res.ok) throw new Error(`El servidor respondió ${res.status}`)
-      const data: { appointments?: Appointment[] } = await res.json()
+      const data: { appointments?: Appointment[]; incompleta?: boolean } = await res.json()
       if (!Array.isArray(data.appointments)) throw new Error('Respuesta de citas ilegible')
       const apts: Appointment[] = data.appointments
       setErrorCitas(false)
+      /* ⚠️ `=== true` Y NO `!!`, y no es manía de estilo: es lo que hace que un
+         servidor que todavía no manda el campo —un despliegue a medias, una
+         respuesta cacheada de antes— NO levante la banda. Ausencia significa «no
+         me consta que falte nada», que es donde estábamos, y no «falta algo». */
+      setCitasIncompletas(data.incompleta === true)
 
       success(apts.map(apt => ({
         id:              apt.id,
@@ -5886,9 +5967,13 @@ export default function AgendaPage() {
          FullCalendar. Ver `eventSourceFailure` en el <FullCalendar>, que es la
          otra mitad —la que cubre a un fallo que no pase por aquí. */
       setErrorCitas(true)
+      /* Se apaga: sin traída no hay recorte del que hablar, y dejarla encendida
+         de la vez anterior pondría las DOS bandas rojas juntas diciendo cosas
+         distintas sobre la misma pantalla. Manda `errorCitas`, que es la peor. */
+      setCitasIncompletas(false)
       failure(err instanceof Error ? err : new Error('Error cargando citas'))
     }
-  }, [filtroMedico])
+  }, [filtroEfectivo])
 
   /* ── Event source: Google Calendar ─────────────────────
    * Una sola cosa: `events`, los eventos del calendario de Spinus que NO son
@@ -5910,7 +5995,7 @@ export default function AgendaPage() {
    *
    * Filtrar aquí exigiría justo eso último. NO lo traigas.
    *
-   * ── POR QUÉ DEPENDER DE `filtroMedico` NO DUPLICA PETICIONES ───────────
+   * ── POR QUÉ DEPENDER DE `filtroEfectivo` NO DUPLICA PETICIONES ─────────
    * Esta función cambia de identidad en cada cambio de filtro, pero FullCalendar
    * NUNCA la ve: lo que registra es `stableGcalSource`, un envoltorio con deps
    * `[]` que lee `gcalSourceRef.current` al llamar. La lista `eventSourcesStable`
@@ -5939,7 +6024,7 @@ export default function AgendaPage() {
       let url = `/api/google/events?from=${info.startStr}&to=${info.endStr}`
       // Cadena vacía = 'todos los médicos'; ahí no se manda nada y el servidor
       // devuelve el calendario completo de la clínica, como siempre.
-      if (filtroMedico) url += `&medico_id=${filtroMedico}`
+      if (filtroEfectivo) url += `&medico_id=${filtroEfectivo}`
 
       // Espeja la lista blanca del servidor (`EventoAgenda` en
       // /api/google/events). Las dos llaves de `start` y `end` son necesarias:
@@ -6011,7 +6096,7 @@ export default function AgendaPage() {
       setEstadoGoogle('error_google')
       failure(err instanceof Error ? err : new Error('Error cargando eventos'))
     }
-  }, [filtroMedico])
+  }, [filtroEfectivo])
 
   /* ── Stable eventSources ref (evita re-registro en cada render) ── */
   const appointmentSourceRef = useRef(appointmentSource)
@@ -6030,14 +6115,43 @@ export default function AgendaPage() {
      ella, callado el `handleEventSources` de FullCalendar
      (`@fullcalendar/core/index.js:1065`), que reconoce las fuentes por
      identidad del `_raw`. Ver el aviso largo de `gcalSource`. */
+  /* ⚠️⚠️ EL GATE DE LAS DOS FUENTES: SIN ROL NO SE PIDE NADA. `false` hasta que
+     `filtroEfectivo` deja de ser `null`, o sea hasta que se sabe si esta agenda
+     abre en un médico o en todos.
+
+     Va en un REF y se escribe en render —igual que los dos refs de arriba, y por
+     el mismo motivo— porque los envoltorios tienen deps `[]` a propósito: una
+     dependencia aquí cambiaría la identidad de `eventSourcesStable`, y el aviso
+     largo de `gcalSource` explica lo que eso cuesta (cuatro peticiones por
+     cambio de filtro y un parpadeo con el calendario vacío).
+
+     ⚠️ SE VUELVE SIN LLAMAR NI A `success` NI A `failure`, Y ESO ES CORRECTO, NO
+     UN CABO SUELTO. La traída de montaje se queda sin contestar y la sustituye
+     el `refetch()` del efecto de arriba en cuanto llega el perfil: FullCalendar
+     empareja respuestas por `fetchId` contra `latestFetchId`
+     (`@fullcalendar/core/index.js:641-647`), así que la petición vieja no podría
+     entrar aunque contestara. Y el indicador de carga no se queda colgado:
+     `computeEventSourcesLoading` (:549) mira el booleano `isFetching` de cada
+     fuente, no un contador de pendientes, y el refetch lo baja al recibir.
+     Mientras tanto la agenda enseña su estado de carga, que es la verdad.
+
+     Contestar `success([])` aquí sería lo tentador y sería justo el defecto de
+     los bloques anteriores: pintar una agenda vacía que no se ha preguntado. */
+  const filtroDecididoRef = useRef(false)
+  filtroDecididoRef.current = filtroEfectivo !== null
+
   const stableAppointmentSource = useCallback(
-    (info: { startStr: string; endStr: string }, success: (events: EventInput[]) => void, failure: (err: Error) => void) =>
-      appointmentSourceRef.current(rangoQuePedir(info), success, failure),
+    (info: { startStr: string; endStr: string }, success: (events: EventInput[]) => void, failure: (err: Error) => void) => {
+      if (!filtroDecididoRef.current) return
+      appointmentSourceRef.current(rangoQuePedir(info), success, failure)
+    },
     []
   )
   const stableGcalSource = useCallback(
-    (info: { startStr: string; endStr: string }, success: (events: EventInput[]) => void, failure: (err: Error) => void) =>
-      gcalSourceRef.current(rangoQuePedir(info), success, failure),
+    (info: { startStr: string; endStr: string }, success: (events: EventInput[]) => void, failure: (err: Error) => void) => {
+      if (!filtroDecididoRef.current) return
+      gcalSourceRef.current(rangoQuePedir(info), success, failure)
+    },
     []
   )
   /**
@@ -6252,7 +6366,10 @@ export default function AgendaPage() {
     const { activeStart, activeEnd } = api.view
     const inicio = new Date(fila.start_time)
     const enRango = inicio >= activeStart && inicio < activeEnd
-    const pasaFiltroMedico = !filtroMedico || fila.medico_id === filtroMedico
+    /* Contra el filtro EFECTIVO, que es el que salió en la petición. Con
+       `null` —perfil aún en vuelo— pasa todo, y da igual: lo que llegue por
+       Realtime en esa rendija lo pisa la primera traída de verdad. */
+    const pasaFiltroMedico = !filtroEfectivo || fila.medico_id === filtroEfectivo
 
     if (!enRango || !pasaFiltroMedico) {
       // Si estaba pintada y dejó de pertenecer a esta vista —la movieron a
@@ -6296,7 +6413,7 @@ export default function AgendaPage() {
     }
   }
 
-  /* El handler se recrea en cada render (lee `filtroMedico`), pero el canal se
+  /* El handler se recrea en cada render (lee `filtroEfectivo`), pero el canal se
      suscribe UNA vez: la ref es lo que los une sin re-suscribir. Mismo patrón
      que `appointmentSourceRef`. */
   const aplicarCambioRef = useRef(aplicarCambioRealtime)
@@ -7103,11 +7220,20 @@ export default function AgendaPage() {
      médicos» no. Cubre los dos caminos por los que hay uno solo: la clínica que
      sólo tiene uno —donde el desplegable ni se pinta— y el filtro puesto. El
      porqué está en la nota de `PanelDia`. */
-  const unMedico = isSingleDoctor || filtroMedico !== ''
+  /* ⚠️ EL `!= null` NO SOBRA: `filtroEfectivo` es `null` mientras se carga el
+     perfil, y `null !== ''` es TRUE. Sin él, el panel prometería horas y huecos
+     de un médico que todavía no se sabe cuál es, y encima sobre una agenda que
+     no se ha traído.
+     Lo que se ve en esa rendija lo decide `isSingleDoctor`, exactamente igual
+     que antes de este cambio: `medicos` llega vacío, así que vale `true`. Para
+     el MÉDICO el parpadeo que había desaparece —la semilla llega con el perfil,
+     casi siempre antes que `medicos`, y a partir de ahí `unMedico` ya no se
+     mueve—; para la secretaria se comporta como siempre. */
+  const unMedico = isSingleDoctor || (filtroEfectivo !== null && filtroEfectivo !== '')
 
   /* «Resumen · Dra. X» sólo cuando hay filtro: en una clínica de un solo médico
      el nombre no distingue nada de nada y ocuparía la línea del título. */
-  const medicoFiltrado = filtroMedico ? medicos.find(m => m.id === filtroMedico) : undefined
+  const medicoFiltrado = filtroEfectivo ? medicos.find(m => m.id === filtroEfectivo) : undefined
   const tituloResumen = medicoFiltrado
     ? `Resumen · ${componerNombreMedicoCompleto(medicoFiltrado)}`
     : 'Resumen del día'
@@ -7127,10 +7253,35 @@ export default function AgendaPage() {
     api.select(new Date(base + t.desde * 60_000), new Date(base + t.hasta * 60_000))
   }
 
-  const resumenConteo = frasearConteo(conteo)
+  /* ⚠️ EL SUBTÍTULO CUENTA LO QUE HAY EN PANTALLA, así que cuando la traída vino
+     recortada su número deja de ser el de la agenda y pasa a ser un SUELO: hay
+     esas y hay más. «al menos» es lo único que cabe decir con verdad — el total
+     exacto de la VENTANA VISIBLE no lo sabe nadie: el servidor sólo pudo contar
+     las del rango que se le pidió, que `rangoQuePedir` ensancha a semanas
+     completas, y encima el conteo de aquí descuenta los días plegados.
+
+     Va aquí y no dentro de `frasearConteo`: aquellas dos funciones son puras y
+     cuentan CATEGORÍAS; quién sabe si el conjunto está entero es esta pantalla.
+
+     ⚠️ EL PREFIJO CUBRE LA FRASE ENTERA, INCLUIDO «· 3 de Google», y ese número
+     sí es exacto (su ruta ya no puede truncarse en silencio desde el punto 1).
+     Es una imprecisión a sabiendas, y en la dirección buena: partir la frase en
+     dos mitades con distinto grado de certeza —«al menos 1000 citas · 3 de
+     Google, éstas sí exactas»— no cabe en un subtítulo de una línea y nadie la
+     leería. Sobra cautela, no falta.
+
+     Sin frase no hay prefijo: «al menos» a secas no dice nada. */
+  const frasePlana = frasearConteo(conteo)
+  const resumenConteo = frasePlana && citasIncompletas ? `al menos ${frasePlana}` : frasePlana
   /* La banda del teléfono lleva la forma abreviada; el header de escritorio, la
      larga. Ver `frasearConteoBreve`. */
-  const resumenConteoBreve = frasearConteoBreve(conteo)
+  /* ⚠️ «≥» Y NO «al menos», y es la misma decisión que ya justifica que exista
+     `frasearConteoBreve`: en 390 px el subtítulo comparte fila con el
+     hamburguesa y el título, y ocho caracteres más parten la última palabra.
+     Un carácter dice lo mismo. La banda roja de debajo lo explica con palabras
+     para quien no lea el símbolo, y sale también en móvil. */
+  const fraseBreve = frasearConteoBreve(conteo)
+  const resumenConteoBreve = fraseBreve && citasIncompletas ? `≥ ${fraseBreve}` : fraseBreve
 
   /* ── BLOQUE 9 · LAS TRES CONDICIONES DE LAS BANDAS ────────────────────────
      Se resuelven aquí y no en el JSX porque cada una es una frase con motivo, y
@@ -7151,10 +7302,20 @@ export default function AgendaPage() {
        · `!googleFallo`— con Google caído faltan eventos que sí existen. El cero
                          de la agenda propia puede ser cierto, pero la frase
                          «Sin citas esta semana» no lo sería.
+       · `!citasIncompletas` — el mismo principio que las dos de arriba: sobre un
+                         conjunto que se sabe incompleto no se afirma un cero.
+                         HONESTAMENTE, hoy cuesta alcanzarla: un mes truncado
+                         llega con mil tarjetas puestas, así que el conteo
+                         visible no es cero, y navegar a una semana suelta vuelve
+                         a pedir un rango que no trunca y apaga la bandera. Se
+                         queda porque la condición que la haría alcanzable —una
+                         reja de conteo más estrecha que el rango pedido, como ya
+                         lo son los días plegados— es un cambio de una línea en
+                         otro sitio, y entonces nadie se acordaría de venir aquí.
      `periodoVacio` vacío apaga la banda en Día y en las dos listas; ver
      `periodoDeLaVista`. */
   const vacioReal =
-    huboTraida && !errorCitas && !googleFallo &&
+    huboTraida && !errorCitas && !googleFallo && !citasIncompletas &&
     conteo.citas === 0 && conteo.eventos === 0 && conteo.google === 0 &&
     periodoVacio !== ''
 
@@ -7423,8 +7584,15 @@ export default function AgendaPage() {
                   trabajo del desplegable: el `<option>` no está capado y enseña
                   el nombre completo, así que la elipsis no esconde información,
                   sólo la aplaza un clic. */}
+              {/* ⚠️ `filtroEfectivo` Y NO `filtroMedico`: el desplegable tiene
+                  que ENSEÑAR el filtro que salió en la petición, incluido el que
+                  puso la semilla del rol. Con `filtroMedico` diría «Todos los
+                  médicos» sobre una agenda filtrada — la mentira exacta que los
+                  bloques anteriores persiguen, y aquí encima con el arreglo al
+                  lado. El `?? ''` es porque un `<select>` con `value={null}`
+                  deja de ser controlado. */}
               <select
-                value={filtroMedico}
+                value={filtroEfectivo ?? ''}
                 onChange={e => setFiltroMedico(e.target.value)}
                 className="appearance-none max-w-[240px] truncate pl-3 pr-9 py-2.5 rounded-[var(--ag-r-btn)] text-sm font-medium cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-[var(--ag-surface)] border border-[var(--ag-border-card)] text-[var(--ag-text)] hover:bg-[var(--ag-bg-app)]"
               >
@@ -7532,7 +7700,7 @@ export default function AgendaPage() {
           onNext={() => calendarRef.current?.getApi().next()}
           onMenu={abrirMenu}
           medicos={medicos}
-          filtroMedico={filtroMedico}
+          filtroMedico={filtroEfectivo ?? ''}
           onFiltroMedico={setFiltroMedico}
           /* `null` y no un booleano: es el manejador o no hay botón. Misma
              condición que el de escritorio (`canEditHorario`). */
@@ -7907,6 +8075,55 @@ export default function AgendaPage() {
               <button type="button" className="ag-aviso-accion" onClick={refetch}>
                 Reintentar
               </button>
+            </Banda>
+          )}
+
+          {/* 1 bis · La traída llegó ENTERA de forma y RECORTADA de fondo.
+              ⚠️ COMPARTE EL TONO ROJO CON LA DE ARRIBA Y NO ES PEREZA. Sólo hay
+              tres tonos (`ag-aviso--error|gcal|vacio`) y estrenar un cuarto
+              pediría un par de tokens nuevos en las DOS paletas de globals.css
+              para una distinción que el ojo no necesita: las dos bandas dicen
+              «lo que ves no es la agenda», y no pueden coincidir en pantalla
+              —una se escribe en el éxito y la otra en el catch—, así que el rojo
+              nunca significa dos cosas a la vez. Lo que las separa es el TEXTO,
+              que es donde estaba la diferencia de verdad: aquélla dice que no se
+              pudo cargar; ésta, que sí se cargó y aun así falta.
+              `urgente` (role="alert") por la misma razón que la otra, y aquí
+              todavía más literal: los huecos que faltan se ven LIBRES, y sobre
+              un hueco libre se agenda encima de una cita que existe.
+              SIN «Reintentar»: la misma consulta devolvería las mismas mil
+              filas. La salida es pedir MENOS RANGO, y eso es lo que ofrece el
+              botón — sólo desde Mes, que es de donde se sale; ya en Semana no
+              hay a dónde acortar y la banda se queda sin acción, que es más
+              honesto que un botón que no cambia nada. */}
+          {citasIncompletas && (
+            <Banda tono="error" urgente>
+              <TriangleAlert size={14} className="ag-aviso-icono" aria-hidden />
+              <p className="ag-aviso-texto">
+                <strong>Faltan citas por mostrar.</strong> Este periodo tiene más citas de las que caben en una carga; lo que ves está incompleto.
+              </p>
+              {/* `dayGridMonth` a secas y sin helper: el Mes es la ÚNICA vista
+                  que vale lo mismo ancha que estrecha (`FORMATOS_DE_VISTA`), así
+                  que aquí no hay pareja que resolver. */}
+              {currentView === 'dayGridMonth' && (
+                <button
+                  type="button"
+                  className="ag-aviso-accion"
+                  onClick={() => {
+                    const api = calendarRef.current?.getApi()
+                    if (!api) return
+                    /* Por `vistaEnElOtroFormato` y no con la cadena a mano: en un
+                       teléfono la Semana es `listWeek`, y `changeView` lanza con
+                       una vista que no se ha registrado. Es el mismo camino que
+                       usan el segmentado y la banda móvil. */
+                    const tipo = vistaEnElOtroFormato('timeGridWeek', isMobile)
+                    api.changeView(tipo)
+                    setCurrentView(tipo)
+                  }}
+                >
+                  Ver por semana
+                </button>
+              )}
             </Banda>
           )}
 
