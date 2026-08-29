@@ -245,11 +245,49 @@ export default function Sidebar() {
           por delante de la banda. En las otras veinte páginas no cambia nada.
           El estado es el mismo en los dos sitios —vive en `MenuMovilContext`—,
           o sea que el de la banda abre este mismo menú.
-          ⚠️ SE DECIDE POR `pathname` Y NO POR CSS. La alternativa era esconderlo
-          con un `:has(.agenda-fc)` desde globals.css, como ya hace la regla del
-          padding de esa página; se descartó porque `:has()` degrada a «la regla
-          no casa», y aquí eso significa DOS hamburguesas encima de la banda, que
-          es peor que el defecto que viene a evitar. */}
+
+          ⚠️⚠️ QUIEN LO ESCONDE ES CSS, NO ESTE COMPONENTE, Y EL CRITERIO SE
+          INVIRTIÓ A SABIENDAS. La regla es `body:has(.ag-banda-movil)
+          .menu-flotante` y vive en `globals.css`, pegada a la banda.
+
+          AQUÍ ESTUVO ESCRITO LO CONTRARIO, y conviene saber por qué dejó de
+          valer antes de reponerlo. Decía: «se decide por `pathname` y no por
+          CSS; la alternativa se descartó porque `:has()` degrada a "la regla no
+          casa", y aquí eso significa DOS hamburguesas encima de la banda, que es
+          peor que el defecto que viene a evitar».
+
+          El razonamiento comparaba mal los dos lados porque no se sabía cuál era
+          el defecto que se evitaba. Con `pathname`, el botón se esconde en el
+          PRIMER render, mientras que la banda no aparece hasta que corre el
+          efecto que descubre el ancho (`isMobile` arranca en `false` en
+          `agenda/page.tsx`). En esa ventana no hay hamburguesa NINGUNO: ni éste
+          ni el de la banda. Y no es sólo un parpadeo — si un efecto de
+          `AgendaPage` anterior a ése lanza, React ABORTA el resto de la lista de
+          efectos de ese fiber (`commitHookEffectListMount` en
+          `react-dom-client`: el `try` envuelve el bucle entero y el `catch` está
+          fuera), así que el de `isMobile` no corre nunca. La página cae al
+          `ErrorBoundary`, que en `(app)/layout.tsx` sólo envuelve a `{children}`
+          y deja vivo a este `Sidebar` — con el botón escondido y `pathname`
+          todavía en `/agenda`. Teléfono sin ninguna vía al menú, y sin
+          navegación en la tarjeta de error. Callejón sin salida, no fealdad.
+
+          Así que la comparación real no es «una hamburguesa contra dos», es
+          «dos contra CERO»:
+            · `:has()` no soportado o la banda ausente → la regla no casa → este
+              botón SE QUEDA. Dos hamburguesas un instante en el peor caso, y el
+              menú siempre alcanzable.
+            · `pathname` → el botón se va aunque no haya banda que lo sustituya.
+          El fallo de CSS degrada hacia el lado seguro y el de JS hacia el
+          peligroso. Por eso se cambió.
+
+          Y la condición ya no es un ESPEJO de la banda: es la banda. La regla
+          pregunta por el nodo real en el DOM, así que no puede desincronizarse de
+          él como sí podía una copia de la ruta o una bandera en un contexto.
+
+          `:has()` lo soporta Chrome 105+, y esta misma hoja ya lo usa para el
+          relleno de esta página (`main > div:has(.agenda-fc)`).
+
+          SI VUELVES A PONER `pathname` AQUÍ, relee esto: reintroduce el cero. */}
       {/* ⚠️ EL `top` LLEVA EL ÁREA SEGURA SUMADA (bloque 6 · paso 10). Con
           `viewport-fit=cover` los 16 px de `top-4` se miden desde el borde
           FÍSICO, y una muesca de iPhone mide entre 47 y 59: este botón nacía
@@ -263,8 +301,11 @@ export default function Sidebar() {
           sube la franja por encima de 50, este botón desaparece. */}
       <button
         onClick={alternarMenu}
-        className={`lg:hidden fixed top-[calc(1rem+env(safe-area-inset-top,0px))] left-4 z-50 text-white p-2 rounded-lg shadow-lg${
-          pathname === '/agenda' ? ' hidden' : ''}`}
+        /* `menu-flotante` NO PINTA NADA: es el asidero de la regla de arriba. Su
+           única razón de ser es que el selector no cuelgue de las utilidades de
+           Tailwind, que cambian con cualquier retoque visual. No la quites al
+           reordenar clases. */
+        className="menu-flotante lg:hidden fixed top-[calc(1rem+env(safe-area-inset-top,0px))] left-4 z-50 text-white p-2 rounded-lg shadow-lg"
         style={{ background: 'var(--cp)' }}
       >
         {mobileOpen ? <X size={20} /> : <Menu size={20} />}

@@ -1842,6 +1842,37 @@ main > div:has(.agenda-fc) .agenda-raiz {
      ⚠️ Y NADA DE RADIOS ARRIBA: no los tiene y no debe tenerlos. Un radio en una
      banda a sangre la despega del borde. */
 }
+
+/* ⚠️⚠️ ESTA REGLA ES LA ÚNICA QUE ESCONDE EL BOTÓN FLOTANTE DEL MENÚ, y vive
+   AQUÍ —pegada a la banda— y no junto al botón, porque quien manda es la banda:
+   la condición es «existe este nodo», no «estamos en tal ruta».
+
+   El botón es `.menu-flotante` en `src/components/layout/Sidebar.tsx`, es el
+   único acceso al menú en las otras veinte páginas, y en la agenda móvil
+   sobraría: la banda trae el suyo dentro y los dos abren el mismo menú
+   (`MenuMovilContext`).
+
+   ⚠️ POR QUÉ CSS Y NO UNA CONDICIÓN EN EL COMPONENTE. Antes se escondía con
+   `pathname === '/agenda'` en el propio `Sidebar`, o sea en el PRIMER render,
+   mientras que la banda no aparece hasta que corre el efecto que descubre el
+   ancho. Entre las dos cosas no quedaba ningún hamburguesa, y en el peor caso
+   —un efecto anterior de `AgendaPage` que lance, que aborta el resto de la lista
+   de efectos de ese fiber— no quedaba ninguno NUNCA. El argumento largo, con la
+   cita de React, está en el comentario de `Sidebar.tsx`; aquí basta la
+   conclusión: la regla que no casa deja DOS hamburguesas, y la condición de JS
+   que no llega a tiempo deja CERO. Se elige el fallo hacia el lado con salida.
+
+   ⚠️ `:has()` NO ES ADORNO Y NO SE PUEDE CAMBIAR POR UN DESCENDIENTE. El botón
+   es `position: fixed` y cuelga del `Sidebar`, que es HERMANO de `<main>`, donde
+   vive la banda: no hay ancestro común más cercano que `body`. Chrome 105+, y
+   esta misma hoja ya lo usa arriba en `main > div:has(.agenda-fc)`.
+
+   ⚠️ NO LE AÑADAS UNA MEDIA QUERY «PARA AFINAR». Sería volver a lo mismo: en
+   móvil con la página caída la banda no está, la media query sí casaría y el
+   botón desaparecería otra vez. La presencia de la banda ya dice todo lo que hay
+   que saber — sólo se monta en móvil. */
+body:has(.ag-banda-movil) .menu-flotante { display: none; }
+
 .ag-banda-movil-fila,
 .ag-banda-movil-filtros { display: flex; align-items: center; gap: 8px; }
 
