@@ -74,3 +74,4 @@ docs/
 docs/*
 !docs/mockups/
 !docs/spec/
+design/
