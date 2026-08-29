@@ -143,11 +143,13 @@ const CONEXION: ConexionGoogle = {
   rol:        'clinica',
   calendarId: 'cal-viejo',
   estado:     'activa',
+  googleAccountEmail: 'consultorio@gmail.test',
 }
 
 const FILA_CONEXION = {
   id: 'cx-1', clinica_id: 'cl-1', user_id: 'us-1',
   rol: 'clinica', calendar_id: 'cal-viejo', estado: 'activa',
+  google_account_email: 'consultorio@gmail.test',
 }
 
 const errorEspejo = () =>
@@ -176,6 +178,18 @@ describe('resolverConexionClinica', () => {
   it('mapea la fila al descriptor, sin secretos', async () => {
     const sesion = clienteFalso([{ data: FILA_CONEXION, error: null }])
     expect(await resolverConexionClinica(comoSesion(sesion), 'cl-1')).toEqual(CONEXION)
+  })
+
+  /* El correo puede faltar y eso NO es un defecto: las conexiones anteriores a
+     los scopes `openid`/`email` lo tienen vacío hasta que su dueño reconecte
+     (plan §12.17). El descriptor tiene que dejarlo pasar como null en vez de
+     tropezar, porque quien lo pinta decide por él. */
+  it('deja pasar el correo en null — identidad desconocida, no conexión rota', async () => {
+    const sesion = clienteFalso([
+      { data: { ...FILA_CONEXION, google_account_email: null }, error: null },
+    ])
+    expect(await resolverConexionClinica(comoSesion(sesion), 'cl-1'))
+      .toEqual({ ...CONEXION, googleAccountEmail: null })
   })
 
   it('devuelve null cuando la clínica no tiene conexión', async () => {

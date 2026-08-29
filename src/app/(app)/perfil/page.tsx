@@ -129,6 +129,23 @@ export default function PerfilPage() {
   // A qué calendario de Google se está sincronizando. null = conectado pero
   // todavía sin calendario, o el médico lo borró desde Google.
   const [gcalNombre, setGcalNombre] = useState<string | null>(null)
+  /**
+   * A qué CUENTA de Google está atado ese calendario. Lo trae el GET de
+   * `/api/google/calendar`, que está entero tras `canManageClinica`, así que
+   * este correo no baja a quien no administra.
+   *
+   * null = identidad desconocida, NUNCA «sin cuenta»: las conexiones anteriores
+   * a los scopes `openid`/`email` lo tienen vacío hasta que su dueño reconecte
+   * (plan §12.17). Con null la tarjeta dice «tu cuenta de Google», como decía
+   * antes de existir este campo; no se inventa ningún «cuenta desconocida».
+   *
+   * DECISIÓN TOMADA, no un descuido: es la cuenta PERSONAL de quien conectó, y
+   * en una clínica con dos administradores el segundo ve el correo del primero.
+   * Se acepta a propósito — saber a qué cuenta está atado el calendario de la
+   * clínica vale más que ocultarlo, porque es lo que explica dónde aparecen las
+   * citas y a quién hay que pedirle que reconecte.
+   */
+  const [gcalCuenta, setGcalCuenta] = useState<string | null>(null)
   const [recreandoGcal, setRecreandoGcal] = useState(false)
   const [confirmarRecrearGcal, setConfirmarRecrearGcal] = useState(false)
 
@@ -259,6 +276,9 @@ export default function PerfilPage() {
         // equivocarse hacia "conecta" es lo que se está arreglando.
         setGcalEstado(d.estado ?? 'error_google')
         setGcalNombre(d.calendarName ?? null)
+        // El 403 del invitado no trae `cuentaEmail`, igual que no trae `estado`:
+        // cae en null y la tarjeta no enseña correo ninguno.
+        setGcalCuenta(d.cuentaEmail ?? null)
       })
       // La red del navegador tampoco es accionable por el médico.
       .catch(() => setGcalEstado('error_google'))
@@ -427,6 +447,14 @@ export default function PerfilPage() {
   if (loading || loadingProfile) return <PerfilSkeleton />
 
   const logoMostrado = logoPreview || apariencia.logo_url
+
+  /* Cómo se nombra la cuenta en la nota de abajo. Con correo se nombra; sin él
+     se dice «tu cuenta de Google», que es exactamente lo que la nota decía antes
+     de que este dato existiera. Sale dos veces —hay calendario y no lo hay—, de
+     ahí la constante. */
+  const cuentaGoogle = gcalCuenta
+    ? <>la cuenta de Google <strong className="text-[#1d1d1f]">{gcalCuenta}</strong></>
+    : <>tu cuenta de Google</>
 
   const inputClass = "w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-[#1d1d1f] placeholder:text-[#86868b] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 focus:bg-white transition-all"
 
@@ -819,13 +847,13 @@ export default function PerfilPage() {
               <p className="mt-3 text-[11px] leading-relaxed text-[#86868b] bg-slate-50 border border-slate-100 rounded-xl px-3 py-2">
                 {gcalNombre ? (
                   <>
-                    Tus citas se sincronizan al calendario <strong className="text-[#1d1d1f]">{gcalNombre}</strong> de
-                    tu cuenta de Google. No lo borres <strong>ni lo quites de tu lista de calendarios</strong>: si
+                    Tus citas se sincronizan al calendario <strong className="text-[#1d1d1f]">{gcalNombre}</strong> de{' '}
+                    {cuentaGoogle}. No lo borres <strong>ni lo quites de tu lista de calendarios</strong>: si
                     desaparece de tu lista, Spinus sigue escribiendo en él y tú dejas de verlo. Si ya te pasó, usa
                     &quot;Recrear calendario&quot;.
                   </>
                 ) : (
-                  <>Todavía no hay un calendario de Spinus en tu cuenta de Google. Se creará solo la próxima vez que abras la agenda.</>
+                  <>Todavía no hay un calendario de Spinus en {cuentaGoogle}. Se creará solo la próxima vez que abras la agenda.</>
                 )}
               </p>
             )}

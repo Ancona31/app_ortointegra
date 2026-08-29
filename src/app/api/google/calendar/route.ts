@@ -101,6 +101,20 @@ export async function GET() {
       estado:       'conectado' satisfies EstadoGoogle,
       calendarId,
       calendarName: calendarId ? await nombreEnGoogle(calendar, calendarId, user.id) : null,
+      // A QUÉ CUENTA DE GOOGLE está atado el calendario. No tiene por qué ser el
+      // correo con el que se entra a Spinus —hoy en producción no lo es—, y sin
+      // enseñarlo no hay forma de saberlo desde la interfaz.
+      //
+      // ⚠ VA SÓLO EN ESTA RESPUESTA, Y ES DELIBERADO. Es la cuenta PERSONAL de
+      // quien conectó, y esta ruta es la única de las cinco que resuelven la
+      // conexión que está entera tras `canManageClinica`
+      // (`conexionDeQuienAdministra`, arriba). NO lo copies a /api/google/events
+      // ni a las de appointments: ésas las llama también quien no administra.
+      //
+      // NULL = identidad desconocida (conexión anterior a los scopes
+      // `openid`/`email`, plan §12.17). El cliente se calla y pinta como antes;
+      // no hay texto de «cuenta desconocida» que inventar.
+      cuentaEmail:  conexion.googleAccountEmail,
     })
   } catch (err) {
     // Aquí cae sobre todo el refresco de token de una conexión revocada desde

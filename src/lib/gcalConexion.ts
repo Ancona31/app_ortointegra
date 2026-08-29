@@ -56,19 +56,36 @@ export interface ConexionGoogle {
   rol:         'clinica' | 'personal'
   calendarId:  string | null
   estado:      'activa' | 'revocada'
+  /**
+   * Correo de la cuenta de Google a la que está atado el calendario, para que
+   * quien administra vea A CUÁL — puede no ser el correo con el que entra a
+   * Spinus, y hoy en producción no lo es.
+   *
+   * NULL SIGNIFICA «IDENTIDAD DESCONOCIDA», NUNCA «SIN CUENTA» ni «conexión
+   * defectuosa». Le pasa a toda conexión anterior a los scopes `openid`/`email`
+   * y se puebla sola cuando su dueño reconecte (plan §12.17). El tipo lo admite
+   * a propósito: si fuera `string`, el compilador dejaría de obligar a
+   * contemplar ese caso y la primera conexión migrada rompería en silencio.
+   *
+   * Quien lo pinte, que no invente un texto de «cuenta desconocida»: con NULL
+   * se calla y ya está.
+   */
+  googleAccountEmail: string | null
 }
 
 /** La fila tal como vive en `clinica_conexiones_google`. */
 interface FilaConexion {
-  id:          string
-  clinica_id:  string
-  user_id:     string
-  rol:         'clinica' | 'personal'
-  calendar_id: string | null
-  estado:      'activa' | 'revocada'
+  id:                   string
+  clinica_id:           string
+  user_id:              string
+  rol:                  'clinica' | 'personal'
+  calendar_id:          string | null
+  estado:               'activa' | 'revocada'
+  google_account_email: string | null
 }
 
-const COLUMNAS_CONEXION = 'id, clinica_id, user_id, rol, calendar_id, estado'
+const COLUMNAS_CONEXION =
+  'id, clinica_id, user_id, rol, calendar_id, estado, google_account_email'
 
 function aDescriptor(fila: FilaConexion): ConexionGoogle {
   return {
@@ -78,6 +95,7 @@ function aDescriptor(fila: FilaConexion): ConexionGoogle {
     rol:        fila.rol,
     calendarId: fila.calendar_id,
     estado:     fila.estado,
+    googleAccountEmail: fila.google_account_email,
   }
 }
 
@@ -341,10 +359,16 @@ interface FilaAlta {
  * sea que NULL es «no lo toques», nunca «bórralo» — la misma regla que el
  * `refresh_token` en `guardarSecretos`.
  *
- * ⚠ SI ALGÚN DÍA ESTOS DOS CAMPOS SUBEN AL DESCRIPTOR `ConexionGoogle`, TIENEN
- * QUE ENTRAR COMO `string | null`. Un tipo no-nulable ahí es exactamente cómo la
- * decisión de convivir se rompe sin que nadie lo note: el compilador dejaría de
- * obligar a contemplar el caso que hoy es mayoría en producción.
+ * ── YA OCURRIÓ: `google_account_email` SUBIÓ AL DESCRIPTOR ──────────────────
+ * Esto era un aviso de futuro; hoy es historia. `ConexionGoogle` lleva el correo
+ * para que /perfil enseñe a qué cuenta está atado el calendario, y entró
+ * —como el aviso exigía— tipado `string | null`. NO lo estreches a `string`: ese
+ * tipo es lo único que obliga a contemplar las conexiones migradas, que lo
+ * tienen vacío hasta que su dueño reconecte.
+ *
+ * `google_account_sub` NO subió y no hace falta que suba: es el identificador
+ * estable con el que se distingue una cuenta de otra, no algo que se enseñe. Si
+ * algún día lo necesitas arriba, vale la misma regla — `string | null`.
  */
 export async function altaConexion(args: {
   userId:    string
