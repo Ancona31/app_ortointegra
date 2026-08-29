@@ -726,20 +726,33 @@ export default function PerfilPage() {
                 <div>
                   <p className="text-sm font-medium text-[#1d1d1f]">Google Calendar</p>
                   <p className="text-[11px] text-[#86868b]">
-                    {gcalEstado === null
-                      ? 'Verificando...'
-                      : gcalEstado === 'conectado'
-                        ? 'Sincronización activa — las citas se crean automáticamente'
-                        : gcalEstado === 'error_google'
-                          // Ojo: NO decir "no conectado". Aquí hay token; lo que
-                          // no hubo es respuesta de Google.
-                          ? 'Google no respondió. Tu conexión sigue guardada; no hace falta que la rehagas.'
-                          : 'Conecta para sincronizar citas con tu calendario personal'}
+                    {/* EL INVITADO SE RESUELVE ANTES DE MIRAR `gcalEstado`, y el orden
+                        no es cosmético. `/api/google/calendar` le contesta 403, el 403
+                        no trae campo `estado`, y el `d.estado ?? 'error_google'` de
+                        `cargarEstadoGcal` lo deja en el casillero de error. Ahí leía
+                        «Google no respondió. Tu conexión sigue guardada», dos frases
+                        falsas para él: Google contestó —contestó que no—, y conexión
+                        suya no hay ninguna. No se le enseña estado porque no hay
+                        ninguno que él pueda consultar. */}
+                    {!isAdmin
+                      ? 'La gestiona quien administra la clínica: es una para todo el equipo, así que tus citas se sincronizan sin que tengas que conectar nada.'
+                      : gcalEstado === null
+                        ? 'Verificando...'
+                        : gcalEstado === 'conectado'
+                          ? 'Sincronización activa — las citas se crean automáticamente'
+                          : gcalEstado === 'error_google'
+                            // Ojo: NO decir "no conectado". Aquí hay token; lo que
+                            // no hubo es respuesta de Google.
+                            ? 'Google no respondió. Tu conexión sigue guardada; no hace falta que la rehagas.'
+                            : 'Conecta para sincronizar citas con tu calendario personal'}
                   </p>
                 </div>
               </div>
               <div className="flex-shrink-0 ml-4">
-                {gcalEstado === null ? (
+                {/* Al invitado no se le ofrece NADA: ni "Conectar" —§12.3: la conexión
+                    es una por clínica y la hace quien la administra—, ni "Reintentar",
+                    que le anunciaría un fallo que no ha ocurrido. */}
+                {!isAdmin ? null : gcalEstado === null ? (
                   <Loader2 size={14} className="animate-spin text-[#86868b]" />
                 ) : gcalEstado === 'error_google' ? (
                   // Sin "Conectar" ni "Desconectar": no se sabe en qué estado
@@ -784,7 +797,12 @@ export default function PerfilPage() {
                       </button>
                     )}
                   </div>
-                ) : (
+                ) : isAdmin && (
+                  /* El mismo gate que "Recrear calendario" y "Desconectar". Era el
+                     único control de esta tarjeta que no lo llevaba: lo que lo ocultaba
+                     al invitado era que su 403 aterrizaba en 'error_google', o sea una
+                     coincidencia. Redundante con el `!isAdmin` de arriba A PROPÓSITO:
+                     sin él, reordenar las ramas vuelve a exponer el botón en silencio. */
                   <a
                     href="/api/google/connect"
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a3a5c] rounded-xl transition-colors"
