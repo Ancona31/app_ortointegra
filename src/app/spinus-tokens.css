@@ -1080,7 +1080,18 @@ input[type="date"].sp-input {
    La sombra no tiene token; es el único literal de la hoja. */
 .sp-doc-actions {
   position: sticky; bottom: 0; z-index: 1;
-  padding: 14px 0 calc(14px + env(safe-area-inset-bottom));
+  /* ⚠️ EL `, 0px` NO ES ADORNO: SIN ÉL SE CAE EL `padding` ENTERO, no sólo el
+     inset. Era el único `env(safe-area-inset-*)` del repositorio escrito sin
+     valor de respaldo (los otros catorce lo llevan). En un motor sin `env()`
+     el `calc()` es inválido, y una declaración inválida se descarta COMPLETA:
+     esta barra se quedaba sin sus 14 px de arriba y de abajo también. Hoy no
+     muerde en ningún navegador vivo; ponerlo es gratis y quita la trampa.
+     El inset sí hace falta aquí y NO lo duplica el contenedor de `(app)`: esta
+     barra es `sticky bottom: 0`, así que mientras se rellena el formulario se
+     ancla al borde físico de la pantalla, por debajo del relleno del layout.
+     Ver el `pb-[calc(1.5rem+env(...))]` de `(app)/layout.tsx`, que cubre otro
+     estado —el final del scroll— y no éste. */
+  padding: 14px 0 calc(14px + env(safe-area-inset-bottom, 0px));
   background: var(--sp-surface);
   border-top: var(--sp-bw-hair) solid var(--sp-line-divider);
   box-shadow: 0 -8px 20px rgba(16, 42, 73, .05);

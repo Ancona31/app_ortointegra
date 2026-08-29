@@ -177,8 +177,20 @@ export default function InicioPage() {
       <ParticleCanvas dark={dark} />
 
       <div className="min-h-screen flex flex-col relative" style={{ zIndex: 1 }}>
-        {/* Top bar */}
-        <div className="flex items-center justify-between px-6 pt-6 pb-2">
+        {/* Top bar.
+            ⚠️ EL RELLENO DE ARRIBA LLEVA EL ÁREA SEGURA SUMADA, no sustituida.
+            Ésta es la pantalla de arranque de la app instalada (`start_url:
+            '/inicio'` en el manifiesto) y con `viewport-fit=cover` los 24 px de
+            `pt-6` se medían desde el borde FÍSICO. La franja navy de
+            `globals.css` (`body::before`) es OPACA y mide lo que la muesca —47
+            a 59 px—, así que se comía media altura del logo y de los enlaces de
+            la derecha; y como esa franja lleva `pointer-events: none`, los
+            enlaces a /pricing y /perfil seguían respondiendo al toque sin
+            verse. Un control invisible que responde es peor que uno desplazado.
+            Los 24 de diseño no se tocan: se suman. En escritorio y en una
+            pestaña normal el `env()` vale 0 y esto es exactamente el `pt-6` de
+            siempre. */}
+        <div className="flex items-center justify-between px-6 pt-[calc(1.5rem+env(safe-area-inset-top,0px))] pb-2">
           <div className="flex items-center gap-2">
             <Image
               src="/logo-spinus.png"

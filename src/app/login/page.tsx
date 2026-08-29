@@ -270,8 +270,20 @@ export default function LoginPage() {
     router.push('/inicio')
   }
 
+  /* ⚠️ EL RELLENO DE ARRIBA LLEVA EL ÁREA SEGURA SUMADA, no sustituida.
+     Centrar protege sólo mientras el contenido CABE: en cuanto desborda
+     —formulario largo, teclado abierto, tipografía grande— el contenedor crece
+     y la tarjeta se alinea arriba. Con `viewport-fit=cover` ese borde es el
+     FÍSICO, y la franja navy de `globals.css` (`body::before`) es OPACA y mide
+     lo que la muesca (47-59 px), así que se comía la cabecera.
+     El `py-12` se parte en `pt` + `pb` A PROPÓSITO: dejar `py-12` y añadir un
+     `pt-*` detrás haría que el ganador lo decidiera el orden de la hoja
+     generada, no el del atributo. Los 48 px de diseño se conservan, y median
+     casi lo mismo que la franja: sin esto la tarjeta la rozaba.
+     En escritorio y en una pestaña normal el `env()` vale 0 y esto queda
+     exactamente como estaba. */
   return (
-    <main className="min-h-dvh flex items-center justify-center px-4 py-12">
+    <main className="min-h-dvh flex items-center justify-center px-4 pt-[calc(3rem+env(safe-area-inset-top,0px))] pb-12">
       <div className="w-full max-w-sm">
 
         {/* ═══ ENCABEZADO ═══

@@ -18,7 +18,22 @@ export default async function LauncherLayout({ children }: { children: React.Rea
     <ToastProvider>
       <ThemeProvider>
         <SubscriptionGateProvider initialState={subscriptionState}>
-          <SuscripcionBanner />
+          {/* ⚠️ EL ENVOLTORIO ES DEL ÁREA SEGURA, y es el mismo que ya lleva
+              este banner en `(app)/layout.tsx:76`. Aquí no lo tenía: el banner
+              es el PRIMER elemento del documento en el launcher, así que con
+              `viewport-fit=cover` sus primeros ~50 px caían bajo la barra de
+              estado y bajo la franja navy que los tapa — se perdía media frase
+              y parte del botón de reactivar.
+              ⚠️ `empty:hidden` NO SOBRA: el banner devuelve `null` cuando la
+              suscripción está al día, que es el caso normal. Sin esto, el
+              envoltorio seguiría midiendo el área segura y metería esa altura
+              en blanco encima de /inicio.
+              ⚠️ SIN `desktopSidebarOffset`, a diferencia de `(app)`: aquí no
+              hay barra lateral que esquivar. Se copia el envoltorio, no la
+              prop. */}
+          <div className="empty:hidden pt-[env(safe-area-inset-top,0px)]">
+            <SuscripcionBanner />
+          </div>
           {children}
         </SubscriptionGateProvider>
       </ThemeProvider>
