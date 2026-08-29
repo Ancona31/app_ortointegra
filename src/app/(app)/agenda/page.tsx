@@ -4389,6 +4389,9 @@ function huecosDe(jornada: Tramo, ocupados: readonly Tramo[], minimo: number): T
 /**
  * El desglose por estado, SÓLO DE CITAS y sólo con los estados presentes.
  *
+ * Cuenta las que TOCAN el día, no las que empiezan en él; el porqué está en la
+ * reja, junto a la comparación.
+ *
  * Ni los eventos genéricos ni los de Google entran: un evento no tiene estado
  * de cita —`ESTADOS_EVENTO` sólo le ofrece dos de los cinco— y un bloque de
  * Google no tiene ninguno. El mockup lo confirma: tres citas arriba, «2
@@ -4406,7 +4409,22 @@ function desgloseDeEstados(
   const cuenta = new Map<Status, number>()
   for (const ev of eventos) {
     if (!ev.start) continue
-    if (ev.start.getTime() < base || ev.start.getTime() >= fin) continue
+    /* ⚠️ POR SOLAPE, NO POR DÓNDE EMPIEZA, Y ES LA CUARTA REJA IGUAL A LAS OTRAS
+       TRES. Aquí decía `start >= base && start < fin`, y era el ÚNICO sitio del
+       archivo que contaba de otra manera: `tramosDeOcupacion` (arriba),
+       `contarTodoElDia` (abajo) y `contarVisibles` ya preguntaban si el evento
+       TOCA el día. Con el criterio viejo, una cita que empieza el lunes y
+       termina el martes no aparecía en el desglose del martes aunque el panel
+       de ese día sí la contara como ocupación — dos números del MISMO panel
+       sacados de dos reglas distintas.
+       Que sea raro no lo salva: una cita de varios días con paciente asignado
+       es poco común, pero la incoherencia es permanente y el día que alguien
+       cree una, el desglose y las horas ocupadas se contradicen sin avisar.
+       Se escribe con la misma forma negada que `tramosDeOcupacion:4334` para
+       que las cuatro se lean igual. `ev.end ?? ev.start` porque aquí, a
+       diferencia de allí, no se exige `end` antes: una fila sin fin cuenta como
+       instantánea, que es lo que ya hace `contarTodoElDia`. */
+    if (!(ev.start.getTime() < fin && (ev.end ?? ev.start).getTime() > base)) continue
     const ext: Partial<Appointment> & { isGcalBlock?: boolean } = ev.extendedProps
     if (ext?.isGcalBlock === true) continue
     if (esEventoGenerico({ paciente_id: ext?.paciente_id ?? null })) continue

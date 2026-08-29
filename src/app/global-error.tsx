@@ -42,6 +42,39 @@ export default function GlobalError({
           >
             Intentar de nuevo
           </button>
+          {/* ⚠️⚠️ SIN ESTA SALIDA LA PANTALLA ES UN CALLEJÓN, Y AQUÍ MÁS QUE EN
+              NINGUNA OTRA. `reset()` vuelve a montar el mismo árbol: ante un
+              fallo DETERMINISTA —datos que rompen un cálculo, un efecto que
+              lanza siempre— vuelve a fallar y no hay tercer botón. Y esto
+              sustituye el DOCUMENTO ENTERO, `<html>` incluido: no sobrevive el
+              menú lateral, ni la barra de la agenda, ni ningún enlace de la
+              aplicación. Sin esto, la única salida es escribir una URL a mano,
+              que en la app instalada ni siquiera hay barra donde escribirla.
+              Es la misma corrección que ya lleva `ErrorBoundary.tsx`, que cubre
+              el piso de abajo —sólo `{children}` de `(app)`—; ésta cubre lo que
+              se le escapa.
+
+              ⚠️ ES UN `<a>` Y NO UN `<Link>`, POR LA MISMA RAZÓN QUE ALLÍ, y
+              aquí es todavía más literal: `Link` navega del lado del cliente y
+              reutiliza el árbol de React que acaba de romperse. Un `<a>` es una
+              carga de documento entera — tira el árbol y empieza de cero, que
+              es lo único sensato después de un error que nadie entiende.
+
+              ⚠️ `/inicio` AUNQUE ESTA PANTALLA PUEDA SALIR SIN SESIÓN, y eso es
+              lo que la hace buen destino en vez de un problema: `/inicio` NO
+              está en la lista de rutas públicas de `src/middleware.ts`, así que
+              sin cookie de sesión el middleware lo redirige él solo a `/login`.
+              Un único destino que acierta en los dos casos —con sesión, la casa
+              del usuario; sin ella, el sitio donde se entra— y sin una
+              comprobación de sesión aquí dentro, que es lo último que conviene
+              hacer en una pantalla que existe porque algo ya reventó.
+              `/` sería más neutro y peor: dejaría al médico logueado en la
+              página de marketing. */}
+          <p className="mt-4">
+            <a href="/inicio" className="text-sm text-slate-500 underline underline-offset-2 hover:text-slate-700 transition-colors">
+              Volver al inicio
+            </a>
+          </p>
         </div>
       </body>
     </html>
