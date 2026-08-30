@@ -3908,10 +3908,13 @@ function CabeceraDiaLista({ date, esHoy, conAnio }: {
    caja sigue existiendo aunque no tenga hijos: es el muelle que empuja la flecha
    derecha contra el borde. Ver su nota en globals.css. */
 function FiltrosBandaMovil(
-  { medicos, filtroMedico, onFiltroMedico, onHorario, onCompactar, compactado }: {
+  { medicos, filtroMedico, onFiltroMedico, onHorario, onCompactar, compactado, mesSinTodos }: {
     medicos: readonly Medico[]; filtroMedico: string
     onFiltroMedico: (id: string) => void; onHorario: (() => void) | null
     onCompactar: (() => void) | null; compactado: boolean
+    /** En Mes, «Todos» se apaga. Ver `OPCION_TODOS` y la nota del desplegable
+        de escritorio, que es el mismo control con otra caja. */
+    mesSinTodos: boolean
   },
 ) {
   /* Mismo criterio que el header de escritorio: el filtro sólo tiene sentido en
@@ -3924,7 +3927,7 @@ function FiltrosBandaMovil(
         <label>
           <span className="sr-only">Filtrar por médico</span>
           <select value={filtroMedico} onChange={e => onFiltroMedico(e.target.value)}>
-            <option value="">Todos los médicos</option>
+            <option value="" disabled={mesSinTodos}>{OPCION_TODOS(mesSinTodos)}</option>
             {medicos.map(m => <option key={m.id} value={m.id}>{componerNombreMedicoCompleto(m)}</option>)}
           </select>
         </label>
@@ -3963,11 +3966,13 @@ function FiltrosBandaMovil(
    repartiría el hueco entre todos y el engrane se despegaría del filtro. El
    porqué entero está junto a `.ag-banda-movil-medio` en globals.css. */
 function NavegacionBandaMovil(
-  { medicos, filtroMedico, onFiltroMedico, onHorario, onCompactar, compactado, onPrev, onNext }: {
+  { medicos, filtroMedico, onFiltroMedico, onHorario, onCompactar, compactado, onPrev, onNext,
+    mesSinTodos }: {
     medicos: readonly Medico[]; filtroMedico: string
     onFiltroMedico: (id: string) => void; onHorario: (() => void) | null
     onCompactar: (() => void) | null; compactado: boolean
     onPrev: () => void; onNext: () => void
+    mesSinTodos: boolean
   },
 ) {
   return (
@@ -3979,6 +3984,7 @@ function NavegacionBandaMovil(
         medicos={medicos} filtroMedico={filtroMedico}
         onFiltroMedico={onFiltroMedico} onHorario={onHorario}
         onCompactar={onCompactar} compactado={compactado}
+        mesSinTodos={mesSinTodos}
       />
       <button type="button" className="ag-banda-movil-ctrl" onClick={onNext} aria-label="Periodo siguiente">
         <ChevronRight size={20} />
@@ -3996,12 +4002,14 @@ function NavegacionBandaMovil(
    de 44; ahora sólo lleva la etiqueta, que son unos 19. */
 function BandaMovil(
   { conteo, vistaActual, onVista, titulo, onPrev, onNext, onMenu,
-    medicos, filtroMedico, onFiltroMedico, onHorario, onCompactar, compactado }: {
+    medicos, filtroMedico, onFiltroMedico, onHorario, onCompactar, compactado,
+    mesSinTodos }: {
     conteo: string; vistaActual: string; onVista: (tipo: string) => void
     titulo: string; onPrev: () => void; onNext: () => void; onMenu: () => void
     medicos: readonly Medico[]; filtroMedico: string
     onFiltroMedico: (id: string) => void; onHorario: (() => void) | null
     onCompactar: (() => void) | null; compactado: boolean
+    mesSinTodos: boolean
   },
 ) {
   return (
@@ -4032,6 +4040,7 @@ function BandaMovil(
         onFiltroMedico={onFiltroMedico} onHorario={onHorario}
         onCompactar={onCompactar} compactado={compactado}
         onPrev={onPrev} onNext={onNext}
+        mesSinTodos={mesSinTodos}
       />
       {/* La fecha, centrada bajo las flechas. `<p>` y no `<span>`: es la etiqueta
           de lo que se está mirando, no un trozo del título. */}
@@ -5115,6 +5124,24 @@ function Banda(
    nativo ahí, esa es la línea — pero entonces sobra la banda, no conviven. */
 const TOOLBAR_ESCRITORIO  = { left: 'prev,next today title', center: '', right: '' } as const
 
+/* El rótulo de «Todos los médicos», que en Mes lleva pegado su motivo.
+ *
+ * ⚠️ LA NOTA VA DENTRO DEL PROPIO `<option>` Y NO AL LADO, y no es una
+ * preferencia: un `<option>` deshabilitado no admite texto de ayuda propio —no
+ * hay dónde colgarlo— y el desplegable nativo no pinta nada que no sea una
+ * opción. Fuera del `<select>` tampoco sirve: en escritorio la fila del header
+ * ya envuelve a dos líneas en anchos de portátil (ver el tope de 240 px), y en
+ * la banda móvil no hay ni sitio.
+ *
+ * ⚠️ Y LA OPCIÓN SE APAGA, NO SE ESCONDE. Esconderla cambiaría el CONTENIDO del
+ * desplegable al cambiar de vista, y un control cuya lista se encoge sola
+ * desorienta más que uno con un elemento en gris. Es la misma disciplina que el
+ * resto de la agenda: se dice lo que pasa, no se retira.
+ *
+ * El registro es el de las bandas: una frase corta, en presente, sin disculpas. */
+const OPCION_TODOS = (enElMes: boolean): string =>
+  enElMes ? 'Todos los médicos — el mes se ve por médico' : 'Todos los médicos'
+
 /** Lo que el subtítulo cuenta, por categoría. */
 type ConteoVisible = { citas: number; eventos: number; google: number }
 
@@ -5348,6 +5375,42 @@ export default function AgendaPage() {
      `||` en su lugar, elegir «Todos» rebotaría a la semilla y el desplegable no
      obedecería. */
   const [filtroMedico, setFiltroMedico] = useState<string | null>(null)
+
+  /* ⚠️⚠️ EL ESPEJO SÍNCRONO DEL FILTRO, Y EXISTE POR UNA RAZÓN DE ORDEN QUE NO SE
+     VE LEYENDO EL RENDER. `null` = nadie ha escrito todavía; manda `filtroEfectivo`.
+
+     `cambiarVista` llama a `api.changeView(...)`, que es SÍNCRONO: FullCalendar
+     pide las citas EN ESA MISMA LÍNEA, y lo hace a través de
+     `appointmentSourceRef.current`, que todavía apunta al closure del render
+     anterior. O sea que un `setFiltroMedico(x)` puesto justo antes NO llega a
+     tiempo: la petición sale con el filtro VIEJO.
+
+     Eso, en el paso a Mes, es exactamente la petición que este bloque viene a
+     eliminar —seis semanas por TODOS los médicos, la que se come el techo de mil
+     filas—, seguida de una segunda ya corregida. Dos peticiones y la cara igual
+     pagada.
+
+     Con el espejo, las dos fuentes leen ESTO antes que su closure, así que la
+     traída síncrona sale ya con el médico correcto y no hay traída cara.
+
+     ⚠️ `''` ES UN VALOR ESCRITO, NO «vacío». Significa «todos los médicos» y
+     tiene que ganarle al closure igual que un id — es lo que hace que la vuelta a
+     «Todos» al salir de Mes también sea síncrona. Por eso el centinela de «nadie
+     ha escrito» es `null` y la lectura es `?? filtroEfectivo`, nunca `||`.
+
+     ⚠️ NO TOCA LA IDENTIDAD DE NINGUNA FUENTE. Es un ref: no entra en las deps de
+     `appointmentSource`/`gcalSource`, que siguen dependiendo de `filtroEfectivo`,
+     ni en las de `stableAppointmentSource`, `stableGcalSource` o
+     `eventSourcesStable`, que siguen como estaban. */
+  const filtroSincronoRef = useRef<string | null>(null)
+
+  /* El médico que PUSIMOS NOSOTROS al entrar en Mes, o `null` si el filtro de
+     ahora lo eligió una persona. Es lo único que distingue una imposición del
+     sistema de una decisión del usuario, y de esa distinción vive la vuelta a
+     «Todos» al salir de Mes: se deshace lo que impusimos, nunca lo que se eligió.
+
+     Un REF y no estado: no pinta nada. Quien pinta es `filtroMedico`. */
+  const medicoForzadoRef = useRef<string | null>(null)
 
   /* ═══ BLOQUE 9 · LO QUE SE SABE DE LA ÚLTIMA TRAÍDA ═══════════════════════
      Cuatro estados y ninguno derivado de otro, porque describen cosas distintas:
@@ -5995,13 +6058,130 @@ export default function AgendaPage() {
      sin fecha conserva la que se está mirando, que es lo que quieren el
      segmentado y la banda. La única que sí manda fecha es la salida «Ver día»
      del panel del mes en el teléfono. */
+  /* Escribe el filtro POR LOS DOS CAMINOS a la vez, y todos los que lo cambian
+     pasan por aquí: los dos desplegables y el paso a Mes.
+
+       · el estado, que es quien manda en el render siguiente y quien pinta;
+       · el espejo, que es lo único que puede leer un `changeView` síncrono;
+       · la marca de forzado, que decide si esto se deshace al salir de Mes.
+
+     ⚠️ `forzado` NO ES UN DETALLE: es la diferencia entre una imposición nuestra
+     y una elección de la persona. Cualquier escritura hecha a mano lo pone en
+     `false` y con eso el médico deja de ser reversible, que es justo lo que pide
+     D3 —«si el usuario eligió a alguien, se respeta»—. */
+  function aplicarFiltro(id: string, forzado: boolean) {
+    setFiltroMedico(id)
+    filtroSincronoRef.current = id
+    medicoForzadoRef.current = forzado ? id : null
+  }
+
+  /* A quién se selecciona al entrar en Mes sin nadie puesto: al propio usuario si
+     es médico, y si no al primero de la lista.
+
+     ⚠️ NO REUTILIZA `defaultMedicoId`, y no por descuido: aquél devuelve `''` para
+     la secretaria a propósito —para obligarla a elegir en el MODAL—, y `''` es
+     precisamente el valor que aquí no puede salir. Son dos preguntas distintas
+     con la misma forma.
+
+     ⚠️ EL `find` NO SOBRA. Un médico cuyo id no esté en la lista de la clínica
+     dejaría el desplegable enseñando un valor que no es ninguna de sus opciones,
+     y el `<select>` caería a la primera. Ante la duda, el primero de la lista. */
+  function medicoQueForzar(): string | null {
+    if (profile?.role === 'medico' && profile.id && medicos.some(m => m.id === profile.id)) {
+      return profile.id
+    }
+    return medicos[0]?.id ?? null
+  }
+
+  /* ⚠️⚠️ CAMBIAR DE VISTA NO VUELVE A PEDIR NADA, Y CON LA TRAÍDA RECORTADA ESO
+     DEJABA A LA BANDA ROJA OFRECIENDO UNA SALIDA QUE NO LO ERA.
+
+     FullCalendar sirve desde su caché cualquier rango CONTENIDO en otro que ya
+     trajo, así que pasar de Mes a Semana dentro del mes ya cargado cuesta CERO
+     peticiones. Está comprobado instrumentando `fetch` (2026-08-30): al pulsar
+     «Ver por semana» no salía ninguna, ni en ese sentido ni en el contrario.
+
+     Con la traída ENTERA eso es lo correcto y no se toca: refrescar en cada
+     cambio de vista pagaría dos peticiones por navegación a cambio de nada.
+
+     Con la traída RECORTADA es justo al revés, porque la vista nueva HEREDA el
+     recorte de la vieja: lo que hay en caché son las primeras filas del rango
+     ANCHO, ordenadas por fecha, y una semana del final del mes cae entera fuera
+     de ellas. En la prueba, la semana que la banda ofrecía —nueve citas reales—
+     salía con CERO. Recargando la página aparecían. O sea que el único botón que
+     la banda ofrece como remedio dejaba la agenda más vacía que antes.
+
+     ⚠️ POR QUÉ EL REFETCH VA CONDICIONADO Y NO SIEMPRE. `citasIncompletas` es
+     exactamente la línea que separa el caso raro del camino normal, y el camino
+     normal es el que no puede pagar peticiones de más. Sin la condición, cada
+     cambio de vista de cada día costaría dos traídas para arreglar un caso que
+     casi nunca ocurre.
+
+     ⚠️ NO TOCA `eventSourcesStable` NI LAS DOS FUENTES MEMOIZADAS, y no puede:
+     `refetchEvents()` es una llamada imperativa sobre la API del calendario, no
+     una dependencia de nada. La identidad de las tres se queda donde estaba, y
+     con ella el silencio de `handleEventSources`.
+
+     ⚠️ Y NO PASA POR `refetch()`, EL DE LA RECONEXIÓN, aunque se parezcan.
+     Aquél se calla si hay un gesto de arrastre en curso —tiene que hacerlo, o
+     purga los eventos a mitad del arrastre—, y aquí esa guarda convertiría el
+     botón en uno que a veces no hace nada. Un cambio de vista no ocurre a mitad
+     de un arrastre.
+
+     ⚠️ EL `changeView` VA SIN FECHA SALVO QUE SE LE DÉ UNA, y la rama importa:
+     sin fecha conserva la que se está mirando, que es lo que quieren el
+     segmentado y la banda. La única que sí manda fecha es la salida «Ver día»
+     del panel del mes en el teléfono.
+
+     ── Y ADEMÁS ES LA PUERTA DEL MES ────────────────────────────────────────
+     ⚠️ LAS DOS ESCRITURAS DEL FILTRO VAN ANTES DEL `changeView`, Y EL ORDEN ES
+     TODO EL ARREGLO. `changeView` pide de forma síncrona; si el filtro se
+     escribiera después, la petición saldría con el valor viejo. Ver
+     `filtroSincronoRef`.
+
+     ⚠️ VA AQUÍ Y NO EN `datesSet`: aquél se reemite en cada `prev/next`, en cada
+     cambio de `hiddenDays` y en cada cruce del umbral de ancho, y esto tiene que
+     correr UNA vez por cambio de vista. Comprobado que toda entrada a Mes pasa
+     por aquí: no hay persistencia de la vista, `initialView` es Semana, el
+     toolbar de escritorio no lleva botones de vista y el efecto del ancho empareja
+     Mes consigo mismo. */
   function cambiarVista(tipo: string, fecha?: Date) {
     const api = calendarRef.current?.getApi()
     if (!api) return
+    if (tipo === 'dayGridMonth') forzarMedicoParaElMes()
+    else revertirMedicoForzado()
     if (fecha) api.changeView(tipo, fecha)
     else api.changeView(tipo)
     setCurrentView(tipo)
     if (citasIncompletas) api.refetchEvents()
+  }
+
+  /* Mes con «Todos» no existe: mil filas entre seis semanas son 24 citas al día
+     para la clínica entera, y un médico con jornada llena hace 16. Con dos
+     médicos activos el mes ya llega al techo, y lo que se recorta son las últimas
+     semanas, que se ven LIBRES. La protección contra el truncado sigue puesta —no
+     se relaja—, pero contener no es lo mismo que evitar.
+
+     ⚠️ `isSingleDoctor` APAGA LA REGLA ENTERA, y es la misma condición que decide
+     si el desplegable existe: donde no hay desplegable no hay restricción. Ahí
+     `''` no significa «todos», significa «el único», las filas son las de un solo
+     médico y el techo no se acerca. De paso cubre la clínica sin médicos, donde
+     forzar no tendría a quién y dejaría el mes en blanco. */
+  function forzarMedicoParaElMes() {
+    if (isSingleDoctor) return
+    if (filtroEfectivo !== '') return
+    const elegido = medicoQueForzar()
+    if (elegido) aplicarFiltro(elegido, true)
+  }
+
+  /* La vuelta. Sólo deshace lo que impusimos: si el filtro de ahora ya no es el
+     que forzamos —porque la persona eligió otro en el desplegable—, no se toca.
+     `aplicarFiltro(..., false)` limpia la marca de camino. */
+  function revertirMedicoForzado() {
+    const forzado = medicoForzadoRef.current
+    if (forzado === null) return
+    if (filtroEfectivo !== forzado) { medicoForzadoRef.current = null; return }
+    aplicarFiltro('', false)
   }
 
   /* Cuándo se pidieron las citas al servidor por última vez. La estampa
@@ -6049,7 +6229,10 @@ export default function AgendaPage() {
     try {
       ultimaTraidaRef.current = Date.now()
       let url = `/api/appointments?from=${info.startStr}&to=${info.endStr}`
-      if (filtroEfectivo) url += `&medico_id=${filtroEfectivo}`
+      /* El espejo primero: en una traída disparada por `changeView` este closure
+         puede ser el del render anterior. Ver `filtroSincronoRef`. */
+      const filtro = filtroSincronoRef.current ?? filtroEfectivo
+      if (filtro) url += `&medico_id=${filtro}`
       const res = await fetch(url)
       /* ⚠️⚠️ ESTAS DOS GUARDAS SON EL BLOQUE 9 ENTERO, Y NO SON DEFENSIVAS: sin
          ellas un fallo del servidor se pintaba como UNA AGENDA VACÍA.
@@ -6159,7 +6342,9 @@ export default function AgendaPage() {
       let url = `/api/google/events?from=${info.startStr}&to=${info.endStr}`
       // Cadena vacía = 'todos los médicos'; ahí no se manda nada y el servidor
       // devuelve el calendario completo de la clínica, como siempre.
-      if (filtroEfectivo) url += `&medico_id=${filtroEfectivo}`
+      // El espejo primero, por lo mismo que en la fuente de citas.
+      const filtro = filtroSincronoRef.current ?? filtroEfectivo
+      if (filtro) url += `&medico_id=${filtro}`
 
       // Espeja la lista blanca del servidor (`EventoAgenda` en
       // /api/google/events). Las dos llaves de `start` y `end` son necesarias:
@@ -7351,6 +7536,12 @@ export default function AgendaPage() {
      es que se esconda con CSS. */
   const panelDelDia = !isMobile && currentView === 'timeGridDay'
 
+  /* En Mes no se puede estar en «Todos»: la opción se apaga en los DOS
+     desplegables. `!isSingleDoctor` por lo mismo que en `forzarMedicoParaElMes`
+     —donde no hay desplegable no hay nada que apagar—, y así las dos mitades de
+     la regla salen de la misma condición y no pueden separarse. */
+  const mesSinTodos = currentView === 'dayGridMonth' && !isSingleDoctor
+
   /* Con un médico se puede hablar de horas y de huecos; con «Todos los
      médicos» no. Cubre los dos caminos por los que hay uno solo: la clínica que
      sólo tiene uno —donde el desplegable ni se pinta— y el filtro puesto. El
@@ -7730,10 +7921,14 @@ export default function AgendaPage() {
                   deja de ser controlado. */}
               <select
                 value={filtroEfectivo ?? ''}
-                onChange={e => setFiltroMedico(e.target.value)}
+                /* Por `aplicarFiltro` y no por `setFiltroMedico`: además del
+                   estado hay que mover el espejo síncrono y, sobre todo, BORRAR
+                   la marca de forzado — esto es una elección de una persona, y
+                   desde aquí el médico deja de ser reversible. */
+                onChange={e => aplicarFiltro(e.target.value, false)}
                 className="appearance-none max-w-[240px] truncate pl-3 pr-9 py-2.5 rounded-[var(--ag-r-btn)] text-sm font-medium cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-[var(--ag-surface)] border border-[var(--ag-border-card)] text-[var(--ag-text)] hover:bg-[var(--ag-bg-app)]"
               >
-                <option value="">Todos los médicos</option>
+                <option value="" disabled={mesSinTodos}>{OPCION_TODOS(mesSinTodos)}</option>
                 {medicos.map(m => (
                   <option key={m.id} value={m.id}>{componerNombreMedicoCompleto(m)}</option>
                 ))}
@@ -7833,7 +8028,10 @@ export default function AgendaPage() {
           onMenu={abrirMenu}
           medicos={medicos}
           filtroMedico={filtroEfectivo ?? ''}
-          onFiltroMedico={setFiltroMedico}
+          mesSinTodos={mesSinTodos}
+          /* Misma puerta que el desplegable de escritorio: elección a mano, así
+             que sin marca de forzado. Ver `aplicarFiltro`. */
+          onFiltroMedico={id => aplicarFiltro(id, false)}
           /* `null` y no un booleano: es el manejador o no hay botón. Misma
              condición que el de escritorio (`canEditHorario`). */
           onHorario={canEditHorario ? () => setHorarioOpen(true) : null}
@@ -8453,7 +8651,22 @@ export default function AgendaPage() {
              segmentado y que nadie ha diseñado. Si algún día se reordenan los
              plugins, esta línea es lo que impide que el destino cambie solo. */
           navLinks
-          navLinkDayClick="timeGridDay"
+          /* ⚠️ ERA LA CADENA `"timeGridDay"` Y AHORA ES UNA FUNCIÓN, POR UNA SOLA
+             RAZÓN: ES LA ÚNICA SALIDA DE MES QUE NO PASA POR `cambiarVista`. Si
+             el médico del mes lo pusimos nosotros, pulsar el número de un día se
+             llevaba esa imposición a la vista Día y allí se quedaba, con la
+             secretaria filtrada sin haber elegido a nadie. Revertir aquí es lo
+             que cierra el círculo.
+
+             ⚠️ EL DESTINO SIGUE SIENDO EL MISMO Y SIGUE ESCRITO A MANO — la nota
+             de arriba explica por qué no se deja resolver por orden de plugins—.
+             Esto no cambia a dónde se va; sólo añade la vuelta del filtro antes
+             de ir. El `changeView` con fecha es exactamente lo que hacía la
+             cadena. */
+          navLinkDayClick={(fecha: Date) => {
+            revertirMedicoForzado()
+            calendarRef.current?.getApi().changeView('timeGridDay', fecha)
+          }}
           nowIndicator
           nowIndicatorContent={renderNowIndicator}
           /* ⚠️ APAGADO EN EL MES DEL TELÉFONO, Y NO ES UN RECORTE DE FUNCIONES.
