@@ -4529,7 +4529,9 @@ const SIN_DATO = '—'
    de llegar aquí: esto es un RESUMEN, no una tabla (§8.3). Es justo lo
    contrario que la leyenda de la tarjeta del calendario, que sí pinta los cinco
    siempre — allí explica una escala, aquí cuenta lo que hay. */
-function DesgloseEstados({ filas }: { filas: readonly { estado: Status; n: number }[] }): ReactElement | null {
+function DesgloseEstados(
+  { filas, incompleto }: { filas: readonly { estado: Status; n: number }[]; incompleto: boolean },
+): ReactElement | null {
   if (filas.length === 0) return null
   return (
     <ul className="ag-desglose">
@@ -4538,38 +4540,74 @@ function DesgloseEstados({ filas }: { filas: readonly { estado: Status; n: numbe
           {/* UN token y un solo color, `-dot`: el mismo que la tarjeta pinta en
               su `borderLeft` y el mismo que la leyenda. Nunca un hex. */}
           <span className="ag-desglose-punto" style={{ backgroundColor: `var(--ag-status-${estado}-dot)` }} />
-          <span>{n} {n === 1 ? ESTADO_CONTADO[estado].uno : ESTADO_CONTADO[estado].varios}</span>
+          {/* El mismo «≥» del subtítulo breve, y por el mismo motivo: con la
+              traída recortada esto deja de contar el día y pasa a ser un SUELO.
+              «1 agendada» sobre un conjunto incompleto es falso; «≥ 1 agendada»
+              es lo único que cabe afirmar. */}
+          <span>{incompleto ? '≥ ' : ''}{n} {n === 1 ? ESTADO_CONTADO[estado].uno : ESTADO_CONTADO[estado].varios}</span>
         </li>
       ))}
     </ul>
   )
 }
 
+/* ⚠️⚠️ `incompleto` ES LA TERCERA RAZÓN POR LA QUE LAS HORAS PASAN A GUIÓN, Y ES
+   LA QUE FALTABA. Las otras dos —«Todos los médicos» y el día cerrado— ya
+   estaban; ésta no llegaba al panel, y era el único sitio de la agenda al que no
+   llegaba. El resultado era que la banda roja avisaba de la rejilla mientras el
+   panel de al lado seguía afirmando `1:00 h ocupadas · 10:00 h libres` sobre un
+   día del que faltaba la mitad de las citas.
+
+   ⚠️ POR QUÉ LAS HORAS SE APAGAN Y LOS CONTEOS NO. Un conteo recortado es un
+   SUELO y se puede decir entero con un «≥»: hay ésas y puede haber más. Las
+   horas no admiten ese trato en las dos direcciones a la vez —las ocupadas son
+   un suelo, pero las LIBRES son un TECHO, y un techo presentado como dato
+   invita a agendar—, así que la única lectura honesta es no darlas. Es
+   exactamente lo que ya significa el guión: «esto no se sabe». Ver `SIN_DATO`.
+
+   No estrena estado visual ninguno: reutiliza el camino que el panel recorre
+   cuando el filtro está en «Todos los médicos». */
 function CardResumen(
-  { titulo, citas, eventos, resumen, horasVisibles }: {
+  { titulo, citas, eventos, resumen, horasVisibles, incompleto }: {
     titulo: string
     citas: number
     eventos: number
     resumen: ResumenDia | null
     /** `false` en «Todos los médicos»: los dos tiles de horas pasan a guión. */
     horasVisibles: boolean
+    /** La traída vino recortada. Los conteos se cualifican y las horas se apagan. */
+    incompleto: boolean
   },
 ): ReactElement {
-  const conHoras = horasVisibles && resumen?.jornada != null
+  const conHoras = horasVisibles && !incompleto && resumen?.jornada != null
+  /* El «≥» y no «al menos», por la misma razón que en la banda breve: el número
+     del tile es grande y comparte caja con su etiqueta. Un carácter dice lo
+     mismo, y la nota de abajo lo explica con palabras. */
+  const suelo = (n: number) => (incompleto ? `≥${n}` : String(n))
   return (
     <section className="ag-panelcard" aria-label={titulo}>
       <h2 className="ag-panelcard-tit">{titulo}</h2>
       <div className="ag-tiles">
-        <TileResumen valor={String(citas)} etiqueta={citas === 1 ? 'cita' : 'citas'} />
-        <TileResumen valor={String(eventos)} etiqueta={eventos === 1 ? 'evento' : 'eventos'} />
+        <TileResumen valor={suelo(citas)} etiqueta={citas === 1 ? 'cita' : 'citas'} />
+        <TileResumen valor={suelo(eventos)} etiqueta={eventos === 1 ? 'evento' : 'eventos'} />
         <TileResumen valor={conHoras ? etiquetaDeHoras(resumen.ocupadas) : SIN_DATO} etiqueta="h ocupadas" />
         <TileResumen valor={conHoras ? etiquetaDeHoras(resumen.libres) : SIN_DATO} etiqueta="h libres" tono="primario" />
       </div>
-      <DesgloseEstados filas={resumen?.porEstado ?? []} />
+      <DesgloseEstados filas={resumen?.porEstado ?? []} incompleto={incompleto} />
+      {/* Va la PRIMERA de las notas: es la que explica por qué los cuatro
+          números de arriba dejaron de ser los de siempre. */}
+      {incompleto && (
+        <p className="ag-panelcard-nota">
+          Faltan citas por cargar: las horas y los huecos de este día no se pueden calcular.
+        </p>
+      )}
       {!horasVisibles && (
         <p className="ag-panelcard-nota">Elige un médico para ver las horas y los huecos.</p>
       )}
-      {horasVisibles && resumen && resumen.jornada == null && (
+      {/* `!incompleto`: con la traída recortada el guión de las horas lo explica
+          la nota de arriba, y dos notas seguidas dando motivos distintos para el
+          mismo guión se leen como una contradicción. */}
+      {horasVisibles && !incompleto && resumen && resumen.jornada == null && (
         <p className="ag-panelcard-nota">Sin horario de consulta este día.</p>
       )}
       {/* Los de todo el día no dan horas y eso, sin decirlo, se lee como un
@@ -4589,11 +4627,34 @@ function CardResumen(
 /* La tarjeta NO se oculta cuando no hay huecos, y es deliberado (§8.4): una
    card que desaparece se lee como un fallo de carga. Lo que cambia es el
    contenido, y el texto dice cuál de los dos motivos es. */
+/* ⚠️⚠️ CON LA TRAÍDA RECORTADA NO SE PINTA NINGÚN HUECO, Y ESTO ES EL ARREGLO,
+   NO UNA CAUTELA DE MÁS. Un hueco de aquí NO es un dato: es un BOTÓN que llama a
+   `abrirHueco` → `api.select()` → el alta. Calculado sobre un día al que le
+   faltan citas, el complemento de la ocupación incluye las horas de las citas
+   que no llegaron, así que el panel ofrecía —comprobado el 2026-08-30 sobre el
+   lunes 24— un hueco de 11:00 a 20:00 con una paciente dentro de 11:00 a 12:00.
+   Pulsarlo abría el alta encima de ella. Es el daño exacto del que avisa la
+   banda roja, servido por la tarjeta de al lado.
+
+   ⚠️ Y NO VALE PINTARLOS «SÓLO INFORMATIVOS», sin `onClick`. Se verían igual que
+   los de siempre, en el mismo sitio y con la misma forma, y el médico que ya
+   sabe que ahí se pulsa no lee la diferencia: se convierte en un botón que no
+   responde, que es peor que uno que responde mal. O son huecos de verdad o no
+   hay huecos.
+
+   La tarjeta NO desaparece, por la misma razón que ya está escrita abajo: una
+   card que se va se lee como un fallo de carga. Lo que cambia es el contenido, y
+   toma el MISMO camino visual que el consultorio cerrado. */
 function CardHuecos(
-  { resumen, onHueco }: { resumen: ResumenDia | null; onHueco: (t: Tramo) => void },
+  { resumen, onHueco, incompleto }: {
+    resumen: ResumenDia | null
+    onHueco: (t: Tramo) => void
+    /** La traída vino recortada: no hay huecos que ofrecer, sólo el motivo. */
+    incompleto: boolean
+  },
 ): ReactElement {
   const jornada = resumen?.jornada ?? null
-  const huecos = resumen?.huecos ?? []
+  const huecos = incompleto ? [] : (resumen?.huecos ?? [])
   return (
     <section className="ag-panelcard" aria-label="Huecos disponibles">
       <h2 className="ag-panelcard-tit">Huecos disponibles</h2>
@@ -4614,9 +4675,14 @@ function CardHuecos(
       ) : (
         <p className="ag-panelcard-vacio">
           <Calendar size={22} aria-hidden />
-          {jornada
-            ? `Día completo · No queda ningún tramo de ${HUECO_MINIMO} min libre entre ${etiquetaDeRango(jornada)}`
-            : 'Consultorio cerrado · No hay horario de consulta este día'}
+          {/* El recorte manda sobre los otros dos motivos: mientras falten
+              citas no se sabe si el día está completo ni si queda algo libre,
+              así que ninguna de las dos frases de abajo sería cierta. */}
+          {incompleto
+            ? 'Faltan citas por cargar · No se pueden calcular los huecos de este día'
+            : jornada
+              ? `Día completo · No queda ningún tramo de ${HUECO_MINIMO} min libre entre ${etiquetaDeRango(jornada)}`
+              : 'Consultorio cerrado · No hay horario de consulta este día'}
         </p>
       )}
     </section>
@@ -4634,13 +4700,15 @@ function CardHuecos(
  * mismo camino (`horasVisibles`). Ver la nota de `SIN_DATO`.
  */
 function PanelDia(
-  { titulo, citas, eventos, resumen, unMedico, onHueco }: {
+  { titulo, citas, eventos, resumen, unMedico, onHueco, incompleto }: {
     titulo: string
     citas: number
     eventos: number
     resumen: ResumenDia | null
     unMedico: boolean
     onHueco: (t: Tramo) => void
+    /** `citasIncompletas` de la página. Ver las cabeceras de las dos tarjetas. */
+    incompleto: boolean
   },
 ): ReactElement {
   return (
@@ -4651,8 +4719,9 @@ function PanelDia(
         eventos={eventos}
         resumen={resumen}
         horasVisibles={unMedico}
+        incompleto={incompleto}
       />
-      {unMedico && <CardHuecos resumen={resumen} onHueco={onHueco} />}
+      {unMedico && <CardHuecos resumen={resumen} onHueco={onHueco} incompleto={incompleto} />}
     </aside>
   )
 }
@@ -5885,6 +5954,54 @@ export default function AgendaPage() {
   function refetch() {
     if (hayGestoEnCurso(gestoEnCursoRef)) return
     calendarRef.current?.getApi().refetchEvents()
+  }
+
+  /* ⚠️⚠️ CAMBIAR DE VISTA NO VUELVE A PEDIR NADA, Y CON LA TRAÍDA RECORTADA ESO
+     DEJABA A LA BANDA ROJA OFRECIENDO UNA SALIDA QUE NO LO ERA.
+
+     FullCalendar sirve desde su caché cualquier rango CONTENIDO en otro que ya
+     trajo, así que pasar de Mes a Semana dentro del mes ya cargado cuesta CERO
+     peticiones. Está comprobado instrumentando `fetch` (2026-08-30): al pulsar
+     «Ver por semana» no salía ninguna, ni en ese sentido ni en el contrario.
+
+     Con la traída ENTERA eso es lo correcto y no se toca: refrescar en cada
+     cambio de vista pagaría dos peticiones por navegación a cambio de nada.
+
+     Con la traída RECORTADA es justo al revés, porque la vista nueva HEREDA el
+     recorte de la vieja: lo que hay en caché son las primeras filas del rango
+     ANCHO, ordenadas por fecha, y una semana del final del mes cae entera fuera
+     de ellas. En la prueba, la semana que la banda ofrecía —nueve citas reales—
+     salía con CERO. Recargando la página aparecían. O sea que el único botón que
+     la banda ofrece como remedio dejaba la agenda más vacía que antes.
+
+     ⚠️ POR QUÉ EL REFETCH VA CONDICIONADO Y NO SIEMPRE. `citasIncompletas` es
+     exactamente la línea que separa el caso raro del camino normal, y el camino
+     normal es el que no puede pagar peticiones de más. Sin la condición, cada
+     cambio de vista de cada día costaría dos traídas para arreglar un caso que
+     casi nunca ocurre.
+
+     ⚠️ NO TOCA `eventSourcesStable` NI LAS DOS FUENTES MEMOIZADAS, y no puede:
+     `refetchEvents()` es una llamada imperativa sobre la API del calendario, no
+     una dependencia de nada. La identidad de las tres se queda donde estaba, y
+     con ella el silencio de `handleEventSources`.
+
+     ⚠️ Y NO PASA POR `refetch()`, EL DE LA RECONEXIÓN, aunque se parezcan.
+     Aquél se calla si hay un gesto de arrastre en curso —tiene que hacerlo, o
+     purga los eventos a mitad del arrastre—, y aquí esa guarda convertiría el
+     botón en uno que a veces no hace nada. Un cambio de vista no ocurre a mitad
+     de un arrastre.
+
+     ⚠️ EL `changeView` VA SIN FECHA SALVO QUE SE LE DÉ UNA, y la rama importa:
+     sin fecha conserva la que se está mirando, que es lo que quieren el
+     segmentado y la banda. La única que sí manda fecha es la salida «Ver día»
+     del panel del mes en el teléfono. */
+  function cambiarVista(tipo: string, fecha?: Date) {
+    const api = calendarRef.current?.getApi()
+    if (!api) return
+    if (fecha) api.changeView(tipo, fecha)
+    else api.changeView(tipo)
+    setCurrentView(tipo)
+    if (citasIncompletas) api.refetchEvents()
   }
 
   /* Cuándo se pidieron las citas al servidor por última vez. La estampa
@@ -7267,6 +7384,13 @@ export default function AgendaPage() {
   function abrirHueco(t: Tramo) {
     const api = calendarRef.current?.getApi()
     if (!api || !resumenDia) return
+    /* ⚠️ EL CIERRE DE SEGURIDAD, Y NO SOBRA POR MUCHO QUE `CardHuecos` YA NO
+       PINTE NINGÚN BOTÓN CUANDO FALTAN CITAS. Lo que está al otro lado de esta
+       línea es abrir el alta sobre un tramo que puede tener una paciente dentro,
+       y eso no puede depender de que una condición de render siga en su sitio
+       dentro de seis meses. Es la misma disciplina que la doble guarda de la
+       traída de citas: dos puertas al mismo daño. */
+    if (citasIncompletas) return
     const base = medianocheDe(resumenDia.dia).getTime()
     api.select(new Date(base + t.desde * 60_000), new Date(base + t.hasta * 60_000))
   }
@@ -7486,12 +7610,7 @@ export default function AgendaPage() {
                   key={v.type}
                   role="tab"
                   aria-selected={active}
-                  onClick={() => {
-                    const api = calendarRef.current?.getApi()
-                    if (!api) return
-                    api.changeView(tipo)
-                    setCurrentView(tipo)
-                  }}
+                  onClick={() => cambiarVista(tipo)}
                   className={`inline-flex items-center transition-all ${active ? '' : 'hover:opacity-70'}`}
                   style={{
                     border: 'none', cursor: 'pointer', borderRadius: 'var(--ag-r-btn)', padding: '6px 13px',
@@ -7707,12 +7826,7 @@ export default function AgendaPage() {
         <BandaMovil
           conteo={resumenConteoBreve}
           vistaActual={currentView}
-          onVista={tipo => {
-            const api = calendarRef.current?.getApi()
-            if (!api) return
-            api.changeView(tipo)
-            setCurrentView(tipo)
-          }}
+          onVista={tipo => cambiarVista(tipo)}
           titulo={tituloVista}
           onPrev={() => calendarRef.current?.getApi().prev()}
           onNext={() => calendarRef.current?.getApi().next()}
@@ -8128,15 +8242,15 @@ export default function AgendaPage() {
                   type="button"
                   className="ag-aviso-accion"
                   onClick={() => {
-                    const api = calendarRef.current?.getApi()
-                    if (!api) return
                     /* Por `vistaEnElOtroFormato` y no con la cadena a mano: en un
                        teléfono la Semana es `listWeek`, y `changeView` lanza con
                        una vista que no se ha registrado. Es el mismo camino que
-                       usan el segmentado y la banda móvil. */
-                    const tipo = vistaEnElOtroFormato('timeGridWeek', isMobile)
-                    api.changeView(tipo)
-                    setCurrentView(tipo)
+                       usan el segmentado y la banda móvil.
+                       Y por `cambiarVista` y no por `changeView` a pelo: es lo
+                       que hace que este botón PIDA la semana en vez de heredar
+                       el recorte del mes. Sin eso no recuperaba nada — ver su
+                       cabecera. */
+                    cambiarVista(vistaEnElOtroFormato('timeGridWeek', isMobile))
                   }}
                 >
                   Ver por semana
@@ -8463,6 +8577,9 @@ export default function AgendaPage() {
           resumen={resumenDia}
           unMedico={unMedico}
           onHueco={abrirHueco}
+          /* La MISMA bandera que levanta la banda roja de arriba. Sin esto el
+             panel afirmaba horas y ofrecía huecos sobre un día recortado. */
+          incompleto={citasIncompletas}
         />
       )}
       </div>
@@ -8488,13 +8605,7 @@ export default function AgendaPage() {
             const evento = calendarRef.current?.getApi().getEventById(id)
             if (evento) abrirCita(evento)
           }}
-          onVerDia={() => {
-            const api = calendarRef.current?.getApi()
-            if (!api) return
-            const destino = vistaEnElOtroFormato('timeGridDay', true)
-            api.changeView(destino, diaSel)
-            setCurrentView(destino)
-          }}
+          onVerDia={() => cambiarVista(vistaEnElOtroFormato('timeGridDay', true), diaSel)}
         />
       )}
 
