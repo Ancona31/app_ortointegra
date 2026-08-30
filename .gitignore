@@ -75,3 +75,4 @@ docs/*
 !docs/mockups/
 !docs/spec/
 design/
+.agent-auth.json
