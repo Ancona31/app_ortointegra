@@ -49,14 +49,54 @@ const FAIL_OPEN: SubscriptionState = {
 }
 
 /**
+ * Las tres columnas de `profiles` que este módulo necesita, para que un
+ * llamador que YA las tenga pueda ahorrarse que se vuelvan a pedir.
+ *
+ * ⚠️ SI AÑADES UNA COLUMNA AL `select` DE ABAJO, AÑÁDELA AQUÍ TAMBIÉN, y al
+ * revés. Son las dos mitades de la misma lista: el `select` de la rama que
+ * consulta, y el contrato de la rama que recibe. Desincronizarlas no da error
+ * de compilación en la rama que consulta —el cliente no está tipado contra el
+ * esquema— y sale como un campo `undefined` en tiempo de ejecución sólo por
+ * uno de los dos caminos, que es la clase de fallo que aparece en producción y
+ * no en local.
+ */
+export type PerfilParaSuscripcion = {
+  role: string | null
+  clinica_id: string | null
+  es_admin_de_clinica: boolean | null
+}
+
+/**
  * getSubscriptionState — invocado server-side desde:
  *   - (app)/layout.tsx para popular el SubscriptionGateProvider.
  *   - (launcher)/layout.tsx por la misma razón.
  *   - layouts hermanos de las rutas bloqueadas para decidir redirect.
  *
+ * ⚠️ EL SEGUNDO PARÁMETRO ES SÓLO RENDIMIENTO Y NO CAMBIA NINGÚN VEREDICTO.
+ * Sin él, esta función abre pidiendo `auth.getUser()` —que SIEMPRE sale a la
+ * red— y después `profiles`. El problema es que `(app)/layout.tsx` acaba de
+ * hacer exactamente esas dos cosas cuatro líneas antes, así que cada render de
+ * CUALQUIER página de `(app)` pagaba el par dos veces. Pasándole el perfil ya
+ * resuelto se salta las dos consultas y entra directo por `clinicas`.
+ *
+ * Medido en el proyecto: 1.656 peticiones a Auth contra 117 a Postgres en 24 h.
+ * Esta duplicación es una de las que alimentan ese catorce a uno.
+ *
+ * ⚠️ QUIEN LO PASA ASUME DOS COSAS, y las dos las cumple el layout: que HAY
+ * sesión (si no la hubiera ya habría redirigido) y que el perfil es el del
+ * usuario de esa sesión. Pasar el perfil de otro usuario devolvería el estado
+ * de suscripción de otra clínica — no lo alimentes con nada que no venga de un
+ * `profiles` filtrado por el `id` del usuario en curso.
+ *
+ * ⚠️ Y NO ES UN ATAJO PARA SALTARSE LA COMPROBACIÓN DE SESIÓN. Si dudas de si
+ * hay sesión, NO pases el parámetro: la rama que consulta la comprueba ella
+ * sola y devuelve FAIL_OPEN. Omitirlo siempre es correcto; pasarlo mal, no.
+ *
  * Casos de retorno isBlocked=false (fail-open documentado):
  *   1) user es null (sesión expirada o ruta llamada sin auth).
- *   2) profile no existe o query falla.
+ *      — sólo alcanzable SIN el segundo parámetro; con él, el llamador ya
+ *        garantizó la sesión.
+ *   2) profile no existe o query falla. — ídem.
  *   3) profile.clinica_id es null (super_admin u onboarding incompleto).
  *   4) query a clinicas falla.
  *   5) suscripcion_estado distinto de 'cancelado' o es_vip_grant=true
@@ -64,31 +104,42 @@ const FAIL_OPEN: SubscriptionState = {
  *   6) count de pacientes activos falla.
  *   7) cualquier excepción no capturada por los chequeos anteriores.
  *
+ * Los casos 3 a 7 se comportan IGUAL con parámetro y sin él: lo único que el
+ * parámetro cambia es de dónde sale el perfil, nunca qué se decide con él.
+ *
  * Caso de retorno isBlocked=true:
  *   suscripcion_estado='cancelado' AND es_vip_grant=false AND count > 5.
  */
 export async function getSubscriptionState(
   supabase: SupabaseClient,
+  perfilYaResuelto?: PerfilParaSuscripcion,
 ): Promise<SubscriptionState> {
   try {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return FAIL_OPEN
+    let profile: PerfilParaSuscripcion
 
-    const { data: profile, error: profileErr } = await supabase
-      .from('profiles')
-      .select('role, clinica_id, es_admin_de_clinica')
-      .eq('id', user.id)
-      .single()
-    if (profileErr || !profile) return FAIL_OPEN
+    if (perfilYaResuelto) {
+      profile = perfilYaResuelto
+    } else {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return FAIL_OPEN
 
-    const role = (profile.role as string) ?? 'medico'
-    const esAdminDeClinica = (profile.es_admin_de_clinica as boolean) === true
+      const { data, error: profileErr } = await supabase
+        .from('profiles')
+        .select('role, clinica_id, es_admin_de_clinica')
+        .eq('id', user.id)
+        .single()
+      if (profileErr || !data) return FAIL_OPEN
+      profile = data
+    }
+
+    const role = profile.role ?? 'medico'
+    const esAdminDeClinica = profile.es_admin_de_clinica === true
 
     if (!profile.clinica_id) {
       return { ...FAIL_OPEN, role, esAdminDeClinica }
     }
 
-    const clinicaId = profile.clinica_id as string
+    const clinicaId = profile.clinica_id
 
     const { data: clinica, error: clinicaErr } = await supabase
       .from('clinicas')

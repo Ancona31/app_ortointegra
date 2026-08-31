@@ -23,9 +23,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  /* ⚠️ LAS TRES COLUMNAS NO SON PARA ESTE LAYOUT: SON PARA
+     `getSubscriptionState`, QUE LAS RECIBE ABAJO. Aquí sólo se mira `role`.
+     Van juntas en este `select` porque pedirlas cuesta LO MISMO que pedir una
+     —es la misma fila, el mismo viaje— mientras que dejar que la función las
+     pida por su cuenta cuesta un viaje entero MÁS un `auth.getUser()`, que
+     siempre sale a la red.
+     La lista tiene que coincidir con `PerfilParaSuscripcion` en
+     `lib/subscription.ts`; si quitas una de aquí, el estado de suscripción se
+     calcula con un campo `undefined` y NO falla en compilación. */
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, clinica_id, es_admin_de_clinica')
     .eq('id', user.id)
     .single()
 
@@ -35,7 +44,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   // Fase 8.2: estado de suscripción server-side. Single source of truth
   // para SuscripcionBanner + intercepts de UI + layouts-guard hijos.
-  const subscriptionState = await getSubscriptionState(supabase)
+  /* ⚠️ EL PERFIL VIAJA COMO PARÁMETRO PARA QUE NO SE VUELVA A CONSULTAR. Sin
+     él, esta llamada repetía el `auth.getUser()` de arriba y el `profiles` de
+     aquí mismo: dos viajes por cada render de cada página de `(app)`, uno de
+     ellos al servidor de Auth. El razonamiento largo está en la cabecera de
+     `getSubscriptionState`.
+     ⚠️ `?? undefined` Y NO `profile!`: si la consulta de arriba falló, `profile`
+     es null y lo correcto es NO pasar nada, para que la función resuelva por su
+     cuenta y caiga en su FAIL_OPEN documentado. Es un camino de error raro
+     donde se paga un viaje de más; a cambio, nunca se le entrega un perfil
+     vacío como si fuera bueno. */
+  const subscriptionState = await getSubscriptionState(supabase, profile ?? undefined)
 
   return (
     /* Configuracion SWR de toda (app). Antes no habia ninguna, asi que regian
