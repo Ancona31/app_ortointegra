@@ -69,7 +69,98 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  /* ════════════════════════════════════════════════════════════════════════
+     LA SESIÓN SE VERIFICA EN LOCAL, NO PREGUNTÁNDOLE AL SERVIDOR DE AUTH
+     ════════════════════════════════════════════════════════════════════════
+     Aquí estuvo `supabase.auth.getUser()`, y era el gasto más caro del
+     proyecto entero. `getUser()` SIEMPRE sale a la red —`GET /auth/v1/user`,
+     sin caché, ver `auth-js/GoTrueClient.js:1457`— y este middleware corre en
+     casi todas las peticiones del dominio. Medido: 1.656 peticiones a Auth
+     contra 117 a Postgres en 24 h, o sea catorce autenticaciones por consulta
+     real. El testigo más claro era `/privacidad`, una página PRERENDERIZADA
+     servida desde disco, que tardaba 521 ms: eso no era la página, era esta
+     línea.
+
+     `getClaims()` verifica la FIRMA del JWT con WebCrypto contra la clave
+     pública del proyecto. Es criptografía, no confianza: un token falsificado
+     o manipulado falla igual que antes.
+
+     ⚠️ CONDICIÓN INDISPENSABLE, Y SI DEJA DE CUMPLIRSE ESTO NO AHORRA NADA:
+     el proyecto tiene que firmar con clave ASIMÉTRICA. `getClaims()` bifurca
+     en `GoTrueClient.js:2978`: si el `alg` empieza por `HS`, o falta el `kid`,
+     o no hay WebCrypto, CAE A `getUser()` con red y volvemos al punto de
+     partida — sin error, sólo lento otra vez. Comprobado al escribir esto:
+     el JWKS del proyecto publica una clave ES256 y los tokens emitidos traen
+     `alg: ES256` con el `kid` que le corresponde. Si algún día alguien rota a
+     HS256 en el panel de Supabase, esta optimización se apaga sola y en
+     silencio: el síntoma sería `/privacidad` volviendo a los 500 ms.
+
+     ⚠️ NO HAY UNA PETICIÓN DE JWKS POR REQUEST. La caché de claves es GLOBAL
+     del isolate, no del cliente (`GoTrueClient.js:42`, `GLOBAL_JWKS`), con TTL
+     de 10 minutos, y está pensada justo para esto («shared-memory execution
+     environments such as Vercel's Fluid Compute»). Da igual que aquí se cree
+     un cliente nuevo en cada invocación.
+
+     ⚠️ EL REFRESCO DE SESIÓN SIGUE VIVO, y era el otro trabajo de este
+     middleware. `getClaims()` sin argumento llama a `getSession()`, que si el
+     token está por caducar dispara `_callRefreshToken`
+     (`GoTrueClient.js:1408`) y escribe las cookies nuevas por el adaptador de
+     `@supabase/ssr` — o sea por el `setAll` de arriba, que reconstruye
+     `supabaseResponse`. Si alguien sustituye esta llamada por un decodificado
+     a mano del JWT, ROMPE EL REFRESCO y todas las sesiones mueren a la hora.
+
+     ⚠️ LO QUE SE PAGA A CAMBIO: una sesión REVOCADA sigue pasando por aquí
+     hasta que su token caduca (TTL de 3.600 s). Se acepta a sabiendas, y por
+     tres motivos:
+      1. Este middleware NUNCA fue la barrera de datos. La barrera es la RLS,
+         que evalúa el JWT en cada consulta y no cambia con esto.
+      2. Las operaciones donde una sesión revocada sí importaría ya validan
+         contra el servidor de Auth POR SÍ MISMAS, y ahí no se ha tocado nada:
+         el cierre de sesión (`lib/auth-context.tsx`, `signOut()` va directo al
+         Auth), el cambio de contraseña (`app/reset-password/page.tsx`,
+         `updateUser()` ídem), y la gestión de usuarios de clínica
+         (`api/admin/usuarios` y `api/admin/crear-usuario`, que hacen
+         `getUser()` con red ANTES de tocar `createAdminClient()`). Lo mismo
+         vale para las 34 rutas que usan cliente de servicio: o llaman a
+         `getUser()` en línea, o pasan por `requireSuperAdmin()` /
+         `requireAdmin()` de `lib/auth.ts`, que también salen a la red.
+         NO LAS "OPTIMICES" a `getClaims()` sin rehacer este razonamiento: son
+         justo las que la RLS no cubre.
+      3. La ventana ya existía por otra puerta. El navegador habla directamente
+         con `rest/v1/*`, y PostgREST valida el JWT criptográficamente sin
+         preguntarle a Auth: un token de una sesión cerrada ya funcionaba por
+         ahí hasta caducar. Este middleware no cerraba esa puerta; pagaba por
+         creer que sí.
+
+     ⚠️ Y LO MÁS IMPORTANTE PARA ENTENDER QUE ESTO NO DEBILITA LA PUERTA: mira
+     el `if` de abajo. Cuando NO hay sesión válida pero SÍ hay cookie `sb-*`,
+     no se redirige — se deja pasar, a propósito y desde antes de este cambio.
+     O sea que la decisión de redirigir ya dependía de que EXISTA una cookie,
+     no de que el servidor de Auth la bendijera. Lo único que `getUser()`
+     aportaba de más era el refresco, y el refresco se conserva.
+
+     ⚠️ EL `try/catch` NO ES DECORATIVO Y NO SE QUITA. `getClaims()` reenvía
+     hacia arriba cualquier error que no sea `AuthError`
+     (`GoTrueClient.js:3005`) —un fallo de WebCrypto, por ejemplo—, y una
+     excepción escapando de un middleware es un 500 EN TODAS LAS PETICIONES DEL
+     SITIO A LA VEZ. Al fallar se cae a `false`, que es exactamente el mismo
+     camino que "no hay sesión": la comprobación de cookie de abajo decide, y
+     quien tenga cookie sigue entrando. Degrada hacia el lado que ya existía.
+
+     ⚠️ UN TOKEN DE OTRO PROYECTO NO PASA, aunque parezca que aquí no se
+     comprueba el emisor: su `kid` no está en el JWKS de éste, `fetchJwk`
+     devuelve null y `getClaims()` cae al `getUser()` con red, que lo rechaza.
+     El caso raro degrada al camino lento, que es el seguro. */
+  let sesionValida = false
+  try {
+    const { data } = await supabase.auth.getClaims()
+    /* `sub` y no la mera existencia de `data`: es el identificador del usuario
+       y viene tipado como obligatorio en `RequiredClaims`. Un payload sin él no
+       es una sesión de nadie. */
+    sesionValida = typeof data?.claims?.sub === 'string'
+  } catch {
+    sesionValida = false
+  }
 
   const isLoginPage = pathname === '/login'
   const isPublicPage = ['/', '/forgot-password', '/reset-password', '/auth/confirm', '/auth/callback', '/auth/confirm-email', '/pricing', '/register', '/privacy', '/terms', '/offline'].includes(pathname)
@@ -82,9 +173,15 @@ export async function middleware(request: NextRequest) {
   const isPublicApi = publicApiPaths.some(p => pathname.startsWith(p))
 
   // Si no hay sesión y no está en ruta pública → verificar cookies antes de redirigir.
-  // getUser() puede fallar por latencia post-login (las cookies existen pero el
-  // servidor de Supabase aún no las procesó). Si hay cookie de sesión, dejar pasar.
-  if (!user && !isLoginPage && !isPublicPage && !isPublicApi) {
+  // La verificación puede no dar sesión por latencia post-login (las cookies
+  // existen pero el token todavía no está escrito del todo). Si hay cookie de
+  // sesión, dejar pasar.
+  // ⚠️ ESTE ES EL `if` DEL QUE HABLA LA NOTA DE `getClaims()` ARRIBA: la rama
+  // que redirige exige que NO haya cookie ninguna. Con cookie presente se pasa
+  // aunque la sesión no valide, y eso era así ya antes. No lo endurezcas de
+  // pasada creyendo que compensas algo — cerrarlo expulsaría a quien acaba de
+  // iniciar sesión, que es el motivo por el que se abrió.
+  if (!sesionValida && !isLoginPage && !isPublicPage && !isPublicApi) {
     const hasSessionCookie = request.cookies.getAll()
       .some(c => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
     if (!hasSessionCookie) {
