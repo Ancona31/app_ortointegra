@@ -506,7 +506,16 @@ hasActive && !isOpen
               Medido en local con build de producción, cargando /ayuda: 14
               peticiones RSC antes, 9 después. Las 5 que desaparecen son todas de
               esta línea. */}
-          <Link href="/privacidad" target="_blank" prefetch={false}
+          {/* ⚠️ `rel="noopener noreferrer"` ES OBLIGATORIO CON `target="_blank"`, y
+              faltaba: sin `noopener` la pestaña abierta recibe `window.opener` y
+              puede reescribir la URL de la de origen — que es una pantalla de la
+              aplicación con sesión abierta. Los navegadores lo aplican por defecto
+              desde 2021, así que hoy no es explotable; se escribe igual porque la
+              garantía no puede depender de la versión del navegador, y porque el
+              enlace gemelo de `app/login/page.tsx` ya lo declara obligatorio en un
+              comentario. Que dos sitios digan lo contrario sobre la misma regla es
+              lo que de verdad se arregla aquí. */}
+          <Link href="/privacidad" target="_blank" rel="noopener noreferrer" prefetch={false}
             className="block text-center text-[10px] text-white/40 hover:text-white/70 transition-colors pt-2">
             Aviso de Privacidad
           </Link>

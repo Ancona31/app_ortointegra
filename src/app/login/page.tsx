@@ -559,10 +559,33 @@ export default function LoginPage() {
         <p className="mt-8 text-center text-[13px] leading-[1.45] text-[var(--lp-ink-500)]">
           © 2026 Spinus · Todos los derechos reservados
           <br />
+          {/* ⚠️ `prefetch={false}` VA ATADO AL `target="_blank"` DE DEBAJO, igual
+              que en el enlace gemelo del pie del menú lateral
+              (`components/layout/Sidebar.tsx`), donde está el razonamiento largo.
+              En corto: con `_blank` el clic abre un contexto de navegación nuevo,
+              que hace carga completa de documento y NO consulta la caché del
+              router de cliente, así que lo precargado no se consume jamás.
+              Y `/privacy` está prerenderizada, que es el caso caro: una ruta
+              estática se precarga entera —árbol más todos sus segmentos—. Medidas
+              aquí: CUATRO peticiones, y las paga quien abre la app sin sesión, o
+              sea el primer contacto con el producto.
+
+              ⚠️ PERO NO SIEMPRE, Y CONVIENE SABERLO ANTES DE MEDIRLO: el prefetch
+              se dispara cuando el enlace ENTRA EN EL VIEWPORT, y este vive al pie
+              de la página. En una ventana corta no llega a verse y no cuesta nada;
+              en una pantalla alta, o en cuanto alguien baja, salen las cuatro.
+              Comprobado en local: cargando /login sin desplazar, cero; desplazando
+              al pie, cuatro. Si mides sin bajar, no vas a ver diferencia y no es
+              que el arreglo no sirva.
+              (El enlace gemelo del menú lateral no tiene ese matiz: el pie del
+              `aside` está siempre a la vista, así que allí eran cinco fijas.)
+
+              Si algún día se quita el `_blank`, esta línea vuelve a discutirse. */}
           <Link
             href="/privacy"
             target="_blank"
             rel="noopener noreferrer"
+            prefetch={false}
             className="transition-colors duration-[var(--sp-dur-micro)] hover:text-[var(--lp-accent)]"
           >
             Aviso de privacidad
