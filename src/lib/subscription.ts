@@ -123,6 +123,34 @@ export async function getSubscriptionState(
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return FAIL_OPEN
 
+      /* ⚠️⚠️ ESTA LISTA DE COLUMNAS TIENE QUE SER IDÉNTICA, CARÁCTER POR
+         CARÁCTER, A LA DE `(app)/layout.tsx`. NO ES ESTILO: ES LO ÚNICO QUE
+         EVITA UN VIAJE DUPLICADO A LA BASE, Y SE ROMPE EN SILENCIO.
+
+         Next desduplica las peticiones `fetch` idénticas dentro de un mismo
+         render (Request Memoization del App Router), y la clave de esa
+         desduplicación es LA URL. Supabase construye la URL con el `select`
+         dentro:
+
+           /rest/v1/profiles?select=role%2Cclinica_id%2Ces_admin_de_clinica&id=eq.…
+
+         Así que dos llamadores que pidan las MISMAS columnas cuestan un viaje, y
+         dos que pidan columnas distintas cuestan dos. Añadir una columna aquí y
+         no allí —o al revés— no da error de compilación, no falla ningún test y
+         no se ve en ninguna parte: sólo aparece una consulta de más por cada
+         render de cada página de `(app)`.
+
+         COMPROBADO MIDIENDO, no deducido. Instrumentando `fetch` en el servidor,
+         una carga de `/documentos` hace 3 viajes a Supabase; una de
+         `/expediente/[id]` hace 4, y el cuarto es exactamente este `profiles`
+         pedido con otro `select` desde `expediente/[id]/layout.tsx:40`, que
+         todavía pide sólo `role`.
+
+         Se intentó volver esto estructural —un resolvedor de sesión compartido
+         con `cache()` de React— y se descartó: diez archivos, dos de ellos
+         guardas de acceso al expediente clínico, para ahorrar UNA consulta.
+         Registrado en `DEUDA_TECNICA.md` como PERF-DT-1. Mientras tanto, la
+         garantía es este comentario y su gemelo en el layout. */
       const { data, error: profileErr } = await supabase
         .from('profiles')
         .select('role, clinica_id, es_admin_de_clinica')

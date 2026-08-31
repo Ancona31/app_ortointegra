@@ -45,6 +45,37 @@ type NavLeaf = {
   icon: React.ElementType
   badge?: string
   disabled?: boolean
+  /**
+   * Apaga la precarga de este enlace.
+   *
+   * ⚠️ LA DECISIÓN VIVE AQUÍ, EN LOS DATOS DE NAVEGACIÓN, Y NO EN EL JSX DE
+   * ABAJO, PORQUE ES UNA DECISIÓN DE PRODUCTO: «¿esto lo va a pulsar de verdad
+   * quien está trabajando?». Al lado de la etiqueta y del icono se puede
+   * contestar; a treinta líneas de distancia, entre `className`es, no.
+   *
+   * QUÉ CUESTA UN ENLACE PRECARGADO, medido en local con build de producción:
+   * los `<Link>` de este menú están TODOS en el viewport desde el primer render
+   * en escritorio —la barra es fija—, así que se precargan todos a la vez, en
+   * competencia con lo que la página esté pidiendo de verdad. Y en Next 16 un
+   * prefetch no es UNA petición: la caché de segmentos pide el árbol de rutas y
+   * luego los segmentos que falten, todos a la misma URL con distinto `?_rsc=`.
+   * Una ruta dinámica de `(app)` sale por dos; una estática prerenderizada, por
+   * cinco. Cargando `/ayuda` eran 14 peticiones RSC antes de esta tanda.
+   *
+   * QUÉ SE PIERDE AL APAGARLO: la transición instantánea. Al pulsar, la ruta se
+   * pide en ese momento y se ve el esqueleto de `(app)/loading.tsx` — que existe
+   * y está cuidado — en vez de aparecer ya pintada. En un destino que se pulsa
+   * una vez al día eso no se nota; en uno que se pulsa cada cinco minutos, sí.
+   * Ése es el criterio, y por eso `/dashboard` y `/agenda` se quedan con
+   * precarga y los tres de abajo no.
+   *
+   * ⚠️ LOS HIJOS DE UN GRUPO NO NECESITAN ESTO Y NO SE LES PONE. Sólo se
+   * renderizan con el grupo desplegado (`expanded`), o sea que su precarga ya
+   * está condicionada a un gesto que ES una señal de intención: quien abre
+   * «Documentos» va a pulsar un documento. Ponerles `sinPrefetch` les quitaría
+   * la instantaneidad justo donde se la han ganado.
+   */
+  sinPrefetch?: boolean
 }
 
 type NavGroup = {
@@ -81,6 +112,10 @@ function navDoctor(isAdmin: boolean): NavSection[] {
   ]
 
   return [
+    /* ⚠️ `/dashboard` y `/agenda` CONSERVAN la precarga a propósito: son los dos
+       destinos que se pulsan de verdad durante la jornada, y son los únicos.
+       Si vienes a apagar más enlaces, empieza por medir; si vienes a
+       encenderlos todos otra vez, lee la nota de `sinPrefetch` arriba. */
     { kind: 'leaf', href: '/dashboard', label: 'Dashboard', icon: Home },
     {
       kind: 'group', key: 'pacientes', label: 'Pacientes', icon: Stethoscope,
@@ -91,7 +126,9 @@ function navDoctor(isAdmin: boolean): NavSection[] {
       ],
     },
     { kind: 'leaf', href: '/agenda', label: 'Agenda', icon: CalendarDays },
-    { kind: 'leaf', href: '/calculadoras-clinicas', label: 'Calculadoras', icon: Calculator },
+    /* Sin precarga: nadie sale de la agenda o del expediente a las calculadoras.
+       Se entra a propósito y desde el menú, con una intención propia. */
+    { kind: 'leaf', href: '/calculadoras-clinicas', label: 'Calculadoras', icon: Calculator, sinPrefetch: true },
     {
       kind: 'group', key: 'documentos', label: 'Documentos', icon: FileText,
       matchPaths: ['/documentos'],
@@ -103,8 +140,12 @@ function navDoctor(isAdmin: boolean): NavSection[] {
       children: adminChildren,
     },
     { kind: 'divider' },
-    { kind: 'leaf', href: '/perfil',  label: 'Mi perfil', icon: UserCircle },
-    { kind: 'leaf', href: '/ayuda',   label: 'Ayuda',     icon: HelpCircle },
+    /* Sin precarga: destino de configuración, no de flujo clínico. Se visita
+       al dar de alta la firma o el logo, no durante la consulta. */
+    { kind: 'leaf', href: '/perfil',  label: 'Mi perfil', icon: UserCircle, sinPrefetch: true },
+    /* Sin precarga: por definición se abre cuando algo no se entiende, que es
+       raro y nunca urgente. */
+    { kind: 'leaf', href: '/ayuda',   label: 'Ayuda',     icon: HelpCircle, sinPrefetch: true },
   ]
 }
 
@@ -399,7 +440,14 @@ export default function Sidebar() {
                 )
               }
               return (
+                /* ⚠️ `undefined` Y NO `true` EN LA RAMA QUE SÍ PRECARGA. El valor
+                   por defecto de `prefetch` es `auto`, que decide según la ruta:
+                   una estática se precarga entera y una dinámica sólo hasta el
+                   `loading.tsx` más cercano. Pasarle `true` FORZARÍA la ruta
+                   completa también en las dinámicas — o sea que "no tocar nada"
+                   se escribe `undefined`, no `true`. */
                 <Link key={section.href} href={section.href} onClick={close}
+                  prefetch={section.sinPrefetch ? false : undefined}
                   className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150 ${
                     active ? 'bg-white text-[var(--cp)] shadow-sm' : 'text-white/55 hover:bg-white/10 hover:text-white'
                   }`}

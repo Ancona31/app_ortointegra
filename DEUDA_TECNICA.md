@@ -3617,4 +3617,128 @@ creyéndolo libre: el evento está a la vista en la banda.
 
 ---
 
+## Latencia de `/agenda` — investigación y tanda de arreglos (2026-08-31)
+
+Origen: una traza de Sentry en producción con `/agenda` en 4,11 s. La causa raíz
+resultó ser que **casi toda petición del dominio pagaba un viaje de red al
+servidor de Auth de Supabase** desde el middleware: 1.656 peticiones a Auth
+contra 117 a Postgres en 24 h. Lo que sigue son los cabos que la tanda dejó
+abiertos a propósito.
+
+### PERF-DT-1 — La desduplicación de `profiles` depende de que dos `select` sean idénticos, y se rompe en silencio
+
+**Estado:** 🟡 abierta, menor · **Archivos:**
+`src/lib/subscription.ts:128` y `src/app/(app)/layout.tsx:37` (las dos listas que
+deben coincidir) · `src/app/(app)/expediente/[id]/layout.tsx:40` (el caso vivo)
+**Detectado:** 2026-08-31, midiendo el commit B2 de la tanda de latencia.
+
+**El mecanismo**
+
+Next desduplica los `fetch` idénticos dentro de un mismo render (Request
+Memoization del App Router) y la clave es **la URL**. Supabase mete el `select`
+en la URL:
+
+```
+/rest/v1/profiles?select=role%2Cclinica_id%2Ces_admin_de_clinica&id=eq.…
+```
+
+Así que los cuatro layouts que se componen en una navegación comparten UN viaje a
+`profiles` **si y sólo si piden exactamente las mismas columnas**. Hoy coinciden,
+pero por accidente: coinciden desde que el commit «no repetir el perfil ya
+resuelto» unificó la lista a tres columnas. Añadir una columna en un sitio y no
+en el otro —o reordenarlas— restaura el viaje doble sin error de compilación, sin
+test que falle y sin nada visible.
+
+**El caso vivo, medido**
+
+`expediente/[id]/layout.tsx:40` todavía pide `select('role')` a secas. Por eso,
+instrumentando `fetch` en el servidor:
+
+```
+/documentos                   → 3 viajes a Supabase
+/expediente/[id]              → 4   ← el cuarto es este profiles con otro select
+/expediente/[id]/nueva-nota   → 4
+```
+
+**Por qué no se resolvió**
+
+Se escribió el arreglo estructural —un resolvedor de sesión compartido con
+`cache()` de React, del que bebieran los nueve layouts— y **se descartó tras
+medirlo**: eran diez archivos, dos de ellos guardas de acceso al expediente
+clínico, a cambio de UNA consulta. La corrección de la premisa importa y conviene
+tenerla escrita: se creía que los layouts anidados hacían 4 llamadas a Auth y 5 a
+Postgres por render, y la medición mostró 1 y 3 — Next ya desduplicaba lo demás.
+
+**Si alguien lo retoma:** el arreglo barato es alinear el `select` de
+`expediente/[id]/layout.tsx` con los otros dos (un viaje menos en todo el
+subárbol `/expediente/[id]/**`, un archivo). El caro es el resolvedor
+compartido, y no compensa por rendimiento — sólo por robustez.
+
+---
+
+### PERF-DT-2 — Los dos guardas de `/expediente` dejan pasar cuando la consulta de `profiles` falla
+
+**Estado:** 🔴 abierta · **Archivos:**
+`src/app/(app)/expediente/[id]/layout.tsx:44` (el que decide por rol) y
+`src/app/(app)/expediente/layout.tsx:22` (el que sólo exige sesión)
+**Detectado:** 2026-08-31, al mapear la equivalencia de los guardas para el
+commit B2 de la tanda de latencia.
+
+**El caso**
+
+```ts
+const { data: profile } = await supabase.from('profiles').select('role')…
+if (profile?.role === 'secretaria') redirect('/expediente')
+```
+
+Si la consulta falla —error de red, RLS, la base caída un instante—, `profile` es
+`null`, `profile?.role` da `undefined`, la comparación es falsa y **la secretaria
+entra al expediente clínico**. El guarda está orientado al lado permisivo: ante la
+duda, abre.
+
+**Lo que NO es**
+
+No es una regresión ni viene de la tanda de latencia; lleva ahí desde que el
+guarda existe. Se dejó **exactamente igual** al revisar B2, a propósito: aquello
+era una optimización y no podía cambiar quién entra.
+
+Tampoco es una fuga de datos por sí solo. La protección PRIMARIA de lo clínico es
+la RLS de las tablas, que excluye a la secretaria en lectura y escritura, y sigue
+en pie pase lo que pase con este guarda. Lo que se pierde es la capa de
+navegación: la secretaria aterrizaría en una pantalla de detalle vacía o rota en
+vez de ser desviada.
+
+**El arreglo**
+
+Invertir la orientación: bloquear cuando el rol NO consta, en vez de dejar pasar.
+Decidirlo para los dos guardas a la vez, y mirando qué hace el resto de la app
+cuando `profiles` no responde — si toda la app falla abierta, cambiar sólo esto
+crea una inconsistencia peor que el defecto. **Merece su propio commit**, no ir
+escondido dentro de otro cambio.
+
+---
+
+### PERF-DT-3 — `(launcher)/inicio/layout.tsx` repite el `getUser()` de su layout padre
+
+**Estado:** 🟡 abierta, menor · **Archivo:**
+`src/app/(launcher)/inicio/layout.tsx:16`
+**Detectado:** 2026-08-31, revisando los layouts anidados de la tanda de
+latencia.
+
+Cuelga de `(launcher)/layout.tsx`, que ya resuelve el estado de suscripción —y
+con él la sesión— en el mismo render, y aun así hace su propio
+`auth.getUser()` más un `select('role')` para desviar a la secretaria a
+`/dashboard` (`:25`). Es el mismo patrón que el de los layouts de `(app)`.
+
+**Coste real: probablemente cero hoy**, por lo que explica PERF-DT-1: el
+`getUser()` es una petición idéntica a la del padre y Next la desduplica. El
+`select('role')` sí es una URL distinta de la de tres columnas, así que ése
+probablemente sí cuesta un viaje — **no está medido**, a diferencia del caso de
+`/expediente/[id]`, que sí lo está.
+
+Quedó fuera de la tanda por alcance: no estaba entre los archivos autorizados. Si
+se toca, va con PERF-DT-1, que es el mismo problema.
+
+---
+
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)

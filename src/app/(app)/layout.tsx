@@ -31,7 +31,26 @@ export default async function AppLayout({ children }: { children: React.ReactNod
      siempre sale a la red.
      La lista tiene que coincidir con `PerfilParaSuscripcion` en
      `lib/subscription.ts`; si quitas una de aquí, el estado de suscripción se
-     calcula con un campo `undefined` y NO falla en compilación. */
+     calcula con un campo `undefined` y NO falla en compilación.
+
+     ⚠️⚠️ Y HAY UNA SEGUNDA RAZÓN, MÁS SUTIL, PARA QUE LA LISTA SEA IDÉNTICA A LA
+     DEL `select` DE `getSubscriptionState`: DE ELLA DEPENDE QUE NO SE HAGA UN
+     VIAJE DE MÁS.
+
+     Next desduplica los `fetch` idénticos dentro de un mismo render (Request
+     Memoization), y la clave es LA URL — que en Supabase lleva el `select`
+     dentro. Con las mismas columnas en los dos sitios, los layouts anidados de
+     `(app)` comparten un solo viaje a `profiles`; con listas distintas, cada uno
+     paga el suyo. Reordenar las columnas también cuenta: la URL cambia.
+
+     No hay nada que avise si se rompe. No es error de compilación, no falla
+     ningún test, y el síntoma es una consulta de más por render que sólo se ve
+     instrumentando el servidor.
+
+     El caso vivo está en `expediente/[id]/layout.tsx:40`, que pide `role` a
+     secas: por eso `/expediente/[id]` hace CUATRO viajes a Supabase donde
+     `/documentos` hace tres. Medido. Registrado como PERF-DT-1 en
+     `DEUDA_TECNICA.md`, junto con por qué no se resolvió estructuralmente. */
   const { data: profile } = await supabase
     .from('profiles')
     .select('role, clinica_id, es_admin_de_clinica')
