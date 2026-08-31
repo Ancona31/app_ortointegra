@@ -54,6 +54,51 @@ const nextConfig: NextConfig = {
         source: '/(.*)',
         headers: securityHeaders,
       },
+      /* ⚠️ SIN ESTO, LOS 20 ICONOS DE LA AGENDA SE REVALIDAN EN CADA NAVEGACIÓN.
+       *
+       * Next sólo pone caché inmutable a `/_next/static/`, que lleva hash en el
+       * nombre. Lo de `public/` sale con `Cache-Control: public, max-age=0`
+       * —comprobado con `curl -I` sobre `/icons/urgencias.svg`—, o sea que el
+       * navegador vuelve a preguntar por cada uno cada vez.
+       *
+       * Los consume `IconoDelEvento` en `agenda/page.tsx:332`, con `mask-image`,
+       * así que se piden al PINTAR: tarde en la cascada, cuando la agenda ya
+       * está compitiendo por ancho de banda con sus dos peticiones de datos. En
+       * producción se midió uno en 470 ms para 2,7 kB. La mayor parte de eso era
+       * el middleware autenticando el archivo —ya arreglado, los estáticos salen
+       * del matcher—; lo que queda y esta regla elimina es el viaje de
+       * revalidación.
+       *
+       * ⚠️ NO PONGAS `immutable`, Y ÉSTA ES LA RAZÓN CONCRETA: estos SVG NO
+       * LLEVAN HASH EN EL NOMBRE. `/icons/urgencias.svg` se llama igual antes y
+       * después de un rediseño, así que `immutable` —que autoriza al navegador a
+       * no volver a preguntar NUNCA durante el max-age— dejaría el icono viejo
+       * clavado el tiempo que durase, sin forma de purgarlo salvo renombrando el
+       * archivo. Con `/_next/static/` sí se puede porque ahí el nombre cambia con
+       * el contenido; aquí no.
+       *
+       * EL REPARTO ELEGIDO:
+       *  · `max-age=86400` — un día sin preguntar. Un icono no cambia en una
+       *    jornada, y la jornada es justo la unidad de uso de esta aplicación.
+       *  · `stale-while-revalidate=604800` — durante la semana siguiente el
+       *    navegador PINTA el icono viejo al instante y revalida en segundo
+       *    plano. O sea que ni siquiera al caducar hay una espera visible.
+       *
+       * EL PRECIO, ACEPTADO: tras cambiar un icono, quien ya lo tenía puede ver
+       * el anterior hasta un día. Si algún día eso importa (un icono equivocado,
+       * no feo), la salida es RENOMBRAR el archivo — el nombre es la clave de
+       * caché y también lo que guarda la base en `appointments.icono`, así que
+       * renombrar exige migrar esas filas. No es gratis; por eso el max-age es
+       * de un día y no de un año. */
+      {
+        source: '/icons/:archivo*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=86400, stale-while-revalidate=604800',
+          },
+        ],
+      },
     ]
   },
   images: {
