@@ -25,6 +25,15 @@ const securityHeaders = [
   { key: 'Permissions-Policy',      value: 'camera=(), microphone=(), geolocation=()' },
 ]
 
+/* La política de caché de los estáticos servidos desde `public/`, en un solo
+ * sitio para los tres directorios que la usan. El porqué de cada número —y por
+ * qué NO lleva `immutable`— está junto a la primera regla que la aplica, en
+ * `headers()`. Si algún día hace falta una política distinta por directorio,
+ * esto se parte; hoy los tres quieren exactamente lo mismo. */
+const cacheEstaticos = [
+  { key: 'Cache-Control', value: 'public, max-age=86400, stale-while-revalidate=604800' },
+]
+
 const nextConfig: NextConfig = {
   // Build ID único por deploy — usado por el Service Worker para nombrar
   // el cache. Garantiza que cada deploy tenga su propio cache y elimina
@@ -92,12 +101,42 @@ const nextConfig: NextConfig = {
        * de un día y no de un año. */
       {
         source: '/icons/:archivo*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=86400, stale-while-revalidate=604800',
-          },
-        ],
+        headers: cacheEstaticos,
+      },
+      /* ⚠️ MISMA REGLA, Y AQUÍ HAY MUCHOS MÁS BYTES QUE EN LOS ICONOS: 29 mp3 de
+       * los tutoriales (~5 MB) y 11 tipografías (~3,5 MB), revalidándose igual
+       * que los SVG. Los dos directorios ya estaban excluidos del middleware
+       * desde antes —`/fonts/` por el incidente de fontkit, `/audio/` por el
+       * matcher—, así que lo único que faltaba era decirle al navegador que
+       * puede quedárselos.
+       *
+       * ⚠️⚠️ SOBRE `/fonts/` Y LA GENERACIÓN DE PDF, QUE ES LA PREGUNTA OBVIA:
+       * ESTA CABECERA NO PUEDE AFECTARLA. En el servidor, react-pdf NO pide las
+       * tipografías por HTTP — las lee del DISCO. `PdfStyles.tsx:4-17` bifurca
+       * por `typeof window === 'undefined'` y la rama de servidor registra
+       * `path.join(process.cwd(), 'public', 'fonts', …)`. Una cabecera de
+       * respuesta HTTP no tiene forma de tocar un `fs.readFile`.
+       * Por URL se cargan sólo en el NAVEGADOR: la rama `else` de ese mismo
+       * archivo, `pdfClientFallback.ts` y las dos familias de v2
+       * (`pdf/v2/fonts.ts:75` y `:102`, que no tienen rama de servidor y cuyos
+       * consumidores son los componentes de `taller-v2`). Ahí cachear sólo puede
+       * ayudar: el archivo es inmutable de hecho y hoy se vuelve a pedir en cada
+       * navegación que genere un documento.
+       * Ninguna ruta de `src/app/api` renderiza con `@react-pdf/renderer`.
+       *
+       * ⚠️ Y AUN ASÍ NO SE USA `immutable`, por lo mismo que en los iconos y con
+       * más razón: `Roboto-Bold.ttf` tampoco lleva hash. Que en la práctica no
+       * cambie nunca no es garantía de nada — el día que se sustituya un .ttf
+       * por otro con el mismo nombre, `immutable` lo dejaría clavado sin salida.
+       * Un día de max-age y una semana de revalidación en segundo plano dan
+       * prácticamente todo el beneficio sin esa esquina. */
+      {
+        source: '/audio/:archivo*',
+        headers: cacheEstaticos,
+      },
+      {
+        source: '/fonts/:archivo*',
+        headers: cacheEstaticos,
       },
     ]
   },
