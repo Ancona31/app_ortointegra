@@ -480,7 +480,33 @@ hasActive && !isOpen
             <LogOut size={14} />
             Cerrar sesión
           </button>
-          <Link href="/privacidad" target="_blank"
+          {/* ⚠️ EL `prefetch={false}` VA ATADO AL `target="_blank"`, Y SI ALGUIEN
+              QUITA EL SEGUNDO TIENE QUE REPLANTEARSE EL PRIMERO.
+
+              Sin él, este enlace pedía `/privacidad` CINCO VECES en cada carga de
+              cada página de `(app)` —no sólo en la agenda—, y las cinco eran
+              imposibles de aprovechar: con `target="_blank"` el clic abre un
+              contexto de navegación nuevo, que hace CARGA COMPLETA DE DOCUMENTO y
+              no consulta la caché del router de cliente. Lo precargado no se
+              consume nunca, en ningún escenario.
+
+              ⚠️ POR QUÉ CINCO Y NO UNA, que es lo que despista al medirlo. En Next
+              16 un prefetch no es una petición: la caché de segmentos pide primero
+              el árbol de rutas y después CADA SEGMENTO que falte
+              (`segment-cache/cache.js:990` y `:1296`), y en modo servidor todas
+              VAN A LA MISMA URL, distinguiéndose sólo por cabecera — en el registro
+              de red se ven como el mismo path con distinto `?_rsc=`.
+
+              Y `/privacidad` es la cara cara: está PRERENDERIZADA (sale en
+              `prerender-manifest.json`), y una ruta estática se precarga ENTERA,
+              árbol más todos sus segmentos. Las rutas de `(app)` son dinámicas y se
+              quedan en dos —árbol y poco más—, porque el prefetch se detiene en el
+              `loading.tsx` del grupo.
+
+              Medido en local con build de producción, cargando /ayuda: 14
+              peticiones RSC antes, 9 después. Las 5 que desaparecen son todas de
+              esta línea. */}
+          <Link href="/privacidad" target="_blank" prefetch={false}
             className="block text-center text-[10px] text-white/40 hover:text-white/70 transition-colors pt-2">
             Aviso de Privacidad
           </Link>
