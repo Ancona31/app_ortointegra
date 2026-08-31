@@ -110,6 +110,55 @@ export type PerfilParaSuscripcion = {
  * Caso de retorno isBlocked=true:
  *   suscripcion_estado='cancelado' AND es_vip_grant=false AND count > 5.
  */
+/**
+ * Las columnas que el perfil DEBE traer para que el veredicto sea de fiar.
+ * Es la misma lista del `select` de abajo, escrita una vez para que la guarda y
+ * la consulta no puedan discrepar.
+ */
+const CLAVES_PERFIL = ['role', 'clinica_id', 'es_admin_de_clinica'] as const
+
+/**
+ * ⚠️⚠️ ESTA GUARDA EXISTE PARA IMPEDIR QUE EL COBRO SE APAGUE ENTERO, EN
+ * SILENCIO, POR UN `select` RECORTADO. NO LA QUITES POR REDUNDANTE.
+ *
+ * El escenario, que es de limpieza bienintencionada y no de malicia: en
+ * `(app)/layout.tsx` sólo se USA `role` a la vista, así que `clinica_id` y
+ * `es_admin_de_clinica` parecen columnas muertas. Alguien recorta el `select` a
+ * `'role'`. A partir de ahí el perfil llega sin `clinica_id`, la comprobación
+ * `if (!profile.clinica_id)` de abajo se cumple, y la función devuelve FAIL_OPEN
+ * —`isBlocked: false`— PARA TODOS LOS USUARIOS. El bloqueo por suscripción
+ * desaparece del producto entero y nadie se entera: no hay error, no hay log, y
+ * la única señal sería que dejan de aparecer los avisos de pago.
+ *
+ * ⚠️ Y TYPESCRIPT NO LO CAZA. `lib/supabase/server.ts` llama a
+ * `createServerClient` SIN el genérico `Database`, así que el `data` de
+ * `.single()` es `any` y se asigna a `PerfilParaSuscripcion` sin una queja. El
+ * tipo dice que las tres claves están; el objeto en tiempo de ejecución tiene
+ * las que pidió el `select`, que es otra cosa.
+ *
+ * Funciona de verdad porque PostgREST devuelve EXACTAMENTE las columnas del
+ * `select`, ni una más: si no se pidió `clinica_id`, la clave no existe en el
+ * objeto —no es que valga `null`—, y `in` lo distingue.
+ *
+ * ⚠️ `in` Y NO `!= null`, Y LA DIFERENCIA ES TODA LA GUARDA. Una clínica sin
+ * `clinica_id` es un caso LEGÍTIMO —super_admin, onboarding a medias— que debe
+ * seguir cayendo en su FAIL_OPEN documentado (caso 3). `in` separa «no se pidió
+ * la columna» de «la columna vale null», que es justo la distinción que hace
+ * falta; `!= null` las confundiría y mandaría a consultar de nuevo a usuarios
+ * perfectamente normales.
+ *
+ * ⚠️ Y LA GUARDA ES SEGURA AUNQUE SU PREMISA FUERA FALSA. Si algún día PostgREST
+ * devolviera columnas no pedidas, `perfilCompleto` sería siempre cierto y el
+ * comportamiento volvería a ser exactamente el de hoy — nunca peor. Sólo puede
+ * ayudar: no hay una rama en la que esta comprobación empeore nada.
+ *
+ * El coste de equivocarse hacia este lado es UNA CONSULTA de más en un camino
+ * que hoy no ocurre. El de equivocarse hacia el otro es dejar de cobrar.
+ */
+function perfilCompleto(perfil: PerfilParaSuscripcion): boolean {
+  return CLAVES_PERFIL.every((clave) => clave in perfil)
+}
+
 export async function getSubscriptionState(
   supabase: SupabaseClient,
   perfilYaResuelto?: PerfilParaSuscripcion,
@@ -117,7 +166,9 @@ export async function getSubscriptionState(
   try {
     let profile: PerfilParaSuscripcion
 
-    if (perfilYaResuelto) {
+    /* Perfil incompleto = se ignora y se consulta, que es el camino seguro.
+       Ver `perfilCompleto`: sin esto, un `select` recortado apaga el cobro. */
+    if (perfilYaResuelto && perfilCompleto(perfilYaResuelto)) {
       profile = perfilYaResuelto
     } else {
       const { data: { user } } = await supabase.auth.getUser()
@@ -126,6 +177,24 @@ export async function getSubscriptionState(
       /* ⚠️⚠️ ESTA LISTA DE COLUMNAS TIENE QUE SER IDÉNTICA, CARÁCTER POR
          CARÁCTER, A LA DE `(app)/layout.tsx`. NO ES ESTILO: ES LO ÚNICO QUE
          EVITA UN VIAJE DUPLICADO A LA BASE, Y SE ROMPE EN SILENCIO.
+
+         ⚠️ QUIÉN EJECUTA ESTE `select`, QUE ES LO QUE HACE QUE EL PAR EXISTA.
+         NO es la llamada de `(app)/layout.tsx`: ése pasa el perfil por parámetro
+         y por tanto NUNCA entra en esta rama. Quienes sí entran son los SEIS
+         layouts que todavía llaman sin argumento:
+
+           (app)/documentos/layout.tsx
+           (app)/pacientes/nuevo/layout.tsx
+           (app)/dicom/layout.tsx
+           (app)/expediente/[id]/nueva-nota/layout.tsx
+           (app)/expediente/[id]/documentos/layout.tsx
+           (launcher)/layout.tsx
+
+         Los cinco primeros están ANIDADOS bajo `(app)/layout`, así que en esas
+         rutas se ejecutan LOS DOS `select` dentro del mismo render: el del
+         layout padre y éste. Ése es el par que tiene que coincidir. Si algún día
+         esos seis dejaran de llamar sin argumento, el acoplamiento desaparecería
+         — pero mientras alguno siga, sigue vivo.
 
          Next desduplica las peticiones `fetch` idénticas dentro de un mismo
          render (Request Memoization del App Router), y la clave de esa

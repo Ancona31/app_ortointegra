@@ -219,12 +219,30 @@ export async function middleware(request: NextRequest) {
    modos. Ninguna ruta de API lleva extensión. Se verificó leyendo
    `routes-manifest.json` + `app-path-routes-manifest.json` del build.
 
+   ⚠️ `.json` NO ESTÁ EN LA LISTA, y conviene saberlo antes de razonar sobre
+   ella: `/manifest.json` sale por su propio literal, no por la extensión. Una
+   ruta autenticada terminada en `.json` sigue pasando por aquí — comprobado con
+   `/api/documentos/x.json`, que redirige a /login sin sesión.
+
    ⚠️ Y AQUÍ ESTÁ EL PRECIO, QUE SE ACEPTA A SABIENDAS: si algún día se crea un
-   route handler AUTENTICADO cuya ruta termine en `.json`, `.svg` o `.js`,
-   quedaría fuera del middleware SIN AVISO NINGUNO — sin error de compilación,
-   sin fallo en el build, sin nada que se vea. Si escribes una ruta así, o le
-   quitas la extensión, o la exceptúas aquí a mano. Es el único caso en que esta
-   línea muerde.
+   route handler AUTENTICADO cuya ruta termine en `.svg`, `.js` o cualquier otra
+   de la lista, quedaría fuera del middleware SIN AVISO NINGUNO — sin error de
+   compilación, sin fallo en el build, sin nada que se vea. Si escribes una ruta
+   así, o le quitas la extensión, o la exceptúas aquí a mano.
+
+   ⚠️⚠️ Y LO QUE SE VERIFICÓ FUERON PATRONES DE RUTA, NO RUTAS DE PETICIÓN. Esa
+   distinción importa y el párrafo de arriba se queda corto sin ella: un SEGMENTO
+   DINÁMICO puede recibir un valor que termine en una de estas extensiones, y esa
+   PETICIÓN se salta el middleware aunque el PATRÓN no llevara extensión ninguna.
+   `/expediente/loquesea.png` casa con `/expediente/[id]` y no pasa por aquí —
+   comprobado.
+
+   NO ES EXPLOTABLE, y por eso la regla se queda: esas rutas se autentican SOLAS.
+   `/expediente/loquesea.png` y `/expediente/abc.svg` contestan 307 a /login sin
+   sesión, igual que `/dashboard`, porque el guarda vive en
+   `(app)/layout.tsx` y `expediente/layout.tsx`, no aquí. El middleware nunca fue
+   la única puerta — y si algún día alguien crea un subárbol autenticado SIN
+   guarda propia en su layout, este párrafo es el que hay que releer.
 
    ⚠️ NADA DE `public/` NECESITA LA BARRERA, y se revisó el árbol entero antes de
    abrirlo: iconos, audio de tutoriales, tipografías, logos, el QR de la demo y

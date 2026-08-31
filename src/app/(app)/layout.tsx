@@ -29,19 +29,31 @@ export default async function AppLayout({ children }: { children: React.ReactNod
      —es la misma fila, el mismo viaje— mientras que dejar que la función las
      pida por su cuenta cuesta un viaje entero MÁS un `auth.getUser()`, que
      siempre sale a la red.
-     La lista tiene que coincidir con `PerfilParaSuscripcion` en
-     `lib/subscription.ts`; si quitas una de aquí, el estado de suscripción se
-     calcula con un campo `undefined` y NO falla en compilación.
+     ⚠️⚠️ RECORTAR ESTE `select` A `'role'` NO ES UNA LIMPIEZA: ES APAGAR EL
+     COBRO. `clinica_id` y `es_admin_de_clinica` parecen columnas muertas porque
+     aquí no se miran, pero viajan abajo como parámetro y sin `clinica_id` el
+     estado de suscripción cae en FAIL_OPEN —`isBlocked: false`— para TODOS los
+     usuarios, sin error y sin log. Y TypeScript no lo caza: el cliente no lleva
+     el genérico `Database`, así que `data` es `any`.
+     Desde la revisión externa hay una guarda que lo intercepta —`perfilCompleto`
+     en `lib/subscription.ts`, que ignora un perfil incompleto y consulta— pero
+     esa guarda es la RED, no el permiso: si se dispara, se paga una consulta de
+     más en cada render. La lista correcta es ésta.
 
-     ⚠️⚠️ Y HAY UNA SEGUNDA RAZÓN, MÁS SUTIL, PARA QUE LA LISTA SEA IDÉNTICA A LA
-     DEL `select` DE `getSubscriptionState`: DE ELLA DEPENDE QUE NO SE HAGA UN
-     VIAJE DE MÁS.
+     ⚠️⚠️ Y HAY UNA SEGUNDA RAZÓN PARA QUE SEA IDÉNTICA A LA DEL `select` INTERNO
+     DE `getSubscriptionState`: DE ELLA DEPENDE QUE NO SE HAGA UN VIAJE DE MÁS.
+
+     Ojo con quién ejecuta aquel `select`, porque no es la llamada de aquí abajo
+     —ésa pasa el perfil y se salta esa rama—. Son los SEIS layouts que todavía
+     llaman sin argumento: `documentos`, `pacientes/nuevo`, `dicom`,
+     `expediente/[id]/nueva-nota`, `expediente/[id]/documentos` y `(launcher)`.
+     Los cinco primeros cuelgan de ESTE layout, así que en sus rutas se ejecutan
+     los dos `select` dentro del mismo render.
 
      Next desduplica los `fetch` idénticos dentro de un mismo render (Request
      Memoization), y la clave es LA URL — que en Supabase lleva el `select`
-     dentro. Con las mismas columnas en los dos sitios, los layouts anidados de
-     `(app)` comparten un solo viaje a `profiles`; con listas distintas, cada uno
-     paga el suyo. Reordenar las columnas también cuenta: la URL cambia.
+     dentro. Con las mismas columnas, esos dos comparten un viaje; con listas
+     distintas, cada uno paga el suyo. Reordenarlas también cuenta: la URL cambia.
 
      No hay nada que avise si se rompe. No es error de compilación, no falla
      ningún test, y el síntoma es una consulta de más por render que sólo se ve

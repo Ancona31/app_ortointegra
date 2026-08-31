@@ -87,23 +87,28 @@ const nextConfig: NextConfig = {
        * el contenido; aquí no.
        *
        * EL REPARTO ELEGIDO:
-       *  · `max-age=86400` — un día sin preguntar. Un icono no cambia en una
-       *    jornada, y la jornada es justo la unidad de uso de esta aplicación.
-       *  · `stale-while-revalidate=604800` — durante la semana siguiente el
-       *    navegador PINTA el icono viejo al instante y revalida en segundo
-       *    plano. O sea que ni siquiera al caducar hay una espera visible.
+       *  · `max-age=86400` — un día sin preguntar nada.
+       *  · `stale-while-revalidate=604800` — pasado ese día, el navegador PINTA
+       *    la copia vieja al instante y revalida por detrás.
        *
-       * EL PRECIO, ACEPTADO: tras cambiar un icono, quien ya lo tenía puede ver
-       * el anterior hasta un día. Si algún día eso importa (un icono equivocado,
-       * no feo), la salida es RENOMBRAR el archivo — el nombre es la clave de
-       * caché y también lo que guarda la base en `appointments.icono`, así que
-       * renombrar exige migrar esas filas. No es gratis; por eso el max-age es
-       * de un día y no de un año. */
+       * ⚠️ EL PRECIO NO ES «hasta un día», Y ESA CUENTA ES FÁCIL DE HACER MAL.
+       * `stale-while-revalidate` sirve lo viejo AHORA y refresca DESPUÉS, así
+       * que la primera visita tras caducar el día todavía ve el icono anterior;
+       * quien lo sustituye es la visita SIGUIENTE. Y si el usuario no vuelve
+       * dentro de la ventana, la copia vieja le sirve los SIETE DÍAS COMPLETOS.
+       * O sea: el suelo es un día y el techo es una semana, no un día.
+       *
+       * Se acepta igual —son iconos, y el fallo es estético— pero si algún día
+       * hay que cambiar uno de verdad (un icono EQUIVOCADO, no feo), no basta
+       * con esperar: la salida es RENOMBRAR el archivo, porque el nombre es la
+       * clave de caché. Y renombrar no es gratis: ese mismo nombre es lo que
+       * guarda la base en `appointments.icono`, así que exige migrar esas filas.
+       * Por eso el max-age es de un día y no de un año. */
       {
         source: '/icons/:archivo*',
         headers: cacheEstaticos,
       },
-      /* ⚠️ MISMA REGLA, Y AQUÍ HAY MUCHOS MÁS BYTES QUE EN LOS ICONOS: 29 mp3 de
+      /* ⚠️ MISMA REGLA, Y AQUÍ HAY MUCHOS MÁS BYTES QUE EN LOS ICONOS: 28 mp3 de
        * los tutoriales (~5 MB) y 11 tipografías (~3,5 MB), revalidándose igual
        * que los SVG. Los dos directorios ya estaban excluidos del middleware
        * desde antes —`/fonts/` por el incidente de fontkit, `/audio/` por el
