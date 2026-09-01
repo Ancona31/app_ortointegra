@@ -3678,13 +3678,13 @@ compartido, y no compensa por rendimiento — sólo por robustez.
 
 ### PERF-DT-2 — Los dos guardas de `/expediente` dejan pasar cuando la consulta de `profiles` falla
 
-**Estado:** 🔴 abierta · **Archivos:**
-`src/app/(app)/expediente/[id]/layout.tsx:44` (el que decide por rol) y
-`src/app/(app)/expediente/layout.tsx:22` (el que sólo exige sesión)
+**Estado:** 🟢 resuelta (2026-09-01) — commit `f505ce2` · **Archivos:**
+`src/app/(app)/expediente/[id]/layout.tsx` (el que decide por rol) y
+`src/app/(app)/expediente/layout.tsx` (el que sólo exige sesión)
 **Detectado:** 2026-08-31, al mapear la equivalencia de los guardas para el
 commit B2 de la tanda de latencia.
 
-**El caso**
+**El caso (como estaba)**
 
 ```ts
 const { data: profile } = await supabase.from('profiles').select('role')…
@@ -3708,13 +3708,66 @@ en pie pase lo que pase con este guarda. Lo que se pierde es la capa de
 navegación: la secretaria aterrizaría en una pantalla de detalle vacía o rota en
 vez de ser desviada.
 
-**El arreglo**
+**El arreglo (el que se pedía)**
 
 Invertir la orientación: bloquear cuando el rol NO consta, en vez de dejar pasar.
 Decidirlo para los dos guardas a la vez, y mirando qué hace el resto de la app
 cuando `profiles` no responde — si toda la app falla abierta, cambiar sólo esto
 crea una inconsistencia peor que el defecto. **Merece su propio commit**, no ir
 escondido dentro de otro cambio.
+
+**Cierre (2026-09-01) — commit `f505ce2`, en su propio commit como se pedía**
+
+El guarda del detalle destructura ahora `error` —antes se tiraba al suelo, y ésa
+era la avería entera— y bloquea sobre `error || !profile?.role`. El deny sobre
+`secretaria` se queda intacto: **este commit cambió el camino de FALLO, no la
+política**. Se descartó a propósito sustituirlo por una lista blanca de roles
+permitidos, que dejaría fuera en silencio a cualquier rol que se añada al `CHECK`
+de la tabla.
+
+Es seguro bloquear ahí porque un rol ausente no puede ser un perfil a medias:
+`profiles.role` es `text NOT NULL DEFAULT 'medico'`
+(`supabase/baseline/02_tables.sql:406`) y la RLS deja a cualquiera leer su propia
+fila (`profiles_select_own`, `07_rls_policies.sql:561`). Si no consta, lo que hay
+es un fallo, no un usuario legítimo.
+
+No se redirige. Las dos salidas obvias mienten —`/login` finge que la sesión se
+cayó cuando el `getUser()` acaba de pasar, y `/expediente` es literalmente lo que
+recibe la secretaria, así que el médico vería su clic evaporarse—, de modo que el
+layout **devuelve un panel de bloqueo en lugar de `children`**: cerrado de verdad
+y honesto sobre lo que pasó. Tampoco se hace `throw`: no hay un solo `error.tsx`
+en `src/app`.
+
+**El guarda de la lista no necesitaba cambio** y por eso no lo tuvo: no consulta
+`profiles`, así que no hay consulta que pueda fallar. Sólo se le añadió el
+comentario que deja escrito el reparto —uno exige sesión, el otro decide por rol—
+para que no haya que deducirlo. Eso es lo que significaba «decidirlo para los dos
+a la vez».
+
+Verificado: `npm run build`, `npx tsc --noEmit` y 575/575 tests en verde.
+
+> ### ⚠️ LOS OTROS CUATRO SITIOS CON ESTE MISMO PATRÓN SIGUEN FALLANDO ABIERTOS,
+> ### Y ESO ES DELIBERADO. NO LOS "ARREGLES" POR SIMETRÍA.
+>
+> Son `(app)/layout.tsx` (el desvío de `super_admin`),
+> `(launcher)/inicio/layout.tsx` (PERF-DT-3), el FAIL_OPEN documentado de
+> `lib/subscription.ts`, y los checks de cliente de `dashboard/page.tsx` y
+> `estadisticas/page.tsx`. Los cinco comparten la forma `profile?.role === …`,
+> pero **ninguno de esos cuatro custodia datos clínicos**: fallan hacia
+> `/inicio`, hacia el dashboard o hacia un banner de suscripción, o sea hacia
+> sitios donde no hay nada que proteger. Cerrarlos convertiría un fallo
+> transitorio de red en gente legítima expulsada de su propia app, a cambio de
+> nada.
+>
+> La regla del proyecto **NO es «todos los guardas fallan igual»**. Es **«los
+> guardas de datos clínicos fallan cerrados»**. La asimetría que ves al comparar
+> `expediente/[id]/layout.tsx` con los otros cuatro no es una migración a medio
+> hacer: es la regla aplicada. Si algún día aparece un guarda nuevo, la pregunta
+> no es a cuál de los dos grupos se parece más, sino si lo que hay detrás es
+> clínico.
+>
+> (Esta nota está repetida dentro de `expediente/[id]/layout.tsx`, junto al
+> código. Si se mueve una, se mueve la otra.)
 
 ---
 
@@ -3738,6 +3791,14 @@ probablemente sí cuesta un viaje — **no está medido**, a diferencia del caso
 
 Quedó fuera de la tanda por alcance: no estaba entre los archivos autorizados. Si
 se toca, va con PERF-DT-1, que es el mismo problema.
+
+**⚠️ ESTO ES DE RENDIMIENTO, NO DE ORIENTACIÓN DEL FALLO.** Su `select('role')`
+también deja pasar cuando la consulta falla —es letra por letra el patrón que
+cerró PERF-DT-2— y **así se queda a propósito**: aquí el fallo abre hacia
+`/inicio`, que no es clínico, y cerrarlo sólo cambiaría un desvío de cortesía por
+un médico expulsado de su propia casa en cada hipo de red. Si alguien viene a
+«terminar lo de PERF-DT-2», el sitio donde se explica por qué no hay nada que
+terminar es la nota de cierre de esa entrada, arriba.
 
 ---
 
