@@ -163,7 +163,35 @@ export async function middleware(request: NextRequest) {
   }
 
   const isLoginPage = pathname === '/login'
-  const isPublicPage = ['/', '/forgot-password', '/reset-password', '/auth/confirm', '/auth/callback', '/auth/confirm-email', '/pricing', '/register', '/privacy', '/terms', '/offline'].includes(pathname)
+  /* ⚠️ `/privacidad` Y `/privacy` SON LA MISMA PÁGINA Y LAS DOS TIENEN QUE ESTAR.
+     No es redundancia: existen las dos rutas —`app/privacidad/page.tsx` y
+     `app/privacy/page.tsx`, las dos devuelven `<AvisoPrivacidadContent />`— y los
+     enlaces del proyecto están repartidos entre ambas. Hacia dentro se usa
+     `/privacidad` (menú lateral, consentimiento de alta, paleta de comandos);
+     hacia fuera, `/privacy` (pie de la landing, login, ayuda). Sólo estaba la
+     segunda, así que la primera pedía iniciar sesión — y un aviso de privacidad
+     que exige registrarse es exactamente la página que no puede hacer eso.
+     El caso más visible ni siquiera requería compartir el enlace: el PIE de la
+     propia página legal (`components/legal/LegalLayout.tsx:61`) apunta a
+     `/privacidad`, así que un visitante sin sesión que llegaba a `/privacy` desde
+     la landing salía disparado al login al pinchar el enlace del pie. La página
+     se enlazaba a sí misma hacia el rebote.
+     Que existan dos rutas para un solo aviso es deuda aparte y está documentada
+     en `login/page.tsx:550`. AQUÍ NO SE RESUELVE: mientras las dos existan y
+     tengan enlaces vivos, las dos son públicas. Si algún día se unifican, la que
+     sobre se quita de esta lista en el mismo cambio, no antes.
+
+     ⚠️ `/demo/receta` ES PÚBLICA POR EL MISMO MOTIVO, Y SU PÚBLICO NUNCA TIENE
+     SESIÓN. Es lo que abre el QR del Teaser 2 de la landing
+     (`components/landing/teaser2/qr-receta-demo.ts:4` codifica
+     `https://www.spinus.com.mx/demo/receta`), o sea que quien la pide es alguien
+     que acaba de escanear un código impreso en la página pública: un posible
+     cliente, no un usuario. Sin esta entrada acababa en `/login`.
+     No expone nada: es una hoja estática con datos ficticios, sin Supabase y sin
+     `notFound()` — ver la cabecera de `app/demo/receta/page.tsx`.
+     Si se añaden más páginas bajo `/demo/`, esto pasa a ser un `startsWith`; con
+     una sola, el literal es más honesto sobre lo que hay. */
+  const isPublicPage = ['/', '/forgot-password', '/reset-password', '/auth/confirm', '/auth/callback', '/auth/confirm-email', '/pricing', '/register', '/privacy', '/privacidad', '/terms', '/offline', '/demo/receta'].includes(pathname)
     || pathname.startsWith('/r/')
     || pathname.startsWith('/offline-mode')
     || pathname.startsWith('/offline-setup')
