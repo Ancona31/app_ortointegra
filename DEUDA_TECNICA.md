@@ -3741,4 +3741,58 @@ se toca, va con PERF-DT-1, que es el mismo problema.
 
 ---
 
+### DEP-DT-3 — `SecretariaDashboard.tsx` es código muerto
+
+**Estado:** 🟡 abierta, menor · **Archivo:**
+`src/app/(app)/dashboard/SecretariaDashboard.tsx` (88 líneas)
+**Detectado:** 2026-09-01, en la Fase 1 del ajuste del panel «Próximas citas».
+
+**Nadie lo importa.** `grep -rn "SecretariaDashboard" src` sólo da la línea
+donde el propio archivo se declara. Quien atiende a `role='secretaria'` es
+`AsistenteDashboard.tsx`, y lo hace desde `dashboard/page.tsx:201`.
+
+Es una versión anterior del panel de la secretaria: saludo, botón de nuevo
+paciente y últimos pacientes registrados. **No tiene panel de citas**, así que
+ninguna de las reglas de esta tanda (sólo citas, tope de cuatro) le aplica ni
+le aplicaría.
+
+**No se borró en esta tanda a propósito:** el encargo era el panel de citas y
+`SecretariaDashboard` no lo tiene, así que borrarlo habría sido aprovechar el
+viaje para otra cosa. Se deja anotado para que la próxima limpieza no tenga que
+volver a averiguar si está vivo. Al retirarlo, comprobar antes que sigue sin
+importadores — es una comprobación de un comando, no una suposición.
+
+---
+
+### UI-DT-1 — «Eventos de hoy» no cabe en la fila de actividad de `/inicio`
+
+**Estado:** 🟡 abierta, es DISEÑO y no defecto · **Archivo:**
+`src/app/(launcher)/inicio/page.tsx:382-395` (la *quick activity row*)
+**Detectado:** 2026-09-01, cerrando el ajuste del panel «Próximas citas».
+
+**Esto NO es un pendiente de corrección: el defecto ya está cerrado.** El
+contador «Hoy tienes N citas» mezclaba en un solo número las citas, los eventos
+genéricos (§12.14) y las canceladas. Hoy cuenta sólo citas de paciente, no
+canceladas y del médico que mira. **Lo que quedó fuera es enseñar los eventos
+genéricos APARTE, con su propio número** — se decidió excluirlos sin más.
+
+**Por qué se paró.** La fila es `flex items-center gap-6` **sin `flex-wrap`**,
+con dos elementos y un divisor de `w-px`. Un tercero es el mismo patrón
+repetido, pero esa fila no envuelve: en móvil se desborda. Elegir cómo no
+desbordar es diseño de una tarjeta que Angel no ha decidido, y por eso no se
+tocó el layout.
+
+**Las dos salidas identificadas**, si se retoma en la rama de diseño:
+
+1. `flex-wrap` en la fila — el tercer elemento baja de línea en pantallas
+   estrechas. Cambia el alto de la tarjeta en móvil.
+2. Esconder el tercero por debajo de `sm` — la fila nunca crece, pero el dato de
+   eventos no existe justo en el tamaño donde más se consulta.
+
+El marcado del elemento y el estado `eventosHoy` que haría falta están en el
+hilo de esa sesión; el filtro que lo alimentaría es el inverso del que ya está
+puesto (`paciente_id is null` en vez de `not null`).
+
+---
+
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)

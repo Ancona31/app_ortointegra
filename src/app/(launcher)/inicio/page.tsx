@@ -114,9 +114,33 @@ export default function InicioPage() {
       const inicioManana = fechaHoraLocalAInstante(desplazarFecha(hoyEnTZ(tz), { dias: 1 }), '00:00', tz)
       const inicioSemana = fechaHoraLocalAInstante(desplazarFecha(hoyEnTZ(tz), { dias: -7 }), '00:00', tz)
 
+      /* «Hoy tienes N citas» — y que los tres filtros digan justo eso.
+         La ventana ya era correcta: de las 00:00 de hoy a las 00:00 de mañana.
+         Lo que contaba de más eran las otras dos:
+
+         · CANCELADAS. Sin filtro de status entraban las `cancelled`, así que
+           una mañana que se vaciaba por cancelaciones seguía anunciando el
+           mismo número. Misma lista que los paneles del dashboard.
+         · EVENTOS GENÉRICOS (§12.14). «Vacaciones IMSS» no es una cita y
+           sumaba una. Mismo `paciente_id not null` que los paneles.
+
+         · LAS DE OTROS MÉDICOS. Sin `medico_id` esto contaba la clínica entera
+           para el ADMINISTRADOR, que es el único a quien la RLS se la enseña,
+           y su panel de `/dashboard` sólo le enseña las suyas: dos cifras en la
+           misma pantalla contando cosas distintas. Va por `user.id` —no por
+           `profile`— porque es el que ya trajo el `getUser()` de arriba, así
+           que no hay carrera con `useProfile`. Para el médico invitado es un
+           no-op: `appointments_select` ya le recortaba a las suyas.
+
+         AQUÍ NO LLEGA LA SECRETARIA, y por eso el filtro no la deja en cero:
+         `inicio/layout.tsx:25` la desvía a /dashboard en el servidor antes de
+         que esto renderice. El launcher es sólo para médicos. */
       supabase
         .from('appointments')
         .select('id', { count: 'exact', head: true })
+        .eq('medico_id', user.id)
+        .not('paciente_id', 'is', null)
+        .in('status', ['scheduled', 'confirmed'])
         .gte('start_time', inicioHoy)
         .lt('start_time', inicioManana)
         .then((res: { count: number | null }) => setCitasHoy(res.count ?? 0))

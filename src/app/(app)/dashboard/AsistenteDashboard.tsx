@@ -59,11 +59,22 @@ export default function AsistenteDashboard() {
         .order('apellido_paterno')
       setMedicos((medicosData as Medico[]) ?? [])
 
-      // Próximas citas de toda la clínica
+      /* Próximas citas de TODOS los médicos de la clínica: la secretaria las
+         necesita todas, y por eso aquí NO va el `medico_id` que sí lleva el
+         panel del médico. Lo que sí comparte es el filtro de evento genérico
+         (§12.14): «Vacaciones IMSS» estorba igual en los dos.
+
+         ⚠️ PIDE 8 Y PINTA 4, Y ESA ASIMETRÍA ES DELIBERADA — no la "arregles"
+         igualando los números como sí se hizo en el panel del médico. El
+         `<select>` de abajo filtra por médico EN CLIENTE, sobre lo ya traído:
+         si la consulta pidiera 4 y las 4 próximas fueran del mismo médico,
+         elegir a cualquier otro diría «No hay citas agendadas» teniéndolas.
+         El colchón de 8 es lo que le da de dónde filtrar. */
       const { data: citasData } = await supabase
         .from('appointments')
         .select('id, title, start_time, status, paciente_id, pacientes(nombre, apellidos), medico:profiles!appointments_medico_id_fkey(id, titulo, nombres, apellido_paterno, apellido_materno)')
         .eq('clinica_id', profile!.clinica_id!)
+        .not('paciente_id', 'is', null)
         .gt('start_time', new Date().toISOString())
         .in('status', ['scheduled', 'confirmed'])
         .order('start_time', { ascending: true })
@@ -125,10 +136,10 @@ export default function AsistenteDashboard() {
               </div>
               <div className="flex-1 min-w-0 space-y-1">
                 <div className="flex items-center justify-between gap-2">
-                  {/* Cae al `title` cuando no hay paciente: es un evento
-                      genérico de §12.14 y sin esto se pintaba un renglón en
-                      blanco. Mismo criterio que la dashboard del médico y que
-                      la agenda. */}
+                  {/* La caída al `title` era para el evento genérico de
+                      §12.14, que la consulta ya no trae. Se deja como red por
+                      si el join de `pacientes` viniera vacío. Mismo criterio
+                      que la dashboard del médico. */}
                   <p className="text-sm font-semibold text-[#1d1d1f]">
                     {cita.pacientes ? `${cita.pacientes.nombre} ${cita.pacientes.apellidos}` : cita.title}
                   </p>

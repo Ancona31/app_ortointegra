@@ -14,7 +14,6 @@ import { formatCitaHora } from './utils'
 import { StatusChip } from './StatusChip'
 import { useConsultorios } from '@/hooks/useConsultorios'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
-import { componerNombreMedicoCorto } from '@/lib/nombreMedico'
 
 /* ─── Helpers ─────────────────────────────────────────────── */
 
@@ -101,7 +100,6 @@ export default function DashboardPage() {
   const [totalPacientes, setTotalPacientes] = useState<number | null>(null)
   const [proximasCitas,  setProximasCitas]  = useState<ProximaCita[]>([])
   const [clinicaTipo,    setClinicaTipo]    = useState<string>('independiente')
-  const [soloMisCitas,   setSoloMisCitas]   = useState(false)
   const [loadingCitas,   setLoadingCitas]   = useState(true)
 
   useEffect(() => {
@@ -170,21 +168,29 @@ export default function DashboardPage() {
 
         const isClinicaAdmin = canManageClinica(profile) && tipo === 'clinica'
 
-        let q = supabase
+        /* SÓLO CITAS DE PACIENTE, NUNCA EVENTOS GENÉRICOS. Es la misma regla
+           que `esEventoGenerico` (agenda/page.tsx:392) —la fila sin paciente es
+           un evento (§12.14)— pero aplicada en la consulta y no al pintar, que
+           es donde de verdad recorta: si se filtrara abajo, «Vacaciones IMSS»
+           seguiría gastando uno de los cuatro sitios de la lista.
+           Por eso NO se importa el helper: no hay predicado que compartir,
+           sólo un `.not()` que la base entiende.
+
+           SÓLO LAS DEL MÉDICO QUE MIRA, también cuando es administrador de la
+           clínica. Su dashboard es su resumen; la clínica entera está en
+           /agenda, que es donde `appointments_select` sí se lo permite. */
+        const { data } = await supabase
           .from('appointments')
           .select('id, title, start_time, status, paciente_id, consultorio_id, pacientes(nombre, apellidos), medico:profiles!appointments_medico_id_fkey(id, titulo, apellido_paterno)')
           .eq('clinica_id', profile!.clinica_id!)
+          .eq('medico_id', profile!.id)
+          .not('paciente_id', 'is', null)
           .gt('start_time', new Date().toISOString())
           .in('status', ['scheduled', 'confirmed'])
           .order('start_time', { ascending: true })
-          .limit(isClinicaAdmin ? 8 : 1) as any
+          .limit(isClinicaAdmin ? 4 : 1)
 
-        if (!isClinicaAdmin) {
-          q = q.eq('medico_id', profile!.id)
-        }
-
-        const { data } = await q
-        setProximasCitas((data as ProximaCita[]) ?? [])
+        setProximasCitas((data as ProximaCita[] | null) ?? [])
       } catch {
         // Red caída o query fallida → citas vacío, el resto del dashboard renderiza
         setProximasCitas([])
@@ -207,9 +213,6 @@ export default function DashboardPage() {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))
 
   const isClinicaAdmin = canManageClinica(profile) && clinicaTipo === 'clinica'
-  const displayCitas   = soloMisCitas
-    ? proximasCitas.filter(c => c.medico?.id === profile?.id)
-    : proximasCitas
   const proximaCita    = proximasCitas[0] ?? null
 
   const iniciarConsulta = (cita: ProximaCita) => {
@@ -241,49 +244,48 @@ export default function DashboardPage() {
                 <CalendarDays size={13} className="text-white/70" />
                 <p className="text-[11px] font-semibold text-white uppercase tracking-widest">Próximas citas</p>
               </div>
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-1.5 text-[11px] text-white/70 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={soloMisCitas}
-                    onChange={e => setSoloMisCitas(e.target.checked)}
-                    className="rounded border-white/30 bg-white/10 text-white focus:ring-white/30"
-                  />
-                  Solo mías
-                </label>
-                <Link href="/agenda" className="text-[10px] text-white/70 hover:text-white hover:underline">Ver agenda →</Link>
-              </div>
+              <Link href="/agenda" className="text-[10px] text-white/70 hover:text-white hover:underline">Ver agenda →</Link>
             </div>
             {loadingCitas ? (
               <div className="px-5 py-4 space-y-3">
                 {[1,2].map(i => <div key={i} className="h-12 bg-slate-100 rounded-xl animate-pulse" />)}
               </div>
-            ) : displayCitas.length > 0 ? (
-              displayCitas.slice(0, 4).map(cita => (
+            ) : proximasCitas.length > 0 ? (
+              proximasCitas.map(cita => (
                 <div key={cita.id} className="flex gap-3 px-5 py-3 border-b border-slate-50 last:border-0">
                   <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0 mt-0.5">
                     <User size={17} className="text-[#1e5fa8]" />
                   </div>
                   <div className="flex-1 min-w-0 space-y-1">
                     <div className="flex items-center justify-between gap-2">
-                      {/* Cae al `title` cuando no hay paciente: es un evento
-                          genérico de §12.14 («Junta de personal», «Cirugía
-                          Sr. Pérez») y sin esto se pintaba UN RENGLÓN EN
-                          BLANCO — no reventaba, sólo no decía nada. La agenda
-                          ya hacía esta misma caída (`pacNombre ?? title`). */}
+                      {/* La caída al `title` que documentaba este comentario ERA
+                          para el evento genérico de §12.14 («Vacaciones IMSS»),
+                          y se retiró con él: la consulta filtra `paciente_id`
+                          no nulo, así que toda fila que llega trae paciente. Se
+                          deja puesta como red por si el join de `pacientes`
+                          viniera vacío — lo único que aún puede dejar el
+                          renglón mudo. */}
                       <p className="text-sm font-semibold text-[#1d1d1f]">
                         {cita.pacientes ? `${cita.pacientes.nombre} ${cita.pacientes.apellidos}` : cita.title}
                       </p>
                       <StatusChip status={cita.status} />
                     </div>
+                    {/* SIN «· Dr. X». Lo tapaba `!soloMisCitas` y se va con el
+                        checkbox, pero se va HACIA OCULTO, no hacia visible: por
+                        D2 estas cuatro filas son ya todas del médico que mira,
+                        así que su propio nombre repetido cuatro veces en su
+                        propio resumen no distingue a nadie. Sigue puesto en el
+                        panel de la secretaria, que es donde sí distingue. */}
                     <div className="flex items-center gap-2 text-[11px] text-[#86868b]">
                       <span>{formatCitaHora(cita.start_time)}</span>
-                      {!soloMisCitas && cita.medico && (
-                        <span>· {componerNombreMedicoCorto(cita.medico)}</span>
-                      )}
                     </div>
                     {cita.paciente_id && (
                       <div className="flex items-center gap-1.5 pt-0.5">
+                        {/* Redundante por construcción desde D2 —la consulta ya
+                            pide `medico_id` = éste— y se deja a propósito: es
+                            barato, y es lo único que impediría ofrecer «iniciar
+                            consulta» sobre la cita de otro si algún día se
+                            ensanchara la consulta de arriba. */}
                         {cita.medico?.id === profile?.id && (
                           <Link
                             href={`/expediente/${cita.paciente_id}/nueva-nota?cita=${cita.id}`}
