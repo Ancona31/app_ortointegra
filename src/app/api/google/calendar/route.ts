@@ -13,6 +13,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { canManageClinica } from '@/lib/permissions'
 import { resolverConexionClinica, guardarCalendarIdSiEsperado, type ConexionGoogle } from '@/lib/gcalConexion'
+import { logAudit } from '@/lib/audit'
 import {
   getGCalClient,
   crearCalendarioSpinus,
@@ -146,7 +147,10 @@ export async function GET() {
  *
  * En cualquier corte el resultado es el id nuevo o null. Nunca un id muerto.
  */
-export async function POST() {
+/* `req` es nuevo y sólo sirve para la `ip` de la entrada de auditoría. Es la
+   firma canónica de un handler de Next; el GET de arriba sigue sin recibirla
+   porque no registra nada. */
+export async function POST(req: Request) {
   let userId = 'sin-sesion'
 
   try {
@@ -226,6 +230,36 @@ export async function POST() {
         { status: 500 },
       )
     }
+
+    /* Recrear tira un calendario y monta otro: los eventos del viejo mueren con
+       él y las citas se sueltan. Queda registrado quién lo pidió y con qué
+       resultado.
+
+       SÓLO EL CAMINO DE ÉXITO, y por eso va aquí abajo y no arriba: los cuatro
+       cortes anteriores devuelven 500 antes de llegar. Eso resuelve además el
+       doble clic sin ninguna guarda extra —el comparar-y-cambiar de
+       `guardarCalendarIdSiEsperado` deja pasar a una sola petición y la
+       perdedora sale por `guardado_fallido`—, así que no puede haber dos
+       entradas para una misma recreación.
+
+       `anterior` puede ser null: la conexión estaba sin calendario y esto fue
+       un alta, no un relevo. Se registra tal cual.
+
+       El nombre del calendario NO entra en la descripción aunque lo tengamos a
+       mano tres líneas más abajo para la respuesta: es `"Spinus - Dr. Fulano"`,
+       o sea el nombre de una persona. Ver la nota en `src/lib/audit.ts`. */
+    await logAudit({
+      userId:      user.id,
+      accion:      'gcal_calendario_recreado',
+      tabla:       'clinica_conexiones_google',
+      registroId:  conexion.id,
+      ip:          req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown',
+      descripcion: JSON.stringify({
+        clinica:  conexion.clinicaId,
+        anterior,
+        nuevo,
+      }),
+    })
 
     return NextResponse.json({
       ok:           true,

@@ -86,6 +86,46 @@ export type AuditAccion =
   | 'sa_export_audit_csv'
   // Vinculación médico-paciente (modelo M:N)
   | 'vincular_medico'
+  /* Los cuatro actos sobre la CONEXIÓN de Google de la clínica (plan §8). No
+     hay trigger de auditoría en `clinica_conexiones_google` —`baseline/
+     06_triggers.sql` lista doce y ninguno es suyo—, así que lo que no escriba
+     `logAudit` no queda en ninguna parte.
+
+     Se registran los actos sobre la conexión, que son raros y consecuentes.
+     NO se registra la sincronización por cita ni el refresco de token: eso es
+     tráfico, y convertiría el `audit_log` en un log de red.
+
+     ⚠️ NI EL CORREO DE GOOGLE DEL ADMINISTRADOR NI EL NOMBRE DEL CALENDARIO
+     ENTRAN EN NINGUNA DE LAS CUATRO DESCRIPCIONES, Y NO ES UN OLVIDO. Si estás
+     a punto de añadir uno pensando que ayuda a investigar, esto es lo que te
+     falta:
+
+       · Para responder «quién desconectó esto» bastan `user_id`, la clínica y
+         `created_at`. El correo de Google no añade nada a esa pregunta.
+       · El `audit_log` es INMUTABLE POR TRIGGER (`supabase_migration_audit_
+         immutable.sql`): ni el service role puede borrar ni modificar una fila.
+         Meter ahí un dato personal es meterlo sin ninguna posibilidad de
+         cancelación ARCO, para siempre.
+       · El correo es el de una cuenta PERSONAL de un tercero, y este panel es
+         de `super_admin` y global: acumularlos construye una libreta de
+         direcciones de los administradores de todas las clínicas.
+       · El nombre del calendario es `"Spinus - Dr. Fulano"` (`gcal.ts:260`),
+         o sea el nombre de una persona, y no hace falta para nada.
+
+     Es la misma regla que ya rige en `enviar_invitacion_cita`, unas líneas más
+     arriba: se registra el papel y el id, nunca la dirección.
+
+     Lo que sí va en `descripcion`, en JSON: el `clinica_id` —`audit_log` no
+     tiene columna propia para él y el panel filtra por texto—, ids de conexión
+     y de calendario, y el uuid de Spinus del dueño de la cuenta. Nunca un
+     token, ni cifrado, ni truncado, ni su `expires_at`.
+
+     `audit_log.accion` es `text` sin CHECK: estas cuatro líneas no necesitan
+     migración. */
+  | 'gcal_conexion_alta'
+  | 'gcal_conexion_baja'
+  | 'gcal_calendario_recreado'
+  | 'gcal_conexion_revocada'
 
 interface AuditParams {
   userId?: string | null

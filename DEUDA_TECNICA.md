@@ -3195,6 +3195,52 @@ control» de `globals.css`.
 
 ---
 
+### LOG-DT-2 — la creación AUTOMÁTICA del calendario de Google no queda registrada
+
+- **Estado:** 🟡 abierta, menor. Registrada el 2026-09-01 al cerrar el commit 5
+  de la rama de Google (el registro de auditoría de las operaciones de
+  conexión). **Es un hueco conocido y aceptado, no un descuido.**
+- **Prioridad:** baja. Por debajo de LOG-DT-1 y de AG-DT-10, sus dos hermanas de
+  familia.
+- **Archivos implicados:** `src/lib/gcal.ts` — `conCalendarioSpinus` y
+  `crearCalendarioSpinus`.
+
+**Qué queda fuera.** El commit 5 registra los cuatro actos sobre la conexión:
+`gcal_conexion_alta`, `gcal_conexion_baja`, `gcal_calendario_recreado` y
+`gcal_conexion_revocada`. Los dos del calendario cubren los caminos que alguien
+**pide**: el del callback al conectar y el del botón de recrear de /perfil.
+
+**Falta el tercero, que es automático.** Cuando `calendar_id` está en null,
+`conCalendarioSpinus` crea el calendario solo, en la primera operación que lo
+necesite. Se llega ahí por dos vías reales: una conexión cuyo calendario falló
+al crearse en el callback, y un 404 porque el médico lo borró desde Google. Ese
+camino **cambia a qué calendario escribe la clínica** —los eventos del anterior
+quedan huérfanos— y hoy no deja entrada en `audit_log`.
+
+**Por qué no se atacó en el mismo commit, y no es pereza:**
+
+- Obliga a tocar `src/lib/gcal.ts`, un quinto archivo fuera del alcance
+  aprobado, y el commit ya tocaba cinco.
+- **Corre a veces dentro de `after()`**, o sea después de responder. Un
+  `await logAudit` ahí no tiene el mismo argumento de coste que en las cuatro
+  entradas del commit 5 (las cuatro cuelgan de un clic o de un redirect), y
+  decidir eso pide mirar los caminos de `after()` uno por uno.
+- Está en la frontera que el plan §8 dibujó a propósito entre «actos sobre la
+  conexión» (se registran) y «tráfico de citas» (no, o el `audit_log` se
+  convierte en un log de red). Esta creación es rara y consecuente, así que cae
+  del lado de los actos — pero se llega a ella desde el tráfico.
+
+**El enganche ya existe y es limpio:** `crearCalendarioSpinus` recibe
+`opciones.actorId` (`gcal.ts:327`), así que hay actor a mano sin cablear nada
+nuevo. La acción `gcal_calendario_recreado` sirve tal cual; lo que cambiaría es
+el `origen` de la descripción, `'sistema'` en vez del actor que pulsa.
+
+**Familia.** Va con **LOG-DT-1** (`logAudit` sin `await`) y con **AG-DT-10**
+(`appointments` sin trigger de auditoría): lagunas del rastro, no del
+calendario. Cuando se ataque, se ataca con ellas.
+
+---
+
 ## Agenda — rediseño
 
 ### AG-DT-1 — `mobileOpen` del Sidebar no se resetea al cruzar el breakpoint

@@ -47,6 +47,7 @@ import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { encrypt } from '@/lib/encrypt'
 import { logger } from '@/lib/logger'
+import { logAudit } from '@/lib/audit'
 
 /** La conexión, SIN secretos. Sale de una lectura bajo RLS. */
 export interface ConexionGoogle {
@@ -520,21 +521,81 @@ export async function guardarSecretos(args: {
  * SIN ESPEJO, y no es un olvido: `google_tokens` no tiene columna `estado`. Por
  * eso el archivo B no compara este campo — ver plan §2.6, que avisa de que un
  * veredicto verde de B no dice nada sobre si la conexión sirve.
+ *
+ * ── ES IDEMPOTENTE A PROPÓSITO, Y NO SE SIMPLIFIQUE ─────────────────────────
+ * El `.eq('estado', 'activa')` y el `.select('id')` NO son decorativos: son lo
+ * que hace que un token muerto produzca UNA entrada de auditoría y no N.
+ *
+ * La agenda dispara varias peticiones en paralelo. Con el permiso ya retirado,
+ * cada una entra en `refrescarSesion`, cada una recibe su `invalid_grant` y
+ * cada una llega hasta aquí. Sin el filtro, las N escrituras prenden —repintar
+ * 'revocada' sobre 'revocada' es un UPDATE perfectamente válido— y el registro
+ * dejaría de servir para contar qué pasó: un solo suceso saldría como una
+ * ráfaga. La ráfaga está acotada (en cuanto la marca prende,
+ * `resolverConexionClinica` deja de devolver esta conexión y no hay más
+ * intentos), pero la primera es real.
+ *
+ * Con el filtro, sólo la petición que de verdad cambia la fila escribe la
+ * entrada. Las demás salen calladas, que es lo correcto: no cambiaron nada.
  */
 export async function marcarRevocada(conexion: ConexionGoogle): Promise<void> {
   const admin = createAdminClient()
-  const { error } = await admin
+  const { data, error } = await admin
     .from('clinica_conexiones_google')
     .update({ estado: 'revocada' })
     .eq('id', conexion.id)
     .eq('clinica_id', conexion.clinicaId)
+    .eq('estado', 'activa')
+    .select('id')
 
   if (error) {
     logger.error('GCal', 'fallo ' + JSON.stringify({
       operacion: 'marcarRevocada — no aborta, ver el docstring',
       mensaje:   error.message,
     }))
+    return
   }
+
+  // Cero filas = ya estaba revocada. Otra petición de la misma ráfaga ganó y ya
+  // escribió la entrada; ésta no tiene nada que registrar.
+  if (!data?.length) return
+
+  /* LA ENTRADA QUE JUSTIFICA ESTE COMMIT: es la única de las cuatro que ocurre
+     SIN QUE NADIE LA PIDA, y deja a la clínica entera sin sincronizar hasta que
+     alguien reconecte a mano. Sin esto, «las citas dejaron de llegar a Google»
+     no tiene respuesta posible en ninguna parte.
+
+     VA AQUÍ DENTRO Y NO EN EL SITIO DE LLAMADA (`gcal.ts`), a propósito: esta
+     función es el ÚNICO escritor de `estado = 'revocada'` en todo el repo, así
+     que el registro no puede separarse de la escritura ni quedarse atrás si
+     mañana aparece un segundo camino.
+
+     ⚠ `userId` ES EL DUEÑO DE LA CUENTA DE GOOGLE, NO EL AUTOR — aquí no hay
+     autor. Se lee como SUJETO, y `origen: 'sistema'` lo dice explícito; la
+     acción `gcal_conexion_revocada` además sólo la produce este camino. Es un
+     uuid a propósito y no el literal 'system': el panel de auditoría cruza
+     `user_id` contra `profiles.id`, que es `uuid`, y un valor no-uuid hace
+     fallar esa consulta y deja SIN NOMBRE a todas las filas de la página, no
+     sólo a la suya.
+
+     El correo de la cuenta de Google NO entra. Ver la nota de la acción en
+     `src/lib/audit.ts`.
+
+     El `await` no cuesta nada aquí: el llamador está en mitad de un `catch` que
+     va a relanzar, y a menudo dentro de un `after()`. Sin él el `insert` se
+     perdería a veces, que es lo peor que le puede pasar a una auditoría. */
+  await logAudit({
+    userId:      conexion.userId,
+    accion:      'gcal_conexion_revocada',
+    tabla:       'clinica_conexiones_google',
+    registroId:  conexion.id,
+    descripcion: JSON.stringify({
+      clinica:       conexion.clinicaId,
+      duenoConexion: conexion.userId,
+      motivo:        'invalid_grant',
+      origen:        'sistema',
+    }),
+  })
 }
 
 /* ── Calendario ─────────────────────────────────────────── */

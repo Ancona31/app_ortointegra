@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { canManageClinica } from '@/lib/permissions'
 import { altaConexion, resolverConexionClinica, type ErrorAlta } from '@/lib/gcalConexion'
+import { logAudit } from '@/lib/audit'
 import { crearCalendarioSpinus, calendarioVive, registrarFalloGCal } from '@/lib/gcal'
 
 /**
@@ -211,6 +212,48 @@ export async function GET(req: NextRequest) {
       fallo.cookies.delete('oauth_state')
       return fallo
     }
+
+    /* QUIÉN APUNTÓ ESTA CLÍNICA A QUÉ CUENTA DE GOOGLE, Y CUÁNDO. Hasta hoy
+       conectar no dejaba ni una línea, y `clinica_conexiones_google` no tiene
+       trigger de auditoría, así que esto es todo el rastro que hay.
+
+       VA AQUÍ Y NO DESPUÉS DEL CALENDARIO, a propósito: si la creación de abajo
+       falla, la conexión existe igual —el alta ya está escrita— y esta entrada
+       sigue siendo cierta. Colgarla del final registraría de menos.
+
+       EL `await` NO ES DECORATIVO Y NO SE QUITA. `logAudit` es `async` y su
+       `try/catch` interno sólo garantiza que NO LANZA, no que termine: sin
+       esperarla, el `insert` sigue en vuelo cuando esta función devuelve el
+       redirect y en Vercel la lambda puede congelarse ahí. Se perdería a veces,
+       que es lo peor que le puede pasar a una auditoría. Esperar no añade
+       ninguna rama de fallo nueva, y esto es un redirect tras una vuelta entera
+       de OAuth: el viaje extra no se nota.
+
+       ⚠ NI EL CORREO DE GOOGLE NI EL NOMBRE DEL CALENDARIO ENTRAN EN LA
+       DESCRIPCIÓN. El porqué está escrito una sola vez, junto a la acción en
+       `src/lib/audit.ts`; léelo antes de añadir nada aquí.
+
+       `calendarioPrevio` NO AFIRMA «RECONEXIÓN», y la distinción importa: el
+       RPC `alta_conexion_google` hace `ON CONFLICT DO UPDATE` y devuelve lo
+       mismo tanto si insertó como si actualizó, así que «alta o reconexión» no
+       es derivable de lo que tenemos. Lo que sí es un hecho: NO NULO prueba
+       reconexión —un alta nueva nunca trae `calendar_id`, el INSERT del RPC no
+       lo escribe—; NULL no distingue un alta nueva de una reconexión cuyo
+       calendario nunca llegó a crearse. Se registra el hecho, no la
+       interpretación. */
+    await logAudit({
+      userId:      user.id,
+      accion:      'gcal_conexion_alta',
+      tabla:       'clinica_conexiones_google',
+      registroId:  alta.alta.conexionId,
+      ip:          req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown',
+      descripcion: JSON.stringify({
+        clinica:          clinicaId,
+        rol:              alta.alta.rol,
+        estado:           alta.alta.estado,
+        calendarioPrevio: alta.alta.calendarId,
+      }),
+    })
 
     // El calendario propio de Spinus. Si falla, los tokens quedan guardados y
     // `calendar_id` en null: `conCalendarioSpinus` lo crea en la primera
