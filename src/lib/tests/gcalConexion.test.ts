@@ -15,11 +15,14 @@
  *     es un CAS (H10).
  *   · El orden de la doble escritura y su única excepción, la del refresco (H9).
  *
- * NOTA PARA EL COMMIT 6 (el cerrojo de §2.2 del plan): este archivo nombra
- * `clinica_conexiones_google` y `google_tokens` a propósito —comprobar a qué
- * tabla fue cada escritura es justo lo que se está probando—, así que la prueba
- * que prohíbe esos literales fuera del módulo tiene que eximir a sus propios
- * tests.
+ * NOTA CORREGIDA EN EL COMMIT 6. Este archivo nombra `clinica_conexiones_google`
+ * y `google_tokens` a propósito —comprobar a qué tabla fue cada escritura es
+ * justo lo que se está probando—, y la versión anterior de esta nota deducía de
+ * ahí que el cerrojo de §2.2 tendría que eximirlo. NO HACE FALTA: el cerrojo
+ * (`cerrojoGcalConexion.test.ts`) sólo cuenta el literal cuando aparece dentro
+ * de un `.from(` o un `.rpc(`, y aquí vive en constantes y en asserts. Su lista
+ * de exenciones está vacía. Si algún día añades a este archivo una llamada real
+ * a Supabase con uno de esos nombres, entonces sí saltará, y con razón.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
