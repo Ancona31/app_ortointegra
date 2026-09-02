@@ -510,6 +510,23 @@ El orden **no es negociable** por lo que explico en §7: el endurecimiento de `/
 > (§12.14)— **no tienen commit asignado todavía**. Lo que sí está fijado es que el
 > permiso de escritura va el último.
 
+> **⛔ ANOTACIÓN 2026-09-01 — EL COMMIT 7 QUEDA CANCELADO. LA SERIE ACABA EN EL 6,
+> como acababa antes de la anotación de arriba.**
+>
+> No se pospone ni se traslada a otra rama: **no se construye**. La barrera que
+> venía a levantar ya existe en las cuatro policies de `appointments`, y lo que
+> habría añadido encima es que la interfaz deje de ofrecer botones que el servidor
+> ya rechaza — cosmético, y a cambio de dos migraciones.
+>
+> **Los dos motivos de riesgo de arriba caen solos, y conviene ver por qué:** el
+> commit 7 pedía commit propio porque «le quita algo a un usuario real» y porque
+> «tiene que poder revertirse solo». Si no se escribe, no le quita nada a nadie y
+> no hay nada que revertir. La razón que lo separaba era exactamente la razón por
+> la que ahora no hace falta.
+>
+> El registro completo, con las policies en las que se apoya y qué lo reabriría,
+> en **§12.19**. La cancelación **no toca** §12.13 ni §12.14, que ya están hechas.
+
 ---
 
 # 7. Qué se rompe si el deploy sale a medias
@@ -1086,6 +1103,60 @@ esto es lo que hay, con el hueco y las dos banderas que le faltaban:
 Google. Ver la anotación de la tabla de §4.
 
 ## 12.7 Permiso de escritura en la agenda, por usuario
+
+> # ⛔ CANCELADO EL 2026-09-01 — NO SE CONSTRUYE. LEE ESTO ANTES QUE NADA.
+>
+> **Todo lo que sigue en este apartado describe algo que ya no se va a escribir.**
+> El commit 7 queda cancelado y con él sus dos migraciones (§12.15, migraciones 1
+> y 2). El apartado **se conserva entero** —no se borra— porque es el razonamiento
+> del que depende poder reabrirlo, y porque el reparto policy/trigger de más abajo
+> sigue siendo la respuesta correcta *si* algún día vuelve a hacer falta.
+>
+> **El motivo: la barrera que este commit venía a construir YA EXISTE en la base.**
+> Verificado en producción el 2026-09-01, y comprobable en el repo en
+> `supabase/migrations/20260530_etapa5h_paso3_policies_appointments.sql:81-143`.
+> Las **cuatro** policies de `appointments` —`appointments_select` (`:81`),
+> `appointments_insert` (`:95`), `appointments_update` (`:109`) y
+> `appointments_delete` (`:131`)— llevan **la misma** restricción:
+>
+> ```sql
+> (medico_id = auth.uid()
+>  OR public.soy_admin_de_clinica()
+>  OR public.get_my_role() = 'secretaria')
+> AND clinica_id = public.get_clinica_id()
+> ```
+>
+> Y el `UPDATE` la aplica **en `qual` Y en `with_check`** (`:114` y `:122`), que es
+> la mitad que se pasa por alto: sin el `with_check`, un médico invitado podría
+> coger una cita que ya cumple el `USING` y dejarla apuntando a otro sitio. Con
+> las dos, **no puede reasignarse una cita ajena**.
+>
+> **Lo único que el commit 7 habría añadido es que la interfaz no muestre botones
+> que el servidor ya rechaza.** Eso es cosmético: nadie lo ha pedido, y cuesta dos
+> migraciones sobre la tabla de la agenda.
+>
+> ### ⚠️ ESTA CANCELACIÓN SE APOYA EN ESAS POLICIES, Y EN NADA MÁS
+>
+> **Si algún día alguien las relaja, la decisión deja de valer y §12.7 vuelve a
+> estar abierto.** No es una fórmula: es la condición literal. Relajar aquí
+> significa cualquiera de estas cosas —quitar el `medico_id = auth.uid()`,
+> ensanchar el `OR` a un rol más, dejar el `UPDATE` sólo con `USING` y sin
+> `WITH CHECK`, o soltar el `AND clinica_id = get_clinica_id()`—. Cualquiera de
+> ellas devuelve al médico invitado la capacidad que este apartado quería
+> quitarle, y entonces hay que releer esto entero, no parchear la interfaz.
+>
+> ### Y lo que estas policies NO cubren, para que la reapertura se decida sobre lo cierto
+>
+> Cubren la **propiedad**: un médico invitado no toca las citas de otro. **No
+> cubren sus propias filas**: sobre una cita suya sigue pudiendo crear, borrar y
+> mover fecha, hora, duración y paciente — justo las cinco cosas de la lista «NO
+> PUEDE» de abajo. Eso **no es un descuido de la cancelación**: es que ese trozo
+> de §12.7 nunca fue seguridad, era preferencia de producto («por defecto APAGADO
+> para los médicos invitados»), y hoy se acepta que un médico invitado gestione su
+> propia agenda. Queda escrito para que quien reabra esto no crea que las policies
+> prometían más de lo que prometen.
+>
+> El registro de la decisión, en **§12.19**.
 
 > **Reescrito el 2026-08-20.** La primera versión de este apartado decía que
 > apagado significaba «no crea, no mueve, no cancela y no borra nada, ni siquiera
@@ -1939,6 +2010,20 @@ por PostgREST. Las dos van en el **commit 7** (final de §6).
 > distinto al de la 4, porque las columnas ya existían y lo que cambia es qué
 > valores admiten. Está razonado en su cabecera.
 
+> **⛔ ANOTACIÓN 2026-09-01 — YA NO QUEDA NINGUNA PENDIENTE. LAS MIGRACIONES 1 Y 2
+> QUEDAN CANCELADAS, NO APLAZADAS.**
+>
+> Las tablas de arriba las listan como «sin escribir (commit 7)», y **esa lectura
+> ya no vale**: el commit 7 está cancelado (§12.19), así que esas dos migraciones
+> **no se van a escribir nunca** mientras la decisión siga en pie. La cuenta viva
+> de la rama es **seis aplicadas y cero pendientes**.
+>
+> Las tablas **no se reescriben**, por la costumbre de este documento: dicen lo
+> que se planeó, y esta anotación dice en qué acabó. Si alguien vuelve a abrir
+> §12.7, estas dos vuelven a la cola tal como están descritas — el diseño
+> policy + trigger columna por columna sigue siendo válido, lo que cambió es que
+> hoy no hace falta.
+
 ---
 
 ## 12.16 Reconexión con OTRA cuenta de Google — alcance nuevo, SIN DECIDIR
@@ -2194,3 +2279,80 @@ Van aquí **como aceptados, no como pendientes**. Ninguno se arregla en esta ram
 > **DATO DE ESTADO (2026-08-21):** ningún beta tester tiene Google conectado, así
 > que no hay ni una cita con la lista de asistentes en mal estado. Estos tres
 > costes nacen sin deuda acumulada detrás; no hace falta corrección de datos.
+
+---
+
+## 12.19 El permiso de escritura en la agenda — CANCELADO (2026-09-01)
+
+**Decisión: el commit 7 (§12.7) no se construye.** No se pospone, no pasa a la
+rama siguiente, no queda «para cuando haya hueco». Se cancela, y con él sus dos
+migraciones (§12.15, migraciones 1 y 2), que nunca llegaron a escribirse.
+
+### Por qué
+
+**La barrera que el commit 7 venía a construir ya existe en la base.** Se verificó
+en producción el 2026-09-01: las **cuatro** policies de `appointments` —SELECT,
+INSERT, UPDATE y DELETE— llevan la misma restricción, acotada por `clinica_id`:
+
+```sql
+(medico_id = auth.uid()
+ OR public.soy_admin_de_clinica()
+ OR public.get_my_role() = 'secretaria')
+AND clinica_id = public.get_clinica_id()
+```
+
+El `UPDATE` **la aplica en `qual` Y en `with_check`**, así que **un médico
+invitado no puede reasignarse una cita ajena** — ni cogiendo una que ya cumple el
+`USING` para dejarla apuntando a otro sitio.
+
+En el repo: `supabase/migrations/20260530_etapa5h_paso3_policies_appointments.sql`,
+`appointments_select` en `:81`, `appointments_insert` en `:95`,
+`appointments_update` en `:109` (con `USING` en `:114` y `WITH CHECK` en `:122`) y
+`appointments_delete` en `:131`.
+
+**Lo único que el commit 7 habría añadido encima es que la interfaz no muestre
+botones que el servidor rechaza.** Eso es cosmético. Nadie lo ha pedido, y el
+precio son dos migraciones sobre la tabla de la agenda: una columna en `profiles`
+con su entrada en el trigger guardián, y un trigger sobre `appointments` que
+compara `NEW` contra `OLD` columna por columna. Es mucha superficie de esquema
+para pulir una interfaz que hoy no molesta a nadie.
+
+### ⚠️ QUÉ REABRE ESTA DECISIÓN
+
+**La cancelación se apoya en esas cuatro policies y en nada más.** Si alguien las
+relaja, deja de valer y §12.7 vuelve a estar abierto — sin discusión previa, por
+la condición misma con la que se cerró. Cuenta como relajarlas:
+
+- quitar el `medico_id = auth.uid()` de cualquiera de las cuatro;
+- ensanchar el `OR` a un rol más;
+- dejar el `UPDATE` sólo con `USING`, sin `WITH CHECK`;
+- soltar el `AND clinica_id = public.get_clinica_id()`.
+
+Quien toque `appointments` en una migración futura tiene que pasar por aquí. Es la
+**dimensión 15** de `supabase/AUDITORIA-MIGRACIONES.md` aplicada a este caso: el
+alcance de los roles se comprueba en las dos direcciones, y aquí una de las dos
+direcciones es una decisión de producto que se cae.
+
+### Lo que estas policies no prometen, y por eso no se pierde
+
+Cubren la **propiedad**, no el permiso por columna: un médico invitado no toca las
+citas de otro, pero **sobre las suyas sigue pudiendo crear, borrar y mover fecha,
+hora, duración y paciente**. Es exactamente la lista «NO PUEDE» de §12.7, y **no
+se está afirmando que la base la cumpla** — no la cumple.
+
+Eso no invalida la cancelación: ese trozo de §12.7 nunca fue seguridad, era
+preferencia de producto (el permiso nacía «APAGADO por defecto para los médicos
+invitados»), y hoy se acepta que un médico invitado gestione su propia agenda. Se
+escribe para que la reapertura, si llega, se decida sobre lo que las policies
+hacen de verdad y no sobre lo que este apartado parezca prometer.
+
+### Lo que la cancelación NO arrastra
+
+- **§12.13 («atendida») y §12.14 (eventos genéricos) siguen en pie** y ya están
+  construidos. Sus migraciones 3, 4, 5 y 6 están aplicadas.
+- **La dependencia cruzada de §12.7 con §12.13** —«el permiso tiene que dejar
+  cambiar `status` pase lo que pase, o el invitado no puede pulsar Iniciar
+  consulta»— **deja de existir como riesgo**: sin trigger que restrinja columnas,
+  no hay nada que pueda bloquear `status` por accidente.
+- **La cuenta de migraciones de la rama** pasa a **seis aplicadas y cero
+  pendientes** (§12.15, anotación del 2026-09-01).
