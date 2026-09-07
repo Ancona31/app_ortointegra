@@ -47,7 +47,22 @@ type ProximaCita = {
 
 /* ─── Config ──────────────────────────────────────────────── */
 
-const ACCESOS = [
+const ACCESOS: {
+  href: string
+  icon: React.ElementType
+  label: string
+  desc: string
+  gradient: string
+  ring: string
+  /* ⚠️ APAGA LA PRECARGA DE ESTA TARJETA. Va en los datos y no en el JSX de
+     abajo porque las cuatro tarjetas salen de UN SOLO `<Link>` dentro de un
+     `map`: sin bandera no hay forma de distinguirlas ahí. Es la misma decisión
+     —y el mismo nombre— que `sinPrefetch` en `NavLeaf` del menú lateral
+     (`components/layout/Sidebar.tsx:78`), pero esta lista es suya y no tiene
+     nada que ver con aquellos datos de navegación.
+     Qué cuesta encenderla: LEE EL COMENTARIO DEL `prefetch={}` en el `map`. */
+  sinPrefetch?: boolean
+}[] = [
   {
     href: '/expediente',
     icon: Stethoscope,
@@ -79,6 +94,13 @@ const ACCESOS = [
     desc: 'Visor de imagen médica',
     gradient: 'from-teal-500 to-teal-600',
     ring: 'group-hover:ring-teal-200',
+    /* La ÚNICA de las cuatro sin precarga: el visor DICOM casi no se abre, así
+       que se pagaban dos peticiones RSC y dos arranques de lambda por carga
+       para un destino que rara vez se pulsa. Las otras tres —Expediente,
+       Agenda y Documentos— sí son destinos de la jornada y la conservan.
+       La tarjeta sigue funcionando igual: al pulsarla se pide la ruta en ese
+       momento y se ve el esqueleto de `(app)/loading.tsx`. */
+    sinPrefetch: true,
   },
 ]
 
@@ -404,10 +426,19 @@ export default function DashboardPage() {
       <div className="animate-slide-up" style={{ animationDelay: '120ms' }}>
         <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest mb-3">Módulos</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {ACCESOS.map(({ href, icon: Icon, label, desc, gradient, ring }) => (
+          {ACCESOS.map(({ href, icon: Icon, label, desc, gradient, ring, sinPrefetch }) => (
             <Link
               key={href}
               href={href}
+              /* ⚠️ CADA `<Link>` CON PRECARGA CUESTA 2 PETICIONES RSC Y 2
+                 INVOCACIONES DE LAMBDA POR CARGA DEL DASHBOARD, SE PULSE O NO.
+                 Medido en producción (2026-09-07): las rutas de `(app)` son
+                 dinámicas, así que la caché de segmentos pide el árbol y luego
+                 el segmento, a la misma URL con distinto `?_rsc=`.
+                 `undefined` NO es lo mismo que `true`: deja el valor por
+                 defecto de Next (`auto`), que es lo que tenían las cuatro antes
+                 de esto. Sólo se apaga la que lleva la bandera. */
+              prefetch={sinPrefetch ? false : undefined}
               className={`group bg-white rounded-2xl border border-slate-100 p-5 shadow-sm
                 hover:shadow-[0_4px_20px_rgba(30,95,168,0.15)] hover:border-[#1e5fa8]/20 hover:-translate-y-1
                 active:scale-[0.97]
@@ -448,8 +479,30 @@ export default function DashboardPage() {
                   key={p.paciente_id}
                   className={`flex items-center gap-3 px-4 py-3 group hover:bg-blue-50/50 transition-colors ${i < recientes.length - 1 ? 'border-b border-slate-50' : ''}`}
                 >
+                  {/* ⚠️ LOS CUATRO `<Link>` DE ESTA FILA VAN SIN PRECARGA, Y SON
+                      CUATRO AUNQUE PAREZCAN TRES: éste y el de la flecha del
+                      final apuntan a la MISMA url, así que apagar uno y dejar
+                      el otro no ahorra nada — Next precargaría igual.
+
+                      EL PRECIO, MEDIDO EN PRODUCCIÓN (2026-09-07): cada `<Link>`
+                      con precarga cuesta 2 peticiones RSC y 2 invocaciones de
+                      lambda en Vercel POR CARGA DEL DASHBOARD, se pulse o no.
+                      Esta lista pinta hasta 5 pacientes, o sea hasta 15 enlaces
+                      distintos; en la traza medida esta fila sola ya ponía 7 de
+                      las 23 precargas de la página, y arrancan justo cuando el
+                      dashboard todavía está pidiendo sus propios datos.
+                      Se pulsa como mucho uno.
+
+                      LO QUE NO CAMBIA: los enlaces navegan exactamente igual.
+                      Lo único que se pierde es la transición instantánea; al
+                      pulsar se ve el esqueleto de `(app)/loading.tsx`, que
+                      existe y está cuidado.
+
+                      Si vuelves a encenderlos, multiplica por el número de
+                      pacientes que pinta la lista antes de decidir. */}
                   <Link
                     href={`/expediente/${p.paciente_id}`}
+                    prefetch={false}
                     className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity"
                   >
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>
@@ -469,6 +522,10 @@ export default function DashboardPage() {
                   <div className="flex items-center gap-1 flex-shrink-0 flex items-center gap-1">
                     <Link
                       href={`/expediente/${p.paciente_id}/documentos?tipo=receta`}
+                      /* Sin precarga: 2 peticiones RSC + 2 lambdas por carga y
+                         por paciente pintado. Ver la nota larga del primer
+                         `<Link>` de la fila. */
+                      prefetch={false}
                       title="Receta express"
                       className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-violet-600 bg-violet-50 hover:bg-violet-100 transition-colors"
                     >
@@ -477,6 +534,10 @@ export default function DashboardPage() {
                     </Link>
                     <Link
                       href={`/expediente/${p.paciente_id}?tab=consultas`}
+                      /* Sin precarga: 2 peticiones RSC + 2 lambdas por carga y
+                         por paciente pintado. Ver la nota larga del primer
+                         `<Link>` de la fila. */
+                      prefetch={false}
                       title="Última nota"
                       className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-teal-600 bg-teal-50 hover:bg-teal-100 transition-colors"
                     >
@@ -485,6 +546,12 @@ export default function DashboardPage() {
                     </Link>
                     <Link
                       href={`/expediente/${p.paciente_id}`}
+                      /* Sin precarga, y es OBLIGATORIO que vaya junto con el
+                         primer `<Link>` de la fila: los dos apuntan a la misma
+                         url, así que dejar éste encendido reactivaría esa
+                         precarga entera y el otro `prefetch={false}` no valdría
+                         nada. Se apagan los dos o ninguno. */
+                      prefetch={false}
                       className="p-1.5 rounded-lg text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors"
                     >
                       <ArrowRight size={13} />
