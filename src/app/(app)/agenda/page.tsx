@@ -615,31 +615,70 @@ function avisoDiaCerrado(date: Date, h: Horario): string | null {
 
 /* ─── Modal de configuración de horario ─────────────────── */
 
-function HorarioModal({ onClose, onSave }: { onClose: () => void; onSave: (h: Horario) => Promise<void> }) {
+/**
+ * De dónde saca el modal su horario, en TRES situaciones y no en dos.
+ *
+ * ⚠️ `error` NO PUEDE DEGRADAR A `HORARIO_DEFAULT`, y por eso es un estado
+ * propio y no un `?? HORARIO_DEFAULT` en el sitio de lectura. Si el agregado
+ * falla y el modal pinta 09:00–19:00, esas horas no se distinguen de las de la
+ * clínica: el administrador ve un horario plausible, pulsa «Guardar» y machaca
+ * el verdadero con uno inventado. El fallo tiene que verse Y no dejar guardar.
+ *
+ * `listo` con `horario: null` es OTRA cosa y sí es legítima: la clínica existe
+ * y todavía no ha configurado horario. Ahí `HORARIO_DEFAULT` es un punto de
+ * partida editable, que es lo que el modal hacía ya.
+ */
+type FuenteHorario =
+  | { estado: 'cargando' }
+  | { estado: 'error' }
+  | { estado: 'listo'; horario: Horario | null }
+
+function HorarioModal({ fuente, onClose, onSave }: { fuente: FuenteHorario; onClose: () => void; onSave: (h: Horario) => Promise<void> }) {
   const { montarPanel, alPulsarTecla } = useDialogoModal(onClose)
   const tituloId = useId()
-  const [horario, setHorario] = useState<Horario | null>(null)
+  const errorId  = useId()
+  /* Lo que dice el agregado, ya resuelto el caso legítimo de «clínica todavía
+     sin horario». `null` mientras no haya una lectura buena que ofrecer. */
+  const base = fuente.estado === 'listo' ? fuente.horario ?? HORARIO_DEFAULT : null
+  /* SÓLO las ediciones del médico, no una copia del horario. Se deriva en vez
+     de sembrarse con un efecto —el dato ya está en el cliente, no hay nada que
+     esperar— y eso trae gratis lo que antes había que vigilar: mientras no haya
+     edición manda el agregado, y en cuanto la hay manda la edición, así que una
+     revalidación de SWR con el modal abierto no puede pisar lo escrito. */
+  const [edicion, setEdicion] = useState<Horario | null>(null)
   const [saving,  setSaving]  = useState(false)
-
-  useEffect(() => {
-    fetch('/api/me/horario')
-      .then(r => r.json())
-      .then(d => setHorario(d.horario ?? HORARIO_DEFAULT))
-  }, [])
+  const horario = edicion ?? base
 
   function toggle(dia: DiaSemana) {
-    setHorario(prev => prev ? { ...prev, [dia]: { ...prev[dia], activo: !prev[dia].activo } } : prev)
+    setEdicion(prev => {
+      const actual = prev ?? base
+      return actual ? { ...actual, [dia]: { ...actual[dia], activo: !actual[dia].activo } } : actual
+    })
   }
 
   function setHora(dia: DiaSemana, campo: 'inicio' | 'fin', val: string) {
-    setHorario(prev => prev ? { ...prev, [dia]: { ...prev[dia], [campo]: val } } : prev)
+    setEdicion(prev => {
+      const actual = prev ?? base
+      return actual ? { ...actual, [dia]: { ...actual[dia], [campo]: val } } : actual
+    })
   }
 
   async function handleSave() {
     if (!horario) return
     setSaving(true)
-    await onSave(horario)
-    setSaving(false)
+    try {
+      await onSave(horario)
+    } catch {
+      /* Quien avisa al médico es `onSave`, que es donde está el toast; aquí no
+         se duplica el mensaje. Este `catch` existe para que un rechazo que se
+         le escape no quede como promesa sin capturar. */
+    } finally {
+      /* ⚠️ EN `finally`, Y NO DETRÁS DEL `await`. Ahí estaba antes, y un
+         rechazo lo saltaba: el botón se quedaba en «Guardando…» y deshabilitado
+         para siempre, y la única salida era cerrar el modal perdiendo lo
+         editado. El botón tiene que volver falle lo que falle. */
+      setSaving(false)
+    }
   }
 
   return (
@@ -653,7 +692,19 @@ function HorarioModal({ onClose, onSave }: { onClose: () => void; onSave: (h: Ho
         onKeyDown={alPulsarTecla}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={tituloId}
+        /* ⚠️ EL PATRÓN ES EL DE `ConfirmModal`, NO EL DE `Banda`, y la
+           diferencia no es de gusto. `Banda` usa `role="alert"` porque
+           INTERRUMPE: la agenda ya estaba en pantalla y algo falló mientras el
+           médico la leía. Aquí no interrumpe nada — el médico acaba de abrir
+           este diálogo y el fallo ES su contenido, igual que la pregunta es
+           todo el contenido de `ConfirmModal`. Por eso el mensaje se nombra
+           desde el propio diálogo y se lee al recibir el foco, sin cortar nada.
+
+           Los DOS ids, y no sólo el del error: `aria-labelledby` concatena, así
+           que el lector anuncia «Horario de consulta. No se pudo cargar el
+           horario». `ConfirmModal` puede prescindir del título porque no tiene;
+           éste sí, y perderlo dejaría un diálogo sin identidad. */
+        aria-labelledby={fuente.estado === 'error' ? `${tituloId} ${errorId}` : tituloId}
         tabIndex={-1}
         className="relative focus:outline-none bg-white rounded-2xl shadow-2xl w-full max-w-md animate-modal-enter overflow-hidden"
       >
@@ -671,7 +722,17 @@ function HorarioModal({ onClose, onSave }: { onClose: () => void; onSave: (h: Ho
         </div>
 
         <div className="px-6 py-4 max-h-[70vh] overflow-y-auto">
-          {!horario ? (
+          {fuente.estado === 'error' ? (
+            /* Ni horario ni pickers: si no se pudo leer, no hay nada que
+               ofrecer. Enseñar aquí un horario por defecto sería justo el
+               camino que lleva a guardar uno inventado encima del real. */
+            <div className="py-8 text-center">
+              <p id={errorId} className="text-sm font-medium text-[#1d1d1f]">No se pudo cargar el horario</p>
+              <p className="mt-1 text-[13px] text-slate-500">
+                Cierra y vuelve a abrir esta ventana. Si sigue igual, recarga la página.
+              </p>
+            </div>
+          ) : !horario ? (
             <div className="flex justify-center py-8">
               <div className="w-5 h-5 rounded-full border-2 border-slate-200 border-t-slate-500 animate-spin" />
             </div>
@@ -729,7 +790,10 @@ function HorarioModal({ onClose, onSave }: { onClose: () => void; onSave: (h: Ho
           </button>
           <button
             onClick={handleSave}
-            disabled={saving || !horario}
+            /* `fuente.estado !== 'listo'` es redundante con `!horario` —sin
+               lectura buena nunca se siembra— y se deja escrito a propósito:
+               que el candado no dependa de razonar sobre otra variable. */
+            disabled={saving || !horario || fuente.estado !== 'listo'}
             className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a4f8c] disabled:opacity-50 transition-colors"
           >
             {saving ? 'Guardando...' : 'Guardar horario'}
@@ -5475,12 +5539,29 @@ export default function AgendaPage() {
      propios: la misma clave la piden ya el Sidebar y el provider de
      consultorios del layout, así que SWR la deduplica y abrir la agenda no
      añade ninguna petición por estos dos datos. */
-  const { data: config, mutate: mutarConfig } = useSWR<ConfigApp>(
+  const { data: config, error: errorConfig, mutate: mutarConfig } = useSWR<ConfigApp>(
     CLAVE_CONFIG,
     fetcherConfig,
     { dedupingInterval: CONFIG_DEDUPE_MS },
   )
   const horario = config?.horario ?? HORARIO_DEFAULT
+
+  /* ── LO QUE VE EL MODAL DE HORARIO, QUE NO ES LO DE ARRIBA ────────────────
+     `horario` lleva `HORARIO_DEFAULT` aplicado para la rejilla y ahí es
+     deliberado (ver la nota de `scrollTime`). Enmascara dos cosas muy
+     distintas: que el agregado falló y que la clínica aún no tiene horario. La
+     rejilla puede vivir con eso —pinta una jornada de 09:00 y ya—, pero el
+     modal ESCRIBE, y ofrecer un horario inventado como si fuera el de la
+     clínica es cómo se machaca el verdadero. Por eso recibe el valor crudo.
+
+     El orden de las ramas importa: `config` primero, así que un dato en cache
+     con una revalidación fallida encima sigue siendo un dato bueno y se pinta.
+     Sólo se declara `error` cuando NO hay nada que enseñar. */
+  const fuenteHorario = useMemo<FuenteHorario>(() => {
+    if (config) return { estado: 'listo', horario: config.horario }
+    if (errorConfig) return { estado: 'error' }
+    return { estado: 'cargando' }
+  }, [config, errorConfig])
   const medicos = config?.medicos ?? SIN_MEDICOS
   const { profile, isDoctor, loading: cargandoPerfil } = useProfile()
   const toast = useToast()
@@ -8932,20 +9013,33 @@ export default function AgendaPage() {
       {/* ── Modal horario ────────────────────────────────── */}
       {horarioOpen && (
         <HorarioModal
+          fuente={fuenteHorario}
           onClose={() => setHorarioOpen(false)}
           onSave={async (h) => {
-            const res = await fetch('/api/me/horario', {
-              method:  'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body:    JSON.stringify({ horario: h }),
-            })
-            if (res.ok) {
-              // El horario vive ya en el agregado: se escribe su rebanada en
-              // el cache en vez de en un estado local paralelo.
-              mutarConfig(c => c ? { ...c, horario: h } : c, { revalidate: false })
-              setHorarioOpen(false)
-              toast.success('Horario actualizado')
-            } else {
+            try {
+              const res = await fetch('/api/me/horario', {
+                method:  'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ horario: h }),
+              })
+              if (res.ok) {
+                // El horario vive ya en el agregado: se escribe su rebanada en
+                // el cache en vez de en un estado local paralelo.
+                mutarConfig(c => c ? { ...c, horario: h } : c, { revalidate: false })
+                setHorarioOpen(false)
+                toast.success('Horario actualizado')
+              } else {
+                toast.error('No se pudo guardar el horario')
+              }
+            } catch {
+              /* El `fetch` ni siquiera llegó a responder (red caída). Para el
+                 médico es el MISMO suceso que un `!res.ok` —«no se guardó»—, así
+                 que reutiliza ese aviso en vez de estrenar uno.
+
+                 ⚠️ Y NO SE CIERRA EL MODAL, igual que en la rama de `!res.ok`:
+                 cerrarlo tiraría lo editado, que sólo vive en el estado local
+                 del modal. Dejándolo abierto puede reintentar sin volver a
+                 teclear nada. */
               toast.error('No se pudo guardar el horario')
             }
           }}

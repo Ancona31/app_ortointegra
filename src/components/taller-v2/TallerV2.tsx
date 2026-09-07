@@ -48,6 +48,18 @@ const MEDICO_FICTICIO: MedicoFicticio = {
   universidad: 'Universidad Nacional Autónoma de México',
   domicilio: 'Av. Ficticia 100, Consultorio 3, Col. Ejemplo, 06700 CDMX',
   telefono: '55 0000 0000',
+  /* ⚠️ SEIS PÍXELES DE ESTE LOGO SALEN TRANSPARENTES EN LA PREVISUALIZACIÓN, Y
+     NO ES NUESTRO DEFECTO. `@react-pdf/png-js` tiene un off-by-one en
+     `lib/png-js.js:64`: `var short = 255 - this.transparency.indexed.length`
+     debería ser `256 -`, porque una paleta tiene hasta 256 entradas. Rellena una
+     de menos, así que el índice 255 se queda sin alfa y se pinta transparente.
+     Sólo afecta a PNG indexado (colortype 3), que es lo que hoy es este icono.
+
+     Hoy son 6 píxeles de 36 864 y es cosmético, pero EL DAÑO ESCALA CON CUÁNTOS
+     PÍXELES CAIGAN EN EL ÍNDICE 255: quien recomprima los iconos y cambie el
+     cuantizador o el orden de la paleta puede mover ese número hacia arriba sin
+     tocar nada de aquí. Si un día se ve un agujero feo en el logo del PDF, mira
+     esto antes que el icono. */
   logo: '/icon-192.png',
 }
 
