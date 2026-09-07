@@ -31,6 +31,18 @@ export const CONFIG_DEDUPE_MS = 300_000
 export const CACHE_CLINICA = 'cache_clinica'
 export const CACHE_CONSULTORIOS = 'cache_consultorios'
 
+/**
+ * ⚠️ `tipo` ES `NOT NULL` EN LA BASE, Y POR ESO NO SE DECLARA ANULABLE.
+ * `supabase/baseline/02_tables.sql:154` y `:167`:
+ *   tipo text NOT NULL DEFAULT 'clinica'
+ *   CHECK (tipo = ANY (ARRAY['clinica', 'independiente']))
+ * O sea que una fila real SIEMPRE lo trae. Eso es lo que permite que quien lo
+ * lea distinga «no lo sé» de un valor: si falta, es que no hay fila —el
+ * agregado no resolvió, falló, o esto viene del cache cifrado de `secureStorage`
+ * escrito ANTES de que esta columna existiera—, nunca que la clínica no tenga
+ * tipo. No le pongas un valor por defecto aquí: destruirías esa distinción.
+ * Su consumidor es `(app)/dashboard/page.tsx`; ver allí qué hace cuando falta.
+ */
 export type ClinicaConfig = {
   id: string
   nombre: string
@@ -39,6 +51,7 @@ export type ClinicaConfig = {
   color_primario: string | null
   color_secundario: string | null
   logo_url: string | null
+  tipo?: 'clinica' | 'independiente'
 }
 
 export type DiaSemana = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo'

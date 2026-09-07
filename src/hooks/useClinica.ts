@@ -10,6 +10,7 @@ import {
   fetcherConfig,
   type ClinicaConfig,
   type ConfigApp,
+  type ErrorConfig,
 } from '@/lib/configApp'
 
 /** Re-exportado desde su nuevo sitio: el tipo se movió, el import no cambia. */
@@ -53,5 +54,18 @@ export function useClinica() {
     subtitulo:       clinica?.subtitulo        ?? null,
     logoUrl:         clinica?.logo_url         ?? null,
     isOfflineData:   !data?.clinica && !!fallback,
+    /* ⚠️ AÑADIDO PARA SEPARAR «TODAVÍA NO SÉ» DE «FALLÓ», QUE ES LO QUE
+       `clinica: null` NO PUEDE DECIR: vale null en los dos casos.
+       A quien solo pinta la marca le da igual —cae a los colores por defecto de
+       arriba y ya—, pero quien tome una DECISIÓN con estos datos necesita la
+       diferencia: sin ella, esperar a que resuelva es esperar para siempre si
+       el agregado devolvió 500. Es el mismo defecto que se corrigió en el modal
+       de horario, y la misma lección: un estado de fallo indistinguible de uno
+       legítimo acaba en un dato inventado tratado como real.
+       Es el `error` de SWR tal cual, el mismo que ya se usaba arriba para
+       decidir el respaldo sin conexión. `undefined` mientras no haya fallo.
+       ⚠️ NO ES «no hay clínica»: para eso el agregado responde 403 y ESO
+       también llega aquí como error (ver `esErrorDeSesion` en configApp.ts). */
+    error: error as ErrorConfig | undefined,
   }
 }

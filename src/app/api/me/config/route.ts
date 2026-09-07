@@ -83,10 +83,19 @@ export async function GET() {
     }
 
     const [clinicaRes, consultoriosRes, medicosRes] = await Promise.all([
-      // Los siete campos de /api/me/clinica + el horario de /api/me/horario.
+      /* Los siete campos de /api/me/clinica + el horario de /api/me/horario +
+         `tipo`.
+         ⚠️ `tipo` NO ES DE ESTE ENDPOINT NI DE LA MARCA: lo pide el dashboard,
+         que antes lo consultaba por su cuenta con un `clinicas?select=tipo`
+         propio. Aquella consulta encadenaba a la de `appointments` —medido en
+         producción: 539 ms de espera pura al final de la cascada— y pedía UNA
+         columna de esta misma fila, que aquí ya viaja entera. Pedirla aquí es
+         gratis: mismo viaje, misma fila.
+         Va en el `select` y en `ClinicaConfig` (src/lib/configApp.ts) a la vez;
+         son las dos mitades de la misma lista. */
       supabase
         .from('clinicas')
-        .select('id, nombre, nombre_display, subtitulo, color_primario, color_secundario, logo_url, horario_consulta')
+        .select('id, nombre, nombre_display, subtitulo, color_primario, color_secundario, logo_url, tipo, horario_consulta')
         .eq('id', profile.clinica_id)
         .single(),
       // Modo owner-scope de /api/consultorios: el filtrado lo hace la RLS.

@@ -13,6 +13,7 @@ import { canManageClinica } from '@/lib/permissions'
 import { formatCitaHora } from './utils'
 import { StatusChip } from './StatusChip'
 import { useConsultorios } from '@/hooks/useConsultorios'
+import { useClinica } from '@/hooks/useClinica'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 
 /* ─── Helpers ─────────────────────────────────────────────── */
@@ -121,8 +122,32 @@ export default function DashboardPage() {
   const [recientes,      setRecientes]      = useState<Reciente[]>([])
   const [totalPacientes, setTotalPacientes] = useState<number | null>(null)
   const [proximasCitas,  setProximasCitas]  = useState<ProximaCita[]>([])
-  const [clinicaTipo,    setClinicaTipo]    = useState<string>('independiente')
   const [loadingCitas,   setLoadingCitas]   = useState(true)
+
+  /* ── EL TIPO DE CLÍNICA SALE DEL AGREGADO, NO DE UNA CONSULTA PROPIA ──────
+     Aquí hubo un `clinicas?select=tipo` dentro de `fetchCitas`, y su problema
+     no era pedir de más sino ENCADENAR: la consulta de `appointments` de abajo
+     no arrancaba hasta que ésa respondía. Medido en producción (2026-09-07),
+     eran 539 ms de espera pura al final de la cascada, justo antes de que el
+     dashboard quedara completo. Y pedía UNA columna de la fila de `clinicas`
+     que `/api/me/config` ya trae entera; sólo faltaba nombrarla en su `select`.
+     El agregado además resuelve ANTES que aquella consulta en todas las trazas
+     medidas (frío 3.911 ms contra 4.438; caliente 647 contra 897).
+
+     ⚠️ `null` SIGNIFICA «NO LO SÉ», Y NO SE COACCIONA A UN VALOR REAL.
+     `clinicas.tipo` es `NOT NULL` en la base, así que toda fila trae valor: si
+     aquí falta, es que no hay fila —el agregado no ha resuelto, ha fallado, o
+     `clinica` viene del cache cifrado escrito antes de que esta columna
+     existiera—. Escribir `?? 'clinica'` o `?? 'independiente'` convertiría esas
+     tres cosas en una afirmación. No lo hagas. */
+  const { clinica, error: errorConfig } = useClinica()
+  const clinicaTipo: 'clinica' | 'independiente' | null = clinica?.tipo ?? null
+
+  /* Resuelto = ya sé la respuesta, sea cual sea; incluye el fallo. Sin esta
+     segunda mitad, un 500 del agregado dejaría la tarjeta de citas en esqueleto
+     PARA SIEMPRE, que es justo lo que el `finally` de `fetchCitas` existe para
+     impedir. `errorConfig` lo expone `useClinica`; ver la nota que hay allí. */
+  const configResuelta = clinica !== null || errorConfig !== undefined
 
   useEffect(() => {
     if (loadingProfile || profile?.role === 'secretaria') return
@@ -173,22 +198,52 @@ export default function DashboardPage() {
         // silent — si el fetch falla, recientes queda vacío y no se renderiza
       })
 
-    // Próximas citas + clinica.tipo — wrap completo en try/catch/finally
-    // para garantizar que loadingCitas siempre termine en false.
+  }, [profile, loadingProfile])
+
+  /* ── LAS PRÓXIMAS CITAS VAN EN SU PROPIO EFECTO, Y ÉSA ES LA MITAD DEL
+       ARREGLO ────────────────────────────────────────────────────────────────
+     Esto vivía dentro del efecto de arriba, detrás del `clinicas?select=tipo`
+     que se ha eliminado, así que no arrancaba hasta que aquél respondía.
+     Separarlo es lo que la desencadena: ahora sale en cuanto hay perfil Y el
+     agregado ha resuelto, o sea a la vez que `pacientes` y `consultas`, no
+     después.
+     ⚠️ TIENE QUE SER UN EFECTO APARTE. Si se dejara arriba con `clinicaTipo` en
+     las dependencias, el efecto ENTERO se repetiría al llegar el agregado y
+     volverían a pedirse el contador de expedientes y las consultas recientes.
+     Wrap completo en try/catch/finally para garantizar que `loadingCitas`
+     siempre termine en false. */
+  useEffect(() => {
+    if (loadingProfile || profile?.role === 'secretaria') return
+
+    /* ⚠️ ESPERA A QUE EL AGREGADO RESUELVA, PERO NO A QUE TENGA ÉXITO.
+       `configResuelta` es cierto también cuando el agregado falló; ahí
+       `clinicaTipo` es null y abajo se resuelve hacia `limit(1)`. Si esto
+       exigiera datos buenos, un 500 dejaría la tarjeta en esqueleto para
+       siempre — el fallo que el `finally` de abajo existe para impedir. */
+    if (!configResuelta) return
+
+    const supabase = createClient()
+
     async function fetchCitas() {
       try {
         if (!profile?.clinica_id) return
 
-        const { data: clinicaData } = await supabase
-          .from('clinicas')
-          .select('tipo')
-          .eq('id', profile.clinica_id)
-          .single()
+        /* ⚠️ TIPO DESCONOCIDO ⇒ NO ES ADMIN DE CLÍNICA. NO ES UN DESCUIDO.
+           `clinicaTipo` es `null` cuando el agregado falló o vino del cache
+           viejo, y aquí eso se resuelve hacia `limit(1)` y tarjeta simple: se
+           enseña de MENOS, nunca de más. Lo contrario —suponer `'clinica'`—
+           pediría cuatro citas y pintaría la tarjeta de lista a quien quizá no
+           lo es.
 
-        const tipo = clinicaData?.tipo ?? 'independiente'
-        setClinicaTipo(tipo)
-
-        const isClinicaAdmin = canManageClinica(profile) && tipo === 'clinica'
+           ⚠️ Y ESTO CONSERVA EL COMPORTAMIENTO QUE YA HABÍA, aunque el código
+           viejo pareciera decir otra cosa. Su fallback era `?? 'independiente'`,
+           que es EL CONTRARIO DEL DEFAULT DE LA BASE (`'clinica'`,
+           `supabase/baseline/02_tables.sql:154`). Parece un descuido y es
+           deliberado: falla hacia el lado seguro. NO LO «ARREGLES» PARA
+           ALINEARLO CON LA BASE — alinearlo daría cuatro citas a quien no las
+           debe ver cuando la consulta falla, que es exactamente el caso que
+           este fallback cubre. */
+        const isClinicaAdmin = canManageClinica(profile) && clinicaTipo === 'clinica'
 
         /* SÓLO CITAS DE PACIENTE, NUNCA EVENTOS GENÉRICOS. Es la misma regla
            que `esEventoGenerico` (agenda/page.tsx:392) —la fila sin paciente es
@@ -223,7 +278,7 @@ export default function DashboardPage() {
     }
 
     void fetchCitas()
-  }, [profile, loadingProfile])
+  }, [profile, loadingProfile, clinicaTipo, configResuelta])
 
   if (loadingProfile) return <DashboardSkeleton />
   if (profile?.role === 'secretaria') return <AsistenteDashboard />
