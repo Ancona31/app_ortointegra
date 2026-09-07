@@ -3902,4 +3902,153 @@ puesto (`paciente_id is null` en vez de `not null`).
 
 ---
 
+## Husos horarios — los dos apaños que quedaron sin cablear
+
+Origen: el inventario de husos del 2026-09-07, hecho sobre `feature/rendimiento-cierre`
+para averiguar si Spinus tenía un defecto de multi-tenant por zona horaria. **No lo
+tiene.** El defecto real existió, se corrigió en agosto de 2026 y lo que sigue son los
+dos únicos sitios que aquel trabajo dejó anotados en el código y sin arreglar.
+
+Las dos entradas viven hoy como comentarios largos dentro de sus propios archivos, y el
+comentario sólo lo lee quien ya abrió el archivo. Eso es lo que esta sección corrige.
+
+### TZ-DT-1 — La medición de laboratorio se guarda con el huso del Centro, no con el de quien la teclea
+
+**Estado:** 🟡 abierta, menor · **Archivo:**
+`src/app/api/labs/mediciones/route.ts:95`
+**Detectado:** commit B de husos, agosto de 2026. Anotado en el propio archivo
+(`:81-94`) y registrado aquí el 2026-09-07.
+**Impacto:** una hora, y sólo fuera del Centro.
+
+**El caso concreto**
+
+`input.fecha` e `input.hora` son **hora de pared**: el médico tecleó «las 9:00» en
+`ModalAgregarMedicion`. El huso que corresponde para convertirlas a instante es el de
+**su dispositivo**, y la línea usa `TZ_CLINICA`:
+
+```ts
+const medidoEn = fechaHoraLocalAInstante(input.fecha, input.hora, TZ_CLINICA)
+```
+
+En Sonora (`America/Hermosillo`, UTC-7 todo el año) la medición queda guardada una hora
+tarde. En el Centro coincide, que es exactamente por lo que esto puede vivir años sin
+que nadie lo reporte.
+
+**Lo que NO es**
+
+**No es el bug de husos de agosto de 2026.** Aquél era otra cosa: `hoyEnTZ`,
+`fechaHoraLocalAInstante` y `renderEnTZ` llevaban `TZ_CLINICA` como **valor por
+defecto**, así que todo llamador que omitía el huso obtenía hora del Centro en silencio,
+con código que parecía consciente del huso y no lo era. Se corrigió quitando el default
+y auditando los ~20 llamadores uno por uno; la red que impide la regresión no es un test,
+es `tsc` (ver la cabecera de `src/lib/dates.ts:21-46`). Esta línea es lo contrario de
+aquello: el huso está escrito, se ve, y por eso se puede discutir.
+
+**No pide cambio de esquema.** El dato de zona ya existe y ya se lee en producción:
+`consultorios.timezone` es `text NOT NULL`
+(`supabase/migrations/20260615_consultorios_01_table.sql:30`), y los snapshots inmutables
+`appointments.consultorio_timezone` y `consultas.consultorio_timezone` se congelan al
+crear la fila (`20260615_consultorios_04_snapshot.sql`). No falta ninguna columna.
+
+**Por qué no se cableó, y sigue siendo la razón**
+
+El huso no viaja por el cable. Haría falta un campo nuevo en **las tres variantes** de
+`CrearMedicionSchema`, mandarlo desde el modal y validarlo aquí contra
+`Intl.supportedValuesOf('timeZone')`. Cinco archivos y una validación nueva, para un dato
+que no es una hora de cita. **Lo caro no es el huso: es propagarlo desde el cliente hasta
+el esquema de validación.**
+
+**Familia.** Va con **TZ-DT-2**, que es el mismo apaño en otro sitio y con el mismo
+motivo; si se ataca uno, se atacan los dos, porque la pieza que hay que construir —mandar
+el huso del dispositivo desde el cliente y validarlo en el servidor— es la misma. Con
+**AG-DT-3** comparte tema y no causa: aquélla es de convenio de escritura del `all_day`.
+
+> ### ⚠️ LOS TRES `America/Mexico_City` QUE QUEDAN EN CÓDIGO DE PRODUCCIÓN SON
+> ### DELIBERADOS. NO SON DEUDA Y NO HAY QUE «LIMPIARLOS».
+>
+> Esta advertencia está aquí porque el inventario del 2026-09-07 empezó dando por hecho
+> que esos tres literales eran el defecto, y no lo son. Quien venga detrás los va a ver
+> y va a pensar lo mismo.
+>
+> - **`src/lib/dates.ts:69` — `TZ_CLINICA`.** Es la política de producto de que un
+>   **documento clínico lleva la fecha de la clínica** y no cambia según quién lo abra.
+>   Está escrita en LA REGLA de la cabecera del módulo (`dates.ts:10-18`) y la aplican
+>   los ocho formularios de documentos, `notaRenderData.ts:65` y `hojaFrontalData.ts:155`.
+>   Cambiarla es una decisión de producto, no una corrección.
+> - **`src/lib/gcal.ts:43` — `GCAL_TIMEZONE`.** Tiene **un solo consumidor**,
+>   `crearCalendarioSpinus` (`gcal.ts:369`), y ahí sólo fija la zona de visualización de
+>   la **cuadrícula** del calendario que Spinus crea en la cuenta de Google del médico.
+>   **Cada cita ya viaja con el huso de su consultorio** desde
+>   `appointments.consultorio_timezone` (`api/appointments/route.ts:516` y
+>   `api/appointments/[id]/route.ts:657,783`). El calendario se crea una vez por clínica
+>   y una clínica puede tener consultorios en husos distintos, así que no hay zona mejor
+>   que elegir: tomar la del primer consultorio sería igual de arbitrario, con la
+>   desventaja de **parecer** una decisión informada. El propio archivo lo explica en
+>   `gcal.ts:352-368`. Hasta agosto de 2026 esta constante sí etiquetaba los eventos, y
+>   por eso las invitaciones de una cita en Hermosillo decían «hora estándar central»;
+>   **ese defecto ya está cerrado.**
+> - **`src/app/r/[folio]/page.tsx:258`.** Es la **rama de respaldo** de `fechaDeEmision`:
+>   formatea `created_at` de la fila sólo cuando el documento no trae fecha ISO dentro de
+>   `contenido`. El camino normal (`:254-256`) es agnóstico de huso a propósito. Además
+>   esa página no muestra ninguna cita —verifica un **documento**, y `documentos` no tiene
+>   columnas de snapshot de consultorio—, así que le aplica la política de documento
+>   clínico del primer punto.
+>
+> La regla corta, para no repetir la investigación: **`TZ_CLINICA` en un documento
+> clínico es correcto; en una hora de cita sería el defecto.** Lo que hay que auditar no
+> es el literal, es qué clase de dato tiene delante.
+
+---
+
+### TZ-DT-2 — Los bordes del filtro de fechas del expediente se calculan en el Centro
+
+**Estado:** 🟡 abierta, menor · **Archivo:**
+`src/app/api/expediente/listar/route.ts:97,104`
+**Detectado:** commit B de husos, agosto de 2026. Anotado en el propio archivo
+(`:79-94`) y registrado aquí el 2026-09-07.
+**Impacto:** una hora en los dos extremos de la ventana, y sólo fuera del Centro.
+
+**El caso concreto**
+
+`desde` y `hasta` son fechas-solo que el médico eligió en el sheet de filtros, así que
+los bordes de la ventana —«el día 1 entero», «hasta acabar el día 15»— son los de **su
+dispositivo**. Las dos conversiones usan `TZ_CLINICA`:
+
+```ts
+p_fecha_desde = fechaHoraLocalAInstante(desdeRaw, '00:00', TZ_CLINICA)
+p_fecha_hasta = fechaHoraLocalAInstante(desplazarFecha(hastaRaw, { dias: 1 }), '00:00', TZ_CLINICA)
+```
+
+En Sonora la ventana sale corrida una hora por los dos extremos, y **un paciente creado
+en la última hora del día cae fuera del filtro**. No hay error, no hay hueco visible: el
+paciente simplemente no está en la lista.
+
+**Lo que NO es**
+
+**No es el bug de husos de agosto de 2026** — ver la explicación en TZ-DT-1: aquél fue el
+valor por defecto de `hoyEnTZ`, `fechaHoraLocalAInstante` y `renderEnTZ` en
+`src/lib/dates.ts`, y se cerró quitándolo y auditando sus llamadores.
+
+**No pide cambio de esquema.** `consultorios.timezone` ya existe y los snapshots de
+`appointments` y `consultas` también; ver TZ-DT-1 para las referencias exactas. Lo que
+falta no es una columna.
+
+**Por qué no se cableó**
+
+Igual que TZ-DT-1: el huso no viaja por el cable. Haría falta un campo nuevo en
+`ParamsListaExpediente`, mandarlo desde `fetchPacientes.ts` y validarlo aquí contra
+`Intl.supportedValuesOf('timeZone')`.
+
+**Y aquí la validación no es opcional, que es lo que lo hace peor que en TZ-DT-1.** Las
+dos conversiones van envueltas en `try/catch` que caen a `null`, así que un IANA sin
+validar **no revienta: apaga el filtro entero en silencio**. Un filtro que deja de
+filtrar sin decirlo es peor defecto que la hora corrida que se venía a arreglar.
+
+**Familia.** Va con **TZ-DT-1**: mismo apaño, mismo motivo y misma pieza pendiente. La
+advertencia sobre los tres `America/Mexico_City` deliberados que quedan en producción
+—`dates.ts:69`, `gcal.ts:43` y `r/[folio]/page.tsx:258`— está al final de TZ-DT-1 y
+**aplica igual a esta entrada**: léela antes de tocar ningún literal de zona horaria.
+
+---
+
 (Fin del registro actual. Nuevas etapas se añaden como secciones ## debajo.)
